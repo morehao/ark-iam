@@ -1,0 +1,69 @@
+server:
+  name: iam
+  port: 8099
+  env: prod
+
+log:
+  default:
+    service: iam
+    module: default
+    level: info
+    writer: file
+    dir: ../../../log
+    enable_otel_trace: true
+    extra_keys:
+      - requestId
+  gorm:
+    service: iam
+    module: gorm
+    level: info
+    writer: file
+    dir: ../../../log
+    enable_otel_trace: true
+    extra_keys:
+      - requestId
+  redis:
+    service: iam
+    module: redis
+    level: info
+    writer: file
+    dir: ../../../log
+    enable_otel_trace: true
+    extra_keys:
+      - requestId
+  es:
+    service: iam
+    module: es
+    level: info
+    writer: file
+    dir: ../../../log
+    enable_otel_trace: true
+    extra_keys:
+      - requestId
+
+trace:
+  enable: true
+  service_version: ""
+  sampler: traceidratio
+  trace_id_ratio: 0.2
+  otlp:
+    endpoint: ""
+    insecure: false
+    timeout: 10s
+
+db_configs:
+  - url: "mysql://root:123456@host.docker.internal:3306/practice?charset=utf8mb4&parseTime=True&loc=Local&timeout=5s&readTimeout=3s&writeTimeout=3s"
+    service: iam
+
+redis_config:
+  service: iam
+  addr: 127.0.0.1:6379
+  password: 123456
+  db: 0
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
+
+es_configs:
+  - service: iam
+    addr: http://host.docker.internal:9200

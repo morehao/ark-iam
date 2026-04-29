@@ -1,0 +1,9 @@
+.idea
+.vscode/*
+!.vscode/launch.json
+.DS_Store
+.history
+
+**/log/**
+output/*
+.opencode/*

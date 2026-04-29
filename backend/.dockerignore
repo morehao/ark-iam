@@ -1,0 +1,7 @@
+.idea
+.DS_Store
+.git
+
+internal/apps/internal/genCode/*
+internal/apps/internal/resource/*
+log/*
