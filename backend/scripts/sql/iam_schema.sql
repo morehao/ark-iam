@@ -2,7 +2,7 @@ CREATE DATABASE iam
 CHARACTER SET utf8mb4
 COLLATE utf8mb4_0900_ai_ci;
 
-CREATE TABLE `tenants`
+CREATE TABLE `tenant`
 (
     `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '租户ID',
     `name`          VARCHAR(128) NOT NULL DEFAULT '' COMMENT '租户名称',
@@ -18,7 +18,7 @@ CREATE TABLE `tenants`
     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='租户表';
 
-CREATE TABLE `systems`
+CREATE TABLE `system`
 (
     `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
     `tenant_id`     BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -35,7 +35,7 @@ CREATE TABLE `systems`
     KEY             `idx_key` (`key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='系统配置表';
 
-CREATE TABLE `users`
+CREATE TABLE `user`
 (
     `id`                    BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '用户ID',
     `tenant_id`             BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -67,7 +67,7 @@ CREATE TABLE `users`
     KEY                     `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户表';
 
-CREATE TABLE `user_login_logs`
+CREATE TABLE `user_login_log`
 (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
     `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -88,7 +88,7 @@ CREATE TABLE `user_login_logs`
     KEY              `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户登录日志表';
 
-CREATE TABLE `user_identities`
+CREATE TABLE `user_identity`
 (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
     `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -109,7 +109,7 @@ CREATE TABLE `user_identities`
     KEY              `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户身份表';
 
-CREATE TABLE `departments`
+CREATE TABLE `department`
 (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '部门ID',
     `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -130,7 +130,7 @@ CREATE TABLE `departments`
     KEY              `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='部门表';
 
-CREATE TABLE `user_department_relations`
+CREATE TABLE `user_department_relation`
 (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
     `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -151,7 +151,7 @@ CREATE TABLE `user_department_relations`
     KEY              `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户部门关系表';
 
-CREATE TABLE `applications`
+CREATE TABLE `application`
 (
     `id`                   BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '应用ID',
     `tenant_id`            BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -175,7 +175,7 @@ CREATE TABLE `applications`
     KEY                    `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='应用表';
 
-CREATE TABLE `application_secrets`
+CREATE TABLE `application_secret`
 (
     `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
     `tenant_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -195,7 +195,7 @@ CREATE TABLE `application_secrets`
     KEY               `idx_tenant_app_name` (`tenant_id`, `application_id`, `name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='应用密钥表';
 
-CREATE TABLE `resources`
+CREATE TABLE `resource`
 (
     `id`                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '资源ID',
     `tenant_id`           BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -215,7 +215,7 @@ CREATE TABLE `resources`
     KEY                   `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='资源表';
 
-CREATE TABLE `scopes`
+CREATE TABLE `scope`
 (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '权限ID',
     `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -235,7 +235,7 @@ CREATE TABLE `scopes`
     KEY              `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='权限范围表';
 
-CREATE TABLE `roles`
+CREATE TABLE `role`
 (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '角色ID',
     `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -258,7 +258,7 @@ CREATE TABLE `roles`
     KEY              `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='角色表';
 
-CREATE TABLE `role_scopes`
+CREATE TABLE `role_scope`
 (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
     `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -277,7 +277,7 @@ CREATE TABLE `role_scopes`
     KEY              `idx_tenant_role_scope` (`tenant_id`, `role_id`, `scope_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='角色权限关联表';
 
-CREATE TABLE `users_roles`
+CREATE TABLE `user_role`
 (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
     `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -296,7 +296,7 @@ CREATE TABLE `users_roles`
     KEY              `idx_tenant_user_role` (`tenant_id`, `user_id`, `role_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户角色关联表';
 
-CREATE TABLE `applications_roles`
+CREATE TABLE `application_role`
 (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
     `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -315,7 +315,7 @@ CREATE TABLE `applications_roles`
     KEY              `idx_tenant_app_role` (`tenant_id`, `application_id`, `role_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='应用角色关联表';
 
-CREATE TABLE `organizations`
+CREATE TABLE `organization`
 (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '组织ID',
     `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -334,7 +334,7 @@ CREATE TABLE `organizations`
     KEY              `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='组织表';
 
-CREATE TABLE `organization_roles`
+CREATE TABLE `organization_role`
 (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '组织角色ID',
     `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -355,7 +355,7 @@ CREATE TABLE `organization_roles`
     KEY              `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='组织角色表';
 
-CREATE TABLE `organization_user_relations`
+CREATE TABLE `organization_user_relation`
 (
     `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
     `tenant_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -374,7 +374,7 @@ CREATE TABLE `organization_user_relations`
     KEY               `idx_tenant_org_user` (`tenant_id`, `organization_id`, `user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='组织用户关系表';
 
-CREATE TABLE `organization_role_user_relations`
+CREATE TABLE `organization_role_user_relation`
 (
     `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
     `tenant_id`         BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -393,7 +393,7 @@ CREATE TABLE `organization_role_user_relations`
     KEY                 `idx_tenant_org_role_user` (`tenant_id`, `organization_id`, `organization_role_id`, `user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='组织角色用户关系表';
 
-CREATE TABLE `menus`
+CREATE TABLE `menu`
 (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '菜单ID',
     `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -423,7 +423,7 @@ CREATE TABLE `menus`
     KEY              `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='菜单表';
 
-CREATE TABLE `role_menus`
+CREATE TABLE `role_menu`
 (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
     `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -442,7 +442,7 @@ CREATE TABLE `role_menus`
     KEY              `idx_tenant_role_menu` (`tenant_id`, `role_id`, `menu_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='角色菜单关联表';
 
-CREATE TABLE `connectors`
+CREATE TABLE `connector`
 (
     `id`                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '连接器ID',
     `tenant_id`          BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -462,7 +462,7 @@ CREATE TABLE `connectors`
     KEY                  `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='连接器表';
 
-CREATE TABLE `sso_connectors`
+CREATE TABLE `sso_connector`
 (
     `id`                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'SSO连接器ID',
     `tenant_id`          BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -485,13 +485,14 @@ CREATE TABLE `sso_connectors`
     KEY                  `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='SSO连接器表';
 
-CREATE TABLE `logs`
+CREATE TABLE `log`
 (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '日志ID',
     `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
     `key`            VARCHAR(128) NOT NULL DEFAULT '' COMMENT '日志键',
     `payload`        JSON NOT NULL DEFAULT ('{}') COMMENT '日志内容',
     `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `deleted_at`     DATETIME DEFAULT NULL COMMENT '删除时间',
     PRIMARY KEY (`id`),
     KEY              `idx_tenant_id` (`tenant_id`),
