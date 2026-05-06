@@ -1,15 +1,15 @@
-database_dsn: mysql://root:123456@tcp(127.0.0.1:3306)/ark_iam?charset=utf8mb4&parseTime=True&loc=Local
+database_dsn: mysql://root:123456@tcp(127.0.0.1:3306)/iam?charset=utf8mb4&parseTime=True&loc=Local
 service_name: iam
 module:
-  package_name: org
-  description: 应用管理
-  table_name: chat_agent_version
-  table_prefix: chat_
+  package_name: tenant
+  description: 租户管理
+  table_name: tenant
+  table_prefix: iam_
 model:
-  package_name: org
+  package_name: tenant
   description: 租户应用关系
-  table_name: chat_agent
-  table_prefix: chat_
+  table_name: tenant_agent
+  table_prefix: iam_
 api:
   package_name: user
   target_filename: user_login_log.go
