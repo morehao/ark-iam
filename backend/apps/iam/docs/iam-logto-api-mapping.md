@@ -241,7 +241,181 @@
 
 ---
 
+## 15. 补充：文档缺失的 Logto API（按模块）
+
+> 说明：以下接口来自 Logto `packages/core/src/routes/**/*.openapi.json`，为本对照文档中原先未覆盖或覆盖不完整的接口。  
+> 映射状态说明：`❌ 待映射` 表示 IAM 文档中暂无对应接口；`⚠️ 部分覆盖` 表示已有部分能力但未完整覆盖该组接口。
+
+### 15.1 用户扩展接口（User Extended）
+
+| Logto 路径 | 方法 | 功能 | 映射状态 |
+|------------|------|------|---------|
+| `/api/users/{userId}/logto-configs` | GET/PATCH | 用户 Logto 配置（MFA、passkey 状态） | ❌ 待映射 |
+| `/api/users/{userId}/profile` | PATCH | 更新用户 profile | ❌ 待映射 |
+| `/api/users/{userId}/sessions/{sessionId}` | GET/DELETE | 会话详情/会话撤销 | ❌ 待映射 |
+| `/api/users/{userId}/mfa-verifications/{verificationId}` | DELETE | 删除指定 MFA 验证 | ❌ 待映射 |
+
+### 15.2 应用扩展接口（Application Extended）
+
+| Logto 路径 | 方法 | 功能 | 映射状态 |
+|------------|------|------|---------|
+| `/api/applications/{id}/legacy-secret` | DELETE | 删除应用 legacy secret | ❌ 待映射 |
+| `/api/applications/{id}/secrets/{name}` | PATCH | 更新指定应用 secret | ❌ 待映射 |
+| `/api/applications/{id}/secrets/{name}` | DELETE | 删除指定应用 secret | ❌ 待映射 |
+| `/api/applications/{id}/custom-data` | GET/PATCH | 应用自定义数据 | ❌ 待映射 |
+| `/api/applications/{id}/organizations` | GET/POST/PUT/DELETE | 应用-组织关系 | ❌ 待映射 |
+| `/api/applications/{id}/users/{userId}/consent-organizations` | GET/POST/PUT/DELETE | 用户对应用的组织授权 | ❌ 待映射 |
+| `/api/applications/{applicationId}/user-consent-scopes` | GET/POST | 应用用户同意作用域 | ❌ 待映射 |
+| `/api/applications/{applicationId}/user-consent-scopes/{scopeType}/{scopeId}` | DELETE | 删除应用用户同意作用域 | ❌ 待映射 |
+| `/api/applications/{id}/protected-app-metadata/custom-domains` | GET/POST | 应用自定义域名 | ❌ 待映射 |
+| `/api/applications/{id}/protected-app-metadata/custom-domains/{domain}` | DELETE | 删除应用自定义域名 | ❌ 待映射 |
+
+### 15.3 组织扩展接口（Organization Extended）
+
+| Logto 路径 | 方法 | 功能 | 映射状态 |
+|------------|------|------|---------|
+| `/api/organizations/{id}/applications` | GET/POST/PUT/DELETE | 组织应用管理 | ❌ 待映射 |
+| `/api/organizations/{id}/applications/roles` | POST | 批量给组织内应用分配角色 | ❌ 待映射 |
+| `/api/organizations/{id}/applications/{applicationId}/roles` | GET/POST/PUT | 组织内应用角色管理 | ❌ 待映射 |
+| `/api/organizations/{id}/applications/{applicationId}/roles/{organizationRoleId}` | DELETE | 移除组织内应用角色 | ❌ 待映射 |
+| `/api/organizations/{id}/jit/email-domains` | GET/POST/PUT | JIT 邮箱域名配置 | ❌ 待映射 |
+| `/api/organizations/{id}/jit/email-domains/{emailDomain}` | DELETE | 删除 JIT 邮箱域名 | ❌ 待映射 |
+| `/api/organizations/{id}/jit/sso-connectors` | GET/POST/PUT | JIT SSO 连接器配置 | ❌ 待映射 |
+| `/api/organizations/{id}/jit/sso-connectors/{ssoConnectorId}` | DELETE | 删除 JIT SSO 连接器 | ❌ 待映射 |
+| `/api/organizations/{id}/users/{userId}/scopes` | GET | 获取组织内用户 scopes | ❌ 待映射 |
+
+### 15.4 组织权限模型补充（Org Scope / Org Invitation）
+
+| Logto 路径 | 方法 | 功能 | 映射状态 |
+|------------|------|------|---------|
+| `/api/organization-scopes` | GET/POST | 组织级 scope 管理 | ❌ 待映射 |
+| `/api/organization-scopes/{id}` | GET/PATCH/DELETE | 组织级 scope 详情/更新/删除 | ❌ 待映射 |
+| `/api/organization-invitations` | GET/POST | 组织邀请管理 | ❌ 待映射 |
+| `/api/organization-invitations/{id}` | GET/DELETE | 组织邀请详情/删除 | ❌ 待映射 |
+| `/api/organization-invitations/{id}/status` | PUT | 更新邀请状态 | ❌ 待映射 |
+| `/api/organization-invitations/{id}/message` | POST | 重发邀请消息 | ❌ 待映射 |
+
+### 15.5 登录体验与交互流（Sign-in Experience / Experience）
+
+| Logto 路径 | 方法 | 功能 | 映射状态 |
+|------------|------|------|---------|
+| `/api/sign-in-exp` | GET/PATCH | 默认登录体验配置 | ❌ 待映射 |
+| `/api/sign-in-exp/default/check-password` | POST | 密码策略检查 | ❌ 待映射 |
+| `/api/sign-in-exp/default/custom-ui-assets` | POST | 上传自定义登录 UI 资源 | ❌ 待映射 |
+| `/api/experience/interaction-event` | PUT | 更新交互事件 | ❌ 待映射 |
+| `/api/experience/identification` | POST | 交互流用户识别 | ❌ 待映射 |
+| `/api/experience/interaction` | GET | 获取交互公开数据 | ❌ 待映射 |
+| `/api/experience/sso-connectors` | GET | 按邮箱域名匹配可用 SSO 连接器 | ❌ 待映射 |
+
+### 15.6 验证与认证增强（Verification / Authn）
+
+| Logto 路径 | 方法 | 功能 | 映射状态 |
+|------------|------|------|---------|
+| `/api/verifications/password` | POST | 密码验证记录 | ❌ 待映射 |
+| `/api/verifications/verification-code` | POST | 发起验证码验证 | ❌ 待映射 |
+| `/api/verifications/verification-code/verify` | POST | 校验验证码 | ❌ 待映射 |
+| `/api/verifications/social` | POST | 发起社交验证 | ❌ 待映射 |
+| `/api/verifications/social/verify` | POST | 社交验证回调校验 | ❌ 待映射 |
+| `/api/verifications/web-authn/registration` | POST | 发起 WebAuthn 注册 | ❌ 待映射 |
+| `/api/verifications/web-authn/registration/verify` | POST | 校验 WebAuthn 注册 | ❌ 待映射 |
+| `/api/authn/hasura` | GET | Hasura Auth Hook | ❌ 待映射 |
+| `/api/authn/single-sign-on/saml/{connectorId}` | POST | SAML SSO ACS 端点 | ❌ 待映射 |
+
+### 15.7 密钥与租户配置（Configs / Keys / JWT）
+
+| Logto 路径 | 方法 | 功能 | 映射状态 |
+|------------|------|------|---------|
+| `/api/configs/admin-console` | GET/PATCH | 控制台全局配置 | ❌ 待映射 |
+| `/api/configs/oidc/{keyType}` | GET | OIDC 密钥列表 | ❌ 待映射 |
+| `/api/configs/oidc/{keyType}/{keyId}` | DELETE | 删除 OIDC 密钥 | ❌ 待映射 |
+| `/api/configs/oidc/{keyType}/rotate` | POST | 轮换 OIDC 密钥 | ❌ 待映射 |
+| `/api/configs/oidc/session` | GET/PATCH | OIDC 会话配置 | ❌ 待映射 |
+| `/api/configs/jwt-customizer` | GET | JWT 自定义脚本列表 | ❌ 待映射 |
+| `/api/configs/jwt-customizer/{tokenTypePath}` | GET/PUT/PATCH/DELETE | JWT 自定义脚本管理 | ❌ 待映射 |
+| `/api/configs/jwt-customizer/test` | POST | JWT 自定义脚本测试 | ❌ 待映射 |
+| `/api/configs/id-token` | GET/PUT | ID Token 扩展 claims 配置 | ❌ 待映射 |
+
+### 15.8 连接器生态补充（Connector / SSO Connector）
+
+| Logto 路径 | 方法 | 功能 | 映射状态 |
+|------------|------|------|---------|
+| `/api/connector-factories` | GET | 连接器工厂列表 | ❌ 待映射 |
+| `/api/connector-factories/{id}` | GET | 连接器工厂详情 | ❌ 待映射 |
+| `/api/captcha-provider` | GET/PUT/DELETE | Captcha 提供商配置 | ❌ 待映射 |
+| `/api/sso-connectors/{id}/idp-initiated-auth-config` | GET/PUT/DELETE | IdP 发起登录配置 | ❌ 待映射 |
+
+### 15.9 SAML 应用（SAML Application）
+
+| Logto 路径 | 方法 | 功能 | 映射状态 |
+|------------|------|------|---------|
+| `/api/saml-applications` | POST | 创建 SAML 应用 | ❌ 待映射 |
+| `/api/saml-applications/{id}` | GET/PATCH/DELETE | SAML 应用管理 | ❌ 待映射 |
+| `/api/saml-applications/{id}/metadata` | GET | 获取 SAML 元数据 | ❌ 待映射 |
+| `/api/saml-applications/{id}/secrets` | GET/POST | SAML 证书管理 | ❌ 待映射 |
+| `/api/saml-applications/{id}/secrets/{secretId}` | PATCH/DELETE | 更新/删除 SAML 证书 | ❌ 待映射 |
+| `/api/saml-applications/{id}/callback` | GET | SAML 应用回调 | ❌ 待映射 |
+| `/api/saml/{id}/authn` | GET/POST | SAML Authn 请求处理 | ❌ 待映射 |
+
+### 15.10 运维与内容管理（Hook / Domain / Template / Phrase / Profile）
+
+| Logto 路径 | 方法 | 功能 | 映射状态 |
+|------------|------|------|---------|
+| `/api/hooks` | GET/POST | Webhook 管理 | ❌ 待映射 |
+| `/api/hooks/{id}` | GET/PATCH/DELETE | Webhook 详情/更新/删除 | ❌ 待映射 |
+| `/api/hooks/{id}/recent-logs` | GET | Webhook 最近日志 | ❌ 待映射 |
+| `/api/hooks/{id}/test` | POST | Webhook 测试触发 | ❌ 待映射 |
+| `/api/hooks/{id}/signing-key` | PATCH | Webhook 签名密钥更新 | ❌ 待映射 |
+| `/api/domains` | GET/POST | 自定义域名管理 | ❌ 待映射 |
+| `/api/domains/{id}` | GET/DELETE | 域名详情/删除 | ❌ 待映射 |
+| `/api/domains/cleanup` | POST | 清理过期域名 | ❌ 待映射 |
+| `/api/email-templates` | GET/PUT/DELETE | 邮件模板管理 | ❌ 待映射 |
+| `/api/email-templates/{id}` | GET/DELETE | 邮件模板详情/删除 | ❌ 待映射 |
+| `/api/email-templates/{id}/details` | PATCH | 邮件模板详情更新 | ❌ 待映射 |
+| `/api/custom-phrases` | GET | 全量短语包 | ❌ 待映射 |
+| `/api/custom-phrases/{languageTag}` | GET/PUT/DELETE | 多语言短语管理 | ❌ 待映射 |
+| `/api/custom-profile-fields` | GET/POST | 自定义资料字段管理 | ❌ 待映射 |
+| `/api/custom-profile-fields/batch` | POST | 批量创建自定义字段 | ❌ 待映射 |
+| `/api/custom-profile-fields/{name}` | GET/PUT/DELETE | 自定义字段详情/更新/删除 | ❌ 待映射 |
+| `/api/custom-profile-fields/properties/sie-order` | POST | 自定义字段显示顺序配置 | ❌ 待映射 |
+
+### 15.11 账户中心与用户自服务（My Account）
+
+| Logto 路径 | 方法 | 功能 | 映射状态 |
+|------------|------|------|---------|
+| `/api/my-account` | GET/PATCH | 当前用户账户资料 | ⚠️ 部分覆盖 |
+| `/api/my-account/identities` | GET/POST | 当前用户身份绑定管理 | ❌ 待映射 |
+| `/api/my-account/identities/{target}` | GET/PUT/DELETE | 当前用户单一身份管理 | ❌ 待映射 |
+| `/api/my-account/sessions` | GET | 当前用户会话列表 | ❌ 待映射 |
+| `/api/my-account/sessions/{sessionId}` | DELETE | 当前用户会话撤销 | ⚠️ 部分覆盖 |
+| `/api/my-account/mfa-verifications` | GET/POST | 当前用户 MFA 验证管理 | ❌ 待映射 |
+
+### 15.12 其他平台接口（System / Dashboard / Token / Asset / Meta）
+
+| Logto 路径 | 方法 | 功能 | 映射状态 |
+|------------|------|------|---------|
+| `/api/dashboard/users/total` | GET | 用户总数统计 | ❌ 待映射 |
+| `/api/dashboard/users/new` | GET | 新增用户统计 | ❌ 待映射 |
+| `/api/dashboard/users/active` | GET | 活跃用户统计 | ❌ 待映射 |
+| `/api/one-time-tokens` | GET/POST | 一次性令牌管理 | ❌ 待映射 |
+| `/api/one-time-tokens/{id}` | GET/DELETE | 一次性令牌详情/删除 | ❌ 待映射 |
+| `/api/one-time-tokens/verify` | POST | 一次性令牌校验 | ❌ 待映射 |
+| `/api/one-time-tokens/{id}/status` | PUT | 一次性令牌状态更新 | ❌ 待映射 |
+| `/api/subject-tokens` | POST | Subject token 创建 | ❌ 待映射 |
+| `/api/user-assets/service-status` | GET | 用户资产服务状态 | ❌ 待映射 |
+| `/api/user-assets` | POST | 用户资产上传 | ❌ 待映射 |
+| `/api/secrets/{id}` | DELETE | 通用 secret 删除 | ❌ 待映射 |
+| `/api/sentinel-activities/delete` | POST | 安全活动批量删除 | ❌ 待映射 |
+| `/api/status` | GET | 服务健康检查 | ❌ 待映射 |
+| `/api/swagger.json` | GET | API 文档 JSON | ❌ 待映射 |
+| `/api/.well-known/management.openapi.json` | GET | Management API OpenAPI 文档 | ❌ 待映射 |
+| `/api/.well-known/experience.openapi.json` | GET | Experience API OpenAPI 文档 | ❌ 待映射 |
+| `/api/.well-known/user.openapi.json` | GET | User API OpenAPI 文档 | ❌ 待映射 |
+
+---
+
 ## 映射状态汇总
+
+> 说明：以下汇总仅统计第 1-14 章原始映射表；第 15 章为新增补充清单，暂未纳入下表统计。
 
 | 状态 | 数量 | 说明 |
 |------|------|------|
