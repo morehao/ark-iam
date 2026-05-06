@@ -168,7 +168,7 @@ swag:
 		--instanceName $(APP)
 	@echo "✅ Swagger 文档已生成：backend/apps/$(APP)/docs"
 
-CLI_VERSION := v0.1.11
+CLI_VERSION := v0.1.12
 CLI_PKG     := github.com/morehao/gocli
 
 # 代码生成（API / module / model 等）
@@ -180,8 +180,22 @@ codegen:
 		echo "   支持的命令：api, module, model"; \
 		exit 1; \
 		fi
+	@if ! command -v gocli >/dev/null 2>&1; then \
+		echo "⚠️  未检测到 gocli，正在安装 $(CLI_VERSION)..."; \
+		go install $(CLI_PKG)@$(CLI_VERSION); \
+	else \
+		INSTALLED_VER=$$(go version -m $$(which gocli) 2>/dev/null \
+			| grep -E "^\s+mod\s+$(CLI_PKG)" | awk '{print $$3}' || echo ""); \
+		echo "🔍 已安装的 gocli 版本: $$INSTALLED_VER，目标版本: $(CLI_VERSION)"; \
+		if [ "$$INSTALLED_VER" != "$(CLI_VERSION)" ]; then \
+			echo "⚠️  版本不匹配，重新安装 $(CLI_VERSION)..."; \
+			go install $(CLI_PKG)@$(CLI_VERSION); \
+		else \
+			echo "✅ gocli 版本已是最新"; \
+		fi; \
+	fi
 	@echo "🔧 开始生成代码：APP=$(APP)，COMMAND=$(COMMAND)"
-	@cd /Users/morehao/Documents/practice/go/ark-iam/backend && gocli generate $(COMMAND) -a $(APP)
+	@cd backend && gocli generate $(COMMAND) -a $(APP)
 
 # ============================================================
 # Docker

@@ -1,0 +1,78 @@
+package dtoorganization
+
+import "github.com/morehao/ark-iam/iam/object/objorganization"
+
+type OrganizationCreateResp struct {
+	OrganizationID uint `json:"organizationID"` // 组织ID
+}
+
+type OrganizationDetailResp struct {
+	OrganizationID      uint `json:"organizationID"`        // 组织ID
+	objorganization.OrganizationBaseInfo `json:"organizationBaseInfo"` // 组织基础信息
+}
+
+type OrganizationPageListResp struct {
+	List  []OrganizationPageListItem `json:"list"`  // 组织列表
+	Total int64                      `json:"total"` // 总数
+}
+
+type OrganizationPageListItem struct {
+	OrganizationID      uint `json:"organizationID"`        // 组织ID
+	objorganization.OrganizationBaseInfo `json:"organizationBaseInfo"` // 组织基础信息
+}
+
+type OrganizationRoleCreateResp struct {
+	OrganizationRoleID uint `json:"organizationRoleID"` // 组织角色ID
+}
+
+type OrganizationRoleDetailResp struct {
+	OrganizationRoleID uint `json:"organizationRoleID"`        // 组织角色ID
+	OrganizationRoleBaseInfo
+}
+
+type OrganizationRolePageListResp struct {
+	List  []OrganizationRolePageListItem `json:"list"`  // 组织角色列表
+	Total int64                          `json:"total"` // 总数
+}
+
+type OrganizationRolePageListItem struct {
+	OrganizationRoleID uint `json:"organizationRoleID"`        // 组织角色ID
+	OrganizationRoleBaseInfo
+}
+
+type OrganizationRoleBaseInfo struct {
+	TenantID       uint   `json:"tenantID" form:"tenantID"`         // 租户ID
+	OrganizationID uint   `json:"organizationID" form:"organizationID"` // 组织ID
+	Name           string `json:"name" form:"name"`                 // 角色名称
+	Description    string `json:"description" form:"description"`   // 角色描述
+	Type           string `json:"type" form:"type"`                 // 角色类型
+}
+
+type OrganizationUserRelationCreateResp struct {
+}
+
+type OrganizationUserRelationPageListResp struct {
+	List  []OrganizationUserRelationPageListItem `json:"list"`  // 组织用户关系列表
+	Total int64                                   `json:"total"` // 总数
+}
+
+type OrganizationUserRelationPageListItem struct {
+	OrganizationID uint `json:"organizationID"` // 组织ID
+	UserID         uint `json:"userID"`         // 用户ID
+	TenantID       uint `json:"tenantID"`       // 租户ID
+}
+
+type OrganizationRoleUserRelationCreateResp struct {
+}
+
+type OrganizationRoleUserRelationPageListResp struct {
+	List  []OrganizationRoleUserRelationPageListItem `json:"list"`  // 组织角色用户关系列表
+	Total int64                                      `json:"total"` // 总数
+}
+
+type OrganizationRoleUserRelationPageListItem struct {
+	OrganizationID     uint `json:"organizationID"`     // 组织ID
+	OrganizationRoleID uint `json:"organizationRoleID"` // 组织角色ID
+	UserID             uint `json:"userID"`             // 用户ID
+	TenantID           uint `json:"tenantID"`           // 租户ID
+}

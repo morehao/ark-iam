@@ -96,19 +96,53 @@ apps/
 │   │   └── middleware/         # 中间件
 │   ├── model/              # 数据模型
 │   └── dao/                # 数据访问层
-├── iam/                       # IAM 应用 (同上结构)
+├── iam/                       # IAM 应用
+│   ├── model/                  # 数据模型（按领域划分）
+│   ├── dao/                    # 数据访问层（按领域划分）
+│   ├── object/                 # 基础对象（按领域划分）
 │   └── internal/
-│       ├── constant/           # 应用层常量（前端专用）
+│       ├── controller/          # 控制器层（按领域划分，如 ctruser）
+│       ├── service/             # 服务层（按领域划分，如 svcuser）
+│       ├── dto/                 # DTO 层（按领域划分，如 dtouser）
+│       ├── router/              # 路由注册
+│       └── constant/           # 应用层常量（前端专用）
 pkg/                          # 公共包
 ```
 
 ### 命名规范
 
-- **包名**: 小写，简短，如 `svcuser`, `dtouser`
+- **包名**: 纯小写，无下划线连线，简短且按业务领域划分，如 `svcuser`（用户服务）、`svcrole`（角色服务）
 - **接口名**: 以 `I` 结尾或使用角色后缀，如 `UserSvc`, `UserCtr`
 - **结构体**: 导出使用大驼峰 `UserSvc`，非导出使用小驼峰 `userSvc`
 - **文件命名**: 小写下划线，如 `user_service.go`，测试文件 `*_test.go`
 - **数据库表**: 下划线命名，如 `user_department`
+
+### 模块划分规范
+
+**按业务领域划分模块，而非按单表划分。**
+
+每个业务领域包含该领域相关的实体、DTO、Service、Controller，放在同一层级目录下。
+
+示例：用户领域（user）包含用户基本信息、用户身份、用户部门关系、用户登录日志等：
+
+```
+apps/iam/
+├── model/user.go              # 用户领域所有实体
+├── dao/user.go               # 用户领域所有数据访问
+├── object/user.go            # 用户领域基础对象
+└── internal/
+    ├── dto/user/             # 用户领域所有 DTO（包含身份、部门关系等）
+    │   ├── request.go
+    │   └── response.go
+    ├── service/svcuser/      # 用户领域服务
+    │   └── user.go
+    └── controller/ctruser/   # 用户领域控制器
+        └── user.go
+```
+
+错误码和路由也按领域划分：
+- 一个业务领域共享一套错误码段（如 user 领域用 1005XX）
+- 路由按领域注册（如 `/v1/iam/user/*` 下包含用户及其相关操作）
 
 ### 常量定义规范
 

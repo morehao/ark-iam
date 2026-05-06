@@ -6,6 +6,7 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/morehao/golib v0.1.5
 	github.com/swaggo/swag v1.16.6
+	gorm.io/gorm v1.31.1
 )
 
 require (
@@ -93,5 +94,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/mysql v1.6.0 // indirect
 	gorm.io/driver/postgres v1.6.0 // indirect
-	gorm.io/gorm v1.31.1 // indirect
 )
