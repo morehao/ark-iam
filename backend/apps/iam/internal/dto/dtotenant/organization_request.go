@@ -1,4 +1,4 @@
-package dtoorganization
+package dtotenant
 
 type OrganizationCreateReq struct {
 	TenantID      uint   `json:"tenantID" form:"tenantID"`           // 租户ID

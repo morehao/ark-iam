@@ -1,9 +1,9 @@
-package ctrorganization
+package ctrtenant
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtoorganization"
-	"github.com/morehao/ark-iam/iam/internal/service/svcorganization"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtotenant"
+	"github.com/morehao/ark-iam/iam/internal/service/svctenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -16,19 +16,19 @@ type OrganizationCtr interface {
 }
 
 type organizationCtr struct {
-	organizationSvc svcorganization.OrganizationSvc
+	organizationSvc svctenant.OrganizationSvc
 }
 
 var _ OrganizationCtr = (*organizationCtr)(nil)
 
 func NewOrganizationCtr() OrganizationCtr {
 	return &organizationCtr{
-		organizationSvc: svcorganization.NewOrganizationSvc(),
+		organizationSvc: svctenant.NewOrganizationSvc(),
 	}
 }
 
 func (ctr *organizationCtr) Create(ctx *gin.Context) {
-	var req dtoorganization.OrganizationCreateReq
+	var req dtotenant.OrganizationCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -42,7 +42,7 @@ func (ctr *organizationCtr) Create(ctx *gin.Context) {
 }
 
 func (ctr *organizationCtr) Delete(ctx *gin.Context) {
-	var req dtoorganization.OrganizationDeleteReq
+	var req dtotenant.OrganizationDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -55,7 +55,7 @@ func (ctr *organizationCtr) Delete(ctx *gin.Context) {
 }
 
 func (ctr *organizationCtr) Update(ctx *gin.Context) {
-	var req dtoorganization.OrganizationUpdateReq
+	var req dtotenant.OrganizationUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -68,7 +68,7 @@ func (ctr *organizationCtr) Update(ctx *gin.Context) {
 }
 
 func (ctr *organizationCtr) Detail(ctx *gin.Context) {
-	var req dtoorganization.OrganizationDetailReq
+	var req dtotenant.OrganizationDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -82,7 +82,7 @@ func (ctr *organizationCtr) Detail(ctx *gin.Context) {
 }
 
 func (ctr *organizationCtr) PageList(ctx *gin.Context) {
-	var req dtoorganization.OrganizationPageListReq
+	var req dtotenant.OrganizationPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return

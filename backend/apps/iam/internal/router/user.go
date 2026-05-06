@@ -2,12 +2,14 @@ package router
 
 import (
 	"github.com/morehao/ark-iam/iam/internal/controller/ctruser"
+	"github.com/morehao/ark-iam/iam/internal/controller/ctruserrole"
 	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
 func userRouter(groups *ginserver.RouterGroups) {
 	userCtr := ctruser.NewUserCtr()
+	userRoleCtr := ctruserrole.NewUserRoleCtr()
 
 	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
 
@@ -34,4 +36,8 @@ func userRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/userDepartmentRelation/pageList", userCtr.PageListUserDepartmentRelation)
 	v1RouterGroup.GET("/userDepartmentRelation/getByUser", userCtr.GetUserDepartmentRelationByUser)
 	v1RouterGroup.POST("/userDepartmentRelation/assignDepartments", userCtr.AssignDepartments)
+
+	v1RouterGroup.POST("/user/role/create", userRoleCtr.Create)
+	v1RouterGroup.POST("/user/role/delete", userRoleCtr.Delete)
+	v1RouterGroup.POST("/user/role/pageList", userRoleCtr.PageList)
 }

@@ -1,12 +1,12 @@
-package svcsystem
+package svctenant
 
 import (
 	"encoding/json"
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtosystem"
-	"github.com/morehao/ark-iam/iam/object/objsystem"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtotenant"
+	"github.com/morehao/ark-iam/iam/object/objaudit"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/biz/gobject"
@@ -15,8 +15,8 @@ import (
 )
 
 type LogSvc interface {
-	Detail(ctx *gin.Context, req *dtosystem.LogDetailReq) (*dtosystem.LogDetailResp, error)
-	PageList(ctx *gin.Context, req *dtosystem.LogPageListReq) (*dtosystem.LogPageListResp, error)
+	Detail(ctx *gin.Context, req *dtotenant.LogDetailReq) (*dtotenant.LogDetailResp, error)
+	PageList(ctx *gin.Context, req *dtotenant.LogPageListReq) (*dtotenant.LogPageListResp, error)
 }
 
 type logSvc struct {
@@ -28,7 +28,7 @@ func NewLogSvc() LogSvc {
 	return &logSvc{}
 }
 
-func (svc *logSvc) Detail(ctx *gin.Context, req *dtosystem.LogDetailReq) (*dtosystem.LogDetailResp, error) {
+func (svc *logSvc) Detail(ctx *gin.Context, req *dtotenant.LogDetailReq) (*dtotenant.LogDetailResp, error) {
 	logEntity, err := dao.NewLogDao().GetByID(ctx, req.LogID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcsystem.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -44,9 +44,9 @@ func (svc *logSvc) Detail(ctx *gin.Context, req *dtosystem.LogDetailReq) (*dtosy
 		return nil, code.GetError(code.LogGetDetailError)
 	}
 
-	resp := &dtosystem.LogDetailResp{
+	resp := &dtotenant.LogDetailResp{
 		LogID: logEntity.ID,
-		LogBaseInfo: objsystem.LogBaseInfo{
+		LogBaseInfo: objaudit.LogBaseInfo{
 			TenantID: logEntity.TenantID,
 			Key:      logEntity.Key,
 			Payload:  payload,
@@ -59,7 +59,7 @@ func (svc *logSvc) Detail(ctx *gin.Context, req *dtosystem.LogDetailReq) (*dtosy
 	return resp, nil
 }
 
-func (svc *logSvc) PageList(ctx *gin.Context, req *dtosystem.LogPageListReq) (*dtosystem.LogPageListResp, error) {
+func (svc *logSvc) PageList(ctx *gin.Context, req *dtotenant.LogPageListReq) (*dtotenant.LogPageListResp, error) {
 	cond := &dao.LogCond{
 		BaseCond: &genericdao.BaseCond{
 			Page:     req.Page,
@@ -74,16 +74,16 @@ func (svc *logSvc) PageList(ctx *gin.Context, req *dtosystem.LogPageListReq) (*d
 		return nil, code.GetError(code.LogGetPageListError)
 	}
 
-	list := make([]dtosystem.LogPageListItem, 0, len(logEntityList))
+	list := make([]dtotenant.LogPageListItem, 0, len(logEntityList))
 	for _, v := range logEntityList {
 		var payload any
 		if err := json.Unmarshal(v.Payload, &payload); err != nil {
 			glog.Errorf(ctx, "[svcsystem.PageList] json.Unmarshal fail, err:%v", err)
 			continue
 		}
-		list = append(list, dtosystem.LogPageListItem{
+		list = append(list, dtotenant.LogPageListItem{
 			LogID: v.ID,
-			LogBaseInfo: objsystem.LogBaseInfo{
+			LogBaseInfo: objaudit.LogBaseInfo{
 				TenantID: v.TenantID,
 				Key:      v.Key,
 				Payload:  payload,
@@ -93,7 +93,7 @@ func (svc *logSvc) PageList(ctx *gin.Context, req *dtosystem.LogPageListReq) (*d
 			},
 		})
 	}
-	return &dtosystem.LogPageListResp{
+	return &dtotenant.LogPageListResp{
 		List:  list,
 		Total: total,
 	}, nil

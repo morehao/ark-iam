@@ -1,6 +1,6 @@
-package dtoorganization
+package dtotenant
 
-import "github.com/morehao/ark-iam/iam/object/objorganization"
+import "github.com/morehao/ark-iam/iam/object/objtenant"
 
 type OrganizationCreateResp struct {
 	OrganizationID uint `json:"organizationID"` // 组织ID
@@ -8,7 +8,7 @@ type OrganizationCreateResp struct {
 
 type OrganizationDetailResp struct {
 	OrganizationID      uint `json:"organizationID"`        // 组织ID
-	objorganization.OrganizationBaseInfo `json:"organizationBaseInfo"` // 组织基础信息
+	objtenant.OrganizationBaseInfo `json:"organizationBaseInfo"` // 组织基础信息
 }
 
 type OrganizationPageListResp struct {
@@ -18,7 +18,7 @@ type OrganizationPageListResp struct {
 
 type OrganizationPageListItem struct {
 	OrganizationID      uint `json:"organizationID"`        // 组织ID
-	objorganization.OrganizationBaseInfo `json:"organizationBaseInfo"` // 组织基础信息
+	objtenant.OrganizationBaseInfo `json:"organizationBaseInfo"` // 组织基础信息
 }
 
 type OrganizationRoleCreateResp struct {

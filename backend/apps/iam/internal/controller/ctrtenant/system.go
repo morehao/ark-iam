@@ -1,9 +1,9 @@
-package ctrsystem
+package ctrtenant
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtosystem"
-	"github.com/morehao/ark-iam/iam/internal/service/svcsystem"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtotenant"
+	"github.com/morehao/ark-iam/iam/internal/service/svctenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -16,19 +16,19 @@ type SystemCtr interface {
 }
 
 type systemCtr struct {
-	systemSvc svcsystem.SystemSvc
+	systemSvc svctenant.SystemSvc
 }
 
 var _ SystemCtr = (*systemCtr)(nil)
 
 func NewSystemCtr() SystemCtr {
 	return &systemCtr{
-		systemSvc: svcsystem.NewSystemSvc(),
+		systemSvc: svctenant.NewSystemSvc(),
 	}
 }
 
 func (ctr *systemCtr) Create(ctx *gin.Context) {
-	var req dtosystem.SystemCreateReq
+	var req dtotenant.SystemCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -42,7 +42,7 @@ func (ctr *systemCtr) Create(ctx *gin.Context) {
 }
 
 func (ctr *systemCtr) Delete(ctx *gin.Context) {
-	var req dtosystem.SystemDeleteReq
+	var req dtotenant.SystemDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -55,7 +55,7 @@ func (ctr *systemCtr) Delete(ctx *gin.Context) {
 }
 
 func (ctr *systemCtr) Update(ctx *gin.Context) {
-	var req dtosystem.SystemUpdateReq
+	var req dtotenant.SystemUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -68,7 +68,7 @@ func (ctr *systemCtr) Update(ctx *gin.Context) {
 }
 
 func (ctr *systemCtr) Detail(ctx *gin.Context) {
-	var req dtosystem.SystemDetailReq
+	var req dtotenant.SystemDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -82,7 +82,7 @@ func (ctr *systemCtr) Detail(ctx *gin.Context) {
 }
 
 func (ctr *systemCtr) PageList(ctx *gin.Context) {
-	var req dtosystem.SystemPageListReq
+	var req dtotenant.SystemPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return

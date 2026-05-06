@@ -1,9 +1,9 @@
-package svcorganization
+package svctenant
 
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtoorganization"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -13,9 +13,9 @@ import (
 )
 
 type OrganizationUserRelationSvc interface {
-	Create(ctx *gin.Context, req *dtoorganization.OrganizationUserRelationCreateReq) (*dtoorganization.OrganizationUserRelationCreateResp, error)
-	Delete(ctx *gin.Context, req *dtoorganization.OrganizationUserRelationDeleteReq) error
-	PageList(ctx *gin.Context, req *dtoorganization.OrganizationUserRelationPageListReq) (*dtoorganization.OrganizationUserRelationPageListResp, error)
+	Create(ctx *gin.Context, req *dtotenant.OrganizationUserRelationCreateReq) (*dtotenant.OrganizationUserRelationCreateResp, error)
+	Delete(ctx *gin.Context, req *dtotenant.OrganizationUserRelationDeleteReq) error
+	PageList(ctx *gin.Context, req *dtotenant.OrganizationUserRelationPageListReq) (*dtotenant.OrganizationUserRelationPageListResp, error)
 }
 
 type organizationUserRelationSvc struct {
@@ -27,7 +27,7 @@ func NewOrganizationUserRelationSvc() OrganizationUserRelationSvc {
 	return &organizationUserRelationSvc{}
 }
 
-func (svc *organizationUserRelationSvc) Create(ctx *gin.Context, req *dtoorganization.OrganizationUserRelationCreateReq) (*dtoorganization.OrganizationUserRelationCreateResp, error) {
+func (svc *organizationUserRelationSvc) Create(ctx *gin.Context, req *dtotenant.OrganizationUserRelationCreateReq) (*dtotenant.OrganizationUserRelationCreateResp, error) {
 	orgEntity, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcorganizationuserrelation.Create] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -57,10 +57,10 @@ func (svc *organizationUserRelationSvc) Create(ctx *gin.Context, req *dtoorganiz
 		glog.Errorf(ctx, "[svcorganizationuserrelation.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.OrganizationUserRelationCreateError)
 	}
-	return &dtoorganization.OrganizationUserRelationCreateResp{}, nil
+	return &dtotenant.OrganizationUserRelationCreateResp{}, nil
 }
 
-func (svc *organizationUserRelationSvc) Delete(ctx *gin.Context, req *dtoorganization.OrganizationUserRelationDeleteReq) error {
+func (svc *organizationUserRelationSvc) Delete(ctx *gin.Context, req *dtotenant.OrganizationUserRelationDeleteReq) error {
 	orgUserEntity, err := dao.NewOrganizationUserRelationDao().GetByID(ctx, req.OrganizationID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcorganizationuserrelation.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -78,7 +78,7 @@ func (svc *organizationUserRelationSvc) Delete(ctx *gin.Context, req *dtoorganiz
 	return nil
 }
 
-func (svc *organizationUserRelationSvc) PageList(ctx *gin.Context, req *dtoorganization.OrganizationUserRelationPageListReq) (*dtoorganization.OrganizationUserRelationPageListResp, error) {
+func (svc *organizationUserRelationSvc) PageList(ctx *gin.Context, req *dtotenant.OrganizationUserRelationPageListReq) (*dtotenant.OrganizationUserRelationPageListResp, error) {
 	cond := &dao.OrganizationUserRelationCond{
 		BaseCond: &genericdao.BaseCond{
 			Page:     req.Page,
@@ -94,15 +94,15 @@ func (svc *organizationUserRelationSvc) PageList(ctx *gin.Context, req *dtoorgan
 		return nil, code.GetError(code.OrganizationUserRelationGetPageListError)
 	}
 
-	list := make([]dtoorganization.OrganizationUserRelationPageListItem, 0, len(orgUserEntityList))
+	list := make([]dtotenant.OrganizationUserRelationPageListItem, 0, len(orgUserEntityList))
 	for _, v := range orgUserEntityList {
-		list = append(list, dtoorganization.OrganizationUserRelationPageListItem{
+		list = append(list, dtotenant.OrganizationUserRelationPageListItem{
 			OrganizationID: v.OrganizationID,
 			UserID:        v.UserID,
 			TenantID:      v.TenantID,
 		})
 	}
-	return &dtoorganization.OrganizationUserRelationPageListResp{
+	return &dtotenant.OrganizationUserRelationPageListResp{
 		List:  list,
 		Total: total,
 	}, nil
