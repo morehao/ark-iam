@@ -1,9 +1,9 @@
-package ctrorganizationroleuserrelation
+package ctrtenantroleuserrelation
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtoorganization"
-	"github.com/morehao/ark-iam/iam/internal/service/svcorganization"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtotenant"
+	"github.com/morehao/ark-iam/iam/internal/service/svctenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -14,14 +14,14 @@ type OrganizationRoleUserRelationCtr interface {
 }
 
 type organizationRoleUserRelationCtr struct {
-	organizationRoleUserRelationSvc svcorganization.OrganizationRoleUserRelationSvc
+	organizationRoleUserRelationSvc svctenant.OrganizationRoleUserRelationSvc
 }
 
 var _ OrganizationRoleUserRelationCtr = (*organizationRoleUserRelationCtr)(nil)
 
 func NewOrganizationRoleUserRelationCtr() OrganizationRoleUserRelationCtr {
 	return &organizationRoleUserRelationCtr{
-		organizationRoleUserRelationSvc: svcorganization.NewOrganizationRoleUserRelationSvc(),
+		organizationRoleUserRelationSvc: svctenant.NewOrganizationRoleUserRelationSvc(),
 	}
 }
 
@@ -30,11 +30,11 @@ func NewOrganizationRoleUserRelationCtr() OrganizationRoleUserRelationCtr {
 // @Summary 创建组织角色用户关系管理
 // @accept application/json
 // @Produce application/json
-// @Param req body dtoorganization.OrganizationRoleUserRelationCreateReq true "创建组织角色用户关系管理"
-// @Success 200 {object} gincontext.DtoRender{data=dtoorganization.OrganizationRoleUserRelationCreateResp} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
+// @Param req body dtotenant.OrganizationRoleUserRelationCreateReq true "创建组织角色用户关系管理"
+// @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationRoleUserRelationCreateResp} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
 // @Router /v1/iam/organization/create [post]
 func (ctr *organizationRoleUserRelationCtr) Create(ctx *gin.Context) {
-	var req dtoorganization.OrganizationRoleUserRelationCreateReq
+	var req dtotenant.OrganizationRoleUserRelationCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -52,11 +52,11 @@ func (ctr *organizationRoleUserRelationCtr) Create(ctx *gin.Context) {
 // @Summary 删除组织角色用户关系管理
 // @accept application/json
 // @Produce application/json
-// @Param req body dtoorganization.OrganizationRoleUserRelationDeleteReq true "删除组织角色用户关系管理"
+// @Param req body dtotenant.OrganizationRoleUserRelationDeleteReq true "删除组织角色用户关系管理"
 // @Success 200 {object} gincontext.DtoRender{data=string} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
 // @Router /v1/iam/organization/delete [post]
 func (ctr *organizationRoleUserRelationCtr) Delete(ctx *gin.Context) {
-	var req dtoorganization.OrganizationRoleUserRelationDeleteReq
+	var req dtotenant.OrganizationRoleUserRelationDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -73,11 +73,11 @@ func (ctr *organizationRoleUserRelationCtr) Delete(ctx *gin.Context) {
 // @Summary 组织角色用户关系管理列表分页
 // @accept application/json
 // @Produce application/json
-// @Param req body dtoorganization.OrganizationRoleUserRelationPageListReq true "组织角色用户关系管理列表"
-// @Success 200 {object} gincontext.DtoRender{data=dtoorganization.OrganizationRoleUserRelationPageListResp} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
+// @Param req body dtotenant.OrganizationRoleUserRelationPageListReq true "组织角色用户关系管理列表"
+// @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationRoleUserRelationPageListResp} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
 // @Router /v1/iam/organization/pageList [post]
 func (ctr *organizationRoleUserRelationCtr) PageList(ctx *gin.Context) {
-	var req dtoorganization.OrganizationRoleUserRelationPageListReq
+	var req dtotenant.OrganizationRoleUserRelationPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return

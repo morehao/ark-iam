@@ -1,9 +1,9 @@
-package svcorganization
+package svctenant
 
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtoorganization"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -13,9 +13,9 @@ import (
 )
 
 type OrganizationRoleUserRelationSvc interface {
-	Create(ctx *gin.Context, req *dtoorganization.OrganizationRoleUserRelationCreateReq) (*dtoorganization.OrganizationRoleUserRelationCreateResp, error)
-	Delete(ctx *gin.Context, req *dtoorganization.OrganizationRoleUserRelationDeleteReq) error
-	PageList(ctx *gin.Context, req *dtoorganization.OrganizationRoleUserRelationPageListReq) (*dtoorganization.OrganizationRoleUserRelationPageListResp, error)
+	Create(ctx *gin.Context, req *dtotenant.OrganizationRoleUserRelationCreateReq) (*dtotenant.OrganizationRoleUserRelationCreateResp, error)
+	Delete(ctx *gin.Context, req *dtotenant.OrganizationRoleUserRelationDeleteReq) error
+	PageList(ctx *gin.Context, req *dtotenant.OrganizationRoleUserRelationPageListReq) (*dtotenant.OrganizationRoleUserRelationPageListResp, error)
 }
 
 type organizationRoleUserRelationSvc struct {
@@ -27,7 +27,7 @@ func NewOrganizationRoleUserRelationSvc() OrganizationRoleUserRelationSvc {
 	return &organizationRoleUserRelationSvc{}
 }
 
-func (svc *organizationRoleUserRelationSvc) Create(ctx *gin.Context, req *dtoorganization.OrganizationRoleUserRelationCreateReq) (*dtoorganization.OrganizationRoleUserRelationCreateResp, error) {
+func (svc *organizationRoleUserRelationSvc) Create(ctx *gin.Context, req *dtotenant.OrganizationRoleUserRelationCreateReq) (*dtotenant.OrganizationRoleUserRelationCreateResp, error) {
 	orgRoleEntity, err := dao.NewOrganizationRoleDao().GetByID(ctx, req.OrganizationRoleID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcorganizationroleuserrelation.Create] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -58,10 +58,10 @@ func (svc *organizationRoleUserRelationSvc) Create(ctx *gin.Context, req *dtoorg
 		glog.Errorf(ctx, "[svcorganizationroleuserrelation.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.OrganizationRoleUserRelationCreateError)
 	}
-	return &dtoorganization.OrganizationRoleUserRelationCreateResp{}, nil
+	return &dtotenant.OrganizationRoleUserRelationCreateResp{}, nil
 }
 
-func (svc *organizationRoleUserRelationSvc) Delete(ctx *gin.Context, req *dtoorganization.OrganizationRoleUserRelationDeleteReq) error {
+func (svc *organizationRoleUserRelationSvc) Delete(ctx *gin.Context, req *dtotenant.OrganizationRoleUserRelationDeleteReq) error {
 	orgRoleUserEntity, err := dao.NewOrganizationRoleUserRelationDao().GetByID(ctx, req.OrganizationRoleID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcorganizationroleuserrelation.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -79,7 +79,7 @@ func (svc *organizationRoleUserRelationSvc) Delete(ctx *gin.Context, req *dtoorg
 	return nil
 }
 
-func (svc *organizationRoleUserRelationSvc) PageList(ctx *gin.Context, req *dtoorganization.OrganizationRoleUserRelationPageListReq) (*dtoorganization.OrganizationRoleUserRelationPageListResp, error) {
+func (svc *organizationRoleUserRelationSvc) PageList(ctx *gin.Context, req *dtotenant.OrganizationRoleUserRelationPageListReq) (*dtotenant.OrganizationRoleUserRelationPageListResp, error) {
 	cond := &dao.OrganizationRoleUserRelationCond{
 		BaseCond: &genericdao.BaseCond{
 			Page:     req.Page,
@@ -96,16 +96,16 @@ func (svc *organizationRoleUserRelationSvc) PageList(ctx *gin.Context, req *dtoo
 		return nil, code.GetError(code.OrganizationRoleUserRelationGetPageListError)
 	}
 
-	list := make([]dtoorganization.OrganizationRoleUserRelationPageListItem, 0, len(orgRoleUserEntityList))
+	list := make([]dtotenant.OrganizationRoleUserRelationPageListItem, 0, len(orgRoleUserEntityList))
 	for _, v := range orgRoleUserEntityList {
-		list = append(list, dtoorganization.OrganizationRoleUserRelationPageListItem{
+		list = append(list, dtotenant.OrganizationRoleUserRelationPageListItem{
 			OrganizationID:     v.OrganizationID,
 			OrganizationRoleID: v.OrganizationRoleID,
 			UserID:             v.UserID,
 			TenantID:           v.TenantID,
 		})
 	}
-	return &dtoorganization.OrganizationRoleUserRelationPageListResp{
+	return &dtotenant.OrganizationRoleUserRelationPageListResp{
 		List:  list,
 		Total: total,
 	}, nil

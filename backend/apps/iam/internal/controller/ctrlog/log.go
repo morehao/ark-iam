@@ -2,8 +2,8 @@ package ctrlog
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtosystem"
-	"github.com/morehao/ark-iam/iam/internal/service/svcsystem"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtotenant"
+	"github.com/morehao/ark-iam/iam/internal/service/svctenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -13,19 +13,19 @@ type LogCtr interface {
 }
 
 type logCtr struct {
-	logSvc svcsystem.LogSvc
+	logSvc svctenant.LogSvc
 }
 
 var _ LogCtr = (*logCtr)(nil)
 
 func NewLogCtr() LogCtr {
 	return &logCtr{
-		logSvc: svcsystem.NewLogSvc(),
+		logSvc: svctenant.NewLogSvc(),
 	}
 }
 
 func (ctr *logCtr) Detail(ctx *gin.Context) {
-	var req dtosystem.LogDetailReq
+	var req dtotenant.LogDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -39,7 +39,7 @@ func (ctr *logCtr) Detail(ctx *gin.Context) {
 }
 
 func (ctr *logCtr) PageList(ctx *gin.Context) {
-	var req dtosystem.LogPageListReq
+	var req dtotenant.LogPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return

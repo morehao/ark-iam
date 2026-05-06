@@ -1,11 +1,11 @@
-package svcsystem
+package svctenant
 
 import (
 	"encoding/json"
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtosystem"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objtenant"
 	"github.com/morehao/ark-iam/pkg/code"
@@ -17,11 +17,11 @@ import (
 )
 
 type SystemSvc interface {
-	Create(ctx *gin.Context, req *dtosystem.SystemCreateReq) (*dtosystem.SystemCreateResp, error)
-	Delete(ctx *gin.Context, req *dtosystem.SystemDeleteReq) error
-	Update(ctx *gin.Context, req *dtosystem.SystemUpdateReq) error
-	Detail(ctx *gin.Context, req *dtosystem.SystemDetailReq) (*dtosystem.SystemDetailResp, error)
-	PageList(ctx *gin.Context, req *dtosystem.SystemPageListReq) (*dtosystem.SystemPageListResp, error)
+	Create(ctx *gin.Context, req *dtotenant.SystemCreateReq) (*dtotenant.SystemCreateResp, error)
+	Delete(ctx *gin.Context, req *dtotenant.SystemDeleteReq) error
+	Update(ctx *gin.Context, req *dtotenant.SystemUpdateReq) error
+	Detail(ctx *gin.Context, req *dtotenant.SystemDetailReq) (*dtotenant.SystemDetailResp, error)
+	PageList(ctx *gin.Context, req *dtotenant.SystemPageListReq) (*dtotenant.SystemPageListResp, error)
 }
 
 type systemSvc struct {
@@ -33,7 +33,7 @@ func NewSystemSvc() SystemSvc {
 	return &systemSvc{}
 }
 
-func (svc *systemSvc) Create(ctx *gin.Context, req *dtosystem.SystemCreateReq) (*dtosystem.SystemCreateResp, error) {
+func (svc *systemSvc) Create(ctx *gin.Context, req *dtotenant.SystemCreateReq) (*dtotenant.SystemCreateResp, error) {
 	valueJson, err := json.Marshal(req.Value)
 	if err != nil {
 		glog.Errorf(ctx, "[svcsystem.Create] json.Marshal fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -51,12 +51,12 @@ func (svc *systemSvc) Create(ctx *gin.Context, req *dtosystem.SystemCreateReq) (
 		glog.Errorf(ctx, "[svcsystem.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.SystemCreateError)
 	}
-	return &dtosystem.SystemCreateResp{
+	return &dtotenant.SystemCreateResp{
 		SystemID: insertEntity.ID,
 	}, nil
 }
 
-func (svc *systemSvc) Delete(ctx *gin.Context, req *dtosystem.SystemDeleteReq) error {
+func (svc *systemSvc) Delete(ctx *gin.Context, req *dtotenant.SystemDeleteReq) error {
 	systemEntity, err := dao.NewSystemDao().GetByID(ctx, req.SystemID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcsystem.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -74,7 +74,7 @@ func (svc *systemSvc) Delete(ctx *gin.Context, req *dtosystem.SystemDeleteReq) e
 	return nil
 }
 
-func (svc *systemSvc) Update(ctx *gin.Context, req *dtosystem.SystemUpdateReq) error {
+func (svc *systemSvc) Update(ctx *gin.Context, req *dtotenant.SystemUpdateReq) error {
 	systemEntity, err := dao.NewSystemDao().GetByID(ctx, req.SystemID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcsystem.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -104,7 +104,7 @@ func (svc *systemSvc) Update(ctx *gin.Context, req *dtosystem.SystemUpdateReq) e
 	return nil
 }
 
-func (svc *systemSvc) Detail(ctx *gin.Context, req *dtosystem.SystemDetailReq) (*dtosystem.SystemDetailResp, error) {
+func (svc *systemSvc) Detail(ctx *gin.Context, req *dtotenant.SystemDetailReq) (*dtotenant.SystemDetailResp, error) {
 	systemEntity, err := dao.NewSystemDao().GetByID(ctx, req.SystemID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcsystem.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -120,7 +120,7 @@ func (svc *systemSvc) Detail(ctx *gin.Context, req *dtosystem.SystemDetailReq) (
 		return nil, code.GetError(code.SystemGetDetailError)
 	}
 
-	resp := &dtosystem.SystemDetailResp{
+	resp := &dtotenant.SystemDetailResp{
 		SystemID: systemEntity.ID,
 		SystemBaseInfo: objtenant.SystemBaseInfo{
 			TenantID: systemEntity.TenantID,
@@ -135,7 +135,7 @@ func (svc *systemSvc) Detail(ctx *gin.Context, req *dtosystem.SystemDetailReq) (
 	return resp, nil
 }
 
-func (svc *systemSvc) PageList(ctx *gin.Context, req *dtosystem.SystemPageListReq) (*dtosystem.SystemPageListResp, error) {
+func (svc *systemSvc) PageList(ctx *gin.Context, req *dtotenant.SystemPageListReq) (*dtotenant.SystemPageListResp, error) {
 	cond := &dao.SystemCond{
 		BaseCond: &genericdao.BaseCond{
 			Page:     req.Page,
@@ -150,14 +150,14 @@ func (svc *systemSvc) PageList(ctx *gin.Context, req *dtosystem.SystemPageListRe
 		return nil, code.GetError(code.SystemGetPageListError)
 	}
 
-	list := make([]dtosystem.SystemPageListItem, 0, len(systemEntityList))
+	list := make([]dtotenant.SystemPageListItem, 0, len(systemEntityList))
 	for _, v := range systemEntityList {
 		var value any
 		if err := json.Unmarshal(v.Value, &value); err != nil {
 			glog.Errorf(ctx, "[svcsystem.PageList] json.Unmarshal fail, err:%v", err)
 			continue
 		}
-		list = append(list, dtosystem.SystemPageListItem{
+		list = append(list, dtotenant.SystemPageListItem{
 			SystemID: v.ID,
 			SystemBaseInfo: objtenant.SystemBaseInfo{
 				TenantID: v.TenantID,
@@ -169,7 +169,7 @@ func (svc *systemSvc) PageList(ctx *gin.Context, req *dtosystem.SystemPageListRe
 			},
 		})
 	}
-	return &dtosystem.SystemPageListResp{
+	return &dtotenant.SystemPageListResp{
 		List:  list,
 		Total: total,
 	}, nil

@@ -2,8 +2,6 @@ package router
 
 import (
 	"github.com/morehao/ark-iam/iam/internal/controller/ctrdepartment"
-	"github.com/morehao/ark-iam/iam/internal/controller/ctrorganization"
-	"github.com/morehao/ark-iam/iam/internal/controller/ctrsystem"
 	"github.com/morehao/ark-iam/iam/internal/controller/ctrtenant"
 	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gserver/ginserver"
@@ -12,8 +10,8 @@ import (
 func tenantRouter(groups *ginserver.RouterGroups) {
 	tenantCtr := ctrtenant.NewTenantCtr()
 	departmentCtr := ctrdepartment.NewDepartmentCtr()
-	organizationCtr := ctrorganization.NewOrganizationCtr()
-	systemCtr := ctrsystem.NewSystemCtr()
+	organizationCtr := ctrtenant.NewOrganizationCtr()
+	systemCtr := ctrtenant.NewSystemCtr()
 
 	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
 

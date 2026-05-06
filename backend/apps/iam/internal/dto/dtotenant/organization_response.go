@@ -1,4 +1,4 @@
-package dtoorganization
+package dtotenant
 
 import "github.com/morehao/ark-iam/iam/object/objtenant"
 
