@@ -1,4 +1,4 @@
-package objorganization
+package objtenant
 
 type OrganizationBaseInfo struct {
 	TenantID      uint   `json:"tenantID" form:"tenantID"`       // 租户ID

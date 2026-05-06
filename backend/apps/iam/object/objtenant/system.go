@@ -1,4 +1,4 @@
-package objsystem
+package objtenant
 
 type SystemBaseInfo struct {
 	TenantID uint   `json:"tenantID" form:"tenantID"` // 租户ID

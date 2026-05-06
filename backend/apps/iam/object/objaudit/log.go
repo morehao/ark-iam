@@ -1,4 +1,4 @@
-package objsystem
+package objaudit
 
 type LogBaseInfo struct {
 	TenantID uint   `json:"tenantID" form:"tenantID"` // 租户ID
