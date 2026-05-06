@@ -1,17 +1,17 @@
 package router
 
 import (
-	"github.com/morehao/ark-iam/iam/internal/controller/ctrrole_scope"
+	"github.com/morehao/ark-iam/iam/internal/controller/ctrrolescope"
 	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
 func roleScopeRouter(groups *ginserver.RouterGroups) {
-	roleScopeCtr := ctrrole_scope.NewRoleScopeCtr()
+	roleScopeCtr := ctrrolescope.NewRoleScopeCtr()
 
 	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
 
-	v1RouterGroup.POST("/roleScope/create", roleScopeCtr.Create)
-	v1RouterGroup.POST("/roleScope/delete", roleScopeCtr.Delete)
-	v1RouterGroup.POST("/roleScope/pageList", roleScopeCtr.PageList)
+	v1RouterGroup.POST("/rolescope/create", roleScopeCtr.Create)
+	v1RouterGroup.POST("/rolescope/delete", roleScopeCtr.Delete)
+	v1RouterGroup.POST("/rolescope/pageList", roleScopeCtr.PageList)
 }
