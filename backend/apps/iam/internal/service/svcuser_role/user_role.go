@@ -28,6 +28,15 @@ func NewUserRoleSvc() UserRoleSvc {
 }
 
 func (svc *userRoleSvc) Create(ctx *gin.Context, req *dtorole.UserRoleCreateReq) (*dtorole.UserRoleCreateResp, error) {
+	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcuser_role.Create] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.RoleGetDetailError)
+	}
+	if roleEntity == nil || roleEntity.ID == 0 {
+		return nil, code.GetError(code.RoleNotExistError)
+	}
+
 	insertEntity := &model.UserRoleEntity{
 		TenantID: req.TenantID,
 		UserID:   req.UserID,

@@ -500,3 +500,27 @@ CREATE TABLE `log`
     KEY              `idx_tenant_created_at` (`tenant_id`, `created_at`),
     KEY              `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='日志表';
+
+CREATE TABLE `refresh_token`
+(
+    `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+    `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
+    `user_id`        BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '用户ID',
+    `application_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '应用ID',
+    `token`          VARCHAR(256) NOT NULL DEFAULT '' COMMENT 'token哈希',
+    `expires_at`     DATETIME DEFAULT NULL COMMENT '过期时间',
+    `revoked_at`     DATETIME DEFAULT NULL COMMENT '撤销时间',
+    `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `deleted_at`     DATETIME DEFAULT NULL COMMENT '删除时间',
+    `created_by`     BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '创建人ID',
+    `updated_by`     BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '更新人ID',
+    `deleted_by`     BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '删除人ID',
+    PRIMARY KEY (`id`),
+    KEY              `idx_tenant_id` (`tenant_id`),
+    KEY              `idx_user_id` (`user_id`),
+    KEY              `idx_token` (`token`),
+    KEY              `idx_tenant_user` (`tenant_id`, `user_id`),
+    KEY              `idx_expires_at` (`expires_at`),
+    KEY              `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='刷新令牌表';

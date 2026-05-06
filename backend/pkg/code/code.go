@@ -57,4 +57,7 @@ func init() {
 	registerError(organizationRoleErrorMsgMap)
 	registerError(organizationUserRelationErrorMsgMap)
 	registerError(organizationRoleUserRelationErrorMsgMap)
+	registerError(authErrorMsgMap)
+	registerError(userAuthErrorMsgMap)
+	registerError(tokenErrorMsgMap)
 }

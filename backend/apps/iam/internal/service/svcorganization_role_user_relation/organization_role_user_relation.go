@@ -28,6 +28,24 @@ func NewOrganizationRoleUserRelationSvc() OrganizationRoleUserRelationSvc {
 }
 
 func (svc *organizationRoleUserRelationSvc) Create(ctx *gin.Context, req *dtoorganization.OrganizationRoleUserRelationCreateReq) (*dtoorganization.OrganizationRoleUserRelationCreateResp, error) {
+	orgRoleEntity, err := dao.NewOrganizationRoleDao().GetByID(ctx, req.OrganizationRoleID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcorganization_role_user_relation.Create] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.OrganizationRoleGetDetailError)
+	}
+	if orgRoleEntity == nil || orgRoleEntity.ID == 0 {
+		return nil, code.GetError(code.OrganizationRoleNotExistError)
+	}
+
+	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcorganization_role_user_relation.Create] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.UserGetDetailError)
+	}
+	if userEntity == nil || userEntity.ID == 0 {
+		return nil, code.GetError(code.UserNotExistError)
+	}
+
 	insertEntity := &model.OrganizationRoleUserRelationEntity{
 		TenantID:           req.TenantID,
 		OrganizationID:     req.OrganizationID,

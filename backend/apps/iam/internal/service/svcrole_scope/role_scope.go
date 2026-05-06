@@ -28,6 +28,25 @@ func NewRoleScopeSvc() RoleScopeSvc {
 }
 
 func (svc *roleScopeSvc) Create(ctx *gin.Context, req *dtorole.RoleScopeCreateReq) (*dtorole.RoleScopeCreateResp, error) {
+	roleDao := dao.NewRoleDao()
+	roleEntity, err := roleDao.GetByID(ctx, req.RoleID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcrole_scope.Create] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.RoleGetDetailError)
+	}
+	if roleEntity == nil || roleEntity.ID == 0 {
+		return nil, code.GetError(code.RoleNotExistError)
+	}
+
+	scopeEntity, err := dao.NewScopeDao().GetByID(ctx, req.ScopeID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcrole_scope.Create] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.ScopeGetDetailError)
+	}
+	if scopeEntity == nil || scopeEntity.ID == 0 {
+		return nil, code.GetError(code.ScopeNotExistError)
+	}
+
 	insertEntity := &model.RoleScopeEntity{
 		TenantID: req.TenantID,
 		RoleID:   req.RoleID,

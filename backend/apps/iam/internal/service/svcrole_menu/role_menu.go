@@ -28,6 +28,24 @@ func NewRoleMenuSvc() RoleMenuSvc {
 }
 
 func (svc *roleMenuSvc) Create(ctx *gin.Context, req *dtorole.RoleMenuCreateReq) (*dtorole.RoleMenuCreateResp, error) {
+	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcrole_menu.Create] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.RoleGetDetailError)
+	}
+	if roleEntity == nil || roleEntity.ID == 0 {
+		return nil, code.GetError(code.RoleNotExistError)
+	}
+
+	menuEntity, err := dao.NewMenuDao().GetByID(ctx, req.MenuID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcrole_menu.Create] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.MenuGetDetailError)
+	}
+	if menuEntity == nil || menuEntity.ID == 0 {
+		return nil, code.GetError(code.MenuNotExistError)
+	}
+
 	insertEntity := &model.RoleMenuEntity{
 		TenantID: req.TenantID,
 		RoleID:   req.RoleID,

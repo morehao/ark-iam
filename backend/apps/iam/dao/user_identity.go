@@ -1,6 +1,8 @@
 package dao
 
 import (
+	"context"
+
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/golib/biz/genericdao"
@@ -44,4 +46,16 @@ func NewUserIdentityDao() *UserIdentityDao {
 			dbclient.IamDB,
 		),
 	}
+}
+
+func (dao *UserIdentityDao) GetByIssuerAndIdentityID(ctx context.Context, tenantID uint, issuer, identityID string) (*model.UserIdentityEntity, error) {
+	db := dbclient.IamDB(ctx)
+	var entity model.UserIdentityEntity
+	err := db.
+		Where("tenant_id = ? AND issuer = ? AND identity_id = ? AND deleted_at IS NULL", tenantID, issuer, identityID).
+		First(&entity).Error
+	if err != nil {
+		return nil, err
+	}
+	return &entity, nil
 }

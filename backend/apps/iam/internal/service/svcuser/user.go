@@ -52,6 +52,38 @@ func NewUserSvc() UserSvc {
 }
 
 func (svc *userSvc) Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtouser.UserCreateResp, error) {
+	userDao := dao.NewUserDao()
+
+	if req.Username != "" {
+		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
+			TenantID: req.TenantID,
+			Username: req.Username,
+		})
+		if existingUser != nil && existingUser.ID != 0 {
+			return nil, code.GetError(code.UsernameAlreadyExistsError)
+		}
+	}
+
+	if req.PrimaryEmail != "" {
+		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
+			TenantID:    req.TenantID,
+			PrimaryEmail: req.PrimaryEmail,
+		})
+		if existingUser != nil && existingUser.ID != 0 {
+			return nil, code.GetError(code.EmailAlreadyExistsError)
+		}
+	}
+
+	if req.PrimaryPhone != "" {
+		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
+			TenantID:    req.TenantID,
+			PrimaryPhone: req.PrimaryPhone,
+		})
+		if existingUser != nil && existingUser.ID != 0 {
+			return nil, code.GetError(code.PhoneAlreadyExistsError)
+		}
+	}
+
 	profileJson, err := json.Marshal(req.Profile)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.Create] json.Marshal profile fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -85,7 +117,7 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtous
 		CreatedBy:         gincontext.GetUserID(ctx),
 	}
 
-	if err := dao.NewUserDao().Insert(ctx, insertEntity); err != nil {
+	if err := userDao.Insert(ctx, insertEntity); err != nil {
 		glog.Errorf(ctx, "[svcuser.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserCreateError)
 	}
@@ -113,13 +145,44 @@ func (svc *userSvc) Delete(ctx *gin.Context, req *dtouser.UserDeleteReq) error {
 }
 
 func (svc *userSvc) Update(ctx *gin.Context, req *dtouser.UserUpdateReq) error {
-	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
+	userDao := dao.NewUserDao()
+	userEntity, err := userDao.GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserUpdateError)
 	}
 	if userEntity == nil || userEntity.ID == 0 {
 		return code.GetError(code.UserNotExistError)
+	}
+
+	if req.Username != "" && req.Username != userEntity.Username {
+		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
+			TenantID: req.TenantID,
+			Username: req.Username,
+		})
+		if existingUser != nil && existingUser.ID != 0 && existingUser.ID != req.UserID {
+			return code.GetError(code.UsernameAlreadyExistsError)
+		}
+	}
+
+	if req.PrimaryEmail != "" && req.PrimaryEmail != userEntity.PrimaryEmail {
+		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
+			TenantID:    req.TenantID,
+			PrimaryEmail: req.PrimaryEmail,
+		})
+		if existingUser != nil && existingUser.ID != 0 && existingUser.ID != req.UserID {
+			return code.GetError(code.EmailAlreadyExistsError)
+		}
+	}
+
+	if req.PrimaryPhone != "" && req.PrimaryPhone != userEntity.PrimaryPhone {
+		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
+			TenantID:    req.TenantID,
+			PrimaryPhone: req.PrimaryPhone,
+		})
+		if existingUser != nil && existingUser.ID != 0 && existingUser.ID != req.UserID {
+			return code.GetError(code.PhoneAlreadyExistsError)
+		}
 	}
 
 	profileJson, err := json.Marshal(req.Profile)

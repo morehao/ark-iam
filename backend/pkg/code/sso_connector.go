@@ -9,6 +9,7 @@ const (
 	SsoConnectorGetDetailError   = 101103
 	SsoConnectorGetPageListError = 101104
 	SsoConnectorNotExistError    = 101105
+	SsoAuthFailedError           = 101106
 )
 
 var ssoConnectorErrorMsgMap = gerror.CodeMsgMap{
@@ -18,4 +19,5 @@ var ssoConnectorErrorMsgMap = gerror.CodeMsgMap{
 	SsoConnectorGetDetailError:   "查看SSO连接器详情失败",
 	SsoConnectorGetPageListError: "查看SSO连接器列表失败",
 	SsoConnectorNotExistError:    "SSO连接器不存在",
+	SsoAuthFailedError:           "SSO认证失败",
 }

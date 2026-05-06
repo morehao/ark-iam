@@ -31,6 +31,15 @@ func NewScopeSvc() ScopeSvc {
 }
 
 func (svc *scopeSvc) Create(ctx *gin.Context, req *dtorole.ScopeCreateReq) (*dtorole.ScopeCreateResp, error) {
+	resourceEntity, err := dao.NewResourceDao().GetByID(ctx, req.ResourceID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcscope.Create] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.ResourceGetDetailError)
+	}
+	if resourceEntity == nil || resourceEntity.ID == 0 {
+		return nil, code.GetError(code.ResourceNotExistError)
+	}
+
 	insertEntity := &model.ScopeEntity{
 		TenantID:   req.TenantID,
 		ResourceID: req.ResourceID,

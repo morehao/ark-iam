@@ -28,6 +28,24 @@ func NewOrganizationUserRelationSvc() OrganizationUserRelationSvc {
 }
 
 func (svc *organizationUserRelationSvc) Create(ctx *gin.Context, req *dtoorganization.OrganizationUserRelationCreateReq) (*dtoorganization.OrganizationUserRelationCreateResp, error) {
+	orgEntity, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcorganization_user_relation.Create] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.OrganizationGetDetailError)
+	}
+	if orgEntity == nil || orgEntity.ID == 0 {
+		return nil, code.GetError(code.OrganizationNotExistError)
+	}
+
+	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcorganization_user_relation.Create] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.UserGetDetailError)
+	}
+	if userEntity == nil || userEntity.ID == 0 {
+		return nil, code.GetError(code.UserNotExistError)
+	}
+
 	insertEntity := &model.OrganizationUserRelationEntity{
 		TenantID:       req.TenantID,
 		OrganizationID: req.OrganizationID,

@@ -30,6 +30,15 @@ func NewOrganizationRoleSvc() OrganizationRoleSvc {
 }
 
 func (svc *organizationRoleSvc) Create(ctx *gin.Context, req *dtoorganization.OrganizationRoleCreateReq) (*dtoorganization.OrganizationRoleCreateResp, error) {
+	orgEntity, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcorganization_role.Create] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.OrganizationGetDetailError)
+	}
+	if orgEntity == nil || orgEntity.ID == 0 {
+		return nil, code.GetError(code.OrganizationNotExistError)
+	}
+
 	insertEntity := &model.OrganizationRoleEntity{
 		TenantID:       req.TenantID,
 		OrganizationID: req.OrganizationID,
