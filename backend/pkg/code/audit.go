@@ -8,7 +8,7 @@ const (
 	LogNotExistError    = 100802
 )
 
-var logErrorMsgMap = gerror.CodeMsgMap{
+var auditErrorMsgMap = gerror.CodeMsgMap{
 	LogGetDetailError:   "查看日志详情失败",
 	LogGetPageListError: "查看日志列表失败",
 	LogNotExistError:    "日志不存在",
