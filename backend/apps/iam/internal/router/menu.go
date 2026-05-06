@@ -11,10 +11,10 @@ func menuRouter(groups *ginserver.RouterGroups) {
 
 	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
 
-	v1RouterGroup.POST("/menu/create", menuCtr.Create)
-	v1RouterGroup.POST("/menu/delete", menuCtr.Delete)
-	v1RouterGroup.POST("/menu/update", menuCtr.Update)
-	v1RouterGroup.GET("/menu/detail", menuCtr.Detail)
-	v1RouterGroup.POST("/menu/pageList", menuCtr.PageList)
-	v1RouterGroup.GET("/menu/tree", menuCtr.Tree)
+	v1RouterGroup.POST("/permission/create", menuCtr.Create)
+	v1RouterGroup.POST("/permission/delete", menuCtr.Delete)
+	v1RouterGroup.POST("/permission/update", menuCtr.Update)
+	v1RouterGroup.GET("/permission/detail", menuCtr.Detail)
+	v1RouterGroup.POST("/permission/pageList", menuCtr.PageList)
+	v1RouterGroup.GET("/permission/tree", menuCtr.Tree)
 }

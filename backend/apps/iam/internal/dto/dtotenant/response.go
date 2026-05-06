@@ -25,3 +25,35 @@ type TenantPageListResp struct {
 	List  []TenantPageListItem `json:"list"`  // 数据列表
 	Total int64               `json:"total"` // 数据总条数
 }
+
+type DepartmentCreateResp struct {
+	DepartmentID uint `json:"departmentID"` // 部门ID
+}
+
+type DepartmentDetailResp struct {
+	DepartmentID uint `json:"departmentID"` // 部门ID
+	objtenant.DepartmentBaseInfo
+	gobject.OperatorBaseInfo
+}
+
+type DepartmentPageListItem struct {
+	DepartmentID uint `json:"departmentID"` // 部门ID
+	objtenant.DepartmentBaseInfo
+	gobject.OperatorBaseInfo
+}
+
+type DepartmentPageListResp struct {
+	List  []DepartmentPageListItem `json:"list"`  // 数据列表
+	Total int64                   `json:"total"` // 数据总条数
+}
+
+type DepartmentTreeItem struct {
+	DepartmentID uint `json:"departmentID"` // 部门ID
+	objtenant.DepartmentBaseInfo
+	gobject.OperatorBaseInfo
+	Children []DepartmentTreeItem `json:"children"` // 子部门
+}
+
+type DepartmentTreeResp struct {
+	List []DepartmentTreeItem `json:"list"` // 部门树
+}

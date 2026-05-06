@@ -2,8 +2,8 @@ package ctrdepartment
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtodepartment"
-	"github.com/morehao/ark-iam/iam/internal/service/svcdepartment"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtotenant"
+	"github.com/morehao/ark-iam/iam/internal/service/svctenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -17,19 +17,19 @@ type DepartmentCtr interface {
 }
 
 type departmentCtr struct {
-	departmentSvc svcdepartment.DepartmentSvc
+	departmentSvc svctenant.DepartmentSvc
 }
 
 var _ DepartmentCtr = (*departmentCtr)(nil)
 
 func NewDepartmentCtr() DepartmentCtr {
 	return &departmentCtr{
-		departmentSvc: svcdepartment.NewDepartmentSvc(),
+		departmentSvc: svctenant.NewDepartmentSvc(),
 	}
 }
 
 func (ctr *departmentCtr) Create(ctx *gin.Context) {
-	var req dtodepartment.DepartmentCreateReq
+	var req dtotenant.DepartmentCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -43,7 +43,7 @@ func (ctr *departmentCtr) Create(ctx *gin.Context) {
 }
 
 func (ctr *departmentCtr) Delete(ctx *gin.Context) {
-	var req dtodepartment.DepartmentDeleteReq
+	var req dtotenant.DepartmentDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -56,7 +56,7 @@ func (ctr *departmentCtr) Delete(ctx *gin.Context) {
 }
 
 func (ctr *departmentCtr) Update(ctx *gin.Context) {
-	var req dtodepartment.DepartmentUpdateReq
+	var req dtotenant.DepartmentUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -69,7 +69,7 @@ func (ctr *departmentCtr) Update(ctx *gin.Context) {
 }
 
 func (ctr *departmentCtr) Detail(ctx *gin.Context) {
-	var req dtodepartment.DepartmentDetailReq
+	var req dtotenant.DepartmentDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -83,7 +83,7 @@ func (ctr *departmentCtr) Detail(ctx *gin.Context) {
 }
 
 func (ctr *departmentCtr) PageList(ctx *gin.Context) {
-	var req dtodepartment.DepartmentPageListReq
+	var req dtotenant.DepartmentPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -97,7 +97,7 @@ func (ctr *departmentCtr) PageList(ctx *gin.Context) {
 }
 
 func (ctr *departmentCtr) Tree(ctx *gin.Context) {
-	var req dtodepartment.DepartmentTreeReq
+	var req dtotenant.DepartmentTreeReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return

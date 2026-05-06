@@ -18,6 +18,6 @@ func authRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/auth/refresh-token", authCtr.RefreshToken)
 	v1RouterGroup.POST("/auth/logout", authCtr.Logout)
 	v1RouterGroup.GET("/auth/userinfo", authCtr.Userinfo)
-	v1RouterGroup.GET("/auth/sso/authorizationUrl", authCtr.GetSsoAuthorizationUrl)
-	v1RouterGroup.GET("/auth/sso/callback", authCtr.SsoCallback)
+	v1RouterGroup.GET("/auth/auth/authorizationUrl", authCtr.GetSsoAuthorizationUrl)
+	v1RouterGroup.GET("/auth/auth/callback", authCtr.SsoCallback)
 }

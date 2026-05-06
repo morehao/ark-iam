@@ -11,6 +11,6 @@ func logRouter(groups *ginserver.RouterGroups) {
 
 	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
 
-	v1RouterGroup.GET("/log/detail", logCtr.Detail)
-	v1RouterGroup.POST("/log/pageList", logCtr.PageList)
+	v1RouterGroup.GET("/system/detail", logCtr.Detail)
+	v1RouterGroup.POST("/system/pageList", logCtr.PageList)
 }

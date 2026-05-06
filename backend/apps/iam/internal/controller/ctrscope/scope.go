@@ -2,8 +2,8 @@ package ctrscope
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtorole"
-	"github.com/morehao/ark-iam/iam/internal/service/svcscope"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtopermission"
+	"github.com/morehao/ark-iam/iam/internal/service/svcresource"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -16,19 +16,19 @@ type ScopeCtr interface {
 }
 
 type scopeCtr struct {
-	scopeSvc svcscope.ScopeSvc
+	scopeSvc svcresource.ScopeSvc
 }
 
 var _ ScopeCtr = (*scopeCtr)(nil)
 
 func NewScopeCtr() ScopeCtr {
 	return &scopeCtr{
-		scopeSvc: svcscope.NewScopeSvc(),
+		scopeSvc: svcresource.NewScopeSvc(),
 	}
 }
 
 func (ctr *scopeCtr) Create(ctx *gin.Context) {
-	var req dtorole.ScopeCreateReq
+	var req dtopermission.ScopeCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -42,7 +42,7 @@ func (ctr *scopeCtr) Create(ctx *gin.Context) {
 }
 
 func (ctr *scopeCtr) Delete(ctx *gin.Context) {
-	var req dtorole.ScopeDeleteReq
+	var req dtopermission.ScopeDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -55,7 +55,7 @@ func (ctr *scopeCtr) Delete(ctx *gin.Context) {
 }
 
 func (ctr *scopeCtr) Update(ctx *gin.Context) {
-	var req dtorole.ScopeUpdateReq
+	var req dtopermission.ScopeUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -68,7 +68,7 @@ func (ctr *scopeCtr) Update(ctx *gin.Context) {
 }
 
 func (ctr *scopeCtr) Detail(ctx *gin.Context) {
-	var req dtorole.ScopeDetailReq
+	var req dtopermission.ScopeDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -82,7 +82,7 @@ func (ctr *scopeCtr) Detail(ctx *gin.Context) {
 }
 
 func (ctr *scopeCtr) PageList(ctx *gin.Context) {
-	var req dtorole.ScopePageListReq
+	var req dtopermission.ScopePageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return

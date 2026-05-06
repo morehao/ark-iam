@@ -11,7 +11,7 @@ func organizationRoleUserRelationRouter(groups *ginserver.RouterGroups) {
 
 	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
 
-	v1RouterGroup.POST("/organizationroleuserrelation/create", organizationRoleUserRelationCtr.Create)
-	v1RouterGroup.POST("/organizationroleuserrelation/delete", organizationRoleUserRelationCtr.Delete)
-	v1RouterGroup.POST("/organizationroleuserrelation/pageList", organizationRoleUserRelationCtr.PageList)
+	v1RouterGroup.POST("/organization/create", organizationRoleUserRelationCtr.Create)
+	v1RouterGroup.POST("/organization/delete", organizationRoleUserRelationCtr.Delete)
+	v1RouterGroup.POST("/organization/pageList", organizationRoleUserRelationCtr.PageList)
 }

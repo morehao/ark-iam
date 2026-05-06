@@ -2,8 +2,8 @@ package ctrrolemenu
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtorole"
-	"github.com/morehao/ark-iam/iam/internal/service/svcrolemenu"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtopermission"
+	"github.com/morehao/ark-iam/iam/internal/service/svcpermission"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -14,14 +14,14 @@ type RoleMenuCtr interface {
 }
 
 type roleMenuCtr struct {
-	roleMenuSvc svcrolemenu.RoleMenuSvc
+	roleMenuSvc svcpermission.RoleMenuSvc
 }
 
 var _ RoleMenuCtr = (*roleMenuCtr)(nil)
 
 func NewRoleMenuCtr() RoleMenuCtr {
 	return &roleMenuCtr{
-		roleMenuSvc: svcrolemenu.NewRoleMenuSvc(),
+		roleMenuSvc: svcpermission.NewRoleMenuSvc(),
 	}
 }
 
@@ -30,11 +30,11 @@ func NewRoleMenuCtr() RoleMenuCtr {
 // @Summary 创建角色菜单关系管理
 // @accept application/json
 // @Produce application/json
-// @Param req body dtorole.RoleMenuCreateReq true "创建角色菜单关系管理"
-// @Success 200 {object} gincontext.DtoRender{data=dtorole.RoleMenuCreateResp} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
-// @Router /v1/iam/rolemenu/create [post]
+// @Param req body dtopermission.RoleMenuCreateReq true "创建角色菜单关系管理"
+// @Success 200 {object} gincontext.DtoRender{data=dtopermission.RoleMenuCreateResp} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
+// @Router /v1/iam/permission/create [post]
 func (ctr *roleMenuCtr) Create(ctx *gin.Context) {
-	var req dtorole.RoleMenuCreateReq
+	var req dtopermission.RoleMenuCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -52,11 +52,11 @@ func (ctr *roleMenuCtr) Create(ctx *gin.Context) {
 // @Summary 删除角色菜单关系管理
 // @accept application/json
 // @Produce application/json
-// @Param req body dtorole.RoleMenuDeleteReq true "删除角色菜单关系管理"
+// @Param req body dtopermission.RoleMenuDeleteReq true "删除角色菜单关系管理"
 // @Success 200 {object} gincontext.DtoRender{data=string} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
-// @Router /v1/iam/rolemenu/delete [post]
+// @Router /v1/iam/permission/delete [post]
 func (ctr *roleMenuCtr) Delete(ctx *gin.Context) {
-	var req dtorole.RoleMenuDeleteReq
+	var req dtopermission.RoleMenuDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -73,11 +73,11 @@ func (ctr *roleMenuCtr) Delete(ctx *gin.Context) {
 // @Summary 角色菜单关系管理列表分页
 // @accept application/json
 // @Produce application/json
-// @Param req body dtorole.RoleMenuPageListReq true "角色菜单关系管理列表"
-// @Success 200 {object} gincontext.DtoRender{data=dtorole.RoleMenuPageListResp} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
-// @Router /v1/iam/rolemenu/pageList [post]
+// @Param req body dtopermission.RoleMenuPageListReq true "角色菜单关系管理列表"
+// @Success 200 {object} gincontext.DtoRender{data=dtopermission.RoleMenuPageListResp} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
+// @Router /v1/iam/permission/pageList [post]
 func (ctr *roleMenuCtr) PageList(ctx *gin.Context) {
-	var req dtorole.RoleMenuPageListReq
+	var req dtopermission.RoleMenuPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return

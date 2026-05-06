@@ -11,10 +11,10 @@ func departmentRouter(groups *ginserver.RouterGroups) {
 
 	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
 
-	v1RouterGroup.POST("/department/create", departmentCtr.Create)
-	v1RouterGroup.POST("/department/delete", departmentCtr.Delete)
-	v1RouterGroup.POST("/department/update", departmentCtr.Update)
-	v1RouterGroup.GET("/department/detail", departmentCtr.Detail)
-	v1RouterGroup.POST("/department/pageList", departmentCtr.PageList)
-	v1RouterGroup.GET("/department/tree", departmentCtr.Tree)
+	v1RouterGroup.POST("/tenant/create", departmentCtr.Create)
+	v1RouterGroup.POST("/tenant/delete", departmentCtr.Delete)
+	v1RouterGroup.POST("/tenant/update", departmentCtr.Update)
+	v1RouterGroup.GET("/tenant/detail", departmentCtr.Detail)
+	v1RouterGroup.POST("/tenant/pageList", departmentCtr.PageList)
+	v1RouterGroup.GET("/tenant/tree", departmentCtr.Tree)
 }

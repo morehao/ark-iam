@@ -11,9 +11,9 @@ func scopeRouter(groups *ginserver.RouterGroups) {
 
 	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
 
-	v1RouterGroup.POST("/scope/create", scopeCtr.Create)
-	v1RouterGroup.POST("/scope/delete", scopeCtr.Delete)
-	v1RouterGroup.POST("/scope/update", scopeCtr.Update)
-	v1RouterGroup.GET("/scope/detail", scopeCtr.Detail)
-	v1RouterGroup.POST("/scope/pageList", scopeCtr.PageList)
+	v1RouterGroup.POST("/resource/create", scopeCtr.Create)
+	v1RouterGroup.POST("/resource/delete", scopeCtr.Delete)
+	v1RouterGroup.POST("/resource/update", scopeCtr.Update)
+	v1RouterGroup.GET("/resource/detail", scopeCtr.Detail)
+	v1RouterGroup.POST("/resource/pageList", scopeCtr.PageList)
 }
