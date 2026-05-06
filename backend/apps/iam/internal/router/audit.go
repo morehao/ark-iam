@@ -6,11 +6,11 @@ import (
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
-func logRouter(groups *ginserver.RouterGroups) {
+func auditRouter(groups *ginserver.RouterGroups) {
 	logCtr := ctrlog.NewLogCtr()
 
 	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
 
-	v1RouterGroup.GET("/system/detail", logCtr.Detail)
-	v1RouterGroup.POST("/system/pageList", logCtr.PageList)
+	v1RouterGroup.GET("/audit/log/detail", logCtr.Detail)
+	v1RouterGroup.POST("/audit/log/pageList", logCtr.PageList)
 }
