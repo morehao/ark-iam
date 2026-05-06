@@ -1,17 +1,17 @@
 package dtosystem
 
 import (
-	"github.com/morehao/ark-iam/iam/object/objsystem"
+	"github.com/morehao/ark-iam/iam/object/objtenant"
 	"github.com/morehao/golib/biz/gobject"
 )
 
 type SystemCreateReq struct {
-	objsystem.SystemBaseInfo
+	objtenant.SystemBaseInfo
 }
 
 type SystemUpdateReq struct {
 	SystemID uint `json:"systemID" binding:"required"` // 自增ID
-	objsystem.SystemBaseInfo
+	objtenant.SystemBaseInfo
 }
 
 type SystemDetailReq struct {

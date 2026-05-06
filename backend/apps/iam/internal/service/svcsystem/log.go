@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtosystem"
-	"github.com/morehao/ark-iam/iam/object/objsystem"
+	"github.com/morehao/ark-iam/iam/object/objaudit"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/biz/gobject"
@@ -46,7 +46,7 @@ func (svc *logSvc) Detail(ctx *gin.Context, req *dtosystem.LogDetailReq) (*dtosy
 
 	resp := &dtosystem.LogDetailResp{
 		LogID: logEntity.ID,
-		LogBaseInfo: objsystem.LogBaseInfo{
+		LogBaseInfo: objaudit.LogBaseInfo{
 			TenantID: logEntity.TenantID,
 			Key:      logEntity.Key,
 			Payload:  payload,
@@ -83,7 +83,7 @@ func (svc *logSvc) PageList(ctx *gin.Context, req *dtosystem.LogPageListReq) (*d
 		}
 		list = append(list, dtosystem.LogPageListItem{
 			LogID: v.ID,
-			LogBaseInfo: objsystem.LogBaseInfo{
+			LogBaseInfo: objaudit.LogBaseInfo{
 				TenantID: v.TenantID,
 				Key:      v.Key,
 				Payload:  payload,

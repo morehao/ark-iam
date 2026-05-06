@@ -5,7 +5,7 @@ import (
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoorganization"
 	"github.com/morehao/ark-iam/iam/model"
-	"github.com/morehao/ark-iam/iam/object/objorganization"
+	"github.com/morehao/ark-iam/iam/object/objtenant"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/genericdao"
@@ -103,7 +103,7 @@ func (svc *organizationSvc) Detail(ctx *gin.Context, req *dtoorganization.Organi
 
 	resp := &dtoorganization.OrganizationDetailResp{
 		OrganizationID: orgEntity.ID,
-		OrganizationBaseInfo: objorganization.OrganizationBaseInfo{
+		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{
 			TenantID:      orgEntity.TenantID,
 			Name:          orgEntity.Name,
 			Description:   orgEntity.Description,
@@ -132,7 +132,7 @@ func (svc *organizationSvc) PageList(ctx *gin.Context, req *dtoorganization.Orga
 	for _, v := range orgEntityList {
 		list = append(list, dtoorganization.OrganizationPageListItem{
 			OrganizationID: v.ID,
-			OrganizationBaseInfo: objorganization.OrganizationBaseInfo{
+			OrganizationBaseInfo: objtenant.OrganizationBaseInfo{
 				TenantID:      v.TenantID,
 				Name:          v.Name,
 				Description:   v.Description,

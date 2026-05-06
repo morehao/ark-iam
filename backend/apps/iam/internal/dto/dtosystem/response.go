@@ -1,7 +1,8 @@
 package dtosystem
 
 import (
-	"github.com/morehao/ark-iam/iam/object/objsystem"
+	"github.com/morehao/ark-iam/iam/object/objaudit"
+	"github.com/morehao/ark-iam/iam/object/objtenant"
 	"github.com/morehao/golib/biz/gobject"
 )
 
@@ -11,13 +12,13 @@ type SystemCreateResp struct {
 
 type SystemDetailResp struct {
 	SystemID uint `json:"systemID"` // 自增ID
-	objsystem.SystemBaseInfo
+	objtenant.SystemBaseInfo
 	gobject.OperatorBaseInfo
 }
 
 type SystemPageListItem struct {
 	SystemID uint `json:"systemID"` // 自增ID
-	objsystem.SystemBaseInfo
+	objtenant.SystemBaseInfo
 	gobject.OperatorBaseInfo
 }
 
@@ -28,13 +29,13 @@ type SystemPageListResp struct {
 
 type LogDetailResp struct {
 	LogID uint `json:"logID"` // 日志ID
-	objsystem.LogBaseInfo
+	objaudit.LogBaseInfo
 	gobject.OperatorBaseInfo
 }
 
 type LogPageListItem struct {
 	LogID uint `json:"logID"` // 日志ID
-	objsystem.LogBaseInfo
+	objaudit.LogBaseInfo
 	gobject.OperatorBaseInfo
 }
 

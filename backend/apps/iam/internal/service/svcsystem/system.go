@@ -7,7 +7,7 @@ import (
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtosystem"
 	"github.com/morehao/ark-iam/iam/model"
-	"github.com/morehao/ark-iam/iam/object/objsystem"
+	"github.com/morehao/ark-iam/iam/object/objtenant"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/genericdao"
@@ -122,7 +122,7 @@ func (svc *systemSvc) Detail(ctx *gin.Context, req *dtosystem.SystemDetailReq) (
 
 	resp := &dtosystem.SystemDetailResp{
 		SystemID: systemEntity.ID,
-		SystemBaseInfo: objsystem.SystemBaseInfo{
+		SystemBaseInfo: objtenant.SystemBaseInfo{
 			TenantID: systemEntity.TenantID,
 			Key:      systemEntity.Key,
 			Value:    value,
@@ -159,7 +159,7 @@ func (svc *systemSvc) PageList(ctx *gin.Context, req *dtosystem.SystemPageListRe
 		}
 		list = append(list, dtosystem.SystemPageListItem{
 			SystemID: v.ID,
-			SystemBaseInfo: objsystem.SystemBaseInfo{
+			SystemBaseInfo: objtenant.SystemBaseInfo{
 				TenantID: v.TenantID,
 				Key:      v.Key,
 				Value:    value,
