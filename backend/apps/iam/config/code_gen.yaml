@@ -7,8 +7,8 @@ module:
   table_prefix: iam_
 model:
   package_name: tenant
-  description: 租户应用关系
-  table_name: tenant_agent
+  description: 租户
+  table_name: tenant
   table_prefix: iam_
 api:
   package_name: user
