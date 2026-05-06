@@ -2,8 +2,8 @@ package ctrrole
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtorole"
-	"github.com/morehao/ark-iam/iam/internal/service/svcrole"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtopermission"
+	"github.com/morehao/ark-iam/iam/internal/service/svcpermission"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -16,19 +16,19 @@ type RoleCtr interface {
 }
 
 type roleCtr struct {
-	roleSvc svcrole.RoleSvc
+	roleSvc svcpermission.RoleSvc
 }
 
 var _ RoleCtr = (*roleCtr)(nil)
 
 func NewRoleCtr() RoleCtr {
 	return &roleCtr{
-		roleSvc: svcrole.NewRoleSvc(),
+		roleSvc: svcpermission.NewRoleSvc(),
 	}
 }
 
 func (ctr *roleCtr) Create(ctx *gin.Context) {
-	var req dtorole.RoleCreateReq
+	var req dtopermission.RoleCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -42,7 +42,7 @@ func (ctr *roleCtr) Create(ctx *gin.Context) {
 }
 
 func (ctr *roleCtr) Delete(ctx *gin.Context) {
-	var req dtorole.RoleDeleteReq
+	var req dtopermission.RoleDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -55,7 +55,7 @@ func (ctr *roleCtr) Delete(ctx *gin.Context) {
 }
 
 func (ctr *roleCtr) Update(ctx *gin.Context) {
-	var req dtorole.RoleUpdateReq
+	var req dtopermission.RoleUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -68,7 +68,7 @@ func (ctr *roleCtr) Update(ctx *gin.Context) {
 }
 
 func (ctr *roleCtr) Detail(ctx *gin.Context) {
-	var req dtorole.RoleDetailReq
+	var req dtopermission.RoleDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -82,7 +82,7 @@ func (ctr *roleCtr) Detail(ctx *gin.Context) {
 }
 
 func (ctr *roleCtr) PageList(ctx *gin.Context) {
-	var req dtorole.RolePageListReq
+	var req dtopermission.RolePageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return

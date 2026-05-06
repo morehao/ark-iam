@@ -2,8 +2,8 @@ package ctrconnector
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtoconnector"
-	"github.com/morehao/ark-iam/iam/internal/service/svcconnector"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
+	"github.com/morehao/ark-iam/iam/internal/service/svcauth"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -16,19 +16,19 @@ type ConnectorCtr interface {
 }
 
 type connectorCtr struct {
-	connectorSvc svcconnector.ConnectorSvc
+	connectorSvc svcauth.ConnectorSvc
 }
 
 var _ ConnectorCtr = (*connectorCtr)(nil)
 
 func NewConnectorCtr() ConnectorCtr {
 	return &connectorCtr{
-		connectorSvc: svcconnector.NewConnectorSvc(),
+		connectorSvc: svcauth.NewConnectorSvc(),
 	}
 }
 
 func (ctr *connectorCtr) Create(ctx *gin.Context) {
-	var req dtoconnector.ConnectorCreateReq
+	var req dtoauth.ConnectorCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -42,7 +42,7 @@ func (ctr *connectorCtr) Create(ctx *gin.Context) {
 }
 
 func (ctr *connectorCtr) Delete(ctx *gin.Context) {
-	var req dtoconnector.ConnectorDeleteReq
+	var req dtoauth.ConnectorDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -55,7 +55,7 @@ func (ctr *connectorCtr) Delete(ctx *gin.Context) {
 }
 
 func (ctr *connectorCtr) Update(ctx *gin.Context) {
-	var req dtoconnector.ConnectorUpdateReq
+	var req dtoauth.ConnectorUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -68,7 +68,7 @@ func (ctr *connectorCtr) Update(ctx *gin.Context) {
 }
 
 func (ctr *connectorCtr) Detail(ctx *gin.Context) {
-	var req dtoconnector.ConnectorDetailReq
+	var req dtoauth.ConnectorDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -82,7 +82,7 @@ func (ctr *connectorCtr) Detail(ctx *gin.Context) {
 }
 
 func (ctr *connectorCtr) PageList(ctx *gin.Context) {
-	var req dtoconnector.ConnectorPageListReq
+	var req dtoauth.ConnectorPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return

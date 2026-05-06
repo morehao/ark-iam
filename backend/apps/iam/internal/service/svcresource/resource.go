@@ -3,7 +3,7 @@ package svcresource
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtorole"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtopermission"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objresource"
 	"github.com/morehao/ark-iam/pkg/code"
@@ -14,11 +14,11 @@ import (
 )
 
 type ResourceSvc interface {
-	Create(ctx *gin.Context, req *dtorole.ResourceCreateReq) (*dtorole.ResourceCreateResp, error)
-	Delete(ctx *gin.Context, req *dtorole.ResourceDeleteReq) error
-	Update(ctx *gin.Context, req *dtorole.ResourceUpdateReq) error
-	Detail(ctx *gin.Context, req *dtorole.ResourceDetailReq) (*dtorole.ResourceDetailResp, error)
-	PageList(ctx *gin.Context, req *dtorole.ResourcePageListReq) (*dtorole.ResourcePageListResp, error)
+	Create(ctx *gin.Context, req *dtopermission.ResourceCreateReq) (*dtopermission.ResourceCreateResp, error)
+	Delete(ctx *gin.Context, req *dtopermission.ResourceDeleteReq) error
+	Update(ctx *gin.Context, req *dtopermission.ResourceUpdateReq) error
+	Detail(ctx *gin.Context, req *dtopermission.ResourceDetailReq) (*dtopermission.ResourceDetailResp, error)
+	PageList(ctx *gin.Context, req *dtopermission.ResourcePageListReq) (*dtopermission.ResourcePageListResp, error)
 }
 
 type resourceSvc struct {
@@ -30,7 +30,7 @@ func NewResourceSvc() ResourceSvc {
 	return &resourceSvc{}
 }
 
-func (svc *resourceSvc) Create(ctx *gin.Context, req *dtorole.ResourceCreateReq) (*dtorole.ResourceCreateResp, error) {
+func (svc *resourceSvc) Create(ctx *gin.Context, req *dtopermission.ResourceCreateReq) (*dtopermission.ResourceCreateResp, error) {
 	insertEntity := &model.ResourceEntity{
 		TenantID:       req.TenantID,
 		Name:           req.Name,
@@ -44,12 +44,12 @@ func (svc *resourceSvc) Create(ctx *gin.Context, req *dtorole.ResourceCreateReq)
 		glog.Errorf(ctx, "[svcresource.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ResourceCreateError)
 	}
-	return &dtorole.ResourceCreateResp{
+	return &dtopermission.ResourceCreateResp{
 		ResourceID: insertEntity.ID,
 	}, nil
 }
 
-func (svc *resourceSvc) Delete(ctx *gin.Context, req *dtorole.ResourceDeleteReq) error {
+func (svc *resourceSvc) Delete(ctx *gin.Context, req *dtopermission.ResourceDeleteReq) error {
 	resourceEntity, err := dao.NewResourceDao().GetByID(ctx, req.ResourceID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcresource.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -67,7 +67,7 @@ func (svc *resourceSvc) Delete(ctx *gin.Context, req *dtorole.ResourceDeleteReq)
 	return nil
 }
 
-func (svc *resourceSvc) Update(ctx *gin.Context, req *dtorole.ResourceUpdateReq) error {
+func (svc *resourceSvc) Update(ctx *gin.Context, req *dtopermission.ResourceUpdateReq) error {
 	resourceEntity, err := dao.NewResourceDao().GetByID(ctx, req.ResourceID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcresource.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -93,7 +93,7 @@ func (svc *resourceSvc) Update(ctx *gin.Context, req *dtorole.ResourceUpdateReq)
 	return nil
 }
 
-func (svc *resourceSvc) Detail(ctx *gin.Context, req *dtorole.ResourceDetailReq) (*dtorole.ResourceDetailResp, error) {
+func (svc *resourceSvc) Detail(ctx *gin.Context, req *dtopermission.ResourceDetailReq) (*dtopermission.ResourceDetailResp, error) {
 	resourceEntity, err := dao.NewResourceDao().GetByID(ctx, req.ResourceID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcresource.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -103,7 +103,7 @@ func (svc *resourceSvc) Detail(ctx *gin.Context, req *dtorole.ResourceDetailReq)
 		return nil, code.GetError(code.ResourceNotExistError)
 	}
 
-	resp := &dtorole.ResourceDetailResp{
+	resp := &dtopermission.ResourceDetailResp{
 		ResourceID: resourceEntity.ID,
 		ResourceBaseInfo: objresource.ResourceBaseInfo{
 			TenantID:       resourceEntity.TenantID,
@@ -116,7 +116,7 @@ func (svc *resourceSvc) Detail(ctx *gin.Context, req *dtorole.ResourceDetailReq)
 	return resp, nil
 }
 
-func (svc *resourceSvc) PageList(ctx *gin.Context, req *dtorole.ResourcePageListReq) (*dtorole.ResourcePageListResp, error) {
+func (svc *resourceSvc) PageList(ctx *gin.Context, req *dtopermission.ResourcePageListReq) (*dtopermission.ResourcePageListResp, error) {
 	cond := &dao.ResourceCond{
 		BaseCond: &genericdao.BaseCond{
 			Page:     req.Page,
@@ -132,9 +132,9 @@ func (svc *resourceSvc) PageList(ctx *gin.Context, req *dtorole.ResourcePageList
 		return nil, code.GetError(code.ResourceGetPageListError)
 	}
 
-	list := make([]dtorole.ResourcePageListItem, 0, len(resourceEntityList))
+	list := make([]dtopermission.ResourcePageListItem, 0, len(resourceEntityList))
 	for _, v := range resourceEntityList {
-		list = append(list, dtorole.ResourcePageListItem{
+		list = append(list, dtopermission.ResourcePageListItem{
 			ResourceID: v.ID,
 			ResourceBaseInfo: objresource.ResourceBaseInfo{
 				TenantID:       v.TenantID,
@@ -145,7 +145,7 @@ func (svc *resourceSvc) PageList(ctx *gin.Context, req *dtorole.ResourcePageList
 			},
 		})
 	}
-	return &dtorole.ResourcePageListResp{
+	return &dtopermission.ResourcePageListResp{
 		List:  list,
 		Total: total,
 	}, nil

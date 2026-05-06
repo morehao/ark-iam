@@ -27,3 +27,13 @@ type SystemPageListReq struct {
 type SystemDeleteReq struct {
 	SystemID uint `json:"systemID" binding:"required"` // 自增ID
 }
+
+type LogDetailReq struct {
+	LogID uint `json:"logID" binding:"required"` // 日志ID
+}
+
+type LogPageListReq struct {
+	gobject.PageQuery
+	TenantID uint   `json:"tenantID"` // 租户ID
+	Key      string `json:"key"`     // 日志键
+}

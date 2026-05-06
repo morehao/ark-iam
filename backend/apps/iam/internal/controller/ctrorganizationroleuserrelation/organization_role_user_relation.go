@@ -3,7 +3,7 @@ package ctrorganizationroleuserrelation
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoorganization"
-	"github.com/morehao/ark-iam/iam/internal/service/svcorganizationroleuserrelation"
+	"github.com/morehao/ark-iam/iam/internal/service/svcorganization"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -14,14 +14,14 @@ type OrganizationRoleUserRelationCtr interface {
 }
 
 type organizationRoleUserRelationCtr struct {
-	organizationRoleUserRelationSvc svcorganizationroleuserrelation.OrganizationRoleUserRelationSvc
+	organizationRoleUserRelationSvc svcorganization.OrganizationRoleUserRelationSvc
 }
 
 var _ OrganizationRoleUserRelationCtr = (*organizationRoleUserRelationCtr)(nil)
 
 func NewOrganizationRoleUserRelationCtr() OrganizationRoleUserRelationCtr {
 	return &organizationRoleUserRelationCtr{
-		organizationRoleUserRelationSvc: svcorganizationroleuserrelation.NewOrganizationRoleUserRelationSvc(),
+		organizationRoleUserRelationSvc: svcorganization.NewOrganizationRoleUserRelationSvc(),
 	}
 }
 
@@ -32,7 +32,7 @@ func NewOrganizationRoleUserRelationCtr() OrganizationRoleUserRelationCtr {
 // @Produce application/json
 // @Param req body dtoorganization.OrganizationRoleUserRelationCreateReq true "创建组织角色用户关系管理"
 // @Success 200 {object} gincontext.DtoRender{data=dtoorganization.OrganizationRoleUserRelationCreateResp} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
-// @Router /v1/iam/organizationroleuserrelation/create [post]
+// @Router /v1/iam/organization/create [post]
 func (ctr *organizationRoleUserRelationCtr) Create(ctx *gin.Context) {
 	var req dtoorganization.OrganizationRoleUserRelationCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -54,7 +54,7 @@ func (ctr *organizationRoleUserRelationCtr) Create(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtoorganization.OrganizationRoleUserRelationDeleteReq true "删除组织角色用户关系管理"
 // @Success 200 {object} gincontext.DtoRender{data=string} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
-// @Router /v1/iam/organizationroleuserrelation/delete [post]
+// @Router /v1/iam/organization/delete [post]
 func (ctr *organizationRoleUserRelationCtr) Delete(ctx *gin.Context) {
 	var req dtoorganization.OrganizationRoleUserRelationDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -75,7 +75,7 @@ func (ctr *organizationRoleUserRelationCtr) Delete(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtoorganization.OrganizationRoleUserRelationPageListReq true "组织角色用户关系管理列表"
 // @Success 200 {object} gincontext.DtoRender{data=dtoorganization.OrganizationRoleUserRelationPageListResp} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
-// @Router /v1/iam/organizationroleuserrelation/pageList [post]
+// @Router /v1/iam/organization/pageList [post]
 func (ctr *organizationRoleUserRelationCtr) PageList(ctx *gin.Context) {
 	var req dtoorganization.OrganizationRoleUserRelationPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {

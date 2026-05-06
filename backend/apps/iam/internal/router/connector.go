@@ -11,9 +11,9 @@ func connectorRouter(groups *ginserver.RouterGroups) {
 
 	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
 
-	v1RouterGroup.POST("/connector/create", connectorCtr.Create)
-	v1RouterGroup.POST("/connector/delete", connectorCtr.Delete)
-	v1RouterGroup.POST("/connector/update", connectorCtr.Update)
-	v1RouterGroup.GET("/connector/detail", connectorCtr.Detail)
-	v1RouterGroup.POST("/connector/pageList", connectorCtr.PageList)
+	v1RouterGroup.POST("/auth/create", connectorCtr.Create)
+	v1RouterGroup.POST("/auth/delete", connectorCtr.Delete)
+	v1RouterGroup.POST("/auth/update", connectorCtr.Update)
+	v1RouterGroup.GET("/auth/detail", connectorCtr.Detail)
+	v1RouterGroup.POST("/auth/pageList", connectorCtr.PageList)
 }

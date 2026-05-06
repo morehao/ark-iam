@@ -2,8 +2,8 @@ package ctruserrole
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtorole"
-	"github.com/morehao/ark-iam/iam/internal/service/svcuserrole"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtopermission"
+	"github.com/morehao/ark-iam/iam/internal/service/svcuser"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -14,14 +14,14 @@ type UserRoleCtr interface {
 }
 
 type userRoleCtr struct {
-	userRoleSvc svcuserrole.UserRoleSvc
+	userRoleSvc svcuser.UserRoleSvc
 }
 
 var _ UserRoleCtr = (*userRoleCtr)(nil)
 
 func NewUserRoleCtr() UserRoleCtr {
 	return &userRoleCtr{
-		userRoleSvc: svcuserrole.NewUserRoleSvc(),
+		userRoleSvc: svcuser.NewUserRoleSvc(),
 	}
 }
 
@@ -30,11 +30,11 @@ func NewUserRoleCtr() UserRoleCtr {
 // @Summary 创建用户角色关系管理
 // @accept application/json
 // @Produce application/json
-// @Param req body dtorole.UserRoleCreateReq true "创建用户角色关系管理"
-// @Success 200 {object} gincontext.DtoRender{data=dtorole.UserRoleCreateResp} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
-// @Router /v1/iam/userrole/create [post]
+// @Param req body dtopermission.UserRoleCreateReq true "创建用户角色关系管理"
+// @Success 200 {object} gincontext.DtoRender{data=dtopermission.UserRoleCreateResp} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
+// @Router /v1/iam/user/create [post]
 func (ctr *userRoleCtr) Create(ctx *gin.Context) {
-	var req dtorole.UserRoleCreateReq
+	var req dtopermission.UserRoleCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -52,11 +52,11 @@ func (ctr *userRoleCtr) Create(ctx *gin.Context) {
 // @Summary 删除用户角色关系管理
 // @accept application/json
 // @Produce application/json
-// @Param req body dtorole.UserRoleDeleteReq true "删除用户角色关系管理"
+// @Param req body dtopermission.UserRoleDeleteReq true "删除用户角色关系管理"
 // @Success 200 {object} gincontext.DtoRender{data=string} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
-// @Router /v1/iam/userrole/delete [post]
+// @Router /v1/iam/user/delete [post]
 func (ctr *userRoleCtr) Delete(ctx *gin.Context) {
-	var req dtorole.UserRoleDeleteReq
+	var req dtopermission.UserRoleDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -73,11 +73,11 @@ func (ctr *userRoleCtr) Delete(ctx *gin.Context) {
 // @Summary 用户角色关系管理列表分页
 // @accept application/json
 // @Produce application/json
-// @Param req body dtorole.UserRolePageListReq true "用户角色关系管理列表"
-// @Success 200 {object} gincontext.DtoRender{data=dtorole.UserRolePageListResp} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
-// @Router /v1/iam/userrole/pageList [post]
+// @Param req body dtopermission.UserRolePageListReq true "用户角色关系管理列表"
+// @Success 200 {object} gincontext.DtoRender{data=dtopermission.UserRolePageListResp} "{"code": 0, "requestID": "xxx", "data": "ok", "msg": "success"}"
+// @Router /v1/iam/user/pageList [post]
 func (ctr *userRoleCtr) PageList(ctx *gin.Context) {
-	var req dtorole.UserRolePageListReq
+	var req dtopermission.UserRolePageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return

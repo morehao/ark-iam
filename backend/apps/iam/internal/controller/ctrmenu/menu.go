@@ -2,8 +2,8 @@ package ctrmenu
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtomenu"
-	"github.com/morehao/ark-iam/iam/internal/service/svcmenu"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtopermission"
+	"github.com/morehao/ark-iam/iam/internal/service/svcpermission"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -17,19 +17,19 @@ type MenuCtr interface {
 }
 
 type menuCtr struct {
-	menuSvc svcmenu.MenuSvc
+	menuSvc svcpermission.MenuSvc
 }
 
 var _ MenuCtr = (*menuCtr)(nil)
 
 func NewMenuCtr() MenuCtr {
 	return &menuCtr{
-		menuSvc: svcmenu.NewMenuSvc(),
+		menuSvc: svcpermission.NewMenuSvc(),
 	}
 }
 
 func (ctr *menuCtr) Create(ctx *gin.Context) {
-	var req dtomenu.MenuCreateReq
+	var req dtopermission.MenuCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -43,7 +43,7 @@ func (ctr *menuCtr) Create(ctx *gin.Context) {
 }
 
 func (ctr *menuCtr) Delete(ctx *gin.Context) {
-	var req dtomenu.MenuDeleteReq
+	var req dtopermission.MenuDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -56,7 +56,7 @@ func (ctr *menuCtr) Delete(ctx *gin.Context) {
 }
 
 func (ctr *menuCtr) Update(ctx *gin.Context) {
-	var req dtomenu.MenuUpdateReq
+	var req dtopermission.MenuUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -69,7 +69,7 @@ func (ctr *menuCtr) Update(ctx *gin.Context) {
 }
 
 func (ctr *menuCtr) Detail(ctx *gin.Context) {
-	var req dtomenu.MenuDetailReq
+	var req dtopermission.MenuDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -83,7 +83,7 @@ func (ctr *menuCtr) Detail(ctx *gin.Context) {
 }
 
 func (ctr *menuCtr) PageList(ctx *gin.Context) {
-	var req dtomenu.MenuPageListReq
+	var req dtopermission.MenuPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -97,7 +97,7 @@ func (ctr *menuCtr) PageList(ctx *gin.Context) {
 }
 
 func (ctr *menuCtr) Tree(ctx *gin.Context) {
-	var req dtomenu.MenuTreeReq
+	var req dtopermission.MenuTreeReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return

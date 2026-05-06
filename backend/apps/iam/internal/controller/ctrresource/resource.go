@@ -2,7 +2,7 @@ package ctrresource
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtorole"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtopermission"
 	"github.com/morehao/ark-iam/iam/internal/service/svcresource"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
@@ -28,7 +28,7 @@ func NewResourceCtr() ResourceCtr {
 }
 
 func (ctr *resourceCtr) Create(ctx *gin.Context) {
-	var req dtorole.ResourceCreateReq
+	var req dtopermission.ResourceCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -42,7 +42,7 @@ func (ctr *resourceCtr) Create(ctx *gin.Context) {
 }
 
 func (ctr *resourceCtr) Delete(ctx *gin.Context) {
-	var req dtorole.ResourceDeleteReq
+	var req dtopermission.ResourceDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -55,7 +55,7 @@ func (ctr *resourceCtr) Delete(ctx *gin.Context) {
 }
 
 func (ctr *resourceCtr) Update(ctx *gin.Context) {
-	var req dtorole.ResourceUpdateReq
+	var req dtopermission.ResourceUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -68,7 +68,7 @@ func (ctr *resourceCtr) Update(ctx *gin.Context) {
 }
 
 func (ctr *resourceCtr) Detail(ctx *gin.Context) {
-	var req dtorole.ResourceDetailReq
+	var req dtopermission.ResourceDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -82,7 +82,7 @@ func (ctr *resourceCtr) Detail(ctx *gin.Context) {
 }
 
 func (ctr *resourceCtr) PageList(ctx *gin.Context) {
-	var req dtorole.ResourcePageListReq
+	var req dtopermission.ResourcePageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
