@@ -7,5 +7,4 @@ func RegisterRouter(groups *ginserver.RouterGroups, appName string) {
 	userRouter(groups)
 	permissionRouter(groups)
 	authRouter(groups)
-	auditRouter(groups)
 }
