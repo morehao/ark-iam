@@ -1,0 +1,11 @@
+.idea
+.vscode/*
+!.vscode/launch.json
+.DS_Store
+.history
+
+**/log/**
+backend/output/*
+frontend/node_modules/*
+frontend/dist/*
+.opencode/*
