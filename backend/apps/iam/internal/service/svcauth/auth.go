@@ -1,7 +1,6 @@
 package svcauth
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -18,16 +17,13 @@ import (
 	"github.com/morehao/ark-iam/pkg/token"
 	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
-	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
-	"github.com/morehao/golib/gutil"
 )
 
 const (
-	PasswordMinLength        = 6
-	TokenExpireDuration      = 24 * time.Hour
+	PasswordMinLength          = 6
+	TokenExpireDuration        = 24 * time.Hour
 	RefreshTokenExpireDuration = 7 * 24 * time.Hour
 )
 
@@ -65,12 +61,12 @@ func (svc *authSvc) Login(ctx *gin.Context, req *dtoauth.LoginReq) (*dtoauth.Log
 
 	if strings.Contains(identifier, "@") {
 		userEntity, err = userDao.GetByCond(ctx, &dao.UserCond{
-			TenantID:    req.TenantID,
+			TenantID:     req.TenantID,
 			PrimaryEmail: identifier,
 		})
 	} else if len(identifier) >= 11 && strings.HasPrefix(identifier, "1") {
 		userEntity, err = userDao.GetByCond(ctx, &dao.UserCond{
-			TenantID:    req.TenantID,
+			TenantID:     req.TenantID,
 			PrimaryPhone: identifier,
 		})
 	} else {
@@ -138,7 +134,7 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 
 	if req.PrimaryEmail != "" {
 		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
-			TenantID:    req.TenantID,
+			TenantID:     req.TenantID,
 			PrimaryEmail: req.PrimaryEmail,
 		})
 		if existingUser != nil && existingUser.ID != 0 {
@@ -148,7 +144,7 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 
 	if req.PrimaryPhone != "" {
 		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
-			TenantID:    req.TenantID,
+			TenantID:     req.TenantID,
 			PrimaryPhone: req.PrimaryPhone,
 		})
 		if existingUser != nil && existingUser.ID != 0 {
@@ -538,415 +534,4 @@ func (svc *authSvc) recordLoginLog(ctx *gin.Context, tenantID, userID uint, succ
 			glog.Errorf(ctx, "[svcauth.recordLoginLog] update last_sign_in_at fail, err:%v", err)
 		}
 	}
-}
-
-type ConnectorSvc interface {
-	Create(ctx *gin.Context, req *dtoauth.ConnectorCreateReq) (*dtoauth.ConnectorCreateResp, error)
-	Delete(ctx *gin.Context, req *dtoauth.ConnectorDeleteReq) error
-	Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateReq) error
-	Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailReq) (*dtoauth.ConnectorDetailResp, error)
-	PageList(ctx *gin.Context, req *dtoauth.ConnectorPageListReq) (*dtoauth.ConnectorPageListResp, error)
-}
-
-type connectorSvc struct {
-}
-
-var _ ConnectorSvc = (*connectorSvc)(nil)
-
-func NewConnectorSvc() ConnectorSvc {
-	return &connectorSvc{}
-}
-
-func (svc *connectorSvc) Create(ctx *gin.Context, req *dtoauth.ConnectorCreateReq) (*dtoauth.ConnectorCreateResp, error) {
-	configJson, err := json.Marshal(req.Config)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.CreateConnector] json.Marshal config fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.ConnectorCreateError)
-	}
-	metadataJson, err := json.Marshal(req.Metadata)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.CreateConnector] json.Marshal metadata fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.ConnectorCreateError)
-	}
-
-	insertEntity := &model.ConnectorEntity{
-		TenantID:           req.TenantID,
-		SyncProfile:        req.SyncProfile,
-		EnableTokenStorage: req.EnableTokenStorage,
-		ConnectorID:        req.ConnectorID,
-		Config:             configJson,
-		Metadata:           metadataJson,
-		CreatedBy:          gincontext.GetUserID(ctx),
-	}
-
-	if err := dao.NewConnectorDao().Insert(ctx, insertEntity); err != nil {
-		glog.Errorf(ctx, "[svcauth.CreateConnector] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.ConnectorCreateError)
-	}
-	return &dtoauth.ConnectorCreateResp{
-		ConnectorID: insertEntity.ID,
-	}, nil
-}
-
-func (svc *connectorSvc) Delete(ctx *gin.Context, req *dtoauth.ConnectorDeleteReq) error {
-	connectorEntity, err := dao.NewConnectorDao().GetByID(ctx, req.ConnectorID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.DeleteConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.ConnectorDeleteError)
-	}
-	if connectorEntity == nil || connectorEntity.ID == 0 {
-		return code.GetError(code.ConnectorNotExistError)
-	}
-
-	userID := gincontext.GetUserID(ctx)
-	if err := dao.NewConnectorDao().Delete(ctx, req.ConnectorID, userID); err != nil {
-		glog.Errorf(ctx, "[svcauth.DeleteConnector] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.ConnectorDeleteError)
-	}
-	return nil
-}
-
-func (svc *connectorSvc) Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateReq) error {
-	connectorEntity, err := dao.NewConnectorDao().GetByID(ctx, req.ConnectorID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.UpdateConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.ConnectorUpdateError)
-	}
-	if connectorEntity == nil || connectorEntity.ID == 0 {
-		return code.GetError(code.ConnectorNotExistError)
-	}
-
-	configJson, err := json.Marshal(req.Config)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.UpdateConnector] json.Marshal config fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.ConnectorUpdateError)
-	}
-	metadataJson, err := json.Marshal(req.Metadata)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.UpdateConnector] json.Marshal metadata fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.ConnectorUpdateError)
-	}
-
-	userID := gincontext.GetUserID(ctx)
-	updateMap := map[string]any{
-		"tenant_id":            req.TenantID,
-		"sync_profile":         req.SyncProfile,
-		"enable_token_storage": req.EnableTokenStorage,
-		"connector_id":         req.ConnectorID,
-		"config":               configJson,
-		"metadata":             metadataJson,
-		"updated_by":           userID,
-	}
-	if err := dao.NewConnectorDao().UpdateMap(ctx, req.ConnectorID, updateMap); err != nil {
-		glog.Errorf(ctx, "[svcauth.UpdateConnector] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.ConnectorUpdateError)
-	}
-	return nil
-}
-
-func (svc *connectorSvc) Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailReq) (*dtoauth.ConnectorDetailResp, error) {
-	connectorEntity, err := dao.NewConnectorDao().GetByID(ctx, req.ConnectorID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.DetailConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.ConnectorGetDetailError)
-	}
-	if connectorEntity == nil || connectorEntity.ID == 0 {
-		return nil, code.GetError(code.ConnectorNotExistError)
-	}
-
-	var config any
-	if err := json.Unmarshal(connectorEntity.Config, &config); err != nil {
-		glog.Errorf(ctx, "[svcauth.DetailConnector] json.Unmarshal config fail, err:%v", err)
-		return nil, code.GetError(code.ConnectorGetDetailError)
-	}
-	var metadata any
-	if err := json.Unmarshal(connectorEntity.Metadata, &metadata); err != nil {
-		glog.Errorf(ctx, "[svcauth.DetailConnector] json.Unmarshal metadata fail, err:%v", err)
-		return nil, code.GetError(code.ConnectorGetDetailError)
-	}
-
-	resp := &dtoauth.ConnectorDetailResp{
-		ConnectorID: connectorEntity.ID,
-		ConnectorBaseInfo: objauth.ConnectorBaseInfo{
-			TenantID:           connectorEntity.TenantID,
-			SyncProfile:        connectorEntity.SyncProfile,
-			EnableTokenStorage: connectorEntity.EnableTokenStorage,
-			ConnectorID:        connectorEntity.ConnectorID,
-			Config:             config,
-			Metadata:           metadata,
-		},
-		OperatorBaseInfo: gobject.OperatorBaseInfo{
-			CreatedAt: connectorEntity.CreatedAt.Unix(),
-			UpdatedAt: connectorEntity.UpdatedAt.Unix(),
-		},
-	}
-	return resp, nil
-}
-
-func (svc *connectorSvc) PageList(ctx *gin.Context, req *dtoauth.ConnectorPageListReq) (*dtoauth.ConnectorPageListResp, error) {
-	cond := &dao.ConnectorCond{
-		BaseCond: &genericdao.BaseCond{
-			Page:     req.Page,
-			PageSize: req.PageSize,
-		},
-		TenantID:    req.TenantID,
-		ConnectorID: req.ConnectorID,
-	}
-	connectorEntityList, total, err := dao.NewConnectorDao().GetPageListByCond(ctx, cond)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.PageListConnector] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.ConnectorGetPageListError)
-	}
-
-	list := make([]dtoauth.ConnectorPageListItem, 0, len(connectorEntityList))
-	for _, v := range connectorEntityList {
-		var config any
-		if err := json.Unmarshal(v.Config, &config); err != nil {
-			glog.Errorf(ctx, "[svcauth.PageListConnector] json.Unmarshal config fail, err:%v", err)
-			continue
-		}
-		var metadata any
-		if err := json.Unmarshal(v.Metadata, &metadata); err != nil {
-			glog.Errorf(ctx, "[svcauth.PageListConnector] json.Unmarshal metadata fail, err:%v", err)
-			continue
-		}
-		list = append(list, dtoauth.ConnectorPageListItem{
-			ConnectorID: v.ID,
-			ConnectorBaseInfo: objauth.ConnectorBaseInfo{
-				TenantID:           v.TenantID,
-				SyncProfile:        v.SyncProfile,
-				EnableTokenStorage: v.EnableTokenStorage,
-				ConnectorID:        v.ConnectorID,
-				Config:             config,
-				Metadata:           metadata,
-			},
-			OperatorBaseInfo: gobject.OperatorBaseInfo{
-				UpdatedAt: v.UpdatedAt.Unix(),
-			},
-		})
-	}
-	return &dtoauth.ConnectorPageListResp{
-		List:  list,
-		Total: total,
-	}, nil
-}
-
-type SsoConnectorSvc interface {
-	Create(ctx *gin.Context, req *dtoauth.SsoConnectorCreateReq) (*dtoauth.SsoConnectorCreateResp, error)
-	Delete(ctx *gin.Context, req *dtoauth.SsoConnectorDeleteReq) error
-	Update(ctx *gin.Context, req *dtoauth.SsoConnectorUpdateReq) error
-	Detail(ctx *gin.Context, req *dtoauth.SsoConnectorDetailReq) (*dtoauth.SsoConnectorDetailResp, error)
-	PageList(ctx *gin.Context, req *dtoauth.SsoConnectorPageListReq) (*dtoauth.SsoConnectorPageListResp, error)
-}
-
-type ssoConnectorSvc struct {
-}
-
-var _ SsoConnectorSvc = (*ssoConnectorSvc)(nil)
-
-func NewSsoConnectorSvc() SsoConnectorSvc {
-	return &ssoConnectorSvc{}
-}
-
-func (svc *ssoConnectorSvc) Create(ctx *gin.Context, req *dtoauth.SsoConnectorCreateReq) (*dtoauth.SsoConnectorCreateResp, error) {
-	configJson, err := json.Marshal(req.Config)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.CreateSsoConnector] json.Marshal config fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.SsoConnectorCreateError)
-	}
-	domainsJson, err := json.Marshal(req.Domains)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.CreateSsoConnector] json.Marshal domains fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.SsoConnectorCreateError)
-	}
-	brandingJson, err := json.Marshal(req.Branding)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.CreateSsoConnector] json.Marshal branding fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.SsoConnectorCreateError)
-	}
-
-	insertEntity := &model.SsoConnectorEntity{
-		TenantID:           req.TenantID,
-		ProviderName:       req.ProviderName,
-		ConnectorName:      req.ConnectorName,
-		Config:             configJson,
-		Domains:            domainsJson,
-		Branding:           brandingJson,
-		SyncProfile:        req.SyncProfile,
-		EnableTokenStorage: req.EnableTokenStorage,
-		CreatedBy:          gincontext.GetUserID(ctx),
-	}
-
-	if err := dao.NewSsoConnectorDao().Insert(ctx, insertEntity); err != nil {
-		glog.Errorf(ctx, "[svcauth.CreateSsoConnector] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.SsoConnectorCreateError)
-	}
-	return &dtoauth.SsoConnectorCreateResp{
-		SsoConnectorID: insertEntity.ID,
-	}, nil
-}
-
-func (svc *ssoConnectorSvc) Delete(ctx *gin.Context, req *dtoauth.SsoConnectorDeleteReq) error {
-	ssoConnectorEntity, err := dao.NewSsoConnectorDao().GetByID(ctx, req.SsoConnectorID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.DeleteSsoConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.SsoConnectorDeleteError)
-	}
-	if ssoConnectorEntity == nil || ssoConnectorEntity.ID == 0 {
-		return code.GetError(code.SsoConnectorNotExistError)
-	}
-
-	userID := gincontext.GetUserID(ctx)
-	if err := dao.NewSsoConnectorDao().Delete(ctx, req.SsoConnectorID, userID); err != nil {
-		glog.Errorf(ctx, "[svcauth.DeleteSsoConnector] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.SsoConnectorDeleteError)
-	}
-	return nil
-}
-
-func (svc *ssoConnectorSvc) Update(ctx *gin.Context, req *dtoauth.SsoConnectorUpdateReq) error {
-	ssoConnectorEntity, err := dao.NewSsoConnectorDao().GetByID(ctx, req.SsoConnectorID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.UpdateSsoConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.SsoConnectorUpdateError)
-	}
-	if ssoConnectorEntity == nil || ssoConnectorEntity.ID == 0 {
-		return code.GetError(code.SsoConnectorNotExistError)
-	}
-
-	configJson, err := json.Marshal(req.Config)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.UpdateSsoConnector] json.Marshal config fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.SsoConnectorUpdateError)
-	}
-	domainsJson, err := json.Marshal(req.Domains)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.UpdateSsoConnector] json.Marshal domains fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.SsoConnectorUpdateError)
-	}
-	brandingJson, err := json.Marshal(req.Branding)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.UpdateSsoConnector] json.Marshal branding fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.SsoConnectorUpdateError)
-	}
-
-	userID := gincontext.GetUserID(ctx)
-	updateMap := map[string]any{
-		"tenant_id":            req.TenantID,
-		"provider_name":         req.ProviderName,
-		"connector_name":        req.ConnectorName,
-		"config":                configJson,
-		"domains":               domainsJson,
-		"branding":              brandingJson,
-		"sync_profile":          req.SyncProfile,
-		"enable_token_storage":  req.EnableTokenStorage,
-		"updated_by":            userID,
-	}
-	if err := dao.NewSsoConnectorDao().UpdateMap(ctx, req.SsoConnectorID, updateMap); err != nil {
-		glog.Errorf(ctx, "[svcauth.UpdateSsoConnector] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.SsoConnectorUpdateError)
-	}
-	return nil
-}
-
-func (svc *ssoConnectorSvc) Detail(ctx *gin.Context, req *dtoauth.SsoConnectorDetailReq) (*dtoauth.SsoConnectorDetailResp, error) {
-	ssoConnectorEntity, err := dao.NewSsoConnectorDao().GetByID(ctx, req.SsoConnectorID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.DetailSsoConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.SsoConnectorGetDetailError)
-	}
-	if ssoConnectorEntity == nil || ssoConnectorEntity.ID == 0 {
-		return nil, code.GetError(code.SsoConnectorNotExistError)
-	}
-
-	var config any
-	if err := json.Unmarshal(ssoConnectorEntity.Config, &config); err != nil {
-		glog.Errorf(ctx, "[svcauth.DetailSsoConnector] json.Unmarshal config fail, err:%v", err)
-		return nil, code.GetError(code.SsoConnectorGetDetailError)
-	}
-	var domains any
-	if err := json.Unmarshal(ssoConnectorEntity.Domains, &domains); err != nil {
-		glog.Errorf(ctx, "[svcauth.DetailSsoConnector] json.Unmarshal domains fail, err:%v", err)
-		return nil, code.GetError(code.SsoConnectorGetDetailError)
-	}
-	var branding any
-	if err := json.Unmarshal(ssoConnectorEntity.Branding, &branding); err != nil {
-		glog.Errorf(ctx, "[svcauth.DetailSsoConnector] json.Unmarshal branding fail, err:%v", err)
-		return nil, code.GetError(code.SsoConnectorGetDetailError)
-	}
-
-	resp := &dtoauth.SsoConnectorDetailResp{
-		SsoConnectorID: ssoConnectorEntity.ID,
-		SsoConnectorBaseInfo: objauth.SsoConnectorBaseInfo{
-			TenantID:           ssoConnectorEntity.TenantID,
-			ProviderName:       ssoConnectorEntity.ProviderName,
-			ConnectorName:      ssoConnectorEntity.ConnectorName,
-			Config:             config,
-			Domains:            domains,
-			Branding:           branding,
-			SyncProfile:        ssoConnectorEntity.SyncProfile,
-			EnableTokenStorage: ssoConnectorEntity.EnableTokenStorage,
-		},
-		OperatorBaseInfo: gobject.OperatorBaseInfo{
-			CreatedAt: ssoConnectorEntity.CreatedAt.Unix(),
-			UpdatedAt: ssoConnectorEntity.UpdatedAt.Unix(),
-		},
-	}
-	return resp, nil
-}
-
-func (svc *ssoConnectorSvc) PageList(ctx *gin.Context, req *dtoauth.SsoConnectorPageListReq) (*dtoauth.SsoConnectorPageListResp, error) {
-	cond := &dao.SsoConnectorCond{
-		BaseCond: &genericdao.BaseCond{
-			Page:     req.Page,
-			PageSize: req.PageSize,
-		},
-		TenantID:      req.TenantID,
-		ProviderName:  req.ProviderName,
-		ConnectorName: req.ConnectorName,
-	}
-	ssoConnectorEntityList, total, err := dao.NewSsoConnectorDao().GetPageListByCond(ctx, cond)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.PageListSsoConnector] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.SsoConnectorGetPageListError)
-	}
-
-	list := make([]dtoauth.SsoConnectorPageListItem, 0, len(ssoConnectorEntityList))
-	for _, v := range ssoConnectorEntityList {
-		var config any
-		if err := json.Unmarshal(v.Config, &config); err != nil {
-			glog.Errorf(ctx, "[svcauth.PageListSsoConnector] json.Unmarshal config fail, err:%v", err)
-			continue
-		}
-		var domains any
-		if err := json.Unmarshal(v.Domains, &domains); err != nil {
-			glog.Errorf(ctx, "[svcauth.PageListSsoConnector] json.Unmarshal domains fail, err:%v", err)
-			continue
-		}
-		var branding any
-		if err := json.Unmarshal(v.Branding, &branding); err != nil {
-			glog.Errorf(ctx, "[svcauth.PageListSsoConnector] json.Unmarshal branding fail, err:%v", err)
-			continue
-		}
-		list = append(list, dtoauth.SsoConnectorPageListItem{
-			SsoConnectorID: v.ID,
-			SsoConnectorBaseInfo: objauth.SsoConnectorBaseInfo{
-				TenantID:           v.TenantID,
-				ProviderName:       v.ProviderName,
-				ConnectorName:      v.ConnectorName,
-				Config:             config,
-				Domains:            domains,
-				Branding:           branding,
-				SyncProfile:        v.SyncProfile,
-				EnableTokenStorage: v.EnableTokenStorage,
-			},
-			OperatorBaseInfo: gobject.OperatorBaseInfo{
-				UpdatedAt: v.UpdatedAt.Unix(),
-			},
-		})
-	}
-	return &dtoauth.SsoConnectorPageListResp{
-		List:  list,
-		Total: total,
-	}, nil
 }

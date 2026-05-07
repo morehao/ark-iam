@@ -3,16 +3,37 @@ package ctrpermission
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtopermission"
+	"github.com/morehao/ark-iam/iam/internal/service/svcpermission"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
-func (ctr *permissionCtr) CreateScope(ctx *gin.Context) {
+type ScopeCtr interface {
+	Create(ctx *gin.Context)
+	Delete(ctx *gin.Context)
+	Update(ctx *gin.Context)
+	Detail(ctx *gin.Context)
+	PageList(ctx *gin.Context)
+}
+
+type scopeCtr struct {
+	scopeSvc svcpermission.ScopeSvc
+}
+
+var _ ScopeCtr = (*scopeCtr)(nil)
+
+func NewScopeCtr() ScopeCtr {
+	return &scopeCtr{
+		scopeSvc: svcpermission.NewScopeSvc(),
+	}
+}
+
+func (ctr *scopeCtr) Create(ctx *gin.Context) {
 	var req dtopermission.ScopeCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.permissionSvc.CreateScope(ctx, &req)
+	res, err := ctr.scopeSvc.Create(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -20,39 +41,39 @@ func (ctr *permissionCtr) CreateScope(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
-func (ctr *permissionCtr) DeleteScope(ctx *gin.Context) {
+func (ctr *scopeCtr) Delete(ctx *gin.Context) {
 	var req dtopermission.ScopeDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.permissionSvc.DeleteScope(ctx, &req); err != nil {
+	if err := ctr.scopeSvc.Delete(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
 	gincontext.Success(ctx, "删除成功")
 }
 
-func (ctr *permissionCtr) UpdateScope(ctx *gin.Context) {
+func (ctr *scopeCtr) Update(ctx *gin.Context) {
 	var req dtopermission.ScopeUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.permissionSvc.UpdateScope(ctx, &req); err != nil {
+	if err := ctr.scopeSvc.Update(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
 	gincontext.Success(ctx, "修改成功")
 }
 
-func (ctr *permissionCtr) DetailScope(ctx *gin.Context) {
+func (ctr *scopeCtr) Detail(ctx *gin.Context) {
 	var req dtopermission.ScopeDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.permissionSvc.DetailScope(ctx, &req)
+	res, err := ctr.scopeSvc.Detail(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -60,13 +81,13 @@ func (ctr *permissionCtr) DetailScope(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
-func (ctr *permissionCtr) PageListScope(ctx *gin.Context) {
+func (ctr *scopeCtr) PageList(ctx *gin.Context) {
 	var req dtopermission.ScopePageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.permissionSvc.PageListScope(ctx, &req)
+	res, err := ctr.scopeSvc.PageList(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
