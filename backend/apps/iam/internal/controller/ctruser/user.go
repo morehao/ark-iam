@@ -257,7 +257,7 @@ func (ctr *userCtr) PageListUserLoginLog(ctx *gin.Context) {
 // @accept application/json
 // @Produce application/json
 // @Param req query dtouser.UserLoginLogByUserReq true "获取用户登录日志"
-// @Success 200 {object} gincontext.DtoRender{data=dtouser.UserLoginLogByUserResp}
+// @Success 200 {object} gincontext.DtoRender{data=dtouser.UserLoginLogPageListResp}
 // @Router /v1/iam/user/getUserLoginLogByUser [get]
 func (ctr *userCtr) GetUserLoginLogByUser(ctx *gin.Context) {
 	var req dtouser.UserLoginLogByUserReq
@@ -381,7 +381,7 @@ func (ctr *userCtr) PageListUserDepartmentRelation(ctx *gin.Context) {
 // @accept application/json
 // @Produce application/json
 // @Param req query dtouser.UserDepartmentRelationByUserReq true "获取用户部门关联"
-// @Success 200 {object} gincontext.DtoRender{data=dtouser.UserDepartmentRelationByUserResp}
+// @Success 200 {object} gincontext.DtoRender{data=dtouser.UserDepartmentRelationPageListResp}
 // @Router /v1/iam/user/getUserDepartmentRelationByUser [get]
 func (ctr *userCtr) GetUserDepartmentRelationByUser(ctx *gin.Context) {
 	var req dtouser.UserDepartmentRelationByUserReq
@@ -505,7 +505,7 @@ func (ctr *userCtr) PageListUserIdentity(ctx *gin.Context) {
 // @accept application/json
 // @Produce application/json
 // @Param req query dtouser.UserIdentityByUserReq true "获取用户身份"
-// @Success 200 {object} gincontext.DtoRender{data=dtouser.UserIdentityByUserResp}
+// @Success 200 {object} gincontext.DtoRender{data=dtouser.UserIdentityPageListResp}
 // @Router /v1/iam/user/getUserIdentityByUser [get]
 func (ctr *userCtr) GetUserIdentityByUser(ctx *gin.Context) {
 	var req dtouser.UserIdentityByUserReq

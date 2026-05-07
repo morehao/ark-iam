@@ -14,7 +14,9276 @@ const docTemplateiam = `{
     },
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
-    "paths": {}
+    "paths": {
+        "/v1/iam/application/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用管理"
+                ],
+                "summary": "创建应用管理",
+                "parameters": [
+                    {
+                        "description": "创建应用管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoapplication.ApplicationCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoapplication.ApplicationCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/application/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用管理"
+                ],
+                "summary": "删除应用管理",
+                "parameters": [
+                    {
+                        "description": "删除应用管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoapplication.ApplicationDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/application/detail": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用管理"
+                ],
+                "summary": "应用管理详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "应用ID",
+                        "name": "applicationID",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoapplication.ApplicationDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/application/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用管理"
+                ],
+                "summary": "应用管理列表分页",
+                "parameters": [
+                    {
+                        "description": "应用管理列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoapplication.ApplicationPageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoapplication.ApplicationPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/application/update": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用管理"
+                ],
+                "summary": "修改应用管理",
+                "parameters": [
+                    {
+                        "description": "修改应用管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoapplication.ApplicationUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/authorizationUrl": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "认证"
+                ],
+                "summary": "获取SSO授权URL",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "连接器ID",
+                        "name": "connectorId",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoauth.SsoAuthorizationUrlResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/callback": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "认证"
+                ],
+                "summary": "SSO回调",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "授权码",
+                        "name": "code",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "连接器ID",
+                        "name": "connectorId",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "状态",
+                        "name": "state",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoauth.SsoCallbackResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/connector/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "连接器"
+                ],
+                "summary": "创建连接器",
+                "parameters": [
+                    {
+                        "description": "创建连接器",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoauth.ConnectorCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoauth.ConnectorCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/connector/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "连接器"
+                ],
+                "summary": "删除连接器",
+                "parameters": [
+                    {
+                        "description": "删除连接器",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoauth.ConnectorDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/connector/detail": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "连接器"
+                ],
+                "summary": "连接器详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "连接器ID",
+                        "name": "connectorID",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoauth.ConnectorDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/connector/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "连接器"
+                ],
+                "summary": "连接器列表分页",
+                "parameters": [
+                    {
+                        "description": "连接器列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoauth.ConnectorPageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoauth.ConnectorPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/connector/update": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "连接器"
+                ],
+                "summary": "修改连接器",
+                "parameters": [
+                    {
+                        "description": "修改连接器",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoauth.ConnectorUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/department/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "部门"
+                ],
+                "summary": "创建部门",
+                "parameters": [
+                    {
+                        "description": "创建部门",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.DepartmentCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.DepartmentCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/department/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "部门"
+                ],
+                "summary": "删除部门",
+                "parameters": [
+                    {
+                        "description": "删除部门",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.DepartmentDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/department/detail": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "部门"
+                ],
+                "summary": "部门详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "部门ID",
+                        "name": "departmentID",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.DepartmentDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/department/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "部门"
+                ],
+                "summary": "部门列表分页",
+                "parameters": [
+                    {
+                        "description": "部门列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.DepartmentPageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.DepartmentPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/department/tree": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "部门"
+                ],
+                "summary": "部门树",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "租户ID",
+                        "name": "tenantID",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.DepartmentTreeResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/department/update": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "部门"
+                ],
+                "summary": "修改部门",
+                "parameters": [
+                    {
+                        "description": "修改部门",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.DepartmentUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/log/detail": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "日志"
+                ],
+                "summary": "日志详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "日志ID",
+                        "name": "logID",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.LogDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/log/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "日志"
+                ],
+                "summary": "日志列表分页",
+                "parameters": [
+                    {
+                        "description": "日志列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.LogPageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.LogPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/login": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "认证"
+                ],
+                "summary": "用户登录",
+                "parameters": [
+                    {
+                        "description": "用户登录",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoauth.LoginReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoauth.LoginResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/logout": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "认证"
+                ],
+                "summary": "用户登出",
+                "parameters": [
+                    {
+                        "description": "用户登出",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoauth.LogoutReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/menu/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单管理"
+                ],
+                "summary": "创建菜单管理",
+                "parameters": [
+                    {
+                        "description": "创建菜单管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.MenuCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.MenuCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/menu/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单管理"
+                ],
+                "summary": "删除菜单管理",
+                "parameters": [
+                    {
+                        "description": "删除菜单管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.MenuDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/menu/detail": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单管理"
+                ],
+                "summary": "菜单管理详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "菜单ID",
+                        "name": "menuID",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.MenuDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/menu/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单管理"
+                ],
+                "summary": "菜单管理列表分页",
+                "parameters": [
+                    {
+                        "description": "菜单管理列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.MenuPageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.MenuPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/menu/tree": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单管理"
+                ],
+                "summary": "菜单管理树",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "租户ID",
+                        "name": "tenantID",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.MenuTreeResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/menu/update": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单管理"
+                ],
+                "summary": "修改菜单管理",
+                "parameters": [
+                    {
+                        "description": "修改菜单管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.MenuUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/organization/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织"
+                ],
+                "summary": "创建组织",
+                "parameters": [
+                    {
+                        "description": "创建组织",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.OrganizationCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.OrganizationCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/organization/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织"
+                ],
+                "summary": "删除组织",
+                "parameters": [
+                    {
+                        "description": "删除组织",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.OrganizationDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/organization/detail": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织"
+                ],
+                "summary": "组织详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "组织ID",
+                        "name": "organizationID",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.OrganizationDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/organization/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织"
+                ],
+                "summary": "组织列表分页",
+                "parameters": [
+                    {
+                        "description": "组织列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.OrganizationPageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.OrganizationPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/organization/update": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织"
+                ],
+                "summary": "修改组织",
+                "parameters": [
+                    {
+                        "description": "修改组织",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.OrganizationUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/organizationRole/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织角色"
+                ],
+                "summary": "创建组织角色",
+                "parameters": [
+                    {
+                        "description": "创建组织角色",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.OrganizationRoleCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.OrganizationRoleCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/organizationRole/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织角色"
+                ],
+                "summary": "删除组织角色",
+                "parameters": [
+                    {
+                        "description": "删除组织角色",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.OrganizationRoleDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/organizationRole/detail": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织角色"
+                ],
+                "summary": "组织角色详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "组织角色ID",
+                        "name": "organizationRoleID",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.OrganizationRoleDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/organizationRole/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织角色"
+                ],
+                "summary": "组织角色列表分页",
+                "parameters": [
+                    {
+                        "description": "组织角色列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.OrganizationRolePageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.OrganizationRolePageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/organizationRole/update": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织角色"
+                ],
+                "summary": "修改组织角色",
+                "parameters": [
+                    {
+                        "description": "修改组织角色",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.OrganizationRoleUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/organizationRoleUser/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织角色用户关联"
+                ],
+                "summary": "创建组织角色用户关联",
+                "parameters": [
+                    {
+                        "description": "创建组织角色用户关联",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.OrganizationRoleUserRelationCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.OrganizationRoleUserRelationCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/organizationRoleUser/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织角色用户关联"
+                ],
+                "summary": "删除组织角色用户关联",
+                "parameters": [
+                    {
+                        "description": "删除组织角色用户关联",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.OrganizationRoleUserRelationDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/organizationRoleUser/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织角色用户关联"
+                ],
+                "summary": "组织角色用户关联列表分页",
+                "parameters": [
+                    {
+                        "description": "组织角色用户关联列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.OrganizationRoleUserRelationPageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.OrganizationRoleUserRelationPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/organizationUser/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织用户关联"
+                ],
+                "summary": "创建组织用户关联",
+                "parameters": [
+                    {
+                        "description": "创建组织用户关联",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.OrganizationUserRelationCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.OrganizationUserRelationCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/organizationUser/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织用户关联"
+                ],
+                "summary": "删除组织用户关联",
+                "parameters": [
+                    {
+                        "description": "删除组织用户关联",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.OrganizationUserRelationDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/organizationUser/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织用户关联"
+                ],
+                "summary": "组织用户关联列表分页",
+                "parameters": [
+                    {
+                        "description": "组织用户关联列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.OrganizationUserRelationPageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.OrganizationUserRelationPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/refreshToken": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "认证"
+                ],
+                "summary": "刷新令牌",
+                "parameters": [
+                    {
+                        "description": "刷新令牌",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoauth.RefreshTokenReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoauth.RefreshTokenResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/register": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "认证"
+                ],
+                "summary": "用户注册",
+                "parameters": [
+                    {
+                        "description": "用户注册",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoauth.RegisterReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoauth.RegisterResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/resource/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "资源管理"
+                ],
+                "summary": "创建资源管理",
+                "parameters": [
+                    {
+                        "description": "创建资源管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.ResourceCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.ResourceCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/resource/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "资源管理"
+                ],
+                "summary": "删除资源管理",
+                "parameters": [
+                    {
+                        "description": "删除资源管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.ResourceDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/resource/detail": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "资源管理"
+                ],
+                "summary": "资源管理详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "资源ID",
+                        "name": "resourceID",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.ResourceDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/resource/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "资源管理"
+                ],
+                "summary": "资源管理列表分页",
+                "parameters": [
+                    {
+                        "description": "资源管理列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.ResourcePageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.ResourcePageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/resource/update": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "资源管理"
+                ],
+                "summary": "修改资源管理",
+                "parameters": [
+                    {
+                        "description": "修改资源管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.ResourceUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/role/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色管理"
+                ],
+                "summary": "创建角色管理",
+                "parameters": [
+                    {
+                        "description": "创建角色管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.RoleCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.RoleCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/role/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色管理"
+                ],
+                "summary": "删除角色管理",
+                "parameters": [
+                    {
+                        "description": "删除角色管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.RoleDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/role/detail": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色管理"
+                ],
+                "summary": "角色管理详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "角色ID",
+                        "name": "roleID",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.RoleDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/role/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色管理"
+                ],
+                "summary": "角色管理列表分页",
+                "parameters": [
+                    {
+                        "description": "角色管理列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.RolePageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.RolePageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/role/update": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色管理"
+                ],
+                "summary": "修改角色管理",
+                "parameters": [
+                    {
+                        "description": "修改角色管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.RoleUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/roleMenu/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色菜单"
+                ],
+                "summary": "创建角色菜单",
+                "parameters": [
+                    {
+                        "description": "创建角色菜单",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.RoleMenuCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.RoleMenuCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/roleMenu/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色菜单"
+                ],
+                "summary": "删除角色菜单",
+                "parameters": [
+                    {
+                        "description": "删除角色菜单",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.RoleMenuDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/roleMenu/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色菜单"
+                ],
+                "summary": "角色菜单列表分页",
+                "parameters": [
+                    {
+                        "description": "角色菜单列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.RoleMenuPageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.RoleMenuPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/roleScope/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色权限范围"
+                ],
+                "summary": "创建角色权限范围",
+                "parameters": [
+                    {
+                        "description": "创建角色权限范围",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.RoleScopeCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.RoleScopeCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/roleScope/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色权限范围"
+                ],
+                "summary": "删除角色权限范围",
+                "parameters": [
+                    {
+                        "description": "删除角色权限范围",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.RoleScopeDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/roleScope/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色权限范围"
+                ],
+                "summary": "角色权限范围列表分页",
+                "parameters": [
+                    {
+                        "description": "角色权限范围列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.RoleScopePageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.RoleScopePageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/scope/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "权限范围"
+                ],
+                "summary": "创建权限范围",
+                "parameters": [
+                    {
+                        "description": "创建权限范围",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.ScopeCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.ScopeCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/scope/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "权限范围"
+                ],
+                "summary": "删除权限范围",
+                "parameters": [
+                    {
+                        "description": "删除权限范围",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.ScopeDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/scope/detail": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "权限范围"
+                ],
+                "summary": "权限范围详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "权限ID",
+                        "name": "scopeID",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.ScopeDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/scope/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "权限范围"
+                ],
+                "summary": "权限范围列表分页",
+                "parameters": [
+                    {
+                        "description": "权限范围列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.ScopePageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.ScopePageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/scope/update": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "权限范围"
+                ],
+                "summary": "修改权限范围",
+                "parameters": [
+                    {
+                        "description": "修改权限范围",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.ScopeUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/ssoConnector/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SSO连接器"
+                ],
+                "summary": "创建SSO连接器",
+                "parameters": [
+                    {
+                        "description": "创建SSO连接器",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoauth.SsoConnectorCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoauth.SsoConnectorCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/ssoConnector/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SSO连接器"
+                ],
+                "summary": "删除SSO连接器",
+                "parameters": [
+                    {
+                        "description": "删除SSO连接器",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoauth.SsoConnectorDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/ssoConnector/detail": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SSO连接器"
+                ],
+                "summary": "SSO连接器详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "SSO连接器ID",
+                        "name": "ssoConnectorID",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoauth.SsoConnectorDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/ssoConnector/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SSO连接器"
+                ],
+                "summary": "SSO连接器列表分页",
+                "parameters": [
+                    {
+                        "description": "SSO连接器列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoauth.SsoConnectorPageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoauth.SsoConnectorPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/ssoConnector/update": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SSO连接器"
+                ],
+                "summary": "修改SSO连接器",
+                "parameters": [
+                    {
+                        "description": "修改SSO连接器",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoauth.SsoConnectorUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/system/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统配置"
+                ],
+                "summary": "创建系统配置",
+                "parameters": [
+                    {
+                        "description": "创建系统配置",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.SystemCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.SystemCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/system/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统配置"
+                ],
+                "summary": "删除系统配置",
+                "parameters": [
+                    {
+                        "description": "删除系统配置",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.SystemDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/system/detail": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统配置"
+                ],
+                "summary": "系统配置详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "自增ID",
+                        "name": "systemID",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.SystemDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/system/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统配置"
+                ],
+                "summary": "系统配置列表分页",
+                "parameters": [
+                    {
+                        "description": "系统配置列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.SystemPageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.SystemPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/system/update": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统配置"
+                ],
+                "summary": "修改系统配置",
+                "parameters": [
+                    {
+                        "description": "修改系统配置",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.SystemUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/tenant/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "租户管理"
+                ],
+                "summary": "创建租户管理",
+                "parameters": [
+                    {
+                        "description": "创建租户管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.TenantCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.TenantCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/tenant/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "租户管理"
+                ],
+                "summary": "删除租户管理",
+                "parameters": [
+                    {
+                        "description": "删除租户管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.TenantDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/tenant/detail": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "租户管理"
+                ],
+                "summary": "租户管理详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "租户ID",
+                        "name": "tenantID",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.TenantDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/tenant/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "租户管理"
+                ],
+                "summary": "租户管理列表分页",
+                "parameters": [
+                    {
+                        "description": "租户管理列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.TenantPageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.TenantPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/tenant/update": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "租户管理"
+                ],
+                "summary": "修改租户管理",
+                "parameters": [
+                    {
+                        "description": "修改租户管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.TenantUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/assignDepartments": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "分配用户部门",
+                "parameters": [
+                    {
+                        "description": "分配用户部门",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.AssignDepartmentsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "创建用户管理",
+                "parameters": [
+                    {
+                        "description": "创建用户管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.UserCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtouser.UserCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/createUserDepartmentRelation": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "创建用户部门关联",
+                "parameters": [
+                    {
+                        "description": "创建用户部门关联",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.UserDepartmentRelationCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtouser.UserDepartmentRelationCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/createUserIdentity": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "创建用户身份",
+                "parameters": [
+                    {
+                        "description": "创建用户身份",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.UserIdentityCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtouser.UserIdentityCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "删除用户管理",
+                "parameters": [
+                    {
+                        "description": "删除用户管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.UserDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/deleteUserDepartmentRelation": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "删除用户部门关联",
+                "parameters": [
+                    {
+                        "description": "删除用户部门关联",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.UserDepartmentRelationDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/deleteUserIdentity": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "删除用户身份",
+                "parameters": [
+                    {
+                        "description": "删除用户身份",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.UserIdentityDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/detail": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "用户管理详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "用户ID",
+                        "name": "userID",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtouser.UserDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/detailUserDepartmentRelation": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "用户部门关联详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "用户部门关系ID",
+                        "name": "userDepartmentRelationID",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtouser.UserDepartmentRelationDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/detailUserIdentity": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "用户身份详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "用户身份ID",
+                        "name": "userIdentityID",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtouser.UserIdentityDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/detailUserLoginLog": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "用户登录日志详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "登录日志ID",
+                        "name": "userLoginLogID",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtouser.UserLoginLogDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/getUserDepartmentRelationByUser": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "获取用户部门关联",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "用户ID",
+                        "name": "userID",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtouser.UserDepartmentRelationPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/getUserIdentityByUser": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "获取用户身份",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "用户ID",
+                        "name": "userID",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtouser.UserIdentityPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/getUserLoginLogByUser": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "获取用户登录日志",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "用户ID",
+                        "name": "userID",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtouser.UserLoginLogPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "用户管理列表分页",
+                "parameters": [
+                    {
+                        "description": "用户管理列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.UserPageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtouser.UserPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/pageListUserDepartmentRelation": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "用户部门关联列表分页",
+                "parameters": [
+                    {
+                        "description": "用户部门关联列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.UserDepartmentRelationPageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtouser.UserDepartmentRelationPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/pageListUserIdentity": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "用户身份列表分页",
+                "parameters": [
+                    {
+                        "description": "用户身份列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.UserIdentityPageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtouser.UserIdentityPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/pageListUserLoginLog": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "用户登录日志列表分页",
+                "parameters": [
+                    {
+                        "description": "用户登录日志列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.UserLoginLogPageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtouser.UserLoginLogPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/update": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "修改用户管理",
+                "parameters": [
+                    {
+                        "description": "修改用户管理",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.UserUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/updatePassword": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "修改用户密码",
+                "parameters": [
+                    {
+                        "description": "修改用户密码",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.UserPasswordUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/updateStatus": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "修改用户状态",
+                "parameters": [
+                    {
+                        "description": "修改用户状态",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.UserStatusUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/updateUserDepartmentRelation": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "修改用户部门关联",
+                "parameters": [
+                    {
+                        "description": "修改用户部门关联",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.UserDepartmentRelationUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/updateUserIdentity": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户管理"
+                ],
+                "summary": "修改用户身份",
+                "parameters": [
+                    {
+                        "description": "修改用户身份",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.UserIdentityUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/userRole/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户角色"
+                ],
+                "summary": "创建用户角色",
+                "parameters": [
+                    {
+                        "description": "创建用户角色",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.UserRoleCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.UserRoleCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/userRole/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户角色"
+                ],
+                "summary": "删除用户角色",
+                "parameters": [
+                    {
+                        "description": "删除用户角色",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.UserRoleDeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/userRole/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户角色"
+                ],
+                "summary": "用户角色列表分页",
+                "parameters": [
+                    {
+                        "description": "用户角色列表分页",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtopermission.UserRolePageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtopermission.UserRolePageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/userinfo": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "认证"
+                ],
+                "summary": "获取用户信息",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoauth.UserinfoResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "dtoapplication.ApplicationCreateReq": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "应用描述",
+                    "type": "string"
+                },
+                "isThirdParty": {
+                    "description": "是否第三方应用",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "应用名称",
+                    "type": "string"
+                },
+                "secret": {
+                    "description": "应用密钥",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "应用类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoapplication.ApplicationCreateResp": {
+            "type": "object",
+            "properties": {
+                "applicationID": {
+                    "description": "应用ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoapplication.ApplicationDeleteReq": {
+            "type": "object",
+            "properties": {
+                "applicationID": {
+                    "description": "应用ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoapplication.ApplicationDetailResp": {
+            "type": "object",
+            "properties": {
+                "applicationBaseInfo": {
+                    "description": "应用基础信息",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objapplication.ApplicationBaseInfo"
+                        }
+                    ]
+                },
+                "applicationID": {
+                    "description": "应用ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoapplication.ApplicationPageListItem": {
+            "type": "object",
+            "properties": {
+                "applicationBaseInfo": {
+                    "description": "应用基础信息",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objapplication.ApplicationBaseInfo"
+                        }
+                    ]
+                },
+                "applicationID": {
+                    "description": "应用ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoapplication.ApplicationPageListReq": {
+            "type": "object",
+            "properties": {
+                "isThirdParty": {
+                    "description": "是否第三方应用",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "应用名称",
+                    "type": "string"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数量",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "应用类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoapplication.ApplicationPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "应用列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtoapplication.ApplicationPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoapplication.ApplicationUpdateReq": {
+            "type": "object",
+            "properties": {
+                "applicationID": {
+                    "description": "应用ID",
+                    "type": "integer"
+                },
+                "description": {
+                    "description": "应用描述",
+                    "type": "string"
+                },
+                "isThirdParty": {
+                    "description": "是否第三方应用",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "应用名称",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "应用类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoauth.ConnectorCreateReq": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "description": "连接器配置"
+                },
+                "connectorID": {
+                    "description": "连接器ID",
+                    "type": "string"
+                },
+                "enableTokenStorage": {
+                    "description": "是否启用令牌存储",
+                    "type": "integer"
+                },
+                "metadata": {
+                    "description": "元数据"
+                },
+                "syncProfile": {
+                    "description": "是否同步资料",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.ConnectorCreateResp": {
+            "type": "object",
+            "properties": {
+                "connectorID": {
+                    "description": "连接器ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.ConnectorDeleteReq": {
+            "type": "object",
+            "required": [
+                "connectorID"
+            ],
+            "properties": {
+                "connectorID": {
+                    "description": "连接器ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.ConnectorDetailResp": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "description": "连接器配置"
+                },
+                "connectorID": {
+                    "description": "连接器ID",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "enableTokenStorage": {
+                    "description": "是否启用令牌存储",
+                    "type": "integer"
+                },
+                "metadata": {
+                    "description": "元数据"
+                },
+                "syncProfile": {
+                    "description": "是否同步资料",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.ConnectorPageListItem": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "description": "连接器配置"
+                },
+                "connectorID": {
+                    "description": "连接器ID",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "enableTokenStorage": {
+                    "description": "是否启用令牌存储",
+                    "type": "integer"
+                },
+                "metadata": {
+                    "description": "元数据"
+                },
+                "syncProfile": {
+                    "description": "是否同步资料",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.ConnectorPageListReq": {
+            "type": "object",
+            "properties": {
+                "connectorID": {
+                    "description": "连接器ID",
+                    "type": "string"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数据条数",
+                    "type": "integer",
+                    "maximum": 1000
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.ConnectorPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "数据列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtoauth.ConnectorPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "数据总条数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.ConnectorUpdateReq": {
+            "type": "object",
+            "required": [
+                "connectorID"
+            ],
+            "properties": {
+                "config": {
+                    "description": "连接器配置"
+                },
+                "connectorID": {
+                    "description": "连接器ID",
+                    "type": "string"
+                },
+                "enableTokenStorage": {
+                    "description": "是否启用令牌存储",
+                    "type": "integer"
+                },
+                "metadata": {
+                    "description": "元数据"
+                },
+                "syncProfile": {
+                    "description": "是否同步资料",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.LoginReq": {
+            "type": "object",
+            "required": [
+                "identifier",
+                "password",
+                "tenantID"
+            ],
+            "properties": {
+                "identifier": {
+                    "description": "用户名/邮箱/手机号",
+                    "type": "string"
+                },
+                "password": {
+                    "description": "密码",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.LoginResp": {
+            "type": "object",
+            "properties": {
+                "accessToken": {
+                    "description": "访问令牌",
+                    "type": "string"
+                },
+                "expiresIn": {
+                    "description": "过期时间(秒)",
+                    "type": "integer"
+                },
+                "refreshToken": {
+                    "description": "刷新令牌",
+                    "type": "string"
+                },
+                "tokenType": {
+                    "description": "令牌类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoauth.LogoutReq": {
+            "type": "object",
+            "properties": {
+                "refreshToken": {
+                    "description": "刷新令牌",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoauth.RefreshTokenReq": {
+            "type": "object",
+            "required": [
+                "refreshToken"
+            ],
+            "properties": {
+                "refreshToken": {
+                    "description": "刷新令牌",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoauth.RefreshTokenResp": {
+            "type": "object",
+            "properties": {
+                "accessToken": {
+                    "description": "访问令牌",
+                    "type": "string"
+                },
+                "expiresIn": {
+                    "description": "过期时间(秒)",
+                    "type": "integer"
+                },
+                "refreshToken": {
+                    "description": "刷新令牌",
+                    "type": "string"
+                },
+                "tokenType": {
+                    "description": "令牌类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoauth.RegisterReq": {
+            "type": "object",
+            "required": [
+                "password",
+                "tenantID",
+                "username"
+            ],
+            "properties": {
+                "name": {
+                    "description": "姓名",
+                    "type": "string"
+                },
+                "password": {
+                    "description": "密码",
+                    "type": "string"
+                },
+                "primaryEmail": {
+                    "description": "主要邮箱",
+                    "type": "string"
+                },
+                "primaryPhone": {
+                    "description": "主要手机号",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "username": {
+                    "description": "用户名",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoauth.RegisterResp": {
+            "type": "object",
+            "properties": {
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.SsoAuthorizationUrlResp": {
+            "type": "object",
+            "properties": {
+                "authorizationUrl": {
+                    "description": "授权地址",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoauth.SsoCallbackResp": {
+            "type": "object",
+            "properties": {
+                "accessToken": {
+                    "description": "访问令牌",
+                    "type": "string"
+                },
+                "expiresIn": {
+                    "description": "过期时间(秒)",
+                    "type": "integer"
+                },
+                "refreshToken": {
+                    "description": "刷新令牌",
+                    "type": "string"
+                },
+                "tokenType": {
+                    "description": "令牌类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoauth.SsoConnectorCreateReq": {
+            "type": "object",
+            "properties": {
+                "branding": {
+                    "description": "品牌配置"
+                },
+                "config": {
+                    "description": "配置"
+                },
+                "connectorName": {
+                    "description": "连接器名称",
+                    "type": "string"
+                },
+                "domains": {
+                    "description": "域名列表"
+                },
+                "enableTokenStorage": {
+                    "description": "是否启用令牌存储",
+                    "type": "integer"
+                },
+                "providerName": {
+                    "description": "提供商名称",
+                    "type": "string"
+                },
+                "syncProfile": {
+                    "description": "是否同步资料",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.SsoConnectorCreateResp": {
+            "type": "object",
+            "properties": {
+                "ssoConnectorID": {
+                    "description": "SSO连接器ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.SsoConnectorDeleteReq": {
+            "type": "object",
+            "required": [
+                "ssoConnectorID"
+            ],
+            "properties": {
+                "ssoConnectorID": {
+                    "description": "SSO连接器ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.SsoConnectorDetailResp": {
+            "type": "object",
+            "properties": {
+                "branding": {
+                    "description": "品牌配置"
+                },
+                "config": {
+                    "description": "配置"
+                },
+                "connectorName": {
+                    "description": "连接器名称",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "domains": {
+                    "description": "域名列表"
+                },
+                "enableTokenStorage": {
+                    "description": "是否启用令牌存储",
+                    "type": "integer"
+                },
+                "providerName": {
+                    "description": "提供商名称",
+                    "type": "string"
+                },
+                "ssoConnectorID": {
+                    "description": "SSO连接器ID",
+                    "type": "integer"
+                },
+                "syncProfile": {
+                    "description": "是否同步资料",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.SsoConnectorPageListItem": {
+            "type": "object",
+            "properties": {
+                "branding": {
+                    "description": "品牌配置"
+                },
+                "config": {
+                    "description": "配置"
+                },
+                "connectorName": {
+                    "description": "连接器名称",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "domains": {
+                    "description": "域名列表"
+                },
+                "enableTokenStorage": {
+                    "description": "是否启用令牌存储",
+                    "type": "integer"
+                },
+                "providerName": {
+                    "description": "提供商名称",
+                    "type": "string"
+                },
+                "ssoConnectorID": {
+                    "description": "SSO连接器ID",
+                    "type": "integer"
+                },
+                "syncProfile": {
+                    "description": "是否同步资料",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.SsoConnectorPageListReq": {
+            "type": "object",
+            "properties": {
+                "connectorName": {
+                    "description": "连接器名称",
+                    "type": "string"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数据条数",
+                    "type": "integer",
+                    "maximum": 1000
+                },
+                "providerName": {
+                    "description": "提供商名称",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.SsoConnectorPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "数据列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtoauth.SsoConnectorPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "数据总条数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.SsoConnectorUpdateReq": {
+            "type": "object",
+            "required": [
+                "ssoConnectorID"
+            ],
+            "properties": {
+                "branding": {
+                    "description": "品牌配置"
+                },
+                "config": {
+                    "description": "配置"
+                },
+                "connectorName": {
+                    "description": "连接器名称",
+                    "type": "string"
+                },
+                "domains": {
+                    "description": "域名列表"
+                },
+                "enableTokenStorage": {
+                    "description": "是否启用令牌存储",
+                    "type": "integer"
+                },
+                "providerName": {
+                    "description": "提供商名称",
+                    "type": "string"
+                },
+                "ssoConnectorID": {
+                    "description": "SSO连接器ID",
+                    "type": "integer"
+                },
+                "syncProfile": {
+                    "description": "是否同步资料",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoauth.UserinfoResp": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "description": "头像",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "姓名",
+                    "type": "string"
+                },
+                "primaryEmail": {
+                    "description": "主要邮箱",
+                    "type": "string"
+                },
+                "primaryPhone": {
+                    "description": "主要手机号",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                },
+                "username": {
+                    "description": "用户名",
+                    "type": "string"
+                }
+            }
+        },
+        "dtopermission.MenuCreateReq": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "菜单编码",
+                    "type": "string"
+                },
+                "component": {
+                    "description": "组件路径",
+                    "type": "string"
+                },
+                "externalLink": {
+                    "description": "是否外链",
+                    "type": "integer"
+                },
+                "hidden": {
+                    "description": "是否隐藏",
+                    "type": "integer"
+                },
+                "icon": {
+                    "description": "菜单图标",
+                    "type": "string"
+                },
+                "keepAlive": {
+                    "description": "是否缓存",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "菜单名称",
+                    "type": "string"
+                },
+                "parentID": {
+                    "description": "父菜单ID",
+                    "type": "integer"
+                },
+                "path": {
+                    "description": "菜单路径",
+                    "type": "string"
+                },
+                "permission": {
+                    "description": "权限标识",
+                    "type": "string"
+                },
+                "redirect": {
+                    "description": "重定向路径",
+                    "type": "string"
+                },
+                "sort": {
+                    "description": "排序",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "状态",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "菜单类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtopermission.MenuCreateResp": {
+            "type": "object",
+            "properties": {
+                "menuID": {
+                    "description": "菜单ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.MenuDeleteReq": {
+            "type": "object",
+            "required": [
+                "menuID"
+            ],
+            "properties": {
+                "menuID": {
+                    "description": "菜单ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.MenuDetailResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "菜单编码",
+                    "type": "string"
+                },
+                "component": {
+                    "description": "组件路径",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "externalLink": {
+                    "description": "是否外链",
+                    "type": "integer"
+                },
+                "hidden": {
+                    "description": "是否隐藏",
+                    "type": "integer"
+                },
+                "icon": {
+                    "description": "菜单图标",
+                    "type": "string"
+                },
+                "keepAlive": {
+                    "description": "是否缓存",
+                    "type": "integer"
+                },
+                "menuID": {
+                    "description": "菜单ID",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "菜单名称",
+                    "type": "string"
+                },
+                "parentID": {
+                    "description": "父菜单ID",
+                    "type": "integer"
+                },
+                "path": {
+                    "description": "菜单路径",
+                    "type": "string"
+                },
+                "permission": {
+                    "description": "权限标识",
+                    "type": "string"
+                },
+                "redirect": {
+                    "description": "重定向路径",
+                    "type": "string"
+                },
+                "sort": {
+                    "description": "排序",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "状态",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "菜单类型",
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.MenuPageListItem": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "菜单编码",
+                    "type": "string"
+                },
+                "component": {
+                    "description": "组件路径",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "externalLink": {
+                    "description": "是否外链",
+                    "type": "integer"
+                },
+                "hidden": {
+                    "description": "是否隐藏",
+                    "type": "integer"
+                },
+                "icon": {
+                    "description": "菜单图标",
+                    "type": "string"
+                },
+                "keepAlive": {
+                    "description": "是否缓存",
+                    "type": "integer"
+                },
+                "menuID": {
+                    "description": "菜单ID",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "菜单名称",
+                    "type": "string"
+                },
+                "parentID": {
+                    "description": "父菜单ID",
+                    "type": "integer"
+                },
+                "path": {
+                    "description": "菜单路径",
+                    "type": "string"
+                },
+                "permission": {
+                    "description": "权限标识",
+                    "type": "string"
+                },
+                "redirect": {
+                    "description": "重定向路径",
+                    "type": "string"
+                },
+                "sort": {
+                    "description": "排序",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "状态",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "菜单类型",
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.MenuPageListReq": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "菜单编码",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "菜单名称",
+                    "type": "string"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数据条数",
+                    "type": "integer",
+                    "maximum": 1000
+                },
+                "parentID": {
+                    "description": "父菜单ID",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "状态",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "菜单类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtopermission.MenuPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "数据列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtopermission.MenuPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "数据总条数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.MenuTreeItem": {
+            "type": "object",
+            "properties": {
+                "children": {
+                    "description": "子菜单",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtopermission.MenuTreeItem"
+                    }
+                },
+                "code": {
+                    "description": "菜单编码",
+                    "type": "string"
+                },
+                "component": {
+                    "description": "组件路径",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "externalLink": {
+                    "description": "是否外链",
+                    "type": "integer"
+                },
+                "hidden": {
+                    "description": "是否隐藏",
+                    "type": "integer"
+                },
+                "icon": {
+                    "description": "菜单图标",
+                    "type": "string"
+                },
+                "keepAlive": {
+                    "description": "是否缓存",
+                    "type": "integer"
+                },
+                "menuID": {
+                    "description": "菜单ID",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "菜单名称",
+                    "type": "string"
+                },
+                "parentID": {
+                    "description": "父菜单ID",
+                    "type": "integer"
+                },
+                "path": {
+                    "description": "菜单路径",
+                    "type": "string"
+                },
+                "permission": {
+                    "description": "权限标识",
+                    "type": "string"
+                },
+                "redirect": {
+                    "description": "重定向路径",
+                    "type": "string"
+                },
+                "sort": {
+                    "description": "排序",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "状态",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "菜单类型",
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.MenuTreeResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "菜单树",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtopermission.MenuTreeItem"
+                    }
+                }
+            }
+        },
+        "dtopermission.MenuUpdateReq": {
+            "type": "object",
+            "required": [
+                "menuID"
+            ],
+            "properties": {
+                "code": {
+                    "description": "菜单编码",
+                    "type": "string"
+                },
+                "component": {
+                    "description": "组件路径",
+                    "type": "string"
+                },
+                "externalLink": {
+                    "description": "是否外链",
+                    "type": "integer"
+                },
+                "hidden": {
+                    "description": "是否隐藏",
+                    "type": "integer"
+                },
+                "icon": {
+                    "description": "菜单图标",
+                    "type": "string"
+                },
+                "keepAlive": {
+                    "description": "是否缓存",
+                    "type": "integer"
+                },
+                "menuID": {
+                    "description": "菜单ID",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "菜单名称",
+                    "type": "string"
+                },
+                "parentID": {
+                    "description": "父菜单ID",
+                    "type": "integer"
+                },
+                "path": {
+                    "description": "菜单路径",
+                    "type": "string"
+                },
+                "permission": {
+                    "description": "权限标识",
+                    "type": "string"
+                },
+                "redirect": {
+                    "description": "重定向路径",
+                    "type": "string"
+                },
+                "sort": {
+                    "description": "排序",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "状态",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "菜单类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtopermission.ResourceCreateReq": {
+            "type": "object",
+            "properties": {
+                "accessTokenTtl": {
+                    "description": "访问令牌TTL",
+                    "type": "integer"
+                },
+                "indicator": {
+                    "description": "资源标识符",
+                    "type": "string"
+                },
+                "isDefault": {
+                    "description": "是否默认",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "资源名称",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.ResourceCreateResp": {
+            "type": "object",
+            "properties": {
+                "resourceID": {
+                    "description": "资源ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.ResourceDeleteReq": {
+            "type": "object",
+            "properties": {
+                "resourceID": {
+                    "description": "资源ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.ResourceDetailResp": {
+            "type": "object",
+            "properties": {
+                "accessTokenTtl": {
+                    "description": "访问令牌TTL",
+                    "type": "integer"
+                },
+                "indicator": {
+                    "description": "资源标识符",
+                    "type": "string"
+                },
+                "isDefault": {
+                    "description": "是否默认",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "资源名称",
+                    "type": "string"
+                },
+                "operatorBaseInfo": {
+                    "description": "操作人信息",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/gobject.OperatorBaseInfo"
+                        }
+                    ]
+                },
+                "resourceID": {
+                    "description": "资源ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.ResourcePageListItem": {
+            "type": "object",
+            "properties": {
+                "accessTokenTtl": {
+                    "description": "访问令牌TTL",
+                    "type": "integer"
+                },
+                "indicator": {
+                    "description": "资源标识符",
+                    "type": "string"
+                },
+                "isDefault": {
+                    "description": "是否默认",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "资源名称",
+                    "type": "string"
+                },
+                "operatorBaseInfo": {
+                    "description": "操作人信息",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/gobject.OperatorBaseInfo"
+                        }
+                    ]
+                },
+                "resourceID": {
+                    "description": "资源ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.ResourcePageListReq": {
+            "type": "object",
+            "properties": {
+                "indicator": {
+                    "description": "资源标识符",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "资源名称",
+                    "type": "string"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数量",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.ResourcePageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtopermission.ResourcePageListItem"
+                    }
+                },
+                "total": {
+                    "description": "总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.ResourceUpdateReq": {
+            "type": "object",
+            "properties": {
+                "accessTokenTtl": {
+                    "description": "访问令牌TTL",
+                    "type": "integer"
+                },
+                "indicator": {
+                    "description": "资源标识符",
+                    "type": "string"
+                },
+                "isDefault": {
+                    "description": "是否默认",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "资源名称",
+                    "type": "string"
+                },
+                "resourceID": {
+                    "description": "资源ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.RoleCreateReq": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "角色编码",
+                    "type": "string"
+                },
+                "description": {
+                    "description": "角色描述",
+                    "type": "string"
+                },
+                "isDefault": {
+                    "description": "是否默认角色",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "角色名称",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "角色类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtopermission.RoleCreateResp": {
+            "type": "object",
+            "properties": {
+                "roleID": {
+                    "description": "角色ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.RoleDeleteReq": {
+            "type": "object",
+            "properties": {
+                "roleID": {
+                    "description": "角色ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.RoleDetailResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "角色编码",
+                    "type": "string"
+                },
+                "description": {
+                    "description": "角色描述",
+                    "type": "string"
+                },
+                "isDefault": {
+                    "description": "是否默认角色",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "角色名称",
+                    "type": "string"
+                },
+                "operatorBaseInfo": {
+                    "description": "操作人信息",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/gobject.OperatorBaseInfo"
+                        }
+                    ]
+                },
+                "roleID": {
+                    "description": "角色ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "角色类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtopermission.RoleMenuCreateReq": {
+            "type": "object",
+            "properties": {
+                "menuID": {
+                    "description": "菜单ID",
+                    "type": "integer"
+                },
+                "roleID": {
+                    "description": "角色ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.RoleMenuCreateResp": {
+            "type": "object"
+        },
+        "dtopermission.RoleMenuDeleteReq": {
+            "type": "object",
+            "properties": {
+                "menuID": {
+                    "description": "菜单ID",
+                    "type": "integer"
+                },
+                "roleID": {
+                    "description": "角色ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.RoleMenuPageListItem": {
+            "type": "object",
+            "properties": {
+                "menuID": {
+                    "description": "菜单ID",
+                    "type": "integer"
+                },
+                "roleID": {
+                    "description": "角色ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.RoleMenuPageListReq": {
+            "type": "object",
+            "properties": {
+                "menuID": {
+                    "description": "菜单ID",
+                    "type": "integer"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数量",
+                    "type": "integer"
+                },
+                "roleID": {
+                    "description": "角色ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.RoleMenuPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtopermission.RoleMenuPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.RolePageListItem": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "角色编码",
+                    "type": "string"
+                },
+                "description": {
+                    "description": "角色描述",
+                    "type": "string"
+                },
+                "isDefault": {
+                    "description": "是否默认角色",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "角色名称",
+                    "type": "string"
+                },
+                "operatorBaseInfo": {
+                    "description": "操作人信息",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/gobject.OperatorBaseInfo"
+                        }
+                    ]
+                },
+                "roleID": {
+                    "description": "角色ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "角色类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtopermission.RolePageListReq": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "角色编码",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "角色名称",
+                    "type": "string"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数量",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "角色类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtopermission.RolePageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtopermission.RolePageListItem"
+                    }
+                },
+                "total": {
+                    "description": "总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.RoleScopeCreateReq": {
+            "type": "object",
+            "properties": {
+                "roleID": {
+                    "description": "角色ID",
+                    "type": "integer"
+                },
+                "scopeID": {
+                    "description": "权限ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.RoleScopeCreateResp": {
+            "type": "object"
+        },
+        "dtopermission.RoleScopeDeleteReq": {
+            "type": "object",
+            "properties": {
+                "roleID": {
+                    "description": "角色ID",
+                    "type": "integer"
+                },
+                "scopeID": {
+                    "description": "权限ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.RoleScopePageListItem": {
+            "type": "object",
+            "properties": {
+                "roleID": {
+                    "description": "角色ID",
+                    "type": "integer"
+                },
+                "scopeID": {
+                    "description": "权限ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.RoleScopePageListReq": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数量",
+                    "type": "integer"
+                },
+                "roleID": {
+                    "description": "角色ID",
+                    "type": "integer"
+                },
+                "scopeID": {
+                    "description": "权限ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.RoleScopePageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtopermission.RoleScopePageListItem"
+                    }
+                },
+                "total": {
+                    "description": "总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.RoleUpdateReq": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "角色编码",
+                    "type": "string"
+                },
+                "description": {
+                    "description": "角色描述",
+                    "type": "string"
+                },
+                "isDefault": {
+                    "description": "是否默认角色",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "角色名称",
+                    "type": "string"
+                },
+                "roleID": {
+                    "description": "角色ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "角色类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtopermission.ScopeCreateReq": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "权限描述",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "权限名称",
+                    "type": "string"
+                },
+                "resourceID": {
+                    "description": "资源ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.ScopeCreateResp": {
+            "type": "object",
+            "properties": {
+                "scopeID": {
+                    "description": "权限ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.ScopeDeleteReq": {
+            "type": "object",
+            "properties": {
+                "scopeID": {
+                    "description": "权限ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.ScopeDetailResp": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "权限描述",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "权限名称",
+                    "type": "string"
+                },
+                "operatorBaseInfo": {
+                    "description": "操作人信息",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/gobject.OperatorBaseInfo"
+                        }
+                    ]
+                },
+                "resourceID": {
+                    "description": "资源ID",
+                    "type": "integer"
+                },
+                "scopeID": {
+                    "description": "权限ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.ScopePageListItem": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "权限描述",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "权限名称",
+                    "type": "string"
+                },
+                "operatorBaseInfo": {
+                    "description": "操作人信息",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/gobject.OperatorBaseInfo"
+                        }
+                    ]
+                },
+                "resourceID": {
+                    "description": "资源ID",
+                    "type": "integer"
+                },
+                "scopeID": {
+                    "description": "权限ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.ScopePageListReq": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "description": "权限名称",
+                    "type": "string"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数量",
+                    "type": "integer"
+                },
+                "resourceID": {
+                    "description": "资源ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.ScopePageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtopermission.ScopePageListItem"
+                    }
+                },
+                "total": {
+                    "description": "总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.ScopeUpdateReq": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "权限描述",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "权限名称",
+                    "type": "string"
+                },
+                "resourceID": {
+                    "description": "资源ID",
+                    "type": "integer"
+                },
+                "scopeID": {
+                    "description": "权限ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.UserRoleCreateReq": {
+            "type": "object",
+            "properties": {
+                "roleID": {
+                    "description": "角色ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.UserRoleCreateResp": {
+            "type": "object"
+        },
+        "dtopermission.UserRoleDeleteReq": {
+            "type": "object",
+            "properties": {
+                "roleID": {
+                    "description": "角色ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.UserRolePageListItem": {
+            "type": "object",
+            "properties": {
+                "roleID": {
+                    "description": "角色ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.UserRolePageListReq": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数量",
+                    "type": "integer"
+                },
+                "roleID": {
+                    "description": "角色ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtopermission.UserRolePageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtopermission.UserRolePageListItem"
+                    }
+                },
+                "total": {
+                    "description": "总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.DepartmentCreateReq": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "部门编码",
+                    "type": "string"
+                },
+                "leaderUserID": {
+                    "description": "部门负责人用户ID",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "部门名称",
+                    "type": "string"
+                },
+                "parentID": {
+                    "description": "父部门ID",
+                    "type": "integer"
+                },
+                "sort": {
+                    "description": "排序",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.DepartmentCreateResp": {
+            "type": "object",
+            "properties": {
+                "departmentID": {
+                    "description": "部门ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.DepartmentDeleteReq": {
+            "type": "object",
+            "required": [
+                "departmentID"
+            ],
+            "properties": {
+                "departmentID": {
+                    "description": "部门ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.DepartmentDetailResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "部门编码",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "departmentID": {
+                    "description": "部门ID",
+                    "type": "integer"
+                },
+                "leaderUserID": {
+                    "description": "部门负责人用户ID",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "部门名称",
+                    "type": "string"
+                },
+                "parentID": {
+                    "description": "父部门ID",
+                    "type": "integer"
+                },
+                "sort": {
+                    "description": "排序",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.DepartmentPageListItem": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "部门编码",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "departmentID": {
+                    "description": "部门ID",
+                    "type": "integer"
+                },
+                "leaderUserID": {
+                    "description": "部门负责人用户ID",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "部门名称",
+                    "type": "string"
+                },
+                "parentID": {
+                    "description": "父部门ID",
+                    "type": "integer"
+                },
+                "sort": {
+                    "description": "排序",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.DepartmentPageListReq": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "部门编码",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "部门名称",
+                    "type": "string"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数据条数",
+                    "type": "integer",
+                    "maximum": 1000
+                },
+                "parentID": {
+                    "description": "父部门ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.DepartmentPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "数据列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.DepartmentPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "数据总条数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.DepartmentTreeItem": {
+            "type": "object",
+            "properties": {
+                "children": {
+                    "description": "子部门",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.DepartmentTreeItem"
+                    }
+                },
+                "code": {
+                    "description": "部门编码",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "departmentID": {
+                    "description": "部门ID",
+                    "type": "integer"
+                },
+                "leaderUserID": {
+                    "description": "部门负责人用户ID",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "部门名称",
+                    "type": "string"
+                },
+                "parentID": {
+                    "description": "父部门ID",
+                    "type": "integer"
+                },
+                "sort": {
+                    "description": "排序",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.DepartmentTreeResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "部门树",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.DepartmentTreeItem"
+                    }
+                }
+            }
+        },
+        "dtotenant.DepartmentUpdateReq": {
+            "type": "object",
+            "required": [
+                "departmentID"
+            ],
+            "properties": {
+                "code": {
+                    "description": "部门编码",
+                    "type": "string"
+                },
+                "departmentID": {
+                    "description": "部门ID",
+                    "type": "integer"
+                },
+                "leaderUserID": {
+                    "description": "部门负责人用户ID",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "部门名称",
+                    "type": "string"
+                },
+                "parentID": {
+                    "description": "父部门ID",
+                    "type": "integer"
+                },
+                "sort": {
+                    "description": "排序",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.LogDetailResp": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "key": {
+                    "description": "日志键",
+                    "type": "string"
+                },
+                "logID": {
+                    "description": "日志ID",
+                    "type": "integer"
+                },
+                "payload": {
+                    "description": "日志内容"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.LogPageListItem": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "key": {
+                    "description": "日志键",
+                    "type": "string"
+                },
+                "logID": {
+                    "description": "日志ID",
+                    "type": "integer"
+                },
+                "payload": {
+                    "description": "日志内容"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.LogPageListReq": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "description": "日志键",
+                    "type": "string"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数据条数",
+                    "type": "integer",
+                    "maximum": 1000
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.LogPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "数据列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.LogPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "数据总条数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationCreateReq": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "组织描述",
+                    "type": "string"
+                },
+                "isMFARequired": {
+                    "description": "是否需要MFA",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "组织名称",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationCreateResp": {
+            "type": "object",
+            "properties": {
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationDeleteReq": {
+            "type": "object",
+            "properties": {
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationDetailResp": {
+            "type": "object",
+            "properties": {
+                "organizationBaseInfo": {
+                    "description": "组织基础信息",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objtenant.OrganizationBaseInfo"
+                        }
+                    ]
+                },
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationPageListItem": {
+            "type": "object",
+            "properties": {
+                "organizationBaseInfo": {
+                    "description": "组织基础信息",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objtenant.OrganizationBaseInfo"
+                        }
+                    ]
+                },
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationPageListReq": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "description": "组织名称",
+                    "type": "string"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数量",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "组织列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.OrganizationPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationRoleCreateReq": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "角色描述",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "角色名称",
+                    "type": "string"
+                },
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "角色类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.OrganizationRoleCreateResp": {
+            "type": "object",
+            "properties": {
+                "organizationRoleID": {
+                    "description": "组织角色ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationRoleDeleteReq": {
+            "type": "object",
+            "properties": {
+                "organizationRoleID": {
+                    "description": "组织角色ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationRoleDetailResp": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "角色描述",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "角色名称",
+                    "type": "string"
+                },
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                },
+                "organizationRoleID": {
+                    "description": "组织角色ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "角色类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.OrganizationRolePageListItem": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "角色描述",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "角色名称",
+                    "type": "string"
+                },
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                },
+                "organizationRoleID": {
+                    "description": "组织角色ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "角色类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.OrganizationRolePageListReq": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "description": "角色名称",
+                    "type": "string"
+                },
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数量",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationRolePageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "组织角色列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.OrganizationRolePageListItem"
+                    }
+                },
+                "total": {
+                    "description": "总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationRoleUpdateReq": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "角色描述",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "角色名称",
+                    "type": "string"
+                },
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                },
+                "organizationRoleID": {
+                    "description": "组织角色ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "角色类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.OrganizationRoleUserRelationCreateReq": {
+            "type": "object",
+            "properties": {
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                },
+                "organizationRoleID": {
+                    "description": "组织角色ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationRoleUserRelationCreateResp": {
+            "type": "object"
+        },
+        "dtotenant.OrganizationRoleUserRelationDeleteReq": {
+            "type": "object",
+            "properties": {
+                "organizationRoleID": {
+                    "description": "组织角色ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationRoleUserRelationPageListItem": {
+            "type": "object",
+            "properties": {
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                },
+                "organizationRoleID": {
+                    "description": "组织角色ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationRoleUserRelationPageListReq": {
+            "type": "object",
+            "properties": {
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                },
+                "organizationRoleID": {
+                    "description": "组织角色ID",
+                    "type": "integer"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数量",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationRoleUserRelationPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "组织角色用户关系列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.OrganizationRoleUserRelationPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationUpdateReq": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "组织描述",
+                    "type": "string"
+                },
+                "isMFARequired": {
+                    "description": "是否需要MFA",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "组织名称",
+                    "type": "string"
+                },
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationUserRelationCreateReq": {
+            "type": "object",
+            "properties": {
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationUserRelationCreateResp": {
+            "type": "object"
+        },
+        "dtotenant.OrganizationUserRelationDeleteReq": {
+            "type": "object",
+            "properties": {
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationUserRelationPageListItem": {
+            "type": "object",
+            "properties": {
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationUserRelationPageListReq": {
+            "type": "object",
+            "properties": {
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数量",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.OrganizationUserRelationPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "组织用户关系列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.OrganizationUserRelationPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.SystemCreateReq": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "description": "配置键",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "value": {
+                    "description": "配置值"
+                }
+            }
+        },
+        "dtotenant.SystemCreateResp": {
+            "type": "object",
+            "properties": {
+                "systemID": {
+                    "description": "自增ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.SystemDeleteReq": {
+            "type": "object",
+            "required": [
+                "systemID"
+            ],
+            "properties": {
+                "systemID": {
+                    "description": "自增ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.SystemDetailResp": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "key": {
+                    "description": "配置键",
+                    "type": "string"
+                },
+                "systemID": {
+                    "description": "自增ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                },
+                "value": {
+                    "description": "配置值"
+                }
+            }
+        },
+        "dtotenant.SystemPageListItem": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "key": {
+                    "description": "配置键",
+                    "type": "string"
+                },
+                "systemID": {
+                    "description": "自增ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                },
+                "value": {
+                    "description": "配置值"
+                }
+            }
+        },
+        "dtotenant.SystemPageListReq": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "description": "配置键",
+                    "type": "string"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数据条数",
+                    "type": "integer",
+                    "maximum": 1000
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.SystemPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "数据列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.SystemPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "数据总条数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.SystemUpdateReq": {
+            "type": "object",
+            "required": [
+                "systemID"
+            ],
+            "properties": {
+                "key": {
+                    "description": "配置键",
+                    "type": "string"
+                },
+                "systemID": {
+                    "description": "自增ID",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "value": {
+                    "description": "配置值"
+                }
+            }
+        },
+        "dtotenant.TenantCreateReq": {
+            "type": "object",
+            "properties": {
+                "dbUser": {
+                    "description": "数据库用户",
+                    "type": "string"
+                },
+                "isSuspended": {
+                    "description": "是否挂起",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "租户名称",
+                    "type": "string"
+                },
+                "tag": {
+                    "description": "标签",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.TenantCreateResp": {
+            "type": "object",
+            "properties": {
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.TenantDeleteReq": {
+            "type": "object",
+            "required": [
+                "tenantID"
+            ],
+            "properties": {
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.TenantDetailResp": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "dbUser": {
+                    "description": "数据库用户",
+                    "type": "string"
+                },
+                "isSuspended": {
+                    "description": "是否挂起",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "租户名称",
+                    "type": "string"
+                },
+                "tag": {
+                    "description": "标签",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.TenantPageListItem": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "dbUser": {
+                    "description": "数据库用户",
+                    "type": "string"
+                },
+                "isSuspended": {
+                    "description": "是否挂起",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "租户名称",
+                    "type": "string"
+                },
+                "tag": {
+                    "description": "标签",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.TenantPageListReq": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数据条数",
+                    "type": "integer",
+                    "maximum": 1000
+                }
+            }
+        },
+        "dtotenant.TenantPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "数据列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.TenantPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "数据总条数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.TenantUpdateReq": {
+            "type": "object",
+            "required": [
+                "tenantID"
+            ],
+            "properties": {
+                "dbUser": {
+                    "description": "数据库用户",
+                    "type": "string"
+                },
+                "isSuspended": {
+                    "description": "是否挂起",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "租户名称",
+                    "type": "string"
+                },
+                "tag": {
+                    "description": "标签",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.AssignDepartmentsReq": {
+            "type": "object",
+            "required": [
+                "departmentIDs",
+                "userID"
+            ],
+            "properties": {
+                "departmentIDs": {
+                    "description": "部门ID列表",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserCreateReq": {
+            "type": "object",
+            "properties": {
+                "applicationID": {
+                    "description": "应用ID",
+                    "type": "integer"
+                },
+                "avatar": {
+                    "description": "头像URL",
+                    "type": "string"
+                },
+                "customData": {
+                    "description": "自定义数据"
+                },
+                "identities": {
+                    "description": "第三方身份"
+                },
+                "isSuspended": {
+                    "description": "是否挂起",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "姓名",
+                    "type": "string"
+                },
+                "passwordEncrypted": {
+                    "description": "加密密码",
+                    "type": "string"
+                },
+                "passwordMethod": {
+                    "description": "密码加密方式",
+                    "type": "string"
+                },
+                "primaryEmail": {
+                    "description": "主要邮箱",
+                    "type": "string"
+                },
+                "primaryPhone": {
+                    "description": "主要手机号",
+                    "type": "string"
+                },
+                "profile": {
+                    "description": "配置信息"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "username": {
+                    "description": "用户名",
+                    "type": "string"
+                }
+            }
+        },
+        "dtouser.UserCreateResp": {
+            "type": "object",
+            "properties": {
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserDeleteReq": {
+            "type": "object",
+            "required": [
+                "userID"
+            ],
+            "properties": {
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserDepartmentRelationCreateReq": {
+            "type": "object",
+            "required": [
+                "departmentID",
+                "tenantID",
+                "userID"
+            ],
+            "properties": {
+                "departmentID": {
+                    "description": "部门ID",
+                    "type": "integer"
+                },
+                "isPrimary": {
+                    "description": "是否主部门",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserDepartmentRelationCreateResp": {
+            "type": "object",
+            "properties": {
+                "userDepartmentRelationID": {
+                    "description": "用户部门关系ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserDepartmentRelationDeleteReq": {
+            "type": "object",
+            "required": [
+                "userDepartmentRelationID"
+            ],
+            "properties": {
+                "userDepartmentRelationID": {
+                    "description": "用户部门关系ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserDepartmentRelationDetailResp": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "departmentID": {
+                    "description": "部门ID",
+                    "type": "integer"
+                },
+                "isPrimary": {
+                    "description": "是否主部门",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                },
+                "userDepartmentRelationID": {
+                    "description": "用户部门关系ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserDepartmentRelationPageListItem": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "departmentID": {
+                    "description": "部门ID",
+                    "type": "integer"
+                },
+                "isPrimary": {
+                    "description": "是否主部门",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                },
+                "userDepartmentRelationID": {
+                    "description": "用户部门关系ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserDepartmentRelationPageListReq": {
+            "type": "object",
+            "properties": {
+                "departmentID": {
+                    "description": "部门ID",
+                    "type": "integer"
+                },
+                "isPrimary": {
+                    "description": "是否主部门",
+                    "type": "integer"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数据条数",
+                    "type": "integer",
+                    "maximum": 1000
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserDepartmentRelationPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "数据列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtouser.UserDepartmentRelationPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "数据总条数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserDepartmentRelationUpdateReq": {
+            "type": "object",
+            "required": [
+                "userDepartmentRelationID"
+            ],
+            "properties": {
+                "departmentID": {
+                    "description": "部门ID",
+                    "type": "integer"
+                },
+                "isPrimary": {
+                    "description": "是否主部门",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userDepartmentRelationID": {
+                    "description": "用户部门关系ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserDetailResp": {
+            "type": "object",
+            "properties": {
+                "applicationID": {
+                    "description": "应用ID",
+                    "type": "integer"
+                },
+                "avatar": {
+                    "description": "头像URL",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "customData": {
+                    "description": "自定义数据"
+                },
+                "identities": {
+                    "description": "第三方身份"
+                },
+                "isSuspended": {
+                    "description": "是否挂起",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "姓名",
+                    "type": "string"
+                },
+                "passwordEncrypted": {
+                    "description": "加密密码",
+                    "type": "string"
+                },
+                "passwordMethod": {
+                    "description": "密码加密方式",
+                    "type": "string"
+                },
+                "primaryEmail": {
+                    "description": "主要邮箱",
+                    "type": "string"
+                },
+                "primaryPhone": {
+                    "description": "主要手机号",
+                    "type": "string"
+                },
+                "profile": {
+                    "description": "配置信息"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                },
+                "username": {
+                    "description": "用户名",
+                    "type": "string"
+                }
+            }
+        },
+        "dtouser.UserIdentityCreateReq": {
+            "type": "object",
+            "required": [
+                "identityID",
+                "issuer",
+                "tenantID",
+                "userID"
+            ],
+            "properties": {
+                "detail": {
+                    "description": "详细信息"
+                },
+                "identityID": {
+                    "description": "第三方用户ID",
+                    "type": "string"
+                },
+                "issuer": {
+                    "description": "身份提供商",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserIdentityCreateResp": {
+            "type": "object",
+            "properties": {
+                "userIdentityID": {
+                    "description": "用户身份ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserIdentityDeleteReq": {
+            "type": "object",
+            "required": [
+                "userIdentityID"
+            ],
+            "properties": {
+                "userIdentityID": {
+                    "description": "用户身份ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserIdentityDetailResp": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "detail": {
+                    "description": "详细信息"
+                },
+                "identityID": {
+                    "description": "第三方用户ID",
+                    "type": "string"
+                },
+                "issuer": {
+                    "description": "身份提供商",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                },
+                "userIdentityID": {
+                    "description": "用户身份ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserIdentityPageListItem": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "detail": {
+                    "description": "详细信息"
+                },
+                "identityID": {
+                    "description": "第三方用户ID",
+                    "type": "string"
+                },
+                "issuer": {
+                    "description": "身份提供商",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                },
+                "userIdentityID": {
+                    "description": "用户身份ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserIdentityPageListReq": {
+            "type": "object",
+            "properties": {
+                "identityID": {
+                    "description": "第三方用户ID",
+                    "type": "string"
+                },
+                "issuer": {
+                    "description": "身份提供商",
+                    "type": "string"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数据条数",
+                    "type": "integer",
+                    "maximum": 1000
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserIdentityPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "数据列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtouser.UserIdentityPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "数据总条数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserIdentityUpdateReq": {
+            "type": "object",
+            "required": [
+                "userIdentityID"
+            ],
+            "properties": {
+                "detail": {
+                    "description": "详细信息"
+                },
+                "identityID": {
+                    "description": "第三方用户ID",
+                    "type": "string"
+                },
+                "issuer": {
+                    "description": "身份提供商",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                },
+                "userIdentityID": {
+                    "description": "用户身份ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserLoginLogDetailResp": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "loginIP": {
+                    "description": "登录IP地址",
+                    "type": "string"
+                },
+                "loginTime": {
+                    "description": "登录时间",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                },
+                "userAgent": {
+                    "description": "用户代理信息",
+                    "type": "string"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                },
+                "userLoginLogID": {
+                    "description": "登录日志ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserLoginLogPageListItem": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "loginIP": {
+                    "description": "登录IP地址",
+                    "type": "string"
+                },
+                "loginTime": {
+                    "description": "登录时间",
+                    "type": "integer"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                },
+                "userAgent": {
+                    "description": "用户代理信息",
+                    "type": "string"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                },
+                "userLoginLogID": {
+                    "description": "登录日志ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserLoginLogPageListReq": {
+            "type": "object",
+            "properties": {
+                "loginIP": {
+                    "description": "登录IP地址",
+                    "type": "string"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数据条数",
+                    "type": "integer",
+                    "maximum": 1000
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserLoginLogPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "数据列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtouser.UserLoginLogPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "数据总条数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserPageListItem": {
+            "type": "object",
+            "properties": {
+                "applicationID": {
+                    "description": "应用ID",
+                    "type": "integer"
+                },
+                "avatar": {
+                    "description": "头像URL",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "customData": {
+                    "description": "自定义数据"
+                },
+                "identities": {
+                    "description": "第三方身份"
+                },
+                "isSuspended": {
+                    "description": "是否挂起",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "姓名",
+                    "type": "string"
+                },
+                "passwordEncrypted": {
+                    "description": "加密密码",
+                    "type": "string"
+                },
+                "passwordMethod": {
+                    "description": "密码加密方式",
+                    "type": "string"
+                },
+                "primaryEmail": {
+                    "description": "主要邮箱",
+                    "type": "string"
+                },
+                "primaryPhone": {
+                    "description": "主要手机号",
+                    "type": "string"
+                },
+                "profile": {
+                    "description": "配置信息"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                },
+                "username": {
+                    "description": "用户名",
+                    "type": "string"
+                }
+            }
+        },
+        "dtouser.UserPageListReq": {
+            "type": "object",
+            "properties": {
+                "isSuspended": {
+                    "description": "是否挂起",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "姓名",
+                    "type": "string"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页数据条数",
+                    "type": "integer",
+                    "maximum": 1000
+                },
+                "primaryEmail": {
+                    "description": "主要邮箱",
+                    "type": "string"
+                },
+                "primaryPhone": {
+                    "description": "主要手机号",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "username": {
+                    "description": "用户名",
+                    "type": "string"
+                }
+            }
+        },
+        "dtouser.UserPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "数据列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtouser.UserPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "数据总条数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserPasswordUpdateReq": {
+            "type": "object",
+            "required": [
+                "userID"
+            ],
+            "properties": {
+                "passwordEncrypted": {
+                    "description": "加密密码",
+                    "type": "string"
+                },
+                "passwordMethod": {
+                    "description": "密码加密方式",
+                    "type": "string"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserStatusUpdateReq": {
+            "type": "object",
+            "required": [
+                "userID"
+            ],
+            "properties": {
+                "isSuspended": {
+                    "description": "是否挂起",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.UserUpdateReq": {
+            "type": "object",
+            "required": [
+                "userID"
+            ],
+            "properties": {
+                "applicationID": {
+                    "description": "应用ID",
+                    "type": "integer"
+                },
+                "avatar": {
+                    "description": "头像URL",
+                    "type": "string"
+                },
+                "customData": {
+                    "description": "自定义数据"
+                },
+                "identities": {
+                    "description": "第三方身份"
+                },
+                "isSuspended": {
+                    "description": "是否挂起",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "姓名",
+                    "type": "string"
+                },
+                "passwordEncrypted": {
+                    "description": "加密密码",
+                    "type": "string"
+                },
+                "passwordMethod": {
+                    "description": "密码加密方式",
+                    "type": "string"
+                },
+                "primaryEmail": {
+                    "description": "主要邮箱",
+                    "type": "string"
+                },
+                "primaryPhone": {
+                    "description": "主要手机号",
+                    "type": "string"
+                },
+                "profile": {
+                    "description": "配置信息"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "integer"
+                },
+                "username": {
+                    "description": "用户名",
+                    "type": "string"
+                }
+            }
+        },
+        "gincontext.DtoRender": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {},
+                "msg": {
+                    "type": "string"
+                },
+                "requestID": {
+                    "type": "string"
+                }
+            }
+        },
+        "gobject.OperatorBaseInfo": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                }
+            }
+        },
+        "objapplication.ApplicationBaseInfo": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "isThirdParty": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "secret": {
+                    "type": "string"
+                },
+                "tenantID": {
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "objtenant.OrganizationBaseInfo": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "组织描述",
+                    "type": "string"
+                },
+                "isMFARequired": {
+                    "description": "是否需要MFA",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "组织名称",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "integer"
+                }
+            }
+        }
+    }
 }`
 
 // SwaggerInfoiam holds exported Swagger Info so clients can modify it
