@@ -371,4 +371,144 @@
 
 ---
 
+## 七、Logto 迁移优先级
+
+### 迁移顺序建议
+
+```
+P0-5(Domain) → P0-4(Connector) → P0-3(SSO Connector) → P0-2(Account) → P0-1(Experience) → P1 系列 → P2 系列
+```
+
+### P0 - 核心模块（必须迁移）
+
+| 优先级 | 模块 | 接口数 | 迁移理由 |
+|--------|------|--------|----------|
+| P0-1 | Experience | 30+ | 登录交互核心，包含注册/登录/验证码/TOTP/WebAuthn/社交登录全流程 |
+| P0-2 | Account | 23 | 用户账户管理、MFA、会话管理 |
+| P0-3 | SSO Connector | 9 | SSO 单点登录功能 |
+| P0-4 | Connector | 9 | 社交账号登录必需 |
+| P0-5 | Domain | 5 | 自定义域名管理 |
+
+### P1 - 重要模块（建议迁移）
+
+| 优先级 | 模块 | 接口数 | 迁移理由 |
+|--------|------|--------|----------|
+| P1-1 | Admin User | 50+ | 用户管理核心，需支持 MFA/SSO 身份关联 |
+| P1-2 | Sign-in Experience | 4 | 登录体验配置（品牌色、语言、表单） |
+| P1-3 | Organization | 40+ | 组织管理、多租户隔离 |
+| P1-4 | Organization Role | 10+ | 组织内权限控制 |
+| P1-5 | Organization Scope | 5 | 组织内 API 范围 |
+
+### P2 - 可选模块（后续补充）
+
+| 优先级 | 模块 | 接口数 | 说明 |
+|--------|------|--------|------|
+| P2-1 | Applications | 20+ | 应用管理后续补充 |
+| P2-2 | Role | 13 | 全局角色管理后续补充 |
+| P2-3 | Resource | 9 | API 资源管理后续补充 |
+| P2-4 | Hooks | 8 | Webhook 后续补充 |
+| P2-5 | Log | 2 | 审计日志后续补充 |
+
+### P0 各模块核心接口清单
+
+#### Domain (P0-5) - 5 个接口
+
+| 接口 | 描述 |
+|------|------|
+| GET /api/domains | 获取域名列表 |
+| POST /api/domains | 创建域名 |
+| POST /api/domains/cleanup | 清理过期域名 |
+| GET /api/domains/{id} | 获取域名详情 |
+| DELETE /api/domains/{id} | 删除域名 |
+
+#### Connector (P0-4) - 9 个接口
+
+| 接口 | 描述 |
+|------|------|
+| GET /api/connectors | 获取连接器列表 |
+| POST /api/connectors | 创建连接器 |
+| GET /api/connectors/{id} | 获取连接器详情 |
+| PATCH /api/connectors/{id} | 更新连接器 |
+| DELETE /api/connectors/{id} | 删除连接器 |
+| GET /api/connector-factories | 获取连接器工厂列表 |
+| GET /api/connector-factories/{id} | 获取连接器工厂详情 |
+| POST /api/connectors/{connectorId}/authorization-uri | 获取授权 URI |
+| POST /api/connectors/{factoryId}/test | 测试连接器 |
+
+#### SSO Connector (P0-3) - 9 个接口
+
+| 接口 | 描述 |
+|------|------|
+| GET /api/sso-connector-providers | 列出所有 SSO 连接器提供商 |
+| GET /api/sso-connectors | 列出 SSO 连接器 |
+| POST /api/sso-connectors | 创建 SSO 连接器 |
+| GET /api/sso-connectors/{id} | 获取 SSO 连接器详情 |
+| PATCH /api/sso-connectors/{id} | 更新 SSO 连接器 |
+| DELETE /api/sso-connectors/{id} | 删除 SSO 连接器 |
+| GET /api/sso-connectors/{id}/idp-initiated-auth-config | 获取 IdP 发起认证配置 |
+| PUT /api/sso-connectors/{id}/idp-initiated-auth-config | 设置 IdP 发起认证配置 |
+| DELETE /api/sso-connectors/{id}/idp-initiated-auth-config | 删除 IdP 发起认证配置 |
+
+#### Account (P0-2) - 23 个接口
+
+| 接口 | 描述 |
+|------|------|
+| GET /api/my-account | 获取用户 profile |
+| PATCH /api/my-account | 更新用户 profile |
+| PATCH /api/my-account/profile | 更新 profile 字段 |
+| POST /api/my-account/password | 更新密码 |
+| GET /api/my-account/mfa-settings | 获取 MFA 设置 |
+| PATCH /api/my-account/mfa-settings | 更新 MFA 设置 |
+| GET /api/my-account/logto-configs | 获取 logto 配置 |
+| PATCH /api/my-account/logto-configs | 更新 logto 配置 |
+| POST /api/my-account/primary-email | 更新主邮箱 |
+| DELETE /api/my-account/primary-email | 删除主邮箱 |
+| POST /api/my-account/primary-phone | 更新主手机 |
+| DELETE /api/my-account/primary-phone | 删除主手机 |
+| POST /api/my-account/identities | 添加社交身份 |
+| DELETE /api/my-account/identities/{target} | 删除社交身份 |
+| GET /api/my-account/mfa-verifications | 获取 MFA 验证列表 |
+| POST /api/my-account/mfa-verifications | 添加 MFA 验证 |
+| PUT /api/my-account/mfa-verifications/totp | 创建或替换 TOTP |
+| POST /api/my-account/mfa-verifications/totp-secret/generate | 生成 TOTP 密钥 |
+| POST /api/my-account/mfa-verifications/backup-codes/generate | 生成备用码 |
+| GET /api/my-account/mfa-verifications/backup-codes | 获取备用码 |
+| PATCH /api/my-account/mfa-verifications/{verificationId}/name | 更新 MFA 验证名称 |
+| DELETE /api/my-account/mfa-verifications/{verificationId} | 删除 MFA 验证 |
+| GET /api/my-account/sessions | 获取所有活跃会话 |
+| DELETE /api/my-account/sessions/{sessionId} | 撤销会话 |
+
+#### Experience (P0-1) - 30+ 个接口
+
+**Experience 主体：**
+
+| 接口 | 描述 |
+|------|------|
+| PUT /api/experience | 初始化新交互 |
+| PUT /api/experience/interaction-event | 更新交互事件 |
+| POST /api/experience/identification | 识别用户 |
+| POST /api/experience/submit | 提交交互 |
+| GET /api/experience/interaction | 获取公共交互数据 |
+| POST /api/experience/profile | 添加用户资料 |
+| PUT /api/experience/profile/password | 重置密码 |
+| POST /api/experience/profile/mfa/* | MFA 相关操作 |
+| GET /api/experience/sso-connectors | 获取 SSO 连接器 |
+| POST /api/experience/preflight/sign-in-passkey/* | Passkey 登录 |
+
+**Verification 子模块：**
+
+| 接口 | 描述 |
+|------|------|
+| POST /api/experience/verification/password | 创建密码验证 |
+| POST /api/experience/verification/totp/* | TOTP 验证 |
+| POST /api/experience/verification/web-authn/* | WebAuthn 验证 |
+| POST /api/experience/verification/sign-in-passkey/* | Passkey 验证 |
+| POST /api/experience/verification/social/{connectorId}/* | 社交登录验证 |
+| POST /api/experience/verification/verification-code | 验证码 |
+| POST /api/experience/verification/mfa-verification-code | MFA 验证码 |
+| POST /api/experience/verification/backup-code/* | 备用码验证 |
+| POST /api/experience/verification/sso/{connectorId}/* | SSO 验证 |
+
+---
+
 *文档生成时间：2026-05-07*
