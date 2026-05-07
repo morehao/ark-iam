@@ -27,6 +27,13 @@ func NewScopeCtr() ScopeCtr {
 	}
 }
 
+// @Tags 权限范围
+// @Summary 创建权限范围
+// @accept application/json
+// @Produce application/json
+// @Param req body dtopermission.ScopeCreateReq true "创建权限范围"
+// @Success 200 {object} gincontext.DtoRender{data=dtopermission.ScopeCreateResp}
+// @Router /v1/iam/scope/create [post]
 func (ctr *scopeCtr) Create(ctx *gin.Context) {
 	var req dtopermission.ScopeCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -41,6 +48,13 @@ func (ctr *scopeCtr) Create(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags 权限范围
+// @Summary 删除权限范围
+// @accept application/json
+// @Produce application/json
+// @Param req body dtopermission.ScopeDeleteReq true "删除权限范围"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/iam/scope/delete [post]
 func (ctr *scopeCtr) Delete(ctx *gin.Context) {
 	var req dtopermission.ScopeDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -54,6 +68,13 @@ func (ctr *scopeCtr) Delete(ctx *gin.Context) {
 	gincontext.Success(ctx, "删除成功")
 }
 
+// @Tags 权限范围
+// @Summary 修改权限范围
+// @accept application/json
+// @Produce application/json
+// @Param req body dtopermission.ScopeUpdateReq true "修改权限范围"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/iam/scope/update [post]
 func (ctr *scopeCtr) Update(ctx *gin.Context) {
 	var req dtopermission.ScopeUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -67,6 +88,13 @@ func (ctr *scopeCtr) Update(ctx *gin.Context) {
 	gincontext.Success(ctx, "修改成功")
 }
 
+// @Tags 权限范围
+// @Summary 权限范围详情
+// @accept application/json
+// @Produce application/json
+// @Param req query dtopermission.ScopeDetailReq true "权限范围详情"
+// @Success 200 {object} gincontext.DtoRender{data=dtopermission.ScopeDetailResp}
+// @Router /v1/iam/scope/detail [get]
 func (ctr *scopeCtr) Detail(ctx *gin.Context) {
 	var req dtopermission.ScopeDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -81,6 +109,13 @@ func (ctr *scopeCtr) Detail(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags 权限范围
+// @Summary 权限范围列表分页
+// @accept application/json
+// @Produce application/json
+// @Param req body dtopermission.ScopePageListReq true "权限范围列表分页"
+// @Success 200 {object} gincontext.DtoRender{data=dtopermission.ScopePageListResp}
+// @Router /v1/iam/scope/pageList [post]
 func (ctr *scopeCtr) PageList(ctx *gin.Context) {
 	var req dtopermission.ScopePageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {

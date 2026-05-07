@@ -25,6 +25,13 @@ func NewOrganizationRoleUserRelationCtr() OrganizationRoleUserRelationCtr {
 	}
 }
 
+// @Tags 组织角色用户关联
+// @Summary 创建组织角色用户关联
+// @accept application/json
+// @Produce application/json
+// @Param req body dtotenant.OrganizationRoleUserRelationCreateReq true "创建组织角色用户关联"
+// @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationRoleUserRelationCreateResp}
+// @Router /v1/iam/organizationRoleUser/create [post]
 func (ctr *organizationRoleUserRelationCtr) Create(ctx *gin.Context) {
 	var req dtotenant.OrganizationRoleUserRelationCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -39,6 +46,13 @@ func (ctr *organizationRoleUserRelationCtr) Create(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags 组织角色用户关联
+// @Summary 删除组织角色用户关联
+// @accept application/json
+// @Produce application/json
+// @Param req body dtotenant.OrganizationRoleUserRelationDeleteReq true "删除组织角色用户关联"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/iam/organizationRoleUser/delete [post]
 func (ctr *organizationRoleUserRelationCtr) Delete(ctx *gin.Context) {
 	var req dtotenant.OrganizationRoleUserRelationDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -52,6 +66,13 @@ func (ctr *organizationRoleUserRelationCtr) Delete(ctx *gin.Context) {
 	gincontext.Success(ctx, "删除成功")
 }
 
+// @Tags 组织角色用户关联
+// @Summary 组织角色用户关联列表分页
+// @accept application/json
+// @Produce application/json
+// @Param req body dtotenant.OrganizationRoleUserRelationPageListReq true "组织角色用户关联列表分页"
+// @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationRoleUserRelationPageListResp}
+// @Router /v1/iam/organizationRoleUser/pageList [post]
 func (ctr *organizationRoleUserRelationCtr) PageList(ctx *gin.Context) {
 	var req dtotenant.OrganizationRoleUserRelationPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {

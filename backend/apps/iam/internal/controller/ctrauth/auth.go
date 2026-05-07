@@ -29,6 +29,13 @@ func NewAuthCtr(authSvc svcauth.AuthSvc) AuthCtr {
 	}
 }
 
+// @Tags 认证
+// @Summary 用户登录
+// @accept application/json
+// @Produce application/json
+// @Param req body dtoauth.LoginReq true "用户登录"
+// @Success 200 {object} gincontext.DtoRender{data=dtoauth.LoginResp}
+// @Router /v1/iam/login [post]
 func (ctr *authCtr) Login(ctx *gin.Context) {
 	var req dtoauth.LoginReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -43,6 +50,13 @@ func (ctr *authCtr) Login(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags 认证
+// @Summary 用户注册
+// @accept application/json
+// @Produce application/json
+// @Param req body dtoauth.RegisterReq true "用户注册"
+// @Success 200 {object} gincontext.DtoRender{data=dtoauth.RegisterResp}
+// @Router /v1/iam/register [post]
 func (ctr *authCtr) Register(ctx *gin.Context) {
 	var req dtoauth.RegisterReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -57,6 +71,13 @@ func (ctr *authCtr) Register(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags 认证
+// @Summary 刷新令牌
+// @accept application/json
+// @Produce application/json
+// @Param req body dtoauth.RefreshTokenReq true "刷新令牌"
+// @Success 200 {object} gincontext.DtoRender{data=dtoauth.RefreshTokenResp}
+// @Router /v1/iam/refreshToken [post]
 func (ctr *authCtr) RefreshToken(ctx *gin.Context) {
 	var req dtoauth.RefreshTokenReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -71,6 +92,13 @@ func (ctr *authCtr) RefreshToken(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags 认证
+// @Summary 用户登出
+// @accept application/json
+// @Produce application/json
+// @Param req body dtoauth.LogoutReq true "用户登出"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/iam/logout [post]
 func (ctr *authCtr) Logout(ctx *gin.Context) {
 	var req dtoauth.LogoutReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -84,6 +112,13 @@ func (ctr *authCtr) Logout(ctx *gin.Context) {
 	gincontext.Success(ctx, "登出成功")
 }
 
+// @Tags 认证
+// @Summary 获取用户信息
+// @accept application/json
+// @Produce application/json
+// @Param req query dtoauth.UserinfoReq true "获取用户信息"
+// @Success 200 {object} gincontext.DtoRender{data=dtoauth.UserinfoResp}
+// @Router /v1/iam/userinfo [get]
 func (ctr *authCtr) Userinfo(ctx *gin.Context) {
 	var req dtoauth.UserinfoReq
 	res, err := ctr.authSvc.Userinfo(ctx, &req)
@@ -94,6 +129,13 @@ func (ctr *authCtr) Userinfo(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags 认证
+// @Summary 获取SSO授权URL
+// @accept application/json
+// @Produce application/json
+// @Param req query dtoauth.SsoAuthorizationUrlReq true "获取SSO授权URL"
+// @Success 200 {object} gincontext.DtoRender{data=dtoauth.SsoAuthorizationUrlResp}
+// @Router /v1/iam/authorizationUrl [get]
 func (ctr *authCtr) GetSsoAuthorizationUrl(ctx *gin.Context) {
 	var req dtoauth.SsoAuthorizationUrlReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -108,6 +150,13 @@ func (ctr *authCtr) GetSsoAuthorizationUrl(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags 认证
+// @Summary SSO回调
+// @accept application/json
+// @Produce application/json
+// @Param req query dtoauth.SsoCallbackReq true "SSO回调"
+// @Success 200 {object} gincontext.DtoRender{data=dtoauth.SsoCallbackResp}
+// @Router /v1/iam/callback [get]
 func (ctr *authCtr) SsoCallback(ctx *gin.Context) {
 	var req dtoauth.SsoCallbackReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {

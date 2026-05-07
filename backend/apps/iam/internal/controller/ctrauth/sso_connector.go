@@ -27,6 +27,13 @@ func NewSsoConnectorCtr() SsoConnectorCtr {
 	}
 }
 
+// @Tags SSO连接器
+// @Summary 创建SSO连接器
+// @accept application/json
+// @Produce application/json
+// @Param req body dtoauth.SsoConnectorCreateReq true "创建SSO连接器"
+// @Success 200 {object} gincontext.DtoRender{data=dtoauth.SsoConnectorCreateResp}
+// @Router /v1/iam/ssoConnector/create [post]
 func (ctr *ssoConnectorCtr) Create(ctx *gin.Context) {
 	var req dtoauth.SsoConnectorCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -41,6 +48,13 @@ func (ctr *ssoConnectorCtr) Create(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags SSO连接器
+// @Summary 删除SSO连接器
+// @accept application/json
+// @Produce application/json
+// @Param req body dtoauth.SsoConnectorDeleteReq true "删除SSO连接器"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/iam/ssoConnector/delete [post]
 func (ctr *ssoConnectorCtr) Delete(ctx *gin.Context) {
 	var req dtoauth.SsoConnectorDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -54,6 +68,13 @@ func (ctr *ssoConnectorCtr) Delete(ctx *gin.Context) {
 	gincontext.Success(ctx, "删除成功")
 }
 
+// @Tags SSO连接器
+// @Summary 修改SSO连接器
+// @accept application/json
+// @Produce application/json
+// @Param req body dtoauth.SsoConnectorUpdateReq true "修改SSO连接器"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/iam/ssoConnector/update [post]
 func (ctr *ssoConnectorCtr) Update(ctx *gin.Context) {
 	var req dtoauth.SsoConnectorUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -67,6 +88,13 @@ func (ctr *ssoConnectorCtr) Update(ctx *gin.Context) {
 	gincontext.Success(ctx, "修改成功")
 }
 
+// @Tags SSO连接器
+// @Summary SSO连接器详情
+// @accept application/json
+// @Produce application/json
+// @Param req query dtoauth.SsoConnectorDetailReq true "SSO连接器详情"
+// @Success 200 {object} gincontext.DtoRender{data=dtoauth.SsoConnectorDetailResp}
+// @Router /v1/iam/ssoConnector/detail [get]
 func (ctr *ssoConnectorCtr) Detail(ctx *gin.Context) {
 	var req dtoauth.SsoConnectorDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -81,6 +109,13 @@ func (ctr *ssoConnectorCtr) Detail(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags SSO连接器
+// @Summary SSO连接器列表分页
+// @accept application/json
+// @Produce application/json
+// @Param req body dtoauth.SsoConnectorPageListReq true "SSO连接器列表分页"
+// @Success 200 {object} gincontext.DtoRender{data=dtoauth.SsoConnectorPageListResp}
+// @Router /v1/iam/ssoConnector/pageList [post]
 func (ctr *ssoConnectorCtr) PageList(ctx *gin.Context) {
 	var req dtoauth.SsoConnectorPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {

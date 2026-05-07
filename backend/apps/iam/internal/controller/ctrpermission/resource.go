@@ -27,6 +27,13 @@ func NewResourceCtr() ResourceCtr {
 	}
 }
 
+// @Tags 资源管理
+// @Summary 创建资源管理
+// @accept application/json
+// @Produce application/json
+// @Param req body dtopermission.ResourceCreateReq true "创建资源管理"
+// @Success 200 {object} gincontext.DtoRender{data=dtopermission.ResourceCreateResp}
+// @Router /v1/iam/resource/create [post]
 func (ctr *resourceCtr) Create(ctx *gin.Context) {
 	var req dtopermission.ResourceCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -41,6 +48,13 @@ func (ctr *resourceCtr) Create(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags 资源管理
+// @Summary 删除资源管理
+// @accept application/json
+// @Produce application/json
+// @Param req body dtopermission.ResourceDeleteReq true "删除资源管理"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/iam/resource/delete [post]
 func (ctr *resourceCtr) Delete(ctx *gin.Context) {
 	var req dtopermission.ResourceDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -54,6 +68,13 @@ func (ctr *resourceCtr) Delete(ctx *gin.Context) {
 	gincontext.Success(ctx, "删除成功")
 }
 
+// @Tags 资源管理
+// @Summary 修改资源管理
+// @accept application/json
+// @Produce application/json
+// @Param req body dtopermission.ResourceUpdateReq true "修改资源管理"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/iam/resource/update [post]
 func (ctr *resourceCtr) Update(ctx *gin.Context) {
 	var req dtopermission.ResourceUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -67,6 +88,13 @@ func (ctr *resourceCtr) Update(ctx *gin.Context) {
 	gincontext.Success(ctx, "修改成功")
 }
 
+// @Tags 资源管理
+// @Summary 资源管理详情
+// @accept application/json
+// @Produce application/json
+// @Param req query dtopermission.ResourceDetailReq true "资源管理详情"
+// @Success 200 {object} gincontext.DtoRender{data=dtopermission.ResourceDetailResp}
+// @Router /v1/iam/resource/detail [get]
 func (ctr *resourceCtr) Detail(ctx *gin.Context) {
 	var req dtopermission.ResourceDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -81,6 +109,13 @@ func (ctr *resourceCtr) Detail(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags 资源管理
+// @Summary 资源管理列表分页
+// @accept application/json
+// @Produce application/json
+// @Param req body dtopermission.ResourcePageListReq true "资源管理列表分页"
+// @Success 200 {object} gincontext.DtoRender{data=dtopermission.ResourcePageListResp}
+// @Router /v1/iam/resource/pageList [post]
 func (ctr *resourceCtr) PageList(ctx *gin.Context) {
 	var req dtopermission.ResourcePageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
