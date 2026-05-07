@@ -61,6 +61,13 @@ const (
 	RoleScopeNotExistError    = 100743
 )
 
+const (
+	RoleUserCreateError      = 100770
+	RoleUserDeleteError      = 100771
+	RoleUserGetListError     = 100772
+	RoleUserNotExistError    = 100773
+)
+
 var permissionErrorMsgMap = gerror.CodeMsgMap{
 	MenuCreateError:      "创建菜单失败",
 	MenuDeleteError:      "删除菜单失败",
@@ -100,4 +107,8 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	RoleScopeDeleteError:      "删除角色权限关联失败",
 	RoleScopeGetPageListError: "查看角色权限关联列表失败",
 	RoleScopeNotExistError:    "角色权限关联不存在",
+	RoleUserCreateError:      "创建角色用户关联失败",
+	RoleUserDeleteError:      "删除角色用户关联失败",
+	RoleUserGetListError:     "查看角色用户列表失败",
+	RoleUserNotExistError:    "角色用户不存在",
 }

@@ -3,6 +3,7 @@ package svcpermission
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtopermission"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objpermission"
@@ -20,6 +21,9 @@ type RoleSvc interface {
 	Update(ctx *gin.Context, req *dtopermission.RoleUpdateReq) error
 	Detail(ctx *gin.Context, req *dtopermission.RoleDetailReq) (*dtopermission.RoleDetailResp, error)
 	PageList(ctx *gin.Context, req *dtopermission.RolePageListReq) (*dtopermission.RolePageListResp, error)
+	ListUsers(ctx *gin.Context, req *dtouser.RoleUserListReq) (*dtouser.RoleUserListResp, error)
+	AssignUsers(ctx *gin.Context, req *dtouser.AssignRoleUsersReq) error
+	RemoveUser(ctx *gin.Context, req *dtouser.RemoveRoleUserReq) error
 }
 
 type roleSvc struct{}
@@ -161,4 +165,90 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtopermission.RolePageListRe
 		List:  list,
 		Total: total,
 	}, nil
+}
+
+func (svc *roleSvc) ListUsers(ctx *gin.Context, req *dtouser.RoleUserListReq) (*dtouser.RoleUserListResp, error) {
+	userRoleDao := dao.NewUserRoleDao()
+	userDao := dao.NewUserDao()
+
+	list, err := userRoleDao.GetListByCond(ctx, &dao.UserRoleCond{
+		RoleID: uint(req.RoleID),
+	})
+	if err != nil {
+		glog.Errorf(ctx, "[roleSvc.ListUsers] get users fail, err:%v", err)
+		return nil, code.GetError(code.RoleUserGetListError)
+	}
+
+	userMap := make(map[uint]*model.UserEntity)
+	for _, ur := range list {
+		if user, err := userDao.GetByID(ctx, ur.UserID); err == nil && user != nil {
+			userMap[user.ID] = user
+		}
+	}
+
+	users := make([]dtouser.RoleUserResp, 0, len(list))
+	for _, ur := range list {
+		if user, ok := userMap[ur.UserID]; ok {
+			users = append(users, dtouser.RoleUserResp{
+				UserID:    uint64(ur.UserID),
+				Username:  user.Username,
+				Name:      user.Name,
+				Email:     user.PrimaryEmail,
+				RoleID:    uint64(ur.RoleID),
+				CreatedAt: ur.CreatedAt.Format("2006-01-02 15:04:05"),
+			})
+		}
+	}
+
+	return &dtouser.RoleUserListResp{
+		Total: int64(len(users)),
+		Users: users,
+	}, nil
+}
+
+func (svc *roleSvc) AssignUsers(ctx *gin.Context, req *dtouser.AssignRoleUsersReq) error {
+	userRoleDao := dao.NewUserRoleDao()
+	userID := gincontext.GetUserID(ctx)
+
+	for _, uid := range req.UserIDs {
+		existing, _ := userRoleDao.GetListByCond(ctx, &dao.UserRoleCond{
+			RoleID: uint(req.RoleID),
+			UserID: uint(uid),
+		})
+		if len(existing) > 0 {
+			continue
+		}
+
+		entity := &model.UserRoleEntity{
+			TenantID:  gincontext.GetTenantID(ctx),
+			UserID:    uint(uid),
+			RoleID:    uint(req.RoleID),
+			CreatedBy: userID,
+		}
+		if err := userRoleDao.Insert(ctx, entity); err != nil {
+			glog.Errorf(ctx, "[roleSvc.AssignUsers] insert fail, err:%v", err)
+			return code.GetError(code.RoleUserCreateError)
+		}
+	}
+
+	return nil
+}
+
+func (svc *roleSvc) RemoveUser(ctx *gin.Context, req *dtouser.RemoveRoleUserReq) error {
+	userRoleDao := dao.NewUserRoleDao()
+
+	list, err := userRoleDao.GetListByCond(ctx, &dao.UserRoleCond{
+		RoleID: uint(req.RoleID),
+		UserID: uint(req.UserID),
+	})
+	if err != nil || len(list) == 0 {
+		return code.GetError(code.RoleUserNotExistError)
+	}
+
+	if err := userRoleDao.Delete(ctx, list[0].ID, gincontext.GetUserID(ctx)); err != nil {
+		glog.Errorf(ctx, "[roleSvc.RemoveUser] delete fail, err:%v", err)
+		return code.GetError(code.RoleUserDeleteError)
+	}
+
+	return nil
 }
