@@ -18,6 +18,8 @@ func roleRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.GET("/role/users", roleCtr.ListUsers)
 	v1RouterGroup.POST("/role/assignUsers", roleCtr.AssignUsers)
 	v1RouterGroup.DELETE("/role/users/:roleId/:userId", roleCtr.RemoveUser)
+	v1RouterGroup.GET("/role/applications", roleCtr.ListApplications)
+	v1RouterGroup.POST("/role/assignApplications", roleCtr.AssignApplications)
 }
 
 func menuRouter(groups *ginserver.RouterGroups) {
