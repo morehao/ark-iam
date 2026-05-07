@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -386,13 +387,88 @@ func generateState() string {
 }
 
 func (svc *authSvc) exchangeCodeForUserInfo(ctx *gin.Context, ssoConnector *model.SsoConnectorEntity, code, state string) (*ssoUserInfo, error) {
+	var config SsoConnectorConfig
+	if err := json.Unmarshal(ssoConnector.Config, &config); err != nil {
+		return nil, err
+	}
+
+	tokenResp, err := svc.exchangeCode(config.TokenURL, config.ClientID, config.ClientSecret, code, config.RedirectURI)
+	if err != nil {
+		glog.Errorf(ctx, "[svcauth.exchangeCodeForUserInfo] exchange code fail, err:%v", err)
+		return nil, err
+	}
+
+	userInfo, err := svc.fetchUserInfo(config.UserInfoURL, tokenResp.AccessToken)
+	if err != nil {
+		glog.Errorf(ctx, "[svcauth.exchangeCodeForUserInfo] fetch user info fail, err:%v", err)
+		return nil, err
+	}
+
 	return &ssoUserInfo{
 		Issuer:    ssoConnector.ProviderName,
-		Subject:   "sso-user-" + code,
-		Email:     "sso-user@example.com",
-		Name:      "SSO User",
-		AvatarUrl: "",
+		Subject:   userInfo.Subject,
+		Email:     userInfo.Email,
+		Name:      userInfo.Name,
+		AvatarUrl: userInfo.Picture,
 	}, nil
+}
+
+type tokenResponse struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpiresIn   int    `json:"expires_in"`
+	Scope       string `json:"scope"`
+}
+
+type userInfoResponse struct {
+	Subject string `json:"sub"`
+	Email   string `json:"email"`
+	Name    string `json:"name"`
+	Picture string `json:"picture"`
+}
+
+func (svc *authSvc) exchangeCode(tokenURL, clientID, clientSecret, code, redirectURI string) (*tokenResponse, error) {
+	data := url.Values{}
+	data.Set("grant_type", "authorization_code")
+	data.Set("code", code)
+	data.Set("redirect_uri", redirectURI)
+	data.Set("client_id", clientID)
+	data.Set("client_secret", clientSecret)
+
+	resp, err := http.PostForm(tokenURL, data)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var tokenResp tokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+		return nil, err
+	}
+
+	return &tokenResp, nil
+}
+
+func (svc *authSvc) fetchUserInfo(userInfoURL, accessToken string) (*userInfoResponse, error) {
+	req, err := http.NewRequest("GET", userInfoURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var userInfo userInfoResponse
+	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
+		return nil, err
+	}
+
+	return &userInfo, nil
 }
 
 type ssoUserInfo struct {
