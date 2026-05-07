@@ -1,6 +1,9 @@
 package svcapplication
 
 import (
+	"encoding/hex"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoapplication"
@@ -9,6 +12,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
@@ -22,6 +26,9 @@ type ApplicationSvc interface {
 	ListRoles(ctx *gin.Context, req *dtoapplication.ApplicationRoleListReq) (*dtoapplication.ApplicationRoleListResp, error)
 	AssignRoles(ctx *gin.Context, req *dtoapplication.AssignApplicationRolesReq) error
 	RemoveRole(ctx *gin.Context, req *dtoapplication.RemoveApplicationRoleReq) error
+	ListSecrets(ctx *gin.Context, req *dtoapplication.ApplicationSecretListReq) (*dtoapplication.ApplicationSecretListResp, error)
+	CreateSecret(ctx *gin.Context, req *dtoapplication.CreateApplicationSecretReq) (*dtoapplication.CreateApplicationSecretResp, error)
+	DeleteSecret(ctx *gin.Context, req *dtoapplication.DeleteApplicationSecretReq) error
 }
 
 type applicationSvc struct {
@@ -166,25 +173,25 @@ func (svc *applicationSvc) ListRoles(ctx *gin.Context, req *dtoapplication.Appli
 	})
 	if err != nil {
 		glog.Errorf(ctx, "[applicationSvc.ListRoles] get roles fail, err:%v", err)
-		return nil, code.GetError(code.ApplicationRoleGetListError)
+		return nil, code.GetError(code.RoleApplicationGetListError)
 	}
 
 	roleMap := make(map[uint]*model.RoleEntity)
-	for _, ar := range list {
-		if role, err := roleDao.GetByID(ctx, ar.RoleID); err == nil && role != nil {
+	if list != nil {
+		if role, err := roleDao.GetByID(ctx, list.RoleID); err == nil && role != nil {
 			roleMap[role.ID] = role
 		}
 	}
 
-	roles := make([]dtoapplication.ApplicationRoleResp, 0, len(list))
-	for _, ar := range list {
-		if role, ok := roleMap[ar.RoleID]; ok {
+	roles := make([]dtoapplication.ApplicationRoleResp, 0, 1)
+	if list != nil {
+		if role, ok := roleMap[list.RoleID]; ok {
 			roles = append(roles, dtoapplication.ApplicationRoleResp{
-				RoleID:        ar.RoleID,
+				RoleID:        uint64(list.RoleID),
 				RoleName:      role.Name,
 				RoleCode:      role.Code,
-				ApplicationID: ar.ApplicationID,
-				CreatedAt:    ar.CreatedAt.Format("2006-01-02 15:04:05"),
+				ApplicationID: uint64(list.ApplicationID),
+				CreatedAt:    list.CreatedAt.Format("2006-01-02 15:04:05"),
 			})
 		}
 	}
@@ -201,22 +208,22 @@ func (svc *applicationSvc) AssignRoles(ctx *gin.Context, req *dtoapplication.Ass
 
 	for _, roleID := range req.RoleIDs {
 		existing, _ := appRoleDao.GetByCond(ctx, &dao.ApplicationRoleCond{
-			ApplicationID: req.ApplicationID,
-			RoleID:       roleID,
+			ApplicationID: uint(req.ApplicationID),
+			RoleID:       uint(roleID),
 		})
-		if len(existing) > 0 {
+		if existing != nil && existing.ID != 0 {
 			continue
 		}
 
 		entity := &model.ApplicationRoleEntity{
 			TenantID:      gincontext.GetTenantID(ctx),
-			ApplicationID: req.ApplicationID,
-			RoleID:       roleID,
+			ApplicationID: uint(req.ApplicationID),
+			RoleID:       uint(roleID),
 			CreatedBy:    userID,
 		}
 		if err := appRoleDao.Insert(ctx, entity); err != nil {
 			glog.Errorf(ctx, "[applicationSvc.AssignRoles] insert fail, err:%v", err)
-			return code.GetError(code.ApplicationRoleCreateError)
+			return code.GetError(code.RoleApplicationCreateError)
 		}
 	}
 
@@ -226,17 +233,107 @@ func (svc *applicationSvc) AssignRoles(ctx *gin.Context, req *dtoapplication.Ass
 func (svc *applicationSvc) RemoveRole(ctx *gin.Context, req *dtoapplication.RemoveApplicationRoleReq) error {
 	appRoleDao := dao.NewApplicationRoleDao()
 
-	list, err := appRoleDao.GetByCond(ctx, &dao.ApplicationRoleCond{
-		ApplicationID: req.ApplicationID,
-		RoleID:       req.RoleID,
+	entity, err := appRoleDao.GetByCond(ctx, &dao.ApplicationRoleCond{
+		ApplicationID: uint(req.ApplicationID),
+		RoleID:       uint(req.RoleID),
 	})
-	if err != nil || len(list) == 0 {
-		return code.GetError(code.ApplicationRoleNotExistError)
+	if err != nil || entity == nil || entity.ID == 0 {
+		return code.GetError(code.RoleApplicationNotExistError)
 	}
 
-	if err := appRoleDao.Delete(ctx, list[0].ID, gincontext.GetUserID(ctx)); err != nil {
+	if err := appRoleDao.Delete(ctx, entity.ID, gincontext.GetUserID(ctx)); err != nil {
 		glog.Errorf(ctx, "[applicationSvc.RemoveRole] delete fail, err:%v", err)
-		return code.GetError(code.ApplicationRoleDeleteError)
+		return code.GetError(code.RoleApplicationDeleteError)
+	}
+
+	return nil
+}
+
+func (svc *applicationSvc) ListSecrets(ctx *gin.Context, req *dtoapplication.ApplicationSecretListReq) (*dtoapplication.ApplicationSecretListResp, error) {
+	secretDao := dao.NewApplicationSecretDao()
+
+	list, total, err := secretDao.GetPageListByCond(ctx, &dao.ApplicationSecretCond{
+		ApplicationID: req.ApplicationID,
+	}, 1, 100)
+	if err != nil {
+		glog.Errorf(ctx, "[applicationSvc.ListSecrets] get secrets fail, err:%v", err)
+		return nil, code.GetError(code.ApplicationSecretGetListError)
+	}
+
+	secrets := make([]dtoapplication.ApplicationSecretResp, 0, len(list))
+	for _, s := range list {
+		var expiresAt *string
+		if s.ExpiresAt > 0 {
+			t := time.Unix(s.ExpiresAt, 0).Format("2006-01-02 15:04:05")
+			expiresAt = &t
+		}
+		secrets = append(secrets, dtoapplication.ApplicationSecretResp{
+			ID:            uint64(s.ID),
+			ApplicationID: uint64(s.ApplicationID),
+			Name:          s.Name,
+			ExpiresAt:     expiresAt,
+			CreatedAt:     s.CreatedAt.Format("2006-01-02 15:04:05"),
+		})
+	}
+
+	return &dtoapplication.ApplicationSecretListResp{
+		Total:   total,
+		Secrets: secrets,
+	}, nil
+}
+
+func (svc *applicationSvc) CreateSecret(ctx *gin.Context, req *dtoapplication.CreateApplicationSecretReq) (*dtoapplication.CreateApplicationSecretResp, error) {
+	randomBytes, err := gcrypto.GenerateRandomBytes(32)
+	if err != nil {
+		glog.Errorf(ctx, "[applicationSvc.CreateSecret] generate secret fail, err:%v", err)
+		return nil, code.GetError(code.ApplicationSecretCreateError)
+	}
+	secretValue := hex.EncodeToString(randomBytes)
+
+	var expiresAt int64
+	if req.ExpiresAt != "" {
+		t, err := time.Parse("2006-01-02 15:04:05", req.ExpiresAt)
+		if err == nil {
+			expiresAt = t.Unix()
+		}
+	}
+
+	entity := &model.ApplicationSecretEntity{
+		TenantID:      gincontext.GetTenantID(ctx),
+		ApplicationID: req.ApplicationID,
+		Name:          req.Name,
+		Value:         secretValue,
+		ExpiresAt:     expiresAt,
+		CreatedBy:    gincontext.GetUserID(ctx),
+	}
+
+	if err := dao.NewApplicationSecretDao().Insert(ctx, entity); err != nil {
+		glog.Errorf(ctx, "[applicationSvc.CreateSecret] insert fail, err:%v", err)
+		return nil, code.GetError(code.ApplicationSecretCreateError)
+	}
+
+	return &dtoapplication.CreateApplicationSecretResp{
+		ID:     uint64(entity.ID),
+		Name:   entity.Name,
+		Secret: secretValue,
+	}, nil
+}
+
+func (svc *applicationSvc) DeleteSecret(ctx *gin.Context, req *dtoapplication.DeleteApplicationSecretReq) error {
+	secretDao := dao.NewApplicationSecretDao()
+
+	entity, err := secretDao.GetByID(ctx, uint(req.SecretID))
+	if err != nil {
+		glog.Errorf(ctx, "[applicationSvc.DeleteSecret] get secret fail, err:%v", err)
+		return code.GetError(code.ApplicationSecretDeleteError)
+	}
+	if entity == nil || entity.ID == 0 {
+		return code.GetError(code.ApplicationSecretNotExistError)
+	}
+
+	if err := secretDao.Delete(ctx, uint(req.SecretID), gincontext.GetUserID(ctx)); err != nil {
+		glog.Errorf(ctx, "[applicationSvc.DeleteSecret] delete fail, err:%v", err)
+		return code.GetError(code.ApplicationSecretDeleteError)
 	}
 
 	return nil

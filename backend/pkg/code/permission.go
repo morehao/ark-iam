@@ -39,12 +39,16 @@ const (
 )
 
 const (
-	ApplicationCreateError      = 100730
-	ApplicationDeleteError      = 100731
-	ApplicationUpdateError      = 100732
-	ApplicationGetDetailError   = 100733
-	ApplicationGetPageListError = 100734
-	ApplicationNotExistError    = 100735
+	ApplicationCreateError         = 100730
+	ApplicationDeleteError         = 100731
+	ApplicationUpdateError         = 100732
+	ApplicationGetDetailError      = 100733
+	ApplicationGetPageListError    = 100734
+	ApplicationNotExistError       = 100735
+	ApplicationSecretCreateError   = 100736
+	ApplicationSecretGetListError  = 100737
+	ApplicationSecretDeleteError   = 100738
+	ApplicationSecretNotExistError = 100739
 )
 
 const (
@@ -62,12 +66,14 @@ const (
 )
 
 const (
-	RoleUserCreateError      = 100770
-	RoleUserDeleteError      = 100771
-	RoleUserGetListError     = 100772
-	RoleUserNotExistError    = 100773
-	RoleApplicationCreateError = 100780
+	RoleUserCreateError         = 100770
+	RoleUserDeleteError         = 100771
+	RoleUserGetListError        = 100772
+	RoleUserNotExistError       = 100773
+	RoleApplicationCreateError  = 100780
 	RoleApplicationGetListError = 100781
+	RoleApplicationDeleteError  = 100782
+	RoleApplicationNotExistError = 100783
 )
 
 var permissionErrorMsgMap = gerror.CodeMsgMap{
@@ -95,12 +101,16 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	ScopeGetDetailError:   "查看权限范围详情失败",
 	ScopeGetPageListError: "查看权限范围列表失败",
 	ScopeNotExistError:   "权限范围不存在",
-	ApplicationCreateError:      "创建应用失败",
-	ApplicationDeleteError:      "删除应用失败",
-	ApplicationUpdateError:      "修改应用失败",
-	ApplicationGetDetailError:   "查看应用详情失败",
-	ApplicationGetPageListError: "查看应用列表失败",
-	ApplicationNotExistError:   "应用不存在",
+	ApplicationCreateError:         "创建应用失败",
+	ApplicationDeleteError:         "删除应用失败",
+	ApplicationUpdateError:         "修改应用失败",
+	ApplicationGetDetailError:      "查看应用详情失败",
+	ApplicationGetPageListError:    "查看应用列表失败",
+	ApplicationNotExistError:       "应用不存在",
+	ApplicationSecretCreateError:   "创建应用密钥失败",
+	ApplicationSecretGetListError:  "查看应用密钥列表失败",
+	ApplicationSecretDeleteError:   "删除应用密钥失败",
+	ApplicationSecretNotExistError: "应用密钥不存在",
 	RoleMenuCreateError:      "创建角色菜单关联失败",
 	RoleMenuDeleteError:      "删除角色菜单关联失败",
 	RoleMenuGetPageListError: "查看角色菜单关联列表失败",
@@ -109,10 +119,12 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	RoleScopeDeleteError:      "删除角色权限关联失败",
 	RoleScopeGetPageListError: "查看角色权限关联列表失败",
 	RoleScopeNotExistError:    "角色权限关联不存在",
-	RoleUserCreateError:      "创建角色用户关联失败",
-	RoleUserDeleteError:      "删除角色用户关联失败",
-	RoleUserGetListError:     "查看角色用户列表失败",
-	RoleUserNotExistError:    "角色用户不存在",
-	RoleApplicationCreateError: "创建角色应用关联失败",
+	RoleUserCreateError:         "创建角色用户关联失败",
+	RoleUserDeleteError:         "删除角色用户关联失败",
+	RoleUserGetListError:        "查看角色用户列表失败",
+	RoleUserNotExistError:       "角色用户不存在",
+	RoleApplicationCreateError:  "创建角色应用关联失败",
 	RoleApplicationGetListError: "查看角色应用列表失败",
+	RoleApplicationDeleteError:  "删除角色应用关联失败",
+	RoleApplicationNotExistError: "角色应用关联不存在",
 }

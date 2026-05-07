@@ -16,6 +16,9 @@ type ApplicationCtr interface {
 	ListRoles(ctx *gin.Context)
 	AssignRoles(ctx *gin.Context)
 	RemoveRole(ctx *gin.Context)
+	ListSecrets(ctx *gin.Context)
+	CreateSecret(ctx *gin.Context)
+	DeleteSecret(ctx *gin.Context)
 }
 
 type applicationCtr struct {
@@ -192,4 +195,66 @@ func (ctr *applicationCtr) RemoveRole(ctx *gin.Context) {
 		return
 	}
 	gincontext.Success(ctx, "移除成功")
+}
+
+// @Tags 应用管理
+// @Summary 应用密钥列表
+// @accept application/json
+// @Produce application/json
+// @Param req query dtoapplication.ApplicationSecretListReq true "应用密钥列表"
+// @Success 200 {object} gincontext.DtoRender{data=dtoapplication.ApplicationSecretListResp}
+// @Router /v1/iam/application/secrets [get]
+func (ctr *applicationCtr) ListSecrets(ctx *gin.Context) {
+	var req dtoapplication.ApplicationSecretListReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.applicationSvc.ListSecrets(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 应用管理
+// @Summary 创建应用密钥
+// @accept application/json
+// @Produce application/json
+// @Param req body dtoapplication.CreateApplicationSecretReq true "创建应用密钥"
+// @Success 200 {object} gincontext.DtoRender{data=dtoapplication.CreateApplicationSecretResp}
+// @Router /v1/iam/application/secrets [post]
+func (ctr *applicationCtr) CreateSecret(ctx *gin.Context) {
+	var req dtoapplication.CreateApplicationSecretReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.applicationSvc.CreateSecret(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 应用管理
+// @Summary 删除应用密钥
+// @accept application/json
+// @Produce application/json
+// @Param req query dtoapplication.DeleteApplicationSecretReq true "删除应用密钥"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/iam/application/secrets/{secretId} [delete]
+func (ctr *applicationCtr) DeleteSecret(ctx *gin.Context) {
+	var req dtoapplication.DeleteApplicationSecretReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctr.applicationSvc.DeleteSecret(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, "删除成功")
 }

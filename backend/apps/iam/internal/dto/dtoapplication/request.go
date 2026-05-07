@@ -48,3 +48,17 @@ type RemoveApplicationRoleReq struct {
 	ApplicationID uint64 `json:"applicationId" binding:"required"`
 	RoleID        uint64 `json:"roleId" path:"roleId" binding:"required"`
 }
+
+type ApplicationSecretListReq struct {
+	ApplicationID uint `json:"applicationId" form:"applicationId" binding:"required"`
+}
+
+type CreateApplicationSecretReq struct {
+	ApplicationID uint   `json:"applicationId" binding:"required"`
+	Name          string `json:"name" binding:"required"`
+	ExpiresAt     string `json:"expiresAt"`
+}
+
+type DeleteApplicationSecretReq struct {
+	SecretID uint64 `json:"secretId" path:"secretId" binding:"required"`
+}

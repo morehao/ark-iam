@@ -95,4 +95,7 @@ func applicationRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.GET("/application/roles", appCtr.ListRoles)
 	v1RouterGroup.POST("/application/assignRoles", appCtr.AssignRoles)
 	v1RouterGroup.DELETE("/application/roles/:roleId", appCtr.RemoveRole)
+	v1RouterGroup.GET("/application/secrets", appCtr.ListSecrets)
+	v1RouterGroup.POST("/application/secrets", appCtr.CreateSecret)
+	v1RouterGroup.DELETE("/application/secrets/:secretId", appCtr.DeleteSecret)
 }

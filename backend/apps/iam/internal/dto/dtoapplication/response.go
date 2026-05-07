@@ -33,3 +33,23 @@ type ApplicationRoleListResp struct {
 	Total  int64                 `json:"total"`
 	Roles  []ApplicationRoleResp `json:"roles"`
 }
+
+type ApplicationSecretResp struct {
+	ID            uint64  `json:"id"`
+	ApplicationID uint64  `json:"applicationId"`
+	Name          string  `json:"name"`
+	Value         string  `json:"value,omitempty"`
+	ExpiresAt     *string `json:"expiresAt"`
+	CreatedAt     string  `json:"createdAt"`
+}
+
+type ApplicationSecretListResp struct {
+	Total   int64                    `json:"total"`
+	Secrets []ApplicationSecretResp `json:"secrets"`
+}
+
+type CreateApplicationSecretResp struct {
+	ID     uint64 `json:"id"`
+	Name   string `json:"name"`
+	Secret string `json:"secret"`
+}
