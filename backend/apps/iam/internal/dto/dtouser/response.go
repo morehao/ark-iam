@@ -106,3 +106,17 @@ type UserDepartmentRelationPageListResp struct {
 	List  []UserDepartmentRelationPageListItem `json:"list"`  // 数据列表
 	Total int64                            `json:"total"` // 数据总条数
 }
+
+type RoleUserResp struct {
+	UserID    uint64 `json:"userId"`
+	Username  string `json:"username"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	RoleID    uint64 `json:"roleId"`
+	CreatedAt string `json:"createdAt"`
+}
+
+type RoleUserListResp struct {
+	Total int64           `json:"total"`
+	Users []RoleUserResp `json:"users"`
+}

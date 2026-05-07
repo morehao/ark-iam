@@ -133,3 +133,17 @@ type AssignDepartmentsReq struct {
 	UserID        uint   `json:"userID" binding:"required"`         // 用户ID
 	DepartmentIDs []uint `json:"departmentIDs" binding:"required"`   // 部门ID列表
 }
+
+type RoleUserListReq struct {
+	RoleID uint64 `json:"roleId" form:"roleId" binding:"required"`
+}
+
+type AssignRoleUsersReq struct {
+	RoleID  uint64   `json:"roleId" binding:"required"`
+	UserIDs []uint64 `json:"userIds" binding:"required,min=1"`
+}
+
+type RemoveRoleUserReq struct {
+	RoleID uint64 `json:"roleId" path:"roleId" binding:"required"`
+	UserID uint64 `json:"userId" path:"userId" binding:"required"`
+}
