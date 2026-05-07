@@ -19,6 +19,9 @@ type ApplicationSvc interface {
 	Update(ctx *gin.Context, req *dtoapplication.ApplicationUpdateReq) error
 	Detail(ctx *gin.Context, req *dtoapplication.ApplicationDetailReq) (*dtoapplication.ApplicationDetailResp, error)
 	PageList(ctx *gin.Context, req *dtoapplication.ApplicationPageListReq) (*dtoapplication.ApplicationPageListResp, error)
+	ListRoles(ctx *gin.Context, req *dtoapplication.ApplicationRoleListReq) (*dtoapplication.ApplicationRoleListResp, error)
+	AssignRoles(ctx *gin.Context, req *dtoapplication.AssignApplicationRolesReq) error
+	RemoveRole(ctx *gin.Context, req *dtoapplication.RemoveApplicationRoleReq) error
 }
 
 type applicationSvc struct {
@@ -152,4 +155,89 @@ func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.Applic
 		List:  list,
 		Total: total,
 	}, nil
+}
+
+func (svc *applicationSvc) ListRoles(ctx *gin.Context, req *dtoapplication.ApplicationRoleListReq) (*dtoapplication.ApplicationRoleListResp, error) {
+	appRoleDao := dao.NewApplicationRoleDao()
+	roleDao := dao.NewRoleDao()
+
+	list, err := appRoleDao.GetByCond(ctx, &dao.ApplicationRoleCond{
+		ApplicationID: req.ApplicationID,
+	})
+	if err != nil {
+		glog.Errorf(ctx, "[applicationSvc.ListRoles] get roles fail, err:%v", err)
+		return nil, code.GetError(code.ApplicationRoleGetListError)
+	}
+
+	roleMap := make(map[uint]*model.RoleEntity)
+	for _, ar := range list {
+		if role, err := roleDao.GetByID(ctx, ar.RoleID); err == nil && role != nil {
+			roleMap[role.ID] = role
+		}
+	}
+
+	roles := make([]dtoapplication.ApplicationRoleResp, 0, len(list))
+	for _, ar := range list {
+		if role, ok := roleMap[ar.RoleID]; ok {
+			roles = append(roles, dtoapplication.ApplicationRoleResp{
+				RoleID:        ar.RoleID,
+				RoleName:      role.Name,
+				RoleCode:      role.Code,
+				ApplicationID: ar.ApplicationID,
+				CreatedAt:    ar.CreatedAt.Format("2006-01-02 15:04:05"),
+			})
+		}
+	}
+
+	return &dtoapplication.ApplicationRoleListResp{
+		Total: int64(len(roles)),
+		Roles: roles,
+	}, nil
+}
+
+func (svc *applicationSvc) AssignRoles(ctx *gin.Context, req *dtoapplication.AssignApplicationRolesReq) error {
+	appRoleDao := dao.NewApplicationRoleDao()
+	userID := gincontext.GetUserID(ctx)
+
+	for _, roleID := range req.RoleIDs {
+		existing, _ := appRoleDao.GetByCond(ctx, &dao.ApplicationRoleCond{
+			ApplicationID: req.ApplicationID,
+			RoleID:       roleID,
+		})
+		if len(existing) > 0 {
+			continue
+		}
+
+		entity := &model.ApplicationRoleEntity{
+			TenantID:      gincontext.GetTenantID(ctx),
+			ApplicationID: req.ApplicationID,
+			RoleID:       roleID,
+			CreatedBy:    userID,
+		}
+		if err := appRoleDao.Insert(ctx, entity); err != nil {
+			glog.Errorf(ctx, "[applicationSvc.AssignRoles] insert fail, err:%v", err)
+			return code.GetError(code.ApplicationRoleCreateError)
+		}
+	}
+
+	return nil
+}
+
+func (svc *applicationSvc) RemoveRole(ctx *gin.Context, req *dtoapplication.RemoveApplicationRoleReq) error {
+	appRoleDao := dao.NewApplicationRoleDao()
+
+	list, err := appRoleDao.GetByCond(ctx, &dao.ApplicationRoleCond{
+		ApplicationID: req.ApplicationID,
+		RoleID:       req.RoleID,
+	})
+	if err != nil || len(list) == 0 {
+		return code.GetError(code.ApplicationRoleNotExistError)
+	}
+
+	if err := appRoleDao.Delete(ctx, list[0].ID, gincontext.GetUserID(ctx)); err != nil {
+		glog.Errorf(ctx, "[applicationSvc.RemoveRole] delete fail, err:%v", err)
+		return code.GetError(code.ApplicationRoleDeleteError)
+	}
+
+	return nil
 }
