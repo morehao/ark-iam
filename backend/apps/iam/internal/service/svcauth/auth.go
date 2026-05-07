@@ -1,8 +1,12 @@
 package svcauth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 	"unicode"
@@ -291,7 +295,11 @@ func (svc *authSvc) GetSsoAuthorizationUrl(ctx *gin.Context, req *dtoauth.SsoAut
 		return nil, code.GetError(code.SsoConnectorNotExistError)
 	}
 
-	authorizationUrl := svc.buildAuthorizationUrl(ssoConnectorEntity)
+	authorizationUrl, err := svc.buildAuthorizationUrl(ssoConnectorEntity)
+	if err != nil {
+		glog.Errorf(ctx, "[svcauth.GetSsoAuthorizationUrl] buildAuthorizationUrl fail, err:%v", err)
+		return nil, code.GetError(code.SsoConnectorGetDetailError)
+	}
 
 	return &dtoauth.SsoAuthorizationUrlResp{
 		AuthorizationUrl: authorizationUrl,
@@ -343,8 +351,38 @@ func (svc *authSvc) SsoCallback(ctx *gin.Context, req *dtoauth.SsoCallbackReq) (
 	}, nil
 }
 
-func (svc *authSvc) buildAuthorizationUrl(ssoConnector *model.SsoConnectorEntity) string {
-	return "https://placeholder-sso.example.com/authorize?connector_id=" + ssoConnector.ProviderName
+func (svc *authSvc) buildAuthorizationUrl(ssoConnector *model.SsoConnectorEntity) (string, error) {
+	var config SsoConnectorConfig
+	if err := json.Unmarshal(ssoConnector.Config, &config); err != nil {
+		return "", err
+	}
+
+	state := generateState()
+
+	params := url.Values{}
+	params.Set("client_id", config.ClientID)
+	params.Set("redirect_uri", config.RedirectURI)
+	params.Set("response_type", "code")
+	params.Set("scope", strings.Join(config.Scopes, " "))
+	params.Set("state", state)
+
+	return fmt.Sprintf("%s?%s", config.AuthURL, params.Encode()), nil
+}
+
+type SsoConnectorConfig struct {
+	ClientID     string   `json:"clientId"`
+	ClientSecret string   `json:"clientSecret"`
+	AuthURL      string   `json:"authUrl"`
+	TokenURL     string   `json:"tokenUrl"`
+	UserInfoURL  string   `json:"userInfoUrl"`
+	RedirectURI  string   `json:"redirectUri"`
+	Scopes       []string `json:"scopes"`
+}
+
+func generateState() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 func (svc *authSvc) exchangeCodeForUserInfo(ctx *gin.Context, ssoConnector *model.SsoConnectorEntity, code, state string) (*ssoUserInfo, error) {
