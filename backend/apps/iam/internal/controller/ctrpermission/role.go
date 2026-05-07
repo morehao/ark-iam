@@ -2,6 +2,7 @@ package ctrpermission
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtopermission"
 	"github.com/morehao/ark-iam/iam/internal/service/svcpermission"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -13,6 +14,9 @@ type RoleCtr interface {
 	Update(ctx *gin.Context)
 	Detail(ctx *gin.Context)
 	PageList(ctx *gin.Context)
+	ListUsers(ctx *gin.Context)
+	AssignUsers(ctx *gin.Context)
+	RemoveUser(ctx *gin.Context)
 }
 
 type roleCtr struct {
@@ -128,4 +132,65 @@ func (ctr *roleCtr) PageList(ctx *gin.Context) {
 		return
 	}
 	gincontext.Success(ctx, res)
+}
+
+// @Tags 角色管理
+// @Summary 角色用户列表
+// @accept application/json
+// @Produce application/json
+// @Param req query dtouser.RoleUserListReq true "角色用户列表"
+// @Success 200 {object} gincontext.DtoRender{data=dtouser.RoleUserListResp}
+// @Router /v1/iam/role/users [get]
+func (ctr *roleCtr) ListUsers(ctx *gin.Context) {
+	var req dtouser.RoleUserListReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.roleSvc.ListUsers(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 角色管理
+// @Summary 分配用户
+// @accept application/json
+// @Produce application/json
+// @Param req body dtouser.AssignRoleUsersReq true "分配用户"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/iam/role/assignUsers [post]
+func (ctr *roleCtr) AssignUsers(ctx *gin.Context) {
+	var req dtouser.AssignRoleUsersReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctr.roleSvc.AssignUsers(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, "分配成功")
+}
+
+// @Tags 角色管理
+// @Summary 移除用户
+// @accept application/json
+// @Produce application/json
+// @Param req query dtouser.RemoveRoleUserReq true "移除用户"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/iam/role/users/{roleId}/{userId} [delete]
+func (ctr *roleCtr) RemoveUser(ctx *gin.Context) {
+	var req dtouser.RemoveRoleUserReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctr.roleSvc.RemoveUser(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, "移除成功")
 }
