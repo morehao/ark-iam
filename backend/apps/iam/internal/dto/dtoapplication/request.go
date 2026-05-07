@@ -34,3 +34,17 @@ type ApplicationPageListReq struct {
 	Type        string `json:"type" form:"type"`         // 应用类型
 	IsThirdParty int8  `json:"isThirdParty" form:"isThirdParty"` // 是否第三方应用
 }
+
+type ApplicationRoleListReq struct {
+	ApplicationID uint `json:"applicationId" form:"applicationId" binding:"required"`
+}
+
+type AssignApplicationRolesReq struct {
+	ApplicationID uint64   `json:"applicationId" binding:"required"`
+	RoleIDs       []uint64 `json:"roleIds" binding:"required,min=1"`
+}
+
+type RemoveApplicationRoleReq struct {
+	ApplicationID uint64 `json:"applicationId" binding:"required"`
+	RoleID        uint64 `json:"roleId" path:"roleId" binding:"required"`
+}
