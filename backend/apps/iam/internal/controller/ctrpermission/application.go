@@ -13,6 +13,9 @@ type ApplicationCtr interface {
 	Update(ctx *gin.Context)
 	Detail(ctx *gin.Context)
 	PageList(ctx *gin.Context)
+	ListRoles(ctx *gin.Context)
+	AssignRoles(ctx *gin.Context)
+	RemoveRole(ctx *gin.Context)
 }
 
 type applicationCtr struct {
@@ -128,4 +131,65 @@ func (ctr *applicationCtr) PageList(ctx *gin.Context) {
 		return
 	}
 	gincontext.Success(ctx, res)
+}
+
+// @Tags 应用管理
+// @Summary 应用角色列表
+// @accept application/json
+// @Produce application/json
+// @Param req query dtoapplication.ApplicationRoleListReq true "应用角色列表"
+// @Success 200 {object} gincontext.DtoRender{data=dtoapplication.ApplicationRoleListResp}
+// @Router /v1/iam/application/roles [get]
+func (ctr *applicationCtr) ListRoles(ctx *gin.Context) {
+	var req dtoapplication.ApplicationRoleListReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.applicationSvc.ListRoles(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 应用管理
+// @Summary 分配角色
+// @accept application/json
+// @Produce application/json
+// @Param req body dtoapplication.AssignApplicationRolesReq true "分配角色"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/iam/application/assignRoles [post]
+func (ctr *applicationCtr) AssignRoles(ctx *gin.Context) {
+	var req dtoapplication.AssignApplicationRolesReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctr.applicationSvc.AssignRoles(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, "分配成功")
+}
+
+// @Tags 应用管理
+// @Summary 移除角色
+// @accept application/json
+// @Produce application/json
+// @Param req query dtoapplication.RemoveApplicationRoleReq true "移除角色"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/iam/application/roles/{roleId} [delete]
+func (ctr *applicationCtr) RemoveRole(ctx *gin.Context) {
+	var req dtoapplication.RemoveApplicationRoleReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctr.applicationSvc.RemoveRole(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, "移除成功")
 }
