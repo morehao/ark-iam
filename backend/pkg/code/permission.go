@@ -66,6 +66,8 @@ const (
 	RoleUserDeleteError      = 100771
 	RoleUserGetListError     = 100772
 	RoleUserNotExistError    = 100773
+	RoleApplicationCreateError = 100780
+	RoleApplicationGetListError = 100781
 )
 
 var permissionErrorMsgMap = gerror.CodeMsgMap{
@@ -111,4 +113,6 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	RoleUserDeleteError:      "删除角色用户关联失败",
 	RoleUserGetListError:     "查看角色用户列表失败",
 	RoleUserNotExistError:    "角色用户不存在",
+	RoleApplicationCreateError: "创建角色应用关联失败",
+	RoleApplicationGetListError: "查看角色应用列表失败",
 }
