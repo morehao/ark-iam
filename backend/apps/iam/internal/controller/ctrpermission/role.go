@@ -17,6 +17,8 @@ type RoleCtr interface {
 	ListUsers(ctx *gin.Context)
 	AssignUsers(ctx *gin.Context)
 	RemoveUser(ctx *gin.Context)
+	ListApplications(ctx *gin.Context)
+	AssignApplications(ctx *gin.Context)
 }
 
 type roleCtr struct {
@@ -193,4 +195,45 @@ func (ctr *roleCtr) RemoveUser(ctx *gin.Context) {
 		return
 	}
 	gincontext.Success(ctx, "移除成功")
+}
+
+// @Tags 角色管理
+// @Summary 角色应用列表
+// @accept application/json
+// @Produce application/json
+// @Param req query dtouser.RoleApplicationListReq true "角色应用列表"
+// @Success 200 {object} gincontext.DtoRender{data=dtouser.RoleApplicationListResp}
+// @Router /v1/iam/role/applications [get]
+func (ctr *roleCtr) ListApplications(ctx *gin.Context) {
+	var req dtouser.RoleApplicationListReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.roleSvc.ListApplications(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 角色管理
+// @Summary 分配应用
+// @accept application/json
+// @Produce application/json
+// @Param req body dtouser.AssignRoleApplicationsReq true "分配应用"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/iam/role/assignApplications [post]
+func (ctr *roleCtr) AssignApplications(ctx *gin.Context) {
+	var req dtouser.AssignRoleApplicationsReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctr.roleSvc.AssignApplications(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, "分配成功")
 }
