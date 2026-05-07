@@ -24,6 +24,8 @@ const (
 	TokenGenerateError         = 110020
 	RefreshTokenRequiredError  = 110021
 	RefreshTokenInvalidError   = 110022
+	SessionGetListError        = 110023
+	SessionRevokeError         = 110024
 )
 
 const (
@@ -67,6 +69,12 @@ var tokenErrorMsgMap = gerror.CodeMsgMap{
 	TokenGenerateError:        "生成令牌失败",
 	RefreshTokenRequiredError: "刷新令牌不能为空",
 	RefreshTokenInvalidError:  "刷新令牌无效",
+	SessionGetListError:       "获取会话列表失败",
+	SessionRevokeError:        "撤销会话失败",
+}
+
+func init() {
+	registerError(tokenErrorMsgMap)
 }
 
 var connectorErrorMsgMap = gerror.CodeMsgMap{
