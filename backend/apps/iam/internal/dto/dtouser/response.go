@@ -120,3 +120,16 @@ type RoleUserListResp struct {
 	Total int64           `json:"total"`
 	Users []RoleUserResp `json:"users"`
 }
+
+type RoleApplicationResp struct {
+	ApplicationID uint64 `json:"applicationId"`
+	AppName       string `json:"appName"`
+	AppType       string `json:"appType"`
+	RoleID        uint64 `json:"roleId"`
+	CreatedAt     string `json:"createdAt"`
+}
+
+type RoleApplicationListResp struct {
+	Total        int64                   `json:"total"`
+	Applications []RoleApplicationResp `json:"applications"`
+}

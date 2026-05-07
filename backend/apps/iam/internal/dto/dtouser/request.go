@@ -147,3 +147,12 @@ type RemoveRoleUserReq struct {
 	RoleID uint64 `json:"roleId" path:"roleId" binding:"required"`
 	UserID uint64 `json:"userId" path:"userId" binding:"required"`
 }
+
+type RoleApplicationListReq struct {
+	RoleID uint64 `json:"roleId" form:"roleId" binding:"required"`
+}
+
+type AssignRoleApplicationsReq struct {
+	RoleID         uint64   `json:"roleId" binding:"required"`
+	ApplicationIDs []uint64 `json:"applicationIds" binding:"required,min=1"`
+}
