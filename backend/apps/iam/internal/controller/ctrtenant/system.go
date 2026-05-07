@@ -7,7 +7,7 @@ import (
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
-type TenantCtr interface {
+type SystemCtr interface {
 	Create(ctx *gin.Context)
 	Delete(ctx *gin.Context)
 	Update(ctx *gin.Context)
@@ -15,25 +15,25 @@ type TenantCtr interface {
 	PageList(ctx *gin.Context)
 }
 
-type tenantCtr struct {
-	tenantSvc svctenant.TenantSvc
+type systemCtr struct {
+	systemSvc svctenant.SystemSvc
 }
 
-var _ TenantCtr = (*tenantCtr)(nil)
+var _ SystemCtr = (*systemCtr)(nil)
 
-func NewTenantCtr() TenantCtr {
-	return &tenantCtr{
-		tenantSvc: svctenant.NewTenantSvc(),
+func NewSystemCtr() SystemCtr {
+	return &systemCtr{
+		systemSvc: svctenant.NewSystemSvc(),
 	}
 }
 
-func (ctr *tenantCtr) Create(ctx *gin.Context) {
-	var req dtotenant.TenantCreateReq
+func (ctr *systemCtr) Create(ctx *gin.Context) {
+	var req dtotenant.SystemCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.tenantSvc.Create(ctx, &req)
+	res, err := ctr.systemSvc.Create(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -41,39 +41,39 @@ func (ctr *tenantCtr) Create(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
-func (ctr *tenantCtr) Delete(ctx *gin.Context) {
-	var req dtotenant.TenantDeleteReq
+func (ctr *systemCtr) Delete(ctx *gin.Context) {
+	var req dtotenant.SystemDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.tenantSvc.Delete(ctx, &req); err != nil {
+	if err := ctr.systemSvc.Delete(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
 	gincontext.Success(ctx, "删除成功")
 }
 
-func (ctr *tenantCtr) Update(ctx *gin.Context) {
-	var req dtotenant.TenantUpdateReq
+func (ctr *systemCtr) Update(ctx *gin.Context) {
+	var req dtotenant.SystemUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.tenantSvc.Update(ctx, &req); err != nil {
+	if err := ctr.systemSvc.Update(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
 	gincontext.Success(ctx, "修改成功")
 }
 
-func (ctr *tenantCtr) Detail(ctx *gin.Context) {
-	var req dtotenant.TenantDetailReq
+func (ctr *systemCtr) Detail(ctx *gin.Context) {
+	var req dtotenant.SystemDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.tenantSvc.Detail(ctx, &req)
+	res, err := ctr.systemSvc.Detail(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -81,13 +81,13 @@ func (ctr *tenantCtr) Detail(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
-func (ctr *tenantCtr) PageList(ctx *gin.Context) {
-	var req dtotenant.TenantPageListReq
+func (ctr *systemCtr) PageList(ctx *gin.Context) {
+	var req dtotenant.SystemPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.tenantSvc.PageList(ctx, &req)
+	res, err := ctr.systemSvc.PageList(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
