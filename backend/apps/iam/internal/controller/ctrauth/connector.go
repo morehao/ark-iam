@@ -3,6 +3,7 @@ package ctrauth
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtoconnector"
 	"github.com/morehao/ark-iam/iam/internal/service/svcauth"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
@@ -13,6 +14,9 @@ type ConnectorCtr interface {
 	Update(ctx *gin.Context)
 	Detail(ctx *gin.Context)
 	PageList(ctx *gin.Context)
+	ListFactories(ctx *gin.Context)
+	TestConnector(ctx *gin.Context)
+	GetAuthorizationUri(ctx *gin.Context)
 }
 
 type connectorCtr struct {
@@ -123,6 +127,64 @@ func (ctr *connectorCtr) PageList(ctx *gin.Context) {
 		return
 	}
 	res, err := ctr.connectorSvc.PageList(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 连接器
+// @Summary 连接器工厂列表
+// @accept application/json
+// @Produce application/json
+// @Success 200 {object} gincontext.DtoRender{data=dtoconnector.ConnectorFactoryListResp}
+// @Router /v1/iam/connector/factories [get]
+func (ctr *connectorCtr) ListFactories(ctx *gin.Context) {
+	res, err := ctr.connectorSvc.ListFactories(ctx)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 连接器
+// @Summary 测试连接器
+// @accept application/json
+// @Produce application/json
+// @Param connectorId path int true "连接器ID"
+// @Success 200 {object} gincontext.DtoRender{data=dtoconnector.TestConnectorResp}
+// @Router /v1/iam/connector/{connectorId}/test [post]
+func (ctr *connectorCtr) TestConnector(ctx *gin.Context) {
+	var req dtoconnector.ConnectorIDReq
+	if err := ctx.ShouldBindUri(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.connectorSvc.TestConnector(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 连接器
+// @Summary 获取授权URI
+// @accept application/json
+// @Produce application/json
+// @Param connectorId path int true "连接器ID"
+// @Param req body dtoconnector.AuthorizationUriReq true "获取授权URI"
+// @Success 200 {object} gincontext.DtoRender{data=dtoconnector.AuthorizationUriResp}
+// @Router /v1/iam/connector/{connectorId}/authorization-uri [post]
+func (ctr *connectorCtr) GetAuthorizationUri(ctx *gin.Context) {
+	var req dtoconnector.AuthorizationUriReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.connectorSvc.GetAuthorizationUri(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

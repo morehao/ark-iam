@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtoconnector"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/code"
@@ -22,6 +23,9 @@ type ConnectorSvc interface {
 	Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateReq) error
 	Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailReq) (*dtoauth.ConnectorDetailResp, error)
 	PageList(ctx *gin.Context, req *dtoauth.ConnectorPageListReq) (*dtoauth.ConnectorPageListResp, error)
+	ListFactories(ctx *gin.Context) (*dtoconnector.ConnectorFactoryListResp, error)
+	TestConnector(ctx *gin.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.TestConnectorResp, error)
+	GetAuthorizationUri(ctx *gin.Context, req *dtoconnector.AuthorizationUriReq) (*dtoconnector.AuthorizationUriResp, error)
 }
 
 type connectorSvc struct{}
@@ -203,5 +207,41 @@ func (svc *connectorSvc) PageList(ctx *gin.Context, req *dtoauth.ConnectorPageLi
 	return &dtoauth.ConnectorPageListResp{
 		List:  list,
 		Total: total,
+	}, nil
+}
+
+func (svc *connectorSvc) ListFactories(ctx *gin.Context) (*dtoconnector.ConnectorFactoryListResp, error) {
+	factories := []dtoconnector.ConnectorFactoryResp{
+		{
+			FactoryID:   "google",
+			Name:        "google",
+			DisplayName: "Google",
+			Logo:        "https://cdn.anything.com/google-logo.png",
+			IsStandard:  true,
+		},
+		{
+			FactoryID:   "github",
+			Name:        "github",
+			DisplayName: "GitHub",
+			Logo:        "https://cdn.anything.com/github-logo.png",
+			IsStandard:  true,
+		},
+	}
+	return &dtoconnector.ConnectorFactoryListResp{
+		Factories: factories,
+	}, nil
+}
+
+func (svc *connectorSvc) TestConnector(ctx *gin.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.TestConnectorResp, error) {
+	return &dtoconnector.TestConnectorResp{
+		Success: true,
+		Message: "连接成功",
+	}, nil
+}
+
+func (svc *connectorSvc) GetAuthorizationUri(ctx *gin.Context, req *dtoconnector.AuthorizationUriReq) (*dtoconnector.AuthorizationUriResp, error) {
+	authUri := "https://authorization.url/oauth/authorize?redirect_uri=" + req.RedirectURI + "&state=" + req.State
+	return &dtoconnector.AuthorizationUriResp{
+		AuthorizationUri: authUri,
 	}, nil
 }

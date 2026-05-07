@@ -30,6 +30,9 @@ func connectorRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/connector/update", connectorCtr.Update)
 	v1RouterGroup.GET("/connector/detail", connectorCtr.Detail)
 	v1RouterGroup.POST("/connector/pageList", connectorCtr.PageList)
+	v1RouterGroup.GET("/connector/factories", connectorCtr.ListFactories)
+	v1RouterGroup.POST("/connector/:connectorId/test", connectorCtr.TestConnector)
+	v1RouterGroup.POST("/connector/:connectorId/authorization-uri", connectorCtr.GetAuthorizationUri)
 }
 
 func ssoConnectorRouter(groups *ginserver.RouterGroups) {
