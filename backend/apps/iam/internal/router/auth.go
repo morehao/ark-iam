@@ -41,4 +41,7 @@ func ssoConnectorRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/ssoConnector/update", ssoConnectorCtr.Update)
 	v1RouterGroup.GET("/ssoConnector/detail", ssoConnectorCtr.Detail)
 	v1RouterGroup.POST("/ssoConnector/pageList", ssoConnectorCtr.PageList)
+	v1RouterGroup.GET("/ssoConnector/providers", ssoConnectorCtr.ListProviders)
+	v1RouterGroup.GET("/ssoConnector/:connectorId/idp-config", ssoConnectorCtr.GetIdpConfig)
+	v1RouterGroup.PUT("/ssoConnector/:connectorId/idp-config", ssoConnectorCtr.UpdateIdpConfig)
 }

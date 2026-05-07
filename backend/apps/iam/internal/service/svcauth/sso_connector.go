@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtosso"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/code"
@@ -22,6 +23,9 @@ type SsoConnectorSvc interface {
 	Update(ctx *gin.Context, req *dtoauth.SsoConnectorUpdateReq) error
 	Detail(ctx *gin.Context, req *dtoauth.SsoConnectorDetailReq) (*dtoauth.SsoConnectorDetailResp, error)
 	PageList(ctx *gin.Context, req *dtoauth.SsoConnectorPageListReq) (*dtoauth.SsoConnectorPageListResp, error)
+	ListProviders(ctx *gin.Context) (*dtosso.SsoProviderListResp, error)
+	GetIdpConfig(ctx *gin.Context, req *dtosso.SsoConnectorIDReq) (*dtosso.SsoIdpConfigResp, error)
+	UpdateIdpConfig(ctx *gin.Context, req *dtosso.SsoConnectorIDReq, configReq *dtosso.SsoIdpConfigReq) error
 }
 
 type ssoConnectorSvc struct{}
@@ -233,4 +237,92 @@ func (svc *ssoConnectorSvc) PageList(ctx *gin.Context, req *dtoauth.SsoConnector
 		List:  list,
 		Total: total,
 	}, nil
+}
+
+func (svc *ssoConnectorSvc) ListProviders(ctx *gin.Context) (*dtosso.SsoProviderListResp, error) {
+	providers := []dtosso.SsoProviderResp{
+		{ProviderName: "google", DisplayName: "Google", Logo: "google"},
+		{ProviderName: "github", DisplayName: "GitHub", Logo: "github"},
+		{ProviderName: "microsoft", DisplayName: "Microsoft", Logo: "microsoft"},
+		{ProviderName: "oidc", DisplayName: "OIDC", Logo: "oidc"},
+	}
+	return &dtosso.SsoProviderListResp{Providers: providers}, nil
+}
+
+func (svc *ssoConnectorSvc) GetIdpConfig(ctx *gin.Context, req *dtosso.SsoConnectorIDReq) (*dtosso.SsoIdpConfigResp, error) {
+	ssoConnectorEntity, err := dao.NewSsoConnectorDao().GetByID(ctx, req.ConnectorID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcauth.GetIdpConfig] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.SsoConnectorGetDetailError)
+	}
+	if ssoConnectorEntity == nil || ssoConnectorEntity.ID == 0 {
+		return nil, code.GetError(code.SsoConnectorNotExistError)
+	}
+
+	var config SsoConnectorConfig
+	if err := json.Unmarshal(ssoConnectorEntity.Config, &config); err != nil {
+		glog.Errorf(ctx, "[svcauth.GetIdpConfig] json.Unmarshal config fail, err:%v", err)
+		return nil, code.GetError(code.SsoConnectorGetDetailError)
+	}
+
+	return &dtosso.SsoIdpConfigResp{
+		ClientID:    config.ClientID,
+		AuthURL:    config.AuthURL,
+		TokenURL:   config.TokenURL,
+		UserInfoURL: config.UserInfoURL,
+		Scopes:     config.Scopes,
+	}, nil
+}
+
+func (svc *ssoConnectorSvc) UpdateIdpConfig(ctx *gin.Context, req *dtosso.SsoConnectorIDReq, configReq *dtosso.SsoIdpConfigReq) error {
+	ssoConnectorEntity, err := dao.NewSsoConnectorDao().GetByID(ctx, req.ConnectorID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcauth.UpdateIdpConfig] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.SsoConnectorUpdateError)
+	}
+	if ssoConnectorEntity == nil || ssoConnectorEntity.ID == 0 {
+		return code.GetError(code.SsoConnectorNotExistError)
+	}
+
+	var existingConfig SsoConnectorConfig
+	if err := json.Unmarshal(ssoConnectorEntity.Config, &existingConfig); err != nil {
+		glog.Errorf(ctx, "[svcauth.UpdateIdpConfig] json.Unmarshal config fail, err:%v", err)
+		return code.GetError(code.SsoConnectorUpdateError)
+	}
+
+	if configReq.ClientID != "" {
+		existingConfig.ClientID = configReq.ClientID
+	}
+	if configReq.ClientSecret != "" {
+		existingConfig.ClientSecret = configReq.ClientSecret
+	}
+	if configReq.AuthURL != "" {
+		existingConfig.AuthURL = configReq.AuthURL
+	}
+	if configReq.TokenURL != "" {
+		existingConfig.TokenURL = configReq.TokenURL
+	}
+	if configReq.UserInfoURL != "" {
+		existingConfig.UserInfoURL = configReq.UserInfoURL
+	}
+	if len(configReq.Scopes) > 0 {
+		existingConfig.Scopes = configReq.Scopes
+	}
+
+	configJson, err := json.Marshal(existingConfig)
+	if err != nil {
+		glog.Errorf(ctx, "[svcauth.UpdateIdpConfig] json.Marshal config fail, err:%v", err)
+		return code.GetError(code.SsoConnectorUpdateError)
+	}
+
+	userID := gincontext.GetUserID(ctx)
+	updateMap := map[string]any{
+		"config":     configJson,
+		"updated_by": userID,
+	}
+	if err := dao.NewSsoConnectorDao().UpdateMap(ctx, req.ConnectorID, updateMap); err != nil {
+		glog.Errorf(ctx, "[svcauth.UpdateIdpConfig] dao UpdateMap fail, err:%v", err)
+		return code.GetError(code.SsoConnectorUpdateError)
+	}
+	return nil
 }
