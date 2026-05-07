@@ -87,4 +87,7 @@ func applicationRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/application/update", appCtr.Update)
 	v1RouterGroup.GET("/application/detail", appCtr.Detail)
 	v1RouterGroup.POST("/application/pageList", appCtr.PageList)
+	v1RouterGroup.GET("/application/roles", appCtr.ListRoles)
+	v1RouterGroup.POST("/application/assignRoles", appCtr.AssignRoles)
+	v1RouterGroup.DELETE("/application/roles/:roleId", appCtr.RemoveRole)
 }
