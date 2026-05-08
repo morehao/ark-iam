@@ -5,7 +5,7 @@
 # ============================================================
 APP        =
 BINARY     = $(APP)
-MAIN_DIR   = ./backend/apps/$(APP)/cmd
+MAIN_DIR   = ./apps/$(APP)/cmd
 BUILD_DIR  = ./backend/output/build
 VERSION    = $(shell date +%Y%m%d%H%M%S)-$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
