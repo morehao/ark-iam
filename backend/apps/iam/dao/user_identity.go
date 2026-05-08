@@ -2,6 +2,8 @@ package dao
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
@@ -11,10 +13,9 @@ import (
 
 type UserIdentityCond struct {
 	*genericdao.BaseCond
-	TenantID   uint
-	UserID     uint
-	Issuer     string
-	IdentityID string
+	TenantID        uint
+	ConnectorID     uint
+	ExternalSubject string
 }
 
 func (c *UserIdentityCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -24,14 +25,11 @@ func (c *UserIdentityCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.TenantID != 0 {
 		db.Where(tableName + ".tenant_id = ?", c.TenantID)
 	}
-	if c.UserID != 0 {
-		db.Where(tableName + ".user_id = ?", c.UserID)
+	if c.ConnectorID != 0 {
+		db.Where(tableName + ".connector_id = ?", c.ConnectorID)
 	}
-	if c.Issuer != "" {
-		db.Where(tableName + ".issuer = ?", c.Issuer)
-	}
-	if c.IdentityID != "" {
-		db.Where(tableName + ".identity_id = ?", c.IdentityID)
+	if c.ExternalSubject != "" {
+		db.Where(tableName + ".external_subject = ?", c.ExternalSubject)
 	}
 }
 
@@ -48,14 +46,26 @@ func NewUserIdentityDao() *UserIdentityDao {
 	}
 }
 
-func (dao *UserIdentityDao) GetByIssuerAndIdentityID(ctx context.Context, tenantID uint, issuer, identityID string) (*model.UserIdentityEntity, error) {
+func (dao *UserIdentityDao) GetByConnectorAndExternalSubject(ctx context.Context, tenantID, connectorID uint, externalSubject string) (*model.UserIdentityEntity, error) {
 	db := dbclient.IamDB(ctx)
 	var entity model.UserIdentityEntity
 	err := db.
-		Where("tenant_id = ? AND issuer = ? AND identity_id = ? AND deleted_at IS NULL", tenantID, issuer, identityID).
+		Where("tenant_id = ? AND connector_id = ? AND external_subject = ? AND deleted_at IS NULL", tenantID, connectorID, externalSubject).
 		First(&entity).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return &entity, nil
+}
+
+func (dao *UserIdentityDao) UpdateBinding(ctx context.Context, identityID, userID uint, issuer string, detail []byte) error {
+	return dao.UpdateMap(ctx, identityID, map[string]any{
+		"user_id":    userID,
+		"issuer":     issuer,
+		"detail":     json.RawMessage(detail),
+		"updated_by": userID,
+	})
 }

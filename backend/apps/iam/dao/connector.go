@@ -10,7 +10,11 @@ import (
 type ConnectorCond struct {
 	*genericdao.BaseCond
 	TenantID    uint
-	ConnectorID string
+	Protocol    string
+	Provider    string
+	Status      string
+	Name        string
+	DisplayName string
 }
 
 func (c *ConnectorCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -20,8 +24,20 @@ func (c *ConnectorCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.TenantID != 0 {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
-	if c.ConnectorID != "" {
-		db.Where(tableName+".connector_id = ?", c.ConnectorID)
+	if c.Protocol != "" {
+		db.Where(tableName+".protocol = ?", c.Protocol)
+	}
+	if c.Provider != "" {
+		db.Where(tableName+".provider = ?", c.Provider)
+	}
+	if c.Status != "" {
+		db.Where(tableName+".status = ?", c.Status)
+	}
+	if c.Name != "" {
+		db.Where(tableName+".name = ?", c.Name)
+	}
+	if c.DisplayName != "" {
+		db.Where(tableName+".display_name = ?", c.DisplayName)
 	}
 }
 

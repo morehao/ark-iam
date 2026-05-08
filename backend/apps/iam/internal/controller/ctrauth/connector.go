@@ -14,9 +14,10 @@ type ConnectorCtr interface {
 	Update(ctx *gin.Context)
 	Detail(ctx *gin.Context)
 	PageList(ctx *gin.Context)
-	ListFactories(ctx *gin.Context)
+	GetFactoryList(ctx *gin.Context)
 	TestConnector(ctx *gin.Context)
-	GetAuthorizationUri(ctx *gin.Context)
+	Authorize(ctx *gin.Context)
+	Callback(ctx *gin.Context)
 }
 
 type connectorCtr struct {
@@ -138,10 +139,16 @@ func (ctr *connectorCtr) PageList(ctx *gin.Context) {
 // @Summary 连接器工厂列表
 // @accept application/json
 // @Produce application/json
+// @Param req body dtoconnector.ConnectorFactoryListReq false "连接器工厂列表"
 // @Success 200 {object} gincontext.DtoRender{data=dtoconnector.ConnectorFactoryListResp}
-// @Router /v1/iam/connector/factories [get]
-func (ctr *connectorCtr) ListFactories(ctx *gin.Context) {
-	res, err := ctr.connectorSvc.ListFactories(ctx)
+// @Router /v1/iam/connector/getFactoryList [post]
+func (ctr *connectorCtr) GetFactoryList(ctx *gin.Context) {
+	var req dtoconnector.ConnectorFactoryListReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.connectorSvc.GetFactoryList(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -171,20 +178,70 @@ func (ctr *connectorCtr) TestConnector(ctx *gin.Context) {
 }
 
 // @Tags 连接器
-// @Summary 获取授权URI
+// @Summary 连接器授权
 // @accept application/json
 // @Produce application/json
 // @Param connectorId path int true "连接器ID"
-// @Param req body dtoconnector.AuthorizationUriReq true "获取授权URI"
-// @Success 200 {object} gincontext.DtoRender{data=dtoconnector.AuthorizationUriResp}
-// @Router /v1/iam/connector/{connectorId}/authorization-uri [post]
-func (ctr *connectorCtr) GetAuthorizationUri(ctx *gin.Context) {
-	var req dtoconnector.AuthorizationUriReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+// @Param req body dtoconnector.ConnectorAuthorizeReq true "连接器授权"
+// @Success 200 {object} gincontext.DtoRender{data=dtoconnector.ConnectorAuthorizeResp}
+// @Router /v1/iam/connector/{connectorId}/authorize [post]
+func (ctr *connectorCtr) Authorize(ctx *gin.Context) {
+	var uriReq struct {
+		ConnectorID uint `uri:"connectorId" binding:"required"`
+	}
+	if err := ctx.ShouldBindUri(&uriReq); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.connectorSvc.GetAuthorizationUri(ctx, &req)
+	var bodyReq struct {
+		RedirectURI  string `json:"redirectUri" binding:"required"`
+		State        string `json:"state"`
+		LoginHint    string `json:"loginHint"`
+		ResponseMode string `json:"responseMode"`
+	}
+	if err := ctx.ShouldBindJSON(&bodyReq); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	req := dtoconnector.ConnectorAuthorizeReq{
+		ConnectorID:  uriReq.ConnectorID,
+		RedirectURI:  bodyReq.RedirectURI,
+		State:        bodyReq.State,
+		LoginHint:    bodyReq.LoginHint,
+		ResponseMode: bodyReq.ResponseMode,
+	}
+	res, err := ctr.connectorSvc.Authorize(ctx, &req, req.ConnectorID)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 连接器
+// @Summary 连接器回调
+// @accept application/json
+// @Produce application/json
+// @Param connectorId query int true "连接器ID"
+// @Param code query string true "授权码"
+// @Param state query string true "状态"
+// @Success 200 {object} gincontext.DtoRender{data=dtoauth.LoginResp}
+// @Router /v1/iam/connector/callback [get]
+func (ctr *connectorCtr) Callback(ctx *gin.Context) {
+	var req struct {
+		ConnectorID uint   `form:"connectorId" binding:"required"`
+		Code        string `form:"code" binding:"required"`
+		State       string `form:"state" binding:"required"`
+	}
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.connectorSvc.Callback(ctx, &dtoconnector.ConnectorCallbackReq{
+		ConnectorID: req.ConnectorID,
+		Code:        req.Code,
+		State:       req.State,
+	})
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

@@ -31,47 +31,13 @@ type LogoutReq struct {
 type UserinfoReq struct {
 }
 
-type SsoAuthorizationUrlReq struct {
-	ConnectorID string `json:"connectorId" binding:"required"` // 连接器ID
-}
-
-type SsoCallbackReq struct {
-	ConnectorID string `json:"connectorId" binding:"required"` // 连接器ID
-	Code        string `json:"code" binding:"required"`       // 授权码
-	State       string `json:"state"`                         // 状态
-}
-
 type AssignDepartmentsReq struct {
 	UserID        uint   `json:"userID" binding:"required"`         // 用户ID
 	DepartmentIDs []uint `json:"departmentIDs" binding:"required"`   // 部门ID列表
 }
 
 type ConnectorDeleteReq struct {
-	ConnectorID uint `json:"connectorID" binding:"required"` // 连接器ID
-}
-
-type SsoConnectorCreateReq struct {
-	objauth.SsoConnectorBaseInfo
-}
-
-type SsoConnectorUpdateReq struct {
-	SsoConnectorID uint `json:"ssoConnectorID" binding:"required"` // SSO连接器ID
-	objauth.SsoConnectorBaseInfo
-}
-
-type SsoConnectorDetailReq struct {
-	SsoConnectorID uint `json:"ssoConnectorID" binding:"required"` // SSO连接器ID
-}
-
-type SsoConnectorPageListReq struct {
-	gobject.PageQuery
-	TenantID      uint   `json:"tenantID"`      // 租户ID
-	ProviderName  string `json:"providerName"`  // 提供商名称
-	ConnectorName string `json:"connectorName"` // 连接器名称
-}
-
-type SsoConnectorDeleteReq struct {
-	SsoConnectorID uint `json:"ssoConnectorID" binding:"required"` // SSO连接器ID
+	ConnectorID uint `json:"connectorId" binding:"required"` // 连接器ID
 }
 
 type ConnectorCreateReq struct {
@@ -79,16 +45,20 @@ type ConnectorCreateReq struct {
 }
 
 type ConnectorUpdateReq struct {
-	ConnectorID uint `json:"connectorID" binding:"required"` // 连接器ID
+	ConnectorID uint `json:"connectorId" binding:"required"` // 连接器ID
 	objauth.ConnectorBaseInfo
 }
 
 type ConnectorDetailReq struct {
-	ConnectorID uint `json:"connectorID" binding:"required"` // 连接器ID
+	ConnectorID uint `json:"connectorId" binding:"required"` // 连接器ID
 }
 
 type ConnectorPageListReq struct {
 	gobject.PageQuery
-	TenantID    uint   `json:"tenantID"`    // 租户ID
-	ConnectorID string `json:"connectorID"` // 连接器ID
+	TenantID    uint   `json:"tenantId"`    // 租户ID
+	Protocol    string `json:"protocol"`    // 协议类型
+	Provider    string `json:"provider"`    // 提供商
+	Status      string `json:"status"`      // 状态
+	Name        string `json:"name"`        // 名称
+	DisplayName string `json:"displayName"` // 显示名称
 }

@@ -90,23 +90,25 @@ CREATE TABLE `user_login_log`
 
 CREATE TABLE `user_identity`
 (
-    `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-    `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
-    `user_id`        BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '用户ID',
-    `issuer`         VARCHAR(256) NOT NULL DEFAULT '' COMMENT '身份提供商',
-    `identity_id`    VARCHAR(128) NOT NULL DEFAULT '' COMMENT '第三方用户ID',
-    `detail`         JSON NOT NULL DEFAULT ('{}') COMMENT '详细信息',
-    `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updated_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted_at`     DATETIME DEFAULT NULL COMMENT '删除时间',
-    `created_by`     BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '创建人ID',
-    `updated_by`     BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '更新人ID',
-    `deleted_by`     BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '删除人ID',
+    `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+    `tenant_id`         BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
+    `user_id`           BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '用户ID',
+    `connector_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '连接器ID',
+    `issuer`            VARCHAR(256) NOT NULL DEFAULT '' COMMENT '身份提供商',
+    `external_subject`  VARCHAR(128) NOT NULL DEFAULT '' COMMENT '外部主体标识',
+    `detail`            JSON NOT NULL DEFAULT ('{}') COMMENT '详细信息',
+    `created_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `deleted_at`        DATETIME DEFAULT NULL COMMENT '删除时间',
+    `created_by`        BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '创建人ID',
+    `updated_by`        BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '更新人ID',
+    `deleted_by`        BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '删除人ID',
     PRIMARY KEY (`id`),
-    KEY              `idx_tenant_id` (`tenant_id`),
-    KEY              `idx_user_id` (`user_id`),
-    KEY              `idx_issuer_identity` (`tenant_id`, `issuer`, `identity_id`),
-    KEY              `idx_deleted_at` (`deleted_at`)
+    KEY                 `idx_tenant_id` (`tenant_id`),
+    KEY                 `idx_user_id` (`user_id`),
+    KEY                 `idx_connector_id` (`connector_id`),
+    KEY                 `idx_tenant_issuer_subject` (`tenant_id`, `issuer`, `external_subject`),
+    KEY                 `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户身份表';
 
 CREATE TABLE `department`
@@ -444,46 +446,32 @@ CREATE TABLE `role_menu`
 
 CREATE TABLE `connector`
 (
-    `id`                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '连接器ID',
-    `tenant_id`          BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
-    `sync_profile`       TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否同步资料',
-    `enable_token_storage` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否启用令牌存储',
-    `connector_id`       VARCHAR(128) NOT NULL DEFAULT '' COMMENT '连接器ID',
-    `config`             JSON NOT NULL DEFAULT ('{}') COMMENT '连接器配置',
-    `metadata`           JSON NOT NULL DEFAULT ('{}') COMMENT '元数据',
-    `created_at`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updated_at`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted_at`         DATETIME DEFAULT NULL COMMENT '删除时间',
-    `created_by`         BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '创建人ID',
-    `updated_by`         BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '更新人ID',
-    `deleted_by`         BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '删除人ID',
+    `id`                       BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '连接器ID',
+    `tenant_id`                BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
+    `name`                     VARCHAR(128) NOT NULL DEFAULT '' COMMENT '连接器名称',
+    `display_name`             VARCHAR(128) NOT NULL DEFAULT '' COMMENT '显示名称',
+    `protocol`                 VARCHAR(64) NOT NULL DEFAULT '' COMMENT '协议类型',
+    `provider`                 VARCHAR(128) NOT NULL DEFAULT '' COMMENT '提供商',
+    `status`                   VARCHAR(32) NOT NULL DEFAULT '' COMMENT '状态',
+    `allow_auto_create_user`   TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否允许自动创建用户',
+    `allow_account_link`       TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否允许账号关联',
+    `sync_profile`             TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否同步资料',
+    `enable_token_storage`     TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否启用令牌存储',
+    `config`                   JSON NOT NULL DEFAULT ('{}') COMMENT '连接器配置',
+    `claim_mapping`            JSON NOT NULL DEFAULT ('{}') COMMENT '声明映射',
+    `domain_policy`            JSON NOT NULL DEFAULT ('{}') COMMENT '域策略',
+    `created_at`               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `deleted_at`               DATETIME DEFAULT NULL COMMENT '删除时间',
+    `created_by`               BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '创建人ID',
+    `updated_by`               BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '更新人ID',
+    `deleted_by`               BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '删除人ID',
     PRIMARY KEY (`id`),
-    KEY                  `idx_tenant_id` (`tenant_id`),
-    KEY                  `idx_deleted_at` (`deleted_at`)
+    KEY                        `idx_tenant_id` (`tenant_id`),
+    KEY                        `idx_tenant_name` (`tenant_id`, `name`),
+    KEY                        `idx_tenant_provider` (`tenant_id`, `provider`),
+    KEY                        `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='连接器表';
-
-CREATE TABLE `sso_connector`
-(
-    `id`                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'SSO连接器ID',
-    `tenant_id`          BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
-    `provider_name`      VARCHAR(128) NOT NULL DEFAULT '' COMMENT '提供商名称',
-    `connector_name`     VARCHAR(128) NOT NULL DEFAULT '' COMMENT '连接器名称',
-    `config`             JSON NOT NULL DEFAULT ('{}') COMMENT '配置',
-    `domains`            JSON NOT NULL DEFAULT ('[]') COMMENT '域名列表',
-    `branding`           JSON NOT NULL DEFAULT ('{}') COMMENT '品牌配置',
-    `sync_profile`       TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否同步资料',
-    `enable_token_storage` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否启用令牌存储',
-    `created_at`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updated_at`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted_at`         DATETIME DEFAULT NULL COMMENT '删除时间',
-    `created_by`         BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '创建人ID',
-    `updated_by`         BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '更新人ID',
-    `deleted_by`         BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '删除人ID',
-    PRIMARY KEY (`id`),
-    KEY                  `idx_tenant_id` (`tenant_id`),
-    KEY                  `idx_tenant_connector_name` (`tenant_id`, `connector_name`),
-    KEY                  `idx_deleted_at` (`deleted_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='SSO连接器表';
 
 CREATE TABLE `log`
 (

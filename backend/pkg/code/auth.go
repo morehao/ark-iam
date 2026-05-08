@@ -37,16 +37,6 @@ const (
 	ConnectorNotExistError    = 101005
 )
 
-const (
-	SsoConnectorCreateError      = 101100
-	SsoConnectorDeleteError      = 101101
-	SsoConnectorUpdateError      = 101102
-	SsoConnectorGetDetailError   = 101103
-	SsoConnectorGetPageListError = 101104
-	SsoConnectorNotExistError    = 101105
-	SsoAuthFailedError           = 101106
-)
-
 var authErrorMsgMap = gerror.CodeMsgMap{
 	AuthIdentifierRequiredError: "用户标识不能为空",
 	AuthLoginFailedError:        "登录失败",
@@ -84,14 +74,4 @@ var connectorErrorMsgMap = gerror.CodeMsgMap{
 	ConnectorGetDetailError:   "查看连接器详情失败",
 	ConnectorGetPageListError: "查看连接器列表失败",
 	ConnectorNotExistError:    "连接器不存在",
-}
-
-var ssoConnectorErrorMsgMap = gerror.CodeMsgMap{
-	SsoConnectorCreateError:      "创建SSO连接器失败",
-	SsoConnectorDeleteError:      "删除SSO连接器失败",
-	SsoConnectorUpdateError:      "修改SSO连接器失败",
-	SsoConnectorGetDetailError:   "查看SSO连接器详情失败",
-	SsoConnectorGetPageListError: "查看SSO连接器列表失败",
-	SsoConnectorNotExistError:   "SSO连接器不存在",
-	SsoAuthFailedError:          "SSO认证失败",
 }

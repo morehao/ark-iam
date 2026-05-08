@@ -13,8 +13,6 @@ type AuthCtr interface {
 	RefreshToken(ctx *gin.Context)
 	Logout(ctx *gin.Context)
 	Userinfo(ctx *gin.Context)
-	GetSsoAuthorizationUrl(ctx *gin.Context)
-	SsoCallback(ctx *gin.Context)
 }
 
 type authCtr struct {
@@ -122,48 +120,6 @@ func (ctr *authCtr) Logout(ctx *gin.Context) {
 func (ctr *authCtr) Userinfo(ctx *gin.Context) {
 	var req dtoauth.UserinfoReq
 	res, err := ctr.authSvc.Userinfo(ctx, &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-// @Tags 认证
-// @Summary 获取SSO授权URL
-// @accept application/json
-// @Produce application/json
-// @Param req query dtoauth.SsoAuthorizationUrlReq true "获取SSO授权URL"
-// @Success 200 {object} gincontext.DtoRender{data=dtoauth.SsoAuthorizationUrlResp}
-// @Router /v1/iam/authorizationUrl [get]
-func (ctr *authCtr) GetSsoAuthorizationUrl(ctx *gin.Context) {
-	var req dtoauth.SsoAuthorizationUrlReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.authSvc.GetSsoAuthorizationUrl(ctx, &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-// @Tags 认证
-// @Summary SSO回调
-// @accept application/json
-// @Produce application/json
-// @Param req query dtoauth.SsoCallbackReq true "SSO回调"
-// @Success 200 {object} gincontext.DtoRender{data=dtoauth.SsoCallbackResp}
-// @Router /v1/iam/callback [get]
-func (ctr *authCtr) SsoCallback(ctx *gin.Context) {
-	var req dtoauth.SsoCallbackReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.authSvc.SsoCallback(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

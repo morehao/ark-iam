@@ -30,35 +30,35 @@ const (
 )
 
 const (
-	OrganizationCreateError      = 100100
-	OrganizationDeleteError      = 100101
-	OrganizationUpdateError      = 100102
-	OrganizationGetDetailError   = 100103
-	OrganizationGetPageListError = 100104
-	OrganizationNotExistError    = 100105
+	OrganizationCreateError      = 100120
+	OrganizationDeleteError      = 100121
+	OrganizationUpdateError      = 100122
+	OrganizationGetDetailError   = 100123
+	OrganizationGetPageListError = 100124
+	OrganizationNotExistError    = 100125
 )
 
 const (
-	OrganizationRoleCreateError      = 100780
-	OrganizationRoleDeleteError      = 100781
-	OrganizationRoleUpdateError      = 100782
-	OrganizationRoleGetDetailError   = 100783
-	OrganizationRoleGetPageListError = 100784
-	OrganizationRoleNotExistError    = 100785
+	OrganizationRoleCreateError      = 100130
+	OrganizationRoleDeleteError      = 100131
+	OrganizationRoleUpdateError      = 100132
+	OrganizationRoleGetDetailError   = 100133
+	OrganizationRoleGetPageListError = 100134
+	OrganizationRoleNotExistError    = 100135
 )
 
 const (
-	OrganizationUserRelationCreateError      = 100790
-	OrganizationUserRelationDeleteError      = 100791
-	OrganizationUserRelationGetPageListError = 100792
-	OrganizationUserRelationNotExistError    = 100793
+	OrganizationUserRelationCreateError      = 100140
+	OrganizationUserRelationDeleteError      = 100141
+	OrganizationUserRelationGetPageListError = 100142
+	OrganizationUserRelationNotExistError    = 100143
 )
 
 const (
-	OrganizationRoleUserRelationCreateError      = 100800
-	OrganizationRoleUserRelationDeleteError      = 100801
-	OrganizationRoleUserRelationGetPageListError = 100802
-	OrganizationRoleUserRelationNotExistError    = 100803
+	OrganizationRoleUserRelationCreateError      = 100150
+	OrganizationRoleUserRelationDeleteError      = 100151
+	OrganizationRoleUserRelationGetPageListError = 100152
+	OrganizationRoleUserRelationNotExistError    = 100153
 )
 
 var tenantErrorMsgMap = gerror.CodeMsgMap{
