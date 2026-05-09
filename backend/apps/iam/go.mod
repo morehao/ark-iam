@@ -3,10 +3,13 @@ module github.com/morehao/ark-iam/iam
 go 1.26.1
 
 require (
+	github.com/coreos/go-oidc/v3 v3.18.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/morehao/golib v0.1.5
+	github.com/redis/go-redis/v9 v9.18.0
 	github.com/swaggo/swag v1.16.6
+	golang.org/x/oauth2 v0.36.0
 	gorm.io/gorm v1.31.1
 )
 
@@ -24,6 +27,7 @@ require (
 	github.com/elastic/go-elasticsearch/v8 v8.19.3 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
 	github.com/gin-contrib/sse v1.1.1 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.22.5 // indirect
@@ -59,7 +63,6 @@ require (
 	github.com/pelletier/go-toml/v2 v2.3.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.59.0 // indirect
-	github.com/redis/go-redis/v9 v9.18.0 // indirect
 	github.com/swaggo/files v1.0.1 // indirect
 	github.com/swaggo/gin-swagger v1.6.1 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect

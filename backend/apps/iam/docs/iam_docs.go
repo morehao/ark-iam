@@ -15,6 +15,51 @@ const docTemplateiam = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/v1/iam/application/assignRoles": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用管理"
+                ],
+                "summary": "分配角色",
+                "parameters": [
+                    {
+                        "description": "分配角色",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoapplication.AssignApplicationRolesReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/v1/iam/application/create": {
             "post": {
                 "consumes": [
@@ -192,6 +237,223 @@ const docTemplateiam = `{
                 }
             }
         },
+        "/v1/iam/application/roles": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用管理"
+                ],
+                "summary": "应用角色列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "name": "applicationId",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoapplication.ApplicationRoleListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/application/roles/{roleId}": {
+            "delete": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用管理"
+                ],
+                "summary": "移除角色",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "name": "applicationId",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "name": "roleId",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/application/secrets": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用管理"
+                ],
+                "summary": "应用密钥列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "name": "applicationId",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoapplication.ApplicationSecretListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用管理"
+                ],
+                "summary": "创建应用密钥",
+                "parameters": [
+                    {
+                        "description": "创建应用密钥",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoapplication.CreateApplicationSecretReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoapplication.CreateApplicationSecretResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/application/secrets/{secretId}": {
+            "delete": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用管理"
+                ],
+                "summary": "删除应用密钥",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "name": "secretId",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/v1/iam/application/update": {
             "post": {
                 "consumes": [
@@ -237,7 +499,7 @@ const docTemplateiam = `{
                 }
             }
         },
-        "/v1/iam/authorizationUrl": {
+        "/v1/iam/connector/callback": {
             "get": {
                 "consumes": [
                     "application/json"
@@ -246,53 +508,17 @@ const docTemplateiam = `{
                     "application/json"
                 ],
                 "tags": [
-                    "认证"
+                    "连接器"
                 ],
-                "summary": "获取SSO授权URL",
+                "summary": "连接器回调",
                 "parameters": [
                     {
-                        "type": "string",
+                        "type": "integer",
                         "description": "连接器ID",
                         "name": "connectorId",
                         "in": "query",
                         "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtoauth.SsoAuthorizationUrlResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/callback": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "认证"
-                ],
-                "summary": "SSO回调",
-                "parameters": [
+                    },
                     {
                         "type": "string",
                         "description": "授权码",
@@ -302,16 +528,10 @@ const docTemplateiam = `{
                     },
                     {
                         "type": "string",
-                        "description": "连接器ID",
-                        "name": "connectorId",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
                         "description": "状态",
                         "name": "state",
-                        "in": "query"
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -326,7 +546,7 @@ const docTemplateiam = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/dtoauth.SsoCallbackResp"
+                                            "$ref": "#/definitions/dtoauth.LoginResp"
                                         }
                                     }
                                 }
@@ -442,7 +662,7 @@ const docTemplateiam = `{
                     {
                         "type": "integer",
                         "description": "连接器ID",
-                        "name": "connectorID",
+                        "name": "connectorId",
                         "in": "query",
                         "required": true
                     }
@@ -460,6 +680,50 @@ const docTemplateiam = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/dtoauth.ConnectorDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/connector/getFactoryList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "连接器"
+                ],
+                "summary": "连接器工厂列表",
+                "parameters": [
+                    {
+                        "description": "连接器工厂列表",
+                        "name": "req",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/dtoconnector.ConnectorFactoryListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoconnector.ConnectorFactoryListResp"
                                         }
                                     }
                                 }
@@ -550,6 +814,101 @@ const docTemplateiam = `{
                                     "properties": {
                                         "data": {
                                             "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/connector/{connectorId}/authorize": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "连接器"
+                ],
+                "summary": "连接器授权",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "连接器ID",
+                        "name": "connectorId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "连接器授权",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoconnector.ConnectorAuthorizeReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoconnector.ConnectorAuthorizeResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/connector/{connectorId}/test": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "连接器"
+                ],
+                "summary": "测试连接器",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "连接器ID",
+                        "name": "connectorId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoconnector.TestConnectorResp"
                                         }
                                     }
                                 }
@@ -2293,6 +2652,138 @@ const docTemplateiam = `{
                 }
             }
         },
+        "/v1/iam/role/applications": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色管理"
+                ],
+                "summary": "角色应用列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "name": "roleId",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtouser.RoleApplicationListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/role/assignApplications": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色管理"
+                ],
+                "summary": "分配应用",
+                "parameters": [
+                    {
+                        "description": "分配应用",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.AssignRoleApplicationsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/role/assignUsers": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色管理"
+                ],
+                "summary": "分配用户",
+                "parameters": [
+                    {
+                        "description": "分配用户",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtouser.AssignRoleUsersReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/v1/iam/role/create": {
             "post": {
                 "consumes": [
@@ -2491,6 +2982,96 @@ const docTemplateiam = `{
                         "schema": {
                             "$ref": "#/definitions/dtopermission.RoleUpdateReq"
                         }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/role/users": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色管理"
+                ],
+                "summary": "角色用户列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "name": "roleId",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtouser.RoleUserListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/role/users/{roleId}/{userId}": {
+            "delete": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色管理"
+                ],
+                "summary": "移除用户",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "name": "roleId",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "name": "userId",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -2982,229 +3563,6 @@ const docTemplateiam = `{
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/dtopermission.ScopeUpdateReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/ssoConnector/create": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "SSO连接器"
-                ],
-                "summary": "创建SSO连接器",
-                "parameters": [
-                    {
-                        "description": "创建SSO连接器",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtoauth.SsoConnectorCreateReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtoauth.SsoConnectorCreateResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/ssoConnector/delete": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "SSO连接器"
-                ],
-                "summary": "删除SSO连接器",
-                "parameters": [
-                    {
-                        "description": "删除SSO连接器",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtoauth.SsoConnectorDeleteReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/ssoConnector/detail": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "SSO连接器"
-                ],
-                "summary": "SSO连接器详情",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "SSO连接器ID",
-                        "name": "ssoConnectorID",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtoauth.SsoConnectorDetailResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/ssoConnector/pageList": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "SSO连接器"
-                ],
-                "summary": "SSO连接器列表分页",
-                "parameters": [
-                    {
-                        "description": "SSO连接器列表分页",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtoauth.SsoConnectorPageListReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtoauth.SsoConnectorPageListResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/ssoConnector/update": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "SSO连接器"
-                ],
-                "summary": "修改SSO连接器",
-                "parameters": [
-                    {
-                        "description": "修改SSO连接器",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtoauth.SsoConnectorUpdateReq"
                         }
                     }
                 ],
@@ -4472,6 +4830,129 @@ const docTemplateiam = `{
                 }
             }
         },
+        "/v1/iam/user/sessions": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "会话管理"
+                ],
+                "summary": "会话列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1000,
+                        "type": "integer",
+                        "description": "每页数据条数",
+                        "name": "pageSize",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtouser.SessionListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "会话管理"
+                ],
+                "summary": "撤销所有会话",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/user/sessions/{sessionId}": {
+            "delete": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "会话管理"
+                ],
+                "summary": "撤销会话",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "name": "sessionId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/v1/iam/user/update": {
             "post": {
                 "consumes": [
@@ -4994,6 +5475,77 @@ const docTemplateiam = `{
                 }
             }
         },
+        "dtoapplication.ApplicationRoleListResp": {
+            "type": "object",
+            "properties": {
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtoapplication.ApplicationRoleResp"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoapplication.ApplicationRoleResp": {
+            "type": "object",
+            "properties": {
+                "applicationId": {
+                    "type": "integer"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "roleCode": {
+                    "type": "string"
+                },
+                "roleId": {
+                    "type": "integer"
+                },
+                "roleName": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtoapplication.ApplicationSecretListResp": {
+            "type": "object",
+            "properties": {
+                "secrets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtoapplication.ApplicationSecretResp"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoapplication.ApplicationSecretResp": {
+            "type": "object",
+            "properties": {
+                "applicationId": {
+                    "type": "integer"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "expiresAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
         "dtoapplication.ApplicationUpdateReq": {
             "type": "object",
             "properties": {
@@ -5023,28 +5575,106 @@ const docTemplateiam = `{
                 }
             }
         },
+        "dtoapplication.AssignApplicationRolesReq": {
+            "type": "object",
+            "required": [
+                "applicationId",
+                "roleIds"
+            ],
+            "properties": {
+                "applicationId": {
+                    "type": "integer"
+                },
+                "roleIds": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "dtoapplication.CreateApplicationSecretReq": {
+            "type": "object",
+            "required": [
+                "applicationId",
+                "name"
+            ],
+            "properties": {
+                "applicationId": {
+                    "type": "integer"
+                },
+                "expiresAt": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtoapplication.CreateApplicationSecretResp": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "secret": {
+                    "type": "string"
+                }
+            }
+        },
         "dtoauth.ConnectorCreateReq": {
             "type": "object",
             "properties": {
+                "allowAccountLink": {
+                    "description": "是否允许账号关联",
+                    "type": "integer"
+                },
+                "allowAutoCreateUser": {
+                    "description": "是否允许自动创建用户",
+                    "type": "integer"
+                },
+                "claimMapping": {
+                    "description": "声明映射"
+                },
                 "config": {
                     "description": "连接器配置"
                 },
-                "connectorID": {
-                    "description": "连接器ID",
+                "displayName": {
+                    "description": "显示名称",
                     "type": "string"
+                },
+                "domainPolicy": {
+                    "description": "域策略"
                 },
                 "enableTokenStorage": {
                     "description": "是否启用令牌存储",
                     "type": "integer"
                 },
-                "metadata": {
-                    "description": "元数据"
+                "name": {
+                    "description": "连接器名称",
+                    "type": "string"
+                },
+                "protocol": {
+                    "description": "协议类型",
+                    "type": "string"
+                },
+                "provider": {
+                    "description": "提供商",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "状态",
+                    "type": "string"
                 },
                 "syncProfile": {
                     "description": "是否同步资料",
                     "type": "integer"
                 },
-                "tenantID": {
+                "tenantId": {
                     "description": "租户ID",
                     "type": "integer"
                 }
@@ -5053,7 +5683,7 @@ const docTemplateiam = `{
         "dtoauth.ConnectorCreateResp": {
             "type": "object",
             "properties": {
-                "connectorID": {
+                "connectorId": {
                     "description": "连接器ID",
                     "type": "integer"
                 }
@@ -5062,10 +5692,10 @@ const docTemplateiam = `{
         "dtoauth.ConnectorDeleteReq": {
             "type": "object",
             "required": [
-                "connectorID"
+                "connectorId"
             ],
             "properties": {
-                "connectorID": {
+                "connectorId": {
                     "description": "连接器ID",
                     "type": "integer"
                 }
@@ -5074,12 +5704,23 @@ const docTemplateiam = `{
         "dtoauth.ConnectorDetailResp": {
             "type": "object",
             "properties": {
+                "allowAccountLink": {
+                    "description": "是否允许账号关联",
+                    "type": "integer"
+                },
+                "allowAutoCreateUser": {
+                    "description": "是否允许自动创建用户",
+                    "type": "integer"
+                },
+                "claimMapping": {
+                    "description": "声明映射"
+                },
                 "config": {
                     "description": "连接器配置"
                 },
-                "connectorID": {
+                "connectorId": {
                     "description": "连接器ID",
-                    "type": "string"
+                    "type": "integer"
                 },
                 "createdAt": {
                     "description": "创建时间",
@@ -5089,18 +5730,38 @@ const docTemplateiam = `{
                     "description": "创建人id",
                     "type": "integer"
                 },
+                "displayName": {
+                    "description": "显示名称",
+                    "type": "string"
+                },
+                "domainPolicy": {
+                    "description": "域策略"
+                },
                 "enableTokenStorage": {
                     "description": "是否启用令牌存储",
                     "type": "integer"
                 },
-                "metadata": {
-                    "description": "元数据"
+                "name": {
+                    "description": "连接器名称",
+                    "type": "string"
+                },
+                "protocol": {
+                    "description": "协议类型",
+                    "type": "string"
+                },
+                "provider": {
+                    "description": "提供商",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "状态",
+                    "type": "string"
                 },
                 "syncProfile": {
                     "description": "是否同步资料",
                     "type": "integer"
                 },
-                "tenantID": {
+                "tenantId": {
                     "description": "租户ID",
                     "type": "integer"
                 },
@@ -5117,12 +5778,23 @@ const docTemplateiam = `{
         "dtoauth.ConnectorPageListItem": {
             "type": "object",
             "properties": {
+                "allowAccountLink": {
+                    "description": "是否允许账号关联",
+                    "type": "integer"
+                },
+                "allowAutoCreateUser": {
+                    "description": "是否允许自动创建用户",
+                    "type": "integer"
+                },
+                "claimMapping": {
+                    "description": "声明映射"
+                },
                 "config": {
                     "description": "连接器配置"
                 },
-                "connectorID": {
+                "connectorId": {
                     "description": "连接器ID",
-                    "type": "string"
+                    "type": "integer"
                 },
                 "createdAt": {
                     "description": "创建时间",
@@ -5132,18 +5804,38 @@ const docTemplateiam = `{
                     "description": "创建人id",
                     "type": "integer"
                 },
+                "displayName": {
+                    "description": "显示名称",
+                    "type": "string"
+                },
+                "domainPolicy": {
+                    "description": "域策略"
+                },
                 "enableTokenStorage": {
                     "description": "是否启用令牌存储",
                     "type": "integer"
                 },
-                "metadata": {
-                    "description": "元数据"
+                "name": {
+                    "description": "连接器名称",
+                    "type": "string"
+                },
+                "protocol": {
+                    "description": "协议类型",
+                    "type": "string"
+                },
+                "provider": {
+                    "description": "提供商",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "状态",
+                    "type": "string"
                 },
                 "syncProfile": {
                     "description": "是否同步资料",
                     "type": "integer"
                 },
-                "tenantID": {
+                "tenantId": {
                     "description": "租户ID",
                     "type": "integer"
                 },
@@ -5160,8 +5852,12 @@ const docTemplateiam = `{
         "dtoauth.ConnectorPageListReq": {
             "type": "object",
             "properties": {
-                "connectorID": {
-                    "description": "连接器ID",
+                "displayName": {
+                    "description": "显示名称",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "名称",
                     "type": "string"
                 },
                 "page": {
@@ -5173,7 +5869,19 @@ const docTemplateiam = `{
                     "type": "integer",
                     "maximum": 1000
                 },
-                "tenantID": {
+                "protocol": {
+                    "description": "协议类型",
+                    "type": "string"
+                },
+                "provider": {
+                    "description": "提供商",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "状态",
+                    "type": "string"
+                },
+                "tenantId": {
                     "description": "租户ID",
                     "type": "integer"
                 }
@@ -5198,28 +5906,59 @@ const docTemplateiam = `{
         "dtoauth.ConnectorUpdateReq": {
             "type": "object",
             "required": [
-                "connectorID"
+                "connectorId"
             ],
             "properties": {
+                "allowAccountLink": {
+                    "description": "是否允许账号关联",
+                    "type": "integer"
+                },
+                "allowAutoCreateUser": {
+                    "description": "是否允许自动创建用户",
+                    "type": "integer"
+                },
+                "claimMapping": {
+                    "description": "声明映射"
+                },
                 "config": {
                     "description": "连接器配置"
                 },
-                "connectorID": {
+                "connectorId": {
                     "description": "连接器ID",
+                    "type": "integer"
+                },
+                "displayName": {
+                    "description": "显示名称",
                     "type": "string"
+                },
+                "domainPolicy": {
+                    "description": "域策略"
                 },
                 "enableTokenStorage": {
                     "description": "是否启用令牌存储",
                     "type": "integer"
                 },
-                "metadata": {
-                    "description": "元数据"
+                "name": {
+                    "description": "连接器名称",
+                    "type": "string"
+                },
+                "protocol": {
+                    "description": "协议类型",
+                    "type": "string"
+                },
+                "provider": {
+                    "description": "提供商",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "状态",
+                    "type": "string"
                 },
                 "syncProfile": {
                     "description": "是否同步资料",
                     "type": "integer"
                 },
-                "tenantID": {
+                "tenantId": {
                     "description": "租户ID",
                     "type": "integer"
                 }
@@ -5353,282 +6092,6 @@ const docTemplateiam = `{
                 }
             }
         },
-        "dtoauth.SsoAuthorizationUrlResp": {
-            "type": "object",
-            "properties": {
-                "authorizationUrl": {
-                    "description": "授权地址",
-                    "type": "string"
-                }
-            }
-        },
-        "dtoauth.SsoCallbackResp": {
-            "type": "object",
-            "properties": {
-                "accessToken": {
-                    "description": "访问令牌",
-                    "type": "string"
-                },
-                "expiresIn": {
-                    "description": "过期时间(秒)",
-                    "type": "integer"
-                },
-                "refreshToken": {
-                    "description": "刷新令牌",
-                    "type": "string"
-                },
-                "tokenType": {
-                    "description": "令牌类型",
-                    "type": "string"
-                }
-            }
-        },
-        "dtoauth.SsoConnectorCreateReq": {
-            "type": "object",
-            "properties": {
-                "branding": {
-                    "description": "品牌配置"
-                },
-                "config": {
-                    "description": "配置"
-                },
-                "connectorName": {
-                    "description": "连接器名称",
-                    "type": "string"
-                },
-                "domains": {
-                    "description": "域名列表"
-                },
-                "enableTokenStorage": {
-                    "description": "是否启用令牌存储",
-                    "type": "integer"
-                },
-                "providerName": {
-                    "description": "提供商名称",
-                    "type": "string"
-                },
-                "syncProfile": {
-                    "description": "是否同步资料",
-                    "type": "integer"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtoauth.SsoConnectorCreateResp": {
-            "type": "object",
-            "properties": {
-                "ssoConnectorID": {
-                    "description": "SSO连接器ID",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtoauth.SsoConnectorDeleteReq": {
-            "type": "object",
-            "required": [
-                "ssoConnectorID"
-            ],
-            "properties": {
-                "ssoConnectorID": {
-                    "description": "SSO连接器ID",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtoauth.SsoConnectorDetailResp": {
-            "type": "object",
-            "properties": {
-                "branding": {
-                    "description": "品牌配置"
-                },
-                "config": {
-                    "description": "配置"
-                },
-                "connectorName": {
-                    "description": "连接器名称",
-                    "type": "string"
-                },
-                "createdAt": {
-                    "description": "创建时间",
-                    "type": "integer"
-                },
-                "createdBy": {
-                    "description": "创建人id",
-                    "type": "integer"
-                },
-                "domains": {
-                    "description": "域名列表"
-                },
-                "enableTokenStorage": {
-                    "description": "是否启用令牌存储",
-                    "type": "integer"
-                },
-                "providerName": {
-                    "description": "提供商名称",
-                    "type": "string"
-                },
-                "ssoConnectorID": {
-                    "description": "SSO连接器ID",
-                    "type": "integer"
-                },
-                "syncProfile": {
-                    "description": "是否同步资料",
-                    "type": "integer"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
-                },
-                "updatedAt": {
-                    "description": "更新时间",
-                    "type": "integer"
-                },
-                "updatedBy": {
-                    "description": "更新人id",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtoauth.SsoConnectorPageListItem": {
-            "type": "object",
-            "properties": {
-                "branding": {
-                    "description": "品牌配置"
-                },
-                "config": {
-                    "description": "配置"
-                },
-                "connectorName": {
-                    "description": "连接器名称",
-                    "type": "string"
-                },
-                "createdAt": {
-                    "description": "创建时间",
-                    "type": "integer"
-                },
-                "createdBy": {
-                    "description": "创建人id",
-                    "type": "integer"
-                },
-                "domains": {
-                    "description": "域名列表"
-                },
-                "enableTokenStorage": {
-                    "description": "是否启用令牌存储",
-                    "type": "integer"
-                },
-                "providerName": {
-                    "description": "提供商名称",
-                    "type": "string"
-                },
-                "ssoConnectorID": {
-                    "description": "SSO连接器ID",
-                    "type": "integer"
-                },
-                "syncProfile": {
-                    "description": "是否同步资料",
-                    "type": "integer"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
-                },
-                "updatedAt": {
-                    "description": "更新时间",
-                    "type": "integer"
-                },
-                "updatedBy": {
-                    "description": "更新人id",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtoauth.SsoConnectorPageListReq": {
-            "type": "object",
-            "properties": {
-                "connectorName": {
-                    "description": "连接器名称",
-                    "type": "string"
-                },
-                "page": {
-                    "description": "页码",
-                    "type": "integer"
-                },
-                "pageSize": {
-                    "description": "每页数据条数",
-                    "type": "integer",
-                    "maximum": 1000
-                },
-                "providerName": {
-                    "description": "提供商名称",
-                    "type": "string"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtoauth.SsoConnectorPageListResp": {
-            "type": "object",
-            "properties": {
-                "list": {
-                    "description": "数据列表",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dtoauth.SsoConnectorPageListItem"
-                    }
-                },
-                "total": {
-                    "description": "数据总条数",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtoauth.SsoConnectorUpdateReq": {
-            "type": "object",
-            "required": [
-                "ssoConnectorID"
-            ],
-            "properties": {
-                "branding": {
-                    "description": "品牌配置"
-                },
-                "config": {
-                    "description": "配置"
-                },
-                "connectorName": {
-                    "description": "连接器名称",
-                    "type": "string"
-                },
-                "domains": {
-                    "description": "域名列表"
-                },
-                "enableTokenStorage": {
-                    "description": "是否启用令牌存储",
-                    "type": "integer"
-                },
-                "providerName": {
-                    "description": "提供商名称",
-                    "type": "string"
-                },
-                "ssoConnectorID": {
-                    "description": "SSO连接器ID",
-                    "type": "integer"
-                },
-                "syncProfile": {
-                    "description": "是否同步资料",
-                    "type": "integer"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
-                }
-            }
-        },
         "dtoauth.UserinfoResp": {
             "type": "object",
             "properties": {
@@ -5659,6 +6122,104 @@ const docTemplateiam = `{
                 "username": {
                     "description": "用户名",
                     "type": "string"
+                }
+            }
+        },
+        "dtoconnector.ConnectorAuthorizeReq": {
+            "type": "object",
+            "required": [
+                "connectorId",
+                "redirectUri"
+            ],
+            "properties": {
+                "connectorId": {
+                    "type": "integer"
+                },
+                "loginHint": {
+                    "type": "string"
+                },
+                "redirectUri": {
+                    "type": "string"
+                },
+                "responseMode": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtoconnector.ConnectorAuthorizeResp": {
+            "type": "object",
+            "properties": {
+                "authorizationUrl": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtoconnector.ConnectorFactoryListReq": {
+            "type": "object",
+            "properties": {
+                "protocol": {
+                    "type": "string"
+                },
+                "provider": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtoconnector.ConnectorFactoryListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtoconnector.ConnectorFactoryResp"
+                    }
+                }
+            }
+        },
+        "dtoconnector.ConnectorFactoryResp": {
+            "type": "object",
+            "properties": {
+                "capabilities": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "configSchema": {},
+                "defaultScopes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "displayName": {
+                    "type": "string"
+                },
+                "factoryId": {
+                    "type": "string"
+                },
+                "isStandard": {
+                    "type": "boolean"
+                },
+                "protocol": {
+                    "type": "string"
+                },
+                "provider": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtoconnector.TestConnectorResp": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
                 }
             }
         },
@@ -8274,6 +8835,152 @@ const docTemplateiam = `{
                 },
                 "userID": {
                     "description": "用户ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.AssignRoleApplicationsReq": {
+            "type": "object",
+            "required": [
+                "applicationIds",
+                "roleId"
+            ],
+            "properties": {
+                "applicationIds": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "roleId": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.AssignRoleUsersReq": {
+            "type": "object",
+            "required": [
+                "roleId",
+                "userIds"
+            ],
+            "properties": {
+                "roleId": {
+                    "type": "integer"
+                },
+                "userIds": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "dtouser.RoleApplicationListResp": {
+            "type": "object",
+            "properties": {
+                "applications": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtouser.RoleApplicationResp"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.RoleApplicationResp": {
+            "type": "object",
+            "properties": {
+                "appName": {
+                    "type": "string"
+                },
+                "appType": {
+                    "type": "string"
+                },
+                "applicationId": {
+                    "type": "integer"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "roleId": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.RoleUserListResp": {
+            "type": "object",
+            "properties": {
+                "total": {
+                    "type": "integer"
+                },
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtouser.RoleUserResp"
+                    }
+                }
+            }
+        },
+        "dtouser.RoleUserResp": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "roleId": {
+                    "type": "integer"
+                },
+                "userId": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtouser.SessionListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtouser.SessionResp"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dtouser.SessionResp": {
+            "type": "object",
+            "properties": {
+                "applicationId": {
+                    "type": "integer"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "expiresAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "isActive": {
+                    "type": "boolean"
+                },
+                "tenantId": {
                     "type": "integer"
                 }
             }

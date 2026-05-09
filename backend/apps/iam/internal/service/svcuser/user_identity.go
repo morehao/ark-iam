@@ -41,12 +41,12 @@ func (svc *userIdentitySvc) Create(ctx *gin.Context, req *dtouser.UserIdentityCr
 	}
 
 	insertEntity := &model.UserIdentityEntity{
-		TenantID:   req.TenantID,
-		UserID:     req.UserID,
-		Issuer:     req.Issuer,
-		IdentityID: req.IdentityID,
-		Detail:     detailJson,
-		CreatedBy:  gincontext.GetUserID(ctx),
+		TenantID:        req.TenantID,
+		UserID:          req.UserID,
+		Issuer:          req.Issuer,
+		ExternalSubject: req.IdentityID,
+		Detail:          detailJson,
+		CreatedBy:       gincontext.GetUserID(ctx),
 	}
 
 	if err := dao.NewUserIdentityDao().Insert(ctx, insertEntity); err != nil {
@@ -94,12 +94,12 @@ func (svc *userIdentitySvc) Update(ctx *gin.Context, req *dtouser.UserIdentityUp
 
 	userID := gincontext.GetUserID(ctx)
 	updateMap := map[string]any{
-		"tenant_id":   req.TenantID,
-		"user_id":     req.UserID,
-		"issuer":      req.Issuer,
-		"identity_id": req.IdentityID,
-		"detail":      detailJson,
-		"updated_by":  userID,
+		"tenant_id":        req.TenantID,
+		"user_id":          req.UserID,
+		"issuer":           req.Issuer,
+		"external_subject": req.IdentityID,
+		"detail":           detailJson,
+		"updated_by":       userID,
 	}
 	if err := dao.NewUserIdentityDao().UpdateMap(ctx, req.UserIdentityID, updateMap); err != nil {
 		glog.Errorf(ctx, "[userIdentitySvc.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -129,7 +129,7 @@ func (svc *userIdentitySvc) Detail(ctx *gin.Context, req *dtouser.UserIdentityDe
 		TenantID:       userIdentityEntity.TenantID,
 		UserID:         userIdentityEntity.UserID,
 		Issuer:         userIdentityEntity.Issuer,
-		IdentityID:     userIdentityEntity.IdentityID,
+		IdentityID:     userIdentityEntity.ExternalSubject,
 		Detail:         detail,
 		OperatorBaseInfo: gobject.OperatorBaseInfo{
 			CreatedAt: userIdentityEntity.CreatedAt.Unix(),
@@ -145,15 +145,23 @@ func (svc *userIdentitySvc) PageList(ctx *gin.Context, req *dtouser.UserIdentity
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID:   req.TenantID,
-		UserID:     req.UserID,
-		Issuer:     req.Issuer,
-		IdentityID: req.IdentityID,
+		TenantID:        req.TenantID,
+		ExternalSubject: req.IdentityID,
 	}
 	userIdentityEntityList, total, err := dao.NewUserIdentityDao().GetPageListByCond(ctx, cond)
 	if err != nil {
 		glog.Errorf(ctx, "[userIdentitySvc.PageList] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserIdentityGetPageListError)
+	}
+	if req.UserID != 0 {
+		filtered := make(model.UserIdentityEntityList, 0, len(userIdentityEntityList))
+		for _, item := range userIdentityEntityList {
+			if item.UserID == req.UserID {
+				filtered = append(filtered, item)
+			}
+		}
+		userIdentityEntityList = filtered
+		total = int64(len(filtered))
 	}
 
 	list := make([]dtouser.UserIdentityPageListItem, 0, len(userIdentityEntityList))
@@ -168,7 +176,7 @@ func (svc *userIdentitySvc) PageList(ctx *gin.Context, req *dtouser.UserIdentity
 			TenantID:       v.TenantID,
 			UserID:         v.UserID,
 			Issuer:         v.Issuer,
-			IdentityID:     v.IdentityID,
+			IdentityID:     v.ExternalSubject,
 			Detail:         detail,
 			OperatorBaseInfo: gobject.OperatorBaseInfo{
 				UpdatedAt: v.UpdatedAt.Unix(),
@@ -182,14 +190,20 @@ func (svc *userIdentitySvc) PageList(ctx *gin.Context, req *dtouser.UserIdentity
 }
 
 func (svc *userIdentitySvc) GetByUser(ctx *gin.Context, req *dtouser.UserIdentityByUserReq) (*dtouser.UserIdentityPageListResp, error) {
-	cond := &dao.UserIdentityCond{
-		UserID: req.UserID,
-	}
+	cond := &dao.UserIdentityCond{}
 	userIdentityEntityList, total, err := dao.NewUserIdentityDao().GetPageListByCond(ctx, cond)
 	if err != nil {
 		glog.Errorf(ctx, "[userIdentitySvc.GetByUser] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserIdentityGetPageListError)
 	}
+	filtered := make(model.UserIdentityEntityList, 0, len(userIdentityEntityList))
+	for _, item := range userIdentityEntityList {
+		if item.UserID == req.UserID {
+			filtered = append(filtered, item)
+		}
+	}
+	userIdentityEntityList = filtered
+	total = int64(len(filtered))
 
 	list := make([]dtouser.UserIdentityPageListItem, 0, len(userIdentityEntityList))
 	for _, v := range userIdentityEntityList {
@@ -203,7 +217,7 @@ func (svc *userIdentitySvc) GetByUser(ctx *gin.Context, req *dtouser.UserIdentit
 			TenantID:       v.TenantID,
 			UserID:         v.UserID,
 			Issuer:         v.Issuer,
-			IdentityID:     v.IdentityID,
+			IdentityID:     v.ExternalSubject,
 			Detail:         detail,
 			OperatorBaseInfo: gobject.OperatorBaseInfo{
 				UpdatedAt: v.UpdatedAt.Unix(),

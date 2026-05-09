@@ -3,9 +3,9 @@ package code
 import "github.com/morehao/golib/gerror"
 
 const (
-	LogGetDetailError   = 100800
-	LogGetPageListError = 100801
-	LogNotExistError    = 100802
+	LogGetDetailError   = 100900
+	LogGetPageListError = 100901
+	LogNotExistError    = 100902
 )
 
 var auditErrorMsgMap = gerror.CodeMsgMap{

@@ -15,7 +15,6 @@ func RegisterRouter(groups *ginserver.RouterGroups, appName string) {
 	applicationRouter(groups)
 	authRouter(groups)
 	connectorRouter(groups)
-	ssoConnectorRouter(groups)
 	departmentRouter(groups)
 	organizationRouter(groups)
 	systemRouter(groups)
