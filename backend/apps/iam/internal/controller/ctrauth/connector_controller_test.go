@@ -172,7 +172,7 @@ func TestConnectorControllerTestConnector(t *testing.T) {
 func TestConnectorControllerCallback(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	svc := &stubConnectorSvc{
-		callbackResp: &dtoauth.LoginResp{TokenInfo: objauth.TokenInfo{AccessToken: "access-token", RefreshToken: "refresh-token"}},
+		callbackResp: &dtoauth.LoginResp{PersonToken: objauth.PersonTokenInfo{TokenInfo: objauth.TokenInfo{AccessToken: "access-token", RefreshToken: "refresh-token"}}},
 	}
 	ctr := &connectorCtr{connectorSvc: svc}
 

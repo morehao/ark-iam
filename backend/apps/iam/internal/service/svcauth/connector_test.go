@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoconnector"
 	"github.com/morehao/ark-iam/iam/model"
@@ -21,29 +23,29 @@ import (
 	"gorm.io/gorm"
 )
 
-type fakeConnectorUserRepository struct {
-	getByIDFunc func(ctx context.Context, id uint) (*model.UserEntity, error)
-	insertFunc  func(ctx context.Context, user *model.UserEntity) error
+type fakeConnectorPersonRepository struct {
+	getByIDFunc func(ctx context.Context, id uint) (*model.PersonEntity, error)
+	insertFunc  func(ctx context.Context, person *model.PersonEntity) error
 }
 
-func (f *fakeConnectorUserRepository) GetByID(ctx context.Context, id uint) (*model.UserEntity, error) {
+func (f *fakeConnectorPersonRepository) GetByID(ctx context.Context, id uint) (*model.PersonEntity, error) {
 	if f.getByIDFunc == nil {
 		return nil, nil
 	}
 	return f.getByIDFunc(ctx, id)
 }
 
-func (f *fakeConnectorUserRepository) Insert(ctx context.Context, user *model.UserEntity) error {
+func (f *fakeConnectorPersonRepository) Insert(ctx context.Context, person *model.PersonEntity) error {
 	if f.insertFunc == nil {
 		return nil
 	}
-	return f.insertFunc(ctx, user)
+	return f.insertFunc(ctx, person)
 }
 
 type fakeConnectorUserIdentityRepository struct {
-	getByConnectorAndExternalSubjectFunc func(ctx context.Context, tenantID, connectorID uint, externalSubject string) (*model.UserIdentityEntity, error)
-	insertFunc                           func(ctx context.Context, entity *model.UserIdentityEntity) error
-	updateBindingFunc                    func(ctx context.Context, identityID, userID uint, issuer string, detail []byte) error
+	getByIssuerAndExternalSubjectFunc func(ctx context.Context, issuer, externalSubject string) (*model.UserIdentityEntity, error)
+	insertFunc                       func(ctx context.Context, entity *model.UserIdentityEntity) error
+	updateBindingFunc                func(ctx context.Context, identityID, personID uint, issuer string, detail []byte) error
 }
 
 type fakeConnectorRuntimeRepository struct {
@@ -51,10 +53,10 @@ type fakeConnectorRuntimeRepository struct {
 }
 
 type fakeConnectorIdentityResolver struct {
-	resolveFunc func(ctx context.Context, input identityResolveInput) (*model.UserEntity, error)
+	resolveFunc func(ctx context.Context, input identityResolveInput) (*resolvedConnectorPerson, error)
 }
 
-func (f *fakeConnectorIdentityResolver) Resolve(ctx context.Context, input identityResolveInput) (*model.UserEntity, error) {
+func (f *fakeConnectorIdentityResolver) Resolve(ctx context.Context, input identityResolveInput) (*resolvedConnectorPerson, error) {
 	if f.resolveFunc == nil {
 		return nil, nil
 	}
@@ -96,11 +98,11 @@ func (f *fakeConnectorStateStore) Consume(ctx context.Context, state string) (*C
 }
 
 type fakeConnectorDriver struct {
-	driverType                 string
-	validateConfigFunc         func(config ConnectorConfig) error
-	buildAuthorizationURLFunc  func(ctx *gin.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error)
-	exchangeCallbackFunc       func(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error)
-	testConnectionFunc         func(ctx *gin.Context, input *ConnectorTestInput) (*ConnectorTestOutput, error)
+	driverType                string
+	validateConfigFunc        func(config ConnectorConfig) error
+	buildAuthorizationURLFunc func(ctx *gin.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error)
+	exchangeCallbackFunc      func(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error)
+	testConnectionFunc        func(ctx *gin.Context, input *ConnectorTestInput) (*ConnectorTestOutput, error)
 }
 
 func (f *fakeConnectorDriver) DriverType() string {
@@ -135,11 +137,11 @@ func (f *fakeConnectorDriver) TestConnection(ctx *gin.Context, input *ConnectorT
 	return f.testConnectionFunc(ctx, input)
 }
 
-func (f *fakeConnectorUserIdentityRepository) GetByConnectorAndExternalSubject(ctx context.Context, tenantID, connectorID uint, externalSubject string) (*model.UserIdentityEntity, error) {
-	if f.getByConnectorAndExternalSubjectFunc == nil {
+func (f *fakeConnectorUserIdentityRepository) GetByIssuerAndExternalSubject(ctx context.Context, issuer, externalSubject string) (*model.UserIdentityEntity, error) {
+	if f.getByIssuerAndExternalSubjectFunc == nil {
 		return nil, nil
 	}
-	return f.getByConnectorAndExternalSubjectFunc(ctx, tenantID, connectorID, externalSubject)
+	return f.getByIssuerAndExternalSubjectFunc(ctx, issuer, externalSubject)
 }
 
 func (f *fakeConnectorUserIdentityRepository) Insert(ctx context.Context, entity *model.UserIdentityEntity) error {
@@ -149,11 +151,11 @@ func (f *fakeConnectorUserIdentityRepository) Insert(ctx context.Context, entity
 	return f.insertFunc(ctx, entity)
 }
 
-func (f *fakeConnectorUserIdentityRepository) UpdateBinding(ctx context.Context, identityID, userID uint, issuer string, detail []byte) error {
+func (f *fakeConnectorUserIdentityRepository) UpdateBinding(ctx context.Context, identityID, personID uint, issuer string, detail []byte) error {
 	if f.updateBindingFunc == nil {
 		return nil
 	}
-	return f.updateBindingFunc(ctx, identityID, userID, issuer, detail)
+	return f.updateBindingFunc(ctx, identityID, personID, issuer, detail)
 }
 
 func TestBuildConnectorInsertEntityKeepsLegacyBusinessIdentifier(t *testing.T) {
@@ -276,7 +278,7 @@ func TestBuildConnectorUpdateMapDoesNotWritePrimaryKeyIntoNameFields(t *testing.
 
 func TestIdentityMapperRejectsUnboundIdentityWhenAutoCreateDisabled(t *testing.T) {
 	mapper := newIdentityMapper(
-		&fakeConnectorUserRepository{},
+		&fakeConnectorPersonRepository{},
 		&fakeConnectorUserIdentityRepository{},
 		WithIdentityMapperTxRunner(connectorRunInTransactionNoop),
 	)
@@ -297,37 +299,35 @@ func TestIdentityMapperRejectsUnboundIdentityWhenAutoCreateDisabled(t *testing.T
 	}
 }
 
-func TestIdentityMapperReturnsBoundUser(t *testing.T) {
-	expectedUser := &model.UserEntity{Model: model.UserEntity{}.Model, TenantID: 22, Username: "bound-user"}
-	expectedUser.ID = 33
+func TestIdentityMapperReturnsBoundPerson(t *testing.T) {
+	expectedPerson := &model.PersonEntity{Model: model.PersonEntity{}.Model, Username: "bound-user", Name: "bound-user"}
+	expectedPerson.ID = 33
 
 	mapper := newIdentityMapper(
-		&fakeConnectorUserRepository{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.UserEntity, error) {
-				if id != expectedUser.ID {
-					t.Fatalf("expected get by id %d, got %d", expectedUser.ID, id)
+		&fakeConnectorPersonRepository{
+			getByIDFunc: func(ctx context.Context, id uint) (*model.PersonEntity, error) {
+				if id != expectedPerson.ID {
+					t.Fatalf("expected get by id %d, got %d", expectedPerson.ID, id)
 				}
-				return expectedUser, nil
+				return expectedPerson, nil
 			},
 		},
 		&fakeConnectorUserIdentityRepository{
-			getByConnectorAndExternalSubjectFunc: func(ctx context.Context, tenantID, connectorID uint, externalSubject string) (*model.UserIdentityEntity, error) {
-				if tenantID != 22 || connectorID != 11 || externalSubject != "external-subject-1" {
-					t.Fatalf("unexpected lookup input tenant=%d connector=%d subject=%q", tenantID, connectorID, externalSubject)
+			getByIssuerAndExternalSubjectFunc: func(ctx context.Context, issuer, externalSubject string) (*model.UserIdentityEntity, error) {
+				if issuer != "https://issuer.example.com" || externalSubject != "external-subject-1" {
+					t.Fatalf("unexpected lookup input issuer=%q subject=%q", issuer, externalSubject)
 				}
 				return &model.UserIdentityEntity{
-					TenantID:         tenantID,
-					UserID:           expectedUser.ID,
-					ConnectorID:      connectorID,
-					Issuer:           "https://issuer.example.com",
-					ExternalSubject:  externalSubject,
+					PersonID:        expectedPerson.ID,
+					Issuer:          "https://issuer.example.com",
+					ExternalSubject: externalSubject,
 				}, nil
 			},
 		},
 		WithIdentityMapperTxRunner(connectorRunInTransactionNoop),
 	)
 
-	user, err := mapper.Resolve(context.Background(), identityResolveInput{
+	person, err := mapper.Resolve(context.Background(), identityResolveInput{
 		Connector: ConnectorRuntime{
 			ID:                  11,
 			TenantID:            22,
@@ -341,20 +341,20 @@ func TestIdentityMapperReturnsBoundUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if user != expectedUser {
-		t.Fatalf("expected bound user pointer to be returned")
+	if person == nil || person.Person != expectedPerson {
+		t.Fatalf("expected bound person pointer to be returned")
 	}
 }
 
-func TestIdentityMapperAutoCreatesUserAndBindsIdentity(t *testing.T) {
-	var insertedUser *model.UserEntity
+func TestIdentityMapperAutoCreatesPersonAndBindsIdentity(t *testing.T) {
+	var insertedPerson *model.PersonEntity
 	var insertedIdentity *model.UserIdentityEntity
 
 	mapper := newIdentityMapper(
-		&fakeConnectorUserRepository{
-			insertFunc: func(ctx context.Context, user *model.UserEntity) error {
-				insertedUser = user
-				user.ID = 44
+		&fakeConnectorPersonRepository{
+			insertFunc: func(ctx context.Context, person *model.PersonEntity) error {
+				insertedPerson = person
+				person.ID = 44
 				return nil
 			},
 		},
@@ -367,7 +367,7 @@ func TestIdentityMapperAutoCreatesUserAndBindsIdentity(t *testing.T) {
 		WithIdentityMapperTxRunner(connectorRunInTransactionNoop),
 	)
 
-	user, err := mapper.Resolve(context.Background(), identityResolveInput{
+	person, err := mapper.Resolve(context.Background(), identityResolveInput{
 		Connector: ConnectorRuntime{
 			ID:                  11,
 			TenantID:            22,
@@ -388,32 +388,26 @@ func TestIdentityMapperAutoCreatesUserAndBindsIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if user == nil {
-		t.Fatalf("expected created user")
+	if person == nil || person.Person == nil {
+		t.Fatalf("expected created person")
 	}
-	if insertedUser == nil {
-		t.Fatalf("expected user insert to be called")
+	if insertedPerson == nil {
+		t.Fatalf("expected person insert to be called")
 	}
-	if insertedUser.TenantID != 22 {
-		t.Fatalf("expected tenant id 22, got %d", insertedUser.TenantID)
+	if insertedPerson.PrimaryEmail != "user@example.com" {
+		t.Fatalf("expected email to map to person primary email, got %q", insertedPerson.PrimaryEmail)
 	}
-	if insertedUser.Username != "preferred-user" {
-		t.Fatalf("expected username from identity username, got %q", insertedUser.Username)
+	if insertedPerson.Name != "Preferred User" {
+		t.Fatalf("expected display name to map to person name, got %q", insertedPerson.Name)
 	}
-	if insertedUser.PrimaryEmail != "user@example.com" {
-		t.Fatalf("expected primary email from identity email, got %q", insertedUser.PrimaryEmail)
-	}
-	if insertedUser.Name != "Preferred User" {
-		t.Fatalf("expected display name to map to user name, got %q", insertedUser.Name)
-	}
-	if insertedUser.Avatar != "https://cdn.example.com/avatar.png" {
-		t.Fatalf("expected avatar url to map to user avatar, got %q", insertedUser.Avatar)
+	if insertedPerson.Avatar != "https://cdn.example.com/avatar.png" {
+		t.Fatalf("expected avatar url to map to person avatar, got %q", insertedPerson.Avatar)
 	}
 	if insertedIdentity == nil {
 		t.Fatalf("expected identity insert to be called")
 	}
-	if insertedIdentity.TenantID != 22 || insertedIdentity.UserID != 44 || insertedIdentity.ConnectorID != 11 {
-		t.Fatalf("unexpected identity binding tenant=%d user=%d connector=%d", insertedIdentity.TenantID, insertedIdentity.UserID, insertedIdentity.ConnectorID)
+	if insertedIdentity.PersonID != 44 || insertedIdentity.ConnectorID != 11 {
+		t.Fatalf("unexpected identity binding person=%d connector=%d", insertedIdentity.PersonID, insertedIdentity.ConnectorID)
 	}
 	if insertedIdentity.Issuer != "https://issuer.example.com" {
 		t.Fatalf("expected issuer to be persisted, got %q", insertedIdentity.Issuer)
@@ -440,7 +434,7 @@ func TestIdentityMapperAutoCreatesUserAndBindsIdentity(t *testing.T) {
 	}
 }
 
-func TestIdentityMapperAutoCreateRollsBackUserWhenBindIdentityFails(t *testing.T) {
+func TestIdentityMapperAutoCreateRollsBackPersonWhenBindIdentityFails(t *testing.T) {
 	ctx := newConnectorRuntimeContext(t)
 	db := newConnectorIdentityMapperTestDB(t)
 	mapper := newIdentityMapper(nil, nil, WithIdentityMapperDBProvider(func(ctx context.Context) *gorm.DB {
@@ -460,7 +454,7 @@ func TestIdentityMapperAutoCreateRollsBackUserWhenBindIdentityFails(t *testing.T
 		}
 	}()
 
-	user, err := mapper.Resolve(ctx, identityResolveInput{
+	person, err := mapper.Resolve(ctx, identityResolveInput{
 		Connector: ConnectorRuntime{ID: 11, TenantID: 22, AllowAutoCreateUser: true},
 		Identity: StandardIdentity{
 			Issuer:      "https://issuer.example.com",
@@ -472,20 +466,20 @@ func TestIdentityMapperAutoCreateRollsBackUserWhenBindIdentityFails(t *testing.T
 	if err == nil {
 		t.Fatal("expected bind identity failure")
 	}
-	if user != nil {
-		t.Fatalf("expected no user result on bind failure, got %+v", user)
+	if person != nil {
+		t.Fatalf("expected no person result on bind failure, got %+v", person)
 	}
 
 	var count int64
-	if err := db.Model(&model.UserEntity{}).Where("tenant_id = ? AND primary_email = ?", 22, "rollback@example.com").Count(&count).Error; err != nil {
-		t.Fatalf("count users: %v", err)
+	if err := db.Model(&model.PersonEntity{}).Where("primary_email = ?", "rollback@example.com").Count(&count).Error; err != nil {
+		t.Fatalf("count persons: %v", err)
 	}
 	if count != 0 {
-		t.Fatalf("expected rollback to remove inserted user, got %d rows", count)
+		t.Fatalf("expected rollback to remove inserted person, got %d rows", count)
 	}
 }
 
-func TestIdentityMapperAutoCreatePersistsUserAndIdentityWithinTransaction(t *testing.T) {
+func TestIdentityMapperAutoCreatePersistsPersonAndIdentityWithinTransaction(t *testing.T) {
 	ctx := newConnectorRuntimeContext(t)
 	db := newConnectorIdentityMapperTestDB(t)
 	defer func() {
@@ -498,7 +492,7 @@ func TestIdentityMapperAutoCreatePersistsUserAndIdentityWithinTransaction(t *tes
 		return db.WithContext(ctx)
 	}))
 
-	user, err := mapper.Resolve(ctx, identityResolveInput{
+	person, err := mapper.Resolve(ctx, identityResolveInput{
 		Connector: ConnectorRuntime{ID: 11, TenantID: 22, AllowAutoCreateUser: true},
 		Identity: StandardIdentity{
 			Issuer:      "https://issuer.example.com",
@@ -511,42 +505,42 @@ func TestIdentityMapperAutoCreatePersistsUserAndIdentityWithinTransaction(t *tes
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if user == nil || user.ID == 0 {
-		t.Fatalf("expected created user, got %+v", user)
+	if person == nil || person.Person == nil || person.Person.ID == 0 {
+		t.Fatalf("expected created person, got %+v", person)
 	}
 
-	var users []model.UserEntity
-	if err := db.Where("tenant_id = ? AND primary_email = ?", 22, "success@example.com").Find(&users).Error; err != nil {
-		t.Fatalf("query users: %v", err)
+	var persons []model.PersonEntity
+	if err := db.Where("primary_email = ?", "success@example.com").Find(&persons).Error; err != nil {
+		t.Fatalf("query persons: %v", err)
 	}
-	if len(users) != 1 {
-		t.Fatalf("expected 1 persisted user, got %d", len(users))
+	if len(persons) != 1 {
+		t.Fatalf("expected 1 persisted person, got %d", len(persons))
 	}
 
 	var identities []model.UserIdentityEntity
-	if err := db.Where("tenant_id = ? AND connector_id = ? AND external_subject = ?", 22, 11, "external-subject-success").Find(&identities).Error; err != nil {
+	if err := db.Where("connector_id = ? AND external_subject = ?", 11, "external-subject-success").Find(&identities).Error; err != nil {
 		t.Fatalf("query identities: %v", err)
 	}
 	if len(identities) != 1 {
 		t.Fatalf("expected 1 persisted identity, got %d", len(identities))
 	}
-	if identities[0].UserID != users[0].ID || identities[0].UserID != user.ID {
-		t.Fatalf("expected identity to bind created user, user=%d persisted=%d identity=%d", user.ID, users[0].ID, identities[0].UserID)
+	if identities[0].PersonID != persons[0].ID || identities[0].PersonID != person.Person.ID {
+		t.Fatalf("expected identity to bind created person, person=%d persisted=%d identity=%d", person.Person.ID, persons[0].ID, identities[0].PersonID)
 	}
 }
 
-func TestIdentityMapperPropagatesBoundUserLookupError(t *testing.T) {
-	expectedErr := errors.New("user lookup failed")
+func TestIdentityMapperPropagatesBoundPersonLookupError(t *testing.T) {
+	expectedErr := errors.New("person lookup failed")
 
 	mapper := newIdentityMapper(
-		&fakeConnectorUserRepository{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.UserEntity, error) {
+		&fakeConnectorPersonRepository{
+			getByIDFunc: func(ctx context.Context, id uint) (*model.PersonEntity, error) {
 				return nil, expectedErr
 			},
 		},
 		&fakeConnectorUserIdentityRepository{
-			getByConnectorAndExternalSubjectFunc: func(ctx context.Context, tenantID, connectorID uint, externalSubject string) (*model.UserIdentityEntity, error) {
-				return &model.UserIdentityEntity{Model: model.UserIdentityEntity{}.Model, UserID: 33}, nil
+			getByIssuerAndExternalSubjectFunc: func(ctx context.Context, issuer, externalSubject string) (*model.UserIdentityEntity, error) {
+				return &model.UserIdentityEntity{Model: model.UserIdentityEntity{}.Model, PersonID: 33}, nil
 			},
 		},
 		WithIdentityMapperTxRunner(connectorRunInTransactionNoop),
@@ -557,7 +551,7 @@ func TestIdentityMapperPropagatesBoundUserLookupError(t *testing.T) {
 		Identity:  StandardIdentity{Subject: "external-subject-1"},
 	})
 	if !errors.Is(err, expectedErr) {
-		t.Fatalf("expected bound user lookup error to propagate, got %v", err)
+		t.Fatalf("expected bound person lookup error to propagate, got %v", err)
 	}
 }
 
@@ -569,18 +563,18 @@ func TestIdentityMapperRepairsOrphanBindingInsteadOfReinserting(t *testing.T) {
 	var updatedDetail StandardIdentity
 
 	mapper := newIdentityMapper(
-		&fakeConnectorUserRepository{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.UserEntity, error) {
+		&fakeConnectorPersonRepository{
+			getByIDFunc: func(ctx context.Context, id uint) (*model.PersonEntity, error) {
 				return nil, nil
 			},
-			insertFunc: func(ctx context.Context, user *model.UserEntity) error {
-				user.ID = 44
+			insertFunc: func(ctx context.Context, person *model.PersonEntity) error {
+				person.ID = 44
 				return nil
 			},
 		},
 		&fakeConnectorUserIdentityRepository{
-			getByConnectorAndExternalSubjectFunc: func(ctx context.Context, tenantID, connectorID uint, externalSubject string) (*model.UserIdentityEntity, error) {
-				entity := &model.UserIdentityEntity{UserID: 33, ConnectorID: connectorID, ExternalSubject: externalSubject, Issuer: "stale"}
+			getByIssuerAndExternalSubjectFunc: func(ctx context.Context, issuer, externalSubject string) (*model.UserIdentityEntity, error) {
+				entity := &model.UserIdentityEntity{PersonID: 33, ConnectorID: 11, ExternalSubject: externalSubject, Issuer: "stale"}
 				entity.ID = 77
 				return entity, nil
 			},
@@ -588,9 +582,9 @@ func TestIdentityMapperRepairsOrphanBindingInsteadOfReinserting(t *testing.T) {
 				inserted = true
 				return nil
 			},
-			updateBindingFunc: func(ctx context.Context, identityID, userID uint, issuer string, detail []byte) error {
+			updateBindingFunc: func(ctx context.Context, identityID, personID uint, issuer string, detail []byte) error {
 				updatedIdentityID = identityID
-				updatedUserID = userID
+				updatedUserID = personID
 				updatedIssuer = issuer
 				return json.Unmarshal(detail, &updatedDetail)
 			},
@@ -598,7 +592,7 @@ func TestIdentityMapperRepairsOrphanBindingInsteadOfReinserting(t *testing.T) {
 		WithIdentityMapperTxRunner(connectorRunInTransactionNoop),
 	)
 
-	user, err := mapper.Resolve(context.Background(), identityResolveInput{
+	person, err := mapper.Resolve(context.Background(), identityResolveInput{
 		Connector: ConnectorRuntime{ID: 11, TenantID: 22, AllowAutoCreateUser: true},
 		Identity: StandardIdentity{
 			Issuer:      "https://issuer.example.com",
@@ -610,8 +604,8 @@ func TestIdentityMapperRepairsOrphanBindingInsteadOfReinserting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if user == nil || user.ID != 44 {
-		t.Fatalf("expected repaired binding to return created user, got %+v", user)
+	if person == nil || person.Person == nil || person.Person.ID != 44 {
+		t.Fatalf("expected repaired binding to return created person, got %+v", person)
 	}
 	if inserted {
 		t.Fatal("expected orphan binding to be repaired via update, not insert")
@@ -650,12 +644,12 @@ func TestConnectorServiceAuthorizeStoresStateAndReturnsAuthorizationURL(t *testi
 	var authorizeInput *ConnectorAuthorizeInput
 	fixedNow := time.Unix(1710000000, 0)
 	connectorEntity := &model.ConnectorEntity{
-		TenantID:  22,
-		Name:      "github-sso",
-		Protocol:  connectorDriverTypeOAuth2,
-		Provider:  connectorProviderGithub,
-		Status:    connectorStatusEnabled,
-		Config:    json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
+		TenantID: 22,
+		Name:     "github-sso",
+		Protocol: connectorDriverTypeOAuth2,
+		Provider: connectorProviderGithub,
+		Status:   connectorStatusEnabled,
+		Config:   json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
 	}
 	connectorEntity.ID = 101
 
@@ -752,12 +746,12 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 
 	var callbackInput *ConnectorCallbackInput
 	connectorEntity := &model.ConnectorEntity{
-		TenantID:  22,
-		Name:      "github-sso",
-		Protocol:  connectorDriverTypeOAuth2,
-		Provider:  connectorProviderGithub,
-		Status:    connectorStatusEnabled,
-		Config:    json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
+		TenantID: 22,
+		Name:     "github-sso",
+		Protocol: connectorDriverTypeOAuth2,
+		Provider: connectorProviderGithub,
+		Status:   connectorStatusEnabled,
+		Config:   json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
 	}
 	connectorEntity.ID = 101
 
@@ -781,10 +775,10 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 		},
 		stateStore: stateStore,
 		identityResolver: &fakeConnectorIdentityResolver{
-			resolveFunc: func(ctx context.Context, input identityResolveInput) (*model.UserEntity, error) {
-				user := &model.UserEntity{TenantID: 22, Username: "callback-user"}
-				user.ID = 88
-				return user, nil
+			resolveFunc: func(ctx context.Context, input identityResolveInput) (*resolvedConnectorPerson, error) {
+				person := &model.PersonEntity{Username: "callback-user", Name: "callback-user"}
+				person.ID = 88
+				return &resolvedConnectorPerson{Person: person}, nil
 			},
 		},
 		tokenGenerator: func(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error) {
@@ -792,6 +786,23 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 		},
 		loginRecorder: func(ctx *gin.Context, tenantID, userID uint, success bool) {},
 	}
+	restoreUserStore := swapUserStoreFactory(func() authUserStore {
+		return &fakeAuthUserStore{
+			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
+				return &model.UserEntity{Model: gorm.Model{ID: 201}, TenantID: 22, PersonID: 88, Name: "callback-user"}, nil
+			},
+			getListByCondFunc: func(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, error) {
+				return model.UserEntityList{{Model: gorm.Model{ID: 201}, TenantID: 22, PersonID: 88, Name: "callback-user"}}, nil
+			},
+		}
+	})
+	defer restoreUserStore()
+	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
+		return &fakeAuthTenantStore{getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
+			return &model.TenantEntity{Model: gorm.Model{ID: 22}, Name: "tenant-22", Tag: "t22"}, nil
+		}}
+	})
+	defer restoreTenantStore()
 	runtimeSvc, ok := any(svc).(interface {
 		Callback(ctx *gin.Context, req *dtoconnector.ConnectorCallbackReq) (*dtoauth.LoginResp, error)
 	})
@@ -827,7 +838,7 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 	}
 }
 
-func TestConnectorCallbackReturnsLoginResp(t *testing.T) {
+func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 	stateStore := NewInMemoryConnectorStateStore()
 	state := &ConnectorState{
 		State:       "callback-state-login-resp",
@@ -851,8 +862,7 @@ func TestConnectorCallbackReturnsLoginResp(t *testing.T) {
 	}
 	connectorEntity.ID = 101
 
-	resolvedUser := &model.UserEntity{TenantID: 22, Username: "connector-user"}
-	resolvedUser.ID = 303
+	resolvedPerson := &model.PersonEntity{Model: gorm.Model{ID: 909}, Username: "connector-person"}
 
 	svc := &connectorSvc{
 		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{
@@ -872,20 +882,38 @@ func TestConnectorCallbackReturnsLoginResp(t *testing.T) {
 		},
 		stateStore: stateStore,
 		identityResolver: &fakeConnectorIdentityResolver{
-			resolveFunc: func(ctx context.Context, input identityResolveInput) (*model.UserEntity, error) {
-				return resolvedUser, nil
+			resolveFunc: func(ctx context.Context, input identityResolveInput) (*resolvedConnectorPerson, error) {
+				return &resolvedConnectorPerson{Person: resolvedPerson}, nil
 			},
 		},
-		tokenGenerator: func(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error) {
-			return &objauth.TokenInfo{
-				AccessToken:  "iam-access-token",
-				RefreshToken: "iam-refresh-token",
-				ExpiresIn:    86400,
-				TokenType:    "Bearer",
-			}, nil
-		},
+		tokenGenerator: nil,
 		loginRecorder: func(ctx *gin.Context, tenantID, userID uint, success bool) {},
 	}
+	restorePersonStore := swapPersonStoreFactory(func() authPersonStore {
+		return &fakeAuthPersonStore{
+			getByCondFunc: func(ctx context.Context, cond *dao.PersonCond) (*model.PersonEntity, error) {
+				return &model.PersonEntity{Model: gorm.Model{ID: 909}, Username: "connector-person"}, nil
+			},
+		}
+	})
+	defer restorePersonStore()
+	restoreUserStore := swapUserStoreFactory(func() authUserStore {
+		return &fakeAuthUserStore{
+			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
+				return &model.UserEntity{Model: gorm.Model{ID: 303}, TenantID: 22, PersonID: 909, Name: "connector-user-a"}, nil
+			},
+			getListByCondFunc: func(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, error) {
+				return model.UserEntityList{{Model: gorm.Model{ID: 303}, TenantID: 22, PersonID: 909, Name: "connector-user-a"}}, nil
+			},
+		}
+	})
+	defer restoreUserStore()
+	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
+		return &fakeAuthTenantStore{getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
+			return &model.TenantEntity{Model: gorm.Model{ID: 22}, Name: "tenant-22", Tag: "t22"}, nil
+		}}
+	})
+	defer restoreTenantStore()
 
 	resp, err := svc.Callback(nil, &dtoconnector.ConnectorCallbackReq{ConnectorID: 101, Code: "authorization-code", State: "callback-state-login-resp"})
 	if err != nil {
@@ -894,11 +922,14 @@ func TestConnectorCallbackReturnsLoginResp(t *testing.T) {
 	if resp == nil {
 		t.Fatal("expected login response")
 	}
-	if resp.AccessToken != "iam-access-token" || resp.RefreshToken != "iam-refresh-token" {
-		t.Fatalf("expected callback to return issued iam tokens, got %+v", resp.TokenInfo)
+	if resp.PersonToken.AccessToken == "" {
+		t.Fatalf("expected callback to return person token, got %+v", resp.PersonToken)
 	}
-	if resp.AccessToken == "provider-access-token" || resp.RefreshToken == "provider-refresh-token" {
-		t.Fatalf("expected callback to return iam tokens instead of provider tokens, got %+v", resp.TokenInfo)
+	if resp.PersonToken.RefreshToken != "" {
+		t.Fatalf("expected person token response without tenant refresh token, got %+v", resp.PersonToken)
+	}
+	if claims := mustParseJWTClaims(t, resp.PersonToken.AccessToken, connectorJWTSignKey()); claims["type"] != "person" || uintClaim(t, claims, "person_id") != 909 {
+		t.Fatalf("expected connector callback to return person-scoped token, got claims=%+v", claims)
 	}
 }
 
@@ -926,15 +957,9 @@ func TestConnectorCallbackInvokesIdentityResolverTokenGeneratorAndLoginRecorder(
 	}
 	connectorEntity.ID = 202
 
-	resolvedUser := &model.UserEntity{TenantID: 66, Username: "mapped-user"}
-	resolvedUser.ID = 909
+	resolvedPerson := &model.PersonEntity{Model: gorm.Model{ID: 909}, Username: "mapped-user", Name: "Mapped User"}
 
 	var resolvedInput identityResolveInput
-	var tokenIssuedFor uint
-	var recordTenantID uint
-	var recordUserID uint
-	var recordSuccess bool
-
 	svc := &connectorSvc{
 		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{
 			driverType: connectorDriverTypeOAuth2,
@@ -956,21 +981,30 @@ func TestConnectorCallbackInvokesIdentityResolverTokenGeneratorAndLoginRecorder(
 		},
 		stateStore: stateStore,
 		identityResolver: &fakeConnectorIdentityResolver{
-			resolveFunc: func(ctx context.Context, input identityResolveInput) (*model.UserEntity, error) {
+			resolveFunc: func(ctx context.Context, input identityResolveInput) (*resolvedConnectorPerson, error) {
 				resolvedInput = input
-				return resolvedUser, nil
+				return &resolvedConnectorPerson{Person: resolvedPerson}, nil
 			},
 		},
-		tokenGenerator: func(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error) {
-			tokenIssuedFor = userEntity.ID
-			return &objauth.TokenInfo{AccessToken: "issued-access", RefreshToken: "issued-refresh", TokenType: "Bearer"}, nil
-		},
-		loginRecorder: func(ctx *gin.Context, tenantID, userID uint, success bool) {
-			recordTenantID = tenantID
-			recordUserID = userID
-			recordSuccess = success
-		},
+		loginRecorder: func(ctx *gin.Context, tenantID, userID uint, success bool) {},
 	}
+	restoreUserStore := swapUserStoreFactory(func() authUserStore {
+		return &fakeAuthUserStore{
+			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
+				return &model.UserEntity{Model: gorm.Model{ID: 501}, TenantID: 66, PersonID: 909, Name: "mapped-user-a"}, nil
+			},
+			getListByCondFunc: func(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, error) {
+				return model.UserEntityList{{Model: gorm.Model{ID: 501}, TenantID: 66, PersonID: 909, Name: "mapped-user-a"}}, nil
+			},
+		}
+	})
+	defer restoreUserStore()
+	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
+		return &fakeAuthTenantStore{getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
+			return &model.TenantEntity{Model: gorm.Model{ID: 66}, Name: "tenant-66", Tag: "t66"}, nil
+		}}
+	})
+	defer restoreTenantStore()
 
 	_, err := svc.Callback(nil, &dtoconnector.ConnectorCallbackReq{ConnectorID: 202, Code: "authorization-code", State: "callback-state-runtime-hooks"})
 	if err != nil {
@@ -981,12 +1015,6 @@ func TestConnectorCallbackInvokesIdentityResolverTokenGeneratorAndLoginRecorder(
 	}
 	if resolvedInput.Identity.Subject != "subject-202" || resolvedInput.Identity.Email != "mapped@example.com" {
 		t.Fatalf("unexpected standard identity input: %+v", resolvedInput.Identity)
-	}
-	if tokenIssuedFor != resolvedUser.ID {
-		t.Fatalf("expected token generator to receive resolved user id %d, got %d", resolvedUser.ID, tokenIssuedFor)
-	}
-	if recordTenantID != 66 || recordUserID != resolvedUser.ID || !recordSuccess {
-		t.Fatalf("unexpected login recorder input tenant=%d user=%d success=%v", recordTenantID, recordUserID, recordSuccess)
 	}
 	if _, err := stateStore.Load(context.Background(), "callback-state-runtime-hooks"); !errors.Is(err, ErrConnectorStateNotFound) {
 		t.Fatalf("expected callback state to be consumed after successful login flow, got err=%v", err)
@@ -1009,11 +1037,11 @@ func TestConnectorServiceCallbackRetainsStateWhenDriverExchangeFails(t *testing.
 
 	expectedErr := errors.New("temporary exchange failure")
 	conn := &model.ConnectorEntity{
-		TenantID:  22,
-		Protocol:  connectorDriverTypeOAuth2,
-		Provider:  connectorProviderGithub,
-		Status:    connectorStatusEnabled,
-		Config:    json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
+		TenantID: 22,
+		Protocol: connectorDriverTypeOAuth2,
+		Provider: connectorProviderGithub,
+		Status:   connectorStatusEnabled,
+		Config:   json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
 	}
 	conn.ID = 101
 
@@ -1052,8 +1080,8 @@ func newConnectorIdentityMapperTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite db: %v", err)
 	}
-	if err := db.AutoMigrate(&model.UserEntity{}, &model.UserIdentityEntity{}); err != nil {
-		t.Fatalf("migrate user tables: %v", err)
+	if err := db.AutoMigrate(&model.PersonEntity{}, &model.UserIdentityEntity{}); err != nil {
+		t.Fatalf("migrate person tables: %v", err)
 	}
 	return db
 }
@@ -1070,4 +1098,28 @@ func newConnectorRuntimeContext(t *testing.T) context.Context {
 func sanitizeConnectorTestName(name string) string {
 	replacer := strings.NewReplacer("/", "_", " ", "_", ":", "_")
 	return replacer.Replace(name)
+}
+
+func mustParseJWTClaims(t *testing.T, tokenString, secret string) jwt.MapClaims {
+	t.Helper()
+	tokenValue, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return []byte(secret), nil
+	})
+	if err != nil {
+		t.Fatalf("parse jwt claims: %v", err)
+	}
+	claims, ok := tokenValue.Claims.(jwt.MapClaims)
+	if !ok {
+		t.Fatalf("expected jwt.MapClaims, got %T", tokenValue.Claims)
+	}
+	return claims
+}
+
+func uintClaim(t *testing.T, claims jwt.MapClaims, key string) uint {
+	t.Helper()
+	value, ok := parsePositiveIntegerClaim(claims, key)
+	if !ok {
+		t.Fatalf("expected positive integer claim %s in %+v", key, claims)
+	}
+	return value
 }

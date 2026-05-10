@@ -12,8 +12,12 @@ type SessionRevokeReq struct {
 
 type SessionResp struct {
 	ID            uint64     `json:"id"`
+	SessionID     string     `json:"sessionId"`
 	ApplicationID uint64     `json:"applicationId"`
 	TenantID      uint64     `json:"tenantId"`
+	ClientType    string     `json:"clientType"`
+	ClientIP      string     `json:"clientIP"`
+	UserAgent     string     `json:"userAgent"`
 	ExpiresAt     *string    `json:"expiresAt"`
 	CreatedAt     string     `json:"createdAt"`
 	IsActive      bool       `json:"isActive"`

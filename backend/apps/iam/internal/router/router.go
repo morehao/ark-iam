@@ -22,4 +22,5 @@ func RegisterRouter(groups *ginserver.RouterGroups, appName string) {
 	organizationUserRelationRouter(groups)
 	organizationRoleUserRelationRouter(groups)
 	logRouter(groups)
+	personRouter(groups)
 }

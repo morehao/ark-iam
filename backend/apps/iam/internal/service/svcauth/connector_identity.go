@@ -22,15 +22,19 @@ type identityResolveInput struct {
 	Identity  StandardIdentity
 }
 
-type connectorUserRepository interface {
-	GetByID(ctx context.Context, id uint) (*model.UserEntity, error)
-	Insert(ctx context.Context, user *model.UserEntity) error
+type resolvedConnectorPerson struct {
+	Person *model.PersonEntity
+}
+
+type connectorPersonRepository interface {
+	GetByID(ctx context.Context, id uint) (*model.PersonEntity, error)
+	Insert(ctx context.Context, person *model.PersonEntity) error
 }
 
 type connectorUserIdentityRepository interface {
-	GetByConnectorAndExternalSubject(ctx context.Context, tenantID, connectorID uint, externalSubject string) (*model.UserIdentityEntity, error)
+	GetByIssuerAndExternalSubject(ctx context.Context, issuer, externalSubject string) (*model.UserIdentityEntity, error)
 	Insert(ctx context.Context, entity *model.UserIdentityEntity) error
-	UpdateBinding(ctx context.Context, identityID, userID uint, issuer string, detail []byte) error
+	UpdateBinding(ctx context.Context, identityID, personID uint, issuer string, detail []byte) error
 }
 
 type connectorTxContextKey struct{}
@@ -42,26 +46,26 @@ type connectorTxRunner func(ctx context.Context, fn func(txCtx context.Context) 
 type identityMapperOption func(*identityMapper)
 
 type identityMapper struct {
-	userRepo         connectorUserRepository
+	personRepo       connectorPersonRepository
 	userIdentityRepo connectorUserIdentityRepository
 	dbProvider       connectorDBProvider
 	txRunner         connectorTxRunner
 }
 
-func newIdentityMapper(userRepo connectorUserRepository, userIdentityRepo connectorUserIdentityRepository, opts ...identityMapperOption) *identityMapper {
+func newIdentityMapper(personRepo connectorPersonRepository, userIdentityRepo connectorUserIdentityRepository, opts ...identityMapperOption) *identityMapper {
 	mapper := &identityMapper{
 		dbProvider: defaultConnectorDBProvider,
 	}
 	for _, opt := range opts {
 		opt(mapper)
 	}
-	if userRepo == nil {
-		userRepo = &connectorUserRepoAdapter{mapper: mapper}
+	if personRepo == nil {
+		personRepo = &connectorPersonRepoAdapter{mapper: mapper}
 	}
 	if userIdentityRepo == nil {
 		userIdentityRepo = &connectorUserIdentityRepoAdapter{mapper: mapper}
 	}
-	mapper.userRepo = userRepo
+	mapper.personRepo = personRepo
 	mapper.userIdentityRepo = userIdentityRepo
 	if mapper.txRunner == nil {
 		mapper.txRunner = mapper.runInTransaction
@@ -113,7 +117,7 @@ func (m *identityMapper) repoDB(ctx context.Context) *gorm.DB {
 	return m.db(ctx)
 }
 
-type connectorUserRepoAdapter struct {
+type connectorPersonRepoAdapter struct {
 	mapper *identityMapper
 }
 
@@ -121,8 +125,8 @@ type connectorUserIdentityRepoAdapter struct {
 	mapper *identityMapper
 }
 
-func (r *connectorUserRepoAdapter) GetByID(ctx context.Context, id uint) (*model.UserEntity, error) {
-	var entity model.UserEntity
+func (r *connectorPersonRepoAdapter) GetByID(ctx context.Context, id uint) (*model.PersonEntity, error) {
+	var entity model.PersonEntity
 	err := r.mapper.repoDB(ctx).First(&entity, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -133,14 +137,14 @@ func (r *connectorUserRepoAdapter) GetByID(ctx context.Context, id uint) (*model
 	return &entity, nil
 }
 
-func (r *connectorUserRepoAdapter) Insert(ctx context.Context, user *model.UserEntity) error {
-	return r.mapper.repoDB(ctx).Create(user).Error
+func (r *connectorPersonRepoAdapter) Insert(ctx context.Context, person *model.PersonEntity) error {
+	return r.mapper.repoDB(ctx).Create(person).Error
 }
 
-func (r *connectorUserIdentityRepoAdapter) GetByConnectorAndExternalSubject(ctx context.Context, tenantID, connectorID uint, externalSubject string) (*model.UserIdentityEntity, error) {
+func (r *connectorUserIdentityRepoAdapter) GetByIssuerAndExternalSubject(ctx context.Context, issuer, externalSubject string) (*model.UserIdentityEntity, error) {
 	var entity model.UserIdentityEntity
 	err := r.mapper.repoDB(ctx).
-		Where("tenant_id = ? AND connector_id = ? AND external_subject = ? AND deleted_at IS NULL", tenantID, connectorID, externalSubject).
+		Where("issuer = ? AND external_subject = ? AND deleted_at IS NULL", issuer, externalSubject).
 		First(&entity).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -155,69 +159,70 @@ func (r *connectorUserIdentityRepoAdapter) Insert(ctx context.Context, entity *m
 	return r.mapper.repoDB(ctx).Create(entity).Error
 }
 
-func (r *connectorUserIdentityRepoAdapter) UpdateBinding(ctx context.Context, identityID, userID uint, issuer string, detail []byte) error {
-	return r.mapper.repoDB(ctx).Model(&model.UserIdentityEntity{}).Where("id = ?", identityID).Updates(map[string]any{
-		"user_id":    userID,
+func (r *connectorUserIdentityRepoAdapter) UpdateBinding(ctx context.Context, identityID, personID uint, issuer string, detail []byte) error {
+	updateMap := map[string]any{
+		"person_id":  personID,
 		"issuer":     issuer,
 		"detail":     json.RawMessage(detail),
-		"updated_by": userID,
-	}).Error
+	}
+	return r.mapper.repoDB(ctx).Model(&model.UserIdentityEntity{}).Where("id = ?", identityID).Updates(updateMap).Error
 }
 
-func (m *identityMapper) Resolve(ctx context.Context, input identityResolveInput) (*model.UserEntity, error) {
-	existingIdentity, err := m.userIdentityRepo.GetByConnectorAndExternalSubject(ctx, input.Connector.TenantID, input.Connector.ID, input.Identity.Subject)
+func (m *identityMapper) Resolve(ctx context.Context, input identityResolveInput) (*resolvedConnectorPerson, error) {
+	existingIdentity, err := m.userIdentityRepo.GetByIssuerAndExternalSubject(ctx, input.Identity.Issuer, input.Identity.Subject)
 	if err != nil {
 		return nil, err
 	}
-	if existingIdentity != nil && existingIdentity.UserID != 0 {
-		user, getErr := m.userRepo.GetByID(ctx, existingIdentity.UserID)
+	if existingIdentity != nil && existingIdentity.PersonID != 0 {
+		person, getErr := m.personRepo.GetByID(ctx, existingIdentity.PersonID)
 		if getErr != nil {
 			return nil, getErr
 		}
-		if user != nil {
-			return user, nil
+		if person != nil {
+			return &resolvedConnectorPerson{Person: person}, nil
 		}
 	}
 	if !input.Connector.AllowAutoCreateUser {
 		return nil, code.GetError(code.UserNotExistError)
 	}
 
-	user := &model.UserEntity{
-		TenantID:     input.Connector.TenantID,
+	person := &model.PersonEntity{
 		Username:     resolveIdentityUsername(input.Identity),
 		PrimaryEmail: input.Identity.Email,
 		Name:         input.Identity.DisplayName,
 		Avatar:       input.Identity.AvatarURL,
 		Profile:      json.RawMessage("{}"),
-		Identities:   json.RawMessage("{}"),
 		CustomData:   json.RawMessage("{}"),
 		CreatedBy:    0,
 	}
+	if person.Name == "" {
+		person.Name = resolveIdentityUsername(input.Identity)
+	}
 	if err := m.txRunner(ctx, func(txCtx context.Context) error {
-		if err := m.userRepo.Insert(txCtx, user); err != nil {
+		if err := m.personRepo.Insert(txCtx, person); err != nil {
 			return err
 		}
-		if err := m.bindIdentity(txCtx, input.Connector, user, input.Identity, existingIdentity); err != nil {
+		if err := m.bindIdentity(txCtx, input.Connector, person, input.Identity, existingIdentity); err != nil {
 			return err
 		}
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	return user, nil
+	return &resolvedConnectorPerson{Person: person}, nil
 }
 
-func (m *identityMapper) bindIdentity(ctx context.Context, connector ConnectorRuntime, user *model.UserEntity, identity StandardIdentity, existingIdentity *model.UserIdentityEntity) error {
+func (m *identityMapper) bindIdentity(ctx context.Context, connector ConnectorRuntime, person *model.PersonEntity, identity StandardIdentity, existingIdentity *model.UserIdentityEntity) error {
+	_ = connector
 	detail, err := json.Marshal(identity)
 	if err != nil {
 		return err
 	}
 	if existingIdentity != nil {
-		return m.userIdentityRepo.UpdateBinding(ctx, existingIdentity.ID, user.ID, identity.Issuer, detail)
+		return m.userIdentityRepo.UpdateBinding(ctx, existingIdentity.ID, person.ID, identity.Issuer, detail)
 	}
 	return m.userIdentityRepo.Insert(ctx, &model.UserIdentityEntity{
-		TenantID:        connector.TenantID,
-		UserID:          user.ID,
+		PersonID:        person.ID,
 		ConnectorID:     connector.ID,
 		Issuer:          identity.Issuer,
 		ExternalSubject: identity.Subject,

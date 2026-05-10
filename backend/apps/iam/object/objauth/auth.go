@@ -1,7 +1,6 @@
 package objauth
 
 type LoginReq struct {
-	TenantID   uint   `json:"tenantID" form:"tenantID"`     // 租户ID
 	Identifier string `json:"identifier" form:"identifier"` // 用户名/邮箱/手机号
 	Password   string `json:"password" form:"password"`     // 密码
 }
@@ -26,6 +25,16 @@ type TokenInfo struct {
 	TokenType    string `json:"tokenType"`    // 令牌类型
 }
 
+type PersonTokenInfo struct {
+	TokenInfo
+}
+
+type TenantOption struct {
+	TenantID uint   `json:"tenantID"` // 租户ID
+	Name     string `json:"name"`     // 租户名称
+	Tag      string `json:"tag"`      // 租户标识
+}
+
 type UserInfo struct {
 	UserID       uint   `json:"userID"`        // 用户ID
 	TenantID     uint   `json:"tenantID"`      // 租户ID
@@ -34,4 +43,17 @@ type UserInfo struct {
 	PrimaryPhone string `json:"primaryPhone"`   // 主要手机号
 	Name         string `json:"name"`          // 姓名
 	Avatar       string `json:"avatar"`        // 头像
+}
+
+type PersonInfo struct {
+	PersonID uint   `json:"personID"` // 自然人ID
+	Name     string `json:"name"`     // 姓名
+	Avatar   string `json:"avatar"`   // 头像
+}
+
+type TenantUserInfo struct {
+	UserID   uint   `json:"userID"`   // 用户ID
+	TenantID uint   `json:"tenantID"` // 租户ID
+	Name     string `json:"name"`     // 姓名
+	IsOwner  int8   `json:"isOwner"`  // 是否租户拥有者
 }

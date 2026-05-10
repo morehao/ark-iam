@@ -209,9 +209,9 @@ func (svc *roleSvc) ListUsers(ctx *gin.Context, req *dtouser.RoleUserListReq) (*
 		if user, ok := userMap[ur.UserID]; ok {
 			users = append(users, dtouser.RoleUserResp{
 				UserID:    uint64(ur.UserID),
-				Username:  user.Username,
+				Username:  "",
 				Name:      user.Name,
-				Email:     user.PrimaryEmail,
+				Email:     "",
 				RoleID:    uint64(ur.RoleID),
 				CreatedAt: ur.CreatedAt.Format("2006-01-02 15:04:05"),
 			})

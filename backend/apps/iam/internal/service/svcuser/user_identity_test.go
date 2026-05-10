@@ -3,6 +3,7 @@ package svcuser
 import (
 	"context"
 	"errors"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -11,8 +12,8 @@ import (
 	"github.com/morehao/ark-iam/iam/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/golib/biz/gcontext"
-	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/biz/gobject"
 	"gorm.io/gorm"
 )
 
@@ -23,8 +24,7 @@ func TestUserIdentityPageListPassesFiltersToDAOAndKeepsDAOTotal(t *testing.T) {
 		pageList: model.UserIdentityEntityList{
 			{
 				Model:           gorm.Model{ID: 1, UpdatedAt: time.Unix(1700000000, 0)},
-				TenantID:        23,
-				UserID:          101,
+				PersonID:        101,
 				Issuer:          "issuer-a",
 				ExternalSubject: "external-1",
 				Detail:          []byte(`{"name":"first"}`),
@@ -48,12 +48,10 @@ func TestUserIdentityPageListPassesFiltersToDAOAndKeepsDAOTotal(t *testing.T) {
 	if repo.lastCond == nil {
 		t.Fatalf("expected DAO condition to be captured")
 	}
-	if repo.lastCond.TenantID != 23 {
-		t.Fatalf("expected tenant id 23 from context, got %d", repo.lastCond.TenantID)
+	if repo.lastCond.PersonID != 101 {
+		t.Fatalf("expected person id 101, got %d", repo.lastCond.PersonID)
 	}
-	if repo.lastCond.UserID != 101 {
-		t.Fatalf("expected user id 101, got %d", repo.lastCond.UserID)
-	}
+
 	if repo.lastCond.Issuer != "issuer-a" {
 		t.Fatalf("expected issuer issuer-a, got %q", repo.lastCond.Issuer)
 	}
@@ -74,12 +72,13 @@ func TestUserIdentityPageListPassesFiltersToDAOAndKeepsDAOTotal(t *testing.T) {
 func TestUserIdentityGetByUserUsesTenantScopedDAOCondition(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Set(gcontext.KeyTenantID, uint(45))
+	relatedUserRepo := &stubUserIdentityUserRepo{detail: &model.UserEntity{Model: gorm.Model{ID: 202}, TenantID: 45, PersonID: 302}}
+	installUserIdentityUserRepo(t, relatedUserRepo)
 	repo := &stubUserIdentityRepo{
 		pageList: model.UserIdentityEntityList{
 			{
 				Model:           gorm.Model{ID: 2, UpdatedAt: time.Unix(1700000001, 0)},
-				TenantID:        45,
-				UserID:          202,
+				PersonID:        302,
 				Issuer:          "issuer-b",
 				ExternalSubject: "external-2",
 				Detail:          []byte(`{"name":"second"}`),
@@ -97,11 +96,8 @@ func TestUserIdentityGetByUserUsesTenantScopedDAOCondition(t *testing.T) {
 	if repo.lastCond == nil {
 		t.Fatalf("expected DAO condition to be captured")
 	}
-	if repo.lastCond.TenantID != 45 {
-		t.Fatalf("expected tenant id 45, got %d", repo.lastCond.TenantID)
-	}
-	if repo.lastCond.UserID != 202 {
-		t.Fatalf("expected user id 202, got %d", repo.lastCond.UserID)
+	if repo.lastCond.PersonID != 302 {
+		t.Fatalf("expected mapped person id 302, got %d", repo.lastCond.PersonID)
 	}
 	if repo.lastCond.BaseCond != nil {
 		t.Fatalf("expected no pagination base condition, got %#v", repo.lastCond.BaseCond)
@@ -114,7 +110,25 @@ func TestUserIdentityGetByUserUsesTenantScopedDAOCondition(t *testing.T) {
 	}
 }
 
+func TestUserIdentityDetailUsesTenantUserToResolvePerson(t *testing.T) {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Set(gcontext.KeyTenantID, uint(84))
+	installUserIdentityUserRepo(t, &stubUserIdentityUserRepo{detail: &model.UserEntity{Model: gorm.Model{ID: 9}, TenantID: 84, PersonID: 902}})
+	repo := &stubUserIdentityRepo{detail: &model.UserIdentityEntity{Model: gorm.Model{ID: 11}, PersonID: 902, Issuer: "issuer-a", ExternalSubject: "external-a", Detail: []byte(`{"name":"mapped"}`)}}
+	installUserIdentityRepo(t, repo)
+
+	svc := &userIdentitySvc{}
+	resp, err := svc.Detail(ginCtx, &dtouser.UserIdentityDetailReq{UserIdentityID: 9})
+	if err != nil {
+		t.Fatalf("Detail returned error: %v", err)
+	}
+	if resp == nil || resp.UserID != 902 {
+		t.Fatalf("expected mapped person response, got %#v", resp)
+	}
+}
+
 type stubUserIdentityRepo struct {
+	detail    *model.UserIdentityEntity
 	pageList model.UserIdentityEntityList
 	total    int64
 	err      error
@@ -126,7 +140,7 @@ func (r *stubUserIdentityRepo) Insert(ctx context.Context, entity *model.UserIde
 }
 
 func (r *stubUserIdentityRepo) GetByID(ctx context.Context, id uint) (*model.UserIdentityEntity, error) {
-	return nil, errors.New("unexpected call to GetByID")
+	return r.detail, r.err
 }
 
 func (r *stubUserIdentityRepo) Delete(ctx context.Context, id uint, deletedBy uint) error {
@@ -145,11 +159,36 @@ func (r *stubUserIdentityRepo) GetPageListByCond(ctx context.Context, cond *dao.
 func installUserIdentityRepo(t *testing.T, repo userIdentityRepository) {
 	t.Helper()
 	prev := newUserIdentityRepo
+	prevSvc := newPersonIdentitySvc
 	newUserIdentityRepo = func() userIdentityRepository {
 		return repo
 	}
+	newPersonIdentitySvc = func() delegatedPersonIdentitySvc {
+		return &stubDelegatedPersonIdentitySvc{repo: repo, userRepo: newUserIdentityUserRepo()}
+	}
 	t.Cleanup(func() {
 		newUserIdentityRepo = prev
+		newPersonIdentitySvc = prevSvc
+	})
+}
+
+type stubUserIdentityUserRepo struct {
+	detail *model.UserEntity
+	err    error
+}
+
+func (r *stubUserIdentityUserRepo) GetByID(ctx context.Context, id uint) (*model.UserEntity, error) {
+	return r.detail, r.err
+}
+
+func installUserIdentityUserRepo(t *testing.T, repo userIdentityUserResolver) {
+	t.Helper()
+	prev := newUserIdentityUserRepo
+	newUserIdentityUserRepo = func() userIdentityUserResolver {
+		return repo
+	}
+	t.Cleanup(func() {
+		newUserIdentityUserRepo = prev
 	})
 }
 
@@ -163,6 +202,75 @@ func cloneUserIdentityCond(cond *dao.UserIdentityCond) *dao.UserIdentityCond {
 		clone.BaseCond = &base
 	}
 	return &clone
+}
+
+type stubDelegatedPersonIdentitySvc struct {
+	repo     userIdentityRepository
+	userRepo userIdentityUserResolver
+}
+
+func (s *stubDelegatedPersonIdentitySvc) Create(ctx *gin.Context, req *dtouser.UserIdentityCreateReq) (*dtouser.UserIdentityCreateResp, error) {
+	return nil, errors.New("unexpected call to Create")
+}
+
+func (s *stubDelegatedPersonIdentitySvc) Delete(ctx *gin.Context, req *dtouser.UserIdentityDeleteReq) error {
+	return errors.New("unexpected call to Delete")
+}
+
+func (s *stubDelegatedPersonIdentitySvc) Update(ctx *gin.Context, req *dtouser.UserIdentityUpdateReq) error {
+	return errors.New("unexpected call to Update")
+}
+
+func (s *stubDelegatedPersonIdentitySvc) Detail(ctx *gin.Context, req *dtouser.UserIdentityDetailReq) (*dtouser.UserIdentityDetailResp, error) {
+	if s.userRepo != nil {
+		userEntity, err := s.userRepo.GetByID(ctx, req.UserIdentityID)
+		if err != nil || userEntity == nil {
+			return nil, err
+		}
+	}
+	entity, err := s.repo.GetByID(ctx, req.UserIdentityID)
+	if err != nil || entity == nil {
+		return nil, err
+	}
+	var detail any
+	_ = json.Unmarshal(entity.Detail, &detail)
+	return &dtouser.UserIdentityDetailResp{UserIdentityID: entity.ID, UserID: entity.PersonID, Issuer: entity.Issuer, IdentityID: entity.ExternalSubject, Detail: detail}, nil
+}
+
+func (s *stubDelegatedPersonIdentitySvc) PageList(ctx *gin.Context, req *dtouser.UserIdentityPageListReq) (*dtouser.UserIdentityPageListResp, error) {
+	list, total, err := s.repo.GetPageListByCond(ctx, &dao.UserIdentityCond{BaseCond: &genericdao.BaseCond{Page: req.Page, PageSize: req.PageSize}, PersonID: req.UserID, Issuer: req.Issuer, ExternalSubject: req.IdentityID})
+	if err != nil {
+		return nil, err
+	}
+	respList := make([]dtouser.UserIdentityPageListItem, 0, len(list))
+	for _, v := range list {
+		var detail any
+		_ = json.Unmarshal(v.Detail, &detail)
+		respList = append(respList, dtouser.UserIdentityPageListItem{UserIdentityID: v.ID, UserID: v.PersonID, Issuer: v.Issuer, IdentityID: v.ExternalSubject, Detail: detail})
+	}
+	return &dtouser.UserIdentityPageListResp{List: respList, Total: total}, nil
+}
+
+func (s *stubDelegatedPersonIdentitySvc) GetByUser(ctx *gin.Context, req *dtouser.UserIdentityByUserReq) (*dtouser.UserIdentityPageListResp, error) {
+	personID := req.UserID
+	if s.userRepo != nil {
+		userEntity, err := s.userRepo.GetByID(ctx, req.UserID)
+		if err != nil || userEntity == nil {
+			return nil, err
+		}
+		personID = userEntity.PersonID
+	}
+	list, total, err := s.repo.GetPageListByCond(ctx, &dao.UserIdentityCond{PersonID: personID})
+	if err != nil {
+		return nil, err
+	}
+	respList := make([]dtouser.UserIdentityPageListItem, 0, len(list))
+	for _, v := range list {
+		var detail any
+		_ = json.Unmarshal(v.Detail, &detail)
+		respList = append(respList, dtouser.UserIdentityPageListItem{UserIdentityID: v.ID, UserID: v.PersonID, Issuer: v.Issuer, IdentityID: v.ExternalSubject, Detail: detail})
+	}
+	return &dtouser.UserIdentityPageListResp{List: respList, Total: total}, nil
 }
 
 var _ userIdentityRepository = (*stubUserIdentityRepo)(nil)

@@ -17,7 +17,7 @@ func TestUserPageListPassesIsSuspendedZeroFilterToDAOCondition(t *testing.T) {
 	isSuspended := int8(0)
 	repo := &stubUserQueryRepo{
 		pageList: model.UserEntityList{
-			{Model: gorm.Model{ID: 1, UpdatedAt: time.Unix(1700000000, 0)}, TenantID: 23, Username: "active-user", Profile: []byte(`{}`), Identities: []byte(`{}`), CustomData: []byte(`{}`), IsSuspended: 0},
+			{Model: gorm.Model{ID: 1, UpdatedAt: time.Unix(1700000000, 0)}, TenantID: 23, Name: "active-user", Profile: []byte(`{}`), CustomData: []byte(`{}`), IsSuspended: 0},
 		},
 		total: 1,
 	}
@@ -26,8 +26,8 @@ func TestUserPageListPassesIsSuspendedZeroFilterToDAOCondition(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	svc := &userSvc{}
 	_, err := svc.PageList(ginCtx, &dtouser.UserPageListReq{
-		PageQuery: gobject.PageQuery{Page: 1, PageSize: 10},
-		TenantID:  23,
+		PageQuery:   gobject.PageQuery{Page: 1, PageSize: 10},
+		TenantID:    23,
 		IsSuspended: &isSuspended,
 	})
 	if err != nil {

@@ -17,8 +17,8 @@ func TestUserCondBuildConditionAppliesIsSuspendedZeroFilter(t *testing.T) {
 		t.Fatalf("migrate user: %v", err)
 	}
 	seed := []model.UserEntity{
-		{TenantID: 1, Username: "active-user", Profile: []byte(`{}`), Identities: []byte(`{}`), CustomData: []byte(`{}`), IsSuspended: 0},
-		{TenantID: 1, Username: "suspended-user", Profile: []byte(`{}`), Identities: []byte(`{}`), CustomData: []byte(`{}`), IsSuspended: 1},
+		{TenantID: 1, PersonID: 11, Name: "active-user", Profile: []byte(`{}`), CustomData: []byte(`{}`), IsSuspended: 0, IsOwner: 0},
+		{TenantID: 1, PersonID: 22, Name: "suspended-user", Profile: []byte(`{}`), CustomData: []byte(`{}`), IsSuspended: 1, IsOwner: 0},
 	}
 	if err := db.Create(&seed).Error; err != nil {
 		t.Fatalf("seed users: %v", err)
@@ -36,7 +36,7 @@ func TestUserCondBuildConditionAppliesIsSuspendedZeroFilter(t *testing.T) {
 	if len(list) != 1 {
 		t.Fatalf("expected 1 filtered row, got %d", len(list))
 	}
-	if list[0].Username != "active-user" || list[0].IsSuspended != 0 {
-		t.Fatalf("unexpected filtered row: username=%q is_suspended=%d", list[0].Username, list[0].IsSuspended)
+	if list[0].Name != "active-user" || list[0].IsSuspended != 0 {
+		t.Fatalf("unexpected filtered row: name=%q is_suspended=%d", list[0].Name, list[0].IsSuspended)
 	}
 }

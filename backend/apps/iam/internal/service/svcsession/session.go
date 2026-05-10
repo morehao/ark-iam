@@ -13,15 +13,15 @@ import (
 )
 
 type SessionSvc interface {
-	List(ctx *gin.Context, req *dtouser.SessionListReq, userID uint) (*dtouser.SessionListResp, error)
-	Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID uint) error
-	RevokeAll(ctx *gin.Context, userID uint) error
+	List(ctx *gin.Context, req *dtouser.SessionListReq, personID, userID, tenantID uint) (*dtouser.SessionListResp, error)
+	Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID, tenantID, personID uint) error
+	RevokeAll(ctx *gin.Context, userID, tenantID, personID uint) error
 }
 
 type sessionStore interface {
 	GetPageListByCond(ctx context.Context, cond *dao.SessionCond, page, pageSize int) ([]model.RefreshTokenEntity, int64, error)
-	RevokeByID(ctx context.Context, id, userID uint) error
-	RevokeAllByUserID(ctx context.Context, userID uint) error
+	RevokeByID(ctx context.Context, id, personID, tenantID, userID uint) error
+	RevokeAllByUserID(ctx context.Context, personID, tenantID, userID uint) error
 }
 
 var newSessionStore = func() sessionStore {
@@ -36,7 +36,7 @@ func NewSessionSvc() SessionSvc {
 	return &sessionSvc{}
 }
 
-func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, userID uint) (*dtouser.SessionListResp, error) {
+func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, personID, userID, tenantID uint) (*dtouser.SessionListResp, error) {
 	sessionDao := newSessionStore()
 
 	page := req.Page
@@ -49,7 +49,9 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, userI
 	}
 
 	list, total, err := sessionDao.GetPageListByCond(ctx.Request.Context(), &dao.SessionCond{
-		UserID: userID,
+		PersonID: personID,
+		UserID:   userID,
+		TenantID: tenantID,
 	}, page, pageSize)
 	if err != nil {
 		glog.Errorf(ctx, "[sessionSvc.List] get page list fail, err:%v", err)
@@ -60,21 +62,25 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, userI
 	now := time.Now()
 	for _, item := range list {
 		var isActive bool
-		if item.RevokedAt != nil && item.RevokedAt.Valid {
+		if item.RevokedAt != nil {
 			isActive = false
-		} else if item.ExpiresAt == nil || !item.ExpiresAt.Valid || !item.ExpiresAt.Time.After(now) {
+		} else if item.ExpiresAt == nil || !item.ExpiresAt.After(now) {
 			isActive = false
 		} else {
 			isActive = true
 		}
 		expiresAt := ""
-		if item.ExpiresAt != nil && item.ExpiresAt.Valid {
-			expiresAt = item.ExpiresAt.Time.Format("2006-01-02 15:04:05")
+		if item.ExpiresAt != nil {
+			expiresAt = item.ExpiresAt.Format("2006-01-02 15:04:05")
 		}
 		sessions = append(sessions, dtouser.SessionResp{
 			ID:            uint64(item.ID),
+			SessionID:     item.SessionID,
 			ApplicationID: uint64(item.ApplicationID),
 			TenantID:      uint64(item.TenantID),
+			ClientType:    item.ClientType,
+			ClientIP:      item.ClientIP,
+			UserAgent:     item.UserAgent,
 			ExpiresAt:     &expiresAt,
 			CreatedAt:     item.CreatedAt.Format("2006-01-02 15:04:05"),
 			IsActive:      isActive,
@@ -87,10 +93,10 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, userI
 	}, nil
 }
 
-func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID uint) error {
+func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID, tenantID, personID uint) error {
 	sessionDao := newSessionStore()
 
-	if err := sessionDao.RevokeByID(ctx.Request.Context(), uint(req.SessionID), userID); err != nil {
+	if err := sessionDao.RevokeByID(ctx.Request.Context(), uint(req.SessionID), personID, tenantID, userID); err != nil {
 		glog.Errorf(ctx, "[sessionSvc.Revoke] revoke fail, err:%v", err)
 		return code.GetError(code.SessionRevokeError)
 	}
@@ -98,10 +104,10 @@ func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, u
 	return nil
 }
 
-func (svc *sessionSvc) RevokeAll(ctx *gin.Context, userID uint) error {
+func (svc *sessionSvc) RevokeAll(ctx *gin.Context, userID, tenantID, personID uint) error {
 	sessionDao := newSessionStore()
 
-	if err := sessionDao.RevokeAllByUserID(ctx, userID); err != nil {
+	if err := sessionDao.RevokeAllByUserID(ctx, personID, tenantID, userID); err != nil {
 		glog.Errorf(ctx, "[sessionSvc.RevokeAll] revoke all fail, err:%v", err)
 		return code.GetError(code.SessionRevokeError)
 	}

@@ -9,9 +9,13 @@ import (
 
 type AuthCtr interface {
 	Login(ctx *gin.Context)
+	SelectTenant(ctx *gin.Context)
+	SwitchTenant(ctx *gin.Context)
+	MyTenants(ctx *gin.Context)
 	Register(ctx *gin.Context)
 	RefreshToken(ctx *gin.Context)
 	Logout(ctx *gin.Context)
+	LogoutAll(ctx *gin.Context)
 	Userinfo(ctx *gin.Context)
 }
 
@@ -41,6 +45,48 @@ func (ctr *authCtr) Login(ctx *gin.Context) {
 		return
 	}
 	res, err := ctr.authSvc.Login(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+func (ctr *authCtr) SelectTenant(ctx *gin.Context) {
+	var req dtoauth.SelectTenantReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.authSvc.SelectTenant(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+func (ctr *authCtr) SwitchTenant(ctx *gin.Context) {
+	var req dtoauth.SwitchTenantReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.authSvc.SwitchTenant(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+func (ctr *authCtr) MyTenants(ctx *gin.Context) {
+	var req dtoauth.MyTenantsReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.authSvc.MyTenants(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -104,6 +150,19 @@ func (ctr *authCtr) Logout(ctx *gin.Context) {
 		return
 	}
 	if err := ctr.authSvc.Logout(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, "登出成功")
+}
+
+func (ctr *authCtr) LogoutAll(ctx *gin.Context) {
+	var req dtoauth.LogoutAllReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctr.authSvc.LogoutAll(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
