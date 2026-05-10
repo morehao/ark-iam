@@ -45,8 +45,8 @@ type AssignApplicationRolesReq struct {
 }
 
 type RemoveApplicationRoleReq struct {
-	ApplicationID uint64 `json:"applicationId" binding:"required"`
-	RoleID        uint64 `json:"roleId" path:"roleId" binding:"required"`
+	ApplicationID uint64 `json:"applicationId" form:"applicationId" binding:"required"`
+	RoleID        uint64 `json:"roleId" uri:"roleId" binding:"required"`
 }
 
 type ApplicationSecretListReq struct {
@@ -60,5 +60,5 @@ type CreateApplicationSecretReq struct {
 }
 
 type DeleteApplicationSecretReq struct {
-	SecretID uint64 `json:"secretId" path:"secretId" binding:"required"`
+	SecretID uint64 `json:"secretId" uri:"secretId" binding:"required"`
 }

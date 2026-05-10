@@ -1,7 +1,9 @@
 package svcauth
 
 import (
+	"context"
 	"errors"
+	"math"
 	"strings"
 	"time"
 	"unicode"
@@ -16,8 +18,10 @@ import (
 	"github.com/morehao/ark-iam/pkg/token"
 	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
+	"gorm.io/gorm"
 )
 
 const (
@@ -25,6 +29,27 @@ const (
 	TokenExpireDuration        = 24 * time.Hour
 	RefreshTokenExpireDuration = 7 * 24 * time.Hour
 )
+
+type authUserStore interface {
+	GetByID(ctx context.Context, id uint) (*model.UserEntity, error)
+	GetByCond(ctx context.Context, cond genericdao.Cond) (*model.UserEntity, error)
+	Insert(ctx context.Context, entity *model.UserEntity) error
+	UpdateMap(ctx context.Context, id uint, updateMap map[string]interface{}) error
+}
+
+type authRefreshTokenStore interface {
+	GetByCond(ctx context.Context, cond genericdao.Cond) (*model.RefreshTokenEntity, error)
+	Insert(ctx context.Context, entity *model.RefreshTokenEntity) error
+	Delete(ctx context.Context, id, userID uint) error
+}
+
+var newAuthUserStore = func() authUserStore {
+	return dao.NewUserDao()
+}
+
+var newAuthRefreshTokenStore = func() authRefreshTokenStore {
+	return dao.NewRefreshTokenDao()
+}
 
 type AuthSvc interface {
 	Login(ctx *gin.Context, req *dtoauth.LoginReq) (*dtoauth.LoginResp, error)
@@ -47,7 +72,7 @@ func NewAuthSvc(jwtSecret string) AuthSvc {
 }
 
 func (svc *authSvc) Login(ctx *gin.Context, req *dtoauth.LoginReq) (*dtoauth.LoginResp, error) {
-	userDao := dao.NewUserDao()
+	userDao := newAuthUserStore()
 	var userEntity *model.UserEntity
 	var err error
 
@@ -57,17 +82,17 @@ func (svc *authSvc) Login(ctx *gin.Context, req *dtoauth.LoginReq) (*dtoauth.Log
 	}
 
 	if strings.Contains(identifier, "@") {
-		userEntity, err = userDao.GetByCond(ctx, &dao.UserCond{
+		userEntity, err = userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{
 			TenantID:     req.TenantID,
 			PrimaryEmail: identifier,
 		})
 	} else if len(identifier) >= 11 && strings.HasPrefix(identifier, "1") {
-		userEntity, err = userDao.GetByCond(ctx, &dao.UserCond{
+		userEntity, err = userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{
 			TenantID:     req.TenantID,
 			PrimaryPhone: identifier,
 		})
 	} else {
-		userEntity, err = userDao.GetByCond(ctx, &dao.UserCond{
+		userEntity, err = userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{
 			TenantID: req.TenantID,
 			Username: identifier,
 		})
@@ -117,10 +142,10 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 		return nil, code.GetError(code.AuthIdentifierRequiredError)
 	}
 
-	userDao := dao.NewUserDao()
+	userDao := newAuthUserStore()
 
 	if req.Username != "" {
-		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
+		existingUser, _ := userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{
 			TenantID: req.TenantID,
 			Username: req.Username,
 		})
@@ -130,7 +155,7 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 	}
 
 	if req.PrimaryEmail != "" {
-		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
+		existingUser, _ := userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{
 			TenantID:     req.TenantID,
 			PrimaryEmail: req.PrimaryEmail,
 		})
@@ -140,7 +165,7 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 	}
 
 	if req.PrimaryPhone != "" {
-		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
+		existingUser, _ := userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{
 			TenantID:     req.TenantID,
 			PrimaryPhone: req.PrimaryPhone,
 		})
@@ -166,7 +191,7 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 		CreatedBy:         0,
 	}
 
-	if err := userDao.Insert(ctx, insertEntity); err != nil {
+	if err := userDao.Insert(ctx.Request.Context(), insertEntity); err != nil {
 		glog.Errorf(ctx, "[svcauth.Register] dao Insert fail, err:%v", err)
 		return nil, code.GetError(code.UserCreateError)
 	}
@@ -187,22 +212,35 @@ func (svc *authSvc) RefreshToken(ctx *gin.Context, req *dtoauth.RefreshTokenReq)
 		return nil, code.GetError(gconstant.TokenInvalidErr)
 	}
 
-	userID, ok := tokenClaims["user_id"].(float64)
+	userID, ok := parsePositiveIntegerClaim(tokenClaims, "user_id")
+	if !ok {
+		return nil, code.GetError(gconstant.TokenInvalidErr)
+	}
+	tenantID, ok := parsePositiveIntegerClaim(tokenClaims, "tenant_id")
 	if !ok {
 		return nil, code.GetError(gconstant.TokenInvalidErr)
 	}
 
-	refreshTokenDao := dao.NewRefreshTokenDao()
-	storedToken, err := refreshTokenDao.GetByCond(ctx, &dao.RefreshTokenCond{
+	refreshTokenDao := newAuthRefreshTokenStore()
+	storedToken, err := refreshTokenDao.GetByCond(ctx.Request.Context(), &dao.RefreshTokenCond{
 		UserID: uint(userID),
 		Token:  token.HashToken(req.RefreshToken),
 	})
 	if err != nil || storedToken == nil {
 		return nil, code.GetError(code.RefreshTokenInvalidError)
 	}
+	if storedToken.TenantID != uint(tenantID) {
+		return nil, code.GetError(code.RefreshTokenInvalidError)
+	}
+	if storedToken.RevokedAt != nil && storedToken.RevokedAt.Valid {
+		return nil, code.GetError(code.RefreshTokenInvalidError)
+	}
+	if storedToken.ExpiresAt == nil || !storedToken.ExpiresAt.Valid || !storedToken.ExpiresAt.Time.After(time.Now()) {
+		return nil, code.GetError(code.RefreshTokenInvalidError)
+	}
 
-	userDao := dao.NewUserDao()
-	userEntity, err := userDao.GetByID(ctx, uint(userID))
+	userDao := newAuthUserStore()
+	userEntity, err := userDao.GetByID(ctx.Request.Context(), uint(userID))
 	if err != nil || userEntity == nil || userEntity.ID == 0 {
 		return nil, code.GetError(code.UserNotExistError)
 	}
@@ -213,7 +251,7 @@ func (svc *authSvc) RefreshToken(ctx *gin.Context, req *dtoauth.RefreshTokenReq)
 		return nil, code.GetError(code.TokenGenerateError)
 	}
 
-	if err := refreshTokenDao.Delete(ctx, storedToken.ID, gincontext.GetUserID(ctx)); err != nil {
+	if err := refreshTokenDao.Delete(ctx.Request.Context(), storedToken.ID, storedToken.UserID); err != nil {
 		glog.Errorf(ctx, "[svcauth.RefreshToken] delete old refreshToken fail, err:%v", err)
 	}
 
@@ -245,8 +283,8 @@ func (svc *authSvc) Userinfo(ctx *gin.Context, req *dtoauth.UserinfoReq) (*dtoau
 		return nil, code.GetError(gconstant.UnauthorizedErr)
 	}
 
-	userDao := dao.NewUserDao()
-	userEntity, err := userDao.GetByID(ctx, userID)
+	userDao := newAuthUserStore()
+	userEntity, err := userDao.GetByID(ctx.Request.Context(), userID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.Userinfo] dao GetByID fail, err:%v, userID:%d", err, userID)
 		return nil, code.GetError(code.UserGetDetailError)
@@ -302,16 +340,21 @@ func (svc *authSvc) generateToken(ctx *gin.Context, userEntity *model.UserEntity
 		return nil, err
 	}
 
-	refreshTokenDao := dao.NewRefreshTokenDao()
+	refreshTokenDao := newAuthRefreshTokenStore()
 	refreshTokenEntity := &model.RefreshTokenEntity{
 		TenantID:      userEntity.TenantID,
 		UserID:        userEntity.ID,
 		ApplicationID: 0,
 		Token:         token.HashToken(refreshTokenString),
+		ExpiresAt: &gorm.DeletedAt{
+			Time:  refreshTokenExp,
+			Valid: true,
+		},
 		CreatedBy:     userEntity.ID,
 	}
-	if err := refreshTokenDao.Insert(ctx, refreshTokenEntity); err != nil {
+	if err := refreshTokenDao.Insert(ctx.Request.Context(), refreshTokenEntity); err != nil {
 		glog.Errorf(ctx, "[svcauth.generateToken] save refreshToken fail, err:%v", err)
+		return nil, err
 	}
 
 	return &objauth.TokenInfo{
@@ -368,6 +411,14 @@ func validatePasswordStrength(password string) error {
 	return nil
 }
 
+func parsePositiveIntegerClaim(claims jwt.MapClaims, key string) (uint, bool) {
+	value, ok := claims[key].(float64)
+	if !ok || value <= 0 || math.Trunc(value) != value {
+		return 0, false
+	}
+	return uint(value), true
+}
+
 func (svc *authSvc) recordLoginLog(ctx *gin.Context, tenantID, userID uint, success bool) {
 	loginIP := gincontext.GetClientIP(ctx)
 	userAgent := ctx.GetHeader("User-Agent")
@@ -385,8 +436,8 @@ func (svc *authSvc) recordLoginLog(ctx *gin.Context, tenantID, userID uint, succ
 	}
 
 	if success {
-		userDao := dao.NewUserDao()
-		if err := userDao.UpdateMap(ctx, userID, map[string]interface{}{
+		userDao := newAuthUserStore()
+		if err := userDao.UpdateMap(ctx.Request.Context(), userID, map[string]interface{}{
 			"last_sign_in_at": time.Now(),
 		}); err != nil {
 			glog.Errorf(ctx, "[svcauth.recordLoginLog] update last_sign_in_at fail, err:%v", err)

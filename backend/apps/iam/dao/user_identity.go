@@ -14,7 +14,9 @@ import (
 type UserIdentityCond struct {
 	*genericdao.BaseCond
 	TenantID        uint
+	UserID          uint
 	ConnectorID     uint
+	Issuer          string
 	ExternalSubject string
 }
 
@@ -23,13 +25,19 @@ func (c *UserIdentityCond) BuildCondition(db *gorm.DB, tableName string) {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
 	if c.TenantID != 0 {
-		db.Where(tableName + ".tenant_id = ?", c.TenantID)
+		*db = *db.Where(tableName+".tenant_id = ?", c.TenantID)
+	}
+	if c.UserID != 0 {
+		*db = *db.Where(tableName+".user_id = ?", c.UserID)
 	}
 	if c.ConnectorID != 0 {
-		db.Where(tableName + ".connector_id = ?", c.ConnectorID)
+		*db = *db.Where(tableName+".connector_id = ?", c.ConnectorID)
+	}
+	if c.Issuer != "" {
+		*db = *db.Where(tableName+".issuer = ?", c.Issuer)
 	}
 	if c.ExternalSubject != "" {
-		db.Where(tableName + ".external_subject = ?", c.ExternalSubject)
+		*db = *db.Where(tableName+".external_subject = ?", c.ExternalSubject)
 	}
 }
 

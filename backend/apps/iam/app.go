@@ -15,16 +15,16 @@ import (
 const AppName = "iam"
 
 func Routers(engine *gin.Engine) {
-	routerGroups := ginserver.NewRouterGroups(engine, AppName, ginserver.Version{
-		Name: gconstant.ApiVersionV1,
-		Middlewares: []gin.HandlerFunc{
-			ginmiddleware.JWTAuth(config.Conf.JWT.SignKey, ginmiddleware.WithAuthSkipPaths(
-				"/v1/iam/org/getConfigsByDomain",
-				"/v1/iam/auth/register",
-				"/v1/iam/auth/loginByPassword",
-				"/v1/iam/auth/selectTenant",
-				"/v1/iam/user/pageList",
-			)),
+		routerGroups := ginserver.NewRouterGroups(engine, AppName, ginserver.Version{
+			Name: gconstant.ApiVersionV1,
+			Middlewares: []gin.HandlerFunc{
+				ginmiddleware.JWTAuth(config.Conf.JWT.SignKey, ginmiddleware.WithAuthSkipPaths(
+					"/v1/iam/org/getConfigsByDomain",
+					"/v1/iam/login",
+					"/v1/iam/register",
+					"/v1/iam/refreshToken",
+					"/v1/iam/connector/callback",
+				)),
 			ginmiddleware.TokenBlacklistCheck(dbclient.RedisCli, ginmiddleware.WithBlacklistKeyPrefix("iam:token:blacklist:")),
 		},
 	})

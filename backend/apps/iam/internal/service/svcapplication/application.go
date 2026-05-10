@@ -1,6 +1,7 @@
 package svcapplication
 
 import (
+	"context"
 	"encoding/hex"
 	"time"
 
@@ -32,6 +33,22 @@ type ApplicationSvc interface {
 }
 
 type applicationSvc struct {
+}
+
+type applicationRoleListReader interface {
+	GetListByCond(ctx context.Context, cond genericdao.Cond) (model.ApplicationRoleEntityList, error)
+}
+
+type roleReader interface {
+	GetByID(ctx context.Context, id uint) (*model.RoleEntity, error)
+}
+
+var newApplicationRoleListReader = func() applicationRoleListReader {
+	return dao.NewApplicationRoleDao()
+}
+
+var newRoleReader = func() roleReader {
+	return dao.NewRoleDao()
 }
 
 var _ ApplicationSvc = (*applicationSvc)(nil)
@@ -165,10 +182,10 @@ func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.Applic
 }
 
 func (svc *applicationSvc) ListRoles(ctx *gin.Context, req *dtoapplication.ApplicationRoleListReq) (*dtoapplication.ApplicationRoleListResp, error) {
-	appRoleDao := dao.NewApplicationRoleDao()
-	roleDao := dao.NewRoleDao()
+	appRoleDao := newApplicationRoleListReader()
+	roleDao := newRoleReader()
 
-	list, err := appRoleDao.GetByCond(ctx, &dao.ApplicationRoleCond{
+	list, err := appRoleDao.GetListByCond(ctx, &dao.ApplicationRoleCond{
 		ApplicationID: req.ApplicationID,
 	})
 	if err != nil {
@@ -176,22 +193,22 @@ func (svc *applicationSvc) ListRoles(ctx *gin.Context, req *dtoapplication.Appli
 		return nil, code.GetError(code.RoleApplicationGetListError)
 	}
 
-	roleMap := make(map[uint]*model.RoleEntity)
-	if list != nil {
-		if role, err := roleDao.GetByID(ctx, list.RoleID); err == nil && role != nil {
+	roleMap := make(map[uint]*model.RoleEntity, len(list))
+	for _, item := range list {
+		if role, err := roleDao.GetByID(ctx, item.RoleID); err == nil && role != nil {
 			roleMap[role.ID] = role
 		}
 	}
 
-	roles := make([]dtoapplication.ApplicationRoleResp, 0, 1)
-	if list != nil {
-		if role, ok := roleMap[list.RoleID]; ok {
+	roles := make([]dtoapplication.ApplicationRoleResp, 0, len(list))
+	for _, item := range list {
+		if role, ok := roleMap[item.RoleID]; ok {
 			roles = append(roles, dtoapplication.ApplicationRoleResp{
-				RoleID:        uint64(list.RoleID),
+				RoleID:        uint64(item.RoleID),
 				RoleName:      role.Name,
 				RoleCode:      role.Code,
-				ApplicationID: uint64(list.ApplicationID),
-				CreatedAt:    list.CreatedAt.Format("2006-01-02 15:04:05"),
+				ApplicationID: uint64(item.ApplicationID),
+				CreatedAt:     item.CreatedAt.Format("2006-01-02 15:04:05"),
 			})
 		}
 	}

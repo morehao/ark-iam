@@ -1,11 +1,13 @@
 package svcsession
 
 import (
+	"context"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtouser"
+	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/glog"
 )
@@ -14,6 +16,16 @@ type SessionSvc interface {
 	List(ctx *gin.Context, req *dtouser.SessionListReq, userID uint) (*dtouser.SessionListResp, error)
 	Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID uint) error
 	RevokeAll(ctx *gin.Context, userID uint) error
+}
+
+type sessionStore interface {
+	GetPageListByCond(ctx context.Context, cond *dao.SessionCond, page, pageSize int) ([]model.RefreshTokenEntity, int64, error)
+	RevokeByID(ctx context.Context, id, userID uint) error
+	RevokeAllByUserID(ctx context.Context, userID uint) error
+}
+
+var newSessionStore = func() sessionStore {
+	return dao.NewSessionDao()
 }
 
 type sessionSvc struct{}
@@ -25,7 +37,7 @@ func NewSessionSvc() SessionSvc {
 }
 
 func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, userID uint) (*dtouser.SessionListResp, error) {
-	sessionDao := dao.NewSessionDao()
+	sessionDao := newSessionStore()
 
 	page := req.Page
 	if page < 1 {
@@ -48,15 +60,15 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, userI
 	now := time.Now()
 	for _, item := range list {
 		var isActive bool
-		if item.RevokedAt.Valid {
+		if item.RevokedAt != nil && item.RevokedAt.Valid {
 			isActive = false
-		} else if item.ExpiresAt.Valid && item.ExpiresAt.Time.Before(now) {
+		} else if item.ExpiresAt == nil || !item.ExpiresAt.Valid || !item.ExpiresAt.Time.After(now) {
 			isActive = false
 		} else {
 			isActive = true
 		}
 		expiresAt := ""
-		if item.ExpiresAt.Valid {
+		if item.ExpiresAt != nil && item.ExpiresAt.Valid {
 			expiresAt = item.ExpiresAt.Time.Format("2006-01-02 15:04:05")
 		}
 		sessions = append(sessions, dtouser.SessionResp{
@@ -76,7 +88,7 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, userI
 }
 
 func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID uint) error {
-	sessionDao := dao.NewSessionDao()
+	sessionDao := newSessionStore()
 
 	if err := sessionDao.RevokeByID(ctx.Request.Context(), uint(req.SessionID), userID); err != nil {
 		glog.Errorf(ctx, "[sessionSvc.Revoke] revoke fail, err:%v", err)
@@ -87,7 +99,7 @@ func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, u
 }
 
 func (svc *sessionSvc) RevokeAll(ctx *gin.Context, userID uint) error {
-	sessionDao := dao.NewSessionDao()
+	sessionDao := newSessionStore()
 
 	if err := sessionDao.RevokeAllByUserID(ctx, userID); err != nil {
 		glog.Errorf(ctx, "[sessionSvc.RevokeAll] revoke all fail, err:%v", err)

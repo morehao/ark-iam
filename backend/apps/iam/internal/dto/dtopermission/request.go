@@ -15,7 +15,7 @@ type MenuUpdateReq struct {
 }
 
 type MenuDetailReq struct {
-	MenuID uint `json:"menuID" binding:"required"` // 菜单ID
+	MenuID uint `json:"menuID" form:"menuID" binding:"required"` // 菜单ID
 }
 
 type MenuPageListReq struct {
@@ -33,7 +33,7 @@ type MenuDeleteReq struct {
 }
 
 type MenuTreeReq struct {
-	TenantID uint `json:"tenantID"` // 租户ID
+	TenantID uint `json:"tenantID" form:"tenantID"` // 租户ID
 }
 
 type RoleCreateReq struct {

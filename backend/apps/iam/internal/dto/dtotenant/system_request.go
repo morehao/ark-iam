@@ -15,7 +15,7 @@ type SystemUpdateReq struct {
 }
 
 type SystemDetailReq struct {
-	SystemID uint `json:"systemID" binding:"required"` // 自增ID
+	SystemID uint `json:"systemID" form:"systemID" binding:"required"` // 自增ID
 }
 
 type SystemPageListReq struct {
@@ -29,7 +29,7 @@ type SystemDeleteReq struct {
 }
 
 type LogDetailReq struct {
-	LogID uint `json:"logID" binding:"required"` // 日志ID
+	LogID uint `json:"logID" form:"logID" binding:"required"` // 日志ID
 }
 
 type LogPageListReq struct {
