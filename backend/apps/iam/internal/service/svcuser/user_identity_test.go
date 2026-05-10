@@ -18,6 +18,7 @@ import (
 
 func TestUserIdentityPageListPassesFiltersToDAOAndKeepsDAOTotal(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Set(gcontext.KeyTenantID, uint(23))
 	repo := &stubUserIdentityRepo{
 		pageList: model.UserIdentityEntityList{
 			{
@@ -48,7 +49,7 @@ func TestUserIdentityPageListPassesFiltersToDAOAndKeepsDAOTotal(t *testing.T) {
 		t.Fatalf("expected DAO condition to be captured")
 	}
 	if repo.lastCond.TenantID != 23 {
-		t.Fatalf("expected tenant id 23, got %d", repo.lastCond.TenantID)
+		t.Fatalf("expected tenant id 23 from context, got %d", repo.lastCond.TenantID)
 	}
 	if repo.lastCond.UserID != 101 {
 		t.Fatalf("expected user id 101, got %d", repo.lastCond.UserID)

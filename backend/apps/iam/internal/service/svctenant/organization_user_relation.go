@@ -1,6 +1,8 @@
 package svctenant
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtotenant"
@@ -11,6 +13,15 @@ import (
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
+
+type organizationUserRelationDeleteRepository interface {
+	GetListByCond(ctx context.Context, cond genericdao.Cond) (model.OrganizationUserRelationEntityList, error)
+	Delete(ctx context.Context, id uint, userID uint) error
+}
+
+var newOrganizationUserRelationDeleteRepo = func() organizationUserRelationDeleteRepository {
+	return dao.NewOrganizationUserRelationDao()
+}
 
 type OrganizationUserRelationSvc interface {
 	Create(ctx *gin.Context, req *dtotenant.OrganizationUserRelationCreateReq) (*dtotenant.OrganizationUserRelationCreateResp, error)
@@ -61,17 +72,22 @@ func (svc *organizationUserRelationSvc) Create(ctx *gin.Context, req *dtotenant.
 }
 
 func (svc *organizationUserRelationSvc) Delete(ctx *gin.Context, req *dtotenant.OrganizationUserRelationDeleteReq) error {
-	orgUserEntity, err := dao.NewOrganizationUserRelationDao().GetByID(ctx, req.OrganizationID)
+	deleteRepo := newOrganizationUserRelationDeleteRepo()
+	orgUserEntityList, err := deleteRepo.GetListByCond(ctx, &dao.OrganizationUserRelationCond{
+		TenantID:       gincontext.GetTenantID(ctx),
+		OrganizationID: req.OrganizationID,
+		UserID:         req.UserID,
+	})
 	if err != nil {
-		glog.Errorf(ctx, "[svcorganizationuserrelation.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		glog.Errorf(ctx, "[svcorganizationuserrelation.Delete] dao GetListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationUserRelationDeleteError)
 	}
-	if orgUserEntity == nil || orgUserEntity.ID == 0 {
+	if len(orgUserEntityList) == 0 || orgUserEntityList[0].ID == 0 {
 		return code.GetError(code.OrganizationUserRelationNotExistError)
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	if err := dao.NewOrganizationUserRelationDao().Delete(ctx, req.OrganizationID, userID); err != nil {
+	if err := deleteRepo.Delete(ctx, orgUserEntityList[0].ID, userID); err != nil {
 		glog.Errorf(ctx, "[svcorganizationuserrelation.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationUserRelationDeleteError)
 	}

@@ -1,18 +1,33 @@
 package svctenant
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtotenant"
+	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objaudit"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
+
+type logScopeRepository interface {
+	GetByID(ctx context.Context, id uint) (*model.LogEntity, error)
+}
+
+var newLogScopeRepo = func() logScopeRepository {
+	return dao.NewLogDao()
+}
+
+func logVisibleToTenant(entity *model.LogEntity, tenantID uint) bool {
+	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
+}
 
 type LogSvc interface {
 	Detail(ctx *gin.Context, req *dtotenant.LogDetailReq) (*dtotenant.LogDetailResp, error)
@@ -29,12 +44,12 @@ func NewLogSvc() LogSvc {
 }
 
 func (svc *logSvc) Detail(ctx *gin.Context, req *dtotenant.LogDetailReq) (*dtotenant.LogDetailResp, error) {
-	logEntity, err := dao.NewLogDao().GetByID(ctx, req.LogID)
+	logEntity, err := newLogScopeRepo().GetByID(ctx, req.LogID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcsystem.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.LogGetDetailError)
 	}
-	if logEntity == nil || logEntity.ID == 0 {
+	if !logVisibleToTenant(logEntity, gincontext.GetTenantID(ctx)) {
 		return nil, code.GetError(code.LogNotExistError)
 	}
 

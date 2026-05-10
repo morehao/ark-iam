@@ -103,7 +103,7 @@ func (svc *userIdentitySvc) Delete(ctx *gin.Context, req *dtouser.UserIdentityDe
 		glog.Errorf(ctx, "[userIdentitySvc.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserIdentityDeleteError)
 	}
-	if userIdentityEntity == nil || userIdentityEntity.ID == 0 {
+	if userIdentityEntity == nil || userIdentityEntity.ID == 0 || userIdentityEntity.TenantID != gincontext.GetTenantID(ctx) {
 		return code.GetError(code.UserIdentityNotExistError)
 	}
 
@@ -122,7 +122,7 @@ func (svc *userIdentitySvc) Update(ctx *gin.Context, req *dtouser.UserIdentityUp
 		glog.Errorf(ctx, "[userIdentitySvc.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserIdentityUpdateError)
 	}
-	if userIdentityEntity == nil || userIdentityEntity.ID == 0 {
+	if userIdentityEntity == nil || userIdentityEntity.ID == 0 || userIdentityEntity.TenantID != gincontext.GetTenantID(ctx) {
 		return code.GetError(code.UserIdentityNotExistError)
 	}
 
@@ -155,7 +155,7 @@ func (svc *userIdentitySvc) Detail(ctx *gin.Context, req *dtouser.UserIdentityDe
 		glog.Errorf(ctx, "[userIdentitySvc.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserIdentityGetDetailError)
 	}
-	if userIdentityEntity == nil || userIdentityEntity.ID == 0 {
+	if userIdentityEntity == nil || userIdentityEntity.ID == 0 || userIdentityEntity.TenantID != gincontext.GetTenantID(ctx) {
 		return nil, code.GetError(code.UserIdentityNotExistError)
 	}
 
@@ -187,7 +187,7 @@ func (svc *userIdentitySvc) PageList(ctx *gin.Context, req *dtouser.UserIdentity
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID:        req.TenantID,
+		TenantID:        gincontext.GetTenantID(ctx),
 		UserID:          req.UserID,
 		Issuer:          req.Issuer,
 		ExternalSubject: req.IdentityID,

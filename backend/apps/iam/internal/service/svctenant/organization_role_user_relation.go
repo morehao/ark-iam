@@ -1,6 +1,8 @@
 package svctenant
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtotenant"
@@ -11,6 +13,15 @@ import (
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
+
+type organizationRoleUserRelationDeleteRepository interface {
+	GetListByCond(ctx context.Context, cond genericdao.Cond) (model.OrganizationRoleUserRelationEntityList, error)
+	Delete(ctx context.Context, id uint, userID uint) error
+}
+
+var newOrganizationRoleUserRelationDeleteRepo = func() organizationRoleUserRelationDeleteRepository {
+	return dao.NewOrganizationRoleUserRelationDao()
+}
 
 type OrganizationRoleUserRelationSvc interface {
 	Create(ctx *gin.Context, req *dtotenant.OrganizationRoleUserRelationCreateReq) (*dtotenant.OrganizationRoleUserRelationCreateResp, error)
@@ -62,17 +73,22 @@ func (svc *organizationRoleUserRelationSvc) Create(ctx *gin.Context, req *dtoten
 }
 
 func (svc *organizationRoleUserRelationSvc) Delete(ctx *gin.Context, req *dtotenant.OrganizationRoleUserRelationDeleteReq) error {
-	orgRoleUserEntity, err := dao.NewOrganizationRoleUserRelationDao().GetByID(ctx, req.OrganizationRoleID)
+	deleteRepo := newOrganizationRoleUserRelationDeleteRepo()
+	orgRoleUserEntityList, err := deleteRepo.GetListByCond(ctx, &dao.OrganizationRoleUserRelationCond{
+		TenantID:           gincontext.GetTenantID(ctx),
+		OrganizationRoleID: req.OrganizationRoleID,
+		UserID:             req.UserID,
+	})
 	if err != nil {
-		glog.Errorf(ctx, "[svcorganizationroleuserrelation.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		glog.Errorf(ctx, "[svcorganizationroleuserrelation.Delete] dao GetListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationRoleUserRelationDeleteError)
 	}
-	if orgRoleUserEntity == nil || orgRoleUserEntity.ID == 0 {
+	if len(orgRoleUserEntityList) == 0 || orgRoleUserEntityList[0].ID == 0 {
 		return code.GetError(code.OrganizationRoleUserRelationNotExistError)
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	if err := dao.NewOrganizationRoleUserRelationDao().Delete(ctx, req.OrganizationRoleID, userID); err != nil {
+	if err := deleteRepo.Delete(ctx, orgRoleUserEntityList[0].ID, userID); err != nil {
 		glog.Errorf(ctx, "[svcorganizationroleuserrelation.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationRoleUserRelationDeleteError)
 	}
