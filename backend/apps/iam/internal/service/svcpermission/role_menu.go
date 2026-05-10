@@ -1,6 +1,8 @@
 package svcpermission
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtopermission"
@@ -11,6 +13,15 @@ import (
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
+
+type roleMenuDeleteRepository interface {
+	GetListByCond(ctx context.Context, cond genericdao.Cond) (model.RoleMenuEntityList, error)
+	Delete(ctx context.Context, id uint, userID uint) error
+}
+
+var newRoleMenuDeleteRepo = func() roleMenuDeleteRepository {
+	return dao.NewRoleMenuDao()
+}
 
 type RoleMenuSvc interface {
 	Create(ctx *gin.Context, req *dtopermission.RoleMenuCreateReq) (*dtopermission.RoleMenuCreateResp, error)
@@ -60,17 +71,22 @@ func (svc *roleMenuSvc) Create(ctx *gin.Context, req *dtopermission.RoleMenuCrea
 }
 
 func (svc *roleMenuSvc) Delete(ctx *gin.Context, req *dtopermission.RoleMenuDeleteReq) error {
-	roleMenuEntity, err := dao.NewRoleMenuDao().GetByID(ctx, req.RoleID)
+	deleteRepo := newRoleMenuDeleteRepo()
+	roleMenuEntityList, err := deleteRepo.GetListByCond(ctx, &dao.RoleMenuCond{
+		TenantID: gincontext.GetTenantID(ctx),
+		RoleID:   req.RoleID,
+		MenuID:   req.MenuID,
+	})
 	if err != nil {
-		glog.Errorf(ctx, "[svcpermission.DeleteRoleMenu] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		glog.Errorf(ctx, "[svcpermission.DeleteRoleMenu] dao GetListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.RoleMenuDeleteError)
 	}
-	if roleMenuEntity == nil || roleMenuEntity.ID == 0 {
+	if len(roleMenuEntityList) == 0 || roleMenuEntityList[0].ID == 0 {
 		return code.GetError(code.RoleMenuNotExistError)
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	if err := dao.NewRoleMenuDao().Delete(ctx, req.RoleID, userID); err != nil {
+	if err := deleteRepo.Delete(ctx, roleMenuEntityList[0].ID, userID); err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteRoleMenu] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.RoleMenuDeleteError)
 	}

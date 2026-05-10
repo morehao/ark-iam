@@ -1,6 +1,8 @@
 package svcpermission
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtopermission"
@@ -13,6 +15,19 @@ import (
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
+
+type menuScopeRepository interface {
+	GetByID(ctx context.Context, id uint) (*model.MenuEntity, error)
+	GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.MenuEntityList, int64, error)
+}
+
+var newMenuScopeRepo = func() menuScopeRepository {
+	return dao.NewMenuDao()
+}
+
+func menuVisibleToTenant(entity *model.MenuEntity, tenantID uint) bool {
+	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
+}
 
 type MenuSvc interface {
 	Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (*dtopermission.MenuCreateResp, error)
@@ -61,12 +76,12 @@ func (svc *menuSvc) Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (
 }
 
 func (svc *menuSvc) Delete(ctx *gin.Context, req *dtopermission.MenuDeleteReq) error {
-	menuEntity, err := dao.NewMenuDao().GetByID(ctx, req.MenuID)
+	menuEntity, err := newMenuScopeRepo().GetByID(ctx, req.MenuID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteMenu] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.MenuDeleteError)
 	}
-	if menuEntity == nil || menuEntity.ID == 0 {
+	if !menuVisibleToTenant(menuEntity, gincontext.GetTenantID(ctx)) {
 		return code.GetError(code.MenuNotExistError)
 	}
 
@@ -79,12 +94,12 @@ func (svc *menuSvc) Delete(ctx *gin.Context, req *dtopermission.MenuDeleteReq) e
 }
 
 func (svc *menuSvc) Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) error {
-	menuEntity, err := dao.NewMenuDao().GetByID(ctx, req.MenuID)
+	menuEntity, err := newMenuScopeRepo().GetByID(ctx, req.MenuID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.UpdateMenu] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.MenuUpdateError)
 	}
-	if menuEntity == nil || menuEntity.ID == 0 {
+	if !menuVisibleToTenant(menuEntity, gincontext.GetTenantID(ctx)) {
 		return code.GetError(code.MenuNotExistError)
 	}
 
@@ -115,12 +130,12 @@ func (svc *menuSvc) Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) e
 }
 
 func (svc *menuSvc) Detail(ctx *gin.Context, req *dtopermission.MenuDetailReq) (*dtopermission.MenuDetailResp, error) {
-	menuEntity, err := dao.NewMenuDao().GetByID(ctx, req.MenuID)
+	menuEntity, err := newMenuScopeRepo().GetByID(ctx, req.MenuID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.DetailMenu] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.MenuGetDetailError)
 	}
-	if menuEntity == nil || menuEntity.ID == 0 {
+	if !menuVisibleToTenant(menuEntity, gincontext.GetTenantID(ctx)) {
 		return nil, code.GetError(code.MenuNotExistError)
 	}
 
@@ -152,19 +167,20 @@ func (svc *menuSvc) Detail(ctx *gin.Context, req *dtopermission.MenuDetailReq) (
 }
 
 func (svc *menuSvc) PageList(ctx *gin.Context, req *dtopermission.MenuPageListReq) (*dtopermission.MenuPageListResp, error) {
+	menuRepo := newMenuScopeRepo()
 	cond := &dao.MenuCond{
 		BaseCond: &genericdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID: req.TenantID,
+		TenantID: gincontext.GetTenantID(ctx),
 		ParentID: req.ParentID,
 		Name:     req.Name,
 		Code:     req.Code,
 		Type:     req.Type,
 		Status:   req.Status,
 	}
-	menuEntityList, total, err := dao.NewMenuDao().GetPageListByCond(ctx, cond)
+	menuEntityList, total, err := menuRepo.GetPageListByCond(ctx, cond)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.PageListMenu] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.MenuGetPageListError)
@@ -203,10 +219,11 @@ func (svc *menuSvc) PageList(ctx *gin.Context, req *dtopermission.MenuPageListRe
 }
 
 func (svc *menuSvc) Tree(ctx *gin.Context, req *dtopermission.MenuTreeReq) (*dtopermission.MenuTreeResp, error) {
+	menuRepo := newMenuScopeRepo()
 	cond := &dao.MenuCond{
-		TenantID: req.TenantID,
+		TenantID: gincontext.GetTenantID(ctx),
 	}
-	menuEntityList, _, err := dao.NewMenuDao().GetPageListByCond(ctx, cond)
+	menuEntityList, _, err := menuRepo.GetPageListByCond(ctx, cond)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.TreeMenu] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.MenuGetPageListError)

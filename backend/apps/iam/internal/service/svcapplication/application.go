@@ -43,12 +43,49 @@ type roleReader interface {
 	GetByID(ctx context.Context, id uint) (*model.RoleEntity, error)
 }
 
+type applicationScopeRepository interface {
+	GetByID(ctx context.Context, id uint) (*model.ApplicationEntity, error)
+	GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.ApplicationEntityList, int64, error)
+	GetSecretByID(ctx context.Context, id uint) (*model.ApplicationSecretEntity, error)
+	DeleteSecret(ctx context.Context, id uint, userID uint) error
+}
+
 var newApplicationRoleListReader = func() applicationRoleListReader {
 	return dao.NewApplicationRoleDao()
 }
 
 var newRoleReader = func() roleReader {
 	return dao.NewRoleDao()
+}
+
+var newApplicationScopeRepo = func() applicationScopeRepository {
+	return &applicationScopeDAO{}
+}
+
+type applicationScopeDAO struct{}
+
+func (d *applicationScopeDAO) GetByID(ctx context.Context, id uint) (*model.ApplicationEntity, error) {
+	return dao.NewApplicationDao().GetByID(ctx, id)
+}
+
+func (d *applicationScopeDAO) GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.ApplicationEntityList, int64, error) {
+	return dao.NewApplicationDao().GetPageListByCond(ctx, cond)
+}
+
+func (d *applicationScopeDAO) GetSecretByID(ctx context.Context, id uint) (*model.ApplicationSecretEntity, error) {
+	return dao.NewApplicationSecretDao().GetByID(ctx, id)
+}
+
+func (d *applicationScopeDAO) DeleteSecret(ctx context.Context, id uint, userID uint) error {
+	return dao.NewApplicationSecretDao().Delete(ctx, id, userID)
+}
+
+func applicationVisibleToTenant(entity *model.ApplicationEntity, tenantID uint) bool {
+	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
+}
+
+func applicationSecretVisibleToTenant(entity *model.ApplicationSecretEntity, tenantID uint) bool {
+	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
 }
 
 var _ ApplicationSvc = (*applicationSvc)(nil)
@@ -78,12 +115,12 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.Applicat
 }
 
 func (svc *applicationSvc) Delete(ctx *gin.Context, req *dtoapplication.ApplicationDeleteReq) error {
-	appEntity, err := dao.NewApplicationDao().GetByID(ctx, req.ApplicationID)
+	appEntity, err := newApplicationScopeRepo().GetByID(ctx, req.ApplicationID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplication.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationDeleteError)
 	}
-	if appEntity == nil || appEntity.ID == 0 {
+	if !applicationVisibleToTenant(appEntity, gincontext.GetTenantID(ctx)) {
 		return code.GetError(code.ApplicationNotExistError)
 	}
 
@@ -96,12 +133,12 @@ func (svc *applicationSvc) Delete(ctx *gin.Context, req *dtoapplication.Applicat
 }
 
 func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.ApplicationUpdateReq) error {
-	appEntity, err := dao.NewApplicationDao().GetByID(ctx, req.ApplicationID)
+	appEntity, err := newApplicationScopeRepo().GetByID(ctx, req.ApplicationID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplication.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationUpdateError)
 	}
-	if appEntity == nil || appEntity.ID == 0 {
+	if !applicationVisibleToTenant(appEntity, gincontext.GetTenantID(ctx)) {
 		return code.GetError(code.ApplicationNotExistError)
 	}
 
@@ -122,12 +159,12 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.Applicat
 }
 
 func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.ApplicationDetailReq) (*dtoapplication.ApplicationDetailResp, error) {
-	appEntity, err := dao.NewApplicationDao().GetByID(ctx, req.ApplicationID)
+	appEntity, err := newApplicationScopeRepo().GetByID(ctx, req.ApplicationID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplication.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationGetDetailError)
 	}
-	if appEntity == nil || appEntity.ID == 0 {
+	if !applicationVisibleToTenant(appEntity, gincontext.GetTenantID(ctx)) {
 		return nil, code.GetError(code.ApplicationNotExistError)
 	}
 
@@ -146,16 +183,17 @@ func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.Applicat
 }
 
 func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.ApplicationPageListReq) (*dtoapplication.ApplicationPageListResp, error) {
+	appRepo := newApplicationScopeRepo()
 	cond := &dao.ApplicationCond{
 		BaseCond: &genericdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID:    req.TenantID,
+		TenantID:    gincontext.GetTenantID(ctx),
 		Name:       req.Name,
 		Type:       req.Type,
 	}
-	appEntityList, total, err := dao.NewApplicationDao().GetPageListByCond(ctx, cond)
+	appEntityList, total, err := appRepo.GetPageListByCond(ctx, cond)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplication.PageList] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationGetPageListError)
@@ -337,18 +375,18 @@ func (svc *applicationSvc) CreateSecret(ctx *gin.Context, req *dtoapplication.Cr
 }
 
 func (svc *applicationSvc) DeleteSecret(ctx *gin.Context, req *dtoapplication.DeleteApplicationSecretReq) error {
-	secretDao := dao.NewApplicationSecretDao()
+	appRepo := newApplicationScopeRepo()
 
-	entity, err := secretDao.GetByID(ctx, uint(req.SecretID))
+	entity, err := appRepo.GetSecretByID(ctx, uint(req.SecretID))
 	if err != nil {
 		glog.Errorf(ctx, "[applicationSvc.DeleteSecret] get secret fail, err:%v", err)
 		return code.GetError(code.ApplicationSecretDeleteError)
 	}
-	if entity == nil || entity.ID == 0 {
+	if !applicationSecretVisibleToTenant(entity, gincontext.GetTenantID(ctx)) {
 		return code.GetError(code.ApplicationSecretNotExistError)
 	}
 
-	if err := secretDao.Delete(ctx, uint(req.SecretID), gincontext.GetUserID(ctx)); err != nil {
+	if err := appRepo.DeleteSecret(ctx, uint(req.SecretID), gincontext.GetUserID(ctx)); err != nil {
 		glog.Errorf(ctx, "[applicationSvc.DeleteSecret] delete fail, err:%v", err)
 		return code.GetError(code.ApplicationSecretDeleteError)
 	}

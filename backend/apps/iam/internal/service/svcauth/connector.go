@@ -45,6 +45,11 @@ type connectorRuntimeRepository interface {
 	GetByID(ctx context.Context, id uint) (*model.ConnectorEntity, error)
 }
 
+type connectorScopeRepository interface {
+	GetByID(ctx context.Context, id uint) (*model.ConnectorEntity, error)
+	GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.ConnectorEntityList, int64, error)
+}
+
 type connectorIdentityResolver interface {
 	Resolve(ctx context.Context, input identityResolveInput) (*model.UserEntity, error)
 }
@@ -78,6 +83,14 @@ func (svc *connectorSvc) getConnectorRepo() connectorRuntimeRepository {
 		svc.connectorRepo = dao.NewConnectorDao()
 	}
 	return svc.connectorRepo
+}
+
+var newConnectorScopeRepo = func() connectorScopeRepository {
+	return dao.NewConnectorDao()
+}
+
+func connectorVisibleToTenant(entity *model.ConnectorEntity, tenantID uint) bool {
+	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
 }
 
 func (svc *connectorSvc) getStateStore() ConnectorStateStore {
@@ -203,12 +216,12 @@ func (svc *connectorSvc) Create(ctx *gin.Context, req *dtoauth.ConnectorCreateRe
 }
 
 func (svc *connectorSvc) Delete(ctx *gin.Context, req *dtoauth.ConnectorDeleteReq) error {
-	connectorEntity, err := dao.NewConnectorDao().GetByID(ctx, req.ConnectorID)
+	connectorEntity, err := newConnectorScopeRepo().GetByID(ctx, req.ConnectorID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.DeleteConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorDeleteError)
 	}
-	if connectorEntity == nil || connectorEntity.ID == 0 {
+	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantID(ctx)) {
 		return code.GetError(code.ConnectorNotExistError)
 	}
 
@@ -221,12 +234,12 @@ func (svc *connectorSvc) Delete(ctx *gin.Context, req *dtoauth.ConnectorDeleteRe
 }
 
 func (svc *connectorSvc) Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateReq) error {
-	connectorEntity, err := dao.NewConnectorDao().GetByID(ctx, req.ConnectorID)
+	connectorEntity, err := newConnectorScopeRepo().GetByID(ctx, req.ConnectorID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.UpdateConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorUpdateError)
 	}
-	if connectorEntity == nil || connectorEntity.ID == 0 {
+	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantID(ctx)) {
 		return code.GetError(code.ConnectorNotExistError)
 	}
 
@@ -243,12 +256,12 @@ func (svc *connectorSvc) Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateRe
 }
 
 func (svc *connectorSvc) Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailReq) (*dtoauth.ConnectorDetailResp, error) {
-	connectorEntity, err := dao.NewConnectorDao().GetByID(ctx, req.ConnectorID)
+	connectorEntity, err := newConnectorScopeRepo().GetByID(ctx, req.ConnectorID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.DetailConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
-	if connectorEntity == nil || connectorEntity.ID == 0 {
+	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantID(ctx)) {
 		return nil, code.GetError(code.ConnectorNotExistError)
 	}
 
@@ -283,19 +296,20 @@ func (svc *connectorSvc) Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailRe
 }
 
 func (svc *connectorSvc) PageList(ctx *gin.Context, req *dtoauth.ConnectorPageListReq) (*dtoauth.ConnectorPageListResp, error) {
+	connectorRepo := newConnectorScopeRepo()
 	cond := &dao.ConnectorCond{
 		BaseCond: &genericdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID:    req.TenantID,
+		TenantID:    gincontext.GetTenantID(ctx),
 		Protocol:    req.Protocol,
 		Provider:    req.Provider,
 		Status:      req.Status,
 		Name:        req.Name,
 		DisplayName: req.DisplayName,
 	}
-	connectorEntityList, total, err := dao.NewConnectorDao().GetPageListByCond(ctx, cond)
+	connectorEntityList, total, err := connectorRepo.GetPageListByCond(ctx, cond)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.PageListConnector] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetPageListError)

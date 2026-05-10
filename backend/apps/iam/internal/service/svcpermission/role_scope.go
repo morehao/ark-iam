@@ -1,6 +1,8 @@
 package svcpermission
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtopermission"
@@ -11,6 +13,15 @@ import (
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
+
+type roleScopeDeleteRepository interface {
+	GetListByCond(ctx context.Context, cond genericdao.Cond) (model.RoleScopeEntityList, error)
+	Delete(ctx context.Context, id uint, userID uint) error
+}
+
+var newRoleScopeDeleteRepo = func() roleScopeDeleteRepository {
+	return dao.NewRoleScopeDao()
+}
 
 type RoleScopeSvc interface {
 	Create(ctx *gin.Context, req *dtopermission.RoleScopeCreateReq) (*dtopermission.RoleScopeCreateResp, error)
@@ -61,17 +72,22 @@ func (svc *roleScopeSvc) Create(ctx *gin.Context, req *dtopermission.RoleScopeCr
 }
 
 func (svc *roleScopeSvc) Delete(ctx *gin.Context, req *dtopermission.RoleScopeDeleteReq) error {
-	roleScopeEntity, err := dao.NewRoleScopeDao().GetByID(ctx, req.RoleID)
+	deleteRepo := newRoleScopeDeleteRepo()
+	roleScopeEntityList, err := deleteRepo.GetListByCond(ctx, &dao.RoleScopeCond{
+		TenantID: gincontext.GetTenantID(ctx),
+		RoleID:   req.RoleID,
+		ScopeID:  req.ScopeID,
+	})
 	if err != nil {
-		glog.Errorf(ctx, "[svcpermission.DeleteRoleScope] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		glog.Errorf(ctx, "[svcpermission.DeleteRoleScope] dao GetListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.RoleScopeDeleteError)
 	}
-	if roleScopeEntity == nil || roleScopeEntity.ID == 0 {
+	if len(roleScopeEntityList) == 0 || roleScopeEntityList[0].ID == 0 {
 		return code.GetError(code.RoleScopeNotExistError)
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	if err := dao.NewRoleScopeDao().Delete(ctx, req.RoleID, userID); err != nil {
+	if err := deleteRepo.Delete(ctx, roleScopeEntityList[0].ID, userID); err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteRoleScope] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.RoleScopeDeleteError)
 	}

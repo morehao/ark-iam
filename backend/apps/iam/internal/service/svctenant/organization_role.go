@@ -1,6 +1,8 @@
 package svctenant
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtotenant"
@@ -11,6 +13,34 @@ import (
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
+
+type organizationRoleScopeRepository interface {
+	GetByID(ctx context.Context, id uint) (*model.OrganizationRoleEntity, error)
+	GetOrganizationByID(ctx context.Context, id uint) (*model.OrganizationEntity, error)
+	Insert(ctx context.Context, entity *model.OrganizationRoleEntity) error
+}
+
+var newOrganizationRoleScopeRepo = func() organizationRoleScopeRepository {
+	return &organizationRoleScopeDAO{}
+}
+
+type organizationRoleScopeDAO struct{}
+
+func (d *organizationRoleScopeDAO) GetByID(ctx context.Context, id uint) (*model.OrganizationRoleEntity, error) {
+	return dao.NewOrganizationRoleDao().GetByID(ctx, id)
+}
+
+func (d *organizationRoleScopeDAO) GetOrganizationByID(ctx context.Context, id uint) (*model.OrganizationEntity, error) {
+	return dao.NewOrganizationDao().GetByID(ctx, id)
+}
+
+func (d *organizationRoleScopeDAO) Insert(ctx context.Context, entity *model.OrganizationRoleEntity) error {
+	return dao.NewOrganizationRoleDao().Insert(ctx, entity)
+}
+
+func organizationRoleVisibleToTenant(entity *model.OrganizationRoleEntity, tenantID uint) bool {
+	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
+}
 
 type OrganizationRoleSvc interface {
 	Create(ctx *gin.Context, req *dtotenant.OrganizationRoleCreateReq) (*dtotenant.OrganizationRoleCreateResp, error)
@@ -30,12 +60,13 @@ func NewOrganizationRoleSvc() OrganizationRoleSvc {
 }
 
 func (svc *organizationRoleSvc) Create(ctx *gin.Context, req *dtotenant.OrganizationRoleCreateReq) (*dtotenant.OrganizationRoleCreateResp, error) {
-	orgEntity, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
+	repo := newOrganizationRoleScopeRepo()
+	orgEntity, err := repo.GetOrganizationByID(ctx, req.OrganizationID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcorganizationrole.Create] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.OrganizationGetDetailError)
 	}
-	if orgEntity == nil || orgEntity.ID == 0 {
+	if !organizationVisibleToTenant(orgEntity, gincontext.GetTenantID(ctx)) {
 		return nil, code.GetError(code.OrganizationNotExistError)
 	}
 
@@ -48,7 +79,7 @@ func (svc *organizationRoleSvc) Create(ctx *gin.Context, req *dtotenant.Organiza
 		CreatedBy:      gincontext.GetUserID(ctx),
 	}
 
-	if err := dao.NewOrganizationRoleDao().Insert(ctx, insertEntity); err != nil {
+	if err := repo.Insert(ctx, insertEntity); err != nil {
 		glog.Errorf(ctx, "[svcorganizationrole.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.OrganizationRoleCreateError)
 	}
@@ -58,12 +89,12 @@ func (svc *organizationRoleSvc) Create(ctx *gin.Context, req *dtotenant.Organiza
 }
 
 func (svc *organizationRoleSvc) Delete(ctx *gin.Context, req *dtotenant.OrganizationRoleDeleteReq) error {
-	orgRoleEntity, err := dao.NewOrganizationRoleDao().GetByID(ctx, req.OrganizationRoleID)
+	orgRoleEntity, err := newOrganizationRoleScopeRepo().GetByID(ctx, req.OrganizationRoleID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcorganizationrole.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationRoleDeleteError)
 	}
-	if orgRoleEntity == nil || orgRoleEntity.ID == 0 {
+	if !organizationRoleVisibleToTenant(orgRoleEntity, gincontext.GetTenantID(ctx)) {
 		return code.GetError(code.OrganizationRoleNotExistError)
 	}
 
@@ -76,12 +107,12 @@ func (svc *organizationRoleSvc) Delete(ctx *gin.Context, req *dtotenant.Organiza
 }
 
 func (svc *organizationRoleSvc) Update(ctx *gin.Context, req *dtotenant.OrganizationRoleUpdateReq) error {
-	orgRoleEntity, err := dao.NewOrganizationRoleDao().GetByID(ctx, req.OrganizationRoleID)
+	orgRoleEntity, err := newOrganizationRoleScopeRepo().GetByID(ctx, req.OrganizationRoleID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcorganizationrole.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationRoleUpdateError)
 	}
-	if orgRoleEntity == nil || orgRoleEntity.ID == 0 {
+	if !organizationRoleVisibleToTenant(orgRoleEntity, gincontext.GetTenantID(ctx)) {
 		return code.GetError(code.OrganizationRoleNotExistError)
 	}
 
@@ -102,12 +133,12 @@ func (svc *organizationRoleSvc) Update(ctx *gin.Context, req *dtotenant.Organiza
 }
 
 func (svc *organizationRoleSvc) Detail(ctx *gin.Context, req *dtotenant.OrganizationRoleDetailReq) (*dtotenant.OrganizationRoleDetailResp, error) {
-	orgRoleEntity, err := dao.NewOrganizationRoleDao().GetByID(ctx, req.OrganizationRoleID)
+	orgRoleEntity, err := newOrganizationRoleScopeRepo().GetByID(ctx, req.OrganizationRoleID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcorganizationrole.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.OrganizationRoleGetDetailError)
 	}
-	if orgRoleEntity == nil || orgRoleEntity.ID == 0 {
+	if !organizationRoleVisibleToTenant(orgRoleEntity, gincontext.GetTenantID(ctx)) {
 		return nil, code.GetError(code.OrganizationRoleNotExistError)
 	}
 

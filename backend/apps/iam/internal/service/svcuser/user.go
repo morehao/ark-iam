@@ -45,6 +45,15 @@ type userQueryRepository interface {
 	GetPageListByCond(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, int64, error)
 }
 
+type userObjectScopeRepository interface {
+	GetByID(ctx context.Context, id uint) (*model.UserEntity, error)
+	GetPageListByCond(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, int64, error)
+}
+
+type userLoginLogDetailRepository interface {
+	GetByID(ctx context.Context, id uint) (*model.UserLoginLogEntity, error)
+}
+
 type userDepartmentRelationQueryRepository interface {
 	GetPageListByCond(ctx context.Context, cond *dao.UserDepartmentRelationCond) (model.UserDepartmentRelationEntityList, int64, error)
 }
@@ -53,8 +62,16 @@ var newUserQueryRepo = func() userQueryRepository {
 	return &userQueryRepoAdapter{dao: dao.NewUserDao()}
 }
 
+var newUserObjectScopeRepo = func() userObjectScopeRepository {
+	return &userObjectScopeRepoAdapter{dao: dao.NewUserDao()}
+}
+
 var newUserLoginLogQueryRepo = func() userLoginLogQueryRepository {
 	return &userLoginLogQueryRepoAdapter{dao: dao.NewUserLoginLogDao()}
+}
+
+var newUserLoginLogDetailRepo = func() userLoginLogDetailRepository {
+	return &userLoginLogDetailRepoAdapter{dao: dao.NewUserLoginLogDao()}
 }
 
 var newUserDepartmentRelationQueryRepo = func() userDepartmentRelationQueryRepository {
@@ -69,12 +86,32 @@ type userQueryRepoAdapter struct {
 	dao *dao.UserDao
 }
 
+type userObjectScopeRepoAdapter struct {
+	dao *dao.UserDao
+}
+
+type userLoginLogDetailRepoAdapter struct {
+	dao *dao.UserLoginLogDao
+}
+
 func (r *userQueryRepoAdapter) GetPageListByCond(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, int64, error) {
+	return r.dao.GetPageListByCond(ctx, cond)
+}
+
+func (r *userObjectScopeRepoAdapter) GetByID(ctx context.Context, id uint) (*model.UserEntity, error) {
+	return r.dao.GetByID(ctx, id)
+}
+
+func (r *userObjectScopeRepoAdapter) GetPageListByCond(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, int64, error) {
 	return r.dao.GetPageListByCond(ctx, cond)
 }
 
 func (r *userLoginLogQueryRepoAdapter) GetPageListByCond(ctx context.Context, cond *dao.UserLoginLogCond) (model.UserLoginLogEntityList, int64, error) {
 	return r.dao.GetPageListByCond(ctx, cond)
+}
+
+func (r *userLoginLogDetailRepoAdapter) GetByID(ctx context.Context, id uint) (*model.UserLoginLogEntity, error) {
+	return r.dao.GetByID(ctx, id)
 }
 
 type userDepartmentRelationQueryRepoAdapter struct {
@@ -171,12 +208,12 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtous
 }
 
 func (svc *userSvc) Delete(ctx *gin.Context, req *dtouser.UserDeleteReq) error {
-	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
+	userEntity, err := newUserObjectScopeRepo().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserDeleteError)
 	}
-	if userEntity == nil || userEntity.ID == 0 {
+	if userEntity == nil || userEntity.ID == 0 || userEntity.TenantID != gincontext.GetTenantID(ctx) {
 		return code.GetError(code.UserNotExistError)
 	}
 
@@ -190,12 +227,12 @@ func (svc *userSvc) Delete(ctx *gin.Context, req *dtouser.UserDeleteReq) error {
 
 func (svc *userSvc) Update(ctx *gin.Context, req *dtouser.UserUpdateReq) error {
 	userDao := dao.NewUserDao()
-	userEntity, err := userDao.GetByID(ctx, req.UserID)
+	userEntity, err := newUserObjectScopeRepo().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserUpdateError)
 	}
-	if userEntity == nil || userEntity.ID == 0 {
+	if userEntity == nil || userEntity.ID == 0 || userEntity.TenantID != gincontext.GetTenantID(ctx) {
 		return code.GetError(code.UserNotExistError)
 	}
 
@@ -270,12 +307,12 @@ func (svc *userSvc) Update(ctx *gin.Context, req *dtouser.UserUpdateReq) error {
 }
 
 func (svc *userSvc) Detail(ctx *gin.Context, req *dtouser.UserDetailReq) (*dtouser.UserDetailResp, error) {
-	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
+	userEntity, err := newUserObjectScopeRepo().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserGetDetailError)
 	}
-	if userEntity == nil || userEntity.ID == 0 {
+	if userEntity == nil || userEntity.ID == 0 || userEntity.TenantID != gincontext.GetTenantID(ctx) {
 		return nil, code.GetError(code.UserNotExistError)
 	}
 
@@ -327,7 +364,7 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtouser.UserPageListReq) (*d
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID:     req.TenantID,
+		TenantID:     gincontext.GetTenantID(ctx),
 		Username:     req.Username,
 		PrimaryEmail: req.PrimaryEmail,
 		PrimaryPhone: req.PrimaryPhone,
@@ -386,12 +423,12 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtouser.UserPageListReq) (*d
 }
 
 func (svc *userSvc) UpdatePassword(ctx *gin.Context, req *dtouser.UserPasswordUpdateReq) error {
-	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
+	userEntity, err := newUserObjectScopeRepo().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.UpdatePassword] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserUpdateError)
 	}
-	if userEntity == nil || userEntity.ID == 0 {
+	if userEntity == nil || userEntity.ID == 0 || userEntity.TenantID != gincontext.GetTenantID(ctx) {
 		return code.GetError(code.UserNotExistError)
 	}
 
@@ -409,12 +446,12 @@ func (svc *userSvc) UpdatePassword(ctx *gin.Context, req *dtouser.UserPasswordUp
 }
 
 func (svc *userSvc) UpdateStatus(ctx *gin.Context, req *dtouser.UserStatusUpdateReq) error {
-	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
+	userEntity, err := newUserObjectScopeRepo().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.UpdateStatus] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserUpdateError)
 	}
-	if userEntity == nil || userEntity.ID == 0 {
+	if userEntity == nil || userEntity.ID == 0 || userEntity.TenantID != gincontext.GetTenantID(ctx) {
 		return code.GetError(code.UserNotExistError)
 	}
 
@@ -468,12 +505,12 @@ func (svc *userSvc) AssignDepartments(ctx *gin.Context, req *dtouser.AssignDepar
 }
 
 func (svc *userSvc) DetailUserLoginLog(ctx *gin.Context, req *dtouser.UserLoginLogDetailReq) (*dtouser.UserLoginLogDetailResp, error) {
-	userLoginLogEntity, err := dao.NewUserLoginLogDao().GetByID(ctx, req.UserLoginLogID)
+	userLoginLogEntity, err := newUserLoginLogDetailRepo().GetByID(ctx, req.UserLoginLogID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.DetailUserLoginLog] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserLoginLogGetDetailError)
 	}
-	if userLoginLogEntity == nil || userLoginLogEntity.ID == 0 {
+	if userLoginLogEntity == nil || userLoginLogEntity.ID == 0 || userLoginLogEntity.TenantID != gincontext.GetTenantID(ctx) {
 		return nil, code.GetError(code.UserLoginLogNotExistError)
 	}
 
@@ -498,7 +535,7 @@ func (svc *userSvc) PageListUserLoginLog(ctx *gin.Context, req *dtouser.UserLogi
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID: req.TenantID,
+		TenantID: gincontext.GetTenantID(ctx),
 		UserID:   req.UserID,
 		LoginIP:  req.LoginIP,
 	}
