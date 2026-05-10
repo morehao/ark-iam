@@ -18,11 +18,6 @@ type UserCtr interface {
 	DetailUserLoginLog(ctx *gin.Context)
 	PageListUserLoginLog(ctx *gin.Context)
 	GetUserLoginLogByUser(ctx *gin.Context)
-	CreateUserDepartmentRelation(ctx *gin.Context)
-	DeleteUserDepartmentRelation(ctx *gin.Context)
-	UpdateUserDepartmentRelation(ctx *gin.Context)
-	DetailUserDepartmentRelation(ctx *gin.Context)
-	PageListUserDepartmentRelation(ctx *gin.Context)
 	GetUserDepartmentRelationByUser(ctx *gin.Context)
 	AssignDepartments(ctx *gin.Context)
 	CreateUserIdentity(ctx *gin.Context)
@@ -266,109 +261,6 @@ func (ctr *userCtr) GetUserLoginLogByUser(ctx *gin.Context) {
 		return
 	}
 	res, err := ctr.userSvc.GetUserLoginLogByUser(ctx, &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-// @Tags 用户管理
-// @Summary 创建用户部门关联
-// @accept application/json
-// @Produce application/json
-// @Param req body dtouser.UserDepartmentRelationCreateReq true "创建用户部门关联"
-// @Success 200 {object} gincontext.DtoRender{data=dtouser.UserDepartmentRelationCreateResp}
-// @Router /v1/iam/user/createUserDepartmentRelation [post]
-func (ctr *userCtr) CreateUserDepartmentRelation(ctx *gin.Context) {
-	var req dtouser.UserDepartmentRelationCreateReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.userSvc.CreateUserDepartmentRelation(ctx, &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-// @Tags 用户管理
-// @Summary 删除用户部门关联
-// @accept application/json
-// @Produce application/json
-// @Param req body dtouser.UserDepartmentRelationDeleteReq true "删除用户部门关联"
-// @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/user/deleteUserDepartmentRelation [post]
-func (ctr *userCtr) DeleteUserDepartmentRelation(ctx *gin.Context) {
-	var req dtouser.UserDepartmentRelationDeleteReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctr.userSvc.DeleteUserDepartmentRelation(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, "删除成功")
-}
-
-// @Tags 用户管理
-// @Summary 修改用户部门关联
-// @accept application/json
-// @Produce application/json
-// @Param req body dtouser.UserDepartmentRelationUpdateReq true "修改用户部门关联"
-// @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/user/updateUserDepartmentRelation [post]
-func (ctr *userCtr) UpdateUserDepartmentRelation(ctx *gin.Context) {
-	var req dtouser.UserDepartmentRelationUpdateReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctr.userSvc.UpdateUserDepartmentRelation(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, "修改成功")
-}
-
-// @Tags 用户管理
-// @Summary 用户部门关联详情
-// @accept application/json
-// @Produce application/json
-// @Param req query dtouser.UserDepartmentRelationDetailReq true "用户部门关联详情"
-// @Success 200 {object} gincontext.DtoRender{data=dtouser.UserDepartmentRelationDetailResp}
-// @Router /v1/iam/user/detailUserDepartmentRelation [get]
-func (ctr *userCtr) DetailUserDepartmentRelation(ctx *gin.Context) {
-	var req dtouser.UserDepartmentRelationDetailReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.userSvc.DetailUserDepartmentRelation(ctx, &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-// @Tags 用户管理
-// @Summary 用户部门关联列表分页
-// @accept application/json
-// @Produce application/json
-// @Param req body dtouser.UserDepartmentRelationPageListReq true "用户部门关联列表分页"
-// @Success 200 {object} gincontext.DtoRender{data=dtouser.UserDepartmentRelationPageListResp}
-// @Router /v1/iam/user/pageListUserDepartmentRelation [post]
-func (ctr *userCtr) PageListUserDepartmentRelation(ctx *gin.Context) {
-	var req dtouser.UserDepartmentRelationPageListReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.userSvc.PageListUserDepartmentRelation(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

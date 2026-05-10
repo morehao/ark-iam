@@ -15,7 +15,7 @@ type TenantUpdateReq struct {
 }
 
 type TenantDetailReq struct {
-	TenantID uint `json:"tenantID" binding:"required"` // 租户ID
+	TenantID uint `json:"tenantID" form:"tenantID" binding:"required"` // 租户ID
 }
 
 type TenantPageListReq struct {
@@ -36,7 +36,7 @@ type DepartmentUpdateReq struct {
 }
 
 type DepartmentDetailReq struct {
-	DepartmentID uint `json:"departmentID" binding:"required"` // 部门ID
+	DepartmentID uint `json:"departmentID" form:"departmentID" binding:"required"` // 部门ID
 }
 
 type DepartmentPageListReq struct {
@@ -52,5 +52,5 @@ type DepartmentDeleteReq struct {
 }
 
 type DepartmentTreeReq struct {
-	TenantID uint `json:"tenantID"` // 租户ID
+	TenantID uint `json:"tenantID" form:"tenantID"` // 租户ID
 }

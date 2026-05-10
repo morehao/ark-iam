@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +17,8 @@ import (
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/code"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 type fakeConnectorUserRepository struct {
@@ -273,6 +278,7 @@ func TestIdentityMapperRejectsUnboundIdentityWhenAutoCreateDisabled(t *testing.T
 	mapper := newIdentityMapper(
 		&fakeConnectorUserRepository{},
 		&fakeConnectorUserIdentityRepository{},
+		WithIdentityMapperTxRunner(connectorRunInTransactionNoop),
 	)
 
 	_, err := mapper.Resolve(context.Background(), identityResolveInput{
@@ -318,6 +324,7 @@ func TestIdentityMapperReturnsBoundUser(t *testing.T) {
 				}, nil
 			},
 		},
+		WithIdentityMapperTxRunner(connectorRunInTransactionNoop),
 	)
 
 	user, err := mapper.Resolve(context.Background(), identityResolveInput{
@@ -357,6 +364,7 @@ func TestIdentityMapperAutoCreatesUserAndBindsIdentity(t *testing.T) {
 				return nil
 			},
 		},
+		WithIdentityMapperTxRunner(connectorRunInTransactionNoop),
 	)
 
 	user, err := mapper.Resolve(context.Background(), identityResolveInput{
@@ -432,6 +440,101 @@ func TestIdentityMapperAutoCreatesUserAndBindsIdentity(t *testing.T) {
 	}
 }
 
+func TestIdentityMapperAutoCreateRollsBackUserWhenBindIdentityFails(t *testing.T) {
+	ctx := newConnectorRuntimeContext(t)
+	db := newConnectorIdentityMapperTestDB(t)
+	mapper := newIdentityMapper(nil, nil, WithIdentityMapperDBProvider(func(ctx context.Context) *gorm.DB {
+		return db.WithContext(ctx)
+	}))
+	if err := db.Callback().Create().Before("gorm:create").Register("test_fail_user_identity_create", func(tx *gorm.DB) {
+		if tx.Statement != nil && tx.Statement.Schema != nil && tx.Statement.Schema.Table == model.TableNameUserIdentity {
+			tx.AddError(errors.New("bind identity failed"))
+		}
+	}); err != nil {
+		t.Fatalf("register create callback: %v", err)
+	}
+	defer func() {
+		_ = db.Callback().Create().Remove("test_fail_user_identity_create")
+		if sqlDB, err := db.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+	}()
+
+	user, err := mapper.Resolve(ctx, identityResolveInput{
+		Connector: ConnectorRuntime{ID: 11, TenantID: 22, AllowAutoCreateUser: true},
+		Identity: StandardIdentity{
+			Issuer:      "https://issuer.example.com",
+			Subject:     "external-subject-rollback",
+			Email:       "rollback@example.com",
+			DisplayName: "Rollback User",
+		},
+	})
+	if err == nil {
+		t.Fatal("expected bind identity failure")
+	}
+	if user != nil {
+		t.Fatalf("expected no user result on bind failure, got %+v", user)
+	}
+
+	var count int64
+	if err := db.Model(&model.UserEntity{}).Where("tenant_id = ? AND primary_email = ?", 22, "rollback@example.com").Count(&count).Error; err != nil {
+		t.Fatalf("count users: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected rollback to remove inserted user, got %d rows", count)
+	}
+}
+
+func TestIdentityMapperAutoCreatePersistsUserAndIdentityWithinTransaction(t *testing.T) {
+	ctx := newConnectorRuntimeContext(t)
+	db := newConnectorIdentityMapperTestDB(t)
+	defer func() {
+		if sqlDB, err := db.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+	}()
+
+	mapper := newIdentityMapper(nil, nil, WithIdentityMapperDBProvider(func(ctx context.Context) *gorm.DB {
+		return db.WithContext(ctx)
+	}))
+
+	user, err := mapper.Resolve(ctx, identityResolveInput{
+		Connector: ConnectorRuntime{ID: 11, TenantID: 22, AllowAutoCreateUser: true},
+		Identity: StandardIdentity{
+			Issuer:      "https://issuer.example.com",
+			Subject:     "external-subject-success",
+			Email:       "success@example.com",
+			Username:    "success-user",
+			DisplayName: "Success User",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if user == nil || user.ID == 0 {
+		t.Fatalf("expected created user, got %+v", user)
+	}
+
+	var users []model.UserEntity
+	if err := db.Where("tenant_id = ? AND primary_email = ?", 22, "success@example.com").Find(&users).Error; err != nil {
+		t.Fatalf("query users: %v", err)
+	}
+	if len(users) != 1 {
+		t.Fatalf("expected 1 persisted user, got %d", len(users))
+	}
+
+	var identities []model.UserIdentityEntity
+	if err := db.Where("tenant_id = ? AND connector_id = ? AND external_subject = ?", 22, 11, "external-subject-success").Find(&identities).Error; err != nil {
+		t.Fatalf("query identities: %v", err)
+	}
+	if len(identities) != 1 {
+		t.Fatalf("expected 1 persisted identity, got %d", len(identities))
+	}
+	if identities[0].UserID != users[0].ID || identities[0].UserID != user.ID {
+		t.Fatalf("expected identity to bind created user, user=%d persisted=%d identity=%d", user.ID, users[0].ID, identities[0].UserID)
+	}
+}
+
 func TestIdentityMapperPropagatesBoundUserLookupError(t *testing.T) {
 	expectedErr := errors.New("user lookup failed")
 
@@ -446,6 +549,7 @@ func TestIdentityMapperPropagatesBoundUserLookupError(t *testing.T) {
 				return &model.UserIdentityEntity{Model: model.UserIdentityEntity{}.Model, UserID: 33}, nil
 			},
 		},
+		WithIdentityMapperTxRunner(connectorRunInTransactionNoop),
 	)
 
 	_, err := mapper.Resolve(context.Background(), identityResolveInput{
@@ -491,6 +595,7 @@ func TestIdentityMapperRepairsOrphanBindingInsteadOfReinserting(t *testing.T) {
 				return json.Unmarshal(detail, &updatedDetail)
 			},
 		},
+		WithIdentityMapperTxRunner(connectorRunInTransactionNoop),
 	)
 
 	user, err := mapper.Resolve(context.Background(), identityResolveInput{
@@ -938,4 +1043,31 @@ func TestConnectorServiceCallbackRetainsStateWhenDriverExchangeFails(t *testing.
 	if loaded == nil || loaded.State != "callback-state-fail" {
 		t.Fatalf("expected retained state after driver failure, got %+v", loaded)
 	}
+}
+
+func newConnectorIdentityMapperTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	dsn := fmt.Sprintf("file:%s_%d?mode=memory&cache=shared", sanitizeConnectorTestName(t.Name()), time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.UserEntity{}, &model.UserIdentityEntity{}); err != nil {
+		t.Fatalf("migrate user tables: %v", err)
+	}
+	return db
+}
+
+func newConnectorRuntimeContext(t *testing.T) context.Context {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodPost, "/", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	return req.Context()
+}
+
+func sanitizeConnectorTestName(name string) string {
+	replacer := strings.NewReplacer("/", "_", " ", "_", ":", "_")
+	return replacer.Replace(name)
 }

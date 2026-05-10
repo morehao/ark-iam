@@ -15,7 +15,7 @@ type UserUpdateReq struct {
 }
 
 type UserDetailReq struct {
-	UserID uint `json:"userID" binding:"required"` // 用户ID
+	UserID uint `json:"userID" form:"userID" binding:"required"` // 用户ID
 }
 
 type UserPageListReq struct {
@@ -25,7 +25,7 @@ type UserPageListReq struct {
 	PrimaryEmail string `json:"primaryEmail"` // 主要邮箱
 	PrimaryPhone string `json:"primaryPhone"` // 主要手机号
 	Name         string `json:"name"`         // 姓名
-	IsSuspended  int8   `json:"isSuspended"`  // 是否挂起
+	IsSuspended  *int8  `json:"isSuspended"`  // 是否挂起
 }
 
 type UserDeleteReq struct {
@@ -60,7 +60,7 @@ type UserIdentityUpdateReq struct {
 }
 
 type UserIdentityDetailReq struct {
-	UserIdentityID uint `json:"userIdentityID" binding:"required"` // 用户身份ID
+	UserIdentityID uint `json:"userIdentityID" form:"userIdentityID" binding:"required"` // 用户身份ID
 }
 
 type UserIdentityPageListReq struct {
@@ -76,11 +76,11 @@ type UserIdentityDeleteReq struct {
 }
 
 type UserIdentityByUserReq struct {
-	UserID uint `json:"userID" binding:"required"` // 用户ID
+	UserID uint `json:"userID" form:"userID" binding:"required"` // 用户ID
 }
 
 type UserLoginLogDetailReq struct {
-	UserLoginLogID uint `json:"userLoginLogID" binding:"required"` // 登录日志ID
+	UserLoginLogID uint `json:"userLoginLogID" form:"userLoginLogID" binding:"required"` // 登录日志ID
 }
 
 type UserLoginLogPageListReq struct {
@@ -91,42 +91,11 @@ type UserLoginLogPageListReq struct {
 }
 
 type UserLoginLogByUserReq struct {
-	UserID uint `json:"userID" binding:"required"` // 用户ID
-}
-
-type UserDepartmentRelationCreateReq struct {
-	TenantID     uint `json:"tenantID" binding:"required"`         // 租户ID
-	UserID       uint `json:"userID" binding:"required"`           // 用户ID
-	DepartmentID uint `json:"departmentID" binding:"required"`   // 部门ID
-	IsPrimary    int8 `json:"isPrimary"`                         // 是否主部门
-}
-
-type UserDepartmentRelationUpdateReq struct {
-	UserDepartmentRelationID uint `json:"userDepartmentRelationID" binding:"required"` // 用户部门关系ID
-	TenantID                 uint   `json:"tenantID"`         // 租户ID
-	UserID                   uint   `json:"userID"`           // 用户ID
-	DepartmentID             uint   `json:"departmentID"`     // 部门ID
-	IsPrimary                int8   `json:"isPrimary"`         // 是否主部门
-}
-
-type UserDepartmentRelationDetailReq struct {
-	UserDepartmentRelationID uint `json:"userDepartmentRelationID" binding:"required"` // 用户部门关系ID
-}
-
-type UserDepartmentRelationPageListReq struct {
-	gobject.PageQuery
-	TenantID     uint `json:"tenantID"`     // 租户ID
-	UserID       uint `json:"userID"`       // 用户ID
-	DepartmentID uint `json:"departmentID"` // 部门ID
-	IsPrimary    int8 `json:"isPrimary"`    // 是否主部门
-}
-
-type UserDepartmentRelationDeleteReq struct {
-	UserDepartmentRelationID uint `json:"userDepartmentRelationID" binding:"required"` // 用户部门关系ID
+	UserID uint `json:"userID" form:"userID" binding:"required"` // 用户ID
 }
 
 type UserDepartmentRelationByUserReq struct {
-	UserID uint `json:"userID" binding:"required"` // 用户ID
+	UserID uint `json:"userID" form:"userID" binding:"required"` // 用户ID
 }
 
 type AssignDepartmentsReq struct {
@@ -144,8 +113,8 @@ type AssignRoleUsersReq struct {
 }
 
 type RemoveRoleUserReq struct {
-	RoleID uint64 `json:"roleId" path:"roleId" binding:"required"`
-	UserID uint64 `json:"userId" path:"userId" binding:"required"`
+	RoleID uint64 `json:"roleId" uri:"roleId" binding:"required"`
+	UserID uint64 `json:"userId" uri:"userId" binding:"required"`
 }
 
 type RoleApplicationListReq struct {

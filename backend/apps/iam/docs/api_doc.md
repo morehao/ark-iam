@@ -108,12 +108,8 @@
 | 删除身份 | POST /v1/iam/user/deleteUserIdentity | DELETE /api/users/{id}/identities/{target} | ✅ 对应 | - |
 | 身份详情 | GET /v1/iam/user/detailUserIdentity | GET /api/users/{id}/identities/{target} | ✅ 对应 | - |
 | 身份列表 | GET /v1/iam/user/getUserIdentityByUser | GET /api/users/{id}/all-identities | ✅ 对应 | - |
-| 部门关联详情 | GET /v1/iam/user/detailUserDepartmentRelation | - | ✅ 特有 | - |
 | 部门关联列表 | GET /v1/iam/user/getUserDepartmentRelationByUser | - | ✅ 特有 | - |
-| 部门关联创建 | POST /v1/iam/user/createUserDepartmentRelation | - | ✅ 特有 | - |
-| 部门关联删除 | POST /v1/iam/user/deleteUserDepartmentRelation | - | ✅ 特有 | - |
-| 部门关联修改 | POST /v1/iam/user/updateUserDepartmentRelation | - | ✅ 特有 | - |
-| 部门关联分页 | POST /v1/iam/user/pageListUserDepartmentRelation | - | ✅ 特有 | - |
+| 部门关联收敛说明 | 保留 `/v1/iam/user/assignDepartments` 与 `/v1/iam/user/getUserDepartmentRelationByUser` | - | ✅ 特有 | 其余用户部门关联 CRUD/分页接口为重复暴露，已收敛下线 |
 | 登录日志 | GET /v1/iam/user/getUserLoginLogByUser | - | ✅ 特有 | - |
 | 登录日志详情 | GET /v1/iam/user/detailUserLoginLog | - | ✅ 特有 | - |
 | 登录日志分页 | POST /v1/iam/user/pageListUserLoginLog | - | ✅ 特有 | - |

@@ -4124,51 +4124,6 @@ const docTemplateiam = `{
                 }
             }
         },
-        "/v1/iam/user/createUserDepartmentRelation": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "用户管理"
-                ],
-                "summary": "创建用户部门关联",
-                "parameters": [
-                    {
-                        "description": "创建用户部门关联",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtouser.UserDepartmentRelationCreateReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtouser.UserDepartmentRelationCreateResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/v1/iam/user/createUserIdentity": {
             "post": {
                 "consumes": [
@@ -4234,51 +4189,6 @@ const docTemplateiam = `{
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/dtouser.UserDeleteReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/user/deleteUserDepartmentRelation": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "用户管理"
-                ],
-                "summary": "删除用户部门关联",
-                "parameters": [
-                    {
-                        "description": "删除用户部门关联",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtouser.UserDepartmentRelationDeleteReq"
                         }
                     }
                 ],
@@ -4383,49 +4293,6 @@ const docTemplateiam = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/dtouser.UserDetailResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/user/detailUserDepartmentRelation": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "用户管理"
-                ],
-                "summary": "用户部门关联详情",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "用户部门关系ID",
-                        "name": "userDepartmentRelationID",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtouser.UserDepartmentRelationDetailResp"
                                         }
                                     }
                                 }
@@ -4686,51 +4553,6 @@ const docTemplateiam = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/dtouser.UserPageListResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/user/pageListUserDepartmentRelation": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "用户管理"
-                ],
-                "summary": "用户部门关联列表分页",
-                "parameters": [
-                    {
-                        "description": "用户部门关联列表分页",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtouser.UserDepartmentRelationPageListReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtouser.UserDepartmentRelationPageListResp"
                                         }
                                     }
                                 }
@@ -5063,51 +4885,6 @@ const docTemplateiam = `{
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/dtouser.UserStatusUpdateReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/user/updateUserDepartmentRelation": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "用户管理"
-                ],
-                "summary": "修改用户部门关联",
-                "parameters": [
-                    {
-                        "description": "修改用户部门关联",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtouser.UserDepartmentRelationUpdateReq"
                         }
                     }
                 ],
@@ -9060,94 +8837,6 @@ const docTemplateiam = `{
                 }
             }
         },
-        "dtouser.UserDepartmentRelationCreateReq": {
-            "type": "object",
-            "required": [
-                "departmentID",
-                "tenantID",
-                "userID"
-            ],
-            "properties": {
-                "departmentID": {
-                    "description": "部门ID",
-                    "type": "integer"
-                },
-                "isPrimary": {
-                    "description": "是否主部门",
-                    "type": "integer"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
-                },
-                "userID": {
-                    "description": "用户ID",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtouser.UserDepartmentRelationCreateResp": {
-            "type": "object",
-            "properties": {
-                "userDepartmentRelationID": {
-                    "description": "用户部门关系ID",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtouser.UserDepartmentRelationDeleteReq": {
-            "type": "object",
-            "required": [
-                "userDepartmentRelationID"
-            ],
-            "properties": {
-                "userDepartmentRelationID": {
-                    "description": "用户部门关系ID",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtouser.UserDepartmentRelationDetailResp": {
-            "type": "object",
-            "properties": {
-                "createdAt": {
-                    "description": "创建时间",
-                    "type": "integer"
-                },
-                "createdBy": {
-                    "description": "创建人id",
-                    "type": "integer"
-                },
-                "departmentID": {
-                    "description": "部门ID",
-                    "type": "integer"
-                },
-                "isPrimary": {
-                    "description": "是否主部门",
-                    "type": "integer"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
-                },
-                "updatedAt": {
-                    "description": "更新时间",
-                    "type": "integer"
-                },
-                "updatedBy": {
-                    "description": "更新人id",
-                    "type": "integer"
-                },
-                "userDepartmentRelationID": {
-                    "description": "用户部门关系ID",
-                    "type": "integer"
-                },
-                "userID": {
-                    "description": "用户ID",
-                    "type": "integer"
-                }
-            }
-        },
         "dtouser.UserDepartmentRelationPageListItem": {
             "type": "object",
             "properties": {
@@ -9189,36 +8878,6 @@ const docTemplateiam = `{
                 }
             }
         },
-        "dtouser.UserDepartmentRelationPageListReq": {
-            "type": "object",
-            "properties": {
-                "departmentID": {
-                    "description": "部门ID",
-                    "type": "integer"
-                },
-                "isPrimary": {
-                    "description": "是否主部门",
-                    "type": "integer"
-                },
-                "page": {
-                    "description": "页码",
-                    "type": "integer"
-                },
-                "pageSize": {
-                    "description": "每页数据条数",
-                    "type": "integer",
-                    "maximum": 1000
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
-                },
-                "userID": {
-                    "description": "用户ID",
-                    "type": "integer"
-                }
-            }
-        },
         "dtouser.UserDepartmentRelationPageListResp": {
             "type": "object",
             "properties": {
@@ -9231,34 +8890,6 @@ const docTemplateiam = `{
                 },
                 "total": {
                     "description": "数据总条数",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtouser.UserDepartmentRelationUpdateReq": {
-            "type": "object",
-            "required": [
-                "userDepartmentRelationID"
-            ],
-            "properties": {
-                "departmentID": {
-                    "description": "部门ID",
-                    "type": "integer"
-                },
-                "isPrimary": {
-                    "description": "是否主部门",
-                    "type": "integer"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
-                },
-                "userDepartmentRelationID": {
-                    "description": "用户部门关系ID",
-                    "type": "integer"
-                },
-                "userID": {
-                    "description": "用户ID",
                     "type": "integer"
                 }
             }

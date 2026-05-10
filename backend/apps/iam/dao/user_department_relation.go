@@ -12,7 +12,7 @@ type UserDepartmentRelationCond struct {
 	TenantID     uint
 	UserID       uint
 	DepartmentID uint
-	IsPrimary    int8
+	IsPrimary    *int8
 }
 
 func (c *UserDepartmentRelationCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -28,8 +28,8 @@ func (c *UserDepartmentRelationCond) BuildCondition(db *gorm.DB, tableName strin
 	if c.DepartmentID != 0 {
 		db.Where(tableName + ".department_id = ?", c.DepartmentID)
 	}
-	if c.IsPrimary != 0 {
-		db.Where(tableName + ".is_primary = ?", c.IsPrimary)
+	if c.IsPrimary != nil {
+		db.Where(tableName + ".is_primary = ?", *c.IsPrimary)
 	}
 }
 

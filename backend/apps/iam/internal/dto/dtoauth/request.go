@@ -12,12 +12,12 @@ type LoginReq struct {
 }
 
 type RegisterReq struct {
-	TenantID     uint   `json:"tenantID" binding:"required"`       // 租户ID
-	Username     string `json:"username" binding:"required"`         // 用户名
-	PrimaryEmail string `json:"primaryEmail"`                       // 主要邮箱
-	PrimaryPhone string `json:"primaryPhone"`                       // 主要手机号
-	Password     string `json:"password" binding:"required"`       // 密码
-	Name         string `json:"name"`                             // 姓名
+	TenantID     uint   `json:"tenantID" binding:"required"` // 租户ID
+	Username     string `json:"username"`                     // 用户名
+	PrimaryEmail string `json:"primaryEmail"`                 // 主要邮箱
+	PrimaryPhone string `json:"primaryPhone"`                 // 主要手机号
+	Password     string `json:"password" binding:"required"` // 密码
+	Name         string `json:"name"`                         // 姓名
 }
 
 type RefreshTokenReq struct {
@@ -50,7 +50,7 @@ type ConnectorUpdateReq struct {
 }
 
 type ConnectorDetailReq struct {
-	ConnectorID uint `json:"connectorId" binding:"required"` // 连接器ID
+	ConnectorID uint `json:"connectorId" form:"connectorId" binding:"required"` // 连接器ID
 }
 
 type ConnectorPageListReq struct {

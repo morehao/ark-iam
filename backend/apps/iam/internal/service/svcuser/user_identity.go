@@ -1,6 +1,7 @@
 package svcuser
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/gin-gonic/gin"
@@ -27,6 +28,42 @@ type UserIdentitySvc interface {
 type userIdentitySvc struct {
 }
 
+type userIdentityRepository interface {
+	Insert(ctx context.Context, entity *model.UserIdentityEntity) error
+	GetByID(ctx context.Context, id uint) (*model.UserIdentityEntity, error)
+	Delete(ctx context.Context, id uint, deletedBy uint) error
+	UpdateMap(ctx context.Context, id uint, updates map[string]any) error
+	GetPageListByCond(ctx context.Context, cond *dao.UserIdentityCond) (model.UserIdentityEntityList, int64, error)
+}
+
+var newUserIdentityRepo = func() userIdentityRepository {
+	return &userIdentityRepoAdapter{dao: dao.NewUserIdentityDao()}
+}
+
+type userIdentityRepoAdapter struct {
+	dao *dao.UserIdentityDao
+}
+
+func (r *userIdentityRepoAdapter) Insert(ctx context.Context, entity *model.UserIdentityEntity) error {
+	return r.dao.Insert(ctx, entity)
+}
+
+func (r *userIdentityRepoAdapter) GetByID(ctx context.Context, id uint) (*model.UserIdentityEntity, error) {
+	return r.dao.GetByID(ctx, id)
+}
+
+func (r *userIdentityRepoAdapter) Delete(ctx context.Context, id uint, deletedBy uint) error {
+	return r.dao.Delete(ctx, id, deletedBy)
+}
+
+func (r *userIdentityRepoAdapter) UpdateMap(ctx context.Context, id uint, updates map[string]any) error {
+	return r.dao.UpdateMap(ctx, id, updates)
+}
+
+func (r *userIdentityRepoAdapter) GetPageListByCond(ctx context.Context, cond *dao.UserIdentityCond) (model.UserIdentityEntityList, int64, error) {
+	return r.dao.GetPageListByCond(ctx, cond)
+}
+
 var _ UserIdentitySvc = (*userIdentitySvc)(nil)
 
 func NewUserIdentitySvc() UserIdentitySvc {
@@ -34,6 +71,7 @@ func NewUserIdentitySvc() UserIdentitySvc {
 }
 
 func (svc *userIdentitySvc) Create(ctx *gin.Context, req *dtouser.UserIdentityCreateReq) (*dtouser.UserIdentityCreateResp, error) {
+	userIdentityRepo := newUserIdentityRepo()
 	detailJson, err := json.Marshal(req.Detail)
 	if err != nil {
 		glog.Errorf(ctx, "[userIdentitySvc.Create] json.Marshal detail fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -49,7 +87,7 @@ func (svc *userIdentitySvc) Create(ctx *gin.Context, req *dtouser.UserIdentityCr
 		CreatedBy:       gincontext.GetUserID(ctx),
 	}
 
-	if err := dao.NewUserIdentityDao().Insert(ctx, insertEntity); err != nil {
+	if err := userIdentityRepo.Insert(ctx, insertEntity); err != nil {
 		glog.Errorf(ctx, "[userIdentitySvc.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserIdentityCreateError)
 	}
@@ -59,7 +97,8 @@ func (svc *userIdentitySvc) Create(ctx *gin.Context, req *dtouser.UserIdentityCr
 }
 
 func (svc *userIdentitySvc) Delete(ctx *gin.Context, req *dtouser.UserIdentityDeleteReq) error {
-	userIdentityEntity, err := dao.NewUserIdentityDao().GetByID(ctx, req.UserIdentityID)
+	userIdentityRepo := newUserIdentityRepo()
+	userIdentityEntity, err := userIdentityRepo.GetByID(ctx, req.UserIdentityID)
 	if err != nil {
 		glog.Errorf(ctx, "[userIdentitySvc.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserIdentityDeleteError)
@@ -69,7 +108,7 @@ func (svc *userIdentitySvc) Delete(ctx *gin.Context, req *dtouser.UserIdentityDe
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	if err := dao.NewUserIdentityDao().Delete(ctx, req.UserIdentityID, userID); err != nil {
+	if err := userIdentityRepo.Delete(ctx, req.UserIdentityID, userID); err != nil {
 		glog.Errorf(ctx, "[userIdentitySvc.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserIdentityDeleteError)
 	}
@@ -77,7 +116,8 @@ func (svc *userIdentitySvc) Delete(ctx *gin.Context, req *dtouser.UserIdentityDe
 }
 
 func (svc *userIdentitySvc) Update(ctx *gin.Context, req *dtouser.UserIdentityUpdateReq) error {
-	userIdentityEntity, err := dao.NewUserIdentityDao().GetByID(ctx, req.UserIdentityID)
+	userIdentityRepo := newUserIdentityRepo()
+	userIdentityEntity, err := userIdentityRepo.GetByID(ctx, req.UserIdentityID)
 	if err != nil {
 		glog.Errorf(ctx, "[userIdentitySvc.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserIdentityUpdateError)
@@ -101,7 +141,7 @@ func (svc *userIdentitySvc) Update(ctx *gin.Context, req *dtouser.UserIdentityUp
 		"detail":           detailJson,
 		"updated_by":       userID,
 	}
-	if err := dao.NewUserIdentityDao().UpdateMap(ctx, req.UserIdentityID, updateMap); err != nil {
+	if err := userIdentityRepo.UpdateMap(ctx, req.UserIdentityID, updateMap); err != nil {
 		glog.Errorf(ctx, "[userIdentitySvc.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserIdentityUpdateError)
 	}
@@ -109,7 +149,8 @@ func (svc *userIdentitySvc) Update(ctx *gin.Context, req *dtouser.UserIdentityUp
 }
 
 func (svc *userIdentitySvc) Detail(ctx *gin.Context, req *dtouser.UserIdentityDetailReq) (*dtouser.UserIdentityDetailResp, error) {
-	userIdentityEntity, err := dao.NewUserIdentityDao().GetByID(ctx, req.UserIdentityID)
+	userIdentityRepo := newUserIdentityRepo()
+	userIdentityEntity, err := userIdentityRepo.GetByID(ctx, req.UserIdentityID)
 	if err != nil {
 		glog.Errorf(ctx, "[userIdentitySvc.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserIdentityGetDetailError)
@@ -140,28 +181,21 @@ func (svc *userIdentitySvc) Detail(ctx *gin.Context, req *dtouser.UserIdentityDe
 }
 
 func (svc *userIdentitySvc) PageList(ctx *gin.Context, req *dtouser.UserIdentityPageListReq) (*dtouser.UserIdentityPageListResp, error) {
+	userIdentityRepo := newUserIdentityRepo()
 	cond := &dao.UserIdentityCond{
 		BaseCond: &genericdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
 		TenantID:        req.TenantID,
+		UserID:          req.UserID,
+		Issuer:          req.Issuer,
 		ExternalSubject: req.IdentityID,
 	}
-	userIdentityEntityList, total, err := dao.NewUserIdentityDao().GetPageListByCond(ctx, cond)
+	userIdentityEntityList, total, err := userIdentityRepo.GetPageListByCond(ctx, cond)
 	if err != nil {
 		glog.Errorf(ctx, "[userIdentitySvc.PageList] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserIdentityGetPageListError)
-	}
-	if req.UserID != 0 {
-		filtered := make(model.UserIdentityEntityList, 0, len(userIdentityEntityList))
-		for _, item := range userIdentityEntityList {
-			if item.UserID == req.UserID {
-				filtered = append(filtered, item)
-			}
-		}
-		userIdentityEntityList = filtered
-		total = int64(len(filtered))
 	}
 
 	list := make([]dtouser.UserIdentityPageListItem, 0, len(userIdentityEntityList))
@@ -190,20 +224,16 @@ func (svc *userIdentitySvc) PageList(ctx *gin.Context, req *dtouser.UserIdentity
 }
 
 func (svc *userIdentitySvc) GetByUser(ctx *gin.Context, req *dtouser.UserIdentityByUserReq) (*dtouser.UserIdentityPageListResp, error) {
-	cond := &dao.UserIdentityCond{}
-	userIdentityEntityList, total, err := dao.NewUserIdentityDao().GetPageListByCond(ctx, cond)
+	userIdentityRepo := newUserIdentityRepo()
+	cond := &dao.UserIdentityCond{
+		TenantID: gincontext.GetTenantID(ctx),
+		UserID:   req.UserID,
+	}
+	userIdentityEntityList, total, err := userIdentityRepo.GetPageListByCond(ctx, cond)
 	if err != nil {
 		glog.Errorf(ctx, "[userIdentitySvc.GetByUser] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserIdentityGetPageListError)
 	}
-	filtered := make(model.UserIdentityEntityList, 0, len(userIdentityEntityList))
-	for _, item := range userIdentityEntityList {
-		if item.UserID == req.UserID {
-			filtered = append(filtered, item)
-		}
-	}
-	userIdentityEntityList = filtered
-	total = int64(len(filtered))
 
 	list := make([]dtouser.UserIdentityPageListItem, 0, len(userIdentityEntityList))
 	for _, v := range userIdentityEntityList {

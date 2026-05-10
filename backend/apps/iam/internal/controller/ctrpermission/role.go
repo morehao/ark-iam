@@ -181,12 +181,13 @@ func (ctr *roleCtr) AssignUsers(ctx *gin.Context) {
 // @Summary 移除用户
 // @accept application/json
 // @Produce application/json
-// @Param req query dtouser.RemoveRoleUserReq true "移除用户"
+// @Param roleId path int true "角色ID"
+// @Param userId path int true "用户ID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
 // @Router /v1/iam/role/users/{roleId}/{userId} [delete]
 func (ctr *roleCtr) RemoveUser(ctx *gin.Context) {
 	var req dtouser.RemoveRoleUserReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := ctx.ShouldBindUri(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

@@ -10,11 +10,11 @@ func tenantRouter(groups *ginserver.RouterGroups) {
 	tenantCtr := ctrtenant.NewTenantCtr()
 
 	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
-	v1RouterGroup.POST("/create", tenantCtr.Create)
-	v1RouterGroup.POST("/delete", tenantCtr.Delete)
-	v1RouterGroup.POST("/update", tenantCtr.Update)
-	v1RouterGroup.GET("/detail", tenantCtr.Detail)
-	v1RouterGroup.POST("/pageList", tenantCtr.PageList)
+	v1RouterGroup.POST("/tenant/create", tenantCtr.Create)
+	v1RouterGroup.POST("/tenant/delete", tenantCtr.Delete)
+	v1RouterGroup.POST("/tenant/update", tenantCtr.Update)
+	v1RouterGroup.GET("/tenant/detail", tenantCtr.Detail)
+	v1RouterGroup.POST("/tenant/pageList", tenantCtr.PageList)
 }
 
 func departmentRouter(groups *ginserver.RouterGroups) {

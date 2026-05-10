@@ -32,11 +32,6 @@ func userRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/user/pageListUserLoginLog", userCtr.PageListUserLoginLog)
 	v1RouterGroup.GET("/user/getUserLoginLogByUser", userCtr.GetUserLoginLogByUser)
 
-	v1RouterGroup.POST("/user/createUserDepartmentRelation", userCtr.CreateUserDepartmentRelation)
-	v1RouterGroup.POST("/user/deleteUserDepartmentRelation", userCtr.DeleteUserDepartmentRelation)
-	v1RouterGroup.POST("/user/updateUserDepartmentRelation", userCtr.UpdateUserDepartmentRelation)
-	v1RouterGroup.GET("/user/detailUserDepartmentRelation", userCtr.DetailUserDepartmentRelation)
-	v1RouterGroup.POST("/user/pageListUserDepartmentRelation", userCtr.PageListUserDepartmentRelation)
 	v1RouterGroup.GET("/user/getUserDepartmentRelationByUser", userCtr.GetUserDepartmentRelationByUser)
 	v1RouterGroup.POST("/user/assignDepartments", userCtr.AssignDepartments)
 

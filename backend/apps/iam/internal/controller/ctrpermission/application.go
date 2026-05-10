@@ -181,14 +181,28 @@ func (ctr *applicationCtr) AssignRoles(ctx *gin.Context) {
 // @Summary 移除角色
 // @accept application/json
 // @Produce application/json
-// @Param req query dtoapplication.RemoveApplicationRoleReq true "移除角色"
+// @Param roleId path int true "角色ID"
+// @Param applicationId query int true "应用ID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
 // @Router /v1/iam/application/roles/{roleId} [delete]
 func (ctr *applicationCtr) RemoveRole(ctx *gin.Context) {
-	var req dtoapplication.RemoveApplicationRoleReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	var uriReq struct {
+		RoleID uint64 `uri:"roleId" binding:"required"`
+	}
+	if err := ctx.ShouldBindUri(&uriReq); err != nil {
 		gincontext.Fail(ctx, err)
 		return
+	}
+	var queryReq struct {
+		ApplicationID uint64 `form:"applicationId" binding:"required"`
+	}
+	if err := ctx.ShouldBindQuery(&queryReq); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	req := dtoapplication.RemoveApplicationRoleReq{
+		ApplicationID: queryReq.ApplicationID,
+		RoleID:        uriReq.RoleID,
 	}
 	if err := ctr.applicationSvc.RemoveRole(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
@@ -243,12 +257,12 @@ func (ctr *applicationCtr) CreateSecret(ctx *gin.Context) {
 // @Summary 删除应用密钥
 // @accept application/json
 // @Produce application/json
-// @Param req query dtoapplication.DeleteApplicationSecretReq true "删除应用密钥"
+// @Param secretId path int true "密钥ID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
 // @Router /v1/iam/application/secrets/{secretId} [delete]
 func (ctr *applicationCtr) DeleteSecret(ctx *gin.Context) {
 	var req dtoapplication.DeleteApplicationSecretReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := ctx.ShouldBindUri(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
