@@ -8,9 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/ark-iam/iam/testutil"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/morehao/golib/biz/gcontext"
+	"github.com/morehao/golib/biz/testkit"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +23,7 @@ func TestLoginByEmail(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewContext()
+	ctx := testsetup.NewContext(testkit.WithContext(testutil.BuildIamContext(1)))
 
 	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
 	require.NoError(t, err)
@@ -38,7 +40,7 @@ func TestLoginByEmail(t *testing.T) {
 	svc := NewAuthSvc(testJWTSecret)
 	resp, err := svc.Login(ginCtx, &dtoauth.LoginReq{
 		Identifier: "login_email_test@example.com",
-		Password:  "Password1",
+		Password:   "Password1",
 	})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -51,7 +53,7 @@ func TestLoginByPhone(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewContext()
+	ctx := testsetup.NewContext(testkit.WithContext(testutil.BuildIamContext(1)))
 
 	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
 	require.NoError(t, err)
@@ -79,7 +81,7 @@ func TestLoginByUsername(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewContext()
+	ctx := testsetup.NewContext(testkit.WithContext(testutil.BuildIamContext(1)))
 
 	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
 	require.NoError(t, err)
@@ -107,7 +109,7 @@ func TestLoginWithWrongPassword(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewContext()
+	ctx := testsetup.NewContext(testkit.WithContext(testutil.BuildIamContext(1)))
 
 	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
 	require.NoError(t, err)
@@ -133,7 +135,7 @@ func TestLoginForSuspendedUser(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewContext()
+	ctx := testsetup.NewContext(testkit.WithContext(testutil.BuildIamContext(1)))
 
 	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
 	require.NoError(t, err)
@@ -165,7 +167,7 @@ func TestRegisterCreatesPersonAndUser(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewContext()
+	ctx := testsetup.NewContext(testkit.WithContext(testutil.BuildIamContext(1)))
 
 	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
 	require.NoError(t, err)
@@ -201,7 +203,7 @@ func TestSelectTenant(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewContext()
+	ctx := testsetup.NewContext(testkit.WithContext(testutil.BuildIamContext(1)))
 
 	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
 	require.NoError(t, err)
@@ -231,7 +233,7 @@ func TestSwitchTenantToNewTenant(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewContext()
+	ctx := testsetup.NewContext(testkit.WithContext(testutil.BuildIamContext(1)))
 
 	tenant1, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant1"), "test_tag1")
 	require.NoError(t, err)
@@ -268,7 +270,7 @@ func TestSwitchTenantRejectsUnjoined(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewContext()
+	ctx := testsetup.NewContext(testkit.WithContext(testutil.BuildIamContext(1)))
 
 	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
 	require.NoError(t, err)
@@ -292,7 +294,7 @@ func TestMyTenants(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewContext()
+	ctx := testsetup.NewContext(testkit.WithContext(testutil.BuildIamContext(1)))
 
 	tenant1, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant1"), "test_tag1")
 	require.NoError(t, err)
@@ -325,7 +327,7 @@ func TestJoinTenant(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewContext()
+	ctx := testsetup.NewContext(testkit.WithContext(testutil.BuildIamContext(1)))
 
 	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
 	require.NoError(t, err)
@@ -361,7 +363,7 @@ func TestUserinfo(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewContext()
+	ctx := testsetup.NewContext(testkit.WithContext(testutil.BuildIamContext(1)))
 
 	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
 	require.NoError(t, err)
@@ -394,7 +396,7 @@ func TestRefreshTokenValid(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewContext()
+	ctx := testsetup.NewContext(testkit.WithContext(testutil.BuildIamContext(1)))
 
 	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
 	require.NoError(t, err)
@@ -429,7 +431,7 @@ func TestLogout(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewContext()
+	ctx := testsetup.NewContext(testkit.WithContext(testutil.BuildIamContext(1)))
 
 	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
 	require.NoError(t, err)
