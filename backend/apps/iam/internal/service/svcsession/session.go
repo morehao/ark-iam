@@ -11,6 +11,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/glog"
+	"gorm.io/gorm"
 )
 
 type SessionSvc interface {
@@ -21,8 +22,7 @@ type SessionSvc interface {
 
 type sessionStore interface {
 	GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.RefreshTokenEntityList, int64, error)
-	RevokeByID(ctx context.Context, id, personID, tenantID, userID uint) error
-	RevokeAllByUserID(ctx context.Context, personID, tenantID, userID uint) error
+	UpdateMap(ctx context.Context, id uint, updates map[string]any) error
 }
 
 var newSessionStore = func() sessionStore {
@@ -99,7 +99,7 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, perso
 func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID, tenantID, personID uint) error {
 	sessionDao := newSessionStore()
 
-	if err := sessionDao.RevokeByID(ctx.Request.Context(), uint(req.SessionID), personID, tenantID, userID); err != nil {
+	if err := sessionDao.UpdateMap(ctx.Request.Context(), uint(req.SessionID), map[string]any{"revoked_at": gorm.Expr("NOW()")}); err != nil {
 		glog.Errorf(ctx, "[sessionSvc.Revoke] revoke fail, err:%v", err)
 		return code.GetError(code.SessionRevokeError)
 	}
@@ -108,9 +108,12 @@ func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, u
 }
 
 func (svc *sessionSvc) RevokeAll(ctx *gin.Context, userID, tenantID, personID uint) error {
-	sessionDao := newSessionStore()
-
-	if err := sessionDao.RevokeAllByUserID(ctx, personID, tenantID, userID); err != nil {
+	cond := &dao.SessionCond{
+		PersonID: personID,
+		TenantID: tenantID,
+		UserID:   userID,
+	}
+	if err := cond.RevokeAll(ctx.Request.Context()); err != nil {
 		glog.Errorf(ctx, "[sessionSvc.RevokeAll] revoke all fail, err:%v", err)
 		return code.GetError(code.SessionRevokeError)
 	}

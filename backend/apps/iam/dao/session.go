@@ -44,12 +44,8 @@ func NewSessionDao() *SessionDao {
 	}
 }
 
-func (d *SessionDao) RevokeByID(ctx context.Context, id, personID, tenantID, userID uint) error {
-	return d.UpdateMap(ctx, id, map[string]any{"revoked_at": gorm.Expr("NOW()")})
-}
-
-func (d *SessionDao) RevokeAllByUserID(ctx context.Context, personID, tenantID, userID uint) error {
-	return dbclient.IamDB(ctx).Model(&model.RefreshTokenEntity{}).
-		Where("person_id = ? AND tenant_id = ? AND user_id = ? AND revoked_at IS NULL", personID, tenantID, userID).
-		Update("revoked_at", gorm.Expr("NOW()")).Error
+func (c *SessionCond) RevokeAll(ctx context.Context) error {
+	db := dbclient.IamDB(ctx).Model(&model.RefreshTokenEntity{}).Table(model.TableNameRefreshToken)
+	c.BuildCondition(db, model.TableNameRefreshToken)
+	return db.Updates(map[string]any{"revoked_at": gorm.Expr("NOW()")}).Error
 }

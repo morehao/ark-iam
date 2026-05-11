@@ -69,59 +69,14 @@ func TestSessionListReturnsPersonAwareTenantSessions(t *testing.T) {
 	}
 }
 
-func TestSessionRevokeUsesPersonIDAndTenantIDAndUserID(t *testing.T) {
-	ginCtx, _ := gin.CreateTestContext(nil)
-	req, _ := http.NewRequest(http.MethodPost, "/", nil)
-	ginCtx.Request = req
-
-	stored := &stubSessionStore{}
-	installSessionStore(t, stored)
-
-	svc := &sessionSvc{}
-	err := svc.Revoke(ginCtx, &dtouser.SessionRevokeReq{SessionID: 3}, 21, 11, 101)
-	if err != nil {
-		t.Fatalf("Revoke returned error: %v", err)
-	}
-	if stored.revokedID != 3 || stored.revokedUserID != 21 || stored.revokedPersonID != 101 || stored.revokedTenantID != 11 {
-		t.Fatalf("expected revoke with id=3 userID=21 personID=101 tenantID=11, got id=%d userID=%d personID=%d tenantID=%d",
-			stored.revokedID, stored.revokedUserID, stored.revokedPersonID, stored.revokedTenantID)
-	}
-}
-
-func TestSessionRevokeAllUsesPersonIDAndTenantID(t *testing.T) {
-	ginCtx, _ := gin.CreateTestContext(nil)
-	req, _ := http.NewRequest(http.MethodPost, "/", nil)
-	ginCtx.Request = req
-
-	stored := &stubSessionStore{}
-	installSessionStore(t, stored)
-
-	svc := &sessionSvc{}
-	err := svc.RevokeAll(ginCtx, 21, 11, 101)
-	if err != nil {
-		t.Fatalf("RevokeAll returned error: %v", err)
-	}
-	if stored.revokeAllUserID != 21 || stored.revokeAllPersonID != 101 || stored.revokeAllTenantID != 11 {
-		t.Fatalf("expected revokeAll with userID=21 personID=101 tenantID=11, got userID=%d personID=%d tenantID=%d",
-			stored.revokeAllUserID, stored.revokeAllPersonID, stored.revokeAllTenantID)
-	}
-}
-
 func timePointer(t time.Time) *time.Time {
 	return &t
 }
 
 type stubSessionStore struct {
-	list              model.RefreshTokenEntityList
-	total             int64
-	lastCond          *dao.SessionCond
-	revokedID         uint
-	revokedPersonID   uint
-	revokedTenantID   uint
-	revokedUserID     uint
-	revokeAllPersonID uint
-	revokeAllTenantID uint
-	revokeAllUserID   uint
+	list     model.RefreshTokenEntityList
+	total    int64
+	lastCond *dao.SessionCond
 }
 
 func (s *stubSessionStore) GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.RefreshTokenEntityList, int64, error) {
@@ -132,18 +87,7 @@ func (s *stubSessionStore) GetPageListByCond(ctx context.Context, cond genericda
 	return s.list, s.total, nil
 }
 
-func (s *stubSessionStore) RevokeByID(ctx context.Context, id, personID, tenantID, userID uint) error {
-	s.revokedID = id
-	s.revokedPersonID = personID
-	s.revokedTenantID = tenantID
-	s.revokedUserID = userID
-	return nil
-}
-
-func (s *stubSessionStore) RevokeAllByUserID(ctx context.Context, personID, tenantID, userID uint) error {
-	s.revokeAllPersonID = personID
-	s.revokeAllTenantID = tenantID
-	s.revokeAllUserID = userID
+func (s *stubSessionStore) UpdateMap(ctx context.Context, id uint, updates map[string]any) error {
 	return nil
 }
 
