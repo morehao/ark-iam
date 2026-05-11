@@ -37,6 +37,10 @@ func TestAuthAndConnectorRoutesUseUnifiedEndpoints(t *testing.T) {
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/login")
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/register")
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/refreshToken")
+	assertRouteRegistered(t, paths, http.MethodGet, "/v1/iam/myTenants")
+	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/selectTenant")
+	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/switchTenant")
+	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/logoutAll")
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/user/pageList")
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/user/assignDepartments")
 	assertRouteRegistered(t, paths, http.MethodGet, "/v1/iam/user/getUserDepartmentRelationByUser")
@@ -47,6 +51,8 @@ func TestAuthAndConnectorRoutesUseUnifiedEndpoints(t *testing.T) {
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/tenant/pageList")
 	assertRouteRegistered(t, paths, http.MethodGet, "/v1/iam/userinfo")
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/logout")
+	assertRouteRegistered(t, paths, http.MethodGet, "/v1/iam/person/detail")
+	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/person/updatePassword")
 
 	assertRouteMissing(t, paths, http.MethodGet, "/v1/iam/connector/factories")
 	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/connector/:connectorId/authorization-url")
@@ -78,10 +84,16 @@ func TestIAMRoutersWhitelistPublicAuthEndpoints(t *testing.T) {
 	assertAnonymousRouteAccessible(t, engine, http.MethodPost, "/v1/iam/register")
 	assertAnonymousRouteAccessible(t, engine, http.MethodPost, "/v1/iam/refreshToken")
 	assertAnonymousRouteAccessible(t, engine, http.MethodGet, "/v1/iam/connector/callback")
+	assertAnonymousRouteAccessible(t, engine, http.MethodGet, "/v1/iam/myTenants")
+	assertAnonymousRouteAccessible(t, engine, http.MethodPost, "/v1/iam/selectTenant")
 
 	assertAnonymousRouteBlocked(t, engine, http.MethodPost, "/v1/iam/user/pageList")
 	assertAnonymousRouteBlocked(t, engine, http.MethodGet, "/v1/iam/userinfo")
 	assertAnonymousRouteBlocked(t, engine, http.MethodPost, "/v1/iam/logout")
+	assertAnonymousRouteBlocked(t, engine, http.MethodPost, "/v1/iam/switchTenant")
+	assertAnonymousRouteBlocked(t, engine, http.MethodPost, "/v1/iam/logoutAll")
+	assertAnonymousRouteBlocked(t, engine, http.MethodGet, "/v1/iam/person/detail")
+	assertAnonymousRouteBlocked(t, engine, http.MethodPost, "/v1/iam/person/updatePassword")
 }
 
 func assertRouteRegistered(t *testing.T, routes map[string]map[string]bool, method, path string) {

@@ -308,8 +308,9 @@ func (svc *applicationSvc) ListSecrets(ctx *gin.Context, req *dtoapplication.App
 	secretDao := dao.NewApplicationSecretDao()
 
 	list, total, err := secretDao.GetPageListByCond(ctx, &dao.ApplicationSecretCond{
+		BaseCond:      &genericdao.BaseCond{Page: 1, PageSize: 100},
 		ApplicationID: req.ApplicationID,
-	}, 1, 100)
+	})
 	if err != nil {
 		glog.Errorf(ctx, "[applicationSvc.ListSecrets] get secrets fail, err:%v", err)
 		return nil, code.GetError(code.ApplicationSecretGetListError)

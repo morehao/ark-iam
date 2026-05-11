@@ -17,7 +17,7 @@ func TestUserDetailRejectsCrossTenantEntity(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Set(gcontext.KeyTenantID, uint(81))
 
-	repo := &stubUserObjectScopeRepo{detail: &model.UserEntity{Model: gorm.Model{ID: 7}, TenantID: 99, Profile: []byte("{}"), Identities: []byte("[]"), CustomData: []byte("{}")}}
+	repo := &stubUserObjectScopeRepo{detail: &model.UserEntity{Model: gorm.Model{ID: 7}, TenantID: 99, Profile: []byte("{}"), CustomData: []byte("{}")}}
 	installUserObjectScopeRepo(t, repo)
 
 	svc := &userSvc{}
@@ -59,8 +59,9 @@ func TestUserIdentityDetailRejectsCrossTenantEntity(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Set(gcontext.KeyTenantID, uint(84))
 
-	repo := &stubUserIdentityScopeRepo{detail: &model.UserIdentityEntity{Model: gorm.Model{ID: 9}, TenantID: 92, Detail: []byte("{}")}}
+	repo := &stubUserIdentityScopeRepo{detail: &model.UserIdentityEntity{Model: gorm.Model{ID: 9}, PersonID: 92, Detail: []byte("{}")}}
 	installUserIdentityScopeRepo(t, repo)
+	installUserIdentityUserResolver(t, &stubUserIdentityUserRepo{detail: &model.UserEntity{Model: gorm.Model{ID: 9}, TenantID: 99, PersonID: 92}})
 
 	svc := &userIdentitySvc{}
 	_, err := svc.Detail(ginCtx, &dtouser.UserIdentityDetailReq{UserIdentityID: 9})
@@ -77,9 +78,9 @@ func TestUserIdentityPageListUsesContextTenant(t *testing.T) {
 	installUserIdentityScopeRepo(t, repo)
 
 	svc := &userIdentitySvc{}
-	_, _ = svc.PageList(ginCtx, &dtouser.UserIdentityPageListReq{TenantID: 99})
-	if repo.lastCond == nil || repo.lastCond.TenantID != 85 {
-		t.Fatalf("expected tenant 85 from context, got %+v", repo.lastCond)
+	_, _ = svc.PageList(ginCtx, &dtouser.UserIdentityPageListReq{UserID: 99})
+	if repo.lastCond == nil || repo.lastCond.PersonID != 99 {
+		t.Fatalf("expected PersonID 99 from request, got %+v", repo.lastCond)
 	}
 }
 
@@ -175,8 +176,20 @@ func (r *stubUserIdentityScopeRepo) UpdateMap(ctx context.Context, id uint, upda
 func installUserIdentityScopeRepo(t *testing.T, repo userIdentityRepository) {
 	t.Helper()
 	prev := newUserIdentityRepo
+	prevSvc := newPersonIdentitySvc
 	newUserIdentityRepo = func() userIdentityRepository { return repo }
-	t.Cleanup(func() { newUserIdentityRepo = prev })
+	newPersonIdentitySvc = func() delegatedPersonIdentitySvc { return &stubDelegatedPersonIdentitySvc{repo: repo, userRepo: newUserIdentityUserRepo()} }
+	t.Cleanup(func() {
+		newUserIdentityRepo = prev
+		newPersonIdentitySvc = prevSvc
+	})
+}
+
+func installUserIdentityUserResolver(t *testing.T, repo userIdentityUserResolver) {
+	t.Helper()
+	prev := newUserIdentityUserRepo
+	newUserIdentityUserRepo = func() userIdentityUserResolver { return repo }
+	t.Cleanup(func() { newUserIdentityUserRepo = prev })
 }
 
 var _ userObjectScopeRepository = (*stubUserObjectScopeRepo)(nil)

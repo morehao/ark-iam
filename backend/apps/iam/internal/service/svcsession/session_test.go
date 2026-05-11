@@ -10,100 +10,94 @@ import (
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/iam/model"
-	"github.com/morehao/golib/biz/gobject"
+	"github.com/morehao/golib/biz/genericdao"
 	"gorm.io/gorm"
 )
 
-type fakeSessionStore struct {
-	getPageListByCondFunc func(ctx context.Context, cond *dao.SessionCond, page, pageSize int) ([]model.RefreshTokenEntity, int64, error)
-	revokeByIDFunc        func(ctx context.Context, id, userID uint) error
-	revokeAllByUserIDFunc func(ctx context.Context, userID uint) error
-}
-
-func (f *fakeSessionStore) GetPageListByCond(ctx context.Context, cond *dao.SessionCond, page, pageSize int) ([]model.RefreshTokenEntity, int64, error) {
-	if f.getPageListByCondFunc == nil {
-		return nil, 0, nil
-	}
-	return f.getPageListByCondFunc(ctx, cond, page, pageSize)
-}
-
-func (f *fakeSessionStore) RevokeByID(ctx context.Context, id, userID uint) error {
-	if f.revokeByIDFunc == nil {
-		return nil
-	}
-	return f.revokeByIDFunc(ctx, id, userID)
-}
-
-func (f *fakeSessionStore) RevokeAllByUserID(ctx context.Context, userID uint) error {
-	if f.revokeAllByUserIDFunc == nil {
-		return nil
-	}
-	return f.revokeAllByUserIDFunc(ctx, userID)
-}
-
-func TestSessionListMarksActivityByExpiresAt(t *testing.T) {
+func TestSessionListReturnsPersonAwareTenantSessions(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Request = newSessionTestRequest(t)
-	now := time.Now()
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	ginCtx.Request = req
 
-	restoreSessionStore := swapSessionStoreFactory(func() sessionStore {
-		return &fakeSessionStore{
-			getPageListByCondFunc: func(ctx context.Context, cond *dao.SessionCond, page, pageSize int) ([]model.RefreshTokenEntity, int64, error) {
-				return []model.RefreshTokenEntity{
-					{
-						Model: gorm.Model{ID: 1, CreatedAt: now},
-					},
-					{
-						Model: gorm.Model{ID: 2, CreatedAt: now},
-						ExpiresAt: &gorm.DeletedAt{
-							Time:  now.Add(-time.Minute),
-							Valid: true,
-						},
-					},
-					{
-						Model: gorm.Model{ID: 3, CreatedAt: now},
-						ExpiresAt: &gorm.DeletedAt{
-							Time:  now.Add(time.Minute),
-							Valid: true,
-						},
-					},
-				}, 3, nil
+	stored := &stubSessionStore{
+		list: []model.RefreshTokenEntity{
+			{
+				Model:         gorm.Model{ID: 1, CreatedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)},
+				PersonID:      101,
+				TenantID:      11,
+				UserID:        21,
+				ApplicationID: 1,
+				SessionID:     "session-1",
+				ClientType:    "web",
+				ClientIP:      "10.0.0.1",
+				UserAgent:     "Mozilla/5.0",
+				ExpiresAt:     timePointer(time.Now().Add(time.Hour)),
 			},
-		}
-	})
-	defer restoreSessionStore()
+			{
+				Model:         gorm.Model{ID: 2, CreatedAt: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)},
+				PersonID:      102,
+				TenantID:      12,
+				UserID:        22,
+				ApplicationID: 2,
+				SessionID:     "session-2",
+				ClientType:    "mobile",
+				ClientIP:      "10.0.0.2",
+				UserAgent:     "App/1.0",
+				ExpiresAt:     timePointer(time.Now().Add(time.Hour)),
+			},
+		},
+		total: 2,
+	}
+	installSessionStore(t, stored)
 
-	resp, err := NewSessionSvc().List(ginCtx, &dtouser.SessionListReq{PageQuery: gobject.PageQuery{Page: 1, PageSize: 10}}, 99)
+	svc := &sessionSvc{}
+	resp, err := svc.List(ginCtx, &dtouser.SessionListReq{}, 101, 21, 11)
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
 	}
-	if len(resp.List) != 3 {
-		t.Fatalf("expected 3 sessions, got %d", len(resp.List))
+	if resp.Total != 2 {
+		t.Fatalf("expected total 2, got %d", resp.Total)
 	}
-	if resp.List[0].IsActive {
-		t.Fatal("expected missing expires_at session to be inactive")
+	if len(resp.List) != 2 {
+		t.Fatalf("expected 2 sessions, got %d", len(resp.List))
 	}
-	if resp.List[1].IsActive {
-		t.Fatal("expected expired session to be inactive")
+	if resp.List[0].SessionID != "session-1" || resp.List[0].ClientType != "web" {
+		t.Fatalf("unexpected session list item: %+v", resp.List[0])
 	}
-	if !resp.List[2].IsActive {
-		t.Fatal("expected unexpired session to be active")
+	if stored.lastCond == nil || stored.lastCond.PersonID != 101 || stored.lastCond.UserID != 21 || stored.lastCond.TenantID != 11 {
+		t.Fatalf("expected cond with personID=101 userID=21 tenantID=11, got %+v", stored.lastCond)
 	}
 }
 
-func newSessionTestRequest(t *testing.T) *http.Request {
+func timePointer(t time.Time) *time.Time {
+	return &t
+}
+
+type stubSessionStore struct {
+	list     model.RefreshTokenEntityList
+	total    int64
+	lastCond *dao.SessionCond
+}
+
+func (s *stubSessionStore) GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.RefreshTokenEntityList, int64, error) {
+	if sc, ok := cond.(*dao.SessionCond); ok {
+		clone := *sc
+		s.lastCond = &clone
+	}
+	return s.list, s.total, nil
+}
+
+func (s *stubSessionStore) UpdateMap(ctx context.Context, id uint, updates map[string]any) error {
+	return nil
+}
+
+func installSessionStore(t *testing.T, store sessionStore) {
 	t.Helper()
-	req, err := http.NewRequest(http.MethodGet, "/", nil)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	return req
-}
-
-func swapSessionStoreFactory(factory func() sessionStore) func() {
 	prev := newSessionStore
-	newSessionStore = factory
-	return func() {
-		newSessionStore = prev
+	newSessionStore = func() sessionStore {
+		return store
 	}
+	t.Cleanup(func() {
+		newSessionStore = prev
+	})
 }

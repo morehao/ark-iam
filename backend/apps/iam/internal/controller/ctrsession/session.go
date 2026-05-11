@@ -40,7 +40,9 @@ func (ctr *sessionCtr) List(ctx *gin.Context) {
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	res, err := ctr.sessionSvc.List(ctx, &req, userID)
+	tenantID := gincontext.GetTenantID(ctx)
+	personID := gincontext.GetPersonID(ctx)
+	res, err := ctr.sessionSvc.List(ctx, &req, personID, userID, tenantID)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -63,7 +65,9 @@ func (ctr *sessionCtr) Revoke(ctx *gin.Context) {
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	if err := ctr.sessionSvc.Revoke(ctx, &req, userID); err != nil {
+	tenantID := gincontext.GetTenantID(ctx)
+	personID := gincontext.GetPersonID(ctx)
+	if err := ctr.sessionSvc.Revoke(ctx, &req, userID, tenantID, personID); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -78,7 +82,9 @@ func (ctr *sessionCtr) Revoke(ctx *gin.Context) {
 // @Router /v1/iam/user/sessions [delete]
 func (ctr *sessionCtr) RevokeAll(ctx *gin.Context) {
 	userID := gincontext.GetUserID(ctx)
-	if err := ctr.sessionSvc.RevokeAll(ctx, userID); err != nil {
+	tenantID := gincontext.GetTenantID(ctx)
+	personID := gincontext.GetPersonID(ctx)
+	if err := ctr.sessionSvc.RevokeAll(ctx, userID, tenantID, personID); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

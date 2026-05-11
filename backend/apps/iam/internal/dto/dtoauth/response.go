@@ -6,7 +6,20 @@ import (
 )
 
 type LoginResp struct {
+	PersonToken objauth.PersonTokenInfo `json:"personToken"`
+	Tenants     []objauth.TenantOption  `json:"tenants"`
+}
+
+type SelectTenantResp struct {
 	objauth.TokenInfo
+}
+
+type SwitchTenantResp struct {
+	objauth.TokenInfo
+}
+
+type MyTenantsResp struct {
+	List []objauth.TenantOption `json:"list"`
 }
 
 type RegisterResp struct {
@@ -18,7 +31,8 @@ type RefreshTokenResp struct {
 }
 
 type UserinfoResp struct {
-	objauth.UserInfo
+	PersonInfo objauth.PersonInfo     `json:"personInfo"`
+	UserInfo   objauth.TenantUserInfo `json:"userInfo"`
 }
 
 type ConnectorCreateResp struct {
@@ -40,4 +54,8 @@ type ConnectorPageListItem struct {
 type ConnectorPageListResp struct {
 	List  []ConnectorPageListItem `json:"list"`  // 数据列表
 	Total int64                  `json:"total"` // 数据总条数
+}
+
+type JoinTenantResp struct {
+	UserID uint `json:"userID"` // 用户ID
 }

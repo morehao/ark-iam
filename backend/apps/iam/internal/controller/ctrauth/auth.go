@@ -9,9 +9,14 @@ import (
 
 type AuthCtr interface {
 	Login(ctx *gin.Context)
+	SelectTenant(ctx *gin.Context)
+	SwitchTenant(ctx *gin.Context)
+	MyTenants(ctx *gin.Context)
 	Register(ctx *gin.Context)
+	JoinTenant(ctx *gin.Context)
 	RefreshToken(ctx *gin.Context)
 	Logout(ctx *gin.Context)
+	LogoutAll(ctx *gin.Context)
 	Userinfo(ctx *gin.Context)
 }
 
@@ -48,6 +53,48 @@ func (ctr *authCtr) Login(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+func (ctr *authCtr) SelectTenant(ctx *gin.Context) {
+	var req dtoauth.SelectTenantReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.authSvc.SelectTenant(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+func (ctr *authCtr) SwitchTenant(ctx *gin.Context) {
+	var req dtoauth.SwitchTenantReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.authSvc.SwitchTenant(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+func (ctr *authCtr) MyTenants(ctx *gin.Context) {
+	var req dtoauth.MyTenantsReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.authSvc.MyTenants(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
 // @Tags 认证
 // @Summary 用户注册
 // @accept application/json
@@ -62,6 +109,27 @@ func (ctr *authCtr) Register(ctx *gin.Context) {
 		return
 	}
 	res, err := ctr.authSvc.Register(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 认证
+// @Summary 加入租户
+// @accept application/json
+// @Produce application/json
+// @Param req body dtoauth.JoinTenantReq true "加入租户"
+// @Success 200 {object} gincontext.DtoRender{data=dtoauth.JoinTenantResp}
+// @Router /v1/iam/joinTenant [post]
+func (ctr *authCtr) JoinTenant(ctx *gin.Context) {
+	var req dtoauth.JoinTenantReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.authSvc.JoinTenant(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -104,6 +172,19 @@ func (ctr *authCtr) Logout(ctx *gin.Context) {
 		return
 	}
 	if err := ctr.authSvc.Logout(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, "登出成功")
+}
+
+func (ctr *authCtr) LogoutAll(ctx *gin.Context) {
+	var req dtoauth.LogoutAllReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctr.authSvc.LogoutAll(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

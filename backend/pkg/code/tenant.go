@@ -61,6 +61,14 @@ const (
 	OrganizationRoleUserRelationNotExistError    = 100153
 )
 
+const (
+	DomainCreateError       = 101200
+	DomainDeleteError       = 101201
+	DomainGetPageListError  = 101202
+	DomainNotExistError     = 101203
+	DomainAlreadyExistError = 101204
+)
+
 var tenantErrorMsgMap = gerror.CodeMsgMap{
 	TenantCreateError:      "创建租户管理失败",
 	TenantDeleteError:      "删除租户管理失败",
@@ -100,4 +108,9 @@ var tenantErrorMsgMap = gerror.CodeMsgMap{
 	OrganizationRoleUserRelationDeleteError:      "删除组织角色用户关联失败",
 	OrganizationRoleUserRelationGetPageListError: "查看组织角色用户关联列表失败",
 	OrganizationRoleUserRelationNotExistError:    "组织角色用户关联不存在",
+	DomainCreateError:       "创建域名失败",
+	DomainDeleteError:       "删除域名失败",
+	DomainGetPageListError:  "查看域名列表失败",
+	DomainNotExistError:     "域名不存在",
+	DomainAlreadyExistError: "域名已存在",
 }

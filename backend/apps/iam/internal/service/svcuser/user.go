@@ -147,7 +147,7 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtous
 
 	if req.PrimaryEmail != "" {
 		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
-			TenantID:    req.TenantID,
+			TenantID:     req.TenantID,
 			PrimaryEmail: req.PrimaryEmail,
 		})
 		if existingUser != nil && existingUser.ID != 0 {
@@ -157,7 +157,7 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtous
 
 	if req.PrimaryPhone != "" {
 		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
-			TenantID:    req.TenantID,
+			TenantID:     req.TenantID,
 			PrimaryPhone: req.PrimaryPhone,
 		})
 		if existingUser != nil && existingUser.ID != 0 {
@@ -170,11 +170,6 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtous
 		glog.Errorf(ctx, "[svcuser.Create] json.Marshal profile fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserCreateError)
 	}
-	identitiesJson, err := json.Marshal(req.Identities)
-	if err != nil {
-		glog.Errorf(ctx, "[svcuser.Create] json.Marshal identities fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.UserCreateError)
-	}
 	customDataJson, err := json.Marshal(req.CustomData)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.Create] json.Marshal customData fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -182,20 +177,13 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtous
 	}
 
 	insertEntity := &model.UserEntity{
-		TenantID:          req.TenantID,
-		Username:          req.Username,
-		PrimaryEmail:      req.PrimaryEmail,
-		PrimaryPhone:      req.PrimaryPhone,
-		PasswordEncrypted: req.PasswordEncrypted,
-		PasswordMethod:    req.PasswordMethod,
-		Name:              req.Name,
-		Avatar:            req.Avatar,
-		Profile:           profileJson,
-		ApplicationID:     req.ApplicationID,
-		Identities:        identitiesJson,
-		CustomData:        customDataJson,
-		IsSuspended:       req.IsSuspended,
-		CreatedBy:         gincontext.GetUserID(ctx),
+		TenantID:    req.TenantID,
+		Name:        req.Name,
+		Avatar:      req.Avatar,
+		Profile:     profileJson,
+		CustomData:  customDataJson,
+		IsSuspended: req.IsSuspended,
+		CreatedBy:   gincontext.GetUserID(ctx),
 	}
 
 	if err := userDao.Insert(ctx, insertEntity); err != nil {
@@ -236,7 +224,7 @@ func (svc *userSvc) Update(ctx *gin.Context, req *dtouser.UserUpdateReq) error {
 		return code.GetError(code.UserNotExistError)
 	}
 
-	if req.Username != "" && req.Username != userEntity.Username {
+	if req.Username != "" {
 		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
 			TenantID: req.TenantID,
 			Username: req.Username,
@@ -246,9 +234,9 @@ func (svc *userSvc) Update(ctx *gin.Context, req *dtouser.UserUpdateReq) error {
 		}
 	}
 
-	if req.PrimaryEmail != "" && req.PrimaryEmail != userEntity.PrimaryEmail {
+	if req.PrimaryEmail != "" {
 		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
-			TenantID:    req.TenantID,
+			TenantID:     req.TenantID,
 			PrimaryEmail: req.PrimaryEmail,
 		})
 		if existingUser != nil && existingUser.ID != 0 && existingUser.ID != req.UserID {
@@ -256,9 +244,9 @@ func (svc *userSvc) Update(ctx *gin.Context, req *dtouser.UserUpdateReq) error {
 		}
 	}
 
-	if req.PrimaryPhone != "" && req.PrimaryPhone != userEntity.PrimaryPhone {
+	if req.PrimaryPhone != "" {
 		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
-			TenantID:    req.TenantID,
+			TenantID:     req.TenantID,
 			PrimaryPhone: req.PrimaryPhone,
 		})
 		if existingUser != nil && existingUser.ID != 0 && existingUser.ID != req.UserID {
@@ -271,11 +259,6 @@ func (svc *userSvc) Update(ctx *gin.Context, req *dtouser.UserUpdateReq) error {
 		glog.Errorf(ctx, "[svcuser.Update] json.Marshal profile fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserUpdateError)
 	}
-	identitiesJson, err := json.Marshal(req.Identities)
-	if err != nil {
-		glog.Errorf(ctx, "[svcuser.Update] json.Marshal identities fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.UserUpdateError)
-	}
 	customDataJson, err := json.Marshal(req.CustomData)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.Update] json.Marshal customData fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -284,20 +267,13 @@ func (svc *userSvc) Update(ctx *gin.Context, req *dtouser.UserUpdateReq) error {
 
 	userID := gincontext.GetUserID(ctx)
 	updateMap := map[string]any{
-		"tenant_id":          req.TenantID,
-		"username":           req.Username,
-		"primary_email":      req.PrimaryEmail,
-		"primary_phone":      req.PrimaryPhone,
-		"password_encrypted": req.PasswordEncrypted,
-		"password_method":    req.PasswordMethod,
-		"name":               req.Name,
-		"avatar":             req.Avatar,
-		"profile":            profileJson,
-		"application_id":     req.ApplicationID,
-		"identities":         identitiesJson,
-		"custom_data":        customDataJson,
-		"is_suspended":       req.IsSuspended,
-		"updated_by":         userID,
+		"tenant_id":    req.TenantID,
+		"name":         req.Name,
+		"avatar":       req.Avatar,
+		"profile":      profileJson,
+		"custom_data":  customDataJson,
+		"is_suspended": req.IsSuspended,
+		"updated_by":   userID,
 	}
 	if err := dao.NewUserDao().UpdateMap(ctx, req.UserID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcuser.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -321,11 +297,6 @@ func (svc *userSvc) Detail(ctx *gin.Context, req *dtouser.UserDetailReq) (*dtous
 		glog.Errorf(ctx, "[svcuser.Detail] json.Unmarshal profile fail, err:%v", err)
 		return nil, code.GetError(code.UserGetDetailError)
 	}
-	var identities any
-	if err := json.Unmarshal(userEntity.Identities, &identities); err != nil {
-		glog.Errorf(ctx, "[svcuser.Detail] json.Unmarshal identities fail, err:%v", err)
-		return nil, code.GetError(code.UserGetDetailError)
-	}
 	var customData any
 	if err := json.Unmarshal(userEntity.CustomData, &customData); err != nil {
 		glog.Errorf(ctx, "[svcuser.Detail] json.Unmarshal customData fail, err:%v", err)
@@ -335,19 +306,12 @@ func (svc *userSvc) Detail(ctx *gin.Context, req *dtouser.UserDetailReq) (*dtous
 	resp := &dtouser.UserDetailResp{
 		UserID: userEntity.ID,
 		UserBaseInfo: objuser.UserBaseInfo{
-			TenantID:          userEntity.TenantID,
-			Username:          userEntity.Username,
-			PrimaryEmail:      userEntity.PrimaryEmail,
-			PrimaryPhone:      userEntity.PrimaryPhone,
-			PasswordEncrypted: userEntity.PasswordEncrypted,
-			PasswordMethod:    userEntity.PasswordMethod,
-			Name:              userEntity.Name,
-			Avatar:            userEntity.Avatar,
-			Profile:           profile,
-			ApplicationID:     userEntity.ApplicationID,
-			Identities:        identities,
-			CustomData:        customData,
-			IsSuspended:       userEntity.IsSuspended,
+			TenantID:    userEntity.TenantID,
+			Name:        userEntity.Name,
+			Avatar:      userEntity.Avatar,
+			Profile:     profile,
+			CustomData:  customData,
+			IsSuspended: userEntity.IsSuspended,
 		},
 		OperatorBaseInfo: gobject.OperatorBaseInfo{
 			CreatedAt: userEntity.CreatedAt.Unix(),
@@ -364,12 +328,9 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtouser.UserPageListReq) (*d
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID:     gincontext.GetTenantID(ctx),
-		Username:     req.Username,
-		PrimaryEmail: req.PrimaryEmail,
-		PrimaryPhone: req.PrimaryPhone,
-		Name:         req.Name,
-		IsSuspended:  req.IsSuspended,
+		TenantID:    gincontext.GetTenantID(ctx),
+		Name:        req.Name,
+		IsSuspended: req.IsSuspended,
 	}
 	userEntityList, total, err := userRepo.GetPageListByCond(ctx, cond)
 	if err != nil {
@@ -384,11 +345,6 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtouser.UserPageListReq) (*d
 			glog.Errorf(ctx, "[svcuser.PageList] json.Unmarshal profile fail, err:%v", err)
 			continue
 		}
-		var identities any
-		if err := json.Unmarshal(v.Identities, &identities); err != nil {
-			glog.Errorf(ctx, "[svcuser.PageList] json.Unmarshal identities fail, err:%v", err)
-			continue
-		}
 		var customData any
 		if err := json.Unmarshal(v.CustomData, &customData); err != nil {
 			glog.Errorf(ctx, "[svcuser.PageList] json.Unmarshal customData fail, err:%v", err)
@@ -397,19 +353,12 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtouser.UserPageListReq) (*d
 		list = append(list, dtouser.UserPageListItem{
 			UserID: v.ID,
 			UserBaseInfo: objuser.UserBaseInfo{
-				TenantID:          v.TenantID,
-				Username:          v.Username,
-				PrimaryEmail:      v.PrimaryEmail,
-				PrimaryPhone:      v.PrimaryPhone,
-				PasswordEncrypted: v.PasswordEncrypted,
-				PasswordMethod:    v.PasswordMethod,
-				Name:              v.Name,
-				Avatar:            v.Avatar,
-				Profile:           profile,
-				ApplicationID:     v.ApplicationID,
-				Identities:        identities,
-				CustomData:        customData,
-				IsSuspended:       v.IsSuspended,
+				TenantID:    v.TenantID,
+				Name:        v.Name,
+				Avatar:      v.Avatar,
+				Profile:     profile,
+				CustomData:  customData,
+				IsSuspended: v.IsSuspended,
 			},
 			OperatorBaseInfo: gobject.OperatorBaseInfo{
 				UpdatedAt: v.UpdatedAt.Unix(),
@@ -433,11 +382,7 @@ func (svc *userSvc) UpdatePassword(ctx *gin.Context, req *dtouser.UserPasswordUp
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	updateMap := map[string]any{
-		"password_encrypted": req.PasswordEncrypted,
-		"password_method":    req.PasswordMethod,
-		"updated_by":         userID,
-	}
+	updateMap := map[string]any{"updated_by": userID}
 	if err := dao.NewUserDao().UpdateMap(ctx, req.UserID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcuser.UpdatePassword] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserUpdateError)

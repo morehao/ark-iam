@@ -13,16 +13,16 @@ type stubSessionSvc struct {
 	revokeReq *dtouser.SessionRevokeReq
 }
 
-func (s *stubSessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, userID uint) (*dtouser.SessionListResp, error) {
+func (s *stubSessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, personID, userID, tenantID uint) (*dtouser.SessionListResp, error) {
 	panic("unexpected call")
 }
 
-func (s *stubSessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID uint) error {
+func (s *stubSessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID, tenantID, personID uint) error {
 	s.revokeReq = req
 	return nil
 }
 
-func (s *stubSessionSvc) RevokeAll(ctx *gin.Context, userID uint) error {
+func (s *stubSessionSvc) RevokeAll(ctx *gin.Context, userID, tenantID, personID uint) error {
 	panic("unexpected call")
 }
 

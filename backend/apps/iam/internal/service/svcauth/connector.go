@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -51,7 +52,7 @@ type connectorScopeRepository interface {
 }
 
 type connectorIdentityResolver interface {
-	Resolve(ctx context.Context, input identityResolveInput) (*model.UserEntity, error)
+	Resolve(ctx context.Context, input identityResolveInput) (*resolvedConnectorPerson, error)
 }
 
 type connectorSvc struct {
@@ -117,8 +118,7 @@ func (svc *connectorSvc) getTokenGenerator() func(ctx *gin.Context, userEntity *
 
 func (svc *connectorSvc) getLoginRecorder() func(ctx *gin.Context, tenantID, userID uint, success bool) {
 	if svc.loginRecorder == nil {
-		authRuntime := &authSvc{}
-		svc.loginRecorder = authRuntime.recordLoginLog
+		svc.loginRecorder = authLoginRecorder
 	}
 	return svc.loginRecorder
 }
@@ -461,7 +461,7 @@ func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorC
 	if err != nil {
 		return nil, err
 	}
-	userEntity, err := svc.getIdentityResolver().Resolve(runtimeContext(ctx), identityResolveInput{
+	resolvedPerson, err := svc.getIdentityResolver().Resolve(runtimeContext(ctx), identityResolveInput{
 		Connector: ConnectorRuntime{
 			ID:                  connectorEntity.ID,
 			TenantID:            connectorEntity.TenantID,
@@ -472,17 +472,30 @@ func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorC
 	if err != nil {
 		return nil, err
 	}
+	if resolvedPerson == nil || resolvedPerson.Person == nil || resolvedPerson.Person.ID == 0 {
+		return nil, code.GetError(code.UserNotExistError)
+	}
 	if _, err := svc.getStateStore().Consume(runtimeContext(ctx), req.State); err != nil {
 		glog.Errorf(ctx, "[svcauth.Callback] consume state fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.AuthLoginFailedError)
 	}
-	tokenInfo, err := svc.getTokenGenerator()(ctx, userEntity)
+	authRuntime := &authSvc{jwtSecret: connectorJWTSignKey()}
+	personToken, err := authRuntime.generatePersonToken(resolvedPerson.Person)
 	if err != nil {
-		glog.Errorf(ctx, "[svcauth.Callback] generate token fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		glog.Errorf(ctx, "[svcauth.Callback] generate person token fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TokenGenerateError)
 	}
-	svc.getLoginRecorder()(ctx, connectorEntity.TenantID, userEntity.ID, true)
-	return &dtoauth.LoginResp{TokenInfo: *tokenInfo}, nil
+	tenantCtx := ctx
+	if tenantCtx == nil {
+		tenantCtx, _ = gin.CreateTestContext(nil)
+		req, _ := http.NewRequest(http.MethodPost, "/", nil)
+		tenantCtx.Request = req
+	}
+	_, tenants, err := authRuntime.listPersonTenants(tenantCtx, resolvedPerson.Person.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &dtoauth.LoginResp{PersonToken: *personToken, Tenants: tenants}, nil
 }
 
 func unmarshalJSON(data json.RawMessage) any {

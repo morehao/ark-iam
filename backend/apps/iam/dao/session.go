@@ -11,6 +11,7 @@ import (
 
 type SessionCond struct {
 	*genericdao.BaseCond
+	PersonID uint
 	TenantID uint
 	UserID   uint
 }
@@ -18,6 +19,9 @@ type SessionCond struct {
 func (c *SessionCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
+	}
+	if c.PersonID != 0 {
+		db.Where(tableName + ".person_id = ?", c.PersonID)
 	}
 	if c.TenantID != 0 {
 		db.Where(tableName + ".tenant_id = ?", c.TenantID)
@@ -40,34 +44,8 @@ func NewSessionDao() *SessionDao {
 	}
 }
 
-func (d *SessionDao) GetPageListByCond(ctx context.Context, cond *SessionCond, page, pageSize int) ([]model.RefreshTokenEntity, int64, error) {
-	var total int64
-	db := dbclient.IamDB(ctx)
-	query := db.Model(&model.RefreshTokenEntity{})
-
-	cond.BuildCondition(query, d.TableName)
-
-	if err := query.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var list model.RefreshTokenEntityList
-	offset := (page - 1) * pageSize
-	if err := query.Offset(offset).Limit(pageSize).Order("id DESC").Find(&list).Error; err != nil {
-		return nil, 0, err
-	}
-
-	return list, total, nil
-}
-
-func (d *SessionDao) RevokeByID(ctx context.Context, id, userID uint) error {
-	return dbclient.IamDB(ctx).Model(&model.RefreshTokenEntity{}).
-		Where("id = ? AND user_id = ?", id, userID).
-		Update("revoked_at", gorm.Expr("NOW()")).Error
-}
-
-func (d *SessionDao) RevokeAllByUserID(ctx context.Context, userID uint) error {
-	return dbclient.IamDB(ctx).Model(&model.RefreshTokenEntity{}).
-		Where("user_id = ? AND revoked_at IS NULL", userID).
-		Update("revoked_at", gorm.Expr("NOW()")).Error
+func (c *SessionCond) RevokeAll(ctx context.Context) error {
+	db := dbclient.IamDB(ctx).Model(&model.RefreshTokenEntity{}).Table(model.TableNameRefreshToken)
+	c.BuildCondition(db, model.TableNameRefreshToken)
+	return db.Updates(map[string]any{"revoked_at": gorm.Expr("NOW()")}).Error
 }

@@ -9,19 +9,20 @@ import (
 	"github.com/morehao/ark-iam/iam/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/glog"
+	"gorm.io/gorm"
 )
 
 type SessionSvc interface {
-	List(ctx *gin.Context, req *dtouser.SessionListReq, userID uint) (*dtouser.SessionListResp, error)
-	Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID uint) error
-	RevokeAll(ctx *gin.Context, userID uint) error
+	List(ctx *gin.Context, req *dtouser.SessionListReq, personID, userID, tenantID uint) (*dtouser.SessionListResp, error)
+	Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID, tenantID, personID uint) error
+	RevokeAll(ctx *gin.Context, userID, tenantID, personID uint) error
 }
 
 type sessionStore interface {
-	GetPageListByCond(ctx context.Context, cond *dao.SessionCond, page, pageSize int) ([]model.RefreshTokenEntity, int64, error)
-	RevokeByID(ctx context.Context, id, userID uint) error
-	RevokeAllByUserID(ctx context.Context, userID uint) error
+	GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.RefreshTokenEntityList, int64, error)
+	UpdateMap(ctx context.Context, id uint, updates map[string]any) error
 }
 
 var newSessionStore = func() sessionStore {
@@ -36,7 +37,7 @@ func NewSessionSvc() SessionSvc {
 	return &sessionSvc{}
 }
 
-func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, userID uint) (*dtouser.SessionListResp, error) {
+func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, personID, userID, tenantID uint) (*dtouser.SessionListResp, error) {
 	sessionDao := newSessionStore()
 
 	page := req.Page
@@ -48,9 +49,13 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, userI
 		pageSize = 10
 	}
 
-	list, total, err := sessionDao.GetPageListByCond(ctx.Request.Context(), &dao.SessionCond{
-		UserID: userID,
-	}, page, pageSize)
+	cond := &dao.SessionCond{
+		BaseCond: &genericdao.BaseCond{Page: page, PageSize: pageSize},
+		PersonID: personID,
+		UserID:   userID,
+		TenantID: tenantID,
+	}
+	list, total, err := sessionDao.GetPageListByCond(ctx.Request.Context(), cond)
 	if err != nil {
 		glog.Errorf(ctx, "[sessionSvc.List] get page list fail, err:%v", err)
 		return nil, code.GetError(code.SessionGetListError)
@@ -60,21 +65,25 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, userI
 	now := time.Now()
 	for _, item := range list {
 		var isActive bool
-		if item.RevokedAt != nil && item.RevokedAt.Valid {
+		if item.RevokedAt != nil {
 			isActive = false
-		} else if item.ExpiresAt == nil || !item.ExpiresAt.Valid || !item.ExpiresAt.Time.After(now) {
+		} else if item.ExpiresAt == nil || !item.ExpiresAt.After(now) {
 			isActive = false
 		} else {
 			isActive = true
 		}
 		expiresAt := ""
-		if item.ExpiresAt != nil && item.ExpiresAt.Valid {
-			expiresAt = item.ExpiresAt.Time.Format("2006-01-02 15:04:05")
+		if item.ExpiresAt != nil {
+			expiresAt = item.ExpiresAt.Format("2006-01-02 15:04:05")
 		}
 		sessions = append(sessions, dtouser.SessionResp{
 			ID:            uint64(item.ID),
+			SessionID:     item.SessionID,
 			ApplicationID: uint64(item.ApplicationID),
 			TenantID:      uint64(item.TenantID),
+			ClientType:    item.ClientType,
+			ClientIP:      item.ClientIP,
+			UserAgent:     item.UserAgent,
 			ExpiresAt:     &expiresAt,
 			CreatedAt:     item.CreatedAt.Format("2006-01-02 15:04:05"),
 			IsActive:      isActive,
@@ -87,10 +96,10 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, userI
 	}, nil
 }
 
-func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID uint) error {
+func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID, tenantID, personID uint) error {
 	sessionDao := newSessionStore()
 
-	if err := sessionDao.RevokeByID(ctx.Request.Context(), uint(req.SessionID), userID); err != nil {
+	if err := sessionDao.UpdateMap(ctx.Request.Context(), uint(req.SessionID), map[string]any{"revoked_at": gorm.Expr("NOW()")}); err != nil {
 		glog.Errorf(ctx, "[sessionSvc.Revoke] revoke fail, err:%v", err)
 		return code.GetError(code.SessionRevokeError)
 	}
@@ -98,10 +107,13 @@ func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, u
 	return nil
 }
 
-func (svc *sessionSvc) RevokeAll(ctx *gin.Context, userID uint) error {
-	sessionDao := newSessionStore()
-
-	if err := sessionDao.RevokeAllByUserID(ctx, userID); err != nil {
+func (svc *sessionSvc) RevokeAll(ctx *gin.Context, userID, tenantID, personID uint) error {
+	cond := &dao.SessionCond{
+		PersonID: personID,
+		TenantID: tenantID,
+		UserID:   userID,
+	}
+	if err := cond.RevokeAll(ctx.Request.Context()); err != nil {
 		glog.Errorf(ctx, "[sessionSvc.RevokeAll] revoke all fail, err:%v", err)
 		return code.GetError(code.SessionRevokeError)
 	}

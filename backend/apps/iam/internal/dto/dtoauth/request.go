@@ -6,9 +6,25 @@ import (
 )
 
 type LoginReq struct {
-	TenantID   uint   `json:"tenantID" binding:"required"`     // 租户ID
 	Identifier string `json:"identifier" binding:"required"`   // 用户名/邮箱/手机号
 	Password   string `json:"password" binding:"required"`     // 密码
+}
+
+type SelectTenantReq struct {
+	TenantID    uint   `json:"tenantID" binding:"required"`       // 租户ID
+	PersonToken string `json:"personToken"`                        // 自然人令牌
+}
+
+type SwitchTenantReq struct {
+	TenantID uint `json:"tenantID" binding:"required"` // 租户ID
+}
+
+type MyTenantsReq struct {
+	PersonToken string `json:"personToken" form:"personToken"` // 自然人令牌
+}
+
+type LogoutAllReq struct {
+	RefreshToken string `json:"refreshToken"` // 刷新令牌
 }
 
 type RegisterReq struct {
@@ -26,6 +42,10 @@ type RefreshTokenReq struct {
 
 type LogoutReq struct {
 	RefreshToken string `json:"refreshToken"` // 刷新令牌
+}
+
+type JoinTenantReq struct {
+	TenantID uint `json:"tenantID" binding:"required"` // 租户ID
 }
 
 type UserinfoReq struct {

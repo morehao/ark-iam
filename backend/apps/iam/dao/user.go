@@ -10,6 +10,7 @@ import (
 type UserCond struct {
 	*genericdao.BaseCond
 	TenantID      uint
+	PersonID      uint
 	Username      string
 	PrimaryEmail  string
 	PrimaryPhone  string
@@ -23,25 +24,28 @@ func (c *UserCond) BuildCondition(db *gorm.DB, tableName string) {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
 	if c.TenantID != 0 {
-		db.Where(tableName + ".tenant_id = ?", c.TenantID)
+		db.Where(tableName+".tenant_id = ?", c.TenantID)
+	}
+	if c.PersonID != 0 {
+		db.Where(tableName+".person_id = ?", c.PersonID)
 	}
 	if c.Username != "" {
-		db.Where(tableName + ".username = ?", c.Username)
+		db.Where(tableName+".username = ?", c.Username)
 	}
 	if c.PrimaryEmail != "" {
-		db.Where(tableName + ".primary_email = ?", c.PrimaryEmail)
+		db.Where(tableName+".primary_email = ?", c.PrimaryEmail)
 	}
 	if c.PrimaryPhone != "" {
-		db.Where(tableName + ".primary_phone = ?", c.PrimaryPhone)
+		db.Where(tableName+".primary_phone = ?", c.PrimaryPhone)
 	}
 	if c.Name != "" {
-		db.Where(tableName + ".name = ?", c.Name)
+		db.Where(tableName+".name = ?", c.Name)
 	}
 	if c.IsSuspended != nil {
-		db.Where(tableName + ".is_suspended = ?", *c.IsSuspended)
+		db.Where(tableName+".is_suspended = ?", *c.IsSuspended)
 	}
 	if c.ApplicationID != 0 {
-		db.Where(tableName + ".application_id = ?", c.ApplicationID)
+		db.Where(tableName+".application_id = ?", c.ApplicationID)
 	}
 }
 
