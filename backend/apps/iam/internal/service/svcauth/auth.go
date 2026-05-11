@@ -80,6 +80,7 @@ type AuthSvc interface {
 	SwitchTenant(ctx *gin.Context, req *dtoauth.SwitchTenantReq) (*dtoauth.SwitchTenantResp, error)
 	MyTenants(ctx *gin.Context, req *dtoauth.MyTenantsReq) (*dtoauth.MyTenantsResp, error)
 	Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoauth.RegisterResp, error)
+	JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*dtoauth.JoinTenantResp, error)
 	RefreshToken(ctx *gin.Context, req *dtoauth.RefreshTokenReq) (*dtoauth.RefreshTokenResp, error)
 	Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error
 	LogoutAll(ctx *gin.Context, req *dtoauth.LogoutAllReq) error
@@ -193,6 +194,16 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 
 	personDao := newAuthPersonStore()
 	userDao := newAuthUserStore()
+	tenantDao := newAuthTenantStore()
+
+	tenantEntity, err := tenantDao.GetByID(ctx.Request.Context(), req.TenantID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcauth.Register] tenant dao GetByID fail, err:%v, tenantID:%d", err, req.TenantID)
+		return nil, code.GetError(code.TenantGetDetailError)
+	}
+	if tenantEntity == nil || tenantEntity.ID == 0 {
+		return nil, code.GetError(code.TenantNotExistError)
+	}
 
 	if req.Username != "" {
 		existingPerson, _ := personDao.GetByCond(ctx.Request.Context(), &dao.PersonCond{
@@ -240,10 +251,13 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 		glog.Errorf(ctx, "[svcauth.Register] person dao Insert fail, err:%v", err)
 		return nil, code.GetError(code.UserCreateError)
 	}
+	now := time.Now()
 	insertEntity := &model.UserEntity{
 		TenantID:  req.TenantID,
 		PersonID:  personEntity.ID,
 		Name:      req.Name,
+		IsOwner:   1,
+		JoinedAt:  &now,
 		CreatedBy: 0,
 	}
 
@@ -254,6 +268,52 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 
 	return &dtoauth.RegisterResp{
 		UserID: insertEntity.ID,
+	}, nil
+}
+
+func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*dtoauth.JoinTenantResp, error) {
+	personID := gincontext.GetPersonID(ctx)
+	if personID == 0 {
+		return nil, code.GetError(gconstant.UnauthorizedErr)
+	}
+
+	tenantDao := newAuthTenantStore()
+	userDao := newAuthUserStore()
+
+	tenantEntity, err := tenantDao.GetByID(ctx.Request.Context(), req.TenantID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcauth.JoinTenant] tenant dao GetByID fail, err:%v, tenantID:%d", err, req.TenantID)
+		return nil, code.GetError(code.TenantGetDetailError)
+	}
+	if tenantEntity == nil || tenantEntity.ID == 0 {
+		return nil, code.GetError(code.TenantNotExistError)
+	}
+
+	existingUser, err := userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{PersonID: personID, TenantID: req.TenantID})
+	if err != nil {
+		glog.Errorf(ctx, "[svcauth.JoinTenant] user dao GetByCond fail, err:%v", err)
+		return nil, code.GetError(code.UserGetDetailError)
+	}
+	if existingUser != nil && existingUser.ID != 0 {
+		return nil, code.GetError(code.AlreadyJoinedError)
+	}
+
+	now := time.Now()
+	userEntity := &model.UserEntity{
+		TenantID:  req.TenantID,
+		PersonID:  personID,
+		Name:      "",
+		IsOwner:   0,
+		JoinedAt:  &now,
+		CreatedBy: 0,
+	}
+	if err := userDao.Insert(ctx.Request.Context(), userEntity); err != nil {
+		glog.Errorf(ctx, "[svcauth.JoinTenant] user dao Insert fail, err:%v", err)
+		return nil, code.GetError(code.UserCreateError)
+	}
+
+	return &dtoauth.JoinTenantResp{
+		UserID: userEntity.ID,
 	}, nil
 }
 
@@ -533,7 +593,7 @@ func (svc *authSvc) listPersonTenants(ctx *gin.Context, personID uint) (*model.U
 		if tenantEntity == nil || tenantEntity.ID == 0 {
 			continue
 		}
-		options = append(options, objauth.TenantOption{TenantID: tenantEntity.ID, Name: tenantEntity.Name, Tag: tenantEntity.Tag})
+		options = append(options, objauth.TenantOption{TenantID: tenantEntity.ID, Name: tenantEntity.Name, Tag: tenantEntity.Tag, UserID: joinedUser.ID, IsOwner: joinedUser.IsOwner})
 	}
 	return userEntity, options, nil
 }

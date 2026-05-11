@@ -18,6 +18,7 @@ func authRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/selectTenant", authCtr.SelectTenant)
 	v1RouterGroup.POST("/switchTenant", authCtr.SwitchTenant)
 	v1RouterGroup.POST("/register", authCtr.Register)
+	v1RouterGroup.POST("/joinTenant", authCtr.JoinTenant)
 	v1RouterGroup.POST("/refreshToken", authCtr.RefreshToken)
 	v1RouterGroup.POST("/logout", authCtr.Logout)
 	v1RouterGroup.POST("/logoutAll", authCtr.LogoutAll)

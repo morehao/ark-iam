@@ -2,6 +2,7 @@ package dao
 
 import (
 	"testing"
+	"time"
 
 	"github.com/morehao/ark-iam/iam/model"
 	"gorm.io/driver/sqlite"
@@ -16,9 +17,10 @@ func TestUserCondBuildConditionAppliesIsSuspendedZeroFilter(t *testing.T) {
 	if err := db.AutoMigrate(&model.UserEntity{}); err != nil {
 		t.Fatalf("migrate user: %v", err)
 	}
+	now := time.Now()
 	seed := []model.UserEntity{
-		{TenantID: 1, PersonID: 11, Name: "active-user", Profile: []byte(`{}`), CustomData: []byte(`{}`), IsSuspended: 0, IsOwner: 0},
-		{TenantID: 1, PersonID: 22, Name: "suspended-user", Profile: []byte(`{}`), CustomData: []byte(`{}`), IsSuspended: 1, IsOwner: 0},
+		{TenantID: 1, PersonID: 11, Name: "active-user", Profile: []byte(`{}`), CustomData: []byte(`{}`), IsSuspended: 0, IsOwner: 0, JoinedAt: &now},
+		{TenantID: 1, PersonID: 22, Name: "suspended-user", Profile: []byte(`{}`), CustomData: []byte(`{}`), IsSuspended: 1, IsOwner: 0, JoinedAt: &now},
 	}
 	if err := db.Create(&seed).Error; err != nil {
 		t.Fatalf("seed users: %v", err)

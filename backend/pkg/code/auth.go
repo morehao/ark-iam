@@ -26,6 +26,7 @@ const (
 	RefreshTokenInvalidError   = 110022
 	SessionGetListError        = 110023
 	SessionRevokeError         = 110024
+	AlreadyJoinedError         = 110025
 )
 
 const (
@@ -61,6 +62,7 @@ var tokenErrorMsgMap = gerror.CodeMsgMap{
 	RefreshTokenInvalidError:  "刷新令牌无效",
 	SessionGetListError:       "获取会话列表失败",
 	SessionRevokeError:        "撤销会话失败",
+	AlreadyJoinedError:        "已加入该租户",
 }
 
 func init() {

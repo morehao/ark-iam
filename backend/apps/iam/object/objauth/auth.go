@@ -33,6 +33,8 @@ type TenantOption struct {
 	TenantID uint   `json:"tenantID"` // 租户ID
 	Name     string `json:"name"`     // 租户名称
 	Tag      string `json:"tag"`      // 租户标识
+	UserID   uint   `json:"userID"`   // 用户ID
+	IsOwner  int8   `json:"isOwner"`  // 是否租户拥有者
 }
 
 type UserInfo struct {

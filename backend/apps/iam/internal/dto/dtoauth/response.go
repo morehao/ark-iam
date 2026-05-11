@@ -55,3 +55,7 @@ type ConnectorPageListResp struct {
 	List  []ConnectorPageListItem `json:"list"`  // 数据列表
 	Total int64                  `json:"total"` // 数据总条数
 }
+
+type JoinTenantResp struct {
+	UserID uint `json:"userID"` // 用户ID
+}

@@ -44,6 +44,10 @@ type LogoutReq struct {
 	RefreshToken string `json:"refreshToken"` // 刷新令牌
 }
 
+type JoinTenantReq struct {
+	TenantID uint `json:"tenantID" binding:"required"` // 租户ID
+}
+
 type UserinfoReq struct {
 }
 

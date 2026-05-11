@@ -352,3 +352,130 @@ func TestSwitchTenantRejectsUnjoinedTenant(t *testing.T) {
 	_, err := svc.SwitchTenant(ginCtx, &dtoauth.SwitchTenantReq{TenantID: 99})
 	assertCode(t, err, code.UserNotExistError)
 }
+
+func TestJoinTenantRejectsNonExistentTenant(t *testing.T) {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = httptestRequest(t)
+	ginCtx.Set(gcontext.KeyPersonID, uint(88))
+
+	restoreUserStore := swapUserStoreFactory(func() authUserStore {
+		return &fakeAuthUserStore{
+			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
+				return nil, nil
+			},
+		}
+	})
+	defer restoreUserStore()
+
+	var tenantLookup uint
+	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
+		return &fakeAuthTenantStore{
+			getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
+				tenantLookup = id
+				return nil, nil
+			},
+		}
+	})
+	defer restoreTenantStore()
+
+	svc := &authSvc{jwtSecret: "test-secret"}
+	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{TenantID: 999})
+	assertCode(t, err, code.TenantNotExistError)
+	if tenantLookup != 999 {
+		t.Fatalf("expected tenant lookup with id 999, got %d", tenantLookup)
+	}
+}
+
+func TestJoinTenantRejectsAlreadyJoinedTenant(t *testing.T) {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = httptestRequest(t)
+	ginCtx.Set(gcontext.KeyPersonID, uint(88))
+
+	restoreUserStore := swapUserStoreFactory(func() authUserStore {
+		return &fakeAuthUserStore{
+			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
+				if cond.PersonID != 88 || cond.TenantID != 22 {
+					t.Fatalf("unexpected user lookup cond: %+v", *cond)
+				}
+				return &model.UserEntity{Model: gorm.Model{ID: 101}, TenantID: 22, PersonID: 88, Name: "existing"}, nil
+			},
+		}
+	})
+	defer restoreUserStore()
+
+	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
+		return &fakeAuthTenantStore{
+			getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
+				return &model.TenantEntity{Model: gorm.Model{ID: 22}, Name: "租户A", Tag: "a"}, nil
+			},
+		}
+	})
+	defer restoreTenantStore()
+
+	svc := &authSvc{jwtSecret: "test-secret"}
+	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{TenantID: 22})
+	assertCode(t, err, code.AlreadyJoinedError)
+}
+
+func TestJoinTenantCreatesNonOwnerUser(t *testing.T) {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = httptestRequest(t)
+	ginCtx.Set(gcontext.KeyPersonID, uint(88))
+
+	var insertedUser *model.UserEntity
+	restoreUserStore := swapUserStoreFactory(func() authUserStore {
+		return &fakeAuthUserStore{
+			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
+				return nil, nil
+			},
+			insertFunc: func(ctx context.Context, entity *model.UserEntity) error {
+				entity.ID = 200
+				copied := *entity
+				insertedUser = &copied
+				return nil
+			},
+		}
+	})
+	defer restoreUserStore()
+
+	var tenantLookup uint
+	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
+		return &fakeAuthTenantStore{
+			getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
+				tenantLookup = id
+				return &model.TenantEntity{Model: gorm.Model{ID: 22}, Name: "租户A", Tag: "a"}, nil
+			},
+		}
+	})
+	defer restoreTenantStore()
+
+	svc := &authSvc{jwtSecret: "test-secret"}
+	resp, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{TenantID: 22})
+	if err != nil {
+		t.Fatalf("JoinTenant returned error: %v", err)
+	}
+	if resp == nil || resp.UserID != 200 {
+		t.Fatalf("expected user id 200, got %#v", resp)
+	}
+	if tenantLookup != 22 {
+		t.Fatalf("expected tenant lookup with id 22, got %d", tenantLookup)
+	}
+	if insertedUser == nil {
+		t.Fatal("expected user to be inserted")
+	}
+	if insertedUser.TenantID != 22 {
+		t.Fatalf("expected tenant id 22, got %d", insertedUser.TenantID)
+	}
+	if insertedUser.PersonID != 88 {
+		t.Fatalf("expected person id 88, got %d", insertedUser.PersonID)
+	}
+	if insertedUser.IsOwner != 0 {
+		t.Fatalf("expected join-tenant user to be non-owner (isOwner=0), got %d", insertedUser.IsOwner)
+	}
+	if insertedUser.Name != "" {
+		t.Fatalf("expected empty name for join-tenant user (person name not copied), got %q", insertedUser.Name)
+	}
+	if insertedUser.JoinedAt == nil {
+		t.Fatal("expected join-tenant user to have joined_at set")
+	}
+}
