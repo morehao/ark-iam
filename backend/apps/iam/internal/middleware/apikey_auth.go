@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/golib/biz/gcontext"
+	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/glog"
 )
 
@@ -56,10 +57,11 @@ func (m *apiKeyAuthMiddleware) Middleware() gin.HandlerFunc {
 		keyHash := hashApiKey(rawKey)
 
 		cond := &dao.ApiKeyCond{
-			KeyHash:   keyHash,
-			RevokedAt: &time.Time{},
+			BaseCond:  &genericdao.BaseCond{Page: 1, PageSize: 1},
+			KeyHash:    keyHash,
+			RevokedAt:  &time.Time{},
 		}
-		list, _, err := m.apiKeyDao.GetPageListByCond(ctx, cond, 1, 1)
+		list, _, err := m.apiKeyDao.GetPageListByCond(ctx, cond)
 		if err != nil {
 			glog.Errorf(ctx, "[middleware.ApiKeyAuth] GetPageListByCond fail, err:%v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
@@ -99,8 +101,8 @@ func (m *apiKeyAuthMiddleware) Middleware() gin.HandlerFunc {
 
 		go func() {
 			updateCtx := ctx.Copy()
-			if err := m.apiKeyDao.UpdateLastUsedAt(updateCtx, entity.ID); err != nil {
-				glog.Errorf(updateCtx, "[middleware.ApiKeyAuth] UpdateLastUsedAt fail, err:%v, id:%d", err, entity.ID)
+			if err := m.apiKeyDao.UpdateMap(updateCtx, entity.ID, map[string]any{"last_used_at": time.Now()}); err != nil {
+				glog.Errorf(updateCtx, "[middleware.ApiKeyAuth] UpdateMap fail, err:%v, id:%d", err, entity.ID)
 			}
 		}()
 

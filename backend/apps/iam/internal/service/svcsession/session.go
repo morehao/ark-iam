@@ -9,6 +9,7 @@ import (
 	"github.com/morehao/ark-iam/iam/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/glog"
 )
 
@@ -19,7 +20,7 @@ type SessionSvc interface {
 }
 
 type sessionStore interface {
-	GetPageListByCond(ctx context.Context, cond *dao.SessionCond, page, pageSize int) ([]model.RefreshTokenEntity, int64, error)
+	GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.RefreshTokenEntityList, int64, error)
 	RevokeByID(ctx context.Context, id, personID, tenantID, userID uint) error
 	RevokeAllByUserID(ctx context.Context, personID, tenantID, userID uint) error
 }
@@ -48,11 +49,13 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, perso
 		pageSize = 10
 	}
 
-	list, total, err := sessionDao.GetPageListByCond(ctx.Request.Context(), &dao.SessionCond{
+	cond := &dao.SessionCond{
+		BaseCond: &genericdao.BaseCond{Page: page, PageSize: pageSize},
 		PersonID: personID,
 		UserID:   userID,
 		TenantID: tenantID,
-	}, page, pageSize)
+	}
+	list, total, err := sessionDao.GetPageListByCond(ctx.Request.Context(), cond)
 	if err != nil {
 		glog.Errorf(ctx, "[sessionSvc.List] get page list fail, err:%v", err)
 		return nil, code.GetError(code.SessionGetListError)

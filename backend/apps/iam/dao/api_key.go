@@ -65,59 +65,7 @@ func NewApiKeyDaoWithDB(dbGetter genericdao.DBGetter) *ApiKeyDao {
 	}
 }
 
-func (d *ApiKeyDao) Insert(ctx context.Context, entity *model.ApiKeyEntity) error {
-	return d.GenericDao.Insert(ctx, entity)
-}
-
-func (d *ApiKeyDao) GetByID(ctx context.Context, id uint) (*model.ApiKeyEntity, error) {
-	var entity model.ApiKeyEntity
-	db := d.dbGetter(ctx).Table(d.TableName)
-	if err := db.Where("id = ?", id).First(&entity).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
-		return nil, err
-	}
-	if entity.ID == 0 {
-		return nil, nil
-	}
-	return &entity, nil
-}
-
-func (d *ApiKeyDao) GetPageListByCond(ctx context.Context, cond *ApiKeyCond, page, pageSize int) (model.ApiKeyEntityList, int64, error) {
-	var total int64
-	db := d.dbGetter(ctx).Model(&model.ApiKeyEntity{}).Table(d.TableName)
-	cond.BuildCondition(db, d.TableName)
-
-	if err := db.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var list model.ApiKeyEntityList
-	offset := (page - 1) * pageSize
-	if err := db.Offset(offset).Limit(pageSize).Order("id DESC").Find(&list).Error; err != nil {
-		return nil, 0, err
-	}
-
-	return list, total, nil
-}
-
-func (d *ApiKeyDao) UpdateLastUsedAt(ctx context.Context, id uint) error {
-	return d.dbGetter(ctx).Model(&model.ApiKeyEntity{}).Table(d.TableName).
-		Where("id = ?", id).
-		Update("last_used_at", time.Now()).Error
-}
-
-func (d *ApiKeyDao) Revoke(ctx context.Context, id uint) error {
-	return d.dbGetter(ctx).Model(&model.ApiKeyEntity{}).Table(d.TableName).
-		Where("id = ?", id).
-		Update("revoked_at", time.Now()).Error
-}
-
 func (d *ApiKeyDao) Delete(ctx context.Context, id uint, deletedBy uint) error {
-	db := d.dbGetter(ctx).Model(&model.ApiKeyEntity{}).Table(d.TableName).Where("id = ?", id)
-	if err := db.Update("deleted_by", deletedBy).Error; err != nil {
-		return err
-	}
-	return db.Delete(&model.ApiKeyEntity{}).Error
+	return d.dbGetter(ctx).Model(&model.ApiKeyEntity{}).Table(d.TableName).Where("id = ?", id).
+		Updates(map[string]any{"deleted_by": deletedBy, "deleted_at": time.Now()}).Error
 }

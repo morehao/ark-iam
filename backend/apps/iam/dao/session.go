@@ -44,30 +44,8 @@ func NewSessionDao() *SessionDao {
 	}
 }
 
-func (d *SessionDao) GetPageListByCond(ctx context.Context, cond *SessionCond, page, pageSize int) ([]model.RefreshTokenEntity, int64, error) {
-	var total int64
-	db := dbclient.IamDB(ctx)
-	query := db.Model(&model.RefreshTokenEntity{})
-
-	cond.BuildCondition(query, d.TableName)
-
-	if err := query.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var list model.RefreshTokenEntityList
-	offset := (page - 1) * pageSize
-	if err := query.Offset(offset).Limit(pageSize).Order("id DESC").Find(&list).Error; err != nil {
-		return nil, 0, err
-	}
-
-	return list, total, nil
-}
-
 func (d *SessionDao) RevokeByID(ctx context.Context, id, personID, tenantID, userID uint) error {
-	return dbclient.IamDB(ctx).Model(&model.RefreshTokenEntity{}).
-		Where("id = ? AND person_id = ? AND tenant_id = ? AND user_id = ?", id, personID, tenantID, userID).
-		Update("revoked_at", gorm.Expr("NOW()")).Error
+	return d.UpdateMap(ctx, id, map[string]any{"revoked_at": gorm.Expr("NOW()")})
 }
 
 func (d *SessionDao) RevokeAllByUserID(ctx context.Context, personID, tenantID, userID uint) error {

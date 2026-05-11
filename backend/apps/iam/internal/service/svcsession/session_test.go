@@ -10,6 +10,7 @@ import (
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/golib/biz/genericdao"
 	"gorm.io/gorm"
 )
 
@@ -111,21 +112,23 @@ func timePointer(t time.Time) *time.Time {
 }
 
 type stubSessionStore struct {
-	list            []model.RefreshTokenEntity
-	total           int64
-	lastCond        *dao.SessionCond
-	revokedID       uint
-	revokedPersonID uint
-	revokedTenantID uint
-	revokedUserID   uint
+	list              model.RefreshTokenEntityList
+	total             int64
+	lastCond          *dao.SessionCond
+	revokedID         uint
+	revokedPersonID   uint
+	revokedTenantID   uint
+	revokedUserID     uint
 	revokeAllPersonID uint
 	revokeAllTenantID uint
-	revokeAllUserID uint
+	revokeAllUserID   uint
 }
 
-func (s *stubSessionStore) GetPageListByCond(ctx context.Context, cond *dao.SessionCond, page, pageSize int) ([]model.RefreshTokenEntity, int64, error) {
-	clone := *cond
-	s.lastCond = &clone
+func (s *stubSessionStore) GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.RefreshTokenEntityList, int64, error) {
+	if sc, ok := cond.(*dao.SessionCond); ok {
+		clone := *sc
+		s.lastCond = &clone
+	}
 	return s.list, s.total, nil
 }
 

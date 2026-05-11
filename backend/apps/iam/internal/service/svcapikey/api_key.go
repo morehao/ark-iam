@@ -12,6 +12,7 @@ import (
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoapikey"
 	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/glog"
 )
 
@@ -94,8 +95,8 @@ func (svc *createApiKeySvc) Create(ctx *gin.Context, tenantID uint, req *dtoapik
 }
 
 func (svc *createApiKeySvc) Revoke(ctx *gin.Context, tenantID uint, req *dtoapikey.RevokeApiKeyReq) error {
-	if err := svc.apiKeyDao.Revoke(context.Background(), req.ID); err != nil {
-		glog.Errorf(ctx, "[svcapikey.Revoke] dao Revoke fail, err:%v, id:%d", err, req.ID)
+	if err := svc.apiKeyDao.UpdateMap(context.Background(), req.ID, map[string]any{"revoked_at": time.Now()}); err != nil {
+		glog.Errorf(ctx, "[svcapikey.Revoke] dao UpdateMap fail, err:%v, id:%d", err, req.ID)
 		return err
 	}
 	return nil
@@ -110,11 +111,6 @@ func (svc *createApiKeySvc) Delete(ctx *gin.Context, tenantID uint, req *dtoapik
 }
 
 func (svc *createApiKeySvc) PageList(ctx *gin.Context, tenantID uint, req *dtoapikey.ApiKeyPageListReq) (*dtoapikey.ApiKeyPageListResp, error) {
-	cond := &dao.ApiKeyCond{
-		TenantID: tenantID,
-		Name:     req.Name,
-	}
-
 	page := req.Page
 	if page <= 0 {
 		page = 1
@@ -124,7 +120,13 @@ func (svc *createApiKeySvc) PageList(ctx *gin.Context, tenantID uint, req *dtoap
 		pageSize = 10
 	}
 
-	list, total, err := svc.apiKeyDao.GetPageListByCond(context.Background(), cond, page, pageSize)
+	cond := &dao.ApiKeyCond{
+		BaseCond: &genericdao.BaseCond{Page: page, PageSize: pageSize},
+		TenantID: tenantID,
+		Name:     req.Name,
+	}
+
+	list, total, err := svc.apiKeyDao.GetPageListByCond(context.Background(), cond)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapikey.PageList] dao GetPageListByCond fail, err:%v", err)
 		return nil, err
