@@ -5,7 +5,7 @@
 .history
 
 **/log/**
-backend/output/*
+**/output/**
 frontend/node_modules/*
 frontend/dist/*
 .opencode/*
