@@ -1,86 +1,162 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import type { AuthStage, PersonInfo, TenantMembership, UserInfo } from '../types/auth'
 
 interface AuthState {
-  accessToken: string | null
+  authStage: AuthStage
+  personToken: string | null
+  tenantToken: string | null
   refreshToken: string | null
-  userInfo: {
-    userID: number
-    name: string
-    tenantID: number
-    isOwner: number
-  } | null
-  personInfo: {
-    personID: number
-    name: string
-    avatar: string
-  } | null
-  currentTenant: {
-    tenantID: number
-    name: string
-    tag: string
-    userID: number
-    isOwner: number
-  } | null
-  tenants: Array<{
-    tenantID: number
-    name: string
-    tag: string
-    userID: number
-    isOwner: number
-  }>
+  tenants: TenantMembership[]
+  currentTenant: TenantMembership | null
+  personInfo: PersonInfo | null
+  userInfo: UserInfo | null
+  accessToken: string | null
 
-  setTokens: (accessToken: string, refreshToken: string) => void
-  setUserinfo: (userInfo: AuthState['userInfo'], personInfo: AuthState['personInfo']) => void
+  setPersonSession: (payload: {
+    personToken: string
+    refreshToken: string
+    tenants: TenantMembership[]
+    personInfo?: PersonInfo | null
+  }) => void
+  setTokens: (personToken: string, refreshToken: string) => void
+  setTenantSession: (payload: {
+    tenantToken: string
+    refreshToken: string
+    currentTenant: TenantMembership
+    userInfo?: UserInfo | null
+  }) => void
+  clearTenantSession: () => void
+  setPersonInfo: (personInfo: PersonInfo | null) => void
+  setUserInfo: (userInfo: UserInfo | null) => void
   setTenants: (tenants: AuthState['tenants']) => void
   setCurrentTenant: (tenant: AuthState['currentTenant']) => void
   logout: () => void
 }
 
+const persistSession = (key: string, value: string | null) => {
+  if (value === null) {
+    localStorage.removeItem(key)
+    return
+  }
+  localStorage.setItem(key, value)
+}
+
+const personRefreshTokenStorageKey = 'personRefreshToken'
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      accessToken: null,
+      authStage: 'anonymous',
+      personToken: null,
+      tenantToken: null,
       refreshToken: null,
-      userInfo: null,
-      personInfo: null,
-      currentTenant: null,
       tenants: [],
+      currentTenant: null,
+      personInfo: null,
+      userInfo: null,
+      accessToken: null,
 
-      setTokens: (accessToken, refreshToken) => {
-        localStorage.setItem('accessToken', accessToken)
-        localStorage.setItem('refreshToken', refreshToken)
-        set({ accessToken, refreshToken })
+      setPersonSession: ({ personToken, refreshToken, tenants, personInfo = null }) => {
+        persistSession('personToken', personToken)
+        persistSession('tenantToken', null)
+        persistSession(personRefreshTokenStorageKey, refreshToken)
+        persistSession('refreshToken', refreshToken)
+        set({
+          authStage: 'person',
+          personToken,
+          tenantToken: null,
+          refreshToken,
+          tenants,
+          currentTenant: null,
+          personInfo,
+          userInfo: null,
+          accessToken: personToken,
+        })
       },
 
-      setUserinfo: (userInfo, personInfo) => set({ userInfo, personInfo }),
+      setTokens: (personToken, refreshToken) => {
+        persistSession('personToken', personToken)
+        persistSession('tenantToken', null)
+        persistSession(personRefreshTokenStorageKey, refreshToken)
+        persistSession('refreshToken', refreshToken)
+        set({
+          authStage: 'person',
+          personToken,
+          tenantToken: null,
+          refreshToken,
+          currentTenant: null,
+          userInfo: null,
+          accessToken: personToken,
+        })
+      },
+
+      setTenantSession: ({ tenantToken, refreshToken, currentTenant, userInfo = null }) => {
+        persistSession('tenantToken', tenantToken)
+        persistSession('refreshToken', refreshToken)
+        set((state) => ({
+          authStage: 'tenant',
+          tenantToken,
+          refreshToken,
+          currentTenant,
+          userInfo,
+          accessToken: tenantToken,
+          personToken: state.personToken,
+        }))
+      },
+
+      clearTenantSession: () => {
+        persistSession('tenantToken', null)
+        const personRefreshToken = localStorage.getItem(personRefreshTokenStorageKey)
+        persistSession('refreshToken', personRefreshToken)
+        set((state) => ({
+          authStage: state.personToken ? 'person' : 'anonymous',
+          tenantToken: null,
+          refreshToken: state.personToken ? personRefreshToken : null,
+          currentTenant: null,
+          userInfo: null,
+          accessToken: state.personToken,
+        }))
+      },
+
+      setPersonInfo: (personInfo) => set({ personInfo }),
+
+      setUserInfo: (userInfo) => set({ userInfo }),
 
       setTenants: (tenants) => set({ tenants }),
 
       setCurrentTenant: (tenant) => set({ currentTenant: tenant }),
 
       logout: () => {
-        localStorage.removeItem('accessToken')
-        localStorage.removeItem('refreshToken')
+        persistSession('personToken', null)
+        persistSession('tenantToken', null)
+        persistSession(personRefreshTokenStorageKey, null)
+        persistSession('refreshToken', null)
         set({
-          accessToken: null,
+          authStage: 'anonymous',
+          personToken: null,
+          tenantToken: null,
           refreshToken: null,
-          userInfo: null,
-          personInfo: null,
-          currentTenant: null,
           tenants: [],
+          currentTenant: null,
+          personInfo: null,
+          userInfo: null,
+          accessToken: null,
         })
       },
     }),
     {
       name: 'auth-storage',
       partialize: (state) => ({
-        accessToken: state.accessToken,
+        authStage: state.authStage,
+        personToken: state.personToken,
+        tenantToken: state.tenantToken,
         refreshToken: state.refreshToken,
-        userInfo: state.userInfo,
-        personInfo: state.personInfo,
-        currentTenant: state.currentTenant,
         tenants: state.tenants,
+        currentTenant: state.currentTenant,
+        personInfo: state.personInfo,
+        userInfo: state.userInfo,
+        accessToken: state.accessToken,
       }),
     }
   )
