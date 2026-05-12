@@ -1,5 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { message } from 'antd'
+import { useAuthStore } from '../stores/authStore'
 
 const request = axios.create({
   baseURL: '/v1/iam',
@@ -8,7 +9,7 @@ const request = axios.create({
 
 request.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('accessToken')
+    const token = useAuthStore.getState().tenantToken ?? localStorage.getItem('tenantToken')
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -26,9 +27,7 @@ request.interceptors.response.use(
     const data = error.response?.data as any
 
     if (status === 401) {
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('refreshToken')
-      window.location.href = '/login'
+      useAuthStore.getState().clearTenantSession()
       return Promise.reject(error)
     }
 

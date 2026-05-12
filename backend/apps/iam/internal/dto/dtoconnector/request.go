@@ -13,7 +13,7 @@ type ConnectorAuthorizeReq struct {
 }
 
 type ConnectorCallbackReq struct {
-	ConnectorID uint   `json:"connectorId" binding:"required"`
+	ConnectorID uint   `json:"connectorId"`
 	Code        string `json:"code" binding:"required"`
 	State       string `json:"state" binding:"required"`
 }
