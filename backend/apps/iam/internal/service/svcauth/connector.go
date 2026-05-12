@@ -435,10 +435,14 @@ func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorC
 		glog.Errorf(ctx, "[svcauth.Callback] load state fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.AuthLoginFailedError)
 	}
-	if storedState == nil || storedState.ConnectorID == 0 || storedState.ConnectorID != req.ConnectorID {
+	if storedState == nil || storedState.ConnectorID == 0 {
 		return nil, code.GetError(code.AuthLoginFailedError)
 	}
-	connectorEntity, err := svc.getConnectorRepo().GetByID(runtimeContext(ctx), storedState.ConnectorID)
+	if req.ConnectorID != 0 && storedState.ConnectorID != req.ConnectorID {
+		return nil, code.GetError(code.AuthLoginFailedError)
+	}
+	connectorID := storedState.ConnectorID
+	connectorEntity, err := svc.getConnectorRepo().GetByID(runtimeContext(ctx), connectorID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.Callback] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetDetailError)
@@ -452,7 +456,7 @@ func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorC
 	}
 	callbackOutput, err := driver.ExchangeCallback(ctx, &ConnectorCallbackInput{
 		Config:      config,
-		ConnectorID: connectorEntity.ID,
+		ConnectorID: connectorID,
 		Code:        req.Code,
 		State:       req.State,
 		Nonce:       storedState.Nonce,

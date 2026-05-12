@@ -838,6 +838,107 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 	}
 }
 
+func TestConnectorServiceCallbackAllowsMissingConnectorID(t *testing.T) {
+	stateStore := NewInMemoryConnectorStateStore()
+	state := &ConnectorState{
+		State:       "callback-state-missing-connector-id",
+		Nonce:       "nonce-missing-connector-id",
+		ConnectorID: 101,
+		TenantID:    22,
+		RedirectURI: "https://app.example.com/oidc/callback",
+		ExpiresAt:   time.Now().Add(time.Minute),
+	}
+	if err := stateStore.Save(context.Background(), state); err != nil {
+		t.Fatalf("stateStore.Save returned error: %v", err)
+	}
+
+	var callbackInput *ConnectorCallbackInput
+	connectorEntity := &model.ConnectorEntity{
+		TenantID: 22,
+		Name:     "github-sso",
+		Protocol: connectorDriverTypeOAuth2,
+		Provider: connectorProviderGithub,
+		Status:   connectorStatusEnabled,
+		Config:   json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
+	}
+	connectorEntity.ID = 101
+
+	svc := &connectorSvc{
+		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{
+			driverType: connectorDriverTypeOAuth2,
+			exchangeCallbackFunc: func(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
+				callbackInput = input
+				return &ConnectorCallbackOutput{
+					Identity: StandardIdentity{Subject: "subject-1"},
+				}, nil
+			},
+		}),
+		connectorRepo: &fakeConnectorRuntimeRepository{
+			getByIDFunc: func(ctx context.Context, id uint) (*model.ConnectorEntity, error) {
+				if id != connectorEntity.ID {
+					t.Fatalf("expected connector lookup by id %d, got %d", connectorEntity.ID, id)
+				}
+				return connectorEntity, nil
+			},
+		},
+		stateStore: stateStore,
+		identityResolver: &fakeConnectorIdentityResolver{
+			resolveFunc: func(ctx context.Context, input identityResolveInput) (*resolvedConnectorPerson, error) {
+				person := &model.PersonEntity{Username: "callback-user", Name: "callback-user"}
+				person.ID = 88
+				return &resolvedConnectorPerson{Person: person}, nil
+			},
+		},
+		tokenGenerator: func(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error) {
+			return &objauth.TokenInfo{AccessToken: "issued-access", RefreshToken: "issued-refresh", TokenType: "Bearer"}, nil
+		},
+		loginRecorder: func(ctx *gin.Context, tenantID, userID uint, success bool) {},
+	}
+	restoreUserStore := swapUserStoreFactory(func() authUserStore {
+		return &fakeAuthUserStore{
+			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
+				return &model.UserEntity{Model: gorm.Model{ID: 201}, TenantID: 22, PersonID: 88, Name: "callback-user"}, nil
+			},
+			getListByCondFunc: func(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, error) {
+				return model.UserEntityList{{Model: gorm.Model{ID: 201}, TenantID: 22, PersonID: 88, Name: "callback-user"}}, nil
+			},
+		}
+	})
+	defer restoreUserStore()
+	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
+		return &fakeAuthTenantStore{getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
+			return &model.TenantEntity{Model: gorm.Model{ID: 22}, Name: "tenant-22", Tag: "t22"}, nil
+		}}
+	})
+	defer restoreTenantStore()
+
+	resp, err := svc.Callback(nil, &dtoconnector.ConnectorCallbackReq{
+		Code:  "authorization-code",
+		State: "callback-state-missing-connector-id",
+	})
+	if err != nil {
+		t.Fatalf("Callback returned error: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("expected placeholder login response")
+	}
+	if callbackInput == nil {
+		t.Fatal("expected driver ExchangeCallback to be called")
+	}
+	if callbackInput.ConnectorID != 101 || callbackInput.Code != "authorization-code" || callbackInput.State != "callback-state-missing-connector-id" {
+		t.Fatalf("unexpected callback input: %+v", callbackInput)
+	}
+	if callbackInput.Nonce != "nonce-missing-connector-id" {
+		t.Fatalf("expected callback nonce from stored state, got %q", callbackInput.Nonce)
+	}
+	if callbackInput.RedirectURI != "https://app.example.com/oidc/callback" {
+		t.Fatalf("expected callback redirect uri from stored state, got %q", callbackInput.RedirectURI)
+	}
+	if _, err := stateStore.Load(context.Background(), "callback-state-missing-connector-id"); !errors.Is(err, ErrConnectorStateNotFound) {
+		t.Fatalf("expected callback state to be consumed, got err=%v", err)
+	}
+}
+
 func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 	stateStore := NewInMemoryConnectorStateStore()
 	state := &ConnectorState{
