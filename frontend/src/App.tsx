@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router'
 import MainLayout from './components/MainLayout'
+import AuthCallback from './pages/auth/AuthCallback'
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
 import SelectTenant from './pages/auth/SelectTenant'
@@ -19,6 +20,7 @@ function App() {
         path="/login"
         element={tenantToken ? <Navigate to="/" replace /> : personToken ? <Navigate to="/select-tenant" replace /> : <Login />}
       />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/register" element={<Register />} />
       <Route
         path="/select-tenant"
