@@ -21,7 +21,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestYourFunction(t *testing.T) {
-    ctx := testsetup.NewContext(
+    ctx := testsetup.NewCtx(
         testsetup.WithUserID(123),
         testsetup.WithMethod("POST"),
         testsetup.WithJSON(),
@@ -51,7 +51,7 @@ testsetup.AppNameIam  // "iam"
 ### 测试上下文
 
 ```go
-ctx := testsetup.NewContext(opts...)
+ctx := testsetup.NewCtx(opts...)
 ```
 
 支持的可选参数：

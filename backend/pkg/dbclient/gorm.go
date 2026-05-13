@@ -18,7 +18,7 @@ var (
 
 const (
 	dbNameDemo = "demo"
-	dbNameIam  = "ark"
+	dbNameIam  = "iam"
 )
 
 func InitMultiDB(configs []dbgorm.GormConfig, logConfig *glog.LogConfig) error {

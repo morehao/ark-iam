@@ -1,10 +1,13 @@
 package testsetup
 
 import (
+	"net/http"
+	"net/url"
 	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/golib/biz/testkit"
+	"github.com/morehao/golib/glog"
 )
 
 type Initializer = testkit.Initializer
@@ -57,6 +60,20 @@ func Done(appName string) {
 	Close(appName)
 }
 
-func NewContext(opts ...testkit.Option) *gin.Context {
-	return testkit.NewContext(opts...)
+func NewCtx(opts ...testkit.Option) *gin.Context {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = &http.Request{
+		URL:    &url.URL{},
+		Header: http.Header{},
+	}
+
+	for _, opt := range opts {
+		opt(ginCtx)
+	}
+
+	if _, exists := ginCtx.Get(glog.KeyAppRequestID); !exists {
+		ginCtx.Set(glog.KeyAppRequestID, glog.GenRequestID())
+	}
+
+	return ginCtx
 }
