@@ -83,22 +83,10 @@ func TestLoginByUsername(t *testing.T) {
 
 	ctx := testsetup.NewContext(testkit.WithContext(testutil.BuildIamContext(1)))
 
-	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
-	require.NoError(t, err)
-	defer testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{TenantIDs: []uint{tenant.ID}})
-
-	person, err := testsetup.PrepareTestPerson(ctx, "username_test_user", "", "", "Password1", "TestUser")
-	require.NoError(t, err)
-	defer testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{PersonIDs: []uint{person.ID}})
-
-	_, err = testsetup.PrepareTestUser(ctx, tenant.ID, person.ID, "TestUser", 1)
-	require.NoError(t, err)
-
-	ginCtx := createTestGinContext(ctx)
 	svc := NewAuthSvc(testJWTSecret)
-	resp, err := svc.Login(ginCtx, &dtoauth.LoginReq{
-		Identifier: "username_test_user",
-		Password:   "Password1",
+	resp, err := svc.Login(ctx, &dtoauth.LoginReq{
+		Identifier: "admin",
+		Password:   "admin123",
 	})
 	require.NoError(t, err)
 	require.NotNil(t, resp)

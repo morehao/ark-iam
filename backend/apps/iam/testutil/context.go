@@ -24,7 +24,6 @@ func BuildIamContext(userID uint) context.Context {
 	if user.TenantID > 0 {
 		relation, err := dao.NewUserDepartmentRelationDao().GetByCond(ctx, &dao.UserDepartmentRelationCond{
 			UserID:    userID,
-			IsPrimary: ptrInt8(1),
 		})
 		if err != nil {
 			panic(err)

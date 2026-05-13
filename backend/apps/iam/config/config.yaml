@@ -51,7 +51,7 @@ trace:
 
 
 db_configs:
-  - url: "mysql://root:123456@127.0.0.1:3306/ark_iam?charset=utf8mb4&parseTime=True&loc=Local&timeout=5s&readTimeout=3s&writeTimeout=3s"
+  - url: "mysql://root:123456@127.0.0.1:3306/iam?charset=utf8mb4&parseTime=True&loc=Local&timeout=5s&readTimeout=3s&writeTimeout=3s"
     service: ark_iam
 
 redis_config:
