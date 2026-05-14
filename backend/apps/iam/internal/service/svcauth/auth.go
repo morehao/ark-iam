@@ -713,6 +713,7 @@ func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID uint, success bool
 		LoginType: "password",
 		LoginIP:   loginIP,
 		UserAgent: userAgent,
+		LoginTime: time.Now(),
 		CreatedBy: 0,
 	}
 
