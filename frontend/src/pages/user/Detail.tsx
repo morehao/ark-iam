@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router'
+import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Descriptions, Button, Spin } from 'antd'
 import { getUserDetail } from '../../api/user'
 

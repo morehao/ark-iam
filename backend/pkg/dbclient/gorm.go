@@ -18,7 +18,7 @@ var (
 
 const (
 	dbNameDemo = "demo"
-	dbNameIam  = "ark_iam"
+	dbNameIam  = "iam"
 )
 
 func InitMultiDB(configs []dbgorm.GormConfig, logConfig *glog.LogConfig) error {
@@ -27,12 +27,8 @@ func InitMultiDB(configs []dbgorm.GormConfig, logConfig *glog.LogConfig) error {
 	}
 
 	var skipTables = []string{
-		"iam_tenant",
-		"iam_org",
-		"iam_org_config",
-		"iam_menu",
-		"iam_role",
-		"iam_role_menu",
+		"person",
+		"tenant",
 	}
 	tenantPlugin := gormplugin.New(
 		gormplugin.WithSkipTables(skipTables),

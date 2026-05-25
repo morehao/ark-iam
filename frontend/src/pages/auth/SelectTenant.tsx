@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button, Card, List, Space, Typography, message } from 'antd'
-import { useNavigate } from 'react-router'
+import { useNavigate } from 'react-router-dom'
 import { selectTenant } from '../../api/auth'
 import { useAuthStore } from '../../stores/authStore'
 

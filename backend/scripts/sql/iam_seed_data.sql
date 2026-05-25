@@ -145,7 +145,7 @@ ON DUPLICATE KEY UPDATE `role_id` = VALUES(`role_id`);
 -- ============================================
 -- 8.1 先插入到 person 表
 INSERT INTO `person` (`id`, `username`, `primary_email`, `primary_phone`, `password_encrypted`, `password_method`, `name`, `avatar`, `profile`, `custom_data`, `is_suspended`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (1, 'admin', 'admin@example.com', '', '$argon2id$v=19$m=16,t=2,p=1$YWJjMTIzNDU2Nzg5YWJjDE$+k2GomfLnXH8z9qN1v8Hvw', 'Argon2id', '系统管理员', '', '{}', '{}', 0, 0, 0, 0)
+VALUES (1, 'admin', 'admin@example.com', '', '$argon2id$v=19$m=65536,t=1,p=4$WG6YLsQm7eBtMH8zezNNbQ$MZQuyYq+0Gj9qawnUzdg7pxqVFkRUmkXBqjD6CE6AaU', 'Argon2id', '系统管理员', '', '{}', '{}', 0, 0, 0, 0)
 ON DUPLICATE KEY UPDATE `username` = VALUES(`username`);
 
 -- 8.2 再插入到 user 表（关联 person_id）

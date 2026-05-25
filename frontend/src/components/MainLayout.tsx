@@ -9,7 +9,7 @@ import {
   MenuUnfoldOutlined,
   LogoutOutlined,
 } from '@ant-design/icons'
-import { Outlet, useNavigate, useLocation } from 'react-router'
+import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { getMyTenants, getUserinfo, switchTenant } from '../api/auth'
 import { useAuthStore } from '../stores/authStore'
 

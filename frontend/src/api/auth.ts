@@ -1,4 +1,5 @@
 import request from '../utils/request'
+import type { ApiResponse } from '../utils/response'
 import type {
   PersonInfo,
   PersonToken,
@@ -6,12 +7,6 @@ import type {
   TenantToken,
   UserInfo,
 } from '../types/auth'
-
-interface ApiResponse<T> {
-  code: number
-  msg: string
-  data: T
-}
 
 export interface LoginReq {
   identifier: string
@@ -50,12 +45,19 @@ export interface SelectTenantResp {
   tenantToken: TenantToken
 }
 
+export interface SwitchTenantResp {
+  tenantToken: TenantToken
+}
+
 export interface SwitchTenantReq {
   tenantID: number
 }
 
-export interface SwitchTenantResp {
-  tenantToken: TenantToken
+export interface RefreshTokenResp {
+  accessToken: string
+  refreshToken: string
+  expiresIn: number
+  tokenType: string
 }
 
 export interface MyTenantsResp {
@@ -90,45 +92,45 @@ export interface ConnectorCallbackResp {
 }
 
 export const login = (data: LoginReq) => {
-  return request.post<any, any>('/auth/login', data)
+  return request.post<LoginReq, ApiResponse<LoginResp>>('/auth/login', data)
 }
 
 export const register = (data: RegisterReq) => {
-  return request.post<any, any>('/auth/register', data)
+  return request.post<RegisterReq, ApiResponse<RegisterResp>>('/auth/register', data)
 }
 
 export const logout = (refreshToken: string) => {
-  return request.post<any, any>('/auth/logout', { refreshToken })
+  return request.post<any, ApiResponse<null>>('/auth/logout', { refreshToken })
 }
 
-export const refreshToken = (refreshToken: string) => {
-  return request.post<any, any>('/auth/refreshToken', { refreshToken })
+export const refreshTokenApi = (refreshToken: string) => {
+  return request.post<any, ApiResponse<RefreshTokenResp>>('/auth/refreshToken', { refreshToken })
 }
 
 export const getUserinfo = () => {
-  return request.get<any, any>('/auth/userinfo')
+  return request.get<any, ApiResponse<UserinfoResp>>('/auth/userinfo')
 }
 
 export const selectTenant = (data: SelectTenantReq) => {
-  return request.post<any, any>('/auth/selectTenant', data)
+  return request.post<SelectTenantReq, ApiResponse<SelectTenantResp>>('/auth/selectTenant', data)
 }
 
 export const switchTenant = (data: SwitchTenantReq) => {
-  return request.post<any, any>('/auth/switchTenant', data)
+  return request.post<SwitchTenantReq, ApiResponse<SwitchTenantResp>>('/auth/switchTenant', data)
 }
 
 export const getMyTenants = (params: MyTenantsReq = {}) => {
-  return request.get<any, ApiResponse<MyTenantsResp>>('/auth/myTenants', {
+  return request.get<MyTenantsReq, ApiResponse<MyTenantsResp>>('/auth/myTenants', {
     params,
   })
 }
 
 export const getConnectorAuthorizationUrl = (data: ConnectorAuthorizationReq) => {
-  return request.post<any, ApiResponse<ConnectorAuthorizationResp>>(`/connector/${data.connectorId}/authorize`, data)
+  return request.post<ConnectorAuthorizationReq, ApiResponse<ConnectorAuthorizationResp>>(`/connector/${data.connectorId}/authorize`, data)
 }
 
 export const completeConnectorCallback = (data: ConnectorCallbackReq) => {
-  return request.get<any, ApiResponse<ConnectorCallbackResp>>('/connector/callback', {
+  return request.get<ConnectorCallbackReq, ApiResponse<ConnectorCallbackResp>>('/connector/callback', {
     params: data,
   })
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Table, Button, Space, Input } from 'antd'
-import { useNavigate } from 'react-router'
+import { useNavigate } from 'react-router-dom'
 import type { ColumnsType } from 'antd/es/table'
 import { getUserPageList, User } from '../../api/user'
 

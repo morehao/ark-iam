@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Card, Spin, message } from 'antd'
-import { useLocation, useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { completeConnectorCallback } from '../../api/auth'
 import { useAuthStore } from '../../stores/authStore'
 import { handleLoginSuccess } from './Login'
