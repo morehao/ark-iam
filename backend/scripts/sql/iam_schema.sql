@@ -6,6 +6,7 @@ CREATE TABLE `tenant`
 (
     `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '租户ID',
     `name`          VARCHAR(128) NOT NULL DEFAULT '' COMMENT '租户名称',
+    `type`          VARCHAR(32) NOT NULL DEFAULT 'customer' COMMENT '租户类型: customer-客户租户, platform-平台租户',
     `db_user`       VARCHAR(64) NOT NULL DEFAULT '' COMMENT '数据库用户',
     `is_suspended`  TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否挂起',
     `tag`           VARCHAR(64) NOT NULL DEFAULT '' COMMENT '标签',

@@ -4,9 +4,9 @@
 -- ============================================
 -- 1. 租户种子数据
 -- ============================================
-INSERT INTO `tenant` (`id`, `name`, `db_user`, `is_suspended`, `tag`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (1, 'Default Tenant', 'default_user', 0, 'default', 0, 0, 0)
-ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
+INSERT INTO `tenant` (`id`, `name`, `type`, `db_user`, `is_suspended`, `tag`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (1, 'Default Tenant', 'platform', 'default_user', 0, 'default', 0, 0, 0)
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `type` = VALUES(`type`);
 
 -- ============================================
 -- 2. 基础角色种子数据
@@ -140,21 +140,32 @@ VALUES
 ON DUPLICATE KEY UPDATE `role_id` = VALUES(`role_id`);
 
 -- ============================================
--- 8. 默认管理员用户种子数据
+-- 8. 管理后台应用及角色关联种子数据
+-- ============================================
+INSERT INTO `application` (`id`, `tenant_id`, `name`, `secret`, `description`, `type`, `oidc_client_metadata`, `custom_client_metadata`, `is_third_party`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (1, 1, '管理后台', '', '平台管理后台应用', 'SPA', '{}', '{}', 0, 0, 0, 0)
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
+
+INSERT INTO `application_role` (`id`, `tenant_id`, `application_id`, `role_id`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (1, 1, 1, 1, 0, 0, 0)
+ON DUPLICATE KEY UPDATE `application_id` = VALUES(`application_id`);
+
+-- ============================================
+-- 9. 默认管理员用户种子数据
 -- 密码: admin123 (Argon2 加密)
 -- ============================================
--- 8.1 先插入到 person 表
+-- 9.1 先插入到 person 表
 INSERT INTO `person` (`id`, `username`, `primary_email`, `primary_phone`, `password_encrypted`, `password_method`, `name`, `avatar`, `profile`, `custom_data`, `is_suspended`, `created_by`, `updated_by`, `deleted_by`)
 VALUES (1, 'admin', 'admin@example.com', '', '$argon2id$v=19$m=65536,t=1,p=4$WG6YLsQm7eBtMH8zezNNbQ$MZQuyYq+0Gj9qawnUzdg7pxqVFkRUmkXBqjD6CE6AaU', 'Argon2id', '系统管理员', '', '{}', '{}', 0, 0, 0, 0)
 ON DUPLICATE KEY UPDATE `username` = VALUES(`username`);
 
--- 8.2 再插入到 user 表（关联 person_id）
+-- 9.2 再插入到 user 表（关联 person_id）
 INSERT INTO `user` (`id`, `tenant_id`, `person_id`, `name`, `avatar`, `profile`, `custom_data`, `is_suspended`, `is_owner`, `created_by`, `updated_by`, `deleted_by`)
 VALUES (1, 1, 1, '系统管理员', '', '{}', '{}', 0, 1, 0, 0, 0)
 ON DUPLICATE KEY UPDATE `tenant_id` = VALUES(`tenant_id`);
 
 -- ============================================
--- 9. 管理员用户角色关联
+-- 10. 管理员用户角色关联
 -- ============================================
 INSERT INTO `user_role` (`id`, `tenant_id`, `user_id`, `role_id`, `created_by`, `updated_by`, `deleted_by`)
 VALUES (1, 1, 1, 1, 0, 0, 0)
