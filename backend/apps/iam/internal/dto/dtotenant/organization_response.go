@@ -48,29 +48,29 @@ type OrganizationRoleBaseInfo struct {
 	Type           string `json:"type" form:"type"`                 // 角色类型
 }
 
-type OrganizationUserRelationCreateResp struct {
+type OrganizationUserCreateResp struct {
 }
 
-type OrganizationUserRelationPageListResp struct {
-	List  []OrganizationUserRelationPageListItem `json:"list"`  // 组织用户关系列表
-	Total int64                                   `json:"total"` // 总数
+type OrganizationUserPageListResp struct {
+	List  []OrganizationUserPageListItem `json:"list"`  // 组织用户列表
+	Total int64                                  `json:"total"` // 总条数
 }
 
-type OrganizationUserRelationPageListItem struct {
+type OrganizationUserPageListItem struct {
 	OrganizationID uint `json:"organizationID"` // 组织ID
 	UserID         uint `json:"userID"`         // 用户ID
 	TenantID       uint `json:"tenantID"`       // 租户ID
 }
 
-type OrganizationRoleUserRelationCreateResp struct {
+type OrganizationRoleUserCreateResp struct {
 }
 
-type OrganizationRoleUserRelationPageListResp struct {
-	List  []OrganizationRoleUserRelationPageListItem `json:"list"`  // 组织角色用户关系列表
-	Total int64                                      `json:"total"` // 总数
+type OrganizationRoleUserPageListResp struct {
+	List  []OrganizationRoleUserPageListItem `json:"list"`  // 组织角色用户列表
+	Total int64                                       `json:"total"` // 总条数
 }
 
-type OrganizationRoleUserRelationPageListItem struct {
+type OrganizationRoleUserPageListItem struct {
 	OrganizationID     uint `json:"organizationID"`     // 组织ID
 	OrganizationRoleID uint `json:"organizationRoleID"` // 组织角色ID
 	UserID             uint `json:"userID"`             // 用户ID

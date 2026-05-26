@@ -13,13 +13,13 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestDeleteOrganizationRoleUserRelationUsesTenantScopedCompositeLookup(t *testing.T) {
+func TestDeleteOrganizationRoleUserUsesTenantScopedCompositeLookup(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Set(gcontext.KeyTenantID, uint(81))
 	ginCtx.Set(gcontext.KeyUserID, uint(9401))
 
-	repo := &stubOrganizationRoleUserRelationDeleteRepo{
-		list: model.OrganizationRoleUserRelationEntityList{{
+	repo := &stubOrganizationRoleUserDeleteRepo{
+		list: model.OrganizationRoleUserEntityList{{
 			Model:              gorm.Model{ID: 119},
 			TenantID:           81,
 			OrganizationID:     401,
@@ -27,10 +27,10 @@ func TestDeleteOrganizationRoleUserRelationUsesTenantScopedCompositeLookup(t *te
 			UserID:             601,
 		}},
 	}
-	installOrganizationRoleUserRelationDeleteRepo(t, repo)
+	installOrganizationRoleUserDeleteRepo(t, repo)
 
-	svc := &organizationRoleUserRelationSvc{}
-	err := svc.Delete(ginCtx, &dtotenant.OrganizationRoleUserRelationDeleteReq{OrganizationRoleID: 501, UserID: 601})
+	svc := &organizationRoleUserSvc{}
+	err := svc.Delete(ginCtx, &dtotenant.OrganizationRoleUserDeleteReq{OrganizationRoleID: 501, UserID: 601})
 	if err != nil {
 		t.Fatalf("Delete returned error: %v", err)
 	}
@@ -48,16 +48,16 @@ func TestDeleteOrganizationRoleUserRelationUsesTenantScopedCompositeLookup(t *te
 	}
 }
 
-func TestDeleteOrganizationRoleUserRelationReturnsNotExistWhenCompositeLookupMisses(t *testing.T) {
+func TestDeleteOrganizationRoleUserReturnsNotExistWhenCompositeLookupMisses(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Set(gcontext.KeyTenantID, uint(82))
 	ginCtx.Set(gcontext.KeyUserID, uint(9402))
 
-	repo := &stubOrganizationRoleUserRelationDeleteRepo{}
-	installOrganizationRoleUserRelationDeleteRepo(t, repo)
+	repo := &stubOrganizationRoleUserDeleteRepo{}
+	installOrganizationRoleUserDeleteRepo(t, repo)
 
-	svc := &organizationRoleUserRelationSvc{}
-	err := svc.Delete(ginCtx, &dtotenant.OrganizationRoleUserRelationDeleteReq{OrganizationRoleID: 501, UserID: 601})
+	svc := &organizationRoleUserSvc{}
+	err := svc.Delete(ginCtx, &dtotenant.OrganizationRoleUserDeleteReq{OrganizationRoleID: 501, UserID: 601})
 	if err == nil {
 		t.Fatalf("expected not exist error")
 	}
@@ -66,17 +66,17 @@ func TestDeleteOrganizationRoleUserRelationReturnsNotExistWhenCompositeLookupMis
 	}
 }
 
-type stubOrganizationRoleUserRelationDeleteRepo struct {
-	list      model.OrganizationRoleUserRelationEntityList
+type stubOrganizationRoleUserDeleteRepo struct {
+	list      model.OrganizationRoleUserEntityList
 	listErr   error
 	deleteErr error
-	lastCond  *dao.OrganizationRoleUserRelationCond
+	lastCond  *dao.OrganizationRoleUserCond
 	deletedID uint
 	deletedBy uint
 }
 
-func (r *stubOrganizationRoleUserRelationDeleteRepo) GetListByCond(ctx context.Context, cond genericdao.Cond) (model.OrganizationRoleUserRelationEntityList, error) {
-	typed, _ := cond.(*dao.OrganizationRoleUserRelationCond)
+func (r *stubOrganizationRoleUserDeleteRepo) GetListByCond(ctx context.Context, cond genericdao.Cond) (model.OrganizationRoleUserEntityList, error) {
+	typed, _ := cond.(*dao.OrganizationRoleUserCond)
 	if typed != nil {
 		clone := *typed
 		if typed.BaseCond != nil {
@@ -88,21 +88,21 @@ func (r *stubOrganizationRoleUserRelationDeleteRepo) GetListByCond(ctx context.C
 	return r.list, r.listErr
 }
 
-func (r *stubOrganizationRoleUserRelationDeleteRepo) Delete(ctx context.Context, id uint, userID uint) error {
+func (r *stubOrganizationRoleUserDeleteRepo) Delete(ctx context.Context, id uint, userID uint) error {
 	r.deletedID = id
 	r.deletedBy = userID
 	return r.deleteErr
 }
 
-func installOrganizationRoleUserRelationDeleteRepo(t *testing.T, repo organizationRoleUserRelationDeleteRepository) {
+func installOrganizationRoleUserDeleteRepo(t *testing.T, repo organizationRoleUserDeleteRepository) {
 	t.Helper()
-	prev := newOrganizationRoleUserRelationDeleteRepo
-	newOrganizationRoleUserRelationDeleteRepo = func() organizationRoleUserRelationDeleteRepository {
+	prev := newOrganizationRoleUserDeleteRepo
+	newOrganizationRoleUserDeleteRepo = func() organizationRoleUserDeleteRepository {
 		return repo
 	}
 	t.Cleanup(func() {
-		newOrganizationRoleUserRelationDeleteRepo = prev
+		newOrganizationRoleUserDeleteRepo = prev
 	})
 }
 
-var _ organizationRoleUserRelationDeleteRepository = (*stubOrganizationRoleUserRelationDeleteRepo)(nil)
+var _ organizationRoleUserDeleteRepository = (*stubOrganizationRoleUserDeleteRepo)(nil)

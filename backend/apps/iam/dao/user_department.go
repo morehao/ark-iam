@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type UserDepartmentRelationCond struct {
+type UserDepartmentCond struct {
 	*genericdao.BaseCond
 	TenantID     uint
 	UserID       uint
@@ -15,7 +15,7 @@ type UserDepartmentRelationCond struct {
 	IsPrimary    *int8
 }
 
-func (c *UserDepartmentRelationCond) BuildCondition(db *gorm.DB, tableName string) {
+func (c *UserDepartmentCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
@@ -33,14 +33,14 @@ func (c *UserDepartmentRelationCond) BuildCondition(db *gorm.DB, tableName strin
 	}
 }
 
-type UserDepartmentRelationDao struct {
-	*genericdao.GenericDao[model.UserDepartmentRelationEntity, model.UserDepartmentRelationEntityList]
+type UserDepartmentDao struct {
+	*genericdao.GenericDao[model.UserDepartmentEntity, model.UserDepartmentEntityList]
 }
 
-func NewUserDepartmentRelationDao() *UserDepartmentRelationDao {
-	return &UserDepartmentRelationDao{
-		GenericDao: genericdao.NewGenericDao[model.UserDepartmentRelationEntity, model.UserDepartmentRelationEntityList](
-			model.TableNameUserDepartmentRelation, "UserDepartmentRelationDao",
+func NewUserDepartmentDao() *UserDepartmentDao {
+	return &UserDepartmentDao{
+		GenericDao: genericdao.NewGenericDao[model.UserDepartmentEntity, model.UserDepartmentEntityList](
+			model.TableNameUserDepartment, "UserDepartmentDao",
 			dbclient.IamDB,
 		),
 	}

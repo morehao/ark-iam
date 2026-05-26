@@ -159,7 +159,7 @@ CREATE TABLE `department`
     KEY              `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='部门表';
 
-CREATE TABLE `user_department_relation`
+CREATE TABLE `user_department`
 (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
     `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -178,7 +178,7 @@ CREATE TABLE `user_department_relation`
     KEY              `idx_department_id` (`department_id`),
     KEY              `idx_tenant_user_dept` (`tenant_id`, `user_id`, `department_id`),
     KEY              `idx_deleted_at` (`deleted_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户部门关系表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户部门表';
 
 CREATE TABLE `application`
 (
@@ -384,7 +384,7 @@ CREATE TABLE `organization_role`
     KEY              `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='组织角色表';
 
-CREATE TABLE `organization_user_relation`
+CREATE TABLE `organization_user`
 (
     `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
     `tenant_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -401,9 +401,9 @@ CREATE TABLE `organization_user_relation`
     KEY               `idx_organization_id` (`organization_id`),
     KEY               `idx_user_id` (`user_id`),
     KEY               `idx_tenant_org_user` (`tenant_id`, `organization_id`, `user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='组织用户关系表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='组织用户表';
 
-CREATE TABLE `organization_role_user_relation`
+CREATE TABLE `organization_role_user`
 (
     `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
     `tenant_id`         BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
@@ -420,7 +420,7 @@ CREATE TABLE `organization_role_user_relation`
     KEY                 `idx_tenant_id` (`tenant_id`),
     KEY                 `idx_tenant_org_user` (`tenant_id`, `organization_id`, `user_id`),
     KEY                 `idx_tenant_org_role_user` (`tenant_id`, `organization_id`, `organization_role_id`, `user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='组织角色用户关系表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='组织角色用户表';
 
 CREATE TABLE `menu`
 (

@@ -7,14 +7,14 @@ import (
 	"gorm.io/gorm"
 )
 
-type OrganizationUserRelationCond struct {
+type OrganizationUserCond struct {
 	*genericdao.BaseCond
 	TenantID       uint
 	OrganizationID uint
 	UserID         uint
 }
 
-func (c *OrganizationUserRelationCond) BuildCondition(db *gorm.DB, tableName string) {
+func (c *OrganizationUserCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
@@ -29,14 +29,14 @@ func (c *OrganizationUserRelationCond) BuildCondition(db *gorm.DB, tableName str
 	}
 }
 
-type OrganizationUserRelationDao struct {
-	*genericdao.GenericDao[model.OrganizationUserRelationEntity, model.OrganizationUserRelationEntityList]
+type OrganizationUserDao struct {
+	*genericdao.GenericDao[model.OrganizationUserEntity, model.OrganizationUserEntityList]
 }
 
-func NewOrganizationUserRelationDao() *OrganizationUserRelationDao {
-	return &OrganizationUserRelationDao{
-		GenericDao: genericdao.NewGenericDao[model.OrganizationUserRelationEntity, model.OrganizationUserRelationEntityList](
-			model.TableNameOrganizationUserRelation, "OrganizationUserRelationDao",
+func NewOrganizationUserDao() *OrganizationUserDao {
+	return &OrganizationUserDao{
+		GenericDao: genericdao.NewGenericDao[model.OrganizationUserEntity, model.OrganizationUserEntityList](
+			model.TableNameOrganizationUser, "OrganizationUserDao",
 			dbclient.IamDB,
 		),
 	}

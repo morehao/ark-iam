@@ -13,23 +13,23 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestDeleteOrganizationUserRelationUsesTenantScopedCompositeLookup(t *testing.T) {
+func TestDeleteOrganizationUserUsesTenantScopedCompositeLookup(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Set(gcontext.KeyTenantID, uint(71))
 	ginCtx.Set(gcontext.KeyUserID, uint(9301))
 
-	repo := &stubOrganizationUserRelationDeleteRepo{
-		list: model.OrganizationUserRelationEntityList{{
+	repo := &stubOrganizationUserDeleteRepo{
+		list: model.OrganizationUserEntityList{{
 			Model:          gorm.Model{ID: 109},
 			TenantID:       71,
 			OrganizationID: 201,
 			UserID:         301,
 		}},
 	}
-	installOrganizationUserRelationDeleteRepo(t, repo)
+	installOrganizationUserDeleteRepo(t, repo)
 
-	svc := &organizationUserRelationSvc{}
-	err := svc.Delete(ginCtx, &dtotenant.OrganizationUserRelationDeleteReq{OrganizationID: 201, UserID: 301})
+	svc := &organizationUserSvc{}
+	err := svc.Delete(ginCtx, &dtotenant.OrganizationUserDeleteReq{OrganizationID: 201, UserID: 301})
 	if err != nil {
 		t.Fatalf("Delete returned error: %v", err)
 	}
@@ -47,16 +47,16 @@ func TestDeleteOrganizationUserRelationUsesTenantScopedCompositeLookup(t *testin
 	}
 }
 
-func TestDeleteOrganizationUserRelationReturnsNotExistWhenCompositeLookupMisses(t *testing.T) {
+func TestDeleteOrganizationUserReturnsNotExistWhenCompositeLookupMisses(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Set(gcontext.KeyTenantID, uint(72))
 	ginCtx.Set(gcontext.KeyUserID, uint(9302))
 
-	repo := &stubOrganizationUserRelationDeleteRepo{}
-	installOrganizationUserRelationDeleteRepo(t, repo)
+	repo := &stubOrganizationUserDeleteRepo{}
+	installOrganizationUserDeleteRepo(t, repo)
 
-	svc := &organizationUserRelationSvc{}
-	err := svc.Delete(ginCtx, &dtotenant.OrganizationUserRelationDeleteReq{OrganizationID: 201, UserID: 301})
+	svc := &organizationUserSvc{}
+	err := svc.Delete(ginCtx, &dtotenant.OrganizationUserDeleteReq{OrganizationID: 201, UserID: 301})
 	if err == nil {
 		t.Fatalf("expected not exist error")
 	}
@@ -65,17 +65,17 @@ func TestDeleteOrganizationUserRelationReturnsNotExistWhenCompositeLookupMisses(
 	}
 }
 
-type stubOrganizationUserRelationDeleteRepo struct {
-	list      model.OrganizationUserRelationEntityList
+type stubOrganizationUserDeleteRepo struct {
+	list      model.OrganizationUserEntityList
 	listErr   error
 	deleteErr error
-	lastCond  *dao.OrganizationUserRelationCond
+	lastCond  *dao.OrganizationUserCond
 	deletedID uint
 	deletedBy uint
 }
 
-func (r *stubOrganizationUserRelationDeleteRepo) GetListByCond(ctx context.Context, cond genericdao.Cond) (model.OrganizationUserRelationEntityList, error) {
-	typed, _ := cond.(*dao.OrganizationUserRelationCond)
+func (r *stubOrganizationUserDeleteRepo) GetListByCond(ctx context.Context, cond genericdao.Cond) (model.OrganizationUserEntityList, error) {
+	typed, _ := cond.(*dao.OrganizationUserCond)
 	if typed != nil {
 		clone := *typed
 		if typed.BaseCond != nil {
@@ -87,21 +87,21 @@ func (r *stubOrganizationUserRelationDeleteRepo) GetListByCond(ctx context.Conte
 	return r.list, r.listErr
 }
 
-func (r *stubOrganizationUserRelationDeleteRepo) Delete(ctx context.Context, id uint, userID uint) error {
+func (r *stubOrganizationUserDeleteRepo) Delete(ctx context.Context, id uint, userID uint) error {
 	r.deletedID = id
 	r.deletedBy = userID
 	return r.deleteErr
 }
 
-func installOrganizationUserRelationDeleteRepo(t *testing.T, repo organizationUserRelationDeleteRepository) {
+func installOrganizationUserDeleteRepo(t *testing.T, repo organizationUserDeleteRepository) {
 	t.Helper()
-	prev := newOrganizationUserRelationDeleteRepo
-	newOrganizationUserRelationDeleteRepo = func() organizationUserRelationDeleteRepository {
+	prev := newOrganizationUserDeleteRepo
+	newOrganizationUserDeleteRepo = func() organizationUserDeleteRepository {
 		return repo
 	}
 	t.Cleanup(func() {
-		newOrganizationUserRelationDeleteRepo = prev
+		newOrganizationUserDeleteRepo = prev
 	})
 }
 
-var _ organizationUserRelationDeleteRepository = (*stubOrganizationUserRelationDeleteRepo)(nil)
+var _ organizationUserDeleteRepository = (*stubOrganizationUserDeleteRepo)(nil)

@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type OrganizationRoleUserRelationCond struct {
+type OrganizationRoleUserCond struct {
 	*genericdao.BaseCond
 	TenantID           uint
 	OrganizationID     uint
@@ -15,7 +15,7 @@ type OrganizationRoleUserRelationCond struct {
 	UserID             uint
 }
 
-func (c *OrganizationRoleUserRelationCond) BuildCondition(db *gorm.DB, tableName string) {
+func (c *OrganizationRoleUserCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
@@ -33,14 +33,14 @@ func (c *OrganizationRoleUserRelationCond) BuildCondition(db *gorm.DB, tableName
 	}
 }
 
-type OrganizationRoleUserRelationDao struct {
-	*genericdao.GenericDao[model.OrganizationRoleUserRelationEntity, model.OrganizationRoleUserRelationEntityList]
+type OrganizationRoleUserDao struct {
+	*genericdao.GenericDao[model.OrganizationRoleUserEntity, model.OrganizationRoleUserEntityList]
 }
 
-func NewOrganizationRoleUserRelationDao() *OrganizationRoleUserRelationDao {
-	return &OrganizationRoleUserRelationDao{
-		GenericDao: genericdao.NewGenericDao[model.OrganizationRoleUserRelationEntity, model.OrganizationRoleUserRelationEntityList](
-			model.TableNameOrganizationRoleUserRelation, "OrganizationRoleUserRelationDao",
+func NewOrganizationRoleUserDao() *OrganizationRoleUserDao {
+	return &OrganizationRoleUserDao{
+		GenericDao: genericdao.NewGenericDao[model.OrganizationRoleUserEntity, model.OrganizationRoleUserEntityList](
+			model.TableNameOrganizationRoleUser, "OrganizationRoleUserDao",
 			dbclient.IamDB,
 		),
 	}

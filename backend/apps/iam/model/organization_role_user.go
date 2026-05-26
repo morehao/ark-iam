@@ -4,9 +4,9 @@ import (
 	"gorm.io/gorm"
 )
 
-const TableNameOrganizationRoleUserRelation = "organization_role_user_relation"
+const TableNameOrganizationRoleUser = "organization_role_user"
 
-type OrganizationRoleUserRelationEntity struct {
+type OrganizationRoleUserEntity struct {
 	gorm.Model
 	TenantID           uint `gorm:"column:tenant_id;type:bigint unsigned;not null;default 0;comment:租户id" json:"tenantID"`
 	OrganizationID     uint `gorm:"column:organization_id;type:bigint unsigned;not null;default 0;comment:组织ID" json:"organizationID"`
@@ -17,14 +17,14 @@ type OrganizationRoleUserRelationEntity struct {
 	DeletedBy          uint `gorm:"column:deleted_by;type:bigint unsigned;not null;default 0;comment:删除人id" json:"deletedBy"`
 }
 
-func (OrganizationRoleUserRelationEntity) TableName() string {
-	return TableNameOrganizationRoleUserRelation
+func (OrganizationRoleUserEntity) TableName() string {
+	return TableNameOrganizationRoleUser
 }
 
-type OrganizationRoleUserRelationEntityList []OrganizationRoleUserRelationEntity
+type OrganizationRoleUserEntityList []OrganizationRoleUserEntity
 
-func (l OrganizationRoleUserRelationEntityList) ToMap() map[uint]OrganizationRoleUserRelationEntity {
-	m := make(map[uint]OrganizationRoleUserRelationEntity)
+func (l OrganizationRoleUserEntityList) ToMap() map[uint]OrganizationRoleUserEntity {
+	m := make(map[uint]OrganizationRoleUserEntity)
 	for _, v := range l {
 		m[v.ID] = v
 	}

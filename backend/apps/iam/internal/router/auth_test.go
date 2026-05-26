@@ -43,7 +43,7 @@ func TestAuthAndConnectorRoutesUseUnifiedEndpoints(t *testing.T) {
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/logoutAll")
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/user/pageList")
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/user/assignDepartments")
-	assertRouteRegistered(t, paths, http.MethodGet, "/v1/iam/user/getUserDepartmentRelationByUser")
+	assertRouteRegistered(t, paths, http.MethodGet, "/v1/iam/user/getUserDepartmentByUser")
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/tenant/create")
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/tenant/delete")
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/tenant/update")
@@ -66,11 +66,11 @@ func TestAuthAndConnectorRoutesUseUnifiedEndpoints(t *testing.T) {
 	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/update")
 	assertRouteMissing(t, paths, http.MethodGet, "/v1/iam/detail")
 	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/pageList")
-	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/user/createUserDepartmentRelation")
-	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/user/deleteUserDepartmentRelation")
-	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/user/updateUserDepartmentRelation")
-	assertRouteMissing(t, paths, http.MethodGet, "/v1/iam/user/detailUserDepartmentRelation")
-	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/user/pageListUserDepartmentRelation")
+	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/user/createUserDepartment")
+	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/user/deleteUserDepartment")
+	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/user/updateUserDepartment")
+	assertRouteMissing(t, paths, http.MethodGet, "/v1/iam/user/detailUserDepartment")
+	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/user/pageListUserDepartment")
 }
 
 func TestIAMRoutersWhitelistPublicAuthEndpoints(t *testing.T) {

@@ -42,7 +42,7 @@ type UserLoginLogBaseInfo struct {
 	LoginTime int64  `json:"loginTime" form:"loginTime"` // 登录时间
 }
 
-type UserDepartmentRelationBaseInfo struct {
+type UserDepartmentBaseInfo struct {
 	TenantID     uint `json:"tenantID" form:"tenantID"`         // 租户ID
 	UserID       uint `json:"userID" form:"userID"`             // 用户ID
 	DepartmentID uint `json:"departmentID" form:"departmentID"` // 部门ID

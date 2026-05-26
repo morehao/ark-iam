@@ -18,7 +18,7 @@ type UserCtr interface {
 	DetailUserLoginLog(ctx *gin.Context)
 	PageListUserLoginLog(ctx *gin.Context)
 	GetUserLoginLogByUser(ctx *gin.Context)
-	GetUserDepartmentRelationByUser(ctx *gin.Context)
+	GetUserDepartmentByUser(ctx *gin.Context)
 	AssignDepartments(ctx *gin.Context)
 	CreateUserIdentity(ctx *gin.Context)
 	DeleteUserIdentity(ctx *gin.Context)
@@ -272,16 +272,16 @@ func (ctr *userCtr) GetUserLoginLogByUser(ctx *gin.Context) {
 // @Summary 获取用户部门关联
 // @accept application/json
 // @Produce application/json
-// @Param req query dtouser.UserDepartmentRelationByUserReq true "获取用户部门关联"
-// @Success 200 {object} gincontext.DtoRender{data=dtouser.UserDepartmentRelationPageListResp}
-// @Router /v1/iam/user/getUserDepartmentRelationByUser [get]
-func (ctr *userCtr) GetUserDepartmentRelationByUser(ctx *gin.Context) {
-	var req dtouser.UserDepartmentRelationByUserReq
+// @Param req query dtouser.UserDepartmentByUserReq true "获取用户部门关联"
+// @Success 200 {object} gincontext.DtoRender{data=dtouser.UserDepartmentPageListResp}
+// @Router /v1/iam/user/getUserDepartmentByUser [get]
+func (ctr *userCtr) GetUserDepartmentByUser(ctx *gin.Context) {
+	var req dtouser.UserDepartmentByUserReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.userSvc.GetUserDepartmentRelationByUser(ctx, &req)
+	res, err := ctr.userSvc.GetUserDepartmentByUser(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

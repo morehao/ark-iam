@@ -94,7 +94,7 @@ type UserLoginLogByUserReq struct {
 	UserID uint `json:"userID" form:"userID" binding:"required"` // 用户ID
 }
 
-type UserDepartmentRelationByUserReq struct {
+type UserDepartmentByUserReq struct {
 	UserID uint `json:"userID" form:"userID" binding:"required"` // 用户ID
 }
 

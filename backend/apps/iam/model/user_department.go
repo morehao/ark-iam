@@ -4,9 +4,9 @@ import (
 	"gorm.io/gorm"
 )
 
-const TableNameUserDepartmentRelation = "user_department_relation"
+const TableNameUserDepartment = "user_department"
 
-type UserDepartmentRelationEntity struct {
+type UserDepartmentEntity struct {
 	gorm.Model
 	TenantID     uint   `gorm:"column:tenant_id;type:bigint unsigned;not null;default 0;comment:租户id"`
 	UserID       uint   `gorm:"column:user_id;type:bigint unsigned;not null;default 0;comment:用户ID"`
@@ -17,14 +17,14 @@ type UserDepartmentRelationEntity struct {
 	DeletedBy    uint   `gorm:"column:deleted_by;type:bigint unsigned;not null;default 0;comment:删除人ID"`
 }
 
-func (UserDepartmentRelationEntity) TableName() string {
-	return TableNameUserDepartmentRelation
+func (UserDepartmentEntity) TableName() string {
+	return TableNameUserDepartment
 }
 
-type UserDepartmentRelationEntityList []UserDepartmentRelationEntity
+type UserDepartmentEntityList []UserDepartmentEntity
 
-func (l UserDepartmentRelationEntityList) ToMap() map[uint]UserDepartmentRelationEntity {
-	m := make(map[uint]UserDepartmentRelationEntity)
+func (l UserDepartmentEntityList) ToMap() map[uint]UserDepartmentEntity {
+	m := make(map[uint]UserDepartmentEntity)
 	for _, v := range l {
 		m[v.ID] = v
 	}

@@ -80,17 +80,17 @@ type UserLoginLogPageListResp struct {
 	Total int64                   `json:"total"` // 数据总条数
 }
 
-type UserDepartmentRelationPageListItem struct {
-	UserDepartmentRelationID uint `json:"userDepartmentRelationID"` // 用户部门关系ID
-	TenantID                 uint   `json:"tenantID"`         // 租户ID
-	UserID                   uint   `json:"userID"`           // 用户ID
-	DepartmentID             uint   `json:"departmentID"`     // 部门ID
-	IsPrimary                int8   `json:"isPrimary"`         // 是否主部门
+type UserDepartmentPageListItem struct {
+	UserDepartmentID uint `json:"userDepartmentID"` // 用户部门ID
+	TenantID                uint                `json:"tenantID"`           // 租户ID
+	UserID                  uint                `json:"userID"`             // 用户ID
+	DepartmentID            uint                `json:"departmentID"`       // 部门ID
+	IsPrimary               int8                `json:"isPrimary"`          // 是否主部门
 	gobject.OperatorBaseInfo
 }
 
-type UserDepartmentRelationPageListResp struct {
-	List  []UserDepartmentRelationPageListItem `json:"list"`  // 数据列表
+type UserDepartmentPageListResp struct {
+	List  []UserDepartmentPageListItem `json:"list"`  // 数据列表
 	Total int64                            `json:"total"` // 数据总条数
 }
 

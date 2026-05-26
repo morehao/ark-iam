@@ -27,7 +27,7 @@ func TestAssignDepartmentsUsesTenantAndSkipsDuplicates(t *testing.T) {
 
 	db := newAssignDepartmentsTestDB(t)
 	installTestIamDB(t, db)
-	if err := db.Create(&model.UserDepartmentRelationEntity{
+	if err := db.Create(&model.UserDepartmentEntity{
 		TenantID:     23,
 		UserID:       100,
 		DepartmentID: 2,
@@ -43,7 +43,7 @@ func TestAssignDepartmentsUsesTenantAndSkipsDuplicates(t *testing.T) {
 		t.Fatalf("AssignDepartments returned error: %v", err)
 	}
 
-	var relations []model.UserDepartmentRelationEntity
+	var relations []model.UserDepartmentEntity
 	if err := db.Order("department_id asc").Find(&relations).Error; err != nil {
 		t.Fatalf("query relations: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestAssignDepartmentsReturnsErrorWhenInsertFailsInTransaction(t *testing.T)
 
 	svc := &userSvc{}
 	err := svc.AssignDepartments(ginCtx, &dtouser.AssignDepartmentsReq{UserID: 100, DepartmentIDs: []uint{1}})
-	assertAssignDepartmentsCode(t, err, code.UserDepartmentRelationCreateError)
+	assertAssignDepartmentsCode(t, err, code.UserDepartmentCreateError)
 }
 
 func TestAssignDepartmentsReturnsErrorWhenTransactionFails(t *testing.T) {
@@ -104,7 +104,7 @@ func TestAssignDepartmentsReturnsErrorWhenTransactionFails(t *testing.T) {
 
 	svc := &userSvc{}
 	err = svc.AssignDepartments(ginCtx, &dtouser.AssignDepartmentsReq{UserID: 100, DepartmentIDs: []uint{1}})
-	assertAssignDepartmentsCode(t, err, code.UserDepartmentRelationCreateError)
+	assertAssignDepartmentsCode(t, err, code.UserDepartmentCreateError)
 }
 
 func newAssignDepartmentsTestDB(t *testing.T) *gorm.DB {
@@ -114,7 +114,7 @@ func newAssignDepartmentsTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite db: %v", err)
 	}
-	if err := db.AutoMigrate(&model.UserDepartmentRelationEntity{}); err != nil {
+	if err := db.AutoMigrate(&model.UserDepartmentEntity{}); err != nil {
 		t.Fatalf("migrate relation table: %v", err)
 	}
 	return db
