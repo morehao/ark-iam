@@ -17,7 +17,7 @@ type ApiKeyEntity struct {
 	KeyHash    string          `gorm:"column:key_hash;type:varchar(256);not null;default '';comment:密钥哈希"`
 	KeyPrefix  string          `gorm:"column:key_prefix;type:varchar(16);not null;default '';comment:密钥前缀(前7位)"`
 	Scope      json.RawMessage `gorm:"column:scope;type:json;not null;default '{}';comment:权限范围"`
-	ExpiresAt  *time.Time      `gorm:"column:expires_at;type:datetime;comment:过期时间"`
+	ExpiredAt  *time.Time      `gorm:"column:expired_at;type:datetime;comment:过期时间"`
 	LastUsedAt sql.NullTime    `gorm:"column:last_used_at;type:datetime;comment:最后使用时间"`
 	RevokedAt  *time.Time      `gorm:"column:revoked_at;type:datetime;comment:撤销时间"`
 	CreatedBy  uint            `gorm:"column:created_by;type:bigint unsigned;not null;default 0;comment:创建人id"`

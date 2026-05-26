@@ -18,7 +18,7 @@ type SessionResp struct {
 	ClientType    string     `json:"clientType"`
 	ClientIP      string     `json:"clientIP"`
 	UserAgent     string     `json:"userAgent"`
-	ExpiresAt     *string    `json:"expiresAt"`
+	ExpiredAt     *string    `json:"expiresAt"`
 	CreatedAt     string     `json:"createdAt"`
 	IsActive      bool       `json:"isActive"`
 }

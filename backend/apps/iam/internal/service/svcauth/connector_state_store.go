@@ -26,7 +26,7 @@ type ConnectorState struct {
 	ConnectorID uint      `json:"connectorId"`
 	TenantID    uint      `json:"tenantId"`
 	RedirectURI string    `json:"redirectUri"`
-	ExpiresAt   time.Time `json:"expiresAt"`
+	ExpiredAt   time.Time `json:"expiresAt"`
 }
 
 type ConnectorStateStore interface {
@@ -87,7 +87,7 @@ func (s *redisConnectorStateStore) Save(ctx context.Context, state *ConnectorSta
 	if err != nil {
 		return err
 	}
-	if err := s.client.Set(ctx, connectorStateRedisKey(state.State), payload, time.Until(state.ExpiresAt)).Err(); err != nil {
+	if err := s.client.Set(ctx, connectorStateRedisKey(state.State), payload, time.Until(state.ExpiredAt)).Err(); err != nil {
 		return err
 	}
 	return nil
@@ -163,7 +163,7 @@ func (s *inMemoryConnectorStateStore) loadLocked(state string) (*ConnectorState,
 	if !ok {
 		return nil, ErrConnectorStateNotFound
 	}
-	if time.Now().After(stored.ExpiresAt) {
+	if time.Now().After(stored.ExpiredAt) {
 		delete(s.states, state)
 		return nil, ErrConnectorStateNotFound
 	}
@@ -178,10 +178,10 @@ func validateConnectorState(state *ConnectorState) error {
 	if state.State == "" {
 		return fmt.Errorf("connector state is required")
 	}
-	if state.ExpiresAt.IsZero() {
+	if state.ExpiredAt.IsZero() {
 		return fmt.Errorf("connector state expiresAt is required")
 	}
-	if time.Until(state.ExpiresAt) <= 0 {
+	if time.Until(state.ExpiredAt) <= 0 {
 		return fmt.Errorf("connector state is expired")
 	}
 	return nil
@@ -192,7 +192,7 @@ func decodeConnectorState(payload []byte) (*ConnectorState, error) {
 	if err := json.Unmarshal(payload, &state); err != nil {
 		return nil, err
 	}
-	if time.Now().After(state.ExpiresAt) {
+	if time.Now().After(state.ExpiredAt) {
 		return nil, ErrConnectorStateNotFound
 	}
 	return &state, nil

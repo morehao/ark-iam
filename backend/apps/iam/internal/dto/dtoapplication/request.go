@@ -56,7 +56,7 @@ type ApplicationSecretListReq struct {
 type CreateApplicationSecretReq struct {
 	ApplicationID uint   `json:"applicationId" binding:"required"`
 	Name          string `json:"name" binding:"required"`
-	ExpiresAt     string `json:"expiresAt"`
+	ExpiredAt     string `json:"expiresAt"`
 }
 
 type DeleteApplicationSecretReq struct {

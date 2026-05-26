@@ -319,15 +319,15 @@ func (svc *applicationSvc) ListSecrets(ctx *gin.Context, req *dtoapplication.App
 	secrets := make([]dtoapplication.ApplicationSecretResp, 0, len(list))
 	for _, s := range list {
 		var expiresAt *string
-		if s.ExpiresAt > 0 {
-			t := time.Unix(s.ExpiresAt, 0).Format("2006-01-02 15:04:05")
+		if s.ExpiredAt != nil {
+			t := s.ExpiredAt.Format("2006-01-02 15:04:05")
 			expiresAt = &t
 		}
 		secrets = append(secrets, dtoapplication.ApplicationSecretResp{
 			ID:            uint64(s.ID),
 			ApplicationID: uint64(s.ApplicationID),
 			Name:          s.Name,
-			ExpiresAt:     expiresAt,
+			ExpiredAt:     expiresAt,
 			CreatedAt:     s.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
@@ -346,11 +346,11 @@ func (svc *applicationSvc) CreateSecret(ctx *gin.Context, req *dtoapplication.Cr
 	}
 	secretValue := hex.EncodeToString(randomBytes)
 
-	var expiresAt int64
-	if req.ExpiresAt != "" {
-		t, err := time.Parse("2006-01-02 15:04:05", req.ExpiresAt)
+	var expiresAt *time.Time
+	if req.ExpiredAt != "" {
+		t, err := time.Parse("2006-01-02 15:04:05", req.ExpiredAt)
 		if err == nil {
-			expiresAt = t.Unix()
+			expiresAt = &t
 		}
 	}
 
@@ -359,7 +359,7 @@ func (svc *applicationSvc) CreateSecret(ctx *gin.Context, req *dtoapplication.Cr
 		ApplicationID: req.ApplicationID,
 		Name:          req.Name,
 		Value:         secretValue,
-		ExpiresAt:     expiresAt,
+		ExpiredAt:     expiresAt,
 		CreatedBy:    gincontext.GetUserID(ctx),
 	}
 

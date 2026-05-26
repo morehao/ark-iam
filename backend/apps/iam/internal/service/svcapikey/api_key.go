@@ -60,8 +60,8 @@ func (svc *createApiKeySvc) Create(ctx *gin.Context, tenantID uint, req *dtoapik
 
 	var expiresAt *time.Time
 	var expiresAtStr string
-	if req.ExpiresAt != "" {
-		t, err := time.Parse("2006-01-02T15:04:05Z", req.ExpiresAt)
+	if req.ExpiredAt != "" {
+		t, err := time.Parse("2006-01-02T15:04:05Z", req.ExpiredAt)
 		if err != nil {
 			glog.Errorf(ctx, "[svcapikey.Create] parse expiresAt fail, err:%v", err)
 			return nil, err
@@ -76,7 +76,7 @@ func (svc *createApiKeySvc) Create(ctx *gin.Context, tenantID uint, req *dtoapik
 		KeyHash:   keyHash,
 		KeyPrefix: keyPrefix,
 		Scope:     scope,
-		ExpiresAt: expiresAt,
+		ExpiredAt: expiresAt,
 		CreatedBy: 0,
 	}
 
@@ -90,7 +90,7 @@ func (svc *createApiKeySvc) Create(ctx *gin.Context, tenantID uint, req *dtoapik
 		Name:      entity.Name,
 		Key:       rawKey,
 		KeyPrefix: keyPrefix,
-		ExpiresAt: expiresAtStr,
+		ExpiredAt: expiresAtStr,
 	}, nil
 }
 
@@ -141,8 +141,8 @@ func (svc *createApiKeySvc) PageList(ctx *gin.Context, tenantID uint, req *dtoap
 			Scope:     string(entity.Scope),
 			CreatedAt: entity.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		}
-		if entity.ExpiresAt != nil {
-			item.ExpiresAt = entity.ExpiresAt.Format("2006-01-02T15:04:05Z")
+		if entity.ExpiredAt != nil {
+			item.ExpiredAt = entity.ExpiredAt.Format("2006-01-02T15:04:05Z")
 		}
 		if entity.LastUsedAt.Valid {
 			item.LastUsedAt = entity.LastUsedAt.Time.Format("2006-01-02T15:04:05Z")

@@ -31,7 +31,7 @@ func TestSessionListReturnsPersonAwareTenantSessions(t *testing.T) {
 				ClientType:    "web",
 				ClientIP:      "10.0.0.1",
 				UserAgent:     "Mozilla/5.0",
-				ExpiresAt:     timePointer(time.Now().Add(time.Hour)),
+				ExpiredAt:     timePointer(time.Now().Add(time.Hour)),
 			},
 			{
 				Model:         gorm.Model{ID: 2, CreatedAt: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)},
@@ -43,7 +43,7 @@ func TestSessionListReturnsPersonAwareTenantSessions(t *testing.T) {
 				ClientType:    "mobile",
 				ClientIP:      "10.0.0.2",
 				UserAgent:     "App/1.0",
-				ExpiresAt:     timePointer(time.Now().Add(time.Hour)),
+				ExpiredAt:     timePointer(time.Now().Add(time.Hour)),
 			},
 		},
 		total: 2,

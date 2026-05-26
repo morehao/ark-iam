@@ -1,6 +1,8 @@
 package model
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 )
 
@@ -12,7 +14,7 @@ type ApplicationSecretEntity struct {
 	ApplicationID uint  `gorm:"column:application_id;type:bigint unsigned;not null;default 0;comment:应用ID" json:"applicationID"`
 	Name          string `gorm:"column:name;type:varchar(256);not null;default '';comment:密钥名称" json:"name"`
 	Value         string `gorm:"column:value;type:varchar(64);not null;default '';comment:密钥值" json:"value"`
-	ExpiresAt     int64 `gorm:"column:expires_at;type:datetime;comment:过期时间" json:"expiresAt"`
+	ExpiredAt     *time.Time `gorm:"column:expired_at;type:datetime;comment:过期时间" json:"expiresAt"`
 	CreatedBy     uint  `gorm:"column:created_by;type:bigint unsigned;not null;default 0;comment:创建人id" json:"createdBy"`
 	UpdatedBy     uint  `gorm:"column:updated_by;type:bigint unsigned;not null;default 0;comment:更新人id" json:"updatedBy"`
 	DeletedBy     uint  `gorm:"column:deleted_by;type:bigint unsigned;not null;default 0;comment:删除人id" json:"deletedBy"`

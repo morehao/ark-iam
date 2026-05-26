@@ -95,7 +95,7 @@ func TestBusinessTimeFieldsUseTimePointerInsteadOfDeletedAt(t *testing.T) {
 		{name: "user joined at", modelType: reflect.TypeOf(UserEntity{}), fieldName: "JoinedAt"},
 		{name: "user last sign in", modelType: reflect.TypeOf(UserEntity{}), fieldName: "LastSignInAt"},
 		{name: "user identity last used", modelType: reflect.TypeOf(UserIdentityEntity{}), fieldName: "LastUsedAt"},
-		{name: "refresh token expires at", modelType: reflect.TypeOf(RefreshTokenEntity{}), fieldName: "ExpiresAt"},
+		{name: "refresh token expires at", modelType: reflect.TypeOf(RefreshTokenEntity{}), fieldName: "ExpiredAt"},
 		{name: "refresh token revoked at", modelType: reflect.TypeOf(RefreshTokenEntity{}), fieldName: "RevokedAt"},
 	}
 

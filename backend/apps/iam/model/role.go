@@ -16,6 +16,7 @@ type RoleEntity struct {
 	IsDefault   int8   `gorm:"column:is_default;type:tinyint(1);not null;default 0;comment:是否默认角色" json:"isDefault"`
 	CreatedBy   uint   `gorm:"column:created_by;type:bigint unsigned;not null;default 0;comment:创建人id" json:"createdBy"`
 	UpdatedBy   uint   `gorm:"column:updated_by;type:bigint unsigned;not null;default 0;comment:更新人id" json:"updatedBy"`
+	DeletedBy   uint   `gorm:"column:deleted_by;type:bigint unsigned;not null;default 0;comment:删除人id" json:"deletedBy"`
 }
 
 func (RoleEntity) TableName() string {

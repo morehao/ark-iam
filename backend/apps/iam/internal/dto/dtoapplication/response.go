@@ -39,7 +39,7 @@ type ApplicationSecretResp struct {
 	ApplicationID uint64  `json:"applicationId"`
 	Name          string  `json:"name"`
 	Value         string  `json:"value,omitempty"`
-	ExpiresAt     *string `json:"expiresAt"`
+	ExpiredAt     *string `json:"expiresAt"`
 	CreatedAt     string  `json:"createdAt"`
 }
 
