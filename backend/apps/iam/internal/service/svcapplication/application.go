@@ -486,6 +486,11 @@ func (svc *applicationSvc) DeleteSecret(ctx *gin.Context, req *dtoapplication.De
 		return code.GetError(code.ApplicationSecretNotExistError)
 	}
 
+	appEntity, err := appRepo.GetByID(ctx, entity.ApplicationID)
+	if err != nil || !applicationVisibleToTenant(appEntity, gincontext.GetTenantID(ctx)) {
+		return code.GetError(code.ApplicationSecretNotExistError)
+	}
+
 	if err := appRepo.DeleteSecret(ctx, uint(req.SecretID), gincontext.GetUserID(ctx)); err != nil {
 		glog.Errorf(ctx, "[svcapplication.DeleteSecret] delete fail, err:%v", err)
 		return code.GetError(code.ApplicationSecretDeleteError)

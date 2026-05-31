@@ -35,7 +35,7 @@ func TestApplicationPageListUsesContextTenant(t *testing.T) {
 	installApplicationScopeRepo(t, repo)
 
 	svc := &applicationSvc{}
-	_, _ = svc.PageList(ginCtx, &dtoapplication.ApplicationPageListReq{TenantID: 99})
+	_, _ = svc.PageList(ginCtx, &dtoapplication.ApplicationPageListReq{})
 	if repo.lastCond == nil || repo.lastCond.TenantID != 62 {
 		t.Fatalf("expected tenant 62 from context, got %+v", repo.lastCond)
 	}
@@ -46,7 +46,11 @@ func TestDeleteSecretRejectsCrossTenantEntity(t *testing.T) {
 	ginCtx.Set(gcontext.KeyTenantID, uint(63))
 	ginCtx.Set(gcontext.KeyUserID, uint(1003))
 
-	repo := &stubApplicationScopeRepo{secret: &model.ApplicationSecretEntity{Model: gorm.Model{ID: 7}, TenantID: 98}}
+	// Secret belongs to app 5, app 5 belongs to tenant 99 (mismatch with context tenant 63)
+	repo := &stubApplicationScopeRepo{
+		secret: &model.ApplicationSecretEntity{Model: gorm.Model{ID: 7}, ApplicationID: 5},
+		detail: &model.ApplicationEntity{Model: gorm.Model{ID: 5}, TenantID: 99},
+	}
 	installApplicationScopeRepo(t, repo)
 
 	svc := &applicationSvc{}
@@ -70,6 +74,10 @@ type stubApplicationScopeRepo struct {
 }
 
 func (r *stubApplicationScopeRepo) GetByID(ctx context.Context, id uint) (*model.ApplicationEntity, error) {
+	return r.detail, r.err
+}
+
+func (r *stubApplicationScopeRepo) GetByCond(ctx context.Context, cond genericdao.Cond) (*model.ApplicationEntity, error) {
 	return r.detail, r.err
 }
 
