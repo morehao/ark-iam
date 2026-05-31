@@ -9,19 +9,19 @@ import (
 
 type ApplicationSecretCond struct {
 	*genericdao.BaseCond
-	TenantID      uint
 	ApplicationID uint
+	Name          string
 }
 
 func (c *ApplicationSecretCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
-		db.Where(tableName + ".tenant_id = ?", c.TenantID)
-	}
 	if c.ApplicationID != 0 {
 		db.Where(tableName + ".application_id = ?", c.ApplicationID)
+	}
+	if c.Name != "" {
+		db.Where(tableName + ".name = ?", c.Name)
 	}
 }
 

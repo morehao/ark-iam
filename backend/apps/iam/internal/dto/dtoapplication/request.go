@@ -1,38 +1,63 @@
 package dtoapplication
 
 type ApplicationCreateReq struct {
-	TenantID    uint   `json:"tenantID" form:"tenantID"`       // 租户ID
-	Name        string `json:"name" form:"name"`               // 应用名称
-	Secret      string `json:"secret" form:"secret"`           // 应用密钥
-	Description string `json:"description" form:"description"` // 应用描述
-	Type        string `json:"type" form:"type"`               // 应用类型
-	IsThirdParty int8  `json:"isThirdParty" form:"isThirdParty"` // 是否第三方应用
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	LogoURL     string `json:"logoURL"`
+	HomepageURL string `json:"homepageURL"`
+	Type        string `json:"type"`
+	IsThirdParty int8  `json:"isThirdParty"`
+
+	RedirectURIs            []string `json:"redirectURIs"`
+	PostLogoutRedirectURIs  []string `json:"postLogoutRedirectURIs"`
+	GrantTypes              []string `json:"grantTypes"`
+	ResponseTypes           []string `json:"responseTypes"`
+	TokenEndpointAuthMethod string   `json:"tokenEndpointAuthMethod"`
+	AllowedOrigins          []string `json:"allowedOrigins"`
+	RequirePKCE             int8     `json:"requirePKCE"`
+	RequireAuthTime         int8     `json:"requireAuthTime"`
+	DefaultScopes           []string `json:"defaultScopes"`
+	AccessTokenTTL          int64    `json:"accessTokenTTL"`
+	RefreshTokenTTL         int64    `json:"refreshTokenTTL"`
 }
 
 type ApplicationUpdateReq struct {
-	ApplicationID uint   `json:"applicationID" form:"applicationID"` // 应用ID
-	TenantID      uint   `json:"tenantID" form:"tenantID"`           // 租户ID
-	Name          string `json:"name" form:"name"`                   // 应用名称
-	Description   string `json:"description" form:"description"`     // 应用描述
-	Type          string `json:"type" form:"type"`                   // 应用类型
-	IsThirdParty  int8   `json:"isThirdParty" form:"isThirdParty"`   // 是否第三方应用
+	ApplicationID uint   `json:"applicationID"`
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	LogoURL       string `json:"logoURL"`
+	HomepageURL   string `json:"homepageURL"`
+	Type          string `json:"type"`
+	Status        string `json:"status"`
+	IsThirdParty  int8   `json:"isThirdParty"`
+
+	RedirectURIs            []string `json:"redirectURIs"`
+	PostLogoutRedirectURIs  []string `json:"postLogoutRedirectURIs"`
+	GrantTypes              []string `json:"grantTypes"`
+	ResponseTypes           []string `json:"responseTypes"`
+	TokenEndpointAuthMethod string   `json:"tokenEndpointAuthMethod"`
+	AllowedOrigins          []string `json:"allowedOrigins"`
+	RequirePKCE             int8     `json:"requirePKCE"`
+	RequireAuthTime         int8     `json:"requireAuthTime"`
+	DefaultScopes           []string `json:"defaultScopes"`
+	AccessTokenTTL          int64    `json:"accessTokenTTL"`
+	RefreshTokenTTL         int64    `json:"refreshTokenTTL"`
 }
 
 type ApplicationDeleteReq struct {
-	ApplicationID uint `json:"applicationID" form:"applicationID"` // 应用ID
+	ApplicationID uint `json:"applicationID"`
 }
 
 type ApplicationDetailReq struct {
-	ApplicationID uint `json:"applicationID" form:"applicationID"` // 应用ID
+	ApplicationID uint `json:"applicationID"`
 }
 
 type ApplicationPageListReq struct {
-	Page        int    `json:"page" form:"page"`         // 页码
-	PageSize    int    `json:"pageSize" form:"pageSize"` // 每页数量
-	TenantID    uint   `json:"tenantID" form:"tenantID"` // 租户ID
-	Name        string `json:"name" form:"name"`         // 应用名称
-	Type        string `json:"type" form:"type"`         // 应用类型
-	IsThirdParty int8  `json:"isThirdParty" form:"isThirdParty"` // 是否第三方应用
+	Page        int    `json:"page"`
+	PageSize    int    `json:"pageSize"`
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Status      string `json:"status"`
 }
 
 type ApplicationRoleListReq struct {

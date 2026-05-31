@@ -12,6 +12,8 @@ type ApplicationCond struct {
 	TenantID uint
 	Name     string
 	Type     string
+	Status   string
+	ClientID string
 }
 
 func (c *ApplicationCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -26,6 +28,12 @@ func (c *ApplicationCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.Type != "" {
 		db.Where(tableName + ".type = ?", c.Type)
+	}
+	if c.Status != "" {
+		db.Where(tableName + ".status = ?", c.Status)
+	}
+	if c.ClientID != "" {
+		db.Where(tableName + ".client_id = ?", c.ClientID)
 	}
 }
 

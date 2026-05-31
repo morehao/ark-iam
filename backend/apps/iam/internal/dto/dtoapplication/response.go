@@ -3,22 +3,23 @@ package dtoapplication
 import "github.com/morehao/ark-iam/iam/object/objapplication"
 
 type ApplicationCreateResp struct {
-	ApplicationID uint `json:"applicationID"` // 应用ID
+	ApplicationID uint   `json:"applicationID"`
+	ClientID      string `json:"clientID"`
 }
 
 type ApplicationDetailResp struct {
-	ApplicationID       uint `json:"applicationID"`        // 应用ID
-	objapplication.ApplicationBaseInfo `json:"applicationBaseInfo"` // 应用基础信息
+	ApplicationID uint `json:"applicationID"`
+	objapplication.ApplicationBaseInfo
 }
 
 type ApplicationPageListResp struct {
-	List  []ApplicationPageListItem `json:"list"`  // 应用列表
-	Total int64                     `json:"total"` // 总数
+	List  []ApplicationPageListItem `json:"list"`
+	Total int64                     `json:"total"`
 }
 
 type ApplicationPageListItem struct {
-	ApplicationID       uint `json:"applicationID"`        // 应用ID
-	objapplication.ApplicationBaseInfo `json:"applicationBaseInfo"` // 应用基础信息
+	ApplicationID uint `json:"applicationID"`
+	objapplication.ApplicationBaseInfo
 }
 
 type ApplicationRoleResp struct {
@@ -30,15 +31,15 @@ type ApplicationRoleResp struct {
 }
 
 type ApplicationRoleListResp struct {
-	Total  int64                 `json:"total"`
-	Roles  []ApplicationRoleResp `json:"roles"`
+	Total int64                 `json:"total"`
+	Roles []ApplicationRoleResp `json:"roles"`
 }
 
 type ApplicationSecretResp struct {
 	ID            uint64  `json:"id"`
 	ApplicationID uint64  `json:"applicationId"`
 	Name          string  `json:"name"`
-	Value         string  `json:"value,omitempty"`
+	ValuePrefix   string  `json:"valuePrefix"`
 	ExpiredAt     *string `json:"expiresAt"`
 	CreatedAt     string  `json:"createdAt"`
 }
@@ -49,7 +50,8 @@ type ApplicationSecretListResp struct {
 }
 
 type CreateApplicationSecretResp struct {
-	ID     uint64 `json:"id"`
-	Name   string `json:"name"`
-	Secret string `json:"secret"`
+	ID          uint64 `json:"id"`
+	Name        string `json:"name"`
+	ValuePrefix string `json:"valuePrefix"`
+	Secret      string `json:"secret"`
 }
