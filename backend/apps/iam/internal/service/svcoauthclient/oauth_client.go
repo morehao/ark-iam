@@ -192,7 +192,7 @@ func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtooauthclient.DetailRe
 		OAuthClientID: entity.ID,
 		OAuthClientBaseInfo: objoauthclient.OAuthClientBaseInfo{
 			TenantID:      entity.TenantID,
-			ApplicationID: entity.ApplicationID,
+			AppID: entity.AppID,
 			ClientID:      entity.ClientID,
 			Name:          entity.Name,
 			Type:          entity.Type,
@@ -225,7 +225,7 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtooauthclient.PageLi
 			OAuthClientID: v.ID,
 			OAuthClientBaseInfo: objoauthclient.OAuthClientBaseInfo{
 				TenantID:      v.TenantID,
-				ApplicationID: v.ApplicationID,
+				AppID: v.AppID,
 				ClientID:      v.ClientID,
 				Name:          v.Name,
 				Type:          v.Type,
@@ -255,7 +255,7 @@ func (svc *oAuthClientSvc) GetByClientID(ctx *gin.Context, clientID string) (*dt
 		OAuthClientID: entity.ID,
 		OAuthClientBaseInfo: objoauthclient.OAuthClientBaseInfo{
 			TenantID:      entity.TenantID,
-			ApplicationID: entity.ApplicationID,
+			AppID: entity.AppID,
 			ClientID:      entity.ClientID,
 			Name:          entity.Name,
 			Type:          entity.Type,

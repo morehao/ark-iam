@@ -247,7 +247,7 @@ CREATE TABLE `role`
 (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '角色ID',
     `tenant_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
-    `application_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '所属应用id',
+    `app_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '所属应用id',
     `name`           VARCHAR(128) NOT NULL DEFAULT '' COMMENT '角色名称',
     `code`           VARCHAR(64) NOT NULL DEFAULT '' COMMENT '角色编码',
     `description`   VARCHAR(256) NOT NULL DEFAULT '' COMMENT '角色描述',
@@ -261,7 +261,7 @@ CREATE TABLE `role`
     `deleted_by`     BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '删除人id',
     PRIMARY KEY (`id`),
     KEY              `idx_tenant_id` (`tenant_id`),
-    KEY              `idx_application_id` (`application_id`),
+    KEY              `idx_app_id` (`app_id`),
     KEY              `idx_tenant_name` (`tenant_id`, `name`),
     KEY              `idx_tenant_code` (`tenant_id`, `code`),
     KEY              `idx_tenant_type` (`tenant_id`, `type`),
@@ -389,7 +389,7 @@ CREATE TABLE `organization_role_user`
 CREATE TABLE `menu`
 (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '菜单ID',
-    `application_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '所属应用id',
+    `app_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '所属应用id',
     `parent_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '父菜单ID',
     `name`           VARCHAR(128) NOT NULL DEFAULT '' COMMENT '菜单名称',
     `code`           VARCHAR(64) NOT NULL DEFAULT '' COMMENT '菜单编码',
@@ -411,8 +411,8 @@ CREATE TABLE `menu`
     `updated_by`     BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '更新人id',
     `deleted_by`     BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '删除人id',
     PRIMARY KEY (`id`),
-    KEY              `idx_tenant_id` (`tenant_id`),
-    KEY              `idx_tenant_parent_id` (`tenant_id`, `parent_id`),
+    KEY              `idx_app_id` (`app_id`),
+    KEY              `idx_app_parent_id` (`app_id`, `parent_id`),
     KEY              `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='菜单表';
 
@@ -556,7 +556,7 @@ CREATE TABLE `domain`
 CREATE TABLE `oauth_client` (
     `id`                            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '客户端ID',
     `tenant_id`                     BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
-    `application_id`                BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '所属应用id',
+    `app_id`                BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '所属应用id',
     `client_id`                     VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'OIDC客户端ID',
     `name`                          VARCHAR(256) NOT NULL DEFAULT '' COMMENT '客户端名称',
     `redirect_uris`                 JSON NOT NULL DEFAULT ('[]') COMMENT '授权回调地址',
@@ -582,7 +582,7 @@ CREATE TABLE `oauth_client` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_client_id` (`client_id`),
     KEY `idx_tenant_id` (`tenant_id`),
-    KEY `idx_application_id` (`application_id`),
+    KEY `idx_app_id` (`app_id`),
     KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='OIDC客户端表';
 
@@ -605,31 +605,10 @@ CREATE TABLE `oauth_client_secret` (
     KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='OIDC客户端密钥表';
 
-CREATE TABLE `app_definition` (
-    `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '应用ID',
-    `code`            VARCHAR(64) NOT NULL DEFAULT '' COMMENT '应用编码（唯一）',
-    `name`            VARCHAR(128) NOT NULL DEFAULT '' COMMENT '应用名称',
-    `description`     TEXT DEFAULT NULL COMMENT '应用描述',
-    `logo_url`        VARCHAR(2048) NOT NULL DEFAULT '' COMMENT '应用logo',
-    `homepage_url`    VARCHAR(2048) NOT NULL DEFAULT '' COMMENT '应用主页',
-    `type`            VARCHAR(32) NOT NULL DEFAULT 'first_party' COMMENT '应用类型',
-    `status`          VARCHAR(32) NOT NULL DEFAULT 'enable' COMMENT '状态',
-    `sort`            INT NOT NULL DEFAULT 0 COMMENT '排序',
-    `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    `deleted_at`      DATETIME DEFAULT NULL,
-    `created_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
-    `updated_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
-    `deleted_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_code` (`code`),
-    KEY `idx_deleted_at` (`deleted_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='应用定义表';
-
 CREATE TABLE `tenant_application` (
     `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
     `tenant_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
-    `application_id`  BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '应用id',
+    `app_id`  BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '应用id',
     `status`          VARCHAR(32) NOT NULL DEFAULT 'enable' COMMENT '状态',
     `config`          JSON NOT NULL DEFAULT ('{}') COMMENT '租户级应用配置',
     `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -639,8 +618,8 @@ CREATE TABLE `tenant_application` (
     `updated_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
     `deleted_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_tenant_app` (`tenant_id`, `application_id`),
+    UNIQUE KEY `uk_tenant_app` (`tenant_id`, `app_id`),
     KEY `idx_tenant_id` (`tenant_id`),
-    KEY `idx_application_id` (`application_id`),
+    KEY `idx_app_id` (`app_id`),
     KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='租户应用订阅表';

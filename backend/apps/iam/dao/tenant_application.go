@@ -10,7 +10,7 @@ import (
 type TenantApplicationCond struct {
 	*genericdao.BaseCond
 	TenantID      uint
-	ApplicationID uint
+	AppID uint
 	Status        string
 }
 
@@ -21,8 +21,8 @@ func (c *TenantApplicationCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.TenantID != 0 {
 		db.Where(tableName + ".tenant_id = ?", c.TenantID)
 	}
-	if c.ApplicationID != 0 {
-		db.Where(tableName + ".application_id = ?", c.ApplicationID)
+	if c.AppID != 0 {
+		db.Where(tableName + ".app_id = ?", c.AppID)
 	}
 	if c.Status != "" {
 		db.Where(tableName + ".status = ?", c.Status)

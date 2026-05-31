@@ -27,7 +27,7 @@ func TestMenuDetailRejectsCrossTenantEntity(t *testing.T) {
 	}
 }
 
-func TestMenuPageListUsesApplicationID(t *testing.T) {
+func TestMenuPageListUsesAppID(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Set(gcontext.KeyTenantID, uint(22))
 
@@ -35,13 +35,13 @@ func TestMenuPageListUsesApplicationID(t *testing.T) {
 	installMenuScopeRepo(t, repo)
 
 	svc := &menuSvc{}
-	_, _ = svc.PageList(ginCtx, &dtopermission.MenuPageListReq{ApplicationID: 10})
-	if repo.lastCond == nil || repo.lastCond.ApplicationID != 10 {
+	_, _ = svc.PageList(ginCtx, &dtopermission.MenuPageListReq{AppID: 10})
+	if repo.lastCond == nil || repo.lastCond.AppID != 10 {
 		t.Fatalf("expected application 10, got %+v", repo.lastCond)
 	}
 }
 
-func TestMenuTreeUsesApplicationID(t *testing.T) {
+func TestMenuTreeUsesAppID(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Set(gcontext.KeyTenantID, uint(23))
 
@@ -49,8 +49,8 @@ func TestMenuTreeUsesApplicationID(t *testing.T) {
 	installMenuScopeRepo(t, repo)
 
 	svc := &menuSvc{}
-	_, _ = svc.Tree(ginCtx, &dtopermission.MenuTreeReq{ApplicationID: 10})
-	if repo.lastTreeCond == nil || repo.lastTreeCond.ApplicationID != 10 {
+	_, _ = svc.Tree(ginCtx, &dtopermission.MenuTreeReq{AppID: 10})
+	if repo.lastTreeCond == nil || repo.lastTreeCond.AppID != 10 {
 		t.Fatalf("expected application 10, got %+v", repo.lastTreeCond)
 	}
 }

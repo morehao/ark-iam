@@ -13,7 +13,7 @@ type SessionRevokeReq struct {
 type SessionResp struct {
 	ID            uint64     `json:"id"`
 	SessionID     string     `json:"sessionId"`
-	ApplicationID uint64     `json:"applicationId"`
+	AppID uint64     `json:"appId"`
 	TenantID      uint64     `json:"tenantId"`
 	ClientType    string     `json:"clientType"`
 	ClientIP      string     `json:"clientIP"`

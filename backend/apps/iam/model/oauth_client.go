@@ -10,7 +10,7 @@ const TableNameOAuthClient = "oauth_client"
 type OAuthClientEntity struct {
 	gorm.Model
 	TenantID        uint   `gorm:"column:tenant_id;type:bigint unsigned;not null;default 0;comment:租户id" json:"tenantID"`
-	ApplicationID   uint   `gorm:"column:application_id;type:bigint unsigned;not null;default 0;comment:所属应用id" json:"applicationID"`
+	AppID   uint   `gorm:"column:app_id;type:bigint unsigned;not null;default 0;comment:所属应用id" json:"appId"`
 	ClientID        string `gorm:"column:client_id;type:varchar(64);not null;default '';uniqueIndex;comment:OIDC客户端ID" json:"clientID"`
 	Name            string `gorm:"column:name;type:varchar(256);not null;default '';comment:客户端名称" json:"name"`
 

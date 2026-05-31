@@ -109,7 +109,7 @@ type RoleUserListResp struct {
 }
 
 type RoleApplicationResp struct {
-	ApplicationID uint64 `json:"applicationId"`
+	AppID uint64 `json:"appId"`
 	AppName       string `json:"appName"`
 	AppType       string `json:"appType"`
 	RoleID        uint64 `json:"roleId"`

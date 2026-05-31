@@ -10,7 +10,7 @@ import (
 type RoleCond struct {
 	*genericdao.BaseCond
 	TenantID      uint
-	ApplicationID uint
+	AppID uint
 	Name          string
 	Code          string
 	Type          string
@@ -23,8 +23,8 @@ func (c *RoleCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.TenantID != 0 {
 		db.Where(tableName + ".tenant_id = ?", c.TenantID)
 	}
-	if c.ApplicationID != 0 {
-		db.Where(tableName + ".application_id = ?", c.ApplicationID)
+	if c.AppID != 0 {
+		db.Where(tableName + ".app_id = ?", c.AppID)
 	}
 	if c.Name != "" {
 		db.Where(tableName + ".name = ?", c.Name)

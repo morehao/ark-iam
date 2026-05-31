@@ -48,7 +48,7 @@ func NewMenuSvc() MenuSvc {
 
 func (svc *menuSvc) Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (*dtopermission.MenuCreateResp, error) {
 	insertEntity := &model.MenuEntity{
-		ApplicationID: req.ApplicationID,
+		AppID: req.AppID,
 		ParentID:      req.ParentID,
 		Name:          req.Name,
 		Code:          req.Code,
@@ -105,7 +105,7 @@ func (svc *menuSvc) Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) e
 
 	userID := gincontext.GetUserID(ctx)
 	updateMap := map[string]any{
-		"application_id": req.ApplicationID,
+		"app_id": req.AppID,
 		"parent_id":      req.ParentID,
 		"name":           req.Name,
 		"code":           req.Code,
@@ -142,7 +142,7 @@ func (svc *menuSvc) Detail(ctx *gin.Context, req *dtopermission.MenuDetailReq) (
 	resp := &dtopermission.MenuDetailResp{
 		MenuID: menuEntity.ID,
 		MenuBaseInfo: objpermission.MenuBaseInfo{
-			ApplicationID: menuEntity.ApplicationID,
+			AppID: menuEntity.AppID,
 			ParentID:      menuEntity.ParentID,
 			Name:          menuEntity.Name,
 			Code:          menuEntity.Code,
@@ -173,7 +173,7 @@ func (svc *menuSvc) PageList(ctx *gin.Context, req *dtopermission.MenuPageListRe
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		ApplicationID: req.ApplicationID,
+		AppID: req.AppID,
 		ParentID:      req.ParentID,
 		Name:          req.Name,
 		Code:          req.Code,
@@ -191,7 +191,7 @@ func (svc *menuSvc) PageList(ctx *gin.Context, req *dtopermission.MenuPageListRe
 		list = append(list, dtopermission.MenuPageListItem{
 			MenuID: v.ID,
 			MenuBaseInfo: objpermission.MenuBaseInfo{
-				ApplicationID: v.ApplicationID,
+				AppID: v.AppID,
 				ParentID:      v.ParentID,
 				Name:          v.Name,
 				Code:          v.Code,
@@ -221,7 +221,7 @@ func (svc *menuSvc) PageList(ctx *gin.Context, req *dtopermission.MenuPageListRe
 func (svc *menuSvc) Tree(ctx *gin.Context, req *dtopermission.MenuTreeReq) (*dtopermission.MenuTreeResp, error) {
 	menuRepo := newMenuScopeRepo()
 	cond := &dao.MenuCond{
-		ApplicationID: req.ApplicationID,
+		AppID: req.AppID,
 	}
 	menuEntityList, _, err := menuRepo.GetPageListByCond(ctx, cond)
 	if err != nil {
@@ -237,7 +237,7 @@ func (svc *menuSvc) Tree(ctx *gin.Context, req *dtopermission.MenuTreeReq) (*dto
 				item := dtopermission.MenuTreeItem{
 					MenuID: menu.ID,
 					MenuBaseInfo: objpermission.MenuBaseInfo{
-						ApplicationID: menu.ApplicationID,
+						AppID: menu.AppID,
 						ParentID:      menu.ParentID,
 						Name:          menu.Name,
 						Code:          menu.Code,

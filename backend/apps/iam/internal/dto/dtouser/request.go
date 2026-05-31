@@ -123,5 +123,5 @@ type RoleApplicationListReq struct {
 
 type AssignRoleApplicationsReq struct {
 	RoleID         uint64   `json:"roleId" binding:"required"`
-	ApplicationIDs []uint64 `json:"applicationIds" binding:"required,min=1"`
+	AppIDs []uint64 `json:"appIds" binding:"required,min=1"`
 }

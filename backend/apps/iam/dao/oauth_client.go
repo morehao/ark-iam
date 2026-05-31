@@ -10,7 +10,7 @@ import (
 type OAuthClientCond struct {
 	*genericdao.BaseCond
 	TenantID      uint
-	ApplicationID uint
+	AppID uint
 	ClientID      string
 	Name          string
 	Type          string
@@ -24,8 +24,8 @@ func (c *OAuthClientCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.TenantID != 0 {
 		db.Where(tableName + ".tenant_id = ?", c.TenantID)
 	}
-	if c.ApplicationID != 0 {
-		db.Where(tableName + ".application_id = ?", c.ApplicationID)
+	if c.AppID != 0 {
+		db.Where(tableName + ".app_id = ?", c.AppID)
 	}
 	if c.ClientID != "" {
 		db.Where(tableName + ".client_id = ?", c.ClientID)

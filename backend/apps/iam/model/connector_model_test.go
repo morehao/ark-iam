@@ -45,7 +45,7 @@ func TestUserModelUsesPersonCenteredFields(t *testing.T) {
 			t.Fatalf("user model missing field: %s", fieldName)
 		}
 	}
-	for _, fieldName := range []string{"Username", "PrimaryEmail", "PrimaryPhone", "PasswordEncrypted", "PasswordMethod", "ApplicationID", "Identities"} {
+	for _, fieldName := range []string{"Username", "PrimaryEmail", "PrimaryPhone", "PasswordEncrypted", "PasswordMethod", "AppID", "Identities"} {
 		if _, ok := userType.FieldByName(fieldName); ok {
 			t.Fatalf("user model still has legacy field: %s", fieldName)
 		}
