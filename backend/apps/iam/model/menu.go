@@ -8,7 +8,7 @@ const TableNameMenu = "menu"
 
 type MenuEntity struct {
 	gorm.Model
-	TenantID     uint   `gorm:"column:tenant_id;type:bigint unsigned;not null;default 0;comment:租户id"`
+	AppID uint   `gorm:"column:app_id;type:bigint unsigned;not null;default 0;comment:所属应用id"`
 	ParentID     uint   `gorm:"column:parent_id;type:bigint unsigned;not null;default 0;comment:父菜单ID"`
 	Name         string `gorm:"column:name;type:varchar(128);not null;default '';comment:菜单名称"`
 	Code         string `gorm:"column:code;type:varchar(64);not null;default '';comment:菜单编码"`

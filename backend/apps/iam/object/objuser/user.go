@@ -10,7 +10,7 @@ type UserBaseInfo struct {
 	Name              string `json:"name" form:"name"`                             // 姓名
 	Avatar            string `json:"avatar" form:"avatar"`                         // 头像URL
 	Profile           any    `json:"profile" form:"profile"`                       // 配置信息
-	ApplicationID     uint   `json:"applicationID" form:"applicationID"`             // 应用ID
+	AppID     uint   `json:"appId" form:"appId"`             // 应用ID
 	Identities        any    `json:"identities" form:"identities"`                 // 第三方身份
 	CustomData        any    `json:"customData" form:"customData"`                 // 自定义数据
 	IsSuspended       int8   `json:"isSuspended" form:"isSuspended"`               // 是否挂起
@@ -42,7 +42,7 @@ type UserLoginLogBaseInfo struct {
 	LoginTime int64  `json:"loginTime" form:"loginTime"` // 登录时间
 }
 
-type UserDepartmentRelationBaseInfo struct {
+type UserDepartmentBaseInfo struct {
 	TenantID     uint `json:"tenantID" form:"tenantID"`         // 租户ID
 	UserID       uint `json:"userID" form:"userID"`             // 用户ID
 	DepartmentID uint `json:"departmentID" form:"departmentID"` // 部门ID

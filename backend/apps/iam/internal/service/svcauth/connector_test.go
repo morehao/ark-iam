@@ -725,8 +725,8 @@ func TestConnectorServiceAuthorizeStoresStateAndReturnsAuthorizationURL(t *testi
 	if savedState.RedirectURI != "https://app.example.com/oidc/callback" {
 		t.Fatalf("expected saved redirect uri, got %q", savedState.RedirectURI)
 	}
-	if !savedState.ExpiresAt.Equal(fixedNow.Add(connectorStateTTL)) {
-		t.Fatalf("expected expires at %v, got %v", fixedNow.Add(connectorStateTTL), savedState.ExpiresAt)
+	if !savedState.ExpiredAt.Equal(fixedNow.Add(connectorStateTTL)) {
+		t.Fatalf("expected expires at %v, got %v", fixedNow.Add(connectorStateTTL), savedState.ExpiredAt)
 	}
 }
 
@@ -738,7 +738,7 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 		ConnectorID: 101,
 		TenantID:    22,
 		RedirectURI: "https://app.example.com/oidc/callback",
-		ExpiresAt:   time.Now().Add(time.Minute),
+		ExpiredAt:   time.Now().Add(time.Minute),
 	}
 	if err := stateStore.Save(context.Background(), state); err != nil {
 		t.Fatalf("stateStore.Save returned error: %v", err)
@@ -846,7 +846,7 @@ func TestConnectorServiceCallbackAllowsMissingConnectorID(t *testing.T) {
 		ConnectorID: 101,
 		TenantID:    22,
 		RedirectURI: "https://app.example.com/oidc/callback",
-		ExpiresAt:   time.Now().Add(time.Minute),
+		ExpiredAt:   time.Now().Add(time.Minute),
 	}
 	if err := stateStore.Save(context.Background(), state); err != nil {
 		t.Fatalf("stateStore.Save returned error: %v", err)
@@ -947,7 +947,7 @@ func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 		ConnectorID: 101,
 		TenantID:    22,
 		RedirectURI: "https://app.example.com/oidc/callback",
-		ExpiresAt:   time.Now().Add(time.Minute),
+		ExpiredAt:   time.Now().Add(time.Minute),
 	}
 	if err := stateStore.Save(context.Background(), state); err != nil {
 		t.Fatalf("stateStore.Save returned error: %v", err)
@@ -1042,7 +1042,7 @@ func TestConnectorCallbackInvokesIdentityResolverTokenGeneratorAndLoginRecorder(
 		ConnectorID: 202,
 		TenantID:    66,
 		RedirectURI: "https://app.example.com/oidc/callback",
-		ExpiresAt:   time.Now().Add(time.Minute),
+		ExpiredAt:   time.Now().Add(time.Minute),
 	}
 	if err := stateStore.Save(context.Background(), state); err != nil {
 		t.Fatalf("stateStore.Save returned error: %v", err)
@@ -1130,7 +1130,7 @@ func TestConnectorServiceCallbackRetainsStateWhenDriverExchangeFails(t *testing.
 		ConnectorID: 101,
 		TenantID:    22,
 		RedirectURI: "https://app.example.com/oidc/callback",
-		ExpiresAt:   time.Now().Add(time.Minute),
+		ExpiredAt:   time.Now().Add(time.Minute),
 	}
 	if err := stateStore.Save(context.Background(), state); err != nil {
 		t.Fatalf("stateStore.Save returned error: %v", err)

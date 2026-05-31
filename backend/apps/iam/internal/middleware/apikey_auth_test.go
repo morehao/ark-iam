@@ -212,7 +212,7 @@ func insertTestApiKey(t *testing.T, apiKeyDao *dao.ApiKeyDao, tenantID uint, key
 		KeyHash:    keyHash,
 		KeyPrefix:  keyPrefix,
 		Scope:      json.RawMessage(`{}`),
-		ExpiresAt:  expiresAt,
+		ExpiredAt:  expiresAt,
 		RevokedAt:  revokedAt,
 		CreatedBy:  42,
 	}

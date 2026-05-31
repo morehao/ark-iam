@@ -91,7 +91,7 @@ func (f *fakeAuthUserStore) UpdateMap(ctx context.Context, id uint, updates map[
 	return nil
 }
 
-func TestGenerateTokenStoresRefreshTokenExpiresAt(t *testing.T) {
+func TestGenerateTokenStoresRefreshTokenExpiredAt(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
 
@@ -117,13 +117,13 @@ func TestGenerateTokenStoresRefreshTokenExpiresAt(t *testing.T) {
 	if inserted == nil {
 		t.Fatal("expected refresh token to be inserted")
 	}
-	if inserted.ExpiresAt == nil {
-		t.Fatal("expected refresh token expires_at to be set")
+	if inserted.ExpiredAt == nil {
+		t.Fatal("expected refresh token expired_at to be set")
 	}
 	minExpire := before.Add(RefreshTokenExpireDuration - time.Second)
 	maxExpire := after.Add(RefreshTokenExpireDuration + time.Second)
-	if inserted.ExpiresAt.Before(minExpire) || inserted.ExpiresAt.After(maxExpire) {
-		t.Fatalf("expected expires_at within [%v, %v], got %v", minExpire, maxExpire, *inserted.ExpiresAt)
+	if inserted.ExpiredAt.Before(minExpire) || inserted.ExpiredAt.After(maxExpire) {
+		t.Fatalf("expected expired_at within [%v, %v], got %v", minExpire, maxExpire, *inserted.ExpiredAt)
 	}
 }
 
@@ -160,7 +160,7 @@ func TestRefreshTokenRejectsStoredTokenWithTenantMismatch(t *testing.T) {
 					UserID:    7,
 					TenantID:  101,
 					Token:     token.HashToken(refreshToken),
-					ExpiresAt: timePointer(time.Now().Add(time.Hour)),
+					ExpiredAt: timePointer(time.Now().Add(time.Hour)),
 				}, nil
 			},
 		}
@@ -185,7 +185,7 @@ func TestRefreshTokenRejectsRevokedToken(t *testing.T) {
 					UserID:    7,
 					TenantID:  100,
 					Token:     token.HashToken(refreshToken),
-					ExpiresAt: timePointer(time.Now().Add(time.Hour)),
+					ExpiredAt: timePointer(time.Now().Add(time.Hour)),
 					RevokedAt: timePointer(time.Now().Add(-time.Minute)),
 				}, nil
 			},
@@ -211,7 +211,7 @@ func TestRefreshTokenRejectsExpiredStoredToken(t *testing.T) {
 					UserID:    7,
 					TenantID:  100,
 					Token:     token.HashToken(refreshToken),
-					ExpiresAt: timePointer(time.Now().Add(-time.Minute)),
+					ExpiredAt: timePointer(time.Now().Add(-time.Minute)),
 				}, nil
 			},
 		}
@@ -222,7 +222,7 @@ func TestRefreshTokenRejectsExpiredStoredToken(t *testing.T) {
 	assertCode(t, err, code.RefreshTokenInvalidError)
 }
 
-func TestRefreshTokenRejectsStoredTokenWithoutExpiresAt(t *testing.T) {
+func TestRefreshTokenRejectsStoredTokenWithoutExpiredAt(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
 	svc := &authSvc{jwtSecret: "test-secret"}
@@ -246,7 +246,7 @@ func TestRefreshTokenRejectsStoredTokenWithoutExpiresAt(t *testing.T) {
 	assertCode(t, err, code.RefreshTokenInvalidError)
 }
 
-func TestRefreshTokenRejectsStoredTokenWithInvalidExpiresAt(t *testing.T) {
+func TestRefreshTokenRejectsStoredTokenWithInvalidExpiredAt(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
 	svc := &authSvc{jwtSecret: "test-secret"}
@@ -260,7 +260,7 @@ func TestRefreshTokenRejectsStoredTokenWithInvalidExpiresAt(t *testing.T) {
 					UserID:    7,
 					TenantID:  100,
 					Token:     token.HashToken(refreshToken),
-					ExpiresAt: nil,
+					ExpiredAt: nil,
 				}, nil
 			},
 		}
@@ -287,7 +287,7 @@ func TestRefreshTokenUsesStoredUserIDWhenDeletingOldToken(t *testing.T) {
 					UserID:    7,
 					TenantID:  100,
 					Token:     token.HashToken(refreshToken),
-					ExpiresAt: timePointer(time.Now().Add(time.Hour)),
+					ExpiredAt: timePointer(time.Now().Add(time.Hour)),
 				}, nil
 			},
 			deleteFunc: func(ctx context.Context, id, userID uint) error {

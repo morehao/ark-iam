@@ -351,7 +351,7 @@ func (svc *authSvc) RefreshToken(ctx *gin.Context, req *dtoauth.RefreshTokenReq)
 	if storedToken.RevokedAt != nil {
 		return nil, code.GetError(code.RefreshTokenInvalidError)
 	}
-	if storedToken.ExpiresAt == nil || !storedToken.ExpiresAt.After(time.Now()) {
+	if storedToken.ExpiredAt == nil || !storedToken.ExpiredAt.After(time.Now()) {
 		return nil, code.GetError(code.RefreshTokenInvalidError)
 	}
 
@@ -485,9 +485,9 @@ func (svc *authSvc) generateToken(ctx *gin.Context, userEntity *model.UserEntity
 		TenantID:      userEntity.TenantID,
 		PersonID:      userEntity.PersonID,
 		UserID:        userEntity.ID,
-		ApplicationID: 0,
+		OAuthClientID: 0,
 		Token:         token.HashToken(refreshTokenString),
-		ExpiresAt:     timePointer(refreshTokenExp),
+		ExpiredAt:     timePointer(refreshTokenExp),
 		CreatedBy:     userEntity.ID,
 	}
 	if err := refreshTokenDao.Insert(ctx.Request.Context(), refreshTokenEntity); err != nil {

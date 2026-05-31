@@ -67,24 +67,24 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, perso
 		var isActive bool
 		if item.RevokedAt != nil {
 			isActive = false
-		} else if item.ExpiresAt == nil || !item.ExpiresAt.After(now) {
+		} else if item.ExpiredAt == nil || !item.ExpiredAt.After(now) {
 			isActive = false
 		} else {
 			isActive = true
 		}
 		expiresAt := ""
-		if item.ExpiresAt != nil {
-			expiresAt = item.ExpiresAt.Format("2006-01-02 15:04:05")
+		if item.ExpiredAt != nil {
+			expiresAt = item.ExpiredAt.Format("2006-01-02 15:04:05")
 		}
 		sessions = append(sessions, dtouser.SessionResp{
 			ID:            uint64(item.ID),
 			SessionID:     item.SessionID,
-			ApplicationID: uint64(item.ApplicationID),
+			AppID: uint64(item.OAuthClientID),
 			TenantID:      uint64(item.TenantID),
 			ClientType:    item.ClientType,
 			ClientIP:      item.ClientIP,
 			UserAgent:     item.UserAgent,
-			ExpiresAt:     &expiresAt,
+			ExpiredAt:     &expiresAt,
 			CreatedAt:     item.CreatedAt.Format("2006-01-02 15:04:05"),
 			IsActive:      isActive,
 		})

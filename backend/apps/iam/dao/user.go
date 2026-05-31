@@ -16,7 +16,6 @@ type UserCond struct {
 	PrimaryPhone  string
 	Name          string
 	IsSuspended   *int8
-	ApplicationID uint
 }
 
 func (c *UserCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -43,9 +42,6 @@ func (c *UserCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.IsSuspended != nil {
 		db.Where(tableName+".is_suspended = ?", *c.IsSuspended)
-	}
-	if c.ApplicationID != 0 {
-		db.Where(tableName+".application_id = ?", c.ApplicationID)
 	}
 }
 

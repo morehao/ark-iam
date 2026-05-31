@@ -11,7 +11,6 @@ type RefreshTokenCond struct {
 	*genericdao.BaseCond
 	TenantID     uint
 	UserID       uint
-	ApplicationID uint
 	Token        string
 }
 
@@ -24,9 +23,6 @@ func (c *RefreshTokenCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.UserID != 0 {
 		db.Where(tableName + ".user_id = ?", c.UserID)
-	}
-	if c.ApplicationID != 0 {
-		db.Where(tableName + ".application_id = ?", c.ApplicationID)
 	}
 	if c.Token != "" {
 		db.Where(tableName + ".token = ?", c.Token)

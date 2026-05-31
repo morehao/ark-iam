@@ -4,18 +4,18 @@
 -- ============================================
 -- 1. 租户种子数据
 -- ============================================
-INSERT INTO `tenant` (`id`, `name`, `db_user`, `is_suspended`, `tag`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (1, 'Default Tenant', 'default_user', 0, 'default', 0, 0, 0)
-ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
+INSERT INTO `tenant` (`id`, `name`, `type`, `db_user`, `is_suspended`, `tag`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (1, 'Default Tenant', 'platform', 'default_user', 0, 'default', 0, 0, 0)
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `type` = VALUES(`type`);
 
 -- ============================================
 -- 2. 基础角色种子数据
 -- ============================================
-INSERT INTO `role` (`id`, `tenant_id`, `name`, `code`, `description`, `type`, `is_default`, `created_by`, `updated_by`, `deleted_by`)
+INSERT INTO `role` (`id`, `tenant_id`, `app_id`, `name`, `code`, `description`, `type`, `is_default`, `created_by`, `updated_by`, `deleted_by`)
 VALUES
-    (1, 1, '管理员', 'admin', '系统管理员，拥有所有权限', 'User', 1, 0, 0, 0),
-    (2, 1, '普通用户', 'user', '普通用户，拥有基本查看权限', 'User', 1, 0, 0, 0),
-    (3, 1, '访客', 'guest', '访客，仅有只读权限', 'User', 1, 0, 0, 0)
+    (1, 1, 1, '管理员', 'admin', '系统管理员，拥有所有权限', 'User', 1, 0, 0, 0),
+    (2, 1, 1, '普通用户', 'user', '普通用户，拥有基本查看权限', 'User', 1, 0, 0, 0),
+    (3, 1, 1, '访客', 'guest', '访客，仅有只读权限', 'User', 1, 0, 0, 0)
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
 
 -- ============================================
@@ -86,7 +86,7 @@ ON DUPLICATE KEY UPDATE `role_id` = VALUES(`role_id`);
 -- ============================================
 -- 6. 基础菜单种子数据
 -- ============================================
-INSERT INTO `menu` (`id`, `tenant_id`, `parent_id`, `name`, `code`, `path`, `icon`, `sort`, `type`, `component`, `redirect`, `hidden`, `external_link`, `keep_alive`, `permission`, `status`, `created_by`, `updated_by`, `deleted_by`)
+INSERT INTO `menu` (`id`, `app_id`, `parent_id`, `name`, `code`, `path`, `icon`, `sort`, `type`, `component`, `redirect`, `hidden`, `external_link`, `keep_alive`, `permission`, `status`, `created_by`, `updated_by`, `deleted_by`)
 VALUES
     -- 一级菜单
     (1, 1, 0, '工作台', 'dashboard', '/dashboard', 'dashboard', 1, 'menu', 'Layout', '', 0, 0, 0, '', 'enable', 0, 0, 0),
@@ -140,21 +140,35 @@ VALUES
 ON DUPLICATE KEY UPDATE `role_id` = VALUES(`role_id`);
 
 -- ============================================
--- 8. 默认管理员用户种子数据
+-- 8. 管理后台应用及角色关联种子数据
+-- ============================================
+INSERT INTO `application` (`id`, `code`, `name`, `description`, `type`, `status`, `sort`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (1, 'admin', '管理后台', '平台管理后台应用', 'first_party', 'enable', 0, 0, 0, 0)
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
+
+-- ============================================
+-- 9. 租户应用订阅种子数据
+-- ============================================
+INSERT INTO `tenant_application` (`id`, `tenant_id`, `app_id`, `status`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (1, 1, 1, 'enable', 0, 0, 0)
+ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
+
+-- ============================================
+-- 10. 默认管理员用户种子数据
 -- 密码: admin123 (Argon2 加密)
 -- ============================================
--- 8.1 先插入到 person 表
+-- 10.1 先插入到 person 表
 INSERT INTO `person` (`id`, `username`, `primary_email`, `primary_phone`, `password_encrypted`, `password_method`, `name`, `avatar`, `profile`, `custom_data`, `is_suspended`, `created_by`, `updated_by`, `deleted_by`)
 VALUES (1, 'admin', 'admin@example.com', '', '$argon2id$v=19$m=65536,t=1,p=4$WG6YLsQm7eBtMH8zezNNbQ$MZQuyYq+0Gj9qawnUzdg7pxqVFkRUmkXBqjD6CE6AaU', 'Argon2id', '系统管理员', '', '{}', '{}', 0, 0, 0, 0)
 ON DUPLICATE KEY UPDATE `username` = VALUES(`username`);
 
--- 8.2 再插入到 user 表（关联 person_id）
+-- 10.2 再插入到 user 表（关联 person_id）
 INSERT INTO `user` (`id`, `tenant_id`, `person_id`, `name`, `avatar`, `profile`, `custom_data`, `is_suspended`, `is_owner`, `created_by`, `updated_by`, `deleted_by`)
 VALUES (1, 1, 1, '系统管理员', '', '{}', '{}', 0, 1, 0, 0, 0)
 ON DUPLICATE KEY UPDATE `tenant_id` = VALUES(`tenant_id`);
 
 -- ============================================
--- 9. 管理员用户角色关联
+-- 11. 管理员用户角色关联
 -- ============================================
 INSERT INTO `user_role` (`id`, `tenant_id`, `user_id`, `role_id`, `created_by`, `updated_by`, `deleted_by`)
 VALUES (1, 1, 1, 1, 0, 0, 0)

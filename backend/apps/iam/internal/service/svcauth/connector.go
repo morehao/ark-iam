@@ -415,7 +415,7 @@ func (svc *connectorSvc) Authorize(ctx *gin.Context, req *dtoconnector.Connector
 		ConnectorID: connectorEntity.ID,
 		TenantID:    connectorEntity.TenantID,
 		RedirectURI: req.RedirectURI,
-		ExpiresAt:   svc.getNowFunc()().Add(connectorStateTTL),
+		ExpiredAt:   svc.getNowFunc()().Add(connectorStateTTL),
 	}); err != nil {
 		glog.Errorf(ctx, "[svcauth.Authorize] save state fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.AuthLoginFailedError)

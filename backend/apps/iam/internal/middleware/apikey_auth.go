@@ -80,7 +80,7 @@ func (m *apiKeyAuthMiddleware) Middleware() gin.HandlerFunc {
 
 		entity := list[0]
 
-		if entity.ExpiresAt != nil && entity.ExpiresAt.Before(time.Now()) {
+		if entity.ExpiredAt != nil && entity.ExpiredAt.Before(time.Now()) {
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"code":    401,
 				"message": "API key has expired",

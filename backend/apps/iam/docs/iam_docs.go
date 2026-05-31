@@ -195,493 +195,6 @@ const docTemplateiam = `{
                 }
             }
         },
-        "/v1/iam/application/assignRoles": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "应用管理"
-                ],
-                "summary": "分配角色",
-                "parameters": [
-                    {
-                        "description": "分配角色",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtoapplication.AssignApplicationRolesReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/application/create": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "应用管理"
-                ],
-                "summary": "创建应用管理",
-                "parameters": [
-                    {
-                        "description": "创建应用管理",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtoapplication.ApplicationCreateReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtoapplication.ApplicationCreateResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/application/delete": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "应用管理"
-                ],
-                "summary": "删除应用管理",
-                "parameters": [
-                    {
-                        "description": "删除应用管理",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtoapplication.ApplicationDeleteReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/application/detail": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "应用管理"
-                ],
-                "summary": "应用管理详情",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "应用ID",
-                        "name": "applicationID",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtoapplication.ApplicationDetailResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/application/pageList": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "应用管理"
-                ],
-                "summary": "应用管理列表分页",
-                "parameters": [
-                    {
-                        "description": "应用管理列表分页",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtoapplication.ApplicationPageListReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtoapplication.ApplicationPageListResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/application/roles": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "应用管理"
-                ],
-                "summary": "应用角色列表",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "name": "applicationId",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtoapplication.ApplicationRoleListResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/application/roles/{roleId}": {
-            "delete": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "应用管理"
-                ],
-                "summary": "移除角色",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "角色ID",
-                        "name": "roleId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "应用ID",
-                        "name": "applicationId",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/application/secrets": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "应用管理"
-                ],
-                "summary": "应用密钥列表",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "name": "applicationId",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtoapplication.ApplicationSecretListResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "应用管理"
-                ],
-                "summary": "创建应用密钥",
-                "parameters": [
-                    {
-                        "description": "创建应用密钥",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtoapplication.CreateApplicationSecretReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtoapplication.CreateApplicationSecretResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/application/secrets/{secretId}": {
-            "delete": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "应用管理"
-                ],
-                "summary": "删除应用密钥",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "密钥ID",
-                        "name": "secretId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/application/update": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "应用管理"
-                ],
-                "summary": "修改应用管理",
-                "parameters": [
-                    {
-                        "description": "修改应用管理",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtoapplication.ApplicationUpdateReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/v1/iam/auth/joinTenant": {
             "post": {
                 "consumes": [
@@ -958,8 +471,7 @@ const docTemplateiam = `{
                         "type": "integer",
                         "description": "连接器ID",
                         "name": "connectorId",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     },
                     {
                         "type": "string",
@@ -2041,8 +1553,8 @@ const docTemplateiam = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "租户ID",
-                        "name": "tenantID",
+                        "description": "应用ID",
+                        "name": "appId",
                         "in": "query"
                     }
                 ],
@@ -2576,7 +2088,7 @@ const docTemplateiam = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dtotenant.OrganizationRoleUserRelationCreateReq"
+                            "$ref": "#/definitions/dtotenant.OrganizationRoleUserCreateReq"
                         }
                     }
                 ],
@@ -2592,7 +2104,7 @@ const docTemplateiam = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/dtotenant.OrganizationRoleUserRelationCreateResp"
+                                            "$ref": "#/definitions/dtotenant.OrganizationRoleUserCreateResp"
                                         }
                                     }
                                 }
@@ -2621,7 +2133,7 @@ const docTemplateiam = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dtotenant.OrganizationRoleUserRelationDeleteReq"
+                            "$ref": "#/definitions/dtotenant.OrganizationRoleUserDeleteReq"
                         }
                     }
                 ],
@@ -2666,7 +2178,7 @@ const docTemplateiam = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dtotenant.OrganizationRoleUserRelationPageListReq"
+                            "$ref": "#/definitions/dtotenant.OrganizationRoleUserPageListReq"
                         }
                     }
                 ],
@@ -2682,7 +2194,7 @@ const docTemplateiam = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/dtotenant.OrganizationRoleUserRelationPageListResp"
+                                            "$ref": "#/definitions/dtotenant.OrganizationRoleUserPageListResp"
                                         }
                                     }
                                 }
@@ -2711,7 +2223,7 @@ const docTemplateiam = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dtotenant.OrganizationUserRelationCreateReq"
+                            "$ref": "#/definitions/dtotenant.OrganizationUserCreateReq"
                         }
                     }
                 ],
@@ -2727,7 +2239,7 @@ const docTemplateiam = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/dtotenant.OrganizationUserRelationCreateResp"
+                                            "$ref": "#/definitions/dtotenant.OrganizationUserCreateResp"
                                         }
                                     }
                                 }
@@ -2756,7 +2268,7 @@ const docTemplateiam = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dtotenant.OrganizationUserRelationDeleteReq"
+                            "$ref": "#/definitions/dtotenant.OrganizationUserDeleteReq"
                         }
                     }
                 ],
@@ -2801,7 +2313,7 @@ const docTemplateiam = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dtotenant.OrganizationUserRelationPageListReq"
+                            "$ref": "#/definitions/dtotenant.OrganizationUserPageListReq"
                         }
                     }
                 ],
@@ -2817,7 +2329,7 @@ const docTemplateiam = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/dtotenant.OrganizationUserRelationPageListResp"
+                                            "$ref": "#/definitions/dtotenant.OrganizationUserPageListResp"
                                         }
                                     }
                                 }
@@ -3103,93 +2615,6 @@ const docTemplateiam = `{
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/dtopermission.ResourceUpdateReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/role/applications": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "角色管理"
-                ],
-                "summary": "角色应用列表",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "name": "roleId",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtouser.RoleApplicationListResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/role/assignApplications": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "角色管理"
-                ],
-                "summary": "分配应用",
-                "parameters": [
-                    {
-                        "description": "分配应用",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtouser.AssignRoleApplicationsReq"
                         }
                     }
                 ],
@@ -4866,7 +4291,7 @@ const docTemplateiam = `{
                 }
             }
         },
-        "/v1/iam/user/getUserDepartmentRelationByUser": {
+        "/v1/iam/user/getUserDepartmentByUser": {
             "get": {
                 "consumes": [
                     "application/json"
@@ -4899,7 +4324,7 @@ const docTemplateiam = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/dtouser.UserDepartmentRelationPageListResp"
+                                            "$ref": "#/definitions/dtouser.UserDepartmentPageListResp"
                                         }
                                     }
                                 }
@@ -5690,283 +5115,6 @@ const docTemplateiam = `{
                 }
             }
         },
-        "dtoapplication.ApplicationCreateReq": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "description": "应用描述",
-                    "type": "string"
-                },
-                "isThirdParty": {
-                    "description": "是否第三方应用",
-                    "type": "integer"
-                },
-                "name": {
-                    "description": "应用名称",
-                    "type": "string"
-                },
-                "secret": {
-                    "description": "应用密钥",
-                    "type": "string"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
-                },
-                "type": {
-                    "description": "应用类型",
-                    "type": "string"
-                }
-            }
-        },
-        "dtoapplication.ApplicationCreateResp": {
-            "type": "object",
-            "properties": {
-                "applicationID": {
-                    "description": "应用ID",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtoapplication.ApplicationDeleteReq": {
-            "type": "object",
-            "properties": {
-                "applicationID": {
-                    "description": "应用ID",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtoapplication.ApplicationDetailResp": {
-            "type": "object",
-            "properties": {
-                "applicationBaseInfo": {
-                    "description": "应用基础信息",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/objapplication.ApplicationBaseInfo"
-                        }
-                    ]
-                },
-                "applicationID": {
-                    "description": "应用ID",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtoapplication.ApplicationPageListItem": {
-            "type": "object",
-            "properties": {
-                "applicationBaseInfo": {
-                    "description": "应用基础信息",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/objapplication.ApplicationBaseInfo"
-                        }
-                    ]
-                },
-                "applicationID": {
-                    "description": "应用ID",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtoapplication.ApplicationPageListReq": {
-            "type": "object",
-            "properties": {
-                "isThirdParty": {
-                    "description": "是否第三方应用",
-                    "type": "integer"
-                },
-                "name": {
-                    "description": "应用名称",
-                    "type": "string"
-                },
-                "page": {
-                    "description": "页码",
-                    "type": "integer"
-                },
-                "pageSize": {
-                    "description": "每页数量",
-                    "type": "integer"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
-                },
-                "type": {
-                    "description": "应用类型",
-                    "type": "string"
-                }
-            }
-        },
-        "dtoapplication.ApplicationPageListResp": {
-            "type": "object",
-            "properties": {
-                "list": {
-                    "description": "应用列表",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dtoapplication.ApplicationPageListItem"
-                    }
-                },
-                "total": {
-                    "description": "总数",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtoapplication.ApplicationRoleListResp": {
-            "type": "object",
-            "properties": {
-                "roles": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dtoapplication.ApplicationRoleResp"
-                    }
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "dtoapplication.ApplicationRoleResp": {
-            "type": "object",
-            "properties": {
-                "applicationId": {
-                    "type": "integer"
-                },
-                "createdAt": {
-                    "type": "string"
-                },
-                "roleCode": {
-                    "type": "string"
-                },
-                "roleId": {
-                    "type": "integer"
-                },
-                "roleName": {
-                    "type": "string"
-                }
-            }
-        },
-        "dtoapplication.ApplicationSecretListResp": {
-            "type": "object",
-            "properties": {
-                "secrets": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dtoapplication.ApplicationSecretResp"
-                    }
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "dtoapplication.ApplicationSecretResp": {
-            "type": "object",
-            "properties": {
-                "applicationId": {
-                    "type": "integer"
-                },
-                "createdAt": {
-                    "type": "string"
-                },
-                "expiresAt": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
-        "dtoapplication.ApplicationUpdateReq": {
-            "type": "object",
-            "properties": {
-                "applicationID": {
-                    "description": "应用ID",
-                    "type": "integer"
-                },
-                "description": {
-                    "description": "应用描述",
-                    "type": "string"
-                },
-                "isThirdParty": {
-                    "description": "是否第三方应用",
-                    "type": "integer"
-                },
-                "name": {
-                    "description": "应用名称",
-                    "type": "string"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
-                },
-                "type": {
-                    "description": "应用类型",
-                    "type": "string"
-                }
-            }
-        },
-        "dtoapplication.AssignApplicationRolesReq": {
-            "type": "object",
-            "required": [
-                "applicationId",
-                "roleIds"
-            ],
-            "properties": {
-                "applicationId": {
-                    "type": "integer"
-                },
-                "roleIds": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "type": "integer"
-                    }
-                }
-            }
-        },
-        "dtoapplication.CreateApplicationSecretReq": {
-            "type": "object",
-            "required": [
-                "applicationId",
-                "name"
-            ],
-            "properties": {
-                "applicationId": {
-                    "type": "integer"
-                },
-                "expiresAt": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "dtoapplication.CreateApplicationSecretResp": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "secret": {
-                    "type": "string"
-                }
-            }
-        },
         "dtoauth.ConnectorCreateReq": {
             "type": "object",
             "properties": {
@@ -6634,6 +5782,10 @@ const docTemplateiam = `{
         "dtopermission.MenuCreateReq": {
             "type": "object",
             "properties": {
+                "appId": {
+                    "description": "应用ID",
+                    "type": "integer"
+                },
                 "code": {
                     "description": "菜单编码",
                     "type": "string"
@@ -6685,10 +5837,6 @@ const docTemplateiam = `{
                 "status": {
                     "description": "状态",
                     "type": "string"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
                 },
                 "type": {
                     "description": "菜单类型",
@@ -6720,6 +5868,10 @@ const docTemplateiam = `{
         "dtopermission.MenuDetailResp": {
             "type": "object",
             "properties": {
+                "appId": {
+                    "description": "应用ID",
+                    "type": "integer"
+                },
                 "code": {
                     "description": "菜单编码",
                     "type": "string"
@@ -6783,10 +5935,6 @@ const docTemplateiam = `{
                 "status": {
                     "description": "状态",
                     "type": "string"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
                 },
                 "type": {
                     "description": "菜单类型",
@@ -6805,6 +5953,10 @@ const docTemplateiam = `{
         "dtopermission.MenuPageListItem": {
             "type": "object",
             "properties": {
+                "appId": {
+                    "description": "应用ID",
+                    "type": "integer"
+                },
                 "code": {
                     "description": "菜单编码",
                     "type": "string"
@@ -6869,10 +6021,6 @@ const docTemplateiam = `{
                     "description": "状态",
                     "type": "string"
                 },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
-                },
                 "type": {
                     "description": "菜单类型",
                     "type": "string"
@@ -6890,6 +6038,10 @@ const docTemplateiam = `{
         "dtopermission.MenuPageListReq": {
             "type": "object",
             "properties": {
+                "appId": {
+                    "description": "应用ID",
+                    "type": "integer"
+                },
                 "code": {
                     "description": "菜单编码",
                     "type": "string"
@@ -6914,10 +6066,6 @@ const docTemplateiam = `{
                 "status": {
                     "description": "状态",
                     "type": "string"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
                 },
                 "type": {
                     "description": "菜单类型",
@@ -6944,6 +6092,10 @@ const docTemplateiam = `{
         "dtopermission.MenuTreeItem": {
             "type": "object",
             "properties": {
+                "appId": {
+                    "description": "应用ID",
+                    "type": "integer"
+                },
                 "children": {
                     "description": "子菜单",
                     "type": "array",
@@ -7015,10 +6167,6 @@ const docTemplateiam = `{
                     "description": "状态",
                     "type": "string"
                 },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
-                },
                 "type": {
                     "description": "菜单类型",
                     "type": "string"
@@ -7051,6 +6199,10 @@ const docTemplateiam = `{
                 "menuID"
             ],
             "properties": {
+                "appId": {
+                    "description": "应用ID",
+                    "type": "integer"
+                },
                 "code": {
                     "description": "菜单编码",
                     "type": "string"
@@ -7106,10 +6258,6 @@ const docTemplateiam = `{
                 "status": {
                     "description": "状态",
                     "type": "string"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
                 },
                 "type": {
                     "description": "菜单类型",
@@ -8697,8 +7845,13 @@ const docTemplateiam = `{
                 }
             }
         },
-        "dtotenant.OrganizationRoleUserRelationCreateReq": {
+        "dtotenant.OrganizationRoleUserCreateReq": {
             "type": "object",
+            "required": [
+                "organizationID",
+                "organizationRoleID",
+                "userID"
+            ],
             "properties": {
                 "organizationID": {
                     "description": "组织ID",
@@ -8708,22 +7861,27 @@ const docTemplateiam = `{
                     "description": "组织角色ID",
                     "type": "integer"
                 },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "integer"
-                },
                 "userID": {
                     "description": "用户ID",
                     "type": "integer"
                 }
             }
         },
-        "dtotenant.OrganizationRoleUserRelationCreateResp": {
+        "dtotenant.OrganizationRoleUserCreateResp": {
             "type": "object"
         },
-        "dtotenant.OrganizationRoleUserRelationDeleteReq": {
+        "dtotenant.OrganizationRoleUserDeleteReq": {
             "type": "object",
+            "required": [
+                "organizationID",
+                "organizationRoleID",
+                "userID"
+            ],
             "properties": {
+                "organizationID": {
+                    "description": "组织ID",
+                    "type": "integer"
+                },
                 "organizationRoleID": {
                     "description": "组织角色ID",
                     "type": "integer"
@@ -8734,7 +7892,7 @@ const docTemplateiam = `{
                 }
             }
         },
-        "dtotenant.OrganizationRoleUserRelationPageListItem": {
+        "dtotenant.OrganizationRoleUserPageListItem": {
             "type": "object",
             "properties": {
                 "organizationID": {
@@ -8755,7 +7913,7 @@ const docTemplateiam = `{
                 }
             }
         },
-        "dtotenant.OrganizationRoleUserRelationPageListReq": {
+        "dtotenant.OrganizationRoleUserPageListReq": {
             "type": "object",
             "properties": {
                 "organizationID": {
@@ -8784,18 +7942,18 @@ const docTemplateiam = `{
                 }
             }
         },
-        "dtotenant.OrganizationRoleUserRelationPageListResp": {
+        "dtotenant.OrganizationRoleUserPageListResp": {
             "type": "object",
             "properties": {
                 "list": {
-                    "description": "组织角色用户关系列表",
+                    "description": "组织角色用户列表",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dtotenant.OrganizationRoleUserRelationPageListItem"
+                        "$ref": "#/definitions/dtotenant.OrganizationRoleUserPageListItem"
                     }
                 },
                 "total": {
-                    "description": "总数",
+                    "description": "总条数",
                     "type": "integer"
                 }
             }
@@ -8825,15 +7983,15 @@ const docTemplateiam = `{
                 }
             }
         },
-        "dtotenant.OrganizationUserRelationCreateReq": {
+        "dtotenant.OrganizationUserCreateReq": {
             "type": "object",
+            "required": [
+                "organizationID",
+                "userID"
+            ],
             "properties": {
                 "organizationID": {
                     "description": "组织ID",
-                    "type": "integer"
-                },
-                "tenantID": {
-                    "description": "租户ID",
                     "type": "integer"
                 },
                 "userID": {
@@ -8842,11 +8000,15 @@ const docTemplateiam = `{
                 }
             }
         },
-        "dtotenant.OrganizationUserRelationCreateResp": {
+        "dtotenant.OrganizationUserCreateResp": {
             "type": "object"
         },
-        "dtotenant.OrganizationUserRelationDeleteReq": {
+        "dtotenant.OrganizationUserDeleteReq": {
             "type": "object",
+            "required": [
+                "organizationID",
+                "userID"
+            ],
             "properties": {
                 "organizationID": {
                     "description": "组织ID",
@@ -8858,7 +8020,7 @@ const docTemplateiam = `{
                 }
             }
         },
-        "dtotenant.OrganizationUserRelationPageListItem": {
+        "dtotenant.OrganizationUserPageListItem": {
             "type": "object",
             "properties": {
                 "organizationID": {
@@ -8875,7 +8037,7 @@ const docTemplateiam = `{
                 }
             }
         },
-        "dtotenant.OrganizationUserRelationPageListReq": {
+        "dtotenant.OrganizationUserPageListReq": {
             "type": "object",
             "properties": {
                 "organizationID": {
@@ -8900,18 +8062,18 @@ const docTemplateiam = `{
                 }
             }
         },
-        "dtotenant.OrganizationUserRelationPageListResp": {
+        "dtotenant.OrganizationUserPageListResp": {
             "type": "object",
             "properties": {
                 "list": {
-                    "description": "组织用户关系列表",
+                    "description": "组织用户列表",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dtotenant.OrganizationUserRelationPageListItem"
+                        "$ref": "#/definitions/dtotenant.OrganizationUserPageListItem"
                     }
                 },
                 "total": {
-                    "description": "总数",
+                    "description": "总条数",
                     "type": "integer"
                 }
             }
@@ -9288,25 +8450,6 @@ const docTemplateiam = `{
                 }
             }
         },
-        "dtouser.AssignRoleApplicationsReq": {
-            "type": "object",
-            "required": [
-                "applicationIds",
-                "roleId"
-            ],
-            "properties": {
-                "applicationIds": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "roleId": {
-                    "type": "integer"
-                }
-            }
-        },
         "dtouser.AssignRoleUsersReq": {
             "type": "object",
             "required": [
@@ -9323,40 +8466,6 @@ const docTemplateiam = `{
                     "items": {
                         "type": "integer"
                     }
-                }
-            }
-        },
-        "dtouser.RoleApplicationListResp": {
-            "type": "object",
-            "properties": {
-                "applications": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dtouser.RoleApplicationResp"
-                    }
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "dtouser.RoleApplicationResp": {
-            "type": "object",
-            "properties": {
-                "appName": {
-                    "type": "string"
-                },
-                "appType": {
-                    "type": "string"
-                },
-                "applicationId": {
-                    "type": "integer"
-                },
-                "createdAt": {
-                    "type": "string"
-                },
-                "roleId": {
-                    "type": "integer"
                 }
             }
         },
@@ -9414,7 +8523,7 @@ const docTemplateiam = `{
         "dtouser.SessionResp": {
             "type": "object",
             "properties": {
-                "applicationId": {
+                "appId": {
                     "type": "integer"
                 },
                 "clientIP": {
@@ -9449,7 +8558,7 @@ const docTemplateiam = `{
         "dtouser.UserCreateReq": {
             "type": "object",
             "properties": {
-                "applicationID": {
+                "appId": {
                     "description": "应用ID",
                     "type": "integer"
                 },
@@ -9521,7 +8630,7 @@ const docTemplateiam = `{
                 }
             }
         },
-        "dtouser.UserDepartmentRelationPageListItem": {
+        "dtouser.UserDepartmentPageListItem": {
             "type": "object",
             "properties": {
                 "createdAt": {
@@ -9552,8 +8661,8 @@ const docTemplateiam = `{
                     "description": "更新人id",
                     "type": "integer"
                 },
-                "userDepartmentRelationID": {
-                    "description": "用户部门关系ID",
+                "userDepartmentID": {
+                    "description": "用户部门ID",
                     "type": "integer"
                 },
                 "userID": {
@@ -9562,14 +8671,14 @@ const docTemplateiam = `{
                 }
             }
         },
-        "dtouser.UserDepartmentRelationPageListResp": {
+        "dtouser.UserDepartmentPageListResp": {
             "type": "object",
             "properties": {
                 "list": {
                     "description": "数据列表",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dtouser.UserDepartmentRelationPageListItem"
+                        "$ref": "#/definitions/dtouser.UserDepartmentPageListItem"
                     }
                 },
                 "total": {
@@ -9581,7 +8690,7 @@ const docTemplateiam = `{
         "dtouser.UserDetailResp": {
             "type": "object",
             "properties": {
-                "applicationID": {
+                "appId": {
                     "description": "应用ID",
                     "type": "integer"
                 },
@@ -10003,7 +9112,7 @@ const docTemplateiam = `{
         "dtouser.UserPageListItem": {
             "type": "object",
             "properties": {
-                "applicationID": {
+                "appId": {
                     "description": "应用ID",
                     "type": "integer"
                 },
@@ -10170,7 +9279,7 @@ const docTemplateiam = `{
                 "userID"
             ],
             "properties": {
-                "applicationID": {
+                "appId": {
                     "description": "应用ID",
                     "type": "integer"
                 },
@@ -10258,29 +9367,6 @@ const docTemplateiam = `{
                 "updatedBy": {
                     "description": "更新人id",
                     "type": "integer"
-                }
-            }
-        },
-        "objapplication.ApplicationBaseInfo": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "isThirdParty": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "secret": {
-                    "type": "string"
-                },
-                "tenantID": {
-                    "type": "integer"
-                },
-                "type": {
-                    "type": "string"
                 }
             }
         },

@@ -39,8 +39,7 @@ type RoleSvc interface {
 	ListUsers(ctx *gin.Context, req *dtouser.RoleUserListReq) (*dtouser.RoleUserListResp, error)
 	AssignUsers(ctx *gin.Context, req *dtouser.AssignRoleUsersReq) error
 	RemoveUser(ctx *gin.Context, req *dtouser.RemoveRoleUserReq) error
-	ListApplications(ctx *gin.Context, req *dtouser.RoleApplicationListReq) (*dtouser.RoleApplicationListResp, error)
-	AssignApplications(ctx *gin.Context, req *dtouser.AssignRoleApplicationsReq) error
+
 }
 
 type roleSvc struct{}
@@ -271,68 +270,4 @@ func (svc *roleSvc) RemoveUser(ctx *gin.Context, req *dtouser.RemoveRoleUserReq)
 	return nil
 }
 
-func (svc *roleSvc) ListApplications(ctx *gin.Context, req *dtouser.RoleApplicationListReq) (*dtouser.RoleApplicationListResp, error) {
-	appRoleDao := dao.NewApplicationRoleDao()
-	appDao := dao.NewApplicationDao()
 
-	list, err := appRoleDao.GetListByCond(ctx, &dao.ApplicationRoleCond{
-		RoleID: uint(req.RoleID),
-	})
-	if err != nil {
-		glog.Errorf(ctx, "[roleSvc.ListApplications] get applications fail, err:%v", err)
-		return nil, code.GetError(code.RoleApplicationGetListError)
-	}
-
-	appMap := make(map[uint]*model.ApplicationEntity)
-	for _, ar := range list {
-		if app, err := appDao.GetByID(ctx, ar.ApplicationID); err == nil && app != nil {
-			appMap[app.ID] = app
-		}
-	}
-
-	apps := make([]dtouser.RoleApplicationResp, 0, len(list))
-	for _, ar := range list {
-		if app, ok := appMap[ar.ApplicationID]; ok {
-			apps = append(apps, dtouser.RoleApplicationResp{
-				ApplicationID: uint64(ar.ApplicationID),
-				AppName:       app.Name,
-				AppType:       app.Type,
-				RoleID:        uint64(ar.RoleID),
-				CreatedAt:     ar.CreatedAt.Format("2006-01-02 15:04:05"),
-			})
-		}
-	}
-
-	return &dtouser.RoleApplicationListResp{
-		Total:        int64(len(apps)),
-		Applications: apps,
-	}, nil
-}
-
-func (svc *roleSvc) AssignApplications(ctx *gin.Context, req *dtouser.AssignRoleApplicationsReq) error {
-	appRoleDao := dao.NewApplicationRoleDao()
-	userID := gincontext.GetUserID(ctx)
-
-	for _, appID := range req.ApplicationIDs {
-		existing, _ := appRoleDao.GetListByCond(ctx, &dao.ApplicationRoleCond{
-			ApplicationID: uint(appID),
-			RoleID:       uint(req.RoleID),
-		})
-		if len(existing) > 0 {
-			continue
-		}
-
-		entity := &model.ApplicationRoleEntity{
-			TenantID:      gincontext.GetTenantID(ctx),
-			ApplicationID: uint(appID),
-			RoleID:       uint(req.RoleID),
-			CreatedBy:    userID,
-		}
-		if err := appRoleDao.Insert(ctx, entity); err != nil {
-			glog.Errorf(ctx, "[roleSvc.AssignApplications] insert fail, err:%v", err)
-			return code.GetError(code.RoleApplicationCreateError)
-		}
-	}
-
-	return nil
-}

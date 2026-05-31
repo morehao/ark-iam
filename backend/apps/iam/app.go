@@ -26,6 +26,7 @@ func Routers(engine *gin.Engine) {
 					"/v1/iam/register",
 					"/v1/iam/refreshToken",
 					"/v1/iam/connector/callback",
+					"/v1/iam/oidc",
 				)),
 			ginmiddleware.TokenBlacklistCheck(dbclient.RedisCli, ginmiddleware.WithBlacklistKeyPrefix("iam:token:blacklist:")),
 		},
@@ -36,4 +37,5 @@ func Routers(engine *gin.Engine) {
 	}
 
 	router.RegisterRouter(routerGroups, AppName)
+	router.InitOIDC(engine, routerGroups)
 }

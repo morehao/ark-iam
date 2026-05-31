@@ -26,7 +26,7 @@ export const getApplicationPageList = (data: ApplicationPageListReq) => {
 }
 
 export const getApplicationDetail = (id: number) => {
-  return request.get<any, ApiResponse<Application>>('/application/detail', { params: { applicationID: id } })
+  return request.get<any, ApiResponse<Application>>('/application/detail', { params: { appId: id } })
 }
 
 export const createApplication = (data: Partial<Application>) => {
@@ -41,8 +41,8 @@ export const deleteApplication = (id: number) => {
   return request.post<any, ApiResponse<null>>('/application/delete', { id })
 }
 
-export const getApplicationRoles = (applicationId: number) => {
-  return request.get<any, ApiResponse<Role[]>>('/application/roles', { params: { applicationId } })
+export const getApplicationRoles = (appId: number) => {
+  return request.get<any, ApiResponse<Role[]>>('/application/roles', { params: { appId } })
 }
 
 export interface Role {

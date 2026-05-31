@@ -32,7 +32,7 @@ func userRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/user/pageListUserLoginLog", userCtr.PageListUserLoginLog)
 	v1RouterGroup.GET("/user/getUserLoginLogByUser", userCtr.GetUserLoginLogByUser)
 
-	v1RouterGroup.GET("/user/getUserDepartmentRelationByUser", userCtr.GetUserDepartmentRelationByUser)
+	v1RouterGroup.GET("/user/getUserDepartmentByUser", userCtr.GetUserDepartmentByUser)
 	v1RouterGroup.POST("/user/assignDepartments", userCtr.AssignDepartments)
 
 	v1RouterGroup.GET("/user/sessions", sessionCtr.List)

@@ -23,7 +23,7 @@ func TestConnectorCallbackReturnsPersonTokenWhenPersonHasMultipleTenants(t *test
 		Nonce:       "nonce-multi-tenant",
 		ConnectorID: 11,
 		RedirectURI: "https://app.example.com/oidc/callback",
-		ExpiresAt:   time.Now().Add(time.Minute),
+		ExpiredAt:   time.Now().Add(time.Minute),
 	}
 	if err := stateStore.Save(context.Background(), state); err != nil {
 		t.Fatalf("stateStore.Save returned error: %v", err)
@@ -110,7 +110,7 @@ func TestConnectorCallbackUsesIdentityResolverPath(t *testing.T) {
 	ginCtx.Request = httptestRequest(t)
 
 	stateStore := NewInMemoryConnectorStateStore()
-	state := &ConnectorState{State: "callback-state-resolver-path", Nonce: "nonce-resolver-path", ConnectorID: 19, RedirectURI: "https://app.example.com/oidc/callback", ExpiresAt: time.Now().Add(time.Minute)}
+	state := &ConnectorState{State: "callback-state-resolver-path", Nonce: "nonce-resolver-path", ConnectorID: 19, RedirectURI: "https://app.example.com/oidc/callback", ExpiredAt: time.Now().Add(time.Minute)}
 	if err := stateStore.Save(context.Background(), state); err != nil {
 		t.Fatalf("stateStore.Save returned error: %v", err)
 	}

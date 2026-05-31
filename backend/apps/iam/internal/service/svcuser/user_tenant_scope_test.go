@@ -56,11 +56,11 @@ func TestGetUserLoginLogByUserUsesTenantScopedDAOCondition(t *testing.T) {
 	}
 }
 
-func TestGetUserDepartmentRelationByUserUsesTenantScopedDAOCondition(t *testing.T) {
+func TestGetUserDepartmentByUserUsesTenantScopedDAOCondition(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Set(gcontext.KeyTenantID, uint(46))
-	repo := &stubUserDepartmentRelationQueryRepo{
-		pageList: model.UserDepartmentRelationEntityList{
+	repo := &stubUserDepartmentQueryRepo{
+		pageList: model.UserDepartmentEntityList{
 			{
 				Model:        gorm.Model{ID: 3, UpdatedAt: time.Unix(1700000002, 0)},
 				TenantID:     46,
@@ -71,12 +71,12 @@ func TestGetUserDepartmentRelationByUserUsesTenantScopedDAOCondition(t *testing.
 		},
 		total: 4,
 	}
-	installUserDepartmentRelationQueryRepo(t, repo)
+	installUserDepartmentQueryRepo(t, repo)
 
 	svc := &userSvc{}
-	resp, err := svc.GetUserDepartmentRelationByUser(ginCtx, &dtouser.UserDepartmentRelationByUserReq{UserID: 303})
+	resp, err := svc.GetUserDepartmentByUser(ginCtx, &dtouser.UserDepartmentByUserReq{UserID: 303})
 	if err != nil {
-		t.Fatalf("GetUserDepartmentRelationByUser returned error: %v", err)
+		t.Fatalf("GetUserDepartmentByUser returned error: %v", err)
 	}
 	if repo.lastCond == nil {
 		t.Fatalf("expected DAO condition to be captured")
@@ -133,30 +133,30 @@ func cloneUserLoginLogCond(cond *dao.UserLoginLogCond) *dao.UserLoginLogCond {
 	return &clone
 }
 
-type stubUserDepartmentRelationQueryRepo struct {
-	pageList model.UserDepartmentRelationEntityList
+type stubUserDepartmentQueryRepo struct {
+	pageList model.UserDepartmentEntityList
 	total    int64
 	err      error
-	lastCond *dao.UserDepartmentRelationCond
+	lastCond *dao.UserDepartmentCond
 }
 
-func (r *stubUserDepartmentRelationQueryRepo) GetPageListByCond(ctx context.Context, cond *dao.UserDepartmentRelationCond) (model.UserDepartmentRelationEntityList, int64, error) {
-	r.lastCond = cloneUserDepartmentRelationCond(cond)
+func (r *stubUserDepartmentQueryRepo) GetPageListByCond(ctx context.Context, cond *dao.UserDepartmentCond) (model.UserDepartmentEntityList, int64, error) {
+	r.lastCond = cloneUserDepartmentCond(cond)
 	return r.pageList, r.total, r.err
 }
 
-func installUserDepartmentRelationQueryRepo(t *testing.T, repo userDepartmentRelationQueryRepository) {
+func installUserDepartmentQueryRepo(t *testing.T, repo userDepartmentQueryRepository) {
 	t.Helper()
-	prev := newUserDepartmentRelationQueryRepo
-	newUserDepartmentRelationQueryRepo = func() userDepartmentRelationQueryRepository {
+	prev := newUserDepartmentQueryRepo
+	newUserDepartmentQueryRepo = func() userDepartmentQueryRepository {
 		return repo
 	}
 	t.Cleanup(func() {
-		newUserDepartmentRelationQueryRepo = prev
+		newUserDepartmentQueryRepo = prev
 	})
 }
 
-func cloneUserDepartmentRelationCond(cond *dao.UserDepartmentRelationCond) *dao.UserDepartmentRelationCond {
+func cloneUserDepartmentCond(cond *dao.UserDepartmentCond) *dao.UserDepartmentCond {
 	if cond == nil {
 		return nil
 	}
@@ -174,4 +174,4 @@ func cloneUserDepartmentRelationCond(cond *dao.UserDepartmentRelationCond) *dao.
 
 var _ userLoginLogQueryRepository = (*stubUserLoginLogQueryRepo)(nil)
 
-var _ userDepartmentRelationQueryRepository = (*stubUserDepartmentRelationQueryRepo)(nil)
+var _ userDepartmentQueryRepository = (*stubUserDepartmentQueryRepo)(nil)

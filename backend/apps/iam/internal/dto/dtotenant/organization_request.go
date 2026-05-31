@@ -63,18 +63,17 @@ type OrganizationRolePageListReq struct {
 	Name           string `json:"name" form:"name"`           // 角色名称
 }
 
-type OrganizationUserRelationCreateReq struct {
-	TenantID       uint `json:"tenantID" form:"tenantID"`           // 租户ID
-	OrganizationID uint `json:"organizationID" form:"organizationID"` // 组织ID
-	UserID         uint `json:"userID" form:"userID"`               // 用户ID
+type OrganizationUserCreateReq struct {
+	OrganizationID uint `json:"organizationID" form:"organizationID" validate:"required"`      // 组织ID
+	UserID         uint `json:"userID" form:"userID" validate:"required"`                      // 用户ID
 }
 
-type OrganizationUserRelationDeleteReq struct {
-	OrganizationID uint `json:"organizationID" form:"organizationID"` // 组织ID
-	UserID         uint `json:"userID" form:"userID"`               // 用户ID
+type OrganizationUserDeleteReq struct {
+	OrganizationID uint `json:"organizationID" form:"organizationID" validate:"required"`      // 组织ID
+	UserID         uint `json:"userID" form:"userID" validate:"required"`                      // 用户ID
 }
 
-type OrganizationUserRelationPageListReq struct {
+type OrganizationUserPageListReq struct {
 	Page           int    `json:"page" form:"page"`           // 页码
 	PageSize       int    `json:"pageSize" form:"pageSize"`   // 每页数量
 	TenantID       uint   `json:"tenantID" form:"tenantID"`  // 租户ID
@@ -82,19 +81,19 @@ type OrganizationUserRelationPageListReq struct {
 	UserID         uint   `json:"userID" form:"userID"`       // 用户ID
 }
 
-type OrganizationRoleUserRelationCreateReq struct {
-	TenantID           uint `json:"tenantID" form:"tenantID"`           // 租户ID
-	OrganizationID     uint `json:"organizationID" form:"organizationID"` // 组织ID
-	OrganizationRoleID uint `json:"organizationRoleID" form:"organizationRoleID"` // 组织角色ID
-	UserID             uint `json:"userID" form:"userID"`               // 用户ID
+type OrganizationRoleUserCreateReq struct {
+	OrganizationID     uint `json:"organizationID" form:"organizationID" validate:"required"`          // 组织ID
+	OrganizationRoleID uint `json:"organizationRoleID" form:"organizationRoleID" validate:"required"`  // 组织角色ID
+	UserID             uint `json:"userID" form:"userID" validate:"required"`                          // 用户ID
 }
 
-type OrganizationRoleUserRelationDeleteReq struct {
-	OrganizationRoleID uint `json:"organizationRoleID" form:"organizationRoleID"` // 组织角色ID
-	UserID             uint `json:"userID" form:"userID"`               // 用户ID
+type OrganizationRoleUserDeleteReq struct {
+	OrganizationID     uint `json:"organizationID" form:"organizationID" validate:"required"`          // 组织ID
+	OrganizationRoleID uint `json:"organizationRoleID" form:"organizationRoleID" validate:"required"`  // 组织角色ID
+	UserID             uint `json:"userID" form:"userID" validate:"required"`                          // 用户ID
 }
 
-type OrganizationRoleUserRelationPageListReq struct {
+type OrganizationRoleUserPageListReq struct {
 	Page               int    `json:"page" form:"page"`           // 页码
 	PageSize           int    `json:"pageSize" form:"pageSize"`   // 每页数量
 	TenantID           uint   `json:"tenantID" form:"tenantID"`  // 租户ID

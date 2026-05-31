@@ -62,22 +62,22 @@ func organizationRoleRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/organizationRole/pageList", organizationRoleCtr.PageList)
 }
 
-func organizationUserRelationRouter(groups *ginserver.RouterGroups) {
-	organizationUserRelationCtr := ctrtenant.NewOrganizationUserRelationCtr()
+func organizationUserRouter(groups *ginserver.RouterGroups) {
+	organizationUserCtr := ctrtenant.NewOrganizationUserCtr()
 
 	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
-	v1RouterGroup.POST("/organizationUser/create", organizationUserRelationCtr.Create)
-	v1RouterGroup.POST("/organizationUser/delete", organizationUserRelationCtr.Delete)
-	v1RouterGroup.POST("/organizationUser/pageList", organizationUserRelationCtr.PageList)
+	v1RouterGroup.POST("/organizationUser/create", organizationUserCtr.Create)
+	v1RouterGroup.POST("/organizationUser/delete", organizationUserCtr.Delete)
+	v1RouterGroup.POST("/organizationUser/pageList", organizationUserCtr.PageList)
 }
 
-func organizationRoleUserRelationRouter(groups *ginserver.RouterGroups) {
-	organizationRoleUserRelationCtr := ctrtenant.NewOrganizationRoleUserRelationCtr()
+func organizationRoleUserRouter(groups *ginserver.RouterGroups) {
+	organizationRoleUserCtr := ctrtenant.NewOrganizationRoleUserCtr()
 
 	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
-	v1RouterGroup.POST("/organizationRoleUser/create", organizationRoleUserRelationCtr.Create)
-	v1RouterGroup.POST("/organizationRoleUser/delete", organizationRoleUserRelationCtr.Delete)
-	v1RouterGroup.POST("/organizationRoleUser/pageList", organizationRoleUserRelationCtr.PageList)
+	v1RouterGroup.POST("/organizationRoleUser/create", organizationRoleUserCtr.Create)
+	v1RouterGroup.POST("/organizationRoleUser/delete", organizationRoleUserCtr.Delete)
+	v1RouterGroup.POST("/organizationRoleUser/pageList", organizationRoleUserCtr.PageList)
 }
 
 func logRouter(groups *ginserver.RouterGroups) {

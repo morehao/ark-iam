@@ -48,17 +48,17 @@ const (
 )
 
 const (
-	OrganizationUserRelationCreateError      = 100140
-	OrganizationUserRelationDeleteError      = 100141
-	OrganizationUserRelationGetPageListError = 100142
-	OrganizationUserRelationNotExistError    = 100143
+	OrganizationUserCreateError      = 100140
+	OrganizationUserDeleteError      = 100141
+	OrganizationUserGetPageListError = 100142
+	OrganizationUserNotExistError    = 100143
 )
 
 const (
-	OrganizationRoleUserRelationCreateError      = 100150
-	OrganizationRoleUserRelationDeleteError      = 100151
-	OrganizationRoleUserRelationGetPageListError = 100152
-	OrganizationRoleUserRelationNotExistError    = 100153
+	OrganizationRoleUserCreateError      = 100150
+	OrganizationRoleUserDeleteError      = 100151
+	OrganizationRoleUserGetPageListError = 100152
+	OrganizationRoleUserNotExistError    = 100153
 )
 
 const (
@@ -100,14 +100,14 @@ var tenantErrorMsgMap = gerror.CodeMsgMap{
 	OrganizationRoleGetDetailError:   "查看组织角色详情失败",
 	OrganizationRoleGetPageListError: "查看组织角色列表失败",
 	OrganizationRoleNotExistError:   "组织角色不存在",
-	OrganizationUserRelationCreateError:      "创建组织用户关联失败",
-	OrganizationUserRelationDeleteError:      "删除组织用户关联失败",
-	OrganizationUserRelationGetPageListError: "查看组织用户关联列表失败",
-	OrganizationUserRelationNotExistError:    "组织用户关联不存在",
-	OrganizationRoleUserRelationCreateError:      "创建组织角色用户关联失败",
-	OrganizationRoleUserRelationDeleteError:      "删除组织角色用户关联失败",
-	OrganizationRoleUserRelationGetPageListError: "查看组织角色用户关联列表失败",
-	OrganizationRoleUserRelationNotExistError:    "组织角色用户关联不存在",
+	OrganizationUserCreateError:      "创建组织用户失败",
+	OrganizationUserDeleteError:      "删除组织用户失败",
+	OrganizationUserGetPageListError: "查看组织用户列表失败",
+	OrganizationUserNotExistError:    "组织用户不存在",
+	OrganizationRoleUserCreateError:      "创建组织角色用户失败",
+	OrganizationRoleUserDeleteError:      "删除组织角色用户失败",
+	OrganizationRoleUserGetPageListError: "查看组织角色用户列表失败",
+	OrganizationRoleUserNotExistError:    "组织角色用户不存在",
 	DomainCreateError:       "创建域名失败",
 	DomainDeleteError:       "删除域名失败",
 	DomainGetPageListError:  "查看域名列表失败",

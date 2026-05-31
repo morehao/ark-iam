@@ -66,7 +66,7 @@ func TestStateStoreSaveLoadConsume(t *testing.T) {
 		ConnectorID: 12,
 		TenantID:    34,
 		RedirectURI: "https://console.example.com/callback",
-		ExpiresAt:   time.Now().Add(time.Minute),
+		ExpiredAt:   time.Now().Add(time.Minute),
 	}
 
 	if err := store.Save(ctx, state); err != nil {
@@ -124,7 +124,7 @@ func TestStateStoreLoadExpiredState(t *testing.T) {
 		ConnectorID: 12,
 		TenantID:    34,
 		RedirectURI: "https://console.example.com/callback",
-		ExpiresAt:   time.Now().Add(time.Second),
+		ExpiredAt:   time.Now().Add(time.Second),
 	}
 
 	if err := store.Save(ctx, state); err != nil {
@@ -134,7 +134,7 @@ func TestStateStoreLoadExpiredState(t *testing.T) {
 	memoryStore := store.(*inMemoryConnectorStateStore)
 	memoryStore.mu.Lock()
 	stored := memoryStore.states[state.State]
-	stored.ExpiresAt = time.Now().Add(-time.Second)
+	stored.ExpiredAt = time.Now().Add(-time.Second)
 	memoryStore.states[state.State] = stored
 	memoryStore.mu.Unlock()
 
@@ -168,7 +168,7 @@ func TestRedisStateStoreUnavailable(t *testing.T) {
 		ConnectorID: 12,
 		TenantID:    34,
 		RedirectURI: "https://console.example.com/callback",
-		ExpiresAt:   time.Now().Add(time.Minute),
+		ExpiredAt:   time.Now().Add(time.Minute),
 	}
 
 	if err := store.Save(ctx, state); !errors.Is(err, ErrConnectorStateStoreUnavailable) {
@@ -196,7 +196,7 @@ func TestRedisStateStoreUsesTTL(t *testing.T) {
 		ConnectorID: 12,
 		TenantID:    34,
 		RedirectURI: "https://console.example.com/callback",
-		ExpiresAt:   time.Now().Add(time.Minute),
+		ExpiredAt:   time.Now().Add(time.Minute),
 	}
 
 	if err := store.Save(ctx, state); err != nil {
@@ -232,7 +232,7 @@ func TestRedisStateStoreRejectsEmptyState(t *testing.T) {
 		ConnectorID: 12,
 		TenantID:    34,
 		RedirectURI: "https://console.example.com/callback",
-		ExpiresAt:   time.Now().Add(time.Minute),
+		ExpiredAt:   time.Now().Add(time.Minute),
 	})
 	if err != nil {
 		t.Fatalf("Marshal returned error: %v", err)

@@ -5,7 +5,7 @@ type CreateApiKeyResp struct {
 	Name      string `json:"name"`
 	Key       string `json:"key"`
 	KeyPrefix string `json:"keyPrefix"`
-	ExpiresAt string `json:"expiresAt"`
+	ExpiredAt string `json:"expiresAt"`
 }
 
 type ApiKeyPageListItem struct {
@@ -13,7 +13,7 @@ type ApiKeyPageListItem struct {
 	Name       string `json:"name"`
 	KeyPrefix  string `json:"keyPrefix"`
 	Scope      string `json:"scope"`
-	ExpiresAt  string `json:"expiresAt"`
+	ExpiredAt  string `json:"expiresAt"`
 	LastUsedAt string `json:"lastUsedAt"`
 	RevokedAt  string `json:"revokedAt"`
 	CreatedAt  string `json:"createdAt"`

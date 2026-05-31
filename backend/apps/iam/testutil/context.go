@@ -22,7 +22,7 @@ func BuildIamContext(userID uint) context.Context {
 	ctx = context.WithValue(ctx, gcontext.KeyPersonID, user.PersonID)
 
 	if user.TenantID > 0 {
-		relation, err := dao.NewUserDepartmentRelationDao().GetByCond(ctx, &dao.UserDepartmentRelationCond{
+		relation, err := dao.NewUserDepartmentDao().GetByCond(ctx, &dao.UserDepartmentCond{
 			UserID:    userID,
 		})
 		if err != nil {
