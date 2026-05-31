@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/morehao/ark-iam/iam/internal/controller/ctroauthclient"
 	"github.com/morehao/ark-iam/iam/internal/controller/ctrpermission"
 	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gserver/ginserver"
@@ -18,8 +19,6 @@ func roleRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.GET("/role/users", roleCtr.ListUsers)
 	v1RouterGroup.POST("/role/assignUsers", roleCtr.AssignUsers)
 	v1RouterGroup.DELETE("/role/users/:roleId/:userId", roleCtr.RemoveUser)
-	v1RouterGroup.GET("/role/applications", roleCtr.ListApplications)
-	v1RouterGroup.POST("/role/assignApplications", roleCtr.AssignApplications)
 }
 
 func menuRouter(groups *ginserver.RouterGroups) {
@@ -84,7 +83,7 @@ func userRoleRouter(groups *ginserver.RouterGroups) {
 }
 
 func applicationRouter(groups *ginserver.RouterGroups) {
-	appCtr := ctrpermission.NewApplicationCtr()
+	appCtr := ctroauthclient.NewOAuthClientCtr()
 
 	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
 	v1RouterGroup.POST("/application/create", appCtr.Create)
@@ -92,9 +91,6 @@ func applicationRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/application/update", appCtr.Update)
 	v1RouterGroup.GET("/application/detail", appCtr.Detail)
 	v1RouterGroup.POST("/application/pageList", appCtr.PageList)
-	v1RouterGroup.GET("/application/roles", appCtr.ListRoles)
-	v1RouterGroup.POST("/application/assignRoles", appCtr.AssignRoles)
-	v1RouterGroup.DELETE("/application/roles/:roleId", appCtr.RemoveRole)
 	v1RouterGroup.GET("/application/secrets", appCtr.ListSecrets)
 	v1RouterGroup.POST("/application/secrets", appCtr.CreateSecret)
 	v1RouterGroup.DELETE("/application/secrets/:secretId", appCtr.DeleteSecret)

@@ -11,22 +11,22 @@ import (
 )
 
 type OIDCClient struct {
-	app *model.ApplicationEntity
+	clientEntity *model.OAuthClientEntity
 }
 
 var _ op.Client = (*OIDCClient)(nil)
 
-func NewOIDCClient(app *model.ApplicationEntity) *OIDCClient {
-	return &OIDCClient{app: app}
+func NewOIDCClient(clientEntity *model.OAuthClientEntity) *OIDCClient {
+	return &OIDCClient{clientEntity: clientEntity}
 }
 
 func (c *OIDCClient) GetID() string {
-	return c.app.ClientID
+	return c.clientEntity.ClientID
 }
 
 func (c *OIDCClient) RedirectURIs() []string {
 	var uris []string
-	if err := json.Unmarshal(c.app.RedirectURIs, &uris); err != nil {
+	if err := json.Unmarshal(c.clientEntity.RedirectURIs, &uris); err != nil {
 		return nil
 	}
 	return uris
@@ -34,7 +34,7 @@ func (c *OIDCClient) RedirectURIs() []string {
 
 func (c *OIDCClient) PostLogoutRedirectURIs() []string {
 	var uris []string
-	if err := json.Unmarshal(c.app.PostLogoutRedirectURIs, &uris); err != nil {
+	if err := json.Unmarshal(c.clientEntity.PostLogoutRedirectURIs, &uris); err != nil {
 		return nil
 	}
 	return uris
@@ -45,7 +45,7 @@ func (c *OIDCClient) ApplicationType() op.ApplicationType {
 }
 
 func (c *OIDCClient) AuthMethod() oidc.AuthMethod {
-	switch c.app.TokenEndpointAuthMethod {
+	switch c.clientEntity.TokenEndpointAuthMethod {
 	case "client_secret_post":
 		return oidc.AuthMethodPost
 	case "none":
@@ -57,7 +57,7 @@ func (c *OIDCClient) AuthMethod() oidc.AuthMethod {
 
 func (c *OIDCClient) ResponseTypes() []oidc.ResponseType {
 	var rawTypes []string
-	if err := json.Unmarshal(c.app.ResponseTypes, &rawTypes); err != nil {
+	if err := json.Unmarshal(c.clientEntity.ResponseTypes, &rawTypes); err != nil {
 		return nil
 	}
 	types := make([]oidc.ResponseType, 0, len(rawTypes))
@@ -76,7 +76,7 @@ func (c *OIDCClient) ResponseTypes() []oidc.ResponseType {
 
 func (c *OIDCClient) GrantTypes() []oidc.GrantType {
 	var rawTypes []string
-	if err := json.Unmarshal(c.app.GrantTypes, &rawTypes); err != nil {
+	if err := json.Unmarshal(c.clientEntity.GrantTypes, &rawTypes); err != nil {
 		return nil
 	}
 	types := make([]oidc.GrantType, 0, len(rawTypes))
@@ -106,8 +106,8 @@ func (c *OIDCClient) AccessTokenType() op.AccessTokenType {
 }
 
 func (c *OIDCClient) IDTokenLifetime() time.Duration {
-	if c.app.AccessTokenTTL > 0 {
-		return time.Duration(c.app.AccessTokenTTL) * time.Second
+	if c.clientEntity.AccessTokenTTL > 0 {
+		return time.Duration(c.clientEntity.AccessTokenTTL) * time.Second
 	}
 	return time.Hour
 }
@@ -130,7 +130,7 @@ func (c *OIDCClient) RestrictAdditionalAccessTokenScopes() func(scopes []string)
 
 func (c *OIDCClient) IsScopeAllowed(scope string) bool {
 	var defaultScopes []string
-	if err := json.Unmarshal(c.app.DefaultScopes, &defaultScopes); err != nil {
+	if err := json.Unmarshal(c.clientEntity.DefaultScopes, &defaultScopes); err != nil {
 		return false
 	}
 	for _, s := range defaultScopes {

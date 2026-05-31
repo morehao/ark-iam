@@ -8,7 +8,8 @@ const TableNameRole = "role"
 
 type RoleEntity struct {
 	gorm.Model
-	TenantID    uint   `gorm:"column:tenant_id;type:bigint unsigned;not null;default 0;comment:租户id" json:"tenantID"`
+	TenantID        uint   `gorm:"column:tenant_id;type:bigint unsigned;not null;default 0;comment:租户id" json:"tenantID"`
+	ApplicationID   uint   `gorm:"column:application_id;type:bigint unsigned;not null;default 0;comment:所属应用id" json:"applicationID"`
 	Name        string `gorm:"column:name;type:varchar(128);not null;default '';comment:角色名称" json:"name"`
 	Code        string `gorm:"column:code;type:varchar(64);not null;default '';comment:角色编码" json:"code"`
 	Description string `gorm:"column:description;type:varchar(256);not null;default '';comment:角色描述" json:"description"`

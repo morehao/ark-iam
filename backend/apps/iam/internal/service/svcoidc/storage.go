@@ -79,22 +79,22 @@ func (s *OIDCStorage) Health(ctx context.Context) error {
 }
 
 func (s *OIDCStorage) GetClientByClientID(ctx context.Context, clientID string) (op.Client, error) {
-	appEntity, err := dao.NewApplicationDao().GetByCond(ctx, &dao.ApplicationCond{ClientID: clientID})
-	if err != nil || appEntity == nil || appEntity.ID == 0 {
+	clientEntity, err := dao.NewOAuthClientDao().GetByCond(ctx, &dao.OAuthClientCond{ClientID: clientID})
+	if err != nil || clientEntity == nil || clientEntity.ID == 0 {
 		return nil, fmt.Errorf("client not found: %s", clientID)
 	}
-	return NewOIDCClient(appEntity), nil
+	return NewOIDCClient(clientEntity), nil
 }
 
 func (s *OIDCStorage) AuthorizeClientIDSecret(ctx context.Context, clientID, clientSecret string) error {
 	secretHash := sha256.Sum256([]byte(clientSecret))
 	clientHash := hex.EncodeToString(secretHash[:])
 
-	appEntity, err := dao.NewApplicationDao().GetByCond(ctx, &dao.ApplicationCond{ClientID: clientID})
-	if err != nil || appEntity == nil || appEntity.ID == 0 {
+	clientEntity, err := dao.NewOAuthClientDao().GetByCond(ctx, &dao.OAuthClientCond{ClientID: clientID})
+	if err != nil || clientEntity == nil || clientEntity.ID == 0 {
 		return oidc.ErrInvalidClient()
 	}
-	secrets, _, err := dao.NewApplicationSecretDao().GetPageListByCond(ctx, &dao.ApplicationSecretCond{ApplicationID: appEntity.ID})
+	secrets, _, err := dao.NewOAuthClientSecretDao().GetPageListByCond(ctx, &dao.OAuthClientSecretCond{OAuthClientID: clientEntity.ID})
 	if err != nil {
 		return oidc.ErrInvalidClient()
 	}
@@ -255,11 +255,11 @@ func (s *OIDCStorage) CreateAccessAndRefreshTokens(ctx context.Context, request 
 		clientID = authReq.GetClientID()
 	}
 
-	var applicationID uint
+	var oauthClientID uint
 	if clientID != "" {
-		appEntity, err := dao.NewApplicationDao().GetByCond(ctx, &dao.ApplicationCond{ClientID: clientID})
-		if err == nil && appEntity != nil {
-			applicationID = appEntity.ID
+		clientEntity, err := dao.NewOAuthClientDao().GetByCond(ctx, &dao.OAuthClientCond{ClientID: clientID})
+		if err == nil && clientEntity != nil {
+			oauthClientID = clientEntity.ID
 		}
 	}
 
@@ -272,7 +272,7 @@ func (s *OIDCStorage) CreateAccessAndRefreshTokens(ctx context.Context, request 
 		PersonID:      personID,
 		TenantID:      userEntity.TenantID,
 		UserID:        userEntity.ID,
-		ApplicationID: applicationID,
+		OAuthClientID: oauthClientID,
 		Token:         refreshTokenHash,
 		ExpiredAt:     &refreshTokenExp,
 		CreatedBy:     userEntity.ID,
@@ -309,10 +309,10 @@ func (s *OIDCStorage) TokenRequestByRefreshToken(ctx context.Context, refreshTok
 	}
 
 	clientID := ""
-	if storedToken.ApplicationID != 0 {
-		appEntity, err := dao.NewApplicationDao().GetByID(ctx, storedToken.ApplicationID)
-		if err == nil && appEntity != nil {
-			clientID = appEntity.ClientID
+	if storedToken.OAuthClientID != 0 {
+		clientEntity, err := dao.NewOAuthClientDao().GetByID(ctx, storedToken.OAuthClientID)
+		if err == nil && clientEntity != nil {
+			clientID = clientEntity.ClientID
 		}
 	}
 

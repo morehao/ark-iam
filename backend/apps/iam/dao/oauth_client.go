@@ -7,16 +7,17 @@ import (
 	"gorm.io/gorm"
 )
 
-type RoleCond struct {
+type OAuthClientCond struct {
 	*genericdao.BaseCond
 	TenantID      uint
 	ApplicationID uint
+	ClientID      string
 	Name          string
-	Code          string
 	Type          string
+	Status        string
 }
 
-func (c *RoleCond) BuildCondition(db *gorm.DB, tableName string) {
+func (c *OAuthClientCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
@@ -26,25 +27,28 @@ func (c *RoleCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.ApplicationID != 0 {
 		db.Where(tableName + ".application_id = ?", c.ApplicationID)
 	}
+	if c.ClientID != "" {
+		db.Where(tableName + ".client_id = ?", c.ClientID)
+	}
 	if c.Name != "" {
 		db.Where(tableName + ".name = ?", c.Name)
-	}
-	if c.Code != "" {
-		db.Where(tableName + ".code = ?", c.Code)
 	}
 	if c.Type != "" {
 		db.Where(tableName + ".type = ?", c.Type)
 	}
+	if c.Status != "" {
+		db.Where(tableName + ".status = ?", c.Status)
+	}
 }
 
-type RoleDao struct {
-	*genericdao.GenericDao[model.RoleEntity, model.RoleEntityList]
+type OAuthClientDao struct {
+	*genericdao.GenericDao[model.OAuthClientEntity, model.OAuthClientEntityList]
 }
 
-func NewRoleDao() *RoleDao {
-	return &RoleDao{
-		GenericDao: genericdao.NewGenericDao[model.RoleEntity, model.RoleEntityList](
-			model.TableNameRole, "RoleDao",
+func NewOAuthClientDao() *OAuthClientDao {
+	return &OAuthClientDao{
+		GenericDao: genericdao.NewGenericDao[model.OAuthClientEntity, model.OAuthClientEntityList](
+			model.TableNameOAuthClient, "OAuthClientDao",
 			dbclient.IamDB,
 		),
 	}

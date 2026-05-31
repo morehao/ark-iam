@@ -485,7 +485,7 @@ func (svc *authSvc) generateToken(ctx *gin.Context, userEntity *model.UserEntity
 		TenantID:      userEntity.TenantID,
 		PersonID:      userEntity.PersonID,
 		UserID:        userEntity.ID,
-		ApplicationID: 0,
+		OAuthClientID: 0,
 		Token:         token.HashToken(refreshTokenString),
 		ExpiredAt:     timePointer(refreshTokenExp),
 		CreatedBy:     userEntity.ID,

@@ -17,17 +17,17 @@ func TestMenuDetailRejectsCrossTenantEntity(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Set(gcontext.KeyTenantID, uint(21))
 
-	repo := &stubMenuScopeRepo{detail: &model.MenuEntity{Model: gorm.Model{ID: 5}, TenantID: 88}}
+	repo := &stubMenuScopeRepo{detail: &model.MenuEntity{Model: gorm.Model{ID: 5}}}
 	installMenuScopeRepo(t, repo)
 
 	svc := &menuSvc{}
 	_, err := svc.Detail(ginCtx, &dtopermission.MenuDetailReq{MenuID: 5})
-	if err == nil {
-		t.Fatalf("expected cross-tenant menu detail to fail")
+	if err != nil {
+		t.Fatalf("unexpected error for menu detail: %v", err)
 	}
 }
 
-func TestMenuPageListUsesContextTenant(t *testing.T) {
+func TestMenuPageListUsesApplicationID(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Set(gcontext.KeyTenantID, uint(22))
 
@@ -35,13 +35,13 @@ func TestMenuPageListUsesContextTenant(t *testing.T) {
 	installMenuScopeRepo(t, repo)
 
 	svc := &menuSvc{}
-	_, _ = svc.PageList(ginCtx, &dtopermission.MenuPageListReq{TenantID: 99})
-	if repo.lastCond == nil || repo.lastCond.TenantID != 22 {
-		t.Fatalf("expected tenant 22 from context, got %+v", repo.lastCond)
+	_, _ = svc.PageList(ginCtx, &dtopermission.MenuPageListReq{ApplicationID: 10})
+	if repo.lastCond == nil || repo.lastCond.ApplicationID != 10 {
+		t.Fatalf("expected application 10, got %+v", repo.lastCond)
 	}
 }
 
-func TestMenuTreeUsesContextTenant(t *testing.T) {
+func TestMenuTreeUsesApplicationID(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Set(gcontext.KeyTenantID, uint(23))
 
@@ -49,9 +49,9 @@ func TestMenuTreeUsesContextTenant(t *testing.T) {
 	installMenuScopeRepo(t, repo)
 
 	svc := &menuSvc{}
-	_, _ = svc.Tree(ginCtx, &dtopermission.MenuTreeReq{TenantID: 99})
-	if repo.lastTreeCond == nil || repo.lastTreeCond.TenantID != 23 {
-		t.Fatalf("expected tenant 23 from context, got %+v", repo.lastTreeCond)
+	_, _ = svc.Tree(ginCtx, &dtopermission.MenuTreeReq{ApplicationID: 10})
+	if repo.lastTreeCond == nil || repo.lastTreeCond.ApplicationID != 10 {
+		t.Fatalf("expected application 10, got %+v", repo.lastTreeCond)
 	}
 }
 

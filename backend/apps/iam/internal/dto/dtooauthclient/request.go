@@ -1,12 +1,12 @@
-package dtoapplication
+package dtooauthclient
 
-type ApplicationCreateReq struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	LogoURL     string `json:"logoURL"`
-	HomepageURL string `json:"homepageURL"`
-	Type        string `json:"type"`
-	IsThirdParty int8  `json:"isThirdParty"`
+type CreateReq struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	LogoURL     string   `json:"logoURL"`
+	HomepageURL string   `json:"homepageURL"`
+	Type        string   `json:"type"`
+	IsThirdParty int8    `json:"isThirdParty"`
 
 	RedirectURIs            []string `json:"redirectURIs"`
 	PostLogoutRedirectURIs  []string `json:"postLogoutRedirectURIs"`
@@ -21,8 +21,8 @@ type ApplicationCreateReq struct {
 	RefreshTokenTTL         int64    `json:"refreshTokenTTL"`
 }
 
-type ApplicationUpdateReq struct {
-	ApplicationID uint   `json:"applicationID"`
+type UpdateReq struct {
+	OAuthClientID uint   `json:"oauthClientId"`
 	Name          string `json:"name"`
 	Description   string `json:"description"`
 	LogoURL       string `json:"logoURL"`
@@ -44,15 +44,15 @@ type ApplicationUpdateReq struct {
 	RefreshTokenTTL         int64    `json:"refreshTokenTTL"`
 }
 
-type ApplicationDeleteReq struct {
-	ApplicationID uint `json:"applicationID"`
+type DeleteReq struct {
+	OAuthClientID uint `json:"oauthClientId"`
 }
 
-type ApplicationDetailReq struct {
-	ApplicationID uint `json:"applicationID"`
+type DetailReq struct {
+	OAuthClientID uint `json:"oauthClientId"`
 }
 
-type ApplicationPageListReq struct {
+type PageListReq struct {
 	Page        int    `json:"page"`
 	PageSize    int    `json:"pageSize"`
 	Name        string `json:"name"`
@@ -60,30 +60,16 @@ type ApplicationPageListReq struct {
 	Status      string `json:"status"`
 }
 
-type ApplicationRoleListReq struct {
-	ApplicationID uint `json:"applicationId" form:"applicationId" binding:"required"`
+type SecretListReq struct {
+	OAuthClientID uint `json:"oauthClientId" form:"oauthClientId" binding:"required"`
 }
 
-type AssignApplicationRolesReq struct {
-	ApplicationID uint64   `json:"applicationId" binding:"required"`
-	RoleIDs       []uint64 `json:"roleIds" binding:"required,min=1"`
-}
-
-type RemoveApplicationRoleReq struct {
-	ApplicationID uint64 `json:"applicationId" form:"applicationId" binding:"required"`
-	RoleID        uint64 `json:"roleId" uri:"roleId" binding:"required"`
-}
-
-type ApplicationSecretListReq struct {
-	ApplicationID uint `json:"applicationId" form:"applicationId" binding:"required"`
-}
-
-type CreateApplicationSecretReq struct {
-	ApplicationID uint   `json:"applicationId" binding:"required"`
+type CreateSecretReq struct {
+	OAuthClientID uint   `json:"oauthClientId" binding:"required"`
 	Name          string `json:"name" binding:"required"`
 	ExpiredAt     string `json:"expiresAt"`
 }
 
-type DeleteApplicationSecretReq struct {
+type DeleteSecretReq struct {
 	SecretID uint64 `json:"secretId" uri:"secretId" binding:"required"`
 }

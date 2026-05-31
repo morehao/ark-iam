@@ -6,11 +6,11 @@ import (
 	"gorm.io/gorm"
 )
 
-const TableNameApplicationSecret = "application_secret"
+const TableNameOAuthClientSecret = "oauth_client_secret"
 
-type ApplicationSecretEntity struct {
+type OAuthClientSecretEntity struct {
 	gorm.Model
-	ApplicationID uint       `gorm:"column:application_id;type:bigint unsigned;not null;default 0;comment:应用ID" json:"applicationID"`
+	OAuthClientID uint       `gorm:"column:oauth_client_id;type:bigint unsigned;not null;default 0;comment:客户端ID" json:"oauthClientID"`
 	Name          string     `gorm:"column:name;type:varchar(256);not null;default '';comment:密钥名称" json:"name"`
 	ValueHash     string     `gorm:"column:value_hash;type:varchar(256);not null;default '';comment:密钥哈希" json:"-"`
 	ValuePrefix   string     `gorm:"column:value_prefix;type:varchar(16);not null;default '';comment:密钥前缀" json:"valuePrefix"`
@@ -21,14 +21,12 @@ type ApplicationSecretEntity struct {
 	DeletedBy     uint       `gorm:"column:deleted_by;type:bigint unsigned;not null;default 0;comment:删除人id" json:"deletedBy"`
 }
 
-func (ApplicationSecretEntity) TableName() string {
-	return TableNameApplicationSecret
-}
+func (OAuthClientSecretEntity) TableName() string { return TableNameOAuthClientSecret }
 
-type ApplicationSecretEntityList []ApplicationSecretEntity
+type OAuthClientSecretEntityList []OAuthClientSecretEntity
 
-func (l ApplicationSecretEntityList) ToMap() map[uint]ApplicationSecretEntity {
-	m := make(map[uint]ApplicationSecretEntity)
+func (l OAuthClientSecretEntityList) ToMap() map[uint]OAuthClientSecretEntity {
+	m := make(map[uint]OAuthClientSecretEntity)
 	for _, v := range l {
 		m[v.ID] = v
 	}
