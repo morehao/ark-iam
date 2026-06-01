@@ -8,6 +8,8 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   LogoutOutlined,
+  BankOutlined,
+  KeyOutlined,
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { getMyTenants, getUserinfo, switchTenant } from '../api/auth'
@@ -38,6 +40,9 @@ const MainLayout = () => {
     { key: '/role', icon: <TeamOutlined />, label: '角色管理' },
     { key: '/department', icon: <TeamOutlined />, label: '部门管理' },
     { key: '/application', icon: <AppstoreOutlined />, label: '应用管理' },
+    { key: '/tenant', icon: <BankOutlined />, label: '租户管理' },
+    { key: '/tenantApplication', icon: <AppstoreOutlined />, label: '租户应用' },
+    { key: '/oauthClient', icon: <KeyOutlined />, label: 'OAuth 客户端' },
   ]
 
   const handleLogout = () => {
