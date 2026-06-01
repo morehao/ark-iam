@@ -505,8 +505,8 @@ CREATE TABLE `refresh_token`
     KEY               `idx_tenant_id` (`tenant_id`),
     KEY               `idx_user_id` (`user_id`),
     UNIQUE KEY        `uk_token` (`token`),
-    UNIQUE KEY        `uk_session_id` (`session_id`),
-    UNIQUE KEY        `uk_person_tenant_user_session` (`person_id`, `tenant_id`, `user_id`, `session_id`),
+    KEY               `idx_session_id` (`session_id`),
+    KEY               `idx_person_tenant_user_session` (`person_id`, `tenant_id`, `user_id`, `session_id`),
     KEY               `idx_expired_at` (`expired_at`),
     KEY               `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='刷新令牌表';

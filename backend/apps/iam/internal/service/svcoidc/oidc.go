@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -42,7 +43,32 @@ func loadSigningKey() (*rsa.PrivateKey, string, error) {
 	if cfg.SigningPrivateKeyPath != "" {
 		pemData, err := os.ReadFile(cfg.SigningPrivateKeyPath)
 		if err != nil {
-			return nil, "", err
+			if !os.IsNotExist(err) {
+				return nil, "", err
+			}
+			privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+			if err != nil {
+				return nil, "", fmt.Errorf("failed to generate signing key: %w", err)
+			}
+			der := x509.MarshalPKCS1PrivateKey(privateKey)
+			encoded := pem.EncodeToMemory(&pem.Block{
+				Type:  "RSA PRIVATE KEY",
+				Bytes: der,
+			})
+			keyDir := filepath.Dir(cfg.SigningPrivateKeyPath)
+			if keyDir != "." {
+				if err := os.MkdirAll(keyDir, 0755); err != nil {
+					return nil, "", fmt.Errorf("failed to create key directory: %w", err)
+				}
+			}
+			if err := os.WriteFile(cfg.SigningPrivateKeyPath, encoded, 0600); err != nil {
+				return nil, "", fmt.Errorf("failed to write signing key: %w", err)
+			}
+			keyID := cfg.SigningKeyID
+			if keyID == "" {
+				keyID = "auto-key"
+			}
+			return privateKey, keyID, nil
 		}
 		block, _ := pem.Decode(pemData)
 		if block == nil || block.Type != "RSA PRIVATE KEY" {

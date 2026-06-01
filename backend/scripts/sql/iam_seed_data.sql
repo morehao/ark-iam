@@ -155,11 +155,11 @@ ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
 
 -- ============================================
 -- 10. 默认管理员用户种子数据
--- 密码: admin123 (Argon2 加密)
+-- 密码: admin123 (bcrypt 加密)
 -- ============================================
 -- 10.1 先插入到 person 表
 INSERT INTO `person` (`id`, `username`, `primary_email`, `primary_phone`, `password_encrypted`, `password_method`, `name`, `avatar`, `profile`, `custom_data`, `is_suspended`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (1, 'admin', 'admin@example.com', '', '$argon2id$v=19$m=65536,t=1,p=4$WG6YLsQm7eBtMH8zezNNbQ$MZQuyYq+0Gj9qawnUzdg7pxqVFkRUmkXBqjD6CE6AaU', 'Argon2id', '系统管理员', '', '{}', '{}', 0, 0, 0, 0)
+VALUES (1, 'admin', 'admin@example.com', '', '$2a$10$Js0KMHZVZY7z0kLoHAvckui8KJK5..xhKkzU2jwiz7X./aIANfnxi', 'bcrypt', '系统管理员', '', '{}', '{}', 0, 0, 0, 0)
 ON DUPLICATE KEY UPDATE `username` = VALUES(`username`);
 
 -- 10.2 再插入到 user 表（关联 person_id）
