@@ -13,16 +13,16 @@ func authRouter(groups *ginserver.RouterGroups) {
 	authCtr := ctrauth.NewAuthCtr(authSvc)
 
 	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
-	v1RouterGroup.POST("/login", authCtr.Login)
-	v1RouterGroup.GET("/myTenants", authCtr.MyTenants)
-	v1RouterGroup.POST("/selectTenant", authCtr.SelectTenant)
-	v1RouterGroup.POST("/switchTenant", authCtr.SwitchTenant)
-	v1RouterGroup.POST("/register", authCtr.Register)
-	v1RouterGroup.POST("/joinTenant", authCtr.JoinTenant)
-	v1RouterGroup.POST("/refreshToken", authCtr.RefreshToken)
-	v1RouterGroup.POST("/logout", authCtr.Logout)
-	v1RouterGroup.POST("/logoutAll", authCtr.LogoutAll)
-	v1RouterGroup.GET("/userinfo", authCtr.Userinfo)
+	v1RouterGroup.POST("/auth/login", authCtr.Login)
+	v1RouterGroup.GET("/auth/myTenants", authCtr.MyTenants)
+	v1RouterGroup.POST("/auth/selectTenant", authCtr.SelectTenant)
+	v1RouterGroup.POST("/auth/switchTenant", authCtr.SwitchTenant)
+	v1RouterGroup.POST("/auth/register", authCtr.Register)
+	v1RouterGroup.POST("/auth/joinTenant", authCtr.JoinTenant)
+	v1RouterGroup.POST("/auth/refreshToken", authCtr.RefreshToken)
+	v1RouterGroup.POST("/auth/logout", authCtr.Logout)
+	v1RouterGroup.POST("/auth/logoutAll", authCtr.LogoutAll)
+	v1RouterGroup.GET("/auth/userinfo", authCtr.Userinfo)
 }
 
 func connectorRouter(groups *ginserver.RouterGroups) {
