@@ -67,6 +67,8 @@ const (
 	DomainGetPageListError  = 101202
 	DomainNotExistError     = 101203
 	DomainAlreadyExistError = 101204
+	DomainUpdateError       = 101205
+	DomainDetailError       = 101206
 )
 
 var tenantErrorMsgMap = gerror.CodeMsgMap{
@@ -113,4 +115,6 @@ var tenantErrorMsgMap = gerror.CodeMsgMap{
 	DomainGetPageListError:  "查看域名列表失败",
 	DomainNotExistError:     "域名不存在",
 	DomainAlreadyExistError: "域名已存在",
+	DomainUpdateError:       "更新域名失败",
+	DomainDetailError:       "查看域名详情失败",
 }
