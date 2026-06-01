@@ -111,12 +111,12 @@ func (ctr *applicationCtr) Detail(ctx *gin.Context) {
 // @Summary 查看应用列表
 // @accept application/json
 // @Produce application/json
-// @Param req query dtoapplication.PageListReq true "查看应用列表"
+// @Param req body dtoapplication.PageListReq true "查看应用列表"
 // @Success 200 {object} gincontext.DtoRender{data=dtoapplication.PageListResp}
-// @Router /v1/iam/application/pageList [get]
+// @Router /v1/iam/application/pageList [post]
 func (ctr *applicationCtr) PageList(ctx *gin.Context) {
 	var req dtoapplication.PageListReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

@@ -13,5 +13,5 @@ func tenantApplicationRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/tenantApplication/delete", ctr.Delete)
 	v1RouterGroup.POST("/tenantApplication/update", ctr.Update)
 	v1RouterGroup.GET("/tenantApplication/detail", ctr.Detail)
-	v1RouterGroup.GET("/tenantApplication/pageList", ctr.PageList)
+	v1RouterGroup.POST("/tenantApplication/pageList", ctr.PageList)
 }

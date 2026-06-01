@@ -21,7 +21,7 @@ type DeleteReq struct {
 }
 
 type PageListReq struct {
-	Page     int    `form:"page"`      // 页码
-	PageSize int    `form:"pageSize"`  // 每页条数
-	Status   string `form:"status"`    // 状态
+	Page     int    `json:"page"`      // 页码
+	PageSize int    `json:"pageSize"`  // 每页条数
+	Status   string `json:"status"`    // 状态
 }

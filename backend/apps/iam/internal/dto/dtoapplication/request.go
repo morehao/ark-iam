@@ -30,9 +30,9 @@ type DeleteReq struct {
 }
 
 type PageListReq struct {
-	Page     int    `form:"page"`                              // 页码
-	PageSize int    `form:"pageSize"`                          // 每页条数
-	Name     string `form:"name"`                              // 应用名称（模糊搜索）
-	Type     string `form:"type"`                              // 应用类型
-	Status   string `form:"status"`                            // 状态
+	Page     int    `json:"page"`                              // 页码
+	PageSize int    `json:"pageSize"`                          // 每页条数
+	Name     string `json:"name"`                              // 应用名称（模糊搜索）
+	Type     string `json:"type"`                              // 应用类型
+	Status   string `json:"status"`                            // 状态
 }
