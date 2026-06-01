@@ -15,7 +15,7 @@ const UserDetail = () => {
       setLoading(true)
       try {
         const resp = await getUserDetail(Number(id))
-        setUser(resp.data)
+        setUser(resp)
       } catch (error) {
         console.error('获取用户详情失败:', error)
       } finally {

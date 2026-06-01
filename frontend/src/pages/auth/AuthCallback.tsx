@@ -31,8 +31,8 @@ const AuthCallback = () => {
         }
 
         await handleLoginSuccess({
-          personToken: resp.data.personToken,
-          tenants: resp.data.tenants,
+          personToken: resp.personToken,
+          tenants: resp.tenants,
           setPersonSession,
           setTenantSession,
           logout,

@@ -54,30 +54,28 @@ describe('AuthCallback', () => {
 
   test('多租户 SSO callback 后跳转到选择租户页', async () => {
     completeConnectorCallbackMock.mockResolvedValue({
-      data: {
-        personToken: {
-          accessToken: 'person-token',
-          refreshToken: 'person-refresh-token',
-          expiresIn: 3600,
-          tokenType: 'Bearer',
-        },
-        tenants: [
-          {
-            tenantID: 7,
-            name: 'Tenant A',
-            tag: 'tenant-a',
-            userID: 101,
-            isOwner: 1,
-          },
-          {
-            tenantID: 8,
-            name: 'Tenant B',
-            tag: 'tenant-b',
-            userID: 101,
-            isOwner: 0,
-          },
-        ],
+      personToken: {
+        accessToken: 'person-token',
+        refreshToken: 'person-refresh-token',
+        expiresIn: 3600,
+        tokenType: 'Bearer',
       },
+      tenants: [
+        {
+          tenantID: 7,
+          name: 'Tenant A',
+          tag: 'tenant-a',
+          userID: 101,
+          isOwner: 1,
+        },
+        {
+          tenantID: 8,
+          name: 'Tenant B',
+          tag: 'tenant-b',
+          userID: 101,
+          isOwner: 0,
+        },
+      ],
     })
 
     render(
@@ -120,9 +118,7 @@ describe('AuthCallback', () => {
     vi.stubEnv('VITE_SSO_CONNECTOR_ID', '12')
     const locationAssignMock = vi.fn()
     getConnectorAuthorizationUrlMock.mockResolvedValue({
-      data: {
-        authorizationUrl: 'https://sso.example.com/authorize',
-      },
+      authorizationUrl: 'https://sso.example.com/authorize',
     })
 
     const originalLocation = window.location

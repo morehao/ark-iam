@@ -1,5 +1,4 @@
 import request from '../utils/request'
-import type { ApiResponse } from '../utils/response'
 
 export interface Application {
   id: number
@@ -22,27 +21,27 @@ export interface ApplicationPageListResp {
 }
 
 export const getApplicationPageList = (data: ApplicationPageListReq) => {
-  return request.post<ApplicationPageListReq, ApiResponse<ApplicationPageListResp>>('/application/pageList', data)
+  return request.post<ApplicationPageListReq, ApplicationPageListResp>('/application/pageList', data)
 }
 
 export const getApplicationDetail = (id: number) => {
-  return request.get<any, ApiResponse<Application>>('/application/detail', { params: { appId: id } })
+  return request.get<any, Application>('/application/detail', { params: { appId: id } })
 }
 
 export const createApplication = (data: Partial<Application>) => {
-  return request.post<Partial<Application>, ApiResponse<Application>>('/application/create', data)
+  return request.post<Partial<Application>, Application>('/application/create', data)
 }
 
 export const updateApplication = (data: Partial<Application>) => {
-  return request.post<Partial<Application>, ApiResponse<Application>>('/application/update', data)
+  return request.post<Partial<Application>, Application>('/application/update', data)
 }
 
 export const deleteApplication = (id: number) => {
-  return request.post<any, ApiResponse<null>>('/application/delete', { id })
+  return request.post<any, null>('/application/delete', { id })
 }
 
 export const getApplicationRoles = (appId: number) => {
-  return request.get<any, ApiResponse<Role[]>>('/application/roles', { params: { appId } })
+  return request.get<any, Role[]>('/application/roles', { params: { appId } })
 }
 
 export interface Role {

@@ -7,13 +7,6 @@ export interface PersonToken {
   tokenType: string
 }
 
-export interface TenantToken {
-  accessToken: string
-  refreshToken: string
-  expiresIn: number
-  tokenType: string
-}
-
 export interface TenantMembership {
   tenantID: number
   name: string

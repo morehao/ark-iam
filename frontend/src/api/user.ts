@@ -1,5 +1,4 @@
 import request from '../utils/request'
-import type { ApiResponse } from '../utils/response'
 
 export interface User {
   id: number
@@ -23,9 +22,9 @@ export interface UserPageListResp {
 }
 
 export const getUserPageList = (data: UserPageListReq) => {
-  return request.post<UserPageListReq, ApiResponse<UserPageListResp>>('/user/pageList', data)
+  return request.post<UserPageListReq, UserPageListResp>('/user/pageList', data)
 }
 
 export const getUserDetail = (id: number) => {
-  return request.get<any, ApiResponse<User>>('/user/detail', { params: { userID: id } })
+  return request.get<any, User>('/user/detail', { params: { userID: id } })
 }

@@ -19,8 +19,8 @@ const UserList = () => {
     setLoading(true)
     try {
       const resp = await getUserPageList({ page, pageSize, keyword })
-      setData(resp.data?.list || [])
-      setTotal(resp.data?.total || 0)
+      setData(resp?.list || [])
+      setTotal(resp?.total || 0)
     } catch (error) {
       console.error('获取用户列表失败:', error)
     } finally {

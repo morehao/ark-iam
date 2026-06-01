@@ -69,8 +69,8 @@ export const handleLoginSuccess = async ({
     })
 
     setTenantSession({
-      tenantToken: tenantResp.data.tenantToken.accessToken,
-      refreshToken: tenantResp.data.tenantToken.refreshToken,
+      tenantToken: tenantResp.accessToken,
+      refreshToken: tenantResp.refreshToken,
       currentTenant,
     })
 
@@ -96,8 +96,8 @@ const Login = () => {
     try {
       const resp = await loginApi(values)
       await handleLoginSuccess({
-        personToken: resp.data.personToken,
-        tenants: resp.data.tenants,
+        personToken: resp.personToken,
+        tenants: resp.tenants,
         setPersonSession,
         setTenantSession,
         logout,
@@ -123,7 +123,7 @@ const Login = () => {
         redirectUri,
       })
 
-      window.location.assign(resp.data.authorizationUrl)
+      window.location.assign(resp.authorizationUrl)
     } catch (error) {
       console.error('获取 SSO 授权地址失败:', error)
     } finally {

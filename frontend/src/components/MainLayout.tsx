@@ -62,8 +62,8 @@ const MainLayout = () => {
           return
         }
 
-        const personInfo = userinfoResp.data?.personInfo ?? null
-        const userInfo = userinfoResp.data?.userInfo ?? null
+        const personInfo = userinfoResp?.personInfo ?? null
+        const userInfo = userinfoResp?.userInfo ?? null
         setPersonInfo(personInfo)
         setUserInfo(userInfo)
 
@@ -73,7 +73,7 @@ const MainLayout = () => {
             return
           }
 
-          nextTenants = tenantsResp.data?.list ?? []
+          nextTenants = tenantsResp?.list ?? []
           setTenants(nextTenants)
         }
 
@@ -106,16 +106,16 @@ const MainLayout = () => {
     try {
       const switchResp = await switchTenant({ tenantID })
       setTenantSession({
-        tenantToken: switchResp.data.tenantToken.accessToken,
-        refreshToken: switchResp.data.tenantToken.refreshToken || refreshToken || '',
+        tenantToken: switchResp.accessToken,
+        refreshToken: switchResp.refreshToken || refreshToken || '',
         currentTenant: nextTenant,
         userInfo: useAuthStore.getState().userInfo,
       })
 
       try {
         const userinfoResp = await getUserinfo()
-        const personInfo = userinfoResp.data?.personInfo ?? null
-        const userInfo = userinfoResp.data?.userInfo ?? null
+        const personInfo = userinfoResp?.personInfo ?? null
+        const userInfo = userinfoResp?.userInfo ?? null
 
         setPersonInfo(personInfo)
         setUserInfo(userInfo)

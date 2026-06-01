@@ -49,33 +49,27 @@ describe('Login', () => {
 
   test('单租户登录后自动选租户并进入首页', async () => {
     loginMock.mockResolvedValue({
-      data: {
-        personToken: {
-          accessToken: 'person-token',
-          refreshToken: 'person-refresh-token',
-          expiresIn: 3600,
-          tokenType: 'Bearer',
-        },
-        tenants: [
-          {
-            tenantID: 7,
-            name: 'Tenant A',
-            tag: 'tenant-a',
-            userID: 101,
-            isOwner: 1,
-          },
-        ],
+      personToken: {
+        accessToken: 'person-token',
+        refreshToken: 'person-refresh-token',
+        expiresIn: 3600,
+        tokenType: 'Bearer',
       },
+      tenants: [
+        {
+          tenantID: 7,
+          name: 'Tenant A',
+          tag: 'tenant-a',
+          userID: 101,
+          isOwner: 1,
+        },
+      ],
     })
     selectTenantMock.mockResolvedValue({
-      data: {
-        tenantToken: {
-          accessToken: 'tenant-token',
-          refreshToken: 'tenant-refresh-token',
-          expiresIn: 3600,
-          tokenType: 'Bearer',
-        },
-      },
+      accessToken: 'tenant-token',
+      refreshToken: 'tenant-refresh-token',
+      expiresIn: 3600,
+      tokenType: 'Bearer',
     })
 
     render(
@@ -121,30 +115,28 @@ describe('Login', () => {
 
   test('多租户登录后跳转到选择租户页', async () => {
     loginMock.mockResolvedValue({
-      data: {
-        personToken: {
-          accessToken: 'person-token',
-          refreshToken: 'person-refresh-token',
-          expiresIn: 3600,
-          tokenType: 'Bearer',
-        },
-        tenants: [
-          {
-            tenantID: 7,
-            name: 'Tenant A',
-            tag: 'tenant-a',
-            userID: 101,
-            isOwner: 1,
-          },
-          {
-            tenantID: 8,
-            name: 'Tenant B',
-            tag: 'tenant-b',
-            userID: 101,
-            isOwner: 0,
-          },
-        ],
+      personToken: {
+        accessToken: 'person-token',
+        refreshToken: 'person-refresh-token',
+        expiresIn: 3600,
+        tokenType: 'Bearer',
       },
+      tenants: [
+        {
+          tenantID: 7,
+          name: 'Tenant A',
+          tag: 'tenant-a',
+          userID: 101,
+          isOwner: 1,
+        },
+        {
+          tenantID: 8,
+          name: 'Tenant B',
+          tag: 'tenant-b',
+          userID: 101,
+          isOwner: 0,
+        },
+      ],
     })
 
     render(
