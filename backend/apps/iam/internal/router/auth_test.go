@@ -16,7 +16,7 @@ import (
 
 func TestAuthAndConnectorRoutesUseUnifiedEndpoints(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	config.Conf = &config.Config{JWT: config.JWT{SignKey: "test-sign-key"}}
+	config.Conf = &config.Config{JWT: config.JWT{SignKey: "test-sign-key"}, Server: config.Server{Env: "dev"}}
 
 	engine := gin.New()
 	groups := ginserver.NewRouterGroups(engine, "iam", ginserver.Version{Name: gconstant.ApiVersionV1})
@@ -75,7 +75,7 @@ func TestAuthAndConnectorRoutesUseUnifiedEndpoints(t *testing.T) {
 
 func TestIAMRoutersWhitelistPublicAuthEndpoints(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	config.Conf = &config.Config{JWT: config.JWT{SignKey: "test-sign-key"}}
+	config.Conf = &config.Config{JWT: config.JWT{SignKey: "test-sign-key"}, Server: config.Server{Env: "dev"}}
 
 	engine := gin.New()
 	iam.Routers(engine)

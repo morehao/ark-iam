@@ -25,8 +25,20 @@ type Config struct {
 	ESConfigs   []dbes.ESConfig           `yaml:"es_configs"`
 	Client      Client                    `yaml:"client"`
 	JWT         JWT                       `yaml:"jwt"`
+	OIDC        OIDC                      `yaml:"oidc"`
 	Password    PasswordConfig            `yaml:"password"`
 	MasterKey   string                    `yaml:"masterKey"`
+}
+
+type OIDC struct {
+	Issuer                string `yaml:"issuer"`
+	FrontendLoginURL      string `yaml:"frontendLoginURL"`
+	SigningKeyID          string `yaml:"signingKeyID"`
+	SigningPrivateKeyPath string `yaml:"signingPrivateKeyPath"`
+	SigningPrivateKeyPEM  string `yaml:"signingPrivateKeyPEM"`
+	EncryptionKey         string `yaml:"encryptionKey"`
+	EncryptionKeyID       string `yaml:"encryptionKeyID"`
+	AllowInsecure         bool   `yaml:"allowInsecure"`
 }
 
 type PasswordConfig struct {

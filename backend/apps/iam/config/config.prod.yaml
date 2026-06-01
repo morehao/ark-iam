@@ -67,3 +67,13 @@ redis_config:
 es_configs:
   - service: iam
     addr: http://host.docker.internal:9200
+
+oidc:
+  issuer: "https://iam.example.com/v1/iam/oidc"
+  frontendLoginURL: "https://console.example.com/oidc/login"
+  signingKeyID: "prod-oidc-key"
+  signingPrivateKeyPath: ""
+  signingPrivateKeyPEM: ""
+  encryptionKey: ""
+  encryptionKeyID: "prod-enc-key"
+  allowInsecure: false
