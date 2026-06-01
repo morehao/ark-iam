@@ -14,7 +14,6 @@ import (
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtooauthclient"
 	"github.com/morehao/ark-iam/iam/model"
-	"github.com/morehao/ark-iam/iam/object/objoauthclient"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/genericdao"
@@ -96,6 +95,7 @@ func marshalStringSlice(s []string) datatypes.JSON {
 func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtooauthclient.CreateReq) (*dtooauthclient.CreateResp, error) {
 	insertEntity := &model.OAuthClientEntity{
 		TenantID:                gincontext.GetTenantID(ctx),
+		AppID:                   req.AppId,
 		ClientID:                generateClientID(),
 		Name:                    req.Name,
 		RedirectURIs:            marshalStringSlice(req.RedirectURIs),
@@ -116,7 +116,7 @@ func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtooauthclient.CreateRe
 
 	if err := dao.NewOAuthClientDao().Insert(ctx, insertEntity); err != nil {
 		glog.Errorf(ctx, "[svcoauthclient.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.ApplicationCreateError)
+		return nil, code.GetError(code.OAuthClientCreateError)
 	}
 	return &dtooauthclient.CreateResp{
 		OAuthClientID: insertEntity.ID,
@@ -128,16 +128,16 @@ func (svc *oAuthClientSvc) Delete(ctx *gin.Context, req *dtooauthclient.DeleteRe
 	entity, err := newOAuthClientScopeRepo().GetByID(ctx, req.OAuthClientID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcoauthclient.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.ApplicationDeleteError)
+		return code.GetError(code.OAuthClientDeleteError)
 	}
 	if !oauthClientVisibleToTenant(entity, gincontext.GetTenantID(ctx)) {
-		return code.GetError(code.ApplicationNotExistError)
+		return code.GetError(code.OAuthClientNotExistError)
 	}
 
 	userID := gincontext.GetUserID(ctx)
 	if err := dao.NewOAuthClientDao().Delete(ctx, req.OAuthClientID, userID); err != nil {
 		glog.Errorf(ctx, "[svcoauthclient.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.ApplicationDeleteError)
+		return code.GetError(code.OAuthClientDeleteError)
 	}
 	return nil
 }
@@ -146,10 +146,10 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtooauthclient.UpdateRe
 	entity, err := newOAuthClientScopeRepo().GetByID(ctx, req.OAuthClientID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcoauthclient.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.ApplicationUpdateError)
+		return code.GetError(code.OAuthClientUpdateError)
 	}
 	if !oauthClientVisibleToTenant(entity, gincontext.GetTenantID(ctx)) {
-		return code.GetError(code.ApplicationNotExistError)
+		return code.GetError(code.OAuthClientNotExistError)
 	}
 
 	userID := gincontext.GetUserID(ctx)
@@ -173,7 +173,7 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtooauthclient.UpdateRe
 	}
 	if err := dao.NewOAuthClientDao().UpdateMap(ctx, req.OAuthClientID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcoauthclient.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.ApplicationUpdateError)
+		return code.GetError(code.OAuthClientUpdateError)
 	}
 	return nil
 }
@@ -182,23 +182,43 @@ func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtooauthclient.DetailRe
 	entity, err := newOAuthClientScopeRepo().GetByID(ctx, req.OAuthClientID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcoauthclient.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.ApplicationGetDetailError)
+		return nil, code.GetError(code.OAuthClientGetDetailError)
 	}
 	if !oauthClientVisibleToTenant(entity, gincontext.GetTenantID(ctx)) {
-		return nil, code.GetError(code.ApplicationNotExistError)
+		return nil, code.GetError(code.OAuthClientNotExistError)
 	}
 
+	var redirectURIs, postLogoutRedirectURIs []string
+	var grantTypes, responseTypes []string
+	var allowedOrigins, defaultScopes []string
+	json.Unmarshal(entity.RedirectURIs, &redirectURIs)
+	json.Unmarshal(entity.PostLogoutRedirectURIs, &postLogoutRedirectURIs)
+	json.Unmarshal(entity.GrantTypes, &grantTypes)
+	json.Unmarshal(entity.ResponseTypes, &responseTypes)
+	json.Unmarshal(entity.AllowedOrigins, &allowedOrigins)
+	json.Unmarshal(entity.DefaultScopes, &defaultScopes)
+
 	return &dtooauthclient.DetailResp{
-		OAuthClientID: entity.ID,
-		OAuthClientBaseInfo: objoauthclient.OAuthClientBaseInfo{
-			TenantID:      entity.TenantID,
-			AppID: entity.AppID,
-			ClientID:      entity.ClientID,
-			Name:          entity.Name,
-			Type:          entity.Type,
-			Status:        entity.Status,
-			IsThirdParty:  entity.IsThirdParty,
-		},
+		OAuthClientID:           entity.ID,
+		TenantID:                entity.TenantID,
+		AppID:                   entity.AppID,
+		ClientID:                entity.ClientID,
+		Name:                    entity.Name,
+		RedirectURIs:            redirectURIs,
+		PostLogoutRedirectURIs:  postLogoutRedirectURIs,
+		GrantTypes:              grantTypes,
+		ResponseTypes:           responseTypes,
+		TokenEndpointAuthMethod: entity.TokenEndpointAuthMethod,
+		AllowedOrigins:          allowedOrigins,
+		RequirePKCE:             entity.RequirePKCE,
+		RequireAuthTime:         entity.RequireAuthTime,
+		DefaultScopes:           defaultScopes,
+		AccessTokenTTL:          entity.AccessTokenTTL,
+		RefreshTokenTTL:         entity.RefreshTokenTTL,
+		Type:                    entity.Type,
+		IsThirdParty:            entity.IsThirdParty,
+		Status:                  entity.Status,
+		CreatedAt:               entity.CreatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
 }
 
@@ -216,22 +236,25 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtooauthclient.PageLi
 	list, total, err := newOAuthClientScopeRepo().GetPageListByCond(ctx, cond)
 	if err != nil {
 		glog.Errorf(ctx, "[svcoauthclient.PageList] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.ApplicationGetPageListError)
+		return nil, code.GetError(code.OAuthClientGetPageListError)
 	}
 
 	items := make([]dtooauthclient.PageListItem, 0, len(list))
 	for _, v := range list {
+		var grantTypes []string
+		json.Unmarshal(v.GrantTypes, &grantTypes)
+
 		items = append(items, dtooauthclient.PageListItem{
-			OAuthClientID: v.ID,
-			OAuthClientBaseInfo: objoauthclient.OAuthClientBaseInfo{
-				TenantID:      v.TenantID,
-				AppID: v.AppID,
-				ClientID:      v.ClientID,
-				Name:          v.Name,
-				Type:          v.Type,
-				Status:        v.Status,
-				IsThirdParty:  v.IsThirdParty,
-			},
+			OAuthClientID:           v.ID,
+			AppID:                   v.AppID,
+			ClientID:                v.ClientID,
+			Name:                    v.Name,
+			Type:                    v.Type,
+			Status:                  v.Status,
+			IsThirdParty:            v.IsThirdParty,
+			GrantTypes:              grantTypes,
+			TokenEndpointAuthMethod: v.TokenEndpointAuthMethod,
+			CreatedAt:               v.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
 	return &dtooauthclient.PageListResp{
@@ -246,22 +269,42 @@ func (svc *oAuthClientSvc) GetByClientID(ctx *gin.Context, clientID string) (*dt
 	})
 	if err != nil {
 		glog.Errorf(ctx, "[svcoauthclient.GetByClientID] dao GetByCond fail, err:%v, clientID:%s", err, clientID)
-		return nil, code.GetError(code.ApplicationGetDetailError)
+		return nil, code.GetError(code.OAuthClientGetDetailError)
 	}
 	if entity == nil || entity.ID == 0 {
-		return nil, code.GetError(code.ApplicationNotExistError)
+		return nil, code.GetError(code.OAuthClientNotExistError)
 	}
+	var redirectURIs, postLogoutRedirectURIs []string
+	var grantTypes, responseTypes []string
+	var allowedOrigins, defaultScopes []string
+	json.Unmarshal(entity.RedirectURIs, &redirectURIs)
+	json.Unmarshal(entity.PostLogoutRedirectURIs, &postLogoutRedirectURIs)
+	json.Unmarshal(entity.GrantTypes, &grantTypes)
+	json.Unmarshal(entity.ResponseTypes, &responseTypes)
+	json.Unmarshal(entity.AllowedOrigins, &allowedOrigins)
+	json.Unmarshal(entity.DefaultScopes, &defaultScopes)
+
 	return &dtooauthclient.DetailResp{
-		OAuthClientID: entity.ID,
-		OAuthClientBaseInfo: objoauthclient.OAuthClientBaseInfo{
-			TenantID:      entity.TenantID,
-			AppID: entity.AppID,
-			ClientID:      entity.ClientID,
-			Name:          entity.Name,
-			Type:          entity.Type,
-			Status:        entity.Status,
-			IsThirdParty:  entity.IsThirdParty,
-		},
+		OAuthClientID:           entity.ID,
+		TenantID:                entity.TenantID,
+		AppID:                   entity.AppID,
+		ClientID:                entity.ClientID,
+		Name:                    entity.Name,
+		RedirectURIs:            redirectURIs,
+		PostLogoutRedirectURIs:  postLogoutRedirectURIs,
+		GrantTypes:              grantTypes,
+		ResponseTypes:           responseTypes,
+		TokenEndpointAuthMethod: entity.TokenEndpointAuthMethod,
+		AllowedOrigins:          allowedOrigins,
+		RequirePKCE:             entity.RequirePKCE,
+		RequireAuthTime:         entity.RequireAuthTime,
+		DefaultScopes:           defaultScopes,
+		AccessTokenTTL:          entity.AccessTokenTTL,
+		RefreshTokenTTL:         entity.RefreshTokenTTL,
+		Type:                    entity.Type,
+		IsThirdParty:            entity.IsThirdParty,
+		Status:                  entity.Status,
+		CreatedAt:               entity.CreatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
 }
 
@@ -274,7 +317,7 @@ func (svc *oAuthClientSvc) ListSecrets(ctx *gin.Context, req *dtooauthclient.Sec
 	})
 	if err != nil {
 		glog.Errorf(ctx, "[svcoauthclient.ListSecrets] get secrets fail, err:%v", err)
-		return nil, code.GetError(code.ApplicationSecretGetListError)
+		return nil, code.GetError(code.OAuthClientSecretGetListError)
 	}
 
 	secrets := make([]dtooauthclient.SecretResp, 0, len(list))
@@ -304,16 +347,16 @@ func (svc *oAuthClientSvc) CreateSecret(ctx *gin.Context, req *dtooauthclient.Cr
 	entity, err := newOAuthClientScopeRepo().GetByID(ctx, req.OAuthClientID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcoauthclient.CreateSecret] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.ApplicationSecretCreateError)
+		return nil, code.GetError(code.OAuthClientSecretCreateError)
 	}
 	if !oauthClientVisibleToTenant(entity, gincontext.GetTenantID(ctx)) {
-		return nil, code.GetError(code.ApplicationNotExistError)
+		return nil, code.GetError(code.OAuthClientNotExistError)
 	}
 
 	randomBytes, err := gcrypto.GenerateRandomBytes(32)
 	if err != nil {
 		glog.Errorf(ctx, "[svcoauthclient.CreateSecret] generate secret fail, err:%v", err)
-		return nil, code.GetError(code.ApplicationSecretCreateError)
+		return nil, code.GetError(code.OAuthClientSecretCreateError)
 	}
 	secretValue := hex.EncodeToString(randomBytes)
 
@@ -345,7 +388,7 @@ func (svc *oAuthClientSvc) CreateSecret(ctx *gin.Context, req *dtooauthclient.Cr
 
 	if err := dao.NewOAuthClientSecretDao().Insert(ctx, secretEntity); err != nil {
 		glog.Errorf(ctx, "[svcoauthclient.CreateSecret] insert fail, err:%v", err)
-		return nil, code.GetError(code.ApplicationSecretCreateError)
+		return nil, code.GetError(code.OAuthClientSecretCreateError)
 	}
 
 	return &dtooauthclient.CreateSecretResp{
@@ -360,20 +403,20 @@ func (svc *oAuthClientSvc) DeleteSecret(ctx *gin.Context, req *dtooauthclient.De
 	secretEntity, err := newOAuthClientScopeRepo().GetSecretByID(ctx, uint(req.SecretID))
 	if err != nil {
 		glog.Errorf(ctx, "[svcoauthclient.DeleteSecret] get secret fail, err:%v", err)
-		return code.GetError(code.ApplicationSecretDeleteError)
+		return code.GetError(code.OAuthClientSecretDeleteError)
 	}
 	if secretEntity == nil || secretEntity.ID == 0 {
-		return code.GetError(code.ApplicationSecretNotExistError)
+		return code.GetError(code.OAuthClientSecretNotExistError)
 	}
 
 	entity, err := newOAuthClientScopeRepo().GetByID(ctx, secretEntity.OAuthClientID)
 	if err != nil || !oauthClientVisibleToTenant(entity, gincontext.GetTenantID(ctx)) {
-		return code.GetError(code.ApplicationSecretNotExistError)
+		return code.GetError(code.OAuthClientSecretNotExistError)
 	}
 
 	if err := newOAuthClientScopeRepo().DeleteSecret(ctx, uint(req.SecretID), gincontext.GetUserID(ctx)); err != nil {
 		glog.Errorf(ctx, "[svcoauthclient.DeleteSecret] delete fail, err:%v", err)
-		return code.GetError(code.ApplicationSecretDeleteError)
+		return code.GetError(code.OAuthClientSecretDeleteError)
 	}
 
 	return nil

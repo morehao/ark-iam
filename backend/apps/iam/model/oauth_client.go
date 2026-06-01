@@ -7,6 +7,28 @@ import (
 
 const TableNameOAuthClient = "oauth_client"
 
+const (
+	OAuthClientTypeFirstParty = "first_party"
+	OAuthClientTypeThirdParty = "third_party"
+)
+
+const (
+	OAuthClientStatusEnable  = "enable"
+	OAuthClientStatusDisable = "disable"
+)
+
+const (
+	GrantTypeAuthorizationCode = "authorization_code"
+	GrantTypeClientCredentials = "client_credentials"
+	GrantTypeRefreshToken      = "refresh_token"
+)
+
+const (
+	TokenEndpointAuthMethodBasic = "client_secret_basic"
+	TokenEndpointAuthMethodPost  = "client_secret_post"
+	TokenEndpointAuthMethodNone  = "none"
+)
+
 type OAuthClientEntity struct {
 	gorm.Model
 	TenantID        uint   `gorm:"column:tenant_id;type:bigint unsigned;not null;default 0;comment:租户id" json:"tenantID"`

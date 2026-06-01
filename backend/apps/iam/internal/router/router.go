@@ -13,8 +13,8 @@ func RegisterRouter(groups *ginserver.RouterGroups, appName string) {
 	roleMenuRouter(groups)
 	roleScopeRouter(groups)
 	userRoleRouter(groups)
+	oauthClientRouter(groups)
 	applicationRouter(groups)
-	appDefinitionRouter(groups)
 	authRouter(groups)
 	connectorRouter(groups)
 	departmentRouter(groups)
@@ -26,4 +26,5 @@ func RegisterRouter(groups *ginserver.RouterGroups, appName string) {
 	logRouter(groups)
 	personRouter(groups)
 	domainRouter(groups)
+	tenantApplicationRouter(groups)
 }

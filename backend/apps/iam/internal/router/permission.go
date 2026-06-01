@@ -82,16 +82,16 @@ func userRoleRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/userRole/pageList", userRoleCtr.PageList)
 }
 
-func applicationRouter(groups *ginserver.RouterGroups) {
+func oauthClientRouter(groups *ginserver.RouterGroups) {
 	appCtr := ctroauthclient.NewOAuthClientCtr()
 
 	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
-	v1RouterGroup.POST("/application/create", appCtr.Create)
-	v1RouterGroup.POST("/application/delete", appCtr.Delete)
-	v1RouterGroup.POST("/application/update", appCtr.Update)
-	v1RouterGroup.GET("/application/detail", appCtr.Detail)
-	v1RouterGroup.POST("/application/pageList", appCtr.PageList)
-	v1RouterGroup.GET("/application/secrets", appCtr.ListSecrets)
-	v1RouterGroup.POST("/application/secrets", appCtr.CreateSecret)
-	v1RouterGroup.DELETE("/application/secrets/:secretId", appCtr.DeleteSecret)
+	v1RouterGroup.POST("/oauthClient/create", appCtr.Create)
+	v1RouterGroup.POST("/oauthClient/delete", appCtr.Delete)
+	v1RouterGroup.POST("/oauthClient/update", appCtr.Update)
+	v1RouterGroup.GET("/oauthClient/detail", appCtr.Detail)
+	v1RouterGroup.POST("/oauthClient/pageList", appCtr.PageList)
+	v1RouterGroup.GET("/oauthClient/secrets", appCtr.ListSecrets)
+	v1RouterGroup.POST("/oauthClient/secrets", appCtr.CreateSecret)
+	v1RouterGroup.DELETE("/oauthClient/secrets/:secretId", appCtr.DeleteSecret)
 }
