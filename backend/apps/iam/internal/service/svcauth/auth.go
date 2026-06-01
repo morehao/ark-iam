@@ -19,6 +19,8 @@ import (
 	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/biz/gobject"
+	"github.com/morehao/golib/gauth/jwtauth"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
 )
@@ -471,13 +473,17 @@ func (svc *authSvc) generateToken(ctx *gin.Context, userEntity *model.UserEntity
 	accessTokenExp := now.Add(TokenExpireDuration)
 	refreshTokenExp := now.Add(RefreshTokenExpireDuration)
 
-	accessTokenClaims := jwt.MapClaims{
-		"user_id":   userEntity.ID,
-		"tenant_id": userEntity.TenantID,
-		"username":  userEntity.Name,
-		"exp":       accessTokenExp.Unix(),
-		"iat":       now.Unix(),
-		"type":      "access",
+	accessTokenClaims := &jwtauth.Claims[gobject.UserClaims]{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(accessTokenExp),
+			IssuedAt:  jwt.NewNumericDate(now),
+		},
+		CustomData: gobject.UserClaims{
+			UserID:    userEntity.ID,
+			TenantID:  userEntity.TenantID,
+			PersonID:  userEntity.PersonID,
+			TokenType: gobject.TokenTypeAuth,
+		},
 	}
 
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessTokenClaims)
