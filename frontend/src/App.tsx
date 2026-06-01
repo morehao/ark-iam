@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import MainLayout from './components/MainLayout'
 import AuthCallback from './pages/auth/AuthCallback'
 import Login from './pages/auth/Login'
+import OIDCLogin from './pages/auth/OIDCLogin'
 import Register from './pages/auth/Register'
 import SelectTenant from './pages/auth/SelectTenant'
 import Dashboard from './pages/dashboard'
@@ -21,6 +22,7 @@ function App() {
         element={tenantToken ? <Navigate to="/" replace /> : personToken ? <Navigate to="/select-tenant" replace /> : <Login />}
       />
       <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/oidc/login" element={<OIDCLogin />} />
       <Route path="/register" element={<Register />} />
       <Route
         path="/select-tenant"

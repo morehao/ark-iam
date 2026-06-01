@@ -2,10 +2,14 @@ package svcoidc
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,7 +17,6 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
 
-	"github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/token"
@@ -61,25 +64,52 @@ func (a *AuthRequest) Done() bool                             { return a.DoneFla
 
 type OIDCStorage struct {
 	authRequests *authRequestStore
+	signingKey   *rsa.PrivateKey
+	signingKeyID string
 }
 
 func NewOIDCStorage() *OIDCStorage {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		panic(err)
+	}
 	return &OIDCStorage{
 		authRequests: &authRequestStore{
 			requests: make(map[string]*AuthRequest),
 			codes:    make(map[string]string),
 		},
+		signingKey:   privateKey,
+		signingKeyID: "default-key",
+	}
+}
+
+func NewOIDCStorageWithKey(privateKey *rsa.PrivateKey, keyID string) *OIDCStorage {
+	return &OIDCStorage{
+		authRequests: &authRequestStore{
+			requests: make(map[string]*AuthRequest),
+			codes:    make(map[string]string),
+		},
+		signingKey:   privateKey,
+		signingKeyID: keyID,
 	}
 }
 
 var _ op.Storage = (*OIDCStorage)(nil)
+
+var newOAuthClientDao = func() *dao.OAuthClientDao {
+	return dao.NewOAuthClientDao()
+}
+
+var newOAuthClientSecretDao = func() *dao.OAuthClientSecretDao {
+	return dao.NewOAuthClientSecretDao()
+}
 
 func (s *OIDCStorage) Health(ctx context.Context) error {
 	return nil
 }
 
 func (s *OIDCStorage) GetClientByClientID(ctx context.Context, clientID string) (op.Client, error) {
-	clientEntity, err := dao.NewOAuthClientDao().GetByCond(ctx, &dao.OAuthClientCond{ClientID: clientID})
+	clientEntity, err := newOAuthClientDao().GetByCond(ctx, &dao.OAuthClientCond{ClientID: clientID})
 	if err != nil || clientEntity == nil || clientEntity.ID == 0 {
 		return nil, fmt.Errorf("client not found: %s", clientID)
 	}
@@ -90,11 +120,11 @@ func (s *OIDCStorage) AuthorizeClientIDSecret(ctx context.Context, clientID, cli
 	secretHash := sha256.Sum256([]byte(clientSecret))
 	clientHash := hex.EncodeToString(secretHash[:])
 
-	clientEntity, err := dao.NewOAuthClientDao().GetByCond(ctx, &dao.OAuthClientCond{ClientID: clientID})
+	clientEntity, err := newOAuthClientDao().GetByCond(ctx, &dao.OAuthClientCond{ClientID: clientID})
 	if err != nil || clientEntity == nil || clientEntity.ID == 0 {
 		return oidc.ErrInvalidClient()
 	}
-	secrets, _, err := dao.NewOAuthClientSecretDao().GetPageListByCond(ctx, &dao.OAuthClientSecretCond{OAuthClientID: clientEntity.ID})
+	secrets, _, err := newOAuthClientSecretDao().GetPageListByCond(ctx, &dao.OAuthClientSecretCond{OAuthClientID: clientEntity.ID})
 	if err != nil {
 		return oidc.ErrInvalidClient()
 	}
@@ -213,6 +243,22 @@ func (s *OIDCStorage) AuthRequestByCode(ctx context.Context, code string) (op.Au
 	return s.AuthRequestByID(ctx, id)
 }
 
+func (s *OIDCStorage) CompleteAuthRequest(id string, subject string, authTime time.Time, amr []string, acr string) error {
+	s.authRequests.mu.Lock()
+	defer s.authRequests.mu.Unlock()
+
+	req, ok := s.authRequests.requests[id]
+	if !ok {
+		return fmt.Errorf("auth request not found: %s", id)
+	}
+	req.Subject = subject
+	req.AuthTime = authTime
+	req.AMR = append([]string(nil), amr...)
+	req.ACR = acr
+	req.DoneFlag = true
+	return nil
+}
+
 func (s *OIDCStorage) SaveAuthCode(ctx context.Context, id, code string) error {
 	s.authRequests.mu.Lock()
 	s.authRequests.codes[code] = id
@@ -241,7 +287,10 @@ func (s *OIDCStorage) CreateAccessAndRefreshTokens(ctx context.Context, request 
 	expiration = time.Now().Add(time.Hour)
 
 	var personID uint
-	fmt.Sscanf(request.GetSubject(), "%d", &personID)
+	personID, err = parseOIDCSubject(request.GetSubject())
+	if err != nil {
+		return "", "", time.Time{}, err
+	}
 
 	userDao := dao.NewUserDao()
 	users, err := userDao.GetListByCond(ctx, &dao.UserCond{PersonID: personID})
@@ -257,7 +306,7 @@ func (s *OIDCStorage) CreateAccessAndRefreshTokens(ctx context.Context, request 
 
 	var oauthClientID uint
 	if clientID != "" {
-		clientEntity, err := dao.NewOAuthClientDao().GetByCond(ctx, &dao.OAuthClientCond{ClientID: clientID})
+		clientEntity, err := newOAuthClientDao().GetByCond(ctx, &dao.OAuthClientCond{ClientID: clientID})
 		if err == nil && clientEntity != nil {
 			oauthClientID = clientEntity.ID
 		}
@@ -310,14 +359,14 @@ func (s *OIDCStorage) TokenRequestByRefreshToken(ctx context.Context, refreshTok
 
 	clientID := ""
 	if storedToken.OAuthClientID != 0 {
-		clientEntity, err := dao.NewOAuthClientDao().GetByID(ctx, storedToken.OAuthClientID)
+		clientEntity, err := newOAuthClientDao().GetByID(ctx, storedToken.OAuthClientID)
 		if err == nil && clientEntity != nil {
 			clientID = clientEntity.ClientID
 		}
 	}
 
 	return &refreshTokenRequest{
-		subject:  fmt.Sprintf("%d", storedToken.PersonID),
+		subject:  buildOIDCSubject(storedToken.PersonID),
 		audience: []string{clientID},
 		scopes:   []string{oidc.ScopeOpenID, oidc.ScopeProfile},
 		clientID: clientID,
@@ -357,28 +406,45 @@ func (s *OIDCStorage) GetRefreshTokenInfo(ctx context.Context, clientID string, 
 	if err != nil || storedToken == nil || storedToken.ID == 0 {
 		return "", "", op.ErrInvalidRefreshToken
 	}
-	return fmt.Sprintf("%d", storedToken.PersonID), "", nil
+	return buildOIDCSubject(storedToken.PersonID), "", nil
+}
+
+func buildOIDCSubject(personID uint) string {
+	return fmt.Sprintf("person:%d", personID)
+}
+
+func parseOIDCSubject(subject string) (uint, error) {
+	const prefix = "person:"
+	if !strings.HasPrefix(subject, prefix) {
+		return 0, fmt.Errorf("invalid oidc subject: %s", subject)
+	}
+	rawID := strings.TrimPrefix(subject, prefix)
+	personID, err := strconv.ParseUint(rawID, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid oidc subject: %s", subject)
+	}
+	return uint(personID), nil
 }
 
 func (s *OIDCStorage) SigningKey(ctx context.Context) (op.SigningKey, error) {
 	return &oidcSigningKey{
-		id:  "default-key",
-		alg: jose.HS256,
-		key: []byte(config.Conf.JWT.SignKey),
+		id:  s.signingKeyID,
+		alg: jose.RS256,
+		key: s.signingKey,
 	}, nil
 }
 
 func (s *OIDCStorage) SignatureAlgorithms(ctx context.Context) ([]jose.SignatureAlgorithm, error) {
-	return []jose.SignatureAlgorithm{jose.HS256}, nil
+	return []jose.SignatureAlgorithm{jose.RS256}, nil
 }
 
 func (s *OIDCStorage) KeySet(ctx context.Context) ([]op.Key, error) {
 	return []op.Key{
 		&oidcKey{
-			id:  "default-key",
-			alg: jose.HS256,
+			id:  s.signingKeyID,
+			alg: jose.RS256,
 			use: "sig",
-			key: []byte(config.Conf.JWT.SignKey),
+			key: &s.signingKey.PublicKey,
 		},
 	}, nil
 }

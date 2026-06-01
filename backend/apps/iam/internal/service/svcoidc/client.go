@@ -2,8 +2,10 @@ package svcoidc
 
 import (
 	"encoding/json"
+	"net/url"
 	"time"
 
+	"github.com/morehao/ark-iam/iam/config"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
 
@@ -98,7 +100,7 @@ func (c *OIDCClient) GrantTypes() []oidc.GrantType {
 }
 
 func (c *OIDCClient) LoginURL(id string) string {
-	return "/login?authRequestID=" + id
+	return config.Conf.OIDC.FrontendLoginURL + "?authRequestID=" + url.QueryEscape(id)
 }
 
 func (c *OIDCClient) AccessTokenType() op.AccessTokenType {

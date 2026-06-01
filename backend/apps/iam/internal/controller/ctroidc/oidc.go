@@ -1,25 +1,30 @@
 package ctroidc
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/iam/internal/service/svcoidc"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
 type OIDCCtr struct {
-	provider *svcoidc.OIDCProvider
+	oidcAuthSvc svcoidc.OIDCAuthSvc
 }
 
 func NewOIDCCtr(provider *svcoidc.OIDCProvider) *OIDCCtr {
-	return &OIDCCtr{provider: provider}
+	return &OIDCCtr{oidcAuthSvc: svcoidc.NewOIDCAuthSvc(provider)}
 }
 
-func (ctr *OIDCCtr) LoginCallback(ctx *gin.Context) {
-	authReqID := ctx.PostForm("authRequestID")
-	if authReqID == "" {
-		ctx.String(http.StatusBadRequest, "missing auth request id")
+func (ctr *OIDCCtr) Login(ctx *gin.Context) {
+	var req dtooidc.OIDCLoginReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
 		return
 	}
-	ctx.Redirect(http.StatusFound, "/v1/iam/oidc/authorize/callback?id="+authReqID)
+	res, err := ctr.oidcAuthSvc.CompleteLogin(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
 }

@@ -76,6 +76,7 @@ var authLoginRecorder = func(ctx *gin.Context, tenantID, userID uint, success bo
 
 type AuthSvc interface {
 	Login(ctx *gin.Context, req *dtoauth.LoginReq) (*dtoauth.LoginResp, error)
+	AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, error)
 	SelectTenant(ctx *gin.Context, req *dtoauth.SelectTenantReq) (*dtoauth.SelectTenantResp, error)
 	SwitchTenant(ctx *gin.Context, req *dtoauth.SwitchTenantReq) (*dtoauth.SwitchTenantResp, error)
 	MyTenants(ctx *gin.Context, req *dtoauth.MyTenantsReq) (*dtoauth.MyTenantsResp, error)
@@ -106,19 +107,9 @@ func (svc *authSvc) Login(ctx *gin.Context, req *dtoauth.LoginReq) (*dtoauth.Log
 	if err != nil {
 		return nil, err
 	}
-
-	if personEntity.IsSuspended == 1 {
-		return nil, code.GetError(code.UserSuspendedError)
-	}
-
-	if personEntity.PasswordEncrypted == "" {
-		return nil, code.GetError(code.PasswordNotSetError)
-	}
-
-	if err := gcrypto.ComparePasswordHash(personEntity.PasswordEncrypted, req.Password); err != nil {
-		authLoginRecorder(ctx, userEntity.TenantID, userEntity.ID, false)
-		glog.Errorf(ctx, "[svcauth.Login] password mismatch, personID:%d", personEntity.ID)
-		return nil, code.GetError(code.PasswordMismatchError)
+	personEntity, userEntity, err = svc.authenticateResolvedPerson(ctx, personEntity, userEntity, req.Password)
+	if err != nil {
+		return nil, err
 	}
 
 	personToken, err := svc.generatePersonToken(personEntity)
@@ -133,6 +124,35 @@ func (svc *authSvc) Login(ctx *gin.Context, req *dtoauth.LoginReq) (*dtoauth.Log
 		PersonToken: *personToken,
 		Tenants:     tenants,
 	}, nil
+}
+
+func (svc *authSvc) AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, error) {
+	personDao := newAuthPersonStore()
+	userDao := newAuthUserStore()
+	personEntity, userEntity, _, err := svc.resolvePersonLogin(ctx, personDao, userDao, identifier)
+	if err != nil {
+		return nil, nil, err
+	}
+	return svc.authenticateResolvedPerson(ctx, personEntity, userEntity, password)
+}
+
+func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *model.PersonEntity, userEntity *model.UserEntity, password string) (*model.PersonEntity, *model.UserEntity, error) {
+	if personEntity.IsSuspended == 1 {
+		return nil, nil, code.GetError(code.UserSuspendedError)
+	}
+
+	if personEntity.PasswordEncrypted == "" {
+		return nil, nil, code.GetError(code.PasswordNotSetError)
+	}
+
+	if err := gcrypto.ComparePasswordHash(personEntity.PasswordEncrypted, password); err != nil {
+		authLoginRecorder(ctx, userEntity.TenantID, userEntity.ID, false)
+		glog.Errorf(ctx, "[svcauth.authenticateResolvedPerson] password mismatch, personID:%d", personEntity.ID)
+		return nil, nil, code.GetError(code.PasswordMismatchError)
+	}
+
+	authLoginRecorder(ctx, userEntity.TenantID, userEntity.ID, true)
+	return personEntity, userEntity, nil
 }
 
 func (svc *authSvc) SelectTenant(ctx *gin.Context, req *dtoauth.SelectTenantReq) (*dtoauth.SelectTenantResp, error) {

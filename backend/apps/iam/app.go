@@ -20,11 +20,11 @@ func Routers(engine *gin.Engine) {
 			Middlewares: []gin.HandlerFunc{
 				ginmiddleware.JWTAuth(config.Conf.JWT.SignKey, ginmiddleware.WithAuthSkipPaths(
 					"/v1/iam/org/getConfigsByDomain",
-					"/v1/iam/login",
-					"/v1/iam/myTenants",
-					"/v1/iam/selectTenant",
-					"/v1/iam/register",
-					"/v1/iam/refreshToken",
+					"/v1/iam/auth/login",
+					"/v1/iam/auth/myTenants",
+					"/v1/iam/auth/selectTenant",
+					"/v1/iam/auth/register",
+					"/v1/iam/auth/refreshToken",
 					"/v1/iam/connector/callback",
 					"/v1/iam/oidc",
 				)),

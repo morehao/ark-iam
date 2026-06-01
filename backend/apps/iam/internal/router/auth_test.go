@@ -16,7 +16,7 @@ import (
 
 func TestAuthAndConnectorRoutesUseUnifiedEndpoints(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	config.Conf = &config.Config{JWT: config.JWT{SignKey: "test-sign-key"}}
+	config.Conf = &config.Config{JWT: config.JWT{SignKey: "test-sign-key"}, Server: config.Server{Env: "dev"}}
 
 	engine := gin.New()
 	groups := ginserver.NewRouterGroups(engine, "iam", ginserver.Version{Name: gconstant.ApiVersionV1})
@@ -34,13 +34,13 @@ func TestAuthAndConnectorRoutesUseUnifiedEndpoints(t *testing.T) {
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/connector/getFactoryList")
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/connector/:connectorId/authorize")
 	assertRouteRegistered(t, paths, http.MethodGet, "/v1/iam/connector/callback")
-	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/login")
-	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/register")
-	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/refreshToken")
-	assertRouteRegistered(t, paths, http.MethodGet, "/v1/iam/myTenants")
-	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/selectTenant")
-	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/switchTenant")
-	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/logoutAll")
+	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/auth/login")
+	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/auth/register")
+	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/auth/refreshToken")
+	assertRouteRegistered(t, paths, http.MethodGet, "/v1/iam/auth/myTenants")
+	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/auth/selectTenant")
+	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/auth/switchTenant")
+	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/auth/logoutAll")
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/user/pageList")
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/user/assignDepartments")
 	assertRouteRegistered(t, paths, http.MethodGet, "/v1/iam/user/getUserDepartmentByUser")
@@ -49,8 +49,8 @@ func TestAuthAndConnectorRoutesUseUnifiedEndpoints(t *testing.T) {
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/tenant/update")
 	assertRouteRegistered(t, paths, http.MethodGet, "/v1/iam/tenant/detail")
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/tenant/pageList")
-	assertRouteRegistered(t, paths, http.MethodGet, "/v1/iam/userinfo")
-	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/logout")
+	assertRouteRegistered(t, paths, http.MethodGet, "/v1/iam/auth/userinfo")
+	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/auth/logout")
 	assertRouteRegistered(t, paths, http.MethodGet, "/v1/iam/person/detail")
 	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/person/updatePassword")
 
@@ -58,9 +58,9 @@ func TestAuthAndConnectorRoutesUseUnifiedEndpoints(t *testing.T) {
 	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/connector/:connectorId/authorization-url")
 	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/ssoConnector/create")
 	assertRouteMissing(t, paths, http.MethodGet, "/v1/iam/ssoConnector/providers")
-	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/auth/register")
+	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/auth/register")
 	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/auth/loginByPassword")
-	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/auth/selectTenant")
+	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/auth/selectTenant")
 	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/create")
 	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/delete")
 	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/update")
@@ -75,23 +75,23 @@ func TestAuthAndConnectorRoutesUseUnifiedEndpoints(t *testing.T) {
 
 func TestIAMRoutersWhitelistPublicAuthEndpoints(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	config.Conf = &config.Config{JWT: config.JWT{SignKey: "test-sign-key"}}
+	config.Conf = &config.Config{JWT: config.JWT{SignKey: "test-sign-key"}, Server: config.Server{Env: "dev"}}
 
 	engine := gin.New()
 	iam.Routers(engine)
 
-	assertAnonymousRouteAccessible(t, engine, http.MethodPost, "/v1/iam/login")
-	assertAnonymousRouteAccessible(t, engine, http.MethodPost, "/v1/iam/register")
-	assertAnonymousRouteAccessible(t, engine, http.MethodPost, "/v1/iam/refreshToken")
+	assertAnonymousRouteAccessible(t, engine, http.MethodPost, "/v1/iam/auth/login")
+	assertAnonymousRouteAccessible(t, engine, http.MethodPost, "/v1/iam/auth/register")
+	assertAnonymousRouteAccessible(t, engine, http.MethodPost, "/v1/iam/auth/refreshToken")
 	assertAnonymousRouteAccessible(t, engine, http.MethodGet, "/v1/iam/connector/callback")
-	assertAnonymousRouteAccessible(t, engine, http.MethodGet, "/v1/iam/myTenants")
-	assertAnonymousRouteAccessible(t, engine, http.MethodPost, "/v1/iam/selectTenant")
+	assertAnonymousRouteAccessible(t, engine, http.MethodGet, "/v1/iam/auth/myTenants")
+	assertAnonymousRouteAccessible(t, engine, http.MethodPost, "/v1/iam/auth/selectTenant")
 
 	assertAnonymousRouteBlocked(t, engine, http.MethodPost, "/v1/iam/user/pageList")
-	assertAnonymousRouteBlocked(t, engine, http.MethodGet, "/v1/iam/userinfo")
-	assertAnonymousRouteBlocked(t, engine, http.MethodPost, "/v1/iam/logout")
-	assertAnonymousRouteBlocked(t, engine, http.MethodPost, "/v1/iam/switchTenant")
-	assertAnonymousRouteBlocked(t, engine, http.MethodPost, "/v1/iam/logoutAll")
+	assertAnonymousRouteBlocked(t, engine, http.MethodGet, "/v1/iam/auth/userinfo")
+	assertAnonymousRouteBlocked(t, engine, http.MethodPost, "/v1/iam/auth/logout")
+	assertAnonymousRouteBlocked(t, engine, http.MethodPost, "/v1/iam/auth/switchTenant")
+	assertAnonymousRouteBlocked(t, engine, http.MethodPost, "/v1/iam/auth/logoutAll")
 	assertAnonymousRouteBlocked(t, engine, http.MethodGet, "/v1/iam/person/detail")
 	assertAnonymousRouteBlocked(t, engine, http.MethodPost, "/v1/iam/person/updatePassword")
 }
