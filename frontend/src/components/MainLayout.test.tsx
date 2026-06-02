@@ -57,26 +57,18 @@ describe('MainLayout', () => {
   test('从头部切换到另一个租户后调用 switchTenant 且更新 currentTenant', async () => {
     getUserinfoMock
       .mockResolvedValueOnce({
-        data: {
-          personInfo: { personID: 9, name: 'Alice', avatar: '' },
-          userInfo: { userID: 101, name: 'Alice', tenantID: 1, isOwner: 1 },
-        },
+        personInfo: { personID: 9, name: 'Alice', avatar: '' },
+        userInfo: { userID: 101, name: 'Alice', tenantID: 1, isOwner: 1 },
       })
       .mockResolvedValueOnce({
-        data: {
-          personInfo: { personID: 9, name: 'Alice', avatar: '' },
-          userInfo: { userID: 102, name: 'Alice', tenantID: 2, isOwner: 0 },
-        },
+        personInfo: { personID: 9, name: 'Alice', avatar: '' },
+        userInfo: { userID: 102, name: 'Alice', tenantID: 2, isOwner: 0 },
       })
     switchTenantMock.mockResolvedValue({
-      data: {
-        tenantToken: {
-          accessToken: 'tenant-token-b',
-          refreshToken: 'tenant-refresh-token-b',
-          expiresIn: 3600,
-          tokenType: 'Bearer',
-        },
-      },
+      accessToken: 'tenant-token-b',
+      refreshToken: 'tenant-refresh-token-b',
+      expiresIn: 3600,
+      tokenType: 'Bearer',
     })
 
     render(
@@ -119,21 +111,15 @@ describe('MainLayout', () => {
   test('切换租户后即使 userinfo 拉取失败也应保留新的 tenant session', async () => {
     getUserinfoMock
       .mockResolvedValueOnce({
-        data: {
-          personInfo: { personID: 9, name: 'Alice', avatar: '' },
-          userInfo: { userID: 101, name: 'Alice', tenantID: 1, isOwner: 1 },
-        },
+        personInfo: { personID: 9, name: 'Alice', avatar: '' },
+        userInfo: { userID: 101, name: 'Alice', tenantID: 1, isOwner: 1 },
       })
       .mockRejectedValueOnce(new Error('userinfo failed'))
     switchTenantMock.mockResolvedValue({
-      data: {
-        tenantToken: {
-          accessToken: 'tenant-token-b',
-          refreshToken: 'tenant-refresh-token-b',
-          expiresIn: 3600,
-          tokenType: 'Bearer',
-        },
-      },
+      accessToken: 'tenant-token-b',
+      refreshToken: 'tenant-refresh-token-b',
+      expiresIn: 3600,
+      tokenType: 'Bearer',
     })
 
     useAuthStore.setState({

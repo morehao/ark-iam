@@ -29,7 +29,7 @@ const OIDCLogin = () => {
         identifier: values.identifier,
         password: values.password,
       })
-      window.location.href = resp.data.continueURL
+      window.location.href = resp.continueURL
     } catch (error) {
       console.error('OIDC 登录失败:', error)
     } finally {

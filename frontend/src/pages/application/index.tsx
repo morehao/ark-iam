@@ -17,8 +17,8 @@ const ApplicationList = () => {
     setLoading(true)
     try {
       const resp = await getApplicationPageList({ page, pageSize, keyword })
-      setData(resp.data?.list || [])
-      setTotal(resp.data?.total || 0)
+      setData(resp?.list || [])
+      setTotal(resp?.total || 0)
     } catch (error) {
       console.error('获取应用列表失败:', error)
     } finally {

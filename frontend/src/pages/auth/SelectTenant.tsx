@@ -26,8 +26,8 @@ const SelectTenant = () => {
     try {
       const resp = await selectTenant({ personToken, tenantID })
       setTenantSession({
-        tenantToken: resp.data.tenantToken.accessToken,
-        refreshToken: resp.data.tenantToken.refreshToken,
+        tenantToken: resp.accessToken,
+        refreshToken: resp.refreshToken,
         currentTenant,
       })
       navigate('/', { replace: true })

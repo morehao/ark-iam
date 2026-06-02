@@ -11,6 +11,8 @@ func domainRouter(groups *ginserver.RouterGroups) {
 
 	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
 	v1RouterGroup.POST("/domain/create", domainCtr.Create)
+	v1RouterGroup.POST("/domain/update", domainCtr.Update)
+	v1RouterGroup.GET("/domain/detail", domainCtr.Detail)
 	v1RouterGroup.POST("/domain/pageList", domainCtr.PageList)
 	v1RouterGroup.POST("/domain/delete", domainCtr.Delete)
 }

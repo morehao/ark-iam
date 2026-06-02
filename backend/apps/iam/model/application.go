@@ -4,6 +4,16 @@ import "gorm.io/gorm"
 
 const TableNameApplication = "application"
 
+const (
+	AppTypeFirstParty = "first_party"
+	AppTypeThirdParty = "third_party"
+)
+
+const (
+	AppStatusEnable  = "enable"
+	AppStatusDisable = "disable"
+)
+
 type ApplicationEntity struct {
 	gorm.Model
 	Code        string `gorm:"column:code;type:varchar(64);not null;default '';uniqueIndex;comment:应用编码" json:"code"`

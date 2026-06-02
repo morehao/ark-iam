@@ -11,7 +11,7 @@ const DepartmentList = () => {
   const fetchData = async () => {
     try {
       const resp = await getDepartmentList()
-      setData(resp.data || [])
+      setData(resp || [])
     } catch (error) {
       console.error('获取部门列表失败:', error)
     }

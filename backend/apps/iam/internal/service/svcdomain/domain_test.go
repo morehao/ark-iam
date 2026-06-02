@@ -40,6 +40,10 @@ func (r *stubDomainRepo) GetByTenantAndDomain(ctx context.Context, tenantID uint
 	return r.byTenantAnd, r.err
 }
 
+func (r *stubDomainRepo) UpdateMap(ctx context.Context, id uint, updateMap map[string]any) error {
+	return r.err
+}
+
 func (r *stubDomainRepo) Delete(ctx context.Context, id uint, deletedBy uint) error {
 	return r.err
 }

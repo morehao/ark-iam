@@ -9,6 +9,8 @@ import (
 
 type DomainCtr interface {
 	Create(ctx *gin.Context)
+	Update(ctx *gin.Context)
+	Detail(ctx *gin.Context)
 	PageList(ctx *gin.Context)
 	Delete(ctx *gin.Context)
 }
@@ -60,6 +62,47 @@ func (ctr *domainCtr) PageList(ctx *gin.Context) {
 		return
 	}
 	res, err := ctr.domainSvc.PageList(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 域名管理
+// @Summary 修改域名
+// @accept application/json
+// @Produce application/json
+// @Param req body dtodomain.UpdateDomainReq true "修改域名"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/iam/domain/update [post]
+func (ctr *domainCtr) Update(ctx *gin.Context) {
+	var req dtodomain.UpdateDomainReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctr.domainSvc.Update(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, "修改成功")
+}
+
+// @Tags 域名管理
+// @Summary 域名详情
+// @accept application/json
+// @Produce application/json
+// @Param req query dtodomain.DomainDetailReq true "域名详情"
+// @Success 200 {object} gincontext.DtoRender{data=dtodomain.DomainDetailResp}
+// @Router /v1/iam/domain/detail [get]
+func (ctr *domainCtr) Detail(ctx *gin.Context) {
+	var req dtodomain.DomainDetailReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.domainSvc.Detail(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

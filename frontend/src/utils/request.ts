@@ -74,7 +74,7 @@ request.interceptors.response.use(
     const { code, msg } = response.data as { code: number; msg: string }
 
     if (code === BizCode.Success) {
-      return response.data
+      return response.data.data
     }
 
     if (code === BizCode.TokenExpired) {
