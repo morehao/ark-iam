@@ -4,30 +4,12 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "test": "vitest run"
-  },
-  "dependencies": {
-    "@ant-design/icons": "^5.4.0",
-    "antd": "^5.22.0",
-    "axios": "^1.7.7",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^7.15.0",
-    "zustand": "^5.0.1"
-  },
-  "devDependencies": {
-    "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.1.0",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^4.3.3",
-    "jsdom": "^25.0.1",
-    "typescript": "^5.6.3",
-    "vite": "^5.4.10",
-    "vitest": "^2.1.4"
+    "dev": "pnpm --filter @ark-iam/web dev",
+    "dev:web": "pnpm --filter @ark-iam/web dev",
+    "dev:sso": "pnpm --filter @ark-iam/sso-test-app dev",
+    "build:web": "pnpm --filter @ark-iam/web build",
+    "test": "pnpm --filter @ark-iam/web test",
+    "test:web": "pnpm --filter @ark-iam/web test"
   },
   "packageManager": "pnpm@11.1.0+sha512.0c44e842e5686b2c061a81adda8b2258bd8818e9704b2cf2c63d56b931a7b2e910092e085027003b96ca3911ab56a07f6df5abaed2be9925034cdd686a535b14"
 }
