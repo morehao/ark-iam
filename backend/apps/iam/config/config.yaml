@@ -75,3 +75,6 @@ oidc:
   encryptionKey: "oidc-dev-encryption-key-32bytes"
   encryptionKeyID: "dev-enc-key"
   allowInsecure: true
+  authRequestTTL: 600
+  authCodeTTL: 300
+  spentCodeTTL: 86400

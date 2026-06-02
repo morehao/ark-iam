@@ -39,6 +39,9 @@ type OIDC struct {
 	EncryptionKey         string `yaml:"encryptionKey"`
 	EncryptionKeyID       string `yaml:"encryptionKeyID"`
 	AllowInsecure         bool   `yaml:"allowInsecure"`
+	AuthRequestTTL        int    `yaml:"authRequestTTL"`
+	AuthCodeTTL           int    `yaml:"authCodeTTL"`
+	SpentCodeTTL          int    `yaml:"spentCodeTTL"`
 }
 
 type PasswordConfig struct {
