@@ -2,6 +2,7 @@ package svcoidc
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/rsa"
 	"strings"
 	"testing"
@@ -9,6 +10,7 @@ import (
 
 	appconfig "github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 )
 
@@ -39,7 +41,13 @@ func TestParseOIDCSubjectRejectsInvalidFormat(t *testing.T) {
 }
 
 func TestCompleteAuthRequestMarksRequestDone(t *testing.T) {
-	storage := NewOIDCStorage()
+	testsetup.Initialize(testsetup.AppNameIam)
+	defer testsetup.Done(testsetup.AppNameIam)
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storage := NewOIDCStorage(NewRedisProtocolStateStore(), NewPersistentStore(), privateKey, "test-key")
 	req, err := storage.CreateAuthRequest(context.Background(), &oidc.AuthRequest{
 		ClientID:     "client-1",
 		RedirectURI:  "https://client.example.com/callback",
@@ -92,7 +100,11 @@ func TestOIDCClientLoginURLUsesConfiguredFrontend(t *testing.T) {
 }
 
 func TestSigningKeyUsesAsymmetricPrivateKey(t *testing.T) {
-	storage := NewOIDCStorage()
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storage := NewOIDCStorage(nil, nil, privateKey, "test-key")
 	key, err := storage.SigningKey(context.Background())
 	if err != nil {
 		t.Fatalf("SigningKey failed: %v", err)
@@ -103,7 +115,11 @@ func TestSigningKeyUsesAsymmetricPrivateKey(t *testing.T) {
 }
 
 func TestKeySetExposesPublicKeyOnly(t *testing.T) {
-	storage := NewOIDCStorage()
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storage := NewOIDCStorage(nil, nil, privateKey, "test-key")
 	keys, err := storage.KeySet(context.Background())
 	if err != nil {
 		t.Fatalf("KeySet failed: %v", err)
