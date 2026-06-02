@@ -142,7 +142,7 @@ func SetupOIDCProvider(issuer string) (*OIDCProvider, error) {
 		return nil, fmt.Errorf("failed to load OIDC signing key: %w", err)
 	}
 
-	storage := NewOIDCStorageWithKey(privateKey, keyID)
+	storage := NewOIDCStorage(NewRedisProtocolStateStore(), NewPersistentStore(), privateKey, keyID)
 
 	encKey, encKeyID := loadEncryptionKey()
 
