@@ -7,6 +7,7 @@ type CreateReq struct {
 	LogoURL     string `json:"logoUrl"`                        // 应用logo
 	HomepageURL string `json:"homepageUrl"`                    // 应用主页
 	Type        string `json:"type"`                           // 应用类型: first_party-第一方, third_party-第三方
+	Visibility  string `json:"visibility" binding:"required"`  // 可见性: public-所有租户, private-仅平台租户
 	Sort        int    `json:"sort"`                           // 排序
 }
 
@@ -17,6 +18,7 @@ type UpdateReq struct {
 	LogoURL     string `json:"logoUrl"`                        // 应用logo
 	HomepageURL string `json:"homepageUrl"`                    // 应用主页
 	Type        string `json:"type"`                           // 应用类型: first_party-第一方, third_party-第三方
+	Visibility  string `json:"visibility"`                     // 可见性: public-所有租户, private-仅平台租户
 	Status      string `json:"status"`                         // 状态: enable-启用, disable-停用
 	Sort        int    `json:"sort"`                           // 排序
 }

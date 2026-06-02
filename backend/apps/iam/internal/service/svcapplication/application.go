@@ -36,6 +36,7 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.CreateRe
 		LogoURL:     req.LogoURL,
 		HomepageURL: req.HomepageURL,
 		Type:        req.Type,
+		Visibility:  req.Visibility,
 		Sort:        req.Sort,
 		CreatedBy:   gincontext.GetUserID(ctx),
 	}
@@ -56,6 +57,7 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.UpdateRe
 		"logo_url":     req.LogoURL,
 		"homepage_url": req.HomepageURL,
 		"type":         req.Type,
+		"visibility":   req.Visibility,
 		"status":       req.Status,
 		"sort":         req.Sort,
 		"updated_by":   gincontext.GetUserID(ctx),
@@ -91,6 +93,7 @@ func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.DetailRe
 		HomepageURL: entity.HomepageURL,
 		Type:        entity.Type,
 		Status:      entity.Status,
+		Visibility:  entity.Visibility,
 		Sort:        entity.Sort,
 		CreatedAt:   entity.CreatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
@@ -120,6 +123,7 @@ func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.PageLi
 			Description: v.Description,
 			Type:        v.Type,
 			Status:      v.Status,
+			Visibility:  v.Visibility,
 			Sort:        v.Sort,
 			CreatedAt:   v.CreatedAt.Format("2006-01-02 15:04:05"),
 		})

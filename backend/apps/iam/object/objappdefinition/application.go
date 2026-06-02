@@ -8,5 +8,6 @@ type AppDefinitionBaseInfo struct {
 	HomepageURL string `json:"homepageUrl"`
 	Type        string `json:"type"`
 	Status      string `json:"status"`
+	Visibility  string `json:"visibility"`
 	Sort        int    `json:"sort"`
 }

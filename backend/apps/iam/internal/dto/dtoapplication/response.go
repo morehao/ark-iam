@@ -14,6 +14,7 @@ type DetailResp struct {
 	HomepageURL string `json:"homepageUrl"` // 应用主页
 	Type        string `json:"type"`        // 应用类型
 	Status      string `json:"status"`      // 状态
+	Visibility  string `json:"visibility"`  // 可见性
 	Sort        int    `json:"sort"`        // 排序
 	CreatedAt   string `json:"createdAt"`   // 创建时间
 }
@@ -25,6 +26,7 @@ type PageListItem struct {
 	Description string `json:"description"` // 应用描述
 	Type        string `json:"type"`        // 应用类型
 	Status      string `json:"status"`      // 状态
+	Visibility  string `json:"visibility"`  // 可见性
 	Sort        int    `json:"sort"`        // 排序
 	CreatedAt   string `json:"createdAt"`   // 创建时间
 }
