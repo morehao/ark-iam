@@ -29,21 +29,22 @@ type authRequestStore struct {
 }
 
 type AuthRequest struct {
-	ID              string
-	ClientID        string
-	RedirectURI     string
-	State           string
-	Scopes          []string
-	ResponseType    oidc.ResponseType
-	ResponseMode    oidc.ResponseMode
-	Nonce           string
-	CodeChallenge   *oidc.CodeChallenge
-	Subject         string
-	AuthTime        time.Time
-	AMR             []string
-	ACR             string
-	Audience        []string
-	DoneFlag        bool
+	ID            string              `json:"id"`
+	ClientID      string              `json:"client_id"`
+	RedirectURI   string              `json:"redirect_uri"`
+	State         string              `json:"state"`
+	Scopes        []string            `json:"scopes"`
+	ResponseType  oidc.ResponseType   `json:"response_type"`
+	ResponseMode  oidc.ResponseMode   `json:"response_mode"`
+	Nonce         string              `json:"nonce"`
+	CodeChallenge *oidc.CodeChallenge `json:"code_challenge,omitempty"`
+	Subject       string              `json:"subject"`
+	AuthTime      time.Time           `json:"auth_time"`
+	AMR           []string            `json:"amr"`
+	ACR           string              `json:"acr"`
+	Audience      []string            `json:"audience"`
+	DoneFlag      bool                `json:"done_flag"`
+	ExpiresAt     time.Time           `json:"expires_at"`
 }
 
 func (a *AuthRequest) GetID() string                          { return a.ID }
@@ -139,8 +140,10 @@ func (s *OIDCStorage) AuthorizeClientIDSecret(ctx context.Context, clientID, cli
 }
 
 func (s *OIDCStorage) SetUserinfoFromScopes(ctx context.Context, userinfo *oidc.UserInfo, userID, clientID string, scopes []string) error {
-	var pid uint
-	fmt.Sscanf(userID, "%d", &pid)
+	pid, err := parseOIDCSubject(userID)
+	if err != nil {
+		return nil
+	}
 	personDao := dao.NewPersonDao()
 	person, err := personDao.GetByID(ctx, pid)
 	if err != nil || person == nil || person.ID == 0 {
@@ -163,8 +166,10 @@ func (s *OIDCStorage) SetUserinfoFromScopes(ctx context.Context, userinfo *oidc.
 }
 
 func (s *OIDCStorage) SetUserinfoFromToken(ctx context.Context, userinfo *oidc.UserInfo, tokenID, subject, origin string) error {
-	var pid uint
-	fmt.Sscanf(subject, "%d", &pid)
+	pid, err := parseOIDCSubject(subject)
+	if err != nil {
+		return nil
+	}
 	personDao := dao.NewPersonDao()
 	person, err := personDao.GetByID(ctx, pid)
 	if err != nil || person == nil || person.ID == 0 {
