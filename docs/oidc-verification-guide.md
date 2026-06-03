@@ -19,9 +19,13 @@ oidc:
   frontendLoginURL: "http://localhost:3000/oidc/login"
   signingKeyID: "dev-oidc-key"
   signingPrivateKeyPath: "config/oidc-dev-key.pem"
+  signingPrivateKeyPEM: ""
   encryptionKey: "oidc-dev-encryption-key-32bytes"
   encryptionKeyID: "dev-enc-key"
   allowInsecure: true
+  authRequestTTL: 600
+  authCodeTTL: 300
+  spentCodeTTL: 86400
 ```
 
 确认签名私钥文件 `backend/apps/iam/config/oidc-dev-key.pem` 存在。
@@ -77,7 +81,7 @@ VALUES
 
 ### 3.2 客户端密钥计算
 
-后端验证密钥的逻辑（`storage.go:119-139`）：
+后端验证密钥的逻辑（`persistent_store.go:46-48`）：
 
 ```go
 secretHash := sha256.Sum256([]byte(clientSecret))
@@ -233,7 +237,7 @@ curl -v 'http://localhost:8099/v1/iam/oidc/authorize/callback?id=ar-174123456789
 ### Step 6: Token Endpoint（code 换 token）
 
 ```bash
-curl -s -X POST http://localhost:8099/v1/iam/oidc/token \
+curl -s -X POST http://localhost:8099/v1/iam/oidc/oauth/token \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d 'grant_type=authorization_code' \
   -d 'code=上一步获取的code' \
@@ -278,7 +282,7 @@ curl -s http://localhost:8099/v1/iam/oidc/userinfo \
 ### Step 8: Refresh Token（可选）
 
 ```bash
-curl -s -X POST http://localhost:8099/v1/iam/oidc/token \
+curl -s -X POST http://localhost:8099/v1/iam/oidc/oauth/token \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d 'grant_type=refresh_token' \
   -d 'refresh_token=上一步获取的refresh_token' \
@@ -323,7 +327,7 @@ curl -s -X POST http://localhost:8099/v1/iam/oidc/login \
 **场景 C：无效 client_id（token 端点）**
 
 ```bash
-curl -s -X POST http://localhost:8099/v1/iam/oidc/token \
+curl -s -X POST http://localhost:8099/v1/iam/oidc/oauth/token \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d 'grant_type=authorization_code' \
   -d 'code=invalid' \
@@ -336,9 +340,23 @@ curl -s -X POST http://localhost:8099/v1/iam/oidc/token \
 
 ## 5. 浏览器全流程验证
 
-### 5.1 准备假 RP 页面
+如果选择优先通过前端页面验证，可直接使用本节流程，Section 4 的 curl 步骤可跳过或后续按需补充。前端认证失败时，页面底部会 toast 显示后端返回的错误提示（如 "OIDC session not found"），同时可在浏览器 Console 面板查看完整错误信息。
 
-在任意目录下创建 HTML 文件 `test-rp.html`：
+### 5.1 入口方式
+
+**方式 A：直接粘贴 URL（推荐）**
+
+在浏览器地址栏直接粘贴 Authorize URL，回车触发流程：
+
+```
+http://localhost:8099/v1/iam/oidc/authorize?client_id=test-rp-client&redirect_uri=https://client.example.com/callback&response_type=code&scope=openid%20profile%20email&state=test-state-123&nonce=test-nonce-456
+```
+
+浏览器会自动跟随 302 跳转到 OIDC 登录页。**建议操作前先打开浏览器 DevTools（F12）→ Network 面板，勾选 Preserve log**，否则 302 跳转后会丢失之前的请求记录。
+
+**方式 B：使用假 RP 页面（观察回调）**
+
+如果想同时确认 code 参数落到了哪个页面，创建一个测试 HTML 文件：
 
 ```html
 <!DOCTYPE html>
@@ -350,7 +368,6 @@ curl -s -X POST http://localhost:8099/v1/iam/oidc/token \
   </a>
   <div id="result"></div>
   <script>
-    // 如果是 callback 跳转回来的，显示 code
     const params = new URLSearchParams(window.location.search);
     if (params.has('code')) {
       document.getElementById('result').innerHTML = '<h3>Callback 成功</h3>' +
@@ -362,31 +379,43 @@ curl -s -X POST http://localhost:8099/v1/iam/oidc/token \
 </html>
 ```
 
-用浏览器直接打开这个 HTML（`file://` 协议即可），点击"发起 OIDC 登录"。
+用浏览器直接用 `file://` 协议打开这个 HTML，点击"发起 OIDC 登录"。`file://` 协议下最终 callback 重定向可能被浏览器拦截，此时仍需到 Network 面板查看最后一条 302 响应的 Location。
 
 ### 5.2 预期流程
 
+打开 DevTools → Network 面板并勾选 **Preserve log**，然后开始操作：
+
 ```
-1. 点击链接 → 跳转到后端 authorize 端点
-2. 后端 302 到 http://localhost:3000/oidc/login?authRequestID=ar-xxx
-3. 浏览器显示 OIDC 登录页
+1. 浏览器访问 authorize URL → 后端返回 302（Network 面板可见）
+2. 浏览器跳转到 http://localhost:3000/oidc/login?authRequestID=ar-xxx
+3. 页面显示 OIDC 登录表单
 4. 输入 identifier 和 password，点击登录
-5. 前端 POST 到 /v1/iam/oidc/login（通过 Vite proxy 到后端 8099）
-6. 后端返回 { continueURL: "http://localhost:8099/v1/iam/oidc/authorize/callback?id=ar-xxx" }
-7. 前端执行 window.location.href = continueURL
-8. 后端完成认证，302 到 redirect_uri?code=yyy&state=test-state-123
-9. 浏览器跳转到 test-rp.html（file:// 协议时可能被浏览器阻止）
+5. 前端 POST /v1/iam/oidc/login（axios baseURL /v1/iam + Vite proxy 转发到后端 8099）
+6. 后端返回 { code: 0, data: { continueURL: "..." } }
+7. 前端执行 window.location.href = resp.continueURL
+8. 浏览器跳转到 /authorize/callback?id=ar-xxx，后端完成认证并 302 到 redirect_uri
+9. redirect_uri 携带 code 和 state 参数（Network 面板可见）
 ```
 
-> 注意：`redirect_uri` 为 `https://client.example.com/callback` 时，浏览器无法实际到达这个地址。这个步骤验证的是 **后端能正确完成回调重定向**。验证实际跳转地址中包含 `code` 参数即可。
+> **关键验证点**：步骤 9 即使浏览器无法加载目标页面（如 `https://client.example.com/callback`），也能在 Network 面板中找到最后一条 302 响应，其 Location 头包含 `?code=xxx&state=test-state-123`。确认 `state` 与步骤 1 传入的一致。
 
-如果希望看到完整浏览器跳转，可以使用一个能监听的回调地址（如 `http://localhost:9999/callback`）启动一个简单 HTTP 服务器：
+> **查看完整回调**：如果想看到浏览器加载回调页面，可将 oauth_client 的 `redirect_uris` 改为 `["http://localhost:9999/callback"]`，然后启动 HTTP 服务器：
+> ```bash
+> python3 -m http.server 9999
+> ```
+> 修改后需重新插入测试数据（Step 3）。浏览器会加载 `http://localhost:9999/callback?code=xxx&state=test-state-123`，页面 404 无所谓，地址栏中能看到 code 和 state 即验证通过。
 
-```bash
-python3 -m http.server 9999
-```
+### 5.3 DevTools 调试技巧
 
-然后将 oauth_client 的 `redirect_uris` 改为 `["http://localhost:9999/callback"]`，并重新插入测试数据（Step 3）。
+| 场景 | 操作 |
+|------|------|
+| 302 跳转后请求记录丢失 | **勾选 Preserve log**，Network 面板顶部勾选框 |
+| 查看 302 跳转目标 | 找到 Status 302 的请求 → Response Headers → `Location` 字段 |
+| 后端返回错误但页面无提示 | Console 面板查看错误对象（`console.error` 输出） |
+| 查看最终 callback 地址 | 最后一条 302 的 Location，或浏览器地址栏实际跳转的 URL |
+| 确认 code/state 参数 | 在 Network 面板搜索 `?code=` 或 `state=` 定位请求 |
+
+> **Preserve log 不生效的替代方案**：如果忘记勾选 Preserve log，可在 Console 面板执行 `window.performance.getEntriesByType('navigation')` 查看当前页面的导航来源，或在 Network 面板开启 **"Show all content"** 筛选。
 
 ## 6. 常见问题排查
 
@@ -431,7 +460,7 @@ cd backend/apps/iam && make run
 ```bash
 # client_secret_basic 方式
 AUTH=$(echo -n "test-rp-client:my-test-client-secret" | base64)
-curl -s -X POST http://localhost:8099/v1/iam/oidc/token \
+curl -s -X POST http://localhost:8099/v1/iam/oidc/oauth/token \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -H "Authorization: Basic $AUTH" \
   -d 'grant_type=authorization_code' \
