@@ -205,6 +205,90 @@ sso-test-app 和 sso-test-app-2 均无 API 代理，直接请求后端 `:8099`�
 
 ---
 
+## Step 8 — 自动化端到端测试
+
+项目提供了基于 puppeteer 的端到端自动化测试脚本，模拟真实浏览器操作，验证 Step 5 + Step 6 中的全部 25 个验证点（跳转路径、Token 交换、UserInfo、刷新 Token、SSO 跨 RP 等）。
+
+### 脚本位置
+
+`e2e/oidc-e2e.js`，依赖在 `e2e/package.json`，使用说明在 `e2e/README.md`。
+
+### 前置条件
+
+- 已完成 Step 1 ~ Step 4（数据库、后端、log-web、sso-test-app、sso-test-app-2 全部启动并运行）
+- macOS 已安装 Google Chrome
+
+### 运行
+
+```bash
+cd e2e
+
+# 安装依赖
+npm install
+
+# 执行端到端测试
+npm run test:oidc
+```
+
+### 输出示例
+
+```
+========== Step 5: RP1 首次登录 ==========
+✅ RP1 首页加载
+✅ 找到并点击"使用 IAM 登录"按钮
+✅ 跳转到 log-web 登录页
+✅ 跳回 RP1 回调页 (带 code/state)
+✅ 显示"项目管理面板"标题
+✅ 显示 SSO 登录徽标
+✅ 展示 4 个统计卡片
+✅ 统计卡片包含"项目数"
+✅ 统计卡片包含"任务数"
+✅ 统计卡片包含"消息数"
+✅ 统计卡片包含"团队数"
+
+========== 验证 Token 详情相关功能 ==========
+✅ Token 详情页显示 access_token
+✅ Token 详情页显示 id_token
+✅ Token 详情页显示 refresh_token
+✅ 从 id_token 解码出 sub (personID)
+✅ UserInfo 获取成功
+✅ Token 刷新成功 (access_token 已更新)
+✅ 成功返回项目管理面板
+
+========== Step 6: 双 RP SSO 验证 ==========
+✅ iam_sso_session cookie 存在
+✅ SSO 流程中无登录表单出现
+✅ RP2 显示"数据分析面板"
+✅ RP2 显示 SSO 登录徽标
+✅ RP2 展示 4 个统计卡片 (订单数/客户数/待处理/完成率)
+✅ RP2 id_token 解码出 sub
+✅ RP1 和 RP2 的 id_token.sub 一致
+
+========== 测试结果汇总 ==========
+总计: 25 通过: 25 失败: 0
+```
+
+退出码：全部通过返回 0，有失败返回 1（适合接入 CI）。
+
+### 跨平台 Chrome 路径
+
+`oidc-e2e.js` 的 `CONFIG.chromePath` 默认值：
+
+| 平台 | 路径 |
+|------|------|
+| macOS | `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` |
+| Linux | `/usr/bin/google-chrome`（按需修改） |
+| Windows | `C:\Program Files\Google\Chrome\Application\chrome.exe`（按需修改） |
+
+### 常见失败排查
+
+- **`RP1 首页加载` 失败** → 检查 `sso-test-app` 是否在 3001 端口运行
+- **`跳转到 log-web 登录页` 失败** → 检查 `log-web` 是否在 3003 端口运行
+- **`Token 刷新成功` 失败** → 检查 `sso-test-app` 和 `sso-test-app-2` 的 scope 是否包含 `offline_access`（已修复，源码默认带上）
+- **`RP1 和 RP2 的 id_token.sub 一致` 失败** → 检查 `iam_sso_session` cookie 是否被设置、Redis 是否可达
+
+---
+
 ## 环境速查表
 
 | 服务 | 地址 | 端口 | 说明 |
@@ -242,6 +326,15 @@ A: 确认 `OAuth Client` 种子数据已导入，client_id 和 secret 正确。
 
 **Q: CORS 报错？**
 A: OIDC 路由组已配置 CORS 中间件，检查浏览器是否拦截。
+
+**Q: 刷新 Token 失败 `invalid_grant`？**
+A: 检查 sso-test-app 的 `scope` 是否包含 `offline_access`。IAM 后端仅在请求 scope 含 `offline_access` 时才签发 refresh_token。源码已默认带上 `openid profile email offline_access`，如自定义过请补上。
+
+**Q: 自动化测试用例不通过？**
+A: 运行 `cd e2e && npm run test:oidc` 逐项查看失败项。常见原因：
+- 服务未启动：检查 8099 / 3001 / 3002 / 3003 端口
+- Chrome 路径不对：编辑 `e2e/oidc-e2e.js` 的 `CONFIG.chromePath`
+- 端口被占用：清理占用进程或改端口
 
 **Q: trace 初始化报错？**
 A: 不影响功能，可以临时将 `config.yaml` 的 `trace.enable` 设为 `false`。

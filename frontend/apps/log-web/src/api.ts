@@ -8,5 +8,5 @@ const api = axios.create({
 
 export async function oidcLogin(data: OIDCLoginReq): Promise<OIDCLoginResp> {
   const resp = await api.post<OIDCLoginResp>('/oidc/login', data)
-  return resp.data
+  return resp.data.data
 }
