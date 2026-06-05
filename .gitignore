@@ -16,3 +16,7 @@ frontend/dist/*
 *.key
 *.cert
 certs/
+
+# 设计文档
+docs/superpowers/specs/
+docs/superpowers/plans/

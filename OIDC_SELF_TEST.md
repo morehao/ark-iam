@@ -51,56 +51,29 @@ curl -s http://localhost:8099/v1/iam/oidc/.well-known/openid-configuration | pyt
 
 ---
 
-## Step 3 — 启动前端（IAM 管理端）
+## Step 3 — 启动独立登录页服务
 
-```bash
-cd frontend
-pnpm dev
-```
-
-或
-
-```bash
-pnpm --filter @ark-iam/web dev
-```
-
-前端监听 `:3000`，API 代理到 `:8099`。
-
----
-
-## Step 3b — 启动第二个 SSO 测试 RP（验证 SSO）
-
-```bash
-cd frontend
-pnpm dev:sso2
-```
-
-sso-test-app-2 监听 `:3002`，配置与 sso-test-app 相同。
-
----
-
-## Step 3c — 启动独立登录页服务
-
-`log-web` 是 monorepo 下的子应用（`frontend/apps/log-web/`），基于 Vite + React，提供独立的登录页面，与 IAM 管理前端解耦。
+`log-web` 是 monorepo 下的子应用（`frontend/apps/log-web/`），基于 Vite + React，提供独立的登录页面。
 
 ```bash
 cd frontend
 pnpm dev:log
 ```
 
-log-web 监听 `:3003`，提供 OIDC 授权码流程所需的登录表单，并预留第三方登录扩展位。
+log-web 监听 `:3003`，提供 OIDC 授权码流程所需的登录表单。
 
 ---
 
-## Step 4 — 启动 SSO 测试 RP1
+## Step 4 — 启动 SSO 测试应用
 
-`sso-test-app` 是 monorepo 下的子应用（`frontend/apps/sso-test-app/`），基于 Vite 开发，支持 HMR。
+`sso-test-app` 和 `sso-test-app-2` 是 monorepo 下的子应用（`frontend/apps/sso-test-app/`、`frontend/apps/sso-test-app-2/`），基于 Vite 开发。
 
-**从 monorepo 根目录启动：**
+**从 monorepo 根目录同时启动 RP1 + RP2：**
 
 ```bash
 cd frontend
 pnpm dev:sso
+pnpm dev:sso2
 ```
 
 **或从子应用目录单独启动：**
@@ -108,9 +81,18 @@ pnpm dev:sso
 ```bash
 cd frontend/apps/sso-test-app
 pnpm dev
+
+# 另一个终端
+cd frontend/apps/sso-test-app-2
+pnpm dev
 ```
 
-sso-test-app 监听 `:3001`，无 API 代理，直接请求后端 `:8099`。
+| 应用 | 端口 | 说明 |
+|------|------|------|
+| sso-test-app | 3001 | SSO 测试 RP（首次手动登录） |
+| sso-test-app-2 | 3002 | SSO 测试 RP（自动 SSO 登录） |
+
+sso-test-app 和 sso-test-app-2 均无 API 代理，直接请求后端 `:8099`。
 
 ---
 
@@ -127,8 +109,8 @@ sso-test-app 监听 `:3001`，无 API 代理，直接请求后端 `:8099`。
      |                                    |<-- 3. 302 → /sso-login -----------|
      |                                    |    (无session cookie)              |
      |                                    |                                    |
-     |-- 4. 302 → :3000/oidc/login ----->|                                    |
-     |    ?authRequestID=ar-xxx           |                                    |
+|-- 4. 302 → :3003/login ---------->|                                    |
+|    ?authRequestID=ar-xxx           |                                    |
      |                                    |                                    |
      |-- 5. POST /oidc/login ------------>|                                    |
      |    (admin/admin123)                |                                    |
@@ -141,10 +123,11 @@ sso-test-app 监听 `:3001`，无 API 代理，直接请求后端 `:8099`。
      |                                    |                                    |
      |-- 9. POST /oauth/token ----------->|                                    |
      |<-- 10. {access_token, id_token} ---|                                    |
+      |-- 10b. 展示"项目管理面板"主页       |                                    |
      |                                    |                                    |
      |                                    |-- (用户在RP1页面浏览中)           |
      |                                    |                                    |
-     |                                    |-- 11. 打开RP2:3002，点击登录 ---->|
+     |                                    |-- 11. 打开RP2:3002，自动登录 ---->|
      |                                    |                                    |
      |                                    |-- 12. GET /authorize ------------->|
      |                                    |                                    |
@@ -156,28 +139,30 @@ sso-test-app 监听 `:3001`，无 API 代理，直接请求后端 `:8099`。
      |                                    |                                    |
      |                                    |-- 16. POST /oauth/token ---------->|
      |                                    |<-- 17. {access_token, id_token} --|
+     |                                    |-- 17b. 展示"数据分析面板"主页    |
 ```
 
 ### 操作步骤（RP1 首次登录）
 
 1. 浏览器打开 `http://localhost:3001/`
 2. 点击 **"使用 IAM 登录"**
-3. 浏览器跳转到 IAM 登录页 `http://localhost:3000/oidc/login?authRequestID=ar-xxx`
+3. 浏览器跳转到独立登录页 `http://localhost:3003/login?authRequestID=ar-xxx`
 4. 输入凭据：
    - 用户名: `admin`
    - 密码: `admin123`
-5. 点击登录
+5. 自动登录
 6. 浏览器自动重定向回测试 RP `http://localhost:3001/?code=xxx&state=yyy`
-7. 测试 RP 页面自动完成令牌交换，展示结果
+7. 测试 RP 页面自动完成令牌交换，展示 **"项目管理面板"主页**
 
 ### 验证要点（RP1）
 
-- ✅ 页面展示 **"OIDC 登录成功"**
-- ✅ 展示 `access_token`（JWT 格式）
-- ✅ 展示 `id_token`（解码后含 sub、iss、aud 等字段）
-- ✅ 展示 `refresh_token`
-- ✅ 点击 **"获取 UserInfo"** 展示用户信息（name、email、username）
-- ✅ 点击 **"刷新 Token"** 成功刷新 access_token
+- ✅ 页面展示 **模拟的"项目管理面板"主页**，包含用户头像、姓名、邮箱和 SSO 登录徽标
+- ✅ 展示 4 个统计卡片：项目数、任务数、消息数、团队数
+- ✅ SSO 徽标显示 **"✅ 已通过 IAM SSO 登录"**
+- ✅ 点击 **"查看 Token 详情"** 可切换查看 access_token、id_token、refresh_token
+- ✅ Token 详情页点击 **"获取 UserInfo"** 展示用户信息（name、email、username）
+- ✅ Token 详情页点击 **"刷新 Token"** 成功刷新 access_token
+- ✅ Token 详情页点击 **"返回主页"** 回到模拟面板
 
 ---
 
@@ -191,16 +176,17 @@ sso-test-app 监听 `:3001`，无 API 代理，直接请求后端 `:8099`。
 
 1. ✅ 完成 Step 5（RP1 已成功登录，浏览器已有 `iam_sso_session` cookie）
 2. 打开新标签页 `http://localhost:3002/`
-3. 点击 **"使用 IAM 登录"**
-4. **浏览器直接重定向回 RP2（`http://localhost:3002/?code=yyy`），无需再次输入凭据！**
-5. RP2 页面自动完成令牌交换，展示结果
+3. **页面自动重定向到 IAM OIDC authorize 端点**（无需任何点击操作）
+4. IAM 检测到已有 session cookie → **自动签发授权码**，重定向回 RP2
+5. RP2 自动完成令牌交换，展示 **"数据分析面板"主页**
 
 ### 验证要点
 
-- ✅ RP1 首次登录：跳转到 IAM 登录页 → 输入凭据 → 成功
-- ✅ RP2 二次登录：**无登录表单出现**，直接完成
-- ✅ 两个 RP 都获取到有效的 access_token 和 id_token
-- ✅ id_token 中的 sub（personID）一致（同一用户）
+- ✅ RP1 首次登录：跳转到 IAM 登录页 → 输入凭据 → 展示"项目管理面板"主页
+- ✅ RP2 二次登录：**无登录表单出现，页面自动完成跳转**，直接展示"数据分析面板"主页
+- ✅ 两个 RP 的 SSO 徽标一致（同一用户身份），但主页面板数据不同
+- ✅ 点击 **"查看 Token 详情"** 可看到有效的 access_token 和 id_token
+- ✅ 两个 RP 的 id_token 中 sub（personID）一致
 
 ---
 
@@ -237,6 +223,13 @@ sso-test-app 监听 `:3001`，无 API 代理，直接请求后端 `:8099`。
 ---
 
 ## 常见问题
+
+**Q: 打开 RP 页面直接跳过了登录表单？**
+A: 浏览器缓存了前次登录的 `iam_sso_session` cookie，这是 SSO 正常行为。如需重新输入密码：
+- **Chrome**: DevTools (F12) → Application → Cookies → `http://localhost:8099` → 删除 `iam_sso_session`
+- **Safari**: 设置 → 隐私 → 管理网站数据 → 搜索 `localhost` → 删除
+- **Firefox**: DevTools (F12) → 存储 → Cookie → `http://localhost:8099` → 删除 `iam_sso_session`
+- 最简方案：使用**无痕/隐私窗口**测试
 
 **Q: 授权请求返回 404？**
 A: 检查后端是否已启动且端口正确。
