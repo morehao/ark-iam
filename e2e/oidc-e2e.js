@@ -1,4 +1,7 @@
 const puppeteer = require('puppeteer-core');
+const path = require('path');
+const { spawn } = require('child_process');
+const net = require('net');
 
 const CONFIG = {
   chromePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -9,6 +12,165 @@ const CONFIG = {
   identifier: 'admin',
   password: 'admin123',
 };
+
+// ============================================================
+// 服务自动管理
+// ============================================================
+
+const ROOT = path.resolve(__dirname, '..');
+const FRONTEND_ROOT = path.join(ROOT, 'frontend');
+
+const SERVICES = [
+  { name: 'IAM Backend', port: 8099, cmd: 'go',   args: ['run', './apps/iam/cmd'], cwd: path.join(ROOT, 'backend'),
+    env: { APP_CONFIG_PATH: path.join(ROOT, 'backend', 'apps', 'iam', 'config', 'config.yaml') } },
+  { name: 'sso-test-app',   port: 3001, cmd: 'pnpm', args: ['--filter', '@ark-iam/sso-test-app', 'dev'],          cwd: FRONTEND_ROOT },
+  { name: 'sso-test-app-2', port: 3002, cmd: 'pnpm', args: ['--filter', '@ark-iam/sso-test-app-2', 'dev'],        cwd: FRONTEND_ROOT },
+  { name: 'log-web',        port: 3003, cmd: 'pnpm', args: ['--filter', '@ark-iam/log-web', 'dev'],                cwd: FRONTEND_ROOT },
+];
+
+const spawnedChildren = [];
+
+function checkPort(port) {
+  return new Promise((resolve) => {
+    // macOS 上 Vite 默认绑定 IPv6 (::1)，需同时尝试两种地址
+    const hosts = ['127.0.0.1', '::1'];
+    let tried = 0;
+    for (const host of hosts) {
+      const socket = new net.Socket();
+      socket.setTimeout(1500);
+      socket.once('connect', () => { socket.destroy(); resolve(true); });
+      socket.once('error', () => { socket.destroy(); });
+      socket.once('timeout', () => { socket.destroy(); });
+      socket.once('close', () => { tried++; if (tried === hosts.length) resolve(false); });
+      socket.connect(port, host);
+    }
+  });
+}
+
+async function waitForPort(port, label, timeoutMs) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (await checkPort(port)) return true;
+    await wait(1000);
+  }
+  return false;
+}
+
+function startService(svc) {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const done = (ok) => { if (!resolved) { resolved = true; resolve(ok); } };
+
+    const opts = {
+      cwd: svc.cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: false,
+    };
+    if (svc.env) {
+      opts.env = { ...process.env, ...svc.env };
+    }
+    const child = spawn(svc.cmd, svc.args, opts);
+    spawnedChildren.push(child);
+
+    child.stdout.on('data', () => {});
+    child.stderr.on('data', () => {});
+
+    child.on('error', (err) => {
+      console.error(`[服务] ${svc.name} 启动失败: ${err.message}`);
+      done(false);
+    });
+
+    child.on('exit', (code) => {
+      if (code !== null && code !== 0) {
+        console.error(`[服务] ${svc.name} 异常退出 (code=${code})`);
+        done(false);
+      }
+    });
+
+    // 异步等待端口就绪
+    waitForPort(svc.port, svc.name, 120000).then(done);
+  });
+}
+
+async function stopServiceOnPort(port, name) {
+  return new Promise((resolve) => {
+    const child = spawn('lsof', ['-ti', `:${port}`], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let pid = '';
+    child.stdout.on('data', (d) => { pid += d.toString(); });
+    child.on('close', () => {
+      if (!pid.trim()) { resolve(); return; }
+      const pids = pid.trim().split('\n').map((p) => parseInt(p)).filter(Boolean);
+      for (const p of pids) {
+        try { process.kill(p, 'SIGTERM'); console.log(`  ⏹ ${name} (PID ${p})`); } catch {}
+      }
+      // 等 2s 后如果还在运行则 SIGKILL
+      setTimeout(() => {
+        for (const p of pids) {
+          try { process.kill(p, 0); process.kill(p, 'SIGKILL'); console.log(`  ☠ ${name} (PID ${p}) 强制终止`); } catch {}
+        }
+        resolve();
+      }, 2000);
+    });
+    child.on('error', () => resolve());
+  });
+}
+
+async function stopAllServices() {
+  console.log('\n========== 停止依赖服务 ==========');
+  // 先快速 kill 自己启动的子进程
+  for (const child of spawnedChildren) {
+    if (child && !child.killed) {
+      try { child.kill('SIGTERM'); } catch {}
+    }
+  }
+  spawnedChildren.length = 0;
+  // 再通过端口查找残余进程并终止
+  await Promise.all(SERVICES.map((svc) => stopServiceOnPort(svc.port, svc.name)));
+}
+
+async function ensureServices() {
+  console.log('\n========== 检查并启动依赖服务 ==========');
+
+  const needStart = [];
+
+  for (const svc of SERVICES) {
+    const running = await checkPort(svc.port);
+    if (running) {
+      console.log(`  ✅ ${svc.name} (端口 ${svc.port}) 已在运行`);
+    } else {
+      console.log(`  ⏳ ${svc.name} (端口 ${svc.port}) 未启动，正在启动...`);
+      needStart.push(svc);
+    }
+  }
+
+  if (needStart.length === 0) {
+    console.log('  所有服务均已就绪\n');
+    return stopAllServices;
+  }
+
+  const promises = needStart.map((svc) => startService(svc));
+  const results = await Promise.all(promises);
+
+  const allReady = results.every(Boolean);
+  if (allReady) {
+    console.log('  ✅ 所有服务已就绪\n');
+  } else {
+    const failed = needStart.filter((_, i) => !results[i]);
+    for (const svc of failed) {
+      console.error(`  ❌ ${svc.name} 启动失败（超时 120s），请检查依赖是否正常（MySQL、Redis 等）`);
+    }
+    await stopAllServices();
+    console.error('\n  服务启动失败，退出\n');
+    process.exit(1);
+  }
+
+  return stopAllServices;
+}
+
+process.on('SIGINT', () => {
+  stopAllServices();
+  process.exit(130);
+});
 
 let pass = 0;
 let fail = 0;
@@ -207,6 +369,8 @@ async function ssoTest(rp1Page, rp1Sub) {
 }
 
 (async () => {
+  const cleanup = await ensureServices();
+
   const browser = await puppeteer.launch({
     executablePath: CONFIG.chromePath,
     headless: 'new',
@@ -229,6 +393,7 @@ async function ssoTest(rp1Page, rp1Sub) {
     results.forEach((r) => console.log(r));
     console.log(`\n总计: ${pass + fail} 通过: ${pass} 失败: ${fail}`);
     await browser.close();
+    await cleanup();
     process.exit(fail > 0 ? 1 : 0);
   }
 })();

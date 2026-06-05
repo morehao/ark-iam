@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { OIDCLoginReq, OIDCLoginResp } from './types'
+import type { ApiResponse, OIDCLoginReq, OIDCLoginResp } from './types'
 
 const api = axios.create({
   baseURL: '/v1/iam',
@@ -7,6 +7,6 @@ const api = axios.create({
 })
 
 export async function oidcLogin(data: OIDCLoginReq): Promise<OIDCLoginResp> {
-  const resp = await api.post<OIDCLoginResp>('/oidc/login', data)
+  const resp = await api.post<ApiResponse<OIDCLoginResp>>('/oidc/login', data)
   return resp.data.data
 }
