@@ -7,15 +7,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 	appconfig "github.com/morehao/ark-iam/iam/config"
-	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"gorm.io/gorm"
 )
 
 func TestFullOIDCCodeFlow(t *testing.T) {
+	testsetup.Initialize(testsetup.AppNameIam)
+	defer testsetup.Done(testsetup.AppNameIam)
+
 	issuer := "http://localhost:8099/v1/iam/oidc"
 	appconfig.Conf = &appconfig.Config{
 		JWT: appconfig.JWT{SignKey: "test-sign-key"},
@@ -23,20 +26,6 @@ func TestFullOIDCCodeFlow(t *testing.T) {
 			Issuer:        issuer,
 			AllowInsecure: true,
 		},
-	}
-
-	origOAuthClientDao := newOAuthClientDao
-	origOAuthClientSecretDao := newOAuthClientSecretDao
-	t.Cleanup(func() {
-		newOAuthClientDao = origOAuthClientDao
-		newOAuthClientSecretDao = origOAuthClientSecretDao
-	})
-
-	newOAuthClientDao = func() *dao.OAuthClientDao {
-		return &dao.OAuthClientDao{}
-	}
-	newOAuthClientSecretDao = func() *dao.OAuthClientSecretDao {
-		return &dao.OAuthClientSecretDao{}
 	}
 
 	provider, err := SetupOIDCProvider(issuer)

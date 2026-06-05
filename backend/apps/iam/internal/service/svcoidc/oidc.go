@@ -19,6 +19,7 @@ import (
 	"github.com/morehao/ark-iam/iam/internal/service/svcauth"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/golib/glog"
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"golang.org/x/text/language"
 )
@@ -142,7 +143,7 @@ func SetupOIDCProvider(issuer string) (*OIDCProvider, error) {
 		return nil, fmt.Errorf("failed to load OIDC signing key: %w", err)
 	}
 
-	storage := NewOIDCStorageWithKey(privateKey, keyID)
+	storage := NewOIDCStorage(NewRedisProtocolStateStore(), NewPersistentStore(), privateKey, keyID)
 
 	encKey, encKeyID := loadEncryptionKey()
 
@@ -188,6 +189,7 @@ func (p *OIDCProvider) BuildAuthCallbackURL(ctx context.Context, authRequestID s
 
 type OIDCAuthSvc interface {
 	CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error)
+	CompleteLoginBySession(ctx context.Context, authRequestID string, sessionID string) (string, error)
 }
 
 type passwordAuthenticator interface {
@@ -195,14 +197,16 @@ type passwordAuthenticator interface {
 }
 
 type oidcAuthSvc struct {
-	provider *OIDCProvider
-	authSvc  passwordAuthenticator
+	provider        *OIDCProvider
+	authSvc         passwordAuthenticator
+	ssoSessionStore SSOSessionStore
 }
 
 func NewOIDCAuthSvc(provider *OIDCProvider) OIDCAuthSvc {
 	return &oidcAuthSvc{
-		provider: provider,
-		authSvc:  svcauth.NewAuthSvc(appconfig.Conf.JWT.SignKey),
+		provider:        provider,
+		authSvc:         svcauth.NewAuthSvc(appconfig.Conf.JWT.SignKey),
+		ssoSessionStore: NewSSOSessionStore(),
 	}
 }
 
@@ -218,7 +222,35 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	if err := svc.provider.Storage.CompleteAuthRequest(req.AuthRequestID, buildOIDCSubject(personEntity.ID), authTime, []string{"pwd"}, ""); err != nil {
 		return nil, code.GetError(code.OIDCSessionNotFound)
 	}
-	return &dtooidc.OIDCLoginResp{
+
+	resp := &dtooidc.OIDCLoginResp{
 		ContinueURL: svc.provider.BuildAuthCallbackURL(ctx.Request.Context(), req.AuthRequestID),
-	}, nil
+	}
+
+	sessionID, err := svc.ssoSessionStore.CreateSession(ctx.Request.Context(), personEntity.ID)
+	if err != nil {
+		glog.Warnf(ctx, "[oidcAuthSvc.CompleteLogin] failed to create sso session: %v", err)
+	} else {
+		resp.SessionID = sessionID
+	}
+
+	return resp, nil
+}
+
+func (svc *oidcAuthSvc) CompleteLoginBySession(ctx context.Context, authRequestID string, sessionID string) (string, error) {
+	personID, err := svc.ssoSessionStore.ValidateSession(ctx, sessionID)
+	if err != nil {
+		return "", err
+	}
+
+	if _, err := svc.provider.Storage.AuthRequestByID(ctx, authRequestID); err != nil {
+		return "", err
+	}
+
+	authTime := time.Now()
+	if err := svc.provider.Storage.CompleteAuthRequest(authRequestID, buildOIDCSubject(personID), authTime, []string{"sso"}, ""); err != nil {
+		return "", err
+	}
+
+	return svc.provider.BuildAuthCallbackURL(ctx, authRequestID), nil
 }

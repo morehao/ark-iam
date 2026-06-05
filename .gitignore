@@ -6,7 +6,7 @@
 
 **/log/**
 **/output/**
-frontend/node_modules/*
+**/node_modules/
 frontend/dist/*
 .opencode/*
 .worktrees/
@@ -16,3 +16,7 @@ frontend/dist/*
 *.key
 *.cert
 certs/
+
+# 设计文档
+docs/superpowers/specs/
+docs/superpowers/plans/

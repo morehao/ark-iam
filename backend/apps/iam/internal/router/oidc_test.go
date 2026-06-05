@@ -10,11 +10,15 @@ import (
 	iam "github.com/morehao/ark-iam/iam"
 	"github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/router"
+	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
 func TestOIDCRoutesExposeLoginEndpoint(t *testing.T) {
+	testsetup.Initialize(testsetup.AppNameIam)
+	defer testsetup.Done(testsetup.AppNameIam)
+
 	gin.SetMode(gin.TestMode)
 	config.Conf = &config.Config{
 		JWT: config.JWT{SignKey: "test-sign-key"},
@@ -43,6 +47,9 @@ func TestOIDCRoutesExposeLoginEndpoint(t *testing.T) {
 }
 
 func TestOIDCLoginEndpointBypassesJWTAuth(t *testing.T) {
+	testsetup.Initialize(testsetup.AppNameIam)
+	defer testsetup.Done(testsetup.AppNameIam)
+
 	gin.SetMode(gin.TestMode)
 	config.Conf = &config.Config{
 		JWT: config.JWT{SignKey: "test-sign-key"},

@@ -173,3 +173,17 @@ ON DUPLICATE KEY UPDATE `tenant_id` = VALUES(`tenant_id`);
 INSERT INTO `user_role` (`id`, `tenant_id`, `user_id`, `role_id`, `created_by`, `updated_by`, `deleted_by`)
 VALUES (1, 1, 1, 1, 0, 0, 0)
 ON DUPLICATE KEY UPDATE `user_id` = VALUES(`user_id`);
+
+-- ============================================
+-- 12. OIDC SSO 测试客户端种子数据
+-- 客户端ID: test-rp-client, 密钥: my-test-client-secret
+-- 回调地址: http://localhost:3001/, http://localhost:3002/ (SSO测试RP1, RP2)
+-- 密钥SHA256: fc090df65f5f35338ad419e13de1c64b84d6674c7e67ff32df3cda6f034cfce2
+-- ============================================
+INSERT INTO `oauth_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `status`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (1, 1, 1, 'test-rp-client', 'SSO测试应用', '["http://localhost:3001/","http://localhost:3002/"]', '["authorization_code","refresh_token"]', '["code"]', 'client_secret_basic', 1, '["openid","profile","email"]', 'enable', 0, 0, 0)
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
+
+INSERT INTO `oauth_client_secret` (`id`, `oauth_client_id`, `name`, `value_hash`, `value_prefix`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (1, 1, 'test-secret', 'fc090df65f5f35338ad419e13de1c64b84d6674c7e67ff32df3cda6f034cfce2', 'my-test-', 0, 0, 0)
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
