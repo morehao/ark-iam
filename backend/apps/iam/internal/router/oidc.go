@@ -32,6 +32,7 @@ func InitOIDC(engine *gin.Engine, groups *ginserver.RouterGroups) {
 	oidcGroup := v1Group.Group("/oidc")
 	oidcGroup.Use(ginmiddleware.CORS())
 	oidcGroup.POST("/login", ctr.Login)
+	oidcGroup.GET("/sso-login", ctr.SSOLogin)
 	oidcGroup.GET("/logged-out", func(ctx *gin.Context) {
 		ctx.String(200, "You have been logged out.")
 	})

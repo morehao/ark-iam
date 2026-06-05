@@ -42,6 +42,7 @@ type OIDC struct {
 	AuthRequestTTL        int    `yaml:"authRequestTTL"`
 	AuthCodeTTL           int    `yaml:"authCodeTTL"`
 	SpentCodeTTL          int    `yaml:"spentCodeTTL"`
+	SessionTTL            int    `yaml:"sessionTTL"`
 }
 
 type PasswordConfig struct {

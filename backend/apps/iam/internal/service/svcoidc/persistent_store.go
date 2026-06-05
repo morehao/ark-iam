@@ -51,7 +51,7 @@ func (s *PersistentStore) AuthorizeClientIDSecret(ctx context.Context, clientID,
 	if err != nil || clientEntity == nil || clientEntity.ID == 0 {
 		return oidc.ErrInvalidClient()
 	}
-	secrets, _, err := s.oauthClientSecretDao().GetPageListByCond(ctx, &dao.OAuthClientSecretCond{OAuthClientID: clientEntity.ID})
+	secrets, err := s.oauthClientSecretDao().GetListByCond(ctx, &dao.OAuthClientSecretCond{OAuthClientID: clientEntity.ID})
 	if err != nil {
 		return oidc.ErrInvalidClient()
 	}

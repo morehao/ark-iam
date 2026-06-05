@@ -212,7 +212,10 @@ func (svc *personSvc) GetByUser(ctx *gin.Context, req *dtouser.UserIdentityByUse
 	if err := ensurePersonIdentityVisibleToTenant(ctx, req.UserID); err != nil {
 		return nil, err
 	}
-	list, total, err := newPersonIdentityRepo().GetPageListByCond(ctx, &dao.UserIdentityCond{PersonID: req.UserID})
+	list, total, err := newPersonIdentityRepo().GetPageListByCond(ctx, &dao.UserIdentityCond{
+		BaseCond: &genericdao.BaseCond{Page: 1, PageSize: 100},
+		PersonID: req.UserID,
+	})
 	if err != nil {
 		glog.Errorf(ctx, "[svcperson.GetByUser] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserIdentityGetPageListError)

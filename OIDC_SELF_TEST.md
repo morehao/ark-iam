@@ -30,7 +30,7 @@ mysql -uroot -p123456 iam < backend/scripts/sql/iam_seed_data.sql
 | 管理员账号 | `admin` / `admin123` |
 | OAuth ClientID | `test-rp-client` |
 | Client Secret | `my-test-client-secret` |
-| 回调地址 | `http://localhost:3001/` |
+| 回调地址 | `http://localhost:3001/`, `http://localhost:3002/` |
 
 ---
 
@@ -51,25 +51,66 @@ curl -s http://localhost:8099/v1/iam/oidc/.well-known/openid-configuration | pyt
 
 ---
 
-## Step 3 — 启动前端
+## Step 3 — 启动前端（IAM 管理端）
 
 ```bash
 cd frontend
 pnpm dev
 ```
 
+或
+
+```bash
+pnpm --filter @ark-iam/web dev
+```
+
 前端监听 `:3000`，API 代理到 `:8099`。
 
 ---
 
-## Step 4 — 启动 SSO 测试 RP
+## Step 3b — 启动第二个 SSO 测试 RP（验证 SSO）
 
 ```bash
-cd frontend/sso-test-app
-python3 -m http.server 3001
+cd frontend
+pnpm dev:sso2
 ```
 
-> 简单静态服务器即可，因为 OIDC 路由组已配置 CORS 中间件。
+sso-test-app-2 监听 `:3002`，配置与 sso-test-app 相同。
+
+---
+
+## Step 3c — 启动独立登录页服务
+
+`log-web` 是 monorepo 下的子应用（`frontend/apps/log-web/`），基于 Vite + React，提供独立的登录页面，与 IAM 管理前端解耦。
+
+```bash
+cd frontend
+pnpm dev:log
+```
+
+log-web 监听 `:3003`，提供 OIDC 授权码流程所需的登录表单，并预留第三方登录扩展位。
+
+---
+
+## Step 4 — 启动 SSO 测试 RP1
+
+`sso-test-app` 是 monorepo 下的子应用（`frontend/apps/sso-test-app/`），基于 Vite 开发，支持 HMR。
+
+**从 monorepo 根目录启动：**
+
+```bash
+cd frontend
+pnpm dev:sso
+```
+
+**或从子应用目录单独启动：**
+
+```bash
+cd frontend/apps/sso-test-app
+pnpm dev
+```
+
+sso-test-app 监听 `:3001`，无 API 代理，直接请求后端 `:8099`。
 
 ---
 
@@ -78,36 +119,46 @@ python3 -m http.server 3001
 ### 流程示意图
 
 ```
-[测试RP:3001]                         [IAM前端:3000]                     [IAM后端:8099]
-     |                                      |                                |
-     |-- 1. 点击"使用IAM登录" -------------->|                                |
-     |                                      |-- 2. /authorize --------------->|
-     |                                      |                                |
-     |                                      |<-- 3. 302 → /oidc/login -------|
-     |                                      |                                |
-     |                                      |-- 4. 展示OIDC登录表单           |
-     |                                      |                                |
-     |                                      |-- 5. POST /oidc/login --------->|
-     |                                      |   (admin/admin123)             |
-     |                                      |                                |
-     |                                      |<-- 6. {continueURL} -----------|
-     |                                      |                                |
-     |                                      |-- 7. 302 → continueURL ------->|
-     |                                      |                                |
-     |<-- 8. 302 → :3001/?code=xxx ---------|                                |
-     |                                      |                                |
-     |-- 9. POST /token ------------------->|                                |
-     |   (code + secret + verifier)         |                                |
-     |                                      |                                |
-     |<-- 10. {access_token, id_token, ...}  |                                |
-     |                                      |                                |
-     |-- 11. GET /userinfo ----------------->|                                |
-     |   (Bearer access_token)              |                                |
-     |                                      |                                |
-     |<-- 12. {name, email, ...}            |                                |
+[测试RP1:3001]                      [测试RP2:3002]                       [IAM后端:8099]
+     |                                    |                                    |
+     |-- 1. 点击"使用IAM登录" ------------>|                                    |
+     |                                    |-- 2. GET /authorize -------------->|
+     |                                    |                                    |
+     |                                    |<-- 3. 302 → /sso-login -----------|
+     |                                    |    (无session cookie)              |
+     |                                    |                                    |
+     |-- 4. 302 → :3000/oidc/login ----->|                                    |
+     |    ?authRequestID=ar-xxx           |                                    |
+     |                                    |                                    |
+     |-- 5. POST /oidc/login ------------>|                                    |
+     |    (admin/admin123)                |                                    |
+     |                                    |                                    |
+     |<-- 6. {continueURL, sessionID} ---|                                    |
+     |    + Set-Cookie: iam_sso_session   |                                    |
+     |                                    |                                    |
+     |-- 7. 302 → continueURL ----------->|                                    |
+     |<-- 8. 302 → :3001/?code=xxx ------|                                    |
+     |                                    |                                    |
+     |-- 9. POST /oauth/token ----------->|                                    |
+     |<-- 10. {access_token, id_token} ---|                                    |
+     |                                    |                                    |
+     |                                    |-- (用户在RP1页面浏览中)           |
+     |                                    |                                    |
+     |                                    |-- 11. 打开RP2:3002，点击登录 ---->|
+     |                                    |                                    |
+     |                                    |-- 12. GET /authorize ------------->|
+     |                                    |                                    |
+     |                                    |<-- 13. 302 → /sso-login ---------|
+     |                                    |    (带session cookie!)            |
+     |                                    |                                    |
+     |                                    |-- 14. 自动完成认证，302 → continue|
+     |                                    |<-- 15. 302 → :3002/?code=yyy ----|
+     |                                    |                                    |
+     |                                    |-- 16. POST /oauth/token ---------->|
+     |                                    |<-- 17. {access_token, id_token} --|
 ```
 
-### 操作步骤
+### 操作步骤（RP1 首次登录）
 
 1. 浏览器打开 `http://localhost:3001/`
 2. 点击 **"使用 IAM 登录"**
@@ -119,7 +170,7 @@ python3 -m http.server 3001
 6. 浏览器自动重定向回测试 RP `http://localhost:3001/?code=xxx&state=yyy`
 7. 测试 RP 页面自动完成令牌交换，展示结果
 
-### 验证要点
+### 验证要点（RP1）
 
 - ✅ 页面展示 **"OIDC 登录成功"**
 - ✅ 展示 `access_token`（JWT 格式）
@@ -130,18 +181,41 @@ python3 -m http.server 3001
 
 ---
 
-## Step 6 — SSO 验证（概念验证）
+## Step 6 — 双 RP SSO 验证
 
-因为 OIDC 本身就是 SSO 协议，本次测试已经验证了 IAM 作为**中心身份提供者（IdP）**的能力：
+### 流程示意图
+
+见上方 Step 5 流程图（步骤 11-17）。
+
+### 操作步骤
+
+1. ✅ 完成 Step 5（RP1 已成功登录，浏览器已有 `iam_sso_session` cookie）
+2. 打开新标签页 `http://localhost:3002/`
+3. 点击 **"使用 IAM 登录"**
+4. **浏览器直接重定向回 RP2（`http://localhost:3002/?code=yyy`），无需再次输入凭据！**
+5. RP2 页面自动完成令牌交换，展示结果
+
+### 验证要点
+
+- ✅ RP1 首次登录：跳转到 IAM 登录页 → 输入凭据 → 成功
+- ✅ RP2 二次登录：**无登录表单出现**，直接完成
+- ✅ 两个 RP 都获取到有效的 access_token 和 id_token
+- ✅ id_token 中的 sub（personID）一致（同一用户）
+
+---
+
+## Step 7 — SSO 原理说明
+
+本次测试验证了 IAM 作为**中心身份提供者（IdP）**的 SSO 能力：
 
 | 验证点 | 说明 | 结果 |
 |--------|------|------|
-| RP 通过 IAM 认证用户 | 测试 RP 使用 IAM 的 OIDC 端点完成登录 | ✅ |
+| 首次登录需凭据 | RP1 首次访问 IAM IdP，无 session cookie，显示登录页 | ✅ |
+| SSO 自动认证 | RP2 访问 IAM IdP，携带 `iam_sso_session` cookie，自动完成认证 | ✅ |
 | 身份令牌签发 | IAM 签发 id_token，含 sub(personID) 等声明 | ✅ |
-| 访问令牌 | access_token 可用于调用 userinfo 等资源 | ✅ |
-| 刷新令牌 | refresh_token 可换取新的 access_token | ✅ |
+| 跨应用令牌 | 同一用户在不同 RP 获取不同的授权码和令牌 | ✅ |
 
-**SSO 的本质** — 用户只需要在 IAM（IdP）进行一次认证，IAM 向任意第三方应用（RP）签发身份令牌。测试 RP 作为第一个"第三方应用"验证了此能力。未来可以创建第二个测试 RP 在 `:3002`，使用同一个 IAM IdP，无需重复输入凭据即可登录。
+**SSO 的本质** — 用户只需要在 IAM（IdP）进行一次认证后，浏览器获得 `iam_sso_session` cookie。后续任意 RP（RP1、RP2 乃至更多）发起 OIDC 授权请求时，服务端 `/sso-login` 端点检测到有效 cookie，自动完成用户认证并生成授权码，用户全程无需干预。
 
 ---
 
@@ -152,10 +226,13 @@ python3 -m http.server 3001
 | MySQL | `127.0.0.1:3306` | 3306 | 数据库 iam |
 | Redis | `127.0.0.1:6379` | 6379 | 缓存 |
 | IAM 后端 | `http://localhost:8099` | 8099 | Gin HTTP 服务 |
-| IAM 前端 | `http://localhost:3000` | 3000 | React SPA |
-| SSO 测试 RP | `http://localhost:3001` | 3001 | 静态 HTML 测试页 |
+| IAM 前端 | `http://localhost:3000` | 3000 | React SPA（管理端） |
+| 独立登录页 | `http://localhost:3003` | 3003 | Vite + React（独立 IdP 登录页） |
+| SSO 测试 RP1 | `http://localhost:3001` | 3001 | 静态 HTML 测试页 |
+| SSO 测试 RP2 | `http://localhost:3002` | 3002 | 静态 HTML 测试页（验证 SSO） |
 | OIDC Issuer | `http://localhost:8099/v1/iam/oidc` | - | OIDC Provider 根路径 |
-| OIDC 登录页 | `http://localhost:3000/oidc/login` | - | 前端 OIDC 登录表单 |
+| OIDC 登录页 | `http://localhost:3003/login` | - | 独立登录页服务（log-web） |
+| SSO Session | `iam_sso_session` cookie | - | HTTP-only，Redis 存储，24h 过期 |
 
 ---
 

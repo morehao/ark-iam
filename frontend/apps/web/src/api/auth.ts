@@ -139,16 +139,3 @@ export const completeConnectorCallback = (data: ConnectorCallbackReq) => {
   })
 }
 
-export interface OIDCLoginReq {
-  authRequestID: string
-  identifier: string
-  password: string
-}
-
-export interface OIDCLoginResp {
-  continueURL: string
-}
-
-export const oidcLogin = (data: OIDCLoginReq) => {
-  return request.post<OIDCLoginReq, OIDCLoginResp>('/oidc/login', data)
-}

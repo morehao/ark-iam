@@ -100,7 +100,7 @@ func (c *OIDCClient) GrantTypes() []oidc.GrantType {
 }
 
 func (c *OIDCClient) LoginURL(id string) string {
-	return config.Conf.OIDC.FrontendLoginURL + "?authRequestID=" + url.QueryEscape(id)
+	return config.Conf.OIDC.Issuer + "/sso-login?authRequestID=" + url.QueryEscape(id)
 }
 
 func (c *OIDCClient) AccessTokenType() op.AccessTokenType {
