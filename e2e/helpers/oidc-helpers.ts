@@ -145,3 +145,26 @@ export async function verifyRp1RequiresLogin(page: Page): Promise<void> {
   expect(body).toContain('您尚未登录此应用');
   expect(body).not.toContain('项目管理面板');
 }
+
+export async function rp1LogoutLocal(page: Page): Promise<void> {
+  await clickByText(page, '退出当前应用');
+  await wait(1000);
+  const body = await page.evaluate(() => document.body.innerText);
+  expect(body).toContain('使用 IAM 登录');
+  expect(body).toContain('您尚未登录此应用');
+}
+
+export async function rp1LogoutGlobal(page: Page): Promise<void> {
+  await clickByText(page, '从所有应用退出');
+  await page.waitForURL(
+    (url) =>
+      url.hostname === 'localhost' &&
+      url.port === '3001' &&
+      !url.searchParams.has('code') &&
+      !url.searchParams.has('error'),
+    { timeout: 30000 }
+  );
+  await wait(1000);
+  const body = await page.evaluate(() => document.body.innerText);
+  expect(body).toContain('使用 IAM 登录');
+}
