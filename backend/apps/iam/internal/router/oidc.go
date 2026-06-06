@@ -3,8 +3,8 @@ package router
 import (
 	"context"
 	"crypto/rsa"
-	"fmt"
 
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/controller/ctroidc"
@@ -44,6 +44,7 @@ func InitOIDC(engine *gin.Engine, groups *ginserver.RouterGroups) {
 	oidcGroup.POST("/login", ctr.Login)
 	oidcGroup.GET("/sso-login", ctr.SSOLogin)
 	oidcGroup.GET("/logged-out", func(ctx *gin.Context) {
+		ctx.SetCookie("iam_sso_session", "", -1, "/", "", false, true)
 		ctx.String(200, "You have been logged out.")
 	})
 	svcoidc.RegisterProviderRoutes(oidcGroup, provider)
