@@ -5,7 +5,9 @@
   "description": "OIDC 端到端自动化测试，模拟浏览器验证完整 OIDC 流程",
   "main": "oidc-e2e.js",
   "scripts": {
-    "test:oidc": "node oidc-e2e.js"
+    "test:oidc": "node oidc-e2e.js",
+    "test:admin": "node admin-e2e.js",
+    "test": "npm run test:oidc && npm run test:admin"
   },
   "dependencies": {
     "puppeteer-core": "^25.1.0"

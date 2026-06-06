@@ -9,6 +9,7 @@ const CONFIG = {
   rp1Url: 'http://localhost:3001/',
   rp2Url: 'http://localhost:3002/',
   logWebUrl: 'http://localhost:3003/login',
+  platformAdminUrl: 'http://localhost:3000/',
   identifier: 'admin',
   password: 'admin123',
 };
@@ -25,7 +26,8 @@ const SERVICES = [
     env: { APP_CONFIG_PATH: path.join(ROOT, 'backend', 'apps', 'iam', 'config', 'config.yaml') } },
   { name: 'sso-test-app',   port: 3001, cmd: 'pnpm', args: ['--filter', '@ark-iam/sso-test-app', 'dev'],          cwd: FRONTEND_ROOT },
   { name: 'sso-test-app-2', port: 3002, cmd: 'pnpm', args: ['--filter', '@ark-iam/sso-test-app-2', 'dev'],        cwd: FRONTEND_ROOT },
-  { name: 'log-web',        port: 3003, cmd: 'pnpm', args: ['--filter', '@ark-iam/log-web', 'dev'],                cwd: FRONTEND_ROOT },
+  { name: 'log-web',             port: 3003, cmd: 'pnpm', args: ['--filter', '@ark-iam/log-web', 'dev'],                  cwd: FRONTEND_ROOT },
+  { name: 'platform-admin-web',  port: 3000, cmd: 'pnpm', args: ['--filter', '@ark-iam/platform-admin-web', 'dev'],    cwd: FRONTEND_ROOT },
 ];
 
 const spawnedChildren = [];
@@ -368,6 +370,59 @@ async function ssoTest(rp1Page, rp1Sub) {
   await page2.close();
 }
 
+async function testPlatformAdmin(rp1Page) {
+  console.log('\n========== Step 7: 管理平台 SSO 登录 ==========');
+  const browser = rp1Page.browser();
+  const adminPage = await browser.newPage();
+
+  const cookies = await rp1Page.cookies();
+  await adminPage.setCookie(...cookies);
+  console.log(`已共享 ${cookies.length} 个 cookies 到管理平台页面`);
+
+  const ssoCookie = cookies.find((c) => c.name === 'iam_sso_session');
+  check('iam_sso_session cookie 存在 (管理平台)',
+    !!ssoCookie,
+    ssoCookie ? `domain=${ssoCookie.domain}` : '无');
+
+  console.log('1) 打开 http://localhost:3000/');
+  await adminPage.goto(CONFIG.platformAdminUrl, { waitUntil: 'networkidle0', timeout: 15000 });
+  await wait(2000);
+
+  const loginText = await adminPage.evaluate(() => document.body.innerText);
+  check('管理平台显示登录页', loginText.includes('IAM 管理平台') && loginText.includes('登录'));
+  check('登录页有"IAM 账号登录"按钮', loginText.includes('IAM 账号登录'));
+
+  console.log('2) 点击"IAM 账号登录" (走 OIDC 授权码流程，凭借已存在的 SSO cookie 自动完成认证)');
+  await clickByText(adminPage, 'IAM 账号登录');
+  await wait(3000);
+
+  const loginFormVisible = await adminPage.$('form input[type="text"]');
+  check('管理平台 SSO 流程中无登录表单出现', !loginFormVisible);
+
+  try {
+    await adminPage.waitForFunction(
+      () => document.body.innerText.includes('仪表盘'),
+      { timeout: 15000 }
+    );
+  } catch {
+    // 容忍 timeout，下面用文本判断
+  }
+
+  const adminText = await adminPage.evaluate(() => document.body.innerText);
+  check('管理平台显示"仪表盘"', adminText.includes('仪表盘'));
+  check('管理平台显示侧边栏"IAM 管理平台"', adminText.includes('IAM 管理平台'));
+  check('管理平台显示"用户管理"菜单', adminText.includes('用户管理'));
+  check('管理平台显示"角色管理"菜单', adminText.includes('角色管理'));
+  check('管理平台显示"部门管理"菜单', adminText.includes('部门管理'));
+  check('管理平台显示"应用管理"菜单', adminText.includes('应用管理'));
+  check('管理平台显示"租户管理"菜单', adminText.includes('租户管理'));
+  check('管理平台显示"OAuth 客户端"菜单', adminText.includes('OAuth 客户端'));
+
+  check('仪表盘展示 4 个统计卡片', ['用户总数', '角色总数', '部门总数', '应用总数'].every((k) => adminText.includes(k)));
+
+  await adminPage.close();
+}
+
 (async () => {
   const cleanup = await ensureServices();
 
@@ -384,6 +439,7 @@ async function ssoTest(rp1Page, rp1Sub) {
     await rp1FirstLogin(page);
     const rp1Sub = await testTokenDetails(page);
     await ssoTest(page, rp1Sub);
+    await testPlatformAdmin(page);
   } catch (e) {
     console.error('\n[!] 测试异常:', e.message);
     console.error(e.stack);

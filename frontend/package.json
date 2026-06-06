@@ -4,14 +4,15 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter @ark-iam/web dev",
-    "dev:web": "pnpm --filter @ark-iam/web dev",
+    "dev": "pnpm --filter @ark-iam/platform-admin-web dev",
+    "dev:web": "pnpm --filter @ark-iam/platform-admin-web dev",
     "dev:sso": "pnpm --filter @ark-iam/sso-test-app dev",
     "dev:sso2": "pnpm --filter @ark-iam/sso-test-app-2 dev",
-    "dev:log": "pnpm --filter @ark-iam/log-web dev",
-    "build:web": "pnpm --filter @ark-iam/web build",
-    "test": "pnpm --filter @ark-iam/web test",
-    "test:web": "pnpm --filter @ark-iam/web test"
+    "dev:log": "pnpm --filter @ark-iam/login-web dev",
+    "dev:all": "pnpm run --parallel --filter @ark-iam/platform-admin-web --filter @ark-iam/sso-test-app --filter @ark-iam/sso-test-app-2 --filter @ark-iam/login-web dev",
+    "build:web": "pnpm --filter @ark-iam/platform-admin-web build",
+    "test": "pnpm --filter @ark-iam/platform-admin-web test",
+    "test:web": "pnpm --filter @ark-iam/platform-admin-web test"
   },
   "packageManager": "pnpm@11.1.0+sha512.0c44e842e5686b2c061a81adda8b2258bd8818e9704b2cf2c63d56b931a7b2e910092e085027003b96ca3911ab56a07f6df5abaed2be9925034cdd686a535b14"
 }

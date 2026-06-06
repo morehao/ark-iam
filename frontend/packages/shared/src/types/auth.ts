@@ -1,18 +1,10 @@
-export type AuthStage = 'anonymous' | 'person' | 'tenant'
+export type AuthStage = 'anonymous' | 'authenticated'
 
-export interface PersonToken {
+export interface TokenSet {
   accessToken: string
+  idToken: string
   refreshToken: string
-  expiresIn: number
-  tokenType: string
-}
-
-export interface TenantMembership {
-  tenantID: number
-  name: string
-  tag: string
-  userID: number
-  isOwner: number
+  expiresAt: number
 }
 
 export interface PersonInfo {
@@ -21,19 +13,7 @@ export interface PersonInfo {
   avatar: string
 }
 
-export interface UserInfo {
-  userID: number
-  name: string
+export interface TenantInfo {
   tenantID: number
-  isOwner: number
-}
-
-export interface ConnectorAuthorizationResp {
-  authorizationURL: string
-  state: string
-}
-
-export interface ConnectorCallbackResp {
-  personToken: PersonToken
-  tenants: TenantMembership[]
+  tenantName: string
 }
