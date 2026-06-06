@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log/slog"
 	"time"
 
 	jose "github.com/go-jose/go-jose/v4"
@@ -16,6 +15,7 @@ import (
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/token"
+	"github.com/morehao/golib/glog"
 )
 
 type PersistentStore struct {
@@ -257,10 +257,10 @@ func (r *refreshTokenRequest) GetTenantID() uint                          { retu
 func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, clientID string) error {
 	personID, err := parseOIDCSubject(userID)
 	if err != nil {
-		slog.WarnContext(ctx, "TerminateSession: failed to parse userID", "userID", userID, "error", err)
+		glog.Warnf(ctx, "[PersistentStore.TerminateSession] parseOIDCSubject fail, userID:%s, err:%v", userID, err)
 		return nil
 	}
-	slog.InfoContext(ctx, "TerminateSession: revoking SSO sessions", "userID", userID, "personID", personID, "clientID", clientID)
+	glog.Infof(ctx, "[PersistentStore.TerminateSession] revoking SSO sessions, userID:%s, personID:%d, clientID:%s", userID, personID, clientID)
 	return NewSSOSessionStore().RevokeSessionsByPersonID(ctx, personID)
 }
 
