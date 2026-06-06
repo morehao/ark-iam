@@ -3,8 +3,8 @@ package router
 import (
 	"context"
 	"crypto/rsa"
-
 	"fmt"
+
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/controller/ctroidc"
