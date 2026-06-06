@@ -10,6 +10,8 @@ import {
   rp1Login,
   rp1SSOLogin,
   verifyRp1RequiresLogin,
+  rp1LogoutLocal,
+  rp1LogoutGlobal,
 } from '../helpers/oidc-helpers';
 
 test.describe('OIDC SSO E2E', () => {
@@ -87,5 +89,33 @@ test.describe('OIDC SSO E2E', () => {
     await adminDirectLogin(page);
     await rp1SSOLogin(rp1Page);
     await rp1Page.close();
+  });
+
+  test('RP1 本地退出 → 重新登录免密：退出当前应用 → 显示登录页 → 点"使用 IAM 登录" → SSO 免密进入主页', async ({ page }) => {
+    await rp1Login(page);
+    await rp1LogoutLocal(page);
+    // SSO Session 仍有效，点击"使用 IAM 登录"应免密进入主页
+    await page.click('button', { timeout: 5000 });
+    try {
+      await page.waitForURL(
+        (url) =>
+          url.hostname === 'localhost' &&
+          url.port === '3001' &&
+          !url.searchParams.has('authRequestID'),
+        { timeout: 20000 }
+      );
+    } catch {}
+    await page.waitForTimeout(2000);
+    await verifyRp1HomePage(page);
+  });
+
+  test('RP1 全局退出 → 需重新认证：全局退出 → 显示登录页 → 需填写凭证', async ({ page }) => {
+    await rp1Login(page);
+    await rp1LogoutGlobal(page);
+    // SSO Session 已清除，点击"使用 IAM 登录"应跳转到登录页
+    await page.click('button', { timeout: 5000 });
+    await page.waitForTimeout(2000);
+    expect(page.url()).toContain(CONFIG.loginWebUrl);
+    expect(page.url()).toContain('authRequestID=');
   });
 });
