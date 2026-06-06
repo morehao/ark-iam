@@ -227,11 +227,13 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 		ContinueURL: svc.provider.BuildAuthCallbackURL(ctx.Request.Context(), req.AuthRequestID),
 	}
 
-	sessionID, err := svc.ssoSessionStore.CreateSession(ctx.Request.Context(), personEntity.ID)
-	if err != nil {
-		glog.Warnf(ctx, "[oidcAuthSvc.CompleteLogin] failed to create sso session: %v", err)
-	} else {
-		resp.SessionID = sessionID
+	if svc.ssoSessionStore != nil {
+		sessionID, err := svc.ssoSessionStore.CreateSession(ctx.Request.Context(), personEntity.ID)
+		if err != nil {
+			glog.Warnf(ctx, "[oidcAuthSvc.CompleteLogin] failed to create sso session: %v", err)
+		} else {
+			resp.SessionID = sessionID
+		}
 	}
 
 	return resp, nil

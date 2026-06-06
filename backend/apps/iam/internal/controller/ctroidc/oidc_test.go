@@ -2,6 +2,7 @@ package ctroidc
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -13,11 +14,19 @@ import (
 )
 
 type fakeOIDCAuthSvc struct {
-	completeLogin func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error)
+	completeLogin        func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error)
+	completeLoginBySession func(ctx context.Context, authRequestID string, sessionID string) (string, error)
 }
 
 func (f *fakeOIDCAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
 	return f.completeLogin(ctx, req)
+}
+
+func (f *fakeOIDCAuthSvc) CompleteLoginBySession(ctx context.Context, authRequestID string, sessionID string) (string, error) {
+	if f.completeLoginBySession != nil {
+		return f.completeLoginBySession(ctx, authRequestID, sessionID)
+	}
+	return "", nil
 }
 
 func TestLoginReturnsContinueURLOnSuccess(t *testing.T) {

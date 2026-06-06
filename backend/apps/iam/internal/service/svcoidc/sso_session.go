@@ -14,11 +14,16 @@ import (
 )
 
 const (
-	ssoSessionKeyPrefix = "iam:oidc:sso_session:"
+	ssoSessionKeyPrefix      = "iam:oidc:sso_session:"
+	ssoUserSessionsKeyPrefix = "iam:oidc:sso_user_sessions:"
 )
 
 func ssoSessionKey(sessionID string) string {
 	return ssoSessionKeyPrefix + sessionID
+}
+
+func ssoUserSessionsKey(personID uint) string {
+	return fmt.Sprintf("%s%d", ssoUserSessionsKeyPrefix, personID)
 }
 
 func defaultSessionTTL() time.Duration {
@@ -37,6 +42,7 @@ type SSOSessionStore interface {
 	CreateSession(ctx context.Context, personID uint) (string, error)
 	ValidateSession(ctx context.Context, sessionID string) (uint, error)
 	RevokeSession(ctx context.Context, sessionID string) error
+	RevokeSessionsByPersonID(ctx context.Context, personID uint) error
 }
 
 type redisSSOSessionStore struct {
@@ -80,6 +86,8 @@ func (s *redisSSOSessionStore) CreateSession(ctx context.Context, personID uint)
 	if err := s.client.Set(ctx, ssoSessionKey(sessionID), encoded, ttl).Err(); err != nil {
 		return "", fmt.Errorf("failed to store session: %w", err)
 	}
+	s.client.SAdd(ctx, ssoUserSessionsKey(personID), sessionID)
+	s.client.Expire(ctx, ssoUserSessionsKey(personID), ttl)
 	return sessionID, nil
 }
 
@@ -105,5 +113,30 @@ func (s *redisSSOSessionStore) RevokeSession(ctx context.Context, sessionID stri
 	if s.client == nil {
 		return fmt.Errorf("redis client not available")
 	}
+	encoded, err := s.client.Get(ctx, ssoSessionKey(sessionID)).Bytes()
+	if err != nil {
+		return s.client.Del(ctx, ssoSessionKey(sessionID)).Err()
+	}
+	var data ssoSessionData
+	if err := json.Unmarshal(encoded, &data); err != nil {
+		return s.client.Del(ctx, ssoSessionKey(sessionID)).Err()
+	}
+	s.client.SRem(ctx, ssoUserSessionsKey(data.PersonID), sessionID)
 	return s.client.Del(ctx, ssoSessionKey(sessionID)).Err()
+}
+
+func (s *redisSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, personID uint) error {
+	if s.client == nil {
+		return fmt.Errorf("redis client not available")
+	}
+	userSessionsKey := ssoUserSessionsKey(personID)
+	sessionIDs, err := s.client.SMembers(ctx, userSessionsKey).Result()
+	if err != nil {
+		return fmt.Errorf("failed to get user sessions: %w", err)
+	}
+	for _, sessionID := range sessionIDs {
+		s.client.Del(ctx, ssoSessionKey(sessionID))
+	}
+	s.client.Del(ctx, userSessionsKey)
+	return nil
 }

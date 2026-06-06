@@ -193,6 +193,6 @@ ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
 -- client_id: platform-admin-web
 -- redirect_uris: http://localhost:3000/auth/callback
 -- ============================================
-INSERT INTO `oauth_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `type`, `is_third_party`, `status`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (2, 1, 1, 'platform-admin-web', 'IAM管理平台', '["http://localhost:3000/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'none', 1, '["openid","profile","email"]', 'first_party', 0, 'enable', 0, 0, 0)
+INSERT INTO `oauth_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `post_logout_redirect_uris`, `type`, `is_third_party`, `status`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (2, 1, 1, 'platform-admin-web', 'IAM管理平台', '["http://localhost:3000/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'none', 1, '["openid","profile","email"]', '["http://localhost:3000/login"]', 'first_party', 0, 'enable', 0, 0, 0)
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);

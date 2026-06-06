@@ -12,7 +12,7 @@ import {
   KeyOutlined,
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { getUserinfo } from '../api/auth'
+import { getUserinfo, logoutAPI } from '../api/auth'
 import { useAuthStore } from '../stores/authStore'
 import { getEndSessionURL } from '../utils/oidc'
 
@@ -24,7 +24,6 @@ const MainLayout = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const authStage = useAuthStore((state) => state.authStage)
-  const idToken = useAuthStore((state) => state.idToken)
   const logout = useAuthStore((state) => state.logout)
   const setPersonInfo = useAuthStore((state) => state.setPersonInfo)
 
@@ -39,10 +38,20 @@ const MainLayout = () => {
     { key: '/oauthClient', icon: <KeyOutlined />, label: 'OAuth 客户端' },
   ]
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const store = useAuthStore.getState()
+    const currentIdToken = store.idToken
+
+    try {
+      await logoutAPI(store.refreshToken ?? '')
+    } catch {
+      // 即使接口调用失败也继续退出流程
+    }
+
+    sessionStorage.setItem('logged_out', '1')
     logout()
-    if (idToken) {
-      window.location.assign(getEndSessionURL(idToken))
+    if (currentIdToken) {
+      window.location.assign(getEndSessionURL(currentIdToken))
     } else {
       navigate('/login')
     }

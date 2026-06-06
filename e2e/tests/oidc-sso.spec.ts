@@ -165,17 +165,32 @@ test.describe('OIDC SSO E2E', () => {
     expect(afterLogoutText).toContain('IAM 管理平台');
     expect(afterLogoutText).toContain('IAM 账号登录');
 
-    // 再次点击"IAM 账号登录"——应出现登录表单而非自动认证
+    // 再次点击"IAM 账号登录"——SSO session 已清除，不应自动认证进仪表盘
     const loginBtn2 = adminPage.locator('button', { hasText: 'IAM 账号登录' });
     await loginBtn2.click();
-    await adminPage.waitForTimeout(3000);
 
-    // 验证 SSO session 已被清除——不应自动进入仪表盘，应停留在 login-web 登录页
-    const currentUrl = adminPage.url();
-    const onLoginPage = currentUrl.includes(CONFIG.loginWebUrl) || currentUrl.includes('/oidc/login');
-    const onDashboard = (await adminPage.evaluate(() => document.body.innerText)).includes('仪表盘');
-    expect(onDashboard).toBe(false);
-    expect(onLoginPage).toBe(true);
+    // OIDC 重定向链路：/authorize → /auth/callback → /（仪表盘）
+    // 如果 SSO session 仍有效，重定向链会自动走完，最终停在仪表盘
+    // 等待链路完全完成后再判断最终状态
+    let autoLoggedIn = false;
+    try {
+      await adminPage.waitForFunction(
+        () => document.body.innerText.includes('仪表盘'),
+        { timeout: 10000 }
+      );
+      autoLoggedIn = true;
+    } catch {
+      // 超时未进入仪表盘 = SSO session 已清除，预期行为
+    }
+
+    const finalText = await adminPage.evaluate(() => document.body.innerText);
+    const finalUrl = adminPage.url();
+
+    // SSO session 已被清除——不应自动进入仪表盘
+    expect(autoLoggedIn, '退出登录后 SSO session 未被清除，仍自动认证进入仪表盘').toBe(false);
+    expect(finalText).not.toContain('仪表盘');
+    // 应停留在登录相关页面
+    expect(finalUrl).toMatch(/\/(login|oidc)/);
 
     await adminPage.close();
   });

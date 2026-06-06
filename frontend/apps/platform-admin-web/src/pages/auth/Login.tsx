@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button, Card } from 'antd'
 import { KeyOutlined } from '@ant-design/icons'
 import {
@@ -10,6 +10,12 @@ import {
 
 const Login = () => {
   const [loading, setLoading] = useState(false)
+  const isLoggedOut = sessionStorage.getItem('logged_out') === '1'
+
+  useEffect(() => {
+    sessionStorage.removeItem('logged_out')
+    document.cookie = 'iam_sso_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+  }, [])
 
   const handleOIDCLogin = async () => {
     setLoading(true)
@@ -17,7 +23,11 @@ const Login = () => {
       const params = generatePKCEParams()
       params.codeChallenge = await generateCodeChallenge(params.codeVerifier)
       storePKCEParams(params)
-      window.location.assign(buildAuthorizeURL(params))
+      let authorizeURL = buildAuthorizeURL(params)
+      if (isLoggedOut) {
+        authorizeURL += '&prompt=login'
+      }
+      window.location.assign(authorizeURL)
     } catch {
       setLoading(false)
     }
