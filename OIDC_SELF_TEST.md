@@ -30,7 +30,7 @@ mysql -uroot -p123456 iam < backend/scripts/sql/iam_seed_data.sql
 | 管理员账号 | `admin` / `admin123` |
 | OAuth ClientID | `test-rp-client` |
 | Client Secret | `my-test-client-secret` |
-| 回调地址 | `http://localhost:3001/`, `http://localhost:3002/` |
+| 回调地址 | `http://localhost:3001/`, `http://localhost:3000/` |
 
 ---
 
@@ -66,14 +66,13 @@ log-web 监听 `:3003`，提供 OIDC 授权码流程所需的登录表单。
 
 ## Step 4 — 启动 SSO 测试应用
 
-`sso-test-app` 和 `sso-test-app-2` 是 monorepo 下的子应用（`frontend/apps/sso-test-app/`、`frontend/apps/sso-test-app-2/`），基于 Vite 开发。
+`sso-test-app` 是 monorepo 下的子应用（`frontend/apps/sso-test-app/`），基于 Vite 开发。
 
-**从 monorepo 根目录同时启动 RP1 + RP2：**
+**启动：**
 
 ```bash
 cd frontend
 pnpm dev:sso
-pnpm dev:sso2
 ```
 
 **或从子应用目录单独启动：**
@@ -81,18 +80,13 @@ pnpm dev:sso2
 ```bash
 cd frontend/apps/sso-test-app
 pnpm dev
-
-# 另一个终端
-cd frontend/apps/sso-test-app-2
-pnpm dev
 ```
 
 | 应用 | 端口 | 说明 |
 |------|------|------|
 | sso-test-app | 3001 | SSO 测试 RP（首次手动登录） |
-| sso-test-app-2 | 3002 | SSO 测试 RP（自动 SSO 登录） |
 
-sso-test-app 和 sso-test-app-2 均无 API 代理，直接请求后端 `:8099`。
+sso-test-app 无 API 代理，直接请求后端 `:8099`。
 
 ---
 
@@ -101,45 +95,27 @@ sso-test-app 和 sso-test-app-2 均无 API 代理，直接请求后端 `:8099`�
 ### 流程示意图
 
 ```
-[测试RP1:3001]                      [测试RP2:3002]                       [IAM后端:8099]
-     |                                    |                                    |
-     |-- 1. 点击"使用IAM登录" ------------>|                                    |
-     |                                    |-- 2. GET /authorize -------------->|
-     |                                    |                                    |
-     |                                    |<-- 3. 302 → /sso-login -----------|
-     |                                    |    (无session cookie)              |
-     |                                    |                                    |
-|-- 4. 302 → :3003/login ---------->|                                    |
-|    ?authRequestID=ar-xxx           |                                    |
-     |                                    |                                    |
-     |-- 5. POST /oidc/login ------------>|                                    |
-     |    (admin/admin123)                |                                    |
-     |                                    |                                    |
-     |<-- 6. {continueURL, sessionID} ---|                                    |
-     |    + Set-Cookie: iam_sso_session   |                                    |
-     |                                    |                                    |
-     |-- 7. 302 → continueURL ----------->|                                    |
-     |<-- 8. 302 → :3001/?code=xxx ------|                                    |
-     |                                    |                                    |
-     |-- 9. POST /oauth/token ----------->|                                    |
-     |<-- 10. {access_token, id_token} ---|                                    |
-      |-- 10b. 展示"项目管理面板"主页       |                                    |
-     |                                    |                                    |
-     |                                    |-- (用户在RP1页面浏览中)           |
-     |                                    |                                    |
-     |                                    |-- 11. 打开RP2:3002，自动登录 ---->|
-     |                                    |                                    |
-     |                                    |-- 12. GET /authorize ------------->|
-     |                                    |                                    |
-     |                                    |<-- 13. 302 → /sso-login ---------|
-     |                                    |    (带session cookie!)            |
-     |                                    |                                    |
-     |                                    |-- 14. 自动完成认证，302 → continue|
-     |                                    |<-- 15. 302 → :3002/?code=yyy ----|
-     |                                    |                                    |
-     |                                    |-- 16. POST /oauth/token ---------->|
-     |                                    |<-- 17. {access_token, id_token} --|
-     |                                    |-- 17b. 展示"数据分析面板"主页    |
+[测试RP:3001]                        [IAM后端:8099]
+     |                                      |
+     |-- 1. 点击"使用IAM登录" ------------>|
+     |                                      |-- 2. GET /authorize -------------->
+     |                                      |
+     |                                      |<-- 3. 302 → /sso-login ------------
+|<-- 4. 302 → :3003/login ------------|
+|    ?authRequestID=ar-xxx             |
+     |                                      |
+     |-- 5. POST /oidc/login ------------->|
+     |    (admin/admin123)                  |
+     |                                      |
+     |<-- 6. {continueURL, sessionID} ------|
+     |    + Set-Cookie: iam_sso_session     |
+     |                                      |
+     |-- 7. 302 → continueURL ------------>|
+     |<-- 8. 302 → :3001/?code=xxx --------|
+     |                                      |
+     |-- 9. POST /oauth/token ------------->|
+     |<-- 10. {access_token, id_token} -----|
+     |-- 10b. 展示"项目管理面板"主页       |
 ```
 
 ### 操作步骤（RP1 首次登录）
@@ -166,27 +142,24 @@ sso-test-app 和 sso-test-app-2 均无 API 代理，直接请求后端 `:8099`�
 
 ---
 
-## Step 6 — 双 RP SSO 验证
+## Step 6 — 管理平台 SSO 自动登录验证
 
-### 流程示意图
-
-见上方 Step 5 流程图（步骤 11-17）。
+SSO 验证中，改以管理平台（platform-admin-web）作为第二个 RP，替代 sso-test-app-2。
 
 ### 操作步骤
 
 1. ✅ 完成 Step 5（RP1 已成功登录，浏览器已有 `iam_sso_session` cookie）
-2. 打开新标签页 `http://localhost:3002/`
-3. **页面自动重定向到 IAM OIDC authorize 端点**（无需任何点击操作）
-4. IAM 检测到已有 session cookie → **自动签发授权码**，重定向回 RP2
-5. RP2 自动完成令牌交换，展示 **"数据分析面板"主页**
+2. 打开新标签页 `http://localhost:3000/`
+3. 页面显示管理平台登录页，点击 **"IAM 账号登录"**
+4. IAM 检测到已有 session cookie → **自动签发授权码**，重定向回管理平台
+5. 管理平台自动完成令牌交换，展示 **仪表盘**
 
 ### 验证要点
 
 - ✅ RP1 首次登录：跳转到 IAM 登录页 → 输入凭据 → 展示"项目管理面板"主页
-- ✅ RP2 二次登录：**无登录表单出现，页面自动完成跳转**，直接展示"数据分析面板"主页
-- ✅ 两个 RP 的 SSO 徽标一致（同一用户身份），但主页面板数据不同
-- ✅ 点击 **"查看 Token 详情"** 可看到有效的 access_token 和 id_token
-- ✅ 两个 RP 的 id_token 中 sub（personID）一致
+- ✅ 管理平台 SSO 登录：点击"IAM 账号登录"后**无登录表单出现**，直接进入仪表盘
+- ✅ 仪表盘展示统计信息（用户总数、角色总数、部门总数、应用总数）
+- ✅ 侧边栏菜单完整（用户管理、角色管理、部门管理、应用管理、租户管理、OAuth 客户端）
 
 ---
 
@@ -196,96 +169,64 @@ sso-test-app 和 sso-test-app-2 均无 API 代理，直接请求后端 `:8099`�
 
 | 验证点 | 说明 | 结果 |
 |--------|------|------|
-| 首次登录需凭据 | RP1 首次访问 IAM IdP，无 session cookie，显示登录页 | ✅ |
-| SSO 自动认证 | RP2 访问 IAM IdP，携带 `iam_sso_session` cookie，自动完成认证 | ✅ |
+| 首次登录需凭据 | RP 首次访问 IAM IdP，无 session cookie，显示登录页 | ✅ |
+| SSO 自动认证 | 管理平台访问 IAM IdP，携带 `iam_sso_session` cookie，自动完成认证 | ✅ |
 | 身份令牌签发 | IAM 签发 id_token，含 sub(personID) 等声明 | ✅ |
-| 跨应用令牌 | 同一用户在不同 RP 获取不同的授权码和令牌 | ✅ |
+| 跨应用令牌 | 同一用户在不同应用获取不同的授权码和令牌 | ✅ |
 
-**SSO 的本质** — 用户只需要在 IAM（IdP）进行一次认证后，浏览器获得 `iam_sso_session` cookie。后续任意 RP（RP1、RP2 乃至更多）发起 OIDC 授权请求时，服务端 `/sso-login` 端点检测到有效 cookie，自动完成用户认证并生成授权码，用户全程无需干预。
+**SSO 的本质** — 用户只需要在 IAM（IdP）进行一次认证后，浏览器获得 `iam_sso_session` cookie。后续任意应用（测试 RP、管理平台）发起 OIDC 授权请求时，服务端 `/sso-login` 端点检测到有效 cookie，自动完成用户认证并生成授权码，用户全程无需干预。
 
 ---
 
 ## Step 8 — 自动化端到端测试
 
-项目提供了基于 puppeteer 的端到端自动化测试脚本，模拟真实浏览器操作，验证 Step 5 + Step 6 中的全部 25 个验证点（跳转路径、Token 交换、UserInfo、刷新 Token、SSO 跨 RP 等）。
-
-### 脚本位置
-
-`e2e/oidc-e2e.js`，依赖在 `e2e/package.json`，使用说明在 `e2e/README.md`。
+项目提供了基于 Playwright 的端到端自动化测试，模拟真实浏览器操作验证 OIDC SSO 完整流程。
 
 ### 前置条件
 
-- 已完成 Step 1 ~ Step 4（数据库、后端、log-web、sso-test-app、sso-test-app-2 全部启动并运行）
-- macOS 已安装 Google Chrome
+- 已完成 Step 1 ~ Step 4（数据库、后端、login-web、sso-test-app 全部启动并运行）
+- 安装 Playwright：`cd e2e && npm install && npx playwright install chromium`
 
 ### 运行
 
 ```bash
+# 如果服务未启动，Playwright 的 globalSetup 会自动启动所需服务
 cd e2e
 
-# 安装依赖
-npm install
+# 执行端到端测试（headless 模式）
+npx playwright test
 
-# 执行端到端测试
-npm run test:oidc
+# 有头模式（可视化调试）
+npx playwright test --headed
+
+# 调试模式
+npx playwright test --debug
 ```
 
 ### 输出示例
 
 ```
-========== Step 5: RP1 首次登录 ==========
-✅ RP1 首页加载
-✅ 找到并点击"使用 IAM 登录"按钮
-✅ 跳转到 log-web 登录页
-✅ 跳回 RP1 回调页 (带 code/state)
-✅ 显示"项目管理面板"标题
-✅ 显示 SSO 登录徽标
-✅ 展示 4 个统计卡片
-✅ 统计卡片包含"项目数"
-✅ 统计卡片包含"任务数"
-✅ 统计卡片包含"消息数"
-✅ 统计卡片包含"团队数"
+Running 3 tests using 1 worker
 
-========== 验证 Token 详情相关功能 ==========
-✅ Token 详情页显示 access_token
-✅ Token 详情页显示 id_token
-✅ Token 详情页显示 refresh_token
-✅ 从 id_token 解码出 sub (personID)
-✅ UserInfo 获取成功
-✅ Token 刷新成功 (access_token 已更新)
-✅ 成功返回项目管理面板
+  ✓  RP1 首次登录 (25.3s)
+  ✓  RP1 Token 详情 (22.1s)
+  ✓  管理平台 SSO 自动登录 (28.6s)
 
-========== Step 6: 双 RP SSO 验证 ==========
-✅ iam_sso_session cookie 存在
-✅ SSO 流程中无登录表单出现
-✅ RP2 显示"数据分析面板"
-✅ RP2 显示 SSO 登录徽标
-✅ RP2 展示 4 个统计卡片 (订单数/客户数/待处理/完成率)
-✅ RP2 id_token 解码出 sub
-✅ RP1 和 RP2 的 id_token.sub 一致
-
-========== 测试结果汇总 ==========
-总计: 25 通过: 25 失败: 0
+  3 passed (76s)
 ```
 
 退出码：全部通过返回 0，有失败返回 1（适合接入 CI）。
 
-### 跨平台 Chrome 路径
+### 进程清理
 
-`oidc-e2e.js` 的 `CONFIG.chromePath` 默认值：
-
-| 平台 | 路径 |
-|------|------|
-| macOS | `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` |
-| Linux | `/usr/bin/google-chrome`（按需修改） |
-| Windows | `C:\Program Files\Google\Chrome\Application\chrome.exe`（按需修改） |
+测试通过 `globalSetup` 启动所需服务（如果未运行），`globalTeardown` 确保测试结束后（无论成功/失败）自动停止所有进程。无需手动清理。
 
 ### 常见失败排查
 
 - **`RP1 首页加载` 失败** → 检查 `sso-test-app` 是否在 3001 端口运行
-- **`跳转到 log-web 登录页` 失败** → 检查 `log-web` 是否在 3003 端口运行
-- **`Token 刷新成功` 失败** → 检查 `sso-test-app` 和 `sso-test-app-2` 的 scope 是否包含 `offline_access`（已修复，源码默认带上）
-- **`RP1 和 RP2 的 id_token.sub 一致` 失败** → 检查 `iam_sso_session` cookie 是否被设置、Redis 是否可达
+- **跳转到登录页失败** → 检查 `login-web` 是否在 3003 端口运行
+- **`Token 刷新成功` 失败** → 检查 sso-test-app 的 scope 是否包含 `offline_access`
+- **管理平台 SSO 登录失败** → 检查 `platform-admin-web` 是否在 3000 端口运行
 
 ---
 
@@ -298,10 +239,9 @@ npm run test:oidc
 | IAM 后端 | `http://localhost:8099` | 8099 | Gin HTTP 服务 |
 | IAM 前端 | `http://localhost:3000` | 3000 | React SPA（管理端） |
 | 独立登录页 | `http://localhost:3003` | 3003 | Vite + React（独立 IdP 登录页） |
-| SSO 测试 RP1 | `http://localhost:3001` | 3001 | 静态 HTML 测试页 |
-| SSO 测试 RP2 | `http://localhost:3002` | 3002 | 静态 HTML 测试页（验证 SSO） |
+| SSO 测试 RP | `http://localhost:3001` | 3001 | 静态 HTML 测试页 |
 | OIDC Issuer | `http://localhost:8099/v1/iam/oidc` | - | OIDC Provider 根路径 |
-| OIDC 登录页 | `http://localhost:3003/login` | - | 独立登录页服务（log-web） |
+| OIDC 登录页 | `http://localhost:3003/login` | - | 独立登录页服务（login-web） |
 | SSO Session | `iam_sso_session` cookie | - | HTTP-only，Redis 存储，24h 过期 |
 
 ---
@@ -331,9 +271,8 @@ A: OIDC 路由组已配置 CORS 中间件，检查浏览器是否拦截。
 A: 检查 sso-test-app 的 `scope` 是否包含 `offline_access`。IAM 后端仅在请求 scope 含 `offline_access` 时才签发 refresh_token。源码已默认带上 `openid profile email offline_access`，如自定义过请补上。
 
 **Q: 自动化测试用例不通过？**
-A: 运行 `cd e2e && npm run test:oidc` 逐项查看失败项。常见原因：
-- 服务未启动：检查 8099 / 3001 / 3002 / 3003 端口
-- Chrome 路径不对：编辑 `e2e/oidc-e2e.js` 的 `CONFIG.chromePath`
+A: 运行 `cd e2e && npx playwright test` 逐项查看失败项。常见原因：
+- 服务未启动：检查 8099 / 3001 / 3000 / 3003 端口
 - 端口被占用：清理占用进程或改端口
 
 **Q: trace 初始化报错？**
