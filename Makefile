@@ -33,7 +33,7 @@ PORT              = 8099
 # ============================================================
 .PHONY: all build build-env clean run lint test swag codegen \
         docker-build docker-run check-image \
-        list-apps deps tidy update-dep dev-frontend stop-frontend help
+        list-apps deps tidy update-dep dev-frontend stop-frontend e2e help
 
 # ============================================================
 # 通用入口：清理、依赖、构建并运行
@@ -249,6 +249,12 @@ stop-frontend:
 	@echo "🛑 正在停止前端服务..."
 	@pkill -f "vite.*ark-iam" 2>/dev/null && echo "✅ 已停止" || echo "⚠️  没有运行中的前端服务"
 
+# 运行 E2E 测试（需先安装依赖：cd e2e && npm install && npx playwright install chromium）
+.PHONY: e2e
+e2e:
+	@echo "🧪 运行 E2E 测试..."
+	@cd e2e && npx playwright test
+
 # ============================================================
 # 其他工具
 # ============================================================
@@ -280,6 +286,7 @@ help:
 	@echo "  测试 & 检查"
 	@echo "    make test      APP=<名称>              运行单元测试"
 	@echo "    make lint                              运行 golangci-lint"
+	@echo "    make e2e                                运行 E2E 测试（Playwright）"
 	@echo ""
 	@echo "  依赖管理"
 	@echo "    make deps                              同步 workspace 并更新全部模块依赖"
