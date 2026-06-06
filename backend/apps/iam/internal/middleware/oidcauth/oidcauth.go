@@ -32,7 +32,7 @@ func WithAuthSkipPaths(paths ...string) AuthOption {
 	}
 }
 
-func OIDCCompatibleAuth(secretKey string, oidcPublicKey *rsa.PublicKey, opts ...AuthOption) gin.HandlerFunc {
+func OIDCCompatibleAuth(secretKey string, getOIDCPublicKey func() *rsa.PublicKey, opts ...AuthOption) gin.HandlerFunc {
 	cfg := &authConfig{}
 	for _, opt := range opts {
 		opt(cfg)
@@ -51,6 +51,7 @@ func OIDCCompatibleAuth(secretKey string, oidcPublicKey *rsa.PublicKey, opts ...
 			return
 		}
 
+		oidcPublicKey := getOIDCPublicKey()
 		claims, err := validateOIDCAccessToken(tokenStr, oidcPublicKey)
 		if err == nil {
 			setOIDCContext(ctx, claims, tokenStr)
@@ -85,6 +86,9 @@ func OIDCCompatibleAuth(secretKey string, oidcPublicKey *rsa.PublicKey, opts ...
 }
 
 func validateOIDCAccessToken(tokenStr string, publicKey *rsa.PublicKey) (jwt.MapClaims, error) {
+	if publicKey == nil {
+		return nil, errors.New("oidc public key not initialized")
+	}
 	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])

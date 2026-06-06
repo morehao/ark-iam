@@ -1,6 +1,8 @@
 package iam
 
 import (
+	"crypto/rsa"
+
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/config"
 	_ "github.com/morehao/ark-iam/iam/docs"
@@ -19,7 +21,7 @@ func Routers(engine *gin.Engine) {
 		routerGroups := ginserver.NewRouterGroups(engine, AppName, ginserver.Version{
 			Name: gconstant.ApiVersionV1,
 			Middlewares: []gin.HandlerFunc{
-				oidcauth.OIDCCompatibleAuth(config.Conf.JWT.SignKey, router.OIDCPublicKey, oidcauth.WithAuthSkipPaths(
+				oidcauth.OIDCCompatibleAuth(config.Conf.JWT.SignKey, func() *rsa.PublicKey { return router.OIDCPublicKey }, oidcauth.WithAuthSkipPaths(
 					"/v1/iam/org/getConfigsByDomain",
 					"/v1/iam/auth/login",
 					"/v1/iam/auth/myTenants",

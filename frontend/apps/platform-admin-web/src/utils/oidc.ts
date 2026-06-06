@@ -35,7 +35,7 @@ export async function generateCodeChallenge(verifier: string): Promise<string> {
 }
 
 export function buildAuthorizeURL(params: PKCEParams): string {
-  const url = new URL(`${OIDC_ISSUER}/authorize`)
+  const url = new URL(`${OIDC_ISSUER}/authorize`, window.location.origin)
   url.searchParams.set('client_id', OIDC_CLIENT_ID)
   url.searchParams.set('redirect_uri', OIDC_REDIRECT_URI)
   url.searchParams.set('response_type', 'code')
@@ -122,7 +122,7 @@ export function parseJWT(token: string): Record<string, unknown> | null {
 }
 
 export function getEndSessionURL(idToken: string): string {
-  const url = new URL(`${OIDC_ISSUER}/end_session`)
+  const url = new URL(`${OIDC_ISSUER}/end_session`, window.location.origin)
   url.searchParams.set('id_token_hint', idToken)
   url.searchParams.set('post_logout_redirect_uri', window.location.origin + '/login')
   return url.toString()

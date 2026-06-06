@@ -26,3 +26,4 @@ docs/superpowers/plans/
 *.exe
 *.out
 backend/apps/**/cmd/cmd
+backend/cmd

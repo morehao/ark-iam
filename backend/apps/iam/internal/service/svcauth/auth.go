@@ -420,24 +420,33 @@ func (svc *authSvc) LogoutAll(ctx *gin.Context, req *dtoauth.LogoutAllReq) error
 }
 
 func (svc *authSvc) Userinfo(ctx *gin.Context, req *dtoauth.UserinfoReq) (*dtoauth.UserinfoResp, error) {
+	userDao := newAuthUserStore()
+
 	userID := gincontext.GetUserID(ctx)
-	if userID == 0 {
+	personID := gincontext.GetPersonID(ctx)
+	tenantID := gincontext.GetTenantID(ctx)
+
+	var userEntity *model.UserEntity
+	var err error
+
+	if userID != 0 {
+		userEntity, err = userDao.GetByID(ctx.Request.Context(), userID)
+	} else if personID != 0 && tenantID != 0 {
+		userEntity, err = userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{PersonID: personID, TenantID: tenantID})
+	} else {
 		return nil, code.GetError(gconstant.UnauthorizedErr)
 	}
 
-	userDao := newAuthUserStore()
-	userEntity, err := userDao.GetByID(ctx.Request.Context(), userID)
 	if err != nil {
-		glog.Errorf(ctx, "[svcauth.Userinfo] dao GetByID fail, err:%v, userID:%d", err, userID)
+		glog.Errorf(ctx, "[svcauth.Userinfo] dao query fail, err:%v, userID:%d, personID:%d, tenantID:%d", err, userID, personID, tenantID)
 		return nil, code.GetError(code.UserGetDetailError)
 	}
 	if userEntity == nil || userEntity.ID == 0 {
 		return nil, code.GetError(code.UserNotExistError)
 	}
 
-	personID := userEntity.PersonID
-	if ctxPersonID := gincontext.GetPersonID(ctx); ctxPersonID != 0 {
-		personID = ctxPersonID
+	if personID == 0 {
+		personID = userEntity.PersonID
 	}
 
 	personInfo := objauth.PersonInfo{}
