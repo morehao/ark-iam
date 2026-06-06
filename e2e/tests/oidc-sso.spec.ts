@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { CONFIG } from '../config';
 import {
+  clickByText,
   verifyRp1HomePage,
   verifyTokenDetails,
   logoutFromAdmin,
@@ -95,16 +96,14 @@ test.describe('OIDC SSO E2E', () => {
     await rp1Login(page);
     await rp1LogoutLocal(page);
     // SSO Session 仍有效，点击"使用 IAM 登录"应免密进入主页
-    await page.click('button', { timeout: 5000 });
-    try {
-      await page.waitForURL(
-        (url) =>
-          url.hostname === 'localhost' &&
-          url.port === '3001' &&
-          !url.searchParams.has('authRequestID'),
-        { timeout: 20000 }
-      );
-    } catch {}
+    await clickByText(page, '使用 IAM 登录');
+    await page.waitForURL(
+      (url) =>
+        url.hostname === 'localhost' &&
+        url.port === '3001' &&
+        !url.searchParams.has('authRequestID'),
+      { timeout: 20000 }
+    );
     await page.waitForTimeout(2000);
     await verifyRp1HomePage(page);
   });
@@ -113,9 +112,11 @@ test.describe('OIDC SSO E2E', () => {
     await rp1Login(page);
     await rp1LogoutGlobal(page);
     // SSO Session 已清除，点击"使用 IAM 登录"应跳转到登录页
-    await page.click('button', { timeout: 5000 });
-    await page.waitForTimeout(2000);
-    expect(page.url()).toContain(CONFIG.loginWebUrl);
+    await clickByText(page, '使用 IAM 登录');
+    await page.waitForURL(
+      (url) => url.toString().includes(CONFIG.loginWebUrl),
+      { timeout: 15000 }
+    );
     expect(page.url()).toContain('authRequestID=');
   });
 });
