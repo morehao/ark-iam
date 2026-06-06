@@ -2,14 +2,13 @@
   "name": "@ark-iam/e2e",
   "version": "1.0.0",
   "private": true,
-  "description": "OIDC 端到端自动化测试，模拟浏览器验证完整 OIDC 流程",
-  "main": "oidc-e2e.js",
+  "description": "OIDC SSO E2E tests with Playwright",
   "scripts": {
-    "test:oidc": "node oidc-e2e.js",
-    "test:admin": "node admin-e2e.js",
-    "test": "npm run test:oidc && npm run test:admin"
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed",
+    "test:debug": "npx playwright test --debug"
   },
-  "dependencies": {
-    "puppeteer-core": "^25.1.0"
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
   }
 }
