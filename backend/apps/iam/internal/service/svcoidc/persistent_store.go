@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	jose "github.com/go-jose/go-jose/v4"
@@ -254,7 +255,13 @@ func (r *refreshTokenRequest) SetCurrentScopes(scopes []string)           { r.sc
 func (r *refreshTokenRequest) GetTenantID() uint                          { return r.tenantID }
 
 func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, clientID string) error {
-	return nil
+	personID, err := parseOIDCSubject(userID)
+	if err != nil {
+		slog.WarnContext(ctx, "TerminateSession: failed to parse userID", "userID", userID, "error", err)
+		return nil
+	}
+	slog.InfoContext(ctx, "TerminateSession: revoking SSO sessions", "userID", userID, "personID", personID, "clientID", clientID)
+	return NewSSOSessionStore().RevokeSessionsByPersonID(ctx, personID)
 }
 
 func (s *PersistentStore) RevokeToken(ctx context.Context, tokenOrTokenID string, userID string, clientID string) *oidc.Error {
