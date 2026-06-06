@@ -67,6 +67,7 @@ func (s *PersistentStore) AuthorizeClientIDSecret(ctx context.Context, clientID,
 }
 
 func (s *PersistentStore) SetUserinfoFromScopes(ctx context.Context, userinfo *oidc.UserInfo, userID, clientID string, scopes []string) error {
+	userinfo.Subject = userID
 	pid, err := parseOIDCSubject(userID)
 	if err != nil {
 		return nil
@@ -92,6 +93,7 @@ func (s *PersistentStore) SetUserinfoFromScopes(ctx context.Context, userinfo *o
 }
 
 func (s *PersistentStore) SetUserinfoFromToken(ctx context.Context, userinfo *oidc.UserInfo, tokenID, subject, origin string) error {
+	userinfo.Subject = subject
 	pid, err := parseOIDCSubject(subject)
 	if err != nil {
 		return nil

@@ -124,5 +124,6 @@ export function parseJWT(token: string): Record<string, unknown> | null {
 export function getEndSessionURL(idToken: string): string {
   const url = new URL(`${OIDC_ISSUER}/end_session`, window.location.origin)
   url.searchParams.set('id_token_hint', idToken)
+  url.searchParams.set('post_logout_redirect_uri', `${window.location.origin}/login`)
   return url.toString()
 }

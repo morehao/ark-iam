@@ -47,5 +47,5 @@ func InitOIDC(engine *gin.Engine, groups *ginserver.RouterGroups) {
 		ctx.SetCookie("iam_sso_session", "", -1, "/", "", false, true)
 		ctx.Redirect(302, config.Conf.OIDC.FrontendLoginURL)
 	})
-	svcoidc.RegisterProviderRoutes(oidcGroup, provider)
+	svcoidc.RegisterProviderRoutes(oidcGroup, provider, "iam_sso_session")
 }
