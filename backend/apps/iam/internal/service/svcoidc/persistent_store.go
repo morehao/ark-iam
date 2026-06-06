@@ -14,6 +14,7 @@ import (
 
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/token"
 	"github.com/morehao/golib/glog"
 )
@@ -111,10 +112,6 @@ func (s *PersistentStore) SetUserinfoFromToken(ctx context.Context, userinfo *oi
 
 func (s *PersistentStore) SetIntrospectionFromToken(ctx context.Context, introspection *oidc.IntrospectionResponse, tokenID, subject, clientID string) error {
 	return nil
-}
-
-type hasTenantID interface {
-	GetTenantID() uint
 }
 
 func (s *PersistentStore) GetPrivateClaimsFromScopes(ctx context.Context, userID, clientID string, scopes []string) (map[string]any, error) {
@@ -262,11 +259,35 @@ func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, c
 		glog.Warnf(ctx, "[PersistentStore.TerminateSession] parseOIDCSubject fail, userID:%s, err:%v", userID, err)
 		return nil
 	}
-	glog.Infof(ctx, "[PersistentStore.TerminateSession] revoking SSO sessions, userID:%s, personID:%d, clientID:%s", userID, personID, clientID)
-	return NewSSOSessionStore().RevokeSessionsByPersonID(ctx, personID)
+	glog.Infof(ctx, "[PersistentStore.TerminateSession] terminating session, userID:%s, personID:%d, clientID:%s", userID, personID, clientID)
+
+	if ssoErr := NewSSOSessionStore().RevokeSessionsByPersonID(ctx, personID); ssoErr != nil {
+		glog.Warnf(ctx, "[PersistentStore.TerminateSession] revoke SSO sessions fail, err:%v", ssoErr)
+	}
+
+	now := time.Now()
+	dbErr := dbclient.IamDB(ctx).Model(&model.RefreshTokenEntity{}).Table(model.TableNameRefreshToken).
+		Where("person_id = ?", personID).Where("revoked_at IS NULL").
+		Update("revoked_at", &now).Error
+	if dbErr != nil {
+		glog.Warnf(ctx, "[PersistentStore.TerminateSession] revoke refresh tokens fail, personID:%d, err:%v", personID, dbErr)
+	}
+	return nil
 }
 
 func (s *PersistentStore) RevokeToken(ctx context.Context, tokenOrTokenID string, userID string, clientID string) *oidc.Error {
+	refreshTokenHash := token.HashToken(tokenOrTokenID)
+	storedToken, err := s.refreshTokenDao().GetByCond(ctx, &dao.RefreshTokenCond{Token: refreshTokenHash})
+	if err != nil || storedToken == nil || storedToken.ID == 0 {
+		return nil
+	}
+	now := time.Now()
+	if updateErr := s.refreshTokenDao().UpdateMap(ctx, storedToken.ID, map[string]any{
+		"revoked_at": &now,
+	}); updateErr != nil {
+		glog.Warnf(ctx, "[PersistentStore.RevokeToken] update revoked_at fail, tokenID:%d, err:%v", storedToken.ID, updateErr)
+		return nil
+	}
 	return nil
 }
 

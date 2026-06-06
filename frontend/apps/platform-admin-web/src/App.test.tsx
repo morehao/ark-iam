@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import App from './App'
@@ -16,6 +16,10 @@ vi.mock('./pages/auth/AuthCallback', () => ({
 }))
 
 describe('App', () => {
+  beforeEach(() => {
+    sessionStorage.setItem('oidc_silent_failed', '1')
+  })
+
   it('renders login page for anonymous users at root', () => {
     render(
       <MemoryRouter initialEntries={['/login']}>

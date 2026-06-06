@@ -24,7 +24,12 @@ const AuthCallback = () => {
     const error = searchParams.get('error')
 
     if (error) {
-      message.error(`登录失败: ${searchParams.get('error_description') || error}`)
+      if (error === 'login_required') {
+        sessionStorage.setItem('oidc_silent_failed', '1')
+      } else {
+        message.error(`登录失败: ${searchParams.get('error_description') || error}`)
+      }
+      clearPKCEParams()
       navigate('/login', { replace: true })
       return
     }
@@ -37,7 +42,7 @@ const AuthCallback = () => {
 
     const pkceParams = loadPKCEParams()
     if (!pkceParams || pkceParams.state !== state) {
-      message.error('登录状态验证失败，请重新登录')
+      clearPKCEParams()
       navigate('/login', { replace: true })
       return
     }

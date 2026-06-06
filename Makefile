@@ -33,7 +33,7 @@ PORT              = 8099
 # ============================================================
 .PHONY: all build build-env clean run lint test swag codegen \
         docker-build docker-run check-image \
-        list-apps deps tidy update-dep dev-frontend stop-frontend e2e e2e-sso e2e-test help
+        list-apps deps tidy update-dep dev-frontend stop-frontend e2e e2e-sso e2e-test verify-oidc help
 
 # ============================================================
 # 通用入口：清理、依赖、构建并运行
@@ -273,6 +273,12 @@ e2e-test:
 	@echo "🧪 运行 E2E 测试: $(TEST)"
 	@cd e2e && npx playwright test --grep "$(TEST)"
 
+# OIDC SSO 登录流程验证（curl 脚本，需先启动后端）
+.PHONY: verify-oidc
+verify-oidc:
+	@echo "🔐 验证 OIDC SSO 登录流程..."
+	@./scripts/verify-oidc-flow.sh
+
 # ============================================================
 # 其他工具
 # ============================================================
@@ -307,6 +313,7 @@ help:
 	@echo "    make e2e                                运行全部 E2E 测试"
 	@echo "    make e2e-sso                            运行 OIDC SSO E2E 测试"
 	@echo "    make e2e-test TEST=\"关键词\"           按名称匹配运行 E2E 测试"
+	@echo "    make verify-oidc                        OIDC SSO 登录流程验证（curl 脚本）"
 	@echo ""
 	@echo "  依赖管理"
 	@echo "    make deps                              同步 workspace 并更新全部模块依赖"

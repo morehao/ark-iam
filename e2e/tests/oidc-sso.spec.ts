@@ -1,197 +1,91 @@
 import { test, expect } from '@playwright/test';
 import { CONFIG } from '../config';
 import {
-  fillLoginFormAndSubmit,
   verifyRp1HomePage,
   verifyTokenDetails,
-  verifyPlatformAdminSSO,
   logoutFromAdmin,
+  adminDirectLogin,
+  adminSSOLogin,
+  adminRequiresLoginAfterLogout,
+  rp1Login,
+  rp1SSOLogin,
+  verifyRp1RequiresLogin,
 } from '../helpers/oidc-helpers';
 
 test.describe('OIDC SSO E2E', () => {
-  test('RP1 首次登录：点击"使用 IAM 登录" → 跳转登录页 → 填写凭证 → 回调展示项目管理面板', async ({ page, context }) => {
-    // 1) 打开 RP1
-    await page.goto(CONFIG.rp1Url, { waitUntil: 'networkidle' });
-    expect(page.url()).toBe(CONFIG.rp1Url);
-
-    // 2) 点击"使用 IAM 登录"按钮
-    await page.click('button', { timeout: 5000 });
-    await page.waitForTimeout(2000);
-
-    // 3) 验证跳转到 login-web 登录页
-    expect(page.url()).toContain(CONFIG.loginWebUrl);
-    expect(page.url()).toContain('authRequestID=');
-
-    // 4) 填写凭证并提交
-    await page.waitForSelector('#identifier', { timeout: 5000 });
-    await page.fill('#identifier', CONFIG.identifier);
-    await page.fill('#password', CONFIG.password);
-
-    // 等待 OIDC 回调完成
-    await page.click('button[type="submit"]');
-    await page.waitForURL((url) => url.hostname === 'localhost' && url.searchParams.has('code'), { timeout: 20000 });
-    await page.waitForTimeout(2000);
-
-    // 5) 验证 RP1 回调 URL 带 code/state
-    const callbackUrl = page.url();
-    expect(callbackUrl).toContain('code=');
-    expect(callbackUrl).toContain('state=');
-
-    // 6) 验证项目管理面板
-    await verifyRp1HomePage(page);
+  test('RP1 首次登录：点击"使用 IAM 登录" → 跳转登录页 → 填写凭证 → 回调展示项目管理面板', async ({ page }) => {
+    await rp1Login(page);
   });
 
-  test('RP1 Token 详情：查看 Token → 获取 UserInfo → 刷新 Token → 返回主页', async ({ page, context }) => {
-    // 先完成登录
-    await page.goto(CONFIG.rp1Url, { waitUntil: 'networkidle' });
-    await page.click('button', { timeout: 5000 });
-    await page.waitForTimeout(2000);
-
-    await page.waitForSelector('#identifier', { timeout: 5000 });
-    await page.fill('#identifier', CONFIG.identifier);
-    await page.fill('#password', CONFIG.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL((url) => url.hostname === 'localhost' && url.searchParams.has('code'), { timeout: 20000 });
-    await page.waitForTimeout(2000);
-
-    // 验证凭证页面先加载
-    await page.waitForFunction(() => document.body.innerText.includes('项目管理面板'), { timeout: 10000 });
-
-    // 验证 Token 详情
+  test('RP1 Token 详情：查看 Token → 获取 UserInfo → 刷新 Token → 返回主页', async ({ page }) => {
+    await rp1Login(page);
     await verifyTokenDetails(page);
   });
 
-  test('管理平台 SSO 自动登录：RP1 登录后 → 打开管理平台 → 点击 IAM 账号登录 → 自动认证进仪表盘', async ({ page, context }) => {
-    // RP1 登录
-    await page.goto(CONFIG.rp1Url, { waitUntil: 'networkidle' });
-    await page.click('button', { timeout: 5000 });
-    await page.waitForTimeout(2000);
-
-    await page.waitForSelector('#identifier', { timeout: 5000 });
-    await page.fill('#identifier', CONFIG.identifier);
-    await page.fill('#password', CONFIG.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL((url) => url.hostname === 'localhost' && url.searchParams.has('code'), { timeout: 20000 });
-    await page.waitForTimeout(2000);
-
-    await page.waitForFunction(() => document.body.innerText.includes('项目管理面板'), { timeout: 10000 });
-
-    // 在同一 context 中打开管理平台（cookie 自动共享）
+  test('管理平台 SSO 自动登录：RP1 登录后 → 打开管理平台 → 静默认证直接进仪表盘', async ({ page, context }) => {
+    await rp1Login(page);
     const adminPage = await context.newPage();
-
-    // 验证管理平台 SSO
-    await adminPage.goto(CONFIG.platformAdminUrl, { waitUntil: 'networkidle', timeout: 15000 });
-    await adminPage.waitForTimeout(2000);
-
-    // 验证登录页
-    const loginText = await adminPage.evaluate(() => document.body.innerText);
-    expect(loginText).toContain('IAM 管理平台');
-    expect(loginText).toContain('IAM 账号登录');
-
-    // 点击"IAM 账号登录"
-    const iamLoginBtn = adminPage.locator('button', { hasText: 'IAM 账号登录' });
-    await iamLoginBtn.click();
-    await adminPage.waitForTimeout(3000);
-
-    // 验证无登录表单出现（SSO 自动认证）
-    const loginFormVisible = await adminPage.$('form input[type="text"]');
-    expect(loginFormVisible).toBeNull();
-
-    // 等待仪表盘加载
-    try {
-      await adminPage.waitForFunction(
-        () => document.body.innerText.includes('仪表盘'),
-        { timeout: 15000 }
-      );
-    } catch {}
-
-    const adminText = await adminPage.evaluate(() => document.body.innerText);
-    expect(adminText).toContain('仪表盘');
-    expect(adminText).toContain('IAM 管理平台');
-    expect(adminText).toContain('用户管理');
-    expect(adminText).toContain('角色管理');
-    expect(adminText).toContain('部门管理');
-    expect(adminText).toContain('应用管理');
-    expect(adminText).toContain('租户管理');
-    expect(adminText).toContain('OAuth 客户端');
-
-    expect(['用户总数', '角色总数', '部门总数', '应用总数'].every((k) => adminText.includes(k))).toBeTruthy();
-
+    await adminSSOLogin(adminPage);
     await adminPage.close();
   });
 
-  test('管理平台登出后 SSO session 已清除：登录 → 登出 → 再点登录应显示登录表单而非自动认证', async ({ page, context }) => {
-    // RP1 登录建立 SSO session
-    await page.goto(CONFIG.rp1Url, { waitUntil: 'networkidle' });
-    await page.click('button', { timeout: 5000 });
-    await page.waitForTimeout(2000);
-
-    await page.waitForSelector('#identifier', { timeout: 5000 });
-    await page.fill('#identifier', CONFIG.identifier);
-    await page.fill('#password', CONFIG.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL((url) => url.hostname === 'localhost' && url.searchParams.has('code'), { timeout: 20000 });
-    await page.waitForTimeout(2000);
-
-    // 在同一 context 中打开管理平台，SSO 应自动登录
+  test('管理平台登出后 SSO session 已清除', async ({ page, context }) => {
+    await rp1Login(page);
     const adminPage = await context.newPage();
-    await adminPage.goto(CONFIG.platformAdminUrl, { waitUntil: 'networkidle', timeout: 15000 });
-    await adminPage.waitForTimeout(2000);
-
-    const loginText = await adminPage.evaluate(() => document.body.innerText);
-    expect(loginText).toContain('IAM 管理平台');
-    expect(loginText).toContain('IAM 账号登录');
-
-    const iamLoginBtn = adminPage.locator('button', { hasText: 'IAM 账号登录' });
-    await iamLoginBtn.click();
-    await adminPage.waitForTimeout(3000);
-
-    // 验证 SSO 自动认证成功——无登录表单出现
-    let loginFormVisible = await adminPage.$('form input[type="text"]');
-    expect(loginFormVisible).toBeNull();
-
-    try {
-      await adminPage.waitForFunction(
-        () => document.body.innerText.includes('仪表盘'),
-        { timeout: 15000 }
-      );
-    } catch {}
-
-    // 登出
+    await adminSSOLogin(adminPage);
     await logoutFromAdmin(adminPage);
-
-    // 验证已回到登录页
-    const afterLogoutText = await adminPage.evaluate(() => document.body.innerText);
-    expect(afterLogoutText).toContain('IAM 管理平台');
-    expect(afterLogoutText).toContain('IAM 账号登录');
-
-    // 再次点击"IAM 账号登录"——SSO session 已清除，不应自动认证进仪表盘
-    const loginBtn2 = adminPage.locator('button', { hasText: 'IAM 账号登录' });
-    await loginBtn2.click();
-
-    // OIDC 重定向链路：/authorize → /auth/callback → /（仪表盘）
-    // 如果 SSO session 仍有效，重定向链会自动走完，最终停在仪表盘
-    // 等待链路完全完成后再判断最终状态
-    let autoLoggedIn = false;
-    try {
-      await adminPage.waitForFunction(
-        () => document.body.innerText.includes('仪表盘'),
-        { timeout: 10000 }
-      );
-      autoLoggedIn = true;
-    } catch {
-      // 超时未进入仪表盘 = SSO session 已清除，预期行为
-    }
-
-    const finalText = await adminPage.evaluate(() => document.body.innerText);
-    const finalUrl = adminPage.url();
-
-    // SSO session 已被清除——不应自动进入仪表盘
-    expect(autoLoggedIn, '退出登录后 SSO session 未被清除，仍自动认证进入仪表盘').toBe(false);
-    expect(finalText).not.toContain('仪表盘');
-    // 应停留在登录相关页面
-    expect(finalUrl).toMatch(/\/(login|oidc)/);
-
+    // 登出后，SSO session 应被清除，管理员需要重新登录（跳转到 login-web）
+    await adminRequiresLoginAfterLogout(adminPage);
     await adminPage.close();
+  });
+
+  test('Admin 直接登录：访问管理平台 → 静默授权跳转 login-web → 填写凭证 → 进入仪表盘', async ({ page }) => {
+    await adminDirectLogin(page);
+  });
+
+  test('Admin 登录后 → SSO 测试应用免密登录（同一 context）', async ({ page, context }) => {
+    await adminDirectLogin(page);
+    const rp1Page = await context.newPage();
+    await rp1SSOLogin(rp1Page);
+    await rp1Page.close();
+  });
+
+  test('Admin 登出后 → SSO 测试应用需重新登录', async ({ page, context }) => {
+    await adminDirectLogin(page);
+    const rp1Page = await context.newPage();
+    await rp1SSOLogin(rp1Page);
+    await logoutFromAdmin(page);
+    await verifyRp1RequiresLogin(rp1Page);
+    await rp1Page.close();
+  });
+
+  test('RP1 登录后 → Admin 管理平台静默 SSO 免密登录', async ({ page, context }) => {
+    await rp1Login(page);
+    const adminPage = await context.newPage();
+    await adminSSOLogin(adminPage);
+    await adminPage.close();
+  });
+
+  test('RP1 登录 → Admin SSO → Admin 登出 → RP1 需重新登录', async ({ page, context }) => {
+    await rp1Login(page);
+    const adminPage = await context.newPage();
+    await adminSSOLogin(adminPage);
+    await logoutFromAdmin(adminPage);
+    await verifyRp1RequiresLogin(page);
+    await adminPage.close();
+  });
+
+  test('双向 SSO：Admin 登录 → RP1 SSO → Admin 登出 → RP1 需重登录；重新 Admin 登录 → RP1 再次 SSO', async ({ page, context }) => {
+    // Round 1: Admin → RP1 SSO
+    await adminDirectLogin(page);
+    const rp1Page = await context.newPage();
+    await rp1SSOLogin(rp1Page);
+    await logoutFromAdmin(page);
+    await verifyRp1RequiresLogin(rp1Page);
+
+    // Round 2: 重新 Admin 登录 → RP1 SSO
+    await adminDirectLogin(page);
+    await rp1SSOLogin(rp1Page);
+    await rp1Page.close();
   });
 });

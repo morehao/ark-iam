@@ -3,11 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import MainLayout from './MainLayout'
 
-vi.mock('../../utils/oidc', () => ({
-  getEndSessionURL: vi.fn(() => 'http://localhost/end_session'),
-}))
-
-vi.mock('../../stores/authStore', () => {
+vi.mock('../stores/authStore', () => {
   const state = {
     authStage: 'authenticated',
     idToken: 'test-id-token',
@@ -26,7 +22,7 @@ vi.mock('../../stores/authStore', () => {
   return { useAuthStore }
 })
 
-vi.mock('../../api/auth', () => ({
+vi.mock('../api/auth', () => ({
   getUserinfo: vi.fn().mockResolvedValue({
     personInfo: { personID: 1, name: 'Test User', avatar: '' },
     userInfo: { userID: 1, tenantID: 1, name: 'Test User', isOwner: 1 },

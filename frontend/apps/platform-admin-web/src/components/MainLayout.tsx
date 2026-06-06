@@ -50,10 +50,13 @@ const MainLayout = () => {
 
     sessionStorage.setItem('logged_out', '1')
     logout()
+
     if (currentIdToken) {
-      window.location.assign(getEndSessionURL(currentIdToken))
-    } else {
-      navigate('/login')
+      const el = document.createElement('script')
+      el.src = getEndSessionURL(currentIdToken)
+      el.onload = () => el.remove()
+      el.onerror = () => el.remove()
+      document.head.appendChild(el)
     }
   }
 

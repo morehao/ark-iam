@@ -57,7 +57,7 @@ db_configs:
 redis_config:
   service: iam
   addr: 127.0.0.1:6379
-  password: 123456
+  password: ""
   db: 0
   dial_timeout: 5s
   read_timeout: 3s
