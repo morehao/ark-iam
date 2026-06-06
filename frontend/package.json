@@ -9,6 +9,7 @@
     "dev:sso": "pnpm --filter @ark-iam/sso-test-app dev",
     "dev:sso2": "pnpm --filter @ark-iam/sso-test-app-2 dev",
     "dev:log": "pnpm --filter @ark-iam/log-web dev",
+    "dev:all": "pnpm run --parallel --filter @ark-iam/web --filter @ark-iam/sso-test-app --filter @ark-iam/sso-test-app-2 --filter @ark-iam/log-web dev",
     "build:web": "pnpm --filter @ark-iam/web build",
     "test": "pnpm --filter @ark-iam/web test",
     "test:web": "pnpm --filter @ark-iam/web test"

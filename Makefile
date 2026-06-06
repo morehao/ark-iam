@@ -33,7 +33,7 @@ PORT              = 8099
 # ============================================================
 .PHONY: all build build-env clean run lint test swag codegen \
         docker-build docker-run check-image \
-        list-apps deps tidy update-dep help
+        list-apps deps tidy update-dep dev-frontend stop-frontend help
 
 # ============================================================
 # 通用入口：清理、依赖、构建并运行
@@ -236,6 +236,20 @@ check-image:
 	fi
 
 # ============================================================
+# 前端开发
+# ============================================================
+
+# 并行启动所有前端服务（开发调试用）
+dev-frontend:
+	@echo "🚀 正在并行启动所有前端服务..."
+	@cd frontend && pnpm run dev:all
+
+# 停止所有前端服务（本地测试用）
+stop-frontend:
+	@echo "🛑 正在停止前端服务..."
+	@pkill -f "vite.*ark-iam" 2>/dev/null && echo "✅ 已停止" || echo "⚠️  没有运行中的前端服务"
+
+# ============================================================
 # 其他工具
 # ============================================================
 
@@ -279,6 +293,10 @@ help:
 	@echo "  Docker"
 	@echo "    make docker-build APP=<名称>           构建 Docker 镜像"
 	@echo "    make docker-run   APP=<名称> [PORT=N]  运行容器（镜像不存在时自动构建）"
+	@echo ""
+	@echo "  前端"
+	@echo "    make dev-frontend                      并行启动所有前端服务"
+	@echo "    make stop-frontend                     停止所有前端服务（本地测试）"
 	@echo ""
 	@echo "  其他"
 	@echo "    make list-apps                         列出所有可用的应用程序"
