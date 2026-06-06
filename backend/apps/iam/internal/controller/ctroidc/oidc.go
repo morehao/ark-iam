@@ -57,6 +57,7 @@ func (ctr *OIDCCtr) SSOLogin(ctx *gin.Context) {
 
 	continueURL, err := ctr.oidcAuthSvc.CompleteLoginBySession(ctx.Request.Context(), authRequestID, sessionID)
 	if err != nil {
+		ctx.SetCookie("iam_sso_session", "", -1, "/", "", false, true)
 		frontendURL := config.Conf.OIDC.FrontendLoginURL + "?authRequestID=" + url.QueryEscape(authRequestID)
 		ctx.Redirect(302, frontendURL)
 		return
