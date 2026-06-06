@@ -147,6 +147,31 @@ function decodeJWT(token) {
   }
 }
 
+function logoutLocal() {
+  currentTokens = null
+  window.currentTokens = null
+  sessionStorage.removeItem('oidc_verifier')
+  sessionStorage.removeItem('oidc_state')
+  history.replaceState({}, '', '/')
+  renderLogin()
+}
+
+function logoutGlobal() {
+  if (!currentTokens || !currentTokens.id_token) {
+    logoutLocal()
+    return
+  }
+  const params = new URLSearchParams({
+    id_token_hint: currentTokens.id_token,
+    post_logout_redirect_uri: CONFIG.redirectUri,
+  })
+  currentTokens = null
+  window.currentTokens = null
+  sessionStorage.removeItem('oidc_verifier')
+  sessionStorage.removeItem('oidc_state')
+  window.location.href = CONFIG.issuer + '/end_session?' + params.toString()
+}
+
 function renderLogin() {
   const el = document.getElementById('content')
   el.innerHTML = `
