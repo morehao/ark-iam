@@ -98,7 +98,47 @@ importers:
         version: 2.1.4(@types/node@25.7.0)(jsdom@25.0.1)
 
   apps/sso-test-app:
+    dependencies:
+      '@ant-design/icons':
+        specifier: ^5.4.0
+        version: 5.4.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      antd:
+        specifier: ^5.22.0
+        version: 5.29.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      axios:
+        specifier: ^1.17.0
+        version: 1.17.0
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+      react-router-dom:
+        specifier: ^7.15.0
+        version: 7.15.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      zustand:
+        specifier: ^5.0.1
+        version: 5.0.13(@types/react@18.3.28)(react@18.3.1)
     devDependencies:
+      '@ark-iam/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@ark-iam/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@types/react':
+        specifier: ^18.3.12
+        version: 18.3.28
+      '@types/react-dom':
+        specifier: ^18.3.1
+        version: 18.3.7(@types/react@18.3.28)
+      '@vitejs/plugin-react':
+        specifier: ^4.3.3
+        version: 4.3.3(vite@5.4.10(@types/node@25.7.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.6.3
       vite:
         specifier: ^5.4.10
         version: 5.4.10(@types/node@25.7.0)
@@ -744,6 +784,10 @@ packages:
   '@vitest/utils@2.1.4':
     resolution: {integrity: sha512-MXDnZn0Awl2S86PSNIim5PWXgIAx8CIkzu35mBdSApUip6RFOGXBCf3YFyeEu8n1IHk4bWD46DeYFu9mQlFIRg==}
 
+  agent-base@6.0.0:
+    resolution: {integrity: sha512-j1Q7cSCqN+AwrmDd+pzgqc0/NpC655x2bUf5ZjRIO77DcNBFmh+OgRNzF6OKdCC9RSCb19fGd99+bhXFdkRNqw==}
+    engines: {node: '>= 6.0.0'}
+
   agent-base@7.0.2:
     resolution: {integrity: sha512-k2/tQ1+8Zf50dEUJWklUP80LcE/+Ph+OJ6cf2Ff2fD/c/TtCe6ofnCoNMz9UnyxOQYlaAALZtEWETzn+1JjfHg==}
     engines: {node: '>= 14'}
@@ -786,6 +830,9 @@ packages:
 
   axios@1.16.0:
     resolution: {integrity: sha512-6hp5CwvTPlN2A31g5dxnwAX0orzM7pmCRDLnZSX772mv8WDqICwFjowHuPs04Mc8deIld1+ejhtaMn5vp6b+1w==}
+
+  axios@1.17.0:
+    resolution: {integrity: sha512-J8SwNxprqqpbfenehxWYXE7CW+wM1BB4w3+N+g+/Wx40xM4rsLrfPmHHxSWIxJLYDgSY/HqlFPIYb2/S3rxafw==}
 
   baseline-browser-mapping@2.10.29:
     resolution: {integrity: sha512-Asa2krT+XTPZINCS+2QcyS8WTkObE77RwkydwF7h6DmnKqbvlalz93m/dnphUyCa6SWSP51VgtEUf2FN+gelFQ==}
@@ -997,6 +1044,10 @@ packages:
   http-proxy-agent@7.0.2:
     resolution: {integrity: sha512-T1gkAiYYDWYx3V5Bmyu7HcfcvL7mUrTWiM6yOfa3PIphViJ/gFPbvidQ+veqSOHci/PxBcDabeUNCzpOODJZig==}
     engines: {node: '>= 14'}
+
+  https-proxy-agent@5.0.1:
+    resolution: {integrity: sha512-dFcAjpTQFgoLMzC2VwU+C/CbS7uRL0lWmxDITmqm7C+7F0Odmj6s9l6alZc6AELXhrnggM2CeWSXHGOdX2YtwA==}
+    engines: {node: '>= 6'}
 
   https-proxy-agent@7.0.5:
     resolution: {integrity: sha512-1e4Wqeblerz+tMKPIq2EMGiiWW1dIjZOksyHWSUm1rmuvw/how9hBHZ38lAGj5ID4Ik6EdkOw7NmWPy6LAwalw==}
@@ -2238,6 +2289,12 @@ snapshots:
       loupe: 3.2.1
       tinyrainbow: 1.2.0
 
+  agent-base@6.0.0:
+    dependencies:
+      debug: 4.4.3
+    transitivePeerDependencies:
+      - supports-color
+
   agent-base@7.0.2:
     dependencies:
       debug: 4.4.3
@@ -2333,6 +2390,16 @@ snapshots:
       proxy-from-env: 2.1.0
     transitivePeerDependencies:
       - debug
+
+  axios@1.17.0:
+    dependencies:
+      follow-redirects: 1.16.0
+      form-data: 4.0.5
+      https-proxy-agent: 5.0.1
+      proxy-from-env: 2.1.0
+    transitivePeerDependencies:
+      - debug
+      - supports-color
 
   baseline-browser-mapping@2.10.29: {}
 
@@ -2536,6 +2603,13 @@ snapshots:
   http-proxy-agent@7.0.2:
     dependencies:
       agent-base: 7.1.0
+      debug: 4.4.3
+    transitivePeerDependencies:
+      - supports-color
+
+  https-proxy-agent@5.0.1:
+    dependencies:
+      agent-base: 6.0.0
       debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
