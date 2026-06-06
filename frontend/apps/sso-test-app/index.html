@@ -89,6 +89,7 @@ const CONFIG = {
 }
 
 let currentTokens = null
+window.currentTokens = null
 
 function escapeHtml(str) {
   const div = document.createElement('div')
@@ -296,6 +297,7 @@ async function handleCallback() {
   }
 
   currentTokens = tokens
+  window.currentTokens = tokens
   renderHomePage(tokens)
 }
 
@@ -360,6 +362,7 @@ async function doRefresh() {
     }
     const tokens = await resp.json()
     currentTokens = tokens
+    window.currentTokens = tokens
     if (el) el.innerHTML = '<span style="color:#52c41a">✅ 刷新成功</span>'
     renderResult(tokens, true)
   } catch (e) {

@@ -1,13 +1,5 @@
 import { type Page, expect } from '@playwright/test';
-
-export const CONFIG = {
-  issuer: 'http://localhost:8099/v1/iam/oidc',
-  rp1Url: 'http://localhost:3001/',
-  loginWebUrl: 'http://localhost:3003/login',
-  platformAdminUrl: 'http://localhost:3000/',
-  identifier: 'admin',
-  password: 'admin123',
-};
+import { CONFIG } from '../config';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

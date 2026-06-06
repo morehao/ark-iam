@@ -1,4 +1,5 @@
-import { spawn, type ChildProcess } from 'child_process';
+import { spawn, execSync, type ChildProcess } from 'child_process';
+import * as http from 'http';
 import * as net from 'net';
 import * as path from 'path';
 
@@ -13,6 +14,8 @@ interface ServiceDef {
   args: string[];
   cwd: string;
   env?: Record<string, string>;
+  /** 健康检查路径，用于验证已运行的服务是否可用 */
+  healthPath: string;
 }
 
 const SERVICES: ServiceDef[] = [
@@ -25,6 +28,7 @@ const SERVICES: ServiceDef[] = [
     env: {
       APP_CONFIG_PATH: path.join(ROOT, 'backend', 'apps', 'iam', 'config', 'config.yaml'),
     },
+    healthPath: '/v1/iam/oidc/healthz',
   },
   {
     name: 'platform-admin-web',
@@ -32,6 +36,7 @@ const SERVICES: ServiceDef[] = [
     cmd: 'pnpm',
     args: ['--filter', '@ark-iam/platform-admin-web', 'dev'],
     cwd: FRONTEND_ROOT,
+    healthPath: '/',
   },
   {
     name: 'sso-test-app',
@@ -39,6 +44,7 @@ const SERVICES: ServiceDef[] = [
     cmd: 'pnpm',
     args: ['--filter', '@ark-iam/sso-test-app', 'dev'],
     cwd: FRONTEND_ROOT,
+    healthPath: '/',
   },
   {
     name: 'login-web',
@@ -46,6 +52,7 @@ const SERVICES: ServiceDef[] = [
     cmd: 'pnpm',
     args: ['--filter', '@ark-iam/login-web', 'dev'],
     cwd: FRONTEND_ROOT,
+    healthPath: '/',
   },
 ];
 
@@ -63,6 +70,39 @@ async function checkPort(port: number): Promise<boolean> {
       socket.connect(port, host);
     }
   });
+}
+
+/**
+ * 对已占用端口的服务做健康检查，确保它能正常响应。
+ * 返回 true 表示服务健康可用，false 表示需要重启。
+ */
+function healthCheck(port: number, healthPath: string, timeoutMs: number = 5000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = http.get(`http://127.0.0.1:${port}${healthPath}`, { timeout: timeoutMs }, (res) => {
+      // 2xx/3xx 认为健康
+      resolve(res.statusCode >= 200 && res.statusCode < 400);
+    });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => { req.destroy(); resolve(false); });
+  });
+}
+
+/**
+ * 强行杀掉指定端口上的所有进程，确保端口干净可用。
+ */
+function killPort(port: number, label: string): void {
+  try {
+    const pids = execSync(`lsof -ti:${port}`, { encoding: 'utf-8' })
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    for (const pid of pids) {
+      try {
+        process.kill(parseInt(pid), 'SIGKILL');
+        console.log(`  ⏹ killed stale ${label} (PID ${pid}) on port ${port}`);
+      } catch {}
+    }
+  } catch {}
 }
 
 async function waitForPort(port: number, label: string, timeoutMs: number): Promise<boolean> {
@@ -84,7 +124,14 @@ async function globalSetup() {
   for (const svc of SERVICES) {
     const running = await checkPort(svc.port);
     if (running) {
-      console.log(`  ✅ ${svc.name} (port ${svc.port}) already running`);
+      const healthy = await healthCheck(svc.port, svc.healthPath);
+      if (healthy) {
+        console.log(`  ✅ ${svc.name} (port ${svc.port}) already running & healthy`);
+      } else {
+        console.log(`  ⚠️ ${svc.name} (port ${svc.port}) occupied but unhealthy, restarting...`);
+        killPort(svc.port, svc.name);
+        needStart.push(svc);
+      }
     } else {
       console.log(`  ⏳ ${svc.name} (port ${svc.port}) starting...`);
       needStart.push(svc);

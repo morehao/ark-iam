@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
+import { CONFIG } from '../config';
 import {
-  CONFIG,
   fillLoginFormAndSubmit,
   verifyRp1HomePage,
   verifyTokenDetails,
