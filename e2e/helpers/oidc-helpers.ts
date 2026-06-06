@@ -157,14 +157,13 @@ export async function rp1LogoutLocal(page: Page): Promise<void> {
 
 export async function rp1LogoutGlobal(page: Page): Promise<void> {
   await clickByText(page, '从所有应用退出');
+  // IAM end_session clears the cookie and redirects to /logged-out, not back to RP1
   await page.waitForURL(
-    (url) =>
-      url.hostname === 'localhost' &&
-      url.port === '3001' &&
-      !url.searchParams.has('code') &&
-      !url.searchParams.has('error'),
-    { timeout: 30000 }
+    (url) => !(url.hostname === 'localhost' && url.port === '3001'),
+    { timeout: 15000 }
   );
+  // Navigate back to RP1 to verify SSO session is cleared
+  await page.goto(CONFIG.rp1Url, { waitUntil: 'networkidle', timeout: 15000 });
   await wait(1000);
   const body = await page.evaluate(() => document.body.innerText);
   expect(body).toContain('使用 IAM 登录');
