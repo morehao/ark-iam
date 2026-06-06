@@ -79,6 +79,27 @@ export async function verifyTokenDetails(page: Page): Promise<void> {
 }
 
 /**
+ * 在管理平台仪表盘页面点击登出
+ * 前提：当前已在管理平台首页（仪表盘可见）
+ * 操作：点击右上角头像 → 点击"退出登录" → 等待 end_session 重定向
+ * 结果：页面跳转到管理平台登录页
+ */
+export async function logoutFromAdmin(page: Page): Promise<void> {
+  // 点击右上角头像打开下拉菜单
+  const avatar = page.locator('.ant-avatar');
+  await avatar.click();
+  await wait(500);
+
+  // 点击"退出登录"菜单项
+  const logoutItem = page.locator('.ant-dropdown-menu-item', { hasText: '退出登录' });
+  await logoutItem.click();
+
+  // end_session 处理 → 重定向回登录页
+  await page.waitForURL((url) => url.toString().includes('/login'), { timeout: 15000 });
+  await wait(2000);
+}
+
+/**
  * 验证管理平台 SSO 自动登录
  * 在同一 browser context 中打开管理平台，点击"IAM 账号登录"，
  * 凭借已存在的 iam_sso_session cookie 自动完成认证

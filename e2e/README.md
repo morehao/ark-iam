@@ -9,6 +9,7 @@
 | RP1 首次登录 | 打开测试 RP → 跳转登录页 → 输入凭据 → 回调展示项目管理面板 |
 | RP1 Token 详情 | 查看 Token → 获取 UserInfo → 刷新 Token → 返回主页 |
 | 管理平台 SSO 自动登录 | RP1 登录后 → 打开管理平台 → 点击 IAM 账号登录 → 自动认证进仪表盘 |
+| 管理平台登出后 SSO 已清除 | 登录 → 登出 → 再点登录应显示登录表单而非自动认证 |
 
 测试基于 Playwright 的 browser context 自动共享 cookie，模拟真实的 SSO session 行为。
 

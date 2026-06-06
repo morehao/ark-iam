@@ -5,6 +5,7 @@ import {
   verifyRp1HomePage,
   verifyTokenDetails,
   verifyPlatformAdminSSO,
+  logoutFromAdmin,
 } from '../helpers/oidc-helpers';
 
 test.describe('OIDC SSO E2E', () => {
@@ -115,6 +116,66 @@ test.describe('OIDC SSO E2E', () => {
     expect(adminText).toContain('OAuth 客户端');
 
     expect(['用户总数', '角色总数', '部门总数', '应用总数'].every((k) => adminText.includes(k))).toBeTruthy();
+
+    await adminPage.close();
+  });
+
+  test('管理平台登出后 SSO session 已清除：登录 → 登出 → 再点登录应显示登录表单而非自动认证', async ({ page, context }) => {
+    // RP1 登录建立 SSO session
+    await page.goto(CONFIG.rp1Url, { waitUntil: 'networkidle' });
+    await page.click('button', { timeout: 5000 });
+    await page.waitForTimeout(2000);
+
+    await page.waitForSelector('#identifier', { timeout: 5000 });
+    await page.fill('#identifier', CONFIG.identifier);
+    await page.fill('#password', CONFIG.password);
+    await page.click('button[type="submit"]');
+    await page.waitForURL((url) => url.hostname === 'localhost' && url.searchParams.has('code'), { timeout: 20000 });
+    await page.waitForTimeout(2000);
+
+    // 在同一 context 中打开管理平台，SSO 应自动登录
+    const adminPage = await context.newPage();
+    await adminPage.goto(CONFIG.platformAdminUrl, { waitUntil: 'networkidle', timeout: 15000 });
+    await adminPage.waitForTimeout(2000);
+
+    const loginText = await adminPage.evaluate(() => document.body.innerText);
+    expect(loginText).toContain('IAM 管理平台');
+    expect(loginText).toContain('IAM 账号登录');
+
+    const iamLoginBtn = adminPage.locator('button', { hasText: 'IAM 账号登录' });
+    await iamLoginBtn.click();
+    await adminPage.waitForTimeout(3000);
+
+    // 验证 SSO 自动认证成功——无登录表单出现
+    let loginFormVisible = await adminPage.$('form input[type="text"]');
+    expect(loginFormVisible).toBeNull();
+
+    try {
+      await adminPage.waitForFunction(
+        () => document.body.innerText.includes('仪表盘'),
+        { timeout: 15000 }
+      );
+    } catch {}
+
+    // 登出
+    await logoutFromAdmin(adminPage);
+
+    // 验证已回到登录页
+    const afterLogoutText = await adminPage.evaluate(() => document.body.innerText);
+    expect(afterLogoutText).toContain('IAM 管理平台');
+    expect(afterLogoutText).toContain('IAM 账号登录');
+
+    // 再次点击"IAM 账号登录"——应出现登录表单而非自动认证
+    const loginBtn2 = adminPage.locator('button', { hasText: 'IAM 账号登录' });
+    await loginBtn2.click();
+    await adminPage.waitForTimeout(3000);
+
+    // 验证 SSO session 已被清除——不应自动进入仪表盘，应停留在 login-web 登录页
+    const currentUrl = adminPage.url();
+    const onLoginPage = currentUrl.includes(CONFIG.loginWebUrl) || currentUrl.includes('/oidc/login');
+    const onDashboard = (await adminPage.evaluate(() => document.body.innerText)).includes('仪表盘');
+    expect(onDashboard).toBe(false);
+    expect(onLoginPage).toBe(true);
 
     await adminPage.close();
   });
