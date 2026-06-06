@@ -33,7 +33,7 @@ PORT              = 8099
 # ============================================================
 .PHONY: all build build-env clean run lint test swag codegen \
         docker-build docker-run check-image \
-        list-apps deps tidy update-dep dev-frontend stop-frontend e2e help
+        list-apps deps tidy update-dep dev-frontend stop-frontend e2e e2e-sso e2e-test help
 
 # ============================================================
 # 通用入口：清理、依赖、构建并运行
@@ -252,8 +252,26 @@ stop-frontend:
 # 运行 E2E 测试（需先安装依赖：cd e2e && npm install && npx playwright install chromium）
 .PHONY: e2e
 e2e:
-	@echo "🧪 运行 E2E 测试..."
+	@echo "🧪 运行全部 E2E 测试..."
 	@cd e2e && npx playwright test
+
+# 运行 OIDC SSO E2E 测试（含 SSO 自动登录、登出后 session 清除等）
+.PHONY: e2e-sso
+e2e-sso:
+	@echo "🧪 运行 OIDC SSO E2E 测试..."
+	@cd e2e && npx playwright test oidc-sso.spec.ts
+
+# 按名称匹配运行 E2E 测试
+# 用法：make e2e-test TEST="管理平台登出"
+.PHONY: e2e-test
+e2e-test:
+	@if [ -z "$(TEST)" ]; then \
+		echo "❌ 请使用 TEST 参数指定测试名称"; \
+		echo "   用法：make e2e-test TEST=\"管理平台登出\""; \
+		exit 1; \
+	fi
+	@echo "🧪 运行 E2E 测试: $(TEST)"
+	@cd e2e && npx playwright test --grep "$(TEST)"
 
 # ============================================================
 # 其他工具
@@ -286,7 +304,9 @@ help:
 	@echo "  测试 & 检查"
 	@echo "    make test      APP=<名称>              运行单元测试"
 	@echo "    make lint                              运行 golangci-lint"
-	@echo "    make e2e                                运行 E2E 测试（Playwright）"
+	@echo "    make e2e                                运行全部 E2E 测试"
+	@echo "    make e2e-sso                            运行 OIDC SSO E2E 测试"
+	@echo "    make e2e-test TEST=\"关键词\"           按名称匹配运行 E2E 测试"
 	@echo ""
 	@echo "  依赖管理"
 	@echo "    make deps                              同步 workspace 并更新全部模块依赖"
