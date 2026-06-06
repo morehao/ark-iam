@@ -103,12 +103,6 @@ importers:
         specifier: ^5.4.10
         version: 5.4.10(@types/node@25.7.0)
 
-  apps/sso-test-app-2:
-    devDependencies:
-      vite:
-        specifier: ^5.4.10
-        version: 5.4.10(@types/node@25.7.0)
-
   packages/shared: {}
 
   packages/tsconfig: {}
