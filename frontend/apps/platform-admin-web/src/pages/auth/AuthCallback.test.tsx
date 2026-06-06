@@ -1,0 +1,46 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import AuthCallback from './AuthCallback'
+
+const mockNavigate = vi.fn()
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return { ...actual, useNavigate: () => mockNavigate }
+})
+
+const mockSetSession = vi.fn()
+vi.mock('../../stores/authStore', () => ({
+  useAuthStore: () => ({ setSession: mockSetSession }),
+}))
+
+vi.mock('../../utils/oidc', () => ({
+  loadPKCEParams: vi.fn(() => ({
+    codeVerifier: 'test-verifier',
+    codeChallenge: 'test-challenge',
+    state: 'test-state',
+  })),
+  clearPKCEParams: vi.fn(),
+  exchangeCodeForTokens: vi.fn().mockResolvedValue({
+    access_token: 'access-token',
+    id_token: 'id-token',
+    refresh_token: 'refresh-token',
+    expires_in: 3600,
+  }),
+}))
+
+describe('AuthCallback', () => {
+  beforeEach(() => {
+    mockNavigate.mockClear()
+    mockSetSession.mockClear()
+  })
+
+  it('shows loading spinner during callback processing', () => {
+    render(
+      <MemoryRouter initialEntries={['/auth/callback?code=test-code&state=test-state']}>
+        <AuthCallback />
+      </MemoryRouter>
+    )
+    expect(screen.getByText('正在完成登录')).toBeInTheDocument()
+  })
+})

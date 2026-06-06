@@ -20,3 +20,9 @@ certs/
 # 设计文档
 docs/superpowers/specs/
 docs/superpowers/plans/
+
+# Go 编译产物
+*.test
+*.exe
+*.out
+backend/apps/**/cmd/cmd

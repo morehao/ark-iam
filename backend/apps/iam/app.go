@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/config"
 	_ "github.com/morehao/ark-iam/iam/docs"
+	"github.com/morehao/ark-iam/iam/internal/middleware/oidcauth"
 	"github.com/morehao/ark-iam/iam/internal/router"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/golib/biz/gconstant"
@@ -18,7 +19,7 @@ func Routers(engine *gin.Engine) {
 		routerGroups := ginserver.NewRouterGroups(engine, AppName, ginserver.Version{
 			Name: gconstant.ApiVersionV1,
 			Middlewares: []gin.HandlerFunc{
-				ginmiddleware.JWTAuth(config.Conf.JWT.SignKey, ginmiddleware.WithAuthSkipPaths(
+				oidcauth.OIDCCompatibleAuth(config.Conf.JWT.SignKey, router.OIDCPublicKey, oidcauth.WithAuthSkipPaths(
 					"/v1/iam/org/getConfigsByDomain",
 					"/v1/iam/auth/login",
 					"/v1/iam/auth/myTenants",

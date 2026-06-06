@@ -187,3 +187,12 @@ ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
 INSERT INTO `oauth_client_secret` (`id`, `oauth_client_id`, `name`, `value_hash`, `value_prefix`, `created_by`, `updated_by`, `deleted_by`)
 VALUES (1, 1, 'test-secret', 'fc090df65f5f35338ad419e13de1c64b84d6674c7e67ff32df3cda6f034cfce2', 'my-test-', 0, 0, 0)
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
+
+-- ============================================
+-- platform-admin-web OAuth Client (第一方 SPA，PKCE)
+-- client_id: platform-admin-web
+-- redirect_uris: http://localhost:3000/auth/callback
+-- ============================================
+INSERT INTO `oauth_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `type`, `is_third_party`, `status`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (2, 1, 1, 'platform-admin-web', 'IAM管理平台', '["http://localhost:3000/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'none', 1, '["openid","profile","email"]', 'first_party', 0, 'enable', 0, 0, 0)
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);

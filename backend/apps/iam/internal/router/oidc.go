@@ -1,6 +1,8 @@
 package router
 
 import (
+	"context"
+	"crypto/rsa"
 	"fmt"
 
 	"github.com/gin-gonic/gin"
@@ -11,6 +13,8 @@ import (
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
+
+var OIDCPublicKey *rsa.PublicKey
 
 func InitOIDC(engine *gin.Engine, groups *ginserver.RouterGroups) {
 	issuer := config.Conf.OIDC.Issuer
@@ -25,6 +29,12 @@ func InitOIDC(engine *gin.Engine, groups *ginserver.RouterGroups) {
 	if err != nil {
 		panic(err)
 	}
+
+	signingKey, err := provider.Storage.SigningKey(context.Background())
+	if err != nil {
+		panic(err)
+	}
+	OIDCPublicKey = &signingKey.Key().(*rsa.PrivateKey).PublicKey
 
 	ctr := ctroidc.NewOIDCCtr(provider)
 

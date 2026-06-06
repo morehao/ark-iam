@@ -110,8 +110,23 @@ func (s *PersistentStore) SetIntrospectionFromToken(ctx context.Context, introsp
 	return nil
 }
 
+type hasTenantID interface {
+	GetTenantID() uint
+}
+
 func (s *PersistentStore) GetPrivateClaimsFromScopes(ctx context.Context, userID, clientID string, scopes []string) (map[string]any, error) {
-	return nil, nil
+	pid, err := parseOIDCSubject(userID)
+	if err != nil {
+		return nil, nil
+	}
+	users, err := s.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid})
+	if err != nil || len(users) == 0 {
+		return nil, nil
+	}
+	tenantID := users[0].TenantID
+	return map[string]any{
+		"tenant_id": tenantID,
+	}, nil
 }
 
 func (s *PersistentStore) GetKeyByIDAndClientID(ctx context.Context, keyID, clientID string) (*jose.JSONWebKey, error) {
@@ -215,6 +230,7 @@ func (s *PersistentStore) TokenRequestByRefreshToken(ctx context.Context, refres
 		clientID: clientID,
 		amr:      []string{"pwd"},
 		authTime: storedToken.CreatedAt,
+		tenantID: storedToken.TenantID,
 	}, nil
 }
 
@@ -225,6 +241,7 @@ type refreshTokenRequest struct {
 	clientID string
 	amr      []string
 	authTime time.Time
+	tenantID uint
 }
 
 func (r *refreshTokenRequest) GetAMR() []string                           { return r.amr }
@@ -234,6 +251,7 @@ func (r *refreshTokenRequest) GetClientID() string                        { retu
 func (r *refreshTokenRequest) GetScopes() []string                        { return r.scopes }
 func (r *refreshTokenRequest) GetSubject() string                         { return r.subject }
 func (r *refreshTokenRequest) SetCurrentScopes(scopes []string)           { r.scopes = scopes }
+func (r *refreshTokenRequest) GetTenantID() uint                          { return r.tenantID }
 
 func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, clientID string) error {
 	return nil

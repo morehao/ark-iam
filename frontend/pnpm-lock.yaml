@@ -8,7 +8,7 @@ importers:
 
   .: {}
 
-  apps/log-web:
+  apps/login-web:
     dependencies:
       axios:
         specifier: ^1.7.0
@@ -39,19 +39,7 @@ importers:
         specifier: ^5.4.10
         version: 5.4.10(@types/node@25.7.0)
 
-  apps/sso-test-app:
-    devDependencies:
-      vite:
-        specifier: ^5.4.10
-        version: 5.4.10(@types/node@25.7.0)
-
-  apps/sso-test-app-2:
-    devDependencies:
-      vite:
-        specifier: ^5.4.10
-        version: 5.4.10(@types/node@25.7.0)
-
-  apps/web:
+  apps/platform-admin-web:
     dependencies:
       '@ant-design/icons':
         specifier: ^5.4.0
@@ -108,6 +96,18 @@ importers:
       vitest:
         specifier: ^2.1.4
         version: 2.1.4(@types/node@25.7.0)(jsdom@25.0.1)
+
+  apps/sso-test-app:
+    devDependencies:
+      vite:
+        specifier: ^5.4.10
+        version: 5.4.10(@types/node@25.7.0)
+
+  apps/sso-test-app-2:
+    devDependencies:
+      vite:
+        specifier: ^5.4.10
+        version: 5.4.10(@types/node@25.7.0)
 
   packages/shared: {}
 

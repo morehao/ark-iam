@@ -30,6 +30,7 @@ type AuthRequest struct {
 	Audience      []string            `json:"audience"`
 	DoneFlag      bool                `json:"done_flag"`
 	ExpiresAt     time.Time           `json:"expires_at"`
+	TenantID      uint                `json:"tenant_id"`
 }
 
 func (a *AuthRequest) GetID() string                          { return a.ID }
@@ -47,6 +48,7 @@ func (a *AuthRequest) GetScopes() []string                    { return a.Scopes 
 func (a *AuthRequest) GetState() string                       { return a.State }
 func (a *AuthRequest) GetSubject() string                     { return a.Subject }
 func (a *AuthRequest) Done() bool                             { return a.DoneFlag }
+func (a *AuthRequest) GetTenantID() uint                    { return a.TenantID }
 
 type OIDCStorage struct {
 	protocolStore   ProtocolStateStore
@@ -149,6 +151,8 @@ func (s *OIDCStorage) RevokeToken(ctx context.Context, tokenOrTokenID string, us
 func (s *OIDCStorage) GetRefreshTokenInfo(ctx context.Context, clientID string, tokenValue string) (userID string, tokenID string, err error) {
 	return s.persistentStore.GetRefreshTokenInfo(ctx, clientID, tokenValue)
 }
+
+
 
 func buildOIDCSubject(personID uint) string {
 	return fmt.Sprintf("person:%d", personID)
