@@ -152,6 +152,7 @@ export async function rp1LogoutLocal(page: Page): Promise<void> {
   const body = await page.evaluate(() => document.body.innerText);
   expect(body).toContain('使用 IAM 登录');
   expect(body).toContain('您尚未登录此应用');
+  expect(body).not.toContain('项目管理面板');
 }
 
 export async function rp1LogoutGlobal(page: Page): Promise<void> {
@@ -167,4 +168,6 @@ export async function rp1LogoutGlobal(page: Page): Promise<void> {
   await wait(1000);
   const body = await page.evaluate(() => document.body.innerText);
   expect(body).toContain('使用 IAM 登录');
+  expect(body).toContain('您尚未登录此应用');
+  expect(body).not.toContain('项目管理面板');
 }
