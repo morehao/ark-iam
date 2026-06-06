@@ -277,8 +277,11 @@ function renderHomePage(tokens) {
       <button class="btn btn-primary btn-sm" onclick="showTokenDetails()">
         🔑 查看 Token 详情
       </button>
-      <button class="btn btn-sm" style="background:#f5f5f5;color:#333" onclick="location.href='/'">
-        🔁 重新开始
+      <button class="btn btn-sm" style="background:#f5f5f5;color:#333" onclick="logoutLocal()">
+        🚪 退出当前应用
+      </button>
+      <button class="btn btn-sm" style="background:#ff4d4f;color:#fff" onclick="logoutGlobal()">
+        🔐 从所有应用退出
       </button>
     </div>
   `
