@@ -1,3 +1,5 @@
+%%{init: {'theme': 'neutral', 'themeVariables': {'primaryColor': '#333333', 'tertiaryColor': '#ffffff', 'primaryBorderColor': '#333333', 'lineColor': '#333333', 'secondaryColor': '#f5f5f5', 'actorBkg': '#ffffff', 'actorBorder': '#333333', 'actorTextColor': '#333333', 'noteBkg': '#f5f5f5', 'noteBorder': '#666666', 'activationBkgColor': '#e0e0e0', 'activationBorderColor': '#666666', 'signalColor': '#333333', 'signalTextColor': '#333333', 'labelTextColor': '#333333', 'loopTextColor': '#333333'}}}%%
+
 # OIDC SSO 集成指南
 
 ## 1. 什么是 SSO 登录
