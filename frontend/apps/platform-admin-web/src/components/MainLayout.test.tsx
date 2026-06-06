@@ -3,29 +3,31 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import MainLayout from './MainLayout'
 
-vi.mock('../../utils/oidc', () => ({
-  getEndSessionURL: vi.fn(() => 'http://localhost/end_session'),
-}))
+vi.mock('../stores/authStore', () => {
+  const state = {
+    authStage: 'authenticated',
+    idToken: 'test-id-token',
+    accessToken: 'test-access-token',
+    refreshToken: 'test-refresh-token',
+    tenantInfo: { tenantID: 1, tenantName: 'Test Tenant' },
+    logout: vi.fn(),
+    setPersonInfo: vi.fn(),
+  }
+  const useAuthStore = Object.assign(
+    (selector?: (s: any) => any) => {
+      return selector ? selector(state) : state
+    },
+    { getState: () => state }
+  )
+  return { useAuthStore }
+})
 
-vi.mock('../../stores/authStore', () => ({
-  useAuthStore: (selector?: (s: any) => any) => {
-    const state = {
-      authStage: 'authenticated',
-      idToken: 'test-id-token',
-      accessToken: 'test-access-token',
-      tenantInfo: { tenantID: 1, tenantName: 'Test Tenant' },
-      logout: vi.fn(),
-      setPersonInfo: vi.fn(),
-    }
-    return selector ? selector(state) : state
-  },
-}))
-
-vi.mock('../../api/auth', () => ({
+vi.mock('../api/auth', () => ({
   getUserinfo: vi.fn().mockResolvedValue({
     personInfo: { personID: 1, name: 'Test User', avatar: '' },
     userInfo: { userID: 1, tenantID: 1, name: 'Test User', isOwner: 1 },
   }),
+  logoutAPI: vi.fn().mockResolvedValue(undefined),
 }))
 
 describe('MainLayout', () => {

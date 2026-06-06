@@ -1,55 +1,64 @@
 # E2E 自动化测试
 
-本目录存放项目的端到端自动化测试脚本，使用 puppeteer 驱动真实 Chrome 浏览器，模拟用户操作验证完整业务流程。
+本目录存放基于 Playwright 的 OIDC SSO 端到端测试，模拟真实浏览器操作验证完整业务流程。
 
-## OIDC 端到端测试
+## 测试场景
 
-`oidc-e2e.js` 对应 `OIDC_SELF_TEST.md` 中 Step 5 (RP1 首次登录) 和 Step 6 (双 RP SSO) 的所有验证要点，共 **25 个测试用例**。
+| 测试用例 | 覆盖内容 |
+|----------|----------|
+| RP1 首次登录 | 打开测试 RP → 跳转登录页 → 输入凭据 → 回调展示项目管理面板 |
+| RP1 Token 详情 | 查看 Token → 获取 UserInfo → 刷新 Token → 返回主页 |
+| 管理平台 SSO 自动登录 | RP1 登录后 → 打开管理平台 → 点击 IAM 账号登录 → 自动认证进仪表盘 |
+| 管理平台登出后 SSO 已清除 | 登录 → 登出 → 再点登录应显示登录表单而非自动认证 |
 
-### 前置条件
+测试基于 Playwright 的 browser context 自动共享 cookie，模拟真实的 SSO session 行为。
 
-- 已完成 `OIDC_SELF_TEST.md` 的 Step 1 ~ Step 4（数据库初始化、后端、前端服务全部启动）
-- macOS 已安装 Google Chrome（`/Applications/Google Chrome.app/`）
+## 前置条件
 
-### 运行
+- Node.js 18+
+- MySQL + Redis 已运行
+- 后端种子数据已导入（`admin` / `admin123` + `test-rp-client`）
+
+## 安装
 
 ```bash
 cd e2e
-
-# 安装依赖
 npm install
-
-# 启动测试（确保后端 8099、log-web 3003、sso-test-app 3001/3002 都在运行）
-npm run test:oidc
+npx playwright install chromium
 ```
 
-### 输出
+## 运行
 
-测试逐项打印每个验证点的 ✅/❌，最后给出汇总：
+```bash
+# headless 模式（CI 推荐）
+npm test
 
-```
-========== 测试结果汇总 ==========
-✅ RP1 首页加载
-✅ 找到并点击"使用 IAM 登录"按钮
-✅ 跳转到 log-web 登录页
-...
-总计: 25 通过: 25 失败: 0
-```
+# 有头模式（可视化调试）
+npm run test:headed
 
-退出码：全部通过返回 0，有失败返回 1（可用于 CI 集成）。
-
-### 跨平台 Chrome 路径
-
-脚本默认 macOS Chrome 路径：
-
-```js
-chromePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+# 单步调试
+npm run test:debug
 ```
 
-如需在 Linux/Windows 环境下运行，编辑 `oidc-e2e.js` 修改 `CONFIG.chromePath`：
+测试自动管理服务生命周期：
+- `globalSetup` — 检查并启动所需服务（IAM 后端 :8099、platform-admin-web :3000、sso-test-app :3001、login-web :3003）
+- `globalTeardown` — 测试结束后强制清理所有进程（无论成功/失败）
 
-| 平台 | Chrome 可执行路径 |
-|------|-----------------|
-| macOS | `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` |
-| Linux | `/usr/bin/google-chrome` |
-| Windows | `C:\Program Files\Google\Chrome\Application\chrome.exe` |
+## 配置
+
+配置文件：`playwright.config.ts`
+
+| 配置项 | 值 | 说明 |
+|--------|-----|------|
+| headless | true | headless 运行 |
+| browser | chromium | 浏览器类型 |
+| workers | 1 | 单 worker（确保服务状态一致） |
+| timeout | 120s | 单个测试超时 |
+
+## 项目集成
+
+通过 Makefile：
+
+```bash
+make e2e
+```

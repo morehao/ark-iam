@@ -16,10 +16,16 @@ vi.mock('../utils/request', () => ({
       }
       return Promise.reject(new Error('unknown'))
     }),
+    post: vi.fn((url: string) => {
+      if (url === '/auth/logout') {
+        return Promise.resolve()
+      }
+      return Promise.reject(new Error('unknown'))
+    }),
   },
 }))
 
-import { getUserinfo, getMyTenants } from './auth'
+import { getUserinfo, getMyTenants, logoutAPI } from './auth'
 
 describe('auth API', () => {
   it('getUserinfo returns person and user info', async () => {
@@ -32,5 +38,9 @@ describe('auth API', () => {
     const resp = await getMyTenants()
     expect(resp.list).toHaveLength(1)
     expect(resp.list[0].tenantID).toBe(1)
+  })
+
+  it('logoutAPI calls logout endpoint', async () => {
+    await expect(logoutAPI('test-refresh-token')).resolves.toBeUndefined()
   })
 })

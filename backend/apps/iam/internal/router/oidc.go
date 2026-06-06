@@ -44,7 +44,8 @@ func InitOIDC(engine *gin.Engine, groups *ginserver.RouterGroups) {
 	oidcGroup.POST("/login", ctr.Login)
 	oidcGroup.GET("/sso-login", ctr.SSOLogin)
 	oidcGroup.GET("/logged-out", func(ctx *gin.Context) {
-		ctx.String(200, "You have been logged out.")
+		ctx.SetCookie("iam_sso_session", "", -1, "/", "", false, true)
+		ctx.Redirect(302, config.Conf.OIDC.FrontendLoginURL)
 	})
-	svcoidc.RegisterProviderRoutes(oidcGroup, provider)
+	svcoidc.RegisterProviderRoutes(oidcGroup, provider, "iam_sso_session")
 }

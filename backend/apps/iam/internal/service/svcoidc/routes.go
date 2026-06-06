@@ -7,7 +7,7 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 )
 
-func RegisterProviderRoutes(routerGroup *gin.RouterGroup, provider *OIDCProvider) {
+func RegisterProviderRoutes(routerGroup *gin.RouterGroup, provider *OIDCProvider, ssoSessionCookieName string) {
 	handler := gin.WrapH(http.StripPrefix("/v1/iam/oidc", provider.Provider))
 	routerGroup.GET(oidc.DiscoveryEndpoint, handler)
 	routerGroup.Any("/authorize", handler)
@@ -16,7 +16,10 @@ func RegisterProviderRoutes(routerGroup *gin.RouterGroup, provider *OIDCProvider
 	routerGroup.Any("/oauth/introspect", handler)
 	routerGroup.Any("/userinfo", handler)
 	routerGroup.Any("/revoke", handler)
-	routerGroup.Any("/end_session", handler)
+	routerGroup.Any("/end_session", func(ctx *gin.Context) {
+		ctx.SetCookie(ssoSessionCookieName, "", -1, "/", "", false, true)
+		handler(ctx)
+	})
 	routerGroup.Any("/keys", handler)
 	routerGroup.Any("/healthz", handler)
 	routerGroup.Any("/ready", handler)

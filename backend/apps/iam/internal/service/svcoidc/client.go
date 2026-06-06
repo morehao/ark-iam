@@ -68,9 +68,9 @@ func (c *OIDCClient) ResponseTypes() []oidc.ResponseType {
 		case "code":
 			types = append(types, oidc.ResponseTypeCode)
 		case "id_token":
-			types = append(types, oidc.ResponseTypeIDToken)
-		case "id_token token":
 			types = append(types, oidc.ResponseTypeIDTokenOnly)
+		case "id_token token":
+			types = append(types, oidc.ResponseTypeIDToken)
 		}
 	}
 	return types
