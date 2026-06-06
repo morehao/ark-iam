@@ -1,5 +1,3 @@
-%%{init: {'theme': 'neutral', 'themeVariables': {'primaryColor': '#333333', 'tertiaryColor': '#ffffff', 'primaryBorderColor': '#333333', 'lineColor': '#333333', 'secondaryColor': '#f5f5f5', 'actorBkg': '#ffffff', 'actorBorder': '#333333', 'actorTextColor': '#333333', 'noteBkg': '#f5f5f5', 'noteBorder': '#666666', 'activationBkgColor': '#e0e0e0', 'activationBorderColor': '#666666', 'signalColor': '#333333', 'signalTextColor': '#333333', 'labelTextColor': '#333333', 'loopTextColor': '#333333'}}}%%
-
 # OIDC SSO 集成指南
 
 ## 1. 什么是 SSO 登录
@@ -181,6 +179,7 @@ IAM 支持 OIDC Discovery，RP 可从此端点自动获取所有协议端点地�
 ### 3.3 完整授权码流程时序图
 
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': {'primaryColor': '#333333', 'tertiaryColor': '#ffffff', 'primaryBorderColor': '#333333', 'lineColor': '#333333', 'secondaryColor': '#f5f5f5', 'actorBkg': '#ffffff', 'actorBorder': '#333333', 'actorTextColor': '#333333', 'noteBkg': '#f5f5f5', 'noteBorder': '#666666', 'activationBkgColor': '#e0e0e0', 'activationBorderColor': '#666666', 'signalColor': '#333333', 'signalTextColor': '#333333', 'labelTextColor': '#333333', 'loopTextColor': '#333333'}}}%%
 sequenceDiagram
     participant User as 用户（浏览器）
     participant RP as 业务应用 (RP)
@@ -250,6 +249,7 @@ sequenceDiagram
 ### 3.4 Refresh Token 流程
 
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': {'primaryColor': '#333333', 'tertiaryColor': '#ffffff', 'primaryBorderColor': '#333333', 'lineColor': '#333333', 'secondaryColor': '#f5f5f5', 'actorBkg': '#ffffff', 'actorBorder': '#333333', 'actorTextColor': '#333333', 'noteBkg': '#f5f5f5', 'noteBorder': '#666666', 'activationBkgColor': '#e0e0e0', 'activationBorderColor': '#666666', 'signalColor': '#333333', 'signalTextColor': '#333333', 'labelTextColor': '#333333', 'loopTextColor': '#333333'}}}%%
 sequenceDiagram
     participant RP as 业务应用 (RP)
     participant IAM as IAM (OIDC Provider)
@@ -269,6 +269,7 @@ sequenceDiagram
 ### 3.5 登出流程
 
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': {'primaryColor': '#333333', 'tertiaryColor': '#ffffff', 'primaryBorderColor': '#333333', 'lineColor': '#333333', 'secondaryColor': '#f5f5f5', 'actorBkg': '#ffffff', 'actorBorder': '#333333', 'actorTextColor': '#333333', 'noteBkg': '#f5f5f5', 'noteBorder': '#666666', 'activationBkgColor': '#e0e0e0', 'activationBorderColor': '#666666', 'signalColor': '#333333', 'signalTextColor': '#333333', 'labelTextColor': '#333333', 'loopTextColor': '#333333'}}}%%
 sequenceDiagram
     participant User as 用户（浏览器）
     participant RP as 业务应用 (RP)
