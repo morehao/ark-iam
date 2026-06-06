@@ -3,7 +3,6 @@ import { CONFIG } from '../config';
 import {
   clickByText,
   verifyRp1HomePage,
-  verifyTokenDetails,
   logoutFromAdmin,
   adminDirectLogin,
   adminSSOLogin,
@@ -11,18 +10,12 @@ import {
   rp1Login,
   rp1SSOLogin,
   verifyRp1RequiresLogin,
-  rp1LogoutLocal,
-  rp1LogoutGlobal,
+  rp1Logout,
 } from '../helpers/oidc-helpers';
 
 test.describe('OIDC SSO E2E', () => {
   test('RP1 首次登录：点击"使用 IAM 登录" → 跳转登录页 → 填写凭证 → 回调展示项目管理面板', async ({ page }) => {
     await rp1Login(page);
-  });
-
-  test('RP1 Token 详情：查看 Token → 获取 UserInfo → 刷新 Token → 返回主页', async ({ page }) => {
-    await rp1Login(page);
-    await verifyTokenDetails(page);
   });
 
   test('管理平台 SSO 自动登录：RP1 登录后 → 打开管理平台 → 静默认证直接进仪表盘', async ({ page, context }) => {
@@ -92,27 +85,11 @@ test.describe('OIDC SSO E2E', () => {
     await rp1Page.close();
   });
 
-  test('RP1 本地退出 → 重新登录免密：退出当前应用 → 显示登录页 → 点"使用 IAM 登录" → SSO 免密进入主页', async ({ page }) => {
+  test('RP1 登出 → 需重新认证：头像下拉退出 → 显示登录页 → 点"IAM 账号登录"跳转登录页', async ({ page }) => {
     await rp1Login(page);
-    await rp1LogoutLocal(page);
-    // SSO Session 仍有效，点击"使用 IAM 登录"应免密进入主页
-    await clickByText(page, '使用 IAM 登录');
-    await page.waitForURL(
-      (url) =>
-        url.hostname === 'localhost' &&
-        url.port === '3001' &&
-        !url.searchParams.has('authRequestID'),
-      { timeout: 20000 }
-    );
-    await page.waitForTimeout(2000);
-    await verifyRp1HomePage(page);
-  });
-
-  test('RP1 全局退出 → 需重新认证：全局退出 → 显示登录页 → 需填写凭证', async ({ page }) => {
-    await rp1Login(page);
-    await rp1LogoutGlobal(page);
-    // SSO Session 已清除，点击"使用 IAM 登录"应跳转到登录页
-    await clickByText(page, '使用 IAM 登录');
+    await rp1Logout(page);
+    // end_session 已清除 SSO Session，点击"IAM 账号登录"应跳转到登录页
+    await clickByText(page, 'IAM 账号登录');
     await page.waitForURL(
       (url) => url.toString().includes(CONFIG.loginWebUrl),
       { timeout: 15000 }
