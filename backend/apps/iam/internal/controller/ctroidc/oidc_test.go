@@ -157,3 +157,21 @@ func TestLoginSetsSSOCookieWhenConfigIsNil(t *testing.T) {
 		t.Fatalf("expected host-only cookie when config is nil, got %q", setCookie)
 	}
 }
+
+func TestSessionStatusReturnsAnonymousWithoutCookie(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	ctr := &OIDCCtr{}
+	engine.GET("/oidc/session/status", ctr.SessionStatus)
+
+	req := httptest.NewRequest(http.MethodGet, "/oidc/session/status", nil)
+	resp := httptest.NewRecorder()
+	engine.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.Code)
+	}
+	if !strings.Contains(resp.Body.String(), `"authenticated":false`) {
+		t.Fatalf("expected anonymous session status, got %s", resp.Body.String())
+	}
+}

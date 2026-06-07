@@ -25,3 +25,7 @@ export const getMyTenants = (params: MyTenantsReq = {}) => {
 export const logoutAPI = (refreshToken: string) => {
   return request.post<any, void>('/auth/logout', { refreshToken })
 }
+
+export const logoutAllAPI = (refreshToken: string) => {
+  return request.post<any, void>('/auth/logoutAll', { refreshToken })
+}

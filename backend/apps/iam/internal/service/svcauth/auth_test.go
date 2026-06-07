@@ -16,6 +16,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/token"
 	"github.com/morehao/golib/biz/gconstant"
+	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/gerror"
@@ -26,6 +27,7 @@ type fakeAuthRefreshTokenStore struct {
 	getByCondFunc func(ctx context.Context, cond *dao.RefreshTokenCond) (*model.RefreshTokenEntity, error)
 	insertFunc    func(ctx context.Context, entity *model.RefreshTokenEntity) error
 	deleteFunc    func(ctx context.Context, id, userID uint) error
+	revokeByPersonIDFunc func(ctx context.Context, personID uint) error
 }
 
 func (f *fakeAuthRefreshTokenStore) GetByCond(ctx context.Context, cond genericdao.Cond) (*model.RefreshTokenEntity, error) {
@@ -48,6 +50,13 @@ func (f *fakeAuthRefreshTokenStore) Delete(ctx context.Context, id, userID uint)
 		return nil
 	}
 	return f.deleteFunc(ctx, id, userID)
+}
+
+func (f *fakeAuthRefreshTokenStore) RevokeByPersonID(ctx context.Context, personID uint) error {
+	if f.revokeByPersonIDFunc == nil {
+		return nil
+	}
+	return f.revokeByPersonIDFunc(ctx, personID)
 }
 
 type fakeAuthUserStore struct {
@@ -323,6 +332,33 @@ func TestRefreshTokenUsesStoredUserIDWhenDeletingOldToken(t *testing.T) {
 	}
 	if deletedUserID != 7 {
 		t.Fatalf("expected delete to use stored user id 7, got %d", deletedUserID)
+	}
+}
+
+func TestLogoutAllRevokesAllRefreshTokensForPerson(t *testing.T) {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = httptestRequest(t)
+	ginCtx.Set(gcontext.KeyPersonID, uint(42))
+	ginCtx.Request.Header.Set("Authorization", "")
+
+	var revokedPersonID uint
+	restoreRefreshTokenStore := swapRefreshTokenStoreFactory(func() authRefreshTokenStore {
+		return &fakeAuthRefreshTokenStore{
+			revokeByPersonIDFunc: func(ctx context.Context, personID uint) error {
+				revokedPersonID = personID
+				return nil
+			},
+		}
+	})
+	defer restoreRefreshTokenStore()
+
+	svc := &authSvc{jwtSecret: "test-secret"}
+	err := svc.LogoutAll(ginCtx, &dtoauth.LogoutAllReq{})
+	if err != nil {
+		t.Fatalf("LogoutAll returned error: %v", err)
+	}
+	if revokedPersonID != 42 {
+		t.Fatalf("expected LogoutAll to revoke refresh tokens for person 42, got %d", revokedPersonID)
 	}
 }
 

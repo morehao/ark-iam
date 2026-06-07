@@ -180,8 +180,8 @@ ON DUPLICATE KEY UPDATE `user_id` = VALUES(`user_id`);
 -- 回调地址: http://localhost:3001/auth/callback (SSO测试应用)
 -- 密钥SHA256: fc090df65f5f35338ad419e13de1c64b84d6674c7e67ff32df3cda6f034cfce2
 -- ============================================
-INSERT INTO `oauth_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `status`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (1, 1, 1, 'test-rp-client', 'SSO测试应用', '["http://localhost:3001/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'client_secret_basic', 1, '["openid","profile","email"]', 'enable', 0, 0, 0)
+INSERT INTO `oauth_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `post_logout_redirect_uris`, `status`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (1, 1, 1, 'test-rp-client', 'SSO测试应用', '["http://localhost:3001/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'client_secret_basic', 1, '["openid","profile","email"]', '["http://localhost:3001/login"]', 'enable', 0, 0, 0)
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
 
 INSERT INTO `oauth_client_secret` (`id`, `oauth_client_id`, `name`, `value_hash`, `value_prefix`, `created_by`, `updated_by`, `deleted_by`)

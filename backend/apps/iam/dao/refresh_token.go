@@ -1,6 +1,9 @@
 package dao
 
 import (
+	"context"
+	"time"
+
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/golib/biz/genericdao"
@@ -40,4 +43,12 @@ func NewRefreshTokenDao() *RefreshTokenDao {
 			dbclient.IamDB,
 		),
 	}
+}
+
+func (d *RefreshTokenDao) RevokeByPersonID(ctx context.Context, personID uint) error {
+	now := time.Now()
+	return dbclient.IamDB(ctx).Model(&model.RefreshTokenEntity{}).
+		Where("person_id = ?", personID).
+		Where("revoked_at IS NULL").
+		Update("revoked_at", &now).Error
 }

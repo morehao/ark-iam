@@ -3,10 +3,6 @@ import { CONFIG } from '../config';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function rp1ClearAuth(): void {
-  localStorage.removeItem('auth-storage');
-}
-
 export async function clickByText(page: Page, text: string): Promise<void> {
   const btn = page.locator('button', { hasText: text });
   await btn.click();
@@ -132,9 +128,11 @@ export async function rp1SSOLogin(page: Page): Promise<void> {
 }
 
 export async function verifyRp1RequiresLogin(page: Page): Promise<void> {
-  await page.addInitScript(rp1ClearAuth);
-  await page.goto(CONFIG.rp1Url, { waitUntil: 'networkidle', timeout: 15000 });
-  await wait(1000);
+  await page.bringToFront();
+  await page.waitForURL(
+    (url) => url.hostname === 'localhost' && url.port === '3001' && url.pathname === '/login',
+    { timeout: 20000 }
+  );
   const body = await page.evaluate(() => document.body.innerText);
   expect(body).toContain('IAM 账号登录');
   expect(body).not.toContain('用户信息');

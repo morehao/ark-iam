@@ -1,6 +1,7 @@
 package ctroidc
 
 import (
+	"net/http"
 	"net/url"
 
 	"github.com/gin-gonic/gin"
@@ -73,4 +74,18 @@ func (ctr *OIDCCtr) SSOLogin(ctx *gin.Context) {
 	}
 
 	ctx.Redirect(302, continueURL)
+}
+
+func (ctr *OIDCCtr) SessionStatus(ctx *gin.Context) {
+	sessionID, err := ctx.Cookie("iam_sso_session")
+	if err != nil || sessionID == "" {
+		ctx.JSON(http.StatusOK, gin.H{"authenticated": false})
+		return
+	}
+	_, err = svcoidc.NewSSOSessionStore().ValidateSession(ctx.Request.Context(), sessionID)
+	if err != nil {
+		ctx.JSON(http.StatusOK, gin.H{"authenticated": false})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"authenticated": true})
 }

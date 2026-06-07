@@ -62,8 +62,17 @@ request.interceptors.response.use(
   (response) => {
     const { code, msg } = response.data as { code: number; msg: string }
     if (code === BizCode.Success) return response.data.data
-    if (code === BizCode.TokenExpired) return handleTokenExpired(response.config)
+    const isLogoutRequest = response.config.url?.includes('/auth/logout')
+    if (code === BizCode.TokenExpired) {
+      if (isLogoutRequest) {
+        return Promise.reject(new Error('session expired'))
+      }
+      return handleTokenExpired(response.config)
+    }
     if (code === BizCode.TokenInvalid || code === BizCode.Unauthorized) {
+      if (isLogoutRequest) {
+        return Promise.reject(new Error(msg || '未认证'))
+      }
       handleAnonymousRedirect()
       return Promise.reject(new Error(msg || '未认证'))
     }
