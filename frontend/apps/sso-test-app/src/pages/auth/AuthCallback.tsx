@@ -11,8 +11,9 @@ import { useAuthStore } from '../../stores/authStore'
 const AuthCallback = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { setSession } = useAuthStore()
+  const { setAuthenticatedSession } = useAuthStore()
   const processedRef = useRef(false)
+  const isInIframe = window.self !== window.top
 
   useEffect(() => {
     if (processedRef.current) return
@@ -25,34 +26,78 @@ const AuthCallback = () => {
 
     if (error) {
       if (error === 'login_required') {
-        sessionStorage.setItem('oidc_silent_failed', '1')
+        if (isInIframe) {
+          sessionStorage.removeItem('oidc_silent')
+          clearPKCEParams()
+          window.parent.postMessage(
+            { type: 'oidc-silent', status: 'expired' },
+            window.location.origin
+          )
+          return
+        }
       } else {
         message.error(`登录失败: ${searchParams.get('error_description') || error}`)
       }
       clearPKCEParams()
-      navigate('/login', { replace: true })
+      if (!isInIframe) navigate('/login', { replace: true })
       return
     }
 
     if (!code || !state) {
       clearPKCEParams()
-      navigate('/login', { replace: true })
+      if (isInIframe) {
+        sessionStorage.removeItem('oidc_silent')
+        window.parent.postMessage(
+          { type: 'oidc-silent', status: 'expired' },
+          window.location.origin
+        )
+      } else {
+        navigate('/login', { replace: true })
+      }
       return
     }
 
     const pkceParams = loadPKCEParams()
     if (!pkceParams || pkceParams.state !== state) {
       clearPKCEParams()
-      navigate('/login', { replace: true })
+      if (isInIframe) {
+        sessionStorage.removeItem('oidc_silent')
+        window.parent.postMessage(
+          { type: 'oidc-silent', status: 'expired' },
+          window.location.origin
+        )
+      } else {
+        navigate('/login', { replace: true })
+      }
       return
     }
+
+    const isSilent = sessionStorage.getItem('oidc_silent') === '1'
 
     const run = async () => {
       try {
         const resp = await exchangeCodeForTokens(code, pkceParams.codeVerifier)
         clearPKCEParams()
-        sessionStorage.removeItem('oidc_silent_failed')
-        setSession({
+
+        if (isInIframe && isSilent) {
+          sessionStorage.removeItem('oidc_silent')
+          window.parent.postMessage(
+            {
+              type: 'oidc-silent',
+              status: 'success',
+              tokens: {
+                accessToken: resp.access_token,
+                idToken: resp.id_token,
+                refreshToken: resp.refresh_token,
+                expiresIn: resp.expires_in,
+              },
+            },
+            window.location.origin
+          )
+          return
+        }
+
+        setAuthenticatedSession({
           accessToken: resp.access_token,
           idToken: resp.id_token,
           refreshToken: resp.refresh_token,
@@ -62,13 +107,22 @@ const AuthCallback = () => {
         navigate('/', { replace: true })
       } catch {
         clearPKCEParams()
-        message.error('登录失败，请重试')
-        navigate('/login', { replace: true })
+        if (isInIframe) {
+          window.parent.postMessage(
+            { type: 'oidc-silent', status: 'expired' },
+            window.location.origin
+          )
+        } else {
+          message.error('登录失败，请重试')
+          navigate('/login', { replace: true })
+        }
       }
     }
 
     void run()
-  }, [location.search, navigate, setSession])
+  }, [location.search, navigate, setAuthenticatedSession, isInIframe])
+
+  if (isInIframe) return null
 
   return (
     <div

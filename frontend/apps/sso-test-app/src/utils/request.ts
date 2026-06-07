@@ -16,7 +16,7 @@ async function handleTokenExpired(originalConfig: InternalAxiosRequestConfig): P
   const store = useAuthStore.getState()
 
   if (!store.refreshToken) {
-    store.logout()
+    store.clearSession()
     window.location.href = '/login'
     return Promise.reject(new Error('no refresh token'))
   }
@@ -38,7 +38,7 @@ async function handleTokenExpired(originalConfig: InternalAxiosRequestConfig): P
       originalConfig.headers!.Authorization = `Bearer ${resp.access_token}`
       return request(originalConfig)
     } catch {
-      store.logout()
+      store.clearSession()
       pendingRequests = []
       window.location.href = '/login'
       return Promise.reject(new Error('token refresh failed'))
@@ -74,7 +74,7 @@ request.interceptors.response.use(
     if (code === BizCode.TokenExpired) return handleTokenExpired(response.config)
 
     if (code === BizCode.TokenInvalid || code === BizCode.Unauthorized) {
-      useAuthStore.getState().logout()
+      useAuthStore.getState().clearSession()
       window.location.href = '/login'
       return Promise.reject(new Error(msg || '未认证'))
     }
@@ -91,7 +91,7 @@ request.interceptors.response.use(
     const status = error.response?.status
     const data = error.response?.data as any
     if (status === 401) {
-      useAuthStore.getState().logout()
+      useAuthStore.getState().clearSession()
       window.location.href = '/login'
       return Promise.reject(error)
     }
