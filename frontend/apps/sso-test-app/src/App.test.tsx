@@ -4,7 +4,10 @@ import { MemoryRouter } from 'react-router-dom'
 import App from './App'
 
 vi.mock('./stores/authStore', () => ({
-  useAuthStore: () => ({ authStage: 'anonymous' }),
+  useAuthStore: (selector?: (state: any) => any) => {
+    const state = { authStage: 'anonymous', beginChecking: vi.fn() }
+    return selector ? selector(state) : state
+  },
 }))
 
 vi.mock('./pages/auth/Login', () => ({
