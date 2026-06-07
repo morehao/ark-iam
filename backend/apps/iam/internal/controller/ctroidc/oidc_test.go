@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -80,5 +81,24 @@ func TestLoginReturnsErrorOnServiceFailure(t *testing.T) {
 	}
 	if body.Code != -1 {
 		t.Fatalf("expected fail code -1, got %d body=%s", body.Code, resp.Body.String())
+	}
+}
+
+func TestLoginSetsSSOCookieWhenSessionCreated(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
+		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/v1/iam/oidc/authorize/callback?id=ar-1", SessionID: "session-1"}, nil
+	}}}
+	engine.POST("/oidc/login", ctr.Login)
+
+	req := httptest.NewRequest(http.MethodPost, "/oidc/login", bytes.NewReader([]byte(`{"authRequestID":"ar-1","identifier":"person@example.com","password":"Password1"}`)))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+	engine.ServeHTTP(resp, req)
+
+	setCookie := resp.Header().Get("Set-Cookie")
+	if !strings.Contains(setCookie, "iam_sso_session=session-1") {
+		t.Fatalf("expected iam_sso_session cookie, got %q", setCookie)
 	}
 }

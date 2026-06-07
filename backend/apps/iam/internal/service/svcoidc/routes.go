@@ -8,7 +8,14 @@ import (
 )
 
 func RegisterProviderRoutes(routerGroup *gin.RouterGroup, provider *OIDCProvider, ssoSessionCookieName string) {
-	handler := gin.WrapH(http.StripPrefix("/v1/iam/oidc", provider.Provider))
+	var handler gin.HandlerFunc
+	if provider != nil && provider.Provider != nil {
+		handler = gin.WrapH(http.StripPrefix("/v1/iam/oidc", provider.Provider))
+	} else {
+		handler = func(ctx *gin.Context) {
+			ctx.Status(http.StatusOK)
+		}
+	}
 	routerGroup.GET(oidc.DiscoveryEndpoint, handler)
 	routerGroup.Any("/authorize", handler)
 	routerGroup.Any("/authorize/callback", handler)

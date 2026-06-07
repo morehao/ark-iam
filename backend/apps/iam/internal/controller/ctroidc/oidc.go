@@ -31,7 +31,10 @@ func (ctr *OIDCCtr) Login(ctx *gin.Context) {
 	}
 
 	if res.SessionID != "" {
-		ttl := config.Conf.OIDC.SessionTTL
+		ttl := 86400
+		if config.Conf != nil {
+			ttl = config.Conf.OIDC.SessionTTL
+		}
 		if ttl <= 0 {
 			ttl = 86400
 		}
