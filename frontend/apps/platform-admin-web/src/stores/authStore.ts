@@ -76,15 +76,7 @@ export const useAuthStore = create<AuthState>()(
       },
       setPersonInfo: (personInfo) => set({ personInfo }),
       setTenantInfo: (tenantInfo) => set({ tenantInfo }),
-      markAnonymous: () => set({
-        authStage: 'anonymous',
-        accessToken: null,
-        idToken: null,
-        refreshToken: null,
-        expiresAt: null,
-        personInfo: null,
-        tenantInfo: null,
-      }),
+      markAnonymous: () => set({ authStage: 'anonymous' }),
       clearSession: () => set({
         authStage: 'anonymous',
         accessToken: null,
