@@ -14,7 +14,7 @@ import TenantApplicationList from './pages/tenantApplication'
 import OAuthClientList from './pages/oauthClient'
 import OAuthClientDetail from './pages/oauthClient/Detail'
 import { useAuthStore } from './stores/authStore'
-import { generatePKCEParams, generateCodeChallenge, buildSilentAuthorizeURL, storePKCEParams } from './utils/oidc'
+import { generatePKCEParams, generateCodeChallenge, buildAuthorizeURL, storePKCEParams } from './utils/oidc'
 
 function FullPageSpinner() {
   return (
@@ -46,8 +46,8 @@ function App() {
       const params = generatePKCEParams()
       params.codeChallenge = await generateCodeChallenge(params.codeVerifier)
       if (gen !== genRef.current) return
-      storePKCEParams(params)
-      const url = buildSilentAuthorizeURL(params)
+      storePKCEParams(params, 'silent')
+      const url = buildAuthorizeURL(params, 'silent')
       window.location.replace(url)
     }
     void run()

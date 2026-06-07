@@ -1,17 +1,14 @@
 import { useEffect, useRef } from 'react'
 import { Card, Spin, message } from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
-import {
-  loadPKCEParams,
-  clearPKCEParams,
-  exchangeCodeForTokens,
-} from '../../utils/oidc'
+import { clearPKCEParams, exchangeCodeForTokens, getOIDCFlowMode, loadPKCEParams } from '../../utils/oidc'
 import { useAuthStore } from '../../stores/authStore'
 
 const AuthCallback = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { setSession } = useAuthStore()
+  const setAuthenticatedSession = useAuthStore((state) => state.setAuthenticatedSession)
+  const markAnonymous = useAuthStore((state) => state.markAnonymous)
   const processedRef = useRef(false)
 
   useEffect(() => {
@@ -22,19 +19,24 @@ const AuthCallback = () => {
     const code = searchParams.get('code')
     const state = searchParams.get('state')
     const error = searchParams.get('error')
+    const flowMode = getOIDCFlowMode()
 
     if (error) {
-      if (error === 'login_required') {
-        sessionStorage.setItem('oidc_silent_failed', '1')
-      } else {
-        message.error(`登录失败: ${searchParams.get('error_description') || error}`)
-      }
       clearPKCEParams()
+      if (flowMode === 'silent' && error === 'login_required') {
+        markAnonymous()
+        navigate('/login', { replace: true })
+        return
+      }
+      message.error(`登录失败: ${searchParams.get('error_description') || error}`)
+      markAnonymous()
       navigate('/login', { replace: true })
       return
     }
 
     if (!code || !state) {
+      clearPKCEParams()
+      markAnonymous()
       message.error('回调参数缺失，请重新登录')
       navigate('/login', { replace: true })
       return
@@ -43,6 +45,7 @@ const AuthCallback = () => {
     const pkceParams = loadPKCEParams()
     if (!pkceParams || pkceParams.state !== state) {
       clearPKCEParams()
+      markAnonymous()
       navigate('/login', { replace: true })
       return
     }
@@ -51,35 +54,31 @@ const AuthCallback = () => {
       try {
         const resp = await exchangeCodeForTokens(code, pkceParams.codeVerifier)
         clearPKCEParams()
-        setSession({
+        setAuthenticatedSession({
           accessToken: resp.access_token,
           idToken: resp.id_token,
           refreshToken: resp.refresh_token,
           expiresIn: resp.expires_in,
         })
-        message.success('登录成功')
+        if (flowMode !== 'silent') {
+          message.success('登录成功')
+        }
         navigate('/', { replace: true })
       } catch {
         clearPKCEParams()
-        message.error('登录失败，请重试')
+        markAnonymous()
+        if (flowMode !== 'silent') {
+          message.error('登录失败，请重试')
+        }
         navigate('/login', { replace: true })
       }
     }
 
     void run()
-  }, [location.search, navigate, setSession])
+  }, [location.search, navigate, setAuthenticatedSession, markAnonymous])
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#f0f2f5',
-        padding: 24,
-      }}
-    >
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f2f5', padding: 24 }}>
       <Card title="正在完成登录" style={{ width: 400, maxWidth: '100%' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
           <Spin />

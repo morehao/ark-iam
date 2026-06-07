@@ -9,9 +9,16 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate }
 })
 
-const mockSetSession = vi.fn()
+const mockSetAuthenticatedSession = vi.fn()
+const mockMarkAnonymous = vi.fn()
 vi.mock('../../stores/authStore', () => ({
-  useAuthStore: () => ({ setSession: mockSetSession }),
+  useAuthStore: (selector: any) => {
+    const state = {
+      setAuthenticatedSession: mockSetAuthenticatedSession,
+      markAnonymous: mockMarkAnonymous,
+    }
+    return selector(state)
+  },
 }))
 
 vi.mock('../../utils/oidc', () => ({
@@ -27,12 +34,14 @@ vi.mock('../../utils/oidc', () => ({
     refresh_token: 'refresh-token',
     expires_in: 3600,
   }),
+  getOIDCFlowMode: vi.fn(() => 'interactive'),
 }))
 
 describe('AuthCallback', () => {
   beforeEach(() => {
     mockNavigate.mockClear()
-    mockSetSession.mockClear()
+    mockSetAuthenticatedSession.mockClear()
+    mockMarkAnonymous.mockClear()
   })
 
   it('shows loading spinner during callback processing', () => {
