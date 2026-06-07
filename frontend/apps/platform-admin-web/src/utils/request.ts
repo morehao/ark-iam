@@ -10,7 +10,7 @@ let isRefreshing = false
 let pendingRequests: Array<(token: string) => void> = []
 
 function handleAnonymousRedirect() {
-  useAuthStore.getState().markAnonymous()
+  useAuthStore.getState().clearSession()
   window.location.href = '/login'
 }
 
