@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import { Spin } from 'antd'
 import MainLayout from './components/MainLayout'
 import AuthCallback from './pages/auth/AuthCallback'
@@ -14,7 +14,7 @@ import TenantApplicationList from './pages/tenantApplication'
 import OAuthClientList from './pages/oauthClient'
 import OAuthClientDetail from './pages/oauthClient/Detail'
 import { useAuthStore } from './stores/authStore'
-import { generatePKCEParams, generateCodeChallenge, buildAuthorizeURL, storePKCEParams } from './utils/oidc'
+import { buildAuthorizeURL, generateCodeChallenge, generatePKCEParams, storePKCEParams } from './utils/oidc'
 
 function FullPageSpinner() {
   return (
@@ -25,49 +25,39 @@ function FullPageSpinner() {
 }
 
 function App() {
-  const { authStage } = useAuthStore()
-  const [isChecking, setIsChecking] = useState(false)
-  const genRef = useRef(0)
+  const authStage = useAuthStore((state) => state.authStage)
+  const beginChecking = useAuthStore((state) => state.beginChecking)
 
   useEffect(() => {
-    if (authStage === 'authenticated') return
+    if (window.location.pathname === '/auth/callback') return
+    if (authStage === 'authenticated' || authStage === 'checking') return
 
-    if (sessionStorage.getItem('logged_out') === '1') return
-
-    if (sessionStorage.getItem('oidc_silent_failed') === '1') {
-      sessionStorage.removeItem('oidc_silent_failed')
-      return
-    }
-
-    const gen = ++genRef.current
-    setIsChecking(true)
+    let active = true
+    beginChecking()
 
     const run = async () => {
       const params = generatePKCEParams()
       params.codeChallenge = await generateCodeChallenge(params.codeVerifier)
-      if (gen !== genRef.current) return
+      if (!active) return
       storePKCEParams(params, 'silent')
-      const url = buildAuthorizeURL(params, 'silent')
-      window.location.replace(url)
+      window.location.replace(buildAuthorizeURL(params, 'silent'))
     }
-    void run()
-  }, [])
 
-  if (isChecking) {
+    void run()
+    return () => {
+      active = false
+    }
+  }, [authStage, beginChecking])
+
+  if (authStage === 'checking') {
     return <FullPageSpinner />
   }
 
   return (
     <Routes>
-      <Route
-        path="/login"
-        element={authStage === 'authenticated' ? <Navigate to="/" replace /> : <Login />}
-      />
+      <Route path="/login" element={authStage === 'authenticated' ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route
-        path="/"
-        element={authStage === 'authenticated' ? <MainLayout /> : <Navigate to="/login" replace />}
-      >
+      <Route path="/" element={authStage === 'authenticated' ? <MainLayout /> : <Navigate to="/login" replace />}>
         <Route index element={<Dashboard />} />
         <Route path="user" element={<UserList />} />
         <Route path="role" element={<RoleList />} />
