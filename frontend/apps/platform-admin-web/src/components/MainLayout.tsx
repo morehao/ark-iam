@@ -4,32 +4,18 @@ import { DashboardOutlined, UserOutlined, TeamOutlined, AppstoreOutlined, MenuFo
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { getUserinfo, logoutAPI } from '../api/auth'
 import { useAuthStore } from '../stores/authStore'
-import { buildAuthorizeURL, generateCodeChallenge, generatePKCEParams, getEndSessionURL, storePKCEParams } from '../utils/oidc'
+import { getEndSessionURL } from '../utils/oidc'
 
 const { Header, Sider, Content } = Layout
 
 const MainLayout = () => {
   const [collapsed, setCollapsed] = useState(false)
   const initializedRef = useRef(false)
-  const checkingRef = useRef(false)
   const navigate = useNavigate()
   const location = useLocation()
   const authStage = useAuthStore((state) => state.authStage)
   const clearSession = useAuthStore((state) => state.clearSession)
   const setPersonInfo = useAuthStore((state) => state.setPersonInfo)
-
-  const triggerSilentProbe = async () => {
-    if (checkingRef.current) return
-    checkingRef.current = true
-    try {
-      const params = generatePKCEParams()
-      params.codeChallenge = await generateCodeChallenge(params.codeVerifier)
-      storePKCEParams(params, 'silent')
-      window.location.replace(buildAuthorizeURL(params, 'silent'))
-    } finally {
-      checkingRef.current = false
-    }
-  }
 
   const handleLogout = async () => {
     const store = useAuthStore.getState()
@@ -61,15 +47,8 @@ const MainLayout = () => {
       }
     }
     void loadUserContext()
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        void triggerSilentProbe()
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
       active = false
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [authStage, setPersonInfo])
 

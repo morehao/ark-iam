@@ -76,7 +76,15 @@ export const useAuthStore = create<AuthState>()(
       },
       setPersonInfo: (personInfo) => set({ personInfo }),
       setTenantInfo: (tenantInfo) => set({ tenantInfo }),
-      markAnonymous: () => set({ authStage: 'anonymous' }),
+      markAnonymous: () => set({
+        authStage: 'anonymous',
+        accessToken: null,
+        idToken: null,
+        refreshToken: null,
+        expiresAt: null,
+        personInfo: null,
+        tenantInfo: null,
+      }),
       clearSession: () => set({
         authStage: 'anonymous',
         accessToken: null,
@@ -90,7 +98,7 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'auth-storage',
       partialize: (state) => ({
-        authStage: state.authStage,
+        authStage: state.authStage === 'checking' ? 'anonymous' : state.authStage,
         accessToken: state.accessToken,
         idToken: state.idToken,
         refreshToken: state.refreshToken,

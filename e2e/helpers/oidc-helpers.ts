@@ -3,13 +3,8 @@ import { CONFIG } from '../config';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function rp1PreventSilentAuth(): void {
-  sessionStorage.setItem('oidc_silent_failed', '1');
-}
-
 function rp1ClearAuth(): void {
   localStorage.removeItem('auth-storage');
-  sessionStorage.setItem('logged_out', '1');
 }
 
 export async function clickByText(page: Page, text: string): Promise<void> {
@@ -67,7 +62,6 @@ async function waitForDashboard(page: Page): Promise<void> {
 }
 
 export async function rp1Login(page: Page): Promise<void> {
-  await page.addInitScript(rp1PreventSilentAuth);
   await page.goto(CONFIG.rp1Url, { waitUntil: 'networkidle' });
   await page.click('button', { timeout: 5000 });
   await page.waitForTimeout(2000);
@@ -121,7 +115,6 @@ export async function adminRequiresLoginAfterLogout(page: Page): Promise<void> {
 }
 
 export async function rp1SSOLogin(page: Page): Promise<void> {
-  await page.addInitScript(rp1PreventSilentAuth);
   await page.goto(CONFIG.rp1Url, { waitUntil: 'networkidle', timeout: 15000 });
   await wait(1000);
   await page.click('button', { timeout: 5000 });
@@ -155,7 +148,7 @@ export async function rp1Logout(page: Page): Promise<void> {
   const logoutItem = page.locator('.ant-dropdown-menu-item', { hasText: '退出登录' });
   await expect(logoutItem).toBeVisible({ timeout: 5000 });
   await logoutItem.click();
-  // end_session 跳转回 RP1，logged_out 标记阻止静默登录
+  // end_session 跳转回 RP1，非登录态直接展示登录页
   await page.waitForURL(
     (url) => url.hostname === 'localhost' && url.port === '3001' && !url.searchParams.has('code'),
     { timeout: 20000 }

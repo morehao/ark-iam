@@ -127,6 +127,12 @@ importers:
       '@ark-iam/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
+      '@testing-library/jest-dom':
+        specifier: ^6.6.3
+        version: 6.9.1
+      '@testing-library/react':
+        specifier: ^16.1.0
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -136,12 +142,18 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^4.3.3
         version: 4.3.3(vite@5.4.10(@types/node@25.7.0))
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1
       typescript:
         specifier: ^5.6.3
         version: 5.6.3
       vite:
         specifier: ^5.4.10
         version: 5.4.10(@types/node@25.7.0)
+      vitest:
+        specifier: ^2.1.4
+        version: 2.1.4(@types/node@25.7.0)(jsdom@25.0.1)
 
   packages/shared: {}
 

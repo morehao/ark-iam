@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import AuthCallback from './AuthCallback'
 
@@ -51,5 +51,22 @@ describe('AuthCallback', () => {
       </MemoryRouter>
     )
     expect(screen.getByText('正在完成登录')).toBeInTheDocument()
+  })
+
+  it('marks anonymous and redirects to login for silent login_required callback', async () => {
+    const oidcModule = await import('../../utils/oidc')
+    vi.spyOn(oidcModule, 'getOIDCFlowMode').mockReturnValueOnce('silent')
+
+    render(
+      <MemoryRouter initialEntries={['/auth/callback?error=login_required&state=test-state']}>
+        <AuthCallback />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(mockMarkAnonymous).toHaveBeenCalledTimes(1)
+    })
+    expect(mockNavigate).toHaveBeenCalledWith('/login', { replace: true })
+    expect(mockSetAuthenticatedSession).not.toHaveBeenCalled()
   })
 })

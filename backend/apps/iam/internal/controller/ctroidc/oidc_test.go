@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtooidc"
 )
 
@@ -84,8 +85,9 @@ func TestLoginReturnsErrorOnServiceFailure(t *testing.T) {
 	}
 }
 
-func TestLoginSetsSSOCookieWhenSessionCreated(t *testing.T) {
+func TestLoginSetsSSOCookieWithoutDomainByDefault(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	config.Conf = &config.Config{}
 	engine := gin.New()
 	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
 		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/v1/iam/oidc/authorize/callback?id=ar-1", SessionID: "session-1"}, nil
@@ -100,5 +102,58 @@ func TestLoginSetsSSOCookieWhenSessionCreated(t *testing.T) {
 	setCookie := resp.Header().Get("Set-Cookie")
 	if !strings.Contains(setCookie, "iam_sso_session=session-1") {
 		t.Fatalf("expected iam_sso_session cookie, got %q", setCookie)
+	}
+	if strings.Contains(setCookie, "Domain=") {
+		t.Fatalf("expected host-only cookie without Domain by default, got %q", setCookie)
+	}
+}
+
+func TestLoginSetsSSOCookieWithConfiguredDomain(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	config.Conf = &config.Config{OIDC: config.OIDC{CookieDomain: "example.com"}}
+	engine := gin.New()
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
+		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/v1/iam/oidc/authorize/callback?id=ar-1", SessionID: "session-1"}, nil
+	}}}
+	engine.POST("/login", ctr.Login)
+
+	reqBody := strings.NewReader(`{"authRequestID":"ar-1","identifier":"demo","password":"pass"}`)
+	req := httptest.NewRequest(http.MethodPost, "/login", reqBody)
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	engine.ServeHTTP(resp, req)
+
+	setCookie := resp.Header().Get("Set-Cookie")
+	if !strings.Contains(setCookie, "Domain=example.com") {
+		t.Fatalf("expected cookie to use configured domain, got %q", setCookie)
+	}
+}
+
+func TestLoginSetsSSOCookieWhenConfigIsNil(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	config.Conf = nil
+	engine := gin.New()
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
+		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/v1/iam/oidc/authorize/callback?id=ar-1", SessionID: "session-1"}, nil
+	}}}
+	engine.POST("/login", ctr.Login)
+
+	reqBody := strings.NewReader(`{"authRequestID":"ar-1","identifier":"demo","password":"pass"}`)
+	req := httptest.NewRequest(http.MethodPost, "/login", reqBody)
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	engine.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected status 200 without config panic, got %d", resp.Code)
+	}
+	setCookie := resp.Header().Get("Set-Cookie")
+	if !strings.Contains(setCookie, "iam_sso_session=session-1") {
+		t.Fatalf("expected iam_sso_session cookie, got %q", setCookie)
+	}
+	if strings.Contains(setCookie, "Domain=") {
+		t.Fatalf("expected host-only cookie when config is nil, got %q", setCookie)
 	}
 }

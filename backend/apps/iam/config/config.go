@@ -33,6 +33,7 @@ type Config struct {
 type OIDC struct {
 	Issuer                string `yaml:"issuer"`
 	FrontendLoginURL      string `yaml:"frontendLoginURL"`
+	CookieDomain          string `yaml:"cookieDomain"`
 	SigningKeyID          string `yaml:"signingKeyID"`
 	SigningPrivateKeyPath string `yaml:"signingPrivateKeyPath"`
 	SigningPrivateKeyPEM  string `yaml:"signingPrivateKeyPEM"`
@@ -43,6 +44,10 @@ type OIDC struct {
 	AuthCodeTTL           int    `yaml:"authCodeTTL"`
 	SpentCodeTTL          int    `yaml:"spentCodeTTL"`
 	SessionTTL            int    `yaml:"sessionTTL"`
+}
+
+func (o OIDC) SSOCookieDomain() string {
+	return o.CookieDomain
 }
 
 type PasswordConfig struct {
