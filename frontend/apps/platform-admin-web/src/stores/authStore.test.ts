@@ -63,4 +63,9 @@ describe('authStore', () => {
     expect(useAuthStore.getState().refreshToken).toBeNull()
     expect(useAuthStore.getState().tenantInfo).toBeNull()
   })
+
+  it('beginChecking transitions to checking', () => {
+    useAuthStore.getState().beginChecking()
+    expect(useAuthStore.getState().authStage).toBe('checking')
+  })
 })

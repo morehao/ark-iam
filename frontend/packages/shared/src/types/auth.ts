@@ -1,4 +1,4 @@
-export type AuthStage = 'anonymous' | 'authenticated'
+export type AuthStage = 'checking' | 'anonymous' | 'authenticated'
 
 export interface TokenSet {
   accessToken: string
