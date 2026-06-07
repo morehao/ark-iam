@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { useEffect, useRef } from 'react'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Spin } from 'antd'
 import MainLayout from './components/MainLayout'
 import AuthCallback from './pages/auth/AuthCallback'
@@ -19,22 +19,30 @@ function FullPageSpinner() {
 function App() {
   const authStage = useAuthStore((state) => state.authStage)
   const beginChecking = useAuthStore((state) => state.beginChecking)
+  const markAnonymous = useAuthStore((state) => state.markAnonymous)
+  const location = useLocation()
+  const silentInitiatedRef = useRef(false)
 
   useEffect(() => {
-    if (window.location.pathname === '/auth/callback') return
+    if (silentInitiatedRef.current) return
     if (authStage === 'authenticated' || authStage === 'checking') return
-    let active = true
+    if (location.pathname === '/auth/callback' || location.pathname === '/login') return
+
+    silentInitiatedRef.current = true
     beginChecking()
-    const run = async () => {
-      const params = generatePKCEParams()
-      params.codeChallenge = await generateCodeChallenge(params.codeVerifier)
-      if (!active) return
-      storePKCEParams(params, 'silent')
-      window.location.replace(buildAuthorizeURL(params, 'silent'))
-    }
-    void run()
-    return () => { active = false }
-  }, [authStage, beginChecking])
+
+    void (async () => {
+      try {
+        const params = generatePKCEParams()
+        params.codeChallenge = await generateCodeChallenge(params.codeVerifier)
+        storePKCEParams(params, 'silent')
+        window.location.replace(buildAuthorizeURL(params, 'silent'))
+      } catch {
+        silentInitiatedRef.current = false
+        markAnonymous()
+      }
+    })()
+  }, [authStage, beginChecking, markAnonymous, location])
 
   if (authStage === 'checking') return <FullPageSpinner />
 
