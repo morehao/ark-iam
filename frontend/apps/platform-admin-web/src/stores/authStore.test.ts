@@ -19,8 +19,8 @@ describe('authStore', () => {
     expect(useAuthStore.getState().accessToken).toBeNull()
   })
 
-  it('setSession transitions to authenticated', () => {
-    useAuthStore.getState().setSession({
+  it('setAuthenticatedSession transitions to authenticated', () => {
+    useAuthStore.getState().setAuthenticatedSession({
       accessToken: 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJwZXJzb246NDIiLCJ0ZW5hbnRfaWQiOjEsImV4cCI6OTk5OTk5OTk5OX0.fake',
       idToken: 'test-id-token',
       refreshToken: 'test-refresh-token',
@@ -32,8 +32,21 @@ describe('authStore', () => {
     expect(useAuthStore.getState().tenantInfo?.tenantID).toBe(1)
   })
 
+  it('setAuthenticatedSession stores tokens and switches to authenticated', () => {
+    useAuthStore.getState().setAuthenticatedSession({
+      accessToken: 'eyJhbGciOiJSUzI1NiJ9.eyJ0ZW5hbnRfaWQiOjEsImV4cCI6OTk5OTk5OTk5OX0.fake',
+      idToken: 'id-token',
+      refreshToken: 'refresh-token',
+      expiresIn: 3600,
+    })
+
+    expect(useAuthStore.getState().authStage).toBe('authenticated')
+    expect(useAuthStore.getState().refreshToken).toBe('refresh-token')
+    expect(useAuthStore.getState().tenantInfo?.tenantID).toBe(1)
+  })
+
   it('updateTokens preserves idToken if not provided', () => {
-    useAuthStore.getState().setSession({
+    useAuthStore.getState().setAuthenticatedSession({
       accessToken: 'old-access',
       idToken: 'old-id-token',
       refreshToken: 'old-refresh',
@@ -49,14 +62,14 @@ describe('authStore', () => {
     expect(useAuthStore.getState().refreshToken).toBe('new-refresh')
   })
 
-  it('logout clears all state', () => {
-    useAuthStore.getState().setSession({
+  it('clearSession clears all state', () => {
+    useAuthStore.getState().setAuthenticatedSession({
       accessToken: 'token',
       idToken: 'id',
       refreshToken: 'refresh',
       expiresIn: 3600,
     })
-    useAuthStore.getState().logout()
+    useAuthStore.getState().clearSession()
     expect(useAuthStore.getState().authStage).toBe('anonymous')
     expect(useAuthStore.getState().accessToken).toBeNull()
     expect(useAuthStore.getState().idToken).toBeNull()
@@ -67,5 +80,12 @@ describe('authStore', () => {
   it('beginChecking transitions to checking', () => {
     useAuthStore.getState().beginChecking()
     expect(useAuthStore.getState().authStage).toBe('checking')
+  })
+
+  it('markAnonymous clears tokens and exits checking mode', () => {
+    useAuthStore.getState().beginChecking()
+    useAuthStore.getState().markAnonymous()
+    expect(useAuthStore.getState().authStage).toBe('anonymous')
+    expect(useAuthStore.getState().accessToken).toBeNull()
   })
 })

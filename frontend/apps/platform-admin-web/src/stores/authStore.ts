@@ -11,8 +11,8 @@ interface AuthState {
   expiresAt: number | null
   personInfo: PersonInfo | null
   tenantInfo: TenantInfo | null
-
-  setSession: (tokens: {
+  beginChecking: () => void
+  setAuthenticatedSession: (tokens: {
     accessToken: string
     idToken: string
     refreshToken: string
@@ -26,7 +26,8 @@ interface AuthState {
   }) => void
   setPersonInfo: (info: PersonInfo | null) => void
   setTenantInfo: (info: TenantInfo | null) => void
-  logout: () => void
+  markAnonymous: () => void
+  clearSession: () => void
 }
 
 function extractTenantFromToken(accessToken: string): TenantInfo | null {
@@ -47,8 +48,8 @@ export const useAuthStore = create<AuthState>()(
       expiresAt: null,
       personInfo: null,
       tenantInfo: null,
-
-      setSession: ({ accessToken, idToken, refreshToken, expiresIn }) => {
+      beginChecking: () => set((state) => ({ authStage: state.accessToken ? 'authenticated' : 'checking' })),
+      setAuthenticatedSession: ({ accessToken, idToken, refreshToken, expiresIn }) => {
         const expiresAt = Date.now() + expiresIn * 1000
         const tenantInfo = extractTenantFromToken(accessToken)
         set({
@@ -61,11 +62,11 @@ export const useAuthStore = create<AuthState>()(
           personInfo: null,
         })
       },
-
       updateTokens: ({ accessToken, idToken, refreshToken, expiresIn }) => {
         const expiresAt = Date.now() + expiresIn * 1000
         const tenantInfo = extractTenantFromToken(accessToken)
         set((state) => ({
+          authStage: 'authenticated',
           accessToken,
           idToken: idToken ?? state.idToken,
           refreshToken,
@@ -73,21 +74,26 @@ export const useAuthStore = create<AuthState>()(
           tenantInfo: tenantInfo ?? state.tenantInfo,
         }))
       },
-
       setPersonInfo: (personInfo) => set({ personInfo }),
       setTenantInfo: (tenantInfo) => set({ tenantInfo }),
-
-      logout: () => {
-        set({
-          authStage: 'anonymous',
-          accessToken: null,
-          idToken: null,
-          refreshToken: null,
-          expiresAt: null,
-          personInfo: null,
-          tenantInfo: null,
-        })
-      },
+      markAnonymous: () => set({
+        authStage: 'anonymous',
+        accessToken: null,
+        idToken: null,
+        refreshToken: null,
+        expiresAt: null,
+        personInfo: null,
+        tenantInfo: null,
+      }),
+      clearSession: () => set({
+        authStage: 'anonymous',
+        accessToken: null,
+        idToken: null,
+        refreshToken: null,
+        expiresAt: null,
+        personInfo: null,
+        tenantInfo: null,
+      }),
     }),
     {
       name: 'auth-storage',
