@@ -44,7 +44,6 @@ func InitOIDC(engine *gin.Engine, groups *ginserver.RouterGroups) {
 	oidcGroup.Use(ginmiddleware.CORS())
 	oidcGroup.POST("/login", ctr.Login)
 	oidcGroup.GET("/sso-login", ctr.SSOLogin)
-	oidcGroup.GET("/session/status", ctr.SessionStatus)
 	oidcGroup.GET("/logged-out", func(ctx *gin.Context) {
 		ctx.SetCookie("iam_sso_session", "", -1, "/", ssoCookieDomain, false, true)
 		ctx.Redirect(302, config.Conf.OIDC.FrontendLoginURL)
