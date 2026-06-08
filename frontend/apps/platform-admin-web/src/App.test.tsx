@@ -1,28 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import App from './App'
 
-let mockAuthStage = 'anonymous'
-let beginCheckingFn = vi.fn()
-let markAnonymousFn = vi.fn()
+let mockIsAuthenticated = false
+let mockIsLoading = false
+let mockActiveNavigator: string | undefined = undefined
+const mockSigninRedirect = vi.fn()
 
-vi.mock('./stores/authStore', () => ({
-  useAuthStore: (selector: any) => {
-    const state = {
-      authStage: mockAuthStage,
-      beginChecking: beginCheckingFn,
-      markAnonymous: markAnonymousFn,
-    }
-    return selector ? selector(state) : state
-  },
-}))
-
-vi.mock('./utils/oidc', () => ({
-  buildAuthorizeURL: vi.fn().mockReturnValue('/v1/iam/oidc/authorize?client_id=test'),
-  generateCodeChallenge: vi.fn().mockResolvedValue('mock-challenge'),
-  generatePKCEParams: vi.fn().mockReturnValue({ codeVerifier: 'v', codeChallenge: 'c', state: 's' }),
-  storePKCEParams: vi.fn(),
+vi.mock('react-oidc-context', () => ({
+  useAuth: () => ({
+    isAuthenticated: mockIsAuthenticated,
+    isLoading: mockIsLoading,
+    activeNavigator: mockActiveNavigator,
+    signinRedirect: mockSigninRedirect,
+    user: null,
+  }),
+  hasAuthParams: vi.fn(() => false),
 }))
 
 vi.mock('./pages/auth/Login', () => ({
@@ -33,15 +26,19 @@ vi.mock('./components/MainLayout', () => ({
   default: () => <div>Main Layout</div>,
 }))
 
+const appModule = await import('./App')
+const App = appModule.default
+
 describe('App', () => {
   beforeEach(() => {
-    mockAuthStage = 'anonymous'
-    beginCheckingFn = vi.fn()
-    markAnonymousFn = vi.fn()
+    mockIsAuthenticated = false
+    mockIsLoading = false
+    mockActiveNavigator = undefined
+    mockSigninRedirect.mockClear()
   })
 
-  it('shows loading spinner while checking session', () => {
-    mockAuthStage = 'checking'
+  it('shows loading spinner while still loading', () => {
+    mockIsLoading = true
     const { container } = render(
       <MemoryRouter initialEntries={['/']}>
         <App />
@@ -50,18 +47,55 @@ describe('App', () => {
     expect(container.querySelector('.ant-spin')).toBeInTheDocument()
   })
 
-  it('renders login page for anonymous users on /login without triggering silent auth', () => {
-    const { getByText } = render(
+  it('shows loading spinner during navigation', () => {
+    mockActiveNavigator = 'signinRedirect'
+    const { container } = render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>
+    )
+    expect(container.querySelector('.ant-spin')).toBeInTheDocument()
+  })
+
+  it('triggers signinRedirect when not authenticated on /', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(mockSigninRedirect).toHaveBeenCalled()
+    })
+  })
+
+  it('triggers signinRedirect on /login when not authenticated', async () => {
+    render(
       <MemoryRouter initialEntries={['/login']}>
         <App />
       </MemoryRouter>
     )
-    expect(getByText('Login Page')).toBeInTheDocument()
-    expect(beginCheckingFn).not.toHaveBeenCalled()
+
+    await waitFor(() => {
+      expect(mockSigninRedirect).toHaveBeenCalled()
+    })
   })
 
-  it('renders main layout for authenticated users', () => {
-    mockAuthStage = 'authenticated'
+  it('does NOT trigger signinRedirect on /auth/callback', async () => {
+    render(
+      <MemoryRouter initialEntries={['/auth/callback']}>
+        <App />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(document.querySelector('.ant-spin')).toBeInTheDocument()
+    })
+    expect(mockSigninRedirect).not.toHaveBeenCalled()
+  })
+
+  it('renders main layout when authenticated', () => {
+    mockIsAuthenticated = true
     const { getByText } = render(
       <MemoryRouter initialEntries={['/']}>
         <App />
@@ -70,48 +104,13 @@ describe('App', () => {
     expect(getByText('Main Layout')).toBeInTheDocument()
   })
 
-  it('initiates silent OIDC flow once when anonymous on /', async () => {
-    const replaceSpy = vi.fn()
-    const originalReplace = window.location.replace
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: { ...window.location, replace: replaceSpy },
-    })
-
-    try {
-      render(
-        <MemoryRouter initialEntries={['/']}>
-          <App />
-        </MemoryRouter>
-      )
-
-      await waitFor(() => {
-        expect(beginCheckingFn).toHaveBeenCalledTimes(1)
-      })
-      await waitFor(() => {
-        expect(replaceSpy).toHaveBeenCalledTimes(1)
-      })
-      expect(replaceSpy.mock.calls[0][0]).toContain('/v1/iam/oidc/authorize')
-    } finally {
-      Object.defineProperty(window, 'location', {
-        configurable: true,
-        value: { replace: originalReplace },
-      })
-    }
-  })
-
-  it('falls back to anonymous when silent flow throws', async () => {
-    const oidcModule = await import('./utils/oidc')
-    vi.spyOn(oidcModule, 'generateCodeChallenge').mockRejectedValueOnce(new Error('crypto failed'))
-
-    render(
-      <MemoryRouter initialEntries={['/']}>
+  it('renders login page when authenticated and on /login', () => {
+    mockIsAuthenticated = true
+    const { getByText } = render(
+      <MemoryRouter initialEntries={['/login']}>
         <App />
       </MemoryRouter>
     )
-
-    await waitFor(() => {
-      expect(markAnonymousFn).toHaveBeenCalledTimes(1)
-    })
+    expect(getByText('Login Page')).toBeInTheDocument()
   })
 })
