@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Route, Routes, useLocation } from 'react-router-dom'
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { Spin } from 'antd'
 import { useAuth } from 'react-oidc-context'
 import MainLayout from './components/MainLayout'
@@ -17,12 +17,19 @@ function FullPageSpinner() {
 function App() {
   const auth = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (!auth.isLoading && !auth.activeNavigator && !auth.isAuthenticated && location.pathname !== '/auth/callback') {
       void auth.signinRedirect()
     }
   }, [auth.isLoading, auth.activeNavigator, auth.isAuthenticated, location.pathname, auth.signinRedirect])
+
+  useEffect(() => {
+    if (auth.isAuthenticated && location.pathname === '/auth/callback') {
+      navigate('/', { replace: true })
+    }
+  }, [auth.isAuthenticated, location.pathname, navigate])
 
   if (auth.isLoading || auth.activeNavigator) {
     return <FullPageSpinner />
