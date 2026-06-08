@@ -1,8 +1,8 @@
-import { useEffect, useRef } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Route, Routes, useLocation } from 'react-router-dom'
 import { Spin } from 'antd'
+import { useAuth } from 'react-oidc-context'
 import MainLayout from './components/MainLayout'
-import AuthCallback from './pages/auth/AuthCallback'
 import Login from './pages/auth/Login'
 import Dashboard from './pages/dashboard'
 import UserList from './pages/user'
@@ -13,8 +13,6 @@ import TenantList from './pages/tenant'
 import TenantApplicationList from './pages/tenantApplication'
 import OAuthClientList from './pages/oauthClient'
 import OAuthClientDetail from './pages/oauthClient/Detail'
-import { useAuthStore } from './stores/authStore'
-import { buildAuthorizeURL, generateCodeChallenge, generatePKCEParams, storePKCEParams } from './utils/oidc'
 
 function FullPageSpinner() {
   return (
@@ -25,42 +23,28 @@ function FullPageSpinner() {
 }
 
 function App() {
-  const authStage = useAuthStore((state) => state.authStage)
-  const beginChecking = useAuthStore((state) => state.beginChecking)
-  const markAnonymous = useAuthStore((state) => state.markAnonymous)
+  const auth = useAuth()
   const location = useLocation()
-  const silentInitiatedRef = useRef(false)
 
   useEffect(() => {
-    if (silentInitiatedRef.current) return
-    if (authStage === 'authenticated' || authStage === 'checking') return
-    if (location.pathname === '/auth/callback' || location.pathname === '/login') return
+    if (!auth.isLoading && !auth.activeNavigator && !auth.isAuthenticated && location.pathname !== '/auth/callback') {
+      void auth.signinRedirect()
+    }
+  }, [auth.isLoading, auth.activeNavigator, auth.isAuthenticated, location.pathname, auth.signinRedirect])
 
-    silentInitiatedRef.current = true
-    beginChecking()
-
-    void (async () => {
-      try {
-        const params = generatePKCEParams()
-        params.codeChallenge = await generateCodeChallenge(params.codeVerifier)
-        storePKCEParams(params, 'silent')
-        window.location.replace(buildAuthorizeURL(params, 'silent'))
-      } catch {
-        silentInitiatedRef.current = false
-        markAnonymous()
-      }
-    })()
-  }, [authStage, beginChecking, markAnonymous, location])
-
-  if (authStage === 'checking') {
+  if (auth.isLoading || auth.activeNavigator) {
     return <FullPageSpinner />
+  }
+
+  if (!auth.isAuthenticated && location.pathname !== '/auth/callback') {
+    return null
   }
 
   return (
     <Routes>
-      <Route path="/login" element={authStage === 'authenticated' ? <Navigate to="/" replace /> : <Login />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route path="/" element={authStage === 'authenticated' ? <MainLayout /> : <Navigate to="/login" replace />}>
+      <Route path="/login" element={<Login />} />
+      <Route path="/auth/callback" element={<FullPageSpinner />} />
+      <Route path="/" element={<MainLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="user" element={<UserList />} />
         <Route path="role" element={<RoleList />} />
