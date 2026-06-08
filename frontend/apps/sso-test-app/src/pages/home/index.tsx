@@ -1,22 +1,19 @@
 import { Card, Avatar } from 'antd'
 import { UserOutlined } from '@ant-design/icons'
-import { useAuthStore } from '../../stores/authStore'
+import { useAuth } from 'react-oidc-context'
 
 const Home = () => {
-  const personInfo = useAuthStore((state) => state.personInfo)
+  const auth = useAuth()
+  const profile = auth.user?.profile as Record<string, any> | undefined
 
   return (
     <Card title="用户信息">
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <Avatar
-          size={64}
-          src={personInfo?.avatar}
-          icon={!personInfo?.avatar ? <UserOutlined /> : undefined}
-        />
+        <Avatar size={64} src={profile?.avatar} icon={<UserOutlined />} />
         <div>
-          <div style={{ fontSize: 18, fontWeight: 500 }}>{personInfo?.name ?? '-'}</div>
+          <div style={{ fontSize: 18, fontWeight: 500 }}>{profile?.name ?? '-'}</div>
           <div style={{ color: '#888', marginTop: 4 }}>
-            用户ID: {personInfo?.personID ?? '-'}
+            用户ID: {profile?.sub ?? '-'}
           </div>
         </div>
       </div>

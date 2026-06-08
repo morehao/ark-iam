@@ -1,34 +1,25 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Layout, Avatar, Dropdown } from 'antd'
 import { UserOutlined, LogoutOutlined } from '@ant-design/icons'
 import { Outlet } from 'react-router-dom'
+import { useAuth } from 'react-oidc-context'
+import type { PersonInfo } from '@ark-iam/shared'
 import { getUserinfo, logoutAllAPI } from '../api/auth'
-import { useAuthStore } from '../stores/authStore'
-import { getEndSessionURL } from '../utils/oidc'
+import { setUserProvider } from '../utils/request'
 
 const { Header, Content } = Layout
 
 const MainLayout = () => {
+  const [personInfo, setPersonInfo] = useState<PersonInfo | null>(null)
   const initializedRef = useRef(false)
-  const silentCheckRef = useRef(false)
-  const authStage = useAuthStore((state) => state.authStage)
-  const clearSession = useAuthStore((state) => state.clearSession)
-  const setPersonInfo = useAuthStore((state) => state.setPersonInfo)
-
-  const handleLogout = async () => {
-    const store = useAuthStore.getState()
-    const currentIdToken = store.idToken
-    try { await logoutAllAPI(store.refreshToken ?? '') } catch {}
-    clearSession()
-    if (currentIdToken) {
-      window.location.assign(getEndSessionURL(currentIdToken))
-      return
-    }
-    window.location.assign('/login')
-  }
+  const auth = useAuth()
 
   useEffect(() => {
-    if (initializedRef.current || authStage !== 'authenticated') return
+    setUserProvider(() => auth.user)
+  }, [auth.user])
+
+  useEffect(() => {
+    if (initializedRef.current || !auth.isAuthenticated) return
     initializedRef.current = true
     let active = true
     const loadUserContext = async () => {
@@ -36,42 +27,24 @@ const MainLayout = () => {
         const userinfoResp = await getUserinfo()
         if (!active) return
         setPersonInfo(userinfoResp?.personInfo ?? null)
-      } catch {}
+      } catch {
+        return
+      }
     }
     void loadUserContext()
-    return () => { active = false }
-  }, [authStage, setPersonInfo])
-
-  useEffect(() => {
-    if (authStage !== 'authenticated') {
-      silentCheckRef.current = false
-      return
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== 'visible' || silentCheckRef.current) return
-
-      silentCheckRef.current = true
-      void (async () => {
-        try {
-          const resp = await fetch('/v1/iam/oidc/session/status', { credentials: 'include' })
-          const data = await resp.json() as { authenticated?: boolean }
-          if (data.authenticated === false) {
-            clearSession()
-            window.location.assign('/login')
-          }
-        } catch {
-        } finally {
-          silentCheckRef.current = false
-        }
-      })()
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      active = false
     }
-  }, [authStage, clearSession])
+  }, [auth.isAuthenticated])
+
+  const handleLogout = async () => {
+    try {
+      await logoutAllAPI(auth.user?.refresh_token ?? '')
+    } catch {
+      // ignore
+    }
+    auth.signoutRedirect()
+  }
 
   const userMenuItems = [
     { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', onClick: handleLogout },
