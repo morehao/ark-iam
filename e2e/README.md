@@ -2,14 +2,31 @@
 
 本目录存放基于 Playwright 的 OIDC SSO 端到端测试，模拟真实浏览器操作验证完整业务流程。
 
+## 认证流程
+
+三个前端应用基于 **react-oidc-context** + **oidc-client-ts** 实现 OIDC 认证，应用会自动重定向到 IAM OIDC Provider。
+
+### SSO 单点登录流程
+
+```
+访问 SP 应用 → 自动 signinRedirect → OIDC authorize 端点
+  ├── 有 iam_sso_session cookie → 静默认证 → 回调 SP 应用
+  └── 无 SSO session → 重定向到 login-web → 填写凭证 → 回调 SP 应用
+```
+
 ## 测试场景
 
 | 测试用例 | 覆盖内容 |
 |----------|----------|
-| RP1 首次登录 | 打开测试 RP → 跳转登录页 → 输入凭据 → 回调展示项目管理面板 |
-| RP1 Token 详情 | 查看 Token → 获取 UserInfo → 刷新 Token → 返回主页 |
-| 管理平台 SSO 自动登录 | RP1 登录后 → 打开管理平台 → 点击 IAM 账号登录 → 自动认证进仪表盘 |
-| 管理平台登出后 SSO 已清除 | 登录 → 登出 → 再点登录应显示登录表单而非自动认证 |
+| RP1 首次登录 | 访问 SSO 测试应用 → 自动跳转 login-web → 填写凭证 → 回调展示首页 |
+| Admin 直接登录 | 访问管理平台 → 自动跳转 login-web → 填写凭证 → 进入仪表盘 |
+| Admin 登录后 SSO 免密 | 先登录 Admin → SSO 测试应用（同 context）自动免密登录 |
+| Admin 登出后 SSO 仍有效 | Admin 登出 → SSO 测试应用仍可 SSO 免密登录 |
+| Admin 登出后自身需重认证 | Admin 登录 → 登出 → 访问需重新跳转 login-web |
+| RP1 登录后 Admin SSO | RP1 登录后 → Admin 管理平台静默 SSO 免密登录 |
+| RP1→Admin→Admin 登出→RP1 | RP1 登录 → Admin SSO → Admin 登出 → RP1 仍可 SSO |
+| 双向 SSO | Admin 登录 → RP1 SSO → Admin 登出 → RP1 仍可 SSO |
+| Admin 登录→登出→重新登录 | 完整认证流程验证 |
 
 测试基于 Playwright 的 browser context 自动共享 cookie，模拟真实的 SSO session 行为。
 

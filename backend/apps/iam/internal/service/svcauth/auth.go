@@ -54,6 +54,7 @@ type authRefreshTokenStore interface {
 	GetByCond(ctx context.Context, cond genericdao.Cond) (*model.RefreshTokenEntity, error)
 	Insert(ctx context.Context, entity *model.RefreshTokenEntity) error
 	Delete(ctx context.Context, id, userID uint) error
+	RevokeByPersonID(ctx context.Context, personID uint) error
 }
 
 var newAuthUserStore = func() authUserStore {
@@ -416,7 +417,17 @@ func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
 }
 
 func (svc *authSvc) LogoutAll(ctx *gin.Context, req *dtoauth.LogoutAllReq) error {
-	return svc.Logout(ctx, &dtoauth.LogoutReq{RefreshToken: req.RefreshToken})
+	if err := svc.Logout(ctx, &dtoauth.LogoutReq{RefreshToken: req.RefreshToken}); err != nil {
+		return err
+	}
+	personID := gincontext.GetPersonID(ctx)
+	if personID == 0 {
+		return nil
+	}
+	if err := newAuthRefreshTokenStore().RevokeByPersonID(ctx.Request.Context(), personID); err != nil {
+		glog.Errorf(ctx, "[svcauth.LogoutAll] RevokeByPersonID fail, personID:%d, err:%v", personID, err)
+	}
+	return nil
 }
 
 func (svc *authSvc) Userinfo(ctx *gin.Context, req *dtoauth.UserinfoReq) (*dtoauth.UserinfoResp, error) {

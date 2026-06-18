@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { Spin } from 'antd'
+import { useAuth } from 'react-oidc-context'
 import MainLayout from './components/MainLayout'
-import AuthCallback from './pages/auth/AuthCallback'
 import Login from './pages/auth/Login'
 import Dashboard from './pages/dashboard'
 import UserList from './pages/user'
@@ -13,8 +13,6 @@ import TenantList from './pages/tenant'
 import TenantApplicationList from './pages/tenantApplication'
 import OAuthClientList from './pages/oauthClient'
 import OAuthClientDetail from './pages/oauthClient/Detail'
-import { useAuthStore } from './stores/authStore'
-import { generatePKCEParams, generateCodeChallenge, buildSilentAuthorizeURL, storePKCEParams } from './utils/oidc'
 
 function FullPageSpinner() {
   return (
@@ -25,49 +23,35 @@ function FullPageSpinner() {
 }
 
 function App() {
-  const { authStage } = useAuthStore()
-  const [isChecking, setIsChecking] = useState(false)
-  const genRef = useRef(0)
+  const auth = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => {
-    if (authStage === 'authenticated') return
-
-    if (sessionStorage.getItem('logged_out') === '1') return
-
-    if (sessionStorage.getItem('oidc_silent_failed') === '1') {
-      sessionStorage.removeItem('oidc_silent_failed')
-      return
+    if (!auth.isLoading && !auth.activeNavigator && !auth.isAuthenticated && location.pathname !== '/auth/callback') {
+      void auth.signinRedirect()
     }
+  }, [auth.isLoading, auth.activeNavigator, auth.isAuthenticated, location.pathname, auth.signinRedirect])
 
-    const gen = ++genRef.current
-    setIsChecking(true)
-
-    const run = async () => {
-      const params = generatePKCEParams()
-      params.codeChallenge = await generateCodeChallenge(params.codeVerifier)
-      if (gen !== genRef.current) return
-      storePKCEParams(params)
-      const url = buildSilentAuthorizeURL(params)
-      window.location.replace(url)
+  useEffect(() => {
+    if (auth.isAuthenticated && location.pathname === '/auth/callback') {
+      navigate('/', { replace: true })
     }
-    void run()
-  }, [])
+  }, [auth.isAuthenticated, location.pathname, navigate])
 
-  if (isChecking) {
+  if (auth.isLoading || auth.activeNavigator) {
     return <FullPageSpinner />
+  }
+
+  if (!auth.isAuthenticated && location.pathname !== '/auth/callback') {
+    return null
   }
 
   return (
     <Routes>
-      <Route
-        path="/login"
-        element={authStage === 'authenticated' ? <Navigate to="/" replace /> : <Login />}
-      />
-      <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route
-        path="/"
-        element={authStage === 'authenticated' ? <MainLayout /> : <Navigate to="/login" replace />}
-      >
+      <Route path="/login" element={<Login />} />
+      <Route path="/auth/callback" element={<FullPageSpinner />} />
+      <Route path="/" element={<MainLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="user" element={<UserList />} />
         <Route path="role" element={<RoleList />} />

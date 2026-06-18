@@ -1,31 +1,53 @@
 import { useEffect, useRef, useState } from 'react'
 import { Layout, Menu, Avatar, Dropdown, Button } from 'antd'
-import {
-  DashboardOutlined,
-  UserOutlined,
-  TeamOutlined,
-  AppstoreOutlined,
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
-  LogoutOutlined,
-  BankOutlined,
-  KeyOutlined,
-} from '@ant-design/icons'
-import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { getUserinfo, logoutAPI } from '../api/auth'
-import { useAuthStore } from '../stores/authStore'
-import { getEndSessionURL } from '../utils/oidc'
+import { DashboardOutlined, UserOutlined, TeamOutlined, AppstoreOutlined, MenuFoldOutlined, MenuUnfoldOutlined, LogoutOutlined, BankOutlined, KeyOutlined } from '@ant-design/icons'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from 'react-oidc-context'
+import type { PersonInfo } from '@ark-iam/shared'
+import { getUserinfo, logoutAllAPI } from '../api/auth'
+import { setUserProvider } from '../utils/request'
 
 const { Header, Sider, Content } = Layout
 
 const MainLayout = () => {
   const [collapsed, setCollapsed] = useState(false)
+  const [personInfo, setPersonInfo] = useState<PersonInfo | null>(null)
   const initializedRef = useRef(false)
   const navigate = useNavigate()
   const location = useLocation()
-  const authStage = useAuthStore((state) => state.authStage)
-  const logout = useAuthStore((state) => state.logout)
-  const setPersonInfo = useAuthStore((state) => state.setPersonInfo)
+  const auth = useAuth()
+
+  useEffect(() => {
+    setUserProvider(() => auth.user)
+  }, [auth.user])
+
+  useEffect(() => {
+    if (initializedRef.current || !auth.isAuthenticated) return
+    initializedRef.current = true
+    let active = true
+    const loadUserContext = async () => {
+      try {
+        const userinfoResp = await getUserinfo()
+        if (!active) return
+        setPersonInfo(userinfoResp?.personInfo ?? null)
+      } catch {
+        return
+      }
+    }
+    void loadUserContext()
+    return () => {
+      active = false
+    }
+  }, [auth.isAuthenticated])
+
+  const handleLogout = async () => {
+    try {
+      await logoutAllAPI(auth.user?.refresh_token ?? '')
+    } catch {
+      // ignore
+    }
+    auth.signoutRedirect()
+  }
 
   const menuItems = [
     { key: '/', icon: <DashboardOutlined />, label: '仪表盘' },
@@ -38,85 +60,20 @@ const MainLayout = () => {
     { key: '/oauthClient', icon: <KeyOutlined />, label: 'OAuth 客户端' },
   ]
 
-  const handleLogout = async () => {
-    const store = useAuthStore.getState()
-    const currentIdToken = store.idToken
-
-    try {
-      await logoutAPI(store.refreshToken ?? '')
-    } catch {
-      // 即使接口调用失败也继续退出流程
-    }
-
-    sessionStorage.setItem('logged_out', '1')
-    logout()
-
-    if (currentIdToken) {
-      const el = document.createElement('script')
-      el.src = getEndSessionURL(currentIdToken)
-      el.onload = () => el.remove()
-      el.onerror = () => el.remove()
-      document.head.appendChild(el)
-    }
-  }
-
-  useEffect(() => {
-    if (initializedRef.current || authStage !== 'authenticated') return
-    initializedRef.current = true
-
-    let active = true
-    const loadUserContext = async () => {
-      try {
-        const userinfoResp = await getUserinfo()
-        if (!active) return
-        const personInfo = userinfoResp?.personInfo ?? null
-        setPersonInfo(personInfo)
-      } catch {
-        return
-      }
-    }
-    void loadUserContext()
-    return () => { active = false }
-  }, [authStage, setPersonInfo])
-
-  const userMenuItems = [
-    { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', onClick: handleLogout },
-  ]
-
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Sider trigger={null} collapsible collapsed={collapsed}>
-        <div style={{
-          height: 64,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#fff',
-          fontSize: collapsed ? 14 : 18,
-          fontWeight: 'bold',
-        }}>
+        <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: collapsed ? 14 : 18, fontWeight: 'bold' }}>
           {collapsed ? 'IAM' : 'IAM 管理平台'}
         </div>
-        <Menu
-          theme="dark"
-          mode="inline"
-          selectedKeys={[location.pathname]}
-          items={menuItems}
-          onClick={({ key }) => navigate(key)}
-        />
+        <Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={menuItems} onClick={({ key }) => navigate(key)} />
       </Sider>
       <Layout>
         <Header style={{ padding: '0 16px', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Button
-            type="text"
-            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            onClick={() => setCollapsed(!collapsed)}
-          />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-              <Avatar style={{ cursor: 'pointer' }} icon={<UserOutlined />} />
-            </Dropdown>
-          </div>
+          <Button type="text" icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => setCollapsed(!collapsed)} />
+          <Dropdown menu={{ items: [{ key: 'logout', icon: <LogoutOutlined />, label: '退出登录', onClick: handleLogout }] }} placement="bottomRight">
+            <Avatar style={{ cursor: 'pointer' }} icon={<UserOutlined />} />
+          </Dropdown>
         </Header>
         <Content style={{ margin: 24, padding: 24, background: '#fff' }}>
           <Outlet />
