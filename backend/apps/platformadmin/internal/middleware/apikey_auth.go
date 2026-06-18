@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/iam/dao"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/glog"
