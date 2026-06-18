@@ -1,6 +1,6 @@
 package dtotenant
 
-import "github.com/morehao/ark-iam/iam/object/objtenant"
+import "github.com/morehao/ark-iam/pkg/iam/object/objtenant"
 
 type OrganizationCreateResp struct {
 	OrganizationID uint `json:"organizationID"` // 组织ID
