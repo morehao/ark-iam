@@ -9,7 +9,7 @@ export function setUserProvider(provider: () => User | null | undefined) {
   userProvider = provider
 }
 
-const request = axios.create({ baseURL: '/v1/iam', timeout: 30000 })
+const request = axios.create({ baseURL: '/v1/platformadmin', timeout: 30000 })
 
 request.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const user = userProvider?.()

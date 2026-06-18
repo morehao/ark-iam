@@ -6,7 +6,7 @@ import { WebStorageStateStore } from 'oidc-client-ts'
 import App from './App'
 
 const oidcConfig = {
-  authority: import.meta.env.VITE_OIDC_ISSUER || '/v1/iam/oidc',
+  authority: import.meta.env.VITE_OIDC_ISSUER || '/v1/auth/oidc',
   client_id: import.meta.env.VITE_OIDC_CLIENT_ID || 'platform-admin-web',
   redirect_uri: window.location.origin + '/auth/callback',
   post_logout_redirect_uri: window.location.origin + '/login',
