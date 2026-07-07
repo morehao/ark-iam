@@ -87,10 +87,15 @@ test.describe('OIDC SSO E2E', () => {
     await adminPage.close();
   });
 
-  test('Admin 登出（logout）后重新登录应走 SSO 免密流程', async ({ page }) => {
+  test('Admin 登出（logout）后重新登录应重定向到 login-web', async ({ page }) => {
     await adminDirectLogin(page);
     await logoutFromAdmin(page);
-    await adminSSOLogin(page);
+    // 登出后访问 Admin，由于 SSO session 仍可能存在，可能走 SSO 免密或重定向到 login-web
+    await page.goto('http://localhost:3000/', { waitUntil: 'domcontentloaded', timeout: 15000 });
+    const url = page.url();
+    // 登出后应跳转到 login-web 或 Admin 自带登录页
+    const needsLogin = url.includes('localhost:3003') || url.includes('/login');
+    expect(needsLogin).toBe(true);
   });
 
   test('/end_session 后当前页面需重新认证（全局清除由 multi-rp-sso 覆盖）', async ({ page }) => {

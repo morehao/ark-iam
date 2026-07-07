@@ -34,18 +34,21 @@ test.describe('错误和边界场景', () => {
 
   test('无效 client_id 导致 OIDC 错误', async ({ page }) => {
     const badUrl = `${CONFIG.issuer}/authorize?client_id=invalid-client&redirect_uri=${encodeURIComponent(CONFIG.rp1Url)}&response_type=code&scope=openid`;
-    await page.goto(badUrl, { waitUntil: 'networkidle', timeout: 15000 });
-    const errorInUrl = page.url().includes('error=');
-    const errorInBody = await page.evaluate(() => document.body.innerText).then(t => t.includes('error') || t.includes('Error'));
-    expect(errorInUrl || errorInBody).toBe(true);
+    const response = await page.goto(badUrl, { waitUntil: 'networkidle', timeout: 15000 });
+    // 无效 client_id 后端应返回错误状态或错误响应
+    const isError = response !== null && (response.status() >= 400 ||
+      page.url().includes('error=') ||
+      page.url().includes('error_description='));
+    expect(isError).toBe(true);
   });
 
   test('无效 redirect_uri 导致 OIDC 错误', async ({ page }) => {
     const badUrl = `${CONFIG.issuer}/authorize?client_id=sso-test-app&redirect_uri=${encodeURIComponent('http://evil.com/callback')}&response_type=code&scope=openid`;
-    await page.goto(badUrl, { waitUntil: 'networkidle', timeout: 15000 });
-    const errorInUrl = page.url().includes('error=');
-    const errorInBody = await page.evaluate(() => document.body.innerText).then(t => t.includes('error') || t.includes('Error'));
-    expect(errorInUrl || errorInBody).toBe(true);
+    const response = await page.goto(badUrl, { waitUntil: 'networkidle', timeout: 15000 });
+    const isError = response !== null && (response.status() >= 400 ||
+      page.url().includes('error=') ||
+      page.url().includes('error_description='));
+    expect(isError).toBe(true);
   });
 
   test('多设备：同一用户在两个独立 context 各自独立 SSO session', async ({ browser }) => {

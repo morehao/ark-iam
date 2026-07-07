@@ -27,7 +27,8 @@ test.describe('Cookie 和跨 Context 隔离', () => {
   test('手动清除 cookie 后需重新认证', async ({ page, context }) => {
     await rp1Login(page);
     await clearAllCookies(context);
-    await page.goto(CONFIG.rp1Url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    // 清除 cookie 后强制导航，触发新的 signinRedirect
+    await page.goto(CONFIG.rp1Url, { waitUntil: 'networkidle', timeout: 15000 });
     await verifyRedirectedToLoginWeb(page);
   });
 
