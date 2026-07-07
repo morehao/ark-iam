@@ -3,11 +3,6 @@ import { CONFIG } from '../config';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function clickByText(page: Page, text: string): Promise<void> {
-  const btn = page.locator('button', { hasText: text });
-  await btn.click();
-}
-
 function isLoginWebUrl(url: string): boolean {
   return url.includes('localhost:3003') && url.includes('/login');
 }
@@ -129,47 +124,6 @@ export async function logoutFromAdmin(page: Page): Promise<void> {
   await logoutItem.click();
   await page.waitForURL((url) => url.toString().includes('/login'), { timeout: 15000 });
   await wait(2000);
-}
-
-export async function adminRequiresLoginAfterLogout(page: Page): Promise<void> {
-  await page.goto(CONFIG.platformAdminUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
-  // Admin app 会自动触发 signinRedirect，如果 SSO 已清除，应跳转到 login-web
-  const url = page.url();
-  if (isLoginWebUrl(url)) {
-    const body = await page.evaluate(() => document.body.innerText);
-    expect(body).not.toContain('仪表盘');
-    return;
-  }
-  // 或者在 Admin 的 /login 页面
-  if (isAdminUrl(url) && url.includes('/login')) {
-    const body = await page.evaluate(() => document.body.innerText);
-    expect(body).toContain('IAM 账号登录');
-    expect(body).not.toContain('仪表盘');
-    return;
-  }
-  throw new Error('SSO session still valid, expected redirect to login');
-}
-
-export async function verifyRp1RequiresLogin(page: Page): Promise<void> {
-  await page.goto(CONFIG.rp1Url, { waitUntil: 'domcontentloaded', timeout: 15000 });
-  // RP1 的 App.tsx 会自动触发 signinRedirect 到 OIDC provider，
-  // 如果 SSO session 已被清除，会重定向到 login-web
-  const url = page.url();
-  if (isLoginWebUrl(url)) {
-    const body = await page.evaluate(() => document.body.innerText);
-    expect(body).toContain('IAM 登录');
-    expect(body).not.toContain('用户信息');
-    return;
-  }
-  // 或者在 RP1 的 /login 页面
-  if (isRp1Url(url) && url.includes('/login')) {
-    const body = await page.evaluate(() => document.body.innerText);
-    expect(body).toContain('IAM 账号登录');
-    expect(body).not.toContain('用户信息');
-    return;
-  }
-  // 如果 SSO session 还存在，会回调到 RP1 首页，说明 SSO 未被清除
-  throw new Error('SSO session still valid, expected redirect to login');
 }
 
 export async function rp1Logout(page: Page): Promise<void> {
