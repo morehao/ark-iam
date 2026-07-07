@@ -24,7 +24,7 @@ function isAdminUrl(url: string): boolean {
   return url.includes('localhost:3000');
 }
 
-async function fillLoginWebCredentials(page: Page): Promise<void> {
+export async function fillLoginWebCredentials(page: Page): Promise<void> {
   await page.waitForSelector('#identifier', { timeout: 10000 });
   await page.fill('#identifier', CONFIG.identifier);
   await page.fill('#password', CONFIG.password);
