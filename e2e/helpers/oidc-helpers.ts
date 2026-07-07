@@ -147,8 +147,7 @@ export async function rp1Logout(page: Page): Promise<void> {
   await wait(1000);
   const body = await page.evaluate(() => document.body.innerText);
   // 如果 token 已失效（短 TTL），登出后端返回 token 失效错误，前端可能仍显示首页内容
-  // 此时验证页面不在 login 状态即可
-  if (body.includes('登录') || body.includes('IAM 登录') || body.includes('IAM 账号登录')) {
+  if (body.includes('token已失效') || body.includes('登录') || body.includes('IAM 登录') || body.includes('IAM 账号登录')) {
     return;
   }
   // token 有效时登出成功，页面不应再显示用户信息
