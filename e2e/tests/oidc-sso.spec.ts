@@ -5,6 +5,10 @@ import {
   logoutFromAdmin,
   adminDirectLogin,
   adminSSOLogin,
+  rp1Logout,
+  callEndSession,
+  clearSSOCookie,
+  verifyRedirectedToLoginWeb,
 } from '../helpers/oidc-helpers';
 
 test.describe('OIDC SSO E2E', () => {
@@ -66,5 +70,42 @@ test.describe('OIDC SSO E2E', () => {
     // Admin 登出只清除自身 token，SSO session 仍然有效
     await rp1SSOLogin(rp1Page);
     await rp1Page.close();
+  });
+
+  test('RP1 自身登出后再次 SSO 免密登录（RP 登出只清自身 token，SSO session 仍在）', async ({ page }) => {
+    await rp1Login(page);
+    await rp1Logout(page);
+    await rp1SSOLogin(page);
+  });
+
+  test('RP1 自身登出后，Admin 的 SSO session 仍有效', async ({ page, context }) => {
+    await rp1Login(page);
+    const adminPage = await context.newPage();
+    await adminSSOLogin(adminPage);
+    await rp1Logout(page);
+    await adminSSOLogin(adminPage);
+    await adminPage.close();
+  });
+
+  test('Admin 登出（logout）后重新登录应走 SSO 免密流程', async ({ page }) => {
+    await adminDirectLogin(page);
+    await logoutFromAdmin(page);
+    await adminSSOLogin(page);
+  });
+
+  test('/end_session 后所有 RP 都需要重新认证', async ({ page, context }) => {
+    await adminDirectLogin(page);
+    const rp1Page = await context.newPage();
+    await rp1SSOLogin(rp1Page);
+    await callEndSession(page);
+    await verifyRedirectedToLoginWeb(rp1Page);
+    await verifyRedirectedToLoginWeb(page);
+    await rp1Page.close();
+  });
+
+  test('/logged-out 清除 cookie 后需重新输入凭证', async ({ page }) => {
+    await rp1Login(page);
+    await clearSSOCookie(page);
+    await verifyRedirectedToLoginWeb(page);
   });
 });
