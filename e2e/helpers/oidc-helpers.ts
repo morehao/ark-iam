@@ -207,29 +207,13 @@ export async function clearAllCookies(context: BrowserContext): Promise<void> {
   await context.clearCookies();
 }
 
-export async function navigateToLoginWebWithAuthRequest(
-  page: Page,
-  targetUrl: string
-): Promise<void> {
-  await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 15000 });
-  const url = page.url();
-
-  if (isAuthCallbackUrl(url) && url.includes('code=')) {
-    await clearSSOCookie(page);
-    await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 15000 });
-  }
-
-  await page.waitForURL(
-    (u) => isLoginWebUrl(u.toString()) && u.searchParams.has('authRequestID'),
-    { timeout: 20000 }
-  );
-}
-
 export async function verifyRedirectedToLoginWeb(page: Page): Promise<void> {
+  // 等待页面重定向到 login-web（如果 SSO session 已清除，OIDC authorize 会重定向到 login-web）
+  // 超时不报错 —— 可能前端有自己的 /login 页面而非 redirect 到 login-web
   try {
     await page.waitForURL((url) => isLoginWebUrl(url.toString()), { timeout: 15000 });
   } catch {
-    // 可能在前端自身的 /login 页
+    // 若同时不在 /login 页，下面 if 会抛出错误
   }
   const currentUrl = page.url();
   if (isLoginWebUrl(currentUrl)) {
@@ -248,21 +232,6 @@ export async function verifyRedirectedToLoginWeb(page: Page): Promise<void> {
   throw new Error(`Expected redirect to login page, but got: ${currentUrl}`);
 }
 
-export async function verifyStillOnHomePage(page: Page, app: 'admin' | 'rp1'): Promise<void> {
-  if (app === 'admin') {
-    await verifyAdminDashboard(page);
-  } else {
-    await verifyRp1HomePage(page);
-  }
-}
-
-export async function loginWithCredentials(page: Page): Promise<void> {
-  await page.waitForSelector('#identifier', { timeout: 10000 });
-  await page.fill('#identifier', CONFIG.identifier);
-  await page.fill('#password', CONFIG.password);
-  await page.click('button[type="submit"]');
-}
-
 export async function callEndSession(page: Page): Promise<void> {
   await page.goto(`${CONFIG.issuer}/end_session`, {
     waitUntil: 'networkidle',
@@ -275,28 +244,4 @@ export async function getSSOSessionCookie(page: Page): Promise<boolean> {
   return cookies.some(
     (c) => c.name === 'iam_sso_session' && (c.domain === 'localhost' || c.domain === '')
   );
-}
-
-export async function extractAuthCode(page: Page): Promise<string> {
-  const url = page.url();
-  const codeMatch = url.match(/[?&]code=([^&]+)/);
-  if (!codeMatch) throw new Error('No auth code found in URL');
-  return codeMatch[1];
-}
-
-export async function verifyAuthCodeReuseFails(
-  page: Page,
-  reusedCode: string,
-  clientId: string
-): Promise<void> {
-  const tokenUrl = `${CONFIG.issuer}/oauth/token`;
-  const response = await page.request.post(tokenUrl, {
-    form: {
-      grant_type: 'authorization_code',
-      code: reusedCode,
-      redirect_uri: CONFIG.rp1Url,
-      client_id: clientId,
-    },
-  });
-  expect(response.status()).toBeGreaterThanOrEqual(400);
 }

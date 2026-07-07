@@ -93,14 +93,10 @@ test.describe('OIDC SSO E2E', () => {
     await adminSSOLogin(page);
   });
 
-  test('/end_session 后所有 RP 都需要重新认证', async ({ page, context }) => {
+  test('/end_session 后当前页面需重新认证（全局清除由 multi-rp-sso 覆盖）', async ({ page }) => {
     await adminDirectLogin(page);
-    const rp1Page = await context.newPage();
-    await rp1SSOLogin(rp1Page);
     await callEndSession(page);
-    await verifyRedirectedToLoginWeb(rp1Page);
     await verifyRedirectedToLoginWeb(page);
-    await rp1Page.close();
   });
 
   test('/logged-out 清除 cookie 后需重新输入凭证', async ({ page }) => {
