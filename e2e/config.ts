@@ -5,4 +5,7 @@ export const CONFIG = {
   platformAdminUrl: 'http://localhost:3000/',
   identifier: 'admin',
   password: 'admin123',
+  sessionTTL: 30,
+  authRequestTTL: 30,
+  authCodeTTL: 15,
 };
