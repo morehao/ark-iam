@@ -9,7 +9,7 @@ import (
 	"github.com/morehao/ark-iam/iam/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"gorm.io/gorm"
 )
@@ -21,7 +21,7 @@ type SessionSvc interface {
 }
 
 type sessionStore interface {
-	GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.RefreshTokenEntityList, int64, error)
+	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.RefreshTokenEntityList, int64, error)
 	UpdateMap(ctx context.Context, id uint, updates map[string]any) error
 }
 
@@ -50,7 +50,7 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, perso
 	}
 
 	cond := &dao.SessionCond{
-		BaseCond: &genericdao.BaseCond{Page: page, PageSize: pageSize},
+		BaseCond: &gormdao.BaseCond{Page: page, PageSize: pageSize},
 		PersonID: personID,
 		UserID:   userID,
 		TenantID: tenantID,
@@ -77,16 +77,16 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, perso
 			expiresAt = item.ExpiredAt.Format("2006-01-02 15:04:05")
 		}
 		sessions = append(sessions, dtouser.SessionResp{
-			ID:            uint64(item.ID),
-			SessionID:     item.SessionID,
-			AppID: uint64(item.OAuthClientID),
-			TenantID:      uint64(item.TenantID),
-			ClientType:    item.ClientType,
-			ClientIP:      item.ClientIP,
-			UserAgent:     item.UserAgent,
-			ExpiredAt:     &expiresAt,
-			CreatedAt:     item.CreatedAt.Format("2006-01-02 15:04:05"),
-			IsActive:      isActive,
+			ID:         uint64(item.ID),
+			SessionID:  item.SessionID,
+			AppID:      uint64(item.OAuthClientID),
+			TenantID:   uint64(item.TenantID),
+			ClientType: item.ClientType,
+			ClientIP:   item.ClientIP,
+			UserAgent:  item.UserAgent,
+			ExpiredAt:  &expiresAt,
+			CreatedAt:  item.CreatedAt.Format("2006-01-02 15:04:05"),
+			IsActive:   isActive,
 		})
 	}
 

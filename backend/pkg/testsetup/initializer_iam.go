@@ -16,7 +16,7 @@ func newIamappInitializer() (Initializer, error) {
 }
 
 func (i *iamappInitializer) Initialize() error {
-	return i.baseAppInitializer.Init()
+	return i.Init()
 }
 
 func (i *iamappInitializer) Close() error {

@@ -7,7 +7,7 @@ import (
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
@@ -46,7 +46,7 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.CreateRe
 	}
 	return &dtoapplication.CreateResp{
 		AppID: entity.ID,
-		Code:     entity.Code,
+		Code:  entity.Code,
 	}, nil
 }
 
@@ -85,7 +85,7 @@ func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.DetailRe
 		return nil, code.GetError(code.ApplicationGetDetailError)
 	}
 	return &dtoapplication.DetailResp{
-		AppID:    entity.ID,
+		AppID:       entity.ID,
 		Code:        entity.Code,
 		Name:        entity.Name,
 		Description: entity.Description,
@@ -101,7 +101,7 @@ func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.DetailRe
 
 func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.PageListReq) (*dtoapplication.PageListResp, error) {
 	cond := &dao.ApplicationCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
@@ -117,7 +117,7 @@ func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.PageLi
 	items := make([]dtoapplication.PageListItem, 0, len(list))
 	for _, v := range list {
 		items = append(items, dtoapplication.PageListItem{
-			AppID:    v.ID,
+			AppID:       v.ID,
 			Code:        v.Code,
 			Name:        v.Name,
 			Description: v.Description,

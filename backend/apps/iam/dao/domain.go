@@ -7,12 +7,12 @@ import (
 
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 type DomainCond struct {
-	*genericdao.BaseCond
+	*gormdao.BaseCond
 	TenantID uint
 	Domain   string
 }
@@ -22,20 +22,20 @@ func (c *DomainCond) BuildCondition(db *gorm.DB, tableName string) {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
 	if c.TenantID != 0 {
-		db.Where(tableName + ".tenant_id = ?", c.TenantID)
+		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
 	if c.Domain != "" {
-		db.Where(tableName + ".domain LIKE ?", "%"+c.Domain+"%")
+		db.Where(tableName+".domain LIKE ?", "%"+c.Domain+"%")
 	}
 }
 
 type DomainDao struct {
-	*genericdao.GenericDao[model.DomainEntity, model.DomainEntityList]
+	*gormdao.Dao[model.DomainEntity, model.DomainEntityList]
 }
 
 func NewDomainDao() *DomainDao {
 	return &DomainDao{
-		GenericDao: genericdao.NewGenericDao[model.DomainEntity, model.DomainEntityList](
+		Dao: gormdao.NewDao[model.DomainEntity, model.DomainEntityList](
 			model.TableNameDomain, "DomainDao",
 			dbclient.IamDB,
 		),

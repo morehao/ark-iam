@@ -3,14 +3,13 @@ package router
 import (
 	"github.com/morehao/ark-iam/iam/internal/controller/ctroauthclient"
 	"github.com/morehao/ark-iam/iam/internal/controller/ctrpermission"
-	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
 func roleRouter(groups *ginserver.RouterGroups) {
 	roleCtr := ctrpermission.NewRoleCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/role/create", roleCtr.Create)
 	v1RouterGroup.POST("/role/delete", roleCtr.Delete)
 	v1RouterGroup.POST("/role/update", roleCtr.Update)
@@ -24,7 +23,7 @@ func roleRouter(groups *ginserver.RouterGroups) {
 func menuRouter(groups *ginserver.RouterGroups) {
 	menuCtr := ctrpermission.NewMenuCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/menu/create", menuCtr.Create)
 	v1RouterGroup.POST("/menu/delete", menuCtr.Delete)
 	v1RouterGroup.POST("/menu/update", menuCtr.Update)
@@ -36,7 +35,7 @@ func menuRouter(groups *ginserver.RouterGroups) {
 func scopeRouter(groups *ginserver.RouterGroups) {
 	scopeCtr := ctrpermission.NewScopeCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/scope/create", scopeCtr.Create)
 	v1RouterGroup.POST("/scope/delete", scopeCtr.Delete)
 	v1RouterGroup.POST("/scope/update", scopeCtr.Update)
@@ -47,7 +46,7 @@ func scopeRouter(groups *ginserver.RouterGroups) {
 func resourceRouter(groups *ginserver.RouterGroups) {
 	resourceCtr := ctrpermission.NewResourceCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/resource/create", resourceCtr.Create)
 	v1RouterGroup.POST("/resource/delete", resourceCtr.Delete)
 	v1RouterGroup.POST("/resource/update", resourceCtr.Update)
@@ -58,7 +57,7 @@ func resourceRouter(groups *ginserver.RouterGroups) {
 func roleMenuRouter(groups *ginserver.RouterGroups) {
 	roleMenuCtr := ctrpermission.NewRoleMenuCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/roleMenu/create", roleMenuCtr.Create)
 	v1RouterGroup.POST("/roleMenu/delete", roleMenuCtr.Delete)
 	v1RouterGroup.POST("/roleMenu/pageList", roleMenuCtr.PageList)
@@ -67,7 +66,7 @@ func roleMenuRouter(groups *ginserver.RouterGroups) {
 func roleScopeRouter(groups *ginserver.RouterGroups) {
 	roleScopeCtr := ctrpermission.NewRoleScopeCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/roleScope/create", roleScopeCtr.Create)
 	v1RouterGroup.POST("/roleScope/delete", roleScopeCtr.Delete)
 	v1RouterGroup.POST("/roleScope/pageList", roleScopeCtr.PageList)
@@ -76,7 +75,7 @@ func roleScopeRouter(groups *ginserver.RouterGroups) {
 func userRoleRouter(groups *ginserver.RouterGroups) {
 	userRoleCtr := ctrpermission.NewUserRoleCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/userRole/create", userRoleCtr.Create)
 	v1RouterGroup.POST("/userRole/delete", userRoleCtr.Delete)
 	v1RouterGroup.POST("/userRole/pageList", userRoleCtr.PageList)
@@ -85,7 +84,7 @@ func userRoleRouter(groups *ginserver.RouterGroups) {
 func oauthClientRouter(groups *ginserver.RouterGroups) {
 	appCtr := ctroauthclient.NewOAuthClientCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/oauthClient/create", appCtr.Create)
 	v1RouterGroup.POST("/oauthClient/delete", appCtr.Delete)
 	v1RouterGroup.POST("/oauthClient/update", appCtr.Update)

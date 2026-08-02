@@ -193,9 +193,11 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 		oldToken, err := s.refreshTokenDao().GetByCond(ctx, &dao.RefreshTokenCond{Token: oldTokenHash})
 		if err == nil && oldToken != nil && oldToken.ID != 0 {
 			dbt := time.Now()
-			s.refreshTokenDao().UpdateMap(ctx, oldToken.ID, map[string]any{
+			if err := s.refreshTokenDao().UpdateMap(ctx, oldToken.ID, map[string]any{
 				"revoked_at": &dbt,
-			})
+			}); err != nil {
+				return "", "", time.Time{}, err
+			}
 		}
 	}
 
@@ -244,14 +246,14 @@ type refreshTokenRequest struct {
 	tenantID uint
 }
 
-func (r *refreshTokenRequest) GetAMR() []string                           { return r.amr }
-func (r *refreshTokenRequest) GetAudience() []string                      { return r.audience }
-func (r *refreshTokenRequest) GetAuthTime() time.Time                     { return r.authTime }
-func (r *refreshTokenRequest) GetClientID() string                        { return r.clientID }
-func (r *refreshTokenRequest) GetScopes() []string                        { return r.scopes }
-func (r *refreshTokenRequest) GetSubject() string                         { return r.subject }
-func (r *refreshTokenRequest) SetCurrentScopes(scopes []string)           { r.scopes = scopes }
-func (r *refreshTokenRequest) GetTenantID() uint                          { return r.tenantID }
+func (r *refreshTokenRequest) GetAMR() []string                 { return r.amr }
+func (r *refreshTokenRequest) GetAudience() []string            { return r.audience }
+func (r *refreshTokenRequest) GetAuthTime() time.Time           { return r.authTime }
+func (r *refreshTokenRequest) GetClientID() string              { return r.clientID }
+func (r *refreshTokenRequest) GetScopes() []string              { return r.scopes }
+func (r *refreshTokenRequest) GetSubject() string               { return r.subject }
+func (r *refreshTokenRequest) SetCurrentScopes(scopes []string) { r.scopes = scopes }
+func (r *refreshTokenRequest) GetTenantID() uint                { return r.tenantID }
 
 func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, clientID string) error {
 	personID, err := parseOIDCSubject(userID)

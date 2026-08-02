@@ -134,11 +134,6 @@ func installUserLoginLogDetailRepo(t *testing.T, repo userLoginLogDetailReposito
 	t.Cleanup(func() { newUserLoginLogDetailRepo = prev })
 }
 
-type userIdentityScopeRepository interface {
-	GetByID(ctx context.Context, id uint) (*model.UserIdentityEntity, error)
-	GetPageListByCond(ctx context.Context, cond *dao.UserIdentityCond) (model.UserIdentityEntityList, int64, error)
-}
-
 type stubUserIdentityScopeRepo struct {
 	detail   *model.UserIdentityEntity
 	pageList model.UserIdentityEntityList
@@ -178,7 +173,9 @@ func installUserIdentityScopeRepo(t *testing.T, repo userIdentityRepository) {
 	prev := newUserIdentityRepo
 	prevSvc := newPersonIdentitySvc
 	newUserIdentityRepo = func() userIdentityRepository { return repo }
-	newPersonIdentitySvc = func() delegatedPersonIdentitySvc { return &stubDelegatedPersonIdentitySvc{repo: repo, userRepo: newUserIdentityUserRepo()} }
+	newPersonIdentitySvc = func() delegatedPersonIdentitySvc {
+		return &stubDelegatedPersonIdentitySvc{repo: repo, userRepo: newUserIdentityUserRepo()}
+	}
 	t.Cleanup(func() {
 		newUserIdentityRepo = prev
 		newPersonIdentitySvc = prevSvc

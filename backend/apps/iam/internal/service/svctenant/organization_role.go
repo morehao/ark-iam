@@ -9,7 +9,7 @@ import (
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
@@ -118,12 +118,12 @@ func (svc *organizationRoleSvc) Update(ctx *gin.Context, req *dtotenant.Organiza
 
 	userID := gincontext.GetUserID(ctx)
 	updateMap := map[string]any{
-		"tenant_id":        req.TenantID,
-		"organization_id":  req.OrganizationID,
-		"name":             req.Name,
-		"description":      req.Description,
-		"type":             req.Type,
-		"updated_by":       userID,
+		"tenant_id":       req.TenantID,
+		"organization_id": req.OrganizationID,
+		"name":            req.Name,
+		"description":     req.Description,
+		"type":            req.Type,
+		"updated_by":      userID,
 	}
 	if err := dao.NewOrganizationRoleDao().UpdateMap(ctx, req.OrganizationRoleID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcorganizationrole.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -157,7 +157,7 @@ func (svc *organizationRoleSvc) Detail(ctx *gin.Context, req *dtotenant.Organiza
 
 func (svc *organizationRoleSvc) PageList(ctx *gin.Context, req *dtotenant.OrganizationRolePageListReq) (*dtotenant.OrganizationRolePageListResp, error) {
 	cond := &dao.OrganizationRoleCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},

@@ -6,12 +6,12 @@ import (
 
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 type ApiKeyCond struct {
-	*genericdao.BaseCond
+	*gormdao.BaseCond
 	TenantID  uint
 	Name      string
 	KeyHash   string
@@ -41,13 +41,13 @@ func (c *ApiKeyCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type ApiKeyDao struct {
-	*genericdao.GenericDao[model.ApiKeyEntity, model.ApiKeyEntityList]
-	dbGetter genericdao.DBGetter
+	*gormdao.Dao[model.ApiKeyEntity, model.ApiKeyEntityList]
+	dbGetter gormdao.DBGetter
 }
 
 func NewApiKeyDao() *ApiKeyDao {
 	return &ApiKeyDao{
-		GenericDao: genericdao.NewGenericDao[model.ApiKeyEntity, model.ApiKeyEntityList](
+		Dao: gormdao.NewDao[model.ApiKeyEntity, model.ApiKeyEntityList](
 			model.TableNameApiKey, "ApiKeyDao",
 			dbclient.IamDB,
 		),
@@ -55,9 +55,9 @@ func NewApiKeyDao() *ApiKeyDao {
 	}
 }
 
-func NewApiKeyDaoWithDB(dbGetter genericdao.DBGetter) *ApiKeyDao {
+func NewApiKeyDaoWithDB(dbGetter gormdao.DBGetter) *ApiKeyDao {
 	return &ApiKeyDao{
-		GenericDao: genericdao.NewGenericDao[model.ApiKeyEntity, model.ApiKeyEntityList](
+		Dao: gormdao.NewDao[model.ApiKeyEntity, model.ApiKeyEntityList](
 			model.TableNameApiKey, "ApiKeyDao",
 			dbGetter,
 		),

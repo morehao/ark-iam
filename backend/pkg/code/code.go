@@ -3,8 +3,7 @@ package code
 import (
 	"fmt"
 
-	"github.com/morehao/golib/biz/gconstant"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/gconstant"
 	"github.com/morehao/golib/gerror"
 )
 
@@ -30,13 +29,15 @@ func GetError(code int) *gerror.Error {
 func init() {
 	// 业务错误码规范: 从 1001XX 开始
 	// 领域划分: tenant(1001XX-1004XX) user(1005XX-1008XX) permission(1006XX-1009XX) auth(1010XX-1011XX) audit
-	registerError(genericdao.DBErrorMsgMap)
+	registerError(gconstant.DBErrorMsgMap)
 	registerError(gconstant.SystemErrorMsgMap)
 	registerError(gconstant.AuthErrorMsgMap)
 	registerError(tenantErrorMsgMap)
 	registerError(userErrorMsgMap)
 	registerError(permissionErrorMsgMap)
 	registerError(authErrorMsgMap)
+	registerError(userAuthErrorMsgMap)
+	registerError(connectorErrorMsgMap)
 	registerError(auditErrorMsgMap)
 	registerError(oidcErrorMsgMap)
 }

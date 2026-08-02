@@ -10,7 +10,7 @@ import (
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
@@ -18,7 +18,7 @@ import (
 type domainRepository interface {
 	Insert(ctx context.Context, entity *model.DomainEntity) error
 	GetByID(ctx context.Context, id uint) (*model.DomainEntity, error)
-	GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.DomainEntityList, int64, error)
+	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.DomainEntityList, int64, error)
 	GetByTenantAndDomain(ctx context.Context, tenantID uint, domain string) (*model.DomainEntity, error)
 	UpdateMap(ctx context.Context, id uint, updateMap map[string]any) error
 	Delete(ctx context.Context, id uint, deletedBy uint) error
@@ -83,7 +83,7 @@ func (svc *domainSvc) PageList(ctx *gin.Context, req *dtodomain.DomainPageListRe
 	tenantID := gincontext.GetTenantID(ctx)
 
 	cond := &dao.DomainCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},

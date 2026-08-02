@@ -54,7 +54,7 @@ func TestRegisterCreatesPersonAndUser(t *testing.T) {
 
 	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
 	require.NoError(t, err)
-	defer testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{TenantIDs: []uint{tenant.ID}})
+	defer func() { _ = testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{TenantIDs: []uint{tenant.ID}}) }()
 
 	svc := NewAuthSvc(testJWTSecret)
 	resp, err := svc.Register(ctx, &dtoauth.RegisterReq{
@@ -68,10 +68,12 @@ func TestRegisterCreatesPersonAndUser(t *testing.T) {
 	require.NotNil(t, resp)
 	require.NotZero(t, resp.UserID)
 
-	defer testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{
-		PersonIDs: []uint{},
-		UserIDs:   []uint{resp.UserID},
-	})
+	defer func() {
+		_ = testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{
+			PersonIDs: []uint{},
+			UserIDs:   []uint{resp.UserID},
+		})
+	}()
 
 	db := dbclient.IamDB(ctx)
 	var person model.PersonEntity
@@ -102,7 +104,7 @@ func TestSelectTenant(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotEmpty(t, resp.TokenInfo.AccessToken)
+	require.NotEmpty(t, resp.AccessToken)
 }
 
 func TestSwitchTenantRejectsUnjoined(t *testing.T) {
@@ -183,11 +185,11 @@ func TestRefreshTokenValid(t *testing.T) {
 	require.NoError(t, err)
 
 	resp, err := svc.RefreshToken(ctx, &dtoauth.RefreshTokenReq{
-		RefreshToken: tokenResp.TokenInfo.RefreshToken,
+		RefreshToken: tokenResp.RefreshToken,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotEmpty(t, resp.TokenInfo.AccessToken)
+	require.NotEmpty(t, resp.AccessToken)
 }
 
 func TestLogout(t *testing.T) {
@@ -211,10 +213,10 @@ func TestLogout(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ctx.Request.Header.Set("Authorization", tokenResp.TokenInfo.AccessToken)
+	ctx.Request.Header.Set("Authorization", tokenResp.AccessToken)
 
 	err = svc.Logout(ctx, &dtoauth.LogoutReq{
-		RefreshToken: tokenResp.TokenInfo.RefreshToken,
+		RefreshToken: tokenResp.RefreshToken,
 	})
 	require.NoError(t, err)
 }

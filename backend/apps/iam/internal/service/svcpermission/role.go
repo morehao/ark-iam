@@ -5,21 +5,21 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtopermission"
+	"github.com/morehao/ark-iam/iam/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objpermission"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/biz/gobject"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
 
 type roleScopeRepository interface {
 	GetByID(ctx context.Context, id uint) (*model.RoleEntity, error)
-	GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.RoleEntityList, int64, error)
+	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.RoleEntityList, int64, error)
 }
 
 var newRoleScopeRepo = func() roleScopeRepository {
@@ -39,7 +39,6 @@ type RoleSvc interface {
 	ListUsers(ctx *gin.Context, req *dtouser.RoleUserListReq) (*dtouser.RoleUserListResp, error)
 	AssignUsers(ctx *gin.Context, req *dtouser.AssignRoleUsersReq) error
 	RemoveUser(ctx *gin.Context, req *dtouser.RemoveRoleUserReq) error
-
 }
 
 type roleSvc struct{}
@@ -100,13 +99,13 @@ func (svc *roleSvc) Update(ctx *gin.Context, req *dtopermission.RoleUpdateReq) e
 
 	userID := gincontext.GetUserID(ctx)
 	updateMap := map[string]any{
-		"tenant_id":    req.TenantID,
-		"name":         req.Name,
-		"code":         req.Code,
-		"description":  req.Description,
-		"type":         req.Type,
-		"is_default":   req.IsDefault,
-		"updated_by":   userID,
+		"tenant_id":   req.TenantID,
+		"name":        req.Name,
+		"code":        req.Code,
+		"description": req.Description,
+		"type":        req.Type,
+		"is_default":  req.IsDefault,
+		"updated_by":  userID,
 	}
 	if err := dao.NewRoleDao().UpdateMap(ctx, req.RoleID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcpermission.UpdateRole] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -146,7 +145,7 @@ func (svc *roleSvc) Detail(ctx *gin.Context, req *dtopermission.RoleDetailReq) (
 func (svc *roleSvc) PageList(ctx *gin.Context, req *dtopermission.RolePageListReq) (*dtopermission.RolePageListResp, error) {
 	roleRepo := newRoleScopeRepo()
 	cond := &dao.RoleCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
@@ -269,5 +268,3 @@ func (svc *roleSvc) RemoveUser(ctx *gin.Context, req *dtouser.RemoveRoleUserReq)
 
 	return nil
 }
-
-

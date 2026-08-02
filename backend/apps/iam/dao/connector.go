@@ -3,12 +3,12 @@ package dao
 import (
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 type ConnectorCond struct {
-	*genericdao.BaseCond
+	*gormdao.BaseCond
 	TenantID    uint
 	Protocol    string
 	Provider    string
@@ -42,12 +42,12 @@ func (c *ConnectorCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type ConnectorDao struct {
-	*genericdao.GenericDao[model.ConnectorEntity, model.ConnectorEntityList]
+	*gormdao.Dao[model.ConnectorEntity, model.ConnectorEntityList]
 }
 
 func NewConnectorDao() *ConnectorDao {
 	return &ConnectorDao{
-		GenericDao: genericdao.NewGenericDao[model.ConnectorEntity, model.ConnectorEntityList](
+		Dao: gormdao.NewDao[model.ConnectorEntity, model.ConnectorEntityList](
 			model.TableNameConnector, "ConnectorDao",
 			dbclient.IamDB,
 		),

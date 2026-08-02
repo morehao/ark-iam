@@ -9,13 +9,13 @@ import (
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
 
 type roleScopeDeleteRepository interface {
-	GetListByCond(ctx context.Context, cond genericdao.Cond) (model.RoleScopeEntityList, error)
+	GetListByCond(ctx context.Context, cond gormdao.Cond) (model.RoleScopeEntityList, error)
 	Delete(ctx context.Context, id uint, userID uint) error
 }
 
@@ -58,9 +58,9 @@ func (svc *roleScopeSvc) Create(ctx *gin.Context, req *dtopermission.RoleScopeCr
 	}
 
 	insertEntity := &model.RoleScopeEntity{
-		TenantID: req.TenantID,
-		RoleID:   req.RoleID,
-		ScopeID:  req.ScopeID,
+		TenantID:  req.TenantID,
+		RoleID:    req.RoleID,
+		ScopeID:   req.ScopeID,
 		CreatedBy: gincontext.GetUserID(ctx),
 	}
 
@@ -96,7 +96,7 @@ func (svc *roleScopeSvc) Delete(ctx *gin.Context, req *dtopermission.RoleScopeDe
 
 func (svc *roleScopeSvc) PageList(ctx *gin.Context, req *dtopermission.RoleScopePageListReq) (*dtopermission.RoleScopePageListResp, error) {
 	cond := &dao.RoleScopeCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},

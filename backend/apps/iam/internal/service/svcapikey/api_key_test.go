@@ -20,7 +20,7 @@ func TestCreateApiKey(t *testing.T) {
 	svc, db, cleanup := newTestApiKeySvc(t)
 	defer cleanup()
 
-	db.AutoMigrate(&model.ApiKeyEntity{})
+	_ = db.AutoMigrate(&model.ApiKeyEntity{})
 
 	req := &dtoapikey.CreateApiKeyReq{
 		Name: "My Test Key",
@@ -53,7 +53,7 @@ func TestCreateApiKeyReturnsKeyOnlyOnce(t *testing.T) {
 	svc, db, cleanup := newTestApiKeySvc(t)
 	defer cleanup()
 
-	db.AutoMigrate(&model.ApiKeyEntity{})
+	_ = db.AutoMigrate(&model.ApiKeyEntity{})
 
 	req := &dtoapikey.CreateApiKeyReq{Name: "One-time Key"}
 	resp, err := svc.Create(newTestGinCtx(1), 1, req)
@@ -81,7 +81,7 @@ func TestRevokeApiKey(t *testing.T) {
 	svc, db, cleanup := newTestApiKeySvc(t)
 	defer cleanup()
 
-	db.AutoMigrate(&model.ApiKeyEntity{})
+	_ = db.AutoMigrate(&model.ApiKeyEntity{})
 
 	req := &dtoapikey.CreateApiKeyReq{Name: "Revokable Key"}
 	resp, err := svc.Create(newTestGinCtx(1), 1, req)
@@ -109,7 +109,7 @@ func TestDeleteApiKey(t *testing.T) {
 	svc, db, cleanup := newTestApiKeySvc(t)
 	defer cleanup()
 
-	db.AutoMigrate(&model.ApiKeyEntity{})
+	_ = db.AutoMigrate(&model.ApiKeyEntity{})
 
 	req := &dtoapikey.CreateApiKeyReq{Name: "Deletable Key"}
 	resp, err := svc.Create(newTestGinCtx(1), 1, req)
@@ -134,7 +134,7 @@ func TestPageListApiKey(t *testing.T) {
 	svc, db, cleanup := newTestApiKeySvc(t)
 	defer cleanup()
 
-	db.AutoMigrate(&model.ApiKeyEntity{})
+	_ = db.AutoMigrate(&model.ApiKeyEntity{})
 
 	for i := 0; i < 3; i++ {
 		req := &dtoapikey.CreateApiKeyReq{Name: "Batch Key"}
@@ -165,7 +165,7 @@ func TestCrossTenantIsolation(t *testing.T) {
 	svc, db, cleanup := newTestApiKeySvc(t)
 	defer cleanup()
 
-	db.AutoMigrate(&model.ApiKeyEntity{})
+	_ = db.AutoMigrate(&model.ApiKeyEntity{})
 
 	req1 := &dtoapikey.CreateApiKeyReq{Name: "Tenant A Key"}
 	resp1, err := svc.Create(newTestGinCtx(1), 1, req1)
@@ -219,7 +219,7 @@ func newTestApiKeySvc(t *testing.T) (CreateApiKeySvc, *gorm.DB, func()) {
 	cleanup := func() {
 		sqlDB, _ := db.DB()
 		if sqlDB != nil {
-			sqlDB.Close()
+			_ = sqlDB.Close()
 		}
 	}
 

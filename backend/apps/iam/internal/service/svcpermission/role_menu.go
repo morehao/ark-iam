@@ -9,13 +9,13 @@ import (
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
 
 type roleMenuDeleteRepository interface {
-	GetListByCond(ctx context.Context, cond genericdao.Cond) (model.RoleMenuEntityList, error)
+	GetListByCond(ctx context.Context, cond gormdao.Cond) (model.RoleMenuEntityList, error)
 	Delete(ctx context.Context, id uint, userID uint) error
 }
 
@@ -57,9 +57,9 @@ func (svc *roleMenuSvc) Create(ctx *gin.Context, req *dtopermission.RoleMenuCrea
 	}
 
 	insertEntity := &model.RoleMenuEntity{
-		TenantID: req.TenantID,
-		RoleID:   req.RoleID,
-		MenuID:   req.MenuID,
+		TenantID:  req.TenantID,
+		RoleID:    req.RoleID,
+		MenuID:    req.MenuID,
 		CreatedBy: gincontext.GetUserID(ctx),
 	}
 
@@ -95,7 +95,7 @@ func (svc *roleMenuSvc) Delete(ctx *gin.Context, req *dtopermission.RoleMenuDele
 
 func (svc *roleMenuSvc) PageList(ctx *gin.Context, req *dtopermission.RoleMenuPageListReq) (*dtopermission.RoleMenuPageListResp, error) {
 	cond := &dao.RoleMenuCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},

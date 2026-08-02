@@ -9,13 +9,13 @@ import (
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
 
 type organizationRoleUserDeleteRepository interface {
-	GetListByCond(ctx context.Context, cond genericdao.Cond) (model.OrganizationRoleUserEntityList, error)
+	GetListByCond(ctx context.Context, cond gormdao.Cond) (model.OrganizationRoleUserEntityList, error)
 	Delete(ctx context.Context, id uint, userID uint) error
 }
 
@@ -97,7 +97,7 @@ func (svc *organizationRoleUserSvc) Delete(ctx *gin.Context, req *dtotenant.Orga
 
 func (svc *organizationRoleUserSvc) PageList(ctx *gin.Context, req *dtotenant.OrganizationRoleUserPageListReq) (*dtotenant.OrganizationRoleUserPageListResp, error) {
 	cond := &dao.OrganizationRoleUserCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},

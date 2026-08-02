@@ -10,7 +10,7 @@ import (
 	"github.com/morehao/ark-iam/iam/object/objresource"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
@@ -18,7 +18,7 @@ import (
 type scopeScopeRepository interface {
 	GetByID(ctx context.Context, id uint) (*model.ScopeEntity, error)
 	GetResourceByID(ctx context.Context, id uint) (*model.ResourceEntity, error)
-	GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.ScopeEntityList, int64, error)
+	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.ScopeEntityList, int64, error)
 	Insert(ctx context.Context, entity *model.ScopeEntity) error
 }
 
@@ -36,7 +36,7 @@ func (d *scopeScopeDAO) GetResourceByID(ctx context.Context, id uint) (*model.Re
 	return dao.NewResourceDao().GetByID(ctx, id)
 }
 
-func (d *scopeScopeDAO) GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.ScopeEntityList, int64, error) {
+func (d *scopeScopeDAO) GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.ScopeEntityList, int64, error) {
 	return dao.NewScopeDao().GetPageListByCond(ctx, cond)
 }
 
@@ -122,11 +122,11 @@ func (svc *scopeSvc) Update(ctx *gin.Context, req *dtopermission.ScopeUpdateReq)
 
 	userID := gincontext.GetUserID(ctx)
 	updateMap := map[string]any{
-		"tenant_id":    req.TenantID,
-		"resource_id":  req.ResourceID,
-		"name":         req.Name,
-		"description":  req.Description,
-		"updated_by":   userID,
+		"tenant_id":   req.TenantID,
+		"resource_id": req.ResourceID,
+		"name":        req.Name,
+		"description": req.Description,
+		"updated_by":  userID,
 	}
 	if err := dao.NewScopeDao().UpdateMap(ctx, req.ScopeID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcpermission.UpdateScope] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -160,7 +160,7 @@ func (svc *scopeSvc) Detail(ctx *gin.Context, req *dtopermission.ScopeDetailReq)
 func (svc *scopeSvc) PageList(ctx *gin.Context, req *dtopermission.ScopePageListReq) (*dtopermission.ScopePageListResp, error) {
 	scopeRepo := newScopeScopeRepo()
 	cond := &dao.ScopeCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},

@@ -10,7 +10,6 @@ import (
 	"github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/router"
 	"github.com/morehao/ark-iam/pkg/testsetup"
-	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
@@ -29,7 +28,7 @@ func TestLoggedOutUsesHostOnlyCookieByDefault(t *testing.T) {
 	}
 
 	engine := gin.New()
-	groups := ginserver.NewRouterGroups(engine, "iam", ginserver.Version{Name: gconstant.ApiVersionV1})
+	groups := ginserver.NewRouterGroups(engine, "iam", ginserver.VersionGroup{Version: ginserver.ApiVersionV1})
 	router.InitOIDC(engine, groups)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/iam/oidc/logged-out", nil)
@@ -63,7 +62,7 @@ func TestLoggedOutUsesConfiguredCookieDomain(t *testing.T) {
 	}
 
 	engine := gin.New()
-	groups := ginserver.NewRouterGroups(engine, "iam", ginserver.Version{Name: gconstant.ApiVersionV1})
+	groups := ginserver.NewRouterGroups(engine, "iam", ginserver.VersionGroup{Version: ginserver.ApiVersionV1})
 	router.InitOIDC(engine, groups)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/iam/oidc/logged-out", nil)

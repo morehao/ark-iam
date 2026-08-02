@@ -3,19 +3,19 @@ package dao
 import (
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 type UserCond struct {
-	*genericdao.BaseCond
-	TenantID      uint
-	PersonID      uint
-	Username      string
-	PrimaryEmail  string
-	PrimaryPhone  string
-	Name          string
-	IsSuspended   *int8
+	*gormdao.BaseCond
+	TenantID     uint
+	PersonID     uint
+	Username     string
+	PrimaryEmail string
+	PrimaryPhone string
+	Name         string
+	IsSuspended  *int8
 }
 
 func (c *UserCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -46,12 +46,12 @@ func (c *UserCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type UserDao struct {
-	*genericdao.GenericDao[model.UserEntity, model.UserEntityList]
+	*gormdao.Dao[model.UserEntity, model.UserEntityList]
 }
 
 func NewUserDao() *UserDao {
 	return &UserDao{
-		GenericDao: genericdao.NewGenericDao[model.UserEntity, model.UserEntityList](
+		Dao: gormdao.NewDao[model.UserEntity, model.UserEntityList](
 			model.TableNameUser, "UserDao",
 			dbclient.IamDB,
 		),

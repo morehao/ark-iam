@@ -207,14 +207,14 @@ func generateTestKey() (rawKey, keyHash, keyPrefix string) {
 func insertTestApiKey(t *testing.T, apiKeyDao *dao.ApiKeyDao, tenantID uint, keyHash, keyPrefix string, revokedAt *time.Time, expiresAt *time.Time) {
 	t.Helper()
 	entity := &model.ApiKeyEntity{
-		TenantID:   tenantID,
-		Name:       "Test Middleware Key",
-		KeyHash:    keyHash,
-		KeyPrefix:  keyPrefix,
-		Scope:      json.RawMessage(`{}`),
-		ExpiredAt:  expiresAt,
-		RevokedAt:  revokedAt,
-		CreatedBy:  42,
+		TenantID:  tenantID,
+		Name:      "Test Middleware Key",
+		KeyHash:   keyHash,
+		KeyPrefix: keyPrefix,
+		Scope:     json.RawMessage(`{}`),
+		ExpiredAt: expiresAt,
+		RevokedAt: revokedAt,
+		CreatedBy: 42,
 	}
 	if err := apiKeyDao.Insert(context.Background(), entity); err != nil {
 		t.Fatalf("insert test api key: %v", err)
@@ -234,7 +234,7 @@ func newTestMiddlewareDB(t *testing.T) (*gorm.DB, func()) {
 	cleanup := func() {
 		sqlDB, _ := db.DB()
 		if sqlDB != nil {
-			sqlDB.Close()
+			_ = sqlDB.Close()
 		}
 	}
 	return db, cleanup

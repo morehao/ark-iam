@@ -9,7 +9,6 @@ import (
 	"github.com/morehao/ark-iam/iam/internal/middleware/oidcauth"
 	"github.com/morehao/ark-iam/iam/internal/router"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
 	"github.com/morehao/golib/biz/gserver/gindocs"
 	"github.com/morehao/golib/biz/gserver/ginserver"
@@ -18,19 +17,19 @@ import (
 const AppName = "iam"
 
 func Routers(engine *gin.Engine) {
-		routerGroups := ginserver.NewRouterGroups(engine, AppName, ginserver.Version{
-			Name: gconstant.ApiVersionV1,
-			Middlewares: []gin.HandlerFunc{
-				oidcauth.OIDCCompatibleAuth(config.Conf.JWT.SignKey, func() *rsa.PublicKey { return router.OIDCPublicKey }, oidcauth.WithAuthSkipPaths(
-					"/v1/iam/org/getConfigsByDomain",
-					"/v1/iam/auth/login",
-					"/v1/iam/auth/myTenants",
-					"/v1/iam/auth/selectTenant",
-					"/v1/iam/auth/register",
-					"/v1/iam/auth/refreshToken",
-					"/v1/iam/connector/callback",
-					"/v1/iam/oidc",
-				)),
+	routerGroups := ginserver.NewRouterGroups(engine, AppName, ginserver.VersionGroup{
+		Version: ginserver.ApiVersionV1,
+		Middlewares: []gin.HandlerFunc{
+			oidcauth.OIDCCompatibleAuth(config.Conf.JWT.SignKey, func() *rsa.PublicKey { return router.OIDCPublicKey }, oidcauth.WithAuthSkipPaths(
+				"/v1/iam/org/getConfigsByDomain",
+				"/v1/iam/auth/login",
+				"/v1/iam/auth/myTenants",
+				"/v1/iam/auth/selectTenant",
+				"/v1/iam/auth/register",
+				"/v1/iam/auth/refreshToken",
+				"/v1/iam/connector/callback",
+				"/v1/iam/oidc",
+			)),
 			ginmiddleware.TokenBlacklistCheck(dbclient.RedisCli, ginmiddleware.WithBlacklistKeyPrefix("iam:token:blacklist:")),
 		},
 	})

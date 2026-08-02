@@ -12,8 +12,8 @@ import (
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/biz/gobject"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 	"gorm.io/gorm"
@@ -324,7 +324,7 @@ func (svc *userSvc) Detail(ctx *gin.Context, req *dtouser.UserDetailReq) (*dtous
 func (svc *userSvc) PageList(ctx *gin.Context, req *dtouser.UserPageListReq) (*dtouser.UserPageListResp, error) {
 	userRepo := newUserQueryRepo()
 	cond := &dao.UserCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
@@ -476,7 +476,7 @@ func (svc *userSvc) DetailUserLoginLog(ctx *gin.Context, req *dtouser.UserLoginL
 
 func (svc *userSvc) PageListUserLoginLog(ctx *gin.Context, req *dtouser.UserLoginLogPageListReq) (*dtouser.UserLoginLogPageListResp, error) {
 	cond := &dao.UserLoginLogCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
@@ -558,10 +558,10 @@ func (svc *userSvc) GetUserDepartmentByUser(ctx *gin.Context, req *dtouser.UserD
 	for _, v := range userDepartmentEntityList {
 		list = append(list, dtouser.UserDepartmentPageListItem{
 			UserDepartmentID: v.ID,
-			TenantID:                 v.TenantID,
-			UserID:                   v.UserID,
-			DepartmentID:             v.DepartmentID,
-			IsPrimary:                v.IsPrimary,
+			TenantID:         v.TenantID,
+			UserID:           v.UserID,
+			DepartmentID:     v.DepartmentID,
+			IsPrimary:        v.IsPrimary,
 			OperatorBaseInfo: gobject.OperatorBaseInfo{
 				UpdatedAt: v.UpdatedAt.Unix(),
 			},

@@ -9,7 +9,6 @@ import (
 	"github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/controller/ctroidc"
 	"github.com/morehao/ark-iam/iam/internal/service/svcoidc"
-	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
@@ -39,7 +38,7 @@ func InitOIDC(engine *gin.Engine, groups *ginserver.RouterGroups) {
 	ctr := ctroidc.NewOIDCCtr(provider)
 	ssoCookieDomain := config.Conf.OIDC.SSOCookieDomain()
 
-	v1Group := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1Group := groups.MustGetGroup(ginserver.ApiVersionV1)
 	oidcGroup := v1Group.Group("/oidc")
 	oidcGroup.Use(ginmiddleware.CORS())
 	oidcGroup.POST("/login", ctr.Login)

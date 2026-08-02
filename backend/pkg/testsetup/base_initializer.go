@@ -11,6 +11,7 @@ import (
 	"github.com/morehao/golib/dbaccess/dbgorm"
 	"github.com/morehao/golib/dbaccess/dbredis"
 	"github.com/morehao/golib/glog"
+	_ "github.com/morehao/golib/glog/driver/zap"
 	"github.com/morehao/golib/gutil"
 )
 
@@ -19,14 +20,14 @@ type baseAppInitializer struct {
 	ConfigPath string
 
 	Log         map[string]glog.LogConfig
-	DBConfigs   []dbgorm.GormConfig
+	DBConfigs   []dbgorm.Config
 	RedisConfig dbredis.RedisConfig
 	ESConfigs   []dbes.ESConfig
 }
 
 type AppConfig struct {
 	Log         map[string]glog.LogConfig `yaml:"log"`
-	DBConfigs   []dbgorm.GormConfig       `yaml:"db_configs"`
+	DBConfigs   []dbgorm.Config           `yaml:"db_configs"`
 	RedisConfig dbredis.RedisConfig       `yaml:"redis_config"`
 	ESConfigs   []dbes.ESConfig           `yaml:"es_configs"`
 }
