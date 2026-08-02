@@ -9,7 +9,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/morehao/golib/biz/gcontext"
-	"github.com/morehao/golib/biz/testkit"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +19,7 @@ func TestLoginByUsername(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	svc := NewAuthSvc(testJWTSecret)
 	resp, err := svc.Login(ctx, &dtoauth.LoginReq{
@@ -36,7 +35,7 @@ func TestLoginWithWrongPassword(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	svc := NewAuthSvc(testJWTSecret)
 	_, err := svc.Login(ctx, &dtoauth.LoginReq{
@@ -50,7 +49,7 @@ func TestRegisterCreatesPersonAndUser(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
 	require.NoError(t, err)
@@ -87,7 +86,7 @@ func TestSelectTenant(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	svc := NewAuthSvc(testJWTSecret)
 	loginResp, err := svc.Login(ctx, &dtoauth.LoginReq{
@@ -111,7 +110,7 @@ func TestSwitchTenantRejectsUnjoined(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	ctx.Set(gcontext.KeyPersonID, uint(1))
 
@@ -126,7 +125,7 @@ func TestMyTenants(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	svc := NewAuthSvc(testJWTSecret)
 	loginResp, err := svc.Login(ctx, &dtoauth.LoginReq{
@@ -148,7 +147,7 @@ func TestUserinfo(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	ctx.Set(gcontext.KeyUserID, uint(1))
 	ctx.Set(gcontext.KeyTenantID, uint(1))
@@ -167,7 +166,7 @@ func TestRefreshTokenValid(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	svc := NewAuthSvc(testJWTSecret)
 	loginResp, err := svc.Login(ctx, &dtoauth.LoginReq{
@@ -196,7 +195,7 @@ func TestLogout(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	svc := NewAuthSvc(testJWTSecret)
 	loginResp, err := svc.Login(ctx, &dtoauth.LoginReq{

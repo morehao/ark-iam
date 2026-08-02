@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/gin-gonic/gin"
+	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/dbaccess/dbgorm"
 	_ "github.com/morehao/golib/dbaccess/dbgorm/driver/mysql"
 	"github.com/morehao/golib/dbaccess/gormplugin"
@@ -31,9 +33,23 @@ func InitMultiDB(configs []dbgorm.Config, logConfig *glog.LogConfig) error {
 		"person",
 		"tenant",
 	}
-	tenantPlugin := gormplugin.New(
-		gormplugin.WithSkipTables(skipTables),
-	)
+	tenantPlugin, err := gormplugin.New(&gormplugin.ScopeConfig{
+		FieldName: "tenant_id",
+		ExtractFunc: func(ctx context.Context) (any, bool) {
+			if ginCtx, ok := ctx.(*gin.Context); ok {
+				return ginCtx.Get(gcontext.KeyTenantID)
+			}
+			value := ctx.Value(gcontext.KeyTenantID)
+			if value == nil {
+				return nil, false
+			}
+			return value, true
+		},
+		SkipTables: skipTables,
+	})
+	if err != nil {
+		return fmt.Errorf("init tenant plugin failed: %v", err)
+	}
 
 	var opts []dbgorm.Option
 	if logConfig != nil {
