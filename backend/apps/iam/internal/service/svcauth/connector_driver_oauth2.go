@@ -151,7 +151,7 @@ func (d *OAuth2Driver) fetchUserInfo(ctx context.Context, token *oauth2.Token, c
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	claims := map[string]any{}
 	if err := json.NewDecoder(resp.Body).Decode(&claims); err != nil {
 		return nil, err

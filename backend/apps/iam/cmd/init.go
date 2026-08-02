@@ -9,6 +9,7 @@ import (
 	"github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/golib/glog"
+	_ "github.com/morehao/golib/glog/driver/zap"
 	"github.com/morehao/golib/gtrace"
 	"github.com/morehao/golib/gtrace/otlptracegrpc"
 )

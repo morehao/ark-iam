@@ -2,8 +2,8 @@ package svcuser
 
 import (
 	"context"
-	"errors"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -12,8 +12,8 @@ import (
 	"github.com/morehao/ark-iam/iam/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/golib/biz/gcontext"
-	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/biz/gobject"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
@@ -58,7 +58,7 @@ func TestUserIdentityPageListPassesFiltersToDAOAndKeepsDAOTotal(t *testing.T) {
 	if repo.lastCond.ExternalSubject != "external-1" {
 		t.Fatalf("expected external subject external-1, got %q", repo.lastCond.ExternalSubject)
 	}
-	if repo.lastCond.BaseCond == nil || repo.lastCond.BaseCond.Page != 2 || repo.lastCond.BaseCond.PageSize != 5 {
+	if repo.lastCond.BaseCond == nil || repo.lastCond.Page != 2 || repo.lastCond.PageSize != 5 {
 		t.Fatalf("expected page condition {2,5}, got %#v", repo.lastCond.BaseCond)
 	}
 	if resp.Total != 7 {
@@ -128,7 +128,7 @@ func TestUserIdentityDetailUsesTenantUserToResolvePerson(t *testing.T) {
 }
 
 type stubUserIdentityRepo struct {
-	detail    *model.UserIdentityEntity
+	detail   *model.UserIdentityEntity
 	pageList model.UserIdentityEntityList
 	total    int64
 	err      error
@@ -238,7 +238,7 @@ func (s *stubDelegatedPersonIdentitySvc) Detail(ctx *gin.Context, req *dtouser.U
 }
 
 func (s *stubDelegatedPersonIdentitySvc) PageList(ctx *gin.Context, req *dtouser.UserIdentityPageListReq) (*dtouser.UserIdentityPageListResp, error) {
-	list, total, err := s.repo.GetPageListByCond(ctx, &dao.UserIdentityCond{BaseCond: &genericdao.BaseCond{Page: req.Page, PageSize: req.PageSize}, PersonID: req.UserID, Issuer: req.Issuer, ExternalSubject: req.IdentityID})
+	list, total, err := s.repo.GetPageListByCond(ctx, &dao.UserIdentityCond{BaseCond: &gormdao.BaseCond{Page: req.Page, PageSize: req.PageSize}, PersonID: req.UserID, Issuer: req.Issuer, ExternalSubject: req.IdentityID})
 	if err != nil {
 		return nil, err
 	}
@@ -275,4 +275,4 @@ func (s *stubDelegatedPersonIdentitySvc) GetByUser(ctx *gin.Context, req *dtouse
 
 var _ userIdentityRepository = (*stubUserIdentityRepo)(nil)
 
-var _ = genericdao.BaseCond{}
+var _ = gormdao.BaseCond{}

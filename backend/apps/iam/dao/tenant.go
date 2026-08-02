@@ -3,12 +3,12 @@ package dao
 import (
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 type TenantCond struct {
-	*genericdao.BaseCond
+	*gormdao.BaseCond
 	CreatedBy   uint
 	DbUser      string
 	DeletedBy   uint
@@ -46,12 +46,12 @@ func (c *TenantCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type TenantDao struct {
-	*genericdao.GenericDao[model.TenantEntity, model.TenantEntityList]
+	*gormdao.Dao[model.TenantEntity, model.TenantEntityList]
 }
 
 func NewTenantDao() *TenantDao {
 	return &TenantDao{
-		GenericDao: genericdao.NewGenericDao[model.TenantEntity, model.TenantEntityList](
+		Dao: gormdao.NewDao[model.TenantEntity, model.TenantEntityList](
 			model.TableNameTenant, "TenantDao",
 			dbclient.IamDB,
 		),

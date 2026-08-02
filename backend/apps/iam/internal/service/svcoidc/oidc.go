@@ -171,7 +171,7 @@ func SetupOIDCProvider(issuer string) (*OIDCProvider, error) {
 		opts = append(opts, op.WithAllowInsecure())
 	}
 
-	provider, err := op.NewOpenIDProvider(issuer, opConfig, storage, opts...)
+	provider, err := op.NewProvider(opConfig, storage, op.StaticIssuer(issuer), opts...)
 	if err != nil {
 		return nil, err
 	}

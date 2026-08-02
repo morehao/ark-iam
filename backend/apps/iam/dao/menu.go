@@ -3,18 +3,18 @@ package dao
 import (
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 type MenuCond struct {
-	*genericdao.BaseCond
-	AppID uint
-	ParentID      uint
-	Name          string
-	Code          string
-	Type          string
-	Status        string
+	*gormdao.BaseCond
+	AppID    uint
+	ParentID uint
+	Name     string
+	Code     string
+	Type     string
+	Status   string
 }
 
 func (c *MenuCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -42,12 +42,12 @@ func (c *MenuCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type MenuDao struct {
-	*genericdao.GenericDao[model.MenuEntity, model.MenuEntityList]
+	*gormdao.Dao[model.MenuEntity, model.MenuEntityList]
 }
 
 func NewMenuDao() *MenuDao {
 	return &MenuDao{
-		GenericDao: genericdao.NewGenericDao[model.MenuEntity, model.MenuEntityList](
+		Dao: gormdao.NewDao[model.MenuEntity, model.MenuEntityList](
 			model.TableNameMenu, "MenuDao",
 			dbclient.IamDB,
 		),

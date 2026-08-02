@@ -11,8 +11,8 @@ import (
 	"github.com/morehao/ark-iam/iam/object/objaudit"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/biz/gobject"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
@@ -76,7 +76,7 @@ func (svc *logSvc) Detail(ctx *gin.Context, req *dtotenant.LogDetailReq) (*dtote
 
 func (svc *logSvc) PageList(ctx *gin.Context, req *dtotenant.LogPageListReq) (*dtotenant.LogPageListResp, error) {
 	cond := &dao.LogCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},

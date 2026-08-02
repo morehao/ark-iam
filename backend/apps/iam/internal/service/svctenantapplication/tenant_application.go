@@ -9,7 +9,7 @@ import (
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
@@ -107,7 +107,7 @@ func (svc *tenantApplicationSvc) Detail(ctx *gin.Context, req *dtotenantapplicat
 
 func (svc *tenantApplicationSvc) PageList(ctx *gin.Context, req *dtotenantapplication.PageListReq) (*dtotenantapplication.PageListResp, error) {
 	cond := &dao.TenantApplicationCond{
-		BaseCond: &genericdao.BaseCond{Page: req.Page, PageSize: req.PageSize},
+		BaseCond: &gormdao.BaseCond{Page: req.Page, PageSize: req.PageSize},
 		TenantID: gincontext.GetTenantID(ctx),
 		Status:   req.Status,
 	}

@@ -11,7 +11,7 @@ import (
 	"github.com/morehao/ark-iam/iam/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/golib/biz/gcontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
@@ -159,7 +159,7 @@ func (r *stubDepartmentScopeRepo) GetByID(ctx context.Context, id uint) (*model.
 	return r.detail, r.err
 }
 
-func (r *stubDepartmentScopeRepo) GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.DepartmentEntityList, int64, error) {
+func (r *stubDepartmentScopeRepo) GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.DepartmentEntityList, int64, error) {
 	typed, _ := cond.(*dao.DepartmentCond)
 	clone := cloneDepartmentCond(typed)
 	if r.recordTarget == "tree" {

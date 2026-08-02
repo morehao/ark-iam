@@ -3,14 +3,14 @@ package dao
 import (
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 type LogCond struct {
-	*genericdao.BaseCond
+	*gormdao.BaseCond
 	TenantID uint
-	Key     string
+	Key      string
 }
 
 func (c *LogCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -26,12 +26,12 @@ func (c *LogCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type LogDao struct {
-	*genericdao.GenericDao[model.LogEntity, model.LogEntityList]
+	*gormdao.Dao[model.LogEntity, model.LogEntityList]
 }
 
 func NewLogDao() *LogDao {
 	return &LogDao{
-		GenericDao: genericdao.NewGenericDao[model.LogEntity, model.LogEntityList](
+		Dao: gormdao.NewDao[model.LogEntity, model.LogEntityList](
 			model.TableNameLog, "LogDao",
 			dbclient.IamDB,
 		),

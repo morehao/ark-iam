@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -128,9 +129,11 @@ func parsePersonIDFromSub(sub string) uint {
 		return 0
 	}
 	raw := strings.TrimPrefix(sub, prefix)
-	var id uint
-	fmt.Sscanf(raw, "%d", &id)
-	return id
+	id, err := strconv.ParseUint(raw, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return uint(id)
 }
 
 func isSkippedPath(path string, skipPaths []string) bool {

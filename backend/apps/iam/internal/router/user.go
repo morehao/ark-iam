@@ -3,7 +3,6 @@ package router
 import (
 	"github.com/morehao/ark-iam/iam/internal/controller/ctrsession"
 	"github.com/morehao/ark-iam/iam/internal/controller/ctruser"
-	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
@@ -11,7 +10,7 @@ func userRouter(groups *ginserver.RouterGroups) {
 	userCtr := ctruser.NewUserCtr()
 	sessionCtr := ctrsession.NewSessionCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 
 	v1RouterGroup.POST("/user/create", userCtr.Create)
 	v1RouterGroup.POST("/user/delete", userCtr.Delete)

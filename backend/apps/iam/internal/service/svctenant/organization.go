@@ -10,7 +10,7 @@ import (
 	"github.com/morehao/ark-iam/iam/object/objtenant"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
@@ -129,7 +129,7 @@ func (svc *organizationSvc) Detail(ctx *gin.Context, req *dtotenant.Organization
 
 func (svc *organizationSvc) PageList(ctx *gin.Context, req *dtotenant.OrganizationPageListReq) (*dtotenant.OrganizationPageListResp, error) {
 	cond := &dao.OrganizationCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},

@@ -16,11 +16,11 @@ import (
 	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/token"
-	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/biz/gobject"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gauth/jwtauth"
+	"github.com/morehao/golib/gconstant"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
 )
@@ -33,25 +33,25 @@ const (
 
 type authUserStore interface {
 	GetByID(ctx context.Context, id uint) (*model.UserEntity, error)
-	GetByCond(ctx context.Context, cond genericdao.Cond) (*model.UserEntity, error)
-	GetListByCond(ctx context.Context, cond genericdao.Cond) (model.UserEntityList, error)
+	GetByCond(ctx context.Context, cond gormdao.Cond) (*model.UserEntity, error)
+	GetListByCond(ctx context.Context, cond gormdao.Cond) (model.UserEntityList, error)
 	Insert(ctx context.Context, entity *model.UserEntity) error
 	UpdateMap(ctx context.Context, id uint, updateMap map[string]interface{}) error
 }
 
 type authPersonStore interface {
 	GetByID(ctx context.Context, id uint) (*model.PersonEntity, error)
-	GetByCond(ctx context.Context, cond genericdao.Cond) (*model.PersonEntity, error)
+	GetByCond(ctx context.Context, cond gormdao.Cond) (*model.PersonEntity, error)
 	Insert(ctx context.Context, entity *model.PersonEntity) error
 }
 
 type authTenantStore interface {
 	GetByID(ctx context.Context, id uint) (*model.TenantEntity, error)
-	GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.TenantEntityList, int64, error)
+	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.TenantEntityList, int64, error)
 }
 
 type authRefreshTokenStore interface {
-	GetByCond(ctx context.Context, cond genericdao.Cond) (*model.RefreshTokenEntity, error)
+	GetByCond(ctx context.Context, cond gormdao.Cond) (*model.RefreshTokenEntity, error)
 	Insert(ctx context.Context, entity *model.RefreshTokenEntity) error
 	Delete(ctx context.Context, id, userID uint) error
 	RevokeByPersonID(ctx context.Context, personID uint) error

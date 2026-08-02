@@ -9,13 +9,13 @@ import (
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
 
 type organizationUserDeleteRepository interface {
-	GetListByCond(ctx context.Context, cond genericdao.Cond) (model.OrganizationUserEntityList, error)
+	GetListByCond(ctx context.Context, cond gormdao.Cond) (model.OrganizationUserEntityList, error)
 	Delete(ctx context.Context, id uint, userID uint) error
 }
 
@@ -96,7 +96,7 @@ func (svc *organizationUserSvc) Delete(ctx *gin.Context, req *dtotenant.Organiza
 
 func (svc *organizationUserSvc) PageList(ctx *gin.Context, req *dtotenant.OrganizationUserPageListReq) (*dtotenant.OrganizationUserPageListResp, error) {
 	cond := &dao.OrganizationUserCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
@@ -114,8 +114,8 @@ func (svc *organizationUserSvc) PageList(ctx *gin.Context, req *dtotenant.Organi
 	for _, v := range orgUserEntityList {
 		list = append(list, dtotenant.OrganizationUserPageListItem{
 			OrganizationID: v.OrganizationID,
-			UserID:        v.UserID,
-			TenantID:      v.TenantID,
+			UserID:         v.UserID,
+			TenantID:       v.TenantID,
 		})
 	}
 	return &dtotenant.OrganizationUserPageListResp{

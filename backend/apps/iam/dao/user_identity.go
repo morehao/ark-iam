@@ -7,12 +7,12 @@ import (
 
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 type UserIdentityCond struct {
-	*genericdao.BaseCond
+	*gormdao.BaseCond
 	PersonID        uint
 	ConnectorID     uint
 	Provider        string
@@ -42,12 +42,12 @@ func (c *UserIdentityCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type UserIdentityDao struct {
-	*genericdao.GenericDao[model.UserIdentityEntity, model.UserIdentityEntityList]
+	*gormdao.Dao[model.UserIdentityEntity, model.UserIdentityEntityList]
 }
 
 func NewUserIdentityDao() *UserIdentityDao {
 	return &UserIdentityDao{
-		GenericDao: genericdao.NewGenericDao[model.UserIdentityEntity, model.UserIdentityEntityList](
+		Dao: gormdao.NewDao[model.UserIdentityEntity, model.UserIdentityEntityList](
 			model.TableNameUserIdentity, "UserIdentityDao",
 			dbclient.IamDB,
 		),

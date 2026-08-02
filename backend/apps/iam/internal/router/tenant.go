@@ -2,14 +2,13 @@ package router
 
 import (
 	"github.com/morehao/ark-iam/iam/internal/controller/ctrtenant"
-	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
 func tenantRouter(groups *ginserver.RouterGroups) {
 	tenantCtr := ctrtenant.NewTenantCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/tenant/create", tenantCtr.Create)
 	v1RouterGroup.POST("/tenant/delete", tenantCtr.Delete)
 	v1RouterGroup.POST("/tenant/update", tenantCtr.Update)
@@ -20,7 +19,7 @@ func tenantRouter(groups *ginserver.RouterGroups) {
 func departmentRouter(groups *ginserver.RouterGroups) {
 	departmentCtr := ctrtenant.NewDepartmentCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/department/create", departmentCtr.Create)
 	v1RouterGroup.POST("/department/delete", departmentCtr.Delete)
 	v1RouterGroup.POST("/department/update", departmentCtr.Update)
@@ -32,7 +31,7 @@ func departmentRouter(groups *ginserver.RouterGroups) {
 func organizationRouter(groups *ginserver.RouterGroups) {
 	organizationCtr := ctrtenant.NewOrganizationCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/organization/create", organizationCtr.Create)
 	v1RouterGroup.POST("/organization/delete", organizationCtr.Delete)
 	v1RouterGroup.POST("/organization/update", organizationCtr.Update)
@@ -43,7 +42,7 @@ func organizationRouter(groups *ginserver.RouterGroups) {
 func systemRouter(groups *ginserver.RouterGroups) {
 	systemCtr := ctrtenant.NewSystemCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/system/create", systemCtr.Create)
 	v1RouterGroup.POST("/system/delete", systemCtr.Delete)
 	v1RouterGroup.POST("/system/update", systemCtr.Update)
@@ -54,7 +53,7 @@ func systemRouter(groups *ginserver.RouterGroups) {
 func organizationRoleRouter(groups *ginserver.RouterGroups) {
 	organizationRoleCtr := ctrtenant.NewOrganizationRoleCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/organizationRole/create", organizationRoleCtr.Create)
 	v1RouterGroup.POST("/organizationRole/delete", organizationRoleCtr.Delete)
 	v1RouterGroup.POST("/organizationRole/update", organizationRoleCtr.Update)
@@ -65,7 +64,7 @@ func organizationRoleRouter(groups *ginserver.RouterGroups) {
 func organizationUserRouter(groups *ginserver.RouterGroups) {
 	organizationUserCtr := ctrtenant.NewOrganizationUserCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/organizationUser/create", organizationUserCtr.Create)
 	v1RouterGroup.POST("/organizationUser/delete", organizationUserCtr.Delete)
 	v1RouterGroup.POST("/organizationUser/pageList", organizationUserCtr.PageList)
@@ -74,7 +73,7 @@ func organizationUserRouter(groups *ginserver.RouterGroups) {
 func organizationRoleUserRouter(groups *ginserver.RouterGroups) {
 	organizationRoleUserCtr := ctrtenant.NewOrganizationRoleUserCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/organizationRoleUser/create", organizationRoleUserCtr.Create)
 	v1RouterGroup.POST("/organizationRoleUser/delete", organizationRoleUserCtr.Delete)
 	v1RouterGroup.POST("/organizationRoleUser/pageList", organizationRoleUserCtr.PageList)
@@ -83,7 +82,7 @@ func organizationRoleUserRouter(groups *ginserver.RouterGroups) {
 func logRouter(groups *ginserver.RouterGroups) {
 	logCtr := ctrtenant.NewLogCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.GET("/log/detail", logCtr.Detail)
 	v1RouterGroup.POST("/log/pageList", logCtr.PageList)
 }

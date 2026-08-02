@@ -11,7 +11,6 @@ import (
 	"github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/router"
 	"github.com/morehao/ark-iam/pkg/testsetup"
-	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
@@ -20,7 +19,7 @@ func TestAuthAndConnectorRoutesUseUnifiedEndpoints(t *testing.T) {
 	config.Conf = &config.Config{JWT: config.JWT{SignKey: "test-sign-key"}, Server: config.Server{Env: "dev"}}
 
 	engine := gin.New()
-	groups := ginserver.NewRouterGroups(engine, "iam", ginserver.Version{Name: gconstant.ApiVersionV1})
+	groups := ginserver.NewRouterGroups(engine, "iam", ginserver.VersionGroup{Version: ginserver.ApiVersionV1})
 	router.RegisterRouter(groups, "iam")
 
 	routes := engine.Routes()

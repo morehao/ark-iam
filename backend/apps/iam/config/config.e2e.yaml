@@ -15,8 +15,11 @@ log:
     service: iam
     module: default
     level: info
-    writer: file
-    dir: ../../../log
+    logger_type: zap
+    writers:
+      - type: console
+      - type: file
+        dir: ../../../log
     enable_otel_trace: true
     extra_keys:
       - requestID
@@ -24,8 +27,11 @@ log:
     service: iam
     module: gorm
     level: debug
-    writer: file
-    dir: ../../../log
+    logger_type: zap
+    writers:
+      - type: console
+      - type: file
+        dir: ../../../log
     enable_otel_trace: true
     extra_keys:
       - requestID
@@ -33,8 +39,11 @@ log:
     service: iam
     module: redis
     level: debug
-    writer: file
-    dir: ../../../log
+    logger_type: zap
+    writers:
+      - type: console
+      - type: file
+        dir: ../../../log
     enable_otel_trace: true
     extra_keys:
       - requestID

@@ -10,14 +10,14 @@ import (
 	"github.com/morehao/ark-iam/iam/object/objresource"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
 
 type resourceScopeRepository interface {
 	GetByID(ctx context.Context, id uint) (*model.ResourceEntity, error)
-	GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.ResourceEntityList, int64, error)
+	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.ResourceEntityList, int64, error)
 }
 
 var newResourceScopeRepo = func() resourceScopeRepository {
@@ -94,11 +94,11 @@ func (svc *resourceSvc) Update(ctx *gin.Context, req *dtopermission.ResourceUpda
 	userID := gincontext.GetUserID(ctx)
 	updateMap := map[string]any{
 		"tenant_id":        req.TenantID,
-		"name":            req.Name,
-		"indicator":       req.Indicator,
-		"is_default":      req.IsDefault,
+		"name":             req.Name,
+		"indicator":        req.Indicator,
+		"is_default":       req.IsDefault,
 		"access_token_ttl": req.AccessTokenTtl,
-		"updated_by":      userID,
+		"updated_by":       userID,
 	}
 	if err := dao.NewResourceDao().UpdateMap(ctx, req.ResourceID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcpermission.UpdateResource] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -133,7 +133,7 @@ func (svc *resourceSvc) Detail(ctx *gin.Context, req *dtopermission.ResourceDeta
 func (svc *resourceSvc) PageList(ctx *gin.Context, req *dtopermission.ResourcePageListReq) (*dtopermission.ResourcePageListResp, error) {
 	resourceRepo := newResourceScopeRepo()
 	cond := &dao.ResourceCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
