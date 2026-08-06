@@ -46,7 +46,10 @@ const MainLayout = () => {
     } catch {
       // ignore
     }
-    auth.signoutRedirect()
+    // 触发 OIDC 全局登出：清除本地 user 并跳转 IdP end_session 端点，
+    // 后端清除 SSO cookie 并撤销 Redis SSO session，实现"一处登出、处处登出"
+    await auth.removeUser()
+    window.location.href = '/v1/iam/oidc/end_session'
   }
 
   const menuItems = [

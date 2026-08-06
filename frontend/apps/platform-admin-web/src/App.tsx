@@ -13,6 +13,7 @@ import TenantList from './pages/tenant'
 import TenantApplicationList from './pages/tenantApplication'
 import OAuthClientList from './pages/oauthClient'
 import OAuthClientDetail from './pages/oauthClient/Detail'
+import { useSSOSessionProbe } from './utils/ssoSessionProbe'
 
 function FullPageSpinner() {
   return (
@@ -26,6 +27,9 @@ function App() {
   const auth = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+
+  // 页面加载时校验 SSO 会话是否仍有效，实现"一处登出、处处登出"
+  useSSOSessionProbe(auth)
 
   useEffect(() => {
     if (!auth.isLoading && !auth.activeNavigator && !auth.isAuthenticated && location.pathname !== '/auth/callback') {

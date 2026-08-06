@@ -5,6 +5,7 @@ import { useAuth } from 'react-oidc-context'
 import MainLayout from './components/MainLayout'
 import Login from './pages/auth/Login'
 import Home from './pages/home'
+import { useSSOSessionProbe } from './utils/ssoSessionProbe'
 
 function FullPageSpinner() {
   return (
@@ -18,6 +19,9 @@ function App() {
   const auth = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+
+  // 页面加载时校验 SSO 会话是否仍有效，实现"一处登出、处处登出"
+  useSSOSessionProbe(auth)
 
   useEffect(() => {
     if (!auth.isLoading && !auth.activeNavigator && !auth.isAuthenticated && location.pathname !== '/auth/callback') {
