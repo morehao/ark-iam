@@ -66,7 +66,7 @@ describe('MainLayout', () => {
     expect(screen.getByText('SSO 测试应用')).toBeInTheDocument()
   })
 
-  it('triggers logoutAll, removeUser and signoutRedirect on logout', async () => {
+  it('triggers logoutAll, then signoutRedirect before removeUser on logout', async () => {
     render(
       <MemoryRouter>
         <MainLayout />
@@ -75,8 +75,11 @@ describe('MainLayout', () => {
     fireEvent.click(screen.getByText('退出登录'))
     await waitFor(() => {
       expect(mockLogoutAllAPI).toHaveBeenCalledWith('mock-refresh')
-      expect(mockRemoveUser).toHaveBeenCalled()
       expect(mockSignoutRedirect).toHaveBeenCalled()
+      expect(mockRemoveUser).toHaveBeenCalled()
+      expect(mockSignoutRedirect.mock.invocationCallOrder[0]).toBeLessThan(
+        mockRemoveUser.mock.invocationCallOrder[0],
+      )
     })
   })
 })

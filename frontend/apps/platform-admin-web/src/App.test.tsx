@@ -16,6 +16,7 @@ vi.mock('react-oidc-context', () => ({
     signinRedirect: mockSigninRedirect,
     signinSilent: mockSigninSilent,
     removeUser: vi.fn(),
+    events: { addSilentRenewError: vi.fn().mockReturnValue(() => {}) },
     user: null,
   }),
   hasAuthParams: vi.fn(() => false),

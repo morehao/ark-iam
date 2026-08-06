@@ -1,18 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Layout, Menu, Avatar, Dropdown, Button } from 'antd'
 import { DashboardOutlined, UserOutlined, TeamOutlined, AppstoreOutlined, MenuFoldOutlined, MenuUnfoldOutlined, LogoutOutlined, BankOutlined, KeyOutlined } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from 'react-oidc-context'
-import type { PersonInfo } from '@ark-iam/shared'
-import { getUserinfo, logoutAllAPI } from '../api/auth'
+import { logoutAllAPI } from '../api/auth'
 import { setUserProvider } from '../utils/request'
 
 const { Header, Sider, Content } = Layout
 
 const MainLayout = () => {
   const [collapsed, setCollapsed] = useState(false)
-  const [personInfo, setPersonInfo] = useState<PersonInfo | null>(null)
-  const initializedRef = useRef(false)
   const navigate = useNavigate()
   const location = useLocation()
   const auth = useAuth()
@@ -21,35 +18,22 @@ const MainLayout = () => {
     setUserProvider(() => auth.user)
   }, [auth.user])
 
-  useEffect(() => {
-    if (initializedRef.current || !auth.isAuthenticated) return
-    initializedRef.current = true
-    let active = true
-    const loadUserContext = async () => {
-      try {
-        const userinfoResp = await getUserinfo()
-        if (!active) return
-        setPersonInfo(userinfoResp?.personInfo ?? null)
-      } catch {
-        return
-      }
-    }
-    void loadUserContext()
-    return () => {
-      active = false
-    }
-  }, [auth.isAuthenticated])
-
   const handleLogout = async () => {
     try {
       await logoutAllAPI(auth.user?.refresh_token ?? '')
     } catch {
-      // ignore
+      // ignore：撤销自有 refresh token 为尽力而为，失败不阻断登出
     }
-    // 触发 OIDC 全局登出：清除本地 user 并跳转 IdP end_session 端点，
-    // 后端清除 SSO cookie 并撤销 Redis SSO session，实现"一处登出、处处登出"
-    await auth.removeUser()
-    window.location.href = '/v1/iam/oidc/end_session'
+    // 触发 OIDC 全局登出：先 signoutRedirect 再清除本地 user。
+    // signoutRedirect 需要从当前 user 读取 id_token_hint 拼入 end_session 请求，
+    // 后端据此定位 personID 并撤销 Redis SSO session，实现"一处登出、处处登出"。
+    // 若先 removeUser，id_token 被清空，end_session 将丢失 id_token_hint，
+    // 导致后端无法定位 SSO session 而跳过撤销，兄弟应用刷新后仍保持登录。
+    try {
+      await auth.signoutRedirect()
+    } finally {
+      await auth.removeUser()
+    }
   }
 
   const menuItems = [
