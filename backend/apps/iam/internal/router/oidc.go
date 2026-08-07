@@ -22,7 +22,7 @@ func InitOIDC(engine *gin.Engine, groups *ginserver.RouterGroups) {
 		if port == "" {
 			port = "8099"
 		}
-		issuer = fmt.Sprintf("http://localhost:%s/v1/iam/oidc", port)
+		issuer = fmt.Sprintf("http://localhost:%s/oidc", port)
 	}
 	provider, err := svcoidc.SetupOIDCProvider(issuer)
 	if err != nil {
@@ -38,8 +38,7 @@ func InitOIDC(engine *gin.Engine, groups *ginserver.RouterGroups) {
 	ctr := ctroidc.NewOIDCCtr(provider)
 	ssoCookieDomain := config.Conf.OIDC.SSOCookieDomain()
 
-	v1Group := groups.MustGetGroup(ginserver.ApiVersionV1)
-	oidcGroup := v1Group.Group("/oidc")
+	oidcGroup := engine.Group("/oidc")
 	oidcGroup.Use(ginmiddleware.CORS())
 	oidcGroup.POST("/login", ctr.Login)
 	oidcGroup.GET("/sso-login", ctr.SSOLogin)

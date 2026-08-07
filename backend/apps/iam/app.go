@@ -31,7 +31,6 @@ func Routers(engine *gin.Engine) {
 				"/v1/iam/auth/register",
 				"/v1/iam/auth/refreshToken",
 				"/v1/iam/connector/callback",
-				"/v1/iam/oidc",
 			), oidcauth.WithOIDCSSOValidation(func(ctx *gin.Context, personID uint) bool {
 				// 无 Redis 时无法校验会话，采取放行（fail-open），避免破坏无 Redis 的环境
 				if dbclient.RedisCli == nil {

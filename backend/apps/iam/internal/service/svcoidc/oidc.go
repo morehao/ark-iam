@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	pathLoggedOut = "/v1/iam/oidc/logged-out"
+	pathLoggedOut = "/oidc/logged-out"
 )
 
 type OIDCProvider struct {

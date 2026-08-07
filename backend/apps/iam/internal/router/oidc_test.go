@@ -22,7 +22,7 @@ func TestOIDCRoutesExposeLoginEndpoint(t *testing.T) {
 	config.Conf = &config.Config{
 		JWT: config.JWT{SignKey: "test-sign-key"},
 		OIDC: config.OIDC{
-			Issuer:           "http://localhost:8099/v1/iam/oidc",
+			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3000/oidc/login",
 			AllowInsecure:    true,
 		},
@@ -41,8 +41,8 @@ func TestOIDCRoutesExposeLoginEndpoint(t *testing.T) {
 		paths[route.Path][route.Method] = true
 	}
 
-	assertRouteRegistered(t, paths, http.MethodPost, "/v1/iam/oidc/login")
-	assertRouteMissing(t, paths, http.MethodPost, "/v1/iam/oidc/login/callback")
+	assertRouteRegistered(t, paths, http.MethodPost, "/oidc/login")
+	assertRouteMissing(t, paths, http.MethodPost, "/oidc/login/callback")
 }
 
 func TestOIDCLoginEndpointBypassesJWTAuth(t *testing.T) {
@@ -53,7 +53,7 @@ func TestOIDCLoginEndpointBypassesJWTAuth(t *testing.T) {
 	config.Conf = &config.Config{
 		JWT: config.JWT{SignKey: "test-sign-key"},
 		OIDC: config.OIDC{
-			Issuer:           "http://localhost:8099/v1/iam/oidc",
+			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3000/oidc/login",
 			AllowInsecure:    true,
 		},
@@ -62,7 +62,7 @@ func TestOIDCLoginEndpointBypassesJWTAuth(t *testing.T) {
 	engine := gin.New()
 	iam.Routers(engine)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/iam/oidc/login", nil)
+	req := httptest.NewRequest(http.MethodPost, "/oidc/login", nil)
 	resp := httptest.NewRecorder()
 	engine.ServeHTTP(resp, req)
 
