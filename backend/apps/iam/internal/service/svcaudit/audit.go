@@ -12,6 +12,7 @@ import (
 
 const (
 	ActionLogin                   = "login"
+	ActionTenantSwitch            = "tenant.switch"
 	ActionTenantCreate            = "tenant.create"
 	ActionApplicationCreate       = "application.create"
 	ActionOAuthClientCreate       = "oauth_client.create"
@@ -33,6 +34,9 @@ type AuditEntry struct {
 var newAuditLogDao = func() *dao.AuditLogDao { return dao.NewAuditLogDao() }
 
 func WriteAudit(ctx *gin.Context, e AuditEntry) {
+	if ctx == nil || ctx.Request == nil {
+		return
+	}
 	entity := &model.AuditLogEntity{
 		ActorPersonID: gincontext.GetPersonID(ctx),
 		ActorUserID:   gincontext.GetUserID(ctx),

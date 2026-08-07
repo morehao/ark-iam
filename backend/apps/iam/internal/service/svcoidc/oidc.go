@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	appconfig "github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtooidc"
+	"github.com/morehao/ark-iam/iam/internal/service/svcaudit"
 	"github.com/morehao/ark-iam/iam/internal/service/svcauth"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objauth"
@@ -271,6 +272,14 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 		}
 	}
 
+	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+		Action:     svcaudit.ActionLogin,
+		TenantID:   tenantID,
+		Result:     "success",
+		TargetType: "person",
+		TargetID:   personEntity.ID,
+	})
+
 	return resp, nil
 }
 
@@ -315,6 +324,13 @@ func (svc *oidcAuthSvc) SelectTenant(ctx context.Context, authRequestID string, 
 			glog.Warnf(ctx, "[oidcAuthSvc.SelectTenant] failed to create sso session: %v", sErr)
 		}
 	}
+	svcaudit.WriteAudit(ginContextFromContext(ctx), svcaudit.AuditEntry{
+		Action:     svcaudit.ActionTenantSwitch,
+		TenantID:   tenantID,
+		Result:     "success",
+		TargetType: "tenant",
+		TargetID:   tenantID,
+	})
 	return resp, nil
 }
 
@@ -352,6 +368,14 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx context.Context, authRequestI
 	if err := svc.provider.Storage.CompleteAuthRequest(authRequestID, buildOIDCSubject(personID), authTime, []string{"sso"}, "", tenantID, true); err != nil {
 		return "", err
 	}
+
+	svcaudit.WriteAudit(ginContextFromContext(ctx), svcaudit.AuditEntry{
+		Action:     svcaudit.ActionLogin,
+		TenantID:   tenantID,
+		Result:     "success",
+		TargetType: "person",
+		TargetID:   personID,
+	})
 
 	return svc.provider.BuildAuthCallbackURL(ctx, authRequestID), nil
 }

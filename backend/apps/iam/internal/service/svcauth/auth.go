@@ -3,6 +3,7 @@ package svcauth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
+	"github.com/morehao/ark-iam/iam/internal/service/svcaudit"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/code"
@@ -527,6 +529,19 @@ func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID uint, success bool
 			glog.Errorf(ctx, "[svcauth.recordLoginLog] update last_sign_in_at fail, err:%v", err)
 		}
 	}
+
+	result := "failure"
+	if success {
+		result = "success"
+	}
+	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+		Action:     svcaudit.ActionLogin,
+		TenantID:   tenantID,
+		Result:     result,
+		TargetType: "person",
+		TargetID:   userID,
+		Detail:     fmt.Sprintf("userID:%d", userID),
+	})
 }
 
 func timePointer(t time.Time) *time.Time {

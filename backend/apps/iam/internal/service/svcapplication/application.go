@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoapplication"
+	"github.com/morehao/ark-iam/iam/internal/service/svcaudit"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -55,6 +56,13 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.CreateRe
 		glog.Errorf(ctx, "[svcapplication.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationCreateError)
 	}
+	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+		Action:     svcaudit.ActionApplicationCreate,
+		TenantID:   0,
+		Result:     "success",
+		TargetType: "application",
+		TargetID:   entity.ID,
+	})
 	return &dtoapplication.CreateResp{
 		AppID: entity.ID,
 		Code:  entity.Code,

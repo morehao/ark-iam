@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtotenant"
+	"github.com/morehao/ark-iam/iam/internal/service/svcaudit"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objtenant"
 	"github.com/morehao/ark-iam/pkg/code"
@@ -44,6 +45,13 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 		glog.Errorf(ctx, "[svctenant.TenantCreate] dao Create fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantCreateError)
 	}
+	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+		Action:     svcaudit.ActionTenantCreate,
+		TenantID:   insertEntity.ID,
+		Result:     "success",
+		TargetType: "tenant",
+		TargetID:   insertEntity.ID,
+	})
 	return &dtotenant.TenantCreateResp{
 		TenantID: insertEntity.ID,
 	}, nil
