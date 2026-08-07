@@ -1,6 +1,8 @@
 package svcapplication
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoapplication"
@@ -23,6 +25,14 @@ type ApplicationSvc interface {
 type applicationSvc struct{}
 
 var _ ApplicationSvc = (*applicationSvc)(nil)
+
+type applicationRepository interface {
+	GetByID(ctx context.Context, id uint) (*model.ApplicationEntity, error)
+}
+
+var newApplicationRepo = func() applicationRepository {
+	return dao.NewApplicationDao()
+}
 
 func NewApplicationSvc() ApplicationSvc {
 	return &applicationSvc{}
@@ -70,6 +80,14 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.UpdateRe
 }
 
 func (svc *applicationSvc) Delete(ctx *gin.Context, req *dtoapplication.DeleteReq) error {
+	entity, err := newApplicationRepo().GetByID(ctx, req.AppID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcapplication.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.ApplicationDeleteError)
+	}
+	if entity != nil && entity.IsSystem == 1 {
+		return code.GetError(code.ApplicationSystemBuiltInErr)
+	}
 	userID := gincontext.GetUserID(ctx)
 	if err := dao.NewApplicationDao().Delete(ctx, req.AppID, userID); err != nil {
 		glog.Errorf(ctx, "[svcapplication.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))

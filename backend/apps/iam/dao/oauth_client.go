@@ -53,3 +53,11 @@ func NewOAuthClientDao() *OAuthClientDao {
 		),
 	}
 }
+
+func NewOAuthClientDaoWithDB(getDB gormdao.DBGetter) *OAuthClientDao {
+	return &OAuthClientDao{
+		Dao: gormdao.NewDao[model.OAuthClientEntity, model.OAuthClientEntityList](
+			model.TableNameOAuthClient, "OAuthClientDao", getDB,
+		),
+	}
+}

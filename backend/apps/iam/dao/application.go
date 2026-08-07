@@ -45,3 +45,11 @@ func NewApplicationDao() *ApplicationDao {
 		),
 	}
 }
+
+func NewApplicationDaoWithDB(getDB gormdao.DBGetter) *ApplicationDao {
+	return &ApplicationDao{
+		Dao: gormdao.NewDao[model.ApplicationEntity, model.ApplicationEntityList](
+			model.TableNameApplication, "ApplicationDao", getDB,
+		),
+	}
+}

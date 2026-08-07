@@ -50,16 +50,20 @@ var newOAuthClientScopeRepo = func() oauthClientScopeRepository {
 
 type oauthClientScopeDAO struct{}
 
+var newOAuthClientDAO = func() *dao.OAuthClientDao {
+	return dao.NewOAuthClientDao()
+}
+
 func (d *oauthClientScopeDAO) GetByID(ctx context.Context, id uint) (*model.OAuthClientEntity, error) {
-	return dao.NewOAuthClientDao().GetByID(ctx, id)
+	return newOAuthClientDAO().GetByID(ctx, id)
 }
 
 func (d *oauthClientScopeDAO) GetByCond(ctx context.Context, cond gormdao.Cond) (*model.OAuthClientEntity, error) {
-	return dao.NewOAuthClientDao().GetByCond(ctx, cond)
+	return newOAuthClientDAO().GetByCond(ctx, cond)
 }
 
 func (d *oauthClientScopeDAO) GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.OAuthClientEntityList, int64, error) {
-	return dao.NewOAuthClientDao().GetPageListByCond(ctx, cond)
+	return newOAuthClientDAO().GetPageListByCond(ctx, cond)
 }
 
 func (d *oauthClientScopeDAO) GetSecretByID(ctx context.Context, id uint) (*model.OAuthClientSecretEntity, error) {
@@ -132,6 +136,9 @@ func (svc *oAuthClientSvc) Delete(ctx *gin.Context, req *dtooauthclient.DeleteRe
 	}
 	if !oauthClientVisibleToTenant(entity, gincontext.GetTenantID(ctx)) {
 		return code.GetError(code.OAuthClientNotExistError)
+	}
+	if entity.IsSystem == 1 {
+		return code.GetError(code.OAuthClientSystemBuiltInErr)
 	}
 
 	userID := gincontext.GetUserID(ctx)
