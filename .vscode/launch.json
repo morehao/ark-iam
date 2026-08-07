@@ -1,37 +1,16 @@
 {
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        {
-            "name": "iam",
+        {   
+            "name": "ark-iam",
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceFolder}/backend/apps/iam/cmd",
-            "cwd": "${workspaceFolder}/backend"
-        },
-        {
-            "name": "auth",
-            "type": "go",
-            "request": "launch",
-            "mode": "auto",
-            "program": "${workspaceFolder}/backend/apps/auth/cmd",
-            "cwd": "${workspaceFolder}/backend"
-        },
-        {
-            "name": "platformadmin",
-            "type": "go",
-            "request": "launch",
-            "mode": "auto",
-            "program": "${workspaceFolder}/backend/apps/platformadmin/cmd",
-            "cwd": "${workspaceFolder}/backend"
-        },
-        {
-            "name": "tenantadmin",
-            "type": "go",
-            "request": "launch",
-            "mode": "auto",
-            "program": "${workspaceFolder}/backend/apps/tenantadmin/cmd",
-            "cwd": "${workspaceFolder}/backend"
+            "program": "${workspaceFolder}/backend/apps/iam/cmd"
         }
     ]
+    
 }

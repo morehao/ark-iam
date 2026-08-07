@@ -9,7 +9,7 @@ import (
 	"time"
 
 	appconfig "github.com/morehao/ark-iam/iam/config"
-	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 )

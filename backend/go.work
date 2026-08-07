@@ -1,9 +1,6 @@
 go 1.26.1
 
 use (
-	./apps/auth
 	./apps/iam
-	./apps/platformadmin
-	./apps/tenantadmin
 	./pkg
 )
