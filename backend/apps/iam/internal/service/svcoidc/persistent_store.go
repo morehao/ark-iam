@@ -25,6 +25,7 @@ type PersistentStore struct {
 	personDao            func() *dao.PersonDao
 	userDao              func() *dao.UserDao
 	refreshTokenDao      func() *dao.RefreshTokenDao
+	apiKeyDao            func() *dao.ApiKeyDao
 }
 
 func NewPersistentStore() *PersistentStore {
@@ -34,7 +35,32 @@ func NewPersistentStore() *PersistentStore {
 		personDao:            dao.NewPersonDao,
 		userDao:              dao.NewUserDao,
 		refreshTokenDao:      dao.NewRefreshTokenDao,
+		apiKeyDao:            dao.NewApiKeyDao,
 	}
+}
+
+func (s *PersistentStore) LookupApiKeyByRawKey(ctx context.Context, rawKey string) (*model.ApiKeyEntity, error) {
+	sum := sha256.Sum256([]byte(rawKey))
+	hash := hex.EncodeToString(sum[:])
+	entity, err := s.apiKeyDao().GetByCond(ctx, &dao.ApiKeyCond{KeyHash: hash})
+	if err != nil || entity == nil || entity.ID == 0 {
+		return nil, nil
+	}
+	if entity.RevokedAt != nil && !entity.RevokedAt.IsZero() {
+		return nil, nil
+	}
+	if entity.ExpiredAt != nil && entity.ExpiredAt.Before(time.Now()) {
+		return nil, nil
+	}
+	return entity, nil
+}
+
+func (s *PersistentStore) GetApiKeyClientByRawKey(ctx context.Context, rawKey string) (op.Client, error) {
+	entity, err := s.LookupApiKeyByRawKey(ctx, rawKey)
+	if err != nil || entity == nil {
+		return nil, oidc.ErrInvalidClient()
+	}
+	return NewApiKeyOpClient(entity), nil
 }
 
 func (s *PersistentStore) GetClientByClientID(ctx context.Context, clientID string) (op.Client, error) {
