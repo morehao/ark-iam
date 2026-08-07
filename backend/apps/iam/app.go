@@ -25,11 +25,7 @@ func Routers(engine *gin.Engine) {
 		Middlewares: []gin.HandlerFunc{
 			oidcauth.OIDCCompatibleAuth(config.Conf.JWT.SignKey, func() *rsa.PublicKey { return router.OIDCPublicKey }, oidcauth.WithAuthSkipPaths(
 				"/v1/iam/org/getConfigsByDomain",
-				"/v1/iam/auth/login",
-				"/v1/iam/auth/myTenants",
-				"/v1/iam/auth/selectTenant",
 				"/v1/iam/auth/register",
-				"/v1/iam/auth/refreshToken",
 				"/v1/iam/connector/callback",
 			), oidcauth.WithOIDCSSOValidation(func(ctx *gin.Context, personID uint) bool {
 				// 无 Redis 时无法校验会话，采取放行（fail-open），避免破坏无 Redis 的环境

@@ -6,7 +6,6 @@ import (
 )
 
 type MyTenantsReq struct {
-	PersonToken string `json:"personToken" form:"personToken"` // 自然人令牌
 }
 
 type LogoutAllReq struct {

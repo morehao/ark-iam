@@ -129,9 +129,6 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 func (svc *authSvc) MyTenants(ctx *gin.Context, req *dtoauth.MyTenantsReq) (*dtoauth.MyTenantsResp, error) {
 	personID := gincontext.GetPersonID(ctx)
 	if personID == 0 {
-		personID = svc.personIDFromToken(req.PersonToken)
-	}
-	if personID == 0 {
 		return nil, code.GetError(gconstant.UnauthorizedErr)
 	}
 
@@ -459,30 +456,6 @@ func (svc *authSvc) listPersonTenants(ctx *gin.Context, personID uint) (*model.U
 		options = append(options, objauth.TenantOption{TenantID: tenantEntity.ID, Name: tenantEntity.Name, Tag: tenantEntity.Tag, UserID: joinedUser.ID, IsOwner: joinedUser.IsOwner})
 	}
 	return userEntity, options, nil
-}
-
-func (svc *authSvc) personIDFromToken(personToken string) uint {
-	if strings.TrimSpace(personToken) == "" {
-		return 0
-	}
-	claims, err := jwt.Parse(personToken, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
-		}
-		return []byte(svc.jwtSecret), nil
-	})
-	if err != nil {
-		return 0
-	}
-	mapClaims, ok := claims.Claims.(jwt.MapClaims)
-	if !ok {
-		return 0
-	}
-	personID, ok := parsePositiveIntegerClaim(mapClaims, "person_id")
-	if !ok {
-		return 0
-	}
-	return personID
 }
 
 func validatePasswordStrength(password string) error {
