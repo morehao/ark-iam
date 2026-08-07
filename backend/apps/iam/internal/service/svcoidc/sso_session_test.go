@@ -2,8 +2,10 @@ package svcoidc
 
 import (
 	"context"
+	"errors"
 	"testing"
 
+	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/stretchr/testify/require"
 )
@@ -35,4 +37,57 @@ func TestHasActiveSession(t *testing.T) {
 	active, err = store.HasActiveSession(ctx, 88)
 	require.NoError(t, err)
 	require.False(t, active)
+}
+
+func TestCreateSessionRecordsSessionAudit(t *testing.T) {
+	testsetup.Initialize(testsetup.AppNameIam)
+	defer testsetup.Done(testsetup.AppNameIam)
+
+	ctx := context.Background()
+	store := NewSSOSessionStore()
+
+	prev := sessionAuditWriter
+	defer func() { sessionAuditWriter = prev }()
+
+	var captured *model.SessionAuditEntity
+	sessionAuditWriter = func(_ context.Context, entity *model.SessionAuditEntity) error {
+		captured = entity
+		return nil
+	}
+
+	sid, err := store.CreateSession(ctx, 88)
+	require.NoError(t, err)
+	require.NotEmpty(t, sid)
+
+	require.NotNil(t, captured, "session audit should be written")
+	require.Equal(t, 88, int(captured.PersonID))
+	require.Equal(t, sid, captured.SessionID)
+	require.Equal(t, sessionAuditStatusActive, captured.Status)
+	require.False(t, captured.LoginTime.IsZero())
+
+	// 清理共享 Redis 中的测试会话，避免污染依赖干净状态的其它用例
+	_ = store.RevokeSessionsByPersonID(ctx, 88)
+}
+
+func TestCreateSessionToleratesAuditWriteFailure(t *testing.T) {
+	testsetup.Initialize(testsetup.AppNameIam)
+	defer testsetup.Done(testsetup.AppNameIam)
+
+	ctx := context.Background()
+	store := NewSSOSessionStore()
+
+	prev := sessionAuditWriter
+	defer func() { sessionAuditWriter = prev }()
+
+	sessionAuditWriter = func(_ context.Context, _ *model.SessionAuditEntity) error {
+		return errors.New("db unavailable")
+	}
+
+	// 审计落库失败不得阻断 SSO 会话创建
+	sid, err := store.CreateSession(ctx, 99)
+	require.NoError(t, err)
+	require.NotEmpty(t, sid)
+
+	// 清理共享 Redis 中的测试会话
+	_ = store.RevokeSessionsByPersonID(ctx, 99)
 }

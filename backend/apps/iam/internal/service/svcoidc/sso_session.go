@@ -8,9 +8,19 @@ import (
 	"fmt"
 	"time"
 
-	appconfig "github.com/morehao/ark-iam/iam/config"
-	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/redis/go-redis/v9"
+
+	appconfig "github.com/morehao/ark-iam/iam/config"
+	"github.com/morehao/ark-iam/iam/dao"
+	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/ark-iam/pkg/dbclient"
+
+	"github.com/morehao/golib/biz/gcontext"
+	"github.com/morehao/golib/glog"
+)
+
+const (
+	sessionAuditStatusActive = "active"
 )
 
 const (
@@ -59,6 +69,36 @@ func NewSSOSessionStore() SSOSessionStore {
 	return &redisSSOSessionStore{client: dbclient.RedisCli}
 }
 
+// sessionAuditWriter 落库 session 审计，返回 error 表示成功写入。默认写入 session 审计表，
+// 测试可通过覆盖该变量注入桩实现，避免污染真实数据库。
+var sessionAuditWriter = func(ctx context.Context, entity *model.SessionAuditEntity) error {
+	return dao.NewSessionAuditDao().Insert(ctx, entity)
+}
+
+// recordSessionAuditBestEffort Session 创建后尽力落库一条 session 审计记录。
+// 审计写入失败仅记录日志，绝不阻断 SSO 会话本身（Redis 会话必须照常可用）。
+// CreateSession 无 gin 上下文，仅能记录 person_id/session_id/tenant_id/login_time/status，
+// client_ip 与 user_agent 暂留空。
+func recordSessionAuditBestEffort(ctx context.Context, sid string, personID uint) {
+	tenantID := uint(0)
+	if v := ctx.Value(gcontext.KeyTenantID); v != nil {
+		if t, ok := v.(uint); ok {
+			tenantID = t
+		}
+	}
+	entity := &model.SessionAuditEntity{
+		PersonID:  personID,
+		SessionID: sid,
+		TenantID:  tenantID,
+		LoginTime: time.Now(),
+		Status:    sessionAuditStatusActive,
+		CreatedBy: personID,
+	}
+	if err := sessionAuditWriter(ctx, entity); err != nil {
+		glog.Errorf(ctx, "[svcoidc.recordSessionAudit] write session audit fail, err:%v, sessionId:%s, personId:%d", err, sid, personID)
+	}
+}
+
 // RevokeSSOSessionsByPersonID 撤销指定 person 的全部 SSO session。
 // 供跨包（如 svcauth 登出）调用，实现全局登出语义。
 func RevokeSSOSessionsByPersonID(ctx context.Context, personID uint) error {
@@ -99,6 +139,7 @@ func (s *redisSSOSessionStore) CreateSession(ctx context.Context, personID uint)
 		return "", fmt.Errorf("failed to index session: %w", err)
 	}
 	s.client.Expire(ctx, ssoUserSessionsKey(personID), ttl)
+	recordSessionAuditBestEffort(ctx, sessionID, personID)
 	return sessionID, nil
 }
 
