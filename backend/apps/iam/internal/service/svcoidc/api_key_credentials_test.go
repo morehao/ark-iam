@@ -13,6 +13,7 @@ import (
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -80,6 +81,9 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 	if err := db.AutoMigrate(&model.ApiKeyEntity{}); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
+	if err := db.AutoMigrate(&model.UserEntity{}); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
 
 	sum := sha256.Sum256([]byte("k1"))
 	hash := hex.EncodeToString(sum[:])
@@ -93,10 +97,29 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 	}).Error; err != nil {
 		t.Fatalf("create api key: %v", err)
 	}
+	// owner user：ID=7（对应 apiKey.CreatedBy），person_id=5
+	now := time.Now()
+	ownerUser := &model.UserEntity{
+		TenantID:   1,
+		PersonID:   5,
+		Profile:    json.RawMessage("{}"),
+		CustomData: json.RawMessage("{}"),
+		JoinedAt:   &now,
+	}
+	ownerUser.ID = 7
+	if err := db.Create(ownerUser).Error; err != nil {
+		t.Fatalf("create owner user: %v", err)
+	}
 
 	persistentStore := NewPersistentStore()
 	persistentStore.apiKeyDao = func() *dao.ApiKeyDao {
 		return dao.NewApiKeyDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
+	}
+	persistentStore.userDao = func() *dao.UserDao {
+		return &dao.UserDao{Dao: gormdao.NewDao[model.UserEntity, model.UserEntityList](
+			model.TableNameUser, "UserDao",
+			func(c context.Context) *gorm.DB { return db.WithContext(c) },
+		)}
 	}
 	persistentStore.oauthClientDao = func() *dao.OAuthClientDao {
 		return dao.NewOAuthClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
@@ -127,6 +150,9 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 	}
 	if _, ok := req.(*clientCredentialsTokenRequest); !ok {
 		t.Fatalf("expected *clientCredentialsTokenRequest, got %T", req)
+	}
+	if got := req.GetSubject(); got != "person:5" {
+		t.Fatalf("expected subject %q, got %q", "person:5", got)
 	}
 
 	claims, err := storage.GetPrivateClaimsFromRequest(ctx, req, []string{"urn:ark:iam:admin"})

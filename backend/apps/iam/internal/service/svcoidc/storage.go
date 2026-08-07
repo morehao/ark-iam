@@ -11,6 +11,8 @@ import (
 	jose "github.com/go-jose/go-jose/v4"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
+
+	"github.com/morehao/golib/glog"
 )
 
 type AuthRequest struct {
@@ -213,8 +215,17 @@ func (s *OIDCStorage) ClientCredentialsTokenRequest(ctx context.Context, clientI
 	if apiKey, err := s.persistentStore.LookupApiKeyByRawKey(ctx, clientID); err == nil && apiKey != nil {
 		req.isApiKey = true
 		req.ownerTenantID = apiKey.TenantID
-		req.ownerUserID = apiKey.CreatedBy
-		req.subject = buildOIDCSubject(apiKey.CreatedBy) // sub 用 owner user 的 person id 语义（见 Task 4）
+		// sub 需用 owner user 的 person id 语义，以便 oidcauth parsePersonIDFromSub 识别（见 Task 4）。
+		// apiKey.CreatedBy 是 owner user 的 user id，非 person id；需经 user 表解析出 person id。
+		if user, uErr := s.persistentStore.userDao().GetByID(ctx, apiKey.CreatedBy); uErr == nil && user != nil && user.ID != 0 {
+			req.ownerUserID = user.ID
+			req.subject = buildOIDCSubject(user.PersonID)
+		} else {
+			// owner user 无法解析出 person id：不产出 person 上下文（保持 subject=clientID），
+			// 仅携带 client_id 私有 claim，避免给出 personID=0 的误导性 sub。
+			glog.Warnf(ctx, "[svcoidc.ClientCredentialsTokenRequest] api key owner user not resolved, createdBy:%d, err:%v", apiKey.CreatedBy, uErr)
+			req.isApiKey = false
+		}
 	}
 	return req, nil
 }
