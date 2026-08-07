@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
-	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/testutil"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/testsetup"

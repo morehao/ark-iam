@@ -7,8 +7,8 @@ import (
 
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoconnector"
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
+	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/code"
 )
 

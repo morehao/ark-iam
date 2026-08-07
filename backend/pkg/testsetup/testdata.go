@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/golib/gcrypto"
 )

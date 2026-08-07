@@ -2,7 +2,7 @@ import axios from 'axios'
 import type { ApiResponse, OIDCLoginReq, OIDCLoginResp } from './types'
 
 const api = axios.create({
-  baseURL: '/v1/auth',
+  baseURL: '/v1/iam',
   timeout: 10000,
 })
 

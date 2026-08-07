@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoconnector"
-	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
+	"github.com/morehao/ark-iam/iam/object/objauth"
 )
 
 type stubConnectorSvc struct {
