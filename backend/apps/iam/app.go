@@ -23,7 +23,7 @@ func Routers(engine *gin.Engine) {
 	routerGroups := ginserver.NewRouterGroups(engine, AppName, ginserver.VersionGroup{
 		Version: ginserver.ApiVersionV1,
 		Middlewares: []gin.HandlerFunc{
-			oidcauth.OIDCCompatibleAuth(config.Conf.JWT.SignKey, func() *rsa.PublicKey { return router.OIDCPublicKey }, oidcauth.WithAuthSkipPaths(
+			oidcauth.OIDCCompatibleAuth(func() *rsa.PublicKey { return router.OIDCPublicKey }, oidcauth.WithAuthSkipPaths(
 				"/v1/iam/org/getConfigsByDomain",
 				"/v1/iam/auth/register",
 				"/v1/iam/connector/callback",

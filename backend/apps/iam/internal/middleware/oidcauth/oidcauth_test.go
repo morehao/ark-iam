@@ -37,7 +37,7 @@ func setupRouter(t *testing.T, validate func(ctx *gin.Context, personID uint) bo
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 	r := gin.New()
-	r.Use(OIDCCompatibleAuth("test-secret", func() *rsa.PublicKey { return &key.PublicKey }, WithOIDCSSOValidation(validate)))
+	r.Use(OIDCCompatibleAuth(func() *rsa.PublicKey { return &key.PublicKey }, WithOIDCSSOValidation(validate)))
 	r.GET("/v1/iam/test", func(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{
 			"personID": ginFromContext(ctx),

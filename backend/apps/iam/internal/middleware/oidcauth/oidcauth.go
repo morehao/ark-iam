@@ -41,7 +41,7 @@ func WithOIDCSSOValidation(validate func(ctx *gin.Context, personID uint) bool) 
 	}
 }
 
-func OIDCCompatibleAuth(secretKey string, getOIDCPublicKey func() *rsa.PublicKey, opts ...AuthOption) gin.HandlerFunc {
+func OIDCCompatibleAuth(getOIDCPublicKey func() *rsa.PublicKey, opts ...AuthOption) gin.HandlerFunc {
 	cfg := &authConfig{}
 	for _, opt := range opts {
 		opt(cfg)
