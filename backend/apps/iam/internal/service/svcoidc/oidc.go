@@ -308,13 +308,33 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx context.Context, authRequestI
 		return "", err
 	}
 
-	if _, err := svc.provider.Storage.AuthRequestByID(ctx, authRequestID); err != nil {
+	authReq, err := svc.provider.Storage.AuthRequestByID(ctx, authRequestID)
+	if err != nil {
 		return "", err
 	}
 
 	tenantID := uint(0)
-	if tenants, tErr := svc.authSvc.TenantsForPerson(ginContextFromContext(ctx), personID); tErr == nil && len(tenants) > 0 {
-		tenantID = tenants[0].TenantID
+	if ar, ok := authReq.(*AuthRequest); ok {
+		tenantID = ar.GetTenantID()
+	}
+	tenants, tErr := svc.authSvc.TenantsForPerson(ginContextFromContext(ctx), personID)
+	if tErr == nil && tenantID != 0 {
+		ok := false
+		for _, t := range tenants {
+			if t.TenantID == tenantID {
+				ok = true
+				break
+			}
+		}
+		// membership safety: never issue a token for a tenant hinted but not owned by the user
+		if !ok {
+			tenantID = 0
+		}
+	}
+	if tenantID == 0 {
+		if len(tenants) > 0 {
+			tenantID = tenants[0].TenantID
+		}
 	}
 
 	authTime := time.Now()

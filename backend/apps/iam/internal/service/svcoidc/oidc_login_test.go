@@ -33,17 +33,146 @@ func (f *fakePasswordAuthenticator) TenantsForPerson(ctx *gin.Context, personID 
 	return nil, nil
 }
 
-type fakeSSOSessionStore struct{}
+type fakeSSOSessionStore struct {
+	validatedPersonID uint
+}
 
 var _ SSOSessionStore = (*fakeSSOSessionStore)(nil)
 
 func (f *fakeSSOSessionStore) CreateSession(ctx context.Context, personID uint) (string, error) {
 	return "session-" + fmt.Sprint(personID), nil
 }
-func (f *fakeSSOSessionStore) ValidateSession(ctx context.Context, sessionID string) (uint, error) { return 0, nil }
+func (f *fakeSSOSessionStore) ValidateSession(ctx context.Context, sessionID string) (uint, error) { return f.validatedPersonID, nil }
 func (f *fakeSSOSessionStore) RevokeSession(ctx context.Context, sessionID string) error            { return nil }
 func (f *fakeSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, personID uint) error    { return nil }
 func (f *fakeSSOSessionStore) HasActiveSession(ctx context.Context, personID uint) (bool, error)    { return false, nil }
+
+func TestCompleteLoginBySessionHonorsAuthRequestTenantHint(t *testing.T) {
+	testsetup.Initialize(testsetup.AppNameIam)
+	defer testsetup.Done(testsetup.AppNameIam)
+
+	appconfig.Conf = &appconfig.Config{
+		JWT: appconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: appconfig.OIDC{
+			Issuer:           "http://localhost:8099/oidc",
+			FrontendLoginURL: "http://localhost:3000/oidc/login",
+			AllowInsecure:    true,
+		},
+	}
+	provider, err := SetupOIDCProvider(appconfig.Conf.OIDC.Issuer)
+	if err != nil {
+		t.Fatalf("SetupOIDCProvider failed: %v", err)
+	}
+	request, err := provider.Storage.CreateAuthRequest(t.Context(), &oidc.AuthRequest{
+		ClientID:     "client-1",
+		RedirectURI:  "https://client.example.com/callback",
+		State:        "state-1",
+		Scopes:       []string{oidc.ScopeOpenID, oidc.ScopeProfile},
+		ResponseType: oidc.ResponseTypeCode,
+		ResponseMode: oidc.ResponseModeQuery,
+	}, "")
+	if err != nil {
+		t.Fatalf("CreateAuthRequest failed: %v", err)
+	}
+
+	authTime := time.Now()
+	if err := provider.Storage.CompleteAuthRequest(request.GetID(), "person:88", authTime, []string{"pwd"}, "", 7, false); err != nil {
+		t.Fatalf("storing tenant hint via CompleteAuthRequest(done=false) failed: %v", err)
+	}
+
+	svc := &oidcAuthSvc{
+		provider: provider,
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error) {
+			if personID != 88 {
+				t.Fatalf("expected personID 88, got %d", personID)
+			}
+			return []objauth.TenantOption{{TenantID: 3, Name: "tenant-3"}, {TenantID: 7, Name: "tenant-7"}}, nil
+		}},
+		ssoSessionStore: &fakeSSOSessionStore{validatedPersonID: 88},
+	}
+
+	res, err := svc.CompleteLoginBySession(t.Context(), request.GetID(), "session-x")
+	if err != nil {
+		t.Fatalf("CompleteLoginBySession failed: %v", err)
+	}
+	if res != "http://localhost:8099/oidc/authorize/callback?id="+request.GetID() {
+		t.Fatalf("unexpected continueURL: %q", res)
+	}
+	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())
+	if err != nil {
+		t.Fatalf("AuthRequestByID failed: %v", err)
+	}
+	completedReq, ok := updated.(*AuthRequest)
+	if !ok {
+		t.Fatalf("expected *AuthRequest, got %T", updated)
+	}
+	if !completedReq.Done() {
+		t.Fatal("expected auth request to be completed")
+	}
+	if completedReq.TenantID != 7 {
+		t.Fatalf("expected SSO to honor tenant hint 7, got %d", completedReq.TenantID)
+	}
+}
+
+func TestCompleteLoginBySessionFallsBackWhenHintNotInPersonsTenants(t *testing.T) {
+	testsetup.Initialize(testsetup.AppNameIam)
+	defer testsetup.Done(testsetup.AppNameIam)
+
+	appconfig.Conf = &appconfig.Config{
+		JWT: appconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: appconfig.OIDC{
+			Issuer:           "http://localhost:8099/oidc",
+			FrontendLoginURL: "http://localhost:3000/oidc/login",
+			AllowInsecure:    true,
+		},
+	}
+	provider, err := SetupOIDCProvider(appconfig.Conf.OIDC.Issuer)
+	if err != nil {
+		t.Fatalf("SetupOIDCProvider failed: %v", err)
+	}
+	request, err := provider.Storage.CreateAuthRequest(t.Context(), &oidc.AuthRequest{
+		ClientID:     "client-1",
+		RedirectURI:  "https://client.example.com/callback",
+		State:        "state-1",
+		Scopes:       []string{oidc.ScopeOpenID, oidc.ScopeProfile},
+		ResponseType: oidc.ResponseTypeCode,
+		ResponseMode: oidc.ResponseModeQuery,
+	}, "")
+	if err != nil {
+		t.Fatalf("CreateAuthRequest failed: %v", err)
+	}
+
+	authTime := time.Now()
+	if err := provider.Storage.CompleteAuthRequest(request.GetID(), "person:88", authTime, []string{"pwd"}, "", 99, false); err != nil {
+		t.Fatalf("storing forged tenant hint via CompleteAuthRequest(done=false) failed: %v", err)
+	}
+
+	svc := &oidcAuthSvc{
+		provider: provider,
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error) {
+			return []objauth.TenantOption{{TenantID: 3, Name: "tenant-3"}}, nil
+		}},
+		ssoSessionStore: &fakeSSOSessionStore{validatedPersonID: 88},
+	}
+
+	if _, err := svc.CompleteLoginBySession(t.Context(), request.GetID(), "session-x"); err != nil {
+		t.Fatalf("CompleteLoginBySession failed: %v", err)
+	}
+	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())
+	if err != nil {
+		t.Fatalf("AuthRequestByID failed: %v", err)
+	}
+	completedReq, ok := updated.(*AuthRequest)
+	if !ok {
+		t.Fatalf("expected *AuthRequest, got %T", updated)
+	}
+	if !completedReq.Done() {
+		t.Fatal("expected auth request to be completed")
+	}
+	if completedReq.TenantID != 3 {
+		t.Fatalf("expected forged hint 99 to fall back to tenants[0]=3, got %d", completedReq.TenantID)
+	}
+}
 
 func TestCompleteLoginReturnsContinueURLAndCompletesRequest(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
