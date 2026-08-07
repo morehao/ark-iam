@@ -28,7 +28,7 @@ func TestCompleteLoginReturnsContinueURLAndCompletesRequest(t *testing.T) {
 	appconfig.Conf = &appconfig.Config{
 		JWT: appconfig.JWT{SignKey: "test-sign-key"},
 		OIDC: appconfig.OIDC{
-			Issuer:           "http://localhost:8099/v1/iam/oidc",
+			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3000/oidc/login",
 			AllowInsecure:    true,
 		},
@@ -60,7 +60,7 @@ func TestCompleteLoginReturnsContinueURLAndCompletesRequest(t *testing.T) {
 	}
 
 	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/v1/iam/oidc/login", nil)
+	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login", nil)
 	res, err := svc.CompleteLogin(ginCtx, &dtooidc.OIDCLoginReq{
 		AuthRequestID: request.GetID(),
 		Identifier:    "person@example.com",
@@ -69,7 +69,7 @@ func TestCompleteLoginReturnsContinueURLAndCompletesRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CompleteLogin failed: %v", err)
 	}
-	if res.ContinueURL != "http://localhost:8099/v1/iam/oidc/authorize/callback?id="+request.GetID() {
+	if res.ContinueURL != "http://localhost:8099/oidc/authorize/callback?id="+request.GetID() {
 		t.Fatalf("unexpected continueURL: %q", res.ContinueURL)
 	}
 	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())

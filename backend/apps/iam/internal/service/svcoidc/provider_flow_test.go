@@ -19,7 +19,7 @@ func TestFullOIDCCodeFlow(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	issuer := "http://localhost:8099/v1/iam/oidc"
+	issuer := "http://localhost:8099/oidc"
 	appconfig.Conf = &appconfig.Config{
 		JWT: appconfig.JWT{SignKey: "test-sign-key"},
 		OIDC: appconfig.OIDC{
@@ -56,7 +56,7 @@ func TestFullOIDCCodeFlow(t *testing.T) {
 	}
 
 	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/v1/iam/oidc/login", nil)
+	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login", nil)
 	res, err := svc.CompleteLogin(ginCtx, &dtooidc.OIDCLoginReq{
 		AuthRequestID: authReq.GetID(),
 		Identifier:    "person@example.com",

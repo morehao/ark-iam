@@ -21,7 +21,7 @@ func makeOIDCToken(t *testing.T, key *rsa.PrivateKey, sub string) string {
 		"sub":       sub,
 		"tenant_id": float64(1),
 		"aud":       "test-client",
-		"iss":       "http://localhost:8099/v1/iam/oidc",
+		"iss":       "http://localhost:8099/oidc",
 		"exp":       time.Now().Add(time.Hour).Unix(),
 		"iat":       time.Now().Unix(),
 	}

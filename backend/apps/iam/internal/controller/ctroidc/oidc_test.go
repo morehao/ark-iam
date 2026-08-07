@@ -35,7 +35,7 @@ func TestLoginReturnsContinueURLOnSuccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
 	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
-		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/v1/iam/oidc/authorize/callback?id=ar-1"}, nil
+		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1"}, nil
 	}}}
 	engine.POST("/oidc/login", ctr.Login)
 
@@ -56,7 +56,7 @@ func TestLoginReturnsContinueURLOnSuccess(t *testing.T) {
 	if body.Code != 0 {
 		t.Fatalf("expected success, got code %d body=%s", body.Code, resp.Body.String())
 	}
-	if body.Data.ContinueURL != "http://localhost:8099/v1/iam/oidc/authorize/callback?id=ar-1" {
+	if body.Data.ContinueURL != "http://localhost:8099/oidc/authorize/callback?id=ar-1" {
 		t.Fatalf("unexpected continueURL: %q", body.Data.ContinueURL)
 	}
 }
@@ -90,7 +90,7 @@ func TestLoginSetsSSOCookieWithoutDomainByDefault(t *testing.T) {
 	config.Conf = &config.Config{}
 	engine := gin.New()
 	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
-		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/v1/iam/oidc/authorize/callback?id=ar-1", SessionID: "session-1"}, nil
+		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1", SessionID: "session-1"}, nil
 	}}}
 	engine.POST("/oidc/login", ctr.Login)
 
@@ -113,7 +113,7 @@ func TestLoginSetsSSOCookieWithConfiguredDomain(t *testing.T) {
 	config.Conf = &config.Config{OIDC: config.OIDC{CookieDomain: "example.com"}}
 	engine := gin.New()
 	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
-		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/v1/iam/oidc/authorize/callback?id=ar-1", SessionID: "session-1"}, nil
+		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1", SessionID: "session-1"}, nil
 	}}}
 	engine.POST("/login", ctr.Login)
 
@@ -135,7 +135,7 @@ func TestLoginSetsSSOCookieWhenConfigIsNil(t *testing.T) {
 	config.Conf = nil
 	engine := gin.New()
 	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
-		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/v1/iam/oidc/authorize/callback?id=ar-1", SessionID: "session-1"}, nil
+		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1", SessionID: "session-1"}, nil
 	}}}
 	engine.POST("/login", ctr.Login)
 
