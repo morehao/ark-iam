@@ -9,6 +9,7 @@ import (
 
 type TenantCtr interface {
 	Create(ctx *gin.Context)
+	CreateAsOwner(ctx *gin.Context)
 	Delete(ctx *gin.Context)
 	Update(ctx *gin.Context)
 	Detail(ctx *gin.Context)
@@ -41,6 +42,28 @@ func (ctr *tenantCtr) Create(ctx *gin.Context) {
 		return
 	}
 	res, err := ctr.tenantSvc.Create(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 租户管理
+// @Summary 0租户自然人自助创建租户并成为租户 owner
+// @accept application/json
+// @Produce application/json
+// @Param req body dtotenant.TenantCreateAsOwnerReq true "创建租户并成为owner"
+// @Success 200 {object} gincontext.DtoRender{data=dtotenant.TenantCreateAsOwnerResp}
+// @Router /v1/iam/tenant/createAsOwner [post]
+func (ctr *tenantCtr) CreateAsOwner(ctx *gin.Context) {
+	var req dtotenant.TenantCreateAsOwnerReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	req.PersonID = gincontext.GetPersonID(ctx)
+	res, err := ctr.tenantSvc.CreateTenantAsOwner(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

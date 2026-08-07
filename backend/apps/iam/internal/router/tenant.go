@@ -10,6 +10,7 @@ func tenantRouter(groups *ginserver.RouterGroups) {
 
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/tenant/create", tenantCtr.Create)
+	v1RouterGroup.POST("/tenant/createAsOwner", tenantCtr.CreateAsOwner)
 	v1RouterGroup.POST("/tenant/delete", tenantCtr.Delete)
 	v1RouterGroup.POST("/tenant/update", tenantCtr.Update)
 	v1RouterGroup.GET("/tenant/detail", tenantCtr.Detail)
