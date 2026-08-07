@@ -11,8 +11,6 @@ import (
 	jose "github.com/go-jose/go-jose/v4"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
-
-	"github.com/morehao/ark-iam/iam/model"
 )
 
 type AuthRequest struct {
@@ -212,29 +210,13 @@ func (s *OIDCStorage) ClientCredentialsTokenRequest(ctx context.Context, clientI
 		scopes:   scopes,
 		clientID: clientID,
 	}
-	if apiKey := s.lookupApiKeyQuiet(ctx, clientID); apiKey != nil {
+	if apiKey, err := s.persistentStore.LookupApiKeyByRawKey(ctx, clientID); err == nil && apiKey != nil {
 		req.isApiKey = true
 		req.ownerTenantID = apiKey.TenantID
 		req.ownerUserID = apiKey.CreatedBy
 		req.subject = buildOIDCSubject(apiKey.CreatedBy) // sub 用 owner user 的 person id 语义（见 Task 4）
 	}
 	return req, nil
-}
-
-// lookupApiKeyQuiet 探测 clientID 是否为 API Key 的 raw key。
-// 当持久化存储未配置（如单测未初始化 dbclient 也未注入 apiKeyDao）时，
-// 底层 gorm dao 可能 panic；此处吞掉 panic 视为非 API Key，避免破坏纯 oauth_client 流程。
-func (s *OIDCStorage) lookupApiKeyQuiet(ctx context.Context, rawKey string) (apiKey *model.ApiKeyEntity) {
-	defer func() {
-		if recover() != nil {
-			apiKey = nil
-		}
-	}()
-	entity, err := s.persistentStore.LookupApiKeyByRawKey(ctx, rawKey)
-	if err != nil || entity == nil {
-		return nil
-	}
-	return entity
 }
 
 type clientCredentialsTokenRequest struct {

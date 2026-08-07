@@ -77,6 +77,9 @@ func TestClientCredentialsStorage(t *testing.T) {
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}
 	}
+	persistentStore.apiKeyDao = func() *dao.ApiKeyDao {
+		return dao.NewApiKeyDaoWithDB(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) })
+	}
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -170,6 +173,9 @@ func TestClientCredentialsRejectsPublicClient(t *testing.T) {
 			model.TableNameOAuthClientSecret, "OAuthClientSecretDao",
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}
+	}
+	persistentStore.apiKeyDao = func() *dao.ApiKeyDao {
+		return dao.NewApiKeyDaoWithDB(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) })
 	}
 
 	storage := NewOIDCStorage(nil, persistentStore, nil, "test-key")
