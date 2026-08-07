@@ -48,14 +48,13 @@ func RegisterProviderRoutes(routerGroup *gin.RouterGroup, provider *OIDCProvider
 }
 
 // tenantHintMiddleware 读取 authorize 请求的 tenant query 参数并注入请求上下文，
-// 供 op.Storage.CreateAuthRequest 经 req.Context() 读取；同时写入 gin 上下文供后续 SSO 使用。
+// 供 op.Storage.CreateAuthRequest 经 req.Context() 读取。
 func tenantHintMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		if t := ctx.Query("tenant"); t != "" {
 			if id, err := strconv.ParseUint(t, 10, 64); err == nil {
 				withValue := context.WithValue(ctx.Request.Context(), ctxTenantHintKey, uint(id))
 				ctx.Request = ctx.Request.WithContext(withValue)
-				ctx.Set("tenantHint", uint(id))
 			}
 		}
 		ctx.Next()

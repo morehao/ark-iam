@@ -215,7 +215,8 @@ func NewOIDCAuthSvc(provider *OIDCProvider) OIDCAuthSvc {
 }
 
 func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
-	if _, err := svc.provider.Storage.AuthRequestByID(ctx.Request.Context(), req.AuthRequestID); err != nil {
+	authReq, err := svc.provider.Storage.AuthRequestByID(ctx.Request.Context(), req.AuthRequestID)
+	if err != nil {
 		return nil, code.GetError(code.OIDCSessionNotFound)
 	}
 	personEntity, userEntity, tenants, err := svc.authSvc.AuthenticatePassword(ctx, req.Identifier, req.Password)
@@ -224,8 +225,20 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	}
 	authTime := time.Now()
 	subject := buildOIDCSubject(personEntity.ID)
-	// 多租户：暂不 done、不发 code，需用户先选租户（SSO 会话 defer 到 selectTenant 完成后再建）
-	if len(tenants) > 1 {
+	// 优先尊重 ?tenant hint（如 SSO 会话过期后回退到密码登录时），但仅当 hint 是 person 的成员租户时才采用
+	resolvedTenant := uint(0)
+	if ar, ok := authReq.(*AuthRequest); ok {
+		if hint := ar.GetTenantID(); hint != 0 {
+			for _, t := range tenants {
+				if t.TenantID == hint {
+					resolvedTenant = hint
+					break
+				}
+			}
+		}
+	}
+	// 多租户：除非有合法的 tenant hint，否则暂不 done、不发 code，需用户先选租户
+	if resolvedTenant == 0 && len(tenants) > 1 {
 		if err := svc.provider.Storage.CompleteAuthRequest(req.AuthRequestID, subject, authTime, []string{"pwd"}, "", 0, false); err != nil {
 			return nil, code.GetError(code.OIDCSessionNotFound)
 		}
@@ -234,8 +247,11 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 			Tenants:                 tenants,
 		}, nil
 	}
-	// 单租户：自动选租户，done，发 code，并建 SSO 会话
-	tenantID := userEntity.TenantID
+	// 单租户（或在多租户但 hint 命中成员租户）：自动选租户，done，发 code，并建 SSO 会话
+	tenantID := resolvedTenant
+	if tenantID == 0 {
+		tenantID = userEntity.TenantID
+	}
 	if err := svc.provider.Storage.CompleteAuthRequest(req.AuthRequestID, subject, authTime, []string{"pwd"}, "", tenantID, true); err != nil {
 		return nil, code.GetError(code.OIDCSessionNotFound)
 	}

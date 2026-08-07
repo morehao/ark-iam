@@ -19,7 +19,6 @@ func TestTenantHintMiddleware_injectsRequestContext(t *testing.T) {
 		v, ok := ctx.Request.Context().Value(ctxTenantHintKey).(uint)
 		assert.True(t, ok, "expected tenant hint in request context")
 		assert.Equal(t, uint(5), v)
-		assert.Equal(t, uint(5), ctx.MustGet("tenantHint"))
 		ctx.Status(http.StatusOK)
 	})
 

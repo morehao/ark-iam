@@ -380,6 +380,152 @@ func TestCompleteLoginMultiTenantRequiresSelection(t *testing.T) {
 	}
 }
 
+func TestCompleteLoginHonorsTenantHint(t *testing.T) {
+	testsetup.Initialize(testsetup.AppNameIam)
+	defer testsetup.Done(testsetup.AppNameIam)
+
+	appconfig.Conf = &appconfig.Config{
+		JWT: appconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: appconfig.OIDC{
+			Issuer:           "http://localhost:8099/oidc",
+			FrontendLoginURL: "http://localhost:3000/oidc/login",
+			AllowInsecure:    true,
+		},
+	}
+	provider, err := SetupOIDCProvider(appconfig.Conf.OIDC.Issuer)
+	if err != nil {
+		t.Fatalf("SetupOIDCProvider failed: %v", err)
+	}
+	request, err := provider.Storage.CreateAuthRequest(t.Context(), &oidc.AuthRequest{
+		ClientID:     "client-1",
+		RedirectURI:  "https://client.example.com/callback",
+		State:        "state-1",
+		Scopes:       []string{oidc.ScopeOpenID, oidc.ScopeProfile},
+		ResponseType: oidc.ResponseTypeCode,
+		ResponseMode: oidc.ResponseModeQuery,
+	}, "")
+	if err != nil {
+		t.Fatalf("CreateAuthRequest failed: %v", err)
+	}
+
+	authTime := time.Now()
+	if err := provider.Storage.CompleteAuthRequest(request.GetID(), "person:88", authTime, []string{"pwd"}, "", 7, false); err != nil {
+		t.Fatalf("storing tenant hint via CompleteAuthRequest(done=false) failed: %v", err)
+	}
+
+	svc := &oidcAuthSvc{
+		provider: provider,
+		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+			return &model.PersonEntity{Model: gorm.Model{ID: 88}}, &model.UserEntity{Model: gorm.Model{ID: 66}, TenantID: 3, PersonID: 88}, []objauth.TenantOption{{TenantID: 3, Name: "tenant-3"}, {TenantID: 7, Name: "tenant-7"}}, nil
+		}},
+		ssoSessionStore: &fakeSSOSessionStore{},
+	}
+
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login", nil)
+	res, err := svc.CompleteLogin(ginCtx, &dtooidc.OIDCLoginReq{
+		AuthRequestID: request.GetID(),
+		Identifier:    "person@example.com",
+		Password:      "Password1",
+	})
+	if err != nil {
+		t.Fatalf("CompleteLogin failed: %v", err)
+	}
+	if res.RequiresTenantSelection {
+		t.Fatal("expected no tenant selection when hint is a valid membership")
+	}
+	if res.TenantID != 7 {
+		t.Fatalf("expected tenant hint 7 to override multi-tenant auto-selection, got %d", res.TenantID)
+	}
+	if res.ContinueURL != "http://localhost:8099/oidc/authorize/callback?id="+request.GetID() {
+		t.Fatalf("unexpected continueURL: %q", res.ContinueURL)
+	}
+	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())
+	if err != nil {
+		t.Fatalf("AuthRequestByID failed: %v", err)
+	}
+	completedReq, ok := updated.(*AuthRequest)
+	if !ok {
+		t.Fatalf("expected *AuthRequest, got %T", updated)
+	}
+	if !completedReq.Done() {
+		t.Fatal("expected auth request to be completed with valid tenant hint")
+	}
+	if completedReq.TenantID != 7 {
+		t.Fatalf("expected completed auth request tenantID 7, got %d", completedReq.TenantID)
+	}
+}
+
+func TestCompleteLoginIgnoresForgedTenantHint(t *testing.T) {
+	testsetup.Initialize(testsetup.AppNameIam)
+	defer testsetup.Done(testsetup.AppNameIam)
+
+	appconfig.Conf = &appconfig.Config{
+		JWT: appconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: appconfig.OIDC{
+			Issuer:           "http://localhost:8099/oidc",
+			FrontendLoginURL: "http://localhost:3000/oidc/login",
+			AllowInsecure:    true,
+		},
+	}
+	provider, err := SetupOIDCProvider(appconfig.Conf.OIDC.Issuer)
+	if err != nil {
+		t.Fatalf("SetupOIDCProvider failed: %v", err)
+	}
+	request, err := provider.Storage.CreateAuthRequest(t.Context(), &oidc.AuthRequest{
+		ClientID:     "client-1",
+		RedirectURI:  "https://client.example.com/callback",
+		State:        "state-1",
+		Scopes:       []string{oidc.ScopeOpenID, oidc.ScopeProfile},
+		ResponseType: oidc.ResponseTypeCode,
+		ResponseMode: oidc.ResponseModeQuery,
+	}, "")
+	if err != nil {
+		t.Fatalf("CreateAuthRequest failed: %v", err)
+	}
+
+	authTime := time.Now()
+	if err := provider.Storage.CompleteAuthRequest(request.GetID(), "person:88", authTime, []string{"pwd"}, "", 99, false); err != nil {
+		t.Fatalf("storing forged tenant hint via CompleteAuthRequest(done=false) failed: %v", err)
+	}
+
+	svc := &oidcAuthSvc{
+		provider: provider,
+		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+			return &model.PersonEntity{Model: gorm.Model{ID: 88}}, &model.UserEntity{Model: gorm.Model{ID: 66}, TenantID: 3, PersonID: 88}, []objauth.TenantOption{{TenantID: 3, Name: "tenant-3"}}, nil
+		}},
+		ssoSessionStore: &fakeSSOSessionStore{},
+	}
+
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login", nil)
+	res, err := svc.CompleteLogin(ginCtx, &dtooidc.OIDCLoginReq{
+		AuthRequestID: request.GetID(),
+		Identifier:    "person@example.com",
+		Password:      "Password1",
+	})
+	if err != nil {
+		t.Fatalf("CompleteLogin failed: %v", err)
+	}
+	if res.TenantID != 3 {
+		t.Fatalf("expected forged hint 99 to fall back to auto-picked tenant 3, got %d", res.TenantID)
+	}
+	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())
+	if err != nil {
+		t.Fatalf("AuthRequestByID failed: %v", err)
+	}
+	completedReq, ok := updated.(*AuthRequest)
+	if !ok {
+		t.Fatalf("expected *AuthRequest, got %T", updated)
+	}
+	if !completedReq.Done() {
+		t.Fatal("expected auth request to be completed")
+	}
+	if completedReq.TenantID != 3 {
+		t.Fatalf("expected completed auth request tenantID 3, got %d", completedReq.TenantID)
+	}
+}
+
 func TestSelectTenantWritesTenantAndReturnsContinueURL(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
