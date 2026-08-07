@@ -114,3 +114,71 @@ func TestClientCredentialsStorage(t *testing.T) {
 		t.Fatalf("expected subject %q, got %q", clientID, req.GetSubject())
 	}
 }
+
+func TestCreateAccessTokenForClientCredentials(t *testing.T) {
+	ctx := context.Background()
+
+	clientID := "cc-client-ttl"
+	accessTokenTTL := int64(7200)
+	db := newClientCredentialsTestDB(t, clientID, accessTokenTTL)
+
+	persistentStore := NewPersistentStore()
+	persistentStore.oauthClientDao = func() *dao.OAuthClientDao {
+		return dao.NewOAuthClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
+	}
+
+	now := time.Now()
+	accessTokenID, expiration, err := persistentStore.CreateAccessToken(ctx, &clientCredentialsTokenRequest{
+		subject:  clientID,
+		audience: []string{"urn:ark:iam:admin"},
+		clientID: clientID,
+		scopes:   []string{"openid"},
+	})
+	if err != nil {
+		t.Fatalf("CreateAccessToken failed: %v", err)
+	}
+	if accessTokenID == "" {
+		t.Fatal("expected non-empty access token id")
+	}
+	if !expiration.After(now) {
+		t.Fatalf("expected expiration in the future, got %v", expiration)
+	}
+	ttlSeconds := int64(expiration.Sub(now).Seconds())
+	if ttlSeconds != accessTokenTTL {
+		t.Fatalf("expected access token ttl to match client's %d, got %d", accessTokenTTL, ttlSeconds)
+	}
+}
+
+func newClientCredentialsTestDB(t *testing.T, clientID string, accessTokenTTL int64) *gorm.DB {
+	t.Helper()
+
+	dsn := fmt.Sprintf("file:ccttl_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.OAuthClientEntity{}, &model.OAuthClientSecretEntity{}); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+
+	clientEntity := &model.OAuthClientEntity{
+		Model:                   gorm.Model{ID: 1},
+		TenantID:                1,
+		ClientID:                clientID,
+		Name:                    "TTL Client",
+		RedirectURIs:            datatypes.JSON("[]"),
+		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
+		GrantTypes:              datatypes.JSON(fmt.Sprintf(`["%s"]`, model.GrantTypeClientCredentials)),
+		ResponseTypes:           datatypes.JSON("[]"),
+		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodBasic,
+		AllowedOrigins:          datatypes.JSON("[]"),
+		DefaultScopes:           datatypes.JSON(`["openid"]`),
+		AccessTokenTTL:          accessTokenTTL,
+		Status:                  model.OAuthClientStatusEnable,
+		Type:                    model.OAuthClientTypeFirstParty,
+	}
+	if err := db.Create(clientEntity).Error; err != nil {
+		t.Fatalf("insert oauth_client: %v", err)
+	}
+	return db
+}

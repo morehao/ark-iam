@@ -138,7 +138,16 @@ func (s *PersistentStore) ValidateJWTProfileScopes(ctx context.Context, userID s
 }
 
 func (s *PersistentStore) CreateAccessToken(ctx context.Context, request op.TokenRequest) (accessTokenID string, expiration time.Time, err error) {
-	return fmt.Sprintf("at-%d", time.Now().UnixNano()), time.Now().Add(time.Hour), nil
+	accessTokenID = fmt.Sprintf("at-%d", time.Now().UnixNano())
+
+	ttl := time.Hour
+	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok {
+		if entity, e := s.oauthClientDao().GetByCond(ctx, &dao.OAuthClientCond{ClientID: ccReq.ClientID()}); e == nil && entity != nil && entity.AccessTokenTTL > 0 {
+			ttl = time.Duration(entity.AccessTokenTTL) * time.Second
+		}
+	}
+	expiration = time.Now().Add(ttl)
+	return accessTokenID, expiration, nil
 }
 
 func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, request op.TokenRequest, currentRefreshToken string) (accessTokenID string, newRefreshToken string, expiration time.Time, err error) {
