@@ -11,8 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/morehao/golib/biz/gcontext"
-	"github.com/morehao/golib/biz/gobject"
-	"github.com/morehao/golib/gauth/jwtauth"
 	"github.com/morehao/golib/glog"
 )
 
@@ -22,7 +20,7 @@ const (
 )
 
 type authConfig struct {
-	skipPaths      []string
+	skipPaths       []string
 	validateOIDCSSO func(ctx *gin.Context, personID uint) bool
 }
 
@@ -76,29 +74,8 @@ func OIDCCompatibleAuth(secretKey string, getOIDCPublicKey func() *rsa.PublicKey
 			return
 		}
 
-		auth, err := jwtauth.New[gobject.UserClaims](secretKey)
-		if err != nil {
-			glog.Errorf(ctx, "[oidcauth] jwtauth.New fail, err:%v", err)
-			abortUnauthorized(ctx, "internal server error")
-			return
-		}
-
-		internalClaims, err := auth.Parse(tokenStr)
-		if err != nil {
-			glog.Errorf(ctx, "[oidcauth] internal JWT parse fail, err:%v", err)
-			abortUnauthorized(ctx, "invalid token")
-			return
-		}
-
-		ctx.Set(gcontext.KeyOrgID, internalClaims.CustomData.OrgID)
-		ctx.Set(gcontext.KeyTenantID, internalClaims.CustomData.TenantID)
-		ctx.Set(gcontext.KeyPersonID, internalClaims.CustomData.PersonID)
-		ctx.Set(gcontext.KeyUserID, internalClaims.CustomData.UserID)
-		ctx.Set(gcontext.KeyDeptID, internalClaims.CustomData.DeptID)
-		ctx.Set(gcontext.KeyUserType, internalClaims.CustomData.UserType)
-		ctx.Set(gcontext.KeyAuthToken, tokenStr)
-
-		ctx.Next()
+		glog.Errorf(ctx, "[oidcauth] oidc access token validation fail, err:%v", err)
+		abortUnauthorized(ctx, "invalid token")
 	}
 }
 

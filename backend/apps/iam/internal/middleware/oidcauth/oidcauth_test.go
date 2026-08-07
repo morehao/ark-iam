@@ -46,6 +46,43 @@ func setupRouter(t *testing.T, validate func(ctx *gin.Context, personID uint) bo
 	return r, key
 }
 
+func makeInternalHS256Token(t *testing.T, sub string) string {
+	t.Helper()
+	claims := jwt.MapClaims{
+		"customData": map[string]interface{}{
+			"userId":    float64(1),
+			"personId":  float64(88),
+			"tenantId":  float64(1),
+			"orgId":     float64(1),
+			"deptId":    float64(1),
+			"userType":  "user",
+			"tokenType": "auth",
+		},
+		"sub": sub,
+		"aud": "test-client",
+		"iss": "test-issuer",
+		"exp": time.Now().Add(time.Hour).Unix(),
+		"iat": time.Now().Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	s, err := token.SignedString([]byte("test-secret"))
+	require.NoError(t, err)
+	return s
+}
+
+func TestRejectsInternalHS256Token(t *testing.T) {
+	r, _ := setupRouter(t, func(ctx *gin.Context, personID uint) bool {
+		return true // 会话有效，但 RS256 验签失败应直接 401
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/iam/test", nil)
+	req.Header.Set(AuthHeaderKey, AuthBearer+makeInternalHS256Token(t, "person:88"))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
 func ginFromContext(ctx *gin.Context) uint {
 	v, _ := ctx.Get(gcontext.KeyPersonID)
 	id, _ := v.(uint)
