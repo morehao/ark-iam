@@ -81,7 +81,7 @@ es_configs:
     addr: http://host.docker.internal:9200
 
 oidc:
-  issuer: "https://iam.example.com/v1/iam/oidc"
+  issuer: "https://iam.example.com/oidc"
   frontendLoginURL: "https://login.example.com/login"
   signingKeyID: "prod-oidc-key"
   signingPrivateKeyPath: ""

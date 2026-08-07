@@ -80,7 +80,7 @@ User (浏览器)          RP (业务应用)            IdP (IAM)
 
 ### 3.2 核心端点详情
 
-#### POST `/v1/iam/oidc/login`（用户认证）
+#### POST `/oidc/login`（用户认证）
 
 前端登录页面调用的接口，用户提交用户名密码后获得 `continueURL`，浏览器跳转此 URL 完成授权码颁发。
 
@@ -99,7 +99,7 @@ User (浏览器)          RP (业务应用)            IdP (IAM)
     "code": 0,
     "msg": "success",
     "data": {
-        "continueURL": "http://iam.example.com/v1/iam/oidc/authorize/callback?id=ar-1741234567890123000"
+        "continueURL": "http://iam.example.com/oidc/authorize/callback?id=ar-1741234567890123000"
     }
 }
 ```
@@ -108,14 +108,14 @@ User (浏览器)          RP (业务应用)            IdP (IAM)
 - `continueURL` 由后端生成，前端收到后应立即跳转
 - 成功后后端同时设置 `iam_sso_session` Cookie，后续同一浏览器访问时自动登录
 
-#### GET `/v1/iam/oidc/sso-login`（SSO 自动登录检查）
+#### GET `/oidc/sso-login`（SSO 自动登录检查）
 
 当用户已有 SSO Session 时，此端点自动完成认证，用户无需再次输入密码。
 
 - 有有效 `iam_sso_session` Cookie → 自动认证 → 302 到 continueURL
 - 无 Cookie → 302 到前端登录页（`frontendLoginURL?authRequestID=xxx`）
 
-#### POST `/v1/iam/oidc/oauth/token`（令牌交换）
+#### POST `/oidc/oauth/token`（令牌交换）
 
 **请求（application/x-www-form-urlencoded）：**
 
@@ -139,7 +139,7 @@ User (浏览器)          RP (业务应用)            IdP (IAM)
 }
 ```
 
-#### GET `/v1/iam/oidc/userinfo`（用户信息）
+#### GET `/oidc/userinfo`（用户信息）
 
 **请求头：** `Authorization: Bearer {access_token}`
 
@@ -161,12 +161,12 @@ IAM 支持 OIDC Discovery，RP 可从此端点自动获取所有协议端点地�
 **响应片段：**
 ```json
 {
-    "issuer": "http://localhost:8099/v1/iam/oidc",
-    "authorization_endpoint": "http://localhost:8099/v1/iam/oidc/authorize",
-    "token_endpoint": "http://localhost:8099/v1/iam/oidc/oauth/token",
-    "userinfo_endpoint": "http://localhost:8099/v1/iam/oidc/userinfo",
-    "jwks_uri": "http://localhost:8099/v1/iam/oidc/.well-known/jwks.json",
-    "end_session_endpoint": "http://localhost:8099/v1/iam/oidc/end_session",
+    "issuer": "http://localhost:8099/oidc",
+    "authorization_endpoint": "http://localhost:8099/oidc/authorize",
+    "token_endpoint": "http://localhost:8099/oidc/oauth/token",
+    "userinfo_endpoint": "http://localhost:8099/oidc/userinfo",
+    "jwks_uri": "http://localhost:8099/oidc/.well-known/jwks.json",
+    "end_session_endpoint": "http://localhost:8099/oidc/end_session",
     "response_types_supported": ["code"],
     "grant_types_supported": ["authorization_code", "refresh_token", "client_credentials"],
     "subject_types_supported": ["public"],
@@ -297,7 +297,7 @@ sequenceDiagram
 2. 获取以下信息：
    - **Client ID**：应用的唯一标识
    - **Client Secret**：应用的密钥，用于 Token 端点认证
-   - **Issuer**：IAM OIDC Provider 地址，如 `https://iam.example.com/v1/iam/oidc`
+   - **Issuer**：IAM OIDC Provider 地址，如 `https://iam.example.com/oidc`
 
 ### 4.2 注册 OAuth Client 时的配置项
 
@@ -319,7 +319,7 @@ sequenceDiagram
 通过 Discovery URL 动态获取所有 OIDC 端点地址：
 
 ```
-GET https://iam.example.com/v1/iam/oidc/.well-known/openid-configuration
+GET https://iam.example.com/oidc/.well-known/openid-configuration
 ```
 
 大多数 OIDC 客户端库支持直接传入 Discovery URL 自动配置。
@@ -329,7 +329,7 @@ GET https://iam.example.com/v1/iam/oidc/.well-known/openid-configuration
 将用户重定向到 IAM 的 authorize 端点：
 
 ```
-GET https://iam.example.com/v1/iam/oidc/authorize
+GET https://iam.example.com/oidc/authorize
   ?client_id=your-client-id
   &redirect_uri=https://app.example.com/callback
   &response_type=code
@@ -363,7 +363,7 @@ GET https://app.example.com/callback?code=xxxxx&state=random-state-string
 后端发起 POST 请求：
 
 ```bash
-curl -X POST https://iam.example.com/v1/iam/oidc/oauth/token \
+curl -X POST https://iam.example.com/oidc/oauth/token \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d 'grant_type=authorization_code' \
   -d 'code=xxxxx' \
@@ -395,7 +395,7 @@ curl -X POST https://iam.example.com/v1/iam/oidc/oauth/token \
 
 ```bash
 curl -H 'Authorization: Bearer {access_token}' \
-  https://iam.example.com/v1/iam/oidc/userinfo
+  https://iam.example.com/oidc/userinfo
 ```
 
 #### Step 7: 建立本地会话
@@ -407,7 +407,7 @@ curl -H 'Authorization: Bearer {access_token}' \
 当 Access Token 过期时，使用 Refresh Token 静默替换：
 
 ```bash
-curl -X POST https://iam.example.com/v1/iam/oidc/oauth/token \
+curl -X POST https://iam.example.com/oidc/oauth/token \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d 'grant_type=refresh_token' \
   -d 'refresh_token=your-refresh-token' \
@@ -422,7 +422,7 @@ curl -X POST https://iam.example.com/v1/iam/oidc/oauth/token \
 业务应用退出时，应将用户重定向到 IAM 的 end_session 端点：
 
 ```
-GET https://iam.example.com/v1/iam/oidc/end_session
+GET https://iam.example.com/oidc/end_session
   ?id_token_hint=xxxx
   &post_logout_redirect_uri=https://app.example.com/logged-out
 ```
@@ -449,7 +449,7 @@ IAM 将清除 SSO Session，用户再次访问其他业务应用时需重新登�
 import { UserManager } from 'oidc-client-ts';
 
 const userManager = new UserManager({
-  authority: 'https://iam.example.com/v1/iam/oidc',
+  authority: 'https://iam.example.com/oidc',
   client_id: 'your-client-id',
   redirect_uri: 'https://app.example.com/callback',
   scope: 'openid profile email',
@@ -468,7 +468,7 @@ userManager.signinRedirectCallback().then(user => {
 // Go 后端示例（使用 coreos/go-oidc）
 import "github.com/coreos/go-oidc/v3/oidc"
 
-provider, _ := oidc.NewProvider(ctx, "https://iam.example.com/v1/iam/oidc")
+provider, _ := oidc.NewProvider(ctx, "https://iam.example.com/oidc")
 verifier := provider.Verifier(&oidc.Config{ClientID: "your-client-id"})
 
 // 验证 id_token
@@ -497,7 +497,7 @@ idToken.Claims(&claims)
 
 ```json
 {
-    "iss": "https://iam.example.com/v1/iam/oidc",
+    "iss": "https://iam.example.com/oidc",
     "sub": "person:42",
     "aud": ["your-client-id"],
     "exp": 1718000000,

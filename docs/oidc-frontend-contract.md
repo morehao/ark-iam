@@ -2,7 +2,7 @@
 
 ## 接口
 
-`POST /v1/iam/oidc/login`
+`POST /oidc/login`
 
 ### 请求
 
@@ -21,7 +21,7 @@
   "code": 0,
   "msg": "success",
   "data": {
-    "continueURL": "http://iam.example.com/v1/iam/oidc/authorize/callback?id=ar-1741234567890123000"
+    "continueURL": "http://iam.example.com/oidc/authorize/callback?id=ar-1741234567890123000"
   }
 }
 ```
@@ -39,7 +39,7 @@
 ## 前端消费流程
 
 1. 浏览器被 OIDC Provider 重定向到前端登录页，URL 中包含 `authRequestID`
-2. 前端收集用户名密码后，调用 `POST /v1/iam/oidc/login`
+2. 前端收集用户名密码后，调用 `POST /oidc/login`
 3. 成功后，执行 `window.location.href = response.data.continueURL`
 4. 浏览器跳转到 Provider 的 `/authorize/callback`，自动完成 OIDC 授权码流程
 

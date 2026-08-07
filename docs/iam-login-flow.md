@@ -13,7 +13,7 @@ IAM 支持多种认证/登录方式，覆盖用户登录、机器认证、对外
 | 5 | **令牌刷新** | 客户端 → IAM | JWT + DB | `POST /auth/refreshToken` | 新 AccessToken + RefreshToken |
 | 6 | **API Key 认证** | 服务 → IAM | SHA-256 + Bearer | 中间件鉴权 | 直接通过 |
 | 7 | **Connector SSO 登录** | 外部 IdP → IAM（IAM 作为 RP） | OAuth2/OIDC | `/v1/iam/connector/*` | PersonToken (同 1) |
-| 8 | **OIDC Provider 登录** | 外部应用 → IAM（IAM 作为 OP） | OIDC | `/v1/iam/oidc/*` | access_token + id_token + refresh_token |
+| 8 | **OIDC Provider 登录** | 外部应用 → IAM（IAM 作为 OP） | OIDC | `/oidc/*` | access_token + id_token + refresh_token |
 
 ### 令牌体系总览
 
@@ -182,7 +182,7 @@ sequenceDiagram
 /v1/iam/auth/selectTenant   - 选择租户（携带 PersonToken）
 /v1/iam/auth/refreshToken   - 刷新令牌（携带 RefreshToken）
 /v1/iam/connector/callback  - 外部 IdP 回调
-/v1/iam/oidc                - 整个 OIDC Provider 前缀
+/oidc                - 整个 OIDC Provider 前缀
 /v1/iam/org/getConfigsByDomain - 组织配置
 ```
 
@@ -657,7 +657,7 @@ Result:
 sequenceDiagram
     participant User as 用户
     participant RP as 外部应用 (RP)
-    participant IAM_OP as IAM OIDC Provider<br/>(/v1/iam/oidc)
+    participant IAM_OP as IAM OIDC Provider<br/>(/oidc)
     participant Frontend as 前端登录页<br/>(frontendLoginURL)
     participant AuthSvc as svcauth.AuthSvc
     participant Storage as OIDCStorage<br/>(内存 + DB)
@@ -689,7 +689,7 @@ sequenceDiagram
         Note over IAM_OP: 校验 is_suspended
         IAM_OP->>Storage: CompleteAuthRequest(authRequestID, personID)
         Storage-->>IAM_OP: Done
-        IAM_OP-->>Frontend: {continueURL: "/v1/iam/oidc/authorize/callback?id=ar-xxx"}
+        IAM_OP-->>Frontend: {continueURL: "/oidc/authorize/callback?id=ar-xxx"}
         Frontend->>User: window.location.href = continueURL
     end
 
