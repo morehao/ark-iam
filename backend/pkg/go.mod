@@ -7,6 +7,7 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/morehao/golib v1.31.1
 	github.com/redis/go-redis/v9 v9.18.0
+	gorm.io/datatypes v1.2.7
 	gorm.io/gorm v1.31.1
 )
 

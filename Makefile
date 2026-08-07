@@ -7,6 +7,8 @@ APP        =
 BINARY     = $(APP)
 MAIN_DIR   = ./apps/$(APP)/cmd
 BUILD_DIR  = ./backend/output/build
+FE_APP     ?= platform-admin-web
+FE_DIR     = ./frontend
 VERSION    = $(shell date +%Y%m%d%H%M%S)-$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 APP_CONFIG_PATH = /app/config.yaml
@@ -33,7 +35,7 @@ PORT              = 8099
 # ============================================================
 .PHONY: all build build-env clean run lint test swag codegen \
         docker-build docker-run check-image \
-        list-apps deps tidy update-dep dev-frontend stop-frontend e2e e2e-sso e2e-test verify-oidc help
+        list-apps deps tidy update-dep dev-fe dev-fe-all build-fe build-fe-all stop-fe dev-frontend stop-frontend e2e e2e-sso e2e-test verify-oidc help
 
 # ============================================================
 # 通用入口：清理、依赖、构建并运行
@@ -235,19 +237,59 @@ check-image:
 		echo "✅ 镜像 $(DOCKER_IMAGE) 已存在，跳过构建"; \
 	fi
 
+# 验证前端 FE_APP 参数是否有效
+define validate_fe_app
+	@if [ -z "$(FE_APP)" ]; then \
+		echo "❌ 请使用 FE_APP=<名称> 指定前端应用"; \
+		echo "   可用的前端应用：$$(ls $(FE_DIR)/apps 2>/dev/null | tr '\n' ' ')"; \
+		exit 1; \
+	fi
+	@if [ ! -d "$(FE_DIR)/apps/$(FE_APP)" ]; then \
+		echo "❌ 前端应用 '$(FE_APP)' 不存在于 $(FE_DIR)/apps 目录下"; \
+		echo "   可用的前端应用：$$(ls $(FE_DIR)/apps 2>/dev/null | tr '\n' ' ')"; \
+		exit 1; \
+	fi
+endef
+
 # ============================================================
 # 前端开发
 # ============================================================
 
+# 启动指定前端应用（开发调试用）
+# 用法：make dev-fe FE_APP=login-web
+dev-fe:
+	$(call validate_fe_app)
+	@echo "🚀 正在启动前端应用 @ark-iam/$(FE_APP)..."
+	@cd $(FE_DIR) && pnpm --filter @ark-iam/$(FE_APP) dev
+
 # 并行启动所有前端服务（开发调试用）
-dev-frontend:
+dev-fe-all:
 	@echo "🚀 正在并行启动所有前端服务..."
-	@cd frontend && pnpm run dev:all
+	@cd $(FE_DIR) && pnpm run dev:all
+
+# 构建指定前端应用
+# 用法：make build-fe FE_APP=sso-test-app
+build-fe:
+	$(call validate_fe_app)
+	@echo "🔨 正在构建前端应用 @ark-iam/$(FE_APP)..."
+	@cd $(FE_DIR) && pnpm --filter @ark-iam/$(FE_APP) build
+
+# 构建全部前端应用
+build-fe-all:
+	@echo "🔨 正在构建全部前端应用..."
+	@cd $(FE_DIR) && pnpm --filter @ark-iam/platform-admin-web --filter @ark-iam/login-web --filter @ark-iam/sso-test-app build
+	@echo "✅ 全部前端应用构建完成"
 
 # 停止所有前端服务（本地测试用）
-stop-frontend:
+stop-fe:
 	@echo "🛑 正在停止前端服务..."
-	@pkill -f "vite.*ark-iam" 2>/dev/null && echo "✅ 已停止" || echo "⚠️  没有运行中的前端服务"
+	@pkill -f "vite" 2>/dev/null && echo "✅ 已停止" || echo "⚠️  没有运行中的前端服务"
+
+# [已废弃] 并行启动所有前端服务，请使用 dev-fe-all
+dev-frontend: dev-fe-all
+
+# [已废弃] 停止所有前端服务，请使用 stop-fe
+stop-frontend: stop-fe
 
 # 运行 E2E 测试（需先安装依赖：cd e2e && npm install && npx playwright install chromium）
 .PHONY: e2e
@@ -329,8 +371,11 @@ help:
 	@echo "    make docker-run   APP=<名称> [PORT=N]  运行容器（镜像不存在时自动构建）"
 	@echo ""
 	@echo "  前端"
-	@echo "    make dev-frontend                      并行启动所有前端服务"
-	@echo "    make stop-frontend                     停止所有前端服务（本地测试）"
+	@echo "    make dev-fe       [FE_APP=<名称>]        启动指定前端应用（默认 platform-admin-web）"
+	@echo "    make dev-fe-all                          并行启动所有前端服务"
+	@echo "    make build-fe     [FE_APP=<名称>]        构建指定前端应用"
+	@echo "    make build-fe-all                       构建全部前端应用"
+	@echo "    make stop-fe                             停止所有前端服务"
 	@echo ""
 	@echo "  其他"
 	@echo "    make list-apps                         列出所有可用的应用程序"

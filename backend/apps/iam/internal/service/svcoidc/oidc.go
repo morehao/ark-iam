@@ -17,7 +17,7 @@ import (
 	appconfig "github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/iam/internal/service/svcauth"
-	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/glog"
 	"github.com/zitadel/oidc/v3/pkg/op"
