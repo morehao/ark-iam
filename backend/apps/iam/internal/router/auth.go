@@ -12,13 +12,9 @@ func authRouter(groups *ginserver.RouterGroups) {
 	authCtr := ctrauth.NewAuthCtr(authSvc)
 
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.POST("/auth/login", authCtr.Login)
 	v1RouterGroup.GET("/auth/myTenants", authCtr.MyTenants)
-	v1RouterGroup.POST("/auth/selectTenant", authCtr.SelectTenant)
-	v1RouterGroup.POST("/auth/switchTenant", authCtr.SwitchTenant)
 	v1RouterGroup.POST("/auth/register", authCtr.Register)
 	v1RouterGroup.POST("/auth/joinTenant", authCtr.JoinTenant)
-	v1RouterGroup.POST("/auth/refreshToken", authCtr.RefreshToken)
 	v1RouterGroup.POST("/auth/logout", authCtr.Logout)
 	v1RouterGroup.POST("/auth/logoutAll", authCtr.LogoutAll)
 	v1RouterGroup.GET("/auth/userinfo", authCtr.Userinfo)

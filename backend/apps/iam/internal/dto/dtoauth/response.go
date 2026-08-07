@@ -10,24 +10,12 @@ type LoginResp struct {
 	Tenants     []objauth.TenantOption  `json:"tenants"`
 }
 
-type SelectTenantResp struct {
-	objauth.TokenInfo
-}
-
-type SwitchTenantResp struct {
-	objauth.TokenInfo
-}
-
 type MyTenantsResp struct {
 	List []objauth.TenantOption `json:"list"`
 }
 
 type RegisterResp struct {
 	UserID uint `json:"userID"` // 用户ID
-}
-
-type RefreshTokenResp struct {
-	objauth.TokenInfo
 }
 
 type UserinfoResp struct {
