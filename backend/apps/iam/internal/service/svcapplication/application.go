@@ -28,6 +28,7 @@ var _ ApplicationSvc = (*applicationSvc)(nil)
 
 type applicationRepository interface {
 	GetByID(ctx context.Context, id uint) (*model.ApplicationEntity, error)
+	Delete(ctx context.Context, id, deletedBy uint) error
 }
 
 var newApplicationRepo = func() applicationRepository {
@@ -89,7 +90,7 @@ func (svc *applicationSvc) Delete(ctx *gin.Context, req *dtoapplication.DeleteRe
 		return code.GetError(code.ApplicationSystemBuiltInErr)
 	}
 	userID := gincontext.GetUserID(ctx)
-	if err := dao.NewApplicationDao().Delete(ctx, req.AppID, userID); err != nil {
+	if err := newApplicationRepo().Delete(ctx, req.AppID, userID); err != nil {
 		glog.Errorf(ctx, "[svcapplication.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationDeleteError)
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/morehao/ark-iam/iam/internal/dto/dtooauthclient"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gerror"
 	"gorm.io/datatypes"
 	"gorm.io/driver/sqlite"
@@ -65,3 +66,74 @@ func newOAuthDeleteCtx(tenantID, userID uint) *gin.Context {
 	ctx.Set("userID", userID)
 	return ctx
 }
+
+func TestDeleteNonSystemOAuthClient(t *testing.T) {
+	repo := &stubOAuthClientDeleteRepo{
+		getByIDEntity: &model.OAuthClientEntity{
+			Model:    gorm.Model{ID: 2},
+			TenantID: 1,
+			ClientID: "y",
+			Name:     "Blog Client",
+			IsSystem: 0,
+		},
+	}
+	installOAuthClientDeleteRepo(t, repo)
+
+	svc := NewOAuthClientSvc()
+	err := svc.Delete(newOAuthDeleteCtx(1, 7), &dtooauthclient.DeleteReq{OAuthClientID: 2})
+	if err != nil {
+		t.Fatalf("Delete returned error: %v", err)
+	}
+	if repo.deletedID != 2 {
+		t.Fatalf("expected delete by id 2, got %d", repo.deletedID)
+	}
+	if repo.deletedBy != 7 {
+		t.Fatalf("expected deletedBy 7, got %d", repo.deletedBy)
+	}
+}
+
+type stubOAuthClientDeleteRepo struct {
+	getByIDEntity *model.OAuthClientEntity
+	getByIDErr    error
+	deletedID     uint
+	deletedBy     uint
+}
+
+func (r *stubOAuthClientDeleteRepo) GetByID(ctx context.Context, id uint) (*model.OAuthClientEntity, error) {
+	return r.getByIDEntity, r.getByIDErr
+}
+
+func (r *stubOAuthClientDeleteRepo) GetByCond(ctx context.Context, cond gormdao.Cond) (*model.OAuthClientEntity, error) {
+	return nil, nil
+}
+
+func (r *stubOAuthClientDeleteRepo) GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.OAuthClientEntityList, int64, error) {
+	return nil, 0, nil
+}
+
+func (r *stubOAuthClientDeleteRepo) GetSecretByID(ctx context.Context, id uint) (*model.OAuthClientSecretEntity, error) {
+	return nil, nil
+}
+
+func (r *stubOAuthClientDeleteRepo) DeleteSecret(ctx context.Context, id, userID uint) error {
+	return nil
+}
+
+func (r *stubOAuthClientDeleteRepo) Delete(ctx context.Context, id, userID uint) error {
+	r.deletedID = id
+	r.deletedBy = userID
+	return nil
+}
+
+func installOAuthClientDeleteRepo(t *testing.T, repo oauthClientScopeRepository) {
+	t.Helper()
+	prev := newOAuthClientScopeRepo
+	newOAuthClientScopeRepo = func() oauthClientScopeRepository {
+		return repo
+	}
+	t.Cleanup(func() {
+		newOAuthClientScopeRepo = prev
+	})
+}
+
+var _ oauthClientScopeRepository = (*stubOAuthClientDeleteRepo)(nil)

@@ -42,6 +42,7 @@ type oauthClientScopeRepository interface {
 	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.OAuthClientEntityList, int64, error)
 	GetSecretByID(ctx context.Context, id uint) (*model.OAuthClientSecretEntity, error)
 	DeleteSecret(ctx context.Context, id uint, userID uint) error
+	Delete(ctx context.Context, id, userID uint) error
 }
 
 var newOAuthClientScopeRepo = func() oauthClientScopeRepository {
@@ -72,6 +73,10 @@ func (d *oauthClientScopeDAO) GetSecretByID(ctx context.Context, id uint) (*mode
 
 func (d *oauthClientScopeDAO) DeleteSecret(ctx context.Context, id uint, userID uint) error {
 	return dao.NewOAuthClientSecretDao().Delete(ctx, id, userID)
+}
+
+func (d *oauthClientScopeDAO) Delete(ctx context.Context, id, userID uint) error {
+	return newOAuthClientDAO().Delete(ctx, id, userID)
 }
 
 func oauthClientVisibleToTenant(entity *model.OAuthClientEntity, tenantID uint) bool {
@@ -142,7 +147,7 @@ func (svc *oAuthClientSvc) Delete(ctx *gin.Context, req *dtooauthclient.DeleteRe
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	if err := dao.NewOAuthClientDao().Delete(ctx, req.OAuthClientID, userID); err != nil {
+	if err := newOAuthClientScopeRepo().Delete(ctx, req.OAuthClientID, userID); err != nil {
 		glog.Errorf(ctx, "[svcoauthclient.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OAuthClientDeleteError)
 	}
