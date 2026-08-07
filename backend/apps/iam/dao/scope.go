@@ -3,12 +3,12 @@ package dao
 import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 type ScopeCond struct {
-	*genericdao.BaseCond
+	*gormdao.BaseCond
 	TenantID   uint
 	ResourceID uint
 	Name       string
@@ -19,23 +19,23 @@ func (c *ScopeCond) BuildCondition(db *gorm.DB, tableName string) {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
 	if c.TenantID != 0 {
-		db.Where(tableName + ".tenant_id = ?", c.TenantID)
+		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
 	if c.ResourceID != 0 {
-		db.Where(tableName + ".resource_id = ?", c.ResourceID)
+		db.Where(tableName+".resource_id = ?", c.ResourceID)
 	}
 	if c.Name != "" {
-		db.Where(tableName + ".name = ?", c.Name)
+		db.Where(tableName+".name = ?", c.Name)
 	}
 }
 
 type ScopeDao struct {
-	*genericdao.GenericDao[model.ScopeEntity, model.ScopeEntityList]
+	*gormdao.Dao[model.ScopeEntity, model.ScopeEntityList]
 }
 
 func NewScopeDao() *ScopeDao {
 	return &ScopeDao{
-		GenericDao: genericdao.NewGenericDao[model.ScopeEntity, model.ScopeEntityList](
+		Dao: gormdao.NewDao[model.ScopeEntity, model.ScopeEntityList](
 			model.TableNameScope, "ScopeDao",
 			dbclient.IamDB,
 		),

@@ -16,7 +16,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
@@ -38,8 +38,8 @@ type oAuthClientSvc struct{}
 
 type oauthClientScopeRepository interface {
 	GetByID(ctx context.Context, id uint) (*model.OAuthClientEntity, error)
-	GetByCond(ctx context.Context, cond genericdao.Cond) (*model.OAuthClientEntity, error)
-	GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.OAuthClientEntityList, int64, error)
+	GetByCond(ctx context.Context, cond gormdao.Cond) (*model.OAuthClientEntity, error)
+	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.OAuthClientEntityList, int64, error)
 	GetSecretByID(ctx context.Context, id uint) (*model.OAuthClientSecretEntity, error)
 	DeleteSecret(ctx context.Context, id uint, userID uint) error
 }
@@ -54,11 +54,11 @@ func (d *oauthClientScopeDAO) GetByID(ctx context.Context, id uint) (*model.OAut
 	return dao.NewOAuthClientDao().GetByID(ctx, id)
 }
 
-func (d *oauthClientScopeDAO) GetByCond(ctx context.Context, cond genericdao.Cond) (*model.OAuthClientEntity, error) {
+func (d *oauthClientScopeDAO) GetByCond(ctx context.Context, cond gormdao.Cond) (*model.OAuthClientEntity, error) {
 	return dao.NewOAuthClientDao().GetByCond(ctx, cond)
 }
 
-func (d *oauthClientScopeDAO) GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.OAuthClientEntityList, int64, error) {
+func (d *oauthClientScopeDAO) GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.OAuthClientEntityList, int64, error) {
 	return dao.NewOAuthClientDao().GetPageListByCond(ctx, cond)
 }
 
@@ -191,12 +191,12 @@ func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtooauthclient.DetailRe
 	var redirectURIs, postLogoutRedirectURIs []string
 	var grantTypes, responseTypes []string
 	var allowedOrigins, defaultScopes []string
-	json.Unmarshal(entity.RedirectURIs, &redirectURIs)
-	json.Unmarshal(entity.PostLogoutRedirectURIs, &postLogoutRedirectURIs)
-	json.Unmarshal(entity.GrantTypes, &grantTypes)
-	json.Unmarshal(entity.ResponseTypes, &responseTypes)
-	json.Unmarshal(entity.AllowedOrigins, &allowedOrigins)
-	json.Unmarshal(entity.DefaultScopes, &defaultScopes)
+	_ = json.Unmarshal(entity.RedirectURIs, &redirectURIs)
+	_ = json.Unmarshal(entity.PostLogoutRedirectURIs, &postLogoutRedirectURIs)
+	_ = json.Unmarshal(entity.GrantTypes, &grantTypes)
+	_ = json.Unmarshal(entity.ResponseTypes, &responseTypes)
+	_ = json.Unmarshal(entity.AllowedOrigins, &allowedOrigins)
+	_ = json.Unmarshal(entity.DefaultScopes, &defaultScopes)
 
 	return &dtooauthclient.DetailResp{
 		OAuthClientID:           entity.ID,
@@ -224,7 +224,7 @@ func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtooauthclient.DetailRe
 
 func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtooauthclient.PageListReq) (*dtooauthclient.PageListResp, error) {
 	cond := &dao.OAuthClientCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
@@ -242,7 +242,7 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtooauthclient.PageLi
 	items := make([]dtooauthclient.PageListItem, 0, len(list))
 	for _, v := range list {
 		var grantTypes []string
-		json.Unmarshal(v.GrantTypes, &grantTypes)
+		_ = json.Unmarshal(v.GrantTypes, &grantTypes)
 
 		items = append(items, dtooauthclient.PageListItem{
 			OAuthClientID:           v.ID,
@@ -277,12 +277,12 @@ func (svc *oAuthClientSvc) GetByClientID(ctx *gin.Context, clientID string) (*dt
 	var redirectURIs, postLogoutRedirectURIs []string
 	var grantTypes, responseTypes []string
 	var allowedOrigins, defaultScopes []string
-	json.Unmarshal(entity.RedirectURIs, &redirectURIs)
-	json.Unmarshal(entity.PostLogoutRedirectURIs, &postLogoutRedirectURIs)
-	json.Unmarshal(entity.GrantTypes, &grantTypes)
-	json.Unmarshal(entity.ResponseTypes, &responseTypes)
-	json.Unmarshal(entity.AllowedOrigins, &allowedOrigins)
-	json.Unmarshal(entity.DefaultScopes, &defaultScopes)
+	_ = json.Unmarshal(entity.RedirectURIs, &redirectURIs)
+	_ = json.Unmarshal(entity.PostLogoutRedirectURIs, &postLogoutRedirectURIs)
+	_ = json.Unmarshal(entity.GrantTypes, &grantTypes)
+	_ = json.Unmarshal(entity.ResponseTypes, &responseTypes)
+	_ = json.Unmarshal(entity.AllowedOrigins, &allowedOrigins)
+	_ = json.Unmarshal(entity.DefaultScopes, &defaultScopes)
 
 	return &dtooauthclient.DetailResp{
 		OAuthClientID:           entity.ID,
@@ -312,7 +312,7 @@ func (svc *oAuthClientSvc) ListSecrets(ctx *gin.Context, req *dtooauthclient.Sec
 	secretDao := dao.NewOAuthClientSecretDao()
 
 	list, total, err := secretDao.GetPageListByCond(ctx, &dao.OAuthClientSecretCond{
-		BaseCond:      &genericdao.BaseCond{Page: 1, PageSize: 100},
+		BaseCond:      &gormdao.BaseCond{Page: 1, PageSize: 100},
 		OAuthClientID: req.OAuthClientID,
 	})
 	if err != nil {

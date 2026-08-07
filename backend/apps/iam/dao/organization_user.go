@@ -3,12 +3,12 @@ package dao
 import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 type OrganizationUserCond struct {
-	*genericdao.BaseCond
+	*gormdao.BaseCond
 	TenantID       uint
 	OrganizationID uint
 	UserID         uint
@@ -19,23 +19,23 @@ func (c *OrganizationUserCond) BuildCondition(db *gorm.DB, tableName string) {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
 	if c.TenantID != 0 {
-		db.Where(tableName + ".tenant_id = ?", c.TenantID)
+		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
 	if c.OrganizationID != 0 {
-		db.Where(tableName + ".organization_id = ?", c.OrganizationID)
+		db.Where(tableName+".organization_id = ?", c.OrganizationID)
 	}
 	if c.UserID != 0 {
-		db.Where(tableName + ".user_id = ?", c.UserID)
+		db.Where(tableName+".user_id = ?", c.UserID)
 	}
 }
 
 type OrganizationUserDao struct {
-	*genericdao.GenericDao[model.OrganizationUserEntity, model.OrganizationUserEntityList]
+	*gormdao.Dao[model.OrganizationUserEntity, model.OrganizationUserEntityList]
 }
 
 func NewOrganizationUserDao() *OrganizationUserDao {
 	return &OrganizationUserDao{
-		GenericDao: genericdao.NewGenericDao[model.OrganizationUserEntity, model.OrganizationUserEntityList](
+		Dao: gormdao.NewDao[model.OrganizationUserEntity, model.OrganizationUserEntityList](
 			model.TableNameOrganizationUser, "OrganizationUserDao",
 			dbclient.IamDB,
 		),

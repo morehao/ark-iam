@@ -44,8 +44,8 @@ func (f *fakeConnectorPersonRepository) Insert(ctx context.Context, person *mode
 
 type fakeConnectorUserIdentityRepository struct {
 	getByIssuerAndExternalSubjectFunc func(ctx context.Context, issuer, externalSubject string) (*model.UserIdentityEntity, error)
-	insertFunc                       func(ctx context.Context, entity *model.UserIdentityEntity) error
-	updateBindingFunc                func(ctx context.Context, identityID, personID uint, issuer string, detail []byte) error
+	insertFunc                        func(ctx context.Context, entity *model.UserIdentityEntity) error
+	updateBindingFunc                 func(ctx context.Context, identityID, personID uint, issuer string, detail []byte) error
 }
 
 type fakeConnectorRuntimeRepository struct {
@@ -442,7 +442,7 @@ func TestIdentityMapperAutoCreateRollsBackPersonWhenBindIdentityFails(t *testing
 	}))
 	if err := db.Callback().Create().Before("gorm:create").Register("test_fail_user_identity_create", func(tx *gorm.DB) {
 		if tx.Statement != nil && tx.Statement.Schema != nil && tx.Statement.Schema.Table == model.TableNameUserIdentity {
-			tx.AddError(errors.New("bind identity failed"))
+			_ = tx.AddError(errors.New("bind identity failed"))
 		}
 	}); err != nil {
 		t.Fatalf("register create callback: %v", err)
@@ -988,7 +988,7 @@ func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 			},
 		},
 		tokenGenerator: nil,
-		loginRecorder: func(ctx *gin.Context, tenantID, userID uint, success bool) {},
+		loginRecorder:  func(ctx *gin.Context, tenantID, userID uint, success bool) {},
 	}
 	restorePersonStore := swapPersonStoreFactory(func() authPersonStore {
 		return &fakeAuthPersonStore{

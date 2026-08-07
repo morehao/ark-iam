@@ -3,16 +3,16 @@ package dao
 import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 type DepartmentCond struct {
-	*genericdao.BaseCond
-	TenantID    uint
-	ParentID    uint
-	Name        string
-	Code        string
+	*gormdao.BaseCond
+	TenantID     uint
+	ParentID     uint
+	Name         string
+	Code         string
 	LeaderUserID uint
 }
 
@@ -38,12 +38,12 @@ func (c *DepartmentCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type DepartmentDao struct {
-	*genericdao.GenericDao[model.DepartmentEntity, model.DepartmentEntityList]
+	*gormdao.Dao[model.DepartmentEntity, model.DepartmentEntityList]
 }
 
 func NewDepartmentDao() *DepartmentDao {
 	return &DepartmentDao{
-		GenericDao: genericdao.NewGenericDao[model.DepartmentEntity, model.DepartmentEntityList](
+		Dao: gormdao.NewDao[model.DepartmentEntity, model.DepartmentEntityList](
 			model.TableNameDepartment, "DepartmentDao",
 			dbclient.IamDB,
 		),

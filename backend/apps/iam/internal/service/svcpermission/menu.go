@@ -10,15 +10,15 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/object/objpermission"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/biz/gobject"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
 
 type menuScopeRepository interface {
 	GetByID(ctx context.Context, id uint) (*model.MenuEntity, error)
-	GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.MenuEntityList, int64, error)
+	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.MenuEntityList, int64, error)
 }
 
 var newMenuScopeRepo = func() menuScopeRepository {
@@ -48,22 +48,22 @@ func NewMenuSvc() MenuSvc {
 
 func (svc *menuSvc) Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (*dtopermission.MenuCreateResp, error) {
 	insertEntity := &model.MenuEntity{
-		AppID: req.AppID,
-		ParentID:      req.ParentID,
-		Name:          req.Name,
-		Code:          req.Code,
-		Path:          req.Path,
-		Icon:          req.Icon,
-		Sort:          req.Sort,
-		Type:          req.Type,
-		Component:     req.Component,
-		Redirect:      req.Redirect,
-		Hidden:        req.Hidden,
-		ExternalLink:  req.ExternalLink,
-		KeepAlive:     req.KeepAlive,
-		Permission:    req.Permission,
-		Status:        req.Status,
-		CreatedBy:     gincontext.GetUserID(ctx),
+		AppID:        req.AppID,
+		ParentID:     req.ParentID,
+		Name:         req.Name,
+		Code:         req.Code,
+		Path:         req.Path,
+		Icon:         req.Icon,
+		Sort:         req.Sort,
+		Type:         req.Type,
+		Component:    req.Component,
+		Redirect:     req.Redirect,
+		Hidden:       req.Hidden,
+		ExternalLink: req.ExternalLink,
+		KeepAlive:    req.KeepAlive,
+		Permission:   req.Permission,
+		Status:       req.Status,
+		CreatedBy:    gincontext.GetUserID(ctx),
 	}
 
 	if err := dao.NewMenuDao().Insert(ctx, insertEntity); err != nil {
@@ -105,22 +105,22 @@ func (svc *menuSvc) Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) e
 
 	userID := gincontext.GetUserID(ctx)
 	updateMap := map[string]any{
-		"app_id": req.AppID,
-		"parent_id":      req.ParentID,
-		"name":           req.Name,
-		"code":           req.Code,
-		"path":           req.Path,
-		"icon":           req.Icon,
-		"sort":           req.Sort,
-		"type":           req.Type,
-		"component":      req.Component,
-		"redirect":       req.Redirect,
-		"hidden":         req.Hidden,
-		"external_link":  req.ExternalLink,
-		"keep_alive":     req.KeepAlive,
-		"permission":     req.Permission,
-		"status":         req.Status,
-		"updated_by":     userID,
+		"app_id":        req.AppID,
+		"parent_id":     req.ParentID,
+		"name":          req.Name,
+		"code":          req.Code,
+		"path":          req.Path,
+		"icon":          req.Icon,
+		"sort":          req.Sort,
+		"type":          req.Type,
+		"component":     req.Component,
+		"redirect":      req.Redirect,
+		"hidden":        req.Hidden,
+		"external_link": req.ExternalLink,
+		"keep_alive":    req.KeepAlive,
+		"permission":    req.Permission,
+		"status":        req.Status,
+		"updated_by":    userID,
 	}
 	if err := dao.NewMenuDao().UpdateMap(ctx, req.MenuID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcpermission.UpdateMenu] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -142,21 +142,21 @@ func (svc *menuSvc) Detail(ctx *gin.Context, req *dtopermission.MenuDetailReq) (
 	resp := &dtopermission.MenuDetailResp{
 		MenuID: menuEntity.ID,
 		MenuBaseInfo: objpermission.MenuBaseInfo{
-			AppID: menuEntity.AppID,
-			ParentID:      menuEntity.ParentID,
-			Name:          menuEntity.Name,
-			Code:          menuEntity.Code,
-			Path:          menuEntity.Path,
-			Icon:          menuEntity.Icon,
-			Sort:          menuEntity.Sort,
-			Type:          menuEntity.Type,
-			Component:     menuEntity.Component,
-			Redirect:      menuEntity.Redirect,
-			Hidden:        menuEntity.Hidden,
-			ExternalLink:  menuEntity.ExternalLink,
-			KeepAlive:     menuEntity.KeepAlive,
-			Permission:    menuEntity.Permission,
-			Status:        menuEntity.Status,
+			AppID:        menuEntity.AppID,
+			ParentID:     menuEntity.ParentID,
+			Name:         menuEntity.Name,
+			Code:         menuEntity.Code,
+			Path:         menuEntity.Path,
+			Icon:         menuEntity.Icon,
+			Sort:         menuEntity.Sort,
+			Type:         menuEntity.Type,
+			Component:    menuEntity.Component,
+			Redirect:     menuEntity.Redirect,
+			Hidden:       menuEntity.Hidden,
+			ExternalLink: menuEntity.ExternalLink,
+			KeepAlive:    menuEntity.KeepAlive,
+			Permission:   menuEntity.Permission,
+			Status:       menuEntity.Status,
 		},
 		OperatorBaseInfo: gobject.OperatorBaseInfo{
 			CreatedAt: menuEntity.CreatedAt.Unix(),
@@ -169,16 +169,16 @@ func (svc *menuSvc) Detail(ctx *gin.Context, req *dtopermission.MenuDetailReq) (
 func (svc *menuSvc) PageList(ctx *gin.Context, req *dtopermission.MenuPageListReq) (*dtopermission.MenuPageListResp, error) {
 	menuRepo := newMenuScopeRepo()
 	cond := &dao.MenuCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		AppID: req.AppID,
-		ParentID:      req.ParentID,
-		Name:          req.Name,
-		Code:          req.Code,
-		Type:          req.Type,
-		Status:        req.Status,
+		AppID:    req.AppID,
+		ParentID: req.ParentID,
+		Name:     req.Name,
+		Code:     req.Code,
+		Type:     req.Type,
+		Status:   req.Status,
 	}
 	menuEntityList, total, err := menuRepo.GetPageListByCond(ctx, cond)
 	if err != nil {
@@ -191,21 +191,21 @@ func (svc *menuSvc) PageList(ctx *gin.Context, req *dtopermission.MenuPageListRe
 		list = append(list, dtopermission.MenuPageListItem{
 			MenuID: v.ID,
 			MenuBaseInfo: objpermission.MenuBaseInfo{
-				AppID: v.AppID,
-				ParentID:      v.ParentID,
-				Name:          v.Name,
-				Code:          v.Code,
-				Path:          v.Path,
-				Icon:          v.Icon,
-				Sort:          v.Sort,
-				Type:          v.Type,
-				Component:     v.Component,
-				Redirect:      v.Redirect,
-				Hidden:        v.Hidden,
-				ExternalLink:  v.ExternalLink,
-				KeepAlive:     v.KeepAlive,
-				Permission:    v.Permission,
-				Status:        v.Status,
+				AppID:        v.AppID,
+				ParentID:     v.ParentID,
+				Name:         v.Name,
+				Code:         v.Code,
+				Path:         v.Path,
+				Icon:         v.Icon,
+				Sort:         v.Sort,
+				Type:         v.Type,
+				Component:    v.Component,
+				Redirect:     v.Redirect,
+				Hidden:       v.Hidden,
+				ExternalLink: v.ExternalLink,
+				KeepAlive:    v.KeepAlive,
+				Permission:   v.Permission,
+				Status:       v.Status,
 			},
 			OperatorBaseInfo: gobject.OperatorBaseInfo{
 				UpdatedAt: v.UpdatedAt.Unix(),
@@ -237,21 +237,21 @@ func (svc *menuSvc) Tree(ctx *gin.Context, req *dtopermission.MenuTreeReq) (*dto
 				item := dtopermission.MenuTreeItem{
 					MenuID: menu.ID,
 					MenuBaseInfo: objpermission.MenuBaseInfo{
-						AppID: menu.AppID,
-						ParentID:      menu.ParentID,
-						Name:          menu.Name,
-						Code:          menu.Code,
-						Path:          menu.Path,
-						Icon:          menu.Icon,
-						Sort:          menu.Sort,
-						Type:          menu.Type,
-						Component:     menu.Component,
-						Redirect:      menu.Redirect,
-						Hidden:        menu.Hidden,
-						ExternalLink:  menu.ExternalLink,
-						KeepAlive:     menu.KeepAlive,
-						Permission:    menu.Permission,
-						Status:        menu.Status,
+						AppID:        menu.AppID,
+						ParentID:     menu.ParentID,
+						Name:         menu.Name,
+						Code:         menu.Code,
+						Path:         menu.Path,
+						Icon:         menu.Icon,
+						Sort:         menu.Sort,
+						Type:         menu.Type,
+						Component:    menu.Component,
+						Redirect:     menu.Redirect,
+						Hidden:       menu.Hidden,
+						ExternalLink: menu.ExternalLink,
+						KeepAlive:    menu.KeepAlive,
+						Permission:   menu.Permission,
+						Status:       menu.Status,
 					},
 					OperatorBaseInfo: gobject.OperatorBaseInfo{
 						UpdatedAt: menu.UpdatedAt.Unix(),

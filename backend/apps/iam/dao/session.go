@@ -5,12 +5,12 @@ import (
 
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 type SessionCond struct {
-	*genericdao.BaseCond
+	*gormdao.BaseCond
 	PersonID uint
 	TenantID uint
 	UserID   uint
@@ -21,23 +21,23 @@ func (c *SessionCond) BuildCondition(db *gorm.DB, tableName string) {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
 	if c.PersonID != 0 {
-		db.Where(tableName + ".person_id = ?", c.PersonID)
+		db.Where(tableName+".person_id = ?", c.PersonID)
 	}
 	if c.TenantID != 0 {
-		db.Where(tableName + ".tenant_id = ?", c.TenantID)
+		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
 	if c.UserID != 0 {
-		db.Where(tableName + ".user_id = ?", c.UserID)
+		db.Where(tableName+".user_id = ?", c.UserID)
 	}
 }
 
 type SessionDao struct {
-	*genericdao.GenericDao[model.RefreshTokenEntity, model.RefreshTokenEntityList]
+	*gormdao.Dao[model.RefreshTokenEntity, model.RefreshTokenEntityList]
 }
 
 func NewSessionDao() *SessionDao {
 	return &SessionDao{
-		GenericDao: genericdao.NewGenericDao[model.RefreshTokenEntity, model.RefreshTokenEntityList](
+		Dao: gormdao.NewDao[model.RefreshTokenEntity, model.RefreshTokenEntityList](
 			model.TableNameRefreshToken, "SessionDao",
 			dbclient.IamDB,
 		),

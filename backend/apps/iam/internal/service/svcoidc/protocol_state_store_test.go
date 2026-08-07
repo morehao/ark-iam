@@ -87,7 +87,7 @@ func TestSaveAndConsumeCode(t *testing.T) {
 	}, "")
 	require.NoError(t, err)
 
-	store.CompleteAuthRequest(req.GetID(), "person:88", time.Now(), []string{"pwd"}, "")
+	_ = store.CompleteAuthRequest(req.GetID(), "person:88", time.Now(), []string{"pwd"}, "")
 
 	code := fmt.Sprintf("auth-code-%d", time.Now().UnixNano())
 	err = store.SaveAuthCode(context.Background(), req.GetID(), code)

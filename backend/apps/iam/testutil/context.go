@@ -3,39 +3,36 @@ package testutil
 import (
 	"context"
 
-	"github.com/morehao/ark-iam/pkg/iam/dao"
+	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/golib/biz/gcontext"
+	"github.com/morehao/golib/biz/testkit"
 )
 
-func BuildIamContext(userID uint) context.Context {
-	ctx := context.Background()
-	user, err := dao.NewUserDao().GetByID(ctx, userID)
-	if err != nil {
-		panic(err)
-	}
-	if user == nil || user.ID == 0 {
-		panic("user not found")
-	}
-
-	ctx = context.WithValue(ctx, gcontext.KeyUserID, user.ID)
-	ctx = context.WithValue(ctx, gcontext.KeyTenantID, user.TenantID)
-	ctx = context.WithValue(ctx, gcontext.KeyPersonID, user.PersonID)
-
-	if user.TenantID > 0 {
-		relation, err := dao.NewUserDepartmentDao().GetByCond(ctx, &dao.UserDepartmentCond{
-			UserID:    userID,
-		})
+func WithIamContext(userID uint) testkit.Option {
+	return func(gc *gin.Context) {
+		user, err := dao.NewUserDao().GetByID(context.Background(), userID)
 		if err != nil {
 			panic(err)
 		}
-		if relation != nil {
-			ctx = context.WithValue(ctx, gcontext.KeyDeptID, relation.DepartmentID)
+		if user == nil || user.ID == 0 {
+			panic("user not found")
+		}
+
+		gc.Set(gcontext.KeyUserID, user.ID)
+		gc.Set(gcontext.KeyTenantID, user.TenantID)
+		gc.Set(gcontext.KeyPersonID, user.PersonID)
+
+		if user.TenantID > 0 {
+			relation, err := dao.NewUserDepartmentDao().GetByCond(context.Background(), &dao.UserDepartmentCond{
+				UserID: userID,
+			})
+			if err != nil {
+				panic(err)
+			}
+			if relation != nil {
+				gc.Set(gcontext.KeyDeptID, relation.DepartmentID)
+			}
 		}
 	}
-
-	return ctx
-}
-
-func ptrInt8(v int8) *int8 {
-	return &v
 }

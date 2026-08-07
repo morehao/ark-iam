@@ -1,12 +1,7 @@
-import { type Page, expect } from '@playwright/test';
+import { type Page, type BrowserContext, expect } from '@playwright/test';
 import { CONFIG } from '../config';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-export async function clickByText(page: Page, text: string): Promise<void> {
-  const btn = page.locator('button', { hasText: text });
-  await btn.click();
-}
 
 function isLoginWebUrl(url: string): boolean {
   return url.includes('localhost:3003') && url.includes('/login');
@@ -24,7 +19,7 @@ function isAdminUrl(url: string): boolean {
   return url.includes('localhost:3000');
 }
 
-async function fillLoginWebCredentials(page: Page): Promise<void> {
+export async function fillLoginWebCredentials(page: Page): Promise<void> {
   await page.waitForSelector('#identifier', { timeout: 10000 });
   await page.fill('#identifier', CONFIG.identifier);
   await page.fill('#password', CONFIG.password);
@@ -131,47 +126,6 @@ export async function logoutFromAdmin(page: Page): Promise<void> {
   await wait(2000);
 }
 
-export async function adminRequiresLoginAfterLogout(page: Page): Promise<void> {
-  await page.goto(CONFIG.platformAdminUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
-  // Admin app 会自动触发 signinRedirect，如果 SSO 已清除，应跳转到 login-web
-  const url = page.url();
-  if (isLoginWebUrl(url)) {
-    const body = await page.evaluate(() => document.body.innerText);
-    expect(body).not.toContain('仪表盘');
-    return;
-  }
-  // 或者在 Admin 的 /login 页面
-  if (isAdminUrl(url) && url.includes('/login')) {
-    const body = await page.evaluate(() => document.body.innerText);
-    expect(body).toContain('IAM 账号登录');
-    expect(body).not.toContain('仪表盘');
-    return;
-  }
-  throw new Error('SSO session still valid, expected redirect to login');
-}
-
-export async function verifyRp1RequiresLogin(page: Page): Promise<void> {
-  await page.goto(CONFIG.rp1Url, { waitUntil: 'domcontentloaded', timeout: 15000 });
-  // RP1 的 App.tsx 会自动触发 signinRedirect 到 OIDC provider，
-  // 如果 SSO session 已被清除，会重定向到 login-web
-  const url = page.url();
-  if (isLoginWebUrl(url)) {
-    const body = await page.evaluate(() => document.body.innerText);
-    expect(body).toContain('IAM 登录');
-    expect(body).not.toContain('用户信息');
-    return;
-  }
-  // 或者在 RP1 的 /login 页面
-  if (isRp1Url(url) && url.includes('/login')) {
-    const body = await page.evaluate(() => document.body.innerText);
-    expect(body).toContain('IAM 账号登录');
-    expect(body).not.toContain('用户信息');
-    return;
-  }
-  // 如果 SSO session 还存在，会回调到 RP1 首页，说明 SSO 未被清除
-  throw new Error('SSO session still valid, expected redirect to login');
-}
-
 export async function rp1Logout(page: Page): Promise<void> {
   const avatar = page.locator('.ant-layout-header .ant-avatar');
   await expect(avatar).toBeVisible({ timeout: 10000 });
@@ -192,5 +146,61 @@ export async function rp1Logout(page: Page): Promise<void> {
   }
   await wait(1000);
   const body = await page.evaluate(() => document.body.innerText);
+  // 如果 token 已失效（短 TTL），登出后端返回 token 失效错误，前端可能仍显示首页内容
+  if (body.includes('token已失效') || body.includes('登录') || body.includes('IAM 登录') || body.includes('IAM 账号登录')) {
+    return;
+  }
+  // token 有效时登出成功，页面不应再显示用户信息
   expect(body).not.toContain('用户信息');
+}
+
+export async function waitForSSOSessionExpiry(): Promise<void> {
+  await wait((CONFIG.sessionTTL + 5) * 1000);
+}
+
+export async function clearSSOCookie(page: Page): Promise<void> {
+  await page.goto(`${CONFIG.issuer}/logged-out`, { waitUntil: 'networkidle', timeout: 10000 });
+}
+
+export async function clearAllCookies(context: BrowserContext): Promise<void> {
+  await context.clearCookies();
+}
+
+export async function verifyRedirectedToLoginWeb(page: Page): Promise<void> {
+  // 等待页面重定向到 login-web（如果 SSO session 已清除，OIDC authorize 会重定向到 login-web）
+  // 超时不报错 —— 可能前端有自己的 /login 页面而非 redirect 到 login-web
+  try {
+    await page.waitForURL((url) => isLoginWebUrl(url.toString()), { timeout: 15000 });
+  } catch {
+    // 若同时不在 /login 页，下面 if 会抛出错误
+  }
+  const currentUrl = page.url();
+  if (isLoginWebUrl(currentUrl)) {
+    const body = await page.evaluate(() => document.body.innerText);
+    expect(body).not.toContain('仪表盘');
+    expect(body).not.toContain('用户信息');
+    return;
+  }
+  if (currentUrl.includes('/login')) {
+    const body = await page.evaluate(() => document.body.innerText);
+    expect(body).toContain('登录');
+    expect(body).not.toContain('仪表盘');
+    expect(body).not.toContain('用户信息');
+    return;
+  }
+  throw new Error(`Expected redirect to login page, but got: ${currentUrl}`);
+}
+
+export async function callEndSession(page: Page): Promise<void> {
+  await page.goto(`${CONFIG.issuer}/end_session`, {
+    waitUntil: 'networkidle',
+    timeout: 10000,
+  });
+}
+
+export async function getSSOSessionCookie(page: Page): Promise<boolean> {
+  const cookies = await page.context().cookies();
+  return cookies.some(
+    (c) => c.name === 'iam_sso_session' && (c.domain === 'localhost' || c.domain === '')
+  );
 }

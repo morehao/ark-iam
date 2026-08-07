@@ -171,12 +171,14 @@ func (s *RedisProtocolStateStore) CompleteAuthRequest(id string, subject string,
 }
 
 func (s *RedisProtocolStateStore) SaveAuthCode(ctx context.Context, id, code string) error {
-	ok, err := s.client.SetNX(ctx, authCodeKey(code), id, defaultAuthCodeTTL()).Result()
-	if err != nil {
+	if err := s.client.SetArgs(ctx, authCodeKey(code), id, redis.SetArgs{
+		Mode: "NX",
+		TTL:  defaultAuthCodeTTL(),
+	}).Err(); err != nil {
+		if errors.Is(err, redis.Nil) {
+			return ErrCodeCollision
+		}
 		return fmt.Errorf("%w: %w", ErrStoreUnavailable, err)
-	}
-	if !ok {
-		return ErrCodeCollision
 	}
 	return nil
 }

@@ -15,22 +15,22 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/token"
-	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gcontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
+	"github.com/morehao/golib/gconstant"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/gerror"
 	"gorm.io/gorm"
 )
 
 type fakeAuthRefreshTokenStore struct {
-	getByCondFunc func(ctx context.Context, cond *dao.RefreshTokenCond) (*model.RefreshTokenEntity, error)
-	insertFunc    func(ctx context.Context, entity *model.RefreshTokenEntity) error
-	deleteFunc    func(ctx context.Context, id, userID uint) error
+	getByCondFunc        func(ctx context.Context, cond *dao.RefreshTokenCond) (*model.RefreshTokenEntity, error)
+	insertFunc           func(ctx context.Context, entity *model.RefreshTokenEntity) error
+	deleteFunc           func(ctx context.Context, id, userID uint) error
 	revokeByPersonIDFunc func(ctx context.Context, personID uint) error
 }
 
-func (f *fakeAuthRefreshTokenStore) GetByCond(ctx context.Context, cond genericdao.Cond) (*model.RefreshTokenEntity, error) {
+func (f *fakeAuthRefreshTokenStore) GetByCond(ctx context.Context, cond gormdao.Cond) (*model.RefreshTokenEntity, error) {
 	if f.getByCondFunc == nil {
 		return nil, nil
 	}
@@ -60,10 +60,10 @@ func (f *fakeAuthRefreshTokenStore) RevokeByPersonID(ctx context.Context, person
 }
 
 type fakeAuthUserStore struct {
-	getByIDFunc   func(ctx context.Context, id uint) (*model.UserEntity, error)
-	getByCondFunc func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error)
+	getByIDFunc       func(ctx context.Context, id uint) (*model.UserEntity, error)
+	getByCondFunc     func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error)
 	getListByCondFunc func(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, error)
-	insertFunc    func(ctx context.Context, entity *model.UserEntity) error
+	insertFunc        func(ctx context.Context, entity *model.UserEntity) error
 }
 
 func (f *fakeAuthUserStore) GetByID(ctx context.Context, id uint) (*model.UserEntity, error) {
@@ -73,7 +73,7 @@ func (f *fakeAuthUserStore) GetByID(ctx context.Context, id uint) (*model.UserEn
 	return f.getByIDFunc(ctx, id)
 }
 
-func (f *fakeAuthUserStore) GetByCond(ctx context.Context, cond genericdao.Cond) (*model.UserEntity, error) {
+func (f *fakeAuthUserStore) GetByCond(ctx context.Context, cond gormdao.Cond) (*model.UserEntity, error) {
 	if f.getByCondFunc == nil {
 		return nil, nil
 	}
@@ -81,7 +81,7 @@ func (f *fakeAuthUserStore) GetByCond(ctx context.Context, cond genericdao.Cond)
 	return f.getByCondFunc(ctx, userCond)
 }
 
-func (f *fakeAuthUserStore) GetListByCond(ctx context.Context, cond genericdao.Cond) (model.UserEntityList, error) {
+func (f *fakeAuthUserStore) GetListByCond(ctx context.Context, cond gormdao.Cond) (model.UserEntityList, error) {
 	if f.getListByCondFunc == nil {
 		return nil, nil
 	}
@@ -324,7 +324,7 @@ func TestRefreshTokenUsesStoredUserIDWhenDeletingOldToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RefreshToken returned error: %v", err)
 	}
-	if resp == nil || resp.TokenInfo.AccessToken == "" {
+	if resp == nil || resp.AccessToken == "" {
 		t.Fatal("expected refreshed token response")
 	}
 	if deletedID != 4 {

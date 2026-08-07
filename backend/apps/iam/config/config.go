@@ -20,7 +20,7 @@ type Config struct {
 	Server      Server                    `yaml:"server"`
 	Log         map[string]glog.LogConfig `yaml:"log"`
 	Trace       gtrace.TraceConfig        `yaml:"trace"`
-	DBConfigs   []dbgorm.GormConfig       `yaml:"db_configs"`
+	DBConfigs   []dbgorm.Config           `yaml:"db_configs"`
 	RedisConfig dbredis.RedisConfig       `yaml:"redis_config"`
 	ESConfigs   []dbes.ESConfig           `yaml:"es_configs"`
 	Client      Client                    `yaml:"client"`

@@ -9,13 +9,13 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
 
 type userRoleDeleteRepository interface {
-	GetListByCond(ctx context.Context, cond genericdao.Cond) (model.UserRoleEntityList, error)
+	GetListByCond(ctx context.Context, cond gormdao.Cond) (model.UserRoleEntityList, error)
 	Delete(ctx context.Context, id uint, userID uint) error
 }
 
@@ -68,9 +68,9 @@ func (svc *userRoleSvc) Create(ctx *gin.Context, req *dtopermission.UserRoleCrea
 	}
 
 	insertEntity := &model.UserRoleEntity{
-		TenantID: req.TenantID,
-		UserID:   req.UserID,
-		RoleID:   req.RoleID,
+		TenantID:  req.TenantID,
+		UserID:    req.UserID,
+		RoleID:    req.RoleID,
 		CreatedBy: gincontext.GetUserID(ctx),
 	}
 
@@ -106,7 +106,7 @@ func (svc *userRoleSvc) Delete(ctx *gin.Context, req *dtopermission.UserRoleDele
 
 func (svc *userRoleSvc) PageList(ctx *gin.Context, req *dtopermission.UserRolePageListReq) (*dtopermission.UserRolePageListResp, error) {
 	cond := &dao.UserRoleCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},

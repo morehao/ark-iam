@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/morehao/golib/biz/gormplugin"
+	"github.com/gin-gonic/gin"
+	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/dbaccess/dbgorm"
+	_ "github.com/morehao/golib/dbaccess/dbgorm/driver/mysql"
+	"github.com/morehao/golib/dbaccess/gormplugin"
 	"github.com/morehao/golib/glog"
 	"gorm.io/gorm"
 )
@@ -21,7 +24,7 @@ const (
 	dbNameIam  = "iam"
 )
 
-func InitMultiDB(configs []dbgorm.GormConfig, logConfig *glog.LogConfig) error {
+func InitMultiDB(configs []dbgorm.Config, logConfig *glog.LogConfig) error {
 	if len(configs) == 0 {
 		return fmt.Errorf("mysql config is empty")
 	}
@@ -30,15 +33,29 @@ func InitMultiDB(configs []dbgorm.GormConfig, logConfig *glog.LogConfig) error {
 		"person",
 		"tenant",
 	}
-	tenantPlugin := gormplugin.New(
-		gormplugin.WithSkipTables(skipTables),
-	)
+	tenantPlugin, err := gormplugin.New(&gormplugin.ScopeConfig{
+		FieldName: "tenant_id",
+		ExtractFunc: func(ctx context.Context) (any, bool) {
+			if ginCtx, ok := ctx.(*gin.Context); ok {
+				return ginCtx.Get(gcontext.KeyTenantID)
+			}
+			value := ctx.Value(gcontext.KeyTenantID)
+			if value == nil {
+				return nil, false
+			}
+			return value, true
+		},
+		SkipTables: skipTables,
+	})
+	if err != nil {
+		return fmt.Errorf("init tenant plugin failed: %v", err)
+	}
 
 	var opts []dbgorm.Option
 	if logConfig != nil {
 		opts = append(opts, dbgorm.WithLogConfig(logConfig))
 	}
-	opts = append(opts, dbgorm.WithCallerSkip(9))
+	opts = append(opts, dbgorm.WithCallerSkip(3))
 	for _, cfg := range configs {
 		client, err := dbgorm.New(&cfg, opts...)
 		if err != nil {

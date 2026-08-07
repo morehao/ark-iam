@@ -10,15 +10,15 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/object/objtenant"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/biz/gobject"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
 
 type departmentScopeRepository interface {
 	GetByID(ctx context.Context, id uint) (*model.DepartmentEntity, error)
-	GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.DepartmentEntityList, int64, error)
+	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.DepartmentEntityList, int64, error)
 }
 
 var newDepartmentScopeRepo = func() departmentScopeRepository {
@@ -143,7 +143,7 @@ func (svc *departmentSvc) Detail(ctx *gin.Context, req *dtotenant.DepartmentDeta
 func (svc *departmentSvc) PageList(ctx *gin.Context, req *dtotenant.DepartmentPageListReq) (*dtotenant.DepartmentPageListResp, error) {
 	departmentRepo := newDepartmentScopeRepo()
 	cond := &dao.DepartmentCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},

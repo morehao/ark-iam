@@ -9,7 +9,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/morehao/golib/biz/gcontext"
-	"github.com/morehao/golib/biz/testkit"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +19,7 @@ func TestLoginByUsername(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	svc := NewAuthSvc(testJWTSecret)
 	resp, err := svc.Login(ctx, &dtoauth.LoginReq{
@@ -36,7 +35,7 @@ func TestLoginWithWrongPassword(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	svc := NewAuthSvc(testJWTSecret)
 	_, err := svc.Login(ctx, &dtoauth.LoginReq{
@@ -50,11 +49,11 @@ func TestRegisterCreatesPersonAndUser(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
 	require.NoError(t, err)
-	defer testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{TenantIDs: []uint{tenant.ID}})
+	defer func() { _ = testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{TenantIDs: []uint{tenant.ID}}) }()
 
 	svc := NewAuthSvc(testJWTSecret)
 	resp, err := svc.Register(ctx, &dtoauth.RegisterReq{
@@ -68,10 +67,12 @@ func TestRegisterCreatesPersonAndUser(t *testing.T) {
 	require.NotNil(t, resp)
 	require.NotZero(t, resp.UserID)
 
-	defer testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{
-		PersonIDs: []uint{},
-		UserIDs:   []uint{resp.UserID},
-	})
+	defer func() {
+		_ = testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{
+			PersonIDs: []uint{},
+			UserIDs:   []uint{resp.UserID},
+		})
+	}()
 
 	db := dbclient.IamDB(ctx)
 	var person model.PersonEntity
@@ -85,7 +86,7 @@ func TestSelectTenant(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	svc := NewAuthSvc(testJWTSecret)
 	loginResp, err := svc.Login(ctx, &dtoauth.LoginReq{
@@ -102,14 +103,14 @@ func TestSelectTenant(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotEmpty(t, resp.TokenInfo.AccessToken)
+	require.NotEmpty(t, resp.AccessToken)
 }
 
 func TestSwitchTenantRejectsUnjoined(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	ctx.Set(gcontext.KeyPersonID, uint(1))
 
@@ -124,7 +125,7 @@ func TestMyTenants(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	svc := NewAuthSvc(testJWTSecret)
 	loginResp, err := svc.Login(ctx, &dtoauth.LoginReq{
@@ -146,7 +147,7 @@ func TestUserinfo(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	ctx.Set(gcontext.KeyUserID, uint(1))
 	ctx.Set(gcontext.KeyTenantID, uint(1))
@@ -165,7 +166,7 @@ func TestRefreshTokenValid(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	svc := NewAuthSvc(testJWTSecret)
 	loginResp, err := svc.Login(ctx, &dtoauth.LoginReq{
@@ -183,18 +184,18 @@ func TestRefreshTokenValid(t *testing.T) {
 	require.NoError(t, err)
 
 	resp, err := svc.RefreshToken(ctx, &dtoauth.RefreshTokenReq{
-		RefreshToken: tokenResp.TokenInfo.RefreshToken,
+		RefreshToken: tokenResp.RefreshToken,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotEmpty(t, resp.TokenInfo.AccessToken)
+	require.NotEmpty(t, resp.AccessToken)
 }
 
 func TestLogout(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := testsetup.NewCtx(testkit.WithContext(testutil.BuildIamContext(1)))
+	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
 	svc := NewAuthSvc(testJWTSecret)
 	loginResp, err := svc.Login(ctx, &dtoauth.LoginReq{
@@ -211,10 +212,10 @@ func TestLogout(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ctx.Request.Header.Set("Authorization", tokenResp.TokenInfo.AccessToken)
+	ctx.Request.Header.Set("Authorization", tokenResp.AccessToken)
 
 	err = svc.Logout(ctx, &dtoauth.LogoutReq{
-		RefreshToken: tokenResp.TokenInfo.RefreshToken,
+		RefreshToken: tokenResp.RefreshToken,
 	})
 	require.NoError(t, err)
 }

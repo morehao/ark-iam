@@ -8,7 +8,7 @@ import (
 	"github.com/morehao/ark-iam/iam/internal/dto/dtodomain"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/biz/gcontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
@@ -32,7 +32,7 @@ func (r *stubDomainRepo) GetByID(ctx context.Context, id uint) (*model.DomainEnt
 	return r.getByID, r.err
 }
 
-func (r *stubDomainRepo) GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.DomainEntityList, int64, error) {
+func (r *stubDomainRepo) GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.DomainEntityList, int64, error) {
 	return r.pageList, r.total, r.err
 }
 

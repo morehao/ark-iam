@@ -3,12 +3,12 @@ package dao
 import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 type SystemCond struct {
-	*genericdao.BaseCond
+	*gormdao.BaseCond
 	TenantID uint
 	Key      string
 }
@@ -26,12 +26,12 @@ func (c *SystemCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type SystemDao struct {
-	*genericdao.GenericDao[model.SystemEntity, model.SystemEntityList]
+	*gormdao.Dao[model.SystemEntity, model.SystemEntityList]
 }
 
 func NewSystemDao() *SystemDao {
 	return &SystemDao{
-		GenericDao: genericdao.NewGenericDao[model.SystemEntity, model.SystemEntityList](
+		Dao: gormdao.NewDao[model.SystemEntity, model.SystemEntityList](
 			model.TableNameSystem, "SystemDao",
 			dbclient.IamDB,
 		),

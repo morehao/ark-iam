@@ -73,7 +73,7 @@ func TestAssignDepartmentsReturnsErrorWhenInsertFailsInTransaction(t *testing.T)
 	db := newAssignDepartmentsTestDB(t)
 	installTestIamDB(t, db)
 	if err := db.Callback().Create().Before("gorm:create").Register("test_fail_create", func(tx *gorm.DB) {
-		tx.AddError(errors.New("insert failed"))
+		_ = tx.AddError(errors.New("insert failed"))
 	}); err != nil {
 		t.Fatalf("register create callback: %v", err)
 	}

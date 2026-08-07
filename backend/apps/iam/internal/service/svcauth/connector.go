@@ -17,8 +17,8 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/biz/gobject"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
@@ -48,7 +48,7 @@ type connectorRuntimeRepository interface {
 
 type connectorScopeRepository interface {
 	GetByID(ctx context.Context, id uint) (*model.ConnectorEntity, error)
-	GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.ConnectorEntityList, int64, error)
+	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.ConnectorEntityList, int64, error)
 }
 
 type connectorIdentityResolver interface {
@@ -56,14 +56,14 @@ type connectorIdentityResolver interface {
 }
 
 type connectorSvc struct {
-	driverRegistry *connectorDriverRegistry
-	connectorRepo  connectorRuntimeRepository
-	stateStore     ConnectorStateStore
+	driverRegistry   *connectorDriverRegistry
+	connectorRepo    connectorRuntimeRepository
+	stateStore       ConnectorStateStore
 	identityResolver connectorIdentityResolver
 	tokenGenerator   func(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error)
 	loginRecorder    func(ctx *gin.Context, tenantID, userID uint, success bool)
-	stateGenerator func() (string, error)
-	nowFunc        func() time.Time
+	stateGenerator   func() (string, error)
+	nowFunc          func() time.Time
 }
 
 var _ ConnectorSvc = (*connectorSvc)(nil)
@@ -106,21 +106,6 @@ func (svc *connectorSvc) getIdentityResolver() connectorIdentityResolver {
 		svc.identityResolver = newIdentityMapper(nil, nil)
 	}
 	return svc.identityResolver
-}
-
-func (svc *connectorSvc) getTokenGenerator() func(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error) {
-	if svc.tokenGenerator == nil {
-		authRuntime := &authSvc{jwtSecret: connectorJWTSignKey()}
-		svc.tokenGenerator = authRuntime.generateToken
-	}
-	return svc.tokenGenerator
-}
-
-func (svc *connectorSvc) getLoginRecorder() func(ctx *gin.Context, tenantID, userID uint, success bool) {
-	if svc.loginRecorder == nil {
-		svc.loginRecorder = authLoginRecorder
-	}
-	return svc.loginRecorder
 }
 
 func (svc *connectorSvc) getStateGenerator() func() (string, error) {
@@ -168,20 +153,20 @@ func buildConnectorUpdateMap(req *dtoauth.ConnectorUpdateReq, updatedBy uint) (m
 	}
 
 	return map[string]any{
-		"tenant_id":            req.TenantID,
-		"name":                 req.Name,
-		"display_name":         req.DisplayName,
-		"protocol":             req.Protocol,
-		"provider":             req.Provider,
-		"status":               req.Status,
+		"tenant_id":              req.TenantID,
+		"name":                   req.Name,
+		"display_name":           req.DisplayName,
+		"protocol":               req.Protocol,
+		"provider":               req.Provider,
+		"status":                 req.Status,
 		"allow_auto_create_user": req.AllowAutoCreateUser,
 		"allow_account_link":     req.AllowAccountLink,
-		"sync_profile":         req.SyncProfile,
-		"enable_token_storage": req.EnableTokenStorage,
-		"config":               configJson,
-		"claim_mapping":        mustMarshalJSON(req.ClaimMapping),
-		"domain_policy":        mustMarshalJSON(req.DomainPolicy),
-		"updated_by":           updatedBy,
+		"sync_profile":           req.SyncProfile,
+		"enable_token_storage":   req.EnableTokenStorage,
+		"config":                 configJson,
+		"claim_mapping":          mustMarshalJSON(req.ClaimMapping),
+		"domain_policy":          mustMarshalJSON(req.DomainPolicy),
+		"updated_by":             updatedBy,
 	}, nil
 }
 
@@ -298,7 +283,7 @@ func (svc *connectorSvc) Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailRe
 func (svc *connectorSvc) PageList(ctx *gin.Context, req *dtoauth.ConnectorPageListReq) (*dtoauth.ConnectorPageListResp, error) {
 	connectorRepo := newConnectorScopeRepo()
 	cond := &dao.ConnectorCond{
-		BaseCond: &genericdao.BaseCond{
+		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},

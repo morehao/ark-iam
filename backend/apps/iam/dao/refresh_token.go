@@ -6,15 +6,15 @@ import (
 
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 type RefreshTokenCond struct {
-	*genericdao.BaseCond
-	TenantID     uint
-	UserID       uint
-	Token        string
+	*gormdao.BaseCond
+	TenantID uint
+	UserID   uint
+	Token    string
 }
 
 func (c *RefreshTokenCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -22,23 +22,23 @@ func (c *RefreshTokenCond) BuildCondition(db *gorm.DB, tableName string) {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
 	if c.TenantID != 0 {
-		db.Where(tableName + ".tenant_id = ?", c.TenantID)
+		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
 	if c.UserID != 0 {
-		db.Where(tableName + ".user_id = ?", c.UserID)
+		db.Where(tableName+".user_id = ?", c.UserID)
 	}
 	if c.Token != "" {
-		db.Where(tableName + ".token = ?", c.Token)
+		db.Where(tableName+".token = ?", c.Token)
 	}
 }
 
 type RefreshTokenDao struct {
-	*genericdao.GenericDao[model.RefreshTokenEntity, model.RefreshTokenEntityList]
+	*gormdao.Dao[model.RefreshTokenEntity, model.RefreshTokenEntityList]
 }
 
 func NewRefreshTokenDao() *RefreshTokenDao {
 	return &RefreshTokenDao{
-		GenericDao: genericdao.NewGenericDao[model.RefreshTokenEntity, model.RefreshTokenEntityList](
+		Dao: gormdao.NewDao[model.RefreshTokenEntity, model.RefreshTokenEntityList](
 			model.TableNameRefreshToken, "RefreshTokenDao",
 			dbclient.IamDB,
 		),

@@ -9,7 +9,7 @@ import (
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/biz/gcontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
@@ -53,7 +53,7 @@ func (r *stubConnectorScopeRepo) GetByID(ctx context.Context, id uint) (*model.C
 	return r.detail, r.err
 }
 
-func (r *stubConnectorScopeRepo) GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.ConnectorEntityList, int64, error) {
+func (r *stubConnectorScopeRepo) GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.ConnectorEntityList, int64, error) {
 	typed, _ := cond.(*dao.ConnectorCond)
 	clone := *typed
 	if typed.BaseCond != nil {

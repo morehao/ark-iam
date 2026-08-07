@@ -3,12 +3,12 @@ package dao
 import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 type ResourceCond struct {
-	*genericdao.BaseCond
+	*gormdao.BaseCond
 	TenantID  uint
 	Name      string
 	Indicator string
@@ -19,23 +19,23 @@ func (c *ResourceCond) BuildCondition(db *gorm.DB, tableName string) {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
 	if c.TenantID != 0 {
-		db.Where(tableName + ".tenant_id = ?", c.TenantID)
+		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
 	if c.Name != "" {
-		db.Where(tableName + ".name = ?", c.Name)
+		db.Where(tableName+".name = ?", c.Name)
 	}
 	if c.Indicator != "" {
-		db.Where(tableName + ".indicator = ?", c.Indicator)
+		db.Where(tableName+".indicator = ?", c.Indicator)
 	}
 }
 
 type ResourceDao struct {
-	*genericdao.GenericDao[model.ResourceEntity, model.ResourceEntityList]
+	*gormdao.Dao[model.ResourceEntity, model.ResourceEntityList]
 }
 
 func NewResourceDao() *ResourceDao {
 	return &ResourceDao{
-		GenericDao: genericdao.NewGenericDao[model.ResourceEntity, model.ResourceEntityList](
+		Dao: gormdao.NewDao[model.ResourceEntity, model.ResourceEntityList](
 			model.TableNameResource, "ResourceDao",
 			dbclient.IamDB,
 		),

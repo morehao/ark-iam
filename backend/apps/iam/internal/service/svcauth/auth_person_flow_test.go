@@ -10,7 +10,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
@@ -27,7 +27,7 @@ func (f *fakeAuthPersonStore) GetByID(ctx context.Context, id uint) (*model.Pers
 	return f.getByIDFunc(ctx, id)
 }
 
-func (f *fakeAuthPersonStore) GetByCond(ctx context.Context, cond genericdao.Cond) (*model.PersonEntity, error) {
+func (f *fakeAuthPersonStore) GetByCond(ctx context.Context, cond gormdao.Cond) (*model.PersonEntity, error) {
 	if f.getByCondFunc == nil {
 		return nil, nil
 	}
@@ -54,7 +54,7 @@ func (f *fakeAuthTenantStore) GetByID(ctx context.Context, id uint) (*model.Tena
 	return f.getByIDFunc(ctx, id)
 }
 
-func (f *fakeAuthTenantStore) GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.TenantEntityList, int64, error) {
+func (f *fakeAuthTenantStore) GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.TenantEntityList, int64, error) {
 	if f.getPageListByCond == nil {
 		return nil, 0, nil
 	}
@@ -321,7 +321,7 @@ func TestSelectTenantReturnsTenantScopedToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SelectTenant returned error: %v", err)
 	}
-	if resp == nil || resp.TokenInfo.AccessToken == "" {
+	if resp == nil || resp.AccessToken == "" {
 		t.Fatalf("expected tenant token response, got %#v", resp)
 	}
 }

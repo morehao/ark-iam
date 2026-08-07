@@ -11,8 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoapikey"
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 )
 
@@ -121,7 +121,7 @@ func (svc *createApiKeySvc) PageList(ctx *gin.Context, tenantID uint, req *dtoap
 	}
 
 	cond := &dao.ApiKeyCond{
-		BaseCond: &genericdao.BaseCond{Page: page, PageSize: pageSize},
+		BaseCond: &gormdao.BaseCond{Page: page, PageSize: pageSize},
 		TenantID: tenantID,
 		Name:     req.Name,
 	}

@@ -11,8 +11,8 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/genericdao"
 	"github.com/morehao/golib/biz/gobject"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
@@ -195,7 +195,7 @@ func (svc *personSvc) PageList(ctx *gin.Context, req *dtouser.UserIdentityPageLi
 		}
 	}
 	cond := &dao.UserIdentityCond{
-		BaseCond: &genericdao.BaseCond{Page: req.Page, PageSize: req.PageSize},
+		BaseCond:        &gormdao.BaseCond{Page: req.Page, PageSize: req.PageSize},
 		PersonID:        personID,
 		Issuer:          req.Issuer,
 		ExternalSubject: req.IdentityID,
@@ -213,7 +213,7 @@ func (svc *personSvc) GetByUser(ctx *gin.Context, req *dtouser.UserIdentityByUse
 		return nil, err
 	}
 	list, total, err := newPersonIdentityRepo().GetPageListByCond(ctx, &dao.UserIdentityCond{
-		BaseCond: &genericdao.BaseCond{Page: 1, PageSize: 100},
+		BaseCond: &gormdao.BaseCond{Page: 1, PageSize: 100},
 		PersonID: req.UserID,
 	})
 	if err != nil {
@@ -269,11 +269,11 @@ func buildPersonIdentityPageListResp(ctx *gin.Context, entityList model.UserIden
 			continue
 		}
 		list = append(list, dtouser.UserIdentityPageListItem{
-			UserIdentityID: v.ID,
-			UserID:         v.PersonID,
-			Issuer:         v.Issuer,
-			IdentityID:     v.ExternalSubject,
-			Detail:         detail,
+			UserIdentityID:   v.ID,
+			UserID:           v.PersonID,
+			Issuer:           v.Issuer,
+			IdentityID:       v.ExternalSubject,
+			Detail:           detail,
 			OperatorBaseInfo: gobject.OperatorBaseInfo{UpdatedAt: v.UpdatedAt.Unix()},
 		})
 	}

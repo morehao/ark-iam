@@ -3,12 +3,12 @@ package dao
 import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 type OrganizationCond struct {
-	*genericdao.BaseCond
+	*gormdao.BaseCond
 	TenantID uint
 	Name     string
 }
@@ -18,20 +18,20 @@ func (c *OrganizationCond) BuildCondition(db *gorm.DB, tableName string) {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
 	if c.TenantID != 0 {
-		db.Where(tableName + ".tenant_id = ?", c.TenantID)
+		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
 	if c.Name != "" {
-		db.Where(tableName + ".name = ?", c.Name)
+		db.Where(tableName+".name = ?", c.Name)
 	}
 }
 
 type OrganizationDao struct {
-	*genericdao.GenericDao[model.OrganizationEntity, model.OrganizationEntityList]
+	*gormdao.Dao[model.OrganizationEntity, model.OrganizationEntityList]
 }
 
 func NewOrganizationDao() *OrganizationDao {
 	return &OrganizationDao{
-		GenericDao: genericdao.NewGenericDao[model.OrganizationEntity, model.OrganizationEntityList](
+		Dao: gormdao.NewDao[model.OrganizationEntity, model.OrganizationEntityList](
 			model.TableNameOrganization, "OrganizationDao",
 			dbclient.IamDB,
 		),

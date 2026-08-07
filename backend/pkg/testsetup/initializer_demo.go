@@ -16,7 +16,7 @@ func newDemoappInitializer() (Initializer, error) {
 }
 
 func (d *demoappInitializer) Initialize() error {
-	return d.baseAppInitializer.Init()
+	return d.Init()
 }
 
 func (d *demoappInitializer) Close() error {

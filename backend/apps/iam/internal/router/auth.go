@@ -4,7 +4,6 @@ import (
 	"github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/controller/ctrauth"
 	"github.com/morehao/ark-iam/iam/internal/service/svcauth"
-	"github.com/morehao/golib/biz/gconstant"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
@@ -12,7 +11,7 @@ func authRouter(groups *ginserver.RouterGroups) {
 	authSvc := svcauth.NewAuthSvc(config.Conf.JWT.SignKey)
 	authCtr := ctrauth.NewAuthCtr(authSvc)
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/auth/login", authCtr.Login)
 	v1RouterGroup.GET("/auth/myTenants", authCtr.MyTenants)
 	v1RouterGroup.POST("/auth/selectTenant", authCtr.SelectTenant)
@@ -28,7 +27,7 @@ func authRouter(groups *ginserver.RouterGroups) {
 func connectorRouter(groups *ginserver.RouterGroups) {
 	connectorCtr := ctrauth.NewConnectorCtr()
 
-	v1RouterGroup := groups.MustGetGroup(gconstant.ApiVersionV1)
+	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/connector/create", connectorCtr.Create)
 	v1RouterGroup.POST("/connector/delete", connectorCtr.Delete)
 	v1RouterGroup.POST("/connector/update", connectorCtr.Update)

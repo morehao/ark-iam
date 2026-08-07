@@ -9,7 +9,7 @@ import (
 	"github.com/morehao/ark-iam/iam/internal/dto/dtopermission"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/biz/gcontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
@@ -74,7 +74,7 @@ type stubRoleMenuDeleteRepo struct {
 	deletedBy uint
 }
 
-func (r *stubRoleMenuDeleteRepo) GetListByCond(ctx context.Context, cond genericdao.Cond) (model.RoleMenuEntityList, error) {
+func (r *stubRoleMenuDeleteRepo) GetListByCond(ctx context.Context, cond gormdao.Cond) (model.RoleMenuEntityList, error) {
 	typed, _ := cond.(*dao.RoleMenuCond)
 	if typed != nil {
 		clone := *typed

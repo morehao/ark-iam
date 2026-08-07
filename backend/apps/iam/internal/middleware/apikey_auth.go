@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/golib/biz/gcontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 )
 
@@ -57,9 +57,9 @@ func (m *apiKeyAuthMiddleware) Middleware() gin.HandlerFunc {
 		keyHash := hashApiKey(rawKey)
 
 		cond := &dao.ApiKeyCond{
-			BaseCond:  &genericdao.BaseCond{Page: 1, PageSize: 1},
-			KeyHash:    keyHash,
-			RevokedAt:  &time.Time{},
+			BaseCond:  &gormdao.BaseCond{Page: 1, PageSize: 1},
+			KeyHash:   keyHash,
+			RevokedAt: &time.Time{},
 		}
 		list, _, err := m.apiKeyDao.GetPageListByCond(ctx, cond)
 		if err != nil {

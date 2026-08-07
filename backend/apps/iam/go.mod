@@ -6,7 +6,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.18.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/morehao/golib v0.1.5
+	github.com/morehao/golib v1.31.1
 	github.com/redis/go-redis/v9 v9.18.0
 	github.com/stretchr/testify v1.11.1
 	github.com/swaggo/swag v1.16.6

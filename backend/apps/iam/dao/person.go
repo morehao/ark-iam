@@ -3,12 +3,12 @@ package dao
 import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 type PersonCond struct {
-	*genericdao.BaseCond
+	*gormdao.BaseCond
 	Username     string
 	PrimaryEmail string
 	PrimaryPhone string
@@ -38,12 +38,12 @@ func (c *PersonCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type PersonDao struct {
-	*genericdao.GenericDao[model.PersonEntity, model.PersonEntityList]
+	*gormdao.Dao[model.PersonEntity, model.PersonEntityList]
 }
 
 func NewPersonDao() *PersonDao {
 	return &PersonDao{
-		GenericDao: genericdao.NewGenericDao[model.PersonEntity, model.PersonEntityList](
+		Dao: gormdao.NewDao[model.PersonEntity, model.PersonEntityList](
 			model.TableNamePerson, "PersonDao",
 			dbclient.IamDB,
 		),

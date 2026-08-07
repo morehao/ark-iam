@@ -9,7 +9,7 @@ import (
 	"github.com/morehao/ark-iam/iam/internal/dto/dtopermission"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/biz/gcontext"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
@@ -176,17 +176,19 @@ func TestScopeCreateRejectsCrossTenantResource(t *testing.T) {
 }
 
 type stubMenuScopeRepo struct {
-	detail     *model.MenuEntity
-	pageList   model.MenuEntityList
-	total      int64
-	err        error
-	lastCond   *dao.MenuCond
+	detail       *model.MenuEntity
+	pageList     model.MenuEntityList
+	total        int64
+	err          error
+	lastCond     *dao.MenuCond
 	lastTreeCond *dao.MenuCond
-	recordTree bool
+	recordTree   bool
 }
 
-func (r *stubMenuScopeRepo) GetByID(ctx context.Context, id uint) (*model.MenuEntity, error) { return r.detail, r.err }
-func (r *stubMenuScopeRepo) GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.MenuEntityList, int64, error) {
+func (r *stubMenuScopeRepo) GetByID(ctx context.Context, id uint) (*model.MenuEntity, error) {
+	return r.detail, r.err
+}
+func (r *stubMenuScopeRepo) GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.MenuEntityList, int64, error) {
 	typed, _ := cond.(*dao.MenuCond)
 	clone := *typed
 	if typed.BaseCond != nil {
@@ -209,8 +211,10 @@ type stubRoleScopeRepo struct {
 	lastCond *dao.RoleCond
 }
 
-func (r *stubRoleScopeRepo) GetByID(ctx context.Context, id uint) (*model.RoleEntity, error) { return r.detail, r.err }
-func (r *stubRoleScopeRepo) GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.RoleEntityList, int64, error) {
+func (r *stubRoleScopeRepo) GetByID(ctx context.Context, id uint) (*model.RoleEntity, error) {
+	return r.detail, r.err
+}
+func (r *stubRoleScopeRepo) GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.RoleEntityList, int64, error) {
 	typed, _ := cond.(*dao.RoleCond)
 	clone := *typed
 	if typed.BaseCond != nil {
@@ -227,7 +231,9 @@ type stubUserRoleCreateScopeRepo struct {
 	inserted *model.UserRoleEntity
 }
 
-func (r *stubUserRoleCreateScopeRepo) GetRoleByID(ctx context.Context, id uint) (*model.RoleEntity, error) { return r.role, r.err }
+func (r *stubUserRoleCreateScopeRepo) GetRoleByID(ctx context.Context, id uint) (*model.RoleEntity, error) {
+	return r.role, r.err
+}
 func (r *stubUserRoleCreateScopeRepo) Insert(ctx context.Context, entity *model.UserRoleEntity) error {
 	clone := *entity
 	r.inserted = &clone
@@ -242,8 +248,10 @@ type stubResourceScopeRepo struct {
 	lastCond *dao.ResourceCond
 }
 
-func (r *stubResourceScopeRepo) GetByID(ctx context.Context, id uint) (*model.ResourceEntity, error) { return r.detail, r.err }
-func (r *stubResourceScopeRepo) GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.ResourceEntityList, int64, error) {
+func (r *stubResourceScopeRepo) GetByID(ctx context.Context, id uint) (*model.ResourceEntity, error) {
+	return r.detail, r.err
+}
+func (r *stubResourceScopeRepo) GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.ResourceEntityList, int64, error) {
 	typed, _ := cond.(*dao.ResourceCond)
 	clone := *typed
 	if typed.BaseCond != nil {
@@ -264,11 +272,13 @@ type stubScopeScopeRepo struct {
 	inserted *model.ScopeEntity
 }
 
-func (r *stubScopeScopeRepo) GetByID(ctx context.Context, id uint) (*model.ScopeEntity, error) { return r.detail, r.err }
+func (r *stubScopeScopeRepo) GetByID(ctx context.Context, id uint) (*model.ScopeEntity, error) {
+	return r.detail, r.err
+}
 func (r *stubScopeScopeRepo) GetResourceByID(ctx context.Context, id uint) (*model.ResourceEntity, error) {
 	return r.resource, r.err
 }
-func (r *stubScopeScopeRepo) GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.ScopeEntityList, int64, error) {
+func (r *stubScopeScopeRepo) GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.ScopeEntityList, int64, error) {
 	typed, _ := cond.(*dao.ScopeCond)
 	clone := *typed
 	if typed.BaseCond != nil {

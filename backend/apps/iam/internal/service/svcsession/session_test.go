@@ -9,8 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtouser"
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/golib/biz/genericdao"
+	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
@@ -79,7 +79,7 @@ type stubSessionStore struct {
 	lastCond *dao.SessionCond
 }
 
-func (s *stubSessionStore) GetPageListByCond(ctx context.Context, cond genericdao.Cond) (model.RefreshTokenEntityList, int64, error) {
+func (s *stubSessionStore) GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.RefreshTokenEntityList, int64, error) {
 	if sc, ok := cond.(*dao.SessionCond); ok {
 		clone := *sc
 		s.lastCond = &clone

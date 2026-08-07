@@ -1,7 +1,14 @@
 server:
   name: iam
   port: 8099
-  env: prod
+  env: dev
+
+client:
+  httpbingo:
+    host: https://httpbingo.org
+    module: httpbingo
+    retry: 3
+    timeout: 5s
 
 log:
   default:
@@ -15,11 +22,11 @@ log:
         dir: ../../../log
     enable_otel_trace: true
     extra_keys:
-      - requestId
+      - requestID
   gorm:
     service: iam
     module: gorm
-    level: info
+    level: debug
     logger_type: zap
     writers:
       - type: console
@@ -27,11 +34,11 @@ log:
         dir: ../../../log
     enable_otel_trace: true
     extra_keys:
-      - requestId
+      - requestID
   redis:
     service: iam
     module: redis
-    level: info
+    level: debug
     logger_type: zap
     writers:
       - type: console
@@ -39,53 +46,45 @@ log:
         dir: ../../../log
     enable_otel_trace: true
     extra_keys:
-      - requestId
-  es:
-    service: iam
-    module: es
-    level: info
-    logger_type: zap
-    writers:
-      - type: console
-      - type: file
-        dir: ../../../log
-    enable_otel_trace: true
-    extra_keys:
-      - requestId
+      - requestID
 
 trace:
   enable: true
   service_version: ""
   sampler: traceidratio
-  trace_id_ratio: 0.2
+  trace_id_ratio: 1.0
   otlp:
-    endpoint: ""
-    insecure: false
+    endpoint: "127.0.0.1:4317"
+    insecure: true
     timeout: 10s
 
 db_configs:
-  - url: "mysql://root:123456@host.docker.internal:3306/practice?charset=utf8mb4&parseTime=True&loc=Local&timeout=5s&readTimeout=3s&writeTimeout=3s"
+  - url: "mysql://root:123456@127.0.0.1:3306/iam?charset=utf8mb4&parseTime=True&loc=Local&timeout=5s&readTimeout=3s&writeTimeout=3s"
     service: iam
 
 redis_config:
   service: iam
   addr: 127.0.0.1:6379
-  password: 123456
+  password: ""
   db: 0
   dial_timeout: 5s
   read_timeout: 3s
   write_timeout: 3s
 
-es_configs:
-  - service: iam
-    addr: http://host.docker.internal:9200
+jwt:
+  signKey: "your-jwt-secret-key"
 
 oidc:
-  issuer: "https://iam.example.com/v1/iam/oidc"
-  frontendLoginURL: "https://login.example.com/login"
-  signingKeyID: "prod-oidc-key"
-  signingPrivateKeyPath: ""
+  issuer: "http://localhost:8099/v1/iam/oidc"
+  frontendLoginURL: "http://localhost:3003/login"
+  signingKeyID: "dev-oidc-key"
+  signingPrivateKeyPath: "config/oidc-dev-key.pem"
   signingPrivateKeyPEM: ""
-  encryptionKey: ""
-  encryptionKeyID: "prod-enc-key"
-  allowInsecure: false
+  encryptionKey: "oidc-dev-encryption-key-32bytes"
+  encryptionKeyID: "dev-enc-key"
+  allowInsecure: true
+  # E2E 专用：缩短 TTL 以测试过期场景
+  authRequestTTL: 30
+  authCodeTTL: 15
+  spentCodeTTL: 60
+  sessionTTL: 30
