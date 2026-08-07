@@ -76,7 +76,8 @@ var authLoginRecorder = func(ctx *gin.Context, tenantID, userID uint, success bo
 }
 
 type AuthSvc interface {
-	AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, error)
+	AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error)
+	TenantsForPerson(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error)
 	MyTenants(ctx *gin.Context, req *dtoauth.MyTenantsReq) (*dtoauth.MyTenantsResp, error)
 	Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoauth.RegisterResp, error)
 	JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*dtoauth.JoinTenantResp, error)
@@ -95,14 +96,26 @@ func NewAuthSvc() AuthSvc {
 	return &authSvc{}
 }
 
-func (svc *authSvc) AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, error) {
+func (svc *authSvc) AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 	personDao := newAuthPersonStore()
 	userDao := newAuthUserStore()
-	personEntity, userEntity, _, err := svc.resolvePersonLogin(ctx, personDao, userDao, identifier)
+	personEntity, userEntity, tenants, err := svc.resolvePersonLogin(ctx, personDao, userDao, identifier)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return svc.authenticateResolvedPerson(ctx, personEntity, userEntity, password)
+	personEntity, userEntity, err = svc.authenticateResolvedPerson(ctx, personEntity, userEntity, password)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return personEntity, userEntity, tenants, nil
+}
+
+func (svc *authSvc) TenantsForPerson(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error) {
+	_, tenants, err := svc.listPersonTenants(ctx, personID)
+	if err != nil {
+		return nil, err
+	}
+	return tenants, nil
 }
 
 func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *model.PersonEntity, userEntity *model.UserEntity, password string) (*model.PersonEntity, *model.UserEntity, error) {

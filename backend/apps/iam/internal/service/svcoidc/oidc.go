@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/morehao/ark-iam/iam/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/iam/internal/service/svcauth"
 	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/glog"
 	"github.com/zitadel/oidc/v3/pkg/op"
@@ -193,7 +195,8 @@ type OIDCAuthSvc interface {
 }
 
 type passwordAuthenticator interface {
-	AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, error)
+	AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error)
+	TenantsForPerson(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error)
 }
 
 type oidcAuthSvc struct {
@@ -214,17 +217,20 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	if _, err := svc.provider.Storage.AuthRequestByID(ctx.Request.Context(), req.AuthRequestID); err != nil {
 		return nil, code.GetError(code.OIDCSessionNotFound)
 	}
-	personEntity, _, err := svc.authSvc.AuthenticatePassword(ctx, req.Identifier, req.Password)
+	personEntity, userEntity, tenants, err := svc.authSvc.AuthenticatePassword(ctx, req.Identifier, req.Password)
 	if err != nil {
 		return nil, err
 	}
 	authTime := time.Now()
-	if err := svc.provider.Storage.CompleteAuthRequest(req.AuthRequestID, buildOIDCSubject(personEntity.ID), authTime, []string{"pwd"}, ""); err != nil {
+	tenantID := userEntity.TenantID
+	if err := svc.provider.Storage.CompleteAuthRequest(req.AuthRequestID, buildOIDCSubject(personEntity.ID), authTime, []string{"pwd"}, "", tenantID); err != nil {
 		return nil, code.GetError(code.OIDCSessionNotFound)
 	}
 
 	resp := &dtooidc.OIDCLoginResp{
 		ContinueURL: svc.provider.BuildAuthCallbackURL(ctx.Request.Context(), req.AuthRequestID),
+		TenantID:    tenantID,
+		Tenants:     tenants,
 	}
 
 	if svc.ssoSessionStore != nil {
@@ -249,10 +255,23 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx context.Context, authRequestI
 		return "", err
 	}
 
+	tenantID := uint(0)
+	if tenants, tErr := svc.authSvc.TenantsForPerson(ginContextFromContext(ctx), personID); tErr == nil && len(tenants) > 0 {
+		tenantID = tenants[0].TenantID
+	}
+
 	authTime := time.Now()
-	if err := svc.provider.Storage.CompleteAuthRequest(authRequestID, buildOIDCSubject(personID), authTime, []string{"sso"}, ""); err != nil {
+	if err := svc.provider.Storage.CompleteAuthRequest(authRequestID, buildOIDCSubject(personID), authTime, []string{"sso"}, "", tenantID); err != nil {
 		return "", err
 	}
 
 	return svc.provider.BuildAuthCallbackURL(ctx, authRequestID), nil
+}
+
+func ginContextFromContext(ctx context.Context) *gin.Context {
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req = req.WithContext(ctx)
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = req
+	return ginCtx
 }

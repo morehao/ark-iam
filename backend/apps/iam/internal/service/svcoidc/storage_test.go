@@ -65,7 +65,7 @@ func TestCompleteAuthRequestMarksRequestDone(t *testing.T) {
 	}
 
 	authTime := time.Unix(1710000000, 0)
-	err = storage.CompleteAuthRequest(req.GetID(), buildOIDCSubject(88), authTime, []string{"pwd"}, "")
+	err = storage.CompleteAuthRequest(req.GetID(), buildOIDCSubject(88), authTime, []string{"pwd"}, "", 0)
 	if err != nil {
 		t.Fatalf("CompleteAuthRequest failed: %v", err)
 	}

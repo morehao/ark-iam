@@ -155,8 +155,8 @@ func (s *OIDCStorage) AuthRequestByCode(ctx context.Context, code string) (op.Au
 	return s.protocolStore.AuthRequestByCode(ctx, code)
 }
 
-func (s *OIDCStorage) CompleteAuthRequest(id string, subject string, authTime time.Time, amr []string, acr string) error {
-	return s.protocolStore.CompleteAuthRequest(id, subject, authTime, amr, acr)
+func (s *OIDCStorage) CompleteAuthRequest(id string, subject string, authTime time.Time, amr []string, acr string, tenantID uint) error {
+	return s.protocolStore.CompleteAuthRequest(id, subject, authTime, amr, acr, tenantID)
 }
 
 func (s *OIDCStorage) SaveAuthCode(ctx context.Context, id, code string) error {
