@@ -144,6 +144,8 @@ func (s *PersistentStore) CreateAccessToken(ctx context.Context, request op.Toke
 	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok {
 		if entity, e := s.oauthClientDao().GetByCond(ctx, &dao.OAuthClientCond{ClientID: ccReq.ClientID()}); e == nil && entity != nil && entity.AccessTokenTTL > 0 {
 			ttl = time.Duration(entity.AccessTokenTTL) * time.Second
+		} else if e != nil {
+			glog.Warnf(ctx, "[PersistentStore.CreateAccessToken] load client ttl fail, clientID:%s, err:%v", ccReq.ClientID(), e)
 		}
 	}
 	expiration = time.Now().Add(ttl)

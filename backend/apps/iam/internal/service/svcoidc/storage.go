@@ -182,6 +182,9 @@ func (s *OIDCStorage) ClientCredentials(ctx context.Context, clientID, clientSec
 	if err != nil {
 		return nil, oidc.ErrInvalidClient()
 	}
+	if client.AuthMethod() == oidc.AuthMethodNone {
+		return nil, oidc.ErrInvalidClient()
+	}
 	return client, nil
 }
 

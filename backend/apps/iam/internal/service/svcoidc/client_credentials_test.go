@@ -115,6 +115,75 @@ func TestClientCredentialsStorage(t *testing.T) {
 	}
 }
 
+func TestClientCredentialsRejectsPublicClient(t *testing.T) {
+	ctx := context.Background()
+
+	dsn := fmt.Sprintf("file:cc_public_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.OAuthClientEntity{}, &model.OAuthClientSecretEntity{}); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+
+	clientID := "public-client"
+	secret := "s3cr3t"
+	secretHash := sha256.Sum256([]byte(secret))
+
+	publicClient := &model.OAuthClientEntity{
+		Model:                   gorm.Model{ID: 1},
+		TenantID:                1,
+		ClientID:                clientID,
+		Name:                    "Public Client",
+		RedirectURIs:            datatypes.JSON("[]"),
+		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
+		GrantTypes:              datatypes.JSON(fmt.Sprintf(`["%s"]`, model.GrantTypeClientCredentials)),
+		ResponseTypes:           datatypes.JSON("[]"),
+		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodNone,
+		AllowedOrigins:          datatypes.JSON("[]"),
+		DefaultScopes:           datatypes.JSON(`["openid"]`),
+		Status:                  model.OAuthClientStatusEnable,
+		Type:                    model.OAuthClientTypeFirstParty,
+	}
+	if err := db.Create(publicClient).Error; err != nil {
+		t.Fatalf("insert oauth_client: %v", err)
+	}
+
+	secretEntity := &model.OAuthClientSecretEntity{
+		Model:         gorm.Model{ID: 1},
+		OAuthClientID: publicClient.ID,
+		Name:          "default",
+		ValueHash:     hex.EncodeToString(secretHash[:]),
+		ValuePrefix:   "s*",
+	}
+	if err := db.Create(secretEntity).Error; err != nil {
+		t.Fatalf("insert oauth_client_secret: %v", err)
+	}
+
+	persistentStore := NewPersistentStore()
+	persistentStore.oauthClientDao = func() *dao.OAuthClientDao {
+		return dao.NewOAuthClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
+	}
+	persistentStore.oauthClientSecretDao = func() *dao.OAuthClientSecretDao {
+		return &dao.OAuthClientSecretDao{Dao: gormdao.NewDao[model.OAuthClientSecretEntity, model.OAuthClientSecretEntityList](
+			model.TableNameOAuthClientSecret, "OAuthClientSecretDao",
+			func(c context.Context) *gorm.DB { return db.WithContext(c) },
+		)}
+	}
+
+	storage := NewOIDCStorage(nil, persistentStore, nil, "test-key")
+
+	ccStorage, ok := (interface{})(storage).(op.ClientCredentialsStorage)
+	if !ok {
+		t.Fatal("expected OIDCStorage to implement op.ClientCredentialsStorage")
+	}
+
+	if client, err := ccStorage.ClientCredentials(ctx, clientID, secret); err == nil {
+		t.Fatalf("expected public client (%s) with auth method none to be rejected, got client %q", clientID, client.GetID())
+	}
+}
+
 func TestCreateAccessTokenForClientCredentials(t *testing.T) {
 	ctx := context.Background()
 
