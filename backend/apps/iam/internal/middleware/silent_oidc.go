@@ -12,15 +12,37 @@ const (
 	oidcErrorLoginRequired = "login_required"
 )
 
-func SilentSSORequired(ssoCookieName string) gin.HandlerFunc {
+// SSOValidator 校验 SSO 会话标识是否仍然有效。命令者返回 nil 表示有效。
+type SSOValidator func(ctx *gin.Context, sessionID string) error
+
+type silentSSOConfig struct {
+	validate SSOValidator
+}
+
+// WithSessionValidator 注入 SSO 会话校验器。设置后，中间件会根据校验结果决定
+// 是否放行，而不再仅凭 cookie 是否存在判定 SSO 会话有效。
+func WithSessionValidator(v SSOValidator) func(*silentSSOConfig) {
+	return func(c *silentSSOConfig) {
+		c.validate = v
+	}
+}
+
+func SilentSSORequired(ssoCookieName string, opts ...func(*silentSSOConfig)) gin.HandlerFunc {
+	cfg := &silentSSOConfig{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
 	return func(ctx *gin.Context) {
 		if ctx.Query("prompt") != oidcPromptNone {
 			ctx.Next()
 			return
 		}
-		if _, err := ctx.Cookie(ssoCookieName); err == nil {
-			ctx.Next()
-			return
+		if sessionID, err := ctx.Cookie(ssoCookieName); err == nil {
+			if cfg.validate == nil || cfg.validate(ctx, sessionID) == nil {
+				ctx.Next()
+				return
+			}
+			// cookie 存在但对应 SSO 会话已失效/被撤销，按未登录处理，返回 login_required
 		}
 
 		redirectURI := ctx.Query("redirect_uri")

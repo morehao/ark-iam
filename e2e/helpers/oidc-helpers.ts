@@ -26,22 +26,42 @@ export async function fillLoginWebCredentials(page: Page): Promise<void> {
   await page.click('button[type="submit"]');
 }
 
+async function resetAppAuthState(page: Page): Promise<void> {
+  // 清空 localStorage 中的 OIDC user 及 cookies，确保触发带 authRequestID 的完整认证流程
+  await page.evaluate(() => localStorage.clear());
+  await page.context().clearCookies();
+}
+
 async function navigateToLoginWeb(page: Page, targetUrl: string): Promise<void> {
   await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 15000 });
 
   const currentUrl = page.url();
-  // 如果已有 SSO session，signinRedirect 直接回调，不会到 login-web
-  // 此时先清除 session 再重试
+  // 如果已有 SSO session/本地 user，signinRedirect 直接回调，不会到 login-web
   if (isAuthCallbackUrl(currentUrl) && currentUrl.includes('code=')) {
     await page.goto(`${CONFIG.issuer}/logged-out`, { waitUntil: 'networkidle', timeout: 10000 });
-    // /logged-out 会清除 cookie 并重定向到 login-web
+    await resetAppAuthState(page);
     await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 15000 });
   }
 
-  await page.waitForURL(
-    (url) => isLoginWebUrl(url.toString()) && url.searchParams.has('authRequestID'),
-    { timeout: 20000 }
-  );
+  let ok = false;
+  try {
+    await page.waitForURL(
+      (url) => isLoginWebUrl(url.toString()) && url.searchParams.has('authRequestID'),
+      { timeout: 12000 }
+    );
+    ok = true;
+  } catch {
+    // 停在应用首页（本地残留 user 且未走授权），清除本地状态后重新触发
+    await resetAppAuthState(page);
+  }
+
+  if (!ok) {
+    await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 15000 });
+    await page.waitForURL(
+      (url) => isLoginWebUrl(url.toString()) && url.searchParams.has('authRequestID'),
+      { timeout: 20000 }
+    );
+  }
 }
 
 export async function verifyRp1HomePage(page: Page): Promise<void> {

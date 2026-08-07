@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -127,5 +128,66 @@ func TestSilentSSORequired_NoState_OmitsStateParam(t *testing.T) {
 	loc := w.Header().Get("Location")
 	if loc != "http://localhost:3000/auth/callback?error=login_required" {
 		t.Fatalf("unexpected Location: %s", loc)
+	}
+}
+
+func TestSilentSSORequired_ValidatorInvalidSession_ReturnsLoginRequired(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	var nextCalled bool
+	r.Use(SilentSSORequired("iam_sso_session", WithSessionValidator(func(ctx *gin.Context, sessionID string) error {
+		return errors.New("session revoked")
+	})))
+	r.GET("/authorize", func(ctx *gin.Context) {
+		nextCalled = true
+		ctx.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/authorize?prompt=none&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fauth%2Fcallback&state=def",
+		nil)
+	req.AddCookie(&http.Cookie{Name: "iam_sso_session", Value: "revoked-session-id"})
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if nextCalled {
+		t.Fatal("next handler should not be called when SSO session is invalid")
+	}
+	if w.Code != http.StatusFound {
+		t.Fatalf("expected 302, got %d", w.Code)
+	}
+	loc := w.Header().Get("Location")
+	if loc != "http://localhost:3000/auth/callback?error=login_required&state=def" {
+		t.Fatalf("unexpected Location: %s", loc)
+	}
+}
+
+func TestSilentSSORequired_ValidatorValidSession_CallsNext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	var nextCalled bool
+	r.Use(SilentSSORequired("iam_sso_session", WithSessionValidator(func(ctx *gin.Context, sessionID string) error {
+		if sessionID != "valid-session-id" {
+			return errors.New("unknown session")
+		}
+		return nil
+	})))
+	r.GET("/authorize", func(ctx *gin.Context) {
+		nextCalled = true
+		ctx.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/authorize?prompt=none&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fauth%2Fcallback",
+		nil)
+	req.AddCookie(&http.Cookie{Name: "iam_sso_session", Value: "valid-session-id"})
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if !nextCalled {
+		t.Fatal("next handler should be called when SSO session is valid")
+	}
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
 	}
 }

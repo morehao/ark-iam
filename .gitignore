@@ -36,3 +36,4 @@ e2e/.env.local
 *.out
 backend/apps/**/cmd/cmd
 backend/cmd
+__debug_bin*

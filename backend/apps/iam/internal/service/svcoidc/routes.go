@@ -19,7 +19,12 @@ func RegisterProviderRoutes(routerGroup *gin.RouterGroup, provider *OIDCProvider
 		}
 	}
 	routerGroup.GET(oidc.DiscoveryEndpoint, handler)
-	routerGroup.Any("/authorize", middleware.SilentSSORequired("iam_sso_session"), handler)
+	ssoStore := NewSSOSessionStore()
+	silentAuth := middleware.SilentSSORequired("iam_sso_session", middleware.WithSessionValidator(func(ctx *gin.Context, sessionID string) error {
+		_, err := ssoStore.ValidateSession(ctx.Request.Context(), sessionID)
+		return err
+	}))
+	routerGroup.Any("/authorize", silentAuth, handler)
 	routerGroup.Any("/authorize/callback", handler)
 	routerGroup.Any("/oauth/token", handler)
 	routerGroup.Any("/oauth/introspect", handler)

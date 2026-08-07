@@ -1,11 +1,10 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { message } from 'antd'
 import { BizCode } from '@ark-iam/shared'
-import type { User } from 'oidc-client-ts'
 
-let userProvider: (() => User | null | undefined) | null = null
+let userProvider: (() => { access_token: string } | null | undefined) | null = null
 
-export function setUserProvider(provider: () => User | null | undefined) {
+export function setUserProvider(provider: () => { access_token: string } | null | undefined) {
   userProvider = provider
 }
 
@@ -27,11 +26,13 @@ request.interceptors.response.use(
       if (userProvider) {
         const user = userProvider()
         if (user) {
-          user.signoutRedirect().catch(() => { window.location.href = '/login' })
+          // 刷新到根路径，由 useSSOSessionProbe 通过 silent renew 判定 SSO 会话：
+          // 仍有效则静默恢复，已失效则自动清除本地登录态并回到登录
+          window.location.href = '/'
           return Promise.reject(new Error(msg || '未认证'))
         }
       }
-      window.location.href = '/login'
+      window.location.href = '/'
       return Promise.reject(new Error(msg || '未认证'))
     }
     if (code === BizCode.Forbidden || code === BizCode.PermissionDenied) {
@@ -46,11 +47,11 @@ request.interceptors.response.use(
       if (userProvider) {
         const user = userProvider()
         if (user) {
-          user.signoutRedirect().catch(() => { window.location.href = '/login' })
+          window.location.href = '/'
           return Promise.reject(error)
         }
       }
-      window.location.href = '/login'
+      window.location.href = '/'
       return Promise.reject(error)
     }
     message.error((error.response?.data as any)?.msg || '请求失败')

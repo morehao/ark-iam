@@ -27,21 +27,20 @@ test.describe('OIDC SSO E2E', () => {
     await rp1Page.close();
   });
 
-  test('Admin 登出后 → SSO 测试应用仍可 SSO 免密登录（SSO session 未被清除）', async ({ page, context }) => {
+  test('Admin 全局登出后 → SSO 测试应用需重新认证', async ({ page, context }) => {
     await adminDirectLogin(page);
     const rp1Page = await context.newPage();
     await rp1SSOLogin(rp1Page);
     await logoutFromAdmin(page);
-    // Admin 登出只清除自身 token，SSO session 仍然有效，RP1 可以直接 SSO
-    await rp1SSOLogin(rp1Page);
+    // Admin 全局登出清除 SSO session，RP1 需重新认证
+    await rp1Login(rp1Page);
     await rp1Page.close();
   });
 
-  test('Admin 直接登录 → 登出 → 重新登录（完整认证）', async ({ page }) => {
+  test('Admin 直接登录 → 登出 → 重新登录（全局登出后需完整认证）', async ({ page }) => {
     await adminDirectLogin(page);
     await logoutFromAdmin(page);
-    // 登出后 SSO session 仍保留，重新登录走 SSO 免密流程
-    // 但 end_session 可能清除 SSO cookie 有延迟，使用完整登录流程
+    // 全局登出已清除 SSO session，重新登录需完整认证流程
     await adminDirectLogin(page);
   });
 
@@ -52,51 +51,47 @@ test.describe('OIDC SSO E2E', () => {
     await adminPage.close();
   });
 
-  test('RP1 登录 → Admin SSO → Admin 登出 → RP1 仍可 SSO 免密登录', async ({ page, context }) => {
+  test('RP1 登录 → Admin SSO → Admin 全局登出 → 需重新认证', async ({ page, context }) => {
     await rp1Login(page);
     const adminPage = await context.newPage();
     await adminSSOLogin(adminPage);
     await logoutFromAdmin(adminPage);
-    // Admin 登出只清除自身 token，SSO session 仍然有效
-    await rp1SSOLogin(page);
+    // Admin 全局登出清除 SSO session，RP1 需重新认证
+    await rp1Login(page);
     await adminPage.close();
   });
 
-  test('双向 SSO：Admin 登录 → RP1 SSO → Admin 登出 → RP1 仍可 SSO 免密登录', async ({ page, context }) => {
+  test('双向 SSO：Admin 登录 → RP1 SSO → Admin 全局登出 → RP1 需重新认证', async ({ page, context }) => {
     await adminDirectLogin(page);
     const rp1Page = await context.newPage();
     await rp1SSOLogin(rp1Page);
     await logoutFromAdmin(page);
-    // Admin 登出只清除自身 token，SSO session 仍然有效
-    await rp1SSOLogin(rp1Page);
+    // Admin 全局登出清除 SSO session，RP1 需重新认证
+    await rp1Login(rp1Page);
     await rp1Page.close();
   });
 
-  test('RP1 自身登出后再次 SSO 免密登录（RP 登出只清自身 token，SSO session 仍在）', async ({ page }) => {
+  test('RP1 自身全局登出后需重新登录', async ({ page }) => {
     await rp1Login(page);
     await rp1Logout(page);
-    await rp1SSOLogin(page);
+    await rp1Login(page);
   });
 
-  test('RP1 自身登出后，Admin 的 SSO session 仍有效', async ({ page, context }) => {
+  test('RP1 自身全局登出后，Admin 需重新认证', async ({ page, context }) => {
     await rp1Login(page);
     const adminPage = await context.newPage();
     await adminSSOLogin(adminPage);
     await rp1Logout(page);
-    await adminSSOLogin(adminPage);
+    // RP1 全局登出清除 SSO session，Admin 需重新认证
+    await adminDirectLogin(adminPage);
     await adminPage.close();
   });
 
-  test('Admin 登出（logout）后重新访问 Admin 需登录', async ({ page }) => {
+  test('Admin 全局登出后再访问 Admin 需登录', async ({ page }) => {
     await adminDirectLogin(page);
     await logoutFromAdmin(page);
-    // 登出后访问 Admin 页面
-    await page.goto('http://localhost:3000/', { waitUntil: 'domcontentloaded', timeout: 15000 });
-    // Admin 登出后页面会尝试静默重认证，如果 SSO session 仍有效则恢复登录
-    // 由于我们刚做了 logout 操作（清除 token），SSO session 仍存在，可能静默重认证成功
-    // 验证页面未崩溃
-    const url = page.url();
-    expect(url.includes('localhost:3000') || url.includes('localhost:3003') || url.includes('/login')).toBe(true);
+    // 全局登出后 SSO session 已清除，再次访问 Admin 需完整认证
+    await adminDirectLogin(page);
   });
 
   test('/end_session 后当前页面需重新认证（全局清除由 multi-rp-sso 覆盖）', async ({ page }) => {

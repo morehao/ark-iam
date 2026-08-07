@@ -43,6 +43,7 @@ type SSOSessionStore interface {
 	ValidateSession(ctx context.Context, sessionID string) (uint, error)
 	RevokeSession(ctx context.Context, sessionID string) error
 	RevokeSessionsByPersonID(ctx context.Context, personID uint) error
+	HasActiveSession(ctx context.Context, personID uint) (bool, error)
 }
 
 type redisSSOSessionStore struct {
@@ -86,7 +87,11 @@ func (s *redisSSOSessionStore) CreateSession(ctx context.Context, personID uint)
 	if err := s.client.Set(ctx, ssoSessionKey(sessionID), encoded, ttl).Err(); err != nil {
 		return "", fmt.Errorf("failed to store session: %w", err)
 	}
-	s.client.SAdd(ctx, ssoUserSessionsKey(personID), sessionID)
+	if err := s.client.SAdd(ctx, ssoUserSessionsKey(personID), sessionID).Err(); err != nil {
+		// 索引写入失败时清理已写入的 session，避免产生无法随全局登出撤销的孤儿会话
+		s.client.Del(ctx, ssoSessionKey(sessionID))
+		return "", fmt.Errorf("failed to index session: %w", err)
+	}
 	s.client.Expire(ctx, ssoUserSessionsKey(personID), ttl)
 	return sessionID, nil
 }
@@ -139,4 +144,31 @@ func (s *redisSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, per
 	}
 	s.client.Del(ctx, userSessionsKey)
 	return nil
+}
+
+// HasActiveSession 返回该自然人是否存在至少一个仍然有效的 SSO 会话。
+// 全局登出（RevokeSessionsByPersonID）会清空对应 sso_user_sessions 索引，
+// 之后此处将返回 false，从而让该自然人的既有 OIDC 访问令牌失效（必须重新认证）。
+// 找到任一有效会话时顺带刷新其 TTL，实现滑动续期，避免活跃用户因会话过期被误登出。
+func (s *redisSSOSessionStore) HasActiveSession(ctx context.Context, personID uint) (bool, error) {
+	if s.client == nil {
+		return false, fmt.Errorf("redis client not available")
+	}
+	userSessionsKey := ssoUserSessionsKey(personID)
+	sessionIDs, err := s.client.SMembers(ctx, userSessionsKey).Result()
+	if err != nil {
+		return false, fmt.Errorf("failed to get user sessions: %w", err)
+	}
+	if len(sessionIDs) == 0 {
+		return false, nil
+	}
+	ttl := defaultSessionTTL()
+	for _, sessionID := range sessionIDs {
+		if n, err := s.client.Exists(ctx, ssoSessionKey(sessionID)).Result(); err == nil && n > 0 {
+			// 滑动续期：保持活跃会话不被会话 TTL 淘汰
+			s.client.Expire(ctx, ssoSessionKey(sessionID), ttl)
+			return true, nil
+		}
+	}
+	return false, nil
 }

@@ -6,6 +6,7 @@ let mockIsAuthenticated = false
 let mockIsLoading = false
 let mockActiveNavigator: string | undefined = undefined
 const mockSigninRedirect = vi.fn()
+const mockSigninSilent = vi.fn(() => Promise.resolve(null))
 
 vi.mock('react-oidc-context', () => ({
   useAuth: () => ({
@@ -13,6 +14,8 @@ vi.mock('react-oidc-context', () => ({
     isLoading: mockIsLoading,
     activeNavigator: mockActiveNavigator,
     signinRedirect: mockSigninRedirect,
+    signinSilent: mockSigninSilent,
+    removeUser: vi.fn(),
     user: null,
   }),
   hasAuthParams: vi.fn(() => false),
@@ -35,6 +38,7 @@ describe('App', () => {
     mockIsLoading = false
     mockActiveNavigator = undefined
     mockSigninRedirect.mockClear()
+    mockSigninSilent.mockClear()
   })
 
   it('shows loading spinner while still loading', () => {
