@@ -7,6 +7,6 @@ const api = axios.create({
 })
 
 export async function oidcLogin(data: OIDCLoginReq): Promise<OIDCLoginResp> {
-  const resp = await api.post<ApiResponse<OIDCLoginResp>>('/oidc/login', data)
+  const resp = await api.post<ApiResponse<OIDCLoginResp>>('/login', data)
   return resp.data.data
 }
