@@ -27,7 +27,11 @@ func Routers(engine *gin.Engine) {
 				"/v1/iam/org/getConfigsByDomain",
 				"/v1/iam/auth/register",
 				"/v1/iam/connector/callback",
-			), oidcauth.WithOIDCSSOValidation(func(ctx *gin.Context, personID uint) bool {
+			), oidcauth.WithOIDCSSOValidation(func(ctx *gin.Context, personID uint, isMachineToken bool) bool {
+				// 机器凭证（client_credentials/API Key）不依赖浏览器 SSO 会话活性，直接放行
+				if isMachineToken {
+					return true
+				}
 				// 无 Redis 时无法校验会话，采取放行（fail-open），避免破坏无 Redis 的环境
 				if dbclient.RedisCli == nil {
 					return true

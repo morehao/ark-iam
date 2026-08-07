@@ -104,8 +104,9 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok {
 		if ccReq.isApiKey {
 			return map[string]any{
-				"tenant_id": ccReq.ownerTenantID,
-				"user_id":   ccReq.ownerUserID,
+				"tenant_id":   ccReq.ownerTenantID,
+				"user_id":     ccReq.ownerUserID,
+				"token_usage": "machine",
 			}, nil
 		}
 		return map[string]any{"client_id": ccReq.ClientID()}, nil

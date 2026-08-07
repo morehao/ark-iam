@@ -52,6 +52,11 @@ func (s *PersistentStore) LookupApiKeyByRawKey(ctx context.Context, rawKey strin
 	if entity.ExpiredAt != nil && entity.ExpiredAt.Before(time.Now()) {
 		return nil, nil
 	}
+	if err := s.apiKeyDao().UpdateMap(ctx, entity.ID, map[string]any{
+		"last_used_at": time.Now(),
+	}); err != nil {
+		glog.Warnf(ctx, "[PersistentStore.LookupApiKeyByRawKey] update last_used_at fail, apiKeyID:%d, err:%v", entity.ID, err)
+	}
 	return entity, nil
 }
 

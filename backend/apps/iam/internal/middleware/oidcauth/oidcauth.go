@@ -21,7 +21,7 @@ const (
 
 type authConfig struct {
 	skipPaths       []string
-	validateOIDCSSO func(ctx *gin.Context, personID uint) bool
+	validateOIDCSSO func(ctx *gin.Context, personID uint, isMachineToken bool) bool
 }
 
 type AuthOption func(*authConfig)
@@ -35,7 +35,9 @@ func WithAuthSkipPaths(paths ...string) AuthOption {
 // WithOIDCSSOValidation 注入 OIDC 访问令牌的 SSO 会话校验器。
 // 校验 OIDC 令牌有效后，如果该校验器返回 false（该自然人不再有有效的 SSO 会话，
 // 例如已在其他应用全局登出），则本次请求按未认证处理，返回 401。
-func WithOIDCSSOValidation(validate func(ctx *gin.Context, personID uint) bool) AuthOption {
+// isMachineToken 标识该令牌是否为机器凭证（client_credentials/API Key）签发，
+// 机器凭证不依赖浏览器 SSO 会话活性，校验器可据此直接放行。
+func WithOIDCSSOValidation(validate func(ctx *gin.Context, personID uint, isMachineToken bool) bool) AuthOption {
 	return func(c *authConfig) {
 		c.validateOIDCSSO = validate
 	}
@@ -63,8 +65,12 @@ func OIDCCompatibleAuth(getOIDCPublicKey func() *rsa.PublicKey, opts ...AuthOpti
 		oidcPublicKey := getOIDCPublicKey()
 		claims, err := validateOIDCAccessToken(tokenStr, oidcPublicKey)
 		if err == nil {
+			isMachine := false
+			if v, ok := claims["token_usage"].(string); ok && v == "machine" {
+				isMachine = true
+			}
 			personID := parsePersonIDFromSub(claims["sub"].(string))
-			if cfg.validateOIDCSSO != nil && !cfg.validateOIDCSSO(ctx, personID) {
+			if cfg.validateOIDCSSO != nil && !cfg.validateOIDCSSO(ctx, personID, isMachine) {
 				glog.Warnf(ctx, "[oidcauth] sso session revoked, personID:%d", personID)
 				abortUnauthorized(ctx, "session expired")
 				return
