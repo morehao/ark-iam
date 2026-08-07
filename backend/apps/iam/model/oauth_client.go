@@ -50,6 +50,7 @@ type OAuthClientEntity struct {
 	Type                    string         `gorm:"column:type;type:varchar(32);not null;default 'first_party';comment:客户端类型" json:"type"`
 	IsThirdParty            int8           `gorm:"column:is_third_party;type:tinyint(1);not null;default 0;comment:是否第三方应用" json:"isThirdParty"`
 	Status                  string         `gorm:"column:status;type:varchar(32);not null;default 'enable';comment:状态" json:"status"`
+	IsSystem                int8           `gorm:"column:is_system;type:tinyint(1);not null;default 0;comment:是否系统内置" json:"isSystem"`
 
 	CreatedBy uint `gorm:"column:created_by;type:bigint unsigned;not null;default 0;comment:创建人id" json:"createdBy"`
 	UpdatedBy uint `gorm:"column:updated_by;type:bigint unsigned;not null;default 0;comment:更新人id" json:"updatedBy"`
