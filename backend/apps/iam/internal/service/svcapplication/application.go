@@ -2,8 +2,11 @@ package svcapplication
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/datatypes"
+
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoapplication"
 	"github.com/morehao/ark-iam/iam/internal/service/svcaudit"
@@ -36,21 +39,29 @@ var newApplicationRepo = func() applicationRepository {
 	return dao.NewApplicationDao()
 }
 
+func defaultTenantPolicy(raw json.RawMessage) datatypes.JSON {
+	if len(raw) == 0 {
+		return datatypes.JSON("{}")
+	}
+	return datatypes.JSON(raw)
+}
+
 func NewApplicationSvc() ApplicationSvc {
 	return &applicationSvc{}
 }
 
 func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.CreateReq) (*dtoapplication.CreateResp, error) {
 	entity := &model.ApplicationEntity{
-		Code:        req.Code,
-		Name:        req.Name,
-		Description: req.Description,
-		LogoURL:     req.LogoURL,
-		HomepageURL: req.HomepageURL,
-		Type:        req.Type,
-		Visibility:  req.Visibility,
-		Sort:        req.Sort,
-		CreatedBy:   gincontext.GetUserID(ctx),
+		Code:         req.Code,
+		Name:         req.Name,
+		Description:  req.Description,
+		LogoURL:      req.LogoURL,
+		HomepageURL:  req.HomepageURL,
+		Type:         req.Type,
+		Visibility:   req.Visibility,
+		TenantPolicy: defaultTenantPolicy(req.TenantPolicy),
+		Sort:         req.Sort,
+		CreatedBy:    gincontext.GetUserID(ctx),
 	}
 	if err := dao.NewApplicationDao().Insert(ctx, entity); err != nil {
 		glog.Errorf(ctx, "[svcapplication.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -80,6 +91,9 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.UpdateRe
 		"status":       req.Status,
 		"sort":         req.Sort,
 		"updated_by":   gincontext.GetUserID(ctx),
+	}
+	if len(req.TenantPolicy) > 0 {
+		updateMap["tenant_policy"] = datatypes.JSON(req.TenantPolicy)
 	}
 	if err := dao.NewApplicationDao().UpdateMap(ctx, req.AppID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcapplication.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -112,17 +126,18 @@ func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.DetailRe
 		return nil, code.GetError(code.ApplicationGetDetailError)
 	}
 	return &dtoapplication.DetailResp{
-		AppID:       entity.ID,
-		Code:        entity.Code,
-		Name:        entity.Name,
-		Description: entity.Description,
-		LogoURL:     entity.LogoURL,
-		HomepageURL: entity.HomepageURL,
-		Type:        entity.Type,
-		Status:      entity.Status,
-		Visibility:  entity.Visibility,
-		Sort:        entity.Sort,
-		CreatedAt:   entity.CreatedAt.Format("2006-01-02 15:04:05"),
+		AppID:        entity.ID,
+		Code:         entity.Code,
+		Name:         entity.Name,
+		Description:  entity.Description,
+		LogoURL:      entity.LogoURL,
+		HomepageURL:  entity.HomepageURL,
+		Type:         entity.Type,
+		Status:       entity.Status,
+		Visibility:   entity.Visibility,
+		Sort:         entity.Sort,
+		TenantPolicy: json.RawMessage(entity.TenantPolicy),
+		CreatedAt:    entity.CreatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
 }
 
@@ -144,15 +159,16 @@ func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.PageLi
 	items := make([]dtoapplication.PageListItem, 0, len(list))
 	for _, v := range list {
 		items = append(items, dtoapplication.PageListItem{
-			AppID:       v.ID,
-			Code:        v.Code,
-			Name:        v.Name,
-			Description: v.Description,
-			Type:        v.Type,
-			Status:      v.Status,
-			Visibility:  v.Visibility,
-			Sort:        v.Sort,
-			CreatedAt:   v.CreatedAt.Format("2006-01-02 15:04:05"),
+			AppID:        v.ID,
+			Code:         v.Code,
+			Name:         v.Name,
+			Description:  v.Description,
+			Type:         v.Type,
+			Status:       v.Status,
+			Visibility:   v.Visibility,
+			Sort:         v.Sort,
+			TenantPolicy: json.RawMessage(v.TenantPolicy),
+			CreatedAt:    v.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
 	return &dtoapplication.PageListResp{List: items, Total: total}, nil

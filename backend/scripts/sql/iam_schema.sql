@@ -192,6 +192,7 @@ CREATE TABLE `application`
     `type`            VARCHAR(32) NOT NULL DEFAULT 'first_party' COMMENT '应用类型',
     `status`          VARCHAR(32) NOT NULL DEFAULT 'enable' COMMENT '状态',
     `sort`            INT NOT NULL DEFAULT 0 COMMENT '排序',
+    `tenant_policy`   JSON NOT NULL DEFAULT ('{}') COMMENT '租户策略',
     `is_system`       TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否系统内置',
     `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
