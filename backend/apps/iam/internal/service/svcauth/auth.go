@@ -122,10 +122,22 @@ func (svc *authSvc) TenantsForPerson(ctx *gin.Context, personID uint) ([]objauth
 
 func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *model.PersonEntity, userEntity *model.UserEntity, password string) (*model.PersonEntity, *model.UserEntity, error) {
 	if personEntity.IsSuspended == 1 {
+		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+			Action:     svcaudit.ActionLogin,
+			Result:     "failure",
+			TargetType: "person",
+			Detail:     fmt.Sprintf("personID:%d, reason:suspended", personEntity.ID),
+		})
 		return nil, nil, code.GetError(code.UserSuspendedError)
 	}
 
 	if personEntity.PasswordEncrypted == "" {
+		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+			Action:     svcaudit.ActionLogin,
+			Result:     "failure",
+			TargetType: "person",
+			Detail:     fmt.Sprintf("personID:%d, reason:password not set", personEntity.ID),
+		})
 		return nil, nil, code.GetError(code.PasswordNotSetError)
 	}
 
@@ -410,10 +422,22 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 
 	personEntity, err := personDao.GetByCond(ctx.Request.Context(), personCond)
 	if err != nil {
+		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+			Action:     svcaudit.ActionLogin,
+			Result:     "failure",
+			TargetType: "person",
+			Detail:     fmt.Sprintf("identifier:%s, reason:user lookup error", identifier),
+		})
 		glog.Errorf(ctx, "[svcauth.Login] person dao GetByCond fail, err:%v", err)
 		return nil, nil, nil, code.GetError(code.UserGetDetailError)
 	}
 	if personEntity == nil || personEntity.ID == 0 {
+		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+			Action:     svcaudit.ActionLogin,
+			Result:     "failure",
+			TargetType: "person",
+			Detail:     fmt.Sprintf("identifier:%s, reason:user not found", identifier),
+		})
 		return nil, nil, nil, code.GetError(code.UserNotExistError)
 	}
 
@@ -424,14 +448,32 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 	if userEntity == nil || userEntity.ID == 0 {
 		userEntity, err = userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{PersonID: personEntity.ID})
 		if err != nil {
+			svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+				Action:     svcaudit.ActionLogin,
+				Result:     "failure",
+				TargetType: "person",
+				Detail:     fmt.Sprintf("personID:%d, reason:user lookup error", personEntity.ID),
+			})
 			glog.Errorf(ctx, "[svcauth.Login] user dao GetByCond fail, err:%v", err)
 			return nil, nil, nil, code.GetError(code.UserGetDetailError)
 		}
 		if userEntity == nil || userEntity.ID == 0 {
+			svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+				Action:     svcaudit.ActionLogin,
+				Result:     "failure",
+				TargetType: "person",
+				Detail:     fmt.Sprintf("personID:%d, reason:no tenant membership", personEntity.ID),
+			})
 			return nil, nil, nil, code.GetError(code.UserNotExistError)
 		}
 	}
 	if userEntity.IsSuspended == 1 {
+		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+			Action:     svcaudit.ActionLogin,
+			Result:     "failure",
+			TargetType: "person",
+			Detail:     fmt.Sprintf("userID:%d, reason:suspended", userEntity.ID),
+		})
 		return nil, nil, nil, code.GetError(code.UserSuspendedError)
 	}
 	return personEntity, userEntity, tenants, nil

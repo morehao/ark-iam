@@ -272,14 +272,6 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 		}
 	}
 
-	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-		Action:     svcaudit.ActionLogin,
-		TenantID:   tenantID,
-		Result:     "success",
-		TargetType: "person",
-		TargetID:   personEntity.ID,
-	})
-
 	return resp, nil
 }
 
