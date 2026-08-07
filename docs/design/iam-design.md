@@ -49,11 +49,12 @@ Person(认证·全局) ──1:N──> User(授权·租户内) <──N:1──
                               ▼
    ┌────────────────────────────────────────────────┐
    │ ID Token  (JWT, 面向 RP)                        │
-   │ sub=租户内user_id, aud=client_id, profile/email │ —— 身份证明
+   │ sub=person_id, aud=client_id, tenant_id,        │ —— 身份证明
+   │ user_id, roles, profile/email                   │
    ├────────────────────────────────────────────────┤
    │ Access Token (JWT, 面向资源服务器)               │
-   │ sub=租户内user_id, aud=目标资源, tenant_id,      │ —— 无状态，JWKS 本地验签
-   │ user_id, scope                                   │
+   │ sub=person_id, aud=目标资源, tenant_id,         │ —— 无状态，JWKS 本地验签
+   │ user_id, roles, scope                           │
    ├────────────────────────────────────────────────┤
    │ Refresh Token (不透明随机串, DB 存哈希)           │ —— 单次使用轮换，可吊销
    │ 关联 person_id/tenant_id/user_id/application_id │
@@ -77,12 +78,12 @@ Person(认证·全局) ──1:N──> User(授权·租户内) <──N:1──
 
 | Token | 内容 | 用途 |
 |---|---|---|
-| ID Token | `iss, sub(=租户内user_id), aud(client_id), exp, iat, auth_time, nonce, amr`, profile/email | end-user 身份证明，仅声明不作资源鉴权 |
-| Access Token | `iss, sub, aud(目标API资源), client_id, exp, iat, scope, tenant_id, user_id` | 调用资源服务器凭证，无状态验签 |
+| ID Token | `iss, sub(=person_id), aud(client_id), exp, iat, auth_time, nonce, amr`, tenant_id/user_id/roles, profile/email | end-user 身份证明，仅声明不作资源鉴权 |
+| Access Token | `iss, sub(=person_id), aud(目标API资源), client_id, exp, iat, scope, tenant_id, user_id, roles` | 调用资源服务器凭证，无状态验签 |
 | Refresh Token | 不透明随机串 → DB 存哈希，记 `person_id/tenant_id/user_id/application_id` | 续期，单次使用轮换，可吊销 |
 | 中心会话 Cookie | 仅 `person_id + created_at` | SSO 物理载体，不存租户选择 |
 
-> **sub 语义**：`sub` = 该 OIDC Client 在特定租户上下文内的稳定用户标识（源自 user_id），**不暴露 person_id**。同一自然人在不同租户接入同一应用时 sub 不同，符合 OIDC 规范"sub 在 issuer+audience 内稳定"。
+> **sub 语义**：`sub` = 全局稳定的 `person_id`（自然人身份，跨租户、跨应用不变），符合 OIDC 规范"sub 在 issuer+audience 内稳定"，确保 RP 侧可将同一自然人跨租户识别为同一终端用户。**租户上下文不放进 sub**，而是作为 claim（`tenant_id`/`user_id`/`roles`）注入 ID token、access token 与 userinfo。租户之间仍相互隔离：`sub` 只回答"你是谁"，`tenant_id` 回答"你在哪个租户"，资源服务器按 `tenant_id` claim 过滤。
 
 ### 2.2 登录 + 选租户（Authorization Code Flow）
 
@@ -108,7 +109,7 @@ Person(认证·全局) ──1:N──> User(授权·租户内) <──N:1──
               │
               ▼
  生成 code → 302 redirect_uri?code&state → RP 用 code 换 token
- (token 携带 sub=租户user_id, tenant_id, user_id)
+ (token 携带 sub=person_id, tenant_id, user_id, roles)
 ```
 
 **租户选择发生在"认证后、发 code 前"**；中心会话只记住"你是谁"，租户选择决定"这次签发哪个租户的 token"。
@@ -133,7 +134,7 @@ Person(认证·全局) ──1:N──> User(授权·租户内) <──N:1──
 
 - 中心会话**不变**。
 - 触发：前端/应用调用 IAM 切换租户接口，或授权请求携带租户提示（`login_hint`/自定义 `org` 参数）再走 `/authorize`。
-- IAM 针对**新租户**重新签发 token（`sub`=新租户 user_id，`tenant_id`=新租户）。
+- IAM 针对**新租户**重新签发 token（`sub`=person_id 不变，`tenant_id`=新租户，`user_id`/`roles` 随新租户）。
 - **不追溯旧租户 token**：其它应用已持有的旧租户 access token 在 TTL 内仍可用、可 refresh 续期；只有它们下次刷新/登录时才切到新租户上下文。
 
 | 认证/发码 | 全局会话 | token |
@@ -235,12 +236,28 @@ user   ──(关联)──> refresh_token(tenant_id+user_id)
 
 ### 4.3 OIDC 协议端点
 
+**Issuer（发现锚点）**
+
+- issuer 必须是**完整 HTTPS URL**（`scheme + host` 必须，`path` 可选），**不能用裸字符串**（如 `ark-iam`）。
+- 规范强制**三方一致**：`token.iss == discovery 返回的 issuer == 端点所在前缀`，任一不一致都会导致验签/校验失败。
+- 本设计保留 `/v1/iam/oidc` 版本化路径，因此 OIDC 端点锚定在该前缀之下，issuer 定义为：
+
+```
+issuer      = https://{BASE_URL}/v1/iam/oidc        （无尾斜杠）
+discovery   = {issuer}/.well-known/openid-configuration
+jwks_uri    = discovery 动态返回（含多 kid，支持轮换）
+token.iss   = https://{BASE_URL}/v1/iam/oidc         （严格相等）
+```
+
+- `{BASE_URL}` 由部署环境变量提供（如 `iam.example.com`），**不在代码里写死**为固定字符串；OIDC 路径 `/v1/iam/oidc` 是常量。
+- ⚠ **演进约定**：版本号 `/v1` 嵌入了 issuer，未来 API 大版本升级（v2）会使 `iss` 变更 → 旧 access/refresh 全部失效。MVP 接受此代价；若将来拆分独立 IdP，应把 OIDC 剥离到`版本无关`前缀（如 `https://{BASE_URL}/oidc`）以稳定 issuer。
+
 | 端点 | 说明 | 认证 |
 |---|---|---|
 | `GET /v1/iam/oidc/.well-known/openid-configuration` | Discovery | 无 |
 | `GET /v1/iam/oidc/.well-known/jwks.json` | 公钥 | 无 |
 | `GET\|POST /v1/iam/oidc/authorize` | 授权入口 | 无 |
-| `GET /v1/iam/oidc/authorize/callback` | 租户选择完成→发 code→重定向 RP | 无 |
+| `GET /v1/iam/oidc/authorize/callback` | 租户选择完成→发 code→重定向 RP（IAM 私有续流端点，RP 不感知） | 无 |
 | `GET /v1/iam/oidc/sso-login` | SSO 自动登录检查（见 2.2/2.5）：有中心会话→自动认证；无→重定向前端登录页 | 中心会话 Cookie |
 | `POST /v1/iam/oidc/oauth/token` | code换/refresh/client_credentials | client 认证 |
 | `GET\|POST /v1/iam/oidc/userinfo` | 用户信息 | access token |
@@ -308,7 +325,7 @@ user   ──(关联)──> refresh_token(tenant_id+user_id)
 ### 5.6 多租户隔离
 - 租户内查询强制携带 `tenant_id` 过滤（中间件注入，防越权）。
 - 授权/签发严格经 `tenant_application` 过滤。
-- `sub`=租户内 user id，天然隔离不同租户用户标识。
+- `sub`=全局 person_id，租户隔离由 `tenant_id` claim 承担，切租户只变 `tenant_id`/`user_id`，`sub` 不变。
 
 ---
 
@@ -363,7 +380,7 @@ JWT/JWKS       : github.com/go-jose/go-jose 或 zitadel 自带 (RS256)
 - [x] 管理员集中配置 OAuth Client
 - [x] 切租户签发新 token，不追溯旧 token
 - [x] 账号产生 = 注册 + 邀请 + 管理员创建
-- [x] `sub` = 租户内 user 标识（不暴露 person）
+- [x] `sub` = 全局 person_id（稳定），租户上下文走 claim
 - [x] 应用级 `tenantPolicy.allowPersonCreateTenant`（0 租户可配置）
 - [x] application(产品) + application_client(OIDC 接入端, 1:N) 两层模型
 - [x] 统一 token 管理面鉴权：权限 = 用户 × 租户上下文；API Key 与用户一对一
