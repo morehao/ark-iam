@@ -205,7 +205,7 @@ type oidcAuthSvc struct {
 func NewOIDCAuthSvc(provider *OIDCProvider) OIDCAuthSvc {
 	return &oidcAuthSvc{
 		provider:        provider,
-		authSvc:         svcauth.NewAuthSvc(appconfig.Conf.JWT.SignKey),
+		authSvc:         svcauth.NewAuthSvc(),
 		ssoSessionStore: NewSSOSessionStore(),
 	}
 }

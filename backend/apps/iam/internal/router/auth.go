@@ -1,14 +1,13 @@
 package router
 
 import (
-	"github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/controller/ctrauth"
 	"github.com/morehao/ark-iam/iam/internal/service/svcauth"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
 func authRouter(groups *ginserver.RouterGroups) {
-	authSvc := svcauth.NewAuthSvc(config.Conf.JWT.SignKey)
+	authSvc := svcauth.NewAuthSvc()
 	authCtr := ctrauth.NewAuthCtr(authSvc)
 
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)

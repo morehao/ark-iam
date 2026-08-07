@@ -13,8 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testJWTSecret = "your-jwt-secret-key"
-
 func TestRegisterCreatesPersonAndUser(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
@@ -25,7 +23,7 @@ func TestRegisterCreatesPersonAndUser(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{TenantIDs: []uint{tenant.ID}}) }()
 
-	svc := NewAuthSvc(testJWTSecret)
+	svc := NewAuthSvc()
 	resp, err := svc.Register(ctx, &dtoauth.RegisterReq{
 		TenantID:     tenant.ID,
 		Username:     "register_test_user",
@@ -59,7 +57,7 @@ func TestMyTenants(t *testing.T) {
 	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 	ctx.Set(gcontext.KeyPersonID, uint(1))
 
-	svc := NewAuthSvc(testJWTSecret)
+	svc := NewAuthSvc()
 	resp, err := svc.MyTenants(ctx, &dtoauth.MyTenantsReq{})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -76,7 +74,7 @@ func TestUserinfo(t *testing.T) {
 	ctx.Set(gcontext.KeyTenantID, uint(1))
 	ctx.Set(gcontext.KeyPersonID, uint(1))
 
-	svc := NewAuthSvc(testJWTSecret)
+	svc := NewAuthSvc()
 	resp, err := svc.Userinfo(ctx, &dtoauth.UserinfoReq{})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -92,7 +90,7 @@ func TestLogout(t *testing.T) {
 	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 	ctx.Set(gcontext.KeyPersonID, uint(1))
 
-	svc := NewAuthSvc(testJWTSecret)
+	svc := NewAuthSvc()
 	err := svc.Logout(ctx, &dtoauth.LogoutReq{RefreshToken: "test-refresh-token"})
 	require.NoError(t, err)
 }

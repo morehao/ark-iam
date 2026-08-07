@@ -91,10 +91,8 @@ type authSvc struct {
 
 var _ AuthSvc = (*authSvc)(nil)
 
-func NewAuthSvc(jwtSecret string) AuthSvc {
-	return &authSvc{
-		jwtSecret: jwtSecret,
-	}
+func NewAuthSvc() AuthSvc {
+	return &authSvc{}
 }
 
 func (svc *authSvc) AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, error) {
