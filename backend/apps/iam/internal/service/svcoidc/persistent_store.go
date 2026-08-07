@@ -239,6 +239,9 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 		ExpiredAt:     &refreshTokenExp,
 		CreatedBy:     userEntity.ID,
 	}
+	if currentRefreshToken != "" {
+		refreshEntity.LastRotatedAt = &now
+	}
 	if err := s.refreshTokenDao().Insert(ctx, refreshEntity); err != nil {
 		return "", "", time.Time{}, err
 	}

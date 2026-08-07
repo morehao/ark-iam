@@ -5,6 +5,7 @@ COLLATE utf8mb4_0900_ai_ci;
 CREATE TABLE `tenant`
 (
     `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '租户ID',
+    `code`          VARCHAR(64) NOT NULL DEFAULT '' COMMENT '租户编码',
     `name`          VARCHAR(128) NOT NULL DEFAULT '' COMMENT '租户名称',
     `type`          VARCHAR(32) NOT NULL DEFAULT 'customer' COMMENT '租户类型: customer-客户租户, platform-平台租户',
     `db_user`       VARCHAR(64) NOT NULL DEFAULT '' COMMENT '数据库用户',
@@ -16,7 +17,8 @@ CREATE TABLE `tenant`
     `created_by`    BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '创建人id',
     `updated_by`    BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '更新人id',
     `deleted_by`    BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '删除人id',
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    UNIQUE KEY       `uk_code` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='租户表';
 
 CREATE TABLE `system`
@@ -496,6 +498,7 @@ CREATE TABLE `refresh_token`
     `user_agent`      VARCHAR(512) NOT NULL DEFAULT '' COMMENT '用户代理信息',
     `expired_at`      DATETIME DEFAULT NULL COMMENT '过期时间',
     `revoked_at`      DATETIME DEFAULT NULL COMMENT '撤销时间',
+    `last_rotated_at` DATETIME DEFAULT NULL COMMENT '最后轮换时间',
     `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `deleted_at`      DATETIME DEFAULT NULL COMMENT '删除时间',
@@ -614,6 +617,7 @@ CREATE TABLE `tenant_application` (
     `app_id`  BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '应用id',
     `status`          VARCHAR(32) NOT NULL DEFAULT 'enable' COMMENT '状态',
     `config`          JSON NOT NULL DEFAULT ('{}') COMMENT '租户级应用配置',
+    `granted_scope`   JSON NOT NULL DEFAULT ('[]') COMMENT '租户级scope授权',
     `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `deleted_at`      DATETIME DEFAULT NULL,

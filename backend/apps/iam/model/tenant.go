@@ -15,6 +15,7 @@ const (
 
 type TenantEntity struct {
 	gorm.Model
+	Code        string     `gorm:"column:code;type:varchar(64);not null;default '';uniqueIndex;comment:租户编码"`
 	CreatedBy   uint       `gorm:"column:created_by;type:bigint unsigned;not null;default 0;comment:创建人id"`
 	DbUser      string     `gorm:"column:db_user;type:varchar(64);not null;default '';comment:数据库用户"`
 	DeletedBy   uint       `gorm:"column:deleted_by;type:bigint unsigned;not null;default 0;comment:删除人id"`

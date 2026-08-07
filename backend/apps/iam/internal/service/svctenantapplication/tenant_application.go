@@ -43,6 +43,9 @@ func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplicat
 	if req.Config != "" {
 		entity.Config = datatypes.JSON([]byte(req.Config))
 	}
+	if req.GrantedScope != "" {
+		entity.GrantedScope = datatypes.JSON([]byte(req.GrantedScope))
+	}
 	if err := dao.NewTenantApplicationDao().Insert(ctx, entity); err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationCreateError)
@@ -80,6 +83,9 @@ func (svc *tenantApplicationSvc) Update(ctx *gin.Context, req *dtotenantapplicat
 	if req.Config != "" {
 		updateMap["config"] = datatypes.JSON([]byte(req.Config))
 	}
+	if req.GrantedScope != "" {
+		updateMap["granted_scope"] = datatypes.JSON([]byte(req.GrantedScope))
+	}
 	if err := dao.NewTenantApplicationDao().UpdateMap(ctx, req.TenantAppID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationUpdateError)
@@ -96,12 +102,13 @@ func (svc *tenantApplicationSvc) Detail(ctx *gin.Context, req *dtotenantapplicat
 		return nil, code.GetError(code.ApplicationNotExistError)
 	}
 	return &dtotenantapplication.DetailResp{
-		TenantAppID: entity.ID,
-		TenantID:    entity.TenantID,
-		AppID:       entity.AppID,
-		Status:      entity.Status,
-		Config:      string(entity.Config),
-		CreatedAt:   entity.CreatedAt.Format("2006-01-02 15:04:05"),
+		TenantAppID:  entity.ID,
+		TenantID:     entity.TenantID,
+		AppID:        entity.AppID,
+		Status:       entity.Status,
+		Config:       string(entity.Config),
+		GrantedScope: string(entity.GrantedScope),
+		CreatedAt:    entity.CreatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
 }
 

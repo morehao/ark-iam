@@ -1,15 +1,17 @@
 package dtotenantapplication
 
 type CreateReq struct {
-	AppID  uint   `json:"appId" binding:"required"`  // 应用ID
-	Status string `json:"status"`                     // 状态: enable-启用, disable-停用
-	Config string `json:"config"`                     // 租户级应用配置(JSON)
+	AppID        uint   `json:"appId" binding:"required"` // 应用ID
+	Status       string `json:"status"`                    // 状态: enable-启用, disable-停用
+	Config       string `json:"config"`                    // 租户级应用配置(JSON)
+	GrantedScope string `json:"grantedScope"`              // 租户级scope授权(JSON)
 }
 
 type UpdateReq struct {
-	TenantAppID uint   `json:"tenantAppId" binding:"required"` // 租户应用订阅ID
-	Status      string `json:"status"`                          // 状态
-	Config      string `json:"config"`                          // 租户级应用配置(JSON)
+	TenantAppID  uint   `json:"tenantAppId" binding:"required"` // 租户应用订阅ID
+	Status       string `json:"status"`                          // 状态
+	Config       string `json:"config"`                          // 租户级应用配置(JSON)
+	GrantedScope string `json:"grantedScope"`                    // 租户级scope授权(JSON)
 }
 
 type DetailReq struct {

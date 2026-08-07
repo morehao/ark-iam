@@ -47,6 +47,7 @@ func NewTenantSvc() TenantSvc {
 // Create 创建租户管理
 func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (*dtotenant.TenantCreateResp, error) {
 	insertEntity := &model.TenantEntity{
+		Code:        req.Code,
 		DbUser:      req.DbUser,
 		IsSuspended: req.IsSuspended,
 		Name:        req.Name,
@@ -239,6 +240,7 @@ func (svc *tenantSvc) Detail(ctx *gin.Context, req *dtotenant.TenantDetailReq) (
 	resp := &dtotenant.TenantDetailResp{
 		TenantID: tenantEntity.ID,
 		TenantBaseInfo: objtenant.TenantBaseInfo{
+			Code:        tenantEntity.Code,
 			DbUser:      tenantEntity.DbUser,
 			IsSuspended: tenantEntity.IsSuspended,
 			Name:        tenantEntity.Name,
@@ -270,6 +272,7 @@ func (svc *tenantSvc) PageList(ctx *gin.Context, req *dtotenant.TenantPageListRe
 		list = append(list, dtotenant.TenantPageListItem{
 			TenantID: v.ID,
 			TenantBaseInfo: objtenant.TenantBaseInfo{
+				Code:        v.Code,
 				DbUser:      v.DbUser,
 				IsSuspended: v.IsSuspended,
 				Name:        v.Name,
