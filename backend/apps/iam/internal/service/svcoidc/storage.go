@@ -11,6 +11,8 @@ import (
 	jose "github.com/go-jose/go-jose/v4"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
+
+	"github.com/morehao/ark-iam/iam/model"
 )
 
 type AuthRequest struct {
@@ -100,9 +102,13 @@ var _ op.CanGetPrivateClaimsFromRequest = (*OIDCStorage)(nil)
 
 func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request op.TokenRequest, restrictedScopes []string) (map[string]any, error) {
 	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok {
-		return map[string]any{
-			"client_id": ccReq.ClientID(),
-		}, nil
+		if ccReq.isApiKey {
+			return map[string]any{
+				"tenant_id": ccReq.ownerTenantID,
+				"user_id":   ccReq.ownerUserID,
+			}, nil
+		}
+		return map[string]any{"client_id": ccReq.ClientID()}, nil
 	}
 	return s.GetPrivateClaimsFromScopes(ctx, request.GetSubject(), getClientIDFromRequest(request), restrictedScopes)
 }
@@ -175,17 +181,24 @@ func (s *OIDCStorage) TokenRequestByRefreshToken(ctx context.Context, refreshTok
 var _ op.ClientCredentialsStorage = (*OIDCStorage)(nil)
 
 func (s *OIDCStorage) ClientCredentials(ctx context.Context, clientID, clientSecret string) (op.Client, error) {
-	if err := s.AuthorizeClientIDSecret(ctx, clientID, clientSecret); err != nil {
+	if err := s.AuthorizeClientIDSecret(ctx, clientID, clientSecret); err == nil {
+		client, cErr := s.GetClientByClientID(ctx, clientID)
+		if cErr == nil {
+			if client.AuthMethod() == oidc.AuthMethodNone {
+				return nil, oidc.ErrInvalidClient()
+			}
+			return client, nil
+		}
+	}
+	// fallback: API Key 作为 client credential（clientID==clientSecret==rawKey）
+	if clientID != clientSecret {
 		return nil, oidc.ErrInvalidClient()
 	}
-	client, err := s.GetClientByClientID(ctx, clientID)
-	if err != nil {
+	apiKey, err := s.persistentStore.LookupApiKeyByRawKey(ctx, clientID)
+	if err != nil || apiKey == nil {
 		return nil, oidc.ErrInvalidClient()
 	}
-	if client.AuthMethod() == oidc.AuthMethodNone {
-		return nil, oidc.ErrInvalidClient()
-	}
-	return client, nil
+	return &apiKeyOpClient{entity: apiKey}, nil
 }
 
 func (s *OIDCStorage) ClientCredentialsTokenRequest(ctx context.Context, clientID string, scopes []string) (op.TokenRequest, error) {
@@ -193,19 +206,45 @@ func (s *OIDCStorage) ClientCredentialsTokenRequest(ctx context.Context, clientI
 	if aud == "" {
 		aud = clientID
 	}
-	return &clientCredentialsTokenRequest{
+	req := &clientCredentialsTokenRequest{
 		subject:  clientID,
 		audience: []string{aud},
 		scopes:   scopes,
 		clientID: clientID,
-	}, nil
+	}
+	if apiKey := s.lookupApiKeyQuiet(ctx, clientID); apiKey != nil {
+		req.isApiKey = true
+		req.ownerTenantID = apiKey.TenantID
+		req.ownerUserID = apiKey.CreatedBy
+		req.subject = buildOIDCSubject(apiKey.CreatedBy) // sub 用 owner user 的 person id 语义（见 Task 4）
+	}
+	return req, nil
+}
+
+// lookupApiKeyQuiet 探测 clientID 是否为 API Key 的 raw key。
+// 当持久化存储未配置（如单测未初始化 dbclient 也未注入 apiKeyDao）时，
+// 底层 gorm dao 可能 panic；此处吞掉 panic 视为非 API Key，避免破坏纯 oauth_client 流程。
+func (s *OIDCStorage) lookupApiKeyQuiet(ctx context.Context, rawKey string) (apiKey *model.ApiKeyEntity) {
+	defer func() {
+		if recover() != nil {
+			apiKey = nil
+		}
+	}()
+	entity, err := s.persistentStore.LookupApiKeyByRawKey(ctx, rawKey)
+	if err != nil || entity == nil {
+		return nil
+	}
+	return entity
 }
 
 type clientCredentialsTokenRequest struct {
-	subject  string
-	audience []string
-	scopes   []string
-	clientID string
+	subject       string
+	audience      []string
+	scopes        []string
+	clientID      string
+	isApiKey      bool
+	ownerTenantID uint
+	ownerUserID   uint
 }
 
 func (r *clientCredentialsTokenRequest) GetSubject() string   { return r.subject }
