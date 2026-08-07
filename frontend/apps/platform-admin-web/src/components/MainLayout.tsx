@@ -11,7 +11,7 @@ const { Header, Sider, Content } = Layout
 
 const MainLayout = () => {
   const [collapsed, setCollapsed] = useState(false)
-  const [tenants, setTenants] = useState<{ tenantID: number; tenantName: string }[]>([])
+  const [tenants, setTenants] = useState<{ tenantID: number; name: string }[]>([])
   const navigate = useNavigate()
   const location = useLocation()
   const auth = useAuth()
@@ -94,7 +94,7 @@ const MainLayout = () => {
                   label: '切换租户',
                   children: tenants.map((t) => ({
                     key: `tenant-${t.tenantID}`,
-                    label: t.tenantName,
+                    label: t.name,
                     disabled: String(t.tenantID) === getCurrentTenantId(),
                     onClick: () => handleSwitchTenant(t.tenantID),
                   })),

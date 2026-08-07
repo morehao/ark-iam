@@ -7,7 +7,7 @@ export interface UserinfoResp {
 }
 
 export interface MyTenantsResp {
-  list: { tenantID: number; tenantName: string }[]
+  list: { tenantID: number; name: string }[]
 }
 
 export interface MyTenantsReq {
