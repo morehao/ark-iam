@@ -25,7 +25,7 @@ func TestCreateAndGetAuthRequest(t *testing.T) {
 		ResponseType: oidc.ResponseTypeCode,
 		ResponseMode: oidc.ResponseModeQuery,
 		Nonce:        "nonce-1",
-	}, "")
+	}, "", 0)
 	require.NoError(t, err)
 	require.NotEmpty(t, req.GetID())
 	assert.False(t, req.Done())
@@ -57,7 +57,7 @@ func TestCompleteAuthRequest(t *testing.T) {
 		Scopes:       []string{oidc.ScopeOpenID, oidc.ScopeProfile},
 		ResponseType: oidc.ResponseTypeCode,
 		ResponseMode: oidc.ResponseModeQuery,
-	}, "")
+	}, "", 0)
 	require.NoError(t, err)
 
 	authTime := time.Unix(1710000000, 0)
@@ -84,7 +84,7 @@ func TestSaveAndConsumeCode(t *testing.T) {
 		Scopes:       []string{oidc.ScopeOpenID, oidc.ScopeProfile},
 		ResponseType: oidc.ResponseTypeCode,
 		ResponseMode: oidc.ResponseModeQuery,
-	}, "")
+	}, "", 0)
 	require.NoError(t, err)
 
 	_ = store.CompleteAuthRequest(req.GetID(), "person:88", time.Now(), []string{"pwd"}, "", 0, true)
@@ -121,7 +121,7 @@ func TestDeleteAuthRequest(t *testing.T) {
 		Scopes:       []string{oidc.ScopeOpenID, oidc.ScopeProfile},
 		ResponseType: oidc.ResponseTypeCode,
 		ResponseMode: oidc.ResponseModeQuery,
-	}, "")
+	}, "", 0)
 	require.NoError(t, err)
 
 	err = store.DeleteAuthRequest(context.Background(), req.GetID())
@@ -143,7 +143,7 @@ func TestConsumeCodeNotCompleted(t *testing.T) {
 		Scopes:       []string{oidc.ScopeOpenID, oidc.ScopeProfile},
 		ResponseType: oidc.ResponseTypeCode,
 		ResponseMode: oidc.ResponseModeQuery,
-	}, "")
+	}, "", 0)
 	require.NoError(t, err)
 
 	// Save code WITHOUT completing the auth request

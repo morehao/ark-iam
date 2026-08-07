@@ -165,7 +165,11 @@ func (s *OIDCStorage) ValidateJWTProfileScopes(ctx context.Context, userID strin
 }
 
 func (s *OIDCStorage) CreateAuthRequest(ctx context.Context, authReq *oidc.AuthRequest, userID string) (op.AuthRequest, error) {
-	return s.protocolStore.CreateAuthRequest(ctx, authReq, userID)
+	var tenantID uint
+	if v, ok := ctx.Value(ctxTenantHintKey).(uint); ok {
+		tenantID = v
+	}
+	return s.protocolStore.CreateAuthRequest(ctx, authReq, userID, tenantID)
 }
 
 func (s *OIDCStorage) AuthRequestByID(ctx context.Context, id string) (op.AuthRequest, error) {

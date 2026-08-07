@@ -24,7 +24,7 @@ var (
 )
 
 type ProtocolStateStore interface {
-	CreateAuthRequest(ctx context.Context, authReq *oidc.AuthRequest, userID string) (op.AuthRequest, error)
+	CreateAuthRequest(ctx context.Context, authReq *oidc.AuthRequest, userID string, tenantID uint) (op.AuthRequest, error)
 	AuthRequestByID(ctx context.Context, id string) (op.AuthRequest, error)
 	AuthRequestByCode(ctx context.Context, code string) (op.AuthRequest, error)
 	SaveAuthCode(ctx context.Context, id, code string) error
@@ -85,7 +85,7 @@ func (s *RedisProtocolStateStore) Health(ctx context.Context) error {
 	return nil
 }
 
-func (s *RedisProtocolStateStore) CreateAuthRequest(ctx context.Context, authReq *oidc.AuthRequest, userID string) (op.AuthRequest, error) {
+func (s *RedisProtocolStateStore) CreateAuthRequest(ctx context.Context, authReq *oidc.AuthRequest, userID string, tenantID uint) (op.AuthRequest, error) {
 	req := &AuthRequest{
 		ID:           fmt.Sprintf("ar-%d", time.Now().UnixNano()),
 		ClientID:     authReq.ClientID,
@@ -96,6 +96,7 @@ func (s *RedisProtocolStateStore) CreateAuthRequest(ctx context.Context, authReq
 		ResponseMode: authReq.ResponseMode,
 		Nonce:        authReq.Nonce,
 		Subject:      userID,
+		TenantID:     tenantID,
 		AuthTime:     time.Now(),
 		Audience:     []string{authReq.ClientID},
 		ExpiresAt:    time.Now().Add(defaultAuthRequestTTL()),
