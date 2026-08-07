@@ -59,6 +59,12 @@ func NewSSOSessionStore() SSOSessionStore {
 	return &redisSSOSessionStore{client: dbclient.RedisCli}
 }
 
+// RevokeSSOSessionsByPersonID 撤销指定 person 的全部 SSO session。
+// 供跨包（如 svcauth 登出）调用，实现全局登出语义。
+func RevokeSSOSessionsByPersonID(ctx context.Context, personID uint) error {
+	return NewSSOSessionStore().RevokeSessionsByPersonID(ctx, personID)
+}
+
 func generateSessionID() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
