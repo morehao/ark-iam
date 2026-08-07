@@ -191,6 +191,7 @@ func (p *OIDCProvider) BuildAuthCallbackURL(ctx context.Context, authRequestID s
 
 type OIDCAuthSvc interface {
 	CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error)
+	SelectTenant(ctx context.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error)
 	CompleteLoginBySession(ctx context.Context, authRequestID string, sessionID string) (string, error)
 }
 
@@ -254,6 +255,45 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 		}
 	}
 
+	return resp, nil
+}
+
+func (svc *oidcAuthSvc) SelectTenant(ctx context.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error) {
+	authReq, err := svc.provider.Storage.AuthRequestByID(ctx, authRequestID)
+	if err != nil {
+		return nil, code.GetError(code.OIDCSessionNotFound)
+	}
+	personID, perr := parseOIDCSubject(authReq.GetSubject())
+	if perr != nil {
+		return nil, code.GetError(code.OIDCSessionNotFound)
+	}
+	tenants, terr := svc.authSvc.TenantsForPerson(ginContextFromContext(ctx), personID)
+	if terr != nil {
+		return nil, code.GetError(code.OIDCSessionNotFound)
+	}
+	ok := false
+	for _, t := range tenants {
+		if t.TenantID == tenantID {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return nil, code.GetError(code.TenantNotExistError)
+	}
+	if err := svc.provider.Storage.CompleteAuthRequest(authRequestID, authReq.GetSubject(), authReq.GetAuthTime(), authReq.GetAMR(), "", tenantID, true); err != nil {
+		return nil, code.GetError(code.OIDCSessionNotFound)
+	}
+	resp := &dtooidc.OIDCLoginResp{
+		ContinueURL: svc.provider.BuildAuthCallbackURL(ctx, authRequestID),
+		TenantID:    tenantID,
+		Tenants:     tenants,
+	}
+	if svc.ssoSessionStore != nil {
+		if sessionID, sErr := svc.ssoSessionStore.CreateSession(ctx, personID); sErr == nil {
+			resp.SessionID = sessionID
+		}
+	}
 	return resp, nil
 }
 

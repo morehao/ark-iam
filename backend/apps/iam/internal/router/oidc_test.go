@@ -42,6 +42,7 @@ func TestOIDCRoutesExposeLoginEndpoint(t *testing.T) {
 	}
 
 	assertRouteRegistered(t, paths, http.MethodPost, "/oidc/login")
+	assertRouteRegistered(t, paths, http.MethodPost, "/oidc/login/selectTenant")
 	assertRouteMissing(t, paths, http.MethodPost, "/oidc/login/callback")
 }
 

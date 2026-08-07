@@ -16,12 +16,20 @@ import (
 )
 
 type fakeOIDCAuthSvc struct {
-	completeLogin        func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error)
+	completeLogin          func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error)
+	selectTenant           func(ctx context.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error)
 	completeLoginBySession func(ctx context.Context, authRequestID string, sessionID string) (string, error)
 }
 
 func (f *fakeOIDCAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
 	return f.completeLogin(ctx, req)
+}
+
+func (f *fakeOIDCAuthSvc) SelectTenant(ctx context.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error) {
+	if f.selectTenant != nil {
+		return f.selectTenant(ctx, authRequestID, tenantID)
+	}
+	return nil, errors.New("selectTenant not implemented in fake")
 }
 
 func (f *fakeOIDCAuthSvc) CompleteLoginBySession(ctx context.Context, authRequestID string, sessionID string) (string, error) {
@@ -82,6 +90,67 @@ func TestLoginReturnsErrorOnServiceFailure(t *testing.T) {
 	}
 	if body.Code != -1 {
 		t.Fatalf("expected fail code -1, got %d body=%s", body.Code, resp.Body.String())
+	}
+}
+
+func TestSelectTenantReturnsContinueURLOnSuccess(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{selectTenant: func(ctx context.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error) {
+		if authRequestID != "ar-1" || tenantID != 7 {
+			t.Fatalf("unexpected args authRequestID=%q tenantID=%d", authRequestID, tenantID)
+		}
+		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1", TenantID: 7}, nil
+	}}}
+	engine.POST("/oidc/login/selectTenant", ctr.SelectTenant)
+
+	req := httptest.NewRequest(http.MethodPost, "/oidc/login/selectTenant", bytes.NewReader([]byte(`{"authRequestID":"ar-1","tenantID":7}`)))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+	engine.ServeHTTP(resp, req)
+
+	var body struct {
+		Code int `json:"code"`
+		Data struct {
+			ContinueURL string `json:"continueURL"`
+			TenantID    uint   `json:"tenantID"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if body.Code != 0 {
+		t.Fatalf("expected success, got code %d body=%s", body.Code, resp.Body.String())
+	}
+	if body.Data.ContinueURL != "http://localhost:8099/oidc/authorize/callback?id=ar-1" {
+		t.Fatalf("unexpected continueURL: %q", body.Data.ContinueURL)
+	}
+	if body.Data.TenantID != 7 {
+		t.Fatalf("expected tenantID 7, got %d", body.Data.TenantID)
+	}
+}
+
+func TestSelectTenantReturnsErrorOnInvalidTenant(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{selectTenant: func(ctx context.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error) {
+		return nil, errors.New("tenant not allowed")
+	}}}
+	engine.POST("/oidc/login/selectTenant", ctr.SelectTenant)
+
+	req := httptest.NewRequest(http.MethodPost, "/oidc/login/selectTenant", bytes.NewReader([]byte(`{"authRequestID":"ar-1","tenantID":99}`)))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+	engine.ServeHTTP(resp, req)
+
+	var body struct {
+		Code int `json:"code"`
+	}
+	if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if body.Code == 0 {
+		t.Fatalf("expected fail code, got body=%s", resp.Body.String())
 	}
 }
 

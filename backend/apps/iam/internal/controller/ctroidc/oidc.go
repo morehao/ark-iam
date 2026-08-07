@@ -46,6 +46,20 @@ func (ctr *OIDCCtr) Login(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+func (ctr *OIDCCtr) SelectTenant(ctx *gin.Context) {
+	var req dtooidc.OIDCSelectTenantReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.oidcAuthSvc.SelectTenant(ctx.Request.Context(), req.AuthRequestID, req.TenantID)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
 func (ctr *OIDCCtr) SSOLogin(ctx *gin.Context) {
 	authRequestID := ctx.Query("authRequestID")
 	if authRequestID == "" {
