@@ -122,6 +122,16 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 			}
 		}
 	}
+	// refresh token 轮换：保留存储的租户，避免重新落到 users[0]
+	if rr, ok := request.(*refreshTokenRequest); ok {
+		if tid := rr.GetTenantID(); tid > 0 {
+			if pid, perr := parseOIDCSubject(rr.GetSubject()); perr == nil {
+				if users, uerr := s.persistentStore.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid, TenantID: tid}); uerr == nil && len(users) > 0 {
+					return map[string]any{"tenant_id": tid}, nil
+				}
+			}
+		}
+	}
 	return s.GetPrivateClaimsFromScopes(ctx, request.GetSubject(), getClientIDFromRequest(request), restrictedScopes)
 }
 

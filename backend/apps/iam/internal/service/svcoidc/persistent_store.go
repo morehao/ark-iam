@@ -198,10 +198,7 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 		return "", "", time.Time{}, fmt.Errorf("user not found for person %d", personID)
 	}
 
-	selectedTenantID := uint(0)
-	if authReq, ok := request.(*AuthRequest); ok {
-		selectedTenantID = authReq.GetTenantID()
-	}
+	selectedTenantID := selectedTenantFromRequest(request)
 	var userEntity *model.UserEntity
 	if selectedTenantID > 0 {
 		for i := range users {
@@ -312,6 +309,18 @@ func (r *refreshTokenRequest) GetScopes() []string              { return r.scope
 func (r *refreshTokenRequest) GetSubject() string               { return r.subject }
 func (r *refreshTokenRequest) SetCurrentScopes(scopes []string) { r.scopes = scopes }
 func (r *refreshTokenRequest) GetTenantID() uint                { return r.tenantID }
+
+// selectedTenantFromRequest 返回请求携带的租户 ID（authorization code 或 refresh token 轮换时从其存储的 tenant 读取）。
+// 未设置（TenantID==0）时返回 0，由调用方决定回退逻辑。
+func selectedTenantFromRequest(request op.TokenRequest) uint {
+	if ar, ok := request.(*AuthRequest); ok {
+		return ar.GetTenantID()
+	}
+	if rr, ok := request.(*refreshTokenRequest); ok {
+		return rr.GetTenantID()
+	}
+	return 0
+}
 
 func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, clientID string) error {
 	personID, err := parseOIDCSubject(userID)

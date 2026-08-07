@@ -163,3 +163,61 @@ func TestGetPrivateClaimsFromRequestFallsBackToFirstUserWhenNoTenant(t *testing.
 		t.Fatalf("expected tenant_id claim 1 (users[0] fallback), got %v (%T)", got, got)
 	}
 }
+
+func TestCreateAccessAndRefreshTokensSelectsTenantFromRefreshTokenRequest(t *testing.T) {
+	ctx := context.Background()
+
+	users := []model.UserEntity{
+		{Model: gorm.Model{ID: 50}, TenantID: 1, PersonID: 88},
+		{Model: gorm.Model{ID: 51}, TenantID: 6, PersonID: 88},
+	}
+	storage, db := newTenantClaimTestStore(t, users)
+
+	// 模拟 refresh token 轮换：请求携带存储的租户 6
+	refreshReq := &refreshTokenRequest{
+		subject:  buildOIDCSubject(88),
+		clientID: "client-1",
+		tenantID: 6,
+	}
+
+	_, refreshToken, _, err := storage.CreateAccessAndRefreshTokens(ctx, refreshReq, "")
+	if err != nil {
+		t.Fatalf("CreateAccessAndRefreshTokens failed: %v", err)
+	}
+
+	var stored model.RefreshTokenEntity
+	if err := db.Table(model.TableNameRefreshToken).Where("token = ?", token.HashToken(refreshToken)).First(&stored).Error; err != nil {
+		t.Fatalf("refresh token not stored: %v", err)
+	}
+	if stored.TenantID != 6 {
+		t.Fatalf("expected refresh token tenant 6 (from refreshTokenRequest), got %d", stored.TenantID)
+	}
+	if stored.UserID != 51 {
+		t.Fatalf("expected refresh token user 51 (tenant 6), got %d", stored.UserID)
+	}
+}
+
+func TestGetPrivateClaimsFromRequestSelectsTenantFromRefreshTokenRequest(t *testing.T) {
+	ctx := context.Background()
+
+	users := []model.UserEntity{
+		{Model: gorm.Model{ID: 60}, TenantID: 1, PersonID: 88},
+		{Model: gorm.Model{ID: 61}, TenantID: 8, PersonID: 88},
+	}
+	storage, _ := newTenantClaimTestStore(t, users)
+
+	refreshReq := &refreshTokenRequest{
+		subject:  buildOIDCSubject(88),
+		clientID: "client-1",
+		tenantID: 8,
+	}
+
+	claims, err := storage.GetPrivateClaimsFromRequest(ctx, refreshReq, []string{"openid"})
+	if err != nil {
+		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
+	}
+	if got, ok := claims["tenant_id"].(uint); !ok || got != 8 {
+		t.Fatalf("expected tenant_id claim 8 (from refreshTokenRequest), got %v (%T)", claims["tenant_id"], claims["tenant_id"])
+	}
+}
+
