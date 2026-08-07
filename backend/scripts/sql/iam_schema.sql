@@ -651,3 +651,26 @@ CREATE TABLE `audit_log` (
     KEY `idx_tenant_action` (`tenant_id`, `action`),
     KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='审计日志表';
+
+CREATE TABLE `session` (
+    `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+    `person_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '自然人id',
+    `session_id`      VARCHAR(64) NOT NULL DEFAULT '' COMMENT '会话id',
+    `tenant_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
+    `client_ip`       VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'IP',
+    `user_agent`      VARCHAR(512) NOT NULL DEFAULT '' COMMENT 'UA',
+    `login_time`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '登录时间',
+    `last_active_at`  DATETIME DEFAULT NULL COMMENT '最后活跃',
+    `revoked_at`      DATETIME DEFAULT NULL COMMENT '撤销时间',
+    `status`          VARCHAR(16) NOT NULL DEFAULT 'active' COMMENT 'active/revoked',
+    `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `deleted_at`      DATETIME DEFAULT NULL,
+    `created_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `updated_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `deleted_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_session_id` (`session_id`),
+    KEY `idx_person_id` (`person_id`),
+    KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会话审计表';
