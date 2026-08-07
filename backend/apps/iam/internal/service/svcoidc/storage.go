@@ -140,6 +140,41 @@ func (s *OIDCStorage) TokenRequestByRefreshToken(ctx context.Context, refreshTok
 	return s.persistentStore.TokenRequestByRefreshToken(ctx, refreshToken)
 }
 
+var _ op.ClientCredentialsStorage = (*OIDCStorage)(nil)
+
+func (s *OIDCStorage) ClientCredentials(ctx context.Context, clientID, clientSecret string) (op.Client, error) {
+	if err := s.AuthorizeClientIDSecret(ctx, clientID, clientSecret); err != nil {
+		return nil, oidc.ErrInvalidClient()
+	}
+	client, err := s.GetClientByClientID(ctx, clientID)
+	if err != nil {
+		return nil, oidc.ErrInvalidClient()
+	}
+	return client, nil
+}
+
+func (s *OIDCStorage) ClientCredentialsTokenRequest(ctx context.Context, clientID string, scopes []string) (op.TokenRequest, error) {
+	return &clientCredentialsTokenRequest{
+		subject:  clientID,
+		audience: []string{clientID},
+		scopes:   scopes,
+		clientID: clientID,
+	}, nil
+}
+
+type clientCredentialsTokenRequest struct {
+	subject  string
+	audience []string
+	scopes   []string
+	clientID string
+}
+
+func (r *clientCredentialsTokenRequest) GetSubject() string   { return r.subject }
+func (r *clientCredentialsTokenRequest) GetAudience() []string { return r.audience }
+func (r *clientCredentialsTokenRequest) GetScopes() []string  { return r.scopes }
+
+func (r *clientCredentialsTokenRequest) ClientID() string { return r.clientID }
+
 func (s *OIDCStorage) TerminateSession(ctx context.Context, userID string, clientID string) error {
 	return s.persistentStore.TerminateSession(ctx, userID, clientID)
 }
