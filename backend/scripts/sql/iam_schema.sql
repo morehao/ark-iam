@@ -625,3 +625,28 @@ CREATE TABLE `tenant_application` (
     KEY `idx_app_id` (`app_id`),
     KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='租户应用订阅表';
+
+CREATE TABLE `audit_log` (
+    `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+    `actor_person_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '操作人person id',
+    `actor_user_id`   BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '操作人user id',
+    `tenant_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
+    `client_id`       VARCHAR(64) NOT NULL DEFAULT '' COMMENT '客户端id',
+    `action`          VARCHAR(64) NOT NULL DEFAULT '' COMMENT '动作标识',
+    `target_type`     VARCHAR(64) NOT NULL DEFAULT '' COMMENT '目标类型',
+    `target_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '目标id',
+    `result`          VARCHAR(16) NOT NULL DEFAULT '' COMMENT '结果 success/failure',
+    `ip`              VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'IP',
+    `user_agent`      VARCHAR(512) NOT NULL DEFAULT '' COMMENT 'UA',
+    `detail`          TEXT COMMENT '详情',
+    `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `deleted_at`      DATETIME DEFAULT NULL,
+    `created_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `updated_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `deleted_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    KEY `idx_actor_person` (`actor_person_id`),
+    KEY `idx_tenant_action` (`tenant_id`, `action`),
+    KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='审计日志表';
