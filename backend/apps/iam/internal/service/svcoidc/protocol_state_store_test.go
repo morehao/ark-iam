@@ -61,7 +61,7 @@ func TestCompleteAuthRequest(t *testing.T) {
 	require.NoError(t, err)
 
 	authTime := time.Unix(1710000000, 0)
-	err = store.CompleteAuthRequest(req.GetID(), "person:88", authTime, []string{"pwd"}, "", 0)
+	err = store.CompleteAuthRequest(req.GetID(), "person:88", authTime, []string{"pwd"}, "", 0, true)
 	require.NoError(t, err)
 
 	found, err := store.AuthRequestByID(context.Background(), req.GetID())
@@ -87,7 +87,7 @@ func TestSaveAndConsumeCode(t *testing.T) {
 	}, "")
 	require.NoError(t, err)
 
-	_ = store.CompleteAuthRequest(req.GetID(), "person:88", time.Now(), []string{"pwd"}, "", 0)
+	_ = store.CompleteAuthRequest(req.GetID(), "person:88", time.Now(), []string{"pwd"}, "", 0, true)
 
 	code := fmt.Sprintf("auth-code-%d", time.Now().UnixNano())
 	err = store.SaveAuthCode(context.Background(), req.GetID(), code)

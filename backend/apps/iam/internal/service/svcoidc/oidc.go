@@ -222,8 +222,20 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 		return nil, err
 	}
 	authTime := time.Now()
+	subject := buildOIDCSubject(personEntity.ID)
+	// 多租户：暂不 done、不发 code，需用户先选租户（SSO 会话 defer 到 selectTenant 完成后再建）
+	if len(tenants) > 1 {
+		if err := svc.provider.Storage.CompleteAuthRequest(req.AuthRequestID, subject, authTime, []string{"pwd"}, "", 0, false); err != nil {
+			return nil, code.GetError(code.OIDCSessionNotFound)
+		}
+		return &dtooidc.OIDCLoginResp{
+			RequiresTenantSelection: true,
+			Tenants:                 tenants,
+		}, nil
+	}
+	// 单租户：自动选租户，done，发 code，并建 SSO 会话
 	tenantID := userEntity.TenantID
-	if err := svc.provider.Storage.CompleteAuthRequest(req.AuthRequestID, buildOIDCSubject(personEntity.ID), authTime, []string{"pwd"}, "", tenantID); err != nil {
+	if err := svc.provider.Storage.CompleteAuthRequest(req.AuthRequestID, subject, authTime, []string{"pwd"}, "", tenantID, true); err != nil {
 		return nil, code.GetError(code.OIDCSessionNotFound)
 	}
 
@@ -261,7 +273,7 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx context.Context, authRequestI
 	}
 
 	authTime := time.Now()
-	if err := svc.provider.Storage.CompleteAuthRequest(authRequestID, buildOIDCSubject(personID), authTime, []string{"sso"}, "", tenantID); err != nil {
+	if err := svc.provider.Storage.CompleteAuthRequest(authRequestID, buildOIDCSubject(personID), authTime, []string{"sso"}, "", tenantID, true); err != nil {
 		return "", err
 	}
 

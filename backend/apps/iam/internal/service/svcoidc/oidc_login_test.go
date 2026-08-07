@@ -106,7 +106,7 @@ func TestCompleteLoginReturnsContinueURLAndCompletesRequest(t *testing.T) {
 	}
 }
 
-func TestCompleteLoginReturnsAllTenants(t *testing.T) {
+func TestCompleteLoginMultiTenantRequiresSelection(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
@@ -151,13 +151,26 @@ func TestCompleteLoginReturnsAllTenants(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CompleteLogin failed: %v", err)
 	}
-	if res.TenantID != 3 {
-		t.Fatalf("expected tenantID 3, got %d", res.TenantID)
+	if !res.RequiresTenantSelection {
+		t.Fatal("expected requiresTenantSelection=true for multi-tenant login")
 	}
 	if len(res.Tenants) != 2 {
 		t.Fatalf("expected 2 tenants, got %#v", res.Tenants)
 	}
-	if res.Tenants[0].TenantID != 3 || res.Tenants[1].TenantID != 7 {
-		t.Fatalf("unexpected tenants order: %#v", res.Tenants)
+	if res.ContinueURL != "" {
+		t.Fatalf("expected empty continueURL for multi-tenant login, got %q", res.ContinueURL)
+	}
+	if res.SessionID != "" {
+		t.Fatalf("expected no sessionID for multi-tenant login, got %q", res.SessionID)
+	}
+	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())
+	if err != nil {
+		t.Fatalf("AuthRequestByID failed: %v", err)
+	}
+	if updated.Done() {
+		t.Fatal("expected multi-tenant auth request NOT to be completed (no code until tenant chosen)")
+	}
+	if updated.GetSubject() != "person:88" {
+		t.Fatalf("expected stored subject person:88, got %q", updated.GetSubject())
 	}
 }
