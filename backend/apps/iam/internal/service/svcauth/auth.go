@@ -14,6 +14,7 @@ import (
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/iam/internal/service/svcaudit"
+	"github.com/morehao/ark-iam/iam/internal/service/svcloginguard"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/code"
@@ -121,6 +122,17 @@ func (svc *authSvc) TenantsForPerson(ctx *gin.Context, personID uint) ([]objauth
 }
 
 func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *model.PersonEntity, userEntity *model.UserEntity, password string) (*model.PersonEntity, *model.UserEntity, error) {
+	ip := gincontext.GetClientIP(ctx)
+	if svcloginguard.Check(ctx, ip, personEntity.ID) {
+		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+			Action:     svcaudit.ActionLogin,
+			Result:     "failure",
+			TargetType: "person",
+			Detail:     fmt.Sprintf("personID:%d, reason:login locked", personEntity.ID),
+		})
+		return nil, nil, code.GetError(code.LoginLockedError)
+	}
+
 	if personEntity.IsSuspended == 1 {
 		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
 			Action:     svcaudit.ActionLogin,
@@ -143,10 +155,12 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 
 	if err := gcrypto.ComparePasswordHash(personEntity.PasswordEncrypted, password); err != nil {
 		authLoginRecorder(ctx, userEntity.TenantID, userEntity.ID, false)
+		svcloginguard.RecordFailure(ctx, ip, personEntity.ID)
 		glog.Errorf(ctx, "[svcauth.authenticateResolvedPerson] password mismatch, personID:%d", personEntity.ID)
 		return nil, nil, code.GetError(code.PasswordMismatchError)
 	}
 
+	svcloginguard.RecordSuccess(ctx, personEntity.ID)
 	authLoginRecorder(ctx, userEntity.TenantID, userEntity.ID, true)
 	return personEntity, userEntity, nil
 }

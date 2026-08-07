@@ -27,7 +27,18 @@ type Config struct {
 	JWT         JWT                       `yaml:"jwt"`
 	OIDC        OIDC                      `yaml:"oidc"`
 	Password    PasswordConfig            `yaml:"password"`
+	Security    SecurityConfig            `yaml:"security"`
 	MasterKey   string                    `yaml:"masterKey"`
+}
+
+type SecurityConfig struct {
+	Login LoginGuardConfig `yaml:"login"`
+}
+
+type LoginGuardConfig struct {
+	MaxFailures int `yaml:"maxFailures"`
+	WindowSec   int `yaml:"windowSec"`
+	LockSec     int `yaml:"lockSec"`
 }
 
 type OIDC struct {

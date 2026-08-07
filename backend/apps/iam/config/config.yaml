@@ -72,6 +72,12 @@ redis_config:
   read_timeout: 3s
   write_timeout: 3s
 
+security:
+  login:
+    maxFailures: 5
+    windowSec: 300
+    lockSec: 900
+
 jwt:
   signKey: "your-jwt-secret-key"
 
