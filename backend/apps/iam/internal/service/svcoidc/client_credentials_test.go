@@ -149,6 +149,43 @@ func TestCreateAccessTokenForClientCredentials(t *testing.T) {
 	}
 }
 
+func TestGetPrivateClaimsFromRequestForClientCredentials(t *testing.T) {
+	ctx := context.Background()
+
+	clientID := "cc-client-private"
+	db := newClientCredentialsTestDB(t, clientID, 3600)
+
+	persistentStore := NewPersistentStore()
+	persistentStore.oauthClientDao = func() *dao.OAuthClientDao {
+		return dao.NewOAuthClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
+	}
+
+	storage := NewOIDCStorage(nil, persistentStore, nil, "test-key")
+
+	req := &clientCredentialsTokenRequest{
+		subject:  clientID,
+		clientID: clientID,
+		audience: []string{"urn:ark:iam:admin"},
+		scopes:   []string{"urn:ark:iam:admin"},
+	}
+	claims, err := storage.GetPrivateClaimsFromRequest(ctx, req, []string{"urn:ark:iam:admin"})
+	if err != nil {
+		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
+	}
+	if got := claims["client_id"]; got != clientID {
+		t.Fatalf("expected client_id claim %q, got %v", clientID, got)
+	}
+}
+
+func TestResolveAudienceFromScopes(t *testing.T) {
+	if got := resolveAudienceFromScopes([]string{"openid", "urn:ark:iam:admin"}); got != "urn:ark:iam:admin" {
+		t.Fatalf("expected urn:ark:iam:admin, got %q", got)
+	}
+	if got := resolveAudienceFromScopes([]string{"openid", "profile", "email", "phone", "offline_access"}); got != "" {
+		t.Fatalf("expected empty audience for standard scopes, got %q", got)
+	}
+}
+
 func newClientCredentialsTestDB(t *testing.T, clientID string, accessTokenTTL int64) *gorm.DB {
 	t.Helper()
 

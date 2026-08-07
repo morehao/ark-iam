@@ -96,6 +96,38 @@ func (s *OIDCStorage) GetPrivateClaimsFromScopes(ctx context.Context, userID, cl
 	return s.persistentStore.GetPrivateClaimsFromScopes(ctx, userID, clientID, scopes)
 }
 
+var _ op.CanGetPrivateClaimsFromRequest = (*OIDCStorage)(nil)
+
+func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request op.TokenRequest, restrictedScopes []string) (map[string]any, error) {
+	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok {
+		return map[string]any{
+			"client_id": ccReq.ClientID(),
+		}, nil
+	}
+	return s.GetPrivateClaimsFromScopes(ctx, request.GetSubject(), getClientIDFromRequest(request), restrictedScopes)
+}
+
+func getClientIDFromRequest(request op.TokenRequest) string {
+	if c, ok := request.(interface{ GetClientID() string }); ok {
+		return c.GetClientID()
+	}
+	return ""
+}
+
+// resolveAudienceFromScopes 从请求 scope 中挑出 resource indicator（如 urn:...），作为 access token 的 aud。
+// 返回第一个非 OIDC 标准 scope 的值；无则返回空串。
+func resolveAudienceFromScopes(scopes []string) string {
+	for _, s := range scopes {
+		switch s {
+		case "openid", "profile", "email", "phone", "offline_access":
+			continue
+		default:
+			return s
+		}
+	}
+	return ""
+}
+
 func (s *OIDCStorage) GetKeyByIDAndClientID(ctx context.Context, keyID, clientID string) (*jose.JSONWebKey, error) {
 	return s.persistentStore.GetKeyByIDAndClientID(ctx, keyID, clientID)
 }
@@ -154,9 +186,13 @@ func (s *OIDCStorage) ClientCredentials(ctx context.Context, clientID, clientSec
 }
 
 func (s *OIDCStorage) ClientCredentialsTokenRequest(ctx context.Context, clientID string, scopes []string) (op.TokenRequest, error) {
+	aud := resolveAudienceFromScopes(scopes)
+	if aud == "" {
+		aud = clientID
+	}
 	return &clientCredentialsTokenRequest{
 		subject:  clientID,
-		audience: []string{clientID},
+		audience: []string{aud},
 		scopes:   scopes,
 		clientID: clientID,
 	}, nil
