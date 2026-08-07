@@ -30,18 +30,7 @@ func (ctr *OIDCCtr) Login(ctx *gin.Context) {
 		return
 	}
 
-	if res.SessionID != "" {
-		ttl := 86400
-		domain := ""
-		if config.Conf != nil {
-			ttl = config.Conf.OIDC.SessionTTL
-			domain = config.Conf.OIDC.SSOCookieDomain()
-		}
-		if ttl <= 0 {
-			ttl = 86400
-		}
-		ctx.SetCookie("iam_sso_session", res.SessionID, ttl, "/", domain, false, true)
-	}
+	setSSOSessionCookie(ctx, res.SessionID)
 
 	gincontext.Success(ctx, res)
 }
@@ -57,7 +46,24 @@ func (ctr *OIDCCtr) SelectTenant(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
+	setSSOSessionCookie(ctx, res.SessionID)
 	gincontext.Success(ctx, res)
+}
+
+func setSSOSessionCookie(ctx *gin.Context, sessionID string) {
+	if sessionID == "" {
+		return
+	}
+	ttl := 86400
+	domain := ""
+	if config.Conf != nil {
+		ttl = config.Conf.OIDC.SessionTTL
+		domain = config.Conf.OIDC.SSOCookieDomain()
+	}
+	if ttl <= 0 {
+		ttl = 86400
+	}
+	ctx.SetCookie("iam_sso_session", sessionID, ttl, "/", domain, false, true)
 }
 
 func (ctr *OIDCCtr) SSOLogin(ctx *gin.Context) {

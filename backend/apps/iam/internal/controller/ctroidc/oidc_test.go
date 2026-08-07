@@ -130,6 +130,26 @@ func TestSelectTenantReturnsContinueURLOnSuccess(t *testing.T) {
 	}
 }
 
+func TestSelectTenantSetsSSOCookie(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	config.Conf = &config.Config{}
+	engine := gin.New()
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{selectTenant: func(ctx context.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error) {
+		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1", TenantID: 7, SessionID: "session-1"}, nil
+	}}}
+	engine.POST("/oidc/login/selectTenant", ctr.SelectTenant)
+
+	req := httptest.NewRequest(http.MethodPost, "/oidc/login/selectTenant", bytes.NewReader([]byte(`{"authRequestID":"ar-1","tenantID":7}`)))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+	engine.ServeHTTP(resp, req)
+
+	setCookie := resp.Header().Get("Set-Cookie")
+	if !strings.Contains(setCookie, "iam_sso_session=session-1") {
+		t.Fatalf("expected iam_sso_session cookie on SelectTenant, got %q", setCookie)
+	}
+}
+
 func TestSelectTenantReturnsErrorOnInvalidTenant(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
