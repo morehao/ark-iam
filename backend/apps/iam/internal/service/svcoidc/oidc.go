@@ -263,6 +263,9 @@ func (svc *oidcAuthSvc) SelectTenant(ctx context.Context, authRequestID string, 
 	if err != nil {
 		return nil, code.GetError(code.OIDCSessionNotFound)
 	}
+	if authReq.Done() {
+		return nil, code.GetError(code.OIDCSessionNotFound)
+	}
 	personID, perr := parseOIDCSubject(authReq.GetSubject())
 	if perr != nil {
 		return nil, code.GetError(code.OIDCSessionNotFound)
@@ -292,6 +295,8 @@ func (svc *oidcAuthSvc) SelectTenant(ctx context.Context, authRequestID string, 
 	if svc.ssoSessionStore != nil {
 		if sessionID, sErr := svc.ssoSessionStore.CreateSession(ctx, personID); sErr == nil {
 			resp.SessionID = sessionID
+		} else {
+			glog.Warnf(ctx, "[oidcAuthSvc.SelectTenant] failed to create sso session: %v", sErr)
 		}
 	}
 	return resp, nil

@@ -1,6 +1,8 @@
 package svcoidc
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -30,6 +32,18 @@ func (f *fakePasswordAuthenticator) TenantsForPerson(ctx *gin.Context, personID 
 	}
 	return nil, nil
 }
+
+type fakeSSOSessionStore struct{}
+
+var _ SSOSessionStore = (*fakeSSOSessionStore)(nil)
+
+func (f *fakeSSOSessionStore) CreateSession(ctx context.Context, personID uint) (string, error) {
+	return "session-" + fmt.Sprint(personID), nil
+}
+func (f *fakeSSOSessionStore) ValidateSession(ctx context.Context, sessionID string) (uint, error) { return 0, nil }
+func (f *fakeSSOSessionStore) RevokeSession(ctx context.Context, sessionID string) error            { return nil }
+func (f *fakeSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, personID uint) error    { return nil }
+func (f *fakeSSOSessionStore) HasActiveSession(ctx context.Context, personID uint) (bool, error)    { return false, nil }
 
 func TestCompleteLoginReturnsContinueURLAndCompletesRequest(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
@@ -297,5 +311,63 @@ func TestSelectTenantRejectsTenantNotBelongingToPerson(t *testing.T) {
 	}
 	if updated.Done() {
 		t.Fatal("expected auth request NOT completed when tenant selection is rejected")
+	}
+}
+
+func TestSelectTenantRejectsAlreadyDoneRequest(t *testing.T) {
+	testsetup.Initialize(testsetup.AppNameIam)
+	defer testsetup.Done(testsetup.AppNameIam)
+
+	appconfig.Conf = &appconfig.Config{
+		JWT: appconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: appconfig.OIDC{
+			Issuer:           "http://localhost:8099/oidc",
+			FrontendLoginURL: "http://localhost:3000/oidc/login",
+			AllowInsecure:    true,
+		},
+	}
+	provider, err := SetupOIDCProvider(appconfig.Conf.OIDC.Issuer)
+	if err != nil {
+		t.Fatalf("SetupOIDCProvider failed: %v", err)
+	}
+	request, err := provider.Storage.CreateAuthRequest(t.Context(), &oidc.AuthRequest{
+		ClientID:     "client-1",
+		RedirectURI:  "https://client.example.com/callback",
+		State:        "state-1",
+		Scopes:       []string{oidc.ScopeOpenID, oidc.ScopeProfile},
+		ResponseType: oidc.ResponseTypeCode,
+		ResponseMode: oidc.ResponseModeQuery,
+	}, "")
+	if err != nil {
+		t.Fatalf("CreateAuthRequest failed: %v", err)
+	}
+
+	callCount := 0
+	svc := &oidcAuthSvc{
+		provider: provider,
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error) {
+			callCount++
+			return []objauth.TenantOption{{TenantID: 3, Name: "tenant-3"}, {TenantID: 7, Name: "tenant-7"}}, nil
+		}},
+		ssoSessionStore: &fakeSSOSessionStore{},
+	}
+
+	authTime := time.Now()
+	if err := provider.Storage.CompleteAuthRequest(request.GetID(), "person:88", authTime, []string{"pwd"}, "", 3, true); err != nil {
+		t.Fatalf("CompleteAuthRequest(done=true) failed: %v", err)
+	}
+
+	if _, err := svc.SelectTenant(t.Context(), request.GetID(), 3); err == nil {
+		t.Fatalf("expected SelectTenant to reject an already-done request")
+	}
+	if callCount != 0 {
+		t.Fatalf("expected tenants lookup NOT to run on done request, ran %d times", callCount)
+	}
+	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())
+	if err != nil {
+		t.Fatalf("AuthRequestByID failed: %v", err)
+	}
+	if !updated.Done() {
+		t.Fatal("expected auth request to remain done")
 	}
 }
