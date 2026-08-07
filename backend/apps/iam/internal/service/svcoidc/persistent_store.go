@@ -197,7 +197,23 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 	if err != nil || len(users) == 0 {
 		return "", "", time.Time{}, fmt.Errorf("user not found for person %d", personID)
 	}
-	userEntity := &users[0]
+
+	selectedTenantID := uint(0)
+	if authReq, ok := request.(*AuthRequest); ok {
+		selectedTenantID = authReq.GetTenantID()
+	}
+	var userEntity *model.UserEntity
+	if selectedTenantID > 0 {
+		for i := range users {
+			if users[i].TenantID == selectedTenantID {
+				userEntity = &users[i]
+				break
+			}
+		}
+	}
+	if userEntity == nil {
+		userEntity = &users[0]
+	}
 
 	clientID := ""
 	if authReq, ok := request.(op.AuthRequest); ok {

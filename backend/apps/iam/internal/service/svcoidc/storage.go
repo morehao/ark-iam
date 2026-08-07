@@ -12,6 +12,7 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
 
+	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/golib/glog"
 )
 
@@ -110,6 +111,16 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 			}, nil
 		}
 		return map[string]any{"client_id": ccReq.ClientID()}, nil
+	}
+	// authorization_code：优先用认证流程确定的租户
+	if authReq, ok := request.(*AuthRequest); ok {
+		if tid := authReq.GetTenantID(); tid > 0 {
+			if pid, perr := parseOIDCSubject(authReq.GetSubject()); perr == nil {
+				if users, uerr := s.persistentStore.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid, TenantID: tid}); uerr == nil && len(users) > 0 {
+					return map[string]any{"tenant_id": tid}, nil
+				}
+			}
+		}
 	}
 	return s.GetPrivateClaimsFromScopes(ctx, request.GetSubject(), getClientIDFromRequest(request), restrictedScopes)
 }
