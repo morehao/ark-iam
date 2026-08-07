@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { AuthProvider } from 'react-oidc-context'
 import { WebStorageStateStore } from 'oidc-client-ts'
 import App from './App'
+import { oidcExtraQueryParams } from './tenant'
 
 const oidcConfig = {
   authority: import.meta.env.VITE_OIDC_ISSUER || '/oidc',
@@ -15,6 +16,7 @@ const oidcConfig = {
   monitorSession: false,
   loadUserInfo: true,
   userStore: new WebStorageStateStore({ store: localStorage }),
+  extraQueryParams: oidcExtraQueryParams,
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
