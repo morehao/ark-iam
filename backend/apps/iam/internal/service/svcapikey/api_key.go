@@ -12,6 +12,7 @@ import (
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoapikey"
 	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 )
@@ -77,7 +78,7 @@ func (svc *createApiKeySvc) Create(ctx *gin.Context, tenantID uint, req *dtoapik
 		KeyPrefix: keyPrefix,
 		Scope:     scope,
 		ExpiredAt: expiresAt,
-		CreatedBy: 0,
+		CreatedBy: gincontext.GetUserID(ctx),
 	}
 
 	if err := svc.apiKeyDao.Insert(context.Background(), entity); err != nil {

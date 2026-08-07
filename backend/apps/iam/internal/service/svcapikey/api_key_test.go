@@ -49,6 +49,34 @@ func TestCreateApiKey(t *testing.T) {
 	}
 }
 
+func TestCreateApiKeyCapturesOwnerUser(t *testing.T) {
+	ctx := newTestGinCtxWithUser(1, 7)
+
+	svc, db, cleanup := newTestApiKeySvc(t)
+	defer cleanup()
+
+	_ = db.AutoMigrate(&model.ApiKeyEntity{})
+
+	req := &dtoapikey.CreateApiKeyReq{
+		Name: "Owner-bound Key",
+	}
+	resp, err := svc.Create(ctx, 1, req)
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	var entity model.ApiKeyEntity
+	if err := db.First(&entity, resp.ID).Error; err != nil {
+		t.Fatalf("query persisted entity failed: %v", err)
+	}
+	if entity.CreatedBy != 7 {
+		t.Fatalf("expected CreatedBy=7, got %d", entity.CreatedBy)
+	}
+	if entity.TenantID != 1 {
+		t.Fatalf("expected TenantID=1, got %d", entity.TenantID)
+	}
+}
+
 func TestCreateApiKeyReturnsKeyOnlyOnce(t *testing.T) {
 	svc, db, cleanup := newTestApiKeySvc(t)
 	defer cleanup()
@@ -229,6 +257,13 @@ func newTestApiKeySvc(t *testing.T) (CreateApiKeySvc, *gorm.DB, func()) {
 func newTestGinCtx(tenantID uint) *gin.Context {
 	ctx := &gin.Context{}
 	ctx.Set(gcontext.KeyTenantID, tenantID)
+	return ctx
+}
+
+func newTestGinCtxWithUser(tenantID, userID uint) *gin.Context {
+	ctx := &gin.Context{}
+	ctx.Set(gcontext.KeyTenantID, tenantID)
+	ctx.Set(gcontext.KeyUserID, userID)
 	return ctx
 }
 
