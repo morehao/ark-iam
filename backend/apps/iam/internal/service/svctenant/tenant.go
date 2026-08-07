@@ -74,6 +74,11 @@ func (svc *tenantSvc) CreateTenantAsOwner(ctx *gin.Context, req *dtotenant.Tenan
 	userID := gincontext.GetUserID(ctx)
 	now := time.Now()
 
+	// 授权闸门：仅允许 0 租户自然人，且目标应用的 tenant_policy.allowPersonCreateTenant 为 true
+	if err := svc.checkCreateTenantAsOwnerGate(ctx, req); err != nil {
+		return nil, err
+	}
+
 	var tenantID uint
 	txErr := iamDBFromContext(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		tenant := &model.TenantEntity{
@@ -93,7 +98,7 @@ func (svc *tenantSvc) CreateTenantAsOwner(ctx *gin.Context, req *dtotenant.Tenan
 			CustomData: json.RawMessage("{}"),
 			IsOwner:    1,
 			JoinedAt:   &now,
-			CreatedBy:  userID,
+			CreatedBy:  req.PersonID,
 		}
 		if err := dao.NewUserDao().WithTx(tx).Insert(ctx, user); err != nil {
 			return err
@@ -130,6 +135,49 @@ func (svc *tenantSvc) CreateTenantAsOwner(ctx *gin.Context, req *dtotenant.Tenan
 	return &dtotenant.TenantCreateAsOwnerResp{
 		TenantID: tenantID,
 	}, nil
+}
+
+// checkCreateTenantAsOwnerGate 校验自助创建租户的授权闸门：
+//  1. 自然人必须处于 0 租户状态（在真实租户下不存在 user 记录）
+//  2. 必须提供有效应用 AppID，且该应用的 tenant_policy.allowPersonCreateTenant 为 true
+func (svc *tenantSvc) checkCreateTenantAsOwnerGate(ctx *gin.Context, req *dtotenant.TenantCreateAsOwnerReq) error {
+	users, err := dao.NewUserDao().GetListByCond(ctx, &dao.UserCond{PersonID: req.PersonID})
+	if err != nil {
+		glog.Errorf(ctx, "[svctenant.CreateTenantAsOwner] query users by person fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.TenantCreateAsOwnerForbiddenError)
+	}
+	for _, u := range users {
+		if u.TenantID > 0 {
+			glog.Errorf(ctx, "[svctenant.CreateTenantAsOwner] person already has a tenant, req:%s", gutil.ToJsonString(req))
+			return code.GetError(code.TenantCreateAsOwnerForbiddenError)
+		}
+	}
+
+	if req.AppID == 0 {
+		glog.Errorf(ctx, "[svctenant.CreateTenantAsOwner] appID is required for self-service tenant creation, req:%s", gutil.ToJsonString(req))
+		return code.GetError(code.TenantCreateAsOwnerForbiddenError)
+	}
+
+	app, err := dao.NewApplicationDao().GetByID(ctx, req.AppID)
+	if err != nil {
+		glog.Errorf(ctx, "[svctenant.CreateTenantAsOwner] query application fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.TenantCreateAsOwnerForbiddenError)
+	}
+	if app == nil || app.ID == 0 {
+		glog.Errorf(ctx, "[svctenant.CreateTenantAsOwner] application not found, req:%s", gutil.ToJsonString(req))
+		return code.GetError(code.TenantCreateAsOwnerForbiddenError)
+	}
+
+	var policy model.TenantPolicy
+	if len(app.TenantPolicy) == 0 {
+		glog.Errorf(ctx, "[svctenant.CreateTenantAsOwner] application has empty tenant policy, req:%s", gutil.ToJsonString(req))
+		return code.GetError(code.TenantCreateAsOwnerForbiddenError)
+	}
+	if err := json.Unmarshal(app.TenantPolicy, &policy); err != nil || policy.AllowPersonCreateTenant == nil || !*policy.AllowPersonCreateTenant {
+		glog.Errorf(ctx, "[svctenant.CreateTenantAsOwner] application policy does not allow person create tenant, req:%s", gutil.ToJsonString(req))
+		return code.GetError(code.TenantCreateAsOwnerForbiddenError)
+	}
+	return nil
 }
 
 // Delete 删除租户管理
