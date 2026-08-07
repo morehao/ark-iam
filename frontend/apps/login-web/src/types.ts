@@ -12,4 +12,11 @@ export interface ApiResponse<T> {
 
 export interface OIDCLoginResp {
   continueURL: string
+  requiresTenantSelection?: boolean
+  tenants?: { tenantID: number; name: string; tag?: string; userID?: number; isOwner?: number }[]
+}
+
+export interface OIDCSelectTenantReq {
+  authRequestID: string
+  tenantID: number
 }
