@@ -8,4 +8,5 @@ type OIDCLoginResp struct {
 	TenantID                uint                   `json:"tenantID,omitempty"`
 	RequiresTenantSelection bool                   `json:"requiresTenantSelection,omitempty"`
 	Tenants                 []objauth.TenantOption `json:"tenants,omitempty"`
+	AllowPersonCreateTenant bool                   `json:"allowPersonCreateTenant"`
 }

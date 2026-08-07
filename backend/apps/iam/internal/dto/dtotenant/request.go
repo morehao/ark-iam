@@ -26,6 +26,12 @@ type TenantDeleteReq struct {
 	TenantID uint `json:"tenantID" binding:"required"` // 租户ID
 }
 
+type TenantCreateAsOwnerReq struct {
+	PersonID uint   `json:"personID" binding:"required"` // 自然人ID
+	Name     string `json:"name" binding:"required"`     // 租户名称
+	AppID    uint   `json:"appID"`                       // 应用ID（可选，订阅该应用）
+}
+
 type DepartmentCreateReq struct {
 	objtenant.DepartmentBaseInfo
 }

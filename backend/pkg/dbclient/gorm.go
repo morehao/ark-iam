@@ -81,6 +81,21 @@ func IamDB(ctx context.Context) *gorm.DB {
 	return GetDB(ctx, dbNameIam)
 }
 
+// RegisterDBForTest injects a gorm DB for a service name (test-only usage).
+// Callers are responsible for closing the underlying connection.
+func RegisterDBForTest(service string, db *gorm.DB) {
+	dbMutex.Lock()
+	defer dbMutex.Unlock()
+	dbMap[service] = db
+}
+
+// ClearDBForTest removes a registered DB (test-only usage).
+func ClearDBForTest(service string) {
+	dbMutex.Lock()
+	defer dbMutex.Unlock()
+	delete(dbMap, service)
+}
+
 func DemoDB(ctx context.Context) *gorm.DB {
 	return GetDB(ctx, dbNameDemo)
 }

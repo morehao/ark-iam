@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"log/slog"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	appconfig "github.com/morehao/ark-iam/iam/config"
+	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/iam/internal/service/svcaudit"
 	"github.com/morehao/ark-iam/iam/internal/service/svcauth"
@@ -202,16 +204,20 @@ type passwordAuthenticator interface {
 }
 
 type oidcAuthSvc struct {
-	provider        *OIDCProvider
-	authSvc         passwordAuthenticator
-	ssoSessionStore SSOSessionStore
+	provider             *OIDCProvider
+	authSvc              passwordAuthenticator
+	ssoSessionStore      SSOSessionStore
+	oauthClientDao       func() *dao.OAuthClientDao
+	applicationDao       func() *dao.ApplicationDao
 }
 
 func NewOIDCAuthSvc(provider *OIDCProvider) OIDCAuthSvc {
 	return &oidcAuthSvc{
-		provider:        provider,
-		authSvc:         svcauth.NewAuthSvc(),
-		ssoSessionStore: NewSSOSessionStore(),
+		provider:             provider,
+		authSvc:              svcauth.NewAuthSvc(),
+		ssoSessionStore:      NewSSOSessionStore(),
+		oauthClientDao:       dao.NewOAuthClientDao,
+		applicationDao:       dao.NewApplicationDao,
 	}
 }
 
@@ -257,10 +263,16 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 		return nil, code.GetError(code.OIDCSessionNotFound)
 	}
 
+	allowPersonCreateTenant := false
+	if cid := clientIDFromAuthRequest(authReq); cid != "" {
+		allowPersonCreateTenant = svc.resolveAllowPersonCreateTenant(ctx, cid, len(tenants))
+	}
+
 	resp := &dtooidc.OIDCLoginResp{
-		ContinueURL: svc.provider.BuildAuthCallbackURL(ctx.Request.Context(), req.AuthRequestID),
-		TenantID:    tenantID,
-		Tenants:     tenants,
+		ContinueURL:             svc.provider.BuildAuthCallbackURL(ctx.Request.Context(), req.AuthRequestID),
+		TenantID:                tenantID,
+		Tenants:                 tenants,
+		AllowPersonCreateTenant: allowPersonCreateTenant,
 	}
 
 	if svc.ssoSessionStore != nil {
@@ -304,10 +316,15 @@ func (svc *oidcAuthSvc) SelectTenant(ctx context.Context, authRequestID string, 
 	if err := svc.provider.Storage.CompleteAuthRequest(authRequestID, authReq.GetSubject(), authReq.GetAuthTime(), authReq.GetAMR(), "", tenantID, true); err != nil {
 		return nil, code.GetError(code.OIDCSessionNotFound)
 	}
+	allowPersonCreateTenant := false
+	if cid := authReq.GetClientID(); cid != "" {
+		allowPersonCreateTenant = svc.resolveAllowPersonCreateTenant(ginContextFromContext(ctx), cid, len(tenants))
+	}
 	resp := &dtooidc.OIDCLoginResp{
-		ContinueURL: svc.provider.BuildAuthCallbackURL(ctx, authRequestID),
-		TenantID:    tenantID,
-		Tenants:     tenants,
+		ContinueURL:             svc.provider.BuildAuthCallbackURL(ctx, authRequestID),
+		TenantID:                tenantID,
+		Tenants:                 tenants,
+		AllowPersonCreateTenant: allowPersonCreateTenant,
 	}
 	if svc.ssoSessionStore != nil {
 		if sessionID, sErr := svc.ssoSessionStore.CreateSession(ctx, personID); sErr == nil {
@@ -378,4 +395,35 @@ func ginContextFromContext(ctx context.Context) *gin.Context {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = req
 	return ginCtx
+}
+
+func clientIDFromAuthRequest(authReq op.AuthRequest) string {
+	if ar, ok := authReq.(*AuthRequest); ok {
+		return ar.GetClientID()
+	}
+	return ""
+}
+
+// resolveAllowPersonCreateTenant reports whether the app backing the oauth client
+// allows a zero-tenant person to self-create a tenant. Person with >=1 tenant => false.
+func (svc *oidcAuthSvc) resolveAllowPersonCreateTenant(ctx *gin.Context, clientID string, tenantCount int) bool {
+	if clientID == "" || tenantCount > 0 || svc.oauthClientDao == nil || svc.applicationDao == nil {
+		return false
+	}
+	client, err := svc.oauthClientDao().GetByCond(ctx, &dao.OAuthClientCond{ClientID: clientID})
+	if err != nil || client == nil || client.AppID == 0 {
+		return false
+	}
+	app, err := svc.applicationDao().GetByID(ctx, client.AppID)
+	if err != nil || app == nil || app.ID == 0 {
+		return false
+	}
+	var policy model.TenantPolicy
+	if len(app.TenantPolicy) == 0 {
+		return false
+	}
+	if err := json.Unmarshal(app.TenantPolicy, &policy); err != nil || policy.AllowPersonCreateTenant == nil {
+		return false
+	}
+	return *policy.AllowPersonCreateTenant
 }

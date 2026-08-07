@@ -1,6 +1,10 @@
 package svctenant
 
 import (
+	"context"
+	"encoding/json"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtotenant"
@@ -8,19 +12,27 @@ import (
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objtenant"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 type TenantSvc interface {
 	Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (*dtotenant.TenantCreateResp, error)
+	CreateTenantAsOwner(ctx *gin.Context, req *dtotenant.TenantCreateAsOwnerReq) (*dtotenant.TenantCreateAsOwnerResp, error)
 	Delete(ctx *gin.Context, req *dtotenant.TenantDeleteReq) error
 	Update(ctx *gin.Context, req *dtotenant.TenantUpdateReq) error
 	Detail(ctx *gin.Context, req *dtotenant.TenantDetailReq) (*dtotenant.TenantDetailResp, error)
 	PageList(ctx *gin.Context, req *dtotenant.TenantPageListReq) (*dtotenant.TenantPageListResp, error)
+}
+
+var iamDBFromContext = func(ctx context.Context) *gorm.DB {
+	return dbclient.IamDB(ctx)
 }
 
 type tenantSvc struct {
@@ -54,6 +66,69 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 	})
 	return &dtotenant.TenantCreateResp{
 		TenantID: insertEntity.ID,
+	}, nil
+}
+
+// CreateTenantAsOwner 0租户自然人自助创建租户并成为租户 owner
+func (svc *tenantSvc) CreateTenantAsOwner(ctx *gin.Context, req *dtotenant.TenantCreateAsOwnerReq) (*dtotenant.TenantCreateAsOwnerResp, error) {
+	userID := gincontext.GetUserID(ctx)
+	now := time.Now()
+
+	var tenantID uint
+	txErr := iamDBFromContext(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		tenant := &model.TenantEntity{
+			Name:      req.Name,
+			Type:      model.TenantTypeCustomer,
+			CreatedBy: userID,
+		}
+		if err := dao.NewTenantDao().WithTx(tx).Insert(ctx, tenant); err != nil {
+			return err
+		}
+
+		user := &model.UserEntity{
+			TenantID:   tenant.ID,
+			PersonID:   req.PersonID,
+			Name:       req.Name,
+			Profile:    json.RawMessage("{}"),
+			CustomData: json.RawMessage("{}"),
+			IsOwner:    1,
+			JoinedAt:   &now,
+			CreatedBy:  userID,
+		}
+		if err := dao.NewUserDao().WithTx(tx).Insert(ctx, user); err != nil {
+			return err
+		}
+
+		if req.AppID != 0 {
+			app := &model.TenantApplicationEntity{
+				TenantID:  tenant.ID,
+				AppID:     req.AppID,
+				Status:    "enable",
+				Config:    datatypes.JSON("{}"),
+				CreatedBy: userID,
+			}
+			if err := dao.NewTenantApplicationDao().WithTx(tx).Insert(ctx, app); err != nil {
+				return err
+			}
+		}
+
+		tenantID = tenant.ID
+		return nil
+	})
+	if txErr != nil {
+		glog.Errorf(ctx, "[svctenant.CreateTenantAsOwner] transaction fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))
+		return nil, code.GetError(code.TenantCreateError)
+	}
+
+	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+		Action:     svcaudit.ActionTenantCreate,
+		TenantID:   tenantID,
+		Result:     "success",
+		TargetType: "tenant",
+		TargetID:   tenantID,
+	})
+	return &dtotenant.TenantCreateAsOwnerResp{
+		TenantID: tenantID,
 	}, nil
 }
 
