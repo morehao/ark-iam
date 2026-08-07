@@ -7,6 +7,7 @@ import (
 
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/testsetup"
+	"github.com/morehao/golib/biz/gcontext"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,7 +44,7 @@ func TestCreateSessionRecordsSessionAudit(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	ctx := context.Background()
+	ctx := context.WithValue(context.Background(), gcontext.KeyTenantID, uint(77))
 	store := NewSSOSessionStore()
 
 	prev := sessionAuditWriter
@@ -64,6 +65,7 @@ func TestCreateSessionRecordsSessionAudit(t *testing.T) {
 	require.Equal(t, sid, captured.SessionID)
 	require.Equal(t, sessionAuditStatusActive, captured.Status)
 	require.False(t, captured.LoginTime.IsZero())
+	require.Equal(t, uint(77), captured.TenantID, "session audit should carry resolved tenant_id from ctx")
 
 	// 清理共享 Redis 中的测试会话，避免污染依赖干净状态的其它用例
 	_ = store.RevokeSessionsByPersonID(ctx, 88)

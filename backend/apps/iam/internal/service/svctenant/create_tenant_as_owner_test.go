@@ -77,6 +77,52 @@ func TestCreateTenantAsOwnerCreatesTenantUserAndSubscription(t *testing.T) {
 	}
 }
 
+func TestCreateTenantAsOwnerMultipleCreatesGetUniqueCodes(t *testing.T) {
+	// 回归：第二次创建时租户 code 必须仍非空唯一，不能因空串撞唯一索引而失败
+	db := newCreateTenantAsOwnerTestDB(t)
+	installTenantIamDB(t, db)
+	seedApplication(t, db, 45, true)
+
+	svc := &tenantSvc{}
+	first, err := svc.CreateTenantAsOwner(newCreateTenantAsOwnerCtx(t, 200), &dtotenant.TenantCreateAsOwnerReq{
+		PersonID: 200,
+		Name:     "First",
+		AppID:    45,
+	})
+	if err != nil {
+		t.Fatalf("first CreateTenantAsOwner returned error: %v", err)
+	}
+	second, err := svc.CreateTenantAsOwner(newCreateTenantAsOwnerCtx(t, 201), &dtotenant.TenantCreateAsOwnerReq{
+		PersonID: 201,
+		Name:     "Second",
+		AppID:    45,
+	})
+	if err != nil {
+		t.Fatalf("second CreateTenantAsOwner returned error (code collision?): %v", err)
+	}
+
+	var tenants []model.TenantEntity
+	if err := db.Order("id").Find(&tenants).Error; err != nil {
+		t.Fatalf("query tenants: %v", err)
+	}
+	if len(tenants) != 2 {
+		t.Fatalf("expected 2 tenants, got %d", len(tenants))
+	}
+	if tenants[0].ID != first.TenantID || tenants[1].ID != second.TenantID {
+		t.Fatalf("unexpected tenant ids: %d, %d", tenants[0].ID, tenants[1].ID)
+	}
+	codes := map[string]bool{}
+	for _, tn := range tenants {
+		if tn.Code == "" {
+			t.Fatalf("expected non-empty code for tenant %d", tn.ID)
+		}
+		if codes[tn.Code] {
+			t.Fatalf("duplicate tenant code %q", tn.Code)
+		}
+		codes[tn.Code] = true
+	}
+}
+
 func TestCreateTenantAsOwnerWithoutAppRejected(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = mustNewRequest(t)
@@ -240,6 +286,14 @@ func installTenantIamDB(t *testing.T, db *gorm.DB) {
 func sanitizeCreateTenantAsOwnerTestName(name string) string {
 	replacer := strings.NewReplacer("/", "_", " ", "_", ":", "_")
 	return replacer.Replace(name)
+}
+
+func newCreateTenantAsOwnerCtx(t *testing.T, userID uint) *gin.Context {
+	t.Helper()
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = mustNewRequest(t)
+	ginCtx.Set(gcontext.KeyUserID, userID)
+	return ginCtx
 }
 
 func mustNewRequest(t *testing.T) *http.Request {

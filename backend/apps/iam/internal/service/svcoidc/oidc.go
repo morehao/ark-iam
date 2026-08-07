@@ -24,6 +24,7 @@ import (
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/glog"
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"golang.org/x/text/language"
@@ -276,7 +277,7 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	}
 
 	if svc.ssoSessionStore != nil {
-		sessionID, err := svc.ssoSessionStore.CreateSession(ctx.Request.Context(), personEntity.ID)
+		sessionID, err := svc.ssoSessionStore.CreateSession(sessionAuditContext(ctx.Request.Context(), tenantID), personEntity.ID)
 		if err != nil {
 			glog.Warnf(ctx, "[oidcAuthSvc.CompleteLogin] failed to create sso session: %v", err)
 		} else {
@@ -327,7 +328,7 @@ func (svc *oidcAuthSvc) SelectTenant(ctx context.Context, authRequestID string, 
 		AllowPersonCreateTenant: allowPersonCreateTenant,
 	}
 	if svc.ssoSessionStore != nil {
-		if sessionID, sErr := svc.ssoSessionStore.CreateSession(ctx, personID); sErr == nil {
+		if sessionID, sErr := svc.ssoSessionStore.CreateSession(sessionAuditContext(ctx, tenantID), personID); sErr == nil {
 			resp.SessionID = sessionID
 		} else {
 			glog.Warnf(ctx, "[oidcAuthSvc.SelectTenant] failed to create sso session: %v", sErr)
@@ -387,6 +388,11 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx context.Context, authRequestI
 	})
 
 	return svc.provider.BuildAuthCallbackURL(ctx, authRequestID), nil
+}
+
+// sessionAuditContext 将已解析的租户写入 context，供 CreateSession 落库 session 审计时读取 tenant_id。
+func sessionAuditContext(ctx context.Context, tenantID uint) context.Context {
+	return context.WithValue(ctx, gcontext.KeyTenantID, tenantID)
 }
 
 func ginContextFromContext(ctx context.Context) *gin.Context {

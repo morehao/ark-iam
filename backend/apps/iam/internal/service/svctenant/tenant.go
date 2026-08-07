@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/iam/internal/service/svcaudit"
@@ -44,10 +45,20 @@ func NewTenantSvc() TenantSvc {
 	return &tenantSvc{}
 }
 
+// generateTenantCode 生成全局唯一、非空的租户编码，用于避免空 code 撞到唯一索引。
+func generateTenantCode() string {
+	return "tenant-" + uuid.NewString()
+}
+
 // Create 创建租户管理
 func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (*dtotenant.TenantCreateResp, error) {
+	tenantCode := req.Code
+	if tenantCode == "" {
+		// 保证 code 非空且唯一，避免撞租户表唯一索引（MySQL 仅允许一条空字符串）
+		tenantCode = generateTenantCode()
+	}
 	insertEntity := &model.TenantEntity{
-		Code:        req.Code,
+		Code:        tenantCode,
 		DbUser:      req.DbUser,
 		IsSuspended: req.IsSuspended,
 		Name:        req.Name,
@@ -83,6 +94,7 @@ func (svc *tenantSvc) CreateTenantAsOwner(ctx *gin.Context, req *dtotenant.Tenan
 	var tenantID uint
 	txErr := iamDBFromContext(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		tenant := &model.TenantEntity{
+			Code:      generateTenantCode(),
 			Name:      req.Name,
 			Type:      model.TenantTypeCustomer,
 			CreatedBy: userID,
@@ -107,11 +119,12 @@ func (svc *tenantSvc) CreateTenantAsOwner(ctx *gin.Context, req *dtotenant.Tenan
 
 		if req.AppID != 0 {
 			app := &model.TenantApplicationEntity{
-				TenantID:  tenant.ID,
-				AppID:     req.AppID,
-				Status:    "enable",
-				Config:    datatypes.JSON("{}"),
-				CreatedBy: userID,
+				TenantID:     tenant.ID,
+				AppID:        req.AppID,
+				Status:       "enable",
+				Config:       datatypes.JSON("{}"),
+				GrantedScope: datatypes.JSON("[]"),
+				CreatedBy:    userID,
 			}
 			if err := dao.NewTenantApplicationDao().WithTx(tx).Insert(ctx, app); err != nil {
 				return err
