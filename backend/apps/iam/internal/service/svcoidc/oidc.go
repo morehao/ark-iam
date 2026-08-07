@@ -314,25 +314,20 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx context.Context, authRequestI
 	}
 
 	tenantID := uint(0)
-	if ar, ok := authReq.(*AuthRequest); ok {
-		tenantID = ar.GetTenantID()
-	}
 	tenants, tErr := svc.authSvc.TenantsForPerson(ginContextFromContext(ctx), personID)
-	if tErr == nil && tenantID != 0 {
-		ok := false
-		for _, t := range tenants {
-			if t.TenantID == tenantID {
-				ok = true
-				break
+	if tErr == nil {
+		if ar, ok := authReq.(*AuthRequest); ok {
+			if hint := ar.GetTenantID(); hint != 0 {
+				for _, t := range tenants {
+					if t.TenantID == hint {
+						tenantID = hint
+						break
+					}
+				}
 			}
 		}
 		// membership safety: never issue a token for a tenant hinted but not owned by the user
-		if !ok {
-			tenantID = 0
-		}
-	}
-	if tenantID == 0 {
-		if len(tenants) > 0 {
+		if tenantID == 0 && len(tenants) > 0 {
 			tenantID = tenants[0].TenantID
 		}
 	}

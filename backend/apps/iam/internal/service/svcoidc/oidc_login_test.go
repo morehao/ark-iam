@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 	appconfig "github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/iam/model"
@@ -171,6 +172,66 @@ func TestCompleteLoginBySessionFallsBackWhenHintNotInPersonsTenants(t *testing.T
 	}
 	if completedReq.TenantID != 3 {
 		t.Fatalf("expected forged hint 99 to fall back to tenants[0]=3, got %d", completedReq.TenantID)
+	}
+}
+
+func TestCompleteLoginBySessionRejectsHintOnTenantLookupError(t *testing.T) {
+	testsetup.Initialize(testsetup.AppNameIam)
+	defer testsetup.Done(testsetup.AppNameIam)
+
+	appconfig.Conf = &appconfig.Config{
+		JWT: appconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: appconfig.OIDC{
+			Issuer:           "http://localhost:8099/oidc",
+			FrontendLoginURL: "http://localhost:3000/oidc/login",
+			AllowInsecure:    true,
+		},
+	}
+	provider, err := SetupOIDCProvider(appconfig.Conf.OIDC.Issuer)
+	if err != nil {
+		t.Fatalf("SetupOIDCProvider failed: %v", err)
+	}
+	request, err := provider.Storage.CreateAuthRequest(t.Context(), &oidc.AuthRequest{
+		ClientID:     "client-1",
+		RedirectURI:  "https://client.example.com/callback",
+		State:        "state-1",
+		Scopes:       []string{oidc.ScopeOpenID, oidc.ScopeProfile},
+		ResponseType: oidc.ResponseTypeCode,
+		ResponseMode: oidc.ResponseModeQuery,
+	}, "")
+	if err != nil {
+		t.Fatalf("CreateAuthRequest failed: %v", err)
+	}
+
+	authTime := time.Now()
+	if err := provider.Storage.CompleteAuthRequest(request.GetID(), "person:88", authTime, []string{"pwd"}, "", 99, false); err != nil {
+		t.Fatalf("storing forged tenant hint via CompleteAuthRequest(done=false) failed: %v", err)
+	}
+
+	svc := &oidcAuthSvc{
+		provider: provider,
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error) {
+			return nil, assert.AnError
+		}},
+		ssoSessionStore: &fakeSSOSessionStore{validatedPersonID: 88},
+	}
+
+	if _, err := svc.CompleteLoginBySession(t.Context(), request.GetID(), "session-x"); err != nil {
+		t.Fatalf("CompleteLoginBySession failed: %v", err)
+	}
+	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())
+	if err != nil {
+		t.Fatalf("AuthRequestByID failed: %v", err)
+	}
+	completedReq, ok := updated.(*AuthRequest)
+	if !ok {
+		t.Fatalf("expected *AuthRequest, got %T", updated)
+	}
+	if !completedReq.Done() {
+		t.Fatal("expected auth request to be completed")
+	}
+	if completedReq.TenantID != 0 {
+		t.Fatalf("expected forged hint to be dropped (tenantID 0) when tenant lookup errors, got %d", completedReq.TenantID)
 	}
 }
 
