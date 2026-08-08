@@ -15,6 +15,7 @@ import (
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/service/svcsso"
 	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/token"
 	"github.com/morehao/golib/glog"
@@ -155,10 +156,7 @@ func (s *PersistentStore) GetPrivateClaimsFromScopes(ctx context.Context, userID
 	if err != nil || len(users) == 0 {
 		return nil, nil
 	}
-	tenantID := users[0].TenantID
-	return map[string]any{
-		"tenant_id": tenantID,
-	}, nil
+	return objauth.TokenClaims{TenantID: users[0].TenantID}.OIDCPrivateClaims(), nil
 }
 
 func (s *PersistentStore) GetKeyByIDAndClientID(ctx context.Context, keyID, clientID string) (*jose.JSONWebKey, error) {

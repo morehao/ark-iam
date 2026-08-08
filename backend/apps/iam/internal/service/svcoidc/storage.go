@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/op"
 
 	"github.com/morehao/ark-iam/iam/dao"
+	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/golib/glog"
 )
 
@@ -104,20 +105,20 @@ var _ op.CanGetPrivateClaimsFromRequest = (*OIDCStorage)(nil)
 func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request op.TokenRequest, restrictedScopes []string) (map[string]any, error) {
 	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok {
 		if ccReq.isApiKey {
-			return map[string]any{
-				"tenant_id":   ccReq.ownerTenantID,
-				"user_id":     ccReq.ownerUserID,
-				"token_usage": "machine",
-			}, nil
+			return (objauth.TokenClaims{
+				TenantID:   ccReq.ownerTenantID,
+				UserID:     ccReq.ownerUserID,
+				TokenUsage: objauth.TokenUsageMachine,
+			}).OIDCPrivateClaims(), nil
 		}
-		return map[string]any{"client_id": ccReq.ClientID()}, nil
+		return objauth.TokenClaims{ClientID: ccReq.ClientID()}.OIDCPrivateClaims(), nil
 	}
 	// authorization_code：优先用认证流程确定的租户
 	if authReq, ok := request.(*AuthRequest); ok {
 		if tid := authReq.GetTenantID(); tid > 0 {
 			if pid, perr := parseOIDCSubject(authReq.GetSubject()); perr == nil {
 				if users, uerr := s.persistentStore.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid, TenantID: tid}); uerr == nil && len(users) > 0 {
-					return map[string]any{"tenant_id": tid}, nil
+					return objauth.TokenClaims{TenantID: tid}.OIDCPrivateClaims(), nil
 				}
 			}
 		}
@@ -127,7 +128,7 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 		if tid := rr.GetTenantID(); tid > 0 {
 			if pid, perr := parseOIDCSubject(rr.GetSubject()); perr == nil {
 				if users, uerr := s.persistentStore.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid, TenantID: tid}); uerr == nil && len(users) > 0 {
-					return map[string]any{"tenant_id": tid}, nil
+					return objauth.TokenClaims{TenantID: tid}.OIDCPrivateClaims(), nil
 				}
 			}
 		}

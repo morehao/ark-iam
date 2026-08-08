@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/morehao/ark-iam/iam/internal/middleware"
+	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/glog"
 )
@@ -78,11 +78,8 @@ func OIDCCompatibleAuth(getOIDCPublicKey func() *rsa.PublicKey, opts ...AuthOpti
 		oidcPublicKey := getOIDCPublicKey()
 		claims, err := validateOIDCAccessToken(tokenStr, oidcPublicKey)
 		if err == nil {
-			isMachine := false
-			if v, ok := claims["token_usage"].(string); ok && v == "machine" {
-				isMachine = true
-			}
-			personID := parsePersonIDFromSub(claims["sub"].(string))
+			isMachine := claims.IsMachine()
+			personID := claims.PersonID()
 			if cfg.validateOIDCSSO != nil && !cfg.validateOIDCSSO(ctx, personID, isMachine) {
 				glog.Warnf(ctx, "[oidcauth] sso session revoked, personID:%d", personID)
 				abortUnauthorized(ctx, "session expired")
@@ -98,54 +95,44 @@ func OIDCCompatibleAuth(getOIDCPublicKey func() *rsa.PublicKey, opts ...AuthOpti
 	}
 }
 
-func validateOIDCAccessToken(tokenStr string, publicKey *rsa.PublicKey) (jwt.MapClaims, error) {
+func validateOIDCAccessToken(tokenStr string, publicKey *rsa.PublicKey) (*objauth.TokenClaims, error) {
 	if publicKey == nil {
 		return nil, errors.New("oidc public key not initialized")
 	}
-	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+	claims := &objauth.TokenClaims{}
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return publicKey, nil
-	}, jwt.WithLeeway(0))
+	}, jwt.WithLeeway(0), jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()}))
 	if err != nil {
 		return nil, err
 	}
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok || !token.Valid {
+	if !token.Valid {
 		return nil, errors.New("invalid oidc token")
 	}
-	_, subOK := claims["sub"].(string)
-	_, tenantOK := claims["tenant_id"].(float64)
-	if !subOK || !tenantOK {
+	// 人 token 必须携带 person sub 与 tenant_id；机器凭证必须携带可知的 token_usage。
+	// 既非 person 也非 machine 的 token（如仅 client_id 的 client_credentials）拒绝。
+	if claims.HasPerson() {
+		if claims.TenantID == 0 {
+			return nil, errors.New("missing required oidc claim: tenant_id")
+		}
+		return claims, nil
+	}
+	if !claims.IsMachine() {
 		return nil, errors.New("missing required oidc claims")
 	}
 	return claims, nil
 }
 
-func setOIDCContext(ctx *gin.Context, claims jwt.MapClaims, tokenStr string) {
-	sub, _ := claims["sub"].(string)
-	personID := parsePersonIDFromSub(sub)
-
-	tenantIDFloat, _ := claims["tenant_id"].(float64)
-	tenantID := uint(tenantIDFloat)
+func setOIDCContext(ctx *gin.Context, claims *objauth.TokenClaims, tokenStr string) {
+	personID := claims.PersonID()
+	tenantID := uint(claims.TenantID)
 
 	ctx.Set(gcontext.KeyPersonID, personID)
 	ctx.Set(gcontext.KeyTenantID, tenantID)
 	ctx.Set(gcontext.KeyAuthToken, tokenStr)
-}
-
-func parsePersonIDFromSub(sub string) uint {
-	const prefix = "person:"
-	if !strings.HasPrefix(sub, prefix) {
-		return 0
-	}
-	raw := strings.TrimPrefix(sub, prefix)
-	id, err := strconv.ParseUint(raw, 10, 64)
-	if err != nil {
-		return 0
-	}
-	return uint(id)
 }
 
 func isSkippedPath(path string, skipPaths []string) bool {
