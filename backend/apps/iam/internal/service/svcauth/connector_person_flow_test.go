@@ -3,15 +3,33 @@ package svcauth
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoconnector"
+	"github.com/morehao/ark-iam/iam/internal/service/svcsso"
 	"github.com/morehao/ark-iam/iam/model"
 	"gorm.io/gorm"
 )
+
+type fakeConnectorSSOSessionStore struct {
+	createdFor uint
+}
+
+var _ svcsso.SSOSessionStore = (*fakeConnectorSSOSessionStore)(nil)
+
+func (f *fakeConnectorSSOSessionStore) CreateSession(ctx context.Context, personID uint) (string, error) {
+	f.createdFor = personID
+	return fmt.Sprintf("sso-session-%d", personID), nil
+}
+
+func (f *fakeConnectorSSOSessionStore) ValidateSession(ctx context.Context, sessionID string) (uint, error) { return 0, nil }
+func (f *fakeConnectorSSOSessionStore) RevokeSession(ctx context.Context, sessionID string) error            { return nil }
+func (f *fakeConnectorSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, personID uint) error    { return nil }
+func (f *fakeConnectorSSOSessionStore) HasActiveSession(ctx context.Context, personID uint) (bool, error)    { return false, nil }
 
 func TestConnectorCallbackReturnsPersonTokenWhenPersonHasMultipleTenants(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
@@ -87,15 +105,16 @@ func TestConnectorCallbackReturnsPersonTokenWhenPersonHasMultipleTenants(t *test
 				return &resolvedConnectorPerson{Person: &model.PersonEntity{Model: gorm.Model{ID: 101}, Username: "alice"}}, nil
 			},
 		},
-		loginRecorder: func(ctx *gin.Context, tenantID, userID uint, success bool) {},
+		ssoSessionStore: &fakeConnectorSSOSessionStore{},
+		loginRecorder:   func(ctx *gin.Context, tenantID, userID uint, success bool) {},
 	}
 
 	resp, err := svc.Callback(ginCtx, &dtoconnector.ConnectorCallbackReq{ConnectorID: 11, Code: "authorization-code", State: "callback-state-multi-tenant"})
 	if err != nil {
 		t.Fatalf("Callback returned error: %v", err)
 	}
-	if resp == nil || resp.PersonToken.AccessToken == "" {
-		t.Fatalf("expected person token in callback response, got %#v", resp)
+	if resp == nil || resp.SSOSessionID == "" {
+		t.Fatalf("expected sso session id in callback response, got %#v", resp)
 	}
 	if len(resp.Tenants) != 2 {
 		t.Fatalf("expected 2 tenant options, got %#v", resp)
@@ -159,6 +178,7 @@ func TestConnectorCallbackUsesIdentityResolverPath(t *testing.T) {
 		connectorRepo: &fakeConnectorRuntimeRepository{getByIDFunc: func(ctx context.Context, id uint) (*model.ConnectorEntity, error) { return conn, nil }},
 		stateStore: stateStore,
 		identityResolver: mapper,
+		ssoSessionStore: &fakeConnectorSSOSessionStore{},
 		loginRecorder: func(ctx *gin.Context, tenantID, userID uint, success bool) {},
 	}
 
@@ -166,8 +186,8 @@ func TestConnectorCallbackUsesIdentityResolverPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Callback returned error: %v", err)
 	}
-	if resp == nil || resp.PersonToken.AccessToken == "" {
-		t.Fatalf("expected person token response, got %#v", resp)
+	if resp == nil || resp.SSOSessionID == "" {
+		t.Fatalf("expected sso session response, got %#v", resp)
 	}
 	if insertedIdentity == nil {
 		t.Fatal("expected identity resolver path to persist identity")

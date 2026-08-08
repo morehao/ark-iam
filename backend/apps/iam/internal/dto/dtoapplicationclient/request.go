@@ -1,4 +1,4 @@
-package dtooauthclient
+package dtoapplicationclient
 
 type CreateReq struct {
 	AppId       uint   `json:"appId" binding:"required"`       // 所属应用ID
@@ -20,7 +20,7 @@ type CreateReq struct {
 }
 
 type UpdateReq struct {
-	OAuthClientID uint   `json:"oauthClientId" binding:"required"` // OAuth客户端ID
+	ApplicationClientID uint   `json:"applicationClientId" binding:"required"` // OAuth客户端ID
 	Name          string `json:"name"`                             // 客户端名称
 	Type          string `json:"type"`                             // 客户端类型
 	Status        string `json:"status"`                           // 状态: enable-启用, disable-停用
@@ -40,11 +40,11 @@ type UpdateReq struct {
 }
 
 type DeleteReq struct {
-	OAuthClientID uint `json:"oauthClientId" binding:"required"` // OAuth客户端ID
+	ApplicationClientID uint `json:"applicationClientId" binding:"required"` // OAuth客户端ID
 }
 
 type DetailReq struct {
-	OAuthClientID uint `json:"oauthClientId" binding:"required"` // OAuth客户端ID
+	ApplicationClientID uint `json:"applicationClientId" binding:"required"` // OAuth客户端ID
 }
 
 type PageListReq struct {
@@ -56,11 +56,11 @@ type PageListReq struct {
 }
 
 type SecretListReq struct {
-	OAuthClientID uint `json:"oauthClientId" form:"oauthClientId" binding:"required"` // OAuth客户端ID
+	ApplicationClientID uint `json:"applicationClientId" form:"applicationClientId" binding:"required"` // OAuth客户端ID
 }
 
 type CreateSecretReq struct {
-	OAuthClientID uint   `json:"oauthClientId" binding:"required"` // OAuth客户端ID
+	ApplicationClientID uint   `json:"applicationClientId" binding:"required"` // OAuth客户端ID
 	Name          string `json:"name" binding:"required"`          // 密钥名称
 	ExpiredAt     string `json:"expiresAt"`                        // 过期时间
 }

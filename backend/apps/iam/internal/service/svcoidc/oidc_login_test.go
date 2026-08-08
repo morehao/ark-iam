@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	appconfig "github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtooidc"
+	"github.com/morehao/ark-iam/iam/internal/service/svcsso"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/testsetup"
@@ -38,7 +39,7 @@ type fakeSSOSessionStore struct {
 	validatedPersonID uint
 }
 
-var _ SSOSessionStore = (*fakeSSOSessionStore)(nil)
+var _ svcsso.SSOSessionStore = (*fakeSSOSessionStore)(nil)
 
 func (f *fakeSSOSessionStore) CreateSession(ctx context.Context, personID uint) (string, error) {
 	return "session-" + fmt.Sprint(personID), nil

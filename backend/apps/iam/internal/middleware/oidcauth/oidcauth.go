@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/morehao/ark-iam/iam/internal/middleware"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/glog"
 )
@@ -52,6 +53,18 @@ func OIDCCompatibleAuth(getOIDCPublicKey func() *rsa.PublicKey, opts ...AuthOpti
 	return func(ctx *gin.Context) {
 		if isSkippedPath(ctx.Request.URL.Path, cfg.skipPaths) {
 			ctx.Next()
+			return
+		}
+
+		// 并行鉴权：若请求显式携带 x-api-key，则任一通过即可（OIDC 或 API Key）。
+		// 机器凭证（API Key）不依赖浏览器 SSO 会话活性，见设计文档 §4.4。
+		// 仅以 x-api-key 头作为机器凭证通道，避免与 Authorization: Bearer 的 OIDC 通道冲突。
+		if ctx.GetHeader("x-api-key") != "" {
+			if middleware.AuthenticateApiKey(ctx) {
+				ctx.Next()
+				return
+			}
+			// API Key 非法/过期/吊销：Authenticate 已写入 401 响应，直接终止
 			return
 		}
 

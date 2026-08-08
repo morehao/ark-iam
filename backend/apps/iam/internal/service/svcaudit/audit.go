@@ -15,8 +15,8 @@ const (
 	ActionTenantSwitch            = "tenant.switch"
 	ActionTenantCreate            = "tenant.create"
 	ActionApplicationCreate       = "application.create"
-	ActionOAuthClientCreate       = "oauth_client.create"
-	ActionOAuthClientCreateSecret = "oauth_client.create_secret"
+	ActionApplicationClientCreate       = "application_client.create"
+	ActionApplicationClientCreateSecret = "application_client.create_secret"
 	ActionApiKeyCreate            = "api_key.create"
 	ActionApiKeyRevoke            = "api_key.revoke"
 )

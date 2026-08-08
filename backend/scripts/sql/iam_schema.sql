@@ -490,7 +490,7 @@ CREATE TABLE `refresh_token`
     `person_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '自然人ID',
     `tenant_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
     `user_id`         BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '用户ID',
-    `oauth_client_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'OIDC客户端ID',
+    `application_client_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'OIDC客户端ID',
     `session_id`      VARCHAR(64) NOT NULL DEFAULT '' COMMENT '会话ID',
     `token`           VARCHAR(256) NOT NULL DEFAULT '' COMMENT 'token哈希',
     `client_type`     VARCHAR(32) NOT NULL DEFAULT '' COMMENT '客户端类型',
@@ -558,7 +558,7 @@ CREATE TABLE `domain`
     KEY             `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='域名表';
 
-CREATE TABLE `oauth_client` (
+CREATE TABLE `application_client` (
     `id`                            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '客户端ID',
     `tenant_id`                     BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
     `app_id`                BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '所属应用id',
@@ -592,9 +592,9 @@ CREATE TABLE `oauth_client` (
     KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='OIDC客户端表';
 
-CREATE TABLE `oauth_client_secret` (
+CREATE TABLE `application_client_secret` (
     `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-    `oauth_client_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '客户端ID',
+    `application_client_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '客户端ID',
     `name`            VARCHAR(256) NOT NULL DEFAULT '' COMMENT '密钥名称',
     `value_hash`      VARCHAR(256) NOT NULL DEFAULT '' COMMENT '密钥哈希',
     `value_prefix`    VARCHAR(16) NOT NULL DEFAULT '' COMMENT '密钥前缀',
@@ -607,7 +607,7 @@ CREATE TABLE `oauth_client_secret` (
     `updated_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
     `deleted_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
     PRIMARY KEY (`id`),
-    KEY `idx_oauth_client_id` (`oauth_client_id`),
+    KEY `idx_application_client_id` (`application_client_id`),
     KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='OIDC客户端密钥表';
 

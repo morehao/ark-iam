@@ -1,4 +1,4 @@
-package svcoidc
+package svcsso
 
 import (
 	"context"
@@ -95,7 +95,7 @@ func recordSessionAuditBestEffort(ctx context.Context, sid string, personID uint
 		CreatedBy: personID,
 	}
 	if err := sessionAuditWriter(ctx, entity); err != nil {
-		glog.Errorf(ctx, "[svcoidc.recordSessionAudit] write session audit fail, err:%v, sessionId:%s, personId:%d", err, sid, personID)
+		glog.Errorf(ctx, "[svcsso.recordSessionAudit] write session audit fail, err:%v, sessionId:%s, personId:%d", err, sid, personID)
 	}
 }
 

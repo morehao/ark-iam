@@ -29,7 +29,7 @@ func TestClientCredentialsStorage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	if err := db.AutoMigrate(&model.OAuthClientEntity{}, &model.OAuthClientSecretEntity{}); err != nil {
+	if err := db.AutoMigrate(&model.ApplicationClientEntity{}, &model.ApplicationClientSecretEntity{}); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
 
@@ -37,7 +37,7 @@ func TestClientCredentialsStorage(t *testing.T) {
 	secret := "s3cr3t"
 	secretHash := sha256.Sum256([]byte(secret))
 
-	clientEntity := &model.OAuthClientEntity{
+	clientEntity := &model.ApplicationClientEntity{
 		Model:                   gorm.Model{ID: 1},
 		TenantID:                1,
 		ClientID:                clientID,
@@ -49,31 +49,31 @@ func TestClientCredentialsStorage(t *testing.T) {
 		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodBasic,
 		AllowedOrigins:          datatypes.JSON("[]"),
 		DefaultScopes:           datatypes.JSON(`["openid"]`),
-		Status:                  model.OAuthClientStatusEnable,
-		Type:                    model.OAuthClientTypeFirstParty,
+		Status:                  model.ApplicationClientStatusEnable,
+		Type:                    model.ApplicationClientTypeFirstParty,
 	}
 	if err := db.Create(clientEntity).Error; err != nil {
-		t.Fatalf("insert oauth_client: %v", err)
+		t.Fatalf("insert application_client: %v", err)
 	}
 
-	secretEntity := &model.OAuthClientSecretEntity{
+	secretEntity := &model.ApplicationClientSecretEntity{
 		Model:         gorm.Model{ID: 1},
-		OAuthClientID: clientEntity.ID,
+		ApplicationClientID: clientEntity.ID,
 		Name:          "default",
 		ValueHash:     hex.EncodeToString(secretHash[:]),
 		ValuePrefix:   "s*",
 	}
 	if err := db.Create(secretEntity).Error; err != nil {
-		t.Fatalf("insert oauth_client_secret: %v", err)
+		t.Fatalf("insert application_client_secret: %v", err)
 	}
 
 	persistentStore := NewPersistentStore()
-	persistentStore.oauthClientDao = func() *dao.OAuthClientDao {
-		return dao.NewOAuthClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
+	persistentStore.applicationClientDao = func() *dao.ApplicationClientDao {
+		return dao.NewApplicationClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
 	}
-	persistentStore.oauthClientSecretDao = func() *dao.OAuthClientSecretDao {
-		return &dao.OAuthClientSecretDao{Dao: gormdao.NewDao[model.OAuthClientSecretEntity, model.OAuthClientSecretEntityList](
-			model.TableNameOAuthClientSecret, "OAuthClientSecretDao",
+	persistentStore.applicationClientSecretDao = func() *dao.ApplicationClientSecretDao {
+		return &dao.ApplicationClientSecretDao{Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList](
+			model.TableNameApplicationClientSecret, "ApplicationClientSecretDao",
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}
 	}
@@ -126,7 +126,7 @@ func TestClientCredentialsRejectsPublicClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	if err := db.AutoMigrate(&model.OAuthClientEntity{}, &model.OAuthClientSecretEntity{}); err != nil {
+	if err := db.AutoMigrate(&model.ApplicationClientEntity{}, &model.ApplicationClientSecretEntity{}); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
 
@@ -134,7 +134,7 @@ func TestClientCredentialsRejectsPublicClient(t *testing.T) {
 	secret := "s3cr3t"
 	secretHash := sha256.Sum256([]byte(secret))
 
-	publicClient := &model.OAuthClientEntity{
+	publicClient := &model.ApplicationClientEntity{
 		Model:                   gorm.Model{ID: 1},
 		TenantID:                1,
 		ClientID:                clientID,
@@ -146,31 +146,31 @@ func TestClientCredentialsRejectsPublicClient(t *testing.T) {
 		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodNone,
 		AllowedOrigins:          datatypes.JSON("[]"),
 		DefaultScopes:           datatypes.JSON(`["openid"]`),
-		Status:                  model.OAuthClientStatusEnable,
-		Type:                    model.OAuthClientTypeFirstParty,
+		Status:                  model.ApplicationClientStatusEnable,
+		Type:                    model.ApplicationClientTypeFirstParty,
 	}
 	if err := db.Create(publicClient).Error; err != nil {
-		t.Fatalf("insert oauth_client: %v", err)
+		t.Fatalf("insert application_client: %v", err)
 	}
 
-	secretEntity := &model.OAuthClientSecretEntity{
+	secretEntity := &model.ApplicationClientSecretEntity{
 		Model:         gorm.Model{ID: 1},
-		OAuthClientID: publicClient.ID,
+		ApplicationClientID: publicClient.ID,
 		Name:          "default",
 		ValueHash:     hex.EncodeToString(secretHash[:]),
 		ValuePrefix:   "s*",
 	}
 	if err := db.Create(secretEntity).Error; err != nil {
-		t.Fatalf("insert oauth_client_secret: %v", err)
+		t.Fatalf("insert application_client_secret: %v", err)
 	}
 
 	persistentStore := NewPersistentStore()
-	persistentStore.oauthClientDao = func() *dao.OAuthClientDao {
-		return dao.NewOAuthClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
+	persistentStore.applicationClientDao = func() *dao.ApplicationClientDao {
+		return dao.NewApplicationClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
 	}
-	persistentStore.oauthClientSecretDao = func() *dao.OAuthClientSecretDao {
-		return &dao.OAuthClientSecretDao{Dao: gormdao.NewDao[model.OAuthClientSecretEntity, model.OAuthClientSecretEntityList](
-			model.TableNameOAuthClientSecret, "OAuthClientSecretDao",
+	persistentStore.applicationClientSecretDao = func() *dao.ApplicationClientSecretDao {
+		return &dao.ApplicationClientSecretDao{Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList](
+			model.TableNameApplicationClientSecret, "ApplicationClientSecretDao",
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}
 	}
@@ -198,8 +198,8 @@ func TestCreateAccessTokenForClientCredentials(t *testing.T) {
 	db := newClientCredentialsTestDB(t, clientID, accessTokenTTL)
 
 	persistentStore := NewPersistentStore()
-	persistentStore.oauthClientDao = func() *dao.OAuthClientDao {
-		return dao.NewOAuthClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
+	persistentStore.applicationClientDao = func() *dao.ApplicationClientDao {
+		return dao.NewApplicationClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
 	}
 
 	now := time.Now()
@@ -231,8 +231,8 @@ func TestGetPrivateClaimsFromRequestForClientCredentials(t *testing.T) {
 	db := newClientCredentialsTestDB(t, clientID, 3600)
 
 	persistentStore := NewPersistentStore()
-	persistentStore.oauthClientDao = func() *dao.OAuthClientDao {
-		return dao.NewOAuthClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
+	persistentStore.applicationClientDao = func() *dao.ApplicationClientDao {
+		return dao.NewApplicationClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
 	}
 
 	storage := NewOIDCStorage(nil, persistentStore, nil, "test-key")
@@ -269,11 +269,11 @@ func newClientCredentialsTestDB(t *testing.T, clientID string, accessTokenTTL in
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	if err := db.AutoMigrate(&model.OAuthClientEntity{}, &model.OAuthClientSecretEntity{}); err != nil {
+	if err := db.AutoMigrate(&model.ApplicationClientEntity{}, &model.ApplicationClientSecretEntity{}); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
 
-	clientEntity := &model.OAuthClientEntity{
+	clientEntity := &model.ApplicationClientEntity{
 		Model:                   gorm.Model{ID: 1},
 		TenantID:                1,
 		ClientID:                clientID,
@@ -286,11 +286,11 @@ func newClientCredentialsTestDB(t *testing.T, clientID string, accessTokenTTL in
 		AllowedOrigins:          datatypes.JSON("[]"),
 		DefaultScopes:           datatypes.JSON(`["openid"]`),
 		AccessTokenTTL:          accessTokenTTL,
-		Status:                  model.OAuthClientStatusEnable,
-		Type:                    model.OAuthClientTypeFirstParty,
+		Status:                  model.ApplicationClientStatusEnable,
+		Type:                    model.ApplicationClientTypeFirstParty,
 	}
 	if err := db.Create(clientEntity).Error; err != nil {
-		t.Fatalf("insert oauth_client: %v", err)
+		t.Fatalf("insert application_client: %v", err)
 	}
 	return db
 }

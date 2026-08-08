@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type OAuthClientCond struct {
+type ApplicationClientCond struct {
 	*gormdao.BaseCond
 	TenantID uint
 	AppID    uint
@@ -17,7 +17,7 @@ type OAuthClientCond struct {
 	Status   string
 }
 
-func (c *OAuthClientCond) BuildCondition(db *gorm.DB, tableName string) {
+func (c *ApplicationClientCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
@@ -41,23 +41,23 @@ func (c *OAuthClientCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 }
 
-type OAuthClientDao struct {
-	*gormdao.Dao[model.OAuthClientEntity, model.OAuthClientEntityList]
+type ApplicationClientDao struct {
+	*gormdao.Dao[model.ApplicationClientEntity, model.ApplicationClientEntityList]
 }
 
-func NewOAuthClientDao() *OAuthClientDao {
-	return &OAuthClientDao{
-		Dao: gormdao.NewDao[model.OAuthClientEntity, model.OAuthClientEntityList](
-			model.TableNameOAuthClient, "OAuthClientDao",
+func NewApplicationClientDao() *ApplicationClientDao {
+	return &ApplicationClientDao{
+		Dao: gormdao.NewDao[model.ApplicationClientEntity, model.ApplicationClientEntityList](
+			model.TableNameApplicationClient, "ApplicationClientDao",
 			dbclient.IamDB,
 		),
 	}
 }
 
-func NewOAuthClientDaoWithDB(getDB gormdao.DBGetter) *OAuthClientDao {
-	return &OAuthClientDao{
-		Dao: gormdao.NewDao[model.OAuthClientEntity, model.OAuthClientEntityList](
-			model.TableNameOAuthClient, "OAuthClientDao", getDB,
+func NewApplicationClientDaoWithDB(getDB gormdao.DBGetter) *ApplicationClientDao {
+	return &ApplicationClientDao{
+		Dao: gormdao.NewDao[model.ApplicationClientEntity, model.ApplicationClientEntityList](
+			model.TableNameApplicationClient, "ApplicationClientDao", getDB,
 		),
 	}
 }

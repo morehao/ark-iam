@@ -101,7 +101,7 @@ func TestMyTenantsReturnsCurrentPersonTenantList(t *testing.T) {
 	})
 	defer restoreTenantStore()
 
-	svc := &authSvc{jwtSecret: "test-secret"}
+	svc := &authSvc{}
 	resp, err := svc.MyTenants(ginCtx, &dtoauth.MyTenantsReq{})
 	if err != nil {
 		t.Fatalf("MyTenants returned error: %v", err)
@@ -142,7 +142,7 @@ func TestJoinTenantRejectsNonExistentTenant(t *testing.T) {
 	})
 	defer restoreTenantStore()
 
-	svc := &authSvc{jwtSecret: "test-secret"}
+	svc := &authSvc{}
 	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{TenantID: 999})
 	assertCode(t, err, code.TenantNotExistError)
 	if tenantLookup != 999 {
@@ -176,7 +176,7 @@ func TestJoinTenantRejectsAlreadyJoinedTenant(t *testing.T) {
 	})
 	defer restoreTenantStore()
 
-	svc := &authSvc{jwtSecret: "test-secret"}
+	svc := &authSvc{}
 	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{TenantID: 22})
 	assertCode(t, err, code.AlreadyJoinedError)
 }
@@ -213,7 +213,7 @@ func TestJoinTenantCreatesNonOwnerUser(t *testing.T) {
 	})
 	defer restoreTenantStore()
 
-	svc := &authSvc{jwtSecret: "test-secret"}
+	svc := &authSvc{}
 	resp, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{TenantID: 22})
 	if err != nil {
 		t.Fatalf("JoinTenant returned error: %v", err)

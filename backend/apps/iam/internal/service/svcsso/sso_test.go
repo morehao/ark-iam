@@ -1,4 +1,4 @@
-package svcoidc
+package svcsso
 
 import (
 	"context"

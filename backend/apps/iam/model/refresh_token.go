@@ -13,7 +13,7 @@ type RefreshTokenEntity struct {
 	PersonID      uint       `gorm:"column:person_id;type:bigint unsigned;not null;default 0;comment:自然人ID"`
 	TenantID      uint       `gorm:"column:tenant_id;type:bigint unsigned;not null;default 0;comment:租户id"`
 	UserID        uint       `gorm:"column:user_id;type:bigint unsigned;not null;default 0;comment:用户ID"`
-	OAuthClientID uint       `gorm:"column:oauth_client_id;type:bigint unsigned;not null;default 0;comment:OIDC客户端ID"`
+	ApplicationClientID uint       `gorm:"column:application_client_id;type:bigint unsigned;not null;default 0;comment:OIDC客户端ID"`
 	SessionID     string     `gorm:"column:session_id;type:varchar(64);not null;default '';comment:会话ID"`
 	Token         string     `gorm:"column:token;type:varchar(256);not null;default '';comment:token哈希"`
 	ClientType    string     `gorm:"column:client_type;type:varchar(32);not null;default '';comment:客户端类型"`

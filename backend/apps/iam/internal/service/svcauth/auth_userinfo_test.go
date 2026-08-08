@@ -48,7 +48,7 @@ func TestUserinfoReturnsPersonAndTenantUser(t *testing.T) {
 	})
 	defer restorePersonStore()
 
-	svc := &authSvc{jwtSecret: "test-sign-key"}
+	svc := &authSvc{}
 	resp, err := svc.Userinfo(ginCtx, &dtoauth.UserinfoReq{})
 	if err != nil {
 		t.Fatalf("Userinfo returned error: %v", err)
@@ -95,7 +95,7 @@ func TestUserinfoReturnsPersonFromContextWhenPersonMissing(t *testing.T) {
 	})
 	defer restorePersonStore()
 
-	svc := &authSvc{jwtSecret: "test-sign-key"}
+	svc := &authSvc{}
 	resp, err := svc.Userinfo(ginCtx, &dtoauth.UserinfoReq{})
 	if err != nil {
 		t.Fatalf("Userinfo returned error: %v", err)

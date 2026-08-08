@@ -79,7 +79,7 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, perso
 		sessions = append(sessions, dtouser.SessionResp{
 			ID:         uint64(item.ID),
 			SessionID:  item.SessionID,
-			AppID:      uint64(item.OAuthClientID),
+			AppID:      uint64(item.ApplicationClientID),
 			TenantID:   uint64(item.TenantID),
 			ClientType: item.ClientType,
 			ClientIP:   item.ClientIP,

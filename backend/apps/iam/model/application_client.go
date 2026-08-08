@@ -5,16 +5,16 @@ import (
 	"gorm.io/gorm"
 )
 
-const TableNameOAuthClient = "oauth_client"
+const TableNameApplicationClient = "application_client"
 
 const (
-	OAuthClientTypeFirstParty = "first_party"
-	OAuthClientTypeThirdParty = "third_party"
+	ApplicationClientTypeFirstParty = "first_party"
+	ApplicationClientTypeThirdParty = "third_party"
 )
 
 const (
-	OAuthClientStatusEnable  = "enable"
-	OAuthClientStatusDisable = "disable"
+	ApplicationClientStatusEnable  = "enable"
+	ApplicationClientStatusDisable = "disable"
 )
 
 const (
@@ -29,7 +29,7 @@ const (
 	TokenEndpointAuthMethodNone  = "none"
 )
 
-type OAuthClientEntity struct {
+type ApplicationClientEntity struct {
 	gorm.Model
 	TenantID        uint   `gorm:"column:tenant_id;type:bigint unsigned;not null;default 0;comment:租户id" json:"tenantID"`
 	AppID   uint   `gorm:"column:app_id;type:bigint unsigned;not null;default 0;comment:所属应用id" json:"appId"`
@@ -57,12 +57,12 @@ type OAuthClientEntity struct {
 	DeletedBy uint `gorm:"column:deleted_by;type:bigint unsigned;not null;default 0;comment:删除人id" json:"deletedBy"`
 }
 
-func (OAuthClientEntity) TableName() string { return TableNameOAuthClient }
+func (ApplicationClientEntity) TableName() string { return TableNameApplicationClient }
 
-type OAuthClientEntityList []OAuthClientEntity
+type ApplicationClientEntityList []ApplicationClientEntity
 
-func (l OAuthClientEntityList) ToMap() map[uint]OAuthClientEntity {
-	m := make(map[uint]OAuthClientEntity)
+func (l ApplicationClientEntityList) ToMap() map[uint]ApplicationClientEntity {
+	m := make(map[uint]ApplicationClientEntity)
 	for _, v := range l {
 		m[v.ID] = v
 	}

@@ -24,7 +24,7 @@ func newTenantClaimTestStore(t *testing.T, users []model.UserEntity) (storage *O
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	if err := db.AutoMigrate(&model.UserEntity{}, &model.RefreshTokenEntity{}, &model.OAuthClientEntity{}); err != nil {
+	if err := db.AutoMigrate(&model.UserEntity{}, &model.RefreshTokenEntity{}, &model.ApplicationClientEntity{}); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
 	for i := range users {
@@ -45,8 +45,8 @@ func newTenantClaimTestStore(t *testing.T, users []model.UserEntity) (storage *O
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}
 	}
-	persistentStore.oauthClientDao = func() *dao.OAuthClientDao {
-		return dao.NewOAuthClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
+	persistentStore.applicationClientDao = func() *dao.ApplicationClientDao {
+		return dao.NewApplicationClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
 	}
 	persistentStore.refreshTokenDao = func() *dao.RefreshTokenDao {
 		return &dao.RefreshTokenDao{Dao: gormdao.NewDao[model.RefreshTokenEntity, model.RefreshTokenEntityList](

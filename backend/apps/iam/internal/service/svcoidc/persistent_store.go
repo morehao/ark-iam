@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/op"
 
 	"github.com/morehao/ark-iam/iam/dao"
+	"github.com/morehao/ark-iam/iam/internal/service/svcsso"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/token"
@@ -20,8 +21,8 @@ import (
 )
 
 type PersistentStore struct {
-	oauthClientDao       func() *dao.OAuthClientDao
-	oauthClientSecretDao func() *dao.OAuthClientSecretDao
+	applicationClientDao       func() *dao.ApplicationClientDao
+	applicationClientSecretDao func() *dao.ApplicationClientSecretDao
 	personDao            func() *dao.PersonDao
 	userDao              func() *dao.UserDao
 	refreshTokenDao      func() *dao.RefreshTokenDao
@@ -30,8 +31,8 @@ type PersistentStore struct {
 
 func NewPersistentStore() *PersistentStore {
 	return &PersistentStore{
-		oauthClientDao:       dao.NewOAuthClientDao,
-		oauthClientSecretDao: dao.NewOAuthClientSecretDao,
+		applicationClientDao:       dao.NewApplicationClientDao,
+		applicationClientSecretDao: dao.NewApplicationClientSecretDao,
 		personDao:            dao.NewPersonDao,
 		userDao:              dao.NewUserDao,
 		refreshTokenDao:      dao.NewRefreshTokenDao,
@@ -69,7 +70,7 @@ func (s *PersistentStore) GetApiKeyClientByRawKey(ctx context.Context, rawKey st
 }
 
 func (s *PersistentStore) GetClientByClientID(ctx context.Context, clientID string) (op.Client, error) {
-	clientEntity, err := s.oauthClientDao().GetByCond(ctx, &dao.OAuthClientCond{ClientID: clientID})
+	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{ClientID: clientID})
 	if err != nil || clientEntity == nil || clientEntity.ID == 0 {
 		return nil, fmt.Errorf("client not found: %s", clientID)
 	}
@@ -80,11 +81,11 @@ func (s *PersistentStore) AuthorizeClientIDSecret(ctx context.Context, clientID,
 	secretHash := sha256.Sum256([]byte(clientSecret))
 	clientHash := hex.EncodeToString(secretHash[:])
 
-	clientEntity, err := s.oauthClientDao().GetByCond(ctx, &dao.OAuthClientCond{ClientID: clientID})
+	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{ClientID: clientID})
 	if err != nil || clientEntity == nil || clientEntity.ID == 0 {
 		return oidc.ErrInvalidClient()
 	}
-	secrets, err := s.oauthClientSecretDao().GetListByCond(ctx, &dao.OAuthClientSecretCond{OAuthClientID: clientEntity.ID})
+	secrets, err := s.applicationClientSecretDao().GetListByCond(ctx, &dao.ApplicationClientSecretCond{ApplicationClientID: clientEntity.ID})
 	if err != nil {
 		return oidc.ErrInvalidClient()
 	}
@@ -173,7 +174,7 @@ func (s *PersistentStore) CreateAccessToken(ctx context.Context, request op.Toke
 
 	ttl := time.Hour
 	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok {
-		if entity, e := s.oauthClientDao().GetByCond(ctx, &dao.OAuthClientCond{ClientID: ccReq.ClientID()}); e == nil && entity != nil && entity.AccessTokenTTL > 0 {
+		if entity, e := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{ClientID: ccReq.ClientID()}); e == nil && entity != nil && entity.AccessTokenTTL > 0 {
 			ttl = time.Duration(entity.AccessTokenTTL) * time.Second
 		} else if e != nil {
 			glog.Warnf(ctx, "[PersistentStore.CreateAccessToken] load client ttl fail, clientID:%s, err:%v", ccReq.ClientID(), e)
@@ -217,11 +218,11 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 		clientID = authReq.GetClientID()
 	}
 
-	var oauthClientID uint
+	var applicationClientID uint
 	if clientID != "" {
-		clientEntity, err := s.oauthClientDao().GetByCond(ctx, &dao.OAuthClientCond{ClientID: clientID})
+		clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{ClientID: clientID})
 		if err == nil && clientEntity != nil {
-			oauthClientID = clientEntity.ID
+			applicationClientID = clientEntity.ID
 		}
 	}
 
@@ -234,7 +235,7 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 		PersonID:      personID,
 		TenantID:      userEntity.TenantID,
 		UserID:        userEntity.ID,
-		OAuthClientID: oauthClientID,
+		ApplicationClientID: applicationClientID,
 		Token:         refreshTokenHash,
 		ExpiredAt:     &refreshTokenExp,
 		CreatedBy:     userEntity.ID,
@@ -276,8 +277,8 @@ func (s *PersistentStore) TokenRequestByRefreshToken(ctx context.Context, refres
 	}
 
 	clientID := ""
-	if storedToken.OAuthClientID != 0 {
-		clientEntity, err := s.oauthClientDao().GetByID(ctx, storedToken.OAuthClientID)
+	if storedToken.ApplicationClientID != 0 {
+		clientEntity, err := s.applicationClientDao().GetByID(ctx, storedToken.ApplicationClientID)
 		if err == nil && clientEntity != nil {
 			clientID = clientEntity.ClientID
 		}
@@ -333,7 +334,7 @@ func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, c
 	}
 	glog.Infof(ctx, "[PersistentStore.TerminateSession] terminating session, userID:%s, personID:%d, clientID:%s", userID, personID, clientID)
 
-	if ssoErr := NewSSOSessionStore().RevokeSessionsByPersonID(ctx, personID); ssoErr != nil {
+	if ssoErr := svcsso.NewSSOSessionStore().RevokeSessionsByPersonID(ctx, personID); ssoErr != nil {
 		glog.Warnf(ctx, "[PersistentStore.TerminateSession] revoke SSO sessions fail, err:%v", ssoErr)
 	}
 

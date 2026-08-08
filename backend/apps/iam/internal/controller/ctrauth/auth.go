@@ -4,7 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/iam/internal/service/svcauth"
-	"github.com/morehao/ark-iam/iam/internal/service/svcoidc"
+	"github.com/morehao/ark-iam/iam/internal/service/svcsso"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/glog"
 )
@@ -119,7 +119,7 @@ func (ctr *authCtr) LogoutAll(ctx *gin.Context) {
 	// 撤销该 person 的全部 SSO session，实现"一处登出、处处登出"的全局登出语义
 	personID := gincontext.GetPersonID(ctx)
 	if personID != 0 {
-		if err := svcoidc.RevokeSSOSessionsByPersonID(ctx.Request.Context(), personID); err != nil {
+		if err := svcsso.RevokeSSOSessionsByPersonID(ctx.Request.Context(), personID); err != nil {
 			glog.Errorf(ctx, "[ctrauth.LogoutAll] RevokeSSOSessionsByPersonID fail, personID:%d, err:%v", personID, err)
 		}
 	}

@@ -8,7 +8,7 @@ import (
 	_ "github.com/morehao/ark-iam/iam/docs"
 	"github.com/morehao/ark-iam/iam/internal/middleware/oidcauth"
 	"github.com/morehao/ark-iam/iam/internal/router"
-	"github.com/morehao/ark-iam/iam/internal/service/svcoidc"
+	"github.com/morehao/ark-iam/iam/internal/service/svcsso"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
 	"github.com/morehao/golib/biz/gserver/gindocs"
@@ -19,7 +19,7 @@ import (
 const AppName = "iam"
 
 func Routers(engine *gin.Engine) {
-	ssoStore := svcoidc.NewSSOSessionStore()
+	ssoStore := svcsso.NewSSOSessionStore()
 	routerGroups := ginserver.NewRouterGroups(engine, AppName, ginserver.VersionGroup{
 		Version: ginserver.ApiVersionV1,
 		Middlewares: []gin.HandlerFunc{

@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoconnector"
+	"github.com/morehao/ark-iam/iam/internal/service/svcsso"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/code"
@@ -60,6 +60,7 @@ type connectorSvc struct {
 	connectorRepo    connectorRuntimeRepository
 	stateStore       ConnectorStateStore
 	identityResolver connectorIdentityResolver
+	ssoSessionStore  svcsso.SSOSessionStore
 	tokenGenerator   func(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error)
 	loginRecorder    func(ctx *gin.Context, tenantID, userID uint, success bool)
 	stateGenerator   func() (string, error)
@@ -106,6 +107,13 @@ func (svc *connectorSvc) getIdentityResolver() connectorIdentityResolver {
 		svc.identityResolver = newIdentityMapper(nil, nil)
 	}
 	return svc.identityResolver
+}
+
+func (svc *connectorSvc) getSSOSessionStore() svcsso.SSOSessionStore {
+	if svc.ssoSessionStore == nil {
+		svc.ssoSessionStore = svcsso.NewSSOSessionStore()
+	}
+	return svc.ssoSessionStore
 }
 
 func (svc *connectorSvc) getStateGenerator() func() (string, error) {
@@ -468,12 +476,16 @@ func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorC
 		glog.Errorf(ctx, "[svcauth.Callback] consume state fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.AuthLoginFailedError)
 	}
-	authRuntime := &authSvc{jwtSecret: connectorJWTSignKey()}
-	personToken, err := authRuntime.generatePersonToken(resolvedPerson.Person)
+
+	// Connector 登录成功后建立 SSO 会话，与账密/OIDC 登录走同一套 person 级中心会话；
+	// 不再签发独立 HS256 person token（token 统一为 OIDC RS256，见设计文档 §4.4）。
+	sessionID, err := svc.getSSOSessionStore().CreateSession(runtimeContext(ctx), resolvedPerson.Person.ID)
 	if err != nil {
-		glog.Errorf(ctx, "[svcauth.Callback] generate person token fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.TokenGenerateError)
+		glog.Errorf(ctx, "[svcauth.Callback] create sso session fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.AuthLoginFailedError)
 	}
+
+	authRuntime := &authSvc{}
 	tenantCtx := ctx
 	if tenantCtx == nil {
 		tenantCtx, _ = gin.CreateTestContext(nil)
@@ -484,7 +496,7 @@ func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorC
 	if err != nil {
 		return nil, err
 	}
-	return &dtoauth.LoginResp{PersonToken: *personToken, Tenants: tenants}, nil
+	return &dtoauth.LoginResp{SSOSessionID: sessionID, Tenants: tenants}, nil
 }
 
 func unmarshalJSON(data json.RawMessage) any {
@@ -514,11 +526,4 @@ func runtimeContext(ctx *gin.Context) context.Context {
 		return ctx.Request.Context()
 	}
 	return context.Background()
-}
-
-func connectorJWTSignKey() string {
-	if config.Conf == nil {
-		return ""
-	}
-	return config.Conf.JWT.SignKey
 }

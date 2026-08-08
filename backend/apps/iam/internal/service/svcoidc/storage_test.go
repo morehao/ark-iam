@@ -91,7 +91,7 @@ func TestCompleteAuthRequestMarksRequestDone(t *testing.T) {
 
 func TestOIDCClientLoginURLUsesConfiguredFrontend(t *testing.T) {
 	appconfig.Conf = &appconfig.Config{OIDC: appconfig.OIDC{FrontendLoginURL: "https://console.example.com/oidc/login"}}
-	client := NewOIDCClient(&model.OAuthClientEntity{ClientID: "client-1"})
+	client := NewOIDCClient(&model.ApplicationClientEntity{ClientID: "client-1"})
 
 	got := client.LoginURL("ar-1")
 	if got != "https://console.example.com/oidc/login?authRequestID=ar-1" {

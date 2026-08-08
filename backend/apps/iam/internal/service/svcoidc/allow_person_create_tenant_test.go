@@ -19,7 +19,7 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 		name        string
 		clientID    string
 		tenantCount int
-		client      *model.OAuthClientEntity
+		client      *model.ApplicationClientEntity
 		app         *model.ApplicationEntity
 		want        bool
 	}{
@@ -27,7 +27,7 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			name:        "person already has tenants => false even if policy allows",
 			clientID:    "cid-1",
 			tenantCount: 1,
-			client:      &model.OAuthClientEntity{AppID: 7},
+			client:      &model.ApplicationClientEntity{AppID: 7},
 			app:         &model.ApplicationEntity{TenantPolicy: datatypes.JSON(`{"allowPersonCreateTenant":true}`)},
 			want:        false,
 		},
@@ -41,7 +41,7 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			name:        "policy allow => true",
 			clientID:    "cid-2",
 			tenantCount: 0,
-			client:      &model.OAuthClientEntity{AppID: 7},
+			client:      &model.ApplicationClientEntity{AppID: 7},
 			app:         &model.ApplicationEntity{TenantPolicy: datatypes.JSON(`{"allowPersonCreateTenant":true}`)},
 			want:        true,
 		},
@@ -49,7 +49,7 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			name:        "policy disallow => false",
 			clientID:    "cid-3",
 			tenantCount: 0,
-			client:      &model.OAuthClientEntity{AppID: 8},
+			client:      &model.ApplicationClientEntity{AppID: 8},
 			app:         &model.ApplicationEntity{TenantPolicy: datatypes.JSON(`{"allowPersonCreateTenant":false}`)},
 			want:        false,
 		},
@@ -57,7 +57,7 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			name:        "policy absent => false",
 			clientID:    "cid-4",
 			tenantCount: 0,
-			client:      &model.OAuthClientEntity{AppID: 9},
+			client:      &model.ApplicationClientEntity{AppID: 9},
 			app:         &model.ApplicationEntity{TenantPolicy: datatypes.JSON(`{}`)},
 			want:        false,
 		},
@@ -96,8 +96,8 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			}
 
 			svc := &oidcAuthSvc{
-				oauthClientDao: func() *dao.OAuthClientDao {
-					return dao.NewOAuthClientDaoWithDB(dbGetter(db))
+				applicationClientDao: func() *dao.ApplicationClientDao {
+					return dao.NewApplicationClientDaoWithDB(dbGetter(db))
 				},
 				applicationDao: func() *dao.ApplicationDao {
 					return dao.NewApplicationDaoWithDB(dbGetter(db))
@@ -124,7 +124,7 @@ func newAllowPersonCreateTenantTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	if err := db.AutoMigrate(&model.OAuthClientEntity{}, &model.ApplicationEntity{}); err != nil {
+	if err := db.AutoMigrate(&model.ApplicationClientEntity{}, &model.ApplicationEntity{}); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
 	t.Cleanup(func() {

@@ -53,17 +53,17 @@ const (
 )
 
 const (
-	OAuthClientCreateError         = 100810
-	OAuthClientDeleteError         = 100811
-	OAuthClientUpdateError         = 100812
-	OAuthClientGetDetailError      = 100813
-	OAuthClientGetPageListError    = 100814
-	OAuthClientNotExistError       = 100815
-	OAuthClientSystemBuiltInErr    = 100820
-	OAuthClientSecretCreateError   = 100816
-	OAuthClientSecretGetListError  = 100817
-	OAuthClientSecretDeleteError   = 100818
-	OAuthClientSecretNotExistError = 100819
+	ApplicationClientCreateError         = 100810
+	ApplicationClientDeleteError         = 100811
+	ApplicationClientUpdateError         = 100812
+	ApplicationClientGetDetailError      = 100813
+	ApplicationClientGetPageListError    = 100814
+	ApplicationClientNotExistError       = 100815
+	ApplicationClientSystemBuiltInErr    = 100820
+	ApplicationClientSecretCreateError   = 100816
+	ApplicationClientSecretGetListError  = 100817
+	ApplicationClientSecretDeleteError   = 100818
+	ApplicationClientSecretNotExistError = 100819
 )
 
 const (
@@ -127,17 +127,17 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	ApplicationSecretGetListError:  "查看应用密钥列表失败",
 	ApplicationSecretDeleteError:   "删除应用密钥失败",
 	ApplicationSecretNotExistError: "应用密钥不存在",
-	OAuthClientCreateError:         "创建OAuth客户端失败",
-	OAuthClientDeleteError:         "删除OAuth客户端失败",
-	OAuthClientUpdateError:         "修改OAuth客户端失败",
-	OAuthClientGetDetailError:      "查看OAuth客户端详情失败",
-	OAuthClientGetPageListError:    "查看OAuth客户端列表失败",
-	OAuthClientNotExistError:       "OAuth客户端不存在",
-	OAuthClientSystemBuiltInErr:    "OAuth客户端为系统内置，不可删除",
-	OAuthClientSecretCreateError:   "创建OAuth客户端密钥失败",
-	OAuthClientSecretGetListError:  "查看OAuth客户端密钥列表失败",
-	OAuthClientSecretDeleteError:   "删除OAuth客户端密钥失败",
-	OAuthClientSecretNotExistError: "OAuth客户端密钥不存在",
+	ApplicationClientCreateError:         "创建OAuth客户端失败",
+	ApplicationClientDeleteError:         "删除OAuth客户端失败",
+	ApplicationClientUpdateError:         "修改OAuth客户端失败",
+	ApplicationClientGetDetailError:      "查看OAuth客户端详情失败",
+	ApplicationClientGetPageListError:    "查看OAuth客户端列表失败",
+	ApplicationClientNotExistError:       "OAuth客户端不存在",
+	ApplicationClientSystemBuiltInErr:    "OAuth客户端为系统内置，不可删除",
+	ApplicationClientSecretCreateError:   "创建OAuth客户端密钥失败",
+	ApplicationClientSecretGetListError:  "查看OAuth客户端密钥列表失败",
+	ApplicationClientSecretDeleteError:   "删除OAuth客户端密钥失败",
+	ApplicationClientSecretNotExistError: "OAuth客户端密钥不存在",
 	RoleMenuCreateError:            "创建角色菜单关联失败",
 	RoleMenuDeleteError:            "删除角色菜单关联失败",
 	RoleMenuGetPageListError:       "查看角色菜单关联列表失败",

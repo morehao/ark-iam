@@ -4,21 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 	"unicode"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/iam/internal/service/svcaudit"
 	"github.com/morehao/ark-iam/iam/internal/service/svcloginguard"
+	"github.com/morehao/ark-iam/iam/internal/service/svcsso"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/token"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gconstant"
@@ -27,9 +25,7 @@ import (
 )
 
 const (
-	PasswordMinLength          = 6
-	TokenExpireDuration        = 24 * time.Hour
-	RefreshTokenExpireDuration = 7 * 24 * time.Hour
+	PasswordMinLength = 6
 )
 
 type authUserStore interface {
@@ -90,7 +86,6 @@ type AuthSvc interface {
 }
 
 type authSvc struct {
-	jwtSecret string
 }
 
 var _ AuthSvc = (*authSvc)(nil)
@@ -314,34 +309,22 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 }
 
 func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
-	if req.RefreshToken != "" {
-		if err := token.AddRefreshTokenToBlacklist(ctx, req.RefreshToken); err != nil {
-			glog.Errorf(ctx, "[svcauth.Logout] AddRefreshTokenToBlacklist fail, err:%v", err)
+	personID := gincontext.GetPersonID(ctx)
+	// 全局登出语义：撤销该 person 的全部 refresh token + SSO 会话，实现"一处登出、处处登出"。
+	// access token 依赖其短 TTL 失效（见设计文档 §2.5），此处不维护 HS256 黑名单。
+	if personID != 0 {
+		if err := newAuthRefreshTokenStore().RevokeByPersonID(ctx.Request.Context(), personID); err != nil {
+			glog.Errorf(ctx, "[svcauth.Logout] RevokeByPersonID fail, personID:%d, err:%v", personID, err)
+		}
+		if err := svcsso.RevokeSSOSessionsByPersonID(ctx.Request.Context(), personID); err != nil {
+			glog.Errorf(ctx, "[svcauth.Logout] RevokeSSOSessionsByPersonID fail, personID:%d, err:%v", personID, err)
 		}
 	}
-
-	accessToken := ctx.GetHeader("Authorization")
-	if accessToken != "" {
-		if err := token.AddTokenToBlacklist(ctx, accessToken, token.TokenExpireDuration); err != nil {
-			glog.Errorf(ctx, "[svcauth.Logout] AddTokenToBlacklist fail, err:%v", err)
-		}
-	}
-
 	return nil
 }
 
 func (svc *authSvc) LogoutAll(ctx *gin.Context, req *dtoauth.LogoutAllReq) error {
-	if err := svc.Logout(ctx, &dtoauth.LogoutReq{RefreshToken: req.RefreshToken}); err != nil {
-		return err
-	}
-	personID := gincontext.GetPersonID(ctx)
-	if personID == 0 {
-		return nil
-	}
-	if err := newAuthRefreshTokenStore().RevokeByPersonID(ctx.Request.Context(), personID); err != nil {
-		glog.Errorf(ctx, "[svcauth.LogoutAll] RevokeByPersonID fail, personID:%d, err:%v", personID, err)
-	}
-	return nil
+	return svc.Logout(ctx, &dtoauth.LogoutReq{RefreshToken: req.RefreshToken})
 }
 
 func (svc *authSvc) Userinfo(ctx *gin.Context, req *dtoauth.UserinfoReq) (*dtoauth.UserinfoResp, error) {
@@ -400,23 +383,6 @@ func (svc *authSvc) Userinfo(ctx *gin.Context, req *dtoauth.UserinfoReq) (*dtoau
 			IsOwner:  userEntity.IsOwner,
 		},
 	}, nil
-}
-
-func (svc *authSvc) generatePersonToken(personEntity *model.PersonEntity) (*objauth.PersonTokenInfo, error) {
-	now := time.Now()
-	accessTokenExp := now.Add(TokenExpireDuration)
-	claims := jwt.MapClaims{
-		"person_id": personEntity.ID,
-		"exp":       accessTokenExp.Unix(),
-		"iat":       now.Unix(),
-		"type":      "person",
-	}
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	accessTokenString, err := accessToken.SignedString([]byte(svc.jwtSecret))
-	if err != nil {
-		return nil, err
-	}
-	return &objauth.PersonTokenInfo{TokenInfo: objauth.TokenInfo{AccessToken: accessTokenString, ExpiresIn: int64(TokenExpireDuration.Seconds()), TokenType: "Bearer"}}, nil
 }
 
 func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonStore, userDao authUserStore, identifier string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
@@ -549,14 +515,6 @@ func validatePasswordStrength(password string) error {
 	}
 
 	return nil
-}
-
-func parsePositiveIntegerClaim(claims jwt.MapClaims, key string) (uint, bool) {
-	value, ok := claims[key].(float64)
-	if !ok || value <= 0 || math.Trunc(value) != value {
-		return 0, false
-	}
-	return uint(value), true
 }
 
 func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID uint, success bool) {

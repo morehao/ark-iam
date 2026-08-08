@@ -1,8 +1,11 @@
 package oidcauth
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,6 +13,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/morehao/ark-iam/iam/dao"
+	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -141,4 +148,52 @@ func TestOIDCSSOValidationMachineTokenBypassesRevokedSession(t *testing.T) {
 	w2 := httptest.NewRecorder()
 	r.ServeHTTP(w2, req2)
 	assert.Equal(t, http.StatusUnauthorized, w2.Code)
+}
+
+// TestAPIKeyParallelAuth 验证 x-api-key 通道与管理 OIDC 并行鉴权（任一通过即放行）。
+// 无 OIDC token，仅携带合法 API Key 也应 200；非法 API Key 应 401。
+func TestAPIKeyParallelAuth(t *testing.T) {
+	testsetup.Initialize(testsetup.AppNameIam)
+	defer testsetup.Done(testsetup.AppNameIam)
+
+	rawKey, keyHash := apiKeyHashForTest(t)
+	seed := &model.ApiKeyEntity{
+		TenantID:  1,
+		Name:      "parallel-auth-test",
+		KeyHash:   keyHash,
+		KeyPrefix: rawKey[:7],
+		Scope:     []byte(`{}`),
+		CreatedBy: 1,
+	}
+	if err := dao.NewApiKeyDao().Insert(context.Background(), seed); err != nil {
+		t.Fatalf("seed api key: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = dbclient.IamDB(context.Background()).Where("id = ?", seed.ID).Delete(&model.ApiKeyEntity{}).Error
+	})
+
+	r, _ := setupRouter(t, func(ctx *gin.Context, personID uint, isMachineToken bool) bool {
+		return true
+	})
+
+	// 仅 x-api-key（无 OIDC token）应放行
+	req := httptest.NewRequest(http.MethodGet, "/v1/iam/test", nil)
+	req.Header.Set("x-api-key", rawKey)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, "x-api-key 应能独立鉴权通过")
+
+	// 非法 API Key 应 401
+	reqBad := httptest.NewRequest(http.MethodGet, "/v1/iam/test", nil)
+	reqBad.Header.Set("x-api-key", "invalid-key-value")
+	wBad := httptest.NewRecorder()
+	r.ServeHTTP(wBad, reqBad)
+	assert.Equal(t, http.StatusUnauthorized, wBad.Code)
+}
+
+func apiKeyHashForTest(t *testing.T) (raw, hash string) {
+	t.Helper()
+	raw = "test-raw-key-1234567890abcdef" 
+	sum := sha256.Sum256([]byte(raw))
+	return raw, hex.EncodeToString(sum[:])
 }

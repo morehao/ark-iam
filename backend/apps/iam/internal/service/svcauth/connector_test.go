@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoconnector"
@@ -784,7 +783,8 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 		tokenGenerator: func(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error) {
 			return &objauth.TokenInfo{AccessToken: "issued-access", RefreshToken: "issued-refresh", TokenType: "Bearer"}, nil
 		},
-		loginRecorder: func(ctx *gin.Context, tenantID, userID uint, success bool) {},
+		loginRecorder:   func(ctx *gin.Context, tenantID, userID uint, success bool) {},
+		ssoSessionStore: &fakeConnectorSSOSessionStore{},
 	}
 	restoreUserStore := swapUserStoreFactory(func() authUserStore {
 		return &fakeAuthUserStore{
@@ -892,7 +892,8 @@ func TestConnectorServiceCallbackAllowsMissingConnectorID(t *testing.T) {
 		tokenGenerator: func(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error) {
 			return &objauth.TokenInfo{AccessToken: "issued-access", RefreshToken: "issued-refresh", TokenType: "Bearer"}, nil
 		},
-		loginRecorder: func(ctx *gin.Context, tenantID, userID uint, success bool) {},
+		loginRecorder:   func(ctx *gin.Context, tenantID, userID uint, success bool) {},
+		ssoSessionStore: &fakeConnectorSSOSessionStore{},
 	}
 	restoreUserStore := swapUserStoreFactory(func() authUserStore {
 		return &fakeAuthUserStore{
@@ -989,6 +990,7 @@ func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 		},
 		tokenGenerator: nil,
 		loginRecorder:  func(ctx *gin.Context, tenantID, userID uint, success bool) {},
+		ssoSessionStore: &fakeConnectorSSOSessionStore{},
 	}
 	restorePersonStore := swapPersonStoreFactory(func() authPersonStore {
 		return &fakeAuthPersonStore{
@@ -1023,14 +1025,8 @@ func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 	if resp == nil {
 		t.Fatal("expected login response")
 	}
-	if resp.PersonToken.AccessToken == "" {
-		t.Fatalf("expected callback to return person token, got %+v", resp.PersonToken)
-	}
-	if resp.PersonToken.RefreshToken != "" {
-		t.Fatalf("expected person token response without tenant refresh token, got %+v", resp.PersonToken)
-	}
-	if claims := mustParseJWTClaims(t, resp.PersonToken.AccessToken, connectorJWTSignKey()); claims["type"] != "person" || uintClaim(t, claims, "person_id") != 909 {
-		t.Fatalf("expected connector callback to return person-scoped token, got claims=%+v", claims)
+	if resp.SSOSessionID == "" {
+		t.Fatalf("expected callback to return sso session id, got %+v", resp)
 	}
 }
 
@@ -1087,7 +1083,8 @@ func TestConnectorCallbackInvokesIdentityResolverTokenGeneratorAndLoginRecorder(
 				return &resolvedConnectorPerson{Person: resolvedPerson}, nil
 			},
 		},
-		loginRecorder: func(ctx *gin.Context, tenantID, userID uint, success bool) {},
+		loginRecorder:   func(ctx *gin.Context, tenantID, userID uint, success bool) {},
+		ssoSessionStore: &fakeConnectorSSOSessionStore{},
 	}
 	restoreUserStore := swapUserStoreFactory(func() authUserStore {
 		return &fakeAuthUserStore{
@@ -1199,28 +1196,4 @@ func newConnectorRuntimeContext(t *testing.T) context.Context {
 func sanitizeConnectorTestName(name string) string {
 	replacer := strings.NewReplacer("/", "_", " ", "_", ":", "_")
 	return replacer.Replace(name)
-}
-
-func mustParseJWTClaims(t *testing.T, tokenString, secret string) jwt.MapClaims {
-	t.Helper()
-	tokenValue, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		return []byte(secret), nil
-	})
-	if err != nil {
-		t.Fatalf("parse jwt claims: %v", err)
-	}
-	claims, ok := tokenValue.Claims.(jwt.MapClaims)
-	if !ok {
-		t.Fatalf("expected jwt.MapClaims, got %T", tokenValue.Claims)
-	}
-	return claims
-}
-
-func uintClaim(t *testing.T, claims jwt.MapClaims, key string) uint {
-	t.Helper()
-	value, ok := parsePositiveIntegerClaim(claims, key)
-	if !ok {
-		t.Fatalf("expected positive integer claim %s in %+v", key, claims)
-	}
-	return value
 }

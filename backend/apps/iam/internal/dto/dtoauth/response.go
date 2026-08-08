@@ -6,8 +6,8 @@ import (
 )
 
 type LoginResp struct {
-	PersonToken objauth.PersonTokenInfo `json:"personToken"`
-	Tenants     []objauth.TenantOption  `json:"tenants"`
+	SSOSessionID string                `json:"ssoSessionID"`
+	Tenants      []objauth.TenantOption `json:"tenants"`
 }
 
 type MyTenantsResp struct {

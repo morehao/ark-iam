@@ -1,12 +1,12 @@
-package dtooauthclient
+package dtoapplicationclient
 
 type CreateResp struct {
-	OAuthClientID uint   `json:"oauthClientId"`   // OAuth客户端ID
+	ApplicationClientID uint   `json:"applicationClientId"`   // OAuth客户端ID
 	ClientID      string `json:"clientID"`         // OIDC客户端ID
 }
 
 type DetailResp struct {
-	OAuthClientID           uint     `json:"oauthClientId"`            // OAuth客户端ID
+	ApplicationClientID           uint     `json:"applicationClientId"`            // OAuth客户端ID
 	TenantID                uint     `json:"tenantId"`                 // 租户ID
 	AppID                   uint     `json:"appId"`                    // 所属应用ID
 	ClientID                string   `json:"clientID"`                 // OIDC客户端ID
@@ -34,7 +34,7 @@ type PageListResp struct {
 }
 
 type PageListItem struct {
-	OAuthClientID           uint     `json:"oauthClientId"`            // OAuth客户端ID
+	ApplicationClientID           uint     `json:"applicationClientId"`            // OAuth客户端ID
 	AppID                   uint     `json:"appId"`                    // 所属应用ID
 	ClientID                string   `json:"clientID"`                 // OIDC客户端ID
 	Name                    string   `json:"name"`                     // 客户端名称
@@ -48,7 +48,7 @@ type PageListItem struct {
 
 type SecretResp struct {
 	ID            uint64  `json:"id"`                                    // 密钥ID
-	OAuthClientID uint64  `json:"oauthClientId"`                        // OAuth客户端ID
+	ApplicationClientID uint64  `json:"applicationClientId"`                        // OAuth客户端ID
 	Name          string  `json:"name"`                                  // 密钥名称
 	ValuePrefix   string  `json:"valuePrefix"`                          // 密钥前缀
 	ExpiredAt     *string `json:"expiresAt"`                             // 过期时间

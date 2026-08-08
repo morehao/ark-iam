@@ -112,7 +112,7 @@ func TestLogoutAllRevokesAllRefreshTokensForPerson(t *testing.T) {
 	})
 	defer restoreRefreshTokenStore()
 
-	svc := &authSvc{jwtSecret: "test-secret"}
+	svc := &authSvc{}
 	err := svc.LogoutAll(ginCtx, &dtoauth.LogoutAllReq{})
 	if err != nil {
 		t.Fatalf("LogoutAll returned error: %v", err)
@@ -208,7 +208,7 @@ func TestRegisterAllowsEmailOnlyIdentifier(t *testing.T) {
 	})
 	defer restoreTenantStore()
 
-	svc := &authSvc{jwtSecret: "test-secret"}
+	svc := &authSvc{}
 	resp, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
 		TenantID:     1,
 		PrimaryEmail: "mail@example.com",
@@ -274,7 +274,7 @@ func TestRegisterAllowsPhoneOnlyIdentifier(t *testing.T) {
 	})
 	defer restoreTenantStore()
 
-	svc := &authSvc{jwtSecret: "test-secret"}
+	svc := &authSvc{}
 	resp, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
 		TenantID:     1,
 		PrimaryPhone: "13800138000",
@@ -330,7 +330,7 @@ func TestRegisterRejectsNonExistentTenant(t *testing.T) {
 	})
 	defer restoreTenantStore()
 
-	svc := &authSvc{jwtSecret: "test-secret"}
+	svc := &authSvc{}
 	_, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
 		TenantID: 999,
 		Username: "new-user",
@@ -383,7 +383,7 @@ func TestRegisterSetsUserAsOwnerAndJoinedAt(t *testing.T) {
 	})
 	defer restoreTenantStore()
 
-	svc := &authSvc{jwtSecret: "test-secret"}
+	svc := &authSvc{}
 	resp, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
 		TenantID: 1,
 		Username: "new-user",
@@ -416,7 +416,7 @@ func TestRegisterRequiresAtLeastOneIdentifier(t *testing.T) {
 	})
 	defer restoreUserStore()
 
-	svc := &authSvc{jwtSecret: "test-secret"}
+	svc := &authSvc{}
 	_, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
 		TenantID: 1,
 		Password: "Password1",
@@ -468,7 +468,7 @@ func TestRegisterCreatesPersonAccount(t *testing.T) {
 	})
 	defer restoreTenantStore()
 
-	svc := &authSvc{jwtSecret: "test-secret"}
+	svc := &authSvc{}
 	resp, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
 		TenantID:     1,
 		Username:     "person-user",

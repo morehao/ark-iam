@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoconnector"
-	"github.com/morehao/ark-iam/iam/object/objauth"
 )
 
 type stubConnectorSvc struct {
@@ -172,7 +171,7 @@ func TestConnectorControllerTestConnector(t *testing.T) {
 func TestConnectorControllerCallback(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	svc := &stubConnectorSvc{
-		callbackResp: &dtoauth.LoginResp{PersonToken: objauth.PersonTokenInfo{TokenInfo: objauth.TokenInfo{AccessToken: "access-token", RefreshToken: "refresh-token"}}},
+		callbackResp: &dtoauth.LoginResp{SSOSessionID: "sso-session-7"},
 	}
 	ctr := &connectorCtr{connectorSvc: svc}
 
@@ -192,7 +191,7 @@ func TestConnectorControllerCallback(t *testing.T) {
 	if svc.callbackReq.ConnectorID != 7 || svc.callbackReq.Code != "callback-code" || svc.callbackReq.State != "state-2" {
 		t.Fatalf("expected query binding to populate callback request, got %+v", *svc.callbackReq)
 	}
-	assertJSONContainsData(t, recorder.Body.Bytes(), "access-token")
+	assertJSONContainsData(t, recorder.Body.Bytes(), "sso-session-7")
 }
 
 func TestConnectorControllerCallbackRequiresState(t *testing.T) {

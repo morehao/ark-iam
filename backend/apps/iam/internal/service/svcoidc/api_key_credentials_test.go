@@ -121,8 +121,8 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}
 	}
-	persistentStore.oauthClientDao = func() *dao.OAuthClientDao {
-		return dao.NewOAuthClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
+	persistentStore.applicationClientDao = func() *dao.ApplicationClientDao {
+		return dao.NewApplicationClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
 	}
 
 	storage := NewOIDCStorage(nil, persistentStore, nil, "test-key")

@@ -21,6 +21,7 @@ import (
 	"github.com/morehao/ark-iam/iam/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/iam/internal/service/svcaudit"
 	"github.com/morehao/ark-iam/iam/internal/service/svcauth"
+	"github.com/morehao/ark-iam/iam/internal/service/svcsso"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/code"
@@ -207,8 +208,8 @@ type passwordAuthenticator interface {
 type oidcAuthSvc struct {
 	provider             *OIDCProvider
 	authSvc              passwordAuthenticator
-	ssoSessionStore      SSOSessionStore
-	oauthClientDao       func() *dao.OAuthClientDao
+	ssoSessionStore      svcsso.SSOSessionStore
+	applicationClientDao       func() *dao.ApplicationClientDao
 	applicationDao       func() *dao.ApplicationDao
 }
 
@@ -216,8 +217,8 @@ func NewOIDCAuthSvc(provider *OIDCProvider) OIDCAuthSvc {
 	return &oidcAuthSvc{
 		provider:             provider,
 		authSvc:              svcauth.NewAuthSvc(),
-		ssoSessionStore:      NewSSOSessionStore(),
-		oauthClientDao:       dao.NewOAuthClientDao,
+		ssoSessionStore:      svcsso.NewSSOSessionStore(),
+		applicationClientDao:       dao.NewApplicationClientDao,
 		applicationDao:       dao.NewApplicationDao,
 	}
 }
@@ -413,10 +414,10 @@ func clientIDFromAuthRequest(authReq op.AuthRequest) string {
 // resolveAllowPersonCreateTenant reports whether the app backing the oauth client
 // allows a zero-tenant person to self-create a tenant. Person with >=1 tenant => false.
 func (svc *oidcAuthSvc) resolveAllowPersonCreateTenant(ctx *gin.Context, clientID string, tenantCount int) bool {
-	if clientID == "" || tenantCount > 0 || svc.oauthClientDao == nil || svc.applicationDao == nil {
+	if clientID == "" || tenantCount > 0 || svc.applicationClientDao == nil || svc.applicationDao == nil {
 		return false
 	}
-	client, err := svc.oauthClientDao().GetByCond(ctx, &dao.OAuthClientCond{ClientID: clientID})
+	client, err := svc.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{ClientID: clientID})
 	if err != nil || client == nil || client.AppID == 0 {
 		return false
 	}

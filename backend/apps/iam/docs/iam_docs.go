@@ -418,6 +418,358 @@ const docTemplateiam = `{
                 }
             }
         },
+        "/v1/iam/applicationClient/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OAuth客户端"
+                ],
+                "summary": "创建OAuth客户端",
+                "parameters": [
+                    {
+                        "description": "创建OAuth客户端",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoapplicationclient.CreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoapplicationclient.CreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/applicationClient/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OAuth客户端"
+                ],
+                "summary": "删除OAuth客户端",
+                "parameters": [
+                    {
+                        "description": "删除OAuth客户端",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoapplicationclient.DeleteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/applicationClient/detail": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OAuth客户端"
+                ],
+                "summary": "查看OAuth客户端详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "OAuth客户端ID",
+                        "name": "applicationClientId",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoapplicationclient.DetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/applicationClient/pageList": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OAuth客户端"
+                ],
+                "summary": "查看OAuth客户端列表",
+                "parameters": [
+                    {
+                        "description": "查看OAuth客户端列表",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoapplicationclient.PageListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoapplicationclient.PageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/applicationClient/secrets": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OAuth客户端密钥"
+                ],
+                "summary": "查看OAuth客户端密钥列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "OAuth客户端ID",
+                        "name": "applicationClientId",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoapplicationclient.SecretListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OAuth客户端密钥"
+                ],
+                "summary": "创建OAuth客户端密钥",
+                "parameters": [
+                    {
+                        "description": "创建OAuth客户端密钥",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoapplicationclient.CreateSecretReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoapplicationclient.CreateSecretResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/applicationClient/secrets/{secretId}": {
+            "delete": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OAuth客户端密钥"
+                ],
+                "summary": "删除OAuth客户端密钥",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "密钥ID",
+                        "name": "secretId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/applicationClient/update": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OAuth客户端"
+                ],
+                "summary": "修改OAuth客户端",
+                "parameters": [
+                    {
+                        "description": "修改OAuth客户端",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoapplicationclient.UpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/v1/iam/auth/joinTenant": {
             "post": {
                 "consumes": [
@@ -1821,358 +2173,6 @@ const docTemplateiam = `{
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/dtopermission.MenuUpdateReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/oauthClient/create": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "OAuth客户端"
-                ],
-                "summary": "创建OAuth客户端",
-                "parameters": [
-                    {
-                        "description": "创建OAuth客户端",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtooauthclient.CreateReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtooauthclient.CreateResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/oauthClient/delete": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "OAuth客户端"
-                ],
-                "summary": "删除OAuth客户端",
-                "parameters": [
-                    {
-                        "description": "删除OAuth客户端",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtooauthclient.DeleteReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/oauthClient/detail": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "OAuth客户端"
-                ],
-                "summary": "查看OAuth客户端详情",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "OAuth客户端ID",
-                        "name": "oauthClientId",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtooauthclient.DetailResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/oauthClient/pageList": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "OAuth客户端"
-                ],
-                "summary": "查看OAuth客户端列表",
-                "parameters": [
-                    {
-                        "description": "查看OAuth客户端列表",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtooauthclient.PageListReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtooauthclient.PageListResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/oauthClient/secrets": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "OAuth客户端密钥"
-                ],
-                "summary": "查看OAuth客户端密钥列表",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "OAuth客户端ID",
-                        "name": "oauthClientId",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtooauthclient.SecretListResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "OAuth客户端密钥"
-                ],
-                "summary": "创建OAuth客户端密钥",
-                "parameters": [
-                    {
-                        "description": "创建OAuth客户端密钥",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtooauthclient.CreateSecretReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtooauthclient.CreateSecretResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/oauthClient/secrets/{secretId}": {
-            "delete": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "OAuth客户端密钥"
-                ],
-                "summary": "删除OAuth客户端密钥",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "密钥ID",
-                        "name": "secretId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/iam/oauthClient/update": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "OAuth客户端"
-                ],
-                "summary": "修改OAuth客户端",
-                "parameters": [
-                    {
-                        "description": "修改OAuth客户端",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtooauthclient.UpdateReq"
                         }
                     }
                 ],
@@ -6226,6 +6226,487 @@ const docTemplateiam = `{
                 }
             }
         },
+        "dtoapplicationclient.CreateReq": {
+            "type": "object",
+            "required": [
+                "appId",
+                "name"
+            ],
+            "properties": {
+                "accessTokenTTL": {
+                    "description": "访问令牌有效期(秒)",
+                    "type": "integer"
+                },
+                "allowedOrigins": {
+                    "description": "CORS白名单",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "appId": {
+                    "description": "所属应用ID",
+                    "type": "integer"
+                },
+                "defaultScopes": {
+                    "description": "默认权限范围",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "grantTypes": {
+                    "description": "授权类型",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "isThirdParty": {
+                    "description": "是否第三方应用",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "客户端名称",
+                    "type": "string"
+                },
+                "postLogoutRedirectURIs": {
+                    "description": "登出回调地址",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "redirectURIs": {
+                    "description": "授权回调地址",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "refreshTokenTTL": {
+                    "description": "刷新令牌有效期(秒)",
+                    "type": "integer"
+                },
+                "requireAuthTime": {
+                    "description": "是否需要auth_time声明",
+                    "type": "integer"
+                },
+                "requirePKCE": {
+                    "description": "是否强制PKCE",
+                    "type": "integer"
+                },
+                "responseTypes": {
+                    "description": "响应类型",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "tokenEndpointAuthMethod": {
+                    "description": "令牌端点认证方式",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "客户端类型: first_party-第一方, third_party-第三方",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoapplicationclient.CreateResp": {
+            "type": "object",
+            "properties": {
+                "applicationClientId": {
+                    "description": "OAuth客户端ID",
+                    "type": "integer"
+                },
+                "clientID": {
+                    "description": "OIDC客户端ID",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoapplicationclient.CreateSecretReq": {
+            "type": "object",
+            "required": [
+                "applicationClientId",
+                "name"
+            ],
+            "properties": {
+                "applicationClientId": {
+                    "description": "OAuth客户端ID",
+                    "type": "integer"
+                },
+                "expiresAt": {
+                    "description": "过期时间",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "密钥名称",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoapplicationclient.CreateSecretResp": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "密钥ID",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "密钥名称",
+                    "type": "string"
+                },
+                "secret": {
+                    "description": "密钥明文（仅创建时返回）",
+                    "type": "string"
+                },
+                "valuePrefix": {
+                    "description": "密钥前缀",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoapplicationclient.DeleteReq": {
+            "type": "object",
+            "required": [
+                "applicationClientId"
+            ],
+            "properties": {
+                "applicationClientId": {
+                    "description": "OAuth客户端ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoapplicationclient.DetailResp": {
+            "type": "object",
+            "properties": {
+                "accessTokenTTL": {
+                    "description": "访问令牌有效期(秒)",
+                    "type": "integer"
+                },
+                "allowedOrigins": {
+                    "description": "CORS白名单",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "appId": {
+                    "description": "所属应用ID",
+                    "type": "integer"
+                },
+                "applicationClientId": {
+                    "description": "OAuth客户端ID",
+                    "type": "integer"
+                },
+                "clientID": {
+                    "description": "OIDC客户端ID",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "string"
+                },
+                "defaultScopes": {
+                    "description": "默认权限范围",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "grantTypes": {
+                    "description": "授权类型",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "isThirdParty": {
+                    "description": "是否第三方应用",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "客户端名称",
+                    "type": "string"
+                },
+                "postLogoutRedirectURIs": {
+                    "description": "登出回调地址",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "redirectURIs": {
+                    "description": "授权回调地址",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "refreshTokenTTL": {
+                    "description": "刷新令牌有效期(秒)",
+                    "type": "integer"
+                },
+                "requireAuthTime": {
+                    "description": "是否需要auth_time声明",
+                    "type": "integer"
+                },
+                "requirePKCE": {
+                    "description": "是否强制PKCE",
+                    "type": "integer"
+                },
+                "responseTypes": {
+                    "description": "响应类型",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "description": "状态",
+                    "type": "string"
+                },
+                "tenantId": {
+                    "description": "租户ID",
+                    "type": "integer"
+                },
+                "tokenEndpointAuthMethod": {
+                    "description": "令牌端点认证方式",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "客户端类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoapplicationclient.PageListItem": {
+            "type": "object",
+            "properties": {
+                "appId": {
+                    "description": "所属应用ID",
+                    "type": "integer"
+                },
+                "applicationClientId": {
+                    "description": "OAuth客户端ID",
+                    "type": "integer"
+                },
+                "clientID": {
+                    "description": "OIDC客户端ID",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "string"
+                },
+                "grantTypes": {
+                    "description": "授权类型",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "isThirdParty": {
+                    "description": "是否第三方应用",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "客户端名称",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "状态",
+                    "type": "string"
+                },
+                "tokenEndpointAuthMethod": {
+                    "description": "令牌端点认证方式",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "客户端类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoapplicationclient.PageListReq": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "description": "客户端名称（模糊搜索）",
+                    "type": "string"
+                },
+                "page": {
+                    "description": "页码",
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "description": "每页条数",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "状态",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "客户端类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoapplicationclient.PageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "列表数据",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtoapplicationclient.PageListItem"
+                    }
+                },
+                "total": {
+                    "description": "总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoapplicationclient.SecretListResp": {
+            "type": "object",
+            "properties": {
+                "secrets": {
+                    "description": "密钥列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtoapplicationclient.SecretResp"
+                    }
+                },
+                "total": {
+                    "description": "总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoapplicationclient.SecretResp": {
+            "type": "object",
+            "properties": {
+                "applicationClientId": {
+                    "description": "OAuth客户端ID",
+                    "type": "integer"
+                },
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "string"
+                },
+                "expiresAt": {
+                    "description": "过期时间",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "密钥ID",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "密钥名称",
+                    "type": "string"
+                },
+                "valuePrefix": {
+                    "description": "密钥前缀",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoapplicationclient.UpdateReq": {
+            "type": "object",
+            "required": [
+                "applicationClientId"
+            ],
+            "properties": {
+                "accessTokenTTL": {
+                    "description": "访问令牌有效期(秒)",
+                    "type": "integer"
+                },
+                "allowedOrigins": {
+                    "description": "CORS白名单",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "applicationClientId": {
+                    "description": "OAuth客户端ID",
+                    "type": "integer"
+                },
+                "defaultScopes": {
+                    "description": "默认权限范围",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "grantTypes": {
+                    "description": "授权类型",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "isThirdParty": {
+                    "description": "是否第三方应用",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "客户端名称",
+                    "type": "string"
+                },
+                "postLogoutRedirectURIs": {
+                    "description": "登出回调地址",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "redirectURIs": {
+                    "description": "授权回调地址",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "refreshTokenTTL": {
+                    "description": "刷新令牌有效期(秒)",
+                    "type": "integer"
+                },
+                "requireAuthTime": {
+                    "description": "是否需要auth_time声明",
+                    "type": "integer"
+                },
+                "requirePKCE": {
+                    "description": "是否强制PKCE",
+                    "type": "integer"
+                },
+                "responseTypes": {
+                    "description": "响应类型",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "description": "状态: enable-启用, disable-停用",
+                    "type": "string"
+                },
+                "tokenEndpointAuthMethod": {
+                    "description": "令牌端点认证方式",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "客户端类型",
+                    "type": "string"
+                }
+            }
+        },
         "dtoauth.ConnectorCreateReq": {
             "type": "object",
             "properties": {
@@ -6588,8 +7069,8 @@ const docTemplateiam = `{
         "dtoauth.LoginResp": {
             "type": "object",
             "properties": {
-                "personToken": {
-                    "$ref": "#/definitions/objauth.PersonTokenInfo"
+                "ssoSessionID": {
+                    "type": "string"
                 },
                 "tenants": {
                     "type": "array",
@@ -6895,487 +7376,6 @@ const docTemplateiam = `{
                 "isVerified": {
                     "description": "是否验证(0-未验证 1-已验证)",
                     "type": "integer"
-                }
-            }
-        },
-        "dtooauthclient.CreateReq": {
-            "type": "object",
-            "required": [
-                "appId",
-                "name"
-            ],
-            "properties": {
-                "accessTokenTTL": {
-                    "description": "访问令牌有效期(秒)",
-                    "type": "integer"
-                },
-                "allowedOrigins": {
-                    "description": "CORS白名单",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "appId": {
-                    "description": "所属应用ID",
-                    "type": "integer"
-                },
-                "defaultScopes": {
-                    "description": "默认权限范围",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "grantTypes": {
-                    "description": "授权类型",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "isThirdParty": {
-                    "description": "是否第三方应用",
-                    "type": "integer"
-                },
-                "name": {
-                    "description": "客户端名称",
-                    "type": "string"
-                },
-                "postLogoutRedirectURIs": {
-                    "description": "登出回调地址",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "redirectURIs": {
-                    "description": "授权回调地址",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "refreshTokenTTL": {
-                    "description": "刷新令牌有效期(秒)",
-                    "type": "integer"
-                },
-                "requireAuthTime": {
-                    "description": "是否需要auth_time声明",
-                    "type": "integer"
-                },
-                "requirePKCE": {
-                    "description": "是否强制PKCE",
-                    "type": "integer"
-                },
-                "responseTypes": {
-                    "description": "响应类型",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "tokenEndpointAuthMethod": {
-                    "description": "令牌端点认证方式",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "客户端类型: first_party-第一方, third_party-第三方",
-                    "type": "string"
-                }
-            }
-        },
-        "dtooauthclient.CreateResp": {
-            "type": "object",
-            "properties": {
-                "clientID": {
-                    "description": "OIDC客户端ID",
-                    "type": "string"
-                },
-                "oauthClientId": {
-                    "description": "OAuth客户端ID",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtooauthclient.CreateSecretReq": {
-            "type": "object",
-            "required": [
-                "name",
-                "oauthClientId"
-            ],
-            "properties": {
-                "expiresAt": {
-                    "description": "过期时间",
-                    "type": "string"
-                },
-                "name": {
-                    "description": "密钥名称",
-                    "type": "string"
-                },
-                "oauthClientId": {
-                    "description": "OAuth客户端ID",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtooauthclient.CreateSecretResp": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "description": "密钥ID",
-                    "type": "integer"
-                },
-                "name": {
-                    "description": "密钥名称",
-                    "type": "string"
-                },
-                "secret": {
-                    "description": "密钥明文（仅创建时返回）",
-                    "type": "string"
-                },
-                "valuePrefix": {
-                    "description": "密钥前缀",
-                    "type": "string"
-                }
-            }
-        },
-        "dtooauthclient.DeleteReq": {
-            "type": "object",
-            "required": [
-                "oauthClientId"
-            ],
-            "properties": {
-                "oauthClientId": {
-                    "description": "OAuth客户端ID",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtooauthclient.DetailResp": {
-            "type": "object",
-            "properties": {
-                "accessTokenTTL": {
-                    "description": "访问令牌有效期(秒)",
-                    "type": "integer"
-                },
-                "allowedOrigins": {
-                    "description": "CORS白名单",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "appId": {
-                    "description": "所属应用ID",
-                    "type": "integer"
-                },
-                "clientID": {
-                    "description": "OIDC客户端ID",
-                    "type": "string"
-                },
-                "createdAt": {
-                    "description": "创建时间",
-                    "type": "string"
-                },
-                "defaultScopes": {
-                    "description": "默认权限范围",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "grantTypes": {
-                    "description": "授权类型",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "isThirdParty": {
-                    "description": "是否第三方应用",
-                    "type": "integer"
-                },
-                "name": {
-                    "description": "客户端名称",
-                    "type": "string"
-                },
-                "oauthClientId": {
-                    "description": "OAuth客户端ID",
-                    "type": "integer"
-                },
-                "postLogoutRedirectURIs": {
-                    "description": "登出回调地址",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "redirectURIs": {
-                    "description": "授权回调地址",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "refreshTokenTTL": {
-                    "description": "刷新令牌有效期(秒)",
-                    "type": "integer"
-                },
-                "requireAuthTime": {
-                    "description": "是否需要auth_time声明",
-                    "type": "integer"
-                },
-                "requirePKCE": {
-                    "description": "是否强制PKCE",
-                    "type": "integer"
-                },
-                "responseTypes": {
-                    "description": "响应类型",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "status": {
-                    "description": "状态",
-                    "type": "string"
-                },
-                "tenantId": {
-                    "description": "租户ID",
-                    "type": "integer"
-                },
-                "tokenEndpointAuthMethod": {
-                    "description": "令牌端点认证方式",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "客户端类型",
-                    "type": "string"
-                }
-            }
-        },
-        "dtooauthclient.PageListItem": {
-            "type": "object",
-            "properties": {
-                "appId": {
-                    "description": "所属应用ID",
-                    "type": "integer"
-                },
-                "clientID": {
-                    "description": "OIDC客户端ID",
-                    "type": "string"
-                },
-                "createdAt": {
-                    "description": "创建时间",
-                    "type": "string"
-                },
-                "grantTypes": {
-                    "description": "授权类型",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "isThirdParty": {
-                    "description": "是否第三方应用",
-                    "type": "integer"
-                },
-                "name": {
-                    "description": "客户端名称",
-                    "type": "string"
-                },
-                "oauthClientId": {
-                    "description": "OAuth客户端ID",
-                    "type": "integer"
-                },
-                "status": {
-                    "description": "状态",
-                    "type": "string"
-                },
-                "tokenEndpointAuthMethod": {
-                    "description": "令牌端点认证方式",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "客户端类型",
-                    "type": "string"
-                }
-            }
-        },
-        "dtooauthclient.PageListReq": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "description": "客户端名称（模糊搜索）",
-                    "type": "string"
-                },
-                "page": {
-                    "description": "页码",
-                    "type": "integer"
-                },
-                "pageSize": {
-                    "description": "每页条数",
-                    "type": "integer"
-                },
-                "status": {
-                    "description": "状态",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "客户端类型",
-                    "type": "string"
-                }
-            }
-        },
-        "dtooauthclient.PageListResp": {
-            "type": "object",
-            "properties": {
-                "list": {
-                    "description": "列表数据",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dtooauthclient.PageListItem"
-                    }
-                },
-                "total": {
-                    "description": "总数",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtooauthclient.SecretListResp": {
-            "type": "object",
-            "properties": {
-                "secrets": {
-                    "description": "密钥列表",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dtooauthclient.SecretResp"
-                    }
-                },
-                "total": {
-                    "description": "总数",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtooauthclient.SecretResp": {
-            "type": "object",
-            "properties": {
-                "createdAt": {
-                    "description": "创建时间",
-                    "type": "string"
-                },
-                "expiresAt": {
-                    "description": "过期时间",
-                    "type": "string"
-                },
-                "id": {
-                    "description": "密钥ID",
-                    "type": "integer"
-                },
-                "name": {
-                    "description": "密钥名称",
-                    "type": "string"
-                },
-                "oauthClientId": {
-                    "description": "OAuth客户端ID",
-                    "type": "integer"
-                },
-                "valuePrefix": {
-                    "description": "密钥前缀",
-                    "type": "string"
-                }
-            }
-        },
-        "dtooauthclient.UpdateReq": {
-            "type": "object",
-            "required": [
-                "oauthClientId"
-            ],
-            "properties": {
-                "accessTokenTTL": {
-                    "description": "访问令牌有效期(秒)",
-                    "type": "integer"
-                },
-                "allowedOrigins": {
-                    "description": "CORS白名单",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "defaultScopes": {
-                    "description": "默认权限范围",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "grantTypes": {
-                    "description": "授权类型",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "isThirdParty": {
-                    "description": "是否第三方应用",
-                    "type": "integer"
-                },
-                "name": {
-                    "description": "客户端名称",
-                    "type": "string"
-                },
-                "oauthClientId": {
-                    "description": "OAuth客户端ID",
-                    "type": "integer"
-                },
-                "postLogoutRedirectURIs": {
-                    "description": "登出回调地址",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "redirectURIs": {
-                    "description": "授权回调地址",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "refreshTokenTTL": {
-                    "description": "刷新令牌有效期(秒)",
-                    "type": "integer"
-                },
-                "requireAuthTime": {
-                    "description": "是否需要auth_time声明",
-                    "type": "integer"
-                },
-                "requirePKCE": {
-                    "description": "是否强制PKCE",
-                    "type": "integer"
-                },
-                "responseTypes": {
-                    "description": "响应类型",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "status": {
-                    "description": "状态: enable-启用, disable-停用",
-                    "type": "string"
-                },
-                "tokenEndpointAuthMethod": {
-                    "description": "令牌端点认证方式",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "客户端类型",
-                    "type": "string"
                 }
             }
         },
@@ -11185,27 +11185,6 @@ const docTemplateiam = `{
                 "personID": {
                     "description": "自然人ID",
                     "type": "integer"
-                }
-            }
-        },
-        "objauth.PersonTokenInfo": {
-            "type": "object",
-            "properties": {
-                "accessToken": {
-                    "description": "访问令牌",
-                    "type": "string"
-                },
-                "expiresIn": {
-                    "description": "过期时间(秒)",
-                    "type": "integer"
-                },
-                "refreshToken": {
-                    "description": "刷新令牌",
-                    "type": "string"
-                },
-                "tokenType": {
-                    "description": "令牌类型",
-                    "type": "string"
                 }
             }
         },
