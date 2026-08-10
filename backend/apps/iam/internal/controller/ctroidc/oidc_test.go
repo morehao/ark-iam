@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtooidc"
+	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 )
 
 type fakeOIDCAuthSvc struct {
@@ -132,7 +133,7 @@ func TestSelectTenantReturnsContinueURLOnSuccess(t *testing.T) {
 
 func TestSelectTenantSetsSSOCookie(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	config.Conf = &config.Config{}
+	config.Conf = &pkgconfig.Config{}
 	engine := gin.New()
 	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{selectTenant: func(ctx context.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error) {
 		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1", TenantID: 7, SessionID: "session-1"}, nil
@@ -176,7 +177,7 @@ func TestSelectTenantReturnsErrorOnInvalidTenant(t *testing.T) {
 
 func TestLoginSetsSSOCookieWithoutDomainByDefault(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	config.Conf = &config.Config{}
+	config.Conf = &pkgconfig.Config{}
 	engine := gin.New()
 	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
 		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1", SessionID: "session-1"}, nil
@@ -199,7 +200,7 @@ func TestLoginSetsSSOCookieWithoutDomainByDefault(t *testing.T) {
 
 func TestLoginSetsSSOCookieWithConfiguredDomain(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	config.Conf = &config.Config{OIDC: config.OIDC{CookieDomain: "example.com"}}
+	config.Conf = &pkgconfig.Config{OIDC: pkgconfig.OIDC{CookieDomain: "example.com"}}
 	engine := gin.New()
 	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
 		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1", SessionID: "session-1"}, nil

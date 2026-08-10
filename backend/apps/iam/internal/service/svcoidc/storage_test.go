@@ -9,6 +9,7 @@ import (
 	"time"
 
 	appconfig "github.com/morehao/ark-iam/iam/config"
+	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
@@ -90,7 +91,7 @@ func TestCompleteAuthRequestMarksRequestDone(t *testing.T) {
 }
 
 func TestOIDCClientLoginURLUsesConfiguredFrontend(t *testing.T) {
-	appconfig.Conf = &appconfig.Config{OIDC: appconfig.OIDC{FrontendLoginURL: "https://console.example.com/oidc/login"}}
+	appconfig.Conf = &pkgconfig.Config{OIDC: pkgconfig.OIDC{FrontendLoginURL: "https://console.example.com/oidc/login"}}
 	client := NewOIDCClient(&model.ApplicationClientEntity{ClientID: "client-1"})
 
 	got := client.LoginURL("ar-1")

@@ -12,6 +12,7 @@ import (
 	appconfig "github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/iam/internal/service/svcsso"
+	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/testsetup"
@@ -53,9 +54,9 @@ func TestCompleteLoginBySessionHonorsAuthRequestTenantHint(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	appconfig.Conf = &appconfig.Config{
-		JWT: appconfig.JWT{SignKey: "test-sign-key"},
-		OIDC: appconfig.OIDC{
+	appconfig.Conf = &pkgconfig.Config{
+		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3000/oidc/login",
 			AllowInsecure:    true,
@@ -120,9 +121,9 @@ func TestCompleteLoginBySessionFallsBackWhenHintNotInPersonsTenants(t *testing.T
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	appconfig.Conf = &appconfig.Config{
-		JWT: appconfig.JWT{SignKey: "test-sign-key"},
-		OIDC: appconfig.OIDC{
+	appconfig.Conf = &pkgconfig.Config{
+		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3000/oidc/login",
 			AllowInsecure:    true,
@@ -180,9 +181,9 @@ func TestCompleteLoginBySessionRejectsHintOnTenantLookupError(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	appconfig.Conf = &appconfig.Config{
-		JWT: appconfig.JWT{SignKey: "test-sign-key"},
-		OIDC: appconfig.OIDC{
+	appconfig.Conf = &pkgconfig.Config{
+		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3000/oidc/login",
 			AllowInsecure:    true,
@@ -240,9 +241,9 @@ func TestCompleteLoginReturnsContinueURLAndCompletesRequest(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	appconfig.Conf = &appconfig.Config{
-		JWT: appconfig.JWT{SignKey: "test-sign-key"},
-		OIDC: appconfig.OIDC{
+	appconfig.Conf = &pkgconfig.Config{
+		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3000/oidc/login",
 			AllowInsecure:    true,
@@ -316,9 +317,9 @@ func TestCompleteLoginMultiTenantRequiresSelection(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	appconfig.Conf = &appconfig.Config{
-		JWT: appconfig.JWT{SignKey: "test-sign-key"},
-		OIDC: appconfig.OIDC{
+	appconfig.Conf = &pkgconfig.Config{
+		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3000/oidc/login",
 			AllowInsecure:    true,
@@ -385,9 +386,9 @@ func TestCompleteLoginHonorsTenantHint(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	appconfig.Conf = &appconfig.Config{
-		JWT: appconfig.JWT{SignKey: "test-sign-key"},
-		OIDC: appconfig.OIDC{
+	appconfig.Conf = &pkgconfig.Config{
+		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3000/oidc/login",
 			AllowInsecure:    true,
@@ -461,9 +462,9 @@ func TestCompleteLoginIgnoresForgedTenantHint(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	appconfig.Conf = &appconfig.Config{
-		JWT: appconfig.JWT{SignKey: "test-sign-key"},
-		OIDC: appconfig.OIDC{
+	appconfig.Conf = &pkgconfig.Config{
+		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3000/oidc/login",
 			AllowInsecure:    true,
@@ -531,9 +532,9 @@ func TestSelectTenantWritesTenantAndReturnsContinueURL(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	appconfig.Conf = &appconfig.Config{
-		JWT: appconfig.JWT{SignKey: "test-sign-key"},
-		OIDC: appconfig.OIDC{
+	appconfig.Conf = &pkgconfig.Config{
+		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3000/oidc/login",
 			AllowInsecure:    true,
@@ -603,9 +604,9 @@ func TestSelectTenantRejectsTenantNotBelongingToPerson(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	appconfig.Conf = &appconfig.Config{
-		JWT: appconfig.JWT{SignKey: "test-sign-key"},
-		OIDC: appconfig.OIDC{
+	appconfig.Conf = &pkgconfig.Config{
+		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3000/oidc/login",
 			AllowInsecure:    true,
@@ -655,9 +656,9 @@ func TestSelectTenantRejectsAlreadyDoneRequest(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	appconfig.Conf = &appconfig.Config{
-		JWT: appconfig.JWT{SignKey: "test-sign-key"},
-		OIDC: appconfig.OIDC{
+	appconfig.Conf = &pkgconfig.Config{
+		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3000/oidc/login",
 			AllowInsecure:    true,

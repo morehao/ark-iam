@@ -10,6 +10,7 @@ import (
 	iam "github.com/morehao/ark-iam/iam"
 	"github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/router"
+	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
@@ -19,9 +20,9 @@ func TestOIDCRoutesExposeLoginEndpoint(t *testing.T) {
 	defer testsetup.Done(testsetup.AppNameIam)
 
 	gin.SetMode(gin.TestMode)
-	config.Conf = &config.Config{
-		JWT: config.JWT{SignKey: "test-sign-key"},
-		OIDC: config.OIDC{
+	config.Conf = &pkgconfig.Config{
+		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3000/oidc/login",
 			AllowInsecure:    true,
@@ -51,9 +52,9 @@ func TestOIDCLoginEndpointBypassesJWTAuth(t *testing.T) {
 	defer testsetup.Done(testsetup.AppNameIam)
 
 	gin.SetMode(gin.TestMode)
-	config.Conf = &config.Config{
-		JWT: config.JWT{SignKey: "test-sign-key"},
-		OIDC: config.OIDC{
+	config.Conf = &pkgconfig.Config{
+		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3000/oidc/login",
 			AllowInsecure:    true,

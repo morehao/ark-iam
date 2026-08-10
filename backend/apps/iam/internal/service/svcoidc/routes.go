@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	appconfig "github.com/morehao/ark-iam/iam/config"
-	"github.com/morehao/ark-iam/iam/internal/middleware"
 	"github.com/morehao/ark-iam/iam/internal/service/svcsso"
+	"github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 )
 

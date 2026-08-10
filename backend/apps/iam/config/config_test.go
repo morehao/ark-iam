@@ -1,16 +1,20 @@
 package config
 
-import "testing"
+import (
+	"testing"
+
+	pkgconfig "github.com/morehao/ark-iam/pkg/config"
+)
 
 func TestSSOCookieDomainDefaultsToLocalhost(t *testing.T) {
-	o := OIDC{CookieDomain: ""}
+	o := pkgconfig.OIDC{CookieDomain: ""}
 	if got := o.SSOCookieDomain(); got != "" {
 		t.Fatalf("expected empty default cookie domain, got %q", got)
 	}
 }
 
 func TestSSOCookieDomainUsesConfiguredValue(t *testing.T) {
-	o := OIDC{CookieDomain: "example.com"}
+	o := pkgconfig.OIDC{CookieDomain: "example.com"}
 	if got := o.SSOCookieDomain(); got != "example.com" {
 		t.Fatalf("expected 'example.com', got %q", got)
 	}

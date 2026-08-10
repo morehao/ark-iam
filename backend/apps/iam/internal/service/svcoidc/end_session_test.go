@@ -8,11 +8,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	appconfig "github.com/morehao/ark-iam/iam/config"
+	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 )
 
 func TestEndSessionClearsSSOCookie(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	appconfig.Conf = &appconfig.Config{}
+	appconfig.Conf = &pkgconfig.Config{}
 	engine := gin.New()
 	group := engine.Group("/oidc")
 	RegisterProviderRoutes(group, &OIDCProvider{}, "iam_sso_session")

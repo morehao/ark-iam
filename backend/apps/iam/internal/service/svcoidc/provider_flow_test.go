@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	appconfig "github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtooidc"
+	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/testsetup"
@@ -21,9 +22,9 @@ func TestFullOIDCCodeFlow(t *testing.T) {
 	defer testsetup.Done(testsetup.AppNameIam)
 
 	issuer := "http://localhost:8099/oidc"
-	appconfig.Conf = &appconfig.Config{
-		JWT: appconfig.JWT{SignKey: "test-sign-key"},
-		OIDC: appconfig.OIDC{
+	appconfig.Conf = &pkgconfig.Config{
+		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: pkgconfig.OIDC{
 			Issuer:        issuer,
 			AllowInsecure: true,
 		},

@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/router"
+	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
@@ -18,9 +19,9 @@ func TestLoggedOutUsesHostOnlyCookieByDefault(t *testing.T) {
 	defer testsetup.Done(testsetup.AppNameIam)
 
 	gin.SetMode(gin.TestMode)
-	config.Conf = &config.Config{
-		JWT: config.JWT{SignKey: "test-key"},
-		OIDC: config.OIDC{
+	config.Conf = &pkgconfig.Config{
+		JWT: pkgconfig.JWT{SignKey: "test-key"},
+		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3003/login",
 			AllowInsecure:    true,
@@ -51,9 +52,9 @@ func TestLoggedOutUsesConfiguredCookieDomain(t *testing.T) {
 	defer testsetup.Done(testsetup.AppNameIam)
 
 	gin.SetMode(gin.TestMode)
-	config.Conf = &config.Config{
-		JWT: config.JWT{SignKey: "test-key"},
-		OIDC: config.OIDC{
+	config.Conf = &pkgconfig.Config{
+		JWT: pkgconfig.JWT{SignKey: "test-key"},
+		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3003/login",
 			CookieDomain:     "example.com",

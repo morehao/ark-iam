@@ -10,13 +10,14 @@ import (
 	iam "github.com/morehao/ark-iam/iam"
 	"github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/router"
+	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
 func TestAuthAndConnectorRoutesUseUnifiedEndpoints(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	config.Conf = &config.Config{JWT: config.JWT{SignKey: "test-sign-key"}, Server: config.Server{Env: "dev"}}
+	config.Conf = &pkgconfig.Config{JWT: pkgconfig.JWT{SignKey: "test-sign-key"}, Server: pkgconfig.Server{Env: "dev"}}
 
 	engine := gin.New()
 	groups := ginserver.NewRouterGroups(engine, "iam", ginserver.VersionGroup{Version: ginserver.ApiVersionV1})
@@ -77,7 +78,7 @@ func TestIAMRoutersWhitelistPublicAuthEndpoints(t *testing.T) {
 	defer testsetup.Done(testsetup.AppNameIam)
 
 	gin.SetMode(gin.TestMode)
-	config.Conf = &config.Config{JWT: config.JWT{SignKey: "test-sign-key"}, Server: config.Server{Env: "dev"}}
+	config.Conf = &pkgconfig.Config{JWT: pkgconfig.JWT{SignKey: "test-sign-key"}, Server: pkgconfig.Server{Env: "dev"}}
 
 	engine := gin.New()
 	iam.Routers(engine)

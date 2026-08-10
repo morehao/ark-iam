@@ -6,6 +6,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/morehao/ark-iam/iam/config"
+	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +25,7 @@ func TestCfgDefaults(t *testing.T) {
 
 func TestCfgFromConfig(t *testing.T) {
 	oldConf := config.Conf
-	config.Conf = &config.Config{Security: config.SecurityConfig{Login: config.LoginGuardConfig{
+	config.Conf = &pkgconfig.Config{Security: pkgconfig.SecurityConfig{Login: pkgconfig.LoginGuardConfig{
 		MaxFailures: 7, WindowSec: 120, LockSec: 600,
 	}}}
 	defer func() { config.Conf = oldConf }()
@@ -37,7 +38,7 @@ func TestCfgFromConfig(t *testing.T) {
 
 func TestCfgIgnoresZero(t *testing.T) {
 	oldConf := config.Conf
-	config.Conf = &config.Config{Security: config.SecurityConfig{Login: config.LoginGuardConfig{
+	config.Conf = &pkgconfig.Config{Security: pkgconfig.SecurityConfig{Login: pkgconfig.LoginGuardConfig{
 		MaxFailures: 3, WindowSec: 0, LockSec: 0,
 	}}}
 	defer func() { config.Conf = oldConf }()
@@ -64,7 +65,7 @@ func TestGuardCounterAndLock(t *testing.T) {
 	oldCli := dbclient.RedisCli
 	oldConf := config.Conf
 	dbclient.RedisCli = redis.NewClient(&redis.Options{Addr: s.Addr()})
-	config.Conf = &config.Config{Security: config.SecurityConfig{Login: config.LoginGuardConfig{
+	config.Conf = &pkgconfig.Config{Security: pkgconfig.SecurityConfig{Login: pkgconfig.LoginGuardConfig{
 		MaxFailures: 3, WindowSec: 300, LockSec: 900,
 	}}}
 	defer func() {
