@@ -15,7 +15,7 @@
 
 ```yaml
 oidc:
-  issuer: "http://localhost:8099/v1/iam/oidc"
+  issuer: "http://localhost:8099/oidc"
   frontendLoginURL: "http://localhost:3000/oidc/login"
   signingKeyID: "dev-oidc-key"
   signingPrivateKeyPath: "config/oidc-dev-key.pem"
@@ -59,10 +59,10 @@ npx vitest run
 
 以下 SQL 插入一个测试 RP（Relying Party）客户端，用于验证完整授权码流程。
 
-### 3.1 插入 oauth_client
+### 3.1 插入 application_client
 
 ```sql
-INSERT INTO `oauth_client`
+INSERT INTO `application_client`
   (`created_at`, `updated_at`, `tenant_id`, `app_id`, `client_id`, `name`,
    `redirect_uris`, `post_logout_redirect_uris`, `grant_types`, `response_types`,
    `token_endpoint_auth_method`, `allowed_origins`, `require_pkce`,
@@ -112,11 +112,11 @@ func main() {
 }
 ```
 
-### 3.3 插入 oauth_client_secret
+### 3.3 插入 application_client_secret
 
 ```sql
-INSERT INTO `oauth_client_secret`
-  (`created_at`, `updated_at`, `oauth_client_id`, `name`, `value_hash`,
+INSERT INTO `application_client_secret`
+  (`created_at`, `updated_at`, `application_client_id`, `name`, `value_hash`,
    `value_prefix`, `expired_at`, `revoked_at`, `created_by`, `updated_by`, `deleted_by`)
 VALUES
   (NOW(), NOW(), 1, '测试密钥',
@@ -124,7 +124,7 @@ VALUES
    'my-test', NULL, NULL, 1, 1, 0);
 ```
 
-> 注意：`oauth_client_id` 是上一步插入的 oauth_client 记录的自增 ID。如果数据库有历史数据，请替换为正确的 ID。
+> 注意：`application_client_id` 是上一步插入的 application_client 记录的自增 ID。如果数据库有历史数据，请替换为正确的 ID。
 >
 > 密钥原文：`my-test-client-secret`（此后 curl 中会用到）
 
@@ -147,11 +147,11 @@ SELECT id, person_id, tenant_id FROM user WHERE person_id = <上面查到的pers
 ### Step 1: Discovery 端点
 
 ```bash
-curl -s http://localhost:8099/v1/iam/oidc/.well-known/openid-configuration | jq .
+curl -s http://localhost:8099/oidc/.well-known/openid-configuration | jq .
 ```
 
 **确认要点：**
-- `issuer` 为 `http://localhost:8099/v1/iam/oidc`
+- `issuer` 为 `http://localhost:8099/oidc`
 - `authorization_endpoint` 存在
 - `token_endpoint` 存在
 - `jwks_uri` 存在
@@ -163,7 +163,7 @@ curl -s http://localhost:8099/v1/iam/oidc/.well-known/openid-configuration | jq 
 ### Step 2: JWKS 端点
 
 ```bash
-curl -s http://localhost:8099/v1/iam/oidc/.well-known/jwks.json | jq .
+curl -s http://localhost:8099/oidc/.well-known/jwks.json | jq .
 ```
 
 **确认要点：**
@@ -176,7 +176,7 @@ curl -s http://localhost:8099/v1/iam/oidc/.well-known/jwks.json | jq .
 手动构造 authorize 请求。在浏览器中打开或使用 curl 跟随重定向：
 
 ```
-http://localhost:8099/v1/iam/oidc/authorize
+http://localhost:8099/oidc/authorize
   ?client_id=test-rp-client
   &redirect_uri=https://client.example.com/callback
   &response_type=code
@@ -188,7 +188,7 @@ http://localhost:8099/v1/iam/oidc/authorize
 **Curl 方式（不跟随 302）：**
 
 ```bash
-curl -v 'http://localhost:8099/v1/iam/oidc/authorize?client_id=test-rp-client&redirect_uri=https://client.example.com/callback&response_type=code&scope=openid%20profile%20email&state=test-state-123&nonce=test-nonce-456'
+curl -v 'http://localhost:8099/oidc/authorize?client_id=test-rp-client&redirect_uri=https://client.example.com/callback&response_type=code&scope=openid%20profile%20email&state=test-state-123&nonce=test-nonce-456'
 ```
 
 **确认要点：**
@@ -203,7 +203,7 @@ curl -v 'http://localhost:8099/v1/iam/oidc/authorize?client_id=test-rp-client&re
 拿到 Step 3 的 `authRequestID`，替换到下面请求中：
 
 ```bash
-curl -s -X POST http://localhost:8099/v1/iam/oidc/login \
+curl -s -X POST http://localhost:8099/oidc/login \
   -H 'Content-Type: application/json' \
   -d '{
     "authRequestID": "ar-1741234567890123000",
@@ -214,7 +214,7 @@ curl -s -X POST http://localhost:8099/v1/iam/oidc/login \
 
 **确认要点：**
 - `code` 为 `0`
-- `data.continueURL` 形如 `http://localhost:8099/v1/iam/oidc/authorize/callback?id=ar-1741234567890123000`
+- `data.continueURL` 形如 `http://localhost:8099/oidc/authorize/callback?id=ar-1741234567890123000`
 
 将 `continueURL` 复制到浏览器打开（或下一步通过 curl 跟随）。
 
@@ -223,7 +223,7 @@ curl -s -X POST http://localhost:8099/v1/iam/oidc/login \
 **Curl 方式（不跟随 302）：**
 
 ```bash
-curl -v 'http://localhost:8099/v1/iam/oidc/authorize/callback?id=ar-1741234567890123000'
+curl -v 'http://localhost:8099/oidc/authorize/callback?id=ar-1741234567890123000'
 ```
 
 **确认要点：**
@@ -237,7 +237,7 @@ curl -v 'http://localhost:8099/v1/iam/oidc/authorize/callback?id=ar-174123456789
 ### Step 6: Token Endpoint（code 换 token）
 
 ```bash
-curl -s -X POST http://localhost:8099/v1/iam/oidc/oauth/token \
+curl -s -X POST http://localhost:8099/oidc/oauth/token \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d 'grant_type=authorization_code' \
   -d 'code=上一步获取的code' \
@@ -262,7 +262,7 @@ curl -s -X POST http://localhost:8099/v1/iam/oidc/oauth/token \
 ```
 
 确认 id_token 的 payload 中：
-- `iss` = `http://localhost:8099/v1/iam/oidc`
+- `iss` = `http://localhost:8099/oidc`
 - `sub` = `person:<id>` 格式
 - `aud` = `test-rp-client`
 - `exp` > `iat`
@@ -270,7 +270,7 @@ curl -s -X POST http://localhost:8099/v1/iam/oidc/oauth/token \
 ### Step 7: UserInfo 端点
 
 ```bash
-curl -s http://localhost:8099/v1/iam/oidc/userinfo \
+curl -s http://localhost:8099/oidc/userinfo \
   -H 'Authorization: Bearer 上一步获取的access_token' | jq .
 ```
 
@@ -282,7 +282,7 @@ curl -s http://localhost:8099/v1/iam/oidc/userinfo \
 ### Step 8: Refresh Token（可选）
 
 ```bash
-curl -s -X POST http://localhost:8099/v1/iam/oidc/oauth/token \
+curl -s -X POST http://localhost:8099/oidc/oauth/token \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d 'grant_type=refresh_token' \
   -d 'refresh_token=上一步获取的refresh_token' \
@@ -299,7 +299,7 @@ curl -s -X POST http://localhost:8099/v1/iam/oidc/oauth/token \
 **场景 A：错误的密码**
 
 ```bash
-curl -s -X POST http://localhost:8099/v1/iam/oidc/login \
+curl -s -X POST http://localhost:8099/oidc/login \
   -H 'Content-Type: application/json' \
   -d '{
     "authRequestID": "ar-xxx",
@@ -313,7 +313,7 @@ curl -s -X POST http://localhost:8099/v1/iam/oidc/login \
 **场景 B：无效的 authRequestID**
 
 ```bash
-curl -s -X POST http://localhost:8099/v1/iam/oidc/login \
+curl -s -X POST http://localhost:8099/oidc/login \
   -H 'Content-Type: application/json' \
   -d '{
     "authRequestID": "non-existent-id",
@@ -327,7 +327,7 @@ curl -s -X POST http://localhost:8099/v1/iam/oidc/login \
 **场景 C：无效 client_id（token 端点）**
 
 ```bash
-curl -s -X POST http://localhost:8099/v1/iam/oidc/oauth/token \
+curl -s -X POST http://localhost:8099/oidc/oauth/token \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d 'grant_type=authorization_code' \
   -d 'code=invalid' \
@@ -349,7 +349,7 @@ curl -s -X POST http://localhost:8099/v1/iam/oidc/oauth/token \
 在浏览器地址栏直接粘贴 Authorize URL，回车触发流程：
 
 ```
-http://localhost:8099/v1/iam/oidc/authorize?client_id=test-rp-client&redirect_uri=https://client.example.com/callback&response_type=code&scope=openid%20profile%20email&state=test-state-123&nonce=test-nonce-456
+http://localhost:8099/oidc/authorize?client_id=test-rp-client&redirect_uri=https://client.example.com/callback&response_type=code&scope=openid%20profile%20email&state=test-state-123&nonce=test-nonce-456
 ```
 
 浏览器会自动跟随 302 跳转到 OIDC 登录页。**建议操作前先打开浏览器 DevTools（F12）→ Network 面板，勾选 Preserve log**，否则 302 跳转后会丢失之前的请求记录。
@@ -363,7 +363,7 @@ http://localhost:8099/v1/iam/oidc/authorize?client_id=test-rp-client&redirect_ur
 <html>
 <body>
   <h1>Test RP</h1>
-  <a href="http://localhost:8099/v1/iam/oidc/authorize?client_id=test-rp-client&redirect_uri=https://client.example.com/callback&response_type=code&scope=openid%20profile%20email&state=test-state-123&nonce=test-nonce-456">
+  <a href="http://localhost:8099/oidc/authorize?client_id=test-rp-client&redirect_uri=https://client.example.com/callback&response_type=code&scope=openid%20profile%20email&state=test-state-123&nonce=test-nonce-456">
     发起 OIDC 登录
   </a>
   <div id="result"></div>
@@ -390,7 +390,7 @@ http://localhost:8099/v1/iam/oidc/authorize?client_id=test-rp-client&redirect_ur
 2. 浏览器跳转到 http://localhost:3000/oidc/login?authRequestID=ar-xxx
 3. 页面显示 OIDC 登录表单
 4. 输入 identifier 和 password，点击登录
-5. 前端 POST /v1/iam/oidc/login（axios baseURL /v1/iam + Vite proxy 转发到后端 8099）
+5. 前端 POST /oidc/login（axios baseURL /v1/iam + Vite proxy 转发到后端 8099）
 6. 后端返回 { code: 0, data: { continueURL: "..." } }
 7. 前端执行 window.location.href = resp.continueURL
 8. 浏览器跳转到 /authorize/callback?id=ar-xxx，后端完成认证并 302 到 redirect_uri
@@ -399,7 +399,7 @@ http://localhost:8099/v1/iam/oidc/authorize?client_id=test-rp-client&redirect_ur
 
 > **关键验证点**：步骤 9 即使浏览器无法加载目标页面（如 `https://client.example.com/callback`），也能在 Network 面板中找到最后一条 302 响应，其 Location 头包含 `?code=xxx&state=test-state-123`。确认 `state` 与步骤 1 传入的一致。
 
-> **查看完整回调**：如果想看到浏览器加载回调页面，可将 oauth_client 的 `redirect_uris` 改为 `["http://localhost:9999/callback"]`，然后启动 HTTP 服务器：
+> **查看完整回调**：如果想看到浏览器加载回调页面，可将 application_client 的 `redirect_uris` 改为 `["http://localhost:9999/callback"]`，然后启动 HTTP 服务器：
 > ```bash
 > python3 -m http.server 9999
 > ```
@@ -432,7 +432,7 @@ cd backend/apps/iam && make run
 
 ### 6.2 CORS 问题
 
-如果前端请求 `POST /v1/iam/oidc/login` 出现跨域错误：
+如果前端请求 `POST /oidc/login` 出现跨域错误：
 
 - 确认 `router/oidc.go` 中 OIDC 路由组已添加 `ginmiddleware.CORS()`
 - 检查请求是从 `http://localhost:3000` 发出
@@ -453,14 +453,14 @@ cd backend/apps/iam && make run
 
 ### 6.5 Token 端点返回 Invalid Client
 
-- 确认 client_id（`test-rp-client`）在 `oauth_client` 表中存在且 `status = enable`
+- 确认 client_id（`test-rp-client`）在 `application_client` 表中存在且 `status = enable`
 - 确认 client_secret 的 SHA256 哈希与库中存储一致
 - 尝试用 `client_secret_basic` 方式（将 client_id:client_secret base64 放入 Authorization header）
 
 ```bash
 # client_secret_basic 方式
 AUTH=$(echo -n "test-rp-client:my-test-client-secret" | base64)
-curl -s -X POST http://localhost:8099/v1/iam/oidc/oauth/token \
+curl -s -X POST http://localhost:8099/oidc/oauth/token \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -H "Authorization: Basic $AUTH" \
   -d 'grant_type=authorization_code' \
@@ -474,7 +474,7 @@ curl -s -X POST http://localhost:8099/v1/iam/oidc/oauth/token \
 |----------|--------|--------|
 | `backend/config.yaml` | `server.port` | 8099 |
 | `frontend/vite.config.ts` | `server.proxy./v1.target` | `http://localhost:8099` |
-| `backend/config.yaml` | `oidc.issuer` | `http://localhost:8099/v1/iam/oidc` |
+| `backend/config.yaml` | `oidc.issuer` | `http://localhost:8099/oidc` |
 | `frontend` 浏览器访问 | 前端页面 | `http://localhost:3000` |
 
 ### 6.7 签名密钥问题
