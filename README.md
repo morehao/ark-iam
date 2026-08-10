@@ -56,19 +56,19 @@ Install the CLI tool:
 go install github.com/morehao/gocli@latest
 ```
 
-Ensure a `code_gen.yaml` config file exists under the application directory, e.g., `backend/apps/demo/config/code_gen.yaml`.
+Ensure a `code_gen.yaml` config file exists under the application directory, e.g., `backend/apps/auth/config/code_gen.yaml`.
 
 Run code generation commands:
 
 ```bash
 # Generate full module based on table
-make codegen APP=demo COMMAND=module
+make codegen APP=auth COMMAND=module
 
 # Generate only model code
-make codegen APP=demo COMMAND=model
+make codegen APP=auth COMMAND=model
 
 # Generate API endpoint code
-make codegen APP=demo COMMAND=api
+make codegen APP=auth COMMAND=api
 ```
 
 See [generate](https://github.com/morehao/gocli?tab=readme-ov-file#generate) for full documentation.

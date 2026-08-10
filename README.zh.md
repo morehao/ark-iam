@@ -56,19 +56,19 @@ ark-iam/
 go install github.com/morehao/gocli@latest
 ```
 
-确保应用目录下存在 `code_gen.yaml` 配置文件，例如 `backend/apps/demo/config/code_gen.yaml`。
+确保应用目录下存在 `code_gen.yaml` 配置文件，例如 `backend/apps/auth/config/code_gen.yaml`。
 
 运行代码生成命令：
 
 ```bash
 # 根据表生成完整模块
-make codegen APP=demo COMMAND=module
+make codegen APP=auth COMMAND=module
 
 # 仅生成 model 代码
-make codegen APP=demo COMMAND=model
+make codegen APP=auth COMMAND=model
 
 # 生成 API 端点代码
-make codegen APP=demo COMMAND=api
+make codegen APP=auth COMMAND=api
 ```
 
 详细文档请参阅 [generate](https://github.com/morehao/gocli?tab=readme-ov-file#generate)。

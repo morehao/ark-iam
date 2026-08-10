@@ -200,7 +200,7 @@ var StatusTextMap = map[string]string{
 
 1. 标准库 (`fmt`, `strings`, `time`...)
 2. 第三方库 (`github.com/gin-gonic/gin`, `github.com/stretchr/testify`...)
-3. 项目内部包 (`github.com/morehao/goark/apps/iam/...`, `github.com/morehao/goark/pkg/...`)
+3. 项目内部包 (`github.com/morehao/ark-iam/apps/platformadmin/...`, `github.com/morehao/ark-iam/pkg/...`)
 4. 关联库 (`github.com/morehao/golib/...`)
 
 ```go
@@ -210,8 +210,8 @@ import (
     "github.com/gin-gonic/gin"
     "github.com/stretchr/testify"
 
-    "github.com/morehao/goark/apps/iam/internal/dto/dtouser"
-    "github.com/morehao/goark/pkg/code"
+    "github.com/morehao/ark-iam/platformadmin/internal/dto/dtouser"
+    "github.com/morehao/ark-iam/pkg/code"
     "github.com/morehao/golib/glog"
 )
 ```
@@ -237,7 +237,7 @@ func NewUserSvc() UserSvc {
 
 ### 错误处理
 
-- 使用统一的错误码包 `github.com/morehao/goark/pkg/code`
+- 使用统一的错误码包 `github.com/morehao/ark-iam/pkg/code`
 - 业务错误通过 `code.GetError(code.XXXError)` 返回
 - 错误日志使用 `glog.Errorf(ctx, "[module.Method] msg, err:%v", err)`
 
@@ -342,7 +342,7 @@ func userRouter(groups *ginserver.RouterGroups) {
 生成文档：
 
 ```bash
-make swag APP=demo
+make swag APP=auth
 ```
 
 ### 测试规范
@@ -377,23 +377,23 @@ func TestGeneratePassword(t *testing.T) {
 
 ```bash
 # 生成 API 路由和控制器
-make codegen APP=demo COMMAND=api
+make codegen APP=auth COMMAND=api
 
 # 生成模块代码
-make codegen APP=demo COMMAND=module
+make codegen APP=auth COMMAND=module
 
 # 生成模型代码
-make codegen APP=demo COMMAND=model
+make codegen APP=auth COMMAND=model
 ```
 
 ### Docker 支持
 
 ```bash
 # 构建 Docker 镜像
-make docker-build APP=demo
+make docker-build APP=auth
 
 # 运行 Docker 容器
-make docker-run APP=demo
+make docker-run APP=auth
 ```
 
 ## 常用工具
