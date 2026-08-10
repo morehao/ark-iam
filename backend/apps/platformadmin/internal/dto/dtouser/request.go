@@ -38,8 +38,8 @@ type UserPasswordUpdateReq struct {
 }
 
 type UserStatusUpdateReq struct {
-	UserID       uint `json:"userID" binding:"required"` // 用户ID
-	IsSuspended int8 `json:"isSuspended"`              // 是否挂起
+	UserID      uint `json:"userID" binding:"required"` // 用户ID
+	IsSuspended int8 `json:"isSuspended"`               // 是否挂起
 }
 
 type UserIdentityCreateReq struct {
@@ -47,16 +47,16 @@ type UserIdentityCreateReq struct {
 	UserID     uint   `json:"userID" binding:"required"`     // 用户ID
 	Issuer     string `json:"issuer" binding:"required"`     // 身份提供商
 	IdentityID string `json:"identityID" binding:"required"` // 第三方用户ID
-	Detail     any    `json:"detail"`                         // 详细信息
+	Detail     any    `json:"detail"`                        // 详细信息
 }
 
 type UserIdentityUpdateReq struct {
-	UserIdentityID uint `json:"userIdentityID" binding:"required"` // 用户身份ID
-	TenantID       uint   `json:"tenantID"`   // 租户ID
-	UserID         uint   `json:"userID"`     // 用户ID
-	Issuer         string `json:"issuer"`     // 身份提供商
-	IdentityID     string `json:"identityID"` // 第三方用户ID
-	Detail         any    `json:"detail"`       // 详细信息
+	UserIdentityID uint   `json:"userIdentityID" binding:"required"` // 用户身份ID
+	TenantID       uint   `json:"tenantID"`                          // 租户ID
+	UserID         uint   `json:"userID"`                            // 用户ID
+	Issuer         string `json:"issuer"`                            // 身份提供商
+	IdentityID     string `json:"identityID"`                        // 第三方用户ID
+	Detail         any    `json:"detail"`                            // 详细信息
 }
 
 type UserIdentityDetailReq struct {
@@ -99,8 +99,8 @@ type UserDepartmentByUserReq struct {
 }
 
 type AssignDepartmentsReq struct {
-	UserID        uint   `json:"userID" binding:"required"`         // 用户ID
-	DepartmentIDs []uint `json:"departmentIDs" binding:"required"`   // 部门ID列表
+	UserID        uint   `json:"userID" binding:"required"`        // 用户ID
+	DepartmentIDs []uint `json:"departmentIDs" binding:"required"` // 部门ID列表
 }
 
 type RoleUserListReq struct {
@@ -122,6 +122,6 @@ type RoleApplicationListReq struct {
 }
 
 type AssignRoleApplicationsReq struct {
-	RoleID         uint64   `json:"roleId" binding:"required"`
+	RoleID uint64   `json:"roleId" binding:"required"`
 	AppIDs []uint64 `json:"appIds" binding:"required,min=1"`
 }

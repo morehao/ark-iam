@@ -48,10 +48,10 @@ type DepartmentDetailReq struct {
 
 type DepartmentPageListReq struct {
 	gobject.PageQuery
-	TenantID   uint   `json:"tenantID"` // 租户ID
-	ParentID   uint   `json:"parentID"` // 父部门ID
-	Name       string `json:"name"`     // 部门名称
-	Code       string `json:"code"`     // 部门编码
+	TenantID uint   `json:"tenantID"` // 租户ID
+	ParentID uint   `json:"parentID"` // 父部门ID
+	Name     string `json:"name"`     // 部门名称
+	Code     string `json:"code"`     // 部门编码
 }
 
 type DepartmentDeleteReq struct {

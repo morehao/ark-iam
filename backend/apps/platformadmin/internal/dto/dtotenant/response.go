@@ -27,7 +27,7 @@ type TenantPageListItem struct {
 
 type TenantPageListResp struct {
 	List  []TenantPageListItem `json:"list"`  // 数据列表
-	Total int64               `json:"total"` // 数据总条数
+	Total int64                `json:"total"` // 数据总条数
 }
 
 type DepartmentCreateResp struct {
@@ -48,7 +48,7 @@ type DepartmentPageListItem struct {
 
 type DepartmentPageListResp struct {
 	List  []DepartmentPageListItem `json:"list"`  // 数据列表
-	Total int64                   `json:"total"` // 数据总条数
+	Total int64                    `json:"total"` // 数据总条数
 }
 
 type DepartmentTreeItem struct {

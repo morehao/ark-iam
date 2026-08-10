@@ -21,7 +21,7 @@ type SystemDetailReq struct {
 type SystemPageListReq struct {
 	gobject.PageQuery
 	TenantID uint   `json:"tenantID"` // 租户ID
-	Key      string `json:"key"`     // 配置键
+	Key      string `json:"key"`      // 配置键
 }
 
 type SystemDeleteReq struct {
@@ -35,5 +35,5 @@ type LogDetailReq struct {
 type LogPageListReq struct {
 	gobject.PageQuery
 	TenantID uint   `json:"tenantID"` // 租户ID
-	Key      string `json:"key"`     // 日志键
+	Key      string `json:"key"`      // 日志键
 }

@@ -24,7 +24,7 @@ type SystemPageListItem struct {
 
 type SystemPageListResp struct {
 	List  []SystemPageListItem `json:"list"`  // 数据列表
-	Total int64               `json:"total"` // 数据总条数
+	Total int64                `json:"total"` // 数据总条数
 }
 
 type LogDetailResp struct {
@@ -41,5 +41,5 @@ type LogPageListItem struct {
 
 type LogPageListResp struct {
 	List  []LogPageListItem `json:"list"`  // 数据列表
-	Total int64            `json:"total"` // 数据总条数
+	Total int64             `json:"total"` // 数据总条数
 }

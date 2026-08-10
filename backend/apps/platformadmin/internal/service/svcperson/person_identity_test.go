@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtouser"
 	"github.com/morehao/golib/biz/gcontext"
 	"gorm.io/gorm"
 )
@@ -135,9 +135,9 @@ func installPersonIdentityRepo(t *testing.T, repo personIdentityRepository) {
 }
 
 type stubPersonIdentityUserRepo struct {
-	userByID       *model.UserEntity
-	usersByPerson  model.UserEntityList
-	err            error
+	userByID        *model.UserEntity
+	usersByPerson   model.UserEntityList
+	err             error
 	lastGetListCond *dao.UserCond
 }
 

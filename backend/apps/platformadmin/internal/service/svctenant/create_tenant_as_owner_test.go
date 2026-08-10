@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenant"
-	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenant"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/gerror"
 	"gorm.io/datatypes"
@@ -239,10 +239,10 @@ func seedApplication(t *testing.T, db *gorm.DB, appID uint, allow bool) {
 		policy = datatypes.JSON([]byte(`{"allowPersonCreateTenant":false}`))
 	}
 	app := model.ApplicationEntity{
-		Model: gorm.Model{ID: appID},
-		Name:  "TestApp",
-		Type:  model.AppTypeFirstParty,
-		Status: model.AppStatusEnable,
+		Model:        gorm.Model{ID: appID},
+		Name:         "TestApp",
+		Type:         model.AppTypeFirstParty,
+		Status:       model.AppStatusEnable,
 		TenantPolicy: policy,
 	}
 	if err := db.Create(&app).Error; err != nil {
