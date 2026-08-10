@@ -5,7 +5,7 @@ import (
 	"gorm.io/datatypes"
 
 	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtotenantapplication"
+	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenantapplication"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"

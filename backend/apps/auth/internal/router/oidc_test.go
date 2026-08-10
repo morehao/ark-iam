@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	iam "github.com/morehao/ark-iam/iam"
 	"github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/auth/internal/router"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
@@ -62,7 +61,8 @@ func TestOIDCLoginEndpointBypassesJWTAuth(t *testing.T) {
 	}
 
 	engine := gin.New()
-	iam.Routers(engine)
+	groups := ginserver.NewRouterGroups(engine, "iam", ginserver.VersionGroup{Version: ginserver.ApiVersionV1})
+	router.InitOIDC(engine, groups)
 
 	req := httptest.NewRequest(http.MethodPost, "/oidc/login", nil)
 	resp := httptest.NewRecorder()

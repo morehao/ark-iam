@@ -13,7 +13,7 @@ import (
 
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoapplicationclient"
-	"github.com/morehao/ark-iam/iam/internal/service/svcaudit"
+	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/golib/biz/gcontext/gincontext"

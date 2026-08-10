@@ -19,7 +19,7 @@ import (
 	appconfig "github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
-	"github.com/morehao/ark-iam/auth/internal/service/svcaudit"
+	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
 	"github.com/morehao/ark-iam/auth/internal/service/svcauth"
 	"github.com/morehao/ark-iam/auth/internal/service/svcsso"
 	"github.com/morehao/ark-iam/pkg/iam/model"

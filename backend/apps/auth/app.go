@@ -9,6 +9,7 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/service/svcsso"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/middleware/oidcauth"
+	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
 	"github.com/morehao/golib/biz/gserver/gindocs"
 	"github.com/morehao/golib/biz/gserver/ginserver"
@@ -17,7 +18,7 @@ import (
 
 const AppName = "auth"
 
-func Init(engine *gin.Engine, Conf *config.Config) {
+func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 	config.Conf = Conf
 
 	ssoStore := svcsso.NewSSOSessionStore()

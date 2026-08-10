@@ -2,7 +2,7 @@ package ctruser
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtouser"
+	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/iam/internal/service/svcuser"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )

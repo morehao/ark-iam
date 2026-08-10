@@ -2,7 +2,7 @@ package ctrtenantapplication
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/iam/internal/dto/dtotenantapplication"
+	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenantapplication"
 	"github.com/morehao/ark-iam/iam/internal/service/svctenantapplication"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )

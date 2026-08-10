@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
-	"github.com/morehao/ark-iam/auth/internal/service/svcaudit"
+	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
 	"github.com/morehao/ark-iam/auth/internal/service/svcloginguard"
 	"github.com/morehao/ark-iam/auth/internal/service/svcsso"
 	"github.com/morehao/ark-iam/pkg/iam/model"
