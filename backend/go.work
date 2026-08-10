@@ -4,5 +4,6 @@ use (
 	./apps/auth
 	./apps/iam
 	./apps/platformadmin
+	./apps/tenantadmin
 	./pkg
 )
