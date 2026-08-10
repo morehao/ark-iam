@@ -35,6 +35,7 @@
 - Node.js 18+
 - MySQL + Redis 已运行
 - 后端种子数据已导入（`admin` / `admin123` + `test-rp-client`）
+- 后端需使用 `config.e2e.yaml` 启动（OIDC 端点前缀 `/oidc`、短 TTL、限流阈值调大）
 
 ## 安装
 

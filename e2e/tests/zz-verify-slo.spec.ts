@@ -1,7 +1,6 @@
 import { test, expect } from '@playwright/test';
 
 test('全局登出后，兄弟应用刷新需重新认证', async ({ page, context }) => {
-  const issuer = 'http://localhost:8099/v1/iam/oidc';
   const identifier = 'admin';
   const password = 'admin123';
 

@@ -71,6 +71,13 @@ redis_config:
   read_timeout: 3s
   write_timeout: 3s
 
+security:
+  login:
+    # E2E 专用：调大阈值，避免多次错误登录触发 IP/person 临时锁定影响后续用例
+    maxFailures: 100
+    windowSec: 3600
+    lockSec: 60
+
 jwt:
   signKey: "your-jwt-secret-key"
 

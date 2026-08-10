@@ -43,7 +43,7 @@ test.describe('错误和边界场景', () => {
   });
 
   test('无效 redirect_uri 导致 OIDC 错误', async ({ page }) => {
-    const badUrl = `${CONFIG.issuer}/authorize?client_id=sso-test-app&redirect_uri=${encodeURIComponent('http://evil.com/callback')}&response_type=code&scope=openid`;
+    const badUrl = `${CONFIG.issuer}/authorize?client_id=test-rp-client&redirect_uri=${encodeURIComponent('http://evil.com/callback')}&response_type=code&scope=openid`;
     const response = await page.goto(badUrl, { waitUntil: 'networkidle', timeout: 15000 });
     const isError = response !== null && (response.status() >= 400 ||
       page.url().includes('error=') ||
