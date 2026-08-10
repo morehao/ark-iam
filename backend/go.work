@@ -3,7 +3,6 @@ go 1.26.1
 use (
 	./apps/auth
 	./apps/gateway
-	./apps/iam
 	./apps/platformadmin
 	./apps/tenantadmin
 	./pkg

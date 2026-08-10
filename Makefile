@@ -104,7 +104,7 @@ test:
 	$(call validate_app)
 	@echo "🧪 正在运行测试..."
 	@cd backend && go work sync && cd ..
-	@cd backend && go test ./apps/$(APP)/internal/... -v
+	@cd backend && go test ./apps/$(APP)/... -v
 
 # ============================================================
 # 依赖管理
