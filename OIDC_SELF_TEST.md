@@ -38,7 +38,7 @@ mysql -uroot -p123456 iam < backend/scripts/sql/iam_seed_data.sql
 
 ```bash
 # 项目根目录
-make run APP=iam
+make run APP=gateway
 ```
 
 服务监听 `:8100`（aggregate 网关，统一 `/v1` 前缀）。验证：

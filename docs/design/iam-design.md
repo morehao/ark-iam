@@ -36,6 +36,8 @@ Person(认证·全局) ──1:N──> User(授权·租户内) <──N:1──
 
 **核心原则：认证(person) 全局，授权(user) 租户内，接入(application) 全局复用并按租户可见。**
 
+> **物理部署**：该 IAM 在 `backend/apps/` 下拆为 `auth`（认证网关，:8081）、`platformadmin`（平台管理，:8082）、`tenantadmin`（租户自服务，:8083）三个应用，另有一个 `gateway` 聚合应用（:8100）在前述三者为单进程部署时挂载全部路由；模型/DAO/对象等共享逻辑下沉至 `backend/pkg/iam`，中间件入 `backend/pkg/middleware`。详见 §6.2 部署。
+
 ### 1.2 登录态与 token 分工
 
 ```
@@ -228,10 +230,12 @@ user   ──(关联)──> refresh_token(tenant_id+user_id)
 ### 4.2 路由前缀
 
 ```
-/v1/auth/*       登录/注册/我的租户/选切租户/刷新/登出 (公共+JWT)
-/oidc/*       OIDC Provider 标准端点 (含 /.well-known/*)
-/v1/console/*    管理后台 API (统一 token 鉴权)
+/v1/{module}/{operation} 统一管理 API（无应用名段，登录/管理/租户自服务共用）
+                           如 /v1/auth/myTenants、/v1/user/pageList、/v1/organizationRole/pageList
+/oidc/*                 OIDC Provider 标准端点（含 /.well-known/*，挂在 auth / gateway）
 ```
+
+> 路由不再包含应用名段：四个应用共享 `/v1` 前缀，`{module}` 即业务模块（`auth`、`person`、`user`、`role`、`tenant`、`organizationRole`...），`{operation}` 为操作（`create`、`update`、`detail`、`pageList`）。
 
 ### 4.3 OIDC 协议端点
 
@@ -321,12 +325,26 @@ user   ──(关联)──> refresh_token(tenant_id+user_id)
 - **安全/合规**：TLS、审计保留、租户隔离、敏感字段哈希/加密。
 
 ### 6.2 部署（MVP 先行）
+
+IAM 后端按职能拆分为**四个应用**，共享公共层 `pkg`，以 Go workspace（`backend/go.work`）管理：
+
+| 应用 | 职责 | 端口 |
+|------|------|------|
+| `auth` | 认证网关：登录/注册/token/OIDC Provider、个人中心、会话、connector | 8081 |
+| `platformadmin` | 平台管理：user/role/menu/tenant/department/system/application/apiKey/domain/log 等 | 8082 |
+| `tenantadmin` | 租户自服务：organization + orgRole/orgUser/orgRoleUser | 8083 |
+| `gateway` | 聚合应用：单进程挂载上述三个，用于单体部署；暴露 `/oidc/*` | 8100 |
+
 ```
-[浏览器/RP] --TLS--> [IAM 单体服务(Gin)] --+--> MySQL(业务/refresh/审计)
-                                          +--> Redis(中心会话/限流)
+[浏览器/RP] --TLS--> [网关 / 任一分割 app (Gin)] --+--> MySQL(业务/refresh/审计)
+                                                  +--> Redis(中心会话/限流)
 ```
+
+- 三个分体应用（auth/platformadmin/tenantadmin）可独立部署，也可由 gateway 单进程聚合为一体（端口 8100）。
+- `pkg` 为跨应用的公共层（config/middleware/ginserver/iam model·dao·object/testsetup 等），无重复代码。
+- 所有应用统一路由前缀 `/v1/{module}/{operation}`；`/oidc/*` 由 auth / gateway 提供。
 - 签名私钥由环境变量/密钥卷提供。
-- 独立 IdP 服务拆分（授权服务与管理/业务分离）为演进选项，不进 MVP。
+- 独立 IdP 服务拆分（授权服务与管理/业务分离）为演进选项，已在「四应用拆分」中实现大部分目标。
 
 ### 6.3 技术栈
 ```

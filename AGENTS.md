@@ -4,17 +4,19 @@
 
 ## 项目概述
 
-GoArk 是一个基于 Gin + GORM 的多应用后端项目，支持 IAM（身份认证）和 Demo 两个应用模块，采用前后端分离架构。
+GoArk 是一个基于 Gin + GORM 的多应用后端项目，采用前后端分离架构。IAM 后端拆分为四个应用（`auth`/`platformadmin`/`tenantadmin`/`gateway`），共享公共层 `backend/pkg`，并以 `backend/go.work` 作为 Go workspace 管理 5 个模块（apps/auth、apps/gateway、apps/platformadmin、apps/tenantadmin、pkg）。
 
 ## 项目结构
 
 ```
 ark-iam/
-├── backend/               # Go 后端项目
+├── backend/               # Go 后端项目（go.work 多模块）
 │   ├── apps/
-│   │   ├── demo/         # Demo 应用
-│   │   └── iam/          # IAM 应用
-│   ├── pkg/              # 公共包
+│   │   ├── auth/          # 认证网关（登录/注册/token/OIDC），:8081
+│   │   ├── platformadmin/ # 平台管理，:8082
+│   │   ├── tenantadmin/   # 租户自服务，:8083
+│   │   └── gateway/       # 聚合应用（挂载上述三者，单体部署），:8100
+│   ├── pkg/               # 公共包（config/middleware/iam/stdb/testsetup 等）
 │   └── Makefile
 ├── frontend/             # React 前端项目
 ├── docs/                  # 文档目录
@@ -25,19 +27,19 @@ ark-iam/
 
 ## 构建与运行命令
 
-所有命令在项目根目录下执行：
+所有命令在项目根目录下执行。有效 `APP` 取值为 `auth | platformadmin | tenantadmin | gateway`：
 
 ```bash
 # 列出所有可用应用
 make list-apps
 
 # 构建指定应用
-make build APP=demo
-make build APP=iam
+make build APP=auth
+make build APP=gateway
 
-# 运行指定应用
-make run APP=demo
-make run APP=iam
+# 运行指定应用（开发调试；gateway 单进程聚合三者）
+make run APP=auth
+make run APP=gateway
 
 # 下载依赖
 make deps
@@ -46,24 +48,25 @@ make deps
 make clean
 ```
 
+应用端口：auth 8081、platformadmin 8082、tenantadmin 8083、gateway 8100。
+
 ## 测试命令
 
 ```bash
 # 运行指定应用的测试（推荐）
-make test APP=demo
-make test APP=iam
+make test APP=gateway
 
 # 运行所有测试
 go test ./...
 
 # 运行单个测试函数
-go test ./apps/demo/internal/service/svcuser -run TestGeneratePassword -v
+go test ./pkg/iam/service/svcuser -run TestGeneratePassword -v
 
 # 运行特定包测试
-go test ./apps/iam/internal/service/svcuser/... -v
+go test ./apps/auth/internal/router/... -v
 
 # 生成测试覆盖率报告
-go test ./apps/demo/internal/... -coverprofile=coverage.out
+go test ./apps/platformadmin/internal/... -coverprofile=coverage.out
 go tool cover -html=coverage.out
 ```
 
@@ -86,28 +89,23 @@ go vet ./...
 
 ```
 apps/
-├── demo/                      # Demo 应用
-│   ├── cmd/                   # 入口函数
+├── auth/                       # 认证网关
+│   ├── cmd/                    # 入口函数
 │   ├── internal/
-│   │   ├── controller/ctrxxx/  # 控制器层 (ctr 前缀)
-│   │   ├── service/svcxxx/     # 服务层 (svc 前缀)
-│   │   ├── dto/dtoxxx/         # DTO 层
-│   │   ├── router/             # 路由注册
-│   │   └── middleware/         # 中间件
-│   ├── model/              # 数据模型
-│   └── dao/                # 数据访问层
-├── iam/                       # IAM 应用
-│   ├── model/                  # 数据模型（按领域划分）
-│   ├── dao/                    # 数据访问层（按领域划分）
-│   ├── object/                 # 基础对象（按领域划分）
-│   └── internal/
-│       ├── controller/          # 控制器层（按领域划分，如 ctruser）
-│       ├── service/             # 服务层（按领域划分，如 svcuser）
-│       ├── dto/                 # DTO 层（按领域划分，如 dtouser）
-│       ├── router/              # 路由注册
-│       └── constant/           # 应用层常量（前端专用）
-pkg/                          # 公共包
+│   │   ├── controller/ctrxxx/   # 控制器层 (ctr 前缀)
+│   │   ├── service/svcxxx/      # 服务层 (svc 前缀)
+│   │   ├── dto/dtoxxx/          # DTO 层
+│   │   ├── router/              # 路由注册
+│   │   └── middleware/          # 中间件
+│   ├── model/               # 数据模型
+│   └── dao/                 # 数据访问层
+├── platformadmin/              # 平台管理（结构同 auth）
+├── tenantadmin/                # 租户自服务（结构同 auth）
+├── gateway/                    # 聚合应用（挂载 auth/platformadmin/tenantadmin）
+pkg/                          # 公共包（跨应用共享：config/middleware/ginserver/iam 等）
 ```
+
+> 跨应用共享的 model/dao/object 抽取到 `pkg/iam`，通用中间件抽取到 `pkg/middleware`，避免分体间重复代码。
 
 ### 命名规范
 
@@ -126,7 +124,7 @@ pkg/                          # 公共包
 示例：用户领域（user）包含用户基本信息、用户身份、用户部门关系、用户登录日志等：
 
 ```
-apps/iam/
+apps/platformadmin/
 ├── model/user.go              # 用户领域所有实体
 ├── dao/user.go               # 用户领域所有数据访问
 ├── object/user.go            # 用户领域基础对象
@@ -182,7 +180,7 @@ func (DepartmentEntity) TableName() string {
 前端专用的状态映射等常量，放在应用的 `internal/constant/` 目录下：
 
 ```go
-// apps/iam/internal/constant/status.go
+// apps/platformadmin/internal/constant/status.go
 package constant
 
 const (

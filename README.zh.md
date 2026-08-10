@@ -4,6 +4,8 @@
 
 `ark-iam` 是一个前后端分离的全栈项目，后端基于 [Gin](https://github.com/gin-gonic/gin)，提供分层、可维护、可扩展的服务结构，支持多个应用模块。
 
+IAM 后端拆分为 `backend/apps/` 下的四个应用（auth、platformadmin、tenantadmin、gateway），共享公共层 `backend/pkg`，以 Go workspace（`backend/go.work`）管理。
+
 ---
 
 # 项目特点
@@ -24,11 +26,13 @@
 
 ```
 ark-iam/
-├── backend/               # Go 后端 (基于 project-layout)
+├── backend/               # Go 后端 (基于 project-layout, go.work 多模块)
 │   ├── apps/
-│   │   ├── demo/          # Demo 应用
-│   │   └── iam/           # IAM 应用
-│   ├── pkg/               # 公共包
+│   │   ├── auth/          # 认证网关（登录/注册/token/OIDC）, :8081
+│   │   ├── platformadmin/ # 平台管理（user/role/menu/tenant）, :8082
+│   │   ├── tenantadmin/   # 租户自服务（organization/orgRole）, :8083
+│   │   └── gateway/       # 聚合应用，挂载上述三个, :8100
+│   ├── pkg/               # 公共包（多应用共享）
 │   ├── scripts/           # 脚本
 │   └── Makefile
 ├── frontend/              # React 前端 (Vite + React)
@@ -80,27 +84,58 @@ go install github.com/swaggo/swag/cmd/swag@latest
 生成 Swagger 文档：
 
 ```bash
-make swag APP=demo
+make swag APP=auth
 ```
 
 访问文档（开发模式）：
 
 ```
-http://localhost:8099/demo/redocs
+http://localhost:8081/auth/redocs
 ```
 
 ### 项目部署
 
+构建 / 运行 / 测试指定应用。有效 `APP` 取值为 `auth | platformadmin | tenantadmin | gateway`（共享层 `pkg` 无需单独构建）：
+
+```bash
+# 列出所有可用应用
+make list-apps
+
+# 构建指定应用
+make build APP=auth
+make build APP=gateway
+
+# 运行指定应用（开发调试）
+make run APP=auth
+make run APP=platformadmin
+make run APP=tenantadmin
+make run APP=gateway     # 单进程聚合 auth + platformadmin + tenantadmin
+
+# 运行指定应用的测试
+make test APP=gateway
+```
+
+应用端口映射：
+
+| 应用 | 端口 |
+|------|------|
+| auth | 8081 |
+| platformadmin | 8082 |
+| tenantadmin | 8083 |
+| gateway（聚合） | 8100 |
+
+所有应用统一使用 `/v1/{模块}/{操作}` 路由前缀（不含应用名段），OIDC Provider 端点为 `/oidc/*`（在 auth / gateway 上）。
+
 构建 Docker 镜像：
 
 ```bash
-make docker-build APP=demo
+make docker-build APP=gateway
 ```
 
 运行容器：
 
 ```bash
-make docker-run APP=demo
+make docker-run APP=gateway
 ```
 
 ### 快速脚手架新后端项目
