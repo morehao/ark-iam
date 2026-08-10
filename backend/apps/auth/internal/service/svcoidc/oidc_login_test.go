@@ -51,8 +51,8 @@ func (f *fakeSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, pers
 func (f *fakeSSOSessionStore) HasActiveSession(ctx context.Context, personID uint) (bool, error)    { return false, nil }
 
 func TestCompleteLoginBySessionHonorsAuthRequestTenantHint(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	appconfig.Conf = &pkgconfig.Config{
 		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
@@ -118,8 +118,8 @@ func TestCompleteLoginBySessionHonorsAuthRequestTenantHint(t *testing.T) {
 }
 
 func TestCompleteLoginBySessionFallsBackWhenHintNotInPersonsTenants(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	appconfig.Conf = &pkgconfig.Config{
 		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
@@ -178,8 +178,8 @@ func TestCompleteLoginBySessionFallsBackWhenHintNotInPersonsTenants(t *testing.T
 }
 
 func TestCompleteLoginBySessionRejectsHintOnTenantLookupError(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	appconfig.Conf = &pkgconfig.Config{
 		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
@@ -238,8 +238,8 @@ func TestCompleteLoginBySessionRejectsHintOnTenantLookupError(t *testing.T) {
 }
 
 func TestCompleteLoginReturnsContinueURLAndCompletesRequest(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	appconfig.Conf = &pkgconfig.Config{
 		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
@@ -314,8 +314,8 @@ func TestCompleteLoginReturnsContinueURLAndCompletesRequest(t *testing.T) {
 }
 
 func TestCompleteLoginMultiTenantRequiresSelection(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	appconfig.Conf = &pkgconfig.Config{
 		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
@@ -383,8 +383,8 @@ func TestCompleteLoginMultiTenantRequiresSelection(t *testing.T) {
 }
 
 func TestCompleteLoginHonorsTenantHint(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	appconfig.Conf = &pkgconfig.Config{
 		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
@@ -459,8 +459,8 @@ func TestCompleteLoginHonorsTenantHint(t *testing.T) {
 }
 
 func TestCompleteLoginIgnoresForgedTenantHint(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	appconfig.Conf = &pkgconfig.Config{
 		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
@@ -529,8 +529,8 @@ func TestCompleteLoginIgnoresForgedTenantHint(t *testing.T) {
 }
 
 func TestSelectTenantWritesTenantAndReturnsContinueURL(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	appconfig.Conf = &pkgconfig.Config{
 		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
@@ -601,8 +601,8 @@ func TestSelectTenantWritesTenantAndReturnsContinueURL(t *testing.T) {
 }
 
 func TestSelectTenantRejectsTenantNotBelongingToPerson(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	appconfig.Conf = &pkgconfig.Config{
 		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
@@ -653,8 +653,8 @@ func TestSelectTenantRejectsTenantNotBelongingToPerson(t *testing.T) {
 }
 
 func TestSelectTenantRejectsAlreadyDoneRequest(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	appconfig.Conf = &pkgconfig.Config{
 		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},

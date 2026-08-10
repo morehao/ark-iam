@@ -153,8 +153,8 @@ func TestOIDCSSOValidationMachineTokenBypassesRevokedSession(t *testing.T) {
 // TestAPIKeyParallelAuth 验证 x-api-key 通道与管理 OIDC 并行鉴权（任一通过即放行）。
 // 无 OIDC token，仅携带合法 API Key 也应 200；非法 API Key 应 401。
 func TestAPIKeyParallelAuth(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	rawKey, keyHash := apiKeyHashForTest(t)
 	seed := &model.ApiKeyEntity{

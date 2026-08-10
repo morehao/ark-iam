@@ -12,8 +12,8 @@ import (
 )
 
 func TestHasActiveSession(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	ctx := context.Background()
 	store := NewSSOSessionStore()
@@ -41,8 +41,8 @@ func TestHasActiveSession(t *testing.T) {
 }
 
 func TestCreateSessionRecordsSessionAudit(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	ctx := context.WithValue(context.Background(), gcontext.KeyTenantID, uint(77))
 	store := NewSSOSessionStore()
@@ -72,8 +72,8 @@ func TestCreateSessionRecordsSessionAudit(t *testing.T) {
 }
 
 func TestCreateSessionToleratesAuditWriteFailure(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	ctx := context.Background()
 	store := NewSSOSessionStore()

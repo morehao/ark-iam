@@ -15,8 +15,8 @@ import (
 )
 
 func TestOIDCRoutesExposeLoginEndpoint(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	gin.SetMode(gin.TestMode)
 	config.Conf = &pkgconfig.Config{
@@ -47,8 +47,8 @@ func TestOIDCRoutesExposeLoginEndpoint(t *testing.T) {
 }
 
 func TestOIDCLoginEndpointBypassesJWTAuth(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	gin.SetMode(gin.TestMode)
 	config.Conf = &pkgconfig.Config{

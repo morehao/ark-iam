@@ -55,8 +55,8 @@ func TestTenantHintMiddleware_invalidTenant(t *testing.T) {
 }
 
 func TestCreateAuthRequestStoresTenant(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	store := NewRedisProtocolStateStore()
 	req, err := store.CreateAuthRequest(context.Background(), &oidc.AuthRequest{
@@ -78,8 +78,8 @@ func TestCreateAuthRequestStoresTenant(t *testing.T) {
 }
 
 func TestCreateAuthRequestReadsTenantHintFromContext(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	ctx := context.WithValue(context.Background(), ctxTenantHintKey, uint(5))
 	req, err := NewRedisProtocolStateStore().CreateAuthRequest(ctx, &oidc.AuthRequest{
@@ -95,8 +95,8 @@ func TestCreateAuthRequestReadsTenantHintFromContext(t *testing.T) {
 }
 
 func TestMiddlewareToStoragePropagatesTenant(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	store := NewRedisProtocolStateStore()
 	storage := NewOIDCStorage(store, nil, nil, "")

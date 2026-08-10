@@ -18,8 +18,8 @@ import (
 )
 
 func TestFullOIDCCodeFlow(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	issuer := "http://localhost:8099/oidc"
 	appconfig.Conf = &pkgconfig.Config{

@@ -14,8 +14,8 @@ import (
 )
 
 func TestRegisterCreatesPersonAndUser(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
@@ -51,8 +51,8 @@ func TestRegisterCreatesPersonAndUser(t *testing.T) {
 }
 
 func TestMyTenants(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 	ctx.Set(gcontext.KeyPersonID, uint(1))
@@ -65,8 +65,8 @@ func TestMyTenants(t *testing.T) {
 }
 
 func TestUserinfo(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 
@@ -84,8 +84,8 @@ func TestUserinfo(t *testing.T) {
 }
 
 func TestLogout(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	ctx := testsetup.NewCtx(testutil.WithIamContext(1))
 	ctx.Set(gcontext.KeyPersonID, uint(1))

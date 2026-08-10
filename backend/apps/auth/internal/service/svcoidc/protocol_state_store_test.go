@@ -13,8 +13,8 @@ import (
 )
 
 func TestCreateAndGetAuthRequest(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	store := NewRedisProtocolStateStore()
 	req, err := store.CreateAuthRequest(context.Background(), &oidc.AuthRequest{
@@ -37,8 +37,8 @@ func TestCreateAndGetAuthRequest(t *testing.T) {
 }
 
 func TestAuthRequestByIDNotFound(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	store := NewRedisProtocolStateStore()
 	_, err := store.AuthRequestByID(context.Background(), "nonexistent")
@@ -46,8 +46,8 @@ func TestAuthRequestByIDNotFound(t *testing.T) {
 }
 
 func TestCompleteAuthRequest(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	store := NewRedisProtocolStateStore()
 	req, err := store.CreateAuthRequest(context.Background(), &oidc.AuthRequest{
@@ -73,8 +73,8 @@ func TestCompleteAuthRequest(t *testing.T) {
 }
 
 func TestSaveAndConsumeCode(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	store := NewRedisProtocolStateStore()
 	req, err := store.CreateAuthRequest(context.Background(), &oidc.AuthRequest{
@@ -110,8 +110,8 @@ func TestSaveAndConsumeCode(t *testing.T) {
 }
 
 func TestDeleteAuthRequest(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	store := NewRedisProtocolStateStore()
 	req, err := store.CreateAuthRequest(context.Background(), &oidc.AuthRequest{
@@ -132,8 +132,8 @@ func TestDeleteAuthRequest(t *testing.T) {
 }
 
 func TestConsumeCodeNotCompleted(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	store := NewRedisProtocolStateStore()
 	req, err := store.CreateAuthRequest(context.Background(), &oidc.AuthRequest{
@@ -156,8 +156,8 @@ func TestConsumeCodeNotCompleted(t *testing.T) {
 }
 
 func TestHealthCheck(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 
 	store := NewRedisProtocolStateStore()
 	err := store.Health(context.Background())

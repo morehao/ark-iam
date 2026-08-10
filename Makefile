@@ -288,10 +288,13 @@ list-apps:
 	@echo "📂 可用的应用程序:"
 	@ls -1 ./backend/apps
 
-# 运行代码检查工具
+# 运行代码检查工具（在 workspace 各模块目录内分别执行）
 lint:
 	@echo "🔍 正在运行代码检查工具..."
-	@cd backend && golangci-lint run ./... && cd ..
+	@cd backend && go work edit -json | grep -o '"DiskPath": "[^"]*"' | awk '{gsub(/"/, "", $$2); print $$2}' | while read mod; do \
+		echo "  => lint $$mod"; \
+		(cd $$mod && golangci-lint run ./...); \
+	done
 
 # ============================================================
 # 帮助信息

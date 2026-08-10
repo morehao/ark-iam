@@ -42,8 +42,8 @@ func TestParseOIDCSubjectRejectsInvalidFormat(t *testing.T) {
 }
 
 func TestCompleteAuthRequestMarksRequestDone(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameIam)
-	defer testsetup.Done(testsetup.AppNameIam)
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
