@@ -9,6 +9,7 @@ import (
 	appconfig "github.com/morehao/ark-iam/iam/config"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
@@ -19,7 +20,7 @@ func TestFullOIDCCodeFlow(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameIam)
 	defer testsetup.Done(testsetup.AppNameIam)
 
-	issuer := "http://localhost:8099/v1/iam/oidc"
+	issuer := "http://localhost:8099/oidc"
 	appconfig.Conf = &appconfig.Config{
 		JWT: appconfig.JWT{SignKey: "test-sign-key"},
 		OIDC: appconfig.OIDC{
@@ -50,13 +51,13 @@ func TestFullOIDCCodeFlow(t *testing.T) {
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, error) {
-			return &model.PersonEntity{Model: gorm.Model{ID: 88}}, &model.UserEntity{Model: gorm.Model{ID: 66}, TenantID: 1, PersonID: 88}, nil
+		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+			return &model.PersonEntity{Model: gorm.Model{ID: 88}}, &model.UserEntity{Model: gorm.Model{ID: 66}, TenantID: 1, PersonID: 88}, nil, nil
 		}},
 	}
 
 	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/v1/iam/oidc/login", nil)
+	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login", nil)
 	res, err := svc.CompleteLogin(ginCtx, &dtooidc.OIDCLoginReq{
 		AuthRequestID: authReq.GetID(),
 		Identifier:    "person@example.com",

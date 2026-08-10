@@ -21,7 +21,7 @@ func TestLoggedOutUsesHostOnlyCookieByDefault(t *testing.T) {
 	config.Conf = &config.Config{
 		JWT: config.JWT{SignKey: "test-key"},
 		OIDC: config.OIDC{
-			Issuer:           "http://localhost:8099/v1/iam/oidc",
+			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3003/login",
 			AllowInsecure:    true,
 		},
@@ -31,7 +31,7 @@ func TestLoggedOutUsesHostOnlyCookieByDefault(t *testing.T) {
 	groups := ginserver.NewRouterGroups(engine, "iam", ginserver.VersionGroup{Version: ginserver.ApiVersionV1})
 	router.InitOIDC(engine, groups)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/iam/oidc/logged-out", nil)
+	req := httptest.NewRequest(http.MethodGet, "/oidc/logged-out", nil)
 	resp := httptest.NewRecorder()
 	engine.ServeHTTP(resp, req)
 
@@ -54,7 +54,7 @@ func TestLoggedOutUsesConfiguredCookieDomain(t *testing.T) {
 	config.Conf = &config.Config{
 		JWT: config.JWT{SignKey: "test-key"},
 		OIDC: config.OIDC{
-			Issuer:           "http://localhost:8099/v1/iam/oidc",
+			Issuer:           "http://localhost:8099/oidc",
 			FrontendLoginURL: "http://localhost:3003/login",
 			CookieDomain:     "example.com",
 			AllowInsecure:    true,
@@ -65,7 +65,7 @@ func TestLoggedOutUsesConfiguredCookieDomain(t *testing.T) {
 	groups := ginserver.NewRouterGroups(engine, "iam", ginserver.VersionGroup{Version: ginserver.ApiVersionV1})
 	router.InitOIDC(engine, groups)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/iam/oidc/logged-out", nil)
+	req := httptest.NewRequest(http.MethodGet, "/oidc/logged-out", nil)
 	resp := httptest.NewRecorder()
 	engine.ServeHTTP(resp, req)
 

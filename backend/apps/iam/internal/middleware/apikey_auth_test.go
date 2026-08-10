@@ -51,6 +51,39 @@ func TestApiKeyAuthValidKey(t *testing.T) {
 	}
 }
 
+// TestApiKeyAuthViaXApiKeyHeader 验证通过 x-api-key 请求头鉴权（对齐设计文档 §4.4 机器凭证通道）。
+func TestApiKeyAuthViaXApiKeyHeader(t *testing.T) {
+	db, cleanup := newTestMiddlewareDB(t)
+	defer cleanup()
+
+	apiKeyDao := dao.NewApiKeyDaoWithDB(func(ctx context.Context) *gorm.DB {
+		return db.WithContext(ctx)
+	})
+
+	rawKey, keyHash, keyPrefix := generateTestKey()
+	insertTestApiKey(t, apiKeyDao, 9, keyHash, keyPrefix, nil, nil)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	mw := newApiKeyAuthMiddlewareWithDao(apiKeyDao)
+	r.Use(mw.Middleware())
+	r.GET("/test", func(ctx *gin.Context) {
+		tenantID, _ := ctx.Get("tenantID")
+		userID, _ := ctx.Get("userID")
+		ctx.JSON(http.StatusOK, gin.H{"tenantID": tenantID, "userID": userID})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("x-api-key", rawKey)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 via x-api-key header, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestApiKeyAuthInvalidKey(t *testing.T) {
 	db, cleanup := newTestMiddlewareDB(t)
 	defer cleanup()

@@ -10,6 +10,10 @@ export default defineConfig({
         target: 'http://localhost:8099',
         changeOrigin: true,
       },
+      '/oidc': {
+        target: 'http://localhost:8099',
+        changeOrigin: true,
+      },
     },
   },
 })

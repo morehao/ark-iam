@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     port: 3003,
     proxy: {
-      '/v1/iam': {
+      '/oidc': {
         target: 'http://localhost:8099',
         changeOrigin: true,
       },

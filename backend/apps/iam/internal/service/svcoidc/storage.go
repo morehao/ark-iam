@@ -11,6 +11,10 @@ import (
 	jose "github.com/go-jose/go-jose/v4"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
+
+	"github.com/morehao/ark-iam/iam/dao"
+	"github.com/morehao/ark-iam/iam/object/objauth"
+	"github.com/morehao/golib/glog"
 )
 
 type AuthRequest struct {
@@ -96,6 +100,63 @@ func (s *OIDCStorage) GetPrivateClaimsFromScopes(ctx context.Context, userID, cl
 	return s.persistentStore.GetPrivateClaimsFromScopes(ctx, userID, clientID, scopes)
 }
 
+var _ op.CanGetPrivateClaimsFromRequest = (*OIDCStorage)(nil)
+
+func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request op.TokenRequest, restrictedScopes []string) (map[string]any, error) {
+	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok {
+		if ccReq.isApiKey {
+			return (objauth.TokenClaims{
+				TenantID:   ccReq.ownerTenantID,
+				UserID:     ccReq.ownerUserID,
+				TokenUsage: objauth.TokenUsageMachine,
+			}).OIDCPrivateClaims(), nil
+		}
+		return objauth.TokenClaims{ClientID: ccReq.ClientID()}.OIDCPrivateClaims(), nil
+	}
+	// authorization_code：优先用认证流程确定的租户
+	if authReq, ok := request.(*AuthRequest); ok {
+		if tid := authReq.GetTenantID(); tid > 0 {
+			if pid, perr := parseOIDCSubject(authReq.GetSubject()); perr == nil {
+				if users, uerr := s.persistentStore.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid, TenantID: tid}); uerr == nil && len(users) > 0 {
+					return objauth.TokenClaims{TenantID: tid}.OIDCPrivateClaims(), nil
+				}
+			}
+		}
+	}
+	// refresh token 轮换：保留存储的租户，避免重新落到 users[0]
+	if rr, ok := request.(*refreshTokenRequest); ok {
+		if tid := rr.GetTenantID(); tid > 0 {
+			if pid, perr := parseOIDCSubject(rr.GetSubject()); perr == nil {
+				if users, uerr := s.persistentStore.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid, TenantID: tid}); uerr == nil && len(users) > 0 {
+					return objauth.TokenClaims{TenantID: tid}.OIDCPrivateClaims(), nil
+				}
+			}
+		}
+	}
+	return s.GetPrivateClaimsFromScopes(ctx, request.GetSubject(), getClientIDFromRequest(request), restrictedScopes)
+}
+
+func getClientIDFromRequest(request op.TokenRequest) string {
+	if c, ok := request.(interface{ GetClientID() string }); ok {
+		return c.GetClientID()
+	}
+	return ""
+}
+
+// resolveAudienceFromScopes 从请求 scope 中挑出 resource indicator（如 urn:...），作为 access token 的 aud。
+// 返回第一个非 OIDC 标准 scope 的值；无则返回空串。
+func resolveAudienceFromScopes(scopes []string) string {
+	for _, s := range scopes {
+		switch s {
+		case "openid", "profile", "email", "phone", "offline_access":
+			continue
+		default:
+			return s
+		}
+	}
+	return ""
+}
+
 func (s *OIDCStorage) GetKeyByIDAndClientID(ctx context.Context, keyID, clientID string) (*jose.JSONWebKey, error) {
 	return s.persistentStore.GetKeyByIDAndClientID(ctx, keyID, clientID)
 }
@@ -105,7 +166,11 @@ func (s *OIDCStorage) ValidateJWTProfileScopes(ctx context.Context, userID strin
 }
 
 func (s *OIDCStorage) CreateAuthRequest(ctx context.Context, authReq *oidc.AuthRequest, userID string) (op.AuthRequest, error) {
-	return s.protocolStore.CreateAuthRequest(ctx, authReq, userID)
+	var tenantID uint
+	if v, ok := ctx.Value(ctxTenantHintKey).(uint); ok {
+		tenantID = v
+	}
+	return s.protocolStore.CreateAuthRequest(ctx, authReq, userID, tenantID)
 }
 
 func (s *OIDCStorage) AuthRequestByID(ctx context.Context, id string) (op.AuthRequest, error) {
@@ -116,8 +181,8 @@ func (s *OIDCStorage) AuthRequestByCode(ctx context.Context, code string) (op.Au
 	return s.protocolStore.AuthRequestByCode(ctx, code)
 }
 
-func (s *OIDCStorage) CompleteAuthRequest(id string, subject string, authTime time.Time, amr []string, acr string) error {
-	return s.protocolStore.CompleteAuthRequest(id, subject, authTime, amr, acr)
+func (s *OIDCStorage) CompleteAuthRequest(id string, subject string, authTime time.Time, amr []string, acr string, tenantID uint, done bool) error {
+	return s.protocolStore.CompleteAuthRequest(id, subject, authTime, amr, acr, tenantID, done)
 }
 
 func (s *OIDCStorage) SaveAuthCode(ctx context.Context, id, code string) error {
@@ -139,6 +204,74 @@ func (s *OIDCStorage) CreateAccessAndRefreshTokens(ctx context.Context, request 
 func (s *OIDCStorage) TokenRequestByRefreshToken(ctx context.Context, refreshToken string) (op.RefreshTokenRequest, error) {
 	return s.persistentStore.TokenRequestByRefreshToken(ctx, refreshToken)
 }
+
+var _ op.ClientCredentialsStorage = (*OIDCStorage)(nil)
+
+func (s *OIDCStorage) ClientCredentials(ctx context.Context, clientID, clientSecret string) (op.Client, error) {
+	if err := s.AuthorizeClientIDSecret(ctx, clientID, clientSecret); err == nil {
+		client, cErr := s.GetClientByClientID(ctx, clientID)
+		if cErr == nil {
+			if client.AuthMethod() == oidc.AuthMethodNone {
+				return nil, oidc.ErrInvalidClient()
+			}
+			return client, nil
+		}
+	}
+	// fallback: API Key 作为 client credential（clientID==clientSecret==rawKey）
+	if clientID != clientSecret {
+		return nil, oidc.ErrInvalidClient()
+	}
+	apiKey, err := s.persistentStore.LookupApiKeyByRawKey(ctx, clientID)
+	if err != nil || apiKey == nil {
+		return nil, oidc.ErrInvalidClient()
+	}
+	return &apiKeyOpClient{entity: apiKey}, nil
+}
+
+func (s *OIDCStorage) ClientCredentialsTokenRequest(ctx context.Context, clientID string, scopes []string) (op.TokenRequest, error) {
+	aud := resolveAudienceFromScopes(scopes)
+	if aud == "" {
+		aud = clientID
+	}
+	req := &clientCredentialsTokenRequest{
+		subject:  clientID,
+		audience: []string{aud},
+		scopes:   scopes,
+		clientID: clientID,
+	}
+	if apiKey, err := s.persistentStore.LookupApiKeyByRawKey(ctx, clientID); err == nil && apiKey != nil {
+		req.isApiKey = true
+		req.ownerTenantID = apiKey.TenantID
+		// sub 需用 owner user 的 person id 语义，以便 oidcauth parsePersonIDFromSub 识别（见 Task 4）。
+		// apiKey.CreatedBy 是 owner user 的 user id，非 person id；需经 user 表解析出 person id。
+		if user, uErr := s.persistentStore.userDao().GetByID(ctx, apiKey.CreatedBy); uErr == nil && user != nil && user.ID != 0 {
+			req.ownerUserID = user.ID
+			req.subject = buildOIDCSubject(user.PersonID)
+		} else {
+			// owner user 无法解析出 person id：不产出 person 上下文（保持 subject=clientID），
+			// 仅携带 client_id 私有 claim，避免给出 personID=0 的误导性 sub。
+			glog.Warnf(ctx, "[svcoidc.ClientCredentialsTokenRequest] api key owner user not resolved, createdBy:%d, err:%v", apiKey.CreatedBy, uErr)
+			req.isApiKey = false
+		}
+	}
+	return req, nil
+}
+
+type clientCredentialsTokenRequest struct {
+	subject       string
+	audience      []string
+	scopes        []string
+	clientID      string
+	isApiKey      bool
+	ownerTenantID uint
+	ownerUserID   uint
+}
+
+func (r *clientCredentialsTokenRequest) GetSubject() string   { return r.subject }
+func (r *clientCredentialsTokenRequest) GetAudience() []string { return r.audience }
+func (r *clientCredentialsTokenRequest) GetScopes() []string  { return r.scopes }
+
+func (r *clientCredentialsTokenRequest) ClientID() string { return r.clientID }
 
 func (s *OIDCStorage) TerminateSession(ctx context.Context, userID string, clientID string) error {
 	return s.persistentStore.TerminateSession(ctx, userID, clientID)

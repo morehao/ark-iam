@@ -4,17 +4,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/iam/internal/service/svcauth"
+	"github.com/morehao/ark-iam/iam/internal/service/svcsso"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"github.com/morehao/golib/glog"
 )
 
 type AuthCtr interface {
-	Login(ctx *gin.Context)
-	SelectTenant(ctx *gin.Context)
-	SwitchTenant(ctx *gin.Context)
 	MyTenants(ctx *gin.Context)
 	Register(ctx *gin.Context)
 	JoinTenant(ctx *gin.Context)
-	RefreshToken(ctx *gin.Context)
 	Logout(ctx *gin.Context)
 	LogoutAll(ctx *gin.Context)
 	Userinfo(ctx *gin.Context)
@@ -30,55 +28,6 @@ func NewAuthCtr(authSvc svcauth.AuthSvc) AuthCtr {
 	return &authCtr{
 		authSvc: authSvc,
 	}
-}
-
-// @Tags 认证
-// @Summary 用户登录
-// @accept application/json
-// @Produce application/json
-// @Param req body dtoauth.LoginReq true "用户登录"
-// @Success 200 {object} gincontext.DtoRender{data=dtoauth.LoginResp}
-// @Router /v1/iam/auth/login [post]
-func (ctr *authCtr) Login(ctx *gin.Context) {
-	var req dtoauth.LoginReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.authSvc.Login(ctx, &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-func (ctr *authCtr) SelectTenant(ctx *gin.Context) {
-	var req dtoauth.SelectTenantReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.authSvc.SelectTenant(ctx, &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-func (ctr *authCtr) SwitchTenant(ctx *gin.Context) {
-	var req dtoauth.SwitchTenantReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.authSvc.SwitchTenant(ctx, &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
 }
 
 func (ctr *authCtr) MyTenants(ctx *gin.Context) {
@@ -138,27 +87,6 @@ func (ctr *authCtr) JoinTenant(ctx *gin.Context) {
 }
 
 // @Tags 认证
-// @Summary 刷新令牌
-// @accept application/json
-// @Produce application/json
-// @Param req body dtoauth.RefreshTokenReq true "刷新令牌"
-// @Success 200 {object} gincontext.DtoRender{data=dtoauth.RefreshTokenResp}
-// @Router /v1/iam/auth/refreshToken [post]
-func (ctr *authCtr) RefreshToken(ctx *gin.Context) {
-	var req dtoauth.RefreshTokenReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.authSvc.RefreshToken(ctx, &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-// @Tags 认证
 // @Summary 用户登出
 // @accept application/json
 // @Produce application/json
@@ -187,6 +115,13 @@ func (ctr *authCtr) LogoutAll(ctx *gin.Context) {
 	if err := ctr.authSvc.LogoutAll(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
+	}
+	// 撤销该 person 的全部 SSO session，实现"一处登出、处处登出"的全局登出语义
+	personID := gincontext.GetPersonID(ctx)
+	if personID != 0 {
+		if err := svcsso.RevokeSSOSessionsByPersonID(ctx.Request.Context(), personID); err != nil {
+			glog.Errorf(ctx, "[ctrauth.LogoutAll] RevokeSSOSessionsByPersonID fail, personID:%d, err:%v", personID, err)
+		}
 	}
 	gincontext.Success(ctx, "登出成功")
 }

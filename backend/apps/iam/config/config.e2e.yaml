@@ -71,11 +71,18 @@ redis_config:
   read_timeout: 3s
   write_timeout: 3s
 
+security:
+  login:
+    # E2E 专用：调大阈值，避免多次错误登录触发 IP/person 临时锁定影响后续用例
+    maxFailures: 100
+    windowSec: 3600
+    lockSec: 60
+
 jwt:
   signKey: "your-jwt-secret-key"
 
 oidc:
-  issuer: "http://localhost:8099/v1/iam/oidc"
+  issuer: "http://localhost:8099/oidc"
   frontendLoginURL: "http://localhost:3003/login"
   signingKeyID: "dev-oidc-key"
   signingPrivateKeyPath: "config/oidc-dev-key.pem"

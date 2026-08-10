@@ -11,7 +11,7 @@ vi.mock('../utils/request', () => ({
       }
       if (url === '/auth/myTenants') {
         return Promise.resolve({
-          list: [{ tenantID: 1, tenantName: 'Default' }],
+          list: [{ tenantID: 1, name: 'Default' }],
         })
       }
       return Promise.reject(new Error('unknown'))

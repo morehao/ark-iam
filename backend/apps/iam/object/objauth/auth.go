@@ -25,10 +25,6 @@ type TokenInfo struct {
 	TokenType    string `json:"tokenType"`    // 令牌类型
 }
 
-type PersonTokenInfo struct {
-	TokenInfo
-}
-
 type TenantOption struct {
 	TenantID uint   `json:"tenantID"` // 租户ID
 	Name     string `json:"name"`     // 租户名称

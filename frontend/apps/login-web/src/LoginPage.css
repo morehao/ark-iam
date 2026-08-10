@@ -129,3 +129,16 @@ body {
 }
 
 .social-btn:hover { border-color: #1677ff; color: #1677ff; }
+
+.tenant-selection h2 {
+  font-size: 16px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.tenant-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

@@ -6,16 +6,8 @@ import (
 )
 
 type LoginResp struct {
-	PersonToken objauth.PersonTokenInfo `json:"personToken"`
-	Tenants     []objauth.TenantOption  `json:"tenants"`
-}
-
-type SelectTenantResp struct {
-	objauth.TokenInfo
-}
-
-type SwitchTenantResp struct {
-	objauth.TokenInfo
+	SSOSessionID string                `json:"ssoSessionID"`
+	Tenants      []objauth.TenantOption `json:"tenants"`
 }
 
 type MyTenantsResp struct {
@@ -24,10 +16,6 @@ type MyTenantsResp struct {
 
 type RegisterResp struct {
 	UserID uint `json:"userID"` // 用户ID
-}
-
-type RefreshTokenResp struct {
-	objauth.TokenInfo
 }
 
 type UserinfoResp struct {

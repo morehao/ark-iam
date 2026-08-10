@@ -5,6 +5,7 @@ COLLATE utf8mb4_0900_ai_ci;
 CREATE TABLE `tenant`
 (
     `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '租户ID',
+    `code`          VARCHAR(64) NOT NULL DEFAULT '' COMMENT '租户编码',
     `name`          VARCHAR(128) NOT NULL DEFAULT '' COMMENT '租户名称',
     `type`          VARCHAR(32) NOT NULL DEFAULT 'customer' COMMENT '租户类型: customer-客户租户, platform-平台租户',
     `db_user`       VARCHAR(64) NOT NULL DEFAULT '' COMMENT '数据库用户',
@@ -16,7 +17,8 @@ CREATE TABLE `tenant`
     `created_by`    BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '创建人id',
     `updated_by`    BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '更新人id',
     `deleted_by`    BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '删除人id',
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    UNIQUE KEY       `uk_code` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='租户表';
 
 CREATE TABLE `system`
@@ -192,6 +194,8 @@ CREATE TABLE `application`
     `type`            VARCHAR(32) NOT NULL DEFAULT 'first_party' COMMENT '应用类型',
     `status`          VARCHAR(32) NOT NULL DEFAULT 'enable' COMMENT '状态',
     `sort`            INT NOT NULL DEFAULT 0 COMMENT '排序',
+    `tenant_policy`   JSON NOT NULL DEFAULT ('{}') COMMENT '租户策略',
+    `is_system`       TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否系统内置',
     `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `deleted_at`      DATETIME DEFAULT NULL COMMENT '删除时间',
@@ -486,7 +490,7 @@ CREATE TABLE `refresh_token`
     `person_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '自然人ID',
     `tenant_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
     `user_id`         BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '用户ID',
-    `oauth_client_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'OIDC客户端ID',
+    `application_client_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'OIDC客户端ID',
     `session_id`      VARCHAR(64) NOT NULL DEFAULT '' COMMENT '会话ID',
     `token`           VARCHAR(256) NOT NULL DEFAULT '' COMMENT 'token哈希',
     `client_type`     VARCHAR(32) NOT NULL DEFAULT '' COMMENT '客户端类型',
@@ -494,6 +498,7 @@ CREATE TABLE `refresh_token`
     `user_agent`      VARCHAR(512) NOT NULL DEFAULT '' COMMENT '用户代理信息',
     `expired_at`      DATETIME DEFAULT NULL COMMENT '过期时间',
     `revoked_at`      DATETIME DEFAULT NULL COMMENT '撤销时间',
+    `last_rotated_at` DATETIME DEFAULT NULL COMMENT '最后轮换时间',
     `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `deleted_at`      DATETIME DEFAULT NULL COMMENT '删除时间',
@@ -553,7 +558,7 @@ CREATE TABLE `domain`
     KEY             `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='域名表';
 
-CREATE TABLE `oauth_client` (
+CREATE TABLE `application_client` (
     `id`                            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '客户端ID',
     `tenant_id`                     BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
     `app_id`                BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '所属应用id',
@@ -573,6 +578,7 @@ CREATE TABLE `oauth_client` (
     `type`                          VARCHAR(32) NOT NULL DEFAULT 'first_party' COMMENT '客户端类型',
     `is_third_party`                TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否第三方应用',
     `status`                        VARCHAR(32) NOT NULL DEFAULT 'enable' COMMENT '状态',
+    `is_system`                     TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否系统内置',
     `created_at`                    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`                    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `deleted_at`                    DATETIME DEFAULT NULL,
@@ -586,9 +592,9 @@ CREATE TABLE `oauth_client` (
     KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='OIDC客户端表';
 
-CREATE TABLE `oauth_client_secret` (
+CREATE TABLE `application_client_secret` (
     `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
-    `oauth_client_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '客户端ID',
+    `application_client_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '客户端ID',
     `name`            VARCHAR(256) NOT NULL DEFAULT '' COMMENT '密钥名称',
     `value_hash`      VARCHAR(256) NOT NULL DEFAULT '' COMMENT '密钥哈希',
     `value_prefix`    VARCHAR(16) NOT NULL DEFAULT '' COMMENT '密钥前缀',
@@ -601,7 +607,7 @@ CREATE TABLE `oauth_client_secret` (
     `updated_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
     `deleted_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
     PRIMARY KEY (`id`),
-    KEY `idx_oauth_client_id` (`oauth_client_id`),
+    KEY `idx_application_client_id` (`application_client_id`),
     KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='OIDC客户端密钥表';
 
@@ -611,6 +617,7 @@ CREATE TABLE `tenant_application` (
     `app_id`  BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '应用id',
     `status`          VARCHAR(32) NOT NULL DEFAULT 'enable' COMMENT '状态',
     `config`          JSON NOT NULL DEFAULT ('{}') COMMENT '租户级应用配置',
+    `granted_scope`   JSON NOT NULL DEFAULT ('[]') COMMENT '租户级scope授权',
     `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `deleted_at`      DATETIME DEFAULT NULL,
@@ -623,3 +630,51 @@ CREATE TABLE `tenant_application` (
     KEY `idx_app_id` (`app_id`),
     KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='租户应用订阅表';
+
+CREATE TABLE `audit_log` (
+    `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+    `actor_person_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '操作人person id',
+    `actor_user_id`   BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '操作人user id',
+    `tenant_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
+    `client_id`       VARCHAR(64) NOT NULL DEFAULT '' COMMENT '客户端id',
+    `action`          VARCHAR(64) NOT NULL DEFAULT '' COMMENT '动作标识',
+    `target_type`     VARCHAR(64) NOT NULL DEFAULT '' COMMENT '目标类型',
+    `target_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '目标id',
+    `result`          VARCHAR(16) NOT NULL DEFAULT '' COMMENT '结果 success/failure',
+    `ip`              VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'IP',
+    `user_agent`      VARCHAR(512) NOT NULL DEFAULT '' COMMENT 'UA',
+    `detail`          TEXT COMMENT '详情',
+    `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `deleted_at`      DATETIME DEFAULT NULL,
+    `created_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `updated_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `deleted_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    KEY `idx_actor_person` (`actor_person_id`),
+    KEY `idx_tenant_action` (`tenant_id`, `action`),
+    KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='审计日志表';
+
+CREATE TABLE `session` (
+    `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+    `person_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '自然人id',
+    `session_id`      VARCHAR(64) NOT NULL DEFAULT '' COMMENT '会话id',
+    `tenant_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '租户id',
+    `client_ip`       VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'IP',
+    `user_agent`      VARCHAR(512) NOT NULL DEFAULT '' COMMENT 'UA',
+    `login_time`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '登录时间',
+    `last_active_at`  DATETIME DEFAULT NULL COMMENT '最后活跃',
+    `revoked_at`      DATETIME DEFAULT NULL COMMENT '撤销时间',
+    `status`          VARCHAR(16) NOT NULL DEFAULT 'active' COMMENT 'active/revoked',
+    `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `deleted_at`      DATETIME DEFAULT NULL,
+    `created_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `updated_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `deleted_by`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_session_id` (`session_id`),
+    KEY `idx_person_id` (`person_id`),
+    KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会话审计表';

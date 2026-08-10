@@ -1,7 +1,7 @@
 package router
 
 import (
-	"github.com/morehao/ark-iam/iam/internal/controller/ctroauthclient"
+	"github.com/morehao/ark-iam/iam/internal/controller/ctrapplicationclient"
 	"github.com/morehao/ark-iam/iam/internal/controller/ctrpermission"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
@@ -81,16 +81,16 @@ func userRoleRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/userRole/pageList", userRoleCtr.PageList)
 }
 
-func oauthClientRouter(groups *ginserver.RouterGroups) {
-	appCtr := ctroauthclient.NewOAuthClientCtr()
+func applicationClientRouter(groups *ginserver.RouterGroups) {
+	appCtr := ctrapplicationclient.NewApplicationClientCtr()
 
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.POST("/oauthClient/create", appCtr.Create)
-	v1RouterGroup.POST("/oauthClient/delete", appCtr.Delete)
-	v1RouterGroup.POST("/oauthClient/update", appCtr.Update)
-	v1RouterGroup.GET("/oauthClient/detail", appCtr.Detail)
-	v1RouterGroup.POST("/oauthClient/pageList", appCtr.PageList)
-	v1RouterGroup.GET("/oauthClient/secrets", appCtr.ListSecrets)
-	v1RouterGroup.POST("/oauthClient/secrets", appCtr.CreateSecret)
-	v1RouterGroup.DELETE("/oauthClient/secrets/:secretId", appCtr.DeleteSecret)
+	v1RouterGroup.POST("/applicationClient/create", appCtr.Create)
+	v1RouterGroup.POST("/applicationClient/delete", appCtr.Delete)
+	v1RouterGroup.POST("/applicationClient/update", appCtr.Update)
+	v1RouterGroup.GET("/applicationClient/detail", appCtr.Detail)
+	v1RouterGroup.POST("/applicationClient/pageList", appCtr.PageList)
+	v1RouterGroup.GET("/applicationClient/secrets", appCtr.ListSecrets)
+	v1RouterGroup.POST("/applicationClient/secrets", appCtr.CreateSecret)
+	v1RouterGroup.DELETE("/applicationClient/secrets/:secretId", appCtr.DeleteSecret)
 }

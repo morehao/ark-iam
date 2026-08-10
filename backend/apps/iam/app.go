@@ -8,7 +8,7 @@ import (
 	_ "github.com/morehao/ark-iam/iam/docs"
 	"github.com/morehao/ark-iam/iam/internal/middleware/oidcauth"
 	"github.com/morehao/ark-iam/iam/internal/router"
-	"github.com/morehao/ark-iam/iam/internal/service/svcoidc"
+	"github.com/morehao/ark-iam/iam/internal/service/svcsso"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
 	"github.com/morehao/golib/biz/gserver/gindocs"
@@ -19,20 +19,19 @@ import (
 const AppName = "iam"
 
 func Routers(engine *gin.Engine) {
-	ssoStore := svcoidc.NewSSOSessionStore()
+	ssoStore := svcsso.NewSSOSessionStore()
 	routerGroups := ginserver.NewRouterGroups(engine, AppName, ginserver.VersionGroup{
 		Version: ginserver.ApiVersionV1,
 		Middlewares: []gin.HandlerFunc{
-			oidcauth.OIDCCompatibleAuth(config.Conf.JWT.SignKey, func() *rsa.PublicKey { return router.OIDCPublicKey }, oidcauth.WithAuthSkipPaths(
+			oidcauth.OIDCCompatibleAuth(func() *rsa.PublicKey { return router.OIDCPublicKey }, oidcauth.WithAuthSkipPaths(
 				"/v1/iam/org/getConfigsByDomain",
-				"/v1/iam/auth/login",
-				"/v1/iam/auth/myTenants",
-				"/v1/iam/auth/selectTenant",
 				"/v1/iam/auth/register",
-				"/v1/iam/auth/refreshToken",
 				"/v1/iam/connector/callback",
-				"/v1/iam/oidc",
-			), oidcauth.WithOIDCSSOValidation(func(ctx *gin.Context, personID uint) bool {
+			), oidcauth.WithOIDCSSOValidation(func(ctx *gin.Context, personID uint, isMachineToken bool) bool {
+				// 机器凭证（client_credentials/API Key）不依赖浏览器 SSO 会话活性，直接放行
+				if isMachineToken {
+					return true
+				}
 				// 无 Redis 时无法校验会话，采取放行（fail-open），避免破坏无 Redis 的环境
 				if dbclient.RedisCli == nil {
 					return true

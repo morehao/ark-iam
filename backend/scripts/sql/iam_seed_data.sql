@@ -142,9 +142,9 @@ ON DUPLICATE KEY UPDATE `role_id` = VALUES(`role_id`);
 -- ============================================
 -- 8. 管理后台应用及角色关联种子数据
 -- ============================================
-INSERT INTO `application` (`id`, `code`, `name`, `description`, `type`, `status`, `sort`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (1, 'admin', '管理后台', '平台管理后台应用', 'first_party', 'enable', 0, 0, 0, 0)
-ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
+INSERT INTO `application` (`id`, `code`, `name`, `description`, `type`, `status`, `sort`, `is_system`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (1, 'admin', '管理后台', '平台管理后台应用', 'first_party', 'enable', 0, 1, 0, 0, 0)
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `is_system` = VALUES(`is_system`);
 
 -- ============================================
 -- 9. 租户应用订阅种子数据
@@ -180,7 +180,7 @@ ON DUPLICATE KEY UPDATE `user_id` = VALUES(`user_id`);
 -- 回调地址: http://localhost:3001/auth/callback (SSO测试应用)
 -- 密钥SHA256: fc090df65f5f35338ad419e13de1c64b84d6674c7e67ff32df3cda6f034cfce2
 -- ============================================
-INSERT INTO `oauth_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `post_logout_redirect_uris`, `status`, `created_by`, `updated_by`, `deleted_by`)
+INSERT INTO `application_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `post_logout_redirect_uris`, `status`, `created_by`, `updated_by`, `deleted_by`)
 VALUES (1, 1, 1, 'test-rp-client', 'SSO测试应用', '["http://localhost:3001/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'client_secret_basic', 1, '["openid","profile","email"]', '["http://localhost:3001/login"]', 'enable', 0, 0, 0)
 ON DUPLICATE KEY UPDATE
   `redirect_uris` = VALUES(`redirect_uris`),
@@ -192,7 +192,7 @@ ON DUPLICATE KEY UPDATE
   `post_logout_redirect_uris` = VALUES(`post_logout_redirect_uris`),
   `status` = VALUES(`status`);
 
-INSERT INTO `oauth_client_secret` (`id`, `oauth_client_id`, `name`, `value_hash`, `value_prefix`, `created_by`, `updated_by`, `deleted_by`)
+INSERT INTO `application_client_secret` (`id`, `application_client_id`, `name`, `value_hash`, `value_prefix`, `created_by`, `updated_by`, `deleted_by`)
 VALUES (1, 1, 'test-secret', 'fc090df65f5f35338ad419e13de1c64b84d6674c7e67ff32df3cda6f034cfce2', 'my-test-', 0, 0, 0)
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
 
@@ -201,8 +201,8 @@ ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
 -- client_id: platform-admin-web
 -- redirect_uris: http://localhost:3000/auth/callback
 -- ============================================
-INSERT INTO `oauth_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `post_logout_redirect_uris`, `type`, `is_third_party`, `status`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (2, 1, 1, 'platform-admin-web', 'IAM管理平台', '["http://localhost:3000/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'none', 1, '["openid","profile","email"]', '["http://localhost:3000/login"]', 'first_party', 0, 'enable', 0, 0, 0)
+INSERT INTO `application_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `post_logout_redirect_uris`, `type`, `is_third_party`, `status`, `is_system`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (2, 1, 1, 'platform-admin-web', 'IAM管理平台', '["http://localhost:3000/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'none', 1, '["openid","profile","email"]', '["http://localhost:3000/login"]', 'first_party', 0, 'enable', 1, 0, 0, 0)
 ON DUPLICATE KEY UPDATE
   `redirect_uris` = VALUES(`redirect_uris`),
   `grant_types` = VALUES(`grant_types`),
@@ -213,4 +213,5 @@ ON DUPLICATE KEY UPDATE
   `post_logout_redirect_uris` = VALUES(`post_logout_redirect_uris`),
   `type` = VALUES(`type`),
   `is_third_party` = VALUES(`is_third_party`),
-  `status` = VALUES(`status`);
+  `status` = VALUES(`status`),
+  `is_system` = VALUES(`is_system`);

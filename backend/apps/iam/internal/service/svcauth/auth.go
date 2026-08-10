@@ -3,32 +3,29 @@ package svcauth
 import (
 	"context"
 	"errors"
-	"math"
+	"fmt"
 	"strings"
 	"time"
 	"unicode"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/morehao/ark-iam/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoauth"
+	"github.com/morehao/ark-iam/iam/internal/service/svcaudit"
+	"github.com/morehao/ark-iam/iam/internal/service/svcloginguard"
+	"github.com/morehao/ark-iam/iam/internal/service/svcsso"
 	"github.com/morehao/ark-iam/iam/model"
 	"github.com/morehao/ark-iam/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/token"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
-	"github.com/morehao/golib/gauth/jwtauth"
 	"github.com/morehao/golib/gconstant"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
 )
 
 const (
-	PasswordMinLength          = 6
-	TokenExpireDuration        = 24 * time.Hour
-	RefreshTokenExpireDuration = 7 * 24 * time.Hour
+	PasswordMinLength = 6
 )
 
 type authUserStore interface {
@@ -78,122 +75,93 @@ var authLoginRecorder = func(ctx *gin.Context, tenantID, userID uint, success bo
 }
 
 type AuthSvc interface {
-	Login(ctx *gin.Context, req *dtoauth.LoginReq) (*dtoauth.LoginResp, error)
-	AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, error)
-	SelectTenant(ctx *gin.Context, req *dtoauth.SelectTenantReq) (*dtoauth.SelectTenantResp, error)
-	SwitchTenant(ctx *gin.Context, req *dtoauth.SwitchTenantReq) (*dtoauth.SwitchTenantResp, error)
+	AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error)
+	TenantsForPerson(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error)
 	MyTenants(ctx *gin.Context, req *dtoauth.MyTenantsReq) (*dtoauth.MyTenantsResp, error)
 	Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoauth.RegisterResp, error)
 	JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*dtoauth.JoinTenantResp, error)
-	RefreshToken(ctx *gin.Context, req *dtoauth.RefreshTokenReq) (*dtoauth.RefreshTokenResp, error)
 	Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error
 	LogoutAll(ctx *gin.Context, req *dtoauth.LogoutAllReq) error
 	Userinfo(ctx *gin.Context, req *dtoauth.UserinfoReq) (*dtoauth.UserinfoResp, error)
 }
 
 type authSvc struct {
-	jwtSecret string
 }
 
 var _ AuthSvc = (*authSvc)(nil)
 
-func NewAuthSvc(jwtSecret string) AuthSvc {
-	return &authSvc{
-		jwtSecret: jwtSecret,
-	}
+func NewAuthSvc() AuthSvc {
+	return &authSvc{}
 }
 
-func (svc *authSvc) Login(ctx *gin.Context, req *dtoauth.LoginReq) (*dtoauth.LoginResp, error) {
+func (svc *authSvc) AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 	personDao := newAuthPersonStore()
 	userDao := newAuthUserStore()
-	personEntity, userEntity, tenants, err := svc.resolvePersonLogin(ctx, personDao, userDao, req.Identifier)
+	personEntity, userEntity, tenants, err := svc.resolvePersonLogin(ctx, personDao, userDao, identifier)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	personEntity, userEntity, err = svc.authenticateResolvedPerson(ctx, personEntity, userEntity, password)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return personEntity, userEntity, tenants, nil
+}
+
+func (svc *authSvc) TenantsForPerson(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error) {
+	_, tenants, err := svc.listPersonTenants(ctx, personID)
 	if err != nil {
 		return nil, err
 	}
-	personEntity, userEntity, err = svc.authenticateResolvedPerson(ctx, personEntity, userEntity, req.Password)
-	if err != nil {
-		return nil, err
-	}
-
-	personToken, err := svc.generatePersonToken(personEntity)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.Login] generatePersonToken fail, err:%v", err)
-		return nil, code.GetError(code.TokenGenerateError)
-	}
-
-	authLoginRecorder(ctx, userEntity.TenantID, userEntity.ID, true)
-
-	return &dtoauth.LoginResp{
-		PersonToken: *personToken,
-		Tenants:     tenants,
-	}, nil
-}
-
-func (svc *authSvc) AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, error) {
-	personDao := newAuthPersonStore()
-	userDao := newAuthUserStore()
-	personEntity, userEntity, _, err := svc.resolvePersonLogin(ctx, personDao, userDao, identifier)
-	if err != nil {
-		return nil, nil, err
-	}
-	return svc.authenticateResolvedPerson(ctx, personEntity, userEntity, password)
+	return tenants, nil
 }
 
 func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *model.PersonEntity, userEntity *model.UserEntity, password string) (*model.PersonEntity, *model.UserEntity, error) {
+	ip := gincontext.GetClientIP(ctx)
+	if svcloginguard.Check(ctx, ip, personEntity.ID) {
+		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+			Action:     svcaudit.ActionLogin,
+			Result:     "failure",
+			TargetType: "person",
+			Detail:     fmt.Sprintf("personID:%d, reason:login locked", personEntity.ID),
+		})
+		return nil, nil, code.GetError(code.LoginLockedError)
+	}
+
 	if personEntity.IsSuspended == 1 {
+		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+			Action:     svcaudit.ActionLogin,
+			Result:     "failure",
+			TargetType: "person",
+			Detail:     fmt.Sprintf("personID:%d, reason:suspended", personEntity.ID),
+		})
 		return nil, nil, code.GetError(code.UserSuspendedError)
 	}
 
 	if personEntity.PasswordEncrypted == "" {
+		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+			Action:     svcaudit.ActionLogin,
+			Result:     "failure",
+			TargetType: "person",
+			Detail:     fmt.Sprintf("personID:%d, reason:password not set", personEntity.ID),
+		})
 		return nil, nil, code.GetError(code.PasswordNotSetError)
 	}
 
 	if err := gcrypto.ComparePasswordHash(personEntity.PasswordEncrypted, password); err != nil {
 		authLoginRecorder(ctx, userEntity.TenantID, userEntity.ID, false)
+		svcloginguard.RecordFailure(ctx, ip, personEntity.ID)
 		glog.Errorf(ctx, "[svcauth.authenticateResolvedPerson] password mismatch, personID:%d", personEntity.ID)
 		return nil, nil, code.GetError(code.PasswordMismatchError)
 	}
 
+	svcloginguard.RecordSuccess(ctx, personEntity.ID)
 	authLoginRecorder(ctx, userEntity.TenantID, userEntity.ID, true)
 	return personEntity, userEntity, nil
 }
 
-func (svc *authSvc) SelectTenant(ctx *gin.Context, req *dtoauth.SelectTenantReq) (*dtoauth.SelectTenantResp, error) {
-	personID := gincontext.GetPersonID(ctx)
-	if personID == 0 {
-		personID = svc.personIDFromToken(req.PersonToken)
-	}
-	if personID == 0 {
-		return nil, code.GetError(gconstant.UnauthorizedErr)
-	}
-
-	tokenInfo, err := svc.issueTenantToken(ctx, personID, req.TenantID)
-	if err != nil {
-		return nil, err
-	}
-
-	return &dtoauth.SelectTenantResp{TokenInfo: *tokenInfo}, nil
-}
-
-func (svc *authSvc) SwitchTenant(ctx *gin.Context, req *dtoauth.SwitchTenantReq) (*dtoauth.SwitchTenantResp, error) {
-	personID := gincontext.GetPersonID(ctx)
-	if personID == 0 {
-		return nil, code.GetError(gconstant.UnauthorizedErr)
-	}
-
-	tokenInfo, err := svc.issueTenantToken(ctx, personID, req.TenantID)
-	if err != nil {
-		return nil, err
-	}
-
-	return &dtoauth.SwitchTenantResp{TokenInfo: *tokenInfo}, nil
-}
-
 func (svc *authSvc) MyTenants(ctx *gin.Context, req *dtoauth.MyTenantsReq) (*dtoauth.MyTenantsResp, error) {
 	personID := gincontext.GetPersonID(ctx)
-	if personID == 0 {
-		personID = svc.personIDFromToken(req.PersonToken)
-	}
 	if personID == 0 {
 		return nil, code.GetError(gconstant.UnauthorizedErr)
 	}
@@ -340,94 +308,23 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 	}, nil
 }
 
-func (svc *authSvc) RefreshToken(ctx *gin.Context, req *dtoauth.RefreshTokenReq) (*dtoauth.RefreshTokenResp, error) {
-	if req.RefreshToken == "" {
-		return nil, code.GetError(code.RefreshTokenRequiredError)
-	}
-
-	tokenClaims, err := svc.parseRefreshToken(req.RefreshToken)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.RefreshToken] parseRefreshToken fail, err:%v", err)
-		return nil, code.GetError(gconstant.TokenInvalidErr)
-	}
-
-	userID, ok := parsePositiveIntegerClaim(tokenClaims, "user_id")
-	if !ok {
-		return nil, code.GetError(gconstant.TokenInvalidErr)
-	}
-	tenantID, ok := parsePositiveIntegerClaim(tokenClaims, "tenant_id")
-	if !ok {
-		return nil, code.GetError(gconstant.TokenInvalidErr)
-	}
-
-	refreshTokenDao := newAuthRefreshTokenStore()
-	storedToken, err := refreshTokenDao.GetByCond(ctx.Request.Context(), &dao.RefreshTokenCond{
-		UserID: uint(userID),
-		Token:  token.HashToken(req.RefreshToken),
-	})
-	if err != nil || storedToken == nil {
-		return nil, code.GetError(code.RefreshTokenInvalidError)
-	}
-	if storedToken.TenantID != uint(tenantID) {
-		return nil, code.GetError(code.RefreshTokenInvalidError)
-	}
-	if storedToken.RevokedAt != nil {
-		return nil, code.GetError(code.RefreshTokenInvalidError)
-	}
-	if storedToken.ExpiredAt == nil || !storedToken.ExpiredAt.After(time.Now()) {
-		return nil, code.GetError(code.RefreshTokenInvalidError)
-	}
-
-	userDao := newAuthUserStore()
-	userEntity, err := userDao.GetByID(ctx.Request.Context(), uint(userID))
-	if err != nil || userEntity == nil || userEntity.ID == 0 {
-		return nil, code.GetError(code.UserNotExistError)
-	}
-
-	tokenInfo, err := svc.generateToken(ctx, userEntity)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.RefreshToken] generateToken fail, err:%v", err)
-		return nil, code.GetError(code.TokenGenerateError)
-	}
-
-	if err := refreshTokenDao.Delete(ctx.Request.Context(), storedToken.ID, storedToken.UserID); err != nil {
-		glog.Errorf(ctx, "[svcauth.RefreshToken] delete old refreshToken fail, err:%v", err)
-	}
-
-	return &dtoauth.RefreshTokenResp{
-		TokenInfo: *tokenInfo,
-	}, nil
-}
-
 func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
-	if req.RefreshToken != "" {
-		if err := token.AddRefreshTokenToBlacklist(ctx, req.RefreshToken); err != nil {
-			glog.Errorf(ctx, "[svcauth.Logout] AddRefreshTokenToBlacklist fail, err:%v", err)
+	personID := gincontext.GetPersonID(ctx)
+	// 全局登出语义：撤销该 person 的全部 refresh token + SSO 会话，实现"一处登出、处处登出"。
+	// access token 依赖其短 TTL 失效（见设计文档 §2.5），此处不维护 HS256 黑名单。
+	if personID != 0 {
+		if err := newAuthRefreshTokenStore().RevokeByPersonID(ctx.Request.Context(), personID); err != nil {
+			glog.Errorf(ctx, "[svcauth.Logout] RevokeByPersonID fail, personID:%d, err:%v", personID, err)
+		}
+		if err := svcsso.RevokeSSOSessionsByPersonID(ctx.Request.Context(), personID); err != nil {
+			glog.Errorf(ctx, "[svcauth.Logout] RevokeSSOSessionsByPersonID fail, personID:%d, err:%v", personID, err)
 		}
 	}
-
-	accessToken := ctx.GetHeader("Authorization")
-	if accessToken != "" {
-		if err := token.AddTokenToBlacklist(ctx, accessToken, token.TokenExpireDuration); err != nil {
-			glog.Errorf(ctx, "[svcauth.Logout] AddTokenToBlacklist fail, err:%v", err)
-		}
-	}
-
 	return nil
 }
 
 func (svc *authSvc) LogoutAll(ctx *gin.Context, req *dtoauth.LogoutAllReq) error {
-	if err := svc.Logout(ctx, &dtoauth.LogoutReq{RefreshToken: req.RefreshToken}); err != nil {
-		return err
-	}
-	personID := gincontext.GetPersonID(ctx)
-	if personID == 0 {
-		return nil
-	}
-	if err := newAuthRefreshTokenStore().RevokeByPersonID(ctx.Request.Context(), personID); err != nil {
-		glog.Errorf(ctx, "[svcauth.LogoutAll] RevokeByPersonID fail, personID:%d, err:%v", personID, err)
-	}
-	return nil
+	return svc.Logout(ctx, &dtoauth.LogoutReq{RefreshToken: req.RefreshToken})
 }
 
 func (svc *authSvc) Userinfo(ctx *gin.Context, req *dtoauth.UserinfoReq) (*dtoauth.UserinfoResp, error) {
@@ -488,84 +385,6 @@ func (svc *authSvc) Userinfo(ctx *gin.Context, req *dtoauth.UserinfoReq) (*dtoau
 	}, nil
 }
 
-func (svc *authSvc) generateToken(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error) {
-	now := time.Now()
-	accessTokenExp := now.Add(TokenExpireDuration)
-	refreshTokenExp := now.Add(RefreshTokenExpireDuration)
-
-	accessTokenClaims := &jwtauth.Claims[gobject.UserClaims]{
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(accessTokenExp),
-			IssuedAt:  jwt.NewNumericDate(now),
-		},
-		CustomData: gobject.UserClaims{
-			UserID:    userEntity.ID,
-			TenantID:  userEntity.TenantID,
-			PersonID:  userEntity.PersonID,
-			TokenType: gobject.TokenTypeAuth,
-		},
-	}
-
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessTokenClaims)
-	accessTokenString, err := accessToken.SignedString([]byte(svc.jwtSecret))
-	if err != nil {
-		return nil, err
-	}
-
-	refreshTokenClaims := jwt.MapClaims{
-		"user_id":   userEntity.ID,
-		"tenant_id": userEntity.TenantID,
-		"exp":       refreshTokenExp.Unix(),
-		"iat":       now.Unix(),
-		"type":      "refresh",
-	}
-
-	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshTokenClaims)
-	refreshTokenString, err := refreshToken.SignedString([]byte(svc.jwtSecret))
-	if err != nil {
-		return nil, err
-	}
-
-	refreshTokenDao := newAuthRefreshTokenStore()
-	refreshTokenEntity := &model.RefreshTokenEntity{
-		TenantID:      userEntity.TenantID,
-		PersonID:      userEntity.PersonID,
-		UserID:        userEntity.ID,
-		OAuthClientID: 0,
-		Token:         token.HashToken(refreshTokenString),
-		ExpiredAt:     timePointer(refreshTokenExp),
-		CreatedBy:     userEntity.ID,
-	}
-	if err := refreshTokenDao.Insert(ctx.Request.Context(), refreshTokenEntity); err != nil {
-		glog.Errorf(ctx, "[svcauth.generateToken] save refreshToken fail, err:%v", err)
-		return nil, err
-	}
-
-	return &objauth.TokenInfo{
-		AccessToken:  accessTokenString,
-		RefreshToken: refreshTokenString,
-		ExpiresIn:    int64(TokenExpireDuration.Seconds()),
-		TokenType:    "Bearer",
-	}, nil
-}
-
-func (svc *authSvc) generatePersonToken(personEntity *model.PersonEntity) (*objauth.PersonTokenInfo, error) {
-	now := time.Now()
-	accessTokenExp := now.Add(TokenExpireDuration)
-	claims := jwt.MapClaims{
-		"person_id": personEntity.ID,
-		"exp":       accessTokenExp.Unix(),
-		"iat":       now.Unix(),
-		"type":      "person",
-	}
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	accessTokenString, err := accessToken.SignedString([]byte(svc.jwtSecret))
-	if err != nil {
-		return nil, err
-	}
-	return &objauth.PersonTokenInfo{TokenInfo: objauth.TokenInfo{AccessToken: accessTokenString, ExpiresIn: int64(TokenExpireDuration.Seconds()), TokenType: "Bearer"}}, nil
-}
-
 func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonStore, userDao authUserStore, identifier string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 	identifier = strings.TrimSpace(identifier)
 	if identifier == "" {
@@ -583,10 +402,22 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 
 	personEntity, err := personDao.GetByCond(ctx.Request.Context(), personCond)
 	if err != nil {
+		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+			Action:     svcaudit.ActionLogin,
+			Result:     "failure",
+			TargetType: "person",
+			Detail:     fmt.Sprintf("identifier:%s, reason:user lookup error", identifier),
+		})
 		glog.Errorf(ctx, "[svcauth.Login] person dao GetByCond fail, err:%v", err)
 		return nil, nil, nil, code.GetError(code.UserGetDetailError)
 	}
 	if personEntity == nil || personEntity.ID == 0 {
+		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+			Action:     svcaudit.ActionLogin,
+			Result:     "failure",
+			TargetType: "person",
+			Detail:     fmt.Sprintf("identifier:%s, reason:user not found", identifier),
+		})
 		return nil, nil, nil, code.GetError(code.UserNotExistError)
 	}
 
@@ -597,14 +428,32 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 	if userEntity == nil || userEntity.ID == 0 {
 		userEntity, err = userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{PersonID: personEntity.ID})
 		if err != nil {
+			svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+				Action:     svcaudit.ActionLogin,
+				Result:     "failure",
+				TargetType: "person",
+				Detail:     fmt.Sprintf("personID:%d, reason:user lookup error", personEntity.ID),
+			})
 			glog.Errorf(ctx, "[svcauth.Login] user dao GetByCond fail, err:%v", err)
 			return nil, nil, nil, code.GetError(code.UserGetDetailError)
 		}
 		if userEntity == nil || userEntity.ID == 0 {
+			svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+				Action:     svcaudit.ActionLogin,
+				Result:     "failure",
+				TargetType: "person",
+				Detail:     fmt.Sprintf("personID:%d, reason:no tenant membership", personEntity.ID),
+			})
 			return nil, nil, nil, code.GetError(code.UserNotExistError)
 		}
 	}
 	if userEntity.IsSuspended == 1 {
+		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+			Action:     svcaudit.ActionLogin,
+			Result:     "failure",
+			TargetType: "person",
+			Detail:     fmt.Sprintf("userID:%d, reason:suspended", userEntity.ID),
+		})
 		return nil, nil, nil, code.GetError(code.UserSuspendedError)
 	}
 	return personEntity, userEntity, tenants, nil
@@ -644,79 +493,6 @@ func (svc *authSvc) listPersonTenants(ctx *gin.Context, personID uint) (*model.U
 	return userEntity, options, nil
 }
 
-func (svc *authSvc) issueTenantToken(ctx *gin.Context, personID, tenantID uint) (*objauth.TokenInfo, error) {
-	userDao := newAuthUserStore()
-	tenantDao := newAuthTenantStore()
-	userEntity, err := userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{PersonID: personID, TenantID: tenantID})
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.issueTenantToken] user dao GetByCond fail, err:%v", err)
-		return nil, code.GetError(code.UserGetDetailError)
-	}
-	if userEntity == nil || userEntity.ID == 0 {
-		return nil, code.GetError(code.UserNotExistError)
-	}
-	tenantEntity, err := tenantDao.GetByID(ctx.Request.Context(), tenantID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.issueTenantToken] tenant dao GetByID fail, err:%v", err)
-		return nil, code.GetError(code.UserGetDetailError)
-	}
-	if tenantEntity == nil || tenantEntity.ID == 0 {
-		return nil, code.GetError(code.UserNotExistError)
-	}
-	tokenInfo, err := svc.generateToken(ctx, userEntity)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.issueTenantToken] generateToken fail, err:%v", err)
-		return nil, code.GetError(code.TokenGenerateError)
-	}
-	return tokenInfo, nil
-}
-
-func (svc *authSvc) personIDFromToken(personToken string) uint {
-	if strings.TrimSpace(personToken) == "" {
-		return 0
-	}
-	claims, err := jwt.Parse(personToken, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
-		}
-		return []byte(svc.jwtSecret), nil
-	})
-	if err != nil {
-		return 0
-	}
-	mapClaims, ok := claims.Claims.(jwt.MapClaims)
-	if !ok {
-		return 0
-	}
-	personID, ok := parsePositiveIntegerClaim(mapClaims, "person_id")
-	if !ok {
-		return 0
-	}
-	return personID
-}
-
-func (svc *authSvc) parseRefreshToken(refreshToken string) (jwt.MapClaims, error) {
-	token, err := jwt.Parse(refreshToken, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
-		}
-		return []byte(svc.jwtSecret), nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		if tokenType, ok := claims["type"].(string); ok && tokenType == "refresh" {
-			return claims, nil
-		}
-		return nil, errors.New("invalid token type")
-	}
-
-	return nil, errors.New("invalid token")
-}
-
 func validatePasswordStrength(password string) error {
 	if len(password) < PasswordMinLength {
 		return errors.New("password too short")
@@ -739,14 +515,6 @@ func validatePasswordStrength(password string) error {
 	}
 
 	return nil
-}
-
-func parsePositiveIntegerClaim(claims jwt.MapClaims, key string) (uint, bool) {
-	value, ok := claims[key].(float64)
-	if !ok || value <= 0 || math.Trunc(value) != value {
-		return 0, false
-	}
-	return uint(value), true
 }
 
 func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID uint, success bool) {
@@ -775,6 +543,19 @@ func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID uint, success bool
 			glog.Errorf(ctx, "[svcauth.recordLoginLog] update last_sign_in_at fail, err:%v", err)
 		}
 	}
+
+	result := "failure"
+	if success {
+		result = "success"
+	}
+	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+		Action:     svcaudit.ActionLogin,
+		TenantID:   tenantID,
+		Result:     result,
+		TargetType: "person",
+		TargetID:   userID,
+		Detail:     fmt.Sprintf("userID:%d", userID),
+	})
 }
 
 func timePointer(t time.Time) *time.Time {

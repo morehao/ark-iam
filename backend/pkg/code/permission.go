@@ -45,6 +45,7 @@ const (
 	ApplicationGetDetailError      = 100733
 	ApplicationGetPageListError    = 100734
 	ApplicationNotExistError       = 100735
+	ApplicationSystemBuiltInErr    = 100746
 	ApplicationSecretCreateError   = 100736
 	ApplicationSecretGetListError  = 100737
 	ApplicationSecretDeleteError   = 100738
@@ -52,16 +53,17 @@ const (
 )
 
 const (
-	OAuthClientCreateError         = 100810
-	OAuthClientDeleteError         = 100811
-	OAuthClientUpdateError         = 100812
-	OAuthClientGetDetailError      = 100813
-	OAuthClientGetPageListError    = 100814
-	OAuthClientNotExistError       = 100815
-	OAuthClientSecretCreateError   = 100816
-	OAuthClientSecretGetListError  = 100817
-	OAuthClientSecretDeleteError   = 100818
-	OAuthClientSecretNotExistError = 100819
+	ApplicationClientCreateError         = 100810
+	ApplicationClientDeleteError         = 100811
+	ApplicationClientUpdateError         = 100812
+	ApplicationClientGetDetailError      = 100813
+	ApplicationClientGetPageListError    = 100814
+	ApplicationClientNotExistError       = 100815
+	ApplicationClientSystemBuiltInErr    = 100820
+	ApplicationClientSecretCreateError   = 100816
+	ApplicationClientSecretGetListError  = 100817
+	ApplicationClientSecretDeleteError   = 100818
+	ApplicationClientSecretNotExistError = 100819
 )
 
 const (
@@ -79,75 +81,77 @@ const (
 )
 
 const (
-	RoleUserCreateError         = 100770
-	RoleUserDeleteError         = 100771
-	RoleUserGetListError        = 100772
-	RoleUserNotExistError       = 100773
-	RoleApplicationCreateError  = 100780
-	RoleApplicationGetListError = 100781
-	RoleApplicationDeleteError  = 100782
+	RoleUserCreateError          = 100770
+	RoleUserDeleteError          = 100771
+	RoleUserGetListError         = 100772
+	RoleUserNotExistError        = 100773
+	RoleApplicationCreateError   = 100780
+	RoleApplicationGetListError  = 100781
+	RoleApplicationDeleteError   = 100782
 	RoleApplicationNotExistError = 100783
 )
 
 var permissionErrorMsgMap = gerror.CodeMsgMap{
-	MenuCreateError:      "创建菜单失败",
-	MenuDeleteError:      "删除菜单失败",
-	MenuUpdateError:      "修改菜单失败",
-	MenuGetDetailError:   "查看菜单详情失败",
-	MenuGetPageListError: "查看菜单列表失败",
-	MenuNotExistError:    "菜单不存在",
-	RoleCreateError:      "创建角色失败",
-	RoleDeleteError:      "删除角色失败",
-	RoleUpdateError:      "修改角色失败",
-	RoleGetDetailError:   "查看角色详情失败",
-	RoleGetPageListError: "查看角色列表失败",
-	RoleNotExistError:    "角色不存在",
-	ResourceCreateError:      "创建资源失败",
-	ResourceDeleteError:      "删除资源失败",
-	ResourceUpdateError:      "修改资源失败",
-	ResourceGetDetailError:   "查看资源详情失败",
-	ResourceGetPageListError: "查看资源列表失败",
-	ResourceNotExistError:    "资源不存在",
-	ScopeCreateError:      "创建权限范围失败",
-	ScopeDeleteError:      "删除权限范围失败",
-	ScopeUpdateError:      "修改权限范围失败",
-	ScopeGetDetailError:   "查看权限范围详情失败",
-	ScopeGetPageListError: "查看权限范围列表失败",
-	ScopeNotExistError:   "权限范围不存在",
+	MenuCreateError:                "创建菜单失败",
+	MenuDeleteError:                "删除菜单失败",
+	MenuUpdateError:                "修改菜单失败",
+	MenuGetDetailError:             "查看菜单详情失败",
+	MenuGetPageListError:           "查看菜单列表失败",
+	MenuNotExistError:              "菜单不存在",
+	RoleCreateError:                "创建角色失败",
+	RoleDeleteError:                "删除角色失败",
+	RoleUpdateError:                "修改角色失败",
+	RoleGetDetailError:             "查看角色详情失败",
+	RoleGetPageListError:           "查看角色列表失败",
+	RoleNotExistError:              "角色不存在",
+	ResourceCreateError:            "创建资源失败",
+	ResourceDeleteError:            "删除资源失败",
+	ResourceUpdateError:            "修改资源失败",
+	ResourceGetDetailError:         "查看资源详情失败",
+	ResourceGetPageListError:       "查看资源列表失败",
+	ResourceNotExistError:          "资源不存在",
+	ScopeCreateError:               "创建权限范围失败",
+	ScopeDeleteError:               "删除权限范围失败",
+	ScopeUpdateError:               "修改权限范围失败",
+	ScopeGetDetailError:            "查看权限范围详情失败",
+	ScopeGetPageListError:          "查看权限范围列表失败",
+	ScopeNotExistError:             "权限范围不存在",
 	ApplicationCreateError:         "创建应用失败",
 	ApplicationDeleteError:         "删除应用失败",
 	ApplicationUpdateError:         "修改应用失败",
 	ApplicationGetDetailError:      "查看应用详情失败",
 	ApplicationGetPageListError:    "查看应用列表失败",
 	ApplicationNotExistError:       "应用不存在",
+	ApplicationSystemBuiltInErr:    "应用为系统内置，不可删除",
 	ApplicationSecretCreateError:   "创建应用密钥失败",
 	ApplicationSecretGetListError:  "查看应用密钥列表失败",
 	ApplicationSecretDeleteError:   "删除应用密钥失败",
 	ApplicationSecretNotExistError: "应用密钥不存在",
-	OAuthClientCreateError:         "创建OAuth客户端失败",
-	OAuthClientDeleteError:         "删除OAuth客户端失败",
-	OAuthClientUpdateError:         "修改OAuth客户端失败",
-	OAuthClientGetDetailError:      "查看OAuth客户端详情失败",
-	OAuthClientGetPageListError:    "查看OAuth客户端列表失败",
-	OAuthClientNotExistError:       "OAuth客户端不存在",
-	OAuthClientSecretCreateError:   "创建OAuth客户端密钥失败",
-	OAuthClientSecretGetListError:  "查看OAuth客户端密钥列表失败",
-	OAuthClientSecretDeleteError:   "删除OAuth客户端密钥失败",
-	OAuthClientSecretNotExistError: "OAuth客户端密钥不存在",
-	RoleMenuCreateError:      "创建角色菜单关联失败",
-	RoleMenuDeleteError:      "删除角色菜单关联失败",
-	RoleMenuGetPageListError: "查看角色菜单关联列表失败",
-	RoleMenuNotExistError:    "角色菜单关联不存在",
-	RoleScopeCreateError:      "创建角色权限关联失败",
-	RoleScopeDeleteError:      "删除角色权限关联失败",
-	RoleScopeGetPageListError: "查看角色权限关联列表失败",
-	RoleScopeNotExistError:    "角色权限关联不存在",
-	RoleUserCreateError:         "创建角色用户关联失败",
-	RoleUserDeleteError:         "删除角色用户关联失败",
-	RoleUserGetListError:        "查看角色用户列表失败",
-	RoleUserNotExistError:       "角色用户不存在",
-	RoleApplicationCreateError:  "创建角色应用关联失败",
-	RoleApplicationGetListError: "查看角色应用列表失败",
-	RoleApplicationDeleteError:  "删除角色应用关联失败",
-	RoleApplicationNotExistError: "角色应用关联不存在",
+	ApplicationClientCreateError:         "创建OAuth客户端失败",
+	ApplicationClientDeleteError:         "删除OAuth客户端失败",
+	ApplicationClientUpdateError:         "修改OAuth客户端失败",
+	ApplicationClientGetDetailError:      "查看OAuth客户端详情失败",
+	ApplicationClientGetPageListError:    "查看OAuth客户端列表失败",
+	ApplicationClientNotExistError:       "OAuth客户端不存在",
+	ApplicationClientSystemBuiltInErr:    "OAuth客户端为系统内置，不可删除",
+	ApplicationClientSecretCreateError:   "创建OAuth客户端密钥失败",
+	ApplicationClientSecretGetListError:  "查看OAuth客户端密钥列表失败",
+	ApplicationClientSecretDeleteError:   "删除OAuth客户端密钥失败",
+	ApplicationClientSecretNotExistError: "OAuth客户端密钥不存在",
+	RoleMenuCreateError:            "创建角色菜单关联失败",
+	RoleMenuDeleteError:            "删除角色菜单关联失败",
+	RoleMenuGetPageListError:       "查看角色菜单关联列表失败",
+	RoleMenuNotExistError:          "角色菜单关联不存在",
+	RoleScopeCreateError:           "创建角色权限关联失败",
+	RoleScopeDeleteError:           "删除角色权限关联失败",
+	RoleScopeGetPageListError:      "查看角色权限关联列表失败",
+	RoleScopeNotExistError:         "角色权限关联不存在",
+	RoleUserCreateError:            "创建角色用户关联失败",
+	RoleUserDeleteError:            "删除角色用户关联失败",
+	RoleUserGetListError:           "查看角色用户列表失败",
+	RoleUserNotExistError:          "角色用户不存在",
+	RoleApplicationCreateError:     "创建角色应用关联失败",
+	RoleApplicationGetListError:    "查看角色应用列表失败",
+	RoleApplicationDeleteError:     "删除角色应用关联失败",
+	RoleApplicationNotExistError:   "角色应用关联不存在",
 }

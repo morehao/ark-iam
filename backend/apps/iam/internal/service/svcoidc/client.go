@@ -13,12 +13,12 @@ import (
 )
 
 type OIDCClient struct {
-	clientEntity *model.OAuthClientEntity
+	clientEntity *model.ApplicationClientEntity
 }
 
 var _ op.Client = (*OIDCClient)(nil)
 
-func NewOIDCClient(clientEntity *model.OAuthClientEntity) *OIDCClient {
+func NewOIDCClient(clientEntity *model.ApplicationClientEntity) *OIDCClient {
 	return &OIDCClient{clientEntity: clientEntity}
 }
 

@@ -1,22 +1,49 @@
 import { useEffect, useState } from 'react'
-import { Layout, Menu, Avatar, Dropdown, Button } from 'antd'
-import { DashboardOutlined, UserOutlined, TeamOutlined, AppstoreOutlined, MenuFoldOutlined, MenuUnfoldOutlined, LogoutOutlined, BankOutlined, KeyOutlined } from '@ant-design/icons'
+import { Layout, Menu, Avatar, Dropdown, Button, message } from 'antd'
+import { DashboardOutlined, UserOutlined, TeamOutlined, AppstoreOutlined, MenuFoldOutlined, MenuUnfoldOutlined, LogoutOutlined, BankOutlined, KeyOutlined, SwapOutlined } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from 'react-oidc-context'
-import { logoutAllAPI } from '../api/auth'
+import { getMyTenants, logoutAllAPI } from '../api/auth'
 import { setUserProvider } from '../utils/request'
+import { getCurrentTenantId, setCurrentTenantId } from '../tenant'
 
 const { Header, Sider, Content } = Layout
 
 const MainLayout = () => {
   const [collapsed, setCollapsed] = useState(false)
+  const [tenants, setTenants] = useState<{ tenantID: number; name: string }[]>([])
   const navigate = useNavigate()
   const location = useLocation()
   const auth = useAuth()
 
   useEffect(() => {
     setUserProvider(() => auth.user)
+    // 从当前 OIDC 用户的 tenant_id claim 同步当前租户，供 oidcConfig extraQueryParams 续期使用
+    const claim = (auth.user?.profile as Record<string, unknown> | undefined)?.tenant_id
+    if (claim != null && getCurrentTenantId() !== String(claim)) {
+      setCurrentTenantId(claim as string | number)
+    }
   }, [auth.user])
+
+  const handleSwitchTenant = async (tenantID: number) => {
+    if (String(tenantID) === getCurrentTenantId()) return
+    setCurrentTenantId(tenantID)
+    try {
+      await auth.removeUser()
+    } catch {
+      // 本地清理失败不阻断重授权
+    }
+    await auth.signinRedirect({ extraQueryParams: { tenant: String(tenantID) }, redirectMethod: 'replace' })
+  }
+
+  const loadTenants = async () => {
+    try {
+      const resp = await getMyTenants()
+      setTenants(resp.list || [])
+    } catch {
+      message.warning('获取可用租户失败')
+    }
+  }
 
   const handleLogout = async () => {
     try {
@@ -58,7 +85,29 @@ const MainLayout = () => {
       <Layout>
         <Header style={{ padding: '0 16px', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Button type="text" icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => setCollapsed(!collapsed)} />
-          <Dropdown menu={{ items: [{ key: 'logout', icon: <LogoutOutlined />, label: '退出登录', onClick: handleLogout }] }} placement="bottomRight">
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  key: 'tenant',
+                  icon: <SwapOutlined />,
+                  label: '切换租户',
+                  children: tenants.map((t) => ({
+                    key: `tenant-${t.tenantID}`,
+                    label: t.name,
+                    disabled: String(t.tenantID) === getCurrentTenantId(),
+                    onClick: () => handleSwitchTenant(t.tenantID),
+                  })),
+                },
+                { type: 'divider' },
+                { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', onClick: handleLogout },
+              ],
+            }}
+            placement="bottomRight"
+            onOpenChange={(open) => {
+              if (open) loadTenants()
+            }}
+          >
             <Avatar style={{ cursor: 'pointer' }} icon={<UserOutlined />} />
           </Dropdown>
         </Header>

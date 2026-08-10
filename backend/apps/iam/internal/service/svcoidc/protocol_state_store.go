@@ -24,11 +24,11 @@ var (
 )
 
 type ProtocolStateStore interface {
-	CreateAuthRequest(ctx context.Context, authReq *oidc.AuthRequest, userID string) (op.AuthRequest, error)
+	CreateAuthRequest(ctx context.Context, authReq *oidc.AuthRequest, userID string, tenantID uint) (op.AuthRequest, error)
 	AuthRequestByID(ctx context.Context, id string) (op.AuthRequest, error)
 	AuthRequestByCode(ctx context.Context, code string) (op.AuthRequest, error)
 	SaveAuthCode(ctx context.Context, id, code string) error
-	CompleteAuthRequest(id string, subject string, authTime time.Time, amr []string, acr string) error
+	CompleteAuthRequest(id string, subject string, authTime time.Time, amr []string, acr string, tenantID uint, done bool) error
 	DeleteAuthRequest(ctx context.Context, id string) error
 	ConsumeAuthCode(ctx context.Context, code string) (op.AuthRequest, error)
 	Health(ctx context.Context) error
@@ -85,7 +85,7 @@ func (s *RedisProtocolStateStore) Health(ctx context.Context) error {
 	return nil
 }
 
-func (s *RedisProtocolStateStore) CreateAuthRequest(ctx context.Context, authReq *oidc.AuthRequest, userID string) (op.AuthRequest, error) {
+func (s *RedisProtocolStateStore) CreateAuthRequest(ctx context.Context, authReq *oidc.AuthRequest, userID string, tenantID uint) (op.AuthRequest, error) {
 	req := &AuthRequest{
 		ID:           fmt.Sprintf("ar-%d", time.Now().UnixNano()),
 		ClientID:     authReq.ClientID,
@@ -96,6 +96,7 @@ func (s *RedisProtocolStateStore) CreateAuthRequest(ctx context.Context, authReq
 		ResponseMode: authReq.ResponseMode,
 		Nonce:        authReq.Nonce,
 		Subject:      userID,
+		TenantID:     tenantID,
 		AuthTime:     time.Now(),
 		Audience:     []string{authReq.ClientID},
 		ExpiresAt:    time.Now().Add(defaultAuthRequestTTL()),
@@ -138,7 +139,7 @@ func (s *RedisProtocolStateStore) AuthRequestByID(ctx context.Context, id string
 	return &req, nil
 }
 
-func (s *RedisProtocolStateStore) CompleteAuthRequest(id string, subject string, authTime time.Time, amr []string, acr string) error {
+func (s *RedisProtocolStateStore) CompleteAuthRequest(id string, subject string, authTime time.Time, amr []string, acr string, tenantID uint, done bool) error {
 	ctx := context.Background()
 	data, err := s.client.Get(ctx, authRequestKey(id)).Bytes()
 	if errors.Is(err, redis.Nil) {
@@ -155,7 +156,8 @@ func (s *RedisProtocolStateStore) CompleteAuthRequest(id string, subject string,
 	req.AuthTime = authTime
 	req.AMR = append([]string(nil), amr...)
 	req.ACR = acr
-	req.DoneFlag = true
+	req.TenantID = tenantID
+	req.DoneFlag = done
 	updated, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("marshal auth request: %w", err)

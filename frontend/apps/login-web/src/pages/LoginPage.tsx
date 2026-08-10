@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react'
-import { oidcLogin } from '../api'
+import { oidcLogin, oidcSelectTenant } from '../api'
 import '../LoginPage.css'
 
 export default function LoginPage() {
@@ -9,6 +9,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [tenants, setTenants] = useState<{ tenantID: number; name: string }[]>([])
+  const [pendingAuthRequestID, setPendingAuthRequestID] = useState('')
 
   useEffect(() => {
     if (!authRequestID) {
@@ -31,9 +33,29 @@ export default function LoginPage() {
     setError('')
     try {
       const resp = await oidcLogin({ authRequestID, identifier, password })
+      if (resp.requiresTenantSelection && resp.tenants?.length) {
+        setTenants(resp.tenants)
+        setPendingAuthRequestID(authRequestID)
+        return
+      }
       window.location.href = resp.continueURL
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || '登录失败，请重试'
+      setError(msg)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const selectTenant = async (tenantID: number) => {
+    if (!pendingAuthRequestID) return
+    setLoading(true)
+    setError('')
+    try {
+      const resp = await oidcSelectTenant({ authRequestID: pendingAuthRequestID, tenantID })
+      window.location.href = resp.continueURL
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || '选择租户失败，请重试'
       setError(msg)
     } finally {
       setLoading(false)
@@ -48,7 +70,24 @@ export default function LoginPage() {
 
         {error && <div className="error-msg">{error}</div>}
 
-        {authRequestID ? (
+        {tenants.length > 0 ? (
+          <div className="tenant-selection">
+            <h2>请选择要登录的组织/租户</h2>
+            <ul className="tenant-list">
+              {tenants.map((t) => (
+                <li key={t.tenantID}>
+                  <button
+                    className="login-btn"
+                    onClick={() => selectTenant(t.tenantID)}
+                    disabled={loading}
+                  >
+                    {t.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : authRequestID ? (
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label htmlFor="identifier">用户名/邮箱/手机号</label>

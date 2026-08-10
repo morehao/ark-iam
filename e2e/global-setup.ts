@@ -28,7 +28,7 @@ const SERVICES: ServiceDef[] = [
     env: {
       APP_CONFIG_PATH: path.join(ROOT, 'backend', 'apps', 'iam', 'config', 'config.e2e.yaml'),
     },
-    healthPath: '/v1/iam/oidc/healthz',
+    healthPath: '/oidc/healthz',
   },
   {
     name: 'platform-admin-web',

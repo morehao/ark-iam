@@ -3,7 +3,6 @@ package ctrperson
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoperson"
-	"github.com/morehao/ark-iam/iam/internal/service/svcauth"
 	"github.com/morehao/ark-iam/iam/internal/service/svcperson"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
@@ -15,15 +14,13 @@ type PersonCtr interface {
 
 type personCtr struct {
 	personSvc svcperson.PersonProfileSvc
-	authSvc   svcauth.AuthSvc
 }
 
 var _ PersonCtr = (*personCtr)(nil)
 
-func NewPersonCtr(personSvc svcperson.PersonProfileSvc, authSvc svcauth.AuthSvc) PersonCtr {
+func NewPersonCtr(personSvc svcperson.PersonProfileSvc) PersonCtr {
 	return &personCtr{
 		personSvc: personSvc,
-		authSvc:   authSvc,
 	}
 }
 

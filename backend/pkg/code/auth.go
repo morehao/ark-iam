@@ -18,6 +18,7 @@ const (
 	EmailAlreadyExistsError    = 100512
 	PhoneAlreadyExistsError    = 100513
 	PasswordValidationError    = 100514
+	LoginLockedError           = 100515
 )
 
 const (
@@ -54,6 +55,7 @@ var userAuthErrorMsgMap = gerror.CodeMsgMap{
 	EmailAlreadyExistsError:    "邮箱已存在",
 	PhoneAlreadyExistsError:    "手机号已存在",
 	PasswordValidationError:    "密码不符合要求",
+	LoginLockedError:           "登录尝试次数过多，已临时锁定",
 }
 
 var tokenErrorMsgMap = gerror.CodeMsgMap{

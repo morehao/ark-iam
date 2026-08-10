@@ -14,10 +14,10 @@ func TestEndSessionClearsSSOCookie(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	appconfig.Conf = &appconfig.Config{}
 	engine := gin.New()
-	group := engine.Group("/v1/iam/oidc")
+	group := engine.Group("/oidc")
 	RegisterProviderRoutes(group, &OIDCProvider{}, "iam_sso_session")
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/iam/oidc/end_session", nil)
+	req := httptest.NewRequest(http.MethodGet, "/oidc/end_session", nil)
 	resp := httptest.NewRecorder()
 	engine.ServeHTTP(resp, req)
 

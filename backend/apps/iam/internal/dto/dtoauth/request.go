@@ -5,22 +5,7 @@ import (
 	"github.com/morehao/golib/biz/gobject"
 )
 
-type LoginReq struct {
-	Identifier string `json:"identifier" binding:"required"`   // 用户名/邮箱/手机号
-	Password   string `json:"password" binding:"required"`     // 密码
-}
-
-type SelectTenantReq struct {
-	TenantID    uint   `json:"tenantID" binding:"required"`       // 租户ID
-	PersonToken string `json:"personToken"`                        // 自然人令牌
-}
-
-type SwitchTenantReq struct {
-	TenantID uint `json:"tenantID" binding:"required"` // 租户ID
-}
-
 type MyTenantsReq struct {
-	PersonToken string `json:"personToken" form:"personToken"` // 自然人令牌
 }
 
 type LogoutAllReq struct {
@@ -34,10 +19,6 @@ type RegisterReq struct {
 	PrimaryPhone string `json:"primaryPhone"`                 // 主要手机号
 	Password     string `json:"password" binding:"required"` // 密码
 	Name         string `json:"name"`                         // 姓名
-}
-
-type RefreshTokenReq struct {
-	RefreshToken string `json:"refreshToken" binding:"required"` // 刷新令牌
 }
 
 type LogoutReq struct {
