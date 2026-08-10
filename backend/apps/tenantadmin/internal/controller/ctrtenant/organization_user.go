@@ -31,7 +31,7 @@ func NewOrganizationUserCtr() OrganizationUserCtr {
 // @Produce application/json
 // @Param req body dtotenant.OrganizationUserCreateReq true "创建组织用户关联"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationUserCreateResp}
-// @Router /v1/iam/organizationUser/create [post]
+// @Router /v1/organizationUser/create [post]
 func (ctr *organizationUserCtr) Create(ctx *gin.Context) {
 	var req dtotenant.OrganizationUserCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -52,7 +52,7 @@ func (ctr *organizationUserCtr) Create(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtotenant.OrganizationUserDeleteReq true "删除组织用户关联"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/organizationUser/delete [post]
+// @Router /v1/organizationUser/delete [post]
 func (ctr *organizationUserCtr) Delete(ctx *gin.Context) {
 	var req dtotenant.OrganizationUserDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -72,7 +72,7 @@ func (ctr *organizationUserCtr) Delete(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtotenant.OrganizationUserPageListReq true "组织用户关联列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationUserPageListResp}
-// @Router /v1/iam/organizationUser/pageList [post]
+// @Router /v1/organizationUser/pageList [post]
 func (ctr *organizationUserCtr) PageList(ctx *gin.Context) {
 	var req dtotenant.OrganizationUserPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {

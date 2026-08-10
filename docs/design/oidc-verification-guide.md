@@ -390,7 +390,7 @@ http://localhost:8099/oidc/authorize?client_id=test-rp-client&redirect_uri=https
 2. 浏览器跳转到 http://localhost:3000/oidc/login?authRequestID=ar-xxx
 3. 页面显示 OIDC 登录表单
 4. 输入 identifier 和 password，点击登录
-5. 前端 POST /oidc/login（axios baseURL /v1/iam + Vite proxy 转发到后端 8099）
+5. 前端 POST /oidc/login（axios baseURL /v1 + Vite proxy 转发到网关 8100）
 6. 后端返回 { code: 0, data: { continueURL: "..." } }
 7. 前端执行 window.location.href = resp.continueURL
 8. 浏览器跳转到 /authorize/callback?id=ar-xxx，后端完成认证并 302 到 redirect_uri
@@ -473,7 +473,7 @@ curl -s -X POST http://localhost:8099/oidc/oauth/token \
 | 配置文件 | 配置项 | 预期值 |
 |----------|--------|--------|
 | `backend/config.yaml` | `server.port` | 8099 |
-| `frontend/vite.config.ts` | `server.proxy./v1.target` | `http://localhost:8099` |
+| `frontend/vite.config.ts` | `server.proxy./v1.target` | `http://localhost:8100` |
 | `backend/config.yaml` | `oidc.issuer` | `http://localhost:8099/oidc` |
 | `frontend` 浏览器访问 | 前端页面 | `http://localhost:3000` |
 

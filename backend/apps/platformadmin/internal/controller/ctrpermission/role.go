@@ -37,7 +37,7 @@ func NewRoleCtr() RoleCtr {
 // @Produce application/json
 // @Param req body dtopermission.RoleCreateReq true "创建角色管理"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.RoleCreateResp}
-// @Router /v1/iam/role/create [post]
+// @Router /v1/role/create [post]
 func (ctr *roleCtr) Create(ctx *gin.Context) {
 	var req dtopermission.RoleCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -58,7 +58,7 @@ func (ctr *roleCtr) Create(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtopermission.RoleDeleteReq true "删除角色管理"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/role/delete [post]
+// @Router /v1/role/delete [post]
 func (ctr *roleCtr) Delete(ctx *gin.Context) {
 	var req dtopermission.RoleDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -78,7 +78,7 @@ func (ctr *roleCtr) Delete(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtopermission.RoleUpdateReq true "修改角色管理"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/role/update [post]
+// @Router /v1/role/update [post]
 func (ctr *roleCtr) Update(ctx *gin.Context) {
 	var req dtopermission.RoleUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -98,7 +98,7 @@ func (ctr *roleCtr) Update(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtopermission.RoleDetailReq true "角色管理详情"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.RoleDetailResp}
-// @Router /v1/iam/role/detail [get]
+// @Router /v1/role/detail [get]
 func (ctr *roleCtr) Detail(ctx *gin.Context) {
 	var req dtopermission.RoleDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -119,7 +119,7 @@ func (ctr *roleCtr) Detail(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtopermission.RolePageListReq true "角色管理列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.RolePageListResp}
-// @Router /v1/iam/role/pageList [post]
+// @Router /v1/role/pageList [post]
 func (ctr *roleCtr) PageList(ctx *gin.Context) {
 	var req dtopermission.RolePageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -140,7 +140,7 @@ func (ctr *roleCtr) PageList(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtouser.RoleUserListReq true "角色用户列表"
 // @Success 200 {object} gincontext.DtoRender{data=dtouser.RoleUserListResp}
-// @Router /v1/iam/role/users [get]
+// @Router /v1/role/users [get]
 func (ctr *roleCtr) ListUsers(ctx *gin.Context) {
 	var req dtouser.RoleUserListReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -161,7 +161,7 @@ func (ctr *roleCtr) ListUsers(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtouser.AssignRoleUsersReq true "分配用户"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/role/assignUsers [post]
+// @Router /v1/role/assignUsers [post]
 func (ctr *roleCtr) AssignUsers(ctx *gin.Context) {
 	var req dtouser.AssignRoleUsersReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -182,7 +182,7 @@ func (ctr *roleCtr) AssignUsers(ctx *gin.Context) {
 // @Param roleId path int true "角色ID"
 // @Param userId path int true "用户ID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/role/users/{roleId}/{userId} [delete]
+// @Router /v1/role/users/{roleId}/{userId} [delete]
 func (ctr *roleCtr) RemoveUser(ctx *gin.Context) {
 	var req dtouser.RemoveRoleUserReq
 	if err := ctx.ShouldBindUri(&req); err != nil {

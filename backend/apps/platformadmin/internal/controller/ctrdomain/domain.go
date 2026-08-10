@@ -33,7 +33,7 @@ func NewDomainCtr() DomainCtr {
 // @Produce application/json
 // @Param req body dtodomain.CreateDomainReq true "创建域名"
 // @Success 200 {object} gincontext.DtoRender{data=dtodomain.DomainCreateResp}
-// @Router /v1/iam/domain/create [post]
+// @Router /v1/domain/create [post]
 func (ctr *domainCtr) Create(ctx *gin.Context) {
 	var req dtodomain.CreateDomainReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -54,7 +54,7 @@ func (ctr *domainCtr) Create(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtodomain.DomainPageListReq true "域名列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtodomain.DomainPageListResp}
-// @Router /v1/iam/domain/pageList [post]
+// @Router /v1/domain/pageList [post]
 func (ctr *domainCtr) PageList(ctx *gin.Context) {
 	var req dtodomain.DomainPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -75,7 +75,7 @@ func (ctr *domainCtr) PageList(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtodomain.UpdateDomainReq true "修改域名"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/domain/update [post]
+// @Router /v1/domain/update [post]
 func (ctr *domainCtr) Update(ctx *gin.Context) {
 	var req dtodomain.UpdateDomainReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -95,7 +95,7 @@ func (ctr *domainCtr) Update(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtodomain.DomainDetailReq true "域名详情"
 // @Success 200 {object} gincontext.DtoRender{data=dtodomain.DomainDetailResp}
-// @Router /v1/iam/domain/detail [get]
+// @Router /v1/domain/detail [get]
 func (ctr *domainCtr) Detail(ctx *gin.Context) {
 	var req dtodomain.DomainDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -116,7 +116,7 @@ func (ctr *domainCtr) Detail(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtodomain.DeleteDomainReq true "删除域名"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/domain/delete [post]
+// @Router /v1/domain/delete [post]
 func (ctr *domainCtr) Delete(ctx *gin.Context) {
 	var req dtodomain.DeleteDomainReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {

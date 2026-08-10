@@ -73,7 +73,7 @@ func TestWriteAudit(t *testing.T) {
 func newAuditTestEnv(t *testing.T) (*gin.Context, *gorm.DB, func()) {
 	t.Helper()
 
-	req, rerr := http.NewRequest(http.MethodPost, "http://localhost/v1/iam/application/create", nil)
+	req, rerr := http.NewRequest(http.MethodPost, "http://localhost/v1/application/create", nil)
 	if rerr != nil {
 		t.Fatalf("build request: %v", rerr)
 	}

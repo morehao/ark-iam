@@ -22,7 +22,7 @@ func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 	config.Conf = Conf
 
 	ssoStore := svcsso.NewSSOSessionStore()
-	routerGroups := ginserver.NewRouterGroups(engine, AppName, ginserver.VersionGroup{
+	routerGroups := ginserver.NewRouterGroups(engine, "", ginserver.VersionGroup{
 		Version: ginserver.ApiVersionV1,
 		Middlewares: []gin.HandlerFunc{
 			oidcauth.OIDCCompatibleAuth(func() *rsa.PublicKey { return authRouter.OIDCPublicKey },

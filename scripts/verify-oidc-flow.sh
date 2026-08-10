@@ -10,7 +10,7 @@ set -euo pipefail
 #   ./scripts/verify-oidc-flow.sh
 #
 # 前置条件:
-#   1. 后端 IAM 服务运行在 localhost:8099
+#   1. 后端网关网关运行在 localhost:8100
 #   2. 数据库已插入测试 OAuth client (test-rp-client)
 #   3. 测试用户已存在 (默认 admin/admin123)
 #
@@ -18,7 +18,7 @@ set -euo pipefail
 # ============================================================
 
 # ==================== 配置项（按需修改） ====================
-IAM_BASE="http://localhost:8099/v1/iam/oidc"   # OIDC Issuer 地址
+IAM_BASE="http://localhost:8100/oidc"          # OIDC Issuer 地址
 CLIENT_ID="test-rp-client"                      # OAuth 客户端 ID
 CLIENT_SECRET="my-test-client-secret"           # 客户端密钥
 REDIRECT_URI="http://localhost:3001/"           # 回调地址（需在 client 中注册）

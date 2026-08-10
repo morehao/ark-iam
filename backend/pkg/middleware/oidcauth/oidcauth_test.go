@@ -48,7 +48,7 @@ func setupRouter(t *testing.T, validate func(ctx *gin.Context, personID uint, is
 	require.NoError(t, err)
 	r := gin.New()
 	r.Use(OIDCCompatibleAuth(func() *rsa.PublicKey { return &key.PublicKey }, WithOIDCSSOValidation(validate)))
-	r.GET("/v1/iam/test", func(ctx *gin.Context) {
+	r.GET("/v1/test", func(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{
 			"personID": ginFromContext(ctx),
 		})
@@ -85,7 +85,7 @@ func TestRejectsInternalHS256Token(t *testing.T) {
 		return true // 会话有效，但 RS256 验签失败应直接 401
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/iam/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
 	req.Header.Set(AuthHeaderKey, AuthBearer+makeInternalHS256Token(t, "person:88"))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -104,7 +104,7 @@ func TestOIDCSSOValidationRejectsRevokedSession(t *testing.T) {
 		return false // 会话已撤销
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/iam/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
 	req.Header.Set(AuthHeaderKey, AuthBearer+makeOIDCToken(t, key, "person:88", ""))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -118,7 +118,7 @@ func TestOIDCSSOValidationAllowsActiveSession(t *testing.T) {
 		return true // 会话有效
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/iam/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
 	req.Header.Set(AuthHeaderKey, AuthBearer+makeOIDCToken(t, key, "person:88", ""))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -135,7 +135,7 @@ func TestOIDCSSOValidationMachineTokenBypassesRevokedSession(t *testing.T) {
 	})
 
 	// 机器令牌：即便自然人会话被撤销也应 200
-	req := httptest.NewRequest(http.MethodGet, "/v1/iam/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
 	req.Header.Set(AuthHeaderKey, AuthBearer+makeOIDCToken(t, key, "person:88", "machine"))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -143,7 +143,7 @@ func TestOIDCSSOValidationMachineTokenBypassesRevokedSession(t *testing.T) {
 	assert.Contains(t, w.Body.String(), `"personID":88`)
 
 	// 非机器令牌：会话撤销应 401
-	req2 := httptest.NewRequest(http.MethodGet, "/v1/iam/test", nil)
+	req2 := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
 	req2.Header.Set(AuthHeaderKey, AuthBearer+makeOIDCToken(t, key, "person:88", ""))
 	w2 := httptest.NewRecorder()
 	r.ServeHTTP(w2, req2)
@@ -177,14 +177,14 @@ func TestAPIKeyParallelAuth(t *testing.T) {
 	})
 
 	// 仅 x-api-key（无 OIDC token）应放行
-	req := httptest.NewRequest(http.MethodGet, "/v1/iam/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
 	req.Header.Set("x-api-key", rawKey)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code, "x-api-key 应能独立鉴权通过")
 
 	// 非法 API Key 应 401
-	reqBad := httptest.NewRequest(http.MethodGet, "/v1/iam/test", nil)
+	reqBad := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
 	reqBad.Header.Set("x-api-key", "invalid-key-value")
 	wBad := httptest.NewRecorder()
 	r.ServeHTTP(wBad, reqBad)

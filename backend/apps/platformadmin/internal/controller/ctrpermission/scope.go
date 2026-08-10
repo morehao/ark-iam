@@ -33,7 +33,7 @@ func NewScopeCtr() ScopeCtr {
 // @Produce application/json
 // @Param req body dtopermission.ScopeCreateReq true "创建权限范围"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.ScopeCreateResp}
-// @Router /v1/iam/scope/create [post]
+// @Router /v1/scope/create [post]
 func (ctr *scopeCtr) Create(ctx *gin.Context) {
 	var req dtopermission.ScopeCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -54,7 +54,7 @@ func (ctr *scopeCtr) Create(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtopermission.ScopeDeleteReq true "删除权限范围"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/scope/delete [post]
+// @Router /v1/scope/delete [post]
 func (ctr *scopeCtr) Delete(ctx *gin.Context) {
 	var req dtopermission.ScopeDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -74,7 +74,7 @@ func (ctr *scopeCtr) Delete(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtopermission.ScopeUpdateReq true "修改权限范围"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/scope/update [post]
+// @Router /v1/scope/update [post]
 func (ctr *scopeCtr) Update(ctx *gin.Context) {
 	var req dtopermission.ScopeUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -94,7 +94,7 @@ func (ctr *scopeCtr) Update(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtopermission.ScopeDetailReq true "权限范围详情"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.ScopeDetailResp}
-// @Router /v1/iam/scope/detail [get]
+// @Router /v1/scope/detail [get]
 func (ctr *scopeCtr) Detail(ctx *gin.Context) {
 	var req dtopermission.ScopeDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -115,7 +115,7 @@ func (ctr *scopeCtr) Detail(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtopermission.ScopePageListReq true "权限范围列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.ScopePageListResp}
-// @Router /v1/iam/scope/pageList [post]
+// @Router /v1/scope/pageList [post]
 func (ctr *scopeCtr) PageList(ctx *gin.Context) {
 	var req dtopermission.ScopePageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {

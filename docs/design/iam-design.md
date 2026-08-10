@@ -228,24 +228,24 @@ user   ──(关联)──> refresh_token(tenant_id+user_id)
 ### 4.2 路由前缀
 
 ```
-/v1/iam/auth/*       登录/注册/我的租户/选切租户/刷新/登出 (公共+JWT)
-/v1/iam/oidc/*       OIDC Provider 标准端点 (含 /.well-known/*)
-/v1/iam/console/*    管理后台 API (统一 token 鉴权)
+/v1/auth/*       登录/注册/我的租户/选切租户/刷新/登出 (公共+JWT)
+/oidc/*       OIDC Provider 标准端点 (含 /.well-known/*)
+/v1/console/*    管理后台 API (统一 token 鉴权)
 ```
 
 ### 4.3 OIDC 协议端点
 
 | 端点 | 说明 | 认证 |
 |---|---|---|
-| `GET /v1/iam/oidc/.well-known/openid-configuration` | Discovery | 无 |
-| `GET /v1/iam/oidc/.well-known/jwks.json` | 公钥 | 无 |
-| `GET\|POST /v1/iam/oidc/authorize` | 授权入口 | 无 |
-| `GET /v1/iam/oidc/authorize/callback` | 租户选择完成→发 code→重定向 RP | 无 |
-| `GET /v1/iam/oidc/sso-login` | SSO 自动登录检查（见 2.2/2.5）：有中心会话→自动认证；无→重定向前端登录页 | 中心会话 Cookie |
-| `POST /v1/iam/oidc/oauth/token` | code换/refresh/client_credentials | client 认证 |
-| `GET\|POST /v1/iam/oidc/userinfo` | 用户信息 | access token |
-| `GET\|POST /v1/iam/oidc/end_session` | 全局登出 | id_token_hint |
-| `POST /v1/iam/oidc/revoke` | 吊销 token | client 认证 |
+| `GET /oidc/.well-known/openid-configuration` | Discovery | 无 |
+| `GET /oidc/.well-known/jwks.json` | 公钥 | 无 |
+| `GET\|POST /oidc/authorize` | 授权入口 | 无 |
+| `GET /oidc/authorize/callback` | 租户选择完成→发 code→重定向 RP | 无 |
+| `GET /oidc/sso-login` | SSO 自动登录检查（见 2.2/2.5）：有中心会话→自动认证；无→重定向前端登录页 | 中心会话 Cookie |
+| `POST /oidc/oauth/token` | code换/refresh/client_credentials | client 认证 |
+| `GET\|POST /oidc/userinfo` | 用户信息 | access token |
+| `GET\|POST /oidc/end_session` | 全局登出 | id_token_hint |
+| `POST /oidc/revoke` | 吊销 token | client 认证 |
 
 **协议库（不造轮子）**
 - OIDC **Provider(OP)**：`github.com/zitadel/oidc/v3`（auth code + PKCE + refresh + custom 端点）

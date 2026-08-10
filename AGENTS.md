@@ -142,7 +142,7 @@ apps/iam/
 
 错误码和路由也按领域划分：
 - 一个业务领域共享一套错误码段（如 user 领域用 1005XX）
-- 路由按领域注册（如 `/v1/iam/user/*` 下包含用户及其相关操作）
+- 路由按领域注册（如 `/v1/user/*` 下包含用户及其相关操作）
 
 ### 常量定义规范
 
@@ -290,9 +290,8 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 
 ### API 路由规范
 
-- **路径格式**: `/{版本}/{app}/{模块}/{操作}`，如 `/v1/iam/user/create`
+- **路径格式**: `/{版本}/{模块}/{操作}`，如 `/v1/user/create`（不再包含聚合服务名段，多个业务模块共享 `/v1` 前缀）
 - **版本号**: 放在路径最前，使用 `/v1/`, `/v2/` 等格式
-- **App 标识**: 用于区分不同应用，如 `iam`, `demo`
 - **模块名**: 对应业务模块，如 `user`, `role`, `menu`
 - **操作名**: 使用驼峰命名，如 `create`, `update`, `detail`, `pageList`, `assignDepartment`
 
@@ -302,29 +301,29 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 
 | 模块 | 操作 | 完整路径 |
 |------|------|----------|
-| user | 创建 | `/v1/iam/user/create` |
-| user | 分配部门 | `/v1/iam/user/assignDepartment` |
-| role | 列表 | `/v1/iam/role/pageList` |
+| user | 创建 | `/v1/user/create` |
+| user | 分配部门 | `/v1/user/assignDepartment` |
+| role | 列表 | `/v1/role/pageList` |
 
 #### 路由注册
 
-在 `router/router.go` 中注册路由，先按版本分组，再按应用分组：
+各业务 app 通过 `ginserver.NewRouterGroups(engine, ...)` 注册共享 `/v1` 前缀（不再有聚合服务名段），然后在 `router/router.go` 中按版本 `MustGetGroup(ginserver.ApiVersionV1)` 注册各模块路由：
 
 ```go
-v1AuthGroup := groups.AuthGroup.Group("/v1")
-iamGroup := v1AuthGroup.Group("/iam")
-
-userRouter(iamGroup)
-roleRouter(iamGroup)
+routerGroups := ginserver.NewRouterGroups(engine, ginserver.VersionGroup{
+    Version: ginserver.ApiVersionV1,
+    // ...
+})
 ```
 
 在各个路由文件中使用 gin 的路由注册方法：
 
 ```go
-func userRouter(routerGroup *gin.RouterGroup) {
-    routerGroup.POST("/user/create", userCtr.Create)
-    routerGroup.POST("/user/delete", userCtr.Delete)
-    routerGroup.GET("/user/detail", userCtr.Detail)
+func userRouter(groups *ginserver.RouterGroups) {
+    v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
+    v1RouterGroup.POST("/user/create", userCtr.Create)
+    v1RouterGroup.POST("/user/delete", userCtr.Delete)
+    v1RouterGroup.GET("/user/detail", userCtr.Detail)
 }
 ```
 

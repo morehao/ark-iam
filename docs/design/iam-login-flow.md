@@ -9,10 +9,10 @@ IAM 支持多种认证/登录方式：浏览器用户密码登录（OIDC Authori
 | 1 | **OIDC 密码登录** | 用户 → IAM(OP) | OIDC AuthCode + PKCE | `/oidc/authorize` → `/oidc/login` → `/oidc/authorize/callback` → `/oidc/oauth/token` | access_token + id_token + refresh_token |
 | 2 | **SSO 自动登录** | 已有会话 → IAM(OP) | cookie + Redis | `/oidc/sso-login` | 跳过密码，直接发 code |
 | 3 | **选/切租户** | 用户 → IAM(OP) | — | `/oidc/login/selectTenant`、`/oidc/authorize?tenant=` | token 携带新租户上下文 |
-| 4 | **自助注册** | 用户 → IAM | bcrypt | `POST /v1/iam/auth/register` | UserID |
-| 5 | **加入租户** | Person → 租户 | — | `POST /v1/iam/auth/joinTenant` | UserID |
+| 4 | **自助注册** | 用户 → IAM | bcrypt | `POST /v1/auth/register` | UserID |
+| 5 | **加入租户** | Person → 租户 | — | `POST /v1/auth/joinTenant` | UserID |
 | 6 | **API Key 认证** | 服务 → IAM | SHA-256 | `x-api-key` 头 / OIDC client_credentials | 直接通过 / `token_usage=machine` |
-| 7 | **Connector SSO 登录** | 外部 IdP → IAM（IAM 作为 RP）| OAuth2/OIDC | `/v1/iam/connector/:id/authorize`、`/v1/iam/connector/callback` | 进入 OIDC 主流程 |
+| 7 | **Connector SSO 登录** | 外部 IdP → IAM（IAM 作为 RP）| OAuth2/OIDC | `/v1/connector/:id/authorize`、`/v1/connector/callback` | 进入 OIDC 主流程 |
 | 8 | **令牌刷新** | RP → IAM | refresh_token 轮换 | `POST /oidc/oauth/token` (grant_type=refresh_token) | 新 access + refresh |
 
 ### 令牌体系总览（当前为 OIDC 标准令牌）
@@ -26,7 +26,7 @@ OIDC Authorization Code Flow 完成认证
 │   身份证明，仅声明                 │
 ├───────────────────────────────────┤
 │   Access Token (JWT, RS256)       │  ← sub=person:{id}, tenant_id, user_id, client_id, token_usage
-│   访问业务 API 的凭证              │     内网 /v1/iam/* 另校验 SSO 会话活性
+│   访问业务 API 的凭证              │     内网 /v1/* 另校验 SSO 会话活性
 ├───────────────────────────────────┤
 │   Refresh Token (不透明串, DB哈希) │  ← 单次使用轮换，可吊销，30d
 │   静默续期令牌                     │
@@ -127,10 +127,10 @@ sequenceDiagram
 ### 登出（全局登出语义）
 
 ```
-用户 → RP → GET /oidc/end_session (或 POST /v1/iam/auth/logout)
+用户 → RP → GET /oidc/end_session (或 POST /v1/auth/logout)
 ① 清中心会话: RevokeSessionsByPersonID + 清 iam_sso_session cookie
 ② 吊销该 person 全部 refresh token: RevokeByPersonID (DB revoked_at)
-③ 内网 /v1/iam/*: OIDCCompatibleAuth 校验 SSO 活性 → 立即 401
+③ 内网 /v1/*: OIDCCompatibleAuth 校验 SSO 活性 → 立即 401
 ④ 302 → post_logout_redirect_uri / /oidc/logged-out
 ```
 
@@ -140,13 +140,13 @@ sequenceDiagram
 
 ### 自助注册
 
-- `POST /v1/iam/auth/register`：校验密码强度（≥6 位 + 大小写 + 数字），校验 username/email/phone 唯一，插入 `person` + `user`(is_owner=1)。
+- `POST /v1/auth/register`：校验密码强度（≥6 位 + 大小写 + 数字），校验 username/email/phone 唯一，插入 `person` + `user`(is_owner=1)。
 - 注册即成为指定租户的拥有者。
 - 代码：`svcauth/auth.go:Register` + `validatePasswordStrength`。
 
 ### 加入租户
 
-- `POST /v1/iam/auth/joinTenant`：已认证 person 加入另一租户，插入 `user`(is_owner=0)。
+- `POST /v1/auth/joinTenant`：已认证 person 加入另一租户，插入 `user`(is_owner=0)。
 - 已在租户中返回 `already joined`。
 - 代码：`svcauth/auth.go:JoinTenant`。
 
@@ -204,10 +204,10 @@ sequenceDiagram
 ### 主流程
 
 ```
-1. 前端 POST /v1/iam/connector/:connectorId/authorize
+1. 前端 POST /v1/connector/:connectorId/authorize
    → 驱动按 protocol 构建授权 URL, state + nonce 存 Redis (TTL 10min)
    → 302/?authorizationUrl 跳外部 IdP
-2. 用户在外部门户授权 → 302 回调 /v1/iam/connector/callback?code&state
+2. 用户在外部门户授权 → 302 回调 /v1/connector/callback?code&state
    → GetDel(state) 原子消费 → 驱动 exchange token → 验证 id_token(nonce) / userinfo
 3. 身份解析 (svcauth/connector_identity.go):
    - 已有 user_identity(iss+sub) → 更新 last_used_at

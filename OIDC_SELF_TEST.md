@@ -41,10 +41,10 @@ mysql -uroot -p123456 iam < backend/scripts/sql/iam_seed_data.sql
 make run APP=iam
 ```
 
-服务监听 `:8099`。验证：
+服务监听 `:8100`（aggregate 网关，统一 `/v1` 前缀）。验证：
 
 ```bash
-curl -s http://localhost:8099/v1/iam/oidc/.well-known/openid-configuration | python3 -m json.tool
+curl -s http://localhost:8100/oidc/.well-known/openid-configuration | python3 -m json.tool
 ```
 
 > 如果 OpenTelemetry 报错不影响启动，代码有 graceful fallback。
@@ -236,11 +236,11 @@ Running 3 tests using 1 worker
 |------|------|------|------|
 | MySQL | `127.0.0.1:3306` | 3306 | 数据库 iam |
 | Redis | `127.0.0.1:6379` | 6379 | 缓存 |
-| IAM 后端 | `http://localhost:8099` | 8099 | Gin HTTP 服务 |
+| IAM 后端 | `http://localhost:8100` | 8100 | Gin 网关（统一 `/v1` 前缀） |
 | IAM 前端 | `http://localhost:3000` | 3000 | React SPA（管理端） |
 | 独立登录页 | `http://localhost:3003` | 3003 | Vite + React（独立 IdP 登录页） |
 | SSO 测试 RP | `http://localhost:3001` | 3001 | 静态 HTML 测试页 |
-| OIDC Issuer | `http://localhost:8099/v1/iam/oidc` | - | OIDC Provider 根路径 |
+| OIDC Issuer | `http://localhost:8100/oidc` | - | OIDC Provider 根路径 |
 | OIDC 登录页 | `http://localhost:3003/login` | - | 独立登录页服务（login-web） |
 | SSO Session | `iam_sso_session` cookie | - | HTTP-only，Redis 存储，24h 过期 |
 

@@ -33,7 +33,7 @@ func TestSessionControllerRevokeBindsURI(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	req := httptest.NewRequest(http.MethodDelete, "/v1/iam/user/sessions/42", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/v1/user/sessions/42", nil)
 	ctx.Request = req
 	ctx.Params = gin.Params{{Key: "sessionId", Value: "42"}}
 
