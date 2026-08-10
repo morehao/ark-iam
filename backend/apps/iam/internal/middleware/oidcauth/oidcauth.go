@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/morehao/ark-iam/iam/internal/middleware"
-	"github.com/morehao/ark-iam/iam/object/objauth"
+	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/glog"
 )

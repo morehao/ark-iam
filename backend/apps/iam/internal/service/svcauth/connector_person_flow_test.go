@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/iam/dao"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/iam/internal/dto/dtoconnector"
 	"github.com/morehao/ark-iam/iam/internal/service/svcsso"
-	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/ark-iam/pkg/iam/model"
 	"gorm.io/gorm"
 )
 

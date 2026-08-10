@@ -11,8 +11,8 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	appconfig "github.com/morehao/ark-iam/iam/config"
-	"github.com/morehao/ark-iam/iam/dao"
-	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
+	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 
 	"github.com/morehao/golib/biz/gcontext"

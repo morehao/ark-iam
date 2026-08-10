@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/morehao/ark-iam/iam/model"
+	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/stretchr/testify/require"

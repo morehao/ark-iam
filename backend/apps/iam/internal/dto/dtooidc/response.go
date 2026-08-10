@@ -1,6 +1,6 @@
 package dtooidc
 
-import "github.com/morehao/ark-iam/iam/object/objauth"
+import "github.com/morehao/ark-iam/pkg/iam/object/objauth"
 
 type OIDCLoginResp struct {
 	ContinueURL             string                 `json:"continueURL"`

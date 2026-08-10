@@ -1,8 +1,8 @@
 package dtotenant
 
 import (
-	"github.com/morehao/ark-iam/iam/object/objaudit"
-	"github.com/morehao/ark-iam/iam/object/objtenant"
+	"github.com/morehao/ark-iam/pkg/iam/object/objaudit"
+	"github.com/morehao/ark-iam/pkg/iam/object/objtenant"
 	"github.com/morehao/golib/biz/gobject"
 )
 
