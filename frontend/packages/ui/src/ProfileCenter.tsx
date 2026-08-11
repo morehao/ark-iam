@@ -57,7 +57,14 @@ export function ProfileCenter({ open, onClose }: Props) {
       title: '操作',
       key: 'action',
       render: (_: unknown, record: SessionResp) => (
-        <Popconfirm title="确认撤销该会话？" onConfirm={() => void revokeSession(record.id)}>
+        <Popconfirm
+          title="确认撤销该会话？"
+          onConfirm={() =>
+            void revokeSession(record.id)
+              .then(() => loadSessions())
+              .catch(() => message.error('撤销会话失败'))
+          }
+        >
           <Button size="small" danger>
             撤销
           </Button>
@@ -105,7 +112,14 @@ export function ProfileCenter({ open, onClose }: Props) {
             children: (
               <>
                 <Space style={{ marginBottom: 12 }}>
-                  <Button danger onClick={() => void revokeAllSessions().then(() => loadSessions())}>
+                  <Button
+                    danger
+                    onClick={() =>
+                      void revokeAllSessions()
+                        .then(() => loadSessions())
+                        .catch(() => message.error('撤销全部会话失败'))
+                    }
+                  >
                     撤销全部会话
                   </Button>
                 </Space>
