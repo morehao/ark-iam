@@ -4,9 +4,9 @@
 -- ============================================
 -- 1. 租户种子数据
 -- ============================================
-INSERT INTO `tenant` (`id`, `name`, `type`, `db_user`, `is_suspended`, `tag`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (1, 'Default Tenant', 'platform', 'default_user', 0, 'default', 0, 0, 0)
-ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `type` = VALUES(`type`);
+INSERT INTO `tenant` (`id`, `name`, `code`, `type`, `db_user`, `is_suspended`, `tag`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (1, 'Default Tenant', 'platform', 'platform', 'default_user', 0, 'default', 0, 0, 0)
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `code` = VALUES(`code`), `type` = VALUES(`type`);
 
 -- ============================================
 -- 2. 基础角色种子数据
@@ -159,8 +159,8 @@ ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
 -- ============================================
 -- 10.1 先插入到 person 表
 INSERT INTO `person` (`id`, `username`, `primary_email`, `primary_phone`, `password_encrypted`, `password_method`, `name`, `avatar`, `profile`, `custom_data`, `is_suspended`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (1, 'admin', 'admin@example.com', '', '$2a$10$Js0KMHZVZY7z0kLoHAvckui8KJK5..xhKkzU2jwiz7X./aIANfnxi', 'bcrypt', '系统管理员', '', '{}', '{}', 0, 0, 0, 0)
-ON DUPLICATE KEY UPDATE `username` = VALUES(`username`);
+VALUES (1, 'admin', 'admin@example.com', '13800000000', '$2a$10$Js0KMHZVZY7z0kLoHAvckui8KJK5..xhKkzU2jwiz7X./aIANfnxi', 'bcrypt', '系统管理员', '', '{}', '{}', 0, 0, 0, 0)
+ON DUPLICATE KEY UPDATE `username` = VALUES(`username`), `primary_email` = VALUES(`primary_email`), `primary_phone` = VALUES(`primary_phone`);
 
 -- 10.2 再插入到 user 表（关联 person_id）
 INSERT INTO `user` (`id`, `tenant_id`, `person_id`, `name`, `avatar`, `profile`, `custom_data`, `is_suspended`, `is_owner`, `created_by`, `updated_by`, `deleted_by`)
@@ -180,8 +180,8 @@ ON DUPLICATE KEY UPDATE `user_id` = VALUES(`user_id`);
 -- 回调地址: http://localhost:3001/auth/callback (SSO测试应用)
 -- 密钥SHA256: fc090df65f5f35338ad419e13de1c64b84d6674c7e67ff32df3cda6f034cfce2
 -- ============================================
-INSERT INTO `application_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `post_logout_redirect_uris`, `status`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (1, 1, 1, 'test-rp-client', 'SSO测试应用', '["http://localhost:3001/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'client_secret_basic', 1, '["openid","profile","email"]', '["http://localhost:3001/login"]', 'enable', 0, 0, 0)
+INSERT INTO `application_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `post_logout_redirect_uris`, `type`, `is_third_party`, `status`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (1, 1, 1, 'test-rp-client', 'SSO测试应用', '["http://localhost:3001/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'client_secret_basic', 1, '["openid","profile","email"]', '["http://localhost:3001/login"]', 'third_party', 1, 'enable', 0, 0, 0)
 ON DUPLICATE KEY UPDATE
   `redirect_uris` = VALUES(`redirect_uris`),
   `grant_types` = VALUES(`grant_types`),
@@ -190,6 +190,8 @@ ON DUPLICATE KEY UPDATE
   `require_pkce` = VALUES(`require_pkce`),
   `default_scopes` = VALUES(`default_scopes`),
   `post_logout_redirect_uris` = VALUES(`post_logout_redirect_uris`),
+  `type` = VALUES(`type`),
+  `is_third_party` = VALUES(`is_third_party`),
   `status` = VALUES(`status`);
 
 INSERT INTO `application_client_secret` (`id`, `application_client_id`, `name`, `value_hash`, `value_prefix`, `created_by`, `updated_by`, `deleted_by`)
