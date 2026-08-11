@@ -31,26 +31,34 @@ const SERVICES: ServiceDef[] = [
     healthPath: '/oidc/healthz',
   },
   {
-    name: 'platform-admin-web',
+    name: 'login-web',
     port: 3000,
+    cmd: 'pnpm',
+    args: ['--filter', '@ark-iam/login-web', 'dev'],
+    cwd: FRONTEND_ROOT,
+    healthPath: '/',
+  },
+  {
+    name: 'platform-admin-web',
+    port: 3001,
     cmd: 'pnpm',
     args: ['--filter', '@ark-iam/platform-admin-web', 'dev'],
     cwd: FRONTEND_ROOT,
     healthPath: '/',
   },
   {
-    name: 'sso-test-app',
-    port: 3001,
+    name: 'unified-login-demo',
+    port: 3002,
     cmd: 'pnpm',
-    args: ['--filter', '@ark-iam/sso-test-app', 'dev'],
+    args: ['--filter', '@ark-iam/unified-login-demo', 'dev'],
     cwd: FRONTEND_ROOT,
     healthPath: '/',
   },
   {
-    name: 'login-web',
+    name: 'tenant-admin-web',
     port: 3003,
     cmd: 'pnpm',
-    args: ['--filter', '@ark-iam/login-web', 'dev'],
+    args: ['--filter', '@ark-iam/tenant-admin-web', 'dev'],
     cwd: FRONTEND_ROOT,
     healthPath: '/',
   },
@@ -80,7 +88,8 @@ function healthCheck(port: number, healthPath: string, timeoutMs: number = 5000)
   return new Promise((resolve) => {
     const req = http.get(`http://127.0.0.1:${port}${healthPath}`, { timeout: timeoutMs }, (res) => {
       // 2xx/3xx 认为健康
-      resolve(res.statusCode >= 200 && res.statusCode < 400);
+      const status = res.statusCode ?? 0;
+      resolve(status >= 200 && status < 400);
     });
     req.on('error', () => resolve(false));
     req.on('timeout', () => { req.destroy(); resolve(false); });

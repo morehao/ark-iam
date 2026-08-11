@@ -4,7 +4,7 @@ import { CONFIG } from '../config';
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function isLoginWebUrl(url: string): boolean {
-  return url.includes('localhost:3003') && url.includes('/login');
+  return url.includes('localhost:3000') && url.includes('/login');
 }
 
 function isAuthCallbackUrl(url: string): boolean {
@@ -12,11 +12,11 @@ function isAuthCallbackUrl(url: string): boolean {
 }
 
 function isRp1Url(url: string): boolean {
-  return url.includes('localhost:3001');
+  return url.includes('localhost:3002');
 }
 
 function isAdminUrl(url: string): boolean {
-  return url.includes('localhost:3000');
+  return url.includes('localhost:3001');
 }
 
 export async function fillLoginWebCredentials(page: Page): Promise<void> {
@@ -26,21 +26,27 @@ export async function fillLoginWebCredentials(page: Page): Promise<void> {
   await page.click('button[type="submit"]');
 }
 
-async function resetAppAuthState(page: Page): Promise<void> {
-  // 清空 localStorage 中的 OIDC user 及 cookies，确保触发带 authRequestID 的完整认证流程
-  await page.evaluate(() => localStorage.clear());
+async function resetAppAuthState(page: Page, targetUrl: string): Promise<void> {
+  // 确保页面回到应用源再清 localStorage（OIDC user 存储于应用 origin），
+  // 避免在 cross-origin iframe/issuer 页上触发 localStorage SecurityError。
+  try {
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+  } catch {
+    // 忽略导航失败，继续尝试清理
+  }
+  await page.evaluate(() => localStorage.clear()).catch(() => {});
   await page.context().clearCookies();
 }
 
 async function navigateToLoginWeb(page: Page, targetUrl: string): Promise<void> {
-  await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 15000 });
+  await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
 
   const currentUrl = page.url();
   // 如果已有 SSO session/本地 user，signinRedirect 直接回调，不会到 login-web
   if (isAuthCallbackUrl(currentUrl) && currentUrl.includes('code=')) {
-    await page.goto(`${CONFIG.issuer}/logged-out`, { waitUntil: 'networkidle', timeout: 10000 });
-    await resetAppAuthState(page);
-    await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 15000 });
+    await page.goto(`${CONFIG.issuer}/logged-out`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+    await resetAppAuthState(page, targetUrl);
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
   }
 
   let ok = false;
@@ -52,11 +58,11 @@ async function navigateToLoginWeb(page: Page, targetUrl: string): Promise<void> 
     ok = true;
   } catch {
     // 停在应用首页（本地残留 user 且未走授权），清除本地状态后重新触发
-    await resetAppAuthState(page);
+    await resetAppAuthState(page, targetUrl);
   }
 
   if (!ok) {
-    await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 15000 });
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
     await page.waitForURL(
       (url) => isLoginWebUrl(url.toString()) && url.searchParams.has('authRequestID'),
       { timeout: 20000 }
@@ -65,23 +71,15 @@ async function navigateToLoginWeb(page: Page, targetUrl: string): Promise<void> 
 }
 
 export async function verifyRp1HomePage(page: Page): Promise<void> {
-  await page.waitForFunction(
-    () => document.body.innerText.includes('用户信息') && document.body.innerText.includes('SSO 测试应用'),
-    { timeout: 30000 }
-  );
-  const body = await page.evaluate(() => document.body.innerText);
-  expect(body).toContain('用户信息');
-  expect(body).toContain('SSO 测试应用');
+  // SPA 的 useSSOSessionProbe 会间歇触发 silent renew，导致 body 周期性清空，
+  // 因此不能依赖一次性 innerText 断言，改用自动重试的 locator 等待稳定可见。
+  await expect(page.getByText('用户信息', { exact: true }).first()).toBeVisible({ timeout: 30000 });
+  await expect(page.getByText('统一登录演示应用', { exact: true }).first()).toBeVisible({ timeout: 30000 });
 }
 
 export async function verifyAdminDashboard(page: Page): Promise<void> {
-  await page.waitForFunction(
-    () => document.body.innerText.includes('仪表盘') && document.body.innerText.includes('IAM 管理平台'),
-    { timeout: 30000 }
-  );
-  const body = await page.evaluate(() => document.body.innerText);
-  expect(body).toContain('仪表盘');
-  expect(body).toContain('IAM 管理平台');
+  await expect(page.getByText('仪表盘', { exact: true }).first()).toBeVisible({ timeout: 30000 });
+  await expect(page.getByText('IAM 管理平台', { exact: true }).first()).toBeVisible({ timeout: 30000 });
 }
 
 export async function rp1Login(page: Page): Promise<void> {
@@ -133,7 +131,7 @@ export async function rp1SSOLogin(page: Page): Promise<void> {
 }
 
 export async function logoutFromAdmin(page: Page): Promise<void> {
-  await page.waitForFunction(() => document.body.innerText.includes('仪表盘'), { timeout: 5000 });
+  await expect(page.getByText('仪表盘', { exact: true }).first()).toBeVisible({ timeout: 10000 });
   await wait(1000);
   const avatar = page.locator('.ant-avatar');
   await expect(avatar).toBeVisible({ timeout: 10000 });
@@ -158,11 +156,19 @@ export async function rp1Logout(page: Page): Promise<void> {
   // 如果 end_session 失败(post_logout_redirect_uri 无效)，页面会停留在 end_session 错误页
   try {
     await page.waitForURL(
-      (url) => isRp1Url(url.toString()) && url.includes('/login'),
+      (url) => isRp1Url(url.toString()) && url.pathname.includes('/login'),
       { timeout: 20000 }
     );
   } catch {
-    await page.goto(CONFIG.rp1Url, { waitUntil: 'networkidle', timeout: 15000 });
+    // signout 的重定向可能仍在进行，goto 被中断(ERR_ABORTED)，重试一次即可
+    for (let i = 0; i < 3; i++) {
+      try {
+        await page.goto(CONFIG.rp1Url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+        break;
+      } catch {
+        await wait(1000);
+      }
+    }
   }
   await wait(1000);
   const body = await page.evaluate(() => document.body.innerText);

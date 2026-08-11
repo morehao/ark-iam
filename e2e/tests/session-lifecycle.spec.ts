@@ -24,7 +24,7 @@ test.describe('Session 生命周期', () => {
     // 验证页面仍然可访问，未崩溃
     await page.reload({ waitUntil: 'domcontentloaded', timeout: 15000 });
     const url = page.url();
-    expect(url.includes('localhost:3001') || url.includes('localhost:3003')).toBe(true);
+    expect(url.includes('localhost:3002') || url.includes('localhost:3000')).toBe(true);
   });
 
   test('SSO session 过期后 Admin 页面可正常访问', async ({ page }) => {
@@ -32,7 +32,7 @@ test.describe('Session 生命周期', () => {
     await waitForSSOSessionExpiry();
     await page.reload({ waitUntil: 'domcontentloaded', timeout: 15000 });
     const url = page.url();
-    expect(url.includes('localhost:3000') || url.includes('localhost:3003')).toBe(true);
+    expect(url.includes('localhost:3001') || url.includes('localhost:3000')).toBe(true);
   });
 
   test('AuthRequest TTL 超时后 login-web 页面不崩溃', async ({ page }) => {
