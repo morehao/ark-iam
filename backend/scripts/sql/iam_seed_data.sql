@@ -177,11 +177,11 @@ ON DUPLICATE KEY UPDATE `user_id` = VALUES(`user_id`);
 -- ============================================
 -- 12. OIDC SSO 测试客户端种子数据
 -- 客户端ID: test-rp-client, 密钥: my-test-client-secret
--- 回调地址: http://localhost:3001/auth/callback (SSO测试应用)
+-- 回调地址: http://localhost:3002/auth/callback (SSO测试应用)
 -- 密钥SHA256: fc090df65f5f35338ad419e13de1c64b84d6674c7e67ff32df3cda6f034cfce2
 -- ============================================
 INSERT INTO `application_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `post_logout_redirect_uris`, `type`, `is_third_party`, `status`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (1, 1, 1, 'test-rp-client', 'SSO测试应用', '["http://localhost:3001/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'client_secret_basic', 1, '["openid","profile","email"]', '["http://localhost:3001/login"]', 'third_party', 1, 'enable', 0, 0, 0)
+VALUES (1, 1, 1, 'test-rp-client', 'SSO测试应用', '["http://localhost:3002/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'client_secret_basic', 1, '["openid","profile","email"]', '["http://localhost:3002/login"]', 'third_party', 1, 'enable', 0, 0, 0)
 ON DUPLICATE KEY UPDATE
   `redirect_uris` = VALUES(`redirect_uris`),
   `grant_types` = VALUES(`grant_types`),
@@ -201,10 +201,30 @@ ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
 -- ============================================
 -- platform-admin-web OAuth Client (第一方 SPA，PKCE)
 -- client_id: platform-admin-web
--- redirect_uris: http://localhost:3000/auth/callback
+-- redirect_uris: http://localhost:3001/auth/callback
 -- ============================================
 INSERT INTO `application_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `post_logout_redirect_uris`, `type`, `is_third_party`, `status`, `is_system`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (2, 1, 1, 'platform-admin-web', 'IAM管理平台', '["http://localhost:3000/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'none', 1, '["openid","profile","email"]', '["http://localhost:3000/login"]', 'first_party', 0, 'enable', 1, 0, 0, 0)
+VALUES (2, 1, 1, 'platform-admin-web', 'IAM管理平台', '["http://localhost:3001/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'none', 1, '["openid","profile","email"]', '["http://localhost:3001/login"]', 'first_party', 0, 'enable', 1, 0, 0, 0)
+ON DUPLICATE KEY UPDATE
+  `redirect_uris` = VALUES(`redirect_uris`),
+  `grant_types` = VALUES(`grant_types`),
+  `response_types` = VALUES(`response_types`),
+  `token_endpoint_auth_method` = VALUES(`token_endpoint_auth_method`),
+  `require_pkce` = VALUES(`require_pkce`),
+  `default_scopes` = VALUES(`default_scopes`),
+  `post_logout_redirect_uris` = VALUES(`post_logout_redirect_uris`),
+  `type` = VALUES(`type`),
+  `is_third_party` = VALUES(`is_third_party`),
+  `status` = VALUES(`status`),
+  `is_system` = VALUES(`is_system`);
+
+-- ============================================
+-- tenant-admin-web OAuth Client (第一方 SPA，PKCE)
+-- client_id: tenant-admin-web
+-- redirect_uris: http://localhost:3003/auth/callback
+-- ============================================
+INSERT INTO `application_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `post_logout_redirect_uris`, `type`, `is_third_party`, `status`, `is_system`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (3, 1, 1, 'tenant-admin-web', '租户管理平台', '["http://localhost:3003/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'none', 1, '["openid","profile","email"]', '["http://localhost:3003/login"]', 'first_party', 0, 'enable', 1, 0, 0, 0)
 ON DUPLICATE KEY UPDATE
   `redirect_uris` = VALUES(`redirect_uris`),
   `grant_types` = VALUES(`grant_types`),
