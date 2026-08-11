@@ -4,8 +4,7 @@ import App from './App'
 import { createAuthProvider } from '@ark-iam/auth'
 
 const AuthProvider = createAuthProvider({
-  clientId: import.meta.env.VITE_OIDC_CLIENT_ID || 'test-rp-client',
-  clientSecret: 'my-test-client-secret',
+  clientId: import.meta.env.VITE_OIDC_CLIENT_ID || 'unified-login-demo',
 })
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
