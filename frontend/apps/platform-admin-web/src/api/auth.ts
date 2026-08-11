@@ -1,5 +1,5 @@
 import request from '../utils/request'
-import type { PersonInfo } from '@ark-iam/shared'
+import type { PersonInfo } from '@ark-iam/types'
 
 export interface UserinfoResp {
   personInfo: PersonInfo

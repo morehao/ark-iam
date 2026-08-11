@@ -1,6 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { message } from 'antd'
-import { BizCode } from '@ark-iam/shared'
+import { BizCode } from '@ark-iam/types'
 
 let userProvider: (() => { access_token: string } | null | undefined) | null = null
 

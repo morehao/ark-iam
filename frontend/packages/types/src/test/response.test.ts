@@ -1,9 +1,5 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { describe, expect, test } from 'vitest'
 import { BizCode } from '@ark-iam/types'
-
-beforeEach(() => {
-  vi.clearAllMocks()
-})
 
 describe('BizCode', () => {
   test('has correct success code', () => {

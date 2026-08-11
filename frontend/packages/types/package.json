@@ -1,5 +1,5 @@
 {
-  "name": "@ark-iam/shared",
+  "name": "@ark-iam/types",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -8,7 +8,7 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "dependencies": {
-    "oidc-client-ts": "^3.5.0"
+  "devDependencies": {
+    "vitest": "^2.1.4"
   }
 }
