@@ -16,17 +16,15 @@ vi.mock('react-oidc-context', () => ({
     signinRedirect: mockSigninRedirect,
     signinSilent: mockSigninSilent,
     removeUser: vi.fn(),
+    events: { addSilentRenewError: vi.fn().mockReturnValue(() => {}) },
     user: null,
   }),
   hasAuthParams: vi.fn(() => false),
 }))
 
-vi.mock('./pages/auth/Login', () => ({
-  default: () => <div>SSO Login Page</div>,
-}))
-
-vi.mock('./components/MainLayout', () => ({
-  default: () => <div>Main Layout</div>,
+vi.mock('@ark-iam/ui', () => ({
+  MainLayout: () => <div>Main Layout</div>,
+  LoginPage: () => <div>SSO Login Page</div>,
 }))
 
 const appModule = await import('./App')

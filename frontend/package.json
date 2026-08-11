@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "pnpm --filter @ark-iam/platform-admin-web dev",
     "dev:web": "pnpm --filter @ark-iam/platform-admin-web dev",
-    "dev:sso": "pnpm --filter @ark-iam/sso-test-app dev",
+    "dev:sso": "pnpm --filter @ark-iam/unified-login-demo dev",
     "dev:log": "pnpm --filter @ark-iam/login-web dev",
-    "dev:all": "pnpm run --parallel --filter @ark-iam/platform-admin-web --filter @ark-iam/sso-test-app --filter @ark-iam/login-web dev",
+    "dev:all": "pnpm run --parallel --filter @ark-iam/platform-admin-web --filter @ark-iam/unified-login-demo --filter @ark-iam/login-web dev",
     "build:web": "pnpm --filter @ark-iam/platform-admin-web build",
     "test": "pnpm --filter @ark-iam/platform-admin-web test",
     "test:web": "pnpm --filter @ark-iam/platform-admin-web test"
