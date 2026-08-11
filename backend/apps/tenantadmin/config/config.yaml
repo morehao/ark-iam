@@ -82,7 +82,7 @@ jwt:
 
 oidc:
   issuer: "http://localhost:8081/oidc"
-  frontendLoginURL: "http://localhost:3003/login"
+  frontendLoginURL: "http://localhost:3002/login"
   signingKeyID: "dev-oidc-key"
   signingPrivateKeyPath: "config/oidc-dev-key.pem"
   signingPrivateKeyPEM: ""

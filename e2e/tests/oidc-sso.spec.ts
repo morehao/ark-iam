@@ -12,7 +12,7 @@ import {
 } from '../helpers/oidc-helpers';
 
 test.describe('OIDC SSO E2E', () => {
-  test('RP1 首次登录：访问 统一登录演示应用 → 自动跳转 login-web → 填写凭证 → 回调展示首页', async ({ page }) => {
+  test('RP1 首次登录：访问 租户管理平台 → 自动跳转 login-web → 填写凭证 → 回调展示首页', async ({ page }) => {
     await rp1Login(page);
   });
 
@@ -20,14 +20,14 @@ test.describe('OIDC SSO E2E', () => {
     await adminDirectLogin(page);
   });
 
-  test('Admin 登录后 → 统一登录演示应用免密登录（同一 context：共享 SSO session）', async ({ page, context }) => {
+  test('Admin 登录后 → 租户管理平台免密登录（同一 context：共享 SSO session）', async ({ page, context }) => {
     await adminDirectLogin(page);
     const rp1Page = await context.newPage();
     await rp1SSOLogin(rp1Page);
     await rp1Page.close();
   });
 
-  test('Admin 全局登出后 → 统一登录演示应用需重新认证', async ({ page, context }) => {
+  test('Admin 全局登出后 → 租户管理平台需重新认证', async ({ page, context }) => {
     await adminDirectLogin(page);
     const rp1Page = await context.newPage();
     await rp1SSOLogin(rp1Page);

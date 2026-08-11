@@ -176,26 +176,7 @@ ON DUPLICATE KEY UPDATE `user_id` = VALUES(`user_id`);
 
 -- ============================================
 -- 12. OIDC SSO 测试客户端种子数据
--- 客户端ID: unified-login-demo
--- 回调地址: http://localhost:3002/auth/callback (统一登录演示应用)
 -- ============================================
-INSERT INTO `application_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `post_logout_redirect_uris`, `type`, `is_third_party`, `status`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (1, 1, 1, 'unified-login-demo', '统一登录演示应用', '["http://localhost:3002/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'none', 1, '["openid","profile","email"]', '["http://localhost:3002/login"]', 'first_party', 0, 'enable', 0, 0, 0)
-ON DUPLICATE KEY UPDATE
-  `client_id` = VALUES(`client_id`),
-  `name` = VALUES(`name`),
-  `redirect_uris` = VALUES(`redirect_uris`),
-  `grant_types` = VALUES(`grant_types`),
-  `response_types` = VALUES(`response_types`),
-  `token_endpoint_auth_method` = VALUES(`token_endpoint_auth_method`),
-  `require_pkce` = VALUES(`require_pkce`),
-  `default_scopes` = VALUES(`default_scopes`),
-  `post_logout_redirect_uris` = VALUES(`post_logout_redirect_uris`),
-  `type` = VALUES(`type`),
-  `is_third_party` = VALUES(`is_third_party`),
-  `status` = VALUES(`status`);
-
-DELETE FROM `application_client_secret` WHERE `application_client_id` = 1;
 
 -- ============================================
 -- platform-admin-web OAuth Client (第一方 SPA，PKCE)
@@ -220,10 +201,10 @@ ON DUPLICATE KEY UPDATE
 -- ============================================
 -- tenant-admin-web OAuth Client (第一方 SPA，PKCE)
 -- client_id: tenant-admin-web
--- redirect_uris: http://localhost:3003/auth/callback
+-- redirect_uris: http://localhost:3002/auth/callback
 -- ============================================
 INSERT INTO `application_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `post_logout_redirect_uris`, `type`, `is_third_party`, `status`, `is_system`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (3, 1, 1, 'tenant-admin-web', '租户管理平台', '["http://localhost:3003/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'none', 1, '["openid","profile","email"]', '["http://localhost:3003/login"]', 'first_party', 0, 'enable', 1, 0, 0, 0)
+VALUES (3, 1, 1, 'tenant-admin-web', '租户管理平台', '["http://localhost:3002/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'none', 1, '["openid","profile","email"]', '["http://localhost:3002/login"]', 'first_party', 0, 'enable', 1, 0, 0, 0)
 ON DUPLICATE KEY UPDATE
   `redirect_uris` = VALUES(`redirect_uris`),
   `grant_types` = VALUES(`grant_types`),

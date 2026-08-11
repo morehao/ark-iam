@@ -20,15 +20,14 @@ test('全局登出后，SSO 会话失效且兄弟应用需重新认证', async (
   await page.waitForURL((url) => url.port === '3001' && !url.pathname.includes('/auth/callback'), { timeout: 30000 });
   await expect(page.getByText('仪表盘', { exact: true }).first()).toBeVisible({ timeout: 30000 });
 
-  // 2. 新开标签页访问 3002（统一登录演示应用），应免密登录（共享 SSO session）
+  // 2. 新开标签页访问 3002（租户管理平台），应免密登录（共享 SSO session）
   const rp1 = await context.newPage();
   await rp1.goto('http://localhost:3002/', { waitUntil: 'domcontentloaded', timeout: 20000 });
-  await expect(rp1.getByText('用户信息', { exact: true }).first()).toBeVisible({ timeout: 30000 });
+  await expect(rp1.getByText('组织管理', { exact: true }).first()).toBeVisible({ timeout: 30000 });
   // SSO session cookie 已建立
   const ssoCookies = await context.cookies('http://localhost:8100');
   expect(ssoCookies.some((c) => c.name === 'iam_sso_session')).toBe(true);
   console.log('>>> 3002 SSO 免密登录成功');
-
   // 3. 在 3001 全局登出
   await page.evaluate(() => { localStorage.clear(); });
   await page.goto('http://localhost:3001/', { waitUntil: 'domcontentloaded', timeout: 20000 });

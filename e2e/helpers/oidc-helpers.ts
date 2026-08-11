@@ -73,8 +73,9 @@ async function navigateToLoginWeb(page: Page, targetUrl: string): Promise<void> 
 export async function verifyRp1HomePage(page: Page): Promise<void> {
   // SPA 的 useSSOSessionProbe 会间歇触发 silent renew，导致 body 周期性清空，
   // 因此不能依赖一次性 innerText 断言，改用自动重试的 locator 等待稳定可见。
-  await expect(page.getByText('用户信息', { exact: true }).first()).toBeVisible({ timeout: 30000 });
-  await expect(page.getByText('统一登录演示应用', { exact: true }).first()).toBeVisible({ timeout: 30000 });
+  // RP1 现由 tenant-admin-web（:3002 / tenant-admin-web client）承担，其首页展示租户组织管理。
+  await expect(page.getByText('组织管理', { exact: true }).first()).toBeVisible({ timeout: 30000 });
+  await expect(page.getByText('租户管理', { exact: true }).first()).toBeVisible({ timeout: 30000 });
 }
 
 export async function verifyAdminDashboard(page: Page): Promise<void> {
@@ -176,8 +177,8 @@ export async function rp1Logout(page: Page): Promise<void> {
   if (body.includes('token已失效') || body.includes('登录') || body.includes('IAM 登录') || body.includes('IAM 账号登录')) {
     return;
   }
-  // token 有效时登出成功，页面不应再显示用户信息
-  expect(body).not.toContain('用户信息');
+  // token 有效时登出成功，页面不应再显示租户首页组织管理
+  expect(body).not.toContain('组织管理');
 }
 
 export async function waitForSSOSessionExpiry(): Promise<void> {
@@ -204,14 +205,14 @@ export async function verifyRedirectedToLoginWeb(page: Page): Promise<void> {
   if (isLoginWebUrl(currentUrl)) {
     const body = await page.evaluate(() => document.body.innerText);
     expect(body).not.toContain('仪表盘');
-    expect(body).not.toContain('用户信息');
+    expect(body).not.toContain('组织管理');
     return;
   }
   if (currentUrl.includes('/login')) {
     const body = await page.evaluate(() => document.body.innerText);
     expect(body).toContain('登录');
     expect(body).not.toContain('仪表盘');
-    expect(body).not.toContain('用户信息');
+    expect(body).not.toContain('组织管理');
     return;
   }
   throw new Error(`Expected redirect to login page, but got: ${currentUrl}`);

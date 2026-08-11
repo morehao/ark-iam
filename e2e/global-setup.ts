@@ -47,16 +47,8 @@ const SERVICES: ServiceDef[] = [
     healthPath: '/',
   },
   {
-    name: 'unified-login-demo',
-    port: 3002,
-    cmd: 'pnpm',
-    args: ['--filter', '@ark-iam/unified-login-demo', 'dev'],
-    cwd: FRONTEND_ROOT,
-    healthPath: '/',
-  },
-  {
     name: 'tenant-admin-web',
-    port: 3003,
+    port: 3002,
     cmd: 'pnpm',
     args: ['--filter', '@ark-iam/tenant-admin-web', 'dev'],
     cwd: FRONTEND_ROOT,

@@ -6,10 +6,9 @@
   "scripts": {
     "dev": "pnpm --filter @ark-iam/platform-admin-web dev",
     "dev:platform": "pnpm --filter @ark-iam/platform-admin-web dev",
-    "dev:demo": "pnpm --filter @ark-iam/unified-login-demo dev",
     "dev:log": "pnpm --filter @ark-iam/login-web dev",
     "dev:tenant": "pnpm --filter @ark-iam/tenant-admin-web dev",
-    "dev:all": "pnpm run --parallel --filter @ark-iam/login-web --filter @ark-iam/platform-admin-web --filter @ark-iam/unified-login-demo --filter @ark-iam/tenant-admin-web dev",
+    "dev:all": "pnpm run --parallel --filter @ark-iam/login-web --filter @ark-iam/platform-admin-web --filter @ark-iam/tenant-admin-web dev",
     "build:web": "pnpm --filter @ark-iam/platform-admin-web build",
     "build:tenant": "pnpm --filter @ark-iam/tenant-admin-web build",
     "test": "pnpm --filter @ark-iam/platform-admin-web test",

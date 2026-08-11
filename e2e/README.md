@@ -18,9 +18,9 @@
 
 | 测试用例 | 覆盖内容 |
 |----------|----------|
-| RP1 首次登录 | 访问统一登录演示应用 → 自动跳转 login-web → 填写凭证 → 回调展示首页 |
+| RP1 首次登录 | 访问租户管理平台 → 自动跳转 login-web → 填写凭证 → 回调展示首页 |
 | Admin 直接登录 | 访问管理平台 → 自动跳转 login-web → 填写凭证 → 进入仪表盘 |
-| Admin 登录后 SSO 免密 | 先登录 Admin → 统一登录演示应用（同 context）自动免密登录 |
+| Admin 登录后 SSO 免密 | 先登录 Admin → 租户管理平台（同 context）自动免密登录 |
 | Admin 登出后自身需重认证 | Admin 登录 → 登出 → 访问需重新跳转 login-web |
 | RP1 登录后 Admin SSO | RP1 登录后 → Admin 管理平台静默 SSO 免密登录 |
 | RP1→Admin→Admin 登出→RP1 | RP1 登录 → Admin SSO → Admin 登出 → 兄弟应用需重新认证 |
@@ -38,14 +38,13 @@
 | gateway | 8100 | - | IAM 后端（`/oidc`） |
 | login-web | 3000 | - | 登录页（凭证表单） |
 | platform-admin-web | 3001 | `platform-admin-web` | 管理平台（Admin） |
-| unified-login-demo | 3002 | `unified-login-demo` | 统一登录演示应用（RP1） |
-| tenant-admin-web | 3003 | `tenant-admin-web` | 租户管理平台 |
+| tenant-admin-web | 3002 | `tenant-admin-web` | 租户管理平台（RP1） |
 
 ## 前置条件
 
 - Node.js 18+
 - MySQL + Redis 已运行
-- 后端种子数据已导入（`admin` / `admin123` + OAuth 客户端 `unified-login-demo` / `platform-admin-web` / `tenant-admin-web`）
+- 后端种子数据已导入（`admin` / `admin123` + OAuth 客户端 `platform-admin-web` / `tenant-admin-web`）
 - 后端需使用 `config.yaml` 启动（OIDC 端点前缀 `/oidc`）
 
 ## 安装
@@ -70,7 +69,7 @@ npm run test:debug
 ```
 
 测试自动管理服务生命周期：
-- `globalSetup` — 检查并启动所需服务（IAM 后端 :8100、platform-admin-web :3001、unified-login-demo :3002、login-web :3000、tenant-admin-web :3003）
+- `globalSetup` — 检查并启动所需服务（IAM 后端 :8100、platform-admin-web :3001、tenant-admin-web :3002、login-web :3000）
 - `globalTeardown` — 测试结束后强制清理所有进程（无论成功/失败）
 
 ## 配置
