@@ -9,6 +9,8 @@
     ".": "./src/index.ts"
   },
   "devDependencies": {
+    "@ark-iam/tsconfig": "workspace:*",
+    "typescript": "^5.6.3",
     "vitest": "^2.1.4"
   }
 }

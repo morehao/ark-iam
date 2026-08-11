@@ -270,6 +270,9 @@ importers:
       '@types/react':
         specifier: ^18.3.0
         version: 18.3.31
+      typescript:
+        specifier: ^5.6.3
+        version: 5.6.3
       vitest:
         specifier: ^2.1.4
         version: 2.1.4(@types/node@25.9.2)(jsdom@25.0.1)
@@ -318,6 +321,12 @@ importers:
 
   packages/types:
     devDependencies:
+      '@ark-iam/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      typescript:
+        specifier: ^5.6.3
+        version: 5.6.3
       vitest:
         specifier: ^2.1.4
         version: 2.1.4(@types/node@25.9.2)(jsdom@25.0.1)
