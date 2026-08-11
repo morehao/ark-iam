@@ -45,7 +45,7 @@ func TestYourFunction(t *testing.T) {
 
 ```go
 testsetup.AppNameDemo // "demo"
-testsetup.AppNameIam  // "iam"
+testsetup.AppNameAuth  // "auth" // 认证网关等分体应用
 ```
 
 ### 测试上下文
@@ -85,7 +85,7 @@ pkg/testsetup/
 ├── constant.go               # 应用名称常量
 ├── base_initializer.go       # 基础初始化器
 ├── initializer_demo.go       # Demo 应用初始化器
-├── initializer_iam.go        # IAM 应用初始化器
+├── initializer_auth.go       # 认证网关（auth）应用初始化器
 └── README.md                 # 文档
 ```
 
@@ -179,7 +179,7 @@ func (m *myappInitializer) Initialize() error {
 ```go
 var initializerCreators = map[string]InitializerFunc{
     AppNameDemo: newDemoappInitializer,
-    AppNameIam:  newIamappInitializer,
+    AppNameAuth: newAuthappInitializer,
     "myapp":     newMyappInitializer,
 }
 ```
@@ -191,7 +191,7 @@ var initializerCreators = map[string]InitializerFunc{
 ```go
 const (
     AppNameDemo  = "demo"
-    AppNameIam   = "iam"
+    AppNameAuth  = "auth"
     AppNameMyapp = "myapp"
 )
 ```

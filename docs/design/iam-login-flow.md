@@ -26,7 +26,7 @@ OIDC Authorization Code Flow 完成认证
 │   身份证明，仅声明                 │
 ├───────────────────────────────────┤
 │   Access Token (JWT, RS256)       │  ← sub=person:{id}, tenant_id, user_id, client_id, token_usage
-│   访问业务 API 的凭证              │     内网 /v1/iam/* 另校验 SSO 会话活性
+│   访问业务 API 的凭证              │     内网 /v1/* 另校验 SSO 会话活性
 ├───────────────────────────────────┤
 │   Refresh Token (不透明串, DB哈希) │  ← 单次使用轮换，可吊销，30d
 │   静默续期令牌                     │
@@ -130,7 +130,7 @@ sequenceDiagram
 用户 → RP → GET /oidc/end_session (或 POST /v1/iam/auth/logout)
 ① 清中心会话: RevokeSessionsByPersonID + 清 iam_sso_session cookie
 ② 吊销该 person 全部 refresh token: RevokeByPersonID (DB revoked_at)
-③ 内网 /v1/iam/*: OIDCCompatibleAuth 校验 SSO 活性 → 立即 401
+③ 内网 /v1/*: OIDCCompatibleAuth 校验 SSO 活性 → 立即 401
 ④ 302 → post_logout_redirect_uri / /oidc/logged-out
 ```
 

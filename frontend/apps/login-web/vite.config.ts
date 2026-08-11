@@ -7,7 +7,7 @@ export default defineConfig({
     port: 3003,
     proxy: {
       '/oidc': {
-        target: 'http://localhost:8099',
+        target: 'http://localhost:8100',
         changeOrigin: true,
       },
     },

@@ -4,17 +4,19 @@
 
 ## 项目概述
 
-GoArk 是一个基于 Gin + GORM 的多应用后端项目，支持 IAM（身份认证）和 Demo 两个应用模块，采用前后端分离架构。
+GoArk 是一个基于 Gin + GORM 的多应用后端项目，采用前后端分离架构。IAM 后端拆分为四个应用（`auth`/`platformadmin`/`tenantadmin`/`gateway`），共享公共层 `backend/pkg`，并以 `backend/go.work` 作为 Go workspace 管理 5 个模块（apps/auth、apps/gateway、apps/platformadmin、apps/tenantadmin、pkg）。
 
 ## 项目结构
 
 ```
 ark-iam/
-├── backend/               # Go 后端项目
+├── backend/               # Go 后端项目（go.work 多模块）
 │   ├── apps/
-│   │   ├── demo/         # Demo 应用
-│   │   └── iam/          # IAM 应用
-│   ├── pkg/              # 公共包
+│   │   ├── auth/          # 认证网关（登录/注册/token/OIDC），:8081
+│   │   ├── platformadmin/ # 平台管理，:8082
+│   │   ├── tenantadmin/   # 租户自服务，:8083
+│   │   └── gateway/       # 聚合应用（挂载上述三者，单体部署），:8100
+│   ├── pkg/               # 公共包（config/middleware/iam/stdb/testsetup 等）
 │   └── Makefile
 ├── frontend/             # React 前端项目
 ├── docs/                  # 文档目录
@@ -25,19 +27,19 @@ ark-iam/
 
 ## 构建与运行命令
 
-所有命令在项目根目录下执行：
+所有命令在项目根目录下执行。有效 `APP` 取值为 `auth | platformadmin | tenantadmin | gateway`：
 
 ```bash
 # 列出所有可用应用
 make list-apps
 
 # 构建指定应用
-make build APP=demo
-make build APP=iam
+make build APP=auth
+make build APP=gateway
 
-# 运行指定应用
-make run APP=demo
-make run APP=iam
+# 运行指定应用（开发调试；gateway 单进程聚合三者）
+make run APP=auth
+make run APP=gateway
 
 # 下载依赖
 make deps
@@ -46,24 +48,25 @@ make deps
 make clean
 ```
 
+应用端口：auth 8081、platformadmin 8082、tenantadmin 8083、gateway 8100。
+
 ## 测试命令
 
 ```bash
 # 运行指定应用的测试（推荐）
-make test APP=demo
-make test APP=iam
+make test APP=gateway
 
 # 运行所有测试
 go test ./...
 
 # 运行单个测试函数
-go test ./apps/demo/internal/service/svcuser -run TestGeneratePassword -v
+go test ./pkg/iam/service/svcuser -run TestGeneratePassword -v
 
 # 运行特定包测试
-go test ./apps/iam/internal/service/svcuser/... -v
+go test ./apps/auth/internal/router/... -v
 
 # 生成测试覆盖率报告
-go test ./apps/demo/internal/... -coverprofile=coverage.out
+go test ./apps/platformadmin/internal/... -coverprofile=coverage.out
 go tool cover -html=coverage.out
 ```
 
@@ -86,28 +89,23 @@ go vet ./...
 
 ```
 apps/
-├── demo/                      # Demo 应用
-│   ├── cmd/                   # 入口函数
+├── auth/                       # 认证网关
+│   ├── cmd/                    # 入口函数
 │   ├── internal/
-│   │   ├── controller/ctrxxx/  # 控制器层 (ctr 前缀)
-│   │   ├── service/svcxxx/     # 服务层 (svc 前缀)
-│   │   ├── dto/dtoxxx/         # DTO 层
-│   │   ├── router/             # 路由注册
-│   │   └── middleware/         # 中间件
-│   ├── model/              # 数据模型
-│   └── dao/                # 数据访问层
-├── iam/                       # IAM 应用
-│   ├── model/                  # 数据模型（按领域划分）
-│   ├── dao/                    # 数据访问层（按领域划分）
-│   ├── object/                 # 基础对象（按领域划分）
-│   └── internal/
-│       ├── controller/          # 控制器层（按领域划分，如 ctruser）
-│       ├── service/             # 服务层（按领域划分，如 svcuser）
-│       ├── dto/                 # DTO 层（按领域划分，如 dtouser）
-│       ├── router/              # 路由注册
-│       └── constant/           # 应用层常量（前端专用）
-pkg/                          # 公共包
+│   │   ├── controller/ctrxxx/   # 控制器层 (ctr 前缀)
+│   │   ├── service/svcxxx/      # 服务层 (svc 前缀)
+│   │   ├── dto/dtoxxx/          # DTO 层
+│   │   ├── router/              # 路由注册
+│   │   └── middleware/          # 中间件
+│   ├── model/               # 数据模型
+│   └── dao/                 # 数据访问层
+├── platformadmin/              # 平台管理（结构同 auth）
+├── tenantadmin/                # 租户自服务（结构同 auth）
+├── gateway/                    # 聚合应用（挂载 auth/platformadmin/tenantadmin）
+pkg/                          # 公共包（跨应用共享：config/middleware/ginserver/iam 等）
 ```
+
+> 跨应用共享的 model/dao/object 抽取到 `pkg/iam`，通用中间件抽取到 `pkg/middleware`，避免分体间重复代码。
 
 ### 命名规范
 
@@ -126,7 +124,7 @@ pkg/                          # 公共包
 示例：用户领域（user）包含用户基本信息、用户身份、用户部门关系、用户登录日志等：
 
 ```
-apps/iam/
+apps/platformadmin/
 ├── model/user.go              # 用户领域所有实体
 ├── dao/user.go               # 用户领域所有数据访问
 ├── object/user.go            # 用户领域基础对象
@@ -182,7 +180,7 @@ func (DepartmentEntity) TableName() string {
 前端专用的状态映射等常量，放在应用的 `internal/constant/` 目录下：
 
 ```go
-// apps/iam/internal/constant/status.go
+// apps/platformadmin/internal/constant/status.go
 package constant
 
 const (
@@ -202,7 +200,7 @@ var StatusTextMap = map[string]string{
 
 1. 标准库 (`fmt`, `strings`, `time`...)
 2. 第三方库 (`github.com/gin-gonic/gin`, `github.com/stretchr/testify`...)
-3. 项目内部包 (`github.com/morehao/goark/apps/iam/...`, `github.com/morehao/goark/pkg/...`)
+3. 项目内部包 (`github.com/morehao/ark-iam/apps/platformadmin/...`, `github.com/morehao/ark-iam/pkg/...`)
 4. 关联库 (`github.com/morehao/golib/...`)
 
 ```go
@@ -212,8 +210,8 @@ import (
     "github.com/gin-gonic/gin"
     "github.com/stretchr/testify"
 
-    "github.com/morehao/goark/apps/iam/internal/dto/dtouser"
-    "github.com/morehao/goark/pkg/code"
+    "github.com/morehao/ark-iam/platformadmin/internal/dto/dtouser"
+    "github.com/morehao/ark-iam/pkg/code"
     "github.com/morehao/golib/glog"
 )
 ```
@@ -239,7 +237,7 @@ func NewUserSvc() UserSvc {
 
 ### 错误处理
 
-- 使用统一的错误码包 `github.com/morehao/goark/pkg/code`
+- 使用统一的错误码包 `github.com/morehao/ark-iam/pkg/code`
 - 业务错误通过 `code.GetError(code.XXXError)` 返回
 - 错误日志使用 `glog.Errorf(ctx, "[module.Method] msg, err:%v", err)`
 
@@ -290,13 +288,13 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 
 ### API 路由规范
 
-- **路径格式**: `/{版本}/{app}/{模块}/{操作}`，如 `/v1/iam/user/create`
+- **路径格式**: `/{版本}/{服务标识}/{模块}/{操作}`，如 `/v1/iam/user/create`（IAM 各业务模块共享 `/v1/iam` 前缀，`iam` 作为统一服务标识段）
 - **版本号**: 放在路径最前，使用 `/v1/`, `/v2/` 等格式
-- **App 标识**: 用于区分不同应用，如 `iam`, `demo`
+- **服务标识**: 用于区分不同服务，如 `iam`, `demo`
 - **模块名**: 对应业务模块，如 `user`, `role`, `menu`
 - **操作名**: 使用驼峰命名，如 `create`, `update`, `detail`, `pageList`, `assignDepartment`
 
-**路由层级限制为4层**，避免使用多层嵌套路径。
+**路由层级限制为5层**，避免使用多层嵌套路径。
 
 #### 路由示例
 
@@ -308,23 +306,23 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 
 #### 路由注册
 
-在 `router/router.go` 中注册路由，先按版本分组，再按应用分组：
+各业务 app 通过 `ginserver.NewRouterGroups(engine, "iam", ...)` 注册共享 `/v1/iam` 前缀，然后在 `router/router.go` 中按版本 `MustGetGroup(ginserver.ApiVersionV1)` 注册各模块路由：
 
 ```go
-v1AuthGroup := groups.AuthGroup.Group("/v1")
-iamGroup := v1AuthGroup.Group("/iam")
-
-userRouter(iamGroup)
-roleRouter(iamGroup)
+routerGroups := ginserver.NewRouterGroups(engine, "iam", ginserver.VersionGroup{
+    Version: ginserver.ApiVersionV1,
+    // ...
+})
 ```
 
 在各个路由文件中使用 gin 的路由注册方法：
 
 ```go
-func userRouter(routerGroup *gin.RouterGroup) {
-    routerGroup.POST("/user/create", userCtr.Create)
-    routerGroup.POST("/user/delete", userCtr.Delete)
-    routerGroup.GET("/user/detail", userCtr.Detail)
+func userRouter(groups *ginserver.RouterGroups) {
+    v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
+    v1RouterGroup.POST("/user/create", userCtr.Create)
+    v1RouterGroup.POST("/user/delete", userCtr.Delete)
+    v1RouterGroup.GET("/user/detail", userCtr.Detail)
 }
 ```
 
@@ -339,13 +337,13 @@ func userRouter(routerGroup *gin.RouterGroup) {
 // @Produce application/json
 // @Param req body dtouser.UserCreateReq true "创建用户管理"
 // @Success 200 {object} gincontext.DtoRender{data=dtouser.UserCreateResp}
-// @Router /v1/demo/user/create [post]
+// @Router /v1/iam/demo/user/create [post]
 ```
 
 生成文档：
 
 ```bash
-make swag APP=demo
+make swag APP=auth
 ```
 
 ### 测试规范
@@ -380,23 +378,23 @@ func TestGeneratePassword(t *testing.T) {
 
 ```bash
 # 生成 API 路由和控制器
-make codegen APP=demo COMMAND=api
+make codegen APP=auth COMMAND=api
 
 # 生成模块代码
-make codegen APP=demo COMMAND=module
+make codegen APP=auth COMMAND=module
 
 # 生成模型代码
-make codegen APP=demo COMMAND=model
+make codegen APP=auth COMMAND=model
 ```
 
 ### Docker 支持
 
 ```bash
 # 构建 Docker 镜像
-make docker-build APP=demo
+make docker-build APP=auth
 
 # 运行 Docker 容器
-make docker-run APP=demo
+make docker-run APP=auth
 ```
 
 ## 常用工具

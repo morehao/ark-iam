@@ -1,8 +1,8 @@
 import { spawn } from 'child_process';
 
-const PORTS = [8099, 3000, 3001, 3003];
+const PORTS = [8100, 3000, 3001, 3003];
 const PORT_LABELS: Record<number, string> = {
-  8099: 'IAM Backend',
+  8100: 'IAM Backend',
   3000: 'platform-admin-web',
   3001: 'sso-test-app',
   3003: 'login-web',

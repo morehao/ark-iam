@@ -7,11 +7,11 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/v1': {
-        target: 'http://localhost:8099',
+        target: 'http://localhost:8100',
         changeOrigin: true,
       },
       '/oidc': {
-        target: 'http://localhost:8099',
+        target: 'http://localhost:8100',
         changeOrigin: true,
       },
     },

@@ -17,7 +17,7 @@ var (
 	mu                  sync.RWMutex
 	initializerCreators = map[string]InitializerFunc{
 		AppNameDemo: newDemoappInitializer,
-		AppNameIam:  newIamappInitializer,
+		AppNameAuth: newAuthappInitializer,
 	}
 	registeredApps = make(map[string]bool)
 )

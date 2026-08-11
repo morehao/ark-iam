@@ -4,6 +4,8 @@
 
 `ark-iam` is a full-stack project with Go backend and React frontend. The backend is based on [Gin](https://github.com/gin-gonic/gin), providing a layered, maintainable, and scalable service structure with multiple app modules.
 
+The IAM backend is split into four apps under `backend/apps/` (auth, platformadmin, tenantadmin, gateway) sharing a common `backend/pkg` layer, managed as a Go workspace (`backend/go.work`).
+
 ---
 
 # Features
@@ -24,14 +26,16 @@
 
 ```
 ark-iam/
-├── backend/               # Go backend (project-layout based)
+├── backend/               # Go backend (project-layout based, go.work multi-module)
 │   ├── apps/
-│   │   ├── demo/         # Demo application
-│   │   └── iam/          # IAM application
-│   ├── pkg/              # Common packages
-│   ├── scripts/          # Scripts
+│   │   ├── auth/          # Authentication gateway (login/register/token/OIDC), :8081
+│   │   ├── platformadmin/ # Platform management (user/role/menu/tenant), :8082
+│   │   ├── tenantadmin/   # Tenant self-service (organization/orgRole), :8083
+│   │   └── gateway/       # Aggregate app mounting all three, :8100
+│   ├── pkg/               # Common packages (shared across apps)
+│   ├── scripts/           # Scripts
 │   └── Makefile
-├── frontend/             # React frontend (Vite + React)
+├── frontend/              # React frontend (Vite + React)
 ├── docs/                 # Documentation
 ├── Makefile              # Root Makefile
 ├── AGENTS.md             # Development guide for AI agents
@@ -52,19 +56,19 @@ Install the CLI tool:
 go install github.com/morehao/gocli@latest
 ```
 
-Ensure a `code_gen.yaml` config file exists under the application directory, e.g., `backend/apps/demo/config/code_gen.yaml`.
+Ensure a `code_gen.yaml` config file exists under the application directory, e.g., `backend/apps/auth/config/code_gen.yaml`.
 
 Run code generation commands:
 
 ```bash
 # Generate full module based on table
-make codegen APP=demo COMMAND=module
+make codegen APP=auth COMMAND=module
 
 # Generate only model code
-make codegen APP=demo COMMAND=model
+make codegen APP=auth COMMAND=model
 
 # Generate API endpoint code
-make codegen APP=demo COMMAND=api
+make codegen APP=auth COMMAND=api
 ```
 
 See [generate](https://github.com/morehao/gocli?tab=readme-ov-file#generate) for full documentation.
@@ -80,27 +84,58 @@ go install github.com/swaggo/swag/cmd/swag@latest
 Generate Swagger docs:
 
 ```bash
-make swag APP=demo
+make swag APP=auth
 ```
 
 Access docs at (dev mode):
 
 ```
-http://localhost:8099/demo/redocs
+http://localhost:8081/auth/redocs
 ```
 
 ### Project Deployment
 
+Build / run / test an app. Valid `APP` values are `auth | platformadmin | tenantadmin | gateway` (the shared `pkg` layer needs no app build):
+
+```bash
+# 列出所有可用应用
+make list-apps
+
+# 构建指定应用
+make build APP=auth
+make build APP=gateway
+
+# 运行指定应用（开发调试）
+make run APP=auth
+make run APP=platformadmin
+make run APP=tenantadmin
+make run APP=gateway     # 单进程聚合 auth + platformadmin + tenantadmin
+
+# 运行指定应用的测试
+make test APP=gateway
+```
+
+App-port mapping:
+
+| App | Port |
+|-----|------|
+| auth | 8081 |
+| platformadmin | 8082 |
+| tenantadmin | 8083 |
+| gateway (aggregate) | 8100 |
+
+Routes are unified across apps as `/v1/iam/{module}/{operation}` plus the OIDC provider prefix `/oidc/*` on auth/gateway.
+
 Build Docker image:
 
 ```bash
-make docker-build APP=demo
+make docker-build APP=gateway
 ```
 
 Run container:
 
 ```bash
-make docker-run APP=demo
+make docker-run APP=gateway
 ```
 
 ### Quickly Scaffold a New Backend Project

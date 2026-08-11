@@ -61,7 +61,7 @@ npm run preview
 
 ## 认证流程
 
-1. 登录：`POST /v1/iam/auth/login`
-2. 获取用户信息：`GET /v1/iam/auth/userinfo`
-3. 刷新 Token：`POST /v1/iam/auth/refreshToken`
-4. 退出登录：`POST /v1/iam/auth/logout`
+1. 登录：`POST /v1/auth/login`
+2. 获取用户信息：`GET /v1/auth/userinfo`
+3. 刷新 Token：`POST /v1/auth/refreshToken`
+4. 退出登录：`POST /v1/auth/logout`
