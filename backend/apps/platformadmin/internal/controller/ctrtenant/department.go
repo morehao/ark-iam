@@ -34,7 +34,7 @@ func NewDepartmentCtr() DepartmentCtr {
 // @Produce application/json
 // @Param req body dtotenant.DepartmentCreateReq true "创建部门"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.DepartmentCreateResp}
-// @Router /v1/department/create [post]
+// @Router /v1/iam/department/create [post]
 func (ctr *departmentCtr) Create(ctx *gin.Context) {
 	var req dtotenant.DepartmentCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -55,7 +55,7 @@ func (ctr *departmentCtr) Create(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtotenant.DepartmentDeleteReq true "删除部门"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/department/delete [post]
+// @Router /v1/iam/department/delete [post]
 func (ctr *departmentCtr) Delete(ctx *gin.Context) {
 	var req dtotenant.DepartmentDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -75,7 +75,7 @@ func (ctr *departmentCtr) Delete(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtotenant.DepartmentUpdateReq true "修改部门"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/department/update [post]
+// @Router /v1/iam/department/update [post]
 func (ctr *departmentCtr) Update(ctx *gin.Context) {
 	var req dtotenant.DepartmentUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -95,7 +95,7 @@ func (ctr *departmentCtr) Update(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtotenant.DepartmentDetailReq true "部门详情"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.DepartmentDetailResp}
-// @Router /v1/department/detail [get]
+// @Router /v1/iam/department/detail [get]
 func (ctr *departmentCtr) Detail(ctx *gin.Context) {
 	var req dtotenant.DepartmentDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -116,7 +116,7 @@ func (ctr *departmentCtr) Detail(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtotenant.DepartmentPageListReq true "部门列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.DepartmentPageListResp}
-// @Router /v1/department/pageList [post]
+// @Router /v1/iam/department/pageList [post]
 func (ctr *departmentCtr) PageList(ctx *gin.Context) {
 	var req dtotenant.DepartmentPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -137,7 +137,7 @@ func (ctr *departmentCtr) PageList(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtotenant.DepartmentTreeReq true "部门树"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.DepartmentTreeResp}
-// @Router /v1/department/tree [get]
+// @Router /v1/iam/department/tree [get]
 func (ctr *departmentCtr) Tree(ctx *gin.Context) {
 	var req dtotenant.DepartmentTreeReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {

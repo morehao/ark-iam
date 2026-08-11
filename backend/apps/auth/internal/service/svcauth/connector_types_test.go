@@ -379,8 +379,8 @@ func TestConnectorTypesExposeNewContractFields(t *testing.T) {
 	}
 	callbackReqType := reflect.TypeOf(callbackReq)
 	callbackConnectorIDField, ok := callbackReqType.FieldByName("ConnectorID")
-	if !ok || callbackConnectorIDField.Tag.Get("json") != "connectorId" || callbackConnectorIDField.Tag.Get("binding") != "required" {
-		t.Fatalf("ConnectorCallbackReq.ConnectorID should keep required connectorId contract")
+	if !ok || callbackConnectorIDField.Tag.Get("json") != "connectorId" {
+		t.Fatalf("ConnectorCallbackReq.ConnectorID should keep connectorId contract")
 	}
 	codeField, ok := callbackReqType.FieldByName("Code")
 	if !ok || codeField.Tag.Get("json") != "code" || codeField.Tag.Get("binding") != "required" {

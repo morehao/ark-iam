@@ -2,6 +2,7 @@ package testsetup
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -21,6 +22,7 @@ func PrepareTestTenant(ctx context.Context, name, tag string) (*model.TenantEnti
 	db := dbclient.IamDB(ctx)
 	entity := &model.TenantEntity{
 		Name: name,
+		Code: name,
 		Tag:  tag,
 	}
 	if err := db.Create(entity).Error; err != nil {
@@ -44,6 +46,8 @@ func PrepareTestPerson(ctx context.Context, username, email, phone, password, na
 		PasswordEncrypted: passwordHash,
 		PasswordMethod:    "bcrypt",
 		Name:              name,
+		Profile:           json.RawMessage("{}"),
+		CustomData:        json.RawMessage("{}"),
 	}
 	if err := db.Create(entity).Error; err != nil {
 		return nil, fmt.Errorf("create person: %w", err)
@@ -55,11 +59,13 @@ func PrepareTestUser(ctx context.Context, tenantID, personID uint, name string, 
 	db := dbclient.IamDB(ctx)
 	now := time.Now()
 	entity := &model.UserEntity{
-		TenantID: tenantID,
-		PersonID: personID,
-		Name:     name,
-		IsOwner:  isOwner,
-		JoinedAt: &now,
+		TenantID:   tenantID,
+		PersonID:   personID,
+		Name:       name,
+		Profile:    json.RawMessage("{}"),
+		CustomData: json.RawMessage("{}"),
+		IsOwner:    isOwner,
+		JoinedAt:   &now,
 	}
 	if err := db.Create(entity).Error; err != nil {
 		return nil, fmt.Errorf("create user: %w", err)

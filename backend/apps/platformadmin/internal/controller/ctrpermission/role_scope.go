@@ -31,7 +31,7 @@ func NewRoleScopeCtr() RoleScopeCtr {
 // @Produce application/json
 // @Param req body dtopermission.RoleScopeCreateReq true "创建角色权限范围"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.RoleScopeCreateResp}
-// @Router /v1/roleScope/create [post]
+// @Router /v1/iam/roleScope/create [post]
 func (ctr *roleScopeCtr) Create(ctx *gin.Context) {
 	var req dtopermission.RoleScopeCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -52,7 +52,7 @@ func (ctr *roleScopeCtr) Create(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtopermission.RoleScopeDeleteReq true "删除角色权限范围"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/roleScope/delete [post]
+// @Router /v1/iam/roleScope/delete [post]
 func (ctr *roleScopeCtr) Delete(ctx *gin.Context) {
 	var req dtopermission.RoleScopeDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -72,7 +72,7 @@ func (ctr *roleScopeCtr) Delete(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtopermission.RoleScopePageListReq true "角色权限范围列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.RoleScopePageListResp}
-// @Router /v1/roleScope/pageList [post]
+// @Router /v1/iam/roleScope/pageList [post]
 func (ctr *roleScopeCtr) PageList(ctx *gin.Context) {
 	var req dtopermission.RoleScopePageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {

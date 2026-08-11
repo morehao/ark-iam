@@ -31,7 +31,7 @@ func NewUserRoleCtr() UserRoleCtr {
 // @Produce application/json
 // @Param req body dtopermission.UserRoleCreateReq true "创建用户角色"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.UserRoleCreateResp}
-// @Router /v1/userRole/create [post]
+// @Router /v1/iam/userRole/create [post]
 func (ctr *userRoleCtr) Create(ctx *gin.Context) {
 	var req dtopermission.UserRoleCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -52,7 +52,7 @@ func (ctr *userRoleCtr) Create(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtopermission.UserRoleDeleteReq true "删除用户角色"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/userRole/delete [post]
+// @Router /v1/iam/userRole/delete [post]
 func (ctr *userRoleCtr) Delete(ctx *gin.Context) {
 	var req dtopermission.UserRoleDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -72,7 +72,7 @@ func (ctr *userRoleCtr) Delete(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtopermission.UserRolePageListReq true "用户角色列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.UserRolePageListResp}
-// @Router /v1/userRole/pageList [post]
+// @Router /v1/iam/userRole/pageList [post]
 func (ctr *userRoleCtr) PageList(ctx *gin.Context) {
 	var req dtopermission.UserRolePageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {

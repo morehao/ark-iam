@@ -140,7 +140,7 @@ apps/platformadmin/
 
 错误码和路由也按领域划分：
 - 一个业务领域共享一套错误码段（如 user 领域用 1005XX）
-- 路由按领域注册（如 `/v1/user/*` 下包含用户及其相关操作）
+- 路由按领域注册（如 `/v1/iam/user/*` 下包含用户及其相关操作）
 
 ### 常量定义规范
 
@@ -288,27 +288,28 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 
 ### API 路由规范
 
-- **路径格式**: `/{版本}/{模块}/{操作}`，如 `/v1/user/create`（不再包含聚合服务名段，多个业务模块共享 `/v1` 前缀）
+- **路径格式**: `/{版本}/{服务标识}/{模块}/{操作}`，如 `/v1/iam/user/create`（IAM 各业务模块共享 `/v1/iam` 前缀，`iam` 作为统一服务标识段）
 - **版本号**: 放在路径最前，使用 `/v1/`, `/v2/` 等格式
+- **服务标识**: 用于区分不同服务，如 `iam`, `demo`
 - **模块名**: 对应业务模块，如 `user`, `role`, `menu`
 - **操作名**: 使用驼峰命名，如 `create`, `update`, `detail`, `pageList`, `assignDepartment`
 
-**路由层级限制为4层**，避免使用多层嵌套路径。
+**路由层级限制为5层**，避免使用多层嵌套路径。
 
 #### 路由示例
 
 | 模块 | 操作 | 完整路径 |
 |------|------|----------|
-| user | 创建 | `/v1/user/create` |
-| user | 分配部门 | `/v1/user/assignDepartment` |
-| role | 列表 | `/v1/role/pageList` |
+| user | 创建 | `/v1/iam/user/create` |
+| user | 分配部门 | `/v1/iam/user/assignDepartment` |
+| role | 列表 | `/v1/iam/role/pageList` |
 
 #### 路由注册
 
-各业务 app 通过 `ginserver.NewRouterGroups(engine, ...)` 注册共享 `/v1` 前缀（不再有聚合服务名段），然后在 `router/router.go` 中按版本 `MustGetGroup(ginserver.ApiVersionV1)` 注册各模块路由：
+各业务 app 通过 `ginserver.NewRouterGroups(engine, "iam", ...)` 注册共享 `/v1/iam` 前缀，然后在 `router/router.go` 中按版本 `MustGetGroup(ginserver.ApiVersionV1)` 注册各模块路由：
 
 ```go
-routerGroups := ginserver.NewRouterGroups(engine, ginserver.VersionGroup{
+routerGroups := ginserver.NewRouterGroups(engine, "iam", ginserver.VersionGroup{
     Version: ginserver.ApiVersionV1,
     // ...
 })
@@ -336,7 +337,7 @@ func userRouter(groups *ginserver.RouterGroups) {
 // @Produce application/json
 // @Param req body dtouser.UserCreateReq true "创建用户管理"
 // @Success 200 {object} gincontext.DtoRender{data=dtouser.UserCreateResp}
-// @Router /v1/demo/user/create [post]
+// @Router /v1/iam/demo/user/create [post]
 ```
 
 生成文档：

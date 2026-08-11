@@ -230,8 +230,8 @@ user   ──(关联)──> refresh_token(tenant_id+user_id)
 ### 4.2 路由前缀
 
 ```
-/v1/{module}/{operation} 统一管理 API（无应用名段，登录/管理/租户自服务共用）
-                           如 /v1/auth/myTenants、/v1/user/pageList、/v1/organizationRole/pageList
+/v1/iam/{module}/{operation} 统一管理 API（iam 服务标识段，登录/管理/租户自服务共用）
+                           如 /v1/iam/auth/myTenants、/v1/iam/user/pageList、/v1/iam/organizationRole/pageList
 /oidc/*                 OIDC Provider 标准端点（含 /.well-known/*，挂在 auth / gateway）
 ```
 
@@ -342,7 +342,7 @@ IAM 后端按职能拆分为**四个应用**，共享公共层 `pkg`，以 Go wo
 
 - 三个分体应用（auth/platformadmin/tenantadmin）可独立部署，也可由 gateway 单进程聚合为一体（端口 8100）。
 - `pkg` 为跨应用的公共层（config/middleware/ginserver/iam model·dao·object/testsetup 等），无重复代码。
-- 所有应用统一路由前缀 `/v1/{module}/{operation}`；`/oidc/*` 由 auth / gateway 提供。
+- 所有应用统一路由前缀 `/v1/iam/{module}/{operation}`；`/oidc/*` 由 auth / gateway 提供。
 - 签名私钥由环境变量/密钥卷提供。
 - 独立 IdP 服务拆分（授权服务与管理/业务分离）为演进选项，已在「四应用拆分」中实现大部分目标。
 

@@ -2,6 +2,7 @@ package svcauth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -236,6 +237,8 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 		PasswordEncrypted: passwordHash,
 		PasswordMethod:    "bcrypt",
 		Name:              req.Name,
+		Profile:           json.RawMessage("{}"),
+		CustomData:        json.RawMessage("{}"),
 		CreatedBy:         0,
 	}
 	if err := personDao.Insert(ctx.Request.Context(), personEntity); err != nil {
@@ -244,12 +247,14 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 	}
 	now := time.Now()
 	insertEntity := &model.UserEntity{
-		TenantID:  req.TenantID,
-		PersonID:  personEntity.ID,
-		Name:      req.Name,
-		IsOwner:   1,
-		JoinedAt:  &now,
-		CreatedBy: 0,
+		TenantID:   req.TenantID,
+		PersonID:   personEntity.ID,
+		Name:       req.Name,
+		Profile:    json.RawMessage("{}"),
+		CustomData: json.RawMessage("{}"),
+		IsOwner:    1,
+		JoinedAt:   &now,
+		CreatedBy:  0,
 	}
 
 	if err := userDao.Insert(ctx.Request.Context(), insertEntity); err != nil {

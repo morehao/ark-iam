@@ -19,7 +19,7 @@ func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 	config.Conf = Conf
 	getOIDCPublicKey := oidcauth.LoadSigningPublicKey(Conf)
 
-	routerGroups := ginserver.NewRouterGroups(engine, "", ginserver.VersionGroup{
+	routerGroups := ginserver.NewRouterGroups(engine, "iam", ginserver.VersionGroup{
 		Version: ginserver.ApiVersionV1,
 		Middlewares: []gin.HandlerFunc{
 			oidcauth.OIDCCompatibleAuth(getOIDCPublicKey),

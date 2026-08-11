@@ -89,7 +89,7 @@ func TestConnectorControllerGetFactoryList(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	req := httptest.NewRequest(http.MethodPost, "/v1/connector/getFactoryList", strings.NewReader(`{"protocol":"oidc","provider":"google"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/iam/connector/getFactoryList", strings.NewReader(`{"protocol":"oidc","provider":"google"}`))
 	req.Header.Set("Content-Type", "application/json")
 	ctx.Request = req
 
@@ -116,7 +116,7 @@ func TestConnectorControllerAuthorize(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	req := httptest.NewRequest(http.MethodPost, "/v1/connector/42/authorize", strings.NewReader(`{"redirectUri":"https://app.example.com/callback","state":"state-1","loginHint":"user@example.com"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/iam/connector/42/authorize", strings.NewReader(`{"redirectUri":"https://app.example.com/callback","state":"state-1","loginHint":"user@example.com"}`))
 	req.Header.Set("Content-Type", "application/json")
 	ctx.Request = req
 	ctx.Params = gin.Params{{Key: "connectorId", Value: "42"}}
@@ -150,7 +150,7 @@ func TestConnectorControllerTestConnector(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	req := httptest.NewRequest(http.MethodPost, "/v1/connector/9/test", nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/iam/connector/9/test", nil)
 	ctx.Request = req
 	ctx.Params = gin.Params{{Key: "connectorId", Value: "9"}}
 
@@ -177,7 +177,7 @@ func TestConnectorControllerCallback(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	req := httptest.NewRequest(http.MethodGet, "/v1/connector/callback?connectorId=7&code=callback-code&state=state-2", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/iam/connector/callback?connectorId=7&code=callback-code&state=state-2", nil)
 	ctx.Request = req
 
 	ctr.Callback(ctx)
@@ -201,7 +201,7 @@ func TestConnectorControllerCallbackRequiresState(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	req := httptest.NewRequest(http.MethodGet, "/v1/connector/callback?connectorId=7&code=callback-code", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/iam/connector/callback?connectorId=7&code=callback-code", nil)
 	ctx.Request = req
 
 	ctr.Callback(ctx)

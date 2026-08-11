@@ -50,7 +50,7 @@ func (ctr *authCtr) MyTenants(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtoauth.RegisterReq true "用户注册"
 // @Success 200 {object} gincontext.DtoRender{data=dtoauth.RegisterResp}
-// @Router /v1/auth/register [post]
+// @Router /v1/iam/auth/register [post]
 func (ctr *authCtr) Register(ctx *gin.Context) {
 	var req dtoauth.RegisterReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -71,7 +71,7 @@ func (ctr *authCtr) Register(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtoauth.JoinTenantReq true "加入租户"
 // @Success 200 {object} gincontext.DtoRender{data=dtoauth.JoinTenantResp}
-// @Router /v1/auth/joinTenant [post]
+// @Router /v1/iam/auth/joinTenant [post]
 func (ctr *authCtr) JoinTenant(ctx *gin.Context) {
 	var req dtoauth.JoinTenantReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -92,7 +92,7 @@ func (ctr *authCtr) JoinTenant(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtoauth.LogoutReq true "用户登出"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/auth/logout [post]
+// @Router /v1/iam/auth/logout [post]
 func (ctr *authCtr) Logout(ctx *gin.Context) {
 	var req dtoauth.LogoutReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -132,7 +132,7 @@ func (ctr *authCtr) LogoutAll(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtoauth.UserinfoReq true "获取用户信息"
 // @Success 200 {object} gincontext.DtoRender{data=dtoauth.UserinfoResp}
-// @Router /v1/auth/userinfo [get]
+// @Router /v1/iam/auth/userinfo [get]
 func (ctr *authCtr) Userinfo(ctx *gin.Context) {
 	var req dtoauth.UserinfoReq
 	res, err := ctr.authSvc.Userinfo(ctx, &req)

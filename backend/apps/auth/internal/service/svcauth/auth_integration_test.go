@@ -23,11 +23,15 @@ func TestRegisterCreatesPersonAndUser(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{TenantIDs: []uint{tenant.ID}}) }()
 
+	username := testsetup.UniqueName("register")
+	email := testsetup.UniqueName("reg") + "@example.com"
+	phone := testsetup.UniqueName("regphone")
 	svc := NewAuthSvc()
 	resp, err := svc.Register(ctx, &dtoauth.RegisterReq{
 		TenantID:     tenant.ID,
-		Username:     "register_test_user",
-		PrimaryEmail: "register_test@example.com",
+		Username:     username,
+		PrimaryEmail: email,
+		PrimaryPhone: phone,
 		Password:     "Password1",
 		Name:         "RegisterTest",
 	})
@@ -35,19 +39,19 @@ func TestRegisterCreatesPersonAndUser(t *testing.T) {
 	require.NotNil(t, resp)
 	require.NotZero(t, resp.UserID)
 
+	db := dbclient.IamDB(ctx)
+	var person model.PersonEntity
+	err = db.Where("primary_email = ?", email).First(&person).Error
+	require.NoError(t, err)
+	assert.Equal(t, username, person.Username)
+	assert.True(t, testsetup.PasswordMatches(person.PasswordEncrypted, "Password1"))
+
 	defer func() {
 		_ = testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{
-			PersonIDs: []uint{},
+			PersonIDs: []uint{person.ID},
 			UserIDs:   []uint{resp.UserID},
 		})
 	}()
-
-	db := dbclient.IamDB(ctx)
-	var person model.PersonEntity
-	err = db.Where("primary_email = ?", "register_test@example.com").First(&person).Error
-	require.NoError(t, err)
-	assert.Equal(t, "register_test_user", person.Username)
-	assert.True(t, testsetup.PasswordMatches(person.PasswordEncrypted, "Password1"))
 }
 
 func TestMyTenants(t *testing.T) {

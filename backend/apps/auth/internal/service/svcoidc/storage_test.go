@@ -90,13 +90,14 @@ func TestCompleteAuthRequestMarksRequestDone(t *testing.T) {
 	}
 }
 
-func TestOIDCClientLoginURLUsesConfiguredFrontend(t *testing.T) {
-	appconfig.Conf = &pkgconfig.Config{OIDC: pkgconfig.OIDC{FrontendLoginURL: "https://console.example.com/oidc/login"}}
+func TestOIDCClientLoginURLUsesIssuerSSOLogin(t *testing.T) {
+	appconfig.Conf = &pkgconfig.Config{OIDC: pkgconfig.OIDC{Issuer: "http://localhost:8099/oidc"}}
 	client := NewOIDCClient(&model.ApplicationClientEntity{ClientID: "client-1"})
 
 	got := client.LoginURL("ar-1")
-	if got != "https://console.example.com/oidc/login?authRequestID=ar-1" {
-		t.Fatalf("expected configured login url, got %q", got)
+	expected := "http://localhost:8099/oidc/sso-login?authRequestID=ar-1"
+	if got != expected {
+		t.Fatalf("expected sso-login url, got %q", got)
 	}
 }
 

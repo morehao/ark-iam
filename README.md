@@ -124,7 +124,7 @@ App-port mapping:
 | tenantadmin | 8083 |
 | gateway (aggregate) | 8100 |
 
-Routes are unified across apps as `/v1/{module}/{operation}` (no app-name segment) plus the OIDC provider prefix `/oidc/*` on auth/gateway.
+Routes are unified across apps as `/v1/iam/{module}/{operation}` plus the OIDC provider prefix `/oidc/*` on auth/gateway.
 
 Build Docker image:
 
