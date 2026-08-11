@@ -1,4 +1,4 @@
-import request from '../utils/request'
+import { request } from '@ark-iam/api'
 
 export interface Department {
   id: number

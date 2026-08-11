@@ -21,8 +21,11 @@
     "zustand": "^5.0.1"
   },
   "devDependencies": {
+    "@ark-iam/api": "workspace:*",
+    "@ark-iam/auth": "workspace:*",
     "@ark-iam/types": "workspace:*",
     "@ark-iam/tsconfig": "workspace:*",
+    "@ark-iam/ui": "workspace:*",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@types/react": "^18.3.12",
