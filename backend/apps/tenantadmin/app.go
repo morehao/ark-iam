@@ -5,6 +5,7 @@ import (
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/middleware/oidcauth"
+	"github.com/morehao/ark-iam/pkg/token"
 	"github.com/morehao/ark-iam/tenantadmin/config"
 	"github.com/morehao/ark-iam/tenantadmin/internal/router"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
@@ -16,14 +17,14 @@ const AppName = "tenantadmin"
 
 func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 	config.Conf = Conf
-	getOIDCPublicKey := router.InitOIDC()
+	getOIDCPublicKey := oidcauth.LoadSigningPublicKey(Conf)
 
 	routerGroups := ginserver.NewRouterGroups(engine, "", ginserver.VersionGroup{
 		Version: ginserver.ApiVersionV1,
 		Middlewares: []gin.HandlerFunc{
 			oidcauth.OIDCCompatibleAuth(getOIDCPublicKey),
 			ginmiddleware.TokenBlacklistCheck(dbclient.RedisCli,
-				ginmiddleware.WithBlacklistKeyPrefix("tenantadmin:token:blacklist:")),
+				ginmiddleware.WithBlacklistKeyPrefix(token.TokenBlacklistKeyPrefix)),
 		},
 	})
 

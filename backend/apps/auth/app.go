@@ -7,9 +7,10 @@ import (
 	"github.com/morehao/ark-iam/auth/config"
 	authRouter "github.com/morehao/ark-iam/auth/internal/router"
 	"github.com/morehao/ark-iam/auth/internal/service/svcsso"
+	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/middleware/oidcauth"
-	pkgconfig "github.com/morehao/ark-iam/pkg/config"
+	"github.com/morehao/ark-iam/pkg/token"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
 	"github.com/morehao/golib/biz/gserver/gindocs"
 	"github.com/morehao/golib/biz/gserver/ginserver"
@@ -47,7 +48,7 @@ func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 					return active
 				})),
 			ginmiddleware.TokenBlacklistCheck(dbclient.RedisCli,
-				ginmiddleware.WithBlacklistKeyPrefix("auth:token:blacklist:")),
+				ginmiddleware.WithBlacklistKeyPrefix(token.TokenBlacklistKeyPrefix)),
 		},
 	})
 

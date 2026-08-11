@@ -21,12 +21,12 @@ interface ServiceDef {
 const SERVICES: ServiceDef[] = [
   {
     name: 'IAM Backend',
-    port: 8099,
+    port: 8100,
     cmd: 'go',
-    args: ['run', './apps/iam/cmd'],
+    args: ['run', './apps/gateway/cmd'],
     cwd: path.join(ROOT, 'backend'),
     env: {
-      APP_CONFIG_PATH: path.join(ROOT, 'backend', 'apps', 'iam', 'config', 'config.e2e.yaml'),
+      APP_CONFIG_PATH: path.join(ROOT, 'backend', 'apps', 'gateway', 'config', 'config.yaml'),
     },
     healthPath: '/oidc/healthz',
   },

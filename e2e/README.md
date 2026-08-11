@@ -35,7 +35,7 @@
 - Node.js 18+
 - MySQL + Redis 已运行
 - 后端种子数据已导入（`admin` / `admin123` + `test-rp-client`）
-- 后端需使用 `config.e2e.yaml` 启动（OIDC 端点前缀 `/oidc`、短 TTL、限流阈值调大）
+- 后端需使用 `config.yaml` 启动（OIDC 端点前缀 `/oidc`、短 TTL、限流阈值调大）
 
 ## 安装
 
@@ -59,7 +59,7 @@ npm run test:debug
 ```
 
 测试自动管理服务生命周期：
-- `globalSetup` — 检查并启动所需服务（IAM 后端 :8099、platform-admin-web :3000、sso-test-app :3001、login-web :3003）
+- `globalSetup` — 检查并启动所需服务（IAM 后端 :8100、platform-admin-web :3000、sso-test-app :3001、login-web :3003）
 - `globalTeardown` — 测试结束后强制清理所有进程（无论成功/失败）
 
 ## 配置

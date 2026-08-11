@@ -8,14 +8,14 @@
 |------|----------|------|
 | MySQL | 外部启动（系统服务） | 3306 |
 | Redis | 外部启动（系统服务） | 6379 |
-| 后端 IAM | `make run APP=iam` | 8099 |
+| 后端 IAM | `make run APP=gateway` | 8100 |
 | 前端 | `npm run dev`（frontend/ 目录） | 3000 |
 
-确认配置文件 `backend/apps/iam/config/config.yaml` 中：
+确认配置文件 `backend/apps/gateway/config/config.yaml` 中：
 
 ```yaml
 oidc:
-  issuer: "http://localhost:8099/oidc"
+  issuer: "http://localhost:8100/oidc"
   frontendLoginURL: "http://localhost:3000/oidc/login"
   signingKeyID: "dev-oidc-key"
   signingPrivateKeyPath: "config/oidc-dev-key.pem"
@@ -28,13 +28,13 @@ oidc:
   spentCodeTTL: 86400
 ```
 
-确认签名私钥文件 `backend/apps/iam/config/oidc-dev-key.pem` 存在。
+确认签名私钥文件 `backend/apps/gateway/config/oidc-dev-key.pem` 存在。
 
 ## 2. 运行自动化测试
 
 ```bash
 # 后端 OIDC 相关测试（不依赖数据库）
-cd backend/apps/iam
+cd backend/apps/auth
 go test -count=1 -v ./internal/service/svcoidc/... |
   grep -E '(PASS|FAIL|---)'
 
@@ -147,11 +147,11 @@ SELECT id, person_id, tenant_id FROM user WHERE person_id = <上面查到的pers
 ### Step 1: Discovery 端点
 
 ```bash
-curl -s http://localhost:8099/oidc/.well-known/openid-configuration | jq .
+curl -s http://localhost:8100/oidc/.well-known/openid-configuration | jq .
 ```
 
 **确认要点：**
-- `issuer` 为 `http://localhost:8099/oidc`
+- `issuer` 为 `http://localhost:8100/oidc`
 - `authorization_endpoint` 存在
 - `token_endpoint` 存在
 - `jwks_uri` 存在
@@ -163,7 +163,7 @@ curl -s http://localhost:8099/oidc/.well-known/openid-configuration | jq .
 ### Step 2: JWKS 端点
 
 ```bash
-curl -s http://localhost:8099/oidc/.well-known/jwks.json | jq .
+curl -s http://localhost:8100/oidc/.well-known/jwks.json | jq .
 ```
 
 **确认要点：**
@@ -176,7 +176,7 @@ curl -s http://localhost:8099/oidc/.well-known/jwks.json | jq .
 手动构造 authorize 请求。在浏览器中打开或使用 curl 跟随重定向：
 
 ```
-http://localhost:8099/oidc/authorize
+http://localhost:8100/oidc/authorize
   ?client_id=test-rp-client
   &redirect_uri=https://client.example.com/callback
   &response_type=code
@@ -188,7 +188,7 @@ http://localhost:8099/oidc/authorize
 **Curl 方式（不跟随 302）：**
 
 ```bash
-curl -v 'http://localhost:8099/oidc/authorize?client_id=test-rp-client&redirect_uri=https://client.example.com/callback&response_type=code&scope=openid%20profile%20email&state=test-state-123&nonce=test-nonce-456'
+curl -v 'http://localhost:8100/oidc/authorize?client_id=test-rp-client&redirect_uri=https://client.example.com/callback&response_type=code&scope=openid%20profile%20email&state=test-state-123&nonce=test-nonce-456'
 ```
 
 **确认要点：**
@@ -203,7 +203,7 @@ curl -v 'http://localhost:8099/oidc/authorize?client_id=test-rp-client&redirect_
 拿到 Step 3 的 `authRequestID`，替换到下面请求中：
 
 ```bash
-curl -s -X POST http://localhost:8099/oidc/login \
+curl -s -X POST http://localhost:8100/oidc/login \
   -H 'Content-Type: application/json' \
   -d '{
     "authRequestID": "ar-1741234567890123000",
@@ -214,7 +214,7 @@ curl -s -X POST http://localhost:8099/oidc/login \
 
 **确认要点：**
 - `code` 为 `0`
-- `data.continueURL` 形如 `http://localhost:8099/oidc/authorize/callback?id=ar-1741234567890123000`
+- `data.continueURL` 形如 `http://localhost:8100/oidc/authorize/callback?id=ar-1741234567890123000`
 
 将 `continueURL` 复制到浏览器打开（或下一步通过 curl 跟随）。
 
@@ -223,7 +223,7 @@ curl -s -X POST http://localhost:8099/oidc/login \
 **Curl 方式（不跟随 302）：**
 
 ```bash
-curl -v 'http://localhost:8099/oidc/authorize/callback?id=ar-1741234567890123000'
+curl -v 'http://localhost:8100/oidc/authorize/callback?id=ar-1741234567890123000'
 ```
 
 **确认要点：**
@@ -237,7 +237,7 @@ curl -v 'http://localhost:8099/oidc/authorize/callback?id=ar-1741234567890123000
 ### Step 6: Token Endpoint（code 换 token）
 
 ```bash
-curl -s -X POST http://localhost:8099/oidc/oauth/token \
+curl -s -X POST http://localhost:8100/oidc/oauth/token \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d 'grant_type=authorization_code' \
   -d 'code=上一步获取的code' \
@@ -262,7 +262,7 @@ curl -s -X POST http://localhost:8099/oidc/oauth/token \
 ```
 
 确认 id_token 的 payload 中：
-- `iss` = `http://localhost:8099/oidc`
+- `iss` = `http://localhost:8100/oidc`
 - `sub` = `person:<id>` 格式
 - `aud` = `test-rp-client`
 - `exp` > `iat`
@@ -270,7 +270,7 @@ curl -s -X POST http://localhost:8099/oidc/oauth/token \
 ### Step 7: UserInfo 端点
 
 ```bash
-curl -s http://localhost:8099/oidc/userinfo \
+curl -s http://localhost:8100/oidc/userinfo \
   -H 'Authorization: Bearer 上一步获取的access_token' | jq .
 ```
 
@@ -282,7 +282,7 @@ curl -s http://localhost:8099/oidc/userinfo \
 ### Step 8: Refresh Token（可选）
 
 ```bash
-curl -s -X POST http://localhost:8099/oidc/oauth/token \
+curl -s -X POST http://localhost:8100/oidc/oauth/token \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d 'grant_type=refresh_token' \
   -d 'refresh_token=上一步获取的refresh_token' \
@@ -299,7 +299,7 @@ curl -s -X POST http://localhost:8099/oidc/oauth/token \
 **场景 A：错误的密码**
 
 ```bash
-curl -s -X POST http://localhost:8099/oidc/login \
+curl -s -X POST http://localhost:8100/oidc/login \
   -H 'Content-Type: application/json' \
   -d '{
     "authRequestID": "ar-xxx",
@@ -313,7 +313,7 @@ curl -s -X POST http://localhost:8099/oidc/login \
 **场景 B：无效的 authRequestID**
 
 ```bash
-curl -s -X POST http://localhost:8099/oidc/login \
+curl -s -X POST http://localhost:8100/oidc/login \
   -H 'Content-Type: application/json' \
   -d '{
     "authRequestID": "non-existent-id",
@@ -327,7 +327,7 @@ curl -s -X POST http://localhost:8099/oidc/login \
 **场景 C：无效 client_id（token 端点）**
 
 ```bash
-curl -s -X POST http://localhost:8099/oidc/oauth/token \
+curl -s -X POST http://localhost:8100/oidc/oauth/token \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d 'grant_type=authorization_code' \
   -d 'code=invalid' \
@@ -349,7 +349,7 @@ curl -s -X POST http://localhost:8099/oidc/oauth/token \
 在浏览器地址栏直接粘贴 Authorize URL，回车触发流程：
 
 ```
-http://localhost:8099/oidc/authorize?client_id=test-rp-client&redirect_uri=https://client.example.com/callback&response_type=code&scope=openid%20profile%20email&state=test-state-123&nonce=test-nonce-456
+http://localhost:8100/oidc/authorize?client_id=test-rp-client&redirect_uri=https://client.example.com/callback&response_type=code&scope=openid%20profile%20email&state=test-state-123&nonce=test-nonce-456
 ```
 
 浏览器会自动跟随 302 跳转到 OIDC 登录页。**建议操作前先打开浏览器 DevTools（F12）→ Network 面板，勾选 Preserve log**，否则 302 跳转后会丢失之前的请求记录。
@@ -363,7 +363,7 @@ http://localhost:8099/oidc/authorize?client_id=test-rp-client&redirect_uri=https
 <html>
 <body>
   <h1>Test RP</h1>
-  <a href="http://localhost:8099/oidc/authorize?client_id=test-rp-client&redirect_uri=https://client.example.com/callback&response_type=code&scope=openid%20profile%20email&state=test-state-123&nonce=test-nonce-456">
+  <a href="http://localhost:8100/oidc/authorize?client_id=test-rp-client&redirect_uri=https://client.example.com/callback&response_type=code&scope=openid%20profile%20email&state=test-state-123&nonce=test-nonce-456">
     发起 OIDC 登录
   </a>
   <div id="result"></div>
@@ -423,7 +423,7 @@ http://localhost:8099/oidc/authorize?client_id=test-rp-client&redirect_uri=https
 
 ```bash
 # 查看启动日志
-cd backend/apps/iam && make run
+cd backend/apps/gateway && make run
 ```
 
 常见错误：
@@ -460,7 +460,7 @@ cd backend/apps/iam && make run
 ```bash
 # client_secret_basic 方式
 AUTH=$(echo -n "test-rp-client:my-test-client-secret" | base64)
-curl -s -X POST http://localhost:8099/oidc/oauth/token \
+curl -s -X POST http://localhost:8100/oidc/oauth/token \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -H "Authorization: Basic $AUTH" \
   -d 'grant_type=authorization_code' \
@@ -472,9 +472,9 @@ curl -s -X POST http://localhost:8099/oidc/oauth/token \
 
 | 配置文件 | 配置项 | 预期值 |
 |----------|--------|--------|
-| `backend/config.yaml` | `server.port` | 8099 |
+| `backend/apps/gateway/config/config.yaml` | `server.port` | 8100 |
 | `frontend/vite.config.ts` | `server.proxy./v1.target` | `http://localhost:8100` |
-| `backend/config.yaml` | `oidc.issuer` | `http://localhost:8099/oidc` |
+| `backend/apps/gateway/config/config.yaml` | `oidc.issuer` | `http://localhost:8100/oidc` |
 | `frontend` 浏览器访问 | 前端页面 | `http://localhost:3000` |
 
 ### 6.7 签名密钥问题
@@ -490,7 +490,7 @@ loaded signing key from config/oidc-dev-key.pem (keyID=dev-oidc-key)
 ## 7. 验证清单（逐项打勾）
 
 ```
-[ ] 启动后端（make run APP=iam）
+[ ] 启动后端（make run APP=gateway）
 [ ] 启动前端（npm run dev）
 [ ] 后端自动化测试通过
 [ ] 前端自动化测试通过
