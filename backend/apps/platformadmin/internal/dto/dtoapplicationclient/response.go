@@ -13,6 +13,7 @@ type DetailResp struct {
 	Name                    string   `json:"name"`                    // 客户端名称
 	RedirectURIs            []string `json:"redirectURIs"`            // 授权回调地址
 	PostLogoutRedirectURIs  []string `json:"postLogoutRedirectURIs"`  // 登出回调地址
+	BackChannelLogoutURI    string   `json:"backChannelLogoutURI"`    // OIDC背信道登出通知地址
 	GrantTypes              []string `json:"grantTypes"`              // 授权类型
 	ResponseTypes           []string `json:"responseTypes"`           // 响应类型
 	TokenEndpointAuthMethod string   `json:"tokenEndpointAuthMethod"` // 令牌端点认证方式

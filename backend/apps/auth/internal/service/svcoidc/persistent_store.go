@@ -12,11 +12,11 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
 
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/auth/internal/service/svcsso"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
-	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/ark-iam/pkg/token"
 	"github.com/morehao/golib/glog"
 )
@@ -24,20 +24,20 @@ import (
 type PersistentStore struct {
 	applicationClientDao       func() *dao.ApplicationClientDao
 	applicationClientSecretDao func() *dao.ApplicationClientSecretDao
-	personDao            func() *dao.PersonDao
-	userDao              func() *dao.UserDao
-	refreshTokenDao      func() *dao.RefreshTokenDao
-	apiKeyDao            func() *dao.ApiKeyDao
+	personDao                  func() *dao.PersonDao
+	userDao                    func() *dao.UserDao
+	refreshTokenDao            func() *dao.RefreshTokenDao
+	apiKeyDao                  func() *dao.ApiKeyDao
 }
 
 func NewPersistentStore() *PersistentStore {
 	return &PersistentStore{
 		applicationClientDao:       dao.NewApplicationClientDao,
 		applicationClientSecretDao: dao.NewApplicationClientSecretDao,
-		personDao:            dao.NewPersonDao,
-		userDao:              dao.NewUserDao,
-		refreshTokenDao:      dao.NewRefreshTokenDao,
-		apiKeyDao:            dao.NewApiKeyDao,
+		personDao:                  dao.NewPersonDao,
+		userDao:                    dao.NewUserDao,
+		refreshTokenDao:            dao.NewRefreshTokenDao,
+		apiKeyDao:                  dao.NewApiKeyDao,
 	}
 }
 
@@ -170,7 +170,7 @@ func (s *PersistentStore) ValidateJWTProfileScopes(ctx context.Context, userID s
 func (s *PersistentStore) CreateAccessToken(ctx context.Context, request op.TokenRequest) (accessTokenID string, expiration time.Time, err error) {
 	accessTokenID = fmt.Sprintf("at-%d", time.Now().UnixNano())
 
-	ttl := time.Hour
+	ttl := 15 * time.Minute
 	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok {
 		if entity, e := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{ClientID: ccReq.ClientID()}); e == nil && entity != nil && entity.AccessTokenTTL > 0 {
 			ttl = time.Duration(entity.AccessTokenTTL) * time.Second
@@ -184,7 +184,6 @@ func (s *PersistentStore) CreateAccessToken(ctx context.Context, request op.Toke
 
 func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, request op.TokenRequest, currentRefreshToken string) (accessTokenID string, newRefreshToken string, expiration time.Time, err error) {
 	accessTokenID = fmt.Sprintf("at-%d", time.Now().UnixNano())
-	expiration = time.Now().Add(time.Hour)
 
 	var personID uint
 	personID, err = parseOIDCSubject(request.GetSubject())
@@ -217,11 +216,26 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 	}
 
 	var applicationClientID uint
+	var clientAccessTokenTTL time.Duration
+	backChannelLogoutURI := ""
 	if clientID != "" {
 		clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{ClientID: clientID})
 		if err == nil && clientEntity != nil {
 			applicationClientID = clientEntity.ID
+			backChannelLogoutURI = clientEntity.BackChannelLogoutURI
+			if clientEntity.AccessTokenTTL > 0 {
+				clientAccessTokenTTL = time.Duration(clientEntity.AccessTokenTTL) * time.Second
+			}
 		}
+	}
+	if clientAccessTokenTTL <= 0 {
+		clientAccessTokenTTL = 15 * time.Minute
+	}
+	expiration = time.Now().Add(clientAccessTokenTTL)
+
+	sessionID := ""
+	if authReq, ok := request.(*AuthRequest); ok {
+		sessionID = authReq.SessionID
 	}
 
 	now := time.Now()
@@ -230,19 +244,31 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 
 	refreshTokenHash := token.HashToken(refreshTokenValue)
 	refreshEntity := &model.RefreshTokenEntity{
-		PersonID:      personID,
-		TenantID:      userEntity.TenantID,
-		UserID:        userEntity.ID,
+		PersonID:            personID,
+		TenantID:            userEntity.TenantID,
+		UserID:              userEntity.ID,
 		ApplicationClientID: applicationClientID,
-		Token:         refreshTokenHash,
-		ExpiredAt:     &refreshTokenExp,
-		CreatedBy:     userEntity.ID,
+		SessionID:           sessionID,
+		Token:               refreshTokenHash,
+		ExpiredAt:           &refreshTokenExp,
+		CreatedBy:           userEntity.ID,
 	}
 	if currentRefreshToken != "" {
 		refreshEntity.LastRotatedAt = &now
 	}
 	if err := s.refreshTokenDao().Insert(ctx, refreshEntity); err != nil {
 		return "", "", time.Time{}, err
+	}
+
+	// 登出登记：有 SSO 会话 且 client 配置了 back_channel_logout_uri 时，登记该会话对该 client 的通知关系。
+	// 无 sid（服务账号/Client Credentials）或未配置背信道 URI 则跳过，对齐 OIDC Back-Channel 注册要求。
+	if sessionID != "" && backChannelLogoutURI != "" {
+		_ = sso.NewSLOStore().Register(ctx, sessionID, sso.LogoutRegistration{
+			OIDCSessionID:        accessTokenID,
+			ClientID:             clientID,
+			UserID:               buildOIDCSubject(personID),
+			BackChannelLogoutURI: backChannelLogoutURI,
+		})
 	}
 
 	if currentRefreshToken != "" {
@@ -332,7 +358,7 @@ func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, c
 	}
 	glog.Infof(ctx, "[PersistentStore.TerminateSession] terminating session, userID:%s, personID:%d, clientID:%s", userID, personID, clientID)
 
-	if ssoErr := svcsso.NewSSOSessionStore().RevokeSessionsByPersonID(ctx, personID); ssoErr != nil {
+	if ssoErr := sso.NewSSOSessionStore().RevokeSessionsByPersonID(ctx, personID); ssoErr != nil {
 		glog.Warnf(ctx, "[PersistentStore.TerminateSession] revoke SSO sessions fail, err:%v", ssoErr)
 	}
 

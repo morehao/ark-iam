@@ -10,14 +10,14 @@ import (
 	"unicode"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
-	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
 	"github.com/morehao/ark-iam/auth/internal/service/svcloginguard"
-	"github.com/morehao/ark-iam/auth/internal/service/svcsso"
+	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
-	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/sso"
+	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gconstant"
@@ -321,7 +321,7 @@ func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
 		if err := newAuthRefreshTokenStore().RevokeByPersonID(ctx.Request.Context(), personID); err != nil {
 			glog.Errorf(ctx, "[svcauth.Logout] RevokeByPersonID fail, personID:%d, err:%v", personID, err)
 		}
-		if err := svcsso.RevokeSSOSessionsByPersonID(ctx.Request.Context(), personID); err != nil {
+		if err := sso.RevokeSSOSessionsByPersonID(ctx.Request.Context(), personID); err != nil {
 			glog.Errorf(ctx, "[svcauth.Logout] RevokeSSOSessionsByPersonID fail, personID:%d, err:%v", personID, err)
 		}
 	}

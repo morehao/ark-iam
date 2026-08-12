@@ -17,14 +17,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	appconfig "github.com/morehao/ark-iam/auth/config"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
-	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
 	"github.com/morehao/ark-iam/auth/internal/service/svcauth"
-	"github.com/morehao/ark-iam/auth/internal/service/svcsso"
+	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
-	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/sso"
+	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/glog"
 	"github.com/zitadel/oidc/v3/pkg/op"
@@ -155,13 +155,15 @@ func SetupOIDCProvider(issuer string) (*OIDCProvider, error) {
 	encKey, encKeyID := loadEncryptionKey()
 
 	opConfig := &op.Config{
-		CryptoKey:                encKey,
-		CryptoKeyId:              encKeyID,
-		DefaultLogoutRedirectURI: pathLoggedOut,
-		CodeMethodS256:           true,
-		AuthMethodPost:           true,
-		GrantTypeRefreshToken:    true,
-		SupportedUILocales:       []language.Tag{language.Chinese, language.English},
+		CryptoKey:                         encKey,
+		CryptoKeyId:                       encKeyID,
+		DefaultLogoutRedirectURI:          pathLoggedOut,
+		CodeMethodS256:                    true,
+		AuthMethodPost:                    true,
+		GrantTypeRefreshToken:             true,
+		BackChannelLogoutSupported:        true,
+		BackChannelLogoutSessionSupported: true,
+		SupportedUILocales:                []language.Tag{language.Chinese, language.English},
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -208,8 +210,8 @@ type passwordAuthenticator interface {
 type oidcAuthSvc struct {
 	provider             *OIDCProvider
 	authSvc              passwordAuthenticator
-	ssoSessionStore      svcsso.SSOSessionStore
-	applicationClientDao       func() *dao.ApplicationClientDao
+	ssoSessionStore      sso.SSOSessionStore
+	applicationClientDao func() *dao.ApplicationClientDao
 	applicationDao       func() *dao.ApplicationDao
 }
 
@@ -217,8 +219,8 @@ func NewOIDCAuthSvc(provider *OIDCProvider) OIDCAuthSvc {
 	return &oidcAuthSvc{
 		provider:             provider,
 		authSvc:              svcauth.NewAuthSvc(),
-		ssoSessionStore:      svcsso.NewSSOSessionStore(),
-		applicationClientDao:       dao.NewApplicationClientDao,
+		ssoSessionStore:      sso.NewSSOSessionStore(),
+		applicationClientDao: dao.NewApplicationClientDao,
 		applicationDao:       dao.NewApplicationDao,
 	}
 }
@@ -283,6 +285,9 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 			glog.Warnf(ctx, "[oidcAuthSvc.CompleteLogin] failed to create sso session: %v", err)
 		} else {
 			resp.SessionID = sessionID
+			if aErr := svc.provider.Storage.AssociateSession(ctx.Request.Context(), req.AuthRequestID, sessionID); aErr != nil {
+				glog.Warnf(ctx, "[oidcAuthSvc.CompleteLogin] associate session fail, err:%v, authRequestID:%s, sessionID:%s", aErr, req.AuthRequestID, sessionID)
+			}
 		}
 	}
 
@@ -331,6 +336,9 @@ func (svc *oidcAuthSvc) SelectTenant(ctx context.Context, authRequestID string, 
 	if svc.ssoSessionStore != nil {
 		if sessionID, sErr := svc.ssoSessionStore.CreateSession(sessionAuditContext(ctx, tenantID), personID); sErr == nil {
 			resp.SessionID = sessionID
+			if aErr := svc.provider.Storage.AssociateSession(ctx, authRequestID, sessionID); aErr != nil {
+				glog.Warnf(ctx, "[oidcAuthSvc.SelectTenant] associate session fail, err:%v, authRequestID:%s, sessionID:%s", aErr, authRequestID, sessionID)
+			}
 		} else {
 			glog.Warnf(ctx, "[oidcAuthSvc.SelectTenant] failed to create sso session: %v", sErr)
 		}
@@ -387,6 +395,10 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx context.Context, authRequestI
 		TargetType: "person",
 		TargetID:   personID,
 	})
+
+	if aErr := svc.provider.Storage.AssociateSession(ctx, authRequestID, sessionID); aErr != nil {
+		glog.Warnf(ctx, "[oidcAuthSvc.CompleteLoginBySession] associate session fail, err:%v, authRequestID:%s, sessionID:%s", aErr, authRequestID, sessionID)
+	}
 
 	return svc.provider.BuildAuthCallbackURL(ctx, authRequestID), nil
 }

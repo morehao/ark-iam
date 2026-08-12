@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	appconfig "github.com/morehao/ark-iam/auth/config"
-	"github.com/morehao/ark-iam/auth/internal/service/svcsso"
+	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 )
@@ -28,7 +28,7 @@ func RegisterProviderRoutes(routerGroup *gin.RouterGroup, provider *OIDCProvider
 		}
 	}
 	routerGroup.GET(oidc.DiscoveryEndpoint, handler)
-	ssoStore := svcsso.NewSSOSessionStore()
+	ssoStore := sso.NewSSOSessionStore()
 	silentAuth := middleware.SilentSSORequired("iam_sso_session", middleware.WithSessionValidator(func(ctx *gin.Context, sessionID string) error {
 		_, err := ssoStore.ValidateSession(ctx.Request.Context(), sessionID)
 		return err

@@ -1,4 +1,8 @@
-package svcsso
+// Package sso 提供 SSO 中心会话（认证态）的存储与校验能力。
+//
+// 定位：跨应用共享的基础会话层，供 auth（OP）等持有会话的一侧使用。
+// 业务应用（RP）作为无状态侧不直接依赖本包（见 docs/design/oidc-slo-unified-logout.md）。
+package sso
 
 import (
 	"context"
@@ -10,10 +14,9 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	appconfig "github.com/morehao/ark-iam/auth/config"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/dbclient"
 
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/glog"
@@ -28,6 +31,9 @@ const (
 	ssoUserSessionsKeyPrefix = "iam:oidc:sso_user_sessions:"
 )
 
+// 默认会话 TTL。调用方可经 WithSessionTTL 覆盖（推荐传入应用配置读取到的值）。
+const defaultSessionTTLDuration = 24 * time.Hour
+
 func ssoSessionKey(sessionID string) string {
 	return ssoSessionKeyPrefix + sessionID
 }
@@ -36,18 +42,22 @@ func ssoUserSessionsKey(personID uint) string {
 	return fmt.Sprintf("%s%d", ssoUserSessionsKeyPrefix, personID)
 }
 
-func defaultSessionTTL() time.Duration {
-	if appconfig.Conf != nil && appconfig.Conf.OIDC.SessionTTL > 0 {
-		return time.Duration(appconfig.Conf.OIDC.SessionTTL) * time.Second
-	}
-	return 24 * time.Hour
-}
-
 type ssoSessionData struct {
 	PersonID  uint      `json:"personID"`
 	CreatedAt time.Time `json:"createdAt"`
 }
 
+// SessionTTLOption 允许调用方为会话 TTL 注入自定义值，取代对具体应用 config 的依赖。
+type SessionTTLOption struct {
+	sessionTTL time.Duration
+}
+
+// WithSessionTTL 设置会话有效期。
+func WithSessionTTL(ttl time.Duration) SessionTTLOption {
+	return SessionTTLOption{sessionTTL: ttl}
+}
+
+// SSOSessionStore 定义 SSO 中心会话的行为。
 type SSOSessionStore interface {
 	CreateSession(ctx context.Context, personID uint) (string, error)
 	ValidateSession(ctx context.Context, sessionID string) (uint, error)
@@ -57,16 +67,25 @@ type SSOSessionStore interface {
 }
 
 type redisSSOSessionStore struct {
-	client *redis.Client
+	client     *redis.Client
+	sessionTTL time.Duration
 }
 
 var _ SSOSessionStore = (*redisSSOSessionStore)(nil)
 
-func NewSSOSessionStore() SSOSessionStore {
-	if dbclient.RedisCli == nil {
-		return &redisSSOSessionStore{}
+// NewSSOSessionStore 构造 SSOSessionStore。默认读取全局 dbclient.RedisCli，
+// 调用方可经 WithSessionTTL 注入会话有效期。
+func NewSSOSessionStore(opts ...SessionTTLOption) SSOSessionStore {
+	store := &redisSSOSessionStore{sessionTTL: defaultSessionTTLDuration}
+	for _, opt := range opts {
+		if opt.sessionTTL > 0 {
+			store.sessionTTL = opt.sessionTTL
+		}
 	}
-	return &redisSSOSessionStore{client: dbclient.RedisCli}
+	if dbclient.RedisCli != nil {
+		store.client = dbclient.RedisCli
+	}
+	return store
 }
 
 // sessionAuditWriter 落库 session 审计，返回 error 表示成功写入。默认写入 session 审计表，
@@ -95,7 +114,7 @@ func recordSessionAuditBestEffort(ctx context.Context, sid string, personID uint
 		CreatedBy: personID,
 	}
 	if err := sessionAuditWriter(ctx, entity); err != nil {
-		glog.Errorf(ctx, "[svcsso.recordSessionAudit] write session audit fail, err:%v, sessionId:%s, personId:%d", err, sid, personID)
+		glog.Errorf(ctx, "[sso.recordSessionAudit] write session audit fail, err:%v, sessionId:%s, personId:%d", err, sid, personID)
 	}
 }
 
@@ -129,7 +148,7 @@ func (s *redisSSOSessionStore) CreateSession(ctx context.Context, personID uint)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal session data: %w", err)
 	}
-	ttl := defaultSessionTTL()
+	ttl := s.sessionTTL
 	if err := s.client.Set(ctx, ssoSessionKey(sessionID), encoded, ttl).Err(); err != nil {
 		return "", fmt.Errorf("failed to store session: %w", err)
 	}
@@ -209,7 +228,7 @@ func (s *redisSSOSessionStore) HasActiveSession(ctx context.Context, personID ui
 	if len(sessionIDs) == 0 {
 		return false, nil
 	}
-	ttl := defaultSessionTTL()
+	ttl := s.sessionTTL
 	for _, sessionID := range sessionIDs {
 		if n, err := s.client.Exists(ctx, ssoSessionKey(sessionID)).Result(); err == nil && n > 0 {
 			// 滑动续期：保持活跃会话不被会话 TTL 淘汰

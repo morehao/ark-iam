@@ -29,6 +29,7 @@ type ProtocolStateStore interface {
 	AuthRequestByCode(ctx context.Context, code string) (op.AuthRequest, error)
 	SaveAuthCode(ctx context.Context, id, code string) error
 	CompleteAuthRequest(id string, subject string, authTime time.Time, amr []string, acr string, tenantID uint, done bool) error
+	AssociateSession(ctx context.Context, id string, sessionID string) error
 	DeleteAuthRequest(ctx context.Context, id string) error
 	ConsumeAuthCode(ctx context.Context, code string) (op.AuthRequest, error)
 	Health(ctx context.Context) error
@@ -158,6 +159,34 @@ func (s *RedisProtocolStateStore) CompleteAuthRequest(id string, subject string,
 	req.ACR = acr
 	req.TenantID = tenantID
 	req.DoneFlag = done
+	updated, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("marshal auth request: %w", err)
+	}
+	ttl := time.Until(req.ExpiresAt)
+	if ttl <= 0 {
+		return ErrSessionNotFound
+	}
+	if err := s.client.Set(ctx, authRequestKey(id), updated, ttl).Err(); err != nil {
+		return fmt.Errorf("%w: %w", ErrStoreUnavailable, err)
+	}
+	return nil
+}
+
+// AssociateSession 将登录环节创建的 SSO 会话 ID 回写到授权票据，作为背信道登出的 sid 锚点。
+func (s *RedisProtocolStateStore) AssociateSession(ctx context.Context, id string, sessionID string) error {
+	data, err := s.client.Get(ctx, authRequestKey(id)).Bytes()
+	if errors.Is(err, redis.Nil) {
+		return ErrSessionNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrStoreUnavailable, err)
+	}
+	var req AuthRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal auth request: %w", err)
+	}
+	req.SessionID = sessionID
 	updated, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("marshal auth request: %w", err)

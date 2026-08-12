@@ -6,9 +6,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/config"
 	authRouter "github.com/morehao/ark-iam/auth/internal/router"
-	"github.com/morehao/ark-iam/auth/internal/service/svcsso"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/ark-iam/pkg/middleware/oidcauth"
 	"github.com/morehao/ark-iam/pkg/token"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
@@ -22,7 +22,7 @@ const AppName = "auth"
 func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 	config.Conf = Conf
 
-	ssoStore := svcsso.NewSSOSessionStore()
+	ssoStore := sso.NewSSOSessionStore()
 	routerGroups := ginserver.NewRouterGroups(engine, "iam", ginserver.VersionGroup{
 		Version: ginserver.ApiVersionV1,
 		Middlewares: []gin.HandlerFunc{

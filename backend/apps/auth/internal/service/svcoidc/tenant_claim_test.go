@@ -221,3 +221,45 @@ func TestGetPrivateClaimsFromRequestSelectsTenantFromRefreshTokenRequest(t *test
 	}
 }
 
+func TestGetPrivateClaimsFromRequestInjectsSidFromAuthRequest(t *testing.T) {
+	ctx := context.Background()
+
+	users := []model.UserEntity{
+		{Model: gorm.Model{ID: 70}, TenantID: 1, PersonID: 88},
+	}
+	storage, _ := newTenantClaimTestStore(t, users)
+
+	authReq := &AuthRequest{
+		Subject:   buildOIDCSubject(88),
+		ClientID:  "client-1",
+		TenantID:  1,
+		SessionID: "sid-xyz",
+	}
+
+	claims, err := storage.GetPrivateClaimsFromRequest(ctx, authReq, []string{"openid"})
+	if err != nil {
+		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
+	}
+	if got, ok := claims["sid"].(string); !ok || got != "sid-xyz" {
+		t.Fatalf("expected sid claim, got %v (%T)", claims["sid"], claims["sid"])
+	}
+}
+
+func TestGetPrivateClaimsFromAuthRequestOmitsSidWhenEmpty(t *testing.T) {
+	ctx := context.Background()
+
+	users := []model.UserEntity{
+		{Model: gorm.Model{ID: 71}, TenantID: 1, PersonID: 88},
+	}
+	storage, _ := newTenantClaimTestStore(t, users)
+
+	authReq := &AuthRequest{Subject: buildOIDCSubject(88), ClientID: "client-1", TenantID: 1}
+
+	claims, err := storage.GetPrivateClaimsFromRequest(ctx, authReq, []string{"openid"})
+	if err != nil {
+		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
+	}
+	if _, exists := claims["sid"]; exists {
+		t.Fatalf("expected no sid claim when SessionID empty, got %v", claims["sid"])
+	}
+}

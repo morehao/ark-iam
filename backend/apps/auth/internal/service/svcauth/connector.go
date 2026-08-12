@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoconnector"
-	"github.com/morehao/ark-iam/auth/internal/service/svcsso"
+	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
-	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
@@ -60,7 +60,7 @@ type connectorSvc struct {
 	connectorRepo    connectorRuntimeRepository
 	stateStore       ConnectorStateStore
 	identityResolver connectorIdentityResolver
-	ssoSessionStore  svcsso.SSOSessionStore
+	ssoSessionStore  sso.SSOSessionStore
 	tokenGenerator   func(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error)
 	loginRecorder    func(ctx *gin.Context, tenantID, userID uint, success bool)
 	stateGenerator   func() (string, error)
@@ -109,9 +109,9 @@ func (svc *connectorSvc) getIdentityResolver() connectorIdentityResolver {
 	return svc.identityResolver
 }
 
-func (svc *connectorSvc) getSSOSessionStore() svcsso.SSOSessionStore {
+func (svc *connectorSvc) getSSOSessionStore() sso.SSOSessionStore {
 	if svc.ssoSessionStore == nil {
-		svc.ssoSessionStore = svcsso.NewSSOSessionStore()
+		svc.ssoSessionStore = sso.NewSSOSessionStore()
 	}
 	return svc.ssoSessionStore
 }

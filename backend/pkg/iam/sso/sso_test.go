@@ -1,4 +1,4 @@
-package svcsso
+package sso
 
 import (
 	"context"
