@@ -27,12 +27,13 @@ func ssoLogoutRegKey(sessionID string) string {
 
 // LogoutJob 一次待发送的 back-channel logout 通知任务。
 type LogoutJob struct {
-	SessionID            string `json:"sessionID"`
-	PersonID             uint   `json:"personID"`
-	OIDCSessionID        string `json:"oidcSessionID"`
-	ClientID             string `json:"clientID"`
-	UserID               string `json:"userID"`
-	BackChannelLogoutURI string `json:"backChannelLogoutURI"`
+	SessionID            string    `json:"sessionID"`
+	PersonID             uint      `json:"personID"`
+	OIDCSessionID        string    `json:"oidcSessionID"`
+	ClientID             string    `json:"clientID"`
+	UserID               string    `json:"userID"`
+	BackChannelLogoutURI string    `json:"backChannelLogoutURI"`
+	CreatedAt            time.Time `json:"createdAt"`
 }
 
 func (j LogoutJob) encode() string {
@@ -44,6 +45,9 @@ func (j LogoutJob) encode() string {
 func EnqueueLogout(ctx context.Context, job LogoutJob) error {
 	if dbclient.RedisCli == nil {
 		return fmt.Errorf("redis client not available")
+	}
+	if job.CreatedAt.IsZero() {
+		job.CreatedAt = time.Now()
 	}
 	return dbclient.RedisCli.LPush(ctx, ssoLogoutQueueKey, job.encode()).Err()
 }

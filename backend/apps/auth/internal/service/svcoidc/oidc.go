@@ -25,7 +25,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
-	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/glog"
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"golang.org/x/text/language"
@@ -405,7 +404,7 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx context.Context, authRequestI
 
 // sessionAuditContext 将已解析的租户写入 context，供 CreateSession 落库 session 审计时读取 tenant_id。
 func sessionAuditContext(ctx context.Context, tenantID uint) context.Context {
-	return context.WithValue(ctx, gcontext.KeyTenantID, tenantID)
+	return context.WithValue(ctx, sso.ContextKeyTenantID, tenantID)
 }
 
 func ginContextFromContext(ctx context.Context) *gin.Context {

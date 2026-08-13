@@ -34,7 +34,6 @@ type logoutWorker struct {
 	signer     jose.Signer
 	issuer     string
 	httpClient *http.Client
-	startedAt  time.Time
 }
 
 // NewLogoutWorker 构造背信道登出 worker。privKey 为 OP 的令牌签名私钥（同 ID token 签名）。
@@ -44,7 +43,6 @@ func NewLogoutWorker(privKey *rsa.PrivateKey, keyID string, issuer string) *logo
 		signer:     signer,
 		issuer:     issuer,
 		httpClient: &http.Client{Timeout: logoutSendTimeout},
-		startedAt:  time.Now(),
 	}
 }
 
@@ -90,8 +88,12 @@ func (w *logoutWorker) handleJob(ctx context.Context, job sso.LogoutJob) {
 }
 
 // expired 丢弃超过 TTL 的过期任务（对齐 Zitadel MaxTtl，避免积压陈旧通知）。
+// 依据 job 内嵌的创建时间戳判断，与 worker 进程生命周期解耦，多副本/长驻运行判定一致。
 func (w *logoutWorker) expired(job sso.LogoutJob) bool {
-	return time.Since(w.startedAt) > logoutJobTTL
+	if job.CreatedAt.IsZero() {
+		return false
+	}
+	return time.Since(job.CreatedAt) > logoutJobTTL
 }
 
 func (w *logoutWorker) send(ctx context.Context, job sso.LogoutJob) error {
@@ -110,7 +112,11 @@ func (w *logoutWorker) send(ctx context.Context, job sso.LogoutJob) error {
 	if err != nil {
 		return fmt.Errorf("do request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cErr := resp.Body.Close(); cErr != nil {
+			glog.Warnf(ctx, "[logoutWorker.send] close response body fail, err:%v", cErr)
+		}
+	}()
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
 	}

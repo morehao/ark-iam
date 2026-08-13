@@ -7,7 +7,6 @@ import (
 
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/testsetup"
-	"github.com/morehao/golib/biz/gcontext"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,7 +43,7 @@ func TestCreateSessionRecordsSessionAudit(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameAuth)
 	defer testsetup.Done(testsetup.AppNameAuth)
 
-	ctx := context.WithValue(context.Background(), gcontext.KeyTenantID, uint(77))
+	ctx := context.WithValue(context.Background(), ContextKeyTenantID, uint(77))
 	store := NewSSOSessionStore()
 
 	prev := sessionAuditWriter

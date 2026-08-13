@@ -17,8 +17,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
-
-	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/glog"
 )
 
@@ -41,6 +39,13 @@ func ssoSessionKey(sessionID string) string {
 func ssoUserSessionsKey(personID uint) string {
 	return fmt.Sprintf("%s%d", ssoUserSessionsKeyPrefix, personID)
 }
+
+// tenantIDCtxKey 用作 context key 的类型，避免直接以 string 作为 context key 触发 staticcheck SA1029。
+type tenantIDCtxKey struct{}
+
+// ContextKeyTenantID 是写入/读取 SSO 会话审计租户 ID 所用的 context key。
+// 供跨包（如 svcoidc 在 context 中注入租户）与包内记录审计时统一使用。
+var ContextKeyTenantID tenantIDCtxKey
 
 type ssoSessionData struct {
 	PersonID  uint      `json:"personID"`
@@ -100,7 +105,7 @@ var sessionAuditWriter = func(ctx context.Context, entity *model.SessionAuditEnt
 // client_ip 与 user_agent 暂留空。
 func recordSessionAuditBestEffort(ctx context.Context, sid string, personID uint) {
 	tenantID := uint(0)
-	if v := ctx.Value(gcontext.KeyTenantID); v != nil {
+	if v := ctx.Value(ContextKeyTenantID); v != nil {
 		if t, ok := v.(uint); ok {
 			tenantID = t
 		}
