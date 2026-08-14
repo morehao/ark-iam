@@ -219,8 +219,8 @@ func NewOIDCAuthSvc(provider *OIDCProvider) OIDCAuthSvc {
 		provider:             provider,
 		authSvc:              svcauth.NewAuthSvc(),
 		ssoSessionStore:      sso.NewSSOSessionStore(),
-		applicationClientDao: dao.NewApplicationClientDao,
-		applicationDao:       dao.NewApplicationDao,
+		applicationClientDao: func() *dao.ApplicationClientDao { return dao.NewApplicationClientDao() },
+		applicationDao:       func() *dao.ApplicationDao { return dao.NewApplicationDao() },
 	}
 }
 

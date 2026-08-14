@@ -32,12 +32,12 @@ type PersistentStore struct {
 
 func NewPersistentStore() *PersistentStore {
 	return &PersistentStore{
-		applicationClientDao:       dao.NewApplicationClientDao,
+		applicationClientDao:       func() *dao.ApplicationClientDao { return dao.NewApplicationClientDao() },
 		applicationClientSecretDao: dao.NewApplicationClientSecretDao,
 		personDao:                  dao.NewPersonDao,
 		userDao:                    dao.NewUserDao,
 		refreshTokenDao:            dao.NewRefreshTokenDao,
-		apiKeyDao:                  dao.NewApiKeyDao,
+		apiKeyDao:                  func() *dao.ApiKeyDao { return dao.NewApiKeyDao() },
 	}
 }
 

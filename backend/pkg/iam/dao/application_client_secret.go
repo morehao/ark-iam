@@ -1,8 +1,8 @@
 package dao
 
 import (
-	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
@@ -10,7 +10,7 @@ import (
 type ApplicationClientSecretCond struct {
 	*gormdao.BaseCond
 	ApplicationClientID uint
-	Name          string
+	Name                string
 }
 
 func (c *ApplicationClientSecretCond) BuildCondition(db *gorm.DB, tableName string) {

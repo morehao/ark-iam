@@ -238,9 +238,9 @@ func newTestApiKeySvc(t *testing.T) (CreateApiKeySvc, *gorm.DB, func()) {
 		t.Fatalf("open sqlite db: %v", err)
 	}
 
-	apiKeyDao := dao.NewApiKeyDaoWithDB(func(ctx context.Context) *gorm.DB {
+	apiKeyDao := dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB {
 		return db.WithContext(ctx)
-	})
+	}))
 
 	svc := newCreateApiKeySvcWithDao(apiKeyDao)
 

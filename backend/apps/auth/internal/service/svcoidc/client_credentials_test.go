@@ -57,11 +57,11 @@ func TestClientCredentialsStorage(t *testing.T) {
 	}
 
 	secretEntity := &model.ApplicationClientSecretEntity{
-		Model:         gorm.Model{ID: 1},
+		Model:               gorm.Model{ID: 1},
 		ApplicationClientID: clientEntity.ID,
-		Name:          "default",
-		ValueHash:     hex.EncodeToString(secretHash[:]),
-		ValuePrefix:   "s*",
+		Name:                "default",
+		ValueHash:           hex.EncodeToString(secretHash[:]),
+		ValuePrefix:         "s*",
 	}
 	if err := db.Create(secretEntity).Error; err != nil {
 		t.Fatalf("insert application_client_secret: %v", err)
@@ -69,7 +69,7 @@ func TestClientCredentialsStorage(t *testing.T) {
 
 	persistentStore := NewPersistentStore()
 	persistentStore.applicationClientDao = func() *dao.ApplicationClientDao {
-		return dao.NewApplicationClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
+		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
 	persistentStore.applicationClientSecretDao = func() *dao.ApplicationClientSecretDao {
 		return &dao.ApplicationClientSecretDao{Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList](
@@ -78,7 +78,7 @@ func TestClientCredentialsStorage(t *testing.T) {
 		)}
 	}
 	persistentStore.apiKeyDao = func() *dao.ApiKeyDao {
-		return dao.NewApiKeyDaoWithDB(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) })
+		return dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
 	}
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -154,11 +154,11 @@ func TestClientCredentialsRejectsPublicClient(t *testing.T) {
 	}
 
 	secretEntity := &model.ApplicationClientSecretEntity{
-		Model:         gorm.Model{ID: 1},
+		Model:               gorm.Model{ID: 1},
 		ApplicationClientID: publicClient.ID,
-		Name:          "default",
-		ValueHash:     hex.EncodeToString(secretHash[:]),
-		ValuePrefix:   "s*",
+		Name:                "default",
+		ValueHash:           hex.EncodeToString(secretHash[:]),
+		ValuePrefix:         "s*",
 	}
 	if err := db.Create(secretEntity).Error; err != nil {
 		t.Fatalf("insert application_client_secret: %v", err)
@@ -166,7 +166,7 @@ func TestClientCredentialsRejectsPublicClient(t *testing.T) {
 
 	persistentStore := NewPersistentStore()
 	persistentStore.applicationClientDao = func() *dao.ApplicationClientDao {
-		return dao.NewApplicationClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
+		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
 	persistentStore.applicationClientSecretDao = func() *dao.ApplicationClientSecretDao {
 		return &dao.ApplicationClientSecretDao{Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList](
@@ -175,7 +175,7 @@ func TestClientCredentialsRejectsPublicClient(t *testing.T) {
 		)}
 	}
 	persistentStore.apiKeyDao = func() *dao.ApiKeyDao {
-		return dao.NewApiKeyDaoWithDB(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) })
+		return dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
 	}
 
 	storage := NewOIDCStorage(nil, persistentStore, nil, "test-key")
@@ -199,7 +199,7 @@ func TestCreateAccessTokenForClientCredentials(t *testing.T) {
 
 	persistentStore := NewPersistentStore()
 	persistentStore.applicationClientDao = func() *dao.ApplicationClientDao {
-		return dao.NewApplicationClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
+		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
 
 	now := time.Now()
@@ -232,7 +232,7 @@ func TestGetPrivateClaimsFromRequestForClientCredentials(t *testing.T) {
 
 	persistentStore := NewPersistentStore()
 	persistentStore.applicationClientDao = func() *dao.ApplicationClientDao {
-		return dao.NewApplicationClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
+		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
 
 	storage := NewOIDCStorage(nil, persistentStore, nil, "test-key")

@@ -29,7 +29,7 @@ func TestDeleteSystemApplicationClient(t *testing.T) {
 	oldNew := newApplicationClientDAO
 	defer func() { newApplicationClientDAO = oldNew }()
 	newApplicationClientDAO = func() *dao.ApplicationClientDao {
-		return dao.NewApplicationClientDaoWithDB(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) })
+		return dao.NewApplicationClientDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
 	}
 
 	_ = db.Create(&model.ApplicationClientEntity{

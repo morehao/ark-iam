@@ -2,7 +2,6 @@ package dao
 
 import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
@@ -35,19 +34,10 @@ func (c *AuditLogCond) BuildCondition(db *gorm.DB, tableName string) {
 
 type AuditLogDao struct {
 	*gormdao.Dao[model.AuditLogEntity, model.AuditLogEntityList]
-	dbGetter gormdao.DBGetter
 }
 
-func NewAuditLogDao() *AuditLogDao {
+func NewAuditLogDao(opts ...DaoOption) *AuditLogDao {
 	return &AuditLogDao{
-		Dao:      gormdao.NewDao[model.AuditLogEntity, model.AuditLogEntityList](model.TableNameAuditLog, "AuditLogDao", dbclient.IamDB),
-		dbGetter: dbclient.IamDB,
-	}
-}
-
-func NewAuditLogDaoWithDB(dbGetter gormdao.DBGetter) *AuditLogDao {
-	return &AuditLogDao{
-		Dao:      gormdao.NewDao[model.AuditLogEntity, model.AuditLogEntityList](model.TableNameAuditLog, "AuditLogDao", dbGetter),
-		dbGetter: dbGetter,
+		Dao: gormdao.NewDao[model.AuditLogEntity, model.AuditLogEntityList](model.TableNameAuditLog, "AuditLogDao", resolveDBGetter(opts...)),
 	}
 }

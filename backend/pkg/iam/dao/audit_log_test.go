@@ -27,9 +27,9 @@ func TestAuditLogDao_InsertAndGetByCond(t *testing.T) {
 
 	_ = db.AutoMigrate(&model.AuditLogEntity{})
 
-	auditDao := NewAuditLogDaoWithDB(func(ctx context.Context) *gorm.DB {
+	auditDao := NewAuditLogDao(WithDBGetter(func(ctx context.Context) *gorm.DB {
 		return db.WithContext(ctx)
-	})
+	}))
 
 	entity := &model.AuditLogEntity{
 		ActorPersonID: 11,
