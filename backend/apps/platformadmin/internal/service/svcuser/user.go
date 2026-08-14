@@ -3,6 +3,7 @@ package svcuser
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -160,37 +161,30 @@ func (svc *userSvc) loadPersonMap(ctx context.Context, personIDs []uint) map[uin
 
 func (svc *userSvc) Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtouser.UserCreateResp, error) {
 	userDao := dao.NewUserDao()
+	personDao := dao.NewPersonDao()
 	tenantID := gincontext.GetTenantID(ctx)
 	if req.TenantID == 0 {
 		req.TenantID = tenantID
 	}
 
+	// username/primaryEmail/primaryPhone 为全局自然人标识，唯一性校验需查 person 表
 	if req.Username != "" {
-		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
-			TenantID: req.TenantID,
-			Username: req.Username,
-		})
-		if existingUser != nil && existingUser.ID != 0 {
+		existingPerson, _ := personDao.GetByCond(ctx, &dao.PersonCond{Username: req.Username})
+		if existingPerson != nil && existingPerson.ID != 0 {
 			return nil, code.GetError(code.UsernameAlreadyExistsError)
 		}
 	}
 
 	if req.PrimaryEmail != "" {
-		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
-			TenantID:     req.TenantID,
-			PrimaryEmail: req.PrimaryEmail,
-		})
-		if existingUser != nil && existingUser.ID != 0 {
+		existingPerson, _ := personDao.GetByCond(ctx, &dao.PersonCond{PrimaryEmail: req.PrimaryEmail})
+		if existingPerson != nil && existingPerson.ID != 0 {
 			return nil, code.GetError(code.EmailAlreadyExistsError)
 		}
 	}
 
 	if req.PrimaryPhone != "" {
-		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
-			TenantID:     req.TenantID,
-			PrimaryPhone: req.PrimaryPhone,
-		})
-		if existingUser != nil && existingUser.ID != 0 {
+		existingPerson, _ := personDao.GetByCond(ctx, &dao.PersonCond{PrimaryPhone: req.PrimaryPhone})
+		if existingPerson != nil && existingPerson.ID != 0 {
 			return nil, code.GetError(code.PhoneAlreadyExistsError)
 		}
 	}
@@ -228,9 +222,9 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtous
 					passwordHash = hash
 				}
 				personEntity := &model.PersonEntity{
-					Username:          req.Username,
-					PrimaryEmail:      req.PrimaryEmail,
-					PrimaryPhone:      req.PrimaryPhone,
+					Username:          model.StrPtr(req.Username),
+					PrimaryEmail:      model.StrPtr(req.PrimaryEmail),
+					PrimaryPhone:      model.StrPtr(req.PrimaryPhone),
 					PasswordEncrypted: passwordHash,
 					PasswordMethod:    "bcrypt",
 					Name:              req.Name,
@@ -241,7 +235,7 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtous
 				}
 				if insertErr := dao.NewPersonDao().WithTx(tx).Insert(ctx, personEntity); insertErr != nil {
 					glog.Errorf(ctx, "[svcuser.Create] person Insert fail, err:%v", insertErr)
-					return code.GetError(code.UserCreateError)
+					return fmt.Errorf("person insert: %w", insertErr)
 				}
 				personID = personEntity.ID
 			}
@@ -262,7 +256,7 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtous
 
 		if insertErr := userDao.WithTx(tx).Insert(ctx, insertEntity); insertErr != nil {
 			glog.Errorf(ctx, "[svcuser.Create] dao Insert fail, err:%v, req:%s", insertErr, gutil.ToJsonString(req))
-			return code.GetError(code.UserCreateError)
+			return fmt.Errorf("user insert: %w", insertErr)
 		}
 		createdUserID = insertEntity.ID
 		return nil
@@ -299,7 +293,7 @@ func (svc *userSvc) Delete(ctx *gin.Context, req *dtouser.UserDeleteReq) error {
 }
 
 func (svc *userSvc) Update(ctx *gin.Context, req *dtouser.UserUpdateReq) error {
-	userDao := dao.NewUserDao()
+	personDao := dao.NewPersonDao()
 	userEntity, err := newUserObjectScopeRepo().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -310,31 +304,22 @@ func (svc *userSvc) Update(ctx *gin.Context, req *dtouser.UserUpdateReq) error {
 	}
 
 	if req.Username != "" {
-		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
-			TenantID: req.TenantID,
-			Username: req.Username,
-		})
-		if existingUser != nil && existingUser.ID != 0 && existingUser.ID != req.UserID {
+		existingPerson, _ := personDao.GetByCond(ctx, &dao.PersonCond{Username: req.Username})
+		if existingPerson != nil && existingPerson.ID != 0 && existingPerson.ID != userEntity.PersonID {
 			return code.GetError(code.UsernameAlreadyExistsError)
 		}
 	}
 
 	if req.PrimaryEmail != "" {
-		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
-			TenantID:     req.TenantID,
-			PrimaryEmail: req.PrimaryEmail,
-		})
-		if existingUser != nil && existingUser.ID != 0 && existingUser.ID != req.UserID {
+		existingPerson, _ := personDao.GetByCond(ctx, &dao.PersonCond{PrimaryEmail: req.PrimaryEmail})
+		if existingPerson != nil && existingPerson.ID != 0 && existingPerson.ID != userEntity.PersonID {
 			return code.GetError(code.EmailAlreadyExistsError)
 		}
 	}
 
 	if req.PrimaryPhone != "" {
-		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
-			TenantID:     req.TenantID,
-			PrimaryPhone: req.PrimaryPhone,
-		})
-		if existingUser != nil && existingUser.ID != 0 && existingUser.ID != req.UserID {
+		existingPerson, _ := personDao.GetByCond(ctx, &dao.PersonCond{PrimaryPhone: req.PrimaryPhone})
+		if existingPerson != nil && existingPerson.ID != 0 && existingPerson.ID != userEntity.PersonID {
 			return code.GetError(code.PhoneAlreadyExistsError)
 		}
 	}
@@ -398,9 +383,9 @@ func (svc *userSvc) Detail(ctx *gin.Context, req *dtouser.UserDetailReq) (*dtous
 		UserID: userEntity.ID,
 		UserBaseInfo: objuser.UserBaseInfo{
 			TenantID:     userEntity.TenantID,
-			Username:     person.Username,
-			PrimaryEmail: person.PrimaryEmail,
-			PrimaryPhone: person.PrimaryPhone,
+			Username:     model.DerefStr(person.Username),
+			PrimaryEmail: model.DerefStr(person.PrimaryEmail),
+			PrimaryPhone: model.DerefStr(person.PrimaryPhone),
 			Name:         userEntity.Name,
 			Avatar:       userEntity.Avatar,
 			Profile:      profile,
@@ -459,9 +444,9 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtouser.UserPageListReq) (*d
 			UserID: v.ID,
 			UserBaseInfo: objuser.UserBaseInfo{
 				TenantID:     v.TenantID,
-				Username:     person.Username,
-				PrimaryEmail: person.PrimaryEmail,
-				PrimaryPhone: person.PrimaryPhone,
+				Username:     model.DerefStr(person.Username),
+				PrimaryEmail: model.DerefStr(person.PrimaryEmail),
+				PrimaryPhone: model.DerefStr(person.PrimaryPhone),
 				Name:         v.Name,
 				Avatar:       v.Avatar,
 				Profile:      profile,

@@ -110,7 +110,7 @@ func TestConnectorCallbackReturnsPersonTokenWhenPersonHasMultipleTenants(t *test
 		stateStore: stateStore,
 		identityResolver: &fakeConnectorIdentityResolver{
 			resolveFunc: func(ctx context.Context, input identityResolveInput) (*resolvedConnectorPerson, error) {
-				return &resolvedConnectorPerson{Person: &model.PersonEntity{Model: gorm.Model{ID: 101}, Username: "alice"}}, nil
+				return &resolvedConnectorPerson{Person: &model.PersonEntity{Model: gorm.Model{ID: 101}, Username: model.StrPtr("alice")}}, nil
 			},
 		},
 		ssoSessionStore: &fakeConnectorSSOSessionStore{},

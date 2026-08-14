@@ -43,7 +43,7 @@ func TestRegisterCreatesPersonAndUser(t *testing.T) {
 	var person model.PersonEntity
 	err = db.Where("primary_email = ?", email).First(&person).Error
 	require.NoError(t, err)
-	assert.Equal(t, username, person.Username)
+	assert.Equal(t, username, model.DerefStr(person.Username))
 	assert.True(t, testsetup.PasswordMatches(person.PasswordEncrypted, "Password1"))
 
 	defer func() {

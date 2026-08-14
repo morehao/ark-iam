@@ -187,8 +187,8 @@ func (m *identityMapper) Resolve(ctx context.Context, input identityResolveInput
 	}
 
 	person := &model.PersonEntity{
-		Username:     resolveIdentityUsername(input.Identity),
-		PrimaryEmail: input.Identity.Email,
+		Username:     model.StrPtr(resolveIdentityUsername(input.Identity)),
+		PrimaryEmail: model.StrPtr(input.Identity.Email),
 		Name:         input.Identity.DisplayName,
 		Avatar:       input.Identity.AvatarURL,
 		Profile:      json.RawMessage("{}"),

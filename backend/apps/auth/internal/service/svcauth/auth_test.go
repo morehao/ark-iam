@@ -485,7 +485,7 @@ func TestRegisterCreatesPersonAccount(t *testing.T) {
 	if insertedPerson == nil {
 		t.Fatal("expected person account to be inserted")
 	}
-	if insertedPerson.Username != "person-user" || insertedPerson.PrimaryEmail != "mail@example.com" {
+	if model.DerefStr(insertedPerson.Username) != "person-user" || model.DerefStr(insertedPerson.PrimaryEmail) != "mail@example.com" {
 		t.Fatalf("expected person identifiers to persist, got %#v", insertedPerson)
 	}
 	if insertedPerson.PasswordEncrypted == "" {

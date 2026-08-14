@@ -107,17 +107,35 @@
 | 6 | `dtoapplicationclient.DetailReq` 只有 `json` tag 无 `form` tag，查询绑定靠字段名大小写不敏感兜底，规范上应显式声明 | 补 `form` tag |
 | 7 | 角色 users 系列接口用 `roleId`（小写 i），其余角色接口用 `roleID`，命名不一致 | 保持后端现状，前端按后端实际字段调用，并在文档标注 |
 
-### 3.2 后端实现问题（缺失/不完整，已修/待修）
+### 3.2 后端实现问题（缺失/不完整，已修）
 
 | # | 问题 | 影响 | 处置 |
 |---|------|------|------|
-| 1 | `svcuser.UpdatePassword` 只更新 `updated_by`，未真正修改密码 | 管理员改密无效 | 改为更新 person 密码（校验原密码逻辑由前端页面承担） |
-| 2 | `svcuser.Create` 不创建 person、不落用户名/邮箱/手机号/密码，创建出的"用户"无法登录 | 用户管理无法真正开通账号 | Create 支持两种模式：指定 `personID` 关联已有自然人；或提供 username+password 时自动创建 person（复用 auth 注册逻辑） |
-| 3 | `svcuser.Detail`/`PageList` 不返回 person 的 username/email/phone/avatar | 用户列表/详情信息缺失 | 关联查询 person 并填充 `UserBaseInfo` |
-| 4 | role/menu/resource/scope 的 Create 未从认证上下文注入当前租户，前端不传 `tenantID` 时创建到 0 租户，随后不可见 | 平台管理建角色/菜单等"创建成功但看不到" | 服务端注入 `gincontext.GetTenantID(ctx)` |
-| 5 | `user_identity` 相关接口存在但无前端页面 | 用户详情页第三方身份管理未覆盖 | 前端用户详情页补齐身份 Tab |
+| 1 | `svcuser.UpdatePassword` 只更新 `updated_by`，未真正修改密码 | 管理员改密无效 | 已改为更新 person 密码（哈希后落库），支持明文或预哈希两种入参 |
+| 2 | `svcuser.Create` 不创建 person、不落用户名/邮箱/手机号/密码，创建出的"用户"无法登录 | 用户管理无法真正开通账号 | 已支持两种模式：指定 `personID` 关联已有自然人；或提供 username+password 时自动创建 person（复用注册逻辑） |
+| 3 | `svcuser.Detail`/`PageList` 不返回 person 的 username/email/phone/avatar | 用户列表/详情信息缺失 | 已关联查询 person 并填充 |
+| 4 | role/resource/scope 的 Create 未从认证上下文注入当前租户，前端不传 `tenantID` 时创建到 0 租户，随后不可见 | 平台管理建角色/资源等"创建成功但看不到" | 已服务端注入 `gincontext.GetTenantID(ctx)` |
+| 5 | 全项目 31 个 DAO 的 `gormdao.Dao.Delete` 默认写 `deleted_time` 列，而所有模型/建表 SQL 用 `deleted_at`（GORM 原生软删），删除接口运行时必然报 MySQL 1054 | **P0：所有删除操作不可用** | 已为全部 DAO 追加 `gormdao.WithoutSoftDelete()`，改为 GORM 原生 `deleted_at` 软删 |
+| 6 | tenantadmin：organization 响应嵌套（`organizationBaseInfo`）与前端扁平类型不符；create/update 取客户端 tenantID 导致建到 0 租户；organizationRole create 缺 organizationID 必填；`validate:"required"` tag 对 gin 无效 | 组织管理页面显示/编辑失效、角色创建必失败 | 已扁平化响应、服务端注入租户、organizationID 加 `binding:"required"`、`validate` 改 `binding` |
+| 7 | auth：`/user/sessions/:id` 撤销无归属校验（IDOR，任意用户可撤销他人会话） | 越权漏洞 | 已加 person/user/tenant 归属校验，无权返回"会话不存在或无权撤销" |
+| 8 | auth：connector pageList 的 `createdAt` 未填充（序列化出零值时间）；person 改密无强度校验 | 展示异常/安全弱化 | 已填充 createdAt、增加与注册一致的强度校验 |
 
-### 3.3 建议的前端最小接口集（页面 → 接口）
+### 3.3 前端完成情况（对应步骤 3/4）
+
+| 前端应用 | 完成内容 |
+|----------|----------|
+| 共享包 types/api/auth/ui | 新增平台领域类型与全量 API 资源；设计系统（品牌主题/AppShell/PageContainer/渐变侧边栏/分屏登录页/个人中心/租户切换） |
+| platform-admin-web | 用户/角色/菜单/部门/应用/OAuth客户端/租户/租户应用/API Key/权限域/资源/域名/系统配置/审计日志 全部页面 + 仪表盘统计；修复 oauthClient/department/application/tenant 契约 |
+| tenant-admin-web | 组织/组织角色/组织用户/组织角色用户 页面完善（联动选择器、扁平响应适配） |
+| login-web | 修复登录失败跳转 `/undefined` 的 bug（校验响应 code）；分屏美化 |
+
+### 3.4 遗留说明（非阻塞）
+
+- OIDC 鉴权中间件（`pkg/middleware/oidcauth`）只注入 personID/tenantID，`GetUserID` 恒为 0 → 各服务 `created_by/updated_by` 为 0；会话列表按 userID 过滤失效。修复需改中间件并回归全部应用，建议后续专项处理。
+- connector 第三方登录完整流程（公开连接器列表、authorize 白名单、回调 302 完成 OIDC 授权、自动建租户成员）仍为缺口，接口齐备但流程未闭环；登录门户"第三方登录"按钮为占位。
+- 注册接口可被任意调用方指定租户创建 owner 账号，无租户策略/风控校验，建议后续收敛。
+
+### 3.5 前端最小接口集（页面 → 接口）
 
 | 前端页面 | 依赖接口 | 现状 |
 |----------|----------|------|

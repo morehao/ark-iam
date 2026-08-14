@@ -299,7 +299,7 @@ func TestIdentityMapperRejectsUnboundIdentityWhenAutoCreateDisabled(t *testing.T
 }
 
 func TestIdentityMapperReturnsBoundPerson(t *testing.T) {
-	expectedPerson := &model.PersonEntity{Model: model.PersonEntity{}.Model, Username: "bound-user", Name: "bound-user"}
+	expectedPerson := &model.PersonEntity{Model: model.PersonEntity{}.Model, Username: model.StrPtr("bound-user"), Name: "bound-user"}
 	expectedPerson.ID = 33
 
 	mapper := newIdentityMapper(
@@ -393,8 +393,8 @@ func TestIdentityMapperAutoCreatesPersonAndBindsIdentity(t *testing.T) {
 	if insertedPerson == nil {
 		t.Fatalf("expected person insert to be called")
 	}
-	if insertedPerson.PrimaryEmail != "user@example.com" {
-		t.Fatalf("expected email to map to person primary email, got %q", insertedPerson.PrimaryEmail)
+	if model.DerefStr(insertedPerson.PrimaryEmail) != "user@example.com" {
+		t.Fatalf("expected email to map to person primary email, got %q", model.DerefStr(insertedPerson.PrimaryEmail))
 	}
 	if insertedPerson.Name != "Preferred User" {
 		t.Fatalf("expected display name to map to person name, got %q", insertedPerson.Name)
@@ -775,7 +775,7 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 		stateStore: stateStore,
 		identityResolver: &fakeConnectorIdentityResolver{
 			resolveFunc: func(ctx context.Context, input identityResolveInput) (*resolvedConnectorPerson, error) {
-				person := &model.PersonEntity{Username: "callback-user", Name: "callback-user"}
+				person := &model.PersonEntity{Username: model.StrPtr("callback-user"), Name: "callback-user"}
 				person.ID = 88
 				return &resolvedConnectorPerson{Person: person}, nil
 			},
@@ -884,7 +884,7 @@ func TestConnectorServiceCallbackAllowsMissingConnectorID(t *testing.T) {
 		stateStore: stateStore,
 		identityResolver: &fakeConnectorIdentityResolver{
 			resolveFunc: func(ctx context.Context, input identityResolveInput) (*resolvedConnectorPerson, error) {
-				person := &model.PersonEntity{Username: "callback-user", Name: "callback-user"}
+				person := &model.PersonEntity{Username: model.StrPtr("callback-user"), Name: "callback-user"}
 				person.ID = 88
 				return &resolvedConnectorPerson{Person: person}, nil
 			},
@@ -964,7 +964,7 @@ func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 	}
 	connectorEntity.ID = 101
 
-	resolvedPerson := &model.PersonEntity{Model: gorm.Model{ID: 909}, Username: "connector-person"}
+	resolvedPerson := &model.PersonEntity{Model: gorm.Model{ID: 909}, Username: model.StrPtr("connector-person")}
 
 	svc := &connectorSvc{
 		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{
@@ -995,7 +995,7 @@ func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 	restorePersonStore := swapPersonStoreFactory(func() authPersonStore {
 		return &fakeAuthPersonStore{
 			getByCondFunc: func(ctx context.Context, cond *dao.PersonCond) (*model.PersonEntity, error) {
-				return &model.PersonEntity{Model: gorm.Model{ID: 909}, Username: "connector-person"}, nil
+				return &model.PersonEntity{Model: gorm.Model{ID: 909}, Username: model.StrPtr("connector-person")}, nil
 			},
 		}
 	})
@@ -1054,7 +1054,7 @@ func TestConnectorCallbackInvokesIdentityResolverTokenGeneratorAndLoginRecorder(
 	}
 	connectorEntity.ID = 202
 
-	resolvedPerson := &model.PersonEntity{Model: gorm.Model{ID: 909}, Username: "mapped-user", Name: "Mapped User"}
+	resolvedPerson := &model.PersonEntity{Model: gorm.Model{ID: 909}, Username: model.StrPtr("mapped-user"), Name: "Mapped User"}
 
 	var resolvedInput identityResolveInput
 	svc := &connectorSvc{

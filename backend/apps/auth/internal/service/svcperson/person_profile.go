@@ -4,9 +4,10 @@ import (
 	"unicode"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoperson"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
+	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
@@ -38,9 +39,9 @@ func (svc *personProfileSvc) Detail(ctx *gin.Context, req *dtoperson.PersonDetai
 
 	return &dtoperson.PersonDetailResp{
 		PersonID:     personEntity.ID,
-		Username:     personEntity.Username,
-		PrimaryEmail: personEntity.PrimaryEmail,
-		PrimaryPhone: personEntity.PrimaryPhone,
+		Username:     model.DerefStr(personEntity.Username),
+		PrimaryEmail: model.DerefStr(personEntity.PrimaryEmail),
+		PrimaryPhone: model.DerefStr(personEntity.PrimaryPhone),
 		Name:         personEntity.Name,
 		Avatar:       personEntity.Avatar,
 		IsSuspended:  personEntity.IsSuspended,
