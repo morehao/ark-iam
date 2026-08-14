@@ -175,4 +175,4 @@
 ### v1.32.0 遗留缺陷 → 已由 v1.32.1 修复
 - **`BaseCond.IncludeDeleted()` 在 nil 嵌入指针上 panic**：所有内嵌 `*gormdao.BaseCond` 的 Cond 以零值构造（未初始化 BaseCond）时，`deletedScope` 的类型断言 + 提升方法调用会 nil 解引用（`gormdao/cond.go`）。golib 自身测试用值嵌入未暴露此问题。
 - **已升级 golib v1.32.1**（含 nil 安全修复 `return c != nil && c.IsDelete`），`go.mod` 4 个模块均指向 v1.32.1。
-- `backend/go.work` 保留 `replace github.com/morehao/golib => ./.tmp/golib-v1.32.1`（本地校验副本，`.tmp/` 不入库）；网络可达后运行 `go mod tidy` 生成 go.sum 条目并删除该 replace 即回归纯远端依赖。
+- **已回归纯远端依赖**：`backend/go.work` 无 replace；`go.work.sum` 含 golib v1.32.1 真实哈希（经 GOPROXY=direct 从 github 计算）。
