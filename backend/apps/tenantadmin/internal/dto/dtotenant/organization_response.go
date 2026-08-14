@@ -7,8 +7,8 @@ type OrganizationCreateResp struct {
 }
 
 type OrganizationDetailResp struct {
-	OrganizationID      uint `json:"organizationID"`        // 组织ID
-	objtenant.OrganizationBaseInfo `json:"organizationBaseInfo"` // 组织基础信息
+	OrganizationID uint `json:"organizationID"` // 组织ID
+	objtenant.OrganizationBaseInfo
 }
 
 type OrganizationPageListResp struct {
@@ -17,8 +17,8 @@ type OrganizationPageListResp struct {
 }
 
 type OrganizationPageListItem struct {
-	OrganizationID      uint `json:"organizationID"`        // 组织ID
-	objtenant.OrganizationBaseInfo `json:"organizationBaseInfo"` // 组织基础信息
+	OrganizationID uint `json:"organizationID"` // 组织ID
+	objtenant.OrganizationBaseInfo
 }
 
 type OrganizationRoleCreateResp struct {

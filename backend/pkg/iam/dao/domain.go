@@ -37,7 +37,7 @@ func NewDomainDao() *DomainDao {
 	return &DomainDao{
 		Dao: gormdao.NewDao[model.DomainEntity, model.DomainEntityList](
 			model.TableNameDomain, "DomainDao",
-			dbclient.IamDB,
+			dbclient.IamDB, gormdao.WithoutSoftDelete(),
 		),
 	}
 }

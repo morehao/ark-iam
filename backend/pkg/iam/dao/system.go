@@ -33,7 +33,7 @@ func NewSystemDao() *SystemDao {
 	return &SystemDao{
 		Dao: gormdao.NewDao[model.SystemEntity, model.SystemEntityList](
 			model.TableNameSystem, "SystemDao",
-			dbclient.IamDB,
+			dbclient.IamDB, gormdao.WithoutSoftDelete(),
 		),
 	}
 }

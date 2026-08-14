@@ -49,7 +49,7 @@ func NewUserIdentityDao() *UserIdentityDao {
 	return &UserIdentityDao{
 		Dao: gormdao.NewDao[model.UserIdentityEntity, model.UserIdentityEntityList](
 			model.TableNameUserIdentity, "UserIdentityDao",
-			dbclient.IamDB,
+			dbclient.IamDB, gormdao.WithoutSoftDelete(),
 		),
 	}
 }

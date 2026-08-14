@@ -38,7 +38,7 @@ func NewSessionAuditDao() *SessionAuditDao {
 	return &SessionAuditDao{
 		Dao: gormdao.NewDao[model.SessionAuditEntity, model.SessionAuditEntityList](
 			model.TableNameSession, "SessionAuditDao",
-			dbclient.IamDB,
+			dbclient.IamDB, gormdao.WithoutSoftDelete(),
 		),
 		dbGetter: dbclient.IamDB,
 	}
@@ -48,7 +48,7 @@ func NewSessionAuditDaoWithDB(dbGetter gormdao.DBGetter) *SessionAuditDao {
 	return &SessionAuditDao{
 		Dao: gormdao.NewDao[model.SessionAuditEntity, model.SessionAuditEntityList](
 			model.TableNameSession, "SessionAuditDao",
-			dbGetter,
+			dbGetter, gormdao.WithoutSoftDelete(),
 		),
 		dbGetter: dbGetter,
 	}

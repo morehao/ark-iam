@@ -3,6 +3,7 @@ package svcuser
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
@@ -14,6 +15,7 @@ import (
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
+	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 	"gorm.io/gorm"
@@ -132,8 +134,36 @@ func NewUserSvc() UserSvc {
 	return &userSvc{}
 }
 
+// loadPersonMap 批量加载自然人信息（username/email/phone 在 person 表），
+// 用于用户列表/详情关联展示。查询失败仅告警并返回空 map，不阻断主流程。
+func (svc *userSvc) loadPersonMap(ctx context.Context, personIDs []uint) map[uint]*model.PersonEntity {
+	result := make(map[uint]*model.PersonEntity)
+	if len(personIDs) == 0 {
+		return result
+	}
+	personDao := dao.NewPersonDao()
+	for _, id := range personIDs {
+		if id == 0 {
+			continue
+		}
+		person, err := personDao.GetByID(ctx, id)
+		if err != nil {
+			glog.Warnf(ctx, "[svcuser.loadPersonMap] person GetByID fail, personID:%d, err:%v", id, err)
+			continue
+		}
+		if person != nil && person.ID != 0 {
+			result[id] = person
+		}
+	}
+	return result
+}
+
 func (svc *userSvc) Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtouser.UserCreateResp, error) {
 	userDao := dao.NewUserDao()
+	tenantID := gincontext.GetTenantID(ctx)
+	if req.TenantID == 0 {
+		req.TenantID = tenantID
+	}
 
 	if req.Username != "" {
 		existingUser, _ := userDao.GetByCond(ctx, &dao.UserCond{
@@ -176,22 +206,77 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtous
 		return nil, code.GetError(code.UserCreateError)
 	}
 
-	insertEntity := &model.UserEntity{
-		TenantID:    req.TenantID,
-		Name:        req.Name,
-		Avatar:      req.Avatar,
-		Profile:     profileJson,
-		CustomData:  customDataJson,
-		IsSuspended: req.IsSuspended,
-		CreatedBy:   gincontext.GetUserID(ctx),
-	}
+	personID := req.PersonID
+	operatorID := gincontext.GetUserID(ctx)
+	now := time.Now()
+	var createdUserID uint
+	txErr := iamDBFromContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if personID == 0 {
+			// 未指定已有自然人：当提供了可登录标识（username/email/phone）时自动创建 person，
+			// 使该用户可登录；否则创建仅租户内可见、无登录凭证的用户记录。
+			if req.Username != "" || req.PrimaryEmail != "" || req.PrimaryPhone != "" || req.Password != "" {
+				if req.Username == "" && req.PrimaryEmail == "" && req.PrimaryPhone == "" {
+					return code.GetError(code.AuthIdentifierRequiredError)
+				}
+				passwordHash := ""
+				if req.Password != "" {
+					hash, hashErr := gcrypto.GeneratePasswordHash(req.Password)
+					if hashErr != nil {
+						glog.Errorf(ctx, "[svcuser.Create] GeneratePasswordHash fail, err:%v", hashErr)
+						return code.GetError(code.PasswordHashError)
+					}
+					passwordHash = hash
+				}
+				personEntity := &model.PersonEntity{
+					Username:          req.Username,
+					PrimaryEmail:      req.PrimaryEmail,
+					PrimaryPhone:      req.PrimaryPhone,
+					PasswordEncrypted: passwordHash,
+					PasswordMethod:    "bcrypt",
+					Name:              req.Name,
+					Avatar:            req.Avatar,
+					Profile:           profileJson,
+					CustomData:        customDataJson,
+					CreatedBy:         operatorID,
+				}
+				if insertErr := dao.NewPersonDao().WithTx(tx).Insert(ctx, personEntity); insertErr != nil {
+					glog.Errorf(ctx, "[svcuser.Create] person Insert fail, err:%v", insertErr)
+					return code.GetError(code.UserCreateError)
+				}
+				personID = personEntity.ID
+			}
+		}
 
-	if err := userDao.Insert(ctx, insertEntity); err != nil {
-		glog.Errorf(ctx, "[svcuser.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		insertEntity := &model.UserEntity{
+			TenantID:    req.TenantID,
+			PersonID:    personID,
+			Name:        req.Name,
+			Avatar:      req.Avatar,
+			Profile:     profileJson,
+			CustomData:  customDataJson,
+			IsSuspended: req.IsSuspended,
+			IsOwner:     0,
+			JoinedAt:    &now,
+			CreatedBy:   operatorID,
+		}
+
+		if insertErr := userDao.WithTx(tx).Insert(ctx, insertEntity); insertErr != nil {
+			glog.Errorf(ctx, "[svcuser.Create] dao Insert fail, err:%v, req:%s", insertErr, gutil.ToJsonString(req))
+			return code.GetError(code.UserCreateError)
+		}
+		createdUserID = insertEntity.ID
+		return nil
+	})
+	if txErr != nil {
+		if txErr == code.GetError(code.AuthIdentifierRequiredError) || txErr == code.GetError(code.PasswordHashError) {
+			return nil, txErr
+		}
+		glog.Errorf(ctx, "[svcuser.Create] transaction fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserCreateError)
 	}
+
 	return &dtouser.UserCreateResp{
-		UserID: insertEntity.ID,
+		UserID: createdUserID,
 	}, nil
 }
 
@@ -303,15 +388,24 @@ func (svc *userSvc) Detail(ctx *gin.Context, req *dtouser.UserDetailReq) (*dtous
 		return nil, code.GetError(code.UserGetDetailError)
 	}
 
+	personMap := svc.loadPersonMap(ctx, []uint{userEntity.PersonID})
+	person := personMap[userEntity.PersonID]
+	if person == nil {
+		person = &model.PersonEntity{}
+	}
+
 	resp := &dtouser.UserDetailResp{
 		UserID: userEntity.ID,
 		UserBaseInfo: objuser.UserBaseInfo{
-			TenantID:    userEntity.TenantID,
-			Name:        userEntity.Name,
-			Avatar:      userEntity.Avatar,
-			Profile:     profile,
-			CustomData:  customData,
-			IsSuspended: userEntity.IsSuspended,
+			TenantID:     userEntity.TenantID,
+			Username:     person.Username,
+			PrimaryEmail: person.PrimaryEmail,
+			PrimaryPhone: person.PrimaryPhone,
+			Name:         userEntity.Name,
+			Avatar:       userEntity.Avatar,
+			Profile:      profile,
+			CustomData:   customData,
+			IsSuspended:  userEntity.IsSuspended,
 		},
 		OperatorBaseInfo: gobject.OperatorBaseInfo{
 			CreatedAt: userEntity.CreatedAt.Unix(),
@@ -339,6 +433,13 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtouser.UserPageListReq) (*d
 	}
 
 	list := make([]dtouser.UserPageListItem, 0, len(userEntityList))
+	personIDs := make([]uint, 0, len(userEntityList))
+	for _, v := range userEntityList {
+		if v.PersonID != 0 {
+			personIDs = append(personIDs, v.PersonID)
+		}
+	}
+	personMap := svc.loadPersonMap(ctx, personIDs)
 	for _, v := range userEntityList {
 		var profile any
 		if err := json.Unmarshal(v.Profile, &profile); err != nil {
@@ -350,15 +451,22 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtouser.UserPageListReq) (*d
 			glog.Errorf(ctx, "[svcuser.PageList] json.Unmarshal customData fail, err:%v", err)
 			continue
 		}
+		person := personMap[v.PersonID]
+		if person == nil {
+			person = &model.PersonEntity{}
+		}
 		list = append(list, dtouser.UserPageListItem{
 			UserID: v.ID,
 			UserBaseInfo: objuser.UserBaseInfo{
-				TenantID:    v.TenantID,
-				Name:        v.Name,
-				Avatar:      v.Avatar,
-				Profile:     profile,
-				CustomData:  customData,
-				IsSuspended: v.IsSuspended,
+				TenantID:     v.TenantID,
+				Username:     person.Username,
+				PrimaryEmail: person.PrimaryEmail,
+				PrimaryPhone: person.PrimaryPhone,
+				Name:         v.Name,
+				Avatar:       v.Avatar,
+				Profile:      profile,
+				CustomData:   customData,
+				IsSuspended:  v.IsSuspended,
 			},
 			OperatorBaseInfo: gobject.OperatorBaseInfo{
 				UpdatedAt: v.UpdatedAt.Unix(),
@@ -380,11 +488,33 @@ func (svc *userSvc) UpdatePassword(ctx *gin.Context, req *dtouser.UserPasswordUp
 	if userEntity == nil || userEntity.ID == 0 || userEntity.TenantID != gincontext.GetTenantID(ctx) {
 		return code.GetError(code.UserNotExistError)
 	}
+	if userEntity.PersonID == 0 {
+		return code.GetError(code.UserNotExistError)
+	}
+
+	password := req.Password
+	if password == "" && req.PasswordEncrypted != "" {
+		// 兼容旧契约：接受已哈希的密码（原样落库）
+		password = req.PasswordEncrypted
+	} else if password != "" {
+		hash, hashErr := gcrypto.GeneratePasswordHash(password)
+		if hashErr != nil {
+			glog.Errorf(ctx, "[svcuser.UpdatePassword] GeneratePasswordHash fail, err:%v", hashErr)
+			return code.GetError(code.PasswordHashError)
+		}
+		password = hash
+	}
+	if password == "" {
+		return code.GetError(code.PasswordValidationError)
+	}
 
 	userID := gincontext.GetUserID(ctx)
-	updateMap := map[string]any{"updated_by": userID}
-	if err := dao.NewUserDao().UpdateMap(ctx, req.UserID, updateMap); err != nil {
-		glog.Errorf(ctx, "[svcuser.UpdatePassword] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+	if err := dao.NewPersonDao().UpdateMap(ctx, userEntity.PersonID, map[string]any{
+		"password_encrypted": password,
+		"password_method":    "bcrypt",
+		"updated_by":         userID,
+	}); err != nil {
+		glog.Errorf(ctx, "[svcuser.UpdatePassword] person UpdateMap fail, err:%v", err)
 		return code.GetError(code.UserUpdateError)
 	}
 	return nil

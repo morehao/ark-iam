@@ -57,12 +57,17 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 		// 保证 code 非空且唯一，避免撞租户表唯一索引（MySQL 仅允许一条空字符串）
 		tenantCode = generateTenantCode()
 	}
+	tenantType := model.TenantType(req.Type)
+	if tenantType != model.TenantTypeCustomer && tenantType != model.TenantTypePlatform {
+		tenantType = model.TenantTypeCustomer
+	}
 	insertEntity := &model.TenantEntity{
 		Code:        tenantCode,
 		DbUser:      req.DbUser,
 		IsSuspended: req.IsSuspended,
 		Name:        req.Name,
 		Tag:         req.Tag,
+		Type:        tenantType,
 	}
 
 	if err := dao.NewTenantDao().Insert(ctx, insertEntity); err != nil {
@@ -226,11 +231,16 @@ func (svc *tenantSvc) Update(ctx *gin.Context, req *dtotenant.TenantUpdateReq) e
 	}
 
 	userID := gincontext.GetUserID(ctx)
+	tenantType := model.TenantType(req.Type)
+	if tenantType != model.TenantTypeCustomer && tenantType != model.TenantTypePlatform {
+		tenantType = model.TenantTypeCustomer
+	}
 	updateMap := map[string]any{
 		"db_user":      req.DbUser,
 		"is_suspended": req.IsSuspended,
 		"name":         req.Name,
 		"tag":          req.Tag,
+		"type":         tenantType,
 		"updated_by":   userID,
 	}
 	if err := dao.NewTenantDao().UpdateMap(ctx, req.TenantID, updateMap); err != nil {
@@ -258,6 +268,7 @@ func (svc *tenantSvc) Detail(ctx *gin.Context, req *dtotenant.TenantDetailReq) (
 			IsSuspended: tenantEntity.IsSuspended,
 			Name:        tenantEntity.Name,
 			Tag:         tenantEntity.Tag,
+			Type:        string(tenantEntity.Type),
 		},
 		OperatorBaseInfo: gobject.OperatorBaseInfo{
 			CreatedAt: tenantEntity.CreatedAt.Unix(),
@@ -290,6 +301,7 @@ func (svc *tenantSvc) PageList(ctx *gin.Context, req *dtotenant.TenantPageListRe
 				IsSuspended: v.IsSuspended,
 				Name:        v.Name,
 				Tag:         v.Tag,
+				Type:        string(v.Type),
 			},
 			OperatorBaseInfo: gobject.OperatorBaseInfo{
 				UpdatedAt: v.UpdatedAt.Unix(),

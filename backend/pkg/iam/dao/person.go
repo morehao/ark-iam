@@ -45,7 +45,7 @@ func NewPersonDao() *PersonDao {
 	return &PersonDao{
 		Dao: gormdao.NewDao[model.PersonEntity, model.PersonEntityList](
 			model.TableNamePerson, "PersonDao",
-			dbclient.IamDB,
+			dbclient.IamDB, gormdao.WithoutSoftDelete(),
 		),
 	}
 }

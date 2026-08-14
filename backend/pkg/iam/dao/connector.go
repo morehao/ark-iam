@@ -49,7 +49,7 @@ func NewConnectorDao() *ConnectorDao {
 	return &ConnectorDao{
 		Dao: gormdao.NewDao[model.ConnectorEntity, model.ConnectorEntityList](
 			model.TableNameConnector, "ConnectorDao",
-			dbclient.IamDB,
+			dbclient.IamDB, gormdao.WithoutSoftDelete(),
 		),
 	}
 }

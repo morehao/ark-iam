@@ -41,7 +41,7 @@ func NewApplicationDao() *ApplicationDao {
 	return &ApplicationDao{
 		Dao: gormdao.NewDao[model.ApplicationEntity, model.ApplicationEntityList](
 			model.TableNameApplication, "ApplicationDao",
-			dbclient.IamDB,
+			dbclient.IamDB, gormdao.WithoutSoftDelete(),
 		),
 	}
 }

@@ -1,6 +1,8 @@
 package svcperson
 
 import (
+	"unicode"
+
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoperson"
@@ -61,6 +63,10 @@ func (svc *personProfileSvc) UpdatePassword(ctx *gin.Context, req *dtoperson.Per
 		return code.GetError(code.UserNotExistError)
 	}
 
+	if err := validateNewPassword(req.NewPassword); err != nil {
+		return code.GetError(code.PasswordValidationError)
+	}
+
 	if err := gcrypto.ComparePasswordHash(personEntity.PasswordEncrypted, req.OldPassword); err != nil {
 		glog.Errorf(ctx, "[svcperson.UpdatePassword] old password mismatch, personID:%d", personID)
 		return code.GetError(code.PasswordMismatchError)
@@ -79,5 +85,27 @@ func (svc *personProfileSvc) UpdatePassword(ctx *gin.Context, req *dtoperson.Per
 		return code.GetError(code.UserUpdateError)
 	}
 
+	return nil
+}
+
+// validateNewPassword 与注册流程的密码强度规则保持一致（≥8 位且含大小写字母与数字）。
+func validateNewPassword(password string) error {
+	if len(password) < 8 {
+		return code.GetError(code.PasswordValidationError)
+	}
+	var hasUpper, hasLower, hasDigit bool
+	for _, char := range password {
+		switch {
+		case unicode.IsUpper(char):
+			hasUpper = true
+		case unicode.IsLower(char):
+			hasLower = true
+		case unicode.IsDigit(char):
+			hasDigit = true
+		}
+	}
+	if !hasUpper || !hasLower || !hasDigit {
+		return code.GetError(code.PasswordValidationError)
+	}
 	return nil
 }

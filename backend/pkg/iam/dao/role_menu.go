@@ -37,7 +37,7 @@ func NewRoleMenuDao() *RoleMenuDao {
 	return &RoleMenuDao{
 		Dao: gormdao.NewDao[model.RoleMenuEntity, model.RoleMenuEntityList](
 			model.TableNameRoleMenu, "RoleMenuDao",
-			dbclient.IamDB,
+			dbclient.IamDB, gormdao.WithoutSoftDelete(),
 		),
 	}
 }

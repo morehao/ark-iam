@@ -49,7 +49,7 @@ func NewApplicationClientDao() *ApplicationClientDao {
 	return &ApplicationClientDao{
 		Dao: gormdao.NewDao[model.ApplicationClientEntity, model.ApplicationClientEntityList](
 			model.TableNameApplicationClient, "ApplicationClientDao",
-			dbclient.IamDB,
+			dbclient.IamDB, gormdao.WithoutSoftDelete(),
 		),
 	}
 }

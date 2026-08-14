@@ -31,20 +31,20 @@ type OrganizationPageListReq struct {
 }
 
 type OrganizationRoleCreateReq struct {
-	TenantID       uint   `json:"tenantID" form:"tenantID"`           // 租户ID
-	OrganizationID uint   `json:"organizationID" form:"organizationID"` // 组织ID
-	Name           string `json:"name" form:"name"`                   // 角色名称
-	Description    string `json:"description" form:"description"`     // 角色描述
-	Type           string `json:"type" form:"type"`                   // 角色类型
+	TenantID       uint   `json:"tenantID" form:"tenantID"`                 // 租户ID
+	OrganizationID uint   `json:"organizationID" form:"organizationID" binding:"required"` // 组织ID
+	Name           string `json:"name" form:"name"`                         // 角色名称
+	Description    string `json:"description" form:"description"`           // 角色描述
+	Type           string `json:"type" form:"type"`                         // 角色类型
 }
 
 type OrganizationRoleUpdateReq struct {
-	OrganizationRoleID uint   `json:"organizationRoleID" form:"organizationRoleID"` // 组织角色ID
-	TenantID           uint   `json:"tenantID" form:"tenantID"`           // 租户ID
-	OrganizationID     uint   `json:"organizationID" form:"organizationID"` // 组织ID
-	Name               string `json:"name" form:"name"`                   // 角色名称
-	Description        string `json:"description" form:"description"`     // 角色描述
-	Type               string `json:"type" form:"type"`                   // 角色类型
+	OrganizationRoleID uint   `json:"organizationRoleID" form:"organizationRoleID" binding:"required"` // 组织角色ID
+	TenantID           uint   `json:"tenantID" form:"tenantID"`                 // 租户ID
+	OrganizationID     uint   `json:"organizationID" form:"organizationID" binding:"required"`         // 组织ID
+	Name               string `json:"name" form:"name"`                         // 角色名称
+	Description        string `json:"description" form:"description"`           // 角色描述
+	Type               string `json:"type" form:"type"`                         // 角色类型
 }
 
 type OrganizationRoleDeleteReq struct {
@@ -64,13 +64,13 @@ type OrganizationRolePageListReq struct {
 }
 
 type OrganizationUserCreateReq struct {
-	OrganizationID uint `json:"organizationID" form:"organizationID" validate:"required"`      // 组织ID
-	UserID         uint `json:"userID" form:"userID" validate:"required"`                      // 用户ID
+	OrganizationID uint `json:"organizationID" form:"organizationID" binding:"required"`      // 组织ID
+	UserID         uint `json:"userID" form:"userID" binding:"required"`                      // 用户ID
 }
 
 type OrganizationUserDeleteReq struct {
-	OrganizationID uint `json:"organizationID" form:"organizationID" validate:"required"`      // 组织ID
-	UserID         uint `json:"userID" form:"userID" validate:"required"`                      // 用户ID
+	OrganizationID uint `json:"organizationID" form:"organizationID" binding:"required"`      // 组织ID
+	UserID         uint `json:"userID" form:"userID" binding:"required"`                      // 用户ID
 }
 
 type OrganizationUserPageListReq struct {
@@ -82,15 +82,15 @@ type OrganizationUserPageListReq struct {
 }
 
 type OrganizationRoleUserCreateReq struct {
-	OrganizationID     uint `json:"organizationID" form:"organizationID" validate:"required"`          // 组织ID
-	OrganizationRoleID uint `json:"organizationRoleID" form:"organizationRoleID" validate:"required"`  // 组织角色ID
-	UserID             uint `json:"userID" form:"userID" validate:"required"`                          // 用户ID
+	OrganizationID     uint `json:"organizationID" form:"organizationID" binding:"required"`          // 组织ID
+	OrganizationRoleID uint `json:"organizationRoleID" form:"organizationRoleID" binding:"required"`  // 组织角色ID
+	UserID             uint `json:"userID" form:"userID" binding:"required"`                          // 用户ID
 }
 
 type OrganizationRoleUserDeleteReq struct {
-	OrganizationID     uint `json:"organizationID" form:"organizationID" validate:"required"`          // 组织ID
-	OrganizationRoleID uint `json:"organizationRoleID" form:"organizationRoleID" validate:"required"`  // 组织角色ID
-	UserID             uint `json:"userID" form:"userID" validate:"required"`                          // 用户ID
+	OrganizationID     uint `json:"organizationID" form:"organizationID" binding:"required"`          // 组织ID
+	OrganizationRoleID uint `json:"organizationRoleID" form:"organizationRoleID" binding:"required"`  // 组织角色ID
+	UserID             uint `json:"userID" form:"userID" binding:"required"`                          // 用户ID
 }
 
 type OrganizationRoleUserPageListReq struct {

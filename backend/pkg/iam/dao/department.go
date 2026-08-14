@@ -45,7 +45,7 @@ func NewDepartmentDao() *DepartmentDao {
 	return &DepartmentDao{
 		Dao: gormdao.NewDao[model.DepartmentEntity, model.DepartmentEntityList](
 			model.TableNameDepartment, "DepartmentDao",
-			dbclient.IamDB,
+			dbclient.IamDB, gormdao.WithoutSoftDelete(),
 		),
 	}
 }

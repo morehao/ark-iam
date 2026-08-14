@@ -33,7 +33,7 @@ func NewApplicationClientSecretDao() *ApplicationClientSecretDao {
 	return &ApplicationClientSecretDao{
 		Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList](
 			model.TableNameApplicationClientSecret, "ApplicationClientSecretDao",
-			dbclient.IamDB,
+			dbclient.IamDB, gormdao.WithoutSoftDelete(),
 		),
 	}
 }

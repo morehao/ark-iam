@@ -37,7 +37,7 @@ func NewRoleScopeDao() *RoleScopeDao {
 	return &RoleScopeDao{
 		Dao: gormdao.NewDao[model.RoleScopeEntity, model.RoleScopeEntityList](
 			model.TableNameRoleScope, "RoleScopeDao",
-			dbclient.IamDB,
+			dbclient.IamDB, gormdao.WithoutSoftDelete(),
 		),
 	}
 }

@@ -82,6 +82,9 @@ func (svc *scopeSvc) Create(ctx *gin.Context, req *dtopermission.ScopeCreateReq)
 		Description: req.Description,
 		CreatedBy:   gincontext.GetUserID(ctx),
 	}
+	if insertEntity.TenantID == 0 {
+		insertEntity.TenantID = gincontext.GetTenantID(ctx)
+	}
 
 	if err := repo.Insert(ctx, insertEntity); err != nil {
 		glog.Errorf(ctx, "[svcpermission.CreateScope] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))

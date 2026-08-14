@@ -53,7 +53,7 @@ func NewTenantDao() *TenantDao {
 	return &TenantDao{
 		Dao: gormdao.NewDao[model.TenantEntity, model.TenantEntityList](
 			model.TableNameTenant, "TenantDao",
-			dbclient.IamDB,
+			dbclient.IamDB, gormdao.WithoutSoftDelete(),
 		),
 	}
 }

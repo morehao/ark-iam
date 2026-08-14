@@ -50,6 +50,10 @@ func NewRoleSvc() RoleSvc {
 }
 
 func (svc *roleSvc) Create(ctx *gin.Context, req *dtopermission.RoleCreateReq) (*dtopermission.RoleCreateResp, error) {
+	tenantID := gincontext.GetTenantID(ctx)
+	if req.TenantID == 0 {
+		req.TenantID = tenantID
+	}
 	insertEntity := &model.RoleEntity{
 		TenantID:    req.TenantID,
 		Name:        req.Name,

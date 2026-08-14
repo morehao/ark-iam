@@ -44,4 +44,5 @@ e2e/.env.local
 *.exe
 *.out
 backend/.tmp/
+backend/.gocache
 __debug_bin*

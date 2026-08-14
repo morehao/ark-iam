@@ -33,7 +33,7 @@ func NewOrganizationDao() *OrganizationDao {
 	return &OrganizationDao{
 		Dao: gormdao.NewDao[model.OrganizationEntity, model.OrganizationEntityList](
 			model.TableNameOrganization, "OrganizationDao",
-			dbclient.IamDB,
+			dbclient.IamDB, gormdao.WithoutSoftDelete(),
 		),
 	}
 }

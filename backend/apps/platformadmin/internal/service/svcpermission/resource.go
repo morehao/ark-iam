@@ -45,6 +45,10 @@ func NewResourceSvc() ResourceSvc {
 }
 
 func (svc *resourceSvc) Create(ctx *gin.Context, req *dtopermission.ResourceCreateReq) (*dtopermission.ResourceCreateResp, error) {
+	tenantID := gincontext.GetTenantID(ctx)
+	if req.TenantID == 0 {
+		req.TenantID = tenantID
+	}
 	insertEntity := &model.ResourceEntity{
 		TenantID:       req.TenantID,
 		Name:           req.Name,

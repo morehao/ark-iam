@@ -99,6 +99,27 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, perso
 func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID, tenantID, personID uint) error {
 	sessionDao := newSessionStore()
 
+	// 归属校验：仅允许撤销本人（person）、本租户、本人 user 名下的会话，防止 IDOR 越权撤销他人会话。
+	sessionList, _, err := sessionDao.GetPageListByCond(ctx.Request.Context(), &dao.SessionCond{
+		PersonID: personID,
+		UserID:   userID,
+		TenantID: tenantID,
+	})
+	if err != nil {
+		glog.Errorf(ctx, "[sessionSvc.Revoke] get session list fail, err:%v", err)
+		return code.GetError(code.SessionGetListError)
+	}
+	owned := false
+	for _, s := range sessionList {
+		if s.ID == uint(req.SessionID) {
+			owned = true
+			break
+		}
+	}
+	if !owned {
+		return code.GetError(code.SessionNotExistError)
+	}
+
 	if err := sessionDao.UpdateMap(ctx.Request.Context(), uint(req.SessionID), map[string]any{"revoked_at": gorm.Expr("NOW()")}); err != nil {
 		glog.Errorf(ctx, "[sessionSvc.Revoke] revoke fail, err:%v", err)
 		return code.GetError(code.SessionRevokeError)

@@ -37,7 +37,7 @@ func NewScopeDao() *ScopeDao {
 	return &ScopeDao{
 		Dao: gormdao.NewDao[model.ScopeEntity, model.ScopeEntityList](
 			model.TableNameScope, "ScopeDao",
-			dbclient.IamDB,
+			dbclient.IamDB, gormdao.WithoutSoftDelete(),
 		),
 	}
 }

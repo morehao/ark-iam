@@ -40,14 +40,14 @@ type AuditLogDao struct {
 
 func NewAuditLogDao() *AuditLogDao {
 	return &AuditLogDao{
-		Dao:      gormdao.NewDao[model.AuditLogEntity, model.AuditLogEntityList](model.TableNameAuditLog, "AuditLogDao", dbclient.IamDB),
+		Dao:      gormdao.NewDao[model.AuditLogEntity, model.AuditLogEntityList](model.TableNameAuditLog, "AuditLogDao", dbclient.IamDB, gormdao.WithoutSoftDelete()),
 		dbGetter: dbclient.IamDB,
 	}
 }
 
 func NewAuditLogDaoWithDB(dbGetter gormdao.DBGetter) *AuditLogDao {
 	return &AuditLogDao{
-		Dao:      gormdao.NewDao[model.AuditLogEntity, model.AuditLogEntityList](model.TableNameAuditLog, "AuditLogDao", dbGetter),
+		Dao:      gormdao.NewDao[model.AuditLogEntity, model.AuditLogEntityList](model.TableNameAuditLog, "AuditLogDao", dbGetter, gormdao.WithoutSoftDelete()),
 		dbGetter: dbGetter,
 	}
 }
