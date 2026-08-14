@@ -9,6 +9,13 @@ VALUES (1, 'Default Tenant', 'platform', 'platform', 'default_user', 0, 'default
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `code` = VALUES(`code`), `type` = VALUES(`type`);
 
 -- ============================================
+-- 1.1 租户同名顶级部门种子数据（每个租户一个 parent_id=0 的顶级部门）
+-- ============================================
+INSERT INTO `department` (`id`, `tenant_id`, `parent_id`, `name`, `code`, `sort`, `leader_user_id`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (1, 1, 0, 'Default Tenant', '', 0, 0, 0, 0, 0)
+ON DUPLICATE KEY UPDATE `tenant_id` = VALUES(`tenant_id`), `parent_id` = VALUES(`parent_id`), `name` = VALUES(`name`);
+
+-- ============================================
 -- 2. 基础角色种子数据
 -- ============================================
 INSERT INTO `role` (`id`, `tenant_id`, `app_id`, `name`, `code`, `description`, `type`, `is_default`, `created_by`, `updated_by`, `deleted_by`)

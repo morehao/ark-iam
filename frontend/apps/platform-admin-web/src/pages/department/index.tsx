@@ -1,19 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Form, Input, InputNumber, message, Modal, Popconfirm, Space, Tree } from 'antd'
+import { Button, Form, Input, InputNumber, message, Modal, Popconfirm, Space, Table, Typography } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
-import type { DataNode } from 'antd/es/tree'
+import type { ColumnsType } from 'antd/es/table'
 import { PageContainer } from '@ark-iam/ui'
 import { createDepartment, deleteDepartment, getDepartmentTree, updateDepartment } from '@ark-iam/api'
 import type { DepartmentItem } from '@ark-iam/types'
-
-interface DeptNode extends DataNode {
-  department: DepartmentItem
-}
+import { fmtTime } from '../../components/common'
 
 export default function DepartmentList() {
   const [data, setData] = useState<DepartmentItem[]>([])
   const [loading, setLoading] = useState(false)
-  const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([])
+  const [expandedRowKeys, setExpandedRowKeys] = useState<React.Key[]>([])
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<DepartmentItem | null>(null)
@@ -39,7 +36,8 @@ export default function DepartmentList() {
       const resp = await getDepartmentTree()
       const list = resp?.list || []
       setData(list)
-      setExpandedKeys(collectKeys(list))
+      // 树形表格默认展开所有节点
+      setExpandedRowKeys(collectKeys(list))
     } catch {
       /* 拦截器已提示 */
     } finally {
@@ -50,13 +48,6 @@ export default function DepartmentList() {
   useEffect(() => {
     void fetchData()
   }, [fetchData])
-
-  const buildTreeData = (list: DepartmentItem[]): DeptNode[] =>
-    list.map((d) => ({
-      key: d.departmentID,
-      department: d,
-      children: d.children?.length ? buildTreeData(d.children) : undefined,
-    }))
 
   const openCreate = (parentID: number) => {
     setEditing(null)
@@ -109,36 +100,59 @@ export default function DepartmentList() {
     }
   }
 
-  const renderTitle = (node: DataNode) => {
-    const d = (node as DeptNode).department
-    return (
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, paddingRight: 8 }}>
+  const columns: ColumnsType<DepartmentItem> = [
+    { title: '部门ID', dataIndex: 'departmentID', key: 'departmentID', width: 90 },
+    {
+      title: '部门名称',
+      dataIndex: 'name',
+      key: 'name',
+      width: 280,
+      render: (v: string, r) => (
         <Space size={8}>
-          <span style={{ fontWeight: 500 }}>{d.name || '-'}</span>
-          {d.code ? (
-            <span style={{ color: 'rgba(17, 24, 39, 0.45)', fontSize: 12, fontFamily: 'monospace' }}>({d.code})</span>
+          <Typography.Text strong>{v || '-'}</Typography.Text>
+          {r.code ? (
+            <Typography.Text type="secondary" style={{ fontSize: 12, fontFamily: 'monospace' }}>
+              ({r.code})
+            </Typography.Text>
           ) : null}
         </Space>
+      ),
+    },
+    { title: '部门编码', dataIndex: 'code', key: 'code', width: 160, render: (v: string) => v || '-' },
+    { title: '排序', dataIndex: 'sort', key: 'sort', width: 80 },
+    { title: '负责人用户ID', dataIndex: 'leaderUserID', key: 'leaderUserID', width: 130, render: (v: number) => v || '-' },
+    {
+      title: '创建时间',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 170,
+      render: (v?: number) => fmtTime(v),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 240,
+      render: (_, r) => (
         <Space size={0} onClick={(e) => e.stopPropagation()}>
-          <Button type="link" size="small" onClick={() => openCreate(d.departmentID)}>
+          <Button type="link" size="small" onClick={() => openCreate(r.departmentID)}>
             新增子部门
           </Button>
-          <Button type="link" size="small" onClick={() => handleEdit(d)}>
+          <Button type="link" size="small" onClick={() => handleEdit(r)}>
             编辑
           </Button>
           <Popconfirm
             title="确认删除该部门？"
             description="删除后其下所有子部门将级联删除。"
-            onConfirm={() => void handleDelete(d)}
+            onConfirm={() => void handleDelete(r)}
           >
             <Button type="link" size="small" danger>
               删除
             </Button>
           </Popconfirm>
         </Space>
-      </div>
-    )
-  }
+      ),
+    },
+  ]
 
   return (
     <PageContainer
@@ -156,13 +170,17 @@ export default function DepartmentList() {
         </Space>
       }
     >
-      <Tree<DeptNode>
-        blockNode
-        selectable={false}
-        treeData={buildTreeData(data)}
-        titleRender={renderTitle}
-        expandedKeys={expandedKeys}
-        onExpand={(keys) => setExpandedKeys(keys)}
+      <Table<DepartmentItem>
+        rowKey="departmentID"
+        columns={columns}
+        dataSource={data}
+        loading={loading}
+        pagination={false}
+        scroll={{ x: 1150 }}
+        expandable={{
+          expandedRowKeys,
+          onExpandedRowsChange: (keys) => setExpandedRowKeys(keys as React.Key[]),
+        }}
       />
 
       <Modal
