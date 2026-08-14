@@ -53,6 +53,10 @@ func (svc *systemSvc) Create(ctx *gin.Context, req *dtotenant.SystemCreateReq) (
 		return nil, code.GetError(code.SystemCreateError)
 	}
 
+	tenantID := gincontext.GetTenantID(ctx)
+	if req.TenantID == 0 {
+		req.TenantID = tenantID
+	}
 	insertEntity := &model.SystemEntity{
 		TenantID:  req.TenantID,
 		Key:       req.Key,
@@ -105,7 +109,7 @@ func (svc *systemSvc) Update(ctx *gin.Context, req *dtotenant.SystemUpdateReq) e
 
 	userID := gincontext.GetUserID(ctx)
 	updateMap := map[string]any{
-		"tenant_id":  req.TenantID,
+		"tenant_id":  gincontext.GetTenantID(ctx),
 		"key":        req.Key,
 		"value":      valueJson,
 		"updated_by": userID,
@@ -154,7 +158,7 @@ func (svc *systemSvc) PageList(ctx *gin.Context, req *dtotenant.SystemPageListRe
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID: req.TenantID,
+		TenantID: gincontext.GetTenantID(ctx),
 		Key:      req.Key,
 	}
 	systemEntityList, total, err := dao.NewSystemDao().GetPageListByCond(ctx, cond)

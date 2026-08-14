@@ -8,10 +8,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtouser"
 	"github.com/morehao/golib/biz/gcontext"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
@@ -222,10 +224,14 @@ func (s *stubDelegatedPersonIdentitySvc) Update(ctx *gin.Context, req *dtouser.U
 }
 
 func (s *stubDelegatedPersonIdentitySvc) Detail(ctx *gin.Context, req *dtouser.UserIdentityDetailReq) (*dtouser.UserIdentityDetailResp, error) {
+	// 模拟 personSvc.Detail 的租户可见性校验（identity 归属 person 需在当前租户有成员关系）
 	if s.userRepo != nil {
 		userEntity, err := s.userRepo.GetByID(ctx, req.UserIdentityID)
 		if err != nil || userEntity == nil {
 			return nil, err
+		}
+		if userEntity.TenantID != gincontext.GetTenantID(ctx) {
+			return nil, code.GetError(code.UserIdentityNotExistError)
 		}
 	}
 	entity, err := s.repo.GetByID(ctx, req.UserIdentityID)
