@@ -24,16 +24,23 @@ const (
 	dbNameIam  = "iam"
 )
 
-func InitMultiDB(configs []dbgorm.Config, logConfig *glog.LogConfig) error {
-	if len(configs) == 0 {
-		return fmt.Errorf("mysql config is empty")
-	}
+// tenantScopeSkipTables 列出不含 tenant_id 列的全局表。
+// tenant 插件会为所有未跳过的表自动注入 tenant_id 过滤条件，而这些表没有该列，
+// 注入后查询会报 "Unknown column 'xxx.tenant_id' in 'where clause'"
+// （平台端表现为 [100734] 查看应用列表失败等列表类错误）。
+// 判断标准：表结构不存在 tenant_id 列（见 backend/scripts/sql/iam_schema.sql）。
+var tenantScopeSkipTables = []string{
+	"person",
+	"tenant",
+	"application",
+	"menu",
+	"user_identity",
+	"application_client_secret",
+}
 
-	var skipTables = []string{
-		"person",
-		"tenant",
-	}
-	tenantPlugin, err := gormplugin.New(&gormplugin.ScopeConfig{
+// newTenantScopePlugin 构造 tenant 插件，同一份配置供业务初始化与测试复用。
+func newTenantScopePlugin(skipTables []string) (*gormplugin.ScopePlugin, error) {
+	return gormplugin.New(&gormplugin.ScopeConfig{
 		FieldName: "tenant_id",
 		ExtractFunc: func(ctx context.Context) (any, bool) {
 			if ginCtx, ok := ctx.(*gin.Context); ok {
@@ -47,6 +54,14 @@ func InitMultiDB(configs []dbgorm.Config, logConfig *glog.LogConfig) error {
 		},
 		SkipTables: skipTables,
 	})
+}
+
+func InitMultiDB(configs []dbgorm.Config, logConfig *glog.LogConfig) error {
+	if len(configs) == 0 {
+		return fmt.Errorf("mysql config is empty")
+	}
+
+	tenantPlugin, err := newTenantScopePlugin(tenantScopeSkipTables)
 	if err != nil {
 		return fmt.Errorf("init tenant plugin failed: %v", err)
 	}

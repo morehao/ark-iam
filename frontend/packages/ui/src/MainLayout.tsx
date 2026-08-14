@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { forwardRef, useMemo, useState } from 'react'
 import { Layout, Menu, Avatar, Dropdown, Tooltip, Badge, theme } from 'antd'
 import type { MenuProps } from 'antd'
 import {
@@ -161,9 +161,17 @@ export function MainLayout({ title, subtitle, menuItems, hasTenantSwitch = true 
   )
 }
 
-function ButtonIcon({ collapsed, onClick }: { collapsed: boolean; onClick: () => void }) {
+interface ButtonIconProps {
+  collapsed: boolean
+  onClick: () => void
+}
+
+// 必须转发 ref：antd 的 Tooltip 依赖 ref 定位气泡，
+// 普通函数组件不支持 ref 会触发 findDOMNode 弃用警告
+const ButtonIcon = forwardRef<HTMLButtonElement, ButtonIconProps>(function ButtonIcon({ collapsed, onClick }, ref) {
   return (
     <button
+      ref={ref}
       onClick={onClick}
       style={{
         width: 36,
@@ -182,4 +190,4 @@ function ButtonIcon({ collapsed, onClick }: { collapsed: boolean; onClick: () =>
       {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
     </button>
   )
-}
+})
