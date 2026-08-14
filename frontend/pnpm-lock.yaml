@@ -10,19 +10,37 @@ importers:
 
   apps/login-web:
     dependencies:
+      '@ant-design/icons':
+        specifier: ^5.4.0
+        version: 5.4.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      antd:
+        specifier: ^5.22.0
+        version: 5.29.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       axios:
         specifier: ^1.7.0
         version: 1.17.0
+      oidc-client-ts:
+        specifier: ^3.5.0
+        version: 3.5.0
       react:
         specifier: ^18.3.0
         version: 18.3.1
       react-dom:
         specifier: ^18.3.0
         version: 18.3.1(react@18.3.1)
+      react-oidc-context:
+        specifier: ^3.3.1
+        version: 3.3.1(oidc-client-ts@3.5.0)(react@18.3.1)
       react-router-dom:
         specifier: ^6.26.0
         version: 6.30.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@ark-iam/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@ark-iam/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@types/react':
         specifier: ^18.3.0
         version: 18.3.31

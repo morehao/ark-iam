@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from 'react-oidc-context'
 import { message } from 'antd'
-import { getMyTenants, logoutAllAPI, setUserProvider, useSSOSessionProbe } from '@ark-iam/api'
+import {
+  getMyTenants,
+  logoutAllAPI,
+  setUserProvider,
+  setSessionExpiredHandler,
+  useSSOSessionProbe,
+} from '@ark-iam/api'
 import { getCurrentTenantId, setCurrentTenantId } from './tenant'
 
 export interface TenantSwitchInfo {
@@ -65,6 +71,14 @@ export function useAuthGuard() {
   useEffect(() => {
     setUserProvider(() => auth.user)
   }, [auth.user])
+
+  // 401（SSO 会话已被其它端点全局登出撤销）时，先移除本地 user 再跳转登录，
+  // 避免 "401 → 刷新 → sessionStorage 残留 user → 再 401" 的死循环。
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      void auth.removeUser()
+    })
+  }, [auth])
 
   useEffect(() => {
     const claim = (auth.user?.profile as Record<string, unknown> | undefined)?.tenant_id

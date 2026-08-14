@@ -94,3 +94,6 @@ oidc:
   authCodeTTL: 300
   spentCodeTTL: 86400
   sessionTTL: 86400
+  # gateway 聚合部署：platform/tenant 均在 gateway 进程内，共享同一认证 Redis，
+  # 开启请求粒度 SSO 活性校验以实现"一处登出、处处登出"即时性。
+  enableSSOSessionValidation: true

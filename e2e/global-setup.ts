@@ -22,6 +22,8 @@ const SERVICES: ServiceDef[] = [
   {
     name: 'IAM Backend',
     port: 8100,
+    // 优先使用预编译二进制（backend/.tmp/gateway-bin），避免 go run 首次编译
+    // 缓慢导致健康检查超时；无二进制时回退 go run。
     cmd: 'go',
     args: ['run', './apps/gateway/cmd'],
     cwd: path.join(ROOT, 'backend'),
@@ -55,6 +57,17 @@ const SERVICES: ServiceDef[] = [
     healthPath: '/',
   },
 ];
+
+// 若预编译 gateway 二进制存在，则替换 backend 服务定义，避免 go run 编译慢导致超时。
+const GATEWAY_BIN = path.join(BACKEND_ROOT, '.tmp', 'gateway-bin');
+const fs = require('fs') as typeof import('fs');
+if (fs.existsSync(GATEWAY_BIN)) {
+  SERVICES[0] = {
+    ...SERVICES[0],
+    cmd: GATEWAY_BIN,
+    args: [],
+  };
+}
 
 async function checkPort(port: number): Promise<boolean> {
   return new Promise((resolve) => {

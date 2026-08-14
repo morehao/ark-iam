@@ -1,11 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { CONFIG } from '../config';
 
-// 全局登出（SLO）场景。
-// 注意：当前实现不依赖会引发白屏循环的 signinSilent 轮询探活，兄弟应用在 access
-// token 有效期内不会"刷新即实时失效"，而是在下一次 token 自动续期时登出。
-// 因此本用例改为验证全局登出后：SSO 会话 cookie 已清除、不再共享免密 SSO，
-// 兄弟应用脱离本地会话后必须重新走完整登录（无法静默 SSO）。
+// 全局登出（SLO）场景：验证 SSO 会话 cookie 被清除、兄弟应用不再共享免密 SSO。
+// 请求粒度 SSO 活性校验（WithOIDCSSOValidation）下的"刷新即实时登出"见
+// real-time-logout.spec.ts；本用例聚焦 cookie 层面的全局登出证据。
 test('全局登出后，SSO 会话失效且兄弟应用需重新认证', async ({ page, context }) => {
   const identifier = 'admin';
   const password = 'admin123';
@@ -29,7 +27,7 @@ test('全局登出后，SSO 会话失效且兄弟应用需重新认证', async (
   expect(ssoCookies.some((c) => c.name === 'iam_sso_session')).toBe(true);
   console.log('>>> 3002 SSO 免密登录成功');
   // 3. 在 3001 全局登出
-  await page.evaluate(() => { localStorage.clear(); });
+  await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
   await page.goto('http://localhost:3001/', { waitUntil: 'domcontentloaded', timeout: 20000 });
   await expect(page.getByText('仪表盘', { exact: true }).first()).toBeVisible({ timeout: 30000 });
   await page.locator('.ant-avatar').click();
@@ -47,7 +45,7 @@ test('全局登出后，SSO 会话失效且兄弟应用需重新认证', async (
   // 5. 清理兄弟应用本地 OIDC 用户（模拟该端本地会话已脱身），再访问 3002
   //    必须走完整 login-web，无法再静默 SSO —— 证明 SSO 会话已全局失效
   await rp1.goto('http://localhost:3002/', { waitUntil: 'domcontentloaded', timeout: 20000 });
-  await rp1.evaluate(() => localStorage.clear());
+  await rp1.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
   await rp1.context().clearCookies();
   await rp1.goto('http://localhost:3002/', { waitUntil: 'domcontentloaded', timeout: 20000 });
   await rp1.waitForURL((url) => url.port === '3000' && url.pathname === '/login', { timeout: 30000 });

@@ -27,14 +27,16 @@ export async function fillLoginWebCredentials(page: Page): Promise<void> {
 }
 
 async function resetAppAuthState(page: Page, targetUrl: string): Promise<void> {
-  // 确保页面回到应用源再清 localStorage（OIDC user 存储于应用 origin），
-  // 避免在 cross-origin iframe/issuer 页上触发 localStorage SecurityError。
+  // 确保页面回到应用源再清 storage（OIDC user 存储于应用 origin），
+  // 避免在 cross-origin iframe/issuer 页上触发 SecurityError。
+  // oidc-client-ts 令牌存于 sessionStorage（见 @ark-iam/auth AuthProvider），
+  // 因此 localStorage 与 sessionStorage 都需要清理。
   try {
     await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
   } catch {
     // 忽略导航失败，继续尝试清理
   }
-  await page.evaluate(() => localStorage.clear()).catch(() => {});
+  await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); }).catch(() => {});
   await page.context().clearCookies();
 }
 

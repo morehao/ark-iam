@@ -76,19 +76,20 @@ func PrepareTestUser(ctx context.Context, tenantID, personID uint, name string, 
 func CleanupTestData(ctx context.Context, ids TestDataIDs) error {
 	db := dbclient.IamDB(ctx)
 
+	// 使用 model 表名常量，避免与当前 schema（user/person/tenant，无 iam_ 前缀）漂移。
 	if len(ids.UserIDs) > 0 {
 		for _, id := range ids.UserIDs {
-			db.Exec("DELETE FROM iam_user WHERE id = ?", id)
+			db.Exec("DELETE FROM "+model.TableNameUser+" WHERE id = ?", id)
 		}
 	}
 	if len(ids.PersonIDs) > 0 {
 		for _, id := range ids.PersonIDs {
-			db.Exec("DELETE FROM iam_person WHERE id = ?", id)
+			db.Exec("DELETE FROM "+model.TableNamePerson+" WHERE id = ?", id)
 		}
 	}
 	if len(ids.TenantIDs) > 0 {
 		for _, id := range ids.TenantIDs {
-			db.Exec("DELETE FROM iam_tenant WHERE id = ?", id)
+			db.Exec("DELETE FROM "+model.TableNameTenant+" WHERE id = ?", id)
 		}
 	}
 

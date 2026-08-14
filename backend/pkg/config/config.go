@@ -48,6 +48,13 @@ type OIDC struct {
 	AuthCodeTTL           int    `yaml:"authCodeTTL"`
 	SpentCodeTTL          int    `yaml:"spentCodeTTL"`
 	SessionTTL            int    `yaml:"sessionTTL"`
+	// EnableSSOSessionValidation 控制业务应用（RP）是否在每次请求时校验
+	// 用户的 SSO 中心会话活性（HasActiveSession）。开启后"一处登出、处处登出"
+	// 在请求粒度即时生效；要求业务应用与 auth 共享同一认证 Redis。
+	EnableSSOSessionValidation bool `yaml:"enableSSOSessionValidation"`
+	// BackChannelLogoutPath 是本应用挂载 back-channel logout 接收端的基础路径
+	// （默认 /oidc/bc-logout）。
+	BackChannelLogoutPath string `yaml:"backChannelLogoutPath"`
 }
 
 func (o OIDC) SSOCookieDomain() string {
