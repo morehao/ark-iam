@@ -22,7 +22,7 @@ frontend/
 │   ├── auth/              # OIDC Provider、租户切换、登出、鉴权守卫
 │   └── ui/                # 设计系统：主题、MainLayout、LoginPage、PageContainer 等
 └── apps/
-    ├── login-web/         # 登录门户（:3000）— OIDC 凭证登录 / 多租户选择
+    ├── login-web/         # 登录页（:3000）— OP 登录 UI：凭证登录 / 多租户选择（非 OIDC Client）
     ├── platform-admin-web/# 平台管理控制台（:3001）— 用户/角色/菜单/部门/应用/OAuth客户端/租户/API Key/域名/系统配置/审计日志
     └── tenant-admin-web/  # 租户自服务控制台（:3003）— 组织/组织角色/组织用户/组织角色用户
 ```
@@ -78,8 +78,9 @@ Vite dev server 将 `/v1` 与 `/oidc` 代理到后端网关 `http://localhost:81
 ### 租户自服务控制台（tenant-admin-web）
 - 组织管理、组织角色、组织用户、组织角色用户
 
-### 登录门户（login-web）
+### 登录页（login-web）
 - OIDC 凭证登录、多租户选择
+- 定位：IAM OP 的登录 UI（非 OIDC Client/RP），凭证直接提交到 OP 内部端点 `/oidc/login`，不参与授权码流程；业务应用（platform-admin-web / tenant-admin-web）才是 OIDC Client
 
 ## 认证流程
 

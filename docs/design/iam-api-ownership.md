@@ -19,7 +19,7 @@
 2. 认证相关（注册/加入租户/登出/我的租户/用户信息/个人中心/会话/connector）归属 `auth`；
    平台管理各模块归属 `platformadmin`；组织与组织角色归属 `tenantadmin`。
 3. **前端应用映射**：
-   - `login-web`（:3000）→ `auth` 的 OIDC 凭证登录（`/oidc/login`、`/oidc/login/selectTenant`）。
+   - `login-web`（:3000）→ `auth` 的 OIDC 凭证登录（`/oidc/login`、`/oidc/login/selectTenant`）。login-web 是 OP 的登录 UI，**不是 OIDC Client**，不注册 `application_client`。
    - `platform-admin-web`（:3001）→ `platformadmin` 全部模块 + `auth` 的个人中心/会话/租户切换。
    - `tenant-admin-web`（:3003）→ `tenantadmin` 全部模块 + `auth` 的个人中心/会话/租户切换。
 

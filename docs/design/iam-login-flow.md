@@ -43,6 +43,7 @@ OIDC Authorization Code Flow 完成认证
 
 - IAM 作为 **OIDC Provider (IdP)**，对外提供标准 OIDC 认证。
 - **RP**（业务应用）如 `platform-admin-web`/`sso-test-app`，通过 OIDC 库（oidc-client-ts）接入。
+- **login-web**（:3000）是 OP 的**登录 UI**（凭证表单 + 多租户选择），**不是 OIDC Client/RP**：凭证直接提交到 OP 内部端点 `/oidc/login`，不参与授权码流程、无 `client_id`/`redirect_uri`（对齐主流 IdP 的托管登录页模式，如 Keycloak/Auth0 Universal Login）。
 - 用户的账号密码由 IAM 认证，token 全部由 IAM 签发。
 
 ### 时序图
@@ -51,7 +52,7 @@ OIDC Authorization Code Flow 完成认证
 sequenceDiagram
     participant User as 用户(浏览器)
     participant RP as 业务应用 (RP, 如管理台)
-    participant LP as 登录页 (login-web)
+    participant LP as 登录页 (login-web, OP 登录 UI 非 Client)
     participant IAM as IAM OP (/oidc)
     participant AuthSvc as svcauth.AuthSvc
     participant Svc as svcoidc.AuthSvc

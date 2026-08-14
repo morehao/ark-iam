@@ -36,7 +36,7 @@
 | 服务 | 端口 | OAuth client_id | 说明 |
 |------|------|-----------------|------|
 | gateway | 8100 | - | IAM 后端（`/oidc`） |
-| login-web | 3000 | - | 登录页（凭证表单） |
+| login-web | 3000 | - | 登录页（凭证表单，非 OIDC Client） |
 | platform-admin-web | 3001 | `platform-admin-web` | 管理平台（Admin） |
 | tenant-admin-web | 3002 | `tenant-admin-web` | 租户管理平台（RP1） |
 
