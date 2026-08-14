@@ -143,8 +143,8 @@ export const revokeApiKey = (id: number) => request.post<any, string>('/apiKey/r
 export const deleteApiKey = (id: number) => request.post<any, string>('/apiKey/delete', { id })
 
 // ==================== 菜单 ====================
-export const getMenuTree = () => request.get<any, MenuTreeResp>('/menu/tree')
-export const getMenuPageList = (data: { page: number; pageSize: number; name?: string }) =>
+export const getMenuTree = (appId: number) => request.get<any, MenuTreeResp>('/menu/tree', { params: { appId } })
+export const getMenuPageList = (data: { page: number; pageSize: number; appId?: number; name?: string }) =>
   request.post<any, PageListResp<MenuItem>>('/menu/pageList', data)
 export const getMenuDetail = (menuID: number) => request.get<any, MenuItem>('/menu/detail', { params: { menuID } })
 export const createMenu = (data: Partial<MenuItem>) => request.post<any, { menuID: number }>('/menu/create', data)
