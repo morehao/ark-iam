@@ -45,7 +45,7 @@ e2e/.env.local
 *.exe
 *.out
 backend/.tmp/
-backend/.gocache
+**/.gocache
 __debug_bin*
 
 # TS 构建缓存
