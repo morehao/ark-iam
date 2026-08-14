@@ -8,4 +8,4 @@ use (
 	./pkg
 )
 
-replace github.com/morehao/golib => ./.tmp/golib-v1.32.0
+replace github.com/morehao/golib => ./.tmp/golib-v1.32.1

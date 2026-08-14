@@ -172,6 +172,7 @@
 - 软删除重构：v1.32.0 默认软删除改为写 `deleted_at` + 自动查询过滤 + `deleted_by`（与本项目 schema 一致）；`WithoutSoftDelete()` 语义变为 **Unscoped 物理删除**。因此移除此前为规避 v1.31.1 缺陷而加的 31 处 `gormdao.WithoutSoftDelete()`。
 - `glog` 常量迁移：`glog.KeyAppRequestID` → `gconstant.KeyAppRequestID`；`glog.GenRequestID()` 已删除 → `gutil.GenUUID()`（`pkg/testsetup/init.go`）。
 
-### v1.32.0 遗留缺陷（已在 golib 仓库工作区打补丁）
-- **`BaseCond.IncludeDeleted()` 在 nil 嵌入指针上 panic**：所有内嵌 `*gormdao.BaseCond` 的 Cond 以零值构造（未初始化 BaseCond）时，`deletedScope` 的类型断言 + 提升方法调用会 nil 解引用（`gormdao/cond.go`）。golib 自身测试用值嵌入未暴露此问题。修复：`return c != nil && c.IsDelete`。
-- **待办**：golib 发布 **v1.32.1**（含上述补丁）后，将 `go.mod` 升至 v1.32.1 并移除 `backend/go.work` 中的 `replace github.com/morehao/golib => ./.tmp/golib-v1.32.0`（该 replace 指向本地打补丁的 v1.32.0 校验副本，目录在 `.tmp/` 下、不入库）。
+### v1.32.0 遗留缺陷 → 已由 v1.32.1 修复
+- **`BaseCond.IncludeDeleted()` 在 nil 嵌入指针上 panic**：所有内嵌 `*gormdao.BaseCond` 的 Cond 以零值构造（未初始化 BaseCond）时，`deletedScope` 的类型断言 + 提升方法调用会 nil 解引用（`gormdao/cond.go`）。golib 自身测试用值嵌入未暴露此问题。
+- **已升级 golib v1.32.1**（含 nil 安全修复 `return c != nil && c.IsDelete`），`go.mod` 4 个模块均指向 v1.32.1。
+- `backend/go.work` 保留 `replace github.com/morehao/golib => ./.tmp/golib-v1.32.1`（本地校验副本，`.tmp/` 不入库）；网络可达后运行 `go mod tidy` 生成 go.sum 条目并删除该 replace 即回归纯远端依赖。
