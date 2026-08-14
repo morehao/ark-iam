@@ -13,6 +13,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/iam/object/objtenant"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenant"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/gerror"
@@ -75,6 +76,18 @@ func TestCreateTenantAsOwnerCreatesTenantUserAndSubscription(t *testing.T) {
 	if apps[0].Status != "enable" {
 		t.Fatalf("unexpected subscription status: %q", apps[0].Status)
 	}
+
+	// 每个租户创建时应自动创建同名的顶级部门（parent_id=0）
+	var depts []model.DepartmentEntity
+	if err := db.Where("tenant_id = ? AND parent_id = 0", resp.TenantID).Find(&depts).Error; err != nil {
+		t.Fatalf("query root departments: %v", err)
+	}
+	if len(depts) != 1 {
+		t.Fatalf("expected 1 root department, got %d", len(depts))
+	}
+	if depts[0].Name != "Acme" || depts[0].CreatedBy != 88 {
+		t.Fatalf("unexpected root department: %+v", depts[0])
+	}
 }
 
 func TestCreateTenantAsOwnerMultipleCreatesGetUniqueCodes(t *testing.T) {
@@ -120,6 +133,48 @@ func TestCreateTenantAsOwnerMultipleCreatesGetUniqueCodes(t *testing.T) {
 			t.Fatalf("duplicate tenant code %q", tn.Code)
 		}
 		codes[tn.Code] = true
+	}
+}
+
+func TestTenantCreateCreatesSameNameRootDepartment(t *testing.T) {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = mustNewRequest(t)
+	ginCtx.Set(gcontext.KeyUserID, uint(300))
+
+	db := newCreateTenantAsOwnerTestDB(t)
+	installTenantIamDB(t, db)
+
+	svc := &tenantSvc{}
+	resp, err := svc.Create(ginCtx, &dtotenant.TenantCreateReq{
+		TenantBaseInfo: objtenant.TenantBaseInfo{
+			Name: "Acme Platform",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Create returned error: %v", err)
+	}
+	if resp.TenantID == 0 {
+		t.Fatalf("expected non-zero tenant id")
+	}
+
+	var tenant model.TenantEntity
+	if err := db.First(&tenant, resp.TenantID).Error; err != nil {
+		t.Fatalf("query tenant: %v", err)
+	}
+	if tenant.Name != "Acme Platform" {
+		t.Fatalf("unexpected tenant: %+v", tenant)
+	}
+
+	// 每个租户创建时应自动创建同名的顶级部门（parent_id=0）
+	var depts []model.DepartmentEntity
+	if err := db.Where("tenant_id = ? AND parent_id = 0", resp.TenantID).Find(&depts).Error; err != nil {
+		t.Fatalf("query root departments: %v", err)
+	}
+	if len(depts) != 1 {
+		t.Fatalf("expected 1 root department, got %d", len(depts))
+	}
+	if depts[0].Name != "Acme Platform" || depts[0].CreatedBy != 300 {
+		t.Fatalf("unexpected root department: %+v", depts[0])
 	}
 }
 
@@ -260,7 +315,7 @@ func newCreateTenantAsOwnerTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite db: %v", err)
 	}
-	if err := db.AutoMigrate(&model.TenantEntity{}, &model.UserEntity{}, &model.TenantApplicationEntity{}, &model.ApplicationEntity{}, &model.AuditLogEntity{}); err != nil {
+	if err := db.AutoMigrate(&model.TenantEntity{}, &model.UserEntity{}, &model.TenantApplicationEntity{}, &model.ApplicationEntity{}, &model.AuditLogEntity{}, &model.DepartmentEntity{}); err != nil {
 		t.Fatalf("migrate tables: %v", err)
 	}
 	return db

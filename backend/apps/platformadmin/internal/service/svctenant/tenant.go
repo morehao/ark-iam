@@ -70,8 +70,25 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 		Type:        tenantType,
 	}
 
-	if err := dao.NewTenantDao().Insert(ctx, insertEntity); err != nil {
-		glog.Errorf(ctx, "[svctenant.TenantCreate] dao Create fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+	userID := gincontext.GetUserID(ctx)
+	txErr := iamDBFromContext(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := dao.NewTenantDao().WithTx(tx).Insert(ctx, insertEntity); err != nil {
+			return err
+		}
+		// 每个租户创建时自动创建同名的顶级部门（parent_id=0）
+		rootDept := &model.DepartmentEntity{
+			TenantID:  insertEntity.ID,
+			ParentID:  0,
+			Name:      req.Name,
+			CreatedBy: userID,
+		}
+		if err := dao.NewDepartmentDao().WithTx(tx).Insert(ctx, rootDept); err != nil {
+			return err
+		}
+		return nil
+	})
+	if txErr != nil {
+		glog.Errorf(ctx, "[svctenant.TenantCreate] transaction fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantCreateError)
 	}
 	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
@@ -134,6 +151,17 @@ func (svc *tenantSvc) CreateTenantAsOwner(ctx *gin.Context, req *dtotenant.Tenan
 			if err := dao.NewTenantApplicationDao().WithTx(tx).Insert(ctx, app); err != nil {
 				return err
 			}
+		}
+
+		// 每个租户创建时自动创建同名的顶级部门（parent_id=0）
+		rootDept := &model.DepartmentEntity{
+			TenantID:  tenant.ID,
+			ParentID:  0,
+			Name:      req.Name,
+			CreatedBy: req.PersonID,
+		}
+		if err := dao.NewDepartmentDao().WithTx(tx).Insert(ctx, rootDept); err != nil {
+			return err
 		}
 
 		tenantID = tenant.ID

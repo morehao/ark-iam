@@ -9,6 +9,13 @@ VALUES (1, 'Default Tenant', 'platform', 'platform', 'default_user', 0, 'default
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `code` = VALUES(`code`), `type` = VALUES(`type`);
 
 -- ============================================
+-- 1.1 租户同名顶级部门种子数据（每个租户一个 parent_id=0 的顶级部门）
+-- ============================================
+INSERT INTO `department` (`id`, `tenant_id`, `parent_id`, `name`, `code`, `sort`, `leader_user_id`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (1, 1, 0, 'Default Tenant', '', 0, 0, 0, 0, 0)
+ON DUPLICATE KEY UPDATE `tenant_id` = VALUES(`tenant_id`), `parent_id` = VALUES(`parent_id`), `name` = VALUES(`name`);
+
+-- ============================================
 -- 2. 基础角色种子数据
 -- ============================================
 INSERT INTO `role` (`id`, `tenant_id`, `app_id`, `name`, `code`, `description`, `type`, `is_default`, `created_by`, `updated_by`, `deleted_by`)
@@ -146,11 +153,26 @@ INSERT INTO `application` (`id`, `code`, `name`, `description`, `type`, `status`
 VALUES (1, 'admin', '管理后台', '平台管理后台应用', 'first_party', 'enable', 0, 1, 0, 0, 0)
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `is_system` = VALUES(`is_system`);
 
+-- 8.1 租户自服务应用（is_system=0：租户可订阅使用的应用，区别于平台管理后台）
+INSERT INTO `application` (`id`, `code`, `name`, `description`, `type`, `status`, `sort`, `is_system`, `created_by`, `updated_by`, `deleted_by`)
+VALUES (2, 'tenant-admin', '租户自服务', '租户自服务控制台应用', 'first_party', 'enable', 1, 0, 0, 0, 0)
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `is_system` = VALUES(`is_system`);
+
+-- 8.2 租户自服务应用菜单
+INSERT INTO `menu` (`id`, `app_id`, `parent_id`, `name`, `code`, `path`, `icon`, `sort`, `type`, `component`, `redirect`, `hidden`, `external_link`, `keep_alive`, `permission`, `status`, `created_by`, `updated_by`, `deleted_by`)
+VALUES
+    (15, 2, 0, '组织管理', 'organization', '/organization', 'apartment', 1, 'menu', 'pages/organization', '', 0, 0, 0, '', 'enable', 0, 0, 0),
+    (16, 2, 0, '组织角色', 'organizationRole', '/organizationRole', 'safety', 2, 'menu', 'pages/organizationRole', '', 0, 0, 0, '', 'enable', 0, 0, 0),
+    (17, 2, 0, '组织用户', 'organizationUser', '/organizationUser', 'team', 3, 'menu', 'pages/organizationUser', '', 0, 0, 0, '', 'enable', 0, 0, 0),
+    (18, 2, 0, '组织角色用户', 'organizationRoleUser', '/organizationRoleUser', 'user-switch', 4, 'menu', 'pages/organizationRoleUser', '', 0, 0, 0, '', 'enable', 0, 0, 0)
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
+
 -- ============================================
 -- 9. 租户应用订阅种子数据
 -- ============================================
 INSERT INTO `tenant_application` (`id`, `tenant_id`, `app_id`, `status`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (1, 1, 1, 'enable', 0, 0, 0)
+VALUES (1, 1, 1, 'enable', 0, 0, 0),
+       (2, 1, 2, 'enable', 0, 0, 0)
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
 
 -- ============================================

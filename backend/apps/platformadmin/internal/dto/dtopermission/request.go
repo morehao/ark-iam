@@ -33,7 +33,7 @@ type MenuDeleteReq struct {
 }
 
 type MenuTreeReq struct {
-	AppID uint `json:"appId" form:"appId"` // 应用ID
+	AppID uint `json:"appId" form:"appId" binding:"required"` // 应用ID（菜单树按应用维度查询）
 }
 
 type RoleCreateReq struct {

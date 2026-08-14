@@ -1,7 +1,7 @@
 package objpermission
 
 type MenuBaseInfo struct {
-	AppID uint   `json:"appId" form:"appId"` // 应用ID
+	AppID uint `json:"appId" form:"appId" binding:"required"` // 应用ID（菜单必须归属某个应用）
 	ParentID     uint   `json:"parentID" form:"parentID"`           // 父菜单ID
 	Name         string `json:"name" form:"name"`                   // 菜单名称
 	Code         string `json:"code" form:"code"`                   // 菜单编码
