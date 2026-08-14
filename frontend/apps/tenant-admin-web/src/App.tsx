@@ -114,7 +114,10 @@ function App() {
 
   const [menuTree, setMenuTree] = useState<MenuItem[] | null>(null)
 
+  // 仅在认证完成后加载动态菜单；未认证时发起请求会 401，
+  // 进而触发全局 session-expired 处理（removeUser + 跳转 /），造成刷新死循环。
   useEffect(() => {
+    if (!auth.isAuthenticated || auth.isLoading || auth.activeNavigator) return
     let mounted = true
     getMyMenuTree()
       .then((resp) => {
@@ -126,7 +129,7 @@ function App() {
     return () => {
       mounted = false
     }
-  }, [])
+  }, [auth.isAuthenticated, auth.isLoading, auth.activeNavigator])
 
   useEffect(() => {
     if (!auth.isLoading && !auth.activeNavigator && !auth.isAuthenticated && location.pathname !== '/auth/callback') {
