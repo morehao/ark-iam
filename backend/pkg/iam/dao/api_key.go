@@ -49,7 +49,7 @@ func NewApiKeyDao() *ApiKeyDao {
 	return &ApiKeyDao{
 		Dao: gormdao.NewDao[model.ApiKeyEntity, model.ApiKeyEntityList](
 			model.TableNameApiKey, "ApiKeyDao",
-			dbclient.IamDB, gormdao.WithoutSoftDelete(),
+			dbclient.IamDB,
 		),
 		dbGetter: dbclient.IamDB,
 	}
@@ -59,7 +59,7 @@ func NewApiKeyDaoWithDB(dbGetter gormdao.DBGetter) *ApiKeyDao {
 	return &ApiKeyDao{
 		Dao: gormdao.NewDao[model.ApiKeyEntity, model.ApiKeyEntityList](
 			model.TableNameApiKey, "ApiKeyDao",
-			dbGetter, gormdao.WithoutSoftDelete(),
+			dbGetter,
 		),
 		dbGetter: dbGetter,
 	}

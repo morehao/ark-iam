@@ -37,7 +37,7 @@ func NewResourceDao() *ResourceDao {
 	return &ResourceDao{
 		Dao: gormdao.NewDao[model.ResourceEntity, model.ResourceEntityList](
 			model.TableNameResource, "ResourceDao",
-			dbclient.IamDB, gormdao.WithoutSoftDelete(),
+			dbclient.IamDB,
 		),
 	}
 }

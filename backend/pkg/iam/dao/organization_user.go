@@ -37,7 +37,7 @@ func NewOrganizationUserDao() *OrganizationUserDao {
 	return &OrganizationUserDao{
 		Dao: gormdao.NewDao[model.OrganizationUserEntity, model.OrganizationUserEntityList](
 			model.TableNameOrganizationUser, "OrganizationUserDao",
-			dbclient.IamDB, gormdao.WithoutSoftDelete(),
+			dbclient.IamDB,
 		),
 	}
 }

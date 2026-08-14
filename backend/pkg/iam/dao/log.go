@@ -33,7 +33,7 @@ func NewLogDao() *LogDao {
 	return &LogDao{
 		Dao: gormdao.NewDao[model.LogEntity, model.LogEntityList](
 			model.TableNameLog, "LogDao",
-			dbclient.IamDB, gormdao.WithoutSoftDelete(),
+			dbclient.IamDB,
 		),
 	}
 }

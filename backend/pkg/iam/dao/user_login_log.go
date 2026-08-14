@@ -37,7 +37,7 @@ func NewUserLoginLogDao() *UserLoginLogDao {
 	return &UserLoginLogDao{
 		Dao: gormdao.NewDao[model.UserLoginLogEntity, model.UserLoginLogEntityList](
 			model.TableNameUserLoginLog, "UserLoginLogDao",
-			dbclient.IamDB, gormdao.WithoutSoftDelete(),
+			dbclient.IamDB,
 		),
 	}
 }

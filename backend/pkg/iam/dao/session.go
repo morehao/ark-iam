@@ -39,7 +39,7 @@ func NewSessionDao() *SessionDao {
 	return &SessionDao{
 		Dao: gormdao.NewDao[model.RefreshTokenEntity, model.RefreshTokenEntityList](
 			model.TableNameRefreshToken, "SessionDao",
-			dbclient.IamDB, gormdao.WithoutSoftDelete(),
+			dbclient.IamDB,
 		),
 	}
 }

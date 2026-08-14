@@ -40,7 +40,7 @@ func NewRefreshTokenDao() *RefreshTokenDao {
 	return &RefreshTokenDao{
 		Dao: gormdao.NewDao[model.RefreshTokenEntity, model.RefreshTokenEntityList](
 			model.TableNameRefreshToken, "RefreshTokenDao",
-			dbclient.IamDB, gormdao.WithoutSoftDelete(),
+			dbclient.IamDB,
 		),
 	}
 }

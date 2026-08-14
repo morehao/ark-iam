@@ -49,7 +49,7 @@ func NewMenuDao() *MenuDao {
 	return &MenuDao{
 		Dao: gormdao.NewDao[model.MenuEntity, model.MenuEntityList](
 			model.TableNameMenu, "MenuDao",
-			dbclient.IamDB, gormdao.WithoutSoftDelete(),
+			dbclient.IamDB,
 		),
 	}
 }

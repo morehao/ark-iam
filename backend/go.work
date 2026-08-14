@@ -7,3 +7,5 @@ use (
 	./apps/tenantadmin
 	./pkg
 )
+
+replace github.com/morehao/golib => ./.tmp/golib-v1.32.0

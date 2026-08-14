@@ -37,7 +37,7 @@ func NewTenantApplicationDao() *TenantApplicationDao {
 	return &TenantApplicationDao{
 		Dao: gormdao.NewDao[model.TenantApplicationEntity, model.TenantApplicationEntityList](
 			model.TableNameTenantApplication, "TenantApplicationDao",
-			dbclient.IamDB, gormdao.WithoutSoftDelete(),
+			dbclient.IamDB,
 		),
 	}
 }
