@@ -2,7 +2,6 @@ package dao
 
 import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
@@ -31,25 +30,13 @@ func (c *SessionAuditCond) BuildCondition(db *gorm.DB, tableName string) {
 
 type SessionAuditDao struct {
 	*gormdao.Dao[model.SessionAuditEntity, model.SessionAuditEntityList]
-	dbGetter gormdao.DBGetter
 }
 
-func NewSessionAuditDao() *SessionAuditDao {
+func NewSessionAuditDao(opts ...DaoOption) *SessionAuditDao {
 	return &SessionAuditDao{
 		Dao: gormdao.NewDao[model.SessionAuditEntity, model.SessionAuditEntityList](
 			model.TableNameSession, "SessionAuditDao",
-			dbclient.IamDB,
+			resolveDBGetter(opts...),
 		),
-		dbGetter: dbclient.IamDB,
-	}
-}
-
-func NewSessionAuditDaoWithDB(dbGetter gormdao.DBGetter) *SessionAuditDao {
-	return &SessionAuditDao{
-		Dao: gormdao.NewDao[model.SessionAuditEntity, model.SessionAuditEntityList](
-			model.TableNameSession, "SessionAuditDao",
-			dbGetter,
-		),
-		dbGetter: dbGetter,
 	}
 }

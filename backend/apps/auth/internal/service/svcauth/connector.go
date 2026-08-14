@@ -333,6 +333,7 @@ func (svc *connectorSvc) PageList(ctx *gin.Context, req *dtoauth.ConnectorPageLi
 				DomainPolicy:        unmarshalJSON(v.DomainPolicy),
 			},
 			OperatorBaseInfo: gobject.OperatorBaseInfo{
+				CreatedAt: v.CreatedAt.Unix(),
 				UpdatedAt: v.UpdatedAt.Unix(),
 			},
 		})

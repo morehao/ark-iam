@@ -93,9 +93,9 @@ func newAuditTestEnv(t *testing.T) (*gin.Context, *gorm.DB, func()) {
 	}
 	_ = db.AutoMigrate(&model.AuditLogEntity{})
 
-	auditDao := dao.NewAuditLogDaoWithDB(func(ctx context.Context) *gorm.DB {
+	auditDao := dao.NewAuditLogDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB {
 		return db.WithContext(ctx)
-	})
+	}))
 
 	orig := newAuditLogDao
 	newAuditLogDao = func() *dao.AuditLogDao { return auditDao }

@@ -116,9 +116,8 @@ func (svc *userIdentitySvc) Update(ctx *gin.Context, req *dtouser.UserIdentityUp
 }
 
 func (svc *userIdentitySvc) Detail(ctx *gin.Context, req *dtouser.UserIdentityDetailReq) (*dtouser.UserIdentityDetailResp, error) {
-	if _, err := svc.resolveTenantUser(ctx, req.UserIdentityID); err != nil {
-		return nil, err
-	}
+	// 直接委托 person 身份服务：其 Detail 已按 identity.PersonID 做租户可见性校验，
+	// 此处不再用 resolveTenantUser（它按 userID 解析，把 identityID 当 userID 查是错位逻辑）。
 	return newPersonIdentitySvc().Detail(ctx, req)
 }
 

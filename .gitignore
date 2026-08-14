@@ -10,6 +10,7 @@
 
 # 日志
 **/log/
+!frontend/**/src/pages/log/
 **/output/
 
 # 前端
@@ -44,4 +45,8 @@ e2e/.env.local
 *.exe
 *.out
 backend/.tmp/
+backend/.gocache
 __debug_bin*
+
+# TS 构建缓存
+*.tsbuildinfo

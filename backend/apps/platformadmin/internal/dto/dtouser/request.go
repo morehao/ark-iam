@@ -6,6 +6,11 @@ import (
 )
 
 type UserCreateReq struct {
+	// PersonID 自然人ID：>0 时关联已有自然人（不重复创建 person）
+	PersonID uint `json:"personID"`
+	// Password 明文密码：与 username/primaryEmail/primaryPhone 组合使用，
+	// 提供时自动创建自然人（person）并建立账号，使该用户可登录。
+	Password string `json:"password"`
 	objuser.UserBaseInfo
 }
 
@@ -34,6 +39,8 @@ type UserDeleteReq struct {
 
 type UserPasswordUpdateReq struct {
 	UserID uint `json:"userID" binding:"required"` // 用户ID
+	// Password 新密码明文（必填，服务端哈希后写入自然人）
+	Password string `json:"password" binding:"required"`
 	objuser.UserPasswordInfo
 }
 

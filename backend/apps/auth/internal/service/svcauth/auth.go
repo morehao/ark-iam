@@ -231,9 +231,9 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 	}
 
 	personEntity := &model.PersonEntity{
-		Username:          req.Username,
-		PrimaryEmail:      req.PrimaryEmail,
-		PrimaryPhone:      req.PrimaryPhone,
+		Username:          model.StrPtr(req.Username),
+		PrimaryEmail:      model.StrPtr(req.PrimaryEmail),
+		PrimaryPhone:      model.StrPtr(req.PrimaryPhone),
 		PasswordEncrypted: passwordHash,
 		PasswordMethod:    "bcrypt",
 		Name:              req.Name,

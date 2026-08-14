@@ -80,7 +80,7 @@ func (svc *logSvc) PageList(ctx *gin.Context, req *dtotenant.LogPageListReq) (*d
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID: req.TenantID,
+		TenantID: gincontext.GetTenantID(ctx),
 		Key:      req.Key,
 	}
 	logEntityList, total, err := dao.NewLogDao().GetPageListByCond(ctx, cond)

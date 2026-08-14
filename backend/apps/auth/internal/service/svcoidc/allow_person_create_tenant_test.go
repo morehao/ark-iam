@@ -97,10 +97,10 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 
 			svc := &oidcAuthSvc{
 				applicationClientDao: func() *dao.ApplicationClientDao {
-					return dao.NewApplicationClientDaoWithDB(dbGetter(db))
+					return dao.NewApplicationClientDao(dao.WithDBGetter(dbGetter(db)))
 				},
 				applicationDao: func() *dao.ApplicationDao {
-					return dao.NewApplicationDaoWithDB(dbGetter(db))
+					return dao.NewApplicationDao(dao.WithDBGetter(dbGetter(db)))
 				},
 			}
 

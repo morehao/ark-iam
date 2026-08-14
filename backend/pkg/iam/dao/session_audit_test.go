@@ -27,9 +27,9 @@ func TestSessionAuditDao_InsertAndGetByCond(t *testing.T) {
 
 	_ = db.AutoMigrate(&model.SessionAuditEntity{})
 
-	sessionAuditDao := NewSessionAuditDaoWithDB(func(ctx context.Context) *gorm.DB {
+	sessionAuditDao := NewSessionAuditDao(WithDBGetter(func(ctx context.Context) *gorm.DB {
 		return db.WithContext(ctx)
-	})
+	}))
 
 	now := time.Now()
 	entity := &model.SessionAuditEntity{

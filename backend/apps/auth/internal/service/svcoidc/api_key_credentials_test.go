@@ -12,8 +12,8 @@ import (
 
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/morehao/golib/dbaccess/gormdao"
+	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -30,7 +30,7 @@ func TestLookupApiKeyByRawKey(t *testing.T) {
 
 	store := NewPersistentStore()
 	store.apiKeyDao = func() *dao.ApiKeyDao {
-		return dao.NewApiKeyDaoWithDB(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) })
+		return dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
 	}
 
 	sum := sha256.Sum256([]byte("rawkey"))
@@ -88,12 +88,12 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 	sum := sha256.Sum256([]byte("k1"))
 	hash := hex.EncodeToString(sum[:])
 	if err := db.Create(&model.ApiKeyEntity{
-		TenantID:   1,
-		Name:       "service-key",
-		KeyHash:    hash,
-		KeyPrefix:  "ak_1234567",
-		Scope:      json.RawMessage("{}"),
-		CreatedBy:  7,
+		TenantID:  1,
+		Name:      "service-key",
+		KeyHash:   hash,
+		KeyPrefix: "ak_1234567",
+		Scope:     json.RawMessage("{}"),
+		CreatedBy: 7,
 	}).Error; err != nil {
 		t.Fatalf("create api key: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 
 	persistentStore := NewPersistentStore()
 	persistentStore.apiKeyDao = func() *dao.ApiKeyDao {
-		return dao.NewApiKeyDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
+		return dao.NewApiKeyDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
 	persistentStore.userDao = func() *dao.UserDao {
 		return &dao.UserDao{Dao: gormdao.NewDao[model.UserEntity, model.UserEntityList](
@@ -122,7 +122,7 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 		)}
 	}
 	persistentStore.applicationClientDao = func() *dao.ApplicationClientDao {
-		return dao.NewApplicationClientDaoWithDB(func(c context.Context) *gorm.DB { return db.WithContext(c) })
+		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
 
 	storage := NewOIDCStorage(nil, persistentStore, nil, "test-key")

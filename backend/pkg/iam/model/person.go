@@ -11,9 +11,11 @@ const TableNamePerson = "person"
 
 type PersonEntity struct {
 	gorm.Model
-	Username          string          `gorm:"column:username;type:varchar(128);not null;default '';comment:全局用户名"`
-	PrimaryEmail      string          `gorm:"column:primary_email;type:varchar(128);not null;default '';comment:主要邮箱"`
-	PrimaryPhone      string          `gorm:"column:primary_phone;type:varchar(128);not null;default '';comment:主要手机号"`
+	// Username/PrimaryEmail/PrimaryPhone 为可选全局标识，空值存 NULL：
+	// 三者均有唯一索引，若空值存 '' 则仅允许一条空记录，后续创建无该标识的用户会撞唯一键。
+	Username          *string         `gorm:"column:username;type:varchar(128);default null;comment:全局用户名"`
+	PrimaryEmail      *string         `gorm:"column:primary_email;type:varchar(128);default null;comment:主要邮箱"`
+	PrimaryPhone      *string         `gorm:"column:primary_phone;type:varchar(128);default null;comment:主要手机号"`
 	PasswordEncrypted string          `gorm:"column:password_encrypted;type:varchar(256);not null;default '';comment:加密密码"`
 	PasswordMethod    string          `gorm:"column:password_method;type:varchar(32);not null;default '';comment:密码加密方式"`
 	Name              string          `gorm:"column:name;type:varchar(128);not null;default '';comment:姓名"`
@@ -25,6 +27,22 @@ type PersonEntity struct {
 	CreatedBy         uint            `gorm:"column:created_by;type:bigint unsigned;not null;default 0;comment:创建人id"`
 	UpdatedBy         uint            `gorm:"column:updated_by;type:bigint unsigned;not null;default 0;comment:更新人id"`
 	DeletedBy         uint            `gorm:"column:deleted_by;type:bigint unsigned;not null;default 0;comment:删除人id"`
+}
+
+// StrPtr 将空字符串转为 nil（NULL），非空返回指针，供 person 可选标识字段使用。
+func StrPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// DerefStr 解引用可空字符串，空/ nil 返回 ""。
+func DerefStr(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }
 
 func (PersonEntity) TableName() string {

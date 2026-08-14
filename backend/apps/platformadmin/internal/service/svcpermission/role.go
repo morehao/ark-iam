@@ -50,6 +50,10 @@ func NewRoleSvc() RoleSvc {
 }
 
 func (svc *roleSvc) Create(ctx *gin.Context, req *dtopermission.RoleCreateReq) (*dtopermission.RoleCreateResp, error) {
+	tenantID := gincontext.GetTenantID(ctx)
+	if req.TenantID == 0 {
+		req.TenantID = tenantID
+	}
 	insertEntity := &model.RoleEntity{
 		TenantID:    req.TenantID,
 		Name:        req.Name,
@@ -196,20 +200,30 @@ func (svc *roleSvc) ListUsers(ctx *gin.Context, req *dtouser.RoleUserListReq) (*
 	}
 
 	userMap := make(map[uint]*model.UserEntity)
+	personMap := make(map[uint]*model.PersonEntity)
 	for _, ur := range list {
 		if user, err := userDao.GetByID(ctx, ur.UserID); err == nil && user != nil {
 			userMap[user.ID] = user
+			if user.PersonID != 0 {
+				if person, perr := dao.NewPersonDao().GetByID(ctx, user.PersonID); perr == nil && person != nil && person.ID != 0 {
+					personMap[user.PersonID] = person
+				}
+			}
 		}
 	}
 
 	users := make([]dtouser.RoleUserResp, 0, len(list))
 	for _, ur := range list {
 		if user, ok := userMap[ur.UserID]; ok {
+			person := personMap[user.PersonID]
+			if person == nil {
+				person = &model.PersonEntity{}
+			}
 			users = append(users, dtouser.RoleUserResp{
 				UserID:    uint64(ur.UserID),
-				Username:  "",
+				Username:  model.DerefStr(person.Username),
 				Name:      user.Name,
-				Email:     "",
+				Email:     model.DerefStr(person.PrimaryEmail),
 				RoleID:    uint64(ur.RoleID),
 				CreatedAt: ur.CreatedAt.Format("2006-01-02 15:04:05"),
 			})

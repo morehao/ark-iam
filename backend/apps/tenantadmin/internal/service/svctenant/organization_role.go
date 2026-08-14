@@ -78,6 +78,9 @@ func (svc *organizationRoleSvc) Create(ctx *gin.Context, req *dtotenant.Organiza
 		Type:           req.Type,
 		CreatedBy:      gincontext.GetUserID(ctx),
 	}
+	if insertEntity.TenantID == 0 {
+		insertEntity.TenantID = gincontext.GetTenantID(ctx)
+	}
 
 	if err := repo.Insert(ctx, insertEntity); err != nil {
 		glog.Errorf(ctx, "[svcorganizationrole.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -118,7 +121,7 @@ func (svc *organizationRoleSvc) Update(ctx *gin.Context, req *dtotenant.Organiza
 
 	userID := gincontext.GetUserID(ctx)
 	updateMap := map[string]any{
-		"tenant_id":       req.TenantID,
+		"tenant_id":       gincontext.GetTenantID(ctx),
 		"organization_id": req.OrganizationID,
 		"name":            req.Name,
 		"description":     req.Description,

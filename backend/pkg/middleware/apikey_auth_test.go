@@ -23,9 +23,9 @@ func TestApiKeyAuthValidKey(t *testing.T) {
 	db, cleanup := newTestMiddlewareDB(t)
 	defer cleanup()
 
-	apiKeyDao := dao.NewApiKeyDaoWithDB(func(ctx context.Context) *gorm.DB {
+	apiKeyDao := dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB {
 		return db.WithContext(ctx)
-	})
+	}))
 
 	rawKey, keyHash, keyPrefix := generateTestKey()
 	insertTestApiKey(t, apiKeyDao, 1, keyHash, keyPrefix, nil, nil)
@@ -56,9 +56,9 @@ func TestApiKeyAuthViaXApiKeyHeader(t *testing.T) {
 	db, cleanup := newTestMiddlewareDB(t)
 	defer cleanup()
 
-	apiKeyDao := dao.NewApiKeyDaoWithDB(func(ctx context.Context) *gorm.DB {
+	apiKeyDao := dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB {
 		return db.WithContext(ctx)
-	})
+	}))
 
 	rawKey, keyHash, keyPrefix := generateTestKey()
 	insertTestApiKey(t, apiKeyDao, 9, keyHash, keyPrefix, nil, nil)
@@ -88,9 +88,9 @@ func TestApiKeyAuthInvalidKey(t *testing.T) {
 	db, cleanup := newTestMiddlewareDB(t)
 	defer cleanup()
 
-	apiKeyDao := dao.NewApiKeyDaoWithDB(func(ctx context.Context) *gorm.DB {
+	apiKeyDao := dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB {
 		return db.WithContext(ctx)
-	})
+	}))
 
 	_, keyHash, keyPrefix := generateTestKey()
 	insertTestApiKey(t, apiKeyDao, 1, keyHash, keyPrefix, nil, nil)
@@ -155,9 +155,9 @@ func TestApiKeyAuthRevokedKey(t *testing.T) {
 	db, cleanup := newTestMiddlewareDB(t)
 	defer cleanup()
 
-	apiKeyDao := dao.NewApiKeyDaoWithDB(func(ctx context.Context) *gorm.DB {
+	apiKeyDao := dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB {
 		return db.WithContext(ctx)
-	})
+	}))
 
 	rawKey, keyHash, keyPrefix := generateTestKey()
 	now := time.Now()
@@ -186,9 +186,9 @@ func TestApiKeyAuthExpiredKey(t *testing.T) {
 	db, cleanup := newTestMiddlewareDB(t)
 	defer cleanup()
 
-	apiKeyDao := dao.NewApiKeyDaoWithDB(func(ctx context.Context) *gorm.DB {
+	apiKeyDao := dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB {
 		return db.WithContext(ctx)
-	})
+	}))
 
 	rawKey, keyHash, keyPrefix := generateTestKey()
 	past := time.Now().Add(-24 * time.Hour)

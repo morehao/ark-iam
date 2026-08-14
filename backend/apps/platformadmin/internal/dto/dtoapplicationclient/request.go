@@ -46,7 +46,7 @@ type DeleteReq struct {
 }
 
 type DetailReq struct {
-	ApplicationClientID uint `json:"applicationClientId" binding:"required"` // OAuth客户端ID
+	ApplicationClientID uint `json:"applicationClientId" form:"applicationClientId" binding:"required"` // OAuth客户端ID
 }
 
 type PageListReq struct {

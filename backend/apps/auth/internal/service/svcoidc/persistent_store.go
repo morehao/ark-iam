@@ -32,12 +32,12 @@ type PersistentStore struct {
 
 func NewPersistentStore() *PersistentStore {
 	return &PersistentStore{
-		applicationClientDao:       dao.NewApplicationClientDao,
+		applicationClientDao:       func() *dao.ApplicationClientDao { return dao.NewApplicationClientDao() },
 		applicationClientSecretDao: dao.NewApplicationClientSecretDao,
 		personDao:                  dao.NewPersonDao,
 		userDao:                    dao.NewUserDao,
 		refreshTokenDao:            dao.NewRefreshTokenDao,
-		apiKeyDao:                  dao.NewApiKeyDao,
+		apiKeyDao:                  func() *dao.ApiKeyDao { return dao.NewApiKeyDao() },
 	}
 }
 
@@ -114,12 +114,12 @@ func (s *PersistentStore) SetUserinfoFromScopes(ctx context.Context, userinfo *o
 		switch scope {
 		case oidc.ScopeProfile:
 			userinfo.Name = person.Name
-			userinfo.PreferredUsername = person.Username
+			userinfo.PreferredUsername = model.DerefStr(person.Username)
 		case oidc.ScopeEmail:
-			userinfo.Email = person.PrimaryEmail
+			userinfo.Email = model.DerefStr(person.PrimaryEmail)
 			userinfo.EmailVerified = true
 		case oidc.ScopePhone:
-			userinfo.PhoneNumber = person.PrimaryPhone
+			userinfo.PhoneNumber = model.DerefStr(person.PrimaryPhone)
 			userinfo.PhoneNumberVerified = false
 		}
 	}
@@ -137,8 +137,8 @@ func (s *PersistentStore) SetUserinfoFromToken(ctx context.Context, userinfo *oi
 		return nil
 	}
 	userinfo.Name = person.Name
-	userinfo.PreferredUsername = person.Username
-	userinfo.Email = person.PrimaryEmail
+	userinfo.PreferredUsername = model.DerefStr(person.Username)
+	userinfo.Email = model.DerefStr(person.PrimaryEmail)
 	userinfo.EmailVerified = true
 	return nil
 }

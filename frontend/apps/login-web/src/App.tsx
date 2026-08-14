@@ -2,17 +2,45 @@ import { useEffect } from 'react'
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthGuard, useLogout, FullPageSpinner } from '@ark-iam/auth'
 import { Button, Card, Typography } from 'antd'
-import { LogoutOutlined } from '@ant-design/icons'
+import { LogoutOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import LoginPage from './pages/LoginPage'
 
 function PortalHome() {
   const logout = useLogout()
   return (
-    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f2f5' }}>
-      <Card style={{ width: 400, textAlign: 'center' }}>
-        <Typography.Title level={4}>IAM 登录门户</Typography.Title>
-        <Typography.Paragraph type="secondary">您已通过统一身份认证登录。</Typography.Paragraph>
-        <Button type="primary" danger icon={<LogoutOutlined />} onClick={() => void logout()} block size="large">
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #eef2ff 0%, #f5f0ff 100%)',
+      }}
+    >
+      <Card style={{ width: 420, textAlign: 'center', borderRadius: 16, boxShadow: '0 20px 60px rgba(15,23,42,0.12)' }} styles={{ body: { padding: '40px 36px' } }}>
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            margin: '0 auto 20px',
+            borderRadius: 18,
+            background: 'linear-gradient(135deg, #4f6ef7 0%, #7a5af8 55%, #a855f7 100%)',
+            color: '#fff',
+            fontSize: 26,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <SafetyCertificateOutlined />
+        </div>
+        <Typography.Title level={4} style={{ marginBottom: 8 }}>
+          IAM 登录门户
+        </Typography.Title>
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 28 }}>
+          您已通过统一身份认证登录，可安全退出或返回应用。
+        </Typography.Paragraph>
+        <Button danger size="large" icon={<LogoutOutlined />} onClick={() => void logout()} block style={{ height: 46, borderRadius: 10, fontWeight: 600 }}>
           全局登出
         </Button>
       </Card>

@@ -41,9 +41,9 @@ CREATE TABLE `system`
 CREATE TABLE `person`
 (
     `id`                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自然人ID',
-    `username`            VARCHAR(128) NOT NULL DEFAULT '' COMMENT '全局用户名',
-    `primary_email`       VARCHAR(128) NOT NULL DEFAULT '' COMMENT '主要邮箱',
-    `primary_phone`       VARCHAR(128) NOT NULL DEFAULT '' COMMENT '主要手机号',
+    `username`            VARCHAR(128) DEFAULT NULL COMMENT '全局用户名',
+    `primary_email`       VARCHAR(128) DEFAULT NULL COMMENT '主要邮箱',
+    `primary_phone`       VARCHAR(128) DEFAULT NULL COMMENT '主要手机号',
     `password_encrypted`  VARCHAR(256) NOT NULL DEFAULT '' COMMENT '加密密码',
     `password_method`     VARCHAR(32) NOT NULL DEFAULT '' COMMENT '密码加密方式',
     `name`                VARCHAR(128) NOT NULL DEFAULT '' COMMENT '姓名',

@@ -45,6 +45,10 @@ func NewOrganizationSvc() OrganizationSvc {
 }
 
 func (svc *organizationSvc) Create(ctx *gin.Context, req *dtotenant.OrganizationCreateReq) (*dtotenant.OrganizationCreateResp, error) {
+	tenantID := gincontext.GetTenantID(ctx)
+	if req.TenantID == 0 {
+		req.TenantID = tenantID
+	}
 	insertEntity := &model.OrganizationEntity{
 		TenantID:      req.TenantID,
 		Name:          req.Name,
@@ -92,11 +96,11 @@ func (svc *organizationSvc) Update(ctx *gin.Context, req *dtotenant.Organization
 
 	userID := gincontext.GetUserID(ctx)
 	updateMap := map[string]any{
-		"tenant_id":       req.TenantID,
-		"name":            req.Name,
-		"description":     req.Description,
+		"tenant_id":      gincontext.GetTenantID(ctx),
+		"name":           req.Name,
+		"description":    req.Description,
 		"is_mfa_required": req.IsMFARequired,
-		"updated_by":      userID,
+		"updated_by":     userID,
 	}
 	if err := dao.NewOrganizationDao().UpdateMap(ctx, req.OrganizationID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcorganization.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -133,7 +137,7 @@ func (svc *organizationSvc) PageList(ctx *gin.Context, req *dtotenant.Organizati
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID: req.TenantID,
+		TenantID: gincontext.GetTenantID(ctx),
 		Name:     req.Name,
 	}
 	orgEntityList, total, err := dao.NewOrganizationDao().GetPageListByCond(ctx, cond)

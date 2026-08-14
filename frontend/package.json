@@ -6,13 +6,17 @@
   "scripts": {
     "dev": "pnpm --filter @ark-iam/platform-admin-web dev",
     "dev:platform": "pnpm --filter @ark-iam/platform-admin-web dev",
-    "dev:log": "pnpm --filter @ark-iam/login-web dev",
+    "dev:login": "pnpm --filter @ark-iam/login-web dev",
     "dev:tenant": "pnpm --filter @ark-iam/tenant-admin-web dev",
     "dev:all": "pnpm run --parallel --filter @ark-iam/login-web --filter @ark-iam/platform-admin-web --filter @ark-iam/tenant-admin-web dev",
+    "build": "pnpm -r --filter './packages/*' --filter './apps/*' build",
     "build:web": "pnpm --filter @ark-iam/platform-admin-web build",
+    "build:login": "pnpm --filter @ark-iam/login-web build",
     "build:tenant": "pnpm --filter @ark-iam/tenant-admin-web build",
+    "typecheck": "pnpm -r --filter './packages/*' --filter './apps/*' exec tsc --noEmit -p tsconfig.json",
     "test": "pnpm --filter @ark-iam/platform-admin-web test",
-    "test:web": "pnpm --filter @ark-iam/platform-admin-web test"
+    "test:web": "pnpm --filter @ark-iam/platform-admin-web test",
+    "test:all": "pnpm -r --filter './packages/*' --filter './apps/*' test"
   },
   "packageManager": "pnpm@11.1.0+sha512.0c44e842e5686b2c061a81adda8b2258bd8818e9704b2cf2c63d56b931a7b2e910092e085027003b96ca3911ab56a07f6df5abaed2be9925034cdd686a535b14"
 }

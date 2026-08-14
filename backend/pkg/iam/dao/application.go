@@ -2,7 +2,6 @@ package dao
 
 import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
@@ -37,19 +36,11 @@ type ApplicationDao struct {
 	*gormdao.Dao[model.ApplicationEntity, model.ApplicationEntityList]
 }
 
-func NewApplicationDao() *ApplicationDao {
+func NewApplicationDao(opts ...DaoOption) *ApplicationDao {
 	return &ApplicationDao{
 		Dao: gormdao.NewDao[model.ApplicationEntity, model.ApplicationEntityList](
 			model.TableNameApplication, "ApplicationDao",
-			dbclient.IamDB,
-		),
-	}
-}
-
-func NewApplicationDaoWithDB(getDB gormdao.DBGetter) *ApplicationDao {
-	return &ApplicationDao{
-		Dao: gormdao.NewDao[model.ApplicationEntity, model.ApplicationEntityList](
-			model.TableNameApplication, "ApplicationDao", getDB,
+			resolveDBGetter(opts...),
 		),
 	}
 }

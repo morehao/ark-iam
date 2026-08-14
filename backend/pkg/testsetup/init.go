@@ -7,7 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/golib/biz/testkit"
-	"github.com/morehao/golib/glog"
+	"github.com/morehao/golib/gconstant"
+	"github.com/morehao/golib/gutil"
 )
 
 type Initializer = testkit.Initializer
@@ -71,8 +72,8 @@ func NewCtx(opts ...testkit.Option) *gin.Context {
 		opt(ginCtx)
 	}
 
-	if _, exists := ginCtx.Get(glog.KeyAppRequestID); !exists {
-		ginCtx.Set(glog.KeyAppRequestID, glog.GenRequestID())
+	if _, exists := ginCtx.Get(gconstant.KeyAppRequestID); !exists {
+		ginCtx.Set(gconstant.KeyAppRequestID, gutil.GenUUID())
 	}
 
 	return ginCtx

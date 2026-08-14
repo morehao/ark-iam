@@ -40,9 +40,9 @@ func PrepareTestPerson(ctx context.Context, username, email, phone, password, na
 	}
 
 	entity := &model.PersonEntity{
-		Username:          username,
-		PrimaryEmail:      email,
-		PrimaryPhone:      phone,
+		Username:          model.StrPtr(username),
+		PrimaryEmail:      model.StrPtr(email),
+		PrimaryPhone:      model.StrPtr(phone),
 		PasswordEncrypted: passwordHash,
 		PasswordMethod:    "bcrypt",
 		Name:              name,

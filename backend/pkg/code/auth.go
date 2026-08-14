@@ -28,6 +28,7 @@ const (
 	SessionGetListError       = 110023
 	SessionRevokeError        = 110024
 	AlreadyJoinedError        = 110025
+	SessionNotExistError      = 110026
 )
 
 const (
@@ -65,6 +66,7 @@ var tokenErrorMsgMap = gerror.CodeMsgMap{
 	SessionGetListError:       "获取会话列表失败",
 	SessionRevokeError:        "撤销会话失败",
 	AlreadyJoinedError:        "已加入该租户",
+	SessionNotExistError:      "会话不存在或无权撤销",
 }
 
 func init() {

@@ -27,7 +27,7 @@ func TestDeleteSystemApplication(t *testing.T) {
 	oldNew := newApplicationRepo
 	defer func() { newApplicationRepo = oldNew }()
 	newApplicationRepo = func() applicationRepository {
-		return dao.NewApplicationDaoWithDB(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) })
+		return dao.NewApplicationDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
 	}
 
 	_ = db.Create(&model.ApplicationEntity{
