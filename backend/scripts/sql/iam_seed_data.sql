@@ -223,22 +223,10 @@ ON DUPLICATE KEY UPDATE
   `is_system` = VALUES(`is_system`);
 
 -- ============================================
--- login-web OAuth Client (第一方 SPA，PKCE，统一登录门户)
--- client_id: login-web
--- redirect_uris: http://localhost:3000/auth/callback
--- 定位：既作为 OP 跳转的集中登录页，也作为受 SSO 保护的门户 App（可触发全局登出）
+-- 说明：login-web（:3000）是 IAM OP 的登录 UI（凭证表单 + 多租户选择），
+-- 不是 OIDC Client/RP —— 凭证直接提交到 OP 内部端点 /oidc/login，
+-- 不参与授权码流程，因此不再注册 application_client。
+-- 只有业务应用（platform-admin-web / tenant-admin-web 等）才是 OIDC Client。
+-- 已有环境若残留 login-web client 行，可执行：
+--   DELETE FROM application_client WHERE client_id = 'login-web';
 -- ============================================
-INSERT INTO `application_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `post_logout_redirect_uris`, `type`, `is_third_party`, `status`, `is_system`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (4, 1, 1, 'login-web', 'IAM 登录门户', '["http://localhost:3000/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'none', 1, '["openid","profile","email"]', '["http://localhost:3000/login"]', 'first_party', 0, 'enable', 1, 0, 0, 0)
-ON DUPLICATE KEY UPDATE
-  `redirect_uris` = VALUES(`redirect_uris`),
-  `grant_types` = VALUES(`grant_types`),
-  `response_types` = VALUES(`response_types`),
-  `token_endpoint_auth_method` = VALUES(`token_endpoint_auth_method`),
-  `require_pkce` = VALUES(`require_pkce`),
-  `default_scopes` = VALUES(`default_scopes`),
-  `post_logout_redirect_uris` = VALUES(`post_logout_redirect_uris`),
-  `type` = VALUES(`type`),
-  `is_third_party` = VALUES(`is_third_party`),
-  `status` = VALUES(`status`),
-  `is_system` = VALUES(`is_system`);
