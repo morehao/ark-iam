@@ -31,13 +31,14 @@ const (
 
 type ApplicationClientEntity struct {
 	gorm.Model
-	TenantID        uint   `gorm:"column:tenant_id;type:bigint unsigned;not null;default 0;comment:租户id" json:"tenantID"`
-	AppID   uint   `gorm:"column:app_id;type:bigint unsigned;not null;default 0;comment:所属应用id" json:"appId"`
-	ClientID        string `gorm:"column:client_id;type:varchar(64);not null;default '';uniqueIndex;comment:OIDC客户端ID" json:"clientID"`
-	Name            string `gorm:"column:name;type:varchar(256);not null;default '';comment:客户端名称" json:"name"`
+	TenantID uint   `gorm:"column:tenant_id;type:bigint unsigned;not null;default 0;comment:租户id" json:"tenantID"`
+	AppID    uint   `gorm:"column:app_id;type:bigint unsigned;not null;default 0;comment:所属应用id" json:"appId"`
+	ClientID string `gorm:"column:client_id;type:varchar(64);not null;default '';uniqueIndex;comment:OIDC客户端ID" json:"clientID"`
+	Name     string `gorm:"column:name;type:varchar(256);not null;default '';comment:客户端名称" json:"name"`
 
 	RedirectURIs            datatypes.JSON `gorm:"column:redirect_uris;type:json;not null;default ('[]');comment:授权回调地址" json:"redirectURIs"`
 	PostLogoutRedirectURIs  datatypes.JSON `gorm:"column:post_logout_redirect_uris;type:json;not null;default ('[]');comment:登出回调地址" json:"postLogoutRedirectURIs"`
+	BackChannelLogoutURI    string         `gorm:"column:back_channel_logout_uri;type:varchar(512);not null;default '';comment:OIDC背信道登出通知地址" json:"backChannelLogoutURI"`
 	GrantTypes              datatypes.JSON `gorm:"column:grant_types;type:json;not null;default ('[\"authorization_code\"]');comment:授权类型" json:"grantTypes"`
 	ResponseTypes           datatypes.JSON `gorm:"column:response_types;type:json;not null;default ('[\"code\"]');comment:响应类型" json:"responseTypes"`
 	TokenEndpointAuthMethod string         `gorm:"column:token_endpoint_auth_method;type:varchar(32);not null;default 'client_secret_basic';comment:令牌端点认证方式" json:"tokenEndpointAuthMethod"`
@@ -45,7 +46,7 @@ type ApplicationClientEntity struct {
 	RequirePKCE             int8           `gorm:"column:require_pkce;type:tinyint(1);not null;default 0;comment:是否强制PKCE" json:"requirePKCE"`
 	RequireAuthTime         int8           `gorm:"column:require_auth_time;type:tinyint(1);not null;default 0;comment:是否需要auth_time声明" json:"requireAuthTime"`
 	DefaultScopes           datatypes.JSON `gorm:"column:default_scopes;type:json;not null;default ('[\"openid\",\"profile\"]');comment:默认权限范围" json:"defaultScopes"`
-	AccessTokenTTL          int64          `gorm:"column:access_token_ttl;type:bigint;not null;default 3600;comment:访问令牌有效期(秒)" json:"accessTokenTTL"`
+	AccessTokenTTL          int64          `gorm:"column:access_token_ttl;type:bigint;not null;default 900;comment:访问令牌有效期(秒)" json:"accessTokenTTL"`
 	RefreshTokenTTL         int64          `gorm:"column:refresh_token_ttl;type:bigint;not null;default 2592000;comment:刷新令牌有效期(秒)" json:"refreshTokenTTL"`
 	Type                    string         `gorm:"column:type;type:varchar(32);not null;default 'first_party';comment:客户端类型" json:"type"`
 	IsThirdParty            int8           `gorm:"column:is_third_party;type:tinyint(1);not null;default 0;comment:是否第三方应用" json:"isThirdParty"`

@@ -33,7 +33,12 @@ func InitOIDC(engine *gin.Engine, groups *ginserver.RouterGroups) {
 	if err != nil {
 		panic(err)
 	}
-	OIDCPublicKey = &signingKey.Key().(*rsa.PrivateKey).PublicKey
+	privKey := signingKey.Key().(*rsa.PrivateKey)
+	OIDCPublicKey = &privKey.PublicKey
+
+	// 启动 back-channel logout 发送器（异步消费登出队列）
+	logoutWorker := svcoidc.NewLogoutWorker(privKey, signingKey.ID(), issuer)
+	go logoutWorker.Run(context.Background())
 
 	ctr := ctroidc.NewOIDCCtr(provider)
 	ssoCookieDomain := config.Conf.OIDC.SSOCookieDomain()

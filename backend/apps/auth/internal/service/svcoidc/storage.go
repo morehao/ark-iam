@@ -14,6 +14,7 @@ import (
 
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
+	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/golib/glog"
 )
 
@@ -35,24 +36,26 @@ type AuthRequest struct {
 	DoneFlag      bool                `json:"done_flag"`
 	ExpiresAt     time.Time           `json:"expires_at"`
 	TenantID      uint                `json:"tenant_id"`
+	SessionID     string              `json:"session_id"`
 }
 
-func (a *AuthRequest) GetID() string                          { return a.ID }
-func (a *AuthRequest) GetACR() string                         { return a.ACR }
-func (a *AuthRequest) GetAMR() []string                       { return a.AMR }
-func (a *AuthRequest) GetAudience() []string                  { return a.Audience }
-func (a *AuthRequest) GetAuthTime() time.Time                 { return a.AuthTime }
-func (a *AuthRequest) GetClientID() string                    { return a.ClientID }
-func (a *AuthRequest) GetCodeChallenge() *oidc.CodeChallenge  { return a.CodeChallenge }
-func (a *AuthRequest) GetNonce() string                       { return a.Nonce }
-func (a *AuthRequest) GetRedirectURI() string                 { return a.RedirectURI }
-func (a *AuthRequest) GetResponseType() oidc.ResponseType     { return a.ResponseType }
-func (a *AuthRequest) GetResponseMode() oidc.ResponseMode     { return a.ResponseMode }
-func (a *AuthRequest) GetScopes() []string                    { return a.Scopes }
-func (a *AuthRequest) GetState() string                       { return a.State }
-func (a *AuthRequest) GetSubject() string                     { return a.Subject }
-func (a *AuthRequest) Done() bool                             { return a.DoneFlag }
-func (a *AuthRequest) GetTenantID() uint                    { return a.TenantID }
+func (a *AuthRequest) GetID() string                         { return a.ID }
+func (a *AuthRequest) GetACR() string                        { return a.ACR }
+func (a *AuthRequest) GetAMR() []string                      { return a.AMR }
+func (a *AuthRequest) GetAudience() []string                 { return a.Audience }
+func (a *AuthRequest) GetAuthTime() time.Time                { return a.AuthTime }
+func (a *AuthRequest) GetClientID() string                   { return a.ClientID }
+func (a *AuthRequest) GetCodeChallenge() *oidc.CodeChallenge { return a.CodeChallenge }
+func (a *AuthRequest) GetNonce() string                      { return a.Nonce }
+func (a *AuthRequest) GetRedirectURI() string                { return a.RedirectURI }
+func (a *AuthRequest) GetResponseType() oidc.ResponseType    { return a.ResponseType }
+func (a *AuthRequest) GetResponseMode() oidc.ResponseMode    { return a.ResponseMode }
+func (a *AuthRequest) GetScopes() []string                   { return a.Scopes }
+func (a *AuthRequest) GetState() string                      { return a.State }
+func (a *AuthRequest) GetSubject() string                    { return a.Subject }
+func (a *AuthRequest) Done() bool                            { return a.DoneFlag }
+func (a *AuthRequest) GetTenantID() uint                     { return a.TenantID }
+func (a *AuthRequest) GetSessionID() string                  { return a.SessionID }
 
 type OIDCStorage struct {
 	protocolStore   ProtocolStateStore
@@ -118,7 +121,13 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 		if tid := authReq.GetTenantID(); tid > 0 {
 			if pid, perr := parseOIDCSubject(authReq.GetSubject()); perr == nil {
 				if users, uerr := s.persistentStore.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid, TenantID: tid}); uerr == nil && len(users) > 0 {
-					return objauth.TokenClaims{TenantID: tid}.OIDCPrivateClaims(), nil
+					claims := objauth.TokenClaims{TenantID: tid}.OIDCPrivateClaims()
+					// sid：注入 SSO 会话标识，使 ID token / access token 携带 sid，
+					// 供 RP 匹配与会话粒度的 back-channel 登出（M4）。
+					if authReq.SessionID != "" {
+						claims["sid"] = authReq.SessionID
+					}
+					return claims, nil
 				}
 			}
 		}
@@ -183,6 +192,10 @@ func (s *OIDCStorage) AuthRequestByCode(ctx context.Context, code string) (op.Au
 
 func (s *OIDCStorage) CompleteAuthRequest(id string, subject string, authTime time.Time, amr []string, acr string, tenantID uint, done bool) error {
 	return s.protocolStore.CompleteAuthRequest(id, subject, authTime, amr, acr, tenantID, done)
+}
+
+func (s *OIDCStorage) AssociateSession(ctx context.Context, id string, sessionID string) error {
+	return s.protocolStore.AssociateSession(ctx, id, sessionID)
 }
 
 func (s *OIDCStorage) SaveAuthCode(ctx context.Context, id, code string) error {
@@ -267,15 +280,70 @@ type clientCredentialsTokenRequest struct {
 	ownerUserID   uint
 }
 
-func (r *clientCredentialsTokenRequest) GetSubject() string   { return r.subject }
+func (r *clientCredentialsTokenRequest) GetSubject() string    { return r.subject }
 func (r *clientCredentialsTokenRequest) GetAudience() []string { return r.audience }
-func (r *clientCredentialsTokenRequest) GetScopes() []string  { return r.scopes }
+func (r *clientCredentialsTokenRequest) GetScopes() []string   { return r.scopes }
 
 func (r *clientCredentialsTokenRequest) ClientID() string { return r.clientID }
 
 func (s *OIDCStorage) TerminateSession(ctx context.Context, userID string, clientID string) error {
 	return s.persistentStore.TerminateSession(ctx, userID, clientID)
 }
+
+// SigningPrivateKey 暴露 OP 的令牌签名私钥，供 back-channel logout worker 构造 logout_token。
+func (s *OIDCStorage) SigningPrivateKey() *rsa.PrivateKey { return s.signingKey }
+
+// TerminateSessionFromRequest 实现 op.CanTerminateSessionFromRequest（RP-Initiated Logout）。
+//
+// 撤销该 person 的 SSO 会话与全部 refresh token，并将待通知的 back-channel 登出任务入队。
+// M3 阶段 ID token 尚不携带 sid，统一按 person 级执行；M4 注入 sid 后按 id_token_hint 精确到中心会话。
+func (s *OIDCStorage) TerminateSessionFromRequest(ctx context.Context, endSessionRequest *op.EndSessionRequest) (string, error) {
+	personID, pErr := parseOIDCSubject(endSessionRequest.UserID)
+	if pErr != nil {
+		glog.Warnf(ctx, "[svcoidc.TerminateSessionFromRequest] parse subject fail, userID:%s, err:%v", endSessionRequest.UserID, pErr)
+		return endSessionRequest.RedirectURI, nil
+	}
+
+	// 撤销 SSO 会话 + 吊销该 person 全部 refresh（D2=A 防续命兜底）
+	if tErr := s.persistentStore.TerminateSession(ctx, endSessionRequest.UserID, endSessionRequest.ClientID); tErr != nil {
+		glog.Warnf(ctx, "[svcoidc.TerminateSessionFromRequest] terminate session fail, personID:%d, err:%v", personID, tErr)
+	}
+
+	// 取待通知的登记：优先按 sid 精确（M4 后），否则按 person 全部
+	slo := sso.NewSLOStore()
+	var regs []sso.LogoutRegistration
+	var err error
+	if endSessionRequest.IDTokenHintClaims != nil && endSessionRequest.IDTokenHintClaims.SessionID != "" {
+		regs, err = slo.ListBySessionID(ctx, endSessionRequest.IDTokenHintClaims.SessionID)
+	} else {
+		regs, err = slo.ListByPersonID(ctx, personID)
+	}
+	if err != nil {
+		glog.Warnf(ctx, "[svcoidc.TerminateSessionFromRequest] list registrations fail, personID:%d, err:%v", personID, err)
+		regs = nil
+	}
+
+	var jobSessionID string
+	if endSessionRequest.IDTokenHintClaims != nil {
+		jobSessionID = endSessionRequest.IDTokenHintClaims.SessionID
+	}
+	for _, reg := range regs {
+		if err := sso.EnqueueLogout(ctx, sso.LogoutJob{
+			SessionID:            jobSessionID,
+			PersonID:             personID,
+			OIDCSessionID:        reg.OIDCSessionID,
+			ClientID:             reg.ClientID,
+			UserID:               reg.UserID,
+			BackChannelLogoutURI: reg.BackChannelLogoutURI,
+		}); err != nil {
+			glog.Warnf(ctx, "[svcoidc.TerminateSessionFromRequest] enqueue logout fail, clientID:%s, err:%v", reg.ClientID, err)
+		}
+	}
+
+	return endSessionRequest.RedirectURI, nil
+}
+
+var _ op.CanTerminateSessionFromRequest = (*OIDCStorage)(nil)
 
 func (s *OIDCStorage) RevokeToken(ctx context.Context, tokenOrTokenID string, userID string, clientID string) *oidc.Error {
 	return s.persistentStore.RevokeToken(ctx, tokenOrTokenID, userID, clientID)
@@ -284,8 +352,6 @@ func (s *OIDCStorage) RevokeToken(ctx context.Context, tokenOrTokenID string, us
 func (s *OIDCStorage) GetRefreshTokenInfo(ctx context.Context, clientID string, tokenValue string) (userID string, tokenID string, err error) {
 	return s.persistentStore.GetRefreshTokenInfo(ctx, clientID, tokenValue)
 }
-
-
 
 func buildOIDCSubject(personID uint) string {
 	return fmt.Sprintf("person:%d", personID)
@@ -344,7 +410,7 @@ type oidcKey struct {
 	key any
 }
 
-func (k *oidcKey) ID() string                           { return k.id }
-func (k *oidcKey) Algorithm() jose.SignatureAlgorithm    { return k.alg }
-func (k *oidcKey) Use() string                           { return k.use }
-func (k *oidcKey) Key() any                              { return k.key }
+func (k *oidcKey) ID() string                         { return k.id }
+func (k *oidcKey) Algorithm() jose.SignatureAlgorithm { return k.alg }
+func (k *oidcKey) Use() string                        { return k.use }
+func (k *oidcKey) Key() any                           { return k.key }

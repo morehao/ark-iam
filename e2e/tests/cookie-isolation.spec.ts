@@ -34,7 +34,7 @@ test.describe('Cookie 和跨 Context 隔离', () => {
     // 页面最终会显示首页（SSO session 在 Redis 中仍有效，SPA 通过其他方式恢复）或跳转登录
     // 验证页面仍然可访问
     const url = page.url();
-    expect(url.includes('localhost:3001') || url.includes('localhost:3003')).toBe(true);
+    expect(url.includes('localhost:3002') || url.includes('localhost:3000')).toBe(true);
   });
 
   test('cookie HttpOnly 不可被 JavaScript 读取', async ({ page }) => {

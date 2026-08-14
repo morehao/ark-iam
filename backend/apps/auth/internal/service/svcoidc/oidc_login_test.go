@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/stretchr/testify/assert"
 	appconfig "github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
-	"github.com/morehao/ark-iam/auth/internal/service/svcsso"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
+	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/ark-iam/pkg/testsetup"
+	"github.com/stretchr/testify/assert"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"gorm.io/gorm"
 )
@@ -40,15 +40,21 @@ type fakeSSOSessionStore struct {
 	validatedPersonID uint
 }
 
-var _ svcsso.SSOSessionStore = (*fakeSSOSessionStore)(nil)
+var _ sso.SSOSessionStore = (*fakeSSOSessionStore)(nil)
 
 func (f *fakeSSOSessionStore) CreateSession(ctx context.Context, personID uint) (string, error) {
 	return "session-" + fmt.Sprint(personID), nil
 }
-func (f *fakeSSOSessionStore) ValidateSession(ctx context.Context, sessionID string) (uint, error) { return f.validatedPersonID, nil }
-func (f *fakeSSOSessionStore) RevokeSession(ctx context.Context, sessionID string) error            { return nil }
-func (f *fakeSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, personID uint) error    { return nil }
-func (f *fakeSSOSessionStore) HasActiveSession(ctx context.Context, personID uint) (bool, error)    { return false, nil }
+func (f *fakeSSOSessionStore) ValidateSession(ctx context.Context, sessionID string) (uint, error) {
+	return f.validatedPersonID, nil
+}
+func (f *fakeSSOSessionStore) RevokeSession(ctx context.Context, sessionID string) error { return nil }
+func (f *fakeSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, personID uint) error {
+	return nil
+}
+func (f *fakeSSOSessionStore) HasActiveSession(ctx context.Context, personID uint) (bool, error) {
+	return false, nil
+}
 
 func TestCompleteLoginBySessionHonorsAuthRequestTenantHint(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameAuth)

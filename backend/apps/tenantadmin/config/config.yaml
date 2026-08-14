@@ -82,7 +82,7 @@ jwt:
 
 oidc:
   issuer: "http://localhost:8081/oidc"
-  frontendLoginURL: "http://localhost:3003/login"
+  frontendLoginURL: "http://localhost:3000/login"
   signingKeyID: "dev-oidc-key"
   signingPrivateKeyPath: "config/oidc-dev-key.pem"
   signingPrivateKeyPEM: ""
@@ -93,3 +93,5 @@ oidc:
   authCodeTTL: 300
   spentCodeTTL: 86400
   sessionTTL: 86400
+  enableSSOSessionValidation: true
+  backChannelLogoutPath: "/bc-logout/tenant"

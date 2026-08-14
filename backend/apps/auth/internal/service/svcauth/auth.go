@@ -10,14 +10,14 @@ import (
 	"unicode"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
-	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
 	"github.com/morehao/ark-iam/auth/internal/service/svcloginguard"
-	"github.com/morehao/ark-iam/auth/internal/service/svcsso"
+	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
-	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/sso"
+	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gconstant"
@@ -321,11 +321,36 @@ func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
 		if err := newAuthRefreshTokenStore().RevokeByPersonID(ctx.Request.Context(), personID); err != nil {
 			glog.Errorf(ctx, "[svcauth.Logout] RevokeByPersonID fail, personID:%d, err:%v", personID, err)
 		}
-		if err := svcsso.RevokeSSOSessionsByPersonID(ctx.Request.Context(), personID); err != nil {
+		// 先入队 back-channel 通知（ListByPersonID 依赖 sso_user_sessions 索引），再撤销 SSO 会话。
+		svc.enqueueBackChannelLogouts(ctx, personID)
+		if err := sso.RevokeSSOSessionsByPersonID(ctx.Request.Context(), personID); err != nil {
 			glog.Errorf(ctx, "[svcauth.Logout] RevokeSSOSessionsByPersonID fail, personID:%d, err:%v", personID, err)
 		}
 	}
 	return nil
+}
+
+// enqueueBackChannelLogouts 将该 person 已登记的全部 client 的 back-channel logout
+// 任务入队（在撤销 SSO 会话前调用，此时会话索引仍可用），使其它已登录应用（含第三方 RP）
+// 即时收到 logout_token。入队失败仅告警，不影响登出主流程；任务由 svcoidc 的 logoutWorker 异步消费。
+func (svc *authSvc) enqueueBackChannelLogouts(ctx *gin.Context, personID uint) {
+	slo := sso.NewSLOStore()
+	regs, err := slo.ListByPersonID(ctx.Request.Context(), personID)
+	if err != nil {
+		glog.Warnf(ctx, "[svcauth.Logout] list logout registrations fail, personID:%d, err:%v", personID, err)
+		return
+	}
+	for _, reg := range regs {
+		if err := sso.EnqueueLogout(ctx.Request.Context(), sso.LogoutJob{
+			PersonID:             personID,
+			OIDCSessionID:        reg.OIDCSessionID,
+			ClientID:             reg.ClientID,
+			UserID:               reg.UserID,
+			BackChannelLogoutURI: reg.BackChannelLogoutURI,
+		}); err != nil {
+			glog.Warnf(ctx, "[svcauth.Logout] enqueue back-channel logout fail, clientID:%s, err:%v", reg.ClientID, err)
+		}
+	}
 }
 
 func (svc *authSvc) LogoutAll(ctx *gin.Context, req *dtoauth.LogoutAllReq) error {
@@ -561,8 +586,4 @@ func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID uint, success bool
 		TargetID:   userID,
 		Detail:     fmt.Sprintf("userID:%d", userID),
 	})
-}
-
-func timePointer(t time.Time) *time.Time {
-	return &t
 }

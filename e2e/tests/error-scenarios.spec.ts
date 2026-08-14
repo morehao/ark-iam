@@ -16,7 +16,7 @@ test.describe('错误和边界场景', () => {
       await page.goto(CONFIG.rp1Url, { waitUntil: 'networkidle', timeout: 15000 });
     }
     await page.waitForURL(
-      (u) => u.toString().includes('localhost:3003') && u.searchParams.has('authRequestID'),
+      (u) => u.toString().includes('localhost:3000') && u.searchParams.has('authRequestID'),
       { timeout: 20000 }
     );
     await page.waitForSelector('#identifier', { timeout: 10000 });
@@ -24,11 +24,11 @@ test.describe('错误和边界场景', () => {
     await page.fill('#password', 'wrong-pass');
     await page.click('button[type="submit"]');
     // 检查 URL 仍停留在 login-web（说明登录失败未跳转），
-    // 同时检查页面无"仪表盘"/"用户信息"（说明未成功回调到应用）
+    // 同时检查页面无"仪表盘"/"组织管理"（说明未成功回调到应用）
     await page.waitForTimeout(3000);
-    const stillOnLoginWeb = page.url().includes('localhost:3003');
+    const stillOnLoginWeb = page.url().includes('localhost:3000');
     const body = await page.evaluate(() => document.body.innerText);
-    const notLoggedIn = !body.includes('仪表盘') && !body.includes('用户信息');
+    const notLoggedIn = !body.includes('仪表盘') && !body.includes('组织管理');
     expect(stillOnLoginWeb || notLoggedIn).toBe(true);
   });
 
@@ -43,7 +43,7 @@ test.describe('错误和边界场景', () => {
   });
 
   test('无效 redirect_uri 导致 OIDC 错误', async ({ page }) => {
-    const badUrl = `${CONFIG.issuer}/authorize?client_id=test-rp-client&redirect_uri=${encodeURIComponent('http://evil.com/callback')}&response_type=code&scope=openid`;
+    const badUrl = `${CONFIG.issuer}/authorize?client_id=tenant-admin-web&redirect_uri=${encodeURIComponent('http://evil.com/callback')}&response_type=code&scope=openid`;
     const response = await page.goto(badUrl, { waitUntil: 'networkidle', timeout: 15000 });
     const isError = response !== null && (response.status() >= 400 ||
       page.url().includes('error=') ||
@@ -64,10 +64,10 @@ test.describe('错误和边界场景', () => {
     await pageB.goto(`${CONFIG.issuer}/logged-out`, { waitUntil: 'networkidle', timeout: 10000 });
     await pageB.goto(CONFIG.rp1Url, { waitUntil: 'networkidle', timeout: 15000 });
     const urlB = pageB.url();
-    if (urlB.includes('localhost:3003')) {
+    if (urlB.includes('localhost:3000')) {
       await fillLoginWebCredentials(pageB);
       await pageB.waitForURL(
-        (u) => u.toString().includes('localhost:3001') && !u.toString().includes('/auth/callback'),
+        (u) => u.toString().includes('localhost:3002') && !u.toString().includes('/auth/callback'),
         { timeout: 30000 }
       );
     }

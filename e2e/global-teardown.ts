@@ -1,11 +1,11 @@
 import { spawn } from 'child_process';
 
-const PORTS = [8100, 3000, 3001, 3003];
+const PORTS = [8100, 3000, 3001, 3002];
 const PORT_LABELS: Record<number, string> = {
   8100: 'IAM Backend',
-  3000: 'platform-admin-web',
-  3001: 'sso-test-app',
-  3003: 'login-web',
+  3000: 'login-web',
+  3001: 'platform-admin-web',
+  3002: 'tenant-admin-web',
 };
 
 function killByPort(port: number, label: string): Promise<void> {

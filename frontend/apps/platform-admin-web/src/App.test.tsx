@@ -22,12 +22,9 @@ vi.mock('react-oidc-context', () => ({
   hasAuthParams: vi.fn(() => false),
 }))
 
-vi.mock('./pages/auth/Login', () => ({
-  default: () => <div>Login Page</div>,
-}))
-
-vi.mock('./components/MainLayout', () => ({
-  default: () => <div>Main Layout</div>,
+vi.mock('@ark-iam/ui', () => ({
+  MainLayout: () => <div>Main Layout</div>,
+  LoginPage: () => <div>Login Page</div>,
 }))
 
 const appModule = await import('./App')

@@ -1,15 +1,24 @@
+# 开发工具
 .idea
 .vscode/*
 !.vscode/launch.json
 .DS_Store
 .history
-
-**/log/**
-**/output/**
-**/node_modules/
-frontend/dist/*
 .opencode/*
+.superpowers/
 .worktrees/
+
+# 日志
+**/log/
+**/output/
+
+# 前端
+frontend/dist/
+frontend/apps/*/dist/
+frontend/packages/*/dist/
+**/node_modules/
+.pnpm-store
+.pnpm-debug.log*
 
 # 密钥文件
 *.pem
@@ -34,6 +43,5 @@ e2e/.env.local
 *.test
 *.exe
 *.out
-backend/apps/**/cmd/cmd
-backend/cmd
+backend/.tmp/
 __debug_bin*
