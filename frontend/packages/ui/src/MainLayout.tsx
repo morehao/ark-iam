@@ -1,17 +1,20 @@
 import { useMemo, useState } from 'react'
-import { Layout, Menu, Avatar, Dropdown, Button } from 'antd'
+import { Layout, Menu, Avatar, Dropdown, Tooltip, Badge, theme } from 'antd'
 import type { MenuProps } from 'antd'
 import {
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  SafetyCertificateOutlined,
   UserOutlined,
   UserSwitchOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthGuard, useLogout } from '@ark-iam/auth'
+import { useAuth } from 'react-oidc-context'
 import { TenantSwitcher } from './TenantSwitcher'
 import { ProfileCenter } from './ProfileCenter'
+import { brand } from './theme'
 
 const { Header, Sider, Content } = Layout
 
@@ -19,21 +22,30 @@ export interface MainMenuItems {
   key: string
   icon?: React.ReactNode
   label: string
+  children?: MainMenuItems[]
 }
 
 interface Props {
   title: string
+  subtitle?: string
   menuItems: MainMenuItems[]
   hasTenantSwitch?: boolean
 }
 
-export function MainLayout({ title, menuItems, hasTenantSwitch = true }: Props) {
+export function MainLayout({ title, subtitle, menuItems, hasTenantSwitch = true }: Props) {
   const [collapsed, setCollapsed] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+  const auth = useAuth()
   useAuthGuard()
   const logout = useLogout()
+  const { token } = theme.useToken()
+
+  const displayName = useMemo(() => {
+    const profile = auth.user?.profile as Record<string, unknown> | undefined
+    return (profile?.name as string) || (profile?.preferred_username as string) || 'IAM 用户'
+  }, [auth.user])
 
   const userMenuItems = useMemo(
     () => [
@@ -44,29 +56,130 @@ export function MainLayout({ title, menuItems, hasTenantSwitch = true }: Props) 
     [logout],
   )
 
+  // 菜单选中态：匹配一级或二级路径
+  const selectedKey = useMemo(() => {
+    const parts = location.pathname.split('/')
+    const level1 = parts[1] ? `/${parts[1]}` : '/'
+    const level2 = parts.length > 2 ? `/${parts[1]}/${parts[2]}` : ''
+    const flat = (items: MainMenuItems[]): string[] => items.flatMap((i) => [i.key, ...(i.children ? flat(i.children) : [])])
+    const all = flat(menuItems)
+    if (all.includes(level2)) return level2
+    if (all.includes(level1)) return level1
+    return '/'
+  }, [location.pathname, menuItems])
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider trigger={null} collapsible collapsed={collapsed}>
-        <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: collapsed ? 14 : 18, fontWeight: 'bold' }}>
-          {collapsed ? 'IAM' : title}
+      <Sider
+        trigger={null}
+        collapsible
+        collapsed={collapsed}
+        width={232}
+        theme="dark"
+        style={{ boxShadow: '2px 0 12px rgba(15,23,42,0.12)', position: 'sticky', top: 0, height: '100vh' }}
+      >
+        <div
+          style={{
+            height: 64,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+            background: brand.gradient,
+            color: '#fff',
+            overflow: 'hidden',
+          }}
+        >
+          <SafetyCertificateOutlined style={{ fontSize: collapsed ? 20 : 24 }} />
+          {!collapsed && (
+            <div style={{ lineHeight: 1.1 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: 0.5 }}>{title}</div>
+              {subtitle && <div style={{ fontSize: 11, opacity: 0.8 }}>{subtitle}</div>}
+            </div>
+          )}
         </div>
-        <Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={menuItems as MenuProps['items']} onClick={({ key }) => navigate(key)} />
+        <Menu
+          theme="dark"
+          mode="inline"
+          selectedKeys={[selectedKey]}
+          defaultOpenKeys={[selectedKey]}
+          items={menuItems as MenuProps['items']}
+          onClick={({ key }) => {
+            if (key !== location.pathname) navigate(key)
+          }}
+          style={{ padding: '8px 10px', borderInlineEnd: 'none' }}
+        />
       </Sider>
       <Layout>
-        <Header style={{ padding: '0 16px', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Button type="text" icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => setCollapsed(!collapsed)} />
-            {hasTenantSwitch && <TenantSwitcher />}
+        <Header
+          style={{
+            padding: '0 20px',
+            background: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: '1px solid #f0f0f0',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Tooltip title={collapsed ? '展开菜单' : '收起菜单'}>
+              <ButtonIcon collapsed={collapsed} onClick={() => setCollapsed(!collapsed)} />
+            </Tooltip>
+            {hasTenantSwitch && (
+              <>
+                <div style={{ width: 1, height: 22, background: '#e5e7eb' }} />
+                <TenantSwitcher />
+              </>
+            )}
           </div>
-          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-            <Avatar style={{ cursor: 'pointer' }} icon={<UserOutlined />} />
-          </Dropdown>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '4px 8px', borderRadius: 8 }} className="user-entry">
+                <Badge dot color={brand.primary} offset={[-2, 2]}>
+                  <Avatar
+                    size={34}
+                    style={{ background: brand.gradient, fontWeight: 600, fontSize: 14 }}
+                    icon={!displayName ? <UserOutlined /> : undefined}
+                  >
+                    {displayName.charAt(0).toUpperCase()}
+                  </Avatar>
+                </Badge>
+                <span style={{ fontSize: 14, color: token.colorText, fontWeight: 500 }}>{displayName}</span>
+              </div>
+            </Dropdown>
+          </div>
         </Header>
-        <Content style={{ margin: 24, padding: 24, background: '#fff' }}>
+        <Content style={{ margin: 20 }}>
           <Outlet />
         </Content>
       </Layout>
       <ProfileCenter open={profileOpen} onClose={() => setProfileOpen(false)} />
     </Layout>
+  )
+}
+
+function ButtonIcon({ collapsed, onClick }: { collapsed: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: 36,
+        height: 36,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        border: 'none',
+        borderRadius: 8,
+        background: 'transparent',
+        cursor: 'pointer',
+        fontSize: 16,
+        color: brand.textSecondary,
+      }}
+    >
+      {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+    </button>
   )
 }

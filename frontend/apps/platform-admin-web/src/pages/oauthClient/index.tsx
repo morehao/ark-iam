@@ -1,192 +1,249 @@
-import { useEffect, useState } from 'react'
-import { Table, Button, Space, Input, Modal, Form, Select, message, Tag } from 'antd'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { Table, Button, Space, Input, Modal, Form, Select, Popconfirm, message } from 'antd'
+import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { getOAuthClientPageList, createOAuthClient, updateOAuthClient, deleteOAuthClient, getOAuthClientDetail, OAuthClient } from '../../api/oauthClient'
+import { PageContainer } from '@ark-iam/ui'
+import { createOAuthClient, deleteOAuthClient, getApplicationPageList, getOAuthClientPageList, updateOAuthClient } from '@ark-iam/api'
+import type { OAuthClientItem } from '@ark-iam/types'
+import { useNavigate } from 'react-router-dom'
+import { fmtTime, StatusTag, TypeTag } from '../../components/common'
 
-const OAuthClientList = () => {
+interface AppOption {
+  value: number
+  label: string
+}
+
+export default function OAuthClientList() {
   const navigate = useNavigate()
-  const [data, setData] = useState<OAuthClient[]>([])
+  const [data, setData] = useState<OAuthClientItem[]>([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
-  const [modalVisible, setModalVisible] = useState(false)
-  const [editingId, setEditingId] = useState<number | null>(null)
+
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<OAuthClientItem | null>(null)
   const [form] = Form.useForm()
   const [submitLoading, setSubmitLoading] = useState(false)
+  const [appOptions, setAppOptions] = useState<AppOption[]>([])
+  const [appLoading, setAppLoading] = useState(false)
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true)
     try {
       const resp = await getOAuthClientPageList({ page, pageSize, name: keyword })
       setData(resp?.list || [])
       setTotal(resp?.total || 0)
-    } catch (error) {
-      console.error('获取OAuth客户端列表失败:', error)
+    } catch {
+      /* 拦截器已提示 */
     } finally {
       setLoading(false)
     }
-  }
-
-  useEffect(() => {
-    fetchData()
   }, [page, pageSize, keyword])
 
-  const handleAdd = () => {
-    setEditingId(null)
-    form.resetFields()
-    setModalVisible(true)
-  }
+  useEffect(() => {
+    void fetchData()
+  }, [fetchData])
 
-  const handleEdit = async (record: OAuthClient) => {
-    setEditingId(record.oauthClientId)
+  const loadApps = async () => {
+    setAppLoading(true)
     try {
-      const detail = await getOAuthClientDetail(record.oauthClientId)
-      form.setFieldsValue(detail)
+      const resp = await getApplicationPageList({ page: 1, pageSize: 100 })
+      setAppOptions((resp?.list || []).map((a) => ({ value: a.appId, label: a.name })))
     } catch {
-      form.setFieldsValue(record)
+      /* 拦截器已提示 */
+    } finally {
+      setAppLoading(false)
     }
-    setModalVisible(true)
   }
 
-  const handleDelete = (record: OAuthClient) => {
-    Modal.confirm({
-      title: '确认删除',
-      content: `确定要删除OAuth客户端"${record.name}"吗？`,
-      onOk: async () => {
-        try {
-          await deleteOAuthClient(record.oauthClientId)
-          message.success('删除成功')
-          fetchData()
-        } catch {
-          console.error('删除OAuth客户端失败')
-        }
-      },
+  const handleCreate = () => {
+    setEditing(null)
+    form.resetFields()
+    setModalOpen(true)
+    void loadApps()
+  }
+
+  const handleEdit = (record: OAuthClientItem) => {
+    setEditing(record)
+    form.setFieldsValue({
+      name: record.name,
+      type: record.type,
+      status: record.status,
+      tokenEndpointAuthMethod: record.tokenEndpointAuthMethod,
     })
+    setModalOpen(true)
   }
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
       setSubmitLoading(true)
-      if (editingId) {
-        await updateOAuthClient({ oauthClientId: editingId, ...values })
+      if (editing) {
+        await updateOAuthClient({ applicationClientId: editing.applicationClientId, ...values })
         message.success('修改成功')
       } else {
         await createOAuthClient(values)
         message.success('创建成功')
       }
-      setModalVisible(false)
-      fetchData()
-    } catch (error) {
-      if (error instanceof Error) {
-        console.error('提交失败:', error.message)
-      }
+      setModalOpen(false)
+      void fetchData()
+    } catch {
+      /* 校验或请求失败 */
     } finally {
       setSubmitLoading(false)
     }
   }
 
-  const columns: ColumnsType<OAuthClient> = [
-    { title: 'ID', dataIndex: 'oauthClientId', key: 'oauthClientId', width: 80 },
-    { title: '客户端ID', dataIndex: 'clientID', key: 'clientID' },
-    { title: '名称', dataIndex: 'name', key: 'name' },
+  const columns: ColumnsType<OAuthClientItem> = [
+    { title: 'ID', dataIndex: 'applicationClientId', key: 'applicationClientId', width: 80 },
     {
-      title: '类型',
-      dataIndex: 'type',
-      key: 'type',
-      render: (val: string) => val === 'third_party' ? <Tag color="orange">第三方</Tag> : <Tag color="blue">第一方</Tag>,
+      title: '客户端ID',
+      dataIndex: 'clientID',
+      key: 'clientID',
+      width: 240,
+      render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v || '-'}</span>,
     },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (val: string) => val === 'enable' ? <Tag color="green">启用</Tag> : <Tag color="red">停用</Tag>,
-    },
-    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt' },
+    { title: '名称', dataIndex: 'name', key: 'name', ellipsis: true },
+    { title: '所属应用ID', dataIndex: 'appId', key: 'appId', width: 110 },
+    { title: '类型', dataIndex: 'type', key: 'type', width: 100, render: (v: string) => <TypeTag value={v} /> },
+    { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (v: string) => <StatusTag value={v} /> },
+    { title: '创建时间', key: 'createdAt', width: 160, render: (_, r) => fmtTime(r.createdAt) },
     {
       title: '操作',
       key: 'action',
-      render: (_, record) => (
-        <Space>
-          <Button type="link" onClick={() => navigate(`/oauthClient/${record.oauthClientId}`)}>详情</Button>
-          <Button type="link" onClick={() => handleEdit(record)}>编辑</Button>
-          <Button type="link" danger onClick={() => handleDelete(record)}>删除</Button>
+      width: 180,
+      render: (_, r) => (
+        <Space size={4}>
+          <Button type="link" size="small" onClick={() => navigate(`/oauthClient/${r.applicationClientId}`)}>
+            详情
+          </Button>
+          <Button type="link" size="small" onClick={() => handleEdit(r)}>
+            编辑
+          </Button>
+          <Popconfirm
+            title="确认删除该客户端？"
+            onConfirm={async () => {
+              try {
+                await deleteOAuthClient(r.applicationClientId)
+                message.success('删除成功')
+                void fetchData()
+              } catch {
+                /* 拦截器已提示 */
+              }
+            }}
+          >
+            <Button type="link" size="small" danger>
+              删除
+            </Button>
+          </Popconfirm>
         </Space>
       ),
     },
   ]
 
   return (
-    <div>
-      <h1>OAuth 客户端管理</h1>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
+    <PageContainer
+      title="OAuth 客户端"
+      description="管理应用接入的 OIDC/OAuth 客户端与密钥"
+      extra={
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
+            刷新
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            新建客户端
+          </Button>
+        </Space>
+      }
+    >
+      <div style={{ marginBottom: 16 }}>
         <Input.Search
-          placeholder="搜索客户端名称"
-          style={{ width: 200 }}
-          onSearch={(value) => setKeyword(value)}
+          allowClear
+          placeholder="按名称搜索"
+          prefix={<SearchOutlined />}
+          style={{ width: 240 }}
+          onSearch={(v) => { setKeyword(v); setPage(1) }}
         />
-        <Button type="primary" onClick={handleAdd}>新建客户端</Button>
       </div>
-      <Table
+      <Table<OAuthClientItem>
+        rowKey="applicationClientId"
         columns={columns}
         dataSource={data}
-        rowKey="oauthClientId"
         loading={loading}
+        scroll={{ x: 1100 }}
         pagination={{
           current: page,
           pageSize,
           total,
+          showSizeChanger: true,
+          showTotal: (t) => `共 ${t} 条`,
           onChange: (p, ps) => {
             setPage(p)
             setPageSize(ps)
           },
         }}
       />
+
       <Modal
-        title={editingId ? '编辑OAuth客户端' : '新建OAuth客户端'}
-        open={modalVisible}
-        onOk={handleSubmit}
-        onCancel={() => setModalVisible(false)}
+        title={editing ? '编辑客户端' : '新建客户端'}
+        open={modalOpen}
+        onOk={() => void handleSubmit()}
+        onCancel={() => setModalOpen(false)}
         confirmLoading={submitLoading}
-        width={640}
+        destroyOnClose
+        width={560}
       >
         <Form form={form} layout="vertical">
-          {!editingId && (
-            <Form.Item name="appId" label="所属应用ID" rules={[{ required: true, message: '请输入应用ID' }]}>
-              <Input type="number" />
+          {!editing && (
+            <Form.Item name="appId" label="所属应用" rules={[{ required: true, message: '请选择所属应用' }]}>
+              <Select
+                placeholder="选择所属应用"
+                loading={appLoading}
+                options={appOptions}
+                showSearch
+                optionFilterProp="label"
+              />
             </Form.Item>
           )}
-          <Form.Item name="name" label="客户端名称" rules={[{ required: true, message: '请输入客户端名称' }]}>
-            <Input />
+          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
+            <Input placeholder="客户端名称" />
           </Form.Item>
-          <Form.Item name="type" label="客户端类型" initialValue="first_party">
-            <Select>
-              <Select.Option value="first_party">第一方</Select.Option>
-              <Select.Option value="third_party">第三方</Select.Option>
-            </Select>
+          <Form.Item name="type" label="类型" initialValue="first_party" rules={[{ required: true, message: '请选择类型' }]}>
+            <Select
+              options={[
+                { value: 'first_party', label: '第一方' },
+                { value: 'third_party', label: '第三方' },
+              ]}
+            />
           </Form.Item>
-          {editingId && (
-            <Form.Item name="status" label="状态" initialValue="enable">
-              <Select>
-                <Select.Option value="enable">启用</Select.Option>
-                <Select.Option value="disable">停用</Select.Option>
-              </Select>
+          <Form.Item
+            name="tokenEndpointAuthMethod"
+            label="令牌端点认证方式"
+            initialValue="client_secret_basic"
+            rules={[{ required: true, message: '请选择认证方式' }]}
+          >
+            <Select
+              options={[
+                { value: 'client_secret_basic', label: 'client_secret_basic' },
+                { value: 'client_secret_post', label: 'client_secret_post' },
+                { value: 'none', label: 'none' },
+              ]}
+            />
+          </Form.Item>
+          {editing && (
+            <Form.Item name="status" label="状态" initialValue="enable" rules={[{ required: true, message: '请选择状态' }]}>
+              <Select
+                options={[
+                  { value: 'enable', label: '启用' },
+                  { value: 'disable', label: '停用' },
+                ]}
+              />
             </Form.Item>
           )}
-          <Form.Item name="tokenEndpointAuthMethod" label="令牌端点认证方式" initialValue="client_secret_basic">
-            <Select>
-              <Select.Option value="client_secret_basic">client_secret_basic</Select.Option>
-              <Select.Option value="client_secret_post">client_secret_post</Select.Option>
-              <Select.Option value="none">none</Select.Option>
-            </Select>
-          </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   )
 }
-
-export default OAuthClientList
