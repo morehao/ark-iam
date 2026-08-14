@@ -12,12 +12,12 @@ import {
   Space,
   Spin,
   Switch,
+  Table,
   Tag,
-  Tree,
   TreeSelect,
   message,
 } from 'antd'
-import type { DataNode } from 'antd/es/tree'
+import type { ColumnsType } from 'antd/es/table'
 import {
   AppstoreOutlined,
   FolderOutlined,
@@ -30,13 +30,7 @@ import {
 import { PageContainer, brand } from '@ark-iam/ui'
 import { createMenu, deleteMenu, getApplicationPageList, getMenuTree, updateMenu } from '@ark-iam/api'
 import type { ApplicationItem, MenuItem } from '@ark-iam/types'
-
-interface MenuTreeNode {
-  key: number
-  title: string
-  menu: MenuItem
-  children?: MenuTreeNode[]
-}
+import { StatusTag } from '../../components/common'
 
 interface MenuFormValues {
   parentID: number
@@ -59,19 +53,10 @@ type ModalMode = 'createRoot' | 'createChild' | 'edit'
 
 const STORAGE_KEY = 'ark-iam:menu:appId'
 
-const TYPE_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  directory: { label: '目录', icon: <FolderOutlined />, color: '#f59e0b' },
-  menu: { label: '菜单', icon: <AppstoreOutlined />, color: '#4f6ef7' },
-  button: { label: '按钮', icon: <ThunderboltOutlined />, color: '#7a5af8' },
-}
-
-function buildTreeData(list: MenuItem[]): MenuTreeNode[] {
-  return list.map((item) => ({
-    key: item.menuID,
-    title: item.name,
-    menu: item,
-    children: item.children?.length ? buildTreeData(item.children) : undefined,
-  }))
+const TYPE_META: Record<string, { label: string; icon: React.ReactNode; color: string; tagColor: string }> = {
+  directory: { label: '目录', icon: <FolderOutlined />, color: '#f59e0b', tagColor: 'orange' },
+  menu: { label: '菜单', icon: <AppstoreOutlined />, color: '#4f6ef7', tagColor: 'blue' },
+  button: { label: '按钮', icon: <ThunderboltOutlined />, color: '#7a5af8', tagColor: 'purple' },
 }
 
 function collectKeys(list: MenuItem[]): number[] {
@@ -86,17 +71,17 @@ function collectKeys(list: MenuItem[]): number[] {
   return keys
 }
 
-function filterTree(nodes: MenuTreeNode[], keyword: string): MenuTreeNode[] {
+function filterMenuTree(list: MenuItem[], keyword: string): MenuItem[] {
   const kw = keyword.trim().toLowerCase()
-  if (!kw) return nodes
+  if (!kw) return list
   const hit = (m: MenuItem) =>
     m.name.toLowerCase().includes(kw) || m.code.toLowerCase().includes(kw) || (m.path || '').toLowerCase().includes(kw)
-  const result: MenuTreeNode[] = []
-  nodes.forEach((n) => {
-    const children = n.children ? filterTree(n.children, keyword) : undefined
-    const self = hit(n.menu)
+  const result: MenuItem[] = []
+  list.forEach((m) => {
+    const children = m.children ? filterMenuTree(m.children, keyword) : undefined
+    const self = hit(m)
     if (self || (children && children.length > 0)) {
-      result.push({ ...n, children: self ? n.children : children })
+      result.push({ ...m, children: self ? m.children : children })
     }
   })
   return result
@@ -107,7 +92,7 @@ export default function MenuList() {
   const [appLoading, setAppLoading] = useState(false)
   const [selectedAppId, setSelectedAppId] = useState<number | undefined>()
 
-  const [treeData, setTreeData] = useState<MenuTreeNode[]>([])
+  const [menuTree, setMenuTree] = useState<MenuItem[]>([])
   const [expandedKeys, setExpandedKeys] = useState<number[]>([])
   const [treeLoading, setTreeLoading] = useState(false)
   const [keyword, setKeyword] = useState('')
@@ -152,7 +137,7 @@ export default function MenuList() {
     try {
       const resp = await getMenuTree(selectedAppId)
       const list = resp?.list || []
-      setTreeData(buildTreeData(list))
+      setMenuTree(list)
       setExpandedKeys(collectKeys(list))
     } catch {
       /* 拦截器已提示 */
@@ -173,13 +158,13 @@ export default function MenuList() {
   // 统计当前应用的菜单构成
   const stats = useMemo(() => {
     const all: MenuItem[] = []
-    const walk = (items: MenuTreeNode[]) => {
-      items.forEach((n) => {
-        all.push(n.menu)
-        if (n.children?.length) walk(n.children as MenuTreeNode[])
+    const walk = (items: MenuItem[]) => {
+      items.forEach((m) => {
+        all.push(m)
+        if (m.children?.length) walk(m.children)
       })
     }
-    walk(treeData)
+    walk(menuTree)
     return {
       total: all.length,
       directory: all.filter((m) => m.type === 'directory').length,
@@ -187,9 +172,9 @@ export default function MenuList() {
       button: all.filter((m) => m.type === 'button').length,
       disabled: all.filter((m) => m.status !== 'enable').length,
     }
-  }, [treeData])
+  }, [menuTree])
 
-  const displayTree = useMemo(() => filterTree(treeData, keyword), [treeData, keyword])
+  const displayList = useMemo(() => filterMenuTree(menuTree, keyword), [menuTree, keyword])
 
   const openModal = (nextMode: ModalMode, parent: MenuItem | null, baseValues: Partial<MenuFormValues>) => {
     setMode(nextMode)
@@ -280,50 +265,101 @@ export default function MenuList() {
       collect(editing)
     }
     type ParentOption = { value: number; title: string; children?: ParentOption[] }
-    const build = (items: MenuTreeNode[]): ParentOption[] =>
+    const build = (items: MenuItem[]): ParentOption[] =>
       items
-        .filter((n) => !excluded.has(n.menu.menuID))
-        .map((n) => ({
-          value: n.menu.menuID,
-          title: `${n.menu.name}（${n.menu.code}）`,
-          children: n.children ? build(n.children) : undefined,
+        .filter((m) => !excluded.has(m.menuID))
+        .map((m) => ({
+          value: m.menuID,
+          title: `${m.name}（${m.code}）`,
+          children: m.children ? build(m.children) : undefined,
         }))
-    return [{ value: 0, title: '根菜单', children: build(treeData) }]
-  }, [treeData, editing])
+    return [{ value: 0, title: '根菜单', children: build(menuTree) }]
+  }, [menuTree, editing])
 
-  const renderTitle = (node: DataNode) => {
-    const menu = (node as MenuTreeNode).menu
-    const meta = TYPE_META[menu.type] || { label: menu.type || '菜单', icon: <UnorderedListOutlined />, color: brand.textSecondary }
-    return (
-      <span className="menu-node">
-        <span className="menu-node-main">
-          <span style={{ color: meta.color, fontSize: 14 }}>{meta.icon}</span>
-          <span style={{ fontWeight: 500 }}>{menu.name}</span>
-          <span className="menu-node-code">{menu.code}</span>
-          <Tag color={meta.color === '#f59e0b' ? 'orange' : meta.color === '#7a5af8' ? 'purple' : 'blue'} style={{ marginInlineEnd: 4 }}>
-            {meta.label}
-          </Tag>
-          {menu.hidden === 1 && <Tag style={{ marginInlineEnd: 4 }}>隐藏</Tag>}
-          <Tag color={menu.status === 'enable' ? 'success' : 'default'} style={{ marginInlineEnd: 0 }}>
-            {menu.status === 'enable' ? '启用' : '停用'}
-          </Tag>
-        </span>
-        <span className="menu-node-actions">
-          <Button type="link" size="small" onClick={() => handleCreateChild(menu)}>
-            新增子菜单
+  const columns: ColumnsType<MenuItem> = [
+    {
+      title: '菜单名称',
+      dataIndex: 'name',
+      key: 'name',
+      width: 300,
+      render: (_, m) => {
+        const meta = TYPE_META[m.type] || { label: m.type || '菜单', icon: <UnorderedListOutlined />, color: brand.textSecondary, tagColor: 'default' }
+        return (
+          <Space size={8}>
+            <span style={{ color: meta.color, fontSize: 14 }}>{meta.icon}</span>
+            <span style={{ fontWeight: 500 }}>{m.name}</span>
+            <span style={{ fontSize: 12, color: brand.textSecondary, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+              {m.code}
+            </span>
+          </Space>
+        )
+      },
+    },
+    {
+      title: '类型',
+      dataIndex: 'type',
+      key: 'type',
+      width: 90,
+      render: (v: string) => {
+        const meta = TYPE_META[v]
+        return meta ? <Tag color={meta.tagColor}>{meta.label}</Tag> : <Tag>{v || '-'}</Tag>
+      },
+    },
+    {
+      title: '路由路径',
+      dataIndex: 'path',
+      key: 'path',
+      width: 180,
+      ellipsis: true,
+      render: (v: string) =>
+        v ? <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12 }}>{v}</span> : '-',
+    },
+    {
+      title: '权限标识',
+      dataIndex: 'permission',
+      key: 'permission',
+      width: 190,
+      ellipsis: true,
+      render: (v: string) =>
+        v ? <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12 }}>{v}</span> : '-',
+    },
+    {
+      title: '排序',
+      dataIndex: 'sort',
+      key: 'sort',
+      width: 70,
+      align: 'center',
+      render: (v: number) => v ?? 0,
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 90,
+      render: (v: string) => <StatusTag value={v} />,
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 220,
+      fixed: 'right',
+      render: (_, m) => (
+        <Space size={0}>
+          <Button type="link" size="small" onClick={() => handleCreateChild(m)}>
+            新增子级
           </Button>
-          <Button type="link" size="small" onClick={() => handleEdit(menu)}>
+          <Button type="link" size="small" onClick={() => handleEdit(m)}>
             编辑
           </Button>
-          <Popconfirm title={`确认删除「${menu.name}」？其子菜单将一并删除`} onConfirm={() => void handleDelete(menu)}>
+          <Popconfirm title={`确认删除「${m.name}」？其子菜单将一并删除`} onConfirm={() => void handleDelete(m)}>
             <Button type="link" size="small" danger>
               删除
             </Button>
           </Popconfirm>
-        </span>
-      </span>
-    )
-  }
+        </Space>
+      ),
+    },
+  ]
 
   const modalTitle =
     mode === 'edit'
@@ -376,32 +412,6 @@ export default function MenuList() {
           border-radius: 8px;
           background: ${brand.gradientSoft};
           font-size: 13px;
-        }
-        .menu-node {
-          display: inline-flex;
-          align-items: center;
-          justify-content: space-between;
-          width: 100%;
-          padding-right: 8px;
-        }
-        .menu-node-main {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .menu-node-code {
-          font-size: 12px;
-          color: ${brand.textSecondary};
-          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        }
-        .menu-node-actions {
-          opacity: 0;
-          transition: opacity 0.15s ease;
-          display: inline-flex;
-          gap: 2px;
-        }
-        .ant-tree-treenode:hover .menu-node-actions {
-          opacity: 1;
         }
       `}</style>
 
@@ -456,7 +466,7 @@ export default function MenuList() {
           onChange={(e) => setKeyword(e.target.value)}
         />
         <Space>
-          <Button size="small" onClick={() => setExpandedKeys(collectKeys(treeData.map((n) => n.menu)))}>
+          <Button size="small" onClick={() => setExpandedKeys(collectKeys(menuTree))}>
             展开全部
           </Button>
           <Button size="small" onClick={() => setExpandedKeys([])}>
@@ -468,19 +478,21 @@ export default function MenuList() {
       <Spin spinning={treeLoading}>
         {!selectedAppId ? (
           <Empty description="请先选择所属应用" style={{ padding: '48px 0' }} />
-        ) : treeData.length === 0 ? (
+        ) : menuTree.length === 0 ? (
           <Empty description="该应用暂无菜单，点击右上角「新建根菜单」开始配置" style={{ padding: '48px 0' }} />
         ) : (
-          <div style={{ maxHeight: 620, overflow: 'auto', border: '1px solid #f0f0f0', borderRadius: 10, padding: '8px 12px' }}>
-            <Tree
-              blockNode
-              showLine
-              treeData={displayTree}
-              expandedKeys={keyword ? collectKeys(displayTree.map((n) => n.menu)) : expandedKeys}
-              onExpand={(keys) => setExpandedKeys(keys as number[])}
-              titleRender={renderTitle}
-            />
-          </div>
+          <Table<MenuItem>
+            rowKey="menuID"
+            columns={columns}
+            dataSource={displayList}
+            loading={treeLoading}
+            pagination={false}
+            scroll={{ x: 1150 }}
+            expandable={{
+              expandedRowKeys: keyword ? collectKeys(displayList) : expandedKeys,
+              onExpandedRowsChange: (keys) => setExpandedKeys(keys as number[]),
+            }}
+          />
         )}
       </Spin>
 
