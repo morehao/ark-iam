@@ -67,6 +67,12 @@ DTO/Service/Controller/claims/SSO/测试与前端类型包。
 > ⚠️ 经验 2：`user` 是 PostgreSQL 保留字。DAO 层按 `表名.列名` 拼 SQL（gormdao `deletedScope` 及各 Cond），
 > 生成未加引号的 `user.deleted_at` 在 PG 上报 `syntax error at or near "."`（登录链路即触发）。
 > 已把用户表改名为 **`tenant_user`**（`model.TableNameUser`，与 `person` 自然人语义区分更清晰），其余 29 张表名均非保留字。
+>
+> ⚠️ 经验 3：golib `gormplugin.ScopePlugin`（多租户过滤）生成 **MySQL 反引号**限定符
+> （`` `tenant_user`.tenant_id = ? ``），在 PG 上报 `syntax error at or near "."`——
+> 任何带 tenant_id 上下文（登录后携带 token 的请求）查询被过滤的表都会触发。
+> 已在 `pkg/dbclient` 自建 PG 兼容插件（双引号限定符，逻辑与 golib 一致），
+> 并新增 `//go:build pg` 回归测试 `pkg/dbclient/tenant_scope_pg_test.go`。
 
 ## 3. 启动自动建表（GORM AutoMigrate）
 

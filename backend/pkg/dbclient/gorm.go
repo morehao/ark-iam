@@ -5,11 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/gin-gonic/gin"
-	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/dbaccess/dbgorm"
 	_ "github.com/morehao/golib/dbaccess/dbgorm/driver/postgres"
-	"github.com/morehao/golib/dbaccess/gormplugin"
 	"github.com/morehao/golib/glog"
 	"gorm.io/gorm"
 )
@@ -41,23 +38,6 @@ var tenantScopeSkipTables = []string{
 	"application_client_secret",
 }
 
-// newTenantScopePlugin 构造 tenant 插件，同一份配置供业务初始化与测试复用。
-func newTenantScopePlugin(skipTables []string) (*gormplugin.ScopePlugin, error) {
-	return gormplugin.New(&gormplugin.ScopeConfig{
-		FieldName: "tenant_id",
-		ExtractFunc: func(ctx context.Context) (any, bool) {
-			if ginCtx, ok := ctx.(*gin.Context); ok {
-				return ginCtx.Get(gcontext.KeyTenantID)
-			}
-			value := ctx.Value(gcontext.KeyTenantID)
-			if value == nil {
-				return nil, false
-			}
-			return value, true
-		},
-		SkipTables: skipTables,
-	})
-}
 
 func InitMultiDB(configs []dbgorm.Config, logConfig *glog.LogConfig) error {
 	if len(configs) == 0 {
