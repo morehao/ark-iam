@@ -28,7 +28,7 @@ func TestApiKeyAuthValidKey(t *testing.T) {
 	}))
 
 	rawKey, keyHash, keyPrefix := generateTestKey()
-	insertTestApiKey(t, apiKeyDao, 1, keyHash, keyPrefix, nil, nil)
+	insertTestApiKey(t, apiKeyDao, "1", keyHash, keyPrefix, nil, nil)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -61,7 +61,7 @@ func TestApiKeyAuthViaXApiKeyHeader(t *testing.T) {
 	}))
 
 	rawKey, keyHash, keyPrefix := generateTestKey()
-	insertTestApiKey(t, apiKeyDao, 9, keyHash, keyPrefix, nil, nil)
+	insertTestApiKey(t, apiKeyDao, "9", keyHash, keyPrefix, nil, nil)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -93,7 +93,7 @@ func TestApiKeyAuthInvalidKey(t *testing.T) {
 	}))
 
 	_, keyHash, keyPrefix := generateTestKey()
-	insertTestApiKey(t, apiKeyDao, 1, keyHash, keyPrefix, nil, nil)
+	insertTestApiKey(t, apiKeyDao, "1", keyHash, keyPrefix, nil, nil)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -161,7 +161,7 @@ func TestApiKeyAuthRevokedKey(t *testing.T) {
 
 	rawKey, keyHash, keyPrefix := generateTestKey()
 	now := time.Now()
-	insertTestApiKey(t, apiKeyDao, 1, keyHash, keyPrefix, &now, nil)
+	insertTestApiKey(t, apiKeyDao, "1", keyHash, keyPrefix, &now, nil)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -192,7 +192,7 @@ func TestApiKeyAuthExpiredKey(t *testing.T) {
 
 	rawKey, keyHash, keyPrefix := generateTestKey()
 	past := time.Now().Add(-24 * time.Hour)
-	insertTestApiKey(t, apiKeyDao, 1, keyHash, keyPrefix, nil, &past)
+	insertTestApiKey(t, apiKeyDao, "1", keyHash, keyPrefix, nil, &past)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -237,7 +237,7 @@ func generateTestKey() (rawKey, keyHash, keyPrefix string) {
 	return
 }
 
-func insertTestApiKey(t *testing.T, apiKeyDao *dao.ApiKeyDao, tenantID uint, keyHash, keyPrefix string, revokedAt *time.Time, expiresAt *time.Time) {
+func insertTestApiKey(t *testing.T, apiKeyDao *dao.ApiKeyDao, tenantID string, keyHash, keyPrefix string, revokedAt *time.Time, expiresAt *time.Time) {
 	t.Helper()
 	entity := &model.ApiKeyEntity{
 		TenantID:  tenantID,
@@ -247,7 +247,7 @@ func insertTestApiKey(t *testing.T, apiKeyDao *dao.ApiKeyDao, tenantID uint, key
 		Scope:     json.RawMessage(`{}`),
 		ExpiredAt: expiresAt,
 		RevokedAt: revokedAt,
-		CreatedBy: 42,
+		CreatedBy: "42",
 	}
 	if err := apiKeyDao.Insert(context.Background(), entity); err != nil {
 		t.Fatalf("insert test api key: %v", err)

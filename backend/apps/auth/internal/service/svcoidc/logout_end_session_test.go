@@ -11,9 +11,9 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/ark-iam/pkg/testsetup"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
-	"gorm.io/gorm"
 )
 
 // sloQueueContended 检测共享 SLO 队列是否正被运行中的服务（logout worker）持续消费。
@@ -62,7 +62,7 @@ func TestTerminateSessionFromRequestEnqueuesPreciseSidJobs(t *testing.T) {
 	ctx := context.Background()
 
 	users := []model.UserEntity{
-		{Model: gorm.Model{ID: 80}, TenantID: 1, PersonID: 88},
+		{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "80"}}, TenantID: "1", PersonID: "88"},
 	}
 	storage, _ := newTenantClaimTestStore(t, users)
 

@@ -3,12 +3,12 @@ package dtoapplication
 import "encoding/json"
 
 type ApplicationCreateResp struct {
-	AppID uint   `json:"appID"` // 应用ID
+	AppID string `json:"appID"` // 应用ID
 	Code  string `json:"code"`  // 应用编码
 }
 
 type ApplicationDetailResp struct {
-	AppID        uint            `json:"appID"`        // 应用ID
+	AppID        string          `json:"appID"`        // 应用ID
 	Code         string          `json:"code"`         // 应用编码
 	Name         string          `json:"name"`         // 应用名称
 	Description  string          `json:"description"`  // 应用描述
@@ -23,7 +23,7 @@ type ApplicationDetailResp struct {
 }
 
 type PageListItem struct {
-	AppID        uint            `json:"appID"`        // 应用ID
+	AppID        string          `json:"appID"`        // 应用ID
 	Code         string          `json:"code"`         // 应用编码
 	Name         string          `json:"name"`         // 应用名称
 	Description  string          `json:"description"`  // 应用描述

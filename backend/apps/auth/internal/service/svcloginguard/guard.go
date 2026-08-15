@@ -11,9 +11,9 @@ import (
 
 const (
 	keyFailIP     = "iam:login_fail:ip:%s"
-	keyFailPerson = "iam:login_fail:person:%d"
+	keyFailPerson = "iam:login_fail:person:%s"
 	keyLockIP     = "iam:login_lock:ip:%s"
-	keyLockPerson = "iam:login_lock:person:%d"
+	keyLockPerson = "iam:login_lock:person:%s"
 )
 
 func cfg() (maxFailures, windowSec, lockSec int) {
@@ -33,7 +33,7 @@ func cfg() (maxFailures, windowSec, lockSec int) {
 }
 
 // Check 是否被锁定，true=锁定。Redis 不可用时 fail-open 返回 false。
-func Check(ctx context.Context, ip string, personID uint) bool {
+func Check(ctx context.Context, ip string, personID string) bool {
 	if dbclient.RedisCli == nil {
 		return false
 	}
@@ -41,7 +41,7 @@ func Check(ctx context.Context, ip string, personID uint) bool {
 	if v, _ := dbclient.RedisCli.Exists(ctx, lockIP).Result(); v > 0 {
 		return true
 	}
-	if personID > 0 {
+	if personID != "" {
 		lockPerson := fmt.Sprintf(keyLockPerson, personID)
 		if v, _ := dbclient.RedisCli.Exists(ctx, lockPerson).Result(); v > 0 {
 			return true
@@ -51,7 +51,7 @@ func Check(ctx context.Context, ip string, personID uint) bool {
 }
 
 // RecordFailure 记录失败次数，达到阈值则锁定 IP 与 person。
-func RecordFailure(ctx context.Context, ip string, personID uint) {
+func RecordFailure(ctx context.Context, ip string, personID string) {
 	if dbclient.RedisCli == nil {
 		return
 	}
@@ -66,7 +66,7 @@ func RecordFailure(ctx context.Context, ip string, personID uint) {
 	}
 	cli.Expire(ctx, ipKey, w)
 
-	if personID > 0 {
+	if personID != "" {
 		personKey := fmt.Sprintf(keyFailPerson, personID)
 		if n, _ := cli.Incr(ctx, personKey).Result(); n >= int64(maxFailures) {
 			cli.Set(ctx, fmt.Sprintf(keyLockPerson, personID), "1", lock)
@@ -76,7 +76,7 @@ func RecordFailure(ctx context.Context, ip string, personID uint) {
 }
 
 // RecordSuccess 登录成功清除失败与锁定计数。
-func RecordSuccess(ctx context.Context, personID uint) {
+func RecordSuccess(ctx context.Context, personID string) {
 	if dbclient.RedisCli == nil {
 		return
 	}
@@ -97,6 +97,6 @@ func lockDuration(s int) time.Duration {
 	return time.Duration(s) * time.Second
 }
 
-func personKeys(pid uint) []string {
+func personKeys(pid string) []string {
 	return []string{fmt.Sprintf(keyFailPerson, pid), fmt.Sprintf(keyLockPerson, pid)}
 }

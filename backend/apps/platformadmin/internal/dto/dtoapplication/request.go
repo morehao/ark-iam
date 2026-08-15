@@ -15,7 +15,7 @@ type ApplicationCreateReq struct {
 }
 
 type ApplicationUpdateReq struct {
-	AppID        uint            `json:"-" uri:"appID" binding:"required"` // 应用ID
+	AppID        string          `json:"-" uri:"appID" binding:"required"` // 应用ID
 	Name         string          `json:"name"`                             // 应用名称
 	Description  string          `json:"description"`                      // 应用描述
 	LogoURL      string          `json:"logoUrl"`                          // 应用logo
@@ -28,11 +28,11 @@ type ApplicationUpdateReq struct {
 }
 
 type ApplicationDetailReq struct {
-	AppID uint `json:"-" uri:"appID" binding:"required"` // 应用ID
+	AppID string `json:"-" uri:"appID" binding:"required"` // 应用ID
 }
 
 type ApplicationDeleteReq struct {
-	AppID uint `json:"-" uri:"appID" binding:"required"` // 应用ID
+	AppID string `json:"-" uri:"appID" binding:"required"` // 应用ID
 }
 
 type ApplicationPageListReq struct {

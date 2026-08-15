@@ -8,8 +8,8 @@ import (
 
 type UserLoginLogCond struct {
 	*gormdao.BaseCond
-	TenantID uint
-	UserID   uint
+	TenantID string
+	UserID   string
 	LoginIP  string
 }
 
@@ -17,10 +17,10 @@ func (c *UserLoginLogCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
-	if c.UserID != 0 {
+	if c.UserID != "" {
 		db.Where(tableName+".user_id = ?", c.UserID)
 	}
 	if c.LoginIP != "" {
@@ -29,12 +29,12 @@ func (c *UserLoginLogCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type UserLoginLogDao struct {
-	*gormdao.Dao[model.UserLoginLogEntity, model.UserLoginLogEntityList, uint]
+	*gormdao.Dao[model.UserLoginLogEntity, model.UserLoginLogEntityList, string]
 }
 
 func NewUserLoginLogDao(opts ...DaoOption) *UserLoginLogDao {
 	return &UserLoginLogDao{
-		Dao: gormdao.NewDao[model.UserLoginLogEntity, model.UserLoginLogEntityList, uint](
+		Dao: gormdao.NewDao[model.UserLoginLogEntity, model.UserLoginLogEntityList, string](
 			model.TableNameUserLoginLog, "UserLoginLogDao",
 			resolveDBGetter(opts...),
 		),

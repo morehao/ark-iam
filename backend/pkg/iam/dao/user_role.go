@@ -8,33 +8,33 @@ import (
 
 type UserRoleCond struct {
 	*gormdao.BaseCond
-	TenantID uint
-	UserID   uint
-	RoleID   uint
+	TenantID string
+	UserID   string
+	RoleID   string
 }
 
 func (c *UserRoleCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
-	if c.UserID != 0 {
+	if c.UserID != "" {
 		db.Where(tableName+".user_id = ?", c.UserID)
 	}
-	if c.RoleID != 0 {
+	if c.RoleID != "" {
 		db.Where(tableName+".role_id = ?", c.RoleID)
 	}
 }
 
 type UserRoleDao struct {
-	*gormdao.Dao[model.UserRoleEntity, model.UserRoleEntityList, uint]
+	*gormdao.Dao[model.UserRoleEntity, model.UserRoleEntityList, string]
 }
 
 func NewUserRoleDao(opts ...DaoOption) *UserRoleDao {
 	return &UserRoleDao{
-		Dao: gormdao.NewDao[model.UserRoleEntity, model.UserRoleEntityList, uint](
+		Dao: gormdao.NewDao[model.UserRoleEntity, model.UserRoleEntityList, string](
 			model.TableNameUserRole, "UserRoleDao",
 			resolveDBGetter(opts...),
 		),

@@ -8,12 +8,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objtenant"
 	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenant"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
@@ -65,7 +65,7 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 		Type:        tenantType,
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	txErr := dbclient.IamDB(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := dao.NewTenantDao().WithTx(tx).Insert(ctx, insertEntity); err != nil {
 			return err
@@ -73,7 +73,7 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 		// 每个租户创建时自动创建同名的顶级部门（parent_id=0）
 		rootDept := &model.DepartmentEntity{
 			TenantID:  insertEntity.ID,
-			ParentID:  0,
+			ParentID:  "",
 			Name:      req.Name,
 			CreatedBy: userID,
 		}
@@ -100,7 +100,7 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 
 // CreateTenantAsOwner 0租户自然人自助创建租户并成为租户 owner
 func (svc *tenantSvc) CreateTenantAsOwner(ctx *gin.Context, req *dtotenant.TenantCreateAsOwnerReq) (*dtotenant.TenantCreateAsOwnerResp, error) {
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	now := time.Now()
 
 	// 授权闸门：仅允许 0 租户自然人，且目标应用的 tenant_policy.allowPersonCreateTenant 为 true
@@ -108,7 +108,7 @@ func (svc *tenantSvc) CreateTenantAsOwner(ctx *gin.Context, req *dtotenant.Tenan
 		return nil, err
 	}
 
-	var tenantID uint
+	var tenantID string
 	txErr := dbclient.IamDB(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		tenant := &model.TenantEntity{
 			Code:      generateTenantCode(),
@@ -134,7 +134,7 @@ func (svc *tenantSvc) CreateTenantAsOwner(ctx *gin.Context, req *dtotenant.Tenan
 			return err
 		}
 
-		if req.AppID != 0 {
+		if req.AppID != "" {
 			app := &model.TenantApplicationEntity{
 				TenantID:     tenant.ID,
 				AppID:        req.AppID,
@@ -151,7 +151,7 @@ func (svc *tenantSvc) CreateTenantAsOwner(ctx *gin.Context, req *dtotenant.Tenan
 		// 每个租户创建时自动创建同名的顶级部门（parent_id=0）
 		rootDept := &model.DepartmentEntity{
 			TenantID:  tenant.ID,
-			ParentID:  0,
+			ParentID:  "",
 			Name:      req.Name,
 			CreatedBy: req.PersonID,
 		}
@@ -189,13 +189,13 @@ func (svc *tenantSvc) checkCreateTenantAsOwnerGate(ctx *gin.Context, req *dtoten
 		return code.GetError(code.TenantCreateAsOwnerForbiddenError)
 	}
 	for _, u := range users {
-		if u.TenantID > 0 {
+		if u.TenantID != "" {
 			glog.Errorf(ctx, "[svctenant.CreateTenantAsOwner] person already has a tenant, req:%s", gutil.ToJsonString(req))
 			return code.GetError(code.TenantCreateAsOwnerForbiddenError)
 		}
 	}
 
-	if req.AppID == 0 {
+	if req.AppID == "" {
 		glog.Errorf(ctx, "[svctenant.CreateTenantAsOwner] appID is required for self-service tenant creation, req:%s", gutil.ToJsonString(req))
 		return code.GetError(code.TenantCreateAsOwnerForbiddenError)
 	}
@@ -205,7 +205,7 @@ func (svc *tenantSvc) checkCreateTenantAsOwnerGate(ctx *gin.Context, req *dtoten
 		glog.Errorf(ctx, "[svctenant.CreateTenantAsOwner] query application fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.TenantCreateAsOwnerForbiddenError)
 	}
-	if app == nil || app.ID == 0 {
+	if app == nil || app.ID == "" {
 		glog.Errorf(ctx, "[svctenant.CreateTenantAsOwner] application not found, req:%s", gutil.ToJsonString(req))
 		return code.GetError(code.TenantCreateAsOwnerForbiddenError)
 	}
@@ -229,11 +229,11 @@ func (svc *tenantSvc) Delete(ctx *gin.Context, req *dtotenant.TenantDeleteReq) e
 		glog.Errorf(ctx, "[svctenant.TenantDelete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.TenantDeleteError)
 	}
-	if tenantEntity == nil || tenantEntity.ID == 0 {
+	if tenantEntity == nil || tenantEntity.ID == "" {
 		return code.GetError(code.TenantNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 
 	if err := dao.NewTenantDao().Delete(ctx, req.TenantID, userID); err != nil {
 		glog.Errorf(ctx, "[svctenant.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -249,11 +249,11 @@ func (svc *tenantSvc) Update(ctx *gin.Context, req *dtotenant.TenantUpdateReq) e
 		glog.Errorf(ctx, "[svctenant.TenantUpdate] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.TenantUpdateError)
 	}
-	if tenantEntity == nil || tenantEntity.ID == 0 {
+	if tenantEntity == nil || tenantEntity.ID == "" {
 		return code.GetError(code.TenantNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	tenantType := model.TenantType(req.Type)
 	if tenantType != model.TenantTypeCustomer && tenantType != model.TenantTypePlatform {
 		tenantType = model.TenantTypeCustomer
@@ -280,7 +280,7 @@ func (svc *tenantSvc) Detail(ctx *gin.Context, req *dtotenant.TenantDetailReq) (
 		glog.Errorf(ctx, "[svctenant.TenantDetail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantGetDetailError)
 	}
-	if tenantEntity == nil || tenantEntity.ID == 0 {
+	if tenantEntity == nil || tenantEntity.ID == "" {
 		return nil, code.GetError(code.TenantNotExistError)
 	}
 	resp := &dtotenant.TenantDetailResp{

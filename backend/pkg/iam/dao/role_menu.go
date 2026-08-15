@@ -8,33 +8,33 @@ import (
 
 type RoleMenuCond struct {
 	*gormdao.BaseCond
-	TenantID uint
-	RoleID   uint
-	MenuID   uint
+	TenantID string
+	RoleID   string
+	MenuID   string
 }
 
 func (c *RoleMenuCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
-	if c.RoleID != 0 {
+	if c.RoleID != "" {
 		db.Where(tableName+".role_id = ?", c.RoleID)
 	}
-	if c.MenuID != 0 {
+	if c.MenuID != "" {
 		db.Where(tableName+".menu_id = ?", c.MenuID)
 	}
 }
 
 type RoleMenuDao struct {
-	*gormdao.Dao[model.RoleMenuEntity, model.RoleMenuEntityList, uint]
+	*gormdao.Dao[model.RoleMenuEntity, model.RoleMenuEntityList, string]
 }
 
 func NewRoleMenuDao(opts ...DaoOption) *RoleMenuDao {
 	return &RoleMenuDao{
-		Dao: gormdao.NewDao[model.RoleMenuEntity, model.RoleMenuEntityList, uint](
+		Dao: gormdao.NewDao[model.RoleMenuEntity, model.RoleMenuEntityList, string](
 			model.TableNameRoleMenu, "RoleMenuDao",
 			resolveDBGetter(opts...),
 		),

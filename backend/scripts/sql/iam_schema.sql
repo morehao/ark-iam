@@ -1,3 +1,4 @@
+-- 已废弃：由 GORM AutoMigrate（pkg/iam/model.AutoMigrateAll）取代，启动时自动建表（见 docs/design/string-id-pg-automigrate-seed.md）。
 CREATE DATABASE iam
 CHARACTER SET utf8mb4
 COLLATE utf8mb4_0900_ai_ci;

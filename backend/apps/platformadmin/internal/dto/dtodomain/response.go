@@ -1,11 +1,11 @@
 package dtodomain
 
 type DomainCreateResp struct {
-	ID uint `json:"id"` // 域名ID
+	ID string `json:"id"` // 域名ID
 }
 
 type DomainDetailResp struct {
-	ID         uint   `json:"id"`         // 域名ID
+	ID         string `json:"id"`         // 域名ID
 	Domain     string `json:"domain"`     // 域名
 	IsVerified int8   `json:"isVerified"` // 是否验证(0-未验证 1-已验证)
 	VerifiedAt string `json:"verifiedAt"` // 验证时间
@@ -14,7 +14,7 @@ type DomainDetailResp struct {
 }
 
 type DomainPageListItem struct {
-	ID         uint   `json:"id"`         // 域名ID
+	ID         string `json:"id"`         // 域名ID
 	Domain     string `json:"domain"`     // 域名
 	IsVerified int8   `json:"isVerified"` // 是否验证(0-未验证 1-已验证)
 	VerifiedAt string `json:"verifiedAt"` // 验证时间

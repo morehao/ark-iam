@@ -43,7 +43,7 @@ type StandardIdentity struct {
 
 type ConnectorAuthorizeInput struct {
 	Config       ConnectorConfig
-	ConnectorID  uint
+	ConnectorID  string
 	RedirectURI  string
 	State        string
 	LoginHint    string
@@ -57,7 +57,7 @@ type ConnectorAuthorizeOutput struct {
 
 type ConnectorCallbackInput struct {
 	Config      ConnectorConfig
-	ConnectorID uint
+	ConnectorID string
 	Code        string
 	State       string
 	Nonce       string

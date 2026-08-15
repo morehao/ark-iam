@@ -6,6 +6,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { createOAuthSecret, deleteOAuthSecret, getOAuthClientDetail, listOAuthSecrets } from '@ark-iam/api'
 import type { OAuthClientDetail as OAuthClientDetailType, OAuthSecretCreateResp, OAuthSecretItem } from '@ark-iam/types'
 import { fmtTime, StatusTag, TypeTag } from '../../components/common'
+import { IDCell } from '@ark-iam/ui'
 
 export default function OAuthClientDetail() {
   const { id } = useParams<{ id: string }>()
@@ -19,7 +20,7 @@ export default function OAuthClientDetail() {
   const [submitLoading, setSubmitLoading] = useState(false)
   const [createdSecret, setCreatedSecret] = useState<OAuthSecretCreateResp | null>(null)
 
-  const clientID = Number(id)
+  const clientID = id ?? ""
 
   const fetchAll = useCallback(async () => {
     if (!id) return
@@ -74,7 +75,7 @@ export default function OAuthClientDetail() {
   }
 
   const secretColumns: ColumnsType<OAuthSecretItem> = [
-    { title: 'ID', dataIndex: 'id', key: 'id', width: 80 },
+    { title: 'ID', dataIndex: 'id', key: 'id', width: 150, render: (v: string) => <IDCell value={v} /> },
     { title: '名称', dataIndex: 'name', key: 'name' },
     {
       title: '前缀',
@@ -129,11 +130,11 @@ export default function OAuthClientDetail() {
 
       <Card title="基本信息" style={{ borderRadius: 12, marginBottom: 16, border: '1px solid #f0f0f0' }} styles={{ body: { padding: 24 } }}>
         <Descriptions column={2} bordered size="small">
-          <Descriptions.Item label="ID">{detail.applicationClientID}</Descriptions.Item>
-          <Descriptions.Item label="租户ID">{detail.tenantID}</Descriptions.Item>
-          <Descriptions.Item label="所属应用ID">{detail.appID}</Descriptions.Item>
+          <Descriptions.Item label="ID"><IDCell value={detail.applicationClientID} /></Descriptions.Item>
+          <Descriptions.Item label="租户ID"><IDCell value={detail.tenantID} /></Descriptions.Item>
+          <Descriptions.Item label="所属应用ID"><IDCell value={detail.appID} /></Descriptions.Item>
           <Descriptions.Item label="客户端ID">
-            <span style={{ fontFamily: 'monospace' }}>{detail.clientID}</span>
+            <IDCell value={detail.clientID} />
           </Descriptions.Item>
           <Descriptions.Item label="名称">{detail.name || '-'}</Descriptions.Item>
           <Descriptions.Item label="类型">

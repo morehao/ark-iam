@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Modal, Tabs, Descriptions, Form, Input, Button, Table, message, Popconfirm, Space, Avatar, Tag, Tooltip } from 'antd'
+import { Modal, Tabs, Descriptions, Form, Input, Button, Table, message, Popconfirm, Space, Avatar, Tag } from 'antd'
 import { getPersonDetail, updatePassword, getSessionList, revokeSession, revokeAllSessions } from '@ark-iam/api'
 import type { PersonDetailResp, SessionResp } from '@ark-iam/types'
 import { brand } from './theme'
+import { IDCell } from './IDCell'
+import { EllipsisCell } from './EllipsisCell'
 
 interface Props {
   open: boolean
@@ -30,7 +32,7 @@ export function ProfileCenter({ open, onClose }: Props) {
       const pages = await Promise.all(
         [1, 2, 3, 4, 5].map((p) => getSessionList({ page: p, pageSize: 10 }).catch(() => ({ list: [], total: 0 }))),
       )
-      const seen = new Set<number>()
+      const seen = new Set<string>()
       const merged: SessionResp[] = []
       for (const resp of pages) {
         for (const s of resp.list || []) {
@@ -71,7 +73,7 @@ export function ProfileCenter({ open, onClose }: Props) {
   }
 
   const columns = [
-    { title: '会话ID', dataIndex: 'sessionID', key: 'sessionID', ellipsis: true },
+    { title: '会话ID', dataIndex: 'sessionID', key: 'sessionID', width: 160, render: (v: string) => <IDCell value={v} /> },
     { title: '客户端', dataIndex: 'clientType', key: 'clientType', width: 110 },
     { title: 'IP', dataIndex: 'clientIP', key: 'clientIP', width: 130 },
     {
@@ -85,8 +87,7 @@ export function ProfileCenter({ open, onClose }: Props) {
       title: 'UserAgent',
       dataIndex: 'userAgent',
       key: 'userAgent',
-      ellipsis: true,
-      render: (v: string) => <Tooltip title={v}>{v || '-'}</Tooltip>,
+      render: (v: string) => <EllipsisCell value={v} />,
     },
     { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 160 },
     {

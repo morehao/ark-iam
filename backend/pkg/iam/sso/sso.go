@@ -36,8 +36,8 @@ func ssoSessionKey(sessionID string) string {
 	return ssoSessionKeyPrefix + sessionID
 }
 
-func ssoUserSessionsKey(personID uint) string {
-	return fmt.Sprintf("%s%d", ssoUserSessionsKeyPrefix, personID)
+func ssoUserSessionsKey(personID string) string {
+	return ssoUserSessionsKeyPrefix + personID
 }
 
 // tenantIDCtxKey 用作 context key 的类型，避免直接以 string 作为 context key 触发 staticcheck SA1029。
@@ -48,7 +48,7 @@ type tenantIDCtxKey struct{}
 var ContextKeyTenantID tenantIDCtxKey
 
 type ssoSessionData struct {
-	PersonID  uint      `json:"personID"`
+	PersonID  string    `json:"personID"`
 	CreatedAt time.Time `json:"createdAt"`
 	// AMR 原始认证方法（如 ["pwd"] / ["mfa"]）。SSO 静默续登（prompt=none / sso-login）
 	// 重新签发 token 时还原，保证 id_token 的 amr 反映原始认证，而非非标准的 "sso"。
@@ -69,13 +69,13 @@ func WithSessionTTL(ttl time.Duration) SessionTTLOption {
 type SSOSessionStore interface {
 	// CreateSession 创建会话并返回会话 ID。amr 为该会话的原始认证方法引用，
 	// 供后续静默续登还原到 id_token 的 amr 声明。
-	CreateSession(ctx context.Context, personID uint, amr []string) (string, error)
-	ValidateSession(ctx context.Context, sessionID string) (uint, error)
+	CreateSession(ctx context.Context, personID string, amr []string) (string, error)
+	ValidateSession(ctx context.Context, sessionID string) (string, error)
 	// SessionAMR 返回会话创建时的认证方法引用；会话不存在时返回 nil。
 	SessionAMR(ctx context.Context, sessionID string) []string
 	RevokeSession(ctx context.Context, sessionID string) error
-	RevokeSessionsByPersonID(ctx context.Context, personID uint) error
-	HasActiveSession(ctx context.Context, personID uint) (bool, error)
+	RevokeSessionsByPersonID(ctx context.Context, personID string) error
+	HasActiveSession(ctx context.Context, personID string) (bool, error)
 }
 
 type redisSSOSessionStore struct {
@@ -110,10 +110,10 @@ var sessionAuditWriter = func(ctx context.Context, entity *model.SessionAuditEnt
 // 审计写入失败仅记录日志，绝不阻断 SSO 会话本身（Redis 会话必须照常可用）。
 // CreateSession 无 gin 上下文，仅能记录 person_id/session_id/tenant_id/login_time/status，
 // client_ip 与 user_agent 暂留空。
-func recordSessionAuditBestEffort(ctx context.Context, sid string, personID uint) {
-	tenantID := uint(0)
+func recordSessionAuditBestEffort(ctx context.Context, sid string, personID string) {
+	tenantID := ""
 	if v := ctx.Value(ContextKeyTenantID); v != nil {
-		if t, ok := v.(uint); ok {
+		if t, ok := v.(string); ok {
 			tenantID = t
 		}
 	}
@@ -126,13 +126,13 @@ func recordSessionAuditBestEffort(ctx context.Context, sid string, personID uint
 		CreatedBy: personID,
 	}
 	if err := sessionAuditWriter(ctx, entity); err != nil {
-		glog.Errorf(ctx, "[sso.recordSessionAudit] write session audit fail, err:%v, sessionId:%s, personId:%d", err, sid, personID)
+		glog.Errorf(ctx, "[sso.recordSessionAudit] write session audit fail, err:%v, sessionId:%s, personId:%s", err, sid, personID)
 	}
 }
 
 // RevokeSSOSessionsByPersonID 撤销指定 person 的全部 SSO session。
 // 供跨包（如 svcauth 登出）调用，实现全局登出语义。
-func RevokeSSOSessionsByPersonID(ctx context.Context, personID uint) error {
+func RevokeSSOSessionsByPersonID(ctx context.Context, personID string) error {
 	return NewSSOSessionStore().RevokeSessionsByPersonID(ctx, personID)
 }
 
@@ -144,7 +144,7 @@ func generateSessionID() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-func (s *redisSSOSessionStore) CreateSession(ctx context.Context, personID uint, amr []string) (string, error) {
+func (s *redisSSOSessionStore) CreateSession(ctx context.Context, personID string, amr []string) (string, error) {
 	if s.client == nil {
 		return "", fmt.Errorf("redis client not available")
 	}
@@ -175,20 +175,20 @@ func (s *redisSSOSessionStore) CreateSession(ctx context.Context, personID uint,
 	return sessionID, nil
 }
 
-func (s *redisSSOSessionStore) ValidateSession(ctx context.Context, sessionID string) (uint, error) {
+func (s *redisSSOSessionStore) ValidateSession(ctx context.Context, sessionID string) (string, error) {
 	if s.client == nil {
-		return 0, fmt.Errorf("redis client not available")
+		return "", fmt.Errorf("redis client not available")
 	}
 	encoded, err := s.client.Get(ctx, ssoSessionKey(sessionID)).Bytes()
 	if err == redis.Nil {
-		return 0, fmt.Errorf("session not found or expired")
+		return "", fmt.Errorf("session not found or expired")
 	}
 	if err != nil {
-		return 0, fmt.Errorf("failed to get session: %w", err)
+		return "", fmt.Errorf("failed to get session: %w", err)
 	}
 	var data ssoSessionData
 	if err := json.Unmarshal(encoded, &data); err != nil {
-		return 0, fmt.Errorf("failed to unmarshal session data: %w", err)
+		return "", fmt.Errorf("failed to unmarshal session data: %w", err)
 	}
 	return data.PersonID, nil
 }
@@ -225,7 +225,7 @@ func (s *redisSSOSessionStore) RevokeSession(ctx context.Context, sessionID stri
 	return s.client.Del(ctx, ssoSessionKey(sessionID)).Err()
 }
 
-func (s *redisSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, personID uint) error {
+func (s *redisSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, personID string) error {
 	if s.client == nil {
 		return fmt.Errorf("redis client not available")
 	}
@@ -245,7 +245,7 @@ func (s *redisSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, per
 // 全局登出（RevokeSessionsByPersonID）会清空对应 sso_user_sessions 索引，
 // 之后此处将返回 false，从而让该自然人的既有 OIDC 访问令牌失效（必须重新认证）。
 // 找到任一有效会话时顺带刷新其 TTL，实现滑动续期，避免活跃用户因会话过期被误登出。
-func (s *redisSSOSessionStore) HasActiveSession(ctx context.Context, personID uint) (bool, error) {
+func (s *redisSSOSessionStore) HasActiveSession(ctx context.Context, personID string) (bool, error) {
 	if s.client == nil {
 		return false, fmt.Errorf("redis client not available")
 	}

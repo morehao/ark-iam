@@ -93,7 +93,7 @@ func (m *apiKeyAuthMiddleware) Authenticate(ctx *gin.Context) bool {
 	go func() {
 		updateCtx := ctx.Copy()
 		if err := m.apiKeyDao.UpdateMap(updateCtx, entity.ID, map[string]any{"last_used_at": time.Now()}); err != nil {
-			glog.Errorf(updateCtx, "[middleware.ApiKeyAuth] UpdateMap fail, err:%v, id:%d", err, entity.ID)
+			glog.Errorf(updateCtx, "[middleware.ApiKeyAuth] UpdateMap fail, err:%v, id:%s", err, entity.ID)
 		}
 	}()
 

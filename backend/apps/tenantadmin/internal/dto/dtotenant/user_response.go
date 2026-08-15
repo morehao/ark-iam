@@ -1,8 +1,8 @@
 package dtotenant
 
 type UserPageListItem struct {
-	UserID       uint   `json:"userID"`       // 用户ID
-	TenantID     uint   `json:"tenantID"`     // 租户ID
+	UserID       string `json:"userID"`       // 用户ID
+	TenantID     string `json:"tenantID"`     // 租户ID
 	Username     string `json:"username"`     // 用户名
 	PrimaryEmail string `json:"primaryEmail"` // 主要邮箱
 	PrimaryPhone string `json:"primaryPhone"` // 主要手机号

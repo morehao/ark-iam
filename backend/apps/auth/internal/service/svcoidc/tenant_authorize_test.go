@@ -16,9 +16,9 @@ import (
 func TestTenantHintMiddleware_injectsRequestContext(t *testing.T) {
 	r := gin.New()
 	r.Any("/authorize", tenantHintMiddleware(), func(ctx *gin.Context) {
-		v, ok := ctx.Request.Context().Value(ctxTenantHintKey).(uint)
+		v, ok := ctx.Request.Context().Value(ctxTenantHintKey).(string)
 		assert.True(t, ok, "expected tenant hint in request context")
-		assert.Equal(t, uint(5), v)
+		assert.Equal(t, "5", v)
 		ctx.Status(http.StatusOK)
 	})
 
@@ -41,10 +41,13 @@ func TestTenantHintMiddleware_noTenant(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
-func TestTenantHintMiddleware_invalidTenant(t *testing.T) {
+func TestTenantHintMiddleware_passesAnyNonEmptyHint(t *testing.T) {
+	// string-id 改造后 tenant hint 是 UUID 字符串：非空即透传，合法性由下游成员租户校验兜底。
 	r := gin.New()
 	r.Any("/authorize", tenantHintMiddleware(), func(ctx *gin.Context) {
-		assert.Nil(t, ctx.Request.Context().Value(ctxTenantHintKey))
+		v, ok := ctx.Request.Context().Value(ctxTenantHintKey).(string)
+		assert.True(t, ok, "expected tenant hint in request context")
+		assert.Equal(t, "abc", v)
 		ctx.Status(http.StatusOK)
 	})
 
@@ -66,22 +69,22 @@ func TestCreateAuthRequestStoresTenant(t *testing.T) {
 		Scopes:       []string{oidc.ScopeOpenID, oidc.ScopeProfile},
 		ResponseType: oidc.ResponseTypeCode,
 		ResponseMode: oidc.ResponseModeQuery,
-	}, "", 5)
+	}, "", "5")
 	require.NoError(t, err)
 	reqTyped, ok := req.(*AuthRequest)
 	require.True(t, ok, "expected *AuthRequest from store")
-	assert.Equal(t, uint(5), reqTyped.GetTenantID())
+	assert.Equal(t, "5", reqTyped.GetTenantID())
 
 	found, err := store.AuthRequestByID(context.Background(), req.GetID())
 	require.NoError(t, err)
-	assert.Equal(t, uint(5), found.(*AuthRequest).GetTenantID())
+	assert.Equal(t, "5", found.(*AuthRequest).GetTenantID())
 }
 
 func TestCreateAuthRequestReadsTenantHintFromContext(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameAuth)
 	defer testsetup.Done(testsetup.AppNameAuth)
 
-	ctx := context.WithValue(context.Background(), ctxTenantHintKey, uint(5))
+	ctx := context.WithValue(context.Background(), ctxTenantHintKey, "5")
 	req, err := NewRedisProtocolStateStore().CreateAuthRequest(ctx, &oidc.AuthRequest{
 		ClientID:     "client-1",
 		RedirectURI:  "https://client.example.com/callback",
@@ -89,9 +92,9 @@ func TestCreateAuthRequestReadsTenantHintFromContext(t *testing.T) {
 		Scopes:       []string{oidc.ScopeOpenID, oidc.ScopeProfile},
 		ResponseType: oidc.ResponseTypeCode,
 		ResponseMode: oidc.ResponseModeQuery,
-	}, "", 5)
+	}, "", "5")
 	require.NoError(t, err)
-	assert.Equal(t, uint(5), req.(*AuthRequest).GetTenantID())
+	assert.Equal(t, "5", req.(*AuthRequest).GetTenantID())
 }
 
 func TestMiddlewareToStoragePropagatesTenant(t *testing.T) {
@@ -101,7 +104,7 @@ func TestMiddlewareToStoragePropagatesTenant(t *testing.T) {
 	store := NewRedisProtocolStateStore()
 	storage := NewOIDCStorage(store, nil, nil, "")
 
-	withValue := context.WithValue(context.Background(), ctxTenantHintKey, uint(7))
+	withValue := context.WithValue(context.Background(), ctxTenantHintKey, "7")
 	res, err := storage.CreateAuthRequest(withValue, &oidc.AuthRequest{
 		ClientID:     "client-1",
 		RedirectURI:  "https://client.example.com/callback",
@@ -111,5 +114,5 @@ func TestMiddlewareToStoragePropagatesTenant(t *testing.T) {
 		ResponseMode: oidc.ResponseModeQuery,
 	}, "")
 	require.NoError(t, err)
-	assert.Equal(t, uint(7), res.(*AuthRequest).GetTenantID())
+	assert.Equal(t, "7", res.(*AuthRequest).GetTenantID())
 }

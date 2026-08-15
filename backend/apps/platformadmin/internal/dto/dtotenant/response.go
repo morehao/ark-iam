@@ -6,21 +6,21 @@ import (
 )
 
 type TenantCreateResp struct {
-	TenantID uint `json:"tenantID"` // 租户ID
+	TenantID string `json:"tenantID"` // 租户ID
 }
 
 type TenantCreateAsOwnerResp struct {
-	TenantID uint `json:"tenantID"` // 租户ID
+	TenantID string `json:"tenantID"` // 租户ID
 }
 
 type TenantDetailResp struct {
-	TenantID uint `json:"tenantID"` // 租户ID
+	TenantID string `json:"tenantID"` // 租户ID
 	objtenant.TenantBaseInfo
 	gobject.OperatorBaseInfo
 }
 
 type TenantPageListItem struct {
-	TenantID uint `json:"tenantID"` // 租户ID
+	TenantID string `json:"tenantID"` // 租户ID
 	objtenant.TenantBaseInfo
 	gobject.OperatorBaseInfo
 }
@@ -31,17 +31,17 @@ type TenantPageListResp struct {
 }
 
 type DepartmentCreateResp struct {
-	DepartmentID uint `json:"departmentID"` // 部门ID
+	DepartmentID string `json:"departmentID"` // 部门ID
 }
 
 type DepartmentDetailResp struct {
-	DepartmentID uint `json:"departmentID"` // 部门ID
+	DepartmentID string `json:"departmentID"` // 部门ID
 	objtenant.DepartmentBaseInfo
 	gobject.OperatorBaseInfo
 }
 
 type DepartmentPageListItem struct {
-	DepartmentID uint `json:"departmentID"` // 部门ID
+	DepartmentID string `json:"departmentID"` // 部门ID
 	objtenant.DepartmentBaseInfo
 	gobject.OperatorBaseInfo
 }
@@ -52,7 +52,7 @@ type DepartmentPageListResp struct {
 }
 
 type DepartmentTreeItem struct {
-	DepartmentID uint `json:"departmentID"` // 部门ID
+	DepartmentID string `json:"departmentID"` // 部门ID
 	objtenant.DepartmentBaseInfo
 	gobject.OperatorBaseInfo
 	Children []DepartmentTreeItem `json:"children"` // 子部门

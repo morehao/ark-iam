@@ -13,10 +13,10 @@ export interface ApiResponse<T> {
 export interface OIDCLoginResp {
   continueURL: string
   requiresTenantSelection?: boolean
-  tenants?: { tenantID: number; name: string; tag?: string; userID?: number; isOwner?: number }[]
+  tenants?: { tenantID: string; name: string; tag?: string; userID?: string; isOwner?: number }[]
 }
 
 export interface OIDCSelectTenantReq {
   authRequestID: string
-  tenantID: number
+  tenantID: string
 }

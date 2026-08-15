@@ -7,17 +7,17 @@ import (
 )
 
 type MenuCreateResp struct {
-	MenuID uint `json:"menuID"` // 菜单ID
+	MenuID string `json:"menuID"` // 菜单ID
 }
 
 type MenuDetailResp struct {
-	MenuID uint `json:"menuID"` // 菜单ID
+	MenuID string `json:"menuID"` // 菜单ID
 	objpermission.MenuBaseInfo
 	gobject.OperatorBaseInfo
 }
 
 type MenuPageListItem struct {
-	MenuID uint `json:"menuID"` // 菜单ID
+	MenuID string `json:"menuID"` // 菜单ID
 	objpermission.MenuBaseInfo
 	gobject.OperatorBaseInfo
 }
@@ -28,7 +28,7 @@ type MenuPageListResp struct {
 }
 
 type MenuTreeItem struct {
-	MenuID uint `json:"menuID"` // 菜单ID
+	MenuID string `json:"menuID"` // 菜单ID
 	objpermission.MenuBaseInfo
 	gobject.OperatorBaseInfo
 	Children []MenuTreeItem `json:"children"` // 子菜单
@@ -39,20 +39,20 @@ type MenuTreeResp struct {
 }
 
 type RoleCreateResp struct {
-	RoleID uint `json:"roleID"` // 角色ID
+	RoleID string `json:"roleID"` // 角色ID
 }
 
 type RoleUpdateResp struct {
 }
 
 type RoleDetailResp struct {
-	RoleID uint `json:"roleID"` // 角色ID
+	RoleID string `json:"roleID"` // 角色ID
 	objpermission.RoleBaseInfo
 	OperatorBaseInfo gobject.OperatorBaseInfo `json:"operatorBaseInfo"` // 操作人信息
 }
 
 type RolePageListItem struct {
-	RoleID uint `json:"roleID"` // 角色ID
+	RoleID string `json:"roleID"` // 角色ID
 	objpermission.RoleBaseInfo
 	OperatorBaseInfo gobject.OperatorBaseInfo `json:"operatorBaseInfo"` // 操作人信息
 }
@@ -63,20 +63,20 @@ type RolePageListResp struct {
 }
 
 type ResourceCreateResp struct {
-	ResourceID uint `json:"resourceID"` // 资源ID
+	ResourceID string `json:"resourceID"` // 资源ID
 }
 
 type ResourceUpdateResp struct {
 }
 
 type ResourceDetailResp struct {
-	ResourceID uint `json:"resourceID"` // 资源ID
+	ResourceID string `json:"resourceID"` // 资源ID
 	objresource.ResourceBaseInfo
 	OperatorBaseInfo gobject.OperatorBaseInfo `json:"operatorBaseInfo"` // 操作人信息
 }
 
 type ResourcePageListItem struct {
-	ResourceID uint `json:"resourceID"` // 资源ID
+	ResourceID string `json:"resourceID"` // 资源ID
 	objresource.ResourceBaseInfo
 	OperatorBaseInfo gobject.OperatorBaseInfo `json:"operatorBaseInfo"` // 操作人信息
 }
@@ -87,20 +87,20 @@ type ResourcePageListResp struct {
 }
 
 type ScopeCreateResp struct {
-	ScopeID uint `json:"scopeID"` // 权限ID
+	ScopeID string `json:"scopeID"` // 权限ID
 }
 
 type ScopeUpdateResp struct {
 }
 
 type ScopeDetailResp struct {
-	ScopeID uint `json:"scopeID"` // 权限ID
+	ScopeID string `json:"scopeID"` // 权限ID
 	objresource.ScopeBaseInfo
 	OperatorBaseInfo gobject.OperatorBaseInfo `json:"operatorBaseInfo"` // 操作人信息
 }
 
 type ScopePageListItem struct {
-	ScopeID uint `json:"scopeID"` // 权限ID
+	ScopeID string `json:"scopeID"` // 权限ID
 	objresource.ScopeBaseInfo
 	OperatorBaseInfo gobject.OperatorBaseInfo `json:"operatorBaseInfo"` // 操作人信息
 }
@@ -117,9 +117,9 @@ type RoleScopeDeleteResp struct {
 }
 
 type RoleScopePageListItem struct {
-	RoleID   uint `json:"roleID"`   // 角色ID
-	ScopeID  uint `json:"scopeID"`  // 权限ID
-	TenantID uint `json:"tenantID"` // 租户ID
+	RoleID   string `json:"roleID"`   // 角色ID
+	ScopeID  string `json:"scopeID"`  // 权限ID
+	TenantID string `json:"tenantID"` // 租户ID
 }
 
 type RoleScopePageListResp struct {
@@ -134,9 +134,9 @@ type UserRoleDeleteResp struct {
 }
 
 type UserRolePageListItem struct {
-	UserID   uint `json:"userID"`   // 用户ID
-	RoleID   uint `json:"roleID"`   // 角色ID
-	TenantID uint `json:"tenantID"` // 租户ID
+	UserID   string `json:"userID"`   // 用户ID
+	RoleID   string `json:"roleID"`   // 角色ID
+	TenantID string `json:"tenantID"` // 租户ID
 }
 
 type UserRolePageListResp struct {
@@ -151,9 +151,9 @@ type RoleMenuDeleteResp struct {
 }
 
 type RoleMenuPageListItem struct {
-	RoleID   uint `json:"roleID"`   // 角色ID
-	MenuID   uint `json:"menuID"`   // 菜单ID
-	TenantID uint `json:"tenantID"` // 租户ID
+	RoleID   string `json:"roleID"`   // 角色ID
+	MenuID   string `json:"menuID"`   // 菜单ID
+	TenantID string `json:"tenantID"` // 租户ID
 }
 
 type RoleMenuPageListResp struct {

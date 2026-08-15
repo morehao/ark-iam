@@ -17,7 +17,7 @@ import (
 
 type fakeOIDCAuthSvc struct {
 	completeLogin          func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error)
-	selectTenant           func(ctx *gin.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error)
+	selectTenant           func(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error)
 	completeLoginBySession func(ctx *gin.Context, authRequestID string, sessionID string) (string, error)
 }
 
@@ -25,7 +25,7 @@ func (f *fakeOIDCAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLogin
 	return f.completeLogin(ctx, req)
 }
 
-func (f *fakeOIDCAuthSvc) SelectTenant(ctx *gin.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error) {
+func (f *fakeOIDCAuthSvc) SelectTenant(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error) {
 	if f.selectTenant != nil {
 		return f.selectTenant(ctx, authRequestID, tenantID)
 	}
@@ -96,15 +96,15 @@ func TestLoginReturnsErrorOnServiceFailure(t *testing.T) {
 func TestSelectTenantReturnsContinueURLOnSuccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
-	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{selectTenant: func(ctx *gin.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error) {
-		if authRequestID != "ar-1" || tenantID != 7 {
-			t.Fatalf("unexpected args authRequestID=%q tenantID=%d", authRequestID, tenantID)
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{selectTenant: func(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error) {
+		if authRequestID != "ar-1" || tenantID != "7" {
+			t.Fatalf("unexpected args authRequestID=%q tenantID=%s", authRequestID, tenantID)
 		}
-		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1", TenantID: 7}, nil
+		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1", TenantID: "7"}, nil
 	}}}
 	engine.POST("/oidc/login/selectTenant", ctr.SelectTenant)
 
-	req := httptest.NewRequest(http.MethodPost, "/oidc/login/selectTenant", bytes.NewReader([]byte(`{"authRequestID":"ar-1","tenantID":7}`)))
+	req := httptest.NewRequest(http.MethodPost, "/oidc/login/selectTenant", bytes.NewReader([]byte(`{"authRequestID":"ar-1","tenantID":"7"}`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp := httptest.NewRecorder()
 	engine.ServeHTTP(resp, req)
@@ -113,7 +113,7 @@ func TestSelectTenantReturnsContinueURLOnSuccess(t *testing.T) {
 		Code int `json:"code"`
 		Data struct {
 			ContinueURL string `json:"continueURL"`
-			TenantID    uint   `json:"tenantID"`
+			TenantID    string `json:"tenantID"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
@@ -125,8 +125,8 @@ func TestSelectTenantReturnsContinueURLOnSuccess(t *testing.T) {
 	if body.Data.ContinueURL != "http://localhost:8099/oidc/authorize/callback?id=ar-1" {
 		t.Fatalf("unexpected continueURL: %q", body.Data.ContinueURL)
 	}
-	if body.Data.TenantID != 7 {
-		t.Fatalf("expected tenantID 7, got %d", body.Data.TenantID)
+	if body.Data.TenantID != "7" {
+		t.Fatalf("expected tenantID 7, got %s", body.Data.TenantID)
 	}
 }
 
@@ -134,12 +134,12 @@ func TestSelectTenantSetsSSOCookie(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	config.Conf = &pkgconfig.Config{}
 	engine := gin.New()
-	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{selectTenant: func(ctx *gin.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error) {
-		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1", TenantID: 7, SessionID: "session-1"}, nil
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{selectTenant: func(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error) {
+		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1", TenantID: "7", SessionID: "session-1"}, nil
 	}}}
 	engine.POST("/oidc/login/selectTenant", ctr.SelectTenant)
 
-	req := httptest.NewRequest(http.MethodPost, "/oidc/login/selectTenant", bytes.NewReader([]byte(`{"authRequestID":"ar-1","tenantID":7}`)))
+	req := httptest.NewRequest(http.MethodPost, "/oidc/login/selectTenant", bytes.NewReader([]byte(`{"authRequestID":"ar-1","tenantID":"7"}`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp := httptest.NewRecorder()
 	engine.ServeHTTP(resp, req)
@@ -153,7 +153,7 @@ func TestSelectTenantSetsSSOCookie(t *testing.T) {
 func TestSelectTenantReturnsErrorOnInvalidTenant(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
-	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{selectTenant: func(ctx *gin.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error) {
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{selectTenant: func(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error) {
 		return nil, errors.New("tenant not allowed")
 	}}}
 	engine.POST("/oidc/login/selectTenant", ctr.SelectTenant)

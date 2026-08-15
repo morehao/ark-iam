@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Descriptions, Drawer, Form, Input, InputNumber, message, Modal, Popconfirm, Select, Space, Table, Tag } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, IDCell, PageContainer } from '@ark-iam/ui'
 import { createApplication, deleteApplication, getApplicationDetail, getApplicationPageList, updateApplication } from '@ark-iam/api'
 import type { ApplicationItem } from '@ark-iam/types'
 import { fmtTime, StatusTag, TypeTag } from '../../components/common'
@@ -108,8 +108,8 @@ export default function ApplicationList() {
     v === 'public' ? <Tag color="blue">公开</Tag> : <Tag color="orange">私有</Tag>
 
   const columns: ColumnsType<ApplicationItem> = [
-    { title: 'ID', dataIndex: 'appID', key: 'appID', width: 70 },
-    { title: '应用名', dataIndex: 'name', key: 'name', width: 180, ellipsis: true },
+    { title: 'ID', dataIndex: 'appID', key: 'appID', width: 150, render: (v: string) => <IDCell value={v} /> },
+    { title: '应用名', dataIndex: 'name', key: 'name', width: 180, render: (v: string) => <EllipsisCell value={v} /> },
     {
       title: '编码',
       dataIndex: 'code',
@@ -254,7 +254,7 @@ export default function ApplicationList() {
       >
         {detail && (
           <Descriptions column={1} bordered size="small">
-            <Descriptions.Item label="应用ID">{detail.appID}</Descriptions.Item>
+            <Descriptions.Item label="应用ID"><IDCell value={detail.appID} /></Descriptions.Item>
             <Descriptions.Item label="编码">{detail.code || '-'}</Descriptions.Item>
             <Descriptions.Item label="名称">{detail.name || '-'}</Descriptions.Item>
             <Descriptions.Item label="类型">

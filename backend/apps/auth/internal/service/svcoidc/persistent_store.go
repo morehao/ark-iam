@@ -46,7 +46,7 @@ func (s *PersistentStore) LookupApiKeyByRawKey(ctx context.Context, rawKey strin
 	sum := sha256.Sum256([]byte(rawKey))
 	hash := hex.EncodeToString(sum[:])
 	entity, err := s.apiKeyDao().GetByCond(ctx, &dao.ApiKeyCond{KeyHash: hash})
-	if err != nil || entity == nil || entity.ID == 0 {
+	if err != nil || entity == nil || entity.ID == "" {
 		return nil, nil
 	}
 	if entity.RevokedAt != nil && !entity.RevokedAt.IsZero() {
@@ -58,7 +58,7 @@ func (s *PersistentStore) LookupApiKeyByRawKey(ctx context.Context, rawKey strin
 	if err := s.apiKeyDao().UpdateMap(ctx, entity.ID, map[string]any{
 		"last_used_at": time.Now(),
 	}); err != nil {
-		glog.Warnf(ctx, "[PersistentStore.LookupApiKeyByRawKey] update last_used_at fail, apiKeyID:%d, err:%v", entity.ID, err)
+		glog.Warnf(ctx, "[PersistentStore.LookupApiKeyByRawKey] update last_used_at fail, apiKeyID:%s, err:%v", entity.ID, err)
 	}
 	return entity, nil
 }
@@ -73,7 +73,7 @@ func (s *PersistentStore) GetApiKeyClientByRawKey(ctx context.Context, rawKey st
 
 func (s *PersistentStore) GetClientByClientID(ctx context.Context, clientID string) (op.Client, error) {
 	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{ClientID: clientID})
-	if err != nil || clientEntity == nil || clientEntity.ID == 0 {
+	if err != nil || clientEntity == nil || clientEntity.ID == "" {
 		return nil, fmt.Errorf("client not found: %s", clientID)
 	}
 	return NewOIDCClient(clientEntity), nil
@@ -84,7 +84,7 @@ func (s *PersistentStore) AuthorizeClientIDSecret(ctx context.Context, clientID,
 	clientHash := hex.EncodeToString(secretHash[:])
 
 	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{ClientID: clientID})
-	if err != nil || clientEntity == nil || clientEntity.ID == 0 {
+	if err != nil || clientEntity == nil || clientEntity.ID == "" {
 		return oidc.ErrInvalidClient()
 	}
 	secrets, err := s.applicationClientSecretDao().GetListByCond(ctx, &dao.ApplicationClientSecretCond{ApplicationClientID: clientEntity.ID})
@@ -128,7 +128,7 @@ func (s *PersistentStore) SetUserinfoFromScopes(ctx context.Context, userinfo *o
 		return nil
 	}
 	person, err := s.personDao().GetByID(ctx, pid)
-	if err != nil || person == nil || person.ID == 0 {
+	if err != nil || person == nil || person.ID == "" {
 		return nil
 	}
 	fillUserInfoByScopes(userinfo, person, scopes)
@@ -149,7 +149,7 @@ func (s *PersistentStore) SetUserinfoFromToken(ctx context.Context, userinfo *oi
 		return nil
 	}
 	person, err := s.personDao().GetByID(ctx, pid)
-	if err != nil || person == nil || person.ID == 0 {
+	if err != nil || person == nil || person.ID == "" {
 		return nil
 	}
 	fillUserInfoByScopes(userinfo, person, meta.Scopes)
@@ -175,7 +175,7 @@ func (s *PersistentStore) SetIntrospectionFromToken(ctx context.Context, introsp
 	// 人 token 补充 username（person 的用户名）；机器 token 直接用 client 标识。
 	if introspection.Username == "" {
 		if pid, perr := parseOIDCSubject(meta.Subject); perr == nil {
-			if person, perr2 := s.personDao().GetByID(ctx, pid); perr2 == nil && person != nil && person.ID != 0 {
+			if person, perr2 := s.personDao().GetByID(ctx, pid); perr2 == nil && person != nil && person.ID != "" {
 				introspection.Username = model.DerefStr(person.Username)
 			}
 		} else {
@@ -183,7 +183,7 @@ func (s *PersistentStore) SetIntrospectionFromToken(ctx context.Context, introsp
 		}
 	}
 	claims := make(map[string]any, 3)
-	if meta.TenantID != 0 {
+	if meta.TenantID != "" {
 		claims["tenant_id"] = meta.TenantID
 	}
 	if meta.TokenUsage != "" {
@@ -256,7 +256,7 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 		return "", "", time.Time{}, fmt.Errorf("generate access token id: %w", err)
 	}
 
-	var personID uint
+	var personID string
 	personID, err = parseOIDCSubject(request.GetSubject())
 	if err != nil {
 		return "", "", time.Time{}, err
@@ -264,12 +264,12 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 
 	users, err := s.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: personID})
 	if err != nil || len(users) == 0 {
-		return "", "", time.Time{}, fmt.Errorf("user not found for person %d", personID)
+		return "", "", time.Time{}, fmt.Errorf("user not found for person %s", personID)
 	}
 
 	selectedTenantID := selectedTenantFromRequest(request)
 	var userEntity *model.UserEntity
-	if selectedTenantID > 0 {
+	if selectedTenantID != "" {
 		for i := range users {
 			if users[i].TenantID == selectedTenantID {
 				userEntity = &users[i]
@@ -286,7 +286,7 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 		clientID = authReq.GetClientID()
 	}
 
-	var applicationClientID uint
+	var applicationClientID string
 	var clientAccessTokenTTL time.Duration
 	var clientRefreshTokenTTL time.Duration
 	backChannelLogoutURI := ""
@@ -378,7 +378,7 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 	if currentRefreshToken != "" {
 		oldTokenHash := token.HashToken(currentRefreshToken)
 		oldToken, err := s.refreshTokenDao().GetByCond(ctx, &dao.RefreshTokenCond{Token: oldTokenHash})
-		if err == nil && oldToken != nil && oldToken.ID != 0 {
+		if err == nil && oldToken != nil && oldToken.ID != "" {
 			dbt := time.Now()
 			if err := s.refreshTokenDao().UpdateMap(ctx, oldToken.ID, map[string]any{
 				"revoked_at": &dbt,
@@ -404,11 +404,11 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 }
 
 // tenantIDFromRequest / tokenUsageFromRequest 供 client_credentials 的 access token 元数据使用。
-func tenantIDFromRequest(request op.TokenRequest) uint {
+func tenantIDFromRequest(request op.TokenRequest) string {
 	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok {
 		return ccReq.ownerTenantID
 	}
-	return 0
+	return ""
 }
 
 func tokenUsageFromRequest(request op.TokenRequest) string {
@@ -421,7 +421,7 @@ func tokenUsageFromRequest(request op.TokenRequest) string {
 func (s *PersistentStore) TokenRequestByRefreshToken(ctx context.Context, refreshToken string) (op.RefreshTokenRequest, error) {
 	refreshTokenHash := token.HashToken(refreshToken)
 	storedToken, err := s.refreshTokenDao().GetByCond(ctx, &dao.RefreshTokenCond{Token: refreshTokenHash})
-	if err != nil || storedToken == nil || storedToken.ID == 0 {
+	if err != nil || storedToken == nil || storedToken.ID == "" {
 		return nil, op.ErrInvalidRefreshToken
 	}
 	if storedToken.RevokedAt != nil {
@@ -432,7 +432,7 @@ func (s *PersistentStore) TokenRequestByRefreshToken(ctx context.Context, refres
 	}
 
 	clientID := ""
-	if storedToken.ApplicationClientID != 0 {
+	if storedToken.ApplicationClientID != "" {
 		clientEntity, err := s.applicationClientDao().GetByID(ctx, storedToken.ApplicationClientID)
 		if err == nil && clientEntity != nil {
 			clientID = clientEntity.ClientID
@@ -473,7 +473,7 @@ type refreshTokenRequest struct {
 	clientID  string
 	amr       []string
 	authTime  time.Time
-	tenantID  uint
+	tenantID  string
 	sessionID string
 }
 
@@ -484,7 +484,7 @@ func (r *refreshTokenRequest) GetClientID() string              { return r.clien
 func (r *refreshTokenRequest) GetScopes() []string              { return r.scopes }
 func (r *refreshTokenRequest) GetSubject() string               { return r.subject }
 func (r *refreshTokenRequest) SetCurrentScopes(scopes []string) { r.scopes = scopes }
-func (r *refreshTokenRequest) GetTenantID() uint                { return r.tenantID }
+func (r *refreshTokenRequest) GetTenantID() string              { return r.tenantID }
 func (r *refreshTokenRequest) GetSessionID() string             { return r.sessionID }
 
 // decodeJSONStringSlice 解析 JSON 字符串数组；解析失败返回 nil。
@@ -500,15 +500,15 @@ func decodeJSONStringSlice(raw []byte) []string {
 }
 
 // selectedTenantFromRequest 返回请求携带的租户 ID（authorization code 或 refresh token 轮换时从其存储的 tenant 读取）。
-// 未设置（TenantID==0）时返回 0，由调用方决定回退逻辑。
-func selectedTenantFromRequest(request op.TokenRequest) uint {
+// 未设置（TenantID == ""）时返回 0，由调用方决定回退逻辑。
+func selectedTenantFromRequest(request op.TokenRequest) string {
 	if ar, ok := request.(*AuthRequest); ok {
 		return ar.GetTenantID()
 	}
 	if rr, ok := request.(*refreshTokenRequest); ok {
 		return rr.GetTenantID()
 	}
-	return 0
+	return ""
 }
 
 func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, clientID string) error {
@@ -517,7 +517,7 @@ func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, c
 		glog.Warnf(ctx, "[PersistentStore.TerminateSession] parseOIDCSubject fail, userID:%s, err:%v", userID, err)
 		return nil
 	}
-	glog.Infof(ctx, "[PersistentStore.TerminateSession] terminating session, userID:%s, personID:%d, clientID:%s", userID, personID, clientID)
+	glog.Infof(ctx, "[PersistentStore.TerminateSession] terminating session, userID:%s, personID:%s, clientID:%s", userID, personID, clientID)
 
 	if ssoErr := sso.NewSSOSessionStore().RevokeSessionsByPersonID(ctx, personID); ssoErr != nil {
 		glog.Warnf(ctx, "[PersistentStore.TerminateSession] revoke SSO sessions fail, err:%v", ssoErr)
@@ -528,7 +528,7 @@ func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, c
 		Where("person_id = ?", personID).Where("revoked_at IS NULL").
 		Update("revoked_at", &now).Error
 	if dbErr != nil {
-		glog.Warnf(ctx, "[PersistentStore.TerminateSession] revoke refresh tokens fail, personID:%d, err:%v", personID, dbErr)
+		glog.Warnf(ctx, "[PersistentStore.TerminateSession] revoke refresh tokens fail, personID:%s, err:%v", personID, dbErr)
 	}
 	return nil
 }
@@ -536,14 +536,14 @@ func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, c
 func (s *PersistentStore) RevokeToken(ctx context.Context, tokenOrTokenID string, userID string, clientID string) *oidc.Error {
 	refreshTokenHash := token.HashToken(tokenOrTokenID)
 	storedToken, err := s.refreshTokenDao().GetByCond(ctx, &dao.RefreshTokenCond{Token: refreshTokenHash})
-	if err != nil || storedToken == nil || storedToken.ID == 0 {
+	if err != nil || storedToken == nil || storedToken.ID == "" {
 		return nil
 	}
 	now := time.Now()
 	if updateErr := s.refreshTokenDao().UpdateMap(ctx, storedToken.ID, map[string]any{
 		"revoked_at": &now,
 	}); updateErr != nil {
-		glog.Warnf(ctx, "[PersistentStore.RevokeToken] update revoked_at fail, tokenID:%d, err:%v", storedToken.ID, updateErr)
+		glog.Warnf(ctx, "[PersistentStore.RevokeToken] update revoked_at fail, tokenID:%s, err:%v", storedToken.ID, updateErr)
 		return nil
 	}
 	return nil
@@ -552,7 +552,7 @@ func (s *PersistentStore) RevokeToken(ctx context.Context, tokenOrTokenID string
 func (s *PersistentStore) GetRefreshTokenInfo(ctx context.Context, clientID string, tokenValue string) (userID string, tokenID string, err error) {
 	refreshTokenHash := token.HashToken(tokenValue)
 	storedToken, err := s.refreshTokenDao().GetByCond(ctx, &dao.RefreshTokenCond{Token: refreshTokenHash})
-	if err != nil || storedToken == nil || storedToken.ID == 0 {
+	if err != nil || storedToken == nil || storedToken.ID == "" {
 		return "", "", op.ErrInvalidRefreshToken
 	}
 	return buildOIDCSubject(storedToken.PersonID), "", nil

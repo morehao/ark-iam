@@ -37,12 +37,12 @@ func (c *PersonCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type PersonDao struct {
-	*gormdao.Dao[model.PersonEntity, model.PersonEntityList, uint]
+	*gormdao.Dao[model.PersonEntity, model.PersonEntityList, string]
 }
 
 func NewPersonDao(opts ...DaoOption) *PersonDao {
 	return &PersonDao{
-		Dao: gormdao.NewDao[model.PersonEntity, model.PersonEntityList, uint](
+		Dao: gormdao.NewDao[model.PersonEntity, model.PersonEntityList, string](
 			model.TableNamePerson, "PersonDao",
 			resolveDBGetter(opts...),
 		),

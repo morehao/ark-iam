@@ -7,11 +7,11 @@ import (
 	"gorm.io/datatypes"
 
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtoapplication"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
@@ -51,7 +51,7 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.Applicat
 		Visibility:   req.Visibility,
 		TenantPolicy: defaultTenantPolicy(req.TenantPolicy),
 		Sort:         req.Sort,
-		CreatedBy:    gincontext.GetUserID(ctx),
+		CreatedBy:    gctx.GetUserID(ctx),
 	}
 	if err := dao.NewApplicationDao().Insert(ctx, entity); err != nil {
 		glog.Errorf(ctx, "[svcapplication.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -59,7 +59,7 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.Applicat
 	}
 	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
 		Action:     svcaudit.ActionApplicationCreate,
-		TenantID:   0,
+		TenantID:   "",
 		Result:     "success",
 		TargetType: "application",
 		TargetID:   entity.ID,
@@ -80,7 +80,7 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.Applicat
 		"visibility":   req.Visibility,
 		"status":       req.Status,
 		"sort":         req.Sort,
-		"updated_by":   gincontext.GetUserID(ctx),
+		"updated_by":   gctx.GetUserID(ctx),
 	}
 	if len(req.TenantPolicy) > 0 {
 		updateMap["tenant_policy"] = datatypes.JSON(req.TenantPolicy)
@@ -101,7 +101,7 @@ func (svc *applicationSvc) Delete(ctx *gin.Context, req *dtoapplication.Applicat
 	if entity != nil && entity.IsSystem == 1 {
 		return code.GetError(code.ApplicationSystemBuiltInErr)
 	}
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	if err := dao.NewApplicationDao().Delete(ctx, req.AppID, userID); err != nil {
 		glog.Errorf(ctx, "[svcapplication.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationDeleteError)
@@ -111,7 +111,7 @@ func (svc *applicationSvc) Delete(ctx *gin.Context, req *dtoapplication.Applicat
 
 func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.ApplicationDetailReq) (*dtoapplication.ApplicationDetailResp, error) {
 	entity, err := dao.NewApplicationDao().GetByID(ctx, req.AppID)
-	if err != nil || entity == nil || entity.ID == 0 {
+	if err != nil || entity == nil || entity.ID == "" {
 		glog.Errorf(ctx, "[svcapplication.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationGetDetailError)
 	}

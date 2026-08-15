@@ -6,17 +6,17 @@ import (
 )
 
 type UserCreateResp struct {
-	UserID uint `json:"userID"` // 用户ID
+	UserID string `json:"userID"` // 用户ID
 }
 
 type UserDetailResp struct {
-	UserID uint `json:"userID"` // 用户ID
+	UserID string `json:"userID"` // 用户ID
 	objuser.UserBaseInfo
 	gobject.OperatorBaseInfo
 }
 
 type UserPageListItem struct {
-	UserID uint `json:"userID"` // 用户ID
+	UserID string `json:"userID"` // 用户ID
 	objuser.UserBaseInfo
 	gobject.OperatorBaseInfo
 }
@@ -27,13 +27,13 @@ type UserPageListResp struct {
 }
 
 type UserIdentityCreateResp struct {
-	UserIdentityID uint `json:"userIdentityID"` // 用户身份ID
+	UserIdentityID string `json:"userIdentityID"` // 用户身份ID
 }
 
 type UserIdentityDetailResp struct {
-	UserIdentityID uint   `json:"userIdentityID"` // 用户身份ID
-	TenantID       uint   `json:"tenantID"`       // 租户ID
-	UserID         uint   `json:"userID"`         // 用户ID
+	UserIdentityID string `json:"userIdentityID"` // 用户身份ID
+	TenantID       string `json:"tenantID"`       // 租户ID
+	UserID         string `json:"userID"`         // 用户ID
 	Issuer         string `json:"issuer"`         // 身份提供商
 	IdentityID     string `json:"identityID"`     // 第三方用户ID
 	Detail         any    `json:"detail"`         // 详细信息
@@ -41,9 +41,9 @@ type UserIdentityDetailResp struct {
 }
 
 type UserIdentityPageListItem struct {
-	UserIdentityID uint   `json:"userIdentityID"` // 用户身份ID
-	TenantID       uint   `json:"tenantID"`       // 租户ID
-	UserID         uint   `json:"userID"`         // 用户ID
+	UserIdentityID string `json:"userIdentityID"` // 用户身份ID
+	TenantID       string `json:"tenantID"`       // 租户ID
+	UserID         string `json:"userID"`         // 用户ID
 	Issuer         string `json:"issuer"`         // 身份提供商
 	IdentityID     string `json:"identityID"`     // 第三方用户ID
 	Detail         any    `json:"detail"`         // 详细信息
@@ -56,9 +56,9 @@ type UserIdentityPageListResp struct {
 }
 
 type UserLoginLogDetailResp struct {
-	UserLoginLogID uint   `json:"userLoginLogID"` // 登录日志ID
-	TenantID       uint   `json:"tenantID"`       // 租户ID
-	UserID         uint   `json:"userID"`         // 用户ID
+	UserLoginLogID string `json:"userLoginLogID"` // 登录日志ID
+	TenantID       string `json:"tenantID"`       // 租户ID
+	UserID         string `json:"userID"`         // 用户ID
 	LoginIP        string `json:"loginIP"`        // 登录IP地址
 	UserAgent      string `json:"userAgent"`      // 用户代理信息
 	LoginTime      int64  `json:"loginTime"`      // 登录时间
@@ -66,9 +66,9 @@ type UserLoginLogDetailResp struct {
 }
 
 type UserLoginLogPageListItem struct {
-	UserLoginLogID uint   `json:"userLoginLogID"` // 登录日志ID
-	TenantID       uint   `json:"tenantID"`       // 租户ID
-	UserID         uint   `json:"userID"`         // 用户ID
+	UserLoginLogID string `json:"userLoginLogID"` // 登录日志ID
+	TenantID       string `json:"tenantID"`       // 租户ID
+	UserID         string `json:"userID"`         // 用户ID
 	LoginIP        string `json:"loginIP"`        // 登录IP地址
 	UserAgent      string `json:"userAgent"`      // 用户代理信息
 	LoginTime      int64  `json:"loginTime"`      // 登录时间
@@ -81,11 +81,11 @@ type UserLoginLogPageListResp struct {
 }
 
 type UserDepartmentPageListItem struct {
-	UserDepartmentID uint `json:"userDepartmentID"` // 用户部门ID
-	TenantID         uint `json:"tenantID"`         // 租户ID
-	UserID           uint `json:"userID"`           // 用户ID
-	DepartmentID     uint `json:"departmentID"`     // 部门ID
-	IsPrimary        int8 `json:"isPrimary"`        // 是否主部门
+	UserDepartmentID string `json:"userDepartmentID"` // 用户部门ID
+	TenantID         string `json:"tenantID"`         // 租户ID
+	UserID           string `json:"userID"`           // 用户ID
+	DepartmentID     string `json:"departmentID"`     // 部门ID
+	IsPrimary        int8   `json:"isPrimary"`        // 是否主部门
 	gobject.OperatorBaseInfo
 }
 
@@ -95,11 +95,11 @@ type UserDepartmentPageListResp struct {
 }
 
 type RoleUserResp struct {
-	UserID    uint   `json:"userID"`
+	UserID    string `json:"userID"`
 	Username  string `json:"username"`
 	Name      string `json:"name"`
 	Email     string `json:"email"`
-	RoleID    uint   `json:"roleID"`
+	RoleID    string `json:"roleID"`
 	CreatedAt string `json:"createdAt"`
 }
 
@@ -109,10 +109,10 @@ type RoleUserListResp struct {
 }
 
 type RoleApplicationResp struct {
-	AppID     uint   `json:"appID"`
+	AppID     string `json:"appID"`
 	AppName   string `json:"appName"`
 	AppType   string `json:"appType"`
-	RoleID    uint   `json:"roleID"`
+	RoleID    string `json:"roleID"`
 	CreatedAt string `json:"createdAt"`
 }
 

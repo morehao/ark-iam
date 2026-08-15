@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Popconfirm, Space, Table, message } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, IDCell, PageContainer } from '@ark-iam/ui'
 import {
   createSystemConfig,
   deleteSystemConfig,
@@ -24,11 +24,6 @@ function formatValue(value: unknown): string {
     }
   }
   return String(value)
-}
-
-/** 超长文本截断 */
-function truncate(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max)}...` : text
 }
 
 interface SystemFormValues {
@@ -119,23 +114,19 @@ export default function SystemConfigList() {
   }
 
   const columns: ColumnsType<SystemConfigItem> = [
-    { title: 'ID', dataIndex: 'systemID', key: 'systemID', width: 70 },
+    { title: 'ID', dataIndex: 'systemID', key: 'systemID', width: 150, render: (v: string) => <IDCell value={v} /> },
     {
       title: '配置键',
       dataIndex: 'key',
       key: 'key',
       width: 220,
-      ellipsis: true,
-      render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v}</span>,
+      render: (v: string) => <EllipsisCell value={v} monospace />,
     },
     {
       title: '配置值',
       dataIndex: 'value',
       key: 'value',
-      ellipsis: true,
-      render: (_, r) => (
-        <span style={{ fontFamily: 'monospace' }}>{truncate(formatValue(r.value), 40)}</span>
-      ),
+      render: (_, r) => <EllipsisCell value={formatValue(r.value)} monospace limit={40} />,
     },
     {
       title: '创建时间',

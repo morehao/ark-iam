@@ -55,9 +55,9 @@ func TestFailOpenWhenRedisNil(t *testing.T) {
 	defer func() { dbclient.RedisCli = oldCli }()
 
 	ctx := context.Background()
-	assert.False(t, Check(ctx, "1.2.3.4", 100))
-	assert.NotPanics(t, func() { RecordFailure(ctx, "1.2.3.4", 100) })
-	assert.NotPanics(t, func() { RecordSuccess(ctx, 100) })
+	assert.False(t, Check(ctx, "1.2.3.4", "100"))
+	assert.NotPanics(t, func() { RecordFailure(ctx, "1.2.3.4", "100") })
+	assert.NotPanics(t, func() { RecordSuccess(ctx, "100") })
 }
 
 func TestGuardCounterAndLock(t *testing.T) {
@@ -76,7 +76,7 @@ func TestGuardCounterAndLock(t *testing.T) {
 
 	ctx := context.Background()
 	const ip = "10.0.0.1"
-	const pid uint = 42
+	const pid = "42"
 
 	assert.False(t, Check(ctx, ip, pid), "not locked before failures")
 

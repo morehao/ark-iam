@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Table, Button, Modal, Form, Input, message, Popconfirm, Space, Select, Tag } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, IDCell, PageContainer } from '@ark-iam/ui'
 import {
   createOrganizationRole,
   deleteOrganizationRole,
@@ -36,7 +36,7 @@ export default function OrganizationRoleList() {
     void load()
   }, [load])
 
-  const orgName = (id: number) => organizations.find((o) => o.organizationID === id)?.name ?? `#${id}`
+  const orgName = (id: string) => organizations.find((o) => o.organizationID === id)?.name ?? `#${id}`
 
   const submit = async () => {
     try {
@@ -59,17 +59,17 @@ export default function OrganizationRoleList() {
     }
   }
 
-  const remove = async (id: number) => {
+  const remove = async (id: string) => {
     await deleteOrganizationRole(id)
     message.success('删除成功')
     void load()
   }
 
   const columns: ColumnsType<OrganizationRoleItem> = [
-    { title: '角色ID', dataIndex: 'organizationRoleID', key: 'organizationRoleID', width: 100 },
+    { title: '角色ID', dataIndex: 'organizationRoleID', key: 'organizationRoleID', width: 150, render: (v: string) => <IDCell value={v} /> },
     { title: '组织', key: 'organization', width: 180, render: (_, r) => orgName(r.organizationID) },
     { title: '名称', dataIndex: 'name', key: 'name' },
-    { title: '描述', dataIndex: 'description', key: 'description', ellipsis: true },
+    { title: '描述', dataIndex: 'description', key: 'description', render: (v: string) => <EllipsisCell value={v} /> },
     {
       title: '类型',
       dataIndex: 'type',

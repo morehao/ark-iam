@@ -1,20 +1,20 @@
 export interface PersonInfo {
-  personID: number
+  personID: string
   name: string
   avatar: string
 }
 
 export interface UserinfoResp {
   personInfo: PersonInfo
-  userInfo: { userID: number; tenantID: number; name: string; isOwner: number }
+  userInfo: { userID: string; tenantID: string; name: string; isOwner: number }
 }
 
 export interface MyTenantsResp {
-  list: { tenantID: number; name: string }[]
+  list: { tenantID: string; name: string }[]
 }
 
 export interface PersonDetailResp {
-  personID: number
+  personID: string
   username: string
   primaryEmail: string
   primaryPhone: string
@@ -29,10 +29,10 @@ export interface PersonUpdatePasswordReq {
 }
 
 export interface SessionResp {
-  id: number
+  id: string
   sessionID: string
-  appID: number
-  tenantID: number
+  appID: string
+  tenantID: string
   clientType: string
   clientIP: string
   userAgent: string

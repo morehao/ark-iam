@@ -8,8 +8,8 @@ import (
 
 type ApplicationClientCond struct {
 	*gormdao.BaseCond
-	TenantID uint
-	AppID    uint
+	TenantID string
+	AppID    string
 	ClientID string
 	Name     string
 	Type     string
@@ -20,10 +20,10 @@ func (c *ApplicationClientCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
-	if c.AppID != 0 {
+	if c.AppID != "" {
 		db.Where(tableName+".app_id = ?", c.AppID)
 	}
 	if c.ClientID != "" {
@@ -41,12 +41,12 @@ func (c *ApplicationClientCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type ApplicationClientDao struct {
-	*gormdao.Dao[model.ApplicationClientEntity, model.ApplicationClientEntityList, uint]
+	*gormdao.Dao[model.ApplicationClientEntity, model.ApplicationClientEntityList, string]
 }
 
 func NewApplicationClientDao(opts ...DaoOption) *ApplicationClientDao {
 	return &ApplicationClientDao{
-		Dao: gormdao.NewDao[model.ApplicationClientEntity, model.ApplicationClientEntityList, uint](
+		Dao: gormdao.NewDao[model.ApplicationClientEntity, model.ApplicationClientEntityList, string](
 			model.TableNameApplicationClient, "ApplicationClientDao",
 			resolveDBGetter(opts...),
 		),

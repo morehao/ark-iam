@@ -1,3 +1,4 @@
+-- 已废弃：由 Go 幂等种子数据（pkg/seed.SeedIam）取代，启动时自动写入（见 docs/design/string-id-pg-automigrate-seed.md）。
 -- IAM 种子数据初始化脚本
 -- 执行顺序: 1) iam_schema.sql 2) iam_seed_data.sql
 

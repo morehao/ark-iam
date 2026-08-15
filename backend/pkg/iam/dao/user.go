@@ -8,8 +8,8 @@ import (
 
 type UserCond struct {
 	*gormdao.BaseCond
-	TenantID     uint
-	PersonID     uint
+	TenantID     string
+	PersonID     string
 	Username     string
 	PrimaryEmail string
 	PrimaryPhone string
@@ -21,10 +21,10 @@ func (c *UserCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
-	if c.PersonID != 0 {
+	if c.PersonID != "" {
 		db.Where(tableName+".person_id = ?", c.PersonID)
 	}
 	if c.Username != "" {
@@ -45,12 +45,12 @@ func (c *UserCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type UserDao struct {
-	*gormdao.Dao[model.UserEntity, model.UserEntityList, uint]
+	*gormdao.Dao[model.UserEntity, model.UserEntityList, string]
 }
 
 func NewUserDao(opts ...DaoOption) *UserDao {
 	return &UserDao{
-		Dao: gormdao.NewDao[model.UserEntity, model.UserEntityList, uint](
+		Dao: gormdao.NewDao[model.UserEntity, model.UserEntityList, string](
 			model.TableNameUser, "UserDao",
 			resolveDBGetter(opts...),
 		),

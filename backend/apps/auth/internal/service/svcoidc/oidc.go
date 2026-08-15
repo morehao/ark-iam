@@ -233,13 +233,13 @@ func (p *OIDCProvider) BuildAuthCallbackURL(ctx context.Context, authRequestID s
 
 type OIDCAuthSvc interface {
 	CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error)
-	SelectTenant(ctx *gin.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error)
+	SelectTenant(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error)
 	CompleteLoginBySession(ctx *gin.Context, authRequestID string, sessionID string) (string, error)
 }
 
 type passwordAuthenticator interface {
 	AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error)
-	TenantsForPerson(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error)
+	TenantsForPerson(ctx *gin.Context, personID string) ([]objauth.TenantOption, error)
 }
 
 type oidcAuthSvc struct {
@@ -272,9 +272,9 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	authTime := time.Now()
 	subject := buildOIDCSubject(personEntity.ID)
 	// 优先尊重 ?tenant hint（如 SSO 会话过期后回退到密码登录时），但仅当 hint 是 person 的成员租户时才采用
-	resolvedTenant := uint(0)
+	resolvedTenant := ""
 	if ar, ok := authReq.(*AuthRequest); ok {
-		if hint := ar.GetTenantID(); hint != 0 {
+		if hint := ar.GetTenantID(); hint != "" {
 			for _, t := range tenants {
 				if t.TenantID == hint {
 					resolvedTenant = hint
@@ -284,8 +284,8 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 		}
 	}
 	// 多租户：除非有合法的 tenant hint，否则暂不 done、不发 code，需用户先选租户
-	if resolvedTenant == 0 && len(tenants) > 1 {
-		if err := svc.provider.Storage.CompleteAuthRequest(ctx.Request.Context(), req.AuthRequestID, subject, authTime, []string{"pwd"}, "", 0, false); err != nil {
+	if resolvedTenant == "" && len(tenants) > 1 {
+		if err := svc.provider.Storage.CompleteAuthRequest(ctx.Request.Context(), req.AuthRequestID, subject, authTime, []string{"pwd"}, "", "", false); err != nil {
 			return nil, code.GetError(code.OIDCSessionNotFound)
 		}
 		return &dtooidc.OIDCLoginResp{
@@ -295,7 +295,7 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	}
 	// 单租户（或在多租户但 hint 命中成员租户）：自动选租户，done，发 code，并建 SSO 会话
 	tenantID := resolvedTenant
-	if tenantID == 0 {
+	if tenantID == "" {
 		tenantID = userEntity.TenantID
 	}
 	if err := svc.provider.Storage.CompleteAuthRequest(ctx.Request.Context(), req.AuthRequestID, subject, authTime, []string{"pwd"}, "", tenantID, true); err != nil {
@@ -329,7 +329,7 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	return resp, nil
 }
 
-func (svc *oidcAuthSvc) SelectTenant(ctx *gin.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error) {
+func (svc *oidcAuthSvc) SelectTenant(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error) {
 	reqCtx := ctx.Request.Context()
 	authReq, err := svc.provider.Storage.AuthRequestByID(reqCtx, authRequestID)
 	if err != nil {
@@ -401,11 +401,11 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID s
 		return "", err
 	}
 
-	tenantID := uint(0)
+	tenantID := ""
 	tenants, tErr := svc.authSvc.TenantsForPerson(ctx, personID)
 	if tErr == nil {
 		if ar, ok := authReq.(*AuthRequest); ok {
-			if hint := ar.GetTenantID(); hint != 0 {
+			if hint := ar.GetTenantID(); hint != "" {
 				for _, t := range tenants {
 					if t.TenantID == hint {
 						tenantID = hint
@@ -415,7 +415,7 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID s
 			}
 		}
 		// membership safety: never issue a token for a tenant hinted but not owned by the user
-		if tenantID == 0 && len(tenants) > 0 {
+		if tenantID == "" && len(tenants) > 0 {
 			tenantID = tenants[0].TenantID
 		}
 	}
@@ -446,7 +446,7 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID s
 }
 
 // sessionAuditContext 将已解析的租户写入 context，供 CreateSession 落库 session 审计时读取 tenant_id。
-func sessionAuditContext(ctx context.Context, tenantID uint) context.Context {
+func sessionAuditContext(ctx context.Context, tenantID string) context.Context {
 	return context.WithValue(ctx, sso.ContextKeyTenantID, tenantID)
 }
 
@@ -464,11 +464,11 @@ func (svc *oidcAuthSvc) resolveAllowPersonCreateTenant(ctx *gin.Context, clientI
 		return false
 	}
 	client, err := svc.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{ClientID: clientID})
-	if err != nil || client == nil || client.AppID == 0 {
+	if err != nil || client == nil || client.AppID == "" {
 		return false
 	}
 	app, err := svc.applicationDao().GetByID(ctx, client.AppID)
-	if err != nil || app == nil || app.ID == 0 {
+	if err != nil || app == nil || app.ID == "" {
 		return false
 	}
 	var policy model.TenantPolicy

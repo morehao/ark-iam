@@ -36,8 +36,8 @@ export default function OrganizationUserList() {
     void load()
   }, [load])
 
-  const orgName = (id: number) => organizations.find((o) => o.organizationID === id)?.name ?? `#${id}`
-  const userName = (id: number) => {
+  const orgName = (id: string) => organizations.find((o) => o.organizationID === id)?.name ?? `#${id}`
+  const userName = (id: string) => {
     const u = users.find((x) => x.userID === id)
     return u ? (u.name ? `${u.name}（@${u.username || id}）` : `@${u.username || id}`) : `#${id}`
   }

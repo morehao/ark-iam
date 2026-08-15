@@ -13,7 +13,7 @@ type LogoutAllReq struct {
 }
 
 type RegisterReq struct {
-	TenantID     uint   `json:"tenantID" binding:"required"` // 租户ID
+	TenantID     string `json:"tenantID" binding:"required"` // 租户ID
 	Username     string `json:"username"`                    // 用户名
 	PrimaryEmail string `json:"primaryEmail"`                // 主要邮箱
 	PrimaryPhone string `json:"primaryPhone"`                // 主要手机号
@@ -26,19 +26,19 @@ type LogoutReq struct {
 }
 
 type JoinTenantReq struct {
-	TenantID uint `json:"tenantID" binding:"required"` // 租户ID
+	TenantID string `json:"tenantID" binding:"required"` // 租户ID
 }
 
 type UserinfoReq struct {
 }
 
 type AssignDepartmentsReq struct {
-	UserID        uint   `json:"userID" binding:"required"`        // 用户ID
-	DepartmentIDs []uint `json:"departmentIDs" binding:"required"` // 部门ID列表
+	UserID        string   `json:"userID" binding:"required"`        // 用户ID
+	DepartmentIDs []string `json:"departmentIDs" binding:"required"` // 部门ID列表
 }
 
 type ConnectorDeleteReq struct {
-	ConnectorID uint `json:"-" uri:"connectorID" binding:"required"` // 连接器ID
+	ConnectorID string `json:"-" uri:"connectorID" binding:"required"` // 连接器ID
 }
 
 type ConnectorCreateReq struct {
@@ -46,17 +46,17 @@ type ConnectorCreateReq struct {
 }
 
 type ConnectorUpdateReq struct {
-	ConnectorID uint `json:"-" uri:"connectorID" binding:"required"` // 连接器ID
+	ConnectorID string `json:"-" uri:"connectorID" binding:"required"` // 连接器ID
 	objauth.ConnectorBaseInfo
 }
 
 type ConnectorDetailReq struct {
-	ConnectorID uint `json:"-" uri:"connectorID" binding:"required"` // 连接器ID
+	ConnectorID string `json:"-" uri:"connectorID" binding:"required"` // 连接器ID
 }
 
 type ConnectorPageListReq struct {
 	gobject.PageQuery
-	TenantID    uint   `json:"tenantID" form:"tenantID"`       // 租户ID
+	TenantID    string `json:"tenantID" form:"tenantID"`       // 租户ID
 	Protocol    string `json:"protocol" form:"protocol"`       // 协议类型
 	Provider    string `json:"provider" form:"provider"`       // 提供商
 	Status      string `json:"status" form:"status"`           // 状态

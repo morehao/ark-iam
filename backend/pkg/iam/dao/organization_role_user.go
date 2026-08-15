@@ -8,37 +8,37 @@ import (
 
 type OrganizationRoleUserCond struct {
 	*gormdao.BaseCond
-	TenantID           uint
-	OrganizationID     uint
-	OrganizationRoleID uint
-	UserID             uint
+	TenantID           string
+	OrganizationID     string
+	OrganizationRoleID string
+	UserID             string
 }
 
 func (c *OrganizationRoleUserCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
-	if c.OrganizationID != 0 {
+	if c.OrganizationID != "" {
 		db.Where(tableName+".organization_id = ?", c.OrganizationID)
 	}
-	if c.OrganizationRoleID != 0 {
+	if c.OrganizationRoleID != "" {
 		db.Where(tableName+".organization_role_id = ?", c.OrganizationRoleID)
 	}
-	if c.UserID != 0 {
+	if c.UserID != "" {
 		db.Where(tableName+".user_id = ?", c.UserID)
 	}
 }
 
 type OrganizationRoleUserDao struct {
-	*gormdao.Dao[model.OrganizationRoleUserEntity, model.OrganizationRoleUserEntityList, uint]
+	*gormdao.Dao[model.OrganizationRoleUserEntity, model.OrganizationRoleUserEntityList, string]
 }
 
 func NewOrganizationRoleUserDao(opts ...DaoOption) *OrganizationRoleUserDao {
 	return &OrganizationRoleUserDao{
-		Dao: gormdao.NewDao[model.OrganizationRoleUserEntity, model.OrganizationRoleUserEntityList, uint](
+		Dao: gormdao.NewDao[model.OrganizationRoleUserEntity, model.OrganizationRoleUserEntityList, string](
 			model.TableNameOrganizationRoleUser, "OrganizationRoleUserDao",
 			resolveDBGetter(opts...),
 		),

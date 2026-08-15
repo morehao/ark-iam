@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, InputNumber, message, Modal, Popconfirm, Space, Table, Typography } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { PageContainer } from '@ark-iam/ui'
+import { IDCell, PageContainer } from '@ark-iam/ui'
 import { createDepartment, deleteDepartment, getDepartmentTree, updateDepartment } from '@ark-iam/api'
 import type { DepartmentItem } from '@ark-iam/types'
 import { fmtTime } from '../../components/common'
@@ -14,7 +14,7 @@ export default function DepartmentList() {
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<DepartmentItem | null>(null)
-  const [parentID, setParentID] = useState(0)
+  const [parentID, setParentID] = useState("")
   const [form] = Form.useForm()
   const [submitLoading, setSubmitLoading] = useState(false)
 
@@ -49,7 +49,7 @@ export default function DepartmentList() {
     void fetchData()
   }, [fetchData])
 
-  const openCreate = (parentID: number) => {
+  const openCreate = (parentID: string) => {
     setEditing(null)
     setParentID(parentID)
     form.resetFields()
@@ -101,7 +101,7 @@ export default function DepartmentList() {
   }
 
   const columns: ColumnsType<DepartmentItem> = [
-    { title: '部门ID', dataIndex: 'departmentID', key: 'departmentID', width: 90 },
+    { title: '部门ID', dataIndex: 'departmentID', key: 'departmentID', width: 150, render: (v: string) => <IDCell value={v} /> },
     {
       title: '部门名称',
       dataIndex: 'name',
@@ -164,7 +164,7 @@ export default function DepartmentList() {
           <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
             刷新
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate(0)}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate("")}>
             新建根部门
           </Button>
         </Space>
@@ -214,6 +214,6 @@ export default function DepartmentList() {
   )
 }
 
-function modalParentTitle(parentID: number) {
-  return parentID === 0 ? '新建根部门' : '新建子部门'
+function modalParentTitle(parentID: string) {
+  return parentID === "" ? '新建根部门' : '新建子部门'
 }

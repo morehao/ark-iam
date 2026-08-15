@@ -40,7 +40,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func newGinCtx(tenantID, userID uint) *gin.Context {
+func newGinCtx(tenantID, userID string) *gin.Context {
 	ctx, _ := gin.CreateTestContext(nil)
 	ctx.Set(gcontext.KeyTenantID, tenantID)
 	ctx.Set(gcontext.KeyUserID, userID)
@@ -49,14 +49,14 @@ func newGinCtx(tenantID, userID uint) *gin.Context {
 
 func TestDomainSvc_Create_Success(t *testing.T) {
 	newTestDB(t)
-	ctx := newGinCtx(10, 100)
+	ctx := newGinCtx("10", "100")
 
 	svc := NewDomainSvc()
 	resp, err := svc.Create(ctx, &dtodomain.DomainCreateReq{Domain: "example.com"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if resp.ID == 0 {
+	if resp.ID == "" {
 		t.Fatalf("expected non-zero id")
 	}
 
@@ -64,28 +64,28 @@ func TestDomainSvc_Create_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
-	if entity == nil || entity.ID == 0 {
+	if entity == nil || entity.ID == "" {
 		t.Fatalf("expected persisted domain")
 	}
 	if entity.Domain != "example.com" {
 		t.Fatalf("expected domain example.com, got %s", entity.Domain)
 	}
-	if entity.TenantID != 10 {
-		t.Fatalf("expected tenantID 10, got %d", entity.TenantID)
+	if entity.TenantID != "10" {
+		t.Fatalf("expected tenantID 10, got %s", entity.TenantID)
 	}
 	if entity.IsVerified != 0 {
 		t.Fatalf("expected isVerified 0, got %d", entity.IsVerified)
 	}
-	if entity.CreatedBy != 100 {
-		t.Fatalf("expected createdBy 100, got %d", entity.CreatedBy)
+	if entity.CreatedBy != "100" {
+		t.Fatalf("expected createdBy 100, got %s", entity.CreatedBy)
 	}
 }
 
 func TestDomainSvc_Create_DomainAlreadyExists(t *testing.T) {
 	db := newTestDB(t)
-	ctx := newGinCtx(10, 100)
+	ctx := newGinCtx("10", "100")
 
-	if err := db.Create(&model.DomainEntity{TenantID: 10, Domain: "example.com"}).Error; err != nil {
+	if err := db.Create(&model.DomainEntity{TenantID: "10", Domain: "example.com"}).Error; err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
@@ -102,7 +102,7 @@ func TestDomainSvc_Create_DomainAlreadyExists(t *testing.T) {
 
 func TestDomainSvc_Create_EmptyDomain(t *testing.T) {
 	newTestDB(t)
-	ctx := newGinCtx(10, 100)
+	ctx := newGinCtx("10", "100")
 
 	svc := NewDomainSvc()
 	resp, err := svc.Create(ctx, &dtodomain.DomainCreateReq{Domain: ""})
@@ -113,16 +113,16 @@ func TestDomainSvc_Create_EmptyDomain(t *testing.T) {
 
 func TestDomainSvc_PageList(t *testing.T) {
 	db := newTestDB(t)
-	ctx := newGinCtx(10, 100)
+	ctx := newGinCtx("10", "100")
 
-	if err := db.Create(&model.DomainEntity{TenantID: 10, Domain: "alpha.com"}).Error; err != nil {
+	if err := db.Create(&model.DomainEntity{TenantID: "10", Domain: "alpha.com"}).Error; err != nil {
 		t.Fatalf("seed alpha: %v", err)
 	}
-	if err := db.Create(&model.DomainEntity{TenantID: 10, Domain: "beta.com"}).Error; err != nil {
+	if err := db.Create(&model.DomainEntity{TenantID: "10", Domain: "beta.com"}).Error; err != nil {
 		t.Fatalf("seed beta: %v", err)
 	}
 	// 其他租户的数据不应出现
-	if err := db.Create(&model.DomainEntity{TenantID: 20, Domain: "alpha-other.com"}).Error; err != nil {
+	if err := db.Create(&model.DomainEntity{TenantID: "20", Domain: "alpha-other.com"}).Error; err != nil {
 		t.Fatalf("seed other tenant: %v", err)
 	}
 
@@ -141,9 +141,9 @@ func TestDomainSvc_PageList(t *testing.T) {
 
 func TestDomainSvc_Delete_Success(t *testing.T) {
 	db := newTestDB(t)
-	ctx := newGinCtx(10, 100)
+	ctx := newGinCtx("10", "100")
 
-	entity := &model.DomainEntity{TenantID: 10, Domain: "example.com"}
+	entity := &model.DomainEntity{TenantID: "10", Domain: "example.com"}
 	if err := db.Create(entity).Error; err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -158,17 +158,17 @@ func TestDomainSvc_Delete_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
-	if got != nil && got.ID != 0 {
+	if got != nil && got.ID != "" {
 		t.Fatalf("expected domain soft-deleted, got %+v", got)
 	}
 }
 
 func TestDomainSvc_Delete_NotExist(t *testing.T) {
 	newTestDB(t)
-	ctx := newGinCtx(10, 100)
+	ctx := newGinCtx("10", "100")
 
 	svc := NewDomainSvc()
-	err := svc.Delete(ctx, &dtodomain.DomainDeleteReq{DomainID: 999})
+	err := svc.Delete(ctx, &dtodomain.DomainDeleteReq{DomainID: "999"})
 	if err == nil {
 		t.Fatalf("expected error for non-existent domain")
 	}

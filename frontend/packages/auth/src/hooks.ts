@@ -11,14 +11,14 @@ import {
 import { getCurrentTenantId, setCurrentTenantId } from './tenant'
 
 export interface TenantSwitchInfo {
-  tenants: { tenantID: number; name: string }[]
+  tenants: { tenantID: string; name: string }[]
   loadTenants: () => Promise<void>
-  handleSwitchTenant: (tenantID: number) => Promise<void>
+  handleSwitchTenant: (tenantID: string) => Promise<void>
 }
 
 export function useTenantSwitching(): TenantSwitchInfo {
   const auth = useAuth()
-  const [tenants, setTenants] = useState<{ tenantID: number; name: string }[]>([])
+  const [tenants, setTenants] = useState<{ tenantID: string; name: string }[]>([])
 
   const loadTenants = useCallback(async () => {
     try {
@@ -30,7 +30,7 @@ export function useTenantSwitching(): TenantSwitchInfo {
   }, [])
 
   const handleSwitchTenant = useCallback(
-    async (tenantID: number) => {
+    async (tenantID: string) => {
       if (String(tenantID) === getCurrentTenantId()) return
       setCurrentTenantId(tenantID)
       try {

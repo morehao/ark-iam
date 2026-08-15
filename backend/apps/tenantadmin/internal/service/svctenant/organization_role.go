@@ -3,17 +3,17 @@ package svctenant
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
 
-func organizationRoleVisibleToTenant(entity *model.OrganizationRoleEntity, tenantID uint) bool {
-	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
+func organizationRoleVisibleToTenant(entity *model.OrganizationRoleEntity, tenantID string) bool {
+	return entity != nil && entity.ID != "" && entity.TenantID == tenantID
 }
 
 type OrganizationRoleSvc interface {
@@ -39,7 +39,7 @@ func (svc *organizationRoleSvc) Create(ctx *gin.Context, req *dtotenant.Organiza
 		glog.Errorf(ctx, "[svcorganizationrole.Create] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.OrganizationGetDetailError)
 	}
-	if !organizationVisibleToTenant(orgEntity, gincontext.GetTenantID(ctx)) {
+	if !organizationVisibleToTenant(orgEntity, gctx.GetTenantID(ctx)) {
 		return nil, code.GetError(code.OrganizationNotExistError)
 	}
 
@@ -49,10 +49,10 @@ func (svc *organizationRoleSvc) Create(ctx *gin.Context, req *dtotenant.Organiza
 		Name:           req.Name,
 		Description:    req.Description,
 		Type:           req.Type,
-		CreatedBy:      gincontext.GetUserID(ctx),
+		CreatedBy:      gctx.GetUserID(ctx),
 	}
-	if insertEntity.TenantID == 0 {
-		insertEntity.TenantID = gincontext.GetTenantID(ctx)
+	if insertEntity.TenantID == "" {
+		insertEntity.TenantID = gctx.GetTenantID(ctx)
 	}
 
 	if err := dao.NewOrganizationRoleDao().Insert(ctx, insertEntity); err != nil {
@@ -70,11 +70,11 @@ func (svc *organizationRoleSvc) Delete(ctx *gin.Context, req *dtotenant.Organiza
 		glog.Errorf(ctx, "[svcorganizationrole.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationRoleDeleteError)
 	}
-	if !organizationRoleVisibleToTenant(orgRoleEntity, gincontext.GetTenantID(ctx)) {
+	if !organizationRoleVisibleToTenant(orgRoleEntity, gctx.GetTenantID(ctx)) {
 		return code.GetError(code.OrganizationRoleNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	if err := dao.NewOrganizationRoleDao().Delete(ctx, req.OrganizationRoleID, userID); err != nil {
 		glog.Errorf(ctx, "[svcorganizationrole.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationRoleDeleteError)
@@ -88,13 +88,13 @@ func (svc *organizationRoleSvc) Update(ctx *gin.Context, req *dtotenant.Organiza
 		glog.Errorf(ctx, "[svcorganizationrole.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationRoleUpdateError)
 	}
-	if !organizationRoleVisibleToTenant(orgRoleEntity, gincontext.GetTenantID(ctx)) {
+	if !organizationRoleVisibleToTenant(orgRoleEntity, gctx.GetTenantID(ctx)) {
 		return code.GetError(code.OrganizationRoleNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	updateMap := map[string]any{
-		"tenant_id":       gincontext.GetTenantID(ctx),
+		"tenant_id":       gctx.GetTenantID(ctx),
 		"organization_id": req.OrganizationID,
 		"name":            req.Name,
 		"description":     req.Description,
@@ -114,7 +114,7 @@ func (svc *organizationRoleSvc) Detail(ctx *gin.Context, req *dtotenant.Organiza
 		glog.Errorf(ctx, "[svcorganizationrole.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.OrganizationRoleGetDetailError)
 	}
-	if !organizationRoleVisibleToTenant(orgRoleEntity, gincontext.GetTenantID(ctx)) {
+	if !organizationRoleVisibleToTenant(orgRoleEntity, gctx.GetTenantID(ctx)) {
 		return nil, code.GetError(code.OrganizationRoleNotExistError)
 	}
 

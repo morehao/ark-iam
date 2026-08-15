@@ -11,24 +11,24 @@ import (
 
 func TestDeleteRoleScopeUsesTenantScopedCompositeLookup(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.RoleScopeEntity{})
-	ctx := newGinCtx(61, 9201)
+	ctx := newGinCtx("61", "9201")
 
-	relation := &model.RoleScopeEntity{TenantID: 61, RoleID: 31, ScopeID: 53}
+	relation := &model.RoleScopeEntity{TenantID: "61", RoleID: "31", ScopeID: "53"}
 	if err := db.Create(relation).Error; err != nil {
 		t.Fatalf("seed role scope: %v", err)
 	}
 
 	svc := &roleScopeSvc{}
-	err := svc.Delete(ctx, &dtopermission.RoleScopeDeleteReq{TenantID: 999, RoleID: 31, ScopeID: 53})
+	err := svc.Delete(ctx, &dtopermission.RoleScopeDeleteReq{TenantID: "999", RoleID: "31", ScopeID: "53"})
 	if err != nil {
 		t.Fatalf("Delete returned error: %v", err)
 	}
 
 	// 软删除后按租户+角色+权限组合条件应查不到
 	left, err := dao.NewRoleScopeDao().GetListByCond(ctx, &dao.RoleScopeCond{
-		TenantID: 61,
-		RoleID:   31,
-		ScopeID:  53,
+		TenantID: "61",
+		RoleID:   "31",
+		ScopeID:  "53",
 	})
 	if err != nil {
 		t.Fatalf("GetListByCond: %v", err)
@@ -44,25 +44,25 @@ func TestDeleteRoleScopeUsesTenantScopedCompositeLookup(t *testing.T) {
 	if softDeleted.DeletedAt.Time.IsZero() {
 		t.Fatalf("expected soft delete timestamp")
 	}
-	if softDeleted.DeletedBy != 9201 {
-		t.Fatalf("expected deletedBy 9201, got %d", softDeleted.DeletedBy)
+	if softDeleted.DeletedBy != "9201" {
+		t.Fatalf("expected deletedBy 9201, got %s", softDeleted.DeletedBy)
 	}
 }
 
 func TestDeleteRoleScopeReturnsNotExistWhenCompositeLookupMisses(t *testing.T) {
 	testutil.SetupSQLite(t, &model.RoleScopeEntity{})
-	ctx := newGinCtx(62, 9202)
+	ctx := newGinCtx("62", "9202")
 
 	svc := &roleScopeSvc{}
-	err := svc.Delete(ctx, &dtopermission.RoleScopeDeleteReq{RoleID: 31, ScopeID: 53})
+	err := svc.Delete(ctx, &dtopermission.RoleScopeDeleteReq{RoleID: "31", ScopeID: "53"})
 	if err == nil {
 		t.Fatalf("expected not exist error")
 	}
 
 	left, err := dao.NewRoleScopeDao().GetListByCond(ctx, &dao.RoleScopeCond{
-		TenantID: 62,
-		RoleID:   31,
-		ScopeID:  53,
+		TenantID: "62",
+		RoleID:   "31",
+		ScopeID:  "53",
 	})
 	if err != nil {
 		t.Fatalf("GetListByCond: %v", err)

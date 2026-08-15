@@ -7,14 +7,14 @@ type SessionListReq struct {
 }
 
 type SessionRevokeReq struct {
-	SessionID uint `json:"-" uri:"sessionID" binding:"required"`
+	SessionID string `json:"-" uri:"sessionID" binding:"required"`
 }
 
 type SessionResp struct {
-	ID         uint    `json:"id"`
+	ID         string  `json:"id"`
 	SessionID  string  `json:"sessionID"`
-	AppID      uint    `json:"appID"`
-	TenantID   uint    `json:"tenantID"`
+	AppID      string  `json:"appID"`
+	TenantID   string  `json:"tenantID"`
 	ClientType string  `json:"clientType"`
 	ClientIP   string  `json:"clientIP"`
 	UserAgent  string  `json:"userAgent"`

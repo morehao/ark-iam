@@ -5,10 +5,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
@@ -35,7 +35,7 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID: gincontext.GetTenantID(ctx),
+		TenantID: gctx.GetTenantID(ctx),
 	}
 	userEntityList, total, err := dao.NewUserDao().GetPageListByCond(ctx, cond)
 	if err != nil {
@@ -43,9 +43,9 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (
 		return nil, code.GetError(code.UserGetPageListError)
 	}
 
-	personIDs := make([]uint, 0, len(userEntityList))
+	personIDs := make([]string, 0, len(userEntityList))
 	for _, v := range userEntityList {
-		if v.PersonID != 0 {
+		if v.PersonID != "" {
 			personIDs = append(personIDs, v.PersonID)
 		}
 	}
@@ -76,22 +76,22 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (
 }
 
 // loadPersonMap 批量加载自然人信息（username/email/phone 来自 person 表）。
-func loadPersonMap(ctx context.Context, personIDs []uint) map[uint]*model.PersonEntity {
-	result := make(map[uint]*model.PersonEntity)
+func loadPersonMap(ctx context.Context, personIDs []string) map[string]*model.PersonEntity {
+	result := make(map[string]*model.PersonEntity)
 	if len(personIDs) == 0 {
 		return result
 	}
 	personDao := dao.NewPersonDao()
 	for _, id := range personIDs {
-		if id == 0 {
+		if id == "" {
 			continue
 		}
 		person, err := personDao.GetByID(ctx, id)
 		if err != nil {
-			glog.Warnf(ctx, "[svcuser.loadPersonMap] person GetByID fail, personID:%d, err:%v", id, err)
+			glog.Warnf(ctx, "[svcuser.loadPersonMap] person GetByID fail, personID:%s, err:%v", id, err)
 			continue
 		}
-		if person != nil && person.ID != 0 {
+		if person != nil && person.ID != "" {
 			result[id] = person
 		}
 	}

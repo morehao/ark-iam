@@ -18,22 +18,22 @@ import (
 func TestAssignDepartmentsUsesTenantAndSkipsDuplicates(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = newAssignDepartmentsRequest(t)
-	ginCtx.Set(gcontext.KeyTenantID, uint(23))
-	ginCtx.Set(gcontext.KeyUserID, uint(88))
+	ginCtx.Set(gcontext.KeyTenantID, "23")
+	ginCtx.Set(gcontext.KeyUserID, "88")
 
 	db := testutil.SetupSQLite(t, &model.UserDepartmentEntity{})
 	if err := db.Create(&model.UserDepartmentEntity{
-		TenantID:     23,
-		UserID:       100,
-		DepartmentID: 2,
+		TenantID:     "23",
+		UserID:       "100",
+		DepartmentID: "2",
 		IsPrimary:    0,
-		CreatedBy:    1,
+		CreatedBy:    "1",
 	}).Error; err != nil {
 		t.Fatalf("seed duplicate relation: %v", err)
 	}
 
 	svc := &userSvc{}
-	err := svc.AssignDepartments(ginCtx, &dtouser.AssignDepartmentsReq{UserID: 100, DepartmentIDs: []uint{1, 2, 3}})
+	err := svc.AssignDepartments(ginCtx, &dtouser.AssignDepartmentsReq{UserID: "100", DepartmentIDs: []string{"1", "2", "3"}})
 	if err != nil {
 		t.Fatalf("AssignDepartments returned error: %v", err)
 	}
@@ -45,14 +45,14 @@ func TestAssignDepartmentsUsesTenantAndSkipsDuplicates(t *testing.T) {
 	if len(relations) != 3 {
 		t.Fatalf("expected 3 total relations after skipping duplicate, got %d", len(relations))
 	}
-	if relations[0].DepartmentID != 1 || relations[1].DepartmentID != 2 || relations[2].DepartmentID != 3 {
-		t.Fatalf("unexpected department ids: %d, %d, %d", relations[0].DepartmentID, relations[1].DepartmentID, relations[2].DepartmentID)
+	if relations[0].DepartmentID != "1" || relations[1].DepartmentID != "2" || relations[2].DepartmentID != "3" {
+		t.Fatalf("unexpected department ids: %s, %s, %s", relations[0].DepartmentID, relations[1].DepartmentID, relations[2].DepartmentID)
 	}
-	if relations[0].TenantID != 23 || relations[2].TenantID != 23 {
-		t.Fatalf("expected inserted tenant id to be 23, got %d and %d", relations[0].TenantID, relations[2].TenantID)
+	if relations[0].TenantID != "23" || relations[2].TenantID != "23" {
+		t.Fatalf("expected inserted tenant id to be 23, got %s and %s", relations[0].TenantID, relations[2].TenantID)
 	}
-	if relations[0].CreatedBy != 88 || relations[2].CreatedBy != 88 {
-		t.Fatalf("expected inserted created_by to be 88, got %d and %d", relations[0].CreatedBy, relations[2].CreatedBy)
+	if relations[0].CreatedBy != "88" || relations[2].CreatedBy != "88" {
+		t.Fatalf("expected inserted created_by to be 88, got %s and %s", relations[0].CreatedBy, relations[2].CreatedBy)
 	}
 	if relations[0].IsPrimary != 0 || relations[2].IsPrimary != 0 {
 		t.Fatalf("expected inserted is_primary to stay 0, got %d and %d", relations[0].IsPrimary, relations[2].IsPrimary)
@@ -62,8 +62,8 @@ func TestAssignDepartmentsUsesTenantAndSkipsDuplicates(t *testing.T) {
 func TestAssignDepartmentsReturnsErrorWhenInsertFailsInTransaction(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = newAssignDepartmentsRequest(t)
-	ginCtx.Set(gcontext.KeyTenantID, uint(9))
-	ginCtx.Set(gcontext.KeyUserID, uint(7))
+	ginCtx.Set(gcontext.KeyTenantID, "9")
+	ginCtx.Set(gcontext.KeyUserID, "7")
 
 	db := testutil.SetupSQLite(t, &model.UserDepartmentEntity{})
 	if err := db.Callback().Create().Before("gorm:create").Register("test_fail_create", func(tx *gorm.DB) {
@@ -76,15 +76,15 @@ func TestAssignDepartmentsReturnsErrorWhenInsertFailsInTransaction(t *testing.T)
 	}()
 
 	svc := &userSvc{}
-	err := svc.AssignDepartments(ginCtx, &dtouser.AssignDepartmentsReq{UserID: 100, DepartmentIDs: []uint{1}})
+	err := svc.AssignDepartments(ginCtx, &dtouser.AssignDepartmentsReq{UserID: "100", DepartmentIDs: []string{"1"}})
 	assertAssignDepartmentsCode(t, err, code.UserDepartmentCreateError)
 }
 
 func TestAssignDepartmentsReturnsErrorWhenTransactionFails(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = newAssignDepartmentsRequest(t)
-	ginCtx.Set(gcontext.KeyTenantID, uint(9))
-	ginCtx.Set(gcontext.KeyUserID, uint(7))
+	ginCtx.Set(gcontext.KeyTenantID, "9")
+	ginCtx.Set(gcontext.KeyUserID, "7")
 
 	db := testutil.SetupSQLite(t, &model.UserDepartmentEntity{})
 	sqlDB, err := db.DB()
@@ -96,7 +96,7 @@ func TestAssignDepartmentsReturnsErrorWhenTransactionFails(t *testing.T) {
 	}
 
 	svc := &userSvc{}
-	err = svc.AssignDepartments(ginCtx, &dtouser.AssignDepartmentsReq{UserID: 100, DepartmentIDs: []uint{1}})
+	err = svc.AssignDepartments(ginCtx, &dtouser.AssignDepartmentsReq{UserID: "100", DepartmentIDs: []string{"1"}})
 	assertAssignDepartmentsCode(t, err, code.UserDepartmentCreateError)
 }
 

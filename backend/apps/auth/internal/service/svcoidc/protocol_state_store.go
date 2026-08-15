@@ -25,11 +25,11 @@ var (
 )
 
 type ProtocolStateStore interface {
-	CreateAuthRequest(ctx context.Context, authReq *oidc.AuthRequest, userID string, tenantID uint) (op.AuthRequest, error)
+	CreateAuthRequest(ctx context.Context, authReq *oidc.AuthRequest, userID string, tenantID string) (op.AuthRequest, error)
 	AuthRequestByID(ctx context.Context, id string) (op.AuthRequest, error)
 	AuthRequestByCode(ctx context.Context, code string) (op.AuthRequest, error)
 	SaveAuthCode(ctx context.Context, id, code string) error
-	CompleteAuthRequest(ctx context.Context, id string, subject string, authTime time.Time, amr []string, acr string, tenantID uint, done bool) error
+	CompleteAuthRequest(ctx context.Context, id string, subject string, authTime time.Time, amr []string, acr string, tenantID string, done bool) error
 	AssociateSession(ctx context.Context, id string, sessionID string) error
 	DeleteAuthRequest(ctx context.Context, id string) error
 	ConsumeAuthCode(ctx context.Context, code string) (op.AuthRequest, error)
@@ -87,7 +87,7 @@ func (s *RedisProtocolStateStore) Health(ctx context.Context) error {
 	return nil
 }
 
-func (s *RedisProtocolStateStore) CreateAuthRequest(ctx context.Context, authReq *oidc.AuthRequest, userID string, tenantID uint) (op.AuthRequest, error) {
+func (s *RedisProtocolStateStore) CreateAuthRequest(ctx context.Context, authReq *oidc.AuthRequest, userID string, tenantID string) (op.AuthRequest, error) {
 	reqID, err := randomTokenID("ar")
 	if err != nil {
 		return nil, fmt.Errorf("generate auth request id: %w", err)
@@ -146,7 +146,7 @@ func (s *RedisProtocolStateStore) AuthRequestByID(ctx context.Context, id string
 	return &req, nil
 }
 
-func (s *RedisProtocolStateStore) CompleteAuthRequest(ctx context.Context, id string, subject string, authTime time.Time, amr []string, acr string, tenantID uint, done bool) error {
+func (s *RedisProtocolStateStore) CompleteAuthRequest(ctx context.Context, id string, subject string, authTime time.Time, amr []string, acr string, tenantID string, done bool) error {
 	data, err := s.client.Get(ctx, authRequestKey(id)).Bytes()
 	if errors.Is(err, redis.Nil) {
 		return ErrSessionNotFound

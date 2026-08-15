@@ -315,14 +315,14 @@ func TestFactoryListSupportsProtocolAndProviderFilters(t *testing.T) {
 
 func TestConnectorTypesExposeNewContractFields(t *testing.T) {
 	authorizeReq := dtoconnector.ConnectorAuthorizeReq{
-		ConnectorID:  12,
+		ConnectorID:  "12",
 		RedirectURI:  "https://console.example.com/callback",
 		State:        "state-1",
 		LoginHint:    "demo@example.com",
 		ResponseMode: "query",
 	}
 	callbackReq := dtoconnector.ConnectorCallbackReq{
-		ConnectorID: 12,
+		ConnectorID: "12",
 		Code:        "code-1",
 		State:       "state-1",
 	}
@@ -332,7 +332,7 @@ func TestConnectorTypesExposeNewContractFields(t *testing.T) {
 	}
 	createReq := dtoauth.ConnectorCreateReq{
 		ConnectorBaseInfo: objauth.ConnectorBaseInfo{
-			TenantID:            1,
+			TenantID:            "1",
 			Name:                "google-workspace",
 			DisplayName:         "Google Workspace",
 			Protocol:            "oidc",
@@ -354,7 +354,7 @@ func TestConnectorTypesExposeNewContractFields(t *testing.T) {
 		},
 	}
 	pageReq := dtoauth.ConnectorPageListReq{
-		TenantID:    1,
+		TenantID:    "1",
 		Protocol:    "oidc",
 		Provider:    "google",
 		Status:      "enabled",
@@ -362,7 +362,7 @@ func TestConnectorTypesExposeNewContractFields(t *testing.T) {
 		DisplayName: "Google Workspace",
 	}
 
-	if authorizeReq.ConnectorID == 0 || callbackReq.ConnectorID == 0 {
+	if authorizeReq.ConnectorID == "" || callbackReq.ConnectorID == "" {
 		t.Fatalf("connector authorize/callback req should expose connector id")
 	}
 	authorizeReqType := reflect.TypeOf(authorizeReq)
@@ -438,7 +438,7 @@ func TestOAuth2DriverBuildAuthorizationURLUsesOAuthConfig(t *testing.T) {
 			ClientSecret: "secret",
 			RedirectURI:  "https://console.example.com/callback?next=/settings profile",
 		},
-		ConnectorID: 12,
+		ConnectorID: "12",
 		State:       "tenant=a b&return=/home",
 	})
 	if err != nil {

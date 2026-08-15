@@ -12,8 +12,8 @@ The IAM backend is split into four apps under `backend/apps/` (auth, platformadm
 
 * **Clear Project Structure**: Inspired by [project-layout](https://github.com/golang-standards/project-layout), follows layered architecture principles, organized for team collaboration and long-term maintenance.
 * **Frontend-Backend Separation**: React frontend with Vite build tool.
-* **Common Component Integration**: Backend includes built-in examples for MySQL, Redis, and Elasticsearch.
-* **Full Link Logging**: Provides a custom logging package `glog` based on `zap`, supporting full trace ID propagation across MySQL, Redis, ES, and HTTP calls.
+* **Common Component Integration**: Backend includes built-in examples for PostgreSQL, Redis, and Elasticsearch.
+* **Full Link Logging**: Provides a custom logging package `glog` based on `zap`, supporting full trace ID propagation across PostgreSQL, Redis, ES, and HTTP calls.
 * **Code Generation Tool**: Comes with a command-line tool `gocli` that can generate standardized code (including model, dao, object, dto, code, service, controller, router layers) based on config.
 * **Swagger API Documentation**: Automatically generate interactive API docs using `swaggo` for easier frontend-backend collaboration and testing.
 * **Docker Support**: Includes a basic `Dockerfile` for containerized deployment.

@@ -8,7 +8,7 @@ import (
 
 type ResourceCond struct {
 	*gormdao.BaseCond
-	TenantID  uint
+	TenantID  string
 	Name      string
 	Indicator string
 }
@@ -17,7 +17,7 @@ func (c *ResourceCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
 	if c.Name != "" {
@@ -29,12 +29,12 @@ func (c *ResourceCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type ResourceDao struct {
-	*gormdao.Dao[model.ResourceEntity, model.ResourceEntityList, uint]
+	*gormdao.Dao[model.ResourceEntity, model.ResourceEntityList, string]
 }
 
 func NewResourceDao(opts ...DaoOption) *ResourceDao {
 	return &ResourceDao{
-		Dao: gormdao.NewDao[model.ResourceEntity, model.ResourceEntityList, uint](
+		Dao: gormdao.NewDao[model.ResourceEntity, model.ResourceEntityList, string](
 			model.TableNameResource, "ResourceDao",
 			resolveDBGetter(opts...),
 		),

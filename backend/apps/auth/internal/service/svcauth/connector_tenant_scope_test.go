@@ -8,17 +8,17 @@ import (
 	"github.com/morehao/ark-iam/auth/testutil"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/biz/gcontext"
-	"gorm.io/gorm"
+	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
 func TestConnectorDetailRejectsCrossTenantEntity(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyTenantID, uint(71))
+	ginCtx.Set(gcontext.KeyTenantID, "71")
 
 	db := testutil.SetupSQLite(t, &model.ConnectorEntity{})
 	if err := db.Create(&model.ConnectorEntity{
-		Model:        gorm.Model{ID: 10},
-		TenantID:     99,
+		BaseEntity:   gormdao.BaseEntity{StringID: gormdao.StringID{ID: "10"}},
+		TenantID:     "99",
 		Name:         "cross",
 		Config:       []byte("{}"),
 		ClaimMapping: []byte("{}"),
@@ -28,7 +28,7 @@ func TestConnectorDetailRejectsCrossTenantEntity(t *testing.T) {
 	}
 
 	svc := &connectorSvc{}
-	_, err := svc.Detail(ginCtx, &dtoauth.ConnectorDetailReq{ConnectorID: 10})
+	_, err := svc.Detail(ginCtx, &dtoauth.ConnectorDetailReq{ConnectorID: "10"})
 	if err == nil {
 		t.Fatalf("expected cross-tenant connector detail to fail")
 	}
@@ -36,11 +36,11 @@ func TestConnectorDetailRejectsCrossTenantEntity(t *testing.T) {
 
 func TestConnectorPageListUsesContextTenant(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyTenantID, uint(72))
+	ginCtx.Set(gcontext.KeyTenantID, "72")
 
 	db := testutil.SetupSQLite(t, &model.ConnectorEntity{})
 	if err := db.Create(&model.ConnectorEntity{
-		TenantID:     72,
+		TenantID:     "72",
 		Name:         "tenant-72",
 		Config:       []byte("{}"),
 		ClaimMapping: []byte("{}"),
@@ -49,7 +49,7 @@ func TestConnectorPageListUsesContextTenant(t *testing.T) {
 		t.Fatalf("seed tenant 72: %v", err)
 	}
 	if err := db.Create(&model.ConnectorEntity{
-		TenantID:     99,
+		TenantID:     "99",
 		Name:         "tenant-99",
 		Config:       []byte("{}"),
 		ClaimMapping: []byte("{}"),
@@ -60,7 +60,7 @@ func TestConnectorPageListUsesContextTenant(t *testing.T) {
 
 	svc := &connectorSvc{}
 	// 请求里的 TenantID 为 99，但服务必须以上下文租户 72 为准
-	resp, err := svc.PageList(ginCtx, &dtoauth.ConnectorPageListReq{TenantID: 99})
+	resp, err := svc.PageList(ginCtx, &dtoauth.ConnectorPageListReq{TenantID: "99"})
 	if err != nil {
 		t.Fatalf("PageList returned error: %v", err)
 	}

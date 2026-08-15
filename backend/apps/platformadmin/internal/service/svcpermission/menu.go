@@ -3,11 +3,11 @@ package svcpermission
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objpermission"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtopermission"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
@@ -15,7 +15,7 @@ import (
 )
 
 func menuVisible(entity *model.MenuEntity) bool {
-	return entity != nil && entity.ID != 0
+	return entity != nil && entity.ID != ""
 }
 
 type MenuSvc interface {
@@ -52,7 +52,7 @@ func (svc *menuSvc) Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (
 		KeepAlive:    req.KeepAlive,
 		Permission:   req.Permission,
 		Status:       req.Status,
-		CreatedBy:    gincontext.GetUserID(ctx),
+		CreatedBy:    gctx.GetUserID(ctx),
 	}
 
 	if err := dao.NewMenuDao().Insert(ctx, insertEntity); err != nil {
@@ -74,7 +74,7 @@ func (svc *menuSvc) Delete(ctx *gin.Context, req *dtopermission.MenuDeleteReq) e
 		return code.GetError(code.MenuNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	if err := dao.NewMenuDao().Delete(ctx, req.MenuID, userID); err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteMenu] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.MenuDeleteError)
@@ -92,7 +92,7 @@ func (svc *menuSvc) Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) e
 		return code.GetError(code.MenuNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	updateMap := map[string]any{
 		"app_id":        req.AppID,
 		"parent_id":     req.ParentID,
@@ -218,8 +218,8 @@ func (svc *menuSvc) Tree(ctx *gin.Context, req *dtopermission.MenuTreeReq) (*dto
 		return nil, code.GetError(code.MenuGetPageListError)
 	}
 
-	var buildTree func(parentID uint) []dtopermission.MenuTreeItem
-	buildTree = func(parentID uint) []dtopermission.MenuTreeItem {
+	var buildTree func(parentID string) []dtopermission.MenuTreeItem
+	buildTree = func(parentID string) []dtopermission.MenuTreeItem {
 		var items []dtopermission.MenuTreeItem
 		for _, menu := range menuEntityList {
 			if menu.ParentID == parentID {
@@ -254,6 +254,6 @@ func (svc *menuSvc) Tree(ctx *gin.Context, req *dtopermission.MenuTreeReq) (*dto
 	}
 
 	return &dtopermission.MenuTreeResp{
-		List: buildTree(0),
+		List: buildTree(""),
 	}, nil
 }

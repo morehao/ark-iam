@@ -27,13 +27,13 @@ import {
   ThunderboltOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons'
-import { PageContainer, brand } from '@ark-iam/ui'
+import { EllipsisCell, PageContainer, brand } from '@ark-iam/ui'
 import { createMenu, deleteMenu, getApplicationPageList, getMenuTree, updateMenu } from '@ark-iam/api'
 import type { ApplicationItem, MenuItem } from '@ark-iam/types'
 import { StatusTag } from '../../components/common'
 
 interface MenuFormValues {
-  parentID: number
+  parentID: string
   name: string
   code: string
   path?: string
@@ -59,8 +59,8 @@ const TYPE_META: Record<string, { label: string; icon: React.ReactNode; color: s
   button: { label: '按钮', icon: <ThunderboltOutlined />, color: '#7a5af8', tagColor: 'purple' },
 }
 
-function collectKeys(list: MenuItem[]): number[] {
-  const keys: number[] = []
+function collectKeys(list: MenuItem[]): string[] {
+  const keys: string[] = []
   const walk = (items: MenuItem[]) => {
     items.forEach((item) => {
       keys.push(item.menuID)
@@ -90,10 +90,10 @@ function filterMenuTree(list: MenuItem[], keyword: string): MenuItem[] {
 export default function MenuList() {
   const [apps, setApps] = useState<ApplicationItem[]>([])
   const [appLoading, setAppLoading] = useState(false)
-  const [selectedAppId, setSelectedAppId] = useState<number | undefined>()
+  const [selectedAppId, setSelectedAppId] = useState<string | undefined>()
 
   const [menuTree, setMenuTree] = useState<MenuItem[]>([])
-  const [expandedKeys, setExpandedKeys] = useState<number[]>([])
+  const [expandedKeys, setExpandedKeys] = useState<string[]>([])
   const [treeLoading, setTreeLoading] = useState(false)
   const [keyword, setKeyword] = useState('')
 
@@ -116,7 +116,7 @@ export default function MenuList() {
       const resp = await getApplicationPageList({ page: 1, pageSize: 100 })
       const list = resp?.list || []
       setApps(list)
-      const saved = Number(localStorage.getItem(STORAGE_KEY) || 0)
+      const saved = localStorage.getItem(STORAGE_KEY) || ""
       const next = list.find((a) => a.appID === saved) || list[0]
       setSelectedAppId(next?.appID)
     } catch {
@@ -150,7 +150,7 @@ export default function MenuList() {
     void fetchData()
   }, [fetchData])
 
-  const handleAppChange = (appID: number) => {
+  const handleAppChange = (appID: string) => {
     setSelectedAppId(appID)
     localStorage.setItem(STORAGE_KEY, String(appID))
   }
@@ -190,7 +190,7 @@ export default function MenuList() {
       message.warning('请先选择所属应用')
       return
     }
-    openModal('createRoot', null, { parentID: 0 })
+    openModal('createRoot', null, { parentID: "" })
   }
 
   const handleCreateChild = (parent: MenuItem) => openModal('createChild', parent, { parentID: parent.menuID })
@@ -256,7 +256,7 @@ export default function MenuList() {
 
   // 上级菜单选项：编辑时排除自身及其子孙，避免形成环
   const parentTreeOptions = useMemo(() => {
-    const excluded = new Set<number>()
+    const excluded = new Set<string>()
     if (editing) {
       const collect = (m: MenuItem) => {
         excluded.add(m.menuID)
@@ -264,7 +264,7 @@ export default function MenuList() {
       }
       collect(editing)
     }
-    type ParentOption = { value: number; title: string; children?: ParentOption[] }
+    type ParentOption = { value: string; title: string; children?: ParentOption[] }
     const build = (items: MenuItem[]): ParentOption[] =>
       items
         .filter((m) => !excluded.has(m.menuID))
@@ -310,18 +310,14 @@ export default function MenuList() {
       dataIndex: 'path',
       key: 'path',
       width: 180,
-      ellipsis: true,
-      render: (v: string) =>
-        v ? <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12 }}>{v}</span> : '-',
+      render: (v: string) => <EllipsisCell value={v} monospace />,
     },
     {
       title: '权限标识',
       dataIndex: 'permission',
       key: 'permission',
       width: 190,
-      ellipsis: true,
-      render: (v: string) =>
-        v ? <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12 }}>{v}</span> : '-',
+      render: (v: string) => <EllipsisCell value={v} monospace />,
     },
     {
       title: '排序',
@@ -490,7 +486,7 @@ export default function MenuList() {
             scroll={{ x: 1150 }}
             expandable={{
               expandedRowKeys: keyword ? collectKeys(displayList) : expandedKeys,
-              onExpandedRowsChange: (keys) => setExpandedKeys(keys as number[]),
+              onExpandedRowsChange: (keys) => setExpandedKeys(keys as string[]),
             }}
           />
         )}

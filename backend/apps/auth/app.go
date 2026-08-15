@@ -32,7 +32,7 @@ func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 			"/v1/auth/register",
 			"/v1/auth/connector/callback",
 		),
-		oidcauth.WithOIDCSSOValidation(func(ctx *gin.Context, personID uint, isMachineToken bool) bool {
+		oidcauth.WithOIDCSSOValidation(func(ctx *gin.Context, personID string, isMachineToken bool) bool {
 			// 机器凭证（client_credentials/API Key）不依赖浏览器 SSO 会话活性，直接放行
 			if isMachineToken {
 				return true
@@ -43,7 +43,7 @@ func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 			}
 			active, err := ssoStore.HasActiveSession(ctx.Request.Context(), personID)
 			if err != nil {
-				glog.Warnf(ctx, "[app.Init] HasActiveSession fail, personID:%d, err:%v", personID, err)
+				glog.Warnf(ctx, "[app.Init] HasActiveSession fail, personID:%s, err:%v", personID, err)
 				return true
 			}
 			return active

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, InputNumber, Modal, Popconfirm, Space, Table, message } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, IDCell, PageContainer } from '@ark-iam/ui'
 import { createScope, deleteScope, getScopeDetail, getScopePageList, updateScope } from '@ark-iam/api'
 import type { ScopeItem } from '@ark-iam/types'
 import { fmtTime } from '../../components/common'
@@ -77,10 +77,10 @@ export default function ScopeList() {
   }
 
   const columns: ColumnsType<ScopeItem> = [
-    { title: 'ID', dataIndex: 'scopeID', key: 'scopeID', width: 70 },
+    { title: 'ID', dataIndex: 'scopeID', key: 'scopeID', width: 150, render: (v: string) => <IDCell value={v} /> },
     { title: '权限名', dataIndex: 'name', key: 'name', width: 180 },
-    { title: '资源ID', dataIndex: 'resourceID', key: 'resourceID', width: 100 },
-    { title: '描述', dataIndex: 'description', key: 'description', ellipsis: true },
+    { title: '资源ID', dataIndex: 'resourceID', key: 'resourceID', width: 150, render: (v: string) => <IDCell value={v} /> },
+    { title: '描述', dataIndex: 'description', key: 'description', render: (v: string) => <EllipsisCell value={v} /> },
     {
       title: '创建时间',
       key: 'createdAt',

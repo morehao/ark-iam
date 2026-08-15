@@ -1,14 +1,14 @@
 package dtoapplicationclient
 
 type ApplicationClientCreateResp struct {
-	ApplicationClientID uint   `json:"applicationClientID"` // OAuth客户端ID
+	ApplicationClientID string `json:"applicationClientID"` // OAuth客户端ID
 	ClientID            string `json:"clientID"`            // OIDC客户端ID
 }
 
 type ApplicationClientDetailResp struct {
-	ApplicationClientID     uint     `json:"applicationClientID"`     // OAuth客户端ID
-	TenantID                uint     `json:"tenantID"`                // 租户ID
-	AppID                   uint     `json:"appID"`                   // 所属应用ID
+	ApplicationClientID     string   `json:"applicationClientID"`     // OAuth客户端ID
+	TenantID                string   `json:"tenantID"`                // 租户ID
+	AppID                   string   `json:"appID"`                   // 所属应用ID
 	ClientID                string   `json:"clientID"`                // OIDC客户端ID
 	Name                    string   `json:"name"`                    // 客户端名称
 	RedirectURIs            []string `json:"redirectURIs"`            // 授权回调地址
@@ -35,8 +35,8 @@ type ApplicationClientPageListResp struct {
 }
 
 type PageListItem struct {
-	ApplicationClientID     uint     `json:"applicationClientID"`     // OAuth客户端ID
-	AppID                   uint     `json:"appID"`                   // 所属应用ID
+	ApplicationClientID     string   `json:"applicationClientID"`     // OAuth客户端ID
+	AppID                   string   `json:"appID"`                   // 所属应用ID
 	ClientID                string   `json:"clientID"`                // OIDC客户端ID
 	Name                    string   `json:"name"`                    // 客户端名称
 	Type                    string   `json:"type"`                    // 客户端类型
@@ -48,8 +48,8 @@ type PageListItem struct {
 }
 
 type SecretResp struct {
-	ID                  uint    `json:"id"`                  // 密钥ID
-	ApplicationClientID uint    `json:"applicationClientID"` // OAuth客户端ID
+	ID                  string  `json:"id"`                  // 密钥ID
+	ApplicationClientID string  `json:"applicationClientID"` // OAuth客户端ID
 	Name                string  `json:"name"`                // 密钥名称
 	ValuePrefix         string  `json:"valuePrefix"`         // 密钥前缀
 	ExpiredAt           *string `json:"expiresAt"`           // 过期时间
@@ -62,7 +62,7 @@ type SecretListResp struct {
 }
 
 type SecretCreateResp struct {
-	ID          uint   `json:"id"`          // 密钥ID
+	ID          string `json:"id"`          // 密钥ID
 	Name        string `json:"name"`        // 密钥名称
 	ValuePrefix string `json:"valuePrefix"` // 密钥前缀
 	Secret      string `json:"secret"`      // 密钥明文（仅创建时返回）

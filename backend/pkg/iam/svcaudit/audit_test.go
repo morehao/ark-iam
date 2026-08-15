@@ -22,9 +22,9 @@ func TestWriteAudit(t *testing.T) {
 
 	WriteAudit(ctx, AuditEntry{
 		Action:     ActionApplicationCreate,
-		TenantID:   1,
+		TenantID:   "1",
 		TargetType: "application",
-		TargetID:   7,
+		TargetID:   "7",
 		Result:     "success",
 		Detail:     "created app",
 		ClientID:   "web-portal",
@@ -35,14 +35,14 @@ func TestWriteAudit(t *testing.T) {
 		t.Fatalf("query persisted audit log failed: %v", err)
 	}
 
-	if entity.ActorPersonID != 101 {
-		t.Fatalf("expected actor_person_id 101, got %d", entity.ActorPersonID)
+	if entity.ActorPersonID != "101" {
+		t.Fatalf("expected actor_person_id 101, got %s", entity.ActorPersonID)
 	}
-	if entity.ActorUserID != 202 {
-		t.Fatalf("expected actor_user_id 202, got %d", entity.ActorUserID)
+	if entity.ActorUserID != "202" {
+		t.Fatalf("expected actor_user_id 202, got %s", entity.ActorUserID)
 	}
-	if entity.TenantID != 1 {
-		t.Fatalf("expected tenant_id 1, got %d", entity.TenantID)
+	if entity.TenantID != "1" {
+		t.Fatalf("expected tenant_id 1, got %s", entity.TenantID)
 	}
 	if entity.ClientID != "web-portal" {
 		t.Fatalf("expected client_id 'web-portal', got '%s'", entity.ClientID)
@@ -53,8 +53,8 @@ func TestWriteAudit(t *testing.T) {
 	if entity.TargetType != "application" {
 		t.Fatalf("expected target_type 'application', got '%s'", entity.TargetType)
 	}
-	if entity.TargetID != 7 {
-		t.Fatalf("expected target_id 7, got %d", entity.TargetID)
+	if entity.TargetID != "7" {
+		t.Fatalf("expected target_id 7, got %s", entity.TargetID)
 	}
 	if entity.Result != "success" {
 		t.Fatalf("expected result 'success', got '%s'", entity.Result)
@@ -65,8 +65,8 @@ func TestWriteAudit(t *testing.T) {
 	if entity.UserAgent != "test-agent" {
 		t.Fatalf("expected user_agent 'test-agent', got '%s'", entity.UserAgent)
 	}
-	if entity.CreatedBy != 202 {
-		t.Fatalf("expected created_by 202, got %d", entity.CreatedBy)
+	if entity.CreatedBy != "202" {
+		t.Fatalf("expected created_by 202, got %s", entity.CreatedBy)
 	}
 }
 
@@ -82,9 +82,9 @@ func newAuditTestEnv(t *testing.T) (*gin.Context, *gorm.DB, func()) {
 
 	ctx, _ := gin.CreateTestContext(nil)
 	ctx.Request = req.WithContext(context.Background())
-	ctx.Set(gcontext.KeyPersonID, uint(101))
-	ctx.Set(gcontext.KeyUserID, uint(202))
-	ctx.Set(gcontext.KeyTenantID, uint(1))
+	ctx.Set(gcontext.KeyPersonID, "101")
+	ctx.Set(gcontext.KeyUserID, "202")
+	ctx.Set(gcontext.KeyTenantID, "1")
 
 	dsn := fmt.Sprintf("file:%s_%d?mode=memory&cache=shared", sanitizeAuditTestName(t.Name()), time.Now().UnixNano())
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})

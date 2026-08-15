@@ -8,8 +8,8 @@ import (
 
 type AuditLogCond struct {
 	*gormdao.BaseCond
-	PersonID uint
-	TenantID uint
+	PersonID string
+	TenantID string
 	Action   string
 	Result   string
 }
@@ -18,10 +18,10 @@ func (c *AuditLogCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.PersonID != 0 {
+	if c.PersonID != "" {
 		db.Where(tableName+".actor_person_id = ?", c.PersonID)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
 	if c.Action != "" {
@@ -33,11 +33,11 @@ func (c *AuditLogCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type AuditLogDao struct {
-	*gormdao.Dao[model.AuditLogEntity, model.AuditLogEntityList, uint]
+	*gormdao.Dao[model.AuditLogEntity, model.AuditLogEntityList, string]
 }
 
 func NewAuditLogDao(opts ...DaoOption) *AuditLogDao {
 	return &AuditLogDao{
-		Dao: gormdao.NewDao[model.AuditLogEntity, model.AuditLogEntityList, uint](model.TableNameAuditLog, "AuditLogDao", resolveDBGetter(opts...)),
+		Dao: gormdao.NewDao[model.AuditLogEntity, model.AuditLogEntityList, string](model.TableNameAuditLog, "AuditLogDao", resolveDBGetter(opts...)),
 	}
 }

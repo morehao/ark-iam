@@ -14,9 +14,9 @@ import (
 )
 
 // newDeleteCtx 构造带租户与操作人上下文的 gin.Context。
-func newDeleteCtx(userID uint) *gin.Context {
+func newDeleteCtx(userID string) *gin.Context {
 	ctx, _ := gin.CreateTestContext(nil)
-	ctx.Set(gcontext.KeyTenantID, uint(1))
+	ctx.Set(gcontext.KeyTenantID, "1")
 	ctx.Set(gcontext.KeyUserID, userID)
 	return ctx
 }
@@ -34,7 +34,7 @@ func TestDeleteSystemApplication(t *testing.T) {
 	}
 
 	svc := NewApplicationSvc()
-	err := svc.Delete(newDeleteCtx(0), &dtoapplication.ApplicationDeleteReq{AppID: entity.ID})
+	err := svc.Delete(newDeleteCtx("0"), &dtoapplication.ApplicationDeleteReq{AppID: entity.ID})
 	if err == nil {
 		t.Fatal("expected error for system-built-in application")
 	}
@@ -56,7 +56,7 @@ func TestDeleteNonSystemApplication(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
-	ctx := newDeleteCtx(7)
+	ctx := newDeleteCtx("7")
 	svc := NewApplicationSvc()
 	if err := svc.Delete(ctx, &dtoapplication.ApplicationDeleteReq{AppID: entity.ID}); err != nil {
 		t.Fatalf("Delete returned error: %v", err)
@@ -67,7 +67,7 @@ func TestDeleteNonSystemApplication(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
-	if got != nil && got.ID != 0 {
+	if got != nil && got.ID != "" {
 		t.Fatalf("expected application soft-deleted, got %+v", got)
 	}
 
@@ -76,7 +76,7 @@ func TestDeleteNonSystemApplication(t *testing.T) {
 	if err := db.Unscoped().Where("id = ?", entity.ID).First(&deleted).Error; err != nil {
 		t.Fatalf("query deleted row: %v", err)
 	}
-	if deleted.DeletedBy != 7 {
-		t.Fatalf("expected deletedBy 7, got %d", deleted.DeletedBy)
+	if deleted.DeletedBy != "7" {
+		t.Fatalf("expected deletedBy 7, got %s", deleted.DeletedBy)
 	}
 }

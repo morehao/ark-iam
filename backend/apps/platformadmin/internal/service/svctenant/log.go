@@ -5,19 +5,19 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objaudit"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenant"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
 
-func logVisibleToTenant(entity *model.LogEntity, tenantID uint) bool {
-	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
+func logVisibleToTenant(entity *model.LogEntity, tenantID string) bool {
+	return entity != nil && entity.ID != "" && entity.TenantID == tenantID
 }
 
 type LogSvc interface {
@@ -40,7 +40,7 @@ func (svc *logSvc) Detail(ctx *gin.Context, req *dtotenant.LogDetailReq) (*dtote
 		glog.Errorf(ctx, "[svcsystem.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.LogGetDetailError)
 	}
-	if !logVisibleToTenant(logEntity, gincontext.GetTenantID(ctx)) {
+	if !logVisibleToTenant(logEntity, gctx.GetTenantID(ctx)) {
 		return nil, code.GetError(code.LogNotExistError)
 	}
 
@@ -71,7 +71,7 @@ func (svc *logSvc) PageList(ctx *gin.Context, req *dtotenant.LogPageListReq) (*d
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID: gincontext.GetTenantID(ctx),
+		TenantID: gctx.GetTenantID(ctx),
 		Key:      req.Key,
 	}
 	logEntityList, total, err := dao.NewLogDao().GetPageListByCond(ctx, cond)

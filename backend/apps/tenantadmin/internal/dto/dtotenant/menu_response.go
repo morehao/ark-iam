@@ -4,7 +4,7 @@ import "github.com/morehao/ark-iam/pkg/iam/object/objpermission"
 
 // MenuTreeItem 租户侧菜单树节点（含所属应用）
 type MenuTreeItem struct {
-	MenuID uint `json:"menuID"` // 菜单ID
+	MenuID string `json:"menuID"` // 菜单ID
 	objpermission.MenuBaseInfo
 	Children []MenuTreeItem `json:"children"` // 子菜单
 }

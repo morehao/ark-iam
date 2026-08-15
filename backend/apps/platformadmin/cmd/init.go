@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/seed"
 	"github.com/morehao/ark-iam/platformadmin"
 	"github.com/morehao/ark-iam/platformadmin/config"
 	"github.com/morehao/golib/glog"
@@ -45,6 +47,16 @@ func resourceInit() error {
 	}
 	if err := dbclient.InitMultiDB(config.Conf.DBConfigs, gormLogConfig); err != nil {
 		return fmt.Errorf("init db failed: %w", err)
+	}
+	if config.Conf.DB.AutoMigrate {
+		if err := model.AutoMigrateAll(dbclient.IamDB(context.Background())); err != nil {
+			return fmt.Errorf("auto migrate failed: %w", err)
+		}
+	}
+	if config.Conf.DB.Seed {
+		if err := seed.SeedIam(context.Background(), dbclient.IamDB(context.Background())); err != nil {
+			return fmt.Errorf("seed data failed: %w", err)
+		}
 	}
 
 	var redisLogConfig *glog.LogConfig

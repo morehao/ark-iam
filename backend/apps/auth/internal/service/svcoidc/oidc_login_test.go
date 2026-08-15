@@ -15,21 +15,21 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/ark-iam/pkg/testsetup"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/stretchr/testify/assert"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
-	"gorm.io/gorm"
 )
 
 type fakePasswordAuthenticator struct {
 	authenticate     func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error)
-	tenantsForPerson func(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error)
+	tenantsForPerson func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error)
 }
 
 func (f *fakePasswordAuthenticator) AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 	return f.authenticate(ctx, identifier, password)
 }
 
-func (f *fakePasswordAuthenticator) TenantsForPerson(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error) {
+func (f *fakePasswordAuthenticator) TenantsForPerson(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
 	if f.tenantsForPerson != nil {
 		return f.tenantsForPerson(ctx, personID)
 	}
@@ -37,26 +37,26 @@ func (f *fakePasswordAuthenticator) TenantsForPerson(ctx *gin.Context, personID 
 }
 
 type fakeSSOSessionStore struct {
-	validatedPersonID uint
+	validatedPersonID string
 	sessionAMR        []string
 }
 
 var _ sso.SSOSessionStore = (*fakeSSOSessionStore)(nil)
 
-func (f *fakeSSOSessionStore) CreateSession(ctx context.Context, personID uint, amr []string) (string, error) {
+func (f *fakeSSOSessionStore) CreateSession(ctx context.Context, personID string, amr []string) (string, error) {
 	return "session-" + fmt.Sprint(personID), nil
 }
-func (f *fakeSSOSessionStore) ValidateSession(ctx context.Context, sessionID string) (uint, error) {
+func (f *fakeSSOSessionStore) ValidateSession(ctx context.Context, sessionID string) (string, error) {
 	return f.validatedPersonID, nil
 }
 func (f *fakeSSOSessionStore) SessionAMR(ctx context.Context, sessionID string) []string {
 	return f.sessionAMR
 }
 func (f *fakeSSOSessionStore) RevokeSession(ctx context.Context, sessionID string) error { return nil }
-func (f *fakeSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, personID uint) error {
+func (f *fakeSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, personID string) error {
 	return nil
 }
-func (f *fakeSSOSessionStore) HasActiveSession(ctx context.Context, personID uint) (bool, error) {
+func (f *fakeSSOSessionStore) HasActiveSession(ctx context.Context, personID string) (bool, error) {
 	return false, nil
 }
 
@@ -89,19 +89,19 @@ func TestCompleteLoginBySessionHonorsAuthRequestTenantHint(t *testing.T) {
 	}
 
 	authTime := time.Now()
-	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", 7, false); err != nil {
+	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", "7", false); err != nil {
 		t.Fatalf("storing tenant hint via CompleteAuthRequest(done=false) failed: %v", err)
 	}
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error) {
-			if personID != 88 {
-				t.Fatalf("expected personID 88, got %d", personID)
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+			if personID != "88" {
+				t.Fatalf("expected personID 88, got %s", personID)
 			}
-			return []objauth.TenantOption{{TenantID: 3, Name: "tenant-3"}, {TenantID: 7, Name: "tenant-7"}}, nil
+			return []objauth.TenantOption{{TenantID: "3", Name: "tenant-3"}, {TenantID: "7", Name: "tenant-7"}}, nil
 		}},
-		ssoSessionStore: &fakeSSOSessionStore{validatedPersonID: 88},
+		ssoSessionStore: &fakeSSOSessionStore{validatedPersonID: "88"},
 	}
 
 	res, err := svc.CompleteLoginBySession(testsetup.NewCtx(), request.GetID(), "session-x")
@@ -122,8 +122,8 @@ func TestCompleteLoginBySessionHonorsAuthRequestTenantHint(t *testing.T) {
 	if !completedReq.Done() {
 		t.Fatal("expected auth request to be completed")
 	}
-	if completedReq.TenantID != 7 {
-		t.Fatalf("expected SSO to honor tenant hint 7, got %d", completedReq.TenantID)
+	if completedReq.TenantID != "7" {
+		t.Fatalf("expected SSO to honor tenant hint 7, got %s", completedReq.TenantID)
 	}
 }
 
@@ -156,16 +156,16 @@ func TestCompleteLoginBySessionFallsBackWhenHintNotInPersonsTenants(t *testing.T
 	}
 
 	authTime := time.Now()
-	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", 99, false); err != nil {
+	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", "99", false); err != nil {
 		t.Fatalf("storing forged tenant hint via CompleteAuthRequest(done=false) failed: %v", err)
 	}
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error) {
-			return []objauth.TenantOption{{TenantID: 3, Name: "tenant-3"}}, nil
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+			return []objauth.TenantOption{{TenantID: "3", Name: "tenant-3"}}, nil
 		}},
-		ssoSessionStore: &fakeSSOSessionStore{validatedPersonID: 88},
+		ssoSessionStore: &fakeSSOSessionStore{validatedPersonID: "88"},
 	}
 
 	if _, err := svc.CompleteLoginBySession(testsetup.NewCtx(), request.GetID(), "session-x"); err != nil {
@@ -182,8 +182,8 @@ func TestCompleteLoginBySessionFallsBackWhenHintNotInPersonsTenants(t *testing.T
 	if !completedReq.Done() {
 		t.Fatal("expected auth request to be completed")
 	}
-	if completedReq.TenantID != 3 {
-		t.Fatalf("expected forged hint 99 to fall back to tenants[0]=3, got %d", completedReq.TenantID)
+	if completedReq.TenantID != "3" {
+		t.Fatalf("expected forged hint 99 to fall back to tenants[0]=3, got %s", completedReq.TenantID)
 	}
 }
 
@@ -216,16 +216,16 @@ func TestCompleteLoginBySessionRejectsHintOnTenantLookupError(t *testing.T) {
 	}
 
 	authTime := time.Now()
-	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", 99, false); err != nil {
+	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", "99", false); err != nil {
 		t.Fatalf("storing forged tenant hint via CompleteAuthRequest(done=false) failed: %v", err)
 	}
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
 			return nil, assert.AnError
 		}},
-		ssoSessionStore: &fakeSSOSessionStore{validatedPersonID: 88},
+		ssoSessionStore: &fakeSSOSessionStore{validatedPersonID: "88"},
 	}
 
 	if _, err := svc.CompleteLoginBySession(testsetup.NewCtx(), request.GetID(), "session-x"); err != nil {
@@ -242,8 +242,8 @@ func TestCompleteLoginBySessionRejectsHintOnTenantLookupError(t *testing.T) {
 	if !completedReq.Done() {
 		t.Fatal("expected auth request to be completed")
 	}
-	if completedReq.TenantID != 0 {
-		t.Fatalf("expected forged hint to be dropped (tenantID 0) when tenant lookup errors, got %d", completedReq.TenantID)
+	if completedReq.TenantID != "" {
+		t.Fatalf("expected forged hint to be dropped (tenantID 0) when tenant lookup errors, got %s", completedReq.TenantID)
 	}
 }
 
@@ -281,7 +281,7 @@ func TestCompleteLoginReturnsContinueURLAndCompletesRequest(t *testing.T) {
 			if identifier != "person@example.com" || password != "Password1" {
 				t.Fatalf("unexpected credentials identifier=%q password=%q", identifier, password)
 			}
-			return &model.PersonEntity{Model: gorm.Model{ID: 88}}, &model.UserEntity{Model: gorm.Model{ID: 66}, TenantID: 1, PersonID: 88}, []objauth.TenantOption{{TenantID: 1, Name: "tenant-1"}}, nil
+			return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}}}, &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "66"}}, TenantID: "1", PersonID: "88"}, []objauth.TenantOption{{TenantID: "1", Name: "tenant-1"}}, nil
 		}},
 	}
 
@@ -298,10 +298,10 @@ func TestCompleteLoginReturnsContinueURLAndCompletesRequest(t *testing.T) {
 	if res.ContinueURL != "http://localhost:8099/oidc/authorize/callback?id="+request.GetID() {
 		t.Fatalf("unexpected continueURL: %q", res.ContinueURL)
 	}
-	if res.TenantID != 1 {
-		t.Fatalf("expected tenantID 1, got %d", res.TenantID)
+	if res.TenantID != "1" {
+		t.Fatalf("expected tenantID 1, got %s", res.TenantID)
 	}
-	if len(res.Tenants) != 1 || res.Tenants[0].TenantID != 1 {
+	if len(res.Tenants) != 1 || res.Tenants[0].TenantID != "1" {
 		t.Fatalf("unexpected tenants: %#v", res.Tenants)
 	}
 	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())
@@ -318,8 +318,8 @@ func TestCompleteLoginReturnsContinueURLAndCompletesRequest(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *AuthRequest, got %T", updated)
 	}
-	if completedReq.TenantID != 1 {
-		t.Fatalf("expected completed auth request tenantID 1, got %d", completedReq.TenantID)
+	if completedReq.TenantID != "1" {
+		t.Fatalf("expected completed auth request tenantID 1, got %s", completedReq.TenantID)
 	}
 }
 
@@ -354,7 +354,7 @@ func TestCompleteLoginMultiTenantRequiresSelection(t *testing.T) {
 	svc := &oidcAuthSvc{
 		provider: provider,
 		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
-			return &model.PersonEntity{Model: gorm.Model{ID: 88}}, &model.UserEntity{Model: gorm.Model{ID: 66}, TenantID: 3, PersonID: 88}, []objauth.TenantOption{{TenantID: 3, Name: "tenant-3"}, {TenantID: 7, Name: "tenant-7"}}, nil
+			return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}}}, &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "66"}}, TenantID: "3", PersonID: "88"}, []objauth.TenantOption{{TenantID: "3", Name: "tenant-3"}, {TenantID: "7", Name: "tenant-7"}}, nil
 		}},
 	}
 
@@ -421,14 +421,14 @@ func TestCompleteLoginHonorsTenantHint(t *testing.T) {
 	}
 
 	authTime := time.Now()
-	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", 7, false); err != nil {
+	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", "7", false); err != nil {
 		t.Fatalf("storing tenant hint via CompleteAuthRequest(done=false) failed: %v", err)
 	}
 
 	svc := &oidcAuthSvc{
 		provider: provider,
 		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
-			return &model.PersonEntity{Model: gorm.Model{ID: 88}}, &model.UserEntity{Model: gorm.Model{ID: 66}, TenantID: 3, PersonID: 88}, []objauth.TenantOption{{TenantID: 3, Name: "tenant-3"}, {TenantID: 7, Name: "tenant-7"}}, nil
+			return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}}}, &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "66"}}, TenantID: "3", PersonID: "88"}, []objauth.TenantOption{{TenantID: "3", Name: "tenant-3"}, {TenantID: "7", Name: "tenant-7"}}, nil
 		}},
 		ssoSessionStore: &fakeSSOSessionStore{},
 	}
@@ -446,8 +446,8 @@ func TestCompleteLoginHonorsTenantHint(t *testing.T) {
 	if res.RequiresTenantSelection {
 		t.Fatal("expected no tenant selection when hint is a valid membership")
 	}
-	if res.TenantID != 7 {
-		t.Fatalf("expected tenant hint 7 to override multi-tenant auto-selection, got %d", res.TenantID)
+	if res.TenantID != "7" {
+		t.Fatalf("expected tenant hint 7 to override multi-tenant auto-selection, got %s", res.TenantID)
 	}
 	if res.ContinueURL != "http://localhost:8099/oidc/authorize/callback?id="+request.GetID() {
 		t.Fatalf("unexpected continueURL: %q", res.ContinueURL)
@@ -463,8 +463,8 @@ func TestCompleteLoginHonorsTenantHint(t *testing.T) {
 	if !completedReq.Done() {
 		t.Fatal("expected auth request to be completed with valid tenant hint")
 	}
-	if completedReq.TenantID != 7 {
-		t.Fatalf("expected completed auth request tenantID 7, got %d", completedReq.TenantID)
+	if completedReq.TenantID != "7" {
+		t.Fatalf("expected completed auth request tenantID 7, got %s", completedReq.TenantID)
 	}
 }
 
@@ -497,14 +497,14 @@ func TestCompleteLoginIgnoresForgedTenantHint(t *testing.T) {
 	}
 
 	authTime := time.Now()
-	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", 99, false); err != nil {
+	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", "99", false); err != nil {
 		t.Fatalf("storing forged tenant hint via CompleteAuthRequest(done=false) failed: %v", err)
 	}
 
 	svc := &oidcAuthSvc{
 		provider: provider,
 		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
-			return &model.PersonEntity{Model: gorm.Model{ID: 88}}, &model.UserEntity{Model: gorm.Model{ID: 66}, TenantID: 3, PersonID: 88}, []objauth.TenantOption{{TenantID: 3, Name: "tenant-3"}}, nil
+			return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}}}, &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "66"}}, TenantID: "3", PersonID: "88"}, []objauth.TenantOption{{TenantID: "3", Name: "tenant-3"}}, nil
 		}},
 		ssoSessionStore: &fakeSSOSessionStore{},
 	}
@@ -519,8 +519,8 @@ func TestCompleteLoginIgnoresForgedTenantHint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CompleteLogin failed: %v", err)
 	}
-	if res.TenantID != 3 {
-		t.Fatalf("expected forged hint 99 to fall back to auto-picked tenant 3, got %d", res.TenantID)
+	if res.TenantID != "3" {
+		t.Fatalf("expected forged hint 99 to fall back to auto-picked tenant 3, got %s", res.TenantID)
 	}
 	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())
 	if err != nil {
@@ -533,8 +533,8 @@ func TestCompleteLoginIgnoresForgedTenantHint(t *testing.T) {
 	if !completedReq.Done() {
 		t.Fatal("expected auth request to be completed")
 	}
-	if completedReq.TenantID != 3 {
-		t.Fatalf("expected completed auth request tenantID 3, got %d", completedReq.TenantID)
+	if completedReq.TenantID != "3" {
+		t.Fatalf("expected completed auth request tenantID 3, got %s", completedReq.TenantID)
 	}
 }
 
@@ -567,29 +567,29 @@ func TestSelectTenantWritesTenantAndReturnsContinueURL(t *testing.T) {
 	}
 
 	authTime := time.Now()
-	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", 0, false); err != nil {
+	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", "", false); err != nil {
 		t.Fatalf("CompleteAuthRequest(done=false) failed: %v", err)
 	}
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error) {
-			if personID != 88 {
-				t.Fatalf("expected personID 88, got %d", personID)
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+			if personID != "88" {
+				t.Fatalf("expected personID 88, got %s", personID)
 			}
-			return []objauth.TenantOption{{TenantID: 3, Name: "tenant-3"}, {TenantID: 7, Name: "tenant-7"}}, nil
+			return []objauth.TenantOption{{TenantID: "3", Name: "tenant-3"}, {TenantID: "7", Name: "tenant-7"}}, nil
 		}},
 	}
 
-	res, err := svc.SelectTenant(testsetup.NewCtx(), request.GetID(), 7)
+	res, err := svc.SelectTenant(testsetup.NewCtx(), request.GetID(), "7")
 	if err != nil {
 		t.Fatalf("SelectTenant failed: %v", err)
 	}
 	if res.ContinueURL != "http://localhost:8099/oidc/authorize/callback?id="+request.GetID() {
 		t.Fatalf("unexpected continueURL: %q", res.ContinueURL)
 	}
-	if res.TenantID != 7 {
-		t.Fatalf("expected tenantID 7, got %d", res.TenantID)
+	if res.TenantID != "7" {
+		t.Fatalf("expected tenantID 7, got %s", res.TenantID)
 	}
 	if len(res.Tenants) != 2 {
 		t.Fatalf("expected 2 tenants, got %#v", res.Tenants)
@@ -605,8 +605,8 @@ func TestSelectTenantWritesTenantAndReturnsContinueURL(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *AuthRequest, got %T", updated)
 	}
-	if completedReq.TenantID != 7 {
-		t.Fatalf("expected completed auth request tenantID 7, got %d", completedReq.TenantID)
+	if completedReq.TenantID != "7" {
+		t.Fatalf("expected completed auth request tenantID 7, got %s", completedReq.TenantID)
 	}
 }
 
@@ -639,18 +639,18 @@ func TestSelectTenantRejectsTenantNotBelongingToPerson(t *testing.T) {
 	}
 
 	authTime := time.Now()
-	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", 0, false); err != nil {
+	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", "", false); err != nil {
 		t.Fatalf("CompleteAuthRequest(done=false) failed: %v", err)
 	}
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error) {
-			return []objauth.TenantOption{{TenantID: 3, Name: "tenant-3"}}, nil
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+			return []objauth.TenantOption{{TenantID: "3", Name: "tenant-3"}}, nil
 		}},
 	}
 
-	if _, err := svc.SelectTenant(testsetup.NewCtx(), request.GetID(), 7); err == nil {
+	if _, err := svc.SelectTenant(testsetup.NewCtx(), request.GetID(), "7"); err == nil {
 		t.Fatal("expected error when selecting a tenant not belonging to the person")
 	}
 	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())
@@ -693,19 +693,19 @@ func TestSelectTenantRejectsAlreadyDoneRequest(t *testing.T) {
 	callCount := 0
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
 			callCount++
-			return []objauth.TenantOption{{TenantID: 3, Name: "tenant-3"}, {TenantID: 7, Name: "tenant-7"}}, nil
+			return []objauth.TenantOption{{TenantID: "3", Name: "tenant-3"}, {TenantID: "7", Name: "tenant-7"}}, nil
 		}},
 		ssoSessionStore: &fakeSSOSessionStore{},
 	}
 
 	authTime := time.Now()
-	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", 3, true); err != nil {
+	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", "3", true); err != nil {
 		t.Fatalf("CompleteAuthRequest(done=true) failed: %v", err)
 	}
 
-	if _, err := svc.SelectTenant(testsetup.NewCtx(), request.GetID(), 3); err == nil {
+	if _, err := svc.SelectTenant(testsetup.NewCtx(), request.GetID(), "3"); err == nil {
 		t.Fatalf("expected SelectTenant to reject an already-done request")
 	}
 	if callCount != 0 {

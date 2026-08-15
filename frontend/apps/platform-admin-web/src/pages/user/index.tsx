@@ -7,7 +7,7 @@ import { createUser, deleteUser, getUserPageList, updateUser, updateUserPassword
 import type { UserItem } from '@ark-iam/types'
 import { fmtTime, SuspendedTag } from '../../components/common'
 import { useNavigate } from 'react-router-dom'
-import { brand } from '@ark-iam/ui'
+import { brand, EllipsisCell, IDCell } from '@ark-iam/ui'
 
 export default function UserList() {
   const navigate = useNavigate()
@@ -102,7 +102,7 @@ export default function UserList() {
   }
 
   const columns: ColumnsType<UserItem> = [
-    { title: 'ID', dataIndex: 'userID', key: 'userID', width: 70 },
+    { title: 'ID', dataIndex: 'userID', key: 'userID', width: 150, render: (v: string) => <IDCell value={v} /> },
     {
       title: '用户',
       key: 'user',
@@ -117,7 +117,7 @@ export default function UserList() {
         </Space>
       ),
     },
-    { title: '邮箱', dataIndex: 'primaryEmail', key: 'primaryEmail', ellipsis: true },
+    { title: '邮箱', dataIndex: 'primaryEmail', key: 'primaryEmail', render: (v: string) => <EllipsisCell value={v} /> },
     { title: '手机号', dataIndex: 'primaryPhone', key: 'primaryPhone', width: 140 },
     {
       title: '状态',

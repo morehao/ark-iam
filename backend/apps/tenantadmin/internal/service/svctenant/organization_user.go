@@ -3,10 +3,10 @@ package svctenant
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
@@ -33,7 +33,7 @@ func (svc *organizationUserSvc) Create(ctx *gin.Context, req *dtotenant.Organiza
 		glog.Errorf(ctx, "[svcorganizationuser.Create] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.OrganizationGetDetailError)
 	}
-	if orgEntity == nil || orgEntity.ID == 0 {
+	if orgEntity == nil || orgEntity.ID == "" {
 		return nil, code.GetError(code.OrganizationNotExistError)
 	}
 
@@ -42,15 +42,15 @@ func (svc *organizationUserSvc) Create(ctx *gin.Context, req *dtotenant.Organiza
 		glog.Errorf(ctx, "[svcorganizationuser.Create] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserGetDetailError)
 	}
-	if userEntity == nil || userEntity.ID == 0 {
+	if userEntity == nil || userEntity.ID == "" {
 		return nil, code.GetError(code.UserNotExistError)
 	}
 
 	insertEntity := &model.OrganizationUserEntity{
-		TenantID:       gincontext.GetTenantID(ctx),
+		TenantID:       gctx.GetTenantID(ctx),
 		OrganizationID: req.OrganizationID,
 		UserID:         req.UserID,
-		CreatedBy:      gincontext.GetUserID(ctx),
+		CreatedBy:      gctx.GetUserID(ctx),
 	}
 
 	if err := dao.NewOrganizationUserDao().Insert(ctx, insertEntity); err != nil {
@@ -62,7 +62,7 @@ func (svc *organizationUserSvc) Create(ctx *gin.Context, req *dtotenant.Organiza
 
 func (svc *organizationUserSvc) Delete(ctx *gin.Context, req *dtotenant.OrganizationUserDeleteReq) error {
 	orgUserEntityList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
-		TenantID:       gincontext.GetTenantID(ctx),
+		TenantID:       gctx.GetTenantID(ctx),
 		OrganizationID: req.OrganizationID,
 		UserID:         req.UserID,
 	})
@@ -70,11 +70,11 @@ func (svc *organizationUserSvc) Delete(ctx *gin.Context, req *dtotenant.Organiza
 		glog.Errorf(ctx, "[svcorganizationuser.Delete] dao GetListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationUserDeleteError)
 	}
-	if len(orgUserEntityList) == 0 || orgUserEntityList[0].ID == 0 {
+	if len(orgUserEntityList) == 0 || orgUserEntityList[0].ID == "" {
 		return code.GetError(code.OrganizationUserNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	if err := dao.NewOrganizationUserDao().Delete(ctx, orgUserEntityList[0].ID, userID); err != nil {
 		glog.Errorf(ctx, "[svcorganizationuser.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationUserDeleteError)

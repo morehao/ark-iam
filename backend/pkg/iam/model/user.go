@@ -4,26 +4,30 @@ import (
 	"encoding/json"
 	"time"
 
-	"gorm.io/gorm"
+	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameUser = "user"
+// TableNameUser 租户内用户表的物理表名。
+// 领域实体保持 UserEntity（租户内用户，与 PersonEntity 自然人区分，贯穿 API/DTO/前端）；
+// 因 user 是 PostgreSQL 保留字（DAO 拼接 user.xxx 会语法错误），物理表名采用 tenant_user，
+// 由 UserEntity.TableName() 建立映射。
+const TableNameUser = "tenant_user"
 
 type UserEntity struct {
-	gorm.Model
-	TenantID     uint            `gorm:"column:tenant_id;type:bigint unsigned;not null;default 0;comment:租户id"`
-	PersonID     uint            `gorm:"column:person_id;type:bigint unsigned;not null;default 0;comment:自然人ID"`
-	Name         string          `gorm:"column:name;type:varchar(128);not null;default '';comment:租户内姓名"`
-	Avatar       string          `gorm:"column:avatar;type:varchar(2048);not null;default '';comment:租户内头像URL"`
-	Profile      json.RawMessage `gorm:"column:profile;type:json;not null;default '{}';comment:租户内配置信息"`
-	CustomData   json.RawMessage `gorm:"column:custom_data;type:json;not null;default '{}';comment:租户内自定义数据"`
-	IsSuspended  int8            `gorm:"column:is_suspended;type:tinyint(1);not null;default 0;comment:是否挂起"`
-	IsOwner      int8            `gorm:"column:is_owner;type:tinyint(1);not null;default 0;comment:是否租户拥有者"`
-	JoinedAt     *time.Time      `gorm:"column:joined_at;type:datetime;not null;default CURRENT_TIMESTAMP;comment:加入租户时间"`
-	LastSignInAt *time.Time      `gorm:"column:last_sign_in_at;type:datetime;comment:最后登录时间"`
-	CreatedBy    uint            `gorm:"column:created_by;type:bigint unsigned;not null;default 0;comment:创建人id"`
-	UpdatedBy    uint            `gorm:"column:updated_by;type:bigint unsigned;not null;default 0;comment:更新人id"`
-	DeletedBy    uint            `gorm:"column:deleted_by;type:bigint unsigned;not null;default 0;comment:删除人id"`
+	gormdao.BaseEntity
+	TenantID     string          `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id"`
+	PersonID     string          `gorm:"column:person_id;type:varchar(36);not null;default:'';comment:自然人ID"`
+	Name         string          `gorm:"column:name;type:varchar(128);not null;default:'';comment:租户内姓名"`
+	Avatar       string          `gorm:"column:avatar;type:varchar(2048);not null;default:'';comment:租户内头像URL"`
+	Profile      json.RawMessage `gorm:"column:profile;type:json;not null;default:'{}';comment:租户内配置信息"`
+	CustomData   json.RawMessage `gorm:"column:custom_data;type:json;not null;default:'{}';comment:租户内自定义数据"`
+	IsSuspended  int8            `gorm:"column:is_suspended;type:smallint;not null;default:0;comment:是否挂起"`
+	IsOwner      int8            `gorm:"column:is_owner;type:smallint;not null;default:0;comment:是否租户拥有者"`
+	JoinedAt     *time.Time      `gorm:"column:joined_at;not null;default:CURRENT_TIMESTAMP;comment:加入租户时间"`
+	LastSignInAt *time.Time      `gorm:"column:last_sign_in_at;comment:最后登录时间"`
+	CreatedBy    string          `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id"`
+	UpdatedBy    string          `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id"`
+	DeletedBy    string          `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人id"`
 }
 
 func (UserEntity) TableName() string {
@@ -32,8 +36,8 @@ func (UserEntity) TableName() string {
 
 type UserEntityList []UserEntity
 
-func (l UserEntityList) ToMap() map[uint]UserEntity {
-	m := make(map[uint]UserEntity)
+func (l UserEntityList) ToMap() map[string]UserEntity {
+	m := make(map[string]UserEntity)
 	for _, v := range l {
 		m[v.ID] = v
 	}

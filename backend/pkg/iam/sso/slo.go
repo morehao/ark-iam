@@ -28,7 +28,7 @@ func ssoLogoutRegKey(sessionID string) string {
 // LogoutJob 一次待发送的 back-channel logout 通知任务。
 type LogoutJob struct {
 	SessionID            string    `json:"sessionID"`
-	PersonID             uint      `json:"personID"`
+	PersonID             string    `json:"personID"`
 	OIDCSessionID        string    `json:"oidcSessionID"`
 	ClientID             string    `json:"clientID"`
 	UserID               string    `json:"userID"`
@@ -99,7 +99,7 @@ func (r LogoutRegistration) memberValue() string {
 type SLOStore interface {
 	Register(ctx context.Context, sessionID string, reg LogoutRegistration) error
 	ListBySessionID(ctx context.Context, sessionID string) ([]LogoutRegistration, error)
-	ListByPersonID(ctx context.Context, personID uint) ([]LogoutRegistration, error)
+	ListByPersonID(ctx context.Context, personID string) ([]LogoutRegistration, error)
 	Delete(ctx context.Context, sessionID string, oidcSessionID string) error
 }
 
@@ -140,7 +140,7 @@ func (s *redisSLOStore) ListBySessionID(ctx context.Context, sessionID string) (
 
 // ListByPersonID 返回指定自然人（跨其全部 SSO 会话）登记的全部 client，
 // 供无 id_token_hint 的 person 级全局登出使用。
-func (s *redisSLOStore) ListByPersonID(ctx context.Context, personID uint) ([]LogoutRegistration, error) {
+func (s *redisSLOStore) ListByPersonID(ctx context.Context, personID string) ([]LogoutRegistration, error) {
 	if s.client == nil {
 		return nil, fmt.Errorf("redis client not available")
 	}

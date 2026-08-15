@@ -11,13 +11,50 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/auth/testutil"
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/morehao/golib/biz/gcontext"
+	"github.com/morehao/golib/dbaccess/dbredis"
+	"github.com/morehao/golib/dbaccess/gormdao"
+	"github.com/morehao/golib/glog"
 	"github.com/stretchr/testify/require"
 )
 
 const bclQueueKey = "iam:oidc:slo_queue"
+
+// setupBCLTestEnv 以内存 SQLite 注册 iam 库（并播种操作人 user "1"），
+// 同时初始化本地 Redis 供 SSO 会话与 SLO 队列使用，替代依赖真实数据库种子的旧集成方式。
+func setupBCLTestEnv(t *testing.T) {
+	t.Helper()
+	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{}, &model.UserDepartmentEntity{})
+	now := time.Now()
+	seedTenant := &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}}, Code: "seed", Name: "seed"}
+	if err := db.Create(seedTenant).Error; err != nil {
+		t.Fatalf("seed tenant: %v", err)
+	}
+	seedPerson := &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}}, Name: "seed", Profile: []byte(`{}`), CustomData: []byte(`{}`)}
+	if err := db.Create(seedPerson).Error; err != nil {
+		t.Fatalf("seed person: %v", err)
+	}
+	seedUser := &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}}, TenantID: "1", PersonID: "1", Name: "seed", Profile: []byte(`{}`), CustomData: []byte(`{}`), JoinedAt: &now}
+	if err := db.Create(seedUser).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+
+	// 最小化初始化日志，避免 glog 未初始化时崩溃
+	_ = glog.InitLogger(&glog.LogConfig{
+		Service:    "auth-test",
+		Module:     "test",
+		Level:      glog.WarnLevel,
+		LoggerType: glog.LoggerTypeZap,
+		Writers:    []glog.WriterConfig{{Type: glog.WriterConsole}},
+	})
+
+	oldCli := dbclient.RedisCli
+	require.NoError(t, dbclient.InitRedis(dbredis.RedisConfig{Service: "iam", Addr: "127.0.0.1:6379"}, nil))
+	t.Cleanup(func() { dbclient.RedisCli = oldCli })
+}
 
 // listLogoutJobs 返回调度队列中的全部 job（不消费），供断言使用。
 func listLogoutJobs(t *testing.T) []sso.LogoutJob {
@@ -35,7 +72,7 @@ func listLogoutJobs(t *testing.T) []sso.LogoutJob {
 }
 
 // findLogoutJob 在队列中查找目标 job（按 person + client + oidcSession 精确定位）。
-func findLogoutJob(jobs []sso.LogoutJob, personID uint, clientID, oidcSessionID string) *sso.LogoutJob {
+func findLogoutJob(jobs []sso.LogoutJob, personID string, clientID, oidcSessionID string) *sso.LogoutJob {
 	for i := range jobs {
 		if jobs[i].PersonID == personID && jobs[i].ClientID == clientID && jobs[i].OIDCSessionID == oidcSessionID {
 			return &jobs[i]
@@ -91,14 +128,13 @@ func parseClientAge(line string) (time.Duration, bool) {
 // TestLogoutEnqueuesBackChannelLogoutForPerson 验证业务侧登出（Logout）会为该 person
 // 已登记的 client 入队 back-channel logout 任务（一处登出 → 处处登出的 OP 侧补充）。
 func TestLogoutEnqueuesBackChannelLogoutForPerson(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameAuth)
-	defer testsetup.Done(testsetup.AppNameAuth)
+	setupBCLTestEnv(t)
 	if sloQueueContended(t) {
 		t.Skip("shared SLO queue is being consumed by a running logout worker; skip queue assertion")
 	}
 	ctx := context.Background()
 
-	personID := uint(99)
+	personID := "99"
 	sid, err := sso.NewSSOSessionStore().CreateSession(ctx, personID, []string{"pwd"})
 	require.NoError(t, err)
 	defer func() {
@@ -115,7 +151,7 @@ func TestLogoutEnqueuesBackChannelLogoutForPerson(t *testing.T) {
 	require.NoError(t, sso.NewSLOStore().Register(ctx, sid, reg))
 	defer func() { _ = sso.NewSLOStore().Delete(ctx, sid, oidcSessionID) }()
 
-	ginCtx := testsetup.NewCtx(testutil.WithIamContext(1))
+	ginCtx := testsetup.NewCtx(testutil.WithIamContext("1"))
 	ginCtx.Set(gcontext.KeyPersonID, personID)
 
 	svc := NewAuthSvc()
@@ -141,11 +177,10 @@ func TestLogoutEnqueuesBackChannelLogoutForPerson(t *testing.T) {
 
 // TestLogoutEnqueuesNothingWithoutRegistrations 验证无登记的 person 登出时不会入队垃圾任务。
 func TestLogoutEnqueuesNothingWithoutRegistrations(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameAuth)
-	defer testsetup.Done(testsetup.AppNameAuth)
+	setupBCLTestEnv(t)
 
-	personID := uint(1000)
-	ginCtx := testsetup.NewCtx(testutil.WithIamContext(1))
+	personID := "1000"
+	ginCtx := testsetup.NewCtx(testutil.WithIamContext("1"))
 	ginCtx.Set(gcontext.KeyPersonID, personID)
 
 	svc := NewAuthSvc()

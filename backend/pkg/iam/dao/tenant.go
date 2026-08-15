@@ -8,26 +8,26 @@ import (
 
 type TenantCond struct {
 	*gormdao.BaseCond
-	CreatedBy   uint
+	CreatedBy   string
 	DbUser      string
-	DeletedBy   uint
+	DeletedBy   string
 	IsSuspended int8
 	Name        string
 	Tag         string
-	UpdatedBy   uint
+	UpdatedBy   string
 }
 
 func (c *TenantCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.CreatedBy != 0 {
+	if c.CreatedBy != "" {
 		db.Where(tableName+".created_by = ?", c.CreatedBy)
 	}
 	if c.DbUser != "" {
 		db.Where(tableName+".db_user = ?", c.DbUser)
 	}
-	if c.DeletedBy != 0 {
+	if c.DeletedBy != "" {
 		db.Where(tableName+".deleted_by = ?", c.DeletedBy)
 	}
 	if c.IsSuspended != 0 {
@@ -39,18 +39,18 @@ func (c *TenantCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.Tag != "" {
 		db.Where(tableName+".tag = ?", c.Tag)
 	}
-	if c.UpdatedBy != 0 {
+	if c.UpdatedBy != "" {
 		db.Where(tableName+".updated_by = ?", c.UpdatedBy)
 	}
 }
 
 type TenantDao struct {
-	*gormdao.Dao[model.TenantEntity, model.TenantEntityList, uint]
+	*gormdao.Dao[model.TenantEntity, model.TenantEntityList, string]
 }
 
 func NewTenantDao(opts ...DaoOption) *TenantDao {
 	return &TenantDao{
-		Dao: gormdao.NewDao[model.TenantEntity, model.TenantEntityList, uint](
+		Dao: gormdao.NewDao[model.TenantEntity, model.TenantEntityList, string](
 			model.TableNameTenant, "TenantDao",
 			resolveDBGetter(opts...),
 		),

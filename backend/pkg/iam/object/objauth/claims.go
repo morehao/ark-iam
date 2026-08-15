@@ -1,14 +1,13 @@
 package objauth
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
 const (
-	// personSubjectPrefix 是 OIDC sub 中自然人标识的前缀（如 person:123）。
+	// personSubjectPrefix 是 OIDC sub 中自然人标识的前缀（如 person:0198d5f6-xxxx）。
 	personSubjectPrefix = "person:"
 
 	// TokenUsageMachine 标识机器凭证签发的 token（API Key / client_credentials）。
@@ -29,11 +28,12 @@ const (
 // 签发侧通过 OIDCPrivateClaims 产出 zitadel op.Storage 所需的扁平 map，
 // 消费侧通过 jwt.ParseWithClaims 直接反序列化为该结构，两端共享同一份定义，
 // 避免 claim 名/类型在 map 字面量与类型断言之间漂移。
+// 自 string-id 改造起，TenantID/UserID 均为字符串主键（UUID v7）。
 type TokenClaims struct {
 	jwt.RegisteredClaims
 	TokenUsage string `json:"token_usage,omitempty"`
-	TenantID   uint   `json:"tenant_id,omitempty"`
-	UserID     uint   `json:"user_id,omitempty"`
+	TenantID   string `json:"tenant_id,omitempty"`
+	UserID     string `json:"user_id,omitempty"`
 	ClientID   string `json:"client_id,omitempty"`
 }
 
@@ -43,10 +43,10 @@ func (c TokenClaims) OIDCPrivateClaims() map[string]any {
 	if c.TokenUsage != "" {
 		m[claimTokenUsage] = c.TokenUsage
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		m[claimTenantID] = c.TenantID
 	}
-	if c.UserID != 0 {
+	if c.UserID != "" {
 		m[claimUserID] = c.UserID
 	}
 	if c.ClientID != "" {
@@ -56,17 +56,12 @@ func (c TokenClaims) OIDCPrivateClaims() map[string]any {
 }
 
 // PersonID 从 Subject（形如 person:<id>）解析自然人ID。
-// 非 person 前缀（如机器凭证 sub=clientID）返回 0。
-func (c *TokenClaims) PersonID() uint {
+// 非 person 前缀（如机器凭证 sub=clientID）返回空字符串。
+func (c *TokenClaims) PersonID() string {
 	if !strings.HasPrefix(c.Subject, personSubjectPrefix) {
-		return 0
+		return ""
 	}
-	raw := strings.TrimPrefix(c.Subject, personSubjectPrefix)
-	id, err := strconv.ParseUint(raw, 10, 64)
-	if err != nil {
-		return 0
-	}
-	return uint(id)
+	return strings.TrimPrefix(c.Subject, personSubjectPrefix)
 }
 
 // IsMachine 判断该 token 是否为机器凭证签发。

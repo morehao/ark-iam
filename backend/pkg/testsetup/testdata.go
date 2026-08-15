@@ -7,15 +7,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/gcrypto"
 )
 
 type TestDataIDs struct {
-	TenantIDs []uint
-	PersonIDs []uint
-	UserIDs   []uint
+	TenantIDs []string
+	PersonIDs []string
+	UserIDs   []string
 }
 
 func PrepareTestTenant(ctx context.Context, name, tag string) (*model.TenantEntity, error) {
@@ -55,7 +55,7 @@ func PrepareTestPerson(ctx context.Context, username, email, phone, password, na
 	return entity, nil
 }
 
-func PrepareTestUser(ctx context.Context, tenantID, personID uint, name string, isOwner int8) (*model.UserEntity, error) {
+func PrepareTestUser(ctx context.Context, tenantID, personID string, name string, isOwner int8) (*model.UserEntity, error) {
 	db := dbclient.IamDB(ctx)
 	now := time.Now()
 	entity := &model.UserEntity{

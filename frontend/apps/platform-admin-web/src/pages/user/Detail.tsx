@@ -16,7 +16,7 @@ import {
 } from '@ark-iam/api'
 import type { DepartmentItem, UserIdentityItem, UserItem, UserLoginLogItem } from '@ark-iam/types'
 import { fmtTime, SuspendedTag } from '../../components/common'
-import { brand } from '@ark-iam/ui'
+import { brand, EllipsisCell, IDCell } from '@ark-iam/ui'
 
 export default function UserDetail() {
   const { id } = useParams<{ id: string }>()
@@ -26,14 +26,14 @@ export default function UserDetail() {
 
   const [identities, setIdentities] = useState<UserIdentityItem[]>([])
   const [loginLogs, setLoginLogs] = useState<UserLoginLogItem[]>([])
-  const [deptRel, setDeptRel] = useState<{ departmentID: number; isPrimary: number }[]>([])
+  const [deptRel, setDeptRel] = useState<{ departmentID: string; isPrimary: number }[]>([])
   const [deptTree, setDeptTree] = useState<DataNode[]>([])
   const [assignModalOpen, setAssignModalOpen] = useState(false)
   const [checkedDeptKeys, setCheckedDeptKeys] = useState<React.Key[]>([])
   const [identityModalOpen, setIdentityModalOpen] = useState(false)
   const [identityForm] = Form.useForm()
 
-  const userID = Number(id)
+  const userID = id ?? ""
 
   const fetchAll = useCallback(async () => {
     if (!id) return
@@ -77,7 +77,7 @@ export default function UserDetail() {
 
   const handleAssign = async () => {
     try {
-      await assignUserDepartments(userID, checkedDeptKeys.map(Number))
+      await assignUserDepartments(userID, checkedDeptKeys.map(String))
       message.success('分配成功')
       setAssignModalOpen(false)
       void fetchAll()
@@ -89,7 +89,7 @@ export default function UserDetail() {
   const handleAddIdentity = async () => {
     try {
       const values = await identityForm.validateFields()
-      await createUserIdentity({ tenantID: user?.tenantID ?? 0, userID: userID, issuer: values.issuer, identityID: values.identityID })
+      await createUserIdentity({ tenantID: user?.tenantID ?? "", userID: userID, issuer: values.issuer, identityID: values.identityID })
       message.success('绑定成功')
       setIdentityModalOpen(false)
       identityForm.resetFields()
@@ -100,7 +100,7 @@ export default function UserDetail() {
   }
 
   const identityColumns: ColumnsType<UserIdentityItem> = [
-    { title: 'ID', dataIndex: 'userIdentityID', key: 'userIdentityID', width: 90 },
+    { title: 'ID', dataIndex: 'userIdentityID', key: 'userIdentityID', width: 150, render: (v: string) => <IDCell value={v} /> },
     { title: '身份提供商', dataIndex: 'issuer', key: 'issuer' },
     { title: '第三方用户ID', dataIndex: 'identityID', key: 'identityID' },
     { title: '创建时间', key: 'createdAt', width: 170, render: (_, r) => fmtTime((r as UserIdentityItem & { createdAt?: number }).createdAt) },
@@ -126,9 +126,9 @@ export default function UserDetail() {
   ]
 
   const logColumns: ColumnsType<UserLoginLogItem> = [
-    { title: 'ID', dataIndex: 'userLoginLogID', key: 'userLoginLogID', width: 90 },
+    { title: 'ID', dataIndex: 'userLoginLogID', key: 'userLoginLogID', width: 150, render: (v: string) => <IDCell value={v} /> },
     { title: '登录IP', dataIndex: 'loginIP', key: 'loginIP', width: 150 },
-    { title: 'UserAgent', dataIndex: 'userAgent', key: 'userAgent', ellipsis: true },
+    { title: 'UserAgent', dataIndex: 'userAgent', key: 'userAgent', render: (v: string) => <EllipsisCell value={v} /> },
     { title: '登录时间', key: 'loginTime', width: 170, render: (_, r) => fmtTime(r.loginTime) },
   ]
 
@@ -175,8 +175,8 @@ export default function UserDetail() {
               label: '基本信息',
               children: (
                 <Descriptions column={2} bordered size="small">
-                  <Descriptions.Item label="用户ID">{user.userID}</Descriptions.Item>
-                  <Descriptions.Item label="租户ID">{user.tenantID}</Descriptions.Item>
+                  <Descriptions.Item label="用户ID"><IDCell value={user.userID} /></Descriptions.Item>
+                  <Descriptions.Item label="租户ID"><IDCell value={user.tenantID} /></Descriptions.Item>
                   <Descriptions.Item label="用户名">{user.username || '-'}</Descriptions.Item>
                   <Descriptions.Item label="姓名">{user.name || '-'}</Descriptions.Item>
                   <Descriptions.Item label="邮箱">{user.primaryEmail || '-'}</Descriptions.Item>
@@ -223,7 +223,7 @@ export default function UserDetail() {
                       dataSource={deptRel}
                       pagination={false}
                       columns={[
-                        { title: '部门ID', dataIndex: 'departmentID', key: 'departmentID' },
+                        { title: '部门ID', dataIndex: 'departmentID', key: 'departmentID', render: (v: string) => <IDCell value={v} /> },
                         {
                           title: '是否主部门',
                           dataIndex: 'isPrimary',

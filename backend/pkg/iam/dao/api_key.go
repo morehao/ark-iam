@@ -10,7 +10,7 @@ import (
 
 type ApiKeyCond struct {
 	*gormdao.BaseCond
-	TenantID  uint
+	TenantID  string
 	Name      string
 	KeyHash   string
 	RevokedAt *time.Time
@@ -20,7 +20,7 @@ func (c *ApiKeyCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
 	if c.Name != "" {
@@ -39,12 +39,12 @@ func (c *ApiKeyCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type ApiKeyDao struct {
-	*gormdao.Dao[model.ApiKeyEntity, model.ApiKeyEntityList, uint]
+	*gormdao.Dao[model.ApiKeyEntity, model.ApiKeyEntityList, string]
 }
 
 func NewApiKeyDao(opts ...DaoOption) *ApiKeyDao {
 	return &ApiKeyDao{
-		Dao: gormdao.NewDao[model.ApiKeyEntity, model.ApiKeyEntityList, uint](
+		Dao: gormdao.NewDao[model.ApiKeyEntity, model.ApiKeyEntityList, string](
 			model.TableNameApiKey, "ApiKeyDao",
 			resolveDBGetter(opts...),
 		),

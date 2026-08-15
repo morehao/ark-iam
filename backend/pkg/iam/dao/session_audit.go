@@ -8,7 +8,7 @@ import (
 
 type SessionAuditCond struct {
 	*gormdao.BaseCond
-	PersonID  uint
+	PersonID  string
 	SessionID string
 	Status    string
 }
@@ -17,7 +17,7 @@ func (c *SessionAuditCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.PersonID != 0 {
+	if c.PersonID != "" {
 		db.Where(tableName+".person_id = ?", c.PersonID)
 	}
 	if c.SessionID != "" {
@@ -29,12 +29,12 @@ func (c *SessionAuditCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type SessionAuditDao struct {
-	*gormdao.Dao[model.SessionAuditEntity, model.SessionAuditEntityList, uint]
+	*gormdao.Dao[model.SessionAuditEntity, model.SessionAuditEntityList, string]
 }
 
 func NewSessionAuditDao(opts ...DaoOption) *SessionAuditDao {
 	return &SessionAuditDao{
-		Dao: gormdao.NewDao[model.SessionAuditEntity, model.SessionAuditEntityList, uint](
+		Dao: gormdao.NewDao[model.SessionAuditEntity, model.SessionAuditEntityList, string](
 			model.TableNameSession, "SessionAuditDao",
 			resolveDBGetter(opts...),
 		),

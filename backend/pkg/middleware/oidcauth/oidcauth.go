@@ -22,7 +22,7 @@ const (
 
 type authConfig struct {
 	skipPaths       []string
-	validateOIDCSSO func(ctx *gin.Context, personID uint, isMachineToken bool) bool
+	validateOIDCSSO func(ctx *gin.Context, personID string, isMachineToken bool) bool
 	// issuer 为 OP 的 issuer，配置后强制校验 access token 的 iss（H3）。
 	issuer string
 	// audiences 为本应用（RP）认可的 aud 集合，配置后强制校验 access token 的 aud，
@@ -59,7 +59,7 @@ func WithOIDCAudiences(audiences ...string) AuthOption {
 // 例如已在其他应用全局登出），则本次请求按未认证处理，返回 401。
 // isMachineToken 标识该令牌是否为机器凭证（client_credentials/API Key）签发，
 // 机器凭证不依赖浏览器 SSO 会话活性，校验器可据此直接放行。
-func WithOIDCSSOValidation(validate func(ctx *gin.Context, personID uint, isMachineToken bool) bool) AuthOption {
+func WithOIDCSSOValidation(validate func(ctx *gin.Context, personID string, isMachineToken bool) bool) AuthOption {
 	return func(c *authConfig) {
 		c.validateOIDCSSO = validate
 	}
@@ -102,7 +102,7 @@ func OIDCCompatibleAuth(getOIDCPublicKey func() *rsa.PublicKey, opts ...AuthOpti
 			isMachine := claims.IsMachine()
 			personID := claims.PersonID()
 			if cfg.validateOIDCSSO != nil && !cfg.validateOIDCSSO(ctx, personID, isMachine) {
-				glog.Warnf(ctx, "[oidcauth] sso session revoked, personID:%d", personID)
+				glog.Warnf(ctx, "[oidcauth] sso session revoked, personID:%s", personID)
 				abortUnauthorized(ctx, "session expired")
 				return
 			}
@@ -150,7 +150,7 @@ func validateOIDCAccessToken(tokenStr string, publicKey *rsa.PublicKey, issuer s
 	// 人 token 必须携带 person sub 与 tenant_id；机器凭证必须携带可知的 token_usage。
 	// 既非 person 也非 machine 的 token（如仅 client_id 的 client_credentials）拒绝。
 	if claims.HasPerson() {
-		if claims.TenantID == 0 {
+		if claims.TenantID == "" {
 			return nil, errors.New("missing required oidc claim: tenant_id")
 		}
 		return claims, nil
@@ -163,10 +163,9 @@ func validateOIDCAccessToken(tokenStr string, publicKey *rsa.PublicKey, issuer s
 
 func setOIDCContext(ctx *gin.Context, claims *objauth.TokenClaims, tokenStr string) {
 	personID := claims.PersonID()
-	tenantID := uint(claims.TenantID)
 
 	ctx.Set(gcontext.KeyPersonID, personID)
-	ctx.Set(gcontext.KeyTenantID, tenantID)
+	ctx.Set(gcontext.KeyTenantID, claims.TenantID)
 	ctx.Set(gcontext.KeyAuthToken, tokenStr)
 }
 

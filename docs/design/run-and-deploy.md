@@ -22,7 +22,7 @@
 | Go | 1.21+ | 后端（go.work 多模块） |
 | Node.js | 18+ | 前端 / e2e |
 | pnpm | 8+ | 前端 monorepo 依赖管理 |
-| MySQL | 5.7+/8.x | 主库（库名 `iam`） |
+| PostgreSQL | 12+ | 主库（库名 `iam`），启动时由 AutoMigrate 自动建表 |
 | Redis | 5+ | SSO 会话 / 授权状态 / SLO 队列 |
 | OpenTelemetry Collector（可选） | - | 链路追踪（默认 `127.0.0.1:4317`） |
 
@@ -70,14 +70,14 @@ pnpm dev:tenant   # tenant-admin-web :3002
 
 ```mermaid
 flowchart LR
-    MYSQL["启动 MySQL<br/>（创建 iam 库）"] --> REDIS["启动 Redis"]
-    REDIS --> SEED["导入种子数据<br/>（租户/管理员/客户端）"]
-    SEED --> BE["启动后端 gateway :8100"]
+    PG["启动 PostgreSQL<br/>（创建 iam 库）"] --> REDIS["启动 Redis"]
+    REDIS --> BE["启动后端 gateway :8100<br/>（AutoMigrate 自动建表 + 幂等种子数据）"]
+    BE --> FE["启动前端三个应用"]
     BE --> FE["启动前端三个应用"]
     FE --> TEST["访问 platform-admin-web 验证登录"]
 ```
 
-种子数据（e2e 环境）：管理员 `admin / admin123`，OAuth 客户端 `platform-admin-web` / `tenant-admin-web`。
+种子数据：启动时由 `pkg/seed` 幂等写入（配置 `db.seed: true` 开启）。管理员 `admin / admin123`，OAuth 客户端 `platform-admin-web` / `tenant-admin-web`。
 
 ### 2.4 验证 OIDC Provider
 
@@ -123,7 +123,7 @@ go vet ./...
 cd e2e
 npm install
 npx playwright install chromium
-# 前置：MySQL + Redis + 后端（gateway）+ 三个前端应用已启动、种子数据已导入
+# 前置：PostgreSQL + Redis + 后端（gateway）+ 三个前端应用已启动（种子数据启动时自动写入）
 npx playwright test
 ```
 
@@ -166,7 +166,7 @@ flowchart TB
             T1["tenantadmin-1 :8083"]
         end
         REDIS_SHARED[("Redis（认证共享）<br/>SSO 会话/授权状态/SLO 队列")]
-        MYSQL[("MySQL")]
+        PG[("PostgreSQL")]
     end
     LB --> AUTH_CLUS
     LB --> PLAT_CLUS
@@ -183,7 +183,7 @@ flowchart TB
 |---|---|---|
 | **单体聚合**（gateway 单进程） | 小规模/开发 | 一个进程挂载三应用，端口 8100 |
 | **分体部署** | 中大规模 | auth / platformadmin / tenantadmin 独立进程独立扩缩容 |
-| **auth 多副本** | 高可用 | 必须共享同一认证 Redis（会话/授权状态），MySQL 主库；`/oidc` 无状态化依赖 Redis |
+| **auth 多副本** | 高可用 | 必须共享同一认证 Redis（会话/授权状态），PostgreSQL 主库；`/oidc` 无状态化依赖 Redis |
 
 **关键约束**：
 

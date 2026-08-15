@@ -22,7 +22,7 @@ type stubConnectorSvc struct {
 	testConnectorErr  error
 
 	authorizeReq         *dtoconnector.ConnectorAuthorizeReq
-	authorizeConnectorID uint
+	authorizeConnectorID string
 	authorizeResp        *dtoconnector.ConnectorAuthorizeResp
 	authorizeErr         error
 
@@ -65,7 +65,7 @@ func (s *stubConnectorSvc) TestConnector(ctx *gin.Context, req *dtoconnector.Con
 	return s.testConnectorResp, s.testConnectorErr
 }
 
-func (s *stubConnectorSvc) Authorize(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID uint) (*dtoconnector.ConnectorAuthorizeResp, error) {
+func (s *stubConnectorSvc) Authorize(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID string) (*dtoconnector.ConnectorAuthorizeResp, error) {
 	s.authorizeReq = req
 	s.authorizeConnectorID = connectorID
 	return s.authorizeResp, s.authorizeErr
@@ -128,11 +128,11 @@ func TestConnectorControllerAuthorize(t *testing.T) {
 	if svc.authorizeReq == nil {
 		t.Fatal("expected Authorize to receive request")
 	}
-	if svc.authorizeConnectorID != 42 {
-		t.Fatalf("expected connectorID 42, got %d", svc.authorizeConnectorID)
+	if svc.authorizeConnectorID != "42" {
+		t.Fatalf("expected connectorID 42, got %s", svc.authorizeConnectorID)
 	}
-	if svc.authorizeReq.ConnectorID != 42 {
-		t.Fatalf("expected URI binding to populate request connectorID, got %d", svc.authorizeReq.ConnectorID)
+	if svc.authorizeReq.ConnectorID != "42" {
+		t.Fatalf("expected URI binding to populate request connectorID, got %s", svc.authorizeReq.ConnectorID)
 	}
 	if svc.authorizeReq.RedirectURI != "https://app.example.com/callback" || svc.authorizeReq.State != "state-1" || svc.authorizeReq.LoginHint != "user@example.com" {
 		t.Fatalf("expected JSON body to bind into authorize request, got %+v", *svc.authorizeReq)
@@ -161,8 +161,8 @@ func TestConnectorControllerTestConnector(t *testing.T) {
 	if svc.testConnectorReq == nil {
 		t.Fatal("expected TestConnector to receive request")
 	}
-	if svc.testConnectorReq.ConnectorID != 9 {
-		t.Fatalf("expected URI binding to populate connectorID=9, got %d", svc.testConnectorReq.ConnectorID)
+	if svc.testConnectorReq.ConnectorID != "9" {
+		t.Fatalf("expected URI binding to populate connectorID=9, got %s", svc.testConnectorReq.ConnectorID)
 	}
 	assertJSONContainsData(t, recorder.Body.Bytes(), "ok")
 }
@@ -187,7 +187,7 @@ func TestConnectorControllerCallback(t *testing.T) {
 	if svc.callbackReq == nil {
 		t.Fatal("expected Callback to receive request")
 	}
-	if svc.callbackReq.ConnectorID != 7 || svc.callbackReq.Code != "callback-code" || svc.callbackReq.State != "state-2" {
+	if svc.callbackReq.ConnectorID != "7" || svc.callbackReq.Code != "callback-code" || svc.callbackReq.State != "state-2" {
 		t.Fatalf("expected query binding to populate callback request, got %+v", *svc.callbackReq)
 	}
 	assertJSONContainsData(t, recorder.Body.Bytes(), "sso-session-7")

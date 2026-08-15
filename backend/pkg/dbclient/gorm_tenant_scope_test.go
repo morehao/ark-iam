@@ -48,7 +48,7 @@ func openTestDB(t *testing.T, skipTables []string) (*gorm.DB, *gin.Context) {
 	// 模拟 OIDC 登录后的请求上下文：gin context 中已写入 tenant_id。
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = &http.Request{URL: &url.URL{}, Header: http.Header{}}
-	ginCtx.Set(gcontext.KeyTenantID, uint(1))
+	ginCtx.Set(gcontext.KeyTenantID, "1")
 
 	return db, ginCtx
 }
@@ -99,28 +99,28 @@ func TestTenantScopePluginTenantTablesStillScoped(t *testing.T) {
 	db, tenantCtx := openTestDB(t, tenantScopeSkipTables)
 
 	// 插入两条不同租户的审计日志。
-	for _, tenantID := range []uint{1, 2} {
+	for _, tenantID := range []string{"1", "2"} {
 		if err := db.WithContext(context.Background()).Create(&model.AuditLogEntity{
-			ActorPersonID: 1,
+			ActorPersonID: "1",
 			Action:        "test.action",
 			TargetType:    "application",
 			Result:        "success",
 			TenantID:      tenantID,
 			ClientID:      "c",
 		}).Error; err != nil {
-			t.Fatalf("seed audit log tenant %d: %v", tenantID, err)
+			t.Fatalf("seed audit log tenant %s: %v", tenantID, err)
 		}
 	}
 
 	var rows []model.AuditLogEntity
 	if err := db.WithContext(tenantCtx).Model(&model.AuditLogEntity{}).Table(model.TableNameAuditLog).
-		Where(model.TableNameAuditLog+".deleted_at IS NULL").Find(&rows).Error; err != nil {
+		Where(model.TableNameAuditLog + ".deleted_at IS NULL").Find(&rows).Error; err != nil {
 		t.Fatalf("query audit_log: %v", err)
 	}
 	if len(rows) != 1 {
 		t.Fatalf("expected only tenant 1 audit log, got %d rows", len(rows))
 	}
-	if rows[0].TenantID != 1 {
-		t.Fatalf("expected tenant_id 1, got %d", rows[0].TenantID)
+	if rows[0].TenantID != "1" {
+		t.Fatalf("expected tenant_id 1, got %s", rows[0].TenantID)
 	}
 }

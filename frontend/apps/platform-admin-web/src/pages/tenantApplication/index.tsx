@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, InputNumber, message, Modal, Popconfirm, Select, Space, Table } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { PageContainer } from '@ark-iam/ui'
+import { IDCell, PageContainer } from '@ark-iam/ui'
 import {
   createTenantApplication,
   deleteTenantApplication,
@@ -91,9 +91,9 @@ export default function TenantApplicationList() {
   }
 
   const columns: ColumnsType<TenantApplicationItem> = [
-    { title: 'ID', dataIndex: 'tenantAppID', key: 'tenantAppID', width: 80 },
-    { title: '租户ID', dataIndex: 'tenantID', key: 'tenantID', width: 100 },
-    { title: '应用ID', dataIndex: 'appID', key: 'appID', width: 100 },
+    { title: 'ID', dataIndex: 'tenantAppID', key: 'tenantAppID', width: 150, render: (v: string) => <IDCell value={v} /> },
+    { title: '租户ID', dataIndex: 'tenantID', key: 'tenantID', width: 150, render: (v: string) => <IDCell value={v} /> },
+    { title: '应用ID', dataIndex: 'appID', key: 'appID', width: 150, render: (v: string) => <IDCell value={v} /> },
     { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (v: string) => <StatusTag value={v} /> },
     { title: '创建时间', key: 'createdAt', width: 170, render: (_, r) => fmtTime(r.createdAt) },
     {

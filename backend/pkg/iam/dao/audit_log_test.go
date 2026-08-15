@@ -32,28 +32,28 @@ func TestAuditLogDao_InsertAndGetByCond(t *testing.T) {
 	}))
 
 	entity := &model.AuditLogEntity{
-		ActorPersonID: 11,
-		ActorUserID:   22,
-		TenantID:      1,
+		ActorPersonID: "11",
+		ActorUserID:   "22",
+		TenantID:      "1",
 		ClientID:      "test-client",
 		Action:        "application.create",
 		TargetType:    "application",
-		TargetID:      99,
+		TargetID:      "99",
 		Result:        "success",
 		IP:            "127.0.0.1",
 		UserAgent:     "go-test",
 		Detail:        "created app",
-		CreatedBy:     22,
+		CreatedBy:     "22",
 	}
 	if err := auditDao.Insert(context.Background(), entity); err != nil {
 		t.Fatalf("Insert failed: %v", err)
 	}
-	if entity.ID == 0 {
+	if entity.ID == "" {
 		t.Fatal("expected non-zero ID after insert")
 	}
 
 	got, err := auditDao.GetByCond(context.Background(), &AuditLogCond{
-		PersonID: 11,
+		PersonID: "11",
 		Action:   "application.create",
 		Result:   "success",
 	})
@@ -64,16 +64,16 @@ func TestAuditLogDao_InsertAndGetByCond(t *testing.T) {
 		t.Fatal("expected one audit log row")
 	}
 	if got.ID != entity.ID {
-		t.Fatalf("expected id %d, got %d", entity.ID, got.ID)
+		t.Fatalf("expected id %s, got %s", entity.ID, got.ID)
 	}
-	if got.ActorUserID != 22 {
-		t.Fatalf("expected actor_user_id 22, got %d", got.ActorUserID)
+	if got.ActorUserID != "22" {
+		t.Fatalf("expected actor_user_id 22, got %s", got.ActorUserID)
 	}
-	if got.TenantID != 1 {
-		t.Fatalf("expected tenant_id 1, got %d", got.TenantID)
+	if got.TenantID != "1" {
+		t.Fatalf("expected tenant_id 1, got %s", got.TenantID)
 	}
-	if got.TargetID != 99 {
-		t.Fatalf("expected target_id 99, got %d", got.TargetID)
+	if got.TargetID != "99" {
+		t.Fatalf("expected target_id 99, got %s", got.TargetID)
 	}
 	if got.Detail != "created app" {
 		t.Fatalf("expected detail 'created app', got '%s'", got.Detail)

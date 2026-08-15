@@ -2,14 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { Table, Button, Space, Input, Modal, Form, Select, Popconfirm, message } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, IDCell, PageContainer } from '@ark-iam/ui'
 import { createOAuthClient, deleteOAuthClient, getApplicationPageList, getOAuthClientPageList, updateOAuthClient } from '@ark-iam/api'
 import type { OAuthClientItem } from '@ark-iam/types'
 import { useNavigate } from 'react-router-dom'
 import { fmtTime, StatusTag, TypeTag } from '../../components/common'
 
 interface AppOption {
-  value: number
+  value: string
   label: string
 }
 
@@ -97,16 +97,16 @@ export default function OAuthClientList() {
   }
 
   const columns: ColumnsType<OAuthClientItem> = [
-    { title: 'ID', dataIndex: 'applicationClientID', key: 'applicationClientID', width: 80 },
+    { title: 'ID', dataIndex: 'applicationClientID', key: 'applicationClientID', width: 150, render: (v: string) => <IDCell value={v} /> },
     {
       title: '客户端ID',
       dataIndex: 'clientID',
       key: 'clientID',
-      width: 240,
-      render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v || '-'}</span>,
+      width: 150,
+      render: (v: string) => <IDCell value={v} />,
     },
-    { title: '名称', dataIndex: 'name', key: 'name', ellipsis: true },
-    { title: '所属应用ID', dataIndex: 'appID', key: 'appID', width: 110 },
+    { title: '名称', dataIndex: 'name', key: 'name', render: (v: string) => <EllipsisCell value={v} /> },
+    { title: '所属应用ID', dataIndex: 'appID', key: 'appID', width: 150, render: (v: string) => <IDCell value={v} /> },
     { title: '类型', dataIndex: 'type', key: 'type', width: 100, render: (v: string) => <TypeTag value={v} /> },
     { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (v: string) => <StatusTag value={v} /> },
     { title: '创建时间', key: 'createdAt', width: 160, render: (_, r) => fmtTime(r.createdAt) },

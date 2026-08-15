@@ -4,29 +4,29 @@ import (
 	"encoding/json"
 	"time"
 
-	"gorm.io/gorm"
+	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
 const TableNamePerson = "person"
 
 type PersonEntity struct {
-	gorm.Model
+	gormdao.BaseEntity
 	// Username/PrimaryEmail/PrimaryPhone 为可选全局标识，空值存 NULL：
 	// 三者均有唯一索引，若空值存 '' 则仅允许一条空记录，后续创建无该标识的用户会撞唯一键。
-	Username          *string         `gorm:"column:username;type:varchar(128);default null;comment:全局用户名"`
-	PrimaryEmail      *string         `gorm:"column:primary_email;type:varchar(128);default null;comment:主要邮箱"`
-	PrimaryPhone      *string         `gorm:"column:primary_phone;type:varchar(128);default null;comment:主要手机号"`
-	PasswordEncrypted string          `gorm:"column:password_encrypted;type:varchar(256);not null;default '';comment:加密密码"`
-	PasswordMethod    string          `gorm:"column:password_method;type:varchar(32);not null;default '';comment:密码加密方式"`
-	Name              string          `gorm:"column:name;type:varchar(128);not null;default '';comment:姓名"`
-	Avatar            string          `gorm:"column:avatar;type:varchar(2048);not null;default '';comment:头像URL"`
-	Profile           json.RawMessage `gorm:"column:profile;type:json;not null;default '{}';comment:配置信息"`
-	CustomData        json.RawMessage `gorm:"column:custom_data;type:json;not null;default '{}';comment:自定义数据"`
-	IsSuspended       int8            `gorm:"column:is_suspended;type:tinyint(1);not null;default 0;comment:是否挂起"`
-	LastSignInAt      *time.Time      `gorm:"column:last_sign_in_at;type:datetime;comment:最后登录时间"`
-	CreatedBy         uint            `gorm:"column:created_by;type:bigint unsigned;not null;default 0;comment:创建人id"`
-	UpdatedBy         uint            `gorm:"column:updated_by;type:bigint unsigned;not null;default 0;comment:更新人id"`
-	DeletedBy         uint            `gorm:"column:deleted_by;type:bigint unsigned;not null;default 0;comment:删除人id"`
+	Username          *string         `gorm:"column:username;type:varchar(128);default:null;comment:全局用户名"`
+	PrimaryEmail      *string         `gorm:"column:primary_email;type:varchar(128);default:null;comment:主要邮箱"`
+	PrimaryPhone      *string         `gorm:"column:primary_phone;type:varchar(128);default:null;comment:主要手机号"`
+	PasswordEncrypted string          `gorm:"column:password_encrypted;type:varchar(256);not null;default:'';comment:加密密码"`
+	PasswordMethod    string          `gorm:"column:password_method;type:varchar(32);not null;default:'';comment:密码加密方式"`
+	Name              string          `gorm:"column:name;type:varchar(128);not null;default:'';comment:姓名"`
+	Avatar            string          `gorm:"column:avatar;type:varchar(2048);not null;default:'';comment:头像URL"`
+	Profile           json.RawMessage `gorm:"column:profile;type:json;not null;default:'{}';comment:配置信息"`
+	CustomData        json.RawMessage `gorm:"column:custom_data;type:json;not null;default:'{}';comment:自定义数据"`
+	IsSuspended       int8            `gorm:"column:is_suspended;type:smallint;not null;default:0;comment:是否挂起"`
+	LastSignInAt      *time.Time      `gorm:"column:last_sign_in_at;comment:最后登录时间"`
+	CreatedBy         string          `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id"`
+	UpdatedBy         string          `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id"`
+	DeletedBy         string          `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人id"`
 }
 
 // StrPtr 将空字符串转为 nil（NULL），非空返回指针，供 person 可选标识字段使用。
@@ -51,8 +51,8 @@ func (PersonEntity) TableName() string {
 
 type PersonEntityList []PersonEntity
 
-func (l PersonEntityList) ToMap() map[uint]PersonEntity {
-	m := make(map[uint]PersonEntity)
+func (l PersonEntityList) ToMap() map[string]PersonEntity {
+	m := make(map[string]PersonEntity)
 	for _, v := range l {
 		m[v.ID] = v
 	}

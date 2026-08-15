@@ -3,6 +3,10 @@ server:
   port: 8082
   env: dev
 
+db:
+  auto_migrate: true
+  seed: true
+
 client:
   httpbingo:
     host: https://httpbingo.org
@@ -59,7 +63,7 @@ trace:
     timeout: 10s
 
 db_configs:
-  - url: "mysql://root:123456@127.0.0.1:3306/iam?charset=utf8mb4&parseTime=True&loc=Local&timeout=5s&readTimeout=3s&writeTimeout=3s"
+  - url: "postgres://postgres:123456@127.0.0.1:5432/iam?sslmode=disable&TimeZone=Asia/Shanghai"
     service: iam
 
 redis_config:

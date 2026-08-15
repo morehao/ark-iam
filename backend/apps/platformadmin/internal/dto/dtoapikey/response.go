@@ -1,7 +1,7 @@
 package dtoapikey
 
 type ApiKeyCreateResp struct {
-	ID        uint   `json:"id"`
+	ID        string `json:"id"`
 	Name      string `json:"name"`
 	Key       string `json:"key"`
 	KeyPrefix string `json:"keyPrefix"`
@@ -9,7 +9,7 @@ type ApiKeyCreateResp struct {
 }
 
 type ApiKeyPageListItem struct {
-	ID         uint   `json:"id"`
+	ID         string `json:"id"`
 	Name       string `json:"name"`
 	KeyPrefix  string `json:"keyPrefix"`
 	Scope      string `json:"scope"`

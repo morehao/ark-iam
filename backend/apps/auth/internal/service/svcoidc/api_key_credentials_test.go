@@ -37,12 +37,12 @@ func TestLookupApiKeyByRawKey(t *testing.T) {
 	hash := hex.EncodeToString(sum[:])
 
 	if err := db.Create(&model.ApiKeyEntity{
-		TenantID:  1,
+		TenantID:  "1",
 		Name:      "test-key",
 		KeyHash:   hash,
 		KeyPrefix: "ak_12345",
 		Scope:     json.RawMessage("{}"),
-		CreatedBy: 7,
+		CreatedBy: "7",
 	}).Error; err != nil {
 		t.Fatalf("create api key: %v", err)
 	}
@@ -54,11 +54,11 @@ func TestLookupApiKeyByRawKey(t *testing.T) {
 	if entity == nil {
 		t.Fatal("expected to find api key, got nil")
 	}
-	if entity.TenantID != 1 {
-		t.Fatalf("expected TenantID 1, got %d", entity.TenantID)
+	if entity.TenantID != "1" {
+		t.Fatalf("expected TenantID 1, got %s", entity.TenantID)
 	}
-	if entity.CreatedBy != 7 {
-		t.Fatalf("expected CreatedBy 7, got %d", entity.CreatedBy)
+	if entity.CreatedBy != "7" {
+		t.Fatalf("expected CreatedBy 7, got %s", entity.CreatedBy)
 	}
 
 	miss, err := store.LookupApiKeyByRawKey(context.Background(), "wrong")
@@ -88,25 +88,25 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 	sum := sha256.Sum256([]byte("k1"))
 	hash := hex.EncodeToString(sum[:])
 	if err := db.Create(&model.ApiKeyEntity{
-		TenantID:  1,
+		TenantID:  "1",
 		Name:      "service-key",
 		KeyHash:   hash,
 		KeyPrefix: "ak_1234567",
 		Scope:     json.RawMessage("{}"),
-		CreatedBy: 7,
+		CreatedBy: "7",
 	}).Error; err != nil {
 		t.Fatalf("create api key: %v", err)
 	}
 	// owner user：ID=7（对应 apiKey.CreatedBy），person_id=5
 	now := time.Now()
 	ownerUser := &model.UserEntity{
-		TenantID:   1,
-		PersonID:   5,
+		TenantID:   "1",
+		PersonID:   "5",
 		Profile:    json.RawMessage("{}"),
 		CustomData: json.RawMessage("{}"),
 		JoinedAt:   &now,
 	}
-	ownerUser.ID = 7
+	ownerUser.ID = "7"
 	if err := db.Create(ownerUser).Error; err != nil {
 		t.Fatalf("create owner user: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 		return dao.NewApiKeyDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
 	persistentStore.userDao = func(opts ...dao.DaoOption) *dao.UserDao {
-		return &dao.UserDao{Dao: gormdao.NewDao[model.UserEntity, model.UserEntityList, uint](
+		return &dao.UserDao{Dao: gormdao.NewDao[model.UserEntity, model.UserEntityList, string](
 			model.TableNameUser, "UserDao",
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}
@@ -163,10 +163,10 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
 	}
-	if got := claims["tenant_id"]; got != uint(1) {
+	if got := claims["tenant_id"]; got != "1" {
 		t.Fatalf("expected tenant_id claim 1, got %v", got)
 	}
-	if got := claims["user_id"]; got != uint(7) {
+	if got := claims["user_id"]; got != "7" {
 		t.Fatalf("expected user_id claim 7, got %v", got)
 	}
 	if got := claims["client_id"]; got != "ak_1234567" {
