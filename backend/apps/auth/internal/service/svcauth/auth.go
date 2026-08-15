@@ -130,7 +130,7 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 		return nil, nil, code.GetError(code.LoginLockedError)
 	}
 
-	if personEntity.IsSuspended == 1 {
+	if personEntity.IsSuspended {
 		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
 			Action:     svcaudit.ActionLogin,
 			Result:     "failure",
@@ -253,7 +253,7 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 		Name:       req.Name,
 		Profile:    json.RawMessage("{}"),
 		CustomData: json.RawMessage("{}"),
-		IsOwner:    1,
+		IsOwner:    true,
 		JoinedAt:   &now,
 		CreatedBy:  "",
 	}
@@ -300,7 +300,7 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 		TenantID:  req.TenantID,
 		PersonID:  personID,
 		Name:      "",
-		IsOwner:   0,
+		IsOwner:   false,
 		JoinedAt:  &now,
 		CreatedBy: "",
 	}
@@ -478,7 +478,7 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 			return nil, nil, nil, code.GetError(code.UserNotExistError)
 		}
 	}
-	if userEntity.IsSuspended == 1 {
+	if userEntity.IsSuspended {
 		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
 			Action:     svcaudit.ActionLogin,
 			Result:     "failure",

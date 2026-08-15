@@ -18,9 +18,9 @@ type MenuEntity struct {
 	Type         string `gorm:"column:type;type:varchar(32);not null;default:'';comment:菜单类型"`
 	Component    string `gorm:"column:component;type:varchar(256);not null;default:'';comment:组件路径"`
 	Redirect     string `gorm:"column:redirect;type:varchar(512);not null;default:'';comment:重定向路径"`
-	Hidden       int8   `gorm:"column:hidden;type:smallint;not null;default:0;comment:是否隐藏"`
-	ExternalLink int8   `gorm:"column:external_link;type:smallint;not null;default:0;comment:是否外链"`
-	KeepAlive    int8   `gorm:"column:keep_alive;type:smallint;not null;default:0;comment:是否缓存"`
+	Hidden       bool   `gorm:"column:hidden;type:boolean;not null;default:false;comment:是否隐藏"`
+	ExternalLink bool   `gorm:"column:external_link;type:boolean;not null;default:false;comment:是否外链"`
+	KeepAlive    bool   `gorm:"column:keep_alive;type:boolean;not null;default:false;comment:是否缓存"`
 	Permission   string `gorm:"column:permission;type:varchar(128);not null;default:'';comment:权限标识"`
 	Status       string `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态"`
 	CreatedBy    string `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id"`

@@ -454,7 +454,7 @@ func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorC
 		Connector: ConnectorRuntime{
 			ID:                  connectorEntity.ID,
 			TenantID:            connectorEntity.TenantID,
-			AllowAutoCreateUser: connectorEntity.AllowAutoCreateUser == 1,
+			AllowAutoCreateUser: connectorEntity.AllowAutoCreateUser,
 		},
 		Identity: callbackOutput.Identity,
 	})

@@ -98,7 +98,7 @@ func (svc *applicationSvc) Delete(ctx *gin.Context, req *dtoapplication.Applicat
 		glog.Errorf(ctx, "[svcapplication.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationDeleteError)
 	}
-	if entity != nil && entity.IsSystem == 1 {
+	if entity != nil && entity.IsSystem {
 		return code.GetError(code.ApplicationSystemBuiltInErr)
 	}
 	userID := gctx.GetUserID(ctx)

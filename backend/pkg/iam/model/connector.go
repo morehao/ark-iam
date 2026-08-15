@@ -16,10 +16,10 @@ type ConnectorEntity struct {
 	Protocol            string          `gorm:"column:protocol;type:varchar(64);not null;default:'';comment:协议类型"`
 	Provider            string          `gorm:"column:provider;type:varchar(128);not null;default:'';comment:提供商"`
 	Status              string          `gorm:"column:status;type:varchar(32);not null;default:'';comment:状态"`
-	AllowAutoCreateUser int8            `gorm:"column:allow_auto_create_user;type:smallint;not null;default:0;comment:是否允许自动创建用户"`
-	AllowAccountLink    int8            `gorm:"column:allow_account_link;type:smallint;not null;default:0;comment:是否允许账号关联"`
-	SyncProfile         int8            `gorm:"column:sync_profile;type:smallint;not null;default:0;comment:是否同步资料"`
-	EnableTokenStorage  int8            `gorm:"column:enable_token_storage;type:smallint;not null;default:0;comment:是否启用令牌存储"`
+	AllowAutoCreateUser bool            `gorm:"column:allow_auto_create_user;type:boolean;not null;default:false;comment:是否允许自动创建用户"`
+	AllowAccountLink    bool            `gorm:"column:allow_account_link;type:boolean;not null;default:false;comment:是否允许账号关联"`
+	SyncProfile         bool            `gorm:"column:sync_profile;type:boolean;not null;default:false;comment:是否同步资料"`
+	EnableTokenStorage  bool            `gorm:"column:enable_token_storage;type:boolean;not null;default:false;comment:是否启用令牌存储"`
 	Config              json.RawMessage `gorm:"column:config;type:json;not null;default:'{}';comment:连接器配置"`
 	ClaimMapping        json.RawMessage `gorm:"column:claim_mapping;type:json;not null;default:'{}';comment:声明映射"`
 	DomainPolicy        json.RawMessage `gorm:"column:domain_policy;type:json;not null;default:'{}';comment:域策略"`

@@ -23,10 +23,10 @@ func newOAuthDeleteCtx(tenantID, userID string) *gin.Context {
 }
 
 // newTestClientEntity 构造一条完整的应用客户端记录（IsSystem 按需传入，其余取常规默认值）。
-func newTestClientEntity(name, clientID string, isSystem int8) *model.ApplicationClientEntity {
+func newTestClientEntity(name, clientID string, isSystem bool) *model.ApplicationClientEntity {
 	return &model.ApplicationClientEntity{
 		TenantID:                "1",
-		ClientID:                clientID,
+		Code:                   clientID,
 		Name:                    name,
 		RedirectURIs:            datatypes.JSON("[]"),
 		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
@@ -44,7 +44,7 @@ func newTestClientEntity(name, clientID string, isSystem int8) *model.Applicatio
 func TestDeleteSystemApplicationClient(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{}, &model.ApplicationClientSecretEntity{})
 
-	entity := newTestClientEntity("System Client", "x", 1)
+	entity := newTestClientEntity("System Client", "x", true)
 	if err := db.Create(entity).Error; err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestDeleteSystemApplicationClient(t *testing.T) {
 func TestDeleteNonSystemApplicationClient(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{}, &model.ApplicationClientSecretEntity{})
 
-	entity := newTestClientEntity("Blog Client", "y", 0)
+	entity := newTestClientEntity("Blog Client", "y", false)
 	if err := db.Create(entity).Error; err != nil {
 		t.Fatalf("seed: %v", err)
 	}

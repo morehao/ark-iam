@@ -11,9 +11,9 @@ type MenuBaseInfo struct {
 	Type         string `json:"type" form:"type"`                      // 菜单类型
 	Component    string `json:"component" form:"component"`            // 组件路径
 	Redirect     string `json:"redirect" form:"redirect"`              // 重定向路径
-	Hidden       int8   `json:"hidden" form:"hidden"`                  // 是否隐藏
-	ExternalLink int8   `json:"externalLink" form:"externalLink"`      // 是否外链
-	KeepAlive    int8   `json:"keepAlive" form:"keepAlive"`            // 是否缓存
+	Hidden bool   `json:"hidden" form:"hidden"`                  // 是否隐藏
+	ExternalLink bool   `json:"externalLink" form:"externalLink"`      // 是否外链
+	KeepAlive bool   `json:"keepAlive" form:"keepAlive"`            // 是否缓存
 	Permission   string `json:"permission" form:"permission"`          // 权限标识
 	Status       string `json:"status" form:"status"`                  // 状态
 }

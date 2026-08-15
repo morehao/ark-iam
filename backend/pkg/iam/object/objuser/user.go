@@ -13,7 +13,7 @@ type UserBaseInfo struct {
 	AppID             string `json:"appID" form:"appID"`                         // 应用ID
 	Identities        any    `json:"identities" form:"identities"`               // 第三方身份
 	CustomData        any    `json:"customData" form:"customData"`               // 自定义数据
-	IsSuspended       int8   `json:"isSuspended" form:"isSuspended"`             // 是否挂起
+	IsSuspended bool   `json:"isSuspended" form:"isSuspended"`             // 是否挂起
 }
 
 type UserPasswordInfo struct {

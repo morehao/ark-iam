@@ -160,7 +160,7 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtous
 			Profile:     profileJson,
 			CustomData:  customDataJson,
 			IsSuspended: req.IsSuspended,
-			IsOwner:     0,
+			IsOwner:     false,
 			JoinedAt:    &now,
 			CreatedBy:   operatorID,
 		}

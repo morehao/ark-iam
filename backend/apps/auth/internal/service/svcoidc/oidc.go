@@ -463,7 +463,7 @@ func (svc *oidcAuthSvc) resolveAllowPersonCreateTenant(ctx *gin.Context, clientI
 	if clientID == "" || tenantCount > 0 || svc.applicationClientDao == nil || svc.applicationDao == nil {
 		return false
 	}
-	client, err := svc.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{ClientID: clientID})
+	client, err := svc.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID})
 	if err != nil || client == nil || client.AppID == "" {
 		return false
 	}

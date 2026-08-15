@@ -30,7 +30,7 @@ type UserPageListReq struct {
 	PrimaryEmail string `json:"primaryEmail" form:"primaryEmail"` // 主要邮箱
 	PrimaryPhone string `json:"primaryPhone" form:"primaryPhone"` // 主要手机号
 	Name         string `json:"name" form:"name"`                 // 姓名
-	IsSuspended  *int8  `json:"isSuspended" form:"isSuspended"`   // 是否挂起
+	IsSuspended *bool  `json:"isSuspended" form:"isSuspended"`   // 是否挂起
 }
 
 type UserDeleteReq struct {
@@ -46,7 +46,7 @@ type UserPasswordUpdateReq struct {
 
 type UserStatusUpdateReq struct {
 	UserID      string `json:"-" uri:"userID" binding:"required"` // 用户ID
-	IsSuspended int8   `json:"isSuspended"`                       // 是否挂起
+	IsSuspended bool   `json:"isSuspended"`                       // 是否挂起
 }
 
 type UserIdentityCreateReq struct {

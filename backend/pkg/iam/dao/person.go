@@ -12,7 +12,7 @@ type PersonCond struct {
 	PrimaryEmail string
 	PrimaryPhone string
 	Name         string
-	IsSuspended  *int8
+	IsSuspended  *bool
 }
 
 func (c *PersonCond) BuildCondition(db *gorm.DB, tableName string) {

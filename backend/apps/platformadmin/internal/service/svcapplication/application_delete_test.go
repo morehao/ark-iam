@@ -27,7 +27,7 @@ func TestDeleteSystemApplication(t *testing.T) {
 	entity := &model.ApplicationEntity{
 		Code:     "admin",
 		Name:     "管理后台",
-		IsSystem: 1,
+		IsSystem: true,
 	}
 	if err := db.Create(entity).Error; err != nil {
 		t.Fatalf("seed: %v", err)
@@ -50,7 +50,7 @@ func TestDeleteNonSystemApplication(t *testing.T) {
 	entity := &model.ApplicationEntity{
 		Code:     "blog",
 		Name:     "博客",
-		IsSystem: 0,
+		IsSystem: false,
 	}
 	if err := db.Create(entity).Error; err != nil {
 		t.Fatalf("seed: %v", err)

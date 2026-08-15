@@ -26,7 +26,8 @@ func NewOIDCClient(clientEntity *model.ApplicationClientEntity) *OIDCClient {
 }
 
 func (c *OIDCClient) GetID() string {
-	return c.clientEntity.ClientID
+	// 实体业务编码 code 即 OIDC 协议中的 client_id（唯一映射点，§5.5）
+	return c.clientEntity.Code
 }
 
 func (c *OIDCClient) RedirectURIs() []string {

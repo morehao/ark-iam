@@ -48,7 +48,7 @@ func (svc *tenantMenuSvc) Tree(ctx *gin.Context) (*dtotenant.MenuTreeResp, error
 			glog.Warnf(ctx, "[svctenant.TenantMenuTree] application GetByID fail or not exist, err:%v, appID:%s", err, item.AppID)
 			continue
 		}
-		if appEntity.IsSystem == 1 {
+		if appEntity.IsSystem {
 			continue
 		}
 		appIDs[item.AppID] = struct{}{}

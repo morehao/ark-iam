@@ -8,7 +8,7 @@ type UserPageListItem struct {
 	PrimaryPhone string `json:"primaryPhone"` // 主要手机号
 	Name         string `json:"name"`         // 姓名
 	Avatar       string `json:"avatar"`       // 头像URL
-	IsSuspended  int8   `json:"isSuspended"`  // 是否挂起
+	IsSuspended bool   `json:"isSuspended"`  // 是否挂起
 	CreatedAt    int64  `json:"createdAt"`    // 创建时间
 }
 

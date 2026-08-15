@@ -126,7 +126,7 @@ func (svc *tenantSvc) CreateTenantAsOwner(ctx *gin.Context, req *dtotenant.Tenan
 			Name:       req.Name,
 			Profile:    json.RawMessage("{}"),
 			CustomData: json.RawMessage("{}"),
-			IsOwner:    1,
+			IsOwner:    true,
 			JoinedAt:   &now,
 			CreatedBy:  req.PersonID,
 		}

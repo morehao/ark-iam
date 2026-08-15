@@ -92,7 +92,7 @@ func TestCompleteAuthRequestMarksRequestDone(t *testing.T) {
 
 func TestOIDCClientLoginURLUsesIssuerSSOLogin(t *testing.T) {
 	appconfig.Conf = &pkgconfig.Config{OIDC: pkgconfig.OIDC{Issuer: "http://localhost:8099/oidc"}}
-	client := NewOIDCClient(&model.ApplicationClientEntity{ClientID: "client-1"})
+	client := NewOIDCClient(&model.ApplicationClientEntity{Code: "client-1"})
 
 	got := client.LoginURL("ar-1")
 	expected := "http://localhost:8099/oidc/sso-login?authRequestID=ar-1"

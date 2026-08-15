@@ -10,10 +10,10 @@ type ApplicationClientCond struct {
 	*gormdao.BaseCond
 	TenantID string
 	AppID    string
-	ClientID string
-	Name     string
-	Type     string
-	Status   string
+	Code   string
+	Name   string
+	Type   string
+	Status string
 }
 
 func (c *ApplicationClientCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -26,8 +26,8 @@ func (c *ApplicationClientCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.AppID != "" {
 		db.Where(tableName+".app_id = ?", c.AppID)
 	}
-	if c.ClientID != "" {
-		db.Where(tableName+".client_id = ?", c.ClientID)
+	if c.Code != "" {
+		db.Where(tableName+".code = ?", c.Code)
 	}
 	if c.Name != "" {
 		db.Where(tableName+".name = ?", c.Name)

@@ -144,7 +144,7 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 		t.Fatalf("expected oidc.ErrInvalidClient on wrong secret, got %v", err)
 	}
 
-	req, err := storage.ClientCredentialsTokenRequest(ctx, "k1", []string{"urn:ark:iam:admin"})
+	req, err := storage.ClientCredentialsTokenRequest(ctx, "k1", []string{"urn:ark:iam:platform-admin"})
 	if err != nil {
 		t.Fatalf("ClientCredentialsTokenRequest failed: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 		t.Fatalf("expected audience [ak_1234567], got %v", got)
 	}
 
-	claims, err := storage.GetPrivateClaimsFromRequest(ctx, req, []string{"urn:ark:iam:admin"})
+	claims, err := storage.GetPrivateClaimsFromRequest(ctx, req, []string{"urn:ark:iam:platform-admin"})
 	if err != nil {
 		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
 	}

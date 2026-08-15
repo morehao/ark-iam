@@ -149,7 +149,7 @@ func TestRefreshTokenTTLUsesClientConfig(t *testing.T) {
 	seedUser(t, db, "21", "88", "7")
 	if err := db.Create(&model.ApplicationClientEntity{
 		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
-		ClientID:                "client-ttl",
+		Code:                   "client-ttl",
 		RedirectURIs:            datatypes.JSON("[]"),
 		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
 		GrantTypes:              datatypes.JSON(`["authorization_code"]`),
@@ -309,8 +309,8 @@ func TestCreateAuthRequestEnforcesRequirePKCE(t *testing.T) {
 	ps, db := newProtocolConformanceStore(t)
 	if err := db.Create(&model.ApplicationClientEntity{
 		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
-		ClientID:                "pkce-client",
-		RequirePKCE:             1,
+		Code:                   "pkce-client",
+		RequirePKCE:             true,
 		RedirectURIs:            datatypes.JSON(`["https://client.example.com/callback"]`),
 		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
 		GrantTypes:              datatypes.JSON(`["authorization_code"]`),

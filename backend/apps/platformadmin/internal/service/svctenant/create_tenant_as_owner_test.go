@@ -59,7 +59,7 @@ func TestCreateTenantAsOwnerCreatesTenantUserAndSubscription(t *testing.T) {
 	if len(users) != 1 {
 		t.Fatalf("expected 1 owner user, got %d", len(users))
 	}
-	if users[0].IsOwner != 1 || users[0].Name != "Acme" || users[0].TenantID != resp.TenantID || users[0].PersonID != "88" {
+	if !users[0].IsOwner || users[0].Name != "Acme" || users[0].TenantID != resp.TenantID || users[0].PersonID != "88" {
 		t.Fatalf("unexpected owner user: %+v", users[0])
 	}
 	if users[0].CreatedBy != "88" {
@@ -225,7 +225,7 @@ func TestCreateTenantAsOwnerRejectedWhenAlreadyHasTenant(t *testing.T) {
 		Name:       "ExistingUser",
 		Profile:    json.RawMessage("{}"),
 		CustomData: json.RawMessage("{}"),
-		IsOwner:    1,
+		IsOwner:    true,
 		JoinedAt:   &now,
 		CreatedBy:  "90",
 	}).Error; err != nil {
