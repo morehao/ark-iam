@@ -9,8 +9,12 @@ import (
 
 type OrganizationUserCtr interface {
 	Create(ctx *gin.Context)
+	Update(ctx *gin.Context)
 	Delete(ctx *gin.Context)
 	PageList(ctx *gin.Context)
+	SubtreeUsers(ctx *gin.Context)
+	GetUserOrganizations(ctx *gin.Context)
+	UpdateUserOrganizations(ctx *gin.Context)
 }
 
 type organizationUserCtr struct {
@@ -25,15 +29,20 @@ func NewOrganizationUserCtr() OrganizationUserCtr {
 	}
 }
 
-// @Tags 组织用户关联
-// @Summary 创建组织用户关联
+// @Tags 组织关系
+// @Summary 添加组织关系（member/leader）
 // @accept application/json
 // @Produce application/json
-// @Param req body dtotenant.OrganizationUserCreateReq true "创建组织用户关联"
+// @Param organizationID path string true "组织ID"
+// @Param req body dtotenant.OrganizationUserCreateReq true "添加关系"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationUserCreateResp}
-// @Router /v1/tenant/organization-users [post]
+// @Router /v1/tenant/organizations/{organizationID}/users [post]
 func (ctr *organizationUserCtr) Create(ctx *gin.Context) {
 	var req dtotenant.OrganizationUserCreateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -46,14 +55,40 @@ func (ctr *organizationUserCtr) Create(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
-// @Tags 组织用户关联
-// @Summary 删除组织用户关联
+// @Tags 组织关系
+// @Summary 更新组织关系（relationType/isPrimary）
 // @accept application/json
 // @Produce application/json
-// @Param organizationID path int true "组织ID"
-// @Param userID path int true "用户ID"
+// @Param organizationID path string true "组织ID"
+// @Param userID path string true "用户ID"
+// @Param req body dtotenant.OrganizationUserUpdateReq true "更新关系"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/tenant/organization-users/{organizationID}/{userID} [delete]
+// @Router /v1/tenant/organizations/{organizationID}/users/{userID} [put]
+func (ctr *organizationUserCtr) Update(ctx *gin.Context) {
+	var req dtotenant.OrganizationUserUpdateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctr.organizationUserSvc.Update(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, "修改成功")
+}
+
+// @Tags 组织关系
+// @Summary 移除组织关系（含 member/leader）
+// @accept application/json
+// @Produce application/json
+// @Param organizationID path string true "组织ID"
+// @Param userID path string true "用户ID"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/tenant/organizations/{organizationID}/users/{userID} [delete]
 func (ctr *organizationUserCtr) Delete(ctx *gin.Context) {
 	var req dtotenant.OrganizationUserDeleteReq
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
@@ -64,18 +99,23 @@ func (ctr *organizationUserCtr) Delete(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	gincontext.Success(ctx, "删除成功")
+	gincontext.Success(ctx, "移除成功")
 }
 
-// @Tags 组织用户关联
-// @Summary 组织用户关联列表分页
+// @Tags 组织关系
+// @Summary 组织关系分页
 // @accept application/json
 // @Produce application/json
-// @Param req query dtotenant.OrganizationUserPageListReq true "组织用户关联列表分页"
+// @Param organizationID path string true "组织ID"
+// @Param req query dtotenant.OrganizationUserPageListReq true "关系分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationUserPageListResp}
-// @Router /v1/tenant/organization-users [get]
+// @Router /v1/tenant/organizations/{organizationID}/users [get]
 func (ctr *organizationUserCtr) PageList(ctx *gin.Context) {
 	var req dtotenant.OrganizationUserPageListReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -86,4 +126,71 @@ func (ctr *organizationUserCtr) PageList(ctx *gin.Context) {
 		return
 	}
 	gincontext.Success(ctx, res)
+}
+
+// @Tags 组织关系
+// @Summary 子树成员聚合（去重）
+// @accept application/json
+// @Produce application/json
+// @Param organizationID path string true "组织ID"
+// @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationSubtreeUsersResp}
+// @Router /v1/tenant/organizations/{organizationID}/users/descendants [get]
+func (ctr *organizationUserCtr) SubtreeUsers(ctx *gin.Context) {
+	var req dtotenant.OrganizationSubtreeUsersReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.organizationUserSvc.SubtreeUsers(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 组织关系
+// @Summary 用户组织归属列表
+// @accept application/json
+// @Produce application/json
+// @Param userID path string true "用户ID"
+// @Success 200 {object} gincontext.DtoRender{data=dtotenant.UserOrganizationListResp}
+// @Router /v1/tenant/users/{userID}/organizations [get]
+func (ctr *organizationUserCtr) GetUserOrganizations(ctx *gin.Context) {
+	var req dtotenant.UserOrganizationListReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.organizationUserSvc.GetUserOrganizations(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 组织关系
+// @Summary 批量替换用户归属（全量替换 member 关系，首个为主归属）
+// @accept application/json
+// @Produce application/json
+// @Param userID path string true "用户ID"
+// @Param req body dtotenant.UserOrganizationsUpdateReq true "批量替换归属"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/tenant/users/{userID}/organizations [put]
+func (ctr *organizationUserCtr) UpdateUserOrganizations(ctx *gin.Context) {
+	var req dtotenant.UserOrganizationsUpdateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctr.organizationUserSvc.UpdateUserOrganizations(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, "修改成功")
 }

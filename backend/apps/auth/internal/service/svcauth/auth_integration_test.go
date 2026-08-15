@@ -20,7 +20,7 @@ import (
 // 替代原先依赖真实数据库与种子数据的集成测试。
 func setupIntegrationDB(t *testing.T) {
 	t.Helper()
-	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{}, &model.UserDepartmentEntity{})
+	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{})
 	now := time.Now()
 	seedTenant := &model.TenantEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},

@@ -32,6 +32,4 @@ func userRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.GET("/users/:userID/login-logs", userCtr.GetUserLoginLogByUser)
 
 	// 用户部门关联
-	v1RouterGroup.GET("/users/:userID/departments", userCtr.GetUserDepartmentByUser)
-	v1RouterGroup.PUT("/users/:userID/departments", userCtr.AssignDepartments)
 }

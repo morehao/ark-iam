@@ -42,9 +42,3 @@ type UserLoginLogBaseInfo struct {
 	LoginTime int64  `json:"loginTime" form:"loginTime"` // 登录时间
 }
 
-type UserDepartmentBaseInfo struct {
-	TenantID     string `json:"tenantID" form:"tenantID"`         // 租户ID
-	UserID       string `json:"userID" form:"userID"`             // 用户ID
-	DepartmentID string `json:"departmentID" form:"departmentID"` // 部门ID
-	IsPrimary    int8   `json:"isPrimary" form:"isPrimary"`       // 是否主部门
-}

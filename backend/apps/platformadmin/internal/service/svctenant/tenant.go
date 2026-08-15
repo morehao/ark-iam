@@ -70,14 +70,22 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 		if err := dao.NewTenantDao().WithTx(tx).Insert(ctx, insertEntity); err != nil {
 			return err
 		}
-		// 每个租户创建时自动创建同名的顶级部门（parent_id=0）
-		rootDept := &model.DepartmentEntity{
+		// 每个租户创建时自动创建同名的根组织节点（组织树容器根）
+		rootOrg := &model.OrganizationEntity{
 			TenantID:  insertEntity.ID,
 			ParentID:  "",
 			Name:      req.Name,
+			Status:    string(model.OrgNodeStatusActive),
 			CreatedBy: userID,
 		}
-		if err := dao.NewDepartmentDao().WithTx(tx).Insert(ctx, rootDept); err != nil {
+		if err := dao.NewOrganizationDao().WithTx(tx).Insert(ctx, rootOrg); err != nil {
+			return err
+		}
+		// 根节点路径："/"+id，深度 1（ID 由 BeforeCreate 生成，需创建后补写）
+		if err := dao.NewOrganizationDao().WithTx(tx).UpdateMap(ctx, rootOrg.ID, map[string]any{
+			"org_path":  "/" + rootOrg.ID,
+			"org_depth": 1,
+		}); err != nil {
 			return err
 		}
 		return nil
@@ -148,14 +156,21 @@ func (svc *tenantSvc) CreateTenantAsOwner(ctx *gin.Context, req *dtotenant.Tenan
 			}
 		}
 
-		// 每个租户创建时自动创建同名的顶级部门（parent_id=0）
-		rootDept := &model.DepartmentEntity{
+		// 每个租户创建时自动创建同名的根组织节点（组织树容器根）
+		rootOrg := &model.OrganizationEntity{
 			TenantID:  tenant.ID,
 			ParentID:  "",
 			Name:      req.Name,
+			Status:    string(model.OrgNodeStatusActive),
 			CreatedBy: req.PersonID,
 		}
-		if err := dao.NewDepartmentDao().WithTx(tx).Insert(ctx, rootDept); err != nil {
+		if err := dao.NewOrganizationDao().WithTx(tx).Insert(ctx, rootOrg); err != nil {
+			return err
+		}
+		if err := dao.NewOrganizationDao().WithTx(tx).UpdateMap(ctx, rootOrg.ID, map[string]any{
+			"org_path":  "/" + rootOrg.ID,
+			"org_depth": 1,
+		}); err != nil {
 			return err
 		}
 

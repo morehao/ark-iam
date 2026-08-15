@@ -22,17 +22,5 @@ func WithIamContext(userID string) testkit.Option {
 		gc.Set(gcontext.KeyUserID, user.ID)
 		gc.Set(gcontext.KeyTenantID, user.TenantID)
 		gc.Set(gcontext.KeyPersonID, user.PersonID)
-
-		if user.TenantID != "" {
-			relation, err := dao.NewUserDepartmentDao().GetByCond(context.Background(), &dao.UserDepartmentCond{
-				UserID: userID,
-			})
-			if err != nil {
-				panic(err)
-			}
-			if relation != nil {
-				gc.Set(gcontext.KeyDeptID, relation.DepartmentID)
-			}
-		}
 	}
 }

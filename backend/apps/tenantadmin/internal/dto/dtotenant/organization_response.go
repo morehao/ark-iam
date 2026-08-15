@@ -2,77 +2,78 @@ package dtotenant
 
 import "github.com/morehao/ark-iam/pkg/iam/object/objtenant"
 
+// ---------- 组织节点 ----------
+
 type OrganizationCreateResp struct {
 	OrganizationID string `json:"organizationID"` // 组织ID
 }
 
+type OrganizationTreeResp struct {
+	List []OrganizationTreeItem `json:"list"` // 组织树
+}
+
+type OrganizationTreeItem struct {
+	OrganizationID string `json:"organizationID"` // 组织ID
+	ParentID       string `json:"parentID"`       // 父节点ID
+	OrgPath        string `json:"orgPath"`        // 祖先链路径(含自身)
+	OrgDepth       int    `json:"orgDepth"`       // 节点深度(根=1)
+	objtenant.OrganizationBaseInfo
+	Children []OrganizationTreeItem `json:"children"` // 子节点
+}
+
 type OrganizationDetailResp struct {
 	OrganizationID string `json:"organizationID"` // 组织ID
+	ParentID       string `json:"parentID"`       // 父节点ID
+	OrgPath        string `json:"orgPath"`        // 祖先链路径(含自身)
+	OrgDepth       int    `json:"orgDepth"`       // 节点深度(根=1)
 	objtenant.OrganizationBaseInfo
+	Ancestors []OrganizationAncestor `json:"ancestors"` // 祖先链(面包屑,自顶向下)
 }
 
-type OrganizationPageListResp struct {
-	List  []OrganizationPageListItem `json:"list"`  // 组织列表
-	Total int64                      `json:"total"` // 总数
-}
-
-type OrganizationPageListItem struct {
+type OrganizationAncestor struct {
 	OrganizationID string `json:"organizationID"` // 组织ID
-	objtenant.OrganizationBaseInfo
+	Name           string `json:"name"`           // 组织名称
 }
 
-type OrganizationRoleCreateResp struct {
-	OrganizationRoleID string `json:"organizationRoleID"` // 组织角色ID
-}
-
-type OrganizationRoleDetailResp struct {
-	OrganizationRoleID string `json:"organizationRoleID"` // 组织角色ID
-	OrganizationRoleBaseInfo
-}
-
-type OrganizationRolePageListResp struct {
-	List  []OrganizationRolePageListItem `json:"list"`  // 组织角色列表
-	Total int64                          `json:"total"` // 总数
-}
-
-type OrganizationRolePageListItem struct {
-	OrganizationRoleID string `json:"organizationRoleID"` // 组织角色ID
-	OrganizationRoleBaseInfo
-}
-
-type OrganizationRoleBaseInfo struct {
-	TenantID       string `json:"tenantID" form:"tenantID"`             // 租户ID
-	OrganizationID string `json:"organizationID" form:"organizationID"` // 组织ID
-	Name           string `json:"name" form:"name"`                     // 角色名称
-	Description    string `json:"description" form:"description"`       // 角色描述
-	Type           string `json:"type" form:"type"`                     // 角色类型
-}
+// ---------- 组织关系 ----------
 
 type OrganizationUserCreateResp struct {
 }
 
 type OrganizationUserPageListResp struct {
-	List  []OrganizationUserPageListItem `json:"list"`  // 组织用户列表
-	Total int64                          `json:"total"` // 总条数
+	List  []OrganizationUserPageListItem `json:"list"`  // 关系列表
+	Total int64                          `json:"total"` // 总数
 }
 
 type OrganizationUserPageListItem struct {
 	OrganizationID string `json:"organizationID"` // 组织ID
 	UserID         string `json:"userID"`         // 用户ID
-	TenantID       string `json:"tenantID"`       // 租户ID
+	UserName       string `json:"userName"`       // 用户姓名
+	RelationType   string `json:"relationType"`   // 关系类型
+	IsPrimary      bool   `json:"isPrimary"`      // 是否主归属
 }
 
-type OrganizationRoleUserCreateResp struct {
+type OrganizationSubtreeUsersResp struct {
+	List []OrganizationSubtreeUser `json:"list"` // 子树成员(去重)
 }
 
-type OrganizationRoleUserPageListResp struct {
-	List  []OrganizationRoleUserPageListItem `json:"list"`  // 组织角色用户列表
-	Total int64                              `json:"total"` // 总条数
+type OrganizationSubtreeUser struct {
+	UserID   string `json:"userID"`   // 用户ID
+	UserName string `json:"userName"` // 用户姓名
 }
 
-type OrganizationRoleUserPageListItem struct {
-	OrganizationID     string `json:"organizationID"`     // 组织ID
-	OrganizationRoleID string `json:"organizationRoleID"` // 组织角色ID
-	UserID             string `json:"userID"`             // 用户ID
-	TenantID           string `json:"tenantID"`           // 租户ID
+// ---------- 用户归属 ----------
+
+type UserOrganizationListResp struct {
+	List []UserOrganizationItem `json:"list"` // 用户组织归属
+}
+
+type UserOrganizationItem struct {
+	OrganizationID   string `json:"organizationID"`   // 组织ID
+	OrganizationName string `json:"organizationName"` // 组织名称
+	RelationType     string `json:"relationType"`     // 关系类型
+	IsPrimary        bool   `json:"isPrimary"`        // 是否主归属
+}
+
+type UserOrganizationsUpdateResp struct {
 }

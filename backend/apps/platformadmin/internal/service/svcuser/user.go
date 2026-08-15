@@ -33,8 +33,6 @@ type UserSvc interface {
 	DetailUserLoginLog(ctx *gin.Context, req *dtouser.UserLoginLogDetailReq) (*dtouser.UserLoginLogDetailResp, error)
 	PageListUserLoginLog(ctx *gin.Context, req *dtouser.UserLoginLogPageListReq) (*dtouser.UserLoginLogPageListResp, error)
 	GetUserLoginLogByUser(ctx *gin.Context, req *dtouser.UserLoginLogByUserReq) (*dtouser.UserLoginLogPageListResp, error)
-	GetUserDepartmentByUser(ctx *gin.Context, req *dtouser.UserDepartmentByUserReq) (*dtouser.UserDepartmentPageListResp, error)
-	AssignDepartments(ctx *gin.Context, req *dtouser.AssignDepartmentsReq) error
 }
 
 type userSvc struct {
@@ -438,43 +436,6 @@ func (svc *userSvc) UpdateStatus(ctx *gin.Context, req *dtouser.UserStatusUpdate
 	return nil
 }
 
-func (svc *userSvc) AssignDepartments(ctx *gin.Context, req *dtouser.AssignDepartmentsReq) error {
-	userID := gctx.GetUserID(ctx)
-	tenantID := gctx.GetTenantID(ctx)
-
-	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
-		for _, deptID := range req.DepartmentIDs {
-			var existing model.UserDepartmentEntity
-			err := tx.WithContext(ctx).Model(&model.UserDepartmentEntity{}).
-				Where("tenant_id = ? AND user_id = ? AND department_id = ?", tenantID, req.UserID, deptID).
-				First(&existing).Error
-			if err != nil && err != gorm.ErrRecordNotFound {
-				return err
-			}
-			if err == nil && existing.ID != "" {
-				continue
-			}
-
-			insertEntity := &model.UserDepartmentEntity{
-				TenantID:     tenantID,
-				UserID:       req.UserID,
-				DepartmentID: deptID,
-				IsPrimary:    0,
-				CreatedBy:    userID,
-			}
-			if err := tx.WithContext(ctx).Create(insertEntity).Error; err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if txErr != nil {
-		glog.Errorf(ctx, "[svcuser.AssignDepartments] transaction fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))
-		return code.GetError(code.UserDepartmentCreateError)
-	}
-	return nil
-}
-
 func (svc *userSvc) DetailUserLoginLog(ctx *gin.Context, req *dtouser.UserLoginLogDetailReq) (*dtouser.UserLoginLogDetailResp, error) {
 	userLoginLogEntity, err := dao.NewUserLoginLogDao().GetByID(ctx, req.UserLoginLogID)
 	if err != nil {
@@ -568,33 +529,3 @@ func (svc *userSvc) GetUserLoginLogByUser(ctx *gin.Context, req *dtouser.UserLog
 	}, nil
 }
 
-func (svc *userSvc) GetUserDepartmentByUser(ctx *gin.Context, req *dtouser.UserDepartmentByUserReq) (*dtouser.UserDepartmentPageListResp, error) {
-	userDepartmentRepo := dao.NewUserDepartmentDao()
-	cond := &dao.UserDepartmentCond{
-		TenantID: gctx.GetTenantID(ctx),
-		UserID:   req.UserID,
-	}
-	userDepartmentEntityList, total, err := userDepartmentRepo.GetPageListByCond(ctx, cond)
-	if err != nil {
-		glog.Errorf(ctx, "[svcuser.GetUserDepartmentByUser] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.UserDepartmentGetPageListError)
-	}
-
-	list := make([]dtouser.UserDepartmentPageListItem, 0, len(userDepartmentEntityList))
-	for _, v := range userDepartmentEntityList {
-		list = append(list, dtouser.UserDepartmentPageListItem{
-			UserDepartmentID: v.ID,
-			TenantID:         v.TenantID,
-			UserID:           v.UserID,
-			DepartmentID:     v.DepartmentID,
-			IsPrimary:        v.IsPrimary,
-			OperatorBaseInfo: gobject.OperatorBaseInfo{
-				UpdatedAt: v.UpdatedAt.Unix(),
-			},
-		})
-	}
-	return &dtouser.UserDepartmentPageListResp{
-		List:  list,
-		Total: total,
-	}, nil
-}

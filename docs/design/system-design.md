@@ -600,11 +600,11 @@ sequenceDiagram
     participant A as auth 应用
     participant DB as PostgreSQL
 
-    U->>A: POST /v1/auth/register（租户ID、用户名/邮箱/手机号、密码、姓名）
-    A->>A: 校验密码强度（≥6 位，含大小写+数字）
-    A->>A: 校验标识唯一（username/email/phone 任一已存在则拒绝）
-    A->>DB: 插入 person（密码 bcrypt 哈希，标识空值存 NULL）
-    A->>DB: 插入 user（person_id + tenant_id，is_owner=1）
+    U->>A: POST /v1/auth/register<br/>（租户ID、用户名/邮箱/手机号、密码、姓名）
+    A->>A: 校验密码强度<br/>（≥6 位，含大小写+数字）
+    A->>A: 校验标识唯一<br/>（username/email/phone 任一已存在则拒绝）
+    A->>DB: 插入 person<br/>（密码 bcrypt 哈希，标识空值存 NULL）
+    A->>DB: 插入 user<br/>（person_id + tenant_id，is_owner=1）
     A-->>U: { userID }
 ```
 
@@ -623,19 +623,19 @@ sequenceDiagram
 
     U->>LW: 提交用户名/密码（POST /oidc/login，带 authRequestID）
     LW->>A: 转发凭证
-    A->>DB: 按标识解析 person（用户名/邮箱/手机号）
-    A->>RD: 登录风控检查（失败次数/锁定时长，maxFailures=5/window=300s/lock=900s）
+    A->>DB: 按标识解析 person<br/>（用户名/邮箱/手机号）
+    A->>RD: 登录风控检查<br/>（失败次数/锁定时长，maxFailures=5/window=300s/lock=900s）
     alt 锁定 / 挂起 / 密码未设置 / 密码错误
         A->>DB: 写审计（failure）+ 登录失败计数
         A-->>U: 对应错误码
     else 校验通过
-        A->>DB: 写登录日志 + 更新 last_sign_in_at + 写审计（success）
-        A->>RD: 创建 SSO 会话（iam:oidc:sso_session:*）+ person 索引
+        A->>DB: 写登录日志 + 更新<br/>last_sign_in_at + 写审计（success）
+        A->>RD: 创建 SSO 会话<br/>（iam:oidc:sso_session:*）+ person 索引
         A->>DB: 落 session 审计记录
         alt 多租户用户
-            A-->>LW: requiresTenantSelection=true + 租户列表
-            U->>LW: 选择租户（POST /oidc/login/selectTenant）
-            A->>A: 完成授权请求（subject=person:123, amr, tenantID）
+            A-->>LW: requiresTenantSelection=true<br/>+ 租户列表
+            U->>LW: 选择租户<br/>（POST /oidc/login/selectTenant）
+            A->>A: 完成授权请求<br/>（subject=person:123, amr, tenantID）
         else 单租户
             A->>A: 自动选租户，完成授权请求
         end
@@ -656,8 +656,8 @@ sequenceDiagram
     participant RD as Redis
 
     U->>RP: 访问应用（未登录）
-    RP->>OP: GET /oidc/authorize（携带 iam_sso_session Cookie，prompt=none 语义）
-    OP->>RD: 校验 SSO 会话（ValidateSession → personID）
+    RP->>OP: GET /oidc/authorize<br/>（携带 iam_sso_session Cookie，prompt=none 语义）
+    OP->>RD: 校验 SSO 会话<br/>（ValidateSession → personID）
     alt 会话有效
         OP->>OP: 完成授权请求（还原 amr），签发授权码
         OP-->>RP: 302 redirect_uri?code=...
@@ -680,14 +680,14 @@ sequenceDiagram
     participant API as 业务后端 API（RP 资源服务器）
     participant RD as Redis
 
-    RP->>OP: POST /oidc/oauth/token（code + PKCE verifier）
+    RP->>OP: POST /oidc/oauth/token<br/>（code + PKCE verifier）
     OP->>OP: 校验授权码、PKCE、client 认证
-    OP->>OP: 签发 id_token（RS256）+ access_token（RS256，含 tenant_id/user_id/client_id/token_usage）
+    OP->>OP: 签发 id_token（RS256）+ access_token（RS256，<br/>含 tenant_id/user_id/client_id/token_usage）
     OP->>RD: 写入 access token 元数据（iam:oidc:at:meta:*）
     OP-->>RP: 令牌
     RP->>API: GET /v1/...（Authorization: Bearer access_token）
-    API->>API: oidcauth 中间件：验签（RS256）→ 校验 iss/aud → 解析 personID/tenantID
-    API->>RD: （可选）SSO 会话活性校验 HasActiveSession（登出即失效）
+    API->>API: oidcauth 中间件：验签（RS256）→<br/>校验 iss/aud → 解析 personID/tenantID
+    API->>RD: （可选）SSO 会话活性校验<br/>HasActiveSession（登出即失效）
     alt 机器凭证（x-api-key 或 client_credentials 签发）
         API->>API: 跳过 SSO 会话活性校验（token_usage=machine）
     end
@@ -709,16 +709,16 @@ sequenceDiagram
     U->>RP1: 点击"退出登录"
     RP1->>A: POST /v1/auth/logout（或 /oidc/end_session）
     A->>A: 解析 personID
-    A->>RD: 查询该 person 全部登出登记（slo_reg，依赖 sso_user_sessions 索引）
+    A->>RD: 查询该 person 全部登出登记<br/>（slo_reg，依赖 sso_user_sessions 索引）
     A->>RD: 入队反向通道登出任务（iam:oidc:slo_queue）
-    A->>RD: 撤销全部 SSO 会话（RevokeSessionsByPersonID）
+    A->>RD: 撤销全部 SSO 会话<br/>（RevokeSessionsByPersonID）
     A->>DB: 吊销该 person 全部 refresh_token
     A->>A: 清除 iam_sso_session Cookie
-    W->>W: 消费队列，签发 logout_token（RS256，15min 有效）
+    W->>W: 消费队列，签发 logout_token<br/>（RS256，15min 有效）
     W->>RP2: POST {back_channel_logout_uri}（logout_token）
     RP2->>RP2: 校验并作废本地会话（按 sid）
     alt 应用 A 继续访问其他 API
-        API->>RD: HasActiveSession=false → 401（请求粒度即时失效）
+        API->>RD: HasActiveSession=false → 401<br/>（请求粒度即时失效）
     end
 ```
 
@@ -732,7 +732,7 @@ sequenceDiagram
     participant DB as PostgreSQL
 
     SVC->>API: 请求（Header: x-api-key: ak_xxx...）
-    API->>DB: 按 key_prefix 定位 + 校验 key_hash + 校验未过期/未吊销
+    API->>DB: 按 key_prefix 定位 + 校验 key_hash<br/>+ 校验未过期/未吊销
     API->>API: 解析 scope，注入身份上下文（token_usage=machine）
     API-->>SVC: 业务数据
 ```
@@ -747,11 +747,11 @@ sequenceDiagram
     participant EXT as 外部 IdP（如企业微信/Google）
     participant DB as PostgreSQL
 
-    U->>A: 发起 connector 授权（POST /oidc/... 或 connector authorize）
-    A->>EXT: 跳转外部 IdP 授权（OAuth2/OIDC connector 驱动）
+    U->>A: 发起 connector 授权<br/>（POST /oidc/... 或 connector authorize）
+    A->>EXT: 跳转外部 IdP 授权<br/>（OAuth2/OIDC connector 驱动）
     EXT-->>A: 回调（code）
     A->>A: connector 驱动换令牌、拉取用户信息
-    A->>DB: 按 claim_mapping 匹配 user_identity（issuer + external_subject）
+    A->>DB: 按 claim_mapping 匹配 user_identity<br/>（issuer + external_subject）
     alt 已关联
         A->>A: 完成登录（走 SSO 会话建立流程）
     else 未关联
@@ -779,7 +779,7 @@ flowchart TB
     E --> G["5. 对接令牌校验<br/>后端挂 oidcauth 中间件<br/>（iss/aud/SSO 会话活性）"]
     F --> G
     G --> H["6. 可选：接入 SLO<br/>配置 back_channel_logout_uri<br/>接收 logout_token"]
-    H --> I["7. 验收（SSO 免密 / 登出即失效 / 审计）"]
+    H --> I["7. 验收<br/>（SSO 免密 / 登出即失效 / 审计）"]
 ```
 
 | 步骤 | 说明 | 关键接口 |

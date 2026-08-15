@@ -16,17 +16,6 @@ func tenantRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/tenants/createAsOwner", tenantCtr.CreateAsOwner)
 }
 
-func departmentRouter(groups *ginserver.RouterGroups) {
-	departmentCtr := ctrtenant.NewDepartmentCtr()
-	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.POST("/departments", departmentCtr.Create)
-	v1RouterGroup.GET("/departments", departmentCtr.PageList)
-	v1RouterGroup.GET("/departments/tree", departmentCtr.Tree)
-	v1RouterGroup.GET("/departments/:departmentID", departmentCtr.Detail)
-	v1RouterGroup.PUT("/departments/:departmentID", departmentCtr.Update)
-	v1RouterGroup.DELETE("/departments/:departmentID", departmentCtr.Delete)
-}
-
 func systemRouter(groups *ginserver.RouterGroups) {
 	systemCtr := ctrtenant.NewSystemCtr()
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)

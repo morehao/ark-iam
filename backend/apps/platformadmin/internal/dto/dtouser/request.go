@@ -103,14 +103,7 @@ type UserLoginLogByUserReq struct {
 	UserID string `json:"-" uri:"userID" binding:"required"` // 用户ID
 }
 
-type UserDepartmentByUserReq struct {
-	UserID string `json:"-" uri:"userID" binding:"required"` // 用户ID
-}
 
-type AssignDepartmentsReq struct {
-	UserID        string   `json:"-" uri:"userID" binding:"required"` // 用户ID（path）
-	DepartmentIDs []string `json:"departmentIDs" binding:"required"`  // 部门ID列表
-}
 
 type RoleUserListReq struct {
 	RoleID string `json:"-" uri:"roleID" binding:"required"`

@@ -13,12 +13,6 @@ const (
 )
 
 const (
-	DepartmentCreateError      = 100400
-	DepartmentDeleteError      = 100401
-	DepartmentUpdateError      = 100402
-	DepartmentGetDetailError   = 100403
-	DepartmentGetPageListError = 100404
-	DepartmentNotExistError    = 100405
 )
 
 const (
@@ -40,26 +34,11 @@ const (
 )
 
 const (
-	OrganizationRoleCreateError      = 100130
-	OrganizationRoleDeleteError      = 100131
-	OrganizationRoleUpdateError      = 100132
-	OrganizationRoleGetDetailError   = 100133
-	OrganizationRoleGetPageListError = 100134
-	OrganizationRoleNotExistError    = 100135
-)
-
-const (
 	OrganizationUserCreateError      = 100140
 	OrganizationUserDeleteError      = 100141
 	OrganizationUserGetPageListError = 100142
 	OrganizationUserNotExistError    = 100143
-)
-
-const (
-	OrganizationRoleUserCreateError      = 100150
-	OrganizationRoleUserDeleteError      = 100151
-	OrganizationRoleUserGetPageListError = 100152
-	OrganizationRoleUserNotExistError    = 100153
+	OrganizationUserUpdateError      = 100144
 )
 
 const (
@@ -80,12 +59,6 @@ var tenantErrorMsgMap = gerror.CodeMsgMap{
 	TenantGetPageListError:               "查看租户管理列表失败",
 	TenantNotExistError:                  "租户管理不存在",
 	TenantCreateAsOwnerForbiddenError:    "当前自然人已拥有租户或应用策略禁止自助创建租户",
-	DepartmentCreateError:                "创建部门失败",
-	DepartmentDeleteError:                "删除部门失败",
-	DepartmentUpdateError:                "修改部门失败",
-	DepartmentGetDetailError:             "查看部门详情失败",
-	DepartmentGetPageListError:           "查看部门列表失败",
-	DepartmentNotExistError:              "部门不存在",
 	SystemCreateError:                    "创建系统配置失败",
 	SystemDeleteError:                    "删除系统配置失败",
 	SystemUpdateError:                    "修改系统配置失败",
@@ -98,20 +71,11 @@ var tenantErrorMsgMap = gerror.CodeMsgMap{
 	OrganizationGetDetailError:           "查看组织详情失败",
 	OrganizationGetPageListError:         "查看组织列表失败",
 	OrganizationNotExistError:            "组织不存在",
-	OrganizationRoleCreateError:          "创建组织角色失败",
-	OrganizationRoleDeleteError:          "删除组织角色失败",
-	OrganizationRoleUpdateError:          "修改组织角色失败",
-	OrganizationRoleGetDetailError:       "查看组织角色详情失败",
-	OrganizationRoleGetPageListError:     "查看组织角色列表失败",
-	OrganizationRoleNotExistError:        "组织角色不存在",
 	OrganizationUserCreateError:          "创建组织用户失败",
 	OrganizationUserDeleteError:          "删除组织用户失败",
 	OrganizationUserGetPageListError:     "查看组织用户列表失败",
 	OrganizationUserNotExistError:        "组织用户不存在",
-	OrganizationRoleUserCreateError:      "创建组织角色用户失败",
-	OrganizationRoleUserDeleteError:      "删除组织角色用户失败",
-	OrganizationRoleUserGetPageListError: "查看组织角色用户列表失败",
-	OrganizationRoleUserNotExistError:    "组织角色用户不存在",
+	OrganizationUserUpdateError:          "修改组织用户失败",
 	DomainCreateError:                    "创建域名失败",
 	DomainDeleteError:                    "删除域名失败",
 	DomainGetPageListError:               "查看域名列表失败",

@@ -4,7 +4,6 @@ import "github.com/morehao/golib/biz/gserver/ginserver"
 
 func RegisterRouter(groups *ginserver.RouterGroups, appName string) {
 	tenantRouter(groups)
-	departmentRouter(groups)
 	systemRouter(groups)
 	logRouter(groups)
 	apiKeyRouter(groups)

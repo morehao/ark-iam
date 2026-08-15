@@ -28,9 +28,8 @@ func TestSeedIamAgainstPostgres(t *testing.T) {
 		tables := []string{
 			"user_role", "role_menu", "role_scope", "tenant_application",
 			"application_client_secret", "application_client", "menu", "scope",
-			"resource", "role", "user_identity", "user_department", "user_login_log",
-			"department", "organization_role_user", "organization_user",
-			"organization_role", "organization", "tenant_user", "person",
+			"resource", "role", "user_identity", "user_login_log",
+			"organization_user", "organization", "tenant_user", "person",
 			"refresh_token", "session", "audit_log", "api_key", "connector",
 			"domain", "system", "log", "application", "tenant",
 		}

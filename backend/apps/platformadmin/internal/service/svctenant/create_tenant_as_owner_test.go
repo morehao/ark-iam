@@ -77,16 +77,16 @@ func TestCreateTenantAsOwnerCreatesTenantUserAndSubscription(t *testing.T) {
 		t.Fatalf("unexpected subscription status: %q", apps[0].Status)
 	}
 
-	// 每个租户创建时应自动创建同名的顶级部门（parent_id=0）
-	var depts []model.DepartmentEntity
-	if err := db.Where("tenant_id = ? AND parent_id = ''", resp.TenantID).Find(&depts).Error; err != nil {
-		t.Fatalf("query root departments: %v", err)
+	// 每个租户创建时应自动创建同名的根组织节点（parent_id=空）
+	var roots []model.OrganizationEntity
+	if err := db.Where("tenant_id = ? AND parent_id = ''", resp.TenantID).Find(&roots).Error; err != nil {
+		t.Fatalf("query root organizations: %v", err)
 	}
-	if len(depts) != 1 {
-		t.Fatalf("expected 1 root department, got %d", len(depts))
+	if len(roots) != 1 {
+		t.Fatalf("expected 1 root organization, got %d", len(roots))
 	}
-	if depts[0].Name != "Acme" || depts[0].CreatedBy != "88" {
-		t.Fatalf("unexpected root department: %+v", depts[0])
+	if roots[0].Name != "Acme" || roots[0].CreatedBy != "88" || roots[0].OrgPath != "/"+roots[0].ID || roots[0].OrgDepth != 1 {
+		t.Fatalf("unexpected root organization: %+v", roots[0])
 	}
 }
 
@@ -165,16 +165,16 @@ func TestTenantCreateCreatesSameNameRootDepartment(t *testing.T) {
 		t.Fatalf("unexpected tenant: %+v", tenant)
 	}
 
-	// 每个租户创建时应自动创建同名的顶级部门（parent_id=0）
-	var depts []model.DepartmentEntity
-	if err := db.Where("tenant_id = ? AND parent_id = ''", resp.TenantID).Find(&depts).Error; err != nil {
-		t.Fatalf("query root departments: %v", err)
+	// 每个租户创建时应自动创建同名的根组织节点（parent_id=空）
+	var roots []model.OrganizationEntity
+	if err := db.Where("tenant_id = ? AND parent_id = ''", resp.TenantID).Find(&roots).Error; err != nil {
+		t.Fatalf("query root organizations: %v", err)
 	}
-	if len(depts) != 1 {
-		t.Fatalf("expected 1 root department, got %d", len(depts))
+	if len(roots) != 1 {
+		t.Fatalf("expected 1 root organization, got %d", len(roots))
 	}
-	if depts[0].Name != "Acme Platform" || depts[0].CreatedBy != "300" {
-		t.Fatalf("unexpected root department: %+v", depts[0])
+	if roots[0].Name != "Acme Platform" || roots[0].CreatedBy != "300" || roots[0].OrgPath != "/"+roots[0].ID {
+		t.Fatalf("unexpected root organization: %+v", roots[0])
 	}
 }
 
@@ -315,7 +315,7 @@ func newCreateTenantAsOwnerTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite db: %v", err)
 	}
-	if err := db.AutoMigrate(&model.TenantEntity{}, &model.UserEntity{}, &model.TenantApplicationEntity{}, &model.ApplicationEntity{}, &model.AuditLogEntity{}, &model.DepartmentEntity{}); err != nil {
+	if err := db.AutoMigrate(&model.TenantEntity{}, &model.UserEntity{}, &model.TenantApplicationEntity{}, &model.ApplicationEntity{}, &model.AuditLogEntity{}, &model.OrganizationEntity{}); err != nil {
 		t.Fatalf("migrate tables: %v", err)
 	}
 	return db

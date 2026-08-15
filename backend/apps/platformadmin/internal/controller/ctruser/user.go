@@ -18,8 +18,6 @@ type UserCtr interface {
 	DetailUserLoginLog(ctx *gin.Context)
 	PageListUserLoginLog(ctx *gin.Context)
 	GetUserLoginLogByUser(ctx *gin.Context)
-	GetUserDepartmentByUser(ctx *gin.Context)
-	AssignDepartments(ctx *gin.Context)
 	CreateUserIdentity(ctx *gin.Context)
 	DeleteUserIdentity(ctx *gin.Context)
 	UpdateUserIdentity(ctx *gin.Context)
@@ -200,37 +198,6 @@ func (ctr *userCtr) UpdateStatus(ctx *gin.Context) {
 	gincontext.Success(ctx, "修改成功")
 }
 
-// @Tags 用户管理
-// @Summary 分配用户部门
-// @accept application/json
-// @Produce application/json
-// @Param userID path int true "用户ID"
-// @Param req body dtouser.AssignDepartmentsReq true "分配用户部门"
-// @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/users/{userID}/departments [put]
-func (ctr *userCtr) AssignDepartments(ctx *gin.Context) {
-	var req dtouser.AssignDepartmentsReq
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctr.userSvc.AssignDepartments(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, "分配成功")
-}
-
-// @Tags 用户管理
-// @Summary 用户登录日志详情
-// @accept application/json
-// @Produce application/json
-// @Param loginLogID path int true "登录日志ID"
-// @Success 200 {object} gincontext.DtoRender{data=dtouser.UserLoginLogDetailResp}
 // @Router /v1/platform/login-logs/{loginLogID} [get]
 func (ctr *userCtr) DetailUserLoginLog(ctx *gin.Context) {
 	var req dtouser.UserLoginLogDetailReq
@@ -281,27 +248,6 @@ func (ctr *userCtr) GetUserLoginLogByUser(ctx *gin.Context) {
 		return
 	}
 	res, err := ctr.userSvc.GetUserLoginLogByUser(ctx, &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-// @Tags 用户管理
-// @Summary 获取用户部门关联
-// @accept application/json
-// @Produce application/json
-// @Param userID path int true "用户ID"
-// @Success 200 {object} gincontext.DtoRender{data=dtouser.UserDepartmentPageListResp}
-// @Router /v1/platform/users/{userID}/departments [get]
-func (ctr *userCtr) GetUserDepartmentByUser(ctx *gin.Context) {
-	var req dtouser.UserDepartmentByUserReq
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.userSvc.GetUserDepartmentByUser(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
