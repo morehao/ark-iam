@@ -9,14 +9,14 @@ type ApiKeyCreateReq struct {
 }
 
 type RevokeApiKeyReq struct {
-	ID uint `json:"id" binding:"required"`
+	ApiKeyID uint `json:"-" uri:"apiKeyID" binding:"required"`
 }
 
 type ApiKeyDeleteReq struct {
-	ID uint `json:"id" binding:"required"`
+	ApiKeyID uint `json:"-" uri:"apiKeyID" binding:"required"`
 }
 
 type ApiKeyPageListReq struct {
 	gobject.PageQuery
-	Name string `json:"name"`
+	Name string `json:"name" form:"name"`
 }

@@ -117,7 +117,7 @@ func TestRevokeApiKey(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Revoke(newTestGinCtx(1), 1, &dtoapikey.RevokeApiKeyReq{ID: resp.ID}); err != nil {
+	if err := svc.Revoke(newTestGinCtx(1), 1, &dtoapikey.RevokeApiKeyReq{ApiKeyID: resp.ID}); err != nil {
 		t.Fatalf("Revoke failed: %v", err)
 	}
 
@@ -145,7 +145,7 @@ func TestDeleteApiKey(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(newTestGinCtx(1), 1, &dtoapikey.ApiKeyDeleteReq{ID: resp.ID}); err != nil {
+	if err := svc.Delete(newTestGinCtx(1), 1, &dtoapikey.ApiKeyDeleteReq{ApiKeyID: resp.ID}); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 

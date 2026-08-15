@@ -10,26 +10,26 @@ type MenuCreateReq struct {
 }
 
 type MenuUpdateReq struct {
-	MenuID uint `json:"menuID" binding:"required"` // 菜单ID
+	MenuID uint `json:"-" uri:"menuID" binding:"required"` // 菜单ID
 	objpermission.MenuBaseInfo
 }
 
 type MenuDetailReq struct {
-	MenuID uint `json:"menuID" form:"menuID" binding:"required"` // 菜单ID
+	MenuID uint `json:"-" uri:"menuID" binding:"required"` // 菜单ID
 }
 
 type MenuPageListReq struct {
 	gobject.PageQuery
-	AppID    uint   `json:"appID"`    // 应用ID
-	ParentID uint   `json:"parentID"` // 父菜单ID
-	Name     string `json:"name"`     // 菜单名称
-	Code     string `json:"code"`     // 菜单编码
-	Type     string `json:"type"`     // 菜单类型
-	Status   string `json:"status"`   // 状态
+	AppID    uint   `json:"appID" form:"appID"`       // 应用ID
+	ParentID uint   `json:"parentID" form:"parentID"` // 父菜单ID
+	Name     string `json:"name" form:"name"`         // 菜单名称
+	Code     string `json:"code" form:"code"`         // 菜单编码
+	Type     string `json:"type" form:"type"`         // 菜单类型
+	Status   string `json:"status" form:"status"`     // 状态
 }
 
 type MenuDeleteReq struct {
-	MenuID uint `json:"menuID" binding:"required"` // 菜单ID
+	MenuID uint `json:"-" uri:"menuID" binding:"required"` // 菜单ID
 }
 
 type MenuTreeReq struct {
@@ -46,7 +46,7 @@ type RoleCreateReq struct {
 }
 
 type RoleUpdateReq struct {
-	RoleID      uint   `json:"roleID" form:"roleID"`           // 角色ID
+	RoleID      uint   `json:"-" uri:"roleID"`                 // 角色ID
 	TenantID    uint   `json:"tenantID" form:"tenantID"`       // 租户ID
 	Name        string `json:"name" form:"name"`               // 角色名称
 	Code        string `json:"code" form:"code"`               // 角色编码
@@ -56,11 +56,11 @@ type RoleUpdateReq struct {
 }
 
 type RoleDeleteReq struct {
-	RoleID uint `json:"roleID" form:"roleID"` // 角色ID
+	RoleID uint `json:"-" uri:"roleID"` // 角色ID
 }
 
 type RoleDetailReq struct {
-	RoleID uint `json:"roleID" form:"roleID"` // 角色ID
+	RoleID uint `json:"-" uri:"roleID"` // 角色ID
 }
 
 type RolePageListReq struct {
@@ -81,7 +81,7 @@ type ResourceCreateReq struct {
 }
 
 type ResourceUpdateReq struct {
-	ResourceID     uint   `json:"resourceID" form:"resourceID"`         // 资源ID
+	ResourceID     uint   `json:"-" uri:"resourceID"`                   // 资源ID
 	TenantID       uint   `json:"tenantID" form:"tenantID"`             // 租户ID
 	Name           string `json:"name" form:"name"`                     // 资源名称
 	Indicator      string `json:"indicator" form:"indicator"`           // 资源标识符
@@ -90,11 +90,11 @@ type ResourceUpdateReq struct {
 }
 
 type ResourceDeleteReq struct {
-	ResourceID uint `json:"resourceID" form:"resourceID"` // 资源ID
+	ResourceID uint `json:"-" uri:"resourceID"` // 资源ID
 }
 
 type ResourceDetailReq struct {
-	ResourceID uint `json:"resourceID" form:"resourceID"` // 资源ID
+	ResourceID uint `json:"-" uri:"resourceID"` // 资源ID
 }
 
 type ResourcePageListReq struct {
@@ -113,7 +113,7 @@ type ScopeCreateReq struct {
 }
 
 type ScopeUpdateReq struct {
-	ScopeID     uint   `json:"scopeID" form:"scopeID"`         // 权限ID
+	ScopeID     uint   `json:"-" uri:"scopeID"`                // 权限ID
 	TenantID    uint   `json:"tenantID" form:"tenantID"`       // 租户ID
 	ResourceID  uint   `json:"resourceID" form:"resourceID"`   // 资源ID
 	Name        string `json:"name" form:"name"`               // 权限名称
@@ -121,11 +121,11 @@ type ScopeUpdateReq struct {
 }
 
 type ScopeDeleteReq struct {
-	ScopeID uint `json:"scopeID" form:"scopeID"` // 权限ID
+	ScopeID uint `json:"-" uri:"scopeID"` // 权限ID
 }
 
 type ScopeDetailReq struct {
-	ScopeID uint `json:"scopeID" form:"scopeID"` // 权限ID
+	ScopeID uint `json:"-" uri:"scopeID"` // 权限ID
 }
 
 type ScopePageListReq struct {
@@ -138,13 +138,13 @@ type ScopePageListReq struct {
 
 type RoleMenuCreateReq struct {
 	TenantID uint `json:"tenantID" form:"tenantID"` // 租户ID
-	RoleID   uint `json:"roleID" form:"roleID"`     // 角色ID
+	RoleID   uint `json:"-" uri:"roleID"`           // 角色ID
 	MenuID   uint `json:"menuID" form:"menuID"`     // 菜单ID
 }
 
 type RoleMenuDeleteReq struct {
-	RoleID   uint `json:"roleID" form:"roleID"`     // 角色ID
-	MenuID   uint `json:"menuID" form:"menuID"`     // 菜单ID
+	RoleID   uint `json:"-" uri:"roleID"`           // 角色ID
+	MenuID   uint `json:"-" uri:"menuID"`           // 菜单ID
 	TenantID uint `json:"tenantID" form:"tenantID"` // 租户ID
 }
 
@@ -152,19 +152,19 @@ type RoleMenuPageListReq struct {
 	Page     int  `json:"page" form:"page"`         // 页码
 	PageSize int  `json:"pageSize" form:"pageSize"` // 每页数量
 	TenantID uint `json:"tenantID" form:"tenantID"` // 租户ID
-	RoleID   uint `json:"roleID" form:"roleID"`     // 角色ID
+	RoleID   uint `json:"-" uri:"roleID"`           // 角色ID
 	MenuID   uint `json:"menuID" form:"menuID"`     // 菜单ID
 }
 
 type RoleScopeCreateReq struct {
 	TenantID uint `json:"tenantID" form:"tenantID"` // 租户ID
-	RoleID   uint `json:"roleID" form:"roleID"`     // 角色ID
+	RoleID   uint `json:"-" uri:"roleID"`           // 角色ID
 	ScopeID  uint `json:"scopeID" form:"scopeID"`   // 权限ID
 }
 
 type RoleScopeDeleteReq struct {
-	RoleID   uint `json:"roleID" form:"roleID"`     // 角色ID
-	ScopeID  uint `json:"scopeID" form:"scopeID"`   // 权限ID
+	RoleID   uint `json:"-" uri:"roleID"`           // 角色ID
+	ScopeID  uint `json:"-" uri:"scopeID"`          // 权限ID
 	TenantID uint `json:"tenantID" form:"tenantID"` // 租户ID
 }
 
@@ -172,26 +172,26 @@ type RoleScopePageListReq struct {
 	Page     int  `json:"page" form:"page"`         // 页码
 	PageSize int  `json:"pageSize" form:"pageSize"` // 每页数量
 	TenantID uint `json:"tenantID" form:"tenantID"` // 租户ID
-	RoleID   uint `json:"roleID" form:"roleID"`     // 角色ID
+	RoleID   uint `json:"-" uri:"roleID"`           // 角色ID
 	ScopeID  uint `json:"scopeID" form:"scopeID"`   // 权限ID
 }
 
 type UserRoleCreateReq struct {
 	TenantID uint `json:"tenantID" form:"tenantID"` // 租户ID
-	UserID   uint `json:"userID" form:"userID"`     // 用户ID
+	UserID   uint `json:"-" uri:"userID"`           // 用户ID
 	RoleID   uint `json:"roleID" form:"roleID"`     // 角色ID
 }
 
 type UserRoleDeleteReq struct {
 	TenantID uint `json:"tenantID" form:"tenantID"` // 租户ID
-	UserID   uint `json:"userID" form:"userID"`     // 用户ID
-	RoleID   uint `json:"roleID" form:"roleID"`     // 角色ID
+	UserID   uint `json:"-" uri:"userID"`           // 用户ID
+	RoleID   uint `json:"-" uri:"roleID"`           // 角色ID
 }
 
 type UserRolePageListReq struct {
 	Page     int  `json:"page" form:"page"`         // 页码
 	PageSize int  `json:"pageSize" form:"pageSize"` // 每页数量
 	TenantID uint `json:"tenantID" form:"tenantID"` // 租户ID
-	UserID   uint `json:"userID" form:"userID"`     // 用户ID
+	UserID   uint `json:"-" uri:"userID"`           // 用户ID
 	RoleID   uint `json:"roleID" form:"roleID"`     // 角色ID
 }

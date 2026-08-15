@@ -149,7 +149,7 @@ func TestDomainSvc_Delete_Success(t *testing.T) {
 	}
 
 	svc := NewDomainSvc()
-	if err := svc.Delete(ctx, &dtodomain.DomainDeleteReq{ID: entity.ID}); err != nil {
+	if err := svc.Delete(ctx, &dtodomain.DomainDeleteReq{DomainID: entity.ID}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -168,7 +168,7 @@ func TestDomainSvc_Delete_NotExist(t *testing.T) {
 	ctx := newGinCtx(10, 100)
 
 	svc := NewDomainSvc()
-	err := svc.Delete(ctx, &dtodomain.DomainDeleteReq{ID: 999})
+	err := svc.Delete(ctx, &dtodomain.DomainDeleteReq{DomainID: 999})
 	if err == nil {
 		t.Fatalf("expected error for non-existent domain")
 	}

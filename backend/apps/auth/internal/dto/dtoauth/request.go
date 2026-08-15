@@ -38,7 +38,7 @@ type AssignDepartmentsReq struct {
 }
 
 type ConnectorDeleteReq struct {
-	ConnectorID uint `json:"connectorID" binding:"required"` // 连接器ID
+	ConnectorID uint `json:"-" uri:"connectorID" binding:"required"` // 连接器ID
 }
 
 type ConnectorCreateReq struct {
@@ -46,20 +46,20 @@ type ConnectorCreateReq struct {
 }
 
 type ConnectorUpdateReq struct {
-	ConnectorID uint `json:"connectorID" binding:"required"` // 连接器ID
+	ConnectorID uint `json:"-" uri:"connectorID" binding:"required"` // 连接器ID
 	objauth.ConnectorBaseInfo
 }
 
 type ConnectorDetailReq struct {
-	ConnectorID uint `json:"connectorID" form:"connectorID" binding:"required"` // 连接器ID
+	ConnectorID uint `json:"-" uri:"connectorID" binding:"required"` // 连接器ID
 }
 
 type ConnectorPageListReq struct {
 	gobject.PageQuery
-	TenantID    uint   `json:"tenantID"`    // 租户ID
-	Protocol    string `json:"protocol"`    // 协议类型
-	Provider    string `json:"provider"`    // 提供商
-	Status      string `json:"status"`      // 状态
-	Name        string `json:"name"`        // 名称
-	DisplayName string `json:"displayName"` // 显示名称
+	TenantID    uint   `json:"tenantID" form:"tenantID"`       // 租户ID
+	Protocol    string `json:"protocol" form:"protocol"`       // 协议类型
+	Provider    string `json:"provider" form:"provider"`       // 提供商
+	Status      string `json:"status" form:"status"`           // 状态
+	Name        string `json:"name" form:"name"`               // 名称
+	DisplayName string `json:"displayName" form:"displayName"` // 显示名称
 }

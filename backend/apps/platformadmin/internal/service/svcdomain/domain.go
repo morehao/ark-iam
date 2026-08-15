@@ -105,7 +105,7 @@ func (svc *domainSvc) Delete(ctx *gin.Context, req *dtodomain.DomainDeleteReq) e
 	tenantID := gincontext.GetTenantID(ctx)
 
 	repo := dao.NewDomainDao()
-	entity, err := repo.GetByID(ctx, req.ID)
+	entity, err := repo.GetByID(ctx, req.DomainID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcdomain.Delete] GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.DomainDeleteError)
@@ -115,7 +115,7 @@ func (svc *domainSvc) Delete(ctx *gin.Context, req *dtodomain.DomainDeleteReq) e
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	if err := repo.Delete(ctx, req.ID, userID); err != nil {
+	if err := repo.Delete(ctx, req.DomainID, userID); err != nil {
 		glog.Errorf(ctx, "[svcdomain.Delete] Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.DomainDeleteError)
 	}
@@ -126,7 +126,7 @@ func (svc *domainSvc) Update(ctx *gin.Context, req *dtodomain.DomainUpdateReq) e
 	tenantID := gincontext.GetTenantID(ctx)
 
 	repo := dao.NewDomainDao()
-	entity, err := repo.GetByID(ctx, req.ID)
+	entity, err := repo.GetByID(ctx, req.DomainID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcdomain.Update] GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.DomainUpdateError)
@@ -145,7 +145,7 @@ func (svc *domainSvc) Update(ctx *gin.Context, req *dtodomain.DomainUpdateReq) e
 		updateMap["is_verified"] = *req.IsVerified
 	}
 
-	if err := repo.UpdateMap(ctx, req.ID, updateMap); err != nil {
+	if err := repo.UpdateMap(ctx, req.DomainID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcdomain.Update] UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.DomainUpdateError)
 	}
@@ -156,7 +156,7 @@ func (svc *domainSvc) Detail(ctx *gin.Context, req *dtodomain.DomainDetailReq) (
 	tenantID := gincontext.GetTenantID(ctx)
 
 	repo := dao.NewDomainDao()
-	entity, err := repo.GetByID(ctx, req.ID)
+	entity, err := repo.GetByID(ctx, req.DomainID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcdomain.Detail] GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.DomainDetailError)

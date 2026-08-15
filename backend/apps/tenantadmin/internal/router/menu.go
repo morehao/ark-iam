@@ -6,10 +6,10 @@ import (
 )
 
 // tenantMenuRouter 租户侧菜单路由。
-// 路径使用 /myMenu/tree，避免与 platformadmin 的 /menu/tree 在 gateway 聚合时冲突。
+// service 段 /v1/tenant 已与 /v1/platform/menus/tree 区分归属。
 func tenantMenuRouter(groups *ginserver.RouterGroups) {
 	tenantMenuCtr := ctrtenant.NewTenantMenuCtr()
 
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.GET("/myMenu/tree", tenantMenuCtr.Tree)
+	v1RouterGroup.GET("/menus/tree", tenantMenuCtr.Tree)
 }

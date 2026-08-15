@@ -30,6 +30,12 @@ func NewAuthCtr(authSvc svcauth.AuthSvc) AuthCtr {
 	}
 }
 
+// @Tags 认证
+// @Summary 我的租户列表
+// @accept application/json
+// @Produce application/json
+// @Success 200 {object} gincontext.DtoRender{data=dtoauth.MyTenantsResp}
+// @Router /v1/auth/me/tenants [get]
 func (ctr *authCtr) MyTenants(ctx *gin.Context) {
 	var req dtoauth.MyTenantsReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {

@@ -34,7 +34,7 @@ func NewMenuCtr() MenuCtr {
 // @Produce application/json
 // @Param req body dtopermission.MenuCreateReq true "创建菜单管理"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.MenuCreateResp}
-// @Router /v1/platform/menu/create [post]
+// @Router /v1/platform/menus [post]
 func (ctr *menuCtr) Create(ctx *gin.Context) {
 	var req dtopermission.MenuCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -53,12 +53,12 @@ func (ctr *menuCtr) Create(ctx *gin.Context) {
 // @Summary 删除菜单管理
 // @accept application/json
 // @Produce application/json
-// @Param req body dtopermission.MenuDeleteReq true "删除菜单管理"
+// @Param menuID path int true "menuID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/menu/delete [post]
+// @Router /v1/platform/menus/{menuID} [delete]
 func (ctr *menuCtr) Delete(ctx *gin.Context) {
 	var req dtopermission.MenuDeleteReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -73,11 +73,16 @@ func (ctr *menuCtr) Delete(ctx *gin.Context) {
 // @Summary 修改菜单管理
 // @accept application/json
 // @Produce application/json
+// @Param menuID path int true "menuID"
 // @Param req body dtopermission.MenuUpdateReq true "修改菜单管理"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/menu/update [post]
+// @Router /v1/platform/menus/{menuID} [put]
 func (ctr *menuCtr) Update(ctx *gin.Context) {
 	var req dtopermission.MenuUpdateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -93,12 +98,12 @@ func (ctr *menuCtr) Update(ctx *gin.Context) {
 // @Summary 菜单管理详情
 // @accept application/json
 // @Produce application/json
-// @Param req query dtopermission.MenuDetailReq true "菜单管理详情"
+// @Param menuID path int true "menuID"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.MenuDetailResp}
-// @Router /v1/platform/menu/detail [get]
+// @Router /v1/platform/menus/{menuID} [get]
 func (ctr *menuCtr) Detail(ctx *gin.Context) {
 	var req dtopermission.MenuDetailReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -114,12 +119,12 @@ func (ctr *menuCtr) Detail(ctx *gin.Context) {
 // @Summary 菜单管理列表分页
 // @accept application/json
 // @Produce application/json
-// @Param req body dtopermission.MenuPageListReq true "菜单管理列表分页"
+// @Param req query dtopermission.MenuPageListReq true "菜单管理列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.MenuPageListResp}
-// @Router /v1/platform/menu/pageList [post]
+// @Router /v1/platform/menus [get]
 func (ctr *menuCtr) PageList(ctx *gin.Context) {
 	var req dtopermission.MenuPageListReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -137,7 +142,7 @@ func (ctr *menuCtr) PageList(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtopermission.MenuTreeReq true "菜单管理树"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.MenuTreeResp}
-// @Router /v1/platform/menu/tree [get]
+// @Router /v1/platform/menus/tree [get]
 func (ctr *menuCtr) Tree(ctx *gin.Context) {
 	var req dtopermission.MenuTreeReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {

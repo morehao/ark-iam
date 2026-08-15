@@ -7,7 +7,7 @@ type SessionListReq struct {
 }
 
 type SessionRevokeReq struct {
-	SessionID uint `json:"sessionID" uri:"sessionID" binding:"required"`
+	SessionID uint `json:"-" uri:"sessionID" binding:"required"`
 }
 
 type SessionResp struct {

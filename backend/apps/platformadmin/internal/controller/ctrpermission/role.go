@@ -37,7 +37,7 @@ func NewRoleCtr() RoleCtr {
 // @Produce application/json
 // @Param req body dtopermission.RoleCreateReq true "创建角色管理"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.RoleCreateResp}
-// @Router /v1/platform/role/create [post]
+// @Router /v1/platform/roles [post]
 func (ctr *roleCtr) Create(ctx *gin.Context) {
 	var req dtopermission.RoleCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -56,12 +56,12 @@ func (ctr *roleCtr) Create(ctx *gin.Context) {
 // @Summary 删除角色管理
 // @accept application/json
 // @Produce application/json
-// @Param req body dtopermission.RoleDeleteReq true "删除角色管理"
+// @Param roleID path int true "角色ID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/role/delete [post]
+// @Router /v1/platform/roles/{roleID} [delete]
 func (ctr *roleCtr) Delete(ctx *gin.Context) {
 	var req dtopermission.RoleDeleteReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -76,11 +76,16 @@ func (ctr *roleCtr) Delete(ctx *gin.Context) {
 // @Summary 修改角色管理
 // @accept application/json
 // @Produce application/json
+// @Param roleID path int true "角色ID"
 // @Param req body dtopermission.RoleUpdateReq true "修改角色管理"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/role/update [post]
+// @Router /v1/platform/roles/{roleID} [put]
 func (ctr *roleCtr) Update(ctx *gin.Context) {
 	var req dtopermission.RoleUpdateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -96,12 +101,12 @@ func (ctr *roleCtr) Update(ctx *gin.Context) {
 // @Summary 角色管理详情
 // @accept application/json
 // @Produce application/json
-// @Param req query dtopermission.RoleDetailReq true "角色管理详情"
+// @Param roleID path int true "角色ID"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.RoleDetailResp}
-// @Router /v1/platform/role/detail [get]
+// @Router /v1/platform/roles/{roleID} [get]
 func (ctr *roleCtr) Detail(ctx *gin.Context) {
 	var req dtopermission.RoleDetailReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -117,12 +122,12 @@ func (ctr *roleCtr) Detail(ctx *gin.Context) {
 // @Summary 角色管理列表分页
 // @accept application/json
 // @Produce application/json
-// @Param req body dtopermission.RolePageListReq true "角色管理列表分页"
+// @Param req query dtopermission.RolePageListReq true "角色管理列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.RolePageListResp}
-// @Router /v1/platform/role/pageList [post]
+// @Router /v1/platform/roles [get]
 func (ctr *roleCtr) PageList(ctx *gin.Context) {
 	var req dtopermission.RolePageListReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -138,12 +143,12 @@ func (ctr *roleCtr) PageList(ctx *gin.Context) {
 // @Summary 角色用户列表
 // @accept application/json
 // @Produce application/json
-// @Param req query dtouser.RoleUserListReq true "角色用户列表"
+// @Param roleID path int true "角色ID"
 // @Success 200 {object} gincontext.DtoRender{data=dtouser.RoleUserListResp}
-// @Router /v1/platform/role/users [get]
+// @Router /v1/platform/roles/{roleID}/users [get]
 func (ctr *roleCtr) ListUsers(ctx *gin.Context) {
 	var req dtouser.RoleUserListReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -159,11 +164,16 @@ func (ctr *roleCtr) ListUsers(ctx *gin.Context) {
 // @Summary 分配用户
 // @accept application/json
 // @Produce application/json
+// @Param roleID path int true "角色ID"
 // @Param req body dtouser.AssignRoleUsersReq true "分配用户"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/role/assignUsers [post]
+// @Router /v1/platform/roles/{roleID}/users [put]
 func (ctr *roleCtr) AssignUsers(ctx *gin.Context) {
 	var req dtouser.AssignRoleUsersReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -182,10 +192,10 @@ func (ctr *roleCtr) AssignUsers(ctx *gin.Context) {
 // @Param roleID path int true "角色ID"
 // @Param userID path int true "用户ID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/role/users/{roleID}/{userID} [delete]
+// @Router /v1/platform/roles/{roleID}/users/{userID} [delete]
 func (ctr *roleCtr) RemoveUser(ctx *gin.Context) {
 	var req dtouser.RemoveRoleUserReq
-	if err := ctx.ShouldBindUri(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

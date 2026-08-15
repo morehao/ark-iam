@@ -31,7 +31,7 @@ func NewOrganizationRoleUserCtr() OrganizationRoleUserCtr {
 // @Produce application/json
 // @Param req body dtotenant.OrganizationRoleUserCreateReq true "创建组织角色用户关联"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationRoleUserCreateResp}
-// @Router /v1/tenant/organizationRoleUser/create [post]
+// @Router /v1/tenant/organization-role-users [post]
 func (ctr *organizationRoleUserCtr) Create(ctx *gin.Context) {
 	var req dtotenant.OrganizationRoleUserCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -50,12 +50,13 @@ func (ctr *organizationRoleUserCtr) Create(ctx *gin.Context) {
 // @Summary 删除组织角色用户关联
 // @accept application/json
 // @Produce application/json
-// @Param req body dtotenant.OrganizationRoleUserDeleteReq true "删除组织角色用户关联"
+// @Param organizationRoleID path int true "组织角色ID"
+// @Param userID path int true "用户ID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/tenant/organizationRoleUser/delete [post]
+// @Router /v1/tenant/organization-role-users/{organizationRoleID}/{userID} [delete]
 func (ctr *organizationRoleUserCtr) Delete(ctx *gin.Context) {
 	var req dtotenant.OrganizationRoleUserDeleteReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -70,12 +71,12 @@ func (ctr *organizationRoleUserCtr) Delete(ctx *gin.Context) {
 // @Summary 组织角色用户关联列表分页
 // @accept application/json
 // @Produce application/json
-// @Param req body dtotenant.OrganizationRoleUserPageListReq true "组织角色用户关联列表分页"
+// @Param req query dtotenant.OrganizationRoleUserPageListReq true "组织角色用户关联列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationRoleUserPageListResp}
-// @Router /v1/tenant/organizationRoleUser/pageList [post]
+// @Router /v1/tenant/organization-role-users [get]
 func (ctr *organizationRoleUserCtr) PageList(ctx *gin.Context) {
 	var req dtotenant.OrganizationRoleUserPageListReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

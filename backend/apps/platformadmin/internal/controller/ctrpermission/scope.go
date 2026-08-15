@@ -33,7 +33,7 @@ func NewScopeCtr() ScopeCtr {
 // @Produce application/json
 // @Param req body dtopermission.ScopeCreateReq true "创建权限范围"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.ScopeCreateResp}
-// @Router /v1/platform/scope/create [post]
+// @Router /v1/platform/scopes [post]
 func (ctr *scopeCtr) Create(ctx *gin.Context) {
 	var req dtopermission.ScopeCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -52,12 +52,12 @@ func (ctr *scopeCtr) Create(ctx *gin.Context) {
 // @Summary 删除权限范围
 // @accept application/json
 // @Produce application/json
-// @Param req body dtopermission.ScopeDeleteReq true "删除权限范围"
+// @Param scopeID path int true "scopeID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/scope/delete [post]
+// @Router /v1/platform/scopes/{scopeID} [delete]
 func (ctr *scopeCtr) Delete(ctx *gin.Context) {
 	var req dtopermission.ScopeDeleteReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -72,11 +72,16 @@ func (ctr *scopeCtr) Delete(ctx *gin.Context) {
 // @Summary 修改权限范围
 // @accept application/json
 // @Produce application/json
+// @Param scopeID path int true "scopeID"
 // @Param req body dtopermission.ScopeUpdateReq true "修改权限范围"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/scope/update [post]
+// @Router /v1/platform/scopes/{scopeID} [put]
 func (ctr *scopeCtr) Update(ctx *gin.Context) {
 	var req dtopermission.ScopeUpdateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -92,12 +97,12 @@ func (ctr *scopeCtr) Update(ctx *gin.Context) {
 // @Summary 权限范围详情
 // @accept application/json
 // @Produce application/json
-// @Param req query dtopermission.ScopeDetailReq true "权限范围详情"
+// @Param scopeID path int true "scopeID"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.ScopeDetailResp}
-// @Router /v1/platform/scope/detail [get]
+// @Router /v1/platform/scopes/{scopeID} [get]
 func (ctr *scopeCtr) Detail(ctx *gin.Context) {
 	var req dtopermission.ScopeDetailReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -113,12 +118,12 @@ func (ctr *scopeCtr) Detail(ctx *gin.Context) {
 // @Summary 权限范围列表分页
 // @accept application/json
 // @Produce application/json
-// @Param req body dtopermission.ScopePageListReq true "权限范围列表分页"
+// @Param req query dtopermission.ScopePageListReq true "权限范围列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.ScopePageListResp}
-// @Router /v1/platform/scope/pageList [post]
+// @Router /v1/platform/scopes [get]
 func (ctr *scopeCtr) PageList(ctx *gin.Context) {
 	var req dtopermission.ScopePageListReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

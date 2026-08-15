@@ -21,11 +21,11 @@ type ApplicationClientCreateReq struct {
 }
 
 type ApplicationClientUpdateReq struct {
-	ApplicationClientID uint   `json:"applicationClientID" binding:"required"` // OAuth客户端ID
-	Name                string `json:"name"`                                   // 客户端名称
-	Type                string `json:"type"`                                   // 客户端类型
-	Status              string `json:"status"`                                 // 状态: enable-启用, disable-停用
-	IsThirdParty        int8   `json:"isThirdParty"`                           // 是否第三方应用
+	ApplicationClientID uint   `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
+	Name                string `json:"name"`                                           // 客户端名称
+	Type                string `json:"type"`                                           // 客户端类型
+	Status              string `json:"status"`                                         // 状态: enable-启用, disable-停用
+	IsThirdParty        int8   `json:"isThirdParty"`                                   // 是否第三方应用
 
 	RedirectURIs            []string `json:"redirectURIs"`            // 授权回调地址
 	PostLogoutRedirectURIs  []string `json:"postLogoutRedirectURIs"`  // 登出回调地址
@@ -42,31 +42,32 @@ type ApplicationClientUpdateReq struct {
 }
 
 type ApplicationClientDeleteReq struct {
-	ApplicationClientID uint `json:"applicationClientID" binding:"required"` // OAuth客户端ID
+	ApplicationClientID uint `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
 }
 
 type ApplicationClientDetailReq struct {
-	ApplicationClientID uint `json:"applicationClientID" form:"applicationClientID" binding:"required"` // OAuth客户端ID
+	ApplicationClientID uint `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
 }
 
 type ApplicationClientPageListReq struct {
-	Page     int    `json:"page"`     // 页码
-	PageSize int    `json:"pageSize"` // 每页条数
-	Name     string `json:"name"`     // 客户端名称（模糊搜索）
-	Type     string `json:"type"`     // 客户端类型
-	Status   string `json:"status"`   // 状态
+	Page     int    `json:"page" form:"page"`         // 页码
+	PageSize int    `json:"pageSize" form:"pageSize"` // 每页条数
+	Name     string `json:"name" form:"name"`         // 客户端名称（模糊搜索）
+	Type     string `json:"type" form:"type"`         // 客户端类型
+	Status   string `json:"status" form:"status"`     // 状态
 }
 
 type SecretListReq struct {
-	ApplicationClientID uint `json:"applicationClientID" form:"applicationClientID" binding:"required"` // OAuth客户端ID
+	ApplicationClientID uint `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
 }
 
 type SecretCreateReq struct {
-	ApplicationClientID uint   `json:"applicationClientID" binding:"required"` // OAuth客户端ID
-	Name                string `json:"name" binding:"required"`                // 密钥名称
-	ExpiredAt           string `json:"expiresAt"`                              // 过期时间
+	ApplicationClientID uint   `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
+	Name                string `json:"name" binding:"required"`                        // 密钥名称
+	ExpiredAt           string `json:"expiresAt"`                                      // 过期时间
 }
 
 type SecretDeleteReq struct {
-	SecretID uint `json:"secretID" uri:"secretID" binding:"required"` // 密钥ID
+	ApplicationClientID uint `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
+	SecretID            uint `json:"-" uri:"secretID" binding:"required"`            // 密钥ID
 }

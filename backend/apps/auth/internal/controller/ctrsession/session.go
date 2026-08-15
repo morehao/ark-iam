@@ -31,7 +31,7 @@ func NewSessionCtr() SessionCtr {
 // @Produce application/json
 // @Param req query dtouser.SessionListReq true "会话列表"
 // @Success 200 {object} gincontext.DtoRender{data=dtouser.SessionListResp}
-// @Router /v1/auth/user/sessions [get]
+// @Router /v1/auth/me/sessions [get]
 func (ctr *sessionCtr) List(ctx *gin.Context) {
 	var req dtouser.SessionListReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -56,10 +56,10 @@ func (ctr *sessionCtr) List(ctx *gin.Context) {
 // @Produce application/json
 // @Param sessionID path int true "会话ID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/auth/user/sessions/{sessionID} [delete]
+// @Router /v1/auth/me/sessions/{sessionID} [delete]
 func (ctr *sessionCtr) Revoke(ctx *gin.Context) {
 	var req dtouser.SessionRevokeReq
-	if err := ctx.ShouldBindUri(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -79,7 +79,7 @@ func (ctr *sessionCtr) Revoke(ctx *gin.Context) {
 // @accept application/json
 // @Produce application/json
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/auth/user/sessions [delete]
+// @Router /v1/auth/me/sessions [delete]
 func (ctr *sessionCtr) RevokeAll(ctx *gin.Context) {
 	userID := gincontext.GetUserID(ctx)
 	tenantID := gincontext.GetTenantID(ctx)

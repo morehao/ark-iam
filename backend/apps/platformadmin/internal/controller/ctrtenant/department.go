@@ -34,7 +34,7 @@ func NewDepartmentCtr() DepartmentCtr {
 // @Produce application/json
 // @Param req body dtotenant.DepartmentCreateReq true "创建部门"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.DepartmentCreateResp}
-// @Router /v1/platform/department/create [post]
+// @Router /v1/platform/departments [post]
 func (ctr *departmentCtr) Create(ctx *gin.Context) {
 	var req dtotenant.DepartmentCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -53,12 +53,12 @@ func (ctr *departmentCtr) Create(ctx *gin.Context) {
 // @Summary 删除部门
 // @accept application/json
 // @Produce application/json
-// @Param req body dtotenant.DepartmentDeleteReq true "删除部门"
+// @Param departmentID path int true "departmentID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/department/delete [post]
+// @Router /v1/platform/departments/{departmentID} [delete]
 func (ctr *departmentCtr) Delete(ctx *gin.Context) {
 	var req dtotenant.DepartmentDeleteReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -74,10 +74,15 @@ func (ctr *departmentCtr) Delete(ctx *gin.Context) {
 // @accept application/json
 // @Produce application/json
 // @Param req body dtotenant.DepartmentUpdateReq true "修改部门"
+// @Param departmentID path int true "departmentID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/department/update [post]
+// @Router /v1/platform/departments/{departmentID} [put]
 func (ctr *departmentCtr) Update(ctx *gin.Context) {
 	var req dtotenant.DepartmentUpdateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -93,12 +98,12 @@ func (ctr *departmentCtr) Update(ctx *gin.Context) {
 // @Summary 部门详情
 // @accept application/json
 // @Produce application/json
-// @Param req query dtotenant.DepartmentDetailReq true "部门详情"
+// @Param departmentID path int true "departmentID"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.DepartmentDetailResp}
-// @Router /v1/platform/department/detail [get]
+// @Router /v1/platform/departments/{departmentID} [get]
 func (ctr *departmentCtr) Detail(ctx *gin.Context) {
 	var req dtotenant.DepartmentDetailReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -114,12 +119,12 @@ func (ctr *departmentCtr) Detail(ctx *gin.Context) {
 // @Summary 部门列表分页
 // @accept application/json
 // @Produce application/json
-// @Param req body dtotenant.DepartmentPageListReq true "部门列表分页"
+// @Param req query dtotenant.DepartmentPageListReq true "部门列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.DepartmentPageListResp}
-// @Router /v1/platform/department/pageList [post]
+// @Router /v1/platform/departments [get]
 func (ctr *departmentCtr) PageList(ctx *gin.Context) {
 	var req dtotenant.DepartmentPageListReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -137,7 +142,7 @@ func (ctr *departmentCtr) PageList(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtotenant.DepartmentTreeReq true "部门树"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.DepartmentTreeResp}
-// @Router /v1/platform/department/tree [get]
+// @Router /v1/platform/departments/tree [get]
 func (ctr *departmentCtr) Tree(ctx *gin.Context) {
 	var req dtotenant.DepartmentTreeReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {

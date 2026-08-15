@@ -7,11 +7,9 @@ import (
 
 func apiKeyRouter(groups *ginserver.RouterGroups) {
 	apiKeyCtr := ctrapikey.NewApiKeyCtr()
-
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-
-	v1RouterGroup.POST("/apiKey/create", apiKeyCtr.Create)
-	v1RouterGroup.POST("/apiKey/pageList", apiKeyCtr.PageList)
-	v1RouterGroup.POST("/apiKey/revoke", apiKeyCtr.Revoke)
-	v1RouterGroup.POST("/apiKey/delete", apiKeyCtr.Delete)
+	v1RouterGroup.POST("/api-keys", apiKeyCtr.Create)
+	v1RouterGroup.GET("/api-keys", apiKeyCtr.PageList)
+	v1RouterGroup.POST("/api-keys/:apiKeyID/revoke", apiKeyCtr.Revoke)
+	v1RouterGroup.DELETE("/api-keys/:apiKeyID", apiKeyCtr.Delete)
 }

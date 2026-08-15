@@ -93,7 +93,7 @@ export default function OAuthClientDetail() {
           title="确认删除该密钥？"
           onConfirm={async () => {
             try {
-              await deleteOAuthSecret(r.id)
+              await deleteOAuthSecret(clientID, r.id)
               message.success('删除成功')
               void fetchSecrets()
             } catch {

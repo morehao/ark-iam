@@ -28,12 +28,12 @@ func NewLogCtr() LogCtr {
 // @Summary 日志详情
 // @accept application/json
 // @Produce application/json
-// @Param req query dtotenant.LogDetailReq true "日志详情"
+// @Param logID path int true "logID"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.LogDetailResp}
-// @Router /v1/platform/log/detail [get]
+// @Router /v1/platform/logs/{logID} [get]
 func (ctr *logCtr) Detail(ctx *gin.Context) {
 	var req dtotenant.LogDetailReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -49,12 +49,12 @@ func (ctr *logCtr) Detail(ctx *gin.Context) {
 // @Summary 日志列表分页
 // @accept application/json
 // @Produce application/json
-// @Param req body dtotenant.LogPageListReq true "日志列表分页"
+// @Param req query dtotenant.LogPageListReq true "日志列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.LogPageListResp}
-// @Router /v1/platform/log/pageList [post]
+// @Router /v1/platform/logs [get]
 func (ctr *logCtr) PageList(ctx *gin.Context) {
 	var req dtotenant.LogPageListReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

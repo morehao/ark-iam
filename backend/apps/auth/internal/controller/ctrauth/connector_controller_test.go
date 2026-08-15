@@ -89,8 +89,7 @@ func TestConnectorControllerGetFactoryList(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	req := httptest.NewRequest(http.MethodPost, "/v1/auth/connector/getFactoryList", strings.NewReader(`{"protocol":"oidc","provider":"google"}`))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodGet, "/v1/auth/connector-factories?protocol=oidc&provider=google", nil)
 	ctx.Request = req
 
 	ctr.GetFactoryList(ctx)
@@ -102,7 +101,7 @@ func TestConnectorControllerGetFactoryList(t *testing.T) {
 		t.Fatal("expected GetFactoryList to receive request")
 	}
 	if svc.getFactoryListReq.Protocol != "oidc" || svc.getFactoryListReq.Provider != "google" {
-		t.Fatalf("expected JSON body to bind into request, got %+v", *svc.getFactoryListReq)
+		t.Fatalf("expected query params to bind into request, got %+v", *svc.getFactoryListReq)
 	}
 	assertJSONContainsData(t, recorder.Body.Bytes(), "oidc-google")
 }

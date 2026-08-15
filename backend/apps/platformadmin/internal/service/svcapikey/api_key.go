@@ -105,8 +105,8 @@ func (svc *createApiKeySvc) Create(ctx *gin.Context, tenantID uint, req *dtoapik
 }
 
 func (svc *createApiKeySvc) Revoke(ctx *gin.Context, tenantID uint, req *dtoapikey.RevokeApiKeyReq) error {
-	if err := svc.apiKeyDao.UpdateMap(context.Background(), req.ID, map[string]any{"revoked_at": time.Now()}); err != nil {
-		glog.Errorf(ctx, "[svcapikey.Revoke] dao UpdateMap fail, err:%v, id:%d", err, req.ID)
+	if err := svc.apiKeyDao.UpdateMap(context.Background(), req.ApiKeyID, map[string]any{"revoked_at": time.Now()}); err != nil {
+		glog.Errorf(ctx, "[svcapikey.Revoke] dao UpdateMap fail, err:%v, id:%d", err, req.ApiKeyID)
 		return err
 	}
 	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
@@ -114,14 +114,14 @@ func (svc *createApiKeySvc) Revoke(ctx *gin.Context, tenantID uint, req *dtoapik
 		TenantID:   tenantID,
 		Result:     "success",
 		TargetType: "api_key",
-		TargetID:   req.ID,
+		TargetID:   req.ApiKeyID,
 	})
 	return nil
 }
 
 func (svc *createApiKeySvc) Delete(ctx *gin.Context, tenantID uint, req *dtoapikey.ApiKeyDeleteReq) error {
-	if err := svc.apiKeyDao.Delete(context.Background(), req.ID, 0); err != nil {
-		glog.Errorf(ctx, "[svcapikey.Delete] dao Delete fail, err:%v, id:%d", err, req.ID)
+	if err := svc.apiKeyDao.Delete(context.Background(), req.ApiKeyID, 0); err != nil {
+		glog.Errorf(ctx, "[svcapikey.Delete] dao Delete fail, err:%v, id:%d", err, req.ApiKeyID)
 		return err
 	}
 	return nil

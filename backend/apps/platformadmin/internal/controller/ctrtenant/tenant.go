@@ -34,7 +34,7 @@ func NewTenantCtr() TenantCtr {
 // @Produce application/json
 // @Param req body dtotenant.TenantCreateReq true "创建租户管理"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.TenantCreateResp}
-// @Router /v1/platform/tenant/create [post]
+// @Router /v1/platform/tenants [post]
 func (ctr *tenantCtr) Create(ctx *gin.Context) {
 	var req dtotenant.TenantCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -55,7 +55,7 @@ func (ctr *tenantCtr) Create(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtotenant.TenantCreateAsOwnerReq true "创建租户并成为owner"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.TenantCreateAsOwnerResp}
-// @Router /v1/platform/tenant/createAsOwner [post]
+// @Router /v1/platform/tenants/createAsOwner [post]
 func (ctr *tenantCtr) CreateAsOwner(ctx *gin.Context) {
 	var req dtotenant.TenantCreateAsOwnerReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -75,12 +75,12 @@ func (ctr *tenantCtr) CreateAsOwner(ctx *gin.Context) {
 // @Summary 删除租户管理
 // @accept application/json
 // @Produce application/json
-// @Param req body dtotenant.TenantDeleteReq true "删除租户管理"
+// @Param tenantID path int true "tenantID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/tenant/delete [post]
+// @Router /v1/platform/tenants/{tenantID} [delete]
 func (ctr *tenantCtr) Delete(ctx *gin.Context) {
 	var req dtotenant.TenantDeleteReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -96,10 +96,15 @@ func (ctr *tenantCtr) Delete(ctx *gin.Context) {
 // @accept application/json
 // @Produce application/json
 // @Param req body dtotenant.TenantUpdateReq true "修改租户管理"
+// @Param tenantID path int true "tenantID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/tenant/update [post]
+// @Router /v1/platform/tenants/{tenantID} [put]
 func (ctr *tenantCtr) Update(ctx *gin.Context) {
 	var req dtotenant.TenantUpdateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -115,12 +120,12 @@ func (ctr *tenantCtr) Update(ctx *gin.Context) {
 // @Summary 租户管理详情
 // @accept application/json
 // @Produce application/json
-// @Param req query dtotenant.TenantDetailReq true "租户管理详情"
+// @Param tenantID path int true "tenantID"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.TenantDetailResp}
-// @Router /v1/platform/tenant/detail [get]
+// @Router /v1/platform/tenants/{tenantID} [get]
 func (ctr *tenantCtr) Detail(ctx *gin.Context) {
 	var req dtotenant.TenantDetailReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -136,12 +141,12 @@ func (ctr *tenantCtr) Detail(ctx *gin.Context) {
 // @Summary 租户管理列表分页
 // @accept application/json
 // @Produce application/json
-// @Param req body dtotenant.TenantPageListReq true "租户管理列表分页"
+// @Param req query dtotenant.TenantPageListReq true "租户管理列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.TenantPageListResp}
-// @Router /v1/platform/tenant/pageList [post]
+// @Router /v1/platform/tenants [get]
 func (ctr *tenantCtr) PageList(ctx *gin.Context) {
 	var req dtotenant.TenantPageListReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

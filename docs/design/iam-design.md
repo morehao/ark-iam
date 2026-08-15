@@ -230,12 +230,14 @@ user   ──(关联)──> refresh_token(tenant_id+user_id)
 ### 4.2 路由前缀
 
 ```
-/v1/{service}/{module}/{operation} 管理 API（service 为应用服务标识段：auth / platform / tenant）
-                          如 /v1/auth/myTenants、/v1/platform/user/pageList、/v1/tenant/organizationRole/pageList
+/v1/{service}/{resource}[/{id}[/{sub-resource}]] 管理 API（service 为应用服务标识段：auth / platform / tenant）
+                          如 /v1/auth/me、/v1/platform/users、/v1/platform/users/{userID}/identities、
+                          /v1/tenant/organization-roles
+/v1/{service}/{resource}(/{id}):{action}        显式动作（如 POST /v1/platform/api-keys/{apiKeyID}:revoke）
 /oidc/*                 OIDC Provider 标准端点（含 /.well-known/*，挂在 auth / gateway）
 ```
 
-> 各应用使用独立服务标识段：auth → `/v1/auth`、platformadmin → `/v1/platform`、tenantadmin → `/v1/tenant`；`{module}` 为业务模块（`person`、`user`、`role`、`tenant`、`organizationRole`...），`{operation}` 为操作（`create`、`update`、`detail`、`pageList`）。模块名可跨应用复用，由服务标识段区分归属；`/oidc/*` 为标准协议路径，不随应用分段。
+> 各应用使用独立服务标识段：auth → `/v1/auth`、platformadmin → `/v1/platform`、tenantadmin → `/v1/tenant`；`{resource}` 为资源集合（复数 + kebab-case，如 `users`、`application-clients`、`organization-roles`），资源名可跨应用复用，由服务标识段区分归属。路由采用**规则化混合**风格（资源 CRUD 走 REST、业务动作走 `:action`、认证动作挂 `/v1/auth` 专用段），完整规范见 `api-routing-convention.md`，改造对照见 `api-route-migration.md`；`/oidc/*` 为标准协议路径，不随应用分段。
 
 ### 4.3 OIDC 协议端点
 

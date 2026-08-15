@@ -29,11 +29,16 @@ func NewUserRoleCtr() UserRoleCtr {
 // @Summary 创建用户角色
 // @accept application/json
 // @Produce application/json
+// @Param userID path int true "userID"
 // @Param req body dtopermission.UserRoleCreateReq true "创建用户角色"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.UserRoleCreateResp}
-// @Router /v1/platform/userRole/create [post]
+// @Router /v1/platform/users/{userID}/roles [post]
 func (ctr *userRoleCtr) Create(ctx *gin.Context) {
 	var req dtopermission.UserRoleCreateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -50,12 +55,13 @@ func (ctr *userRoleCtr) Create(ctx *gin.Context) {
 // @Summary 删除用户角色
 // @accept application/json
 // @Produce application/json
-// @Param req body dtopermission.UserRoleDeleteReq true "删除用户角色"
+// @Param userID path int true "userID"
+// @Param roleID path int true "roleID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/userRole/delete [post]
+// @Router /v1/platform/users/{userID}/roles/{roleID} [delete]
 func (ctr *userRoleCtr) Delete(ctx *gin.Context) {
 	var req dtopermission.UserRoleDeleteReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -70,12 +76,17 @@ func (ctr *userRoleCtr) Delete(ctx *gin.Context) {
 // @Summary 用户角色列表分页
 // @accept application/json
 // @Produce application/json
-// @Param req body dtopermission.UserRolePageListReq true "用户角色列表分页"
+// @Param userID path int true "userID"
+// @Param req query dtopermission.UserRolePageListReq true "用户角色列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.UserRolePageListResp}
-// @Router /v1/platform/userRole/pageList [post]
+// @Router /v1/platform/users/{userID}/roles [get]
 func (ctr *userRoleCtr) PageList(ctx *gin.Context) {
 	var req dtopermission.UserRolePageListReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

@@ -7,20 +7,20 @@ type DomainCreateReq struct {
 }
 
 type DomainUpdateReq struct {
-	ID         uint   `json:"id" binding:"required"` // 域名ID
-	Domain     string `json:"domain"`                // 域名
-	IsVerified *int8  `json:"isVerified"`            // 是否验证(0-未验证 1-已验证)
+	DomainID   uint   `json:"-" uri:"domainID" binding:"required"` // 域名ID
+	Domain     string `json:"domain"`                              // 域名
+	IsVerified *int8  `json:"isVerified"`                          // 是否验证(0-未验证 1-已验证)
 }
 
 type DomainDetailReq struct {
-	ID uint `form:"id" binding:"required"` // 域名ID
+	DomainID uint `json:"-" uri:"domainID" binding:"required"` // 域名ID
 }
 
 type DomainPageListReq struct {
 	gobject.PageQuery
-	Domain string `json:"domain"` // 域名(模糊搜索)
+	Domain string `json:"domain" form:"domain"` // 域名(模糊搜索)
 }
 
 type DomainDeleteReq struct {
-	ID uint `json:"id" binding:"required"` // 域名ID
+	DomainID uint `json:"-" uri:"domainID" binding:"required"` // 域名ID
 }

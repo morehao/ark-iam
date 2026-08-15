@@ -31,7 +31,7 @@ func NewApplicationCtr() ApplicationCtr {
 // @Produce application/json
 // @Param req body dtoapplication.ApplicationCreateReq true "创建应用"
 // @Success 200 {object} gincontext.DtoRender{data=dtoapplication.ApplicationCreateResp}
-// @Router /v1/platform/application/create [post]
+// @Router /v1/platform/applications [post]
 func (ctr *applicationCtr) Create(ctx *gin.Context) {
 	var req dtoapplication.ApplicationCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -50,11 +50,16 @@ func (ctr *applicationCtr) Create(ctx *gin.Context) {
 // @Summary 修改应用
 // @accept application/json
 // @Produce application/json
+// @Param appID path int true "appID"
 // @Param req body dtoapplication.ApplicationUpdateReq true "修改应用"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/application/update [post]
+// @Router /v1/platform/applications/{appID} [put]
 func (ctr *applicationCtr) Update(ctx *gin.Context) {
 	var req dtoapplication.ApplicationUpdateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -70,12 +75,12 @@ func (ctr *applicationCtr) Update(ctx *gin.Context) {
 // @Summary 删除应用
 // @accept application/json
 // @Produce application/json
-// @Param req body dtoapplication.ApplicationDeleteReq true "删除应用"
+// @Param appID path int true "appID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/application/delete [post]
+// @Router /v1/platform/applications/{appID} [delete]
 func (ctr *applicationCtr) Delete(ctx *gin.Context) {
 	var req dtoapplication.ApplicationDeleteReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -90,12 +95,12 @@ func (ctr *applicationCtr) Delete(ctx *gin.Context) {
 // @Summary 查看应用详情
 // @accept application/json
 // @Produce application/json
-// @Param req query dtoapplication.ApplicationDetailReq true "查看应用详情"
+// @Param appID path int true "appID"
 // @Success 200 {object} gincontext.DtoRender{data=dtoapplication.ApplicationDetailResp}
-// @Router /v1/platform/application/detail [get]
+// @Router /v1/platform/applications/{appID} [get]
 func (ctr *applicationCtr) Detail(ctx *gin.Context) {
 	var req dtoapplication.ApplicationDetailReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -111,12 +116,12 @@ func (ctr *applicationCtr) Detail(ctx *gin.Context) {
 // @Summary 查看应用列表
 // @accept application/json
 // @Produce application/json
-// @Param req body dtoapplication.ApplicationPageListReq true "查看应用列表"
+// @Param req query dtoapplication.ApplicationPageListReq true "查看应用列表"
 // @Success 200 {object} gincontext.DtoRender{data=dtoapplication.ApplicationPageListResp}
-// @Router /v1/platform/application/pageList [post]
+// @Router /v1/platform/applications [get]
 func (ctr *applicationCtr) PageList(ctx *gin.Context) {
 	var req dtoapplication.ApplicationPageListReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

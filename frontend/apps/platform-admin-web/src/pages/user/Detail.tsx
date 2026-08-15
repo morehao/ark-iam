@@ -112,7 +112,7 @@ export default function UserDetail() {
         <Popconfirm
           title="确认解绑该身份？"
           onConfirm={async () => {
-            await deleteUserIdentity(r.userIdentityID)
+            await deleteUserIdentity(userID, r.userIdentityID)
             message.success('解绑成功')
             void fetchAll()
           }}
