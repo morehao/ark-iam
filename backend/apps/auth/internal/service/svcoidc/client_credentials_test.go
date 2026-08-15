@@ -254,7 +254,7 @@ func TestGetPrivateClaimsFromRequestForClientCredentials(t *testing.T) {
 
 func TestResolveAudienceFromRequest(t *testing.T) {
 	// RFC 8707：resource 参数优先
-	resourceCtx := context.WithValue(context.Background(), ctxResourceKey, "https://api.example.com")
+	resourceCtx := context.WithValue(context.Background(), ResourceHintKey, "https://api.example.com")
 	if got := resolveAudienceFromRequest(resourceCtx, "client-1"); got != "https://api.example.com" {
 		t.Fatalf("expected resource audience, got %q", got)
 	}

@@ -17,6 +17,16 @@ import (
 	"github.com/morehao/golib/glog"
 )
 
+// ctxKey 使用私有类型标记，避免与其它 context key 冲突（导出值、私有类型，
+// 同 http.ServerContextKey 的惯用法：外部只能使用这两个 key，不能定义同类型新 key）。
+type ctxKey string
+
+// TenantHintKey 承载 authorize 请求的租户跳转 hint（经 req.Context() 传递到 op.Storage）。
+const TenantHintKey ctxKey = "iam.tenantHint"
+
+// ResourceHintKey 承载 token 端点的 RFC 8707 resource 参数（经 req.Context() 传递到 op.Storage）。
+const ResourceHintKey ctxKey = "iam.resource"
+
 type AuthRequest struct {
 	ID            string              `json:"id"`
 	ClientID      string              `json:"client_id"`
@@ -182,7 +192,7 @@ func getClientIDFromRequest(request op.TokenRequest) string {
 // 优先取 token 请求的 resource 参数；无 resource 时默认取 client 标识
 // （OAuth client id / API Key 前缀），不再把自定义 scope 当作 audience。
 func resolveAudienceFromRequest(ctx context.Context, defaultAudience string) string {
-	if v, ok := ctx.Value(ctxResourceKey).(string); ok && v != "" {
+	if v, ok := ctx.Value(ResourceHintKey).(string); ok && v != "" {
 		return v
 	}
 	return defaultAudience
@@ -198,7 +208,7 @@ func (s *OIDCStorage) ValidateJWTProfileScopes(ctx context.Context, userID strin
 
 func (s *OIDCStorage) CreateAuthRequest(ctx context.Context, authReq *oidc.AuthRequest, userID string) (op.AuthRequest, error) {
 	var tenantID string
-	if v, ok := ctx.Value(ctxTenantHintKey).(string); ok {
+	if v, ok := ctx.Value(TenantHintKey).(string); ok {
 		tenantID = v
 	}
 	// M3：客户端配置 require_pkce=1 时强制 PKCE（RFC 7636），缺失 code_challenge 直接拒绝。
