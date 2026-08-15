@@ -1,8 +1,6 @@
 package svcpermission
 
 import (
-	"context"
-
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
@@ -13,15 +11,6 @@ import (
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
-
-type roleScopeDeleteRepository interface {
-	GetListByCond(ctx context.Context, cond gormdao.Cond) (model.RoleScopeEntityList, error)
-	Delete(ctx context.Context, id uint, userID uint) error
-}
-
-var newRoleScopeDeleteRepo = func() roleScopeDeleteRepository {
-	return dao.NewRoleScopeDao()
-}
 
 type RoleScopeSvc interface {
 	Create(ctx *gin.Context, req *dtopermission.RoleScopeCreateReq) (*dtopermission.RoleScopeCreateResp, error)
@@ -72,8 +61,8 @@ func (svc *roleScopeSvc) Create(ctx *gin.Context, req *dtopermission.RoleScopeCr
 }
 
 func (svc *roleScopeSvc) Delete(ctx *gin.Context, req *dtopermission.RoleScopeDeleteReq) error {
-	deleteRepo := newRoleScopeDeleteRepo()
-	roleScopeEntityList, err := deleteRepo.GetListByCond(ctx, &dao.RoleScopeCond{
+	roleScopeDao := dao.NewRoleScopeDao()
+	roleScopeEntityList, err := roleScopeDao.GetListByCond(ctx, &dao.RoleScopeCond{
 		TenantID: gincontext.GetTenantID(ctx),
 		RoleID:   req.RoleID,
 		ScopeID:  req.ScopeID,
@@ -87,7 +76,7 @@ func (svc *roleScopeSvc) Delete(ctx *gin.Context, req *dtopermission.RoleScopeDe
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	if err := deleteRepo.Delete(ctx, roleScopeEntityList[0].ID, userID); err != nil {
+	if err := roleScopeDao.Delete(ctx, roleScopeEntityList[0].ID, userID); err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteRoleScope] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.RoleScopeDeleteError)
 	}

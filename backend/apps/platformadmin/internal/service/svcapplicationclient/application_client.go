@@ -1,7 +1,6 @@
 package svcapplicationclient
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -24,61 +23,18 @@ import (
 )
 
 type ApplicationClientSvc interface {
-	Create(ctx *gin.Context, req *dtoapplicationclient.CreateReq) (*dtoapplicationclient.CreateResp, error)
-	Delete(ctx *gin.Context, req *dtoapplicationclient.DeleteReq) error
-	Update(ctx *gin.Context, req *dtoapplicationclient.UpdateReq) error
-	Detail(ctx *gin.Context, req *dtoapplicationclient.DetailReq) (*dtoapplicationclient.DetailResp, error)
-	PageList(ctx *gin.Context, req *dtoapplicationclient.PageListReq) (*dtoapplicationclient.PageListResp, error)
-	GetByClientID(ctx *gin.Context, clientID string) (*dtoapplicationclient.DetailResp, error)
+	Create(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientCreateReq) (*dtoapplicationclient.ApplicationClientCreateResp, error)
+	Delete(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientDeleteReq) error
+	Update(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientUpdateReq) error
+	Detail(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientDetailReq) (*dtoapplicationclient.ApplicationClientDetailResp, error)
+	PageList(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientPageListReq) (*dtoapplicationclient.ApplicationClientPageListResp, error)
+	GetByClientID(ctx *gin.Context, clientID string) (*dtoapplicationclient.ApplicationClientDetailResp, error)
 	ListSecrets(ctx *gin.Context, req *dtoapplicationclient.SecretListReq) (*dtoapplicationclient.SecretListResp, error)
-	CreateSecret(ctx *gin.Context, req *dtoapplicationclient.CreateSecretReq) (*dtoapplicationclient.CreateSecretResp, error)
-	DeleteSecret(ctx *gin.Context, req *dtoapplicationclient.DeleteSecretReq) error
+	CreateSecret(ctx *gin.Context, req *dtoapplicationclient.SecretCreateReq) (*dtoapplicationclient.SecretCreateResp, error)
+	DeleteSecret(ctx *gin.Context, req *dtoapplicationclient.SecretDeleteReq) error
 }
 
 type oAuthClientSvc struct{}
-
-type applicationClientScopeRepository interface {
-	GetByID(ctx context.Context, id uint) (*model.ApplicationClientEntity, error)
-	GetByCond(ctx context.Context, cond gormdao.Cond) (*model.ApplicationClientEntity, error)
-	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.ApplicationClientEntityList, int64, error)
-	GetSecretByID(ctx context.Context, id uint) (*model.ApplicationClientSecretEntity, error)
-	DeleteSecret(ctx context.Context, id uint, userID uint) error
-	Delete(ctx context.Context, id, userID uint) error
-}
-
-var newApplicationClientScopeRepo = func() applicationClientScopeRepository {
-	return &applicationClientScopeDAO{}
-}
-
-type applicationClientScopeDAO struct{}
-
-var newApplicationClientDAO = func() *dao.ApplicationClientDao {
-	return dao.NewApplicationClientDao()
-}
-
-func (d *applicationClientScopeDAO) GetByID(ctx context.Context, id uint) (*model.ApplicationClientEntity, error) {
-	return newApplicationClientDAO().GetByID(ctx, id)
-}
-
-func (d *applicationClientScopeDAO) GetByCond(ctx context.Context, cond gormdao.Cond) (*model.ApplicationClientEntity, error) {
-	return newApplicationClientDAO().GetByCond(ctx, cond)
-}
-
-func (d *applicationClientScopeDAO) GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.ApplicationClientEntityList, int64, error) {
-	return newApplicationClientDAO().GetPageListByCond(ctx, cond)
-}
-
-func (d *applicationClientScopeDAO) GetSecretByID(ctx context.Context, id uint) (*model.ApplicationClientSecretEntity, error) {
-	return dao.NewApplicationClientSecretDao().GetByID(ctx, id)
-}
-
-func (d *applicationClientScopeDAO) DeleteSecret(ctx context.Context, id uint, userID uint) error {
-	return dao.NewApplicationClientSecretDao().Delete(ctx, id, userID)
-}
-
-func (d *applicationClientScopeDAO) Delete(ctx context.Context, id, userID uint) error {
-	return newApplicationClientDAO().Delete(ctx, id, userID)
-}
 
 func applicationClientVisibleToTenant(entity *model.ApplicationClientEntity, tenantID uint) bool {
 	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
@@ -102,10 +58,10 @@ func marshalStringSlice(s []string) datatypes.JSON {
 	return datatypes.JSON(b)
 }
 
-func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.CreateReq) (*dtoapplicationclient.CreateResp, error) {
+func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientCreateReq) (*dtoapplicationclient.ApplicationClientCreateResp, error) {
 	insertEntity := &model.ApplicationClientEntity{
 		TenantID:                gincontext.GetTenantID(ctx),
-		AppID:                   req.AppId,
+		AppID:                   req.AppID,
 		ClientID:                generateClientID(),
 		Name:                    req.Name,
 		RedirectURIs:            marshalStringSlice(req.RedirectURIs),
@@ -136,14 +92,14 @@ func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.Cr
 		TargetType: "application_client",
 		TargetID:   insertEntity.ID,
 	})
-	return &dtoapplicationclient.CreateResp{
+	return &dtoapplicationclient.ApplicationClientCreateResp{
 		ApplicationClientID: insertEntity.ID,
 		ClientID:            insertEntity.ClientID,
 	}, nil
 }
 
-func (svc *oAuthClientSvc) Delete(ctx *gin.Context, req *dtoapplicationclient.DeleteReq) error {
-	entity, err := newApplicationClientScopeRepo().GetByID(ctx, req.ApplicationClientID)
+func (svc *oAuthClientSvc) Delete(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientDeleteReq) error {
+	entity, err := dao.NewApplicationClientDao().GetByID(ctx, req.ApplicationClientID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationClientDeleteError)
@@ -156,15 +112,15 @@ func (svc *oAuthClientSvc) Delete(ctx *gin.Context, req *dtoapplicationclient.De
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	if err := newApplicationClientScopeRepo().Delete(ctx, req.ApplicationClientID, userID); err != nil {
+	if err := dao.NewApplicationClientDao().Delete(ctx, req.ApplicationClientID, userID); err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationClientDeleteError)
 	}
 	return nil
 }
 
-func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.UpdateReq) error {
-	entity, err := newApplicationClientScopeRepo().GetByID(ctx, req.ApplicationClientID)
+func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientUpdateReq) error {
+	entity, err := dao.NewApplicationClientDao().GetByID(ctx, req.ApplicationClientID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationClientUpdateError)
@@ -200,8 +156,8 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.Up
 	return nil
 }
 
-func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtoapplicationclient.DetailReq) (*dtoapplicationclient.DetailResp, error) {
-	entity, err := newApplicationClientScopeRepo().GetByID(ctx, req.ApplicationClientID)
+func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientDetailReq) (*dtoapplicationclient.ApplicationClientDetailResp, error) {
+	entity, err := dao.NewApplicationClientDao().GetByID(ctx, req.ApplicationClientID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationClientGetDetailError)
@@ -220,7 +176,7 @@ func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtoapplicationclient.De
 	_ = json.Unmarshal(entity.AllowedOrigins, &allowedOrigins)
 	_ = json.Unmarshal(entity.DefaultScopes, &defaultScopes)
 
-	return &dtoapplicationclient.DetailResp{
+	return &dtoapplicationclient.ApplicationClientDetailResp{
 		ApplicationClientID:     entity.ID,
 		TenantID:                entity.TenantID,
 		AppID:                   entity.AppID,
@@ -245,7 +201,7 @@ func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtoapplicationclient.De
 	}, nil
 }
 
-func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.PageListReq) (*dtoapplicationclient.PageListResp, error) {
+func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientPageListReq) (*dtoapplicationclient.ApplicationClientPageListResp, error) {
 	cond := &dao.ApplicationClientCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
@@ -256,7 +212,7 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.
 		Type:     req.Type,
 		Status:   req.Status,
 	}
-	list, total, err := newApplicationClientScopeRepo().GetPageListByCond(ctx, cond)
+	list, total, err := dao.NewApplicationClientDao().GetPageListByCond(ctx, cond)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.PageList] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationClientGetPageListError)
@@ -280,14 +236,14 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.
 			CreatedAt:               v.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
-	return &dtoapplicationclient.PageListResp{
+	return &dtoapplicationclient.ApplicationClientPageListResp{
 		List:  items,
 		Total: total,
 	}, nil
 }
 
-func (svc *oAuthClientSvc) GetByClientID(ctx *gin.Context, clientID string) (*dtoapplicationclient.DetailResp, error) {
-	entity, err := newApplicationClientScopeRepo().GetByCond(ctx, &dao.ApplicationClientCond{
+func (svc *oAuthClientSvc) GetByClientID(ctx *gin.Context, clientID string) (*dtoapplicationclient.ApplicationClientDetailResp, error) {
+	entity, err := dao.NewApplicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{
 		ClientID: clientID,
 	})
 	if err != nil {
@@ -307,7 +263,7 @@ func (svc *oAuthClientSvc) GetByClientID(ctx *gin.Context, clientID string) (*dt
 	_ = json.Unmarshal(entity.AllowedOrigins, &allowedOrigins)
 	_ = json.Unmarshal(entity.DefaultScopes, &defaultScopes)
 
-	return &dtoapplicationclient.DetailResp{
+	return &dtoapplicationclient.ApplicationClientDetailResp{
 		ApplicationClientID:     entity.ID,
 		TenantID:                entity.TenantID,
 		AppID:                   entity.AppID,
@@ -352,8 +308,8 @@ func (svc *oAuthClientSvc) ListSecrets(ctx *gin.Context, req *dtoapplicationclie
 			expiresAt = &t
 		}
 		secrets = append(secrets, dtoapplicationclient.SecretResp{
-			ID:                  uint64(s.ID),
-			ApplicationClientID: uint64(s.ApplicationClientID),
+			ID:                  s.ID,
+			ApplicationClientID: s.ApplicationClientID,
 			Name:                s.Name,
 			ValuePrefix:         s.ValuePrefix,
 			ExpiredAt:           expiresAt,
@@ -367,8 +323,8 @@ func (svc *oAuthClientSvc) ListSecrets(ctx *gin.Context, req *dtoapplicationclie
 	}, nil
 }
 
-func (svc *oAuthClientSvc) CreateSecret(ctx *gin.Context, req *dtoapplicationclient.CreateSecretReq) (*dtoapplicationclient.CreateSecretResp, error) {
-	entity, err := newApplicationClientScopeRepo().GetByID(ctx, req.ApplicationClientID)
+func (svc *oAuthClientSvc) CreateSecret(ctx *gin.Context, req *dtoapplicationclient.SecretCreateReq) (*dtoapplicationclient.SecretCreateResp, error) {
+	entity, err := dao.NewApplicationClientDao().GetByID(ctx, req.ApplicationClientID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.CreateSecret] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationClientSecretCreateError)
@@ -423,16 +379,16 @@ func (svc *oAuthClientSvc) CreateSecret(ctx *gin.Context, req *dtoapplicationcli
 		TargetID:   secretEntity.ApplicationClientID,
 	})
 
-	return &dtoapplicationclient.CreateSecretResp{
-		ID:          uint64(secretEntity.ID),
+	return &dtoapplicationclient.SecretCreateResp{
+		ID:          secretEntity.ID,
 		Name:        secretEntity.Name,
 		ValuePrefix: secretEntity.ValuePrefix,
 		Secret:      secretValue,
 	}, nil
 }
 
-func (svc *oAuthClientSvc) DeleteSecret(ctx *gin.Context, req *dtoapplicationclient.DeleteSecretReq) error {
-	secretEntity, err := newApplicationClientScopeRepo().GetSecretByID(ctx, uint(req.SecretID))
+func (svc *oAuthClientSvc) DeleteSecret(ctx *gin.Context, req *dtoapplicationclient.SecretDeleteReq) error {
+	secretEntity, err := dao.NewApplicationClientSecretDao().GetByID(ctx, uint(req.SecretID))
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.DeleteSecret] get secret fail, err:%v", err)
 		return code.GetError(code.ApplicationClientSecretDeleteError)
@@ -441,12 +397,12 @@ func (svc *oAuthClientSvc) DeleteSecret(ctx *gin.Context, req *dtoapplicationcli
 		return code.GetError(code.ApplicationClientSecretNotExistError)
 	}
 
-	entity, err := newApplicationClientScopeRepo().GetByID(ctx, secretEntity.ApplicationClientID)
+	entity, err := dao.NewApplicationClientDao().GetByID(ctx, secretEntity.ApplicationClientID)
 	if err != nil || !applicationClientVisibleToTenant(entity, gincontext.GetTenantID(ctx)) {
 		return code.GetError(code.ApplicationClientSecretNotExistError)
 	}
 
-	if err := newApplicationClientScopeRepo().DeleteSecret(ctx, uint(req.SecretID), gincontext.GetUserID(ctx)); err != nil {
+	if err := dao.NewApplicationClientSecretDao().Delete(ctx, uint(req.SecretID), gincontext.GetUserID(ctx)); err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.DeleteSecret] delete fail, err:%v", err)
 		return code.GetError(code.ApplicationClientSecretDeleteError)
 	}

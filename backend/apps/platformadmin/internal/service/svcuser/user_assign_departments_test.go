@@ -1,21 +1,17 @@
 package svcuser
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"net/http"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtouser"
+	"github.com/morehao/ark-iam/platformadmin/testutil"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/gerror"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -25,8 +21,7 @@ func TestAssignDepartmentsUsesTenantAndSkipsDuplicates(t *testing.T) {
 	ginCtx.Set(gcontext.KeyTenantID, uint(23))
 	ginCtx.Set(gcontext.KeyUserID, uint(88))
 
-	db := newAssignDepartmentsTestDB(t)
-	installTestIamDB(t, db)
+	db := testutil.SetupSQLite(t, &model.UserDepartmentEntity{})
 	if err := db.Create(&model.UserDepartmentEntity{
 		TenantID:     23,
 		UserID:       100,
@@ -70,8 +65,7 @@ func TestAssignDepartmentsReturnsErrorWhenInsertFailsInTransaction(t *testing.T)
 	ginCtx.Set(gcontext.KeyTenantID, uint(9))
 	ginCtx.Set(gcontext.KeyUserID, uint(7))
 
-	db := newAssignDepartmentsTestDB(t)
-	installTestIamDB(t, db)
+	db := testutil.SetupSQLite(t, &model.UserDepartmentEntity{})
 	if err := db.Callback().Create().Before("gorm:create").Register("test_fail_create", func(tx *gorm.DB) {
 		_ = tx.AddError(errors.New("insert failed"))
 	}); err != nil {
@@ -92,8 +86,7 @@ func TestAssignDepartmentsReturnsErrorWhenTransactionFails(t *testing.T) {
 	ginCtx.Set(gcontext.KeyTenantID, uint(9))
 	ginCtx.Set(gcontext.KeyUserID, uint(7))
 
-	db := newAssignDepartmentsTestDB(t)
-	installTestIamDB(t, db)
+	db := testutil.SetupSQLite(t, &model.UserDepartmentEntity{})
 	sqlDB, err := db.DB()
 	if err != nil {
 		t.Fatalf("get sql db: %v", err)
@@ -105,38 +98,6 @@ func TestAssignDepartmentsReturnsErrorWhenTransactionFails(t *testing.T) {
 	svc := &userSvc{}
 	err = svc.AssignDepartments(ginCtx, &dtouser.AssignDepartmentsReq{UserID: 100, DepartmentIDs: []uint{1}})
 	assertAssignDepartmentsCode(t, err, code.UserDepartmentCreateError)
-}
-
-func newAssignDepartmentsTestDB(t *testing.T) *gorm.DB {
-	t.Helper()
-	dsn := fmt.Sprintf("file:%s_%d?mode=memory&cache=shared", sanitizeAssignDepartmentsTestName(t.Name()), time.Now().UnixNano())
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite db: %v", err)
-	}
-	if err := db.AutoMigrate(&model.UserDepartmentEntity{}); err != nil {
-		t.Fatalf("migrate relation table: %v", err)
-	}
-	return db
-}
-
-func installTestIamDB(t *testing.T, db *gorm.DB) {
-	t.Helper()
-	prev := iamDBFromContext
-	iamDBFromContext = func(ctx context.Context) *gorm.DB {
-		return db.WithContext(ctx)
-	}
-	t.Cleanup(func() {
-		iamDBFromContext = prev
-		if sqlDB, err := db.DB(); err == nil {
-			_ = sqlDB.Close()
-		}
-	})
-}
-
-func sanitizeAssignDepartmentsTestName(name string) string {
-	replacer := strings.NewReplacer("/", "_", " ", "_", ":", "_")
-	return replacer.Replace(name)
 }
 
 func assertAssignDepartmentsCode(t *testing.T, err error, want int) {

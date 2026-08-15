@@ -8,89 +8,83 @@ import (
 
 func roleRouter(groups *ginserver.RouterGroups) {
 	roleCtr := ctrpermission.NewRoleCtr()
-
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.POST("/role/create", roleCtr.Create)
-	v1RouterGroup.POST("/role/delete", roleCtr.Delete)
-	v1RouterGroup.POST("/role/update", roleCtr.Update)
-	v1RouterGroup.GET("/role/detail", roleCtr.Detail)
-	v1RouterGroup.POST("/role/pageList", roleCtr.PageList)
-	v1RouterGroup.GET("/role/users", roleCtr.ListUsers)
-	v1RouterGroup.POST("/role/assignUsers", roleCtr.AssignUsers)
-	v1RouterGroup.DELETE("/role/users/:roleId/:userId", roleCtr.RemoveUser)
+	v1RouterGroup.POST("/roles", roleCtr.Create)
+	v1RouterGroup.GET("/roles", roleCtr.PageList)
+	v1RouterGroup.GET("/roles/:roleID", roleCtr.Detail)
+	v1RouterGroup.PUT("/roles/:roleID", roleCtr.Update)
+	v1RouterGroup.DELETE("/roles/:roleID", roleCtr.Delete)
+	// 角色-用户关联
+	v1RouterGroup.GET("/roles/:roleID/users", roleCtr.ListUsers)
+	v1RouterGroup.PUT("/roles/:roleID/users", roleCtr.AssignUsers)
+	v1RouterGroup.DELETE("/roles/:roleID/users/:userID", roleCtr.RemoveUser)
 }
 
 func menuRouter(groups *ginserver.RouterGroups) {
 	menuCtr := ctrpermission.NewMenuCtr()
-
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.POST("/menu/create", menuCtr.Create)
-	v1RouterGroup.POST("/menu/delete", menuCtr.Delete)
-	v1RouterGroup.POST("/menu/update", menuCtr.Update)
-	v1RouterGroup.GET("/menu/detail", menuCtr.Detail)
-	v1RouterGroup.POST("/menu/pageList", menuCtr.PageList)
-	v1RouterGroup.GET("/menu/tree", menuCtr.Tree)
+	v1RouterGroup.POST("/menus", menuCtr.Create)
+	v1RouterGroup.GET("/menus", menuCtr.PageList)
+	v1RouterGroup.GET("/menus/tree", menuCtr.Tree)
+	v1RouterGroup.GET("/menus/:menuID", menuCtr.Detail)
+	v1RouterGroup.PUT("/menus/:menuID", menuCtr.Update)
+	v1RouterGroup.DELETE("/menus/:menuID", menuCtr.Delete)
 }
 
 func scopeRouter(groups *ginserver.RouterGroups) {
 	scopeCtr := ctrpermission.NewScopeCtr()
-
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.POST("/scope/create", scopeCtr.Create)
-	v1RouterGroup.POST("/scope/delete", scopeCtr.Delete)
-	v1RouterGroup.POST("/scope/update", scopeCtr.Update)
-	v1RouterGroup.GET("/scope/detail", scopeCtr.Detail)
-	v1RouterGroup.POST("/scope/pageList", scopeCtr.PageList)
+	v1RouterGroup.POST("/scopes", scopeCtr.Create)
+	v1RouterGroup.GET("/scopes", scopeCtr.PageList)
+	v1RouterGroup.GET("/scopes/:scopeID", scopeCtr.Detail)
+	v1RouterGroup.PUT("/scopes/:scopeID", scopeCtr.Update)
+	v1RouterGroup.DELETE("/scopes/:scopeID", scopeCtr.Delete)
 }
 
 func resourceRouter(groups *ginserver.RouterGroups) {
 	resourceCtr := ctrpermission.NewResourceCtr()
-
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.POST("/resource/create", resourceCtr.Create)
-	v1RouterGroup.POST("/resource/delete", resourceCtr.Delete)
-	v1RouterGroup.POST("/resource/update", resourceCtr.Update)
-	v1RouterGroup.GET("/resource/detail", resourceCtr.Detail)
-	v1RouterGroup.POST("/resource/pageList", resourceCtr.PageList)
+	v1RouterGroup.POST("/resources", resourceCtr.Create)
+	v1RouterGroup.GET("/resources", resourceCtr.PageList)
+	v1RouterGroup.GET("/resources/:resourceID", resourceCtr.Detail)
+	v1RouterGroup.PUT("/resources/:resourceID", resourceCtr.Update)
+	v1RouterGroup.DELETE("/resources/:resourceID", resourceCtr.Delete)
 }
 
 func roleMenuRouter(groups *ginserver.RouterGroups) {
 	roleMenuCtr := ctrpermission.NewRoleMenuCtr()
-
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.POST("/roleMenu/create", roleMenuCtr.Create)
-	v1RouterGroup.POST("/roleMenu/delete", roleMenuCtr.Delete)
-	v1RouterGroup.POST("/roleMenu/pageList", roleMenuCtr.PageList)
+	v1RouterGroup.GET("/roles/:roleID/menus", roleMenuCtr.PageList)
+	v1RouterGroup.POST("/roles/:roleID/menus", roleMenuCtr.Create)
+	v1RouterGroup.DELETE("/roles/:roleID/menus/:menuID", roleMenuCtr.Delete)
 }
 
 func roleScopeRouter(groups *ginserver.RouterGroups) {
 	roleScopeCtr := ctrpermission.NewRoleScopeCtr()
-
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.POST("/roleScope/create", roleScopeCtr.Create)
-	v1RouterGroup.POST("/roleScope/delete", roleScopeCtr.Delete)
-	v1RouterGroup.POST("/roleScope/pageList", roleScopeCtr.PageList)
+	v1RouterGroup.GET("/roles/:roleID/scopes", roleScopeCtr.PageList)
+	v1RouterGroup.POST("/roles/:roleID/scopes", roleScopeCtr.Create)
+	v1RouterGroup.DELETE("/roles/:roleID/scopes/:scopeID", roleScopeCtr.Delete)
 }
 
 func userRoleRouter(groups *ginserver.RouterGroups) {
 	userRoleCtr := ctrpermission.NewUserRoleCtr()
-
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.POST("/userRole/create", userRoleCtr.Create)
-	v1RouterGroup.POST("/userRole/delete", userRoleCtr.Delete)
-	v1RouterGroup.POST("/userRole/pageList", userRoleCtr.PageList)
+	v1RouterGroup.GET("/users/:userID/roles", userRoleCtr.PageList)
+	v1RouterGroup.POST("/users/:userID/roles", userRoleCtr.Create)
+	v1RouterGroup.DELETE("/users/:userID/roles/:roleID", userRoleCtr.Delete)
 }
 
 func applicationClientRouter(groups *ginserver.RouterGroups) {
 	appCtr := ctrapplicationclient.NewApplicationClientCtr()
-
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.POST("/applicationClient/create", appCtr.Create)
-	v1RouterGroup.POST("/applicationClient/delete", appCtr.Delete)
-	v1RouterGroup.POST("/applicationClient/update", appCtr.Update)
-	v1RouterGroup.GET("/applicationClient/detail", appCtr.Detail)
-	v1RouterGroup.POST("/applicationClient/pageList", appCtr.PageList)
-	v1RouterGroup.GET("/applicationClient/secrets", appCtr.ListSecrets)
-	v1RouterGroup.POST("/applicationClient/secrets", appCtr.CreateSecret)
-	v1RouterGroup.DELETE("/applicationClient/secrets/:secretId", appCtr.DeleteSecret)
+	v1RouterGroup.POST("/application-clients", appCtr.Create)
+	v1RouterGroup.GET("/application-clients", appCtr.PageList)
+	v1RouterGroup.GET("/application-clients/:applicationClientID", appCtr.Detail)
+	v1RouterGroup.PUT("/application-clients/:applicationClientID", appCtr.Update)
+	v1RouterGroup.DELETE("/application-clients/:applicationClientID", appCtr.Delete)
+	// 客户端密钥（子资源）
+	v1RouterGroup.GET("/application-clients/:applicationClientID/secrets", appCtr.ListSecrets)
+	v1RouterGroup.POST("/application-clients/:applicationClientID/secrets", appCtr.CreateSecret)
+	v1RouterGroup.DELETE("/application-clients/:applicationClientID/secrets/:secretID", appCtr.DeleteSecret)
 }

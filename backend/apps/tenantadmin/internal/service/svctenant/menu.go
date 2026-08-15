@@ -1,8 +1,6 @@
 package svctenant
 
 import (
-	"context"
-
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
@@ -10,18 +8,8 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/object/objpermission"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 )
-
-// tenantMenuRepository 租户侧菜单查询依赖
-type tenantMenuRepository interface {
-	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.MenuEntityList, int64, error)
-}
-
-var newTenantMenuRepo = func() tenantMenuRepository {
-	return dao.NewMenuDao()
-}
 
 // TenantMenuSvc 租户侧菜单服务
 type TenantMenuSvc interface {
@@ -66,10 +54,9 @@ func (svc *tenantMenuSvc) Tree(ctx *gin.Context) (*dtotenant.MenuTreeResp, error
 		appIDs[item.AppID] = struct{}{}
 	}
 
-	menuRepo := newTenantMenuRepo()
 	var menus []*model.MenuEntity
 	for appID := range appIDs {
-		menuEntityList, _, err := menuRepo.GetPageListByCond(ctx, &dao.MenuCond{
+		menuEntityList, _, err := dao.NewMenuDao().GetPageListByCond(ctx, &dao.MenuCond{
 			AppID:  appID,
 			Status: model.AppStatusEnable,
 		})

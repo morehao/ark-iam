@@ -140,7 +140,7 @@ apps/platformadmin/
 
 错误码和路由也按领域划分：
 - 一个业务领域共享一套错误码段（如 user 领域用 1005XX）
-- 路由按领域注册（如 `/v1/platform/user/*` 下包含用户及其相关操作）
+- 路由按领域注册（如 `/v1/platform/users/*` 下包含用户及其相关操作）
 
 ### 常量定义规范
 
@@ -235,6 +235,14 @@ func NewUserSvc() UserSvc {
 }
 ```
 
+### 服务层数据访问与测试约定
+
+- **服务层直接调用 `dao.NewXxxDao()`**，不定义 repository 接口/adapter/函数变量等中间层；跨表操作在调用点直接使用对应 dao。
+- **ID 字段命名**：Go 字段与 JSON tag 一律 `ID` 全大写（`userID`、`roleID`、`appID`、`connectorID`），禁止 `roleId`/`appId` 等小写 d 写法；路由 path 参数（`:roleID`）与 swagger 注解同步。**path 是 ID 的唯一来源**：凡带 `uri:"xxxID"` 的字段，DTO tag 用 `json:"-" uri:"xxxID"`（禁止挂 `json:"xxxID"`/`form:"xxxID"`，防 body/query 覆盖 path 造成参数污染）。
+- **DTO 命名**：统一 `<业务名词><动词>Req/Resp`（如 `UserCreateReq`、`DomainCreateReq`），禁止 `CreateDomainReq`、裸 `CreateReq` 等变体。
+- **DTO ID 类型**：统一 `uint`（与 `gorm.Model.ID` 一致），禁止 `uint64`。
+- **单元测试**：统一使用各 app `testutil.SetupSQLite(t, entities...)`（内存 SQLite 注册为全局 iam 库），服务内部 `dao.NewXxxDao()` 自动落测试库，直接断言真实 dao 行为；不写 stub/注入 seam。注意 sqlite 对 `not null` JSON 列（`profile`/`config` 等）与 `joined_at` 需要显式播种值。
+
 ### 错误处理
 
 - 使用统一的错误码包 `github.com/morehao/ark-iam/pkg/code`
@@ -288,22 +296,33 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 
 ### API 路由规范
 
-- **路径格式**: `/{版本}/{服务标识}/{模块}/{操作}`，如 `/v1/platform/user/create`（`服务标识` 即应用标识段：auth → `/v1/auth`、platformadmin → `/v1/platform`、tenantadmin → `/v1/tenant`，各应用路径互不相同；模块名可跨应用复用，由服务标识段区分归属）
-- **版本号**: 放在路径最前，使用 `/v1/`, `/v2/` 等格式
-- **服务标识**: 用于区分不同服务/应用，如 `auth`, `platform`, `tenant`（OIDC 标准端点 `/oidc/*` 除外，不随应用分段）
-- **模块名**: 对应业务模块，如 `user`, `role`, `menu`
-- **操作名**: 使用驼峰命名，如 `create`, `update`, `detail`, `pageList`, `assignDepartment`
+采用**规则化混合**风格（REST 资源式为主 + 显式动作式补充），完整规范见 `docs/design/api-routing-convention.md`，旧→新路由对照见 `docs/design/api-route-migration.md`。
 
-**路由层级限制为5层**，避免使用多层嵌套路径。
+**三条硬规则（新增路由必须按序判定）**：
+
+- **R1 资源 CRUD → REST**：资源的增删改查/列表/详情/树，用「集合 + 方法 + ID」表达。路径格式 `/{版本}/{服务标识}/{资源}[/{id}[/{子资源}]]`（如 `/v1/platform/users/{userID}/identities`；`服务标识` 即应用标识段：auth → `/v1/auth`、platformadmin → `/v1/platform`、tenantadmin → `/v1/tenant`，各应用路径互不相同；资源名可跨应用复用，由服务标识段区分归属）
+- **R2 业务动作 → 动作子路径**：状态流转/触发副作用类操作用 `POST /资源/{id}/动作`（如 `POST /v1/platform/api-keys/{apiKeyID}/revoke`）；认证/会话类动作挂 `/v1/auth` 动作式专用段（`register`/`joinTenant`/`logout`/`logoutAll`/`userinfo` 原样保留）
+- **R3 标准协议 → 专用前缀**：`/oidc/*`、back-channel logout、docs 不走业务路由规范，保持不动
+
+**资源命名**：复数 + kebab-case（`users`、`application-clients`、`api-keys`、`tenant-applications`），禁止驼峰（`applicationClient`）。ID 路径参数一律 `{xxxID}` 全大写（`{userID}`、`{roleID}`、`{appID}`），与 DTO JSON tag 及 swagger 注解同步。
+
+**HTTP 方法语义**：`GET` 查询（含分页列表）／`POST` 创建与动作子路径（`/id/action`）／`PUT` 全量更新与批量授权（全量替换集合）／`PATCH` 局部更新（如状态）／`DELETE` 删除。**禁止** `POST /xxx/delete`、`POST /xxx/update`、`POST /xxx/pageList` 等动作式写法。
+
+**关联建模**：从属资源用子资源（`/users/{userID}/identities`）；多对多关联用父资源子集合两端视角（`/roles/{roleID}/users` 与 `/users/{userID}/roles`），批量授权 = `PUT` 集合全量替换；跨父资源检索保留顶层只读资源（`/v1/platform/user-identities`、`/v1/platform/login-logs`）。
+
+**层级限制**：集合层级 ≤ 3（路径段 ≤ 6：`v1 / service / collection / {id} / subcollection / {id}`），禁止更深嵌套。
+
+**当前用户资源**：`/v1/auth/me`（原 person）、`/v1/auth/me/tenants`（原 myTenants）、`/v1/auth/me/sessions`（原 user/sessions）。
 
 #### 路由示例
 
-| 模块 | 操作 | 完整路径 |
+| 资源 | 操作 | 完整路径 |
 |------|------|----------|
-| user | 创建 | `/v1/platform/user/create` |
-| user | 分配部门 | `/v1/platform/user/assignDepartment` |
-| role | 列表 | `/v1/platform/role/pageList` |
-| 认证操作 | 注册 | `/v1/auth/register`（auth 应用认证操作直接挂服务段，避免 `/v1/auth/auth/*`） |
+| user | 创建 | `POST /v1/platform/users` |
+| user | 分配部门（全量替换） | `PUT /v1/platform/users/{userID}/departments` |
+| role | 分页列表 | `GET /v1/platform/roles?page=&pageSize=` |
+| apiKey | 吊销（动作） | `POST /v1/platform/api-keys/{apiKeyID}/revoke` |
+| 认证操作 | 注册 | `POST /v1/auth/register`（auth 应用认证操作直接挂服务段，避免 `/v1/auth/auth/*`） |
 
 #### 路由注册
 
@@ -316,14 +335,18 @@ routerGroups := ginserver.NewRouterGroups(engine, "platform", ginserver.VersionG
 })
 ```
 
-在各个路由文件中使用 gin 的路由注册方法：
+在各个路由文件中使用 gin 的路由注册方法（统一按「create → list → tree/detail → update → delete → 动作/子资源」顺序排列）：
 
 ```go
 func userRouter(groups *ginserver.RouterGroups) {
     v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-    v1RouterGroup.POST("/user/create", userCtr.Create)
-    v1RouterGroup.POST("/user/delete", userCtr.Delete)
-    v1RouterGroup.GET("/user/detail", userCtr.Detail)
+    v1RouterGroup.POST("/users", userCtr.Create)
+    v1RouterGroup.GET("/users", userCtr.PageList)
+    v1RouterGroup.GET("/users/:userID", userCtr.Detail)
+    v1RouterGroup.PUT("/users/:userID", userCtr.Update)
+    v1RouterGroup.PATCH("/users/:userID", userCtr.UpdateStatus)
+    v1RouterGroup.DELETE("/users/:userID", userCtr.Delete)
+    v1RouterGroup.GET("/users/:userID/identities", userCtr.GetUserIdentityByUser)
 }
 ```
 
@@ -338,7 +361,7 @@ func userRouter(groups *ginserver.RouterGroups) {
 // @Produce application/json
 // @Param req body dtouser.UserCreateReq true "创建用户管理"
 // @Success 200 {object} gincontext.DtoRender{data=dtouser.UserCreateResp}
-// @Router /v1/platform/user/create [post]
+// @Router /v1/platform/users [post]
 ```
 
 生成文档：

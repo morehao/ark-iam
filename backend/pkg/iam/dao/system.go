@@ -1,7 +1,6 @@
 package dao
 
 import (
-	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
@@ -29,11 +28,11 @@ type SystemDao struct {
 	*gormdao.Dao[model.SystemEntity, model.SystemEntityList]
 }
 
-func NewSystemDao() *SystemDao {
+func NewSystemDao(opts ...DaoOption) *SystemDao {
 	return &SystemDao{
 		Dao: gormdao.NewDao[model.SystemEntity, model.SystemEntityList](
 			model.TableNameSystem, "SystemDao",
-			dbclient.IamDB,
+			resolveDBGetter(opts...),
 		),
 	}
 }

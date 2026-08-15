@@ -50,7 +50,7 @@ export default function OAuthClientList() {
     setAppLoading(true)
     try {
       const resp = await getApplicationPageList({ page: 1, pageSize: 100 })
-      setAppOptions((resp?.list || []).map((a) => ({ value: a.appId, label: a.name })))
+      setAppOptions((resp?.list || []).map((a) => ({ value: a.appID, label: a.name })))
     } catch {
       /* 拦截器已提示 */
     } finally {
@@ -81,7 +81,7 @@ export default function OAuthClientList() {
       const values = await form.validateFields()
       setSubmitLoading(true)
       if (editing) {
-        await updateOAuthClient({ applicationClientId: editing.applicationClientId, ...values })
+        await updateOAuthClient({ applicationClientID: editing.applicationClientID, ...values })
         message.success('修改成功')
       } else {
         await createOAuthClient(values)
@@ -97,7 +97,7 @@ export default function OAuthClientList() {
   }
 
   const columns: ColumnsType<OAuthClientItem> = [
-    { title: 'ID', dataIndex: 'applicationClientId', key: 'applicationClientId', width: 80 },
+    { title: 'ID', dataIndex: 'applicationClientID', key: 'applicationClientID', width: 80 },
     {
       title: '客户端ID',
       dataIndex: 'clientID',
@@ -106,7 +106,7 @@ export default function OAuthClientList() {
       render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v || '-'}</span>,
     },
     { title: '名称', dataIndex: 'name', key: 'name', ellipsis: true },
-    { title: '所属应用ID', dataIndex: 'appId', key: 'appId', width: 110 },
+    { title: '所属应用ID', dataIndex: 'appID', key: 'appID', width: 110 },
     { title: '类型', dataIndex: 'type', key: 'type', width: 100, render: (v: string) => <TypeTag value={v} /> },
     { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (v: string) => <StatusTag value={v} /> },
     { title: '创建时间', key: 'createdAt', width: 160, render: (_, r) => fmtTime(r.createdAt) },
@@ -116,7 +116,7 @@ export default function OAuthClientList() {
       width: 180,
       render: (_, r) => (
         <Space size={4}>
-          <Button type="link" size="small" onClick={() => navigate(`/oauthClient/${r.applicationClientId}`)}>
+          <Button type="link" size="small" onClick={() => navigate(`/oauthClient/${r.applicationClientID}`)}>
             详情
           </Button>
           <Button type="link" size="small" onClick={() => handleEdit(r)}>
@@ -126,7 +126,7 @@ export default function OAuthClientList() {
             title="确认删除该客户端？"
             onConfirm={async () => {
               try {
-                await deleteOAuthClient(r.applicationClientId)
+                await deleteOAuthClient(r.applicationClientID)
                 message.success('删除成功')
                 void fetchData()
               } catch {
@@ -168,7 +168,7 @@ export default function OAuthClientList() {
         />
       </div>
       <Table<OAuthClientItem>
-        rowKey="applicationClientId"
+        rowKey="applicationClientID"
         columns={columns}
         dataSource={data}
         loading={loading}
@@ -197,7 +197,7 @@ export default function OAuthClientList() {
       >
         <Form form={form} layout="vertical">
           {!editing && (
-            <Form.Item name="appId" label="所属应用" rules={[{ required: true, message: '请选择所属应用' }]}>
+            <Form.Item name="appID" label="所属应用" rules={[{ required: true, message: '请选择所属应用' }]}>
               <Select
                 placeholder="选择所属应用"
                 loading={appLoading}

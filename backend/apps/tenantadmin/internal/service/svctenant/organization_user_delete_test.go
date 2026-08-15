@@ -1,107 +1,82 @@
 package svctenant
 
 import (
-	"context"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
+	"github.com/morehao/ark-iam/tenantadmin/testutil"
 	"github.com/morehao/golib/biz/gcontext"
-	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
 func TestDeleteOrganizationUserUsesTenantScopedCompositeLookup(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.OrganizationUserEntity{})
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Set(gcontext.KeyTenantID, uint(71))
 	ginCtx.Set(gcontext.KeyUserID, uint(9301))
 
-	repo := &stubOrganizationUserDeleteRepo{
-		list: model.OrganizationUserEntityList{{
-			Model:          gorm.Model{ID: 109},
-			TenantID:       71,
-			OrganizationID: 201,
-			UserID:         301,
-		}},
+	relation := &model.OrganizationUserEntity{
+		Model:          gorm.Model{ID: 109},
+		TenantID:       71,
+		OrganizationID: 201,
+		UserID:         301,
 	}
-	installOrganizationUserDeleteRepo(t, repo)
+	if err := db.Create(relation).Error; err != nil {
+		t.Fatalf("seed relation: %v", err)
+	}
 
 	svc := &organizationUserSvc{}
 	err := svc.Delete(ginCtx, &dtotenant.OrganizationUserDeleteReq{OrganizationID: 201, UserID: 301})
 	if err != nil {
 		t.Fatalf("Delete returned error: %v", err)
 	}
-	if repo.lastCond == nil {
-		t.Fatalf("expected lookup condition to be captured")
+
+	// 租户作用域复合条件命中后，应按关系记录 id 软删除，并记录操作人
+	left, err := dao.NewOrganizationUserDao().GetListByCond(ginCtx, &dao.OrganizationUserCond{
+		TenantID:       71,
+		OrganizationID: 201,
+		UserID:         301,
+	})
+	if err != nil {
+		t.Fatalf("GetListByCond: %v", err)
 	}
-	if repo.lastCond.TenantID != 71 || repo.lastCond.OrganizationID != 201 || repo.lastCond.UserID != 301 {
-		t.Fatalf("unexpected composite lookup: %+v", repo.lastCond)
+	if len(left) != 0 {
+		t.Fatalf("expected relation soft-deleted, got %+v", left)
 	}
-	if repo.deletedID != 109 {
-		t.Fatalf("expected delete by relation id 109, got %d", repo.deletedID)
+
+	var deleted model.OrganizationUserEntity
+	if err := db.Unscoped().Where("id = ?", 109).First(&deleted).Error; err != nil {
+		t.Fatalf("load deleted row: %v", err)
 	}
-	if repo.deletedBy != 9301 {
-		t.Fatalf("expected deletedBy 9301, got %d", repo.deletedBy)
+	if !deleted.DeletedAt.Valid {
+		t.Fatalf("expected deleted_at set")
+	}
+	if deleted.DeletedBy != 9301 {
+		t.Fatalf("expected deletedBy 9301, got %d", deleted.DeletedBy)
 	}
 }
 
 func TestDeleteOrganizationUserReturnsNotExistWhenCompositeLookupMisses(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.OrganizationUserEntity{})
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Set(gcontext.KeyTenantID, uint(72))
 	ginCtx.Set(gcontext.KeyUserID, uint(9302))
-
-	repo := &stubOrganizationUserDeleteRepo{}
-	installOrganizationUserDeleteRepo(t, repo)
 
 	svc := &organizationUserSvc{}
 	err := svc.Delete(ginCtx, &dtotenant.OrganizationUserDeleteReq{OrganizationID: 201, UserID: 301})
 	if err == nil {
 		t.Fatalf("expected not exist error")
 	}
-	if repo.deletedID != 0 {
-		t.Fatalf("expected no delete call, got deletedID=%d", repo.deletedID)
+
+	// 未命中任何关系记录时，不应发生删除
+	var count int64
+	if err := db.Model(&model.OrganizationUserEntity{}).Count(&count).Error; err != nil {
+		t.Fatalf("count rows: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected no rows after failed delete, got %d", count)
 	}
 }
-
-type stubOrganizationUserDeleteRepo struct {
-	list      model.OrganizationUserEntityList
-	listErr   error
-	deleteErr error
-	lastCond  *dao.OrganizationUserCond
-	deletedID uint
-	deletedBy uint
-}
-
-func (r *stubOrganizationUserDeleteRepo) GetListByCond(ctx context.Context, cond gormdao.Cond) (model.OrganizationUserEntityList, error) {
-	typed, _ := cond.(*dao.OrganizationUserCond)
-	if typed != nil {
-		clone := *typed
-		if typed.BaseCond != nil {
-			base := *typed.BaseCond
-			clone.BaseCond = &base
-		}
-		r.lastCond = &clone
-	}
-	return r.list, r.listErr
-}
-
-func (r *stubOrganizationUserDeleteRepo) Delete(ctx context.Context, id uint, userID uint) error {
-	r.deletedID = id
-	r.deletedBy = userID
-	return r.deleteErr
-}
-
-func installOrganizationUserDeleteRepo(t *testing.T, repo organizationUserDeleteRepository) {
-	t.Helper()
-	prev := newOrganizationUserDeleteRepo
-	newOrganizationUserDeleteRepo = func() organizationUserDeleteRepository {
-		return repo
-	}
-	t.Cleanup(func() {
-		newOrganizationUserDeleteRepo = prev
-	})
-}
-
-var _ organizationUserDeleteRepository = (*stubOrganizationUserDeleteRepo)(nil)

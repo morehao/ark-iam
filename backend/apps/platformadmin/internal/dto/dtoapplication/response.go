@@ -2,13 +2,13 @@ package dtoapplication
 
 import "encoding/json"
 
-type CreateResp struct {
-	AppID uint   `json:"appId"` // 应用ID
+type ApplicationCreateResp struct {
+	AppID uint   `json:"appID"` // 应用ID
 	Code  string `json:"code"`  // 应用编码
 }
 
-type DetailResp struct {
-	AppID        uint            `json:"appId"`        // 应用ID
+type ApplicationDetailResp struct {
+	AppID        uint            `json:"appID"`        // 应用ID
 	Code         string          `json:"code"`         // 应用编码
 	Name         string          `json:"name"`         // 应用名称
 	Description  string          `json:"description"`  // 应用描述
@@ -23,7 +23,7 @@ type DetailResp struct {
 }
 
 type PageListItem struct {
-	AppID        uint            `json:"appId"`        // 应用ID
+	AppID        uint            `json:"appID"`        // 应用ID
 	Code         string          `json:"code"`         // 应用编码
 	Name         string          `json:"name"`         // 应用名称
 	Description  string          `json:"description"`  // 应用描述
@@ -35,7 +35,7 @@ type PageListItem struct {
 	CreatedAt    string          `json:"createdAt"`    // 创建时间
 }
 
-type PageListResp struct {
+type ApplicationPageListResp struct {
 	List  []PageListItem `json:"list"`  // 列表数据
 	Total int64          `json:"total"` // 总数
 }

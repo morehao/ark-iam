@@ -67,7 +67,7 @@ export default function ApplicationList() {
     setDetail(record)
     setDetailOpen(true)
     try {
-      const resp = await getApplicationDetail(record.appId)
+      const resp = await getApplicationDetail(record.appID)
       setDetail(resp)
     } catch {
       /* 拦截器已提示 */
@@ -79,7 +79,7 @@ export default function ApplicationList() {
       const values = await form.validateFields()
       setSubmitLoading(true)
       if (editing) {
-        await updateApplication({ appId: editing.appId, ...values })
+        await updateApplication({ appID: editing.appID, ...values })
         message.success('修改成功')
       } else {
         await createApplication(values)
@@ -96,7 +96,7 @@ export default function ApplicationList() {
 
   const handleDelete = async (record: ApplicationItem) => {
     try {
-      await deleteApplication(record.appId)
+      await deleteApplication(record.appID)
       message.success('删除成功')
       void fetchData()
     } catch {
@@ -108,7 +108,7 @@ export default function ApplicationList() {
     v === 'public' ? <Tag color="blue">公开</Tag> : <Tag color="orange">私有</Tag>
 
   const columns: ColumnsType<ApplicationItem> = [
-    { title: 'ID', dataIndex: 'appId', key: 'appId', width: 70 },
+    { title: 'ID', dataIndex: 'appID', key: 'appID', width: 70 },
     { title: '应用名', dataIndex: 'name', key: 'name', width: 180, ellipsis: true },
     {
       title: '编码',
@@ -171,7 +171,7 @@ export default function ApplicationList() {
         />
       </div>
       <Table<ApplicationItem>
-        rowKey="appId"
+        rowKey="appID"
         columns={columns}
         dataSource={data}
         loading={loading}
@@ -254,7 +254,7 @@ export default function ApplicationList() {
       >
         {detail && (
           <Descriptions column={1} bordered size="small">
-            <Descriptions.Item label="应用ID">{detail.appId}</Descriptions.Item>
+            <Descriptions.Item label="应用ID">{detail.appID}</Descriptions.Item>
             <Descriptions.Item label="编码">{detail.code || '-'}</Descriptions.Item>
             <Descriptions.Item label="名称">{detail.name || '-'}</Descriptions.Item>
             <Descriptions.Item label="类型">

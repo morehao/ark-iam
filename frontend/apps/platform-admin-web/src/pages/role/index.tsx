@@ -180,7 +180,7 @@ export default function RoleList() {
   const handleRemoveMember = async (record: RoleUserItem) => {
     if (!memberRole) return
     try {
-      await removeRoleUser(memberRole.roleID, record.userId)
+      await removeRoleUser(memberRole.roleID, record.userID)
       message.success('移除成功')
       void fetchMembers(memberRole.roleID)
     } catch (error) {
@@ -233,7 +233,7 @@ export default function RoleList() {
   ]
 
   const readOnlyMemberColumns: ColumnsType<RoleUserItem> = [
-    { title: '用户ID', dataIndex: 'userId', key: 'userId', width: 80 },
+    { title: '用户ID', dataIndex: 'userID', key: 'userID', width: 80 },
     { title: '姓名', dataIndex: 'name', key: 'name', width: 120, render: (v: string) => v || '-' },
     { title: '用户名', dataIndex: 'username', key: 'username', width: 120, render: (v: string) => v || '-' },
     { title: '邮箱', dataIndex: 'email', key: 'email', ellipsis: true, render: (v: string) => v || '-' },
@@ -366,7 +366,7 @@ export default function RoleList() {
           </Typography.Text>
         </div>
         <Table<RoleUserItem>
-          rowKey="userId"
+          rowKey="userID"
           columns={readOnlyMemberColumns}
           dataSource={members}
           loading={membersLoading}
@@ -392,7 +392,7 @@ export default function RoleList() {
         }
       >
         <Table<RoleUserItem>
-          rowKey="userId"
+          rowKey="userID"
           columns={memberColumns}
           dataSource={members}
           loading={membersLoading}

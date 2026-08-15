@@ -1,14 +1,12 @@
 package svcsession
 
 import (
-	"context"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtouser"
-	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"gorm.io/gorm"
@@ -20,15 +18,6 @@ type SessionSvc interface {
 	RevokeAll(ctx *gin.Context, userID, tenantID, personID uint) error
 }
 
-type sessionStore interface {
-	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.RefreshTokenEntityList, int64, error)
-	UpdateMap(ctx context.Context, id uint, updates map[string]any) error
-}
-
-var newSessionStore = func() sessionStore {
-	return dao.NewSessionDao()
-}
-
 type sessionSvc struct{}
 
 var _ SessionSvc = (*sessionSvc)(nil)
@@ -38,7 +27,7 @@ func NewSessionSvc() SessionSvc {
 }
 
 func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, personID, userID, tenantID uint) (*dtouser.SessionListResp, error) {
-	sessionDao := newSessionStore()
+	sessionDao := dao.NewSessionDao()
 
 	page := req.Page
 	if page < 1 {
@@ -77,10 +66,10 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, perso
 			expiresAt = item.ExpiredAt.Format("2006-01-02 15:04:05")
 		}
 		sessions = append(sessions, dtouser.SessionResp{
-			ID:         uint64(item.ID),
+			ID:         item.ID,
 			SessionID:  item.SessionID,
-			AppID:      uint64(item.ApplicationClientID),
-			TenantID:   uint64(item.TenantID),
+			AppID:      item.ApplicationClientID,
+			TenantID:   item.TenantID,
 			ClientType: item.ClientType,
 			ClientIP:   item.ClientIP,
 			UserAgent:  item.UserAgent,
@@ -97,7 +86,7 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, perso
 }
 
 func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID, tenantID, personID uint) error {
-	sessionDao := newSessionStore()
+	sessionDao := dao.NewSessionDao()
 
 	// 归属校验：仅允许撤销本人（person）、本租户、本人 user 名下的会话，防止 IDOR 越权撤销他人会话。
 	sessionList, _, err := sessionDao.GetPageListByCond(ctx.Request.Context(), &dao.SessionCond{

@@ -71,7 +71,7 @@ export function ProfileCenter({ open, onClose }: Props) {
   }
 
   const columns = [
-    { title: '会话ID', dataIndex: 'sessionId', key: 'sessionId', ellipsis: true },
+    { title: '会话ID', dataIndex: 'sessionID', key: 'sessionID', ellipsis: true },
     { title: '客户端', dataIndex: 'clientType', key: 'clientType', width: 110 },
     { title: 'IP', dataIndex: 'clientIP', key: 'clientIP', width: 130 },
     {

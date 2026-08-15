@@ -33,7 +33,7 @@ func NewSystemCtr() SystemCtr {
 // @Produce application/json
 // @Param req body dtotenant.SystemCreateReq true "创建系统配置"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.SystemCreateResp}
-// @Router /v1/platform/system/create [post]
+// @Router /v1/platform/systems [post]
 func (ctr *systemCtr) Create(ctx *gin.Context) {
 	var req dtotenant.SystemCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -52,12 +52,12 @@ func (ctr *systemCtr) Create(ctx *gin.Context) {
 // @Summary 删除系统配置
 // @accept application/json
 // @Produce application/json
-// @Param req body dtotenant.SystemDeleteReq true "删除系统配置"
+// @Param systemID path int true "systemID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/system/delete [post]
+// @Router /v1/platform/systems/{systemID} [delete]
 func (ctr *systemCtr) Delete(ctx *gin.Context) {
 	var req dtotenant.SystemDeleteReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -73,10 +73,15 @@ func (ctr *systemCtr) Delete(ctx *gin.Context) {
 // @accept application/json
 // @Produce application/json
 // @Param req body dtotenant.SystemUpdateReq true "修改系统配置"
+// @Param systemID path int true "systemID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/system/update [post]
+// @Router /v1/platform/systems/{systemID} [put]
 func (ctr *systemCtr) Update(ctx *gin.Context) {
 	var req dtotenant.SystemUpdateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -92,12 +97,12 @@ func (ctr *systemCtr) Update(ctx *gin.Context) {
 // @Summary 系统配置详情
 // @accept application/json
 // @Produce application/json
-// @Param req query dtotenant.SystemDetailReq true "系统配置详情"
+// @Param systemID path int true "systemID"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.SystemDetailResp}
-// @Router /v1/platform/system/detail [get]
+// @Router /v1/platform/systems/{systemID} [get]
 func (ctr *systemCtr) Detail(ctx *gin.Context) {
 	var req dtotenant.SystemDetailReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -113,12 +118,12 @@ func (ctr *systemCtr) Detail(ctx *gin.Context) {
 // @Summary 系统配置列表分页
 // @accept application/json
 // @Produce application/json
-// @Param req body dtotenant.SystemPageListReq true "系统配置列表分页"
+// @Param req query dtotenant.SystemPageListReq true "系统配置列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.SystemPageListResp}
-// @Router /v1/platform/system/pageList [post]
+// @Router /v1/platform/systems [get]
 func (ctr *systemCtr) PageList(ctx *gin.Context) {
 	var req dtotenant.SystemPageListReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

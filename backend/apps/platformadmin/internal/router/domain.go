@@ -7,11 +7,10 @@ import (
 
 func domainRouter(groups *ginserver.RouterGroups) {
 	domainCtr := ctrdomain.NewDomainCtr()
-
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.POST("/domain/create", domainCtr.Create)
-	v1RouterGroup.POST("/domain/update", domainCtr.Update)
-	v1RouterGroup.GET("/domain/detail", domainCtr.Detail)
-	v1RouterGroup.POST("/domain/pageList", domainCtr.PageList)
-	v1RouterGroup.POST("/domain/delete", domainCtr.Delete)
+	v1RouterGroup.POST("/domains", domainCtr.Create)
+	v1RouterGroup.GET("/domains", domainCtr.PageList)
+	v1RouterGroup.GET("/domains/:domainID", domainCtr.Detail)
+	v1RouterGroup.PUT("/domains/:domainID", domainCtr.Update)
+	v1RouterGroup.DELETE("/domains/:domainID", domainCtr.Delete)
 }

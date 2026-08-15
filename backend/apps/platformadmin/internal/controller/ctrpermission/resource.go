@@ -33,7 +33,7 @@ func NewResourceCtr() ResourceCtr {
 // @Produce application/json
 // @Param req body dtopermission.ResourceCreateReq true "创建资源管理"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.ResourceCreateResp}
-// @Router /v1/platform/resource/create [post]
+// @Router /v1/platform/resources [post]
 func (ctr *resourceCtr) Create(ctx *gin.Context) {
 	var req dtopermission.ResourceCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -52,12 +52,12 @@ func (ctr *resourceCtr) Create(ctx *gin.Context) {
 // @Summary 删除资源管理
 // @accept application/json
 // @Produce application/json
-// @Param req body dtopermission.ResourceDeleteReq true "删除资源管理"
+// @Param resourceID path int true "resourceID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/resource/delete [post]
+// @Router /v1/platform/resources/{resourceID} [delete]
 func (ctr *resourceCtr) Delete(ctx *gin.Context) {
 	var req dtopermission.ResourceDeleteReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -72,11 +72,16 @@ func (ctr *resourceCtr) Delete(ctx *gin.Context) {
 // @Summary 修改资源管理
 // @accept application/json
 // @Produce application/json
+// @Param resourceID path int true "resourceID"
 // @Param req body dtopermission.ResourceUpdateReq true "修改资源管理"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/resource/update [post]
+// @Router /v1/platform/resources/{resourceID} [put]
 func (ctr *resourceCtr) Update(ctx *gin.Context) {
 	var req dtopermission.ResourceUpdateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -92,12 +97,12 @@ func (ctr *resourceCtr) Update(ctx *gin.Context) {
 // @Summary 资源管理详情
 // @accept application/json
 // @Produce application/json
-// @Param req query dtopermission.ResourceDetailReq true "资源管理详情"
+// @Param resourceID path int true "resourceID"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.ResourceDetailResp}
-// @Router /v1/platform/resource/detail [get]
+// @Router /v1/platform/resources/{resourceID} [get]
 func (ctr *resourceCtr) Detail(ctx *gin.Context) {
 	var req dtopermission.ResourceDetailReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -113,12 +118,12 @@ func (ctr *resourceCtr) Detail(ctx *gin.Context) {
 // @Summary 资源管理列表分页
 // @accept application/json
 // @Produce application/json
-// @Param req body dtopermission.ResourcePageListReq true "资源管理列表分页"
+// @Param req query dtopermission.ResourcePageListReq true "资源管理列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.ResourcePageListResp}
-// @Router /v1/platform/resource/pageList [post]
+// @Router /v1/platform/resources [get]
 func (ctr *resourceCtr) PageList(ctx *gin.Context) {
 	var req dtopermission.ResourcePageListReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

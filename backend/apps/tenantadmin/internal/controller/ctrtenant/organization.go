@@ -33,7 +33,7 @@ func NewOrganizationCtr() OrganizationCtr {
 // @Produce application/json
 // @Param req body dtotenant.OrganizationCreateReq true "创建组织"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationCreateResp}
-// @Router /v1/tenant/organization/create [post]
+// @Router /v1/tenant/organizations [post]
 func (ctr *organizationCtr) Create(ctx *gin.Context) {
 	var req dtotenant.OrganizationCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -52,12 +52,12 @@ func (ctr *organizationCtr) Create(ctx *gin.Context) {
 // @Summary 删除组织
 // @accept application/json
 // @Produce application/json
-// @Param req body dtotenant.OrganizationDeleteReq true "删除组织"
+// @Param organizationID path int true "组织ID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/tenant/organization/delete [post]
+// @Router /v1/tenant/organizations/{organizationID} [delete]
 func (ctr *organizationCtr) Delete(ctx *gin.Context) {
 	var req dtotenant.OrganizationDeleteReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -72,11 +72,16 @@ func (ctr *organizationCtr) Delete(ctx *gin.Context) {
 // @Summary 修改组织
 // @accept application/json
 // @Produce application/json
+// @Param organizationID path int true "组织ID"
 // @Param req body dtotenant.OrganizationUpdateReq true "修改组织"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/tenant/organization/update [post]
+// @Router /v1/tenant/organizations/{organizationID} [put]
 func (ctr *organizationCtr) Update(ctx *gin.Context) {
 	var req dtotenant.OrganizationUpdateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -92,12 +97,12 @@ func (ctr *organizationCtr) Update(ctx *gin.Context) {
 // @Summary 组织详情
 // @accept application/json
 // @Produce application/json
-// @Param req query dtotenant.OrganizationDetailReq true "组织详情"
+// @Param organizationID path int true "组织ID"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationDetailResp}
-// @Router /v1/tenant/organization/detail [get]
+// @Router /v1/tenant/organizations/{organizationID} [get]
 func (ctr *organizationCtr) Detail(ctx *gin.Context) {
 	var req dtotenant.OrganizationDetailReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -113,12 +118,12 @@ func (ctr *organizationCtr) Detail(ctx *gin.Context) {
 // @Summary 组织列表分页
 // @accept application/json
 // @Produce application/json
-// @Param req body dtotenant.OrganizationPageListReq true "组织列表分页"
+// @Param req query dtotenant.OrganizationPageListReq true "组织列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationPageListResp}
-// @Router /v1/tenant/organization/pageList [post]
+// @Router /v1/tenant/organizations [get]
 func (ctr *organizationCtr) PageList(ctx *gin.Context) {
 	var req dtotenant.OrganizationPageListReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

@@ -1,8 +1,6 @@
 package svcpermission
 
 import (
-	"context"
-
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
@@ -15,15 +13,6 @@ import (
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
-
-type menuScopeRepository interface {
-	GetByID(ctx context.Context, id uint) (*model.MenuEntity, error)
-	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.MenuEntityList, int64, error)
-}
-
-var newMenuScopeRepo = func() menuScopeRepository {
-	return dao.NewMenuDao()
-}
 
 func menuVisible(entity *model.MenuEntity) bool {
 	return entity != nil && entity.ID != 0
@@ -76,7 +65,7 @@ func (svc *menuSvc) Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (
 }
 
 func (svc *menuSvc) Delete(ctx *gin.Context, req *dtopermission.MenuDeleteReq) error {
-	menuEntity, err := newMenuScopeRepo().GetByID(ctx, req.MenuID)
+	menuEntity, err := dao.NewMenuDao().GetByID(ctx, req.MenuID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteMenu] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.MenuDeleteError)
@@ -94,7 +83,7 @@ func (svc *menuSvc) Delete(ctx *gin.Context, req *dtopermission.MenuDeleteReq) e
 }
 
 func (svc *menuSvc) Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) error {
-	menuEntity, err := newMenuScopeRepo().GetByID(ctx, req.MenuID)
+	menuEntity, err := dao.NewMenuDao().GetByID(ctx, req.MenuID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.UpdateMenu] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.MenuUpdateError)
@@ -130,7 +119,7 @@ func (svc *menuSvc) Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) e
 }
 
 func (svc *menuSvc) Detail(ctx *gin.Context, req *dtopermission.MenuDetailReq) (*dtopermission.MenuDetailResp, error) {
-	menuEntity, err := newMenuScopeRepo().GetByID(ctx, req.MenuID)
+	menuEntity, err := dao.NewMenuDao().GetByID(ctx, req.MenuID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.DetailMenu] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.MenuGetDetailError)
@@ -167,7 +156,7 @@ func (svc *menuSvc) Detail(ctx *gin.Context, req *dtopermission.MenuDetailReq) (
 }
 
 func (svc *menuSvc) PageList(ctx *gin.Context, req *dtopermission.MenuPageListReq) (*dtopermission.MenuPageListResp, error) {
-	menuRepo := newMenuScopeRepo()
+	menuRepo := dao.NewMenuDao()
 	cond := &dao.MenuCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
@@ -219,7 +208,7 @@ func (svc *menuSvc) PageList(ctx *gin.Context, req *dtopermission.MenuPageListRe
 }
 
 func (svc *menuSvc) Tree(ctx *gin.Context, req *dtopermission.MenuTreeReq) (*dtopermission.MenuTreeResp, error) {
-	menuRepo := newMenuScopeRepo()
+	menuRepo := dao.NewMenuDao()
 	cond := &dao.MenuCond{
 		AppID: req.AppID,
 	}

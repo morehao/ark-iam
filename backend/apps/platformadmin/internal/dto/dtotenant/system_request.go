@@ -10,30 +10,30 @@ type SystemCreateReq struct {
 }
 
 type SystemUpdateReq struct {
-	SystemID uint `json:"systemID" binding:"required"` // 自增ID
+	SystemID uint `json:"-" uri:"systemID" binding:"required"` // 自增ID
 	objtenant.SystemBaseInfo
 }
 
 type SystemDetailReq struct {
-	SystemID uint `json:"systemID" form:"systemID" binding:"required"` // 自增ID
+	SystemID uint `json:"-" uri:"systemID" binding:"required"` // 自增ID
 }
 
 type SystemPageListReq struct {
 	gobject.PageQuery
-	TenantID uint   `json:"tenantID"` // 租户ID
-	Key      string `json:"key"`      // 配置键
+	TenantID uint   `json:"tenantID" form:"tenantID"` // 租户ID
+	Key      string `json:"key" form:"key"`           // 配置键
 }
 
 type SystemDeleteReq struct {
-	SystemID uint `json:"systemID" binding:"required"` // 自增ID
+	SystemID uint `json:"-" uri:"systemID" binding:"required"` // 自增ID
 }
 
 type LogDetailReq struct {
-	LogID uint `json:"logID" form:"logID" binding:"required"` // 日志ID
+	LogID uint `json:"-" uri:"logID" binding:"required"` // 日志ID
 }
 
 type LogPageListReq struct {
 	gobject.PageQuery
-	TenantID uint   `json:"tenantID"` // 租户ID
-	Key      string `json:"key"`      // 日志键
+	TenantID uint   `json:"tenantID" form:"tenantID"` // 租户ID
+	Key      string `json:"key" form:"key"`           // 日志键
 }

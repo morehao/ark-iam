@@ -23,8 +23,8 @@ var (
 type ConnectorState struct {
 	State       string    `json:"state"`
 	Nonce       string    `json:"nonce"`
-	ConnectorID uint      `json:"connectorId"`
-	TenantID    uint      `json:"tenantId"`
+	ConnectorID uint      `json:"connectorID"`
+	TenantID    uint      `json:"tenantID"`
 	RedirectURI string    `json:"redirectUri"`
 	ExpiredAt   time.Time `json:"expiresAt"`
 }

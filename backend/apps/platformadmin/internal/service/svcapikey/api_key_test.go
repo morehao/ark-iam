@@ -22,7 +22,7 @@ func TestCreateApiKey(t *testing.T) {
 
 	_ = db.AutoMigrate(&model.ApiKeyEntity{})
 
-	req := &dtoapikey.CreateApiKeyReq{
+	req := &dtoapikey.ApiKeyCreateReq{
 		Name: "My Test Key",
 	}
 	resp, err := svc.Create(newTestGinCtx(1), 1, req)
@@ -57,7 +57,7 @@ func TestCreateApiKeyCapturesOwnerUser(t *testing.T) {
 
 	_ = db.AutoMigrate(&model.ApiKeyEntity{})
 
-	req := &dtoapikey.CreateApiKeyReq{
+	req := &dtoapikey.ApiKeyCreateReq{
 		Name: "Owner-bound Key",
 	}
 	resp, err := svc.Create(ctx, 1, req)
@@ -83,7 +83,7 @@ func TestCreateApiKeyReturnsKeyOnlyOnce(t *testing.T) {
 
 	_ = db.AutoMigrate(&model.ApiKeyEntity{})
 
-	req := &dtoapikey.CreateApiKeyReq{Name: "One-time Key"}
+	req := &dtoapikey.ApiKeyCreateReq{Name: "One-time Key"}
 	resp, err := svc.Create(newTestGinCtx(1), 1, req)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
@@ -111,13 +111,13 @@ func TestRevokeApiKey(t *testing.T) {
 
 	_ = db.AutoMigrate(&model.ApiKeyEntity{})
 
-	req := &dtoapikey.CreateApiKeyReq{Name: "Revokable Key"}
+	req := &dtoapikey.ApiKeyCreateReq{Name: "Revokable Key"}
 	resp, err := svc.Create(newTestGinCtx(1), 1, req)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Revoke(newTestGinCtx(1), 1, &dtoapikey.RevokeApiKeyReq{ID: resp.ID}); err != nil {
+	if err := svc.Revoke(newTestGinCtx(1), 1, &dtoapikey.RevokeApiKeyReq{ApiKeyID: resp.ID}); err != nil {
 		t.Fatalf("Revoke failed: %v", err)
 	}
 
@@ -139,13 +139,13 @@ func TestDeleteApiKey(t *testing.T) {
 
 	_ = db.AutoMigrate(&model.ApiKeyEntity{})
 
-	req := &dtoapikey.CreateApiKeyReq{Name: "Deletable Key"}
+	req := &dtoapikey.ApiKeyCreateReq{Name: "Deletable Key"}
 	resp, err := svc.Create(newTestGinCtx(1), 1, req)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(newTestGinCtx(1), 1, &dtoapikey.DeleteApiKeyReq{ID: resp.ID}); err != nil {
+	if err := svc.Delete(newTestGinCtx(1), 1, &dtoapikey.ApiKeyDeleteReq{ApiKeyID: resp.ID}); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
@@ -165,7 +165,7 @@ func TestPageListApiKey(t *testing.T) {
 	_ = db.AutoMigrate(&model.ApiKeyEntity{})
 
 	for i := 0; i < 3; i++ {
-		req := &dtoapikey.CreateApiKeyReq{Name: "Batch Key"}
+		req := &dtoapikey.ApiKeyCreateReq{Name: "Batch Key"}
 		_, err := svc.Create(newTestGinCtx(1), 1, req)
 		if err != nil {
 			t.Fatalf("Create failed: %v", err)
@@ -195,13 +195,13 @@ func TestCrossTenantIsolation(t *testing.T) {
 
 	_ = db.AutoMigrate(&model.ApiKeyEntity{})
 
-	req1 := &dtoapikey.CreateApiKeyReq{Name: "Tenant A Key"}
+	req1 := &dtoapikey.ApiKeyCreateReq{Name: "Tenant A Key"}
 	resp1, err := svc.Create(newTestGinCtx(1), 1, req1)
 	if err != nil {
 		t.Fatalf("Create tenant 1 failed: %v", err)
 	}
 
-	req2 := &dtoapikey.CreateApiKeyReq{Name: "Tenant B Key"}
+	req2 := &dtoapikey.ApiKeyCreateReq{Name: "Tenant B Key"}
 	_, err = svc.Create(newTestGinCtx(2), 2, req2)
 	if err != nil {
 		t.Fatalf("Create tenant 2 failed: %v", err)

@@ -13,6 +13,8 @@
 | 数据库建模、SQL 评审 | 表结构、字段含义、业务场景 | [iam_data_model_overview.md](iam_data_model_overview.md) |
 | 理解各类登录流程 | 端到端时序、代码路径 | [iam-login-flow.md](iam-login-flow.md) |
 | 前端开发对接 | `/oidc/login` 等接口契约 | [oidc-frontend-contract.md](oidc-frontend-contract.md) |
+| 后端/前端开发 | 路由怎么写、新接口如何设计 | [api-routing-convention.md](api-routing-convention.md) |
+| 路由改造执行 | 旧→新路由对照、分步迁移计划 | [api-route-migration.md](api-route-migration.md) |
 | 业务应用接入 SSO/RP | 如何作为 RP 接入 OIDC | [oidc-sso-integration.md](oidc-sso-integration.md) |
 | 统一登出 / SLO / back-channel | 登出不同步、标准 Back-Channel Logout、sid、多副本 | [oidc-slo-unified-logout.md](oidc-slo-unified-logout.md) |
 | 联调验证、问题排查 | 怎么测、怎么排障 | [oidc-verification-guide.md](oidc-verification-guide.md) |
@@ -28,3 +30,5 @@
 | [oidc-sso-integration.md](oidc-sso-integration.md) | 面向业务应用（RP）的接入指南：OIDC 概念、端点说明、接入步骤、代码示例 |
 | [oidc-slo-unified-logout.md](oidc-slo-unified-logout.md) | **统一登出设计变更**：登出不同步的根因、OP/RP 无状态分层、标准 Back-Channel Logout、sid 会话锚点、auth 多副本共享认证 Redis、分步实施（M1–M5）|
 | [oidc-verification-guide.md](oidc-verification-guide.md) | 联调验证指南：自动化测试、curl 协议验证、浏览器全流程、常见问题排查 |
+| [api-routing-convention.md](api-routing-convention.md) | **API 路由规范**：规则化混合（R1 资源 CRUD → REST / R2 业务动作 → `:action` / R3 协议端点不动），资源命名、方法语义、子资源与关联建模、认证域边界 |
+| [api-route-migration.md](api-route-migration.md) | **路由改造方案**：134 条 `/v1` 路由旧→新对照表、迁移原则、配套变更、分步执行计划与验证方式 |

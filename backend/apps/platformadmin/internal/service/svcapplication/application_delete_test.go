@@ -1,44 +1,40 @@
 package svcapplication
 
 import (
-	"context"
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtoapplication"
+	"github.com/morehao/ark-iam/platformadmin/testutil"
+	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/gerror"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
+// newDeleteCtx 构造带租户与操作人上下文的 gin.Context。
+func newDeleteCtx(userID uint) *gin.Context {
+	ctx, _ := gin.CreateTestContext(nil)
+	ctx.Set(gcontext.KeyTenantID, uint(1))
+	ctx.Set(gcontext.KeyUserID, userID)
+	return ctx
+}
+
 func TestDeleteSystemApplication(t *testing.T) {
-	dsn := fmt.Sprintf("file:app_%d?mode=memory&cache=shared", time.Now().UnixNano())
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	_ = db.AutoMigrate(&model.ApplicationEntity{})
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{})
 
-	oldNew := newApplicationRepo
-	defer func() { newApplicationRepo = oldNew }()
-	newApplicationRepo = func() applicationRepository {
-		return dao.NewApplicationDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
-	}
-
-	_ = db.Create(&model.ApplicationEntity{
-		Model:    gorm.Model{ID: 1},
+	entity := &model.ApplicationEntity{
 		Code:     "admin",
 		Name:     "管理后台",
 		IsSystem: 1,
-	}).Error
+	}
+	if err := db.Create(entity).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
 
 	svc := NewApplicationSvc()
-	err = svc.Delete(newDeleteCtx(0), &dtoapplication.DeleteReq{AppID: 1})
+	err := svc.Delete(newDeleteCtx(0), &dtoapplication.ApplicationDeleteReq{AppID: entity.ID})
 	if err == nil {
 		t.Fatal("expected error for system-built-in application")
 	}
@@ -48,63 +44,39 @@ func TestDeleteSystemApplication(t *testing.T) {
 	}
 }
 
-func newDeleteCtx(userID uint) *gin.Context {
-	ctx := &gin.Context{}
-	ctx.Set("tenantID", uint(1))
-	ctx.Set("userID", userID)
-	return ctx
-}
-
 func TestDeleteNonSystemApplication(t *testing.T) {
-	repo := &stubApplicationDeleteRepo{
-		getByIDEntity: &model.ApplicationEntity{
-			Model:    gorm.Model{ID: 2},
-			Code:     "blog",
-			Name:     "博客",
-			IsSystem: 0,
-		},
-	}
-	installApplicationDeleteRepo(t, repo)
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{})
 
+	entity := &model.ApplicationEntity{
+		Code:     "blog",
+		Name:     "博客",
+		IsSystem: 0,
+	}
+	if err := db.Create(entity).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	ctx := newDeleteCtx(7)
 	svc := NewApplicationSvc()
-	err := svc.Delete(newDeleteCtx(7), &dtoapplication.DeleteReq{AppID: 2})
-	if err != nil {
+	if err := svc.Delete(ctx, &dtoapplication.ApplicationDeleteReq{AppID: entity.ID}); err != nil {
 		t.Fatalf("Delete returned error: %v", err)
 	}
-	if repo.deletedID != 2 {
-		t.Fatalf("expected delete by id 2, got %d", repo.deletedID)
+
+	// 真实 dao 断言：软删除后按 ID 查不到
+	got, err := dao.NewApplicationDao().GetByID(ctx, entity.ID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
 	}
-	if repo.deletedBy != 7 {
-		t.Fatalf("expected deletedBy 7, got %d", repo.deletedBy)
+	if got != nil && got.ID != 0 {
+		t.Fatalf("expected application soft-deleted, got %+v", got)
+	}
+
+	// 删除人应写入 7（对应原 stub 断言 deletedBy == 7）
+	var deleted model.ApplicationEntity
+	if err := db.Unscoped().Where("id = ?", entity.ID).First(&deleted).Error; err != nil {
+		t.Fatalf("query deleted row: %v", err)
+	}
+	if deleted.DeletedBy != 7 {
+		t.Fatalf("expected deletedBy 7, got %d", deleted.DeletedBy)
 	}
 }
-
-type stubApplicationDeleteRepo struct {
-	getByIDEntity *model.ApplicationEntity
-	getByIDErr    error
-	deletedID     uint
-	deletedBy     uint
-}
-
-func (r *stubApplicationDeleteRepo) GetByID(ctx context.Context, id uint) (*model.ApplicationEntity, error) {
-	return r.getByIDEntity, r.getByIDErr
-}
-
-func (r *stubApplicationDeleteRepo) Delete(ctx context.Context, id, deletedBy uint) error {
-	r.deletedID = id
-	r.deletedBy = deletedBy
-	return nil
-}
-
-func installApplicationDeleteRepo(t *testing.T, repo applicationRepository) {
-	t.Helper()
-	prev := newApplicationRepo
-	newApplicationRepo = func() applicationRepository {
-		return repo
-	}
-	t.Cleanup(func() {
-		newApplicationRepo = prev
-	})
-}
-
-var _ applicationRepository = (*stubApplicationDeleteRepo)(nil)

@@ -51,7 +51,7 @@ interface MenuFormValues {
 
 type ModalMode = 'createRoot' | 'createChild' | 'edit'
 
-const STORAGE_KEY = 'ark-iam:menu:appId'
+const STORAGE_KEY = 'ark-iam:menu:appID'
 
 const TYPE_META: Record<string, { label: string; icon: React.ReactNode; color: string; tagColor: string }> = {
   directory: { label: '目录', icon: <FolderOutlined />, color: '#f59e0b', tagColor: 'orange' },
@@ -105,7 +105,7 @@ export default function MenuList() {
   const [submitLoading, setSubmitLoading] = useState(false)
 
   const selectedApp = useMemo(
-    () => apps.find((a) => a.appId === selectedAppId) || null,
+    () => apps.find((a) => a.appID === selectedAppId) || null,
     [apps, selectedAppId],
   )
 
@@ -117,8 +117,8 @@ export default function MenuList() {
       const list = resp?.list || []
       setApps(list)
       const saved = Number(localStorage.getItem(STORAGE_KEY) || 0)
-      const next = list.find((a) => a.appId === saved) || list[0]
-      setSelectedAppId(next?.appId)
+      const next = list.find((a) => a.appID === saved) || list[0]
+      setSelectedAppId(next?.appID)
     } catch {
       /* 拦截器已提示 */
     } finally {
@@ -150,9 +150,9 @@ export default function MenuList() {
     void fetchData()
   }, [fetchData])
 
-  const handleAppChange = (appId: number) => {
-    setSelectedAppId(appId)
-    localStorage.setItem(STORAGE_KEY, String(appId))
+  const handleAppChange = (appID: number) => {
+    setSelectedAppId(appID)
+    localStorage.setItem(STORAGE_KEY, String(appID))
   }
 
   // 统计当前应用的菜单构成
@@ -229,10 +229,10 @@ export default function MenuList() {
       setSubmitLoading(true)
       // 新建/编辑始终以列表页选中的应用为准
       if (mode === 'edit' && editing) {
-        await updateMenu({ menuID: editing.menuID, appId: selectedAppId, ...values })
+        await updateMenu({ menuID: editing.menuID, appID: selectedAppId, ...values })
         message.success('修改成功')
       } else {
-        await createMenu({ appId: selectedAppId, ...values })
+        await createMenu({ appID: selectedAppId, ...values })
         message.success('创建成功')
       }
       setModalOpen(false)
@@ -428,7 +428,7 @@ export default function MenuList() {
             value={selectedAppId}
             onChange={handleAppChange}
             options={apps.map((a) => ({
-              value: a.appId,
+              value: a.appID,
               label: `${a.name}（${a.code}）`,
             }))}
           />

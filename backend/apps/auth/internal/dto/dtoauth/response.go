@@ -6,7 +6,7 @@ import (
 )
 
 type LoginResp struct {
-	SSOSessionID string                `json:"ssoSessionID"`
+	SSOSessionID string                 `json:"ssoSessionID"`
 	Tenants      []objauth.TenantOption `json:"tenants"`
 }
 
@@ -24,24 +24,24 @@ type UserinfoResp struct {
 }
 
 type ConnectorCreateResp struct {
-	ConnectorID uint `json:"connectorId"` // 连接器ID
+	ConnectorID uint `json:"connectorID"` // 连接器ID
 }
 
 type ConnectorDetailResp struct {
-	ConnectorID uint `json:"connectorId"` // 连接器ID
+	ConnectorID uint `json:"connectorID"` // 连接器ID
 	objauth.ConnectorBaseInfo
 	gobject.OperatorBaseInfo
 }
 
 type ConnectorPageListItem struct {
-	ConnectorID uint `json:"connectorId"` // 连接器ID
+	ConnectorID uint `json:"connectorID"` // 连接器ID
 	objauth.ConnectorBaseInfo
 	gobject.OperatorBaseInfo
 }
 
 type ConnectorPageListResp struct {
 	List  []ConnectorPageListItem `json:"list"`  // 数据列表
-	Total int64                  `json:"total"` // 数据总条数
+	Total int64                   `json:"total"` // 数据总条数
 }
 
 type JoinTenantResp struct {

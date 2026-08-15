@@ -1,7 +1,6 @@
 package svcperson
 
 import (
-	"context"
 	"encoding/json"
 
 	"github.com/gin-gonic/gin"
@@ -27,58 +26,6 @@ type PersonSvc interface {
 
 type personSvc struct{}
 
-type personIdentityRepository interface {
-	Insert(ctx context.Context, entity *model.UserIdentityEntity) error
-	GetByID(ctx context.Context, id uint) (*model.UserIdentityEntity, error)
-	Delete(ctx context.Context, id uint, deletedBy uint) error
-	UpdateMap(ctx context.Context, id uint, updates map[string]any) error
-	GetPageListByCond(ctx context.Context, cond *dao.UserIdentityCond) (model.UserIdentityEntityList, int64, error)
-}
-
-type personIdentityUserRepository interface {
-	GetListByCond(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, error)
-}
-
-var newPersonIdentityRepo = func() personIdentityRepository {
-	return &personIdentityRepoAdapter{dao: dao.NewUserIdentityDao()}
-}
-
-var newPersonIdentityUserRepo = func() personIdentityUserRepository {
-	return &personIdentityUserRepoAdapter{dao: dao.NewUserDao()}
-}
-
-type personIdentityRepoAdapter struct {
-	dao *dao.UserIdentityDao
-}
-
-type personIdentityUserRepoAdapter struct {
-	dao *dao.UserDao
-}
-
-func (r *personIdentityRepoAdapter) Insert(ctx context.Context, entity *model.UserIdentityEntity) error {
-	return r.dao.Insert(ctx, entity)
-}
-
-func (r *personIdentityRepoAdapter) GetByID(ctx context.Context, id uint) (*model.UserIdentityEntity, error) {
-	return r.dao.GetByID(ctx, id)
-}
-
-func (r *personIdentityRepoAdapter) Delete(ctx context.Context, id uint, deletedBy uint) error {
-	return r.dao.Delete(ctx, id, deletedBy)
-}
-
-func (r *personIdentityRepoAdapter) UpdateMap(ctx context.Context, id uint, updates map[string]any) error {
-	return r.dao.UpdateMap(ctx, id, updates)
-}
-
-func (r *personIdentityRepoAdapter) GetPageListByCond(ctx context.Context, cond *dao.UserIdentityCond) (model.UserIdentityEntityList, int64, error) {
-	return r.dao.GetPageListByCond(ctx, cond)
-}
-
-func (r *personIdentityUserRepoAdapter) GetListByCond(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, error) {
-	return r.dao.GetListByCond(ctx, cond)
-}
-
 var _ PersonSvc = (*personSvc)(nil)
 
 func NewPersonSvc() PersonSvc {
@@ -102,7 +49,7 @@ func (svc *personSvc) Create(ctx *gin.Context, req *dtouser.UserIdentityCreateRe
 		Detail:          detailJSON,
 		CreatedBy:       gincontext.GetUserID(ctx),
 	}
-	if err := newPersonIdentityRepo().Insert(ctx, insertEntity); err != nil {
+	if err := dao.NewUserIdentityDao().Insert(ctx, insertEntity); err != nil {
 		glog.Errorf(ctx, "[svcperson.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserIdentityCreateError)
 	}
@@ -110,7 +57,7 @@ func (svc *personSvc) Create(ctx *gin.Context, req *dtouser.UserIdentityCreateRe
 }
 
 func (svc *personSvc) Delete(ctx *gin.Context, req *dtouser.UserIdentityDeleteReq) error {
-	entity, err := newPersonIdentityRepo().GetByID(ctx, req.UserIdentityID)
+	entity, err := dao.NewUserIdentityDao().GetByID(ctx, req.UserIdentityID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcperson.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserIdentityDeleteError)
@@ -121,7 +68,7 @@ func (svc *personSvc) Delete(ctx *gin.Context, req *dtouser.UserIdentityDeleteRe
 	if err := ensurePersonIdentityVisibleToTenant(ctx, entity.PersonID); err != nil {
 		return err
 	}
-	if err := newPersonIdentityRepo().Delete(ctx, req.UserIdentityID, gincontext.GetUserID(ctx)); err != nil {
+	if err := dao.NewUserIdentityDao().Delete(ctx, req.UserIdentityID, gincontext.GetUserID(ctx)); err != nil {
 		glog.Errorf(ctx, "[svcperson.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserIdentityDeleteError)
 	}
@@ -129,7 +76,7 @@ func (svc *personSvc) Delete(ctx *gin.Context, req *dtouser.UserIdentityDeleteRe
 }
 
 func (svc *personSvc) Update(ctx *gin.Context, req *dtouser.UserIdentityUpdateReq) error {
-	entity, err := newPersonIdentityRepo().GetByID(ctx, req.UserIdentityID)
+	entity, err := dao.NewUserIdentityDao().GetByID(ctx, req.UserIdentityID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcperson.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserIdentityUpdateError)
@@ -159,7 +106,7 @@ func (svc *personSvc) Update(ctx *gin.Context, req *dtouser.UserIdentityUpdateRe
 	if operatorID := gincontext.GetUserID(ctx); operatorID != 0 {
 		updateMap["updated_by"] = operatorID
 	}
-	if err := newPersonIdentityRepo().UpdateMap(ctx, req.UserIdentityID, updateMap); err != nil {
+	if err := dao.NewUserIdentityDao().UpdateMap(ctx, req.UserIdentityID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcperson.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserIdentityUpdateError)
 	}
@@ -167,7 +114,7 @@ func (svc *personSvc) Update(ctx *gin.Context, req *dtouser.UserIdentityUpdateRe
 }
 
 func (svc *personSvc) Detail(ctx *gin.Context, req *dtouser.UserIdentityDetailReq) (*dtouser.UserIdentityDetailResp, error) {
-	entity, err := newPersonIdentityRepo().GetByID(ctx, req.UserIdentityID)
+	entity, err := dao.NewUserIdentityDao().GetByID(ctx, req.UserIdentityID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcperson.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserIdentityGetDetailError)
@@ -194,7 +141,7 @@ func (svc *personSvc) PageList(ctx *gin.Context, req *dtouser.UserIdentityPageLi
 		Issuer:          req.Issuer,
 		ExternalSubject: req.IdentityID,
 	}
-	list, total, err := newPersonIdentityRepo().GetPageListByCond(ctx, cond)
+	list, total, err := dao.NewUserIdentityDao().GetPageListByCond(ctx, cond)
 	if err != nil {
 		glog.Errorf(ctx, "[svcperson.PageList] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserIdentityGetPageListError)
@@ -206,7 +153,7 @@ func (svc *personSvc) GetByUser(ctx *gin.Context, req *dtouser.UserIdentityByUse
 	if err := ensurePersonIdentityVisibleToTenant(ctx, req.UserID); err != nil {
 		return nil, err
 	}
-	list, total, err := newPersonIdentityRepo().GetPageListByCond(ctx, &dao.UserIdentityCond{
+	list, total, err := dao.NewUserIdentityDao().GetPageListByCond(ctx, &dao.UserIdentityCond{
 		BaseCond: &gormdao.BaseCond{Page: 1, PageSize: 100},
 		PersonID: req.UserID,
 	})
@@ -221,7 +168,7 @@ func ensurePersonIdentityVisibleToTenant(ctx *gin.Context, personID uint) error 
 	if personID == 0 {
 		return code.GetError(code.UserIdentityNotExistError)
 	}
-	users, err := newPersonIdentityUserRepo().GetListByCond(ctx, &dao.UserCond{PersonID: personID})
+	users, err := dao.NewUserDao().GetListByCond(ctx, &dao.UserCond{PersonID: personID})
 	if err != nil {
 		glog.Errorf(ctx, "[svcperson.ensurePersonIdentityVisibleToTenant] user dao GetListByCond fail, err:%v, personID:%d", err, personID)
 		return code.GetError(code.UserIdentityGetDetailError)

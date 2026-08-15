@@ -36,11 +36,11 @@ type RefreshTokenDao struct {
 	*gormdao.Dao[model.RefreshTokenEntity, model.RefreshTokenEntityList]
 }
 
-func NewRefreshTokenDao() *RefreshTokenDao {
+func NewRefreshTokenDao(opts ...DaoOption) *RefreshTokenDao {
 	return &RefreshTokenDao{
 		Dao: gormdao.NewDao[model.RefreshTokenEntity, model.RefreshTokenEntityList](
 			model.TableNameRefreshToken, "RefreshTokenDao",
-			dbclient.IamDB,
+			resolveDBGetter(opts...),
 		),
 	}
 }

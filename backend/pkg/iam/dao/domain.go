@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
@@ -33,11 +32,11 @@ type DomainDao struct {
 	*gormdao.Dao[model.DomainEntity, model.DomainEntityList]
 }
 
-func NewDomainDao() *DomainDao {
+func NewDomainDao(opts ...DaoOption) *DomainDao {
 	return &DomainDao{
 		Dao: gormdao.NewDao[model.DomainEntity, model.DomainEntityList](
 			model.TableNameDomain, "DomainDao",
-			dbclient.IamDB,
+			resolveDBGetter(opts...),
 		),
 	}
 }

@@ -1,27 +1,16 @@
 package svctenant
 
 import (
-	"context"
-
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
-	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
+	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
-
-type organizationUserDeleteRepository interface {
-	GetListByCond(ctx context.Context, cond gormdao.Cond) (model.OrganizationUserEntityList, error)
-	Delete(ctx context.Context, id uint, userID uint) error
-}
-
-var newOrganizationUserDeleteRepo = func() organizationUserDeleteRepository {
-	return dao.NewOrganizationUserDao()
-}
 
 type OrganizationUserSvc interface {
 	Create(ctx *gin.Context, req *dtotenant.OrganizationUserCreateReq) (*dtotenant.OrganizationUserCreateResp, error)
@@ -72,8 +61,7 @@ func (svc *organizationUserSvc) Create(ctx *gin.Context, req *dtotenant.Organiza
 }
 
 func (svc *organizationUserSvc) Delete(ctx *gin.Context, req *dtotenant.OrganizationUserDeleteReq) error {
-	deleteRepo := newOrganizationUserDeleteRepo()
-	orgUserEntityList, err := deleteRepo.GetListByCond(ctx, &dao.OrganizationUserCond{
+	orgUserEntityList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
 		TenantID:       gincontext.GetTenantID(ctx),
 		OrganizationID: req.OrganizationID,
 		UserID:         req.UserID,
@@ -87,7 +75,7 @@ func (svc *organizationUserSvc) Delete(ctx *gin.Context, req *dtotenant.Organiza
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	if err := deleteRepo.Delete(ctx, orgUserEntityList[0].ID, userID); err != nil {
+	if err := dao.NewOrganizationUserDao().Delete(ctx, orgUserEntityList[0].ID, userID); err != nil {
 		glog.Errorf(ctx, "[svcorganizationuser.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationUserDeleteError)
 	}

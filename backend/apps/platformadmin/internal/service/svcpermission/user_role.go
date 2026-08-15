@@ -1,8 +1,6 @@
 package svcpermission
 
 import (
-	"context"
-
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
@@ -13,34 +11,6 @@ import (
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
-
-type userRoleDeleteRepository interface {
-	GetListByCond(ctx context.Context, cond gormdao.Cond) (model.UserRoleEntityList, error)
-	Delete(ctx context.Context, id uint, userID uint) error
-}
-
-type userRoleCreateScopeRepository interface {
-	GetRoleByID(ctx context.Context, id uint) (*model.RoleEntity, error)
-	Insert(ctx context.Context, entity *model.UserRoleEntity) error
-}
-
-var newUserRoleDeleteRepo = func() userRoleDeleteRepository {
-	return dao.NewUserRoleDao()
-}
-
-var newUserRoleCreateScopeRepo = func() userRoleCreateScopeRepository {
-	return &userRoleCreateScopeDAO{}
-}
-
-type userRoleCreateScopeDAO struct{}
-
-func (d *userRoleCreateScopeDAO) GetRoleByID(ctx context.Context, id uint) (*model.RoleEntity, error) {
-	return dao.NewRoleDao().GetByID(ctx, id)
-}
-
-func (d *userRoleCreateScopeDAO) Insert(ctx context.Context, entity *model.UserRoleEntity) error {
-	return dao.NewUserRoleDao().Insert(ctx, entity)
-}
 
 type UserRoleSvc interface {
 	Create(ctx *gin.Context, req *dtopermission.UserRoleCreateReq) (*dtopermission.UserRoleCreateResp, error)
@@ -57,8 +27,7 @@ func NewUserRoleSvc() UserRoleSvc {
 }
 
 func (svc *userRoleSvc) Create(ctx *gin.Context, req *dtopermission.UserRoleCreateReq) (*dtopermission.UserRoleCreateResp, error) {
-	repo := newUserRoleCreateScopeRepo()
-	roleEntity, err := repo.GetRoleByID(ctx, req.RoleID)
+	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.CreateUserRole] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.RoleGetDetailError)
@@ -74,7 +43,7 @@ func (svc *userRoleSvc) Create(ctx *gin.Context, req *dtopermission.UserRoleCrea
 		CreatedBy: gincontext.GetUserID(ctx),
 	}
 
-	if err := repo.Insert(ctx, insertEntity); err != nil {
+	if err := dao.NewUserRoleDao().Insert(ctx, insertEntity); err != nil {
 		glog.Errorf(ctx, "[svcpermission.CreateUserRole] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserRoleCreateError)
 	}
@@ -82,8 +51,8 @@ func (svc *userRoleSvc) Create(ctx *gin.Context, req *dtopermission.UserRoleCrea
 }
 
 func (svc *userRoleSvc) Delete(ctx *gin.Context, req *dtopermission.UserRoleDeleteReq) error {
-	deleteRepo := newUserRoleDeleteRepo()
-	userRoleEntityList, err := deleteRepo.GetListByCond(ctx, &dao.UserRoleCond{
+	userRoleDao := dao.NewUserRoleDao()
+	userRoleEntityList, err := userRoleDao.GetListByCond(ctx, &dao.UserRoleCond{
 		TenantID: gincontext.GetTenantID(ctx),
 		UserID:   req.UserID,
 		RoleID:   req.RoleID,
@@ -97,7 +66,7 @@ func (svc *userRoleSvc) Delete(ctx *gin.Context, req *dtopermission.UserRoleDele
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	if err := deleteRepo.Delete(ctx, userRoleEntityList[0].ID, userID); err != nil {
+	if err := userRoleDao.Delete(ctx, userRoleEntityList[0].ID, userID); err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteUserRole] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserRoleDeleteError)
 	}

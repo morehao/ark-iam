@@ -15,11 +15,11 @@ import (
 )
 
 type TenantApplicationSvc interface {
-	Create(ctx *gin.Context, req *dtotenantapplication.CreateReq) (*dtotenantapplication.CreateResp, error)
-	Delete(ctx *gin.Context, req *dtotenantapplication.DeleteReq) error
-	Update(ctx *gin.Context, req *dtotenantapplication.UpdateReq) error
-	Detail(ctx *gin.Context, req *dtotenantapplication.DetailReq) (*dtotenantapplication.DetailResp, error)
-	PageList(ctx *gin.Context, req *dtotenantapplication.PageListReq) (*dtotenantapplication.PageListResp, error)
+	Create(ctx *gin.Context, req *dtotenantapplication.TenantApplicationCreateReq) (*dtotenantapplication.TenantApplicationCreateResp, error)
+	Delete(ctx *gin.Context, req *dtotenantapplication.TenantApplicationDeleteReq) error
+	Update(ctx *gin.Context, req *dtotenantapplication.TenantApplicationUpdateReq) error
+	Detail(ctx *gin.Context, req *dtotenantapplication.TenantApplicationDetailReq) (*dtotenantapplication.TenantApplicationDetailResp, error)
+	PageList(ctx *gin.Context, req *dtotenantapplication.TenantApplicationPageListReq) (*dtotenantapplication.TenantApplicationPageListResp, error)
 }
 
 type tenantApplicationSvc struct{}
@@ -30,7 +30,7 @@ func NewTenantApplicationSvc() TenantApplicationSvc {
 	return &tenantApplicationSvc{}
 }
 
-func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplication.CreateReq) (*dtotenantapplication.CreateResp, error) {
+func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplication.TenantApplicationCreateReq) (*dtotenantapplication.TenantApplicationCreateResp, error) {
 	entity := &model.TenantApplicationEntity{
 		TenantID:  gincontext.GetTenantID(ctx),
 		AppID:     req.AppID,
@@ -50,10 +50,10 @@ func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplicat
 		glog.Errorf(ctx, "[svctenantapplication.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationCreateError)
 	}
-	return &dtotenantapplication.CreateResp{TenantAppID: entity.ID}, nil
+	return &dtotenantapplication.TenantApplicationCreateResp{TenantAppID: entity.ID}, nil
 }
 
-func (svc *tenantApplicationSvc) Delete(ctx *gin.Context, req *dtotenantapplication.DeleteReq) error {
+func (svc *tenantApplicationSvc) Delete(ctx *gin.Context, req *dtotenantapplication.TenantApplicationDeleteReq) error {
 	entity, err := dao.NewTenantApplicationDao().GetByID(ctx, req.TenantAppID)
 	if err != nil || entity == nil || entity.ID == 0 {
 		return code.GetError(code.ApplicationNotExistError)
@@ -68,7 +68,7 @@ func (svc *tenantApplicationSvc) Delete(ctx *gin.Context, req *dtotenantapplicat
 	return nil
 }
 
-func (svc *tenantApplicationSvc) Update(ctx *gin.Context, req *dtotenantapplication.UpdateReq) error {
+func (svc *tenantApplicationSvc) Update(ctx *gin.Context, req *dtotenantapplication.TenantApplicationUpdateReq) error {
 	entity, err := dao.NewTenantApplicationDao().GetByID(ctx, req.TenantAppID)
 	if err != nil || entity == nil || entity.ID == 0 {
 		return code.GetError(code.ApplicationNotExistError)
@@ -93,7 +93,7 @@ func (svc *tenantApplicationSvc) Update(ctx *gin.Context, req *dtotenantapplicat
 	return nil
 }
 
-func (svc *tenantApplicationSvc) Detail(ctx *gin.Context, req *dtotenantapplication.DetailReq) (*dtotenantapplication.DetailResp, error) {
+func (svc *tenantApplicationSvc) Detail(ctx *gin.Context, req *dtotenantapplication.TenantApplicationDetailReq) (*dtotenantapplication.TenantApplicationDetailResp, error) {
 	entity, err := dao.NewTenantApplicationDao().GetByID(ctx, req.TenantAppID)
 	if err != nil || entity == nil || entity.ID == 0 {
 		return nil, code.GetError(code.ApplicationNotExistError)
@@ -101,7 +101,7 @@ func (svc *tenantApplicationSvc) Detail(ctx *gin.Context, req *dtotenantapplicat
 	if entity.TenantID != gincontext.GetTenantID(ctx) {
 		return nil, code.GetError(code.ApplicationNotExistError)
 	}
-	return &dtotenantapplication.DetailResp{
+	return &dtotenantapplication.TenantApplicationDetailResp{
 		TenantAppID:  entity.ID,
 		TenantID:     entity.TenantID,
 		AppID:        entity.AppID,
@@ -112,7 +112,7 @@ func (svc *tenantApplicationSvc) Detail(ctx *gin.Context, req *dtotenantapplicat
 	}, nil
 }
 
-func (svc *tenantApplicationSvc) PageList(ctx *gin.Context, req *dtotenantapplication.PageListReq) (*dtotenantapplication.PageListResp, error) {
+func (svc *tenantApplicationSvc) PageList(ctx *gin.Context, req *dtotenantapplication.TenantApplicationPageListReq) (*dtotenantapplication.TenantApplicationPageListResp, error) {
 	cond := &dao.TenantApplicationCond{
 		BaseCond: &gormdao.BaseCond{Page: req.Page, PageSize: req.PageSize},
 		TenantID: gincontext.GetTenantID(ctx),
@@ -133,5 +133,5 @@ func (svc *tenantApplicationSvc) PageList(ctx *gin.Context, req *dtotenantapplic
 			CreatedAt:   v.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
-	return &dtotenantapplication.PageListResp{List: items, Total: total}, nil
+	return &dtotenantapplication.TenantApplicationPageListResp{List: items, Total: total}, nil
 }

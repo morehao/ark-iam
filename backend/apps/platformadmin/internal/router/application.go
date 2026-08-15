@@ -8,9 +8,9 @@ import (
 func applicationRouter(groups *ginserver.RouterGroups) {
 	ctr := ctrapplication.NewApplicationCtr()
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.POST("/application/create", ctr.Create)
-	v1RouterGroup.POST("/application/delete", ctr.Delete)
-	v1RouterGroup.POST("/application/update", ctr.Update)
-	v1RouterGroup.GET("/application/detail", ctr.Detail)
-	v1RouterGroup.POST("/application/pageList", ctr.PageList)
+	v1RouterGroup.POST("/applications", ctr.Create)
+	v1RouterGroup.GET("/applications", ctr.PageList)
+	v1RouterGroup.GET("/applications/:appID", ctr.Detail)
+	v1RouterGroup.PUT("/applications/:appID", ctr.Update)
+	v1RouterGroup.DELETE("/applications/:appID", ctr.Delete)
 }

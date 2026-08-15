@@ -1,130 +1,133 @@
 package svcdomain
 
 import (
-	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtodomain"
 	"github.com/morehao/golib/biz/gcontext"
-	"github.com/morehao/golib/dbaccess/gormdao"
+	"github.com/morehao/golib/gerror"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
-type stubDomainRepo struct {
-	inserted    *model.DomainEntity
-	getByID     *model.DomainEntity
-	pageList    model.DomainEntityList
-	total       int64
-	byTenantAnd *model.DomainEntity
-	err         error
-}
-
-func (r *stubDomainRepo) Insert(ctx context.Context, entity *model.DomainEntity) error {
-	entity.ID = 1
-	clone := *entity
-	r.inserted = &clone
-	return r.err
-}
-
-func (r *stubDomainRepo) GetByID(ctx context.Context, id uint) (*model.DomainEntity, error) {
-	return r.getByID, r.err
-}
-
-func (r *stubDomainRepo) GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.DomainEntityList, int64, error) {
-	return r.pageList, r.total, r.err
-}
-
-func (r *stubDomainRepo) GetByTenantAndDomain(ctx context.Context, tenantID uint, domain string) (*model.DomainEntity, error) {
-	return r.byTenantAnd, r.err
-}
-
-func (r *stubDomainRepo) UpdateMap(ctx context.Context, id uint, updateMap map[string]any) error {
-	return r.err
-}
-
-func (r *stubDomainRepo) Delete(ctx context.Context, id uint, deletedBy uint) error {
-	return r.err
-}
-
-func installDomainRepo(t *testing.T, repo *stubDomainRepo) {
+// newTestDB 打开独立的内存 SQLite，并注册为全局 iam 库，使 service 内部直接
+// dao.NewXxxDao() 的调用自动落到测试库，无需任何注入 seam。
+func newTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	prev := newDomainRepo
-	newDomainRepo = func() domainRepository { return repo }
-	t.Cleanup(func() { newDomainRepo = prev })
+	dsn := fmt.Sprintf("file:svcdomain_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(&model.DomainEntity{}); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+	dbclient.RegisterDBForTest(dbclient.ServiceNameIam, db)
+	t.Cleanup(func() {
+		dbclient.ClearDBForTest(dbclient.ServiceNameIam)
+		sqlDB, _ := db.DB()
+		if sqlDB != nil {
+			_ = sqlDB.Close()
+		}
+	})
+	return db
+}
+
+func newGinCtx(tenantID, userID uint) *gin.Context {
+	ctx, _ := gin.CreateTestContext(nil)
+	ctx.Set(gcontext.KeyTenantID, tenantID)
+	ctx.Set(gcontext.KeyUserID, userID)
+	return ctx
 }
 
 func TestDomainSvc_Create_Success(t *testing.T) {
-	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyTenantID, uint(10))
-	ginCtx.Set(gcontext.KeyUserID, uint(100))
+	newTestDB(t)
+	ctx := newGinCtx(10, 100)
 
-	repo := &stubDomainRepo{}
-	installDomainRepo(t, repo)
-
-	svc := &domainSvc{}
-	resp, err := svc.Create(ginCtx, &dtodomain.CreateDomainReq{Domain: "example.com"})
+	svc := NewDomainSvc()
+	resp, err := svc.Create(ctx, &dtodomain.DomainCreateReq{Domain: "example.com"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if resp.ID != 1 {
-		t.Fatalf("expected id 1, got %d", resp.ID)
+	if resp.ID == 0 {
+		t.Fatalf("expected non-zero id")
 	}
-	if repo.inserted == nil {
-		t.Fatalf("expected insert to be called")
+
+	entity, err := dao.NewDomainDao().GetByID(ctx, resp.ID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
 	}
-	if repo.inserted.Domain != "example.com" {
-		t.Fatalf("expected domain example.com, got %s", repo.inserted.Domain)
+	if entity == nil || entity.ID == 0 {
+		t.Fatalf("expected persisted domain")
 	}
-	if repo.inserted.TenantID != 10 {
-		t.Fatalf("expected tenantID 10, got %d", repo.inserted.TenantID)
+	if entity.Domain != "example.com" {
+		t.Fatalf("expected domain example.com, got %s", entity.Domain)
+	}
+	if entity.TenantID != 10 {
+		t.Fatalf("expected tenantID 10, got %d", entity.TenantID)
+	}
+	if entity.IsVerified != 0 {
+		t.Fatalf("expected isVerified 0, got %d", entity.IsVerified)
+	}
+	if entity.CreatedBy != 100 {
+		t.Fatalf("expected createdBy 100, got %d", entity.CreatedBy)
 	}
 }
 
 func TestDomainSvc_Create_DomainAlreadyExists(t *testing.T) {
-	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyTenantID, uint(10))
-	ginCtx.Set(gcontext.KeyUserID, uint(100))
+	db := newTestDB(t)
+	ctx := newGinCtx(10, 100)
 
-	repo := &stubDomainRepo{
-		byTenantAnd: &model.DomainEntity{Model: gorm.Model{ID: 5}, Domain: "example.com", TenantID: 10},
+	if err := db.Create(&model.DomainEntity{TenantID: 10, Domain: "example.com"}).Error; err != nil {
+		t.Fatalf("seed: %v", err)
 	}
-	installDomainRepo(t, repo)
 
-	svc := &domainSvc{}
-	resp, err := svc.Create(ginCtx, &dtodomain.CreateDomainReq{Domain: "example.com"})
+	svc := NewDomainSvc()
+	resp, err := svc.Create(ctx, &dtodomain.DomainCreateReq{Domain: "example.com"})
 	if err == nil {
 		t.Fatalf("expected error for duplicate domain, got resp=%+v", resp)
+	}
+	gerr, ok := err.(*gerror.Error)
+	if !ok || gerr.Code != int(code.DomainAlreadyExistError) {
+		t.Fatalf("expected DomainAlreadyExistError, got %v", err)
 	}
 }
 
 func TestDomainSvc_Create_EmptyDomain(t *testing.T) {
-	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyTenantID, uint(10))
-	ginCtx.Set(gcontext.KeyUserID, uint(100))
+	newTestDB(t)
+	ctx := newGinCtx(10, 100)
 
-	svc := &domainSvc{}
-	resp, err := svc.Create(ginCtx, &dtodomain.CreateDomainReq{Domain: ""})
+	svc := NewDomainSvc()
+	resp, err := svc.Create(ctx, &dtodomain.DomainCreateReq{Domain: ""})
 	if err == nil {
 		t.Fatalf("expected error for empty domain, got resp=%+v", resp)
 	}
 }
 
 func TestDomainSvc_PageList(t *testing.T) {
-	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyTenantID, uint(10))
+	db := newTestDB(t)
+	ctx := newGinCtx(10, 100)
 
-	repo := &stubDomainRepo{
-		pageList: model.DomainEntityList{
-			{Model: gorm.Model{ID: 1}, TenantID: 10, Domain: "alpha.com", IsVerified: 1},
-		},
-		total: 1,
+	if err := db.Create(&model.DomainEntity{TenantID: 10, Domain: "alpha.com"}).Error; err != nil {
+		t.Fatalf("seed alpha: %v", err)
 	}
-	installDomainRepo(t, repo)
+	if err := db.Create(&model.DomainEntity{TenantID: 10, Domain: "beta.com"}).Error; err != nil {
+		t.Fatalf("seed beta: %v", err)
+	}
+	// 其他租户的数据不应出现
+	if err := db.Create(&model.DomainEntity{TenantID: 20, Domain: "alpha-other.com"}).Error; err != nil {
+		t.Fatalf("seed other tenant: %v", err)
+	}
 
-	svc := &domainSvc{}
-	resp, err := svc.PageList(ginCtx, &dtodomain.DomainPageListReq{Domain: "alpha"})
+	svc := NewDomainSvc()
+	resp, err := svc.PageList(ctx, &dtodomain.DomainPageListReq{Domain: "alpha"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -137,32 +140,35 @@ func TestDomainSvc_PageList(t *testing.T) {
 }
 
 func TestDomainSvc_Delete_Success(t *testing.T) {
-	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyTenantID, uint(10))
-	ginCtx.Set(gcontext.KeyUserID, uint(100))
+	db := newTestDB(t)
+	ctx := newGinCtx(10, 100)
 
-	repo := &stubDomainRepo{
-		getByID: &model.DomainEntity{Model: gorm.Model{ID: 1}, TenantID: 10, Domain: "example.com"},
+	entity := &model.DomainEntity{TenantID: 10, Domain: "example.com"}
+	if err := db.Create(entity).Error; err != nil {
+		t.Fatalf("seed: %v", err)
 	}
-	installDomainRepo(t, repo)
 
-	svc := &domainSvc{}
-	err := svc.Delete(ginCtx, &dtodomain.DeleteDomainReq{ID: 1})
-	if err != nil {
+	svc := NewDomainSvc()
+	if err := svc.Delete(ctx, &dtodomain.DomainDeleteReq{DomainID: entity.ID}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// 软删除后 GetByID 应查不到
+	got, err := dao.NewDomainDao().GetByID(ctx, entity.ID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if got != nil && got.ID != 0 {
+		t.Fatalf("expected domain soft-deleted, got %+v", got)
 	}
 }
 
 func TestDomainSvc_Delete_NotExist(t *testing.T) {
-	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyTenantID, uint(10))
-	ginCtx.Set(gcontext.KeyUserID, uint(100))
+	newTestDB(t)
+	ctx := newGinCtx(10, 100)
 
-	repo := &stubDomainRepo{}
-	installDomainRepo(t, repo)
-
-	svc := &domainSvc{}
-	err := svc.Delete(ginCtx, &dtodomain.DeleteDomainReq{ID: 999})
+	svc := NewDomainSvc()
+	err := svc.Delete(ctx, &dtodomain.DomainDeleteReq{DomainID: 999})
 	if err == nil {
 		t.Fatalf("expected error for non-existent domain")
 	}

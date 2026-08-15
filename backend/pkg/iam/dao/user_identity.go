@@ -45,11 +45,11 @@ type UserIdentityDao struct {
 	*gormdao.Dao[model.UserIdentityEntity, model.UserIdentityEntityList]
 }
 
-func NewUserIdentityDao() *UserIdentityDao {
+func NewUserIdentityDao(opts ...DaoOption) *UserIdentityDao {
 	return &UserIdentityDao{
 		Dao: gormdao.NewDao[model.UserIdentityEntity, model.UserIdentityEntityList](
 			model.TableNameUserIdentity, "UserIdentityDao",
-			dbclient.IamDB,
+			resolveDBGetter(opts...),
 		),
 	}
 }

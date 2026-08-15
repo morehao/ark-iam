@@ -31,11 +31,11 @@ func NewDomainCtr() DomainCtr {
 // @Summary 创建域名
 // @accept application/json
 // @Produce application/json
-// @Param req body dtodomain.CreateDomainReq true "创建域名"
+// @Param req body dtodomain.DomainCreateReq true "创建域名"
 // @Success 200 {object} gincontext.DtoRender{data=dtodomain.DomainCreateResp}
-// @Router /v1/platform/domain/create [post]
+// @Router /v1/platform/domains [post]
 func (ctr *domainCtr) Create(ctx *gin.Context) {
-	var req dtodomain.CreateDomainReq
+	var req dtodomain.DomainCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -52,12 +52,12 @@ func (ctr *domainCtr) Create(ctx *gin.Context) {
 // @Summary 域名列表分页
 // @accept application/json
 // @Produce application/json
-// @Param req body dtodomain.DomainPageListReq true "域名列表分页"
+// @Param req query dtodomain.DomainPageListReq true "域名列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtodomain.DomainPageListResp}
-// @Router /v1/platform/domain/pageList [post]
+// @Router /v1/platform/domains [get]
 func (ctr *domainCtr) PageList(ctx *gin.Context) {
 	var req dtodomain.DomainPageListReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -73,11 +73,16 @@ func (ctr *domainCtr) PageList(ctx *gin.Context) {
 // @Summary 修改域名
 // @accept application/json
 // @Produce application/json
-// @Param req body dtodomain.UpdateDomainReq true "修改域名"
+// @Param domainID path int true "domainID"
+// @Param req body dtodomain.DomainUpdateReq true "修改域名"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/domain/update [post]
+// @Router /v1/platform/domains/{domainID} [put]
 func (ctr *domainCtr) Update(ctx *gin.Context) {
-	var req dtodomain.UpdateDomainReq
+	var req dtodomain.DomainUpdateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -93,12 +98,12 @@ func (ctr *domainCtr) Update(ctx *gin.Context) {
 // @Summary 域名详情
 // @accept application/json
 // @Produce application/json
-// @Param req query dtodomain.DomainDetailReq true "域名详情"
+// @Param domainID path int true "domainID"
 // @Success 200 {object} gincontext.DtoRender{data=dtodomain.DomainDetailResp}
-// @Router /v1/platform/domain/detail [get]
+// @Router /v1/platform/domains/{domainID} [get]
 func (ctr *domainCtr) Detail(ctx *gin.Context) {
 	var req dtodomain.DomainDetailReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -114,12 +119,12 @@ func (ctr *domainCtr) Detail(ctx *gin.Context) {
 // @Summary 删除域名
 // @accept application/json
 // @Produce application/json
-// @Param req body dtodomain.DeleteDomainReq true "删除域名"
+// @Param domainID path int true "domainID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/domain/delete [post]
+// @Router /v1/platform/domains/{domainID} [delete]
 func (ctr *domainCtr) Delete(ctx *gin.Context) {
-	var req dtodomain.DeleteDomainReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	var req dtodomain.DomainDeleteReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

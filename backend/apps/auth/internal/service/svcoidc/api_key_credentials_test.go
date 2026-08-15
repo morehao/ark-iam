@@ -29,7 +29,7 @@ func TestLookupApiKeyByRawKey(t *testing.T) {
 	}
 
 	store := NewPersistentStore()
-	store.apiKeyDao = func() *dao.ApiKeyDao {
+	store.apiKeyDao = func(opts ...dao.DaoOption) *dao.ApiKeyDao {
 		return dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
 	}
 
@@ -112,16 +112,16 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 	}
 
 	persistentStore := NewPersistentStore()
-	persistentStore.apiKeyDao = func() *dao.ApiKeyDao {
+	persistentStore.apiKeyDao = func(opts ...dao.DaoOption) *dao.ApiKeyDao {
 		return dao.NewApiKeyDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
-	persistentStore.userDao = func() *dao.UserDao {
+	persistentStore.userDao = func(opts ...dao.DaoOption) *dao.UserDao {
 		return &dao.UserDao{Dao: gormdao.NewDao[model.UserEntity, model.UserEntityList](
 			model.TableNameUser, "UserDao",
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}
 	}
-	persistentStore.applicationClientDao = func() *dao.ApplicationClientDao {
+	persistentStore.applicationClientDao = func(opts ...dao.DaoOption) *dao.ApplicationClientDao {
 		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
 

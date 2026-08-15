@@ -1,6 +1,6 @@
 package dtoapikey
 
-type CreateApiKeyResp struct {
+type ApiKeyCreateResp struct {
 	ID        uint   `json:"id"`
 	Name      string `json:"name"`
 	Key       string `json:"key"`

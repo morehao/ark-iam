@@ -9,7 +9,7 @@ func userSessionRouter(groups *ginserver.RouterGroups) {
 	sessionCtr := ctrsession.NewSessionCtr()
 
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.GET("/user/sessions", sessionCtr.List)
-	v1RouterGroup.DELETE("/user/sessions", sessionCtr.RevokeAll)
-	v1RouterGroup.DELETE("/user/sessions/:sessionId", sessionCtr.Revoke)
+	v1RouterGroup.GET("/me/sessions", sessionCtr.List)
+	v1RouterGroup.DELETE("/me/sessions", sessionCtr.RevokeAll)
+	v1RouterGroup.DELETE("/me/sessions/:sessionID", sessionCtr.Revoke)
 }

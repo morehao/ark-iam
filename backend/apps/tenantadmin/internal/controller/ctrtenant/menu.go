@@ -27,7 +27,7 @@ func NewTenantMenuCtr() TenantMenuCtr {
 // @accept application/json
 // @Produce application/json
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.MenuTreeResp}
-// @Router /v1/tenant/myMenu/tree [get]
+// @Router /v1/tenant/menus/tree [get]
 func (ctr *tenantMenuCtr) Tree(ctx *gin.Context) {
 	res, err := ctr.tenantMenuSvc.Tree(ctx)
 	if err != nil {

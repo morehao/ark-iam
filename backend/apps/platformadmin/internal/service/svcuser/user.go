@@ -40,95 +40,6 @@ type UserSvc interface {
 type userSvc struct {
 }
 
-type userLoginLogQueryRepository interface {
-	GetPageListByCond(ctx context.Context, cond *dao.UserLoginLogCond) (model.UserLoginLogEntityList, int64, error)
-}
-
-type userQueryRepository interface {
-	GetPageListByCond(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, int64, error)
-}
-
-type userObjectScopeRepository interface {
-	GetByID(ctx context.Context, id uint) (*model.UserEntity, error)
-	GetPageListByCond(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, int64, error)
-}
-
-type userLoginLogDetailRepository interface {
-	GetByID(ctx context.Context, id uint) (*model.UserLoginLogEntity, error)
-}
-
-type userDepartmentQueryRepository interface {
-	GetPageListByCond(ctx context.Context, cond *dao.UserDepartmentCond) (model.UserDepartmentEntityList, int64, error)
-}
-
-var newUserQueryRepo = func() userQueryRepository {
-	return &userQueryRepoAdapter{dao: dao.NewUserDao()}
-}
-
-var newUserObjectScopeRepo = func() userObjectScopeRepository {
-	return &userObjectScopeRepoAdapter{dao: dao.NewUserDao()}
-}
-
-var newUserLoginLogQueryRepo = func() userLoginLogQueryRepository {
-	return &userLoginLogQueryRepoAdapter{dao: dao.NewUserLoginLogDao()}
-}
-
-var newUserLoginLogDetailRepo = func() userLoginLogDetailRepository {
-	return &userLoginLogDetailRepoAdapter{dao: dao.NewUserLoginLogDao()}
-}
-
-var newUserDepartmentQueryRepo = func() userDepartmentQueryRepository {
-	return &userDepartmentQueryRepoAdapter{dao: dao.NewUserDepartmentDao()}
-}
-
-type userLoginLogQueryRepoAdapter struct {
-	dao *dao.UserLoginLogDao
-}
-
-type userQueryRepoAdapter struct {
-	dao *dao.UserDao
-}
-
-type userObjectScopeRepoAdapter struct {
-	dao *dao.UserDao
-}
-
-type userLoginLogDetailRepoAdapter struct {
-	dao *dao.UserLoginLogDao
-}
-
-func (r *userQueryRepoAdapter) GetPageListByCond(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, int64, error) {
-	return r.dao.GetPageListByCond(ctx, cond)
-}
-
-func (r *userObjectScopeRepoAdapter) GetByID(ctx context.Context, id uint) (*model.UserEntity, error) {
-	return r.dao.GetByID(ctx, id)
-}
-
-func (r *userObjectScopeRepoAdapter) GetPageListByCond(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, int64, error) {
-	return r.dao.GetPageListByCond(ctx, cond)
-}
-
-func (r *userLoginLogQueryRepoAdapter) GetPageListByCond(ctx context.Context, cond *dao.UserLoginLogCond) (model.UserLoginLogEntityList, int64, error) {
-	return r.dao.GetPageListByCond(ctx, cond)
-}
-
-func (r *userLoginLogDetailRepoAdapter) GetByID(ctx context.Context, id uint) (*model.UserLoginLogEntity, error) {
-	return r.dao.GetByID(ctx, id)
-}
-
-type userDepartmentQueryRepoAdapter struct {
-	dao *dao.UserDepartmentDao
-}
-
-func (r *userDepartmentQueryRepoAdapter) GetPageListByCond(ctx context.Context, cond *dao.UserDepartmentCond) (model.UserDepartmentEntityList, int64, error) {
-	return r.dao.GetPageListByCond(ctx, cond)
-}
-
-var iamDBFromContext = func(ctx context.Context) *gorm.DB {
-	return dbclient.IamDB(ctx)
-}
-
 var _ UserSvc = (*userSvc)(nil)
 
 func NewUserSvc() UserSvc {
@@ -204,7 +115,7 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtous
 	operatorID := gincontext.GetUserID(ctx)
 	now := time.Now()
 	var createdUserID uint
-	txErr := iamDBFromContext(ctx).Transaction(func(tx *gorm.DB) error {
+	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
 		if personID == 0 {
 			// 未指定已有自然人：当提供了可登录标识（username/email/phone）时自动创建 person，
 			// 使该用户可登录；否则创建仅租户内可见、无登录凭证的用户记录。
@@ -275,7 +186,7 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtous
 }
 
 func (svc *userSvc) Delete(ctx *gin.Context, req *dtouser.UserDeleteReq) error {
-	userEntity, err := newUserObjectScopeRepo().GetByID(ctx, req.UserID)
+	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserDeleteError)
@@ -294,7 +205,7 @@ func (svc *userSvc) Delete(ctx *gin.Context, req *dtouser.UserDeleteReq) error {
 
 func (svc *userSvc) Update(ctx *gin.Context, req *dtouser.UserUpdateReq) error {
 	personDao := dao.NewPersonDao()
-	userEntity, err := newUserObjectScopeRepo().GetByID(ctx, req.UserID)
+	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserUpdateError)
@@ -353,7 +264,7 @@ func (svc *userSvc) Update(ctx *gin.Context, req *dtouser.UserUpdateReq) error {
 }
 
 func (svc *userSvc) Detail(ctx *gin.Context, req *dtouser.UserDetailReq) (*dtouser.UserDetailResp, error) {
-	userEntity, err := newUserObjectScopeRepo().GetByID(ctx, req.UserID)
+	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserGetDetailError)
@@ -401,7 +312,7 @@ func (svc *userSvc) Detail(ctx *gin.Context, req *dtouser.UserDetailReq) (*dtous
 }
 
 func (svc *userSvc) PageList(ctx *gin.Context, req *dtouser.UserPageListReq) (*dtouser.UserPageListResp, error) {
-	userRepo := newUserQueryRepo()
+	userRepo := dao.NewUserDao()
 	cond := &dao.UserCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
@@ -465,7 +376,7 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtouser.UserPageListReq) (*d
 }
 
 func (svc *userSvc) UpdatePassword(ctx *gin.Context, req *dtouser.UserPasswordUpdateReq) error {
-	userEntity, err := newUserObjectScopeRepo().GetByID(ctx, req.UserID)
+	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.UpdatePassword] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserUpdateError)
@@ -506,7 +417,7 @@ func (svc *userSvc) UpdatePassword(ctx *gin.Context, req *dtouser.UserPasswordUp
 }
 
 func (svc *userSvc) UpdateStatus(ctx *gin.Context, req *dtouser.UserStatusUpdateReq) error {
-	userEntity, err := newUserObjectScopeRepo().GetByID(ctx, req.UserID)
+	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.UpdateStatus] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserUpdateError)
@@ -531,7 +442,7 @@ func (svc *userSvc) AssignDepartments(ctx *gin.Context, req *dtouser.AssignDepar
 	userID := gincontext.GetUserID(ctx)
 	tenantID := gincontext.GetTenantID(ctx)
 
-	txErr := iamDBFromContext(ctx).Transaction(func(tx *gorm.DB) error {
+	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
 		for _, deptID := range req.DepartmentIDs {
 			var existing model.UserDepartmentEntity
 			err := tx.WithContext(ctx).Model(&model.UserDepartmentEntity{}).
@@ -565,7 +476,7 @@ func (svc *userSvc) AssignDepartments(ctx *gin.Context, req *dtouser.AssignDepar
 }
 
 func (svc *userSvc) DetailUserLoginLog(ctx *gin.Context, req *dtouser.UserLoginLogDetailReq) (*dtouser.UserLoginLogDetailResp, error) {
-	userLoginLogEntity, err := newUserLoginLogDetailRepo().GetByID(ctx, req.UserLoginLogID)
+	userLoginLogEntity, err := dao.NewUserLoginLogDao().GetByID(ctx, req.UserLoginLogID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.DetailUserLoginLog] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserLoginLogGetDetailError)
@@ -626,7 +537,7 @@ func (svc *userSvc) PageListUserLoginLog(ctx *gin.Context, req *dtouser.UserLogi
 }
 
 func (svc *userSvc) GetUserLoginLogByUser(ctx *gin.Context, req *dtouser.UserLoginLogByUserReq) (*dtouser.UserLoginLogPageListResp, error) {
-	userLoginLogRepo := newUserLoginLogQueryRepo()
+	userLoginLogRepo := dao.NewUserLoginLogDao()
 	cond := &dao.UserLoginLogCond{
 		TenantID: gincontext.GetTenantID(ctx),
 		UserID:   req.UserID,
@@ -658,7 +569,7 @@ func (svc *userSvc) GetUserLoginLogByUser(ctx *gin.Context, req *dtouser.UserLog
 }
 
 func (svc *userSvc) GetUserDepartmentByUser(ctx *gin.Context, req *dtouser.UserDepartmentByUserReq) (*dtouser.UserDepartmentPageListResp, error) {
-	userDepartmentRepo := newUserDepartmentQueryRepo()
+	userDepartmentRepo := dao.NewUserDepartmentDao()
 	cond := &dao.UserDepartmentCond{
 		TenantID: gincontext.GetTenantID(ctx),
 		UserID:   req.UserID,

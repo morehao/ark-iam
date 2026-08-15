@@ -7,9 +7,9 @@ import (
 
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoconnector"
+	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
-	"github.com/morehao/ark-iam/pkg/code"
 )
 
 func TestDefaultConnectorFactories(t *testing.T) {
@@ -370,7 +370,7 @@ func TestConnectorTypesExposeNewContractFields(t *testing.T) {
 	if !ok {
 		t.Fatalf("ConnectorAuthorizeReq should define ConnectorID field")
 	}
-	if connectorIDField.Tag.Get("uri") != "connectorId" || connectorIDField.Tag.Get("binding") != "required" {
+	if connectorIDField.Tag.Get("uri") != "connectorID" || connectorIDField.Tag.Get("binding") != "required" {
 		t.Fatalf("ConnectorAuthorizeReq.ConnectorID should keep required uri binding tag contract")
 	}
 	redirectURIField, ok := authorizeReqType.FieldByName("RedirectURI")
@@ -379,7 +379,7 @@ func TestConnectorTypesExposeNewContractFields(t *testing.T) {
 	}
 	callbackReqType := reflect.TypeOf(callbackReq)
 	callbackConnectorIDField, ok := callbackReqType.FieldByName("ConnectorID")
-	if !ok || callbackConnectorIDField.Tag.Get("json") != "connectorId" {
+	if !ok || callbackConnectorIDField.Tag.Get("json") != "connectorID" {
 		t.Fatalf("ConnectorCallbackReq.ConnectorID should keep connectorId contract")
 	}
 	codeField, ok := callbackReqType.FieldByName("Code")

@@ -1,28 +1,54 @@
 package svcperson
 
 import (
-	"context"
+	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtouser"
+	"github.com/morehao/ark-iam/platformadmin/testutil"
 	"github.com/morehao/golib/biz/gcontext"
 	"gorm.io/gorm"
 )
 
-func TestPersonIdentityCreatePersistsPersonID(t *testing.T) {
-	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyUserID, uint(501))
-	ginCtx.Set(gcontext.KeyTenantID, uint(88))
+func newPersonIdentityGinCtx(tenantID, userID uint) *gin.Context {
+	ctx, _ := gin.CreateTestContext(nil)
+	ctx.Set(gcontext.KeyTenantID, tenantID)
+	ctx.Set(gcontext.KeyUserID, userID)
+	return ctx
+}
 
-	repo := &stubPersonIdentityRepo{}
-	installPersonIdentityRepo(t, repo)
-	installPersonIdentityUserRepo(t, &stubPersonIdentityUserRepo{usersByPerson: model.UserEntityList{{Model: gorm.Model{ID: 601}, TenantID: 88, PersonID: 66}}})
+// seedUser 播种用户数据。SQLite 下 user.joined_at 为 NOT NULL 且显式 NULL
+// 不会回退到默认值，必须显式设置 JoinedAt（profile/custom_data 同理）。
+func seedUser(t *testing.T, db *gorm.DB, tenantID, personID uint, name string) *model.UserEntity {
+	t.Helper()
+	now := time.Now()
+	u := &model.UserEntity{
+		TenantID:   tenantID,
+		PersonID:   personID,
+		Name:       name,
+		Profile:    json.RawMessage("{}"),
+		CustomData: json.RawMessage("{}"),
+		JoinedAt:   &now,
+	}
+	if err := db.Create(u).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	return u
+}
+
+func TestPersonIdentityCreatePersistsPersonID(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.UserIdentityEntity{}, &model.UserEntity{})
+	ctx := newPersonIdentityGinCtx(88, 501)
+
+	// 自然人 66 在租户 88 下拥有用户，身份创建应落到该自然人
+	seedUser(t, db, 88, 66, "alice")
 
 	svc := &personSvc{}
-	resp, err := svc.Create(ginCtx, &dtouser.UserIdentityCreateReq{
+	resp, err := svc.Create(ctx, &dtouser.UserIdentityCreateReq{
 		TenantID:   88,
 		UserID:     66,
 		Issuer:     "https://issuer.example.com",
@@ -34,130 +60,79 @@ func TestPersonIdentityCreatePersistsPersonID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create returned error: %v", err)
 	}
-	if resp == nil || resp.UserIdentityID != 701 {
+	if resp == nil || resp.UserIdentityID == 0 {
 		t.Fatalf("expected created identity response, got %#v", resp)
 	}
-	if repo.inserted == nil {
-		t.Fatal("expected identity insert to be called")
+
+	got, err := dao.NewUserIdentityDao().GetByID(ctx, resp.UserIdentityID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
 	}
-	if repo.inserted.PersonID != 66 {
-		t.Fatalf("expected person_id 66, got %d", repo.inserted.PersonID)
+	if got == nil || got.ID == 0 {
+		t.Fatalf("expected identity persisted")
 	}
-	if repo.inserted.Issuer != "https://issuer.example.com" {
-		t.Fatalf("expected issuer to be persisted, got %q", repo.inserted.Issuer)
+	if got.PersonID != 66 {
+		t.Fatalf("expected person_id 66, got %d", got.PersonID)
 	}
-	if repo.inserted.ExternalSubject != "external-subject-1" {
-		t.Fatalf("expected external subject to be persisted, got %q", repo.inserted.ExternalSubject)
+	if got.Issuer != "https://issuer.example.com" {
+		t.Fatalf("expected issuer to be persisted, got %q", got.Issuer)
 	}
-	if repo.inserted.CreatedBy != 501 {
-		t.Fatalf("expected created_by 501, got %d", repo.inserted.CreatedBy)
+	if got.ExternalSubject != "external-subject-1" {
+		t.Fatalf("expected external subject to be persisted, got %q", got.ExternalSubject)
+	}
+	if got.CreatedBy != 501 {
+		t.Fatalf("expected created_by 501, got %d", got.CreatedBy)
 	}
 }
 
 func TestPersonIdentityUpdateDoesNotPersistFakeUpdatedByWhenOperatorMissing(t *testing.T) {
-	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyTenantID, uint(31))
-	repo := &stubPersonIdentityRepo{detail: &model.UserIdentityEntity{Model: gorm.Model{ID: 9}, PersonID: 71, Detail: []byte(`{}`)}}
-	userRepo := &stubPersonIdentityUserRepo{usersByPerson: model.UserEntityList{{Model: gorm.Model{ID: 101}, TenantID: 31, PersonID: 71}}}
-	installPersonIdentityRepo(t, repo)
-	installPersonIdentityUserRepo(t, userRepo)
+	db := testutil.SetupSQLite(t, &model.UserIdentityEntity{}, &model.UserEntity{})
+	ctx := newPersonIdentityGinCtx(31, 0)
+
+	seedUser(t, db, 31, 71, "bob")
+	identity := &model.UserIdentityEntity{PersonID: 71, Issuer: "issuer-old", ExternalSubject: "external-old", Detail: json.RawMessage(`{}`)}
+	if err := db.Create(identity).Error; err != nil {
+		t.Fatalf("seed identity: %v", err)
+	}
 
 	svc := &personSvc{}
-	err := svc.Update(ginCtx, &dtouser.UserIdentityUpdateReq{UserIdentityID: 9, UserID: 71, Issuer: "issuer-a", IdentityID: "external-a", Detail: map[string]any{"k": "v"}})
+	err := svc.Update(ctx, &dtouser.UserIdentityUpdateReq{
+		UserIdentityID: identity.ID,
+		UserID:         71,
+		Issuer:         "issuer-a",
+		IdentityID:     "external-a",
+		Detail:         map[string]any{"k": "v"},
+	})
 	if err != nil {
 		t.Fatalf("Update returned error: %v", err)
 	}
-	if _, ok := repo.updated["updated_by"]; ok {
-		t.Fatalf("expected updated_by to be omitted when operator missing, got %#v", repo.updated)
+
+	got, err := dao.NewUserIdentityDao().GetByID(ctx, identity.ID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if got == nil || got.ID == 0 {
+		t.Fatalf("expected identity persisted")
+	}
+	if got.UpdatedBy != 0 {
+		t.Fatalf("expected updated_by to be omitted when operator missing, got %d", got.UpdatedBy)
 	}
 }
 
 func TestPersonIdentityDetailRejectsCrossTenantPerson(t *testing.T) {
-	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyTenantID, uint(31))
-	repo := &stubPersonIdentityRepo{detail: &model.UserIdentityEntity{Model: gorm.Model{ID: 9}, PersonID: 71, Detail: []byte(`{}`)}}
-	userRepo := &stubPersonIdentityUserRepo{usersByPerson: model.UserEntityList{{Model: gorm.Model{ID: 101}, TenantID: 99, PersonID: 71}}}
-	installPersonIdentityRepo(t, repo)
-	installPersonIdentityUserRepo(t, userRepo)
+	db := testutil.SetupSQLite(t, &model.UserIdentityEntity{}, &model.UserEntity{})
+	ctx := newPersonIdentityGinCtx(31, 0)
+
+	// 该自然人只存在于租户 99，当前上下文租户 31 无权访问
+	seedUser(t, db, 99, 71, "carol")
+	identity := &model.UserIdentityEntity{PersonID: 71, Detail: json.RawMessage(`{}`)}
+	if err := db.Create(identity).Error; err != nil {
+		t.Fatalf("seed identity: %v", err)
+	}
 
 	svc := &personSvc{}
-	_, err := svc.Detail(ginCtx, &dtouser.UserIdentityDetailReq{UserIdentityID: 9})
+	_, err := svc.Detail(ctx, &dtouser.UserIdentityDetailReq{UserIdentityID: identity.ID})
 	if err == nil {
 		t.Fatal("expected cross-tenant person identity detail to fail")
 	}
-}
-
-type stubPersonIdentityRepo struct {
-	inserted *model.UserIdentityEntity
-	updated  map[string]any
-	detail   *model.UserIdentityEntity
-	pageList model.UserIdentityEntityList
-	total    int64
-	err      error
-	lastCond *dao.UserIdentityCond
-}
-
-func (r *stubPersonIdentityRepo) Insert(ctx context.Context, entity *model.UserIdentityEntity) error {
-	clone := *entity
-	clone.Model = gorm.Model{ID: 701}
-	entity.ID = 701
-	r.inserted = &clone
-	return r.err
-}
-
-func (r *stubPersonIdentityRepo) GetByID(ctx context.Context, id uint) (*model.UserIdentityEntity, error) {
-	return r.detail, r.err
-}
-
-func (r *stubPersonIdentityRepo) Delete(ctx context.Context, id uint, deletedBy uint) error {
-	return r.err
-}
-
-func (r *stubPersonIdentityRepo) UpdateMap(ctx context.Context, id uint, updates map[string]any) error {
-	r.updated = updates
-	return r.err
-}
-
-func (r *stubPersonIdentityRepo) GetPageListByCond(ctx context.Context, cond *dao.UserIdentityCond) (model.UserIdentityEntityList, int64, error) {
-	r.lastCond = cond
-	return r.pageList, r.total, r.err
-}
-
-func installPersonIdentityRepo(t *testing.T, repo personIdentityRepository) {
-	t.Helper()
-	prev := newPersonIdentityRepo
-	newPersonIdentityRepo = func() personIdentityRepository {
-		return repo
-	}
-	t.Cleanup(func() {
-		newPersonIdentityRepo = prev
-	})
-}
-
-type stubPersonIdentityUserRepo struct {
-	userByID        *model.UserEntity
-	usersByPerson   model.UserEntityList
-	err             error
-	lastGetListCond *dao.UserCond
-}
-
-func (r *stubPersonIdentityUserRepo) GetByID(ctx context.Context, id uint) (*model.UserEntity, error) {
-	return r.userByID, r.err
-}
-
-func (r *stubPersonIdentityUserRepo) GetListByCond(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, error) {
-	clone := *cond
-	r.lastGetListCond = &clone
-	return r.usersByPerson, r.err
-}
-
-func installPersonIdentityUserRepo(t *testing.T, repo personIdentityUserRepository) {
-	t.Helper()
-	prev := newPersonIdentityUserRepo
-	newPersonIdentityUserRepo = func() personIdentityUserRepository {
-		return repo
-	}
-	t.Cleanup(func() {
-		newPersonIdentityUserRepo = prev
-	})
 }

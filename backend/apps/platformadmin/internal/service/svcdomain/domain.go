@@ -1,7 +1,6 @@
 package svcdomain
 
 import (
-	"context"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -15,25 +14,12 @@ import (
 	"github.com/morehao/golib/gutil"
 )
 
-type domainRepository interface {
-	Insert(ctx context.Context, entity *model.DomainEntity) error
-	GetByID(ctx context.Context, id uint) (*model.DomainEntity, error)
-	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.DomainEntityList, int64, error)
-	GetByTenantAndDomain(ctx context.Context, tenantID uint, domain string) (*model.DomainEntity, error)
-	UpdateMap(ctx context.Context, id uint, updateMap map[string]any) error
-	Delete(ctx context.Context, id uint, deletedBy uint) error
-}
-
-var newDomainRepo = func() domainRepository {
-	return dao.NewDomainDao()
-}
-
 type DomainSvc interface {
-	Create(ctx *gin.Context, req *dtodomain.CreateDomainReq) (*dtodomain.DomainCreateResp, error)
-	Update(ctx *gin.Context, req *dtodomain.UpdateDomainReq) error
+	Create(ctx *gin.Context, req *dtodomain.DomainCreateReq) (*dtodomain.DomainCreateResp, error)
+	Update(ctx *gin.Context, req *dtodomain.DomainUpdateReq) error
 	Detail(ctx *gin.Context, req *dtodomain.DomainDetailReq) (*dtodomain.DomainDetailResp, error)
 	PageList(ctx *gin.Context, req *dtodomain.DomainPageListReq) (*dtodomain.DomainPageListResp, error)
-	Delete(ctx *gin.Context, req *dtodomain.DeleteDomainReq) error
+	Delete(ctx *gin.Context, req *dtodomain.DomainDeleteReq) error
 }
 
 type domainSvc struct{}
@@ -44,7 +30,7 @@ func NewDomainSvc() DomainSvc {
 	return &domainSvc{}
 }
 
-func (svc *domainSvc) Create(ctx *gin.Context, req *dtodomain.CreateDomainReq) (*dtodomain.DomainCreateResp, error) {
+func (svc *domainSvc) Create(ctx *gin.Context, req *dtodomain.DomainCreateReq) (*dtodomain.DomainCreateResp, error) {
 	domain := strings.TrimSpace(req.Domain)
 	if domain == "" {
 		return nil, code.GetError(code.DomainCreateError)
@@ -55,7 +41,7 @@ func (svc *domainSvc) Create(ctx *gin.Context, req *dtodomain.CreateDomainReq) (
 
 	tenantID := gincontext.GetTenantID(ctx)
 
-	repo := newDomainRepo()
+	repo := dao.NewDomainDao()
 	existing, err := repo.GetByTenantAndDomain(ctx, tenantID, domain)
 	if err != nil {
 		glog.Errorf(ctx, "[svcdomain.Create] GetByTenantAndDomain fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -91,7 +77,7 @@ func (svc *domainSvc) PageList(ctx *gin.Context, req *dtodomain.DomainPageListRe
 		Domain:   req.Domain,
 	}
 
-	repo := newDomainRepo()
+	repo := dao.NewDomainDao()
 	list, total, err := repo.GetPageListByCond(ctx, cond)
 	if err != nil {
 		glog.Errorf(ctx, "[svcdomain.PageList] GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -115,11 +101,11 @@ func (svc *domainSvc) PageList(ctx *gin.Context, req *dtodomain.DomainPageListRe
 	return &dtodomain.DomainPageListResp{List: items, Total: total}, nil
 }
 
-func (svc *domainSvc) Delete(ctx *gin.Context, req *dtodomain.DeleteDomainReq) error {
+func (svc *domainSvc) Delete(ctx *gin.Context, req *dtodomain.DomainDeleteReq) error {
 	tenantID := gincontext.GetTenantID(ctx)
 
-	repo := newDomainRepo()
-	entity, err := repo.GetByID(ctx, req.ID)
+	repo := dao.NewDomainDao()
+	entity, err := repo.GetByID(ctx, req.DomainID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcdomain.Delete] GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.DomainDeleteError)
@@ -129,18 +115,18 @@ func (svc *domainSvc) Delete(ctx *gin.Context, req *dtodomain.DeleteDomainReq) e
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	if err := repo.Delete(ctx, req.ID, userID); err != nil {
+	if err := repo.Delete(ctx, req.DomainID, userID); err != nil {
 		glog.Errorf(ctx, "[svcdomain.Delete] Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.DomainDeleteError)
 	}
 	return nil
 }
 
-func (svc *domainSvc) Update(ctx *gin.Context, req *dtodomain.UpdateDomainReq) error {
+func (svc *domainSvc) Update(ctx *gin.Context, req *dtodomain.DomainUpdateReq) error {
 	tenantID := gincontext.GetTenantID(ctx)
 
-	repo := newDomainRepo()
-	entity, err := repo.GetByID(ctx, req.ID)
+	repo := dao.NewDomainDao()
+	entity, err := repo.GetByID(ctx, req.DomainID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcdomain.Update] GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.DomainUpdateError)
@@ -159,7 +145,7 @@ func (svc *domainSvc) Update(ctx *gin.Context, req *dtodomain.UpdateDomainReq) e
 		updateMap["is_verified"] = *req.IsVerified
 	}
 
-	if err := repo.UpdateMap(ctx, req.ID, updateMap); err != nil {
+	if err := repo.UpdateMap(ctx, req.DomainID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcdomain.Update] UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.DomainUpdateError)
 	}
@@ -169,8 +155,8 @@ func (svc *domainSvc) Update(ctx *gin.Context, req *dtodomain.UpdateDomainReq) e
 func (svc *domainSvc) Detail(ctx *gin.Context, req *dtodomain.DomainDetailReq) (*dtodomain.DomainDetailResp, error) {
 	tenantID := gincontext.GetTenantID(ctx)
 
-	repo := newDomainRepo()
-	entity, err := repo.GetByID(ctx, req.ID)
+	repo := dao.NewDomainDao()
+	entity, err := repo.GetByID(ctx, req.DomainID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcdomain.Detail] GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.DomainDetailError)

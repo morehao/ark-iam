@@ -5,7 +5,7 @@ import { createAuthProvider } from '@ark-iam/auth'
 import { AppShell } from '@ark-iam/ui'
 
 const AuthProvider = createAuthProvider({
-  clientId: import.meta.env.VITE_OIDC_CLIENT_ID || 'tenant-admin-web',
+  clientID: import.meta.env.VITE_OIDC_CLIENT_ID || 'tenant-admin-web',
 })
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

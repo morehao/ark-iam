@@ -30,9 +30,9 @@ export interface PersonUpdatePasswordReq {
 
 export interface SessionResp {
   id: number
-  sessionId: string
-  appId: number
-  tenantId: number
+  sessionID: string
+  appID: number
+  tenantID: number
   clientType: string
   clientIP: string
   userAgent: string

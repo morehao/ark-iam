@@ -10,12 +10,12 @@ type TenantCreateReq struct {
 }
 
 type TenantUpdateReq struct {
-	TenantID uint `json:"tenantID" binding:"required"` // 租户ID
+	TenantID uint `json:"-" uri:"tenantID" binding:"required"` // 租户ID
 	objtenant.TenantBaseInfo
 }
 
 type TenantDetailReq struct {
-	TenantID uint `json:"tenantID" form:"tenantID" binding:"required"` // 租户ID
+	TenantID uint `json:"-" uri:"tenantID" binding:"required"` // 租户ID
 }
 
 type TenantPageListReq struct {
@@ -23,7 +23,7 @@ type TenantPageListReq struct {
 }
 
 type TenantDeleteReq struct {
-	TenantID uint `json:"tenantID" binding:"required"` // 租户ID
+	TenantID uint `json:"-" uri:"tenantID" binding:"required"` // 租户ID
 }
 
 type TenantCreateAsOwnerReq struct {
@@ -38,24 +38,24 @@ type DepartmentCreateReq struct {
 }
 
 type DepartmentUpdateReq struct {
-	DepartmentID uint `json:"departmentID" binding:"required"` // 部门ID
+	DepartmentID uint `json:"-" uri:"departmentID" binding:"required"` // 部门ID
 	objtenant.DepartmentBaseInfo
 }
 
 type DepartmentDetailReq struct {
-	DepartmentID uint `json:"departmentID" form:"departmentID" binding:"required"` // 部门ID
+	DepartmentID uint `json:"-" uri:"departmentID" binding:"required"` // 部门ID
 }
 
 type DepartmentPageListReq struct {
 	gobject.PageQuery
-	TenantID uint   `json:"tenantID"` // 租户ID
-	ParentID uint   `json:"parentID"` // 父部门ID
-	Name     string `json:"name"`     // 部门名称
-	Code     string `json:"code"`     // 部门编码
+	TenantID uint   `json:"tenantID" form:"tenantID"` // 租户ID
+	ParentID uint   `json:"parentID" form:"parentID"` // 父部门ID
+	Name     string `json:"name" form:"name"`         // 部门名称
+	Code     string `json:"code" form:"code"`         // 部门编码
 }
 
 type DepartmentDeleteReq struct {
-	DepartmentID uint `json:"departmentID" binding:"required"` // 部门ID
+	DepartmentID uint `json:"-" uri:"departmentID" binding:"required"` // 部门ID
 }
 
 type DepartmentTreeReq struct {

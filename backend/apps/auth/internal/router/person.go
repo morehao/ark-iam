@@ -10,6 +10,6 @@ func personRouter(groups *ginserver.RouterGroups) {
 	personCtr := ctrperson.NewPersonCtr(svcperson.NewPersonProfileSvc())
 
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.GET("/person/detail", personCtr.Detail)
-	v1RouterGroup.POST("/person/updatePassword", personCtr.UpdatePassword)
+	v1RouterGroup.GET("/me", personCtr.Detail)
+	v1RouterGroup.POST("/me/changePassword", personCtr.UpdatePassword)
 }

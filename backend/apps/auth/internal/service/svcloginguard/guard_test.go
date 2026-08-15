@@ -69,7 +69,7 @@ func TestGuardCounterAndLock(t *testing.T) {
 		MaxFailures: 3, WindowSec: 300, LockSec: 900,
 	}}}
 	defer func() {
-		dbclient.RedisCli.Close()
+		_ = dbclient.RedisCli.Close()
 		dbclient.RedisCli = oldCli
 		config.Conf = oldConf
 	}()

@@ -29,11 +29,16 @@ func NewRoleScopeCtr() RoleScopeCtr {
 // @Summary 创建角色权限范围
 // @accept application/json
 // @Produce application/json
+// @Param roleID path int true "roleID"
 // @Param req body dtopermission.RoleScopeCreateReq true "创建角色权限范围"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.RoleScopeCreateResp}
-// @Router /v1/platform/roleScope/create [post]
+// @Router /v1/platform/roles/{roleID}/scopes [post]
 func (ctr *roleScopeCtr) Create(ctx *gin.Context) {
 	var req dtopermission.RoleScopeCreateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -50,12 +55,13 @@ func (ctr *roleScopeCtr) Create(ctx *gin.Context) {
 // @Summary 删除角色权限范围
 // @accept application/json
 // @Produce application/json
-// @Param req body dtopermission.RoleScopeDeleteReq true "删除角色权限范围"
+// @Param roleID path int true "roleID"
+// @Param scopeID path int true "scopeID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/roleScope/delete [post]
+// @Router /v1/platform/roles/{roleID}/scopes/{scopeID} [delete]
 func (ctr *roleScopeCtr) Delete(ctx *gin.Context) {
 	var req dtopermission.RoleScopeDeleteReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -70,12 +76,17 @@ func (ctr *roleScopeCtr) Delete(ctx *gin.Context) {
 // @Summary 角色权限范围列表分页
 // @accept application/json
 // @Produce application/json
-// @Param req body dtopermission.RoleScopePageListReq true "角色权限范围列表分页"
+// @Param roleID path int true "roleID"
+// @Param req query dtopermission.RoleScopePageListReq true "角色权限范围列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.RoleScopePageListResp}
-// @Router /v1/platform/roleScope/pageList [post]
+// @Router /v1/platform/roles/{roleID}/scopes [get]
 func (ctr *roleScopeCtr) PageList(ctx *gin.Context) {
 	var req dtopermission.RoleScopePageListReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

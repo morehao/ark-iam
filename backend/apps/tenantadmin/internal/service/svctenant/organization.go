@@ -1,27 +1,17 @@
 package svctenant
 
 import (
-	"context"
-
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objtenant"
-	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
-
-type organizationScopeRepository interface {
-	GetByID(ctx context.Context, id uint) (*model.OrganizationEntity, error)
-}
-
-var newOrganizationScopeRepo = func() organizationScopeRepository {
-	return dao.NewOrganizationDao()
-}
 
 func organizationVisibleToTenant(entity *model.OrganizationEntity, tenantID uint) bool {
 	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
@@ -67,7 +57,7 @@ func (svc *organizationSvc) Create(ctx *gin.Context, req *dtotenant.Organization
 }
 
 func (svc *organizationSvc) Delete(ctx *gin.Context, req *dtotenant.OrganizationDeleteReq) error {
-	orgEntity, err := newOrganizationScopeRepo().GetByID(ctx, req.OrganizationID)
+	orgEntity, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcorganization.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationDeleteError)
@@ -85,7 +75,7 @@ func (svc *organizationSvc) Delete(ctx *gin.Context, req *dtotenant.Organization
 }
 
 func (svc *organizationSvc) Update(ctx *gin.Context, req *dtotenant.OrganizationUpdateReq) error {
-	orgEntity, err := newOrganizationScopeRepo().GetByID(ctx, req.OrganizationID)
+	orgEntity, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcorganization.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationUpdateError)
@@ -96,11 +86,11 @@ func (svc *organizationSvc) Update(ctx *gin.Context, req *dtotenant.Organization
 
 	userID := gincontext.GetUserID(ctx)
 	updateMap := map[string]any{
-		"tenant_id":      gincontext.GetTenantID(ctx),
-		"name":           req.Name,
-		"description":    req.Description,
+		"tenant_id":       gincontext.GetTenantID(ctx),
+		"name":            req.Name,
+		"description":     req.Description,
 		"is_mfa_required": req.IsMFARequired,
-		"updated_by":     userID,
+		"updated_by":      userID,
 	}
 	if err := dao.NewOrganizationDao().UpdateMap(ctx, req.OrganizationID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcorganization.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -110,7 +100,7 @@ func (svc *organizationSvc) Update(ctx *gin.Context, req *dtotenant.Organization
 }
 
 func (svc *organizationSvc) Detail(ctx *gin.Context, req *dtotenant.OrganizationDetailReq) (*dtotenant.OrganizationDetailResp, error) {
-	orgEntity, err := newOrganizationScopeRepo().GetByID(ctx, req.OrganizationID)
+	orgEntity, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcorganization.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.OrganizationGetDetailError)
