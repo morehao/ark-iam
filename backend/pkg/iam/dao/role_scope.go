@@ -29,12 +29,12 @@ func (c *RoleScopeCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type RoleScopeDao struct {
-	*gormdao.Dao[model.RoleScopeEntity, model.RoleScopeEntityList]
+	*gormdao.Dao[model.RoleScopeEntity, model.RoleScopeEntityList, uint]
 }
 
 func NewRoleScopeDao(opts ...DaoOption) *RoleScopeDao {
 	return &RoleScopeDao{
-		Dao: gormdao.NewDao[model.RoleScopeEntity, model.RoleScopeEntityList](
+		Dao: gormdao.NewDao[model.RoleScopeEntity, model.RoleScopeEntityList, uint](
 			model.TableNameRoleScope, "RoleScopeDao",
 			resolveDBGetter(opts...),
 		),

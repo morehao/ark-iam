@@ -25,12 +25,12 @@ func (c *SystemCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type SystemDao struct {
-	*gormdao.Dao[model.SystemEntity, model.SystemEntityList]
+	*gormdao.Dao[model.SystemEntity, model.SystemEntityList, uint]
 }
 
 func NewSystemDao(opts ...DaoOption) *SystemDao {
 	return &SystemDao{
-		Dao: gormdao.NewDao[model.SystemEntity, model.SystemEntityList](
+		Dao: gormdao.NewDao[model.SystemEntity, model.SystemEntityList, uint](
 			model.TableNameSystem, "SystemDao",
 			resolveDBGetter(opts...),
 		),

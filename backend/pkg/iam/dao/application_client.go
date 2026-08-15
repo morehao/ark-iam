@@ -41,12 +41,12 @@ func (c *ApplicationClientCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type ApplicationClientDao struct {
-	*gormdao.Dao[model.ApplicationClientEntity, model.ApplicationClientEntityList]
+	*gormdao.Dao[model.ApplicationClientEntity, model.ApplicationClientEntityList, uint]
 }
 
 func NewApplicationClientDao(opts ...DaoOption) *ApplicationClientDao {
 	return &ApplicationClientDao{
-		Dao: gormdao.NewDao[model.ApplicationClientEntity, model.ApplicationClientEntityList](
+		Dao: gormdao.NewDao[model.ApplicationClientEntity, model.ApplicationClientEntityList, uint](
 			model.TableNameApplicationClient, "ApplicationClientDao",
 			resolveDBGetter(opts...),
 		),

@@ -41,12 +41,12 @@ func (c *ConnectorCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type ConnectorDao struct {
-	*gormdao.Dao[model.ConnectorEntity, model.ConnectorEntityList]
+	*gormdao.Dao[model.ConnectorEntity, model.ConnectorEntityList, uint]
 }
 
 func NewConnectorDao(opts ...DaoOption) *ConnectorDao {
 	return &ConnectorDao{
-		Dao: gormdao.NewDao[model.ConnectorEntity, model.ConnectorEntityList](
+		Dao: gormdao.NewDao[model.ConnectorEntity, model.ConnectorEntityList, uint](
 			model.TableNameConnector, "ConnectorDao",
 			resolveDBGetter(opts...),
 		),

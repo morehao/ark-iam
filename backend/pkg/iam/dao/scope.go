@@ -29,12 +29,12 @@ func (c *ScopeCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type ScopeDao struct {
-	*gormdao.Dao[model.ScopeEntity, model.ScopeEntityList]
+	*gormdao.Dao[model.ScopeEntity, model.ScopeEntityList, uint]
 }
 
 func NewScopeDao(opts ...DaoOption) *ScopeDao {
 	return &ScopeDao{
-		Dao: gormdao.NewDao[model.ScopeEntity, model.ScopeEntityList](
+		Dao: gormdao.NewDao[model.ScopeEntity, model.ScopeEntityList, uint](
 			model.TableNameScope, "ScopeDao",
 			resolveDBGetter(opts...),
 		),

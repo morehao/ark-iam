@@ -29,12 +29,12 @@ func (c *SessionAuditCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type SessionAuditDao struct {
-	*gormdao.Dao[model.SessionAuditEntity, model.SessionAuditEntityList]
+	*gormdao.Dao[model.SessionAuditEntity, model.SessionAuditEntityList, uint]
 }
 
 func NewSessionAuditDao(opts ...DaoOption) *SessionAuditDao {
 	return &SessionAuditDao{
-		Dao: gormdao.NewDao[model.SessionAuditEntity, model.SessionAuditEntityList](
+		Dao: gormdao.NewDao[model.SessionAuditEntity, model.SessionAuditEntityList, uint](
 			model.TableNameSession, "SessionAuditDao",
 			resolveDBGetter(opts...),
 		),

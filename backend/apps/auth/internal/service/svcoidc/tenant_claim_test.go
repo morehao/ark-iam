@@ -40,7 +40,7 @@ func newTenantClaimTestStore(t *testing.T, users []model.UserEntity) (storage *O
 
 	persistentStore := NewPersistentStore()
 	persistentStore.userDao = func(opts ...dao.DaoOption) *dao.UserDao {
-		return &dao.UserDao{Dao: gormdao.NewDao[model.UserEntity, model.UserEntityList](
+		return &dao.UserDao{Dao: gormdao.NewDao[model.UserEntity, model.UserEntityList, uint](
 			model.TableNameUser, "UserDao",
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}
@@ -49,7 +49,7 @@ func newTenantClaimTestStore(t *testing.T, users []model.UserEntity) (storage *O
 		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
 	persistentStore.refreshTokenDao = func(opts ...dao.DaoOption) *dao.RefreshTokenDao {
-		return &dao.RefreshTokenDao{Dao: gormdao.NewDao[model.RefreshTokenEntity, model.RefreshTokenEntityList](
+		return &dao.RefreshTokenDao{Dao: gormdao.NewDao[model.RefreshTokenEntity, model.RefreshTokenEntityList, uint](
 			model.TableNameRefreshToken, "RefreshTokenDao",
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}

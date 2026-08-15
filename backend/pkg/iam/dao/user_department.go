@@ -33,12 +33,12 @@ func (c *UserDepartmentCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type UserDepartmentDao struct {
-	*gormdao.Dao[model.UserDepartmentEntity, model.UserDepartmentEntityList]
+	*gormdao.Dao[model.UserDepartmentEntity, model.UserDepartmentEntityList, uint]
 }
 
 func NewUserDepartmentDao(opts ...DaoOption) *UserDepartmentDao {
 	return &UserDepartmentDao{
-		Dao: gormdao.NewDao[model.UserDepartmentEntity, model.UserDepartmentEntityList](
+		Dao: gormdao.NewDao[model.UserDepartmentEntity, model.UserDepartmentEntityList, uint](
 			model.TableNameUserDepartment, "UserDepartmentDao",
 			resolveDBGetter(opts...),
 		),

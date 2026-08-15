@@ -45,12 +45,12 @@ func (c *TenantCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type TenantDao struct {
-	*gormdao.Dao[model.TenantEntity, model.TenantEntityList]
+	*gormdao.Dao[model.TenantEntity, model.TenantEntityList, uint]
 }
 
 func NewTenantDao(opts ...DaoOption) *TenantDao {
 	return &TenantDao{
-		Dao: gormdao.NewDao[model.TenantEntity, model.TenantEntityList](
+		Dao: gormdao.NewDao[model.TenantEntity, model.TenantEntityList, uint](
 			model.TableNameTenant, "TenantDao",
 			resolveDBGetter(opts...),
 		),
