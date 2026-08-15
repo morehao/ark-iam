@@ -23,13 +23,13 @@ func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 	config.Conf = Conf
 
 	ssoStore := sso.NewSSOSessionStore()
-	routerGroups := ginserver.NewRouterGroups(engine, "iam", ginserver.VersionGroup{
+	routerGroups := ginserver.NewRouterGroups(engine, "auth", ginserver.VersionGroup{
 		Version: ginserver.ApiVersionV1,
 		Middlewares: []gin.HandlerFunc{
 			oidcauth.OIDCCompatibleAuth(func() *rsa.PublicKey { return authRouter.OIDCPublicKey },
 				oidcauth.WithAuthSkipPaths(
-					"/v1/iam/auth/register",
-					"/v1/iam/connector/callback",
+					"/v1/auth/register",
+					"/v1/auth/connector/callback",
 				),
 				oidcauth.WithOIDCSSOValidation(func(ctx *gin.Context, personID uint, isMachineToken bool) bool {
 					// 机器凭证（client_credentials/API Key）不依赖浏览器 SSO 会话活性，直接放行

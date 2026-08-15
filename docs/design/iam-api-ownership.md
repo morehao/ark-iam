@@ -8,14 +8,14 @@
 
 | 应用 | 职责（设计文档 §6.2） | 路由前缀 | 端口 |
 |------|----------------------|----------|------|
-| `auth` | 认证网关：登录/注册/token/OIDC Provider、个人中心、会话、connector | `/v1/iam/auth/*`、`/v1/iam/person/*`、`/v1/iam/user/sessions`、`/v1/iam/connector/*`、`/oidc/*` | 8081 |
-| `platformadmin` | 平台管理：user/role/menu/tenant/department/system/application/apiKey/domain/log 等 | `/v1/iam/{user,role,menu,scope,resource,tenant,department,system,log,application,applicationClient,apiKey,domain,tenantApplication}/*` | 8082 |
-| `tenantadmin` | 租户自服务：organization + orgRole/orgUser/orgRoleUser | `/v1/iam/organization*` | 8083 |
+| `auth` | 认证网关：登录/注册/token/OIDC Provider、个人中心、会话、connector | `/v1/auth/*`（register/myTenants/logout 等直接挂服务段）、`/v1/auth/person/*`、`/v1/auth/user/sessions`、`/v1/auth/connector/*`、`/oidc/*` | 8081 |
+| `platformadmin` | 平台管理：user/role/menu/tenant/department/system/application/apiKey/domain/log 等 | `/v1/platform/{user,role,menu,scope,resource,tenant,department,system,log,application,applicationClient,apiKey,domain,tenantApplication}/*` | 8082 |
+| `tenantadmin` | 租户自服务：organization + orgRole/orgUser/orgRoleUser | `/v1/tenant/organization*`、`/v1/tenant/myMenu/*` | 8083 |
 | `gateway` | 聚合应用：单进程挂载上述三者全部路由（不新增业务接口） | - | 8100 |
 
 ### 归属原则（与设计文档 §4.1 一致）
 
-1. **共享 `/v1/iam/{module}/{operation}` 前缀**，`{module}` 为业务模块，`{operation}` 为操作（create/update/detail/pageList/delete…），不按应用分段。
+1. **每个应用使用独立的服务标识段**：auth → `/v1/auth/*`、platformadmin → `/v1/platform/*`、tenantadmin → `/v1/tenant/*`；`{module}` 为业务模块，`{operation}` 为操作（create/update/detail/pageList/delete…），模块名可跨应用复用（如 `user` 同时存在于 auth 的 `/v1/auth/user/sessions` 与 platformadmin 的 `/v1/platform/user/*`），由服务标识段区分归属。`/oidc/*` 为标准协议路径，不随应用分段。
 2. 认证相关（注册/加入租户/登出/我的租户/用户信息/个人中心/会话/connector）归属 `auth`；
    平台管理各模块归属 `platformadmin`；组织与组织角色归属 `tenantadmin`。
 3. **前端应用映射**：
@@ -27,16 +27,16 @@
 
 ### 2.1 auth 应用
 
-#### 业务接口（`/v1/iam`）
+#### 业务接口（`/v1/auth`）
 
 | 方法 | 路径 | 请求 | 响应 |
 |------|------|------|------|
-| GET | /auth/myTenants | - | `{list:[{tenantID,name}]}` |
-| POST | /auth/register | tenantID/username/primaryEmail/primaryPhone/password/name | `{userID}` |
-| POST | /auth/joinTenant | tenantID | `{userID}` |
-| POST | /auth/logout | refreshToken | - |
-| POST | /auth/logoutAll | refreshToken | - |
-| GET | /auth/userinfo | - | `{personInfo,userInfo}` |
+| GET | /myTenants | - | `{list:[{tenantID,name}]}` |
+| POST | /register | tenantID/username/primaryEmail/primaryPhone/password/name | `{userID}` |
+| POST | /joinTenant | tenantID | `{userID}` |
+| POST | /logout | refreshToken | - |
+| POST | /logoutAll | refreshToken | - |
+| GET | /userinfo | - | `{personInfo,userInfo}` |
 | GET | /person/detail | - | PersonDetailResp |
 | POST | /person/updatePassword | oldPassword/newPassword | - |
 | GET | /user/sessions | page/pageSize | `{list,total}` |
@@ -62,7 +62,7 @@
 | GET | /oidc/logged-out | 登出回跳 |
 | * | /oidc/authorize、/oidc/oauth/token、/oidc/userinfo、/.well-known/* 等 | zitadel oidc Provider 标准端点 |
 
-### 2.2 platformadmin 应用（`/v1/iam`）
+### 2.2 platformadmin 应用（`/v1/platform`）
 
 | 模块 | 接口（create/delete/update/detail/pageList + 特有） |
 |------|------|
@@ -84,7 +84,7 @@
 | domain | create/update/detail/pageList/delete |
 | tenantApplication | create/delete/update/detail/pageList |
 
-### 2.3 tenantadmin 应用（`/v1/iam`）
+### 2.3 tenantadmin 应用（`/v1/tenant`）
 
 | 模块 | 接口 |
 |------|------|

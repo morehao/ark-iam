@@ -48,7 +48,7 @@ func NewUserCtr() UserCtr {
 // @Produce application/json
 // @Param req body dtouser.UserCreateReq true "创建用户管理"
 // @Success 200 {object} gincontext.DtoRender{data=dtouser.UserCreateResp}
-// @Router /v1/iam/user/create [post]
+// @Router /v1/platform/user/create [post]
 func (ctr *userCtr) Create(ctx *gin.Context) {
 	var req dtouser.UserCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -69,7 +69,7 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtouser.UserDeleteReq true "删除用户管理"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/user/delete [post]
+// @Router /v1/platform/user/delete [post]
 func (ctr *userCtr) Delete(ctx *gin.Context) {
 	var req dtouser.UserDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -89,7 +89,7 @@ func (ctr *userCtr) Delete(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtouser.UserUpdateReq true "修改用户管理"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/user/update [post]
+// @Router /v1/platform/user/update [post]
 func (ctr *userCtr) Update(ctx *gin.Context) {
 	var req dtouser.UserUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -109,7 +109,7 @@ func (ctr *userCtr) Update(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtouser.UserDetailReq true "用户管理详情"
 // @Success 200 {object} gincontext.DtoRender{data=dtouser.UserDetailResp}
-// @Router /v1/iam/user/detail [get]
+// @Router /v1/platform/user/detail [get]
 func (ctr *userCtr) Detail(ctx *gin.Context) {
 	var req dtouser.UserDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -130,7 +130,7 @@ func (ctr *userCtr) Detail(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtouser.UserPageListReq true "用户管理列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtouser.UserPageListResp}
-// @Router /v1/iam/user/pageList [post]
+// @Router /v1/platform/user/pageList [post]
 func (ctr *userCtr) PageList(ctx *gin.Context) {
 	var req dtouser.UserPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -151,7 +151,7 @@ func (ctr *userCtr) PageList(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtouser.UserPasswordUpdateReq true "修改用户密码"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/user/updatePassword [post]
+// @Router /v1/platform/user/updatePassword [post]
 func (ctr *userCtr) UpdatePassword(ctx *gin.Context) {
 	var req dtouser.UserPasswordUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -171,7 +171,7 @@ func (ctr *userCtr) UpdatePassword(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtouser.UserStatusUpdateReq true "修改用户状态"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/user/updateStatus [post]
+// @Router /v1/platform/user/updateStatus [post]
 func (ctr *userCtr) UpdateStatus(ctx *gin.Context) {
 	var req dtouser.UserStatusUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -191,7 +191,7 @@ func (ctr *userCtr) UpdateStatus(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtouser.AssignDepartmentsReq true "分配用户部门"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/user/assignDepartments [post]
+// @Router /v1/platform/user/assignDepartments [post]
 func (ctr *userCtr) AssignDepartments(ctx *gin.Context) {
 	var req dtouser.AssignDepartmentsReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -211,7 +211,7 @@ func (ctr *userCtr) AssignDepartments(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtouser.UserLoginLogDetailReq true "用户登录日志详情"
 // @Success 200 {object} gincontext.DtoRender{data=dtouser.UserLoginLogDetailResp}
-// @Router /v1/iam/user/detailUserLoginLog [get]
+// @Router /v1/platform/user/detailUserLoginLog [get]
 func (ctr *userCtr) DetailUserLoginLog(ctx *gin.Context) {
 	var req dtouser.UserLoginLogDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -232,7 +232,7 @@ func (ctr *userCtr) DetailUserLoginLog(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtouser.UserLoginLogPageListReq true "用户登录日志列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtouser.UserLoginLogPageListResp}
-// @Router /v1/iam/user/pageListUserLoginLog [post]
+// @Router /v1/platform/user/pageListUserLoginLog [post]
 func (ctr *userCtr) PageListUserLoginLog(ctx *gin.Context) {
 	var req dtouser.UserLoginLogPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -253,7 +253,7 @@ func (ctr *userCtr) PageListUserLoginLog(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtouser.UserLoginLogByUserReq true "获取用户登录日志"
 // @Success 200 {object} gincontext.DtoRender{data=dtouser.UserLoginLogPageListResp}
-// @Router /v1/iam/user/getUserLoginLogByUser [get]
+// @Router /v1/platform/user/getUserLoginLogByUser [get]
 func (ctr *userCtr) GetUserLoginLogByUser(ctx *gin.Context) {
 	var req dtouser.UserLoginLogByUserReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -274,7 +274,7 @@ func (ctr *userCtr) GetUserLoginLogByUser(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtouser.UserDepartmentByUserReq true "获取用户部门关联"
 // @Success 200 {object} gincontext.DtoRender{data=dtouser.UserDepartmentPageListResp}
-// @Router /v1/iam/user/getUserDepartmentByUser [get]
+// @Router /v1/platform/user/getUserDepartmentByUser [get]
 func (ctr *userCtr) GetUserDepartmentByUser(ctx *gin.Context) {
 	var req dtouser.UserDepartmentByUserReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -295,7 +295,7 @@ func (ctr *userCtr) GetUserDepartmentByUser(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtouser.UserIdentityCreateReq true "创建用户身份"
 // @Success 200 {object} gincontext.DtoRender{data=dtouser.UserIdentityCreateResp}
-// @Router /v1/iam/user/createUserIdentity [post]
+// @Router /v1/platform/user/createUserIdentity [post]
 func (ctr *userCtr) CreateUserIdentity(ctx *gin.Context) {
 	var req dtouser.UserIdentityCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -316,7 +316,7 @@ func (ctr *userCtr) CreateUserIdentity(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtouser.UserIdentityDeleteReq true "删除用户身份"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/user/deleteUserIdentity [post]
+// @Router /v1/platform/user/deleteUserIdentity [post]
 func (ctr *userCtr) DeleteUserIdentity(ctx *gin.Context) {
 	var req dtouser.UserIdentityDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -336,7 +336,7 @@ func (ctr *userCtr) DeleteUserIdentity(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtouser.UserIdentityUpdateReq true "修改用户身份"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/user/updateUserIdentity [post]
+// @Router /v1/platform/user/updateUserIdentity [post]
 func (ctr *userCtr) UpdateUserIdentity(ctx *gin.Context) {
 	var req dtouser.UserIdentityUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -356,7 +356,7 @@ func (ctr *userCtr) UpdateUserIdentity(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtouser.UserIdentityDetailReq true "用户身份详情"
 // @Success 200 {object} gincontext.DtoRender{data=dtouser.UserIdentityDetailResp}
-// @Router /v1/iam/user/detailUserIdentity [get]
+// @Router /v1/platform/user/detailUserIdentity [get]
 func (ctr *userCtr) DetailUserIdentity(ctx *gin.Context) {
 	var req dtouser.UserIdentityDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -377,7 +377,7 @@ func (ctr *userCtr) DetailUserIdentity(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtouser.UserIdentityPageListReq true "用户身份列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtouser.UserIdentityPageListResp}
-// @Router /v1/iam/user/pageListUserIdentity [post]
+// @Router /v1/platform/user/pageListUserIdentity [post]
 func (ctr *userCtr) PageListUserIdentity(ctx *gin.Context) {
 	var req dtouser.UserIdentityPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -398,7 +398,7 @@ func (ctr *userCtr) PageListUserIdentity(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtouser.UserIdentityByUserReq true "获取用户身份"
 // @Success 200 {object} gincontext.DtoRender{data=dtouser.UserIdentityPageListResp}
-// @Router /v1/iam/user/getUserIdentityByUser [get]
+// @Router /v1/platform/user/getUserIdentityByUser [get]
 func (ctr *userCtr) GetUserIdentityByUser(ctx *gin.Context) {
 	var req dtouser.UserIdentityByUserReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {

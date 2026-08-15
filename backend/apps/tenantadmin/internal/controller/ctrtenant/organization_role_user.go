@@ -31,7 +31,7 @@ func NewOrganizationRoleUserCtr() OrganizationRoleUserCtr {
 // @Produce application/json
 // @Param req body dtotenant.OrganizationRoleUserCreateReq true "创建组织角色用户关联"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationRoleUserCreateResp}
-// @Router /v1/iam/organizationRoleUser/create [post]
+// @Router /v1/tenant/organizationRoleUser/create [post]
 func (ctr *organizationRoleUserCtr) Create(ctx *gin.Context) {
 	var req dtotenant.OrganizationRoleUserCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -52,7 +52,7 @@ func (ctr *organizationRoleUserCtr) Create(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtotenant.OrganizationRoleUserDeleteReq true "删除组织角色用户关联"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/organizationRoleUser/delete [post]
+// @Router /v1/tenant/organizationRoleUser/delete [post]
 func (ctr *organizationRoleUserCtr) Delete(ctx *gin.Context) {
 	var req dtotenant.OrganizationRoleUserDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -72,7 +72,7 @@ func (ctr *organizationRoleUserCtr) Delete(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtotenant.OrganizationRoleUserPageListReq true "组织角色用户关联列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationRoleUserPageListResp}
-// @Router /v1/iam/organizationRoleUser/pageList [post]
+// @Router /v1/tenant/organizationRoleUser/pageList [post]
 func (ctr *organizationRoleUserCtr) PageList(ctx *gin.Context) {
 	var req dtotenant.OrganizationRoleUserPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {

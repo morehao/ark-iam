@@ -33,7 +33,7 @@ func NewTenantApplicationCtr() TenantApplicationCtr {
 // @Produce application/json
 // @Param req body dtotenantapplication.CreateReq true "创建租户应用订阅"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenantapplication.CreateResp}
-// @Router /v1/iam/tenantApplication/create [post]
+// @Router /v1/platform/tenantApplication/create [post]
 func (ctr *tenantApplicationCtr) Create(ctx *gin.Context) {
 	var req dtotenantapplication.CreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -54,7 +54,7 @@ func (ctr *tenantApplicationCtr) Create(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtotenantapplication.DeleteReq true "删除租户应用订阅"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/tenantApplication/delete [post]
+// @Router /v1/platform/tenantApplication/delete [post]
 func (ctr *tenantApplicationCtr) Delete(ctx *gin.Context) {
 	var req dtotenantapplication.DeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -74,7 +74,7 @@ func (ctr *tenantApplicationCtr) Delete(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtotenantapplication.UpdateReq true "修改租户应用订阅"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/tenantApplication/update [post]
+// @Router /v1/platform/tenantApplication/update [post]
 func (ctr *tenantApplicationCtr) Update(ctx *gin.Context) {
 	var req dtotenantapplication.UpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -94,7 +94,7 @@ func (ctr *tenantApplicationCtr) Update(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtotenantapplication.DetailReq true "查看租户应用订阅详情"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenantapplication.DetailResp}
-// @Router /v1/iam/tenantApplication/detail [get]
+// @Router /v1/platform/tenantApplication/detail [get]
 func (ctr *tenantApplicationCtr) Detail(ctx *gin.Context) {
 	var req dtotenantapplication.DetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -115,7 +115,7 @@ func (ctr *tenantApplicationCtr) Detail(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtotenantapplication.PageListReq true "查看租户应用订阅列表"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenantapplication.PageListResp}
-// @Router /v1/iam/tenantApplication/pageList [post]
+// @Router /v1/platform/tenantApplication/pageList [post]
 func (ctr *tenantApplicationCtr) PageList(ctx *gin.Context) {
 	var req dtotenantapplication.PageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
