@@ -29,7 +29,7 @@ func TestLoggedOutUsesHostOnlyCookieByDefault(t *testing.T) {
 	}
 
 	engine := gin.New()
-	groups := ginserver.NewRouterGroups(engine, "iam", ginserver.VersionGroup{Version: ginserver.ApiVersionV1})
+	groups := ginserver.NewRouterGroups(engine, "auth", ginserver.VersionGroup{Version: ginserver.ApiVersionV1})
 	router.InitOIDC(engine, groups)
 
 	req := httptest.NewRequest(http.MethodGet, "/oidc/logged-out", nil)
@@ -63,7 +63,7 @@ func TestLoggedOutUsesConfiguredCookieDomain(t *testing.T) {
 	}
 
 	engine := gin.New()
-	groups := ginserver.NewRouterGroups(engine, "iam", ginserver.VersionGroup{Version: ginserver.ApiVersionV1})
+	groups := ginserver.NewRouterGroups(engine, "auth", ginserver.VersionGroup{Version: ginserver.ApiVersionV1})
 	router.InitOIDC(engine, groups)
 
 	req := httptest.NewRequest(http.MethodGet, "/oidc/logged-out", nil)

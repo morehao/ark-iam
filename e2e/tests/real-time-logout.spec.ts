@@ -99,7 +99,7 @@ test.describe('实时统一登出', () => {
     // 2. 清理接收端历史记录，确保断言的是本次登出产生的通知
     await clearBackChannelRecent(request);
 
-    // 3. 全局登出（走 /v1/iam/auth/logoutAll + end_session，触发 SLO 入队）
+    // 3. 全局登出（走 /v1/auth/logoutAll + end_session，触发 SLO 入队）
     await page.locator('.ant-avatar').click();
     await page.waitForTimeout(500);
     await page.locator('.ant-dropdown-menu-item', { hasText: '退出登录' }).click();

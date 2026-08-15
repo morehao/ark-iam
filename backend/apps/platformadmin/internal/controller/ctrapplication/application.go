@@ -31,7 +31,7 @@ func NewApplicationCtr() ApplicationCtr {
 // @Produce application/json
 // @Param req body dtoapplication.CreateReq true "创建应用"
 // @Success 200 {object} gincontext.DtoRender{data=dtoapplication.CreateResp}
-// @Router /v1/iam/application/create [post]
+// @Router /v1/platform/application/create [post]
 func (ctr *applicationCtr) Create(ctx *gin.Context) {
 	var req dtoapplication.CreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -52,7 +52,7 @@ func (ctr *applicationCtr) Create(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtoapplication.UpdateReq true "修改应用"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/application/update [post]
+// @Router /v1/platform/application/update [post]
 func (ctr *applicationCtr) Update(ctx *gin.Context) {
 	var req dtoapplication.UpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -72,7 +72,7 @@ func (ctr *applicationCtr) Update(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtoapplication.DeleteReq true "删除应用"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/application/delete [post]
+// @Router /v1/platform/application/delete [post]
 func (ctr *applicationCtr) Delete(ctx *gin.Context) {
 	var req dtoapplication.DeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -92,7 +92,7 @@ func (ctr *applicationCtr) Delete(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtoapplication.DetailReq true "查看应用详情"
 // @Success 200 {object} gincontext.DtoRender{data=dtoapplication.DetailResp}
-// @Router /v1/iam/application/detail [get]
+// @Router /v1/platform/application/detail [get]
 func (ctr *applicationCtr) Detail(ctx *gin.Context) {
 	var req dtoapplication.DetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -113,7 +113,7 @@ func (ctr *applicationCtr) Detail(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtoapplication.PageListReq true "查看应用列表"
 // @Success 200 {object} gincontext.DtoRender{data=dtoapplication.PageListResp}
-// @Router /v1/iam/application/pageList [post]
+// @Router /v1/platform/application/pageList [post]
 func (ctr *applicationCtr) PageList(ctx *gin.Context) {
 	var req dtoapplication.PageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {

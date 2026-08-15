@@ -30,7 +30,7 @@ func NewLogCtr() LogCtr {
 // @Produce application/json
 // @Param req query dtotenant.LogDetailReq true "日志详情"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.LogDetailResp}
-// @Router /v1/iam/log/detail [get]
+// @Router /v1/platform/log/detail [get]
 func (ctr *logCtr) Detail(ctx *gin.Context) {
 	var req dtotenant.LogDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -51,7 +51,7 @@ func (ctr *logCtr) Detail(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtotenant.LogPageListReq true "日志列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.LogPageListResp}
-// @Router /v1/iam/log/pageList [post]
+// @Router /v1/platform/log/pageList [post]
 func (ctr *logCtr) PageList(ctx *gin.Context) {
 	var req dtotenant.LogPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {

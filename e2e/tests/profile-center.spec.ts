@@ -12,7 +12,7 @@ test.describe('个人中心', () => {
     const profileItem = page.locator('.ant-dropdown-menu-item', { hasText: '个人中心' });
     await expect(profileItem).toBeVisible({ timeout: 5000 });
 
-    // 在触发请求前注册响应监听，验证个人中心依赖的业务接口非 404（baseURL 含 /v1/iam）
+    // 在触发请求前注册响应监听，验证个人中心依赖的业务接口非 404（baseURL 含 /v1）
     const personDetailPromise = page.waitForResponse((r) => r.url().includes('/person/detail'), { timeout: 15000 });
     const sessionsPromise = page.waitForResponse(
       (r) => r.url().includes('/user/sessions') && r.request().method() === 'GET',

@@ -33,7 +33,7 @@ func NewSystemCtr() SystemCtr {
 // @Produce application/json
 // @Param req body dtotenant.SystemCreateReq true "创建系统配置"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.SystemCreateResp}
-// @Router /v1/iam/system/create [post]
+// @Router /v1/platform/system/create [post]
 func (ctr *systemCtr) Create(ctx *gin.Context) {
 	var req dtotenant.SystemCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -54,7 +54,7 @@ func (ctr *systemCtr) Create(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtotenant.SystemDeleteReq true "删除系统配置"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/system/delete [post]
+// @Router /v1/platform/system/delete [post]
 func (ctr *systemCtr) Delete(ctx *gin.Context) {
 	var req dtotenant.SystemDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -74,7 +74,7 @@ func (ctr *systemCtr) Delete(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtotenant.SystemUpdateReq true "修改系统配置"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/iam/system/update [post]
+// @Router /v1/platform/system/update [post]
 func (ctr *systemCtr) Update(ctx *gin.Context) {
 	var req dtotenant.SystemUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -94,7 +94,7 @@ func (ctr *systemCtr) Update(ctx *gin.Context) {
 // @Produce application/json
 // @Param req query dtotenant.SystemDetailReq true "系统配置详情"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.SystemDetailResp}
-// @Router /v1/iam/system/detail [get]
+// @Router /v1/platform/system/detail [get]
 func (ctr *systemCtr) Detail(ctx *gin.Context) {
 	var req dtotenant.SystemDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -115,7 +115,7 @@ func (ctr *systemCtr) Detail(ctx *gin.Context) {
 // @Produce application/json
 // @Param req body dtotenant.SystemPageListReq true "系统配置列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.SystemPageListResp}
-// @Router /v1/iam/system/pageList [post]
+// @Router /v1/platform/system/pageList [post]
 func (ctr *systemCtr) PageList(ctx *gin.Context) {
 	var req dtotenant.SystemPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {

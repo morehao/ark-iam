@@ -47,7 +47,7 @@ func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 			}))
 	}
 
-	routerGroups := ginserver.NewRouterGroups(engine, "iam", ginserver.VersionGroup{
+	routerGroups := ginserver.NewRouterGroups(engine, "tenant", ginserver.VersionGroup{
 		Version: ginserver.ApiVersionV1,
 		Middlewares: []gin.HandlerFunc{
 			oidcauth.OIDCCompatibleAuth(getOIDCPublicKey, oidcAuthOpts...),
