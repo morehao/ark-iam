@@ -151,8 +151,12 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 	if _, ok := req.(*clientCredentialsTokenRequest); !ok {
 		t.Fatalf("expected *clientCredentialsTokenRequest, got %T", req)
 	}
-	if got := req.GetSubject(); got != "person:5" {
-		t.Fatalf("expected subject %q, got %q", "person:5", got)
+	// H1：sub/aud/client_id 一律用 key 前缀，绝不把原始 API Key 写进 token claim
+	if got := req.GetSubject(); got != "ak_1234567" {
+		t.Fatalf("expected subject %q, got %q", "ak_1234567", got)
+	}
+	if got := req.GetAudience(); len(got) != 1 || got[0] != "ak_1234567" {
+		t.Fatalf("expected audience [ak_1234567], got %v", got)
 	}
 
 	claims, err := storage.GetPrivateClaimsFromRequest(ctx, req, []string{"urn:ark:iam:admin"})
@@ -164,5 +168,11 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 	}
 	if got := claims["user_id"]; got != uint(7) {
 		t.Fatalf("expected user_id claim 7, got %v", got)
+	}
+	if got := claims["client_id"]; got != "ak_1234567" {
+		t.Fatalf("expected client_id claim %q, got %v", "ak_1234567", got)
+	}
+	if got := claims["token_usage"]; got != "machine" {
+		t.Fatalf("expected token_usage claim machine, got %v", got)
 	}
 }

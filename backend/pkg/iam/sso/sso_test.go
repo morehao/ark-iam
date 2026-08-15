@@ -23,7 +23,7 @@ func TestHasActiveSession(t *testing.T) {
 	require.False(t, active)
 
 	// 创建会话后 -> 有效
-	sid, err := store.CreateSession(ctx, 88)
+	sid, err := store.CreateSession(ctx, 88, []string{"pwd"})
 	require.NoError(t, err)
 	require.NotEmpty(t, sid)
 
@@ -55,7 +55,7 @@ func TestCreateSessionRecordsSessionAudit(t *testing.T) {
 		return nil
 	}
 
-	sid, err := store.CreateSession(ctx, 88)
+	sid, err := store.CreateSession(ctx, 88, []string{"pwd"})
 	require.NoError(t, err)
 	require.NotEmpty(t, sid)
 
@@ -85,7 +85,7 @@ func TestCreateSessionToleratesAuditWriteFailure(t *testing.T) {
 	}
 
 	// 审计落库失败不得阻断 SSO 会话创建
-	sid, err := store.CreateSession(ctx, 99)
+	sid, err := store.CreateSession(ctx, 99, []string{"pwd"})
 	require.NoError(t, err)
 	require.NotEmpty(t, sid)
 

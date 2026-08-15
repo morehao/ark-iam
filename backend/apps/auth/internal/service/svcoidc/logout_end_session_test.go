@@ -2,9 +2,12 @@ package svcoidc
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/ark-iam/pkg/testsetup"
@@ -13,9 +16,49 @@ import (
 	"gorm.io/gorm"
 )
 
+// sloQueueContended 检测共享 SLO 队列是否正被运行中的服务（logout worker）持续消费。
+// 若被外部消费，队列内容无法稳定断言（任务会被立即取走），测试应跳过而非误报失败。
+// 仅把连接存活超过 contentionMinAge 的 BRPop 消费者视为外部 worker：
+// 本测试套件自身的短超时 BRPop（几秒内）不算，避免跨包并行时误判。
+func sloQueueContended(t *testing.T) bool {
+	t.Helper()
+	const contentionMinAge = 5 * time.Second
+	clients, err := dbclient.RedisCli.ClientList(context.Background()).Result()
+	if err != nil {
+		return true // 无法探测时保守跳过
+	}
+	for _, line := range strings.Split(clients, "\n") {
+		if !strings.Contains(line, "cmd=brpop") {
+			continue
+		}
+		if age, ok := parseClientAge(line); ok && age > contentionMinAge {
+			return true
+		}
+	}
+	return false
+}
+
+// parseClientAge 从 redis CLIENT LIST 单行中解析 age=<秒> 字段。
+func parseClientAge(line string) (time.Duration, bool) {
+	for _, field := range strings.Fields(line) {
+		if strings.HasPrefix(field, "age=") {
+			secs, err := strconv.ParseInt(strings.TrimPrefix(field, "age="), 10, 64)
+			if err != nil {
+				return 0, false
+			}
+			return time.Duration(secs) * time.Second, true
+		}
+	}
+	return 0, false
+}
+
 func TestTerminateSessionFromRequestEnqueuesPreciseSidJobs(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameAuth)
 	defer testsetup.Done(testsetup.AppNameAuth)
+	// 共享 SLO 队列被运行中的 logout worker 消费时任务会被立即取走，无法稳定断言（环境问题）。
+	if sloQueueContended(t) {
+		t.Skip("shared SLO queue is being consumed by a running logout worker; skip queue assertion")
+	}
 	ctx := context.Background()
 
 	users := []model.UserEntity{

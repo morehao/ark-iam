@@ -2,7 +2,9 @@ package sso
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/stretchr/testify/require"
@@ -64,6 +66,8 @@ func TestLogoutQueueEnqueueDequeue(t *testing.T) {
 	defer testsetup.Done(testsetup.AppNameAuth)
 
 	ctx := context.Background()
+	// 使用测试独立的队列键，避免与运行中的 logout worker 共享消费（共享开发 Redis 场景）。
+	queueKey := fmt.Sprintf("iam:oidc:slo_queue:test:%d", time.Now().UnixNano())
 	job := LogoutJob{
 		SessionID:            "sid-1",
 		PersonID:             42,
@@ -72,9 +76,9 @@ func TestLogoutQueueEnqueueDequeue(t *testing.T) {
 		UserID:               "person:42",
 		BackChannelLogoutURI: "https://a.example.com/bc-logout",
 	}
-	require.NoError(t, EnqueueLogout(ctx, job))
+	require.NoError(t, enqueueLogout(ctx, queueKey, job))
 
-	got, ok, err := DequeueLogout(ctx, 0)
+	got, ok, err := dequeueLogout(ctx, queueKey, 5*time.Second)
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.Equal(t, "client-a", got.ClientID)

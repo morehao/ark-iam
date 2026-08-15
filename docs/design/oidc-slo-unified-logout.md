@@ -302,14 +302,15 @@ sequenceDiagram
 
 > **M3 完成即业务目标达成**。
 
-### M4：规范完备
+### M4：规范完备（✅ 已实现）
 
 **P8：ID token 携带 sid**
-- **实现方式（经实测，零破坏）**：不替换 token 端点，而是利用库 `op.CreateIDToken`（`zitadel/oidc/pkg/op/token.go:201`）把 `Storage.(CanGetPrivateClaimsFromRequest).GetPrivateClaimsFromRequest` 返回的 claims **merge 进 ID token / access token payload**（`mergeAndMarshalClaims`），且 `oidc.IDTokenClaims.UnmarshalJSON` 会把 payload 的 `sid` 反序列化进结构化 `SessionID` 字段。
-- 因此在 `OIDCStorage.GetPrivateClaimsFromRequest` 的 authorization_code 分支（`svcoidc/storage.go`），当 `authReq.SessionID != ""` 时往返回 claims 加 `sid`，即可让 ID token 携带 `sid`，无需 fork/自研 token 端点。
+- **实现方式（经实测，零破坏）**：zitadel 的 `op.CreateIDToken`（`zitadel/oidc/pkg/op/token.go`）对实现了 `Storage.(CanSetUserinfoFromRequest).SetUserinfoFromRequest` 的存储，会把返回的 `oidc.UserInfo.Claims` **merge 进 ID token payload**（`IDTokenClaims.SetUserInfo` 的 `gu.MapMerge`），且 `oidc.IDTokenClaims.UnmarshalJSON` 会把 payload 的 `sid` 反序列化进结构化 `SessionID` 字段。
+- 因此 `OIDCStorage` 实现 `CanSetUserinfoFromRequest`（`svcoidc/storage.go`）：authorization_code 分支取 `authReq.SessionID`、刷新分支取 `refreshTokenRequest.SessionID`，非空时写入 `userinfo.Claims["sid"]`，即可让 **ID token 携带 sid**，无需 fork/自研 token 端点。
+- 同步项：refresh token 持久化 `session_id`（`pkg/iam/model/refresh_token.go`），刷新后的 access token / ID token 继续携带 sid；`GetPrivateClaimsFromRequest` 的刷新分支回填 sid（`svcoidc/storage.go`）。
 - discovery `backchannel_logout_session_supported=true`（`oidc.go` op.Config）。
-- **验收**：ID token 含 `sid`；外部 RP 可精确匹配会话；`end_session` 用 `id_token_hint` 的 sid 精确定位并回填 logout_token.sid。
-- **风险缓解**：本方案破坏面极小（仅 private claims 注入），M3 不依赖它；即使回退 `session_supported=false` 也不影响核心登出。
+- **验收（已满足）**：ID token 含 `sid`；外部 RP 可精确匹配会话；`end_session` 用 `id_token_hint` 的 sid 精确定位并回填 logout_token.sid。
+- **风险缓解**：破坏面极小（仅 userinfo claims 注入），即使回退 `session_supported=false` 也不影响核心登出。
 
 ### M5：测试与破坏性回归
 

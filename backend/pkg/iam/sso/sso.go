@@ -50,6 +50,9 @@ var ContextKeyTenantID tenantIDCtxKey
 type ssoSessionData struct {
 	PersonID  uint      `json:"personID"`
 	CreatedAt time.Time `json:"createdAt"`
+	// AMR 原始认证方法（如 ["pwd"] / ["mfa"]）。SSO 静默续登（prompt=none / sso-login）
+	// 重新签发 token 时还原，保证 id_token 的 amr 反映原始认证，而非非标准的 "sso"。
+	AMR []string `json:"amr,omitempty"`
 }
 
 // SessionTTLOption 允许调用方为会话 TTL 注入自定义值，取代对具体应用 config 的依赖。
@@ -64,8 +67,12 @@ func WithSessionTTL(ttl time.Duration) SessionTTLOption {
 
 // SSOSessionStore 定义 SSO 中心会话的行为。
 type SSOSessionStore interface {
-	CreateSession(ctx context.Context, personID uint) (string, error)
+	// CreateSession 创建会话并返回会话 ID。amr 为该会话的原始认证方法引用，
+	// 供后续静默续登还原到 id_token 的 amr 声明。
+	CreateSession(ctx context.Context, personID uint, amr []string) (string, error)
 	ValidateSession(ctx context.Context, sessionID string) (uint, error)
+	// SessionAMR 返回会话创建时的认证方法引用；会话不存在时返回 nil。
+	SessionAMR(ctx context.Context, sessionID string) []string
 	RevokeSession(ctx context.Context, sessionID string) error
 	RevokeSessionsByPersonID(ctx context.Context, personID uint) error
 	HasActiveSession(ctx context.Context, personID uint) (bool, error)
@@ -137,7 +144,7 @@ func generateSessionID() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-func (s *redisSSOSessionStore) CreateSession(ctx context.Context, personID uint) (string, error) {
+func (s *redisSSOSessionStore) CreateSession(ctx context.Context, personID uint, amr []string) (string, error) {
 	if s.client == nil {
 		return "", fmt.Errorf("redis client not available")
 	}
@@ -148,6 +155,7 @@ func (s *redisSSOSessionStore) CreateSession(ctx context.Context, personID uint)
 	data := ssoSessionData{
 		PersonID:  personID,
 		CreatedAt: time.Now(),
+		AMR:       append([]string(nil), amr...),
 	}
 	encoded, err := json.Marshal(data)
 	if err != nil {
@@ -183,6 +191,22 @@ func (s *redisSSOSessionStore) ValidateSession(ctx context.Context, sessionID st
 		return 0, fmt.Errorf("failed to unmarshal session data: %w", err)
 	}
 	return data.PersonID, nil
+}
+
+// SessionAMR 读取会话创建时的认证方法引用；会话不存在或解析失败返回 nil。
+func (s *redisSSOSessionStore) SessionAMR(ctx context.Context, sessionID string) []string {
+	if s.client == nil {
+		return nil
+	}
+	encoded, err := s.client.Get(ctx, ssoSessionKey(sessionID)).Bytes()
+	if err != nil {
+		return nil
+	}
+	var data ssoSessionData
+	if err := json.Unmarshal(encoded, &data); err != nil {
+		return nil
+	}
+	return append([]string(nil), data.AMR...)
 }
 
 func (s *redisSSOSessionStore) RevokeSession(ctx context.Context, sessionID string) error {

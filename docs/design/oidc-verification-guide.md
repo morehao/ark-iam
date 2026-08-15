@@ -26,9 +26,20 @@ oidc:
   authRequestTTL: 600
   authCodeTTL: 300
   spentCodeTTL: 86400
+  # SSO 会话 cookie：生产（HTTPS）必须 cookieSecure: true；
+  # 跨站 SSO 场景 cookieSameSite: none（且必须配合 cookieSecure: true）。
+  cookieSecure: false
+  cookieSameSite: lax
 ```
 
-确认签名私钥文件 `backend/apps/gateway/config/oidc-dev-key.pem` 存在。
+> **密钥 fail-closed**：非 dev 环境（`server.env` 非 dev/空）未配置 `signingPrivateKeyPath/PEM` 或 `encryptionKey` 时应用拒绝启动，不再自动生成临时密钥（临时密钥会导致重启后已签发 token 全部失效且各 RP 公钥失同步）。
+
+确认签名私钥文件存在。`signingPrivateKeyPath` 为相对路径，解析取决于进程工作目录：
+
+- `make run APP=gateway`（`cd backend && go run ...`）→ 工作目录为 `backend/`，实际加载 **`backend/config/oidc-dev-key.pem`**；
+- IDE/独立启动（工作目录在 `backend/apps/<app>/`）→ 加载 `backend/apps/<app>/config/oidc-dev-key.pem`。
+
+> **密钥一致性（必须）**：仓库内所有 `oidc-dev-key.pem` 副本（`backend/config/` 与各 `apps/*/config/`）必须为同一把密钥且全部入库。若某副本缺失，dev 环境启动时 OP 会自动生成新密钥写入，导致不同目录启动的进程密钥不一致——已签发 token 全部 401（`invalid token`）。改 key 后需重启 gateway 并重新登录。
 
 ## 2. 运行自动化测试
 
@@ -506,4 +517,10 @@ loaded signing key from config/oidc-dev-key.pem (keyID=dev-oidc-key)
 [ ] Refresh Token 可用
 [ ] 密码错误场景返回正确错误码
 [ ] 无效 authRequestID 场景返回 100799
+[ ] RP 中间件校验 iss/aud（平台管理只认 platform-admin-web 的 aud，租户管理只认 tenant-admin-web）
+[ ] require_pkce=1 的客户端缺少 code_challenge 时授权请求被拒绝
+[ ] 刷新 token 后 scope 与原始授权一致（含 email/offline_access，不再缩水为 openid+profile）
+[ ] introspection 返回 scope/client_id/sub/exp/username 等完整信息
+[ ] userinfo 只返回 token 实际授权 scope 内的声明
+[ ] email_verified 为 false（无邮箱验证流程，不宣称已验证）
 ```

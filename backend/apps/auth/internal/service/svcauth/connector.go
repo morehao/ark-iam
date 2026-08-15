@@ -471,7 +471,8 @@ func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorC
 
 	// Connector 登录成功后建立 SSO 会话，与账密/OIDC 登录走同一套 person 级中心会话；
 	// 不再签发独立 HS256 person token（token 统一为 OIDC RS256，见设计文档 §4.4）。
-	sessionID, err := svc.getSSOSessionStore().CreateSession(runtimeContext(ctx), resolvedPerson.Person.ID)
+	// amr 记录外部 IdP 认证方式（connector 名），供静默续登还原到 id_token。
+	sessionID, err := svc.getSSOSessionStore().CreateSession(runtimeContext(ctx), resolvedPerson.Person.ID, []string{"ext"})
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.Callback] create sso session fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.AuthLoginFailedError)

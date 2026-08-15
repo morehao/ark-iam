@@ -252,12 +252,15 @@ func TestGetPrivateClaimsFromRequestForClientCredentials(t *testing.T) {
 	}
 }
 
-func TestResolveAudienceFromScopes(t *testing.T) {
-	if got := resolveAudienceFromScopes([]string{"openid", "urn:ark:iam:admin"}); got != "urn:ark:iam:admin" {
-		t.Fatalf("expected urn:ark:iam:admin, got %q", got)
+func TestResolveAudienceFromRequest(t *testing.T) {
+	// RFC 8707：resource 参数优先
+	resourceCtx := context.WithValue(context.Background(), ctxResourceKey, "https://api.example.com")
+	if got := resolveAudienceFromRequest(resourceCtx, "client-1"); got != "https://api.example.com" {
+		t.Fatalf("expected resource audience, got %q", got)
 	}
-	if got := resolveAudienceFromScopes([]string{"openid", "profile", "email", "phone", "offline_access"}); got != "" {
-		t.Fatalf("expected empty audience for standard scopes, got %q", got)
+	// 无 resource：回退到 client 标识（不再把自定义 scope 当 audience）
+	if got := resolveAudienceFromRequest(context.Background(), "client-1"); got != "client-1" {
+		t.Fatalf("expected default client audience, got %q", got)
 	}
 }
 

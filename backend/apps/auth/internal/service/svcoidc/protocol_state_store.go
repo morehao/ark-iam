@@ -15,12 +15,13 @@ import (
 )
 
 var (
-	ErrStoreUnavailable    = errors.New("oidc protocol state store unavailable")
-	ErrSessionNotFound     = errors.New("auth request not found")
-	ErrCodeInvalid         = errors.New("authorization code invalid")
-	ErrCodeAlreadyUsed     = errors.New("authorization code already used")
-	ErrCodeCollision       = errors.New("authorization code collision")
-	ErrSessionNotCompleted = errors.New("auth request not completed")
+	ErrStoreUnavailable               = errors.New("oidc protocol state store unavailable")
+	ErrSessionNotFound                = errors.New("auth request not found")
+	ErrCodeInvalid                    = errors.New("authorization code invalid")
+	ErrCodeAlreadyUsed                = errors.New("authorization code already used")
+	ErrCodeCollision                  = errors.New("authorization code collision")
+	ErrSessionNotCompleted            = errors.New("auth request not completed")
+	ErrCodeChallengeMethodUnsupported = errors.New("unsupported code challenge method")
 )
 
 type ProtocolStateStore interface {
@@ -28,7 +29,7 @@ type ProtocolStateStore interface {
 	AuthRequestByID(ctx context.Context, id string) (op.AuthRequest, error)
 	AuthRequestByCode(ctx context.Context, code string) (op.AuthRequest, error)
 	SaveAuthCode(ctx context.Context, id, code string) error
-	CompleteAuthRequest(id string, subject string, authTime time.Time, amr []string, acr string, tenantID uint, done bool) error
+	CompleteAuthRequest(ctx context.Context, id string, subject string, authTime time.Time, amr []string, acr string, tenantID uint, done bool) error
 	AssociateSession(ctx context.Context, id string, sessionID string) error
 	DeleteAuthRequest(ctx context.Context, id string) error
 	ConsumeAuthCode(ctx context.Context, code string) (op.AuthRequest, error)
@@ -87,8 +88,12 @@ func (s *RedisProtocolStateStore) Health(ctx context.Context) error {
 }
 
 func (s *RedisProtocolStateStore) CreateAuthRequest(ctx context.Context, authReq *oidc.AuthRequest, userID string, tenantID uint) (op.AuthRequest, error) {
+	reqID, err := randomTokenID("ar")
+	if err != nil {
+		return nil, fmt.Errorf("generate auth request id: %w", err)
+	}
 	req := &AuthRequest{
-		ID:           fmt.Sprintf("ar-%d", time.Now().UnixNano()),
+		ID:           reqID,
 		ClientID:     authReq.ClientID,
 		RedirectURI:  authReq.RedirectURI,
 		State:        authReq.State,
@@ -103,13 +108,14 @@ func (s *RedisProtocolStateStore) CreateAuthRequest(ctx context.Context, authReq
 		ExpiresAt:    time.Now().Add(defaultAuthRequestTTL()),
 	}
 	if authReq.CodeChallenge != "" {
-		method := oidc.CodeChallengeMethodS256
-		if authReq.CodeChallengeMethod == "plain" {
-			method = oidc.CodeChallengeMethodPlain
+		// 仅接受 S256：discovery 的 code_challenge_methods_supported 只声明 S256，
+		// plain 会被 RFC 7636 认为可被窃听的降级通道，一律拒绝。
+		if authReq.CodeChallengeMethod != "" && authReq.CodeChallengeMethod != oidc.CodeChallengeMethodS256 {
+			return nil, ErrCodeChallengeMethodUnsupported
 		}
 		req.CodeChallenge = &oidc.CodeChallenge{
 			Challenge: authReq.CodeChallenge,
-			Method:    method,
+			Method:    oidc.CodeChallengeMethodS256,
 		}
 	}
 	data, err := json.Marshal(req)
@@ -140,8 +146,7 @@ func (s *RedisProtocolStateStore) AuthRequestByID(ctx context.Context, id string
 	return &req, nil
 }
 
-func (s *RedisProtocolStateStore) CompleteAuthRequest(id string, subject string, authTime time.Time, amr []string, acr string, tenantID uint, done bool) error {
-	ctx := context.Background()
+func (s *RedisProtocolStateStore) CompleteAuthRequest(ctx context.Context, id string, subject string, authTime time.Time, amr []string, acr string, tenantID uint, done bool) error {
 	data, err := s.client.Get(ctx, authRequestKey(id)).Bytes()
 	if errors.Is(err, redis.Nil) {
 		return ErrSessionNotFound

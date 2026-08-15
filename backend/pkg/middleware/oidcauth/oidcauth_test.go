@@ -13,9 +13,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/stretchr/testify/assert"
@@ -193,7 +193,103 @@ func TestAPIKeyParallelAuth(t *testing.T) {
 
 func apiKeyHashForTest(t *testing.T) (raw, hash string) {
 	t.Helper()
-	raw = "test-raw-key-1234567890abcdef" 
+	raw = "test-raw-key-1234567890abcdef"
 	sum := sha256.Sum256([]byte(raw))
 	return raw, hex.EncodeToString(sum[:])
+}
+
+func TestRejectsTokenWithWrongIssuer(t *testing.T) {
+	// H3：配置 issuer 后，iss 不匹配的 token 一律拒绝
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
+	gin.SetMode(gin.TestMode)
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	r := gin.New()
+	r.Use(OIDCCompatibleAuth(func() *rsa.PublicKey { return &key.PublicKey },
+		WithOIDCIssuer("http://localhost:8099/oidc")))
+	r.GET("/v1/test", func(ctx *gin.Context) { ctx.Status(http.StatusOK) })
+
+	claims := jwt.MapClaims{
+		"sub":       "person:88",
+		"tenant_id": float64(1),
+		"aud":       "test-client",
+		"iss":       "http://evil.example.com/oidc",
+		"exp":       time.Now().Add(time.Hour).Unix(),
+		"iat":       time.Now().Unix(),
+	}
+	tok := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	s, err := tok.SignedString(key)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
+	req.Header.Set(AuthHeaderKey, AuthBearer+s)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestRejectsTokenWithWrongAudience(t *testing.T) {
+	// H3：配置 audiences 后，aud 不含本应用 client_id 的 token 一律拒绝（跨 client 串用防护）
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
+	gin.SetMode(gin.TestMode)
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	r := gin.New()
+	r.Use(OIDCCompatibleAuth(func() *rsa.PublicKey { return &key.PublicKey },
+		WithOIDCIssuer("http://localhost:8099/oidc"),
+		WithOIDCAudiences("platform-admin-web")))
+	r.GET("/v1/test", func(ctx *gin.Context) { ctx.Status(http.StatusOK) })
+
+	claims := jwt.MapClaims{
+		"sub":       "person:88",
+		"tenant_id": float64(1),
+		"aud":       "tenant-admin-web", // 另一个 client 的 token
+		"iss":       "http://localhost:8099/oidc",
+		"exp":       time.Now().Add(time.Hour).Unix(),
+		"iat":       time.Now().Unix(),
+	}
+	tok := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	s, err := tok.SignedString(key)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
+	req.Header.Set(AuthHeaderKey, AuthBearer+s)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestAcceptsTokenWithMatchingIssuerAndAudience(t *testing.T) {
+	// H3：iss/aud 均匹配时放行
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
+	gin.SetMode(gin.TestMode)
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	r := gin.New()
+	r.Use(OIDCCompatibleAuth(func() *rsa.PublicKey { return &key.PublicKey },
+		WithOIDCIssuer("http://localhost:8099/oidc"),
+		WithOIDCAudiences("platform-admin-web"),
+		WithOIDCSSOValidation(func(ctx *gin.Context, personID uint, isMachineToken bool) bool { return true })))
+	r.GET("/v1/test", func(ctx *gin.Context) { ctx.Status(http.StatusOK) })
+
+	claims := jwt.MapClaims{
+		"sub":       "person:88",
+		"tenant_id": float64(1),
+		"aud":       "platform-admin-web",
+		"iss":       "http://localhost:8099/oidc",
+		"exp":       time.Now().Add(time.Hour).Unix(),
+		"iat":       time.Now().Unix(),
+	}
+	tok := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	s, err := tok.SignedString(key)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
+	req.Header.Set(AuthHeaderKey, AuthBearer+s)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
 }

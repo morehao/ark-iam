@@ -10,8 +10,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/ark-iam/pkg/middleware/oidcauth"
-	"github.com/morehao/ark-iam/pkg/token"
-	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
 	"github.com/morehao/golib/biz/gserver/gindocs"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 	"github.com/morehao/golib/glog"
@@ -23,32 +21,38 @@ func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 	config.Conf = Conf
 
 	ssoStore := sso.NewSSOSessionStore()
+	oidcAuthOpts := []oidcauth.AuthOption{}
+	if Conf != nil && Conf.OIDC.Issuer != "" {
+		// H3：auth 作为 OP 自身，其 /v1/auth/* 接口接受任一合法 client 签发的 token，
+		// 因此只校验 iss（必须是本 OP），aud 由各业务应用（RP）自行收紧。
+		oidcAuthOpts = append(oidcAuthOpts, oidcauth.WithOIDCIssuer(Conf.OIDC.Issuer))
+	}
+	oidcAuthOpts = append(oidcAuthOpts,
+		oidcauth.WithAuthSkipPaths(
+			"/v1/auth/register",
+			"/v1/auth/connector/callback",
+		),
+		oidcauth.WithOIDCSSOValidation(func(ctx *gin.Context, personID uint, isMachineToken bool) bool {
+			// 机器凭证（client_credentials/API Key）不依赖浏览器 SSO 会话活性，直接放行
+			if isMachineToken {
+				return true
+			}
+			// 无 Redis 时无法校验会话，采取放行（fail-open），避免破坏无 Redis 的环境
+			if dbclient.RedisCli == nil {
+				return true
+			}
+			active, err := ssoStore.HasActiveSession(ctx.Request.Context(), personID)
+			if err != nil {
+				glog.Warnf(ctx, "[app.Init] HasActiveSession fail, personID:%d, err:%v", personID, err)
+				return true
+			}
+			return active
+		}),
+	)
 	routerGroups := ginserver.NewRouterGroups(engine, "auth", ginserver.VersionGroup{
 		Version: ginserver.ApiVersionV1,
 		Middlewares: []gin.HandlerFunc{
-			oidcauth.OIDCCompatibleAuth(func() *rsa.PublicKey { return authRouter.OIDCPublicKey },
-				oidcauth.WithAuthSkipPaths(
-					"/v1/auth/register",
-					"/v1/auth/connector/callback",
-				),
-				oidcauth.WithOIDCSSOValidation(func(ctx *gin.Context, personID uint, isMachineToken bool) bool {
-					// 机器凭证（client_credentials/API Key）不依赖浏览器 SSO 会话活性，直接放行
-					if isMachineToken {
-						return true
-					}
-					// 无 Redis 时无法校验会话，采取放行（fail-open），避免破坏无 Redis 的环境
-					if dbclient.RedisCli == nil {
-						return true
-					}
-					active, err := ssoStore.HasActiveSession(ctx.Request.Context(), personID)
-					if err != nil {
-						glog.Warnf(ctx, "[app.Init] HasActiveSession fail, personID:%d, err:%v", personID, err)
-						return true
-					}
-					return active
-				})),
-			ginmiddleware.TokenBlacklistCheck(dbclient.RedisCli,
-				ginmiddleware.WithBlacklistKeyPrefix(token.TokenBlacklistKeyPrefix)),
+			oidcauth.OIDCCompatibleAuth(func() *rsa.PublicKey { return authRouter.OIDCPublicKey }, oidcAuthOpts...),
 		},
 	})
 

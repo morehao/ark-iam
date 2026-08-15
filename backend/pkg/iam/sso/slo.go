@@ -43,21 +43,32 @@ func (j LogoutJob) encode() string {
 
 // EnqueueLogout 将一条登出通知任务推入 Redis FIFO 队列，供背信道 worker 异步消费。
 func EnqueueLogout(ctx context.Context, job LogoutJob) error {
+	return enqueueLogout(ctx, ssoLogoutQueueKey, job)
+}
+
+// enqueueLogout 与 DequeueLogout 类似，但允许指定队列键，
+// 供测试使用独立队列避免与运行中的 worker 共享消费。
+func enqueueLogout(ctx context.Context, queueKey string, job LogoutJob) error {
 	if dbclient.RedisCli == nil {
 		return fmt.Errorf("redis client not available")
 	}
 	if job.CreatedAt.IsZero() {
 		job.CreatedAt = time.Now()
 	}
-	return dbclient.RedisCli.LPush(ctx, ssoLogoutQueueKey, job.encode()).Err()
+	return dbclient.RedisCli.LPush(ctx, queueKey, job.encode()).Err()
 }
 
 // DequeueLogout 阻塞地从队列取出（BRPOP）一条登出任务；无任务时返回 ok=false。
 func DequeueLogout(ctx context.Context, timeout time.Duration) (LogoutJob, bool, error) {
+	return dequeueLogout(ctx, ssoLogoutQueueKey, timeout)
+}
+
+// dequeueLogout 与 DequeueLogout 类似，但允许指定队列键。
+func dequeueLogout(ctx context.Context, queueKey string, timeout time.Duration) (LogoutJob, bool, error) {
 	if dbclient.RedisCli == nil {
 		return LogoutJob{}, false, fmt.Errorf("redis client not available")
 	}
-	vals, err := dbclient.RedisCli.BRPop(ctx, timeout, ssoLogoutQueueKey).Result()
+	vals, err := dbclient.RedisCli.BRPop(ctx, timeout, queueKey).Result()
 	if err == redis.Nil || len(vals) < 2 {
 		return LogoutJob{}, false, nil
 	}

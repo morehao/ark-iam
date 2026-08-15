@@ -93,11 +93,13 @@ clean:
 # ============================================================
 
 # 直接用 go run 启动（开发调试用）
+# 注意：必须在 backend/apps/<app>/cmd 目录下启动——config（../config/config.yaml）、
+# 签名密钥（config/oidc-dev-key.pem）、日志（../../../log）等相对路径均按该 CWD 设计。
 run:
 	$(call validate_app)
 	@echo "🚀 正在运行应用程序 $(APP)..."
 	@cd backend && go work sync && cd ..
-	@cd backend && go run $(MAIN_DIR)
+	@cd backend/apps/$(APP)/cmd && go run .
 
 # 运行单元测试
 test:

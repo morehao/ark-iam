@@ -10,7 +10,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -40,6 +39,23 @@ type OIDCProvider struct {
 	issuer   string
 }
 
+// isDevEnv 判断当前环境是否为开发环境（dev/空）。
+// 密钥 fail-closed 规则仅对非 dev 环境生效：生产必须显式配置签名/加密密钥。
+func isDevEnv() bool {
+	if appconfig.Conf == nil {
+		return true
+	}
+	return appconfig.Conf.Server.Env == "" || appconfig.Conf.Server.Env == "dev"
+}
+
+// isSupportedRSAPrivateKeyBlock 判断 PEM 块是否为受支持的 RSA 私钥编码：
+// PKCS#1（"RSA PRIVATE KEY"）或 PKCS#8（"PRIVATE KEY"）。两者后续均由
+// ParsePKCS8PrivateKey 优先解析、ParsePKCS1PrivateKey 兜底，与 RP 侧
+// oidcauth.LoadSigningPublicKey 的宽容解析保持一致。
+func isSupportedRSAPrivateKeyBlock(blockType string) bool {
+	return blockType == "RSA PRIVATE KEY" || blockType == "PRIVATE KEY"
+}
+
 func loadSigningKey() (*rsa.PrivateKey, string, error) {
 	if appconfig.Conf == nil {
 		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -52,6 +68,11 @@ func loadSigningKey() (*rsa.PrivateKey, string, error) {
 		if err != nil {
 			if !os.IsNotExist(err) {
 				return nil, "", err
+			}
+			// H4：非 dev 环境显式配置了路径但文件缺失时 fail-closed——
+			// 自动生成新密钥会静默更换 kid，导致所有已签发 token 失效且各 RP 公钥失同步。
+			if !isDevEnv() {
+				return nil, "", fmt.Errorf("signing private key file not found: %s (refusing to auto-generate in non-dev)", cfg.SigningPrivateKeyPath)
 			}
 			privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 			if err != nil {
@@ -78,7 +99,7 @@ func loadSigningKey() (*rsa.PrivateKey, string, error) {
 			return privateKey, keyID, nil
 		}
 		block, _ := pem.Decode(pemData)
-		if block == nil || block.Type != "RSA PRIVATE KEY" {
+		if block == nil || !isSupportedRSAPrivateKeyBlock(block.Type) {
 			return nil, "", fmt.Errorf("invalid RSA private key PEM: %s", cfg.SigningPrivateKeyPath)
 		}
 		privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
@@ -101,7 +122,7 @@ func loadSigningKey() (*rsa.PrivateKey, string, error) {
 
 	if cfg.SigningPrivateKeyPEM != "" {
 		block, _ := pem.Decode([]byte(cfg.SigningPrivateKeyPEM))
-		if block == nil || block.Type != "RSA PRIVATE KEY" {
+		if block == nil || !isSupportedRSAPrivateKeyBlock(block.Type) {
 			return nil, "", fmt.Errorf("invalid RSA private key PEM in config")
 		}
 		privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
@@ -122,6 +143,11 @@ func loadSigningKey() (*rsa.PrivateKey, string, error) {
 		return rsaKey, keyID, nil
 	}
 
+	// H4：未配置任何签名密钥时，仅 dev 环境允许生成临时密钥；
+	// 非 dev 环境 fail-closed，避免重启后 token 全量失效与 RP 公钥失同步。
+	if !isDevEnv() {
+		return nil, "", fmt.Errorf("oidc signing key not configured (set signingPrivateKeyPath or signingPrivateKeyPEM)")
+	}
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, "", err
@@ -129,18 +155,25 @@ func loadSigningKey() (*rsa.PrivateKey, string, error) {
 	return privateKey, "auto-key", nil
 }
 
-func loadEncryptionKey() ([32]byte, string) {
-	encKeyStr := "test-key-32-bytes-for-oidc-encrp"
-	encKeyID := "enc-key-1"
-	if appconfig.Conf != nil {
-		if appconfig.Conf.OIDC.EncryptionKey != "" {
-			encKeyStr = appconfig.Conf.OIDC.EncryptionKey
-		}
-		if appconfig.Conf.OIDC.EncryptionKeyID != "" {
-			encKeyID = appconfig.Conf.OIDC.EncryptionKeyID
-		}
+func loadEncryptionKey() ([32]byte, string, error) {
+	if appconfig.Conf == nil {
+		return sha256.Sum256([]byte("test-key-32-bytes-for-oidc-encrp")), "enc-key-1", nil
 	}
-	return sha256.Sum256([]byte(encKeyStr)), encKeyID
+	cfg := &appconfig.Conf.OIDC
+	encKeyStr := cfg.EncryptionKey
+	encKeyID := cfg.EncryptionKeyID
+	if encKeyID == "" {
+		encKeyID = "enc-key-1"
+	}
+	// H4：非 dev 环境必须显式配置 encryptionKey；
+	// 缺省测试密钥是公开常量，生产使用等于 auth code 可被伪造。
+	if encKeyStr == "" {
+		if !isDevEnv() {
+			return [32]byte{}, "", fmt.Errorf("oidc encryptionKey not configured (required in non-dev)")
+		}
+		encKeyStr = "test-key-32-bytes-for-oidc-encrp"
+	}
+	return sha256.Sum256([]byte(encKeyStr)), encKeyID, nil
 }
 
 func SetupOIDCProvider(issuer string) (*OIDCProvider, error) {
@@ -151,7 +184,10 @@ func SetupOIDCProvider(issuer string) (*OIDCProvider, error) {
 
 	storage := NewOIDCStorage(NewRedisProtocolStateStore(), NewPersistentStore(), privateKey, keyID)
 
-	encKey, encKeyID := loadEncryptionKey()
+	encKey, encKeyID, err := loadEncryptionKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load OIDC encryption key: %w", err)
+	}
 
 	opConfig := &op.Config{
 		CryptoKey:                         encKey,
@@ -197,8 +233,8 @@ func (p *OIDCProvider) BuildAuthCallbackURL(ctx context.Context, authRequestID s
 
 type OIDCAuthSvc interface {
 	CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error)
-	SelectTenant(ctx context.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error)
-	CompleteLoginBySession(ctx context.Context, authRequestID string, sessionID string) (string, error)
+	SelectTenant(ctx *gin.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error)
+	CompleteLoginBySession(ctx *gin.Context, authRequestID string, sessionID string) (string, error)
 }
 
 type passwordAuthenticator interface {
@@ -249,7 +285,7 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	}
 	// 多租户：除非有合法的 tenant hint，否则暂不 done、不发 code，需用户先选租户
 	if resolvedTenant == 0 && len(tenants) > 1 {
-		if err := svc.provider.Storage.CompleteAuthRequest(req.AuthRequestID, subject, authTime, []string{"pwd"}, "", 0, false); err != nil {
+		if err := svc.provider.Storage.CompleteAuthRequest(ctx.Request.Context(), req.AuthRequestID, subject, authTime, []string{"pwd"}, "", 0, false); err != nil {
 			return nil, code.GetError(code.OIDCSessionNotFound)
 		}
 		return &dtooidc.OIDCLoginResp{
@@ -262,7 +298,7 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	if tenantID == 0 {
 		tenantID = userEntity.TenantID
 	}
-	if err := svc.provider.Storage.CompleteAuthRequest(req.AuthRequestID, subject, authTime, []string{"pwd"}, "", tenantID, true); err != nil {
+	if err := svc.provider.Storage.CompleteAuthRequest(ctx.Request.Context(), req.AuthRequestID, subject, authTime, []string{"pwd"}, "", tenantID, true); err != nil {
 		return nil, code.GetError(code.OIDCSessionNotFound)
 	}
 
@@ -279,7 +315,7 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	}
 
 	if svc.ssoSessionStore != nil {
-		sessionID, err := svc.ssoSessionStore.CreateSession(sessionAuditContext(ctx.Request.Context(), tenantID), personEntity.ID)
+		sessionID, err := svc.ssoSessionStore.CreateSession(sessionAuditContext(ctx.Request.Context(), tenantID), personEntity.ID, []string{"pwd"})
 		if err != nil {
 			glog.Warnf(ctx, "[oidcAuthSvc.CompleteLogin] failed to create sso session: %v", err)
 		} else {
@@ -293,8 +329,9 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	return resp, nil
 }
 
-func (svc *oidcAuthSvc) SelectTenant(ctx context.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error) {
-	authReq, err := svc.provider.Storage.AuthRequestByID(ctx, authRequestID)
+func (svc *oidcAuthSvc) SelectTenant(ctx *gin.Context, authRequestID string, tenantID uint) (*dtooidc.OIDCLoginResp, error) {
+	reqCtx := ctx.Request.Context()
+	authReq, err := svc.provider.Storage.AuthRequestByID(reqCtx, authRequestID)
 	if err != nil {
 		return nil, code.GetError(code.OIDCSessionNotFound)
 	}
@@ -305,7 +342,7 @@ func (svc *oidcAuthSvc) SelectTenant(ctx context.Context, authRequestID string, 
 	if perr != nil {
 		return nil, code.GetError(code.OIDCSessionNotFound)
 	}
-	tenants, terr := svc.authSvc.TenantsForPerson(ginContextFromContext(ctx), personID)
+	tenants, terr := svc.authSvc.TenantsForPerson(ctx, personID)
 	if terr != nil {
 		return nil, code.GetError(code.OIDCSessionNotFound)
 	}
@@ -319,30 +356,30 @@ func (svc *oidcAuthSvc) SelectTenant(ctx context.Context, authRequestID string, 
 	if !ok {
 		return nil, code.GetError(code.TenantNotExistError)
 	}
-	if err := svc.provider.Storage.CompleteAuthRequest(authRequestID, authReq.GetSubject(), authReq.GetAuthTime(), authReq.GetAMR(), "", tenantID, true); err != nil {
+	if err := svc.provider.Storage.CompleteAuthRequest(reqCtx, authRequestID, authReq.GetSubject(), authReq.GetAuthTime(), authReq.GetAMR(), "", tenantID, true); err != nil {
 		return nil, code.GetError(code.OIDCSessionNotFound)
 	}
 	allowPersonCreateTenant := false
 	if cid := authReq.GetClientID(); cid != "" {
-		allowPersonCreateTenant = svc.resolveAllowPersonCreateTenant(ginContextFromContext(ctx), cid, len(tenants))
+		allowPersonCreateTenant = svc.resolveAllowPersonCreateTenant(ctx, cid, len(tenants))
 	}
 	resp := &dtooidc.OIDCLoginResp{
-		ContinueURL:             svc.provider.BuildAuthCallbackURL(ctx, authRequestID),
+		ContinueURL:             svc.provider.BuildAuthCallbackURL(reqCtx, authRequestID),
 		TenantID:                tenantID,
 		Tenants:                 tenants,
 		AllowPersonCreateTenant: allowPersonCreateTenant,
 	}
 	if svc.ssoSessionStore != nil {
-		if sessionID, sErr := svc.ssoSessionStore.CreateSession(sessionAuditContext(ctx, tenantID), personID); sErr == nil {
+		if sessionID, sErr := svc.ssoSessionStore.CreateSession(sessionAuditContext(reqCtx, tenantID), personID, authReq.GetAMR()); sErr == nil {
 			resp.SessionID = sessionID
-			if aErr := svc.provider.Storage.AssociateSession(ctx, authRequestID, sessionID); aErr != nil {
+			if aErr := svc.provider.Storage.AssociateSession(reqCtx, authRequestID, sessionID); aErr != nil {
 				glog.Warnf(ctx, "[oidcAuthSvc.SelectTenant] associate session fail, err:%v, authRequestID:%s, sessionID:%s", aErr, authRequestID, sessionID)
 			}
 		} else {
 			glog.Warnf(ctx, "[oidcAuthSvc.SelectTenant] failed to create sso session: %v", sErr)
 		}
 	}
-	svcaudit.WriteAudit(ginContextFromContext(ctx), svcaudit.AuditEntry{
+	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
 		Action:     svcaudit.ActionTenantSwitch,
 		TenantID:   tenantID,
 		Result:     "success",
@@ -352,19 +389,20 @@ func (svc *oidcAuthSvc) SelectTenant(ctx context.Context, authRequestID string, 
 	return resp, nil
 }
 
-func (svc *oidcAuthSvc) CompleteLoginBySession(ctx context.Context, authRequestID string, sessionID string) (string, error) {
-	personID, err := svc.ssoSessionStore.ValidateSession(ctx, sessionID)
+func (svc *oidcAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID string, sessionID string) (string, error) {
+	reqCtx := ctx.Request.Context()
+	personID, err := svc.ssoSessionStore.ValidateSession(reqCtx, sessionID)
 	if err != nil {
 		return "", err
 	}
 
-	authReq, err := svc.provider.Storage.AuthRequestByID(ctx, authRequestID)
+	authReq, err := svc.provider.Storage.AuthRequestByID(reqCtx, authRequestID)
 	if err != nil {
 		return "", err
 	}
 
 	tenantID := uint(0)
-	tenants, tErr := svc.authSvc.TenantsForPerson(ginContextFromContext(ctx), personID)
+	tenants, tErr := svc.authSvc.TenantsForPerson(ctx, personID)
 	if tErr == nil {
 		if ar, ok := authReq.(*AuthRequest); ok {
 			if hint := ar.GetTenantID(); hint != 0 {
@@ -383,11 +421,16 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx context.Context, authRequestI
 	}
 
 	authTime := time.Now()
-	if err := svc.provider.Storage.CompleteAuthRequest(authRequestID, buildOIDCSubject(personID), authTime, []string{"sso"}, "", tenantID, true); err != nil {
+	// L7：amr 还原会话创建时的原始认证方法（如 ["pwd"]），不再使用非标准的 "sso"。
+	amr := svc.ssoSessionStore.SessionAMR(reqCtx, sessionID)
+	if len(amr) == 0 {
+		amr = []string{"pwd"}
+	}
+	if err := svc.provider.Storage.CompleteAuthRequest(reqCtx, authRequestID, buildOIDCSubject(personID), authTime, amr, "", tenantID, true); err != nil {
 		return "", err
 	}
 
-	svcaudit.WriteAudit(ginContextFromContext(ctx), svcaudit.AuditEntry{
+	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
 		Action:     svcaudit.ActionLogin,
 		TenantID:   tenantID,
 		Result:     "success",
@@ -395,24 +438,16 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx context.Context, authRequestI
 		TargetID:   personID,
 	})
 
-	if aErr := svc.provider.Storage.AssociateSession(ctx, authRequestID, sessionID); aErr != nil {
+	if aErr := svc.provider.Storage.AssociateSession(reqCtx, authRequestID, sessionID); aErr != nil {
 		glog.Warnf(ctx, "[oidcAuthSvc.CompleteLoginBySession] associate session fail, err:%v, authRequestID:%s, sessionID:%s", aErr, authRequestID, sessionID)
 	}
 
-	return svc.provider.BuildAuthCallbackURL(ctx, authRequestID), nil
+	return svc.provider.BuildAuthCallbackURL(reqCtx, authRequestID), nil
 }
 
 // sessionAuditContext 将已解析的租户写入 context，供 CreateSession 落库 session 审计时读取 tenant_id。
 func sessionAuditContext(ctx context.Context, tenantID uint) context.Context {
 	return context.WithValue(ctx, sso.ContextKeyTenantID, tenantID)
-}
-
-func ginContextFromContext(ctx context.Context) *gin.Context {
-	req, _ := http.NewRequest(http.MethodGet, "/", nil)
-	req = req.WithContext(ctx)
-	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Request = req
-	return ginCtx
 }
 
 func clientIDFromAuthRequest(authReq op.AuthRequest) string {

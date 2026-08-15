@@ -23,6 +23,11 @@ const (
 type authConfig struct {
 	skipPaths       []string
 	validateOIDCSSO func(ctx *gin.Context, personID uint, isMachineToken bool) bool
+	// issuer 为 OP 的 issuer，配置后强制校验 access token 的 iss（H3）。
+	issuer string
+	// audiences 为本应用（RP）认可的 aud 集合，配置后强制校验 access token 的 aud，
+	// 防止同一 OP 下其它 client 的 token 串用本应用接口。
+	audiences []string
 }
 
 type AuthOption func(*authConfig)
@@ -30,6 +35,22 @@ type AuthOption func(*authConfig)
 func WithAuthSkipPaths(paths ...string) AuthOption {
 	return func(c *authConfig) {
 		c.skipPaths = append(c.skipPaths, paths...)
+	}
+}
+
+// WithOIDCIssuer 注入期望的 OP issuer。设置后 access token 的 iss 必须精确匹配，
+// 否则按无效 token 拒绝。
+func WithOIDCIssuer(issuer string) AuthOption {
+	return func(c *authConfig) {
+		c.issuer = issuer
+	}
+}
+
+// WithOIDCAudiences 注入本应用认可的 aud 集合（通常是本应用的 OIDC client_id）。
+// 设置后 access token 的 aud 必须包含其中之一，否则按无效 token 拒绝。
+func WithOIDCAudiences(audiences ...string) AuthOption {
+	return func(c *authConfig) {
+		c.audiences = append(c.audiences, audiences...)
 	}
 }
 
@@ -76,7 +97,7 @@ func OIDCCompatibleAuth(getOIDCPublicKey func() *rsa.PublicKey, opts ...AuthOpti
 		}
 
 		oidcPublicKey := getOIDCPublicKey()
-		claims, err := validateOIDCAccessToken(tokenStr, oidcPublicKey)
+		claims, err := validateOIDCAccessToken(tokenStr, oidcPublicKey, cfg.issuer, cfg.audiences)
 		if err == nil {
 			isMachine := claims.IsMachine()
 			personID := claims.PersonID()
@@ -95,17 +116,31 @@ func OIDCCompatibleAuth(getOIDCPublicKey func() *rsa.PublicKey, opts ...AuthOpti
 	}
 }
 
-func validateOIDCAccessToken(tokenStr string, publicKey *rsa.PublicKey) (*objauth.TokenClaims, error) {
+// validateOIDCAccessToken 校验 OIDC access token 的签名与核心声明（H3）：
+//   - 算法必须为 RS256（拒绝 HS256 等对称算法混淆）；
+//   - 配置了 issuer 时，iss 必须精确匹配 OP issuer；
+//   - 配置了 audiences 时，aud 必须包含本应用 client_id（防跨 client 串用）。
+func validateOIDCAccessToken(tokenStr string, publicKey *rsa.PublicKey, issuer string, audiences []string) (*objauth.TokenClaims, error) {
 	if publicKey == nil {
 		return nil, errors.New("oidc public key not initialized")
 	}
 	claims := &objauth.TokenClaims{}
+	parserOpts := []jwt.ParserOption{
+		jwt.WithLeeway(0),
+		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()}),
+	}
+	if issuer != "" {
+		parserOpts = append(parserOpts, jwt.WithIssuer(issuer))
+	}
+	if len(audiences) > 0 {
+		parserOpts = append(parserOpts, jwt.WithAudience(audiences...))
+	}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return publicKey, nil
-	}, jwt.WithLeeway(0), jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()}))
+	}, parserOpts...)
 	if err != nil {
 		return nil, err
 	}
