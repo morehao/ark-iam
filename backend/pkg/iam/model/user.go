@@ -7,7 +7,11 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameUser = "tenant_user" // user 是 PostgreSQL 保留字；tenant_user 与 person（自然人）语义区分更清晰
+// TableNameUser 租户内用户表的物理表名。
+// 领域实体保持 UserEntity（租户内用户，与 PersonEntity 自然人区分，贯穿 API/DTO/前端）；
+// 因 user 是 PostgreSQL 保留字（DAO 拼接 user.xxx 会语法错误），物理表名采用 tenant_user，
+// 由 UserEntity.TableName() 建立映射。
+const TableNameUser = "tenant_user"
 
 type UserEntity struct {
 	gormdao.BaseEntity
