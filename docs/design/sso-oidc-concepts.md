@@ -294,10 +294,10 @@ sequenceDiagram
     participant OP as 认证中心 (OP)
 
     Note over RP: access_token 接近过期
-    RP->>OP: POST /oidc/oauth/token（grant_type=refresh_token + refresh_token）
+    RP->>OP: POST /oidc/oauth/token<br/>（grant_type=refresh_token<br/>+ refresh_token）
     OP->>OP: 校验刷新令牌哈希、有效期、scope 还原
-    OP-->>RP: 新 access_token + 新 refresh_token（轮换）
-    Note over RP,OP: 旧 refresh_token 作废；登出/全局登出时按 person 吊销全部
+    OP-->>RP: 新 access_token<br/>+ 新 refresh_token（轮换）
+    Note over RP,OP: 旧 refresh_token 作废；<br/>登出/全局登出时按 person 吊销全部
 ```
 
 ---
@@ -306,12 +306,12 @@ sequenceDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Active: 签发（授权码/刷新/客户端凭证）
-    Active --> Active: 刷新令牌轮换（旧令牌作废）
-    Active --> Expired: 超过 TTL（access 900s 默认 / id 10min / refresh 30d）
+    [*] --> Active: 签发<br/>（授权码/刷新/客户端凭证）
+    Active --> Active: 刷新令牌轮换<br/>（旧令牌作废）
+    Active --> Expired: 超过 TTL<br/>（access 900s / id 10min / refresh 30d）
     Active --> Revoked: 主动吊销（/revoke）
     Active --> Revoked: 用户登出（logout / logoutAll）
-    Active --> Revoked: 全局登出（SLO：撤销 SSO 会话 + 全部 refresh token）
+    Active --> Revoked: 全局登出<br/>（SLO：撤销 SSO 会话<br/>+ 全部 refresh token）
     Expired --> [*]
     Revoked --> [*]
 ```
@@ -356,12 +356,12 @@ sequenceDiagram
     participant RP2 as 应用 B
 
     U->>RP1: 点击"退出登录"
-    RP1->>OP: 调用登出端点（携带 id_token_hint 或会话）
-    OP->>OP: 撤销 SSO 会话（iam:oidc:sso_session:*）<br/>吊销该 person 全部 refresh_token
-    OP->>Q: 入队 back-channel 通知任务（含 client_id、sid、通知地址）
+    RP1->>OP: 调用登出端点<br/>（携带 id_token_hint 或会话）
+    OP->>OP: 撤销 SSO 会话<br/>（iam:oidc:sso_session:*）<br/>吊销该 person 全部 refresh_token
+    OP->>Q: 入队 back-channel 通知任务<br/>（含 client_id、sid、通知地址）
     Q->>W: 消费任务
-    W->>RP2: POST {back_channel_logout_uri}（Body: logout_token，RS256 签名）
-    RP2->>RP2: 校验 logout_token（iss/aud/sid）→ 作废本地会话
+    W->>RP2: POST {back_channel_logout_uri}<br/>（Body: logout_token，RS256 签名）
+    RP2->>RP2: 校验 logout_token（iss/aud/sid）<br/>→ 作废本地会话
     W-->>OP: 通知成功 → 删除登记（幂等）
     U->>RP2: 刷新应用 B
     RP2-->>U: 已被登出，跳转登录页

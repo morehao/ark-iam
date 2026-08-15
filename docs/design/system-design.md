@@ -73,7 +73,7 @@ flowchart TB
             PLAT["platformadmin :8082<br/>平台管理"]
             TENANT["tenantadmin :8083<br/>租户自服务"]
         end
-        PKG["backend/pkg 公共层<br/>config / dbclient / middleware / code<br/>iam(model·dao·object) / oidc / sso / token / testsetup"]
+        PKG["backend/pkg 公共层<br/>config / dbclient / middleware / code<br/>iam(model·dao·object) / oidc / sso<br/>token / testsetup"]
     end
 
     subgraph INFRA["基础设施"]
@@ -116,8 +116,8 @@ flowchart TB
         C["controller/ctrxxx 控制器<br/>参数绑定、响应封装"]
         S["service/svcxxx 服务层<br/>业务逻辑、事务、审计"]
         D["dao/ 数据访问层"]
-        M["model/ 数据模型（跨应用共享于 pkg/iam/model）"]
-        O["object/ 领域对象（跨应用共享于 pkg/iam/object）"]
+        M["model/ 数据模型<br/>（跨应用共享于 pkg/iam/model）"]
+        O["object/ 领域对象<br/>（跨应用共享于 pkg/iam/object）"]
         DTO["dto/dtoxxx 请求/响应对象"]
     end
     R --> C --> S --> D --> M

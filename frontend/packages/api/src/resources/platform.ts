@@ -8,8 +8,6 @@ import type {
   AuditLogItem,
   ConnectorFactoryItem,
   ConnectorItem,
-  DepartmentItem,
-  DepartmentTreeResp,
   DomainItem,
   MenuItem,
   MenuTreeResp,
@@ -34,7 +32,6 @@ import type {
   TenantItem,
   TenantUpdateReq,
   UserCreateReq,
-  UserDepartmentItem,
   UserIdentityCreateReq,
   UserIdentityItem,
   UserItem,
@@ -75,11 +72,6 @@ export const deleteUserIdentity = (userID: string, userIdentityID: string) =>
 export const getUserLoginLogByUser = (userID: string) =>
   request.get<any, PageListResp<UserLoginLogItem>>(`/platform/users/${userID}/login-logs`)
 
-export const getUserDepartmentByUser = (userID: string) =>
-  request.get<any, PageListResp<UserDepartmentItem>>(`/platform/users/${userID}/departments`)
-export const assignUserDepartments = (userID: string, departmentIDs: string[]) =>
-  request.put<any, string>(`/platform/users/${userID}/departments`, { departmentIDs })
-
 // ==================== 角色 ====================
 export const getRolePageList = (data: { page: number; pageSize: number; name?: string }) =>
   request.get<any, PageListResp<RoleItem>>('/platform/roles', { params: data })
@@ -95,18 +87,6 @@ export const assignRoleUsers = (roleID: string, userIDs: string[]) => request.pu
 export const removeRoleUser = (roleID: string, userID: string) => request.delete<any, string>(`/platform/roles/${roleID}/users/${userID}`)
 
 // ==================== 部门 ====================
-export const getDepartmentTree = () => request.get<any, DepartmentTreeResp>('/platform/departments/tree')
-export const getDepartmentPageList = (data: { page: number; pageSize: number; name?: string }) =>
-  request.get<any, PageListResp<DepartmentItem>>('/platform/departments', { params: data })
-export const getDepartmentDetail = (departmentID: string) =>
-  request.get<any, DepartmentItem>(`/platform/departments/${departmentID}`)
-export const createDepartment = (data: Partial<DepartmentItem>) => request.post<any, { departmentID: string }>('/platform/departments', data)
-export const updateDepartment = (data: Partial<DepartmentItem>) => {
-  const { departmentID, ...body } = data
-  return request.put<any, string>(`/platform/departments/${departmentID}`, body)
-}
-export const deleteDepartment = (departmentID: string) => request.delete<any, string>(`/platform/departments/${departmentID}`)
-
 // ==================== 应用 ====================
 export const getApplicationPageList = (data: { page: number; pageSize: number; name?: string }) =>
   request.get<any, PageListResp<ApplicationItem>>('/platform/applications', { params: data })

@@ -71,14 +71,6 @@ export interface UserLoginLogItem {
   createdAt?: number
 }
 
-export interface UserDepartmentItem {
-  userDepartmentID: string
-  tenantID: string
-  userID: string
-  departmentID: string
-  isPrimary: number
-}
-
 // ---------- 角色 ----------
 export interface RoleItem {
   roleID: string
@@ -119,22 +111,6 @@ export interface RoleUserItem {
 }
 
 // ---------- 部门 ----------
-export interface DepartmentItem {
-  departmentID: string
-  tenantID: string
-  parentID: string
-  name: string
-  code: string
-  sort: number
-  leaderUserID: string
-  createdAt?: number
-  children?: DepartmentItem[]
-}
-
-export interface DepartmentTreeResp {
-  list: DepartmentItem[]
-}
-
 // ---------- 应用 ----------
 export interface ApplicationItem {
   appID: string
