@@ -6,18 +6,14 @@ import (
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
+// roleRouter 平台排查视角：种子角色与跨租户角色只读查看；
+// 租户内角色 CRUD/成员/菜单授权收敛到 tenantadmin。
 func roleRouter(groups *ginserver.RouterGroups) {
 	roleCtr := ctrpermission.NewRoleCtr()
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.POST("/roles", roleCtr.Create)
 	v1RouterGroup.GET("/roles", roleCtr.PageList)
 	v1RouterGroup.GET("/roles/:roleID", roleCtr.Detail)
-	v1RouterGroup.PUT("/roles/:roleID", roleCtr.Update)
-	v1RouterGroup.DELETE("/roles/:roleID", roleCtr.Delete)
-	// 角色-用户关联
 	v1RouterGroup.GET("/roles/:roleID/users", roleCtr.ListUsers)
-	v1RouterGroup.PUT("/roles/:roleID/users", roleCtr.AssignUsers)
-	v1RouterGroup.DELETE("/roles/:roleID/users/:userID", roleCtr.RemoveUser)
 }
 
 func menuRouter(groups *ginserver.RouterGroups) {
@@ -49,30 +45,6 @@ func resourceRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.GET("/resources/:resourceID", resourceCtr.Detail)
 	v1RouterGroup.PUT("/resources/:resourceID", resourceCtr.Update)
 	v1RouterGroup.DELETE("/resources/:resourceID", resourceCtr.Delete)
-}
-
-func roleMenuRouter(groups *ginserver.RouterGroups) {
-	roleMenuCtr := ctrpermission.NewRoleMenuCtr()
-	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.GET("/roles/:roleID/menus", roleMenuCtr.PageList)
-	v1RouterGroup.POST("/roles/:roleID/menus", roleMenuCtr.Create)
-	v1RouterGroup.DELETE("/roles/:roleID/menus/:menuID", roleMenuCtr.Delete)
-}
-
-func roleScopeRouter(groups *ginserver.RouterGroups) {
-	roleScopeCtr := ctrpermission.NewRoleScopeCtr()
-	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.GET("/roles/:roleID/scopes", roleScopeCtr.PageList)
-	v1RouterGroup.POST("/roles/:roleID/scopes", roleScopeCtr.Create)
-	v1RouterGroup.DELETE("/roles/:roleID/scopes/:scopeID", roleScopeCtr.Delete)
-}
-
-func userRoleRouter(groups *ginserver.RouterGroups) {
-	userRoleCtr := ctrpermission.NewUserRoleCtr()
-	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.GET("/users/:userID/roles", userRoleCtr.PageList)
-	v1RouterGroup.POST("/users/:userID/roles", userRoleCtr.Create)
-	v1RouterGroup.DELETE("/users/:userID/roles/:roleID", userRoleCtr.Delete)
 }
 
 func applicationClientRouter(groups *ginserver.RouterGroups) {

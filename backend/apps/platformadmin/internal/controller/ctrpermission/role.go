@@ -8,15 +8,11 @@ import (
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
+// RoleCtr 平台排查视角：角色只读查看（列表/详情/成员）。
 type RoleCtr interface {
-	Create(ctx *gin.Context)
-	Delete(ctx *gin.Context)
-	Update(ctx *gin.Context)
 	Detail(ctx *gin.Context)
 	PageList(ctx *gin.Context)
 	ListUsers(ctx *gin.Context)
-	AssignUsers(ctx *gin.Context)
-	RemoveUser(ctx *gin.Context)
 }
 
 type roleCtr struct {
@@ -29,72 +25,6 @@ func NewRoleCtr() RoleCtr {
 	return &roleCtr{
 		roleSvc: svcpermission.NewRoleSvc(),
 	}
-}
-
-// @Tags 角色管理
-// @Summary 创建角色管理
-// @accept application/json
-// @Produce application/json
-// @Param req body dtopermission.RoleCreateReq true "创建角色管理"
-// @Success 200 {object} gincontext.DtoRender{data=dtopermission.RoleCreateResp}
-// @Router /v1/platform/roles [post]
-func (ctr *roleCtr) Create(ctx *gin.Context) {
-	var req dtopermission.RoleCreateReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.roleSvc.Create(ctx, &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-// @Tags 角色管理
-// @Summary 删除角色管理
-// @accept application/json
-// @Produce application/json
-// @Param roleID path int true "角色ID"
-// @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/roles/{roleID} [delete]
-func (ctr *roleCtr) Delete(ctx *gin.Context) {
-	var req dtopermission.RoleDeleteReq
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctr.roleSvc.Delete(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, "删除成功")
-}
-
-// @Tags 角色管理
-// @Summary 修改角色管理
-// @accept application/json
-// @Produce application/json
-// @Param roleID path int true "角色ID"
-// @Param req body dtopermission.RoleUpdateReq true "修改角色管理"
-// @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/roles/{roleID} [put]
-func (ctr *roleCtr) Update(ctx *gin.Context) {
-	var req dtopermission.RoleUpdateReq
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctr.roleSvc.Update(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, "修改成功")
 }
 
 // @Tags 角色管理
@@ -158,50 +88,4 @@ func (ctr *roleCtr) ListUsers(ctx *gin.Context) {
 		return
 	}
 	gincontext.Success(ctx, res)
-}
-
-// @Tags 角色管理
-// @Summary 分配用户
-// @accept application/json
-// @Produce application/json
-// @Param roleID path int true "角色ID"
-// @Param req body dtouser.AssignRoleUsersReq true "分配用户"
-// @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/roles/{roleID}/users [put]
-func (ctr *roleCtr) AssignUsers(ctx *gin.Context) {
-	var req dtouser.AssignRoleUsersReq
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctr.roleSvc.AssignUsers(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, "分配成功")
-}
-
-// @Tags 角色管理
-// @Summary 移除用户
-// @accept application/json
-// @Produce application/json
-// @Param roleID path int true "角色ID"
-// @Param userID path int true "用户ID"
-// @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/roles/{roleID}/users/{userID} [delete]
-func (ctr *roleCtr) RemoveUser(ctx *gin.Context) {
-	var req dtouser.RemoveRoleUserReq
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctr.roleSvc.RemoveUser(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, "移除成功")
 }

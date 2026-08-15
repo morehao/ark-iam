@@ -70,25 +70,39 @@ func TestSeedIamAgainstPostgres(t *testing.T) {
 	assertCount("application", 2)
 	assertCount("role", 3)
 	assertCount("resource", 2)
-	assertCount("scope", 14)
-	assertCount("menu", 18)
+	assertCount("scope", 12)
+	assertCount("menu", 15)
 	assertCount("person", 1)
 	assertCount("tenant_user", 1)
 	assertCount("application_client", 2)
 	assertCount("user_role", 1)
-	assertCount("role_menu", 18)
-	assertCount("role_scope", 23)
+	assertCount("role_menu", 19)
+	assertCount("role_scope", 15)
 	assertCount("tenant_application", 2)
+	assertCount("organization", 1)
+	assertCount("organization_user", 1)
 
 	// 验证管理员用户归属
 	var u model.UserEntity
-	if err := db.Where("is_owner = 1").First(&u).Error; err != nil {
+	if err := db.Where("is_owner = ?", true).First(&u).Error; err != nil {
 		t.Fatalf("admin user not found: %v", err)
 	}
 	if u.TenantID == "" || u.PersonID == "" {
 		t.Fatalf("admin user missing tenant/person linkage: %+v", u)
 	}
 	t.Logf("admin user id=%s tenant=%s person=%s", u.ID, u.TenantID, u.PersonID)
+
+	// 验证管理员从属顶级部门（member 关系 + 主归属）
+	var rootOrg model.OrganizationEntity
+	if err := db.Where("tenant_id = ? AND parent_id = ?", u.TenantID, "").First(&rootOrg).Error; err != nil {
+		t.Fatalf("root organization not found: %v", err)
+	}
+	var ou model.OrganizationUserEntity
+	if err := db.Where("tenant_id = ? AND user_id = ? AND organization_id = ? AND relation_type = ? AND is_primary = ?",
+		u.TenantID, u.ID, rootOrg.ID, string(model.OrgUserRelationMember), true).First(&ou).Error; err != nil {
+		t.Fatalf("admin organization relation not found: %v", err)
+	}
+	t.Logf("admin org relation: org=%s relation=%s primary=%v", ou.OrganizationID, ou.RelationType, ou.IsPrimary)
 
 	cleanup()
 	t.Log("PG AutoMigrate + Seed idempotency check passed")

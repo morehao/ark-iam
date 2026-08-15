@@ -1,6 +1,8 @@
 package svctenant
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dbclient"
@@ -149,12 +151,13 @@ func (svc *organizationUserSvc) Delete(ctx *gin.Context, req *dtotenant.Organiza
 }
 
 func (svc *organizationUserSvc) PageList(ctx *gin.Context, req *dtotenant.OrganizationUserPageListReq) (*dtotenant.OrganizationUserPageListResp, error) {
+	tenantID := gctx.GetTenantID(ctx)
 	cond := &dao.OrganizationUserCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID:       gctx.GetTenantID(ctx),
+		TenantID:       tenantID,
 		OrganizationID: req.OrganizationID,
 		RelationType:   req.RelationType,
 		IsPrimary:      req.IsPrimary,
@@ -165,16 +168,38 @@ func (svc *organizationUserSvc) PageList(ctx *gin.Context, req *dtotenant.Organi
 		return nil, code.GetError(code.OrganizationUserGetPageListError)
 	}
 
+	// 批量加载用户与其自然人基础信息（消除 N+1）
+	userIDs := make([]string, 0, len(relationList))
+	for _, v := range relationList {
+		userIDs = append(userIDs, v.UserID)
+	}
+	userMap, personMap := (&userSvc{}).loadUserPersonMaps(ctx, userIDs)
+
+	keyword := req.Keyword
 	list := make([]dtotenant.OrganizationUserPageListItem, 0, len(relationList))
 	for _, v := range relationList {
+		u := userMap[v.UserID]
+		if u == nil {
+			continue
+		}
+		person := personMap[u.PersonID]
+		if person == nil {
+			person = &model.PersonEntity{}
+		}
 		item := dtotenant.OrganizationUserPageListItem{
 			OrganizationID: v.OrganizationID,
 			UserID:         v.UserID,
-			UserName:       svc.userName(ctx, v.UserID),
+			UserName:       u.Name,
+			Username:       model.DerefStr(person.Username),
+			PrimaryEmail:   model.DerefStr(person.PrimaryEmail),
+			PrimaryPhone:   model.DerefStr(person.PrimaryPhone),
+			Avatar:         u.Avatar,
+			IsSuspended:    u.IsSuspended,
 			RelationType:   v.RelationType,
 			IsPrimary:      v.IsPrimary,
+			JoinedAt:       v.CreatedAt.Unix(),
 		}
-		if req.UserName != "" && item.UserName != req.UserName {
+		if keyword != "" && !matchMemberKeyword(item, keyword) {
 			continue
 		}
 		list = append(list, item)
@@ -183,6 +208,14 @@ func (svc *organizationUserSvc) PageList(ctx *gin.Context, req *dtotenant.Organi
 		List:  list,
 		Total: total,
 	}, nil
+}
+
+// matchMemberKeyword 成员关键词匹配：姓名/用户名/邮箱/手机任一包含即命中。
+func matchMemberKeyword(item dtotenant.OrganizationUserPageListItem, keyword string) bool {
+	return strings.Contains(item.UserName, keyword) ||
+		strings.Contains(item.Username, keyword) ||
+		strings.Contains(item.PrimaryEmail, keyword) ||
+		strings.Contains(item.PrimaryPhone, keyword)
 }
 
 // SubtreeUsers 子树成员聚合：org_path 前缀查子树节点 → 取 member 关系 → 去重用户。
@@ -232,13 +265,23 @@ func (svc *organizationUserSvc) SubtreeUsers(ctx *gin.Context, req *dtotenant.Or
 // GetUserOrganizations 用户组织归属（含各节点名称）。
 func (svc *organizationUserSvc) GetUserOrganizations(ctx *gin.Context, req *dtotenant.UserOrganizationListReq) (*dtotenant.UserOrganizationListResp, error) {
 	tenantID := gctx.GetTenantID(ctx)
+	list, err := loadUserOrganizations(ctx, tenantID, req.UserID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcorganizationuser.GetUserOrganizations] load fail, err:%v", err)
+		return nil, code.GetError(code.OrganizationUserGetPageListError)
+	}
+	return &dtotenant.UserOrganizationListResp{List: list}, nil
+}
+
+// loadUserOrganizations 查询用户组织归属（含各节点名称），供用户归属接口与用户详情复用。
+func loadUserOrganizations(ctx *gin.Context, tenantID, userID string) ([]dtotenant.UserOrganizationItem, error) {
 	relationList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
 		TenantID: tenantID,
-		UserID:   req.UserID,
+		UserID:   userID,
 	})
 	if err != nil {
-		glog.Errorf(ctx, "[svcorganizationuser.GetUserOrganizations] dao GetListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.OrganizationUserGetPageListError)
+		glog.Errorf(ctx, "[svcorganizationuser.loadUserOrganizations] dao GetListByCond fail, err:%v, userID:%s", err, userID)
+		return nil, err
 	}
 
 	orgIDSet := make(map[string]bool)
@@ -261,12 +304,16 @@ func (svc *organizationUserSvc) GetUserOrganizations(ctx *gin.Context, req *dtot
 			IsPrimary:        r.IsPrimary,
 		})
 	}
-	return &dtotenant.UserOrganizationListResp{List: list}, nil
+	return list, nil
 }
 
 // UpdateUserOrganizations 全量替换用户归属（member 关系集合，首个为主归属）。
 func (svc *organizationUserSvc) UpdateUserOrganizations(ctx *gin.Context, req *dtotenant.UserOrganizationsUpdateReq) error {
 	tenantID := gctx.GetTenantID(ctx)
+	// 用户必须从属于至少一个部门（业务约束，防绕过 DTO 校验）
+	if len(req.OrganizationIDs) == 0 {
+		return code.GetError(code.UserOrganizationRequiredError)
+	}
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
 	if err != nil || userEntity == nil || userEntity.ID == "" || userEntity.TenantID != tenantID {
 		return code.GetError(code.UserNotExistError)

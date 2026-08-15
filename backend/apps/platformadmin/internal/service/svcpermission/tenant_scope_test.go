@@ -3,11 +3,20 @@ package svcpermission
 import (
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtopermission"
 	"github.com/morehao/ark-iam/platformadmin/testutil"
+	"github.com/morehao/golib/biz/gcontext"
 )
+
+func newGinCtx(tenantID, userID string) *gin.Context {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Set(gcontext.KeyTenantID, tenantID)
+	ginCtx.Set(gcontext.KeyUserID, userID)
+	return ginCtx
+}
 
 func TestMenuDetailRejectsCrossTenantEntity(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.MenuEntity{})
@@ -111,29 +120,6 @@ func TestRolePageListUsesContextTenant(t *testing.T) {
 	}
 }
 
-func TestUserRoleCreateRejectsCrossTenantRole(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{})
-	ctx := newGinCtx("33", "1001")
-
-	role := &model.RoleEntity{TenantID: "44", Name: "other-tenant-role"}
-	if err := db.Create(role).Error; err != nil {
-		t.Fatalf("seed role: %v", err)
-	}
-
-	svc := &userRoleSvc{}
-	_, err := svc.Create(ctx, &dtopermission.UserRoleCreateReq{TenantID: "33", UserID: "1", RoleID: role.ID})
-	if err == nil {
-		t.Fatalf("expected cross-tenant role reference to fail")
-	}
-
-	left, err := dao.NewUserRoleDao().GetListByCond(ctx, &dao.UserRoleCond{TenantID: "33"})
-	if err != nil {
-		t.Fatalf("GetListByCond: %v", err)
-	}
-	if len(left) != 0 {
-		t.Fatalf("expected no insert for cross-tenant role, got %+v", left)
-	}
-}
 
 func TestResourceDetailRejectsCrossTenantEntity(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ResourceEntity{})

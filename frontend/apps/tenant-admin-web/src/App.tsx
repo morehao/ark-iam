@@ -3,19 +3,25 @@ import { Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-
 import { useAuthGuard, FullPageSpinner } from '@ark-iam/auth'
 import { MainLayout, LoginPage } from '@ark-iam/ui'
 import type { MainMenuItems } from '@ark-iam/ui'
-import { ApartmentOutlined } from '@ant-design/icons'
+import { ApartmentOutlined, SafetyCertificateOutlined, UserOutlined } from '@ant-design/icons'
 import type { MenuItem } from '@ark-iam/types'
 import { getMyMenuTree } from './api/menu'
 import OrganizationList from './pages/organization'
+import TenantUserList from './pages/user'
+import TenantRoleList from './pages/role'
 
 // 图标映射：后端 menu.icon 存储的字符串 -> antd 图标组件
 const ICON_MAP: Record<string, React.ReactNode> = {
   apartment: <ApartmentOutlined />,
+  user: <UserOutlined />,
+  role: <SafetyCertificateOutlined />,
 }
 
 // 组件白名单：只有 path 命中才会渲染路由与侧边栏菜单，避免点击进入 404
 const COMPONENT_MAP: Record<string, React.ComponentType> = {
   '/organization': OrganizationList,
+  '/user': TenantUserList,
+  '/role': TenantRoleList,
 }
 
 function iconOf(icon?: string): React.ReactNode {
@@ -46,6 +52,8 @@ function makeStaticMenu(id: string, name: string, code: string, path: string, ic
 
 const STATIC_MENU_TREE: MenuItem[] = [
   makeStaticMenu("1", '组织架构', 'organization', '/organization', 'apartment'),
+  makeStaticMenu("2", '用户管理', 'tenant-user', '/user', 'user'),
+  makeStaticMenu("3", '角色管理', 'tenant-role', '/role', 'role'),
 ]
 
 // 将后端菜单树转换为 MainLayout 侧边栏菜单；叶子菜单需命中组件白名单，目录仅保留有可渲染子项的

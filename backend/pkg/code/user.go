@@ -3,12 +3,15 @@ package code
 import "github.com/morehao/golib/gerror"
 
 const (
-	UserCreateError      = 100500
-	UserDeleteError      = 100501
-	UserUpdateError      = 100502
-	UserGetDetailError   = 100503
-	UserGetPageListError = 100504
-	UserNotExistError    = 100505
+	UserCreateError                = 100500
+	UserDeleteError                = 100501
+	UserUpdateError                = 100502
+	UserGetDetailError             = 100503
+	UserGetPageListError           = 100504
+	UserNotExistError              = 100505
+	UserOrganizationRequiredError  = 100518 // 用户必须从属于至少一个部门
+	UserAlreadyInTenantError       = 100516 // 自然人已在本租户内
+	UserResetPasswordError         = 100517 // 重置密码失败
 )
 
 const (
@@ -31,6 +34,7 @@ const (
 	UserRoleDeleteError      = 100751
 	UserRoleGetPageListError = 100752
 	UserRoleNotExistError    = 100753
+	UserRoleReplaceError     = 100754 // 全量替换用户角色失败
 )
 
 var userErrorMsgMap = gerror.CodeMsgMap{
@@ -40,6 +44,9 @@ var userErrorMsgMap = gerror.CodeMsgMap{
 	UserGetDetailError:             "查看用户详情失败",
 	UserGetPageListError:           "查看用户列表失败",
 	UserNotExistError:              "用户不存在",
+	UserOrganizationRequiredError:  "用户必须从属于至少一个部门",
+	UserAlreadyInTenantError:       "该用户已在本租户内",
+	UserResetPasswordError:         "重置密码失败",
 	UserIdentityCreateError:        "创建用户身份失败",
 	UserIdentityDeleteError:        "删除用户身份失败",
 	UserIdentityUpdateError:        "修改用户身份失败",
@@ -53,4 +60,5 @@ var userErrorMsgMap = gerror.CodeMsgMap{
 	UserRoleDeleteError:            "删除用户角色关联失败",
 	UserRoleGetPageListError:       "查看用户角色关联列表失败",
 	UserRoleNotExistError:          "用户角色关联不存在",
+	UserRoleReplaceError:           "更新用户角色失败",
 }

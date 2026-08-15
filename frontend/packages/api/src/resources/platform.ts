@@ -6,8 +6,6 @@ import type {
   ApplicationItem,
   ApplicationUpdateReq,
   AuditLogItem,
-  ConnectorFactoryItem,
-  ConnectorItem,
   DomainItem,
   MenuItem,
   MenuTreeResp,
@@ -19,9 +17,7 @@ import type {
   OAuthSecretItem,
   PageListResp,
   ResourceItem,
-  RoleCreateReq,
   RoleItem,
-  RoleUpdateReq,
   RoleUserItem,
   ScopeItem,
   SystemConfigItem,
@@ -31,26 +27,18 @@ import type {
   TenantCreateReq,
   TenantItem,
   TenantUpdateReq,
-  UserCreateReq,
   UserIdentityCreateReq,
   UserIdentityItem,
   UserItem,
   UserLoginLogItem,
   UserPasswordUpdateReq,
   UserStatusUpdateReq,
-  UserUpdateReq,
 } from '@ark-iam/types'
 
-// ==================== 用户 ====================
+// ==================== 用户（平台排查视角） ====================
 export const getUserPageList = (data: { page: number; pageSize: number; name?: string; isSuspended?: number }) =>
   request.get<any, PageListResp<UserItem>>('/platform/users', { params: data })
 export const getUserDetail = (userID: string) => request.get<any, UserItem>(`/platform/users/${userID}`)
-export const createUser = (data: UserCreateReq) => request.post<any, { userID: string }>('/platform/users', data)
-export const updateUser = (data: UserUpdateReq) => {
-  const { userID, ...body } = data
-  return request.put<any, string>(`/platform/users/${userID}`, body)
-}
-export const deleteUser = (userID: string) => request.delete<any, string>(`/platform/users/${userID}`)
 export const updateUserStatus = (data: UserStatusUpdateReq) => {
   const { userID, ...body } = data
   return request.patch<any, string>(`/platform/users/${userID}`, body)
@@ -72,19 +60,10 @@ export const deleteUserIdentity = (userID: string, userIdentityID: string) =>
 export const getUserLoginLogByUser = (userID: string) =>
   request.get<any, PageListResp<UserLoginLogItem>>(`/platform/users/${userID}/login-logs`)
 
-// ==================== 角色 ====================
+// ==================== 角色（平台排查视角） ====================
 export const getRolePageList = (data: { page: number; pageSize: number; name?: string }) =>
   request.get<any, PageListResp<RoleItem>>('/platform/roles', { params: data })
-export const getRoleDetail = (roleID: string) => request.get<any, RoleItem>(`/platform/roles/${roleID}`)
-export const createRole = (data: RoleCreateReq) => request.post<any, { roleID: string }>('/platform/roles', data)
-export const updateRole = (data: RoleUpdateReq) => {
-  const { roleID, ...body } = data
-  return request.put<any, string>(`/platform/roles/${roleID}`, body)
-}
-export const deleteRole = (roleID: string) => request.delete<any, string>(`/platform/roles/${roleID}`)
 export const getRoleUsers = (roleID: string) => request.get<any, { total: number; users: RoleUserItem[] }>(`/platform/roles/${roleID}/users`)
-export const assignRoleUsers = (roleID: string, userIDs: string[]) => request.put<any, string>(`/platform/roles/${roleID}/users`, { userIDs })
-export const removeRoleUser = (roleID: string, userID: string) => request.delete<any, string>(`/platform/roles/${roleID}/users/${userID}`)
 
 // ==================== 部门 ====================
 // ==================== 应用 ====================
@@ -123,7 +102,6 @@ export const deleteOAuthSecret = (applicationClientID: string, secretID: string)
 // ==================== 租户 ====================
 export const getTenantPageList = (data: { page: number; pageSize: number; name?: string }) =>
   request.get<any, PageListResp<TenantItem>>('/platform/tenants', { params: data })
-export const getTenantDetail = (tenantID: string) => request.get<any, TenantItem>(`/platform/tenants/${tenantID}`)
 export const createTenant = (data: TenantCreateReq) => request.post<any, { tenantID: string }>('/platform/tenants', data)
 export const updateTenant = (data: TenantUpdateReq) => {
   const { tenantID, ...body } = data
@@ -134,8 +112,6 @@ export const deleteTenant = (tenantID: string) => request.delete<any, string>(`/
 // ==================== 租户应用 ====================
 export const getTenantApplicationPageList = (data: { page: number; pageSize: number; status?: string }) =>
   request.get<any, PageListResp<TenantApplicationItem>>('/platform/tenant-applications', { params: data })
-export const getTenantApplicationDetail = (tenantAppID: string) =>
-  request.get<any, TenantApplicationItem>(`/platform/tenant-applications/${tenantAppID}`)
 export const createTenantApplication = (data: TenantApplicationCreateReq) =>
   request.post<any, { tenantAppID: string }>('/platform/tenant-applications', data)
 export const updateTenantApplication = (data: TenantApplicationUpdateReq) => {
@@ -155,9 +131,6 @@ export const deleteApiKey = (id: string) => request.delete<any, string>(`/platfo
 
 // ==================== 菜单 ====================
 export const getMenuTree = (appID: string) => request.get<any, MenuTreeResp>('/platform/menus/tree', { params: { appID } })
-export const getMenuPageList = (data: { page: number; pageSize: number; appID?: string; name?: string }) =>
-  request.get<any, PageListResp<MenuItem>>('/platform/menus', { params: data })
-export const getMenuDetail = (menuID: string) => request.get<any, MenuItem>(`/platform/menus/${menuID}`)
 export const createMenu = (data: Partial<MenuItem>) => request.post<any, { menuID: string }>('/platform/menus', data)
 export const updateMenu = (data: Partial<MenuItem>) => {
   const { menuID, ...body } = data
@@ -213,16 +186,3 @@ export const deleteSystemConfig = (systemID: string) => request.delete<any, stri
 export const getAuditLogPageList = (data: { page: number; pageSize: number; key?: string }) =>
   request.get<any, PageListResp<AuditLogItem>>('/platform/logs', { params: data })
 export const getAuditLogDetail = (logID: string) => request.get<any, AuditLogItem>(`/platform/logs/${logID}`)
-
-// ==================== Connector（auth） ====================
-export const getConnectorPageList = (data: { page: number; pageSize: number; name?: string }) =>
-  request.get<any, PageListResp<ConnectorItem>>('/auth/connectors', { params: data })
-export const getConnectorDetail = (connectorID: string) => request.get<any, ConnectorItem>(`/auth/connectors/${connectorID}`)
-export const createConnector = (data: Partial<ConnectorItem>) => request.post<any, { connectorID: string }>('/auth/connectors', data)
-export const updateConnector = (data: Partial<ConnectorItem>) => {
-  const { connectorID, ...body } = data
-  return request.put<any, string>(`/auth/connectors/${connectorID}`, body)
-}
-export const deleteConnector = (connectorID: string) => request.delete<any, string>(`/auth/connectors/${connectorID}`)
-export const getConnectorFactoryList = (data?: { protocol?: string; provider?: string }) =>
-  request.get<any, { list: ConnectorFactoryItem[] }>('/auth/connector-factories', { params: data })

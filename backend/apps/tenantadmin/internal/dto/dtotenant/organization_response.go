@@ -48,9 +48,15 @@ type OrganizationUserPageListResp struct {
 type OrganizationUserPageListItem struct {
 	OrganizationID string `json:"organizationID"` // 组织ID
 	UserID         string `json:"userID"`         // 用户ID
-	UserName       string `json:"userName"`       // 用户姓名
+	UserName       string `json:"userName"`       // 用户姓名(租户内)
+	Username       string `json:"username"`       // 全局用户名
+	PrimaryEmail   string `json:"primaryEmail"`   // 主要邮箱
+	PrimaryPhone   string `json:"primaryPhone"`   // 主要手机号
+	Avatar         string `json:"avatar"`         // 头像URL
+	IsSuspended    bool   `json:"isSuspended"`    // 是否挂起
 	RelationType   string `json:"relationType"`   // 关系类型
 	IsPrimary      bool   `json:"isPrimary"`      // 是否主归属
+	JoinedAt       int64  `json:"joinedAt"`       // 加入时间(关系创建时间)
 }
 
 type OrganizationSubtreeUsersResp struct {

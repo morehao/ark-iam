@@ -7,17 +7,12 @@ import (
 
 func tenantRouter(groups *ginserver.RouterGroups) {
 	tenantCtr := ctrtenant.NewTenantCtr()
-	organizationCtr := ctrtenant.NewOrganizationCtr()
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/tenants", tenantCtr.Create)
 	v1RouterGroup.GET("/tenants", tenantCtr.PageList)
 	v1RouterGroup.GET("/tenants/:tenantID", tenantCtr.Detail)
 	v1RouterGroup.PUT("/tenants/:tenantID", tenantCtr.Update)
 	v1RouterGroup.DELETE("/tenants/:tenantID", tenantCtr.Delete)
-	v1RouterGroup.POST("/tenants/createAsOwner", tenantCtr.CreateAsOwner)
-	// 组织只读（跨租户排查）
-	v1RouterGroup.GET("/organizations/tree", organizationCtr.Tree)
-	v1RouterGroup.GET("/users/:userID/organizations", organizationCtr.GetUserOrganizations)
 }
 
 func systemRouter(groups *ginserver.RouterGroups) {

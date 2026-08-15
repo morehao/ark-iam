@@ -14,8 +14,14 @@ export interface OrganizationUserItem {
   organizationID: string
   userID: string
   userName: string
+  username: string
+  primaryEmail: string
+  primaryPhone: string
+  avatar: string
+  isSuspended: boolean
   relationType: string
   isPrimary: boolean
+  joinedAt?: number
 }
 
 export interface UserOrganizationItem {

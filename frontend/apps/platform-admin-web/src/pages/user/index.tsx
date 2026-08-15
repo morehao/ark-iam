@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Table, Button, Space, Input, Modal, Form, Switch, Popconfirm, message, Avatar, Tooltip } from 'antd'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { Table, Button, Space, Input, Modal, Form, Switch, message, Avatar, Tooltip, Tag } from 'antd'
+import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { PageContainer } from '@ark-iam/ui'
-import { createUser, deleteUser, getUserPageList, updateUser, updateUserPassword, updateUserStatus } from '@ark-iam/api'
+import { getUserPageList, updateUserPassword, updateUserStatus } from '@ark-iam/api'
 import type { UserItem } from '@ark-iam/types'
-import { fmtTime, SuspendedTag } from '../../components/common'
+import { fmtTime } from '../../components/common'
 import { useNavigate } from 'react-router-dom'
-import { brand, EllipsisCell, IDCell } from '@ark-iam/ui'
+import { brand, EllipsisCell } from '@ark-iam/ui'
 
 export default function UserList() {
   const navigate = useNavigate()
@@ -18,9 +18,6 @@ export default function UserList() {
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
 
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editing, setEditing] = useState<UserItem | null>(null)
-  const [form] = Form.useForm()
   const [pwdModalOpen, setPwdModalOpen] = useState(false)
   const [pwdTarget, setPwdTarget] = useState<UserItem | null>(null)
   const [pwdForm] = Form.useForm()
@@ -42,38 +39,6 @@ export default function UserList() {
   useEffect(() => {
     void fetchData()
   }, [fetchData])
-
-  const handleCreate = () => {
-    setEditing(null)
-    form.resetFields()
-    setModalOpen(true)
-  }
-
-  const handleEdit = (record: UserItem) => {
-    setEditing(record)
-    form.setFieldsValue({ name: record.name, avatar: record.avatar, isSuspended: record.isSuspended })
-    setModalOpen(true)
-  }
-
-  const handleSubmit = async () => {
-    try {
-      const values = await form.validateFields()
-      setSubmitLoading(true)
-      if (editing) {
-        await updateUser({ userID: editing.userID, ...values })
-        message.success('修改成功')
-      } else {
-        await createUser(values)
-        message.success('创建成功')
-      }
-      setModalOpen(false)
-      void fetchData()
-    } catch {
-      /* 校验或请求失败 */
-    } finally {
-      setSubmitLoading(false)
-    }
-  }
 
   const handleToggleStatus = async (record: UserItem, checked: boolean) => {
     try {
@@ -102,7 +67,7 @@ export default function UserList() {
   }
 
   const columns: ColumnsType<UserItem> = [
-    { title: 'ID', dataIndex: 'userID', key: 'userID', width: 150, render: (v: string) => <IDCell value={v} /> },
+    { title: 'ID', dataIndex: 'userID', key: 'userID', width: 150, render: (v: string) => <EllipsisCell value={v} /> },
     {
       title: '用户',
       key: 'user',
@@ -123,8 +88,8 @@ export default function UserList() {
       title: '状态',
       dataIndex: 'isSuspended',
       key: 'isSuspended',
-      width: 120,
-      render: (v: number) => <SuspendedTag value={v} />,
+      width: 100,
+      render: (v: number) => (v === 1 ? <Tag color="red">挂起</Tag> : <Tag color="green">正常</Tag>),
     },
     {
       title: '创建时间',
@@ -135,14 +100,11 @@ export default function UserList() {
     {
       title: '操作',
       key: 'action',
-      width: 260,
+      width: 200,
       render: (_, r) => (
         <Space size={4}>
           <Button type="link" size="small" onClick={() => navigate(`/user/${r.userID}`)}>
             详情
-          </Button>
-          <Button type="link" size="small" onClick={() => handleEdit(r)}>
-            编辑
           </Button>
           <Button type="link" size="small" onClick={() => { setPwdTarget(r); pwdForm.resetFields(); setPwdModalOpen(true) }}>
             重置密码
@@ -150,18 +112,6 @@ export default function UserList() {
           <Tooltip title={r.isSuspended === 1 ? '恢复账号' : '挂起账号'}>
             <Switch size="small" checked={r.isSuspended !== 1} onChange={(c) => void handleToggleStatus(r, !c)} />
           </Tooltip>
-          <Popconfirm
-            title="确认删除该用户？"
-            onConfirm={async () => {
-              await deleteUser(r.userID)
-              message.success('删除成功')
-              void fetchData()
-            }}
-          >
-            <Button type="link" size="small" danger>
-              删除
-            </Button>
-          </Popconfirm>
         </Space>
       ),
     },
@@ -169,17 +119,12 @@ export default function UserList() {
 
   return (
     <PageContainer
-      title="用户管理"
-      description="管理租户内的用户账号、状态与登录凭证"
+      title="用户管理（平台视角）"
+      description="跨租户用户目录排查：只读查看 + 挂起/恢复 + 重置密码；租户内账号管理（创建/组织归属/角色）请使用租户自服务控制台"
       extra={
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
-            刷新
-          </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-            新建用户
-          </Button>
-        </Space>
+        <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
+          刷新
+        </Button>
       }
     >
       <div style={{ marginBottom: 16 }}>
@@ -209,46 +154,6 @@ export default function UserList() {
           },
         }}
       />
-
-      <Modal
-        title={editing ? '编辑用户' : '新建用户'}
-        open={modalOpen}
-        onOk={() => void handleSubmit()}
-        onCancel={() => setModalOpen(false)}
-        confirmLoading={submitLoading}
-        destroyOnClose
-        width={560}
-      >
-        <Form form={form} layout="vertical">
-          {!editing && (
-            <>
-              <Form.Item name="username" label="用户名" rules={[{ required: true, message: '请输入用户名' }]}>
-                <Input placeholder="登录账号" />
-              </Form.Item>
-              <Form.Item name="password" label="初始密码" rules={[{ required: true, message: '请输入初始密码' }, { min: 8, message: '至少 8 位，需含大小写字母和数字' }]}>
-                <Input.Password placeholder="至少 8 位，需含大小写字母和数字" />
-              </Form.Item>
-              <Form.Item name="primaryEmail" label="邮箱" rules={[{ type: 'email', message: '邮箱格式不正确' }]}>
-                <Input placeholder="选填" />
-              </Form.Item>
-              <Form.Item name="primaryPhone" label="手机号">
-                <Input placeholder="选填" />
-              </Form.Item>
-            </>
-          )}
-          <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}>
-            <Input placeholder="用户姓名" />
-          </Form.Item>
-          <Form.Item name="avatar" label="头像地址">
-            <Input placeholder="https://... 选填" />
-          </Form.Item>
-          {editing && (
-            <Form.Item name="isSuspended" label="状态" valuePropName="checked" getValueFromEvent={(c: boolean) => (c ? 0 : 1)} initialValue={0}>
-              <Switch checkedChildren="正常" unCheckedChildren="挂起" />
-            </Form.Item>
-          )}
-        </Form>
-      </Modal>
 
       <Modal
         title={`重置密码 - ${pwdTarget?.name || ''}`}

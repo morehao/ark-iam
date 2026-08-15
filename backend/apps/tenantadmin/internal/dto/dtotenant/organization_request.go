@@ -61,7 +61,7 @@ type OrganizationUserPageListReq struct {
 	OrganizationID string `json:"-" uri:"organizationID" binding:"required"` // 组织ID
 	RelationType   string `json:"relationType" form:"relationType"`          // 关系类型过滤
 	IsPrimary      *bool  `json:"isPrimary" form:"isPrimary"`                // 主归属过滤
-	UserName       string `json:"userName" form:"userName"`                  // 用户姓名模糊过滤
+	Keyword        string `json:"keyword" form:"keyword"`                    // 关键词(姓名/用户名/邮箱/手机 模糊)
 }
 
 type OrganizationSubtreeUsersReq struct {

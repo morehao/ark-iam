@@ -8,61 +8,8 @@ import (
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/platformadmin/testutil"
 	"github.com/morehao/golib/biz/gcontext"
-	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
-
-func TestUserIdentityPageListPassesFiltersToDAOAndKeepsDAOTotal(t *testing.T) {
-	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyTenantID, "23")
-
-	db := testutil.SetupSQLite(t, &model.UserIdentityEntity{}, &model.UserEntity{})
-	// person 101 在当前租户有用户，可查询其身份
-	if err := testSeedUser(db, &model.UserEntity{
-		TenantID:   "23",
-		PersonID:   "101",
-		Name:       "tenant-23",
-		Profile:    []byte("{}"),
-		CustomData: []byte("{}"),
-	}); err != nil {
-		t.Fatalf("seed user: %v", err)
-	}
-	// 命中过滤条件的一条 + 不命中的一条
-	if err := db.Create(&model.UserIdentityEntity{
-		PersonID:        "101",
-		Issuer:          "issuer-a",
-		ExternalSubject: "external-1",
-		Detail:          []byte(`{"name":"first"}`),
-	}).Error; err != nil {
-		t.Fatalf("seed matching identity: %v", err)
-	}
-	if err := db.Create(&model.UserIdentityEntity{
-		PersonID:        "101",
-		Issuer:          "issuer-b",
-		ExternalSubject: "external-2",
-		Detail:          []byte(`{"name":"second"}`),
-	}).Error; err != nil {
-		t.Fatalf("seed other identity: %v", err)
-	}
-
-	svc := &userIdentitySvc{}
-	resp, err := svc.PageList(ginCtx, &dtouser.UserIdentityPageListReq{
-		PageQuery:  gobject.PageQuery{Page: 1, PageSize: 5},
-		UserID:     "101",
-		Issuer:     "issuer-a",
-		IdentityID: "external-1",
-	})
-	if err != nil {
-		t.Fatalf("PageList returned error: %v", err)
-	}
-	if resp.Total != 1 || len(resp.List) != 1 {
-		t.Fatalf("expected 1 filtered identity, got total=%d list=%d", resp.Total, len(resp.List))
-	}
-	item := resp.List[0]
-	if item.Issuer != "issuer-a" || item.IdentityID != "external-1" || item.UserID != "101" {
-		t.Fatalf("unexpected identity item: %+v", item)
-	}
-}
 
 func TestUserIdentityGetByUserUsesTenantScopedDAOCondition(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
@@ -111,38 +58,3 @@ func TestUserIdentityGetByUserUsesTenantScopedDAOCondition(t *testing.T) {
 	}
 }
 
-func TestUserIdentityDetailUsesTenantUserToResolvePerson(t *testing.T) {
-	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyTenantID, "84")
-
-	db := testutil.SetupSQLite(t, &model.UserIdentityEntity{}, &model.UserEntity{})
-	// 用户 9（租户 84）关联 person 902，身份 11 归属 person 902
-	if err := testSeedUser(db, &model.UserEntity{
-		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "9"}},
-		TenantID:   "84",
-		PersonID:   "902",
-		Name:       "user-9",
-		Profile:    []byte("{}"),
-		CustomData: []byte("{}"),
-	}); err != nil {
-		t.Fatalf("seed user: %v", err)
-	}
-	if err := db.Create(&model.UserIdentityEntity{
-		BaseEntity:      gormdao.BaseEntity{StringID: gormdao.StringID{ID: "11"}},
-		PersonID:        "902",
-		Issuer:          "issuer-a",
-		ExternalSubject: "external-a",
-		Detail:          []byte(`{"name":"mapped"}`),
-	}).Error; err != nil {
-		t.Fatalf("seed identity: %v", err)
-	}
-
-	svc := &userIdentitySvc{}
-	resp, err := svc.Detail(ginCtx, &dtouser.UserIdentityDetailReq{UserIdentityID: "11"})
-	if err != nil {
-		t.Fatalf("Detail returned error: %v", err)
-	}
-	if resp == nil || resp.UserID != "902" {
-		t.Fatalf("expected mapped person response (UserID=902), got %#v", resp)
-	}
-}

@@ -8,6 +8,7 @@ import (
 
 type TenantMenuCtr interface {
 	Tree(ctx *gin.Context)
+	Apps(ctx *gin.Context)
 }
 
 type tenantMenuCtr struct {
@@ -30,6 +31,21 @@ func NewTenantMenuCtr() TenantMenuCtr {
 // @Router /v1/tenant/menus/tree [get]
 func (ctr *tenantMenuCtr) Tree(ctx *gin.Context) {
 	res, err := ctr.tenantMenuSvc.Tree(ctx)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 租户菜单
+// @Summary 当前租户订阅的应用列表（角色归属应用选项）
+// @accept application/json
+// @Produce application/json
+// @Success 200 {object} gincontext.DtoRender{data=dtotenant.TenantAppsResp}
+// @Router /v1/tenant/apps [get]
+func (ctr *tenantMenuCtr) Apps(ctx *gin.Context) {
+	res, err := ctr.tenantMenuSvc.Apps(ctx)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

@@ -9,10 +9,6 @@ type TenantCreateResp struct {
 	TenantID string `json:"tenantID"` // 租户ID
 }
 
-type TenantCreateAsOwnerResp struct {
-	TenantID string `json:"tenantID"` // 租户ID
-}
-
 type TenantDetailResp struct {
 	TenantID string `json:"tenantID"` // 租户ID
 	objtenant.TenantBaseInfo

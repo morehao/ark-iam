@@ -8,6 +8,7 @@ import (
 
 type ApplicationCond struct {
 	*gormdao.BaseCond
+	IDs    []string
 	Name   string
 	Type   string
 	Status string
@@ -17,6 +18,9 @@ type ApplicationCond struct {
 func (c *ApplicationCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
+	}
+	if len(c.IDs) > 0 {
+		db.Where(tableName+".id IN ?", c.IDs)
 	}
 	if c.Name != "" {
 		db.Where(tableName+".name = ?", c.Name)

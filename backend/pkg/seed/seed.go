@@ -5,12 +5,17 @@
 // 因此可安全重复执行，兼容全新数据库与已有数据的升级场景。
 // 自 string-id 改造起所有主键为字符串（UUID v7），实体间关联在写入时动态接线，
 // 不再依赖固定的数字主键。
+//
+// 业务约束：用户必须从属于某个部门（组织节点），种子管理员同样从属于
+// 租户的顶级部门（根组织节点，seedRootOrganization 创建），归属关系为
+// member + is_primary 主归属。
 package seed
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/gcrypto"
@@ -72,8 +77,9 @@ func SeedIam(ctx context.Context, db *gorm.DB) error {
 		return err
 	}
 
-	// 2. 租户同名顶级部门
-	if err := seedRootOrganization(ctx, db, tenant); err != nil {
+	// 2. 租户同名顶级部门（用户归属的根组织，管理员也归属于此）
+	rootOrg, err := seedRootOrganization(ctx, db, tenant)
+	if err != nil {
 		return err
 	}
 
@@ -124,8 +130,8 @@ func SeedIam(ctx context.Context, db *gorm.DB) error {
 		return err
 	}
 
-	// 10. 默认管理员（person + user + user_role）
-	adminUser, err := seedAdminUser(ctx, db, tenant)
+	// 10. 默认管理员（person + user + user_role + 顶级部门归属）
+	adminUser, err := seedAdminUser(ctx, db, tenant, rootOrg)
 	if err != nil {
 		return err
 	}
@@ -167,32 +173,34 @@ func getOrCreateTenant(ctx context.Context, db *gorm.DB) (*model.TenantEntity, e
 	return entity, nil
 }
 
-func seedRootOrganization(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity) error {
-	var count int64
-	if err := db.Model(&model.OrganizationEntity{}).
-		Where("tenant_id = ? AND parent_id = ?", tenant.ID, "").Count(&count).Error; err != nil {
-		return fmt.Errorf("seed root organization count fail: %w", err)
+// seedRootOrganization 确保租户存在唯一顶级部门（根组织节点），并返回该节点。
+// 所有种子用户（含管理员）均从属于此顶级部门。
+func seedRootOrganization(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity) (*model.OrganizationEntity, error) {
+	org := &model.OrganizationEntity{}
+	err := db.Where("tenant_id = ? AND parent_id = ?", tenant.ID, "").First(org).Error
+	if err == nil {
+		return org, nil
 	}
-	if count > 0 {
-		return nil
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("seed root organization query fail: %w", err)
 	}
-	org := &model.OrganizationEntity{
+	org = &model.OrganizationEntity{
 		TenantID: tenant.ID,
 		Name:     tenant.Name,
 		Code:     tenant.Code,
 		Status:   string(model.OrgNodeStatusActive),
 	}
 	if err := db.WithContext(ctx).Create(org).Error; err != nil {
-		return fmt.Errorf("seed root organization create fail: %w", err)
+		return nil, fmt.Errorf("seed root organization create fail: %w", err)
 	}
 	// 根节点路径："/"+id，深度 1（ID 由 BeforeCreate 生成，需创建后补写）
 	if err := db.WithContext(ctx).Model(org).Updates(map[string]any{
 		"org_path":  "/" + org.ID,
 		"org_depth": 1,
 	}).Error; err != nil {
-		return fmt.Errorf("seed root organization path fail: %w", err)
+		return nil, fmt.Errorf("seed root organization path fail: %w", err)
 	}
-	return nil
+	return org, nil
 }
 
 func getOrCreateApplication(ctx context.Context, db *gorm.DB, code, name, desc string, sort int, isSystem bool) (*model.ApplicationEntity, error) {
@@ -382,8 +390,10 @@ func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model
 		{appCode: appCodeAdmin, parentCode: "menu", name: "菜单列表", code: "menu-list", path: "/menu/list", sort: 1, component: "/menu/list/index", permission: "platform-admin:menu:read"},
 		{appCode: appCodeAdmin, parentCode: "application", name: "应用列表", code: "application-list", path: "/application/list", sort: 1, component: "/application/list/index", permission: "platform-admin:application:read"},
 		{appCode: appCodeAdmin, parentCode: "resource", name: "资源列表", code: "resource-list", path: "/resource/list", sort: 1, component: "/resource/list/index", permission: "platform-admin:resource:read"},
-		// 租户自服务一级菜单（组织架构 = 组织树容器）
+		// 租户自服务一级菜单（组织架构 = 组织树容器；用户/角色编码加 tenant- 前缀，避免与平台菜单 code 撞名）
 		{appCode: appCodeTenantAdmin, name: "组织架构", code: "organization", path: "/organization", icon: "apartment", sort: 1, component: "pages/organization", permission: ""},
+		{appCode: appCodeTenantAdmin, name: "用户管理", code: "tenant-user", path: "/user", icon: "user", sort: 2, component: "pages/user", permission: ""},
+		{appCode: appCodeTenantAdmin, name: "角色管理", code: "tenant-role", path: "/role", icon: "role", sort: 3, component: "pages/role", permission: ""},
 	}
 
 	appByCode := map[string]*model.ApplicationEntity{appCodeAdmin: adminApp, appCodeTenantAdmin: tenantAdminApp}
@@ -434,6 +444,7 @@ func seedRoleMenus(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity,
 		{roleCode: "admin", menuCode: []string{
 			"dashboard", "user", "role", "menu", "application", "resource",
 			"user-list", "role-list", "role-permission", "menu-list", "application-list", "resource-list",
+			"organization", "tenant-user", "tenant-role",
 		}},
 		{roleCode: "user", menuCode: []string{"dashboard", "user", "user-list"}},
 		{roleCode: "guest", menuCode: []string{"dashboard"}},
@@ -478,7 +489,13 @@ func seedTenantApplications(ctx context.Context, db *gorm.DB, tenant *model.Tena
 	return nil
 }
 
-func seedAdminUser(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity) (*model.UserEntity, error) {
+// seedAdminUser 幂等写入默认管理员（person + user），并确保其从属于顶级部门 rootOrg
+// （member 关系 + 主归属），满足"用户必须从属于某个部门"的业务约束。
+// rootOrg 缺失时视为种子数据不完整，直接报错，避免产出无归属用户。
+func seedAdminUser(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, rootOrg *model.OrganizationEntity) (*model.UserEntity, error) {
+	if rootOrg == nil || rootOrg.ID == "" {
+		return nil, fmt.Errorf("seed admin user fail: root organization not found")
+	}
 	passwordHash, err := gcrypto.GeneratePasswordHash(adminPassword)
 	if err != nil {
 		return nil, fmt.Errorf("seed admin password hash fail: %w", err)
@@ -513,6 +530,7 @@ func seedAdminUser(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity)
 		return nil, fmt.Errorf("seed admin user query fail: %w", uErr)
 	}
 	if errors.Is(uErr, gorm.ErrRecordNotFound) {
+		now := time.Now()
 		user = &model.UserEntity{
 			TenantID:    tenant.ID,
 			PersonID:    person.ID,
@@ -521,13 +539,46 @@ func seedAdminUser(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity)
 			CustomData:  []byte(`{}`),
 			IsOwner:     true,
 			IsSuspended: false,
+			JoinedAt:    &now,
 		}
 		if err := db.WithContext(ctx).Create(user).Error; err != nil {
 			return nil, fmt.Errorf("seed admin user create fail: %w", err)
 		}
 		glog.Infof(ctx, "[seed] admin user created, id:%s (default password: %s)", user.ID, adminPassword)
 	}
+
+	// 顶级部门归属（幂等，兼容已有库升级：admin 用户已存在但尚无组织归属的场景）
+	if err := seedAdminUserOrganization(ctx, db, tenant, user, rootOrg); err != nil {
+		return nil, err
+	}
 	return user, nil
+}
+
+// seedAdminUserOrganization 幂等建立管理员与顶级部门的归属关系（member + 主归属）。
+// 该函数独立于用户创建之外执行，保证升级场景（用户已存在、归属缺失）也能补齐。
+func seedAdminUserOrganization(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, user *model.UserEntity, rootOrg *model.OrganizationEntity) error {
+	var count int64
+	if err := db.Model(&model.OrganizationUserEntity{}).
+		Where("tenant_id = ? AND user_id = ? AND organization_id = ? AND relation_type = ?",
+			tenant.ID, user.ID, rootOrg.ID, string(model.OrgUserRelationMember)).
+		Count(&count).Error; err != nil {
+		return fmt.Errorf("seed admin organization count fail: %w", err)
+	}
+	if count > 0 {
+		return nil
+	}
+	relation := &model.OrganizationUserEntity{
+		TenantID:       tenant.ID,
+		OrganizationID: rootOrg.ID,
+		UserID:         user.ID,
+		RelationType:   string(model.OrgUserRelationMember),
+		IsPrimary:      true,
+	}
+	if err := db.WithContext(ctx).Create(relation).Error; err != nil {
+		return fmt.Errorf("seed admin organization create fail: %w", err)
+	}
+	glog.Infof(ctx, "[seed] admin organization relation created, user_id:%s org_id:%s", user.ID, rootOrg.ID)
+	return nil
 }
 
 func seedAdminUserRole(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adminUser *model.UserEntity, roles map[string]*model.RoleEntity) error {

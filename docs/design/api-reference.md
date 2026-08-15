@@ -159,45 +159,30 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 > 前缀 `platform`：`/v1/platform/...`。全部需 Bearer 令牌（平台管理员）。
 
-### 5.1 用户与身份
+### 5.1 用户与身份（平台排查视角）
+
+> 平台端用户管理为**跨租户排查视角**：只读目录 + 挂起/恢复 + 重置密码；租户内账号创建/编辑/删除、组织归属与角色分配收敛到 `/v1/tenant/*`。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/v1/platform/users` | 创建用户 |
 | GET | `/v1/platform/users` | 用户分页列表 |
 | GET | `/v1/platform/users/:userID` | 用户详情 |
-| PUT | `/v1/platform/users/:userID` | 更新用户 |
-| PATCH | `/v1/platform/users/:userID` | 更新状态（启用/停用） |
-| DELETE | `/v1/platform/users/:userID` | 删除用户 |
+| PATCH | `/v1/platform/users/:userID` | 更新状态（挂起/恢复） |
 | POST | `/v1/platform/users/:userID/changePassword` | 重置/修改密码 |
-| GET | `/v1/platform/users/:userID/roles` | 用户角色列表 |
-| POST | `/v1/platform/users/:userID/roles` | 授予角色 |
-| DELETE | `/v1/platform/users/:userID/roles/:roleID` | 移除角色 |
-| GET | `/v1/platform/users/:userID/organizations` | 用户组织归属（平台只读） |
 | GET | `/v1/platform/users/:userID/identities` | 用户外部身份列表 |
 | POST | `/v1/platform/users/:userID/identities` | 关联外部身份 |
-| GET/PUT/DELETE | `/v1/platform/users/:userID/identities/:identityID` | 外部身份详情/更新/删除 |
-| GET | `/v1/platform/user-identities` | 外部身份跨用户检索（顶层只读） |
-| GET | `/v1/platform/login-logs` | 登录日志分页 |
-| GET | `/v1/platform/login-logs/:loginLogID` | 登录日志详情 |
+| DELETE | `/v1/platform/users/:userID/identities/:identityID` | 解绑外部身份 |
 | GET | `/v1/platform/users/:userID/login-logs` | 某用户登录日志 |
 
-### 5.2 角色与权限
+### 5.2 角色与权限（平台排查视角）
+
+> 平台端角色为**排查视角**：列表/详情/成员只读；租户内角色 CRUD 与授权（成员/菜单）收敛到 `/v1/tenant/*`。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/v1/platform/roles` | 创建角色 |
 | GET | `/v1/platform/roles` | 角色分页 |
 | GET | `/v1/platform/roles/:roleID` | 角色详情 |
-| PUT | `/v1/platform/roles/:roleID` | 更新角色 |
-| DELETE | `/v1/platform/roles/:roleID` | 删除角色 |
-| GET | `/v1/platform/roles/:roleID/users` | 角色成员 |
-| PUT | `/v1/platform/roles/:roleID/users` | 分配成员（全量替换） |
-| DELETE | `/v1/platform/roles/:roleID/users/:userID` | 移除成员 |
-| GET/POST | `/v1/platform/roles/:roleID/menus` | 角色菜单查询/授权 |
-| DELETE | `/v1/platform/roles/:roleID/menus/:menuID` | 移除角色菜单 |
-| GET/POST | `/v1/platform/roles/:roleID/scopes` | 角色权限点查询/授权 |
-| DELETE | `/v1/platform/roles/:roleID/scopes/:scopeID` | 移除角色权限点 |
+| GET | `/v1/platform/roles/:roleID/users` | 角色成员（只读） |
 | POST | `/v1/platform/menus` | 创建菜单 |
 | GET | `/v1/platform/menus` | 菜单分页 |
 | GET | `/v1/platform/menus/tree` | 菜单树 |
@@ -216,8 +201,6 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | POST | `/v1/platform/tenants` | 创建租户 |
 | GET | `/v1/platform/tenants` | 租户分页 |
 | GET/PUT/DELETE | `/v1/platform/tenants/:tenantID` | 租户详情/更新/删除 |
-| POST | `/v1/platform/tenants/createAsOwner` | 以拥有者身份创建租户 |
-| GET | `/v1/platform/organizations/tree` | 组织树（平台只读，?tenantID= 必填） |
 | POST | `/v1/platform/tenant-applications` | 开通租户-应用 |
 | GET | `/v1/platform/tenant-applications` | 租户应用分页 |
 | GET/PUT/DELETE | `/v1/platform/tenant-applications/:tenantAppID` | 详情/更新/删除 |
@@ -265,15 +248,28 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/v1/tenant/users` | 租户用户分页 |
+| GET | `/v1/tenant/users` | 租户用户分页（?keyword= 姓名/用户名/邮箱/手机，?isSuspended=，含主组织/角色数） |
+| POST | `/v1/tenant/users` | 创建租户用户（姓名/部门 organizationIDs/邮箱/手机/密码；**姓名即自然人信息**：无匹配 person 则按姓名创建，命中 email/phone 复用；部门归属同事务建立，首个为主组织） |
+| GET | `/v1/tenant/users/:userID` | 用户详情（基础信息 + 组织归属 + 角色） |
+| PATCH | `/v1/tenant/users/:userID` | 局部更新（姓名/头像/状态） |
+| POST | `/v1/tenant/users/:userID/reset-password` | 重置密码（写入关联 person） |
+| GET | `/v1/tenant/users/:userID/roles` | 用户已分配角色（用户侧授权入口） |
+| PUT | `/v1/tenant/users/:userID/roles` | 全量替换用户角色 |
+| GET | `/v1/tenant/apps` | 租户订阅应用列表（角色归属/菜单授权的应用选项） |
+| POST | `/v1/tenant/roles` | 创建角色（**appID 必选**，角色从属于应用，编码应用内唯一） |
+| GET | `/v1/tenant/roles` | 角色分页（?appID=&keyword=，含成员数/菜单数/所属应用名） |
+| GET | `/v1/tenant/roles/:roleID` | 角色详情 |
+| PUT | `/v1/tenant/roles/:roleID` | 更新角色 |
+| DELETE | `/v1/tenant/roles/:roleID` | 删除角色（级联清理成员/菜单关联） |
+| GET | `/v1/tenant/roles/:roleID/menus` | 角色菜单授权回显（**所属应用的菜单树** + 已授权ID，角色侧授权入口） |
+| PUT | `/v1/tenant/roles/:roleID/menus` | 全量替换角色菜单授权 |
 | POST | `/v1/tenant/organizations` | 创建组织节点 |
 | GET | `/v1/tenant/organizations/tree` | 组织树 |
 | GET | `/v1/tenant/organizations/:organizationID` | 节点详情（含面包屑祖先链） |
 | PUT | `/v1/tenant/organizations/:organizationID` | 更新节点（改 parentID 即移动） |
 | PATCH | `/v1/tenant/organizations/:organizationID` | 更新状态（启停用） |
 | DELETE | `/v1/tenant/organizations/:organizationID` | 删除节点（有子/成员需 ?cascade=1） |
-| GET | `/v1/tenant/organizations/:organizationID/users` | 节点关系分页（?relationType=&isPrimary=） |
-| POST | `/v1/tenant/organizations/:organizationID/users` | 添加关系 {userID, relationType, isPrimary} |
+| GET | `/v1/tenant/organizations/:organizationID/users` | 节点关系分页（?relationType=&isPrimary=&keyword=，含用户基础信息） || POST | `/v1/tenant/organizations/:organizationID/users` | 添加关系 {userID, relationType, isPrimary} |
 | PUT | `/v1/tenant/organizations/:organizationID/users/:userID` | 更新关系（relationType/isPrimary） |
 | DELETE | `/v1/tenant/organizations/:organizationID/users/:userID` | 移除关系 |
 | GET | `/v1/tenant/organizations/:organizationID/users/descendants` | 子树成员聚合（去重） |
