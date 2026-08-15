@@ -116,7 +116,7 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 		return dao.NewApiKeyDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
 	persistentStore.userDao = func(opts ...dao.DaoOption) *dao.UserDao {
-		return &dao.UserDao{Dao: gormdao.NewDao[model.UserEntity, model.UserEntityList](
+		return &dao.UserDao{Dao: gormdao.NewDao[model.UserEntity, model.UserEntityList, uint](
 			model.TableNameUser, "UserDao",
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}

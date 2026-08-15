@@ -32,12 +32,12 @@ func (c *SessionCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type SessionDao struct {
-	*gormdao.Dao[model.RefreshTokenEntity, model.RefreshTokenEntityList]
+	*gormdao.Dao[model.RefreshTokenEntity, model.RefreshTokenEntityList, uint]
 }
 
 func NewSessionDao(opts ...DaoOption) *SessionDao {
 	return &SessionDao{
-		Dao: gormdao.NewDao[model.RefreshTokenEntity, model.RefreshTokenEntityList](
+		Dao: gormdao.NewDao[model.RefreshTokenEntity, model.RefreshTokenEntityList, uint](
 			model.TableNameRefreshToken, "SessionDao",
 			resolveDBGetter(opts...),
 		),

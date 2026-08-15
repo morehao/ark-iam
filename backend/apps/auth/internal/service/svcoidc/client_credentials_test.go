@@ -72,7 +72,7 @@ func TestClientCredentialsStorage(t *testing.T) {
 		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
 	persistentStore.applicationClientSecretDao = func(opts ...dao.DaoOption) *dao.ApplicationClientSecretDao {
-		return &dao.ApplicationClientSecretDao{Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList](
+		return &dao.ApplicationClientSecretDao{Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList, uint](
 			model.TableNameApplicationClientSecret, "ApplicationClientSecretDao",
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}
@@ -169,7 +169,7 @@ func TestClientCredentialsRejectsPublicClient(t *testing.T) {
 		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
 	persistentStore.applicationClientSecretDao = func(opts ...dao.DaoOption) *dao.ApplicationClientSecretDao {
-		return &dao.ApplicationClientSecretDao{Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList](
+		return &dao.ApplicationClientSecretDao{Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList, uint](
 			model.TableNameApplicationClientSecret, "ApplicationClientSecretDao",
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}

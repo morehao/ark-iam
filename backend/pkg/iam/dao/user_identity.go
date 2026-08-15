@@ -42,12 +42,12 @@ func (c *UserIdentityCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type UserIdentityDao struct {
-	*gormdao.Dao[model.UserIdentityEntity, model.UserIdentityEntityList]
+	*gormdao.Dao[model.UserIdentityEntity, model.UserIdentityEntityList, uint]
 }
 
 func NewUserIdentityDao(opts ...DaoOption) *UserIdentityDao {
 	return &UserIdentityDao{
-		Dao: gormdao.NewDao[model.UserIdentityEntity, model.UserIdentityEntityList](
+		Dao: gormdao.NewDao[model.UserIdentityEntity, model.UserIdentityEntityList, uint](
 			model.TableNameUserIdentity, "UserIdentityDao",
 			resolveDBGetter(opts...),
 		),

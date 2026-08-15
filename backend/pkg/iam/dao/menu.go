@@ -41,12 +41,12 @@ func (c *MenuCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type MenuDao struct {
-	*gormdao.Dao[model.MenuEntity, model.MenuEntityList]
+	*gormdao.Dao[model.MenuEntity, model.MenuEntityList, uint]
 }
 
 func NewMenuDao(opts ...DaoOption) *MenuDao {
 	return &MenuDao{
-		Dao: gormdao.NewDao[model.MenuEntity, model.MenuEntityList](
+		Dao: gormdao.NewDao[model.MenuEntity, model.MenuEntityList, uint](
 			model.TableNameMenu, "MenuDao",
 			resolveDBGetter(opts...),
 		),

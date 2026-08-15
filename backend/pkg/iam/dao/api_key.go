@@ -39,12 +39,12 @@ func (c *ApiKeyCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type ApiKeyDao struct {
-	*gormdao.Dao[model.ApiKeyEntity, model.ApiKeyEntityList]
+	*gormdao.Dao[model.ApiKeyEntity, model.ApiKeyEntityList, uint]
 }
 
 func NewApiKeyDao(opts ...DaoOption) *ApiKeyDao {
 	return &ApiKeyDao{
-		Dao: gormdao.NewDao[model.ApiKeyEntity, model.ApiKeyEntityList](
+		Dao: gormdao.NewDao[model.ApiKeyEntity, model.ApiKeyEntityList, uint](
 			model.TableNameApiKey, "ApiKeyDao",
 			resolveDBGetter(opts...),
 		),

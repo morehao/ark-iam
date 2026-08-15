@@ -33,11 +33,11 @@ func (c *AuditLogCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type AuditLogDao struct {
-	*gormdao.Dao[model.AuditLogEntity, model.AuditLogEntityList]
+	*gormdao.Dao[model.AuditLogEntity, model.AuditLogEntityList, uint]
 }
 
 func NewAuditLogDao(opts ...DaoOption) *AuditLogDao {
 	return &AuditLogDao{
-		Dao: gormdao.NewDao[model.AuditLogEntity, model.AuditLogEntityList](model.TableNameAuditLog, "AuditLogDao", resolveDBGetter(opts...)),
+		Dao: gormdao.NewDao[model.AuditLogEntity, model.AuditLogEntityList, uint](model.TableNameAuditLog, "AuditLogDao", resolveDBGetter(opts...)),
 	}
 }

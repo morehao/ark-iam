@@ -29,12 +29,12 @@ func (c *DomainCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type DomainDao struct {
-	*gormdao.Dao[model.DomainEntity, model.DomainEntityList]
+	*gormdao.Dao[model.DomainEntity, model.DomainEntityList, uint]
 }
 
 func NewDomainDao(opts ...DaoOption) *DomainDao {
 	return &DomainDao{
-		Dao: gormdao.NewDao[model.DomainEntity, model.DomainEntityList](
+		Dao: gormdao.NewDao[model.DomainEntity, model.DomainEntityList, uint](
 			model.TableNameDomain, "DomainDao",
 			resolveDBGetter(opts...),
 		),

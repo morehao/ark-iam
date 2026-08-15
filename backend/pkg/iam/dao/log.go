@@ -25,12 +25,12 @@ func (c *LogCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type LogDao struct {
-	*gormdao.Dao[model.LogEntity, model.LogEntityList]
+	*gormdao.Dao[model.LogEntity, model.LogEntityList, uint]
 }
 
 func NewLogDao(opts ...DaoOption) *LogDao {
 	return &LogDao{
-		Dao: gormdao.NewDao[model.LogEntity, model.LogEntityList](
+		Dao: gormdao.NewDao[model.LogEntity, model.LogEntityList, uint](
 			model.TableNameLog, "LogDao",
 			resolveDBGetter(opts...),
 		),

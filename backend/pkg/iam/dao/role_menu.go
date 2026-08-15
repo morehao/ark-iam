@@ -29,12 +29,12 @@ func (c *RoleMenuCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type RoleMenuDao struct {
-	*gormdao.Dao[model.RoleMenuEntity, model.RoleMenuEntityList]
+	*gormdao.Dao[model.RoleMenuEntity, model.RoleMenuEntityList, uint]
 }
 
 func NewRoleMenuDao(opts ...DaoOption) *RoleMenuDao {
 	return &RoleMenuDao{
-		Dao: gormdao.NewDao[model.RoleMenuEntity, model.RoleMenuEntityList](
+		Dao: gormdao.NewDao[model.RoleMenuEntity, model.RoleMenuEntityList, uint](
 			model.TableNameRoleMenu, "RoleMenuDao",
 			resolveDBGetter(opts...),
 		),

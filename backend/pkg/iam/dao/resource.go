@@ -29,12 +29,12 @@ func (c *ResourceCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type ResourceDao struct {
-	*gormdao.Dao[model.ResourceEntity, model.ResourceEntityList]
+	*gormdao.Dao[model.ResourceEntity, model.ResourceEntityList, uint]
 }
 
 func NewResourceDao(opts ...DaoOption) *ResourceDao {
 	return &ResourceDao{
-		Dao: gormdao.NewDao[model.ResourceEntity, model.ResourceEntityList](
+		Dao: gormdao.NewDao[model.ResourceEntity, model.ResourceEntityList, uint](
 			model.TableNameResource, "ResourceDao",
 			resolveDBGetter(opts...),
 		),
