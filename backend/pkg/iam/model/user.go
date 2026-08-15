@@ -7,7 +7,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameUser = "user_account" // user 是 PostgreSQL 保留字，改用 user_account
+const TableNameUser = "tenant_user" // user 是 PostgreSQL 保留字；tenant_user 与 person（自然人）语义区分更清晰
 
 type UserEntity struct {
 	gormdao.BaseEntity

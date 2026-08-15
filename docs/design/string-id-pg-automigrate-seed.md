@@ -66,7 +66,7 @@ DTO/Service/Controller/claims/SSO/测试与前端类型包。
 >
 > ⚠️ 经验 2：`user` 是 PostgreSQL 保留字。DAO 层按 `表名.列名` 拼 SQL（gormdao `deletedScope` 及各 Cond），
 > 生成未加引号的 `user.deleted_at` 在 PG 上报 `syntax error at or near "."`（登录链路即触发）。
-> 已把用户表改名为 **`user_account`**（`model.TableNameUser`），其余 29 张表名均非保留字。
+> 已把用户表改名为 **`tenant_user`**（`model.TableNameUser`，与 `person` 自然人语义区分更清晰），其余 29 张表名均非保留字。
 
 ## 3. 启动自动建表（GORM AutoMigrate）
 

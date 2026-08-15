@@ -30,7 +30,7 @@ func TestSeedIamAgainstPostgres(t *testing.T) {
 			"application_client_secret", "application_client", "menu", "scope",
 			"resource", "role", "user_identity", "user_department", "user_login_log",
 			"department", "organization_role_user", "organization_user",
-			"organization_role", "organization", "user_account", "person",
+			"organization_role", "organization", "tenant_user", "person",
 			"refresh_token", "session", "audit_log", "api_key", "connector",
 			"domain", "system", "log", "application", "tenant",
 		}
@@ -74,7 +74,7 @@ func TestSeedIamAgainstPostgres(t *testing.T) {
 	assertCount("scope", 14)
 	assertCount("menu", 18)
 	assertCount("person", 1)
-	assertCount("user_account", 1)
+	assertCount("tenant_user", 1)
 	assertCount("application_client", 2)
 	assertCount("user_role", 1)
 	assertCount("role_menu", 18)
