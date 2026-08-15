@@ -46,11 +46,6 @@ type connectorRuntimeRepository interface {
 	GetByID(ctx context.Context, id uint) (*model.ConnectorEntity, error)
 }
 
-type connectorScopeRepository interface {
-	GetByID(ctx context.Context, id uint) (*model.ConnectorEntity, error)
-	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.ConnectorEntityList, int64, error)
-}
-
 type connectorIdentityResolver interface {
 	Resolve(ctx context.Context, input identityResolveInput) (*resolvedConnectorPerson, error)
 }
@@ -85,10 +80,6 @@ func (svc *connectorSvc) getConnectorRepo() connectorRuntimeRepository {
 		svc.connectorRepo = dao.NewConnectorDao()
 	}
 	return svc.connectorRepo
-}
-
-var newConnectorScopeRepo = func() connectorScopeRepository {
-	return dao.NewConnectorDao()
 }
 
 func connectorVisibleToTenant(entity *model.ConnectorEntity, tenantID uint) bool {
@@ -209,7 +200,7 @@ func (svc *connectorSvc) Create(ctx *gin.Context, req *dtoauth.ConnectorCreateRe
 }
 
 func (svc *connectorSvc) Delete(ctx *gin.Context, req *dtoauth.ConnectorDeleteReq) error {
-	connectorEntity, err := newConnectorScopeRepo().GetByID(ctx, req.ConnectorID)
+	connectorEntity, err := dao.NewConnectorDao().GetByID(ctx, req.ConnectorID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.DeleteConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorDeleteError)
@@ -227,7 +218,7 @@ func (svc *connectorSvc) Delete(ctx *gin.Context, req *dtoauth.ConnectorDeleteRe
 }
 
 func (svc *connectorSvc) Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateReq) error {
-	connectorEntity, err := newConnectorScopeRepo().GetByID(ctx, req.ConnectorID)
+	connectorEntity, err := dao.NewConnectorDao().GetByID(ctx, req.ConnectorID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.UpdateConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorUpdateError)
@@ -249,7 +240,7 @@ func (svc *connectorSvc) Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateRe
 }
 
 func (svc *connectorSvc) Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailReq) (*dtoauth.ConnectorDetailResp, error) {
-	connectorEntity, err := newConnectorScopeRepo().GetByID(ctx, req.ConnectorID)
+	connectorEntity, err := dao.NewConnectorDao().GetByID(ctx, req.ConnectorID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.DetailConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetDetailError)
@@ -289,7 +280,7 @@ func (svc *connectorSvc) Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailRe
 }
 
 func (svc *connectorSvc) PageList(ctx *gin.Context, req *dtoauth.ConnectorPageListReq) (*dtoauth.ConnectorPageListResp, error) {
-	connectorRepo := newConnectorScopeRepo()
+	connectorRepo := dao.NewConnectorDao()
 	cond := &dao.ConnectorCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,

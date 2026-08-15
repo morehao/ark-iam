@@ -40,7 +40,7 @@ function iconOf(icon?: string): React.ReactNode {
 function makeStaticMenu(id: number, name: string, code: string, path: string, icon: string): MenuItem {
   return {
     menuID: id,
-    appId: 2,
+    appID: 2,
     parentID: 0,
     name,
     code,

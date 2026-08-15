@@ -76,9 +76,9 @@ export const getRoleDetail = (roleID: number) => request.get<any, RoleItem>('/pl
 export const createRole = (data: RoleCreateReq) => request.post<any, { roleID: number }>('/platform/role/create', data)
 export const updateRole = (data: RoleUpdateReq) => request.post<any, string>('/platform/role/update', data)
 export const deleteRole = (roleID: number) => request.post<any, string>('/platform/role/delete', { roleID })
-export const getRoleUsers = (roleId: number) => request.get<any, { total: number; users: RoleUserItem[] }>('/platform/role/users', { params: { roleId } })
-export const assignRoleUsers = (roleId: number, userIds: number[]) => request.post<any, string>('/platform/role/assignUsers', { roleId, userIds })
-export const removeRoleUser = (roleId: number, userId: number) => request.delete<any, string>(`/platform/role/users/${roleId}/${userId}`)
+export const getRoleUsers = (roleID: number) => request.get<any, { total: number; users: RoleUserItem[] }>('/platform/role/users', { params: { roleID } })
+export const assignRoleUsers = (roleID: number, userIDs: number[]) => request.post<any, string>('/platform/role/assignUsers', { roleID, userIDs })
+export const removeRoleUser = (roleID: number, userID: number) => request.delete<any, string>(`/platform/role/users/${roleID}/${userID}`)
 
 // ==================== 部门 ====================
 export const getDepartmentTree = () => request.get<any, DepartmentTreeResp>('/platform/department/tree')
@@ -93,26 +93,26 @@ export const deleteDepartment = (departmentID: number) => request.post<any, stri
 // ==================== 应用 ====================
 export const getApplicationPageList = (data: { page: number; pageSize: number; name?: string }) =>
   request.post<any, PageListResp<ApplicationItem>>('/platform/application/pageList', data)
-export const getApplicationDetail = (appId: number) => request.get<any, ApplicationItem>('/platform/application/detail', { params: { appId } })
-export const createApplication = (data: ApplicationCreateReq) => request.post<any, { appId: number; code: string }>('/platform/application/create', data)
+export const getApplicationDetail = (appID: number) => request.get<any, ApplicationItem>('/platform/application/detail', { params: { appID } })
+export const createApplication = (data: ApplicationCreateReq) => request.post<any, { appID: number; code: string }>('/platform/application/create', data)
 export const updateApplication = (data: ApplicationUpdateReq) => request.post<any, string>('/platform/application/update', data)
-export const deleteApplication = (appId: number) => request.post<any, string>('/platform/application/delete', { appId })
+export const deleteApplication = (appID: number) => request.post<any, string>('/platform/application/delete', { appID })
 
 // ==================== OAuth 客户端 ====================
 export const getOAuthClientPageList = (data: { page: number; pageSize: number; name?: string }) =>
   request.post<any, PageListResp<OAuthClientItem>>('/platform/applicationClient/pageList', data)
-export const getOAuthClientDetail = (applicationClientId: number) =>
-  request.get<any, OAuthClientDetail>('/platform/applicationClient/detail', { params: { applicationClientId } })
+export const getOAuthClientDetail = (applicationClientID: number) =>
+  request.get<any, OAuthClientDetail>('/platform/applicationClient/detail', { params: { applicationClientID } })
 export const createOAuthClient = (data: OAuthClientCreateReq) =>
-  request.post<any, { applicationClientId: number; clientID: string }>('/platform/applicationClient/create', data)
+  request.post<any, { applicationClientID: number; clientID: string }>('/platform/applicationClient/create', data)
 export const updateOAuthClient = (data: OAuthClientUpdateReq) => request.post<any, string>('/platform/applicationClient/update', data)
-export const deleteOAuthClient = (applicationClientId: number) =>
-  request.post<any, string>('/platform/applicationClient/delete', { applicationClientId })
-export const listOAuthSecrets = (applicationClientId: number) =>
-  request.get<any, { total: number; secrets: OAuthSecretItem[] }>('/platform/applicationClient/secrets', { params: { applicationClientId } })
-export const createOAuthSecret = (data: { applicationClientId: number; name: string; expiresAt?: string }) =>
+export const deleteOAuthClient = (applicationClientID: number) =>
+  request.post<any, string>('/platform/applicationClient/delete', { applicationClientID })
+export const listOAuthSecrets = (applicationClientID: number) =>
+  request.get<any, { total: number; secrets: OAuthSecretItem[] }>('/platform/applicationClient/secrets', { params: { applicationClientID } })
+export const createOAuthSecret = (data: { applicationClientID: number; name: string; expiresAt?: string }) =>
   request.post<any, OAuthSecretCreateResp>('/platform/applicationClient/secrets', data)
-export const deleteOAuthSecret = (secretId: number) => request.delete<any, string>(`/platform/applicationClient/secrets/${secretId}`)
+export const deleteOAuthSecret = (secretID: number) => request.delete<any, string>(`/platform/applicationClient/secrets/${secretID}`)
 
 // ==================== 租户 ====================
 export const getTenantPageList = (data: { page: number; pageSize: number; name?: string }) =>
@@ -125,14 +125,14 @@ export const deleteTenant = (tenantID: number) => request.post<any, string>('/pl
 // ==================== 租户应用 ====================
 export const getTenantApplicationPageList = (data: { page: number; pageSize: number; status?: string }) =>
   request.post<any, PageListResp<TenantApplicationItem>>('/platform/tenantApplication/pageList', data)
-export const getTenantApplicationDetail = (tenantAppId: number) =>
-  request.get<any, TenantApplicationItem>('/platform/tenantApplication/detail', { params: { tenantAppId } })
+export const getTenantApplicationDetail = (tenantAppID: number) =>
+  request.get<any, TenantApplicationItem>('/platform/tenantApplication/detail', { params: { tenantAppID } })
 export const createTenantApplication = (data: TenantApplicationCreateReq) =>
-  request.post<any, { tenantAppId: number }>('/platform/tenantApplication/create', data)
+  request.post<any, { tenantAppID: number }>('/platform/tenantApplication/create', data)
 export const updateTenantApplication = (data: TenantApplicationUpdateReq) =>
   request.post<any, string>('/platform/tenantApplication/update', data)
-export const deleteTenantApplication = (tenantAppId: number) =>
-  request.post<any, string>('/platform/tenantApplication/delete', { tenantAppId })
+export const deleteTenantApplication = (tenantAppID: number) =>
+  request.post<any, string>('/platform/tenantApplication/delete', { tenantAppID })
 
 // ==================== API Key ====================
 export const getApiKeyPageList = (data: { page: number; pageSize: number; name?: string }) =>
@@ -143,8 +143,8 @@ export const revokeApiKey = (id: number) => request.post<any, string>('/platform
 export const deleteApiKey = (id: number) => request.post<any, string>('/platform/apiKey/delete', { id })
 
 // ==================== 菜单 ====================
-export const getMenuTree = (appId: number) => request.get<any, MenuTreeResp>('/platform/menu/tree', { params: { appId } })
-export const getMenuPageList = (data: { page: number; pageSize: number; appId?: number; name?: string }) =>
+export const getMenuTree = (appID: number) => request.get<any, MenuTreeResp>('/platform/menu/tree', { params: { appID } })
+export const getMenuPageList = (data: { page: number; pageSize: number; appID?: number; name?: string }) =>
   request.post<any, PageListResp<MenuItem>>('/platform/menu/pageList', data)
 export const getMenuDetail = (menuID: number) => request.get<any, MenuItem>('/platform/menu/detail', { params: { menuID } })
 export const createMenu = (data: Partial<MenuItem>) => request.post<any, { menuID: number }>('/platform/menu/create', data)
@@ -193,9 +193,9 @@ export const getAuditLogDetail = (logID: number) => request.get<any, AuditLogIte
 // ==================== Connector（auth） ====================
 export const getConnectorPageList = (data: { page: number; pageSize: number; name?: string }) =>
   request.post<any, PageListResp<ConnectorItem>>('/auth/connector/pageList', data)
-export const getConnectorDetail = (connectorId: number) => request.get<any, ConnectorItem>('/auth/connector/detail', { params: { connectorId } })
-export const createConnector = (data: Partial<ConnectorItem>) => request.post<any, { connectorId: number }>('/auth/connector/create', data)
+export const getConnectorDetail = (connectorID: number) => request.get<any, ConnectorItem>('/auth/connector/detail', { params: { connectorID } })
+export const createConnector = (data: Partial<ConnectorItem>) => request.post<any, { connectorID: number }>('/auth/connector/create', data)
 export const updateConnector = (data: Partial<ConnectorItem>) => request.post<any, string>('/auth/connector/update', data)
-export const deleteConnector = (connectorId: number) => request.post<any, string>('/auth/connector/delete', { connectorId })
+export const deleteConnector = (connectorID: number) => request.post<any, string>('/auth/connector/delete', { connectorID })
 export const getConnectorFactoryList = (data?: { protocol?: string; provider?: string }) =>
   request.post<any, { list: ConnectorFactoryItem[] }>('/auth/connector/getFactoryList', data)

@@ -119,7 +119,7 @@ func TestConnectorControllerAuthorize(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/auth/connector/42/authorize", strings.NewReader(`{"redirectUri":"https://app.example.com/callback","state":"state-1","loginHint":"user@example.com"}`))
 	req.Header.Set("Content-Type", "application/json")
 	ctx.Request = req
-	ctx.Params = gin.Params{{Key: "connectorId", Value: "42"}}
+	ctx.Params = gin.Params{{Key: "connectorID", Value: "42"}}
 
 	ctr.Authorize(ctx)
 
@@ -152,7 +152,7 @@ func TestConnectorControllerTestConnector(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(recorder)
 	req := httptest.NewRequest(http.MethodPost, "/v1/auth/connector/9/test", nil)
 	ctx.Request = req
-	ctx.Params = gin.Params{{Key: "connectorId", Value: "9"}}
+	ctx.Params = gin.Params{{Key: "connectorID", Value: "9"}}
 
 	ctr.TestConnector(ctx)
 
@@ -177,7 +177,7 @@ func TestConnectorControllerCallback(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	req := httptest.NewRequest(http.MethodGet, "/v1/auth/connector/callback?connectorId=7&code=callback-code&state=state-2", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/auth/connector/callback?connectorID=7&code=callback-code&state=state-2", nil)
 	ctx.Request = req
 
 	ctr.Callback(ctx)
@@ -201,7 +201,7 @@ func TestConnectorControllerCallbackRequiresState(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	req := httptest.NewRequest(http.MethodGet, "/v1/auth/connector/callback?connectorId=7&code=callback-code", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/auth/connector/callback?connectorID=7&code=callback-code", nil)
 	ctx.Request = req
 
 	ctr.Callback(ctx)

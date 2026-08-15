@@ -6,18 +6,18 @@ import { defaultIssuer, defaultRedirectPath, defaultPostLogoutRedirectPath, defa
 import { oidcExtraQueryParams } from './tenant'
 
 export interface CreateAuthProviderOptions {
-  clientId: string
+  clientID: string
   clientSecret?: string
   getExtraQueryParams?: () => Record<string, string | number | boolean>
   redirectPath?: string
 }
 
 export function createAuthProvider(opts: CreateAuthProviderOptions) {
-  const { clientId, clientSecret, redirectPath = defaultRedirectPath } = opts
+  const { clientID, clientSecret, redirectPath = defaultRedirectPath } = opts
 
   const oidcConfig = {
     authority: import.meta.env.VITE_OIDC_ISSUER || defaultIssuer,
-    client_id: clientId,
+    client_id: clientID,
     ...(clientSecret ? { client_secret: clientSecret } : {}),
     redirect_uri: window.location.origin + redirectPath,
     post_logout_redirect_uri: window.location.origin + defaultPostLogoutRedirectPath,

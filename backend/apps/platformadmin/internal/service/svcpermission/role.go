@@ -1,8 +1,6 @@
 package svcpermission
 
 import (
-	"context"
-
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
@@ -16,15 +14,6 @@ import (
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
-
-type roleScopeRepository interface {
-	GetByID(ctx context.Context, id uint) (*model.RoleEntity, error)
-	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.RoleEntityList, int64, error)
-}
-
-var newRoleScopeRepo = func() roleScopeRepository {
-	return dao.NewRoleDao()
-}
 
 func roleVisibleToTenant(entity *model.RoleEntity, tenantID uint) bool {
 	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
@@ -74,7 +63,7 @@ func (svc *roleSvc) Create(ctx *gin.Context, req *dtopermission.RoleCreateReq) (
 }
 
 func (svc *roleSvc) Delete(ctx *gin.Context, req *dtopermission.RoleDeleteReq) error {
-	roleEntity, err := newRoleScopeRepo().GetByID(ctx, req.RoleID)
+	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteRole] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.RoleDeleteError)
@@ -92,7 +81,7 @@ func (svc *roleSvc) Delete(ctx *gin.Context, req *dtopermission.RoleDeleteReq) e
 }
 
 func (svc *roleSvc) Update(ctx *gin.Context, req *dtopermission.RoleUpdateReq) error {
-	roleEntity, err := newRoleScopeRepo().GetByID(ctx, req.RoleID)
+	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.UpdateRole] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.RoleUpdateError)
@@ -119,7 +108,7 @@ func (svc *roleSvc) Update(ctx *gin.Context, req *dtopermission.RoleUpdateReq) e
 }
 
 func (svc *roleSvc) Detail(ctx *gin.Context, req *dtopermission.RoleDetailReq) (*dtopermission.RoleDetailResp, error) {
-	roleEntity, err := newRoleScopeRepo().GetByID(ctx, req.RoleID)
+	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.DetailRole] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.RoleGetDetailError)
@@ -147,7 +136,7 @@ func (svc *roleSvc) Detail(ctx *gin.Context, req *dtopermission.RoleDetailReq) (
 }
 
 func (svc *roleSvc) PageList(ctx *gin.Context, req *dtopermission.RolePageListReq) (*dtopermission.RolePageListResp, error) {
-	roleRepo := newRoleScopeRepo()
+	roleRepo := dao.NewRoleDao()
 	cond := &dao.RoleCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
@@ -220,11 +209,11 @@ func (svc *roleSvc) ListUsers(ctx *gin.Context, req *dtouser.RoleUserListReq) (*
 				person = &model.PersonEntity{}
 			}
 			users = append(users, dtouser.RoleUserResp{
-				UserID:    uint64(ur.UserID),
+				UserID:    ur.UserID,
 				Username:  model.DerefStr(person.Username),
 				Name:      user.Name,
 				Email:     model.DerefStr(person.PrimaryEmail),
-				RoleID:    uint64(ur.RoleID),
+				RoleID:    ur.RoleID,
 				CreatedAt: ur.CreatedAt.Format("2006-01-02 15:04:05"),
 			})
 		}

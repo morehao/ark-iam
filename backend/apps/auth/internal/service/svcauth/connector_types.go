@@ -22,7 +22,7 @@ type ConnectorConfig struct {
 	AuthURL      string         `json:"authUrl"`
 	TokenURL     string         `json:"tokenUrl"`
 	UserInfoURL  string         `json:"userInfoUrl"`
-	ClientID     string         `json:"clientId"`
+	ClientID     string         `json:"clientID"`
 	ClientSecret string         `json:"clientSecret"`
 	RedirectURI  string         `json:"redirectUri"`
 	Scopes       []string       `json:"scopes"`

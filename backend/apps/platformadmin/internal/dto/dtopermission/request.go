@@ -20,7 +20,7 @@ type MenuDetailReq struct {
 
 type MenuPageListReq struct {
 	gobject.PageQuery
-	AppID    uint   `json:"appId"`    // 应用ID
+	AppID    uint   `json:"appID"`    // 应用ID
 	ParentID uint   `json:"parentID"` // 父菜单ID
 	Name     string `json:"name"`     // 菜单名称
 	Code     string `json:"code"`     // 菜单编码
@@ -33,7 +33,7 @@ type MenuDeleteReq struct {
 }
 
 type MenuTreeReq struct {
-	AppID uint `json:"appId" form:"appId" binding:"required"` // 应用ID（菜单树按应用维度查询）
+	AppID uint `json:"appID" form:"appID" binding:"required"` // 应用ID（菜单树按应用维度查询）
 }
 
 type RoleCreateReq struct {

@@ -15,5 +15,5 @@ export const getPersonDetail = () => request.get<any, PersonDetailResp>('/auth/p
 export const updatePassword = (req: PersonUpdatePasswordReq) => request.post<any, void>('/auth/person/updatePassword', req)
 export const getSessionList = (params?: { page?: number; pageSize?: number }) =>
   request.get<any, SessionListResp>('/auth/user/sessions', { params })
-export const revokeSession = (sessionId: number) => request.delete<any, void>(`/auth/user/sessions/${sessionId}`)
+export const revokeSession = (sessionID: number) => request.delete<any, void>(`/auth/user/sessions/${sessionID}`)
 export const revokeAllSessions = () => request.delete<any, void>('/auth/user/sessions')

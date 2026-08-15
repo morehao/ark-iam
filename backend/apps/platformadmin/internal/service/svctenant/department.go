@@ -1,8 +1,6 @@
 package svctenant
 
 import (
-	"context"
-
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
@@ -15,15 +13,6 @@ import (
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
-
-type departmentScopeRepository interface {
-	GetByID(ctx context.Context, id uint) (*model.DepartmentEntity, error)
-	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.DepartmentEntityList, int64, error)
-}
-
-var newDepartmentScopeRepo = func() departmentScopeRepository {
-	return dao.NewDepartmentDao()
-}
 
 func departmentVisibleToTenant(entity *model.DepartmentEntity, tenantID uint) bool {
 	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
@@ -68,7 +57,7 @@ func (svc *departmentSvc) Create(ctx *gin.Context, req *dtotenant.DepartmentCrea
 }
 
 func (svc *departmentSvc) Delete(ctx *gin.Context, req *dtotenant.DepartmentDeleteReq) error {
-	departmentEntity, err := newDepartmentScopeRepo().GetByID(ctx, req.DepartmentID)
+	departmentEntity, err := dao.NewDepartmentDao().GetByID(ctx, req.DepartmentID)
 	if err != nil {
 		glog.Errorf(ctx, "[svctenant.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.DepartmentDeleteError)
@@ -86,7 +75,7 @@ func (svc *departmentSvc) Delete(ctx *gin.Context, req *dtotenant.DepartmentDele
 }
 
 func (svc *departmentSvc) Update(ctx *gin.Context, req *dtotenant.DepartmentUpdateReq) error {
-	departmentEntity, err := newDepartmentScopeRepo().GetByID(ctx, req.DepartmentID)
+	departmentEntity, err := dao.NewDepartmentDao().GetByID(ctx, req.DepartmentID)
 	if err != nil {
 		glog.Errorf(ctx, "[svctenant.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.DepartmentUpdateError)
@@ -113,7 +102,7 @@ func (svc *departmentSvc) Update(ctx *gin.Context, req *dtotenant.DepartmentUpda
 }
 
 func (svc *departmentSvc) Detail(ctx *gin.Context, req *dtotenant.DepartmentDetailReq) (*dtotenant.DepartmentDetailResp, error) {
-	departmentEntity, err := newDepartmentScopeRepo().GetByID(ctx, req.DepartmentID)
+	departmentEntity, err := dao.NewDepartmentDao().GetByID(ctx, req.DepartmentID)
 	if err != nil {
 		glog.Errorf(ctx, "[svctenant.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.DepartmentGetDetailError)
@@ -141,7 +130,7 @@ func (svc *departmentSvc) Detail(ctx *gin.Context, req *dtotenant.DepartmentDeta
 }
 
 func (svc *departmentSvc) PageList(ctx *gin.Context, req *dtotenant.DepartmentPageListReq) (*dtotenant.DepartmentPageListResp, error) {
-	departmentRepo := newDepartmentScopeRepo()
+	departmentRepo := dao.NewDepartmentDao()
 	cond := &dao.DepartmentCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
@@ -182,7 +171,7 @@ func (svc *departmentSvc) PageList(ctx *gin.Context, req *dtotenant.DepartmentPa
 }
 
 func (svc *departmentSvc) Tree(ctx *gin.Context, req *dtotenant.DepartmentTreeReq) (*dtotenant.DepartmentTreeResp, error) {
-	departmentRepo := newDepartmentScopeRepo()
+	departmentRepo := dao.NewDepartmentDao()
 	cond := &dao.DepartmentCond{
 		TenantID: gincontext.GetTenantID(ctx),
 	}

@@ -1,7 +1,6 @@
 package dao
 
 import (
-	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
@@ -45,11 +44,11 @@ type ConnectorDao struct {
 	*gormdao.Dao[model.ConnectorEntity, model.ConnectorEntityList]
 }
 
-func NewConnectorDao() *ConnectorDao {
+func NewConnectorDao(opts ...DaoOption) *ConnectorDao {
 	return &ConnectorDao{
 		Dao: gormdao.NewDao[model.ConnectorEntity, model.ConnectorEntityList](
 			model.TableNameConnector, "ConnectorDao",
-			dbclient.IamDB,
+			resolveDBGetter(opts...),
 		),
 	}
 }

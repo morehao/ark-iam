@@ -1,7 +1,6 @@
 package dao
 
 import (
-	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
@@ -33,11 +32,11 @@ type OrganizationRoleDao struct {
 	*gormdao.Dao[model.OrganizationRoleEntity, model.OrganizationRoleEntityList]
 }
 
-func NewOrganizationRoleDao() *OrganizationRoleDao {
+func NewOrganizationRoleDao(opts ...DaoOption) *OrganizationRoleDao {
 	return &OrganizationRoleDao{
 		Dao: gormdao.NewDao[model.OrganizationRoleEntity, model.OrganizationRoleEntityList](
 			model.TableNameOrganizationRole, "OrganizationRoleDao",
-			dbclient.IamDB,
+			resolveDBGetter(opts...),
 		),
 	}
 }

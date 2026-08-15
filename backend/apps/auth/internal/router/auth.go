@@ -31,7 +31,7 @@ func connectorRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.GET("/connector/detail", connectorCtr.Detail)
 	v1RouterGroup.POST("/connector/pageList", connectorCtr.PageList)
 	v1RouterGroup.POST("/connector/getFactoryList", connectorCtr.GetFactoryList)
-	v1RouterGroup.POST("/connector/:connectorId/test", connectorCtr.TestConnector)
-	v1RouterGroup.POST("/connector/:connectorId/authorize", connectorCtr.Authorize)
+	v1RouterGroup.POST("/connector/:connectorID/test", connectorCtr.TestConnector)
+	v1RouterGroup.POST("/connector/:connectorID/authorize", connectorCtr.Authorize)
 	v1RouterGroup.GET("/connector/callback", connectorCtr.Callback)
 }

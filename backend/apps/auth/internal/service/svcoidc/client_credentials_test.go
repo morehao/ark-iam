@@ -68,16 +68,16 @@ func TestClientCredentialsStorage(t *testing.T) {
 	}
 
 	persistentStore := NewPersistentStore()
-	persistentStore.applicationClientDao = func() *dao.ApplicationClientDao {
+	persistentStore.applicationClientDao = func(opts ...dao.DaoOption) *dao.ApplicationClientDao {
 		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
-	persistentStore.applicationClientSecretDao = func() *dao.ApplicationClientSecretDao {
+	persistentStore.applicationClientSecretDao = func(opts ...dao.DaoOption) *dao.ApplicationClientSecretDao {
 		return &dao.ApplicationClientSecretDao{Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList](
 			model.TableNameApplicationClientSecret, "ApplicationClientSecretDao",
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}
 	}
-	persistentStore.apiKeyDao = func() *dao.ApiKeyDao {
+	persistentStore.apiKeyDao = func(opts ...dao.DaoOption) *dao.ApiKeyDao {
 		return dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
 	}
 
@@ -165,16 +165,16 @@ func TestClientCredentialsRejectsPublicClient(t *testing.T) {
 	}
 
 	persistentStore := NewPersistentStore()
-	persistentStore.applicationClientDao = func() *dao.ApplicationClientDao {
+	persistentStore.applicationClientDao = func(opts ...dao.DaoOption) *dao.ApplicationClientDao {
 		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
-	persistentStore.applicationClientSecretDao = func() *dao.ApplicationClientSecretDao {
+	persistentStore.applicationClientSecretDao = func(opts ...dao.DaoOption) *dao.ApplicationClientSecretDao {
 		return &dao.ApplicationClientSecretDao{Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList](
 			model.TableNameApplicationClientSecret, "ApplicationClientSecretDao",
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}
 	}
-	persistentStore.apiKeyDao = func() *dao.ApiKeyDao {
+	persistentStore.apiKeyDao = func(opts ...dao.DaoOption) *dao.ApiKeyDao {
 		return dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
 	}
 
@@ -198,7 +198,7 @@ func TestCreateAccessTokenForClientCredentials(t *testing.T) {
 	db := newClientCredentialsTestDB(t, clientID, accessTokenTTL)
 
 	persistentStore := NewPersistentStore()
-	persistentStore.applicationClientDao = func() *dao.ApplicationClientDao {
+	persistentStore.applicationClientDao = func(opts ...dao.DaoOption) *dao.ApplicationClientDao {
 		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
 
@@ -231,7 +231,7 @@ func TestGetPrivateClaimsFromRequestForClientCredentials(t *testing.T) {
 	db := newClientCredentialsTestDB(t, clientID, 3600)
 
 	persistentStore := NewPersistentStore()
-	persistentStore.applicationClientDao = func() *dao.ApplicationClientDao {
+	persistentStore.applicationClientDao = func(opts ...dao.DaoOption) *dao.ApplicationClientDao {
 		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
 

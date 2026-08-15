@@ -1,7 +1,6 @@
 package dao
 
 import (
-	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
@@ -49,11 +48,11 @@ type TenantDao struct {
 	*gormdao.Dao[model.TenantEntity, model.TenantEntityList]
 }
 
-func NewTenantDao() *TenantDao {
+func NewTenantDao(opts ...DaoOption) *TenantDao {
 	return &TenantDao{
 		Dao: gormdao.NewDao[model.TenantEntity, model.TenantEntityList](
 			model.TableNameTenant, "TenantDao",
-			dbclient.IamDB,
+			resolveDBGetter(opts...),
 		),
 	}
 }

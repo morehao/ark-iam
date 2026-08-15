@@ -1,7 +1,7 @@
 package dtoapplicationclient
 
-type CreateReq struct {
-	AppId        uint   `json:"appId" binding:"required"` // 所属应用ID
+type ApplicationClientCreateReq struct {
+	AppID        uint   `json:"appID" binding:"required"` // 所属应用ID
 	Name         string `json:"name" binding:"required"`  // 客户端名称
 	Type         string `json:"type"`                     // 客户端类型: first_party-第一方, third_party-第三方
 	IsThirdParty int8   `json:"isThirdParty"`             // 是否第三方应用
@@ -20,8 +20,8 @@ type CreateReq struct {
 	RefreshTokenTTL         int64    `json:"refreshTokenTTL"`         // 刷新令牌有效期(秒)
 }
 
-type UpdateReq struct {
-	ApplicationClientID uint   `json:"applicationClientId" binding:"required"` // OAuth客户端ID
+type ApplicationClientUpdateReq struct {
+	ApplicationClientID uint   `json:"applicationClientID" binding:"required"` // OAuth客户端ID
 	Name                string `json:"name"`                                   // 客户端名称
 	Type                string `json:"type"`                                   // 客户端类型
 	Status              string `json:"status"`                                 // 状态: enable-启用, disable-停用
@@ -41,15 +41,15 @@ type UpdateReq struct {
 	RefreshTokenTTL         int64    `json:"refreshTokenTTL"`         // 刷新令牌有效期(秒)
 }
 
-type DeleteReq struct {
-	ApplicationClientID uint `json:"applicationClientId" binding:"required"` // OAuth客户端ID
+type ApplicationClientDeleteReq struct {
+	ApplicationClientID uint `json:"applicationClientID" binding:"required"` // OAuth客户端ID
 }
 
-type DetailReq struct {
-	ApplicationClientID uint `json:"applicationClientId" form:"applicationClientId" binding:"required"` // OAuth客户端ID
+type ApplicationClientDetailReq struct {
+	ApplicationClientID uint `json:"applicationClientID" form:"applicationClientID" binding:"required"` // OAuth客户端ID
 }
 
-type PageListReq struct {
+type ApplicationClientPageListReq struct {
 	Page     int    `json:"page"`     // 页码
 	PageSize int    `json:"pageSize"` // 每页条数
 	Name     string `json:"name"`     // 客户端名称（模糊搜索）
@@ -58,15 +58,15 @@ type PageListReq struct {
 }
 
 type SecretListReq struct {
-	ApplicationClientID uint `json:"applicationClientId" form:"applicationClientId" binding:"required"` // OAuth客户端ID
+	ApplicationClientID uint `json:"applicationClientID" form:"applicationClientID" binding:"required"` // OAuth客户端ID
 }
 
-type CreateSecretReq struct {
-	ApplicationClientID uint   `json:"applicationClientId" binding:"required"` // OAuth客户端ID
+type SecretCreateReq struct {
+	ApplicationClientID uint   `json:"applicationClientID" binding:"required"` // OAuth客户端ID
 	Name                string `json:"name" binding:"required"`                // 密钥名称
 	ExpiredAt           string `json:"expiresAt"`                              // 过期时间
 }
 
-type DeleteSecretReq struct {
-	SecretID uint64 `json:"secretId" uri:"secretId" binding:"required"` // 密钥ID
+type SecretDeleteReq struct {
+	SecretID uint `json:"secretID" uri:"secretID" binding:"required"` // 密钥ID
 }

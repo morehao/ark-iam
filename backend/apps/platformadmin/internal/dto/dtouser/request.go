@@ -111,24 +111,24 @@ type AssignDepartmentsReq struct {
 }
 
 type RoleUserListReq struct {
-	RoleID uint64 `json:"roleId" form:"roleId" binding:"required"`
+	RoleID uint `json:"roleID" form:"roleID" binding:"required"`
 }
 
 type AssignRoleUsersReq struct {
-	RoleID  uint64   `json:"roleId" binding:"required"`
-	UserIDs []uint64 `json:"userIds" binding:"required,min=1"`
+	RoleID  uint   `json:"roleID" binding:"required"`
+	UserIDs []uint `json:"userIDs" binding:"required,min=1"`
 }
 
 type RemoveRoleUserReq struct {
-	RoleID uint64 `json:"roleId" uri:"roleId" binding:"required"`
-	UserID uint64 `json:"userId" uri:"userId" binding:"required"`
+	RoleID uint `json:"roleID" uri:"roleID" binding:"required"`
+	UserID uint `json:"userID" uri:"userID" binding:"required"`
 }
 
 type RoleApplicationListReq struct {
-	RoleID uint64 `json:"roleId" form:"roleId" binding:"required"`
+	RoleID uint `json:"roleID" form:"roleID" binding:"required"`
 }
 
 type AssignRoleApplicationsReq struct {
-	RoleID uint64   `json:"roleId" binding:"required"`
-	AppIDs []uint64 `json:"appIds" binding:"required,min=1"`
+	RoleID uint   `json:"roleID" binding:"required"`
+	AppIDs []uint `json:"appIDs" binding:"required,min=1"`
 }

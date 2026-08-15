@@ -2,7 +2,7 @@ package dtoapikey
 
 import "github.com/morehao/golib/biz/gobject"
 
-type CreateApiKeyReq struct {
+type ApiKeyCreateReq struct {
 	Name      string `json:"name" binding:"required"`
 	Scope     string `json:"scope"`
 	ExpiredAt string `json:"expiresAt"`
@@ -12,7 +12,7 @@ type RevokeApiKeyReq struct {
 	ID uint `json:"id" binding:"required"`
 }
 
-type DeleteApiKeyReq struct {
+type ApiKeyDeleteReq struct {
 	ID uint `json:"id" binding:"required"`
 }
 

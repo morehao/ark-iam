@@ -35,11 +35,11 @@ type SessionDao struct {
 	*gormdao.Dao[model.RefreshTokenEntity, model.RefreshTokenEntityList]
 }
 
-func NewSessionDao() *SessionDao {
+func NewSessionDao(opts ...DaoOption) *SessionDao {
 	return &SessionDao{
 		Dao: gormdao.NewDao[model.RefreshTokenEntity, model.RefreshTokenEntityList](
 			model.TableNameRefreshToken, "SessionDao",
-			dbclient.IamDB,
+			resolveDBGetter(opts...),
 		),
 	}
 }

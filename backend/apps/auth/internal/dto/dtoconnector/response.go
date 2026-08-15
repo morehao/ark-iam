@@ -1,7 +1,7 @@
 package dtoconnector
 
 type ConnectorFactoryResp struct {
-	FactoryID     string   `json:"factoryId"`
+	FactoryID     string   `json:"factoryID"`
 	Protocol      string   `json:"protocol"`
 	Provider      string   `json:"provider"`
 	DisplayName   string   `json:"displayName"`

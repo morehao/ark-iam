@@ -22,6 +22,9 @@ var (
 const (
 	dbNameDemo = "demo"
 	dbNameIam  = "iam"
+
+	// ServiceNameIam iam 库服务名，测试中配合 RegisterDBForTest 使用。
+	ServiceNameIam = dbNameIam
 )
 
 // tenantScopeSkipTables 列出不含 tenant_id 列的全局表。

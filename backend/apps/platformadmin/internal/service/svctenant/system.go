@@ -1,7 +1,6 @@
 package svctenant
 
 import (
-	"context"
 	"encoding/json"
 
 	"github.com/gin-gonic/gin"
@@ -16,14 +15,6 @@ import (
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
-
-type systemScopeRepository interface {
-	GetByID(ctx context.Context, id uint) (*model.SystemEntity, error)
-}
-
-var newSystemScopeRepo = func() systemScopeRepository {
-	return dao.NewSystemDao()
-}
 
 func systemVisibleToTenant(entity *model.SystemEntity, tenantID uint) bool {
 	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
@@ -74,7 +65,7 @@ func (svc *systemSvc) Create(ctx *gin.Context, req *dtotenant.SystemCreateReq) (
 }
 
 func (svc *systemSvc) Delete(ctx *gin.Context, req *dtotenant.SystemDeleteReq) error {
-	systemEntity, err := newSystemScopeRepo().GetByID(ctx, req.SystemID)
+	systemEntity, err := dao.NewSystemDao().GetByID(ctx, req.SystemID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcsystem.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.SystemDeleteError)
@@ -92,7 +83,7 @@ func (svc *systemSvc) Delete(ctx *gin.Context, req *dtotenant.SystemDeleteReq) e
 }
 
 func (svc *systemSvc) Update(ctx *gin.Context, req *dtotenant.SystemUpdateReq) error {
-	systemEntity, err := newSystemScopeRepo().GetByID(ctx, req.SystemID)
+	systemEntity, err := dao.NewSystemDao().GetByID(ctx, req.SystemID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcsystem.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.SystemUpdateError)
@@ -122,7 +113,7 @@ func (svc *systemSvc) Update(ctx *gin.Context, req *dtotenant.SystemUpdateReq) e
 }
 
 func (svc *systemSvc) Detail(ctx *gin.Context, req *dtotenant.SystemDetailReq) (*dtotenant.SystemDetailResp, error) {
-	systemEntity, err := newSystemScopeRepo().GetByID(ctx, req.SystemID)
+	systemEntity, err := dao.NewSystemDao().GetByID(ctx, req.SystemID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcsystem.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.SystemGetDetailError)

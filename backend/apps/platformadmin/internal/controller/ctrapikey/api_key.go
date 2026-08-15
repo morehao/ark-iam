@@ -30,11 +30,11 @@ func NewApiKeyCtr() ApiKeyCtr {
 // @Summary 创建API密钥
 // @accept application/json
 // @Produce application/json
-// @Param req body dtoapikey.CreateApiKeyReq true "创建API密钥"
-// @Success 200 {object} gincontext.DtoRender{data=dtoapikey.CreateApiKeyResp}
+// @Param req body dtoapikey.ApiKeyCreateReq true "创建API密钥"
+// @Success 200 {object} gincontext.DtoRender{data=dtoapikey.ApiKeyCreateResp}
 // @Router /v1/platform/apiKey/create [post]
 func (ctr *apiKeyCtr) Create(ctx *gin.Context) {
-	var req dtoapikey.CreateApiKeyReq
+	var req dtoapikey.ApiKeyCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -95,11 +95,11 @@ func (ctr *apiKeyCtr) Revoke(ctx *gin.Context) {
 // @Summary 删除API密钥
 // @accept application/json
 // @Produce application/json
-// @Param req body dtoapikey.DeleteApiKeyReq true "删除API密钥"
+// @Param req body dtoapikey.ApiKeyDeleteReq true "删除API密钥"
 // @Success 200 {object} gincontext.DtoRender{data=string}
 // @Router /v1/platform/apiKey/delete [post]
 func (ctr *apiKeyCtr) Delete(ctx *gin.Context) {
-	var req dtoapikey.DeleteApiKeyReq
+	var req dtoapikey.ApiKeyDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return

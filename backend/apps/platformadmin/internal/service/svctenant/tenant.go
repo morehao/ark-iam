@@ -1,7 +1,6 @@
 package svctenant
 
 import (
-	"context"
 	"encoding/json"
 	"time"
 
@@ -30,10 +29,6 @@ type TenantSvc interface {
 	Update(ctx *gin.Context, req *dtotenant.TenantUpdateReq) error
 	Detail(ctx *gin.Context, req *dtotenant.TenantDetailReq) (*dtotenant.TenantDetailResp, error)
 	PageList(ctx *gin.Context, req *dtotenant.TenantPageListReq) (*dtotenant.TenantPageListResp, error)
-}
-
-var iamDBFromContext = func(ctx context.Context) *gorm.DB {
-	return dbclient.IamDB(ctx)
 }
 
 type tenantSvc struct {
@@ -71,7 +66,7 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	txErr := iamDBFromContext(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	txErr := dbclient.IamDB(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := dao.NewTenantDao().WithTx(tx).Insert(ctx, insertEntity); err != nil {
 			return err
 		}
@@ -114,7 +109,7 @@ func (svc *tenantSvc) CreateTenantAsOwner(ctx *gin.Context, req *dtotenant.Tenan
 	}
 
 	var tenantID uint
-	txErr := iamDBFromContext(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	txErr := dbclient.IamDB(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		tenant := &model.TenantEntity{
 			Code:      generateTenantCode(),
 			Name:      req.Name,

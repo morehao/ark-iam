@@ -1,11 +1,11 @@
 package dtoconnector
 
 type ConnectorIDReq struct {
-	ConnectorID uint64 `json:"connectorId" uri:"connectorId" binding:"required"`
+	ConnectorID uint `json:"connectorID" uri:"connectorID" binding:"required"`
 }
 
 type ConnectorAuthorizeReq struct {
-	ConnectorID  uint   `json:"connectorId" uri:"connectorId" binding:"required"`
+	ConnectorID  uint   `json:"connectorID" uri:"connectorID" binding:"required"`
 	RedirectURI  string `json:"redirectUri" binding:"required"`
 	State        string `json:"state"`
 	LoginHint    string `json:"loginHint"`
@@ -13,7 +13,7 @@ type ConnectorAuthorizeReq struct {
 }
 
 type ConnectorCallbackReq struct {
-	ConnectorID uint   `json:"connectorId"`
+	ConnectorID uint   `json:"connectorID"`
 	Code        string `json:"code" binding:"required"`
 	State       string `json:"state" binding:"required"`
 }

@@ -1,8 +1,6 @@
 package svcpermission
 
 import (
-	"context"
-
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
@@ -14,15 +12,6 @@ import (
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
-
-type resourceScopeRepository interface {
-	GetByID(ctx context.Context, id uint) (*model.ResourceEntity, error)
-	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.ResourceEntityList, int64, error)
-}
-
-var newResourceScopeRepo = func() resourceScopeRepository {
-	return dao.NewResourceDao()
-}
 
 func resourceVisibleToTenant(entity *model.ResourceEntity, tenantID uint) bool {
 	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
@@ -68,7 +57,7 @@ func (svc *resourceSvc) Create(ctx *gin.Context, req *dtopermission.ResourceCrea
 }
 
 func (svc *resourceSvc) Delete(ctx *gin.Context, req *dtopermission.ResourceDeleteReq) error {
-	resourceEntity, err := newResourceScopeRepo().GetByID(ctx, req.ResourceID)
+	resourceEntity, err := dao.NewResourceDao().GetByID(ctx, req.ResourceID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteResource] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ResourceDeleteError)
@@ -86,7 +75,7 @@ func (svc *resourceSvc) Delete(ctx *gin.Context, req *dtopermission.ResourceDele
 }
 
 func (svc *resourceSvc) Update(ctx *gin.Context, req *dtopermission.ResourceUpdateReq) error {
-	resourceEntity, err := newResourceScopeRepo().GetByID(ctx, req.ResourceID)
+	resourceEntity, err := dao.NewResourceDao().GetByID(ctx, req.ResourceID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.UpdateResource] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ResourceUpdateError)
@@ -112,7 +101,7 @@ func (svc *resourceSvc) Update(ctx *gin.Context, req *dtopermission.ResourceUpda
 }
 
 func (svc *resourceSvc) Detail(ctx *gin.Context, req *dtopermission.ResourceDetailReq) (*dtopermission.ResourceDetailResp, error) {
-	resourceEntity, err := newResourceScopeRepo().GetByID(ctx, req.ResourceID)
+	resourceEntity, err := dao.NewResourceDao().GetByID(ctx, req.ResourceID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.DetailResource] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ResourceGetDetailError)
@@ -135,7 +124,7 @@ func (svc *resourceSvc) Detail(ctx *gin.Context, req *dtopermission.ResourceDeta
 }
 
 func (svc *resourceSvc) PageList(ctx *gin.Context, req *dtopermission.ResourcePageListReq) (*dtopermission.ResourcePageListResp, error) {
-	resourceRepo := newResourceScopeRepo()
+	resourceRepo := dao.NewResourceDao()
 	cond := &dao.ResourceCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,

@@ -1,7 +1,6 @@
 package svctenant
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -323,14 +322,9 @@ func newCreateTenantAsOwnerTestDB(t *testing.T) *gorm.DB {
 
 func installTenantIamDB(t *testing.T, db *gorm.DB) {
 	t.Helper()
-	prev := iamDBFromContext
-	iamDBFromContext = func(ctx context.Context) *gorm.DB {
-		return db.WithContext(ctx)
-	}
 	const svcName = "iam"
 	dbclient.RegisterDBForTest(svcName, db)
 	t.Cleanup(func() {
-		iamDBFromContext = prev
 		dbclient.ClearDBForTest(svcName)
 		if sqlDB, err := db.DB(); err == nil {
 			_ = sqlDB.Close()

@@ -1,27 +1,16 @@
 package svctenant
 
 import (
-	"context"
-
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
-	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
+	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
-
-type organizationRoleUserDeleteRepository interface {
-	GetListByCond(ctx context.Context, cond gormdao.Cond) (model.OrganizationRoleUserEntityList, error)
-	Delete(ctx context.Context, id uint, userID uint) error
-}
-
-var newOrganizationRoleUserDeleteRepo = func() organizationRoleUserDeleteRepository {
-	return dao.NewOrganizationRoleUserDao()
-}
 
 type OrganizationRoleUserSvc interface {
 	Create(ctx *gin.Context, req *dtotenant.OrganizationRoleUserCreateReq) (*dtotenant.OrganizationRoleUserCreateResp, error)
@@ -73,8 +62,7 @@ func (svc *organizationRoleUserSvc) Create(ctx *gin.Context, req *dtotenant.Orga
 }
 
 func (svc *organizationRoleUserSvc) Delete(ctx *gin.Context, req *dtotenant.OrganizationRoleUserDeleteReq) error {
-	deleteRepo := newOrganizationRoleUserDeleteRepo()
-	orgRoleUserEntityList, err := deleteRepo.GetListByCond(ctx, &dao.OrganizationRoleUserCond{
+	orgRoleUserEntityList, err := dao.NewOrganizationRoleUserDao().GetListByCond(ctx, &dao.OrganizationRoleUserCond{
 		TenantID:           gincontext.GetTenantID(ctx),
 		OrganizationRoleID: req.OrganizationRoleID,
 		UserID:             req.UserID,
@@ -88,7 +76,7 @@ func (svc *organizationRoleUserSvc) Delete(ctx *gin.Context, req *dtotenant.Orga
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	if err := deleteRepo.Delete(ctx, orgRoleUserEntityList[0].ID, userID); err != nil {
+	if err := dao.NewOrganizationRoleUserDao().Delete(ctx, orgRoleUserEntityList[0].ID, userID); err != nil {
 		glog.Errorf(ctx, "[svcorganizationroleuser.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationRoleUserDeleteError)
 	}

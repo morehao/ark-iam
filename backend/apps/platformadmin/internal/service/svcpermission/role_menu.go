@@ -1,8 +1,6 @@
 package svcpermission
 
 import (
-	"context"
-
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
@@ -13,15 +11,6 @@ import (
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
-
-type roleMenuDeleteRepository interface {
-	GetListByCond(ctx context.Context, cond gormdao.Cond) (model.RoleMenuEntityList, error)
-	Delete(ctx context.Context, id uint, userID uint) error
-}
-
-var newRoleMenuDeleteRepo = func() roleMenuDeleteRepository {
-	return dao.NewRoleMenuDao()
-}
 
 type RoleMenuSvc interface {
 	Create(ctx *gin.Context, req *dtopermission.RoleMenuCreateReq) (*dtopermission.RoleMenuCreateResp, error)
@@ -71,8 +60,8 @@ func (svc *roleMenuSvc) Create(ctx *gin.Context, req *dtopermission.RoleMenuCrea
 }
 
 func (svc *roleMenuSvc) Delete(ctx *gin.Context, req *dtopermission.RoleMenuDeleteReq) error {
-	deleteRepo := newRoleMenuDeleteRepo()
-	roleMenuEntityList, err := deleteRepo.GetListByCond(ctx, &dao.RoleMenuCond{
+	roleMenuDao := dao.NewRoleMenuDao()
+	roleMenuEntityList, err := roleMenuDao.GetListByCond(ctx, &dao.RoleMenuCond{
 		TenantID: gincontext.GetTenantID(ctx),
 		RoleID:   req.RoleID,
 		MenuID:   req.MenuID,
@@ -86,7 +75,7 @@ func (svc *roleMenuSvc) Delete(ctx *gin.Context, req *dtopermission.RoleMenuDele
 	}
 
 	userID := gincontext.GetUserID(ctx)
-	if err := deleteRepo.Delete(ctx, roleMenuEntityList[0].ID, userID); err != nil {
+	if err := roleMenuDao.Delete(ctx, roleMenuEntityList[0].ID, userID); err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteRoleMenu] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.RoleMenuDeleteError)
 	}

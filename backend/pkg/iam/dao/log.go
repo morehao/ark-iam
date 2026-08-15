@@ -1,7 +1,6 @@
 package dao
 
 import (
-	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
@@ -29,11 +28,11 @@ type LogDao struct {
 	*gormdao.Dao[model.LogEntity, model.LogEntityList]
 }
 
-func NewLogDao() *LogDao {
+func NewLogDao(opts ...DaoOption) *LogDao {
 	return &LogDao{
 		Dao: gormdao.NewDao[model.LogEntity, model.LogEntityList](
 			model.TableNameLog, "LogDao",
-			dbclient.IamDB,
+			resolveDBGetter(opts...),
 		),
 	}
 }

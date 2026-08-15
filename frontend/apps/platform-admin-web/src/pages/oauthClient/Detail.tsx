@@ -19,33 +19,33 @@ export default function OAuthClientDetail() {
   const [submitLoading, setSubmitLoading] = useState(false)
   const [createdSecret, setCreatedSecret] = useState<OAuthSecretCreateResp | null>(null)
 
-  const clientId = Number(id)
+  const clientID = Number(id)
 
   const fetchAll = useCallback(async () => {
     if (!id) return
     setLoading(true)
     try {
-      const resp = await getOAuthClientDetail(clientId)
+      const resp = await getOAuthClientDetail(clientID)
       setDetail(resp)
     } catch {
       /* 拦截器已提示 */
     } finally {
       setLoading(false)
     }
-  }, [id, clientId])
+  }, [id, clientID])
 
   const fetchSecrets = useCallback(async () => {
     if (!id) return
     setSecretLoading(true)
     try {
-      const resp = await listOAuthSecrets(clientId)
+      const resp = await listOAuthSecrets(clientID)
       setSecrets(resp?.secrets || [])
     } catch {
       /* 拦截器已提示 */
     } finally {
       setSecretLoading(false)
     }
-  }, [id, clientId])
+  }, [id, clientID])
 
   useEffect(() => {
     void fetchAll()
@@ -57,7 +57,7 @@ export default function OAuthClientDetail() {
       const values = await secretForm.validateFields()
       setSubmitLoading(true)
       const resp = await createOAuthSecret({
-        applicationClientId: clientId,
+        applicationClientID: clientID,
         name: values.name,
         expiresAt: values.expiresAt ? values.expiresAt.toISOString() : undefined,
       })
@@ -129,9 +129,9 @@ export default function OAuthClientDetail() {
 
       <Card title="基本信息" style={{ borderRadius: 12, marginBottom: 16, border: '1px solid #f0f0f0' }} styles={{ body: { padding: 24 } }}>
         <Descriptions column={2} bordered size="small">
-          <Descriptions.Item label="ID">{detail.applicationClientId}</Descriptions.Item>
-          <Descriptions.Item label="租户ID">{detail.tenantId}</Descriptions.Item>
-          <Descriptions.Item label="所属应用ID">{detail.appId}</Descriptions.Item>
+          <Descriptions.Item label="ID">{detail.applicationClientID}</Descriptions.Item>
+          <Descriptions.Item label="租户ID">{detail.tenantID}</Descriptions.Item>
+          <Descriptions.Item label="所属应用ID">{detail.appID}</Descriptions.Item>
           <Descriptions.Item label="客户端ID">
             <span style={{ fontFamily: 'monospace' }}>{detail.clientID}</span>
           </Descriptions.Item>

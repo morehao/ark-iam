@@ -1,7 +1,6 @@
 package dao
 
 import (
-	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
@@ -29,11 +28,11 @@ type ApplicationClientSecretDao struct {
 	*gormdao.Dao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList]
 }
 
-func NewApplicationClientSecretDao() *ApplicationClientSecretDao {
+func NewApplicationClientSecretDao(opts ...DaoOption) *ApplicationClientSecretDao {
 	return &ApplicationClientSecretDao{
 		Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList](
 			model.TableNameApplicationClientSecret, "ApplicationClientSecretDao",
-			dbclient.IamDB,
+			resolveDBGetter(opts...),
 		),
 	}
 }

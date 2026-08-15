@@ -31,11 +31,11 @@ func NewDomainCtr() DomainCtr {
 // @Summary 创建域名
 // @accept application/json
 // @Produce application/json
-// @Param req body dtodomain.CreateDomainReq true "创建域名"
+// @Param req body dtodomain.DomainCreateReq true "创建域名"
 // @Success 200 {object} gincontext.DtoRender{data=dtodomain.DomainCreateResp}
 // @Router /v1/platform/domain/create [post]
 func (ctr *domainCtr) Create(ctx *gin.Context) {
-	var req dtodomain.CreateDomainReq
+	var req dtodomain.DomainCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -73,11 +73,11 @@ func (ctr *domainCtr) PageList(ctx *gin.Context) {
 // @Summary 修改域名
 // @accept application/json
 // @Produce application/json
-// @Param req body dtodomain.UpdateDomainReq true "修改域名"
+// @Param req body dtodomain.DomainUpdateReq true "修改域名"
 // @Success 200 {object} gincontext.DtoRender{data=string}
 // @Router /v1/platform/domain/update [post]
 func (ctr *domainCtr) Update(ctx *gin.Context) {
-	var req dtodomain.UpdateDomainReq
+	var req dtodomain.DomainUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -114,11 +114,11 @@ func (ctr *domainCtr) Detail(ctx *gin.Context) {
 // @Summary 删除域名
 // @accept application/json
 // @Produce application/json
-// @Param req body dtodomain.DeleteDomainReq true "删除域名"
+// @Param req body dtodomain.DomainDeleteReq true "删除域名"
 // @Success 200 {object} gincontext.DtoRender{data=string}
 // @Router /v1/platform/domain/delete [post]
 func (ctr *domainCtr) Delete(ctx *gin.Context) {
-	var req dtodomain.DeleteDomainReq
+	var req dtodomain.DomainDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return

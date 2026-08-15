@@ -1,7 +1,6 @@
 package svcapplication
 
 import (
-	"context"
 	"encoding/json"
 
 	"github.com/gin-gonic/gin"
@@ -19,25 +18,16 @@ import (
 )
 
 type ApplicationSvc interface {
-	Create(ctx *gin.Context, req *dtoapplication.CreateReq) (*dtoapplication.CreateResp, error)
-	Update(ctx *gin.Context, req *dtoapplication.UpdateReq) error
-	Delete(ctx *gin.Context, req *dtoapplication.DeleteReq) error
-	Detail(ctx *gin.Context, req *dtoapplication.DetailReq) (*dtoapplication.DetailResp, error)
-	PageList(ctx *gin.Context, req *dtoapplication.PageListReq) (*dtoapplication.PageListResp, error)
+	Create(ctx *gin.Context, req *dtoapplication.ApplicationCreateReq) (*dtoapplication.ApplicationCreateResp, error)
+	Update(ctx *gin.Context, req *dtoapplication.ApplicationUpdateReq) error
+	Delete(ctx *gin.Context, req *dtoapplication.ApplicationDeleteReq) error
+	Detail(ctx *gin.Context, req *dtoapplication.ApplicationDetailReq) (*dtoapplication.ApplicationDetailResp, error)
+	PageList(ctx *gin.Context, req *dtoapplication.ApplicationPageListReq) (*dtoapplication.ApplicationPageListResp, error)
 }
 
 type applicationSvc struct{}
 
 var _ ApplicationSvc = (*applicationSvc)(nil)
-
-type applicationRepository interface {
-	GetByID(ctx context.Context, id uint) (*model.ApplicationEntity, error)
-	Delete(ctx context.Context, id, deletedBy uint) error
-}
-
-var newApplicationRepo = func() applicationRepository {
-	return dao.NewApplicationDao()
-}
 
 func defaultTenantPolicy(raw json.RawMessage) datatypes.JSON {
 	if len(raw) == 0 {
@@ -50,7 +40,7 @@ func NewApplicationSvc() ApplicationSvc {
 	return &applicationSvc{}
 }
 
-func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.CreateReq) (*dtoapplication.CreateResp, error) {
+func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.ApplicationCreateReq) (*dtoapplication.ApplicationCreateResp, error) {
 	entity := &model.ApplicationEntity{
 		Code:         req.Code,
 		Name:         req.Name,
@@ -74,13 +64,13 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.CreateRe
 		TargetType: "application",
 		TargetID:   entity.ID,
 	})
-	return &dtoapplication.CreateResp{
+	return &dtoapplication.ApplicationCreateResp{
 		AppID: entity.ID,
 		Code:  entity.Code,
 	}, nil
 }
 
-func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.UpdateReq) error {
+func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.ApplicationUpdateReq) error {
 	updateMap := map[string]any{
 		"name":         req.Name,
 		"description":  req.Description,
@@ -102,8 +92,8 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.UpdateRe
 	return nil
 }
 
-func (svc *applicationSvc) Delete(ctx *gin.Context, req *dtoapplication.DeleteReq) error {
-	entity, err := newApplicationRepo().GetByID(ctx, req.AppID)
+func (svc *applicationSvc) Delete(ctx *gin.Context, req *dtoapplication.ApplicationDeleteReq) error {
+	entity, err := dao.NewApplicationDao().GetByID(ctx, req.AppID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplication.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationDeleteError)
@@ -112,20 +102,20 @@ func (svc *applicationSvc) Delete(ctx *gin.Context, req *dtoapplication.DeleteRe
 		return code.GetError(code.ApplicationSystemBuiltInErr)
 	}
 	userID := gincontext.GetUserID(ctx)
-	if err := newApplicationRepo().Delete(ctx, req.AppID, userID); err != nil {
+	if err := dao.NewApplicationDao().Delete(ctx, req.AppID, userID); err != nil {
 		glog.Errorf(ctx, "[svcapplication.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationDeleteError)
 	}
 	return nil
 }
 
-func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.DetailReq) (*dtoapplication.DetailResp, error) {
+func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.ApplicationDetailReq) (*dtoapplication.ApplicationDetailResp, error) {
 	entity, err := dao.NewApplicationDao().GetByID(ctx, req.AppID)
 	if err != nil || entity == nil || entity.ID == 0 {
 		glog.Errorf(ctx, "[svcapplication.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationGetDetailError)
 	}
-	return &dtoapplication.DetailResp{
+	return &dtoapplication.ApplicationDetailResp{
 		AppID:        entity.ID,
 		Code:         entity.Code,
 		Name:         entity.Name,
@@ -141,7 +131,7 @@ func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.DetailRe
 	}, nil
 }
 
-func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.PageListReq) (*dtoapplication.PageListResp, error) {
+func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.ApplicationPageListReq) (*dtoapplication.ApplicationPageListResp, error) {
 	cond := &dao.ApplicationCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
@@ -171,5 +161,5 @@ func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.PageLi
 			CreatedAt:    v.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
-	return &dtoapplication.PageListResp{List: items, Total: total}, nil
+	return &dtoapplication.ApplicationPageListResp{List: items, Total: total}, nil
 }

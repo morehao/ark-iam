@@ -1,7 +1,6 @@
 package dao
 
 import (
-	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
@@ -33,11 +32,11 @@ type ScopeDao struct {
 	*gormdao.Dao[model.ScopeEntity, model.ScopeEntityList]
 }
 
-func NewScopeDao() *ScopeDao {
+func NewScopeDao(opts ...DaoOption) *ScopeDao {
 	return &ScopeDao{
 		Dao: gormdao.NewDao[model.ScopeEntity, model.ScopeEntityList](
 			model.TableNameScope, "ScopeDao",
-			dbclient.IamDB,
+			resolveDBGetter(opts...),
 		),
 	}
 }

@@ -2,7 +2,7 @@ package dtoapplication
 
 import "encoding/json"
 
-type CreateReq struct {
+type ApplicationCreateReq struct {
 	Code         string          `json:"code" binding:"required"`       // 应用编码
 	Name         string          `json:"name" binding:"required"`       // 应用名称
 	Description  string          `json:"description"`                   // 应用描述
@@ -14,8 +14,8 @@ type CreateReq struct {
 	TenantPolicy json.RawMessage `json:"tenantPolicy"`                  // 租户策略
 }
 
-type UpdateReq struct {
-	AppID        uint            `json:"appId" binding:"required"` // 应用ID
+type ApplicationUpdateReq struct {
+	AppID        uint            `json:"appID" binding:"required"` // 应用ID
 	Name         string          `json:"name"`                     // 应用名称
 	Description  string          `json:"description"`              // 应用描述
 	LogoURL      string          `json:"logoUrl"`                  // 应用logo
@@ -27,15 +27,15 @@ type UpdateReq struct {
 	TenantPolicy json.RawMessage `json:"tenantPolicy"`             // 租户策略
 }
 
-type DetailReq struct {
-	AppID uint `form:"appId" binding:"required"` // 应用ID
+type ApplicationDetailReq struct {
+	AppID uint `form:"appID" binding:"required"` // 应用ID
 }
 
-type DeleteReq struct {
-	AppID uint `json:"appId" binding:"required"` // 应用ID
+type ApplicationDeleteReq struct {
+	AppID uint `json:"appID" binding:"required"` // 应用ID
 }
 
-type PageListReq struct {
+type ApplicationPageListReq struct {
 	Page     int    `json:"page"`     // 页码
 	PageSize int    `json:"pageSize"` // 每页条数
 	Name     string `json:"name"`     // 应用名称（模糊搜索）

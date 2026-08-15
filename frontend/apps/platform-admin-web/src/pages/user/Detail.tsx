@@ -33,17 +33,17 @@ export default function UserDetail() {
   const [identityModalOpen, setIdentityModalOpen] = useState(false)
   const [identityForm] = Form.useForm()
 
-  const userId = Number(id)
+  const userID = Number(id)
 
   const fetchAll = useCallback(async () => {
     if (!id) return
     setLoading(true)
     try {
       const [u, ids, logs, depts] = await Promise.allSettled([
-        getUserDetail(userId),
-        getUserIdentityByUser(userId),
-        getUserLoginLogByUser(userId),
-        getUserDepartmentByUser(userId),
+        getUserDetail(userID),
+        getUserIdentityByUser(userID),
+        getUserLoginLogByUser(userID),
+        getUserDepartmentByUser(userID),
       ])
       if (u.status === 'fulfilled') setUser(u.value)
       if (ids.status === 'fulfilled') setIdentities(ids.value.list || [])
@@ -52,7 +52,7 @@ export default function UserDetail() {
     } finally {
       setLoading(false)
     }
-  }, [id, userId])
+  }, [id, userID])
 
   useEffect(() => {
     void fetchAll()
@@ -77,7 +77,7 @@ export default function UserDetail() {
 
   const handleAssign = async () => {
     try {
-      await assignUserDepartments(userId, checkedDeptKeys.map(Number))
+      await assignUserDepartments(userID, checkedDeptKeys.map(Number))
       message.success('分配成功')
       setAssignModalOpen(false)
       void fetchAll()
@@ -89,7 +89,7 @@ export default function UserDetail() {
   const handleAddIdentity = async () => {
     try {
       const values = await identityForm.validateFields()
-      await createUserIdentity({ tenantID: user?.tenantID ?? 0, userID: userId, issuer: values.issuer, identityID: values.identityID })
+      await createUserIdentity({ tenantID: user?.tenantID ?? 0, userID: userID, issuer: values.issuer, identityID: values.identityID })
       message.success('绑定成功')
       setIdentityModalOpen(false)
       identityForm.resetFields()

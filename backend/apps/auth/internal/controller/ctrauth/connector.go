@@ -160,9 +160,9 @@ func (ctr *connectorCtr) GetFactoryList(ctx *gin.Context) {
 // @Summary 测试连接器
 // @accept application/json
 // @Produce application/json
-// @Param connectorId path int true "连接器ID"
+// @Param connectorID path int true "连接器ID"
 // @Success 200 {object} gincontext.DtoRender{data=dtoconnector.TestConnectorResp}
-// @Router /v1/auth/connector/{connectorId}/test [post]
+// @Router /v1/auth/connector/{connectorID}/test [post]
 func (ctr *connectorCtr) TestConnector(ctx *gin.Context) {
 	var req dtoconnector.ConnectorIDReq
 	if err := ctx.ShouldBindUri(&req); err != nil {
@@ -181,13 +181,13 @@ func (ctr *connectorCtr) TestConnector(ctx *gin.Context) {
 // @Summary 连接器授权
 // @accept application/json
 // @Produce application/json
-// @Param connectorId path int true "连接器ID"
+// @Param connectorID path int true "连接器ID"
 // @Param req body dtoconnector.ConnectorAuthorizeReq true "连接器授权"
 // @Success 200 {object} gincontext.DtoRender{data=dtoconnector.ConnectorAuthorizeResp}
-// @Router /v1/auth/connector/{connectorId}/authorize [post]
+// @Router /v1/auth/connector/{connectorID}/authorize [post]
 func (ctr *connectorCtr) Authorize(ctx *gin.Context) {
 	var uriReq struct {
-		ConnectorID uint `uri:"connectorId" binding:"required"`
+		ConnectorID uint `uri:"connectorID" binding:"required"`
 	}
 	if err := ctx.ShouldBindUri(&uriReq); err != nil {
 		gincontext.Fail(ctx, err)
@@ -222,14 +222,14 @@ func (ctr *connectorCtr) Authorize(ctx *gin.Context) {
 // @Summary 连接器回调
 // @accept application/json
 // @Produce application/json
-// @Param connectorId query int false "连接器ID"
+// @Param connectorID query int false "连接器ID"
 // @Param code query string true "授权码"
 // @Param state query string true "状态"
 // @Success 200 {object} gincontext.DtoRender{data=dtoauth.LoginResp}
 // @Router /v1/auth/connector/callback [get]
 func (ctr *connectorCtr) Callback(ctx *gin.Context) {
 	var req struct {
-		ConnectorID uint   `form:"connectorId"`
+		ConnectorID uint   `form:"connectorID"`
 		Code        string `form:"code" binding:"required"`
 		State       string `form:"state" binding:"required"`
 	}

@@ -34,11 +34,11 @@ func NewApplicationClientCtr() ApplicationClientCtr {
 // @Summary 创建OAuth客户端
 // @accept application/json
 // @Produce application/json
-// @Param req body dtoapplicationclient.CreateReq true "创建OAuth客户端"
-// @Success 200 {object} gincontext.DtoRender{data=dtoapplicationclient.CreateResp}
+// @Param req body dtoapplicationclient.ApplicationClientCreateReq true "创建OAuth客户端"
+// @Success 200 {object} gincontext.DtoRender{data=dtoapplicationclient.ApplicationClientCreateResp}
 // @Router /v1/platform/applicationClient/create [post]
 func (ctr *oAuthClientCtr) Create(ctx *gin.Context) {
-	var req dtoapplicationclient.CreateReq
+	var req dtoapplicationclient.ApplicationClientCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -55,11 +55,11 @@ func (ctr *oAuthClientCtr) Create(ctx *gin.Context) {
 // @Summary 删除OAuth客户端
 // @accept application/json
 // @Produce application/json
-// @Param req body dtoapplicationclient.DeleteReq true "删除OAuth客户端"
+// @Param req body dtoapplicationclient.ApplicationClientDeleteReq true "删除OAuth客户端"
 // @Success 200 {object} gincontext.DtoRender{data=string}
 // @Router /v1/platform/applicationClient/delete [post]
 func (ctr *oAuthClientCtr) Delete(ctx *gin.Context) {
-	var req dtoapplicationclient.DeleteReq
+	var req dtoapplicationclient.ApplicationClientDeleteReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -75,11 +75,11 @@ func (ctr *oAuthClientCtr) Delete(ctx *gin.Context) {
 // @Summary 修改OAuth客户端
 // @accept application/json
 // @Produce application/json
-// @Param req body dtoapplicationclient.UpdateReq true "修改OAuth客户端"
+// @Param req body dtoapplicationclient.ApplicationClientUpdateReq true "修改OAuth客户端"
 // @Success 200 {object} gincontext.DtoRender{data=string}
 // @Router /v1/platform/applicationClient/update [post]
 func (ctr *oAuthClientCtr) Update(ctx *gin.Context) {
-	var req dtoapplicationclient.UpdateReq
+	var req dtoapplicationclient.ApplicationClientUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -95,11 +95,11 @@ func (ctr *oAuthClientCtr) Update(ctx *gin.Context) {
 // @Summary 查看OAuth客户端详情
 // @accept application/json
 // @Produce application/json
-// @Param req query dtoapplicationclient.DetailReq true "查看OAuth客户端详情"
-// @Success 200 {object} gincontext.DtoRender{data=dtoapplicationclient.DetailResp}
+// @Param req query dtoapplicationclient.ApplicationClientDetailReq true "查看OAuth客户端详情"
+// @Success 200 {object} gincontext.DtoRender{data=dtoapplicationclient.ApplicationClientDetailResp}
 // @Router /v1/platform/applicationClient/detail [get]
 func (ctr *oAuthClientCtr) Detail(ctx *gin.Context) {
-	var req dtoapplicationclient.DetailReq
+	var req dtoapplicationclient.ApplicationClientDetailReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -116,11 +116,11 @@ func (ctr *oAuthClientCtr) Detail(ctx *gin.Context) {
 // @Summary 查看OAuth客户端列表
 // @accept application/json
 // @Produce application/json
-// @Param req body dtoapplicationclient.PageListReq true "查看OAuth客户端列表"
-// @Success 200 {object} gincontext.DtoRender{data=dtoapplicationclient.PageListResp}
+// @Param req body dtoapplicationclient.ApplicationClientPageListReq true "查看OAuth客户端列表"
+// @Success 200 {object} gincontext.DtoRender{data=dtoapplicationclient.ApplicationClientPageListResp}
 // @Router /v1/platform/applicationClient/pageList [post]
 func (ctr *oAuthClientCtr) PageList(ctx *gin.Context) {
-	var req dtoapplicationclient.PageListReq
+	var req dtoapplicationclient.ApplicationClientPageListReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -158,11 +158,11 @@ func (ctr *oAuthClientCtr) ListSecrets(ctx *gin.Context) {
 // @Summary 创建OAuth客户端密钥
 // @accept application/json
 // @Produce application/json
-// @Param req body dtoapplicationclient.CreateSecretReq true "创建OAuth客户端密钥"
-// @Success 200 {object} gincontext.DtoRender{data=dtoapplicationclient.CreateSecretResp}
+// @Param req body dtoapplicationclient.SecretCreateReq true "创建OAuth客户端密钥"
+// @Success 200 {object} gincontext.DtoRender{data=dtoapplicationclient.SecretCreateResp}
 // @Router /v1/platform/applicationClient/secrets [post]
 func (ctr *oAuthClientCtr) CreateSecret(ctx *gin.Context) {
-	var req dtoapplicationclient.CreateSecretReq
+	var req dtoapplicationclient.SecretCreateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -179,11 +179,11 @@ func (ctr *oAuthClientCtr) CreateSecret(ctx *gin.Context) {
 // @Summary 删除OAuth客户端密钥
 // @accept application/json
 // @Produce application/json
-// @Param secretId path int true "密钥ID"
+// @Param secretID path int true "密钥ID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/applicationClient/secrets/{secretId} [delete]
+// @Router /v1/platform/applicationClient/secrets/{secretID} [delete]
 func (ctr *oAuthClientCtr) DeleteSecret(ctx *gin.Context) {
-	var req dtoapplicationclient.DeleteSecretReq
+	var req dtoapplicationclient.SecretDeleteReq
 	if err := ctx.ShouldBindUri(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return

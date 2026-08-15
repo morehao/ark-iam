@@ -1,7 +1,6 @@
 package svctenant
 
 import (
-	"context"
 	"encoding/json"
 
 	"github.com/gin-gonic/gin"
@@ -16,14 +15,6 @@ import (
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
-
-type logScopeRepository interface {
-	GetByID(ctx context.Context, id uint) (*model.LogEntity, error)
-}
-
-var newLogScopeRepo = func() logScopeRepository {
-	return dao.NewLogDao()
-}
 
 func logVisibleToTenant(entity *model.LogEntity, tenantID uint) bool {
 	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
@@ -44,7 +35,7 @@ func NewLogSvc() LogSvc {
 }
 
 func (svc *logSvc) Detail(ctx *gin.Context, req *dtotenant.LogDetailReq) (*dtotenant.LogDetailResp, error) {
-	logEntity, err := newLogScopeRepo().GetByID(ctx, req.LogID)
+	logEntity, err := dao.NewLogDao().GetByID(ctx, req.LogID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcsystem.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.LogGetDetailError)

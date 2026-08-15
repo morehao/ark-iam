@@ -95,11 +95,11 @@ type UserDepartmentPageListResp struct {
 }
 
 type RoleUserResp struct {
-	UserID    uint64 `json:"userId"`
+	UserID    uint   `json:"userID"`
 	Username  string `json:"username"`
 	Name      string `json:"name"`
 	Email     string `json:"email"`
-	RoleID    uint64 `json:"roleId"`
+	RoleID    uint   `json:"roleID"`
 	CreatedAt string `json:"createdAt"`
 }
 
@@ -109,10 +109,10 @@ type RoleUserListResp struct {
 }
 
 type RoleApplicationResp struct {
-	AppID     uint64 `json:"appId"`
+	AppID     uint   `json:"appID"`
 	AppName   string `json:"appName"`
 	AppType   string `json:"appType"`
-	RoleID    uint64 `json:"roleId"`
+	RoleID    uint   `json:"roleID"`
 	CreatedAt string `json:"createdAt"`
 }
 

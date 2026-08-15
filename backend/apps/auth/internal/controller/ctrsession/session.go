@@ -54,9 +54,9 @@ func (ctr *sessionCtr) List(ctx *gin.Context) {
 // @Summary 撤销会话
 // @accept application/json
 // @Produce application/json
-// @Param sessionId path int true "会话ID"
+// @Param sessionID path int true "会话ID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/auth/user/sessions/{sessionId} [delete]
+// @Router /v1/auth/user/sessions/{sessionID} [delete]
 func (ctr *sessionCtr) Revoke(ctx *gin.Context) {
 	var req dtouser.SessionRevokeReq
 	if err := ctx.ShouldBindUri(&req); err != nil {

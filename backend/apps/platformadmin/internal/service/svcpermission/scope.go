@@ -1,8 +1,6 @@
 package svcpermission
 
 import (
-	"context"
-
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
@@ -14,35 +12,6 @@ import (
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
-
-type scopeScopeRepository interface {
-	GetByID(ctx context.Context, id uint) (*model.ScopeEntity, error)
-	GetResourceByID(ctx context.Context, id uint) (*model.ResourceEntity, error)
-	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.ScopeEntityList, int64, error)
-	Insert(ctx context.Context, entity *model.ScopeEntity) error
-}
-
-var newScopeScopeRepo = func() scopeScopeRepository {
-	return &scopeScopeDAO{}
-}
-
-type scopeScopeDAO struct{}
-
-func (d *scopeScopeDAO) GetByID(ctx context.Context, id uint) (*model.ScopeEntity, error) {
-	return dao.NewScopeDao().GetByID(ctx, id)
-}
-
-func (d *scopeScopeDAO) GetResourceByID(ctx context.Context, id uint) (*model.ResourceEntity, error) {
-	return dao.NewResourceDao().GetByID(ctx, id)
-}
-
-func (d *scopeScopeDAO) GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.ScopeEntityList, int64, error) {
-	return dao.NewScopeDao().GetPageListByCond(ctx, cond)
-}
-
-func (d *scopeScopeDAO) Insert(ctx context.Context, entity *model.ScopeEntity) error {
-	return dao.NewScopeDao().Insert(ctx, entity)
-}
 
 func scopeVisibleToTenant(entity *model.ScopeEntity, tenantID uint) bool {
 	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
@@ -65,8 +34,7 @@ func NewScopeSvc() ScopeSvc {
 }
 
 func (svc *scopeSvc) Create(ctx *gin.Context, req *dtopermission.ScopeCreateReq) (*dtopermission.ScopeCreateResp, error) {
-	repo := newScopeScopeRepo()
-	resourceEntity, err := repo.GetResourceByID(ctx, req.ResourceID)
+	resourceEntity, err := dao.NewResourceDao().GetByID(ctx, req.ResourceID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.CreateScope] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ResourceGetDetailError)
@@ -86,7 +54,7 @@ func (svc *scopeSvc) Create(ctx *gin.Context, req *dtopermission.ScopeCreateReq)
 		insertEntity.TenantID = gincontext.GetTenantID(ctx)
 	}
 
-	if err := repo.Insert(ctx, insertEntity); err != nil {
+	if err := dao.NewScopeDao().Insert(ctx, insertEntity); err != nil {
 		glog.Errorf(ctx, "[svcpermission.CreateScope] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ScopeCreateError)
 	}
@@ -96,7 +64,7 @@ func (svc *scopeSvc) Create(ctx *gin.Context, req *dtopermission.ScopeCreateReq)
 }
 
 func (svc *scopeSvc) Delete(ctx *gin.Context, req *dtopermission.ScopeDeleteReq) error {
-	scopeEntity, err := newScopeScopeRepo().GetByID(ctx, req.ScopeID)
+	scopeEntity, err := dao.NewScopeDao().GetByID(ctx, req.ScopeID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteScope] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ScopeDeleteError)
@@ -114,7 +82,7 @@ func (svc *scopeSvc) Delete(ctx *gin.Context, req *dtopermission.ScopeDeleteReq)
 }
 
 func (svc *scopeSvc) Update(ctx *gin.Context, req *dtopermission.ScopeUpdateReq) error {
-	scopeEntity, err := newScopeScopeRepo().GetByID(ctx, req.ScopeID)
+	scopeEntity, err := dao.NewScopeDao().GetByID(ctx, req.ScopeID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.UpdateScope] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ScopeUpdateError)
@@ -139,7 +107,7 @@ func (svc *scopeSvc) Update(ctx *gin.Context, req *dtopermission.ScopeUpdateReq)
 }
 
 func (svc *scopeSvc) Detail(ctx *gin.Context, req *dtopermission.ScopeDetailReq) (*dtopermission.ScopeDetailResp, error) {
-	scopeEntity, err := newScopeScopeRepo().GetByID(ctx, req.ScopeID)
+	scopeEntity, err := dao.NewScopeDao().GetByID(ctx, req.ScopeID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.DetailScope] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ScopeGetDetailError)
@@ -161,7 +129,7 @@ func (svc *scopeSvc) Detail(ctx *gin.Context, req *dtopermission.ScopeDetailReq)
 }
 
 func (svc *scopeSvc) PageList(ctx *gin.Context, req *dtopermission.ScopePageListReq) (*dtopermission.ScopePageListResp, error) {
-	scopeRepo := newScopeScopeRepo()
+	scopeRepo := dao.NewScopeDao()
 	cond := &dao.ScopeCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,

@@ -52,7 +52,7 @@ export default function TenantApplicationList() {
   const handleEdit = (record: TenantApplicationItem) => {
     setEditing(record)
     form.setFieldsValue({
-      appId: record.appId,
+      appID: record.appID,
       status: record.status,
       config: record.config,
     })
@@ -64,8 +64,8 @@ export default function TenantApplicationList() {
       const values = await form.validateFields()
       setSubmitLoading(true)
       if (editing) {
-        const { appId: _appId, ...rest } = values
-        await updateTenantApplication({ tenantAppId: editing.tenantAppId, ...rest })
+        const { appID: _appId, ...rest } = values
+        await updateTenantApplication({ tenantAppID: editing.tenantAppID, ...rest })
         message.success('修改成功')
       } else {
         await createTenantApplication(values)
@@ -82,7 +82,7 @@ export default function TenantApplicationList() {
 
   const handleDelete = async (record: TenantApplicationItem) => {
     try {
-      await deleteTenantApplication(record.tenantAppId)
+      await deleteTenantApplication(record.tenantAppID)
       message.success('删除成功')
       void fetchData()
     } catch {
@@ -91,9 +91,9 @@ export default function TenantApplicationList() {
   }
 
   const columns: ColumnsType<TenantApplicationItem> = [
-    { title: 'ID', dataIndex: 'tenantAppId', key: 'tenantAppId', width: 80 },
-    { title: '租户ID', dataIndex: 'tenantId', key: 'tenantId', width: 100 },
-    { title: '应用ID', dataIndex: 'appId', key: 'appId', width: 100 },
+    { title: 'ID', dataIndex: 'tenantAppID', key: 'tenantAppID', width: 80 },
+    { title: '租户ID', dataIndex: 'tenantID', key: 'tenantID', width: 100 },
+    { title: '应用ID', dataIndex: 'appID', key: 'appID', width: 100 },
     { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (v: string) => <StatusTag value={v} /> },
     { title: '创建时间', key: 'createdAt', width: 170, render: (_, r) => fmtTime(r.createdAt) },
     {
@@ -147,7 +147,7 @@ export default function TenantApplicationList() {
         />
       </div>
       <Table<TenantApplicationItem>
-        rowKey="tenantAppId"
+        rowKey="tenantAppID"
         columns={columns}
         dataSource={data}
         loading={loading}
@@ -175,7 +175,7 @@ export default function TenantApplicationList() {
         width={520}
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="appId" label="应用ID" rules={[{ required: true, message: '请输入应用ID' }]}>
+          <Form.Item name="appID" label="应用ID" rules={[{ required: true, message: '请输入应用ID' }]}>
             <InputNumber style={{ width: '100%' }} placeholder="应用ID" disabled={!!editing} />
           </Form.Item>
           <Form.Item name="status" label="状态">

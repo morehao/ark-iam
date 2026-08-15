@@ -17,7 +17,7 @@ func roleRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/role/pageList", roleCtr.PageList)
 	v1RouterGroup.GET("/role/users", roleCtr.ListUsers)
 	v1RouterGroup.POST("/role/assignUsers", roleCtr.AssignUsers)
-	v1RouterGroup.DELETE("/role/users/:roleId/:userId", roleCtr.RemoveUser)
+	v1RouterGroup.DELETE("/role/users/:roleID/:userID", roleCtr.RemoveUser)
 }
 
 func menuRouter(groups *ginserver.RouterGroups) {
@@ -92,5 +92,5 @@ func applicationClientRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/applicationClient/pageList", appCtr.PageList)
 	v1RouterGroup.GET("/applicationClient/secrets", appCtr.ListSecrets)
 	v1RouterGroup.POST("/applicationClient/secrets", appCtr.CreateSecret)
-	v1RouterGroup.DELETE("/applicationClient/secrets/:secretId", appCtr.DeleteSecret)
+	v1RouterGroup.DELETE("/applicationClient/secrets/:secretID", appCtr.DeleteSecret)
 }
