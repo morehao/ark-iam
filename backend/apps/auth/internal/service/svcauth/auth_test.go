@@ -398,8 +398,8 @@ func TestRegisterSetsUserAsOwnerAndJoinedAt(t *testing.T) {
 	if insertedUser == nil {
 		t.Fatal("expected user to be inserted")
 	}
-	if insertedUser.IsOwner != 1 {
-		t.Fatalf("expected register user to be owner (isOwner=1), got %d", insertedUser.IsOwner)
+	if !insertedUser.IsOwner {
+		t.Fatalf("expected register user to be owner (isOwner=true), got %t", insertedUser.IsOwner)
 	}
 	if insertedUser.JoinedAt == nil {
 		t.Fatal("expected register user to have joined_at set")

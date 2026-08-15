@@ -10,11 +10,13 @@ type UserCond struct {
 	*gormdao.BaseCond
 	TenantID     string
 	PersonID     string
+	IDs          []string // 主键 IN 批量查询
 	Username     string
 	PrimaryEmail string
 	PrimaryPhone string
 	Name         string
-	IsSuspended  *int8
+	IsSuspended  *bool
+	Keyword      string // 模糊搜索: 租户内姓名 LIKE 或关联 person 的 username/email/phone LIKE
 }
 
 func (c *UserCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -26,6 +28,9 @@ func (c *UserCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.PersonID != "" {
 		db.Where(tableName+".person_id = ?", c.PersonID)
+	}
+	if len(c.IDs) > 0 {
+		db.Where(tableName+".id IN ?", c.IDs)
 	}
 	if c.Username != "" {
 		db.Where(tableName+".username = ?", c.Username)
@@ -41,6 +46,11 @@ func (c *UserCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.IsSuspended != nil {
 		db.Where(tableName+".is_suspended = ?", *c.IsSuspended)
+	}
+	if c.Keyword != "" {
+		k := "%" + c.Keyword + "%"
+		db.Where(tableName+".name LIKE ? OR "+tableName+".person_id IN (SELECT id FROM "+model.TableNamePerson+" WHERE username LIKE ? OR primary_email LIKE ? OR primary_phone LIKE ?)",
+			k, k, k, k)
 	}
 }
 

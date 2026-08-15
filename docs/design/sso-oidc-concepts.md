@@ -222,26 +222,26 @@ sequenceDiagram
 
     Note over RP: 生成 code_verifier + code_challenge(S256)
     U->>RP: 点击"登录"
-    RP->>RP: 构造 authorize 请求（含 state、nonce、code_challenge）
-    RP->>OP: GET /oidc/authorize?client_id=...&redirect_uri=...&scope=openid&code_challenge=...
+    RP->>RP: 构造 authorize 请求<br/>（含 state、nonce、code_challenge）
+    RP->>OP: GET /oidc/authorize?client_id=...<br/>&redirect_uri=...&scope=openid<br/>&code_challenge=...
     alt 已有 SSO 会话（iam_sso_session Cookie）
         OP->>OP: 静默认证（prompt=none / sso-login）
     else 无会话
         OP-->>U: 302 跳转登录页（login-web）
         U->>OP: 填写用户名/密码（POST /oidc/login）
-        Note over OP: 校验凭证 → 创建 SSO 会话 → 写入 iam_sso_session Cookie
+        Note over OP: 校验凭证 → 创建 SSO 会话<br/>→ 写入 iam_sso_session Cookie
         alt 多租户用户
-            OP-->>U: 返回租户列表（requiresTenantSelection=true）
+            OP-->>U: 返回租户列表<br/>（requiresTenantSelection=true）
             U->>OP: POST /oidc/login/selectTenant 选择租户
         end
     end
-    OP-->>RP: 302 回调 redirect_uri?code=授权码&state=...
+    OP-->>RP: 302 回调<br/>redirect_uri?code=授权码&state=...
     Note over RP: 校验 state（防 CSRF）
-    RP->>OP: POST /oidc/oauth/token（code + code_verifier + client 认证）
-    OP-->>RP: 返回 { id_token, access_token, refresh_token, expires_in }
+    RP->>OP: POST /oidc/oauth/token<br/>（code + code_verifier + client 认证）
+    OP-->>RP: 返回 {id_token, access_token,<br/>refresh_token, expires_in}
     Note over RP: 校验 id_token 签名/iss/aud/nonce
-    RP->>API: 请求业务接口（Authorization: Bearer access_token）
-    API->>API: 校验令牌（签名/iss/aud/租户/SSO 会话活性）
+    RP->>API: 请求业务接口<br/>（Authorization: Bearer access_token）
+    API->>API: 校验令牌<br/>（签名/iss/aud/租户/SSO 会话活性）
     API-->>RP: 业务数据
     RP-->>U: 展示已登录页面
 ```
@@ -258,14 +258,14 @@ sequenceDiagram
     participant RP2 as 应用 B (待登录)
     participant OP as 认证中心 (OP)
 
-    Note over U,RP1: 用户已登录应用 A，浏览器持有 iam_sso_session Cookie
+    Note over U,RP1: 用户已登录应用 A<br/>浏览器持有 iam_sso_session Cookie
     U->>RP2: 访问应用 B
-    RP2->>OP: GET /oidc/authorize（prompt=none 或 sso-login）
-    OP->>OP: 校验 SSO 会话 Cookie（Redis 查询 iam:oidc:sso_session:*）
-    OP-->>RP2: 302 回调 redirect_uri?code=...（免密直接发码）
+    RP2->>OP: GET /oidc/authorize<br/>（prompt=none 或 sso-login）
+    OP->>OP: 校验 SSO 会话 Cookie<br/>（Redis 查询 iam:oidc:sso_session:*）
+    OP-->>RP2: 302 回调<br/>redirect_uri?code=...（免密直接发码）
     RP2->>OP: POST /oidc/oauth/token
     OP-->>RP2: id_token + access_token
-    RP2-->>U: 直接进入应用 B（全程无密码输入）
+    RP2-->>U: 直接进入应用 B<br/>（全程无密码输入）
 ```
 
 ### 5.3 client_credentials（机器凭证）
@@ -277,11 +277,11 @@ sequenceDiagram
     participant OP as 认证中心 (OP)
     participant API as 目标业务 API
 
-    SVC->>OP: POST /oidc/oauth/token（grant_type=client_credentials + client 认证）
+    SVC->>OP: POST /oidc/oauth/token<br/>（grant_type=client_credentials<br/>+ client 认证）
     OP->>OP: 校验 client_id / client_secret
-    OP-->>SVC: access_token（token_usage=machine，sub=client_id）
-    SVC->>API: 请求业务接口（Authorization: Bearer access_token）
-    API->>API: 校验令牌（机器凭证不依赖浏览器 SSO 会话）
+    OP-->>SVC: access_token（token_usage=machine，<br/>sub=client_id）
+    SVC->>API: 请求业务接口<br/>（Authorization: Bearer access_token）
+    API->>API: 校验令牌（机器凭证<br/>不依赖浏览器 SSO 会话）
     API-->>SVC: 业务数据
 ```
 
@@ -294,10 +294,10 @@ sequenceDiagram
     participant OP as 认证中心 (OP)
 
     Note over RP: access_token 接近过期
-    RP->>OP: POST /oidc/oauth/token（grant_type=refresh_token + refresh_token）
+    RP->>OP: POST /oidc/oauth/token<br/>（grant_type=refresh_token<br/>+ refresh_token）
     OP->>OP: 校验刷新令牌哈希、有效期、scope 还原
-    OP-->>RP: 新 access_token + 新 refresh_token（轮换）
-    Note over RP,OP: 旧 refresh_token 作废；登出/全局登出时按 person 吊销全部
+    OP-->>RP: 新 access_token<br/>+ 新 refresh_token（轮换）
+    Note over RP,OP: 旧 refresh_token 作废；<br/>登出/全局登出时按 person 吊销全部
 ```
 
 ---
@@ -306,12 +306,12 @@ sequenceDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Active: 签发（授权码/刷新/客户端凭证）
-    Active --> Active: 刷新令牌轮换（旧令牌作废）
-    Active --> Expired: 超过 TTL（access 900s 默认 / id 10min / refresh 30d）
+    [*] --> Active: 签发<br/>（授权码/刷新/客户端凭证）
+    Active --> Active: 刷新令牌轮换<br/>（旧令牌作废）
+    Active --> Expired: 超过 TTL<br/>（access 900s / id 10min / refresh 30d）
     Active --> Revoked: 主动吊销（/revoke）
     Active --> Revoked: 用户登出（logout / logoutAll）
-    Active --> Revoked: 全局登出（SLO：撤销 SSO 会话 + 全部 refresh token）
+    Active --> Revoked: 全局登出<br/>（SLO：撤销 SSO 会话<br/>+ 全部 refresh token）
     Expired --> [*]
     Revoked --> [*]
 ```
@@ -356,12 +356,12 @@ sequenceDiagram
     participant RP2 as 应用 B
 
     U->>RP1: 点击"退出登录"
-    RP1->>OP: 调用登出端点（携带 id_token_hint 或会话）
-    OP->>OP: 撤销 SSO 会话（iam:oidc:sso_session:*）<br/>吊销该 person 全部 refresh_token
-    OP->>Q: 入队 back-channel 通知任务（含 client_id、sid、通知地址）
+    RP1->>OP: 调用登出端点<br/>（携带 id_token_hint 或会话）
+    OP->>OP: 撤销 SSO 会话<br/>（iam:oidc:sso_session:*）<br/>吊销该 person 全部 refresh_token
+    OP->>Q: 入队 back-channel 通知任务<br/>（含 client_id、sid、通知地址）
     Q->>W: 消费任务
-    W->>RP2: POST {back_channel_logout_uri}（Body: logout_token，RS256 签名）
-    RP2->>RP2: 校验 logout_token（iss/aud/sid）→ 作废本地会话
+    W->>RP2: POST {back_channel_logout_uri}<br/>（Body: logout_token，RS256 签名）
+    RP2->>RP2: 校验 logout_token（iss/aud/sid）<br/>→ 作废本地会话
     W-->>OP: 通知成功 → 删除登记（幂等）
     U->>RP2: 刷新应用 B
     RP2-->>U: 已被登出，跳转登录页

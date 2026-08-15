@@ -94,8 +94,11 @@ func AutoMigrateAll(db *gorm.DB) error {
 `pkg/seed/seed.go`：以 Go 代码取代 `scripts/sql/iam_seed_data.sql`（MySQL 方言）。
 
 - **写入内容**：平台租户、顶级部门、应用（admin/tenant-admin）、角色（admin/user/guest）、
-  资源与 14 个 scope、角色-scope 关联、18 个菜单、角色-menu 关联、租户应用订阅、
+  资源与 12 个 scope、角色-scope 关联、15 个菜单、角色-menu 关联、租户应用订阅、
   管理员账号（`admin / admin123`）、两个 OIDC 测试客户端。
+- **用户必属部门**：用户必须从属于某个部门（组织节点），种子管理员同样从属于
+  顶级部门（根组织节点），归属关系为 `member` + `is_primary` 主归属
+  （`organization_user` 表，幂等写入，兼容已有库升级补齐）。
 - **幂等策略**：按唯一键查重（租户 `code`、应用 `code`、角色 `(tenant_id, code)`、
   scope `(tenant_id, name)`、菜单 `(app_id, code)`、person `username`、client `client_id`、
   关联表 `(tenant_id, role_id, scope_id)` 等），已存在则跳过、不存在则创建；

@@ -13,7 +13,7 @@ type UserBaseInfo struct {
 	AppID             string `json:"appID" form:"appID"`                         // 应用ID
 	Identities        any    `json:"identities" form:"identities"`               // 第三方身份
 	CustomData        any    `json:"customData" form:"customData"`               // 自定义数据
-	IsSuspended       int8   `json:"isSuspended" form:"isSuspended"`             // 是否挂起
+	IsSuspended bool   `json:"isSuspended" form:"isSuspended"`             // 是否挂起
 }
 
 type UserPasswordInfo struct {
@@ -42,9 +42,3 @@ type UserLoginLogBaseInfo struct {
 	LoginTime int64  `json:"loginTime" form:"loginTime"` // 登录时间
 }
 
-type UserDepartmentBaseInfo struct {
-	TenantID     string `json:"tenantID" form:"tenantID"`         // 租户ID
-	UserID       string `json:"userID" form:"userID"`             // 用户ID
-	DepartmentID string `json:"departmentID" form:"departmentID"` // 部门ID
-	IsPrimary    int8   `json:"isPrimary" form:"isPrimary"`       // 是否主部门
-}

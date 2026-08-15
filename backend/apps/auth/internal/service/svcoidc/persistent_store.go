@@ -72,7 +72,7 @@ func (s *PersistentStore) GetApiKeyClientByRawKey(ctx context.Context, rawKey st
 }
 
 func (s *PersistentStore) GetClientByClientID(ctx context.Context, clientID string) (op.Client, error) {
-	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{ClientID: clientID})
+	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID})
 	if err != nil || clientEntity == nil || clientEntity.ID == "" {
 		return nil, fmt.Errorf("client not found: %s", clientID)
 	}
@@ -83,7 +83,7 @@ func (s *PersistentStore) AuthorizeClientIDSecret(ctx context.Context, clientID,
 	secretHash := sha256.Sum256([]byte(clientSecret))
 	clientHash := hex.EncodeToString(secretHash[:])
 
-	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{ClientID: clientID})
+	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID})
 	if err != nil || clientEntity == nil || clientEntity.ID == "" {
 		return oidc.ErrInvalidClient()
 	}
@@ -231,7 +231,7 @@ func (s *PersistentStore) CreateAccessToken(ctx context.Context, request op.Toke
 
 	ttl := 15 * time.Minute
 	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok {
-		if entity, e := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{ClientID: ccReq.ClientID()}); e == nil && entity != nil && entity.AccessTokenTTL > 0 {
+		if entity, e := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: ccReq.ClientID()}); e == nil && entity != nil && entity.AccessTokenTTL > 0 {
 			ttl = time.Duration(entity.AccessTokenTTL) * time.Second
 		} else if e != nil {
 			glog.Warnf(ctx, "[PersistentStore.CreateAccessToken] load client ttl fail, clientID:%s, err:%v", ccReq.ClientID(), e)
@@ -291,7 +291,7 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 	var clientRefreshTokenTTL time.Duration
 	backChannelLogoutURI := ""
 	if clientID != "" {
-		clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{ClientID: clientID})
+		clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID})
 		if err == nil && clientEntity != nil {
 			applicationClientID = clientEntity.ID
 			backChannelLogoutURI = clientEntity.BackChannelLogoutURI
@@ -435,7 +435,7 @@ func (s *PersistentStore) TokenRequestByRefreshToken(ctx context.Context, refres
 	if storedToken.ApplicationClientID != "" {
 		clientEntity, err := s.applicationClientDao().GetByID(ctx, storedToken.ApplicationClientID)
 		if err == nil && clientEntity != nil {
-			clientID = clientEntity.ClientID
+			clientID = clientEntity.Code
 		}
 	}
 

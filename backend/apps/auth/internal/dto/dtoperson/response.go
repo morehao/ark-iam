@@ -7,5 +7,5 @@ type PersonDetailResp struct {
 	PrimaryPhone string `json:"primaryPhone"`
 	Name         string `json:"name"`
 	Avatar       string `json:"avatar"`
-	IsSuspended  int8   `json:"isSuspended"`
+	IsSuspended bool   `json:"isSuspended"`
 }

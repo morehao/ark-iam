@@ -1,20 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Card, Descriptions, Tabs, Table, Button, Spin, Space, Avatar, Tag, Modal, Form, Input, Popconfirm, message, Tree, Empty } from 'antd'
+import { Card, Descriptions, Tabs, Table, Button, Spin, Space, Avatar, Modal, Form, Input, Popconfirm, message } from 'antd'
 import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import type { DataNode } from 'antd/es/tree'
 import {
-  assignUserDepartments,
   createUserIdentity,
   deleteUserIdentity,
-  getDepartmentTree,
-  getUserDepartmentByUser,
   getUserDetail,
   getUserIdentityByUser,
   getUserLoginLogByUser,
 } from '@ark-iam/api'
-import type { DepartmentItem, UserIdentityItem, UserItem, UserLoginLogItem } from '@ark-iam/types'
+import type { UserIdentityItem, UserItem, UserLoginLogItem } from '@ark-iam/types'
 import { fmtTime, SuspendedTag } from '../../components/common'
 import { brand, EllipsisCell, IDCell } from '@ark-iam/ui'
 
@@ -26,10 +22,6 @@ export default function UserDetail() {
 
   const [identities, setIdentities] = useState<UserIdentityItem[]>([])
   const [loginLogs, setLoginLogs] = useState<UserLoginLogItem[]>([])
-  const [deptRel, setDeptRel] = useState<{ departmentID: string; isPrimary: number }[]>([])
-  const [deptTree, setDeptTree] = useState<DataNode[]>([])
-  const [assignModalOpen, setAssignModalOpen] = useState(false)
-  const [checkedDeptKeys, setCheckedDeptKeys] = useState<React.Key[]>([])
   const [identityModalOpen, setIdentityModalOpen] = useState(false)
   const [identityForm] = Form.useForm()
 
@@ -39,16 +31,14 @@ export default function UserDetail() {
     if (!id) return
     setLoading(true)
     try {
-      const [u, ids, logs, depts] = await Promise.allSettled([
+      const [u, ids, logs] = await Promise.allSettled([
         getUserDetail(userID),
         getUserIdentityByUser(userID),
         getUserLoginLogByUser(userID),
-        getUserDepartmentByUser(userID),
       ])
       if (u.status === 'fulfilled') setUser(u.value)
       if (ids.status === 'fulfilled') setIdentities(ids.value.list || [])
       if (logs.status === 'fulfilled') setLoginLogs(logs.value.list || [])
-      if (depts.status === 'fulfilled') setDeptRel(depts.value.list || [])
     } finally {
       setLoading(false)
     }
@@ -57,34 +47,6 @@ export default function UserDetail() {
   useEffect(() => {
     void fetchAll()
   }, [fetchAll])
-
-  const loadDeptTree = async () => {
-    try {
-      const resp = await getDepartmentTree()
-      const build = (list: DepartmentItem[]): DataNode[] =>
-        list.map((d) => ({ key: d.departmentID, title: d.name, children: d.children ? build(d.children) : [] }))
-      setDeptTree(build(resp.list || []))
-    } catch {
-      /* 拦截器已提示 */
-    }
-  }
-
-  const openAssign = async () => {
-    await loadDeptTree()
-    setCheckedDeptKeys(deptRel.map((d) => d.departmentID))
-    setAssignModalOpen(true)
-  }
-
-  const handleAssign = async () => {
-    try {
-      await assignUserDepartments(userID, checkedDeptKeys.map(String))
-      message.success('分配成功')
-      setAssignModalOpen(false)
-      void fetchAll()
-    } catch {
-      /* 拦截器已提示 */
-    }
-  }
 
   const handleAddIdentity = async () => {
     try {
@@ -205,50 +167,9 @@ export default function UserDetail() {
                 <Table<UserLoginLogItem> rowKey="userLoginLogID" columns={logColumns} dataSource={loginLogs} pagination={false} scroll={{ x: 700 }} />
               ),
             },
-            {
-              key: 'department',
-              label: '部门归属',
-              children: (
-                <>
-                  <Space style={{ marginBottom: 12 }}>
-                    <Button type="primary" onClick={() => void openAssign()}>
-                      分配部门
-                    </Button>
-                  </Space>
-                  {deptRel.length === 0 ? (
-                    <Empty description="尚未分配部门" />
-                  ) : (
-                    <Table
-                      rowKey="departmentID"
-                      dataSource={deptRel}
-                      pagination={false}
-                      columns={[
-                        { title: '部门ID', dataIndex: 'departmentID', key: 'departmentID', render: (v: string) => <IDCell value={v} /> },
-                        {
-                          title: '是否主部门',
-                          dataIndex: 'isPrimary',
-                          key: 'isPrimary',
-                          render: (v: number) => (v === 1 ? <Tag color="blue">主部门</Tag> : <Tag>普通</Tag>),
-                        },
-                      ]}
-                    />
-                  )}
-                </>
-              ),
-            },
           ]}
         />
       </Card>
-
-      <Modal title="分配部门" open={assignModalOpen} onOk={() => void handleAssign()} onCancel={() => setAssignModalOpen(false)} width={420}>
-        <Tree
-          checkable
-          treeData={deptTree}
-          checkedKeys={checkedDeptKeys}
-          onCheck={(keys) => setCheckedDeptKeys(Array.isArray(keys) ? keys : keys.checked)}
-          defaultExpandAll
-        />
-      </Modal>
 
       <Modal title="绑定第三方身份" open={identityModalOpen} onOk={() => void handleAddIdentity()} onCancel={() => setIdentityModalOpen(false)} destroyOnClose>
         <Form form={identityForm} layout="vertical">

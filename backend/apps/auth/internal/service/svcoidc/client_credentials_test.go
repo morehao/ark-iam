@@ -40,7 +40,7 @@ func TestClientCredentialsStorage(t *testing.T) {
 	clientEntity := &model.ApplicationClientEntity{
 		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
 		TenantID:                "1",
-		ClientID:                clientID,
+		Code:                   clientID,
 		Name:                    "Machine Client",
 		RedirectURIs:            datatypes.JSON("[]"),
 		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
@@ -137,7 +137,7 @@ func TestClientCredentialsRejectsPublicClient(t *testing.T) {
 	publicClient := &model.ApplicationClientEntity{
 		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
 		TenantID:                "1",
-		ClientID:                clientID,
+		Code:                   clientID,
 		Name:                    "Public Client",
 		RedirectURIs:            datatypes.JSON("[]"),
 		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
@@ -205,7 +205,7 @@ func TestCreateAccessTokenForClientCredentials(t *testing.T) {
 	now := time.Now()
 	accessTokenID, expiration, err := persistentStore.CreateAccessToken(ctx, &clientCredentialsTokenRequest{
 		subject:  clientID,
-		audience: []string{"urn:ark:iam:admin"},
+		audience: []string{"urn:ark:iam:platform-admin"},
 		clientID: clientID,
 		scopes:   []string{"openid"},
 	})
@@ -240,10 +240,10 @@ func TestGetPrivateClaimsFromRequestForClientCredentials(t *testing.T) {
 	req := &clientCredentialsTokenRequest{
 		subject:  clientID,
 		clientID: clientID,
-		audience: []string{"urn:ark:iam:admin"},
-		scopes:   []string{"urn:ark:iam:admin"},
+		audience: []string{"urn:ark:iam:platform-admin"},
+		scopes:   []string{"urn:ark:iam:platform-admin"},
 	}
-	claims, err := storage.GetPrivateClaimsFromRequest(ctx, req, []string{"urn:ark:iam:admin"})
+	claims, err := storage.GetPrivateClaimsFromRequest(ctx, req, []string{"urn:ark:iam:platform-admin"})
 	if err != nil {
 		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
 	}
@@ -279,7 +279,7 @@ func newClientCredentialsTestDB(t *testing.T, clientID string, accessTokenTTL in
 	clientEntity := &model.ApplicationClientEntity{
 		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
 		TenantID:                "1",
-		ClientID:                clientID,
+		Code:                   clientID,
 		Name:                    "TTL Client",
 		RedirectURIs:            datatypes.JSON("[]"),
 		PostLogoutRedirectURIs:  datatypes.JSON("[]"),

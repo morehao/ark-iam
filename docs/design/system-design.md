@@ -73,7 +73,7 @@ flowchart TB
             PLAT["platformadmin :8082<br/>平台管理"]
             TENANT["tenantadmin :8083<br/>租户自服务"]
         end
-        PKG["backend/pkg 公共层<br/>config / dbclient / middleware / code<br/>iam(model·dao·object) / oidc / sso / token / testsetup"]
+        PKG["backend/pkg 公共层<br/>config / dbclient / middleware / code<br/>iam(model·dao·object) / oidc / sso<br/>token / testsetup"]
     end
 
     subgraph INFRA["基础设施"]
@@ -116,8 +116,8 @@ flowchart TB
         C["controller/ctrxxx 控制器<br/>参数绑定、响应封装"]
         S["service/svcxxx 服务层<br/>业务逻辑、事务、审计"]
         D["dao/ 数据访问层"]
-        M["model/ 数据模型（跨应用共享于 pkg/iam/model）"]
-        O["object/ 领域对象（跨应用共享于 pkg/iam/object）"]
+        M["model/ 数据模型<br/>（跨应用共享于 pkg/iam/model）"]
+        O["object/ 领域对象<br/>（跨应用共享于 pkg/iam/object）"]
         DTO["dto/dtoxxx 请求/响应对象"]
     end
     R --> C --> S --> D --> M
@@ -139,8 +139,8 @@ flowchart TB
 | 应用 | 服务标识 | 独立端口 | 职责 | 主要领域 |
 |---|---|---|---|---|
 | **auth** | `auth` | 8081 | 认证网关：登录/注册/令牌/OIDC Provider/SSO/SLO/Connector | person、user（成员）、refresh_token、session、connector、user_identity |
-| **platformadmin** | `platform` | 8082 | 平台管理：租户/用户/角色/菜单/权限/应用/OAuth 客户端/API Key/域名/系统配置/审计 | tenant、user、role、menu、scope、resource、application、application_client、api_key、domain、department、system |
-| **tenantadmin** | `tenant` | 8083 | 租户自服务：组织/组织角色/组织成员/租户菜单 | organization、organization_role、organization_user |
+| **platformadmin** | `platform` | 8082 | 平台管理：租户/用户/角色/菜单/权限/应用/OAuth 客户端/API Key/域名/系统配置/审计 | tenant、user、role、menu、scope、resource、application、application_client、api_key、domain、system |
+| **tenantadmin** | `tenant` | 8083 | 租户自服务：组织架构（组织树/成员关系）/租户菜单 | organization、organization_user |
 | **gateway** | 聚合 | 8100 | 单体聚合部署，挂载 auth + platformadmin + tenantadmin | 无独立业务 |
 
 > 各应用通过 `ginserver.NewRouterGroups(engine, "<服务标识>", ...)` 注册前缀，业务路由形如 `/v1/{auth|platform|tenant}/...`；OIDC 协议端点固定挂在 `/oidc/*`（R3 专用前缀，不走业务路由规范）。
@@ -176,7 +176,7 @@ flowchart TB
 - 统一前缀/命名：表名小写下划线，主键 `gorm.Model`（`id/created_at/updated_at/deleted_at`），审计字段 `created_by/updated_by/deleted_by`；
 - **person 为中心的跨租户模型**：身份类字段（username/email/phone/password）只放 `person`，`user` 只放租户内成员关系与租户内资料；
 - 字典值全部常量定义（如 `application_client.type`、`tenant.type`），禁止硬编码字符串；
-- 关联表（多对多）独立建表：`user_role`、`role_menu`、`role_scope`、`organization_user`、`organization_role_user`、`user_department`；
+- 关联表（多对多）独立建表：`user_role`、`role_menu`、`role_scope`、`organization_user`；
 - 令牌/密钥类敏感字段只存**哈希**（`refresh_token.token`、`application_client_secret.value_hash`、`api_key.key_hash`）；
 - 空值可空标识字段存 `NULL`（`person.username/primary_email/primary_phone` 均为可空指针，配唯一索引），避免唯一索引撞空串。
 
@@ -190,15 +190,9 @@ erDiagram
     application ||--o{ tenant_application : "1:N"
     application ||--o{ application_client : "1:N"
     application_client ||--o{ application_client_secret : "1:N"
-    tenant ||--o{ organization : "1:N"
-    organization ||--o{ organization_role : "1:N"
-    organization ||--o{ organization_user : "1:N"
+    tenant ||--o{ organization : "1:N 组织树(parent_id 自引用)"
+    organization ||--o{ organization_user : "1:N 关系(member/leader)"
     user ||--o{ organization_user : "1:N"
-    organization_role ||--o{ organization_role_user : "1:N"
-    user ||--o{ organization_role_user : "1:N"
-    tenant ||--o{ department : "1:N"
-    user ||--o{ user_department : "1:N"
-    department ||--o{ user_department : "1:N"
     tenant ||--o{ role : "1:N"
     application ||--o{ role : "1:N"
     user ||--o{ user_role : "1:N"
@@ -307,45 +301,23 @@ erDiagram
         json granted_scope "租户级 scope 授权"
     }
     organization {
-        uint id PK
-        uint tenant_id FK
+        string id PK "UUID v7"
+        string tenant_id FK
+        string parent_id "父节点(空为根)"
+        string org_path "祖先链(含自身)"
+        int org_depth "深度(根=1)"
         string name
-        string description
-        json custom_data
-        tinyint is_mfa_required
-    }
-    organization_role {
-        uint id PK
-        uint tenant_id FK
-        uint organization_id FK
-        string name
-        string type
+        string code "外部同步编码(可空)"
+        int sort
+        string status "active/inactive"
     }
     organization_user {
-        uint id PK
-        uint tenant_id FK
-        uint organization_id FK
-        uint user_id FK
-    }
-    organization_role_user {
-        uint id PK
-        uint tenant_id FK
-        uint organization_id FK
-        uint organization_role_id FK
-        uint user_id FK
-    }
-    department {
-        uint id PK
-        uint tenant_id FK
-        string name
-        uint parent_id
-    }
-    user_department {
-        uint id PK
-        uint tenant_id FK
-        uint user_id FK
-        uint department_id FK
-        tinyint is_primary
+        string id PK "UUID v7"
+        string tenant_id FK
+        string organization_id FK
+        string user_id FK
+        string relation_type "member/leader"
+        bool is_primary "主归属(仅member)"
     }
     role {
         uint id PK
@@ -537,12 +509,8 @@ erDiagram
 
 | 表 | 说明 |
 |---|---|
-| `organization` | 组织节点（租户内）；`is_mfa_required` 是否强制 MFA |
-| `organization_role` | 组织角色 |
-| `organization_user` | 组织-成员关联 |
-| `organization_role_user` | 组织角色-成员关联 |
-| `department` | 部门（支持 `parent_id` 树） |
-| `user_department` | 用户-部门关联（`is_primary` 主部门） |
+| `organization` | 组织树节点（租户内用户容器）：`parent_id` 树 + `org_path`/`org_depth` 物化路径，`status` 启停用 |
+| `organization_user` | 组织关系（多态）：`relation_type` 互斥枚举 member/leader，`is_primary` 主归属（仅 member 可置位） |
 
 #### 权限域
 
@@ -600,11 +568,11 @@ sequenceDiagram
     participant A as auth 应用
     participant DB as PostgreSQL
 
-    U->>A: POST /v1/auth/register（租户ID、用户名/邮箱/手机号、密码、姓名）
-    A->>A: 校验密码强度（≥6 位，含大小写+数字）
-    A->>A: 校验标识唯一（username/email/phone 任一已存在则拒绝）
-    A->>DB: 插入 person（密码 bcrypt 哈希，标识空值存 NULL）
-    A->>DB: 插入 user（person_id + tenant_id，is_owner=1）
+    U->>A: POST /v1/auth/register<br/>（租户ID、用户名/邮箱/手机号、密码、姓名）
+    A->>A: 校验密码强度<br/>（≥6 位，含大小写+数字）
+    A->>A: 校验标识唯一<br/>（username/email/phone 任一已存在则拒绝）
+    A->>DB: 插入 person<br/>（密码 bcrypt 哈希，标识空值存 NULL）
+    A->>DB: 插入 user<br/>（person_id + tenant_id，is_owner=1）
     A-->>U: { userID }
 ```
 
@@ -623,19 +591,19 @@ sequenceDiagram
 
     U->>LW: 提交用户名/密码（POST /oidc/login，带 authRequestID）
     LW->>A: 转发凭证
-    A->>DB: 按标识解析 person（用户名/邮箱/手机号）
-    A->>RD: 登录风控检查（失败次数/锁定时长，maxFailures=5/window=300s/lock=900s）
+    A->>DB: 按标识解析 person<br/>（用户名/邮箱/手机号）
+    A->>RD: 登录风控检查<br/>（失败次数/锁定时长，maxFailures=5/window=300s/lock=900s）
     alt 锁定 / 挂起 / 密码未设置 / 密码错误
         A->>DB: 写审计（failure）+ 登录失败计数
         A-->>U: 对应错误码
     else 校验通过
-        A->>DB: 写登录日志 + 更新 last_sign_in_at + 写审计（success）
-        A->>RD: 创建 SSO 会话（iam:oidc:sso_session:*）+ person 索引
+        A->>DB: 写登录日志 + 更新<br/>last_sign_in_at + 写审计（success）
+        A->>RD: 创建 SSO 会话<br/>（iam:oidc:sso_session:*）+ person 索引
         A->>DB: 落 session 审计记录
         alt 多租户用户
-            A-->>LW: requiresTenantSelection=true + 租户列表
-            U->>LW: 选择租户（POST /oidc/login/selectTenant）
-            A->>A: 完成授权请求（subject=person:123, amr, tenantID）
+            A-->>LW: requiresTenantSelection=true<br/>+ 租户列表
+            U->>LW: 选择租户<br/>（POST /oidc/login/selectTenant）
+            A->>A: 完成授权请求<br/>（subject=person:123, amr, tenantID）
         else 单租户
             A->>A: 自动选租户，完成授权请求
         end
@@ -656,8 +624,8 @@ sequenceDiagram
     participant RD as Redis
 
     U->>RP: 访问应用（未登录）
-    RP->>OP: GET /oidc/authorize（携带 iam_sso_session Cookie，prompt=none 语义）
-    OP->>RD: 校验 SSO 会话（ValidateSession → personID）
+    RP->>OP: GET /oidc/authorize<br/>（携带 iam_sso_session Cookie，prompt=none 语义）
+    OP->>RD: 校验 SSO 会话<br/>（ValidateSession → personID）
     alt 会话有效
         OP->>OP: 完成授权请求（还原 amr），签发授权码
         OP-->>RP: 302 redirect_uri?code=...
@@ -680,14 +648,14 @@ sequenceDiagram
     participant API as 业务后端 API（RP 资源服务器）
     participant RD as Redis
 
-    RP->>OP: POST /oidc/oauth/token（code + PKCE verifier）
+    RP->>OP: POST /oidc/oauth/token<br/>（code + PKCE verifier）
     OP->>OP: 校验授权码、PKCE、client 认证
-    OP->>OP: 签发 id_token（RS256）+ access_token（RS256，含 tenant_id/user_id/client_id/token_usage）
+    OP->>OP: 签发 id_token（RS256）+ access_token（RS256，<br/>含 tenant_id/user_id/client_id/token_usage）
     OP->>RD: 写入 access token 元数据（iam:oidc:at:meta:*）
     OP-->>RP: 令牌
     RP->>API: GET /v1/...（Authorization: Bearer access_token）
-    API->>API: oidcauth 中间件：验签（RS256）→ 校验 iss/aud → 解析 personID/tenantID
-    API->>RD: （可选）SSO 会话活性校验 HasActiveSession（登出即失效）
+    API->>API: oidcauth 中间件：验签（RS256）→<br/>校验 iss/aud → 解析 personID/tenantID
+    API->>RD: （可选）SSO 会话活性校验<br/>HasActiveSession（登出即失效）
     alt 机器凭证（x-api-key 或 client_credentials 签发）
         API->>API: 跳过 SSO 会话活性校验（token_usage=machine）
     end
@@ -709,16 +677,16 @@ sequenceDiagram
     U->>RP1: 点击"退出登录"
     RP1->>A: POST /v1/auth/logout（或 /oidc/end_session）
     A->>A: 解析 personID
-    A->>RD: 查询该 person 全部登出登记（slo_reg，依赖 sso_user_sessions 索引）
+    A->>RD: 查询该 person 全部登出登记<br/>（slo_reg，依赖 sso_user_sessions 索引）
     A->>RD: 入队反向通道登出任务（iam:oidc:slo_queue）
-    A->>RD: 撤销全部 SSO 会话（RevokeSessionsByPersonID）
+    A->>RD: 撤销全部 SSO 会话<br/>（RevokeSessionsByPersonID）
     A->>DB: 吊销该 person 全部 refresh_token
     A->>A: 清除 iam_sso_session Cookie
-    W->>W: 消费队列，签发 logout_token（RS256，15min 有效）
+    W->>W: 消费队列，签发 logout_token<br/>（RS256，15min 有效）
     W->>RP2: POST {back_channel_logout_uri}（logout_token）
     RP2->>RP2: 校验并作废本地会话（按 sid）
     alt 应用 A 继续访问其他 API
-        API->>RD: HasActiveSession=false → 401（请求粒度即时失效）
+        API->>RD: HasActiveSession=false → 401<br/>（请求粒度即时失效）
     end
 ```
 
@@ -732,7 +700,7 @@ sequenceDiagram
     participant DB as PostgreSQL
 
     SVC->>API: 请求（Header: x-api-key: ak_xxx...）
-    API->>DB: 按 key_prefix 定位 + 校验 key_hash + 校验未过期/未吊销
+    API->>DB: 按 key_prefix 定位 + 校验 key_hash<br/>+ 校验未过期/未吊销
     API->>API: 解析 scope，注入身份上下文（token_usage=machine）
     API-->>SVC: 业务数据
 ```
@@ -747,11 +715,11 @@ sequenceDiagram
     participant EXT as 外部 IdP（如企业微信/Google）
     participant DB as PostgreSQL
 
-    U->>A: 发起 connector 授权（POST /oidc/... 或 connector authorize）
-    A->>EXT: 跳转外部 IdP 授权（OAuth2/OIDC connector 驱动）
+    U->>A: 发起 connector 授权<br/>（POST /oidc/... 或 connector authorize）
+    A->>EXT: 跳转外部 IdP 授权<br/>（OAuth2/OIDC connector 驱动）
     EXT-->>A: 回调（code）
     A->>A: connector 驱动换令牌、拉取用户信息
-    A->>DB: 按 claim_mapping 匹配 user_identity（issuer + external_subject）
+    A->>DB: 按 claim_mapping 匹配 user_identity<br/>（issuer + external_subject）
     alt 已关联
         A->>A: 完成登录（走 SSO 会话建立流程）
     else 未关联
@@ -779,7 +747,7 @@ flowchart TB
     E --> G["5. 对接令牌校验<br/>后端挂 oidcauth 中间件<br/>（iss/aud/SSO 会话活性）"]
     F --> G
     G --> H["6. 可选：接入 SLO<br/>配置 back_channel_logout_uri<br/>接收 logout_token"]
-    H --> I["7. 验收（SSO 免密 / 登出即失效 / 审计）"]
+    H --> I["7. 验收<br/>（SSO 免密 / 登出即失效 / 审计）"]
 ```
 
 | 步骤 | 说明 | 关键接口 |
@@ -832,7 +800,7 @@ flowchart TB
 
 - **组织架构增强**：部门/组织与角色联动、批量导入导出；
 - **更多授权类型**：`urn:ietf:params:oauth:grant-type:token-exchange`、jwt-bearer（当前显式拒绝，避免虚假宣称）；
-- **MFA**：基于 `organization.is_mfa_required` 的 TOTP/短信二次认证；
+- **MFA**：TOTP/短信二次认证（组织级 MFA 策略已移出组织表，后续按租户级/system 配置承载）；
 - **SCIM 供给**：租户→应用的用户供给协议；
 - **细粒度授权**：资源级（`resource`/`scope`）的 ABAC 策略引擎；
 - **auth 高可用**：共享认证 Redis 已支持多副本，后续补会话一致性看护与优雅降级；

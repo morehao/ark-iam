@@ -11,6 +11,9 @@ type OrganizationUserCond struct {
 	TenantID       string
 	OrganizationID string
 	UserID         string
+	RelationType   string
+	// IsPrimary 过滤主归属（仅配合 RelationType=member 使用）
+	IsPrimary *bool
 }
 
 func (c *OrganizationUserCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -25,6 +28,12 @@ func (c *OrganizationUserCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.UserID != "" {
 		db.Where(tableName+".user_id = ?", c.UserID)
+	}
+	if c.RelationType != "" {
+		db.Where(tableName+".relation_type = ?", c.RelationType)
+	}
+	if c.IsPrimary != nil {
+		db.Where(tableName+".is_primary = ?", *c.IsPrimary)
 	}
 }
 

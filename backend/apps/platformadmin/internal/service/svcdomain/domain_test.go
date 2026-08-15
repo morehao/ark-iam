@@ -73,8 +73,8 @@ func TestDomainSvc_Create_Success(t *testing.T) {
 	if entity.TenantID != "10" {
 		t.Fatalf("expected tenantID 10, got %s", entity.TenantID)
 	}
-	if entity.IsVerified != 0 {
-		t.Fatalf("expected isVerified 0, got %d", entity.IsVerified)
+	if entity.IsVerified {
+		if entity.IsVerified { t.Fatalf("expected isVerified false, got true") }
 	}
 	if entity.CreatedBy != "100" {
 		t.Fatalf("expected createdBy 100, got %s", entity.CreatedBy)

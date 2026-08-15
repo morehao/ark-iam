@@ -12,4 +12,5 @@ func tenantMenuRouter(groups *ginserver.RouterGroups) {
 
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.GET("/menus/tree", tenantMenuCtr.Tree)
+	v1RouterGroup.GET("/apps", tenantMenuCtr.Apps)
 }

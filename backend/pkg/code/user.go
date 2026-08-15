@@ -3,12 +3,15 @@ package code
 import "github.com/morehao/golib/gerror"
 
 const (
-	UserCreateError      = 100500
-	UserDeleteError      = 100501
-	UserUpdateError      = 100502
-	UserGetDetailError   = 100503
-	UserGetPageListError = 100504
-	UserNotExistError    = 100505
+	UserCreateError                = 100500
+	UserDeleteError                = 100501
+	UserUpdateError                = 100502
+	UserGetDetailError             = 100503
+	UserGetPageListError           = 100504
+	UserNotExistError              = 100505
+	UserOrganizationRequiredError  = 100518 // 用户必须从属于至少一个部门
+	UserAlreadyInTenantError       = 100516 // 自然人已在本租户内
+	UserResetPasswordError         = 100517 // 重置密码失败
 )
 
 const (
@@ -27,19 +30,11 @@ const (
 )
 
 const (
-	UserDepartmentCreateError      = 104100
-	UserDepartmentDeleteError      = 104101
-	UserDepartmentUpdateError      = 104102
-	UserDepartmentGetDetailError   = 104103
-	UserDepartmentGetPageListError = 104104
-	UserDepartmentNotExistError    = 104105
-)
-
-const (
 	UserRoleCreateError      = 100750
 	UserRoleDeleteError      = 100751
 	UserRoleGetPageListError = 100752
 	UserRoleNotExistError    = 100753
+	UserRoleReplaceError     = 100754 // 全量替换用户角色失败
 )
 
 var userErrorMsgMap = gerror.CodeMsgMap{
@@ -49,6 +44,9 @@ var userErrorMsgMap = gerror.CodeMsgMap{
 	UserGetDetailError:             "查看用户详情失败",
 	UserGetPageListError:           "查看用户列表失败",
 	UserNotExistError:              "用户不存在",
+	UserOrganizationRequiredError:  "用户必须从属于至少一个部门",
+	UserAlreadyInTenantError:       "该用户已在本租户内",
+	UserResetPasswordError:         "重置密码失败",
 	UserIdentityCreateError:        "创建用户身份失败",
 	UserIdentityDeleteError:        "删除用户身份失败",
 	UserIdentityUpdateError:        "修改用户身份失败",
@@ -58,14 +56,9 @@ var userErrorMsgMap = gerror.CodeMsgMap{
 	UserLoginLogGetDetailError:     "查看用户登录日志详情失败",
 	UserLoginLogGetPageListError:   "查看用户登录日志列表失败",
 	UserLoginLogNotExistError:      "用户登录日志不存在",
-	UserDepartmentCreateError:      "创建用户部门失败",
-	UserDepartmentDeleteError:      "删除用户部门失败",
-	UserDepartmentUpdateError:      "修改用户部门失败",
-	UserDepartmentGetDetailError:   "查看用户部门详情失败",
-	UserDepartmentGetPageListError: "查看用户部门列表失败",
-	UserDepartmentNotExistError:    "用户部门不存在",
 	UserRoleCreateError:            "创建用户角色关联失败",
 	UserRoleDeleteError:            "删除用户角色关联失败",
 	UserRoleGetPageListError:       "查看用户角色关联列表失败",
 	UserRoleNotExistError:          "用户角色关联不存在",
+	UserRoleReplaceError:           "更新用户角色失败",
 }

@@ -46,7 +46,7 @@ func NewApplicationClientSvc() ApplicationClientSvc {
 	return &oAuthClientSvc{}
 }
 
-func generateClientID() string {
+func generateClientCode() string {
 	return uuid.New().String()
 }
 
@@ -62,7 +62,7 @@ func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.Ap
 	insertEntity := &model.ApplicationClientEntity{
 		TenantID:                gctx.GetTenantID(ctx),
 		AppID:                   req.AppID,
-		ClientID:                generateClientID(),
+		Code:                    generateClientCode(),
 		Name:                    req.Name,
 		RedirectURIs:            marshalStringSlice(req.RedirectURIs),
 		PostLogoutRedirectURIs:  marshalStringSlice(req.PostLogoutRedirectURIs),
@@ -94,7 +94,7 @@ func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.Ap
 	})
 	return &dtoapplicationclient.ApplicationClientCreateResp{
 		ApplicationClientID: insertEntity.ID,
-		ClientID:            insertEntity.ClientID,
+		Code:                insertEntity.Code,
 	}, nil
 }
 
@@ -107,7 +107,7 @@ func (svc *oAuthClientSvc) Delete(ctx *gin.Context, req *dtoapplicationclient.Ap
 	if !applicationClientVisibleToTenant(entity, gctx.GetTenantID(ctx)) {
 		return code.GetError(code.ApplicationClientNotExistError)
 	}
-	if entity.IsSystem == 1 {
+	if entity.IsSystem {
 		return code.GetError(code.ApplicationClientSystemBuiltInErr)
 	}
 
@@ -180,7 +180,7 @@ func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtoapplicationclient.Ap
 		ApplicationClientID:     entity.ID,
 		TenantID:                entity.TenantID,
 		AppID:                   entity.AppID,
-		ClientID:                entity.ClientID,
+		Code:                    entity.Code,
 		Name:                    entity.Name,
 		RedirectURIs:            redirectURIs,
 		PostLogoutRedirectURIs:  postLogoutRedirectURIs,
@@ -226,7 +226,7 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.
 		items = append(items, dtoapplicationclient.PageListItem{
 			ApplicationClientID:     v.ID,
 			AppID:                   v.AppID,
-			ClientID:                v.ClientID,
+			Code:                    v.Code,
 			Name:                    v.Name,
 			Type:                    v.Type,
 			Status:                  v.Status,
@@ -244,7 +244,7 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.
 
 func (svc *oAuthClientSvc) GetByClientID(ctx *gin.Context, clientID string) (*dtoapplicationclient.ApplicationClientDetailResp, error) {
 	entity, err := dao.NewApplicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{
-		ClientID: clientID,
+		Code: clientID,
 	})
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.GetByClientID] dao GetByCond fail, err:%v, clientID:%s", err, clientID)
@@ -267,7 +267,7 @@ func (svc *oAuthClientSvc) GetByClientID(ctx *gin.Context, clientID string) (*dt
 		ApplicationClientID:     entity.ID,
 		TenantID:                entity.TenantID,
 		AppID:                   entity.AppID,
-		ClientID:                entity.ClientID,
+		Code:                    entity.Code,
 		Name:                    entity.Name,
 		RedirectURIs:            redirectURIs,
 		PostLogoutRedirectURIs:  postLogoutRedirectURIs,

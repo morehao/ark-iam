@@ -12,7 +12,7 @@ type DomainEntity struct {
 	gormdao.BaseEntity
 	TenantID   string       `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id"`
 	Domain     string       `gorm:"column:domain;type:varchar(256);not null;default:'';comment:域名"`
-	IsVerified int8         `gorm:"column:is_verified;type:smallint;not null;default:0;comment:是否验证"`
+	IsVerified bool         `gorm:"column:is_verified;type:boolean;not null;default:false;comment:是否验证"`
 	VerifiedAt sql.NullTime `gorm:"column:verified_at;default:null;comment:验证时间"`
 	CreatedBy  string       `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id"`
 	UpdatedBy  string       `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id"`

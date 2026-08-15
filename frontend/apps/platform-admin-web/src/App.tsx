@@ -22,7 +22,6 @@ import Dashboard from './pages/dashboard'
 import UserList from './pages/user'
 import UserDetail from './pages/user/Detail'
 import RoleList from './pages/role'
-import DepartmentList from './pages/department'
 import ApplicationList from './pages/application'
 import TenantList from './pages/tenant'
 import TenantApplicationList from './pages/tenantApplication'
@@ -55,7 +54,6 @@ const menuItems: MainMenuItems[] = [
     icon: <ApartmentOutlined />,
     label: '组织与租户',
     children: [
-      { key: '/department', icon: <ApartmentOutlined />, label: '部门管理' },
       { key: '/tenant', icon: <GlobalOutlined />, label: '租户管理' },
       { key: '/tenantApplication', icon: <ShoppingOutlined />, label: '租户应用' },
     ],
@@ -111,7 +109,6 @@ function App() {
         <Route path="user" element={<UserList />} />
         <Route path="user/:id" element={<UserDetail />} />
         <Route path="role" element={<RoleList />} />
-        <Route path="department" element={<DepartmentList />} />
         <Route path="application" element={<ApplicationList />} />
         <Route path="tenant" element={<TenantList />} />
         <Route path="tenantApplication" element={<TenantApplicationList />} />

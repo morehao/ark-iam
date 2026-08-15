@@ -24,7 +24,7 @@
 
 ```mermaid
 flowchart TB
-    START["新业务应用"] --> PREP["① 准备：应用名/编码/回调地址/类型"]
+    START["新业务应用"] --> PREP["① 准备：应用名/编码/<br>回调地址/类型"]
     PREP --> APP["② 创建应用（application）"]
     APP --> CLIENT["③ 创建 OAuth 客户端（application_client）"]
     CLIENT --> SPLIT{"应用形态"}
@@ -166,7 +166,7 @@ sequenceDiagram
     participant API as 业务后端
 
     U->>FE: 访问应用
-    FE->>OP: signinRedirect → /oidc/authorize（code + PKCE challenge）
+    FE->>OP: signinRedirect → /oidc/authorize<br/>（code + PKCE challenge）
     alt 已有 iam_sso_session
         OP-->>FE: 302 回调（免密）
     else 无会话

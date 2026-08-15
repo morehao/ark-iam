@@ -6,5 +6,5 @@ type RoleBaseInfo struct {
 	Code        string `json:"code" form:"code"`               // 角色编码
 	Description string `json:"description" form:"description"` // 角色描述
 	Type        string `json:"type" form:"type"`               // 角色类型
-	IsDefault   int8   `json:"isDefault" form:"isDefault"`     // 是否默认角色
+	IsDefault bool   `json:"isDefault" form:"isDefault"`     // 是否默认角色
 }

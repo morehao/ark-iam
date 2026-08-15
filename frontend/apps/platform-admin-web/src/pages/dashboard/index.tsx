@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Card, Col, Row, Statistic, Typography, Spin } from 'antd'
 import {
-  ApartmentOutlined,
   AppstoreOutlined,
   GlobalOutlined,
   SafetyCertificateOutlined,
@@ -9,7 +8,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import { PageContainer, brand } from '@ark-iam/ui'
-import { getUserPageList, getRolePageList, getDepartmentTree, getApplicationPageList, getTenantPageList } from '@ark-iam/api'
+import { getUserPageList, getRolePageList, getApplicationPageList, getTenantPageList } from '@ark-iam/api'
 
 interface Stat {
   title: string
@@ -22,7 +21,6 @@ export default function Dashboard() {
   const [stats, setStats] = useState<Stat[]>([
     { title: '用户总数', value: null, icon: <UserOutlined />, color: '#4f6ef7' },
     { title: '角色总数', value: null, icon: <SafetyCertificateOutlined />, color: '#7a5af8' },
-    { title: '部门总数', value: null, icon: <ApartmentOutlined />, color: '#06b6d4' },
     { title: '应用总数', value: null, icon: <AppstoreOutlined />, color: '#f59e0b' },
     { title: '租户总数', value: null, icon: <GlobalOutlined />, color: '#22c55e' },
   ])
@@ -32,10 +30,9 @@ export default function Dashboard() {
     let mounted = true
     const load = async () => {
       try {
-        const [users, roles, depts, apps, tenants] = await Promise.allSettled([
+        const [users, roles, apps, tenants] = await Promise.allSettled([
           getUserPageList({ page: 1, pageSize: 1 }),
           getRolePageList({ page: 1, pageSize: 1 }),
-          getDepartmentTree(),
           getApplicationPageList({ page: 1, pageSize: 1 }),
           getTenantPageList({ page: 1, pageSize: 1 }),
         ])
@@ -44,7 +41,6 @@ export default function Dashboard() {
         setStats([
           { title: '用户总数', value: count(users), icon: <UserOutlined />, color: '#4f6ef7' },
           { title: '角色总数', value: count(roles), icon: <SafetyCertificateOutlined />, color: '#7a5af8' },
-          { title: '部门总数', value: count(depts), icon: <ApartmentOutlined />, color: '#06b6d4' },
           { title: '应用总数', value: count(apps), icon: <AppstoreOutlined />, color: '#f59e0b' },
           { title: '租户总数', value: count(tenants), icon: <GlobalOutlined />, color: '#22c55e' },
         ])

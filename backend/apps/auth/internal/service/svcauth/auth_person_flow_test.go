@@ -232,8 +232,8 @@ func TestJoinTenantCreatesNonOwnerUser(t *testing.T) {
 	if insertedUser.PersonID != "88" {
 		t.Fatalf("expected person id 88, got %s", insertedUser.PersonID)
 	}
-	if insertedUser.IsOwner != 0 {
-		t.Fatalf("expected join-tenant user to be non-owner (isOwner=0), got %d", insertedUser.IsOwner)
+	if insertedUser.IsOwner {
+		t.Fatalf("expected join-tenant user to be non-owner (isOwner=false), got %t", insertedUser.IsOwner)
 	}
 	if insertedUser.Name != "" {
 		t.Fatalf("expected empty name for join-tenant user (person name not copied), got %q", insertedUser.Name)

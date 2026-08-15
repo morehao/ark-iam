@@ -73,7 +73,6 @@ flowchart LR
     PG["启动 PostgreSQL<br/>（创建 iam 库）"] --> REDIS["启动 Redis"]
     REDIS --> BE["启动后端 gateway :8100<br/>（AutoMigrate 自动建表 + 幂等种子数据）"]
     BE --> FE["启动前端三个应用"]
-    BE --> FE["启动前端三个应用"]
     FE --> TEST["访问 platform-admin-web 验证登录"]
 ```
 

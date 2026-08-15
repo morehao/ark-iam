@@ -1,31 +1,38 @@
 export interface OrganizationItem {
   organizationID: string
-  tenantID: string
+  parentID: string
+  orgPath: string
+  orgDepth: number
   name: string
-  description: string
-  isMFARequired: number
-}
-
-export interface OrganizationRoleItem {
-  organizationRoleID: string
-  tenantID: string
-  organizationID: string
-  name: string
-  description: string
-  type: string
+  code: string
+  sort: number
+  status: string
+  children?: OrganizationItem[]
 }
 
 export interface OrganizationUserItem {
   organizationID: string
   userID: string
-  tenantID: string
+  userName: string
+  username: string
+  primaryEmail: string
+  primaryPhone: string
+  avatar: string
+  isSuspended: boolean
+  relationType: string
+  isPrimary: boolean
+  joinedAt?: number
 }
 
-export interface OrganizationRoleUserItem {
+export interface UserOrganizationItem {
   organizationID: string
-  organizationRoleID: string
-  userID: string
-  tenantID: string
+  organizationName: string
+  relationType: string
+  isPrimary: boolean
+}
+
+export interface OrganizationTreeResp {
+  list: OrganizationItem[]
 }
 
 export interface PageListResp<T> {

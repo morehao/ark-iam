@@ -55,7 +55,7 @@ func PrepareTestPerson(ctx context.Context, username, email, phone, password, na
 	return entity, nil
 }
 
-func PrepareTestUser(ctx context.Context, tenantID, personID string, name string, isOwner int8) (*model.UserEntity, error) {
+func PrepareTestUser(ctx context.Context, tenantID, personID string, name string, isOwner bool) (*model.UserEntity, error) {
 	db := dbclient.IamDB(ctx)
 	now := time.Now()
 	entity := &model.UserEntity{

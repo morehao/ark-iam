@@ -8,16 +8,20 @@ import (
 
 type PersonCond struct {
 	*gormdao.BaseCond
+	IDs          []string // 主键 IN 批量查询
 	Username     string
 	PrimaryEmail string
 	PrimaryPhone string
 	Name         string
-	IsSuspended  *int8
+	IsSuspended  *bool
 }
 
 func (c *PersonCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
+	}
+	if len(c.IDs) > 0 {
+		db.Where(tableName+".id IN ?", c.IDs)
 	}
 	if c.Username != "" {
 		db.Where(tableName+".username = ?", c.Username)

@@ -38,12 +38,6 @@ type MenuTreeResp struct {
 	List []MenuTreeItem `json:"list"` // 菜单树
 }
 
-type RoleCreateResp struct {
-	RoleID string `json:"roleID"` // 角色ID
-}
-
-type RoleUpdateResp struct {
-}
 
 type RoleDetailResp struct {
 	RoleID string `json:"roleID"` // 角色ID
@@ -110,53 +104,3 @@ type ScopePageListResp struct {
 	Total int64               `json:"total"` // 总数
 }
 
-type RoleScopeCreateResp struct {
-}
-
-type RoleScopeDeleteResp struct {
-}
-
-type RoleScopePageListItem struct {
-	RoleID   string `json:"roleID"`   // 角色ID
-	ScopeID  string `json:"scopeID"`  // 权限ID
-	TenantID string `json:"tenantID"` // 租户ID
-}
-
-type RoleScopePageListResp struct {
-	List  []RoleScopePageListItem `json:"list"`  // 列表
-	Total int64                   `json:"total"` // 总数
-}
-
-type UserRoleCreateResp struct {
-}
-
-type UserRoleDeleteResp struct {
-}
-
-type UserRolePageListItem struct {
-	UserID   string `json:"userID"`   // 用户ID
-	RoleID   string `json:"roleID"`   // 角色ID
-	TenantID string `json:"tenantID"` // 租户ID
-}
-
-type UserRolePageListResp struct {
-	List  []UserRolePageListItem `json:"list"`  // 列表
-	Total int64                  `json:"total"` // 总数
-}
-
-type RoleMenuCreateResp struct {
-}
-
-type RoleMenuDeleteResp struct {
-}
-
-type RoleMenuPageListItem struct {
-	RoleID   string `json:"roleID"`   // 角色ID
-	MenuID   string `json:"menuID"`   // 菜单ID
-	TenantID string `json:"tenantID"` // 租户ID
-}
-
-type RoleMenuPageListResp struct {
-	List  []RoleMenuPageListItem `json:"list"`  // 列表
-	Total int64                  `json:"total"` // 总数
-}

@@ -14,7 +14,7 @@ type RoleEntity struct {
 	Code        string `gorm:"column:code;type:varchar(64);not null;default:'';comment:角色编码" json:"code"`
 	Description string `gorm:"column:description;type:varchar(256);not null;default:'';comment:角色描述" json:"description"`
 	Type        string `gorm:"column:type;type:varchar(32);not null;default:'User';comment:角色类型" json:"type"`
-	IsDefault   int8   `gorm:"column:is_default;type:smallint;not null;default:0;comment:是否默认角色" json:"isDefault"`
+	IsDefault   bool   `gorm:"column:is_default;type:boolean;not null;default:false;comment:是否默认角色" json:"isDefault"`
 	CreatedBy   string `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id" json:"createdBy"`
 	UpdatedBy   string `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id" json:"updatedBy"`
 	DeletedBy   string `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人id" json:"deletedBy"`

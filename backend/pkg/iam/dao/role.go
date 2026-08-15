@@ -10,9 +10,11 @@ type RoleCond struct {
 	*gormdao.BaseCond
 	TenantID string
 	AppID    string
+	IDs      []string
 	Name     string
 	Code     string
 	Type     string
+	Keyword  string // 模糊搜索: 名称/编码 LIKE
 }
 
 func (c *RoleCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -24,6 +26,13 @@ func (c *RoleCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.AppID != "" {
 		db.Where(tableName+".app_id = ?", c.AppID)
+	}
+	if len(c.IDs) > 0 {
+		db.Where(tableName+".id IN ?", c.IDs)
+	}
+	if c.Keyword != "" {
+		k := "%" + c.Keyword + "%"
+		db.Where(tableName+".name LIKE ? OR "+tableName+".code LIKE ?", k, k)
 	}
 	if c.Name != "" {
 		db.Where(tableName+".name = ?", c.Name)

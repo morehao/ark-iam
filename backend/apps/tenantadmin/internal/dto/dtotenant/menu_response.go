@@ -13,3 +13,15 @@ type MenuTreeItem struct {
 type MenuTreeResp struct {
 	List []MenuTreeItem `json:"list"` // 菜单树
 }
+
+// TenantAppItem 租户订阅的应用（角色归属 / 菜单授权的应用选项）
+type TenantAppItem struct {
+	AppID string `json:"appID"` // 应用ID
+	Code  string `json:"code"`  // 应用编码
+	Name  string `json:"name"`  // 应用名称
+}
+
+// TenantAppsResp 租户订阅应用列表响应
+type TenantAppsResp struct {
+	List []TenantAppItem `json:"list"` // 应用列表
+}

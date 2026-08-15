@@ -1,6 +1,6 @@
 # 组织架构容器化设计（organization = 租户下用户容器）
 
-> 状态：设计稿（待评审落地）
+> 状态：已落地（feat/organization-container 分支）
 > 涉及：`organization` / `organization_user` 两张表重构为"租户下用户容器"；删除 `department` / `user_department` / `organization_role` / `organization_role_user` 四张表；tenantadmin 组织树 API 重建；platformadmin 部门管理下线（组织树只读）；平台管理应用编码 `admin` → `platform-admin`；`application_client.client_id` → `code`。项目处于开发期，无兼容性顾虑，直接改 + 重置开发库。
 
 ## 1. 背景与目标

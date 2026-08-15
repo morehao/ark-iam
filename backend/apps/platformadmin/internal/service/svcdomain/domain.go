@@ -54,7 +54,7 @@ func (svc *domainSvc) Create(ctx *gin.Context, req *dtodomain.DomainCreateReq) (
 	entity := &model.DomainEntity{
 		TenantID:   tenantID,
 		Domain:     domain,
-		IsVerified: 0,
+		IsVerified: false,
 		CreatedBy:  gctx.GetUserID(ctx),
 		UpdatedBy:  gctx.GetUserID(ctx),
 	}

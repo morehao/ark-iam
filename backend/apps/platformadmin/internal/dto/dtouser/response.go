@@ -5,10 +5,6 @@ import (
 	"github.com/morehao/golib/biz/gobject"
 )
 
-type UserCreateResp struct {
-	UserID string `json:"userID"` // 用户ID
-}
-
 type UserDetailResp struct {
 	UserID string `json:"userID"` // 用户ID
 	objuser.UserBaseInfo
@@ -55,16 +51,6 @@ type UserIdentityPageListResp struct {
 	Total int64                      `json:"total"` // 数据总条数
 }
 
-type UserLoginLogDetailResp struct {
-	UserLoginLogID string `json:"userLoginLogID"` // 登录日志ID
-	TenantID       string `json:"tenantID"`       // 租户ID
-	UserID         string `json:"userID"`         // 用户ID
-	LoginIP        string `json:"loginIP"`        // 登录IP地址
-	UserAgent      string `json:"userAgent"`      // 用户代理信息
-	LoginTime      int64  `json:"loginTime"`      // 登录时间
-	gobject.OperatorBaseInfo
-}
-
 type UserLoginLogPageListItem struct {
 	UserLoginLogID string `json:"userLoginLogID"` // 登录日志ID
 	TenantID       string `json:"tenantID"`       // 租户ID
@@ -80,20 +66,6 @@ type UserLoginLogPageListResp struct {
 	Total int64                      `json:"total"` // 数据总条数
 }
 
-type UserDepartmentPageListItem struct {
-	UserDepartmentID string `json:"userDepartmentID"` // 用户部门ID
-	TenantID         string `json:"tenantID"`         // 租户ID
-	UserID           string `json:"userID"`           // 用户ID
-	DepartmentID     string `json:"departmentID"`     // 部门ID
-	IsPrimary        int8   `json:"isPrimary"`        // 是否主部门
-	gobject.OperatorBaseInfo
-}
-
-type UserDepartmentPageListResp struct {
-	List  []UserDepartmentPageListItem `json:"list"`  // 数据列表
-	Total int64                        `json:"total"` // 数据总条数
-}
-
 type RoleUserResp struct {
 	UserID    string `json:"userID"`
 	Username  string `json:"username"`
@@ -106,17 +78,4 @@ type RoleUserResp struct {
 type RoleUserListResp struct {
 	Total int64          `json:"total"`
 	Users []RoleUserResp `json:"users"`
-}
-
-type RoleApplicationResp struct {
-	AppID     string `json:"appID"`
-	AppName   string `json:"appName"`
-	AppType   string `json:"appType"`
-	RoleID    string `json:"roleID"`
-	CreatedAt string `json:"createdAt"`
-}
-
-type RoleApplicationListResp struct {
-	Total        int64                 `json:"total"`
-	Applications []RoleApplicationResp `json:"applications"`
 }

@@ -29,7 +29,7 @@ func TestUserinfoReturnsPersonAndTenantUser(t *testing.T) {
 					TenantID:   "11",
 					PersonID:   "101",
 					Name:       "租户用户",
-					IsOwner:    1,
+					IsOwner:    true,
 				}, nil
 			},
 		}
@@ -56,7 +56,7 @@ func TestUserinfoReturnsPersonAndTenantUser(t *testing.T) {
 	if resp.PersonInfo.PersonID != "101" || resp.PersonInfo.Name != "自然人" {
 		t.Fatalf("unexpected personInfo: %+v", resp.PersonInfo)
 	}
-	if resp.UserInfo.UserID != "21" || resp.UserInfo.TenantID != "11" || resp.UserInfo.Name != "租户用户" || resp.UserInfo.IsOwner != 1 {
+	if resp.UserInfo.UserID != "21" || resp.UserInfo.TenantID != "11" || resp.UserInfo.Name != "租户用户" || !resp.UserInfo.IsOwner {
 		t.Fatalf("unexpected userInfo: %+v", resp.UserInfo)
 	}
 }
@@ -76,7 +76,7 @@ func TestUserinfoReturnsPersonFromContextWhenPersonMissing(t *testing.T) {
 					TenantID:   "11",
 					PersonID:   "99",
 					Name:       "租户用户",
-					IsOwner:    0,
+					IsOwner:    false,
 				}, nil
 			},
 		}
@@ -103,7 +103,7 @@ func TestUserinfoReturnsPersonFromContextWhenPersonMissing(t *testing.T) {
 	if resp.PersonInfo.PersonID != "99" || resp.PersonInfo.Name != "自然人99" {
 		t.Fatalf("expected personInfo from user's person_id, got %+v", resp.PersonInfo)
 	}
-	if resp.UserInfo.UserID != "21" || resp.UserInfo.IsOwner != 0 {
+	if resp.UserInfo.UserID != "21" || resp.UserInfo.IsOwner {
 		t.Fatalf("expected userInfo populated, got %+v", resp.UserInfo)
 	}
 }

@@ -219,7 +219,7 @@ func (s *OIDCStorage) enforceRequirePKCE(ctx context.Context, authReq *oidc.Auth
 		return nil
 	}
 	oc, ok := client.(*OIDCClient)
-	if !ok || oc.clientEntity.RequirePKCE != 1 {
+	if !ok || !oc.clientEntity.RequirePKCE {
 		return nil
 	}
 	if authReq.CodeChallenge == "" {

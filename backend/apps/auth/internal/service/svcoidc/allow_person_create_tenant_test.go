@@ -75,7 +75,7 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			if c.client != nil && c.clientID != "" {
 				client := c.client
 				client.ID = client.AppID
-				client.ClientID = c.clientID
+				client.Code = c.clientID
 				client.RedirectURIs = datatypes.JSON(`[]`)
 				client.PostLogoutRedirectURIs = datatypes.JSON(`[]`)
 				client.GrantTypes = datatypes.JSON(`["authorization_code"]`)

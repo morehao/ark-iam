@@ -27,7 +27,7 @@ const bclQueueKey = "iam:oidc:slo_queue"
 // 同时初始化本地 Redis 供 SSO 会话与 SLO 队列使用，替代依赖真实数据库种子的旧集成方式。
 func setupBCLTestEnv(t *testing.T) {
 	t.Helper()
-	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{}, &model.UserDepartmentEntity{})
+	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{})
 	now := time.Now()
 	seedTenant := &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}}, Code: "seed", Name: "seed"}
 	if err := db.Create(seedTenant).Error; err != nil {

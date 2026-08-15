@@ -21,8 +21,8 @@ type UserEntity struct {
 	Avatar       string          `gorm:"column:avatar;type:varchar(2048);not null;default:'';comment:租户内头像URL"`
 	Profile      json.RawMessage `gorm:"column:profile;type:json;not null;default:'{}';comment:租户内配置信息"`
 	CustomData   json.RawMessage `gorm:"column:custom_data;type:json;not null;default:'{}';comment:租户内自定义数据"`
-	IsSuspended  int8            `gorm:"column:is_suspended;type:smallint;not null;default:0;comment:是否挂起"`
-	IsOwner      int8            `gorm:"column:is_owner;type:smallint;not null;default:0;comment:是否租户拥有者"`
+	IsSuspended  bool            `gorm:"column:is_suspended;type:boolean;not null;default:false;comment:是否挂起"`
+	IsOwner      bool            `gorm:"column:is_owner;type:boolean;not null;default:false;comment:是否租户拥有者"`
 	JoinedAt     *time.Time      `gorm:"column:joined_at;not null;default:CURRENT_TIMESTAMP;comment:加入租户时间"`
 	LastSignInAt *time.Time      `gorm:"column:last_sign_in_at;comment:最后登录时间"`
 	CreatedBy    string          `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id"`

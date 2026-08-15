@@ -50,3 +50,6 @@ __debug_bin*
 
 # TS 构建缓存
 *.tsbuildinfo
+
+# go 本地缓存（误入仓库防护）
+**/.tmp/

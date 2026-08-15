@@ -23,7 +23,7 @@ func TestUserPageListPassesIsSuspendedZeroFilterToDAOCondition(t *testing.T) {
 		Name:        "active-user",
 		Profile:     []byte("{}"),
 		CustomData:  []byte("{}"),
-		IsSuspended: 0,
+		IsSuspended: false,
 	}); err != nil {
 		t.Fatalf("seed active user: %v", err)
 	}
@@ -33,12 +33,12 @@ func TestUserPageListPassesIsSuspendedZeroFilterToDAOCondition(t *testing.T) {
 		Name:        "suspended-user",
 		Profile:     []byte("{}"),
 		CustomData:  []byte("{}"),
-		IsSuspended: 1,
+		IsSuspended: true,
 	}); err != nil {
 		t.Fatalf("seed suspended user: %v", err)
 	}
 
-	isSuspended := int8(0)
+	isSuspended := false
 	svc := &userSvc{}
 	resp, err := svc.PageList(ginCtx, &dtouser.UserPageListReq{
 		PageQuery:   gobject.PageQuery{Page: 1, PageSize: 10},

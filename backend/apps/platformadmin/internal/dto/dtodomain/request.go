@@ -9,7 +9,7 @@ type DomainCreateReq struct {
 type DomainUpdateReq struct {
 	DomainID   string `json:"-" uri:"domainID" binding:"required"` // 域名ID
 	Domain     string `json:"domain"`                              // 域名
-	IsVerified *int8  `json:"isVerified"`                          // 是否验证(0-未验证 1-已验证)
+	IsVerified *bool  `json:"isVerified"`                          // 是否验证(0-未验证 1-已验证)
 }
 
 type DomainDetailReq struct {
