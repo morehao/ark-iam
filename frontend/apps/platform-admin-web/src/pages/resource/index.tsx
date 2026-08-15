@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, InputNumber, Modal, Popconfirm, Space, Switch, Table, Tag, message } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { PageContainer } from '@ark-iam/ui'
+import { IDCell, PageContainer } from '@ark-iam/ui'
 import { createResource, deleteResource, getResourceDetail, getResourcePageList, updateResource } from '@ark-iam/api'
 import type { ResourceItem } from '@ark-iam/types'
 import { fmtTime } from '../../components/common'
@@ -87,7 +87,7 @@ export default function ResourceList() {
   }
 
   const columns: ColumnsType<ResourceItem> = [
-    { title: 'ID', dataIndex: 'resourceID', key: 'resourceID', width: 70 },
+    { title: 'ID', dataIndex: 'resourceID', key: 'resourceID', width: 150, render: (v: string) => <IDCell value={v} /> },
     { title: '资源名', dataIndex: 'name', key: 'name', width: 180 },
     {
       title: '标识符',

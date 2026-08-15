@@ -27,7 +27,7 @@ import {
   ThunderboltOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons'
-import { PageContainer, brand } from '@ark-iam/ui'
+import { EllipsisCell, PageContainer, brand } from '@ark-iam/ui'
 import { createMenu, deleteMenu, getApplicationPageList, getMenuTree, updateMenu } from '@ark-iam/api'
 import type { ApplicationItem, MenuItem } from '@ark-iam/types'
 import { StatusTag } from '../../components/common'
@@ -310,18 +310,14 @@ export default function MenuList() {
       dataIndex: 'path',
       key: 'path',
       width: 180,
-      ellipsis: true,
-      render: (v: string) =>
-        v ? <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12 }}>{v}</span> : '-',
+      render: (v: string) => <EllipsisCell value={v} monospace />,
     },
     {
       title: '权限标识',
       dataIndex: 'permission',
       key: 'permission',
       width: 190,
-      ellipsis: true,
-      render: (v: string) =>
-        v ? <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12 }}>{v}</span> : '-',
+      render: (v: string) => <EllipsisCell value={v} monospace />,
     },
     {
       title: '排序',

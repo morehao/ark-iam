@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Descriptions, Drawer, Input, Space, Table, Tooltip } from 'antd'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, IDCell, PageContainer } from '@ark-iam/ui'
 import { getAuditLogDetail, getAuditLogPageList } from '@ark-iam/api'
 import type { AuditLogItem } from '@ark-iam/types'
 import { fmtTime } from '../../components/common'
@@ -64,20 +64,19 @@ export default function AuditLogList() {
   }
 
   const columns: ColumnsType<AuditLogItem> = [
-    { title: 'ID', dataIndex: 'logID', key: 'logID', width: 70 },
+    { title: 'ID', dataIndex: 'logID', key: 'logID', width: 150, render: (v: string) => <IDCell value={v} /> },
     {
       title: '日志键',
       dataIndex: 'key',
       key: 'key',
       width: 220,
-      ellipsis: true,
-      render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v}</span>,
+      render: (v: string) => <EllipsisCell value={v} monospace />,
     },
     {
       title: '内容',
       dataIndex: 'payload',
       key: 'payload',
-      ellipsis: true,
+      ellipsis: { showTitle: false },
       render: (_, r) => {
         const text = formatPayload(r.payload)
         return (
@@ -87,7 +86,7 @@ export default function AuditLogList() {
         )
       },
     },
-    { title: '租户ID', dataIndex: 'tenantID', key: 'tenantID', width: 100 },
+    { title: '租户ID', dataIndex: 'tenantID', key: 'tenantID', width: 150, render: (v: string) => <IDCell value={v} /> },
     {
       title: '创建时间',
       key: 'createdAt',
@@ -153,9 +152,9 @@ export default function AuditLogList() {
         {detail && (
           <>
             <Descriptions column={1} bordered size="small">
-              <Descriptions.Item label="ID">{detail.logID}</Descriptions.Item>
+              <Descriptions.Item label="ID"><IDCell value={detail.logID} /></Descriptions.Item>
               <Descriptions.Item label="日志键">{detail.key}</Descriptions.Item>
-              <Descriptions.Item label="租户ID">{detail.tenantID}</Descriptions.Item>
+              <Descriptions.Item label="租户ID"><IDCell value={detail.tenantID} /></Descriptions.Item>
               <Descriptions.Item label="创建时间">{fmtTime(detail.createdAt)}</Descriptions.Item>
             </Descriptions>
             <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>内容</div>

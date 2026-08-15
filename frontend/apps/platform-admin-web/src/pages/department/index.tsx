@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, InputNumber, message, Modal, Popconfirm, Space, Table, Typography } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { PageContainer } from '@ark-iam/ui'
+import { IDCell, PageContainer } from '@ark-iam/ui'
 import { createDepartment, deleteDepartment, getDepartmentTree, updateDepartment } from '@ark-iam/api'
 import type { DepartmentItem } from '@ark-iam/types'
 import { fmtTime } from '../../components/common'
@@ -101,7 +101,7 @@ export default function DepartmentList() {
   }
 
   const columns: ColumnsType<DepartmentItem> = [
-    { title: '部门ID', dataIndex: 'departmentID', key: 'departmentID', width: 90 },
+    { title: '部门ID', dataIndex: 'departmentID', key: 'departmentID', width: 150, render: (v: string) => <IDCell value={v} /> },
     {
       title: '部门名称',
       dataIndex: 'name',

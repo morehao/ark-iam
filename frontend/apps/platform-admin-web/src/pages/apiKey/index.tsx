@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { Alert, Button, DatePicker, Form, Input, Modal, Popconfirm, Space, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { CopyOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
-import { PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, IDCell, PageContainer } from '@ark-iam/ui'
 import { createApiKey, deleteApiKey, getApiKeyPageList, revokeApiKey } from '@ark-iam/api'
 import type { ApiKeyCreateResp, ApiKeyItem } from '@ark-iam/types'
 import { fmtTime } from '../../components/common'
@@ -104,8 +104,8 @@ export default function ApiKeyList() {
   }
 
   const columns: ColumnsType<ApiKeyItem> = [
-    { title: 'ID', dataIndex: 'id', key: 'id', width: 70 },
-    { title: '名称', dataIndex: 'name', key: 'name', ellipsis: true },
+    { title: 'ID', dataIndex: 'id', key: 'id', width: 150, render: (v: string) => <IDCell value={v} /> },
+    { title: '名称', dataIndex: 'name', key: 'name', render: (v: string) => <EllipsisCell value={v} /> },
     {
       title: '前缀',
       dataIndex: 'keyPrefix',
@@ -113,7 +113,7 @@ export default function ApiKeyList() {
       width: 180,
       render: (v: string) => <span style={{ ...monospaceStyle, fontSize: 12 }}>{v || '-'}</span>,
     },
-    { title: '范围', dataIndex: 'scope', key: 'scope', ellipsis: true, render: (v: string) => v || '-' },
+    { title: '范围', dataIndex: 'scope', key: 'scope', render: (v: string) => <EllipsisCell value={v} /> },
     { title: '过期时间', dataIndex: 'expiresAt', key: 'expiresAt', width: 160, render: (v: string) => fmtTime(v) },
     { title: '最后使用', dataIndex: 'lastUsedAt', key: 'lastUsedAt', width: 160, render: (v: string) => fmtTime(v) },
     {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, message, Modal, Popconfirm, Select, Space, Switch, Table } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, IDCell, PageContainer } from '@ark-iam/ui'
 import { createTenant, deleteTenant, getTenantPageList, updateTenant } from '@ark-iam/api'
 import type { TenantItem } from '@ark-iam/types'
 import { fmtTime, SuspendedTag, TypeTag } from '../../components/common'
@@ -88,8 +88,8 @@ export default function TenantList() {
   }
 
   const columns: ColumnsType<TenantItem> = [
-    { title: 'ID', dataIndex: 'tenantID', key: 'tenantID', width: 70 },
-    { title: '租户名', dataIndex: 'name', key: 'name', width: 180, ellipsis: true },
+    { title: 'ID', dataIndex: 'tenantID', key: 'tenantID', width: 150, render: (v: string) => <IDCell value={v} /> },
+    { title: '租户名', dataIndex: 'name', key: 'name', width: 180, render: (v: string) => <EllipsisCell value={v} /> },
     {
       title: '编码',
       dataIndex: 'code',

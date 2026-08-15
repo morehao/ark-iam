@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { AutoComplete, Button, Descriptions, Drawer, Form, Input, message, Modal, Popconfirm, Select, Space, Table, Tag, Typography } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined, UserAddOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, IDCell, PageContainer } from '@ark-iam/ui'
 import { assignRoleUsers, createRole, deleteRole, getRolePageList, getRoleUsers, getUserPageList, removeRoleUser, updateRole } from '@ark-iam/api'
 import type { RoleItem, RoleUserItem, UserItem } from '@ark-iam/types'
 import { fmtTime } from '../../components/common'
@@ -189,7 +189,7 @@ export default function RoleList() {
   }
 
   const columns: ColumnsType<RoleItem> = [
-    { title: '角色ID', dataIndex: 'roleID', key: 'roleID', width: 80 },
+    { title: '角色ID', dataIndex: 'roleID', key: 'roleID', width: 150, render: (v: string) => <IDCell value={v} /> },
     { title: '角色名称', dataIndex: 'name', key: 'name', width: 160, render: (v: string) => v || '-' },
     { title: '角色编码', dataIndex: 'code', key: 'code', width: 160, render: (v: string) => v || '-' },
     {
@@ -199,7 +199,7 @@ export default function RoleList() {
       width: 110,
       render: (v: string) => renderRoleType(v),
     },
-    { title: '描述', dataIndex: 'description', key: 'description', ellipsis: true, render: (v: string) => v || '-' },
+    { title: '描述', dataIndex: 'description', key: 'description', render: (v: string) => <EllipsisCell value={v} /> },
     {
       title: '创建时间',
       dataIndex: 'createdAt',
@@ -233,10 +233,10 @@ export default function RoleList() {
   ]
 
   const readOnlyMemberColumns: ColumnsType<RoleUserItem> = [
-    { title: '用户ID', dataIndex: 'userID', key: 'userID', width: 80 },
+    { title: '用户ID', dataIndex: 'userID', key: 'userID', width: 150, render: (v: string) => <IDCell value={v} /> },
     { title: '姓名', dataIndex: 'name', key: 'name', width: 120, render: (v: string) => v || '-' },
     { title: '用户名', dataIndex: 'username', key: 'username', width: 120, render: (v: string) => v || '-' },
-    { title: '邮箱', dataIndex: 'email', key: 'email', ellipsis: true, render: (v: string) => v || '-' },
+    { title: '邮箱', dataIndex: 'email', key: 'email', render: (v: string) => <EllipsisCell value={v} /> },
     {
       title: '加入时间',
       dataIndex: 'createdAt',
@@ -348,7 +348,7 @@ export default function RoleList() {
       >
         {detailRole && (
           <Descriptions column={2} size="small" bordered>
-            <Descriptions.Item label="角色ID">{detailRole.roleID}</Descriptions.Item>
+            <Descriptions.Item label="角色ID"><IDCell value={detailRole.roleID} /></Descriptions.Item>
             <Descriptions.Item label="角色名称">{detailRole.name}</Descriptions.Item>
             <Descriptions.Item label="角色编码">{detailRole.code}</Descriptions.Item>
             <Descriptions.Item label="类型">{renderRoleType(detailRole.type)}</Descriptions.Item>

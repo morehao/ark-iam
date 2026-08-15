@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Table, Button, Modal, Form, Input, Switch, message, Popconfirm, Space } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, IDCell, PageContainer } from '@ark-iam/ui'
 import { createOrganization, deleteOrganization, getOrganizationPage, updateOrganization } from '../../api/organization'
 import type { OrganizationItem } from '@ark-iam/types'
 
@@ -56,9 +56,9 @@ export default function OrganizationList() {
   }
 
   const columns: ColumnsType<OrganizationItem> = [
-    { title: '组织ID', dataIndex: 'organizationID', key: 'organizationID', width: 100 },
+    { title: '组织ID', dataIndex: 'organizationID', key: 'organizationID', width: 150, render: (v: string) => <IDCell value={v} /> },
     { title: '组织名称', dataIndex: 'name', key: 'name' },
-    { title: '描述', dataIndex: 'description', key: 'description', ellipsis: true },
+    { title: '描述', dataIndex: 'description', key: 'description', render: (v: string) => <EllipsisCell value={v} /> },
     {
       title: '需要 MFA',
       dataIndex: 'isMFARequired',
