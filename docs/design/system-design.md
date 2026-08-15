@@ -139,8 +139,8 @@ flowchart TB
 | 应用 | 服务标识 | 独立端口 | 职责 | 主要领域 |
 |---|---|---|---|---|
 | **auth** | `auth` | 8081 | 认证网关：登录/注册/令牌/OIDC Provider/SSO/SLO/Connector | person、user（成员）、refresh_token、session、connector、user_identity |
-| **platformadmin** | `platform` | 8082 | 平台管理：租户/用户/角色/菜单/权限/应用/OAuth 客户端/API Key/域名/系统配置/审计 | tenant、user、role、menu、scope、resource、application、application_client、api_key、domain、department、system |
-| **tenantadmin** | `tenant` | 8083 | 租户自服务：组织/组织角色/组织成员/租户菜单 | organization、organization_role、organization_user |
+| **platformadmin** | `platform` | 8082 | 平台管理：租户/用户/角色/菜单/权限/应用/OAuth 客户端/API Key/域名/系统配置/审计 | tenant、user、role、menu、scope、resource、application、application_client、api_key、domain、system |
+| **tenantadmin** | `tenant` | 8083 | 租户自服务：组织架构（组织树/成员关系）/租户菜单 | organization、organization_user |
 | **gateway** | 聚合 | 8100 | 单体聚合部署，挂载 auth + platformadmin + tenantadmin | 无独立业务 |
 
 > 各应用通过 `ginserver.NewRouterGroups(engine, "<服务标识>", ...)` 注册前缀，业务路由形如 `/v1/{auth|platform|tenant}/...`；OIDC 协议端点固定挂在 `/oidc/*`（R3 专用前缀，不走业务路由规范）。
@@ -176,7 +176,7 @@ flowchart TB
 - 统一前缀/命名：表名小写下划线，主键 `gorm.Model`（`id/created_at/updated_at/deleted_at`），审计字段 `created_by/updated_by/deleted_by`；
 - **person 为中心的跨租户模型**：身份类字段（username/email/phone/password）只放 `person`，`user` 只放租户内成员关系与租户内资料；
 - 字典值全部常量定义（如 `application_client.type`、`tenant.type`），禁止硬编码字符串；
-- 关联表（多对多）独立建表：`user_role`、`role_menu`、`role_scope`、`organization_user`、`organization_role_user`、`user_department`；
+- 关联表（多对多）独立建表：`user_role`、`role_menu`、`role_scope`、`organization_user`；
 - 令牌/密钥类敏感字段只存**哈希**（`refresh_token.token`、`application_client_secret.value_hash`、`api_key.key_hash`）；
 - 空值可空标识字段存 `NULL`（`person.username/primary_email/primary_phone` 均为可空指针，配唯一索引），避免唯一索引撞空串。
 
@@ -190,15 +190,9 @@ erDiagram
     application ||--o{ tenant_application : "1:N"
     application ||--o{ application_client : "1:N"
     application_client ||--o{ application_client_secret : "1:N"
-    tenant ||--o{ organization : "1:N"
-    organization ||--o{ organization_role : "1:N"
-    organization ||--o{ organization_user : "1:N"
+    tenant ||--o{ organization : "1:N 组织树(parent_id 自引用)"
+    organization ||--o{ organization_user : "1:N 关系(member/leader)"
     user ||--o{ organization_user : "1:N"
-    organization_role ||--o{ organization_role_user : "1:N"
-    user ||--o{ organization_role_user : "1:N"
-    tenant ||--o{ department : "1:N"
-    user ||--o{ user_department : "1:N"
-    department ||--o{ user_department : "1:N"
     tenant ||--o{ role : "1:N"
     application ||--o{ role : "1:N"
     user ||--o{ user_role : "1:N"
@@ -307,45 +301,23 @@ erDiagram
         json granted_scope "租户级 scope 授权"
     }
     organization {
-        uint id PK
-        uint tenant_id FK
+        string id PK "UUID v7"
+        string tenant_id FK
+        string parent_id "父节点(空为根)"
+        string org_path "祖先链(含自身)"
+        int org_depth "深度(根=1)"
         string name
-        string description
-        json custom_data
-        tinyint is_mfa_required
-    }
-    organization_role {
-        uint id PK
-        uint tenant_id FK
-        uint organization_id FK
-        string name
-        string type
+        string code "外部同步编码(可空)"
+        int sort
+        string status "active/inactive"
     }
     organization_user {
-        uint id PK
-        uint tenant_id FK
-        uint organization_id FK
-        uint user_id FK
-    }
-    organization_role_user {
-        uint id PK
-        uint tenant_id FK
-        uint organization_id FK
-        uint organization_role_id FK
-        uint user_id FK
-    }
-    department {
-        uint id PK
-        uint tenant_id FK
-        string name
-        uint parent_id
-    }
-    user_department {
-        uint id PK
-        uint tenant_id FK
-        uint user_id FK
-        uint department_id FK
-        tinyint is_primary
+        string id PK "UUID v7"
+        string tenant_id FK
+        string organization_id FK
+        string user_id FK
+        string relation_type "member/leader"
+        bool is_primary "主归属(仅member)"
     }
     role {
         uint id PK
@@ -537,12 +509,8 @@ erDiagram
 
 | 表 | 说明 |
 |---|---|
-| `organization` | 组织节点（租户内）；`is_mfa_required` 是否强制 MFA |
-| `organization_role` | 组织角色 |
-| `organization_user` | 组织-成员关联 |
-| `organization_role_user` | 组织角色-成员关联 |
-| `department` | 部门（支持 `parent_id` 树） |
-| `user_department` | 用户-部门关联（`is_primary` 主部门） |
+| `organization` | 组织树节点（租户内用户容器）：`parent_id` 树 + `org_path`/`org_depth` 物化路径，`status` 启停用 |
+| `organization_user` | 组织关系（多态）：`relation_type` 互斥枚举 member/leader，`is_primary` 主归属（仅 member 可置位） |
 
 #### 权限域
 
@@ -832,7 +800,7 @@ flowchart TB
 
 - **组织架构增强**：部门/组织与角色联动、批量导入导出；
 - **更多授权类型**：`urn:ietf:params:oauth:grant-type:token-exchange`、jwt-bearer（当前显式拒绝，避免虚假宣称）；
-- **MFA**：基于 `organization.is_mfa_required` 的 TOTP/短信二次认证；
+- **MFA**：TOTP/短信二次认证（组织级 MFA 策略已移出组织表，后续按租户级/system 配置承载）；
 - **SCIM 供给**：租户→应用的用户供给协议；
 - **细粒度授权**：资源级（`resource`/`scope`）的 ABAC 策略引擎；
 - **auth 高可用**：共享认证 Redis 已支持多副本，后续补会话一致性看护与优雅降级；

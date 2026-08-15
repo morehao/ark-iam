@@ -173,8 +173,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | GET | `/v1/platform/users/:userID/roles` | 用户角色列表 |
 | POST | `/v1/platform/users/:userID/roles` | 授予角色 |
 | DELETE | `/v1/platform/users/:userID/roles/:roleID` | 移除角色 |
-| GET | `/v1/platform/users/:userID/departments` | 用户部门 |
-| PUT | `/v1/platform/users/:userID/departments` | 分配部门（全量替换） |
+| GET | `/v1/platform/users/:userID/organizations` | 用户组织归属（平台只读） |
 | GET | `/v1/platform/users/:userID/identities` | 用户外部身份列表 |
 | POST | `/v1/platform/users/:userID/identities` | 关联外部身份 |
 | GET/PUT/DELETE | `/v1/platform/users/:userID/identities/:identityID` | 外部身份详情/更新/删除 |
@@ -218,10 +217,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | GET | `/v1/platform/tenants` | 租户分页 |
 | GET/PUT/DELETE | `/v1/platform/tenants/:tenantID` | 租户详情/更新/删除 |
 | POST | `/v1/platform/tenants/createAsOwner` | 以拥有者身份创建租户 |
-| POST | `/v1/platform/departments` | 创建部门 |
-| GET | `/v1/platform/departments` | 部门分页 |
-| GET | `/v1/platform/departments/tree` | 部门树 |
-| GET/PUT/DELETE | `/v1/platform/departments/:departmentID` | 部门详情/更新/删除 |
+| GET | `/v1/platform/organizations/tree` | 组织树（平台只读，?tenantID= 必填） |
 | POST | `/v1/platform/tenant-applications` | 开通租户-应用 |
 | GET | `/v1/platform/tenant-applications` | 租户应用分页 |
 | GET/PUT/DELETE | `/v1/platform/tenant-applications/:tenantAppID` | 详情/更新/删除 |
@@ -270,16 +266,19 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/v1/tenant/users` | 租户用户分页 |
-| POST | `/v1/tenant/organizations` | 创建组织 |
-| GET | `/v1/tenant/organizations` | 组织分页 |
-| GET/PUT/DELETE | `/v1/tenant/organizations/:organizationID` | 组织详情/更新/删除 |
-| POST | `/v1/tenant/organization-roles` | 创建组织角色 |
-| GET | `/v1/tenant/organization-roles` | 组织角色分页 |
-| GET/PUT/DELETE | `/v1/tenant/organization-roles/:organizationRoleID` | 详情/更新/删除 |
-| GET/POST | `/v1/tenant/organization-users` | 组织成员查询/添加 |
-| DELETE | `/v1/tenant/organization-users/:organizationID/:userID` | 移除组织成员 |
-| GET/POST | `/v1/tenant/organization-role-users` | 组织角色成员查询/添加 |
-| DELETE | `/v1/tenant/organization-role-users/:organizationRoleID/:userID` | 移除组织角色成员 |
+| POST | `/v1/tenant/organizations` | 创建组织节点 |
+| GET | `/v1/tenant/organizations/tree` | 组织树 |
+| GET | `/v1/tenant/organizations/:organizationID` | 节点详情（含面包屑祖先链） |
+| PUT | `/v1/tenant/organizations/:organizationID` | 更新节点（改 parentID 即移动） |
+| PATCH | `/v1/tenant/organizations/:organizationID` | 更新状态（启停用） |
+| DELETE | `/v1/tenant/organizations/:organizationID` | 删除节点（有子/成员需 ?cascade=1） |
+| GET | `/v1/tenant/organizations/:organizationID/users` | 节点关系分页（?relationType=&isPrimary=） |
+| POST | `/v1/tenant/organizations/:organizationID/users` | 添加关系 {userID, relationType, isPrimary} |
+| PUT | `/v1/tenant/organizations/:organizationID/users/:userID` | 更新关系（relationType/isPrimary） |
+| DELETE | `/v1/tenant/organizations/:organizationID/users/:userID` | 移除关系 |
+| GET | `/v1/tenant/organizations/:organizationID/users/descendants` | 子树成员聚合（去重） |
+| GET | `/v1/tenant/users/:userID/organizations` | 用户组织归属 |
+| PUT | `/v1/tenant/users/:userID/organizations` | 批量替换用户归属（全量替换 member，首个为主归属） |
 | GET | `/v1/tenant/menus/tree` | 租户动态菜单树 |
 
 ---
