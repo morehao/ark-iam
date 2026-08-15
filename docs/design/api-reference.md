@@ -96,7 +96,7 @@ flowchart LR
 | `/oidc/login/selectTenant` | POST | 多租户用户选择租户（authRequestID + tenantID） |
 | `/oidc/sso-login` | GET | SSO 免密续登（携带 `iam_sso_session` Cookie，`?authRequestID=`） |
 | `/oidc/logged-out` | GET | 登出落地页（清除 SSO Cookie 后跳前端登录页） |
-| `/oidc/bc-logout` | POST | **背信道登出接收端**（各 RP 应用也挂载此路径族，如 `/oidc/bc-logout/platform`） |
+| `/oidc/bc-logout` | POST | **反向通道登出接收端**（各 RP 应用也挂载此路径族，如 `/oidc/bc-logout/platform`） |
 
 ### 3.3 令牌端点示例
 

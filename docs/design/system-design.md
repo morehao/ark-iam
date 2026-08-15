@@ -581,8 +581,8 @@ erDiagram
 |---|---|---|
 | `iam:oidc:sso_session:<sessionID>` | String | SSO 会话数据（personID、AMR），TTL = sessionTTL（默认 24h） |
 | `iam:oidc:sso_user_sessions:<personID>` | Set | 某 person 的全部会话 ID 索引 |
-| `iam:oidc:sso_reg:<sessionID>` | Set | 会话级背信道登出登记（client_id、sid、通知地址），TTL 24h |
-| `iam:oidc:slo_queue` | List | 背信道登出任务 FIFO 队列（LPUSH/BRPOP） |
+| `iam:oidc:sso_reg:<sessionID>` | Set | 会话级反向通道登出登记（client_id、sid、通知地址），TTL 24h |
+| `iam:oidc:slo_queue` | List | 反向通道登出任务 FIFO 队列（LPUSH/BRPOP） |
 | `iam:oidc:at:meta:<tokenID>` | String | Access Token 签发元数据（introspection/userinfo 用） |
 | `iam:oidc:*`（授权码/请求状态） | String | OIDC 协议状态（zitadel storage 实现） |
 | 登录风控计数 | String/计数器 | 登录失败次数/锁定时长（`security.login` 配置） |
@@ -710,7 +710,7 @@ sequenceDiagram
     RP1->>A: POST /v1/auth/logout（或 /oidc/end_session）
     A->>A: 解析 personID
     A->>RD: 查询该 person 全部登出登记（slo_reg，依赖 sso_user_sessions 索引）
-    A->>RD: 入队背信道任务（iam:oidc:slo_queue）
+    A->>RD: 入队反向通道登出任务（iam:oidc:slo_queue）
     A->>RD: 撤销全部 SSO 会话（RevokeSessionsByPersonID）
     A->>DB: 吊销该 person 全部 refresh_token
     A->>A: 清除 iam_sso_session Cookie
@@ -812,7 +812,7 @@ flowchart TB
     subgraph 会话安全
         S8["SSO 会话 Redis TTL + 滑动续期"]
         S9["登出即失效：请求粒度会话活性校验"]
-        S10["SLO 背信道通知 + logout_token 签名"]
+        S10["SLO 反向通道通知 + logout_token 签名"]
     end
 ```
 

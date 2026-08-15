@@ -294,9 +294,9 @@ auth.signoutRedirect({ post_logout_redirect_uri: 'https://my-app.example.com/log
 // window.location = 'http://localhost:8081/oidc/end_session?post_logout_redirect_uri=...'
 ```
 
-OP 收到登出请求后：清除 `iam_sso_session` Cookie → 撤销该 person 全部 SSO 会话与 Refresh Token → 入队背信道通知。
+OP 收到登出请求后：清除 `iam_sso_session` Cookie → 撤销该 person 全部 SSO 会话与 Refresh Token → 入队反向通道登出通知。
 
-### 7.2 背信道登出接收端（Gin 示例）
+### 7.2 反向通道登出接收端（Gin 示例）
 
 ```go
 import "github.com/morehao/ark-iam/pkg/oidc/logout"
@@ -327,7 +327,7 @@ sequenceDiagram
 
 ### 7.3 不接入 SLO 的降级行为
 
-即使不配置 `back_channel_logout_uri`，业务 API 在启用 `EnableSSOSessionValidation` 且共享 Redis 时，仍会在**下一次请求**因 SSO 会话已撤销而返回 401（请求粒度登出失效）。背信道接入只是让**已打开页面**也能即时登出。
+即使不配置 `back_channel_logout_uri`，业务 API 在启用 `EnableSSOSessionValidation` 且共享 Redis 时，仍会在**下一次请求**因 SSO 会话已撤销而返回 401（请求粒度登出失效）。反向通道登出接入只是让**已打开页面**也能即时登出。
 
 ---
 

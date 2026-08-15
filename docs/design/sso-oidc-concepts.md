@@ -121,7 +121,7 @@ RP 接入前必须在 OP 注册一个 **OAuth Client**，核心注册字段（�
 | `response_types` | 允许的响应类型 | `["code"]` |
 | `token_endpoint_auth_method` | 令牌端点客户端认证方式 | `client_secret_basic` / `client_secret_post` / `none` |
 | `post_logout_redirect_uris` | 登出后跳转白名单 | - |
-| `back_channel_logout_uri` | 背信道登出通知地址（SLO） | - |
+| `back_channel_logout_uri` | 反向通道登出通知地址（SLO，即服务端登出通知） | - |
 | `require_pkce` | 是否强制 PKCE | 默认否（协议侧始终支持 S256） |
 | `default_scopes` | 默认授权 scope | `["openid","profile"]` |
 | `access_token_ttl` / `refresh_token_ttl` | 令牌有效期（秒） | 900 / 2592000 |
@@ -332,7 +332,7 @@ stateDiagram-v2
 flowchart TB
     subgraph 登出路径
         A["用户在某应用点击登出"] --> B["前端登出<br/>RP-Initiated Logout<br/>（end_session / 本地清除）"]
-        A --> C["背信道登出<br/>Back-Channel Logout<br/>（OP → 各 RP，系统间通知）"]
+        A --> C["反向通道登出<br/>Back-Channel Logout<br/>（服务端到服务端通知）"]
     end
     B --> D["清理本地令牌"]
     C --> E["OP 撤销 SSO 会话<br/>+ 全部 Refresh Token"]
@@ -341,9 +341,9 @@ flowchart TB
 ```
 
 - **前端登出（Front-Channel）**：用户在应用 A 点击登出 → 调用 OP 登出端点 → OP 清除 SSO 会话 Cookie 与全部 Refresh Token → 其他应用下次请求因会话已撤销而被拒绝（请求粒度即时生效）。
-- **背信道登出（Back-Channel，标准 SLO）**：OP 向所有"登记过令牌"的 RP 的 `back_channel_logout_uri` 异步发送签名的 **logout_token**，RP 校验后按 `sid` 作废本地会话——**即使其他应用页面未刷新也能被登出**。
+- **反向通道登出（Back-Channel Logout，又称"背信道登出"，标准 SLO）**：认证中心**不经用户浏览器、直接在服务端**向所有"登记过令牌"的 RP 的 `back_channel_logout_uri` 异步发送签名的 **logout_token**，RP 校验后按 `sid` 作废本地会话——**即使其他应用页面未刷新也能被登出**。
 
-### 7.2 背信道登出时序
+### 7.2 反向通道登出时序
 
 ```mermaid
 sequenceDiagram
@@ -415,7 +415,7 @@ flowchart LR
 | 公钥集合 | JWKS | JSON Web Key Set，验签公钥 |
 | 挑战码 | PKCE code_challenge | 防止授权码被拦截的证明 |
 | 发现端点 | Discovery | `.well-known/openid-configuration` 元数据 |
-| 背信道登出 | Back-Channel Logout | OP 主动通知 RP 登出的机制 |
+| 反向通道登出（又称背信道登出） | Back-Channel Logout | 认证中心在服务端直接通知各 RP 登出的机制 |
 | 会话标识 | sid | SSO 会话 ID，用于登出关联 |
 
 > 更多与本系统强相关的术语（租户、自然人、应用、OAuth 客户端、连接器、API Key 等）见 [glossary.md](glossary.md)。

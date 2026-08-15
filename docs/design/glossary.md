@@ -32,7 +32,7 @@
 | 术语 | 英文 | 说明 |
 |---|---|---|
 | 单点登录 | SSO | 一次认证，多应用免密通行 |
-| 单点登出 | SLO | 一处登出，处处登出（含背信道通知） |
+| 单点登出 | SLO | 一处登出，处处登出（含反向通道通知） |
 | 授权服务器 / 身份提供商 | OP / IdP | 认证用户并签发令牌的一方（本系统为 auth 应用 `/oidc`） |
 | 依赖方 | RP / Client | 接入认证的业务应用 |
 | 资源服务器 | Resource Server | 承载受保护 API 的服务（业务后端） |
@@ -45,7 +45,7 @@
 | PKCE | Proof Key for Code Exchange | 授权码证明密钥（S256），防授权码拦截 |
 | 发现端点 | Discovery | `/.well-known/openid-configuration`，声明 issuer 与全部端点 |
 | JWKS | JSON Web Key Set | OP 验签公钥集合（`/oidc/keys`） |
-| 背信道登出 | Back-Channel Logout | OP 主动向 RP 的 `back_channel_logout_uri` 推送 logout_token |
+| 反向通道登出（又称背信道登出） | Back-Channel Logout | 认证中心不经浏览器、在服务端直接向 RP 的 `back_channel_logout_uri` 推送 logout_token |
 | 登出令牌 | logout_token | SLO 通知令牌（含 `events`、`sid`、`jti`） |
 | 会话 ID | sid | SSO 会话标识，用于登出关联与 token 关联 |
 | 认证方法引用 | AMR | 认证方法引用（如 `["pwd"]`），还原到 id_token |
