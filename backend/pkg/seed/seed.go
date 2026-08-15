@@ -382,11 +382,8 @@ func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model
 		{appCode: appCodeAdmin, parentCode: "menu", name: "菜单列表", code: "menu-list", path: "/menu/list", sort: 1, component: "/menu/list/index", permission: "platform-admin:menu:read"},
 		{appCode: appCodeAdmin, parentCode: "application", name: "应用列表", code: "application-list", path: "/application/list", sort: 1, component: "/application/list/index", permission: "platform-admin:application:read"},
 		{appCode: appCodeAdmin, parentCode: "resource", name: "资源列表", code: "resource-list", path: "/resource/list", sort: 1, component: "/resource/list/index", permission: "platform-admin:resource:read"},
-		// 租户自服务一级菜单
-		{appCode: appCodeTenantAdmin, name: "组织管理", code: "organization", path: "/organization", icon: "apartment", sort: 1, component: "pages/organization", permission: ""},
-		{appCode: appCodeTenantAdmin, name: "组织角色", code: "organizationRole", path: "/organizationRole", icon: "safety", sort: 2, component: "pages/organizationRole", permission: ""},
-		{appCode: appCodeTenantAdmin, name: "组织用户", code: "organizationUser", path: "/organizationUser", icon: "team", sort: 3, component: "pages/organizationUser", permission: ""},
-		{appCode: appCodeTenantAdmin, name: "组织角色用户", code: "organizationRoleUser", path: "/organizationRoleUser", icon: "user-switch", sort: 4, component: "pages/organizationRoleUser", permission: ""},
+		// 租户自服务一级菜单（组织架构 = 组织树容器）
+		{appCode: appCodeTenantAdmin, name: "组织架构", code: "organization", path: "/organization", icon: "apartment", sort: 1, component: "pages/organization", permission: ""},
 	}
 
 	appByCode := map[string]*model.ApplicationEntity{appCodeAdmin: adminApp, appCodeTenantAdmin: tenantAdminApp}

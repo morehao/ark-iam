@@ -63,10 +63,9 @@ func (svc *organizationSvc) Create(ctx *gin.Context, req *dtotenant.Organization
 		if parent.OrgDepth+1 > model.MaxOrgDepth {
 			return nil, code.GetError(code.OrganizationCreateError)
 		}
-		insertEntity.OrgPath = parent.OrgPath + "/" + insertEntity.ID
+		insertEntity.OrgPath = parent.OrgPath
 		insertEntity.OrgDepth = parent.OrgDepth + 1
 	} else {
-		insertEntity.OrgPath = "/" + insertEntity.ID
 		insertEntity.OrgDepth = 1
 	}
 
@@ -84,6 +83,14 @@ func (svc *organizationSvc) Create(ctx *gin.Context, req *dtotenant.Organization
 
 	if err := dao.NewOrganizationDao().Insert(ctx, insertEntity); err != nil {
 		glog.Errorf(ctx, "[svcorganization.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.OrganizationCreateError)
+	}
+	// 物化路径含自身 ID（ID 由 BeforeCreate 生成，需插入后补写）
+	if err := dao.NewOrganizationDao().UpdateMap(ctx, insertEntity.ID, map[string]any{
+		"org_path":  insertEntity.OrgPath + "/" + insertEntity.ID,
+		"org_depth": insertEntity.OrgDepth,
+	}); err != nil {
+		glog.Errorf(ctx, "[svcorganization.Create] dao UpdateMap path fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.OrganizationCreateError)
 	}
 	return &dtotenant.OrganizationCreateResp{
