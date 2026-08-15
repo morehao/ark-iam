@@ -3,6 +3,7 @@ package svcauth
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"testing"
 
@@ -509,9 +510,9 @@ func assertCode(t *testing.T, err error, want int) {
 	if err == nil {
 		t.Fatalf("expected error code %d, got nil", want)
 	}
-	gerr, ok := err.(*gerror.Error)
-	if !ok {
-		t.Fatalf("expected *gerror.Error, got %T", err)
+	var gerr gerror.Error
+	if !errors.As(err, &gerr) {
+		t.Fatalf("expected gerror.Error, got %T", err)
 	}
 	if gerr.Code != want {
 		t.Fatalf("expected error code %d, got %d", want, gerr.Code)

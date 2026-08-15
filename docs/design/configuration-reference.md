@@ -192,7 +192,7 @@ oidc:
 
 - 密钥加载优先级：`signingPrivateKeyPath`（文件）→ `signingPrivateKeyPEM`（内联）→ dev 自动生成（kid=`auto-key`）；
 - **fail-closed 规则**：非 dev 环境未配置密钥或文件缺失时，服务**拒绝启动**（避免重启后 kid 变化导致全部令牌失效与 RP 公钥失同步）；
-- RP 侧通过 `oidcauth.LoadSigningPublicKey(Conf)` 从同一配置加载公钥；也可从 `GET {issuer}/keys`（JWKS）动态获取。
+- RP 侧通过 `middleware.LoadSigningPublicKey(Conf)` 从同一配置加载公钥；也可从 `GET {issuer}/keys`（JWKS）动态获取。
 
 ### 8.2 SSO Cookie 拓扑选择
 

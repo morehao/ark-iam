@@ -38,8 +38,7 @@ func TestDeleteSystemApplication(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for system-built-in application")
 	}
-	gerr, ok := err.(*gerror.Error)
-	if !ok || gerr.Code != int(code.ApplicationSystemBuiltInErr) {
+	if gerror.GetCode(err) != int(code.ApplicationSystemBuiltInErr) {
 		t.Fatalf("expected ApplicationSystemBuiltInErr, got %v", err)
 	}
 }

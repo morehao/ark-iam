@@ -94,8 +94,7 @@ func TestDomainSvc_Create_DomainAlreadyExists(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error for duplicate domain, got resp=%+v", resp)
 	}
-	gerr, ok := err.(*gerror.Error)
-	if !ok || gerr.Code != int(code.DomainAlreadyExistError) {
+	if gerror.GetCode(err) != int(code.DomainAlreadyExistError) {
 		t.Fatalf("expected DomainAlreadyExistError, got %v", err)
 	}
 }

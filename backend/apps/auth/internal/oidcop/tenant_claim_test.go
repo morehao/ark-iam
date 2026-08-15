@@ -1,4 +1,4 @@
-package svcoidc
+package oidcop
 
 import (
 	"context"
@@ -74,7 +74,7 @@ func TestCreateAccessAndRefreshTokensSelectsTenantFromAuthRequest(t *testing.T) 
 	storage, db := newTenantClaimTestStore(t, users)
 
 	authReq := &AuthRequest{
-		Subject:  buildOIDCSubject("88"),
+		Subject:  BuildSubject("88"),
 		ClientID: "client-1",
 		TenantID: "9",
 	}
@@ -105,7 +105,7 @@ func TestCreateAccessAndRefreshTokensFallsBackToFirstUserWhenNoTenant(t *testing
 	}
 	storage, db := newTenantClaimTestStore(t, users)
 
-	authReq := &AuthRequest{Subject: buildOIDCSubject("88"), ClientID: "client-1"}
+	authReq := &AuthRequest{Subject: BuildSubject("88"), ClientID: "client-1"}
 
 	_, refreshToken, _, err := storage.CreateAccessAndRefreshTokens(ctx, authReq, "")
 	if err != nil {
@@ -133,7 +133,7 @@ func TestGetPrivateClaimsFromRequestSelectsTenantFromAuthRequest(t *testing.T) {
 	}
 	storage, _ := newTenantClaimTestStore(t, users)
 
-	authReq := &AuthRequest{Subject: buildOIDCSubject("88"), ClientID: "client-1", TenantID: "7"}
+	authReq := &AuthRequest{Subject: BuildSubject("88"), ClientID: "client-1", TenantID: "7"}
 
 	claims, err := storage.GetPrivateClaimsFromRequest(ctx, authReq, []string{"openid"})
 	if err != nil {
@@ -155,7 +155,7 @@ func TestGetPrivateClaimsFromRequestOmitsTenantWhenAmbiguous(t *testing.T) {
 
 	// 多租户 person 且请求未携带明确租户（TenantID == ""）时，宁可不产出 tenant_id，
 	// 也不静默取 users[0]（L4）。
-	authReq := &AuthRequest{Subject: buildOIDCSubject("88"), ClientID: "client-1"}
+	authReq := &AuthRequest{Subject: BuildSubject("88"), ClientID: "client-1"}
 
 	claims, err := storage.GetPrivateClaimsFromRequest(ctx, authReq, []string{"openid"})
 	if err != nil {
@@ -177,7 +177,7 @@ func TestCreateAccessAndRefreshTokensSelectsTenantFromRefreshTokenRequest(t *tes
 
 	// 模拟 refresh token 轮换：请求携带存储的租户 6
 	refreshReq := &refreshTokenRequest{
-		subject:  buildOIDCSubject("88"),
+		subject:  BuildSubject("88"),
 		clientID: "client-1",
 		tenantID: "6",
 	}
@@ -209,7 +209,7 @@ func TestGetPrivateClaimsFromRequestSelectsTenantFromRefreshTokenRequest(t *test
 	storage, _ := newTenantClaimTestStore(t, users)
 
 	refreshReq := &refreshTokenRequest{
-		subject:  buildOIDCSubject("88"),
+		subject:  BuildSubject("88"),
 		clientID: "client-1",
 		tenantID: "8",
 	}
@@ -232,7 +232,7 @@ func TestGetPrivateClaimsFromRequestInjectsSidFromAuthRequest(t *testing.T) {
 	storage, _ := newTenantClaimTestStore(t, users)
 
 	authReq := &AuthRequest{
-		Subject:   buildOIDCSubject("88"),
+		Subject:   BuildSubject("88"),
 		ClientID:  "client-1",
 		TenantID:  "1",
 		SessionID: "sid-xyz",
@@ -255,7 +255,7 @@ func TestGetPrivateClaimsFromAuthRequestOmitsSidWhenEmpty(t *testing.T) {
 	}
 	storage, _ := newTenantClaimTestStore(t, users)
 
-	authReq := &AuthRequest{Subject: buildOIDCSubject("88"), ClientID: "client-1", TenantID: "1"}
+	authReq := &AuthRequest{Subject: BuildSubject("88"), ClientID: "client-1", TenantID: "1"}
 
 	claims, err := storage.GetPrivateClaimsFromRequest(ctx, authReq, []string{"openid"})
 	if err != nil {

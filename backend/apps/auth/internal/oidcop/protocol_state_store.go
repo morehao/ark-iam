@@ -1,4 +1,4 @@
-package svcoidc
+package oidcop
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	appconfig "github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/redis/go-redis/v9"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
@@ -46,38 +45,67 @@ func authRequestKey(id string) string { return authRequestKeyPrefix + id }
 func authCodeKey(code string) string  { return authCodeKeyPrefix + code }
 func spentCodeKey(code string) string { return spentCodeKeyPrefix + code }
 
-func defaultAuthRequestTTL() time.Duration {
-	if appconfig.Conf != nil && appconfig.Conf.OIDC.AuthRequestTTL > 0 {
-		return time.Duration(appconfig.Conf.OIDC.AuthRequestTTL) * time.Second
-	}
-	return 10 * time.Minute
+// 协议态默认 TTL（可经 NewRedisProtocolStateStore 的选项覆盖，由组装方注入应用配置值）。
+const (
+	defaultAuthRequestTTL = 10 * time.Minute
+	defaultAuthCodeTTL    = 5 * time.Minute
+	defaultSpentCodeTTL   = 24 * time.Hour
+)
+
+// protocolStateStoreOption 承载 Redis 协议态存储的可注入配置。
+type protocolStateStoreOption struct {
+	authRequestTTL time.Duration
+	authCodeTTL    time.Duration
+	spentCodeTTL   time.Duration
 }
 
-func defaultAuthCodeTTL() time.Duration {
-	if appconfig.Conf != nil && appconfig.Conf.OIDC.AuthCodeTTL > 0 {
-		return time.Duration(appconfig.Conf.OIDC.AuthCodeTTL) * time.Second
-	}
-	return 5 * time.Minute
+// ProtocolStateOption 允许调用方为协议态存储注入 TTL 等配置。
+type ProtocolStateOption func(*protocolStateStoreOption)
+
+// WithAuthRequestTTL 设置授权票据 TTL。
+func WithAuthRequestTTL(ttl time.Duration) ProtocolStateOption {
+	return func(o *protocolStateStoreOption) { o.authRequestTTL = ttl }
 }
 
-func defaultSpentCodeTTL() time.Duration {
-	if appconfig.Conf != nil && appconfig.Conf.OIDC.SpentCodeTTL > 0 {
-		return time.Duration(appconfig.Conf.OIDC.SpentCodeTTL) * time.Second
-	}
-	return 24 * time.Hour
+// WithAuthCodeTTL 设置授权码 TTL。
+func WithAuthCodeTTL(ttl time.Duration) ProtocolStateOption {
+	return func(o *protocolStateStoreOption) { o.authCodeTTL = ttl }
+}
+
+// WithSpentCodeTTL 设置已消费授权码防重放 TTL。
+func WithSpentCodeTTL(ttl time.Duration) ProtocolStateOption {
+	return func(o *protocolStateStoreOption) { o.spentCodeTTL = ttl }
 }
 
 type RedisProtocolStateStore struct {
-	client *redis.Client
+	client         *redis.Client
+	authRequestTTL time.Duration
+	authCodeTTL    time.Duration
+	spentCodeTTL   time.Duration
 }
 
 var _ ProtocolStateStore = (*RedisProtocolStateStore)(nil)
 
-func NewRedisProtocolStateStore() *RedisProtocolStateStore {
+// NewRedisProtocolStateStore 构造 Redis 协议态存储，默认读取全局 dbclient.RedisCli，
+// 调用方可经 ProtocolStateOption 注入 TTL 等配置。
+func NewRedisProtocolStateStore(opts ...ProtocolStateOption) *RedisProtocolStateStore {
 	if dbclient.RedisCli == nil {
 		panic("redis client not initialized for OIDC protocol state store")
 	}
-	return &RedisProtocolStateStore{client: dbclient.RedisCli}
+	cfg := protocolStateStoreOption{
+		authRequestTTL: defaultAuthRequestTTL,
+		authCodeTTL:    defaultAuthCodeTTL,
+		spentCodeTTL:   defaultSpentCodeTTL,
+	}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	return &RedisProtocolStateStore{
+		client:         dbclient.RedisCli,
+		authRequestTTL: cfg.authRequestTTL,
+		authCodeTTL:    cfg.authCodeTTL,
+		spentCodeTTL:   cfg.spentCodeTTL,
+	}
 }
 
 func (s *RedisProtocolStateStore) Health(ctx context.Context) error {
@@ -105,7 +133,7 @@ func (s *RedisProtocolStateStore) CreateAuthRequest(ctx context.Context, authReq
 		TenantID:     tenantID,
 		AuthTime:     time.Now(),
 		Audience:     []string{authReq.ClientID},
-		ExpiresAt:    time.Now().Add(defaultAuthRequestTTL()),
+		ExpiresAt:    time.Now().Add(s.authRequestTTL),
 	}
 	if authReq.CodeChallenge != "" {
 		// 仅接受 S256：discovery 的 code_challenge_methods_supported 只声明 S256，
@@ -122,7 +150,7 @@ func (s *RedisProtocolStateStore) CreateAuthRequest(ctx context.Context, authReq
 	if err != nil {
 		return nil, fmt.Errorf("marshal auth request: %w", err)
 	}
-	if err := s.client.Set(ctx, authRequestKey(req.ID), data, defaultAuthRequestTTL()).Err(); err != nil {
+	if err := s.client.Set(ctx, authRequestKey(req.ID), data, s.authRequestTTL).Err(); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrStoreUnavailable, err)
 	}
 	return req, nil
@@ -209,7 +237,7 @@ func (s *RedisProtocolStateStore) AssociateSession(ctx context.Context, id strin
 func (s *RedisProtocolStateStore) SaveAuthCode(ctx context.Context, id, code string) error {
 	if err := s.client.SetArgs(ctx, authCodeKey(code), id, redis.SetArgs{
 		Mode: "NX",
-		TTL:  defaultAuthCodeTTL(),
+		TTL:  s.authCodeTTL,
 	}).Err(); err != nil {
 		if errors.Is(err, redis.Nil) {
 			return ErrCodeCollision
@@ -268,7 +296,7 @@ func (s *RedisProtocolStateStore) consumeAuthCode(ctx context.Context, code stri
 	}
 
 	if deleteCode {
-		if err := s.client.Set(ctx, spentCodeKey(code), "1", defaultSpentCodeTTL()).Err(); err != nil {
+		if err := s.client.Set(ctx, spentCodeKey(code), "1", s.spentCodeTTL).Err(); err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrStoreUnavailable, err)
 		}
 	}

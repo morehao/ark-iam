@@ -1,4 +1,4 @@
-package logout
+package goidc
 
 import (
 	"crypto/rand"

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/auth/internal/service/svcoidc"
+	"github.com/morehao/ark-iam/auth/internal/oidcop"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -72,8 +72,8 @@ func TestCarryOIDCHints_movesHintsIntoRequestContext(t *testing.T) {
 		ctx.Set(ginKeyTenantHint, "5")
 		ctx.Set(ginKeyResourceHint, "https://api.example.com")
 		CarryOIDCHints(ctx)
-		assert.Equal(t, "5", ctx.Request.Context().Value(svcoidc.TenantHintKey))
-		assert.Equal(t, "https://api.example.com", ctx.Request.Context().Value(svcoidc.ResourceHintKey))
+		assert.Equal(t, "5", ctx.Request.Context().Value(oidcop.TenantHintKey))
+		assert.Equal(t, "https://api.example.com", ctx.Request.Context().Value(oidcop.ResourceHintKey))
 		ctx.Status(http.StatusOK)
 	})
 
@@ -88,7 +88,7 @@ func TestCarryOIDCHints_noHints_noop(t *testing.T) {
 	engine := gin.New()
 	engine.Any("/authorize", func(ctx *gin.Context) {
 		CarryOIDCHints(ctx)
-		assert.Nil(t, ctx.Request.Context().Value(svcoidc.TenantHintKey))
+		assert.Nil(t, ctx.Request.Context().Value(oidcop.TenantHintKey))
 		ctx.Status(http.StatusOK)
 	})
 

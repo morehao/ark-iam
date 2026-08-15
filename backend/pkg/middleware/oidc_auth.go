@@ -1,16 +1,21 @@
-package oidcauth
+package middleware
 
 import (
 	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+
+	"github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
-	"github.com/morehao/ark-iam/pkg/middleware"
+
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/glog"
 )
@@ -81,7 +86,7 @@ func OIDCCompatibleAuth(getOIDCPublicKey func() *rsa.PublicKey, opts ...AuthOpti
 		// 机器凭证（API Key）不依赖浏览器 SSO 会话活性，见设计文档 §4.4。
 		// 仅以 x-api-key 头作为机器凭证通道，避免与 Authorization: Bearer 的 OIDC 通道冲突。
 		if ctx.GetHeader("x-api-key") != "" {
-			if middleware.AuthenticateApiKey(ctx) {
+			if AuthenticateApiKey(ctx) {
 				ctx.Next()
 				return
 			}
@@ -159,6 +164,38 @@ func validateOIDCAccessToken(tokenStr string, publicKey *rsa.PublicKey, issuer s
 		return nil, errors.New("missing required oidc claims")
 	}
 	return claims, nil
+}
+
+// LoadSigningPublicKey returns a closure yielding the RSA public key used to
+// verify OIDC access tokens issued by the auth app. It reads the signing key
+// from conf.OIDC.SigningPrivateKeyPath (file) or SigningPrivateKeyPEM.
+func LoadSigningPublicKey(conf *config.Config) func() *rsa.PublicKey {
+	var publicKey *rsa.PublicKey
+	if conf != nil && conf.OIDC.SigningPrivateKeyPath != "" {
+		if pemData, err := os.ReadFile(conf.OIDC.SigningPrivateKeyPath); err == nil {
+			if block, _ := pem.Decode(pemData); block != nil {
+				if pk, err := parsePrivateKey(block.Bytes); err == nil {
+					publicKey = &pk.PublicKey
+				}
+			}
+		}
+	} else if conf != nil && conf.OIDC.SigningPrivateKeyPEM != "" {
+		if block, _ := pem.Decode([]byte(conf.OIDC.SigningPrivateKeyPEM)); block != nil {
+			if pk, err := parsePrivateKey(block.Bytes); err == nil {
+				publicKey = &pk.PublicKey
+			}
+		}
+	}
+	return func() *rsa.PublicKey { return publicKey }
+}
+
+func parsePrivateKey(der []byte) (*rsa.PrivateKey, error) {
+	if pk, err := x509.ParsePKCS8PrivateKey(der); err == nil {
+		if rsaKey, ok := pk.(*rsa.PrivateKey); ok {
+			return rsaKey, nil
+		}
+	}
+	return x509.ParsePKCS1PrivateKey(der)
 }
 
 func setOIDCContext(ctx *gin.Context, claims *objauth.TokenClaims, tokenStr string) {

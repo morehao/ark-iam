@@ -30,7 +30,7 @@ flowchart TB
     CLIENT --> SPLIT{"应用形态"}
     SPLIT -->|"有前端页面"| FE["④a 前端：授权码 + PKCE<br/>（react-oidc-context / oidc-client-ts）"]
     SPLIT -->|"纯后端服务"| BE["④b 后端：client_credentials / API Key"]
-    FE --> GUARD["⑤ 后端：挂 oidcauth 鉴权中间件"]
+    FE --> GUARD["⑤ 后端：挂 OIDC 鉴权中间件"]
     BE --> GUARD
     GUARD --> SLO["⑥ 可选：back-channel logout 接收端"]
     SLO --> CHECK["⑦ 验收"]
@@ -184,7 +184,7 @@ sequenceDiagram
 
 ## 5. 后端接入：令牌校验中间件
 
-业务后端（Gin）挂载 `pkg/middleware/oidcauth` 的 `OIDCCompatibleAuth` 中间件，校验流程：
+业务后端（Gin）挂载 `pkg/middleware` 的 `OIDCCompatibleAuth` 中间件，校验流程：
 
 ```mermaid
 flowchart TB
@@ -207,20 +207,20 @@ flowchart TB
 ```go
 // 应用入口（仿照 platformadmin/app.go）
 import (
-    "github.com/morehao/ark-iam/pkg/middleware/oidcauth"
+    "github.com/morehao/ark-iam/pkg/middleware"
     "github.com/morehao/golib/biz/gserver/ginserver"
 )
 
-getOIDCPublicKey := oidcauth.LoadSigningPublicKey(Conf) // 从配置加载 OP 签名公钥
+getOIDCPublicKey := middleware.LoadSigningPublicKey(Conf) // 从配置加载 OP 签名公钥
 
-oidcAuthOpts := []oidcauth.AuthOption{
-    oidcauth.WithOIDCIssuer(Conf.OIDC.Issuer),            // 必须：校验 iss
-    oidcauth.WithOIDCAudiences("my-app-web"),             // 必须：校验 aud = 本应用 client_id
-    oidcauth.WithAuthSkipPaths("/v1/myapp/register"),     // 可选：免鉴权路径
+oidcAuthOpts := []middleware.AuthOption{
+    middleware.WithOIDCIssuer(Conf.OIDC.Issuer),            // 必须：校验 iss
+    middleware.WithOIDCAudiences("my-app-web"),             // 必须：校验 aud = 本应用 client_id
+    middleware.WithAuthSkipPaths("/v1/myapp/register"),     // 可选：免鉴权路径
 }
 if Conf.OIDC.EnableSSOSessionValidation {
     oidcAuthOpts = append(oidcAuthOpts,
-        oidcauth.WithOIDCSSOValidation(func(ctx *gin.Context, personID uint, isMachineToken bool) bool {
+        middleware.WithOIDCSSOValidation(func(ctx *gin.Context, personID uint, isMachineToken bool) bool {
             if isMachineToken { return true } // 机器凭证不依赖浏览器会话
             active, err := ssoStore.HasActiveSession(ctx.Request.Context(), personID)
             return err == nil && active
@@ -230,7 +230,7 @@ if Conf.OIDC.EnableSSOSessionValidation {
 routerGroups := ginserver.NewRouterGroups(engine, "myapp", ginserver.VersionGroup{
     Version: ginserver.ApiVersionV1,
     Middlewares: []gin.HandlerFunc{
-        oidcauth.OIDCCompatibleAuth(getOIDCPublicKey, oidcAuthOpts...),
+        middleware.OIDCCompatibleAuth(getOIDCPublicKey, oidcAuthOpts...),
     },
 })
 ```
@@ -299,15 +299,15 @@ OP 收到登出请求后：清除 `iam_sso_session` Cookie → 撤销该 person 
 ### 7.2 反向通道登出接收端（Gin 示例）
 
 ```go
-import "github.com/morehao/ark-iam/pkg/oidc/logout"
+import "github.com/morehao/ark-iam/pkg/goidc"
 
 // 挂载接收端点（路径与客户端注册的 backChannelLogoutURI 一致）
 group := engine.Group("/oidc")
 basePath := Conf.OIDC.BackChannelLogoutPath // 默认 /bc-logout/myapp
-logout.RegisterReceiverRoutes(group, basePath, getOIDCPublicKey, Conf.OIDC.Issuer, "my-app-web", nil)
+goidc.RegisterReceiverRoutes(group, basePath, getOIDCPublicKey, Conf.OIDC.Issuer, "my-app-web", nil)
 ```
 
-**接收端职责**（`pkg/oidc/logout` 已实现）：
+**接收端职责**（`pkg/goidc` 已实现）：
 
 ```mermaid
 sequenceDiagram

@@ -94,6 +94,7 @@ apps/
 │   ├── internal/
 │   │   ├── controller/ctrxxx/   # 控制器层 (ctr 前缀)
 │   │   ├── service/svcxxx/      # 服务层 (svc 前缀)
+│   │   ├── oidcop/              # OIDC Provider 领域层（op.Storage 适配/协议态/持久化/客户端适配）
 │   │   ├── dto/dtoxxx/          # DTO 层
 │   │   ├── router/              # 路由注册
 │   │   └── middleware/          # 中间件
@@ -102,10 +103,12 @@ apps/
 ├── platformadmin/              # 平台管理（结构同 auth）
 ├── tenantadmin/                # 租户自服务（结构同 auth）
 ├── gateway/                    # 聚合应用（挂载 auth/platformadmin/tenantadmin）
-pkg/                          # 公共包（跨应用共享：config/middleware/ginserver/iam 等）
+pkg/                          # 公共包（跨应用共享：config/middleware/goidc/ginserver/iam 等）
 ```
 
-> 跨应用共享的 model/dao/object 抽取到 `pkg/iam`，通用中间件抽取到 `pkg/middleware`，避免分体间重复代码。
+> 跨应用共享的 model/dao/object 抽取到 `pkg/iam`，通用中间件抽取到 `pkg/middleware`（OIDC 鉴权中间件在 `pkg/middleware/oidc_auth.go`），RP 侧 back-channel logout 接收端在 `pkg/goidc`，避免分体间重复代码。
+>
+> **OIDC 分层约定**：OP（Provider）侧领域层在 `apps/auth/internal/oidcop`（仅 auth 使用，绑定 auth 实体与 zitadel op 框架）；跨应用共享的 OIDC 能力（当前为 RP 侧 `pkg/goidc`）才放 `pkg`。若未来出现第二个 OP 消费者，将 `oidcop` 上提至 `pkg/goidc`。
 
 ### 命名规范
 

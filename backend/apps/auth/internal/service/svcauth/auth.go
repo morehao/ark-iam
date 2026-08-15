@@ -333,7 +333,7 @@ func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
 
 // enqueueBackChannelLogouts 将该 person 已登记的全部 client 的 back-channel logout
 // 任务入队（在撤销 SSO 会话前调用，此时会话索引仍可用），使其它已登录应用（含第三方 RP）
-// 即时收到 logout_token。入队失败仅告警，不影响登出主流程；任务由 svcoidc 的 logoutWorker 异步消费。
+// 即时收到 logout_token。入队失败仅告警，不影响登出主流程；任务由 oidcop 的 logoutWorker 异步消费。
 func (svc *authSvc) enqueueBackChannelLogouts(ctx *gin.Context, personID string) {
 	slo := sso.NewSLOStore()
 	regs, err := slo.ListByPersonID(ctx.Request.Context(), personID)

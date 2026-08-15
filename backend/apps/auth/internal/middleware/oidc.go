@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/auth/internal/oidcop"
 	"github.com/morehao/ark-iam/auth/internal/service/svcoidc"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
 	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
@@ -45,10 +46,10 @@ func ResourceHint() gin.HandlerFunc {
 func CarryOIDCHints(ctx *gin.Context) {
 	reqCtx := ctx.Request.Context()
 	if t := ctx.GetString(ginKeyTenantHint); t != "" {
-		reqCtx = context.WithValue(reqCtx, svcoidc.TenantHintKey, t)
+		reqCtx = context.WithValue(reqCtx, oidcop.TenantHintKey, t)
 	}
 	if r := ctx.GetString(ginKeyResourceHint); r != "" {
-		reqCtx = context.WithValue(reqCtx, svcoidc.ResourceHintKey, r)
+		reqCtx = context.WithValue(reqCtx, oidcop.ResourceHintKey, r)
 	}
 	ctx.Request = ctx.Request.WithContext(reqCtx)
 }
