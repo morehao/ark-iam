@@ -60,9 +60,13 @@ DTO/Service/Controller/claims/SSO/测试与前端类型包。
   布尔/枚举类 int8 用 `smallint`；ID 列 `varchar(36)`。
 - 单元测试仍用内存 SQLite（gorm 方言抽象，测试不依赖 PG）。
 
-> ⚠️ 经验：gorm 的 `default X`（空格形式）标签不会被识别为默认值（`ParseTagSetting` 按 `:` 切分），
+> ⚠️ 经验 1：gorm 的 `default X`（空格形式）标签不会被识别为默认值（`ParseTagSetting` 按 `:` 切分），
 > 会导致 `not null` 列插入 NULL 报错。本项目已统一为 `default:X` 冒号形式
 > （`default:CURRENT_TIMESTAMP`、`default:('{}')` 等），并在 PG 上实测验证。
+>
+> ⚠️ 经验 2：`user` 是 PostgreSQL 保留字。DAO 层按 `表名.列名` 拼 SQL（gormdao `deletedScope` 及各 Cond），
+> 生成未加引号的 `user.deleted_at` 在 PG 上报 `syntax error at or near "."`（登录链路即触发）。
+> 已把用户表改名为 **`user_account`**（`model.TableNameUser`），其余 29 张表名均非保留字。
 
 ## 3. 启动自动建表（GORM AutoMigrate）
 
