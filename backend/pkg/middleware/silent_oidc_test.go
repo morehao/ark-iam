@@ -13,7 +13,7 @@ func TestSilentSSORequired_NoCookie_ReturnsLoginRequired(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	var nextCalled bool
-	r.Use(SilentSSORequired("iam_sso_session"))
+	r.Use(SilentSSORequired("iam_sso_session", WithRedirectURIVerifier(allowAllRedirectURIVerifier)))
 	r.GET("/authorize", func(ctx *gin.Context) {
 		nextCalled = true
 		ctx.Status(http.StatusOK)
@@ -111,7 +111,7 @@ func TestSilentSSORequired_NoRedirectURI_Returns400(t *testing.T) {
 func TestSilentSSORequired_NoState_OmitsStateParam(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(SilentSSORequired("iam_sso_session"))
+	r.Use(SilentSSORequired("iam_sso_session", WithRedirectURIVerifier(allowAllRedirectURIVerifier)))
 	r.GET("/authorize", func(ctx *gin.Context) {
 		ctx.Status(http.StatusOK)
 	})
@@ -131,13 +131,19 @@ func TestSilentSSORequired_NoState_OmitsStateParam(t *testing.T) {
 	}
 }
 
+func allowAllRedirectURIVerifier(ctx *gin.Context, clientID, redirectURI string) bool {
+	return true
+}
+
 func TestSilentSSORequired_ValidatorInvalidSession_ReturnsLoginRequired(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	var nextCalled bool
-	r.Use(SilentSSORequired("iam_sso_session", WithSessionValidator(func(ctx *gin.Context, sessionID string) error {
-		return errors.New("session revoked")
-	})))
+	r.Use(SilentSSORequired("iam_sso_session",
+		WithSessionValidator(func(ctx *gin.Context, sessionID string) error {
+			return errors.New("session revoked")
+		}),
+		WithRedirectURIVerifier(allowAllRedirectURIVerifier)))
 	r.GET("/authorize", func(ctx *gin.Context) {
 		nextCalled = true
 		ctx.Status(http.StatusOK)
@@ -189,5 +195,32 @@ func TestSilentSSORequired_ValidatorValidSession_CallsNext(t *testing.T) {
 	}
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestSilentSSORequired_RejectsUnregisteredRedirectURI(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	var nextCalled bool
+	// L1：redirect_uri 不在 client 注册列表时拒绝跳转（防开放重定向）
+	r.Use(SilentSSORequired("iam_sso_session", WithRedirectURIVerifier(func(ctx *gin.Context, clientID, redirectURI string) bool {
+		return redirectURI == "https://rp.example.com/callback"
+	})))
+	r.GET("/authorize", func(ctx *gin.Context) {
+		nextCalled = true
+		ctx.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/authorize?prompt=none&client_id=client-1&redirect_uri=https%3A%2F%2Fevil.example.com%2Fcallback",
+		nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if nextCalled {
+		t.Fatal("next handler should not be called for unregistered redirect_uri")
+	}
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unregistered redirect_uri, got %d", w.Code)
 	}
 }

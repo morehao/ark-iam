@@ -19,7 +19,7 @@ func NewApiKeyOpClient(entity *model.ApiKeyEntity) *apiKeyOpClient {
 	return &apiKeyOpClient{entity: entity}
 }
 
-func (c *apiKeyOpClient) GetID() string    { return c.entity.KeyPrefix }
+func (c *apiKeyOpClient) GetID() string { return c.entity.KeyPrefix }
 func (c *apiKeyOpClient) RedirectURIs() []string {
 	return nil
 }
@@ -39,7 +39,7 @@ func (c *apiKeyOpClient) AccessTokenType() op.AccessTokenType {
 	return op.AccessTokenTypeJWT
 }
 func (c *apiKeyOpClient) IDTokenLifetime() time.Duration { return time.Hour }
-func (c *apiKeyOpClient) DevMode() bool                   { return false }
+func (c *apiKeyOpClient) DevMode() bool                  { return false }
 func (c *apiKeyOpClient) RestrictAdditionalIdTokenScopes() func(scopes []string) []string {
 	return func(scopes []string) []string { return scopes }
 }

@@ -38,15 +38,19 @@ func (f *fakePasswordAuthenticator) TenantsForPerson(ctx *gin.Context, personID 
 
 type fakeSSOSessionStore struct {
 	validatedPersonID uint
+	sessionAMR        []string
 }
 
 var _ sso.SSOSessionStore = (*fakeSSOSessionStore)(nil)
 
-func (f *fakeSSOSessionStore) CreateSession(ctx context.Context, personID uint) (string, error) {
+func (f *fakeSSOSessionStore) CreateSession(ctx context.Context, personID uint, amr []string) (string, error) {
 	return "session-" + fmt.Sprint(personID), nil
 }
 func (f *fakeSSOSessionStore) ValidateSession(ctx context.Context, sessionID string) (uint, error) {
 	return f.validatedPersonID, nil
+}
+func (f *fakeSSOSessionStore) SessionAMR(ctx context.Context, sessionID string) []string {
+	return f.sessionAMR
 }
 func (f *fakeSSOSessionStore) RevokeSession(ctx context.Context, sessionID string) error { return nil }
 func (f *fakeSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, personID uint) error {
@@ -85,7 +89,7 @@ func TestCompleteLoginBySessionHonorsAuthRequestTenantHint(t *testing.T) {
 	}
 
 	authTime := time.Now()
-	if err := provider.Storage.CompleteAuthRequest(request.GetID(), "person:88", authTime, []string{"pwd"}, "", 7, false); err != nil {
+	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", 7, false); err != nil {
 		t.Fatalf("storing tenant hint via CompleteAuthRequest(done=false) failed: %v", err)
 	}
 
@@ -100,7 +104,7 @@ func TestCompleteLoginBySessionHonorsAuthRequestTenantHint(t *testing.T) {
 		ssoSessionStore: &fakeSSOSessionStore{validatedPersonID: 88},
 	}
 
-	res, err := svc.CompleteLoginBySession(t.Context(), request.GetID(), "session-x")
+	res, err := svc.CompleteLoginBySession(testsetup.NewCtx(), request.GetID(), "session-x")
 	if err != nil {
 		t.Fatalf("CompleteLoginBySession failed: %v", err)
 	}
@@ -152,7 +156,7 @@ func TestCompleteLoginBySessionFallsBackWhenHintNotInPersonsTenants(t *testing.T
 	}
 
 	authTime := time.Now()
-	if err := provider.Storage.CompleteAuthRequest(request.GetID(), "person:88", authTime, []string{"pwd"}, "", 99, false); err != nil {
+	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", 99, false); err != nil {
 		t.Fatalf("storing forged tenant hint via CompleteAuthRequest(done=false) failed: %v", err)
 	}
 
@@ -164,7 +168,7 @@ func TestCompleteLoginBySessionFallsBackWhenHintNotInPersonsTenants(t *testing.T
 		ssoSessionStore: &fakeSSOSessionStore{validatedPersonID: 88},
 	}
 
-	if _, err := svc.CompleteLoginBySession(t.Context(), request.GetID(), "session-x"); err != nil {
+	if _, err := svc.CompleteLoginBySession(testsetup.NewCtx(), request.GetID(), "session-x"); err != nil {
 		t.Fatalf("CompleteLoginBySession failed: %v", err)
 	}
 	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())
@@ -212,7 +216,7 @@ func TestCompleteLoginBySessionRejectsHintOnTenantLookupError(t *testing.T) {
 	}
 
 	authTime := time.Now()
-	if err := provider.Storage.CompleteAuthRequest(request.GetID(), "person:88", authTime, []string{"pwd"}, "", 99, false); err != nil {
+	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", 99, false); err != nil {
 		t.Fatalf("storing forged tenant hint via CompleteAuthRequest(done=false) failed: %v", err)
 	}
 
@@ -224,7 +228,7 @@ func TestCompleteLoginBySessionRejectsHintOnTenantLookupError(t *testing.T) {
 		ssoSessionStore: &fakeSSOSessionStore{validatedPersonID: 88},
 	}
 
-	if _, err := svc.CompleteLoginBySession(t.Context(), request.GetID(), "session-x"); err != nil {
+	if _, err := svc.CompleteLoginBySession(testsetup.NewCtx(), request.GetID(), "session-x"); err != nil {
 		t.Fatalf("CompleteLoginBySession failed: %v", err)
 	}
 	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())
@@ -417,7 +421,7 @@ func TestCompleteLoginHonorsTenantHint(t *testing.T) {
 	}
 
 	authTime := time.Now()
-	if err := provider.Storage.CompleteAuthRequest(request.GetID(), "person:88", authTime, []string{"pwd"}, "", 7, false); err != nil {
+	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", 7, false); err != nil {
 		t.Fatalf("storing tenant hint via CompleteAuthRequest(done=false) failed: %v", err)
 	}
 
@@ -493,7 +497,7 @@ func TestCompleteLoginIgnoresForgedTenantHint(t *testing.T) {
 	}
 
 	authTime := time.Now()
-	if err := provider.Storage.CompleteAuthRequest(request.GetID(), "person:88", authTime, []string{"pwd"}, "", 99, false); err != nil {
+	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", 99, false); err != nil {
 		t.Fatalf("storing forged tenant hint via CompleteAuthRequest(done=false) failed: %v", err)
 	}
 
@@ -563,7 +567,7 @@ func TestSelectTenantWritesTenantAndReturnsContinueURL(t *testing.T) {
 	}
 
 	authTime := time.Now()
-	if err := provider.Storage.CompleteAuthRequest(request.GetID(), "person:88", authTime, []string{"pwd"}, "", 0, false); err != nil {
+	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", 0, false); err != nil {
 		t.Fatalf("CompleteAuthRequest(done=false) failed: %v", err)
 	}
 
@@ -577,7 +581,7 @@ func TestSelectTenantWritesTenantAndReturnsContinueURL(t *testing.T) {
 		}},
 	}
 
-	res, err := svc.SelectTenant(t.Context(), request.GetID(), 7)
+	res, err := svc.SelectTenant(testsetup.NewCtx(), request.GetID(), 7)
 	if err != nil {
 		t.Fatalf("SelectTenant failed: %v", err)
 	}
@@ -635,7 +639,7 @@ func TestSelectTenantRejectsTenantNotBelongingToPerson(t *testing.T) {
 	}
 
 	authTime := time.Now()
-	if err := provider.Storage.CompleteAuthRequest(request.GetID(), "person:88", authTime, []string{"pwd"}, "", 0, false); err != nil {
+	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", 0, false); err != nil {
 		t.Fatalf("CompleteAuthRequest(done=false) failed: %v", err)
 	}
 
@@ -646,7 +650,7 @@ func TestSelectTenantRejectsTenantNotBelongingToPerson(t *testing.T) {
 		}},
 	}
 
-	if _, err := svc.SelectTenant(t.Context(), request.GetID(), 7); err == nil {
+	if _, err := svc.SelectTenant(testsetup.NewCtx(), request.GetID(), 7); err == nil {
 		t.Fatal("expected error when selecting a tenant not belonging to the person")
 	}
 	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())
@@ -697,11 +701,11 @@ func TestSelectTenantRejectsAlreadyDoneRequest(t *testing.T) {
 	}
 
 	authTime := time.Now()
-	if err := provider.Storage.CompleteAuthRequest(request.GetID(), "person:88", authTime, []string{"pwd"}, "", 3, true); err != nil {
+	if err := provider.Storage.CompleteAuthRequest(t.Context(), request.GetID(), "person:88", authTime, []string{"pwd"}, "", 3, true); err != nil {
 		t.Fatalf("CompleteAuthRequest(done=true) failed: %v", err)
 	}
 
-	if _, err := svc.SelectTenant(t.Context(), request.GetID(), 3); err == nil {
+	if _, err := svc.SelectTenant(testsetup.NewCtx(), request.GetID(), 3); err == nil {
 		t.Fatalf("expected SelectTenant to reject an already-done request")
 	}
 	if callCount != 0 {

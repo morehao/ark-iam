@@ -94,3 +94,7 @@ oidc:
   authCodeTTL: 300
   spentCodeTTL: 86400
   sessionTTL: 86400
+  # SSO 会话 cookie：开发环境 http 不启用 Secure；生产（HTTPS）必须 cookieSecure: true，
+  # 跨站 SSO 场景 cookieSameSite: none（且必须配合 cookieSecure: true）。
+  cookieSecure: false
+  cookieSameSite: lax

@@ -21,13 +21,16 @@ type fakeConnectorSSOSessionStore struct {
 
 var _ sso.SSOSessionStore = (*fakeConnectorSSOSessionStore)(nil)
 
-func (f *fakeConnectorSSOSessionStore) CreateSession(ctx context.Context, personID uint) (string, error) {
+func (f *fakeConnectorSSOSessionStore) CreateSession(ctx context.Context, personID uint, amr []string) (string, error) {
 	f.createdFor = personID
 	return fmt.Sprintf("sso-session-%d", personID), nil
 }
 
 func (f *fakeConnectorSSOSessionStore) ValidateSession(ctx context.Context, sessionID string) (uint, error) {
 	return 0, nil
+}
+func (f *fakeConnectorSSOSessionStore) SessionAMR(ctx context.Context, sessionID string) []string {
+	return nil
 }
 func (f *fakeConnectorSSOSessionStore) RevokeSession(ctx context.Context, sessionID string) error {
 	return nil

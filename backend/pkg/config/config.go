@@ -1,6 +1,9 @@
 package config
 
 import (
+	"net/http"
+	"strings"
+
 	"github.com/morehao/golib/dbaccess/dbes"
 	"github.com/morehao/golib/dbaccess/dbgorm"
 	"github.com/morehao/golib/dbaccess/dbredis"
@@ -35,9 +38,14 @@ type LoginGuardConfig struct {
 }
 
 type OIDC struct {
-	Issuer                string `yaml:"issuer"`
-	FrontendLoginURL      string `yaml:"frontendLoginURL"`
-	CookieDomain          string `yaml:"cookieDomain"`
+	Issuer           string `yaml:"issuer"`
+	FrontendLoginURL string `yaml:"frontendLoginURL"`
+	CookieDomain     string `yaml:"cookieDomain"`
+	// CookieSecure 控制 SSO 会话 cookie 的 Secure 标志。生产环境（HTTPS）必须为 true。
+	CookieSecure bool `yaml:"cookieSecure"`
+	// CookieSameSite 控制 SSO 会话 cookie 的 SameSite 属性，取值 lax/strict/none。
+	// 默认 lax；跨站（不同站点间 SSO）场景需 none（且 CookieSecure 必须为 true）。
+	CookieSameSite        string `yaml:"cookieSameSite"`
 	SigningKeyID          string `yaml:"signingKeyID"`
 	SigningPrivateKeyPath string `yaml:"signingPrivateKeyPath"`
 	SigningPrivateKeyPEM  string `yaml:"signingPrivateKeyPEM"`
@@ -59,6 +67,18 @@ type OIDC struct {
 
 func (o OIDC) SSOCookieDomain() string {
 	return o.CookieDomain
+}
+
+// CookieSameSiteMode 把配置字符串转换为 http.SameSite；未配置或非法值默认 Lax。
+func (o OIDC) CookieSameSiteMode() http.SameSite {
+	switch strings.ToLower(o.CookieSameSite) {
+	case "strict":
+		return http.SameSiteStrictMode
+	case "none":
+		return http.SameSiteNoneMode
+	default:
+		return http.SameSiteLaxMode
+	}
 }
 
 type PasswordConfig struct {

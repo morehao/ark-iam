@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -100,6 +101,26 @@ func (s *PersistentStore) AuthorizeClientIDSecret(ctx context.Context, clientID,
 	return oidc.ErrInvalidClient()
 }
 
+// fillUserInfoByScopes 按 scope 填充 userinfo 标准声明。
+// email_verified 恒为 false：当前无邮箱验证流程，不得宣称已验证（H5）。
+func fillUserInfoByScopes(userinfo *oidc.UserInfo, person *model.PersonEntity, scopes []string) {
+	for _, scope := range scopes {
+		switch scope {
+		case oidc.ScopeProfile:
+			userinfo.Name = person.Name
+			userinfo.PreferredUsername = model.DerefStr(person.Username)
+		case oidc.ScopeEmail:
+			userinfo.Email = model.DerefStr(person.PrimaryEmail)
+			if userinfo.Email != "" {
+				userinfo.EmailVerified = false
+			}
+		case oidc.ScopePhone:
+			userinfo.PhoneNumber = model.DerefStr(person.PrimaryPhone)
+			userinfo.PhoneNumberVerified = false
+		}
+	}
+}
+
 func (s *PersistentStore) SetUserinfoFromScopes(ctx context.Context, userinfo *oidc.UserInfo, userID, clientID string, scopes []string) error {
 	userinfo.Subject = userID
 	pid, err := parseOIDCSubject(userID)
@@ -110,24 +131,19 @@ func (s *PersistentStore) SetUserinfoFromScopes(ctx context.Context, userinfo *o
 	if err != nil || person == nil || person.ID == 0 {
 		return nil
 	}
-	for _, scope := range scopes {
-		switch scope {
-		case oidc.ScopeProfile:
-			userinfo.Name = person.Name
-			userinfo.PreferredUsername = model.DerefStr(person.Username)
-		case oidc.ScopeEmail:
-			userinfo.Email = model.DerefStr(person.PrimaryEmail)
-			userinfo.EmailVerified = true
-		case oidc.ScopePhone:
-			userinfo.PhoneNumber = model.DerefStr(person.PrimaryPhone)
-			userinfo.PhoneNumberVerified = false
-		}
-	}
+	fillUserInfoByScopes(userinfo, person, scopes)
 	return nil
 }
 
+// SetUserinfoFromToken 按 access token 签发时记录的 scope 裁剪 userinfo 声明（M2）。
+// 元数据不可得（Redis 不可用 / 未知 token）时仅返回 sub，不返回任何个人信息，
+// 避免绕过 scope 授权泄露 email/name 等声明。
 func (s *PersistentStore) SetUserinfoFromToken(ctx context.Context, userinfo *oidc.UserInfo, tokenID, subject, origin string) error {
 	userinfo.Subject = subject
+	meta := loadAccessTokenMeta(ctx, tokenID)
+	if meta == nil {
+		return nil
+	}
 	pid, err := parseOIDCSubject(subject)
 	if err != nil {
 		return nil
@@ -136,14 +152,49 @@ func (s *PersistentStore) SetUserinfoFromToken(ctx context.Context, userinfo *oi
 	if err != nil || person == nil || person.ID == 0 {
 		return nil
 	}
-	userinfo.Name = person.Name
-	userinfo.PreferredUsername = model.DerefStr(person.Username)
-	userinfo.Email = model.DerefStr(person.PrimaryEmail)
-	userinfo.EmailVerified = true
+	fillUserInfoByScopes(userinfo, person, meta.Scopes)
 	return nil
 }
 
+// SetIntrospectionFromToken 返回 RFC 7662 规定的完整 introspection 响应（M1）：
+// scope/client_id/sub/exp/iat/token_type/username 及私有声明。
+// 元数据不可得时保持空响应（active 由 op 层在 SetIntrospectionFromToken 成功后置 true）。
 func (s *PersistentStore) SetIntrospectionFromToken(ctx context.Context, introspection *oidc.IntrospectionResponse, tokenID, subject, clientID string) error {
+	meta := loadAccessTokenMeta(ctx, tokenID)
+	if meta == nil {
+		return nil
+	}
+	introspection.Scope = oidc.SpaceDelimitedArray(meta.Scopes)
+	introspection.ClientID = meta.ClientID
+	introspection.TokenType = oidc.BearerToken
+	introspection.Expiration = oidc.FromTime(meta.ExpiresAt)
+	introspection.IssuedAt = oidc.FromTime(meta.IssuedAt)
+	introspection.Subject = meta.Subject
+	introspection.Audience = oidc.Audience{meta.ClientID}
+	introspection.Username = meta.Username
+	// 人 token 补充 username（person 的用户名）；机器 token 直接用 client 标识。
+	if introspection.Username == "" {
+		if pid, perr := parseOIDCSubject(meta.Subject); perr == nil {
+			if person, perr2 := s.personDao().GetByID(ctx, pid); perr2 == nil && person != nil && person.ID != 0 {
+				introspection.Username = model.DerefStr(person.Username)
+			}
+		} else {
+			introspection.Username = meta.ClientID
+		}
+	}
+	claims := make(map[string]any, 3)
+	if meta.TenantID != 0 {
+		claims["tenant_id"] = meta.TenantID
+	}
+	if meta.TokenUsage != "" {
+		claims["token_usage"] = meta.TokenUsage
+	}
+	if meta.SessionID != "" {
+		claims["sid"] = meta.SessionID
+	}
+	if len(claims) > 0 {
+		introspection.Claims = claims
+	}
 	return nil
 }
 
@@ -154,6 +205,11 @@ func (s *PersistentStore) GetPrivateClaimsFromScopes(ctx context.Context, userID
 	}
 	users, err := s.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid})
 	if err != nil || len(users) == 0 {
+		return nil, nil
+	}
+	// L4：请求未携带明确租户上下文时，只有单租户才可确定 tenant_id；
+	// 多租户（users>1）存在歧义，宁可不产出 claim 也不静默取 users[0]。
+	if len(users) != 1 {
 		return nil, nil
 	}
 	return objauth.TokenClaims{TenantID: users[0].TenantID}.OIDCPrivateClaims(), nil
@@ -168,7 +224,10 @@ func (s *PersistentStore) ValidateJWTProfileScopes(ctx context.Context, userID s
 }
 
 func (s *PersistentStore) CreateAccessToken(ctx context.Context, request op.TokenRequest) (accessTokenID string, expiration time.Time, err error) {
-	accessTokenID = fmt.Sprintf("at-%d", time.Now().UnixNano())
+	accessTokenID, err = randomTokenID("at")
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("generate access token id: %w", err)
+	}
 
 	ttl := 15 * time.Minute
 	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok {
@@ -179,11 +238,23 @@ func (s *PersistentStore) CreateAccessToken(ctx context.Context, request op.Toke
 		}
 	}
 	expiration = time.Now().Add(ttl)
+	storeAccessTokenMeta(ctx, accessTokenID, accessTokenMeta{
+		Subject:    request.GetSubject(),
+		ClientID:   getClientIDFromRequest(request),
+		Scopes:     request.GetScopes(),
+		IssuedAt:   time.Now(),
+		ExpiresAt:  expiration,
+		TenantID:   tenantIDFromRequest(request),
+		TokenUsage: tokenUsageFromRequest(request),
+	})
 	return accessTokenID, expiration, nil
 }
 
 func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, request op.TokenRequest, currentRefreshToken string) (accessTokenID string, newRefreshToken string, expiration time.Time, err error) {
-	accessTokenID = fmt.Sprintf("at-%d", time.Now().UnixNano())
+	accessTokenID, err = randomTokenID("at")
+	if err != nil {
+		return "", "", time.Time{}, fmt.Errorf("generate access token id: %w", err)
+	}
 
 	var personID uint
 	personID, err = parseOIDCSubject(request.GetSubject())
@@ -217,6 +288,7 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 
 	var applicationClientID uint
 	var clientAccessTokenTTL time.Duration
+	var clientRefreshTokenTTL time.Duration
 	backChannelLogoutURI := ""
 	if clientID != "" {
 		clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{ClientID: clientID})
@@ -226,12 +298,32 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 			if clientEntity.AccessTokenTTL > 0 {
 				clientAccessTokenTTL = time.Duration(clientEntity.AccessTokenTTL) * time.Second
 			}
+			if clientEntity.RefreshTokenTTL > 0 {
+				clientRefreshTokenTTL = time.Duration(clientEntity.RefreshTokenTTL) * time.Second
+			}
 		}
 	}
 	if clientAccessTokenTTL <= 0 {
 		clientAccessTokenTTL = 15 * time.Minute
 	}
 	expiration = time.Now().Add(clientAccessTokenTTL)
+
+	// H2：refresh token 持久化授权时授予的 scope / amr / auth_time，
+	// 刷新时原样还原（RFC 6749 §6 要求刷新 token 的 scope 与原始授权一致）。
+	scopes := append([]string(nil), request.GetScopes()...)
+	// op.TokenRequest 不含 amr/auth_time（仅 IDTokenRequest 有），
+	// 授权码流/刷新流的具体请求类型均实现之，此处用接口断言提取。
+	var amr []string
+	if r, ok := request.(interface{ GetAMR() []string }); ok {
+		amr = append([]string(nil), r.GetAMR()...)
+	}
+	authTime := time.Time{}
+	if r, ok := request.(interface{ GetAuthTime() time.Time }); ok {
+		authTime = r.GetAuthTime()
+	}
+	if authTime.IsZero() {
+		authTime = time.Now()
+	}
 
 	sessionID := ""
 	if authReq, ok := request.(*AuthRequest); ok {
@@ -240,9 +332,18 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 
 	now := time.Now()
 	refreshTokenExp := now.Add(30 * 24 * time.Hour)
-	refreshTokenValue := fmt.Sprintf("rt-%d-%d", time.Now().UnixNano(), userEntity.ID)
+	if clientRefreshTokenTTL > 0 {
+		refreshTokenExp = now.Add(clientRefreshTokenTTL)
+	}
+	// refresh token 是长期凭证，值必须为密码学随机（不可由时间戳+ID 推断）。
+	refreshTokenValue, err := randomTokenID("rt")
+	if err != nil {
+		return "", "", time.Time{}, fmt.Errorf("generate refresh token: %w", err)
+	}
 
 	refreshTokenHash := token.HashToken(refreshTokenValue)
+	scopesJSON, _ := json.Marshal(scopes)
+	amrJSON, _ := json.Marshal(amr)
 	refreshEntity := &model.RefreshTokenEntity{
 		PersonID:            personID,
 		TenantID:            userEntity.TenantID,
@@ -250,6 +351,9 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 		ApplicationClientID: applicationClientID,
 		SessionID:           sessionID,
 		Token:               refreshTokenHash,
+		Scopes:              scopesJSON,
+		AMR:                 amrJSON,
+		AuthTime:            &authTime,
 		ExpiredAt:           &refreshTokenExp,
 		CreatedBy:           userEntity.ID,
 	}
@@ -284,7 +388,34 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 		}
 	}
 
+	// access token 元数据（M1/M2：introspection 与 userinfo 按 scope 裁剪）。
+	storeAccessTokenMeta(ctx, accessTokenID, accessTokenMeta{
+		Subject:    request.GetSubject(),
+		ClientID:   clientID,
+		Scopes:     scopes,
+		IssuedAt:   time.Now(),
+		ExpiresAt:  expiration,
+		TenantID:   userEntity.TenantID,
+		SessionID:  sessionID,
+		TokenUsage: "",
+	})
+
 	return accessTokenID, refreshTokenValue, expiration, nil
+}
+
+// tenantIDFromRequest / tokenUsageFromRequest 供 client_credentials 的 access token 元数据使用。
+func tenantIDFromRequest(request op.TokenRequest) uint {
+	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok {
+		return ccReq.ownerTenantID
+	}
+	return 0
+}
+
+func tokenUsageFromRequest(request op.TokenRequest) string {
+	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok && ccReq.isApiKey {
+		return objauth.TokenUsageMachine
+	}
+	return ""
 }
 
 func (s *PersistentStore) TokenRequestByRefreshToken(ctx context.Context, refreshToken string) (op.RefreshTokenRequest, error) {
@@ -308,25 +439,42 @@ func (s *PersistentStore) TokenRequestByRefreshToken(ctx context.Context, refres
 		}
 	}
 
+	// H2：还原授权时持久化的 scope / amr / auth_time / session_id，
+	// 保证刷新后的 token 与原始授权一致（RFC 6749 §6），并让刷新后的 token 携带 sid。
+	scopes := decodeJSONStringSlice(storedToken.Scopes)
+	if len(scopes) == 0 {
+		scopes = []string{oidc.ScopeOpenID, oidc.ScopeProfile}
+	}
+	amr := decodeJSONStringSlice(storedToken.AMR)
+	if len(amr) == 0 {
+		amr = []string{"pwd"}
+	}
+	authTime := storedToken.CreatedAt
+	if storedToken.AuthTime != nil && !storedToken.AuthTime.IsZero() {
+		authTime = *storedToken.AuthTime
+	}
+
 	return &refreshTokenRequest{
-		subject:  buildOIDCSubject(storedToken.PersonID),
-		audience: []string{clientID},
-		scopes:   []string{oidc.ScopeOpenID, oidc.ScopeProfile},
-		clientID: clientID,
-		amr:      []string{"pwd"},
-		authTime: storedToken.CreatedAt,
-		tenantID: storedToken.TenantID,
+		subject:   buildOIDCSubject(storedToken.PersonID),
+		audience:  []string{clientID},
+		scopes:    scopes,
+		clientID:  clientID,
+		amr:       amr,
+		authTime:  authTime,
+		tenantID:  storedToken.TenantID,
+		sessionID: storedToken.SessionID,
 	}, nil
 }
 
 type refreshTokenRequest struct {
-	subject  string
-	audience []string
-	scopes   []string
-	clientID string
-	amr      []string
-	authTime time.Time
-	tenantID uint
+	subject   string
+	audience  []string
+	scopes    []string
+	clientID  string
+	amr       []string
+	authTime  time.Time
+	tenantID  uint
+	sessionID string
 }
 
 func (r *refreshTokenRequest) GetAMR() []string                 { return r.amr }
@@ -337,6 +485,19 @@ func (r *refreshTokenRequest) GetScopes() []string              { return r.scope
 func (r *refreshTokenRequest) GetSubject() string               { return r.subject }
 func (r *refreshTokenRequest) SetCurrentScopes(scopes []string) { r.scopes = scopes }
 func (r *refreshTokenRequest) GetTenantID() uint                { return r.tenantID }
+func (r *refreshTokenRequest) GetSessionID() string             { return r.sessionID }
+
+// decodeJSONStringSlice 解析 JSON 字符串数组；解析失败返回 nil。
+func decodeJSONStringSlice(raw []byte) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	var out []string
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil
+	}
+	return out
+}
 
 // selectedTenantFromRequest 返回请求携带的租户 ID（authorization code 或 refresh token 轮换时从其存储的 tenant 读取）。
 // 未设置（TenantID==0）时返回 0，由调用方决定回退逻辑。

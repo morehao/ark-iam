@@ -7,6 +7,7 @@ import (
 	"github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/auth/internal/service/svcoidc"
+	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -41,7 +42,7 @@ func (ctr *OIDCCtr) SelectTenant(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.oidcAuthSvc.SelectTenant(ctx.Request.Context(), req.AuthRequestID, req.TenantID)
+	res, err := ctr.oidcAuthSvc.SelectTenant(ctx, req.AuthRequestID, req.TenantID)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -50,20 +51,26 @@ func (ctr *OIDCCtr) SelectTenant(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// setSSOSessionCookie 写 SSO 会话 cookie，Secure/SameSite 由配置决定（L2）：
+// 生产（HTTPS）应 cookieSecure=true；跨站场景 sameSite=none 且必须配合 Secure。
 func setSSOSessionCookie(ctx *gin.Context, sessionID string) {
 	if sessionID == "" {
 		return
 	}
 	ttl := 86400
 	domain := ""
+	secure := false
+	sameSite := sso.DefaultSameSite
 	if config.Conf != nil {
 		ttl = config.Conf.OIDC.SessionTTL
 		domain = config.Conf.OIDC.SSOCookieDomain()
+		secure = config.Conf.OIDC.CookieSecure
+		sameSite = config.Conf.OIDC.CookieSameSiteMode()
 	}
 	if ttl <= 0 {
 		ttl = 86400
 	}
-	ctx.SetCookie("iam_sso_session", sessionID, ttl, "/", domain, false, true)
+	sso.SetSessionCookie(ctx, sso.SessionCookieName, sessionID, ttl, domain, secure, sameSite)
 }
 
 func (ctr *OIDCCtr) SSOLogin(ctx *gin.Context) {
@@ -73,20 +80,24 @@ func (ctr *OIDCCtr) SSOLogin(ctx *gin.Context) {
 		return
 	}
 
-	sessionID, err := ctx.Cookie("iam_sso_session")
+	sessionID, err := ctx.Cookie(sso.SessionCookieName)
 	if err != nil {
 		frontendURL := config.Conf.OIDC.FrontendLoginURL + "?authRequestID=" + url.QueryEscape(authRequestID)
 		ctx.Redirect(302, frontendURL)
 		return
 	}
 
-	continueURL, err := ctr.oidcAuthSvc.CompleteLoginBySession(ctx.Request.Context(), authRequestID, sessionID)
+	continueURL, err := ctr.oidcAuthSvc.CompleteLoginBySession(ctx, authRequestID, sessionID)
 	if err != nil {
 		domain := ""
+		secure := false
+		sameSite := sso.DefaultSameSite
 		if config.Conf != nil {
 			domain = config.Conf.OIDC.SSOCookieDomain()
+			secure = config.Conf.OIDC.CookieSecure
+			sameSite = config.Conf.OIDC.CookieSameSiteMode()
 		}
-		ctx.SetCookie("iam_sso_session", "", -1, "/", domain, false, true)
+		sso.ClearSessionCookie(ctx, sso.SessionCookieName, domain, secure, sameSite)
 		frontendURL := config.Conf.OIDC.FrontendLoginURL + "?authRequestID=" + url.QueryEscape(authRequestID)
 		ctx.Redirect(302, frontendURL)
 		return
@@ -94,5 +105,3 @@ func (ctr *OIDCCtr) SSOLogin(ctx *gin.Context) {
 
 	ctx.Redirect(302, continueURL)
 }
-
-

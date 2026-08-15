@@ -9,6 +9,7 @@ import (
 	"github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/auth/internal/controller/ctroidc"
 	"github.com/morehao/ark-iam/auth/internal/service/svcoidc"
+	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
@@ -41,7 +42,6 @@ func InitOIDC(engine *gin.Engine, groups *ginserver.RouterGroups) {
 	go logoutWorker.Run(context.Background())
 
 	ctr := ctroidc.NewOIDCCtr(provider)
-	ssoCookieDomain := config.Conf.OIDC.SSOCookieDomain()
 
 	oidcGroup := engine.Group("/oidc")
 	oidcGroup.Use(ginmiddleware.CORS())
@@ -49,8 +49,8 @@ func InitOIDC(engine *gin.Engine, groups *ginserver.RouterGroups) {
 	oidcGroup.POST("/login/selectTenant", ctr.SelectTenant)
 	oidcGroup.GET("/sso-login", ctr.SSOLogin)
 	oidcGroup.GET("/logged-out", func(ctx *gin.Context) {
-		ctx.SetCookie("iam_sso_session", "", -1, "/", ssoCookieDomain, false, true)
+		svcoidc.ClearSSOCookie(ctx, sso.SessionCookieName)
 		ctx.Redirect(302, config.Conf.OIDC.FrontendLoginURL)
 	})
-	svcoidc.RegisterProviderRoutes(oidcGroup, provider, "iam_sso_session")
+	svcoidc.RegisterProviderRoutes(oidcGroup, provider, sso.SessionCookieName)
 }

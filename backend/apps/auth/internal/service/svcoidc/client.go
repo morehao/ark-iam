@@ -12,6 +12,9 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 )
 
+// idTokenLifetime 是 ID token 的默认有效期（10 分钟）。
+const idTokenLifetime = 10 * time.Minute
+
 type OIDCClient struct {
 	clientEntity *model.ApplicationClientEntity
 }
@@ -52,8 +55,12 @@ func (c *OIDCClient) AuthMethod() oidc.AuthMethod {
 		return oidc.AuthMethodPost
 	case "none":
 		return oidc.AuthMethodNone
-	default:
+	case "client_secret_basic":
 		return oidc.AuthMethodBasic
+	default:
+		// M5：private_key_jwt / client_secret_jwt 等未实现的认证方式显式失败（fail-closed），
+		// 不再静默退化为 Basic——zitadel 会因 AuthMethodPrivateKeyJWT 不受支持而干净地拒绝该客户端。
+		return oidc.AuthMethodPrivateKeyJWT
 	}
 }
 
@@ -90,11 +97,9 @@ func (c *OIDCClient) GrantTypes() []oidc.GrantType {
 			types = append(types, oidc.GrantTypeClientCredentials)
 		case "refresh_token":
 			types = append(types, oidc.GrantTypeRefreshToken)
-		case "urn:ietf:params:oauth:grant-type:token-exchange":
-			types = append(types, oidc.GrantTypeTokenExchange)
-		case "urn:ietf:params:oauth:grant-type:jwt-bearer":
-			types = append(types, oidc.GrantTypeBearer)
 		}
+		// M5：token-exchange / jwt-bearer 尚未实现（无 TokenExchangeStorage / JWT 公钥注册），
+		// 一律不映射，避免向客户端宣称实际不支持的能力。
 	}
 	return types
 }
@@ -107,11 +112,10 @@ func (c *OIDCClient) AccessTokenType() op.AccessTokenType {
 	return op.AccessTokenTypeJWT
 }
 
+// IDTokenLifetime 返回 ID token 的有效期。ID token 是短生命周期凭证
+// （主流 IdP 通常 5~10 分钟），与 access token 的 AccessTokenTTL 解耦。
 func (c *OIDCClient) IDTokenLifetime() time.Duration {
-	if c.clientEntity.AccessTokenTTL > 0 {
-		return time.Duration(c.clientEntity.AccessTokenTTL) * time.Second
-	}
-	return time.Hour
+	return idTokenLifetime
 }
 
 func (c *OIDCClient) DevMode() bool {

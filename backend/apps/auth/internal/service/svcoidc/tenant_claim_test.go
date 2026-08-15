@@ -144,7 +144,7 @@ func TestGetPrivateClaimsFromRequestSelectsTenantFromAuthRequest(t *testing.T) {
 	}
 }
 
-func TestGetPrivateClaimsFromRequestFallsBackToFirstUserWhenNoTenant(t *testing.T) {
+func TestGetPrivateClaimsFromRequestOmitsTenantWhenAmbiguous(t *testing.T) {
 	ctx := context.Background()
 
 	users := []model.UserEntity{
@@ -153,14 +153,16 @@ func TestGetPrivateClaimsFromRequestFallsBackToFirstUserWhenNoTenant(t *testing.
 	}
 	storage, _ := newTenantClaimTestStore(t, users)
 
+	// 多租户 person 且请求未携带明确租户（TenantID==0）时，宁可不产出 tenant_id，
+	// 也不静默取 users[0]（L4）。
 	authReq := &AuthRequest{Subject: buildOIDCSubject(88), ClientID: "client-1"}
 
 	claims, err := storage.GetPrivateClaimsFromRequest(ctx, authReq, []string{"openid"})
 	if err != nil {
 		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
 	}
-	if got := claims["tenant_id"]; got != uint(1) {
-		t.Fatalf("expected tenant_id claim 1 (users[0] fallback), got %v (%T)", got, got)
+	if _, exists := claims["tenant_id"]; exists {
+		t.Fatalf("expected no tenant_id claim for ambiguous tenant, got %v", claims["tenant_id"])
 	}
 }
 
