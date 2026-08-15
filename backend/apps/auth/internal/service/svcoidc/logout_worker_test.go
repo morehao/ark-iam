@@ -20,7 +20,7 @@ func TestBuildLogoutToken(t *testing.T) {
 
 	job := sso.LogoutJob{
 		SessionID:            "sid-abc",
-		PersonID:             42,
+		PersonID:             "42",
 		OIDCSessionID:        "at-1",
 		ClientID:             "client-a",
 		UserID:               "person:42",

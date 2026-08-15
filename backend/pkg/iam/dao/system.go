@@ -8,7 +8,7 @@ import (
 
 type SystemCond struct {
 	*gormdao.BaseCond
-	TenantID uint
+	TenantID string
 	Key      string
 }
 
@@ -16,7 +16,7 @@ func (c *SystemCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
 	if c.Key != "" {
@@ -25,12 +25,12 @@ func (c *SystemCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type SystemDao struct {
-	*gormdao.Dao[model.SystemEntity, model.SystemEntityList, uint]
+	*gormdao.Dao[model.SystemEntity, model.SystemEntityList, string]
 }
 
 func NewSystemDao(opts ...DaoOption) *SystemDao {
 	return &SystemDao{
-		Dao: gormdao.NewDao[model.SystemEntity, model.SystemEntityList, uint](
+		Dao: gormdao.NewDao[model.SystemEntity, model.SystemEntityList, string](
 			model.TableNameSystem, "SystemDao",
 			resolveDBGetter(opts...),
 		),

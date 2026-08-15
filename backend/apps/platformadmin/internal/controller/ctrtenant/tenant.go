@@ -2,6 +2,7 @@ package ctrtenant
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/platformadmin/internal/service/svctenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -62,7 +63,7 @@ func (ctr *tenantCtr) CreateAsOwner(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	req.PersonID = gincontext.GetPersonID(ctx)
+	req.PersonID = gctx.GetPersonID(ctx)
 	res, err := ctr.tenantSvc.CreateTenantAsOwner(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)

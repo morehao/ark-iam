@@ -3,18 +3,18 @@ package svctenant
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objtenant"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
 
-func organizationVisibleToTenant(entity *model.OrganizationEntity, tenantID uint) bool {
-	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
+func organizationVisibleToTenant(entity *model.OrganizationEntity, tenantID string) bool {
+	return entity != nil && entity.ID != "" && entity.TenantID == tenantID
 }
 
 type OrganizationSvc interface {
@@ -35,8 +35,8 @@ func NewOrganizationSvc() OrganizationSvc {
 }
 
 func (svc *organizationSvc) Create(ctx *gin.Context, req *dtotenant.OrganizationCreateReq) (*dtotenant.OrganizationCreateResp, error) {
-	tenantID := gincontext.GetTenantID(ctx)
-	if req.TenantID == 0 {
+	tenantID := gctx.GetTenantID(ctx)
+	if req.TenantID == "" {
 		req.TenantID = tenantID
 	}
 	insertEntity := &model.OrganizationEntity{
@@ -44,7 +44,7 @@ func (svc *organizationSvc) Create(ctx *gin.Context, req *dtotenant.Organization
 		Name:          req.Name,
 		Description:   req.Description,
 		IsMFARequired: req.IsMFARequired,
-		CreatedBy:     gincontext.GetUserID(ctx),
+		CreatedBy:     gctx.GetUserID(ctx),
 	}
 
 	if err := dao.NewOrganizationDao().Insert(ctx, insertEntity); err != nil {
@@ -62,11 +62,11 @@ func (svc *organizationSvc) Delete(ctx *gin.Context, req *dtotenant.Organization
 		glog.Errorf(ctx, "[svcorganization.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationDeleteError)
 	}
-	if !organizationVisibleToTenant(orgEntity, gincontext.GetTenantID(ctx)) {
+	if !organizationVisibleToTenant(orgEntity, gctx.GetTenantID(ctx)) {
 		return code.GetError(code.OrganizationNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	if err := dao.NewOrganizationDao().Delete(ctx, req.OrganizationID, userID); err != nil {
 		glog.Errorf(ctx, "[svcorganization.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationDeleteError)
@@ -80,13 +80,13 @@ func (svc *organizationSvc) Update(ctx *gin.Context, req *dtotenant.Organization
 		glog.Errorf(ctx, "[svcorganization.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationUpdateError)
 	}
-	if !organizationVisibleToTenant(orgEntity, gincontext.GetTenantID(ctx)) {
+	if !organizationVisibleToTenant(orgEntity, gctx.GetTenantID(ctx)) {
 		return code.GetError(code.OrganizationNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	updateMap := map[string]any{
-		"tenant_id":       gincontext.GetTenantID(ctx),
+		"tenant_id":       gctx.GetTenantID(ctx),
 		"name":            req.Name,
 		"description":     req.Description,
 		"is_mfa_required": req.IsMFARequired,
@@ -105,7 +105,7 @@ func (svc *organizationSvc) Detail(ctx *gin.Context, req *dtotenant.Organization
 		glog.Errorf(ctx, "[svcorganization.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.OrganizationGetDetailError)
 	}
-	if !organizationVisibleToTenant(orgEntity, gincontext.GetTenantID(ctx)) {
+	if !organizationVisibleToTenant(orgEntity, gctx.GetTenantID(ctx)) {
 		return nil, code.GetError(code.OrganizationNotExistError)
 	}
 
@@ -127,7 +127,7 @@ func (svc *organizationSvc) PageList(ctx *gin.Context, req *dtotenant.Organizati
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID: gincontext.GetTenantID(ctx),
+		TenantID: gctx.GetTenantID(ctx),
 		Name:     req.Name,
 	}
 	orgEntityList, total, err := dao.NewOrganizationDao().GetPageListByCond(ctx, cond)

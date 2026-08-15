@@ -37,16 +37,16 @@ function iconOf(icon?: string): React.ReactNode {
 }
 
 // 静态 fallback 菜单：后端不可用或未配置时保持页面可用
-function makeStaticMenu(id: number, name: string, code: string, path: string, icon: string): MenuItem {
+function makeStaticMenu(id: string, name: string, code: string, path: string, icon: string): MenuItem {
   return {
     menuID: id,
-    appID: 2,
-    parentID: 0,
+    appID: "2",
+    parentID: "",
     name,
     code,
     path,
     icon,
-    sort: id,
+    sort: Number(id),
     type: 'menu',
     component: '',
     redirect: '',
@@ -59,10 +59,10 @@ function makeStaticMenu(id: number, name: string, code: string, path: string, ic
 }
 
 const STATIC_MENU_TREE: MenuItem[] = [
-  makeStaticMenu(1, '组织管理', 'organization', '/organization', 'apartment'),
-  makeStaticMenu(2, '组织角色', 'organizationRole', '/organizationRole', 'safety'),
-  makeStaticMenu(3, '组织用户', 'organizationUser', '/organizationUser', 'team'),
-  makeStaticMenu(4, '组织角色用户', 'organizationRoleUser', '/organizationRoleUser', 'user-switch'),
+  makeStaticMenu("1", '组织管理', 'organization', '/organization', 'apartment'),
+  makeStaticMenu("2", '组织角色', 'organizationRole', '/organizationRole', 'safety'),
+  makeStaticMenu("3", '组织用户', 'organizationUser', '/organizationUser', 'team'),
+  makeStaticMenu("4", '组织角色用户', 'organizationRoleUser', '/organizationRoleUser', 'user-switch'),
 ]
 
 // 将后端菜单树转换为 MainLayout 侧边栏菜单；叶子菜单需命中组件白名单，目录仅保留有可渲染子项的

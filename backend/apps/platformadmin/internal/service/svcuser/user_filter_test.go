@@ -13,13 +13,13 @@ import (
 
 func TestUserPageListPassesIsSuspendedZeroFilterToDAOCondition(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyTenantID, uint(23))
+	ginCtx.Set(gcontext.KeyTenantID, "23")
 
 	db := testutil.SetupSQLite(t, &model.UserEntity{})
 	// 同租户下挂起/未挂起用户各一，isSuspended=0 过滤应只返回未挂起的
 	if err := testSeedUser(db, &model.UserEntity{
-		TenantID:    23,
-		PersonID:    1,
+		TenantID:    "23",
+		PersonID:    "1",
 		Name:        "active-user",
 		Profile:     []byte("{}"),
 		CustomData:  []byte("{}"),
@@ -28,8 +28,8 @@ func TestUserPageListPassesIsSuspendedZeroFilterToDAOCondition(t *testing.T) {
 		t.Fatalf("seed active user: %v", err)
 	}
 	if err := testSeedUser(db, &model.UserEntity{
-		TenantID:    23,
-		PersonID:    2,
+		TenantID:    "23",
+		PersonID:    "2",
 		Name:        "suspended-user",
 		Profile:     []byte("{}"),
 		CustomData:  []byte("{}"),
@@ -42,7 +42,7 @@ func TestUserPageListPassesIsSuspendedZeroFilterToDAOCondition(t *testing.T) {
 	svc := &userSvc{}
 	resp, err := svc.PageList(ginCtx, &dtouser.UserPageListReq{
 		PageQuery:   gobject.PageQuery{Page: 1, PageSize: 10},
-		TenantID:    23,
+		TenantID:    "23",
 		IsSuspended: &isSuspended,
 	})
 	if err != nil {

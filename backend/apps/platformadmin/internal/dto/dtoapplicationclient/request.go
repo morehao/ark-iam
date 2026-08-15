@@ -1,7 +1,7 @@
 package dtoapplicationclient
 
 type ApplicationClientCreateReq struct {
-	AppID        uint   `json:"appID" binding:"required"` // 所属应用ID
+	AppID        string `json:"appID" binding:"required"` // 所属应用ID
 	Name         string `json:"name" binding:"required"`  // 客户端名称
 	Type         string `json:"type"`                     // 客户端类型: first_party-第一方, third_party-第三方
 	IsThirdParty int8   `json:"isThirdParty"`             // 是否第三方应用
@@ -21,7 +21,7 @@ type ApplicationClientCreateReq struct {
 }
 
 type ApplicationClientUpdateReq struct {
-	ApplicationClientID uint   `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
+	ApplicationClientID string `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
 	Name                string `json:"name"`                                           // 客户端名称
 	Type                string `json:"type"`                                           // 客户端类型
 	Status              string `json:"status"`                                         // 状态: enable-启用, disable-停用
@@ -42,11 +42,11 @@ type ApplicationClientUpdateReq struct {
 }
 
 type ApplicationClientDeleteReq struct {
-	ApplicationClientID uint `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
+	ApplicationClientID string `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
 }
 
 type ApplicationClientDetailReq struct {
-	ApplicationClientID uint `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
+	ApplicationClientID string `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
 }
 
 type ApplicationClientPageListReq struct {
@@ -58,16 +58,16 @@ type ApplicationClientPageListReq struct {
 }
 
 type SecretListReq struct {
-	ApplicationClientID uint `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
+	ApplicationClientID string `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
 }
 
 type SecretCreateReq struct {
-	ApplicationClientID uint   `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
+	ApplicationClientID string `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
 	Name                string `json:"name" binding:"required"`                        // 密钥名称
 	ExpiredAt           string `json:"expiresAt"`                                      // 过期时间
 }
 
 type SecretDeleteReq struct {
-	ApplicationClientID uint `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
-	SecretID            uint `json:"-" uri:"secretID" binding:"required"`            // 密钥ID
+	ApplicationClientID string `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
+	SecretID            string `json:"-" uri:"secretID" binding:"required"`            // 密钥ID
 }

@@ -1,19 +1,19 @@
 package model
 
 import (
-	"gorm.io/gorm"
+	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
 const TableNameOrganizationUser = "organization_user"
 
 type OrganizationUserEntity struct {
-	gorm.Model
-	TenantID       uint `gorm:"column:tenant_id;type:bigint unsigned;not null;default 0;comment:租户id" json:"tenantID"`
-	OrganizationID uint `gorm:"column:organization_id;type:bigint unsigned;not null;default 0;comment:组织ID" json:"organizationID"`
-	UserID         uint `gorm:"column:user_id;type:bigint unsigned;not null;default 0;comment:用户ID" json:"userID"`
-	CreatedBy      uint `gorm:"column:created_by;type:bigint unsigned;not null;default 0;comment:创建人id" json:"createdBy"`
-	UpdatedBy      uint `gorm:"column:updated_by;type:bigint unsigned;not null;default 0;comment:更新人id" json:"updatedBy"`
-	DeletedBy      uint `gorm:"column:deleted_by;type:bigint unsigned;not null;default 0;comment:删除人id" json:"deletedBy"`
+	gormdao.BaseEntity
+	TenantID       string `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id" json:"tenantID"`
+	OrganizationID string `gorm:"column:organization_id;type:varchar(36);not null;default:'';comment:组织ID" json:"organizationID"`
+	UserID         string `gorm:"column:user_id;type:varchar(36);not null;default:'';comment:用户ID" json:"userID"`
+	CreatedBy      string `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id" json:"createdBy"`
+	UpdatedBy      string `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id" json:"updatedBy"`
+	DeletedBy      string `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人id" json:"deletedBy"`
 }
 
 func (OrganizationUserEntity) TableName() string {
@@ -22,8 +22,8 @@ func (OrganizationUserEntity) TableName() string {
 
 type OrganizationUserEntityList []OrganizationUserEntity
 
-func (l OrganizationUserEntityList) ToMap() map[uint]OrganizationUserEntity {
-	m := make(map[uint]OrganizationUserEntity)
+func (l OrganizationUserEntityList) ToMap() map[string]OrganizationUserEntity {
+	m := make(map[string]OrganizationUserEntity)
 	for _, v := range l {
 		m[v.ID] = v
 	}

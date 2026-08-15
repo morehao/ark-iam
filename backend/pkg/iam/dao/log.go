@@ -8,7 +8,7 @@ import (
 
 type LogCond struct {
 	*gormdao.BaseCond
-	TenantID uint
+	TenantID string
 	Key      string
 }
 
@@ -16,7 +16,7 @@ func (c *LogCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
 	if c.Key != "" {
@@ -25,12 +25,12 @@ func (c *LogCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type LogDao struct {
-	*gormdao.Dao[model.LogEntity, model.LogEntityList, uint]
+	*gormdao.Dao[model.LogEntity, model.LogEntityList, string]
 }
 
 func NewLogDao(opts ...DaoOption) *LogDao {
 	return &LogDao{
-		Dao: gormdao.NewDao[model.LogEntity, model.LogEntityList, uint](
+		Dao: gormdao.NewDao[model.LogEntity, model.LogEntityList, string](
 			model.TableNameLog, "LogDao",
 			resolveDBGetter(opts...),
 		),

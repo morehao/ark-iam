@@ -58,7 +58,7 @@ func TestLogoutWorkerSendsBackChannelLogoutAndDeletesRegistration(t *testing.T) 
 	// 触发发送（走 handleJob：成功后删除登记）
 	worker.handleJob(ctx, sso.LogoutJob{
 		SessionID:            sid,
-		PersonID:             88,
+		PersonID:             "88",
 		OIDCSessionID:        "at-e2e",
 		ClientID:             "client-e2e",
 		UserID:               "person:88",

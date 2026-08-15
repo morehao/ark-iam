@@ -3,11 +3,11 @@ package svcuser
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/platformadmin/internal/service/svcperson"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
 type UserIdentitySvc interface {
@@ -66,21 +66,21 @@ func (svc *userIdentitySvc) GetByUser(ctx *gin.Context, req *dtouser.UserIdentit
 	return svcperson.NewPersonSvc().GetByUser(ctx, &dtouser.UserIdentityByUserReq{UserID: userEntity.PersonID})
 }
 
-func (svc *userIdentitySvc) mapUserIdentityReqToPerson(ctx *gin.Context, userID uint, req *dtouser.UserIdentityCreateReq) (*dtouser.UserIdentityCreateReq, error) {
+func (svc *userIdentitySvc) mapUserIdentityReqToPerson(ctx *gin.Context, userID string, req *dtouser.UserIdentityCreateReq) (*dtouser.UserIdentityCreateReq, error) {
 	userEntity, err := svc.resolveTenantUser(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 	clone := *req
 	clone.UserID = userEntity.PersonID
-	clone.TenantID = gincontext.GetTenantID(ctx)
+	clone.TenantID = gctx.GetTenantID(ctx)
 	return &clone, nil
 }
 
 func (svc *userIdentitySvc) mapUserIdentityUpdateReqToPerson(ctx *gin.Context, req *dtouser.UserIdentityUpdateReq) (*dtouser.UserIdentityUpdateReq, error) {
 	clone := *req
-	clone.TenantID = gincontext.GetTenantID(ctx)
-	if req.UserID != 0 {
+	clone.TenantID = gctx.GetTenantID(ctx)
+	if req.UserID != "" {
 		userEntity, err := svc.resolveTenantUser(ctx, req.UserID)
 		if err != nil {
 			return nil, err
@@ -90,12 +90,12 @@ func (svc *userIdentitySvc) mapUserIdentityUpdateReqToPerson(ctx *gin.Context, r
 	return &clone, nil
 }
 
-func (svc *userIdentitySvc) resolveTenantUser(ctx *gin.Context, userID uint) (*model.UserEntity, error) {
+func (svc *userIdentitySvc) resolveTenantUser(ctx *gin.Context, userID string) (*model.UserEntity, error) {
 	userEntity, err := dao.NewUserDao().GetByID(ctx, userID)
 	if err != nil {
 		return nil, code.GetError(code.UserNotExistError)
 	}
-	if userEntity == nil || userEntity.ID == 0 || userEntity.TenantID != gincontext.GetTenantID(ctx) || userEntity.PersonID == 0 {
+	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gctx.GetTenantID(ctx) || userEntity.PersonID == "" {
 		return nil, code.GetError(code.UserNotExistError)
 	}
 	return userEntity, nil

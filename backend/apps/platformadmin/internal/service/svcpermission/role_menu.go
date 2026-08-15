@@ -3,10 +3,10 @@ package svcpermission
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtopermission"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
@@ -32,7 +32,7 @@ func (svc *roleMenuSvc) Create(ctx *gin.Context, req *dtopermission.RoleMenuCrea
 		glog.Errorf(ctx, "[svcpermission.CreateRoleMenu] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.RoleGetDetailError)
 	}
-	if roleEntity == nil || roleEntity.ID == 0 {
+	if roleEntity == nil || roleEntity.ID == "" {
 		return nil, code.GetError(code.RoleNotExistError)
 	}
 
@@ -41,7 +41,7 @@ func (svc *roleMenuSvc) Create(ctx *gin.Context, req *dtopermission.RoleMenuCrea
 		glog.Errorf(ctx, "[svcpermission.CreateRoleMenu] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.MenuGetDetailError)
 	}
-	if menuEntity == nil || menuEntity.ID == 0 {
+	if menuEntity == nil || menuEntity.ID == "" {
 		return nil, code.GetError(code.MenuNotExistError)
 	}
 
@@ -49,7 +49,7 @@ func (svc *roleMenuSvc) Create(ctx *gin.Context, req *dtopermission.RoleMenuCrea
 		TenantID:  req.TenantID,
 		RoleID:    req.RoleID,
 		MenuID:    req.MenuID,
-		CreatedBy: gincontext.GetUserID(ctx),
+		CreatedBy: gctx.GetUserID(ctx),
 	}
 
 	if err := dao.NewRoleMenuDao().Insert(ctx, insertEntity); err != nil {
@@ -62,7 +62,7 @@ func (svc *roleMenuSvc) Create(ctx *gin.Context, req *dtopermission.RoleMenuCrea
 func (svc *roleMenuSvc) Delete(ctx *gin.Context, req *dtopermission.RoleMenuDeleteReq) error {
 	roleMenuDao := dao.NewRoleMenuDao()
 	roleMenuEntityList, err := roleMenuDao.GetListByCond(ctx, &dao.RoleMenuCond{
-		TenantID: gincontext.GetTenantID(ctx),
+		TenantID: gctx.GetTenantID(ctx),
 		RoleID:   req.RoleID,
 		MenuID:   req.MenuID,
 	})
@@ -70,11 +70,11 @@ func (svc *roleMenuSvc) Delete(ctx *gin.Context, req *dtopermission.RoleMenuDele
 		glog.Errorf(ctx, "[svcpermission.DeleteRoleMenu] dao GetListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.RoleMenuDeleteError)
 	}
-	if len(roleMenuEntityList) == 0 || roleMenuEntityList[0].ID == 0 {
+	if len(roleMenuEntityList) == 0 || roleMenuEntityList[0].ID == "" {
 		return code.GetError(code.RoleMenuNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	if err := roleMenuDao.Delete(ctx, roleMenuEntityList[0].ID, userID); err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteRoleMenu] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.RoleMenuDeleteError)

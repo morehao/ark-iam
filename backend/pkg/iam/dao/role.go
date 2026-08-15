@@ -8,8 +8,8 @@ import (
 
 type RoleCond struct {
 	*gormdao.BaseCond
-	TenantID uint
-	AppID    uint
+	TenantID string
+	AppID    string
 	Name     string
 	Code     string
 	Type     string
@@ -19,10 +19,10 @@ func (c *RoleCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
-	if c.AppID != 0 {
+	if c.AppID != "" {
 		db.Where(tableName+".app_id = ?", c.AppID)
 	}
 	if c.Name != "" {
@@ -37,12 +37,12 @@ func (c *RoleCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type RoleDao struct {
-	*gormdao.Dao[model.RoleEntity, model.RoleEntityList, uint]
+	*gormdao.Dao[model.RoleEntity, model.RoleEntityList, string]
 }
 
 func NewRoleDao(opts ...DaoOption) *RoleDao {
 	return &RoleDao{
-		Dao: gormdao.NewDao[model.RoleEntity, model.RoleEntityList, uint](
+		Dao: gormdao.NewDao[model.RoleEntity, model.RoleEntityList, string](
 			model.TableNameRole, "RoleDao",
 			resolveDBGetter(opts...),
 		),

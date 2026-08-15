@@ -49,7 +49,7 @@ export default function OrganizationList() {
     }
   }
 
-  const remove = async (id: number) => {
+  const remove = async (id: string) => {
     await deleteOrganization(id)
     message.success('删除成功')
     void load()

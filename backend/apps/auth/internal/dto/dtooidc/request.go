@@ -8,5 +8,5 @@ type OIDCLoginReq struct {
 
 type OIDCSelectTenantReq struct {
 	AuthRequestID string `json:"authRequestID" binding:"required"`
-	TenantID      uint   `json:"tenantID" binding:"required"`
+	TenantID      string `json:"tenantID" binding:"required"`
 }

@@ -12,22 +12,23 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoconnector"
+	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
-	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 type fakeConnectorPersonRepository struct {
-	getByIDFunc func(ctx context.Context, id uint) (*model.PersonEntity, error)
+	getByIDFunc func(ctx context.Context, id string) (*model.PersonEntity, error)
 	insertFunc  func(ctx context.Context, person *model.PersonEntity) error
 }
 
-func (f *fakeConnectorPersonRepository) GetByID(ctx context.Context, id uint) (*model.PersonEntity, error) {
+func (f *fakeConnectorPersonRepository) GetByID(ctx context.Context, id string) (*model.PersonEntity, error) {
 	if f.getByIDFunc == nil {
 		return nil, nil
 	}
@@ -44,11 +45,11 @@ func (f *fakeConnectorPersonRepository) Insert(ctx context.Context, person *mode
 type fakeConnectorUserIdentityRepository struct {
 	getByIssuerAndExternalSubjectFunc func(ctx context.Context, issuer, externalSubject string) (*model.UserIdentityEntity, error)
 	insertFunc                        func(ctx context.Context, entity *model.UserIdentityEntity) error
-	updateBindingFunc                 func(ctx context.Context, identityID, personID uint, issuer string, detail []byte) error
+	updateBindingFunc                 func(ctx context.Context, identityID, personID string, issuer string, detail []byte) error
 }
 
 type fakeConnectorRuntimeRepository struct {
-	getByIDFunc func(ctx context.Context, id uint) (*model.ConnectorEntity, error)
+	getByIDFunc func(ctx context.Context, id string) (*model.ConnectorEntity, error)
 }
 
 type fakeConnectorIdentityResolver struct {
@@ -62,7 +63,7 @@ func (f *fakeConnectorIdentityResolver) Resolve(ctx context.Context, input ident
 	return f.resolveFunc(ctx, input)
 }
 
-func (f *fakeConnectorRuntimeRepository) GetByID(ctx context.Context, id uint) (*model.ConnectorEntity, error) {
+func (f *fakeConnectorRuntimeRepository) GetByID(ctx context.Context, id string) (*model.ConnectorEntity, error) {
 	if f.getByIDFunc == nil {
 		return nil, nil
 	}
@@ -150,7 +151,7 @@ func (f *fakeConnectorUserIdentityRepository) Insert(ctx context.Context, entity
 	return f.insertFunc(ctx, entity)
 }
 
-func (f *fakeConnectorUserIdentityRepository) UpdateBinding(ctx context.Context, identityID, personID uint, issuer string, detail []byte) error {
+func (f *fakeConnectorUserIdentityRepository) UpdateBinding(ctx context.Context, identityID, personID string, issuer string, detail []byte) error {
 	if f.updateBindingFunc == nil {
 		return nil
 	}
@@ -160,7 +161,7 @@ func (f *fakeConnectorUserIdentityRepository) UpdateBinding(ctx context.Context,
 func TestBuildConnectorInsertEntityKeepsLegacyBusinessIdentifier(t *testing.T) {
 	req := &dtoauth.ConnectorCreateReq{
 		ConnectorBaseInfo: objauth.ConnectorBaseInfo{
-			TenantID:            1,
+			TenantID:            "1",
 			Name:                "google-workspace",
 			DisplayName:         "Google Workspace",
 			Protocol:            "oidc",
@@ -182,7 +183,7 @@ func TestBuildConnectorInsertEntityKeepsLegacyBusinessIdentifier(t *testing.T) {
 		},
 	}
 
-	entity, err := buildConnectorInsertEntity(req, 99)
+	entity, err := buildConnectorInsertEntity(req, "99")
 	if err != nil {
 		t.Fatalf("buildConnectorInsertEntity returned error: %v", err)
 	}
@@ -200,7 +201,7 @@ func TestBuildConnectorInsertEntityKeepsLegacyBusinessIdentifier(t *testing.T) {
 func TestBuildConnectorInsertEntityDoesNotPersistLegacyMetadataAsClaimMapping(t *testing.T) {
 	req := &dtoauth.ConnectorCreateReq{
 		ConnectorBaseInfo: objauth.ConnectorBaseInfo{
-			TenantID:            1,
+			TenantID:            "1",
 			Name:                "google-workspace",
 			DisplayName:         "Google Workspace",
 			Protocol:            "oidc",
@@ -222,7 +223,7 @@ func TestBuildConnectorInsertEntityDoesNotPersistLegacyMetadataAsClaimMapping(t 
 		},
 	}
 
-	entity, err := buildConnectorInsertEntity(req, 99)
+	entity, err := buildConnectorInsertEntity(req, "99")
 	if err != nil {
 		t.Fatalf("buildConnectorInsertEntity returned error: %v", err)
 	}
@@ -236,9 +237,9 @@ func TestBuildConnectorInsertEntityDoesNotPersistLegacyMetadataAsClaimMapping(t 
 
 func TestBuildConnectorUpdateMapDoesNotWritePrimaryKeyIntoNameFields(t *testing.T) {
 	req := &dtoauth.ConnectorUpdateReq{
-		ConnectorID: 42,
+		ConnectorID: "42",
 		ConnectorBaseInfo: objauth.ConnectorBaseInfo{
-			TenantID:            1,
+			TenantID:            "1",
 			Name:                "google-workspace",
 			DisplayName:         "Google Workspace",
 			Protocol:            "oidc",
@@ -260,7 +261,7 @@ func TestBuildConnectorUpdateMapDoesNotWritePrimaryKeyIntoNameFields(t *testing.
 		},
 	}
 
-	updateMap, err := buildConnectorUpdateMap(req, 100)
+	updateMap, err := buildConnectorUpdateMap(req, "100")
 	if err != nil {
 		t.Fatalf("buildConnectorUpdateMap returned error: %v", err)
 	}
@@ -284,8 +285,8 @@ func TestIdentityMapperRejectsUnboundIdentityWhenAutoCreateDisabled(t *testing.T
 
 	_, err := mapper.Resolve(context.Background(), identityResolveInput{
 		Connector: ConnectorRuntime{
-			ID:                  11,
-			TenantID:            22,
+			ID:                  "11",
+			TenantID:            "22",
 			AllowAutoCreateUser: false,
 		},
 		Identity: StandardIdentity{
@@ -299,14 +300,14 @@ func TestIdentityMapperRejectsUnboundIdentityWhenAutoCreateDisabled(t *testing.T
 }
 
 func TestIdentityMapperReturnsBoundPerson(t *testing.T) {
-	expectedPerson := &model.PersonEntity{Model: model.PersonEntity{}.Model, Username: model.StrPtr("bound-user"), Name: "bound-user"}
-	expectedPerson.ID = 33
+	expectedPerson := &model.PersonEntity{BaseEntity: model.PersonEntity{}.BaseEntity, Username: model.StrPtr("bound-user"), Name: "bound-user"}
+	expectedPerson.ID = "33"
 
 	mapper := newIdentityMapper(
 		&fakeConnectorPersonRepository{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.PersonEntity, error) {
+			getByIDFunc: func(ctx context.Context, id string) (*model.PersonEntity, error) {
 				if id != expectedPerson.ID {
-					t.Fatalf("expected get by id %d, got %d", expectedPerson.ID, id)
+					t.Fatalf("expected get by id %s, got %s", expectedPerson.ID, id)
 				}
 				return expectedPerson, nil
 			},
@@ -328,8 +329,8 @@ func TestIdentityMapperReturnsBoundPerson(t *testing.T) {
 
 	person, err := mapper.Resolve(context.Background(), identityResolveInput{
 		Connector: ConnectorRuntime{
-			ID:                  11,
-			TenantID:            22,
+			ID:                  "11",
+			TenantID:            "22",
 			AllowAutoCreateUser: true,
 		},
 		Identity: StandardIdentity{
@@ -353,7 +354,7 @@ func TestIdentityMapperAutoCreatesPersonAndBindsIdentity(t *testing.T) {
 		&fakeConnectorPersonRepository{
 			insertFunc: func(ctx context.Context, person *model.PersonEntity) error {
 				insertedPerson = person
-				person.ID = 44
+				person.ID = "44"
 				return nil
 			},
 		},
@@ -368,8 +369,8 @@ func TestIdentityMapperAutoCreatesPersonAndBindsIdentity(t *testing.T) {
 
 	person, err := mapper.Resolve(context.Background(), identityResolveInput{
 		Connector: ConnectorRuntime{
-			ID:                  11,
-			TenantID:            22,
+			ID:                  "11",
+			TenantID:            "22",
 			AllowAutoCreateUser: true,
 		},
 		Identity: StandardIdentity{
@@ -405,8 +406,8 @@ func TestIdentityMapperAutoCreatesPersonAndBindsIdentity(t *testing.T) {
 	if insertedIdentity == nil {
 		t.Fatalf("expected identity insert to be called")
 	}
-	if insertedIdentity.PersonID != 44 || insertedIdentity.ConnectorID != 11 {
-		t.Fatalf("unexpected identity binding person=%d connector=%d", insertedIdentity.PersonID, insertedIdentity.ConnectorID)
+	if insertedIdentity.PersonID != "44" || insertedIdentity.ConnectorID != "11" {
+		t.Fatalf("unexpected identity binding person=%s connector=%s", insertedIdentity.PersonID, insertedIdentity.ConnectorID)
 	}
 	if insertedIdentity.Issuer != "https://issuer.example.com" {
 		t.Fatalf("expected issuer to be persisted, got %q", insertedIdentity.Issuer)
@@ -454,7 +455,7 @@ func TestIdentityMapperAutoCreateRollsBackPersonWhenBindIdentityFails(t *testing
 	}()
 
 	person, err := mapper.Resolve(ctx, identityResolveInput{
-		Connector: ConnectorRuntime{ID: 11, TenantID: 22, AllowAutoCreateUser: true},
+		Connector: ConnectorRuntime{ID: "11", TenantID: "22", AllowAutoCreateUser: true},
 		Identity: StandardIdentity{
 			Issuer:      "https://issuer.example.com",
 			Subject:     "external-subject-rollback",
@@ -492,7 +493,7 @@ func TestIdentityMapperAutoCreatePersistsPersonAndIdentityWithinTransaction(t *t
 	}))
 
 	person, err := mapper.Resolve(ctx, identityResolveInput{
-		Connector: ConnectorRuntime{ID: 11, TenantID: 22, AllowAutoCreateUser: true},
+		Connector: ConnectorRuntime{ID: "11", TenantID: "22", AllowAutoCreateUser: true},
 		Identity: StandardIdentity{
 			Issuer:      "https://issuer.example.com",
 			Subject:     "external-subject-success",
@@ -504,7 +505,7 @@ func TestIdentityMapperAutoCreatePersistsPersonAndIdentityWithinTransaction(t *t
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if person == nil || person.Person == nil || person.Person.ID == 0 {
+	if person == nil || person.Person == nil || person.Person.ID == "" {
 		t.Fatalf("expected created person, got %+v", person)
 	}
 
@@ -524,7 +525,7 @@ func TestIdentityMapperAutoCreatePersistsPersonAndIdentityWithinTransaction(t *t
 		t.Fatalf("expected 1 persisted identity, got %d", len(identities))
 	}
 	if identities[0].PersonID != persons[0].ID || identities[0].PersonID != person.Person.ID {
-		t.Fatalf("expected identity to bind created person, person=%d persisted=%d identity=%d", person.Person.ID, persons[0].ID, identities[0].PersonID)
+		t.Fatalf("expected identity to bind created person, person=%s persisted=%s identity=%s", person.Person.ID, persons[0].ID, identities[0].PersonID)
 	}
 }
 
@@ -533,20 +534,20 @@ func TestIdentityMapperPropagatesBoundPersonLookupError(t *testing.T) {
 
 	mapper := newIdentityMapper(
 		&fakeConnectorPersonRepository{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.PersonEntity, error) {
+			getByIDFunc: func(ctx context.Context, id string) (*model.PersonEntity, error) {
 				return nil, expectedErr
 			},
 		},
 		&fakeConnectorUserIdentityRepository{
 			getByIssuerAndExternalSubjectFunc: func(ctx context.Context, issuer, externalSubject string) (*model.UserIdentityEntity, error) {
-				return &model.UserIdentityEntity{Model: model.UserIdentityEntity{}.Model, PersonID: 33}, nil
+				return &model.UserIdentityEntity{BaseEntity: model.UserIdentityEntity{}.BaseEntity, PersonID: "33"}, nil
 			},
 		},
 		WithIdentityMapperTxRunner(connectorRunInTransactionNoop),
 	)
 
 	_, err := mapper.Resolve(context.Background(), identityResolveInput{
-		Connector: ConnectorRuntime{ID: 11, TenantID: 22, AllowAutoCreateUser: true},
+		Connector: ConnectorRuntime{ID: "11", TenantID: "22", AllowAutoCreateUser: true},
 		Identity:  StandardIdentity{Subject: "external-subject-1"},
 	})
 	if !errors.Is(err, expectedErr) {
@@ -556,32 +557,32 @@ func TestIdentityMapperPropagatesBoundPersonLookupError(t *testing.T) {
 
 func TestIdentityMapperRepairsOrphanBindingInsteadOfReinserting(t *testing.T) {
 	var inserted bool
-	var updatedIdentityID uint
-	var updatedUserID uint
+	var updatedIdentityID string
+	var updatedUserID string
 	var updatedIssuer string
 	var updatedDetail StandardIdentity
 
 	mapper := newIdentityMapper(
 		&fakeConnectorPersonRepository{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.PersonEntity, error) {
+			getByIDFunc: func(ctx context.Context, id string) (*model.PersonEntity, error) {
 				return nil, nil
 			},
 			insertFunc: func(ctx context.Context, person *model.PersonEntity) error {
-				person.ID = 44
+				person.ID = "44"
 				return nil
 			},
 		},
 		&fakeConnectorUserIdentityRepository{
 			getByIssuerAndExternalSubjectFunc: func(ctx context.Context, issuer, externalSubject string) (*model.UserIdentityEntity, error) {
-				entity := &model.UserIdentityEntity{PersonID: 33, ConnectorID: 11, ExternalSubject: externalSubject, Issuer: "stale"}
-				entity.ID = 77
+				entity := &model.UserIdentityEntity{PersonID: "33", ConnectorID: "11", ExternalSubject: externalSubject, Issuer: "stale"}
+				entity.ID = "77"
 				return entity, nil
 			},
 			insertFunc: func(ctx context.Context, entity *model.UserIdentityEntity) error {
 				inserted = true
 				return nil
 			},
-			updateBindingFunc: func(ctx context.Context, identityID, personID uint, issuer string, detail []byte) error {
+			updateBindingFunc: func(ctx context.Context, identityID, personID string, issuer string, detail []byte) error {
 				updatedIdentityID = identityID
 				updatedUserID = personID
 				updatedIssuer = issuer
@@ -592,7 +593,7 @@ func TestIdentityMapperRepairsOrphanBindingInsteadOfReinserting(t *testing.T) {
 	)
 
 	person, err := mapper.Resolve(context.Background(), identityResolveInput{
-		Connector: ConnectorRuntime{ID: 11, TenantID: 22, AllowAutoCreateUser: true},
+		Connector: ConnectorRuntime{ID: "11", TenantID: "22", AllowAutoCreateUser: true},
 		Identity: StandardIdentity{
 			Issuer:      "https://issuer.example.com",
 			Subject:     "external-subject-1",
@@ -603,14 +604,14 @@ func TestIdentityMapperRepairsOrphanBindingInsteadOfReinserting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if person == nil || person.Person == nil || person.Person.ID != 44 {
+	if person == nil || person.Person == nil || person.Person.ID != "44" {
 		t.Fatalf("expected repaired binding to return created person, got %+v", person)
 	}
 	if inserted {
 		t.Fatal("expected orphan binding to be repaired via update, not insert")
 	}
-	if updatedIdentityID != 77 || updatedUserID != 44 {
-		t.Fatalf("unexpected binding update target identity=%d user=%d", updatedIdentityID, updatedUserID)
+	if updatedIdentityID != "77" || updatedUserID != "44" {
+		t.Fatalf("unexpected binding update target identity=%s user=%s", updatedIdentityID, updatedUserID)
 	}
 	if updatedIssuer != "https://issuer.example.com" {
 		t.Fatalf("expected repaired binding issuer to be refreshed, got %q", updatedIssuer)
@@ -643,14 +644,14 @@ func TestConnectorServiceAuthorizeStoresStateAndReturnsAuthorizationURL(t *testi
 	var authorizeInput *ConnectorAuthorizeInput
 	fixedNow := time.Unix(1710000000, 0)
 	connectorEntity := &model.ConnectorEntity{
-		TenantID: 22,
+		TenantID: "22",
 		Name:     "github-sso",
 		Protocol: connectorDriverTypeOAuth2,
 		Provider: connectorProviderGithub,
 		Status:   connectorStatusEnabled,
 		Config:   json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
 	}
-	connectorEntity.ID = 101
+	connectorEntity.ID = "101"
 
 	svc := &connectorSvc{
 		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{
@@ -664,9 +665,9 @@ func TestConnectorServiceAuthorizeStoresStateAndReturnsAuthorizationURL(t *testi
 			},
 		}),
 		connectorRepo: &fakeConnectorRuntimeRepository{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.ConnectorEntity, error) {
+			getByIDFunc: func(ctx context.Context, id string) (*model.ConnectorEntity, error) {
 				if id != connectorEntity.ID {
-					t.Fatalf("expected connector lookup by id %d, got %d", connectorEntity.ID, id)
+					t.Fatalf("expected connector lookup by id %s, got %s", connectorEntity.ID, id)
 				}
 				return connectorEntity, nil
 			},
@@ -686,7 +687,7 @@ func TestConnectorServiceAuthorizeStoresStateAndReturnsAuthorizationURL(t *testi
 		},
 	}
 	runtimeSvc, ok := any(svc).(interface {
-		Authorize(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID uint) (*dtoconnector.ConnectorAuthorizeResp, error)
+		Authorize(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID string) (*dtoconnector.ConnectorAuthorizeResp, error)
 	})
 	if !ok {
 		t.Fatal("connector service should expose Authorize")
@@ -734,8 +735,8 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 	state := &ConnectorState{
 		State:       "callback-state",
 		Nonce:       "nonce-1",
-		ConnectorID: 101,
-		TenantID:    22,
+		ConnectorID: "101",
+		TenantID:    "22",
 		RedirectURI: "https://app.example.com/oidc/callback",
 		ExpiredAt:   time.Now().Add(time.Minute),
 	}
@@ -745,14 +746,14 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 
 	var callbackInput *ConnectorCallbackInput
 	connectorEntity := &model.ConnectorEntity{
-		TenantID: 22,
+		TenantID: "22",
 		Name:     "github-sso",
 		Protocol: connectorDriverTypeOAuth2,
 		Provider: connectorProviderGithub,
 		Status:   connectorStatusEnabled,
 		Config:   json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
 	}
-	connectorEntity.ID = 101
+	connectorEntity.ID = "101"
 
 	svc := &connectorSvc{
 		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{
@@ -765,9 +766,9 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 			},
 		}),
 		connectorRepo: &fakeConnectorRuntimeRepository{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.ConnectorEntity, error) {
+			getByIDFunc: func(ctx context.Context, id string) (*model.ConnectorEntity, error) {
 				if id != connectorEntity.ID {
-					t.Fatalf("expected connector lookup by id %d, got %d", connectorEntity.ID, id)
+					t.Fatalf("expected connector lookup by id %s, got %s", connectorEntity.ID, id)
 				}
 				return connectorEntity, nil
 			},
@@ -776,30 +777,30 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 		identityResolver: &fakeConnectorIdentityResolver{
 			resolveFunc: func(ctx context.Context, input identityResolveInput) (*resolvedConnectorPerson, error) {
 				person := &model.PersonEntity{Username: model.StrPtr("callback-user"), Name: "callback-user"}
-				person.ID = 88
+				person.ID = "88"
 				return &resolvedConnectorPerson{Person: person}, nil
 			},
 		},
 		tokenGenerator: func(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error) {
 			return &objauth.TokenInfo{AccessToken: "issued-access", RefreshToken: "issued-refresh", TokenType: "Bearer"}, nil
 		},
-		loginRecorder:   func(ctx *gin.Context, tenantID, userID uint, success bool) {},
+		loginRecorder:   func(ctx *gin.Context, tenantID, userID string, success bool) {},
 		ssoSessionStore: &fakeConnectorSSOSessionStore{},
 	}
 	restoreUserStore := swapUserStoreFactory(func() authUserStore {
 		return &fakeAuthUserStore{
 			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
-				return &model.UserEntity{Model: gorm.Model{ID: 201}, TenantID: 22, PersonID: 88, Name: "callback-user"}, nil
+				return &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "201"}}, TenantID: "22", PersonID: "88", Name: "callback-user"}, nil
 			},
 			getListByCondFunc: func(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, error) {
-				return model.UserEntityList{{Model: gorm.Model{ID: 201}, TenantID: 22, PersonID: 88, Name: "callback-user"}}, nil
+				return model.UserEntityList{{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "201"}}, TenantID: "22", PersonID: "88", Name: "callback-user"}}, nil
 			},
 		}
 	})
 	defer restoreUserStore()
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
-		return &fakeAuthTenantStore{getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
-			return &model.TenantEntity{Model: gorm.Model{ID: 22}, Name: "tenant-22", Tag: "t22"}, nil
+		return &fakeAuthTenantStore{getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
+			return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "22"}}, Name: "tenant-22", Tag: "t22"}, nil
 		}}
 	})
 	defer restoreTenantStore()
@@ -811,7 +812,7 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 	}
 
 	resp, err := runtimeSvc.Callback(nil, &dtoconnector.ConnectorCallbackReq{
-		ConnectorID: 101,
+		ConnectorID: "101",
 		Code:        "authorization-code",
 		State:       "callback-state",
 	})
@@ -824,7 +825,7 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 	if callbackInput == nil {
 		t.Fatal("expected driver ExchangeCallback to be called")
 	}
-	if callbackInput.ConnectorID != 101 || callbackInput.Code != "authorization-code" || callbackInput.State != "callback-state" {
+	if callbackInput.ConnectorID != "101" || callbackInput.Code != "authorization-code" || callbackInput.State != "callback-state" {
 		t.Fatalf("unexpected callback input: %+v", callbackInput)
 	}
 	if callbackInput.Nonce != "nonce-1" {
@@ -843,8 +844,8 @@ func TestConnectorServiceCallbackAllowsMissingConnectorID(t *testing.T) {
 	state := &ConnectorState{
 		State:       "callback-state-missing-connector-id",
 		Nonce:       "nonce-missing-connector-id",
-		ConnectorID: 101,
-		TenantID:    22,
+		ConnectorID: "101",
+		TenantID:    "22",
 		RedirectURI: "https://app.example.com/oidc/callback",
 		ExpiredAt:   time.Now().Add(time.Minute),
 	}
@@ -854,14 +855,14 @@ func TestConnectorServiceCallbackAllowsMissingConnectorID(t *testing.T) {
 
 	var callbackInput *ConnectorCallbackInput
 	connectorEntity := &model.ConnectorEntity{
-		TenantID: 22,
+		TenantID: "22",
 		Name:     "github-sso",
 		Protocol: connectorDriverTypeOAuth2,
 		Provider: connectorProviderGithub,
 		Status:   connectorStatusEnabled,
 		Config:   json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
 	}
-	connectorEntity.ID = 101
+	connectorEntity.ID = "101"
 
 	svc := &connectorSvc{
 		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{
@@ -874,9 +875,9 @@ func TestConnectorServiceCallbackAllowsMissingConnectorID(t *testing.T) {
 			},
 		}),
 		connectorRepo: &fakeConnectorRuntimeRepository{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.ConnectorEntity, error) {
+			getByIDFunc: func(ctx context.Context, id string) (*model.ConnectorEntity, error) {
 				if id != connectorEntity.ID {
-					t.Fatalf("expected connector lookup by id %d, got %d", connectorEntity.ID, id)
+					t.Fatalf("expected connector lookup by id %s, got %s", connectorEntity.ID, id)
 				}
 				return connectorEntity, nil
 			},
@@ -885,30 +886,30 @@ func TestConnectorServiceCallbackAllowsMissingConnectorID(t *testing.T) {
 		identityResolver: &fakeConnectorIdentityResolver{
 			resolveFunc: func(ctx context.Context, input identityResolveInput) (*resolvedConnectorPerson, error) {
 				person := &model.PersonEntity{Username: model.StrPtr("callback-user"), Name: "callback-user"}
-				person.ID = 88
+				person.ID = "88"
 				return &resolvedConnectorPerson{Person: person}, nil
 			},
 		},
 		tokenGenerator: func(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error) {
 			return &objauth.TokenInfo{AccessToken: "issued-access", RefreshToken: "issued-refresh", TokenType: "Bearer"}, nil
 		},
-		loginRecorder:   func(ctx *gin.Context, tenantID, userID uint, success bool) {},
+		loginRecorder:   func(ctx *gin.Context, tenantID, userID string, success bool) {},
 		ssoSessionStore: &fakeConnectorSSOSessionStore{},
 	}
 	restoreUserStore := swapUserStoreFactory(func() authUserStore {
 		return &fakeAuthUserStore{
 			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
-				return &model.UserEntity{Model: gorm.Model{ID: 201}, TenantID: 22, PersonID: 88, Name: "callback-user"}, nil
+				return &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "201"}}, TenantID: "22", PersonID: "88", Name: "callback-user"}, nil
 			},
 			getListByCondFunc: func(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, error) {
-				return model.UserEntityList{{Model: gorm.Model{ID: 201}, TenantID: 22, PersonID: 88, Name: "callback-user"}}, nil
+				return model.UserEntityList{{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "201"}}, TenantID: "22", PersonID: "88", Name: "callback-user"}}, nil
 			},
 		}
 	})
 	defer restoreUserStore()
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
-		return &fakeAuthTenantStore{getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
-			return &model.TenantEntity{Model: gorm.Model{ID: 22}, Name: "tenant-22", Tag: "t22"}, nil
+		return &fakeAuthTenantStore{getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
+			return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "22"}}, Name: "tenant-22", Tag: "t22"}, nil
 		}}
 	})
 	defer restoreTenantStore()
@@ -926,7 +927,7 @@ func TestConnectorServiceCallbackAllowsMissingConnectorID(t *testing.T) {
 	if callbackInput == nil {
 		t.Fatal("expected driver ExchangeCallback to be called")
 	}
-	if callbackInput.ConnectorID != 101 || callbackInput.Code != "authorization-code" || callbackInput.State != "callback-state-missing-connector-id" {
+	if callbackInput.ConnectorID != "101" || callbackInput.Code != "authorization-code" || callbackInput.State != "callback-state-missing-connector-id" {
 		t.Fatalf("unexpected callback input: %+v", callbackInput)
 	}
 	if callbackInput.Nonce != "nonce-missing-connector-id" {
@@ -945,8 +946,8 @@ func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 	state := &ConnectorState{
 		State:       "callback-state-login-resp",
 		Nonce:       "nonce-login-resp",
-		ConnectorID: 101,
-		TenantID:    22,
+		ConnectorID: "101",
+		TenantID:    "22",
 		RedirectURI: "https://app.example.com/oidc/callback",
 		ExpiredAt:   time.Now().Add(time.Minute),
 	}
@@ -955,16 +956,16 @@ func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 	}
 
 	connectorEntity := &model.ConnectorEntity{
-		TenantID:            22,
+		TenantID:            "22",
 		Protocol:            connectorDriverTypeOAuth2,
 		Provider:            connectorProviderGithub,
 		Status:              connectorStatusEnabled,
 		AllowAutoCreateUser: 1,
 		Config:              json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
 	}
-	connectorEntity.ID = 101
+	connectorEntity.ID = "101"
 
-	resolvedPerson := &model.PersonEntity{Model: gorm.Model{ID: 909}, Username: model.StrPtr("connector-person")}
+	resolvedPerson := &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "909"}}, Username: model.StrPtr("connector-person")}
 
 	svc := &connectorSvc{
 		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{
@@ -978,7 +979,7 @@ func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 			},
 		}),
 		connectorRepo: &fakeConnectorRuntimeRepository{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.ConnectorEntity, error) {
+			getByIDFunc: func(ctx context.Context, id string) (*model.ConnectorEntity, error) {
 				return connectorEntity, nil
 			},
 		},
@@ -988,14 +989,14 @@ func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 				return &resolvedConnectorPerson{Person: resolvedPerson}, nil
 			},
 		},
-		tokenGenerator: nil,
-		loginRecorder:  func(ctx *gin.Context, tenantID, userID uint, success bool) {},
+		tokenGenerator:  nil,
+		loginRecorder:   func(ctx *gin.Context, tenantID, userID string, success bool) {},
 		ssoSessionStore: &fakeConnectorSSOSessionStore{},
 	}
 	restorePersonStore := swapPersonStoreFactory(func() authPersonStore {
 		return &fakeAuthPersonStore{
 			getByCondFunc: func(ctx context.Context, cond *dao.PersonCond) (*model.PersonEntity, error) {
-				return &model.PersonEntity{Model: gorm.Model{ID: 909}, Username: model.StrPtr("connector-person")}, nil
+				return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "909"}}, Username: model.StrPtr("connector-person")}, nil
 			},
 		}
 	})
@@ -1003,22 +1004,22 @@ func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 	restoreUserStore := swapUserStoreFactory(func() authUserStore {
 		return &fakeAuthUserStore{
 			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
-				return &model.UserEntity{Model: gorm.Model{ID: 303}, TenantID: 22, PersonID: 909, Name: "connector-user-a"}, nil
+				return &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "303"}}, TenantID: "22", PersonID: "909", Name: "connector-user-a"}, nil
 			},
 			getListByCondFunc: func(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, error) {
-				return model.UserEntityList{{Model: gorm.Model{ID: 303}, TenantID: 22, PersonID: 909, Name: "connector-user-a"}}, nil
+				return model.UserEntityList{{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "303"}}, TenantID: "22", PersonID: "909", Name: "connector-user-a"}}, nil
 			},
 		}
 	})
 	defer restoreUserStore()
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
-		return &fakeAuthTenantStore{getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
-			return &model.TenantEntity{Model: gorm.Model{ID: 22}, Name: "tenant-22", Tag: "t22"}, nil
+		return &fakeAuthTenantStore{getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
+			return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "22"}}, Name: "tenant-22", Tag: "t22"}, nil
 		}}
 	})
 	defer restoreTenantStore()
 
-	resp, err := svc.Callback(nil, &dtoconnector.ConnectorCallbackReq{ConnectorID: 101, Code: "authorization-code", State: "callback-state-login-resp"})
+	resp, err := svc.Callback(nil, &dtoconnector.ConnectorCallbackReq{ConnectorID: "101", Code: "authorization-code", State: "callback-state-login-resp"})
 	if err != nil {
 		t.Fatalf("Callback returned error: %v", err)
 	}
@@ -1035,8 +1036,8 @@ func TestConnectorCallbackInvokesIdentityResolverTokenGeneratorAndLoginRecorder(
 	state := &ConnectorState{
 		State:       "callback-state-runtime-hooks",
 		Nonce:       "nonce-runtime-hooks",
-		ConnectorID: 202,
-		TenantID:    66,
+		ConnectorID: "202",
+		TenantID:    "66",
 		RedirectURI: "https://app.example.com/oidc/callback",
 		ExpiredAt:   time.Now().Add(time.Minute),
 	}
@@ -1045,16 +1046,16 @@ func TestConnectorCallbackInvokesIdentityResolverTokenGeneratorAndLoginRecorder(
 	}
 
 	connectorEntity := &model.ConnectorEntity{
-		TenantID:            66,
+		TenantID:            "66",
 		Protocol:            connectorDriverTypeOAuth2,
 		Provider:            connectorProviderGithub,
 		Status:              connectorStatusEnabled,
 		AllowAutoCreateUser: 1,
 		Config:              json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
 	}
-	connectorEntity.ID = 202
+	connectorEntity.ID = "202"
 
-	resolvedPerson := &model.PersonEntity{Model: gorm.Model{ID: 909}, Username: model.StrPtr("mapped-user"), Name: "Mapped User"}
+	resolvedPerson := &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "909"}}, Username: model.StrPtr("mapped-user"), Name: "Mapped User"}
 
 	var resolvedInput identityResolveInput
 	svc := &connectorSvc{
@@ -1072,7 +1073,7 @@ func TestConnectorCallbackInvokesIdentityResolverTokenGeneratorAndLoginRecorder(
 			},
 		}),
 		connectorRepo: &fakeConnectorRuntimeRepository{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.ConnectorEntity, error) {
+			getByIDFunc: func(ctx context.Context, id string) (*model.ConnectorEntity, error) {
 				return connectorEntity, nil
 			},
 		},
@@ -1083,32 +1084,32 @@ func TestConnectorCallbackInvokesIdentityResolverTokenGeneratorAndLoginRecorder(
 				return &resolvedConnectorPerson{Person: resolvedPerson}, nil
 			},
 		},
-		loginRecorder:   func(ctx *gin.Context, tenantID, userID uint, success bool) {},
+		loginRecorder:   func(ctx *gin.Context, tenantID, userID string, success bool) {},
 		ssoSessionStore: &fakeConnectorSSOSessionStore{},
 	}
 	restoreUserStore := swapUserStoreFactory(func() authUserStore {
 		return &fakeAuthUserStore{
 			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
-				return &model.UserEntity{Model: gorm.Model{ID: 501}, TenantID: 66, PersonID: 909, Name: "mapped-user-a"}, nil
+				return &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "501"}}, TenantID: "66", PersonID: "909", Name: "mapped-user-a"}, nil
 			},
 			getListByCondFunc: func(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, error) {
-				return model.UserEntityList{{Model: gorm.Model{ID: 501}, TenantID: 66, PersonID: 909, Name: "mapped-user-a"}}, nil
+				return model.UserEntityList{{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "501"}}, TenantID: "66", PersonID: "909", Name: "mapped-user-a"}}, nil
 			},
 		}
 	})
 	defer restoreUserStore()
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
-		return &fakeAuthTenantStore{getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
-			return &model.TenantEntity{Model: gorm.Model{ID: 66}, Name: "tenant-66", Tag: "t66"}, nil
+		return &fakeAuthTenantStore{getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
+			return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "66"}}, Name: "tenant-66", Tag: "t66"}, nil
 		}}
 	})
 	defer restoreTenantStore()
 
-	_, err := svc.Callback(nil, &dtoconnector.ConnectorCallbackReq{ConnectorID: 202, Code: "authorization-code", State: "callback-state-runtime-hooks"})
+	_, err := svc.Callback(nil, &dtoconnector.ConnectorCallbackReq{ConnectorID: "202", Code: "authorization-code", State: "callback-state-runtime-hooks"})
 	if err != nil {
 		t.Fatalf("Callback returned error: %v", err)
 	}
-	if resolvedInput.Connector.ID != 202 || resolvedInput.Connector.TenantID != 66 || !resolvedInput.Connector.AllowAutoCreateUser {
+	if resolvedInput.Connector.ID != "202" || resolvedInput.Connector.TenantID != "66" || !resolvedInput.Connector.AllowAutoCreateUser {
 		t.Fatalf("unexpected connector runtime input: %+v", resolvedInput.Connector)
 	}
 	if resolvedInput.Identity.Subject != "subject-202" || resolvedInput.Identity.Email != "mapped@example.com" {
@@ -1124,8 +1125,8 @@ func TestConnectorServiceCallbackRetainsStateWhenDriverExchangeFails(t *testing.
 	state := &ConnectorState{
 		State:       "callback-state-fail",
 		Nonce:       "nonce-2",
-		ConnectorID: 101,
-		TenantID:    22,
+		ConnectorID: "101",
+		TenantID:    "22",
 		RedirectURI: "https://app.example.com/oidc/callback",
 		ExpiredAt:   time.Now().Add(time.Minute),
 	}
@@ -1135,13 +1136,13 @@ func TestConnectorServiceCallbackRetainsStateWhenDriverExchangeFails(t *testing.
 
 	expectedErr := errors.New("temporary exchange failure")
 	conn := &model.ConnectorEntity{
-		TenantID: 22,
+		TenantID: "22",
 		Protocol: connectorDriverTypeOAuth2,
 		Provider: connectorProviderGithub,
 		Status:   connectorStatusEnabled,
 		Config:   json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
 	}
-	conn.ID = 101
+	conn.ID = "101"
 
 	svc := &connectorSvc{
 		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{
@@ -1151,14 +1152,14 @@ func TestConnectorServiceCallbackRetainsStateWhenDriverExchangeFails(t *testing.
 			},
 		}),
 		connectorRepo: &fakeConnectorRuntimeRepository{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.ConnectorEntity, error) {
+			getByIDFunc: func(ctx context.Context, id string) (*model.ConnectorEntity, error) {
 				return conn, nil
 			},
 		},
 		stateStore: stateStore,
 	}
 
-	_, err := svc.Callback(nil, &dtoconnector.ConnectorCallbackReq{ConnectorID: 101, Code: "authorization-code", State: "callback-state-fail"})
+	_, err := svc.Callback(nil, &dtoconnector.ConnectorCallbackReq{ConnectorID: "101", Code: "authorization-code", State: "callback-state-fail"})
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("expected driver exchange error to propagate, got %v", err)
 	}

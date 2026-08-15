@@ -12,8 +12,8 @@ IAM 后端拆分为 `backend/apps/` 下的四个应用（auth、platformadmin、
 
 * **清晰的项目结构**: 借鉴 [project-layout](https://github.com/golang-standards/project-layout)，遵循分层架构原则，适合团队协作和长期维护。
 * **前后端分离**: React 前端 + Vite 构建工具。
-* **通用组件集成**: 后端内置 MySQL、Redis 和 Elasticsearch 示例。
-* **全链路日志**: 基于 `zap` 的自定义日志包 `glog`，支持 MySQL、Redis、ES 和 HTTP 调用的全链路 trace ID 传播。
+* **通用组件集成**: 后端内置 PostgreSQL、Redis 和 Elasticsearch 示例。
+* **全链路日志**: 基于 `zap` 的自定义日志包 `glog`，支持 PostgreSQL、Redis、ES 和 HTTP 调用的全链路 trace ID 传播。
 * **代码生成工具**: 配套命令行工具 `gocli`，可根据配置生成标准化代码（包括 model、dao、object、dto、code、service、controller、router 各层）。
 * **Swagger API 文档**: 使用 `swaggo` 自动生成交互式 API 文档，方便前后端协作和测试。
 * **Docker 支持**: 包含基础的 `Dockerfile` 用于容器化部署。

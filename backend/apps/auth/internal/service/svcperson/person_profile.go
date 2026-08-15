@@ -6,9 +6,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoperson"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
 )
@@ -22,18 +22,18 @@ func NewPersonProfileSvc() PersonProfileSvc {
 }
 
 func (svc *personProfileSvc) Detail(ctx *gin.Context, req *dtoperson.PersonDetailReq) (*dtoperson.PersonDetailResp, error) {
-	personID := gincontext.GetPersonID(ctx)
-	if personID == 0 {
+	personID := gctx.GetPersonID(ctx)
+	if personID == "" {
 		return nil, code.GetError(code.UserNotExistError)
 	}
 
 	personDao := dao.NewPersonDao()
 	personEntity, err := personDao.GetByID(ctx.Request.Context(), personID)
 	if err != nil {
-		glog.Errorf(ctx, "[svcperson.Detail] dao GetByID fail, err:%v, personID:%d", err, personID)
+		glog.Errorf(ctx, "[svcperson.Detail] dao GetByID fail, err:%v, personID:%s", err, personID)
 		return nil, code.GetError(code.UserGetDetailError)
 	}
-	if personEntity == nil || personEntity.ID == 0 {
+	if personEntity == nil || personEntity.ID == "" {
 		return nil, code.GetError(code.UserNotExistError)
 	}
 
@@ -49,18 +49,18 @@ func (svc *personProfileSvc) Detail(ctx *gin.Context, req *dtoperson.PersonDetai
 }
 
 func (svc *personProfileSvc) UpdatePassword(ctx *gin.Context, req *dtoperson.PersonUpdatePasswordReq) error {
-	personID := gincontext.GetPersonID(ctx)
-	if personID == 0 {
+	personID := gctx.GetPersonID(ctx)
+	if personID == "" {
 		return code.GetError(code.UserNotExistError)
 	}
 
 	personDao := dao.NewPersonDao()
 	personEntity, err := personDao.GetByID(ctx.Request.Context(), personID)
 	if err != nil {
-		glog.Errorf(ctx, "[svcperson.UpdatePassword] dao GetByID fail, err:%v, personID:%d", err, personID)
+		glog.Errorf(ctx, "[svcperson.UpdatePassword] dao GetByID fail, err:%v, personID:%s", err, personID)
 		return code.GetError(code.UserGetDetailError)
 	}
-	if personEntity == nil || personEntity.ID == 0 {
+	if personEntity == nil || personEntity.ID == "" {
 		return code.GetError(code.UserNotExistError)
 	}
 
@@ -69,7 +69,7 @@ func (svc *personProfileSvc) UpdatePassword(ctx *gin.Context, req *dtoperson.Per
 	}
 
 	if err := gcrypto.ComparePasswordHash(personEntity.PasswordEncrypted, req.OldPassword); err != nil {
-		glog.Errorf(ctx, "[svcperson.UpdatePassword] old password mismatch, personID:%d", personID)
+		glog.Errorf(ctx, "[svcperson.UpdatePassword] old password mismatch, personID:%s", personID)
 		return code.GetError(code.PasswordMismatchError)
 	}
 
@@ -82,7 +82,7 @@ func (svc *personProfileSvc) UpdatePassword(ctx *gin.Context, req *dtoperson.Per
 	if err := personDao.UpdateMap(ctx.Request.Context(), personID, map[string]interface{}{
 		"password_encrypted": newHash,
 	}); err != nil {
-		glog.Errorf(ctx, "[svcperson.UpdatePassword] dao UpdateMap fail, err:%v, personID:%d", err, personID)
+		glog.Errorf(ctx, "[svcperson.UpdatePassword] dao UpdateMap fail, err:%v, personID:%s", err, personID)
 		return code.GetError(code.UserUpdateError)
 	}
 

@@ -12,11 +12,11 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoconnector"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
@@ -37,13 +37,13 @@ type ConnectorSvc interface {
 	GetFactoryList(ctx *gin.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error)
 	ListFactories(ctx *gin.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error)
 	TestConnector(ctx *gin.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.TestConnectorResp, error)
-	Authorize(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID uint) (*dtoconnector.ConnectorAuthorizeResp, error)
+	Authorize(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID string) (*dtoconnector.ConnectorAuthorizeResp, error)
 	GetAuthorizationURL(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq) (*dtoconnector.ConnectorAuthorizeResp, error)
 	Callback(ctx *gin.Context, req *dtoconnector.ConnectorCallbackReq) (*dtoauth.LoginResp, error)
 }
 
 type connectorRuntimeRepository interface {
-	GetByID(ctx context.Context, id uint) (*model.ConnectorEntity, error)
+	GetByID(ctx context.Context, id string) (*model.ConnectorEntity, error)
 }
 
 type connectorIdentityResolver interface {
@@ -57,7 +57,7 @@ type connectorSvc struct {
 	identityResolver connectorIdentityResolver
 	ssoSessionStore  sso.SSOSessionStore
 	tokenGenerator   func(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error)
-	loginRecorder    func(ctx *gin.Context, tenantID, userID uint, success bool)
+	loginRecorder    func(ctx *gin.Context, tenantID, userID string, success bool)
 	stateGenerator   func() (string, error)
 	nowFunc          func() time.Time
 }
@@ -82,8 +82,8 @@ func (svc *connectorSvc) getConnectorRepo() connectorRuntimeRepository {
 	return svc.connectorRepo
 }
 
-func connectorVisibleToTenant(entity *model.ConnectorEntity, tenantID uint) bool {
-	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
+func connectorVisibleToTenant(entity *model.ConnectorEntity, tenantID string) bool {
+	return entity != nil && entity.ID != "" && entity.TenantID == tenantID
 }
 
 func (svc *connectorSvc) getStateStore() ConnectorStateStore {
@@ -121,7 +121,7 @@ func (svc *connectorSvc) getNowFunc() func() time.Time {
 	return svc.nowFunc
 }
 
-func buildConnectorInsertEntity(req *dtoauth.ConnectorCreateReq, createdBy uint) (*model.ConnectorEntity, error) {
+func buildConnectorInsertEntity(req *dtoauth.ConnectorCreateReq, createdBy string) (*model.ConnectorEntity, error) {
 	configJson, err := json.Marshal(req.Config)
 	if err != nil {
 		return nil, err
@@ -145,7 +145,7 @@ func buildConnectorInsertEntity(req *dtoauth.ConnectorCreateReq, createdBy uint)
 	}, nil
 }
 
-func buildConnectorUpdateMap(req *dtoauth.ConnectorUpdateReq, updatedBy uint) (map[string]any, error) {
+func buildConnectorUpdateMap(req *dtoauth.ConnectorUpdateReq, updatedBy string) (map[string]any, error) {
 	configJson, err := json.Marshal(req.Config)
 	if err != nil {
 		return nil, err
@@ -184,7 +184,7 @@ func mustMarshalJSON(value any) json.RawMessage {
 }
 
 func (svc *connectorSvc) Create(ctx *gin.Context, req *dtoauth.ConnectorCreateReq) (*dtoauth.ConnectorCreateResp, error) {
-	insertEntity, err := buildConnectorInsertEntity(req, gincontext.GetUserID(ctx))
+	insertEntity, err := buildConnectorInsertEntity(req, gctx.GetUserID(ctx))
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.CreateConnector] build insert entity fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorCreateError)
@@ -205,11 +205,11 @@ func (svc *connectorSvc) Delete(ctx *gin.Context, req *dtoauth.ConnectorDeleteRe
 		glog.Errorf(ctx, "[svcauth.DeleteConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorDeleteError)
 	}
-	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantID(ctx)) {
+	if !connectorVisibleToTenant(connectorEntity, gctx.GetTenantID(ctx)) {
 		return code.GetError(code.ConnectorNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	if err := dao.NewConnectorDao().Delete(ctx, req.ConnectorID, userID); err != nil {
 		glog.Errorf(ctx, "[svcauth.DeleteConnector] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorDeleteError)
@@ -223,11 +223,11 @@ func (svc *connectorSvc) Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateRe
 		glog.Errorf(ctx, "[svcauth.UpdateConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorUpdateError)
 	}
-	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantID(ctx)) {
+	if !connectorVisibleToTenant(connectorEntity, gctx.GetTenantID(ctx)) {
 		return code.GetError(code.ConnectorNotExistError)
 	}
 
-	updateMap, err := buildConnectorUpdateMap(req, gincontext.GetUserID(ctx))
+	updateMap, err := buildConnectorUpdateMap(req, gctx.GetUserID(ctx))
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.UpdateConnector] build update map fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorUpdateError)
@@ -245,7 +245,7 @@ func (svc *connectorSvc) Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailRe
 		glog.Errorf(ctx, "[svcauth.DetailConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
-	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantID(ctx)) {
+	if !connectorVisibleToTenant(connectorEntity, gctx.GetTenantID(ctx)) {
 		return nil, code.GetError(code.ConnectorNotExistError)
 	}
 
@@ -286,7 +286,7 @@ func (svc *connectorSvc) PageList(ctx *gin.Context, req *dtoauth.ConnectorPageLi
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID:    gincontext.GetTenantID(ctx),
+		TenantID:    gctx.GetTenantID(ctx),
 		Protocol:    req.Protocol,
 		Provider:    req.Provider,
 		Status:      req.Status,
@@ -346,7 +346,7 @@ func (svc *connectorSvc) ListFactories(ctx *gin.Context, req *dtoconnector.Conne
 }
 
 func (svc *connectorSvc) TestConnector(ctx *gin.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.TestConnectorResp, error) {
-	connectorEntity, err := dao.NewConnectorDao().GetByID(ctx, uint(req.ConnectorID))
+	connectorEntity, err := dao.NewConnectorDao().GetByID(ctx, req.ConnectorID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.TestConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetDetailError)
@@ -365,13 +365,13 @@ func (svc *connectorSvc) TestConnector(ctx *gin.Context, req *dtoconnector.Conne
 	}, nil
 }
 
-func (svc *connectorSvc) Authorize(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID uint) (*dtoconnector.ConnectorAuthorizeResp, error) {
+func (svc *connectorSvc) Authorize(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID string) (*dtoconnector.ConnectorAuthorizeResp, error) {
 	connectorEntity, err := svc.getConnectorRepo().GetByID(runtimeContext(ctx), connectorID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.Authorize] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
-	if connectorEntity == nil || connectorEntity.ID == 0 || connectorEntity.Status != connectorStatusEnabled {
+	if connectorEntity == nil || connectorEntity.ID == "" || connectorEntity.Status != connectorStatusEnabled {
 		return nil, code.GetError(code.ConnectorNotExistError)
 	}
 	stateValue, err := svc.getStateGenerator()()
@@ -420,10 +420,10 @@ func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorC
 		glog.Errorf(ctx, "[svcauth.Callback] load state fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.AuthLoginFailedError)
 	}
-	if storedState == nil || storedState.ConnectorID == 0 {
+	if storedState == nil || storedState.ConnectorID == "" {
 		return nil, code.GetError(code.AuthLoginFailedError)
 	}
-	if req.ConnectorID != 0 && storedState.ConnectorID != req.ConnectorID {
+	if req.ConnectorID != "" && storedState.ConnectorID != req.ConnectorID {
 		return nil, code.GetError(code.AuthLoginFailedError)
 	}
 	connectorID := storedState.ConnectorID
@@ -432,7 +432,7 @@ func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorC
 		glog.Errorf(ctx, "[svcauth.Callback] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
-	if connectorEntity == nil || connectorEntity.ID == 0 || connectorEntity.Status != connectorStatusEnabled {
+	if connectorEntity == nil || connectorEntity.ID == "" || connectorEntity.Status != connectorStatusEnabled {
 		return nil, code.GetError(code.ConnectorNotExistError)
 	}
 	driver, config, err := selectDriverForConnector(svc.getDriverRegistry(), connectorEntity)
@@ -461,7 +461,7 @@ func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorC
 	if err != nil {
 		return nil, err
 	}
-	if resolvedPerson == nil || resolvedPerson.Person == nil || resolvedPerson.Person.ID == 0 {
+	if resolvedPerson == nil || resolvedPerson.Person == nil || resolvedPerson.Person.ID == "" {
 		return nil, code.GetError(code.UserNotExistError)
 	}
 	if _, err := svc.getStateStore().Consume(runtimeContext(ctx), req.State); err != nil {

@@ -33,12 +33,12 @@ func (c *ApplicationCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type ApplicationDao struct {
-	*gormdao.Dao[model.ApplicationEntity, model.ApplicationEntityList, uint]
+	*gormdao.Dao[model.ApplicationEntity, model.ApplicationEntityList, string]
 }
 
 func NewApplicationDao(opts ...DaoOption) *ApplicationDao {
 	return &ApplicationDao{
-		Dao: gormdao.NewDao[model.ApplicationEntity, model.ApplicationEntityList, uint](
+		Dao: gormdao.NewDao[model.ApplicationEntity, model.ApplicationEntityList, string](
 			model.TableNameApplication, "ApplicationDao",
 			resolveDBGetter(opts...),
 		),

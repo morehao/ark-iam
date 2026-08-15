@@ -13,9 +13,9 @@ import (
 )
 
 type SessionSvc interface {
-	List(ctx *gin.Context, req *dtouser.SessionListReq, personID, userID, tenantID uint) (*dtouser.SessionListResp, error)
-	Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID, tenantID, personID uint) error
-	RevokeAll(ctx *gin.Context, userID, tenantID, personID uint) error
+	List(ctx *gin.Context, req *dtouser.SessionListReq, personID, userID, tenantID string) (*dtouser.SessionListResp, error)
+	Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID, tenantID, personID string) error
+	RevokeAll(ctx *gin.Context, userID, tenantID, personID string) error
 }
 
 type sessionSvc struct{}
@@ -26,7 +26,7 @@ func NewSessionSvc() SessionSvc {
 	return &sessionSvc{}
 }
 
-func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, personID, userID, tenantID uint) (*dtouser.SessionListResp, error) {
+func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, personID, userID, tenantID string) (*dtouser.SessionListResp, error) {
 	sessionDao := dao.NewSessionDao()
 
 	page := req.Page
@@ -85,7 +85,7 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, perso
 	}, nil
 }
 
-func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID, tenantID, personID uint) error {
+func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID, tenantID, personID string) error {
 	sessionDao := dao.NewSessionDao()
 
 	// 归属校验：仅允许撤销本人（person）、本租户、本人 user 名下的会话，防止 IDOR 越权撤销他人会话。
@@ -100,7 +100,7 @@ func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, u
 	}
 	owned := false
 	for _, s := range sessionList {
-		if s.ID == uint(req.SessionID) {
+		if s.ID == req.SessionID {
 			owned = true
 			break
 		}
@@ -109,7 +109,7 @@ func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, u
 		return code.GetError(code.SessionNotExistError)
 	}
 
-	if err := sessionDao.UpdateMap(ctx.Request.Context(), uint(req.SessionID), map[string]any{"revoked_at": gorm.Expr("NOW()")}); err != nil {
+	if err := sessionDao.UpdateMap(ctx.Request.Context(), req.SessionID, map[string]any{"revoked_at": gorm.Expr("NOW()")}); err != nil {
 		glog.Errorf(ctx, "[sessionSvc.Revoke] revoke fail, err:%v", err)
 		return code.GetError(code.SessionRevokeError)
 	}
@@ -117,7 +117,7 @@ func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, u
 	return nil
 }
 
-func (svc *sessionSvc) RevokeAll(ctx *gin.Context, userID, tenantID, personID uint) error {
+func (svc *sessionSvc) RevokeAll(ctx *gin.Context, userID, tenantID, personID string) error {
 	cond := &dao.SessionCond{
 		PersonID: personID,
 		TenantID: tenantID,

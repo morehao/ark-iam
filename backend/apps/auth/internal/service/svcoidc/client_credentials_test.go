@@ -38,8 +38,8 @@ func TestClientCredentialsStorage(t *testing.T) {
 	secretHash := sha256.Sum256([]byte(secret))
 
 	clientEntity := &model.ApplicationClientEntity{
-		Model:                   gorm.Model{ID: 1},
-		TenantID:                1,
+		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
+		TenantID:                "1",
 		ClientID:                clientID,
 		Name:                    "Machine Client",
 		RedirectURIs:            datatypes.JSON("[]"),
@@ -57,7 +57,7 @@ func TestClientCredentialsStorage(t *testing.T) {
 	}
 
 	secretEntity := &model.ApplicationClientSecretEntity{
-		Model:               gorm.Model{ID: 1},
+		BaseEntity:          gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
 		ApplicationClientID: clientEntity.ID,
 		Name:                "default",
 		ValueHash:           hex.EncodeToString(secretHash[:]),
@@ -72,7 +72,7 @@ func TestClientCredentialsStorage(t *testing.T) {
 		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
 	persistentStore.applicationClientSecretDao = func(opts ...dao.DaoOption) *dao.ApplicationClientSecretDao {
-		return &dao.ApplicationClientSecretDao{Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList, uint](
+		return &dao.ApplicationClientSecretDao{Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList, string](
 			model.TableNameApplicationClientSecret, "ApplicationClientSecretDao",
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}
@@ -135,8 +135,8 @@ func TestClientCredentialsRejectsPublicClient(t *testing.T) {
 	secretHash := sha256.Sum256([]byte(secret))
 
 	publicClient := &model.ApplicationClientEntity{
-		Model:                   gorm.Model{ID: 1},
-		TenantID:                1,
+		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
+		TenantID:                "1",
 		ClientID:                clientID,
 		Name:                    "Public Client",
 		RedirectURIs:            datatypes.JSON("[]"),
@@ -154,7 +154,7 @@ func TestClientCredentialsRejectsPublicClient(t *testing.T) {
 	}
 
 	secretEntity := &model.ApplicationClientSecretEntity{
-		Model:               gorm.Model{ID: 1},
+		BaseEntity:          gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
 		ApplicationClientID: publicClient.ID,
 		Name:                "default",
 		ValueHash:           hex.EncodeToString(secretHash[:]),
@@ -169,7 +169,7 @@ func TestClientCredentialsRejectsPublicClient(t *testing.T) {
 		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
 	}
 	persistentStore.applicationClientSecretDao = func(opts ...dao.DaoOption) *dao.ApplicationClientSecretDao {
-		return &dao.ApplicationClientSecretDao{Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList, uint](
+		return &dao.ApplicationClientSecretDao{Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList, string](
 			model.TableNameApplicationClientSecret, "ApplicationClientSecretDao",
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}
@@ -277,8 +277,8 @@ func newClientCredentialsTestDB(t *testing.T, clientID string, accessTokenTTL in
 	}
 
 	clientEntity := &model.ApplicationClientEntity{
-		Model:                   gorm.Model{ID: 1},
-		TenantID:                1,
+		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
+		TenantID:                "1",
 		ClientID:                clientID,
 		Name:                    "TTL Client",
 		RedirectURIs:            datatypes.JSON("[]"),

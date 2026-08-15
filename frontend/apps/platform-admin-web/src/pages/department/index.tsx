@@ -14,7 +14,7 @@ export default function DepartmentList() {
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<DepartmentItem | null>(null)
-  const [parentID, setParentID] = useState(0)
+  const [parentID, setParentID] = useState("")
   const [form] = Form.useForm()
   const [submitLoading, setSubmitLoading] = useState(false)
 
@@ -49,7 +49,7 @@ export default function DepartmentList() {
     void fetchData()
   }, [fetchData])
 
-  const openCreate = (parentID: number) => {
+  const openCreate = (parentID: string) => {
     setEditing(null)
     setParentID(parentID)
     form.resetFields()
@@ -164,7 +164,7 @@ export default function DepartmentList() {
           <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
             刷新
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate(0)}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate("")}>
             新建根部门
           </Button>
         </Space>
@@ -214,6 +214,6 @@ export default function DepartmentList() {
   )
 }
 
-function modalParentTitle(parentID: number) {
-  return parentID === 0 ? '新建根部门' : '新建子部门'
+function modalParentTitle(parentID: string) {
+  return parentID === "" ? '新建根部门' : '新建子部门'
 }

@@ -240,7 +240,7 @@ func NewUserSvc() UserSvc {
 - **服务层直接调用 `dao.NewXxxDao()`**，不定义 repository 接口/adapter/函数变量等中间层；跨表操作在调用点直接使用对应 dao。
 - **ID 字段命名**：Go 字段与 JSON tag 一律 `ID` 全大写（`userID`、`roleID`、`appID`、`connectorID`），禁止 `roleId`/`appId` 等小写 d 写法；路由 path 参数（`:roleID`）与 swagger 注解同步。**path 是 ID 的唯一来源**：凡带 `uri:"xxxID"` 的字段，DTO tag 用 `json:"-" uri:"xxxID"`（禁止挂 `json:"xxxID"`/`form:"xxxID"`，防 body/query 覆盖 path 造成参数污染）。
 - **DTO 命名**：统一 `<业务名词><动词>Req/Resp`（如 `UserCreateReq`、`DomainCreateReq`），禁止 `CreateDomainReq`、裸 `CreateReq` 等变体。
-- **DTO ID 类型**：统一 `uint`（与 `gorm.Model.ID` 一致），禁止 `uint64`。
+- **DTO ID 类型**：统一 `string`（字符串主键，UUID v7，由 `gormdao.BaseEntity` 自动生成；见 `docs/design/string-id-pg-automigrate-seed.md`），禁止 `uint`/`uint64`。
 - **单元测试**：统一使用各 app `testutil.SetupSQLite(t, entities...)`（内存 SQLite 注册为全局 iam 库），服务内部 `dao.NewXxxDao()` 自动落测试库，直接断言真实 dao 行为；不写 stub/注入 seam。注意 sqlite 对 `not null` JSON 列（`profile`/`config` 等）与 `joined_at` 需要显式播种值。
 
 ### 错误处理
@@ -426,7 +426,7 @@ make docker-run APP=auth
 - **依赖管理**: go mod
 - **API 文档**: swag (Swag Go)
 - **代码生成**: gocli
-- **数据库**: GORM with MySQL/PostgreSQL
+- **数据库**: GORM with PostgreSQL（主库，启动时 AutoMigrate 自动建表 + 幂等种子数据），测试用 SQLite
 - **缓存**: Redis
 - **链路追踪**: OpenTelemetry
 - **日志**: golib/glog

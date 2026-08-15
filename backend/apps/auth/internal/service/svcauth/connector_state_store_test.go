@@ -63,8 +63,8 @@ func TestStateStoreSaveLoadConsume(t *testing.T) {
 	state := &ConnectorState{
 		State:       "state-1",
 		Nonce:       "nonce-1",
-		ConnectorID: 12,
-		TenantID:    34,
+		ConnectorID: "12",
+		TenantID:    "34",
 		RedirectURI: "https://console.example.com/callback",
 		ExpiredAt:   time.Now().Add(time.Minute),
 	}
@@ -121,8 +121,8 @@ func TestStateStoreLoadExpiredState(t *testing.T) {
 	state := &ConnectorState{
 		State:       "expired-state",
 		Nonce:       "nonce-1",
-		ConnectorID: 12,
-		TenantID:    34,
+		ConnectorID: "12",
+		TenantID:    "34",
 		RedirectURI: "https://console.example.com/callback",
 		ExpiredAt:   time.Now().Add(time.Second),
 	}
@@ -165,8 +165,8 @@ func TestRedisStateStoreUnavailable(t *testing.T) {
 	state := &ConnectorState{
 		State:       "state-1",
 		Nonce:       "nonce-1",
-		ConnectorID: 12,
-		TenantID:    34,
+		ConnectorID: "12",
+		TenantID:    "34",
 		RedirectURI: "https://console.example.com/callback",
 		ExpiredAt:   time.Now().Add(time.Minute),
 	}
@@ -193,8 +193,8 @@ func TestRedisStateStoreUsesTTL(t *testing.T) {
 	state := &ConnectorState{
 		State:       "state-1",
 		Nonce:       "nonce-1",
-		ConnectorID: 12,
-		TenantID:    34,
+		ConnectorID: "12",
+		TenantID:    "34",
 		RedirectURI: "https://console.example.com/callback",
 		ExpiredAt:   time.Now().Add(time.Minute),
 	}
@@ -229,8 +229,8 @@ func TestRedisStateStoreRejectsEmptyState(t *testing.T) {
 	payload, err := json.Marshal(&ConnectorState{
 		State:       "state-1",
 		Nonce:       "nonce-1",
-		ConnectorID: 12,
-		TenantID:    34,
+		ConnectorID: "12",
+		TenantID:    "34",
 		RedirectURI: "https://console.example.com/callback",
 		ExpiredAt:   time.Now().Add(time.Minute),
 	})

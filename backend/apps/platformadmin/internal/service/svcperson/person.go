@@ -5,10 +5,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtouser"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
@@ -47,7 +47,7 @@ func (svc *personSvc) Create(ctx *gin.Context, req *dtouser.UserIdentityCreateRe
 		Issuer:          req.Issuer,
 		ExternalSubject: req.IdentityID,
 		Detail:          detailJSON,
-		CreatedBy:       gincontext.GetUserID(ctx),
+		CreatedBy:       gctx.GetUserID(ctx),
 	}
 	if err := dao.NewUserIdentityDao().Insert(ctx, insertEntity); err != nil {
 		glog.Errorf(ctx, "[svcperson.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -62,13 +62,13 @@ func (svc *personSvc) Delete(ctx *gin.Context, req *dtouser.UserIdentityDeleteRe
 		glog.Errorf(ctx, "[svcperson.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserIdentityDeleteError)
 	}
-	if entity == nil || entity.ID == 0 {
+	if entity == nil || entity.ID == "" {
 		return code.GetError(code.UserIdentityNotExistError)
 	}
 	if err := ensurePersonIdentityVisibleToTenant(ctx, entity.PersonID); err != nil {
 		return err
 	}
-	if err := dao.NewUserIdentityDao().Delete(ctx, req.UserIdentityID, gincontext.GetUserID(ctx)); err != nil {
+	if err := dao.NewUserIdentityDao().Delete(ctx, req.UserIdentityID, gctx.GetUserID(ctx)); err != nil {
 		glog.Errorf(ctx, "[svcperson.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserIdentityDeleteError)
 	}
@@ -81,13 +81,13 @@ func (svc *personSvc) Update(ctx *gin.Context, req *dtouser.UserIdentityUpdateRe
 		glog.Errorf(ctx, "[svcperson.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserIdentityUpdateError)
 	}
-	if entity == nil || entity.ID == 0 {
+	if entity == nil || entity.ID == "" {
 		return code.GetError(code.UserIdentityNotExistError)
 	}
 	if err := ensurePersonIdentityVisibleToTenant(ctx, entity.PersonID); err != nil {
 		return err
 	}
-	if req.UserID != 0 && req.UserID != entity.PersonID {
+	if req.UserID != "" && req.UserID != entity.PersonID {
 		if err := ensurePersonIdentityVisibleToTenant(ctx, req.UserID); err != nil {
 			return err
 		}
@@ -103,7 +103,7 @@ func (svc *personSvc) Update(ctx *gin.Context, req *dtouser.UserIdentityUpdateRe
 		"external_subject": req.IdentityID,
 		"detail":           detailJSON,
 	}
-	if operatorID := gincontext.GetUserID(ctx); operatorID != 0 {
+	if operatorID := gctx.GetUserID(ctx); operatorID != "" {
 		updateMap["updated_by"] = operatorID
 	}
 	if err := dao.NewUserIdentityDao().UpdateMap(ctx, req.UserIdentityID, updateMap); err != nil {
@@ -119,7 +119,7 @@ func (svc *personSvc) Detail(ctx *gin.Context, req *dtouser.UserIdentityDetailRe
 		glog.Errorf(ctx, "[svcperson.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserIdentityGetDetailError)
 	}
-	if entity == nil || entity.ID == 0 {
+	if entity == nil || entity.ID == "" {
 		return nil, code.GetError(code.UserIdentityNotExistError)
 	}
 	if err := ensurePersonIdentityVisibleToTenant(ctx, entity.PersonID); err != nil {
@@ -130,7 +130,7 @@ func (svc *personSvc) Detail(ctx *gin.Context, req *dtouser.UserIdentityDetailRe
 
 func (svc *personSvc) PageList(ctx *gin.Context, req *dtouser.UserIdentityPageListReq) (*dtouser.UserIdentityPageListResp, error) {
 	personID := req.UserID
-	if personID != 0 {
+	if personID != "" {
 		if err := ensurePersonIdentityVisibleToTenant(ctx, personID); err != nil {
 			return nil, err
 		}
@@ -164,16 +164,16 @@ func (svc *personSvc) GetByUser(ctx *gin.Context, req *dtouser.UserIdentityByUse
 	return buildPersonIdentityPageListResp(ctx, list, total)
 }
 
-func ensurePersonIdentityVisibleToTenant(ctx *gin.Context, personID uint) error {
-	if personID == 0 {
+func ensurePersonIdentityVisibleToTenant(ctx *gin.Context, personID string) error {
+	if personID == "" {
 		return code.GetError(code.UserIdentityNotExistError)
 	}
 	users, err := dao.NewUserDao().GetListByCond(ctx, &dao.UserCond{PersonID: personID})
 	if err != nil {
-		glog.Errorf(ctx, "[svcperson.ensurePersonIdentityVisibleToTenant] user dao GetListByCond fail, err:%v, personID:%d", err, personID)
+		glog.Errorf(ctx, "[svcperson.ensurePersonIdentityVisibleToTenant] user dao GetListByCond fail, err:%v, personID:%s", err, personID)
 		return code.GetError(code.UserIdentityGetDetailError)
 	}
-	tenantID := gincontext.GetTenantID(ctx)
+	tenantID := gctx.GetTenantID(ctx)
 	for _, userEntity := range users {
 		if userEntity.TenantID == tenantID {
 			return nil

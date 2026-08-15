@@ -1,7 +1,7 @@
 package objauth
 
 type ConnectorBaseInfo struct {
-	TenantID            uint   `json:"tenantID" form:"tenantID"`                       // 租户ID
+	TenantID            string `json:"tenantID" form:"tenantID"`                       // 租户ID
 	Name                string `json:"name" form:"name"`                               // 连接器名称
 	DisplayName         string `json:"displayName" form:"displayName"`                 // 显示名称
 	Protocol            string `json:"protocol" form:"protocol"`                       // 协议类型

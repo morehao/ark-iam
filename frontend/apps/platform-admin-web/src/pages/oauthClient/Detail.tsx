@@ -19,7 +19,7 @@ export default function OAuthClientDetail() {
   const [submitLoading, setSubmitLoading] = useState(false)
   const [createdSecret, setCreatedSecret] = useState<OAuthSecretCreateResp | null>(null)
 
-  const clientID = Number(id)
+  const clientID = id ?? ""
 
   const fetchAll = useCallback(async () => {
     if (!id) return

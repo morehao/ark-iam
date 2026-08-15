@@ -8,7 +8,7 @@ import (
 
 type ConnectorCond struct {
 	*gormdao.BaseCond
-	TenantID    uint
+	TenantID    string
 	Protocol    string
 	Provider    string
 	Status      string
@@ -20,7 +20,7 @@ func (c *ConnectorCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
 	if c.Protocol != "" {
@@ -41,12 +41,12 @@ func (c *ConnectorCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type ConnectorDao struct {
-	*gormdao.Dao[model.ConnectorEntity, model.ConnectorEntityList, uint]
+	*gormdao.Dao[model.ConnectorEntity, model.ConnectorEntityList, string]
 }
 
 func NewConnectorDao(opts ...DaoOption) *ConnectorDao {
 	return &ConnectorDao{
-		Dao: gormdao.NewDao[model.ConnectorEntity, model.ConnectorEntityList, uint](
+		Dao: gormdao.NewDao[model.ConnectorEntity, model.ConnectorEntityList, string](
 			model.TableNameConnector, "ConnectorDao",
 			resolveDBGetter(opts...),
 		),

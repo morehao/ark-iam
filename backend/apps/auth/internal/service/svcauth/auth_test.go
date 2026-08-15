@@ -7,22 +7,21 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
-	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
+	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/gerror"
-	"gorm.io/gorm"
 )
 
 type fakeAuthRefreshTokenStore struct {
 	getByCondFunc        func(ctx context.Context, cond *dao.RefreshTokenCond) (*model.RefreshTokenEntity, error)
 	insertFunc           func(ctx context.Context, entity *model.RefreshTokenEntity) error
-	deleteFunc           func(ctx context.Context, id, userID uint) error
-	revokeByPersonIDFunc func(ctx context.Context, personID uint) error
+	deleteFunc           func(ctx context.Context, id, userID string) error
+	revokeByPersonIDFunc func(ctx context.Context, personID string) error
 }
 
 func (f *fakeAuthRefreshTokenStore) GetByCond(ctx context.Context, cond gormdao.Cond) (*model.RefreshTokenEntity, error) {
@@ -40,14 +39,14 @@ func (f *fakeAuthRefreshTokenStore) Insert(ctx context.Context, entity *model.Re
 	return f.insertFunc(ctx, entity)
 }
 
-func (f *fakeAuthRefreshTokenStore) Delete(ctx context.Context, id, userID uint) error {
+func (f *fakeAuthRefreshTokenStore) Delete(ctx context.Context, id, userID string) error {
 	if f.deleteFunc == nil {
 		return nil
 	}
 	return f.deleteFunc(ctx, id, userID)
 }
 
-func (f *fakeAuthRefreshTokenStore) RevokeByPersonID(ctx context.Context, personID uint) error {
+func (f *fakeAuthRefreshTokenStore) RevokeByPersonID(ctx context.Context, personID string) error {
 	if f.revokeByPersonIDFunc == nil {
 		return nil
 	}
@@ -55,13 +54,13 @@ func (f *fakeAuthRefreshTokenStore) RevokeByPersonID(ctx context.Context, person
 }
 
 type fakeAuthUserStore struct {
-	getByIDFunc       func(ctx context.Context, id uint) (*model.UserEntity, error)
+	getByIDFunc       func(ctx context.Context, id string) (*model.UserEntity, error)
 	getByCondFunc     func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error)
 	getListByCondFunc func(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, error)
 	insertFunc        func(ctx context.Context, entity *model.UserEntity) error
 }
 
-func (f *fakeAuthUserStore) GetByID(ctx context.Context, id uint) (*model.UserEntity, error) {
+func (f *fakeAuthUserStore) GetByID(ctx context.Context, id string) (*model.UserEntity, error) {
 	if f.getByIDFunc == nil {
 		return nil, nil
 	}
@@ -91,20 +90,20 @@ func (f *fakeAuthUserStore) Insert(ctx context.Context, entity *model.UserEntity
 	return f.insertFunc(ctx, entity)
 }
 
-func (f *fakeAuthUserStore) UpdateMap(ctx context.Context, id uint, updates map[string]interface{}) error {
+func (f *fakeAuthUserStore) UpdateMap(ctx context.Context, id string, updates map[string]any) error {
 	return nil
 }
 
 func TestLogoutAllRevokesAllRefreshTokensForPerson(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
-	ginCtx.Set(gcontext.KeyPersonID, uint(42))
+	ginCtx.Set(gcontext.KeyPersonID, "42")
 	ginCtx.Request.Header.Set("Authorization", "")
 
-	var revokedPersonID uint
+	var revokedPersonID string
 	restoreRefreshTokenStore := swapRefreshTokenStoreFactory(func() authRefreshTokenStore {
 		return &fakeAuthRefreshTokenStore{
-			revokeByPersonIDFunc: func(ctx context.Context, personID uint) error {
+			revokeByPersonIDFunc: func(ctx context.Context, personID string) error {
 				revokedPersonID = personID
 				return nil
 			},
@@ -117,14 +116,14 @@ func TestLogoutAllRevokesAllRefreshTokensForPerson(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LogoutAll returned error: %v", err)
 	}
-	if revokedPersonID != 42 {
-		t.Fatalf("expected LogoutAll to revoke refresh tokens for person 42, got %d", revokedPersonID)
+	if revokedPersonID != "42" {
+		t.Fatalf("expected LogoutAll to revoke refresh tokens for person 42, got %s", revokedPersonID)
 	}
 }
 
 func TestRegisterReqBindingAllowsEmailOnlyIdentifier(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
-	body := []byte(`{"tenantID":1,"primaryEmail":"mail@example.com","password":"Password1","name":"tester"}`)
+	body := []byte(`{"tenantID":"1","primaryEmail":"mail@example.com","password":"Password1","name":"tester"}`)
 	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("new request: %v", err)
@@ -146,7 +145,7 @@ func TestRegisterReqBindingAllowsEmailOnlyIdentifier(t *testing.T) {
 
 func TestRegisterReqBindingAllowsPhoneOnlyIdentifier(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
-	body := []byte(`{"tenantID":1,"primaryPhone":"13800138000","password":"Password1","name":"tester"}`)
+	body := []byte(`{"tenantID":"1","primaryPhone":"13800138000","password":"Password1","name":"tester"}`)
 	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("new request: %v", err)
@@ -177,7 +176,7 @@ func TestRegisterAllowsEmailOnlyIdentifier(t *testing.T) {
 				return nil, nil
 			},
 			insertFunc: func(ctx context.Context, entity *model.PersonEntity) error {
-				entity.ID = 100
+				entity.ID = "100"
 				return nil
 			},
 		}
@@ -190,7 +189,7 @@ func TestRegisterAllowsEmailOnlyIdentifier(t *testing.T) {
 				return nil, nil
 			},
 			insertFunc: func(ctx context.Context, entity *model.UserEntity) error {
-				entity.ID = 101
+				entity.ID = "101"
 				copied := *entity
 				inserted = &copied
 				return nil
@@ -201,8 +200,8 @@ func TestRegisterAllowsEmailOnlyIdentifier(t *testing.T) {
 
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
 		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
-				return &model.TenantEntity{Model: gorm.Model{ID: 1}, Name: "租户A", Tag: "a"}, nil
+			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
+				return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}}, Name: "租户A", Tag: "a"}, nil
 			},
 		}
 	})
@@ -210,7 +209,7 @@ func TestRegisterAllowsEmailOnlyIdentifier(t *testing.T) {
 
 	svc := &authSvc{}
 	resp, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
-		TenantID:     1,
+		TenantID:     "1",
 		PrimaryEmail: "mail@example.com",
 		Password:     "Password1",
 		Name:         "tester",
@@ -218,14 +217,14 @@ func TestRegisterAllowsEmailOnlyIdentifier(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Register returned error: %v", err)
 	}
-	if resp == nil || resp.UserID != 101 {
+	if resp == nil || resp.UserID != "101" {
 		t.Fatalf("expected user id 101, got %#v", resp)
 	}
 	if inserted == nil {
 		t.Fatal("expected user to be inserted")
 	}
-	if inserted.TenantID != 1 {
-		t.Fatalf("expected tenant id 1, got %d", inserted.TenantID)
+	if inserted.TenantID != "1" {
+		t.Fatalf("expected tenant id 1, got %s", inserted.TenantID)
 	}
 	if inserted.Name != "tester" {
 		t.Fatalf("expected name tester, got %q", inserted.Name)
@@ -243,7 +242,7 @@ func TestRegisterAllowsPhoneOnlyIdentifier(t *testing.T) {
 				return nil, nil
 			},
 			insertFunc: func(ctx context.Context, entity *model.PersonEntity) error {
-				entity.ID = 100
+				entity.ID = "100"
 				return nil
 			},
 		}
@@ -256,7 +255,7 @@ func TestRegisterAllowsPhoneOnlyIdentifier(t *testing.T) {
 				return nil, nil
 			},
 			insertFunc: func(ctx context.Context, entity *model.UserEntity) error {
-				entity.ID = 102
+				entity.ID = "102"
 				copied := *entity
 				inserted = &copied
 				return nil
@@ -267,8 +266,8 @@ func TestRegisterAllowsPhoneOnlyIdentifier(t *testing.T) {
 
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
 		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
-				return &model.TenantEntity{Model: gorm.Model{ID: 1}, Name: "租户A", Tag: "a"}, nil
+			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
+				return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}}, Name: "租户A", Tag: "a"}, nil
 			},
 		}
 	})
@@ -276,7 +275,7 @@ func TestRegisterAllowsPhoneOnlyIdentifier(t *testing.T) {
 
 	svc := &authSvc{}
 	resp, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
-		TenantID:     1,
+		TenantID:     "1",
 		PrimaryPhone: "13800138000",
 		Password:     "Password1",
 		Name:         "tester",
@@ -284,14 +283,14 @@ func TestRegisterAllowsPhoneOnlyIdentifier(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Register returned error: %v", err)
 	}
-	if resp == nil || resp.UserID != 102 {
+	if resp == nil || resp.UserID != "102" {
 		t.Fatalf("expected user id 102, got %#v", resp)
 	}
 	if inserted == nil {
 		t.Fatal("expected user to be inserted")
 	}
-	if inserted.TenantID != 1 {
-		t.Fatalf("expected tenant id 1, got %d", inserted.TenantID)
+	if inserted.TenantID != "1" {
+		t.Fatalf("expected tenant id 1, got %s", inserted.TenantID)
 	}
 	if inserted.Name != "tester" {
 		t.Fatalf("expected name tester, got %q", inserted.Name)
@@ -319,10 +318,10 @@ func TestRegisterRejectsNonExistentTenant(t *testing.T) {
 	})
 	defer restoreUserStore()
 
-	var tenantLookup uint
+	var tenantLookup string
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
 		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
+			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
 				tenantLookup = id
 				return nil, nil
 			},
@@ -332,14 +331,14 @@ func TestRegisterRejectsNonExistentTenant(t *testing.T) {
 
 	svc := &authSvc{}
 	_, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
-		TenantID: 999,
+		TenantID: "999",
 		Username: "new-user",
 		Password: "Password1",
 		Name:     "tester",
 	})
 	assertCode(t, err, code.TenantNotExistError)
-	if tenantLookup != 999 {
-		t.Fatalf("expected tenant lookup with id 999, got %d", tenantLookup)
+	if tenantLookup != "999" {
+		t.Fatalf("expected tenant lookup with id 999, got %s", tenantLookup)
 	}
 }
 
@@ -354,7 +353,7 @@ func TestRegisterSetsUserAsOwnerAndJoinedAt(t *testing.T) {
 				return nil, nil
 			},
 			insertFunc: func(ctx context.Context, entity *model.PersonEntity) error {
-				entity.ID = 88
+				entity.ID = "88"
 				return nil
 			},
 		}
@@ -366,7 +365,7 @@ func TestRegisterSetsUserAsOwnerAndJoinedAt(t *testing.T) {
 				return nil, nil
 			},
 			insertFunc: func(ctx context.Context, entity *model.UserEntity) error {
-				entity.ID = 101
+				entity.ID = "101"
 				copied := *entity
 				insertedUser = &copied
 				return nil
@@ -376,8 +375,8 @@ func TestRegisterSetsUserAsOwnerAndJoinedAt(t *testing.T) {
 	defer restoreUserStore()
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
 		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
-				return &model.TenantEntity{Model: gorm.Model{ID: 1}, Name: "租户A", Tag: "a"}, nil
+			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
+				return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}}, Name: "租户A", Tag: "a"}, nil
 			},
 		}
 	})
@@ -385,7 +384,7 @@ func TestRegisterSetsUserAsOwnerAndJoinedAt(t *testing.T) {
 
 	svc := &authSvc{}
 	resp, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
-		TenantID: 1,
+		TenantID: "1",
 		Username: "new-user",
 		Password: "Password1",
 		Name:     "tester",
@@ -393,7 +392,7 @@ func TestRegisterSetsUserAsOwnerAndJoinedAt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Register returned error: %v", err)
 	}
-	if resp == nil || resp.UserID != 101 {
+	if resp == nil || resp.UserID != "101" {
 		t.Fatalf("expected user id 101, got %#v", resp)
 	}
 	if insertedUser == nil {
@@ -418,7 +417,7 @@ func TestRegisterRequiresAtLeastOneIdentifier(t *testing.T) {
 
 	svc := &authSvc{}
 	_, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
-		TenantID: 1,
+		TenantID: "1",
 		Password: "Password1",
 		Name:     "tester",
 	})
@@ -437,7 +436,7 @@ func TestRegisterCreatesPersonAccount(t *testing.T) {
 				return nil, nil
 			},
 			insertFunc: func(ctx context.Context, entity *model.PersonEntity) error {
-				entity.ID = 88
+				entity.ID = "88"
 				copied := *entity
 				insertedPerson = &copied
 				return nil
@@ -451,7 +450,7 @@ func TestRegisterCreatesPersonAccount(t *testing.T) {
 				return nil, nil
 			},
 			insertFunc: func(ctx context.Context, entity *model.UserEntity) error {
-				entity.ID = 101
+				entity.ID = "101"
 				copied := *entity
 				insertedUser = &copied
 				return nil
@@ -461,8 +460,8 @@ func TestRegisterCreatesPersonAccount(t *testing.T) {
 	defer restoreUserStore()
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
 		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
-				return &model.TenantEntity{Model: gorm.Model{ID: 1}, Name: "租户A", Tag: "a"}, nil
+			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
+				return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}}, Name: "租户A", Tag: "a"}, nil
 			},
 		}
 	})
@@ -470,7 +469,7 @@ func TestRegisterCreatesPersonAccount(t *testing.T) {
 
 	svc := &authSvc{}
 	resp, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
-		TenantID:     1,
+		TenantID:     "1",
 		Username:     "person-user",
 		PrimaryEmail: "mail@example.com",
 		Password:     "Password1",
@@ -479,7 +478,7 @@ func TestRegisterCreatesPersonAccount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Register returned error: %v", err)
 	}
-	if resp == nil || resp.UserID != 101 {
+	if resp == nil || resp.UserID != "101" {
 		t.Fatalf("expected created tenant user id 101, got %#v", resp)
 	}
 	if insertedPerson == nil {
@@ -497,7 +496,7 @@ func TestRegisterCreatesPersonAccount(t *testing.T) {
 	if insertedUser == nil {
 		t.Fatal("expected tenant user to be inserted")
 	}
-	if insertedUser.PersonID != 88 || insertedUser.TenantID != 1 {
+	if insertedUser.PersonID != "88" || insertedUser.TenantID != "1" {
 		t.Fatalf("expected tenant user to reference created person, got %#v", insertedUser)
 	}
 	if insertedUser.Name != "tester" {

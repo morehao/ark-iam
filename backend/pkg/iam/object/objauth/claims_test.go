@@ -20,11 +20,11 @@ func TestOIDCPrivateClaimsRoundTrip(t *testing.T) {
 	}{
 		{
 			name:   "person token with tenant",
-			claims: TokenClaims{RegisteredClaims: jwt.RegisteredClaims{Subject: "person:88"}, TenantID: 7},
+			claims: TokenClaims{RegisteredClaims: jwt.RegisteredClaims{Subject: "person:88"}, TenantID: "7"},
 		},
 		{
 			name:   "api key machine token",
-			claims: TokenClaims{RegisteredClaims: jwt.RegisteredClaims{Subject: "person:88"}, TenantID: 1, UserID: 7, TokenUsage: TokenUsageMachine},
+			claims: TokenClaims{RegisteredClaims: jwt.RegisteredClaims{Subject: "person:88"}, TenantID: "1", UserID: "7", TokenUsage: TokenUsageMachine},
 		},
 		{
 			name:   "client credentials token",
@@ -75,10 +75,10 @@ func TestOIDCPrivateClaimsRoundTrip(t *testing.T) {
 				t.Errorf("subject mismatch: got %q want %q", parsed.Subject, tc.claims.Subject)
 			}
 			if parsed.TenantID != tc.claims.TenantID {
-				t.Errorf("tenant_id mismatch: got %d want %d", parsed.TenantID, tc.claims.TenantID)
+				t.Errorf("tenant_id mismatch: got %s want %s", parsed.TenantID, tc.claims.TenantID)
 			}
 			if parsed.UserID != tc.claims.UserID {
-				t.Errorf("user_id mismatch: got %d want %d", parsed.UserID, tc.claims.UserID)
+				t.Errorf("user_id mismatch: got %s want %s", parsed.UserID, tc.claims.UserID)
 			}
 			if parsed.TokenUsage != tc.claims.TokenUsage {
 				t.Errorf("token_usage mismatch: got %q want %q", parsed.TokenUsage, tc.claims.TokenUsage)
@@ -93,8 +93,8 @@ func TestOIDCPrivateClaimsRoundTrip(t *testing.T) {
 // TestTokenClaimsHelpers 覆盖 PersonID / IsMachine / HasPerson。
 func TestTokenClaimsHelpers(t *testing.T) {
 	personTC := &TokenClaims{RegisteredClaims: jwt.RegisteredClaims{Subject: "person:123"}}
-	if got := personTC.PersonID(); got != 123 {
-		t.Errorf("person PersonID got %d want 123", got)
+	if got := personTC.PersonID(); got != "123" {
+		t.Errorf("person PersonID got %s want 123", got)
 	}
 	if !personTC.HasPerson() {
 		t.Error("person token should HasPerson")
@@ -104,8 +104,8 @@ func TestTokenClaimsHelpers(t *testing.T) {
 	}
 
 	machineTC := &TokenClaims{RegisteredClaims: jwt.RegisteredClaims{Subject: "client-1"}, TokenUsage: TokenUsageMachine}
-	if got := machineTC.PersonID(); got != 0 {
-		t.Errorf("machine PersonID got %d want 0", got)
+	if got := machineTC.PersonID(); got != "" {
+		t.Errorf("machine PersonID got %s want 0", got)
 	}
 	if machineTC.HasPerson() {
 		t.Error("machine token should not HasPerson")
@@ -115,8 +115,8 @@ func TestTokenClaimsHelpers(t *testing.T) {
 	}
 
 	invalidSub := &TokenClaims{RegisteredClaims: jwt.RegisteredClaims{Subject: "not-a-person"}}
-	if got := invalidSub.PersonID(); got != 0 {
-		t.Errorf("invalid subject PersonID got %d want 0", got)
+	if got := invalidSub.PersonID(); got != "" {
+		t.Errorf("invalid subject PersonID got %s want empty", got)
 	}
 }
 
@@ -127,8 +127,8 @@ func TestOIDCPrivateClaimsOmitEmpty(t *testing.T) {
 		t.Errorf("empty claims should produce empty map, got %v", empty)
 	}
 
-	onlyTenant := TokenClaims{TenantID: 9}.OIDCPrivateClaims()
-	if len(onlyTenant) != 1 || onlyTenant["tenant_id"] != uint(9) {
+	onlyTenant := TokenClaims{TenantID: "9"}.OIDCPrivateClaims()
+	if len(onlyTenant) != 1 || onlyTenant["tenant_id"] != "9" {
 		t.Errorf("tenant-only claims got %v", onlyTenant)
 	}
 }

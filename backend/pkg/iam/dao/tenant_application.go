@@ -8,8 +8,8 @@ import (
 
 type TenantApplicationCond struct {
 	*gormdao.BaseCond
-	TenantID uint
-	AppID    uint
+	TenantID string
+	AppID    string
 	Status   string
 }
 
@@ -17,10 +17,10 @@ func (c *TenantApplicationCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
-	if c.AppID != 0 {
+	if c.AppID != "" {
 		db.Where(tableName+".app_id = ?", c.AppID)
 	}
 	if c.Status != "" {
@@ -29,12 +29,12 @@ func (c *TenantApplicationCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type TenantApplicationDao struct {
-	*gormdao.Dao[model.TenantApplicationEntity, model.TenantApplicationEntityList, uint]
+	*gormdao.Dao[model.TenantApplicationEntity, model.TenantApplicationEntityList, string]
 }
 
 func NewTenantApplicationDao(opts ...DaoOption) *TenantApplicationDao {
 	return &TenantApplicationDao{
-		Dao: gormdao.NewDao[model.TenantApplicationEntity, model.TenantApplicationEntityList, uint](
+		Dao: gormdao.NewDao[model.TenantApplicationEntity, model.TenantApplicationEntityList, string](
 			model.TableNameTenantApplication, "TenantApplicationDao",
 			resolveDBGetter(opts...),
 		),

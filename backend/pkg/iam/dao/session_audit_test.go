@@ -33,25 +33,25 @@ func TestSessionAuditDao_InsertAndGetByCond(t *testing.T) {
 
 	now := time.Now()
 	entity := &model.SessionAuditEntity{
-		PersonID:  55,
+		PersonID:  "55",
 		SessionID: "sess-abc-123",
-		TenantID:  1,
+		TenantID:  "1",
 		ClientIP:  "10.0.0.1",
 		UserAgent: "go-test-ua",
 		LoginTime: now,
 		Status:    "active",
-		CreatedBy: 55,
-		UpdatedBy: 55,
+		CreatedBy: "55",
+		UpdatedBy: "55",
 	}
 	if err := sessionAuditDao.Insert(context.Background(), entity); err != nil {
 		t.Fatalf("Insert failed: %v", err)
 	}
-	if entity.ID == 0 {
+	if entity.ID == "" {
 		t.Fatal("expected non-zero ID after insert")
 	}
 
 	got, err := sessionAuditDao.GetByCond(context.Background(), &SessionAuditCond{
-		PersonID:  55,
+		PersonID:  "55",
 		SessionID: "sess-abc-123",
 		Status:    "active",
 	})
@@ -62,16 +62,16 @@ func TestSessionAuditDao_InsertAndGetByCond(t *testing.T) {
 		t.Fatal("expected one session audit row")
 	}
 	if got.ID != entity.ID {
-		t.Fatalf("expected id %d, got %d", entity.ID, got.ID)
+		t.Fatalf("expected id %s, got %s", entity.ID, got.ID)
 	}
-	if got.PersonID != 55 {
-		t.Fatalf("expected person_id 55, got %d", got.PersonID)
+	if got.PersonID != "55" {
+		t.Fatalf("expected person_id 55, got %s", got.PersonID)
 	}
 	if got.SessionID != "sess-abc-123" {
 		t.Fatalf("expected session_id 'sess-abc-123', got '%s'", got.SessionID)
 	}
-	if got.TenantID != 1 {
-		t.Fatalf("expected tenant_id 1, got %d", got.TenantID)
+	if got.TenantID != "1" {
+		t.Fatalf("expected tenant_id 1, got %s", got.TenantID)
 	}
 	if got.ClientIP != "10.0.0.1" {
 		t.Fatalf("expected client_ip '10.0.0.1', got '%s'", got.ClientIP)

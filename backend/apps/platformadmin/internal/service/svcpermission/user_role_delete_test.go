@@ -11,24 +11,24 @@ import (
 
 func TestDeleteUserRoleUsesTenantScopedCompositeLookup(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.UserRoleEntity{})
-	ctx := newGinCtx(41, 9001)
+	ctx := newGinCtx("41", "9001")
 
-	relation := &model.UserRoleEntity{TenantID: 41, UserID: 12, RoleID: 34}
+	relation := &model.UserRoleEntity{TenantID: "41", UserID: "12", RoleID: "34"}
 	if err := db.Create(relation).Error; err != nil {
 		t.Fatalf("seed user role: %v", err)
 	}
 
 	svc := &userRoleSvc{}
-	err := svc.Delete(ctx, &dtopermission.UserRoleDeleteReq{TenantID: 999, UserID: 12, RoleID: 34})
+	err := svc.Delete(ctx, &dtopermission.UserRoleDeleteReq{TenantID: "999", UserID: "12", RoleID: "34"})
 	if err != nil {
 		t.Fatalf("Delete returned error: %v", err)
 	}
 
 	// 软删除后按租户+用户+角色组合条件应查不到
 	left, err := dao.NewUserRoleDao().GetListByCond(ctx, &dao.UserRoleCond{
-		TenantID: 41,
-		UserID:   12,
-		RoleID:   34,
+		TenantID: "41",
+		UserID:   "12",
+		RoleID:   "34",
 	})
 	if err != nil {
 		t.Fatalf("GetListByCond: %v", err)
@@ -44,25 +44,25 @@ func TestDeleteUserRoleUsesTenantScopedCompositeLookup(t *testing.T) {
 	if softDeleted.DeletedAt.Time.IsZero() {
 		t.Fatalf("expected soft delete timestamp")
 	}
-	if softDeleted.DeletedBy != 9001 {
-		t.Fatalf("expected deletedBy 9001, got %d", softDeleted.DeletedBy)
+	if softDeleted.DeletedBy != "9001" {
+		t.Fatalf("expected deletedBy 9001, got %s", softDeleted.DeletedBy)
 	}
 }
 
 func TestDeleteUserRoleReturnsNotExistWhenCompositeLookupMisses(t *testing.T) {
 	testutil.SetupSQLite(t, &model.UserRoleEntity{})
-	ctx := newGinCtx(42, 9002)
+	ctx := newGinCtx("42", "9002")
 
 	svc := &userRoleSvc{}
-	err := svc.Delete(ctx, &dtopermission.UserRoleDeleteReq{UserID: 12, RoleID: 34})
+	err := svc.Delete(ctx, &dtopermission.UserRoleDeleteReq{UserID: "12", RoleID: "34"})
 	if err == nil {
 		t.Fatalf("expected not exist error")
 	}
 
 	left, err := dao.NewUserRoleDao().GetListByCond(ctx, &dao.UserRoleCond{
-		TenantID: 42,
-		UserID:   12,
-		RoleID:   34,
+		TenantID: "42",
+		UserID:   "12",
+		RoleID:   "34",
 	})
 	if err != nil {
 		t.Fatalf("GetListByCond: %v", err)

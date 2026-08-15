@@ -38,7 +38,7 @@ func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 		// 本应用的下一次请求即判 401，实现"一处登出、处处登出"的即时性。
 		// 前提：本应用与 auth 共享同一认证 Redis。
 		oidcAuthOpts = append(oidcAuthOpts,
-			oidcauth.WithOIDCSSOValidation(func(ctx *gin.Context, personID uint, isMachineToken bool) bool {
+			oidcauth.WithOIDCSSOValidation(func(ctx *gin.Context, personID string, isMachineToken bool) bool {
 				if isMachineToken {
 					return true
 				}
@@ -47,7 +47,7 @@ func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 				}
 				active, err := ssoStore.HasActiveSession(ctx.Request.Context(), personID)
 				if err != nil {
-					glog.Warnf(ctx, "[platformadmin.Init] HasActiveSession fail, personID:%d, err:%v", personID, err)
+					glog.Warnf(ctx, "[platformadmin.Init] HasActiveSession fail, personID:%s, err:%v", personID, err)
 					return true
 				}
 				return active

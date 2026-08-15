@@ -8,33 +8,33 @@ import (
 
 type OrganizationUserCond struct {
 	*gormdao.BaseCond
-	TenantID       uint
-	OrganizationID uint
-	UserID         uint
+	TenantID       string
+	OrganizationID string
+	UserID         string
 }
 
 func (c *OrganizationUserCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
-	if c.OrganizationID != 0 {
+	if c.OrganizationID != "" {
 		db.Where(tableName+".organization_id = ?", c.OrganizationID)
 	}
-	if c.UserID != 0 {
+	if c.UserID != "" {
 		db.Where(tableName+".user_id = ?", c.UserID)
 	}
 }
 
 type OrganizationUserDao struct {
-	*gormdao.Dao[model.OrganizationUserEntity, model.OrganizationUserEntityList, uint]
+	*gormdao.Dao[model.OrganizationUserEntity, model.OrganizationUserEntityList, string]
 }
 
 func NewOrganizationUserDao(opts ...DaoOption) *OrganizationUserDao {
 	return &OrganizationUserDao{
-		Dao: gormdao.NewDao[model.OrganizationUserEntity, model.OrganizationUserEntityList, uint](
+		Dao: gormdao.NewDao[model.OrganizationUserEntity, model.OrganizationUserEntityList, string](
 			model.TableNameOrganizationUser, "OrganizationUserDao",
 			resolveDBGetter(opts...),
 		),

@@ -37,7 +37,7 @@ type accessTokenMeta struct {
 	Scopes     []string  `json:"scopes"`
 	IssuedAt   time.Time `json:"issuedAt"`
 	ExpiresAt  time.Time `json:"expiresAt"`
-	TenantID   uint      `json:"tenantID,omitempty"`
+	TenantID   string    `json:"tenantID,omitempty"`
 	SessionID  string    `json:"sessionID,omitempty"`
 	TokenUsage string    `json:"tokenUsage,omitempty"`
 	Username   string    `json:"username,omitempty"`

@@ -9,13 +9,13 @@ import (
 	"github.com/morehao/golib/biz/testkit"
 )
 
-func WithIamContext(userID uint) testkit.Option {
+func WithIamContext(userID string) testkit.Option {
 	return func(gc *gin.Context) {
 		user, err := dao.NewUserDao().GetByID(context.Background(), userID)
 		if err != nil {
 			panic(err)
 		}
-		if user == nil || user.ID == 0 {
+		if user == nil || user.ID == "" {
 			panic("user not found")
 		}
 
@@ -23,7 +23,7 @@ func WithIamContext(userID uint) testkit.Option {
 		gc.Set(gcontext.KeyTenantID, user.TenantID)
 		gc.Set(gcontext.KeyPersonID, user.PersonID)
 
-		if user.TenantID > 0 {
+		if user.TenantID != "" {
 			relation, err := dao.NewUserDepartmentDao().GetByCond(context.Background(), &dao.UserDepartmentCond{
 				UserID: userID,
 			})

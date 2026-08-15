@@ -8,7 +8,7 @@ import (
 
 type OrganizationCond struct {
 	*gormdao.BaseCond
-	TenantID uint
+	TenantID string
 	Name     string
 }
 
@@ -16,7 +16,7 @@ func (c *OrganizationCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
 	if c.Name != "" {
@@ -25,12 +25,12 @@ func (c *OrganizationCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type OrganizationDao struct {
-	*gormdao.Dao[model.OrganizationEntity, model.OrganizationEntityList, uint]
+	*gormdao.Dao[model.OrganizationEntity, model.OrganizationEntityList, string]
 }
 
 func NewOrganizationDao(opts ...DaoOption) *OrganizationDao {
 	return &OrganizationDao{
-		Dao: gormdao.NewDao[model.OrganizationEntity, model.OrganizationEntityList, uint](
+		Dao: gormdao.NewDao[model.OrganizationEntity, model.OrganizationEntityList, string](
 			model.TableNameOrganization, "OrganizationDao",
 			resolveDBGetter(opts...),
 		),

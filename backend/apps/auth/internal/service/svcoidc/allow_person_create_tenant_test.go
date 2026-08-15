@@ -27,7 +27,7 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			name:        "person already has tenants => false even if policy allows",
 			clientID:    "cid-1",
 			tenantCount: 1,
-			client:      &model.ApplicationClientEntity{AppID: 7},
+			client:      &model.ApplicationClientEntity{AppID: "7"},
 			app:         &model.ApplicationEntity{TenantPolicy: datatypes.JSON(`{"allowPersonCreateTenant":true}`)},
 			want:        false,
 		},
@@ -41,7 +41,7 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			name:        "policy allow => true",
 			clientID:    "cid-2",
 			tenantCount: 0,
-			client:      &model.ApplicationClientEntity{AppID: 7},
+			client:      &model.ApplicationClientEntity{AppID: "7"},
 			app:         &model.ApplicationEntity{TenantPolicy: datatypes.JSON(`{"allowPersonCreateTenant":true}`)},
 			want:        true,
 		},
@@ -49,7 +49,7 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			name:        "policy disallow => false",
 			clientID:    "cid-3",
 			tenantCount: 0,
-			client:      &model.ApplicationClientEntity{AppID: 8},
+			client:      &model.ApplicationClientEntity{AppID: "8"},
 			app:         &model.ApplicationEntity{TenantPolicy: datatypes.JSON(`{"allowPersonCreateTenant":false}`)},
 			want:        false,
 		},
@@ -57,7 +57,7 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			name:        "policy absent => false",
 			clientID:    "cid-4",
 			tenantCount: 0,
-			client:      &model.ApplicationClientEntity{AppID: 9},
+			client:      &model.ApplicationClientEntity{AppID: "9"},
 			app:         &model.ApplicationEntity{TenantPolicy: datatypes.JSON(`{}`)},
 			want:        false,
 		},
@@ -74,7 +74,7 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			db := newAllowPersonCreateTenantTestDB(t)
 			if c.client != nil && c.clientID != "" {
 				client := c.client
-				client.Model = gorm.Model{ID: client.AppID}
+				client.ID = client.AppID
 				client.ClientID = c.clientID
 				client.RedirectURIs = datatypes.JSON(`[]`)
 				client.PostLogoutRedirectURIs = datatypes.JSON(`[]`)
@@ -88,8 +88,8 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			}
 			if c.client != nil && c.app != nil && c.clientID != "" {
 				app := c.app
-				app.Model = gorm.Model{ID: c.client.AppID}
-				app.Code = fmt.Sprintf("app-%d", c.client.AppID)
+				app.ID = c.client.AppID
+				app.Code = fmt.Sprintf("app-%s", c.client.AppID)
 				if err := db.Create(app).Error; err != nil {
 					t.Fatalf("seed app: %v", err)
 				}

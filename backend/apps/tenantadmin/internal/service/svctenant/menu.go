@@ -3,11 +3,11 @@ package svctenant
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objpermission"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/glog"
 )
 
@@ -25,7 +25,7 @@ func NewTenantMenuSvc() TenantMenuSvc {
 }
 
 func (svc *tenantMenuSvc) Tree(ctx *gin.Context) (*dtotenant.MenuTreeResp, error) {
-	tenantID := gincontext.GetTenantID(ctx)
+	tenantID := gctx.GetTenantID(ctx)
 
 	// 当前租户订阅的启用应用
 	tenantAppList, _, err := dao.NewTenantApplicationDao().GetPageListByCond(ctx, &dao.TenantApplicationCond{
@@ -33,19 +33,19 @@ func (svc *tenantMenuSvc) Tree(ctx *gin.Context) (*dtotenant.MenuTreeResp, error
 		Status:   model.AppStatusEnable,
 	})
 	if err != nil {
-		glog.Errorf(ctx, "[svctenant.TenantMenuTree] dao tenantApplication GetPageListByCond fail, err:%v, tenantID:%d", err, tenantID)
+		glog.Errorf(ctx, "[svctenant.TenantMenuTree] dao tenantApplication GetPageListByCond fail, err:%v, tenantID:%s", err, tenantID)
 		return nil, code.GetError(code.MenuGetPageListError)
 	}
 
 	// 收集订阅应用，排除平台系统内置应用（如管理后台），租户自服务只展示租户可用的应用菜单
-	appIDs := make(map[uint]struct{})
+	appIDs := make(map[string]struct{})
 	for _, item := range tenantAppList {
-		if item.AppID == 0 {
+		if item.AppID == "" {
 			continue
 		}
 		appEntity, err := dao.NewApplicationDao().GetByID(ctx, item.AppID)
-		if err != nil || appEntity == nil || appEntity.ID == 0 {
-			glog.Warnf(ctx, "[svctenant.TenantMenuTree] application GetByID fail or not exist, err:%v, appID:%d", err, item.AppID)
+		if err != nil || appEntity == nil || appEntity.ID == "" {
+			glog.Warnf(ctx, "[svctenant.TenantMenuTree] application GetByID fail or not exist, err:%v, appID:%s", err, item.AppID)
 			continue
 		}
 		if appEntity.IsSystem == 1 {
@@ -61,7 +61,7 @@ func (svc *tenantMenuSvc) Tree(ctx *gin.Context) (*dtotenant.MenuTreeResp, error
 			Status: model.AppStatusEnable,
 		})
 		if err != nil {
-			glog.Errorf(ctx, "[svctenant.TenantMenuTree] dao menu GetPageListByCond fail, err:%v, appID:%d", err, appID)
+			glog.Errorf(ctx, "[svctenant.TenantMenuTree] dao menu GetPageListByCond fail, err:%v, appID:%s", err, appID)
 			return nil, code.GetError(code.MenuGetPageListError)
 		}
 		for i := range menuEntityList {
@@ -69,8 +69,8 @@ func (svc *tenantMenuSvc) Tree(ctx *gin.Context) (*dtotenant.MenuTreeResp, error
 		}
 	}
 
-	var buildTree func(parentID uint) []dtotenant.MenuTreeItem
-	buildTree = func(parentID uint) []dtotenant.MenuTreeItem {
+	var buildTree func(parentID string) []dtotenant.MenuTreeItem
+	buildTree = func(parentID string) []dtotenant.MenuTreeItem {
 		var items []dtotenant.MenuTreeItem
 		for _, menu := range menus {
 			if menu.ParentID != parentID {
@@ -103,6 +103,6 @@ func (svc *tenantMenuSvc) Tree(ctx *gin.Context) (*dtotenant.MenuTreeResp, error
 	}
 
 	return &dtotenant.MenuTreeResp{
-		List: buildTree(0),
+		List: buildTree(""),
 	}, nil
 }

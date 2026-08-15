@@ -39,8 +39,12 @@ trace:
   otlp:
     endpoint: "127.0.0.1:4317"
 
+db:
+  auto_migrate: true   # 启动时基于 GORM AutoMigrate 自动建表/增量同步（幂等）
+  seed: true           # 启动时幂等写入基础种子数据（租户/角色/权限/菜单/管理员/应用客户端）
+
 db_configs:
-  - url: "mysql://root:123456@127.0.0.1:3306/iam?charset=utf8mb4&parseTime=True&loc=Local"
+  - url: "postgres://postgres:123456@127.0.0.1:5432/iam?sslmode=disable&TimeZone=Asia/Shanghai"
     service: iam
 
 redis_config:
@@ -123,8 +127,15 @@ oidc:
 
 | 配置项 | 说明 |
 |---|---|
-| `url` | MySQL DSN（`mysql://user:pass@host:port/db?charset=utf8mb4&parseTime=True&loc=Local`） |
+| `url` | PostgreSQL DSN（`postgres://user:pass@host:port/db?sslmode=disable&TimeZone=Asia/Shanghai`） |
 | `service` | 库服务名（本系统 `iam`），应用通过 `dbclient.IamDB(ctx)` 访问 |
+
+## 5.1 db（启动行为）
+
+| 配置项 | 说明 |
+|---|---|
+| `auto_migrate` | 启动时基于 GORM AutoMigrate 自动创建/增量同步全部数据表（幂等，只增不改不删）；关闭后需自行执行 schema 初始化 |
+| `seed` | 启动时幂等写入基础种子数据（平台租户、角色、资源、权限、菜单、管理员账号 admin/admin123、OIDC 测试客户端）；基于唯一键查重，可安全重复执行 |
 
 > 多租户预留：`tenant.db_user` 字段支持按租户路由数据库用户（当前未启用分库）。
 

@@ -77,7 +77,7 @@ flowchart TB
     end
 
     subgraph INFRA["基础设施"]
-        MYSQL[("MySQL<br/>iam 库（主数据）")]
+        PG[("PostgreSQL<br/>iam 库（主数据）")]
         REDIS[("Redis<br/>SSO 会话 / 授权状态 / 令牌元数据 / SLO 队列")]
         OTLP[("OpenTelemetry Collector<br/>链路追踪")]
     end
@@ -160,7 +160,7 @@ flowchart TB
 | 后端框架 | Gin + GORM + Go workspace（`backend/go.work`，5 个模块） |
 | OIDC Provider | [zitadel/oidc/v3](https://github.com/zitadel/oidc)（`op` 包） |
 | JWT | golang-jwt/jwt/v5（RP 校验）、go-jose（logout_token 签名） |
-| 数据库 | MySQL（主库，`iam`），测试用 SQLite 内存库 |
+| 数据库 | PostgreSQL（主库，`iam`，启动时 AutoMigrate 自动建表），测试用 SQLite 内存库 |
 | 缓存/会话 | Redis（SSO 会话、授权状态、令牌元数据、SLO 队列） |
 | 日志 | golib/glog（zap 内核，全链路 requestID / traceID） |
 | 链路追踪 | OpenTelemetry（OTLP gRPC Collector） |
@@ -598,7 +598,7 @@ sequenceDiagram
     autonumber
     actor U as 用户
     participant A as auth 应用
-    participant DB as MySQL
+    participant DB as PostgreSQL
 
     U->>A: POST /v1/auth/register（租户ID、用户名/邮箱/手机号、密码、姓名）
     A->>A: 校验密码强度（≥6 位，含大小写+数字）
@@ -618,7 +618,7 @@ sequenceDiagram
     actor U as 用户
     participant LW as login-web（:3000）
     participant A as auth（OP）
-    participant DB as MySQL
+    participant DB as PostgreSQL
     participant RD as Redis
 
     U->>LW: 提交用户名/密码（POST /oidc/login，带 authRequestID）
@@ -729,7 +729,7 @@ sequenceDiagram
     autonumber
     participant SVC as 后端服务
     participant API as 业务 API
-    participant DB as MySQL
+    participant DB as PostgreSQL
 
     SVC->>API: 请求（Header: x-api-key: ak_xxx...）
     API->>DB: 按 key_prefix 定位 + 校验 key_hash + 校验未过期/未吊销
@@ -745,7 +745,7 @@ sequenceDiagram
     actor U as 用户
     participant A as auth（OP）
     participant EXT as 外部 IdP（如企业微信/Google）
-    participant DB as MySQL
+    participant DB as PostgreSQL
 
     U->>A: 发起 connector 授权（POST /oidc/... 或 connector authorize）
     A->>EXT: 跳转外部 IdP 授权（OAuth2/OIDC connector 驱动）

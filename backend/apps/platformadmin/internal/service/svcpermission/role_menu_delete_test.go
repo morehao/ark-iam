@@ -11,7 +11,7 @@ import (
 	"github.com/morehao/golib/biz/gcontext"
 )
 
-func newGinCtx(tenantID, userID uint) *gin.Context {
+func newGinCtx(tenantID, userID string) *gin.Context {
 	ctx, _ := gin.CreateTestContext(nil)
 	ctx.Set(gcontext.KeyTenantID, tenantID)
 	ctx.Set(gcontext.KeyUserID, userID)
@@ -20,24 +20,24 @@ func newGinCtx(tenantID, userID uint) *gin.Context {
 
 func TestDeleteRoleMenuUsesTenantScopedCompositeLookup(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.RoleMenuEntity{})
-	ctx := newGinCtx(51, 9101)
+	ctx := newGinCtx("51", "9101")
 
-	relation := &model.RoleMenuEntity{TenantID: 51, RoleID: 21, MenuID: 43}
+	relation := &model.RoleMenuEntity{TenantID: "51", RoleID: "21", MenuID: "43"}
 	if err := db.Create(relation).Error; err != nil {
 		t.Fatalf("seed role menu: %v", err)
 	}
 
 	svc := &roleMenuSvc{}
-	err := svc.Delete(ctx, &dtopermission.RoleMenuDeleteReq{TenantID: 999, RoleID: 21, MenuID: 43})
+	err := svc.Delete(ctx, &dtopermission.RoleMenuDeleteReq{TenantID: "999", RoleID: "21", MenuID: "43"})
 	if err != nil {
 		t.Fatalf("Delete returned error: %v", err)
 	}
 
 	// 软删除后按租户+角色+菜单组合条件应查不到
 	left, err := dao.NewRoleMenuDao().GetListByCond(ctx, &dao.RoleMenuCond{
-		TenantID: 51,
-		RoleID:   21,
-		MenuID:   43,
+		TenantID: "51",
+		RoleID:   "21",
+		MenuID:   "43",
 	})
 	if err != nil {
 		t.Fatalf("GetListByCond: %v", err)
@@ -54,25 +54,25 @@ func TestDeleteRoleMenuUsesTenantScopedCompositeLookup(t *testing.T) {
 	if softDeleted.DeletedAt.Time.IsZero() {
 		t.Fatalf("expected soft delete timestamp")
 	}
-	if softDeleted.DeletedBy != 9101 {
-		t.Fatalf("expected deletedBy 9101, got %d", softDeleted.DeletedBy)
+	if softDeleted.DeletedBy != "9101" {
+		t.Fatalf("expected deletedBy 9101, got %s", softDeleted.DeletedBy)
 	}
 }
 
 func TestDeleteRoleMenuReturnsNotExistWhenCompositeLookupMisses(t *testing.T) {
 	testutil.SetupSQLite(t, &model.RoleMenuEntity{})
-	ctx := newGinCtx(52, 9102)
+	ctx := newGinCtx("52", "9102")
 
 	svc := &roleMenuSvc{}
-	err := svc.Delete(ctx, &dtopermission.RoleMenuDeleteReq{RoleID: 21, MenuID: 43})
+	err := svc.Delete(ctx, &dtopermission.RoleMenuDeleteReq{RoleID: "21", MenuID: "43"})
 	if err == nil {
 		t.Fatalf("expected not exist error")
 	}
 
 	left, err := dao.NewRoleMenuDao().GetListByCond(ctx, &dao.RoleMenuCond{
-		TenantID: 52,
-		RoleID:   21,
-		MenuID:   43,
+		TenantID: "52",
+		RoleID:   "21",
+		MenuID:   "43",
 	})
 	if err != nil {
 		t.Fatalf("GetListByCond: %v", err)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rsa"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -35,7 +34,7 @@ type AuthRequest struct {
 	Audience      []string            `json:"audience"`
 	DoneFlag      bool                `json:"done_flag"`
 	ExpiresAt     time.Time           `json:"expires_at"`
-	TenantID      uint                `json:"tenant_id"`
+	TenantID      string              `json:"tenant_id"`
 	SessionID     string              `json:"session_id"`
 }
 
@@ -54,7 +53,7 @@ func (a *AuthRequest) GetScopes() []string                   { return a.Scopes }
 func (a *AuthRequest) GetState() string                      { return a.State }
 func (a *AuthRequest) GetSubject() string                    { return a.Subject }
 func (a *AuthRequest) Done() bool                            { return a.DoneFlag }
-func (a *AuthRequest) GetTenantID() uint                     { return a.TenantID }
+func (a *AuthRequest) GetTenantID() string                   { return a.TenantID }
 func (a *AuthRequest) GetSessionID() string                  { return a.SessionID }
 
 type OIDCStorage struct {
@@ -140,7 +139,7 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 	}
 	// authorization_code：优先用认证流程确定的租户
 	if authReq, ok := request.(*AuthRequest); ok {
-		if tid := authReq.GetTenantID(); tid > 0 {
+		if tid := authReq.GetTenantID(); tid != "" {
 			if pid, perr := parseOIDCSubject(authReq.GetSubject()); perr == nil {
 				if users, uerr := s.persistentStore.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid, TenantID: tid}); uerr == nil && len(users) > 0 {
 					claims := objauth.TokenClaims{TenantID: tid}.OIDCPrivateClaims()
@@ -156,7 +155,7 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 	}
 	// refresh token 轮换：保留存储的租户，避免重新落到 users[0]
 	if rr, ok := request.(*refreshTokenRequest); ok {
-		if tid := rr.GetTenantID(); tid > 0 {
+		if tid := rr.GetTenantID(); tid != "" {
 			if pid, perr := parseOIDCSubject(rr.GetSubject()); perr == nil {
 				if users, uerr := s.persistentStore.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid, TenantID: tid}); uerr == nil && len(users) > 0 {
 					claims := objauth.TokenClaims{TenantID: tid}.OIDCPrivateClaims()
@@ -198,8 +197,8 @@ func (s *OIDCStorage) ValidateJWTProfileScopes(ctx context.Context, userID strin
 }
 
 func (s *OIDCStorage) CreateAuthRequest(ctx context.Context, authReq *oidc.AuthRequest, userID string) (op.AuthRequest, error) {
-	var tenantID uint
-	if v, ok := ctx.Value(ctxTenantHintKey).(uint); ok {
+	var tenantID string
+	if v, ok := ctx.Value(ctxTenantHintKey).(string); ok {
 		tenantID = v
 	}
 	// M3：客户端配置 require_pkce=1 时强制 PKCE（RFC 7636），缺失 code_challenge 直接拒绝。
@@ -237,7 +236,7 @@ func (s *OIDCStorage) AuthRequestByCode(ctx context.Context, code string) (op.Au
 	return s.protocolStore.AuthRequestByCode(ctx, code)
 }
 
-func (s *OIDCStorage) CompleteAuthRequest(ctx context.Context, id string, subject string, authTime time.Time, amr []string, acr string, tenantID uint, done bool) error {
+func (s *OIDCStorage) CompleteAuthRequest(ctx context.Context, id string, subject string, authTime time.Time, amr []string, acr string, tenantID string, done bool) error {
 	return s.protocolStore.CompleteAuthRequest(ctx, id, subject, authTime, amr, acr, tenantID, done)
 }
 
@@ -315,8 +314,8 @@ type clientCredentialsTokenRequest struct {
 	scopes        []string
 	clientID      string
 	isApiKey      bool
-	ownerTenantID uint
-	ownerUserID   uint
+	ownerTenantID string
+	ownerUserID   string
 }
 
 func (r *clientCredentialsTokenRequest) GetSubject() string    { return r.subject }
@@ -345,7 +344,7 @@ func (s *OIDCStorage) TerminateSessionFromRequest(ctx context.Context, endSessio
 
 	// 撤销 SSO 会话 + 吊销该 person 全部 refresh（D2=A 防续命兜底）
 	if tErr := s.persistentStore.TerminateSession(ctx, endSessionRequest.UserID, endSessionRequest.ClientID); tErr != nil {
-		glog.Warnf(ctx, "[svcoidc.TerminateSessionFromRequest] terminate session fail, personID:%d, err:%v", personID, tErr)
+		glog.Warnf(ctx, "[svcoidc.TerminateSessionFromRequest] terminate session fail, personID:%s, err:%v", personID, tErr)
 	}
 
 	// 取待通知的登记：优先按 sid 精确（M4 后），否则按 person 全部
@@ -358,7 +357,7 @@ func (s *OIDCStorage) TerminateSessionFromRequest(ctx context.Context, endSessio
 		regs, err = slo.ListByPersonID(ctx, personID)
 	}
 	if err != nil {
-		glog.Warnf(ctx, "[svcoidc.TerminateSessionFromRequest] list registrations fail, personID:%d, err:%v", personID, err)
+		glog.Warnf(ctx, "[svcoidc.TerminateSessionFromRequest] list registrations fail, personID:%s, err:%v", personID, err)
 		regs = nil
 	}
 
@@ -392,21 +391,20 @@ func (s *OIDCStorage) GetRefreshTokenInfo(ctx context.Context, clientID string, 
 	return s.persistentStore.GetRefreshTokenInfo(ctx, clientID, tokenValue)
 }
 
-func buildOIDCSubject(personID uint) string {
-	return fmt.Sprintf("person:%d", personID)
+func buildOIDCSubject(personID string) string {
+	return fmt.Sprintf("person:%s", personID)
 }
 
-func parseOIDCSubject(subject string) (uint, error) {
+func parseOIDCSubject(subject string) (string, error) {
 	const prefix = "person:"
 	if !strings.HasPrefix(subject, prefix) {
-		return 0, fmt.Errorf("invalid oidc subject: %s", subject)
+		return "", fmt.Errorf("invalid oidc subject: %s", subject)
 	}
 	rawID := strings.TrimPrefix(subject, prefix)
-	personID, err := strconv.ParseUint(rawID, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid oidc subject: %s", subject)
+	if rawID == "" {
+		return "", fmt.Errorf("invalid oidc subject: %s", subject)
 	}
-	return uint(personID), nil
+	return rawID, nil
 }
 
 func (s *OIDCStorage) SigningKey(ctx context.Context) (op.SigningKey, error) {

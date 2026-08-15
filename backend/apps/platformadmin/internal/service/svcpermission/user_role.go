@@ -3,10 +3,10 @@ package svcpermission
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtopermission"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
@@ -32,7 +32,7 @@ func (svc *userRoleSvc) Create(ctx *gin.Context, req *dtopermission.UserRoleCrea
 		glog.Errorf(ctx, "[svcpermission.CreateUserRole] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.RoleGetDetailError)
 	}
-	if !roleVisibleToTenant(roleEntity, gincontext.GetTenantID(ctx)) {
+	if !roleVisibleToTenant(roleEntity, gctx.GetTenantID(ctx)) {
 		return nil, code.GetError(code.RoleNotExistError)
 	}
 
@@ -40,7 +40,7 @@ func (svc *userRoleSvc) Create(ctx *gin.Context, req *dtopermission.UserRoleCrea
 		TenantID:  req.TenantID,
 		UserID:    req.UserID,
 		RoleID:    req.RoleID,
-		CreatedBy: gincontext.GetUserID(ctx),
+		CreatedBy: gctx.GetUserID(ctx),
 	}
 
 	if err := dao.NewUserRoleDao().Insert(ctx, insertEntity); err != nil {
@@ -53,7 +53,7 @@ func (svc *userRoleSvc) Create(ctx *gin.Context, req *dtopermission.UserRoleCrea
 func (svc *userRoleSvc) Delete(ctx *gin.Context, req *dtopermission.UserRoleDeleteReq) error {
 	userRoleDao := dao.NewUserRoleDao()
 	userRoleEntityList, err := userRoleDao.GetListByCond(ctx, &dao.UserRoleCond{
-		TenantID: gincontext.GetTenantID(ctx),
+		TenantID: gctx.GetTenantID(ctx),
 		UserID:   req.UserID,
 		RoleID:   req.RoleID,
 	})
@@ -61,11 +61,11 @@ func (svc *userRoleSvc) Delete(ctx *gin.Context, req *dtopermission.UserRoleDele
 		glog.Errorf(ctx, "[svcpermission.DeleteUserRole] dao GetListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserRoleDeleteError)
 	}
-	if len(userRoleEntityList) == 0 || userRoleEntityList[0].ID == 0 {
+	if len(userRoleEntityList) == 0 || userRoleEntityList[0].ID == "" {
 		return code.GetError(code.UserRoleNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	if err := userRoleDao.Delete(ctx, userRoleEntityList[0].ID, userID); err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteUserRole] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserRoleDeleteError)

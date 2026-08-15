@@ -36,7 +36,7 @@ export default function OrganizationRoleList() {
     void load()
   }, [load])
 
-  const orgName = (id: number) => organizations.find((o) => o.organizationID === id)?.name ?? `#${id}`
+  const orgName = (id: string) => organizations.find((o) => o.organizationID === id)?.name ?? `#${id}`
 
   const submit = async () => {
     try {
@@ -59,7 +59,7 @@ export default function OrganizationRoleList() {
     }
   }
 
-  const remove = async (id: number) => {
+  const remove = async (id: string) => {
     await deleteOrganizationRole(id)
     message.success('删除成功')
     void load()

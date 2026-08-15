@@ -12,7 +12,7 @@ import (
 
 type DomainCond struct {
 	*gormdao.BaseCond
-	TenantID uint
+	TenantID string
 	Domain   string
 }
 
@@ -20,7 +20,7 @@ func (c *DomainCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
 	if c.Domain != "" {
@@ -29,19 +29,19 @@ func (c *DomainCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type DomainDao struct {
-	*gormdao.Dao[model.DomainEntity, model.DomainEntityList, uint]
+	*gormdao.Dao[model.DomainEntity, model.DomainEntityList, string]
 }
 
 func NewDomainDao(opts ...DaoOption) *DomainDao {
 	return &DomainDao{
-		Dao: gormdao.NewDao[model.DomainEntity, model.DomainEntityList, uint](
+		Dao: gormdao.NewDao[model.DomainEntity, model.DomainEntityList, string](
 			model.TableNameDomain, "DomainDao",
 			resolveDBGetter(opts...),
 		),
 	}
 }
 
-func (dao *DomainDao) GetByTenantAndDomain(ctx context.Context, tenantID uint, domain string) (*model.DomainEntity, error) {
+func (dao *DomainDao) GetByTenantAndDomain(ctx context.Context, tenantID string, domain string) (*model.DomainEntity, error) {
 	db := dao.DB(ctx).Table(model.TableNameDomain)
 	var entity model.DomainEntity
 	err := db.
@@ -57,7 +57,7 @@ func (dao *DomainDao) GetByTenantAndDomain(ctx context.Context, tenantID uint, d
 	return &entity, nil
 }
 
-func (dao *DomainDao) Delete(ctx context.Context, id uint, deletedBy uint) error {
+func (dao *DomainDao) Delete(ctx context.Context, id string, deletedBy string) error {
 	db := dao.DB(ctx).Table(model.TableNameDomain)
 	now := time.Now()
 	if err := db.Where("id = ?", id).Updates(map[string]any{

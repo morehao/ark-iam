@@ -9,20 +9,20 @@ import (
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/tenantadmin/testutil"
 	"github.com/morehao/golib/biz/gcontext"
-	"gorm.io/gorm"
+	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
 func TestOrganizationDetailRejectsCrossTenantEntity(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.OrganizationEntity{})
 	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyTenantID, uint(41))
+	ginCtx.Set(gcontext.KeyTenantID, "41")
 
-	if err := db.Create(&model.OrganizationEntity{Model: gorm.Model{ID: 8}, TenantID: 99, CustomData: json.RawMessage("{}")}).Error; err != nil {
+	if err := db.Create(&model.OrganizationEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "8"}}, TenantID: "99", CustomData: json.RawMessage("{}")}).Error; err != nil {
 		t.Fatalf("seed organization: %v", err)
 	}
 
 	svc := &organizationSvc{}
-	resp, err := svc.Detail(ginCtx, &dtotenant.OrganizationDetailReq{OrganizationID: 8})
+	resp, err := svc.Detail(ginCtx, &dtotenant.OrganizationDetailReq{OrganizationID: "8"})
 	if err == nil {
 		t.Fatalf("expected cross-tenant organization detail to fail, resp=%+v", resp)
 	}
@@ -31,14 +31,14 @@ func TestOrganizationDetailRejectsCrossTenantEntity(t *testing.T) {
 func TestOrganizationRoleDetailRejectsCrossTenantEntity(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.OrganizationRoleEntity{})
 	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyTenantID, uint(51))
+	ginCtx.Set(gcontext.KeyTenantID, "51")
 
-	if err := db.Create(&model.OrganizationRoleEntity{Model: gorm.Model{ID: 9}, TenantID: 98}).Error; err != nil {
+	if err := db.Create(&model.OrganizationRoleEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "9"}}, TenantID: "98"}).Error; err != nil {
 		t.Fatalf("seed organization role: %v", err)
 	}
 
 	svc := &organizationRoleSvc{}
-	resp, err := svc.Detail(ginCtx, &dtotenant.OrganizationRoleDetailReq{OrganizationRoleID: 9})
+	resp, err := svc.Detail(ginCtx, &dtotenant.OrganizationRoleDetailReq{OrganizationRoleID: "9"})
 	if err == nil {
 		t.Fatalf("expected cross-tenant organization role detail to fail, resp=%+v", resp)
 	}
@@ -47,15 +47,15 @@ func TestOrganizationRoleDetailRejectsCrossTenantEntity(t *testing.T) {
 func TestOrganizationRoleCreateRejectsCrossTenantOrganization(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.OrganizationEntity{}, &model.OrganizationRoleEntity{})
 	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyTenantID, uint(52))
-	ginCtx.Set(gcontext.KeyUserID, uint(1001))
+	ginCtx.Set(gcontext.KeyTenantID, "52")
+	ginCtx.Set(gcontext.KeyUserID, "1001")
 
-	if err := db.Create(&model.OrganizationEntity{Model: gorm.Model{ID: 6}, TenantID: 77, CustomData: json.RawMessage("{}")}).Error; err != nil {
+	if err := db.Create(&model.OrganizationEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "6"}}, TenantID: "77", CustomData: json.RawMessage("{}")}).Error; err != nil {
 		t.Fatalf("seed organization: %v", err)
 	}
 
 	svc := &organizationRoleSvc{}
-	resp, err := svc.Create(ginCtx, &dtotenant.OrganizationRoleCreateReq{TenantID: 52, OrganizationID: 6, Name: "ops"})
+	resp, err := svc.Create(ginCtx, &dtotenant.OrganizationRoleCreateReq{TenantID: "52", OrganizationID: "6", Name: "ops"})
 	if err == nil {
 		t.Fatalf("expected cross-tenant organization create to fail, resp=%+v", resp)
 	}

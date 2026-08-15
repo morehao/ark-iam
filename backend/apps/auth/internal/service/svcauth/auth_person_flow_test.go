@@ -5,22 +5,21 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
-	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
+	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
-	"gorm.io/gorm"
 )
 
 type fakeAuthPersonStore struct {
-	getByIDFunc   func(ctx context.Context, id uint) (*model.PersonEntity, error)
+	getByIDFunc   func(ctx context.Context, id string) (*model.PersonEntity, error)
 	getByCondFunc func(ctx context.Context, cond *dao.PersonCond) (*model.PersonEntity, error)
 	insertFunc    func(ctx context.Context, entity *model.PersonEntity) error
 }
 
-func (f *fakeAuthPersonStore) GetByID(ctx context.Context, id uint) (*model.PersonEntity, error) {
+func (f *fakeAuthPersonStore) GetByID(ctx context.Context, id string) (*model.PersonEntity, error) {
 	if f.getByIDFunc == nil {
 		return nil, nil
 	}
@@ -43,11 +42,11 @@ func (f *fakeAuthPersonStore) Insert(ctx context.Context, entity *model.PersonEn
 }
 
 type fakeAuthTenantStore struct {
-	getByIDFunc       func(ctx context.Context, id uint) (*model.TenantEntity, error)
+	getByIDFunc       func(ctx context.Context, id string) (*model.TenantEntity, error)
 	getPageListByCond func(ctx context.Context, cond *dao.TenantCond) (model.TenantEntityList, int64, error)
 }
 
-func (f *fakeAuthTenantStore) GetByID(ctx context.Context, id uint) (*model.TenantEntity, error) {
+func (f *fakeAuthTenantStore) GetByID(ctx context.Context, id string) (*model.TenantEntity, error) {
 	if f.getByIDFunc == nil {
 		return nil, nil
 	}
@@ -65,20 +64,20 @@ func (f *fakeAuthTenantStore) GetPageListByCond(ctx context.Context, cond gormda
 func TestMyTenantsReturnsCurrentPersonTenantList(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
-	ginCtx.Set(gcontext.KeyPersonID, uint(88))
+	ginCtx.Set(gcontext.KeyPersonID, "88")
 
 	var userLookup *dao.UserCond
 	restoreUserStore := swapUserStoreFactory(func() authUserStore {
 		return &fakeAuthUserStore{
 			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
 				userLookup = cond
-				return &model.UserEntity{Model: gorm.Model{ID: 101}, TenantID: 11, PersonID: 88, Name: "tenant-user"}, nil
+				return &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "101"}}, TenantID: "11", PersonID: "88", Name: "tenant-user"}, nil
 			},
 			getListByCondFunc: func(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, error) {
 				userLookup = cond
 				return model.UserEntityList{
-					{Model: gorm.Model{ID: 101}, TenantID: 11, PersonID: 88, Name: "tenant-user-a"},
-					{Model: gorm.Model{ID: 102}, TenantID: 12, PersonID: 88, Name: "tenant-user-b"},
+					{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "101"}}, TenantID: "11", PersonID: "88", Name: "tenant-user-a"},
+					{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "102"}}, TenantID: "12", PersonID: "88", Name: "tenant-user-b"},
 				}, nil
 			},
 		}
@@ -87,12 +86,12 @@ func TestMyTenantsReturnsCurrentPersonTenantList(t *testing.T) {
 
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
 		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
+			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
 				switch id {
-				case 11:
-					return &model.TenantEntity{Model: gorm.Model{ID: 11}, Name: "租户A", Tag: "a"}, nil
-				case 12:
-					return &model.TenantEntity{Model: gorm.Model{ID: 12}, Name: "租户B", Tag: "b"}, nil
+				case "11":
+					return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "11"}}, Name: "租户A", Tag: "a"}, nil
+				case "12":
+					return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "12"}}, Name: "租户B", Tag: "b"}, nil
 				default:
 					return nil, nil
 				}
@@ -106,13 +105,13 @@ func TestMyTenantsReturnsCurrentPersonTenantList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MyTenants returned error: %v", err)
 	}
-	if userLookup == nil || userLookup.PersonID != 88 {
+	if userLookup == nil || userLookup.PersonID != "88" {
 		t.Fatalf("expected tenant lookup to use personID 88, got %+v", userLookup)
 	}
 	if resp == nil || len(resp.List) != 2 {
 		t.Fatalf("expected two tenants, got %#v", resp)
 	}
-	if resp.List[0].TenantID != 11 || resp.List[1].TenantID != 12 {
+	if resp.List[0].TenantID != "11" || resp.List[1].TenantID != "12" {
 		t.Fatalf("expected joined tenant IDs [11 12], got %#v", resp.List)
 	}
 }
@@ -120,7 +119,7 @@ func TestMyTenantsReturnsCurrentPersonTenantList(t *testing.T) {
 func TestJoinTenantRejectsNonExistentTenant(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
-	ginCtx.Set(gcontext.KeyPersonID, uint(88))
+	ginCtx.Set(gcontext.KeyPersonID, "88")
 
 	restoreUserStore := swapUserStoreFactory(func() authUserStore {
 		return &fakeAuthUserStore{
@@ -131,10 +130,10 @@ func TestJoinTenantRejectsNonExistentTenant(t *testing.T) {
 	})
 	defer restoreUserStore()
 
-	var tenantLookup uint
+	var tenantLookup string
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
 		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
+			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
 				tenantLookup = id
 				return nil, nil
 			},
@@ -143,25 +142,25 @@ func TestJoinTenantRejectsNonExistentTenant(t *testing.T) {
 	defer restoreTenantStore()
 
 	svc := &authSvc{}
-	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{TenantID: 999})
+	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{TenantID: "999"})
 	assertCode(t, err, code.TenantNotExistError)
-	if tenantLookup != 999 {
-		t.Fatalf("expected tenant lookup with id 999, got %d", tenantLookup)
+	if tenantLookup != "999" {
+		t.Fatalf("expected tenant lookup with id 999, got %s", tenantLookup)
 	}
 }
 
 func TestJoinTenantRejectsAlreadyJoinedTenant(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
-	ginCtx.Set(gcontext.KeyPersonID, uint(88))
+	ginCtx.Set(gcontext.KeyPersonID, "88")
 
 	restoreUserStore := swapUserStoreFactory(func() authUserStore {
 		return &fakeAuthUserStore{
 			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
-				if cond.PersonID != 88 || cond.TenantID != 22 {
+				if cond.PersonID != "88" || cond.TenantID != "22" {
 					t.Fatalf("unexpected user lookup cond: %+v", *cond)
 				}
-				return &model.UserEntity{Model: gorm.Model{ID: 101}, TenantID: 22, PersonID: 88, Name: "existing"}, nil
+				return &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "101"}}, TenantID: "22", PersonID: "88", Name: "existing"}, nil
 			},
 		}
 	})
@@ -169,22 +168,22 @@ func TestJoinTenantRejectsAlreadyJoinedTenant(t *testing.T) {
 
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
 		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
-				return &model.TenantEntity{Model: gorm.Model{ID: 22}, Name: "租户A", Tag: "a"}, nil
+			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
+				return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "22"}}, Name: "租户A", Tag: "a"}, nil
 			},
 		}
 	})
 	defer restoreTenantStore()
 
 	svc := &authSvc{}
-	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{TenantID: 22})
+	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{TenantID: "22"})
 	assertCode(t, err, code.AlreadyJoinedError)
 }
 
 func TestJoinTenantCreatesNonOwnerUser(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
-	ginCtx.Set(gcontext.KeyPersonID, uint(88))
+	ginCtx.Set(gcontext.KeyPersonID, "88")
 
 	var insertedUser *model.UserEntity
 	restoreUserStore := swapUserStoreFactory(func() authUserStore {
@@ -193,7 +192,7 @@ func TestJoinTenantCreatesNonOwnerUser(t *testing.T) {
 				return nil, nil
 			},
 			insertFunc: func(ctx context.Context, entity *model.UserEntity) error {
-				entity.ID = 200
+				entity.ID = "200"
 				copied := *entity
 				insertedUser = &copied
 				return nil
@@ -202,36 +201,36 @@ func TestJoinTenantCreatesNonOwnerUser(t *testing.T) {
 	})
 	defer restoreUserStore()
 
-	var tenantLookup uint
+	var tenantLookup string
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
 		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id uint) (*model.TenantEntity, error) {
+			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
 				tenantLookup = id
-				return &model.TenantEntity{Model: gorm.Model{ID: 22}, Name: "租户A", Tag: "a"}, nil
+				return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "22"}}, Name: "租户A", Tag: "a"}, nil
 			},
 		}
 	})
 	defer restoreTenantStore()
 
 	svc := &authSvc{}
-	resp, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{TenantID: 22})
+	resp, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{TenantID: "22"})
 	if err != nil {
 		t.Fatalf("JoinTenant returned error: %v", err)
 	}
-	if resp == nil || resp.UserID != 200 {
+	if resp == nil || resp.UserID != "200" {
 		t.Fatalf("expected user id 200, got %#v", resp)
 	}
-	if tenantLookup != 22 {
-		t.Fatalf("expected tenant lookup with id 22, got %d", tenantLookup)
+	if tenantLookup != "22" {
+		t.Fatalf("expected tenant lookup with id 22, got %s", tenantLookup)
 	}
 	if insertedUser == nil {
 		t.Fatal("expected user to be inserted")
 	}
-	if insertedUser.TenantID != 22 {
-		t.Fatalf("expected tenant id 22, got %d", insertedUser.TenantID)
+	if insertedUser.TenantID != "22" {
+		t.Fatalf("expected tenant id 22, got %s", insertedUser.TenantID)
 	}
-	if insertedUser.PersonID != 88 {
-		t.Fatalf("expected person id 88, got %d", insertedUser.PersonID)
+	if insertedUser.PersonID != "88" {
+		t.Fatalf("expected person id 88, got %s", insertedUser.PersonID)
 	}
 	if insertedUser.IsOwner != 0 {
 		t.Fatalf("expected join-tenant user to be non-owner (isOwner=0), got %d", insertedUser.IsOwner)

@@ -1,7 +1,7 @@
 package dtoperson
 
 type PersonDetailResp struct {
-	PersonID     uint   `json:"personID"`
+	PersonID     string `json:"personID"`
 	Username     string `json:"username"`
 	PrimaryEmail string `json:"primaryEmail"`
 	PrimaryPhone string `json:"primaryPhone"`

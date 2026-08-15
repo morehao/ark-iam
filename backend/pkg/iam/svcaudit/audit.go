@@ -6,26 +6,27 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/glog"
 )
 
 const (
-	ActionLogin                   = "login"
-	ActionTenantSwitch            = "tenant.switch"
-	ActionTenantCreate            = "tenant.create"
-	ActionApplicationCreate       = "application.create"
+	ActionLogin                         = "login"
+	ActionTenantSwitch                  = "tenant.switch"
+	ActionTenantCreate                  = "tenant.create"
+	ActionApplicationCreate             = "application.create"
 	ActionApplicationClientCreate       = "application_client.create"
 	ActionApplicationClientCreateSecret = "application_client.create_secret"
-	ActionApiKeyCreate            = "api_key.create"
-	ActionApiKeyRevoke            = "api_key.revoke"
+	ActionApiKeyCreate                  = "api_key.create"
+	ActionApiKeyRevoke                  = "api_key.revoke"
 )
 
 type AuditEntry struct {
 	Action     string
-	TenantID   uint
+	TenantID   string
 	TargetType string
-	TargetID   uint
+	TargetID   string
 	Result     string // success / failure
 	Detail     string
 	ClientID   string
@@ -38,8 +39,8 @@ func WriteAudit(ctx *gin.Context, e AuditEntry) {
 		return
 	}
 	entity := &model.AuditLogEntity{
-		ActorPersonID: gincontext.GetPersonID(ctx),
-		ActorUserID:   gincontext.GetUserID(ctx),
+		ActorPersonID: ctx.GetString(gcontext.KeyPersonID),
+		ActorUserID:   ctx.GetString(gcontext.KeyUserID),
 		TenantID:      e.TenantID,
 		ClientID:      e.ClientID,
 		Action:        e.Action,
@@ -49,7 +50,7 @@ func WriteAudit(ctx *gin.Context, e AuditEntry) {
 		IP:            gincontext.GetClientIP(ctx),
 		UserAgent:     ctx.GetHeader("User-Agent"),
 		Detail:        e.Detail,
-		CreatedBy:     gincontext.GetUserID(ctx),
+		CreatedBy:     ctx.GetString(gcontext.KeyUserID),
 	}
 	if err := newAuditLogDao().Insert(context.Background(), entity); err != nil {
 		glog.Errorf(ctx, "[svcaudit.WriteAudit] failed, action:%s, err:%v", e.Action, err)

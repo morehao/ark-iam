@@ -9,11 +9,11 @@ type ApiKeyCreateReq struct {
 }
 
 type RevokeApiKeyReq struct {
-	ApiKeyID uint `json:"-" uri:"apiKeyID" binding:"required"`
+	ApiKeyID string `json:"-" uri:"apiKeyID" binding:"required"`
 }
 
 type ApiKeyDeleteReq struct {
-	ApiKeyID uint `json:"-" uri:"apiKeyID" binding:"required"`
+	ApiKeyID string `json:"-" uri:"apiKeyID" binding:"required"`
 }
 
 type ApiKeyPageListReq struct {

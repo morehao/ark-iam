@@ -8,8 +8,8 @@ import (
 
 type MenuCond struct {
 	*gormdao.BaseCond
-	AppID    uint
-	ParentID uint
+	AppID    string
+	ParentID string
 	Name     string
 	Code     string
 	Type     string
@@ -20,10 +20,10 @@ func (c *MenuCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.AppID != 0 {
+	if c.AppID != "" {
 		db.Where(tableName+".app_id = ?", c.AppID)
 	}
-	if c.ParentID != 0 {
+	if c.ParentID != "" {
 		db.Where(tableName+".parent_id = ?", c.ParentID)
 	}
 	if c.Name != "" {
@@ -41,12 +41,12 @@ func (c *MenuCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type MenuDao struct {
-	*gormdao.Dao[model.MenuEntity, model.MenuEntityList, uint]
+	*gormdao.Dao[model.MenuEntity, model.MenuEntityList, string]
 }
 
 func NewMenuDao(opts ...DaoOption) *MenuDao {
 	return &MenuDao{
-		Dao: gormdao.NewDao[model.MenuEntity, model.MenuEntityList, uint](
+		Dao: gormdao.NewDao[model.MenuEntity, model.MenuEntityList, string](
 			model.TableNameMenu, "MenuDao",
 			resolveDBGetter(opts...),
 		),

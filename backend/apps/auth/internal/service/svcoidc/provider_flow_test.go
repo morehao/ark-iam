@@ -12,9 +12,9 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/testsetup"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
-	"gorm.io/gorm"
 )
 
 func TestFullOIDCCodeFlow(t *testing.T) {
@@ -53,7 +53,7 @@ func TestFullOIDCCodeFlow(t *testing.T) {
 	svc := &oidcAuthSvc{
 		provider: provider,
 		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
-			return &model.PersonEntity{Model: gorm.Model{ID: 88}}, &model.UserEntity{Model: gorm.Model{ID: 66}, TenantID: 1, PersonID: 88}, nil, nil
+			return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}}}, &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "66"}}, TenantID: "1", PersonID: "88"}, nil, nil
 		}},
 	}
 

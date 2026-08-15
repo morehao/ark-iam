@@ -2,8 +2,8 @@
 
 // ---------- 用户 ----------
 export interface UserItem {
-  userID: number
-  tenantID: number
+  userID: string
+  tenantID: string
   username: string
   primaryEmail: string
   primaryPhone: string
@@ -14,9 +14,9 @@ export interface UserItem {
 }
 
 export interface UserCreateReq {
-  personID?: number
+  personID?: string
   password?: string
-  tenantID?: number
+  tenantID?: string
   username?: string
   primaryEmail?: string
   primaryPhone?: string
@@ -26,27 +26,27 @@ export interface UserCreateReq {
 }
 
 export interface UserUpdateReq {
-  userID: number
-  tenantID?: number
+  userID: string
+  tenantID?: string
   name?: string
   avatar?: string
   isSuspended?: number
 }
 
 export interface UserStatusUpdateReq {
-  userID: number
+  userID: string
   isSuspended: number
 }
 
 export interface UserPasswordUpdateReq {
-  userID: number
+  userID: string
   password: string
 }
 
 export interface UserIdentityItem {
-  userIdentityID: number
-  tenantID: number
-  userID: number
+  userIdentityID: string
+  tenantID: string
+  userID: string
   issuer: string
   identityID: string
   detail?: unknown
@@ -54,17 +54,17 @@ export interface UserIdentityItem {
 }
 
 export interface UserIdentityCreateReq {
-  tenantID: number
-  userID: number
+  tenantID: string
+  userID: string
   issuer: string
   identityID: string
   detail?: unknown
 }
 
 export interface UserLoginLogItem {
-  userLoginLogID: number
-  tenantID: number
-  userID: number
+  userLoginLogID: string
+  tenantID: string
+  userID: string
   loginIP: string
   userAgent: string
   loginTime: number
@@ -72,17 +72,17 @@ export interface UserLoginLogItem {
 }
 
 export interface UserDepartmentItem {
-  userDepartmentID: number
-  tenantID: number
-  userID: number
-  departmentID: number
+  userDepartmentID: string
+  tenantID: string
+  userID: string
+  departmentID: string
   isPrimary: number
 }
 
 // ---------- 角色 ----------
 export interface RoleItem {
-  roleID: number
-  tenantID: number
+  roleID: string
+  tenantID: string
   name: string
   code: string
   description: string
@@ -92,7 +92,7 @@ export interface RoleItem {
 }
 
 export interface RoleCreateReq {
-  tenantID?: number
+  tenantID?: string
   name: string
   code: string
   description?: string
@@ -101,7 +101,7 @@ export interface RoleCreateReq {
 }
 
 export interface RoleUpdateReq {
-  roleID: number
+  roleID: string
   name?: string
   code?: string
   description?: string
@@ -110,23 +110,23 @@ export interface RoleUpdateReq {
 }
 
 export interface RoleUserItem {
-  userID: number
+  userID: string
   username: string
   name: string
   email: string
-  roleID: number
+  roleID: string
   createdAt: string
 }
 
 // ---------- 部门 ----------
 export interface DepartmentItem {
-  departmentID: number
-  tenantID: number
-  parentID: number
+  departmentID: string
+  tenantID: string
+  parentID: string
   name: string
   code: string
   sort: number
-  leaderUserID: number
+  leaderUserID: string
   createdAt?: number
   children?: DepartmentItem[]
 }
@@ -137,7 +137,7 @@ export interface DepartmentTreeResp {
 
 // ---------- 应用 ----------
 export interface ApplicationItem {
-  appID: number
+  appID: string
   code: string
   name: string
   description: string
@@ -163,7 +163,7 @@ export interface ApplicationCreateReq {
 }
 
 export interface ApplicationUpdateReq {
-  appID: number
+  appID: string
   name?: string
   description?: string
   logoUrl?: string
@@ -176,8 +176,8 @@ export interface ApplicationUpdateReq {
 
 // ---------- OAuth 客户端 ----------
 export interface OAuthClientItem {
-  applicationClientID: number
-  appID: number
+  applicationClientID: string
+  appID: string
   clientID: string
   name: string
   type: string
@@ -189,7 +189,7 @@ export interface OAuthClientItem {
 }
 
 export interface OAuthClientDetail extends OAuthClientItem {
-  tenantID: number
+  tenantID: string
   redirectURIs: string[]
   postLogoutRedirectURIs: string[]
   backChannelLogoutURI: string
@@ -203,7 +203,7 @@ export interface OAuthClientDetail extends OAuthClientItem {
 }
 
 export interface OAuthClientCreateReq {
-  appID: number
+  appID: string
   name: string
   type?: string
   isThirdParty?: number
@@ -221,7 +221,7 @@ export interface OAuthClientCreateReq {
 }
 
 export interface OAuthClientUpdateReq {
-  applicationClientID: number
+  applicationClientID: string
   name?: string
   type?: string
   status?: string
@@ -240,8 +240,8 @@ export interface OAuthClientUpdateReq {
 }
 
 export interface OAuthSecretItem {
-  id: number
-  applicationClientID: number
+  id: string
+  applicationClientID: string
   name: string
   valuePrefix: string
   expiresAt: string | null
@@ -249,7 +249,7 @@ export interface OAuthSecretItem {
 }
 
 export interface OAuthSecretCreateResp {
-  id: number
+  id: string
   name: string
   valuePrefix: string
   secret: string
@@ -257,7 +257,7 @@ export interface OAuthSecretCreateResp {
 
 // ---------- 租户 ----------
 export interface TenantItem {
-  tenantID: number
+  tenantID: string
   code: string
   dbUser: string
   isSuspended: number
@@ -277,7 +277,7 @@ export interface TenantCreateReq {
 }
 
 export interface TenantUpdateReq {
-  tenantID: number
+  tenantID: string
   name?: string
   code?: string
   dbUser?: string
@@ -288,9 +288,9 @@ export interface TenantUpdateReq {
 
 // ---------- 租户应用 ----------
 export interface TenantApplicationItem {
-  tenantAppID: number
-  tenantID: number
-  appID: number
+  tenantAppID: string
+  tenantID: string
+  appID: string
   status: string
   config?: string
   grantedScope?: string
@@ -298,14 +298,14 @@ export interface TenantApplicationItem {
 }
 
 export interface TenantApplicationCreateReq {
-  appID: number
+  appID: string
   status?: string
   config?: string
   grantedScope?: string
 }
 
 export interface TenantApplicationUpdateReq {
-  tenantAppID: number
+  tenantAppID: string
   status?: string
   config?: string
   grantedScope?: string
@@ -313,7 +313,7 @@ export interface TenantApplicationUpdateReq {
 
 // ---------- API Key ----------
 export interface ApiKeyItem {
-  id: number
+  id: string
   name: string
   keyPrefix: string
   scope: string
@@ -324,7 +324,7 @@ export interface ApiKeyItem {
 }
 
 export interface ApiKeyCreateResp {
-  id: number
+  id: string
   name: string
   key: string
   keyPrefix: string
@@ -333,9 +333,9 @@ export interface ApiKeyCreateResp {
 
 // ---------- 菜单 ----------
 export interface MenuItem {
-  menuID: number
-  appID: number
-  parentID: number
+  menuID: string
+  appID: string
+  parentID: string
   name: string
   code: string
   path: string
@@ -359,17 +359,17 @@ export interface MenuTreeResp {
 
 // ---------- 权限域 / 资源 ----------
 export interface ScopeItem {
-  scopeID: number
-  tenantID: number
-  resourceID: number
+  scopeID: string
+  tenantID: string
+  resourceID: string
   name: string
   description: string
   createdAt?: number
 }
 
 export interface ResourceItem {
-  resourceID: number
-  tenantID: number
+  resourceID: string
+  tenantID: string
   name: string
   indicator: string
   isDefault: number
@@ -379,7 +379,7 @@ export interface ResourceItem {
 
 // ---------- 域名 ----------
 export interface DomainItem {
-  id: number
+  id: string
   domain: string
   isVerified: number
   verifiedAt: string
@@ -388,8 +388,8 @@ export interface DomainItem {
 
 // ---------- 系统配置 ----------
 export interface SystemConfigItem {
-  systemID: number
-  tenantID: number
+  systemID: string
+  tenantID: string
   key: string
   value?: unknown
   createdAt?: number
@@ -397,8 +397,8 @@ export interface SystemConfigItem {
 
 // ---------- 审计日志 ----------
 export interface AuditLogItem {
-  logID: number
-  tenantID: number
+  logID: string
+  tenantID: string
   key: string
   payload?: unknown
   createdAt?: number
@@ -406,8 +406,8 @@ export interface AuditLogItem {
 
 // ---------- Connector（auth） ----------
 export interface ConnectorItem {
-  connectorID: number
-  tenantID: number
+  connectorID: string
+  tenantID: string
   name: string
   displayName: string
   protocol: string

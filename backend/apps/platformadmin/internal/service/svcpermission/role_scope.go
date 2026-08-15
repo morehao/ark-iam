@@ -3,10 +3,10 @@ package svcpermission
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtopermission"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
@@ -33,7 +33,7 @@ func (svc *roleScopeSvc) Create(ctx *gin.Context, req *dtopermission.RoleScopeCr
 		glog.Errorf(ctx, "[svcpermission.CreateRoleScope] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.RoleGetDetailError)
 	}
-	if roleEntity == nil || roleEntity.ID == 0 {
+	if roleEntity == nil || roleEntity.ID == "" {
 		return nil, code.GetError(code.RoleNotExistError)
 	}
 
@@ -42,7 +42,7 @@ func (svc *roleScopeSvc) Create(ctx *gin.Context, req *dtopermission.RoleScopeCr
 		glog.Errorf(ctx, "[svcpermission.CreateRoleScope] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ScopeGetDetailError)
 	}
-	if scopeEntity == nil || scopeEntity.ID == 0 {
+	if scopeEntity == nil || scopeEntity.ID == "" {
 		return nil, code.GetError(code.ScopeNotExistError)
 	}
 
@@ -50,7 +50,7 @@ func (svc *roleScopeSvc) Create(ctx *gin.Context, req *dtopermission.RoleScopeCr
 		TenantID:  req.TenantID,
 		RoleID:    req.RoleID,
 		ScopeID:   req.ScopeID,
-		CreatedBy: gincontext.GetUserID(ctx),
+		CreatedBy: gctx.GetUserID(ctx),
 	}
 
 	if err := dao.NewRoleScopeDao().Insert(ctx, insertEntity); err != nil {
@@ -63,7 +63,7 @@ func (svc *roleScopeSvc) Create(ctx *gin.Context, req *dtopermission.RoleScopeCr
 func (svc *roleScopeSvc) Delete(ctx *gin.Context, req *dtopermission.RoleScopeDeleteReq) error {
 	roleScopeDao := dao.NewRoleScopeDao()
 	roleScopeEntityList, err := roleScopeDao.GetListByCond(ctx, &dao.RoleScopeCond{
-		TenantID: gincontext.GetTenantID(ctx),
+		TenantID: gctx.GetTenantID(ctx),
 		RoleID:   req.RoleID,
 		ScopeID:  req.ScopeID,
 	})
@@ -71,11 +71,11 @@ func (svc *roleScopeSvc) Delete(ctx *gin.Context, req *dtopermission.RoleScopeDe
 		glog.Errorf(ctx, "[svcpermission.DeleteRoleScope] dao GetListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.RoleScopeDeleteError)
 	}
-	if len(roleScopeEntityList) == 0 || roleScopeEntityList[0].ID == 0 {
+	if len(roleScopeEntityList) == 0 || roleScopeEntityList[0].ID == "" {
 		return code.GetError(code.RoleScopeNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	if err := roleScopeDao.Delete(ctx, roleScopeEntityList[0].ID, userID); err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteRoleScope] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.RoleScopeDeleteError)

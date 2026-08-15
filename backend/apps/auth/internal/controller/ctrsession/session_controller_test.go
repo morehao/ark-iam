@@ -13,16 +13,16 @@ type stubSessionSvc struct {
 	revokeReq *dtouser.SessionRevokeReq
 }
 
-func (s *stubSessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, personID, userID, tenantID uint) (*dtouser.SessionListResp, error) {
+func (s *stubSessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq, personID, userID, tenantID string) (*dtouser.SessionListResp, error) {
 	panic("unexpected call")
 }
 
-func (s *stubSessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID, tenantID, personID uint) error {
+func (s *stubSessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq, userID, tenantID, personID string) error {
 	s.revokeReq = req
 	return nil
 }
 
-func (s *stubSessionSvc) RevokeAll(ctx *gin.Context, userID, tenantID, personID uint) error {
+func (s *stubSessionSvc) RevokeAll(ctx *gin.Context, userID, tenantID, personID string) error {
 	panic("unexpected call")
 }
 
@@ -42,7 +42,7 @@ func TestSessionControllerRevokeBindsURI(t *testing.T) {
 	if svc.revokeReq == nil {
 		t.Fatal("expected Revoke service to receive request")
 	}
-	if svc.revokeReq.SessionID != 42 {
-		t.Fatalf("expected URI binding to populate sessionID=42, got %d", svc.revokeReq.SessionID)
+	if svc.revokeReq.SessionID != "42" {
+		t.Fatalf("expected URI binding to populate sessionID=42, got %s", svc.revokeReq.SessionID)
 	}
 }

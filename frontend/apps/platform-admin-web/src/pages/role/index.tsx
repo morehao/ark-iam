@@ -47,7 +47,7 @@ export default function RoleList() {
   const [addOpen, setAddOpen] = useState(false)
   const [userOptions, setUserOptions] = useState<UserItem[]>([])
   const [usersLoading, setUsersLoading] = useState(false)
-  const [selectedUserIds, setSelectedUserIds] = useState<number[]>([])
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
   const [assignLoading, setAssignLoading] = useState(false)
 
   const fetchData = useCallback(async () => {
@@ -67,7 +67,7 @@ export default function RoleList() {
     void fetchData()
   }, [fetchData])
 
-  const fetchMembers = useCallback(async (roleID: number) => {
+  const fetchMembers = useCallback(async (roleID: string) => {
     setMembersLoading(true)
     try {
       const resp = await getRoleUsers(roleID)
@@ -420,7 +420,7 @@ export default function RoleList() {
           loading={usersLoading}
           style={{ width: '100%' }}
           value={selectedUserIds}
-          onChange={(v: number[]) => setSelectedUserIds(v)}
+          onChange={(v: string[]) => setSelectedUserIds(v)}
           options={userOptions.map((u) => ({ label: `${u.name}(${u.username})`, value: u.userID }))}
         />
       </Modal>

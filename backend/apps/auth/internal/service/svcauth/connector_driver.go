@@ -5,8 +5,8 @@ import (
 	"net/url"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/model"
 )
 
 func validateOIDCConnectorConfig(config ConnectorConfig) error {
@@ -87,7 +87,7 @@ func (r *connectorDriverRegistry) Select(config ConnectorConfig) (ConnectorDrive
 }
 
 func buildConnectorConfig(connector *model.ConnectorEntity) (ConnectorConfig, error) {
-	if connector == nil || connector.ID == 0 && connector.Protocol == "" && connector.Provider == "" && len(connector.Config) == 0 {
+	if connector == nil || connector.ID == "" && connector.Protocol == "" && connector.Provider == "" && len(connector.Config) == 0 {
 		return ConnectorConfig{}, code.GetError(code.ConnectorNotExistError)
 	}
 

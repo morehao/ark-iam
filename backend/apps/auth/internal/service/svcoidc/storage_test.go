@@ -16,7 +16,7 @@ import (
 )
 
 func TestBuildOIDCSubject(t *testing.T) {
-	if got := buildOIDCSubject(12); got != "person:12" {
+	if got := buildOIDCSubject("12"); got != "person:12" {
 		t.Fatalf("expected subject person:12, got %q", got)
 	}
 }
@@ -26,8 +26,8 @@ func TestParseOIDCSubject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected subject to parse, got err: %v", err)
 	}
-	if personID != 34 {
-		t.Fatalf("expected personID 34, got %d", personID)
+	if personID != "34" {
+		t.Fatalf("expected personID 34, got %s", personID)
 	}
 }
 
@@ -66,7 +66,7 @@ func TestCompleteAuthRequestMarksRequestDone(t *testing.T) {
 	}
 
 	authTime := time.Unix(1710000000, 0)
-	err = storage.CompleteAuthRequest(context.Background(), req.GetID(), buildOIDCSubject(88), authTime, []string{"pwd"}, "", 0, true)
+	err = storage.CompleteAuthRequest(context.Background(), req.GetID(), buildOIDCSubject("88"), authTime, []string{"pwd"}, "", "", true)
 	if err != nil {
 		t.Fatalf("CompleteAuthRequest failed: %v", err)
 	}

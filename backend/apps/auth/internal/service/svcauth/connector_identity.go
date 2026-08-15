@@ -5,15 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/iam/model"
 	"gorm.io/gorm"
 )
 
 type ConnectorRuntime struct {
-	ID                  uint
-	TenantID            uint
+	ID                  string
+	TenantID            string
 	AllowAutoCreateUser bool
 }
 
@@ -27,14 +27,14 @@ type resolvedConnectorPerson struct {
 }
 
 type connectorPersonRepository interface {
-	GetByID(ctx context.Context, id uint) (*model.PersonEntity, error)
+	GetByID(ctx context.Context, id string) (*model.PersonEntity, error)
 	Insert(ctx context.Context, person *model.PersonEntity) error
 }
 
 type connectorUserIdentityRepository interface {
 	GetByIssuerAndExternalSubject(ctx context.Context, issuer, externalSubject string) (*model.UserIdentityEntity, error)
 	Insert(ctx context.Context, entity *model.UserIdentityEntity) error
-	UpdateBinding(ctx context.Context, identityID, personID uint, issuer string, detail []byte) error
+	UpdateBinding(ctx context.Context, identityID, personID string, issuer string, detail []byte) error
 }
 
 type connectorTxContextKey struct{}
@@ -125,7 +125,7 @@ type connectorUserIdentityRepoAdapter struct {
 	mapper *identityMapper
 }
 
-func (r *connectorPersonRepoAdapter) GetByID(ctx context.Context, id uint) (*model.PersonEntity, error) {
+func (r *connectorPersonRepoAdapter) GetByID(ctx context.Context, id string) (*model.PersonEntity, error) {
 	var entity model.PersonEntity
 	err := r.mapper.repoDB(ctx).First(&entity, id).Error
 	if err != nil {
@@ -159,11 +159,11 @@ func (r *connectorUserIdentityRepoAdapter) Insert(ctx context.Context, entity *m
 	return r.mapper.repoDB(ctx).Create(entity).Error
 }
 
-func (r *connectorUserIdentityRepoAdapter) UpdateBinding(ctx context.Context, identityID, personID uint, issuer string, detail []byte) error {
+func (r *connectorUserIdentityRepoAdapter) UpdateBinding(ctx context.Context, identityID, personID string, issuer string, detail []byte) error {
 	updateMap := map[string]any{
-		"person_id":  personID,
-		"issuer":     issuer,
-		"detail":     json.RawMessage(detail),
+		"person_id": personID,
+		"issuer":    issuer,
+		"detail":    json.RawMessage(detail),
 	}
 	return r.mapper.repoDB(ctx).Model(&model.UserIdentityEntity{}).Where("id = ?", identityID).Updates(updateMap).Error
 }
@@ -173,7 +173,7 @@ func (m *identityMapper) Resolve(ctx context.Context, input identityResolveInput
 	if err != nil {
 		return nil, err
 	}
-	if existingIdentity != nil && existingIdentity.PersonID != 0 {
+	if existingIdentity != nil && existingIdentity.PersonID != "" {
 		person, getErr := m.personRepo.GetByID(ctx, existingIdentity.PersonID)
 		if getErr != nil {
 			return nil, getErr
@@ -193,7 +193,7 @@ func (m *identityMapper) Resolve(ctx context.Context, input identityResolveInput
 		Avatar:       input.Identity.AvatarURL,
 		Profile:      json.RawMessage("{}"),
 		CustomData:   json.RawMessage("{}"),
-		CreatedBy:    0,
+		CreatedBy:    "",
 	}
 	if person.Name == "" {
 		person.Name = resolveIdentityUsername(input.Identity)
@@ -227,7 +227,7 @@ func (m *identityMapper) bindIdentity(ctx context.Context, connector ConnectorRu
 		Issuer:          identity.Issuer,
 		ExternalSubject: identity.Subject,
 		Detail:          detail,
-		CreatedBy:       0,
+		CreatedBy:       "",
 	})
 }
 

@@ -3,7 +3,6 @@ package svcoidc
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	appconfig "github.com/morehao/ark-iam/auth/config"
@@ -86,10 +85,8 @@ func redirectURIVerifier(provider *OIDCProvider) func(ctx *gin.Context, clientID
 func tenantHintMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		if t := ctx.Query("tenant"); t != "" {
-			if id, err := strconv.ParseUint(t, 10, 64); err == nil {
-				withValue := context.WithValue(ctx.Request.Context(), ctxTenantHintKey, uint(id))
-				ctx.Request = ctx.Request.WithContext(withValue)
-			}
+			withValue := context.WithValue(ctx.Request.Context(), ctxTenantHintKey, t)
+			ctx.Request = ctx.Request.WithContext(withValue)
 		}
 		ctx.Next()
 	}

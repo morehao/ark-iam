@@ -20,10 +20,10 @@ func TestSessionListReturnsPersonAwareTenantSessions(t *testing.T) {
 	expiresAt := time.Now().Add(time.Hour)
 	// 仅 person 101/tenant 11/user 21 的会话应被返回
 	if err := db.Create(&model.RefreshTokenEntity{
-		PersonID:            101,
-		TenantID:            11,
-		UserID:              21,
-		ApplicationClientID: 1,
+		PersonID:            "101",
+		TenantID:            "11",
+		UserID:              "21",
+		ApplicationClientID: "1",
 		SessionID:           "session-1",
 		ClientType:          "web",
 		ClientIP:            "10.0.0.1",
@@ -33,10 +33,10 @@ func TestSessionListReturnsPersonAwareTenantSessions(t *testing.T) {
 		t.Fatalf("seed session-1: %v", err)
 	}
 	if err := db.Create(&model.RefreshTokenEntity{
-		PersonID:            102,
-		TenantID:            12,
-		UserID:              22,
-		ApplicationClientID: 2,
+		PersonID:            "102",
+		TenantID:            "12",
+		UserID:              "22",
+		ApplicationClientID: "2",
 		SessionID:           "session-2",
 		ClientType:          "mobile",
 		ClientIP:            "10.0.0.2",
@@ -47,7 +47,7 @@ func TestSessionListReturnsPersonAwareTenantSessions(t *testing.T) {
 	}
 
 	svc := &sessionSvc{}
-	resp, err := svc.List(ginCtx, &dtouser.SessionListReq{}, 101, 21, 11)
+	resp, err := svc.List(ginCtx, &dtouser.SessionListReq{}, "101", "21", "11")
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
 	}

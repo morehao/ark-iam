@@ -3,19 +3,19 @@ package svctenant
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objtenant"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenant"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
 
-func departmentVisibleToTenant(entity *model.DepartmentEntity, tenantID uint) bool {
-	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
+func departmentVisibleToTenant(entity *model.DepartmentEntity, tenantID string) bool {
+	return entity != nil && entity.ID != "" && entity.TenantID == tenantID
 }
 
 type DepartmentSvc interface {
@@ -44,7 +44,7 @@ func (svc *departmentSvc) Create(ctx *gin.Context, req *dtotenant.DepartmentCrea
 		Code:         req.Code,
 		Sort:         req.Sort,
 		LeaderUserID: req.LeaderUserID,
-		CreatedBy:    gincontext.GetUserID(ctx),
+		CreatedBy:    gctx.GetUserID(ctx),
 	}
 
 	if err := dao.NewDepartmentDao().Insert(ctx, insertEntity); err != nil {
@@ -62,11 +62,11 @@ func (svc *departmentSvc) Delete(ctx *gin.Context, req *dtotenant.DepartmentDele
 		glog.Errorf(ctx, "[svctenant.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.DepartmentDeleteError)
 	}
-	if !departmentVisibleToTenant(departmentEntity, gincontext.GetTenantID(ctx)) {
+	if !departmentVisibleToTenant(departmentEntity, gctx.GetTenantID(ctx)) {
 		return code.GetError(code.DepartmentNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	if err := dao.NewDepartmentDao().Delete(ctx, req.DepartmentID, userID); err != nil {
 		glog.Errorf(ctx, "[svctenant.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.DepartmentDeleteError)
@@ -80,11 +80,11 @@ func (svc *departmentSvc) Update(ctx *gin.Context, req *dtotenant.DepartmentUpda
 		glog.Errorf(ctx, "[svctenant.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.DepartmentUpdateError)
 	}
-	if !departmentVisibleToTenant(departmentEntity, gincontext.GetTenantID(ctx)) {
+	if !departmentVisibleToTenant(departmentEntity, gctx.GetTenantID(ctx)) {
 		return code.GetError(code.DepartmentNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	updateMap := map[string]any{
 		"tenant_id":      req.TenantID,
 		"parent_id":      req.ParentID,
@@ -107,7 +107,7 @@ func (svc *departmentSvc) Detail(ctx *gin.Context, req *dtotenant.DepartmentDeta
 		glog.Errorf(ctx, "[svctenant.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.DepartmentGetDetailError)
 	}
-	if !departmentVisibleToTenant(departmentEntity, gincontext.GetTenantID(ctx)) {
+	if !departmentVisibleToTenant(departmentEntity, gctx.GetTenantID(ctx)) {
 		return nil, code.GetError(code.DepartmentNotExistError)
 	}
 
@@ -136,7 +136,7 @@ func (svc *departmentSvc) PageList(ctx *gin.Context, req *dtotenant.DepartmentPa
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID: gincontext.GetTenantID(ctx),
+		TenantID: gctx.GetTenantID(ctx),
 		ParentID: req.ParentID,
 		Name:     req.Name,
 		Code:     req.Code,
@@ -173,7 +173,7 @@ func (svc *departmentSvc) PageList(ctx *gin.Context, req *dtotenant.DepartmentPa
 func (svc *departmentSvc) Tree(ctx *gin.Context, req *dtotenant.DepartmentTreeReq) (*dtotenant.DepartmentTreeResp, error) {
 	departmentRepo := dao.NewDepartmentDao()
 	cond := &dao.DepartmentCond{
-		TenantID: gincontext.GetTenantID(ctx),
+		TenantID: gctx.GetTenantID(ctx),
 	}
 	departmentEntityList, _, err := departmentRepo.GetPageListByCond(ctx, cond)
 	if err != nil {
@@ -181,13 +181,13 @@ func (svc *departmentSvc) Tree(ctx *gin.Context, req *dtotenant.DepartmentTreeRe
 		return nil, code.GetError(code.DepartmentGetPageListError)
 	}
 
-	deptMap := make(map[uint]*model.DepartmentEntity)
+	deptMap := make(map[string]*model.DepartmentEntity)
 	for i := range departmentEntityList {
 		deptMap[departmentEntityList[i].ID] = &departmentEntityList[i]
 	}
 
-	var buildTree func(parentID uint) []dtotenant.DepartmentTreeItem
-	buildTree = func(parentID uint) []dtotenant.DepartmentTreeItem {
+	var buildTree func(parentID string) []dtotenant.DepartmentTreeItem
+	buildTree = func(parentID string) []dtotenant.DepartmentTreeItem {
 		var items []dtotenant.DepartmentTreeItem
 		for _, dept := range departmentEntityList {
 			if dept.ParentID == parentID {
@@ -214,6 +214,6 @@ func (svc *departmentSvc) Tree(ctx *gin.Context, req *dtotenant.DepartmentTreeRe
 	}
 
 	return &dtotenant.DepartmentTreeResp{
-		List: buildTree(0),
+		List: buildTree(""),
 	}, nil
 }

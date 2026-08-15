@@ -26,14 +26,14 @@ export default function UserDetail() {
 
   const [identities, setIdentities] = useState<UserIdentityItem[]>([])
   const [loginLogs, setLoginLogs] = useState<UserLoginLogItem[]>([])
-  const [deptRel, setDeptRel] = useState<{ departmentID: number; isPrimary: number }[]>([])
+  const [deptRel, setDeptRel] = useState<{ departmentID: string; isPrimary: number }[]>([])
   const [deptTree, setDeptTree] = useState<DataNode[]>([])
   const [assignModalOpen, setAssignModalOpen] = useState(false)
   const [checkedDeptKeys, setCheckedDeptKeys] = useState<React.Key[]>([])
   const [identityModalOpen, setIdentityModalOpen] = useState(false)
   const [identityForm] = Form.useForm()
 
-  const userID = Number(id)
+  const userID = id ?? ""
 
   const fetchAll = useCallback(async () => {
     if (!id) return
@@ -77,7 +77,7 @@ export default function UserDetail() {
 
   const handleAssign = async () => {
     try {
-      await assignUserDepartments(userID, checkedDeptKeys.map(Number))
+      await assignUserDepartments(userID, checkedDeptKeys.map(String))
       message.success('分配成功')
       setAssignModalOpen(false)
       void fetchAll()
@@ -89,7 +89,7 @@ export default function UserDetail() {
   const handleAddIdentity = async () => {
     try {
       const values = await identityForm.validateFields()
-      await createUserIdentity({ tenantID: user?.tenantID ?? 0, userID: userID, issuer: values.issuer, identityID: values.identityID })
+      await createUserIdentity({ tenantID: user?.tenantID ?? "", userID: userID, issuer: values.issuer, identityID: values.identityID })
       message.success('绑定成功')
       setIdentityModalOpen(false)
       identityForm.resetFields()

@@ -15,7 +15,7 @@ import (
 )
 
 // newOAuthDeleteCtx 构造带租户与操作人上下文的 gin.Context。
-func newOAuthDeleteCtx(tenantID, userID uint) *gin.Context {
+func newOAuthDeleteCtx(tenantID, userID string) *gin.Context {
 	ctx, _ := gin.CreateTestContext(nil)
 	ctx.Set(gcontext.KeyTenantID, tenantID)
 	ctx.Set(gcontext.KeyUserID, userID)
@@ -25,7 +25,7 @@ func newOAuthDeleteCtx(tenantID, userID uint) *gin.Context {
 // newTestClientEntity 构造一条完整的应用客户端记录（IsSystem 按需传入，其余取常规默认值）。
 func newTestClientEntity(name, clientID string, isSystem int8) *model.ApplicationClientEntity {
 	return &model.ApplicationClientEntity{
-		TenantID:                1,
+		TenantID:                "1",
 		ClientID:                clientID,
 		Name:                    name,
 		RedirectURIs:            datatypes.JSON("[]"),
@@ -50,7 +50,7 @@ func TestDeleteSystemApplicationClient(t *testing.T) {
 	}
 
 	svc := NewApplicationClientSvc()
-	err := svc.Delete(newOAuthDeleteCtx(1, 0), &dtoapplicationclient.ApplicationClientDeleteReq{ApplicationClientID: entity.ID})
+	err := svc.Delete(newOAuthDeleteCtx("1", "0"), &dtoapplicationclient.ApplicationClientDeleteReq{ApplicationClientID: entity.ID})
 	if err == nil {
 		t.Fatal("expected error for system-built-in oauth client")
 	}
@@ -68,7 +68,7 @@ func TestDeleteNonSystemApplicationClient(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
-	ctx := newOAuthDeleteCtx(1, 7)
+	ctx := newOAuthDeleteCtx("1", "7")
 	svc := NewApplicationClientSvc()
 	if err := svc.Delete(ctx, &dtoapplicationclient.ApplicationClientDeleteReq{ApplicationClientID: entity.ID}); err != nil {
 		t.Fatalf("Delete returned error: %v", err)
@@ -79,7 +79,7 @@ func TestDeleteNonSystemApplicationClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
-	if got != nil && got.ID != 0 {
+	if got != nil && got.ID != "" {
 		t.Fatalf("expected client soft-deleted, got %+v", got)
 	}
 
@@ -88,7 +88,7 @@ func TestDeleteNonSystemApplicationClient(t *testing.T) {
 	if err := db.Unscoped().Where("id = ?", entity.ID).First(&deleted).Error; err != nil {
 		t.Fatalf("query deleted row: %v", err)
 	}
-	if deleted.DeletedBy != 7 {
-		t.Fatalf("expected deletedBy 7, got %d", deleted.DeletedBy)
+	if deleted.DeletedBy != "7" {
+		t.Fatalf("expected deletedBy 7, got %s", deleted.DeletedBy)
 	}
 }

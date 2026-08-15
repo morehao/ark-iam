@@ -131,7 +131,7 @@ func (w *logoutWorker) buildLogoutToken(job sso.LogoutJob) (string, error) {
 	}
 	sub := job.UserID
 	if sub == "" {
-		sub = fmt.Sprintf("person:%d", job.PersonID)
+		sub = fmt.Sprintf("person:%s", job.PersonID)
 	}
 	claims := oidc.NewLogoutTokenClaims(
 		w.issuer,

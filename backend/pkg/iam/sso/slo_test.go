@@ -70,7 +70,7 @@ func TestLogoutQueueEnqueueDequeue(t *testing.T) {
 	queueKey := fmt.Sprintf("iam:oidc:slo_queue:test:%d", time.Now().UnixNano())
 	job := LogoutJob{
 		SessionID:            "sid-1",
-		PersonID:             42,
+		PersonID:             "42",
 		OIDCSessionID:        "at-1",
 		ClientID:             "client-a",
 		UserID:               "person:42",
@@ -84,5 +84,5 @@ func TestLogoutQueueEnqueueDequeue(t *testing.T) {
 	require.Equal(t, "client-a", got.ClientID)
 	require.Equal(t, "person:42", got.UserID)
 	require.Equal(t, "sid-1", got.SessionID)
-	require.Equal(t, uint(42), got.PersonID)
+	require.Equal(t, "42", got.PersonID)
 }

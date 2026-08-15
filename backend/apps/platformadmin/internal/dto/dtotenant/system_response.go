@@ -7,17 +7,17 @@ import (
 )
 
 type SystemCreateResp struct {
-	SystemID uint `json:"systemID"` // 自增ID
+	SystemID string `json:"systemID"` // 自增ID
 }
 
 type SystemDetailResp struct {
-	SystemID uint `json:"systemID"` // 自增ID
+	SystemID string `json:"systemID"` // 自增ID
 	objtenant.SystemBaseInfo
 	gobject.OperatorBaseInfo
 }
 
 type SystemPageListItem struct {
-	SystemID uint `json:"systemID"` // 自增ID
+	SystemID string `json:"systemID"` // 自增ID
 	objtenant.SystemBaseInfo
 	gobject.OperatorBaseInfo
 }
@@ -28,13 +28,13 @@ type SystemPageListResp struct {
 }
 
 type LogDetailResp struct {
-	LogID uint `json:"logID"` // 日志ID
+	LogID string `json:"logID"` // 日志ID
 	objaudit.LogBaseInfo
 	gobject.OperatorBaseInfo
 }
 
 type LogPageListItem struct {
-	LogID uint `json:"logID"` // 日志ID
+	LogID string `json:"logID"` // 日志ID
 	objaudit.LogBaseInfo
 	gobject.OperatorBaseInfo
 }

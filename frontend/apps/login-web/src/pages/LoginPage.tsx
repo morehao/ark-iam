@@ -9,7 +9,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [tenants, setTenants] = useState<{ tenantID: number; name: string }[]>([])
+  const [tenants, setTenants] = useState<{ tenantID: string; name: string }[]>([])
   const [pendingAuthRequestID, setPendingAuthRequestID] = useState('')
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function LoginPage() {
     }
   }
 
-  const selectTenant = async (tenantID: number) => {
+  const selectTenant = async (tenantID: string) => {
     if (!pendingAuthRequestID) return
     setLoading(true)
     setError('')

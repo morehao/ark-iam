@@ -8,9 +8,9 @@ import (
 
 type UserDepartmentCond struct {
 	*gormdao.BaseCond
-	TenantID     uint
-	UserID       uint
-	DepartmentID uint
+	TenantID     string
+	UserID       string
+	DepartmentID string
 	IsPrimary    *int8
 }
 
@@ -18,13 +18,13 @@ func (c *UserDepartmentCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
-	if c.UserID != 0 {
+	if c.UserID != "" {
 		db.Where(tableName+".user_id = ?", c.UserID)
 	}
-	if c.DepartmentID != 0 {
+	if c.DepartmentID != "" {
 		db.Where(tableName+".department_id = ?", c.DepartmentID)
 	}
 	if c.IsPrimary != nil {
@@ -33,12 +33,12 @@ func (c *UserDepartmentCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type UserDepartmentDao struct {
-	*gormdao.Dao[model.UserDepartmentEntity, model.UserDepartmentEntityList, uint]
+	*gormdao.Dao[model.UserDepartmentEntity, model.UserDepartmentEntityList, string]
 }
 
 func NewUserDepartmentDao(opts ...DaoOption) *UserDepartmentDao {
 	return &UserDepartmentDao{
-		Dao: gormdao.NewDao[model.UserDepartmentEntity, model.UserDepartmentEntityList, uint](
+		Dao: gormdao.NewDao[model.UserDepartmentEntity, model.UserDepartmentEntityList, string](
 			model.TableNameUserDepartment, "UserDepartmentDao",
 			resolveDBGetter(opts...),
 		),

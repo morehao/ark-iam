@@ -8,7 +8,7 @@ import (
 
 type ApplicationClientSecretCond struct {
 	*gormdao.BaseCond
-	ApplicationClientID uint
+	ApplicationClientID string
 	Name                string
 }
 
@@ -16,7 +16,7 @@ func (c *ApplicationClientSecretCond) BuildCondition(db *gorm.DB, tableName stri
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.ApplicationClientID != 0 {
+	if c.ApplicationClientID != "" {
 		db.Where(tableName+".application_client_id = ?", c.ApplicationClientID)
 	}
 	if c.Name != "" {
@@ -25,12 +25,12 @@ func (c *ApplicationClientSecretCond) BuildCondition(db *gorm.DB, tableName stri
 }
 
 type ApplicationClientSecretDao struct {
-	*gormdao.Dao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList, uint]
+	*gormdao.Dao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList, string]
 }
 
 func NewApplicationClientSecretDao(opts ...DaoOption) *ApplicationClientSecretDao {
 	return &ApplicationClientSecretDao{
-		Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList, uint](
+		Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList, string](
 			model.TableNameApplicationClientSecret, "ApplicationClientSecretDao",
 			resolveDBGetter(opts...),
 		),

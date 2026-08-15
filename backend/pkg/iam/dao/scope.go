@@ -8,8 +8,8 @@ import (
 
 type ScopeCond struct {
 	*gormdao.BaseCond
-	TenantID   uint
-	ResourceID uint
+	TenantID   string
+	ResourceID string
 	Name       string
 }
 
@@ -17,10 +17,10 @@ func (c *ScopeCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
-	if c.ResourceID != 0 {
+	if c.ResourceID != "" {
 		db.Where(tableName+".resource_id = ?", c.ResourceID)
 	}
 	if c.Name != "" {
@@ -29,12 +29,12 @@ func (c *ScopeCond) BuildCondition(db *gorm.DB, tableName string) {
 }
 
 type ScopeDao struct {
-	*gormdao.Dao[model.ScopeEntity, model.ScopeEntityList, uint]
+	*gormdao.Dao[model.ScopeEntity, model.ScopeEntityList, string]
 }
 
 func NewScopeDao(opts ...DaoOption) *ScopeDao {
 	return &ScopeDao{
-		Dao: gormdao.NewDao[model.ScopeEntity, model.ScopeEntityList, uint](
+		Dao: gormdao.NewDao[model.ScopeEntity, model.ScopeEntityList, string](
 			model.TableNameScope, "ScopeDao",
 			resolveDBGetter(opts...),
 		),

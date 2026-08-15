@@ -11,33 +11,33 @@ import (
 
 type SessionCond struct {
 	*gormdao.BaseCond
-	PersonID uint
-	TenantID uint
-	UserID   uint
+	PersonID string
+	TenantID string
+	UserID   string
 }
 
 func (c *SessionCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.PersonID != 0 {
+	if c.PersonID != "" {
 		db.Where(tableName+".person_id = ?", c.PersonID)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
-	if c.UserID != 0 {
+	if c.UserID != "" {
 		db.Where(tableName+".user_id = ?", c.UserID)
 	}
 }
 
 type SessionDao struct {
-	*gormdao.Dao[model.RefreshTokenEntity, model.RefreshTokenEntityList, uint]
+	*gormdao.Dao[model.RefreshTokenEntity, model.RefreshTokenEntityList, string]
 }
 
 func NewSessionDao(opts ...DaoOption) *SessionDao {
 	return &SessionDao{
-		Dao: gormdao.NewDao[model.RefreshTokenEntity, model.RefreshTokenEntityList, uint](
+		Dao: gormdao.NewDao[model.RefreshTokenEntity, model.RefreshTokenEntityList, string](
 			model.TableNameRefreshToken, "SessionDao",
 			resolveDBGetter(opts...),
 		),

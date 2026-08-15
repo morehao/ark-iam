@@ -8,33 +8,33 @@ import (
 
 type RoleScopeCond struct {
 	*gormdao.BaseCond
-	TenantID uint
-	RoleID   uint
-	ScopeID  uint
+	TenantID string
+	RoleID   string
+	ScopeID  string
 }
 
 func (c *RoleScopeCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
-	if c.TenantID != 0 {
+	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
 	}
-	if c.RoleID != 0 {
+	if c.RoleID != "" {
 		db.Where(tableName+".role_id = ?", c.RoleID)
 	}
-	if c.ScopeID != 0 {
+	if c.ScopeID != "" {
 		db.Where(tableName+".scope_id = ?", c.ScopeID)
 	}
 }
 
 type RoleScopeDao struct {
-	*gormdao.Dao[model.RoleScopeEntity, model.RoleScopeEntityList, uint]
+	*gormdao.Dao[model.RoleScopeEntity, model.RoleScopeEntityList, string]
 }
 
 func NewRoleScopeDao(opts ...DaoOption) *RoleScopeDao {
 	return &RoleScopeDao{
-		Dao: gormdao.NewDao[model.RoleScopeEntity, model.RoleScopeEntityList, uint](
+		Dao: gormdao.NewDao[model.RoleScopeEntity, model.RoleScopeEntityList, string](
 			model.TableNameRoleScope, "RoleScopeDao",
 			resolveDBGetter(opts...),
 		),

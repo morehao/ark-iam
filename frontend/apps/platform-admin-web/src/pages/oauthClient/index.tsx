@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import { fmtTime, StatusTag, TypeTag } from '../../components/common'
 
 interface AppOption {
-  value: number
+  value: string
   label: string
 }
 

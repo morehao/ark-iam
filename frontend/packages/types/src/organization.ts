@@ -1,31 +1,31 @@
 export interface OrganizationItem {
-  organizationID: number
-  tenantID: number
+  organizationID: string
+  tenantID: string
   name: string
   description: string
   isMFARequired: number
 }
 
 export interface OrganizationRoleItem {
-  organizationRoleID: number
-  tenantID: number
-  organizationID: number
+  organizationRoleID: string
+  tenantID: string
+  organizationID: string
   name: string
   description: string
   type: string
 }
 
 export interface OrganizationUserItem {
-  organizationID: number
-  userID: number
-  tenantID: number
+  organizationID: string
+  userID: string
+  tenantID: string
 }
 
 export interface OrganizationRoleUserItem {
-  organizationID: number
-  organizationRoleID: number
-  userID: number
-  tenantID: number
+  organizationID: string
+  organizationRoleID: string
+  userID: string
+  tenantID: string
 }
 
 export interface PageListResp<T> {

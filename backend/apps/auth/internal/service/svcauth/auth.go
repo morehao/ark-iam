@@ -13,6 +13,7 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/auth/internal/service/svcloginguard"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
@@ -30,29 +31,29 @@ const (
 )
 
 type authUserStore interface {
-	GetByID(ctx context.Context, id uint) (*model.UserEntity, error)
+	GetByID(ctx context.Context, id string) (*model.UserEntity, error)
 	GetByCond(ctx context.Context, cond gormdao.Cond) (*model.UserEntity, error)
 	GetListByCond(ctx context.Context, cond gormdao.Cond) (model.UserEntityList, error)
 	Insert(ctx context.Context, entity *model.UserEntity) error
-	UpdateMap(ctx context.Context, id uint, updateMap map[string]interface{}) error
+	UpdateMap(ctx context.Context, id string, updateMap map[string]any) error
 }
 
 type authPersonStore interface {
-	GetByID(ctx context.Context, id uint) (*model.PersonEntity, error)
+	GetByID(ctx context.Context, id string) (*model.PersonEntity, error)
 	GetByCond(ctx context.Context, cond gormdao.Cond) (*model.PersonEntity, error)
 	Insert(ctx context.Context, entity *model.PersonEntity) error
 }
 
 type authTenantStore interface {
-	GetByID(ctx context.Context, id uint) (*model.TenantEntity, error)
+	GetByID(ctx context.Context, id string) (*model.TenantEntity, error)
 	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.TenantEntityList, int64, error)
 }
 
 type authRefreshTokenStore interface {
 	GetByCond(ctx context.Context, cond gormdao.Cond) (*model.RefreshTokenEntity, error)
 	Insert(ctx context.Context, entity *model.RefreshTokenEntity) error
-	Delete(ctx context.Context, id, userID uint) error
-	RevokeByPersonID(ctx context.Context, personID uint) error
+	Delete(ctx context.Context, id, userID string) error
+	RevokeByPersonID(ctx context.Context, personID string) error
 }
 
 var newAuthUserStore = func() authUserStore {
@@ -71,13 +72,13 @@ var newAuthRefreshTokenStore = func() authRefreshTokenStore {
 	return dao.NewRefreshTokenDao()
 }
 
-var authLoginRecorder = func(ctx *gin.Context, tenantID, userID uint, success bool) {
+var authLoginRecorder = func(ctx *gin.Context, tenantID, userID string, success bool) {
 	defaultRecordLoginLog(ctx, tenantID, userID, success)
 }
 
 type AuthSvc interface {
 	AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error)
-	TenantsForPerson(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error)
+	TenantsForPerson(ctx *gin.Context, personID string) ([]objauth.TenantOption, error)
 	MyTenants(ctx *gin.Context, req *dtoauth.MyTenantsReq) (*dtoauth.MyTenantsResp, error)
 	Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoauth.RegisterResp, error)
 	JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*dtoauth.JoinTenantResp, error)
@@ -109,7 +110,7 @@ func (svc *authSvc) AuthenticatePassword(ctx *gin.Context, identifier, password 
 	return personEntity, userEntity, tenants, nil
 }
 
-func (svc *authSvc) TenantsForPerson(ctx *gin.Context, personID uint) ([]objauth.TenantOption, error) {
+func (svc *authSvc) TenantsForPerson(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
 	_, tenants, err := svc.listPersonTenants(ctx, personID)
 	if err != nil {
 		return nil, err
@@ -124,7 +125,7 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 			Action:     svcaudit.ActionLogin,
 			Result:     "failure",
 			TargetType: "person",
-			Detail:     fmt.Sprintf("personID:%d, reason:login locked", personEntity.ID),
+			Detail:     fmt.Sprintf("personID:%s, reason:login locked", personEntity.ID),
 		})
 		return nil, nil, code.GetError(code.LoginLockedError)
 	}
@@ -134,7 +135,7 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 			Action:     svcaudit.ActionLogin,
 			Result:     "failure",
 			TargetType: "person",
-			Detail:     fmt.Sprintf("personID:%d, reason:suspended", personEntity.ID),
+			Detail:     fmt.Sprintf("personID:%s, reason:suspended", personEntity.ID),
 		})
 		return nil, nil, code.GetError(code.UserSuspendedError)
 	}
@@ -144,7 +145,7 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 			Action:     svcaudit.ActionLogin,
 			Result:     "failure",
 			TargetType: "person",
-			Detail:     fmt.Sprintf("personID:%d, reason:password not set", personEntity.ID),
+			Detail:     fmt.Sprintf("personID:%s, reason:password not set", personEntity.ID),
 		})
 		return nil, nil, code.GetError(code.PasswordNotSetError)
 	}
@@ -152,7 +153,7 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 	if err := gcrypto.ComparePasswordHash(personEntity.PasswordEncrypted, password); err != nil {
 		authLoginRecorder(ctx, userEntity.TenantID, userEntity.ID, false)
 		svcloginguard.RecordFailure(ctx, ip, personEntity.ID)
-		glog.Errorf(ctx, "[svcauth.authenticateResolvedPerson] password mismatch, personID:%d", personEntity.ID)
+		glog.Errorf(ctx, "[svcauth.authenticateResolvedPerson] password mismatch, personID:%s", personEntity.ID)
 		return nil, nil, code.GetError(code.PasswordMismatchError)
 	}
 
@@ -162,8 +163,8 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 }
 
 func (svc *authSvc) MyTenants(ctx *gin.Context, req *dtoauth.MyTenantsReq) (*dtoauth.MyTenantsResp, error) {
-	personID := gincontext.GetPersonID(ctx)
-	if personID == 0 {
+	personID := gctx.GetPersonID(ctx)
+	if personID == "" {
 		return nil, code.GetError(gconstant.UnauthorizedErr)
 	}
 
@@ -190,10 +191,10 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 
 	tenantEntity, err := tenantDao.GetByID(ctx.Request.Context(), req.TenantID)
 	if err != nil {
-		glog.Errorf(ctx, "[svcauth.Register] tenant dao GetByID fail, err:%v, tenantID:%d", err, req.TenantID)
+		glog.Errorf(ctx, "[svcauth.Register] tenant dao GetByID fail, err:%v, tenantID:%s", err, req.TenantID)
 		return nil, code.GetError(code.TenantGetDetailError)
 	}
-	if tenantEntity == nil || tenantEntity.ID == 0 {
+	if tenantEntity == nil || tenantEntity.ID == "" {
 		return nil, code.GetError(code.TenantNotExistError)
 	}
 
@@ -201,7 +202,7 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 		existingPerson, _ := personDao.GetByCond(ctx.Request.Context(), &dao.PersonCond{
 			Username: req.Username,
 		})
-		if existingPerson != nil && existingPerson.ID != 0 {
+		if existingPerson != nil && existingPerson.ID != "" {
 			return nil, code.GetError(code.UsernameAlreadyExistsError)
 		}
 	}
@@ -210,7 +211,7 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 		existingPerson, _ := personDao.GetByCond(ctx.Request.Context(), &dao.PersonCond{
 			PrimaryEmail: req.PrimaryEmail,
 		})
-		if existingPerson != nil && existingPerson.ID != 0 {
+		if existingPerson != nil && existingPerson.ID != "" {
 			return nil, code.GetError(code.EmailAlreadyExistsError)
 		}
 	}
@@ -219,7 +220,7 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 		existingPerson, _ := personDao.GetByCond(ctx.Request.Context(), &dao.PersonCond{
 			PrimaryPhone: req.PrimaryPhone,
 		})
-		if existingPerson != nil && existingPerson.ID != 0 {
+		if existingPerson != nil && existingPerson.ID != "" {
 			return nil, code.GetError(code.PhoneAlreadyExistsError)
 		}
 	}
@@ -239,7 +240,7 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 		Name:              req.Name,
 		Profile:           json.RawMessage("{}"),
 		CustomData:        json.RawMessage("{}"),
-		CreatedBy:         0,
+		CreatedBy:         "",
 	}
 	if err := personDao.Insert(ctx.Request.Context(), personEntity); err != nil {
 		glog.Errorf(ctx, "[svcauth.Register] person dao Insert fail, err:%v", err)
@@ -254,7 +255,7 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 		CustomData: json.RawMessage("{}"),
 		IsOwner:    1,
 		JoinedAt:   &now,
-		CreatedBy:  0,
+		CreatedBy:  "",
 	}
 
 	if err := userDao.Insert(ctx.Request.Context(), insertEntity); err != nil {
@@ -268,8 +269,8 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 }
 
 func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*dtoauth.JoinTenantResp, error) {
-	personID := gincontext.GetPersonID(ctx)
-	if personID == 0 {
+	personID := gctx.GetPersonID(ctx)
+	if personID == "" {
 		return nil, code.GetError(gconstant.UnauthorizedErr)
 	}
 
@@ -278,10 +279,10 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 
 	tenantEntity, err := tenantDao.GetByID(ctx.Request.Context(), req.TenantID)
 	if err != nil {
-		glog.Errorf(ctx, "[svcauth.JoinTenant] tenant dao GetByID fail, err:%v, tenantID:%d", err, req.TenantID)
+		glog.Errorf(ctx, "[svcauth.JoinTenant] tenant dao GetByID fail, err:%v, tenantID:%s", err, req.TenantID)
 		return nil, code.GetError(code.TenantGetDetailError)
 	}
-	if tenantEntity == nil || tenantEntity.ID == 0 {
+	if tenantEntity == nil || tenantEntity.ID == "" {
 		return nil, code.GetError(code.TenantNotExistError)
 	}
 
@@ -290,7 +291,7 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 		glog.Errorf(ctx, "[svcauth.JoinTenant] user dao GetByCond fail, err:%v", err)
 		return nil, code.GetError(code.UserGetDetailError)
 	}
-	if existingUser != nil && existingUser.ID != 0 {
+	if existingUser != nil && existingUser.ID != "" {
 		return nil, code.GetError(code.AlreadyJoinedError)
 	}
 
@@ -301,7 +302,7 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 		Name:      "",
 		IsOwner:   0,
 		JoinedAt:  &now,
-		CreatedBy: 0,
+		CreatedBy: "",
 	}
 	if err := userDao.Insert(ctx.Request.Context(), userEntity); err != nil {
 		glog.Errorf(ctx, "[svcauth.JoinTenant] user dao Insert fail, err:%v", err)
@@ -314,17 +315,17 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 }
 
 func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
-	personID := gincontext.GetPersonID(ctx)
+	personID := gctx.GetPersonID(ctx)
 	// 全局登出语义：撤销该 person 的全部 refresh token + SSO 会话，实现"一处登出、处处登出"。
 	// access token 依赖其短 TTL 失效（见设计文档 §2.5），此处不维护 HS256 黑名单。
-	if personID != 0 {
+	if personID != "" {
 		if err := newAuthRefreshTokenStore().RevokeByPersonID(ctx.Request.Context(), personID); err != nil {
-			glog.Errorf(ctx, "[svcauth.Logout] RevokeByPersonID fail, personID:%d, err:%v", personID, err)
+			glog.Errorf(ctx, "[svcauth.Logout] RevokeByPersonID fail, personID:%s, err:%v", personID, err)
 		}
 		// 先入队 back-channel 通知（ListByPersonID 依赖 sso_user_sessions 索引），再撤销 SSO 会话。
 		svc.enqueueBackChannelLogouts(ctx, personID)
 		if err := sso.RevokeSSOSessionsByPersonID(ctx.Request.Context(), personID); err != nil {
-			glog.Errorf(ctx, "[svcauth.Logout] RevokeSSOSessionsByPersonID fail, personID:%d, err:%v", personID, err)
+			glog.Errorf(ctx, "[svcauth.Logout] RevokeSSOSessionsByPersonID fail, personID:%s, err:%v", personID, err)
 		}
 	}
 	return nil
@@ -333,11 +334,11 @@ func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
 // enqueueBackChannelLogouts 将该 person 已登记的全部 client 的 back-channel logout
 // 任务入队（在撤销 SSO 会话前调用，此时会话索引仍可用），使其它已登录应用（含第三方 RP）
 // 即时收到 logout_token。入队失败仅告警，不影响登出主流程；任务由 svcoidc 的 logoutWorker 异步消费。
-func (svc *authSvc) enqueueBackChannelLogouts(ctx *gin.Context, personID uint) {
+func (svc *authSvc) enqueueBackChannelLogouts(ctx *gin.Context, personID string) {
 	slo := sso.NewSLOStore()
 	regs, err := slo.ListByPersonID(ctx.Request.Context(), personID)
 	if err != nil {
-		glog.Warnf(ctx, "[svcauth.Logout] list logout registrations fail, personID:%d, err:%v", personID, err)
+		glog.Warnf(ctx, "[svcauth.Logout] list logout registrations fail, personID:%s, err:%v", personID, err)
 		return
 	}
 	for _, reg := range regs {
@@ -360,38 +361,38 @@ func (svc *authSvc) LogoutAll(ctx *gin.Context, req *dtoauth.LogoutAllReq) error
 func (svc *authSvc) Userinfo(ctx *gin.Context, req *dtoauth.UserinfoReq) (*dtoauth.UserinfoResp, error) {
 	userDao := newAuthUserStore()
 
-	userID := gincontext.GetUserID(ctx)
-	personID := gincontext.GetPersonID(ctx)
-	tenantID := gincontext.GetTenantID(ctx)
+	userID := gctx.GetUserID(ctx)
+	personID := gctx.GetPersonID(ctx)
+	tenantID := gctx.GetTenantID(ctx)
 
 	var userEntity *model.UserEntity
 	var err error
 
-	if userID != 0 {
+	if userID != "" {
 		userEntity, err = userDao.GetByID(ctx.Request.Context(), userID)
-	} else if personID != 0 && tenantID != 0 {
+	} else if personID != "" && tenantID != "" {
 		userEntity, err = userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{PersonID: personID, TenantID: tenantID})
 	} else {
 		return nil, code.GetError(gconstant.UnauthorizedErr)
 	}
 
 	if err != nil {
-		glog.Errorf(ctx, "[svcauth.Userinfo] dao query fail, err:%v, userID:%d, personID:%d, tenantID:%d", err, userID, personID, tenantID)
+		glog.Errorf(ctx, "[svcauth.Userinfo] dao query fail, err:%v, userID:%s, personID:%s, tenantID:%s", err, userID, personID, tenantID)
 		return nil, code.GetError(code.UserGetDetailError)
 	}
-	if userEntity == nil || userEntity.ID == 0 {
+	if userEntity == nil || userEntity.ID == "" {
 		return nil, code.GetError(code.UserNotExistError)
 	}
 
-	if personID == 0 {
+	if personID == "" {
 		personID = userEntity.PersonID
 	}
 
 	personInfo := objauth.PersonInfo{}
-	if personID != 0 {
+	if personID != "" {
 		personDao := newAuthPersonStore()
 		personEntity, personErr := personDao.GetByID(ctx.Request.Context(), personID)
-		if personErr == nil && personEntity != nil && personEntity.ID != 0 {
+		if personErr == nil && personEntity != nil && personEntity.ID != "" {
 			personInfo = objauth.PersonInfo{
 				PersonID: personEntity.ID,
 				Name:     personEntity.Name,
@@ -441,7 +442,7 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 		glog.Errorf(ctx, "[svcauth.Login] person dao GetByCond fail, err:%v", err)
 		return nil, nil, nil, code.GetError(code.UserGetDetailError)
 	}
-	if personEntity == nil || personEntity.ID == 0 {
+	if personEntity == nil || personEntity.ID == "" {
 		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
 			Action:     svcaudit.ActionLogin,
 			Result:     "failure",
@@ -455,24 +456,24 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if userEntity == nil || userEntity.ID == 0 {
+	if userEntity == nil || userEntity.ID == "" {
 		userEntity, err = userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{PersonID: personEntity.ID})
 		if err != nil {
 			svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
 				Action:     svcaudit.ActionLogin,
 				Result:     "failure",
 				TargetType: "person",
-				Detail:     fmt.Sprintf("personID:%d, reason:user lookup error", personEntity.ID),
+				Detail:     fmt.Sprintf("personID:%s, reason:user lookup error", personEntity.ID),
 			})
 			glog.Errorf(ctx, "[svcauth.Login] user dao GetByCond fail, err:%v", err)
 			return nil, nil, nil, code.GetError(code.UserGetDetailError)
 		}
-		if userEntity == nil || userEntity.ID == 0 {
+		if userEntity == nil || userEntity.ID == "" {
 			svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
 				Action:     svcaudit.ActionLogin,
 				Result:     "failure",
 				TargetType: "person",
-				Detail:     fmt.Sprintf("personID:%d, reason:no tenant membership", personEntity.ID),
+				Detail:     fmt.Sprintf("personID:%s, reason:no tenant membership", personEntity.ID),
 			})
 			return nil, nil, nil, code.GetError(code.UserNotExistError)
 		}
@@ -482,14 +483,14 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 			Action:     svcaudit.ActionLogin,
 			Result:     "failure",
 			TargetType: "person",
-			Detail:     fmt.Sprintf("userID:%d, reason:suspended", userEntity.ID),
+			Detail:     fmt.Sprintf("userID:%s, reason:suspended", userEntity.ID),
 		})
 		return nil, nil, nil, code.GetError(code.UserSuspendedError)
 	}
 	return personEntity, userEntity, tenants, nil
 }
 
-func (svc *authSvc) listPersonTenants(ctx *gin.Context, personID uint) (*model.UserEntity, []objauth.TenantOption, error) {
+func (svc *authSvc) listPersonTenants(ctx *gin.Context, personID string) (*model.UserEntity, []objauth.TenantOption, error) {
 	userDao := newAuthUserStore()
 	tenantDao := newAuthTenantStore()
 	userEntity, err := userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{PersonID: personID})
@@ -497,7 +498,7 @@ func (svc *authSvc) listPersonTenants(ctx *gin.Context, personID uint) (*model.U
 		glog.Errorf(ctx, "[svcauth.listPersonTenants] user dao GetByCond fail, err:%v", err)
 		return nil, nil, code.GetError(code.UserGetDetailError)
 	}
-	if userEntity == nil || userEntity.ID == 0 {
+	if userEntity == nil || userEntity.ID == "" {
 		return nil, nil, code.GetError(code.UserNotExistError)
 	}
 	joinedUsers, err := userDao.GetListByCond(ctx.Request.Context(), &dao.UserCond{PersonID: personID})
@@ -507,15 +508,15 @@ func (svc *authSvc) listPersonTenants(ctx *gin.Context, personID uint) (*model.U
 	}
 	options := make([]objauth.TenantOption, 0, len(joinedUsers))
 	for _, joinedUser := range joinedUsers {
-		if joinedUser.TenantID == 0 {
+		if joinedUser.TenantID == "" {
 			continue
 		}
 		tenantEntity, getErr := tenantDao.GetByID(ctx.Request.Context(), joinedUser.TenantID)
 		if getErr != nil {
-			glog.Errorf(ctx, "[svcauth.listPersonTenants] tenant dao GetByID fail, err:%v, tenantID:%d", getErr, joinedUser.TenantID)
+			glog.Errorf(ctx, "[svcauth.listPersonTenants] tenant dao GetByID fail, err:%v, tenantID:%s", getErr, joinedUser.TenantID)
 			return nil, nil, code.GetError(code.UserGetDetailError)
 		}
-		if tenantEntity == nil || tenantEntity.ID == 0 {
+		if tenantEntity == nil || tenantEntity.ID == "" {
 			continue
 		}
 		options = append(options, objauth.TenantOption{TenantID: tenantEntity.ID, Name: tenantEntity.Name, Tag: tenantEntity.Tag, UserID: joinedUser.ID, IsOwner: joinedUser.IsOwner})
@@ -547,7 +548,7 @@ func validatePasswordStrength(password string) error {
 	return nil
 }
 
-func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID uint, success bool) {
+func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID string, success bool) {
 	loginIP := gincontext.GetClientIP(ctx)
 	userAgent := ctx.GetHeader("User-Agent")
 
@@ -558,7 +559,7 @@ func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID uint, success bool
 		LoginIP:   loginIP,
 		UserAgent: userAgent,
 		LoginTime: time.Now(),
-		CreatedBy: 0,
+		CreatedBy: "",
 	}
 
 	if err := dao.NewUserLoginLogDao().Insert(ctx, loginLogEntity); err != nil {
@@ -584,6 +585,6 @@ func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID uint, success bool
 		Result:     result,
 		TargetType: "person",
 		TargetID:   userID,
-		Detail:     fmt.Sprintf("userID:%d", userID),
+		Detail:     fmt.Sprintf("userID:%s", userID),
 	})
 }

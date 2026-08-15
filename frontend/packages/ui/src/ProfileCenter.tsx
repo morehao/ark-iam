@@ -30,7 +30,7 @@ export function ProfileCenter({ open, onClose }: Props) {
       const pages = await Promise.all(
         [1, 2, 3, 4, 5].map((p) => getSessionList({ page: p, pageSize: 10 }).catch(() => ({ list: [], total: 0 }))),
       )
-      const seen = new Set<number>()
+      const seen = new Set<string>()
       const merged: SessionResp[] = []
       for (const resp of pages) {
         for (const s of resp.list || []) {

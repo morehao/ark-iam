@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,17 +17,38 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
+
+func newOIDCAuthTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	dsn := fmt.Sprintf("file:oidcauth_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.ApiKeyEntity{}); err != nil {
+		t.Fatalf("migrate api_key: %v", err)
+	}
+	dbclient.RegisterDBForTest(dbclient.ServiceNameIam, db)
+	t.Cleanup(func() {
+		sqlDB, _ := db.DB()
+		if sqlDB != nil {
+			_ = sqlDB.Close()
+		}
+	})
+	return db
+}
 
 func makeOIDCToken(t *testing.T, key *rsa.PrivateKey, sub string, tokenUsage string) string {
 	t.Helper()
 	claims := jwt.MapClaims{
 		"sub":       sub,
-		"tenant_id": float64(1),
+		"tenant_id": "1",
 		"aud":       "test-client",
 		"iss":       "http://localhost:8099/oidc",
 		"exp":       time.Now().Add(time.Hour).Unix(),
@@ -41,7 +63,7 @@ func makeOIDCToken(t *testing.T, key *rsa.PrivateKey, sub string, tokenUsage str
 	return s
 }
 
-func setupRouter(t *testing.T, validate func(ctx *gin.Context, personID uint, isMachineToken bool) bool) (*gin.Engine, *rsa.PrivateKey) {
+func setupRouter(t *testing.T, validate func(ctx *gin.Context, personID string, isMachineToken bool) bool) (*gin.Engine, *rsa.PrivateKey) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -81,7 +103,7 @@ func makeInternalHS256Token(t *testing.T, sub string) string {
 }
 
 func TestRejectsInternalHS256Token(t *testing.T) {
-	r, _ := setupRouter(t, func(ctx *gin.Context, personID uint, isMachineToken bool) bool {
+	r, _ := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
 		return true // 会话有效，但 RS256 验签失败应直接 401
 	})
 
@@ -93,14 +115,14 @@ func TestRejectsInternalHS256Token(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 }
 
-func ginFromContext(ctx *gin.Context) uint {
+func ginFromContext(ctx *gin.Context) string {
 	v, _ := ctx.Get(gcontext.KeyPersonID)
-	id, _ := v.(uint)
+	id, _ := v.(string)
 	return id
 }
 
 func TestOIDCSSOValidationRejectsRevokedSession(t *testing.T) {
-	r, key := setupRouter(t, func(ctx *gin.Context, personID uint, isMachineToken bool) bool {
+	r, key := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
 		return false // 会话已撤销
 	})
 
@@ -114,7 +136,7 @@ func TestOIDCSSOValidationRejectsRevokedSession(t *testing.T) {
 }
 
 func TestOIDCSSOValidationAllowsActiveSession(t *testing.T) {
-	r, key := setupRouter(t, func(ctx *gin.Context, personID uint, isMachineToken bool) bool {
+	r, key := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
 		return true // 会话有效
 	})
 
@@ -124,13 +146,13 @@ func TestOIDCSSOValidationAllowsActiveSession(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), `"personID":88`)
+	assert.Contains(t, w.Body.String(), `"personID":"88"`)
 }
 
 func TestOIDCSSOValidationMachineTokenBypassesRevokedSession(t *testing.T) {
 	// 机器令牌（token_usage=machine）通过 SSO 校验器时即使自然人的浏览器会话已撤销也放行。
 	// 校验器按生产契约（app.go）对机器令牌直接 short-circuit 返回 true。
-	r, key := setupRouter(t, func(ctx *gin.Context, personID uint, isMachineToken bool) bool {
+	r, key := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
 		return isMachineToken // 非机器令牌返回 false（会话撤销），机器令牌放行
 	})
 
@@ -140,7 +162,7 @@ func TestOIDCSSOValidationMachineTokenBypassesRevokedSession(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), `"personID":88`)
+	assert.Contains(t, w.Body.String(), `"personID":"88"`)
 
 	// 非机器令牌：会话撤销应 401
 	req2 := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
@@ -153,17 +175,18 @@ func TestOIDCSSOValidationMachineTokenBypassesRevokedSession(t *testing.T) {
 // TestAPIKeyParallelAuth 验证 x-api-key 通道与管理 OIDC 并行鉴权（任一通过即放行）。
 // 无 OIDC token，仅携带合法 API Key 也应 200；非法 API Key 应 401。
 func TestAPIKeyParallelAuth(t *testing.T) {
-	testsetup.Initialize(testsetup.AppNameAuth)
-	defer testsetup.Done(testsetup.AppNameAuth)
+	// 与其余单元测试一致：内存 SQLite 注册为全局 iam 库，不依赖真实数据库。
+	_ = newOIDCAuthTestDB(t)
+	t.Cleanup(func() { dbclient.ClearDBForTest(dbclient.ServiceNameIam) })
 
 	rawKey, keyHash := apiKeyHashForTest(t)
 	seed := &model.ApiKeyEntity{
-		TenantID:  1,
+		TenantID:  "1",
 		Name:      "parallel-auth-test",
 		KeyHash:   keyHash,
 		KeyPrefix: rawKey[:7],
 		Scope:     []byte(`{}`),
-		CreatedBy: 1,
+		CreatedBy: "1",
 	}
 	if err := dao.NewApiKeyDao().Insert(context.Background(), seed); err != nil {
 		t.Fatalf("seed api key: %v", err)
@@ -172,7 +195,7 @@ func TestAPIKeyParallelAuth(t *testing.T) {
 		_ = dbclient.IamDB(context.Background()).Where("id = ?", seed.ID).Delete(&model.ApiKeyEntity{}).Error
 	})
 
-	r, _ := setupRouter(t, func(ctx *gin.Context, personID uint, isMachineToken bool) bool {
+	r, _ := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
 		return true
 	})
 
@@ -200,8 +223,6 @@ func apiKeyHashForTest(t *testing.T) (raw, hash string) {
 
 func TestRejectsTokenWithWrongIssuer(t *testing.T) {
 	// H3：配置 issuer 后，iss 不匹配的 token 一律拒绝
-	testsetup.Initialize(testsetup.AppNameAuth)
-	defer testsetup.Done(testsetup.AppNameAuth)
 	gin.SetMode(gin.TestMode)
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
@@ -212,7 +233,7 @@ func TestRejectsTokenWithWrongIssuer(t *testing.T) {
 
 	claims := jwt.MapClaims{
 		"sub":       "person:88",
-		"tenant_id": float64(1),
+		"tenant_id": "1",
 		"aud":       "test-client",
 		"iss":       "http://evil.example.com/oidc",
 		"exp":       time.Now().Add(time.Hour).Unix(),
@@ -231,8 +252,6 @@ func TestRejectsTokenWithWrongIssuer(t *testing.T) {
 
 func TestRejectsTokenWithWrongAudience(t *testing.T) {
 	// H3：配置 audiences 后，aud 不含本应用 client_id 的 token 一律拒绝（跨 client 串用防护）
-	testsetup.Initialize(testsetup.AppNameAuth)
-	defer testsetup.Done(testsetup.AppNameAuth)
 	gin.SetMode(gin.TestMode)
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
@@ -244,7 +263,7 @@ func TestRejectsTokenWithWrongAudience(t *testing.T) {
 
 	claims := jwt.MapClaims{
 		"sub":       "person:88",
-		"tenant_id": float64(1),
+		"tenant_id": "1",
 		"aud":       "tenant-admin-web", // 另一个 client 的 token
 		"iss":       "http://localhost:8099/oidc",
 		"exp":       time.Now().Add(time.Hour).Unix(),
@@ -263,8 +282,6 @@ func TestRejectsTokenWithWrongAudience(t *testing.T) {
 
 func TestAcceptsTokenWithMatchingIssuerAndAudience(t *testing.T) {
 	// H3：iss/aud 均匹配时放行
-	testsetup.Initialize(testsetup.AppNameAuth)
-	defer testsetup.Done(testsetup.AppNameAuth)
 	gin.SetMode(gin.TestMode)
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
@@ -272,12 +289,12 @@ func TestAcceptsTokenWithMatchingIssuerAndAudience(t *testing.T) {
 	r.Use(OIDCCompatibleAuth(func() *rsa.PublicKey { return &key.PublicKey },
 		WithOIDCIssuer("http://localhost:8099/oidc"),
 		WithOIDCAudiences("platform-admin-web"),
-		WithOIDCSSOValidation(func(ctx *gin.Context, personID uint, isMachineToken bool) bool { return true })))
+		WithOIDCSSOValidation(func(ctx *gin.Context, personID string, isMachineToken bool) bool { return true })))
 	r.GET("/v1/test", func(ctx *gin.Context) { ctx.Status(http.StatusOK) })
 
 	claims := jwt.MapClaims{
 		"sub":       "person:88",
-		"tenant_id": float64(1),
+		"tenant_id": "1",
 		"aud":       "platform-admin-web",
 		"iss":       "http://localhost:8099/oidc",
 		"exp":       time.Now().Add(time.Hour).Unix(),

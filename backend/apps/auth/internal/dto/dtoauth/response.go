@@ -15,7 +15,7 @@ type MyTenantsResp struct {
 }
 
 type RegisterResp struct {
-	UserID uint `json:"userID"` // 用户ID
+	UserID string `json:"userID"` // 用户ID
 }
 
 type UserinfoResp struct {
@@ -24,17 +24,17 @@ type UserinfoResp struct {
 }
 
 type ConnectorCreateResp struct {
-	ConnectorID uint `json:"connectorID"` // 连接器ID
+	ConnectorID string `json:"connectorID"` // 连接器ID
 }
 
 type ConnectorDetailResp struct {
-	ConnectorID uint `json:"connectorID"` // 连接器ID
+	ConnectorID string `json:"connectorID"` // 连接器ID
 	objauth.ConnectorBaseInfo
 	gobject.OperatorBaseInfo
 }
 
 type ConnectorPageListItem struct {
-	ConnectorID uint `json:"connectorID"` // 连接器ID
+	ConnectorID string `json:"connectorID"` // 连接器ID
 	objauth.ConnectorBaseInfo
 	gobject.OperatorBaseInfo
 }
@@ -45,5 +45,5 @@ type ConnectorPageListResp struct {
 }
 
 type JoinTenantResp struct {
-	UserID uint `json:"userID"` // 用户ID
+	UserID string `json:"userID"` // 用户ID
 }

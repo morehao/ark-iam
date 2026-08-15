@@ -3,18 +3,18 @@ package svcpermission
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objresource"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtopermission"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
 
-func scopeVisibleToTenant(entity *model.ScopeEntity, tenantID uint) bool {
-	return entity != nil && entity.ID != 0 && entity.TenantID == tenantID
+func scopeVisibleToTenant(entity *model.ScopeEntity, tenantID string) bool {
+	return entity != nil && entity.ID != "" && entity.TenantID == tenantID
 }
 
 type ScopeSvc interface {
@@ -39,7 +39,7 @@ func (svc *scopeSvc) Create(ctx *gin.Context, req *dtopermission.ScopeCreateReq)
 		glog.Errorf(ctx, "[svcpermission.CreateScope] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ResourceGetDetailError)
 	}
-	if !resourceVisibleToTenant(resourceEntity, gincontext.GetTenantID(ctx)) {
+	if !resourceVisibleToTenant(resourceEntity, gctx.GetTenantID(ctx)) {
 		return nil, code.GetError(code.ResourceNotExistError)
 	}
 
@@ -48,10 +48,10 @@ func (svc *scopeSvc) Create(ctx *gin.Context, req *dtopermission.ScopeCreateReq)
 		ResourceID:  req.ResourceID,
 		Name:        req.Name,
 		Description: req.Description,
-		CreatedBy:   gincontext.GetUserID(ctx),
+		CreatedBy:   gctx.GetUserID(ctx),
 	}
-	if insertEntity.TenantID == 0 {
-		insertEntity.TenantID = gincontext.GetTenantID(ctx)
+	if insertEntity.TenantID == "" {
+		insertEntity.TenantID = gctx.GetTenantID(ctx)
 	}
 
 	if err := dao.NewScopeDao().Insert(ctx, insertEntity); err != nil {
@@ -69,11 +69,11 @@ func (svc *scopeSvc) Delete(ctx *gin.Context, req *dtopermission.ScopeDeleteReq)
 		glog.Errorf(ctx, "[svcpermission.DeleteScope] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ScopeDeleteError)
 	}
-	if !scopeVisibleToTenant(scopeEntity, gincontext.GetTenantID(ctx)) {
+	if !scopeVisibleToTenant(scopeEntity, gctx.GetTenantID(ctx)) {
 		return code.GetError(code.ScopeNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	if err := dao.NewScopeDao().Delete(ctx, req.ScopeID, userID); err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteScope] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ScopeDeleteError)
@@ -87,11 +87,11 @@ func (svc *scopeSvc) Update(ctx *gin.Context, req *dtopermission.ScopeUpdateReq)
 		glog.Errorf(ctx, "[svcpermission.UpdateScope] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ScopeUpdateError)
 	}
-	if !scopeVisibleToTenant(scopeEntity, gincontext.GetTenantID(ctx)) {
+	if !scopeVisibleToTenant(scopeEntity, gctx.GetTenantID(ctx)) {
 		return code.GetError(code.ScopeNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gctx.GetUserID(ctx)
 	updateMap := map[string]any{
 		"tenant_id":   req.TenantID,
 		"resource_id": req.ResourceID,
@@ -112,7 +112,7 @@ func (svc *scopeSvc) Detail(ctx *gin.Context, req *dtopermission.ScopeDetailReq)
 		glog.Errorf(ctx, "[svcpermission.DetailScope] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ScopeGetDetailError)
 	}
-	if !scopeVisibleToTenant(scopeEntity, gincontext.GetTenantID(ctx)) {
+	if !scopeVisibleToTenant(scopeEntity, gctx.GetTenantID(ctx)) {
 		return nil, code.GetError(code.ScopeNotExistError)
 	}
 
@@ -135,7 +135,7 @@ func (svc *scopeSvc) PageList(ctx *gin.Context, req *dtopermission.ScopePageList
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID:   gincontext.GetTenantID(ctx),
+		TenantID:   gctx.GetTenantID(ctx),
 		ResourceID: req.ResourceID,
 		Name:       req.Name,
 	}

@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/dbaccess/dbgorm"
-	_ "github.com/morehao/golib/dbaccess/dbgorm/driver/mysql"
+	_ "github.com/morehao/golib/dbaccess/dbgorm/driver/postgres"
 	"github.com/morehao/golib/dbaccess/gormplugin"
 	"github.com/morehao/golib/glog"
 	"gorm.io/gorm"
