@@ -48,6 +48,14 @@ func isDevEnv() bool {
 	return appconfig.Conf.Server.Env == "" || appconfig.Conf.Server.Env == "dev"
 }
 
+// isSupportedRSAPrivateKeyBlock 判断 PEM 块是否为受支持的 RSA 私钥编码：
+// PKCS#1（"RSA PRIVATE KEY"）或 PKCS#8（"PRIVATE KEY"）。两者后续均由
+// ParsePKCS8PrivateKey 优先解析、ParsePKCS1PrivateKey 兜底，与 RP 侧
+// oidcauth.LoadSigningPublicKey 的宽容解析保持一致。
+func isSupportedRSAPrivateKeyBlock(blockType string) bool {
+	return blockType == "RSA PRIVATE KEY" || blockType == "PRIVATE KEY"
+}
+
 func loadSigningKey() (*rsa.PrivateKey, string, error) {
 	if appconfig.Conf == nil {
 		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -91,7 +99,7 @@ func loadSigningKey() (*rsa.PrivateKey, string, error) {
 			return privateKey, keyID, nil
 		}
 		block, _ := pem.Decode(pemData)
-		if block == nil || block.Type != "RSA PRIVATE KEY" {
+		if block == nil || !isSupportedRSAPrivateKeyBlock(block.Type) {
 			return nil, "", fmt.Errorf("invalid RSA private key PEM: %s", cfg.SigningPrivateKeyPath)
 		}
 		privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
@@ -114,7 +122,7 @@ func loadSigningKey() (*rsa.PrivateKey, string, error) {
 
 	if cfg.SigningPrivateKeyPEM != "" {
 		block, _ := pem.Decode([]byte(cfg.SigningPrivateKeyPEM))
-		if block == nil || block.Type != "RSA PRIVATE KEY" {
+		if block == nil || !isSupportedRSAPrivateKeyBlock(block.Type) {
 			return nil, "", fmt.Errorf("invalid RSA private key PEM in config")
 		}
 		privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)

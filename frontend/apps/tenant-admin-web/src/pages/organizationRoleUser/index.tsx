@@ -3,7 +3,6 @@ import { Table, Button, Modal, Form, message, Popconfirm, Space, Select, Tag } f
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { PageContainer } from '@ark-iam/ui'
-import { getUserPageList } from '@ark-iam/api'
 import {
   createOrganizationRoleUser,
   deleteOrganizationRoleUser,
@@ -11,6 +10,7 @@ import {
   getOrganizationRolePage,
   getOrganizationRoleUserPage,
 } from '../../api/organization'
+import { getTenantUserPageList } from '../../api/user'
 import type { OrganizationItem, OrganizationRoleItem, OrganizationRoleUserItem, UserItem } from '@ark-iam/types'
 
 export default function OrganizationRoleUserList() {
@@ -30,7 +30,7 @@ export default function OrganizationRoleUserList() {
         getOrganizationRoleUserPage({ page: 1, pageSize: 100 }),
         getOrganizationPage({ page: 1, pageSize: 100 }),
         getOrganizationRolePage({ page: 1, pageSize: 100 }),
-        getUserPageList({ page: 1, pageSize: 100 }).catch(() => ({ list: [], total: 0 })),
+        getTenantUserPageList({ page: 1, pageSize: 100 }).catch(() => ({ list: [], total: 0 })),
       ])
       setList(rels.list || [])
       setOrganizations(orgs.list || [])
