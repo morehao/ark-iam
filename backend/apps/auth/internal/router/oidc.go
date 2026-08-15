@@ -9,7 +9,7 @@ import (
 	"github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/auth/internal/controller/ctroidc"
 	"github.com/morehao/ark-iam/auth/internal/middleware"
-	"github.com/morehao/ark-iam/auth/internal/oidcop"
+	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/morehao/ark-iam/auth/internal/service/svcoidc"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"

@@ -364,7 +364,7 @@ DROP TABLE organization_role;
 - `pkg/seed/seed_pg_test.go`：删表顺序列表
 - `apps/platformadmin/internal/service/svctenant/tenant.go`：`CreateTenantAsOwner` 事务内创建**同名根组织节点**（替代原根部门逻辑）
 - `pkg/iam/model/application_client.go` / `pkg/iam/dao/application_client.go`：`client_id` → `code`（见 §5.5）
-- `apps/auth/internal/service/oidcop/client.go`：`OIDCClient.GetID()` 返回 `Code`（协议映射点）
+- `apps/auth/internal/core/oidcop/client.go`：`OIDCClient.GetID()` 返回 `Code`（协议映射点）
 - `apps/platformadmin` `svcapplicationclient` / `dtoapplicationclient`：生成函数（`generateClientID` → 生成 code）与 DTO `clientID` JSON 字段 → `code`
 - `pkg/seed/seed.go`：OAuth 客户端种子 `clientID` → `code`
 - 测试：`create_tenant_as_owner_test.go` 根部门断言 → 根组织断言

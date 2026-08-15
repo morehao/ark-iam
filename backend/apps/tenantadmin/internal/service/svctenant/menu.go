@@ -3,11 +3,11 @@ package svctenant
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objpermission"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/glog"
 )
 
@@ -54,7 +54,7 @@ func (svc *tenantMenuSvc) Apps(ctx *gin.Context) (*dtotenant.TenantAppsResp, err
 
 // loadTenantApps 当前租户订阅的启用非系统应用（排除平台系统内置应用，如管理后台）。
 func loadTenantApps(ctx *gin.Context) ([]model.ApplicationEntity, error) {
-	tenantID := gctx.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantID(ctx)
 	tenantAppList, _, err := dao.NewTenantApplicationDao().GetPageListByCond(ctx, &dao.TenantApplicationCond{
 		TenantID: tenantID,
 		Status:   model.AppStatusEnable,

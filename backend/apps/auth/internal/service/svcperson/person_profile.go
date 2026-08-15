@@ -6,9 +6,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoperson"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
 )
@@ -22,7 +22,7 @@ func NewPersonProfileSvc() PersonProfileSvc {
 }
 
 func (svc *personProfileSvc) Detail(ctx *gin.Context, req *dtoperson.PersonDetailReq) (*dtoperson.PersonDetailResp, error) {
-	personID := gctx.GetPersonID(ctx)
+	personID := gincontext.GetPersonID(ctx)
 	if personID == "" {
 		return nil, code.GetError(code.UserNotExistError)
 	}
@@ -49,7 +49,7 @@ func (svc *personProfileSvc) Detail(ctx *gin.Context, req *dtoperson.PersonDetai
 }
 
 func (svc *personProfileSvc) UpdatePassword(ctx *gin.Context, req *dtoperson.PersonUpdatePasswordReq) error {
-	personID := gctx.GetPersonID(ctx)
+	personID := gincontext.GetPersonID(ctx)
 	if personID == "" {
 		return code.GetError(code.UserNotExistError)
 	}

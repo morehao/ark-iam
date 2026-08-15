@@ -3,7 +3,7 @@
 // 当前内容为 OIDC Back-Channel Logout（OIDC Back-Channel Logout 1.0）的
 // RP 侧接收端：供各业务应用（RP）挂载 back-channel logout 接收端点，
 // 接收由 auth（OP）在用户登出后推送的 logout_token，并执行本地会话清除。
-// 与 auth/internal/oidcop（OP 侧领域层，含登出登记与 SLO 队列）对应，本包是"接收端"。
+// 与 auth/internal/core/oidcop（OP 侧领域层，含登出登记与 SLO 队列）对应，本包是"接收端"。
 // OP 侧领域层代码位于 auth 应用内部，待出现第二个 OP 消费者时再上提至本包。
 package goidc
 

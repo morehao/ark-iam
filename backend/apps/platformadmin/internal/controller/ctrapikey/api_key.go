@@ -2,7 +2,6 @@ package ctrapikey
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtoapikey"
 	"github.com/morehao/ark-iam/platformadmin/internal/service/svcapikey"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -40,7 +39,7 @@ func (ctr *apiKeyCtr) Create(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	tenantID := gctx.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantID(ctx)
 	res, err := ctr.apiKeySvc.Create(ctx, tenantID, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
@@ -62,7 +61,7 @@ func (ctr *apiKeyCtr) PageList(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	tenantID := gctx.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantID(ctx)
 	res, err := ctr.apiKeySvc.PageList(ctx, tenantID, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
@@ -84,7 +83,7 @@ func (ctr *apiKeyCtr) Revoke(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	tenantID := gctx.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantID(ctx)
 	if err := ctr.apiKeySvc.Revoke(ctx, tenantID, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -105,7 +104,7 @@ func (ctr *apiKeyCtr) Delete(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	tenantID := gctx.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantID(ctx)
 	if err := ctr.apiKeySvc.Delete(ctx, tenantID, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return

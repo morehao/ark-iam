@@ -12,11 +12,11 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoconnector"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
@@ -184,7 +184,7 @@ func mustMarshalJSON(value any) json.RawMessage {
 }
 
 func (svc *connectorSvc) Create(ctx *gin.Context, req *dtoauth.ConnectorCreateReq) (*dtoauth.ConnectorCreateResp, error) {
-	insertEntity, err := buildConnectorInsertEntity(req, gctx.GetUserID(ctx))
+	insertEntity, err := buildConnectorInsertEntity(req, gincontext.GetUserID(ctx))
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.CreateConnector] build insert entity fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorCreateError)
@@ -205,11 +205,11 @@ func (svc *connectorSvc) Delete(ctx *gin.Context, req *dtoauth.ConnectorDeleteRe
 		glog.Errorf(ctx, "[svcauth.DeleteConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorDeleteError)
 	}
-	if !connectorVisibleToTenant(connectorEntity, gctx.GetTenantID(ctx)) {
+	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantID(ctx)) {
 		return code.GetError(code.ConnectorNotExistError)
 	}
 
-	userID := gctx.GetUserID(ctx)
+	userID := gincontext.GetUserID(ctx)
 	if err := dao.NewConnectorDao().Delete(ctx, req.ConnectorID, userID); err != nil {
 		glog.Errorf(ctx, "[svcauth.DeleteConnector] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorDeleteError)
@@ -223,11 +223,11 @@ func (svc *connectorSvc) Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateRe
 		glog.Errorf(ctx, "[svcauth.UpdateConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorUpdateError)
 	}
-	if !connectorVisibleToTenant(connectorEntity, gctx.GetTenantID(ctx)) {
+	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantID(ctx)) {
 		return code.GetError(code.ConnectorNotExistError)
 	}
 
-	updateMap, err := buildConnectorUpdateMap(req, gctx.GetUserID(ctx))
+	updateMap, err := buildConnectorUpdateMap(req, gincontext.GetUserID(ctx))
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.UpdateConnector] build update map fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorUpdateError)
@@ -245,7 +245,7 @@ func (svc *connectorSvc) Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailRe
 		glog.Errorf(ctx, "[svcauth.DetailConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
-	if !connectorVisibleToTenant(connectorEntity, gctx.GetTenantID(ctx)) {
+	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantID(ctx)) {
 		return nil, code.GetError(code.ConnectorNotExistError)
 	}
 
@@ -286,7 +286,7 @@ func (svc *connectorSvc) PageList(ctx *gin.Context, req *dtoauth.ConnectorPageLi
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID:    gctx.GetTenantID(ctx),
+		TenantID:    gincontext.GetTenantID(ctx),
 		Protocol:    req.Protocol,
 		Provider:    req.Provider,
 		Status:      req.Status,

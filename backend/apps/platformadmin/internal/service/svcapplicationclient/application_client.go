@@ -11,11 +11,11 @@ import (
 	"gorm.io/datatypes"
 
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtoapplicationclient"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
@@ -60,7 +60,7 @@ func marshalStringSlice(s []string) datatypes.JSON {
 
 func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientCreateReq) (*dtoapplicationclient.ApplicationClientCreateResp, error) {
 	insertEntity := &model.ApplicationClientEntity{
-		TenantID:                gctx.GetTenantID(ctx),
+		TenantID:                gincontext.GetTenantID(ctx),
 		AppID:                   req.AppID,
 		Code:                    generateClientCode(),
 		Name:                    req.Name,
@@ -78,7 +78,7 @@ func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.Ap
 		RefreshTokenTTL:         req.RefreshTokenTTL,
 		Type:                    req.Type,
 		IsThirdParty:            req.IsThirdParty,
-		CreatedBy:               gctx.GetUserID(ctx),
+		CreatedBy:               gincontext.GetUserID(ctx),
 	}
 
 	if err := dao.NewApplicationClientDao().Insert(ctx, insertEntity); err != nil {
@@ -104,14 +104,14 @@ func (svc *oAuthClientSvc) Delete(ctx *gin.Context, req *dtoapplicationclient.Ap
 		glog.Errorf(ctx, "[svcapplicationclient.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationClientDeleteError)
 	}
-	if !applicationClientVisibleToTenant(entity, gctx.GetTenantID(ctx)) {
+	if !applicationClientVisibleToTenant(entity, gincontext.GetTenantID(ctx)) {
 		return code.GetError(code.ApplicationClientNotExistError)
 	}
 	if entity.IsSystem {
 		return code.GetError(code.ApplicationClientSystemBuiltInErr)
 	}
 
-	userID := gctx.GetUserID(ctx)
+	userID := gincontext.GetUserID(ctx)
 	if err := dao.NewApplicationClientDao().Delete(ctx, req.ApplicationClientID, userID); err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationClientDeleteError)
@@ -125,11 +125,11 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.Ap
 		glog.Errorf(ctx, "[svcapplicationclient.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationClientUpdateError)
 	}
-	if !applicationClientVisibleToTenant(entity, gctx.GetTenantID(ctx)) {
+	if !applicationClientVisibleToTenant(entity, gincontext.GetTenantID(ctx)) {
 		return code.GetError(code.ApplicationClientNotExistError)
 	}
 
-	userID := gctx.GetUserID(ctx)
+	userID := gincontext.GetUserID(ctx)
 	updateMap := map[string]any{
 		"name":                       req.Name,
 		"type":                       req.Type,
@@ -162,7 +162,7 @@ func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtoapplicationclient.Ap
 		glog.Errorf(ctx, "[svcapplicationclient.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationClientGetDetailError)
 	}
-	if !applicationClientVisibleToTenant(entity, gctx.GetTenantID(ctx)) {
+	if !applicationClientVisibleToTenant(entity, gincontext.GetTenantID(ctx)) {
 		return nil, code.GetError(code.ApplicationClientNotExistError)
 	}
 
@@ -207,7 +207,7 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID: gctx.GetTenantID(ctx),
+		TenantID: gincontext.GetTenantID(ctx),
 		Name:     req.Name,
 		Type:     req.Type,
 		Status:   req.Status,
@@ -329,7 +329,7 @@ func (svc *oAuthClientSvc) CreateSecret(ctx *gin.Context, req *dtoapplicationcli
 		glog.Errorf(ctx, "[svcapplicationclient.CreateSecret] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationClientSecretCreateError)
 	}
-	if !applicationClientVisibleToTenant(entity, gctx.GetTenantID(ctx)) {
+	if !applicationClientVisibleToTenant(entity, gincontext.GetTenantID(ctx)) {
 		return nil, code.GetError(code.ApplicationClientNotExistError)
 	}
 
@@ -363,7 +363,7 @@ func (svc *oAuthClientSvc) CreateSecret(ctx *gin.Context, req *dtoapplicationcli
 		ValueHash:           valueHash,
 		ValuePrefix:         valuePrefix,
 		ExpiredAt:           expiresAt,
-		CreatedBy:           gctx.GetUserID(ctx),
+		CreatedBy:           gincontext.GetUserID(ctx),
 	}
 
 	if err := dao.NewApplicationClientSecretDao().Insert(ctx, secretEntity); err != nil {
@@ -398,11 +398,11 @@ func (svc *oAuthClientSvc) DeleteSecret(ctx *gin.Context, req *dtoapplicationcli
 	}
 
 	entity, err := dao.NewApplicationClientDao().GetByID(ctx, secretEntity.ApplicationClientID)
-	if err != nil || !applicationClientVisibleToTenant(entity, gctx.GetTenantID(ctx)) {
+	if err != nil || !applicationClientVisibleToTenant(entity, gincontext.GetTenantID(ctx)) {
 		return code.GetError(code.ApplicationClientSecretNotExistError)
 	}
 
-	if err := dao.NewApplicationClientSecretDao().Delete(ctx, req.SecretID, gctx.GetUserID(ctx)); err != nil {
+	if err := dao.NewApplicationClientSecretDao().Delete(ctx, req.SecretID, gincontext.GetUserID(ctx)); err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.DeleteSecret] delete fail, err:%v", err)
 		return code.GetError(code.ApplicationClientSecretDeleteError)
 	}

@@ -15,7 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	appconfig "github.com/morehao/ark-iam/auth/config"
-	"github.com/morehao/ark-iam/auth/internal/oidcop"
+	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"golang.org/x/text/language"
 )

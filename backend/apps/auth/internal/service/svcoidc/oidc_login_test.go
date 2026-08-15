@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	appconfig "github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
-	"github.com/morehao/ark-iam/auth/internal/oidcop"
+	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"

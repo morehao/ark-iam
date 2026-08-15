@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/auth/internal/oidcop"
+	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/morehao/ark-iam/auth/internal/service/svcoidc"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
 	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
