@@ -3,12 +3,12 @@ package svcpermission
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objpermission"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtopermission"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtouser"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
@@ -40,7 +40,7 @@ func (svc *roleSvc) Detail(ctx *gin.Context, req *dtopermission.RoleDetailReq) (
 		glog.Errorf(ctx, "[svcpermission.DetailRole] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.RoleGetDetailError)
 	}
-	if !roleVisibleToTenant(roleEntity, gctx.GetTenantID(ctx)) {
+	if !roleVisibleToTenant(roleEntity, gincontext.GetTenantID(ctx)) {
 		return nil, code.GetError(code.RoleNotExistError)
 	}
 
@@ -69,7 +69,7 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtopermission.RolePageListRe
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID: gctx.GetTenantID(ctx),
+		TenantID: gincontext.GetTenantID(ctx),
 		Name:     req.Name,
 		Code:     req.Code,
 		Type:     req.Type,

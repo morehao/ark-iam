@@ -9,6 +9,7 @@ import (
 	"github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/auth/internal/controller/ctroidc"
 	"github.com/morehao/ark-iam/auth/internal/middleware"
+	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/morehao/ark-iam/auth/internal/service/svcoidc"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
@@ -42,7 +43,7 @@ func InitOIDC(engine *gin.Engine, groups *ginserver.RouterGroups) {
 	OIDCPublicKey = &privKey.PublicKey
 
 	// 启动 back-channel logout 发送器（异步消费登出队列）
-	logoutWorker := svcoidc.NewLogoutWorker(privKey, signingKey.ID(), issuer)
+	logoutWorker := oidcop.NewLogoutWorker(privKey, signingKey.ID(), issuer)
 	go logoutWorker.Run(context.Background())
 
 	ctr := ctroidc.NewOIDCCtr(provider)

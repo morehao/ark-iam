@@ -5,12 +5,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objtenant"
 	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenant"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
@@ -60,7 +60,7 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 		Type:        tenantType,
 	}
 
-	userID := gctx.GetUserID(ctx)
+	userID := gincontext.GetUserID(ctx)
 	txErr := dbclient.IamDB(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := dao.NewTenantDao().WithTx(tx).Insert(ctx, insertEntity); err != nil {
 			return err
@@ -111,7 +111,7 @@ func (svc *tenantSvc) Delete(ctx *gin.Context, req *dtotenant.TenantDeleteReq) e
 		return code.GetError(code.TenantNotExistError)
 	}
 
-	userID := gctx.GetUserID(ctx)
+	userID := gincontext.GetUserID(ctx)
 
 	if err := dao.NewTenantDao().Delete(ctx, req.TenantID, userID); err != nil {
 		glog.Errorf(ctx, "[svctenant.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -131,7 +131,7 @@ func (svc *tenantSvc) Update(ctx *gin.Context, req *dtotenant.TenantUpdateReq) e
 		return code.GetError(code.TenantNotExistError)
 	}
 
-	userID := gctx.GetUserID(ctx)
+	userID := gincontext.GetUserID(ctx)
 	tenantType := model.TenantType(req.Type)
 	if tenantType != model.TenantTypeCustomer && tenantType != model.TenantTypePlatform {
 		tenantType = model.TenantTypeCustomer

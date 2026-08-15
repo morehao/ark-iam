@@ -6,11 +6,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objtenant"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 	"gorm.io/gorm"
@@ -41,7 +41,7 @@ func NewOrganizationSvc() OrganizationSvc {
 // Create 创建组织节点：根节点 org_path="/"+id、org_depth=1；
 // 子节点继承父节点路径并做深度上限校验。
 func (svc *organizationSvc) Create(ctx *gin.Context, req *dtotenant.OrganizationCreateReq) (*dtotenant.OrganizationCreateResp, error) {
-	tenantID := gctx.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantID(ctx)
 	insertEntity := &model.OrganizationEntity{
 		TenantID:  tenantID,
 		ParentID:  req.ParentID,
@@ -49,7 +49,7 @@ func (svc *organizationSvc) Create(ctx *gin.Context, req *dtotenant.Organization
 		Code:      req.Code,
 		Sort:      req.Sort,
 		Status:    req.Status,
-		CreatedBy: gctx.GetUserID(ctx),
+		CreatedBy: gincontext.GetUserID(ctx),
 	}
 	if insertEntity.Status == "" {
 		insertEntity.Status = string(model.OrgNodeStatusActive)
@@ -101,7 +101,7 @@ func (svc *organizationSvc) Create(ctx *gin.Context, req *dtotenant.Organization
 // Tree 组织树：查询租户全量节点（按 sort 升序），应用层组装树。
 func (svc *organizationSvc) Tree(ctx *gin.Context, req *dtotenant.OrganizationTreeReq) (*dtotenant.OrganizationTreeResp, error) {
 	cond := &dao.OrganizationCond{
-		TenantID: gctx.GetTenantID(ctx),
+		TenantID: gincontext.GetTenantID(ctx),
 		Name:     req.Name,
 		Status:   req.Status,
 	}
@@ -149,7 +149,7 @@ func (svc *organizationSvc) Detail(ctx *gin.Context, req *dtotenant.Organization
 		glog.Errorf(ctx, "[svcorganization.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.OrganizationGetDetailError)
 	}
-	if !organizationVisibleToTenant(orgEntity, gctx.GetTenantID(ctx)) {
+	if !organizationVisibleToTenant(orgEntity, gincontext.GetTenantID(ctx)) {
 		return nil, code.GetError(code.OrganizationNotExistError)
 	}
 
@@ -165,7 +165,7 @@ func (svc *organizationSvc) Detail(ctx *gin.Context, req *dtotenant.Organization
 			Status: orgEntity.Status,
 		},
 	}
-	resp.Ancestors = svc.loadAncestors(ctx, orgEntity.OrgPath, gctx.GetTenantID(ctx))
+	resp.Ancestors = svc.loadAncestors(ctx, orgEntity.OrgPath, gincontext.GetTenantID(ctx))
 	return resp, nil
 }
 
@@ -202,7 +202,7 @@ func (svc *organizationSvc) loadAncestors(ctx *gin.Context, orgPath, tenantID st
 
 // Update 全量更新（含移动：改 parentID 时做环路/深度校验并级联更新子树 org_path/org_depth）。
 func (svc *organizationSvc) Update(ctx *gin.Context, req *dtotenant.OrganizationUpdateReq) error {
-	tenantID := gctx.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantID(ctx)
 	orgEntity, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcorganization.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -212,7 +212,7 @@ func (svc *organizationSvc) Update(ctx *gin.Context, req *dtotenant.Organization
 		return code.GetError(code.OrganizationNotExistError)
 	}
 
-	userID := gctx.GetUserID(ctx)
+	userID := gincontext.GetUserID(ctx)
 	if req.ParentID != orgEntity.ParentID {
 		if err := svc.moveNode(ctx, tenantID, orgEntity, req.ParentID, userID); err != nil {
 			return err
@@ -239,7 +239,7 @@ func (svc *organizationSvc) UpdateStatus(ctx *gin.Context, req *dtotenant.Organi
 		glog.Errorf(ctx, "[svcorganization.UpdateStatus] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationUpdateError)
 	}
-	if !organizationVisibleToTenant(orgEntity, gctx.GetTenantID(ctx)) {
+	if !organizationVisibleToTenant(orgEntity, gincontext.GetTenantID(ctx)) {
 		return code.GetError(code.OrganizationNotExistError)
 	}
 	if req.Status != string(model.OrgNodeStatusActive) && req.Status != string(model.OrgNodeStatusInactive) {
@@ -247,7 +247,7 @@ func (svc *organizationSvc) UpdateStatus(ctx *gin.Context, req *dtotenant.Organi
 	}
 	if err := dao.NewOrganizationDao().UpdateMap(ctx, req.OrganizationID, map[string]any{
 		"status":     req.Status,
-		"updated_by": gctx.GetUserID(ctx),
+		"updated_by": gincontext.GetUserID(ctx),
 	}); err != nil {
 		glog.Errorf(ctx, "[svcorganization.UpdateStatus] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationUpdateError)
@@ -310,7 +310,7 @@ func (svc *organizationSvc) moveNode(ctx *gin.Context, tenantID string, node *mo
 
 // Delete 删除节点：默认拒绝（有子节点或成员时），?cascade=1 级联软删子树并解绑成员。
 func (svc *organizationSvc) Delete(ctx *gin.Context, req *dtotenant.OrganizationDeleteReq) error {
-	tenantID := gctx.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantID(ctx)
 	orgEntity, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcorganization.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -354,7 +354,7 @@ func (svc *organizationSvc) Delete(ctx *gin.Context, req *dtotenant.Organization
 		return code.GetError(code.OrganizationDeleteError)
 	}
 
-	userID := gctx.GetUserID(ctx)
+	userID := gincontext.GetUserID(ctx)
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
 		for _, v := range subList {
 			if err := dao.NewOrganizationDao().Delete(ctx, v.ID, userID); err != nil {

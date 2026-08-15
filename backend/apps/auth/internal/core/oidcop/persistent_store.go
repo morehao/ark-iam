@@ -1,4 +1,4 @@
-package svcoidc
+package oidcop
 
 import (
 	"context"
@@ -22,6 +22,20 @@ import (
 	"github.com/morehao/golib/glog"
 )
 
+// persistentStoreOption 承载持久化存储的可注入配置。
+type persistentStoreOption struct {
+	// issuer 为 OP 的 issuer，构造 OIDCClient 时注入，用于生成 LoginURL。
+	issuer string
+}
+
+// PersistentStoreOption 允许调用方为持久化存储注入配置。
+type PersistentStoreOption func(*persistentStoreOption)
+
+// WithIssuer 注入 OP issuer，使签发的 OIDCClient 能构造正确的 LoginURL。
+func WithIssuer(issuer string) PersistentStoreOption {
+	return func(o *persistentStoreOption) { o.issuer = issuer }
+}
+
 type PersistentStore struct {
 	applicationClientDao       func(opts ...dao.DaoOption) *dao.ApplicationClientDao
 	applicationClientSecretDao func(opts ...dao.DaoOption) *dao.ApplicationClientSecretDao
@@ -29,9 +43,14 @@ type PersistentStore struct {
 	userDao                    func(opts ...dao.DaoOption) *dao.UserDao
 	refreshTokenDao            func(opts ...dao.DaoOption) *dao.RefreshTokenDao
 	apiKeyDao                  func(opts ...dao.DaoOption) *dao.ApiKeyDao
+	issuer                     string
 }
 
-func NewPersistentStore() *PersistentStore {
+func NewPersistentStore(opts ...PersistentStoreOption) *PersistentStore {
+	cfg := &persistentStoreOption{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
 	return &PersistentStore{
 		applicationClientDao:       func(opts ...dao.DaoOption) *dao.ApplicationClientDao { return dao.NewApplicationClientDao() },
 		applicationClientSecretDao: dao.NewApplicationClientSecretDao,
@@ -39,6 +58,7 @@ func NewPersistentStore() *PersistentStore {
 		userDao:                    dao.NewUserDao,
 		refreshTokenDao:            dao.NewRefreshTokenDao,
 		apiKeyDao:                  func(opts ...dao.DaoOption) *dao.ApiKeyDao { return dao.NewApiKeyDao() },
+		issuer:                     cfg.issuer,
 	}
 }
 
@@ -76,7 +96,7 @@ func (s *PersistentStore) GetClientByClientID(ctx context.Context, clientID stri
 	if err != nil || clientEntity == nil || clientEntity.ID == "" {
 		return nil, fmt.Errorf("client not found: %s", clientID)
 	}
-	return NewOIDCClient(clientEntity), nil
+	return NewOIDCClient(clientEntity, s.issuer), nil
 }
 
 func (s *PersistentStore) AuthorizeClientIDSecret(ctx context.Context, clientID, clientSecret string) error {
@@ -123,7 +143,7 @@ func fillUserInfoByScopes(userinfo *oidc.UserInfo, person *model.PersonEntity, s
 
 func (s *PersistentStore) SetUserinfoFromScopes(ctx context.Context, userinfo *oidc.UserInfo, userID, clientID string, scopes []string) error {
 	userinfo.Subject = userID
-	pid, err := parseOIDCSubject(userID)
+	pid, err := ParseSubject(userID)
 	if err != nil {
 		return nil
 	}
@@ -144,7 +164,7 @@ func (s *PersistentStore) SetUserinfoFromToken(ctx context.Context, userinfo *oi
 	if meta == nil {
 		return nil
 	}
-	pid, err := parseOIDCSubject(subject)
+	pid, err := ParseSubject(subject)
 	if err != nil {
 		return nil
 	}
@@ -174,7 +194,7 @@ func (s *PersistentStore) SetIntrospectionFromToken(ctx context.Context, introsp
 	introspection.Username = meta.Username
 	// 人 token 补充 username（person 的用户名）；机器 token 直接用 client 标识。
 	if introspection.Username == "" {
-		if pid, perr := parseOIDCSubject(meta.Subject); perr == nil {
+		if pid, perr := ParseSubject(meta.Subject); perr == nil {
 			if person, perr2 := s.personDao().GetByID(ctx, pid); perr2 == nil && person != nil && person.ID != "" {
 				introspection.Username = model.DerefStr(person.Username)
 			}
@@ -199,7 +219,7 @@ func (s *PersistentStore) SetIntrospectionFromToken(ctx context.Context, introsp
 }
 
 func (s *PersistentStore) GetPrivateClaimsFromScopes(ctx context.Context, userID, clientID string, scopes []string) (map[string]any, error) {
-	pid, err := parseOIDCSubject(userID)
+	pid, err := ParseSubject(userID)
 	if err != nil {
 		return nil, nil
 	}
@@ -257,7 +277,7 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 	}
 
 	var personID string
-	personID, err = parseOIDCSubject(request.GetSubject())
+	personID, err = ParseSubject(request.GetSubject())
 	if err != nil {
 		return "", "", time.Time{}, err
 	}
@@ -370,7 +390,7 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 		_ = sso.NewSLOStore().Register(ctx, sessionID, sso.LogoutRegistration{
 			OIDCSessionID:        accessTokenID,
 			ClientID:             clientID,
-			UserID:               buildOIDCSubject(personID),
+			UserID:               BuildSubject(personID),
 			BackChannelLogoutURI: backChannelLogoutURI,
 		})
 	}
@@ -455,7 +475,7 @@ func (s *PersistentStore) TokenRequestByRefreshToken(ctx context.Context, refres
 	}
 
 	return &refreshTokenRequest{
-		subject:   buildOIDCSubject(storedToken.PersonID),
+		subject:   BuildSubject(storedToken.PersonID),
 		audience:  []string{clientID},
 		scopes:    scopes,
 		clientID:  clientID,
@@ -512,9 +532,9 @@ func selectedTenantFromRequest(request op.TokenRequest) string {
 }
 
 func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, clientID string) error {
-	personID, err := parseOIDCSubject(userID)
+	personID, err := ParseSubject(userID)
 	if err != nil {
-		glog.Warnf(ctx, "[PersistentStore.TerminateSession] parseOIDCSubject fail, userID:%s, err:%v", userID, err)
+		glog.Warnf(ctx, "[PersistentStore.TerminateSession] ParseSubject fail, userID:%s, err:%v", userID, err)
 		return nil
 	}
 	glog.Infof(ctx, "[PersistentStore.TerminateSession] terminating session, userID:%s, personID:%s, clientID:%s", userID, personID, clientID)
@@ -555,5 +575,5 @@ func (s *PersistentStore) GetRefreshTokenInfo(ctx context.Context, clientID stri
 	if err != nil || storedToken == nil || storedToken.ID == "" {
 		return "", "", op.ErrInvalidRefreshToken
 	}
-	return buildOIDCSubject(storedToken.PersonID), "", nil
+	return BuildSubject(storedToken.PersonID), "", nil
 }

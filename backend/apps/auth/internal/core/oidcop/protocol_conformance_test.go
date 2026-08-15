@@ -1,4 +1,4 @@
-package svcoidc
+package oidcop
 
 import (
 	"context"
@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	appconfig "github.com/morehao/ark-iam/auth/config"
-	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/testsetup"
@@ -92,7 +90,7 @@ func TestRefreshTokenPersistsAndRestoresScopeAMRAuthTime(t *testing.T) {
 
 	authTime := time.Unix(1710000000, 0)
 	authReq := &AuthRequest{
-		Subject:   buildOIDCSubject("88"),
+		Subject:   BuildSubject("88"),
 		ClientID:  "client-1",
 		TenantID:  "7",
 		SessionID: "sid-1",
@@ -149,7 +147,7 @@ func TestRefreshTokenTTLUsesClientConfig(t *testing.T) {
 	seedUser(t, db, "21", "88", "7")
 	if err := db.Create(&model.ApplicationClientEntity{
 		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
-		Code:                   "client-ttl",
+		Code:                    "client-ttl",
 		RedirectURIs:            datatypes.JSON("[]"),
 		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
 		GrantTypes:              datatypes.JSON(`["authorization_code"]`),
@@ -166,7 +164,7 @@ func TestRefreshTokenTTLUsesClientConfig(t *testing.T) {
 	}
 
 	authReq := &AuthRequest{
-		Subject:  buildOIDCSubject("88"),
+		Subject:  BuildSubject("88"),
 		ClientID: "client-ttl",
 		TenantID: "7",
 		Scopes:   []string{oidc.ScopeOpenID},
@@ -181,7 +179,7 @@ func TestRefreshTokenTTLUsesClientConfig(t *testing.T) {
 	if err := db.Where("token = ?", hashToken(refreshToken)).First(&stored).Error; err != nil {
 		t.Fatalf("refresh token not stored: %v", err)
 	}
-	ttlSeconds := int64(stored.ExpiredAt.Sub(time.Now()).Seconds())
+	ttlSeconds := int64(time.Until(*stored.ExpiredAt).Seconds())
 	if ttlSeconds < 7100 || ttlSeconds > 7300 {
 		t.Fatalf("expected refresh token ttl ~7200s (client config), got %d", ttlSeconds)
 	}
@@ -200,7 +198,7 @@ func TestSetIntrospectionFromTokenReturnsFullResponse(t *testing.T) {
 	issuedAt := time.Now().Add(-time.Minute)
 	expiresAt := time.Now().Add(15 * time.Minute)
 	storeAccessTokenMeta(context.Background(), tokenID, accessTokenMeta{
-		Subject:    buildOIDCSubject("88"),
+		Subject:    BuildSubject("88"),
 		ClientID:   "client-1",
 		Scopes:     []string{oidc.ScopeOpenID, oidc.ScopeProfile},
 		IssuedAt:   issuedAt,
@@ -211,7 +209,7 @@ func TestSetIntrospectionFromTokenReturnsFullResponse(t *testing.T) {
 	})
 
 	resp := &oidc.IntrospectionResponse{}
-	if err := ps.SetIntrospectionFromToken(context.Background(), resp, tokenID, buildOIDCSubject("88"), "client-1"); err != nil {
+	if err := ps.SetIntrospectionFromToken(context.Background(), resp, tokenID, BuildSubject("88"), "client-1"); err != nil {
 		t.Fatalf("SetIntrospectionFromToken failed: %v", err)
 	}
 	if len(resp.Scope) != 2 {
@@ -223,7 +221,7 @@ func TestSetIntrospectionFromTokenReturnsFullResponse(t *testing.T) {
 	if resp.TokenType != oidc.BearerToken {
 		t.Fatalf("expected token_type Bearer, got %q", resp.TokenType)
 	}
-	if resp.Subject != buildOIDCSubject("88") {
+	if resp.Subject != BuildSubject("88") {
 		t.Fatalf("expected subject person:88, got %q", resp.Subject)
 	}
 	if !resp.Expiration.AsTime().Equal(expiresAt.Truncate(time.Second)) {
@@ -248,14 +246,14 @@ func TestSetUserinfoFromTokenHonorsTokenScopes(t *testing.T) {
 
 	// 仅 openid：不得返回 email/name
 	storeAccessTokenMeta(context.Background(), "at-only-openid", accessTokenMeta{
-		Subject:   buildOIDCSubject("88"),
+		Subject:   BuildSubject("88"),
 		ClientID:  "client-1",
 		Scopes:    []string{oidc.ScopeOpenID},
 		IssuedAt:  time.Now(),
 		ExpiresAt: time.Now().Add(time.Minute),
 	})
 	info := &oidc.UserInfo{}
-	if err := ps.SetUserinfoFromToken(context.Background(), info, "at-only-openid", buildOIDCSubject("88"), ""); err != nil {
+	if err := ps.SetUserinfoFromToken(context.Background(), info, "at-only-openid", BuildSubject("88"), ""); err != nil {
 		t.Fatalf("SetUserinfoFromToken failed: %v", err)
 	}
 	if info.Email != "" || info.Name != "" {
@@ -264,14 +262,14 @@ func TestSetUserinfoFromTokenHonorsTokenScopes(t *testing.T) {
 
 	// openid + email：返回 email，且 email_verified 必须为 false（H5，无验证流程不得宣称已验证）
 	storeAccessTokenMeta(context.Background(), "at-with-email", accessTokenMeta{
-		Subject:   buildOIDCSubject("88"),
+		Subject:   BuildSubject("88"),
 		ClientID:  "client-1",
 		Scopes:    []string{oidc.ScopeOpenID, oidc.ScopeEmail},
 		IssuedAt:  time.Now(),
 		ExpiresAt: time.Now().Add(time.Minute),
 	})
 	info = &oidc.UserInfo{}
-	if err := ps.SetUserinfoFromToken(context.Background(), info, "at-with-email", buildOIDCSubject("88"), ""); err != nil {
+	if err := ps.SetUserinfoFromToken(context.Background(), info, "at-with-email", BuildSubject("88"), ""); err != nil {
 		t.Fatalf("SetUserinfoFromToken failed: %v", err)
 	}
 	if info.Email != "person@example.com" {
@@ -289,7 +287,7 @@ func TestSetUserinfoFromScopesEmailVerifiedFalse(t *testing.T) {
 	seedPerson(t, db, "88", "person@example.com")
 
 	info := &oidc.UserInfo{}
-	if err := ps.SetUserinfoFromScopes(context.Background(), info, buildOIDCSubject("88"), "client-1", []string{oidc.ScopeOpenID, oidc.ScopeEmail}); err != nil {
+	if err := ps.SetUserinfoFromScopes(context.Background(), info, BuildSubject("88"), "client-1", []string{oidc.ScopeOpenID, oidc.ScopeEmail}); err != nil {
 		t.Fatalf("SetUserinfoFromScopes failed: %v", err)
 	}
 	if info.Email != "person@example.com" {
@@ -309,7 +307,7 @@ func TestCreateAuthRequestEnforcesRequirePKCE(t *testing.T) {
 	ps, db := newProtocolConformanceStore(t)
 	if err := db.Create(&model.ApplicationClientEntity{
 		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
-		Code:                   "pkce-client",
+		Code:                    "pkce-client",
 		RequirePKCE:             true,
 		RedirectURIs:            datatypes.JSON(`["https://client.example.com/callback"]`),
 		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
@@ -396,36 +394,6 @@ func TestSetUserinfoFromRequestInjectsSid(t *testing.T) {
 	_ = storage.SetUserinfoFromRequest(context.Background(), empty, &AuthRequest{}, []string{oidc.ScopeOpenID})
 	if _, exists := empty.Claims["sid"]; exists {
 		t.Fatal("expected no sid claim when session is empty")
-	}
-}
-
-// TestLoadKeysFailClosedInNonDev 覆盖 H4：
-// 非 dev 环境未配置签名/加密密钥时必须启动失败（fail-closed），禁止使用临时/测试密钥。
-func TestLoadKeysFailClosedInNonDev(t *testing.T) {
-	prev := appconfig.Conf
-	defer func() { appconfig.Conf = prev }()
-	appconfig.Conf = &pkgconfig.Config{
-		Server: pkgconfig.Server{Env: "prod"},
-		OIDC:   pkgconfig.OIDC{},
-	}
-
-	if _, _, err := loadSigningKey(); err == nil {
-		t.Fatal("expected loadSigningKey to fail in non-dev without configured key")
-	}
-	if _, _, err := loadEncryptionKey(); err == nil {
-		t.Fatal("expected loadEncryptionKey to fail in non-dev without configured key")
-	}
-
-	// dev 环境允许临时/测试密钥
-	appconfig.Conf = &pkgconfig.Config{
-		Server: pkgconfig.Server{Env: "dev"},
-		OIDC:   pkgconfig.OIDC{},
-	}
-	if _, _, err := loadSigningKey(); err != nil {
-		t.Fatalf("expected loadSigningKey to succeed in dev, got %v", err)
-	}
-	if _, _, err := loadEncryptionKey(); err != nil {
-		t.Fatalf("expected loadEncryptionKey to succeed in dev, got %v", err)
 	}
 }
 

@@ -3,11 +3,11 @@ package svcuser
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/platformadmin/internal/service/svcperson"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
 type UserIdentitySvc interface {
@@ -52,7 +52,7 @@ func (svc *userIdentitySvc) mapUserIdentityReqToPerson(ctx *gin.Context, userID 
 	}
 	clone := *req
 	clone.UserID = userEntity.PersonID
-	clone.TenantID = gctx.GetTenantID(ctx)
+	clone.TenantID = gincontext.GetTenantID(ctx)
 	return &clone, nil
 }
 
@@ -61,7 +61,7 @@ func (svc *userIdentitySvc) resolveTenantUser(ctx *gin.Context, userID string) (
 	if err != nil {
 		return nil, code.GetError(code.UserNotExistError)
 	}
-	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gctx.GetTenantID(ctx) || userEntity.PersonID == "" {
+	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gincontext.GetTenantID(ctx) || userEntity.PersonID == "" {
 		return nil, code.GetError(code.UserNotExistError)
 	}
 	return userEntity, nil

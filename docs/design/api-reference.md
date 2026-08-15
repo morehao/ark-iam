@@ -63,7 +63,7 @@ flowchart LR
 | 通道 | 使用方 | 说明 |
 |---|---|---|
 | `Authorization: Bearer <access_token>` | 登录用户（前端） | OIDC JWT，`sub=person:<id>`，私有声明 `tenant_id`/`user_id`/`client_id`/`token_usage` |
-| `x-api-key: ak_xxx` | 机器/服务 | 与 Bearer 通道二选一，任一通过即可（`oidcauth` 中间件逻辑） |
+| `x-api-key: ak_xxx` | 机器/服务 | 与 Bearer 通道二选一，任一通过即可（OIDC 鉴权中间件逻辑） |
 
 免鉴权路径（跳过校验）：`/v1/auth/register`、`/v1/auth/connector/callback`、OIDC 协议端点 `/oidc/*` 中除授权回调外的端点。
 

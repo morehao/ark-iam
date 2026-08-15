@@ -4,7 +4,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/auth/internal/service/svcsession"
-	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -40,9 +39,9 @@ func (ctr *sessionCtr) List(ctx *gin.Context) {
 		return
 	}
 
-	userID := gctx.GetUserID(ctx)
-	tenantID := gctx.GetTenantID(ctx)
-	personID := gctx.GetPersonID(ctx)
+	userID := gincontext.GetUserID(ctx)
+	tenantID := gincontext.GetTenantID(ctx)
+	personID := gincontext.GetPersonID(ctx)
 	res, err := ctr.sessionSvc.List(ctx, &req, personID, userID, tenantID)
 	if err != nil {
 		gincontext.Fail(ctx, err)
@@ -65,9 +64,9 @@ func (ctr *sessionCtr) Revoke(ctx *gin.Context) {
 		return
 	}
 
-	userID := gctx.GetUserID(ctx)
-	tenantID := gctx.GetTenantID(ctx)
-	personID := gctx.GetPersonID(ctx)
+	userID := gincontext.GetUserID(ctx)
+	tenantID := gincontext.GetTenantID(ctx)
+	personID := gincontext.GetPersonID(ctx)
 	if err := ctr.sessionSvc.Revoke(ctx, &req, userID, tenantID, personID); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -82,9 +81,9 @@ func (ctr *sessionCtr) Revoke(ctx *gin.Context) {
 // @Success 200 {object} gincontext.DtoRender{data=string}
 // @Router /v1/auth/me/sessions [delete]
 func (ctr *sessionCtr) RevokeAll(ctx *gin.Context) {
-	userID := gctx.GetUserID(ctx)
-	tenantID := gctx.GetTenantID(ctx)
-	personID := gctx.GetPersonID(ctx)
+	userID := gincontext.GetUserID(ctx)
+	tenantID := gincontext.GetTenantID(ctx)
+	personID := gincontext.GetPersonID(ctx)
 	if err := ctr.sessionSvc.RevokeAll(ctx, userID, tenantID, personID); err != nil {
 		gincontext.Fail(ctx, err)
 		return

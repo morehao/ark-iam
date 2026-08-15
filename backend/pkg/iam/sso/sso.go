@@ -44,7 +44,7 @@ func ssoUserSessionsKey(personID string) string {
 type tenantIDCtxKey struct{}
 
 // ContextKeyTenantID 是写入/读取 SSO 会话审计租户 ID 所用的 context key。
-// 供跨包（如 svcoidc 在 context 中注入租户）与包内记录审计时统一使用。
+// 供跨包（如 oidcop 在 context 中注入租户）与包内记录审计时统一使用。
 var ContextKeyTenantID tenantIDCtxKey
 
 type ssoSessionData struct {

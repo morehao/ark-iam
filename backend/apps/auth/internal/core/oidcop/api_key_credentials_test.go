@@ -1,4 +1,4 @@
-package svcoidc
+package oidcop
 
 import (
 	"context"

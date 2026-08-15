@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	appconfig "github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
+	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
@@ -115,7 +116,7 @@ func TestCompleteLoginBySessionHonorsAuthRequestTenantHint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AuthRequestByID failed: %v", err)
 	}
-	completedReq, ok := updated.(*AuthRequest)
+	completedReq, ok := updated.(*oidcop.AuthRequest)
 	if !ok {
 		t.Fatalf("expected *AuthRequest, got %T", updated)
 	}
@@ -175,7 +176,7 @@ func TestCompleteLoginBySessionFallsBackWhenHintNotInPersonsTenants(t *testing.T
 	if err != nil {
 		t.Fatalf("AuthRequestByID failed: %v", err)
 	}
-	completedReq, ok := updated.(*AuthRequest)
+	completedReq, ok := updated.(*oidcop.AuthRequest)
 	if !ok {
 		t.Fatalf("expected *AuthRequest, got %T", updated)
 	}
@@ -235,7 +236,7 @@ func TestCompleteLoginBySessionRejectsHintOnTenantLookupError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AuthRequestByID failed: %v", err)
 	}
-	completedReq, ok := updated.(*AuthRequest)
+	completedReq, ok := updated.(*oidcop.AuthRequest)
 	if !ok {
 		t.Fatalf("expected *AuthRequest, got %T", updated)
 	}
@@ -314,7 +315,7 @@ func TestCompleteLoginReturnsContinueURLAndCompletesRequest(t *testing.T) {
 	if updated.GetSubject() != "person:88" {
 		t.Fatalf("expected completed subject person:88, got %q", updated.GetSubject())
 	}
-	completedReq, ok := updated.(*AuthRequest)
+	completedReq, ok := updated.(*oidcop.AuthRequest)
 	if !ok {
 		t.Fatalf("expected *AuthRequest, got %T", updated)
 	}
@@ -456,7 +457,7 @@ func TestCompleteLoginHonorsTenantHint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AuthRequestByID failed: %v", err)
 	}
-	completedReq, ok := updated.(*AuthRequest)
+	completedReq, ok := updated.(*oidcop.AuthRequest)
 	if !ok {
 		t.Fatalf("expected *AuthRequest, got %T", updated)
 	}
@@ -526,7 +527,7 @@ func TestCompleteLoginIgnoresForgedTenantHint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AuthRequestByID failed: %v", err)
 	}
-	completedReq, ok := updated.(*AuthRequest)
+	completedReq, ok := updated.(*oidcop.AuthRequest)
 	if !ok {
 		t.Fatalf("expected *AuthRequest, got %T", updated)
 	}
@@ -601,7 +602,7 @@ func TestSelectTenantWritesTenantAndReturnsContinueURL(t *testing.T) {
 	if !updated.Done() {
 		t.Fatal("expected auth request to be completed after tenant selection")
 	}
-	completedReq, ok := updated.(*AuthRequest)
+	completedReq, ok := updated.(*oidcop.AuthRequest)
 	if !ok {
 		t.Fatalf("expected *AuthRequest, got %T", updated)
 	}

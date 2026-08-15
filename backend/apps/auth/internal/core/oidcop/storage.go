@@ -1,4 +1,4 @@
-package svcoidc
+package oidcop
 
 import (
 	"context"
@@ -150,7 +150,7 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 	// authorization_code：优先用认证流程确定的租户
 	if authReq, ok := request.(*AuthRequest); ok {
 		if tid := authReq.GetTenantID(); tid != "" {
-			if pid, perr := parseOIDCSubject(authReq.GetSubject()); perr == nil {
+			if pid, perr := ParseSubject(authReq.GetSubject()); perr == nil {
 				if users, uerr := s.persistentStore.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid, TenantID: tid}); uerr == nil && len(users) > 0 {
 					claims := objauth.TokenClaims{TenantID: tid}.OIDCPrivateClaims()
 					// sid：注入 SSO 会话标识，使 access token 携带 sid，
@@ -166,7 +166,7 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 	// refresh token 轮换：保留存储的租户，避免重新落到 users[0]
 	if rr, ok := request.(*refreshTokenRequest); ok {
 		if tid := rr.GetTenantID(); tid != "" {
-			if pid, perr := parseOIDCSubject(rr.GetSubject()); perr == nil {
+			if pid, perr := ParseSubject(rr.GetSubject()); perr == nil {
 				if users, uerr := s.persistentStore.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid, TenantID: tid}); uerr == nil && len(users) > 0 {
 					claims := objauth.TokenClaims{TenantID: tid}.OIDCPrivateClaims()
 					// sid：刷新轮换也携带会话标识，保证刷新后的 token 可关联同一中心会话。
@@ -346,15 +346,15 @@ func (s *OIDCStorage) SigningPrivateKey() *rsa.PrivateKey { return s.signingKey 
 // 撤销该 person 的 SSO 会话与全部 refresh token，并将待通知的 back-channel 登出任务入队。
 // M3 阶段 ID token 尚不携带 sid，统一按 person 级执行；M4 注入 sid 后按 id_token_hint 精确到中心会话。
 func (s *OIDCStorage) TerminateSessionFromRequest(ctx context.Context, endSessionRequest *op.EndSessionRequest) (string, error) {
-	personID, pErr := parseOIDCSubject(endSessionRequest.UserID)
+	personID, pErr := ParseSubject(endSessionRequest.UserID)
 	if pErr != nil {
-		glog.Warnf(ctx, "[svcoidc.TerminateSessionFromRequest] parse subject fail, userID:%s, err:%v", endSessionRequest.UserID, pErr)
+		glog.Warnf(ctx, "[oidcop.TerminateSessionFromRequest] parse subject fail, userID:%s, err:%v", endSessionRequest.UserID, pErr)
 		return endSessionRequest.RedirectURI, nil
 	}
 
 	// 撤销 SSO 会话 + 吊销该 person 全部 refresh（D2=A 防续命兜底）
 	if tErr := s.persistentStore.TerminateSession(ctx, endSessionRequest.UserID, endSessionRequest.ClientID); tErr != nil {
-		glog.Warnf(ctx, "[svcoidc.TerminateSessionFromRequest] terminate session fail, personID:%s, err:%v", personID, tErr)
+		glog.Warnf(ctx, "[oidcop.TerminateSessionFromRequest] terminate session fail, personID:%s, err:%v", personID, tErr)
 	}
 
 	// 取待通知的登记：优先按 sid 精确（M4 后），否则按 person 全部
@@ -367,7 +367,7 @@ func (s *OIDCStorage) TerminateSessionFromRequest(ctx context.Context, endSessio
 		regs, err = slo.ListByPersonID(ctx, personID)
 	}
 	if err != nil {
-		glog.Warnf(ctx, "[svcoidc.TerminateSessionFromRequest] list registrations fail, personID:%s, err:%v", personID, err)
+		glog.Warnf(ctx, "[oidcop.TerminateSessionFromRequest] list registrations fail, personID:%s, err:%v", personID, err)
 		regs = nil
 	}
 
@@ -384,7 +384,7 @@ func (s *OIDCStorage) TerminateSessionFromRequest(ctx context.Context, endSessio
 			UserID:               reg.UserID,
 			BackChannelLogoutURI: reg.BackChannelLogoutURI,
 		}); err != nil {
-			glog.Warnf(ctx, "[svcoidc.TerminateSessionFromRequest] enqueue logout fail, clientID:%s, err:%v", reg.ClientID, err)
+			glog.Warnf(ctx, "[oidcop.TerminateSessionFromRequest] enqueue logout fail, clientID:%s, err:%v", reg.ClientID, err)
 		}
 	}
 
@@ -401,11 +401,11 @@ func (s *OIDCStorage) GetRefreshTokenInfo(ctx context.Context, clientID string, 
 	return s.persistentStore.GetRefreshTokenInfo(ctx, clientID, tokenValue)
 }
 
-func buildOIDCSubject(personID string) string {
+func BuildSubject(personID string) string {
 	return fmt.Sprintf("person:%s", personID)
 }
 
-func parseOIDCSubject(subject string) (string, error) {
+func ParseSubject(subject string) (string, error) {
 	const prefix = "person:"
 	if !strings.HasPrefix(subject, prefix) {
 		return "", fmt.Errorf("invalid oidc subject: %s", subject)

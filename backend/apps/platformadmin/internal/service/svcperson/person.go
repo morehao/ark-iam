@@ -5,10 +5,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/gctx"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtouser"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
@@ -47,7 +47,7 @@ func (svc *personSvc) Create(ctx *gin.Context, req *dtouser.UserIdentityCreateRe
 		Issuer:          req.Issuer,
 		ExternalSubject: req.IdentityID,
 		Detail:          detailJSON,
-		CreatedBy:       gctx.GetUserID(ctx),
+		CreatedBy:       gincontext.GetUserID(ctx),
 	}
 	if err := dao.NewUserIdentityDao().Insert(ctx, insertEntity); err != nil {
 		glog.Errorf(ctx, "[svcperson.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -68,7 +68,7 @@ func (svc *personSvc) Delete(ctx *gin.Context, req *dtouser.UserIdentityDeleteRe
 	if err := ensurePersonIdentityVisibleToTenant(ctx, entity.PersonID); err != nil {
 		return err
 	}
-	if err := dao.NewUserIdentityDao().Delete(ctx, req.UserIdentityID, gctx.GetUserID(ctx)); err != nil {
+	if err := dao.NewUserIdentityDao().Delete(ctx, req.UserIdentityID, gincontext.GetUserID(ctx)); err != nil {
 		glog.Errorf(ctx, "[svcperson.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserIdentityDeleteError)
 	}
@@ -103,7 +103,7 @@ func (svc *personSvc) Update(ctx *gin.Context, req *dtouser.UserIdentityUpdateRe
 		"external_subject": req.IdentityID,
 		"detail":           detailJSON,
 	}
-	if operatorID := gctx.GetUserID(ctx); operatorID != "" {
+	if operatorID := gincontext.GetUserID(ctx); operatorID != "" {
 		updateMap["updated_by"] = operatorID
 	}
 	if err := dao.NewUserIdentityDao().UpdateMap(ctx, req.UserIdentityID, updateMap); err != nil {
@@ -173,7 +173,7 @@ func ensurePersonIdentityVisibleToTenant(ctx *gin.Context, personID string) erro
 		glog.Errorf(ctx, "[svcperson.ensurePersonIdentityVisibleToTenant] user dao GetListByCond fail, err:%v, personID:%s", err, personID)
 		return code.GetError(code.UserIdentityGetDetailError)
 	}
-	tenantID := gctx.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantID(ctx)
 	for _, userEntity := range users {
 		if userEntity.TenantID == tenantID {
 			return nil

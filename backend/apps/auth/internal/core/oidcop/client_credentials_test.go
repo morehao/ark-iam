@@ -1,4 +1,4 @@
-package svcoidc
+package oidcop
 
 import (
 	"context"
@@ -40,7 +40,7 @@ func TestClientCredentialsStorage(t *testing.T) {
 	clientEntity := &model.ApplicationClientEntity{
 		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
 		TenantID:                "1",
-		Code:                   clientID,
+		Code:                    clientID,
 		Name:                    "Machine Client",
 		RedirectURIs:            datatypes.JSON("[]"),
 		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
@@ -137,7 +137,7 @@ func TestClientCredentialsRejectsPublicClient(t *testing.T) {
 	publicClient := &model.ApplicationClientEntity{
 		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
 		TenantID:                "1",
-		Code:                   clientID,
+		Code:                    clientID,
 		Name:                    "Public Client",
 		RedirectURIs:            datatypes.JSON("[]"),
 		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
@@ -279,7 +279,7 @@ func newClientCredentialsTestDB(t *testing.T, clientID string, accessTokenTTL in
 	clientEntity := &model.ApplicationClientEntity{
 		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
 		TenantID:                "1",
-		Code:                   clientID,
+		Code:                    clientID,
 		Name:                    "TTL Client",
 		RedirectURIs:            datatypes.JSON("[]"),
 		PostLogoutRedirectURIs:  datatypes.JSON("[]"),

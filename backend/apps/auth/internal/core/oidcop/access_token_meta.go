@@ -1,4 +1,4 @@
-package svcoidc
+package oidcop
 
 import (
 	"context"
@@ -51,11 +51,11 @@ func storeAccessTokenMeta(ctx context.Context, tokenID string, meta accessTokenM
 	}
 	data, err := json.Marshal(meta)
 	if err != nil {
-		glog.Warnf(ctx, "[svcoidc.storeAccessTokenMeta] marshal fail, tokenID:%s, err:%v", tokenID, err)
+		glog.Warnf(ctx, "[oidcop.storeAccessTokenMeta] marshal fail, tokenID:%s, err:%v", tokenID, err)
 		return
 	}
 	if err := dbclient.RedisCli.Set(ctx, accessTokenMetaKey(tokenID), data, metaTTLFor(meta.ExpiresAt)).Err(); err != nil {
-		glog.Warnf(ctx, "[svcoidc.storeAccessTokenMeta] redis set fail, tokenID:%s, err:%v", tokenID, err)
+		glog.Warnf(ctx, "[oidcop.storeAccessTokenMeta] redis set fail, tokenID:%s, err:%v", tokenID, err)
 	}
 }
 
@@ -70,7 +70,7 @@ func loadAccessTokenMeta(ctx context.Context, tokenID string) *accessTokenMeta {
 	}
 	var meta accessTokenMeta
 	if err := json.Unmarshal(data, &meta); err != nil {
-		glog.Warnf(ctx, "[svcoidc.loadAccessTokenMeta] unmarshal fail, tokenID:%s, err:%v", tokenID, err)
+		glog.Warnf(ctx, "[oidcop.loadAccessTokenMeta] unmarshal fail, tokenID:%s, err:%v", tokenID, err)
 		return nil
 	}
 	return &meta

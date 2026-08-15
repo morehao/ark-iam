@@ -1,4 +1,4 @@
-package svcoidc
+package oidcop
 
 import (
 	"context"
@@ -8,21 +8,19 @@ import (
 	"testing"
 	"time"
 
-	appconfig "github.com/morehao/ark-iam/auth/config"
-	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 )
 
 func TestBuildOIDCSubject(t *testing.T) {
-	if got := buildOIDCSubject("12"); got != "person:12" {
+	if got := BuildSubject("12"); got != "person:12" {
 		t.Fatalf("expected subject person:12, got %q", got)
 	}
 }
 
 func TestParseOIDCSubject(t *testing.T) {
-	personID, err := parseOIDCSubject("person:34")
+	personID, err := ParseSubject("person:34")
 	if err != nil {
 		t.Fatalf("expected subject to parse, got err: %v", err)
 	}
@@ -32,7 +30,7 @@ func TestParseOIDCSubject(t *testing.T) {
 }
 
 func TestParseOIDCSubjectRejectsInvalidFormat(t *testing.T) {
-	_, err := parseOIDCSubject("34")
+	_, err := ParseSubject("34")
 	if err == nil {
 		t.Fatal("expected invalid subject format to fail")
 	}
@@ -66,7 +64,7 @@ func TestCompleteAuthRequestMarksRequestDone(t *testing.T) {
 	}
 
 	authTime := time.Unix(1710000000, 0)
-	err = storage.CompleteAuthRequest(context.Background(), req.GetID(), buildOIDCSubject("88"), authTime, []string{"pwd"}, "", "", true)
+	err = storage.CompleteAuthRequest(context.Background(), req.GetID(), BuildSubject("88"), authTime, []string{"pwd"}, "", "", true)
 	if err != nil {
 		t.Fatalf("CompleteAuthRequest failed: %v", err)
 	}
@@ -91,8 +89,7 @@ func TestCompleteAuthRequestMarksRequestDone(t *testing.T) {
 }
 
 func TestOIDCClientLoginURLUsesIssuerSSOLogin(t *testing.T) {
-	appconfig.Conf = &pkgconfig.Config{OIDC: pkgconfig.OIDC{Issuer: "http://localhost:8099/oidc"}}
-	client := NewOIDCClient(&model.ApplicationClientEntity{Code: "client-1"})
+	client := NewOIDCClient(&model.ApplicationClientEntity{Code: "client-1"}, "http://localhost:8099/oidc")
 
 	got := client.LoginURL("ar-1")
 	expected := "http://localhost:8099/oidc/sso-login?authRequestID=ar-1"

@@ -21,9 +21,13 @@ func registerError(codeMsgMap gerror.CodeMsgMap) {
 	}
 }
 
-func GetError(code int) *gerror.Error {
-	err := errorMap[code]
-	return &err
+// GetError 返回注册的业务错误哨兵值。
+// golib/gerror 的哨兵设计为值类型（var ErrNotFound = Error{...}），
+// errors.Is / errors.As 均按值匹配；若返回指针，每次调用都是新指针，
+// 会导致 errors.Is(err, GetError(...)) 恒不成立，且 gincontext 无法
+// 通过 errors.As 提取业务错误码。
+func GetError(code int) gerror.Error {
+	return errorMap[code]
 }
 
 func init() {

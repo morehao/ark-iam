@@ -304,7 +304,7 @@ DROP TABLE organization_role;
 |---|---|---|
 | 实体/DB | `ApplicationClientEntity.ClientID`（column `client_id`，uniqueIndex） | → `Code`（column `code`） |
 | DAO 条件 | `ApplicationClientCond.ClientID` | → `Code` |
-| OIDC 协议适配（**唯一映射点**） | `OIDCClient.GetID()` 返回 `clientEntity.ClientID`（`svcoidc/client.go`） | → 返回 `clientEntity.Code` |
+| OIDC 协议适配（**唯一映射点**） | `OIDCClient.GetID()` 返回 `clientEntity.ClientID`（`oidcop/client.go`） | → 返回 `clientEntity.Code` |
 | 协议查询 | `GetClientByClientID` / `AuthorizeClientIDSecret`（zitadel op 接口签名） | 接口名/参数**保留** `clientID`（协议语境），内部按 `code` 查询 |
 | token claim / introspection / `audit_log.client_id` | `client_id` | **保留**（记录的是协议身份，非实体字段） |
 | 外键 | `application_client_secret.application_client_id`、`refresh_token.application_client_id` | **不动**（指向内部主键 `id`） |
@@ -364,7 +364,7 @@ DROP TABLE organization_role;
 - `pkg/seed/seed_pg_test.go`：删表顺序列表
 - `apps/platformadmin/internal/service/svctenant/tenant.go`：`CreateTenantAsOwner` 事务内创建**同名根组织节点**（替代原根部门逻辑）
 - `pkg/iam/model/application_client.go` / `pkg/iam/dao/application_client.go`：`client_id` → `code`（见 §5.5）
-- `apps/auth/internal/service/svcoidc/client.go`：`OIDCClient.GetID()` 返回 `Code`（协议映射点）
+- `apps/auth/internal/core/oidcop/client.go`：`OIDCClient.GetID()` 返回 `Code`（协议映射点）
 - `apps/platformadmin` `svcapplicationclient` / `dtoapplicationclient`：生成函数（`generateClientID` → 生成 code）与 DTO `clientID` JSON 字段 → `code`
 - `pkg/seed/seed.go`：OAuth 客户端种子 `clientID` → `code`
 - 测试：`create_tenant_as_owner_test.go` 根部门断言 → 根组织断言

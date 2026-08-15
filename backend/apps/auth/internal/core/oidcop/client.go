@@ -1,11 +1,10 @@
-package svcoidc
+package oidcop
 
 import (
 	"encoding/json"
 	"net/url"
 	"time"
 
-	"github.com/morehao/ark-iam/auth/config"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
 
@@ -17,12 +16,14 @@ const idTokenLifetime = 10 * time.Minute
 
 type OIDCClient struct {
 	clientEntity *model.ApplicationClientEntity
+	// issuer 为 OP 的 issuer，用于构造 LoginURL（由组装方注入）。
+	issuer string
 }
 
 var _ op.Client = (*OIDCClient)(nil)
 
-func NewOIDCClient(clientEntity *model.ApplicationClientEntity) *OIDCClient {
-	return &OIDCClient{clientEntity: clientEntity}
+func NewOIDCClient(clientEntity *model.ApplicationClientEntity, issuer string) *OIDCClient {
+	return &OIDCClient{clientEntity: clientEntity, issuer: issuer}
 }
 
 func (c *OIDCClient) GetID() string {
@@ -106,7 +107,7 @@ func (c *OIDCClient) GrantTypes() []oidc.GrantType {
 }
 
 func (c *OIDCClient) LoginURL(id string) string {
-	return config.Conf.OIDC.Issuer + "/sso-login?authRequestID=" + url.QueryEscape(id)
+	return c.issuer + "/sso-login?authRequestID=" + url.QueryEscape(id)
 }
 
 func (c *OIDCClient) AccessTokenType() op.AccessTokenType {

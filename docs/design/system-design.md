@@ -126,7 +126,7 @@ flowchart TB
     S --> DTO
 ```
 
-- **跨应用共享**的 model / dao / object 抽到 `pkg/iam`，通用中间件抽到 `pkg/middleware`（含 OIDC 鉴权中间件 `oidcauth`）；
+- **跨应用共享**的 model / dao / object 抽到 `pkg/iam`，通用中间件抽到 `pkg/middleware`（含 OIDC 鉴权中间件）；
 - 服务层依赖接口 + 构造函数注入，控制器统一 `gincontext.Success/Fail` 返回 `{code, msg, data}` 信封；
 - 数据库访问基于 GORM，事务用 `dbclient.IamDB(ctx).Transaction(...)` 封装。
 
@@ -654,7 +654,7 @@ sequenceDiagram
     OP->>RD: 写入 access token 元数据（iam:oidc:at:meta:*）
     OP-->>RP: 令牌
     RP->>API: GET /v1/...（Authorization: Bearer access_token）
-    API->>API: oidcauth 中间件：验签（RS256）→<br/>校验 iss/aud → 解析 personID/tenantID
+    API->>API: OIDC 鉴权中间件：验签（RS256）→<br/>校验 iss/aud → 解析 personID/tenantID
     API->>RD: （可选）SSO 会话活性校验<br/>HasActiveSession（登出即失效）
     alt 机器凭证（x-api-key 或 client_credentials 签发）
         API->>API: 跳过 SSO 会话活性校验（token_usage=machine）
@@ -744,7 +744,7 @@ flowchart TB
     C --> D{"客户端形态"}
     D -->|"前端 SPA（推荐）"| E["4a. 配置授权码 + PKCE<br/>react-oidc-context / oidc-client-ts"]
     D -->|"后端服务"| F["4b. 配置 client_credentials<br/>或 API Key"]
-    E --> G["5. 对接令牌校验<br/>后端挂 oidcauth 中间件<br/>（iss/aud/SSO 会话活性）"]
+    E --> G["5. 对接令牌校验<br/>后端挂 OIDC 鉴权中间件<br/>（iss/aud/SSO 会话活性）"]
     F --> G
     G --> H["6. 可选：接入 SLO<br/>配置 back_channel_logout_uri<br/>接收 logout_token"]
     H --> I["7. 验收<br/>（SSO 免密 / 登出即失效 / 审计）"]
@@ -756,7 +756,7 @@ flowchart TB
 | 2. 创建应用 | 平台管理员创建应用并配置租户策略 | `POST /v1/platform/applications` |
 | 3. 创建客户端 | 一个应用可多个客户端（多端/多环境），**redirect_uri 必须精确白名单** | `POST /v1/platform/application-clients` |
 | 4. 前端接入 | Authorization Code + PKCE，`state`/`nonce` 由 SDK 处理 | `/oidc/*` 端点 |
-| 5. 后端校验 | `oidcauth.OIDCCompatibleAuth` 中间件：验签 + iss/aud + SSO 会话活性 | `pkg/middleware/oidcauth` |
+| 5. 后端校验 | `middleware.OIDCCompatibleAuth` 中间件：验签 + iss/aud + SSO 会话活性 | `pkg/middleware` |
 | 6. 单点登出 | 配置 `back_channel_logout_uri` 接收 logout_token | `POST /oidc/bc-logout` |
 | 7. 验收 | 跨应用免密、一处登出处处登出、审计可查 | - |
 
@@ -792,7 +792,7 @@ flowchart TB
 | 密钥 | 签名/加密密钥生产 fail-closed（未配置直接启动失败）；dev 自动生成临时密钥 |
 | 会话 | SSO Cookie `iam_sso_session`（SameSite 默认 Lax，生产 Secure）；Redis 会话 TTL + 活跃续期；登出撤销全部会话与刷新令牌 |
 | 审计 | 登录成功/失败、租户切换、操作动作全量写 `audit_log`；登录写 `user_login_log` |
-| 中间件 | `oidcauth`：无 token 401、API Key 通道独立（`x-api-key`）、机器凭证豁免 SSO 会话活性校验 |
+| 中间件 | OIDC 鉴权：无 token 401、API Key 通道独立（`x-api-key`）、机器凭证豁免 SSO 会话活性校验 |
 
 ---
 

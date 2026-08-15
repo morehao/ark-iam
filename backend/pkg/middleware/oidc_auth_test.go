@@ -1,4 +1,4 @@
-package oidcauth
+package middleware
 
 import (
 	"context"
