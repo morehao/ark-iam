@@ -9,8 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	appconfig "github.com/morehao/ark-iam/auth/config"
-	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
+	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
@@ -52,6 +52,9 @@ func (f *fakeSSOSessionStore) ValidateSession(ctx context.Context, sessionID str
 }
 func (f *fakeSSOSessionStore) SessionAMR(ctx context.Context, sessionID string) []string {
 	return f.sessionAMR
+}
+func (f *fakeSSOSessionStore) SessionAuthTime(ctx context.Context, sessionID string) time.Time {
+	return time.Now()
 }
 func (f *fakeSSOSessionStore) RevokeSession(ctx context.Context, sessionID string) error { return nil }
 func (f *fakeSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, personID string) error {

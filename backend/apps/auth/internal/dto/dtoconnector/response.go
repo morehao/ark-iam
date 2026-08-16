@@ -15,7 +15,7 @@ type ConnectorFactoryListResp struct {
 	List []ConnectorFactoryResp `json:"list"`
 }
 
-type TestConnectorResp struct {
+type ConnectorTestResp struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 }

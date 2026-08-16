@@ -84,6 +84,9 @@ func dequeueLogout(ctx context.Context, queueKey string, timeout time.Duration) 
 
 // LogoutRegistration 记录一次会话在其某个 client 上签发过令牌，登出时应向该 client 发 back-channel 通知。
 type LogoutRegistration struct {
+	// SessionID 是中心 SSO 会话 ID（sid）。登记时回填，使 person 级登出路径
+	// 也能构造携带 sid 的 logout_token，并让通知成功后 Delete 幂等可执行。
+	SessionID            string `json:"sessionID"`
 	OIDCSessionID        string `json:"oidcSessionID"`
 	ClientID             string `json:"clientID"`
 	UserID               string `json:"userID"`
@@ -119,11 +122,18 @@ func NewSLOStore() SLOStore {
 }
 
 // Register 为指定会话登记一条待通知的 client 信息。
+// 登记集合键带 TTL（ssoLogoutRegTTL），避免登出后无人清理导致 Redis 键无限堆积。
 func (s *redisSLOStore) Register(ctx context.Context, sessionID string, reg LogoutRegistration) error {
 	if s.client == nil {
 		return fmt.Errorf("redis client not available")
 	}
-	return s.client.SAdd(ctx, ssoLogoutRegKey(sessionID), reg.memberValue()).Err()
+	if reg.SessionID == "" {
+		reg.SessionID = sessionID
+	}
+	if err := s.client.SAdd(ctx, ssoLogoutRegKey(sessionID), reg.memberValue()).Err(); err != nil {
+		return err
+	}
+	return s.client.Expire(ctx, ssoLogoutRegKey(sessionID), ssoLogoutRegTTL).Err()
 }
 
 // ListBySessionID 返回指定会话下登记的全部 client。

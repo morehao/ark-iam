@@ -4,13 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
 
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/golib/glog"
 )
 
 const connectorProviderWechat = "wechat"
@@ -19,7 +22,7 @@ type oauth2IdentityNormalizer func(config ConnectorConfig, claims map[string]any
 
 type OAuth2Driver struct {
 	normalizers     map[string]oauth2IdentityNormalizer
-	tokenExchanger  func(ctx context.Context, config oauth2.Config, code string) (*oauth2.Token, error)
+	tokenExchanger  func(ctx context.Context, config oauth2.Config, code string, codeVerifier string) (*oauth2.Token, error)
 	userInfoFetcher func(ctx context.Context, token *oauth2.Token, config ConnectorConfig) (map[string]any, error)
 }
 
@@ -50,6 +53,11 @@ func (d *OAuth2Driver) BuildAuthorizationURL(ctx *gin.Context, input *ConnectorA
 	if err := d.ValidateConfig(input.Config); err != nil {
 		return nil, err
 	}
+	// H10：出站目标（authURL/tokenURL）做 SSRF 防护
+	if err := validateOutboundURL(input.Config.AuthURL); err != nil {
+		glog.Warnf(ctx, "[OAuth2Driver.BuildAuthorizationURL] invalid auth url, err:%v", err)
+		return nil, code.GetError(code.ConnectorGetDetailError)
+	}
 
 	oauthConfig := oauth2.Config{
 		ClientID:     input.Config.ClientID,
@@ -62,9 +70,20 @@ func (d *OAuth2Driver) BuildAuthorizationURL(ctx *gin.Context, input *ConnectorA
 		},
 	}
 
+	// H10：OAuth2 授权码模式启用 PKCE（S256），防授权码截获兑换
+	verifier, err := generatePKCEVerifier()
+	if err != nil {
+		return nil, code.GetError(code.ConnectorGetDetailError)
+	}
+	authURL := oauthConfig.AuthCodeURL(input.State,
+		oauth2.SetAuthURLParam("code_challenge", pkceChallengeS256(verifier)),
+		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
+	)
+
 	return &ConnectorAuthorizeOutput{
-		AuthorizationURL: oauthConfig.AuthCodeURL(input.State),
+		AuthorizationURL: authURL,
 		Nonce:            "",
+		CodeVerifier:     verifier,
 	}, nil
 }
 
@@ -74,6 +93,17 @@ func (d *OAuth2Driver) ExchangeCallback(ctx *gin.Context, input *ConnectorCallba
 	}
 	if err := d.ValidateConfig(input.Config); err != nil {
 		return nil, err
+	}
+	// H10：token/userinfo 出站目标做 SSRF 防护
+	if err := validateOutboundURL(input.Config.TokenURL); err != nil {
+		glog.Warnf(ctx, "[OAuth2Driver.ExchangeCallback] invalid token url, err:%v", err)
+		return nil, code.GetError(code.ConnectorGetDetailError)
+	}
+	if input.Config.UserInfoURL != "" {
+		if err := validateOutboundURL(input.Config.UserInfoURL); err != nil {
+			glog.Warnf(ctx, "[OAuth2Driver.ExchangeCallback] invalid userinfo url, err:%v", err)
+			return nil, code.GetError(code.ConnectorGetDetailError)
+		}
 	}
 	oauthConfig := oauth2.Config{
 		ClientID:     input.Config.ClientID,
@@ -85,7 +115,7 @@ func (d *OAuth2Driver) ExchangeCallback(ctx *gin.Context, input *ConnectorCallba
 			TokenURL: input.Config.TokenURL,
 		},
 	}
-	token, err := d.exchangeToken(runtimeContext(ctx), oauthConfig, input.Code)
+	token, err := d.exchangeToken(runtimeContext(ctx), oauthConfig, input.Code, input.CodeVerifier)
 	if err != nil {
 		return nil, code.GetError(code.AuthLoginFailedError)
 	}
@@ -131,12 +161,19 @@ func (d *OAuth2Driver) getNormalizers() map[string]oauth2IdentityNormalizer {
 	return NewOAuth2Driver().(*OAuth2Driver).normalizers
 }
 
-func (d *OAuth2Driver) exchangeToken(ctx context.Context, config oauth2.Config, code string) (*oauth2.Token, error) {
+func (d *OAuth2Driver) exchangeToken(ctx context.Context, config oauth2.Config, code string, codeVerifier string) (*oauth2.Token, error) {
 	if d.tokenExchanger != nil {
-		return d.tokenExchanger(ctx, config, code)
+		return d.tokenExchanger(ctx, config, code, codeVerifier)
 	}
-	return config.Exchange(ctx, code)
+	authOpts := []oauth2.AuthCodeOption{}
+	if codeVerifier != "" {
+		authOpts = append(authOpts, oauth2.SetAuthURLParam("code_verifier", codeVerifier))
+	}
+	return config.Exchange(ctx, code, authOpts...)
 }
+
+// connectorHTTPClient 出站 HTTP 客户端：带超时，防 IdP 不响应导致请求挂起。
+var connectorHTTPClient = &http.Client{Timeout: 10 * time.Second}
 
 func (d *OAuth2Driver) fetchUserInfo(ctx context.Context, token *oauth2.Token, config ConnectorConfig) (map[string]any, error) {
 	if d.userInfoFetcher != nil {
@@ -147,13 +184,14 @@ func (d *OAuth2Driver) fetchUserInfo(ctx context.Context, token *oauth2.Token, c
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := connectorHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
+	// 限制响应体大小（1MB），防恶意 IdP 返回超大 body 撑爆内存
 	claims := map[string]any{}
-	if err := json.NewDecoder(resp.Body).Decode(&claims); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&claims); err != nil {
 		return nil, err
 	}
 	return claims, nil

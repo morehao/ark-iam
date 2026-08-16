@@ -1,11 +1,12 @@
 package svcoidc
 
 import (
+	"errors"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
+	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/auth/internal/service/svcauth"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
@@ -20,6 +21,29 @@ type OIDCAuthSvc interface {
 	CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error)
 	SelectTenant(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error)
 	CompleteLoginBySession(ctx *gin.Context, authRequestID string, sessionID string) (string, error)
+}
+
+// errSilentLoginNotAllowed 标记静默登录被拒（prompt=login / max_age 超期），
+// 由 SSOLogin 处理为清除 SSO cookie 并跳回登录页重新认证。
+var errSilentLoginNotAllowed = errors.New("silent login not allowed")
+
+// mapAuthRequestError 区分"授权票据不存在"与"存储故障"：
+// 前者返回 OIDCSessionNotFound（客户端可重试登录），后者返回 OIDCServerError（服务端问题）。
+func mapAuthRequestError(err error) error {
+	if errors.Is(err, oidcop.ErrStoreUnavailable) {
+		return code.GetError(code.OIDCServerError)
+	}
+	return code.GetError(code.OIDCSessionNotFound)
+}
+
+// containsPrompt 判断 prompt 参数是否包含指定值。
+func containsPrompt(prompts []string, target string) bool {
+	for _, p := range prompts {
+		if p == target {
+			return true
+		}
+	}
+	return false
 }
 
 type passwordAuthenticator interface {
@@ -48,7 +72,7 @@ func NewOIDCAuthSvc(provider *OIDCProvider) OIDCAuthSvc {
 func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
 	authReq, err := svc.provider.Storage.AuthRequestByID(ctx.Request.Context(), req.AuthRequestID)
 	if err != nil {
-		return nil, code.GetError(code.OIDCSessionNotFound)
+		return nil, mapAuthRequestError(err)
 	}
 	personEntity, userEntity, tenants, err := svc.authSvc.AuthenticatePassword(ctx, req.Identifier, req.Password)
 	if err != nil {
@@ -71,7 +95,7 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	// 多租户：除非有合法的 tenant hint，否则暂不 done、不发 code，需用户先选租户
 	if resolvedTenant == "" && len(tenants) > 1 {
 		if err := svc.provider.Storage.CompleteAuthRequest(ctx.Request.Context(), req.AuthRequestID, subject, authTime, []string{"pwd"}, "", "", false); err != nil {
-			return nil, code.GetError(code.OIDCSessionNotFound)
+			return nil, mapAuthRequestError(err)
 		}
 		return &dtooidc.OIDCLoginResp{
 			RequiresTenantSelection: true,
@@ -84,8 +108,16 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 		tenantID = userEntity.TenantID
 	}
 	if err := svc.provider.Storage.CompleteAuthRequest(ctx.Request.Context(), req.AuthRequestID, subject, authTime, []string{"pwd"}, "", tenantID, true); err != nil {
-		return nil, code.GetError(code.OIDCSessionNotFound)
+		return nil, mapAuthRequestError(err)
 	}
+	// 补记密码登录主路径的审计（SelectTenant / CompleteLoginBySession 均已记录）
+	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
+		Action:     svcaudit.ActionLogin,
+		TenantID:   tenantID,
+		Result:     "success",
+		TargetType: "person",
+		TargetID:   personEntity.ID,
+	})
 
 	allowPersonCreateTenant := false
 	if cid := clientIDFromAuthRequest(authReq); cid != "" {
@@ -118,7 +150,7 @@ func (svc *oidcAuthSvc) SelectTenant(ctx *gin.Context, authRequestID string, ten
 	reqCtx := ctx.Request.Context()
 	authReq, err := svc.provider.Storage.AuthRequestByID(reqCtx, authRequestID)
 	if err != nil {
-		return nil, code.GetError(code.OIDCSessionNotFound)
+		return nil, mapAuthRequestError(err)
 	}
 	if authReq.Done() {
 		return nil, code.GetError(code.OIDCSessionNotFound)
@@ -142,7 +174,7 @@ func (svc *oidcAuthSvc) SelectTenant(ctx *gin.Context, authRequestID string, ten
 		return nil, code.GetError(code.TenantNotExistError)
 	}
 	if err := svc.provider.Storage.CompleteAuthRequest(reqCtx, authRequestID, authReq.GetSubject(), authReq.GetAuthTime(), authReq.GetAMR(), "", tenantID, true); err != nil {
-		return nil, code.GetError(code.OIDCSessionNotFound)
+		return nil, mapAuthRequestError(err)
 	}
 	allowPersonCreateTenant := false
 	if cid := authReq.GetClientID(); cid != "" {
@@ -205,7 +237,22 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID s
 		}
 	}
 
-	authTime := time.Now()
+	authTime := svc.ssoSessionStore.SessionAuthTime(reqCtx, sessionID)
+	if authTime.IsZero() {
+		authTime = time.Now()
+	}
+	// H5：OIDC Core §3.1.2.1 —— prompt=login 强制重新认证；max_age 超期后不得静默续登。
+	// 任一命中即拒绝静默完成，由 SSOLogin 清 cookie 并跳转登录页重新认证。
+	if ar, ok := authReq.(*oidcop.AuthRequest); ok {
+		if containsPrompt(ar.Prompt, "login") {
+			glog.Warnf(ctx, "[oidcAuthSvc.CompleteLoginBySession] prompt=login requires re-auth, authRequestID:%s", authRequestID)
+			return "", errSilentLoginNotAllowed
+		}
+		if ar.MaxAge != nil && authTime.Add(time.Duration(*ar.MaxAge)*time.Second).Before(time.Now()) {
+			glog.Warnf(ctx, "[oidcAuthSvc.CompleteLoginBySession] max_age exceeded, re-auth required, authRequestID:%s", authRequestID)
+			return "", errSilentLoginNotAllowed
+		}
+	}
 	// L7：amr 还原会话创建时的原始认证方法（如 ["pwd"]），不再使用非标准的 "sso"。
 	amr := svc.ssoSessionStore.SessionAMR(reqCtx, sessionID)
 	if len(amr) == 0 {

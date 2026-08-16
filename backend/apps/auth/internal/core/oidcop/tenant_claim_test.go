@@ -54,6 +54,7 @@ func newTenantClaimTestStore(t *testing.T, users []model.UserEntity) (storage *O
 			func(c context.Context) *gorm.DB { return db.WithContext(c) },
 		)}
 	}
+	persistentStore.db = func(c context.Context) *gorm.DB { return db.WithContext(c) }
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {

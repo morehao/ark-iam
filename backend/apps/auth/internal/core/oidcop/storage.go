@@ -27,6 +27,10 @@ const TenantHintKey ctxKey = "iam.tenantHint"
 // ResourceHintKey 承载 token 端点的 RFC 8707 resource 参数（经 req.Context() 传递到 op.Storage）。
 const ResourceHintKey ctxKey = "iam.resource"
 
+// SSOSessionHintKey 承载 end_session 请求的 SSO 会话 ID（从 cookie 解析，经 req.Context() 传递）。
+// 供 TerminateSessionFromRequest 在无 id_token_hint 时仍能确定撤销目标 person。
+const SSOSessionHintKey ctxKey = "iam.ssoSession"
+
 type AuthRequest struct {
 	ID            string              `json:"id"`
 	ClientID      string              `json:"client_id"`
@@ -46,6 +50,10 @@ type AuthRequest struct {
 	ExpiresAt     time.Time           `json:"expires_at"`
 	TenantID      string              `json:"tenant_id"`
 	SessionID     string              `json:"session_id"`
+	// H5：prompt / max_age 必须持久化，静默续登（CompleteLoginBySession）时校验：
+	// prompt=login 强制重新认证；authTime+max_age 超期后禁止静默完成。
+	Prompt []string `json:"prompt,omitempty"`
+	MaxAge *uint    `json:"max_age,omitempty"`
 }
 
 func (a *AuthRequest) GetID() string                         { return a.ID }
@@ -151,7 +159,13 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 	if authReq, ok := request.(*AuthRequest); ok {
 		if tid := authReq.GetTenantID(); tid != "" {
 			if pid, perr := ParseSubject(authReq.GetSubject()); perr == nil {
-				if users, uerr := s.persistentStore.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid, TenantID: tid}); uerr == nil && len(users) > 0 {
+				users, uerr := s.persistentStore.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid, TenantID: tid})
+				if uerr != nil {
+					// 查询失败不再静默降级：缺少 tenant_id 的 token 会破坏下游授权，直接报错
+					glog.Errorf(ctx, "[oidcop.GetPrivateClaimsFromRequest] user dao GetListByCond fail, err:%v", uerr)
+					return nil, uerr
+				}
+				if len(users) > 0 {
 					claims := objauth.TokenClaims{TenantID: tid}.OIDCPrivateClaims()
 					// sid：注入 SSO 会话标识，使 access token 携带 sid，
 					// 供 RP 匹配与会话粒度的 back-channel 登出（M4）。
@@ -167,7 +181,12 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 	if rr, ok := request.(*refreshTokenRequest); ok {
 		if tid := rr.GetTenantID(); tid != "" {
 			if pid, perr := ParseSubject(rr.GetSubject()); perr == nil {
-				if users, uerr := s.persistentStore.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid, TenantID: tid}); uerr == nil && len(users) > 0 {
+				users, uerr := s.persistentStore.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid, TenantID: tid})
+				if uerr != nil {
+					glog.Errorf(ctx, "[oidcop.GetPrivateClaimsFromRequest] user dao GetListByCond fail, err:%v", uerr)
+					return nil, uerr
+				}
+				if len(users) > 0 {
 					claims := objauth.TokenClaims{TenantID: tid}.OIDCPrivateClaims()
 					// sid：刷新轮换也携带会话标识，保证刷新后的 token 可关联同一中心会话。
 					if rr.GetSessionID() != "" {
@@ -346,14 +365,24 @@ func (s *OIDCStorage) SigningPrivateKey() *rsa.PrivateKey { return s.signingKey 
 // 撤销该 person 的 SSO 会话与全部 refresh token，并将待通知的 back-channel 登出任务入队。
 // M3 阶段 ID token 尚不携带 sid，统一按 person 级执行；M4 注入 sid 后按 id_token_hint 精确到中心会话。
 func (s *OIDCStorage) TerminateSessionFromRequest(ctx context.Context, endSessionRequest *op.EndSessionRequest) (string, error) {
-	personID, pErr := ParseSubject(endSessionRequest.UserID)
+	userID := endSessionRequest.UserID
+	// H15：无 id_token_hint 时（如 OP 自家登出页），回退用 SSO cookie 会话确定撤销目标，
+	// 否则"登出"只清 cookie，refresh token 仍有效、RP 也收不到 back-channel 通知。
+	if userID == "" {
+		if v, ok := ctx.Value(SSOSessionHintKey).(string); ok && v != "" {
+			if pid, vErr := sso.NewSSOSessionStore().ValidateSession(ctx, v); vErr == nil && pid != "" {
+				userID = BuildSubject(pid)
+			}
+		}
+	}
+	personID, pErr := ParseSubject(userID)
 	if pErr != nil {
-		glog.Warnf(ctx, "[oidcop.TerminateSessionFromRequest] parse subject fail, userID:%s, err:%v", endSessionRequest.UserID, pErr)
+		glog.Warnf(ctx, "[oidcop.TerminateSessionFromRequest] parse subject fail, userID:%s, err:%v", userID, pErr)
 		return endSessionRequest.RedirectURI, nil
 	}
 
 	// 撤销 SSO 会话 + 吊销该 person 全部 refresh（D2=A 防续命兜底）
-	if tErr := s.persistentStore.TerminateSession(ctx, endSessionRequest.UserID, endSessionRequest.ClientID); tErr != nil {
+	if tErr := s.persistentStore.TerminateSession(ctx, userID, endSessionRequest.ClientID); tErr != nil {
 		glog.Warnf(ctx, "[oidcop.TerminateSessionFromRequest] terminate session fail, personID:%s, err:%v", personID, tErr)
 	}
 
@@ -371,13 +400,15 @@ func (s *OIDCStorage) TerminateSessionFromRequest(ctx context.Context, endSessio
 		regs = nil
 	}
 
-	var jobSessionID string
-	if endSessionRequest.IDTokenHintClaims != nil {
-		jobSessionID = endSessionRequest.IDTokenHintClaims.SessionID
-	}
 	for _, reg := range regs {
+		// 优先用登记时回填的中心会话 ID，保证 logout_token 始终携带 sid，
+		// 且通知成功后 Delete 幂等可执行；id_token_hint 携带的 sid 优先。
+		jobSID := reg.SessionID
+		if endSessionRequest.IDTokenHintClaims != nil && endSessionRequest.IDTokenHintClaims.SessionID != "" {
+			jobSID = endSessionRequest.IDTokenHintClaims.SessionID
+		}
 		if err := sso.EnqueueLogout(ctx, sso.LogoutJob{
-			SessionID:            jobSessionID,
+			SessionID:            jobSID,
 			PersonID:             personID,
 			OIDCSessionID:        reg.OIDCSessionID,
 			ClientID:             reg.ClientID,

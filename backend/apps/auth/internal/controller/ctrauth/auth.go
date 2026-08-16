@@ -4,9 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/auth/internal/service/svcauth"
-	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
-	"github.com/morehao/golib/glog"
 )
 
 type AuthCtr interface {
@@ -93,10 +91,9 @@ func (ctr *authCtr) JoinTenant(ctx *gin.Context) {
 }
 
 // @Tags 认证
-// @Summary 用户登出
+// @Summary 用户登出（全局：撤销全部 refresh token + SSO 会话）
 // @accept application/json
 // @Produce application/json
-// @Param req body dtoauth.LogoutReq true "用户登出"
 // @Success 200 {object} gincontext.DtoRender{data=string}
 // @Router /v1/auth/logout [post]
 func (ctr *authCtr) Logout(ctx *gin.Context) {
@@ -112,6 +109,8 @@ func (ctr *authCtr) Logout(ctx *gin.Context) {
 	gincontext.Success(ctx, "登出成功")
 }
 
+// LogoutAll 与 Logout 语义一致（均为 person 级全局登出）。
+// 会话撤销已由 svcauth.Logout 内部完成，此处不再重复调用 SSO 撤销。
 func (ctr *authCtr) LogoutAll(ctx *gin.Context) {
 	var req dtoauth.LogoutAllReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -121,13 +120,6 @@ func (ctr *authCtr) LogoutAll(ctx *gin.Context) {
 	if err := ctr.authSvc.LogoutAll(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
-	}
-	// 撤销该 person 的全部 SSO session，实现"一处登出、处处登出"的全局登出语义
-	personID := gincontext.GetPersonID(ctx)
-	if personID != "" {
-		if err := sso.RevokeSSOSessionsByPersonID(ctx.Request.Context(), personID); err != nil {
-			glog.Errorf(ctx, "[ctrauth.LogoutAll] RevokeSSOSessionsByPersonID fail, personID:%s, err:%v", personID, err)
-		}
 	}
 	gincontext.Success(ctx, "登出成功")
 }

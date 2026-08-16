@@ -28,7 +28,13 @@ func randomTokenID(prefix string) (string, error) {
 //   - userinfo 端点按 token 实际 scope 裁剪声明（M2）。
 const accessTokenMetaKeyPrefix = "iam:oidc:at:meta:"
 
-func accessTokenMetaKey(tokenID string) string { return accessTokenMetaKeyPrefix + tokenID }
+// accessTokenRevokedKeyPrefix 是 access token 撤销黑名单的 key 前缀。
+// JWT access token 无法在签发侧物理撤销，只能经黑名单使 OP 侧的
+// userinfo / introspection 端点拒绝（RFC 7009 撤销语义）。
+const accessTokenRevokedKeyPrefix = "iam:oidc:at:revoked:"
+
+func accessTokenMetaKey(tokenID string) string    { return accessTokenMetaKeyPrefix + tokenID }
+func accessTokenRevokedKey(tokenID string) string { return accessTokenRevokedKeyPrefix + tokenID }
 
 // accessTokenMeta 是一次 access token 签发时的上下文快照。
 type accessTokenMeta struct {
@@ -83,4 +89,32 @@ func metaTTLFor(expiration time.Time) time.Duration {
 		return time.Minute
 	}
 	return ttl
+}
+
+// revokeAccessToken 将 access token 的 jti 写入撤销黑名单。
+// TTL 尽量对齐 token 剩余有效期（读取元数据推算），元数据不可得时保守用 15 分钟。
+// 黑名单仅作用于 OP 侧的 userinfo / introspection 端点（RP 侧无状态依赖短 TTL）。
+func revokeAccessToken(ctx context.Context, tokenID string) {
+	if dbclient.RedisCli == nil || tokenID == "" {
+		return
+	}
+	ttl := 15 * time.Minute
+	if meta := loadAccessTokenMeta(ctx, tokenID); meta != nil {
+		if d := time.Until(meta.ExpiresAt); d > 0 {
+			ttl = d + time.Minute
+		}
+	}
+	if err := dbclient.RedisCli.Set(ctx, accessTokenRevokedKey(tokenID), "1", ttl).Err(); err != nil {
+		glog.Warnf(ctx, "[oidcop.revokeAccessToken] redis set fail, tokenID:%s, err:%v", tokenID, err)
+	}
+}
+
+// isAccessTokenRevoked 判断 access token 是否已被撤销（命中黑名单）。
+// Redis 不可用/未知 token 时返回 false（fail-open：黑名单是尽力而为的撤销增强）。
+func isAccessTokenRevoked(ctx context.Context, tokenID string) bool {
+	if dbclient.RedisCli == nil || tokenID == "" {
+		return false
+	}
+	n, err := dbclient.RedisCli.Exists(ctx, accessTokenRevokedKey(tokenID)).Result()
+	return err == nil && n > 0
 }

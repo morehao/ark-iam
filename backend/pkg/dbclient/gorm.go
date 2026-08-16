@@ -38,7 +38,6 @@ var tenantScopeSkipTables = []string{
 	"application_client_secret",
 }
 
-
 func InitMultiDB(configs []dbgorm.Config, logConfig *glog.LogConfig) error {
 	if len(configs) == 0 {
 		return fmt.Errorf("mysql config is empty")
@@ -72,7 +71,13 @@ func InitMultiDB(configs []dbgorm.Config, logConfig *glog.LogConfig) error {
 func GetDB(ctx context.Context, dbName string) *gorm.DB {
 	dbMutex.RLock()
 	defer dbMutex.RUnlock()
-	return dbMap[dbName].WithContext(ctx)
+	db := dbMap[dbName]
+	if db == nil {
+		// 库未注册（如未 InitMultiDB 的测试环境）时返回 nil，调用方自行判空，
+		// 避免 nil *gorm.DB 方法调用直接 panic。
+		return nil
+	}
+	return db.WithContext(ctx)
 }
 
 func IamDB(ctx context.Context) *gorm.DB {

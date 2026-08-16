@@ -1,13 +1,13 @@
 package svcperson
 
 import (
-	"unicode"
-
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoperson"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/iam/password"
+	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
@@ -64,7 +64,17 @@ func (svc *personProfileSvc) UpdatePassword(ctx *gin.Context, req *dtoperson.Per
 		return code.GetError(code.UserNotExistError)
 	}
 
-	if err := validateNewPassword(req.NewPassword); err != nil {
+	// 连接器注册的账号可能没有本地密码，此时应提示"密码未设置"而非"密码错误"
+	if personEntity.PasswordEncrypted == "" {
+		return code.GetError(code.PasswordNotSetError)
+	}
+
+	if err := password.ValidateStrength(req.NewPassword); err != nil {
+		return code.GetError(code.PasswordValidationError)
+	}
+
+	if req.OldPassword == req.NewPassword {
+		glog.Warnf(ctx, "[svcperson.UpdatePassword] new password equals old password, personID:%s", personID)
 		return code.GetError(code.PasswordValidationError)
 	}
 
@@ -86,27 +96,17 @@ func (svc *personProfileSvc) UpdatePassword(ctx *gin.Context, req *dtoperson.Per
 		return code.GetError(code.UserUpdateError)
 	}
 
+	// H7：改密即全局登出——撤销该 person 的全部 SSO 会话与 refresh token，
+	// 使已泄露/被盗的旧会话在改密后立即失效（与 Logout 的"一处登出、处处登出"语义一致）。
+	if err := sso.RevokeSSOSessionsByPersonID(ctx.Request.Context(), personID); err != nil {
+		glog.Warnf(ctx, "[svcperson.UpdatePassword] revoke sso sessions fail, personID:%s, err:%v", personID, err)
+	}
+	if err := dao.NewRefreshTokenDao().RevokeByPersonID(ctx.Request.Context(), personID); err != nil {
+		glog.Warnf(ctx, "[svcperson.UpdatePassword] revoke refresh tokens fail, personID:%s, err:%v", personID, err)
+	}
+
 	return nil
 }
 
-// validateNewPassword 与注册流程的密码强度规则保持一致（≥8 位且含大小写字母与数字）。
-func validateNewPassword(password string) error {
-	if len(password) < 8 {
-		return code.GetError(code.PasswordValidationError)
-	}
-	var hasUpper, hasLower, hasDigit bool
-	for _, char := range password {
-		switch {
-		case unicode.IsUpper(char):
-			hasUpper = true
-		case unicode.IsLower(char):
-			hasLower = true
-		case unicode.IsDigit(char):
-			hasDigit = true
-		}
-	}
-	if !hasUpper || !hasLower || !hasDigit {
-		return code.GetError(code.PasswordValidationError)
-	}
-	return nil
-}
+// 注意：密码强度规则统一走公共包 pkg/iam/password（8~128 位，含大小写数字），
+// 与注册流程（svcauth.validatePasswordStrength）保持一致。

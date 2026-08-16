@@ -33,6 +33,8 @@ func cfg() (maxFailures, windowSec, lockSec int) {
 }
 
 // Check 是否被锁定，true=锁定。Redis 不可用时 fail-open 返回 false。
+// person 维度锁记录触发锁定的 IP：仅当当前请求 IP 与触发 IP 一致时拒绝，
+// 防止攻击者用受害者的用户名触发锁定后，受害者从其它 IP 也无法登录（DoS）。
 func Check(ctx context.Context, ip string, personID string) bool {
 	if dbclient.RedisCli == nil {
 		return false
@@ -43,14 +45,14 @@ func Check(ctx context.Context, ip string, personID string) bool {
 	}
 	if personID != "" {
 		lockPerson := fmt.Sprintf(keyLockPerson, personID)
-		if v, _ := dbclient.RedisCli.Exists(ctx, lockPerson).Result(); v > 0 {
+		if v, _ := dbclient.RedisCli.Get(ctx, lockPerson).Result(); v == ip {
 			return true
 		}
 	}
 	return false
 }
 
-// RecordFailure 记录失败次数，达到阈值则锁定 IP 与 person。
+// RecordFailure 记录失败次数，达到阈值则锁定 IP，并对 person 记录触发锁定的 IP。
 func RecordFailure(ctx context.Context, ip string, personID string) {
 	if dbclient.RedisCli == nil {
 		return
@@ -69,18 +71,25 @@ func RecordFailure(ctx context.Context, ip string, personID string) {
 	if personID != "" {
 		personKey := fmt.Sprintf(keyFailPerson, personID)
 		if n, _ := cli.Incr(ctx, personKey).Result(); n >= int64(maxFailures) {
-			cli.Set(ctx, fmt.Sprintf(keyLockPerson, personID), "1", lock)
+			// 记录触发锁定的 IP：Check 时仅同 IP 拒绝，避免账号锁定被用作 DoS
+			cli.Set(ctx, fmt.Sprintf(keyLockPerson, personID), ip, lock)
 		}
 		cli.Expire(ctx, personKey, w)
 	}
 }
 
-// RecordSuccess 登录成功清除失败与锁定计数。
-func RecordSuccess(ctx context.Context, personID string) {
+// RecordSuccess 登录成功清除该 person 与来源 IP 的失败计数与锁定状态。
+// 此前仅清 person 维度：共享出口 IP（NAT/办公网）下某用户触发 IP 锁后，
+// 其它用户即使成功登录也无法解锁，导致整个出口 IP 被误锁（H9）。
+func RecordSuccess(ctx context.Context, ip string, personID string) {
 	if dbclient.RedisCli == nil {
 		return
 	}
-	dbclient.RedisCli.Del(ctx, personKeys(personID)...)
+	keys := personKeys(personID)
+	if ip != "" {
+		keys = append(keys, fmt.Sprintf(keyFailIP, ip), fmt.Sprintf(keyLockIP, ip))
+	}
+	dbclient.RedisCli.Del(ctx, keys...)
 }
 
 func windowSeconds(s int) time.Duration {

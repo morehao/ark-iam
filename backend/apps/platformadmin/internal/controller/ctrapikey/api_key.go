@@ -39,8 +39,7 @@ func (ctr *apiKeyCtr) Create(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	tenantID := gincontext.GetTenantID(ctx)
-	res, err := ctr.apiKeySvc.Create(ctx, tenantID, &req)
+	res, err := ctr.apiKeySvc.Create(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -61,8 +60,7 @@ func (ctr *apiKeyCtr) PageList(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	tenantID := gincontext.GetTenantID(ctx)
-	res, err := ctr.apiKeySvc.PageList(ctx, tenantID, &req)
+	res, err := ctr.apiKeySvc.PageList(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -83,8 +81,7 @@ func (ctr *apiKeyCtr) Revoke(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	tenantID := gincontext.GetTenantID(ctx)
-	if err := ctr.apiKeySvc.Revoke(ctx, tenantID, &req); err != nil {
+	if err := ctr.apiKeySvc.Revoke(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -104,8 +101,7 @@ func (ctr *apiKeyCtr) Delete(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	tenantID := gincontext.GetTenantID(ctx)
-	if err := ctr.apiKeySvc.Delete(ctx, tenantID, &req); err != nil {
+	if err := ctr.apiKeySvc.Delete(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

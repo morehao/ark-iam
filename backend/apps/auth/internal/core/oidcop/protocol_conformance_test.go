@@ -47,6 +47,7 @@ func newProtocolConformanceStore(t *testing.T, migrate ...any) (*PersistentStore
 	ps.applicationClientSecretDao = func(opts ...dao.DaoOption) *dao.ApplicationClientSecretDao {
 		return dao.NewApplicationClientSecretDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
 	}
+	ps.db = func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }
 	return ps, db
 }
 

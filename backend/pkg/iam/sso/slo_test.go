@@ -16,7 +16,7 @@ func TestLogoutRegistrationRegisterAndListBySessionID(t *testing.T) {
 
 	ctx := context.Background()
 	store := NewSLOStore()
-	sid := "test-slo-session-1"
+	sid := fmt.Sprintf("test-slo-session-1-%d", time.Now().UnixNano())
 
 	reg := LogoutRegistration{
 		OIDCSessionID:        "at-1",
@@ -45,7 +45,7 @@ func TestLogoutRegistrationDeleteOnlyMatchesOIDCSession(t *testing.T) {
 
 	ctx := context.Background()
 	store := NewSLOStore()
-	sid := "test-slo-session-2"
+	sid := fmt.Sprintf("test-slo-session-2-%d", time.Now().UnixNano())
 
 	regA := LogoutRegistration{OIDCSessionID: "at-a", ClientID: "client-a", UserID: "person:7", BackChannelLogoutURI: "https://a/bc"}
 	regB := LogoutRegistration{OIDCSessionID: "at-b", ClientID: "client-b", UserID: "person:7", BackChannelLogoutURI: "https://b/bc"}

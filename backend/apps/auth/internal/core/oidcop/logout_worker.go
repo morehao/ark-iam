@@ -47,6 +47,7 @@ func NewLogoutWorker(privKey *rsa.PrivateKey, keyID string, issuer string) *logo
 }
 
 // Run 起一个常驻消费者，阻塞地从队列取任务并发送，直至 ctx 取消。
+// Redis 故障时退避重试，避免忙循环打爆 Redis。
 func (w *logoutWorker) Run(ctx context.Context) {
 	for {
 		job, ok, err := sso.DequeueLogout(ctx, 2*time.Second)
@@ -55,6 +56,11 @@ func (w *logoutWorker) Run(ctx context.Context) {
 				return
 			}
 			glog.Warnf(ctx, "[logoutWorker.Run] dequeue logout fail, err:%v", err)
+			select {
+			case <-time.After(time.Second):
+			case <-ctx.Done():
+				return
+			}
 			continue
 		}
 		if !ok {

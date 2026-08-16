@@ -44,6 +44,7 @@ func (f *fakeAuthPersonStore) Insert(ctx context.Context, entity *model.PersonEn
 type fakeAuthTenantStore struct {
 	getByIDFunc       func(ctx context.Context, id string) (*model.TenantEntity, error)
 	getPageListByCond func(ctx context.Context, cond *dao.TenantCond) (model.TenantEntityList, int64, error)
+	getListByCondFunc func(ctx context.Context, cond *dao.TenantCond) (model.TenantEntityList, error)
 }
 
 func (f *fakeAuthTenantStore) GetByID(ctx context.Context, id string) (*model.TenantEntity, error) {
@@ -59,6 +60,14 @@ func (f *fakeAuthTenantStore) GetPageListByCond(ctx context.Context, cond gormda
 	}
 	tenantCond, _ := cond.(*dao.TenantCond)
 	return f.getPageListByCond(ctx, tenantCond)
+}
+
+func (f *fakeAuthTenantStore) GetListByCond(ctx context.Context, cond gormdao.Cond) (model.TenantEntityList, error) {
+	if f.getListByCondFunc == nil {
+		return nil, nil
+	}
+	tenantCond, _ := cond.(*dao.TenantCond)
+	return f.getListByCondFunc(ctx, tenantCond)
 }
 
 func TestMyTenantsReturnsCurrentPersonTenantList(t *testing.T) {
@@ -86,15 +95,11 @@ func TestMyTenantsReturnsCurrentPersonTenantList(t *testing.T) {
 
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
 		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
-				switch id {
-				case "11":
-					return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "11"}}, Name: "租户A", Tag: "a"}, nil
-				case "12":
-					return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "12"}}, Name: "租户B", Tag: "b"}, nil
-				default:
-					return nil, nil
-				}
+			getListByCondFunc: func(ctx context.Context, cond *dao.TenantCond) (model.TenantEntityList, error) {
+				return model.TenantEntityList{
+					{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "11"}}, Name: "租户A", Tag: "a"},
+					{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "12"}}, Name: "租户B", Tag: "b"},
+				}, nil
 			},
 		}
 	})

@@ -131,6 +131,6 @@ func TestLogout(t *testing.T) {
 	ctx.Set(gcontext.KeyPersonID, "1")
 
 	svc := NewAuthSvc()
-	err := svc.Logout(ctx, &dtoauth.LogoutReq{RefreshToken: "test-refresh-token"})
+	err := svc.Logout(ctx, &dtoauth.LogoutReq{})
 	require.NoError(t, err)
 }

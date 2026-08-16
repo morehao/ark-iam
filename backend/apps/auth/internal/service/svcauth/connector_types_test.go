@@ -2,6 +2,7 @@ package svcauth
 
 import (
 	"encoding/json"
+	"net/url"
 	"reflect"
 	"testing"
 
@@ -447,8 +448,27 @@ func TestOAuth2DriverBuildAuthorizationURLUsesOAuthConfig(t *testing.T) {
 	if resp.AuthorizationURL == "" {
 		t.Fatalf("authorizationUrl should not be empty")
 	}
-	expected := "https://github.com/login/oauth/authorize?client_id=oauth-client&redirect_uri=https%3A%2F%2Fconsole.example.com%2Fcallback%3Fnext%3D%2Fsettings+profile&response_type=code&state=tenant%3Da+b%26return%3D%2Fhome"
-	if resp.AuthorizationURL != expected {
-		t.Fatalf("authorizationUrl should be URL-encoded, got %q", resp.AuthorizationURL)
+	authorizeURL, err := url.Parse(resp.AuthorizationURL)
+	if err != nil {
+		t.Fatalf("parse authorization url: %v", err)
+	}
+	if authorizeURL.Query().Get("client_id") != "oauth-client" {
+		t.Fatalf("expected client_id, got %q", authorizeURL.Query().Get("client_id"))
+	}
+	if authorizeURL.Query().Get("state") != "tenant=a b&return=/home" {
+		t.Fatalf("expected URL-encoded state, got %q", authorizeURL.Query().Get("state"))
+	}
+	if authorizeURL.Query().Get("redirect_uri") != "https://console.example.com/callback?next=/settings profile" {
+		t.Fatalf("expected URL-encoded redirect_uri, got %q", authorizeURL.Query().Get("redirect_uri"))
+	}
+	// H10：OAuth2 授权码模式启用 PKCE S256
+	if authorizeURL.Query().Get("code_challenge_method") != "S256" {
+		t.Fatalf("expected PKCE S256 challenge method, got %q", authorizeURL.Query().Get("code_challenge_method"))
+	}
+	if authorizeURL.Query().Get("code_challenge") == "" {
+		t.Fatal("expected PKCE code_challenge parameter")
+	}
+	if resp.CodeVerifier == "" {
+		t.Fatal("expected code verifier to be returned for state persistence")
 	}
 }

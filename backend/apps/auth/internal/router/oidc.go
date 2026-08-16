@@ -25,7 +25,8 @@ func InitOIDC(engine *gin.Engine, ctr *ctroidc.OIDCCtr) {
 	oidcGroup.GET("/logged-out", ctr.LoggedOut)
 	oidcGroup.GET(oidc.DiscoveryEndpoint, oidcHandler)
 	// L1：prompt=none 静默登录失败跳回 redirect_uri 前，校验其确为该 client 注册的回调地址
-	oidcGroup.Any("/authorize", middleware.TenantHint(), middleware.OIDCSilentAuth(ctr.Provider(), sso.SessionCookieName), oidcHandler)
+	// authorize 为 GET-only（OIDC Core §3.1.2.1）
+	oidcGroup.GET("/authorize", middleware.TenantHint(), middleware.OIDCSilentAuth(ctr.Provider(), sso.SessionCookieName), oidcHandler)
 	oidcGroup.Any("/authorize/callback", oidcHandler)
 	// L3：token 端点读取 RFC 8707 resource 参数，供 storage 决定 access token 的 aud
 	oidcGroup.Any("/oauth/token", middleware.ResourceHint(), oidcHandler)

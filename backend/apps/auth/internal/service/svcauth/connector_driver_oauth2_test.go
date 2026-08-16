@@ -150,7 +150,7 @@ func TestDefaultConnectorDriverRegistryUsesRealOAuth2Driver(t *testing.T) {
 func TestOAuth2DriverExchangeCallbackReturnsNormalizedIdentity(t *testing.T) {
 	driver := &OAuth2Driver{
 		normalizers: NewOAuth2Driver().(*OAuth2Driver).normalizers,
-		tokenExchanger: func(ctx context.Context, config oauth2.Config, code string) (*oauth2.Token, error) {
+		tokenExchanger: func(ctx context.Context, config oauth2.Config, code string, _ string) (*oauth2.Token, error) {
 			if code != "oauth-code" {
 				t.Fatalf("expected exchange code oauth-code, got %q", code)
 			}

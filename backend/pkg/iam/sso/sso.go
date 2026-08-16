@@ -50,6 +50,9 @@ var ContextKeyTenantID tenantIDCtxKey
 type ssoSessionData struct {
 	PersonID  string    `json:"personID"`
 	CreatedAt time.Time `json:"createdAt"`
+	// AuthTime 是会话建立（认证发生）的时间。静默续登（prompt=none / sso-login）
+	// 还原到 id_token 的 auth_time 声明，并用于 max_age 超期判定（H5）。
+	AuthTime time.Time `json:"authTime"`
 	// AMR 原始认证方法（如 ["pwd"] / ["mfa"]）。SSO 静默续登（prompt=none / sso-login）
 	// 重新签发 token 时还原，保证 id_token 的 amr 反映原始认证，而非非标准的 "sso"。
 	AMR []string `json:"amr,omitempty"`
@@ -73,6 +76,8 @@ type SSOSessionStore interface {
 	ValidateSession(ctx context.Context, sessionID string) (string, error)
 	// SessionAMR 返回会话创建时的认证方法引用；会话不存在时返回 nil。
 	SessionAMR(ctx context.Context, sessionID string) []string
+	// SessionAuthTime 返回会话创建（认证发生）时间；会话不存在时返回零值。
+	SessionAuthTime(ctx context.Context, sessionID string) time.Time
 	RevokeSession(ctx context.Context, sessionID string) error
 	RevokeSessionsByPersonID(ctx context.Context, personID string) error
 	HasActiveSession(ctx context.Context, personID string) (bool, error)
@@ -152,9 +157,11 @@ func (s *redisSSOSessionStore) CreateSession(ctx context.Context, personID strin
 	if err != nil {
 		return "", err
 	}
+	now := time.Now()
 	data := ssoSessionData{
 		PersonID:  personID,
-		CreatedAt: time.Now(),
+		CreatedAt: now,
+		AuthTime:  now,
 		AMR:       append([]string(nil), amr...),
 	}
 	encoded, err := json.Marshal(data)
@@ -209,6 +216,22 @@ func (s *redisSSOSessionStore) SessionAMR(ctx context.Context, sessionID string)
 	return append([]string(nil), data.AMR...)
 }
 
+// SessionAuthTime 读取会话建立（认证发生）时间；会话不存在或解析失败返回零值。
+func (s *redisSSOSessionStore) SessionAuthTime(ctx context.Context, sessionID string) time.Time {
+	if s.client == nil {
+		return time.Time{}
+	}
+	encoded, err := s.client.Get(ctx, ssoSessionKey(sessionID)).Bytes()
+	if err != nil {
+		return time.Time{}
+	}
+	var data ssoSessionData
+	if err := json.Unmarshal(encoded, &data); err != nil {
+		return time.Time{}
+	}
+	return data.AuthTime
+}
+
 func (s *redisSSOSessionStore) RevokeSession(ctx context.Context, sessionID string) error {
 	if s.client == nil {
 		return fmt.Errorf("redis client not available")
@@ -244,7 +267,9 @@ func (s *redisSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, per
 // HasActiveSession 返回该自然人是否存在至少一个仍然有效的 SSO 会话。
 // 全局登出（RevokeSessionsByPersonID）会清空对应 sso_user_sessions 索引，
 // 之后此处将返回 false，从而让该自然人的既有 OIDC 访问令牌失效（必须重新认证）。
-// 找到任一有效会话时顺带刷新其 TTL，实现滑动续期，避免活跃用户因会话过期被误登出。
+// 找到任一有效会话时顺带刷新其 TTL 与索引 key 的 TTL，实现滑动续期，
+// 避免活跃用户因会话/索引过期被误登出（H6：索引 key 若只设一次 TTL，
+// 24h 后即过期，SMembers 返回空导致活跃用户被误判为无活跃会话）。
 func (s *redisSSOSessionStore) HasActiveSession(ctx context.Context, personID string) (bool, error) {
 	if s.client == nil {
 		return false, fmt.Errorf("redis client not available")
@@ -260,8 +285,9 @@ func (s *redisSSOSessionStore) HasActiveSession(ctx context.Context, personID st
 	ttl := s.sessionTTL
 	for _, sessionID := range sessionIDs {
 		if n, err := s.client.Exists(ctx, ssoSessionKey(sessionID)).Result(); err == nil && n > 0 {
-			// 滑动续期：保持活跃会话不被会话 TTL 淘汰
+			// 滑动续期：保持活跃会话不被会话 TTL 淘汰，并同步续索引 key 的 TTL
 			s.client.Expire(ctx, ssoSessionKey(sessionID), ttl)
+			s.client.Expire(ctx, userSessionsKey, ttl)
 			return true, nil
 		}
 	}

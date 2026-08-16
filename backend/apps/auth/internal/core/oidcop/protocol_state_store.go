@@ -134,6 +134,14 @@ func (s *RedisProtocolStateStore) CreateAuthRequest(ctx context.Context, authReq
 		AuthTime:     time.Now(),
 		Audience:     []string{authReq.ClientID},
 		ExpiresAt:    time.Now().Add(s.authRequestTTL),
+		// H5：持久化 prompt / max_age，供静默续登时执行 OIDC Core 的重新认证语义
+		Prompt: append([]string(nil), authReq.Prompt...),
+		MaxAge: authReq.MaxAge,
+	}
+	// id_token_hint 预认证：op 层解析出 userID（sub）后视为已完成认证，
+	// 允许 RP 凭有效 id_token_hint 直接完成授权（silent auth 通道）。
+	if userID != "" {
+		req.DoneFlag = true
 	}
 	if authReq.CodeChallenge != "" {
 		// 仅接受 S256：discovery 的 code_challenge_methods_supported 只声明 S256，
@@ -247,10 +255,15 @@ func (s *RedisProtocolStateStore) SaveAuthCode(ctx context.Context, id, code str
 	return nil
 }
 
+// AuthRequestByCode 是 op.Storage 的授权码兑换入口（zitadel 只调用此方法）。
+// 必须走原子消费路径（GetDel code + 写 spent 防重放标记），
+// 否则并发兑换同一 code 可各自产出一套 token（RFC 6749 §4.1.2 要求 code 单次使用）。
 func (s *RedisProtocolStateStore) AuthRequestByCode(ctx context.Context, code string) (op.AuthRequest, error) {
-	return s.consumeAuthCode(ctx, code, false)
+	return s.consumeAuthCode(ctx, code, true)
 }
 
+// ConsumeAuthCode 显式原子消费授权码（GetDel + spent 标记），
+// 供需要主动消费语义的调用方使用；生产 op 流程经 AuthRequestByCode 消费。
 func (s *RedisProtocolStateStore) ConsumeAuthCode(ctx context.Context, code string) (op.AuthRequest, error) {
 	return s.consumeAuthCode(ctx, code, true)
 }

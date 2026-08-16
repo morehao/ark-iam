@@ -13,6 +13,7 @@ import (
 
 const (
 	ActionLogin                         = "login"
+	ActionLogout                        = "logout"
 	ActionTenantSwitch                  = "tenant.switch"
 	ActionTenantCreate                  = "tenant.create"
 	ActionApplicationCreate             = "application.create"
@@ -38,6 +39,13 @@ func WriteAudit(ctx *gin.Context, e AuditEntry) {
 	if ctx == nil || ctx.Request == nil {
 		return
 	}
+	// 审计写入是 best-effort：任何异常（含 DB 未初始化导致 nil *gorm.DB panic）
+	// 都不得阻断业务主流程，统一 recover 后仅记日志。
+	defer func() {
+		if r := recover(); r != nil {
+			glog.Errorf(ctx, "[svcaudit.WriteAudit] panic recovered, action:%s, panic:%v", e.Action, r)
+		}
+	}()
 	entity := &model.AuditLogEntity{
 		ActorPersonID: ctx.GetString(gcontext.KeyPersonID),
 		ActorUserID:   ctx.GetString(gcontext.KeyUserID),

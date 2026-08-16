@@ -2,7 +2,8 @@ package svcauth
 
 import "github.com/morehao/ark-iam/auth/internal/dto/dtoconnector"
 
-func defaultConnectorFactories() []dtoconnector.ConnectorFactoryResp {
+// defaultConnectorFactoriesOnce 只构建一次工厂列表（只读共享），避免每次请求重建。
+var defaultConnectorFactoriesOnce = func() []dtoconnector.ConnectorFactoryResp {
 	return []dtoconnector.ConnectorFactoryResp{
 		{
 			FactoryID:     "oidc-google",
@@ -44,6 +45,10 @@ func defaultConnectorFactories() []dtoconnector.ConnectorFactoryResp {
 			},
 		},
 	}
+}()
+
+func defaultConnectorFactories() []dtoconnector.ConnectorFactoryResp {
+	return defaultConnectorFactoriesOnce
 }
 
 func selectConnectorFactories(req *dtoconnector.ConnectorFactoryListReq, factories []dtoconnector.ConnectorFactoryResp) []dtoconnector.ConnectorFactoryResp {
