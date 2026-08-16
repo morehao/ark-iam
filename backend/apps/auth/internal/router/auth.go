@@ -2,14 +2,11 @@ package router
 
 import (
 	"github.com/morehao/ark-iam/auth/internal/controller/ctrauth"
-	"github.com/morehao/ark-iam/auth/internal/service/svcauth"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
 func authRouter(groups *ginserver.RouterGroups) {
-	authSvc := svcauth.NewAuthSvc()
-	authCtr := ctrauth.NewAuthCtr(authSvc)
-
+	authCtr := ctrauth.NewAuthCtr()
 	// 认证相关操作直接挂在服务标识段下（/v1/auth/{operation}），
 	// 避免出现 /v1/auth/auth/register 的冗余路径。
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
@@ -23,7 +20,6 @@ func authRouter(groups *ginserver.RouterGroups) {
 
 func connectorRouter(groups *ginserver.RouterGroups) {
 	connectorCtr := ctrauth.NewConnectorCtr()
-
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.POST("/connectors", connectorCtr.Create)
 	v1RouterGroup.GET("/connectors", connectorCtr.PageList)

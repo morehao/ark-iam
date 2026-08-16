@@ -8,10 +8,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/config"
+	"github.com/morehao/ark-iam/auth/internal/controller/ctroidc"
 	"github.com/morehao/ark-iam/auth/internal/router"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/testsetup"
-	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
 func TestOIDCRoutesExposeLoginEndpoint(t *testing.T) {
@@ -29,8 +29,8 @@ func TestOIDCRoutesExposeLoginEndpoint(t *testing.T) {
 	}
 
 	engine := gin.New()
-	groups := ginserver.NewRouterGroups(engine, "auth", ginserver.VersionGroup{Version: ginserver.ApiVersionV1})
-	router.InitOIDC(engine, groups)
+	// InitOIDC 只做路由注册；测试用 nil provider 的控制器即可验证路由表
+	router.InitOIDC(engine, ctroidc.NewOIDCCtrWithProvider(nil))
 
 	routes := engine.Routes()
 	paths := make(map[string]map[string]bool, len(routes))
@@ -61,8 +61,8 @@ func TestOIDCLoginEndpointBypassesJWTAuth(t *testing.T) {
 	}
 
 	engine := gin.New()
-	groups := ginserver.NewRouterGroups(engine, "auth", ginserver.VersionGroup{Version: ginserver.ApiVersionV1})
-	router.InitOIDC(engine, groups)
+	// InitOIDC 只做路由注册；测试用 nil provider 的控制器即可验证路由表
+	router.InitOIDC(engine, ctroidc.NewOIDCCtrWithProvider(nil))
 
 	req := httptest.NewRequest(http.MethodPost, "/oidc/login", nil)
 	resp := httptest.NewRecorder()

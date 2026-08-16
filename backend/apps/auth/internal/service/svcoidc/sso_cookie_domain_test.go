@@ -8,10 +8,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/config"
+	"github.com/morehao/ark-iam/auth/internal/controller/ctroidc"
 	"github.com/morehao/ark-iam/auth/internal/router"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/testsetup"
-	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
 func TestLoggedOutUsesHostOnlyCookieByDefault(t *testing.T) {
@@ -29,8 +29,8 @@ func TestLoggedOutUsesHostOnlyCookieByDefault(t *testing.T) {
 	}
 
 	engine := gin.New()
-	groups := ginserver.NewRouterGroups(engine, "auth", ginserver.VersionGroup{Version: ginserver.ApiVersionV1})
-	router.InitOIDC(engine, groups)
+	// InitOIDC 只做路由注册；LoggedOut 不依赖 provider，nil 即可
+	router.InitOIDC(engine, ctroidc.NewOIDCCtrWithProvider(nil))
 
 	req := httptest.NewRequest(http.MethodGet, "/oidc/logged-out", nil)
 	resp := httptest.NewRecorder()
@@ -63,8 +63,8 @@ func TestLoggedOutUsesConfiguredCookieDomain(t *testing.T) {
 	}
 
 	engine := gin.New()
-	groups := ginserver.NewRouterGroups(engine, "auth", ginserver.VersionGroup{Version: ginserver.ApiVersionV1})
-	router.InitOIDC(engine, groups)
+	// InitOIDC 只做路由注册；LoggedOut 不依赖 provider，nil 即可
+	router.InitOIDC(engine, ctroidc.NewOIDCCtrWithProvider(nil))
 
 	req := httptest.NewRequest(http.MethodGet, "/oidc/logged-out", nil)
 	resp := httptest.NewRecorder()

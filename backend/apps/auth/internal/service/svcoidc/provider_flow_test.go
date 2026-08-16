@@ -30,7 +30,7 @@ func TestFullOIDCCodeFlow(t *testing.T) {
 		},
 	}
 
-	provider, err := SetupOIDCProvider(issuer)
+	provider, err := SetupOIDCProvider()
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider failed: %v", err)
 	}

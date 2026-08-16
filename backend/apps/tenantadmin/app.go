@@ -65,7 +65,7 @@ func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 		gindocs.Register(engine.Group("/"+AppName), AppName)
 	}
 
-	router.RegisterRouter(routerGroups, AppName)
+	router.RegisterRouter(routerGroups)
 	registerBackChannelLogout(engine, Conf, getOIDCPublicKey)
 }
 

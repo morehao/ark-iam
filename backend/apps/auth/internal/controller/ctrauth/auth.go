@@ -24,9 +24,9 @@ type authCtr struct {
 
 var _ AuthCtr = (*authCtr)(nil)
 
-func NewAuthCtr(authSvc svcauth.AuthSvc) AuthCtr {
+func NewAuthCtr() AuthCtr {
 	return &authCtr{
-		authSvc: authSvc,
+		authSvc: svcauth.NewAuthSvc(),
 	}
 }
 

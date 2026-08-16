@@ -1,6 +1,9 @@
 package ctroidc
 
 import (
+	"context"
+	"crypto/rsa"
+	"fmt"
 	"net/http"
 	"net/url"
 
@@ -16,10 +19,48 @@ import (
 type OIDCCtr struct {
 	provider    *svcoidc.OIDCProvider
 	oidcAuthSvc svcoidc.OIDCAuthSvc
+	publicKey   *rsa.PublicKey
 }
 
-func NewOIDCCtr(provider *svcoidc.OIDCProvider) *OIDCCtr {
-	return &OIDCCtr{provider: provider, oidcAuthSvc: svcoidc.NewOIDCAuthSvc(provider)}
+// NewOIDCCtr 自装配 OIDC OP：provider（签名/加密密钥、协议态 storage）、
+// back-channel logout 发送器、OIDC 鉴权服务与签名公钥缓存。
+// 装配失败（如非 dev 环境密钥缺失）直接 panic，与旧 app 装配层行为一致。
+func NewOIDCCtr() *OIDCCtr {
+	provider, err := svcoidc.SetupOIDCProvider()
+	if err != nil {
+		panic(fmt.Sprintf("[ctroidc.NewOIDCCtr] SetupOIDCProvider fail, err:%v", err))
+	}
+	if err := provider.StartLogoutWorker(context.Background()); err != nil {
+		panic(fmt.Sprintf("[ctroidc.NewOIDCCtr] StartLogoutWorker fail, err:%v", err))
+	}
+	return newOIDCCtr(provider)
+}
+
+// NewOIDCCtrWithProvider 测试专用：注入轻量/空 provider，跳过真实装配（密钥、worker）。
+func NewOIDCCtrWithProvider(provider *svcoidc.OIDCProvider) *OIDCCtr {
+	return newOIDCCtr(provider)
+}
+
+func newOIDCCtr(provider *svcoidc.OIDCProvider) *OIDCCtr {
+	ctr := &OIDCCtr{provider: provider, oidcAuthSvc: svcoidc.NewOIDCAuthSvc(provider)}
+	if pub, err := provider.PublicKey(); err == nil {
+		ctr.publicKey = pub
+	}
+	return ctr
+}
+
+// PublicKey 返回 OP 签名公钥，供业务路由鉴权中间件校验本 OP 签发的 token。
+// 未装配成功（测试注入空 provider）时返回 nil。
+func (ctr *OIDCCtr) PublicKey() *rsa.PublicKey {
+	if ctr == nil {
+		return nil
+	}
+	return ctr.publicKey
+}
+
+// Provider 返回底层 OP provider，供路由层装配 OIDC 中间件使用。
+func (ctr *OIDCCtr) Provider() *svcoidc.OIDCProvider {
+	return ctr.provider
 }
 
 func (ctr *OIDCCtr) Login(ctx *gin.Context) {

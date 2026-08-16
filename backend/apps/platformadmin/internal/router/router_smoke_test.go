@@ -15,5 +15,5 @@ func TestRegisterAllRoutes(t *testing.T) {
 	groups := ginserver.NewRouterGroups(engine, "platform", ginserver.VersionGroup{
 		Version: ginserver.ApiVersionV1,
 	})
-	RegisterRouter(groups, "platformadmin")
+	RegisterRouter(groups)
 }

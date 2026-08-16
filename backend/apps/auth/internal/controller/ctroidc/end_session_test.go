@@ -16,7 +16,7 @@ func TestEndSessionClearsSSOCookie(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	appconfig.Conf = &pkgconfig.Config{}
 	engine := gin.New()
-	ctr := NewOIDCCtr(&svcoidc.OIDCProvider{})
+	ctr := NewOIDCCtrWithProvider(&svcoidc.OIDCProvider{})
 	engine.Any("/oidc/end_session", ctr.EndSession)
 
 	req := httptest.NewRequest(http.MethodGet, "/oidc/end_session", nil)
@@ -40,7 +40,7 @@ func TestEndSessionClearsSSOCookie(t *testing.T) {
 func TestProviderHandlerFallsBackWhenProviderMissing(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
-	ctr := NewOIDCCtr(&svcoidc.OIDCProvider{})
+	ctr := NewOIDCCtrWithProvider(&svcoidc.OIDCProvider{})
 	engine.Any("/oidc/keys", ctr.ProviderHandler())
 
 	req := httptest.NewRequest(http.MethodGet, "/oidc/keys", nil)
@@ -56,7 +56,7 @@ func TestLoggedOutClearsSSOCookieAndRedirects(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	appconfig.Conf = &pkgconfig.Config{OIDC: pkgconfig.OIDC{FrontendLoginURL: "http://localhost:3000/oidc/login"}}
 	engine := gin.New()
-	ctr := NewOIDCCtr(&svcoidc.OIDCProvider{})
+	ctr := NewOIDCCtrWithProvider(&svcoidc.OIDCProvider{})
 	engine.GET("/oidc/logged-out", ctr.LoggedOut)
 
 	req := httptest.NewRequest(http.MethodGet, "/oidc/logged-out", nil)
