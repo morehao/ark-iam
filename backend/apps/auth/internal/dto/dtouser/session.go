@@ -10,6 +10,9 @@ type SessionRevokeReq struct {
 	SessionID string `json:"-" uri:"sessionID" binding:"required"`
 }
 
+// SessionRevokeAllReq 撤销所有会话（无请求参数，仅占位以统一 svc 入参约定）
+type SessionRevokeAllReq struct{}
+
 type SessionResp struct {
 	ID         string  `json:"id"`
 	SessionID  string  `json:"sessionID"`

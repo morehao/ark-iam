@@ -21,12 +21,15 @@ var (
 )
 
 type ConnectorState struct {
-	State       string    `json:"state"`
-	Nonce       string    `json:"nonce"`
-	ConnectorID string    `json:"connectorID"`
-	TenantID    string    `json:"tenantID"`
-	RedirectURI string    `json:"redirectUri"`
-	ExpiredAt   time.Time `json:"expiresAt"`
+	State string `json:"state"`
+	Nonce string `json:"nonce"`
+	// CodeVerifier 是 OAuth2/OIDC 授权码模式生成的 PKCE verifier（S256），
+	// 回调换 code 时回填，防止授权码被第三方截获后兑换（H10）。
+	CodeVerifier string    `json:"codeVerifier"`
+	ConnectorID  string    `json:"connectorID"`
+	TenantID     string    `json:"tenantID"`
+	RedirectURI  string    `json:"redirectUri"`
+	ExpiredAt    time.Time `json:"expiresAt"`
 }
 
 type ConnectorStateStore interface {

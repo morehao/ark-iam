@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"net/http"
+	"fmt"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -36,7 +36,7 @@ type ConnectorSvc interface {
 	PageList(ctx *gin.Context, req *dtoauth.ConnectorPageListReq) (*dtoauth.ConnectorPageListResp, error)
 	GetFactoryList(ctx *gin.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error)
 	ListFactories(ctx *gin.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error)
-	TestConnector(ctx *gin.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.TestConnectorResp, error)
+	TestConnector(ctx *gin.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.ConnectorTestResp, error)
 	Authorize(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID string) (*dtoconnector.ConnectorAuthorizeResp, error)
 	GetAuthorizationURL(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq) (*dtoconnector.ConnectorAuthorizeResp, error)
 	Callback(ctx *gin.Context, req *dtoconnector.ConnectorCallbackReq) (*dtoauth.LoginResp, error)
@@ -55,6 +55,7 @@ type connectorSvc struct {
 	connectorRepo    connectorRuntimeRepository
 	stateStore       ConnectorStateStore
 	identityResolver connectorIdentityResolver
+	authSvc          tenantProvider
 	ssoSessionStore  sso.SSOSessionStore
 	tokenGenerator   func(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error)
 	loginRecorder    func(ctx *gin.Context, tenantID, userID string, success bool)
@@ -62,10 +63,25 @@ type connectorSvc struct {
 	nowFunc          func() time.Time
 }
 
+// tenantProvider 抽象"查询自然人租户列表"能力，由 svcauth.AuthSvc 实现。
+type tenantProvider interface {
+	TenantsForPerson(ctx *gin.Context, personID string) ([]objauth.TenantOption, error)
+}
+
 var _ ConnectorSvc = (*connectorSvc)(nil)
 
 func NewConnectorSvc() ConnectorSvc {
-	return &connectorSvc{driverRegistry: defaultConnectorDriverRegistry()}
+	return &connectorSvc{
+		driverRegistry: defaultConnectorDriverRegistry(),
+		authSvc:        NewAuthSvc(),
+	}
+}
+
+func (svc *connectorSvc) getAuthSvc() tenantProvider {
+	if svc.authSvc == nil {
+		svc.authSvc = NewAuthSvc()
+	}
+	return svc.authSvc
 }
 
 func (svc *connectorSvc) getDriverRegistry() *connectorDriverRegistry {
@@ -121,14 +137,23 @@ func (svc *connectorSvc) getNowFunc() func() time.Time {
 	return svc.nowFunc
 }
 
-func buildConnectorInsertEntity(req *dtoauth.ConnectorCreateReq, createdBy string) (*model.ConnectorEntity, error) {
+func buildConnectorInsertEntity(req *dtoauth.ConnectorCreateReq, tenantID string, createdBy string) (*model.ConnectorEntity, error) {
 	configJson, err := json.Marshal(req.Config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("marshal config fail: %w", err)
+	}
+	claimMapping, err := marshalJSON(req.ClaimMapping)
+	if err != nil {
+		return nil, fmt.Errorf("marshal claimMapping fail: %w", err)
+	}
+	domainPolicy, err := marshalJSON(req.DomainPolicy)
+	if err != nil {
+		return nil, fmt.Errorf("marshal domainPolicy fail: %w", err)
 	}
 
 	return &model.ConnectorEntity{
-		TenantID:            req.TenantID,
+		// H11：租户归属一律取自鉴权上下文，不信任请求体 tenantID（防跨租户创建）
+		TenantID:            tenantID,
 		Name:                req.Name,
 		DisplayName:         req.DisplayName,
 		Protocol:            req.Protocol,
@@ -139,8 +164,8 @@ func buildConnectorInsertEntity(req *dtoauth.ConnectorCreateReq, createdBy strin
 		SyncProfile:         req.SyncProfile,
 		EnableTokenStorage:  req.EnableTokenStorage,
 		Config:              configJson,
-		ClaimMapping:        mustMarshalJSON(req.ClaimMapping),
-		DomainPolicy:        mustMarshalJSON(req.DomainPolicy),
+		ClaimMapping:        claimMapping,
+		DomainPolicy:        domainPolicy,
 		CreatedBy:           createdBy,
 	}, nil
 }
@@ -148,11 +173,19 @@ func buildConnectorInsertEntity(req *dtoauth.ConnectorCreateReq, createdBy strin
 func buildConnectorUpdateMap(req *dtoauth.ConnectorUpdateReq, updatedBy string) (map[string]any, error) {
 	configJson, err := json.Marshal(req.Config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("marshal config fail: %w", err)
+	}
+	claimMapping, err := marshalJSON(req.ClaimMapping)
+	if err != nil {
+		return nil, fmt.Errorf("marshal claimMapping fail: %w", err)
+	}
+	domainPolicy, err := marshalJSON(req.DomainPolicy)
+	if err != nil {
+		return nil, fmt.Errorf("marshal domainPolicy fail: %w", err)
 	}
 
 	return map[string]any{
-		"tenant_id":              req.TenantID,
+		// 注意：tenant_id 不可更新（连接器归属租户固定，防跨租户迁移）
 		"name":                   req.Name,
 		"display_name":           req.DisplayName,
 		"protocol":               req.Protocol,
@@ -163,28 +196,29 @@ func buildConnectorUpdateMap(req *dtoauth.ConnectorUpdateReq, updatedBy string) 
 		"sync_profile":           req.SyncProfile,
 		"enable_token_storage":   req.EnableTokenStorage,
 		"config":                 configJson,
-		"claim_mapping":          mustMarshalJSON(req.ClaimMapping),
-		"domain_policy":          mustMarshalJSON(req.DomainPolicy),
+		"claim_mapping":          claimMapping,
+		"domain_policy":          domainPolicy,
 		"updated_by":             updatedBy,
 	}, nil
 }
 
-func mustMarshalJSON(value any) json.RawMessage {
+// marshalJSON 序列化 JSON 字段；nil / "null" 输出 "{}"。
+func marshalJSON(value any) (json.RawMessage, error) {
 	if value == nil {
-		return json.RawMessage("{}")
+		return json.RawMessage("{}"), nil
 	}
 	data, err := json.Marshal(value)
 	if err != nil {
-		return json.RawMessage("{}")
+		return nil, err
 	}
 	if len(data) == 0 || string(data) == "null" {
-		return json.RawMessage("{}")
+		return json.RawMessage("{}"), nil
 	}
-	return data
+	return data, nil
 }
 
 func (svc *connectorSvc) Create(ctx *gin.Context, req *dtoauth.ConnectorCreateReq) (*dtoauth.ConnectorCreateResp, error) {
-	insertEntity, err := buildConnectorInsertEntity(req, gincontext.GetUserID(ctx))
+	insertEntity, err := buildConnectorInsertEntity(req, gincontext.GetTenantID(ctx), gincontext.GetUserID(ctx))
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.CreateConnector] build insert entity fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorCreateError)
@@ -254,6 +288,8 @@ func (svc *connectorSvc) Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailRe
 		glog.Errorf(ctx, "[svcauth.DetailConnector] json.Unmarshal config fail, err:%v", err)
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
+	// H3：返回前对 Config 脱敏（clientSecret/token 等敏感字段不落地前端）
+	config = sanitizeConnectorConfig(config)
 	resp := &dtoauth.ConnectorDetailResp{
 		ConnectorID: connectorEntity.ID,
 		ConnectorBaseInfo: objauth.ConnectorBaseInfo{
@@ -306,6 +342,8 @@ func (svc *connectorSvc) PageList(ctx *gin.Context, req *dtoauth.ConnectorPageLi
 			glog.Errorf(ctx, "[svcauth.PageListConnector] json.Unmarshal config fail, err:%v", err)
 			continue
 		}
+		// H3：列表同样脱敏，避免 clientSecret 等敏感字段泄露
+		config = sanitizeConnectorConfig(config)
 		list = append(list, dtoauth.ConnectorPageListItem{
 			ConnectorID: v.ID,
 			ConnectorBaseInfo: objauth.ConnectorBaseInfo{
@@ -345,11 +383,15 @@ func (svc *connectorSvc) ListFactories(ctx *gin.Context, req *dtoconnector.Conne
 	return svc.GetFactoryList(ctx, req)
 }
 
-func (svc *connectorSvc) TestConnector(ctx *gin.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.TestConnectorResp, error) {
+func (svc *connectorSvc) TestConnector(ctx *gin.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.ConnectorTestResp, error) {
 	connectorEntity, err := dao.NewConnectorDao().GetByID(ctx, req.ConnectorID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.TestConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetDetailError)
+	}
+	// H11：与其他 CRUD 一致，测试连接器必须校验租户归属（防跨租户触发外部网络请求）
+	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantID(ctx)) {
+		return nil, code.GetError(code.ConnectorNotExistError)
 	}
 	driver, config, err := selectDriverForConnector(svc.getDriverRegistry(), connectorEntity)
 	if err != nil {
@@ -359,7 +401,7 @@ func (svc *connectorSvc) TestConnector(ctx *gin.Context, req *dtoconnector.Conne
 	if err != nil {
 		return nil, err
 	}
-	return &dtoconnector.TestConnectorResp{
+	return &dtoconnector.ConnectorTestResp{
 		Success: result.Success,
 		Message: result.Message,
 	}, nil
@@ -371,8 +413,14 @@ func (svc *connectorSvc) Authorize(ctx *gin.Context, req *dtoconnector.Connector
 		glog.Errorf(ctx, "[svcauth.Authorize] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
-	if connectorEntity == nil || connectorEntity.ID == "" || connectorEntity.Status != connectorStatusEnabled {
+	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantID(ctx)) || connectorEntity.Status != connectorStatusEnabled {
 		return nil, code.GetError(code.ConnectorNotExistError)
+	}
+	// H12：redirect_uri 必须与本连接器配置的回调地址同源且为 https，
+	// 防止把授权码导向攻击者控制的地址（开放重定向/授权码劫持）。
+	if err := validateConnectorRedirectURI(req.RedirectURI, connectorEntity); err != nil {
+		glog.Warnf(ctx, "[svcauth.Authorize] invalid redirect uri, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.AuthLoginFailedError)
 	}
 	stateValue, err := svc.getStateGenerator()()
 	if err != nil {
@@ -395,12 +443,13 @@ func (svc *connectorSvc) Authorize(ctx *gin.Context, req *dtoconnector.Connector
 		return nil, err
 	}
 	if err := svc.getStateStore().Save(runtimeContext(ctx), &ConnectorState{
-		State:       stateValue,
-		Nonce:       result.Nonce,
-		ConnectorID: connectorEntity.ID,
-		TenantID:    connectorEntity.TenantID,
-		RedirectURI: req.RedirectURI,
-		ExpiredAt:   svc.getNowFunc()().Add(connectorStateTTL),
+		State:        stateValue,
+		Nonce:        result.Nonce,
+		ConnectorID:  connectorEntity.ID,
+		TenantID:     connectorEntity.TenantID,
+		RedirectURI:  req.RedirectURI,
+		ExpiredAt:    svc.getNowFunc()().Add(connectorStateTTL),
+		CodeVerifier: result.CodeVerifier,
 	}); err != nil {
 		glog.Errorf(ctx, "[svcauth.Authorize] save state fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.AuthLoginFailedError)
@@ -415,9 +464,11 @@ func (svc *connectorSvc) GetAuthorizationURL(ctx *gin.Context, req *dtoconnector
 }
 
 func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorCallbackReq) (*dtoauth.LoginResp, error) {
-	storedState, err := svc.getStateStore().Load(runtimeContext(ctx), req.State)
+	// 先原子消费 state（GetDel）：一次性使用，杜绝重放窗口；
+	// 消费失败（已使用/过期/伪造）直接拒绝，不再继续 exchange。
+	storedState, err := svc.getStateStore().Consume(runtimeContext(ctx), req.State)
 	if err != nil {
-		glog.Errorf(ctx, "[svcauth.Callback] load state fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		glog.Errorf(ctx, "[svcauth.Callback] consume state fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.AuthLoginFailedError)
 	}
 	if storedState == nil || storedState.ConnectorID == "" {
@@ -440,12 +491,13 @@ func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorC
 		return nil, err
 	}
 	callbackOutput, err := driver.ExchangeCallback(ctx, &ConnectorCallbackInput{
-		Config:      config,
-		ConnectorID: connectorID,
-		Code:        req.Code,
-		State:       req.State,
-		Nonce:       storedState.Nonce,
-		RedirectURI: storedState.RedirectURI,
+		Config:       config,
+		ConnectorID:  connectorID,
+		Code:         req.Code,
+		State:        req.State,
+		Nonce:        storedState.Nonce,
+		CodeVerifier: storedState.CodeVerifier,
+		RedirectURI:  storedState.RedirectURI,
 	})
 	if err != nil {
 		return nil, err
@@ -464,10 +516,6 @@ func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorC
 	if resolvedPerson == nil || resolvedPerson.Person == nil || resolvedPerson.Person.ID == "" {
 		return nil, code.GetError(code.UserNotExistError)
 	}
-	if _, err := svc.getStateStore().Consume(runtimeContext(ctx), req.State); err != nil {
-		glog.Errorf(ctx, "[svcauth.Callback] consume state fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.AuthLoginFailedError)
-	}
 
 	// Connector 登录成功后建立 SSO 会话，与账密/OIDC 登录走同一套 person 级中心会话；
 	// 不再签发独立 HS256 person token（token 统一为 OIDC RS256，见设计文档 §4.4）。
@@ -478,14 +526,8 @@ func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorC
 		return nil, code.GetError(code.AuthLoginFailedError)
 	}
 
-	authRuntime := &authSvc{}
-	tenantCtx := ctx
-	if tenantCtx == nil {
-		tenantCtx, _ = gin.CreateTestContext(nil)
-		req, _ := http.NewRequest(http.MethodPost, "/", nil)
-		tenantCtx.Request = req
-	}
-	_, tenants, err := authRuntime.listPersonTenants(tenantCtx, resolvedPerson.Person.ID)
+	// 走 AuthSvc 接口查询该 person 的租户列表（自动创建用户已在 Resolve 中建立租户成员）
+	tenants, err := svc.getAuthSvc().TenantsForPerson(ctx, resolvedPerson.Person.ID)
 	if err != nil {
 		return nil, err
 	}

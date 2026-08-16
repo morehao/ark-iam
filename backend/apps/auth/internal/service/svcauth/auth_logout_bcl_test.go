@@ -155,7 +155,7 @@ func TestLogoutEnqueuesBackChannelLogoutForPerson(t *testing.T) {
 	ginCtx.Set(gcontext.KeyPersonID, personID)
 
 	svc := NewAuthSvc()
-	require.NoError(t, svc.Logout(ginCtx, &dtoauth.LogoutReq{RefreshToken: "rt-bcl"}))
+	require.NoError(t, svc.Logout(ginCtx, &dtoauth.LogoutReq{}))
 
 	// Logout 使该 person 的登记被入队；轮询等待写入稳定
 	var job *sso.LogoutJob

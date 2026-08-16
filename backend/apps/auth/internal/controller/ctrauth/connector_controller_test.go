@@ -18,7 +18,7 @@ type stubConnectorSvc struct {
 	getFactoryListErr  error
 
 	testConnectorReq  *dtoconnector.ConnectorIDReq
-	testConnectorResp *dtoconnector.TestConnectorResp
+	testConnectorResp *dtoconnector.ConnectorTestResp
 	testConnectorErr  error
 
 	authorizeReq         *dtoconnector.ConnectorAuthorizeReq
@@ -60,7 +60,7 @@ func (s *stubConnectorSvc) ListFactories(ctx *gin.Context, req *dtoconnector.Con
 	panic("unexpected call")
 }
 
-func (s *stubConnectorSvc) TestConnector(ctx *gin.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.TestConnectorResp, error) {
+func (s *stubConnectorSvc) TestConnector(ctx *gin.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.ConnectorTestResp, error) {
 	s.testConnectorReq = req
 	return s.testConnectorResp, s.testConnectorErr
 }
@@ -143,7 +143,7 @@ func TestConnectorControllerAuthorize(t *testing.T) {
 func TestConnectorControllerTestConnector(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	svc := &stubConnectorSvc{
-		testConnectorResp: &dtoconnector.TestConnectorResp{Success: true, Message: "ok"},
+		testConnectorResp: &dtoconnector.ConnectorTestResp{Success: true, Message: "ok"},
 	}
 	ctr := &connectorCtr{connectorSvc: svc}
 

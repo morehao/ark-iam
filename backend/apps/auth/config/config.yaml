@@ -81,14 +81,22 @@ security:
     maxFailures: 5
     windowSec: 300
     lockSec: 900
+    # 登录/注册/改密码接口的 IP 频率限流参数（ratePerMinute=每分钟令牌数, burst=突发容量）
+    ratePerMinute: 30
+    burst: 10
 
+# 生产环境注意：
+#   - 以下密钥/口令均为开发用值，生产必须通过环境变量/密钥管理注入，禁止复用本文件值；
+#   - 非 dev 环境启动会强制校验：cookieSecure=true、allowInsecure=false、签名/加密密钥已配置。
 jwt:
-  signKey: "your-jwt-secret-key"
+  # 已废弃（token 统一为 OIDC RS256），仅保留结构兼容，可安全移除
+  signKey: ""
 
 oidc:
   issuer: "http://localhost:8081/oidc"
   frontendLoginURL: "http://localhost:3000/login"
   signingKeyID: "dev-oidc-key"
+  # 开发签名私钥（仓库内 dev 密钥，仅 dev 使用；生产必须换成独立私钥并外部化）
   signingPrivateKeyPath: "config/oidc-dev-key.pem"
   signingPrivateKeyPEM: ""
   encryptionKey: "oidc-dev-encryption-key-32bytes"

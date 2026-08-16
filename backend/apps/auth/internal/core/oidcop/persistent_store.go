@@ -3,10 +3,12 @@ package oidcop
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	jose "github.com/go-jose/go-jose/v4"
@@ -20,7 +22,12 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/ark-iam/pkg/token"
 	"github.com/morehao/golib/glog"
+	"gorm.io/gorm"
 )
+
+// errRefreshTokenReused 标记 refresh token 复用（已被并发轮换或撤销）。
+// 按 RFC 9706 §4.1 检测到复用时应撤销整个 token 家族。
+var errRefreshTokenReused = errors.New("refresh token reused")
 
 // persistentStoreOption 承载持久化存储的可注入配置。
 type persistentStoreOption struct {
@@ -44,6 +51,9 @@ type PersistentStore struct {
 	refreshTokenDao            func(opts ...dao.DaoOption) *dao.RefreshTokenDao
 	apiKeyDao                  func(opts ...dao.DaoOption) *dao.ApiKeyDao
 	issuer                     string
+	// db 返回用于事务的 DB 句柄（轮换原子性等）。默认全局 iam 库，
+	// 测试可注入独立 SQLite 连接。
+	db func(ctx context.Context) *gorm.DB
 }
 
 func NewPersistentStore(opts ...PersistentStoreOption) *PersistentStore {
@@ -59,7 +69,18 @@ func NewPersistentStore(opts ...PersistentStoreOption) *PersistentStore {
 		refreshTokenDao:            dao.NewRefreshTokenDao,
 		apiKeyDao:                  func(opts ...dao.DaoOption) *dao.ApiKeyDao { return dao.NewApiKeyDao() },
 		issuer:                     cfg.issuer,
+		db:                         dbclient.IamDB,
 	}
+}
+
+// txDB 返回事务用 DB；未注入时回退全局 iam 库。
+func (s *PersistentStore) txDB(ctx context.Context) *gorm.DB {
+	if s.db != nil {
+		if db := s.db(ctx); db != nil {
+			return db
+		}
+	}
+	return dbclient.IamDB(ctx)
 }
 
 func (s *PersistentStore) LookupApiKeyByRawKey(ctx context.Context, rawKey string) (*model.ApiKeyEntity, error) {
@@ -75,10 +96,13 @@ func (s *PersistentStore) LookupApiKeyByRawKey(ctx context.Context, rawKey strin
 	if entity.ExpiredAt != nil && entity.ExpiredAt.Before(time.Now()) {
 		return nil, nil
 	}
-	if err := s.apiKeyDao().UpdateMap(ctx, entity.ID, map[string]any{
-		"last_used_at": time.Now(),
-	}); err != nil {
-		glog.Warnf(ctx, "[PersistentStore.LookupApiKeyByRawKey] update last_used_at fail, apiKeyID:%s, err:%v", entity.ID, err)
+	// last_used_at 写入降频：一分钟窗口内不重复写，避免每个请求都触发一次 DB 写
+	if !entity.LastUsedAt.Valid || time.Since(entity.LastUsedAt.Time) > time.Minute {
+		if err := s.apiKeyDao().UpdateMap(ctx, entity.ID, map[string]any{
+			"last_used_at": time.Now(),
+		}); err != nil {
+			glog.Warnf(ctx, "[PersistentStore.LookupApiKeyByRawKey] update last_used_at fail, apiKeyID:%s, err:%v", entity.ID, err)
+		}
 	}
 	return entity, nil
 }
@@ -92,7 +116,8 @@ func (s *PersistentStore) GetApiKeyClientByRawKey(ctx context.Context, rawKey st
 }
 
 func (s *PersistentStore) GetClientByClientID(ctx context.Context, clientID string) (op.Client, error) {
-	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID})
+	// H4：仅返回启用状态的 client，管理员停用后 authorize/token/client_credentials 立即失效
+	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID, Status: model.ApplicationClientStatusEnable})
 	if err != nil || clientEntity == nil || clientEntity.ID == "" {
 		return nil, fmt.Errorf("client not found: %s", clientID)
 	}
@@ -103,7 +128,8 @@ func (s *PersistentStore) AuthorizeClientIDSecret(ctx context.Context, clientID,
 	secretHash := sha256.Sum256([]byte(clientSecret))
 	clientHash := hex.EncodeToString(secretHash[:])
 
-	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID})
+	// H4：停用 client 的 secret 一律拒绝
+	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID, Status: model.ApplicationClientStatusEnable})
 	if err != nil || clientEntity == nil || clientEntity.ID == "" {
 		return oidc.ErrInvalidClient()
 	}
@@ -112,7 +138,8 @@ func (s *PersistentStore) AuthorizeClientIDSecret(ctx context.Context, clientID,
 		return oidc.ErrInvalidClient()
 	}
 	for _, sec := range secrets {
-		if sec.ValueHash == clientHash && sec.RevokedAt == nil {
+		// H14：哈希比较使用恒定时间算法，避免时序侧信道
+		if subtle.ConstantTimeCompare([]byte(sec.ValueHash), []byte(clientHash)) == 1 && sec.RevokedAt == nil {
 			if sec.ExpiredAt == nil || sec.ExpiredAt.After(time.Now()) {
 				return nil
 			}
@@ -156,13 +183,16 @@ func (s *PersistentStore) SetUserinfoFromScopes(ctx context.Context, userinfo *o
 }
 
 // SetUserinfoFromToken 按 access token 签发时记录的 scope 裁剪 userinfo 声明（M2）。
-// 元数据不可得（Redis 不可用 / 未知 token）时仅返回 sub，不返回任何个人信息，
-// 避免绕过 scope 授权泄露 email/name 等声明。
+// 已被撤销（黑名单）或元数据不可得（Redis 不可用 / 未知 token）时返回 error，
+// 由 op 层拒绝请求（403），避免绕过 scope 授权泄露 email/name 等声明。
 func (s *PersistentStore) SetUserinfoFromToken(ctx context.Context, userinfo *oidc.UserInfo, tokenID, subject, origin string) error {
 	userinfo.Subject = subject
+	if isAccessTokenRevoked(ctx, tokenID) {
+		return errors.New("access token revoked")
+	}
 	meta := loadAccessTokenMeta(ctx, tokenID)
 	if meta == nil {
-		return nil
+		return errors.New("access token meta not found")
 	}
 	pid, err := ParseSubject(subject)
 	if err != nil {
@@ -178,11 +208,14 @@ func (s *PersistentStore) SetUserinfoFromToken(ctx context.Context, userinfo *oi
 
 // SetIntrospectionFromToken 返回 RFC 7662 规定的完整 introspection 响应（M1）：
 // scope/client_id/sub/exp/iat/token_type/username 及私有声明。
-// 元数据不可得时保持空响应（active 由 op 层在 SetIntrospectionFromToken 成功后置 true）。
+// 元数据不可得或 token 已被撤销时返回 error，op 层将保持 active=false。
 func (s *PersistentStore) SetIntrospectionFromToken(ctx context.Context, introspection *oidc.IntrospectionResponse, tokenID, subject, clientID string) error {
+	if isAccessTokenRevoked(ctx, tokenID) {
+		return errors.New("access token revoked")
+	}
 	meta := loadAccessTokenMeta(ctx, tokenID)
 	if meta == nil {
-		return nil
+		return errors.New("access token meta not found")
 	}
 	introspection.Scope = oidc.SpaceDelimitedArray(meta.Scopes)
 	introspection.ClientID = meta.ClientID
@@ -249,12 +282,32 @@ func (s *PersistentStore) CreateAccessToken(ctx context.Context, request op.Toke
 		return "", time.Time{}, fmt.Errorf("generate access token id: %w", err)
 	}
 
+	// sessionID：code 流且 client 未启用 refresh_token grant 时也走本方法，
+	// 此时从 AuthRequest 提取会话标识，保证这类 client 也能收到 back-channel 登出通知。
+	sessionID := ""
+	if authReq, ok := request.(*AuthRequest); ok {
+		sessionID = authReq.SessionID
+	}
+
 	ttl := 15 * time.Minute
+	var backChannelLogoutURI string
+	var clientID string
 	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok {
-		if entity, e := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: ccReq.ClientID()}); e == nil && entity != nil && entity.AccessTokenTTL > 0 {
+		clientID = ccReq.ClientID()
+		if entity, e := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID}); e == nil && entity != nil && entity.AccessTokenTTL > 0 {
 			ttl = time.Duration(entity.AccessTokenTTL) * time.Second
 		} else if e != nil {
-			glog.Warnf(ctx, "[PersistentStore.CreateAccessToken] load client ttl fail, clientID:%s, err:%v", ccReq.ClientID(), e)
+			glog.Warnf(ctx, "[PersistentStore.CreateAccessToken] load client ttl fail, clientID:%s, err:%v", clientID, e)
+		}
+	} else if authReq, ok := request.(*AuthRequest); ok {
+		clientID = authReq.GetClientID()
+		if clientID != "" {
+			if entity, e := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID}); e == nil && entity != nil {
+				backChannelLogoutURI = entity.BackChannelLogoutURI
+				if entity.AccessTokenTTL > 0 {
+					ttl = time.Duration(entity.AccessTokenTTL) * time.Second
+				}
+			}
 		}
 	}
 	expiration = time.Now().Add(ttl)
@@ -265,8 +318,22 @@ func (s *PersistentStore) CreateAccessToken(ctx context.Context, request op.Toke
 		IssuedAt:   time.Now(),
 		ExpiresAt:  expiration,
 		TenantID:   tenantIDFromRequest(request),
+		SessionID:  sessionID,
 		TokenUsage: tokenUsageFromRequest(request),
 	})
+	// back-channel 登记：与 CreateAccessAndRefreshTokens 对齐，覆盖"仅 access token"的 code 流
+	if sessionID != "" && backChannelLogoutURI != "" {
+		pid, perr := ParseSubject(request.GetSubject())
+		if perr == nil {
+			_ = sso.NewSLOStore().Register(ctx, sessionID, sso.LogoutRegistration{
+				OIDCSessionID:        accessTokenID,
+				ClientID:             clientID,
+				UserID:               BuildSubject(pid),
+				SessionID:            sessionID,
+				BackChannelLogoutURI: backChannelLogoutURI,
+			})
+		}
+	}
 	return accessTokenID, expiration, nil
 }
 
@@ -349,6 +416,11 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 	if authReq, ok := request.(*AuthRequest); ok {
 		sessionID = authReq.SessionID
 	}
+	if rr, ok := request.(*refreshTokenRequest); ok {
+		// 刷新轮换必须还原授权时持久化的会话标识（M4），否则刷新后的 token 丢失 sid，
+		// 无法再按会话粒度关联背信道登出与 id_token 的 sid 声明。
+		sessionID = rr.GetSessionID()
+	}
 
 	now := time.Now()
 	refreshTokenExp := now.Add(30 * 24 * time.Hour)
@@ -380,8 +452,43 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 	if currentRefreshToken != "" {
 		refreshEntity.LastRotatedAt = &now
 	}
-	if err := s.refreshTokenDao().Insert(ctx, refreshEntity); err != nil {
-		return "", "", time.Time{}, err
+
+	// S7：新行插入与旧行撤销放同一事务，且旧行撤销采用条件 UPDATE
+	// （WHERE token=? AND revoked_at IS NULL，行数=1 才算成功），
+	// 杜绝并发刷新时两个请求都通过校验、各自产出一套新 token 的分裂。
+	// 条件撤销命中 0 行说明旧 token 已被并发轮换/撤销 → 视为复用攻击
+	// （RFC 9706 §4.1），撤销该 person 全部 refresh token（token 家族）。
+	txErr := s.txDB(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(refreshEntity).Error; err != nil {
+			return err
+		}
+		if currentRefreshToken != "" {
+			oldTokenHash := token.HashToken(currentRefreshToken)
+			res := tx.Model(&model.RefreshTokenEntity{}).Table(model.TableNameRefreshToken).
+				Where("token = ? AND revoked_at IS NULL", oldTokenHash).
+				Update("revoked_at", &now)
+			if res.Error != nil {
+				return res.Error
+			}
+			if res.RowsAffected == 0 {
+				return errRefreshTokenReused
+			}
+		}
+		return nil
+	})
+	if txErr != nil {
+		if errors.Is(txErr, errRefreshTokenReused) {
+			// 复用：旧 token 家族全部作废（独立于回滚的事务执行）
+			glog.Warnf(ctx, "[PersistentStore.CreateAccessAndRefreshTokens] refresh token reused, revoke family, personID:%s", personID)
+			famErr := s.txDB(ctx).Model(&model.RefreshTokenEntity{}).Table(model.TableNameRefreshToken).
+				Where("person_id = ? AND revoked_at IS NULL", personID).
+				Update("revoked_at", &now).Error
+			if famErr != nil {
+				glog.Warnf(ctx, "[PersistentStore.CreateAccessAndRefreshTokens] revoke token family fail, personID:%s, err:%v", personID, famErr)
+			}
+			return "", "", time.Time{}, op.ErrInvalidRefreshToken
+		}
+		return "", "", time.Time{}, txErr
 	}
 
 	// 登出登记：有 SSO 会话 且 client 配置了 back_channel_logout_uri 时，登记该会话对该 client 的通知关系。
@@ -391,21 +498,9 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 			OIDCSessionID:        accessTokenID,
 			ClientID:             clientID,
 			UserID:               BuildSubject(personID),
+			SessionID:            sessionID,
 			BackChannelLogoutURI: backChannelLogoutURI,
 		})
-	}
-
-	if currentRefreshToken != "" {
-		oldTokenHash := token.HashToken(currentRefreshToken)
-		oldToken, err := s.refreshTokenDao().GetByCond(ctx, &dao.RefreshTokenCond{Token: oldTokenHash})
-		if err == nil && oldToken != nil && oldToken.ID != "" {
-			dbt := time.Now()
-			if err := s.refreshTokenDao().UpdateMap(ctx, oldToken.ID, map[string]any{
-				"revoked_at": &dbt,
-			}); err != nil {
-				return "", "", time.Time{}, err
-			}
-		}
 	}
 
 	// access token 元数据（M1/M2：introspection 与 userinfo 按 scope 裁剪）。
@@ -544,7 +639,7 @@ func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, c
 	}
 
 	now := time.Now()
-	dbErr := dbclient.IamDB(ctx).Model(&model.RefreshTokenEntity{}).Table(model.TableNameRefreshToken).
+	dbErr := s.txDB(ctx).Model(&model.RefreshTokenEntity{}).Table(model.TableNameRefreshToken).
 		Where("person_id = ?", personID).Where("revoked_at IS NULL").
 		Update("revoked_at", &now).Error
 	if dbErr != nil {
@@ -554,17 +649,30 @@ func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, c
 }
 
 func (s *PersistentStore) RevokeToken(ctx context.Context, tokenOrTokenID string, userID string, clientID string) *oidc.Error {
-	refreshTokenHash := token.HashToken(tokenOrTokenID)
-	storedToken, err := s.refreshTokenDao().GetByCond(ctx, &dao.RefreshTokenCond{Token: refreshTokenHash})
-	if err != nil || storedToken == nil || storedToken.ID == "" {
+	if tokenOrTokenID == "" {
 		return nil
 	}
-	now := time.Now()
-	if updateErr := s.refreshTokenDao().UpdateMap(ctx, storedToken.ID, map[string]any{
-		"revoked_at": &now,
-	}); updateErr != nil {
-		glog.Warnf(ctx, "[PersistentStore.RevokeToken] update revoked_at fail, tokenID:%s, err:%v", storedToken.ID, updateErr)
+	// access token jti（at- 前缀）→ 加入 Redis 黑名单，使 OP 侧 userinfo/introspection 拒绝
+	if strings.HasPrefix(tokenOrTokenID, "at-") {
+		revokeAccessToken(ctx, tokenOrTokenID)
 		return nil
+	}
+	// refresh token 行 ID → 按主键撤销（RFC 7009：GetRefreshTokenInfo 返回行 ID 后由 op 传入）
+	q := s.txDB(ctx).Model(&model.RefreshTokenEntity{}).Table(model.TableNameRefreshToken).
+		Where("id = ?", tokenOrTokenID)
+	if userID != "" {
+		if pid, perr := ParseSubject(userID); perr == nil {
+			q = q.Where("person_id = ?", pid)
+		}
+	}
+	if clientID != "" {
+		if entity, cErr := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID}); cErr == nil && entity != nil && entity.ID != "" {
+			q = q.Where("application_client_id = ?", entity.ID)
+		}
+	}
+	now := time.Now()
+	if updateErr := q.Update("revoked_at", &now).Error; updateErr != nil {
+		glog.Warnf(ctx, "[PersistentStore.RevokeToken] update revoked_at fail, tokenID:%s, err:%v", tokenOrTokenID, updateErr)
 	}
 	return nil
 }
@@ -575,5 +683,20 @@ func (s *PersistentStore) GetRefreshTokenInfo(ctx context.Context, clientID stri
 	if err != nil || storedToken == nil || storedToken.ID == "" {
 		return "", "", op.ErrInvalidRefreshToken
 	}
-	return BuildSubject(storedToken.PersonID), "", nil
+	if storedToken.RevokedAt != nil {
+		return "", "", op.ErrInvalidRefreshToken
+	}
+	if storedToken.ExpiredAt == nil || !storedToken.ExpiredAt.After(time.Now()) {
+		return "", "", op.ErrInvalidRefreshToken
+	}
+	// RFC 7009 §2.1：token 必须属于发起撤销请求的 client
+	if clientID != "" {
+		if entity, cErr := s.applicationClientDao().GetByID(ctx, storedToken.ApplicationClientID); cErr == nil && entity != nil && entity.Code != "" {
+			if entity.Code != clientID {
+				return "", "", op.ErrInvalidRefreshToken
+			}
+		}
+	}
+	// 返回行 ID（而非空串）：zitadel 撤销流程会用它作为待撤销 token 传给 RevokeToken
+	return BuildSubject(storedToken.PersonID), storedToken.ID, nil
 }

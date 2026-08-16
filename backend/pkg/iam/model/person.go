@@ -11,8 +11,9 @@ const TableNamePerson = "person"
 
 type PersonEntity struct {
 	gormdao.BaseEntity
-	// Username/PrimaryEmail/PrimaryPhone 为可选全局标识，空值存 NULL：
-	// 三者均有唯一索引，若空值存 '' 则仅允许一条空记录，后续创建无该标识的用户会撞唯一键。
+	// Username/PrimaryEmail/PrimaryPhone 为可选全局标识，空值存 NULL。
+	// 唯一性由部分唯一索引保证（WHERE deleted_at IS NULL，见 automigrate.go
+	// EnsurePartialUniqueIndexes），软删除记录不占用标识、也不与新增记录冲突。
 	Username          *string         `gorm:"column:username;type:varchar(128);default:null;comment:全局用户名"`
 	PrimaryEmail      *string         `gorm:"column:primary_email;type:varchar(128);default:null;comment:主要邮箱"`
 	PrimaryPhone      *string         `gorm:"column:primary_phone;type:varchar(128);default:null;comment:主要手机号"`

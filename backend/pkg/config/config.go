@@ -98,6 +98,11 @@ type Server struct {
 	Name string `yaml:"name"` // 服务名称
 	Port string `yaml:"port"` // 服务端口
 	Env  string `yaml:"env"`  // 环境变量
+	// TrustedProxies 是可信反向代理的 CIDR 列表（如 ["10.0.0.0/8"]）。
+	// 配置后 gin 仅从这些代理透传的 X-Forwarded-For 取客户端 IP；
+	// 未配置时默认不信任任何代理（直接使用 RemoteAddr），
+	// 防止客户端伪造 X-Forwarded-For 绕过按 IP 维度的限流/登录锁定。
+	TrustedProxies []string `yaml:"trustedProxies"`
 }
 
 // DBConfig 数据库启动行为配置。

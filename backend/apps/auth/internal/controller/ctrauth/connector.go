@@ -57,7 +57,7 @@ func (ctr *connectorCtr) Create(ctx *gin.Context) {
 // @Summary 删除连接器
 // @accept application/json
 // @Produce application/json
-// @Param connectorID path int true "连接器ID"
+// @Param connectorID path string true "连接器ID"
 // @Success 200 {object} gincontext.DtoRender{data=string}
 // @Router /v1/auth/connectors/{connectorID} [delete]
 func (ctr *connectorCtr) Delete(ctx *gin.Context) {
@@ -77,7 +77,7 @@ func (ctr *connectorCtr) Delete(ctx *gin.Context) {
 // @Summary 修改连接器
 // @accept application/json
 // @Produce application/json
-// @Param connectorID path int true "连接器ID"
+// @Param connectorID path string true "连接器ID"
 // @Param req body dtoauth.ConnectorUpdateReq true "修改连接器"
 // @Success 200 {object} gincontext.DtoRender{data=string}
 // @Router /v1/auth/connectors/{connectorID} [put]
@@ -102,7 +102,7 @@ func (ctr *connectorCtr) Update(ctx *gin.Context) {
 // @Summary 连接器详情
 // @accept application/json
 // @Produce application/json
-// @Param connectorID path int true "连接器ID"
+// @Param connectorID path string true "连接器ID"
 // @Success 200 {object} gincontext.DtoRender{data=dtoauth.ConnectorDetailResp}
 // @Router /v1/auth/connectors/{connectorID} [get]
 func (ctr *connectorCtr) Detail(ctx *gin.Context) {
@@ -165,7 +165,7 @@ func (ctr *connectorCtr) GetFactoryList(ctx *gin.Context) {
 // @Summary 测试连接器
 // @accept application/json
 // @Produce application/json
-// @Param connectorID path int true "连接器ID"
+// @Param connectorID path string true "连接器ID"
 // @Success 200 {object} gincontext.DtoRender{data=dtoconnector.TestConnectorResp}
 // @Router /v1/auth/connectors/{connectorID}/test [post]
 func (ctr *connectorCtr) TestConnector(ctx *gin.Context) {
@@ -186,7 +186,7 @@ func (ctr *connectorCtr) TestConnector(ctx *gin.Context) {
 // @Summary 连接器授权
 // @accept application/json
 // @Produce application/json
-// @Param connectorID path int true "连接器ID"
+// @Param connectorID path string true "连接器ID"
 // @Param req body dtoconnector.ConnectorAuthorizeReq true "连接器授权"
 // @Success 200 {object} gincontext.DtoRender{data=dtoconnector.ConnectorAuthorizeResp}
 // @Router /v1/auth/connectors/{connectorID}/authorize [post]

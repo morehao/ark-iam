@@ -9,12 +9,15 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/auth/testutil"
 	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/golib/biz/gcontext"
 )
 
 func TestSessionListReturnsPersonAwareTenantSessions(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 	ginCtx.Request = req
+	ginCtx.Set(gcontext.KeyPersonID, "101")
+	ginCtx.Set(gcontext.KeyTenantID, "11")
 
 	db := testutil.SetupSQLite(t, &model.RefreshTokenEntity{})
 	expiresAt := time.Now().Add(time.Hour)
@@ -47,7 +50,7 @@ func TestSessionListReturnsPersonAwareTenantSessions(t *testing.T) {
 	}
 
 	svc := &sessionSvc{}
-	resp, err := svc.List(ginCtx, &dtouser.SessionListReq{}, "101", "21", "11")
+	resp, err := svc.List(ginCtx, &dtouser.SessionListReq{})
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
 	}

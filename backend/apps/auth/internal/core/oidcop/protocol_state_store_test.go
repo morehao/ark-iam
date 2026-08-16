@@ -93,19 +93,16 @@ func TestSaveAndConsumeCode(t *testing.T) {
 	err = store.SaveAuthCode(context.Background(), req.GetID(), code)
 	require.NoError(t, err)
 
-	// Lookup by code (non-consuming)
+	// S3：AuthRequestByCode 即原子消费（GetDel + spent 防重放标记），首次兑换成功
 	found, err := store.AuthRequestByCode(context.Background(), code)
 	require.NoError(t, err)
 	assert.Equal(t, req.GetID(), found.GetID())
 	assert.True(t, found.Done())
 
-	// Consume the code
-	found, err = store.ConsumeAuthCode(context.Background(), code)
-	require.NoError(t, err)
-	assert.Equal(t, req.GetID(), found.GetID())
-
-	// After consume, AuthRequestByCode should return ErrCodeAlreadyUsed
+	// 二次兑换（并发/顺序重放）一律拒绝
 	_, err = store.AuthRequestByCode(context.Background(), code)
+	assert.ErrorIs(t, err, ErrCodeAlreadyUsed)
+	_, err = store.ConsumeAuthCode(context.Background(), code)
 	assert.ErrorIs(t, err, ErrCodeAlreadyUsed)
 }
 

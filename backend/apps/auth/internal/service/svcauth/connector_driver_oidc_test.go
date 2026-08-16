@@ -223,7 +223,7 @@ func TestOIDCDriverExchangeCallbackReturnsStandardIdentity(t *testing.T) {
 				userInfo: fakeOIDCUserInfo{claims: map[string]any{"email": "oidc@example.com", "name": "OIDC User", "picture": "https://cdn.example.com/oidc.png"}},
 			}, nil
 		},
-		tokenExchanger: func(ctx context.Context, config oauth2.Config, code string) (*oauth2.Token, error) {
+		tokenExchanger: func(ctx context.Context, config oauth2.Config, code string, _ string) (*oauth2.Token, error) {
 			if code != "oidc-code" {
 				t.Fatalf("expected exchange code oidc-code, got %q", code)
 			}

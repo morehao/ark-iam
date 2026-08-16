@@ -57,7 +57,7 @@ func TestFailOpenWhenRedisNil(t *testing.T) {
 	ctx := context.Background()
 	assert.False(t, Check(ctx, "1.2.3.4", "100"))
 	assert.NotPanics(t, func() { RecordFailure(ctx, "1.2.3.4", "100") })
-	assert.NotPanics(t, func() { RecordSuccess(ctx, "100") })
+	assert.NotPanics(t, func() { RecordSuccess(ctx, "", "100") })
 }
 
 func TestGuardCounterAndLock(t *testing.T) {
@@ -87,9 +87,9 @@ func TestGuardCounterAndLock(t *testing.T) {
 	RecordFailure(ctx, ip, pid)
 	assert.True(t, Check(ctx, ip, pid), "locked after threshold")
 
-	// success clears the person-side lock; a second-chance login still sees
-	// the person cleared but IP remains locked, so verify via a fresh person
-	RecordSuccess(ctx, pid)
+	// success clears both person-side and IP-side locks (H9: shared NAT IP 下
+	// 成功登录应解锁出口 IP，避免误锁整个网段)
+	RecordSuccess(ctx, ip, pid)
 	assert.False(t, Check(ctx, "other-ip", pid), "person unlocked after success")
-	assert.True(t, Check(ctx, ip, pid), "ip lock persists after success (person only cleared)")
+	assert.False(t, Check(ctx, ip, pid), "ip lock cleared after success")
 }

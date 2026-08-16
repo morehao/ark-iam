@@ -22,7 +22,10 @@ func OIDCBusinessAuthOptions() []pkgmiddleware.AuthOption {
 	opts = append(opts,
 		pkgmiddleware.WithAuthSkipPaths(
 			"/v1/auth/register",
-			"/v1/auth/connector/callback",
+			// 注意：必须与 router/auth.go 中注册的路由完全一致（复数 connectors）。
+			// 第三方 IdP 回调（GET，无 Authorization 头）若被鉴权中间件拦截将直接 401，
+			// 导致连接器登录不可用（曾有单复数拼写不一致的回归）。
+			"/v1/auth/connectors/callback",
 		),
 		pkgmiddleware.WithOIDCSSOValidation(func(ctx *gin.Context, personID string, isMachineToken bool) bool {
 			// 机器凭证（client_credentials/API Key）不依赖浏览器 SSO 会话活性，直接放行

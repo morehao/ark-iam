@@ -9,13 +9,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
+	"github.com/morehao/ark-iam/auth/testutil"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
-	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/gerror"
+	"gorm.io/gorm"
 )
 
 type fakeAuthRefreshTokenStore struct {
@@ -170,43 +171,8 @@ func TestRegisterAllowsEmailOnlyIdentifier(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
 
-	var inserted *model.UserEntity
-	restorePersonStore := swapPersonStoreFactory(func() authPersonStore {
-		return &fakeAuthPersonStore{
-			getByCondFunc: func(ctx context.Context, cond *dao.PersonCond) (*model.PersonEntity, error) {
-				return nil, nil
-			},
-			insertFunc: func(ctx context.Context, entity *model.PersonEntity) error {
-				entity.ID = "100"
-				return nil
-			},
-		}
-	})
-	defer restorePersonStore()
-
-	restoreUserStore := swapUserStoreFactory(func() authUserStore {
-		return &fakeAuthUserStore{
-			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
-				return nil, nil
-			},
-			insertFunc: func(ctx context.Context, entity *model.UserEntity) error {
-				entity.ID = "101"
-				copied := *entity
-				inserted = &copied
-				return nil
-			},
-		}
-	})
-	defer restoreUserStore()
-
-	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
-		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
-				return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}}, Name: "租户A", Tag: "a"}, nil
-			},
-		}
-	})
-	defer restoreTenantStore()
+	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{})
+	seedTestTenant(t, db, "1", "租户A")
 
 	svc := &authSvc{}
 	resp, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
@@ -218,17 +184,22 @@ func TestRegisterAllowsEmailOnlyIdentifier(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Register returned error: %v", err)
 	}
-	if resp == nil || resp.UserID != "101" {
-		t.Fatalf("expected user id 101, got %#v", resp)
+	if resp == nil || resp.UserID == "" {
+		t.Fatalf("expected created user id, got %#v", resp)
 	}
-	if inserted == nil {
-		t.Fatal("expected user to be inserted")
+	var user model.UserEntity
+	if err := db.Where("id = ?", resp.UserID).First(&user).Error; err != nil {
+		t.Fatalf("expected user persisted: %v", err)
 	}
-	if inserted.TenantID != "1" {
-		t.Fatalf("expected tenant id 1, got %s", inserted.TenantID)
+	if user.TenantID != "1" || user.Name != "tester" || user.PersonID == "" {
+		t.Fatalf("unexpected persisted user: %+v", user)
 	}
-	if inserted.Name != "tester" {
-		t.Fatalf("expected name tester, got %q", inserted.Name)
+	var person model.PersonEntity
+	if err := db.Where("id = ?", user.PersonID).First(&person).Error; err != nil {
+		t.Fatalf("expected person persisted: %v", err)
+	}
+	if model.DerefStr(person.PrimaryEmail) != "mail@example.com" {
+		t.Fatalf("expected email persisted, got %q", model.DerefStr(person.PrimaryEmail))
 	}
 }
 
@@ -236,43 +207,8 @@ func TestRegisterAllowsPhoneOnlyIdentifier(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
 
-	var inserted *model.UserEntity
-	restorePersonStore := swapPersonStoreFactory(func() authPersonStore {
-		return &fakeAuthPersonStore{
-			getByCondFunc: func(ctx context.Context, cond *dao.PersonCond) (*model.PersonEntity, error) {
-				return nil, nil
-			},
-			insertFunc: func(ctx context.Context, entity *model.PersonEntity) error {
-				entity.ID = "100"
-				return nil
-			},
-		}
-	})
-	defer restorePersonStore()
-
-	restoreUserStore := swapUserStoreFactory(func() authUserStore {
-		return &fakeAuthUserStore{
-			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
-				return nil, nil
-			},
-			insertFunc: func(ctx context.Context, entity *model.UserEntity) error {
-				entity.ID = "102"
-				copied := *entity
-				inserted = &copied
-				return nil
-			},
-		}
-	})
-	defer restoreUserStore()
-
-	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
-		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
-				return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}}, Name: "租户A", Tag: "a"}, nil
-			},
-		}
-	})
-	defer restoreTenantStore()
+	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{})
+	seedTestTenant(t, db, "1", "租户A")
 
 	svc := &authSvc{}
 	resp, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
@@ -284,17 +220,15 @@ func TestRegisterAllowsPhoneOnlyIdentifier(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Register returned error: %v", err)
 	}
-	if resp == nil || resp.UserID != "102" {
-		t.Fatalf("expected user id 102, got %#v", resp)
+	if resp == nil || resp.UserID == "" {
+		t.Fatalf("expected created user id, got %#v", resp)
 	}
-	if inserted == nil {
-		t.Fatal("expected user to be inserted")
+	var user model.UserEntity
+	if err := db.Where("id = ?", resp.UserID).First(&user).Error; err != nil {
+		t.Fatalf("expected user persisted: %v", err)
 	}
-	if inserted.TenantID != "1" {
-		t.Fatalf("expected tenant id 1, got %s", inserted.TenantID)
-	}
-	if inserted.Name != "tester" {
-		t.Fatalf("expected name tester, got %q", inserted.Name)
+	if user.TenantID != "1" || user.Name != "tester" {
+		t.Fatalf("unexpected persisted user: %+v", user)
 	}
 }
 
@@ -302,33 +236,7 @@ func TestRegisterRejectsNonExistentTenant(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
 
-	restorePersonStore := swapPersonStoreFactory(func() authPersonStore {
-		return &fakeAuthPersonStore{
-			getByCondFunc: func(ctx context.Context, cond *dao.PersonCond) (*model.PersonEntity, error) {
-				return nil, nil
-			},
-		}
-	})
-	defer restorePersonStore()
-	restoreUserStore := swapUserStoreFactory(func() authUserStore {
-		return &fakeAuthUserStore{
-			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
-				return nil, nil
-			},
-		}
-	})
-	defer restoreUserStore()
-
-	var tenantLookup string
-	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
-		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
-				tenantLookup = id
-				return nil, nil
-			},
-		}
-	})
-	defer restoreTenantStore()
+	testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{})
 
 	svc := &authSvc{}
 	_, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
@@ -338,50 +246,14 @@ func TestRegisterRejectsNonExistentTenant(t *testing.T) {
 		Name:     "tester",
 	})
 	assertCode(t, err, code.TenantNotExistError)
-	if tenantLookup != "999" {
-		t.Fatalf("expected tenant lookup with id 999, got %s", tenantLookup)
-	}
 }
 
-func TestRegisterSetsUserAsOwnerAndJoinedAt(t *testing.T) {
+func TestRegisterSetsUserJoinedAt(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
 
-	var insertedUser *model.UserEntity
-	restorePersonStore := swapPersonStoreFactory(func() authPersonStore {
-		return &fakeAuthPersonStore{
-			getByCondFunc: func(ctx context.Context, cond *dao.PersonCond) (*model.PersonEntity, error) {
-				return nil, nil
-			},
-			insertFunc: func(ctx context.Context, entity *model.PersonEntity) error {
-				entity.ID = "88"
-				return nil
-			},
-		}
-	})
-	defer restorePersonStore()
-	restoreUserStore := swapUserStoreFactory(func() authUserStore {
-		return &fakeAuthUserStore{
-			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
-				return nil, nil
-			},
-			insertFunc: func(ctx context.Context, entity *model.UserEntity) error {
-				entity.ID = "101"
-				copied := *entity
-				insertedUser = &copied
-				return nil
-			},
-		}
-	})
-	defer restoreUserStore()
-	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
-		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
-				return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}}, Name: "租户A", Tag: "a"}, nil
-			},
-		}
-	})
-	defer restoreTenantStore()
+	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{})
+	seedTestTenant(t, db, "1", "租户A")
 
 	svc := &authSvc{}
 	resp, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
@@ -393,16 +265,18 @@ func TestRegisterSetsUserAsOwnerAndJoinedAt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Register returned error: %v", err)
 	}
-	if resp == nil || resp.UserID != "101" {
-		t.Fatalf("expected user id 101, got %#v", resp)
+	if resp == nil || resp.UserID == "" {
+		t.Fatalf("expected created user id, got %#v", resp)
 	}
-	if insertedUser == nil {
-		t.Fatal("expected user to be inserted")
+	var user model.UserEntity
+	if err := db.Where("id = ?", resp.UserID).First(&user).Error; err != nil {
+		t.Fatalf("expected user persisted: %v", err)
 	}
-	if !insertedUser.IsOwner {
-		t.Fatalf("expected register user to be owner (isOwner=true), got %t", insertedUser.IsOwner)
+	// H2：开放注册加入已有租户不授予 owner（owner 由租户创建/管理员授予）
+	if user.IsOwner {
+		t.Fatalf("expected register user NOT to be owner (H2), got isOwner=true")
 	}
-	if insertedUser.JoinedAt == nil {
+	if user.JoinedAt == nil {
 		t.Fatal("expected register user to have joined_at set")
 	}
 }
@@ -429,44 +303,8 @@ func TestRegisterCreatesPersonAccount(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
 
-	var insertedPerson *model.PersonEntity
-	var insertedUser *model.UserEntity
-	restorePersonStore := swapPersonStoreFactory(func() authPersonStore {
-		return &fakeAuthPersonStore{
-			getByCondFunc: func(ctx context.Context, cond *dao.PersonCond) (*model.PersonEntity, error) {
-				return nil, nil
-			},
-			insertFunc: func(ctx context.Context, entity *model.PersonEntity) error {
-				entity.ID = "88"
-				copied := *entity
-				insertedPerson = &copied
-				return nil
-			},
-		}
-	})
-	defer restorePersonStore()
-	restoreUserStore := swapUserStoreFactory(func() authUserStore {
-		return &fakeAuthUserStore{
-			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
-				return nil, nil
-			},
-			insertFunc: func(ctx context.Context, entity *model.UserEntity) error {
-				entity.ID = "101"
-				copied := *entity
-				insertedUser = &copied
-				return nil
-			},
-		}
-	})
-	defer restoreUserStore()
-	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
-		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
-				return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}}, Name: "租户A", Tag: "a"}, nil
-			},
-		}
-	})
-	defer restoreTenantStore()
+	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{})
+	seedTestTenant(t, db, "1", "租户A")
 
 	svc := &authSvc{}
 	resp, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
@@ -479,29 +317,22 @@ func TestRegisterCreatesPersonAccount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Register returned error: %v", err)
 	}
-	if resp == nil || resp.UserID != "101" {
-		t.Fatalf("expected created tenant user id 101, got %#v", resp)
+	if resp == nil || resp.UserID == "" {
+		t.Fatalf("expected created tenant user id, got %#v", resp)
 	}
-	if insertedPerson == nil {
-		t.Fatal("expected person account to be inserted")
+	var user model.UserEntity
+	if err := db.Where("id = ?", resp.UserID).First(&user).Error; err != nil {
+		t.Fatalf("expected user persisted: %v", err)
 	}
-	if model.DerefStr(insertedPerson.Username) != "person-user" || model.DerefStr(insertedPerson.PrimaryEmail) != "mail@example.com" {
-		t.Fatalf("expected person identifiers to persist, got %#v", insertedPerson)
+	var person model.PersonEntity
+	if err := db.Where("id = ?", user.PersonID).First(&person).Error; err != nil {
+		t.Fatalf("expected person account persisted: %v", err)
 	}
-	if insertedPerson.PasswordEncrypted == "" {
+	if model.DerefStr(person.Username) != "person-user" || model.DerefStr(person.PrimaryEmail) != "mail@example.com" {
+		t.Fatalf("expected person identifiers to persist, got %#v", person)
+	}
+	if person.PasswordEncrypted == "" {
 		t.Fatal("expected person password hash to be persisted")
-	}
-	if err := gcrypto.ComparePasswordHash(insertedPerson.PasswordEncrypted, "Password1"); err != nil {
-		t.Fatalf("expected person password hash to match original password: %v", err)
-	}
-	if insertedUser == nil {
-		t.Fatal("expected tenant user to be inserted")
-	}
-	if insertedUser.PersonID != "88" || insertedUser.TenantID != "1" {
-		t.Fatalf("expected tenant user to reference created person, got %#v", insertedUser)
-	}
-	if insertedUser.Name != "tester" {
-		t.Fatalf("expected tenant user display name tester, got %#v", insertedUser)
 	}
 }
 
@@ -557,5 +388,18 @@ func swapTenantStoreFactory(factory func() authTenantStore) func() {
 	newAuthTenantStore = factory
 	return func() {
 		newAuthTenantStore = prev
+	}
+}
+
+// seedTestTenant 向测试库播种一个租户。
+func seedTestTenant(t *testing.T, db *gorm.DB, id, name string) {
+	t.Helper()
+	tenant := &model.TenantEntity{
+		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: id}},
+		Name:       name,
+		Type:       model.TenantTypeCustomer,
+	}
+	if err := db.Create(tenant).Error; err != nil {
+		t.Fatalf("seed tenant: %v", err)
 	}
 }

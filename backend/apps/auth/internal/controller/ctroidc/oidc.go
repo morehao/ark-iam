@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/config"
+	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/auth/internal/middleware"
 	"github.com/morehao/ark-iam/auth/internal/service/svcoidc"
@@ -170,7 +171,13 @@ func (ctr *OIDCCtr) ProviderHandler() gin.HandlerFunc {
 
 // EndSession 处理 RP-Initiated Logout（/oidc/end_session）：
 // 先清除 SSO 中心会话 cookie（L2），再交给 provider 完成协议侧登出。
+// 无 id_token_hint 时，把 SSO cookie 会话 ID 放入 request context，
+// 供 storage 回退按会话确定撤销目标（H15）。
 func (ctr *OIDCCtr) EndSession(ctx *gin.Context) {
+	if sessionID, err := ctx.Cookie(sso.SessionCookieName); err == nil && sessionID != "" {
+		reqCtx := context.WithValue(ctx.Request.Context(), oidcop.SSOSessionHintKey, sessionID)
+		ctx.Request = ctx.Request.WithContext(reqCtx)
+	}
 	clearSSOCookie(ctx)
 	ctr.ProviderHandler()(ctx)
 }

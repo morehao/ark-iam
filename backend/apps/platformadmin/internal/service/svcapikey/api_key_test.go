@@ -25,7 +25,7 @@ func TestCreateApiKey(t *testing.T) {
 	req := &dtoapikey.ApiKeyCreateReq{
 		Name: "My Test Key",
 	}
-	resp, err := svc.Create(newTestGinCtx("1"), "1", req)
+	resp, err := svc.Create(newTestGinCtx("1"), req)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestCreateApiKeyCapturesOwnerUser(t *testing.T) {
 	req := &dtoapikey.ApiKeyCreateReq{
 		Name: "Owner-bound Key",
 	}
-	resp, err := svc.Create(ctx, "1", req)
+	resp, err := svc.Create(ctx, req)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -84,13 +84,13 @@ func TestCreateApiKeyReturnsKeyOnlyOnce(t *testing.T) {
 	_ = db.AutoMigrate(&model.ApiKeyEntity{})
 
 	req := &dtoapikey.ApiKeyCreateReq{Name: "One-time Key"}
-	resp, err := svc.Create(newTestGinCtx("1"), "1", req)
+	resp, err := svc.Create(newTestGinCtx("1"), req)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 	key := resp.Key
 
-	pageResp, err := svc.PageList(newTestGinCtx("1"), "1", &dtoapikey.ApiKeyPageListReq{Name: "One-time Key"})
+	pageResp, err := svc.PageList(newTestGinCtx("1"), &dtoapikey.ApiKeyPageListReq{Name: "One-time Key"})
 	if err != nil {
 		t.Fatalf("PageList failed: %v", err)
 	}
@@ -112,16 +112,16 @@ func TestRevokeApiKey(t *testing.T) {
 	_ = db.AutoMigrate(&model.ApiKeyEntity{})
 
 	req := &dtoapikey.ApiKeyCreateReq{Name: "Revokable Key"}
-	resp, err := svc.Create(newTestGinCtx("1"), "1", req)
+	resp, err := svc.Create(newTestGinCtx("1"), req)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Revoke(newTestGinCtx("1"), "1", &dtoapikey.RevokeApiKeyReq{ApiKeyID: resp.ID}); err != nil {
+	if err := svc.Revoke(newTestGinCtx("1"), &dtoapikey.RevokeApiKeyReq{ApiKeyID: resp.ID}); err != nil {
 		t.Fatalf("Revoke failed: %v", err)
 	}
 
-	pageResp, err := svc.PageList(newTestGinCtx("1"), "1", &dtoapikey.ApiKeyPageListReq{Name: "Revokable Key"})
+	pageResp, err := svc.PageList(newTestGinCtx("1"), &dtoapikey.ApiKeyPageListReq{Name: "Revokable Key"})
 	if err != nil {
 		t.Fatalf("PageList failed: %v", err)
 	}
@@ -140,16 +140,16 @@ func TestDeleteApiKey(t *testing.T) {
 	_ = db.AutoMigrate(&model.ApiKeyEntity{})
 
 	req := &dtoapikey.ApiKeyCreateReq{Name: "Deletable Key"}
-	resp, err := svc.Create(newTestGinCtx("1"), "1", req)
+	resp, err := svc.Create(newTestGinCtx("1"), req)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(newTestGinCtx("1"), "1", &dtoapikey.ApiKeyDeleteReq{ApiKeyID: resp.ID}); err != nil {
+	if err := svc.Delete(newTestGinCtx("1"), &dtoapikey.ApiKeyDeleteReq{ApiKeyID: resp.ID}); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	pageResp, err := svc.PageList(newTestGinCtx("1"), "1", &dtoapikey.ApiKeyPageListReq{Name: "Deletable Key"})
+	pageResp, err := svc.PageList(newTestGinCtx("1"), &dtoapikey.ApiKeyPageListReq{Name: "Deletable Key"})
 	if err != nil {
 		t.Fatalf("PageList failed: %v", err)
 	}
@@ -166,13 +166,13 @@ func TestPageListApiKey(t *testing.T) {
 
 	for i := 0; i < 3; i++ {
 		req := &dtoapikey.ApiKeyCreateReq{Name: "Batch Key"}
-		_, err := svc.Create(newTestGinCtx("1"), "1", req)
+		_, err := svc.Create(newTestGinCtx("1"), req)
 		if err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 	}
 
-	pageResp, err := svc.PageList(newTestGinCtx("1"), "1", &dtoapikey.ApiKeyPageListReq{Name: "Batch Key"})
+	pageResp, err := svc.PageList(newTestGinCtx("1"), &dtoapikey.ApiKeyPageListReq{Name: "Batch Key"})
 	if err != nil {
 		t.Fatalf("PageList failed: %v", err)
 	}
@@ -196,23 +196,23 @@ func TestCrossTenantIsolation(t *testing.T) {
 	_ = db.AutoMigrate(&model.ApiKeyEntity{})
 
 	req1 := &dtoapikey.ApiKeyCreateReq{Name: "Tenant A Key"}
-	resp1, err := svc.Create(newTestGinCtx("1"), "1", req1)
+	resp1, err := svc.Create(newTestGinCtx("1"), req1)
 	if err != nil {
 		t.Fatalf("Create tenant 1 failed: %v", err)
 	}
 
 	req2 := &dtoapikey.ApiKeyCreateReq{Name: "Tenant B Key"}
-	_, err = svc.Create(newTestGinCtx("2"), "2", req2)
+	_, err = svc.Create(newTestGinCtx("2"), req2)
 	if err != nil {
 		t.Fatalf("Create tenant 2 failed: %v", err)
 	}
 
-	pageResp1, err := svc.PageList(newTestGinCtx("1"), "1", &dtoapikey.ApiKeyPageListReq{})
+	pageResp1, err := svc.PageList(newTestGinCtx("1"), &dtoapikey.ApiKeyPageListReq{})
 	if err != nil {
 		t.Fatalf("PageList tenant 1 failed: %v", err)
 	}
 
-	pageResp2, err := svc.PageList(newTestGinCtx("2"), "2", &dtoapikey.ApiKeyPageListReq{})
+	pageResp2, err := svc.PageList(newTestGinCtx("2"), &dtoapikey.ApiKeyPageListReq{})
 	if err != nil {
 		t.Fatalf("PageList tenant 2 failed: %v", err)
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
+	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -40,6 +41,17 @@ func (f *fakeConnectorPersonRepository) Insert(ctx context.Context, person *mode
 		return nil
 	}
 	return f.insertFunc(ctx, person)
+}
+
+type fakeConnectorUserRepository struct {
+	insertFunc func(ctx context.Context, user *model.UserEntity) error
+}
+
+func (f *fakeConnectorUserRepository) Insert(ctx context.Context, user *model.UserEntity) error {
+	if f.insertFunc == nil {
+		return nil
+	}
+	return f.insertFunc(ctx, user)
 }
 
 type fakeConnectorUserIdentityRepository struct {
@@ -183,7 +195,7 @@ func TestBuildConnectorInsertEntityKeepsLegacyBusinessIdentifier(t *testing.T) {
 		},
 	}
 
-	entity, err := buildConnectorInsertEntity(req, "99")
+	entity, err := buildConnectorInsertEntity(req, "99", "created-by")
 	if err != nil {
 		t.Fatalf("buildConnectorInsertEntity returned error: %v", err)
 	}
@@ -223,7 +235,7 @@ func TestBuildConnectorInsertEntityDoesNotPersistLegacyMetadataAsClaimMapping(t 
 		},
 	}
 
-	entity, err := buildConnectorInsertEntity(req, "99")
+	entity, err := buildConnectorInsertEntity(req, "99", "created-by")
 	if err != nil {
 		t.Fatalf("buildConnectorInsertEntity returned error: %v", err)
 	}
@@ -349,6 +361,7 @@ func TestIdentityMapperReturnsBoundPerson(t *testing.T) {
 func TestIdentityMapperAutoCreatesPersonAndBindsIdentity(t *testing.T) {
 	var insertedPerson *model.PersonEntity
 	var insertedIdentity *model.UserIdentityEntity
+	var insertedUser *model.UserEntity
 
 	mapper := newIdentityMapper(
 		&fakeConnectorPersonRepository{
@@ -365,6 +378,13 @@ func TestIdentityMapperAutoCreatesPersonAndBindsIdentity(t *testing.T) {
 			},
 		},
 		WithIdentityMapperTxRunner(connectorRunInTransactionNoop),
+		// S4：自动创建用户需建立租户成员（UserEntity）
+		WithIdentityMapperUserRepository(&fakeConnectorUserRepository{
+			insertFunc: func(ctx context.Context, user *model.UserEntity) error {
+				insertedUser = user
+				return nil
+			},
+		}),
 	)
 
 	person, err := mapper.Resolve(context.Background(), identityResolveInput{
@@ -414,6 +434,13 @@ func TestIdentityMapperAutoCreatesPersonAndBindsIdentity(t *testing.T) {
 	}
 	if insertedIdentity.ExternalSubject != "external-subject-1" {
 		t.Fatalf("expected external subject to be persisted, got %q", insertedIdentity.ExternalSubject)
+	}
+	// S4：自动创建用户须建立租户成员（UserEntity），成员租户 = connector 租户
+	if insertedUser == nil {
+		t.Fatal("expected user (tenant membership) insert to be called")
+	}
+	if insertedUser.PersonID != "44" || insertedUser.TenantID != "22" {
+		t.Fatalf("unexpected user membership person=%s tenant=%s", insertedUser.PersonID, insertedUser.TenantID)
 	}
 	var detail StandardIdentity
 	if err := json.Unmarshal(insertedIdentity.Detail, &detail); err != nil {
@@ -590,6 +617,7 @@ func TestIdentityMapperRepairsOrphanBindingInsteadOfReinserting(t *testing.T) {
 			},
 		},
 		WithIdentityMapperTxRunner(connectorRunInTransactionNoop),
+		WithIdentityMapperUserRepository(&fakeConnectorUserRepository{}),
 	)
 
 	person, err := mapper.Resolve(context.Background(), identityResolveInput{
@@ -693,8 +721,13 @@ func TestConnectorServiceAuthorizeStoresStateAndReturnsAuthorizationURL(t *testi
 		t.Fatal("connector service should expose Authorize")
 	}
 
-	resp, err := runtimeSvc.Authorize(nil, &dtoconnector.ConnectorAuthorizeReq{
-		RedirectURI:  "https://app.example.com/oidc/callback",
+	// Authorize 现在要求非 nil gin 上下文（取租户归属）且 redirect_uri 与配置同源（H11/H12）
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = httptestRequest(t)
+	ginCtx.Set(gcontext.KeyTenantID, "22")
+
+	resp, err := runtimeSvc.Authorize(ginCtx, &dtoconnector.ConnectorAuthorizeReq{
+		RedirectURI:  "https://iam.example.com/callback",
 		LoginHint:    "user@example.com",
 		ResponseMode: "query",
 	}, connectorEntity.ID)
@@ -710,7 +743,7 @@ func TestConnectorServiceAuthorizeStoresStateAndReturnsAuthorizationURL(t *testi
 	if authorizeInput.State != "generated-state" || authorizeInput.ConnectorID != connectorEntity.ID {
 		t.Fatalf("unexpected authorize input: %+v", authorizeInput)
 	}
-	if authorizeInput.RedirectURI != "https://app.example.com/oidc/callback" {
+	if authorizeInput.RedirectURI != "https://iam.example.com/callback" {
 		t.Fatalf("expected request redirect uri to be forwarded, got %q", authorizeInput.RedirectURI)
 	}
 	if savedState == nil {
@@ -722,7 +755,7 @@ func TestConnectorServiceAuthorizeStoresStateAndReturnsAuthorizationURL(t *testi
 	if savedState.ConnectorID != connectorEntity.ID || savedState.TenantID != connectorEntity.TenantID {
 		t.Fatalf("unexpected saved connector identity: %+v", savedState)
 	}
-	if savedState.RedirectURI != "https://app.example.com/oidc/callback" {
+	if savedState.RedirectURI != "https://iam.example.com/callback" {
 		t.Fatalf("expected saved redirect uri, got %q", savedState.RedirectURI)
 	}
 	if !savedState.ExpiredAt.Equal(fixedNow.Add(connectorStateTTL)) {
@@ -799,8 +832,8 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 	})
 	defer restoreUserStore()
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
-		return &fakeAuthTenantStore{getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
-			return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "22"}}, Name: "tenant-22", Tag: "t22"}, nil
+		return &fakeAuthTenantStore{getListByCondFunc: func(ctx context.Context, cond *dao.TenantCond) (model.TenantEntityList, error) {
+			return model.TenantEntityList{{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "22"}}, Name: "tenant-22", Tag: "t22"}}, nil
 		}}
 	})
 	defer restoreTenantStore()
@@ -811,7 +844,11 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 		t.Fatal("connector service should expose Callback")
 	}
 
-	resp, err := runtimeSvc.Callback(nil, &dtoconnector.ConnectorCallbackReq{
+	// Callback 需要非 nil gin 上下文（租户查询走 gincontext）
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = httptestRequest(t)
+
+	resp, err := runtimeSvc.Callback(ginCtx, &dtoconnector.ConnectorCallbackReq{
 		ConnectorID: "101",
 		Code:        "authorization-code",
 		State:       "callback-state",
@@ -914,7 +951,7 @@ func TestConnectorServiceCallbackAllowsMissingConnectorID(t *testing.T) {
 	})
 	defer restoreTenantStore()
 
-	resp, err := svc.Callback(nil, &dtoconnector.ConnectorCallbackReq{
+	resp, err := svc.Callback(testGinCtx(t), &dtoconnector.ConnectorCallbackReq{
 		Code:  "authorization-code",
 		State: "callback-state-missing-connector-id",
 	})
@@ -1019,7 +1056,7 @@ func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 	})
 	defer restoreTenantStore()
 
-	resp, err := svc.Callback(nil, &dtoconnector.ConnectorCallbackReq{ConnectorID: "101", Code: "authorization-code", State: "callback-state-login-resp"})
+	resp, err := svc.Callback(testGinCtx(t), &dtoconnector.ConnectorCallbackReq{ConnectorID: "101", Code: "authorization-code", State: "callback-state-login-resp"})
 	if err != nil {
 		t.Fatalf("Callback returned error: %v", err)
 	}
@@ -1105,7 +1142,7 @@ func TestConnectorCallbackInvokesIdentityResolverTokenGeneratorAndLoginRecorder(
 	})
 	defer restoreTenantStore()
 
-	_, err := svc.Callback(nil, &dtoconnector.ConnectorCallbackReq{ConnectorID: "202", Code: "authorization-code", State: "callback-state-runtime-hooks"})
+	_, err := svc.Callback(testGinCtx(t), &dtoconnector.ConnectorCallbackReq{ConnectorID: "202", Code: "authorization-code", State: "callback-state-runtime-hooks"})
 	if err != nil {
 		t.Fatalf("Callback returned error: %v", err)
 	}
@@ -1159,16 +1196,14 @@ func TestConnectorServiceCallbackRetainsStateWhenDriverExchangeFails(t *testing.
 		stateStore: stateStore,
 	}
 
-	_, err := svc.Callback(nil, &dtoconnector.ConnectorCallbackReq{ConnectorID: "101", Code: "authorization-code", State: "callback-state-fail"})
+	_, err := svc.Callback(testGinCtx(t), &dtoconnector.ConnectorCallbackReq{ConnectorID: "101", Code: "authorization-code", State: "callback-state-fail"})
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("expected driver exchange error to propagate, got %v", err)
 	}
-	loaded, loadErr := stateStore.Load(context.Background(), "callback-state-fail")
-	if loadErr != nil {
-		t.Fatalf("expected state to remain for retry, got load err %v", loadErr)
-	}
-	if loaded == nil || loaded.State != "callback-state-fail" {
-		t.Fatalf("expected retained state after driver failure, got %+v", loaded)
+	// 新语义：state 先原子消费（防重放），exchange 失败后不可重试（需重新授权）
+	_, loadErr := stateStore.Load(context.Background(), "callback-state-fail")
+	if loadErr == nil {
+		t.Fatal("expected state to be consumed after callback (single-use), replay should be rejected")
 	}
 }
 
@@ -1179,7 +1214,7 @@ func newConnectorIdentityMapperTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite db: %v", err)
 	}
-	if err := db.AutoMigrate(&model.PersonEntity{}, &model.UserIdentityEntity{}); err != nil {
+	if err := db.AutoMigrate(&model.PersonEntity{}, &model.UserIdentityEntity{}, &model.UserEntity{}); err != nil {
 		t.Fatalf("migrate person tables: %v", err)
 	}
 	return db
@@ -1197,4 +1232,12 @@ func newConnectorRuntimeContext(t *testing.T) context.Context {
 func sanitizeConnectorTestName(name string) string {
 	replacer := strings.NewReplacer("/", "_", " ", "_", ":", "_")
 	return replacer.Replace(name)
+}
+
+// testGinCtx 构造带 Request 的 gin 测试上下文（Callback 的租户查询依赖 gincontext）。
+func testGinCtx(t *testing.T) *gin.Context {
+	t.Helper()
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = httptestRequest(t)
+	return ginCtx
 }

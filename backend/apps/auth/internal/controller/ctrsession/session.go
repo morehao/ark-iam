@@ -39,10 +39,7 @@ func (ctr *sessionCtr) List(ctx *gin.Context) {
 		return
 	}
 
-	userID := gincontext.GetUserID(ctx)
-	tenantID := gincontext.GetTenantID(ctx)
-	personID := gincontext.GetPersonID(ctx)
-	res, err := ctr.sessionSvc.List(ctx, &req, personID, userID, tenantID)
+	res, err := ctr.sessionSvc.List(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -54,7 +51,7 @@ func (ctr *sessionCtr) List(ctx *gin.Context) {
 // @Summary 撤销会话
 // @accept application/json
 // @Produce application/json
-// @Param sessionID path int true "会话ID"
+// @Param sessionID path string true "会话记录ID（会话列表中的 id 字段，即 refresh token 记录主键）"
 // @Success 200 {object} gincontext.DtoRender{data=string}
 // @Router /v1/auth/me/sessions/{sessionID} [delete]
 func (ctr *sessionCtr) Revoke(ctx *gin.Context) {
@@ -64,10 +61,7 @@ func (ctr *sessionCtr) Revoke(ctx *gin.Context) {
 		return
 	}
 
-	userID := gincontext.GetUserID(ctx)
-	tenantID := gincontext.GetTenantID(ctx)
-	personID := gincontext.GetPersonID(ctx)
-	if err := ctr.sessionSvc.Revoke(ctx, &req, userID, tenantID, personID); err != nil {
+	if err := ctr.sessionSvc.Revoke(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -81,10 +75,8 @@ func (ctr *sessionCtr) Revoke(ctx *gin.Context) {
 // @Success 200 {object} gincontext.DtoRender{data=string}
 // @Router /v1/auth/me/sessions [delete]
 func (ctr *sessionCtr) RevokeAll(ctx *gin.Context) {
-	userID := gincontext.GetUserID(ctx)
-	tenantID := gincontext.GetTenantID(ctx)
-	personID := gincontext.GetPersonID(ctx)
-	if err := ctr.sessionSvc.RevokeAll(ctx, userID, tenantID, personID); err != nil {
+	var req dtouser.SessionRevokeAllReq
+	if err := ctr.sessionSvc.RevokeAll(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

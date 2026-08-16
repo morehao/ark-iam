@@ -32,6 +32,9 @@ func (f *fakeConnectorSSOSessionStore) ValidateSession(ctx context.Context, sess
 func (f *fakeConnectorSSOSessionStore) SessionAMR(ctx context.Context, sessionID string) []string {
 	return nil
 }
+func (f *fakeConnectorSSOSessionStore) SessionAuthTime(ctx context.Context, sessionID string) time.Time {
+	return time.Now()
+}
 func (f *fakeConnectorSSOSessionStore) RevokeSession(ctx context.Context, sessionID string) error {
 	return nil
 }
@@ -84,15 +87,11 @@ func TestConnectorCallbackReturnsPersonTokenWhenPersonHasMultipleTenants(t *test
 
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
 		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
-				switch id {
-				case "11":
-					return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "11"}}, Name: "tenant-a", Tag: "a"}, nil
-				case "12":
-					return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "12"}}, Name: "tenant-b", Tag: "b"}, nil
-				default:
-					return nil, nil
-				}
+			getListByCondFunc: func(ctx context.Context, cond *dao.TenantCond) (model.TenantEntityList, error) {
+				return model.TenantEntityList{
+					{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "11"}}, Name: "tenant-a", Tag: "a"},
+					{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "12"}}, Name: "tenant-b", Tag: "b"},
+				}, nil
 			},
 		}
 	})
@@ -147,8 +146,10 @@ func TestConnectorCallbackUsesIdentityResolverPath(t *testing.T) {
 
 	conn := &model.ConnectorEntity{Protocol: connectorDriverTypeOAuth2, Provider: connectorProviderGithub, Status: connectorStatusEnabled, AllowAutoCreateUser: true, Config: json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`)}
 	conn.ID = "19"
+	conn.TenantID = "19"
 
 	var insertedIdentity *model.UserIdentityEntity
+	var insertedUser *model.UserEntity
 	mapper := newIdentityMapper(
 		&fakeConnectorPersonRepository{insertFunc: func(ctx context.Context, person *model.PersonEntity) error {
 			person.ID = "501"
@@ -162,6 +163,12 @@ func TestConnectorCallbackUsesIdentityResolverPath(t *testing.T) {
 			},
 		},
 		WithIdentityMapperTxRunner(connectorRunInTransactionNoop),
+		// S4：自动创建用户需同时建立租户成员（UserEntity），注入 fake 断言
+		WithIdentityMapperUserRepository(&fakeConnectorUserRepository{insertFunc: func(ctx context.Context, user *model.UserEntity) error {
+			clone := *user
+			insertedUser = &clone
+			return nil
+		}}),
 	)
 
 	restoreUserStore := swapUserStoreFactory(func() authUserStore {
@@ -176,8 +183,8 @@ func TestConnectorCallbackUsesIdentityResolverPath(t *testing.T) {
 	})
 	defer restoreUserStore()
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
-		return &fakeAuthTenantStore{getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
-			return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "31"}}, Name: "tenant-a", Tag: "a"}, nil
+		return &fakeAuthTenantStore{getListByCondFunc: func(ctx context.Context, cond *dao.TenantCond) (model.TenantEntityList, error) {
+			return model.TenantEntityList{{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "31"}}, Name: "tenant-a", Tag: "a"}}, nil
 		}}
 	})
 	defer restoreTenantStore()
@@ -205,5 +212,12 @@ func TestConnectorCallbackUsesIdentityResolverPath(t *testing.T) {
 	}
 	if insertedIdentity.PersonID != "501" || insertedIdentity.Issuer != "https://issuer.example.com" || insertedIdentity.ExternalSubject != "sub-resolver" {
 		t.Fatalf("unexpected persisted identity: %#v", insertedIdentity)
+	}
+	// S4：自动创建用户必须同时建立租户成员（UserEntity）
+	if insertedUser == nil {
+		t.Fatal("expected auto-created user (tenant membership) to be inserted")
+	}
+	if insertedUser.PersonID != "501" || insertedUser.TenantID != "19" {
+		t.Fatalf("unexpected persisted user: %#v", insertedUser)
 	}
 }

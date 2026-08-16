@@ -5,12 +5,14 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
 
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/golib/glog"
 )
 
 type oidcProvider interface {
@@ -37,7 +39,7 @@ type OIDCUserInfo interface {
 type OIDCDriver struct {
 	providerFactory func(ctx context.Context, issuer string) (oidcProvider, error)
 	nonceGenerator  func() (string, error)
-	tokenExchanger  func(ctx context.Context, config oauth2.Config, code string) (*oauth2.Token, error)
+	tokenExchanger  func(ctx context.Context, config oauth2.Config, code string, codeVerifier string) (*oauth2.Token, error)
 	verifierFactory func(provider oidcProvider, config *oidc.Config) OIDCVerifier
 }
 
@@ -69,12 +71,22 @@ func (d *OIDCDriver) BuildAuthorizationURL(ctx *gin.Context, input *ConnectorAut
 	if err := d.ValidateConfig(input.Config); err != nil {
 		return nil, err
 	}
+	// H10：discovery issuer 出站目标做 SSRF 防护
+	if err := validateOutboundURL(input.Config.Issuer); err != nil {
+		glog.Warnf(ctx, "[OIDCDriver.BuildAuthorizationURL] invalid issuer, err:%v", err)
+		return nil, code.GetError(code.ConnectorGetDetailError)
+	}
 
 	provider, err := d.getProvider(ctx, input.Config.Issuer)
 	if err != nil {
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
 	nonce, err := d.getNonce()
+	if err != nil {
+		return nil, code.GetError(code.ConnectorGetDetailError)
+	}
+	// H10：授权码模式启用 PKCE（S256）
+	verifier, err := generatePKCEVerifier()
 	if err != nil {
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
@@ -86,9 +98,15 @@ func (d *OIDCDriver) BuildAuthorizationURL(ctx *gin.Context, input *ConnectorAut
 		Scopes:       input.Config.Scopes,
 		Endpoint:     provider.Endpoint(),
 	}
+	authURL := oauthConfig.AuthCodeURL(input.State,
+		oidc.Nonce(nonce),
+		oauth2.SetAuthURLParam("code_challenge", pkceChallengeS256(verifier)),
+		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
+	)
 	return &ConnectorAuthorizeOutput{
-		AuthorizationURL: oauthConfig.AuthCodeURL(input.State, oidc.Nonce(nonce)),
+		AuthorizationURL: authURL,
 		Nonce:            nonce,
+		CodeVerifier:     verifier,
 	}, nil
 }
 
@@ -98,6 +116,11 @@ func (d *OIDCDriver) ExchangeCallback(ctx *gin.Context, input *ConnectorCallback
 	}
 	if err := d.ValidateConfig(input.Config); err != nil {
 		return nil, err
+	}
+	// H10：discovery issuer 出站目标做 SSRF 防护
+	if err := validateOutboundURL(input.Config.Issuer); err != nil {
+		glog.Warnf(ctx, "[OIDCDriver.ExchangeCallback] invalid issuer, err:%v", err)
+		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
 	provider, err := d.getProvider(runtimeContext(ctx), input.Config.Issuer)
 	if err != nil {
@@ -110,7 +133,7 @@ func (d *OIDCDriver) ExchangeCallback(ctx *gin.Context, input *ConnectorCallback
 		Scopes:       input.Config.Scopes,
 		Endpoint:     provider.Endpoint(),
 	}
-	token, err := d.exchangeToken(runtimeContext(ctx), oauthConfig, input.Code)
+	token, err := d.exchangeToken(runtimeContext(ctx), oauthConfig, input.Code, input.CodeVerifier)
 	if err != nil {
 		return nil, code.GetError(code.AuthLoginFailedError)
 	}
@@ -122,7 +145,10 @@ func (d *OIDCDriver) ExchangeCallback(ctx *gin.Context, input *ConnectorCallback
 	if err != nil {
 		return nil, code.GetError(code.AuthLoginFailedError)
 	}
-	if input.Nonce != "" && verifiedToken.Nonce() != input.Nonce {
+	// H10：nonce 强制校验（不再条件跳过）——nonce 由本系统生成并持久化在 state，
+	// 缺失或失配均视为登录请求重放/会话固定攻击。
+	if input.Nonce == "" || verifiedToken.Nonce() != input.Nonce {
+		glog.Warnf(ctx, "[OIDCDriver.ExchangeCallback] nonce mismatch, connectorID:%s", input.ConnectorID)
 		return nil, code.GetError(code.AuthLoginFailedError)
 	}
 	claims := map[string]any{}
@@ -172,11 +198,15 @@ func (d *OIDCDriver) getNonce() (string, error) {
 	return defaultOIDCNonceGenerator()
 }
 
-func (d *OIDCDriver) exchangeToken(ctx context.Context, config oauth2.Config, code string) (*oauth2.Token, error) {
+func (d *OIDCDriver) exchangeToken(ctx context.Context, config oauth2.Config, code string, codeVerifier string) (*oauth2.Token, error) {
 	if d.tokenExchanger != nil {
-		return d.tokenExchanger(ctx, config, code)
+		return d.tokenExchanger(ctx, config, code, codeVerifier)
 	}
-	return config.Exchange(ctx, code)
+	authOpts := []oauth2.AuthCodeOption{}
+	if codeVerifier != "" {
+		authOpts = append(authOpts, oauth2.SetAuthURLParam("code_verifier", codeVerifier))
+	}
+	return config.Exchange(ctx, code, authOpts...)
 }
 
 func (d *OIDCDriver) getVerifier(provider oidcProvider, config *oidc.Config) OIDCVerifier {
@@ -202,7 +232,10 @@ func (d *OIDCDriver) fetchUserInfoClaims(ctx context.Context, provider oidcProvi
 }
 
 func defaultOIDCProviderFactory(ctx context.Context, issuer string) (oidcProvider, error) {
-	provider, err := oidc.NewProvider(ctx, issuer)
+	// H10：discovery 出站请求带超时，防 IdP 不响应挂起登录流程
+	discoveryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	provider, err := oidc.NewProvider(discoveryCtx, issuer)
 	if err != nil {
 		return nil, err
 	}

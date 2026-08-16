@@ -53,6 +53,8 @@ type ConnectorAuthorizeInput struct {
 type ConnectorAuthorizeOutput struct {
 	AuthorizationURL string
 	Nonce            string
+	// CodeVerifier 为 PKCE S256 verifier，由驱动生成，需随 state 持久化以便回调回填。
+	CodeVerifier string
 }
 
 type ConnectorCallbackInput struct {
@@ -61,7 +63,9 @@ type ConnectorCallbackInput struct {
 	Code        string
 	State       string
 	Nonce       string
-	RedirectURI string
+	// CodeVerifier 为授权阶段生成的 PKCE verifier，换 code 时回填。
+	CodeVerifier string
+	RedirectURI  string
 }
 
 type ConnectorCallbackOutput struct {

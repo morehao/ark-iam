@@ -23,6 +23,10 @@ type UserIdentityEntity struct {
 	DeletedBy       string          `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人ID"`
 }
 
+// 注：同一外部主体（issuer + external_subject）在本系统只能绑定到一个自然人，
+// 唯一性由部分唯一索引保证（WHERE deleted_at IS NULL，见 automigrate.go
+// EnsurePartialUniqueIndexes），并发回调不会重复创建 person/identity。
+
 func (UserIdentityEntity) TableName() string {
 	return TableNameUserIdentity
 }

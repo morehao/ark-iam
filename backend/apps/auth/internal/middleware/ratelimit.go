@@ -42,6 +42,16 @@ func loginRateLimitParams() rateLimitParams {
 // Redis 不可用时 fail-open 放行（与 svcloginguard 的降级策略一致）。
 // 注意与 svcloginguard（失败累计锁定）互补：限流挡高频，锁定挡低频持续尝试。
 func LoginRateLimit() gin.HandlerFunc {
+	return NewLoginRateLimit("oidc:login:ip:")
+}
+
+// PasswordChangeRateLimit 修改密码接口频率限流（按 IP），防止对旧密码的暴力试探。
+func PasswordChangeRateLimit() gin.HandlerFunc {
+	return NewLoginRateLimit("password:change:ip:")
+}
+
+// NewLoginRateLimit 按指定 key 前缀构造登录/敏感操作的 IP 频率限流中间件。
+func NewLoginRateLimit(keyPrefix string) gin.HandlerFunc {
 	if dbclient.RedisCli == nil {
 		return func(ctx *gin.Context) { ctx.Next() }
 	}
@@ -57,7 +67,7 @@ func LoginRateLimit() gin.HandlerFunc {
 		return func(ctx *gin.Context) { ctx.Next() }
 	}
 	return func(ctx *gin.Context) {
-		key := "oidc:login:ip:" + gincontext.GetClientIP(ctx)
+		key := keyPrefix + gincontext.GetClientIP(ctx)
 		if !limiter.Allow(ctx.Request.Context(), key) {
 			gincontext.Fail(ctx, code.GetError(code.LoginRateLimitedError))
 			ctx.Abort()

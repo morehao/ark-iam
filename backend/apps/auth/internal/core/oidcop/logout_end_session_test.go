@@ -2,6 +2,7 @@ package oidcop
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -66,14 +67,17 @@ func TestTerminateSessionFromRequestEnqueuesPreciseSidJobs(t *testing.T) {
 	}
 	storage, _ := newTenantClaimTestStore(t, users)
 
-	// 登记两个会话：sid-a 与 sid-b，person 88
+	// 登记两个会话：sid-a 与 sid-b，person 88（使用带时间戳的唯一会话 ID，避免共享 Redis 残留干扰）
+	uniq := time.Now().UnixNano()
+	sidA := fmt.Sprintf("sid-a-%d", uniq)
+	sidB := fmt.Sprintf("sid-b-%d", uniq)
 	sloStore := sso.NewSLOStore()
 	regA := sso.LogoutRegistration{OIDCSessionID: "at-a", ClientID: "client-a", UserID: "person:88", BackChannelLogoutURI: "https://a/bc"}
 	regB := sso.LogoutRegistration{OIDCSessionID: "at-b", ClientID: "client-b", UserID: "person:88", BackChannelLogoutURI: "https://b/bc"}
-	if err := sloStore.Register(ctx, "sid-a", regA); err != nil {
+	if err := sloStore.Register(ctx, sidA, regA); err != nil {
 		t.Fatalf("register sid-a: %v", err)
 	}
-	if err := sloStore.Register(ctx, "sid-b", regB); err != nil {
+	if err := sloStore.Register(ctx, sidB, regB); err != nil {
 		t.Fatalf("register sid-b: %v", err)
 	}
 
@@ -81,7 +85,7 @@ func TestTerminateSessionFromRequestEnqueuesPreciseSidJobs(t *testing.T) {
 	endSession := &op.EndSessionRequest{
 		UserID: "person:88",
 		IDTokenHintClaims: &oidc.IDTokenClaims{
-			SessionID: "sid-a",
+			SessionID: sidA,
 		},
 		RedirectURI: "https://rp.example.com/logged-out",
 	}
@@ -97,8 +101,8 @@ func TestTerminateSessionFromRequestEnqueuesPreciseSidJobs(t *testing.T) {
 	if !ok {
 		t.Fatal("expected a logout job")
 	}
-	if job.SessionID != "sid-a" {
-		t.Fatalf("expected job SessionID sid-a, got %q", job.SessionID)
+	if job.SessionID != sidA {
+		t.Fatalf("expected job SessionID %s, got %q", sidA, job.SessionID)
 	}
 	if job.ClientID != "client-a" {
 		t.Fatalf("expected job client client-a, got %q", job.ClientID)

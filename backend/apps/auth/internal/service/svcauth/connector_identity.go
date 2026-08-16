@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dbclient"
@@ -37,6 +38,12 @@ type connectorUserIdentityRepository interface {
 	UpdateBinding(ctx context.Context, identityID, personID string, issuer string, detail []byte) error
 }
 
+// connectorUserRepository 负责写入租户成员关系（UserEntity）。
+// 自动创建用户时若不同时建立成员关系，登录后续流程（listPersonTenants）将查不到租户而失败（S4）。
+type connectorUserRepository interface {
+	Insert(ctx context.Context, user *model.UserEntity) error
+}
+
 type connectorTxContextKey struct{}
 
 type connectorDBProvider func(ctx context.Context) *gorm.DB
@@ -48,6 +55,7 @@ type identityMapperOption func(*identityMapper)
 type identityMapper struct {
 	personRepo       connectorPersonRepository
 	userIdentityRepo connectorUserIdentityRepository
+	userRepo         connectorUserRepository
 	dbProvider       connectorDBProvider
 	txRunner         connectorTxRunner
 }
@@ -65,12 +73,24 @@ func newIdentityMapper(personRepo connectorPersonRepository, userIdentityRepo co
 	if userIdentityRepo == nil {
 		userIdentityRepo = &connectorUserIdentityRepoAdapter{mapper: mapper}
 	}
+	if mapper.userRepo == nil {
+		mapper.userRepo = &connectorUserRepoAdapter{mapper: mapper}
+	}
 	mapper.personRepo = personRepo
 	mapper.userIdentityRepo = userIdentityRepo
 	if mapper.txRunner == nil {
 		mapper.txRunner = mapper.runInTransaction
 	}
 	return mapper
+}
+
+// WithIdentityMapperUserRepository 注入租户成员仓库（测试注入桩用）。
+func WithIdentityMapperUserRepository(repo connectorUserRepository) identityMapperOption {
+	return func(m *identityMapper) {
+		if repo != nil {
+			m.userRepo = repo
+		}
+	}
 }
 
 func WithIdentityMapperDBProvider(provider connectorDBProvider) identityMapperOption {
@@ -125,6 +145,10 @@ type connectorUserIdentityRepoAdapter struct {
 	mapper *identityMapper
 }
 
+type connectorUserRepoAdapter struct {
+	mapper *identityMapper
+}
+
 func (r *connectorPersonRepoAdapter) GetByID(ctx context.Context, id string) (*model.PersonEntity, error) {
 	var entity model.PersonEntity
 	err := r.mapper.repoDB(ctx).First(&entity, id).Error
@@ -168,6 +192,11 @@ func (r *connectorUserIdentityRepoAdapter) UpdateBinding(ctx context.Context, id
 	return r.mapper.repoDB(ctx).Model(&model.UserIdentityEntity{}).Where("id = ?", identityID).Updates(updateMap).Error
 }
 
+// connectorUserRepoAdapter 写入租户成员（UserEntity）。
+func (r *connectorUserRepoAdapter) Insert(ctx context.Context, user *model.UserEntity) error {
+	return r.mapper.repoDB(ctx).Create(user).Error
+}
+
 func (m *identityMapper) Resolve(ctx context.Context, input identityResolveInput) (*resolvedConnectorPerson, error) {
 	existingIdentity, err := m.userIdentityRepo.GetByIssuerAndExternalSubject(ctx, input.Identity.Issuer, input.Identity.Subject)
 	if err != nil {
@@ -200,6 +229,21 @@ func (m *identityMapper) Resolve(ctx context.Context, input identityResolveInput
 	}
 	if err := m.txRunner(ctx, func(txCtx context.Context) error {
 		if err := m.personRepo.Insert(txCtx, person); err != nil {
+			return err
+		}
+		// S4：自动创建的用户必须同事务建立租户成员关系（UserEntity），
+		// 否则后续登录流程（Callback → listPersonTenants）查不到成员而失败。
+		now := time.Now()
+		user := &model.UserEntity{
+			TenantID:   input.Connector.TenantID,
+			PersonID:   person.ID,
+			Name:       person.Name,
+			Profile:    json.RawMessage("{}"),
+			CustomData: json.RawMessage("{}"),
+			JoinedAt:   &now,
+			CreatedBy:  "",
+		}
+		if err := m.userRepo.Insert(txCtx, user); err != nil {
 			return err
 		}
 		if err := m.bindIdentity(txCtx, input.Connector, person, input.Identity, existingIdentity); err != nil {
