@@ -22,6 +22,8 @@ import (
 
 const (
 	pathLoggedOut = "/oidc/logged-out"
+	// defaultIssuerPort 未配置 issuer 时推导本地 OP 地址使用的端口。
+	defaultIssuerPort = "8099"
 )
 
 type OIDCProvider struct {
@@ -185,7 +187,25 @@ func protocolStateTTLOptions() []oidcop.ProtocolStateOption {
 	return opts
 }
 
-func SetupOIDCProvider(issuer string) (*OIDCProvider, error) {
+// resolveIssuer 从应用配置解析 OP issuer；未配置时按本地端口推导（缺省 8099）。
+func resolveIssuer() string {
+	if appconfig.Conf == nil {
+		return fmt.Sprintf("http://localhost:%s/oidc", defaultIssuerPort)
+	}
+	if issuer := appconfig.Conf.OIDC.Issuer; issuer != "" {
+		return issuer
+	}
+	port := appconfig.Conf.Server.Port
+	if port == "" {
+		port = defaultIssuerPort
+	}
+	return fmt.Sprintf("http://localhost:%s/oidc", port)
+}
+
+// SetupOIDCProvider 按应用配置自装配 OP provider：issuer 解析、签名/加密密钥、
+// 协议态 storage 与 op.Provider。
+func SetupOIDCProvider() (*OIDCProvider, error) {
+	issuer := resolveIssuer()
 	privateKey, keyID, err := loadSigningKey()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load OIDC signing key: %w", err)
@@ -238,6 +258,42 @@ func SetupOIDCProvider(issuer string) (*OIDCProvider, error) {
 		Storage:  storage,
 		issuer:   issuer,
 	}, nil
+}
+
+// SigningKey 返回 OP 的签名私钥与 keyID（供 back-channel logout 发送器使用）。
+func (p *OIDCProvider) SigningKey(ctx context.Context) (*rsa.PrivateKey, string, error) {
+	if p == nil || p.Storage == nil {
+		return nil, "", fmt.Errorf("oidc provider storage not initialized")
+	}
+	signingKey, err := p.Storage.SigningKey(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	privKey, ok := signingKey.Key().(*rsa.PrivateKey)
+	if !ok {
+		return nil, "", fmt.Errorf("oidc signing key is not RSA private key: %T", signingKey.Key())
+	}
+	return privKey, signingKey.ID(), nil
+}
+
+// StartLogoutWorker 启动 back-channel logout 发送器（异步消费登出队列，发送 logout_token）。
+func (p *OIDCProvider) StartLogoutWorker(ctx context.Context) error {
+	privKey, keyID, err := p.SigningKey(ctx)
+	if err != nil {
+		return err
+	}
+	worker := oidcop.NewLogoutWorker(privKey, keyID, p.issuer)
+	go worker.Run(ctx)
+	return nil
+}
+
+// PublicKey 返回 OP 签名公钥，供业务路由鉴权中间件校验本 OP 签发的 token。
+func (p *OIDCProvider) PublicKey() (*rsa.PublicKey, error) {
+	privKey, _, err := p.SigningKey(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	return &privKey.PublicKey, nil
 }
 
 func (p *OIDCProvider) BuildAuthCallbackURL(ctx context.Context, authRequestID string) string {

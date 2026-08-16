@@ -73,7 +73,7 @@ func TestCompleteLoginBySessionHonorsAuthRequestTenantHint(t *testing.T) {
 			AllowInsecure:    true,
 		},
 	}
-	provider, err := SetupOIDCProvider(appconfig.Conf.OIDC.Issuer)
+	provider, err := SetupOIDCProvider()
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider failed: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestCompleteLoginBySessionFallsBackWhenHintNotInPersonsTenants(t *testing.T
 			AllowInsecure:    true,
 		},
 	}
-	provider, err := SetupOIDCProvider(appconfig.Conf.OIDC.Issuer)
+	provider, err := SetupOIDCProvider()
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider failed: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestCompleteLoginBySessionRejectsHintOnTenantLookupError(t *testing.T) {
 			AllowInsecure:    true,
 		},
 	}
-	provider, err := SetupOIDCProvider(appconfig.Conf.OIDC.Issuer)
+	provider, err := SetupOIDCProvider()
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider failed: %v", err)
 	}
@@ -260,7 +260,7 @@ func TestCompleteLoginReturnsContinueURLAndCompletesRequest(t *testing.T) {
 			AllowInsecure:    true,
 		},
 	}
-	provider, err := SetupOIDCProvider(appconfig.Conf.OIDC.Issuer)
+	provider, err := SetupOIDCProvider()
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider failed: %v", err)
 	}
@@ -336,7 +336,7 @@ func TestCompleteLoginMultiTenantRequiresSelection(t *testing.T) {
 			AllowInsecure:    true,
 		},
 	}
-	provider, err := SetupOIDCProvider(appconfig.Conf.OIDC.Issuer)
+	provider, err := SetupOIDCProvider()
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider failed: %v", err)
 	}
@@ -405,7 +405,7 @@ func TestCompleteLoginHonorsTenantHint(t *testing.T) {
 			AllowInsecure:    true,
 		},
 	}
-	provider, err := SetupOIDCProvider(appconfig.Conf.OIDC.Issuer)
+	provider, err := SetupOIDCProvider()
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider failed: %v", err)
 	}
@@ -481,7 +481,7 @@ func TestCompleteLoginIgnoresForgedTenantHint(t *testing.T) {
 			AllowInsecure:    true,
 		},
 	}
-	provider, err := SetupOIDCProvider(appconfig.Conf.OIDC.Issuer)
+	provider, err := SetupOIDCProvider()
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider failed: %v", err)
 	}
@@ -551,7 +551,7 @@ func TestSelectTenantWritesTenantAndReturnsContinueURL(t *testing.T) {
 			AllowInsecure:    true,
 		},
 	}
-	provider, err := SetupOIDCProvider(appconfig.Conf.OIDC.Issuer)
+	provider, err := SetupOIDCProvider()
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider failed: %v", err)
 	}
@@ -623,7 +623,7 @@ func TestSelectTenantRejectsTenantNotBelongingToPerson(t *testing.T) {
 			AllowInsecure:    true,
 		},
 	}
-	provider, err := SetupOIDCProvider(appconfig.Conf.OIDC.Issuer)
+	provider, err := SetupOIDCProvider()
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider failed: %v", err)
 	}
@@ -675,7 +675,7 @@ func TestSelectTenantRejectsAlreadyDoneRequest(t *testing.T) {
 			AllowInsecure:    true,
 		},
 	}
-	provider, err := SetupOIDCProvider(appconfig.Conf.OIDC.Issuer)
+	provider, err := SetupOIDCProvider()
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider failed: %v", err)
 	}

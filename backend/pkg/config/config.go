@@ -36,6 +36,10 @@ type LoginGuardConfig struct {
 	MaxFailures int `yaml:"maxFailures"`
 	WindowSec   int `yaml:"windowSec"`
 	LockSec     int `yaml:"lockSec"`
+	// RateLimit 登录接口频率限流（按 IP），每分钟允许的请求数与突发容量。
+	// 未配置时使用默认值（如 30/min、burst 10），见 middleware.LoginRateLimit。
+	RatePerMinute int `yaml:"ratePerMinute"`
+	Burst         int `yaml:"burst"`
 }
 
 type OIDC struct {

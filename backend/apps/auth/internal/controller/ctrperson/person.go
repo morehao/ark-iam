@@ -18,9 +18,9 @@ type personCtr struct {
 
 var _ PersonCtr = (*personCtr)(nil)
 
-func NewPersonCtr(personSvc svcperson.PersonProfileSvc) PersonCtr {
+func NewPersonCtr() PersonCtr {
 	return &personCtr{
-		personSvc: personSvc,
+		personSvc: svcperson.NewPersonProfileSvc(),
 	}
 }
 
