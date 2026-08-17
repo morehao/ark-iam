@@ -52,7 +52,7 @@ func (svc *userIdentitySvc) mapUserIdentityReqToPerson(ctx *gin.Context, userID 
 	}
 	clone := *req
 	clone.UserID = userEntity.PersonID
-	clone.TenantID = gincontext.GetTenantID(ctx)
+	clone.TenantID = gincontext.GetTenantIDString(ctx)
 	return &clone, nil
 }
 
@@ -61,7 +61,7 @@ func (svc *userIdentitySvc) resolveTenantUser(ctx *gin.Context, userID string) (
 	if err != nil {
 		return nil, code.GetError(code.UserNotExistError)
 	}
-	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gincontext.GetTenantID(ctx) || userEntity.PersonID == "" {
+	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gincontext.GetTenantIDString(ctx) || userEntity.PersonID == "" {
 		return nil, code.GetError(code.UserNotExistError)
 	}
 	return userEntity, nil

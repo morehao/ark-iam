@@ -47,7 +47,7 @@ func (svc *personSvc) Create(ctx *gin.Context, req *dtouser.UserIdentityCreateRe
 		Issuer:          req.Issuer,
 		ExternalSubject: req.IdentityID,
 		Detail:          detailJSON,
-		CreatedBy:       gincontext.GetUserID(ctx),
+		CreatedBy:       gincontext.GetUserIDString(ctx),
 	}
 	if err := dao.NewUserIdentityDao().Insert(ctx, insertEntity); err != nil {
 		glog.Errorf(ctx, "[svcperson.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -68,7 +68,7 @@ func (svc *personSvc) Delete(ctx *gin.Context, req *dtouser.UserIdentityDeleteRe
 	if err := ensurePersonIdentityVisibleToTenant(ctx, entity.PersonID); err != nil {
 		return err
 	}
-	if err := dao.NewUserIdentityDao().Delete(ctx, req.UserIdentityID, gincontext.GetUserID(ctx)); err != nil {
+	if err := dao.NewUserIdentityDao().Delete(ctx, req.UserIdentityID, gincontext.GetUserIDString(ctx)); err != nil {
 		glog.Errorf(ctx, "[svcperson.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserIdentityDeleteError)
 	}
@@ -103,7 +103,7 @@ func (svc *personSvc) Update(ctx *gin.Context, req *dtouser.UserIdentityUpdateRe
 		"external_subject": req.IdentityID,
 		"detail":           detailJSON,
 	}
-	if operatorID := gincontext.GetUserID(ctx); operatorID != "" {
+	if operatorID := gincontext.GetUserIDString(ctx); operatorID != "" {
 		updateMap["updated_by"] = operatorID
 	}
 	if err := dao.NewUserIdentityDao().UpdateMap(ctx, req.UserIdentityID, updateMap); err != nil {
@@ -173,7 +173,7 @@ func ensurePersonIdentityVisibleToTenant(ctx *gin.Context, personID string) erro
 		glog.Errorf(ctx, "[svcperson.ensurePersonIdentityVisibleToTenant] user dao GetListByCond fail, err:%v, personID:%s", err, personID)
 		return code.GetError(code.UserIdentityGetDetailError)
 	}
-	tenantID := gincontext.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantIDString(ctx)
 	for _, userEntity := range users {
 		if userEntity.TenantID == tenantID {
 			return nil

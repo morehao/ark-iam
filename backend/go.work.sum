@@ -60,6 +60,7 @@ github.com/morehao/golib v1.32.1 h1:/lGBIifs66hkoNE+1TUukjUY345FGGRAiwxhP3pYQTo=
 github.com/morehao/golib v1.32.1/go.mod h1:ir03Dfy0ARhZfmTP/P4WOGFS7C7rvXcF/8i7ib66XrI=
 github.com/morehao/golib v1.32.3/go.mod h1:ir03Dfy0ARhZfmTP/P4WOGFS7C7rvXcF/8i7ib66XrI=
 github.com/morehao/golib v1.32.9/go.mod h1:0BYKKj6taAPqfA7rmgh7pyQT6W3+DpUgkuzTeRA8QvE=
+github.com/morehao/golib v1.32.12/go.mod h1:0BYKKj6taAPqfA7rmgh7pyQT6W3+DpUgkuzTeRA8QvE=
 github.com/muhlemmer/gu v0.3.1 h1:7EAqmFrW7n3hETvuAdmFmn4hS8W+z3LgKtrnow+YzNM=
 github.com/muhlemmer/gu v0.3.1/go.mod h1:YHtHR+gxM+bKEIIs7Hmi9sPT3ZDUvTN/i88wQpZkrdM=
 github.com/muhlemmer/httpforwarded v0.1.0 h1:x4DLrzXdliq8mprgUMR0olDvHGkou5BJsK/vWUetyzY=

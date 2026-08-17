@@ -54,7 +54,7 @@ func (svc *tenantMenuSvc) Apps(ctx *gin.Context) (*dtotenant.TenantAppsResp, err
 
 // loadTenantApps 当前租户订阅的启用非系统应用（排除平台系统内置应用，如管理后台）。
 func loadTenantApps(ctx *gin.Context) ([]model.ApplicationEntity, error) {
-	tenantID := gincontext.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantIDString(ctx)
 	tenantAppList, _, err := dao.NewTenantApplicationDao().GetPageListByCond(ctx, &dao.TenantApplicationCond{
 		TenantID: tenantID,
 		Status:   model.AppStatusEnable,

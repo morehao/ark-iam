@@ -36,7 +36,7 @@ func NewOrganizationUserSvc() OrganizationUserSvc {
 }
 
 func (svc *organizationUserSvc) Create(ctx *gin.Context, req *dtotenant.OrganizationUserCreateReq) (*dtotenant.OrganizationUserCreateResp, error) {
-	tenantID := gincontext.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantIDString(ctx)
 	relationType := req.RelationType
 	if relationType == "" {
 		relationType = string(model.OrgUserRelationMember)
@@ -63,7 +63,7 @@ func (svc *organizationUserSvc) Create(ctx *gin.Context, req *dtotenant.Organiza
 		UserID:         req.UserID,
 		RelationType:   relationType,
 		IsPrimary:      req.IsPrimary,
-		CreatedBy:      gincontext.GetUserID(ctx),
+		CreatedBy:      gincontext.GetUserIDString(ctx),
 	}
 
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
@@ -83,7 +83,7 @@ func (svc *organizationUserSvc) Create(ctx *gin.Context, req *dtotenant.Organiza
 }
 
 func (svc *organizationUserSvc) Update(ctx *gin.Context, req *dtotenant.OrganizationUserUpdateReq) error {
-	tenantID := gincontext.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantIDString(ctx)
 	relationType := req.RelationType
 	if relationType == "" {
 		relationType = string(model.OrgUserRelationMember)
@@ -105,7 +105,7 @@ func (svc *organizationUserSvc) Update(ctx *gin.Context, req *dtotenant.Organiza
 		return code.GetError(code.OrganizationUserNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gincontext.GetUserIDString(ctx)
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
 		if req.IsPrimary {
 			if err := clearPrimaryOrg(ctx, tenantID, req.UserID); err != nil {
@@ -126,7 +126,7 @@ func (svc *organizationUserSvc) Update(ctx *gin.Context, req *dtotenant.Organiza
 }
 
 func (svc *organizationUserSvc) Delete(ctx *gin.Context, req *dtotenant.OrganizationUserDeleteReq) error {
-	tenantID := gincontext.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantIDString(ctx)
 	relationList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
 		TenantID:       tenantID,
 		OrganizationID: req.OrganizationID,
@@ -140,7 +140,7 @@ func (svc *organizationUserSvc) Delete(ctx *gin.Context, req *dtotenant.Organiza
 		return code.GetError(code.OrganizationUserNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gincontext.GetUserIDString(ctx)
 	for _, r := range relationList {
 		if err := dao.NewOrganizationUserDao().Delete(ctx, r.ID, userID); err != nil {
 			glog.Errorf(ctx, "[svcorganizationuser.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -151,7 +151,7 @@ func (svc *organizationUserSvc) Delete(ctx *gin.Context, req *dtotenant.Organiza
 }
 
 func (svc *organizationUserSvc) PageList(ctx *gin.Context, req *dtotenant.OrganizationUserPageListReq) (*dtotenant.OrganizationUserPageListResp, error) {
-	tenantID := gincontext.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantIDString(ctx)
 	cond := &dao.OrganizationUserCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
@@ -220,7 +220,7 @@ func matchMemberKeyword(item dtotenant.OrganizationUserPageListItem, keyword str
 
 // SubtreeUsers 子树成员聚合：org_path 前缀查子树节点 → 取 member 关系 → 去重用户。
 func (svc *organizationUserSvc) SubtreeUsers(ctx *gin.Context, req *dtotenant.OrganizationSubtreeUsersReq) (*dtotenant.OrganizationSubtreeUsersResp, error) {
-	tenantID := gincontext.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantIDString(ctx)
 	orgEntity, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
 	if err != nil || !organizationVisibleToTenant(orgEntity, tenantID) {
 		return nil, code.GetError(code.OrganizationNotExistError)
@@ -264,7 +264,7 @@ func (svc *organizationUserSvc) SubtreeUsers(ctx *gin.Context, req *dtotenant.Or
 
 // GetUserOrganizations 用户组织归属（含各节点名称）。
 func (svc *organizationUserSvc) GetUserOrganizations(ctx *gin.Context, req *dtotenant.UserOrganizationListReq) (*dtotenant.UserOrganizationListResp, error) {
-	tenantID := gincontext.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantIDString(ctx)
 	list, err := loadUserOrganizations(ctx, tenantID, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcorganizationuser.GetUserOrganizations] load fail, err:%v", err)
@@ -309,7 +309,7 @@ func loadUserOrganizations(ctx *gin.Context, tenantID, userID string) ([]dtotena
 
 // UpdateUserOrganizations 全量替换用户归属（member 关系集合，首个为主归属）。
 func (svc *organizationUserSvc) UpdateUserOrganizations(ctx *gin.Context, req *dtotenant.UserOrganizationsUpdateReq) error {
-	tenantID := gincontext.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantIDString(ctx)
 	// 用户必须从属于至少一个部门（业务约束，防绕过 DTO 校验）
 	if len(req.OrganizationIDs) == 0 {
 		return code.GetError(code.UserOrganizationRequiredError)
@@ -333,7 +333,7 @@ func (svc *organizationUserSvc) UpdateUserOrganizations(ctx *gin.Context, req *d
 		}
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gincontext.GetUserIDString(ctx)
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
 		oldList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
 			TenantID:     tenantID,

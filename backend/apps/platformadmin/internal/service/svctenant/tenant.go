@@ -60,7 +60,7 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 		Type:        tenantType,
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gincontext.GetUserIDString(ctx)
 	txErr := dbclient.IamDB(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := dao.NewTenantDao().WithTx(tx).Insert(ctx, insertEntity); err != nil {
 			return err
@@ -111,7 +111,7 @@ func (svc *tenantSvc) Delete(ctx *gin.Context, req *dtotenant.TenantDeleteReq) e
 		return code.GetError(code.TenantNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gincontext.GetUserIDString(ctx)
 
 	if err := dao.NewTenantDao().Delete(ctx, req.TenantID, userID); err != nil {
 		glog.Errorf(ctx, "[svctenant.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -131,7 +131,7 @@ func (svc *tenantSvc) Update(ctx *gin.Context, req *dtotenant.TenantUpdateReq) e
 		return code.GetError(code.TenantNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gincontext.GetUserIDString(ctx)
 	tenantType := model.TenantType(req.Type)
 	if tenantType != model.TenantTypeCustomer && tenantType != model.TenantTypePlatform {
 		tenantType = model.TenantTypeCustomer

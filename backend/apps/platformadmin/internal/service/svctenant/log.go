@@ -40,7 +40,7 @@ func (svc *logSvc) Detail(ctx *gin.Context, req *dtotenant.LogDetailReq) (*dtote
 		glog.Errorf(ctx, "[svcsystem.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.LogGetDetailError)
 	}
-	if !logVisibleToTenant(logEntity, gincontext.GetTenantID(ctx)) {
+	if !logVisibleToTenant(logEntity, gincontext.GetTenantIDString(ctx)) {
 		return nil, code.GetError(code.LogNotExistError)
 	}
 
@@ -71,7 +71,7 @@ func (svc *logSvc) PageList(ctx *gin.Context, req *dtotenant.LogPageListReq) (*d
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID: gincontext.GetTenantID(ctx),
+		TenantID: gincontext.GetTenantIDString(ctx),
 		Key:      req.Key,
 	}
 	logEntityList, total, err := dao.NewLogDao().GetPageListByCond(ctx, cond)

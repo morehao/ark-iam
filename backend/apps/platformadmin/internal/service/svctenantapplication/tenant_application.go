@@ -32,10 +32,10 @@ func NewTenantApplicationSvc() TenantApplicationSvc {
 
 func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplication.TenantApplicationCreateReq) (*dtotenantapplication.TenantApplicationCreateResp, error) {
 	entity := &model.TenantApplicationEntity{
-		TenantID:  gincontext.GetTenantID(ctx),
+		TenantID:  gincontext.GetTenantIDString(ctx),
 		AppID:     req.AppID,
 		Status:    req.Status,
-		CreatedBy: gincontext.GetUserID(ctx),
+		CreatedBy: gincontext.GetUserIDString(ctx),
 	}
 	if entity.Status == "" {
 		entity.Status = model.AppStatusEnable
@@ -65,10 +65,10 @@ func (svc *tenantApplicationSvc) Delete(ctx *gin.Context, req *dtotenantapplicat
 	if err != nil || entity == nil || entity.ID == "" {
 		return code.GetError(code.ApplicationNotExistError)
 	}
-	if entity.TenantID != gincontext.GetTenantID(ctx) {
+	if entity.TenantID != gincontext.GetTenantIDString(ctx) {
 		return code.GetError(code.ApplicationNotExistError)
 	}
-	if err := dao.NewTenantApplicationDao().Delete(ctx, req.TenantAppID, gincontext.GetUserID(ctx)); err != nil {
+	if err := dao.NewTenantApplicationDao().Delete(ctx, req.TenantAppID, gincontext.GetUserIDString(ctx)); err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationDeleteError)
 	}
@@ -80,12 +80,12 @@ func (svc *tenantApplicationSvc) Update(ctx *gin.Context, req *dtotenantapplicat
 	if err != nil || entity == nil || entity.ID == "" {
 		return code.GetError(code.ApplicationNotExistError)
 	}
-	if entity.TenantID != gincontext.GetTenantID(ctx) {
+	if entity.TenantID != gincontext.GetTenantIDString(ctx) {
 		return code.GetError(code.ApplicationNotExistError)
 	}
 	updateMap := map[string]any{
 		"status":     req.Status,
-		"updated_by": gincontext.GetUserID(ctx),
+		"updated_by": gincontext.GetUserIDString(ctx),
 	}
 	if req.Config != "" {
 		updateMap["config"] = datatypes.JSON([]byte(req.Config))
@@ -105,7 +105,7 @@ func (svc *tenantApplicationSvc) Detail(ctx *gin.Context, req *dtotenantapplicat
 	if err != nil || entity == nil || entity.ID == "" {
 		return nil, code.GetError(code.ApplicationNotExistError)
 	}
-	if entity.TenantID != gincontext.GetTenantID(ctx) {
+	if entity.TenantID != gincontext.GetTenantIDString(ctx) {
 		return nil, code.GetError(code.ApplicationNotExistError)
 	}
 	return &dtotenantapplication.TenantApplicationDetailResp{
@@ -122,7 +122,7 @@ func (svc *tenantApplicationSvc) Detail(ctx *gin.Context, req *dtotenantapplicat
 func (svc *tenantApplicationSvc) PageList(ctx *gin.Context, req *dtotenantapplication.TenantApplicationPageListReq) (*dtotenantapplication.TenantApplicationPageListResp, error) {
 	cond := &dao.TenantApplicationCond{
 		BaseCond: &gormdao.BaseCond{Page: req.Page, PageSize: req.PageSize},
-		TenantID: gincontext.GetTenantID(ctx),
+		TenantID: gincontext.GetTenantIDString(ctx),
 		Status:   req.Status,
 	}
 	list, total, err := dao.NewTenantApplicationDao().GetPageListByCond(ctx, cond)

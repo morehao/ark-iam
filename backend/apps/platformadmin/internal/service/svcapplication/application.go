@@ -51,7 +51,7 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.Applicat
 		Visibility:   req.Visibility,
 		TenantPolicy: defaultTenantPolicy(req.TenantPolicy),
 		Sort:         req.Sort,
-		CreatedBy:    gincontext.GetUserID(ctx),
+		CreatedBy:    gincontext.GetUserIDString(ctx),
 	}
 	if err := dao.NewApplicationDao().Insert(ctx, entity); err != nil {
 		glog.Errorf(ctx, "[svcapplication.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -80,7 +80,7 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.Applicat
 		"visibility":   req.Visibility,
 		"status":       req.Status,
 		"sort":         req.Sort,
-		"updated_by":   gincontext.GetUserID(ctx),
+		"updated_by":   gincontext.GetUserIDString(ctx),
 	}
 	if len(req.TenantPolicy) > 0 {
 		updateMap["tenant_policy"] = datatypes.JSON(req.TenantPolicy)
@@ -101,7 +101,7 @@ func (svc *applicationSvc) Delete(ctx *gin.Context, req *dtoapplication.Applicat
 	if entity != nil && entity.IsSystem {
 		return code.GetError(code.ApplicationSystemBuiltInErr)
 	}
-	userID := gincontext.GetUserID(ctx)
+	userID := gincontext.GetUserIDString(ctx)
 	if err := dao.NewApplicationDao().Delete(ctx, req.AppID, userID); err != nil {
 		glog.Errorf(ctx, "[svcapplication.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationDeleteError)

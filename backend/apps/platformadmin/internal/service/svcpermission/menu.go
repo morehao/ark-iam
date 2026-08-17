@@ -52,7 +52,7 @@ func (svc *menuSvc) Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (
 		KeepAlive:    req.KeepAlive,
 		Permission:   req.Permission,
 		Status:       req.Status,
-		CreatedBy:    gincontext.GetUserID(ctx),
+		CreatedBy:    gincontext.GetUserIDString(ctx),
 	}
 
 	if err := dao.NewMenuDao().Insert(ctx, insertEntity); err != nil {
@@ -74,7 +74,7 @@ func (svc *menuSvc) Delete(ctx *gin.Context, req *dtopermission.MenuDeleteReq) e
 		return code.GetError(code.MenuNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gincontext.GetUserIDString(ctx)
 	if err := dao.NewMenuDao().Delete(ctx, req.MenuID, userID); err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteMenu] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.MenuDeleteError)
@@ -92,7 +92,7 @@ func (svc *menuSvc) Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) e
 		return code.GetError(code.MenuNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gincontext.GetUserIDString(ctx)
 	updateMap := map[string]any{
 		"app_id":        req.AppID,
 		"parent_id":     req.ParentID,

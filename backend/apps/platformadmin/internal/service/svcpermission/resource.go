@@ -34,7 +34,7 @@ func NewResourceSvc() ResourceSvc {
 }
 
 func (svc *resourceSvc) Create(ctx *gin.Context, req *dtopermission.ResourceCreateReq) (*dtopermission.ResourceCreateResp, error) {
-	tenantID := gincontext.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantIDString(ctx)
 	if req.TenantID == "" {
 		req.TenantID = tenantID
 	}
@@ -44,7 +44,7 @@ func (svc *resourceSvc) Create(ctx *gin.Context, req *dtopermission.ResourceCrea
 		Indicator:      req.Indicator,
 		IsDefault:      req.IsDefault,
 		AccessTokenTtl: req.AccessTokenTtl,
-		CreatedBy:      gincontext.GetUserID(ctx),
+		CreatedBy:      gincontext.GetUserIDString(ctx),
 	}
 
 	if err := dao.NewResourceDao().Insert(ctx, insertEntity); err != nil {
@@ -62,11 +62,11 @@ func (svc *resourceSvc) Delete(ctx *gin.Context, req *dtopermission.ResourceDele
 		glog.Errorf(ctx, "[svcpermission.DeleteResource] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ResourceDeleteError)
 	}
-	if !resourceVisibleToTenant(resourceEntity, gincontext.GetTenantID(ctx)) {
+	if !resourceVisibleToTenant(resourceEntity, gincontext.GetTenantIDString(ctx)) {
 		return code.GetError(code.ResourceNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gincontext.GetUserIDString(ctx)
 	if err := dao.NewResourceDao().Delete(ctx, req.ResourceID, userID); err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteResource] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ResourceDeleteError)
@@ -80,11 +80,11 @@ func (svc *resourceSvc) Update(ctx *gin.Context, req *dtopermission.ResourceUpda
 		glog.Errorf(ctx, "[svcpermission.UpdateResource] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ResourceUpdateError)
 	}
-	if !resourceVisibleToTenant(resourceEntity, gincontext.GetTenantID(ctx)) {
+	if !resourceVisibleToTenant(resourceEntity, gincontext.GetTenantIDString(ctx)) {
 		return code.GetError(code.ResourceNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gincontext.GetUserIDString(ctx)
 	updateMap := map[string]any{
 		"tenant_id":        req.TenantID,
 		"name":             req.Name,
@@ -106,7 +106,7 @@ func (svc *resourceSvc) Detail(ctx *gin.Context, req *dtopermission.ResourceDeta
 		glog.Errorf(ctx, "[svcpermission.DetailResource] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ResourceGetDetailError)
 	}
-	if !resourceVisibleToTenant(resourceEntity, gincontext.GetTenantID(ctx)) {
+	if !resourceVisibleToTenant(resourceEntity, gincontext.GetTenantIDString(ctx)) {
 		return nil, code.GetError(code.ResourceNotExistError)
 	}
 
@@ -130,7 +130,7 @@ func (svc *resourceSvc) PageList(ctx *gin.Context, req *dtopermission.ResourcePa
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID:  gincontext.GetTenantID(ctx),
+		TenantID:  gincontext.GetTenantIDString(ctx),
 		Name:      req.Name,
 		Indicator: req.Indicator,
 	}

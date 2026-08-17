@@ -44,7 +44,7 @@ func (svc *systemSvc) Create(ctx *gin.Context, req *dtotenant.SystemCreateReq) (
 		return nil, code.GetError(code.SystemCreateError)
 	}
 
-	tenantID := gincontext.GetTenantID(ctx)
+	tenantID := gincontext.GetTenantIDString(ctx)
 	if req.TenantID == "" {
 		req.TenantID = tenantID
 	}
@@ -52,7 +52,7 @@ func (svc *systemSvc) Create(ctx *gin.Context, req *dtotenant.SystemCreateReq) (
 		TenantID:  req.TenantID,
 		Key:       req.Key,
 		Value:     valueJson,
-		CreatedBy: gincontext.GetUserID(ctx),
+		CreatedBy: gincontext.GetUserIDString(ctx),
 	}
 
 	if err := dao.NewSystemDao().Insert(ctx, insertEntity); err != nil {
@@ -70,11 +70,11 @@ func (svc *systemSvc) Delete(ctx *gin.Context, req *dtotenant.SystemDeleteReq) e
 		glog.Errorf(ctx, "[svcsystem.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.SystemDeleteError)
 	}
-	if !systemVisibleToTenant(systemEntity, gincontext.GetTenantID(ctx)) {
+	if !systemVisibleToTenant(systemEntity, gincontext.GetTenantIDString(ctx)) {
 		return code.GetError(code.SystemNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gincontext.GetUserIDString(ctx)
 	if err := dao.NewSystemDao().Delete(ctx, req.SystemID, userID); err != nil {
 		glog.Errorf(ctx, "[svcsystem.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.SystemDeleteError)
@@ -88,7 +88,7 @@ func (svc *systemSvc) Update(ctx *gin.Context, req *dtotenant.SystemUpdateReq) e
 		glog.Errorf(ctx, "[svcsystem.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.SystemUpdateError)
 	}
-	if !systemVisibleToTenant(systemEntity, gincontext.GetTenantID(ctx)) {
+	if !systemVisibleToTenant(systemEntity, gincontext.GetTenantIDString(ctx)) {
 		return code.GetError(code.SystemNotExistError)
 	}
 
@@ -98,9 +98,9 @@ func (svc *systemSvc) Update(ctx *gin.Context, req *dtotenant.SystemUpdateReq) e
 		return code.GetError(code.SystemUpdateError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gincontext.GetUserIDString(ctx)
 	updateMap := map[string]any{
-		"tenant_id":  gincontext.GetTenantID(ctx),
+		"tenant_id":  gincontext.GetTenantIDString(ctx),
 		"key":        req.Key,
 		"value":      valueJson,
 		"updated_by": userID,
@@ -118,7 +118,7 @@ func (svc *systemSvc) Detail(ctx *gin.Context, req *dtotenant.SystemDetailReq) (
 		glog.Errorf(ctx, "[svcsystem.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.SystemGetDetailError)
 	}
-	if !systemVisibleToTenant(systemEntity, gincontext.GetTenantID(ctx)) {
+	if !systemVisibleToTenant(systemEntity, gincontext.GetTenantIDString(ctx)) {
 		return nil, code.GetError(code.SystemNotExistError)
 	}
 
@@ -149,7 +149,7 @@ func (svc *systemSvc) PageList(ctx *gin.Context, req *dtotenant.SystemPageListRe
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID: gincontext.GetTenantID(ctx),
+		TenantID: gincontext.GetTenantIDString(ctx),
 		Key:      req.Key,
 	}
 	systemEntityList, total, err := dao.NewSystemDao().GetPageListByCond(ctx, cond)
