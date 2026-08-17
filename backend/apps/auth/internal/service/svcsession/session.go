@@ -34,8 +34,8 @@ func NewSessionSvc() SessionSvc {
 
 func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq) (*dtouser.SessionListResp, error) {
 	refreshTokenDao := dao.NewRefreshTokenDao()
-	personID := gincontext.GetPersonID(ctx)
-	tenantID := gincontext.GetTenantID(ctx)
+	personID := gincontext.GetPersonIDString(ctx)
+	tenantID := gincontext.GetTenantIDString(ctx)
 
 	page := req.Page
 	if page < 1 {
@@ -96,7 +96,7 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq) (*dto
 func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq) error {
 	// 单条条件 UPDATE（id + person + tenant 归属），RowsAffected==0 即无权或不存在，
 	// 替代"全量拉取 + 内存比对"的旧实现，消除归属校验与撤销之间的竞态。
-	hit, err := dao.NewRefreshTokenDao().RevokeByID(ctx.Request.Context(), req.SessionID, gincontext.GetPersonID(ctx), gincontext.GetTenantID(ctx))
+	hit, err := dao.NewRefreshTokenDao().RevokeByID(ctx.Request.Context(), req.SessionID, gincontext.GetPersonIDString(ctx), gincontext.GetTenantIDString(ctx))
 	if err != nil {
 		glog.Errorf(ctx, "[sessionSvc.Revoke] revoke fail, err:%v", err)
 		return code.GetError(code.SessionRevokeError)
@@ -109,8 +109,8 @@ func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq) e
 
 func (svc *sessionSvc) RevokeAll(ctx *gin.Context, _ *dtouser.SessionRevokeAllReq) error {
 	if err := dao.NewRefreshTokenDao().RevokeByCond(ctx.Request.Context(), &dao.RefreshTokenCond{
-		PersonID: gincontext.GetPersonID(ctx),
-		TenantID: gincontext.GetTenantID(ctx),
+		PersonID: gincontext.GetPersonIDString(ctx),
+		TenantID: gincontext.GetTenantIDString(ctx),
 	}); err != nil {
 		glog.Errorf(ctx, "[sessionSvc.RevokeAll] revoke all fail, err:%v", err)
 		return code.GetError(code.SessionRevokeError)

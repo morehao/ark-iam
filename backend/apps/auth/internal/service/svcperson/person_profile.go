@@ -22,7 +22,7 @@ func NewPersonProfileSvc() PersonProfileSvc {
 }
 
 func (svc *personProfileSvc) Detail(ctx *gin.Context, req *dtoperson.PersonDetailReq) (*dtoperson.PersonDetailResp, error) {
-	personID := gincontext.GetPersonID(ctx)
+	personID := gincontext.GetPersonIDString(ctx)
 	if personID == "" {
 		return nil, code.GetError(code.UserNotExistError)
 	}
@@ -49,7 +49,7 @@ func (svc *personProfileSvc) Detail(ctx *gin.Context, req *dtoperson.PersonDetai
 }
 
 func (svc *personProfileSvc) UpdatePassword(ctx *gin.Context, req *dtoperson.PersonUpdatePasswordReq) error {
-	personID := gincontext.GetPersonID(ctx)
+	personID := gincontext.GetPersonIDString(ctx)
 	if personID == "" {
 		return code.GetError(code.UserNotExistError)
 	}

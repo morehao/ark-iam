@@ -164,7 +164,7 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 }
 
 func (svc *authSvc) MyTenants(ctx *gin.Context, req *dtoauth.MyTenantsReq) (*dtoauth.MyTenantsResp, error) {
-	personID := gincontext.GetPersonID(ctx)
+	personID := gincontext.GetPersonIDString(ctx)
 	if personID == "" {
 		return nil, code.GetError(gconstant.UnauthorizedErr)
 	}
@@ -311,7 +311,7 @@ func (svc *authSvc) resolveRegisterConflict(ctx *gin.Context, personDao authPers
 }
 
 func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*dtoauth.JoinTenantResp, error) {
-	personID := gincontext.GetPersonID(ctx)
+	personID := gincontext.GetPersonIDString(ctx)
 	if personID == "" {
 		return nil, code.GetError(gconstant.UnauthorizedErr)
 	}
@@ -357,7 +357,7 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 }
 
 func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
-	personID := gincontext.GetPersonID(ctx)
+	personID := gincontext.GetPersonIDString(ctx)
 	// 全局登出语义：撤销该 person 的全部 refresh token + SSO 会话，实现"一处登出、处处登出"。
 	// access token 依赖其短 TTL 失效（见设计文档 §2.5），此处不维护 HS256 黑名单。
 	if personID != "" {
@@ -412,9 +412,9 @@ func (svc *authSvc) LogoutAll(ctx *gin.Context, req *dtoauth.LogoutAllReq) error
 func (svc *authSvc) Userinfo(ctx *gin.Context, req *dtoauth.UserinfoReq) (*dtoauth.UserinfoResp, error) {
 	userDao := newAuthUserStore()
 
-	userID := gincontext.GetUserID(ctx)
-	personID := gincontext.GetPersonID(ctx)
-	tenantID := gincontext.GetTenantID(ctx)
+	userID := gincontext.GetUserIDString(ctx)
+	personID := gincontext.GetPersonIDString(ctx)
+	tenantID := gincontext.GetTenantIDString(ctx)
 
 	var userEntity *model.UserEntity
 	var err error

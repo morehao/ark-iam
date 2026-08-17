@@ -73,13 +73,13 @@ func (svc *createApiKeySvc) Create(ctx *gin.Context, req *dtoapikey.ApiKeyCreate
 	}
 
 	entity := &model.ApiKeyEntity{
-		TenantID:  gincontext.GetTenantID(ctx),
+		TenantID:  gincontext.GetTenantIDString(ctx),
 		Name:      req.Name,
 		KeyHash:   keyHash,
 		KeyPrefix: keyPrefix,
 		Scope:     scope,
 		ExpiredAt: expiresAt,
-		CreatedBy: gincontext.GetUserID(ctx),
+		CreatedBy: gincontext.GetUserIDString(ctx),
 	}
 
 	if err := svc.apiKeyDao.Insert(context.Background(), entity); err != nil {
@@ -89,7 +89,7 @@ func (svc *createApiKeySvc) Create(ctx *gin.Context, req *dtoapikey.ApiKeyCreate
 
 	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
 		Action:     svcaudit.ActionApiKeyCreate,
-		TenantID:   gincontext.GetTenantID(ctx),
+		TenantID:   gincontext.GetTenantIDString(ctx),
 		Result:     "success",
 		TargetType: "api_key",
 		TargetID:   entity.ID,
@@ -111,7 +111,7 @@ func (svc *createApiKeySvc) Revoke(ctx *gin.Context, req *dtoapikey.RevokeApiKey
 	}
 	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
 		Action:     svcaudit.ActionApiKeyRevoke,
-		TenantID:   gincontext.GetTenantID(ctx),
+		TenantID:   gincontext.GetTenantIDString(ctx),
 		Result:     "success",
 		TargetType: "api_key",
 		TargetID:   req.ApiKeyID,
@@ -139,7 +139,7 @@ func (svc *createApiKeySvc) PageList(ctx *gin.Context, req *dtoapikey.ApiKeyPage
 
 	cond := &dao.ApiKeyCond{
 		BaseCond: &gormdao.BaseCond{Page: page, PageSize: pageSize},
-		TenantID: gincontext.GetTenantID(ctx),
+		TenantID: gincontext.GetTenantIDString(ctx),
 		Name:     req.Name,
 	}
 

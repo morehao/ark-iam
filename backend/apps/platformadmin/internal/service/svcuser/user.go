@@ -66,7 +66,7 @@ func (svc *userSvc) Detail(ctx *gin.Context, req *dtouser.UserDetailReq) (*dtous
 		glog.Errorf(ctx, "[svcuser.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserGetDetailError)
 	}
-	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gincontext.GetTenantID(ctx) {
+	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gincontext.GetTenantIDString(ctx) {
 		return nil, code.GetError(code.UserNotExistError)
 	}
 
@@ -115,7 +115,7 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtouser.UserPageListReq) (*d
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID:    gincontext.GetTenantID(ctx),
+		TenantID:    gincontext.GetTenantIDString(ctx),
 		Name:        req.Name,
 		IsSuspended: req.IsSuspended,
 	}
@@ -178,7 +178,7 @@ func (svc *userSvc) UpdatePassword(ctx *gin.Context, req *dtouser.UserPasswordUp
 		glog.Errorf(ctx, "[svcuser.UpdatePassword] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserUpdateError)
 	}
-	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gincontext.GetTenantID(ctx) {
+	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gincontext.GetTenantIDString(ctx) {
 		return code.GetError(code.UserNotExistError)
 	}
 	if userEntity.PersonID == "" {
@@ -201,7 +201,7 @@ func (svc *userSvc) UpdatePassword(ctx *gin.Context, req *dtouser.UserPasswordUp
 		return code.GetError(code.PasswordValidationError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gincontext.GetUserIDString(ctx)
 	if err := dao.NewPersonDao().UpdateMap(ctx, userEntity.PersonID, map[string]any{
 		"password_encrypted": password,
 		"password_method":    "bcrypt",
@@ -219,11 +219,11 @@ func (svc *userSvc) UpdateStatus(ctx *gin.Context, req *dtouser.UserStatusUpdate
 		glog.Errorf(ctx, "[svcuser.UpdateStatus] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserUpdateError)
 	}
-	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gincontext.GetTenantID(ctx) {
+	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gincontext.GetTenantIDString(ctx) {
 		return code.GetError(code.UserNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gincontext.GetUserIDString(ctx)
 	updateMap := map[string]any{
 		"is_suspended": req.IsSuspended,
 		"updated_by":   userID,
@@ -238,7 +238,7 @@ func (svc *userSvc) UpdateStatus(ctx *gin.Context, req *dtouser.UserStatusUpdate
 func (svc *userSvc) GetUserLoginLogByUser(ctx *gin.Context, req *dtouser.UserLoginLogByUserReq) (*dtouser.UserLoginLogPageListResp, error) {
 	userLoginLogRepo := dao.NewUserLoginLogDao()
 	cond := &dao.UserLoginLogCond{
-		TenantID: gincontext.GetTenantID(ctx),
+		TenantID: gincontext.GetTenantIDString(ctx),
 		UserID:   req.UserID,
 	}
 	userLoginLogEntityList, total, err := userLoginLogRepo.GetPageListByCond(ctx, cond)

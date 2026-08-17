@@ -218,7 +218,7 @@ func marshalJSON(value any) (json.RawMessage, error) {
 }
 
 func (svc *connectorSvc) Create(ctx *gin.Context, req *dtoauth.ConnectorCreateReq) (*dtoauth.ConnectorCreateResp, error) {
-	insertEntity, err := buildConnectorInsertEntity(req, gincontext.GetTenantID(ctx), gincontext.GetUserID(ctx))
+	insertEntity, err := buildConnectorInsertEntity(req, gincontext.GetTenantIDString(ctx), gincontext.GetUserIDString(ctx))
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.CreateConnector] build insert entity fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorCreateError)
@@ -239,11 +239,11 @@ func (svc *connectorSvc) Delete(ctx *gin.Context, req *dtoauth.ConnectorDeleteRe
 		glog.Errorf(ctx, "[svcauth.DeleteConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorDeleteError)
 	}
-	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantID(ctx)) {
+	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantIDString(ctx)) {
 		return code.GetError(code.ConnectorNotExistError)
 	}
 
-	userID := gincontext.GetUserID(ctx)
+	userID := gincontext.GetUserIDString(ctx)
 	if err := dao.NewConnectorDao().Delete(ctx, req.ConnectorID, userID); err != nil {
 		glog.Errorf(ctx, "[svcauth.DeleteConnector] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorDeleteError)
@@ -257,11 +257,11 @@ func (svc *connectorSvc) Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateRe
 		glog.Errorf(ctx, "[svcauth.UpdateConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorUpdateError)
 	}
-	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantID(ctx)) {
+	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantIDString(ctx)) {
 		return code.GetError(code.ConnectorNotExistError)
 	}
 
-	updateMap, err := buildConnectorUpdateMap(req, gincontext.GetUserID(ctx))
+	updateMap, err := buildConnectorUpdateMap(req, gincontext.GetUserIDString(ctx))
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.UpdateConnector] build update map fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorUpdateError)
@@ -279,7 +279,7 @@ func (svc *connectorSvc) Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailRe
 		glog.Errorf(ctx, "[svcauth.DetailConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
-	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantID(ctx)) {
+	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantIDString(ctx)) {
 		return nil, code.GetError(code.ConnectorNotExistError)
 	}
 
@@ -322,7 +322,7 @@ func (svc *connectorSvc) PageList(ctx *gin.Context, req *dtoauth.ConnectorPageLi
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID:    gincontext.GetTenantID(ctx),
+		TenantID:    gincontext.GetTenantIDString(ctx),
 		Protocol:    req.Protocol,
 		Provider:    req.Provider,
 		Status:      req.Status,
@@ -390,7 +390,7 @@ func (svc *connectorSvc) TestConnector(ctx *gin.Context, req *dtoconnector.Conne
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
 	// H11：与其他 CRUD 一致，测试连接器必须校验租户归属（防跨租户触发外部网络请求）
-	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantID(ctx)) {
+	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantIDString(ctx)) {
 		return nil, code.GetError(code.ConnectorNotExistError)
 	}
 	driver, config, err := selectDriverForConnector(svc.getDriverRegistry(), connectorEntity)
@@ -413,7 +413,7 @@ func (svc *connectorSvc) Authorize(ctx *gin.Context, req *dtoconnector.Connector
 		glog.Errorf(ctx, "[svcauth.Authorize] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
-	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantID(ctx)) || connectorEntity.Status != connectorStatusEnabled {
+	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantIDString(ctx)) || connectorEntity.Status != connectorStatusEnabled {
 		return nil, code.GetError(code.ConnectorNotExistError)
 	}
 	// H12：redirect_uri 必须与本连接器配置的回调地址同源且为 https，

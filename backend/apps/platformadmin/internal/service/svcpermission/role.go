@@ -40,7 +40,7 @@ func (svc *roleSvc) Detail(ctx *gin.Context, req *dtopermission.RoleDetailReq) (
 		glog.Errorf(ctx, "[svcpermission.DetailRole] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.RoleGetDetailError)
 	}
-	if !roleVisibleToTenant(roleEntity, gincontext.GetTenantID(ctx)) {
+	if !roleVisibleToTenant(roleEntity, gincontext.GetTenantIDString(ctx)) {
 		return nil, code.GetError(code.RoleNotExistError)
 	}
 
@@ -69,7 +69,7 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtopermission.RolePageListRe
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID: gincontext.GetTenantID(ctx),
+		TenantID: gincontext.GetTenantIDString(ctx),
 		Name:     req.Name,
 		Code:     req.Code,
 		Type:     req.Type,
