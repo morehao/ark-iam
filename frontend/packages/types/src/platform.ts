@@ -78,7 +78,6 @@ export interface RoleItem {
   name: string
   code: string
   description: string
-  type: string
   source?: 'builtin' | 'custom' | string
   adminLevel?: 'none' | 'basic' | 'super' | string
   createdAt?: number
@@ -89,7 +88,6 @@ export interface RoleCreateReq {
   name: string
   code: string
   description?: string
-  type?: string
 }
 
 export interface RoleUpdateReq {
@@ -97,7 +95,6 @@ export interface RoleUpdateReq {
   name?: string
   code?: string
   description?: string
-  type?: string
 }
 
 export interface RoleUserItem {
@@ -323,7 +320,6 @@ export interface MenuItem {
   hidden: number
   externalLink: number
   keepAlive: number
-  permission: string
   status: string
   createdAt?: number
   children?: MenuItem[]
@@ -331,26 +327,6 @@ export interface MenuItem {
 
 export interface MenuTreeResp {
   list: MenuItem[]
-}
-
-// ---------- 权限域 / 资源 ----------
-export interface ScopeItem {
-  scopeID: string
-  tenantID: string
-  resourceID: string
-  name: string
-  description: string
-  createdAt?: number
-}
-
-export interface ResourceItem {
-  resourceID: string
-  tenantID: string
-  name: string
-  indicator: string
-  isDefault: number
-  accessTokenTtl: number
-  createdAt?: number
 }
 
 // ---------- 域名 ----------

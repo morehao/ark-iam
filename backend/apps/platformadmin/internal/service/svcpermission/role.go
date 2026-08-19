@@ -51,7 +51,6 @@ func (svc *roleSvc) Detail(ctx *gin.Context, req *dtopermission.RoleDetailReq) (
 			Name:        roleEntity.Name,
 			Code:        roleEntity.Code,
 			Description: roleEntity.Description,
-			Type:        roleEntity.Type,
 			Source:      roleEntity.Source,
 			AdminLevel:  roleEntity.AdminLevel,
 		},
@@ -73,7 +72,6 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtopermission.RolePageListRe
 		TenantID: gincontext.GetTenantIDString(ctx),
 		Name:     req.Name,
 		Code:     req.Code,
-		Type:     req.Type,
 	}
 	roleEntityList, total, err := roleRepo.GetPageListByCond(ctx, cond)
 	if err != nil {
@@ -90,7 +88,6 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtopermission.RolePageListRe
 				Name:        v.Name,
 				Code:        v.Code,
 				Description: v.Description,
-				Type:        v.Type,
 				Source:      v.Source,
 				AdminLevel:  v.AdminLevel,
 			},

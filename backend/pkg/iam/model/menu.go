@@ -44,7 +44,6 @@ type MenuEntity struct {
 	Hidden       bool   `gorm:"column:hidden;type:boolean;not null;default:false;comment:是否隐藏"`
 	ExternalLink bool   `gorm:"column:external_link;type:boolean;not null;default:false;comment:是否外链"`
 	KeepAlive    bool   `gorm:"column:keep_alive;type:boolean;not null;default:false;comment:是否缓存"`
-	Permission   string `gorm:"column:permission;type:varchar(128);not null;default:'';comment:权限标识"`
 	Status       string `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态"`
 	CreatedBy    string `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id"`
 	UpdatedBy    string `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id"`

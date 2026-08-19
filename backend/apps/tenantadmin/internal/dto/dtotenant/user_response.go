@@ -36,7 +36,6 @@ type UserRoleItem struct {
 	Name        string `json:"name"`        // 角色名称
 	Code        string `json:"code"`        // 角色编码
 	Description string `json:"description"` // 角色描述
-	Type        string `json:"type"`        // 角色类型
 }
 
 type UserRolesListResp struct {

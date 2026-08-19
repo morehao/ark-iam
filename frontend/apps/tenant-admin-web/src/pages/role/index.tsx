@@ -29,23 +29,22 @@ import {
 import { getTenantApps } from '../../api/menu'
 import { fmtTime } from '../../components/common'
 
-const ROLE_TYPE_OPTIONS = [
-  { label: '用户', value: 'User' },
-  { label: '管理员', value: 'Admin' },
-  { label: '访客', value: 'Guest' },
-]
-
-function renderRoleType(type?: string) {
-  switch (type) {
-    case 'Admin':
-      return <Tag color="purple">管理员</Tag>
-    case 'User':
-      return <Tag color="blue">用户</Tag>
-    case 'Guest':
-      return <Tag color="default">访客</Tag>
+/** 系统管理等级展示：super→超管，basic→基础，none→无 */
+function adminLevelText(level?: string) {
+  switch (level) {
+    case 'super':
+      return <Tag color="red">超管</Tag>
+    case 'basic':
+      return <Tag color="purple">基础管理</Tag>
+    case 'none':
     default:
-      return <Tag>{type || '-'}</Tag>
+      return <Tag>无</Tag>
   }
+}
+
+/** 来源标签：builtin→内置(金)，其余→自定义(蓝) */
+function sourceTag(source?: string) {
+  return source === 'builtin' ? <Tag color="gold">内置</Tag> : <Tag color="blue">自定义</Tag>
 }
 
 // 菜单树 -> Tree 数据
@@ -110,7 +109,7 @@ export default function TenantRolePage() {
 
   const openEdit = (record: TenantRoleItem) => {
     setEditing(record)
-    form.setFieldsValue({ name: record.name, code: record.code, description: record.description, type: record.type })
+    form.setFieldsValue({ name: record.name, code: record.code, description: record.description })
     setModalOpen(true)
   }
 
@@ -175,13 +174,19 @@ export default function TenantRolePage() {
     { title: '角色名称', dataIndex: 'name', key: 'name', width: 150, render: (v: string) => v || '-' },
     { title: '所属应用', dataIndex: 'appName', key: 'appName', width: 130, render: (_: string, r) => <Tag>{r.appName || '系统角色'}</Tag> },
     { title: '角色编码', dataIndex: 'code', key: 'code', width: 150, render: (v: string) => v || '-' },
-    { title: '类型', dataIndex: 'type', key: 'type', width: 100, render: (v: string) => renderRoleType(v) },
     {
       title: '来源',
       dataIndex: 'source',
       key: 'source',
       width: 100,
       render: (v: string) => (v === 'builtin' ? <Tag color="gold">内置</Tag> : <Tag color="blue">自定义</Tag>),
+    },
+    {
+      title: '系统管理',
+      dataIndex: 'adminLevel',
+      key: 'adminLevel',
+      width: 110,
+      render: (v: string) => adminLevelText(v),
     },
     { title: '描述', dataIndex: 'description', key: 'description', render: (v: string) => v || '-' },
     { title: '成员数', dataIndex: 'memberCount', key: 'memberCount', width: 80, render: (v: number) => v || 0 },
@@ -287,6 +292,15 @@ export default function TenantRolePage() {
         width={560}
       >
         <Form form={form} layout="vertical">
+          {/* 只读：来源 + 系统管理等级（新建固定 custom/none，编辑按记录回显） */}
+          <div style={{ display: 'flex', gap: 24, marginBottom: 20, color: '#475569', fontSize: 13 }}>
+            <span>
+              来源：{editing ? sourceTag(editing.source) : sourceTag('custom')}
+            </span>
+            <span>
+              系统管理：{adminLevelText(editing?.adminLevel)}
+            </span>
+          </div>
           {!editing && (
             <Form.Item name="appID" label="所属应用" rules={[{ required: true, message: '请选择所属应用' }]}>
               <Select placeholder="选择该角色归属的应用" options={apps.map((a) => ({ label: a.name, value: a.appID }))} />
@@ -297,9 +311,6 @@ export default function TenantRolePage() {
           </Form.Item>
           <Form.Item name="code" label="角色编码" rules={[{ required: true, message: '请输入角色编码' }]}>
             <Input placeholder="如：dept_admin（应用内唯一）" />
-          </Form.Item>
-          <Form.Item name="type" label="类型" initialValue="User">
-            <Select options={ROLE_TYPE_OPTIONS} />
           </Form.Item>
           <Form.Item name="description" label="描述">
             <Input.TextArea rows={3} placeholder="选填" />

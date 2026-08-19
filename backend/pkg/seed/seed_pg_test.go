@@ -26,9 +26,9 @@ func TestSeedIamAgainstPostgres(t *testing.T) {
 	// 清理旧数据（顺序：先删关联表，再删主表）
 	cleanup := func() {
 		tables := []string{
-			"user_role", "role_menu", "role_scope", "tenant_application",
-			"application_client_secret", "application_client", "menu", "scope",
-			"resource", "role", "user_identity", "user_login_log",
+			"user_role", "role_menu", "tenant_application",
+			"application_client_secret", "application_client", "menu",
+			"role", "user_identity", "user_login_log",
 			"organization_user", "organization", "tenant_user", "person",
 			"refresh_token", "session", "audit_log", "api_key", "connector",
 			"domain", "system", "log", "application", "tenant",
@@ -69,15 +69,12 @@ func TestSeedIamAgainstPostgres(t *testing.T) {
 	assertCount("tenant", 1)
 	assertCount("application", 2)
 	assertCount("role", 1)
-	assertCount("resource", 2)
-	assertCount("scope", 12)
-	assertCount("menu", 15)
+	assertCount("menu", 12)
 	assertCount("person", 1)
 	assertCount("tenant_user", 1)
 	assertCount("application_client", 2)
 	assertCount("user_role", 1)
-	assertCount("role_menu", 15)
-	assertCount("role_scope", 10)
+	assertCount("role_menu", 12)
 	assertCount("tenant_application", 2)
 	assertCount("organization", 1)
 	assertCount("organization_user", 1)

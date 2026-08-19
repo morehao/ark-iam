@@ -3,14 +3,12 @@ package svctenant
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objpermission"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/glog"
-	"gorm.io/gorm"
 )
 
 // TenantMenuSvc 租户侧菜单服务
@@ -136,7 +134,6 @@ func buildAppMenuTree(ctx *gin.Context, appID string) ([]dtotenant.MenuTreeItem,
 					Hidden:       menu.Hidden,
 					ExternalLink: menu.ExternalLink,
 					KeepAlive:    menu.KeepAlive,
-					Permission:   menu.Permission,
 					Status:       menu.Status,
 				},
 				Children: buildTree(menu.ID),
@@ -225,7 +222,8 @@ func HasSystemAdminCapability(ctx *gin.Context) (bool, error) {
 	return level.HasSystemAdmin(), nil
 }
 
-// ResolveUserAdminLevel 推导当前用户能达到的最高系统管理等级（授权驱动，聚合该用户全部角色的 scope）。
+// ResolveUserAdminLevel 推导当前用户能达到的最高系统管理等级：聚合该用户全部角色，
+// 取各角色 admin_level（显式能力标签）的最高档位（none < basic < super）。
 func ResolveUserAdminLevel(ctx *gin.Context) (model.SysAdminLevel, error) {
 	tenantID := gincontext.GetTenantIDString(ctx)
 	userID := gincontext.GetUserIDString(ctx)
@@ -245,76 +243,18 @@ func ResolveUserAdminLevel(ctx *gin.Context) (model.SysAdminLevel, error) {
 	for _, r := range urList {
 		roleIDs = append(roleIDs, r.RoleID)
 	}
-	// 2. 角色 → scope 关联
-	var rsList []model.RoleScopeEntity
-	if err := gormDBFromCtx(ctx).Where("tenant_id = ? AND role_id IN ?", tenantID, roleIDs).Find(&rsList).Error; err != nil {
-		glog.Errorf(ctx, "[svctenant.ResolveUserAdminLevel] query role_scope fail, err:%v", err)
+	// 2. 角色 → 取最高 admin_level
+	roleList, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{TenantID: tenantID, IDs: roleIDs})
+	if err != nil {
+		glog.Errorf(ctx, "[svctenant.ResolveUserAdminLevel] query role fail, err:%v, tenantID:%s", err, tenantID)
 		return model.SysAdminLevelNone, err
 	}
-	if len(rsList) == 0 {
-		return model.SysAdminLevelNone, nil
-	}
-	scopeIDs := make([]string, 0, len(rsList))
-	for _, rs := range rsList {
-		scopeIDs = append(scopeIDs, rs.ScopeID)
-	}
-	// 3. scope → 聚合名称并推导等级
-	var scopeList []model.ScopeEntity
-	if err := gormDBFromCtx(ctx).Where("tenant_id = ? AND id IN ?", tenantID, scopeIDs).Find(&scopeList).Error; err != nil {
-		glog.Errorf(ctx, "[svctenant.ResolveUserAdminLevel] query scope fail, err:%v", err)
-		return model.SysAdminLevelNone, err
-	}
-	names := make([]string, 0, len(scopeList))
-	for _, s := range scopeList {
-		names = append(names, s.Name)
-	}
-	return model.DeriveAdminLevelFromScopeNames(names), nil
-}
-
-// SyncRoleAdminLevel 推导弹角色 admin_level 并回写（授权驱动投影同步入口）。
-// 供角色 scope 授权变更后调用：加载该角色已授 scope → 推导等级 → 若与当前不一致则更新列。
-func SyncRoleAdminLevel(ctx *gin.Context, role *model.RoleEntity) error {
-	if role == nil || role.ID == "" {
-		return nil
-	}
-	if role.AdminLevel == "" {
-		role.AdminLevel = string(model.SysAdminLevelNone)
-	}
-	// 该角色已授 scope 名称
-	var rsList []model.RoleScopeEntity
-	if err := gormDBFromCtx(ctx).Where("tenant_id = ? AND role_id = ?", role.TenantID, role.ID).Find(&rsList).Error; err != nil {
-		glog.Errorf(ctx, "[svctenant.SyncRoleAdminLevel] query role_scope fail, err:%v, roleID:%s", err, role.ID)
-		return err
-	}
-	var scopeIDs []string
-	for _, rs := range rsList {
-		scopeIDs = append(scopeIDs, rs.ScopeID)
-	}
-	names := []string{}
-	if len(scopeIDs) > 0 {
-		var scopeList []model.ScopeEntity
-		if err := gormDBFromCtx(ctx).Where("tenant_id = ? AND id IN ?", role.TenantID, scopeIDs).Find(&scopeList).Error; err != nil {
-			glog.Errorf(ctx, "[svctenant.SyncRoleAdminLevel] query scope fail, err:%v, roleID:%s", err, role.ID)
-			return err
-		}
-		for _, s := range scopeList {
-			names = append(names, s.Name)
+	level := model.SysAdminLevelNone
+	for _, r := range roleList {
+		lv := model.SysAdminLevel(r.AdminLevel)
+		if lv.SysAdminRank() > level.SysAdminRank() {
+			level = lv
 		}
 	}
-	target := string(model.DeriveAdminLevelFromScopeNames(names))
-	if role.AdminLevel == target {
-		return nil
-	}
-	if err := gormDBFromCtx(ctx).Model(&model.RoleEntity{}).Where("id = ?", role.ID).
-		UpdateColumn("admin_level", target).Error; err != nil {
-		glog.Errorf(ctx, "[svctenant.SyncRoleAdminLevel] update admin_level fail, err:%v, roleID:%s", err, role.ID)
-		return err
-	}
-	role.AdminLevel = target
-	return nil
-}
-
-// gormDBFromCtx 取得公共 IAM 库的 *gorm.DB（封装 dbclient，供本次聚合查询使用）。
-func gormDBFromCtx(ctx *gin.Context) *gorm.DB {
-	return dbclient.IamDB(ctx)
+	return level, nil
 }

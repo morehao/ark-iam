@@ -42,7 +42,6 @@ interface MenuFormValues {
   type?: string
   component?: string
   redirect?: string
-  permission?: string
   status?: string
   hidden: number
   externalLink: number
@@ -210,7 +209,6 @@ export default function MenuList() {
       type: menu.type,
       component: menu.component,
       redirect: menu.redirect,
-      permission: menu.permission,
       status: menu.status,
       hidden: menu.hidden,
       externalLink: menu.externalLink,
@@ -310,13 +308,6 @@ export default function MenuList() {
       dataIndex: 'path',
       key: 'path',
       width: 180,
-      render: (v: string) => <EllipsisCell value={v} monospace />,
-    },
-    {
-      title: '权限标识',
-      dataIndex: 'permission',
-      key: 'permission',
-      width: 190,
       render: (v: string) => <EllipsisCell value={v} monospace />,
     },
     {
@@ -579,9 +570,6 @@ export default function MenuList() {
           <Divider orientation="left" plain style={{ margin: '16px 0 8px', fontSize: 13 }}>
             权限与展示
           </Divider>
-          <Form.Item name="permission" label="权限标识">
-            <Input placeholder="如 iam:user:create" />
-          </Form.Item>
           <div style={{ display: 'flex', gap: 32 }}>
             <Form.Item name="hidden" label="隐藏" valuePropName="checked" getValueFromEvent={(c: boolean) => (c ? 1 : 0)}>
               <Switch checkedChildren="是" unCheckedChildren="否" />

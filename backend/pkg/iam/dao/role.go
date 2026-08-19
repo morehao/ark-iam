@@ -13,7 +13,6 @@ type RoleCond struct {
 	IDs               []string
 	Name              string
 	Code              string
-	Type              string
 	Source            string
 	AdminLevel        string // 精确匹配系统管理等级
 	AdminLevelAtLeast string // 按门槛匹配：admin_level 等级 >= 该值（如 "basic" 命中 basic/super）
@@ -42,9 +41,6 @@ func (c *RoleCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.Code != "" {
 		db.Where(tableName+".code = ?", c.Code)
-	}
-	if c.Type != "" {
-		db.Where(tableName+".type = ?", c.Type)
 	}
 	if c.Source != "" {
 		db.Where(tableName+".source = ?", c.Source)

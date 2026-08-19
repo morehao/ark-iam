@@ -31,10 +31,12 @@ export function TenantSwitcher() {
           color: '#333',
           cursor: 'pointer',
           fontSize: 13,
+          lineHeight: 1,
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 6,
-          padding: '6px 12px',
+          height: 32,
+          padding: '0 12px',
+          boxSizing: 'border-box',
           borderRadius: 8,
           border: '1px solid #e5e7eb',
           background: '#fafbff',
@@ -43,7 +45,7 @@ export function TenantSwitcher() {
         className="tenant-switcher"
       >
         <SwapOutlined style={{ color: '#4f6ef7' }} />
-        <span style={{ fontWeight: 500 }}>{currentName}</span>
+        <span style={{ fontWeight: 500, lineHeight: 1 }}>{currentName}</span>
       </span>
     </Dropdown>
   )

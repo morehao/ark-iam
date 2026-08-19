@@ -16,10 +16,8 @@ import type {
   OAuthSecretCreateResp,
   OAuthSecretItem,
   PageListResp,
-  ResourceItem,
   RoleItem,
   RoleUserItem,
-  ScopeItem,
   SystemConfigItem,
   TenantApplicationCreateReq,
   TenantApplicationItem,
@@ -137,28 +135,6 @@ export const updateMenu = (data: Partial<MenuItem>) => {
   return request.put<any, string>(`/platform/menus/${menuID}`, body)
 }
 export const deleteMenu = (menuID: string) => request.delete<any, string>(`/platform/menus/${menuID}`)
-
-// ==================== 权限域 ====================
-export const getScopePageList = (data: { page: number; pageSize: number; name?: string }) =>
-  request.get<any, PageListResp<ScopeItem>>('/platform/scopes', { params: data })
-export const getScopeDetail = (scopeID: string) => request.get<any, ScopeItem>(`/platform/scopes/${scopeID}`)
-export const createScope = (data: Partial<ScopeItem>) => request.post<any, { scopeID: string }>('/platform/scopes', data)
-export const updateScope = (data: Partial<ScopeItem>) => {
-  const { scopeID, ...body } = data
-  return request.put<any, string>(`/platform/scopes/${scopeID}`, body)
-}
-export const deleteScope = (scopeID: string) => request.delete<any, string>(`/platform/scopes/${scopeID}`)
-
-// ==================== 资源 ====================
-export const getResourcePageList = (data: { page: number; pageSize: number; name?: string }) =>
-  request.get<any, PageListResp<ResourceItem>>('/platform/resources', { params: data })
-export const getResourceDetail = (resourceID: string) => request.get<any, ResourceItem>(`/platform/resources/${resourceID}`)
-export const createResource = (data: Partial<ResourceItem>) => request.post<any, { resourceID: string }>('/platform/resources', data)
-export const updateResource = (data: Partial<ResourceItem>) => {
-  const { resourceID, ...body } = data
-  return request.put<any, string>(`/platform/resources/${resourceID}`, body)
-}
-export const deleteResource = (resourceID: string) => request.delete<any, string>(`/platform/resources/${resourceID}`)
 
 // ==================== 域名 ====================
 export const getDomainPageList = (data: { page: number; pageSize: number; domain?: string }) =>

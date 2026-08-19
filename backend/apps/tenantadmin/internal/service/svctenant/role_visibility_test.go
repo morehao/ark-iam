@@ -20,7 +20,6 @@ func seedBuiltinRole(t *testing.T, db *gorm.DB, id, tenantID, appID string) {
 		AppID:      appID,
 		Name:       "管理员",
 		Code:       "admin",
-		Type:       "User",
 		Source:     string(model.RoleSourceBuiltin),
 		AdminLevel: string(model.SysAdminLevelSuper),
 		CreatedBy:  "seed",
@@ -56,13 +55,13 @@ func TestUpdateRejectsBuiltinCoreChange(t *testing.T) {
 	ginCtx := newOrgGinCtx(t, "t1", "op")
 
 	// 改编码 → 拒绝
-	err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "管理员", Code: "super-admin", Type: "User"})
+	err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "管理员", Code: "super-admin"})
 	if err == nil || err != code.GetError(code.RoleUpdateBuiltinForbiddenError) {
 		t.Fatalf("expected builtin update forbidden, got %v", err)
 	}
 
 	// 改名 + 改描述 → 允许（核心字段不变）
-	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "超级管理员", Code: "admin", Type: "User", Description: "系统内置"}); err != nil {
+	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "超级管理员", Code: "admin", Description: "系统内置"}); err != nil {
 		t.Fatalf("update name/desc should be allowed: %v", err)
 	}
 	var got model.RoleEntity
@@ -74,33 +73,27 @@ func TestUpdateRejectsBuiltinCoreChange(t *testing.T) {
 	}
 }
 
-// TestHasSystemAdminCapability 系统管理能力判定（授权驱动）：admin 角色拥有管理 scope 则具备能力，
-// 普通成员（仅 me scope）不具备。
+// TestHasSystemAdminCapability 系统管理能力判定（按角色显式 admin_level 标签）：
+// admin 角色 admin_level=super 则具备能力；普通成员角色 admin_level=none 不具备。
 func TestHasSystemAdminCapability(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserRoleEntity{}, &model.RoleScopeEntity{}, &model.ScopeEntity{},
-		&model.ResourceEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
-	for _, s := range []*model.ScopeEntity{
-		{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "s1"}}, TenantID: "t1", Name: "platform-admin:user:write"},
-		{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "s2"}}, TenantID: "t1", Name: "me:profile:read"},
-	} {
-		if err := db.Create(s).Error; err != nil {
-			t.Fatalf("seed scope: %v", err)
-		}
-	}
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{},
+		&model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	seedTestApp(t, db, "t1", "app1")
 
-	// 用户 u1 → 角色 r-admin → scope s1（管理写）
+	// 用户 u1 → 角色 r-admin（super）→ 具备
+	if err := db.Create(&model.RoleEntity{
+		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "r-admin"}},
+		TenantID:   "t1", AppID: "app1", Name: "管理员", Code: "admin",
+		Source: string(model.RoleSourceCustom), AdminLevel: string(model.SysAdminLevelSuper),
+		CreatedBy: "t",
+	}).Error; err != nil {
+		t.Fatalf("seed role: %v", err)
+	}
 	if err := db.Create(&model.UserRoleEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "ur1"}},
 		TenantID:   "t1", UserID: "u1", RoleID: "r-admin", CreatedBy: "t",
 	}).Error; err != nil {
 		t.Fatalf("seed user_role: %v", err)
-	}
-	if err := db.Create(&model.RoleScopeEntity{
-		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "rs1"}},
-		TenantID:   "t1", RoleID: "r-admin", ScopeID: "s1", CreatedBy: "t",
-	}).Error; err != nil {
-		t.Fatalf("seed role_scope: %v", err)
 	}
 
 	has, err := HasSystemAdminCapability(newOrgGinCtx(t, "t1", "u1"))
@@ -111,25 +104,27 @@ func TestHasSystemAdminCapability(t *testing.T) {
 		t.Fatalf("admin user should have system admin capability")
 	}
 
-	// 用户 u2 → 角色 r-user → scope s2（仅 me），不具备
+	// 用户 u2 → 角色 r-user（none）→ 不具备
+	if err := db.Create(&model.RoleEntity{
+		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "r-user"}},
+		TenantID:   "t1", AppID: "app1", Name: "成员", Code: "user",
+		Source: string(model.RoleSourceCustom), AdminLevel: string(model.SysAdminLevelNone),
+		CreatedBy: "t",
+	}).Error; err != nil {
+		t.Fatalf("seed role u2: %v", err)
+	}
 	if err := db.Create(&model.UserRoleEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "ur2"}},
 		TenantID:   "t1", UserID: "u2", RoleID: "r-user", CreatedBy: "t",
 	}).Error; err != nil {
 		t.Fatalf("seed user_role u2: %v", err)
 	}
-	if err := db.Create(&model.RoleScopeEntity{
-		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "rs2"}},
-		TenantID:   "t1", RoleID: "r-user", ScopeID: "s2", CreatedBy: "t",
-	}).Error; err != nil {
-		t.Fatalf("seed role_scope u2: %v", err)
-	}
 	has, err = HasSystemAdminCapability(newOrgGinCtx(t, "t1", "u2"))
 	if err != nil {
 		t.Fatalf("hasadmin u2: %v", err)
 	}
 	if has {
-		t.Fatalf("user with only me scope should NOT have system admin capability")
+		t.Fatalf("user with none admin_level role should NOT have system admin capability")
 	}
 }
 
@@ -183,7 +178,6 @@ func seedBuiltinSystemRole(t *testing.T, db *gorm.DB, id, tenantID, appID string
 		AppID:      appID,
 		Name:       "管理员",
 		Code:       "admin",
-		Type:       "User",
 		Source:     string(model.RoleSourceBuiltin),
 		AdminLevel: string(model.SysAdminLevelSuper),
 		CreatedBy:  "seed",
@@ -259,24 +253,5 @@ func TestUpdateRolesAllowWhenOtherAdminExists(t *testing.T) {
 	err := svc.UpdateRoles(newOrgGinCtx(t, "t1", "op"), &dtotenant.UserRolesUpdateReq{UserID: "u1", RoleIDs: []string{}})
 	if err != nil {
 		t.Fatalf("release when another admin remains should be allowed: %v", err)
-	}
-}
-
-// TestDeriveAdminLevelFromScopeNames 授权驱动推导规则。
-func TestDeriveAdminLevelFromScopeNames(t *testing.T) {
-	cases := []struct {
-		names []string
-		want  model.SysAdminLevel
-	}{
-		{nil, model.SysAdminLevelNone},
-		{[]string{"me:profile:read"}, model.SysAdminLevelNone},            // 个人中心不算系统管理
-		{[]string{"platform-admin:application:read"}, model.SysAdminLevelBasic}, // 管理类只读
-		{[]string{"tenant:user:write"}, model.SysAdminLevelSuper},         // 管理类写
-		{[]string{"me:profile:write", "platform-admin:role:read", "tenant:user:write"}, model.SysAdminLevelSuper},
-	}
-	for _, c := range cases {
-		if got := model.DeriveAdminLevelFromScopeNames(c.names); got != c.want {
-			t.Fatalf("DeriveAdminLevelFromScopeNames(%v) = %q, want %q", c.names, got, c.want)
-		}
 	}
 }

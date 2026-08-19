@@ -48,7 +48,6 @@ function makeStaticMenu(id: string, name: string, code: string, path: string, ic
     hidden: 0,
     externalLink: 0,
     keepAlive: 0,
-    permission: '',
     status: 'enable',
   }
 }

@@ -50,7 +50,6 @@ func (svc *menuSvc) Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (
 		Hidden:       req.Hidden,
 		ExternalLink: req.ExternalLink,
 		KeepAlive:    req.KeepAlive,
-		Permission:   req.Permission,
 		Status:       req.Status,
 		CreatedBy:    gincontext.GetUserIDString(ctx),
 	}
@@ -107,7 +106,6 @@ func (svc *menuSvc) Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) e
 		"hidden":        req.Hidden,
 		"external_link": req.ExternalLink,
 		"keep_alive":    req.KeepAlive,
-		"permission":    req.Permission,
 		"status":        req.Status,
 		"updated_by":    userID,
 	}
@@ -145,7 +143,6 @@ func (svc *menuSvc) Detail(ctx *gin.Context, req *dtopermission.MenuDetailReq) (
 			Hidden:       menuEntity.Hidden,
 			ExternalLink: menuEntity.ExternalLink,
 			KeepAlive:    menuEntity.KeepAlive,
-			Permission:   menuEntity.Permission,
 			Status:       menuEntity.Status,
 		},
 		OperatorBaseInfo: gobject.OperatorBaseInfo{
@@ -195,7 +192,6 @@ func (svc *menuSvc) PageList(ctx *gin.Context, req *dtopermission.MenuPageListRe
 				Hidden:       v.Hidden,
 				ExternalLink: v.ExternalLink,
 				KeepAlive:    v.KeepAlive,
-				Permission:   v.Permission,
 				Status:       v.Status,
 			},
 			OperatorBaseInfo: gobject.OperatorBaseInfo{
@@ -242,7 +238,6 @@ func (svc *menuSvc) Tree(ctx *gin.Context, req *dtopermission.MenuTreeReq) (*dto
 						Hidden:       menu.Hidden,
 						ExternalLink: menu.ExternalLink,
 						KeepAlive:    menu.KeepAlive,
-						Permission:   menu.Permission,
 						Status:       menu.Status,
 					},
 					OperatorBaseInfo: gobject.OperatorBaseInfo{

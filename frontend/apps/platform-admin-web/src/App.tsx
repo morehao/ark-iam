@@ -11,7 +11,6 @@ import {
   GlobalOutlined,
   KeyOutlined,
   MenuOutlined,
-  ProfileOutlined,
   SafetyCertificateOutlined,
   SettingOutlined,
   ShoppingOutlined,
@@ -29,8 +28,6 @@ import OAuthClientList from './pages/oauthClient'
 import OAuthClientDetail from './pages/oauthClient/Detail'
 import ApiKeyList from './pages/apiKey'
 import MenuList from './pages/menu'
-import ScopeList from './pages/scope'
-import ResourceList from './pages/resource'
 import DomainList from './pages/domain'
 import SystemList from './pages/system'
 import LogList from './pages/log'
@@ -45,8 +42,6 @@ const menuItems: MainMenuItems[] = [
       { key: '/user', icon: <UserOutlined />, label: '用户管理' },
       { key: '/role', icon: <SafetyCertificateOutlined />, label: '角色管理' },
       { key: '/menu', icon: <MenuOutlined />, label: '菜单管理' },
-      { key: '/scope', icon: <ProfileOutlined />, label: '权限域' },
-      { key: '/resource', icon: <FileSearchOutlined />, label: '资源' },
     ],
   },
   {
@@ -116,8 +111,6 @@ function App() {
         <Route path="oauthClient/:id" element={<OAuthClientDetail />} />
         <Route path="apiKey" element={<ApiKeyList />} />
         <Route path="menu" element={<MenuList />} />
-        <Route path="scope" element={<ScopeList />} />
-        <Route path="resource" element={<ResourceList />} />
         <Route path="domain" element={<DomainList />} />
         <Route path="system" element={<SystemList />} />
         <Route path="log" element={<LogList />} />

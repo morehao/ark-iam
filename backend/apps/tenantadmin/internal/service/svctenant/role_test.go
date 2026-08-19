@@ -40,7 +40,6 @@ func seedTestRole(t *testing.T, db *gorm.DB, id, tenantID, appID, name, code str
 		AppID:      appID,
 		Name:       name,
 		Code:       code,
-		Type:       "User",
 		CreatedBy:  "t",
 	}).Error; err != nil {
 		t.Fatalf("seed role: %v", err)

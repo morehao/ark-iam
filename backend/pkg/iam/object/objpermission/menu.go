@@ -15,6 +15,5 @@ type MenuBaseInfo struct {
 	Hidden bool   `json:"hidden" form:"hidden"`                  // 是否隐藏
 	ExternalLink bool   `json:"externalLink" form:"externalLink"`      // 是否外链
 	KeepAlive bool   `json:"keepAlive" form:"keepAlive"`            // 是否缓存
-	Permission   string `json:"permission" form:"permission"`          // 权限标识
 	Status       string `json:"status" form:"status"`                  // 状态
 }

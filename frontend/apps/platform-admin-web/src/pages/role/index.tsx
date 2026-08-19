@@ -7,18 +7,6 @@ import { getRolePageList, getRoleUsers } from '@ark-iam/api'
 import type { RoleItem, RoleUserItem } from '@ark-iam/types'
 import { fmtTime } from '../../components/common'
 
-/** 角色类型渲染：User→用户(蓝)，Admin→管理员(紫)，其他原样展示 */
-function renderRoleType(type?: string) {
-  switch (type) {
-    case 'User':
-      return <Tag color="blue">用户</Tag>
-    case 'Admin':
-      return <Tag color="purple">管理员</Tag>
-    default:
-      return <Tag>{type || '-'}</Tag>
-  }
-}
-
 /** 系统管理等级展示：super→超管，basic→基础，none→无 */
 function adminLevelText(level?: string) {
   switch (level) {
@@ -87,7 +75,20 @@ export default function RoleList() {
     { title: '角色ID', dataIndex: 'roleID', key: 'roleID', width: 150, render: (v: string) => <IDCell value={v} /> },
     { title: '角色名称', dataIndex: 'name', key: 'name', width: 160, render: (v: string) => v || '-' },
     { title: '角色编码', dataIndex: 'code', key: 'code', width: 160, render: (v: string) => v || '-' },
-    { title: '类型', dataIndex: 'type', key: 'type', width: 110, render: (v: string) => renderRoleType(v) },
+    {
+      title: '来源',
+      dataIndex: 'source',
+      key: 'source',
+      width: 100,
+      render: (v: string) => (v === 'builtin' ? <Tag color="gold">内置</Tag> : <Tag color="blue">自定义</Tag>),
+    },
+    {
+      title: '系统管理',
+      dataIndex: 'adminLevel',
+      key: 'adminLevel',
+      width: 110,
+      render: (v: string) => adminLevelText(v),
+    },
     { title: '描述', dataIndex: 'description', key: 'description', render: (v: string) => <EllipsisCell value={v} /> },
     {
       title: '创建时间',
@@ -150,7 +151,7 @@ export default function RoleList() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1000 }}
+        scroll={{ x: 1140 }}
         pagination={{
           current: page,
           pageSize,
@@ -171,7 +172,6 @@ export default function RoleList() {
             <Descriptions.Item label="角色ID"><IDCell value={detailRole.roleID} /></Descriptions.Item>
             <Descriptions.Item label="角色名称">{detailRole.name}</Descriptions.Item>
             <Descriptions.Item label="角色编码">{detailRole.code}</Descriptions.Item>
-            <Descriptions.Item label="类型">{renderRoleType(detailRole.type)}</Descriptions.Item>
             <Descriptions.Item label="来源">
               {detailRole.source === 'builtin' ? <Tag color="gold">内置</Tag> : <Tag color="blue">自定义</Tag>}
             </Descriptions.Item>

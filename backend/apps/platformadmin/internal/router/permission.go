@@ -27,26 +27,6 @@ func menuRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.DELETE("/menus/:menuID", menuCtr.Delete)
 }
 
-func scopeRouter(groups *ginserver.RouterGroups) {
-	scopeCtr := ctrpermission.NewScopeCtr()
-	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.POST("/scopes", scopeCtr.Create)
-	v1RouterGroup.GET("/scopes", scopeCtr.PageList)
-	v1RouterGroup.GET("/scopes/:scopeID", scopeCtr.Detail)
-	v1RouterGroup.PUT("/scopes/:scopeID", scopeCtr.Update)
-	v1RouterGroup.DELETE("/scopes/:scopeID", scopeCtr.Delete)
-}
-
-func resourceRouter(groups *ginserver.RouterGroups) {
-	resourceCtr := ctrpermission.NewResourceCtr()
-	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.POST("/resources", resourceCtr.Create)
-	v1RouterGroup.GET("/resources", resourceCtr.PageList)
-	v1RouterGroup.GET("/resources/:resourceID", resourceCtr.Detail)
-	v1RouterGroup.PUT("/resources/:resourceID", resourceCtr.Update)
-	v1RouterGroup.DELETE("/resources/:resourceID", resourceCtr.Delete)
-}
-
 func applicationClientRouter(groups *ginserver.RouterGroups) {
 	appCtr := ctrapplicationclient.NewApplicationClientCtr()
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)

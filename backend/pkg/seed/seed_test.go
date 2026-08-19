@@ -60,20 +60,17 @@ func TestSeedIamSQLite(t *testing.T) {
 	assertCount("tenant", 1)
 	assertCount("application", 2)
 	assertCount("role", 1)
-	assertCount("resource", 2)
-	assertCount("scope", 12)
-	assertCount("menu", 15)
+	assertCount("menu", 12)
 	assertCount("person", 1)
 	assertCount("tenant_user", 1)
 	assertCount("application_client", 2)
 	assertCount("user_role", 1)
-	assertCount("role_menu", 15)
-	assertCount("role_scope", 10)
+	assertCount("role_menu", 12)
 	assertCount("tenant_application", 2)
 	assertCount("organization", 1)
 	assertCount("organization_user", 1)
 
-	// 授权驱动派生化：内置唯一角色 admin 的 admin_level = super（按 scope 推导）
+	// 内置唯一角色 admin 的 admin_level = super（种子显式能力标签，非 scope 推导）
 	adminLevelByCode := map[string]string{}
 	var roles []model.RoleEntity
 	if err := db.Find(&roles).Error; err != nil {

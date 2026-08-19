@@ -39,9 +39,6 @@ func NewRoleSvc() RoleSvc {
 // Create 创建租户角色（编码租户内唯一）。
 func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dtotenant.RoleCreateResp, error) {
 	tenantID := gincontext.GetTenantIDString(ctx)
-	if req.Type == "" {
-		req.Type = "User"
-	}
 
 	// 角色从属于租户订阅的应用：校验 appID
 	appList, err := loadTenantApps(ctx)
@@ -75,7 +72,6 @@ func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dto
 		Name:        req.Name,
 		Code:        req.Code,
 		Description: req.Description,
-		Type:        req.Type,
 		Source:      string(model.RoleSourceCustom),
 		AdminLevel:  string(model.SysAdminLevelNone),
 		CreatedBy:   gincontext.GetUserIDString(ctx),
@@ -145,12 +141,11 @@ func (svc *roleSvc) Update(ctx *gin.Context, req *dtotenant.RoleUpdateReq) error
 		"name":        req.Name,
 		"code":        req.Code,
 		"description": req.Description,
-		"type":        req.Type,
 		"updated_by":  gincontext.GetUserIDString(ctx),
 	}
-	// 内置角色保护：禁止改核心字段（编码/类别），名称与描述仍可改
+	// 内置角色保护：禁止改核心字段（编码），名称与描述仍可改
 	if roleEntity.Source == string(model.RoleSourceBuiltin) {
-		if req.Code != roleEntity.Code || req.Type != roleEntity.Type {
+		if req.Code != roleEntity.Code {
 			return code.GetError(code.RoleUpdateBuiltinForbiddenError)
 		}
 	}
@@ -183,7 +178,6 @@ func (svc *roleSvc) Detail(ctx *gin.Context, req *dtotenant.RoleDetailReq) (*dto
 		Name:        roleEntity.Name,
 		Code:        roleEntity.Code,
 		Description: roleEntity.Description,
-		Type:        roleEntity.Type,
 		Source:      roleEntity.Source,
 		AdminLevel:  roleEntity.AdminLevel,
 		MemberCount: memberCount[req.RoleID],
@@ -233,7 +227,6 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtotenant.RolePageListReq) (
 			Name:        v.Name,
 			Code:        v.Code,
 			Description: v.Description,
-			Type:        v.Type,
 			Source:      v.Source,
 			AdminLevel:  v.AdminLevel,
 			MemberCount: memberCount[v.ID],

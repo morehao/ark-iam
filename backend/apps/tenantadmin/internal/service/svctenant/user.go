@@ -604,7 +604,6 @@ func (svc *userSvc) listRoles(ctx *gin.Context, tenantID, userID string) ([]dtot
 			Name:        role.Name,
 			Code:        role.Code,
 			Description: role.Description,
-			Type:        role.Type,
 		})
 	}
 	return list, nil

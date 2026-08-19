@@ -1,5 +1,9 @@
 # 角色表两维度调整方案：内置/自定义 × 管理员/普通成员
 
+> ⚠️ **本方案已废弃（superseded）**。下文的核心设计——「业务权限 scope（`resource`/`scope`/`role_scope`）+ 授权驱动推导 `admin_level`」——已在后续调整中**彻底移除**：业务权限点不再由 IAM 承载，`admin_level` 改为角色的**显式能力标签**（由租户管理员直接勾选 none/basic/super），权限职责回归业务应用，IAM/auth 仅做身份。若需追溯当时的拆解依据，保留本文作为历史记录；**勿再按本方案的 scope 授权驱动落地**。
+>
+> 说明：本文在此前的会话中已记录了「内置/自定义 × 管理员/普通成员」两维度的落地（`role.source`/`role.admin_level` 字段保留、`role.type` 移除），其中 `source` 与 `admin_level` 两项仍有效；**仅「由 scope 推导 admin_level」的授权驱动部分已废弃**。
+
 > 关联需求：角色表需要体现「内置角色/自定义角色」与「管理员角色/普通成员角色」两个维度。
 > 状态：设计方案（v2，已按反馈修订）。约定：**合理性优先，不要求最小改动，允许破坏性调整。**
 
@@ -110,19 +114,20 @@ type RoleEntity struct {
 
 > 它等价于：`role.admin_level >= basic == (role拥有系统级写scope)`。我们把推导结果物化成一个可索引字段，便于展示和快速筛选，但**它永远是 scope 授权的投影，不独立定义权限**。
 
-### 2.3 破坏性调整：`role.type` 的处置
+### 2.3 破坏性调整：`role.type` 已移除
 
-当前 `type`（Admin/User/Guest）只被前端当展示标签，后端从未用它判定权限。为避免两套语义（`type` vs `role_scope`）并存造成漂移：
+原 `type`（Admin/User/Guest）仅做展示标签，后端从未用它判定权限。为避免两套语义（`type` vs `role_scope`）并存造成漂移，**已彻底移除 `role.type` 列**：
 
-- **推荐：废弃 `role.type` 的权限语义，仅作历史展示。** 新展示用 `admin_level`（算出来的）+ `role_scope`（真实授权）。
-- 若要一并清理：把 `type` 列移除，前端改为：`来源(source)` + `管理员?(admin_level)` + `所授权限(scope/menu)`。
-- 破坏性调整下可一步到位，不留易混淆字段。
+- 展示以 `source`（来源）+ `admin_level`（算出来的系统管理等级）+ `role_scope`（真实授权）为准。
+- 前端角色列表/详情不再渲染「类型」列或表单字段。
+- 内置角色保护不再比较 `type`，仅锁定 `code`。
+- 破坏性调整一步到位，不留易混淆字段。
 
 ### 2.4 迁移注意（存量库）
 
 - 新增列默认 `custom`，会误标存量内置角色。需存量回填：`role.source='builtin' where code='admin'`（按实际内置 code 集，现仅 admin）。
 - `admin_level` 回填：用已有的 `role_scope` 推导（admin→super），或按 code 显式指定。
-- 若删 `type` 列，PG 用 `DROP COLUMN`（AutoMigrate 不自动删列，需显式迁移 + seed 兼容）。
+- 删 `type` 列：PG 用 `DROP COLUMN`（AutoMigrate 不自动删列，需显式迁移 + seed 兼容）。
 
 ---
 
@@ -131,7 +136,7 @@ type RoleEntity struct {
 ### 后端
 | 文件 | 改动 |
 |------|------|
-| `pkg/iam/model/role.go` | 加 `Source`、`AdminLevel`（+`SysAdminLevel` 常量）；（如清理）删 `Type` |
+| `pkg/iam/model/role.go` | 加 `Source`、`AdminLevel`（+`SysAdminLevel` 常量）；删除 `Type` |
 | `pkg/iam/dao/role.go` `RoleCond` | 加 `Source`/`AdminLevel`/`AdminLevelAtLeast` 查询条件 |
 | `pkg/seed/seed.go` `seedRoles` | 内置角色设 `source=builtin`、`admin_level`（admin→super）；加存量回填 |
 | `svctenant/role.go`（Create/Delete/Update） | 创建固定 `custom`+`admin_level=none`；删除/改键防内置；改权限时重算 `admin_level` |
@@ -148,10 +153,10 @@ type RoleEntity struct {
 | `packages/api` | 透传字段 |
 
 ### 测试
-- 内置角色删除被拒、改 `code/admin_level` 被拒、改 name 放行。
-- 自定义角色默认 `custom`；授权 `:write` 后 `admin_level` 自动变为 >=basic。
-- `HasSystemAdminCapability`：admin→true、user→false、自定义授 write→true。
-- 存量回填与（如删列）表迁移。
+- 内置角色删除被拒、改 `code`（核心键）被拒、改 name/desc 放行。
+- 自定义角色默认 `custom`+`admin_level=none`；授权 `:write` 后 `admin_level` 自动变为 >=basic。
+- `HasSystemAdminCapability`：admin→true、无管理 scope→false、授 write→true。
+- 存量回填与删 `type` 列表迁移。
 
 ---
 
@@ -277,7 +282,7 @@ type MenuAuthorizationEntity struct { // 设计预留
 - `pkg/iam/model/role.go`：新增授权驱动的投影推导函数 `DeriveAdminLevelFromScopeNames`（任一管理类 `:write` → `super`；仅管理类 `:read` → `basic`；否则 `none`；`me:` 个人中心不计）。`HasSystemAdminCapability` 与其共用同一推导，保证标签与授权同源。
 - `pkg/iam/dao/role.go`：`RoleCond` 新增 `Source`/`AdminLevel`/`AdminLevelAtLeast` 过滤。
 - `pkg/seed/seed.go`：内置角色写 `source=builtin`、admin 设 `admin_level=super`；存量幂等回填；并在 seedRoleScopes 之后调用 `syncRoleAdminLevels` 按 scope 重算各角色 `admin_level`（授权驱动投影同步）。
-- `svctenant/role.go`：Create 固定 `source=custom`+`admin_level=none`；Delete 拒绝内置角色；Update 内置禁改 code/type；`HasSystemAdminCapability` 改按 `admin_level>=basic` 识别系统管理角色。
+- `svctenant/role.go`：Create 固定 `source=custom`+`admin_level=none`；Delete 拒绝内置角色；Update 内置禁改 code；`HasSystemAdminCapability` 改按 `admin_level>=basic` 识别系统管理角色。
 - DTO（tenantadmin/platformadmin + `objpermission.RoleBaseInfo`）透出 `source`/`adminLevel`。
 - 新增错误码 `RoleDeleteBuiltinForbiddenError`/`RoleUpdateBuiltinForbiddenError`。
 - 前端 types 补 `source`/`adminLevel`；tenant 角色页显示来源标签 + 内置角色禁用编辑/删除；platform 详情显示来源/系统管理等级。
