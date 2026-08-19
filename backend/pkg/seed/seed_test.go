@@ -59,7 +59,7 @@ func TestSeedIamSQLite(t *testing.T) {
 	}
 	assertCount("tenant", 1)
 	assertCount("application", 2)
-	assertCount("role", 3)
+	assertCount("role", 1)
 	assertCount("resource", 2)
 	assertCount("scope", 12)
 	assertCount("menu", 15)
@@ -67,11 +67,29 @@ func TestSeedIamSQLite(t *testing.T) {
 	assertCount("tenant_user", 1)
 	assertCount("application_client", 2)
 	assertCount("user_role", 1)
-	assertCount("role_menu", 19)
-	assertCount("role_scope", 15)
+	assertCount("role_menu", 15)
+	assertCount("role_scope", 10)
 	assertCount("tenant_application", 2)
 	assertCount("organization", 1)
 	assertCount("organization_user", 1)
+
+	// 授权驱动派生化：内置唯一角色 admin 的 admin_level = super（按 scope 推导）
+	adminLevelByCode := map[string]string{}
+	var roles []model.RoleEntity
+	if err := db.Find(&roles).Error; err != nil {
+		t.Fatalf("query roles: %v", err)
+	}
+	for _, r := range roles {
+		adminLevelByCode[r.Code] = r.AdminLevel
+	}
+	wantLevels := map[string]string{
+		"admin": string(model.SysAdminLevelSuper),
+	}
+	for code, want := range wantLevels {
+		if adminLevelByCode[code] != want {
+			t.Fatalf("role %s admin_level = %q, want %q", code, adminLevelByCode[code], want)
+		}
+	}
 
 	// 管理员从属顶级部门（member 关系 + 主归属）
 	var tenant model.TenantEntity

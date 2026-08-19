@@ -176,6 +176,13 @@ export default function TenantRolePage() {
     { title: '所属应用', dataIndex: 'appName', key: 'appName', width: 130, render: (_: string, r) => <Tag>{r.appName || '系统角色'}</Tag> },
     { title: '角色编码', dataIndex: 'code', key: 'code', width: 150, render: (v: string) => v || '-' },
     { title: '类型', dataIndex: 'type', key: 'type', width: 100, render: (v: string) => renderRoleType(v) },
+    {
+      title: '来源',
+      dataIndex: 'source',
+      key: 'source',
+      width: 100,
+      render: (v: string) => (v === 'builtin' ? <Tag color="gold">内置</Tag> : <Tag color="blue">自定义</Tag>),
+    },
     { title: '描述', dataIndex: 'description', key: 'description', render: (v: string) => v || '-' },
     { title: '成员数', dataIndex: 'memberCount', key: 'memberCount', width: 80, render: (v: number) => v || 0 },
     { title: '授权菜单', dataIndex: 'menuCount', key: 'menuCount', width: 80, render: (v: number) => v || 0 },
@@ -190,21 +197,24 @@ export default function TenantRolePage() {
       title: '操作',
       key: 'action',
       width: 200,
-      render: (_, r) => (
-        <Space size={4}>
-          <Button type="link" size="small" icon={<SafetyCertificateOutlined />} onClick={() => void openMenuAuth(r)}>
-            菜单权限
-          </Button>
-          <Button type="link" size="small" onClick={() => openEdit(r)}>
-            编辑
-          </Button>
-          <Popconfirm title="确认删除该角色？（级联清理成员/菜单关联）" onConfirm={() => void handleDelete(r)}>
-            <Button type="link" size="small" danger>
-              删除
+      render: (_, r) => {
+        const isBuiltin = r.source === 'builtin'
+        return (
+          <Space size={4}>
+            <Button type="link" size="small" icon={<SafetyCertificateOutlined />} onClick={() => void openMenuAuth(r)}>
+              菜单权限
             </Button>
-          </Popconfirm>
-        </Space>
-      ),
+            <Button type="link" size="small" disabled={isBuiltin} onClick={() => openEdit(r)}>
+              编辑
+            </Button>
+            <Popconfirm title="确认删除该角色？（级联清理成员/菜单关联）" onConfirm={() => void handleDelete(r)}>
+              <Button type="link" size="small" danger disabled={isBuiltin}>
+                删除
+              </Button>
+            </Popconfirm>
+          </Space>
+        )
+      },
     },
   ]
 

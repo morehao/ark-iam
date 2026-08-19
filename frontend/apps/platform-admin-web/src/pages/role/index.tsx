@@ -19,6 +19,19 @@ function renderRoleType(type?: string) {
   }
 }
 
+/** 系统管理等级展示：super→超管，basic→基础，none→无 */
+function adminLevelText(level?: string) {
+  switch (level) {
+    case 'super':
+      return <Tag color="red">超管</Tag>
+    case 'basic':
+      return <Tag color="purple">基础管理</Tag>
+    case 'none':
+    default:
+      return <Tag>无</Tag>
+  }
+}
+
 export default function RoleList() {
   const [data, setData] = useState<RoleItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -159,7 +172,10 @@ export default function RoleList() {
             <Descriptions.Item label="角色名称">{detailRole.name}</Descriptions.Item>
             <Descriptions.Item label="角色编码">{detailRole.code}</Descriptions.Item>
             <Descriptions.Item label="类型">{renderRoleType(detailRole.type)}</Descriptions.Item>
-            <Descriptions.Item label="默认角色">{detailRole.isDefault === 1 ? '是' : '否'}</Descriptions.Item>
+            <Descriptions.Item label="来源">
+              {detailRole.source === 'builtin' ? <Tag color="gold">内置</Tag> : <Tag color="blue">自定义</Tag>}
+            </Descriptions.Item>
+            <Descriptions.Item label="系统管理">{adminLevelText(detailRole.adminLevel)}</Descriptions.Item>
             <Descriptions.Item label="创建时间">{fmtTime(detailRole.createdAt)}</Descriptions.Item>
             <Descriptions.Item label="描述" span={2}>
               {detailRole.description || '-'}

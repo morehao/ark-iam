@@ -52,7 +52,8 @@ func (svc *roleSvc) Detail(ctx *gin.Context, req *dtopermission.RoleDetailReq) (
 			Code:        roleEntity.Code,
 			Description: roleEntity.Description,
 			Type:        roleEntity.Type,
-			IsDefault:   roleEntity.IsDefault,
+			Source:      roleEntity.Source,
+			AdminLevel:  roleEntity.AdminLevel,
 		},
 		OperatorBaseInfo: gobject.OperatorBaseInfo{
 			CreatedAt: int64(roleEntity.CreatedAt.Unix()),
@@ -90,7 +91,8 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtopermission.RolePageListRe
 				Code:        v.Code,
 				Description: v.Description,
 				Type:        v.Type,
-				IsDefault:   v.IsDefault,
+				Source:      v.Source,
+				AdminLevel:  v.AdminLevel,
 			},
 			OperatorBaseInfo: gobject.OperatorBaseInfo{
 				UpdatedAt: v.UpdatedAt.Unix(),

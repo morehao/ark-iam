@@ -79,7 +79,8 @@ export interface RoleItem {
   code: string
   description: string
   type: string
-  isDefault: number
+  source?: 'builtin' | 'custom' | string
+  adminLevel?: 'none' | 'basic' | 'super' | string
   createdAt?: number
 }
 
@@ -89,7 +90,6 @@ export interface RoleCreateReq {
   code: string
   description?: string
   type?: string
-  isDefault?: number
 }
 
 export interface RoleUpdateReq {
@@ -98,7 +98,6 @@ export interface RoleUpdateReq {
   code?: string
   description?: string
   type?: string
-  isDefault?: number
 }
 
 export interface RoleUserItem {
@@ -318,6 +317,7 @@ export interface MenuItem {
   icon: string
   sort: number
   type: string
+  visibility?: 'public' | 'member' | 'admin' | string
   component: string
   redirect: string
   hidden: number

@@ -8,12 +8,13 @@ import (
 
 type MenuCond struct {
 	*gormdao.BaseCond
-	AppID    string
-	ParentID string
-	Name     string
-	Code     string
-	Type     string
-	Status   string
+	AppID      string
+	ParentID   string
+	Name       string
+	Code       string
+	Type       string
+	Status     string
+	Visibility string
 }
 
 func (c *MenuCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -34,6 +35,9 @@ func (c *MenuCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.Type != "" {
 		db.Where(tableName+".type = ?", c.Type)
+	}
+	if c.Visibility != "" {
+		db.Where(tableName+".visibility = ?", c.Visibility)
 	}
 	if c.Status != "" {
 		db.Where(tableName+".status = ?", c.Status)

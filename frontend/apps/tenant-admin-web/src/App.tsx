@@ -28,7 +28,9 @@ function iconOf(icon?: string): React.ReactNode {
   return (icon && ICON_MAP[icon]) || <ApartmentOutlined />
 }
 
-// 静态 fallback 菜单：后端不可用或未配置时保持页面可用
+// 静态 fallback 菜单：后端不可用或未配置时保持页面可用。
+// 注意：这里只放「所有人/普通成员」可见的公共菜单，不带管理菜单（tenant-user/tenant-role），
+// 避免后端故障走 fallback 时把管理入口暴露给普通成员。
 function makeStaticMenu(id: string, name: string, code: string, path: string, icon: string): MenuItem {
   return {
     menuID: id,
@@ -40,6 +42,7 @@ function makeStaticMenu(id: string, name: string, code: string, path: string, ic
     icon,
     sort: Number(id),
     type: 'menu',
+    visibility: 'public',
     component: '',
     redirect: '',
     hidden: 0,
@@ -52,8 +55,6 @@ function makeStaticMenu(id: string, name: string, code: string, path: string, ic
 
 const STATIC_MENU_TREE: MenuItem[] = [
   makeStaticMenu("1", '组织架构', 'organization', '/organization', 'apartment'),
-  makeStaticMenu("2", '用户管理', 'tenant-user', '/user', 'user'),
-  makeStaticMenu("3", '角色管理', 'tenant-role', '/role', 'role'),
 ]
 
 // 将后端菜单树转换为 MainLayout 侧边栏菜单；叶子菜单需命中组件白名单，目录仅保留有可渲染子项的

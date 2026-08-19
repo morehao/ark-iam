@@ -12,12 +12,14 @@ const (
 )
 
 const (
-	RoleCreateError      = 100700
-	RoleDeleteError      = 100701
-	RoleUpdateError      = 100702
-	RoleGetDetailError   = 100703
-	RoleGetPageListError = 100704
-	RoleNotExistError    = 100705
+	RoleCreateError                 = 100700
+	RoleDeleteError                 = 100701
+	RoleUpdateError                 = 100702
+	RoleGetDetailError              = 100703
+	RoleGetPageListError            = 100704
+	RoleNotExistError               = 100705
+	RoleDeleteBuiltinForbiddenError = 100706
+	RoleUpdateBuiltinForbiddenError = 100707
 )
 
 const (
@@ -104,6 +106,8 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	RoleGetDetailError:                   "查看角色详情失败",
 	RoleGetPageListError:                 "查看角色列表失败",
 	RoleNotExistError:                    "角色不存在",
+	RoleDeleteBuiltinForbiddenError:      "内置角色禁止删除",
+	RoleUpdateBuiltinForbiddenError:      "内置角色禁止修改核心字段",
 	ResourceCreateError:                  "创建资源失败",
 	ResourceDeleteError:                  "删除资源失败",
 	ResourceUpdateError:                  "修改资源失败",

@@ -76,6 +76,8 @@ func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dto
 		Code:        req.Code,
 		Description: req.Description,
 		Type:        req.Type,
+		Source:      string(model.RoleSourceCustom),
+		AdminLevel:  string(model.SysAdminLevelNone),
 		CreatedBy:   gincontext.GetUserIDString(ctx),
 	}
 	if err := dao.NewRoleDao().Insert(ctx, insertEntity); err != nil {
@@ -91,6 +93,10 @@ func (svc *roleSvc) Delete(ctx *gin.Context, req *dtotenant.RoleDeleteReq) error
 	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
 	if err != nil || !roleVisibleToTenant(roleEntity, tenantID) {
 		return code.GetError(code.RoleNotExistError)
+	}
+	// 内置角色禁止删除（防止系统管理能力失控且 seed 幂等不自动重建）
+	if roleEntity.Source == string(model.RoleSourceBuiltin) {
+		return code.GetError(code.RoleDeleteBuiltinForbiddenError)
 	}
 
 	userID := gincontext.GetUserIDString(ctx)
@@ -142,6 +148,12 @@ func (svc *roleSvc) Update(ctx *gin.Context, req *dtotenant.RoleUpdateReq) error
 		"type":        req.Type,
 		"updated_by":  gincontext.GetUserIDString(ctx),
 	}
+	// 内置角色保护：禁止改核心字段（编码/类别），名称与描述仍可改
+	if roleEntity.Source == string(model.RoleSourceBuiltin) {
+		if req.Code != roleEntity.Code || req.Type != roleEntity.Type {
+			return code.GetError(code.RoleUpdateBuiltinForbiddenError)
+		}
+	}
 	if err := dao.NewRoleDao().UpdateMap(ctx, req.RoleID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcrole.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.RoleUpdateError)
@@ -172,7 +184,8 @@ func (svc *roleSvc) Detail(ctx *gin.Context, req *dtotenant.RoleDetailReq) (*dto
 		Code:        roleEntity.Code,
 		Description: roleEntity.Description,
 		Type:        roleEntity.Type,
-		IsDefault:   roleEntity.IsDefault,
+		Source:      roleEntity.Source,
+		AdminLevel:  roleEntity.AdminLevel,
 		MemberCount: memberCount[req.RoleID],
 		MenuCount:   menuCount[req.RoleID],
 		CreatedAt:   roleEntity.CreatedAt.Unix(),
@@ -221,7 +234,8 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtotenant.RolePageListReq) (
 			Code:        v.Code,
 			Description: v.Description,
 			Type:        v.Type,
-			IsDefault:   v.IsDefault,
+			Source:      v.Source,
+			AdminLevel:  v.AdminLevel,
 			MemberCount: memberCount[v.ID],
 			MenuCount:   menuCount[v.ID],
 			CreatedAt:   v.CreatedAt.Unix(),

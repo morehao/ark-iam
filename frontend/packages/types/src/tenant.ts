@@ -61,7 +61,8 @@ export interface TenantRoleItem {
   code: string
   description: string
   type: string
-  isDefault: boolean
+  source?: 'builtin' | 'custom' | string
+  adminLevel?: 'none' | 'basic' | 'super' | string
   memberCount: number
   menuCount: number
   createdAt?: number
