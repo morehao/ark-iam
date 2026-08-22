@@ -87,17 +87,17 @@ func AutoMigrateAll(db *gorm.DB) error {
 - 幂等：只新增缺失的表/列/索引，不删不改既有结构，可安全重复执行与多实例并发。
 - 开关：`db.auto_migrate`（各应用 `config/config.yaml`，默认 `true`）。
 - 各应用 `cmd/init.go` 在 `InitMultiDB` 后调用。
-- 取代 `backend/scripts/sql/iam_schema.sql`（MySQL 方言，已废弃）。
+- 取代历史 MySQL 方言建表脚本 `backend/scripts/sql/iam_schema.sql`（已废弃删除）。
 
 ## 4. 种子数据：启动时幂等写入
 
-`pkg/seed/seed.go`：以 Go 代码取代 `scripts/sql/iam_seed_data.sql`（MySQL 方言）。
+`pkg/seed/seed.go`：以 Go 代码取代历史 MySQL 方言种子脚本 `scripts/sql/iam_seed_data.sql`（已废弃删除）。
 
 - **写入内容**：平台租户、顶级部门、应用（admin/tenant-admin）、角色（admin/user/guest）、
   资源与 12 个 scope、角色-scope 关联、15 个菜单、角色-menu 关联、租户应用订阅、
   管理员账号（`admin / admin123`）、两个 OIDC 测试客户端。
 - **用户必属部门**：用户必须从属于某个部门（组织节点），种子管理员同样从属于
-  顶级部门（根组织节点），归属关系为 `member` + `is_primary` 主归属
+  顶级部门（根组织节点），归属关系为 `primary` 行政主部门
   （`organization_user` 表，幂等写入，兼容已有库升级补齐）。
 - **幂等策略**：按唯一键查重（租户 `code`、应用 `code`、角色 `(tenant_id, code)`、
   scope `(tenant_id, name)`、菜单 `(app_id, code)`、person `username`、client `client_id`、

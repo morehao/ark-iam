@@ -37,12 +37,9 @@ func (svc *organizationUserSvc) Create(ctx *gin.Context, req *dtotenant.Organiza
 	tenantID := gincontext.GetTenantIDString(ctx)
 	relationType := req.RelationType
 	if relationType == "" {
-		relationType = string(model.OrgUserRelationMember)
+		relationType = model.OrgUserRelationPrimary
 	}
-	if relationType != string(model.OrgUserRelationMember) && relationType != string(model.OrgUserRelationLeader) {
-		return nil, code.GetError(code.OrganizationUserCreateError)
-	}
-	if req.IsPrimary && relationType != string(model.OrgUserRelationMember) {
+	if !isValidRelationType(relationType) {
 		return nil, code.GetError(code.OrganizationUserCreateError)
 	}
 
@@ -63,23 +60,55 @@ func (svc *organizationUserSvc) Create(ctx *gin.Context, req *dtotenant.Organiza
 		return nil, code.GetError(code.UserNotExistError)
 	}
 
-	insertEntity := &model.OrganizationUserEntity{
-		TenantID:       tenantID,
-		OrganizationID: req.OrganizationID,
-		UserID:         req.UserID,
-		RelationType:   relationType,
-		IsPrimary:      req.IsPrimary,
-		CreatedBy:      gincontext.GetUserIDString(ctx),
-	}
-
+	userID := gincontext.GetUserIDString(ctx)
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
-		if insertEntity.IsPrimary {
-			// 主归属唯一：先清该用户现有主归属
-			if err := clearPrimaryOrg(ctx, tenantID, req.UserID); err != nil {
+		orgUserDao := dao.NewOrganizationUserDao().WithTx(tx)
+		if relationType == model.OrgUserRelationPrimary {
+			// primary（行政主部门）每用户至多 1 行：已存在则覆盖其组织归属，避免重复行。
+			oldList, err := orgUserDao.GetListByCond(ctx, &dao.OrganizationUserCond{
+				TenantID:     tenantID,
+				UserID:       req.UserID,
+				RelationType: model.OrgUserRelationPrimary,
+			})
+			if err != nil {
 				return err
 			}
+			if len(oldList) > 0 {
+				return orgUserDao.UpdateMap(ctx, oldList[0].ID, map[string]any{
+					"organization_id": req.OrganizationID,
+					"updated_by":      userID,
+				})
+			}
 		}
-		return dao.NewOrganizationUserDao().Insert(ctx, insertEntity)
+		if relationType == model.OrgUserRelationLeader {
+			// 一个部门至多一个负责人：冲突拒绝。
+			if err := ensureOrgLeaderUnique(ctx, tx, tenantID, req.OrganizationID, req.UserID); err != nil {
+				return err
+			}
+			// 同一用户同一部门 leader 唯一：已存在则幂等跳过。
+			exist, err := orgUserDao.GetListByCond(ctx, &dao.OrganizationUserCond{
+				TenantID:       tenantID,
+				OrganizationID: req.OrganizationID,
+				UserID:         req.UserID,
+				RelationType:   model.OrgUserRelationLeader,
+			})
+			if err != nil {
+				return err
+			}
+			if len(exist) > 0 {
+				return orgUserDao.UpdateMap(ctx, exist[0].ID, map[string]any{
+					"updated_by": userID,
+				})
+			}
+		}
+		entity := &model.OrganizationUserEntity{
+			TenantID:       tenantID,
+			OrganizationID: req.OrganizationID,
+			UserID:         req.UserID,
+			RelationType:   relationType,
+			CreatedBy:      userID,
+		}
+		return orgUserDao.Insert(ctx, entity)
 	})
 	if txErr != nil {
 		glog.Errorf(ctx, "[svcorganizationuser.Create] transaction fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))
@@ -92,12 +121,9 @@ func (svc *organizationUserSvc) Update(ctx *gin.Context, req *dtotenant.Organiza
 	tenantID := gincontext.GetTenantIDString(ctx)
 	relationType := req.RelationType
 	if relationType == "" {
-		relationType = string(model.OrgUserRelationMember)
+		relationType = model.OrgUserRelationPrimary
 	}
-	if relationType != string(model.OrgUserRelationMember) && relationType != string(model.OrgUserRelationLeader) {
-		return code.GetError(code.OrganizationUserUpdateError)
-	}
-	if req.IsPrimary && relationType != string(model.OrgUserRelationMember) {
+	if !isValidRelationType(relationType) {
 		return code.GetError(code.OrganizationUserUpdateError)
 	}
 
@@ -105,7 +131,6 @@ func (svc *organizationUserSvc) Update(ctx *gin.Context, req *dtotenant.Organiza
 		TenantID:       tenantID,
 		OrganizationID: req.OrganizationID,
 		UserID:         req.UserID,
-		RelationType:   relationType,
 	})
 	if err != nil {
 		glog.Errorf(ctx, "[svcorganizationuser.Update] dao GetListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -117,20 +142,145 @@ func (svc *organizationUserSvc) Update(ctx *gin.Context, req *dtotenant.Organiza
 
 	userID := gincontext.GetUserIDString(ctx)
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
-		if req.IsPrimary {
-			if err := clearPrimaryOrg(ctx, tenantID, req.UserID); err != nil {
+		if relationType == model.OrgUserRelationLeader {
+			// 一个部门至多一个负责人：目标关系为 leader 且该部门已有其他 leader 时拒绝。
+			if err := ensureOrgLeaderUnique(ctx, tx, tenantID, req.OrganizationID, req.UserID); err != nil {
 				return err
 			}
 		}
-		return dao.NewOrganizationUserDao().UpdateMap(ctx, relationList[0].ID, map[string]any{
-			"relation_type": relationType,
-			"is_primary":    req.IsPrimary,
-			"updated_by":    userID,
-		})
+		// 目标：把该用户在此组织的全部关系收敛为单一关系类型 relationType。
+		// 已为目标类型的行跳过，其余行改挂目标类型；若目标类型原本已存在，
+		// 其余行直接删除，避免同 org+user+relationType 唯一键冲突。
+		hasTarget := false
+		for _, r := range relationList {
+			if r.RelationType == relationType {
+				hasTarget = true
+				break
+			}
+		}
+		for _, r := range relationList {
+			if r.RelationType == relationType {
+				if err := dao.NewOrganizationUserDao().UpdateMap(ctx, r.ID, map[string]any{
+					"updated_by": userID,
+				}); err != nil {
+					return err
+				}
+				continue
+			}
+			if hasTarget {
+				// 目标类型已存在：删除本行即可收敛
+				if err := dao.NewOrganizationUserDao().Delete(ctx, r.ID, userID); err != nil {
+					return err
+				}
+				continue
+			}
+			// 目标类型不存在：改挂第一行为目标类型
+			if err := dao.NewOrganizationUserDao().UpdateMap(ctx, r.ID, map[string]any{
+				"relation_type": relationType,
+				"updated_by":    userID,
+			}); err != nil {
+				return err
+			}
+			hasTarget = true
+			if relationType == model.OrgUserRelationPrimary {
+				if err := ensureSinglePrimary(ctx, tx, tenantID, req.UserID, r.ID, userID); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
 	})
 	if txErr != nil {
 		glog.Errorf(ctx, "[svcorganizationuser.Update] transaction fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))
 		return code.GetError(code.OrganizationUserUpdateError)
+	}
+	return nil
+}
+
+// isValidRelationType 校验关系类型是否为合法枚举。
+func isValidRelationType(relationType model.OrgUserRelationType) bool {
+	switch relationType {
+	case model.OrgUserRelationPrimary, model.OrgUserRelationSecondary, model.OrgUserRelationLeader:
+		return true
+	}
+	return false
+}
+
+// ensureOrgLeaderUnique 保证一个部门至多一个负责人：查询该部门的 leader 关系，
+// 若存在除 exceptUserID 之外的用户则返回负责人冲突错误。须在事务内传入 tx。
+func ensureOrgLeaderUnique(ctx *gin.Context, tx *gorm.DB, tenantID, orgID, exceptUserID string) error {
+	leaderList, err := dao.NewOrganizationUserDao().WithTx(tx).GetListByCond(ctx, &dao.OrganizationUserCond{
+		TenantID:       tenantID,
+		OrganizationID: orgID,
+		RelationType:   model.OrgUserRelationLeader,
+	})
+	if err != nil {
+		glog.Errorf(ctx, "[svcorganizationuser.ensureOrgLeaderUnique] dao GetListByCond fail, err:%v, orgID:%s", err, orgID)
+		return err
+	}
+	for _, r := range leaderList {
+		if r.UserID != exceptUserID {
+			return code.GetError(code.OrganizationUserLeaderConflictError)
+		}
+	}
+	return nil
+}
+
+// replaceOrgRelationList 全量替换用户某种组织关系集合：删除旧关系并插入 orgIDs 对应新关系。
+// 供 user.Create/Update 的组织维度局部/整体更新复用（须在事务内传入 tx）。
+func replaceOrgRelationList(ctx *gin.Context, tx *gorm.DB, tenantID, userID string, orgIDs []string, relationType model.OrgUserRelationType, operatorID string) error {
+	orgUserDao := dao.NewOrganizationUserDao().WithTx(tx)
+	oldList, err := orgUserDao.GetListByCond(ctx, &dao.OrganizationUserCond{
+		TenantID:     tenantID,
+		UserID:       userID,
+		RelationType: relationType,
+	})
+	if err != nil {
+		return err
+	}
+	for _, r := range oldList {
+		if err := orgUserDao.Delete(ctx, r.ID, operatorID); err != nil {
+			return err
+		}
+	}
+	for _, orgID := range orgIDs {
+		if relationType == model.OrgUserRelationLeader {
+			// 每部门至多一个负责人：冲突拒绝（删除本用户旧 leader 后，其余用户仍占用则拒绝）。
+			if err := ensureOrgLeaderUnique(ctx, tx, tenantID, orgID, userID); err != nil {
+				return err
+			}
+		}
+		entity := &model.OrganizationUserEntity{
+			TenantID:       tenantID,
+			OrganizationID: orgID,
+			UserID:         userID,
+			RelationType:   relationType,
+			CreatedBy:      operatorID,
+		}
+		if err := orgUserDao.Insert(ctx, entity); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ensureSinglePrimary 保证 primary（行政主部门）每用户至多 1 行：除 exceptID 外不保留其他 primary 行。须在事务内传入 tx。
+func ensureSinglePrimary(ctx *gin.Context, tx *gorm.DB, tenantID, userID, exceptID, operatorID string) error {
+	orgUserDao := dao.NewOrganizationUserDao().WithTx(tx)
+	oldList, err := orgUserDao.GetListByCond(ctx, &dao.OrganizationUserCond{
+		TenantID:     tenantID,
+		UserID:       userID,
+		RelationType: model.OrgUserRelationPrimary,
+	})
+	if err != nil {
+		return err
+	}
+	for _, r := range oldList {
+		if r.ID != exceptID {
+			if err := orgUserDao.Delete(ctx, r.ID, operatorID); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -170,7 +320,6 @@ func (svc *organizationUserSvc) PageList(ctx *gin.Context, req *dtotenant.Organi
 		TenantID:       tenantID,
 		OrganizationID: req.OrganizationID,
 		RelationType:   req.RelationType,
-		IsPrimary:      req.IsPrimary,
 	}
 	relationList, total, err := dao.NewOrganizationUserDao().GetPageListByCond(ctx, cond)
 	if err != nil {
@@ -206,7 +355,6 @@ func (svc *organizationUserSvc) PageList(ctx *gin.Context, req *dtotenant.Organi
 			Avatar:         u.Avatar,
 			IsSuspended:    u.IsSuspended,
 			RelationType:   v.RelationType,
-			IsPrimary:      v.IsPrimary,
 			JoinedAt:       v.CreatedAt.Unix(),
 		}
 		if keyword != "" && !matchMemberKeyword(item, keyword) {
@@ -256,16 +404,15 @@ func loadUserOrganizations(ctx *gin.Context, tenantID, userID string) ([]dtotena
 			OrganizationID:   r.OrganizationID,
 			OrganizationName: orgNameMap[r.OrganizationID],
 			RelationType:     r.RelationType,
-			IsPrimary:        r.IsPrimary,
 		})
 	}
 	return list, nil
 }
 
-// UpdateUserOrganizations 全量替换用户归属（member 关系集合，首个为主归属）。
+// UpdateUserOrganizations 全量替换用户参与部门（secondary 关系集合）。
 func (svc *organizationUserSvc) UpdateUserOrganizations(ctx *gin.Context, req *dtotenant.UserOrganizationsUpdateReq) error {
 	tenantID := gincontext.GetTenantIDString(ctx)
-	// 用户必须从属于至少一个部门（业务约束，防绕过 DTO 校验）
+	// 用户必须参与至少一个部门（业务约束，防绕过 DTO 校验）
 	if len(req.OrganizationIDs) == 0 {
 		return code.GetError(code.UserOrganizationRequiredError)
 	}
@@ -297,7 +444,7 @@ func (svc *organizationUserSvc) UpdateUserOrganizations(ctx *gin.Context, req *d
 		oldList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
 			TenantID:     tenantID,
 			UserID:       req.UserID,
-			RelationType: string(model.OrgUserRelationMember),
+			RelationType: model.OrgUserRelationSecondary,
 		})
 		if err != nil {
 			return err
@@ -307,13 +454,12 @@ func (svc *organizationUserSvc) UpdateUserOrganizations(ctx *gin.Context, req *d
 				return err
 			}
 		}
-		for i, orgID := range req.OrganizationIDs {
+		for _, orgID := range req.OrganizationIDs {
 			entity := &model.OrganizationUserEntity{
 				TenantID:       tenantID,
 				OrganizationID: orgID,
 				UserID:         req.UserID,
-				RelationType:   string(model.OrgUserRelationMember),
-				IsPrimary:      i == 0,
+				RelationType:   model.OrgUserRelationSecondary,
 				CreatedBy:      userID,
 			}
 			if err := dao.NewOrganizationUserDao().Insert(ctx, entity); err != nil {
@@ -328,23 +474,3 @@ func (svc *organizationUserSvc) UpdateUserOrganizations(ctx *gin.Context, req *d
 	}
 	return nil
 }
-
-// clearPrimaryOrg 清除用户现有主归属标记。
-func clearPrimaryOrg(ctx *gin.Context, tenantID, userID string) error {
-	oldList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
-		TenantID:  tenantID,
-		UserID:    userID,
-		IsPrimary: boolPtr(true),
-	})
-	if err != nil {
-		return err
-	}
-	for _, r := range oldList {
-		if err := dao.NewOrganizationUserDao().UpdateMap(ctx, r.ID, map[string]any{"is_primary": false}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func boolPtr(b bool) *bool { return &b }

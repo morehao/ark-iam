@@ -158,6 +158,29 @@ apps/platformadmin/
 | 字典值常量 | `model/*.go` | 所有字典字符串定义成常量 |
 | 应用层常量（前端专用） | `internal/constant/` | 状态映射等前端专用常量 |
 
+#### 强类型字符串枚举（字典常量全链路复用）
+
+**凡定义成常量的一组字典字符串，必须声明具名类型，并让实体/DAO/DTO/Service/测试全链路复用该类型与常量。**
+
+```go
+// model/organization_user.go
+// 具名类型 + 常量（禁止硬编码、禁止在其他层裸写字符串）
+type OrgUserRelationType string
+
+const (
+    OrgUserRelationPrimary   OrgUserRelationType = "primary"   // 行政主部门，每用户至多 1 行
+    OrgUserRelationSecondary OrgUserRelationType = "secondary" // 跨部门参与，可多条
+    OrgUserRelationLeader    OrgUserRelationType = "leader"    // 负责人，可多条
+)
+```
+
+**硬规则（新增字典枚举必守）：**
+
+1. **字段类型用具名类型，不用 `string`**：实体、DAO Cond、DTO 请求/响应的枚举字段一律声明为该具名类型（如 `RelationType OrgUserRelationType`），而非 `string`——编译期即可杜绝拼错枚举值。
+2. **全链路用常量**：赋值、传参、比较一律引用常量，如 `model.OrgUserRelationPrimary`，**禁止** `string(model.OrgUserRelationX)` 强转、**禁止**显式类型转换换别的枚举类型、**禁止**裸字面量 `"primary"`/`"admin"` 出现在非定义处。
+3. **非法值校验归 service**：请求来自前端（JSON/form 绑定原始类型），service 入口用 `switch` + 常量白名单判合法，非法返回对应功能级错误码；合法值命中常量直接使用。
+4. **JSON/DB 向下兼容**：具名类型的底层是 `string`，JSON 序列化仍是普通字符串、gorm 存 varchar，前端和数据库均无感知；DTO 包允许 import `pkg/iam/model`（单向下游，无环）。
+
 #### 数据表常量（model 层）
 
 ```go

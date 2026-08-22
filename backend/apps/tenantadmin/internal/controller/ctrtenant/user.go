@@ -9,6 +9,7 @@ import (
 
 type UserCtr interface {
 	PageList(ctx *gin.Context)
+	MemberPageList(ctx *gin.Context)
 	Create(ctx *gin.Context)
 	Detail(ctx *gin.Context)
 	Update(ctx *gin.Context)
@@ -71,6 +72,27 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags 成员
+// @Summary 成员总表分页（以人为维度，含部门关系:主/非主/负责）
+// @accept application/json
+// @Produce application/json
+// @Param req query dtotenant.MemberPageListReq true "成员总表分页"
+// @Success 200 {object} gincontext.DtoRender{data=dtotenant.MemberPageListResp}
+// @Router /v1/tenant/members [get]
+func (ctr *userCtr) MemberPageList(ctx *gin.Context) {
+	var req dtotenant.MemberPageListReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.userSvc.MemberPageList(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
 // @Tags 用户
 // @Summary 用户详情（基础信息 + 组织归属 + 角色）
 // @accept application/json
@@ -93,7 +115,7 @@ func (ctr *userCtr) Detail(ctx *gin.Context) {
 }
 
 // @Tags 用户
-// @Summary 局部更新用户（姓名/头像/状态）
+// @Summary 局部更新用户（姓名/头像/状态 + 主/参与/负责部门）
 // @accept application/json
 // @Produce application/json
 // @Param userID path string true "用户ID"

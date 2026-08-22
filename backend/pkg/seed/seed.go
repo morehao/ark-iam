@@ -1,14 +1,14 @@
 // Package seed 提供 IAM 基础种子数据的幂等写入能力。
 //
-// 替代历史 scripts/sql/iam_seed_data.sql（MySQL 方言）：服务启动时基于
-// 唯一键（code / client_id / username 等）查重，已存在则跳过、不存在则创建，
+// 替代历史 MySQL 方言建表/种子脚本（scripts/sql/*.sql 已废弃删除）：服务启动时
+// 基于唯一键（code / client_id / username 等）查重，已存在则跳过、不存在则创建，
 // 因此可安全重复执行，兼容全新数据库与已有数据的升级场景。
 // 自 string-id 改造起所有主键为字符串（UUID v7），实体间关联在写入时动态接线，
 // 不再依赖固定的数字主键。
 //
 // 业务约束：用户必须从属于某个部门（组织节点），种子管理员同样从属于
 // 租户的顶级部门（根组织节点，seedRootOrganization 创建），归属关系为
-// member + is_primary 主归属。
+// member 行政主部门。
 package seed
 
 import (
@@ -40,23 +40,23 @@ const (
 
 // seedRole 角色种子定义。
 type seedRole struct {
-	code        string
-	name        string
-	desc        string
-	adminLevel  string // 系统管理等级(none/basic/super)，空=无系统管理能力
+	code       string
+	name       string
+	desc       string
+	adminLevel string // 系统管理等级(none/basic/super)，空=无系统管理能力
 }
 
 // seedMenu 菜单种子定义；parentCode 为空表示顶级菜单。visibility 缺省为 public。
 type seedMenu struct {
-	appCode      string
-	parentCode   string
-	name         string
-	code         string
-	path         string
-	icon         string
-	sort         int
-	component    string
-	visibility   string
+	appCode    string
+	parentCode string
+	name       string
+	code       string
+	path       string
+	icon       string
+	sort       int
+	component  string
+	visibility string
 }
 
 // SeedIam 幂等写入 IAM 基础种子数据。任一环节失败即返回错误，由调用方决定是否阻断启动。
@@ -376,7 +376,7 @@ func seedTenantApplications(ctx context.Context, db *gorm.DB, tenant *model.Tena
 }
 
 // seedAdminUser 幂等写入默认管理员（person + user），并确保其从属于顶级部门 rootOrg
-// （member 关系 + 主归属），满足"用户必须从属于某个部门"的业务约束。
+// （primary 行政主部门），满足"用户必须从属于某个部门"的业务约束。
 // rootOrg 缺失时视为种子数据不完整，直接报错，避免产出无归属用户。
 func seedAdminUser(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, rootOrg *model.OrganizationEntity) (*model.UserEntity, error) {
 	if rootOrg == nil || rootOrg.ID == "" {
@@ -440,13 +440,13 @@ func seedAdminUser(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity,
 	return user, nil
 }
 
-// seedAdminUserOrganization 幂等建立管理员与顶级部门的归属关系（member + 主归属）。
+// seedAdminUserOrganization 幂等建立管理员与顶级部门的行政主部门关系（primary）。
 // 该函数独立于用户创建之外执行，保证升级场景（用户已存在、归属缺失）也能补齐。
 func seedAdminUserOrganization(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, user *model.UserEntity, rootOrg *model.OrganizationEntity) error {
 	var count int64
 	if err := db.Model(&model.OrganizationUserEntity{}).
 		Where("tenant_id = ? AND user_id = ? AND organization_id = ? AND relation_type = ?",
-			tenant.ID, user.ID, rootOrg.ID, string(model.OrgUserRelationMember)).
+			tenant.ID, user.ID, rootOrg.ID, model.OrgUserRelationPrimary).
 		Count(&count).Error; err != nil {
 		return fmt.Errorf("seed admin organization count fail: %w", err)
 	}
@@ -457,8 +457,7 @@ func seedAdminUserOrganization(ctx context.Context, db *gorm.DB, tenant *model.T
 		TenantID:       tenant.ID,
 		OrganizationID: rootOrg.ID,
 		UserID:         user.ID,
-		RelationType:   string(model.OrgUserRelationMember),
-		IsPrimary:      true,
+		RelationType:   model.OrgUserRelationPrimary,
 	}
 	if err := db.WithContext(ctx).Create(relation).Error; err != nil {
 		return fmt.Errorf("seed admin organization create fail: %w", err)

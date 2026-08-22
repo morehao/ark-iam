@@ -58,7 +58,7 @@ func TestOrganizationCreateRootAndChildPaths(t *testing.T) {
 	}
 
 	child, err := svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
-		ParentID: root.OrganizationID,
+		ParentID:             root.OrganizationID,
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "研发部"},
 	})
 	if err != nil {
@@ -89,11 +89,11 @@ func TestOrganizationMoveCascadesPathAndRejectsCycle(t *testing.T) {
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "A"},
 	})
 	b, _ := svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
-		ParentID: root.OrganizationID,
+		ParentID:             root.OrganizationID,
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "B"},
 	})
 	c, _ := svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
-		ParentID: b.OrganizationID,
+		ParentID:             b.OrganizationID,
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "C"},
 	})
 
@@ -147,7 +147,7 @@ func TestOrganizationDeleteRejectsWithChildrenAndCascade(t *testing.T) {
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "A"},
 	})
 	child, _ := svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
-		ParentID: root.OrganizationID,
+		ParentID:             root.OrganizationID,
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "B"},
 	})
 
@@ -172,7 +172,7 @@ func TestOrganizationDeleteRejectsWithChildrenAndCascade(t *testing.T) {
 	}
 }
 
-func TestOrganizationUserRelationPrimaryAndLeaderGuard(t *testing.T) {
+func TestOrganizationUserMemberSingletonAndValidTypes(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.UserEntity{})
 	ginCtx := newOrgGinCtx(t, "41", "1001")
 	seedTestUser(t, db, "41", "u1", "用户一")
@@ -183,53 +183,76 @@ func TestOrganizationUserRelationPrimaryAndLeaderGuard(t *testing.T) {
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "A"},
 	})
 	other, _ := orgSvc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
-		ParentID: root.OrganizationID,
+		ParentID:             root.OrganizationID,
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "A1"},
 	})
 
 	svc := &organizationUserSvc{}
-	// u1 归属 A（主）
+	// u1 行政归属 A
 	if _, err := svc.Create(ginCtx, &dtotenant.OrganizationUserCreateReq{
 		OrganizationID: root.OrganizationID,
 		UserID:         "u1",
-		RelationType:   string(model.OrgUserRelationMember),
-		IsPrimary:      true,
+		RelationType:   model.OrgUserRelationPrimary,
 	}); err != nil {
 		t.Fatalf("add member u1: %v", err)
 	}
-	// u1 再归属 A1（主）→ A 的主标记应被清
+	// u1 再行政主部门 A1 → 应覆盖为 A1（primary 每用户至多 1 行）
 	if _, err := svc.Create(ginCtx, &dtotenant.OrganizationUserCreateReq{
 		OrganizationID: other.OrganizationID,
 		UserID:         "u1",
-		RelationType:   string(model.OrgUserRelationMember),
-		IsPrimary:      true,
+		RelationType:   model.OrgUserRelationPrimary,
 	}); err != nil {
-		t.Fatalf("add member u1 to A1: %v", err)
+		t.Fatalf("reassign primary u1 to A1: %v", err)
 	}
 	var primaryCount int64
-	if err := db.Model(&model.OrganizationUserEntity{}).Where("user_id = ? AND is_primary = ?", "u1", true).Count(&primaryCount).Error; err != nil {
+	if err := db.Model(&model.OrganizationUserEntity{}).
+		Where("user_id = ? AND relation_type = ?", "u1", model.OrgUserRelationPrimary).
+		Count(&primaryCount).Error; err != nil {
 		t.Fatalf("count primary: %v", err)
 	}
 	if primaryCount != 1 {
 		t.Fatalf("expected exactly 1 primary relation, got %d", primaryCount)
 	}
 
-	// leader 关系不能置主
+	// 非法关系类型拒绝
 	if _, err := svc.Create(ginCtx, &dtotenant.OrganizationUserCreateReq{
 		OrganizationID: root.OrganizationID,
 		UserID:         "u2",
-		RelationType:   string(model.OrgUserRelationLeader),
-		IsPrimary:      true,
+		RelationType:   "admin",
 	}); err == nil {
-		t.Fatalf("expected leader-with-primary to fail")
+		t.Fatalf("expected invalid relation type to fail")
 	}
-	// leader 关系正常建立（不要求是成员）
+	// secondary 正常建立（u2 参与 A）
 	if _, err := svc.Create(ginCtx, &dtotenant.OrganizationUserCreateReq{
 		OrganizationID: root.OrganizationID,
 		UserID:         "u2",
-		RelationType:   string(model.OrgUserRelationLeader),
+		RelationType:   model.OrgUserRelationSecondary,
+	}); err != nil {
+		t.Fatalf("add secondary u2: %v", err)
+	}
+	// leader 不要求同时是成员：u2 负责 A1
+	if _, err := svc.Create(ginCtx, &dtotenant.OrganizationUserCreateReq{
+		OrganizationID: other.OrganizationID,
+		UserID:         "u2",
+		RelationType:   model.OrgUserRelationLeader,
 	}); err != nil {
 		t.Fatalf("add leader u2: %v", err)
+	}
+	// 一个部门至多一个负责人：u2 已是 A1 的负责人，u1 再设 A1 负责人应冲突拒绝
+	if _, err := svc.Create(ginCtx, &dtotenant.OrganizationUserCreateReq{
+		OrganizationID: other.OrganizationID,
+		UserID:         "u1",
+		RelationType:   model.OrgUserRelationLeader,
+	}); err == nil {
+		t.Fatalf("expected leader conflict to be rejected")
+	}
+	// 同一用户重复设为同一部门负责人：幂等成功
+	if _, err := svc.Create(ginCtx, &dtotenant.OrganizationUserCreateReq{
+		OrganizationID: other.OrganizationID,
+		UserID:         "u2",
+		RelationType:   model.OrgUserRelationLeader,
+	}); err != nil {
+		t.Fatalf("re-set same leader should succeed: %v", err)
 	}
 }
 
@@ -249,7 +272,7 @@ func TestOrganizationUserCrossTenantRejected(t *testing.T) {
 	if _, err := svc.Create(otherCtx, &dtotenant.OrganizationUserCreateReq{
 		OrganizationID: root.OrganizationID,
 		UserID:         "u1",
-		RelationType:   string(model.OrgUserRelationMember),
+		RelationType:   model.OrgUserRelationPrimary,
 	}); err == nil {
 		t.Fatalf("expected cross-tenant relation create to fail")
 	}
@@ -265,12 +288,12 @@ func TestUpdateUserOrganizationsReplace(t *testing.T) {
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "A"},
 	})
 	org2, _ := orgSvc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
-		ParentID: root.OrganizationID,
+		ParentID:             root.OrganizationID,
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "A2"},
 	})
 
 	svc := &organizationUserSvc{}
-	// 全量替换为 [A, A2]
+	// 全量替换参与部门为 [A, A2]
 	if err := svc.UpdateUserOrganizations(ginCtx, &dtotenant.UserOrganizationsUpdateReq{
 		UserID:          "u1",
 		OrganizationIDs: []string{root.OrganizationID, org2.OrganizationID},
@@ -282,13 +305,15 @@ func TestUpdateUserOrganizationsReplace(t *testing.T) {
 		t.Fatalf("load user orgs: %v", err)
 	}
 	if len(list) != 2 {
-		t.Fatalf("expected 2 relations, got %d", len(list))
+		t.Fatalf("expected 2 secondary relations, got %d", len(list))
 	}
-	if !list[0].IsPrimary || list[1].IsPrimary {
-		t.Fatalf("expected only first org primary, got %+v", list)
+	for _, it := range list {
+		if it.RelationType != model.OrgUserRelationSecondary {
+			t.Fatalf("expected secondary relation, got %s", it.RelationType)
+		}
 	}
 
-	// 全量替换为 [A2] → 只剩 1 条且为主
+	// 全量替换为 [A2] → 只剩 1 条
 	if err := svc.UpdateUserOrganizations(ginCtx, &dtotenant.UserOrganizationsUpdateReq{
 		UserID:          "u1",
 		OrganizationIDs: []string{org2.OrganizationID},
@@ -299,7 +324,7 @@ func TestUpdateUserOrganizationsReplace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load user orgs: %v", err)
 	}
-	if len(list) != 1 || !list[0].IsPrimary || list[0].OrganizationID != org2.OrganizationID {
+	if len(list) != 1 || list[0].OrganizationID != org2.OrganizationID || list[0].RelationType != model.OrgUserRelationSecondary {
 		t.Fatalf("unexpected relations after second replace: %+v", list)
 	}
 }
@@ -316,16 +341,16 @@ func TestOrganizationChildrenPageAndHasChildren(t *testing.T) {
 		t.Fatalf("create root: %v", err)
 	}
 	a, _ := svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
-		ParentID: root.OrganizationID,
+		ParentID:             root.OrganizationID,
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "A", Status: "active"},
 	})
 	svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
-		ParentID: root.OrganizationID,
+		ParentID:             root.OrganizationID,
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "B", Status: "inactive"},
 	})
 	// A 下挂一个深层子级，验证 hasChildren
 	svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
-		ParentID: a.OrganizationID,
+		ParentID:             a.OrganizationID,
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "A1", Status: "active"},
 	})
 

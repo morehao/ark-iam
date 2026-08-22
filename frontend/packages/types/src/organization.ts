@@ -33,7 +33,6 @@ export interface OrganizationUserItem {
   avatar: string
   isSuspended: boolean
   relationType: string
-  isPrimary: boolean
   joinedAt?: number
 }
 
@@ -41,7 +40,6 @@ export interface UserOrganizationItem {
   organizationID: string
   organizationName: string
   relationType: string
-  isPrimary: boolean
 }
 
 export interface OrganizationTreeResp {

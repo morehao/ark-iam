@@ -269,12 +269,12 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | PUT | `/v1/tenant/organizations/:organizationID` | 更新节点（改 parentID 即移动） |
 | PATCH | `/v1/tenant/organizations/:organizationID` | 更新状态（启停用） |
 | DELETE | `/v1/tenant/organizations/:organizationID` | 删除节点（有子/成员需 ?cascade=1） |
-| GET | `/v1/tenant/organizations/:organizationID/users` | 节点关系分页（?relationType=&isPrimary=&keyword=，含用户基础信息） || POST | `/v1/tenant/organizations/:organizationID/users` | 添加关系 {userID, relationType, isPrimary} |
-| PUT | `/v1/tenant/organizations/:organizationID/users/:userID` | 更新关系（relationType/isPrimary） |
+| GET | `/v1/tenant/organizations/:organizationID/users` | 节点关系分页（?relationType=&keyword=，含用户基础信息；relationType: primary/secondary/leader） || POST | `/v1/tenant/organizations/:organizationID/users` | 添加关系 {userID, relationType}（primary 至多 1 行/用户） |
+| PUT | `/v1/tenant/organizations/:organizationID/users/:userID` | 更新关系（relationType） |
 | DELETE | `/v1/tenant/organizations/:organizationID/users/:userID` | 移除关系 |
 | GET | `/v1/tenant/organizations/:organizationID/users/descendants` | 子树成员聚合（去重） |
 | GET | `/v1/tenant/users/:userID/organizations` | 用户组织归属 |
-| PUT | `/v1/tenant/users/:userID/organizations` | 批量替换用户归属（全量替换 member，首个为主归属） |
+| PUT | `/v1/tenant/users/:userID/organizations` | 批量替换参与部门（全量替换 secondary） |
 | GET | `/v1/tenant/menus/tree` | 租户动态菜单树 |
 
 ---

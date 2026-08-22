@@ -28,7 +28,7 @@ func NewOrganizationUserCtr() OrganizationUserCtr {
 }
 
 // @Tags 组织关系
-// @Summary 添加组织关系（member/leader）
+// @Summary 添加组织关系（primary/secondary/leader）
 // @accept application/json
 // @Produce application/json
 // @Param organizationID path string true "组织ID"
@@ -54,7 +54,7 @@ func (ctr *organizationUserCtr) Create(ctx *gin.Context) {
 }
 
 // @Tags 组织关系
-// @Summary 更新组织关系（relationType/isPrimary）
+// @Summary 更新组织关系（relationType）
 // @accept application/json
 // @Produce application/json
 // @Param organizationID path string true "组织ID"
@@ -80,7 +80,7 @@ func (ctr *organizationUserCtr) Update(ctx *gin.Context) {
 }
 
 // @Tags 组织关系
-// @Summary 移除组织关系（含 member/leader）
+// @Summary 移除组织关系（含 primary/secondary/leader）
 // @accept application/json
 // @Produce application/json
 // @Param organizationID path string true "组织ID"
@@ -127,11 +127,11 @@ func (ctr *organizationUserCtr) PageList(ctx *gin.Context) {
 }
 
 // @Tags 组织关系
-// @Summary 批量替换用户归属（全量替换 member 关系，首个为主归属）
+// @Summary 批量替换用户参与部门（全量替换 secondary 关系）
 // @accept application/json
 // @Produce application/json
 // @Param userID path string true "用户ID"
-// @Param req body dtotenant.UserOrganizationsUpdateReq true "批量替换归属"
+// @Param req body dtotenant.UserOrganizationsUpdateReq true "批量替换参与部门"
 // @Success 200 {object} gincontext.DtoRender{data=string}
 // @Router /v1/tenant/users/{userID}/organizations [put]
 func (ctr *organizationUserCtr) UpdateUserOrganizations(ctx *gin.Context) {

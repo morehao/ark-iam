@@ -41,3 +41,24 @@ type UserRoleItem struct {
 type UserRolesListResp struct {
 	List []UserRoleItem `json:"list"` // 角色列表
 }
+
+// MemberPageListItem 成员列表条目(以人为维度,含部门关系数组:主/非主/负责)。
+type MemberPageListItem struct {
+	UserID       string                 `json:"userID"`       // 用户ID
+	TenantID     string                 `json:"tenantID"`     // 租户ID
+	Username     string                 `json:"username"`     // 用户名
+	PrimaryEmail string                 `json:"primaryEmail"` // 主要邮箱
+	PrimaryPhone string                 `json:"primaryPhone"` // 主要手机号
+	Name         string                 `json:"name"`         // 姓名
+	Avatar       string                 `json:"avatar"`       // 头像URL
+	IsSuspended  bool                   `json:"isSuspended"`  // 是否挂起
+	RoleCount    int64                  `json:"roleCount"`    // 角色数
+	CreatedAt    int64                  `json:"createdAt"`    // 创建时间
+	PrimaryOrgID string                 `json:"primaryOrgID"` // 主部门ID(可能为空)
+	Organizations []UserOrganizationItem `json:"organizations"` // 部门关系(含主/非主/负责)
+}
+
+type MemberPageListResp struct {
+	List  []MemberPageListItem `json:"list"`  // 数据列表
+	Total int64                `json:"total"` // 数据总条数
+}

@@ -89,17 +89,17 @@ func TestSeedIamAgainstPostgres(t *testing.T) {
 	}
 	t.Logf("admin user id=%s tenant=%s person=%s", u.ID, u.TenantID, u.PersonID)
 
-	// 验证管理员从属顶级部门（member 关系 + 主归属）
+	// 验证管理员从属顶级部门（primary 行政主部门）
 	var rootOrg model.OrganizationEntity
 	if err := db.Where("tenant_id = ? AND parent_id = ?", u.TenantID, "").First(&rootOrg).Error; err != nil {
 		t.Fatalf("root organization not found: %v", err)
 	}
 	var ou model.OrganizationUserEntity
-	if err := db.Where("tenant_id = ? AND user_id = ? AND organization_id = ? AND relation_type = ? AND is_primary = ?",
-		u.TenantID, u.ID, rootOrg.ID, string(model.OrgUserRelationMember), true).First(&ou).Error; err != nil {
+	if err := db.Where("tenant_id = ? AND user_id = ? AND organization_id = ? AND relation_type = ?",
+		u.TenantID, u.ID, rootOrg.ID, model.OrgUserRelationPrimary).First(&ou).Error; err != nil {
 		t.Fatalf("admin organization relation not found: %v", err)
 	}
-	t.Logf("admin org relation: org=%s relation=%s primary=%v", ou.OrganizationID, ou.RelationType, ou.IsPrimary)
+	t.Logf("admin org relation: org=%s relation=%s", ou.OrganizationID, ou.RelationType)
 
 	cleanup()
 	t.Log("PG AutoMigrate + Seed idempotency check passed")

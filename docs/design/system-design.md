@@ -191,7 +191,7 @@ erDiagram
     application ||--o{ application_client : "1:N"
     application_client ||--o{ application_client_secret : "1:N"
     tenant ||--o{ organization : "1:N 组织树(parent_id 自引用)"
-    organization ||--o{ organization_user : "1:N 关系(member/leader)"
+    organization ||--o{ organization_user : "1:N 关系(primary/secondary/leader)"
     user ||--o{ organization_user : "1:N"
     tenant ||--o{ role : "1:N"
     application ||--o{ role : "1:N"
@@ -316,8 +316,7 @@ erDiagram
         string tenant_id FK
         string organization_id FK
         string user_id FK
-        string relation_type "member/leader"
-        bool is_primary "主归属(仅member)"
+        string relation_type "primary/secondary/leader"
     }
     role {
         uint id PK
@@ -510,7 +509,7 @@ erDiagram
 | 表 | 说明 |
 |---|---|
 | `organization` | 组织树节点（租户内用户容器）：`parent_id` 树 + `org_path`/`org_depth` 物化路径，`status` 启停用 |
-| `organization_user` | 组织关系（多态）：`relation_type` 互斥枚举 member/leader，`is_primary` 主归属（仅 member 可置位） |
+| `organization_user` | 组织关系（多态）：`relation_type` 强类型枚举 primary/secondary/leader（primary 行政主部门至多 1 行/用户，无 is_primary） |
 
 #### 权限域
 
