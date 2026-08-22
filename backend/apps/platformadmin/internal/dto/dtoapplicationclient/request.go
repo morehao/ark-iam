@@ -64,7 +64,7 @@ type SecretListReq struct {
 type SecretCreateReq struct {
 	ApplicationClientID string `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
 	Name                string `json:"name" binding:"required"`                        // 密钥名称
-	ExpiredAt           string `json:"expiresAt"`                                      // 过期时间
+	ExpiredAt           int64  `json:"expiresAt"` // 过期时间(unix 秒)
 }
 
 type SecretDeleteReq struct {

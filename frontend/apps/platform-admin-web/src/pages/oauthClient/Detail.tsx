@@ -60,7 +60,7 @@ export default function OAuthClientDetail() {
       const resp = await createOAuthSecret({
         applicationClientID: clientID,
         name: values.name,
-        expiresAt: values.expiresAt ? values.expiresAt.toISOString() : undefined,
+        expiresAt: values.expiresAt ? Math.floor(values.expiresAt.valueOf() / 1000) : undefined,
       })
       setCreatedSecret(resp)
       message.success('密钥创建成功，请立即保存明文')
@@ -83,7 +83,7 @@ export default function OAuthClientDetail() {
       key: 'valuePrefix',
       render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v || '-'}</span>,
     },
-    { title: '过期时间', dataIndex: 'expiresAt', key: 'expiresAt', width: 180, render: (v: string | null) => v || '永不过期' },
+    { title: '过期时间', dataIndex: 'expiresAt', key: 'expiresAt', width: 180, render: (v: number | null) => (v ? fmtTime(v) : '永不过期') },
     { title: '创建时间', key: 'createdAt', width: 170, render: (_, r) => fmtTime(r.createdAt) },
     {
       title: '操作',

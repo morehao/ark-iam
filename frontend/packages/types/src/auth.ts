@@ -36,8 +36,8 @@ export interface SessionResp {
   clientType: string
   clientIP: string
   userAgent: string
-  expiresAt?: string | null
-  createdAt: string
+  expiresAt?: number | null
+  createdAt: number
   isActive: boolean
 }
 

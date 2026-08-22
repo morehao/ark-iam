@@ -140,7 +140,7 @@ func (svc *roleSvc) ListUsers(ctx *gin.Context, req *dtouser.RoleUserListReq) (*
 				Name:      user.Name,
 				Email:     model.DerefStr(person.PrimaryEmail),
 				RoleID:    ur.RoleID,
-				CreatedAt: ur.CreatedAt.Format("2006-01-02 15:04:05"),
+				CreatedAt: ur.CreatedAt.Unix(),
 			})
 		}
 	}

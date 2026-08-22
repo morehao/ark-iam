@@ -90,7 +90,7 @@ export const deleteOAuthClient = (applicationClientID: string) =>
   request.delete<any, string>(`/platform/application-clients/${applicationClientID}`)
 export const listOAuthSecrets = (applicationClientID: string) =>
   request.get<any, { total: number; secrets: OAuthSecretItem[] }>(`/platform/application-clients/${applicationClientID}/secrets`)
-export const createOAuthSecret = (data: { applicationClientID: string; name: string; expiresAt?: string }) => {
+export const createOAuthSecret = (data: { applicationClientID: string; name: string; expiresAt?: number }) => {
   const { applicationClientID, ...body } = data
   return request.post<any, OAuthSecretCreateResp>(`/platform/application-clients/${applicationClientID}/secrets`, body)
 }
@@ -122,7 +122,7 @@ export const deleteTenantApplication = (tenantAppID: string) =>
 // ==================== API Key ====================
 export const getApiKeyPageList = (data: { page: number; pageSize: number; name?: string }) =>
   request.get<any, PageListResp<ApiKeyItem>>('/platform/api-keys', { params: data })
-export const createApiKey = (data: { name: string; scope?: string; expiresAt?: string }) =>
+export const createApiKey = (data: { name: string; scope?: string; expiresAt?: number }) =>
   request.post<any, ApiKeyCreateResp>('/platform/api-keys', data)
 export const revokeApiKey = (id: string) => request.post<any, string>(`/platform/api-keys/${id}/revoke`)
 export const deleteApiKey = (id: string) => request.delete<any, string>(`/platform/api-keys/${id}`)

@@ -128,7 +128,7 @@ func TestRevokeApiKey(t *testing.T) {
 	if len(pageResp.List) == 0 {
 		t.Fatal("expected at least 1 result")
 	}
-	if pageResp.List[0].RevokedAt == "" {
+	if pageResp.List[0].RevokedAt == 0 {
 		t.Fatal("expected RevokedAt to be set")
 	}
 }

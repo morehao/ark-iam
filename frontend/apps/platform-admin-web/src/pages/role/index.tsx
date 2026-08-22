@@ -119,7 +119,7 @@ export default function RoleList() {
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 170,
-      render: (v: string) => fmtTime(v),
+      render: (v: number) => fmtTime(v),
     },
   ]
 

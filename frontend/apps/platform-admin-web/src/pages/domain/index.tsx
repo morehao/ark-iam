@@ -97,14 +97,14 @@ export default function DomainList() {
       dataIndex: 'verifiedAt',
       key: 'verifiedAt',
       width: 160,
-      render: (v: string) => fmtTime(v),
+      render: (v: number | null) => fmtTime(v),
     },
     {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 160,
-      render: (v: string) => fmtTime(v),
+      render: (v: number) => fmtTime(v),
     },
     {
       title: '操作',

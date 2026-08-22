@@ -86,16 +86,17 @@ func (svc *domainSvc) PageList(ctx *gin.Context, req *dtodomain.DomainPageListRe
 
 	items := make([]dtodomain.DomainPageListItem, 0, len(list))
 	for _, v := range list {
-		verifiedAt := ""
+		var verifiedAt *int64
 		if v.VerifiedAt.Valid {
-			verifiedAt = v.VerifiedAt.Time.Format("2006-01-02 15:04:05")
+			t := v.VerifiedAt.Time.Unix()
+			verifiedAt = &t
 		}
 		items = append(items, dtodomain.DomainPageListItem{
 			ID:         v.ID,
 			Domain:     v.Domain,
 			IsVerified: v.IsVerified,
 			VerifiedAt: verifiedAt,
-			CreatedAt:  v.CreatedAt.Format("2006-01-02 15:04:05"),
+			CreatedAt:  v.CreatedAt.Unix(),
 		})
 	}
 	return &dtodomain.DomainPageListResp{List: items, Total: total}, nil
@@ -165,16 +166,17 @@ func (svc *domainSvc) Detail(ctx *gin.Context, req *dtodomain.DomainDetailReq) (
 		return nil, code.GetError(code.DomainNotExistError)
 	}
 
-	verifiedAt := ""
+	var verifiedAt *int64
 	if entity.VerifiedAt.Valid {
-		verifiedAt = entity.VerifiedAt.Time.Format("2006-01-02 15:04:05")
+		t := entity.VerifiedAt.Time.Unix()
+		verifiedAt = &t
 	}
 	return &dtodomain.DomainDetailResp{
 		ID:         entity.ID,
 		Domain:     entity.Domain,
 		IsVerified: entity.IsVerified,
 		VerifiedAt: verifiedAt,
-		CreatedAt:  entity.CreatedAt.Format("2006-01-02 15:04:05"),
-		UpdatedAt:  entity.UpdatedAt.Format("2006-01-02 15:04:05"),
+		CreatedAt:  entity.CreatedAt.Unix(),
+		UpdatedAt:  entity.UpdatedAt.Unix(),
 	}, nil
 }

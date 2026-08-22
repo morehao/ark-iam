@@ -5,7 +5,7 @@ type ApiKeyCreateResp struct {
 	Name      string `json:"name"`
 	Key       string `json:"key"`
 	KeyPrefix string `json:"keyPrefix"`
-	ExpiredAt string `json:"expiresAt"`
+	ExpiredAt int64 `json:"expiresAt"` // 过期时间(unix 秒)
 }
 
 type ApiKeyPageListItem struct {
@@ -13,10 +13,10 @@ type ApiKeyPageListItem struct {
 	Name       string `json:"name"`
 	KeyPrefix  string `json:"keyPrefix"`
 	Scope      string `json:"scope"`
-	ExpiredAt  string `json:"expiresAt"`
-	LastUsedAt string `json:"lastUsedAt"`
-	RevokedAt  string `json:"revokedAt"`
-	CreatedAt  string `json:"createdAt"`
+	ExpiredAt  int64  `json:"expiresAt"`  // 过期时间(unix 秒)
+	LastUsedAt int64  `json:"lastUsedAt"` // 最后使用时间(unix 秒)
+	RevokedAt  int64  `json:"revokedAt"`  // 撤销时间(unix 秒)
+	CreatedAt  int64  `json:"createdAt"`  // 创建时间(unix 秒)
 }
 
 type ApiKeyPageListResp struct {

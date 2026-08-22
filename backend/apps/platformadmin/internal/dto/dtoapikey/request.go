@@ -5,7 +5,7 @@ import "github.com/morehao/golib/biz/gobject"
 type ApiKeyCreateReq struct {
 	Name      string `json:"name" binding:"required"`
 	Scope     string `json:"scope"`
-	ExpiredAt string `json:"expiresAt"`
+	ExpiredAt int64 `json:"expiresAt"` // 过期时间(unix 秒)
 }
 
 type RevokeApiKeyReq struct {

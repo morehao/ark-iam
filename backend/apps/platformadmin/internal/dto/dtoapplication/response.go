@@ -19,7 +19,7 @@ type ApplicationDetailResp struct {
 	Visibility   string          `json:"visibility"`   // 可见性
 	Sort         int             `json:"sort"`         // 排序
 	TenantPolicy json.RawMessage `json:"tenantPolicy"` // 租户策略
-	CreatedAt    string          `json:"createdAt"`    // 创建时间
+	CreatedAt    int64           `json:"createdAt"`    // 创建时间(unix 秒)
 }
 
 type PageListItem struct {
@@ -32,7 +32,7 @@ type PageListItem struct {
 	Visibility   string          `json:"visibility"`   // 可见性
 	Sort         int             `json:"sort"`         // 排序
 	TenantPolicy json.RawMessage `json:"tenantPolicy"` // 租户策略
-	CreatedAt    string          `json:"createdAt"`    // 创建时间
+	CreatedAt    int64           `json:"createdAt"`    // 创建时间(unix 秒)
 }
 
 type ApplicationPageListResp struct {

@@ -103,7 +103,7 @@ export interface RoleUserItem {
   name: string
   email: string
   roleID: string
-  createdAt: string
+  createdAt: number
 }
 
 // ---------- 部门 ----------
@@ -120,7 +120,7 @@ export interface ApplicationItem {
   visibility: string
   sort: number
   tenantPolicy?: unknown
-  createdAt?: string
+  createdAt?: number
 }
 
 export interface ApplicationCreateReq {
@@ -157,7 +157,7 @@ export interface OAuthClientItem {
   isThirdParty: number
   grantTypes: string[]
   tokenEndpointAuthMethod: string
-  createdAt?: string
+  createdAt?: number
 }
 
 export interface OAuthClientDetail extends OAuthClientItem {
@@ -216,8 +216,8 @@ export interface OAuthSecretItem {
   applicationClientID: string
   name: string
   valuePrefix: string
-  expiresAt: string | null
-  createdAt: string
+  expiresAt: number | null
+  createdAt: number
 }
 
 export interface OAuthSecretCreateResp {
@@ -266,7 +266,7 @@ export interface TenantApplicationItem {
   status: string
   config?: string
   grantedScope?: string
-  createdAt?: string
+  createdAt?: number
 }
 
 export interface TenantApplicationCreateReq {
@@ -289,10 +289,10 @@ export interface ApiKeyItem {
   name: string
   keyPrefix: string
   scope: string
-  expiresAt: string
-  lastUsedAt: string
-  revokedAt: string
-  createdAt: string
+  expiresAt: number
+  lastUsedAt: number
+  revokedAt: number
+  createdAt: number
 }
 
 export interface ApiKeyCreateResp {
@@ -300,7 +300,7 @@ export interface ApiKeyCreateResp {
   name: string
   key: string
   keyPrefix: string
-  expiresAt: string
+  expiresAt: number
 }
 
 // ---------- 菜单 ----------
@@ -334,8 +334,8 @@ export interface DomainItem {
   id: string
   domain: string
   isVerified: number
-  verifiedAt: string
-  createdAt: string
+  verifiedAt: number | null
+  createdAt: number
 }
 
 // ---------- 系统配置 ----------

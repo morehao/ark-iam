@@ -21,8 +21,6 @@ type OrganizationUserSvc interface {
 	Update(ctx *gin.Context, req *dtotenant.OrganizationUserUpdateReq) error
 	Delete(ctx *gin.Context, req *dtotenant.OrganizationUserDeleteReq) error
 	PageList(ctx *gin.Context, req *dtotenant.OrganizationUserPageListReq) (*dtotenant.OrganizationUserPageListResp, error)
-	SubtreeUsers(ctx *gin.Context, req *dtotenant.OrganizationSubtreeUsersReq) (*dtotenant.OrganizationSubtreeUsersResp, error)
-	GetUserOrganizations(ctx *gin.Context, req *dtotenant.UserOrganizationListReq) (*dtotenant.UserOrganizationListResp, error)
 	UpdateUserOrganizations(ctx *gin.Context, req *dtotenant.UserOrganizationsUpdateReq) error
 }
 
@@ -49,11 +47,19 @@ func (svc *organizationUserSvc) Create(ctx *gin.Context, req *dtotenant.Organiza
 	}
 
 	orgEntity, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
-	if err != nil || !organizationVisibleToTenant(orgEntity, tenantID) {
+	if err != nil {
+		glog.Errorf(ctx, "[svcorganizationuser.Create] dao GetByID org fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.OrganizationUserCreateError)
+	}
+	if !organizationVisibleToTenant(orgEntity, tenantID) {
 		return nil, code.GetError(code.OrganizationNotExistError)
 	}
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
-	if err != nil || userEntity == nil || userEntity.ID == "" || userEntity.TenantID != tenantID {
+	if err != nil {
+		glog.Errorf(ctx, "[svcorganizationuser.Create] dao GetByID user fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.OrganizationUserCreateError)
+	}
+	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != tenantID {
 		return nil, code.GetError(code.UserNotExistError)
 	}
 
@@ -101,7 +107,11 @@ func (svc *organizationUserSvc) Update(ctx *gin.Context, req *dtotenant.Organiza
 		UserID:         req.UserID,
 		RelationType:   relationType,
 	})
-	if err != nil || len(relationList) == 0 {
+	if err != nil {
+		glog.Errorf(ctx, "[svcorganizationuser.Update] dao GetListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.OrganizationUserUpdateError)
+	}
+	if len(relationList) == 0 {
 		return code.GetError(code.OrganizationUserNotExistError)
 	}
 
@@ -218,61 +228,6 @@ func matchMemberKeyword(item dtotenant.OrganizationUserPageListItem, keyword str
 		strings.Contains(item.PrimaryPhone, keyword)
 }
 
-// SubtreeUsers 子树成员聚合：org_path 前缀查子树节点 → 取 member 关系 → 去重用户。
-func (svc *organizationUserSvc) SubtreeUsers(ctx *gin.Context, req *dtotenant.OrganizationSubtreeUsersReq) (*dtotenant.OrganizationSubtreeUsersResp, error) {
-	tenantID := gincontext.GetTenantIDString(ctx)
-	orgEntity, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
-	if err != nil || !organizationVisibleToTenant(orgEntity, tenantID) {
-		return nil, code.GetError(code.OrganizationNotExistError)
-	}
-
-	subList, err := dao.NewOrganizationDao().GetListByCond(ctx, &dao.OrganizationCond{
-		TenantID: tenantID,
-		OrgPath:  orgEntity.OrgPath,
-	})
-	if err != nil {
-		glog.Errorf(ctx, "[svcorganizationuser.SubtreeUsers] query subtree fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.OrganizationUserGetPageListError)
-	}
-	orgIDs := make([]string, 0, len(subList))
-	for _, v := range subList {
-		orgIDs = append(orgIDs, v.ID)
-	}
-
-	relationList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
-		TenantID:     tenantID,
-		RelationType: string(model.OrgUserRelationMember),
-	})
-	if err != nil {
-		glog.Errorf(ctx, "[svcorganizationuser.SubtreeUsers] query relations fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.OrganizationUserGetPageListError)
-	}
-
-	seen := make(map[string]bool)
-	list := make([]dtotenant.OrganizationSubtreeUser, 0)
-	for _, r := range relationList {
-		if containsString(orgIDs, r.OrganizationID) && !seen[r.UserID] {
-			seen[r.UserID] = true
-			list = append(list, dtotenant.OrganizationSubtreeUser{
-				UserID:   r.UserID,
-				UserName: svc.userName(ctx, r.UserID),
-			})
-		}
-	}
-	return &dtotenant.OrganizationSubtreeUsersResp{List: list}, nil
-}
-
-// GetUserOrganizations 用户组织归属（含各节点名称）。
-func (svc *organizationUserSvc) GetUserOrganizations(ctx *gin.Context, req *dtotenant.UserOrganizationListReq) (*dtotenant.UserOrganizationListResp, error) {
-	tenantID := gincontext.GetTenantIDString(ctx)
-	list, err := loadUserOrganizations(ctx, tenantID, req.UserID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcorganizationuser.GetUserOrganizations] load fail, err:%v", err)
-		return nil, code.GetError(code.OrganizationUserGetPageListError)
-	}
-	return &dtotenant.UserOrganizationListResp{List: list}, nil
-}
-
 // loadUserOrganizations 查询用户组织归属（含各节点名称），供用户归属接口与用户详情复用。
 func loadUserOrganizations(ctx *gin.Context, tenantID, userID string) ([]dtotenant.UserOrganizationItem, error) {
 	relationList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
@@ -315,7 +270,11 @@ func (svc *organizationUserSvc) UpdateUserOrganizations(ctx *gin.Context, req *d
 		return code.GetError(code.UserOrganizationRequiredError)
 	}
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
-	if err != nil || userEntity == nil || userEntity.ID == "" || userEntity.TenantID != tenantID {
+	if err != nil {
+		glog.Errorf(ctx, "[svcorganizationuser.UpdateUserOrganizations] dao GetByID user fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.OrganizationUserCreateError)
+	}
+	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != tenantID {
 		return code.GetError(code.UserNotExistError)
 	}
 	orgList, err := dao.NewOrganizationDao().GetListByCond(ctx, &dao.OrganizationCond{TenantID: tenantID})
@@ -389,12 +348,3 @@ func clearPrimaryOrg(ctx *gin.Context, tenantID, userID string) error {
 }
 
 func boolPtr(b bool) *bool { return &b }
-
-// userName 查询用户姓名（关系分页/聚合展示用）。
-func (svc *organizationUserSvc) userName(ctx *gin.Context, userID string) string {
-	u, err := dao.NewUserDao().GetByID(ctx, userID)
-	if err != nil || u == nil {
-		return ""
-	}
-	return u.Name
-}

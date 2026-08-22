@@ -277,15 +277,15 @@ func TestUpdateUserOrganizationsReplace(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("replace orgs: %v", err)
 	}
-	resp, err := svc.GetUserOrganizations(ginCtx, &dtotenant.UserOrganizationListReq{UserID: "u1"})
+	list, err := loadUserOrganizations(ginCtx, "41", "u1")
 	if err != nil {
-		t.Fatalf("get user orgs: %v", err)
+		t.Fatalf("load user orgs: %v", err)
 	}
-	if len(resp.List) != 2 {
-		t.Fatalf("expected 2 relations, got %d", len(resp.List))
+	if len(list) != 2 {
+		t.Fatalf("expected 2 relations, got %d", len(list))
 	}
-	if !resp.List[0].IsPrimary || resp.List[1].IsPrimary {
-		t.Fatalf("expected only first org primary, got %+v", resp.List)
+	if !list[0].IsPrimary || list[1].IsPrimary {
+		t.Fatalf("expected only first org primary, got %+v", list)
 	}
 
 	// 全量替换为 [A2] → 只剩 1 条且为主
@@ -295,11 +295,98 @@ func TestUpdateUserOrganizationsReplace(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("replace orgs again: %v", err)
 	}
-	resp, err = svc.GetUserOrganizations(ginCtx, &dtotenant.UserOrganizationListReq{UserID: "u1"})
+	list, err = loadUserOrganizations(ginCtx, "41", "u1")
 	if err != nil {
-		t.Fatalf("get user orgs: %v", err)
+		t.Fatalf("load user orgs: %v", err)
 	}
-	if len(resp.List) != 1 || !resp.List[0].IsPrimary || resp.List[0].OrganizationID != org2.OrganizationID {
-		t.Fatalf("unexpected relations after second replace: %+v", resp.List)
+	if len(list) != 1 || !list[0].IsPrimary || list[0].OrganizationID != org2.OrganizationID {
+		t.Fatalf("unexpected relations after second replace: %+v", list)
+	}
+}
+
+func TestOrganizationChildrenPageAndHasChildren(t *testing.T) {
+	_ = testutil.SetupSQLite(t, &model.OrganizationEntity{}, &model.OrganizationUserEntity{})
+	ginCtx := newOrgGinCtx(t, "41", "1001")
+
+	svc := &organizationSvc{}
+	root, err := svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
+		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "总公司", Status: "active"},
+	})
+	if err != nil {
+		t.Fatalf("create root: %v", err)
+	}
+	a, _ := svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
+		ParentID: root.OrganizationID,
+		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "A", Status: "active"},
+	})
+	svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
+		ParentID: root.OrganizationID,
+		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "B", Status: "inactive"},
+	})
+	// A 下挂一个深层子级，验证 hasChildren
+	svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
+		ParentID: a.OrganizationID,
+		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "A1", Status: "active"},
+	})
+
+	// 直属子级：应只有 A、B 两项
+	resp, err := svc.Children(ginCtx, &dtotenant.OrganizationChildrenReq{
+		OrganizationID: root.OrganizationID,
+		Page:           1,
+		PageSize:       10,
+	})
+	if err != nil {
+		t.Fatalf("children: %v", err)
+	}
+	if resp.Total != 2 || len(resp.List) != 2 {
+		t.Fatalf("expected 2 children, got total=%d len=%d", resp.Total, len(resp.List))
+	}
+	// A 有下级，B 无下级
+	has := map[string]bool{}
+	for _, item := range resp.List {
+		has[item.Name] = item.HasChildren
+	}
+	if !has["A"] {
+		t.Fatalf("expected A to have children, got %+v", has)
+	}
+	if has["B"] {
+		t.Fatalf("expected B to have no children, got %+v", has)
+	}
+
+	// 状态筛选：只返回启用的 A
+	resp, err = svc.Children(ginCtx, &dtotenant.OrganizationChildrenReq{
+		OrganizationID: root.OrganizationID,
+		Status:         "active",
+		Page:           1,
+		PageSize:       10,
+	})
+	if err != nil {
+		t.Fatalf("children status filter: %v", err)
+	}
+	if resp.Total != 1 || resp.List[0].Name != "A" {
+		t.Fatalf("expected only A, got total=%d names=%+v", resp.Total, resp.List)
+	}
+
+	// 分页：pageSize=1 时 total 仍为 2
+	resp, err = svc.Children(ginCtx, &dtotenant.OrganizationChildrenReq{
+		OrganizationID: root.OrganizationID,
+		Page:           1,
+		PageSize:       1,
+	})
+	if err != nil {
+		t.Fatalf("children paging: %v", err)
+	}
+	if resp.Total != 2 || len(resp.List) != 1 {
+		t.Fatalf("expected total=2 len=1, got total=%d len=%d", resp.Total, len(resp.List))
+	}
+
+	// 跨租户：另一租户查询该部门子级应失败
+	otherCtx := newOrgGinCtx(t, "42", "1002")
+	if _, err := svc.Children(otherCtx, &dtotenant.OrganizationChildrenReq{
+		OrganizationID: root.OrganizationID,
+		Page:           1,
+		PageSize:       10,
+	}); err == nil {
+		t.Fatalf("expected cross-tenant children to fail")
 	}
 }

@@ -7,7 +7,20 @@ export interface OrganizationItem {
   code: string
   sort: number
   status: string
+  createdAt?: number
   children?: OrganizationItem[]
+}
+
+export interface OrganizationChildItem {
+  organizationID: string
+  parentID: string
+  orgDepth: number
+  name: string
+  code: string
+  sort: number
+  status: string
+  createdAt?: number
+  hasChildren?: boolean
 }
 
 export interface OrganizationUserItem {
@@ -33,6 +46,11 @@ export interface UserOrganizationItem {
 
 export interface OrganizationTreeResp {
   list: OrganizationItem[]
+}
+
+export interface OrganizationChildrenResp {
+  list: OrganizationChildItem[]
+  total: number
 }
 
 export interface PageListResp<T> {

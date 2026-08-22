@@ -74,8 +74,12 @@ func loadTenantApps(ctx *gin.Context) ([]model.ApplicationEntity, error) {
 			continue
 		}
 		appEntity, err := dao.NewApplicationDao().GetByID(ctx, item.AppID)
-		if err != nil || appEntity == nil || appEntity.ID == "" {
-			glog.Warnf(ctx, "[svctenant.loadTenantApps] application GetByID fail or not exist, err:%v, appID:%s", err, item.AppID)
+		if err != nil {
+			glog.Errorf(ctx, "[svctenant.loadTenantApps] application GetByID fail, err:%v, appID:%s", err, item.AppID)
+			continue
+		}
+		if appEntity == nil || appEntity.ID == "" {
+			glog.Warnf(ctx, "[svctenant.loadTenantApps] application not exist, appID:%s", item.AppID)
 			continue
 		}
 		if appEntity.IsSystem {

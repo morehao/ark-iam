@@ -178,7 +178,11 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 	createPerson := false
 	if personID != "" {
 		person, err := dao.NewPersonDao().GetByID(ctx, personID)
-		if err != nil || person == nil || person.ID == "" {
+		if err != nil {
+			glog.Errorf(ctx, "[svcuser.Create] dao GetByID person fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+			return nil, code.GetError(code.UserCreateError)
+		}
+		if person == nil || person.ID == "" {
 			return nil, code.GetError(code.UserNotExistError)
 		}
 	} else {
@@ -303,7 +307,11 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 func (svc *userSvc) Detail(ctx *gin.Context, req *dtotenant.UserDetailReq) (*dtotenant.UserDetailResp, error) {
 	tenantID := gincontext.GetTenantIDString(ctx)
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
-	if err != nil || userEntity == nil || userEntity.ID == "" || userEntity.TenantID != tenantID {
+	if err != nil {
+		glog.Errorf(ctx, "[svcuser.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.UserGetDetailError)
+	}
+	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != tenantID {
 		return nil, code.GetError(code.UserNotExistError)
 	}
 
@@ -352,7 +360,11 @@ func (svc *userSvc) Detail(ctx *gin.Context, req *dtotenant.UserDetailReq) (*dto
 // Update 局部更新用户（PATCH）：姓名/头像/状态。
 func (svc *userSvc) Update(ctx *gin.Context, req *dtotenant.UserUpdateReq) error {
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
-	if err != nil || userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gincontext.GetTenantIDString(ctx) {
+	if err != nil {
+		glog.Errorf(ctx, "[svcuser.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.UserUpdateError)
+	}
+	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gincontext.GetTenantIDString(ctx) {
 		return code.GetError(code.UserNotExistError)
 	}
 
@@ -376,7 +388,11 @@ func (svc *userSvc) Update(ctx *gin.Context, req *dtotenant.UserUpdateReq) error
 // ResetPassword 重置密码：更新关联 person 的密码哈希（无自然人关联的用户不可登录，直接拒绝）。
 func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPasswordReq) error {
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
-	if err != nil || userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gincontext.GetTenantIDString(ctx) {
+	if err != nil {
+		glog.Errorf(ctx, "[svcuser.ResetPassword] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.UserUpdateError)
+	}
+	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gincontext.GetTenantIDString(ctx) {
 		return code.GetError(code.UserNotExistError)
 	}
 	if userEntity.PersonID == "" {
@@ -403,7 +419,11 @@ func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPass
 func (svc *userSvc) ListRoles(ctx *gin.Context, req *dtotenant.UserRolesListReq) (*dtotenant.UserRolesListResp, error) {
 	tenantID := gincontext.GetTenantIDString(ctx)
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
-	if err != nil || userEntity == nil || userEntity.ID == "" || userEntity.TenantID != tenantID {
+	if err != nil {
+		glog.Errorf(ctx, "[svcuser.ListRoles] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.UserGetDetailError)
+	}
+	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != tenantID {
 		return nil, code.GetError(code.UserNotExistError)
 	}
 	roles, err := svc.listRoles(ctx, tenantID, req.UserID)
@@ -417,14 +437,22 @@ func (svc *userSvc) ListRoles(ctx *gin.Context, req *dtotenant.UserRolesListReq)
 func (svc *userSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.UserRolesUpdateReq) error {
 	tenantID := gincontext.GetTenantIDString(ctx)
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
-	if err != nil || userEntity == nil || userEntity.ID == "" || userEntity.TenantID != tenantID {
+	if err != nil {
+		glog.Errorf(ctx, "[svcuser.UpdateRoles] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.UserUpdateError)
+	}
+	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != tenantID {
 		return code.GetError(code.UserNotExistError)
 	}
 
 	// 校验角色均属于本租户
 	if len(req.RoleIDs) > 0 {
 		roleList, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{TenantID: tenantID, IDs: req.RoleIDs})
-		if err != nil || len(roleList) != len(req.RoleIDs) {
+		if err != nil {
+			glog.Errorf(ctx, "[svcuser.UpdateRoles] dao GetListByCond roles fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+			return code.GetError(code.UserUpdateError)
+		}
+		if len(roleList) != len(req.RoleIDs) {
 			return code.GetError(code.RoleNotExistError)
 		}
 	}

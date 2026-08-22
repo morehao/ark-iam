@@ -25,13 +25,18 @@ type OrganizationDeleteReq struct {
 	Cascade        bool   `json:"cascade" form:"cascade"`                    // 是否级联删除子树与成员(默认拒绝)
 }
 
-type OrganizationDetailReq struct {
-	OrganizationID string `json:"-" uri:"organizationID" binding:"required"` // 组织ID
-}
-
 type OrganizationTreeReq struct {
 	Name   string `json:"name" form:"name"`     // 组织名称过滤
 	Status string `json:"status" form:"status"` // 状态过滤
+}
+
+// OrganizationChildrenReq 某部门直属子部门分页查询。
+type OrganizationChildrenReq struct {
+	OrganizationID string `json:"-" uri:"organizationID" binding:"required"` // 部门ID(父节点)
+	Name           string `json:"name" form:"name"`                          // 部门名称过滤
+	Status         string `json:"status" form:"status"`                      // 状态过滤
+	Page           int    `json:"page" form:"page"`                          // 页码
+	PageSize       int    `json:"pageSize" form:"pageSize"`                  // 每页数量
 }
 
 // ---------- 组织关系 ----------
@@ -64,15 +69,7 @@ type OrganizationUserPageListReq struct {
 	Keyword        string `json:"keyword" form:"keyword"`                    // 关键词(姓名/用户名/邮箱/手机 模糊)
 }
 
-type OrganizationSubtreeUsersReq struct {
-	OrganizationID string `json:"-" uri:"organizationID" binding:"required"` // 组织ID
-}
-
 // ---------- 用户归属 ----------
-
-type UserOrganizationListReq struct {
-	UserID string `json:"-" uri:"userID" binding:"required"` // 用户ID
-}
 
 type UserOrganizationsUpdateReq struct {
 	UserID          string   `json:"-" uri:"userID" binding:"required"`  // 用户ID

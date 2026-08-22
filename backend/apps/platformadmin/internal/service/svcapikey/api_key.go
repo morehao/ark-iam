@@ -61,15 +61,11 @@ func (svc *createApiKeySvc) Create(ctx *gin.Context, req *dtoapikey.ApiKeyCreate
 	}
 
 	var expiresAt *time.Time
-	var expiresAtStr string
-	if req.ExpiredAt != "" {
-		t, err := time.Parse("2006-01-02T15:04:05Z", req.ExpiredAt)
-		if err != nil {
-			glog.Errorf(ctx, "[svcapikey.Create] parse expiresAt fail, err:%v", err)
-			return nil, err
-		}
+	var expiresAtUnix int64
+	if req.ExpiredAt > 0 {
+		t := time.Unix(req.ExpiredAt, 0)
 		expiresAt = &t
-		expiresAtStr = t.Format("2006-01-02T15:04:05Z")
+		expiresAtUnix = req.ExpiredAt
 	}
 
 	entity := &model.ApiKeyEntity{
@@ -100,7 +96,7 @@ func (svc *createApiKeySvc) Create(ctx *gin.Context, req *dtoapikey.ApiKeyCreate
 		Name:      entity.Name,
 		Key:       rawKey,
 		KeyPrefix: keyPrefix,
-		ExpiredAt: expiresAtStr,
+		ExpiredAt: expiresAtUnix,
 	}, nil
 }
 
@@ -156,16 +152,16 @@ func (svc *createApiKeySvc) PageList(ctx *gin.Context, req *dtoapikey.ApiKeyPage
 			Name:      entity.Name,
 			KeyPrefix: entity.KeyPrefix,
 			Scope:     string(entity.Scope),
-			CreatedAt: entity.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			CreatedAt: entity.CreatedAt.Unix(),
 		}
 		if entity.ExpiredAt != nil {
-			item.ExpiredAt = entity.ExpiredAt.Format("2006-01-02T15:04:05Z")
+			item.ExpiredAt = entity.ExpiredAt.Unix()
 		}
 		if entity.LastUsedAt.Valid {
-			item.LastUsedAt = entity.LastUsedAt.Time.Format("2006-01-02T15:04:05Z")
+			item.LastUsedAt = entity.LastUsedAt.Time.Unix()
 		}
 		if entity.RevokedAt != nil {
-			item.RevokedAt = entity.RevokedAt.Format("2006-01-02T15:04:05Z")
+			item.RevokedAt = entity.RevokedAt.Unix()
 		}
 		items = append(items, item)
 	}

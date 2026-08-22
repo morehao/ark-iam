@@ -127,7 +127,7 @@ func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.Applicat
 		Visibility:   entity.Visibility,
 		Sort:         entity.Sort,
 		TenantPolicy: json.RawMessage(entity.TenantPolicy),
-		CreatedAt:    entity.CreatedAt.Format("2006-01-02 15:04:05"),
+		CreatedAt:    entity.CreatedAt.Unix(),
 	}, nil
 }
 
@@ -158,7 +158,7 @@ func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.Applic
 			Visibility:   v.Visibility,
 			Sort:         v.Sort,
 			TenantPolicy: json.RawMessage(v.TenantPolicy),
-			CreatedAt:    v.CreatedAt.Format("2006-01-02 15:04:05"),
+			CreatedAt:    v.CreatedAt.Unix(),
 		})
 	}
 	return &dtoapplication.ApplicationPageListResp{List: items, Total: total}, nil

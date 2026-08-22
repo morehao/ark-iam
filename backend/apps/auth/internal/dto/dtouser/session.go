@@ -21,8 +21,8 @@ type SessionResp struct {
 	ClientType string  `json:"clientType"`
 	ClientIP   string  `json:"clientIP"`
 	UserAgent  string  `json:"userAgent"`
-	ExpiredAt  *string `json:"expiresAt"`
-	CreatedAt  string  `json:"createdAt"`
+	ExpiredAt  *int64 `json:"expiresAt"` // 过期时间(unix 秒)
+	CreatedAt  int64  `json:"createdAt"` // 创建时间(unix 秒)
 	IsActive   bool    `json:"isActive"`
 }
 

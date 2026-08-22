@@ -87,7 +87,11 @@ func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dto
 func (svc *roleSvc) Delete(ctx *gin.Context, req *dtotenant.RoleDeleteReq) error {
 	tenantID := gincontext.GetTenantIDString(ctx)
 	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
-	if err != nil || !roleVisibleToTenant(roleEntity, tenantID) {
+	if err != nil {
+		glog.Errorf(ctx, "[svcrole.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.RoleDeleteError)
+	}
+	if !roleVisibleToTenant(roleEntity, tenantID) {
 		return code.GetError(code.RoleNotExistError)
 	}
 	// 内置角色禁止删除（防止系统管理能力失控且 seed 幂等不自动重建）
@@ -133,7 +137,11 @@ func (svc *roleSvc) Delete(ctx *gin.Context, req *dtotenant.RoleDeleteReq) error
 func (svc *roleSvc) Update(ctx *gin.Context, req *dtotenant.RoleUpdateReq) error {
 	tenantID := gincontext.GetTenantIDString(ctx)
 	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
-	if err != nil || !roleVisibleToTenant(roleEntity, tenantID) {
+	if err != nil {
+		glog.Errorf(ctx, "[svcrole.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.RoleUpdateError)
+	}
+	if !roleVisibleToTenant(roleEntity, tenantID) {
 		return code.GetError(code.RoleNotExistError)
 	}
 
@@ -160,7 +168,11 @@ func (svc *roleSvc) Update(ctx *gin.Context, req *dtotenant.RoleUpdateReq) error
 func (svc *roleSvc) Detail(ctx *gin.Context, req *dtotenant.RoleDetailReq) (*dtotenant.RoleDetailResp, error) {
 	tenantID := gincontext.GetTenantIDString(ctx)
 	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
-	if err != nil || !roleVisibleToTenant(roleEntity, tenantID) {
+	if err != nil {
+		glog.Errorf(ctx, "[svcrole.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.RoleGetDetailError)
+	}
+	if !roleVisibleToTenant(roleEntity, tenantID) {
 		return nil, code.GetError(code.RoleNotExistError)
 	}
 	memberCount, menuCount, err := svc.roleRelationCounts(ctx, tenantID, []string{req.RoleID})
@@ -241,7 +253,11 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtotenant.RolePageListReq) (
 func (svc *roleSvc) GetMenus(ctx *gin.Context, req *dtotenant.RoleDetailReq) (*dtotenant.RoleMenuTreeResp, error) {
 	tenantID := gincontext.GetTenantIDString(ctx)
 	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
-	if err != nil || !roleVisibleToTenant(roleEntity, tenantID) {
+	if err != nil {
+		glog.Errorf(ctx, "[svcrole.GetMenus] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.RoleGetDetailError)
+	}
+	if !roleVisibleToTenant(roleEntity, tenantID) {
 		return nil, code.GetError(code.RoleNotExistError)
 	}
 
@@ -274,7 +290,11 @@ func (svc *roleSvc) roleMenuTree(ctx *gin.Context, roleEntity *model.RoleEntity)
 func (svc *roleSvc) UpdateMenus(ctx *gin.Context, req *dtotenant.RoleMenusUpdateReq) error {
 	tenantID := gincontext.GetTenantIDString(ctx)
 	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
-	if err != nil || !roleVisibleToTenant(roleEntity, tenantID) {
+	if err != nil {
+		glog.Errorf(ctx, "[svcrole.UpdateMenus] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.RoleUpdateError)
+	}
+	if !roleVisibleToTenant(roleEntity, tenantID) {
 		return code.GetError(code.RoleNotExistError)
 	}
 
