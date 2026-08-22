@@ -104,7 +104,7 @@ flowchart LR
 # 授权码换令牌（client_secret_basic）
 curl -X POST http://localhost:8081/oidc/oauth/token \
   -u "platform-admin-web:客户端密钥" \
-  -d "grant_type=authorization_code&code=xxx&redirect_uri=http://localhost:3001/callback&code_verifier=xxx"
+  -d "grant_type=authorization_code&code=xxx&redirect_uri=http://localhost:4001/callback&code_verifier=xxx"
 
 # 刷新令牌
 curl -X POST http://localhost:8081/oidc/oauth/token \

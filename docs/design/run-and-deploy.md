@@ -61,9 +61,9 @@ make run APP=gateway
 cd frontend
 pnpm install
 
-pnpm dev          # platform-admin-web :3001
-pnpm dev:login    # login-web :3000
-pnpm dev:tenant   # tenant-admin-web :3002
+pnpm dev          # platform-admin-web :4001
+pnpm dev:login    # login-web :4000
+pnpm dev:tenant   # tenant-admin-web :4002
 ```
 
 ### 2.3 启动顺序与数据准备

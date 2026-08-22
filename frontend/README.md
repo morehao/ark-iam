@@ -22,9 +22,9 @@ frontend/
 │   ├── auth/              # OIDC Provider、租户切换、登出、鉴权守卫
 │   └── ui/                # 设计系统：主题、MainLayout、LoginPage、PageContainer 等
 └── apps/
-    ├── login-web/         # 登录页（:3000）— OP 登录 UI：凭证登录 / 多租户选择（非 OIDC Client）
-    ├── platform-admin-web/# 平台管理控制台（:3001）— 用户/角色/菜单/部门/应用/OAuth客户端/租户/API Key/域名/系统配置/审计日志
-    └── tenant-admin-web/  # 租户自服务控制台（:3003）— 组织/组织角色/组织用户/组织角色用户
+    ├── login-web/         # 登录页（:4000）— OP 登录 UI：凭证登录 / 多租户选择（非 OIDC Client）
+    ├── platform-admin-web/# 平台管理控制台（:4001）— 用户/角色/菜单/部门/应用/OAuth客户端/租户/API Key/域名/系统配置/审计日志
+    └── tenant-admin-web/  # 租户自服务控制台（:4002）— 组织/组织角色/组织用户/组织角色用户
 ```
 
 依赖方向：`ui → auth → api → types`，业务 app 消费共享包。
@@ -36,9 +36,9 @@ frontend/
 pnpm install
 
 # 开发模式（单应用）
-pnpm dev              # 平台管理（:3001）
-pnpm dev:login        # 登录门户（:3000）
-pnpm dev:tenant       # 租户自服务（:3003）
+pnpm dev              # 平台管理（:4001）
+pnpm dev:login        # 登录门户（:4000）
+pnpm dev:tenant       # 租户自服务（:4002）
 
 # 同时启动三个应用
 pnpm dev:all

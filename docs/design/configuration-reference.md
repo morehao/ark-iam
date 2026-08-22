@@ -63,7 +63,7 @@ jwt:
 
 oidc:
   issuer: "http://localhost:8081/oidc"
-  frontendLoginURL: "http://localhost:3000/login"
+  frontendLoginURL: "http://localhost:4000/login"
   signingPrivateKeyPath: "config/oidc-dev-key.pem"
   signingPrivateKeyPEM: ""
   signingKeyID: "dev-oidc-key"
@@ -171,7 +171,7 @@ oidc:
 | 配置项 | 说明 | 默认 |
 |---|---|---|
 | `issuer` | OIDC issuer（派生全部端点）。生产必须为正式域名 | `http://localhost:{port}/oidc` |
-| `frontendLoginURL` | 登录门户地址（跳转与 logged-out 落地） | `http://localhost:3000/login` |
+| `frontendLoginURL` | 登录门户地址（跳转与 logged-out 落地） | `http://localhost:4000/login` |
 | `signingKeyID` | 签名密钥 kid | dev-oidc-key |
 | `signingPrivateKeyPath` | 签名私钥 PEM 文件路径（PKCS#1/PKCS#8） | - |
 | `signingPrivateKeyPEM` | 签名私钥 PEM 内联（与 path 二选一） | - |

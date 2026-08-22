@@ -116,7 +116,7 @@ RP 接入前必须在 OP 注册一个 **OAuth Client**，核心注册字段（�
 |---|---|---|
 | `client_id` | 客户端唯一标识 | 如 `platform-admin-web` |
 | `client_secret` | 客户端密钥（仅机密客户端需要，库中只存哈希） | - |
-| `redirect_uris` | 授权码回调地址（**必须白名单精确匹配**） | 如 `http://localhost:3001/callback` |
+| `redirect_uris` | 授权码回调地址（**必须白名单精确匹配**） | 如 `http://localhost:4001/callback` |
 | `grant_types` | 允许的授权类型 | `["authorization_code"]` |
 | `response_types` | 允许的响应类型 | `["code"]` |
 | `token_endpoint_auth_method` | 令牌端点客户端认证方式 | `client_secret_basic` / `client_secret_post` / `none` |

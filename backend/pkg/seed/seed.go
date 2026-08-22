@@ -266,10 +266,11 @@ func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model
 		{appCode: appCodeAdmin, parentCode: "role", name: "角色列表", code: "role-list", path: "/role/list", sort: 1, component: "/role/list/index", visibility: string(model.MenuVisibilityAdmin)},
 		{appCode: appCodeAdmin, parentCode: "menu", name: "菜单列表", code: "menu-list", path: "/menu/list", sort: 1, component: "/menu/list/index", visibility: string(model.MenuVisibilityAdmin)},
 		{appCode: appCodeAdmin, parentCode: "application", name: "应用列表", code: "application-list", path: "/application/list", sort: 1, component: "/application/list/index", visibility: string(model.MenuVisibilityAdmin)},
-		// 租户自服务一级菜单（组织架构 = 组织树容器；用户/角色编码加 tenant- 前缀，避免与平台菜单 code 撞名）
-		{appCode: appCodeTenantAdmin, name: "组织架构", code: "organization", path: "/organization", icon: "apartment", sort: 1, component: "pages/organization", visibility: string(model.MenuVisibilityPublic)},
-		{appCode: appCodeTenantAdmin, name: "用户管理", code: "tenant-user", path: "/user", icon: "user", sort: 2, component: "pages/user", visibility: string(model.MenuVisibilityAdmin)},
-		{appCode: appCodeTenantAdmin, name: "角色管理", code: "tenant-role", path: "/role", icon: "role", sort: 3, component: "pages/role", visibility: string(model.MenuVisibilityAdmin)},
+		// 租户自服务一级菜单（组织架构拆为组织管理/成员管理；用户/角色编码加 tenant- 前缀，避免与平台菜单 code 撞名）
+		{appCode: appCodeTenantAdmin, name: "组织管理", code: "organization", path: "/organization", icon: "apartment", sort: 1, component: "pages/organization", visibility: string(model.MenuVisibilityPublic)},
+		{appCode: appCodeTenantAdmin, name: "成员管理", code: "organization-member", path: "/organization/members", icon: "team", sort: 2, component: "pages/organization-member", visibility: string(model.MenuVisibilityPublic)},
+		{appCode: appCodeTenantAdmin, name: "用户管理", code: "tenant-user", path: "/user", icon: "user", sort: 3, component: "pages/user", visibility: string(model.MenuVisibilityAdmin)},
+		{appCode: appCodeTenantAdmin, name: "角色管理", code: "tenant-role", path: "/role", icon: "role", sort: 4, component: "pages/role", visibility: string(model.MenuVisibilityAdmin)},
 	}
 
 	appByCode := map[string]*model.ApplicationEntity{appCodeAdmin: adminApp, appCodeTenantAdmin: tenantAdminApp}
@@ -331,7 +332,7 @@ func seedRoleMenus(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity,
 		{roleCode: "admin", menuCode: []string{
 			"dashboard", "user", "role", "menu", "application",
 			"user-list", "role-list", "menu-list", "application-list",
-			"organization", "tenant-user", "tenant-role",
+			"organization", "organization-member", "tenant-user", "tenant-role",
 		}},
 	}
 	for _, rel := range relations {
@@ -496,15 +497,15 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, tenant *model.TenantEntit
 		{
 			code:                 oauthClientPlatformAdminWeb,
 			name:                 "IAM管理平台",
-			redirectURIs:         `["http://localhost:3001/auth/callback"]`,
-			postLogoutRedirect:   `["http://localhost:3001/login"]`,
+			redirectURIs:         `["http://localhost:4001/auth/callback"]`,
+			postLogoutRedirect:   `["http://localhost:4001/login"]`,
 			backChannelLogoutURI: "http://localhost:8100/oidc/bc-logout/platform",
 		},
 		{
 			code:                 oauthClientTenantAdminWeb,
 			name:                 "租户管理平台",
-			redirectURIs:         `["http://localhost:3002/auth/callback"]`,
-			postLogoutRedirect:   `["http://localhost:3002/login"]`,
+			redirectURIs:         `["http://localhost:4002/auth/callback"]`,
+			postLogoutRedirect:   `["http://localhost:4002/login"]`,
 			backChannelLogoutURI: "http://localhost:8100/oidc/bc-logout/tenant",
 		},
 	}
