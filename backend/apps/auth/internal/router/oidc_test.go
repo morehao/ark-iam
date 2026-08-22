@@ -23,7 +23,7 @@ func TestOIDCRoutesExposeLoginEndpoint(t *testing.T) {
 		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
 		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
-			FrontendLoginURL: "http://localhost:3000/oidc/login",
+			FrontendLoginURL: "http://localhost:4000/oidc/login",
 			AllowInsecure:    true,
 		},
 	}
@@ -55,7 +55,7 @@ func TestOIDCLoginEndpointBypassesJWTAuth(t *testing.T) {
 		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
 		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
-			FrontendLoginURL: "http://localhost:3000/oidc/login",
+			FrontendLoginURL: "http://localhost:4000/oidc/login",
 			AllowInsecure:    true,
 		},
 	}

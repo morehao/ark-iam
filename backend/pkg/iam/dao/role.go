@@ -8,13 +8,15 @@ import (
 
 type RoleCond struct {
 	*gormdao.BaseCond
-	TenantID string
-	AppID    string
-	IDs      []string
-	Name     string
-	Code     string
-	Type     string
-	Keyword  string // 模糊搜索: 名称/编码 LIKE
+	TenantID          string
+	AppID             string
+	IDs               []string
+	Name              string
+	Code              string
+	Source            string
+	AdminLevel        string // 精确匹配系统管理等级
+	AdminLevelAtLeast string // 按门槛匹配：admin_level 等级 >= 该值（如 "basic" 命中 basic/super）
+	Keyword           string // 模糊搜索: 名称/编码 LIKE
 }
 
 func (c *RoleCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -40,8 +42,14 @@ func (c *RoleCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.Code != "" {
 		db.Where(tableName+".code = ?", c.Code)
 	}
-	if c.Type != "" {
-		db.Where(tableName+".type = ?", c.Type)
+	if c.Source != "" {
+		db.Where(tableName+".source = ?", c.Source)
+	}
+	if c.AdminLevel != "" {
+		db.Where(tableName+".admin_level = ?", c.AdminLevel)
+	}
+	if c.AdminLevelAtLeast != "" {
+		db.Where(tableName+".admin_level IN ?", adminLevelsAtLeast(c.AdminLevelAtLeast))
 	}
 }
 
@@ -55,5 +63,17 @@ func NewRoleDao(opts ...DaoOption) *RoleDao {
 			model.TableNameRole, "RoleDao",
 			resolveDBGetter(opts...),
 		),
+	}
+}
+
+// adminLevelsAtLeast 返回等级 >= threshold 的全部等级取值（none < basic < super）。
+func adminLevelsAtLeast(threshold string) []string {
+	switch model.SysAdminLevel(threshold).SysAdminRank() {
+	case model.SysAdminLevelSuper.SysAdminRank():
+		return []string{string(model.SysAdminLevelSuper)}
+	case model.SysAdminLevelBasic.SysAdminRank():
+		return []string{string(model.SysAdminLevelBasic), string(model.SysAdminLevelSuper)}
+	default:
+		return []string{string(model.SysAdminLevelNone), string(model.SysAdminLevelBasic), string(model.SysAdminLevelSuper)}
 	}
 }

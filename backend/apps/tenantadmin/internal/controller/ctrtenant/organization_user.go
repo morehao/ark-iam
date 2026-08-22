@@ -12,8 +12,6 @@ type OrganizationUserCtr interface {
 	Update(ctx *gin.Context)
 	Delete(ctx *gin.Context)
 	PageList(ctx *gin.Context)
-	SubtreeUsers(ctx *gin.Context)
-	GetUserOrganizations(ctx *gin.Context)
 	UpdateUserOrganizations(ctx *gin.Context)
 }
 
@@ -121,48 +119,6 @@ func (ctr *organizationUserCtr) PageList(ctx *gin.Context) {
 		return
 	}
 	res, err := ctr.organizationUserSvc.PageList(ctx, &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-// @Tags 组织关系
-// @Summary 子树成员聚合（去重）
-// @accept application/json
-// @Produce application/json
-// @Param organizationID path string true "组织ID"
-// @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationSubtreeUsersResp}
-// @Router /v1/tenant/organizations/{organizationID}/users/descendants [get]
-func (ctr *organizationUserCtr) SubtreeUsers(ctx *gin.Context) {
-	var req dtotenant.OrganizationSubtreeUsersReq
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.organizationUserSvc.SubtreeUsers(ctx, &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-// @Tags 组织关系
-// @Summary 用户组织归属列表
-// @accept application/json
-// @Produce application/json
-// @Param userID path string true "用户ID"
-// @Success 200 {object} gincontext.DtoRender{data=dtotenant.UserOrganizationListResp}
-// @Router /v1/tenant/users/{userID}/organizations [get]
-func (ctr *organizationUserCtr) GetUserOrganizations(ctx *gin.Context) {
-	var req dtotenant.UserOrganizationListReq
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.organizationUserSvc.GetUserOrganizations(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

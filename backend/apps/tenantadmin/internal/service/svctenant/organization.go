@@ -11,6 +11,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/object/objtenant"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 	"gorm.io/gorm"
@@ -23,7 +24,7 @@ func organizationVisibleToTenant(entity *model.OrganizationEntity, tenantID stri
 type OrganizationSvc interface {
 	Create(ctx *gin.Context, req *dtotenant.OrganizationCreateReq) (*dtotenant.OrganizationCreateResp, error)
 	Tree(ctx *gin.Context, req *dtotenant.OrganizationTreeReq) (*dtotenant.OrganizationTreeResp, error)
-	Detail(ctx *gin.Context, req *dtotenant.OrganizationDetailReq) (*dtotenant.OrganizationDetailResp, error)
+	Children(ctx *gin.Context, req *dtotenant.OrganizationChildrenReq) (*dtotenant.OrganizationChildrenResp, error)
 	Update(ctx *gin.Context, req *dtotenant.OrganizationUpdateReq) error
 	UpdateStatus(ctx *gin.Context, req *dtotenant.OrganizationStatusReq) error
 	Delete(ctx *gin.Context, req *dtotenant.OrganizationDeleteReq) error
@@ -57,7 +58,11 @@ func (svc *organizationSvc) Create(ctx *gin.Context, req *dtotenant.Organization
 
 	if req.ParentID != "" {
 		parent, err := dao.NewOrganizationDao().GetByID(ctx, req.ParentID)
-		if err != nil || !organizationVisibleToTenant(parent, tenantID) {
+		if err != nil {
+			glog.Errorf(ctx, "[svcorganization.Create] dao GetByID parent fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+			return nil, code.GetError(code.OrganizationCreateError)
+		}
+		if !organizationVisibleToTenant(parent, tenantID) {
 			return nil, code.GetError(code.OrganizationNotExistError)
 		}
 		if parent.OrgDepth+1 > model.MaxOrgDepth {
@@ -119,6 +124,7 @@ func (svc *organizationSvc) Tree(ctx *gin.Context, req *dtotenant.OrganizationTr
 			ParentID:       v.ParentID,
 			OrgPath:        v.OrgPath,
 			OrgDepth:       v.OrgDepth,
+			CreatedAt:      v.CreatedAt.Unix(),
 			OrganizationBaseInfo: objtenant.OrganizationBaseInfo{
 				Name:   v.Name,
 				Code:   v.Code,
@@ -142,62 +148,77 @@ func (svc *organizationSvc) Tree(ctx *gin.Context, req *dtotenant.OrganizationTr
 	return &dtotenant.OrganizationTreeResp{List: roots}, nil
 }
 
-// Detail 节点详情（含祖先链面包屑）。
-func (svc *organizationSvc) Detail(ctx *gin.Context, req *dtotenant.OrganizationDetailReq) (*dtotenant.OrganizationDetailResp, error) {
-	orgEntity, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
+// Children 某部门直属子部门分页：校验父节点归属租户后按 parentID 查直属子级，
+// 并附带每项是否有下级（供前端扁平列表展示层级展开标识）。
+func (svc *organizationSvc) Children(ctx *gin.Context, req *dtotenant.OrganizationChildrenReq) (*dtotenant.OrganizationChildrenResp, error) {
+	tenantID := gincontext.GetTenantIDString(ctx)
+	parent, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
 	if err != nil {
-		glog.Errorf(ctx, "[svcorganization.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.OrganizationGetDetailError)
+		glog.Errorf(ctx, "[svcorganization.Children] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.OrganizationGetPageListError)
 	}
-	if !organizationVisibleToTenant(orgEntity, gincontext.GetTenantIDString(ctx)) {
+	if !organizationVisibleToTenant(parent, tenantID) {
 		return nil, code.GetError(code.OrganizationNotExistError)
 	}
 
-	resp := &dtotenant.OrganizationDetailResp{
-		OrganizationID: orgEntity.ID,
-		ParentID:       orgEntity.ParentID,
-		OrgPath:        orgEntity.OrgPath,
-		OrgDepth:       orgEntity.OrgDepth,
-		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{
-			Name:   orgEntity.Name,
-			Code:   orgEntity.Code,
-			Sort:   orgEntity.Sort,
-			Status: orgEntity.Status,
+	cond := &dao.OrganizationCond{
+		BaseCond: &gormdao.BaseCond{
+			Page:     req.Page,
+			PageSize: req.PageSize,
 		},
+		TenantID: tenantID,
+		ParentID: req.OrganizationID,
+		Name:     req.Name,
+		Status:   req.Status,
 	}
-	resp.Ancestors = svc.loadAncestors(ctx, orgEntity.OrgPath, gincontext.GetTenantIDString(ctx))
-	return resp, nil
+	childList, total, err := dao.NewOrganizationDao().GetPageListByCond(ctx, cond)
+	if err != nil {
+		glog.Errorf(ctx, "[svcorganization.Children] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.OrganizationGetPageListError)
+	}
+
+	// 判断每个直属子级是否还有下级（避免 N+1：一次查租户全量 parent_id 集合）
+	hasChildSet, err := svc.childOrgIDSet(ctx, tenantID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcorganization.Children] query child set fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.OrganizationGetPageListError)
+	}
+
+	list := make([]dtotenant.OrganizationChildItem, 0, len(childList))
+	for i := range childList {
+		v := &childList[i]
+		list = append(list, dtotenant.OrganizationChildItem{
+			OrganizationID: v.ID,
+			ParentID:       v.ParentID,
+			OrgDepth:       v.OrgDepth,
+			CreatedAt:      v.CreatedAt.Unix(),
+			HasChildren:    hasChildSet[v.ID],
+			OrganizationBaseInfo: objtenant.OrganizationBaseInfo{
+				Name:   v.Name,
+				Code:   v.Code,
+				Sort:   v.Sort,
+				Status: v.Status,
+			},
+		})
+	}
+	return &dtotenant.OrganizationChildrenResp{List: list, Total: total}, nil
 }
 
-// loadAncestors 按 org_path 解析祖先链（不含自身），批量查名后自顶向下排序。
-func (svc *organizationSvc) loadAncestors(ctx *gin.Context, orgPath, tenantID string) []dtotenant.OrganizationAncestor {
-	if orgPath == "" {
-		return nil
-	}
-	parts := strings.Split(strings.Trim(orgPath, "/"), "/")
-	var ids []string
-	for _, p := range parts {
-		if p != "" {
-			ids = append(ids, p)
-		}
-	}
-	if len(ids) <= 1 {
-		return nil
-	}
-	ancestorIDs := ids[:len(ids)-1]
+// childOrgIDSet 返回租户内"作为父节点存在"的组织 ID 集合（用于 hasChildren 判定）。
+func (svc *organizationSvc) childOrgIDSet(ctx *gin.Context, tenantID string) (map[string]bool, error) {
+	// 需要查询哪些组织是其他组织的父节点：按 org_depth > 1 提取 parent_id 集合不可行（分页），
+	// 改为查询租户下所有组织，收集其 parent_id。
 	list, err := dao.NewOrganizationDao().GetListByCond(ctx, &dao.OrganizationCond{TenantID: tenantID})
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	nameMap := make(map[string]string, len(list))
+	set := make(map[string]bool, len(list))
 	for _, v := range list {
-		nameMap[v.ID] = v.Name
+		if v.ParentID != "" {
+			set[v.ParentID] = true
+		}
 	}
-	ancestors := make([]dtotenant.OrganizationAncestor, 0, len(ancestorIDs))
-	for _, id := range ancestorIDs {
-		ancestors = append(ancestors, dtotenant.OrganizationAncestor{OrganizationID: id, Name: nameMap[id]})
-	}
-	return ancestors
+	return set, nil
 }
 
 // Update 全量更新（含移动：改 parentID 时做环路/深度校验并级联更新子树 org_path/org_depth）。
@@ -261,7 +282,11 @@ func (svc *organizationSvc) moveNode(ctx *gin.Context, tenantID string, node *mo
 	newDepth := 0
 	if newParentID != "" {
 		newParent, err := dao.NewOrganizationDao().GetByID(ctx, newParentID)
-		if err != nil || !organizationVisibleToTenant(newParent, tenantID) {
+		if err != nil {
+			glog.Errorf(ctx, "[svcorganization.moveNode] dao GetByID newParent fail, err:%v, nodeID:%s newParentID:%s", err, node.ID, newParentID)
+			return code.GetError(code.OrganizationUpdateError)
+		}
+		if !organizationVisibleToTenant(newParent, tenantID) {
 			return code.GetError(code.OrganizationNotExistError)
 		}
 		// 环路：新父是 node 自身或其子孙（org_path 前缀判断）

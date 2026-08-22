@@ -26,7 +26,7 @@ type ApplicationClientDetailResp struct {
 	Type                    string   `json:"type"`                    // 客户端类型
 	IsThirdParty bool     `json:"isThirdParty"`            // 是否第三方应用
 	Status                  string   `json:"status"`                  // 状态
-	CreatedAt               string   `json:"createdAt"`               // 创建时间
+	CreatedAt               int64    `json:"createdAt"`               // 创建时间(unix 秒)
 }
 
 type ApplicationClientPageListResp struct {
@@ -44,7 +44,7 @@ type PageListItem struct {
 	IsThirdParty bool     `json:"isThirdParty"`            // 是否第三方应用
 	GrantTypes              []string `json:"grantTypes"`              // 授权类型
 	TokenEndpointAuthMethod string   `json:"tokenEndpointAuthMethod"` // 令牌端点认证方式
-	CreatedAt               string   `json:"createdAt"`               // 创建时间
+	CreatedAt               int64    `json:"createdAt"`               // 创建时间(unix 秒)
 }
 
 type SecretResp struct {
@@ -52,8 +52,8 @@ type SecretResp struct {
 	ApplicationClientID string  `json:"applicationClientID"` // OAuth客户端ID
 	Name                string  `json:"name"`                // 密钥名称
 	ValuePrefix         string  `json:"valuePrefix"`         // 密钥前缀
-	ExpiredAt           *string `json:"expiresAt"`           // 过期时间
-	CreatedAt           string  `json:"createdAt"`           // 创建时间
+	ExpiredAt           *int64 `json:"expiresAt"`           // 过期时间(unix 秒)
+	CreatedAt           int64  `json:"createdAt"`           // 创建时间(unix 秒)
 }
 
 type SecretListResp struct {

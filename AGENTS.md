@@ -246,6 +246,7 @@ func NewUserSvc() UserSvc {
 - **ID 字段命名**：Go 字段与 JSON tag 一律 `ID` 全大写（`userID`、`roleID`、`appID`、`connectorID`），禁止 `roleId`/`appId` 等小写 d 写法；路由 path 参数（`:roleID`）与 swagger 注解同步。**path 是 ID 的唯一来源**：凡带 `uri:"xxxID"` 的字段，DTO tag 用 `json:"-" uri:"xxxID"`（禁止挂 `json:"xxxID"`/`form:"xxxID"`，防 body/query 覆盖 path 造成参数污染）。
 - **DTO 命名**：统一 `<业务名词><动词>Req/Resp`（如 `UserCreateReq`、`DomainCreateReq`），禁止 `CreateDomainReq`、裸 `CreateReq` 等变体。
 - **DTO ID 类型**：统一 `string`（字符串主键，UUID v7，由 `gormdao.BaseEntity` 自动生成；见 `docs/design/string-id-pg-automigrate-seed.md`），禁止 `uint`/`uint64`。
+- **前后端时间交互**：前后端交互的所有时间字段统一使用**秒级 int64 时间戳**（Unix 秒，即 `.Unix()`）。包括新建、编辑、筛选、展示等一切 DTO 请求与响应字段，禁止用 `string` 承载格式化时间（如 `"2006-01-02 15:04:05"`）。出参可空时间用指针 `*int64`（无值返回 `null`），入参可空时间用 `int64`（无值传 `0`）；`gobject.OperatorBaseInfo` 内嵌的 `CreatedAt`/`UpdatedAt` 已是 int64，禁止覆盖为 string。service 层出参用 `x.Unix()`，入参解析用 `time.Unix(req.ExpiredAt, 0)`。
 - **单元测试**：统一使用各 app `testutil.SetupSQLite(t, entities...)`（内存 SQLite 注册为全局 iam 库），服务内部 `dao.NewXxxDao()` 自动落测试库，直接断言真实 dao 行为；不写 stub/注入 seam。注意 sqlite 对 `not null` JSON 列（`profile`/`config` 等）与 `joined_at` 需要显式播种值。
 
 ### 错误处理
@@ -258,6 +259,36 @@ func NewUserSvc() UserSvc {
 if err != nil {
     glog.Errorf(ctx, "[svcuser.Create] daoUser GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
     return nil, code.GetError(code.UserCreateError)
+}
+```
+
+#### err 判断与业务边界判断必须分离
+
+`err != nil` 属于**不可预期的系统错误**（数据库/网络/IO 等），无论来自 DAO 还是任何会返回 error 的调用，都必须**先单独判断**，记录日志后返回该操作的功能级错误码；**不得**与可预期的业务边界判断（如结果为 nil、主键为空、不属于当前租户、列表长度不匹配）混在同一个 `if` 里。混写会掩盖真实根因（把系统错误伪装成"XX 不存在/不匹配"）且丢失错误日志。
+
+- 不可预期错误（`err != nil`）→ 单独 `if`，`glog.Errorf` 后返回功能级错误码（`CreateError`/`UpdateError`/`DeleteError`/`GetDetailError` 等）
+- 可预期业务边界（`entity == nil`/`ID == ""`/`TenantID != tenantID`/`len != 0` 等）→ 单独 `if`，返回 `NotExistError` 等业务错误码
+
+错误示范（err 与边界混写）：
+
+```go
+// 错误：系统错误被掩盖为 OrganizationNotExistError，且未记日志
+parent, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
+if err != nil || !organizationVisibleToTenant(parent, tenantID) {
+    return nil, code.GetError(code.OrganizationNotExistError)
+}
+```
+
+正确示范（分离）：
+
+```go
+parent, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
+if err != nil {
+    glog.Errorf(ctx, "[svcorganization.Children] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+    return nil, code.GetError(code.OrganizationGetPageListError)
+}
+if !organizationVisibleToTenant(parent, tenantID) {
+    return nil, code.GetError(code.OrganizationNotExistError)
 }
 ```
 

@@ -42,7 +42,6 @@ export interface TenantUserRoleItem {
   name: string
   code: string
   description: string
-  type: string
 }
 
 // ---------- 租户订阅应用 ----------
@@ -60,8 +59,8 @@ export interface TenantRoleItem {
   name: string
   code: string
   description: string
-  type: string
-  isDefault: boolean
+  source?: 'builtin' | 'custom' | string
+  adminLevel?: 'none' | 'basic' | 'super' | string
   memberCount: number
   menuCount: number
   createdAt?: number
@@ -72,7 +71,6 @@ export interface TenantRoleCreateReq {
   name: string
   code: string
   description?: string
-  type?: string
 }
 
 export interface TenantRoleMenuResp {

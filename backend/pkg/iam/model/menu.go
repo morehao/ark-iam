@@ -6,6 +6,28 @@ import (
 
 const TableNameMenu = "menu"
 
+// MenuVisibility 菜单可见性门槛（单调：等级越高可见范围越窄）。
+type MenuVisibility string
+
+// 菜单可见性门槛取值（禁止硬编码）。
+const (
+	MenuVisibilityPublic MenuVisibility = "public" // 所有人可见（无门槛）
+	MenuVisibilityMember MenuVisibility = "member" // 任意租户成员可见（登录即可）
+	MenuVisibilityAdmin  MenuVisibility = "admin"  // 仅管理员角色可见（硬隔离）
+)
+
+// VisibilityRank 返回可见性门槛的序数（用于线性比较：public < member < admin）。
+func (v MenuVisibility) VisibilityRank() int {
+	switch v {
+	case MenuVisibilityAdmin:
+		return 3
+	case MenuVisibilityMember:
+		return 2
+	default:
+		return 1 // MenuVisibilityPublic
+	}
+}
+
 type MenuEntity struct {
 	gormdao.BaseEntity
 	AppID        string `gorm:"column:app_id;type:varchar(36);not null;default:'';comment:所属应用id"`
@@ -16,12 +38,12 @@ type MenuEntity struct {
 	Icon         string `gorm:"column:icon;type:varchar(256);not null;default:'';comment:菜单图标"`
 	Sort         int    `gorm:"column:sort;type:int;not null;default:0;comment:排序"`
 	Type         string `gorm:"column:type;type:varchar(32);not null;default:'';comment:菜单类型"`
+	Visibility   string `gorm:"column:visibility;type:varchar(32);not null;default:'public';comment:可见性门槛(public/member/admin)" json:"visibility"`
 	Component    string `gorm:"column:component;type:varchar(256);not null;default:'';comment:组件路径"`
 	Redirect     string `gorm:"column:redirect;type:varchar(512);not null;default:'';comment:重定向路径"`
 	Hidden       bool   `gorm:"column:hidden;type:boolean;not null;default:false;comment:是否隐藏"`
 	ExternalLink bool   `gorm:"column:external_link;type:boolean;not null;default:false;comment:是否外链"`
 	KeepAlive    bool   `gorm:"column:keep_alive;type:boolean;not null;default:false;comment:是否缓存"`
-	Permission   string `gorm:"column:permission;type:varchar(128);not null;default:'';comment:权限标识"`
 	Status       string `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态"`
 	CreatedBy    string `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id"`
 	UpdatedBy    string `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id"`

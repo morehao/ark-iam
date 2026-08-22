@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtopermission"
 	"github.com/morehao/ark-iam/platformadmin/testutil"
@@ -117,104 +116,5 @@ func TestRolePageListUsesContextTenant(t *testing.T) {
 	}
 	if resp.Total != 1 || len(resp.List) != 1 || resp.List[0].TenantID != "32" {
 		t.Fatalf("expected tenant 32 from context, got %+v", resp.List)
-	}
-}
-
-
-func TestResourceDetailRejectsCrossTenantEntity(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.ResourceEntity{})
-	ctx := newGinCtx("41", "0")
-
-	res := &model.ResourceEntity{TenantID: "66", Name: "other-tenant-resource"}
-	if err := db.Create(res).Error; err != nil {
-		t.Fatalf("seed resource: %v", err)
-	}
-
-	svc := &resourceSvc{}
-	_, err := svc.Detail(ctx, &dtopermission.ResourceDetailReq{ResourceID: res.ID})
-	if err == nil {
-		t.Fatalf("expected cross-tenant resource detail to fail")
-	}
-}
-
-func TestResourcePageListUsesContextTenant(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.ResourceEntity{})
-	ctx := newGinCtx("42", "0")
-
-	if err := db.Create(&model.ResourceEntity{TenantID: "42", Name: "r42"}).Error; err != nil {
-		t.Fatalf("seed tenant42: %v", err)
-	}
-	if err := db.Create(&model.ResourceEntity{TenantID: "99", Name: "r99"}).Error; err != nil {
-		t.Fatalf("seed tenant99: %v", err)
-	}
-
-	svc := &resourceSvc{}
-	resp, err := svc.PageList(ctx, &dtopermission.ResourcePageListReq{TenantID: "99"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.Total != 1 || len(resp.List) != 1 || resp.List[0].TenantID != "42" {
-		t.Fatalf("expected tenant 42 from context, got %+v", resp.List)
-	}
-}
-
-func TestScopeDetailRejectsCrossTenantEntity(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.ScopeEntity{})
-	ctx := newGinCtx("51", "0")
-
-	scope := &model.ScopeEntity{TenantID: "65", ResourceID: "1", Name: "other-tenant-scope"}
-	if err := db.Create(scope).Error; err != nil {
-		t.Fatalf("seed scope: %v", err)
-	}
-
-	svc := &scopeSvc{}
-	_, err := svc.Detail(ctx, &dtopermission.ScopeDetailReq{ScopeID: scope.ID})
-	if err == nil {
-		t.Fatalf("expected cross-tenant scope detail to fail")
-	}
-}
-
-func TestScopePageListUsesContextTenant(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.ScopeEntity{})
-	ctx := newGinCtx("52", "0")
-
-	if err := db.Create(&model.ScopeEntity{TenantID: "52", ResourceID: "1", Name: "s52"}).Error; err != nil {
-		t.Fatalf("seed tenant52: %v", err)
-	}
-	if err := db.Create(&model.ScopeEntity{TenantID: "99", ResourceID: "1", Name: "s99"}).Error; err != nil {
-		t.Fatalf("seed tenant99: %v", err)
-	}
-
-	svc := &scopeSvc{}
-	resp, err := svc.PageList(ctx, &dtopermission.ScopePageListReq{TenantID: "99"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.Total != 1 || len(resp.List) != 1 || resp.List[0].TenantID != "52" {
-		t.Fatalf("expected tenant 52 from context, got %+v", resp.List)
-	}
-}
-
-func TestScopeCreateRejectsCrossTenantResource(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.ResourceEntity{}, &model.ScopeEntity{})
-	ctx := newGinCtx("53", "1002")
-
-	res := &model.ResourceEntity{TenantID: "64", Name: "other-tenant-resource"}
-	if err := db.Create(res).Error; err != nil {
-		t.Fatalf("seed resource: %v", err)
-	}
-
-	svc := &scopeSvc{}
-	_, err := svc.Create(ctx, &dtopermission.ScopeCreateReq{TenantID: "53", ResourceID: res.ID, Name: "read"})
-	if err == nil {
-		t.Fatalf("expected cross-tenant resource reference to fail")
-	}
-
-	left, err := dao.NewScopeDao().GetListByCond(ctx, &dao.ScopeCond{TenantID: "53"})
-	if err != nil {
-		t.Fatalf("GetListByCond: %v", err)
-	}
-	if len(left) != 0 {
-		t.Fatalf("expected no insert for cross-tenant resource, got %+v", left)
 	}
 }

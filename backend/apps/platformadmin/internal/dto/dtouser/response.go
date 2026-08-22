@@ -72,7 +72,7 @@ type RoleUserResp struct {
 	Name      string `json:"name"`
 	Email     string `json:"email"`
 	RoleID    string `json:"roleID"`
-	CreatedAt string `json:"createdAt"`
+	CreatedAt int64  `json:"createdAt"` // 创建时间(unix 秒)
 }
 
 type RoleUserListResp struct {

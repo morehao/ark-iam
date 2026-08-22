@@ -17,22 +17,25 @@ type OrganizationTreeItem struct {
 	ParentID       string `json:"parentID"`       // 父节点ID
 	OrgPath        string `json:"orgPath"`        // 祖先链路径(含自身)
 	OrgDepth       int    `json:"orgDepth"`       // 节点深度(根=1)
+	CreatedAt      int64  `json:"createdAt"`      // 创建时间(unix 秒)
 	objtenant.OrganizationBaseInfo
 	Children []OrganizationTreeItem `json:"children"` // 子节点
 }
 
-type OrganizationDetailResp struct {
-	OrganizationID string `json:"organizationID"` // 组织ID
-	ParentID       string `json:"parentID"`       // 父节点ID
-	OrgPath        string `json:"orgPath"`        // 祖先链路径(含自身)
-	OrgDepth       int    `json:"orgDepth"`       // 节点深度(根=1)
-	objtenant.OrganizationBaseInfo
-	Ancestors []OrganizationAncestor `json:"ancestors"` // 祖先链(面包屑,自顶向下)
+// OrganizationChildrenResp 某部门直属子部门分页结果。
+type OrganizationChildrenResp struct {
+	List  []OrganizationChildItem `json:"list"`  // 直属子部门
+	Total int64                   `json:"total"` // 总数
 }
 
-type OrganizationAncestor struct {
-	OrganizationID string `json:"organizationID"` // 组织ID
-	Name           string `json:"name"`           // 组织名称
+// OrganizationChildItem 子部门条目（不含 children，扁平展示）。
+type OrganizationChildItem struct {
+	OrganizationID string                   `json:"organizationID"` // 组织ID
+	ParentID       string                   `json:"parentID"`       // 父节点ID
+	OrgDepth       int                      `json:"orgDepth"`       // 节点深度
+	CreatedAt      int64                    `json:"createdAt"`      // 创建时间(unix 秒)
+	HasChildren    bool                     `json:"hasChildren"`    // 是否还有下级
+	objtenant.OrganizationBaseInfo
 }
 
 // ---------- 组织关系 ----------
@@ -59,20 +62,7 @@ type OrganizationUserPageListItem struct {
 	JoinedAt       int64  `json:"joinedAt"`       // 加入时间(关系创建时间)
 }
 
-type OrganizationSubtreeUsersResp struct {
-	List []OrganizationSubtreeUser `json:"list"` // 子树成员(去重)
-}
-
-type OrganizationSubtreeUser struct {
-	UserID   string `json:"userID"`   // 用户ID
-	UserName string `json:"userName"` // 用户姓名
-}
-
 // ---------- 用户归属 ----------
-
-type UserOrganizationListResp struct {
-	List []UserOrganizationItem `json:"list"` // 用户组织归属
-}
 
 type UserOrganizationItem struct {
 	OrganizationID   string `json:"organizationID"`   // 组织ID

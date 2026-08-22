@@ -54,7 +54,7 @@ func TestProviderHandlerFallsBackWhenProviderMissing(t *testing.T) {
 
 func TestLoggedOutClearsSSOCookieAndRedirects(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	appconfig.Conf = &pkgconfig.Config{OIDC: pkgconfig.OIDC{FrontendLoginURL: "http://localhost:3000/oidc/login"}}
+	appconfig.Conf = &pkgconfig.Config{OIDC: pkgconfig.OIDC{FrontendLoginURL: "http://localhost:4000/oidc/login"}}
 	engine := gin.New()
 	ctr := NewOIDCCtrWithProvider(&svcoidc.OIDCProvider{})
 	engine.GET("/oidc/logged-out", ctr.LoggedOut)
@@ -66,7 +66,7 @@ func TestLoggedOutClearsSSOCookieAndRedirects(t *testing.T) {
 	if resp.Code != http.StatusFound {
 		t.Fatalf("expected 302 redirect, got %d", resp.Code)
 	}
-	if loc := resp.Header().Get("Location"); loc != "http://localhost:3000/oidc/login" {
+	if loc := resp.Header().Get("Location"); loc != "http://localhost:4000/oidc/login" {
 		t.Fatalf("unexpected redirect location: %q", loc)
 	}
 	setCookie := resp.Header().Get("Set-Cookie")

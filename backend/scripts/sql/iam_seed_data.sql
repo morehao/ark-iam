@@ -204,11 +204,11 @@ ON DUPLICATE KEY UPDATE `user_id` = VALUES(`user_id`);
 -- ============================================
 -- platform-admin-web OAuth Client (第一方 SPA，PKCE)
 -- client_id: platform-admin-web
--- redirect_uris: http://localhost:3001/auth/callback
+-- redirect_uris: http://localhost:4001/auth/callback
 -- back_channel_logout_uri: gateway 聚合部署下指向本应用接收端
 -- ============================================
 INSERT INTO `application_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `post_logout_redirect_uris`, `back_channel_logout_uri`, `type`, `is_third_party`, `status`, `is_system`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (2, 1, 1, 'platform-admin-web', 'IAM管理平台', '["http://localhost:3001/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'none', 1, '["openid","profile","email"]', '["http://localhost:3001/login"]', 'http://localhost:8100/oidc/bc-logout/platform', 'first_party', 0, 'enable', 1, 0, 0, 0)
+VALUES (2, 1, 1, 'platform-admin-web', 'IAM管理平台', '["http://localhost:4001/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'none', 1, '["openid","profile","email"]', '["http://localhost:4001/login"]', 'http://localhost:8100/oidc/bc-logout/platform', 'first_party', 0, 'enable', 1, 0, 0, 0)
 ON DUPLICATE KEY UPDATE
   `redirect_uris` = VALUES(`redirect_uris`),
   `grant_types` = VALUES(`grant_types`),
@@ -226,11 +226,11 @@ ON DUPLICATE KEY UPDATE
 -- ============================================
 -- tenant-admin-web OAuth Client (第一方 SPA，PKCE)
 -- client_id: tenant-admin-web
--- redirect_uris: http://localhost:3002/auth/callback
+-- redirect_uris: http://localhost:4002/auth/callback
 -- back_channel_logout_uri: gateway 聚合部署下指向本应用接收端
 -- ============================================
 INSERT INTO `application_client` (`id`, `tenant_id`, `app_id`, `client_id`, `name`, `redirect_uris`, `grant_types`, `response_types`, `token_endpoint_auth_method`, `require_pkce`, `default_scopes`, `post_logout_redirect_uris`, `back_channel_logout_uri`, `type`, `is_third_party`, `status`, `is_system`, `created_by`, `updated_by`, `deleted_by`)
-VALUES (3, 1, 1, 'tenant-admin-web', '租户管理平台', '["http://localhost:3002/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'none', 1, '["openid","profile","email"]', '["http://localhost:3002/login"]', 'http://localhost:8100/oidc/bc-logout/tenant', 'first_party', 0, 'enable', 1, 0, 0, 0)
+VALUES (3, 1, 1, 'tenant-admin-web', '租户管理平台', '["http://localhost:4002/auth/callback"]', '["authorization_code","refresh_token"]', '["code"]', 'none', 1, '["openid","profile","email"]', '["http://localhost:4002/login"]', 'http://localhost:8100/oidc/bc-logout/tenant', 'first_party', 0, 'enable', 1, 0, 0, 0)
 ON DUPLICATE KEY UPDATE
   `redirect_uris` = VALUES(`redirect_uris`),
   `grant_types` = VALUES(`grant_types`),
@@ -246,7 +246,7 @@ ON DUPLICATE KEY UPDATE
   `is_system` = VALUES(`is_system`);
 
 -- ============================================
--- 说明：login-web（:3000）是 IAM OP 的登录 UI（凭证表单 + 多租户选择），
+-- 说明：login-web（:4000）是 IAM OP 的登录 UI（凭证表单 + 多租户选择），
 -- 不是 OIDC Client/RP —— 凭证直接提交到 OP 内部端点 /oidc/login，
 -- 不参与授权码流程，因此不再注册 application_client。
 -- 只有业务应用（platform-admin-web / tenant-admin-web 等）才是 OIDC Client。

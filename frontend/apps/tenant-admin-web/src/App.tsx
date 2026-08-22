@@ -3,10 +3,11 @@ import { Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-
 import { useAuthGuard, FullPageSpinner } from '@ark-iam/auth'
 import { MainLayout, LoginPage } from '@ark-iam/ui'
 import type { MainMenuItems } from '@ark-iam/ui'
-import { ApartmentOutlined, SafetyCertificateOutlined, UserOutlined } from '@ant-design/icons'
+import { ApartmentOutlined, SafetyCertificateOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons'
 import type { MenuItem } from '@ark-iam/types'
 import { getMyMenuTree } from './api/menu'
 import OrganizationList from './pages/organization'
+import OrganizationMembersList from './pages/organization-members'
 import TenantUserList from './pages/user'
 import TenantRoleList from './pages/role'
 
@@ -15,11 +16,13 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   apartment: <ApartmentOutlined />,
   user: <UserOutlined />,
   role: <SafetyCertificateOutlined />,
+  team: <TeamOutlined />,
 }
 
 // 组件白名单：只有 path 命中才会渲染路由与侧边栏菜单，避免点击进入 404
 const COMPONENT_MAP: Record<string, React.ComponentType> = {
   '/organization': OrganizationList,
+  '/organization/members': OrganizationMembersList,
   '/user': TenantUserList,
   '/role': TenantRoleList,
 }
@@ -28,7 +31,9 @@ function iconOf(icon?: string): React.ReactNode {
   return (icon && ICON_MAP[icon]) || <ApartmentOutlined />
 }
 
-// 静态 fallback 菜单：后端不可用或未配置时保持页面可用
+// 静态 fallback 菜单：后端不可用或未配置时保持页面可用。
+// 注意：这里只放「所有人/普通成员」可见的公共菜单，不带管理菜单（tenant-user/tenant-role），
+// 避免后端故障走 fallback 时把管理入口暴露给普通成员。
 function makeStaticMenu(id: string, name: string, code: string, path: string, icon: string): MenuItem {
   return {
     menuID: id,
@@ -40,20 +45,19 @@ function makeStaticMenu(id: string, name: string, code: string, path: string, ic
     icon,
     sort: Number(id),
     type: 'menu',
+    visibility: 'public',
     component: '',
     redirect: '',
     hidden: 0,
     externalLink: 0,
     keepAlive: 0,
-    permission: '',
     status: 'enable',
   }
 }
 
 const STATIC_MENU_TREE: MenuItem[] = [
-  makeStaticMenu("1", '组织架构', 'organization', '/organization', 'apartment'),
-  makeStaticMenu("2", '用户管理', 'tenant-user', '/user', 'user'),
-  makeStaticMenu("3", '角色管理', 'tenant-role', '/role', 'role'),
+  makeStaticMenu("1", '组织管理', 'organization', '/organization', 'apartment'),
+  makeStaticMenu("2", '成员管理', 'organization-member', '/organization/members', 'team'),
 ]
 
 // 将后端菜单树转换为 MainLayout 侧边栏菜单；叶子菜单需命中组件白名单，目录仅保留有可渲染子项的

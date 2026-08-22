@@ -10,7 +10,7 @@ import { fmtTime } from '../../components/common'
 interface ApiKeyFormValues {
   name: string
   scope?: string
-  expiresAt?: { toISOString: () => string }
+  expiresAt?: { valueOf: () => number }
 }
 
 const monospaceStyle: CSSProperties = { fontFamily: 'Consolas, Monaco, monospace' }
@@ -59,7 +59,7 @@ export default function ApiKeyList() {
       const resp = await createApiKey({
         name: values.name,
         scope: values.scope || undefined,
-        expiresAt: values.expiresAt ? values.expiresAt.toISOString() : undefined,
+        expiresAt: values.expiresAt ? Math.floor(values.expiresAt.valueOf() / 1000) : undefined,
       })
       message.success('创建成功')
       setModalOpen(false)
@@ -114,15 +114,15 @@ export default function ApiKeyList() {
       render: (v: string) => <span style={{ ...monospaceStyle, fontSize: 12 }}>{v || '-'}</span>,
     },
     { title: '范围', dataIndex: 'scope', key: 'scope', render: (v: string) => <EllipsisCell value={v} /> },
-    { title: '过期时间', dataIndex: 'expiresAt', key: 'expiresAt', width: 160, render: (v: string) => fmtTime(v) },
-    { title: '最后使用', dataIndex: 'lastUsedAt', key: 'lastUsedAt', width: 160, render: (v: string) => fmtTime(v) },
+    { title: '过期时间', dataIndex: 'expiresAt', key: 'expiresAt', width: 160, render: (v: number) => fmtTime(v) },
+    { title: '最后使用', dataIndex: 'lastUsedAt', key: 'lastUsedAt', width: 160, render: (v: number) => fmtTime(v) },
     {
       title: '状态',
       key: 'status',
       width: 90,
       render: (_, r) => (r.revokedAt ? <Tag color="error">已吊销</Tag> : <Tag color="success">有效</Tag>),
     },
-    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 160, render: (v: string) => fmtTime(v) },
+    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 160, render: (v: number) => fmtTime(v) },
     {
       title: '操作',
       key: 'action',

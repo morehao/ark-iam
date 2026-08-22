@@ -15,8 +15,6 @@ import (
 // SessionSvc 管理"我的会话"（即该 person 名下有效的 refresh token 记录）。
 // 说明：会话列表与撤销操作的对象是 refresh_token 表中的记录（每个 refresh token
 // 对应一个登录会话），而非 SSO 中心会话（Redis + session 审计表）。
-// sessionTimeLayout 会话时间展示格式。
-const sessionTimeLayout = "2006-01-02 15:04:05"
 
 type SessionSvc interface {
 	List(ctx *gin.Context, req *dtouser.SessionListReq) (*dtouser.SessionListResp, error)
@@ -68,9 +66,10 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq) (*dto
 		} else {
 			isActive = true
 		}
-		expiresAt := ""
+		var expiresAt *int64
 		if item.ExpiredAt != nil {
-			expiresAt = item.ExpiredAt.Format(sessionTimeLayout)
+			t := item.ExpiredAt.Unix()
+			expiresAt = &t
 		}
 		sessions = append(sessions, dtouser.SessionResp{
 			// ID 即 refresh token 记录主键，也是撤销接口 :sessionID 路径参数的值
@@ -81,8 +80,8 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq) (*dto
 			ClientType: item.ClientType,
 			ClientIP:   item.ClientIP,
 			UserAgent:  item.UserAgent,
-			ExpiredAt:  &expiresAt,
-			CreatedAt:  item.CreatedAt.Format(sessionTimeLayout),
+			ExpiredAt:  expiresAt,
+			CreatedAt:  item.CreatedAt.Unix(),
 			IsActive:   isActive,
 		})
 	}

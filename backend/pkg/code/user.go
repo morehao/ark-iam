@@ -30,11 +30,12 @@ const (
 )
 
 const (
-	UserRoleCreateError      = 100750
-	UserRoleDeleteError      = 100751
-	UserRoleGetPageListError = 100752
-	UserRoleNotExistError    = 100753
-	UserRoleReplaceError     = 100754 // 全量替换用户角色失败
+	UserRoleCreateError                  = 100750
+	UserRoleDeleteError                  = 100751
+	UserRoleGetPageListError             = 100752
+	UserRoleNotExistError                = 100753
+	UserRoleReplaceError                 = 100754 // 全量替换用户角色失败
+	UserRoleRemoveLastAdminForbiddenError = 100755 // 禁止移除最后一个内置管理员角色，防止系统管理能力锁死
 )
 
 var userErrorMsgMap = gerror.CodeMsgMap{
@@ -61,4 +62,5 @@ var userErrorMsgMap = gerror.CodeMsgMap{
 	UserRoleGetPageListError:       "查看用户角色关联列表失败",
 	UserRoleNotExistError:          "用户角色关联不存在",
 	UserRoleReplaceError:           "更新用户角色失败",
+	UserRoleRemoveLastAdminForbiddenError: "禁止移除最后一个内置管理员角色，系统管理能力可能锁死",
 }

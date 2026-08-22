@@ -51,8 +51,8 @@ func (svc *roleSvc) Detail(ctx *gin.Context, req *dtopermission.RoleDetailReq) (
 			Name:        roleEntity.Name,
 			Code:        roleEntity.Code,
 			Description: roleEntity.Description,
-			Type:        roleEntity.Type,
-			IsDefault:   roleEntity.IsDefault,
+			Source:      roleEntity.Source,
+			AdminLevel:  roleEntity.AdminLevel,
 		},
 		OperatorBaseInfo: gobject.OperatorBaseInfo{
 			CreatedAt: int64(roleEntity.CreatedAt.Unix()),
@@ -72,7 +72,6 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtopermission.RolePageListRe
 		TenantID: gincontext.GetTenantIDString(ctx),
 		Name:     req.Name,
 		Code:     req.Code,
-		Type:     req.Type,
 	}
 	roleEntityList, total, err := roleRepo.GetPageListByCond(ctx, cond)
 	if err != nil {
@@ -89,8 +88,8 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtopermission.RolePageListRe
 				Name:        v.Name,
 				Code:        v.Code,
 				Description: v.Description,
-				Type:        v.Type,
-				IsDefault:   v.IsDefault,
+				Source:      v.Source,
+				AdminLevel:  v.AdminLevel,
 			},
 			OperatorBaseInfo: gobject.OperatorBaseInfo{
 				UpdatedAt: v.UpdatedAt.Unix(),
@@ -141,7 +140,7 @@ func (svc *roleSvc) ListUsers(ctx *gin.Context, req *dtouser.RoleUserListReq) (*
 				Name:      user.Name,
 				Email:     model.DerefStr(person.PrimaryEmail),
 				RoleID:    ur.RoleID,
-				CreatedAt: ur.CreatedAt.Format("2006-01-02 15:04:05"),
+				CreatedAt: ur.CreatedAt.Unix(),
 			})
 		}
 	}

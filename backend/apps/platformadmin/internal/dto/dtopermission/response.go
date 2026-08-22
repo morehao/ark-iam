@@ -2,7 +2,6 @@ package dtopermission
 
 import (
 	"github.com/morehao/ark-iam/pkg/iam/object/objpermission"
-	"github.com/morehao/ark-iam/pkg/iam/object/objresource"
 	"github.com/morehao/golib/biz/gobject"
 )
 
@@ -54,53 +53,5 @@ type RolePageListItem struct {
 type RolePageListResp struct {
 	List  []RolePageListItem `json:"list"`  // 列表
 	Total int64              `json:"total"` // 总数
-}
-
-type ResourceCreateResp struct {
-	ResourceID string `json:"resourceID"` // 资源ID
-}
-
-type ResourceUpdateResp struct {
-}
-
-type ResourceDetailResp struct {
-	ResourceID string `json:"resourceID"` // 资源ID
-	objresource.ResourceBaseInfo
-	OperatorBaseInfo gobject.OperatorBaseInfo `json:"operatorBaseInfo"` // 操作人信息
-}
-
-type ResourcePageListItem struct {
-	ResourceID string `json:"resourceID"` // 资源ID
-	objresource.ResourceBaseInfo
-	OperatorBaseInfo gobject.OperatorBaseInfo `json:"operatorBaseInfo"` // 操作人信息
-}
-
-type ResourcePageListResp struct {
-	List  []ResourcePageListItem `json:"list"`  // 列表
-	Total int64                  `json:"total"` // 总数
-}
-
-type ScopeCreateResp struct {
-	ScopeID string `json:"scopeID"` // 权限ID
-}
-
-type ScopeUpdateResp struct {
-}
-
-type ScopeDetailResp struct {
-	ScopeID string `json:"scopeID"` // 权限ID
-	objresource.ScopeBaseInfo
-	OperatorBaseInfo gobject.OperatorBaseInfo `json:"operatorBaseInfo"` // 操作人信息
-}
-
-type ScopePageListItem struct {
-	ScopeID string `json:"scopeID"` // 权限ID
-	objresource.ScopeBaseInfo
-	OperatorBaseInfo gobject.OperatorBaseInfo `json:"operatorBaseInfo"` // 操作人信息
-}
-
-type ScopePageListResp struct {
-	List  []ScopePageListItem `json:"list"`  // 列表
-	Total int64               `json:"total"` // 总数
 }
 

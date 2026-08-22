@@ -197,7 +197,7 @@ func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtoapplicationclient.Ap
 		Type:                    entity.Type,
 		IsThirdParty:            entity.IsThirdParty,
 		Status:                  entity.Status,
-		CreatedAt:               entity.CreatedAt.Format("2006-01-02 15:04:05"),
+		CreatedAt:               entity.CreatedAt.Unix(),
 	}, nil
 }
 
@@ -233,7 +233,7 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.
 			IsThirdParty:            v.IsThirdParty,
 			GrantTypes:              grantTypes,
 			TokenEndpointAuthMethod: v.TokenEndpointAuthMethod,
-			CreatedAt:               v.CreatedAt.Format("2006-01-02 15:04:05"),
+			CreatedAt:               v.CreatedAt.Unix(),
 		})
 	}
 	return &dtoapplicationclient.ApplicationClientPageListResp{
@@ -284,7 +284,7 @@ func (svc *oAuthClientSvc) GetByClientID(ctx *gin.Context, clientID string) (*dt
 		Type:                    entity.Type,
 		IsThirdParty:            entity.IsThirdParty,
 		Status:                  entity.Status,
-		CreatedAt:               entity.CreatedAt.Format("2006-01-02 15:04:05"),
+		CreatedAt:               entity.CreatedAt.Unix(),
 	}, nil
 }
 
@@ -302,9 +302,9 @@ func (svc *oAuthClientSvc) ListSecrets(ctx *gin.Context, req *dtoapplicationclie
 
 	secrets := make([]dtoapplicationclient.SecretResp, 0, len(list))
 	for _, s := range list {
-		var expiresAt *string
+		var expiresAt *int64
 		if s.ExpiredAt != nil {
-			t := s.ExpiredAt.Format("2006-01-02 15:04:05")
+			t := s.ExpiredAt.Unix()
 			expiresAt = &t
 		}
 		secrets = append(secrets, dtoapplicationclient.SecretResp{
@@ -313,7 +313,7 @@ func (svc *oAuthClientSvc) ListSecrets(ctx *gin.Context, req *dtoapplicationclie
 			Name:                s.Name,
 			ValuePrefix:         s.ValuePrefix,
 			ExpiredAt:           expiresAt,
-			CreatedAt:           s.CreatedAt.Format("2006-01-02 15:04:05"),
+			CreatedAt:           s.CreatedAt.Unix(),
 		})
 	}
 
@@ -350,11 +350,9 @@ func (svc *oAuthClientSvc) CreateSecret(ctx *gin.Context, req *dtoapplicationcli
 	valuePrefix := secretValue[:prefixLen]
 
 	var expiresAt *time.Time
-	if req.ExpiredAt != "" {
-		t, err := time.Parse("2006-01-02 15:04:05", req.ExpiredAt)
-		if err == nil {
-			expiresAt = &t
-		}
+	if req.ExpiredAt > 0 {
+		t := time.Unix(req.ExpiredAt, 0)
+		expiresAt = &t
 	}
 
 	secretEntity := &model.ApplicationClientSecretEntity{

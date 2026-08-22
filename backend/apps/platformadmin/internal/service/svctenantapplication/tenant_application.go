@@ -115,7 +115,7 @@ func (svc *tenantApplicationSvc) Detail(ctx *gin.Context, req *dtotenantapplicat
 		Status:       entity.Status,
 		Config:       string(entity.Config),
 		GrantedScope: string(entity.GrantedScope),
-		CreatedAt:    entity.CreatedAt.Format("2006-01-02 15:04:05"),
+		CreatedAt:    entity.CreatedAt.Unix(),
 	}, nil
 }
 
@@ -137,7 +137,7 @@ func (svc *tenantApplicationSvc) PageList(ctx *gin.Context, req *dtotenantapplic
 			TenantID:    v.TenantID,
 			AppID:       v.AppID,
 			Status:      v.Status,
-			CreatedAt:   v.CreatedAt.Format("2006-01-02 15:04:05"),
+			CreatedAt:   v.CreatedAt.Unix(),
 		})
 	}
 	return &dtotenantapplication.TenantApplicationPageListResp{List: items, Total: total}, nil

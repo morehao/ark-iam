@@ -23,7 +23,7 @@ func TestLoggedOutUsesHostOnlyCookieByDefault(t *testing.T) {
 		JWT: pkgconfig.JWT{SignKey: "test-key"},
 		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
-			FrontendLoginURL: "http://localhost:3003/login",
+			FrontendLoginURL: "http://localhost:4000/login",
 			AllowInsecure:    true,
 		},
 	}
@@ -56,7 +56,7 @@ func TestLoggedOutUsesConfiguredCookieDomain(t *testing.T) {
 		JWT: pkgconfig.JWT{SignKey: "test-key"},
 		OIDC: pkgconfig.OIDC{
 			Issuer:           "http://localhost:8099/oidc",
-			FrontendLoginURL: "http://localhost:3003/login",
+			FrontendLoginURL: "http://localhost:4000/login",
 			CookieDomain:     "example.com",
 			AllowInsecure:    true,
 		},

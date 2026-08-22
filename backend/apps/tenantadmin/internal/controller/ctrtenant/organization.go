@@ -10,7 +10,7 @@ import (
 type OrganizationCtr interface {
 	Create(ctx *gin.Context)
 	Tree(ctx *gin.Context)
-	Detail(ctx *gin.Context)
+	Children(ctx *gin.Context)
 	Update(ctx *gin.Context)
 	UpdateStatus(ctx *gin.Context)
 	Delete(ctx *gin.Context)
@@ -71,19 +71,24 @@ func (ctr *organizationCtr) Tree(ctx *gin.Context) {
 }
 
 // @Tags 组织
-// @Summary 组织详情
+// @Summary 某部门直属子部门分页列表
 // @accept application/json
 // @Produce application/json
-// @Param organizationID path string true "组织ID"
-// @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationDetailResp}
-// @Router /v1/tenant/organizations/{organizationID} [get]
-func (ctr *organizationCtr) Detail(ctx *gin.Context) {
-	var req dtotenant.OrganizationDetailReq
+// @Param organizationID path string true "部门ID(父节点)"
+// @Param req query dtotenant.OrganizationChildrenReq true "子部门查询"
+// @Success 200 {object} gincontext.DtoRender{data=dtotenant.OrganizationChildrenResp}
+// @Router /v1/tenant/organizations/{organizationID}/children [get]
+func (ctr *organizationCtr) Children(ctx *gin.Context) {
+	var req dtotenant.OrganizationChildrenReq
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.organizationSvc.Detail(ctx, &req)
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.organizationSvc.Children(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

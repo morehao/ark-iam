@@ -1,11 +1,10 @@
 package dtotenant
 
 type RoleCreateReq struct {
-	AppID       string `json:"appID" binding:"required"`        // 所属应用ID（租户订阅的非系统应用）
-	Name        string `json:"name" binding:"required"`         // 角色名称
-	Code        string `json:"code" binding:"required"`         // 角色编码(应用内唯一)
-	Description string `json:"description"`                     // 角色描述
-	Type        string `json:"type"`                            // 角色类型(默认 User)
+	AppID       string `json:"appID" binding:"required"` // 所属应用ID（租户订阅的非系统应用）
+	Name        string `json:"name" binding:"required"`  // 角色名称
+	Code        string `json:"code" binding:"required"`  // 角色编码(应用内唯一)
+	Description string `json:"description"`              // 角色描述
 }
 
 type RoleUpdateReq struct {
@@ -13,7 +12,6 @@ type RoleUpdateReq struct {
 	Name        string `json:"name" binding:"required"`           // 角色名称
 	Code        string `json:"code" binding:"required"`           // 角色编码
 	Description string `json:"description"`                       // 角色描述
-	Type        string `json:"type"`                              // 角色类型
 }
 
 type RoleDetailReq struct {

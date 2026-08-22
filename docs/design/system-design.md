@@ -61,9 +61,9 @@
 ```mermaid
 flowchart TB
     subgraph FE["前端（React 18 + Vite，pnpm monorepo）"]
-        LW["login-web :3000<br/>登录门户（非 OIDC Client）"]
-        PW["platform-admin-web :3001<br/>平台管理台"]
-        TW["tenant-admin-web :3002<br/>租户管理台"]
+        LW["login-web :4000<br/>登录门户（非 OIDC Client）"]
+        PW["platform-admin-web :4001<br/>平台管理台"]
+        TW["tenant-admin-web :4002<br/>租户管理台"]
         OIDCSDK["react-oidc-context / oidc-client-ts<br/>（Authorization Code + PKCE）"]
     end
 
@@ -149,9 +149,9 @@ flowchart TB
 
 | 应用 | 端口 | 说明 |
 |---|---|---|
-| login-web | 3000 | 登录门户：凭证登录、多租户选择（非 OIDC Client，直接调用 `/oidc/login`） |
-| platform-admin-web | 3001 | 平台管理控制台（OIDC Client，client_id `platform-admin-web`） |
-| tenant-admin-web | 3002 | 租户自服务控制台（OIDC Client，client_id `tenant-admin-web`） |
+| login-web | 4000 | 登录门户：凭证登录、多租户选择（非 OIDC Client，直接调用 `/oidc/login`） |
+| platform-admin-web | 4001 | 平台管理控制台（OIDC Client，client_id `platform-admin-web`） |
+| tenant-admin-web | 4002 | 租户自服务控制台（OIDC Client，client_id `tenant-admin-web`） |
 
 ### 3.3 技术栈
 
@@ -584,7 +584,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor U as 用户
-    participant LW as login-web（:3000）
+    participant LW as login-web（:4000）
     participant A as auth（OP）
     participant DB as PostgreSQL
     participant RD as Redis

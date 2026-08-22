@@ -12,30 +12,14 @@ const (
 )
 
 const (
-	RoleCreateError      = 100700
-	RoleDeleteError      = 100701
-	RoleUpdateError      = 100702
-	RoleGetDetailError   = 100703
-	RoleGetPageListError = 100704
-	RoleNotExistError    = 100705
-)
-
-const (
-	ResourceCreateError      = 100710
-	ResourceDeleteError      = 100711
-	ResourceUpdateError      = 100712
-	ResourceGetDetailError   = 100713
-	ResourceGetPageListError = 100714
-	ResourceNotExistError    = 100715
-)
-
-const (
-	ScopeCreateError      = 100720
-	ScopeDeleteError      = 100721
-	ScopeUpdateError      = 100722
-	ScopeGetDetailError   = 100723
-	ScopeGetPageListError = 100724
-	ScopeNotExistError    = 100725
+	RoleCreateError                 = 100700
+	RoleDeleteError                 = 100701
+	RoleUpdateError                 = 100702
+	RoleGetDetailError              = 100703
+	RoleGetPageListError            = 100704
+	RoleNotExistError               = 100705
+	RoleDeleteBuiltinForbiddenError = 100706
+	RoleUpdateBuiltinForbiddenError = 100707
 )
 
 const (
@@ -74,13 +58,6 @@ const (
 )
 
 const (
-	RoleScopeCreateError      = 100740
-	RoleScopeDeleteError      = 100741
-	RoleScopeGetPageListError = 100742
-	RoleScopeNotExistError    = 100743
-)
-
-const (
 	RoleUserCreateError          = 100770
 	RoleUserDeleteError          = 100771
 	RoleUserGetListError         = 100772
@@ -104,18 +81,8 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	RoleGetDetailError:                   "查看角色详情失败",
 	RoleGetPageListError:                 "查看角色列表失败",
 	RoleNotExistError:                    "角色不存在",
-	ResourceCreateError:                  "创建资源失败",
-	ResourceDeleteError:                  "删除资源失败",
-	ResourceUpdateError:                  "修改资源失败",
-	ResourceGetDetailError:               "查看资源详情失败",
-	ResourceGetPageListError:             "查看资源列表失败",
-	ResourceNotExistError:                "资源不存在",
-	ScopeCreateError:                     "创建权限范围失败",
-	ScopeDeleteError:                     "删除权限范围失败",
-	ScopeUpdateError:                     "修改权限范围失败",
-	ScopeGetDetailError:                  "查看权限范围详情失败",
-	ScopeGetPageListError:                "查看权限范围列表失败",
-	ScopeNotExistError:                   "权限范围不存在",
+	RoleDeleteBuiltinForbiddenError:      "内置角色禁止删除",
+	RoleUpdateBuiltinForbiddenError:      "内置角色禁止修改核心字段",
 	ApplicationCreateError:               "创建应用失败",
 	ApplicationDeleteError:               "删除应用失败",
 	ApplicationUpdateError:               "修改应用失败",
@@ -142,10 +109,6 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	RoleMenuDeleteError:                  "删除角色菜单关联失败",
 	RoleMenuGetPageListError:             "查看角色菜单关联列表失败",
 	RoleMenuNotExistError:                "角色菜单关联不存在",
-	RoleScopeCreateError:                 "创建角色权限关联失败",
-	RoleScopeDeleteError:                 "删除角色权限关联失败",
-	RoleScopeGetPageListError:            "查看角色权限关联列表失败",
-	RoleScopeNotExistError:               "角色权限关联不存在",
 	RoleUserCreateError:                  "创建角色用户关联失败",
 	RoleUserDeleteError:                  "删除角色用户关联失败",
 	RoleUserGetListError:                 "查看角色用户列表失败",

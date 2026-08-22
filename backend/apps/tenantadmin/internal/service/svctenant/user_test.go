@@ -316,7 +316,6 @@ func TestUserDetailWithOrganizationsAndRoles(t *testing.T) {
 		TenantID:   "t1",
 		Name:       "管理员",
 		Code:       "admin",
-		Type:       "Admin",
 	}).Error; err != nil {
 		t.Fatalf("seed role: %v", err)
 	}
@@ -356,7 +355,6 @@ func TestUserUpdateRolesFullReplace(t *testing.T) {
 			TenantID:   "t1",
 			Name:       r.code,
 			Code:       r.code,
-			Type:       "User",
 		}).Error; err != nil {
 			t.Fatalf("seed role %s: %v", r.id, err)
 		}

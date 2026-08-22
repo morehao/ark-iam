@@ -16,8 +16,8 @@ type RolePageListItem struct {
 	Name        string `json:"name"`        // 角色名称
 	Code        string `json:"code"`        // 角色编码
 	Description string `json:"description"` // 角色描述
-	Type        string `json:"type"`        // 角色类型
-	IsDefault   bool   `json:"isDefault"`   // 是否默认角色
+	Source      string `json:"source"`      // 角色来源(builtin/custom)
+	AdminLevel  string `json:"adminLevel"`  // 系统管理等级(none/basic/super)
 	MemberCount int64  `json:"memberCount"` // 成员数
 	MenuCount   int64  `json:"menuCount"`   // 授权菜单数
 	CreatedAt   int64  `json:"createdAt"`   // 创建时间
@@ -30,8 +30,8 @@ type RoleDetailResp struct {
 	Name        string `json:"name"`        // 角色名称
 	Code        string `json:"code"`        // 角色编码
 	Description string `json:"description"` // 角色描述
-	Type        string `json:"type"`        // 角色类型
-	IsDefault   bool   `json:"isDefault"`   // 是否默认角色
+	Source      string `json:"source"`      // 角色来源(builtin/custom)
+	AdminLevel  string `json:"adminLevel"`  // 系统管理等级(none/basic/super)
 	MemberCount int64  `json:"memberCount"` // 成员数
 	MenuCount   int64  `json:"menuCount"`   // 授权菜单数
 	CreatedAt   int64  `json:"createdAt"`   // 创建时间

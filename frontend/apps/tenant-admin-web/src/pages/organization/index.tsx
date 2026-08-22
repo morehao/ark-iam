@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Avatar,
   Button,
   Card,
-  Descriptions,
-  Drawer,
   Form,
   Input,
   InputNumber,
@@ -13,46 +10,55 @@ import {
   Select,
   Space,
   Spin,
-  Switch,
   Table,
-  Tabs,
   Tag,
   Tree,
   TreeSelect,
   message,
 } from 'antd'
-import { PlusOutlined, ReloadOutlined, SearchOutlined, UserAddOutlined } from '@ant-design/icons'
+import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
 import { PageContainer } from '@ark-iam/ui'
-import type { OrganizationItem, OrganizationUserItem, TenantUserItem } from '@ark-iam/types'
+import type { OrganizationChildItem, OrganizationItem } from '@ark-iam/types'
+import { fmtTime } from '../../components/common'
 import {
   createOrganization,
-  createOrganizationUser,
   deleteOrganization,
-  deleteOrganizationUser,
+  getOrganizationChildren,
   getOrganizationTree,
-  getOrganizationUserPage,
   updateOrganization,
   updateOrganizationStatus,
-  updateOrganizationUser,
 } from '../../api/organization'
-import { getTenantUserPageList } from '../../api/user'
 
-const RELATION_OPTIONS = [
-  { label: '成员', value: 'member' },
-  { label: '负责人', value: 'leader' },
-]
-
+// 树节点：纯部门名称
 function buildTree(list: OrganizationItem[]): DataNode[] {
   return list.map((n) => ({
     key: n.organizationID,
-    title: `${n.name}${n.status === 'inactive' ? '（停用）' : ''}`,
+    title: n.name,
     children: n.children?.length ? buildTree(n.children) : undefined,
   }))
 }
 
-// 收集目标节点及其全部子孙 ID（移动/删除时排除自身与后代）
+// 按关键字在树上过滤节点（命中节点保留其祖先链）
+function filterTree(list: OrganizationItem[], keyword: string): OrganizationItem[] {
+  const kw = keyword.trim().toLowerCase()
+  if (!kw) return list
+  const hit = (n: OrganizationItem) => n.name.toLowerCase().includes(kw)
+  const walk = (items: OrganizationItem[]): OrganizationItem[] => {
+    const out: OrganizationItem[] = []
+    for (const n of items) {
+      const children = n.children?.length ? walk(n.children) : []
+      if (hit(n) || children.length) {
+        out.push({ ...n, children })
+      }
+    }
+    return out
+  }
+  return walk(list)
+}
+
+// 收集目标节点及其全部子孙 ID
 function collectSelfAndDescendants(list: OrganizationItem[], id: string): Set<string> {
   const result = new Set<string>()
   const node = findNode(list, id)
@@ -66,43 +72,37 @@ function collectSelfAndDescendants(list: OrganizationItem[], id: string): Set<st
 }
 
 export default function OrganizationPage() {
-  const [tree, setTree] = useState<DataNode[]>([])
   const [orgList, setOrgList] = useState<OrganizationItem[]>([])
   const [selectedID, setSelectedID] = useState<string>('')
-  const [loading, setLoading] = useState(false)
+  const [treeLoading, setTreeLoading] = useState(false)
 
-  const [members, setMembers] = useState<OrganizationUserItem[]>([])
-  const [memberTotal, setMemberTotal] = useState(0)
-  const [memberPage, setMemberPage] = useState(1)
-  const [memberPageSize, setMemberPageSize] = useState(10)
-  const [memberLoading, setMemberLoading] = useState(false)
-  const [relationFilter, setRelationFilter] = useState<string | undefined>()
-  const [keyword, setKeyword] = useState('')
+  // 左侧树搜索关键字（仅影响树展示）
+  const [treeKeyword, setTreeKeyword] = useState('')
+
+  // 右侧子部门列表独立接口：筛选 + 分页
+  const [childrenList, setChildrenList] = useState<OrganizationChildItem[]>([])
+  const [childrenTotal, setChildrenTotal] = useState(0)
+  const [childrenLoading, setChildrenLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const pageSize = 10
+  const [filterForm] = Form.useForm()
+  const [query, setQuery] = useState<{ name?: string; status?: string }>({})
 
   const [nodeModalOpen, setNodeModalOpen] = useState(false)
-  const [editingNode, setEditingNode] = useState<OrganizationItem | null>(null)
+  const [editingNode, setEditingNode] = useState<{ organizationID: string } | null>(null)
   const [nodeForm] = Form.useForm()
 
-  const [addDrawerOpen, setAddDrawerOpen] = useState(false)
-  const [userOptions, setUserOptions] = useState<TenantUserItem[]>([])
-  const [usersLoading, setUsersLoading] = useState(false)
-  const [userKeyword, setUserKeyword] = useState('')
-  const [selectedUserIDs, setSelectedUserIDs] = useState<string[]>([])
-  const [memberRelation, setMemberRelation] = useState('member')
-  const [memberIsPrimary, setMemberIsPrimary] = useState(false)
-  const [adding, setAdding] = useState(false)
-
+  // 左侧树加载
   const loadTree = useCallback(async () => {
-    setLoading(true)
+    setTreeLoading(true)
     try {
       const resp = await getOrganizationTree()
       setOrgList(resp.list || [])
-      setTree(buildTree(resp.list || []))
       if (!selectedID && resp.list?.length) {
         setSelectedID(resp.list[0].organizationID)
       }
     } finally {
-      setLoading(false)
+      setTreeLoading(false)
     }
   }, [selectedID])
 
@@ -110,45 +110,38 @@ export default function OrganizationPage() {
     void loadTree()
   }, [loadTree])
 
-  const loadMembers = useCallback(async () => {
-    if (!selectedID) return
-    setMemberLoading(true)
-    try {
-      const resp = await getOrganizationUserPage(selectedID, {
-        page: memberPage,
-        pageSize: memberPageSize,
-        relationType: relationFilter,
-        keyword: keyword || undefined,
-      })
-      setMembers(resp.list || [])
-      setMemberTotal(resp.total || 0)
-    } finally {
-      setMemberLoading(false)
-    }
-  }, [selectedID, memberPage, memberPageSize, relationFilter, keyword])
+  // 右侧直属子部门列表加载（入参：选中部门 + 筛选 + 分页）
+  const loadChildren = useCallback(
+    async (p: number) => {
+      if (!selectedID) {
+        setChildrenList([])
+        setChildrenTotal(0)
+        return
+      }
+      setChildrenLoading(true)
+      try {
+        const resp = await getOrganizationChildren(selectedID, {
+          page: p,
+          pageSize,
+          name: query.name,
+          status: query.status,
+        })
+        setChildrenList(resp.list || [])
+        setChildrenTotal(resp.total || 0)
+      } finally {
+        setChildrenLoading(false)
+      }
+    },
+    [selectedID, query],
+  )
 
   useEffect(() => {
-    void loadMembers()
-  }, [loadMembers])
+    setPage(1)
+    void loadChildren(1)
+  }, [loadChildren, selectedID])
 
-  const selectedNode = useMemo(() => (selectedID ? findNode(orgList, selectedID) : null), [orgList, selectedID])
-
-  // 节点信息：面包屑 + 子节点数 + 成员数
-  const ancestors = useMemo(() => {
-    if (!selectedNode?.orgPath) return []
-    const ids = selectedNode.orgPath.split('/').filter(Boolean)
-    const nameMap = new Map<string, string>()
-    const walk = (items: OrganizationItem[]) => {
-      for (const n of items) {
-        nameMap.set(n.organizationID, n.name)
-        if (n.children?.length) walk(n.children)
-      }
-    }
-    walk(orgList)
-    return ids.map((id) => ({ id, name: nameMap.get(id) || id }))
-  }, [selectedNode, orgList])
-
-  const childCount = useMemo(() => selectedNode?.children?.length ?? 0, [selectedNode])
+  const visibleTree = useMemo(() => filterTree(orgList, treeKeyword), [orgList, treeKeyword])
+  const visibleTreeData = useMemo(() => buildTree(visibleTree), [visibleTree])
 
   const openCreateNode = (parentID?: string) => {
     setEditingNode(null)
@@ -157,7 +150,7 @@ export default function OrganizationPage() {
     setNodeModalOpen(true)
   }
 
-  const openEditNode = (node: OrganizationItem) => {
+  const openEditNode = (node: { organizationID: string; parentID?: string; name: string; code?: string; sort?: number; status: string }) => {
     setEditingNode(node)
     nodeForm.setFieldsValue({
       parentID: node.parentID || undefined,
@@ -181,162 +174,31 @@ export default function OrganizationPage() {
       }
       setNodeModalOpen(false)
       void loadTree()
+      void loadChildren(page)
     } catch {
       /* 校验或请求失败 */
     }
   }
 
-  const removeNode = async (cascade: boolean) => {
-    if (!selectedID) return
+  const removeNode = async (id: string) => {
     try {
-      await deleteOrganization(selectedID, cascade)
+      await deleteOrganization(id, true)
       message.success('删除成功')
-      setSelectedID('')
+      if (page > 1 && childrenList.length === 1) setPage(page - 1)
       void loadTree()
+      void loadChildren(page)
     } catch {
       /* 拦截器已提示 */
     }
   }
 
-  const toggleStatus = async () => {
-    if (!selectedNode) return
-    const next = selectedNode.status === 'active' ? 'inactive' : 'active'
-    await updateOrganizationStatus(selectedNode.organizationID, next)
+  const toggleStatus = async (node: { organizationID: string; status: string }) => {
+    const next = node.status === 'active' ? 'inactive' : 'active'
+    await updateOrganizationStatus(node.organizationID, next)
     message.success('状态已更新')
     void loadTree()
+    void loadChildren(page)
   }
-
-  const loadUserOptions = useCallback(async (kw: string) => {
-    setUsersLoading(true)
-    try {
-      const resp = await getTenantUserPageList({ page: 1, pageSize: 50, keyword: kw || undefined })
-      setUserOptions(resp.list || [])
-    } finally {
-      setUsersLoading(false)
-    }
-  }, [])
-
-  const openAddDrawer = () => {
-    setSelectedUserIDs([])
-    setMemberRelation('member')
-    setMemberIsPrimary(false)
-    setUserKeyword('')
-    setAddDrawerOpen(true)
-    void loadUserOptions('')
-  }
-
-  const submitAddMembers = async () => {
-    if (!selectedID || selectedUserIDs.length === 0) {
-      message.warning('请选择要添加的用户')
-      return
-    }
-    setAdding(true)
-    try {
-      for (let i = 0; i < selectedUserIDs.length; i++) {
-        await createOrganizationUser(selectedID, {
-          userID: selectedUserIDs[i],
-          relationType: memberRelation,
-          isPrimary: memberIsPrimary && i === 0,
-        })
-      }
-      message.success('添加成功')
-      setAddDrawerOpen(false)
-      void loadMembers()
-    } catch {
-      /* 拦截器已提示 */
-    } finally {
-      setAdding(false)
-    }
-  }
-
-  const removeMember = async (userID: string) => {
-    if (!selectedID) return
-    await deleteOrganizationUser(selectedID, userID)
-    message.success('移除成功')
-    void loadMembers()
-  }
-
-  const setPrimary = async (userID: string) => {
-    if (!selectedID) return
-    await updateOrganizationUser(selectedID, userID, { relationType: 'member', isPrimary: true })
-    message.success('已设为主归属')
-    void loadMembers()
-  }
-
-  const changeRelation = async (userID: string, relationType: string) => {
-    if (!selectedID) return
-    await updateOrganizationUser(selectedID, userID, { relationType })
-    message.success('关系已更新')
-    void loadMembers()
-  }
-
-  const memberColumns: ColumnsType<OrganizationUserItem> = [
-    {
-      title: '用户',
-      key: 'user',
-      width: 200,
-      render: (_, r) => (
-        <Space>
-          <Avatar size={28}>{r.userName?.charAt(0)?.toUpperCase() || 'U'}</Avatar>
-          <Space direction="vertical" size={0}>
-            <span style={{ fontWeight: 500 }}>{r.userName || '-'}</span>
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>@{r.username || '-'}</span>
-          </Space>
-        </Space>
-      ),
-    },
-    { title: '邮箱', dataIndex: 'primaryEmail', key: 'primaryEmail', render: (v: string) => v || '-' },
-    { title: '手机号', dataIndex: 'primaryPhone', key: 'primaryPhone', width: 130, render: (v: string) => v || '-' },
-    {
-      title: '状态',
-      dataIndex: 'isSuspended',
-      key: 'isSuspended',
-      width: 90,
-      render: (v: boolean) => (v ? <Tag color="red">挂起</Tag> : <Tag color="green">正常</Tag>),
-    },
-    {
-      title: '关系',
-      dataIndex: 'relationType',
-      key: 'relationType',
-      width: 110,
-      render: (v: string, r) => (
-        <Select
-          size="small"
-          value={v}
-          style={{ width: 92 }}
-          options={RELATION_OPTIONS}
-          onChange={(next) => void changeRelation(r.userID, next)}
-        />
-      ),
-    },
-    {
-      title: '主归属',
-      dataIndex: 'isPrimary',
-      key: 'isPrimary',
-      width: 90,
-      render: (v: boolean, r) =>
-        v ? <Tag color="gold">主</Tag> : r.relationType === 'member' ? <Button type="link" size="small" onClick={() => void setPrimary(r.userID)}>设为主</Button> : <Tag>否</Tag>,
-    },
-    {
-      title: '加入时间',
-      dataIndex: 'joinedAt',
-      key: 'joinedAt',
-      width: 160,
-      render: (v?: number) => fmtTime(v),
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 90,
-      render: (_, r) => (
-        <Popconfirm title="确认移除该关系？" onConfirm={() => void removeMember(r.userID)}>
-          <Button type="link" size="small" danger>
-            移除
-          </Button>
-        </Popconfirm>
-      ),
-    },
-  ]
 
   const parentTreeData = useMemo(() => {
     if (!selectedID) return []
@@ -353,31 +215,70 @@ export default function OrganizationPage() {
     return toTree(orgList)
   }, [orgList, selectedID])
 
+  // 右侧子部门列表列
+  const tableColumns: ColumnsType<OrganizationChildItem> = [
+    {
+      title: '部门名称',
+      dataIndex: 'name',
+      key: 'name',
+      render: (v: string, r) => (
+        <a onClick={() => setSelectedID(r.organizationID)}>{v}</a>
+      ),
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 90,
+      render: (v: string) => (v === 'active' ? <Tag color="green">启用</Tag> : <Tag color="orange">停用</Tag>),
+    },
+    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 180, render: (v?: number) => (v ? fmtTime(v * 1000) : '-') },
+    {
+      title: '操作',
+      key: 'action',
+      width: 200,
+      render: (_, r) => (
+        <Space size={0}>
+          <Button type="link" size="small" onClick={() => openEditNode(r)}>
+            编辑
+          </Button>
+          <Button type="link" size="small" onClick={() => void toggleStatus(r)}>
+            {r.status === 'active' ? '停用' : '启用'}
+          </Button>
+          <Popconfirm title="确认删除该部门及其子部门/成员？" onConfirm={() => void removeNode(r.organizationID)}>
+            <Button type="link" size="small" danger>
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ]
+
   return (
     <PageContainer
       title="组织架构"
-      description="租户下的组织树与成员关系（成员/负责人，主归属唯一）"
-      extra={
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={() => void loadTree()}>
-            刷新
-          </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreateNode()}>
-            新建根组织
-          </Button>
-        </Space>
-      }
     >
+      <style>{`
+        #org-tree-card .ant-tree-treenode {
+          padding-inline: 0;
+        }
+        #org-tree-card .ant-tree-switcher {
+          width: 0;
+          overflow: hidden;
+        }
+      `}</style>
       <Space align="start" size={16} style={{ width: '100%' }}>
-        <Card title="组织树" style={{ width: 260, borderRadius: 12 }} styles={{ body: { maxHeight: 680, overflow: 'auto' } }}>
-          <Spin spinning={loading}>
-            {tree.length === 0 ? (
+        <Card id="org-tree-card" style={{ width: 280, borderRadius: 12 }} styles={{ body: { padding: '16px 16px', maxHeight: 680, overflow: 'auto' } }}>
+          <Input placeholder="搜索部门" allowClear value={treeKeyword} onChange={(e) => setTreeKeyword(e.target.value)} style={{ marginBottom: 12 }} />
+          <Spin spinning={treeLoading}>
+            {visibleTreeData.length === 0 ? (
               <Button type="dashed" block icon={<PlusOutlined />} onClick={() => openCreateNode()}>
-                创建组织
+                创建部门
               </Button>
             ) : (
               <Tree
-                treeData={tree}
+                treeData={visibleTreeData}
                 selectedKeys={selectedID ? [selectedID] : []}
                 onSelect={(keys) => keys.length && setSelectedID(String(keys[0]))}
                 defaultExpandAll
@@ -387,136 +288,97 @@ export default function OrganizationPage() {
           </Spin>
         </Card>
 
-        <Card style={{ flex: 1, borderRadius: 12 }} styles={{ body: { padding: 0 } }}>
-          {!selectedID || !selectedNode ? (
-            <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>请先选择左侧组织节点</div>
-          ) : (
-            <Tabs
-              defaultActiveKey="info"
-              items={[
-                {
-                  key: 'info',
-                  label: '节点信息',
-                  children: (
-                    <div style={{ padding: 16 }}>
-                      <Descriptions column={2} bordered size="small">
-                        <Descriptions.Item label="组织名称">{selectedNode.name}</Descriptions.Item>
-                        <Descriptions.Item label="组织编码">{selectedNode.code || '-'}</Descriptions.Item>
-                        <Descriptions.Item label="同级排序">{selectedNode.sort ?? 0}</Descriptions.Item>
-                        <Descriptions.Item label="状态">
-                          {selectedNode.status === 'active' ? <Tag color="green">启用</Tag> : <Tag color="orange">停用</Tag>}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="子组织数">{childCount}</Descriptions.Item>
-                        <Descriptions.Item label="成员数">{memberTotal}</Descriptions.Item>
-                        <Descriptions.Item label="路径" span={2}>
-                          <Space size={4} wrap>
-                            {ancestors.map((a, i) => (
-                              <span key={a.id}>
-                                {i > 0 && <span style={{ margin: '0 4px', color: '#94a3b8' }}>/</span>}
-                                {a.name}
-                              </span>
-                            ))}
-                          </Space>
-                        </Descriptions.Item>
-                      </Descriptions>
-                      <Space style={{ marginTop: 16 }}>
-                        <Button size="small" icon={<PlusOutlined />} onClick={() => openCreateNode(selectedID)}>
-                          新建子组织
-                        </Button>
-                        <Button size="small" onClick={() => openEditNode(selectedNode)}>
-                          编辑 / 移动
-                        </Button>
-                        <Popconfirm title={selectedNode.status === 'active' ? '停用该节点？' : '启用该节点？'} onConfirm={() => void toggleStatus()}>
-                          <Button size="small">{selectedNode.status === 'active' ? '停用' : '启用'}</Button>
-                        </Popconfirm>
-                        <Popconfirm title="确认删除该节点？有子组织/成员需勾选级联" onConfirm={() => void removeNode(false)} okText="仅删本节点" cancelText="取消">
-                          <Button size="small" danger>
-                            删除
-                          </Button>
-                        </Popconfirm>
-                        <Popconfirm title="级联删除该节点及全部子组织/成员？" onConfirm={() => void removeNode(true)}>
-                          <Button size="small" danger>
-                            级联删除
-                          </Button>
-                        </Popconfirm>
-                      </Space>
-                    </div>
-                  ),
-                },
-                {
-                  key: 'members',
-                  label: `成员管理${memberTotal ? `（${memberTotal}）` : ''}`,
-                  children: (
-                    <div style={{ padding: 16 }}>
-                      <Space style={{ marginBottom: 12 }} wrap>
-                        <Select
-                          allowClear
-                          placeholder="关系类型"
-                          style={{ width: 130 }}
-                          options={RELATION_OPTIONS}
-                          value={relationFilter}
-                          onChange={(v) => {
-                            setRelationFilter(v)
-                            setMemberPage(1)
-                          }}
-                        />
-                        <Input.Search
-                          allowClear
-                          placeholder="姓名/用户名/邮箱/手机"
-                          prefix={<SearchOutlined />}
-                          style={{ width: 240 }}
-                          onSearch={(v) => {
-                            setKeyword(v)
-                            setMemberPage(1)
-                          }}
-                        />
-                        <Button type="primary" icon={<UserAddOutlined />} onClick={openAddDrawer}>
-                          添加成员/负责人
-                        </Button>
-                      </Space>
-                      <Table<OrganizationUserItem>
-                        rowKey={(r) => `${r.organizationID}-${r.userID}-${r.relationType}`}
-                        loading={memberLoading}
-                        columns={memberColumns}
-                        dataSource={members}
-                        scroll={{ x: 1100 }}
-                        pagination={{
-                          current: memberPage,
-                          pageSize: memberPageSize,
-                          total: memberTotal,
-                          showSizeChanger: true,
-                          showTotal: (t) => `共 ${t} 条`,
-                          onChange: (p, ps) => {
-                            setMemberPage(p)
-                            setMemberPageSize(ps)
-                          },
-                        }}
-                      />
-                    </div>
-                  ),
-                },
-              ]}
-            />
-          )}
+        <Card style={{ flex: 1, borderRadius: 12 }} styles={{ body: { padding: '16px 24px 24px' } }}>
+          {/* 第一行：查询筛选栏 */}
+          <Form
+            form={filterForm}
+            layout="inline"
+            style={{ marginBottom: 16, rowGap: 12 }}
+            onFinish={(v: { name?: string; status?: string }) => {
+              setQuery({ name: v.name, status: v.status })
+            }}
+          >
+            <Form.Item name="name" label="部门名称">
+              <Input placeholder="请输入部门名称" allowClear style={{ width: 200 }} />
+            </Form.Item>
+            <Form.Item name="status" label="状态">
+              <Select
+                allowClear
+                placeholder="请选择状态"
+                style={{ width: 160 }}
+                options={[
+                  { label: '启用', value: 'active' },
+                  { label: '停用', value: 'inactive' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item style={{ marginLeft: 'auto', marginRight: 0 }}>
+              <Space>
+                <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
+                  查询
+                </Button>
+                <Button
+                  onClick={() => {
+                    filterForm.resetFields()
+                    setQuery({})
+                  }}
+                >
+                  重置
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+
+          {/* 分隔线 */}
+          <div style={{ borderBottom: '1px solid rgba(5,5,5,0.06)', marginBottom: 16 }} />
+
+          {/* 第二行：工具栏 */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreateNode()}>
+              新增部门
+            </Button>
+          </div>
+
+          {/* 分隔线 */}
+          <div style={{ borderBottom: '1px solid rgba(5,5,5,0.06)', marginBottom: 16 }} />
+
+          <Table<OrganizationChildItem>
+            rowKey={(r) => r.organizationID}
+            size="middle"
+            columns={tableColumns}
+            dataSource={childrenList}
+            loading={childrenLoading}
+            locale={{ emptyText: '暂无下级部门' }}
+            pagination={{
+              current: page,
+              pageSize,
+              total: childrenTotal,
+              showTotal: (t) => `共 ${t} 条`,
+              onChange: (p) => {
+                setPage(p)
+                void loadChildren(p)
+              },
+            }}
+          />
         </Card>
       </Space>
 
-      <Modal title={editingNode ? '编辑组织（可改父组织实现移动）' : '新建组织'} open={nodeModalOpen} onOk={() => void submitNode()} onCancel={() => setNodeModalOpen(false)} destroyOnClose>
+      <Modal title={editingNode ? '编辑部门（可改父部门实现移动）' : '新建部门'} open={nodeModalOpen} onOk={() => void submitNode()} onCancel={() => setNodeModalOpen(false)} destroyOnClose>
         <Form form={nodeForm} layout="vertical">
           {editingNode && (
-            <Form.Item name="parentID" label="父组织（不选为根节点；移动会级联更新子组织路径）">
-              <TreeSelect allowClear treeDefaultExpandAll treeData={parentTreeData} placeholder="选择父组织" />
+            <Form.Item name="parentID" label="父部门（不选为根节点；移动会级联更新子部门路径）">
+              <TreeSelect allowClear treeDefaultExpandAll treeData={parentTreeData} placeholder="选择父部门" />
             </Form.Item>
           )}
           {!editingNode && (
-            <Form.Item name="parentID" label="父组织（不选为根节点）">
-              <TreeSelect allowClear treeDefaultExpandAll treeData={orgList.length ? toTreeSelect(orgList) : []} placeholder="选择父组织" />
+            <Form.Item name="parentID" label="父部门（不选为根节点）">
+              <TreeSelect allowClear treeDefaultExpandAll treeData={orgList.length ? toTreeSelect(orgList) : []} placeholder="选择父部门" />
             </Form.Item>
           )}
-          <Form.Item name="name" label="组织名称" rules={[{ required: true, message: '请输入组织名称' }]}>
+          <Form.Item name="name" label="部门名称" rules={[{ required: true, message: '请输入部门名称' }]}>
             <Input placeholder="如：产品研发部" />
           </Form.Item>
-          <Form.Item name="code" label="组织编码">
+          <Form.Item name="code" label="部门编码">
             <Input placeholder="可空，外部系统同步用" />
           </Form.Item>
           <Form.Item name="sort" label="同级排序" initialValue={0}>
@@ -532,52 +394,6 @@ export default function OrganizationPage() {
           </Form.Item>
         </Form>
       </Modal>
-
-      <Drawer
-        title="添加成员 / 负责人"
-        width={480}
-        open={addDrawerOpen}
-        onClose={() => setAddDrawerOpen(false)}
-        footer={
-          <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
-            <Button onClick={() => setAddDrawerOpen(false)}>取消</Button>
-            <Button type="primary" loading={adding} onClick={() => void submitAddMembers()}>
-              添加
-            </Button>
-          </Space>
-        }
-      >
-        <Space direction="vertical" style={{ width: '100%' }} size={16}>
-          <div>
-            <div style={{ marginBottom: 8, fontWeight: 500 }}>选择用户（从租户用户目录搜索）</div>
-            <Select
-              mode="multiple"
-              allowClear
-              showSearch
-              filterOption={false}
-              onSearch={(v) => {
-                setUserKeyword(v)
-                void loadUserOptions(v)
-              }}
-              placeholder="输入姓名/用户名/邮箱/手机搜索"
-              loading={usersLoading}
-              style={{ width: '100%' }}
-              value={selectedUserIDs}
-              onChange={setSelectedUserIDs}
-              options={userOptions.map((u) => ({ label: `${u.name}（@${u.username || '-'}）`, value: u.userID }))}
-              notFoundContent={userKeyword ? '无匹配用户' : '输入关键词搜索'}
-            />
-          </div>
-          <div>
-            <div style={{ marginBottom: 8, fontWeight: 500 }}>关系类型</div>
-            <Select style={{ width: '100%' }} value={memberRelation} onChange={setMemberRelation} options={RELATION_OPTIONS} />
-          </div>
-          <div>
-            <Switch checked={memberIsPrimary} onChange={setMemberIsPrimary} disabled={memberRelation !== 'member'} />
-            <span style={{ marginLeft: 8, color: '#64748b' }}>设为首个为主归属（仅成员关系，且仅对第一个用户生效）</span>
-          </div>
-        </Space>
-      </Drawer>
     </PageContainer>
   )
 }
@@ -601,14 +417,4 @@ function toTreeSelect(list: OrganizationItem[]): any[] {
     value: n.organizationID,
     children: n.children?.length ? toTreeSelect(n.children) : undefined,
   }))
-}
-
-// fmtTime 时间戳渲染（秒级兼容）
-function fmtTime(value?: number | null): string {
-  if (value == null || value === 0) return '-'
-  const ms = value < 1e12 ? value * 1000 : value
-  const d = new Date(ms)
-  if (Number.isNaN(d.getTime())) return String(value)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }

@@ -122,9 +122,10 @@ export function MainLayout({ title, subtitle, menuItems, hasTenantSwitch = true 
             position: 'sticky',
             top: 0,
             zIndex: 10,
+            lineHeight: 1,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, lineHeight: 'normal' }}>
             <Tooltip title={collapsed ? '展开菜单' : '收起菜单'}>
               <ButtonIcon collapsed={collapsed} onClick={() => setCollapsed(!collapsed)} />
             </Tooltip>
@@ -135,9 +136,9 @@ export function MainLayout({ title, subtitle, menuItems, hasTenantSwitch = true 
               </>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, lineHeight: 'normal' }}>
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '4px 8px', borderRadius: 8 }} className="user-entry">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, height: 42, padding: '0 8px', lineHeight: 1, borderRadius: 8, cursor: 'pointer' }} className="user-entry">
                 <Badge dot color={brand.primary} offset={[-2, 2]}>
                   <Avatar
                     size={34}
@@ -147,7 +148,7 @@ export function MainLayout({ title, subtitle, menuItems, hasTenantSwitch = true 
                     {displayName.charAt(0).toUpperCase()}
                   </Avatar>
                 </Badge>
-                <span style={{ fontSize: 14, color: token.colorText, fontWeight: 500 }}>{displayName}</span>
+                <span style={{ fontSize: 14, color: token.colorText, fontWeight: 500, lineHeight: 1 }}>{displayName}</span>
               </div>
             </Dropdown>
           </div>
