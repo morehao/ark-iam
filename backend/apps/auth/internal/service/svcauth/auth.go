@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	appconfig "github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/auth/internal/service/svcloginguard"
 	"github.com/morehao/ark-iam/pkg/code"
@@ -19,8 +21,10 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/iam/password"
+	"github.com/morehao/ark-iam/pkg/iam/person"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/ark-iam/pkg/iam/audit"
+	"github.com/morehao/ark-iam/pkg/iam/tenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gconstant"
@@ -178,64 +182,18 @@ func (svc *authSvc) MyTenants(ctx *gin.Context, req *dtoauth.MyTenantsReq) (*dto
 }
 
 func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoauth.RegisterResp, error) {
+	// 通道 A：自助开通租户。注册人自任该租户 owner（对标 zitadel register/org）。
+	// person + tenant + owner user 同事务创建；并发撞唯一索引由 DB 唯一索引兜底。
 	if err := validatePasswordStrength(req.Password); err != nil {
 		return nil, code.GetError(code.PasswordValidationError)
 	}
-
 	if req.Username == "" && req.PrimaryEmail == "" && req.PrimaryPhone == "" {
 		return nil, code.GetError(code.AuthIdentifierRequiredError)
 	}
-
-	personDao := newAuthPersonStore()
-	tenantDao := newAuthTenantStore()
-
-	tenantEntity, err := tenantDao.GetByID(ctx.Request.Context(), req.TenantID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.Register] tenant dao GetByID fail, err:%v, tenantID:%s", err, req.TenantID)
-		return nil, code.GetError(code.TenantGetDetailError)
-	}
-	if tenantEntity == nil || tenantEntity.ID == "" {
-		return nil, code.GetError(code.TenantNotExistError)
-	}
-
-	// S6：查重错误不再静默吞掉——数据库故障时必须如实返回，不能继续插入
-	if req.Username != "" {
-		existingPerson, qErr := personDao.GetByCond(ctx.Request.Context(), &dao.PersonCond{
-			Username: req.Username,
-		})
-		if qErr != nil {
-			glog.Errorf(ctx, "[svcauth.Register] person dao GetByCond by username fail, err:%v, username:%s", qErr, req.Username)
-			return nil, code.GetError(code.UserGetDetailError)
-		}
-		if existingPerson != nil && existingPerson.ID != "" {
-			return nil, code.GetError(code.UsernameAlreadyExistsError)
-		}
-	}
-
-	if req.PrimaryEmail != "" {
-		existingPerson, qErr := personDao.GetByCond(ctx.Request.Context(), &dao.PersonCond{
-			PrimaryEmail: req.PrimaryEmail,
-		})
-		if qErr != nil {
-			glog.Errorf(ctx, "[svcauth.Register] person dao GetByCond by email fail, err:%v, email:%s", qErr, req.PrimaryEmail)
-			return nil, code.GetError(code.UserGetDetailError)
-		}
-		if existingPerson != nil && existingPerson.ID != "" {
-			return nil, code.GetError(code.EmailAlreadyExistsError)
-		}
-	}
-
-	if req.PrimaryPhone != "" {
-		existingPerson, qErr := personDao.GetByCond(ctx.Request.Context(), &dao.PersonCond{
-			PrimaryPhone: req.PrimaryPhone,
-		})
-		if qErr != nil {
-			glog.Errorf(ctx, "[svcauth.Register] person dao GetByCond by phone fail, err:%v, phone:%s", qErr, req.PrimaryPhone)
-			return nil, code.GetError(code.UserGetDetailError)
-		}
-		if existingPerson != nil && existingPerson.ID != "" {
-			return nil, code.GetError(code.PhoneAlreadyExistsError)
-		}
+	// 通道 A 全局开关：生产默认关闭自助开通租户（防批量刷租户，对标 DisallowPublicOrgRegistration）
+	if appconfig.Conf == nil || !appconfig.Conf.SelfRegister.Enabled {
+		glog.Warnf(ctx, "[svcauth.Register] self-register disabled, req:%s", gutil.ToJsonString(req))
+		return nil, code.GetError(code.AuthTenantRegisterNotAllowedError)
 	}
 
 	passwordHash, err := gcrypto.GeneratePasswordHash(req.Password)
@@ -244,54 +202,96 @@ func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoau
 		return nil, code.GetError(code.PasswordHashError)
 	}
 
-	personEntity := &model.PersonEntity{
-		Username:          model.StrPtr(req.Username),
-		PrimaryEmail:      model.StrPtr(req.PrimaryEmail),
-		PrimaryPhone:      model.StrPtr(req.PrimaryPhone),
-		PasswordEncrypted: passwordHash,
-		PasswordMethod:    "bcrypt",
-		Name:              req.Name,
-		Profile:           json.RawMessage("{}"),
-		CustomData:        json.RawMessage("{}"),
-		CreatedBy:         "",
-	}
-	now := time.Now()
-	insertEntity := &model.UserEntity{
-		TenantID:   req.TenantID,
-		Name:       req.Name,
-		Profile:    json.RawMessage("{}"),
-		CustomData: json.RawMessage("{}"),
-		// H2：开放注册加入已有租户，绝不授予 owner（owner 由租户创建流程/管理员授予）
-		IsOwner:  false,
-		JoinedAt: &now,
+	tenantCode := strings.TrimSpace(req.TenantCode)
+	if tenantCode == "" {
+		// 保证 code 非空且唯一，避免撞租户表唯一索引
+		tenantCode = "tenant-" + uuid.NewString()
 	}
 
-	// S6：person + user 同事务插入，避免 user 插入失败留下孤儿 person；
-	// 并发注册撞唯一索引（check-then-insert 竞态）时由 DB 唯一索引兜底。
+	var personEntity *model.PersonEntity
+	var tenantEntity *model.TenantEntity
+	var ownerUserID string
+
 	txErr := dbclient.IamDB(ctx.Request.Context()).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(personEntity).Error; err != nil {
-			return err
+		// 1. person find-or-create（统一入口，替代自写三连查重）
+		var p *model.PersonEntity
+		var fErr error
+		p, _, fErr = person.FindOrCreate(ctx.Request.Context(), tx, &person.FindOrCreateReq{
+			Username:          req.Username,
+			PrimaryEmail:      req.PrimaryEmail,
+			PrimaryPhone:      req.PrimaryPhone,
+			PasswordEncrypted: passwordHash,
+			PasswordMethod:    "bcrypt",
+			Name:              req.Name,
+			CreatedBy:         "",
+		})
+		if fErr != nil {
+			glog.Errorf(ctx, "[svcauth.Register] person FindOrCreate fail, err:%v, req:%s", fErr, gutil.ToJsonString(req))
+			return fErr
 		}
-		insertEntity.PersonID = personEntity.ID
-		insertEntity.CreatedBy = ""
-		return tx.Create(insertEntity).Error
+		personEntity = p
+		// 2. 建租户 + 根组织
+		var tErr error
+		tenantEntity, tErr = tenant.CreateWithRootOrg(ctx.Request.Context(), tx, &tenant.CreateWithRootOrgReq{
+			Code:      tenantCode,
+			Name:      req.TenantName,
+			Type:      model.TenantTypeCustomer,
+			CreatedBy: personEntity.ID,
+		})
+		if tErr != nil {
+			glog.Errorf(ctx, "[svcauth.Register] tenant CreateWithRootOrg fail, err:%v, req:%s", tErr, gutil.ToJsonString(req))
+			return tErr
+		}
+		// 3. 建 owner user（注册人自任租户 owner）
+		now := time.Now()
+		insertEntity := &model.UserEntity{
+			TenantID:   tenantEntity.ID,
+			PersonID:   personEntity.ID,
+			Name:       req.Name,
+			Profile:    json.RawMessage(`{}`),
+			CustomData: json.RawMessage(`{}`),
+			IsOwner:    true,
+			JoinedAt:   &now,
+			CreatedBy:  personEntity.ID,
+		}
+		if uErr := dao.NewUserDao().WithTx(tx).Insert(ctx.Request.Context(), insertEntity); uErr != nil {
+			glog.Errorf(ctx, "[svcauth.Register] user Insert fail, err:%v, req:%s", uErr, gutil.ToJsonString(req))
+			return uErr
+		}
+		ownerUserID = insertEntity.ID
+		return nil
 	})
 	if txErr != nil {
 		if errors.Is(txErr, gorm.ErrDuplicatedKey) {
 			// 并发竞态：唯一键冲突，回查确定撞的是哪个标识
-			return nil, svc.resolveRegisterConflict(ctx, personDao, req)
+			return nil, svcResolveRegisterConflict(ctx, req)
 		}
 		glog.Errorf(ctx, "[svcauth.Register] transaction fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))
-		return nil, code.GetError(code.UserCreateError)
+		return nil, code.GetError(code.AuthRegisterFailedError)
 	}
 
+	// 注册即登录：建 SSO 会话（subject=personID，默认租户=新租户），复用 svcoidc 会话语义。
+	// SSO 会话依赖 Redis，注册主流程不应因会话基础设施异常而失败，故用 recover 兜底。
+	sessionID := safeCreateSSOSession(ctx, personEntity.ID, tenantEntity.ID)
+
+	audit.WriteAudit(ctx, audit.AuditEntry{
+		Action:     audit.ActionTenantCreate,
+		TenantID:   tenantEntity.ID,
+		Result:     "success",
+		TargetType: "tenant",
+		TargetID:   tenantEntity.ID,
+	})
+
 	return &dtoauth.RegisterResp{
-		UserID: insertEntity.ID,
+		UserID:   ownerUserID,
+		TenantID: tenantEntity.ID,
+		SessionID: sessionID,
 	}, nil
 }
 
-// resolveRegisterConflict 唯一键冲突时回查哪个标识已存在，返回对应错误码。
-func (svc *authSvc) resolveRegisterConflict(ctx *gin.Context, personDao authPersonStore, req *dtoauth.RegisterReq) error {
+// svcResolveRegisterConflict 唯一键冲突时回查哪个标识已存在，返回对应错误码。
+func svcResolveRegisterConflict(ctx *gin.Context, req *dtoauth.RegisterReq) error {
+	personDao := dao.NewPersonDao()
 	if req.Username != "" {
 		if p, qErr := personDao.GetByCond(ctx.Request.Context(), &dao.PersonCond{Username: req.Username}); qErr == nil && p != nil && p.ID != "" {
 			return code.GetError(code.UsernameAlreadyExistsError)
@@ -307,28 +307,36 @@ func (svc *authSvc) resolveRegisterConflict(ctx *gin.Context, personDao authPers
 			return code.GetError(code.PhoneAlreadyExistsError)
 		}
 	}
-	return code.GetError(code.UsernameAlreadyExistsError)
+	return code.GetError(code.AuthRegisterFailedError)
 }
 
 func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*dtoauth.JoinTenantResp, error) {
+	// 通道 B：凭邀请加入已有租户（非 owner）。
+	// 落哪个租户由邀请码决定（租户侧授权，禁止裸 tenantID 直入）。
 	personID := gincontext.GetPersonIDString(ctx)
 	if personID == "" {
 		return nil, code.GetError(gconstant.UnauthorizedErr)
 	}
+	if req.InviteCode == "" {
+		return nil, code.GetError(code.AuthJoinNotAllowedError)
+	}
 
-	tenantDao := newAuthTenantStore()
-	userDao := newAuthUserStore()
-
-	tenantEntity, err := tenantDao.GetByID(ctx.Request.Context(), req.TenantID)
+	// 1. 解析邀请
+	inviteEntity, err := dao.NewInviteDao().GetByCond(ctx.Request.Context(), &dao.InviteCond{Code: req.InviteCode})
 	if err != nil {
-		glog.Errorf(ctx, "[svcauth.JoinTenant] tenant dao GetByID fail, err:%v, tenantID:%s", err, req.TenantID)
-		return nil, code.GetError(code.TenantGetDetailError)
+		glog.Errorf(ctx, "[svcauth.JoinTenant] invite dao GetByCond fail, err:%v, code:%s", err, req.InviteCode)
+		return nil, code.GetError(code.InviteGetDetailError)
 	}
-	if tenantEntity == nil || tenantEntity.ID == "" {
-		return nil, code.GetError(code.TenantNotExistError)
+	if inviteEntity == nil || inviteEntity.ID == "" || inviteEntity.Status != model.InviteStatusPending {
+		return nil, code.GetError(code.InviteInvalidError)
 	}
+	if inviteEntity.ExpiresAt != nil && time.Now().After(*inviteEntity.ExpiresAt) {
+		return nil, code.GetError(code.InviteExpiredError)
+	}
+	tenantID := inviteEntity.TenantID
 
-	existingUser, err := userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{PersonID: personID, TenantID: req.TenantID})
+	userDao := newAuthUserStore()
+	existingUser, err := userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{PersonID: personID, TenantID: tenantID})
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.JoinTenant] user dao GetByCond fail, err:%v", err)
 		return nil, code.GetError(code.UserGetDetailError)
@@ -337,22 +345,40 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 		return nil, code.GetError(code.AlreadyJoinedError)
 	}
 
-	now := time.Now()
-	userEntity := &model.UserEntity{
-		TenantID:  req.TenantID,
-		PersonID:  personID,
-		Name:      "",
-		IsOwner:   false,
-		JoinedAt:  &now,
-		CreatedBy: "",
-	}
-	if err := userDao.Insert(ctx.Request.Context(), userEntity); err != nil {
-		glog.Errorf(ctx, "[svcauth.JoinTenant] user dao Insert fail, err:%v", err)
+	// 2. 建成员 user（非 owner）+ 标记邀请已用
+	var userID string
+	txErr := dbclient.IamDB(ctx.Request.Context()).Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		userEntity := &model.UserEntity{
+			TenantID:   tenantID,
+			PersonID:   personID,
+			Name:       "",
+			Profile:    json.RawMessage(`{}`),
+			CustomData: json.RawMessage(`{}`),
+			IsOwner:    false,
+			JoinedAt:   &now,
+			CreatedBy:  personID,
+		}
+		if uErr := dao.NewUserDao().WithTx(tx).Insert(ctx.Request.Context(), userEntity); uErr != nil {
+			return uErr
+		}
+		userID = userEntity.ID
+		// 标记邀请已使用
+		if uErr := dao.NewInviteDao().WithTx(tx).UpdateMap(ctx.Request.Context(), inviteEntity.ID, map[string]any{
+			"status":     string(model.InviteStatusAccepted),
+			"updated_by": personID,
+		}); uErr != nil {
+			return uErr
+		}
+		return nil
+	})
+	if txErr != nil {
+		glog.Errorf(ctx, "[svcauth.JoinTenant] transaction fail, err:%v, code:%s", txErr, req.InviteCode)
 		return nil, code.GetError(code.UserCreateError)
 	}
 
 	return &dtoauth.JoinTenantResp{
-		UserID: userEntity.ID,
+		UserID: userID,
 	}, nil
 }
 
@@ -588,6 +614,27 @@ func toAnySlice(ids []string) []any {
 // （8~128 位，含大小写数字；上限防 bcrypt 登录 DoS）。
 func validatePasswordStrength(rawPassword string) error {
 	return password.ValidateStrength(rawPassword)
+}
+
+// safeCreateSSOSession 以 recover 兜底创建 SSO 会话（注册即登录）。
+// SSO 会话依赖 Redis，不应因会话基础设施异常导致注册主流程失败。
+func safeCreateSSOSession(ctx *gin.Context, personID, tenantID string) (sessionID string) {
+	defer func() {
+		if r := recover(); r != nil {
+			glog.Warnf(ctx, "[svcauth.safeCreateSSOSession] panic recovered creating sso session, err:%v", r)
+		}
+	}()
+	ssoStore := sso.NewSSOSessionStore()
+	if ssoStore == nil {
+		return ""
+	}
+	sessCtx := context.WithValue(ctx.Request.Context(), sso.ContextKeyTenantID, tenantID)
+	sid, sErr := ssoStore.CreateSession(sessCtx, personID, []string{"pwd"})
+	if sErr != nil {
+		glog.Warnf(ctx, "[svcauth.Register] create sso session fail, err:%v", sErr)
+		return ""
+	}
+	return sid
 }
 
 // hashIdentifier 对登录标识做摘要（前 16 位 hex），

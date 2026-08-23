@@ -8,9 +8,11 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	appconfig "github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/auth/testutil"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/biz/gcontext"
@@ -125,7 +127,7 @@ func TestLogoutAllRevokesAllRefreshTokensForPerson(t *testing.T) {
 
 func TestRegisterReqBindingAllowsEmailOnlyIdentifier(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
-	body := []byte(`{"tenantID":"1","primaryEmail":"mail@example.com","password":"Password1","name":"tester"}`)
+	body := []byte(`{"tenantName":"租户A","primaryEmail":"mail@example.com","password":"Password1","name":"tester"}`)
 	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("new request: %v", err)
@@ -137,6 +139,9 @@ func TestRegisterReqBindingAllowsEmailOnlyIdentifier(t *testing.T) {
 	if err := ginCtx.ShouldBindJSON(&registerReq); err != nil {
 		t.Fatalf("expected email-only registration request to bind, got error: %v", err)
 	}
+	if registerReq.TenantName != "租户A" {
+		t.Fatalf("expected bound tenant name, got %q", registerReq.TenantName)
+	}
 	if registerReq.Username != "" {
 		t.Fatalf("expected empty username after bind, got %q", registerReq.Username)
 	}
@@ -147,7 +152,7 @@ func TestRegisterReqBindingAllowsEmailOnlyIdentifier(t *testing.T) {
 
 func TestRegisterReqBindingAllowsPhoneOnlyIdentifier(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
-	body := []byte(`{"tenantID":"1","primaryPhone":"13800138000","password":"Password1","name":"tester"}`)
+	body := []byte(`{"tenantName":"租户A","primaryPhone":"13800138000","password":"Password1","name":"tester"}`)
 	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("new request: %v", err)
@@ -171,12 +176,12 @@ func TestRegisterAllowsEmailOnlyIdentifier(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
 
-	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{})
-	seedTestTenant(t, db, "1", "租户A")
+	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{}, &model.OrganizationEntity{})
 
+	enableSelfRegister()
 	svc := &authSvc{}
 	resp, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
-		TenantID:     "1",
+		TenantName:   "租户A",
 		PrimaryEmail: "mail@example.com",
 		Password:     "Password1",
 		Name:         "tester",
@@ -187,12 +192,18 @@ func TestRegisterAllowsEmailOnlyIdentifier(t *testing.T) {
 	if resp == nil || resp.UserID == "" {
 		t.Fatalf("expected created user id, got %#v", resp)
 	}
+	if resp.TenantID == "" {
+		t.Fatalf("expected created tenant id, got %#v", resp)
+	}
 	var user model.UserEntity
 	if err := db.Where("id = ?", resp.UserID).First(&user).Error; err != nil {
 		t.Fatalf("expected user persisted: %v", err)
 	}
-	if user.TenantID != "1" || user.Name != "tester" || user.PersonID == "" {
+	if user.TenantID != resp.TenantID || user.Name != "tester" || user.PersonID == "" {
 		t.Fatalf("unexpected persisted user: %+v", user)
+	}
+	if !user.IsOwner {
+		t.Fatalf("expected register to be tenant owner (channel A), got isOwner=false")
 	}
 	var person model.PersonEntity
 	if err := db.Where("id = ?", user.PersonID).First(&person).Error; err != nil {
@@ -201,18 +212,25 @@ func TestRegisterAllowsEmailOnlyIdentifier(t *testing.T) {
 	if model.DerefStr(person.PrimaryEmail) != "mail@example.com" {
 		t.Fatalf("expected email persisted, got %q", model.DerefStr(person.PrimaryEmail))
 	}
+	var tenant model.TenantEntity
+	if err := db.Where("id = ?", resp.TenantID).First(&tenant).Error; err != nil {
+		t.Fatalf("expected tenant persisted: %v", err)
+	}
+	if tenant.Name != "租户A" {
+		t.Fatalf("expected tenant name persisted, got %q", tenant.Name)
+	}
 }
 
 func TestRegisterAllowsPhoneOnlyIdentifier(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
 
-	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{})
-	seedTestTenant(t, db, "1", "租户A")
+	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{}, &model.OrganizationEntity{})
 
+	enableSelfRegister()
 	svc := &authSvc{}
 	resp, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
-		TenantID:     "1",
+		TenantName:   "租户A",
 		PrimaryPhone: "13800138000",
 		Password:     "Password1",
 		Name:         "tester",
@@ -227,40 +245,60 @@ func TestRegisterAllowsPhoneOnlyIdentifier(t *testing.T) {
 	if err := db.Where("id = ?", resp.UserID).First(&user).Error; err != nil {
 		t.Fatalf("expected user persisted: %v", err)
 	}
-	if user.TenantID != "1" || user.Name != "tester" {
+	if user.Name != "tester" || !user.IsOwner {
 		t.Fatalf("unexpected persisted user: %+v", user)
 	}
 }
 
-func TestRegisterRejectsNonExistentTenant(t *testing.T) {
+func TestRegisterCreatesNewTenantAndOwner(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
 
-	testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{})
+	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{}, &model.OrganizationEntity{})
 
+	enableSelfRegister()
 	svc := &authSvc{}
-	_, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
-		TenantID: "999",
-		Username: "new-user",
-		Password: "Password1",
-		Name:     "tester",
+	resp, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
+		TenantName: "my-org",
+		Username:   "new-user",
+		Password:   "Password1",
+		Name:       "tester",
 	})
-	assertCode(t, err, code.TenantNotExistError)
+	if err != nil {
+		t.Fatalf("Register returned error: %v", err)
+	}
+	if resp == nil || resp.TenantID == "" {
+		t.Fatalf("expected new tenant id, got %#v", resp)
+	}
+	var user model.UserEntity
+	if err := db.Where("id = ?", resp.UserID).First(&user).Error; err != nil {
+		t.Fatalf("expected user persisted: %v", err)
+	}
+	if user.TenantID != resp.TenantID || !user.IsOwner {
+		t.Fatalf("expected user to be owner of the new tenant, got user: %+v", user)
+	}
+	var orgCount int64
+	if err := db.Model(&model.OrganizationEntity{}).Where("tenant_id = ?", resp.TenantID).Count(&orgCount).Error; err != nil {
+		t.Fatalf("count org: %v", err)
+	}
+	if orgCount != 1 {
+		t.Fatalf("expected 1 root org created for new tenant, got %d", orgCount)
+	}
 }
 
 func TestRegisterSetsUserJoinedAt(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
 
-	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{})
-	seedTestTenant(t, db, "1", "租户A")
+	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{}, &model.OrganizationEntity{})
 
+	enableSelfRegister()
 	svc := &authSvc{}
 	resp, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
-		TenantID: "1",
-		Username: "new-user",
-		Password: "Password1",
-		Name:     "tester",
+		TenantName: "租户A",
+		Username:   "new-user",
+		Password:   "Password1",
+		Name:       "tester",
 	})
 	if err != nil {
 		t.Fatalf("Register returned error: %v", err)
@@ -272,9 +310,9 @@ func TestRegisterSetsUserJoinedAt(t *testing.T) {
 	if err := db.Where("id = ?", resp.UserID).First(&user).Error; err != nil {
 		t.Fatalf("expected user persisted: %v", err)
 	}
-	// H2：开放注册加入已有租户不授予 owner（owner 由租户创建/管理员授予）
-	if user.IsOwner {
-		t.Fatalf("expected register user NOT to be owner (H2), got isOwner=true")
+	// 通道 A：自助开通租户的用户即 owner
+	if !user.IsOwner {
+		t.Fatalf("expected register user to be owner (channel A), got isOwner=false")
 	}
 	if user.JoinedAt == nil {
 		t.Fatal("expected register user to have joined_at set")
@@ -292,23 +330,41 @@ func TestRegisterRequiresAtLeastOneIdentifier(t *testing.T) {
 
 	svc := &authSvc{}
 	_, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
-		TenantID: "1",
-		Password: "Password1",
-		Name:     "tester",
+		TenantName: "租户A",
+		Password:   "Password1",
+		Name:       "tester",
 	})
 	assertCode(t, err, code.AuthIdentifierRequiredError)
+}
+
+func TestRegisterRejectsWhenSelfRegisterDisabled(t *testing.T) {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = httptestRequest(t)
+
+	restoreConf := appconfig.Conf
+	appconfig.Conf = &config.Config{SelfRegister: config.SelfRegistrationConfig{Enabled: false}}
+	defer func() { appconfig.Conf = restoreConf }()
+
+	svc := &authSvc{}
+	_, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
+		TenantName:   "租户A",
+		PrimaryEmail: "mail@example.com",
+		Password:     "Password1",
+		Name:         "tester",
+	})
+	assertCode(t, err, code.AuthTenantRegisterNotAllowedError)
 }
 
 func TestRegisterCreatesPersonAccount(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
 
-	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{})
-	seedTestTenant(t, db, "1", "租户A")
+	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{}, &model.OrganizationEntity{})
 
+	enableSelfRegister()
 	svc := &authSvc{}
 	resp, err := svc.Register(ginCtx, &dtoauth.RegisterReq{
-		TenantID:     "1",
+		TenantName:   "租户A",
 		Username:     "person-user",
 		PrimaryEmail: "mail@example.com",
 		Password:     "Password1",
@@ -388,6 +444,13 @@ func swapTenantStoreFactory(factory func() authTenantStore) func() {
 	newAuthTenantStore = factory
 	return func() {
 		newAuthTenantStore = prev
+	}
+}
+
+// enableSelfRegister 打开通道 A 全局开关，使自助开通租户测试可通过。
+func enableSelfRegister() {
+	appconfig.Conf = &config.Config{
+		SelfRegister: config.SelfRegistrationConfig{Enabled: true},
 	}
 }
 

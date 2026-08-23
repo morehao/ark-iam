@@ -20,7 +20,7 @@ import (
 // 替代原先依赖真实数据库与种子数据的集成测试。
 func setupIntegrationDB(t *testing.T) {
 	t.Helper()
-	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{})
+	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{}, &model.OrganizationEntity{})
 	now := time.Now()
 	seedTenant := &model.TenantEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
@@ -55,19 +55,16 @@ func setupIntegrationDB(t *testing.T) {
 
 func TestRegisterCreatesPersonAndUser(t *testing.T) {
 	setupIntegrationDB(t)
+	enableSelfRegister()
 
 	ctx := testsetup.NewCtx(testutil.WithIamContext("1"))
-
-	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
-	require.NoError(t, err)
-	defer func() { _ = testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{TenantIDs: []string{tenant.ID}}) }()
 
 	username := testsetup.UniqueName("register")
 	email := testsetup.UniqueName("reg") + "@example.com"
 	phone := testsetup.UniqueName("regphone")
 	svc := NewAuthSvc()
 	resp, err := svc.Register(ctx, &dtoauth.RegisterReq{
-		TenantID:     tenant.ID,
+		TenantName:   testsetup.UniqueName("reg-tenant"),
 		Username:     username,
 		PrimaryEmail: email,
 		PrimaryPhone: phone,
@@ -77,6 +74,7 @@ func TestRegisterCreatesPersonAndUser(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	require.NotZero(t, resp.UserID)
+	require.NotZero(t, resp.TenantID)
 
 	db := dbclient.IamDB(ctx)
 	var person model.PersonEntity
@@ -85,10 +83,18 @@ func TestRegisterCreatesPersonAndUser(t *testing.T) {
 	assert.Equal(t, username, model.DerefStr(person.Username))
 	assert.True(t, testsetup.PasswordMatches(person.PasswordEncrypted, "Password1"))
 
+	var user model.UserEntity
+	err = db.Where("id = ?", resp.UserID).First(&user).Error
+	require.NoError(t, err)
+	assert.Equal(t, resp.TenantID, user.TenantID)
+	// 通道 A：自助开通租户的用户即 owner
+	assert.True(t, user.IsOwner)
+
 	defer func() {
 		_ = testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{
 			PersonIDs: []string{person.ID},
 			UserIDs:   []string{resp.UserID},
+			TenantIDs: []string{resp.TenantID},
 		})
 	}()
 }

@@ -166,7 +166,7 @@ func (ctr *connectorCtr) GetFactoryList(ctx *gin.Context) {
 // @accept application/json
 // @Produce application/json
 // @Param connectorID path string true "连接器ID"
-// @Success 200 {object} gincontext.DtoRender{data=dtoconnector.TestConnectorResp}
+// @Success 200 {object} gincontext.DtoRender{data=dtoconnector.ConnectorTestResp}
 // @Router /v1/auth/connectors/{connectorID}/test [post]
 func (ctr *connectorCtr) TestConnector(ctx *gin.Context) {
 	var req dtoconnector.ConnectorIDReq

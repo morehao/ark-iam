@@ -15,7 +15,9 @@ type MyTenantsResp struct {
 }
 
 type RegisterResp struct {
-	UserID string `json:"userID"` // 用户ID
+	UserID    string `json:"userID"`    // 用户ID
+	TenantID  string `json:"tenantID"`  // 新开通的租户ID
+	SessionID string `json:"sessionID"` // 注册即登录的 SSO 会话ID（可能为空）
 }
 
 type UserinfoResp struct {

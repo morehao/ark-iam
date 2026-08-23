@@ -17,19 +17,23 @@ type LogoutReq struct {
 type LogoutAllReq struct {
 }
 
+// JoinTenantReq 加入已有租户请求。落哪个租户不由用户指定，而是通过
+// inviteCode（邀请码）或应用定向的默认租户决定，禁止裸 tenantID 直入。
 type JoinTenantReq struct {
-	TenantID string `json:"tenantID" binding:"required"` // 租户ID
+	InviteCode string `json:"inviteCode,omitempty"` // 邀请码（主门禁）
 }
 
-// RegisterReq 注册请求。Username/PrimaryEmail/PrimaryPhone 至少提供一个；
+// RegisterReq 自助开通租户请求（通道 A）。注册人自任租户 owner。
+// Username/PrimaryEmail/PrimaryPhone 至少提供一个；TenantName 必填。
 // 字段长度上限与全局标识一致（防超长字符串入库）。
 type RegisterReq struct {
-	TenantID     string `json:"tenantID" binding:"required"`         // 租户ID
-	Username     string `json:"username" binding:"max=128"`          // 用户名
-	PrimaryEmail string `json:"primaryEmail" binding:"max=128"`      // 主要邮箱
-	PrimaryPhone string `json:"primaryPhone" binding:"max=32"`       // 主要手机号
-	Password     string `json:"password" binding:"required,max=128"` // 密码
-	Name         string `json:"name" binding:"max=128"`              // 姓名
+	TenantName   string `json:"tenantName" binding:"required,max=128"` // 租户名
+	TenantCode   string `json:"tenantCode" binding:"max=64"`           // 租户编码（可选，空则自动生成）
+	Username     string `json:"username" binding:"max=128"`            // 用户名
+	PrimaryEmail string `json:"primaryEmail" binding:"max=128"`        // 主要邮箱
+	PrimaryPhone string `json:"primaryPhone" binding:"max=32"`         // 主要手机号
+	Password     string `json:"password" binding:"required,max=128"`   // 密码
+	Name         string `json:"name" binding:"max=128"`                // 姓名
 }
 
 type UserinfoReq struct {

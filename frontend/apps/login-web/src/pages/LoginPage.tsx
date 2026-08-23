@@ -1,4 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { oidcLogin, oidcSelectTenant } from '../api'
 import '../LoginPage.css'
 
@@ -110,36 +111,44 @@ export default function LoginPage() {
               </ul>
             </div>
           ) : authRequestID ? (
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label htmlFor="identifier">用户名 / 邮箱 / 手机号</label>
-                <input
-                  id="identifier"
-                  type="text"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="请输入用户名"
-                  autoFocus
-                  autoComplete="username"
-                />
-              </div>
+            <>
+              <form onSubmit={handleSubmit}>
+                <div className="form-group">
+                  <label htmlFor="identifier">用户名 / 邮箱 / 手机号</label>
+                  <input
+                    id="identifier"
+                    type="text"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="请输入用户名"
+                    autoFocus
+                    autoComplete="username"
+                  />
+                </div>
 
-              <div className="form-group">
-                <label htmlFor="password">密码</label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="请输入密码"
-                  autoComplete="current-password"
-                />
-              </div>
+                <div className="form-group">
+                  <label htmlFor="password">密码</label>
+                  <input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="请输入密码"
+                    autoComplete="current-password"
+                  />
+                </div>
 
-              <button type="submit" className="login-btn" disabled={loading}>
-                {loading ? '登录中...' : '登录'}
-              </button>
-            </form>
+                <button type="submit" className="login-btn" disabled={loading}>
+                  {loading ? '登录中...' : '登录'}
+                </button>
+              </form>
+
+              <p style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: '#8b93a7' }}>
+                没有账号？<Link to="/register/org" style={{ color: '#4f6ef7', textDecoration: 'none' }}>开通新租户</Link>
+                <span style={{ margin: '0 8px' }}>·</span>
+                <Link to="/join" style={{ color: '#4f6ef7', textDecoration: 'none' }}>凭邀请加入</Link>
+              </p>
+            </>
           ) : (
             <div className="error-msg">认证请求无效，请重新发起登录</div>
           )}

@@ -3,9 +3,17 @@ package code
 import "github.com/morehao/golib/gerror"
 
 const (
-	AuthIdentifierRequiredError = 110010
-	AuthLoginFailedError        = 110011
-	AuthRegisterFailedError     = 110012
+	AuthIdentifierRequiredError    = 110010
+	AuthLoginFailedError           = 110011
+	AuthRegisterFailedError        = 110012
+	AuthJoinNotAllowedError        = 110013
+	AuthTenantRegisterNotAllowedError = 110014
+	InviteGetDetailError           = 110030
+	InviteInvalidError             = 110031
+	InviteExpiredError             = 110032
+	InviteCreateError              = 110033
+	InviteRevokeError              = 110034
+	InviteGetPageListError         = 110035
 )
 
 const (
@@ -42,9 +50,17 @@ const (
 )
 
 var authErrorMsgMap = gerror.CodeMsgMap{
-	AuthIdentifierRequiredError: "用户标识不能为空",
-	AuthLoginFailedError:        "登录失败",
-	AuthRegisterFailedError:     "注册失败",
+	AuthIdentifierRequiredError:       "用户标识不能为空",
+	AuthLoginFailedError:              "登录失败",
+	AuthRegisterFailedError:           "注册失败",
+	AuthJoinNotAllowedError:           "无权加入该租户",
+	AuthTenantRegisterNotAllowedError: "当前未开放自助开通租户",
+	InviteGetDetailError:              "获取邀请信息失败",
+	InviteInvalidError:                "邀请码无效",
+	InviteExpiredError:                "邀请码已过期",
+	InviteCreateError:                 "创建邀请失败",
+	InviteRevokeError:                 "撤销邀请失败",
+	InviteGetPageListError:            "获取邀请列表失败",
 }
 
 var userAuthErrorMsgMap = gerror.CodeMsgMap{

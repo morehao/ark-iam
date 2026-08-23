@@ -25,7 +25,17 @@ type Config struct {
 	OIDC        OIDC                      `yaml:"oidc"`
 	Password    PasswordConfig            `yaml:"password"`
 	Security    SecurityConfig            `yaml:"security"`
+	SelfRegister SelfRegistrationConfig   `yaml:"selfRegister"`
 	MasterKey   string                    `yaml:"masterKey"`
+}
+
+// SelfRegistrationConfig 自助开通租户（通道 A）的全局开关配置。
+// AllowPersonCreateTenant 策略字段是 per-application 的；open-registration
+// 端点（POST /v1/auth/register）无应用上下文，需全局开关兜底（对标 zitadel
+// DisallowPublicOrgRegistration，默认生产关闭避免批量刷租户）。
+type SelfRegistrationConfig struct {
+	// Enabled 是否开放终端用户自助开通租户。false 时通道 A 返回 AuthTenantRegisterNotAllowedError。
+	Enabled bool `yaml:"enabled"`
 }
 
 type SecurityConfig struct {

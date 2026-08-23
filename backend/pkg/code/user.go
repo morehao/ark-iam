@@ -13,6 +13,7 @@ const (
 	UserAlreadyInTenantError      = 100516 // 自然人已在本租户内
 	UserResetPasswordError        = 100517 // 重置密码失败
 	UserContactRequiredError      = 100521 // 邮箱或手机号至少填写一个
+	UserOwnerUpdateError          = 100522 // 指派/取消租户拥有者失败
 )
 
 const (
@@ -50,6 +51,7 @@ var userErrorMsgMap = gerror.CodeMsgMap{
 	UserAlreadyInTenantError:              "该用户已在本租户内",
 	UserResetPasswordError:                "重置密码失败",
 	UserContactRequiredError:              "邮箱或手机号至少填写一个",
+	UserOwnerUpdateError:                  "设置租户拥有者失败",
 	UserIdentityCreateError:               "创建用户身份失败",
 	UserIdentityDeleteError:               "删除用户身份失败",
 	UserIdentityUpdateError:               "修改用户身份失败",

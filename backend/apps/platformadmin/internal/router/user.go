@@ -15,6 +15,7 @@ func userRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.GET("/users", userCtr.PageList)
 	v1RouterGroup.GET("/users/:userID", userCtr.Detail)
 	v1RouterGroup.PATCH("/users/:userID", userCtr.UpdateStatus)
+	v1RouterGroup.PUT("/users/:userID/owner", userCtr.UpdateOwner)
 	v1RouterGroup.POST("/users/:userID/changePassword", userCtr.UpdatePassword)
 
 	// 用户身份（用户视角子资源）
