@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	appconfig "github.com/morehao/ark-iam/auth/config"
@@ -178,5 +179,45 @@ func TestRegisterPersonReuseExistingPersonKeepPassword(t *testing.T) {
 	}
 	if after.PasswordEncrypted != "keep-me" {
 		t.Fatalf("expected password NOT overwritten, got %q", after.PasswordEncrypted)
+	}
+}
+
+func TestCreateTenantSucceedsForZeroTenantPerson(t *testing.T) {
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
+	appconfig.Conf = &pkgconfig.Config{OIDC: pkgconfig.OIDC{Issuer: "http://localhost:8099/oidc", AllowInsecure: true}}
+	provider, err := SetupOIDCProvider()
+	if err != nil {
+		t.Fatalf("SetupOIDCProvider: %v", err)
+	}
+	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", policy: `{"allowPersonCreateTenant":true}`}})
+	p := &model.PersonEntity{Username: model.StrPtr("bob"), Name: "Bob", Profile: json.RawMessage(`{}`), CustomData: json.RawMessage(`{}`)}
+	if err := db.Create(p).Error; err != nil {
+		t.Fatalf("create person: %v", err)
+	}
+	authReq := newAuthReq(t, provider, "cid-1")
+	if err := provider.Storage.CompleteAuthRequest(t.Context(), authReq.GetID(), oidcop.BuildSubject(p.ID), time.Now(), []string{"pwd"}, "", "", false); err != nil {
+		t.Fatalf("bind person: %v", err)
+	}
+
+	svc := registerSvc(provider, db, func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+		return nil, nil // 零租户
+	})
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/createTenant", nil)
+	res, err := svc.CreateTenant(ginCtx, &dtooidc.CreateTenantReq{AuthRequestID: authReq.GetID(), TenantName: "Acme", TenantCode: "acme"})
+	if err != nil {
+		t.Fatalf("CreateTenant failed: %v", err)
+	}
+	if res.TenantID == "" || res.PersonID != p.ID {
+		t.Fatalf("unexpected resp: %#v", res)
+	}
+	tenants, tErr := dao.NewTenantDao().GetListByCond(t.Context(), &dao.TenantCond{})
+	if tErr != nil || len(tenants) == 0 {
+		t.Fatalf("expected tenant persisted, err:%v", tErr)
+	}
+	users, uErr := dao.NewUserDao().GetListByCond(t.Context(), &dao.UserCond{PersonID: p.ID, TenantID: res.TenantID})
+	if uErr != nil || len(users) == 0 || !users[0].IsOwner {
+		t.Fatalf("expected owner user, got users:%#v err:%v", users, uErr)
 	}
 }

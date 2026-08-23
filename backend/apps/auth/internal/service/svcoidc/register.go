@@ -1,10 +1,14 @@
 package svcoidc
 
 import (
+	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/pkg/code"
@@ -13,9 +17,12 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/password"
 	"github.com/morehao/ark-iam/pkg/iam/person"
+	"github.com/morehao/ark-iam/pkg/iam/tenant"
+
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
+
 	"gorm.io/gorm"
 )
 
@@ -115,7 +122,78 @@ func svcResolvePersonConflict(ctx *gin.Context, req *dtooidc.RegisterPersonReq) 
 	return code.GetError(code.AuthRegisterFailedError)
 }
 
-// CreateTenant 完整实现在 Task4；此处为满足接口编译的最小骨架。
+// CreateTenant 为 OIDC 流程内已注册、零租户且应用允许的 person 开通租户并自任 owner。
+// 仅建 person+tenant+owner 成员；认证收尾（complete + 发 code + SSO 会话）由前端调 selectTenant 完成。
 func (svc *oidcAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenantReq) (*dtooidc.CreateTenantResp, error) {
-	return nil, code.GetError(code.AuthRegisterFailedError)
+	authReq, err := svc.provider.Storage.AuthRequestByID(ctx.Request.Context(), req.AuthRequestID)
+	if err != nil {
+		return nil, mapAuthRequestError(err)
+	}
+	if authReq.Done() {
+		return nil, code.GetError(code.OIDCSessionNotFound)
+	}
+	personID, perr := oidcop.ParseSubject(authReq.GetSubject())
+	if perr != nil {
+		return nil, code.GetError(code.OIDCSessionNotFound)
+	}
+	clientID := clientIDFromAuthRequest(authReq)
+	if !svc.appAllowsPersonCreateTenant(ctx, clientID) {
+		glog.Warnf(ctx, "[oidcAuthSvc.CreateTenant] app disallows tenant create, clientID:%s, req:%s", clientID, gutil.ToJsonString(req))
+		return nil, code.GetError(code.AuthTenantRegisterNotAllowedError)
+	}
+	tenants, tErr := svc.authSvc.TenantsForPerson(ctx, personID)
+	if tErr != nil {
+		glog.Errorf(ctx, "[oidcAuthSvc.CreateTenant] TenantsForPerson fail, err:%v", tErr)
+		return nil, code.GetError(code.AuthRegisterFailedError)
+	}
+	if len(tenants) > 0 {
+		return nil, code.GetError(code.AlreadyJoinedError)
+	}
+
+	tenantCode := strings.TrimSpace(req.TenantCode)
+	if tenantCode == "" {
+		tenantCode = "tenant-" + uuid.NewString()
+	}
+
+	var tenantEntity *model.TenantEntity
+	txErr := dbclient.IamDB(ctx.Request.Context()).Transaction(func(tx *gorm.DB) error {
+		var tErr error
+		tenantEntity, tErr = tenant.CreateWithRootOrg(ctx.Request.Context(), tx, &tenant.CreateWithRootOrgReq{
+			Code:      tenantCode,
+			Name:      req.TenantName,
+			Type:      model.TenantTypeCustomer,
+			CreatedBy: personID,
+		})
+		if tErr != nil {
+			return tErr
+		}
+		now := time.Now()
+		owner := &model.UserEntity{
+			TenantID:   tenantEntity.ID,
+			PersonID:   personID,
+			Name:       "",
+			Profile:    json.RawMessage(`{}`),
+			CustomData: json.RawMessage(`{}`),
+			IsOwner:    true,
+			JoinedAt:   &now,
+			CreatedBy:  personID,
+		}
+		if uErr := dao.NewUserDao().WithTx(tx).Insert(ctx.Request.Context(), owner); uErr != nil {
+			return uErr
+		}
+		return nil
+	})
+	if txErr != nil {
+		if errors.Is(txErr, gorm.ErrDuplicatedKey) {
+			glog.Warnf(ctx, "[oidcAuthSvc.CreateTenant] tenant code duplicate, req:%s", gutil.ToJsonString(req))
+			return nil, code.GetError(code.AuthRegisterFailedError)
+		}
+		glog.Errorf(ctx, "[oidcAuthSvc.CreateTenant] transaction fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))
+		return nil, code.GetError(code.AuthRegisterFailedError)
+	}
+
+	return &dtooidc.CreateTenantResp{
+		TenantID: tenantEntity.ID,
+		PersonID: personID,
+	}, nil
 }
