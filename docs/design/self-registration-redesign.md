@@ -1,6 +1,8 @@
 # GoArk 自助注册重设计 · 实现计划
 
 > 状态：**已全部实施 S1-S10**（后端通道A/B、Invite、owner指派、注册即登录、全局开关 + 前端 login-web 注册/加入表单）· 参考主流多租户 IAM（keycloak/zitadel/logto/casdoor）源码模式 + GoArk 现状
+>
+> **2026-08-23 演进**：通道A（`/v1/auth/register`）与全局 `SelfRegister` 开关已移除，注册收口到 OIDC 流程（`/oidc/registerPerson` + `/oidc/createTenant`），按应用 `TenantPolicy.AllowPersonCreateTenant` 判定；person 注册与创建/选择租户拆分，认证收尾复用 `POST /oidc/login/selectTenant`。详见 `docs/superpowers/specs/2026-08-23-register-to-oidc-design.md`。
 
 ---
 
