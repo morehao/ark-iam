@@ -1,10 +1,7 @@
 package svcapplication
 
 import (
-	"encoding/json"
-
 	"github.com/gin-gonic/gin"
-	"gorm.io/datatypes"
 
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
@@ -29,29 +26,23 @@ type applicationSvc struct{}
 
 var _ ApplicationSvc = (*applicationSvc)(nil)
 
-func defaultTenantPolicy(raw json.RawMessage) datatypes.JSON {
-	if len(raw) == 0 {
-		return datatypes.JSON("{}")
-	}
-	return datatypes.JSON(raw)
-}
-
 func NewApplicationSvc() ApplicationSvc {
 	return &applicationSvc{}
 }
 
 func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.ApplicationCreateReq) (*dtoapplication.ApplicationCreateResp, error) {
 	entity := &model.ApplicationEntity{
-		Code:         req.Code,
-		Name:         req.Name,
-		Description:  req.Description,
-		LogoURL:      req.LogoURL,
-		HomepageURL:  req.HomepageURL,
-		Type:         req.Type,
-		Visibility:   req.Visibility,
-		TenantPolicy: defaultTenantPolicy(req.TenantPolicy),
-		Sort:         req.Sort,
-		CreatedBy:    gincontext.GetUserIDString(ctx),
+		Code:                    req.Code,
+		Name:                    req.Name,
+		Description:             req.Description,
+		LogoURL:                 req.LogoURL,
+		HomepageURL:             req.HomepageURL,
+		Type:                    req.Type,
+		Visibility:              req.Visibility,
+		AllowPersonCreateTenant: req.AllowPersonCreateTenant,
+		AllowJoinByInvite:       req.AllowJoinByInvite,
+		Sort:                    req.Sort,
+		CreatedBy:               gincontext.GetUserIDString(ctx),
 	}
 	if err := dao.NewApplicationDao().Insert(ctx, entity); err != nil {
 		glog.Errorf(ctx, "[svcapplication.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -82,8 +73,11 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.Applicat
 		"sort":         req.Sort,
 		"updated_by":   gincontext.GetUserIDString(ctx),
 	}
-	if len(req.TenantPolicy) > 0 {
-		updateMap["tenant_policy"] = datatypes.JSON(req.TenantPolicy)
+	if req.AllowPersonCreateTenant != nil {
+		updateMap["allow_person_create_tenant"] = *req.AllowPersonCreateTenant
+	}
+	if req.AllowJoinByInvite != nil {
+		updateMap["allow_join_by_invite"] = *req.AllowJoinByInvite
 	}
 	if err := dao.NewApplicationDao().UpdateMap(ctx, req.AppID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcapplication.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -116,18 +110,19 @@ func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.Applicat
 		return nil, code.GetError(code.ApplicationGetDetailError)
 	}
 	return &dtoapplication.ApplicationDetailResp{
-		AppID:        entity.ID,
-		Code:         entity.Code,
-		Name:         entity.Name,
-		Description:  entity.Description,
-		LogoURL:      entity.LogoURL,
-		HomepageURL:  entity.HomepageURL,
-		Type:         entity.Type,
-		Status:       entity.Status,
-		Visibility:   entity.Visibility,
-		Sort:         entity.Sort,
-		TenantPolicy: json.RawMessage(entity.TenantPolicy),
-		CreatedAt:    entity.CreatedAt.Unix(),
+		AppID:                   entity.ID,
+		Code:                    entity.Code,
+		Name:                    entity.Name,
+		Description:             entity.Description,
+		LogoURL:                 entity.LogoURL,
+		HomepageURL:             entity.HomepageURL,
+		Type:                    entity.Type,
+		Status:                  entity.Status,
+		Visibility:              entity.Visibility,
+		Sort:                    entity.Sort,
+		AllowPersonCreateTenant: entity.AllowPersonCreateTenant,
+		AllowJoinByInvite:       entity.AllowJoinByInvite,
+		CreatedAt:               entity.CreatedAt.Unix(),
 	}, nil
 }
 
@@ -149,16 +144,17 @@ func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.Applic
 	items := make([]dtoapplication.PageListItem, 0, len(list))
 	for _, v := range list {
 		items = append(items, dtoapplication.PageListItem{
-			AppID:        v.ID,
-			Code:         v.Code,
-			Name:         v.Name,
-			Description:  v.Description,
-			Type:         v.Type,
-			Status:       v.Status,
-			Visibility:   v.Visibility,
-			Sort:         v.Sort,
-			TenantPolicy: json.RawMessage(v.TenantPolicy),
-			CreatedAt:    v.CreatedAt.Unix(),
+			AppID:                   v.ID,
+			Code:                    v.Code,
+			Name:                    v.Name,
+			Description:             v.Description,
+			Type:                    v.Type,
+			Status:                  v.Status,
+			Visibility:              v.Visibility,
+			Sort:                    v.Sort,
+			AllowPersonCreateTenant: v.AllowPersonCreateTenant,
+			AllowJoinByInvite:       v.AllowJoinByInvite,
+			CreatedAt:               v.CreatedAt.Unix(),
 		})
 	}
 	return &dtoapplication.ApplicationPageListResp{List: items, Total: total}, nil

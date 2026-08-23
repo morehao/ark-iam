@@ -124,6 +124,28 @@ func (ctr *OIDCCtr) CreateTenant(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// LoginConfig 登录页前置策略查询：由 authRequestID 反查应用是否允许自助注册。
+// @Tags OIDC
+// @Summary 登录页前置策略查询
+// @accept application/json
+// @Produce application/json
+// @Param req body dtooidc.OIDCLoginConfigReq true "登录页策略查询请求"
+// @Success 200 {object} gincontext.DtoRender{data=dtooidc.OIDCLoginConfigResp}
+// @Router /oidc/login-config [post]
+func (ctr *OIDCCtr) LoginConfig(ctx *gin.Context) {
+	var req dtooidc.OIDCLoginConfigReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.oidcAuthSvc.LoginConfig(ctx, req.AuthRequestID)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
 // setSSOSessionCookie 写 SSO 会话 cookie，Secure/SameSite 由配置决定（L2）：
 // 生产（HTTPS）应 cookieSecure=true；跨站场景 sameSite=none 且必须配合 Secure。
 func setSSOSessionCookie(ctx *gin.Context, sessionID string) {

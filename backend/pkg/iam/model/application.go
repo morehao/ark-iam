@@ -2,7 +2,6 @@ package model
 
 import (
 	"github.com/morehao/golib/dbaccess/gormdao"
-	"gorm.io/datatypes"
 )
 
 const TableNameApplication = "application"
@@ -22,16 +21,12 @@ const (
 	VisibilityPrivate = "private"
 )
 
-type TenantPolicy struct {
-	AllowPersonCreateTenant *bool `json:"allowPersonCreateTenant,omitempty"`
-	AllowJoinByInvite       *bool `json:"allowJoinByInvite,omitempty"`
-}
-
 type ApplicationEntity struct {
 	gormdao.BaseEntity
-	Code         string         `gorm:"column:code;type:varchar(64);not null;default:'';uniqueIndex;comment:应用编码" json:"code"`
-	TenantPolicy datatypes.JSON `gorm:"column:tenant_policy;type:json;default:'{}';comment:租户策略" json:"tenantPolicy"`
-	Name         string         `gorm:"column:name;type:varchar(128);not null;default:'';comment:应用名称" json:"name"`
+	Code                     string `gorm:"column:code;type:varchar(64);not null;default:'';uniqueIndex;comment:应用编码" json:"code"`
+	AllowPersonCreateTenant  *bool  `gorm:"column:allow_person_create_tenant;type:boolean;not null;default:false;comment:个人是否可自助创建租户" json:"allowPersonCreateTenant"`
+	AllowJoinByInvite        *bool  `gorm:"column:allow_join_by_invite;type:boolean;not null;default:false;comment:是否允许通过邀请加入租户" json:"allowJoinByInvite"`
+	Name                     string `gorm:"column:name;type:varchar(128);not null;default:'';comment:应用名称" json:"name"`
 	Description  string         `gorm:"column:description;type:text;comment:应用描述" json:"description"`
 	LogoURL      string         `gorm:"column:logo_url;type:varchar(2048);not null;default:'';comment:应用logo" json:"logoURL"`
 	HomepageURL  string         `gorm:"column:homepage_url;type:varchar(2048);not null;default:'';comment:应用主页" json:"homepageURL"`

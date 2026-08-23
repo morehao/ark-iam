@@ -50,3 +50,11 @@ export interface CreateTenantResp {
   tenantID: string
   personID: string
 }
+
+export interface OIDCLoginConfigReq {
+  authRequestID: string
+}
+
+export interface OIDCLoginConfigResp {
+  allowPersonCreateTenant: boolean
+}

@@ -23,6 +23,8 @@ func InitOIDC(engine *gin.Engine, ctr *ctroidc.OIDCCtr) {
 	oidcGroup.POST("/login/selectTenant", ctr.SelectTenant)
 	oidcGroup.POST("/registerPerson", ctr.RegisterPerson)
 	oidcGroup.POST("/createTenant", ctr.CreateTenant)
+	// login-config 为登录页前置策略查询（如是否允许自助注册/建租户），仅读协议态与应用策略
+	oidcGroup.POST("/login-config", ctr.LoginConfig)
 	oidcGroup.GET("/sso-login", ctr.SSOLogin)
 	oidcGroup.GET("/logged-out", ctr.LoggedOut)
 	oidcGroup.GET(oidc.DiscoveryEndpoint, oidcHandler)

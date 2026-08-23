@@ -19,7 +19,7 @@ const (
 )
 
 // InviteEntity 加入租户的邀请单：租户 owner/管理员生成，凭证持有者凭 inviteCode 加入该租户。
-// 用户侧能否自助加入的开关由租户策略 AllowJoinByInvite 控制（见 Application.TenantPolicy）。
+// 用户侧能否自助加入的开关由租户策略 AllowJoinByInvite 控制（见 ApplicationEntity.AllowJoinByInvite）。
 type InviteEntity struct {
 	gormdao.BaseEntity
 	TenantID  string       `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:归属租户"`

@@ -28,8 +28,10 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			clientID:    "cid-1",
 			tenantCount: 1,
 			client:      &model.ApplicationClientEntity{AppID: "7"},
-			app:         &model.ApplicationEntity{TenantPolicy: datatypes.JSON(`{"allowPersonCreateTenant":true}`)},
-			want:        false,
+			app: &model.ApplicationEntity{
+				AllowPersonCreateTenant: model.BoolPtr(true),
+			},
+			want: false,
 		},
 		{
 			name:        "empty client id => false",
@@ -42,23 +44,27 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			clientID:    "cid-2",
 			tenantCount: 0,
 			client:      &model.ApplicationClientEntity{AppID: "7"},
-			app:         &model.ApplicationEntity{TenantPolicy: datatypes.JSON(`{"allowPersonCreateTenant":true}`)},
-			want:        true,
+			app: &model.ApplicationEntity{
+				AllowPersonCreateTenant: model.BoolPtr(true),
+			},
+			want: true,
 		},
 		{
 			name:        "policy disallow => false",
 			clientID:    "cid-3",
 			tenantCount: 0,
 			client:      &model.ApplicationClientEntity{AppID: "8"},
-			app:         &model.ApplicationEntity{TenantPolicy: datatypes.JSON(`{"allowPersonCreateTenant":false}`)},
-			want:        false,
+			app: &model.ApplicationEntity{
+				AllowPersonCreateTenant: model.BoolPtr(false),
+			},
+			want: false,
 		},
 		{
 			name:        "policy absent => false",
 			clientID:    "cid-4",
 			tenantCount: 0,
 			client:      &model.ApplicationClientEntity{AppID: "9"},
-			app:         &model.ApplicationEntity{TenantPolicy: datatypes.JSON(`{}`)},
+			app:         &model.ApplicationEntity{},
 			want:        false,
 		},
 		{
@@ -115,19 +121,18 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 
 func TestAppAllowsPersonCreateTenant(t *testing.T) {
 	cases := []struct {
-		name   string
-		policy string // tenant_policy JSON
-		want   bool
+		name  string
+		allow *bool
+		want  bool
 	}{
-		{name: "true", policy: `{"allowPersonCreateTenant":true}`, want: true},
-		{name: "false", policy: `{"allowPersonCreateTenant":false}`, want: false},
-		{name: "absent", policy: `{}`, want: false},
-		{name: "unset", policy: ``, want: false},
+		{name: "true", allow: model.BoolPtr(true), want: true},
+		{name: "false", allow: model.BoolPtr(false), want: false},
+		{name: "absent", allow: nil, want: false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			db := newAllowPersonCreateTenantTestDB(t)
-			app := &model.ApplicationEntity{Code: "app-x", TenantPolicy: datatypes.JSON(c.policy)}
+			app := &model.ApplicationEntity{Code: "app-x", AllowPersonCreateTenant: c.allow}
 			if err := db.Create(app).Error; err != nil {
 				t.Fatalf("seed app: %v", err)
 			}

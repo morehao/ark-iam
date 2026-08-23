@@ -2,12 +2,10 @@ package svcoidc
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
@@ -38,14 +36,7 @@ func (svc *oidcAuthSvc) appAllowsPersonCreateTenant(ctx *gin.Context, clientID s
 	if err != nil || app == nil || app.ID == "" {
 		return false
 	}
-	var policy model.TenantPolicy
-	if len(app.TenantPolicy) == 0 {
-		return false
-	}
-	if err := json.Unmarshal(app.TenantPolicy, &policy); err != nil || policy.AllowPersonCreateTenant == nil {
-		return false
-	}
-	return *policy.AllowPersonCreateTenant
+	return app.AllowPersonCreateTenant != nil && *app.AllowPersonCreateTenant
 }
 
 // resolveAllowPersonCreateTenant reports whether the app backing the oauth client

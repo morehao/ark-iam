@@ -3,7 +3,7 @@ package dtooidc
 import "github.com/morehao/ark-iam/pkg/iam/object/objauth"
 
 // RegisterPersonReq 注册 person 请求。OIDC 认证请求内完成 person 注册，
-// 应用是否允许由 authRequestID 反查的 client→app 的 TenantPolicy 决定。
+// 应用是否允许由 authRequestID 反查的 client→app 的 AllowPersonCreateTenant 决定。
 // Username/PrimaryEmail/PrimaryPhone 至少填写一个。
 type RegisterPersonReq struct {
 	AuthRequestID string `json:"authRequestID" binding:"required"`      // OIDC 授权票据ID（携带应用上下文）
@@ -34,4 +34,16 @@ type CreateTenantReq struct {
 type CreateTenantResp struct {
 	TenantID string `json:"tenantID"`
 	PersonID string `json:"personID"`
+}
+
+// OIDCLoginConfigReq 登录页前置策略查询请求。登录页在渲染前调用，
+// 由 authRequestID 反查 client→app 的策略，决定是否展示自助注册等入口。
+type OIDCLoginConfigReq struct {
+	AuthRequestID string `json:"authRequestID" binding:"required"` // OIDC 授权票据ID（携带应用上下文）
+}
+
+// OIDCLoginConfigResp 登录页策略配置响应。为面向扩展的通用配置对象，
+// 后续可继续追加策略位字段。
+type OIDCLoginConfigResp struct {
+	AllowPersonCreateTenant bool `json:"allowPersonCreateTenant"` // 应用是否允许自助注册/创建租户
 }

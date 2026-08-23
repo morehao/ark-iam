@@ -216,3 +216,20 @@ func (svc *oidcAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenant
 		PersonID: personID,
 	}, nil
 }
+
+// LoginConfig 登录页前置查询应用策略（当前含是否允许自助注册/创建租户）。
+// 供登录页在渲染前决定是否展示"注册账号"入口；仅读 OIDC 协议态与应用策略，
+// 不改变任何状态。判定链与 RegisterPerson/CreateTenant 同源，保证 UI 判断与门禁一致。
+func (svc *oidcAuthSvc) LoginConfig(ctx *gin.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error) {
+	authReq, err := svc.provider.Storage.AuthRequestByID(ctx.Request.Context(), authRequestID)
+	if err != nil {
+		return nil, mapAuthRequestError(err)
+	}
+	if authReq.Done() {
+		return nil, code.GetError(code.OIDCSessionNotFound)
+	}
+	clientID := clientIDFromAuthRequest(authReq)
+	return &dtooidc.OIDCLoginConfigResp{
+		AllowPersonCreateTenant: svc.appAllowsPersonCreateTenant(ctx, clientID),
+	}, nil
+}
