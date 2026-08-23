@@ -113,6 +113,13 @@ export default function LoginPage() {
         name: name.trim(),
         password: registerPassword,
       })
+      if (resp.requiresPasswordLogin) {
+        setError('该账号已存在，请使用密码登录')
+        setTenants([])
+        setPendingAuthRequestID('')
+        setMode('login')
+        return
+      }
       if (resp.tenants?.length) {
         setTenants(resp.tenants.map((t) => ({ tenantID: t.tenantID, name: t.name })))
         setPendingAuthRequestID(authRequestID)

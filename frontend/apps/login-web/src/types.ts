@@ -34,6 +34,7 @@ export interface RegisterPersonReq {
 
 export interface RegisterPersonResp {
   personID: string
+  requiresPasswordLogin?: boolean
   requiresTenantSelection: boolean
   tenants?: { tenantID: string; name: string; tag?: string; userID?: string; isOwner?: number }[]
   allowPersonCreateTenant: boolean
