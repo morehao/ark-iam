@@ -480,27 +480,6 @@ func validatePasswordStrength(rawPassword string) error {
 	return password.ValidateStrength(rawPassword)
 }
 
-// safeCreateSSOSession 以 recover 兜底创建 SSO 会话（注册即登录）。
-// SSO 会话依赖 Redis，不应因会话基础设施异常导致注册主流程失败。
-func safeCreateSSOSession(ctx *gin.Context, personID, tenantID string) (sessionID string) {
-	defer func() {
-		if r := recover(); r != nil {
-			glog.Warnf(ctx, "[svcauth.safeCreateSSOSession] panic recovered creating sso session, err:%v", r)
-		}
-	}()
-	ssoStore := sso.NewSSOSessionStore()
-	if ssoStore == nil {
-		return ""
-	}
-	sessCtx := context.WithValue(ctx.Request.Context(), sso.ContextKeyTenantID, tenantID)
-	sid, sErr := ssoStore.CreateSession(sessCtx, personID, []string{"pwd"})
-	if sErr != nil {
-		glog.Warnf(ctx, "[svcauth.safeCreateSSOSession] create sso session fail, err:%v", sErr)
-		return ""
-	}
-	return sid
-}
-
 // hashIdentifier 对登录标识做摘要（前 16 位 hex），
 // 供审计/日志记录失败来源而不泄露明文用户名/邮箱。
 func hashIdentifier(identifier string) string {
