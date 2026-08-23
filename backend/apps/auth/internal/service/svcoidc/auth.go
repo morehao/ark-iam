@@ -21,6 +21,8 @@ type OIDCAuthSvc interface {
 	CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error)
 	SelectTenant(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error)
 	CompleteLoginBySession(ctx *gin.Context, authRequestID string, sessionID string) (string, error)
+	RegisterPerson(ctx *gin.Context, req *dtooidc.RegisterPersonReq) (*dtooidc.RegisterPersonResp, error)
+	CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenantReq) (*dtooidc.CreateTenantResp, error)
 }
 
 // errSilentLoginNotAllowed 标记静默登录被拒（prompt=login / max_age 超期），
