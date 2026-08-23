@@ -4,20 +4,14 @@ import type {
   OIDCLoginReq,
   OIDCLoginResp,
   OIDCSelectTenantReq,
-  RegisterOrgReq,
-  RegisterOrgResp,
-  JoinTenantReq,
-  JoinTenantResp,
+  RegisterPersonReq,
+  RegisterPersonResp,
+  CreateTenantReq,
+  CreateTenantResp,
 } from './types'
 
 const api = axios.create({
   baseURL: '/oidc',
-  timeout: 10000,
-})
-
-// /v1/* 业务端点（经 gateway:8100 代理），后接 auth 的 /v1/auth/*
-const authApi = axios.create({
-  baseURL: '/v1/auth',
   timeout: 10000,
 })
 
@@ -40,9 +34,8 @@ export async function oidcSelectTenant(data: OIDCSelectTenantReq): Promise<OIDCL
   return body.data
 }
 
-// 通道 A：自助开通租户（注册人自任租户 owner）
-export async function registerOrg(data: RegisterOrgReq): Promise<RegisterOrgResp> {
-  const resp = await authApi.post<ApiResponse<RegisterOrgResp>>('/register', data)
+export async function registerPerson(data: RegisterPersonReq): Promise<RegisterPersonResp> {
+  const resp = await api.post<ApiResponse<RegisterPersonResp>>('/registerPerson', data)
   const body = resp.data
   if (body.code !== 0) {
     throw new Error(body.msg || '注册失败，请重试')
@@ -50,12 +43,11 @@ export async function registerOrg(data: RegisterOrgReq): Promise<RegisterOrgResp
   return body.data
 }
 
-// 通道 B：凭邀请加入已有租户（普通成员，非 owner）
-export async function joinWithInvite(data: JoinTenantReq): Promise<JoinTenantResp> {
-  const resp = await authApi.post<ApiResponse<JoinTenantResp>>('/joinTenant', data)
+export async function createTenant(data: CreateTenantReq): Promise<CreateTenantResp> {
+  const resp = await api.post<ApiResponse<CreateTenantResp>>('/createTenant', data)
   const body = resp.data
   if (body.code !== 0) {
-    throw new Error(body.msg || '加入租户失败，请重试')
+    throw new Error(body.msg || '创建租户失败，请重试')
   }
   return body.data
 }
