@@ -10,6 +10,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/iam/person"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
@@ -21,6 +22,7 @@ import (
 
 type UserSvc interface {
 	PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (*dtotenant.UserPageListResp, error)
+	MemberPageList(ctx *gin.Context, req *dtotenant.MemberPageListReq) (*dtotenant.MemberPageListResp, error)
 	Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dtotenant.UserCreateResp, error)
 	Detail(ctx *gin.Context, req *dtotenant.UserDetailReq) (*dtotenant.UserDetailResp, error)
 	Update(ctx *gin.Context, req *dtotenant.UserUpdateReq) error
@@ -92,20 +94,136 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (
 	}, nil
 }
 
-// loadPrimaryOrgNameMap 批量查询用户主组织名称（member 关系 + is_primary 唯一行）。
+// MemberPageList 成员总表(以人为维度)：展示租户内全部成员，可选按"恰在该部门"过滤，返回每个成员的部门关系数组(主/非主/负责)。
+func (svc *userSvc) MemberPageList(ctx *gin.Context, req *dtotenant.MemberPageListReq) (*dtotenant.MemberPageListResp, error) {
+	tenantID := gincontext.GetTenantIDString(ctx)
+	cond := &dao.UserCond{
+		BaseCond: &gormdao.BaseCond{
+			Page:     req.Page,
+			PageSize: req.PageSize,
+		},
+		TenantID:    tenantID,
+		Keyword:     req.Keyword,
+		IsSuspended: req.IsSuspended,
+	}
+
+	// 部门过滤：仅筛选恰在该部门(member/leader 均可)的成员，不掺子部门。
+	if req.OrganizationID != "" {
+		relationList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
+			TenantID:       tenantID,
+			OrganizationID: req.OrganizationID,
+		})
+		if err != nil {
+			glog.Errorf(ctx, "[svcuser.MemberPageList] dao relation GetListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+			return nil, code.GetError(code.UserGetPageListError)
+		}
+		userIDs := make([]string, 0, len(relationList))
+		for _, r := range relationList {
+			userIDs = append(userIDs, r.UserID)
+		}
+		if len(userIDs) == 0 {
+			return &dtotenant.MemberPageListResp{List: []dtotenant.MemberPageListItem{}, Total: 0}, nil
+		}
+		cond.IDs = userIDs
+	}
+
+	userEntityList, total, err := dao.NewUserDao().GetPageListByCond(ctx, cond)
+	if err != nil {
+		glog.Errorf(ctx, "[svcuser.MemberPageList] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.UserGetPageListError)
+	}
+
+	userIDs := make([]string, 0, len(userEntityList))
+	for _, v := range userEntityList {
+		userIDs = append(userIDs, v.ID)
+	}
+	_, personMap := svc.loadUserPersonMaps(ctx, userIDs)
+	roleCountMap := loadUserRoleCountMap(ctx, tenantID, userIDs)
+
+	// 批量加载每个用户的部门关系 + 组织名称
+	orgRelationMap := loadUserOrgRelationMap(ctx, tenantID, userIDs)
+
+	list := make([]dtotenant.MemberPageListItem, 0, len(userEntityList))
+	for _, v := range userEntityList {
+		person := personMap[v.PersonID]
+		if person == nil {
+			person = &model.PersonEntity{}
+		}
+		orgs := orgRelationMap[v.ID]
+		item := dtotenant.MemberPageListItem{
+			UserID:        v.ID,
+			TenantID:      v.TenantID,
+			Username:      model.DerefStr(person.Username),
+			PrimaryEmail:  model.DerefStr(person.PrimaryEmail),
+			PrimaryPhone:  model.DerefStr(person.PrimaryPhone),
+			Name:          v.Name,
+			Avatar:        v.Avatar,
+			IsSuspended:   v.IsSuspended,
+			RoleCount:     roleCountMap[v.ID],
+			CreatedAt:     v.CreatedAt.Unix(),
+			Organizations: orgs,
+		}
+		for _, o := range orgs {
+			if o.RelationType == model.OrgUserRelationPrimary {
+				item.PrimaryOrgID = o.OrganizationID
+				break
+			}
+		}
+		list = append(list, item)
+	}
+	return &dtotenant.MemberPageListResp{
+		List:  list,
+		Total: total,
+	}, nil
+}
+
+// loadUserOrgRelationMap 批量加载多个用户的部门关系(含组织名称),按 userID 分组返回。
+func loadUserOrgRelationMap(ctx *gin.Context, tenantID string, userIDs []string) map[string][]dtotenant.UserOrganizationItem {
+	result := make(map[string][]dtotenant.UserOrganizationItem, len(userIDs))
+	if len(userIDs) == 0 {
+		return result
+	}
+	relationList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
+		TenantID: tenantID,
+		UserIDs:  userIDs,
+	})
+	if err != nil {
+		glog.Warnf(ctx, "[svcuser.loadUserOrgRelationMap] relation GetListByCond fail, err:%v", err)
+		return result
+	}
+	orgIDSet := make(map[string]bool, len(relationList))
+	for _, r := range relationList {
+		orgIDSet[r.OrganizationID] = true
+	}
+	orgNameMap := make(map[string]string, len(orgIDSet))
+	for orgID := range orgIDSet {
+		if o, err := dao.NewOrganizationDao().GetByID(ctx, orgID); err == nil && o != nil {
+			orgNameMap[orgID] = o.Name
+		}
+	}
+	for _, r := range relationList {
+		result[r.UserID] = append(result[r.UserID], dtotenant.UserOrganizationItem{
+			OrganizationID:   r.OrganizationID,
+			OrganizationName: orgNameMap[r.OrganizationID],
+			RelationType:     r.RelationType,
+		})
+	}
+	return result
+}
+
+// loadPrimaryOrgNameMap 批量查询用户行政归属组织名称（member 唯一行）。
 func loadPrimaryOrgNameMap(ctx *gin.Context, tenantID string, userIDs []string) map[string]string {
 	result := make(map[string]string, len(userIDs))
 	if len(userIDs) == 0 {
 		return result
 	}
-	primary := true
 	relationList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
 		TenantID:     tenantID,
-		RelationType: string(model.OrgUserRelationMember),
-		IsPrimary:    &primary,
+		RelationType: model.OrgUserRelationPrimary,
+		UserIDs:      userIDs,
 	})
 	if err != nil {
-		glog.Warnf(ctx, "[svcuser.loadPrimaryOrgNameMap] query primary org fail, err:%v", err)
+		glog.Warnf(ctx, "[svcuser.loadPrimaryOrgNameMap] query member org fail, err:%v", err)
 		return result
 	}
 	userOrgMap := make(map[string]string, len(relationList))
@@ -162,7 +280,7 @@ func loadUserRoleCountMap(ctx *gin.Context, tenantID string, userIDs []string) m
 
 // Create 创建租户用户：person find-or-create（见设计文档 §4.4）。
 // 提供 personID 直接关联；否则按 email/phone 命中已有 person 则复用；未命中则同事务创建 person（姓名即自然人姓名）；
-// 同时按 organizationIDs 建立组织归属（首个为主组织）。
+// 同时按 organizationIDs 建立行政归属（member，至多 1 个）、leaderOrgIDs 建立负责关系（leader）。
 // 业务约束：用户必须从属于至少一个部门，organizationIDs 必传。
 func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dtotenant.UserCreateResp, error) {
 	tenantID := gincontext.GetTenantIDString(ctx)
@@ -172,10 +290,15 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 	if len(req.OrganizationIDs) == 0 {
 		return nil, code.GetError(code.UserOrganizationRequiredError)
 	}
+	// 0.1 邮箱或手机号至少填写一个（联系方式是用户识别/找回的必需信息）
+	if req.PrimaryEmail == "" && req.PrimaryPhone == "" {
+		return nil, code.GetError(code.UserContactRequiredError)
+	}
 
-	// 1. 解析 personID（find-or-create：默认以姓名创建自然人，命中已有全局身份则复用）
+	// 1. 解析 personID：显式提供时校验存在并直接关联；未提供时在事务内 find-or-create
+	// （person 领域能力，见 pkg/iam/person）：命中已有全局身份则复用，未命中则同事务新建。
 	personID := req.PersonID
-	createPerson := false
+	resolvePersonInTx := false
 	if personID != "" {
 		person, err := dao.NewPersonDao().GetByID(ctx, personID)
 		if err != nil {
@@ -186,27 +309,12 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 			return nil, code.GetError(code.UserNotExistError)
 		}
 	} else {
-		personID = svc.findExistingPersonID(ctx, req)
-		if personID == "" {
-			createPerson = true
-		}
+		resolvePersonInTx = true
 	}
 
-	// 2. 同一自然人在本租户内只能有一条 user
-	if personID != "" {
-		existing, err := dao.NewUserDao().GetListByCond(ctx, &dao.UserCond{TenantID: tenantID, PersonID: personID})
-		if err != nil {
-			glog.Errorf(ctx, "[svcuser.Create] query user by person fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-			return nil, code.GetError(code.UserCreateError)
-		}
-		if len(existing) > 0 {
-			return nil, code.GetError(code.UserAlreadyInTenantError)
-		}
-	}
-
-	// 3. 校验归属组织均属于本租户
+	// 2. 校验归属组织均属于本租户
 	orgSet := make(map[string]bool)
-	if len(req.OrganizationIDs) > 0 {
+	if len(req.OrganizationIDs) > 0 || len(req.SecondaryOrgIDs) > 0 || len(req.LeaderOrgIDs) > 0 {
 		orgList, err := dao.NewOrganizationDao().GetListByCond(ctx, &dao.OrganizationCond{TenantID: tenantID})
 		if err != nil {
 			glog.Errorf(ctx, "[svcuser.Create] query org fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -220,12 +328,22 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 				return nil, code.GetError(code.OrganizationNotExistError)
 			}
 		}
+		for _, orgID := range req.SecondaryOrgIDs {
+			if !orgSet[orgID] {
+				return nil, code.GetError(code.OrganizationNotExistError)
+			}
+		}
+		for _, orgID := range req.LeaderOrgIDs {
+			if !orgSet[orgID] {
+				return nil, code.GetError(code.OrganizationNotExistError)
+			}
+		}
 	}
 
-	// 4. 事务：创建 person（如需）+ 创建 user + 建立组织归属
+	// 3. 事务：person find-or-create + 创建 user + 建立组织归属
 	var createdUserID string
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
-		if createPerson {
+		if resolvePersonInTx {
 			passwordHash := ""
 			if req.Password != "" {
 				hash, hashErr := gcrypto.GeneratePasswordHash(req.Password)
@@ -235,23 +353,31 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 				}
 				passwordHash = hash
 			}
-			personEntity := &model.PersonEntity{
-				Username:          model.StrPtr(req.Username),
-				PrimaryEmail:      model.StrPtr(req.PrimaryEmail),
-				PrimaryPhone:      model.StrPtr(req.PrimaryPhone),
+			personEntity, _, personErr := person.FindOrCreate(ctx, tx, &person.FindOrCreateReq{
+				Username:          req.Username,
+				PrimaryEmail:      req.PrimaryEmail,
+				PrimaryPhone:      req.PrimaryPhone,
 				PasswordEncrypted: passwordHash,
 				PasswordMethod:    "bcrypt",
 				Name:              req.Name,
 				Avatar:            req.Avatar,
-				Profile:           json.RawMessage(`{}`),
-				CustomData:        json.RawMessage(`{}`),
 				CreatedBy:         operatorID,
-			}
-			if insertErr := dao.NewPersonDao().WithTx(tx).Insert(ctx, personEntity); insertErr != nil {
-				glog.Errorf(ctx, "[svcuser.Create] person Insert fail, err:%v", insertErr)
-				return fmt.Errorf("person insert: %w", insertErr)
+			})
+			if personErr != nil {
+				glog.Errorf(ctx, "[svcuser.Create] person FindOrCreate fail, err:%v, req:%s", personErr, gutil.ToJsonString(req))
+				return fmt.Errorf("person find-or-create: %w", personErr)
 			}
 			personID = personEntity.ID
+		}
+
+		// 同一自然人在本租户内只能有一条 user（person 关联/新建后即可确定 personID 校验）
+		existing, err := dao.NewUserDao().WithTx(tx).GetListByCond(ctx, &dao.UserCond{TenantID: tenantID, PersonID: personID})
+		if err != nil {
+			glog.Errorf(ctx, "[svcuser.Create] query user by person fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+			return fmt.Errorf("query user by person: %w", err)
+		}
+		if len(existing) > 0 {
+			return code.GetError(code.UserAlreadyInTenantError)
 		}
 
 		now := time.Now()
@@ -273,19 +399,52 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 		}
 		createdUserID = insertEntity.ID
 
-		// 建立组织归属（member 关系，首个为主组织）
-		for i, orgID := range req.OrganizationIDs {
+		// 建立行政主部门（primary 关系，至多 1 条）
+		if len(req.OrganizationIDs) > 1 {
+			return code.GetError(code.UserOrganizationRequiredError)
+		}
+		for _, orgID := range req.OrganizationIDs {
 			relation := &model.OrganizationUserEntity{
 				TenantID:       tenantID,
 				OrganizationID: orgID,
 				UserID:         insertEntity.ID,
-				RelationType:   string(model.OrgUserRelationMember),
-				IsPrimary:      i == 0,
+				RelationType:   model.OrgUserRelationPrimary,
 				CreatedBy:      operatorID,
 			}
 			if insertErr := dao.NewOrganizationUserDao().WithTx(tx).Insert(ctx, relation); insertErr != nil {
 				glog.Errorf(ctx, "[svcuser.Create] org relation Insert fail, err:%v", insertErr)
 				return fmt.Errorf("org relation insert: %w", insertErr)
+			}
+		}
+		// 建立负责部门关系（leader，独立于归属；一个部门至多一个负责人）
+		for _, orgID := range req.LeaderOrgIDs {
+			if err := ensureOrgLeaderUnique(ctx, tx, tenantID, orgID, insertEntity.ID); err != nil {
+				return err
+			}
+			relation := &model.OrganizationUserEntity{
+				TenantID:       tenantID,
+				OrganizationID: orgID,
+				UserID:         insertEntity.ID,
+				RelationType:   model.OrgUserRelationLeader,
+				CreatedBy:      operatorID,
+			}
+			if insertErr := dao.NewOrganizationUserDao().WithTx(tx).Insert(ctx, relation); insertErr != nil {
+				glog.Errorf(ctx, "[svcuser.Create] leader relation Insert fail, err:%v", insertErr)
+				return fmt.Errorf("leader relation insert: %w", insertErr)
+			}
+		}
+		// 建立参与部门关系（secondary，可多条）
+		for _, orgID := range req.SecondaryOrgIDs {
+			relation := &model.OrganizationUserEntity{
+				TenantID:       tenantID,
+				OrganizationID: orgID,
+				UserID:         insertEntity.ID,
+				RelationType:   model.OrgUserRelationSecondary,
+				CreatedBy:      operatorID,
+			}
+			if insertErr := dao.NewOrganizationUserDao().WithTx(tx).Insert(ctx, relation); insertErr != nil {
+				glog.Errorf(ctx, "[svcuser.Create] secondary relation Insert fail, err:%v", insertErr)
+				return fmt.Errorf("secondary relation insert: %w", insertErr)
 			}
 		}
 		return nil
@@ -357,32 +516,188 @@ func (svc *userSvc) Detail(ctx *gin.Context, req *dtotenant.UserDetailReq) (*dto
 	return resp, nil
 }
 
-// Update 局部更新用户（PATCH）：姓名/头像/状态。
+// Update 局部更新用户（PATCH）：姓名/头像/状态 + 主/参与/负责部门更新。
 func (svc *userSvc) Update(ctx *gin.Context, req *dtotenant.UserUpdateReq) error {
+	tenantID := gincontext.GetTenantIDString(ctx)
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserUpdateError)
 	}
-	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gincontext.GetTenantIDString(ctx) {
+	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != tenantID {
 		return code.GetError(code.UserNotExistError)
 	}
+	operatorID := gincontext.GetUserIDString(ctx)
 
-	updateMap := map[string]any{"updated_by": gincontext.GetUserIDString(ctx)}
-	if req.Name != "" {
-		updateMap["name"] = req.Name
+	// 主部门不可清空：显式传 "" 拒绝。
+	if req.PrimaryOrgID != nil && *req.PrimaryOrgID == "" {
+		return code.GetError(code.UserOrganizationRequiredError)
 	}
-	if req.Avatar != "" {
-		updateMap["avatar"] = req.Avatar
+
+	// 编辑联系方式（person 全局标识）：加载当前 person 以便做二选一与唯一性校验。
+	var curPerson *model.PersonEntity
+	if (req.Username != nil || req.PrimaryEmail != nil || req.PrimaryPhone != nil) && userEntity.PersonID != "" {
+		curPerson, err = dao.NewPersonDao().GetByID(ctx, userEntity.PersonID)
+		if err != nil {
+			glog.Errorf(ctx, "[svcuser.Update] dao GetByID person fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+			return code.GetError(code.UserUpdateError)
+		}
 	}
-	if req.IsSuspended != nil {
-		updateMap["is_suspended"] = *req.IsSuspended
+
+	// 联系方式二选一 + 唯一性：基于变更后结果校验（传入值 + 保持的旧值）。
+	if curPerson != nil {
+		newEmail := model.DerefStr(curPerson.PrimaryEmail)
+		if req.PrimaryEmail != nil {
+			newEmail = *req.PrimaryEmail
+		}
+		newPhone := model.DerefStr(curPerson.PrimaryPhone)
+		if req.PrimaryPhone != nil {
+			newPhone = *req.PrimaryPhone
+		}
+		if newEmail == "" && newPhone == "" {
+			return code.GetError(code.UserContactRequiredError)
+		}
+		if err := checkPersonContactUnique(ctx, curPerson.ID, req.Username, req.PrimaryEmail, req.PrimaryPhone); err != nil {
+			return err
+		}
 	}
-	if err := dao.NewUserDao().UpdateMap(ctx, req.UserID, updateMap); err != nil {
-		glog.Errorf(ctx, "[svcuser.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+
+	// 校验传入的组织均属本租户。
+	orgSet := make(map[string]bool)
+	if (req.PrimaryOrgID != nil && *req.PrimaryOrgID != "") || req.SecondaryOrgIDs != nil || req.LeaderOrgIDs != nil {
+		orgList, err := dao.NewOrganizationDao().GetListByCond(ctx, &dao.OrganizationCond{TenantID: tenantID})
+		if err != nil {
+			glog.Errorf(ctx, "[svcuser.Update] query org fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+			return code.GetError(code.UserUpdateError)
+		}
+		for _, o := range orgList {
+			orgSet[o.ID] = true
+		}
+		checkOwnership := func(id string) bool { return id == "" || orgSet[id] }
+		if req.PrimaryOrgID != nil && !checkOwnership(*req.PrimaryOrgID) {
+			return code.GetError(code.OrganizationNotExistError)
+		}
+		for _, id := range derefSlice(req.SecondaryOrgIDs) {
+			if !orgSet[id] {
+				return code.GetError(code.OrganizationNotExistError)
+			}
+		}
+		for _, id := range derefSlice(req.LeaderOrgIDs) {
+			if !orgSet[id] {
+				return code.GetError(code.OrganizationNotExistError)
+			}
+		}
+	}
+
+	var txErr = dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
+		updateMap := map[string]any{"updated_by": operatorID}
+		if req.Name != "" {
+			updateMap["name"] = req.Name
+		}
+		if req.Avatar != "" {
+			updateMap["avatar"] = req.Avatar
+		}
+		if req.IsSuspended != nil {
+			updateMap["is_suspended"] = *req.IsSuspended
+		}
+		if len(updateMap) > 0 {
+			if err := dao.NewUserDao().UpdateMap(ctx, req.UserID, updateMap); err != nil {
+				return err
+			}
+		}
+		if curPerson != nil {
+			if err := updatePersonContact(ctx, tx, curPerson, req.Username, req.PrimaryEmail, req.PrimaryPhone); err != nil {
+				return err
+			}
+		}
+		if req.PrimaryOrgID != nil {
+			// 替换主部门：删旧 primary（至多 1 行）后建新。
+			if err := replaceOrgRelationList(ctx, tx, tenantID, req.UserID, []string{*req.PrimaryOrgID}, model.OrgUserRelationPrimary, operatorID); err != nil {
+				return err
+			}
+		}
+		if req.SecondaryOrgIDs != nil {
+			if err := replaceOrgRelationList(ctx, tx, tenantID, req.UserID, *req.SecondaryOrgIDs, model.OrgUserRelationSecondary, operatorID); err != nil {
+				return err
+			}
+		}
+		if req.LeaderOrgIDs != nil {
+			if err := replaceOrgRelationList(ctx, tx, tenantID, req.UserID, *req.LeaderOrgIDs, model.OrgUserRelationLeader, operatorID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if txErr != nil {
+		if txErr == code.GetError(code.OrganizationUserLeaderConflictError) {
+			return txErr
+		}
+		glog.Errorf(ctx, "[svcuser.Update] transaction fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))
 		return code.GetError(code.UserUpdateError)
 	}
 	return nil
+}
+
+// derefSlice 解引用可空切片，nil 返回空切片。
+func derefSlice(p *[]string) []string {
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
+// checkPersonContactUnique 校验变更后的用户名/邮箱/手机号不被其他 person 占用。
+// 仅对传入（非 nil）的字段做查重，排除当前 person 自身。
+func checkPersonContactUnique(ctx *gin.Context, selfPersonID string, username, email, phone *string) error {
+	if username != nil && *username != "" {
+		if p, err := dao.NewPersonDao().GetByCond(ctx, &dao.PersonCond{Username: *username}); err != nil {
+			return err
+		} else if p != nil && p.ID != "" && p.ID != selfPersonID {
+			return code.GetError(code.UsernameAlreadyExistsError)
+		}
+	}
+	if email != nil && *email != "" {
+		if p, err := dao.NewPersonDao().GetByCond(ctx, &dao.PersonCond{PrimaryEmail: *email}); err != nil {
+			return err
+		} else if p != nil && p.ID != "" && p.ID != selfPersonID {
+			return code.GetError(code.EmailAlreadyExistsError)
+		}
+	}
+	if phone != nil && *phone != "" {
+		if p, err := dao.NewPersonDao().GetByCond(ctx, &dao.PersonCond{PrimaryPhone: *phone}); err != nil {
+			return err
+		} else if p != nil && p.ID != "" && p.ID != selfPersonID {
+			return code.GetError(code.PhoneAlreadyExistsError)
+		}
+	}
+	return nil
+}
+
+// updatePersonContact 更新 person 的用户名/邮箱/手机号（空串视为清空）。须在事务内传入 tx。
+func updatePersonContact(ctx *gin.Context, tx *gorm.DB, person *model.PersonEntity, username, email, phone *string) error {
+	personDao := dao.NewPersonDao().WithTx(tx)
+	updateMap := map[string]any{"updated_by": gincontext.GetUserIDString(ctx)}
+	if username != nil {
+		updateMap["username"] = strPtrOrNil(username)
+	}
+	if email != nil {
+		updateMap["primary_email"] = strPtrOrNil(email)
+	}
+	if phone != nil {
+		updateMap["primary_phone"] = strPtrOrNil(phone)
+	}
+	if len(updateMap) == 0 {
+		return nil
+	}
+	return personDao.UpdateMap(ctx, person.ID, updateMap)
+}
+
+// strPtrOrNil 将指针字符串转 person 存储值：空串转 nil（清空），非空保留指针。
+func strPtrOrNil(p *string) *string {
+	if p == nil || *p == "" {
+		return nil
+	}
+	return p
 }
 
 // ResetPassword 重置密码：更新关联 person 的密码哈希（无自然人关联的用户不可登录，直接拒绝）。
@@ -635,27 +950,6 @@ func (svc *userSvc) listRoles(ctx *gin.Context, tenantID, userID string) ([]dtot
 		})
 	}
 	return list, nil
-}
-
-// findExistingPersonID 按 username/email/phone 全局唯一标识查找已有 person（命中其一即返回其 ID）。
-func (svc *userSvc) findExistingPersonID(ctx *gin.Context, req *dtotenant.UserCreateReq) string {
-	personDao := dao.NewPersonDao()
-	if req.Username != "" {
-		if p, _ := personDao.GetByCond(ctx, &dao.PersonCond{Username: req.Username}); p != nil && p.ID != "" {
-			return p.ID
-		}
-	}
-	if req.PrimaryEmail != "" {
-		if p, _ := personDao.GetByCond(ctx, &dao.PersonCond{PrimaryEmail: req.PrimaryEmail}); p != nil && p.ID != "" {
-			return p.ID
-		}
-	}
-	if req.PrimaryPhone != "" {
-		if p, _ := personDao.GetByCond(ctx, &dao.PersonCond{PrimaryPhone: req.PrimaryPhone}); p != nil && p.ID != "" {
-			return p.ID
-		}
-	}
-	return ""
 }
 
 // loadUserPersonMaps 批量加载用户与其关联自然人（IN 查询，避免 N+1）。

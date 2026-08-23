@@ -21,6 +21,8 @@ func InitOIDC(engine *gin.Engine, ctr *ctroidc.OIDCCtr) {
 	// 登录端点按 IP 频率限流（防暴力破解/CC，golib ratelimit；Redis 不可用时 fail-open）
 	oidcGroup.POST("/login", middleware.LoginRateLimit(), ctr.Login)
 	oidcGroup.POST("/login/selectTenant", ctr.SelectTenant)
+	oidcGroup.POST("/registerPerson", ctr.RegisterPerson)
+	oidcGroup.POST("/createTenant", ctr.CreateTenant)
 	oidcGroup.GET("/sso-login", ctr.SSOLogin)
 	oidcGroup.GET("/logged-out", ctr.LoggedOut)
 	oidcGroup.GET(oidc.DiscoveryEndpoint, oidcHandler)

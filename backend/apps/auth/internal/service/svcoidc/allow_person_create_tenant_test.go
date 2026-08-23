@@ -113,6 +113,47 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 	}
 }
 
+func TestAppAllowsPersonCreateTenant(t *testing.T) {
+	cases := []struct {
+		name   string
+		policy string // tenant_policy JSON
+		want   bool
+	}{
+		{name: "true", policy: `{"allowPersonCreateTenant":true}`, want: true},
+		{name: "false", policy: `{"allowPersonCreateTenant":false}`, want: false},
+		{name: "absent", policy: `{}`, want: false},
+		{name: "unset", policy: ``, want: false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			db := newAllowPersonCreateTenantTestDB(t)
+			app := &model.ApplicationEntity{Code: "app-x", TenantPolicy: datatypes.JSON(c.policy)}
+			if err := db.Create(app).Error; err != nil {
+				t.Fatalf("seed app: %v", err)
+			}
+			client := &model.ApplicationClientEntity{Code: "cid-x", AppID: app.ID}
+			client.ID = client.AppID
+			client.RedirectURIs = datatypes.JSON(`[]`)
+			client.PostLogoutRedirectURIs = datatypes.JSON(`[]`)
+			client.GrantTypes = datatypes.JSON(`["authorization_code"]`)
+			client.ResponseTypes = datatypes.JSON(`["code"]`)
+			client.AllowedOrigins = datatypes.JSON(`[]`)
+			client.DefaultScopes = datatypes.JSON(`["openid"]`)
+			if err := db.Create(client).Error; err != nil {
+				t.Fatalf("seed client: %v", err)
+			}
+			svc := &oidcAuthSvc{
+				applicationClientDao: func() *dao.ApplicationClientDao { return dao.NewApplicationClientDao(dao.WithDBGetter(dbGetter(db))) },
+				applicationDao:       func() *dao.ApplicationDao { return dao.NewApplicationDao(dao.WithDBGetter(dbGetter(db))) },
+			}
+			ginCtx, _ := gin.CreateTestContext(nil)
+			if got := svc.appAllowsPersonCreateTenant(ginCtx, "cid-x"); got != c.want {
+				t.Fatalf("expected %v, got %v", c.want, got)
+			}
+		})
+	}
+}
+
 func dbGetter(db *gorm.DB) func(context.Context) *gorm.DB {
 	return func(c context.Context) *gorm.DB { return db.WithContext(c) }
 }

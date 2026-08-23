@@ -12,6 +12,7 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
@@ -324,6 +325,138 @@ func TestCompleteLoginReturnsContinueURLAndCompletesRequest(t *testing.T) {
 	}
 	if completedReq.TenantID != "1" {
 		t.Fatalf("expected completed auth request tenantID 1, got %s", completedReq.TenantID)
+	}
+}
+
+func TestCompleteLoginZeroTenantVerifiedPersonBindsDoneFalseAndReturnsCreateTenantSignal(t *testing.T) {
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
+	appconfig.Conf = &pkgconfig.Config{
+		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: pkgconfig.OIDC{
+			Issuer:           "http://localhost:8099/oidc",
+			FrontendLoginURL: "http://localhost:4000/oidc/login",
+			AllowInsecure:    true,
+		},
+	}
+	provider, err := SetupOIDCProvider()
+	if err != nil {
+		t.Fatalf("SetupOIDCProvider failed: %v", err)
+	}
+	db := newSeedDB(t, []appSeedApp{{clientCode: "client-1", policy: `{"allowPersonCreateTenant":true}`}})
+	request, err := provider.Storage.CreateAuthRequest(t.Context(), &oidc.AuthRequest{
+		ClientID:     "client-1",
+		RedirectURI:  "https://client.example.com/callback",
+		State:        "state-1",
+		Scopes:       []string{oidc.ScopeOpenID, oidc.ScopeProfile},
+		ResponseType: oidc.ResponseTypeCode,
+		ResponseMode: oidc.ResponseModeQuery,
+	}, "")
+	if err != nil {
+		t.Fatalf("CreateAuthRequest failed: %v", err)
+	}
+
+	svc := &oidcAuthSvc{
+		provider: provider,
+		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+			// 零租户已验密 person：无 user、无 tenants
+			return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}}}, nil, nil, nil
+		}},
+		applicationClientDao: func() *dao.ApplicationClientDao { return dao.NewApplicationClientDao(dao.WithDBGetter(dbGetter(db))) },
+		applicationDao:       func() *dao.ApplicationDao { return dao.NewApplicationDao(dao.WithDBGetter(dbGetter(db))) },
+		ssoSessionStore:      &fakeSSOSessionStore{},
+	}
+
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login", nil)
+	res, err := svc.CompleteLogin(ginCtx, &dtooidc.OIDCLoginReq{
+		AuthRequestID: request.GetID(),
+		Identifier:    "zero@example.com",
+		Password:      "Password1",
+	})
+	if err != nil {
+		t.Fatalf("CompleteLogin failed: %v", err)
+	}
+	if !res.AllowPersonCreateTenant {
+		t.Fatal("expected allowPersonCreateTenant=true for zero-tenant person in allowing app")
+	}
+	if res.PersonID != "88" {
+		t.Fatalf("expected personID 88, got %q", res.PersonID)
+	}
+	if res.ContinueURL != "" {
+		t.Fatalf("expected no continueURL (no code) for zero-tenant, got %q", res.ContinueURL)
+	}
+	if res.SessionID != "" {
+		t.Fatalf("expected no SSO session for zero-tenant login, got %q", res.SessionID)
+	}
+	if res.RequiresTenantSelection {
+		t.Fatal("expected requiresTenantSelection=false for zero-tenant login")
+	}
+	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())
+	if err != nil {
+		t.Fatalf("AuthRequestByID failed: %v", err)
+	}
+	if updated.Done() {
+		t.Fatal("expected auth request NOT done (no code) for zero-tenant login")
+	}
+	if updated.GetSubject() != oidcop.BuildSubject("88") {
+		t.Fatalf("expected bound subject person:88, got %q", updated.GetSubject())
+	}
+}
+
+func TestCompleteLoginZeroTenantAppDisallowFalse(t *testing.T) {
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
+	appconfig.Conf = &pkgconfig.Config{
+		JWT: pkgconfig.JWT{SignKey: "test-sign-key"},
+		OIDC: pkgconfig.OIDC{
+			Issuer:           "http://localhost:8099/oidc",
+			FrontendLoginURL: "http://localhost:4000/oidc/login",
+			AllowInsecure:    true,
+		},
+	}
+	provider, err := SetupOIDCProvider()
+	if err != nil {
+		t.Fatalf("SetupOIDCProvider failed: %v", err)
+	}
+	db := newSeedDB(t, []appSeedApp{{clientCode: "client-1", policy: `{"allowPersonCreateTenant":false}`}})
+	request, err := provider.Storage.CreateAuthRequest(t.Context(), &oidc.AuthRequest{
+		ClientID:     "client-1",
+		RedirectURI:  "https://client.example.com/callback",
+		State:        "state-1",
+		Scopes:       []string{oidc.ScopeOpenID, oidc.ScopeProfile},
+		ResponseType: oidc.ResponseTypeCode,
+		ResponseMode: oidc.ResponseModeQuery,
+	}, "")
+	if err != nil {
+		t.Fatalf("CreateAuthRequest failed: %v", err)
+	}
+
+	svc := &oidcAuthSvc{
+		provider: provider,
+		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+			return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}}}, nil, nil, nil
+		}},
+		applicationClientDao: func() *dao.ApplicationClientDao { return dao.NewApplicationClientDao(dao.WithDBGetter(dbGetter(db))) },
+		applicationDao:       func() *dao.ApplicationDao { return dao.NewApplicationDao(dao.WithDBGetter(dbGetter(db))) },
+		ssoSessionStore:      &fakeSSOSessionStore{},
+	}
+
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login", nil)
+	res, err := svc.CompleteLogin(ginCtx, &dtooidc.OIDCLoginReq{
+		AuthRequestID: request.GetID(),
+		Identifier:    "zero@example.com",
+		Password:      "Password1",
+	})
+	if err != nil {
+		t.Fatalf("CompleteLogin failed: %v", err)
+	}
+	if res.AllowPersonCreateTenant {
+		t.Fatal("expected allowPersonCreateTenant=false when app disallows")
+	}
+	if res.PersonID != "88" {
+		t.Fatalf("expected personID 88, got %q", res.PersonID)
 	}
 }
 

@@ -33,7 +33,7 @@ func setupDB(t *testing.T) *gorm.DB {
 }
 
 // TestSeedIamSQLite 在内存 SQLite 上验证种子数据：首次写入 + 二次幂等，
-// 并断言管理员用户从属顶级部门（member 关系 + 主归属）。
+// 并断言管理员用户从属顶级部门（primary 行政主部门）。
 func TestSeedIamSQLite(t *testing.T) {
 	db := setupDB(t)
 	ctx := context.Background()
@@ -88,7 +88,7 @@ func TestSeedIamSQLite(t *testing.T) {
 		}
 	}
 
-	// 管理员从属顶级部门（member 关系 + 主归属）
+	// 管理员从属顶级部门（primary 行政主部门）
 	var tenant model.TenantEntity
 	if err := db.Where("code = ?", "platform").First(&tenant).Error; err != nil {
 		t.Fatalf("platform tenant not found: %v", err)
@@ -102,8 +102,8 @@ func TestSeedIamSQLite(t *testing.T) {
 		t.Fatalf("root organization not found: %v", err)
 	}
 	var ou model.OrganizationUserEntity
-	if err := db.Where("tenant_id = ? AND user_id = ? AND organization_id = ? AND relation_type = ? AND is_primary = ?",
-		tenant.ID, adminUser.ID, rootOrg.ID, string(model.OrgUserRelationMember), true).First(&ou).Error; err != nil {
+	if err := db.Where("tenant_id = ? AND user_id = ? AND organization_id = ? AND relation_type = ?",
+		tenant.ID, adminUser.ID, rootOrg.ID, model.OrgUserRelationPrimary).First(&ou).Error; err != nil {
 		t.Fatalf("admin organization relation not found: %v", err)
 	}
 }

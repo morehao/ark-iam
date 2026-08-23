@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -15,18 +14,17 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/service/svcloginguard"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/iam/audit"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
-	"github.com/morehao/ark-iam/pkg/iam/password"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
-	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gconstant"
 	"github.com/morehao/golib/gcrypto"
+	"github.com/morehao/golib/gerror"
 	"github.com/morehao/golib/glog"
-	"github.com/morehao/golib/gutil"
 	"gorm.io/gorm"
 )
 
@@ -81,7 +79,6 @@ type AuthSvc interface {
 	AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error)
 	TenantsForPerson(ctx *gin.Context, personID string) ([]objauth.TenantOption, error)
 	MyTenants(ctx *gin.Context, req *dtoauth.MyTenantsReq) (*dtoauth.MyTenantsResp, error)
-	Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoauth.RegisterResp, error)
 	JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*dtoauth.JoinTenantResp, error)
 	Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error
 	LogoutAll(ctx *gin.Context, req *dtoauth.LogoutAllReq) error
@@ -103,6 +100,15 @@ func (svc *authSvc) AuthenticatePassword(ctx *gin.Context, identifier, password 
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	// 零租户 person：person 存在但无任何租户成员（userEntity==nil 且 tenants 为空）。
+	// 仍必须强制密码校验（与普通账号同错，防枚举），通过后才放行到"建自己租户"。
+	if personEntity != nil && userEntity == nil && len(tenants) == 0 {
+		personEntity, _, aErr := svc.authenticateResolvedPerson(ctx, personEntity, nil, password)
+		if aErr != nil {
+			return nil, nil, nil, aErr
+		}
+		return personEntity, nil, nil, nil
+	}
 	personEntity, userEntity, err = svc.authenticateResolvedPerson(ctx, personEntity, userEntity, password)
 	if err != nil {
 		return nil, nil, nil, err
@@ -120,9 +126,14 @@ func (svc *authSvc) TenantsForPerson(ctx *gin.Context, personID string) ([]objau
 
 func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *model.PersonEntity, userEntity *model.UserEntity, password string) (*model.PersonEntity, *model.UserEntity, error) {
 	ip := gincontext.GetClientIP(ctx)
+	// 零租户 person（userEntity==nil）：无 tenant/user id，登录审计记 person 级空 id。
+	tenantID, userID := "", ""
+	if userEntity != nil {
+		tenantID, userID = userEntity.TenantID, userEntity.ID
+	}
 	if svcloginguard.Check(ctx, ip, personEntity.ID) {
-		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-			Action:     svcaudit.ActionLogin,
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
 			Result:     "failure",
 			TargetType: "person",
 			Detail:     fmt.Sprintf("personID:%s, reason:login locked", personEntity.ID),
@@ -131,8 +142,8 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 	}
 
 	if personEntity.IsSuspended {
-		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-			Action:     svcaudit.ActionLogin,
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
 			Result:     "failure",
 			TargetType: "person",
 			Detail:     fmt.Sprintf("personID:%s, reason:suspended", personEntity.ID),
@@ -141,8 +152,8 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 	}
 
 	if personEntity.PasswordEncrypted == "" {
-		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-			Action:     svcaudit.ActionLogin,
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
 			Result:     "failure",
 			TargetType: "person",
 			Detail:     fmt.Sprintf("personID:%s, reason:password not set", personEntity.ID),
@@ -151,7 +162,7 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 	}
 
 	if err := gcrypto.ComparePasswordHash(personEntity.PasswordEncrypted, password); err != nil {
-		authLoginRecorder(ctx, userEntity.TenantID, userEntity.ID, false)
+		authLoginRecorder(ctx, tenantID, userID, false)
 		svcloginguard.RecordFailure(ctx, ip, personEntity.ID)
 		glog.Errorf(ctx, "[svcauth.authenticateResolvedPerson] password mismatch, personID:%s", personEntity.ID)
 		// H8：密码错误与用户不存在统一错误码，避免用户名枚举
@@ -159,7 +170,7 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 	}
 
 	svcloginguard.RecordSuccess(ctx, ip, personEntity.ID)
-	authLoginRecorder(ctx, userEntity.TenantID, userEntity.ID, true)
+	authLoginRecorder(ctx, tenantID, userID, true)
 	return personEntity, userEntity, nil
 }
 
@@ -177,158 +188,33 @@ func (svc *authSvc) MyTenants(ctx *gin.Context, req *dtoauth.MyTenantsReq) (*dto
 	return &dtoauth.MyTenantsResp{List: tenants}, nil
 }
 
-func (svc *authSvc) Register(ctx *gin.Context, req *dtoauth.RegisterReq) (*dtoauth.RegisterResp, error) {
-	if err := validatePasswordStrength(req.Password); err != nil {
-		return nil, code.GetError(code.PasswordValidationError)
-	}
-
-	if req.Username == "" && req.PrimaryEmail == "" && req.PrimaryPhone == "" {
-		return nil, code.GetError(code.AuthIdentifierRequiredError)
-	}
-
-	personDao := newAuthPersonStore()
-	tenantDao := newAuthTenantStore()
-
-	tenantEntity, err := tenantDao.GetByID(ctx.Request.Context(), req.TenantID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.Register] tenant dao GetByID fail, err:%v, tenantID:%s", err, req.TenantID)
-		return nil, code.GetError(code.TenantGetDetailError)
-	}
-	if tenantEntity == nil || tenantEntity.ID == "" {
-		return nil, code.GetError(code.TenantNotExistError)
-	}
-
-	// S6：查重错误不再静默吞掉——数据库故障时必须如实返回，不能继续插入
-	if req.Username != "" {
-		existingPerson, qErr := personDao.GetByCond(ctx.Request.Context(), &dao.PersonCond{
-			Username: req.Username,
-		})
-		if qErr != nil {
-			glog.Errorf(ctx, "[svcauth.Register] person dao GetByCond by username fail, err:%v, username:%s", qErr, req.Username)
-			return nil, code.GetError(code.UserGetDetailError)
-		}
-		if existingPerson != nil && existingPerson.ID != "" {
-			return nil, code.GetError(code.UsernameAlreadyExistsError)
-		}
-	}
-
-	if req.PrimaryEmail != "" {
-		existingPerson, qErr := personDao.GetByCond(ctx.Request.Context(), &dao.PersonCond{
-			PrimaryEmail: req.PrimaryEmail,
-		})
-		if qErr != nil {
-			glog.Errorf(ctx, "[svcauth.Register] person dao GetByCond by email fail, err:%v, email:%s", qErr, req.PrimaryEmail)
-			return nil, code.GetError(code.UserGetDetailError)
-		}
-		if existingPerson != nil && existingPerson.ID != "" {
-			return nil, code.GetError(code.EmailAlreadyExistsError)
-		}
-	}
-
-	if req.PrimaryPhone != "" {
-		existingPerson, qErr := personDao.GetByCond(ctx.Request.Context(), &dao.PersonCond{
-			PrimaryPhone: req.PrimaryPhone,
-		})
-		if qErr != nil {
-			glog.Errorf(ctx, "[svcauth.Register] person dao GetByCond by phone fail, err:%v, phone:%s", qErr, req.PrimaryPhone)
-			return nil, code.GetError(code.UserGetDetailError)
-		}
-		if existingPerson != nil && existingPerson.ID != "" {
-			return nil, code.GetError(code.PhoneAlreadyExistsError)
-		}
-	}
-
-	passwordHash, err := gcrypto.GeneratePasswordHash(req.Password)
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.Register] GeneratePasswordHash fail, err:%v", err)
-		return nil, code.GetError(code.PasswordHashError)
-	}
-
-	personEntity := &model.PersonEntity{
-		Username:          model.StrPtr(req.Username),
-		PrimaryEmail:      model.StrPtr(req.PrimaryEmail),
-		PrimaryPhone:      model.StrPtr(req.PrimaryPhone),
-		PasswordEncrypted: passwordHash,
-		PasswordMethod:    "bcrypt",
-		Name:              req.Name,
-		Profile:           json.RawMessage("{}"),
-		CustomData:        json.RawMessage("{}"),
-		CreatedBy:         "",
-	}
-	now := time.Now()
-	insertEntity := &model.UserEntity{
-		TenantID:   req.TenantID,
-		Name:       req.Name,
-		Profile:    json.RawMessage("{}"),
-		CustomData: json.RawMessage("{}"),
-		// H2：开放注册加入已有租户，绝不授予 owner（owner 由租户创建流程/管理员授予）
-		IsOwner:  false,
-		JoinedAt: &now,
-	}
-
-	// S6：person + user 同事务插入，避免 user 插入失败留下孤儿 person；
-	// 并发注册撞唯一索引（check-then-insert 竞态）时由 DB 唯一索引兜底。
-	txErr := dbclient.IamDB(ctx.Request.Context()).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(personEntity).Error; err != nil {
-			return err
-		}
-		insertEntity.PersonID = personEntity.ID
-		insertEntity.CreatedBy = ""
-		return tx.Create(insertEntity).Error
-	})
-	if txErr != nil {
-		if errors.Is(txErr, gorm.ErrDuplicatedKey) {
-			// 并发竞态：唯一键冲突，回查确定撞的是哪个标识
-			return nil, svc.resolveRegisterConflict(ctx, personDao, req)
-		}
-		glog.Errorf(ctx, "[svcauth.Register] transaction fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))
-		return nil, code.GetError(code.UserCreateError)
-	}
-
-	return &dtoauth.RegisterResp{
-		UserID: insertEntity.ID,
-	}, nil
-}
-
-// resolveRegisterConflict 唯一键冲突时回查哪个标识已存在，返回对应错误码。
-func (svc *authSvc) resolveRegisterConflict(ctx *gin.Context, personDao authPersonStore, req *dtoauth.RegisterReq) error {
-	if req.Username != "" {
-		if p, qErr := personDao.GetByCond(ctx.Request.Context(), &dao.PersonCond{Username: req.Username}); qErr == nil && p != nil && p.ID != "" {
-			return code.GetError(code.UsernameAlreadyExistsError)
-		}
-	}
-	if req.PrimaryEmail != "" {
-		if p, qErr := personDao.GetByCond(ctx.Request.Context(), &dao.PersonCond{PrimaryEmail: req.PrimaryEmail}); qErr == nil && p != nil && p.ID != "" {
-			return code.GetError(code.EmailAlreadyExistsError)
-		}
-	}
-	if req.PrimaryPhone != "" {
-		if p, qErr := personDao.GetByCond(ctx.Request.Context(), &dao.PersonCond{PrimaryPhone: req.PrimaryPhone}); qErr == nil && p != nil && p.ID != "" {
-			return code.GetError(code.PhoneAlreadyExistsError)
-		}
-	}
-	return code.GetError(code.UsernameAlreadyExistsError)
-}
-
 func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*dtoauth.JoinTenantResp, error) {
+	// 通道 B：凭邀请加入已有租户（非 owner）。
+	// 落哪个租户由邀请码决定（租户侧授权，禁止裸 tenantID 直入）。
 	personID := gincontext.GetPersonIDString(ctx)
 	if personID == "" {
 		return nil, code.GetError(gconstant.UnauthorizedErr)
 	}
+	if req.InviteCode == "" {
+		return nil, code.GetError(code.AuthJoinNotAllowedError)
+	}
 
-	tenantDao := newAuthTenantStore()
-	userDao := newAuthUserStore()
-
-	tenantEntity, err := tenantDao.GetByID(ctx.Request.Context(), req.TenantID)
+	// 1. 解析邀请
+	inviteEntity, err := dao.NewInviteDao().GetByCond(ctx.Request.Context(), &dao.InviteCond{Code: req.InviteCode})
 	if err != nil {
-		glog.Errorf(ctx, "[svcauth.JoinTenant] tenant dao GetByID fail, err:%v, tenantID:%s", err, req.TenantID)
-		return nil, code.GetError(code.TenantGetDetailError)
+		glog.Errorf(ctx, "[svcauth.JoinTenant] invite dao GetByCond fail, err:%v, code:%s", err, req.InviteCode)
+		return nil, code.GetError(code.InviteGetDetailError)
 	}
-	if tenantEntity == nil || tenantEntity.ID == "" {
-		return nil, code.GetError(code.TenantNotExistError)
+	if inviteEntity == nil || inviteEntity.ID == "" || inviteEntity.Status != model.InviteStatusPending {
+		return nil, code.GetError(code.InviteInvalidError)
 	}
+	if inviteEntity.ExpiresAt != nil && time.Now().After(*inviteEntity.ExpiresAt) {
+		return nil, code.GetError(code.InviteExpiredError)
+	}
+	tenantID := inviteEntity.TenantID
 
-	existingUser, err := userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{PersonID: personID, TenantID: req.TenantID})
+	userDao := newAuthUserStore()
+	existingUser, err := userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{PersonID: personID, TenantID: tenantID})
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.JoinTenant] user dao GetByCond fail, err:%v", err)
 		return nil, code.GetError(code.UserGetDetailError)
@@ -337,22 +223,40 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 		return nil, code.GetError(code.AlreadyJoinedError)
 	}
 
-	now := time.Now()
-	userEntity := &model.UserEntity{
-		TenantID:  req.TenantID,
-		PersonID:  personID,
-		Name:      "",
-		IsOwner:   false,
-		JoinedAt:  &now,
-		CreatedBy: "",
-	}
-	if err := userDao.Insert(ctx.Request.Context(), userEntity); err != nil {
-		glog.Errorf(ctx, "[svcauth.JoinTenant] user dao Insert fail, err:%v", err)
+	// 2. 建成员 user（非 owner）+ 标记邀请已用
+	var userID string
+	txErr := dbclient.IamDB(ctx.Request.Context()).Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		userEntity := &model.UserEntity{
+			TenantID:   tenantID,
+			PersonID:   personID,
+			Name:       "",
+			Profile:    json.RawMessage(`{}`),
+			CustomData: json.RawMessage(`{}`),
+			IsOwner:    false,
+			JoinedAt:   &now,
+			CreatedBy:  personID,
+		}
+		if uErr := dao.NewUserDao().WithTx(tx).Insert(ctx.Request.Context(), userEntity); uErr != nil {
+			return uErr
+		}
+		userID = userEntity.ID
+		// 标记邀请已使用
+		if uErr := dao.NewInviteDao().WithTx(tx).UpdateMap(ctx.Request.Context(), inviteEntity.ID, map[string]any{
+			"status":     string(model.InviteStatusAccepted),
+			"updated_by": personID,
+		}); uErr != nil {
+			return uErr
+		}
+		return nil
+	})
+	if txErr != nil {
+		glog.Errorf(ctx, "[svcauth.JoinTenant] transaction fail, err:%v, code:%s", txErr, req.InviteCode)
 		return nil, code.GetError(code.UserCreateError)
 	}
 
 	return &dtoauth.JoinTenantResp{
-		UserID: userEntity.ID,
+		UserID: userID,
 	}, nil
 }
 
@@ -362,8 +266,8 @@ func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
 	// access token 依赖其短 TTL 失效（见设计文档 §2.5），此处不维护 HS256 黑名单。
 	if personID != "" {
 		// H13：登出动作记录审计
-		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-			Action:     svcaudit.ActionLogout,
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogout,
 			Result:     "success",
 			TargetType: "person",
 			TargetID:   personID,
@@ -489,8 +393,8 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 
 	personEntity, err := personDao.GetByCond(ctx.Request.Context(), personCond)
 	if err != nil {
-		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-			Action:     svcaudit.ActionLogin,
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
 			Result:     "failure",
 			TargetType: "person",
 			Detail:     fmt.Sprintf("identifier:%s, reason:user lookup error", identifier),
@@ -502,8 +406,8 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 		// H8：未知标识同样计入 IP 维度失败（防口令喷洒绕过 IP 锁）；
 		// 审计 detail 不写"user not found"，避免用户名枚举。
 		svcloginguard.RecordFailure(ctx, gincontext.GetClientIP(ctx), "")
-		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-			Action:     svcaudit.ActionLogin,
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
 			Result:     "failure",
 			TargetType: "person",
 			Detail:     fmt.Sprintf("identifier-hash:%s, reason:auth failed", hashIdentifier(identifier)),
@@ -513,12 +417,16 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 
 	userEntity, tenants, err := svc.listPersonTenants(ctx, personEntity.ID)
 	if err != nil {
-		// listPersonTenants 在无租户成员时返回 UserNotExistError（登录失败统一语义）
+		// 零租户 person（无任何租户成员）：放行到密码验证，合法与否由密码决定。
+		// 用错误码（而非字符串）区分"零租户"与"系统错误"：只有 UserNotExistError 表示零租户。
+		if gerror.IsCode(err, code.UserNotExistError) {
+			return personEntity, nil, nil, nil
+		}
 		return nil, nil, nil, err
 	}
 	if userEntity.IsSuspended {
-		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-			Action:     svcaudit.ActionLogin,
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
 			Result:     "failure",
 			TargetType: "person",
 			Detail:     fmt.Sprintf("userID:%s, reason:suspended", userEntity.ID),
@@ -584,12 +492,6 @@ func toAnySlice(ids []string) []any {
 	return out
 }
 
-// validatePasswordStrength 密码强度校验，统一走公共包 pkg/iam/password
-// （8~128 位，含大小写数字；上限防 bcrypt 登录 DoS）。
-func validatePasswordStrength(rawPassword string) error {
-	return password.ValidateStrength(rawPassword)
-}
-
 // hashIdentifier 对登录标识做摘要（前 16 位 hex），
 // 供审计/日志记录失败来源而不泄露明文用户名/邮箱。
 func hashIdentifier(identifier string) string {
@@ -628,8 +530,8 @@ func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID string, success bo
 	if success {
 		result = "success"
 	}
-	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-		Action:     svcaudit.ActionLogin,
+	audit.WriteAudit(ctx, audit.AuditEntry{
+		Action:     audit.ActionLogin,
 		TenantID:   tenantID,
 		Result:     result,
 		TargetType: "person",

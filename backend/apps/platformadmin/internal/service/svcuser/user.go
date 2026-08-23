@@ -24,6 +24,7 @@ type UserSvc interface {
 	PageList(ctx *gin.Context, req *dtouser.UserPageListReq) (*dtouser.UserPageListResp, error)
 	UpdatePassword(ctx *gin.Context, req *dtouser.UserPasswordUpdateReq) error
 	UpdateStatus(ctx *gin.Context, req *dtouser.UserStatusUpdateReq) error
+	UpdateOwner(ctx *gin.Context, req *dtouser.UserOwnerUpdateReq) error
 	GetUserLoginLogByUser(ctx *gin.Context, req *dtouser.UserLoginLogByUserReq) (*dtouser.UserLoginLogPageListResp, error)
 }
 
@@ -231,6 +232,29 @@ func (svc *userSvc) UpdateStatus(ctx *gin.Context, req *dtouser.UserStatusUpdate
 	if err := dao.NewUserDao().UpdateMap(ctx, req.UserID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcuser.UpdateStatus] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserUpdateError)
+	}
+	return nil
+}
+
+// UpdateOwner 平台管理员显式指派/取消某租户用户为租户拥有者。
+// 目标用户所在的租户以该 user 自身 TenantID 为准（平台管理员跨租户操作，不依赖操作者租户上下文）。
+func (svc *userSvc) UpdateOwner(ctx *gin.Context, req *dtouser.UserOwnerUpdateReq) error {
+	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcuser.UpdateOwner] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.UserOwnerUpdateError)
+	}
+	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID == "" {
+		return code.GetError(code.UserNotExistError)
+	}
+
+	updateMap := map[string]any{
+		"is_owner":   req.IsOwner,
+		"updated_by": gincontext.GetUserIDString(ctx),
+	}
+	if err := dao.NewUserDao().UpdateMap(ctx, req.UserID, updateMap); err != nil {
+		glog.Errorf(ctx, "[svcuser.UpdateOwner] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.UserOwnerUpdateError)
 	}
 	return nil
 }

@@ -11,6 +11,7 @@ func userRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.GET("/users", userCtr.PageList)
 	v1RouterGroup.POST("/users", userCtr.Create)
+	v1RouterGroup.GET("/members", userCtr.MemberPageList)
 	v1RouterGroup.GET("/users/:userID", userCtr.Detail)
 	v1RouterGroup.PATCH("/users/:userID", userCtr.Update)
 	v1RouterGroup.POST("/users/:userID/reset-password", userCtr.ResetPassword)

@@ -1,6 +1,9 @@
 package dtotenant
 
-import "github.com/morehao/ark-iam/pkg/iam/object/objtenant"
+import (
+	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/iam/object/objtenant"
+)
 
 // ---------- 组织节点 ----------
 
@@ -30,11 +33,11 @@ type OrganizationChildrenResp struct {
 
 // OrganizationChildItem 子部门条目（不含 children，扁平展示）。
 type OrganizationChildItem struct {
-	OrganizationID string                   `json:"organizationID"` // 组织ID
-	ParentID       string                   `json:"parentID"`       // 父节点ID
-	OrgDepth       int                      `json:"orgDepth"`       // 节点深度
-	CreatedAt      int64                    `json:"createdAt"`      // 创建时间(unix 秒)
-	HasChildren    bool                     `json:"hasChildren"`    // 是否还有下级
+	OrganizationID string `json:"organizationID"` // 组织ID
+	ParentID       string `json:"parentID"`       // 父节点ID
+	OrgDepth       int    `json:"orgDepth"`       // 节点深度
+	CreatedAt      int64  `json:"createdAt"`      // 创建时间(unix 秒)
+	HasChildren    bool   `json:"hasChildren"`    // 是否还有下级
 	objtenant.OrganizationBaseInfo
 }
 
@@ -49,26 +52,24 @@ type OrganizationUserPageListResp struct {
 }
 
 type OrganizationUserPageListItem struct {
-	OrganizationID string `json:"organizationID"` // 组织ID
-	UserID         string `json:"userID"`         // 用户ID
-	UserName       string `json:"userName"`       // 用户姓名(租户内)
-	Username       string `json:"username"`       // 全局用户名
-	PrimaryEmail   string `json:"primaryEmail"`   // 主要邮箱
-	PrimaryPhone   string `json:"primaryPhone"`   // 主要手机号
-	Avatar         string `json:"avatar"`         // 头像URL
-	IsSuspended    bool   `json:"isSuspended"`    // 是否挂起
-	RelationType   string `json:"relationType"`   // 关系类型
-	IsPrimary      bool   `json:"isPrimary"`      // 是否主归属
-	JoinedAt       int64  `json:"joinedAt"`       // 加入时间(关系创建时间)
+	OrganizationID string                    `json:"organizationID"` // 组织ID
+	UserID         string                    `json:"userID"`         // 用户ID
+	UserName       string                    `json:"userName"`       // 用户姓名(租户内)
+	Username       string                    `json:"username"`       // 全局用户名
+	PrimaryEmail   string                    `json:"primaryEmail"`   // 主要邮箱
+	PrimaryPhone   string                    `json:"primaryPhone"`   // 主要手机号
+	Avatar         string                    `json:"avatar"`         // 头像URL
+	IsSuspended    bool                      `json:"isSuspended"`    // 是否挂起
+	RelationType   model.OrgUserRelationType `json:"relationType"`   // 关系类型
+	JoinedAt       int64                     `json:"joinedAt"`       // 加入时间(关系创建时间)
 }
 
-// ---------- 用户归属 ----------
+// ---------- 用户参与 ----------
 
 type UserOrganizationItem struct {
-	OrganizationID   string `json:"organizationID"`   // 组织ID
-	OrganizationName string `json:"organizationName"` // 组织名称
-	RelationType     string `json:"relationType"`     // 关系类型
-	IsPrimary        bool   `json:"isPrimary"`        // 是否主归属
+	OrganizationID   string                    `json:"organizationID"`   // 组织ID
+	OrganizationName string                    `json:"organizationName"` // 组织名称
+	RelationType     model.OrgUserRelationType `json:"relationType"`     // 关系类型
 }
 
 type UserOrganizationsUpdateResp struct {

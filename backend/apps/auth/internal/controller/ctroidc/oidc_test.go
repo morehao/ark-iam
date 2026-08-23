@@ -19,6 +19,8 @@ type fakeOIDCAuthSvc struct {
 	completeLogin          func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error)
 	selectTenant           func(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error)
 	completeLoginBySession func(ctx *gin.Context, authRequestID string, sessionID string) (string, error)
+	registerPerson         func(ctx *gin.Context, req *dtooidc.RegisterPersonReq) (*dtooidc.RegisterPersonResp, error)
+	createTenant           func(ctx *gin.Context, req *dtooidc.CreateTenantReq) (*dtooidc.CreateTenantResp, error)
 }
 
 func (f *fakeOIDCAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
@@ -37,6 +39,20 @@ func (f *fakeOIDCAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID
 		return f.completeLoginBySession(ctx, authRequestID, sessionID)
 	}
 	return "", nil
+}
+
+func (f *fakeOIDCAuthSvc) RegisterPerson(ctx *gin.Context, req *dtooidc.RegisterPersonReq) (*dtooidc.RegisterPersonResp, error) {
+	if f.registerPerson != nil {
+		return f.registerPerson(ctx, req)
+	}
+	return nil, errors.New("registerPerson not implemented in fake")
+}
+
+func (f *fakeOIDCAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenantReq) (*dtooidc.CreateTenantResp, error) {
+	if f.createTenant != nil {
+		return f.createTenant(ctx, req)
+	}
+	return nil, errors.New("createTenant not implemented in fake")
 }
 
 func TestLoginReturnsContinueURLOnSuccess(t *testing.T) {

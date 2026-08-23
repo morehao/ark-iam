@@ -95,7 +95,14 @@ export default function TenantUserPage() {
 
   const openEdit = (record: TenantUserItem) => {
     setEditing(record)
-    form.setFieldsValue({ name: record.name, avatar: record.avatar, isSuspended: record.isSuspended })
+    form.setFieldsValue({
+      name: record.name,
+      username: record.username,
+      primaryEmail: record.primaryEmail,
+      primaryPhone: record.primaryPhone,
+      avatar: record.avatar,
+      isSuspended: record.isSuspended,
+    })
     setModalOpen(true)
   }
 
@@ -104,7 +111,15 @@ export default function TenantUserPage() {
       const values = await form.validateFields()
       setSubmitLoading(true)
       if (editing) {
-        await updateTenantUser({ userID: editing.userID, name: values.name, avatar: values.avatar, isSuspended: values.isSuspended })
+        await updateTenantUser({
+          userID: editing.userID,
+          name: values.name,
+          username: values.username,
+          primaryEmail: values.primaryEmail,
+          primaryPhone: values.primaryPhone,
+          avatar: values.avatar,
+          isSuspended: values.isSuspended,
+        })
         message.success('保存成功')
       } else {
         await createTenantUser({ ...values, organizationIDs: [values.organizationID] })
@@ -137,7 +152,7 @@ export default function TenantUserPage() {
       ])
       setDetail(d)
       setOrgTree(orgs?.list || [])
-      setOrgIDs((d.organizations || []).filter((o) => o.relationType === 'member').map((o) => o.organizationID))
+      setOrgIDs((d.organizations || []).filter((o) => o.relationType === 'secondary').map((o) => o.organizationID))
       setRoleOptions(roles?.list || [])
       setRoleIDs((d.roles || []).map((r) => r.roleID))
     } catch {
@@ -149,13 +164,13 @@ export default function TenantUserPage() {
 
   const saveOrgAssignments = async () => {
     if (!detail) return
-    // 业务约束：用户必须从属于至少一个部门，禁止清空全部组织归属
+    // 业务约束：用户必须参与至少一个部门，禁止清空全部参与关系
     if (!orgIDs.length) {
-      message.error('用户必须从属于至少一个部门')
+      message.error('用户必须参与至少一个部门')
       return
     }
     await updateUserOrganizations(detail.userID, orgIDs)
-    message.success('组织归属已更新')
+    message.success('参与部门已更新')
     void openDetail(detail)
   }
 
@@ -314,11 +329,11 @@ export default function TenantUserPage() {
         width={560}
       >
         <Form form={form} layout="vertical">
+          <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}>
+            <Input placeholder="如：张三（无匹配自然人时按此姓名创建）" />
+          </Form.Item>
           {!editing && (
             <>
-              <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}>
-                <Input placeholder="如：张三（无匹配自然人时按此姓名创建）" />
-              </Form.Item>
               <Form.Item name="organizationID" label="部门" rules={[{ required: true, message: '请选择部门' }]}>
                 <TreeSelect
                   treeData={toTreeSelect(orgTree)}
@@ -326,33 +341,54 @@ export default function TenantUserPage() {
                   placeholder="选择所属部门（同时建立组织归属）"
                 />
               </Form.Item>
-              <Form.Item name="primaryEmail" label="邮箱">
-                <Input placeholder="可空；命中已有自然人则复用" />
-              </Form.Item>
-              <Form.Item name="primaryPhone" label="手机号">
-                <Input placeholder="可空" />
-              </Form.Item>
-              <Form.Item name="password" label="初始密码">
-                <Input.Password placeholder="可空；提供后该用户可登录" />
-              </Form.Item>
-              <Form.Item name="isSuspended" label="状态" valuePropName="checked" initialValue={false}>
-                <Switch checkedChildren="挂起" unCheckedChildren="正常" />
+              <Form.Item name="secondaryOrgIDs" label="参与部门">
+                <TreeSelect
+                  treeData={toTreeSelect(orgTree)}
+                  treeDefaultExpandAll
+                  multiple
+                  allowClear
+                  placeholder="选择参与部门（可多个，跨部门协作）"
+                />
               </Form.Item>
             </>
+          )}
+          <Form.Item
+            name="primaryEmail"
+            label="邮箱"
+            dependencies={['primaryPhone']}
+            rules={[
+              {
+                validator: (_, v) => {
+                  const phone = form.getFieldValue('primaryPhone')
+                  if ((!v || v === '') && (!phone || phone === '')) {
+                    return Promise.reject(new Error('邮箱和手机号至少填写一个'))
+                  }
+                  return Promise.resolve()
+                },
+              },
+            ]}
+          >
+            <Input placeholder="邮箱" />
+          </Form.Item>
+          <Form.Item name="primaryPhone" label="手机号" dependencies={['primaryEmail']}>
+            <Input placeholder="手机号" />
+          </Form.Item>
+          <Form.Item name="username" label="用户名">
+            <Input placeholder="可空，全局用户名" />
+          </Form.Item>
+          {!editing && (
+            <Form.Item name="password" label="初始密码">
+              <Input.Password placeholder="可空；提供后该用户可登录" />
+            </Form.Item>
           )}
           {editing && (
-            <>
-              <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}>
-                <Input />
-              </Form.Item>
-              <Form.Item name="avatar" label="头像URL">
-                <Input placeholder="可空" />
-              </Form.Item>
-              <Form.Item name="isSuspended" label="状态" valuePropName="checked">
-                <Switch checkedChildren="挂起" unCheckedChildren="正常" />
-              </Form.Item>
-            </>
+            <Form.Item name="avatar" label="头像URL">
+              <Input placeholder="可空" />
+            </Form.Item>
           )}
+          <Form.Item name="isSuspended" label="状态" valuePropName="checked" initialValue={false}>
+            <Switch checkedChildren="挂起" unCheckedChildren="正常" />
+          </Form.Item>
         </Form>
       </Modal>
 
@@ -393,7 +429,7 @@ export default function TenantUserPage() {
               },
               {
                 key: 'org',
-                label: '组织归属',
+                label: '参与部门',
                 children: (
                   <Space direction="vertical" size={12} style={{ width: '100%' }}>
                     <TreeSelect
@@ -404,13 +440,13 @@ export default function TenantUserPage() {
                       allowClear
                       treeDefaultExpandAll
                       style={{ width: '100%' }}
-                      placeholder="勾选所属组织（首个为主组织）"
+                      placeholder="勾选参与部门（可多选）"
                     />
                     <div style={{ color: '#94a3b8', fontSize: 12 }}>
-                      首个为主组织（主归属）；保存时全量替换成员关系
+                      参与部门用于跨部门协作；保存时全量替换参与关系（主部门请通过组织关系维护）
                     </div>
                     <Button type="primary" onClick={() => void saveOrgAssignments()}>
-                      保存组织归属
+                      保存参与部门
                     </Button>
                   </Space>
                 ),

@@ -31,6 +31,13 @@ type UserStatusUpdateReq struct {
 	IsSuspended bool   `json:"isSuspended"`                       // 是否挂起
 }
 
+// UserOwnerUpdateReq 平台管理员显式指派/取消某租户用户为租户拥有者。
+// owner 只由平台管理员（或自助开通租户时的注册人）产生，普通自助加入永不 owner。
+type UserOwnerUpdateReq struct {
+	UserID  string `json:"-" uri:"userID" binding:"required"` // 用户ID
+	IsOwner bool   `json:"isOwner"`                           // 是否租户拥有者
+}
+
 type UserIdentityCreateReq struct {
 	TenantID   string `json:"tenantID" binding:"required"`   // 租户ID
 	UserID     string `json:"-" uri:"userID"`                // 用户ID（path）

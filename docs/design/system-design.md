@@ -191,7 +191,7 @@ erDiagram
     application ||--o{ application_client : "1:N"
     application_client ||--o{ application_client_secret : "1:N"
     tenant ||--o{ organization : "1:N 组织树(parent_id 自引用)"
-    organization ||--o{ organization_user : "1:N 关系(member/leader)"
+    organization ||--o{ organization_user : "1:N 关系(primary/secondary/leader)"
     user ||--o{ organization_user : "1:N"
     tenant ||--o{ role : "1:N"
     application ||--o{ role : "1:N"
@@ -316,8 +316,7 @@ erDiagram
         string tenant_id FK
         string organization_id FK
         string user_id FK
-        string relation_type "member/leader"
-        bool is_primary "主归属(仅member)"
+        string relation_type "primary/secondary/leader"
     }
     role {
         uint id PK
@@ -510,7 +509,7 @@ erDiagram
 | 表 | 说明 |
 |---|---|
 | `organization` | 组织树节点（租户内用户容器）：`parent_id` 树 + `org_path`/`org_depth` 物化路径，`status` 启停用 |
-| `organization_user` | 组织关系（多态）：`relation_type` 互斥枚举 member/leader，`is_primary` 主归属（仅 member 可置位） |
+| `organization_user` | 组织关系（多态）：`relation_type` 强类型枚举 primary/secondary/leader（primary 行政主部门至多 1 行/用户，无 is_primary） |
 
 #### 权限域
 
@@ -559,7 +558,11 @@ erDiagram
 
 ## 5. 核心业务流程
 
-### 5.1 用户注册（平台自助注册）
+### 5.1 自助开通租户（通道 A）与凭邀请加入租户（通道 B）
+
+注册分为两条独立通道，**owner 只由通道 A 或管理员显式指派产生**，通道 B 加入者永远是普通成员：
+
+**通道 A：自助开通租户（`POST /v1/auth/register`）**
 
 ```mermaid
 sequenceDiagram
@@ -568,15 +571,38 @@ sequenceDiagram
     participant A as auth 应用
     participant DB as PostgreSQL
 
-    U->>A: POST /v1/auth/register<br/>（租户ID、用户名/邮箱/手机号、密码、姓名）
-    A->>A: 校验密码强度<br/>（≥6 位，含大小写+数字）
-    A->>A: 校验标识唯一<br/>（username/email/phone 任一已存在则拒绝）
-    A->>DB: 插入 person<br/>（密码 bcrypt 哈希，标识空值存 NULL）
-    A->>DB: 插入 user<br/>（person_id + tenant_id，is_owner=1）
+    U->>A: POST /v1/auth/register<br/>（租户名、用户名/邮箱/手机号、密码、姓名）
+    A->>A: 校验全局开关 selfRegister.enabled<br/>（关闭则拒绝）
+    A->>A: 校验密码强度 + 标识唯一<br/>（person find-or-create）
+    A->>DB: 事务创建
+    A->>DB: 1) person（bcrypt 密码哈希）
+    A->>DB: 2) tenant（Code 自动生成）+ 根组织节点
+    A->>DB: 3) user（person_id + tenant_id，is_owner=1）
+    A->>A: 注册即登录：建 SSO 会话（subject=personID）
+    A-->>U: { userID, tenantID, sessionID }
+```
+
+**要点**：通道 A 的注册人自任该新租户的**拥有者**（`is_owner=1`），对标 zitadel `register/org`。开关 `SecurityConfig.SelfRegister.Enabled` 默认关闭，生产环境需显式开启以防批量刷租户。
+
+**通道 B：凭邀请加入已有租户（`POST /v1/auth/joinTenant`）**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 已登录用户
+    participant A as auth 应用
+    participant AT as tenantadmin 应用
+    participant DB as PostgreSQL
+
+    AT->>DB: owner/管理员生成邀请<br/>（POST /v1/tenant/invites）
+    U->>A: POST /v1/auth/joinTenant<br/>（inviteCode）
+    A->>A: 校验邀请（有效、未过期、未使用）→ 解析租户
+    A->>DB: 查重 user（person_id + tenant_id）
+    A->>DB: 事务创建 user（is_owner=0）+ 标记邀请已用
     A-->>U: { userID }
 ```
 
-**要点**：注册即成为该租户的**拥有者**（`is_owner=1`）；后续可通过 `POST /v1/auth/joinTenant` 加入其他租户。
+**要点**：落哪个租户由**邀请码**决定（租户侧授权），**禁止裸 `tenantID` 直入**——这是软隔离多租户模型下的必要门禁（对标 keycloak 落当前 realm / zitadel org scope）。加入者永远是普通成员，owner 由 `PUT /v1/platform/users/{userID}/owner`（平台管理员）显式指派。
 
 ### 5.2 密码登录（OIDC 授权码流程中的认证环节）
 

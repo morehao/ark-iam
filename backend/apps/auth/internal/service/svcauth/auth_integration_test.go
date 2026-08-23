@@ -7,7 +7,6 @@ import (
 
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/auth/testutil"
-	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/morehao/golib/biz/gcontext"
@@ -20,7 +19,7 @@ import (
 // 替代原先依赖真实数据库与种子数据的集成测试。
 func setupIntegrationDB(t *testing.T) {
 	t.Helper()
-	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{})
+	db := testutil.SetupSQLite(t, &model.TenantEntity{}, &model.PersonEntity{}, &model.UserEntity{}, &model.OrganizationEntity{})
 	now := time.Now()
 	seedTenant := &model.TenantEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
@@ -51,46 +50,6 @@ func setupIntegrationDB(t *testing.T) {
 	if err := db.Create(seedUser).Error; err != nil {
 		t.Fatalf("seed user: %v", err)
 	}
-}
-
-func TestRegisterCreatesPersonAndUser(t *testing.T) {
-	setupIntegrationDB(t)
-
-	ctx := testsetup.NewCtx(testutil.WithIamContext("1"))
-
-	tenant, err := testsetup.PrepareTestTenant(ctx, testsetup.UniqueName("tenant"), "test_tag")
-	require.NoError(t, err)
-	defer func() { _ = testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{TenantIDs: []string{tenant.ID}}) }()
-
-	username := testsetup.UniqueName("register")
-	email := testsetup.UniqueName("reg") + "@example.com"
-	phone := testsetup.UniqueName("regphone")
-	svc := NewAuthSvc()
-	resp, err := svc.Register(ctx, &dtoauth.RegisterReq{
-		TenantID:     tenant.ID,
-		Username:     username,
-		PrimaryEmail: email,
-		PrimaryPhone: phone,
-		Password:     "Password1",
-		Name:         "RegisterTest",
-	})
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	require.NotZero(t, resp.UserID)
-
-	db := dbclient.IamDB(ctx)
-	var person model.PersonEntity
-	err = db.Where("primary_email = ?", email).First(&person).Error
-	require.NoError(t, err)
-	assert.Equal(t, username, model.DerefStr(person.Username))
-	assert.True(t, testsetup.PasswordMatches(person.PasswordEncrypted, "Password1"))
-
-	defer func() {
-		_ = testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{
-			PersonIDs: []string{person.ID},
-			UserIDs:   []string{resp.UserID},
-		})
-	}()
 }
 
 func TestMyTenants(t *testing.T) {

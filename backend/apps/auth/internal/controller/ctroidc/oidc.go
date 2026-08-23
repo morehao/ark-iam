@@ -96,6 +96,34 @@ func (ctr *OIDCCtr) SelectTenant(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+func (ctr *OIDCCtr) RegisterPerson(ctx *gin.Context) {
+	var req dtooidc.RegisterPersonReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.oidcAuthSvc.RegisterPerson(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+func (ctr *OIDCCtr) CreateTenant(ctx *gin.Context) {
+	var req dtooidc.CreateTenantReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.oidcAuthSvc.CreateTenant(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
 // setSSOSessionCookie 写 SSO 会话 cookie，Secure/SameSite 由配置决定（L2）：
 // 生产（HTTPS）应 cookieSecure=true；跨站场景 sameSite=none 且必须配合 Secure。
 func setSSOSessionCookie(ctx *gin.Context, sessionID string) {

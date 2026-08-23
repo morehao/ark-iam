@@ -7,4 +7,5 @@ func RegisterRouter(groups *ginserver.RouterGroups) {
 	organizationRouter(groups)
 	roleRouter(groups)
 	tenantMenuRouter(groups)
+	inviteRouter(groups)
 }

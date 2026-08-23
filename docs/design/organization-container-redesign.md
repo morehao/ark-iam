@@ -73,52 +73,51 @@ const (
 const MaxOrgDepth = 10 // 深度上限，防病态树
 ```
 
-### 2.2 `organization_user`：组织关系（用户 ↔ 组织节点，互斥关系类型 + 主归属属性）
+### 2.2 `organization_user`：组织关系（用户 ↔ 组织节点，互斥关系类型）
 
 ```go
 const TableNameOrganizationUser = "organization_user"
 
-// 关系类型枚举（字符串，全系统约束）——"用户↔组织节点"之间是多态关系，
-// 枚举值互斥纯净：member（归属）与 leader（负责）是不同关系种类
+// 关系类型枚举（强类型，全系统约束）——"用户↔组织节点"之间是多态关系，
+// 枚举值互斥纯净：primary（行政主部门）与 secondary（跨部门参与）、leader（负责）是不同的关系种类
+// 全链路复用：实体/DAO Cond/DTO 字段一律用本类型，禁止 string(...) 强转与裸字面量
 type OrgUserRelationType string
 const (
-    OrgUserRelationMember OrgUserRelationType = "member" // 归属（成员）
-    OrgUserRelationLeader OrgUserRelationType = "leader" // 负责人（独立于归属，不要求同时是成员）
+    OrgUserRelationPrimary   OrgUserRelationType = "primary"   // 行政主部门（每用户至多 1 行）
+    OrgUserRelationSecondary OrgUserRelationType = "secondary" // 参与（跨部门参与，可多行）
+    OrgUserRelationLeader    OrgUserRelationType = "leader"    // 负责人（可多行，不要求同时是成员）
     // admin 等其他关系种类由业务按需扩展常量，无需改表
 )
 
 type OrganizationUserEntity struct {
     gormdao.BaseEntity
-    TenantID       string `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id" json:"tenantID"`
-    OrganizationID string `gorm:"column:organization_id;type:varchar(36);not null;default:'';comment:组织节点ID" json:"organizationID"`
-    UserID         string `gorm:"column:user_id;type:varchar(36);not null;default:'';comment:用户ID" json:"userID"`
-    RelationType   string `gorm:"column:relation_type;type:varchar(32);not null;default:'member';comment:关系类型(字符串枚举)" json:"relationType"`
-    IsPrimary      bool   `gorm:"column:is_primary;type:boolean;not null;default:false;comment:是否主归属(仅member关系可置位)" json:"isPrimary"`
-    CreatedBy      string `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id" json:"createdBy"`
-    UpdatedBy      string `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id" json:"updatedBy"`
-    DeletedBy      string `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人id" json:"deletedBy"`
+    TenantID       string    `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id" json:"tenantID"`
+    OrganizationID string    `gorm:"column:organization_id;type:varchar(36);not null;default:'';comment:组织节点ID" json:"organizationID"`
+    UserID         string    `gorm:"column:user_id;type:varchar(36);not null;default:'';comment:用户ID" json:"userID"`
+    RelationType   OrgUserRelationType `gorm:"column:relation_type;type:varchar(32);not null;default:'primary';comment:关系类型(字符串枚举)" json:"relationType"`
+    CreatedBy      string    `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id" json:"createdBy"`
+    UpdatedBy      string    `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id" json:"updatedBy"`
+    DeletedBy      string    `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人id" json:"deletedBy"`
 }
 ```
 
-**语义要点**：
+**语义要点**（强类型三枚举，去掉了 `is_primary`，行政主部门用 `primary` 唯一行表达）：
 
 | 场景 | 表达 |
 |---|---|
-| 跨部门 | 一个 user 多行（`relation_type=member`，一个 `organization_id`） |
-| 主部门 | `is_primary=true` 一行（仅 `member` 关系可置位）；租户内每用户**至多 1 行**（服务层校验 + 部分唯一索引 `(tenant_id, user_id) WHERE is_primary` 双保险） |
+| 行政主部门 | `relation_type=primary` **至多 1 行**（服务层校验），即用户唯一主部门，无需 `is_primary` |
+| 跨部门参与 | `relation_type=secondary` 一行/节点，可多行（一个 user 跨多个部门参与） |
 | 负责人 | `relation_type=leader` 一行；与归属是**独立关系**（负责人不必是成员）；一节点可多负责人（正/副职），由业务在展示层定义 |
-| 同一用户同一节点多关系 | 多条记录（如 member + leader 各一行），唯一键 `(tenant_id, organization_id, user_id, relation_type)` |
-| 查归属 | **单值过滤** `relation_type='member'`（需要时叠加 `is_primary` 过滤主归属），无需关系组 IN |
+| 同一用户同一节点多关系 | 多条记录（如 primary + leader 各一行），唯一键 `(tenant_id, organization_id, user_id, relation_type)` |
+| 查归属 | **单值过滤** `relation_type='primary'`（行政主部门）或 `secondary`（参与），无需关系组 IN |
 | 职位 | **不落核心表**——职位是完整业务域（职级/字典/薪酬联动），由各应用自建（如 `project_group` 或业务职位表关联本表），轻量场景由业务侧自行承载 |
 
-> `relation_type` 是**字符串枚举**（互斥关系种类）；`is_primary` 是**布尔值**（Go `bool`，DB `boolean`）——是 member 关系的**属性**而非关系类型（与 `is_leader` 用布尔表达关系类型的错误不同）。换主归属 = 事务内两行 update（旧 `is_primary=false`，目标 `is_primary=true`）。"负责人是否必须同时是成员"属业务规则，核心允许独立，需要强约束的业务在服务层校验。
+> `relation_type` 是**强类型字符串枚举**（互斥关系种类），primary/secondary/leader 各自独立。primary（行政主部门）每用户至多 1 行由服务层保障（无 `is_primary`，去掉了主归属属性）。"负责人是否必须同时是成员"属业务规则，核心允许独立，需要强约束的业务在服务层校验。
 
 **索引**（`organization_user`）：
 
 ```sql
-CREATE UNIQUE INDEX uk_org_user    ON organization_user (tenant_id, organization_id, user_id, relation_type);
--- 主归属唯一：PG / SQLite 均支持部分索引（DB 级兜底，服务层换主事务保证一致）
-CREATE UNIQUE INDEX uk_primary_org ON organization_user (tenant_id, user_id) WHERE is_primary;
+CREATE UNIQUE INDEX uk_org_user ON organization_user (tenant_id, organization_id, user_id, relation_type);
 ```
 
 ## 3. org_path 物化路径设计
@@ -205,13 +204,13 @@ CREATE INDEX idx_organization_path  ON organization (org_path text_pattern_ops);
 | PUT | `/v1/tenant/organizations/:organizationID` | 全量更新（改 parentID = 移动节点，含环路/深度校验） |
 | PATCH | `/v1/tenant/organizations/:organizationID` | 局部更新（如 status 启停用） |
 | DELETE | `/v1/tenant/organizations/:organizationID` | 删除（有子/成员默认拒绝，?cascade=1 级联） |
-| GET | `/v1/tenant/organizations/:organizationID/users` | 节点关系分页（?relationType=&isPrimary=&userName=） |
-| POST | `/v1/tenant/organizations/:organizationID/users` | 添加关系 {userID, relationType, isPrimary}（isPrimary 仅 member 可置位） |
-| PUT | `/v1/tenant/organizations/:organizationID/users/:userID` | 更新关系（relationType/isPrimary，含换主事务） |
+| GET | `/v1/tenant/organizations/:organizationID/users` | 节点关系分页（?relationType=&userName=） |
+| POST | `/v1/tenant/organizations/:organizationID/users` | 添加关系 {userID, relationType}（primary 至多 1 行/用户，服务层校验） |
+| PUT | `/v1/tenant/organizations/:organizationID/users/:userID` | 更新关系（relationType） |
 | DELETE | `/v1/tenant/organizations/:organizationID/users/:userID` | 移除成员 |
 | GET | `/v1/tenant/organizations/:organizationID/users/descendants` | 子树成员聚合（去重，跨子节点） |
-| GET | `/v1/tenant/users/:userID/organizations` | 用户归属列表（含主组织 + 各节点面包屑） |
-| PUT | `/v1/tenant/users/:userID/organizations` | 批量替换用户归属（全量替换集合，走路由规范 PUT 语义） |
+| GET | `/v1/tenant/users/:userID/organizations` | 用户归属列表（含各节点面包屑） |
+| PUT | `/v1/tenant/users/:userID/organizations` | 批量替换参与部门（全量替换 secondary） |
 
 ### 4.2 platformadmin（只读视角，`/v1/platform`）
 
@@ -245,11 +244,9 @@ UPDATE organization SET org_path = '/' || id WHERE org_path = '';  -- 存量行�
 CREATE INDEX idx_organization_parent ON organization (tenant_id, parent_id);
 CREATE INDEX idx_organization_path  ON organization (org_path text_pattern_ops);
 
--- ② organization_user：关系类型（互斥枚举）+ 主归属（布尔属性，禁止 smallint 0/1）
-ALTER TABLE organization_user ADD COLUMN relation_type varchar(32) NOT NULL DEFAULT 'member';
-ALTER TABLE organization_user ADD COLUMN is_primary    boolean     NOT NULL DEFAULT false;
-CREATE UNIQUE INDEX uk_org_user     ON organization_user (tenant_id, organization_id, user_id, relation_type);
-CREATE UNIQUE INDEX uk_primary_org  ON organization_user (tenant_id, user_id) WHERE is_primary;
+-- ② organization_user：关系类型（互斥枚举）——primary 行政主部门/secondary 参与/leader 负责，无 is_primary
+ALTER TABLE organization_user ADD COLUMN relation_type varchar(32) NOT NULL DEFAULT 'primary';
+CREATE UNIQUE INDEX uk_org_user ON organization_user (tenant_id, organization_id, user_id, relation_type);
 ```
 
 ### 5.2 数据迁移（department → organization）
@@ -261,9 +258,9 @@ SELECT id, tenant_id, parent_id,
        '/' || id, 1, name, code, sort, 'active', created_at, updated_at, deleted_at, created_by, updated_by, deleted_by
 FROM department;
 -- ② 重建 org_path / org_depth（按 parent_id 从根遍历；根 = parent_id 为空的行）
--- ③ 用户-部门关联 → 组织关系（relation_type 一律 member，is_primary 直接带过来）
-INSERT INTO organization_user (id, tenant_id, organization_id, user_id, relation_type, is_primary, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by)
-SELECT id, tenant_id, department_id, user_id, 'member', is_primary, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by
+-- ③ 用户-部门关联 → 组织关系（relation_type 一律 primary）
+INSERT INTO organization_user (id, tenant_id, organization_id, user_id, relation_type, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by)
+SELECT id, tenant_id, department_id, user_id, 'primary', created_at, updated_at, deleted_at, created_by, updated_by, deleted_by
 FROM user_department;
 -- ④ 删除旧表
 DROP TABLE user_department;
@@ -322,7 +319,7 @@ DROP TABLE organization_role;
 | 组织节点级角色/授权 | 属授权域，非关系模型 | v2 按 role 维度设计（`org_node_role_user`）；节点管理类关系（如 admin）可先用 `relation_type` 扩展常量承载 |
 | 职位/职级 | 完整业务域（职级序列/职称/薪酬联动） | 各应用自建职位表，关联 `organization_user` |
 | 节点级 MFA | MFA 是认证策略 | 租户级 `system` 配置 |
-| 关系专属业务属性（leader 正副职、admin 管理范围等） | 业务语义，非结构事实 | 业务侧承载；**核心只承诺 `relation_type`（互斥关系种类）+ `is_primary`（唯一结构属性）两个维度**，新增关系类型通常无需加字段；结构性属性若膨胀，走 §6.3 关系属性演进 |
+| 关系专属业务属性（leader 正副职、admin 管理范围等） | 业务语义，非结构事实 | 业务侧承载；**核心只承诺 `relation_type`（互斥关系种类）一个维度**，新增关系类型通常无需加字段；结构性属性若膨胀，走 §6.3 关系属性演进 |
 
 ### 6.2 类型与业务扩展的标准姿势
 
@@ -336,8 +333,8 @@ DROP TABLE organization_role;
 
 **① 闭包表**：将来若出现"全租户人事报表等近静态树 + 极高频跨组织聚合"，再补 `organization_closure(ancestor_id, descendant_id, depth)`，与 `org_path` 共存（写入时双写），无需推翻本文设计。
 
-**② 关系属性演进**：`organization_user` 当前只承诺 `relation_type` + `is_primary` 两个维度（§6.1）。若未来出现"多种关系类型的结构级专属属性"（如 leader 需要"是否代理"、admin 需要"管理范围"）：
-- **少数（1~2 个）**：按 `is_primary` 同模式加列即可（边际成本 = 一列 + 一个 DTO 字段，只影响该关系类型的代码）；
+**② 关系属性演进**：`organization_user` 当前只承诺 `relation_type` 一个维度（§6.1）。若未来出现"多种关系类型的结构级专属属性"（如 leader 需要"是否代理"、admin 需要"管理范围"）：
+- **少数（1~2 个）**：按关系类型加列即可（边际成本 = 一列 + 一个 DTO 字段，只影响该关系类型的代码）；
 - **多数（开始膨胀）**：引入关系属性表 `organization_user_attr(relation_id, attr_key, attr_value)`（或 JSON 列）承载"关系级属性"，`organization_user` 核心结构不变——与闭包表同理，**只做加法、不推翻**。
 
 ## 7. 影响面与改动清单
@@ -356,7 +353,7 @@ DROP TABLE organization_role;
 **修改**
 
 - `pkg/iam/model/organization.go`：加 `parent_id/org_path/org_depth/code/sort`，`status` 为字符串枚举（`"active"/"inactive"`）；去 `is_mfa_required` 与 `custom_data`
-- `pkg/iam/model/organization_user.go`：重写为**关系表**——`relation_type`（字符串枚举 member/leader，可扩展，**互斥**）+ `is_primary`（布尔 `bool`，仅 member 可置位）
+- `pkg/iam/model/organization_user.go`：重写为**关系表**——`relation_type`（强类型枚举 primary/secondary/leader，可扩展，**互斥**），无 `is_primary`（primary 行政主部门靠唯一行表达）
 - **全系统布尔字段改造（§1.3 原则 5）**：21 处 `int8` 0/1 布尔 → Go `bool`——`tenant/user/person.is_suspended`、`user.is_owner`、`connector.allow_auto_create_user / allow_account_link / sync_profile / enable_token_storage`、`application.is_system`、`menu.hidden / external_link / keep_alive`、`role.is_default`、`resource.is_default`、`domain.is_verified`、`application_client.require_pkce / require_auth_time / is_third_party / is_system`（另 2 处 `is_mfa_required` / `user_department.is_primary` 随旧表删除）
 - `pkg/iam/model/automigrate.go`：实体清单（删 4 留 2）
 - `pkg/iam/dao/organization.go`：Cond 增 `ParentID/OrgPath/Status/Code`；新增树方法（GetTreeByTenant / GetDescendants / MoveNode 事务 / 环路与深度校验）
@@ -372,7 +369,7 @@ DROP TABLE organization_role;
 **新增/重写**
 
 - `svctenant/organization.go`：Tree / Create / Update（含移动）/ Delete（级联）/ Detail（含面包屑）
-- `svctenant/organization_user.go`：AddRelation / RemoveRelation / UpdateRelation / PageList / SubtreeMembers（按 `relation_type` 单值过滤；`is_primary` 仅 `member` 可置位，服务层校验；换主归属 = 事务内两行 update，部分唯一索引兜底）
+- `svctenant/organization_user.go`：AddRelation / RemoveRelation / UpdateRelation / PageList / SubtreeMembers（按 `relation_type` 单值过滤；primary 行政主部门每用户至多 1 行由服务层校验，换保/新增时覆盖或拒绝重复行）
 - 用户归属：`GET/PUT /v1/tenant/users/:userID/organizations`
 - platformadmin 只读：`GET /v1/platform/organizations`、`GET /v1/platform/organizations/tree`、`GET /v1/platform/users/:userID/organizations`
 
@@ -392,7 +389,7 @@ DROP TABLE organization_role;
 ## 8. 验收标准
 
 1. `go test ./...` 全绿，`make lint` 通过；
-2. tenantadmin 组织树完整可用：建树、移动（环路拒绝）、级联删除、**关系管理（relation_type 增删改、is_primary 仅 member 可置位、主组织唯一由部分唯一索引兜底）**、子树成员聚合；
+2. tenantadmin 组织树完整可用：建树、移动（环路拒绝）、级联删除、**关系管理（relation_type 增删改：primary/secondary/leader，primary 每用户至多 1 行）**、子树成员聚合；
 3. platformadmin 组织树只读、无写接口；
 4. 新租户创建自动种**同名**根组织节点（种子与运行时双路径，幂等）；
 5. 存量库迁移脚本在 PG 实测通过（`//go:build pg` 测试覆盖）；

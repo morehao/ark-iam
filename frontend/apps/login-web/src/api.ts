@@ -1,5 +1,14 @@
 import axios from 'axios'
-import type { ApiResponse, OIDCLoginReq, OIDCLoginResp, OIDCSelectTenantReq } from './types'
+import type {
+  ApiResponse,
+  OIDCLoginReq,
+  OIDCLoginResp,
+  OIDCSelectTenantReq,
+  RegisterPersonReq,
+  RegisterPersonResp,
+  CreateTenantReq,
+  CreateTenantResp,
+} from './types'
 
 const api = axios.create({
   baseURL: '/oidc',
@@ -21,6 +30,24 @@ export async function oidcSelectTenant(data: OIDCSelectTenantReq): Promise<OIDCL
   const body = resp.data
   if (body.code !== 0) {
     throw new Error(body.msg || '选择租户失败，请重试')
+  }
+  return body.data
+}
+
+export async function registerPerson(data: RegisterPersonReq): Promise<RegisterPersonResp> {
+  const resp = await api.post<ApiResponse<RegisterPersonResp>>('/registerPerson', data)
+  const body = resp.data
+  if (body.code !== 0) {
+    throw new Error(body.msg || '注册失败，请重试')
+  }
+  return body.data
+}
+
+export async function createTenant(data: CreateTenantReq): Promise<CreateTenantResp> {
+  const resp = await api.post<ApiResponse<CreateTenantResp>>('/createTenant', data)
+  const body = resp.data
+  if (body.code !== 0) {
+    throw new Error(body.msg || '创建租户失败，请重试')
   }
   return body.data
 }

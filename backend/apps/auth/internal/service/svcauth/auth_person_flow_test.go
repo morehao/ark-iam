@@ -2,15 +2,19 @@ package svcauth
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
+	"github.com/morehao/ark-iam/auth/testutil"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
+	"gorm.io/gorm"
 )
 
 type fakeAuthPersonStore struct {
@@ -121,37 +125,45 @@ func TestMyTenantsReturnsCurrentPersonTenantList(t *testing.T) {
 	}
 }
 
-func TestJoinTenantRejectsNonExistentTenant(t *testing.T) {
+func TestJoinTenantRejectsMissingInviteCode(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
-	restoreUserStore := swapUserStoreFactory(func() authUserStore {
-		return &fakeAuthUserStore{
-			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
-				return nil, nil
-			},
-		}
-	})
-	defer restoreUserStore()
-
-	var tenantLookup string
-	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
-		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
-				tenantLookup = id
-				return nil, nil
-			},
-		}
-	})
-	defer restoreTenantStore()
+	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{})
 
 	svc := &authSvc{}
-	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{TenantID: "999"})
-	assertCode(t, err, code.TenantNotExistError)
-	if tenantLookup != "999" {
-		t.Fatalf("expected tenant lookup with id 999, got %s", tenantLookup)
+	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: ""})
+	assertCode(t, err, code.AuthJoinNotAllowedError)
+	if cerr := db.Exec("SELECT 1 FROM tenant_invite").Error; cerr != nil {
+		t.Fatalf("expected invite table migrated: %v", cerr)
 	}
+}
+
+func TestJoinTenantRejectsInvalidInvite(t *testing.T) {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = httptestRequest(t)
+	ginCtx.Set(gcontext.KeyPersonID, "88")
+
+	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{})
+	seedInvite(t, db, "invite-abc", "22", model.InviteStatusPending, nil)
+
+	svc := &authSvc{}
+	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: "no-such-code"})
+	assertCode(t, err, code.InviteInvalidError)
+}
+
+func TestJoinTenantRejectsRevokedInvite(t *testing.T) {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = httptestRequest(t)
+	ginCtx.Set(gcontext.KeyPersonID, "88")
+
+	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{})
+	seedInvite(t, db, "invite-abc", "22", model.InviteStatusRevoked, nil)
+
+	svc := &authSvc{}
+	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: "invite-abc"})
+	assertCode(t, err, code.InviteInvalidError)
 }
 
 func TestJoinTenantRejectsAlreadyJoinedTenant(t *testing.T) {
@@ -159,29 +171,24 @@ func TestJoinTenantRejectsAlreadyJoinedTenant(t *testing.T) {
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
-	restoreUserStore := swapUserStoreFactory(func() authUserStore {
-		return &fakeAuthUserStore{
-			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
-				if cond.PersonID != "88" || cond.TenantID != "22" {
-					t.Fatalf("unexpected user lookup cond: %+v", *cond)
-				}
-				return &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "101"}}, TenantID: "22", PersonID: "88", Name: "existing"}, nil
-			},
-		}
-	})
-	defer restoreUserStore()
-
-	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
-		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
-				return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "22"}}, Name: "租户A", Tag: "a"}, nil
-			},
-		}
-	})
-	defer restoreTenantStore()
+	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{})
+	seedInvite(t, db, "invite-abc", "22", model.InviteStatusPending, nil)
+	now := time.Now()
+	existing := &model.UserEntity{
+		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "101"}},
+		TenantID:   "22",
+		PersonID:   "88",
+		Name:       "existing",
+		Profile:    json.RawMessage(`{}`),
+		CustomData: json.RawMessage(`{}`),
+		JoinedAt:   &now,
+	}
+	if err := db.Create(existing).Error; err != nil {
+		t.Fatalf("seed existing user: %v", err)
+	}
 
 	svc := &authSvc{}
-	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{TenantID: "22"})
+	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: "invite-abc"})
 	assertCode(t, err, code.AlreadyJoinedError)
 }
 
@@ -190,46 +197,21 @@ func TestJoinTenantCreatesNonOwnerUser(t *testing.T) {
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
-	var insertedUser *model.UserEntity
-	restoreUserStore := swapUserStoreFactory(func() authUserStore {
-		return &fakeAuthUserStore{
-			getByCondFunc: func(ctx context.Context, cond *dao.UserCond) (*model.UserEntity, error) {
-				return nil, nil
-			},
-			insertFunc: func(ctx context.Context, entity *model.UserEntity) error {
-				entity.ID = "200"
-				copied := *entity
-				insertedUser = &copied
-				return nil
-			},
-		}
-	})
-	defer restoreUserStore()
-
-	var tenantLookup string
-	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
-		return &fakeAuthTenantStore{
-			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
-				tenantLookup = id
-				return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "22"}}, Name: "租户A", Tag: "a"}, nil
-			},
-		}
-	})
-	defer restoreTenantStore()
+	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{})
+	seedInvite(t, db, "invite-abc", "22", model.InviteStatusPending, nil)
 
 	svc := &authSvc{}
-	resp, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{TenantID: "22"})
+	resp, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: "invite-abc"})
 	if err != nil {
 		t.Fatalf("JoinTenant returned error: %v", err)
 	}
-	if resp == nil || resp.UserID != "200" {
-		t.Fatalf("expected user id 200, got %#v", resp)
+	if resp == nil || resp.UserID == "" {
+		t.Fatalf("expected created user id, got %#v", resp)
 	}
-	if tenantLookup != "22" {
-		t.Fatalf("expected tenant lookup with id 22, got %s", tenantLookup)
-	}
-	if insertedUser == nil {
-		t.Fatal("expected user to be inserted")
+
+	var insertedUser model.UserEntity
+	if err := db.Where("id = ?", resp.UserID).First(&insertedUser).Error; err != nil {
+		t.Fatalf("expected user persisted: %v", err)
 	}
 	if insertedUser.TenantID != "22" {
 		t.Fatalf("expected tenant id 22, got %s", insertedUser.TenantID)
@@ -240,10 +222,30 @@ func TestJoinTenantCreatesNonOwnerUser(t *testing.T) {
 	if insertedUser.IsOwner {
 		t.Fatalf("expected join-tenant user to be non-owner (isOwner=false), got %t", insertedUser.IsOwner)
 	}
-	if insertedUser.Name != "" {
-		t.Fatalf("expected empty name for join-tenant user (person name not copied), got %q", insertedUser.Name)
-	}
 	if insertedUser.JoinedAt == nil {
 		t.Fatal("expected join-tenant user to have joined_at set")
+	}
+
+	// 邀请应被标记为已使用
+	var invite model.InviteEntity
+	if err := db.Where("code = ?", "invite-abc").First(&invite).Error; err != nil {
+		t.Fatalf("expected invite persisted: %v", err)
+	}
+	if invite.Status != model.InviteStatusAccepted {
+		t.Fatalf("expected invite marked accepted, got %s", invite.Status)
+	}
+}
+
+// seedInvite 向测试库播种一条邀请。
+func seedInvite(t *testing.T, db *gorm.DB, code, tenantID string, status model.InviteStatus, expiresAt *time.Time) {
+	t.Helper()
+	invite := &model.InviteEntity{
+		Code:      code,
+		TenantID:  tenantID,
+		Status:    status,
+		ExpiresAt: expiresAt,
+	}
+	if err := db.Create(invite).Error; err != nil {
+		t.Fatalf("seed invite: %v", err)
 	}
 }

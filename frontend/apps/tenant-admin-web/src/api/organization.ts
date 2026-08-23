@@ -28,9 +28,9 @@ export const deleteOrganization = (id: string, cascade = false) =>
 // ---------- 组织关系 ----------
 export const getOrganizationUserPage = (organizationID: string, params?: { page?: number; pageSize?: number; relationType?: string; keyword?: string }) =>
   request.get<any, PageListResp<OrganizationUserItem>>(`/tenant/organizations/${organizationID}/users`, { params })
-export const createOrganizationUser = (organizationID: string, data: { userID: string; relationType?: string; isPrimary?: boolean }) =>
+export const createOrganizationUser = (organizationID: string, data: { userID: string; relationType?: string }) =>
   request.post<any, void>(`/tenant/organizations/${organizationID}/users`, data)
-export const updateOrganizationUser = (organizationID: string, userID: string, data: { relationType?: string; isPrimary?: boolean }) =>
+export const updateOrganizationUser = (organizationID: string, userID: string, data: { relationType?: string }) =>
   request.put<any, string>(`/tenant/organizations/${organizationID}/users/${userID}`, data)
 export const deleteOrganizationUser = (organizationID: string, userID: string) =>
   request.delete<any, string>(`/tenant/organizations/${organizationID}/users/${userID}`)

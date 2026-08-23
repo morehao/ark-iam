@@ -31,6 +31,7 @@ func AllEntities() []any {
 		&SessionAuditEntity{},
 		&AuditLogEntity{},
 		&LogEntity{},
+		&InviteEntity{},
 	}
 }
 
@@ -53,6 +54,7 @@ var partialUniqueIndexes = []string{
 	`CREATE UNIQUE INDEX IF NOT EXISTS idx_person_primary_email ON person (primary_email) WHERE deleted_at IS NULL`,
 	`CREATE UNIQUE INDEX IF NOT EXISTS idx_person_primary_phone ON person (primary_phone) WHERE deleted_at IS NULL`,
 	`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_identity_issuer_subject ON user_identity (issuer, external_subject) WHERE deleted_at IS NULL`,
+	`CREATE UNIQUE INDEX IF NOT EXISTS idx_invite_code ON tenant_invite (code) WHERE deleted_at IS NULL`,
 }
 
 // EnsurePartialUniqueIndexes 创建/校验软删除表的部分唯一索引（幂等）。

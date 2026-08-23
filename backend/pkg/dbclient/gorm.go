@@ -28,7 +28,7 @@ const (
 // tenant 插件会为所有未跳过的表自动注入 tenant_id 过滤条件，而这些表没有该列，
 // 注入后查询会报 "Unknown column 'xxx.tenant_id' in 'where clause'"
 // （平台端表现为 [100734] 查看应用列表失败等列表类错误）。
-// 判断标准：表结构不存在 tenant_id 列（见 backend/scripts/sql/iam_schema.sql）。
+// 判断标准：表结构不存在 tenant_id 列（见 pkg/iam/model 各实体定义）。
 var tenantScopeSkipTables = []string{
 	"person",
 	"tenant",

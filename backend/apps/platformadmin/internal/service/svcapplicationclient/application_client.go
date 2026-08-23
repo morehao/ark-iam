@@ -13,7 +13,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
+	"github.com/morehao/ark-iam/pkg/iam/audit"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtoapplicationclient"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
@@ -85,8 +85,8 @@ func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.Ap
 		glog.Errorf(ctx, "[svcapplicationclient.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationClientCreateError)
 	}
-	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-		Action:     svcaudit.ActionApplicationClientCreate,
+	audit.WriteAudit(ctx, audit.AuditEntry{
+		Action:     audit.ActionApplicationClientCreate,
 		TenantID:   insertEntity.TenantID,
 		Result:     "success",
 		TargetType: "application_client",
@@ -369,8 +369,8 @@ func (svc *oAuthClientSvc) CreateSecret(ctx *gin.Context, req *dtoapplicationcli
 		return nil, code.GetError(code.ApplicationClientSecretCreateError)
 	}
 
-	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-		Action:     svcaudit.ActionApplicationClientCreateSecret,
+	audit.WriteAudit(ctx, audit.AuditEntry{
+		Action:     audit.ActionApplicationClientCreateSecret,
 		TenantID:   entity.TenantID,
 		Result:     "success",
 		TargetType: "application_client",

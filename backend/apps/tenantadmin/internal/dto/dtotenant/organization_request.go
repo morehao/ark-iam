@@ -1,6 +1,9 @@
 package dtotenant
 
-import "github.com/morehao/ark-iam/pkg/iam/object/objtenant"
+import (
+	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/iam/object/objtenant"
+)
 
 // ---------- 组织节点 ----------
 
@@ -42,17 +45,15 @@ type OrganizationChildrenReq struct {
 // ---------- 组织关系 ----------
 
 type OrganizationUserCreateReq struct {
-	OrganizationID string `json:"-" uri:"organizationID" binding:"required"` // 组织ID
-	UserID         string `json:"userID" binding:"required"`                 // 用户ID
-	RelationType   string `json:"relationType"`                              // 关系类型: member-归属 leader-负责人(默认member)
-	IsPrimary      bool   `json:"isPrimary"`                                 // 是否主归属(仅member关系可置位)
+	OrganizationID string                    `json:"-" uri:"organizationID" binding:"required"` // 组织ID
+	UserID         string                    `json:"userID" binding:"required"`                 // 用户ID
+	RelationType   model.OrgUserRelationType `json:"relationType"`                              // 关系类型: primary-行政主部门(每用户至多1) secondary-跨部门参与 leader-负责
 }
 
 type OrganizationUserUpdateReq struct {
-	OrganizationID string `json:"-" uri:"organizationID" binding:"required"` // 组织ID
-	UserID         string `json:"-" uri:"userID" binding:"required"`         // 用户ID
-	RelationType   string `json:"relationType"`                              // 关系类型
-	IsPrimary      bool   `json:"isPrimary"`                                 // 是否主归属(仅member关系可置位)
+	OrganizationID string                    `json:"-" uri:"organizationID" binding:"required"` // 组织ID
+	UserID         string                    `json:"-" uri:"userID" binding:"required"`         // 用户ID
+	RelationType   model.OrgUserRelationType `json:"relationType"`                              // 关系类型
 }
 
 type OrganizationUserDeleteReq struct {
@@ -61,17 +62,16 @@ type OrganizationUserDeleteReq struct {
 }
 
 type OrganizationUserPageListReq struct {
-	Page           int    `json:"page" form:"page"`                          // 页码
-	PageSize       int    `json:"pageSize" form:"pageSize"`                  // 每页数量
-	OrganizationID string `json:"-" uri:"organizationID" binding:"required"` // 组织ID
-	RelationType   string `json:"relationType" form:"relationType"`          // 关系类型过滤
-	IsPrimary      *bool  `json:"isPrimary" form:"isPrimary"`                // 主归属过滤
-	Keyword        string `json:"keyword" form:"keyword"`                    // 关键词(姓名/用户名/邮箱/手机 模糊)
+	Page           int                       `json:"page" form:"page"`                          // 页码
+	PageSize       int                       `json:"pageSize" form:"pageSize"`                  // 每页数量
+	OrganizationID string                    `json:"-" uri:"organizationID" binding:"required"` // 组织ID
+	RelationType   model.OrgUserRelationType `json:"relationType" form:"relationType"`          // 关系类型过滤
+	Keyword        string                    `json:"keyword" form:"keyword"`                    // 关键词(姓名/用户名/邮箱/手机 模糊)
 }
 
-// ---------- 用户归属 ----------
+// ---------- 用户参与 ----------
 
 type UserOrganizationsUpdateReq struct {
 	UserID          string   `json:"-" uri:"userID" binding:"required"`  // 用户ID
-	OrganizationIDs []string `json:"organizationIDs" binding:"required"` // 归属组织ID列表(全量替换member关系,首个为主归属)
+	OrganizationIDs []string `json:"organizationIDs" binding:"required"` // 参与部门ID列表(全量替换participant关系)
 }

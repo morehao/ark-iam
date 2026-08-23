@@ -14,10 +14,6 @@ type MyTenantsResp struct {
 	List []objauth.TenantOption `json:"list"`
 }
 
-type RegisterResp struct {
-	UserID string `json:"userID"` // 用户ID
-}
-
 type UserinfoResp struct {
 	PersonInfo objauth.PersonInfo     `json:"personInfo"`
 	UserInfo   objauth.TenantUserInfo `json:"userInfo"`

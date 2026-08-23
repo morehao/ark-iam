@@ -1,4 +1,4 @@
-package svcaudit
+package audit
 
 import (
 	"context"

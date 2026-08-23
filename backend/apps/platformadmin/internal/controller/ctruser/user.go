@@ -13,6 +13,7 @@ type UserCtr interface {
 	PageList(ctx *gin.Context)
 	UpdatePassword(ctx *gin.Context)
 	UpdateStatus(ctx *gin.Context)
+	UpdateOwner(ctx *gin.Context)
 	GetUserLoginLogByUser(ctx *gin.Context)
 	CreateUserIdentity(ctx *gin.Context)
 	DeleteUserIdentity(ctx *gin.Context)
@@ -123,6 +124,31 @@ func (ctr *userCtr) UpdateStatus(ctx *gin.Context) {
 		return
 	}
 	gincontext.Success(ctx, "修改成功")
+}
+
+// @Tags 用户管理
+// @Summary 设置租户拥有者（平台管理员显式指派/取消）
+// @accept application/json
+// @Produce application/json
+// @Param userID path int true "用户ID"
+// @Param req body dtouser.UserOwnerUpdateReq true "设置租户拥有者"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/platform/users/{userID}/owner [put]
+func (ctr *userCtr) UpdateOwner(ctx *gin.Context) {
+	var req dtouser.UserOwnerUpdateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctr.userSvc.UpdateOwner(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, "设置成功")
 }
 
 // @Tags 用户管理
