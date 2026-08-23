@@ -103,7 +103,7 @@ func loadTenantApps(ctx *gin.Context) ([]model.ApplicationEntity, error) {
 func buildAppMenuTree(ctx *gin.Context, appID string) ([]dtotenant.MenuTreeItem, error) {
 	menuEntityList, _, err := dao.NewMenuDao().GetPageListByCond(ctx, &dao.MenuCond{
 		AppID:  appID,
-		Status: model.AppStatusEnable,
+		Status: model.MenuStatusEnable,
 	})
 	if err != nil {
 		glog.Errorf(ctx, "[svctenant.buildAppMenuTree] dao menu GetPageListByCond fail, err:%v, appID:%s", err, appID)
@@ -167,31 +167,90 @@ func buildTenantMenuTree(ctx *gin.Context) ([]dtotenant.MenuTreeItem, error) {
 }
 
 // buildMyMenuTree 构建当前用户可见的租户控制台菜单树：
-// 在 buildTenantMenuTree 的全量菜单基础上，按「可见性门槛（visibility）<= 当前用户可达等级」过滤；
-// 父子收敛：父菜单达标则整棵保留（含其全部子菜单），避免出现子可见而父不可见的不连贯结构。
+//   - 内置管理员豁免：持有内置管理员角色（source=builtin && admin_level=super）→ 全量菜单（含 visibility=admin，免授权）；
+//   - 普通成员：按该用户授权菜单集合（role_menu 并集）过滤 + visibility 门槛（public/member）二次过滤；
+//     父子收敛：父未达标/未授权时若存在可见子项则保留父壳，保证层级连贯。
 func buildMyMenuTree(ctx *gin.Context) ([]dtotenant.MenuTreeItem, error) {
-	level, err := resolveUserMenuLevel(ctx)
-	if err != nil {
-		return nil, err
-	}
 	full, err := buildTenantMenuTree(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return pruneMenuTree(full, level), nil
+	admin, err := userHoldsBuiltinAdmin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if admin {
+		return full, nil
+	}
+	authed, err := userAuthorizedMenuIDs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return pruneMenuTreeByAuthed(full, authed, model.MenuVisibilityMember.VisibilityRank()), nil
 }
 
-// resolveUserMenuLevel 计算当前用户能达到的最高可见档位（rank）。租户/tenant 端点本身要求已登录成员，
-// 故基线为 member；若具备系统管理能力则升为 admin。
-func resolveUserMenuLevel(ctx *gin.Context) (int, error) {
-	hasAdmin, err := HasSystemAdminCapability(ctx)
+// userHoldsBuiltinAdmin 判断当前用户是否持有内置管理员角色（source=builtin && admin_level=super）。
+func userHoldsBuiltinAdmin(ctx *gin.Context) (bool, error) {
+	tenantID := gincontext.GetTenantIDString(ctx)
+	userID := gincontext.GetUserIDString(ctx)
+	if tenantID == "" || userID == "" {
+		return false, nil
+	}
+	urList, err := dao.NewUserRoleDao().GetListByCond(ctx, &dao.UserRoleCond{TenantID: tenantID, UserID: userID})
 	if err != nil {
-		return model.MenuVisibilityMember.VisibilityRank(), nil
+		glog.Errorf(ctx, "[svctenant.userHoldsBuiltinAdmin] query user_role fail, err:%v, tenantID:%s, userID:%s", err, tenantID, userID)
+		return false, err
 	}
-	if hasAdmin {
-		return model.MenuVisibilityAdmin.VisibilityRank(), nil
+	if len(urList) == 0 {
+		return false, nil
 	}
-	return model.MenuVisibilityMember.VisibilityRank(), nil
+	roleIDs := make([]string, 0, len(urList))
+	for _, r := range urList {
+		roleIDs = append(roleIDs, r.RoleID)
+	}
+	roleList, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{TenantID: tenantID, IDs: roleIDs})
+	if err != nil {
+		glog.Errorf(ctx, "[svctenant.userHoldsBuiltinAdmin] query role fail, err:%v, tenantID:%s", err, tenantID)
+		return false, err
+	}
+	for i := range roleList {
+		r := &roleList[i]
+		if r.IsBuiltinAdmin() {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// userAuthorizedMenuIDs 返回当前用户在指定租户下经 role_menu 授权得到的菜单 ID 集合（跨角色去重）。
+func userAuthorizedMenuIDs(ctx *gin.Context) (map[string]bool, error) {
+	tenantID := gincontext.GetTenantIDString(ctx)
+	userID := gincontext.GetUserIDString(ctx)
+	result := make(map[string]bool)
+	if tenantID == "" || userID == "" {
+		return result, nil
+	}
+	urList, err := dao.NewUserRoleDao().GetListByCond(ctx, &dao.UserRoleCond{TenantID: tenantID, UserID: userID})
+	if err != nil {
+		glog.Errorf(ctx, "[svctenant.userAuthorizedMenuIDs] query user_role fail, err:%v, tenantID:%s, userID:%s", err, tenantID, userID)
+		return nil, err
+	}
+	if len(urList) == 0 {
+		return result, nil
+	}
+	roleIDs := make([]string, 0, len(urList))
+	for _, r := range urList {
+		roleIDs = append(roleIDs, r.RoleID)
+	}
+	rmList, err := dao.NewRoleMenuDao().GetListByCond(ctx, &dao.RoleMenuCond{TenantID: tenantID, RoleIDs: roleIDs})
+	if err != nil {
+		glog.Errorf(ctx, "[svctenant.userAuthorizedMenuIDs] query role_menu fail, err:%v, tenantID:%s", err, tenantID)
+		return nil, err
+	}
+	for _, rm := range rmList {
+		result[rm.MenuID] = true
+	}
+	return result, nil
 }
 
 // pruneMenuTree 按可见等级剪枝菜单树：可见(保留下钻) 或略过，父菜单达标则递归保留子树。
@@ -215,9 +274,29 @@ func pruneMenuTree(items []dtotenant.MenuTreeItem, level int) []dtotenant.MenuTr
 	return result
 }
 
-// HasSystemAdminCapability 判断当前用户（按 gin 上下文取租户/用户）是否具备「系统管理能力」。
-// 授权驱动：遍历该用户的全部角色，聚合其 scope，推导系统管理等级（>= basic 即视为具备系统管理能力）。
-// 说明：此处以「拥有管理资源 scope」作为判定，而非角色 type 硬编码；与 OIDC token 的 scope 口径一致。
+// pruneMenuTreeByAuthed 按「授权集合 + 可见等级」剪枝菜单树：菜单需同时命中已授权且可见等级达标；
+// 父未命中但存在命中子项时保留父壳（导航分组），保证层级连贯。
+func pruneMenuTreeByAuthed(items []dtotenant.MenuTreeItem, authed map[string]bool, level int) []dtotenant.MenuTreeItem {
+	result := make([]dtotenant.MenuTreeItem, 0, len(items))
+	for _, item := range items {
+		children := pruneMenuTreeByAuthed(item.Children, authed, level)
+		itemVis := model.MenuVisibility(item.Visibility).VisibilityRank()
+		if itemVis <= level && authed[item.MenuID] {
+			item.Children = children
+			result = append(result, item)
+			continue
+		}
+		// 父未达标/未授权：仅当有命中子菜单时保留父壳（作为导航分组）
+		if len(children) > 0 {
+			item.Children = children
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+// HasSystemAdminCapability 判断当前用户（按 gin 上下文取租户/用户）是否具备「系统管理能力」
+// （admin_level == super）。授权驱动：聚合该用户全部角色取最高 admin_level。
 func HasSystemAdminCapability(ctx *gin.Context) (bool, error) {
 	level, err := ResolveUserAdminLevel(ctx)
 	if err != nil {
@@ -227,21 +306,21 @@ func HasSystemAdminCapability(ctx *gin.Context) (bool, error) {
 }
 
 // ResolveUserAdminLevel 推导当前用户能达到的最高系统管理等级：聚合该用户全部角色，
-// 取各角色 admin_level（显式能力标签）的最高档位（none < basic < super）。
+// 取各角色 admin_level（显式能力标签）的最高档位（member < super）。
 func ResolveUserAdminLevel(ctx *gin.Context) (model.SysAdminLevel, error) {
 	tenantID := gincontext.GetTenantIDString(ctx)
 	userID := gincontext.GetUserIDString(ctx)
 	if tenantID == "" || userID == "" {
-		return model.SysAdminLevelNone, nil
+		return model.SysAdminLevelMember, nil
 	}
 	// 1. 用户 → 角色
 	urList, err := dao.NewUserRoleDao().GetListByCond(ctx, &dao.UserRoleCond{TenantID: tenantID, UserID: userID})
 	if err != nil {
 		glog.Errorf(ctx, "[svctenant.ResolveUserAdminLevel] query user_role fail, err:%v, tenantID:%s, userID:%s", err, tenantID, userID)
-		return model.SysAdminLevelNone, err
+		return model.SysAdminLevelMember, err
 	}
 	if len(urList) == 0 {
-		return model.SysAdminLevelNone, nil
+		return model.SysAdminLevelMember, nil
 	}
 	roleIDs := make([]string, 0, len(urList))
 	for _, r := range urList {
@@ -251,11 +330,11 @@ func ResolveUserAdminLevel(ctx *gin.Context) (model.SysAdminLevel, error) {
 	roleList, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{TenantID: tenantID, IDs: roleIDs})
 	if err != nil {
 		glog.Errorf(ctx, "[svctenant.ResolveUserAdminLevel] query role fail, err:%v, tenantID:%s", err, tenantID)
-		return model.SysAdminLevelNone, err
+		return model.SysAdminLevelMember, err
 	}
-	level := model.SysAdminLevelNone
-	for _, r := range roleList {
-		lv := model.SysAdminLevel(r.AdminLevel)
+	level := model.SysAdminLevelMember
+	for i := range roleList {
+		lv := model.SysAdminLevel(roleList[i].AdminLevel)
 		if lv.SysAdminRank() > level.SysAdminRank() {
 			level = lv
 		}

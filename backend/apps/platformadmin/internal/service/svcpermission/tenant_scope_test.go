@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/iam/object/objpermission"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtopermission"
 	"github.com/morehao/ark-iam/platformadmin/testutil"
 	"github.com/morehao/golib/biz/gcontext"
@@ -95,6 +96,108 @@ func TestRoleDetailRejectsCrossTenantEntity(t *testing.T) {
 	_, err := svc.Detail(ctx, &dtopermission.RoleDetailReq{RoleID: role.ID})
 	if err == nil {
 		t.Fatalf("expected cross-tenant role detail to fail")
+	}
+}
+
+func TestMenuCreatePersistsVisibilityAndStatusAndType(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.MenuEntity{})
+	ctx := newGinCtx("20", "0")
+
+	svc := &menuSvc{}
+	resp, err := svc.Create(ctx, &dtopermission.MenuCreateReq{
+		MenuBaseInfo: objpermission.MenuBaseInfo{
+			AppID:      "10",
+			Name:       "工作台",
+			Code:       "dashboard",
+			Type:       model.MenuTypeMenu,
+			Visibility: model.MenuVisibilityMember,
+			Status:     model.MenuStatusEnable,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	var got model.MenuEntity
+	if err := db.First(&got, "id = ?", resp.MenuID).Error; err != nil {
+		t.Fatalf("load menu: %v", err)
+	}
+	if got.Visibility != model.MenuVisibilityMember {
+		t.Fatalf("expected visibility member, got %q", got.Visibility)
+	}
+	if got.Type != model.MenuTypeMenu {
+		t.Fatalf("expected type menu, got %q", got.Type)
+	}
+	if got.Status != model.MenuStatusEnable {
+		t.Fatalf("expected status enable, got %q", got.Status)
+	}
+}
+
+func TestMenuCreateRejectsInvalidEnums(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.MenuEntity{})
+	ctx := newGinCtx("21", "0")
+
+	svc := &menuSvc{}
+	_, err := svc.Create(ctx, &dtopermission.MenuCreateReq{
+		MenuBaseInfo: objpermission.MenuBaseInfo{
+			AppID:      "10",
+			Name:       "x",
+			Code:       "x",
+			Type:       model.MenuTypeButton,
+			Visibility: model.MenuVisibility("illegal"),
+			Status:     model.MenuStatusEnable,
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected invalid visibility to be rejected")
+	}
+	var count int64
+	if err := db.Model(&model.MenuEntity{}).Count(&count).Error; err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected 0 rows created, got %d", count)
+	}
+}
+
+func TestMenuUpdatePersistsVisibility(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.MenuEntity{})
+	ctx := newGinCtx("22", "0")
+
+	menu := &model.MenuEntity{
+		AppID:      "10",
+		Name:       "m",
+		Code:       "m",
+		Type:       model.MenuTypeMenu,
+		Visibility: model.MenuVisibilityPublic,
+		Status:     model.MenuStatusEnable,
+	}
+	if err := db.Create(menu).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	svc := &menuSvc{}
+	err := svc.Update(ctx, &dtopermission.MenuUpdateReq{
+		MenuID: menu.ID,
+		MenuBaseInfo: objpermission.MenuBaseInfo{
+			AppID:      "10",
+			Name:       "m",
+			Code:       "m",
+			Type:       model.MenuTypeMenu,
+			Visibility: model.MenuVisibilityAdmin,
+			Status:     model.MenuStatusEnable,
+		},
+	})
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	var got model.MenuEntity
+	if err := db.First(&got, "id = ?", menu.ID).Error; err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got.Visibility != model.MenuVisibilityAdmin {
+		t.Fatalf("expected visibility admin after update, got %q", got.Visibility)
 	}
 }
 

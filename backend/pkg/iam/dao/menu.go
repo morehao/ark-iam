@@ -12,9 +12,9 @@ type MenuCond struct {
 	ParentID   string
 	Name       string
 	Code       string
-	Type       string
-	Status     string
-	Visibility string
+	Type       model.MenuType
+	Status     model.MenuStatus
+	Visibility model.MenuVisibility
 }
 
 func (c *MenuCond) BuildCondition(db *gorm.DB, tableName string) {

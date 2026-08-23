@@ -20,26 +20,26 @@ type SysAdminLevel string
 
 // 系统管理等级取值（禁止硬编码）。
 const (
-	SysAdminLevelNone  SysAdminLevel = "none"  // 无系统管理能力（普通成员）
-	SysAdminLevelBasic SysAdminLevel = "basic" // 基础系统管理
-	SysAdminLevelSuper SysAdminLevel = "super" // 超级管理员（全部系统功能）
+	SysAdminLevelMember SysAdminLevel = "member" // 普通租户成员（无系统管理能力）
+	SysAdminLevelSuper  SysAdminLevel = "super"  // 超级管理员（全部系统功能）
 )
 
-// HasSystemAdmin 判断等级是否具备任一系统管理能力（>= basic）。
+// HasSystemAdmin 判断等级是否具备系统管理能力（仅 super）。
 func (l SysAdminLevel) HasSystemAdmin() bool {
-	return l.SysAdminRank() >= SysAdminLevelBasic.SysAdminRank()
+	return l == SysAdminLevelSuper
 }
 
-// SysAdminRank 返回系统管理等级的序数（用于门槛比较：none < basic < super）。
+// SysAdminRank 返回系统管理等级的序数（用于门槛比较：member < super）。
 func (l SysAdminLevel) SysAdminRank() int {
-	switch l {
-	case SysAdminLevelSuper:
-		return 3
-	case SysAdminLevelBasic:
+	if l == SysAdminLevelSuper {
 		return 2
-	default:
-		return 1 // SysAdminLevelNone
 	}
+	return 1 // SysAdminLevelMember
+}
+
+// IsBuiltinAdmin 判断角色是否为内置管理员（source=builtin 且 admin_level=super）。
+func (r *RoleEntity) IsBuiltinAdmin() bool {
+	return r != nil && r.Source == string(RoleSourceBuiltin) && SysAdminLevel(r.AdminLevel) == SysAdminLevelSuper
 }
 
 type RoleEntity struct {
@@ -50,7 +50,7 @@ type RoleEntity struct {
 	Code        string `gorm:"column:code;type:varchar(64);not null;default:'';comment:角色编码" json:"code"`
 	Description string `gorm:"column:description;type:varchar(256);not null;default:'';comment:角色描述" json:"description"`
 	Source      string `gorm:"column:source;type:varchar(16);not null;default:'custom';comment:角色来源(builtin/custom)" json:"source"`
-	AdminLevel  string `gorm:"column:admin_level;type:varchar(16);not null;default:'none';comment:系统管理等级(none/basic/super)" json:"adminLevel"`
+	AdminLevel  string `gorm:"column:admin_level;type:varchar(16);not null;default:'member';comment:系统管理等级(member/super)" json:"adminLevel"`
 	CreatedBy   string `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id" json:"createdBy"`
 	UpdatedBy   string `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id" json:"updatedBy"`
 	DeletedBy   string `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人id" json:"deletedBy"`

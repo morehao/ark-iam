@@ -872,7 +872,7 @@ func (svc *userSvc) hasOtherSystemAdminHolder(ctx *gin.Context, tenantID, target
 	return true, nil
 }
 
-// filterBuiltinSystemRoles 从 roleIDs 中筛出「内置 + 系统管理」的角色 ID。
+// filterBuiltinSystemRoles 从 roleIDs 中筛出「内置 + 系统管理」的角色 ID（内置管理员：source=builtin && admin_level=super）。
 func (svc *userSvc) filterBuiltinSystemRoles(ctx *gin.Context, tenantID string, roleIDs []string) ([]string, error) {
 	result := make([]string, 0)
 	if len(roleIDs) == 0 {
@@ -882,20 +882,21 @@ func (svc *userSvc) filterBuiltinSystemRoles(ctx *gin.Context, tenantID string, 
 	if err != nil {
 		return nil, err
 	}
-	for _, r := range roles {
-		if r.Source == string(model.RoleSourceBuiltin) && model.SysAdminLevel(r.AdminLevel).HasSystemAdmin() {
+	for i := range roles {
+		r := &roles[i]
+		if r.IsBuiltinAdmin() {
 			result = append(result, r.ID)
 		}
 	}
 	return result, nil
 }
 
-// listTenantBuiltinSystemRoles 返回当前租户内全部内置系统管理角色 ID。
+// listTenantBuiltinSystemRoles 返回当前租户内全部内置管理员角色 ID。
 func (svc *userSvc) listTenantBuiltinSystemRoles(ctx *gin.Context, tenantID string) ([]string, error) {
 	roles, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{
 		TenantID:          tenantID,
 		Source:            string(model.RoleSourceBuiltin),
-		AdminLevelAtLeast: string(model.SysAdminLevelBasic),
+		AdminLevelAtLeast: string(model.SysAdminLevelSuper),
 	})
 	if err != nil {
 		return nil, err

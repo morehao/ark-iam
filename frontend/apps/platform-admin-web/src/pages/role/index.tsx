@@ -7,16 +7,14 @@ import { getRolePageList, getRoleUsers } from '@ark-iam/api'
 import type { RoleItem, RoleUserItem } from '@ark-iam/types'
 import { fmtTime } from '../../components/common'
 
-/** 系统管理等级展示：super→超管，basic→基础，none→无 */
+/** 系统管理等级展示：super→超管，member→成员 */
 function adminLevelText(level?: string) {
   switch (level) {
     case 'super':
       return <Tag color="red">超管</Tag>
-    case 'basic':
-      return <Tag color="purple">基础管理</Tag>
-    case 'none':
+    case 'member':
     default:
-      return <Tag>无</Tag>
+      return <Tag>成员</Tag>
   }
 }
 

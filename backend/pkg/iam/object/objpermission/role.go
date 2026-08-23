@@ -6,5 +6,5 @@ type RoleBaseInfo struct {
 	Code        string `json:"code" form:"code"`               // 角色编码
 	Description string `json:"description" form:"description"` // 角色描述
 	Source      string `json:"source" form:"source"`           // 角色来源(builtin/custom)
-	AdminLevel  string `json:"adminLevel" form:"adminLevel"`   // 系统管理等级(none/basic/super)
+	AdminLevel  string `json:"adminLevel" form:"adminLevel"`   // 系统管理等级(member/super)
 }

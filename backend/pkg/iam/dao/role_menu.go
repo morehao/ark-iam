@@ -10,6 +10,7 @@ type RoleMenuCond struct {
 	*gormdao.BaseCond
 	TenantID string
 	RoleID   string
+	RoleIDs  []string
 	MenuID   string
 }
 
@@ -22,6 +23,9 @@ func (c *RoleMenuCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.RoleID != "" {
 		db.Where(tableName+".role_id = ?", c.RoleID)
+	}
+	if len(c.RoleIDs) > 0 {
+		db.Where(tableName+".role_id IN ?", c.RoleIDs)
 	}
 	if c.MenuID != "" {
 		db.Where(tableName+".menu_id = ?", c.MenuID)

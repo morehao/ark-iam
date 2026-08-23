@@ -29,16 +29,14 @@ import {
 import { getTenantApps } from '../../api/menu'
 import { fmtTime } from '../../components/common'
 
-/** 系统管理等级展示：super→超管，basic→基础，none→无 */
+/** 系统管理等级展示：super→超管，member→成员 */
 function adminLevelText(level?: string) {
   switch (level) {
     case 'super':
       return <Tag color="red">超管</Tag>
-    case 'basic':
-      return <Tag color="purple">基础管理</Tag>
-    case 'none':
+    case 'member':
     default:
-      return <Tag>无</Tag>
+      return <Tag>成员</Tag>
   }
 }
 
@@ -47,13 +45,20 @@ function sourceTag(source?: string) {
   return source === 'builtin' ? <Tag color="gold">内置</Tag> : <Tag color="blue">自定义</Tag>
 }
 
-// 菜单树 -> Tree 数据
-function toMenuTree(list: MenuItem[]): DataNode[] {
-  return list.map((m) => ({
-    key: m.menuID,
-    title: m.name,
-    children: m.children?.length ? toMenuTree(m.children) : undefined,
-  }))
+/** 是否为内置管理员角色（source=builtin && admin_level=super） */
+function isBuiltinAdminRole(r?: TenantRoleItem): boolean {
+  return !!r && r.source === 'builtin' && r.adminLevel === 'super'
+}
+
+// 菜单树 -> Tree 数据；非内置管理员角色剔除 visibility=admin 节点（授权约束，前端兜底）
+function toMenuTree(list: MenuItem[], builtinAdmin: boolean): DataNode[] {
+  return list
+    .filter((m) => builtinAdmin || m.visibility !== 'admin')
+    .map((m) => ({
+      key: m.menuID,
+      title: m.name,
+      children: m.children?.length ? toMenuTree(m.children, builtinAdmin) : undefined,
+    }))
 }
 
 export default function TenantRolePage() {
@@ -146,7 +151,7 @@ export default function TenantRolePage() {
     setCheckedKeys([])
     try {
       const resp = await getTenantRoleMenus(record.roleID)
-      setMenuTree(toMenuTree(resp?.list || []))
+      setMenuTree(toMenuTree(resp?.list || [], isBuiltinAdminRole(record)))
       setCheckedKeys(resp?.menuIDs || [])
     } catch {
       /* 拦截器已提示 */

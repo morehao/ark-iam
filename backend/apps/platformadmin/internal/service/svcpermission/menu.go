@@ -18,6 +18,26 @@ func menuVisible(entity *model.MenuEntity) bool {
 	return entity != nil && entity.ID != ""
 }
 
+// validateMenuEnums 校验菜单字典枚举合法值：Type/Status/Visibility 必须命中间断白名单常量。
+func validateMenuEnums(req *objpermission.MenuBaseInfo) bool {
+	switch req.Type {
+	case model.MenuTypeDirectory, model.MenuTypeMenu, model.MenuTypeButton:
+	default:
+		return false
+	}
+	switch req.Status {
+	case model.MenuStatusEnable, model.MenuStatusDisable:
+	default:
+		return false
+	}
+	switch req.Visibility {
+	case model.MenuVisibilityPublic, model.MenuVisibilityMember, model.MenuVisibilityAdmin:
+	default:
+		return false
+	}
+	return true
+}
+
 type MenuSvc interface {
 	Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (*dtopermission.MenuCreateResp, error)
 	Delete(ctx *gin.Context, req *dtopermission.MenuDeleteReq) error
@@ -36,6 +56,9 @@ func NewMenuSvc() MenuSvc {
 }
 
 func (svc *menuSvc) Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (*dtopermission.MenuCreateResp, error) {
+	if !validateMenuEnums(&req.MenuBaseInfo) {
+		return nil, code.GetError(code.MenuCreateError)
+	}
 	insertEntity := &model.MenuEntity{
 		AppID:        req.AppID,
 		ParentID:     req.ParentID,
@@ -45,6 +68,7 @@ func (svc *menuSvc) Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (
 		Icon:         req.Icon,
 		Sort:         req.Sort,
 		Type:         req.Type,
+		Visibility:   req.Visibility,
 		Component:    req.Component,
 		Redirect:     req.Redirect,
 		Hidden:       req.Hidden,
@@ -90,6 +114,9 @@ func (svc *menuSvc) Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) e
 	if !menuVisible(menuEntity) {
 		return code.GetError(code.MenuNotExistError)
 	}
+	if !validateMenuEnums(&req.MenuBaseInfo) {
+		return code.GetError(code.MenuUpdateError)
+	}
 
 	userID := gincontext.GetUserIDString(ctx)
 	updateMap := map[string]any{
@@ -101,6 +128,7 @@ func (svc *menuSvc) Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) e
 		"icon":          req.Icon,
 		"sort":          req.Sort,
 		"type":          req.Type,
+		"visibility":    req.Visibility,
 		"component":     req.Component,
 		"redirect":      req.Redirect,
 		"hidden":        req.Hidden,
@@ -160,12 +188,13 @@ func (svc *menuSvc) PageList(ctx *gin.Context, req *dtopermission.MenuPageListRe
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		AppID:    req.AppID,
-		ParentID: req.ParentID,
-		Name:     req.Name,
-		Code:     req.Code,
-		Type:     req.Type,
-		Status:   req.Status,
+		AppID:      req.AppID,
+		ParentID:   req.ParentID,
+		Name:       req.Name,
+		Code:       req.Code,
+		Type:       req.Type,
+		Status:     req.Status,
+		Visibility: req.Visibility,
 	}
 	menuEntityList, total, err := menuRepo.GetPageListByCond(ctx, cond)
 	if err != nil {
