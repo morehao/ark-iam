@@ -20,6 +20,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/tenant"
 
 	"github.com/morehao/golib/gcrypto"
+	"github.com/morehao/golib/gerror"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 
@@ -95,7 +96,9 @@ func (svc *oidcAuthSvc) RegisterPerson(ctx *gin.Context, req *dtooidc.RegisterPe
 	}
 
 	tenants, tErr := svc.authSvc.TenantsForPerson(ctx, personEntity.ID)
-	if tErr != nil {
+	// 零租户 person（无任何租户成员）查询返回 UserNotExistError：注册语境下视为空租户列表，
+	// 走 AllowPersonCreateTenant 建租户流程，而非注册失败。兼容既有 listPersonTenants 契约。
+	if tErr != nil && !gerror.IsCode(tErr, code.UserNotExistError) {
 		glog.Errorf(ctx, "[oidcAuthSvc.RegisterPerson] TenantsForPerson fail, err:%v, personID:%s", tErr, personEntity.ID)
 		return nil, code.GetError(code.AuthRegisterFailedError)
 	}
@@ -156,7 +159,9 @@ func (svc *oidcAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenant
 		return nil, code.GetError(code.AuthTenantRegisterNotAllowedError)
 	}
 	tenants, tErr := svc.authSvc.TenantsForPerson(ctx, personID)
-	if tErr != nil {
+	// 零租户 person（无任何租户成员）查询返回 UserNotExistError：建租户语境下视为
+	// 尚未加入任何租户（len(tenants)==0），放行继续建租户，而非注册失败。
+	if tErr != nil && !gerror.IsCode(tErr, code.UserNotExistError) {
 		glog.Errorf(ctx, "[oidcAuthSvc.CreateTenant] TenantsForPerson fail, err:%v", tErr)
 		return nil, code.GetError(code.AuthRegisterFailedError)
 	}
