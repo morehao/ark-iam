@@ -58,8 +58,9 @@ func (svc *oidcAuthSvc) RegisterPerson(ctx *gin.Context, req *dtooidc.RegisterPe
 	}
 
 	var personEntity *model.PersonEntity
+	personCreated := false
 	txErr := dbclient.IamDB(ctx.Request.Context()).Transaction(func(tx *gorm.DB) error {
-		p, _, fErr := person.FindOrCreate(ctx.Request.Context(), tx, &person.FindOrCreateReq{
+		p, created, fErr := person.FindOrCreate(ctx.Request.Context(), tx, &person.FindOrCreateReq{
 			Username:          req.Username,
 			PrimaryEmail:      req.PrimaryEmail,
 			PrimaryPhone:      req.PrimaryPhone,
@@ -72,6 +73,7 @@ func (svc *oidcAuthSvc) RegisterPerson(ctx *gin.Context, req *dtooidc.RegisterPe
 			return fErr
 		}
 		personEntity = p
+		personCreated = created
 		return nil
 	})
 	if txErr != nil {
@@ -80,6 +82,16 @@ func (svc *oidcAuthSvc) RegisterPerson(ctx *gin.Context, req *dtooidc.RegisterPe
 		}
 		glog.Errorf(ctx, "[oidcAuthSvc.RegisterPerson] person find-or-create fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))
 		return nil, code.GetError(code.AuthRegisterFailedError)
+	}
+
+	// C1：已存在的 person 不通过注册免密绑定——要求走密码登录（/oidc/login）。
+	// 否则攻击者以任意密码复用他人 person 即可冒用其身份。已存在时不得
+	// 返回既有租户、不得绑定 authRequest、不得进入选租户/建租户。
+	if !personCreated {
+		return &dtooidc.RegisterPersonResp{
+			PersonID:              personEntity.ID,
+			RequiresPasswordLogin: true,
+		}, nil
 	}
 
 	tenants, tErr := svc.authSvc.TenantsForPerson(ctx, personEntity.ID)
@@ -124,6 +136,8 @@ func svcResolvePersonConflict(ctx *gin.Context, req *dtooidc.RegisterPersonReq) 
 
 // CreateTenant 为 OIDC 流程内已注册、零租户且应用允许的 person 开通租户并自任 owner。
 // 仅建 person+tenant+owner 成员；认证收尾（complete + 发 code + SSO 会话）由前端调 selectTenant 完成。
+// I1：createTenant 无幂等、不置 done，同一 authRequest 可被重复调用批量建多个租户，但这是
+// 新建 person 的自建动作（C1 修复后仅新建 person 可达此），非跨用户/冒用风险，判定可接受。
 func (svc *oidcAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenantReq) (*dtooidc.CreateTenantResp, error) {
 	authReq, err := svc.provider.Storage.AuthRequestByID(ctx.Request.Context(), req.AuthRequestID)
 	if err != nil {

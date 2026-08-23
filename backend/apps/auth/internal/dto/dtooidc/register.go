@@ -16,10 +16,11 @@ type RegisterPersonReq struct {
 
 // RegisterPersonResp 注册 person 响应。
 type RegisterPersonResp struct {
-	PersonID                string                 `json:"personID"`                // person ID
-	RequiresTenantSelection bool                   `json:"requiresTenantSelection"` // 是否需选租户（已注册且有租户）
-	Tenants                 []objauth.TenantOption `json:"tenants,omitempty"`       // 该 person 已有租户列表
-	AllowPersonCreateTenant bool                   `json:"allowPersonCreateTenant"` // 应用允许 + 零租户 → 展示创建租户
+	PersonID              string                 `json:"personID"`                       // person ID
+	RequiresPasswordLogin bool                   `json:"requiresPasswordLogin,omitempty"` // person 已存在需走密码登录
+	RequiresTenantSelection bool                 `json:"requiresTenantSelection"`         // 是否需选租户（已注册且有租户）
+	Tenants                 []objauth.TenantOption `json:"tenants,omitempty"`             // 该 person 已有租户列表
+	AllowPersonCreateTenant bool                 `json:"allowPersonCreateTenant"`         // 应用允许 + 零租户 → 展示创建租户
 }
 
 // CreateTenantReq 创建租户请求（注册 person 后，为零租户 person 开通租户）。

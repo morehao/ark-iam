@@ -140,7 +140,7 @@ func TestRegisterPersonCreatesAndBindsPerson(t *testing.T) {
 	}
 }
 
-func TestRegisterPersonReuseExistingPersonKeepPassword(t *testing.T) {
+func TestRegisterPersonExistingPersonRequiresPasswordLogin(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameAuth)
 	defer testsetup.Done(testsetup.AppNameAuth)
 	appconfig.Conf = &pkgconfig.Config{OIDC: pkgconfig.OIDC{Issuer: "http://localhost:8099/oidc", AllowInsecure: true}}
@@ -170,8 +170,11 @@ func TestRegisterPersonReuseExistingPersonKeepPassword(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RegisterPerson: %v", err)
 	}
+	if !resp.RequiresPasswordLogin {
+		t.Fatal("expected RequiresPasswordLogin=true for existing person")
+	}
 	if resp.PersonID != existing.ID {
-		t.Fatalf("expected reuse existing person %s, got %s", existing.ID, resp.PersonID)
+		t.Fatalf("expected existing person %s, got %s", existing.ID, resp.PersonID)
 	}
 	after, aerr := dao.NewPersonDao().GetByCond(t.Context(), &dao.PersonCond{Username: "alice"})
 	if aerr != nil || after == nil {
@@ -179,6 +182,16 @@ func TestRegisterPersonReuseExistingPersonKeepPassword(t *testing.T) {
 	}
 	if after.PasswordEncrypted != "keep-me" {
 		t.Fatalf("expected password NOT overwritten, got %q", after.PasswordEncrypted)
+	}
+	upd, uerr := provider.Storage.AuthRequestByID(t.Context(), authReq.GetID())
+	if uerr != nil {
+		t.Fatalf("AuthRequestByID: %v", uerr)
+	}
+	if upd.Done() {
+		t.Fatal("expected auth request NOT done for existing person")
+	}
+	if upd.GetSubject() == oidcop.BuildSubject(existing.ID) {
+		t.Fatal("expected auth request NOT bound to existing person")
 	}
 }
 
