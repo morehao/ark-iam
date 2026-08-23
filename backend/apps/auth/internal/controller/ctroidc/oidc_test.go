@@ -21,6 +21,7 @@ type fakeOIDCAuthSvc struct {
 	completeLoginBySession func(ctx *gin.Context, authRequestID string, sessionID string) (string, error)
 	registerPerson         func(ctx *gin.Context, req *dtooidc.RegisterPersonReq) (*dtooidc.RegisterPersonResp, error)
 	createTenant           func(ctx *gin.Context, req *dtooidc.CreateTenantReq) (*dtooidc.CreateTenantResp, error)
+	loginConfig            func(ctx *gin.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error)
 }
 
 func (f *fakeOIDCAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
@@ -53,6 +54,13 @@ func (f *fakeOIDCAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTena
 		return f.createTenant(ctx, req)
 	}
 	return nil, errors.New("createTenant not implemented in fake")
+}
+
+func (f *fakeOIDCAuthSvc) LoginConfig(ctx *gin.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error) {
+	if f.loginConfig != nil {
+		return f.loginConfig(ctx, authRequestID)
+	}
+	return nil, errors.New("loginConfig not implemented in fake")
 }
 
 func TestLoginReturnsContinueURLOnSuccess(t *testing.T) {
@@ -260,5 +268,61 @@ func TestLoginSetsSSOCookieWhenConfigIsNil(t *testing.T) {
 	}
 	if strings.Contains(setCookie, "Domain=") {
 		t.Fatalf("expected host-only cookie when config is nil, got %q", setCookie)
+	}
+}
+
+func TestLoginConfigReturnsAllowPersonCreateTenant(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{loginConfig: func(ctx *gin.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error) {
+		return &dtooidc.OIDCLoginConfigResp{AllowPersonCreateTenant: true}, nil
+	}}}
+	engine.POST("/oidc/login-config", ctr.LoginConfig)
+
+	reqBody := strings.NewReader(`{"authRequestID":"ar-1"}`)
+	req := httptest.NewRequest(http.MethodPost, "/oidc/login-config", reqBody)
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	engine.ServeHTTP(resp, req)
+
+	var body struct {
+		Code int `json:"code"`
+		Data struct {
+			AllowPersonCreateTenant bool `json:"allowPersonCreateTenant"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if body.Code != 0 {
+		t.Fatalf("expected code 0, got %d", body.Code)
+	}
+	if !body.Data.AllowPersonCreateTenant {
+		t.Fatal("expected allowPersonCreateTenant=true in response")
+	}
+}
+
+func TestLoginConfigMissingAuthRequestID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{}}
+	engine.POST("/oidc/login-config", ctr.LoginConfig)
+
+	reqBody := strings.NewReader(`{}`)
+	req := httptest.NewRequest(http.MethodPost, "/oidc/login-config", reqBody)
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	engine.ServeHTTP(resp, req)
+
+	var body struct {
+		Code int `json:"code"`
+	}
+	if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if body.Code == 0 {
+		t.Fatal("expected non-zero code for missing authRequestID")
 	}
 }

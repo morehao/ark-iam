@@ -8,6 +8,8 @@ import type {
   RegisterPersonResp,
   CreateTenantReq,
   CreateTenantResp,
+  OIDCLoginConfigReq,
+  OIDCLoginConfigResp,
 } from './types'
 
 const api = axios.create({
@@ -48,6 +50,15 @@ export async function createTenant(data: CreateTenantReq): Promise<CreateTenantR
   const body = resp.data
   if (body.code !== 0) {
     throw new Error(body.msg || '创建租户失败，请重试')
+  }
+  return body.data
+}
+
+export async function getLoginConfig(data: OIDCLoginConfigReq): Promise<OIDCLoginConfigResp> {
+  const resp = await api.post<ApiResponse<OIDCLoginConfigResp>>('/login-config', data)
+  const body = resp.data
+  if (body.code !== 0) {
+    throw new Error(body.msg || '获取登录配置失败，请重试')
   }
   return body.data
 }

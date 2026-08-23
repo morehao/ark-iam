@@ -38,6 +38,11 @@ func StrPtr(s string) *string {
 	return &s
 }
 
+// BoolPtr 返回 bool 值指针，供 *bool 字段显式赋值使用。
+func BoolPtr(b bool) *bool {
+	return &b
+}
+
 // DerefStr 解引用可空字符串，空/ nil 返回 ""。
 func DerefStr(p *string) string {
 	if p == nil {

@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react'
-import { oidcLogin, oidcSelectTenant, registerPerson, createTenant } from '../api'
+import { oidcLogin, oidcSelectTenant, registerPerson, createTenant, getLoginConfig } from '../api'
 import '../LoginPage.css'
 
 type Mode = 'login' | 'register' | 'createTenant'
@@ -14,6 +14,9 @@ export default function LoginPage() {
   const [tenants, setTenants] = useState<{ tenantID: string; name: string }[]>([])
   const [pendingAuthRequestID, setPendingAuthRequestID] = useState('')
 
+  // 应用是否开放自助注册：登录前查询，决定是否展示"注册账号"入口
+  const [allowRegister, setAllowRegister] = useState(false)
+
   // 注册 person / 创建租户两步表单
   const [mode, setMode] = useState<Mode>('login')
   const [username, setUsername] = useState('')
@@ -27,7 +30,11 @@ export default function LoginPage() {
   useEffect(() => {
     if (!authRequestID) {
       setError('缺少认证请求 ID，请从应用重新发起登录')
+      return
     }
+    getLoginConfig({ authRequestID })
+      .then((resp) => setAllowRegister(resp.allowPersonCreateTenant))
+      .catch(() => setAllowRegister(false))
   }, [authRequestID])
 
   const handleSubmit = async (e: FormEvent) => {
@@ -300,12 +307,14 @@ export default function LoginPage() {
                   </button>
                 </form>
 
-                <p style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: '#8b93a7' }}>
-                  没有账号？
-                  <button type="button" onClick={enableRegister} style={{ color: '#4f6ef7', textDecoration: 'none', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: 0 }}>
-                    注册账号
-                  </button>
-                </p>
+                {allowRegister && (
+                  <p style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: '#8b93a7' }}>
+                    没有账号？
+                    <button type="button" onClick={enableRegister} style={{ color: '#4f6ef7', textDecoration: 'none', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: 0 }}>
+                      注册账号
+                    </button>
+                  </p>
+                )}
               </>
             )
           ) : (

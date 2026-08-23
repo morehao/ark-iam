@@ -119,7 +119,8 @@ export interface ApplicationItem {
   status: string
   visibility: string
   sort: number
-  tenantPolicy?: unknown
+  allowPersonCreateTenant?: boolean
+  allowJoinByInvite?: boolean
   createdAt?: number
 }
 
@@ -132,6 +133,8 @@ export interface ApplicationCreateReq {
   type?: string
   visibility: string
   sort?: number
+  allowPersonCreateTenant?: boolean
+  allowJoinByInvite?: boolean
 }
 
 export interface ApplicationUpdateReq {
@@ -144,6 +147,8 @@ export interface ApplicationUpdateReq {
   visibility?: string
   status?: string
   sort?: number
+  allowPersonCreateTenant?: boolean
+  allowJoinByInvite?: boolean
 }
 
 // ---------- OAuth 客户端 ----------

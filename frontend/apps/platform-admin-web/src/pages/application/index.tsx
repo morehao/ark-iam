@@ -269,24 +269,8 @@ export default function ApplicationList() {
             <Descriptions.Item label="首页地址">{detail.homepageUrl || '-'}</Descriptions.Item>
             <Descriptions.Item label="排序">{detail.sort ?? '-'}</Descriptions.Item>
             <Descriptions.Item label="创建时间">{fmtTime(detail.createdAt)}</Descriptions.Item>
-            <Descriptions.Item label="租户策略">
-              {detail.tenantPolicy ? (
-                <pre
-                  style={{
-                    margin: 0,
-                    maxHeight: 320,
-                    overflow: 'auto',
-                    fontSize: 12,
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-all',
-                  }}
-                >
-                  {JSON.stringify(detail.tenantPolicy, null, 2)}
-                </pre>
-              ) : (
-                '-'
-              )}
-            </Descriptions.Item>
+            <Descriptions.Item label="个人自助创建租户">{detail.allowPersonCreateTenant ? '是' : '否'}</Descriptions.Item>
+            <Descriptions.Item label="允许邀请加入租户">{detail.allowJoinByInvite ? '是' : '否'}</Descriptions.Item>
           </Descriptions>
         )}
       </Drawer>

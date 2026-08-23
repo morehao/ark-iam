@@ -24,7 +24,7 @@ import (
 
 type appSeedApp struct {
 	clientCode string
-	policy     string
+	allow      *bool
 }
 
 func newSeedDB(t *testing.T, apps []appSeedApp) *gorm.DB {
@@ -35,7 +35,7 @@ func newSeedDB(t *testing.T, apps []appSeedApp) *gorm.DB {
 		&model.ApplicationClientEntity{}, &model.ApplicationEntity{},
 	)
 	for _, a := range apps {
-		appEntity := &model.ApplicationEntity{Code: "app-" + a.clientCode, TenantPolicy: datatypes.JSON(a.policy)}
+		appEntity := &model.ApplicationEntity{Code: "app-" + a.clientCode, AllowPersonCreateTenant: a.allow}
 		if err := db.Create(appEntity).Error; err != nil {
 			t.Fatalf("seed app %s: %v", a.clientCode, err)
 		}
@@ -87,7 +87,7 @@ func TestRegisterPersonDisallowedWhenAppPolicyFalse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider: %v", err)
 	}
-	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", policy: `{"allowPersonCreateTenant":false}`}})
+	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", allow: model.BoolPtr(false)}})
 	authReq := newAuthReq(t, provider, "cid-1")
 
 	svc := registerSvc(provider, db, nil)
@@ -106,7 +106,7 @@ func TestRegisterPersonCreatesAndBindsPerson(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider: %v", err)
 	}
-	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", policy: `{"allowPersonCreateTenant":true}`}})
+	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", allow: model.BoolPtr(true)}})
 	authReq := newAuthReq(t, provider, "cid-1")
 
 	svc := registerSvc(provider, db, func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
@@ -148,7 +148,7 @@ func TestRegisterPersonExistingPersonRequiresPasswordLogin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider: %v", err)
 	}
-	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", policy: `{"allowPersonCreateTenant":true}`}})
+	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", allow: model.BoolPtr(true)}})
 	existing := &model.PersonEntity{
 		Username:          model.StrPtr("alice"),
 		PasswordEncrypted: "keep-me",
@@ -203,7 +203,7 @@ func TestCreateTenantSucceedsForZeroTenantPerson(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider: %v", err)
 	}
-	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", policy: `{"allowPersonCreateTenant":true}`}})
+	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", allow: model.BoolPtr(true)}})
 	p := &model.PersonEntity{Username: model.StrPtr("bob"), Name: "Bob", Profile: json.RawMessage(`{}`), CustomData: json.RawMessage(`{}`)}
 	if err := db.Create(p).Error; err != nil {
 		t.Fatalf("create person: %v", err)
@@ -233,4 +233,60 @@ func TestCreateTenantSucceedsForZeroTenantPerson(t *testing.T) {
 	if uErr != nil || len(users) == 0 || !users[0].IsOwner {
 		t.Fatalf("expected owner user, got users:%#v err:%v", users, uErr)
 	}
+}
+
+func TestLoginConfig(t *testing.T) {
+	newProvider := func(t *testing.T) *OIDCProvider {
+		testsetup.Initialize(testsetup.AppNameAuth)
+		t.Cleanup(func() { testsetup.Done(testsetup.AppNameAuth) })
+		appconfig.Conf = &pkgconfig.Config{OIDC: pkgconfig.OIDC{Issuer: "http://localhost:8099/oidc", AllowInsecure: true}}
+		provider, err := SetupOIDCProvider()
+		if err != nil {
+			t.Fatalf("SetupOIDCProvider: %v", err)
+		}
+		return provider
+	}
+
+	t.Run("allow register => true", func(t *testing.T) {
+		provider := newProvider(t)
+		db := newSeedDB(t, []appSeedApp{{clientCode: "cfg-1", allow: model.BoolPtr(true)}})
+		authReq := newAuthReq(t, provider, "cfg-1")
+		svc := registerSvc(provider, db, nil)
+		ginCtx, _ := gin.CreateTestContext(nil)
+		ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login-config", nil)
+		res, err := svc.LoginConfig(ginCtx, authReq.GetID())
+		if err != nil {
+			t.Fatalf("LoginConfig: %v", err)
+		}
+		if !res.AllowPersonCreateTenant {
+			t.Fatal("expected allowPersonCreateTenant=true")
+		}
+	})
+
+	t.Run("disallow register => false", func(t *testing.T) {
+		provider := newProvider(t)
+		db := newSeedDB(t, []appSeedApp{{clientCode: "cfg-2", allow: model.BoolPtr(false)}})
+		authReq := newAuthReq(t, provider, "cfg-2")
+		svc := registerSvc(provider, db, nil)
+		ginCtx, _ := gin.CreateTestContext(nil)
+		ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login-config", nil)
+		res, err := svc.LoginConfig(ginCtx, authReq.GetID())
+		if err != nil {
+			t.Fatalf("LoginConfig: %v", err)
+		}
+		if res.AllowPersonCreateTenant {
+			t.Fatal("expected allowPersonCreateTenant=false")
+		}
+	})
+
+	t.Run("invalid authRequest => error", func(t *testing.T) {
+		provider := newProvider(t)
+		db := newSeedDB(t, nil)
+		svc := registerSvc(provider, db, nil)
+		ginCtx, _ := gin.CreateTestContext(nil)
+		ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login-config", nil)
+		if _, err := svc.LoginConfig(ginCtx, "missing-id"); err == nil {
+			t.Fatal("expected error for invalid authRequestID")
+		}
+	})
 }
