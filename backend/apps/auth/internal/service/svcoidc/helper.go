@@ -24,10 +24,10 @@ func clientIDFromAuthRequest(authReq op.AuthRequest) string {
 	return ""
 }
 
-// resolveAllowPersonCreateTenant reports whether the app backing the oauth client
-// allows a zero-tenant person to self-create a tenant. Person with >=1 tenant => false.
-func (svc *oidcAuthSvc) resolveAllowPersonCreateTenant(ctx *gin.Context, clientID string, tenantCount int) bool {
-	if clientID == "" || tenantCount > 0 || svc.applicationClientDao == nil || svc.applicationDao == nil {
+// appAllowsPersonCreateTenant 仅判定应用策略层面是否允许 person 注册/建租户（不看 person 租户数）。
+// 供 RegisterPerson/CreateTenant 作为"注册入口是否开放"的门禁。
+func (svc *oidcAuthSvc) appAllowsPersonCreateTenant(ctx *gin.Context, clientID string) bool {
+	if clientID == "" || svc.applicationClientDao == nil || svc.applicationDao == nil {
 		return false
 	}
 	client, err := svc.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID})
@@ -46,4 +46,13 @@ func (svc *oidcAuthSvc) resolveAllowPersonCreateTenant(ctx *gin.Context, clientI
 		return false
 	}
 	return *policy.AllowPersonCreateTenant
+}
+
+// resolveAllowPersonCreateTenant reports whether the app backing the oauth client
+// allows a zero-tenant person to self-create a tenant. Person with >=1 tenant => false.
+func (svc *oidcAuthSvc) resolveAllowPersonCreateTenant(ctx *gin.Context, clientID string, tenantCount int) bool {
+	if clientID == "" || tenantCount > 0 {
+		return false
+	}
+	return svc.appAllowsPersonCreateTenant(ctx, clientID)
 }
