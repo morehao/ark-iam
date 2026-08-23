@@ -94,6 +94,7 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 		}
 		return &dtooidc.OIDCLoginResp{
 			PersonID:                personEntity.ID,
+			Tenants:                 []objauth.TenantOption{},
 			AllowPersonCreateTenant: allow,
 		}, nil
 	}

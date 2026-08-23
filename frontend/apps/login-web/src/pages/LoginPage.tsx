@@ -50,11 +50,15 @@ export default function LoginPage() {
         setPendingAuthRequestID(authRequestID)
         return
       }
-      // 零租户已登录 person：无租户可选，引导创建自己的租户（复用 createTenant → selectTenant 收尾）
-      if (resp.allowPersonCreateTenant && !resp.tenants?.length && resp.personID) {
-        setTenants([])
-        setPendingAuthRequestID('')
-        setMode('createTenant')
+      // 零租户已登录 person：无租户成员（响应带 personID）。应用允许则引导建租户，否则给出明确提示。
+      if (resp.personID && !resp.tenants?.length) {
+        if (resp.allowPersonCreateTenant) {
+          setTenants([])
+          setPendingAuthRequestID('')
+          setMode('createTenant')
+        } else {
+          setError('该账号暂无可用租户，且当前应用未开放创建租户')
+        }
         return
       }
       if (resp.continueURL) {
