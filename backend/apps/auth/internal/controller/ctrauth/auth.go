@@ -9,7 +9,6 @@ import (
 
 type AuthCtr interface {
 	MyTenants(ctx *gin.Context)
-	Register(ctx *gin.Context)
 	JoinTenant(ctx *gin.Context)
 	Logout(ctx *gin.Context)
 	LogoutAll(ctx *gin.Context)
@@ -41,27 +40,6 @@ func (ctr *authCtr) MyTenants(ctx *gin.Context) {
 		return
 	}
 	res, err := ctr.authSvc.MyTenants(ctx, &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-// @Tags 认证
-// @Summary 用户注册
-// @accept application/json
-// @Produce application/json
-// @Param req body dtoauth.RegisterReq true "用户注册"
-// @Success 200 {object} gincontext.DtoRender{data=dtoauth.RegisterResp}
-// @Router /v1/auth/register [post]
-func (ctr *authCtr) Register(ctx *gin.Context) {
-	var req dtoauth.RegisterReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.authSvc.Register(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

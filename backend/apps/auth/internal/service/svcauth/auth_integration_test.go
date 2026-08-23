@@ -7,7 +7,6 @@ import (
 
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/auth/testutil"
-	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/morehao/golib/biz/gcontext"
@@ -51,52 +50,6 @@ func setupIntegrationDB(t *testing.T) {
 	if err := db.Create(seedUser).Error; err != nil {
 		t.Fatalf("seed user: %v", err)
 	}
-}
-
-func TestRegisterCreatesPersonAndUser(t *testing.T) {
-	setupIntegrationDB(t)
-	enableSelfRegister()
-
-	ctx := testsetup.NewCtx(testutil.WithIamContext("1"))
-
-	username := testsetup.UniqueName("register")
-	email := testsetup.UniqueName("reg") + "@example.com"
-	phone := testsetup.UniqueName("regphone")
-	svc := NewAuthSvc()
-	resp, err := svc.Register(ctx, &dtoauth.RegisterReq{
-		TenantName:   testsetup.UniqueName("reg-tenant"),
-		Username:     username,
-		PrimaryEmail: email,
-		PrimaryPhone: phone,
-		Password:     "Password1",
-		Name:         "RegisterTest",
-	})
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	require.NotZero(t, resp.UserID)
-	require.NotZero(t, resp.TenantID)
-
-	db := dbclient.IamDB(ctx)
-	var person model.PersonEntity
-	err = db.Where("primary_email = ?", email).First(&person).Error
-	require.NoError(t, err)
-	assert.Equal(t, username, model.DerefStr(person.Username))
-	assert.True(t, testsetup.PasswordMatches(person.PasswordEncrypted, "Password1"))
-
-	var user model.UserEntity
-	err = db.Where("id = ?", resp.UserID).First(&user).Error
-	require.NoError(t, err)
-	assert.Equal(t, resp.TenantID, user.TenantID)
-	// 通道 A：自助开通租户的用户即 owner
-	assert.True(t, user.IsOwner)
-
-	defer func() {
-		_ = testsetup.CleanupTestData(ctx, testsetup.TestDataIDs{
-			PersonIDs: []string{person.ID},
-			UserIDs:   []string{resp.UserID},
-			TenantIDs: []string{resp.TenantID},
-		})
-	}()
 }
 
 func TestMyTenants(t *testing.T) {

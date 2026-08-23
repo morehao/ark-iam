@@ -2,7 +2,6 @@ package router
 
 import (
 	"github.com/morehao/ark-iam/auth/internal/controller/ctrauth"
-	"github.com/morehao/ark-iam/auth/internal/middleware"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
@@ -12,8 +11,6 @@ func authRouter(groups *ginserver.RouterGroups) {
 	// 避免出现 /v1/auth/auth/register 的冗余路径。
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
 	v1RouterGroup.GET("/me/tenants", authCtr.MyTenants)
-	// 注册为匿名路径且影响面大，挂 IP 限流防批量刷号（H2）
-	v1RouterGroup.POST("/register", middleware.LoginRateLimit(), authCtr.Register)
 	v1RouterGroup.POST("/joinTenant", authCtr.JoinTenant)
 	v1RouterGroup.POST("/logout", authCtr.Logout)
 	v1RouterGroup.POST("/logoutAll", authCtr.LogoutAll)

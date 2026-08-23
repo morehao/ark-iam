@@ -54,7 +54,7 @@ var authErrorMsgMap = gerror.CodeMsgMap{
 	AuthLoginFailedError:              "登录失败",
 	AuthRegisterFailedError:           "注册失败",
 	AuthJoinNotAllowedError:           "无权加入该租户",
-	AuthTenantRegisterNotAllowedError: "当前未开放自助开通租户",
+	AuthTenantRegisterNotAllowedError: "该应用未开放注册",
 	InviteGetDetailError:              "获取邀请信息失败",
 	InviteInvalidError:                "邀请码无效",
 	InviteExpiredError:                "邀请码已过期",

@@ -790,51 +790,6 @@ const docTemplateauth = `{
                 }
             }
         },
-        "/v1/auth/register": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "认证"
-                ],
-                "summary": "用户注册",
-                "parameters": [
-                    {
-                        "description": "用户注册",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtoauth.RegisterReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtoauth.RegisterResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/v1/auth/userinfo": {
             "get": {
                 "consumes": [
@@ -1192,67 +1147,6 @@ const docTemplateauth = `{
                     "items": {
                         "$ref": "#/definitions/objauth.TenantOption"
                     }
-                }
-            }
-        },
-        "dtoauth.RegisterReq": {
-            "type": "object",
-            "required": [
-                "password",
-                "tenantName"
-            ],
-            "properties": {
-                "name": {
-                    "description": "姓名",
-                    "type": "string",
-                    "maxLength": 128
-                },
-                "password": {
-                    "description": "密码",
-                    "type": "string",
-                    "maxLength": 128
-                },
-                "primaryEmail": {
-                    "description": "主要邮箱",
-                    "type": "string",
-                    "maxLength": 128
-                },
-                "primaryPhone": {
-                    "description": "主要手机号",
-                    "type": "string",
-                    "maxLength": 32
-                },
-                "tenantCode": {
-                    "description": "租户编码（可选，空则自动生成）",
-                    "type": "string",
-                    "maxLength": 64
-                },
-                "tenantName": {
-                    "description": "租户名",
-                    "type": "string",
-                    "maxLength": 128
-                },
-                "username": {
-                    "description": "用户名",
-                    "type": "string",
-                    "maxLength": 128
-                }
-            }
-        },
-        "dtoauth.RegisterResp": {
-            "type": "object",
-            "properties": {
-                "sessionID": {
-                    "description": "注册即登录的 SSO 会话ID（可能为空）",
-                    "type": "string"
-                },
-                "tenantID": {
-                    "description": "新开通的租户ID",
-                    "type": "string"
-                },
-                "userID": {
-                    "description": "用户ID",
-                    "type": "string"
                 }
             }
         },
