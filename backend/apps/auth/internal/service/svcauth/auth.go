@@ -18,7 +18,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
-	"github.com/morehao/ark-iam/pkg/iam/password"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
@@ -472,12 +471,6 @@ func toAnySlice(ids []string) []any {
 		out[i] = id
 	}
 	return out
-}
-
-// validatePasswordStrength 密码强度校验，统一走公共包 pkg/iam/password
-// （8~128 位，含大小写数字；上限防 bcrypt 登录 DoS）。
-func validatePasswordStrength(rawPassword string) error {
-	return password.ValidateStrength(rawPassword)
 }
 
 // hashIdentifier 对登录标识做摘要（前 16 位 hex），

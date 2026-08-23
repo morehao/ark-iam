@@ -13,7 +13,6 @@ import (
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gerror"
-	"gorm.io/gorm"
 )
 
 type fakeAuthRefreshTokenStore struct {
@@ -172,18 +171,5 @@ func swapTenantStoreFactory(factory func() authTenantStore) func() {
 	newAuthTenantStore = factory
 	return func() {
 		newAuthTenantStore = prev
-	}
-}
-
-// seedTestTenant 向测试库播种一个租户。
-func seedTestTenant(t *testing.T, db *gorm.DB, id, name string) {
-	t.Helper()
-	tenant := &model.TenantEntity{
-		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: id}},
-		Name:       name,
-		Type:       model.TenantTypeCustomer,
-	}
-	if err := db.Create(tenant).Error; err != nil {
-		t.Fatalf("seed tenant: %v", err)
 	}
 }
