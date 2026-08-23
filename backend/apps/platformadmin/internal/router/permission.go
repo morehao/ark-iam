@@ -22,6 +22,7 @@ func menuRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/menus", menuCtr.Create)
 	v1RouterGroup.GET("/menus", menuCtr.PageList)
 	v1RouterGroup.GET("/menus/tree", menuCtr.Tree)
+	v1RouterGroup.GET("/menus/my", menuCtr.MyTree)
 	v1RouterGroup.GET("/menus/:menuID", menuCtr.Detail)
 	v1RouterGroup.PUT("/menus/:menuID", menuCtr.Update)
 	v1RouterGroup.DELETE("/menus/:menuID", menuCtr.Delete)

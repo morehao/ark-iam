@@ -31,35 +31,6 @@ function iconOf(icon?: string): React.ReactNode {
   return (icon && ICON_MAP[icon]) || <ApartmentOutlined />
 }
 
-// 静态 fallback 菜单：后端不可用或未配置时保持页面可用。
-// 注意：这里只放「所有人/普通成员」可见的公共菜单，不带管理菜单（tenant-user/tenant-role），
-// 避免后端故障走 fallback 时把管理入口暴露给普通成员。
-function makeStaticMenu(id: string, name: string, code: string, path: string, icon: string): MenuItem {
-  return {
-    menuID: id,
-    appID: "2",
-    parentID: "",
-    name,
-    code,
-    path,
-    icon,
-    sort: Number(id),
-    type: 'menu',
-    visibility: 'public',
-    component: '',
-    redirect: '',
-    hidden: 0,
-    externalLink: 0,
-    keepAlive: 0,
-    status: 'enable',
-  }
-}
-
-const STATIC_MENU_TREE: MenuItem[] = [
-  makeStaticMenu("1", '组织管理', 'organization', '/organization', 'apartment'),
-  makeStaticMenu("2", '成员管理', 'organization-member', '/organization/members', 'team'),
-]
-
 // 将后端菜单树转换为 MainLayout 侧边栏菜单；叶子菜单需命中组件白名单，目录仅保留有可渲染子项的
 function buildMenuItems(list: MenuItem[]): MainMenuItems[] {
   const result: MainMenuItems[] = []
@@ -90,7 +61,7 @@ function collectRoutes(list: MenuItem[]): React.ReactNode[] {
   return result
 }
 
-// 找到第一个可渲染的菜单 path，作为默认首页重定向目标
+// 找到第一个可渲染的菜单 path，作为默认首页重定向目标；无可用菜单时返回空串（由调用方渲染空态）。
 function firstRoutablePath(list: MenuItem[]): string {
   for (const m of list) {
     if (COMPONENT_MAP[m.path]) return m.path
@@ -99,7 +70,7 @@ function firstRoutablePath(list: MenuItem[]): string {
       if (sub) return sub
     }
   }
-  return '/organization'
+  return ''
 }
 
 function App() {
@@ -119,7 +90,8 @@ function App() {
         if (mounted) setMenuTree(resp?.list || [])
       })
       .catch(() => {
-        /* 后端不可用时保持静态 fallback */
+        // 后端不可用：保持菜单为空（不做静态 fallback，管理入口绝不凭空出现）
+        if (mounted) setMenuTree([])
       })
     return () => {
       mounted = false
@@ -138,10 +110,9 @@ function App() {
     }
   }, [auth.isAuthenticated, location.pathname, navigate])
 
-  const effectiveTree = useMemo(() => {
-    if (menuTree !== null && menuTree.length > 0) return menuTree
-    return STATIC_MENU_TREE
-  }, [menuTree])
+  // 菜单严格依赖后端按角色下发：后端未返回则不渲染侧边栏菜单，不提供任何静态兜底。
+  const menuLoaded = menuTree !== null
+  const effectiveTree = useMemo(() => menuTree ?? [], [menuTree])
 
   const sidebarMenu = useMemo(() => buildMenuItems(effectiveTree), [effectiveTree])
   const dynamicRoutes = useMemo(() => collectRoutes(effectiveTree), [effectiveTree])
@@ -149,16 +120,32 @@ function App() {
 
   if (auth.isLoading || auth.activeNavigator) return <FullPageSpinner />
   if (!auth.isAuthenticated && location.pathname !== '/auth/callback') return null
+  if (!menuLoaded) return <FullPageSpinner />
 
   return (
     <Routes>
       <Route path="/login" element={<LoginPage title="租户管理" subtitle="租户自服务控制台" />} />
       <Route path="/auth/callback" element={<FullPageSpinner />} />
       <Route path="/" element={<MainLayout title="Ark IAM" subtitle="租户自服务" menuItems={sidebarMenu} />}>
-        <Route index element={<Navigate to={defaultPath} replace />} />
+        {defaultPath ? (
+          <Route index element={<Navigate to={defaultPath} replace />} />
+        ) : (
+          <Route index element={<EmptyAccess />} />
+        )}
         {dynamicRoutes}
       </Route>
     </Routes>
+  )
+}
+
+// EmptyAccess 菜单为空（后端未下发任何权限菜单）时的空态占位，避免重定向到 404 或白屏。
+function EmptyAccess() {
+  return (
+    <div style={{ padding: 80, textAlign: 'center', color: '#94a3b8' }}>
+      <div style={{ fontSize: 40 }}>🔒</div>
+      <p>暂无可用菜单</p>
+      <p style={{ fontSize: 13 }}>当前账号未被授予任何菜单权限，请联系租户管理员。</p>
+    </div>
   )
 }
 

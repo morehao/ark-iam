@@ -14,6 +14,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/morehao/ark-iam/pkg/config"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
 
 	"github.com/morehao/golib/biz/gcontext"
@@ -111,7 +112,10 @@ func OIDCCompatibleAuth(getOIDCPublicKey func() *rsa.PublicKey, opts ...AuthOpti
 				abortUnauthorized(ctx, "session expired")
 				return
 			}
-			setOIDCContext(ctx, claims, tokenStr)
+			if err := setOIDCContext(ctx, claims, tokenStr); err != nil {
+				abortUnauthorized(ctx, "invalid token")
+				return
+			}
 			ctx.Next()
 			return
 		}
@@ -198,12 +202,36 @@ func parsePrivateKey(der []byte) (*rsa.PrivateKey, error) {
 	return x509.ParsePKCS1PrivateKey(der)
 }
 
-func setOIDCContext(ctx *gin.Context, claims *objauth.TokenClaims, tokenStr string) {
+// setOIDCContext 把 OIDC claims 注入 gin 上下文：
+//   - person token：设置 personID + tenantID + authToken，并以 (tenantID, personID) 反查当前租户下的用户，
+//     将 userID 写入 KeyUserID。反查失败视为非法访问（该自然人非当前租户成员或无对应账户）。
+//   - 机器凭证（token_usage=machine）：仅注入 personID/tenantID/authToken，不反查用户
+//     （机器凭证不隶属某个租户成员，KeyUserID 由 API Key 通道负责注入）。
+func setOIDCContext(ctx *gin.Context, claims *objauth.TokenClaims, tokenStr string) error {
 	personID := claims.PersonID()
 
 	ctx.Set(gcontext.KeyPersonID, personID)
 	ctx.Set(gcontext.KeyTenantID, claims.TenantID)
 	ctx.Set(gcontext.KeyAuthToken, tokenStr)
+
+	// 机器凭证不需要反查租户用户。
+	if claims.IsMachine() || personID == "" {
+		return nil
+	}
+	userList, err := dao.NewUserDao().GetListByCond(ctx, &dao.UserCond{
+		TenantID: claims.TenantID,
+		PersonID: personID,
+	})
+	if err != nil {
+		glog.Errorf(ctx, "[oidcauth] resolve tenant user fail, err:%v, tenantID:%s, personID:%s", err, claims.TenantID, personID)
+		return fmt.Errorf("resolve tenant user fail: %w", err)
+	}
+	if len(userList) == 0 {
+		glog.Warnf(ctx, "[oidcauth] person has no user in tenant, tenantID:%s, personID:%s", claims.TenantID, personID)
+		return fmt.Errorf("person not a member of tenant")
+	}
+	ctx.Set(gcontext.KeyUserID, userList[0].ID)
+	return nil
 }
 
 func isSkippedPath(path string, skipPaths []string) bool {

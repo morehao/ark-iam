@@ -341,6 +341,11 @@ export interface MenuTreeResp {
   list: MenuItem[]
 }
 
+// 当前用户可见菜单树（平台侧边栏动态菜单）
+export interface MenuMyTreeResp {
+  list: MenuItem[]
+}
+
 // ---------- 域名 ----------
 export interface DomainItem {
   id: string

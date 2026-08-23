@@ -37,6 +37,11 @@ type MenuTreeResp struct {
 	List []MenuTreeItem `json:"list"` // 菜单树
 }
 
+// MenuMyTreeResp 当前用户可见的平台菜单树（侧边栏动态菜单用，基于公共层节点）。
+type MenuMyTreeResp struct {
+	List []objpermission.MenuItemNode `json:"list"` // 当前用户可见菜单树
+}
+
 
 type RoleDetailResp struct {
 	RoleID string `json:"roleID"` // 角色ID
