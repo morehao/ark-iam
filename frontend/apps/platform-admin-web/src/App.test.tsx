@@ -96,14 +96,15 @@ describe('App', () => {
     expect(mockSigninRedirect).not.toHaveBeenCalled()
   })
 
-  it('renders main layout when authenticated', () => {
+  it('renders main layout when authenticated', async () => {
     mockIsAuthenticated = true
     const { getByText } = render(
       <MemoryRouter initialEntries={['/']}>
         <App />
       </MemoryRouter>
     )
-    expect(getByText('Main Layout')).toBeInTheDocument()
+    // 动态菜单接口在测试环境请求失败，catch 后置空菜单并完成加载，最终渲染 MainLayout。
+    await waitFor(() => expect(getByText('Main Layout')).toBeInTheDocument())
   })
 
   it('renders login page when authenticated and on /login', () => {

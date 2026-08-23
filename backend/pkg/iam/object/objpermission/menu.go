@@ -21,3 +21,10 @@ type MenuBaseInfo struct {
 	KeepAlive    bool                 `json:"keepAlive" form:"keepAlive"`            // 是否缓存
 	Status       model.MenuStatus     `json:"status" form:"status"`                  // 状态
 }
+
+// MenuItemNode 菜单树公共节点（跨应用复用：tenantadmin / platformadmin 均返回该结构）。
+type MenuItemNode struct {
+	MenuID string `json:"menuID"` // 菜单ID
+	MenuBaseInfo
+	Children []MenuItemNode `json:"children"` // 子菜单
+}

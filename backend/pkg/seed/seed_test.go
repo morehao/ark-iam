@@ -59,13 +59,13 @@ func TestSeedIamSQLite(t *testing.T) {
 	}
 	assertCount("tenant", 1)
 	assertCount("application", 2)
-	assertCount("role", 1)
-	assertCount("menu", 13)
+	assertCount("role", 2)
+	assertCount("menu", 20)
 	assertCount("person", 1)
 	assertCount("tenant_user", 1)
 	assertCount("application_client", 2)
-	assertCount("user_role", 1)
-	assertCount("role_menu", 13)
+	assertCount("user_role", 2)
+	assertCount("role_menu", 20)
 	assertCount("tenant_application", 2)
 	assertCount("organization", 1)
 	assertCount("organization_user", 1)
@@ -80,11 +80,59 @@ func TestSeedIamSQLite(t *testing.T) {
 		adminLevelByCode[r.Code] = r.AdminLevel
 	}
 	wantLevels := map[string]string{
-		"admin": string(model.SysAdminLevelSuper),
+		"admin":        string(model.SysAdminLevelSuper),
+		"tenant_admin": string(model.SysAdminLevelSuper),
 	}
 	for code, want := range wantLevels {
 		if adminLevelByCode[code] != want {
 			t.Fatalf("role %s admin_level = %q, want %q", code, adminLevelByCode[code], want)
+		}
+	}
+
+	// 内置角色归属应用：admin 属管理后台、tenant_admin 属租户自服务（source=builtin）
+	appIDByName := map[string]string{}
+	var apps []model.ApplicationEntity
+	if err := db.Find(&apps).Error; err != nil {
+		t.Fatalf("query applications: %v", err)
+	}
+	for _, a := range apps {
+		appIDByName[a.Name] = a.ID
+	}
+	roleByCode := map[string]*model.RoleEntity{}
+	for i := range roles {
+		roleByCode[roles[i].Code] = &roles[i]
+	}
+	if got := roleByCode["admin"]; got.Source != string(model.RoleSourceBuiltin) || got.AppID != appIDByName["管理后台"] {
+		t.Fatalf("seed admin role source/appID mismatch: source=%s appID=%s", got.Source, got.AppID)
+	}
+	if got := roleByCode["tenant_admin"]; got.Source != string(model.RoleSourceBuiltin) || got.AppID != appIDByName["租户自服务"] {
+		t.Fatalf("seed tenant_admin role source/appID mismatch: source=%s appID=%s", got.Source, got.AppID)
+	}
+
+	// tenant_admin 预授权租户自服务应用全部 4 个菜单
+	wantMenuCodes := map[string]bool{"organization": false, "organization-member": false, "tenant-user": false, "tenant-role": false}
+	menuIDByCode := map[string]string{}
+	var menus []model.MenuEntity
+	if err := db.Find(&menus).Error; err != nil {
+		t.Fatalf("query menus: %v", err)
+	}
+	for _, m := range menus {
+		menuIDByCode[m.Code] = m.ID
+	}
+	var tenantAdminMenus []model.RoleMenuEntity
+	if err := db.Where("role_id = ?", roleByCode["tenant_admin"].ID).Find(&tenantAdminMenus).Error; err != nil {
+		t.Fatalf("query tenant_admin role_menu: %v", err)
+	}
+	for _, rm := range tenantAdminMenus {
+		for code, id := range menuIDByCode {
+			if rm.MenuID == id {
+				wantMenuCodes[code] = true
+			}
+		}
+	}
+	for code, found := range wantMenuCodes {
+		if !found {
+			t.Fatalf("tenant_admin role_menu missing menu %s", code)
 		}
 	}
 
@@ -97,6 +145,22 @@ func TestSeedIamSQLite(t *testing.T) {
 	if err := db.Where("tenant_id = ? AND is_owner = ?", tenant.ID, true).First(&adminUser).Error; err != nil {
 		t.Fatalf("admin user not found: %v", err)
 	}
+
+	// 默认管理员用户额外多绑 tenant_admin（拥有 admin + tenant_admin 两角色，非替换）
+	roleIDsOfAdmin := map[string]bool{}
+	var adminRoles []model.UserRoleEntity
+	if err := db.Where("user_id = ?", adminUser.ID).Find(&adminRoles).Error; err != nil {
+		t.Fatalf("query admin user_role: %v", err)
+	}
+	for _, ur := range adminRoles {
+		roleIDsOfAdmin[ur.RoleID] = true
+	}
+	if len(roleIDsOfAdmin) != 2 ||
+		!roleIDsOfAdmin[roleByCode["admin"].ID] ||
+		!roleIDsOfAdmin[roleByCode["tenant_admin"].ID] {
+		t.Fatalf("admin user roles want {admin, tenant_admin}, got %v", roleIDsOfAdmin)
+	}
+
 	var rootOrg model.OrganizationEntity
 	if err := db.Where("tenant_id = ? AND parent_id = ?", tenant.ID, "").First(&rootOrg).Error; err != nil {
 		t.Fatalf("root organization not found: %v", err)

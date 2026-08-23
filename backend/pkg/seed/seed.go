@@ -37,6 +37,7 @@ const (
 
 // seedRole 角色种子定义。
 type seedRole struct {
+	app        *model.ApplicationEntity // 角色所属应用
 	code       string
 	name       string
 	desc       string
@@ -53,6 +54,7 @@ type seedMenu struct {
 	icon       string
 	sort       int
 	component  string
+	menuType   model.MenuType
 	visibility model.MenuVisibility
 }
 
@@ -80,8 +82,8 @@ func SeedIam(ctx context.Context, db *gorm.DB) error {
 		return err
 	}
 
-	// 4. 角色
-	roles, err := seedRoles(ctx, db, tenant, adminApp)
+	// 4. 角色（admin 归属管理后台；tenant_admin 归属租户自服务）
+	roles, err := seedRoles(ctx, db, tenant, adminApp, tenantAdminApp)
 	if err != nil {
 		return err
 	}
@@ -200,9 +202,10 @@ func getOrCreateApplication(ctx context.Context, db *gorm.DB, code, name, desc s
 	return entity, nil
 }
 
-func seedRoles(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, app *model.ApplicationEntity) (map[string]*model.RoleEntity, error) {
+func seedRoles(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adminApp, tenantAdminApp *model.ApplicationEntity) (map[string]*model.RoleEntity, error) {
 	defs := []seedRole{
-		{code: "admin", name: "管理员", desc: "系统管理员，拥有所有权限", adminLevel: string(model.SysAdminLevelSuper)},
+		{app: adminApp, code: "admin", name: "管理员", desc: "系统管理员，拥有所有权限", adminLevel: string(model.SysAdminLevelSuper)},
+		{app: tenantAdminApp, code: "tenant_admin", name: "租户管理员", desc: "租户自服务应用管理员，拥有全部租户自服务权限", adminLevel: string(model.SysAdminLevelSuper)},
 	}
 	out := make(map[string]*model.RoleEntity, len(defs))
 	for _, def := range defs {
@@ -218,7 +221,7 @@ func seedRoles(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, app
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			entity = &model.RoleEntity{
 				TenantID:    tenant.ID,
-				AppID:       app.ID,
+				AppID:       def.app.ID,
 				Name:        def.name,
 				Code:        def.code,
 				Description: def.desc,
@@ -250,24 +253,39 @@ func seedRoles(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, app
 	return out, nil
 }
 
+// menuTypeOf 返回菜单种子定义的 type；未显式指定时缺省为 menu。
+func menuTypeOf(def seedMenu) model.MenuType {
+	if def.menuType == "" {
+		return model.MenuTypeMenu
+	}
+	return def.menuType
+}
+
 func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model.ApplicationEntity) (map[string]*model.MenuEntity, error) {
 	defs := []seedMenu{
-		// 管理后台一级菜单
-		{appCode: appCodeAdmin, name: "工作台", code: "dashboard", path: "/dashboard", icon: "dashboard", sort: 1, component: "Layout", visibility: model.MenuVisibilityMember},
-		{appCode: appCodeAdmin, name: "用户管理", code: "user", path: "/user", icon: "user", sort: 2, component: "Layout", visibility: model.MenuVisibilityAdmin},
-		{appCode: appCodeAdmin, name: "角色管理", code: "role", path: "/role", icon: "role", sort: 3, component: "Layout", visibility: model.MenuVisibilityAdmin},
-		{appCode: appCodeAdmin, name: "菜单管理", code: "menu", path: "/menu", icon: "menu", sort: 4, component: "Layout", visibility: model.MenuVisibilityAdmin},
-		{appCode: appCodeAdmin, name: "应用管理", code: "application", path: "/application", icon: "app", sort: 6, component: "Layout", visibility: model.MenuVisibilityAdmin},
-		// 管理后台二级菜单
-		{appCode: appCodeAdmin, parentCode: "user", name: "用户列表", code: "user-list", path: "/user/list", sort: 1, component: "/user/list/index", visibility: model.MenuVisibilityAdmin},
-		{appCode: appCodeAdmin, parentCode: "role", name: "角色列表", code: "role-list", path: "/role/list", sort: 1, component: "/role/list/index", visibility: model.MenuVisibilityAdmin},
-		{appCode: appCodeAdmin, parentCode: "menu", name: "菜单列表", code: "menu-list", path: "/menu/list", sort: 1, component: "/menu/list/index", visibility: model.MenuVisibilityAdmin},
-		{appCode: appCodeAdmin, parentCode: "application", name: "应用列表", code: "application-list", path: "/application/list", sort: 1, component: "/application/list/index", visibility: model.MenuVisibilityAdmin},
+		// 管理后台：目录分组（type=directory，无页面）+ 页面叶子（type=menu，指向真实前端页面）。
+		// 分组与叶子同为 admin 可见，与平台"仅管理员可管理"语义一致。
+		{appCode: appCodeAdmin, name: "工作台", code: "dashboard", path: "/dashboard", icon: "dashboard", sort: 1, component: "/dashboard/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityMember},
+		{appCode: appCodeAdmin, parentCode: "", name: "用户与权限", code: "grp-identity", icon: "team", sort: 2, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, parentCode: "grp-identity", name: "用户管理", code: "user", path: "/user", icon: "user", sort: 1, component: "/user/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, parentCode: "grp-identity", name: "角色管理", code: "role", path: "/role", icon: "role", sort: 2, component: "/role/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, parentCode: "grp-identity", name: "菜单管理", code: "menu", path: "/menu", icon: "menu", sort: 3, component: "/menu/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, name: "组织与租户", code: "grp-org", icon: "apartment", sort: 3, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, parentCode: "grp-org", name: "租户管理", code: "tenant", path: "/tenant", icon: "global", sort: 1, component: "/tenant/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, parentCode: "grp-org", name: "租户应用", code: "tenant-application", path: "/tenant-application", icon: "shopping", sort: 2, component: "/tenantApplication/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, name: "应用与接入", code: "grp-app", icon: "app", sort: 4, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, parentCode: "grp-app", name: "应用管理", code: "application", path: "/application", icon: "app", sort: 1, component: "/application/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, parentCode: "grp-app", name: "OAuth客户端", code: "oauth-client", path: "/oauth-client", icon: "key", sort: 2, component: "/oauthClient/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, parentCode: "grp-app", name: "域名管理", code: "domain", path: "/domain", icon: "global", sort: 3, component: "/domain/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, name: "安全与运维", code: "grp-ops", icon: "setting", sort: 5, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, parentCode: "grp-ops", name: "API密钥", code: "api-key", path: "/api-key", icon: "key", sort: 1, component: "/apiKey/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, parentCode: "grp-ops", name: "系统配置", code: "system", path: "/system", icon: "setting", sort: 2, component: "/system/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, parentCode: "grp-ops", name: "审计日志", code: "log", path: "/log", icon: "file", sort: 3, component: "/log/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		// 租户自服务一级菜单（组织架构拆为组织管理/成员管理；用户/角色编码加 tenant- 前缀，避免与平台菜单 code 撞名）
-		{appCode: appCodeTenantAdmin, name: "组织管理", code: "organization", path: "/organization", icon: "apartment", sort: 1, component: "pages/organization", visibility: model.MenuVisibilityPublic},
-		{appCode: appCodeTenantAdmin, name: "成员管理", code: "organization-member", path: "/organization/members", icon: "team", sort: 2, component: "pages/organization-member", visibility: model.MenuVisibilityPublic},
-		{appCode: appCodeTenantAdmin, name: "用户管理", code: "tenant-user", path: "/user", icon: "user", sort: 3, component: "pages/user", visibility: model.MenuVisibilityAdmin},
-		{appCode: appCodeTenantAdmin, name: "角色管理", code: "tenant-role", path: "/role", icon: "role", sort: 4, component: "pages/role", visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeTenantAdmin, name: "组织管理", code: "organization", path: "/organization", icon: "apartment", sort: 1, component: "pages/organization", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityPublic},
+		{appCode: appCodeTenantAdmin, name: "成员管理", code: "organization-member", path: "/organization/members", icon: "team", sort: 2, component: "pages/organization-member", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityPublic},
+		{appCode: appCodeTenantAdmin, name: "用户管理", code: "tenant-user", path: "/user", icon: "user", sort: 3, component: "pages/user", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeTenantAdmin, name: "角色管理", code: "tenant-role", path: "/role", icon: "role", sort: 4, component: "pages/role", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 	}
 
 	appByCode := map[string]*model.ApplicationEntity{appCodeAdmin: adminApp, appCodeTenantAdmin: tenantAdminApp}
@@ -300,7 +318,7 @@ func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model
 				Path:       def.path,
 				Icon:       def.icon,
 				Sort:       def.sort,
-				Type:       model.MenuTypeMenu,
+				Type:       menuTypeOf(def),
 				Visibility: visibility,
 				Component:  def.component,
 				Status:     model.MenuStatusEnable,
@@ -308,13 +326,39 @@ func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model
 			if err := db.WithContext(ctx).Create(entity).Error; err != nil {
 				return nil, fmt.Errorf("seed menu %s create fail: %w", def.code, err)
 			}
-		} else if entity.Visibility != visibility {
-			// 幂等回填：存量菜单的可见性门槛随种子定义更新，避免沿用旧默认值
-			if uerr := db.Model(&model.MenuEntity{}).Where("id = ?", entity.ID).
-				UpdateColumn("visibility", visibility).Error; uerr != nil {
-				return nil, fmt.Errorf("seed menu %s update visibility fail: %w", def.code, uerr)
+		} else {
+			// 幂等回填：存量菜单的关键字段随种子定义更新，保证跨版本升级后与 seed 定义一致。
+			updateMap := map[string]any{}
+			if entity.Name != def.name {
+				updateMap["name"] = def.name
 			}
-			entity.Visibility = visibility
+			if entity.Path != def.path {
+				updateMap["path"] = def.path
+			}
+			if entity.Icon != def.icon {
+				updateMap["icon"] = def.icon
+			}
+			if entity.Sort != def.sort {
+				updateMap["sort"] = def.sort
+			}
+			if entity.Component != def.component {
+				updateMap["component"] = def.component
+			}
+			if entity.Visibility != visibility {
+				updateMap["visibility"] = visibility
+			}
+			if entity.Type != menuTypeOf(def) {
+				updateMap["type"] = menuTypeOf(def)
+			}
+			if entity.ParentID != parentID {
+				updateMap["parent_id"] = parentID
+			}
+			if len(updateMap) > 0 {
+				if uerr := db.Model(&model.MenuEntity{}).Where("id = ?", entity.ID).
+					Updates(updateMap).Error; uerr != nil {
+					return nil, fmt.Errorf("seed menu %s update fail: %w", def.code, uerr)
+				}
+			}
 		}
 		out[def.code] = entity
 	}
@@ -327,8 +371,11 @@ func seedRoleMenus(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity,
 		menuCode []string
 	}{
 		{roleCode: "admin", menuCode: []string{
-			"dashboard", "user", "role", "menu", "application",
-			"user-list", "role-list", "menu-list", "application-list",
+			"dashboard", "user", "role", "menu", "tenant", "application",
+			"tenant-application", "oauth-client", "api-key", "domain", "system", "log",
+			"organization", "organization-member", "tenant-user", "tenant-role",
+		}},
+		{roleCode: "tenant_admin", menuCode: []string{
 			"organization", "organization-member", "tenant-user", "tenant-role",
 		}},
 	}
@@ -464,19 +511,22 @@ func seedAdminUserOrganization(ctx context.Context, db *gorm.DB, tenant *model.T
 }
 
 func seedAdminUserRole(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adminUser *model.UserEntity, roles map[string]*model.RoleEntity) error {
-	adminRole := roles["admin"]
-	var count int64
-	if err := db.Model(&model.UserRoleEntity{}).
-		Where("tenant_id = ? AND user_id = ? AND role_id = ?", tenant.ID, adminUser.ID, adminRole.ID).
-		Count(&count).Error; err != nil {
-		return fmt.Errorf("seed user_role count fail: %w", err)
-	}
-	if count > 0 {
-		return nil
-	}
-	ur := &model.UserRoleEntity{TenantID: tenant.ID, UserID: adminUser.ID, RoleID: adminRole.ID}
-	if err := db.WithContext(ctx).Create(ur).Error; err != nil {
-		return fmt.Errorf("seed user_role create fail: %w", err)
+	// 默认管理员同时持有管理后台 admin 与租户自服务 tenant_admin 两个内置管理员角色
+	for _, roleCode := range []string{"admin", "tenant_admin"} {
+		role := roles[roleCode]
+		var count int64
+		if err := db.Model(&model.UserRoleEntity{}).
+			Where("tenant_id = ? AND user_id = ? AND role_id = ?", tenant.ID, adminUser.ID, role.ID).
+			Count(&count).Error; err != nil {
+			return fmt.Errorf("seed user_role count fail: %w", err)
+		}
+		if count > 0 {
+			continue
+		}
+		ur := &model.UserRoleEntity{TenantID: tenant.ID, UserID: adminUser.ID, RoleID: role.ID}
+		if err := db.WithContext(ctx).Create(ur).Error; err != nil {
+			return fmt.Errorf("seed user_role create fail: %w", err)
+		}
 	}
 	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objpermission"
+	"github.com/morehao/ark-iam/pkg/iam/svcmenu"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtopermission"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
@@ -45,6 +46,7 @@ type MenuSvc interface {
 	Detail(ctx *gin.Context, req *dtopermission.MenuDetailReq) (*dtopermission.MenuDetailResp, error)
 	PageList(ctx *gin.Context, req *dtopermission.MenuPageListReq) (*dtopermission.MenuPageListResp, error)
 	Tree(ctx *gin.Context, req *dtopermission.MenuTreeReq) (*dtopermission.MenuTreeResp, error)
+	MyTree(ctx *gin.Context) (*dtopermission.MenuMyTreeResp, error)
 }
 
 type menuSvc struct{}
@@ -283,4 +285,35 @@ func (svc *menuSvc) Tree(ctx *gin.Context, req *dtopermission.MenuTreeReq) (*dto
 	return &dtopermission.MenuTreeResp{
 		List: buildTree(""),
 	}, nil
+}
+
+// platformAdminAppCode 平台管理后台应用的种子编码（见 pkg/seed，appCodeAdmin）。
+const platformAdminAppCode = "platform-admin"
+
+// MyTree 返回当前用户可见的平台菜单树（侧边栏动态菜单）。
+// 平台菜单固定归属平台管理后台应用（platform-admin），按用户的角色授权（超管全量 + role_menu 授权 + visibility）过滤，
+// 与租户控制台菜单逻辑保持一致，复用公共层 svcmenu。
+func (svc *menuSvc) MyTree(ctx *gin.Context) (*dtopermission.MenuMyTreeResp, error) {
+	tenantID := gincontext.GetTenantIDString(ctx)
+	userID := gincontext.GetUserIDString(ctx)
+
+	appList, _, err := dao.NewApplicationDao().GetPageListByCond(ctx, &dao.ApplicationCond{
+		BaseCond: &gormdao.BaseCond{Page: 1, PageSize: 1},
+		Code:     platformAdminAppCode,
+	})
+	if err != nil {
+		glog.Errorf(ctx, "[svcpermission.MyTree] query platform app fail, err:%v", err)
+		return nil, code.GetError(code.MenuGetPageListError)
+	}
+	if len(appList) == 0 || appList[0].ID == "" {
+		glog.Errorf(ctx, "[svcpermission.MyTree] platform app not found, code:%s", platformAdminAppCode)
+		return nil, code.GetError(code.MenuGetPageListError)
+	}
+
+	nodes, err := svcmenu.BuildMyMenuTree(ctx, tenantID, userID, []string{appList[0].ID})
+	if err != nil {
+		glog.Errorf(ctx, "[svcpermission.MyTree] build my menu tree fail, err:%v", err)
+		return nil, code.GetError(code.MenuGetPageListError)
+	}
+	return &dtopermission.MenuMyTreeResp{List: nodes}, nil
 }

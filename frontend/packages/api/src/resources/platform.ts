@@ -8,6 +8,7 @@ import type {
   AuditLogItem,
   DomainItem,
   MenuItem,
+  MenuMyTreeResp,
   MenuTreeResp,
   OAuthClientCreateReq,
   OAuthClientDetail,
@@ -129,6 +130,7 @@ export const deleteApiKey = (id: string) => request.delete<any, string>(`/platfo
 
 // ==================== 菜单 ====================
 export const getMenuTree = (appID: string) => request.get<any, MenuTreeResp>('/platform/menus/tree', { params: { appID } })
+export const getMyMenuTree = () => request.get<any, MenuMyTreeResp>('/platform/menus/my')
 export const createMenu = (data: Partial<MenuItem>) => request.post<any, { menuID: string }>('/platform/menus', data)
 export const updateMenu = (data: Partial<MenuItem>) => {
   const { menuID, ...body } = data

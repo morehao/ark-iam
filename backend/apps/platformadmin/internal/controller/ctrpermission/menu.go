@@ -14,6 +14,7 @@ type MenuCtr interface {
 	Detail(ctx *gin.Context)
 	PageList(ctx *gin.Context)
 	Tree(ctx *gin.Context)
+	MyTree(ctx *gin.Context)
 }
 
 type menuCtr struct {
@@ -150,6 +151,21 @@ func (ctr *menuCtr) Tree(ctx *gin.Context) {
 		return
 	}
 	res, err := ctr.menuSvc.Tree(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 菜单管理
+// @Summary 当前用户可见菜单树（侧边栏动态菜单）
+// @accept application/json
+// @Produce application/json
+// @Success 200 {object} gincontext.DtoRender{data=dtopermission.MenuMyTreeResp}
+// @Router /v1/platform/menus/my [get]
+func (ctr *menuCtr) MyTree(ctx *gin.Context) {
+	res, err := ctr.menuSvc.MyTree(ctx)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

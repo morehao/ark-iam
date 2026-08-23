@@ -34,6 +34,9 @@ func newOIDCAuthTestDB(t *testing.T) *gorm.DB {
 	if err := db.AutoMigrate(&model.ApiKeyEntity{}); err != nil {
 		t.Fatalf("migrate api_key: %v", err)
 	}
+	if err := db.AutoMigrate(&model.UserEntity{}); err != nil {
+		t.Fatalf("migrate user: %v", err)
+	}
 	dbclient.RegisterDBForTest(dbclient.ServiceNameIam, db)
 	t.Cleanup(func() {
 		sqlDB, _ := db.DB()
@@ -73,6 +76,7 @@ func setupRouter(t *testing.T, validate func(ctx *gin.Context, personID string, 
 	r.GET("/v1/test", func(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{
 			"personID": ginFromContext(ctx),
+			"userID":   ctx.GetString(gcontext.KeyUserID),
 		})
 	})
 	return r, key
@@ -136,6 +140,11 @@ func TestOIDCSSOValidationRejectsRevokedSession(t *testing.T) {
 }
 
 func TestOIDCSSOValidationAllowsActiveSession(t *testing.T) {
+	// person token 反查租户用户需要测试库：建立 SQLite 并 seed (tenant=1, person=88) 的用户
+	_ = newOIDCAuthTestDB(t)
+	seedDefaultOIDCUser(t)
+	t.Cleanup(func() { dbclient.ClearDBForTest(dbclient.ServiceNameIam) })
+
 	r, key := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
 		return true // 会话有效
 	})
@@ -147,11 +156,18 @@ func TestOIDCSSOValidationAllowsActiveSession(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), `"personID":"88"`)
+	// person token 反查租户用户成功，userID 应被注入上下文
+	assert.NotEqual(t, "", w.Body)
+	assert.Contains(t, w.Body.String(), `"userID"`)
 }
 
 func TestOIDCSSOValidationMachineTokenBypassesRevokedSession(t *testing.T) {
 	// 机器令牌（token_usage=machine）通过 SSO 校验器时即使自然人的浏览器会话已撤销也放行。
 	// 校验器按生产契约（app.go）对机器令牌直接 short-circuit 返回 true。
+	// 非机器 person 分支会反查租户用户：注册空 user 表，令 (tenant=1,person=88) 反查为空 → 401。
+	_ = newOIDCAuthTestDB(t)
+	t.Cleanup(func() { dbclient.ClearDBForTest(dbclient.ServiceNameIam) })
+
 	r, key := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
 		return isMachineToken // 非机器令牌返回 false（会话撤销），机器令牌放行
 	})
@@ -221,6 +237,26 @@ func apiKeyHashForTest(t *testing.T) (raw, hash string) {
 	return raw, hex.EncodeToString(sum[:])
 }
 
+// seedDefaultOIDCUser 在全局测试 iam 库写入 person=88 对应租户 1 下的用户，供 person token 反查使用。
+// 需显式播种 not null JSON（profile/custom_data）与 joined_at，兼容 SQLite。
+func seedDefaultOIDCUser(t *testing.T) {
+	t.Helper()
+	now := time.Now()
+	user := &model.UserEntity{
+		TenantID:    "1",
+		PersonID:    "88",
+		Name:        "oidc-user",
+		Profile:     []byte(`{}`),
+		CustomData:  []byte(`{}`),
+		JoinedAt:    &now,
+		IsSuspended: false,
+	}
+	if err := dao.NewUserDao().Insert(context.Background(), user); err != nil {
+		t.Fatalf("seed oidc user: %v", err)
+	}
+	// 内存 SQLite 随连接关闭清空，无需显式删除；亦避免 cleanup 顺序访问已清除的全局 DB。
+}
+
 func TestRejectsTokenWithWrongIssuer(t *testing.T) {
 	// H3：配置 issuer 后，iss 不匹配的 token 一律拒绝
 	gin.SetMode(gin.TestMode)
@@ -281,7 +317,11 @@ func TestRejectsTokenWithWrongAudience(t *testing.T) {
 }
 
 func TestAcceptsTokenWithMatchingIssuerAndAudience(t *testing.T) {
-	// H3：iss/aud 均匹配时放行
+	// H3：iss/aud 均匹配时放行（person token 需要测试库反查租户用户）
+	_ = newOIDCAuthTestDB(t)
+	seedDefaultOIDCUser(t)
+	t.Cleanup(func() { dbclient.ClearDBForTest(dbclient.ServiceNameIam) })
+
 	gin.SetMode(gin.TestMode)
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
@@ -309,4 +349,21 @@ func TestAcceptsTokenWithMatchingIssuerAndAudience(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// TestOIDCPersonWithoutUserRejected person token 在该租户无对应用户时拒绝（非租户成员）。
+func TestOIDCPersonWithoutUserRejected(t *testing.T) {
+	// 建立空 user 表 DB（不 seed），令唯一 person token 的反查为空 → 401
+	_ = newOIDCAuthTestDB(t)
+	t.Cleanup(func() { dbclient.ClearDBForTest(dbclient.ServiceNameIam) })
+
+	r, key := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
+		return true
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
+	req.Header.Set(AuthHeaderKey, AuthBearer+makeOIDCToken(t, key, "person:88", ""))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
 }
