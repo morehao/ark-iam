@@ -23,6 +23,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gconstant"
 	"github.com/morehao/golib/gcrypto"
+	"github.com/morehao/golib/gerror"
 	"github.com/morehao/golib/glog"
 	"gorm.io/gorm"
 )
@@ -99,6 +100,15 @@ func (svc *authSvc) AuthenticatePassword(ctx *gin.Context, identifier, password 
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	// 零租户 person：person 存在但无任何租户成员（userEntity==nil 且 tenants 为空）。
+	// 仍必须强制密码校验（与普通账号同错，防枚举），通过后才放行到"建自己租户"。
+	if personEntity != nil && userEntity == nil && len(tenants) == 0 {
+		personEntity, _, aErr := svc.authenticateResolvedPerson(ctx, personEntity, nil, password)
+		if aErr != nil {
+			return nil, nil, nil, aErr
+		}
+		return personEntity, nil, nil, nil
+	}
 	personEntity, userEntity, err = svc.authenticateResolvedPerson(ctx, personEntity, userEntity, password)
 	if err != nil {
 		return nil, nil, nil, err
@@ -116,6 +126,11 @@ func (svc *authSvc) TenantsForPerson(ctx *gin.Context, personID string) ([]objau
 
 func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *model.PersonEntity, userEntity *model.UserEntity, password string) (*model.PersonEntity, *model.UserEntity, error) {
 	ip := gincontext.GetClientIP(ctx)
+	// 零租户 person（userEntity==nil）：无 tenant/user id，登录审计记 person 级空 id。
+	tenantID, userID := "", ""
+	if userEntity != nil {
+		tenantID, userID = userEntity.TenantID, userEntity.ID
+	}
 	if svcloginguard.Check(ctx, ip, personEntity.ID) {
 		audit.WriteAudit(ctx, audit.AuditEntry{
 			Action:     audit.ActionLogin,
@@ -147,7 +162,7 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 	}
 
 	if err := gcrypto.ComparePasswordHash(personEntity.PasswordEncrypted, password); err != nil {
-		authLoginRecorder(ctx, userEntity.TenantID, userEntity.ID, false)
+		authLoginRecorder(ctx, tenantID, userID, false)
 		svcloginguard.RecordFailure(ctx, ip, personEntity.ID)
 		glog.Errorf(ctx, "[svcauth.authenticateResolvedPerson] password mismatch, personID:%s", personEntity.ID)
 		// H8：密码错误与用户不存在统一错误码，避免用户名枚举
@@ -155,7 +170,7 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 	}
 
 	svcloginguard.RecordSuccess(ctx, ip, personEntity.ID)
-	authLoginRecorder(ctx, userEntity.TenantID, userEntity.ID, true)
+	authLoginRecorder(ctx, tenantID, userID, true)
 	return personEntity, userEntity, nil
 }
 
@@ -402,7 +417,11 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 
 	userEntity, tenants, err := svc.listPersonTenants(ctx, personEntity.ID)
 	if err != nil {
-		// listPersonTenants 在无租户成员时返回 UserNotExistError（登录失败统一语义）
+		// 零租户 person（无任何租户成员）：放行到密码验证，合法与否由密码决定。
+		// 用错误码（而非字符串）区分"零租户"与"系统错误"：只有 UserNotExistError 表示零租户。
+		if gerror.IsCode(err, code.UserNotExistError) {
+			return personEntity, nil, nil, nil
+		}
 		return nil, nil, nil, err
 	}
 	if userEntity.IsSuspended {

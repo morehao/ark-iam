@@ -80,6 +80,23 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	if err != nil {
 		return nil, err
 	}
+	// 零租户已验密 person（person 存在但无租户成员）：绑定 authRequest(done=false)，
+	// 返回"可建租户"信号，不发 code、不建 SSO 会话（无租户上下文无法发 token）。
+	// 在访问 userEntity.TenantID 之前返回，避免 nil 解引用 panic。
+	if personEntity != nil && userEntity == nil && len(tenants) == 0 {
+		if cErr := svc.provider.Storage.CompleteAuthRequest(ctx.Request.Context(), req.AuthRequestID,
+			oidcop.BuildSubject(personEntity.ID), time.Now(), []string{"pwd"}, "", "", false); cErr != nil {
+			return nil, mapAuthRequestError(cErr)
+		}
+		allow := false
+		if cid := clientIDFromAuthRequest(authReq); cid != "" {
+			allow = svc.appAllowsPersonCreateTenant(ctx, cid)
+		}
+		return &dtooidc.OIDCLoginResp{
+			PersonID:                personEntity.ID,
+			AllowPersonCreateTenant: allow,
+		}, nil
+	}
 	authTime := time.Now()
 	subject := oidcop.BuildSubject(personEntity.ID)
 	// 优先尊重 ?tenant hint（如 SSO 会话过期后回退到密码登录时），但仅当 hint 是 person 的成员租户时才采用
