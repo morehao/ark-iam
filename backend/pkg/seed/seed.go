@@ -31,9 +31,6 @@ const (
 	appCodeAdmin       = "platform-admin"
 	appCodeTenantAdmin = "tenant-admin"
 
-	menuStatusEnable = "enable"
-	menuTypeMenu     = "menu"
-
 	oauthClientPlatformAdminWeb = "platform-admin-web"
 	oauthClientTenantAdminWeb   = "tenant-admin-web"
 )
@@ -43,7 +40,7 @@ type seedRole struct {
 	code       string
 	name       string
 	desc       string
-	adminLevel string // 系统管理等级(none/basic/super)，空=无系统管理能力
+	adminLevel string // 系统管理等级(member/super)，空=无系统管理能力
 }
 
 // seedMenu 菜单种子定义；parentCode 为空表示顶级菜单。visibility 缺省为 public。
@@ -56,7 +53,7 @@ type seedMenu struct {
 	icon       string
 	sort       int
 	component  string
-	visibility string
+	visibility model.MenuVisibility
 }
 
 // SeedIam 幂等写入 IAM 基础种子数据。任一环节失败即返回错误，由调用方决定是否阻断启动。
@@ -211,7 +208,7 @@ func seedRoles(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, app
 	for _, def := range defs {
 		adminLevel := def.adminLevel
 		if adminLevel == "" {
-			adminLevel = string(model.SysAdminLevelNone)
+			adminLevel = string(model.SysAdminLevelMember)
 		}
 		entity := &model.RoleEntity{}
 		err := db.Where("tenant_id = ? AND code = ?", tenant.ID, def.code).First(entity).Error
@@ -256,21 +253,21 @@ func seedRoles(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, app
 func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model.ApplicationEntity) (map[string]*model.MenuEntity, error) {
 	defs := []seedMenu{
 		// 管理后台一级菜单
-		{appCode: appCodeAdmin, name: "工作台", code: "dashboard", path: "/dashboard", icon: "dashboard", sort: 1, component: "Layout", visibility: string(model.MenuVisibilityMember)},
-		{appCode: appCodeAdmin, name: "用户管理", code: "user", path: "/user", icon: "user", sort: 2, component: "Layout", visibility: string(model.MenuVisibilityAdmin)},
-		{appCode: appCodeAdmin, name: "角色管理", code: "role", path: "/role", icon: "role", sort: 3, component: "Layout", visibility: string(model.MenuVisibilityAdmin)},
-		{appCode: appCodeAdmin, name: "菜单管理", code: "menu", path: "/menu", icon: "menu", sort: 4, component: "Layout", visibility: string(model.MenuVisibilityAdmin)},
-		{appCode: appCodeAdmin, name: "应用管理", code: "application", path: "/application", icon: "app", sort: 6, component: "Layout", visibility: string(model.MenuVisibilityAdmin)},
+		{appCode: appCodeAdmin, name: "工作台", code: "dashboard", path: "/dashboard", icon: "dashboard", sort: 1, component: "Layout", visibility: model.MenuVisibilityMember},
+		{appCode: appCodeAdmin, name: "用户管理", code: "user", path: "/user", icon: "user", sort: 2, component: "Layout", visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, name: "角色管理", code: "role", path: "/role", icon: "role", sort: 3, component: "Layout", visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, name: "菜单管理", code: "menu", path: "/menu", icon: "menu", sort: 4, component: "Layout", visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, name: "应用管理", code: "application", path: "/application", icon: "app", sort: 6, component: "Layout", visibility: model.MenuVisibilityAdmin},
 		// 管理后台二级菜单
-		{appCode: appCodeAdmin, parentCode: "user", name: "用户列表", code: "user-list", path: "/user/list", sort: 1, component: "/user/list/index", visibility: string(model.MenuVisibilityAdmin)},
-		{appCode: appCodeAdmin, parentCode: "role", name: "角色列表", code: "role-list", path: "/role/list", sort: 1, component: "/role/list/index", visibility: string(model.MenuVisibilityAdmin)},
-		{appCode: appCodeAdmin, parentCode: "menu", name: "菜单列表", code: "menu-list", path: "/menu/list", sort: 1, component: "/menu/list/index", visibility: string(model.MenuVisibilityAdmin)},
-		{appCode: appCodeAdmin, parentCode: "application", name: "应用列表", code: "application-list", path: "/application/list", sort: 1, component: "/application/list/index", visibility: string(model.MenuVisibilityAdmin)},
+		{appCode: appCodeAdmin, parentCode: "user", name: "用户列表", code: "user-list", path: "/user/list", sort: 1, component: "/user/list/index", visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, parentCode: "role", name: "角色列表", code: "role-list", path: "/role/list", sort: 1, component: "/role/list/index", visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, parentCode: "menu", name: "菜单列表", code: "menu-list", path: "/menu/list", sort: 1, component: "/menu/list/index", visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, parentCode: "application", name: "应用列表", code: "application-list", path: "/application/list", sort: 1, component: "/application/list/index", visibility: model.MenuVisibilityAdmin},
 		// 租户自服务一级菜单（组织架构拆为组织管理/成员管理；用户/角色编码加 tenant- 前缀，避免与平台菜单 code 撞名）
-		{appCode: appCodeTenantAdmin, name: "组织管理", code: "organization", path: "/organization", icon: "apartment", sort: 1, component: "pages/organization", visibility: string(model.MenuVisibilityPublic)},
-		{appCode: appCodeTenantAdmin, name: "成员管理", code: "organization-member", path: "/organization/members", icon: "team", sort: 2, component: "pages/organization-member", visibility: string(model.MenuVisibilityPublic)},
-		{appCode: appCodeTenantAdmin, name: "用户管理", code: "tenant-user", path: "/user", icon: "user", sort: 3, component: "pages/user", visibility: string(model.MenuVisibilityAdmin)},
-		{appCode: appCodeTenantAdmin, name: "角色管理", code: "tenant-role", path: "/role", icon: "role", sort: 4, component: "pages/role", visibility: string(model.MenuVisibilityAdmin)},
+		{appCode: appCodeTenantAdmin, name: "组织管理", code: "organization", path: "/organization", icon: "apartment", sort: 1, component: "pages/organization", visibility: model.MenuVisibilityPublic},
+		{appCode: appCodeTenantAdmin, name: "成员管理", code: "organization-member", path: "/organization/members", icon: "team", sort: 2, component: "pages/organization-member", visibility: model.MenuVisibilityPublic},
+		{appCode: appCodeTenantAdmin, name: "用户管理", code: "tenant-user", path: "/user", icon: "user", sort: 3, component: "pages/user", visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeTenantAdmin, name: "角色管理", code: "tenant-role", path: "/role", icon: "role", sort: 4, component: "pages/role", visibility: model.MenuVisibilityAdmin},
 	}
 
 	appByCode := map[string]*model.ApplicationEntity{appCodeAdmin: adminApp, appCodeTenantAdmin: tenantAdminApp}
@@ -292,7 +289,7 @@ func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model
 		}
 		visibility := def.visibility
 		if visibility == "" {
-			visibility = string(model.MenuVisibilityPublic)
+			visibility = model.MenuVisibilityPublic
 		}
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			entity = &model.MenuEntity{
@@ -303,10 +300,10 @@ func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model
 				Path:       def.path,
 				Icon:       def.icon,
 				Sort:       def.sort,
-				Type:       menuTypeMenu,
+				Type:       model.MenuTypeMenu,
 				Visibility: visibility,
 				Component:  def.component,
-				Status:     menuStatusEnable,
+				Status:     model.MenuStatusEnable,
 			}
 			if err := db.WithContext(ctx).Create(entity).Error; err != nil {
 				return nil, fmt.Errorf("seed menu %s create fail: %w", def.code, err)

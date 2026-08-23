@@ -29,7 +29,7 @@ import {
 } from '@ant-design/icons'
 import { EllipsisCell, PageContainer, brand } from '@ark-iam/ui'
 import { createMenu, deleteMenu, getApplicationPageList, getMenuTree, updateMenu } from '@ark-iam/api'
-import type { ApplicationItem, MenuItem } from '@ark-iam/types'
+import type { ApplicationItem, MenuItem, MenuStatus, MenuType, MenuVisibility } from '@ark-iam/types'
 import { StatusTag } from '../../components/common'
 
 interface MenuFormValues {
@@ -39,10 +39,11 @@ interface MenuFormValues {
   path?: string
   icon?: string
   sort?: number
-  type?: string
+  type?: MenuType
+  visibility?: MenuVisibility
   component?: string
   redirect?: string
-  status?: string
+  status?: MenuStatus
   hidden: number
   externalLink: number
   keepAlive: number
@@ -56,6 +57,17 @@ const TYPE_META: Record<string, { label: string; icon: React.ReactNode; color: s
   directory: { label: '目录', icon: <FolderOutlined />, color: '#f59e0b', tagColor: 'orange' },
   menu: { label: '菜单', icon: <AppstoreOutlined />, color: '#4f6ef7', tagColor: 'blue' },
   button: { label: '按钮', icon: <ThunderboltOutlined />, color: '#7a5af8', tagColor: 'purple' },
+}
+
+const VISIBILITY_META: Record<MenuVisibility, { label: string; tagColor: string }> = {
+  public: { label: '所有人', tagColor: 'green' },
+  member: { label: '租户成员', tagColor: 'blue' },
+  admin: { label: '管理员', tagColor: 'orange' },
+}
+
+function renderMenuVisibility(v: string) {
+  const meta = VISIBILITY_META[v as MenuVisibility]
+  return meta ? <Tag color={meta.tagColor}>{meta.label}</Tag> : <Tag>{v || '-'}</Tag>
 }
 
 function collectKeys(list: MenuItem[]): string[] {
@@ -180,7 +192,15 @@ export default function MenuList() {
     setEditing(null)
     setParentMenu(parent)
     form.resetFields()
-    form.setFieldsValue({ type: 'menu', status: 'enable', hidden: 0, externalLink: 0, keepAlive: 0, ...baseValues })
+    form.setFieldsValue({
+      type: 'menu',
+      status: 'enable',
+      visibility: 'public',
+      hidden: 0,
+      externalLink: 0,
+      keepAlive: 0,
+      ...baseValues,
+    })
     setModalOpen(true)
   }
 
@@ -207,6 +227,7 @@ export default function MenuList() {
       icon: menu.icon,
       sort: menu.sort,
       type: menu.type,
+      visibility: menu.visibility || 'public',
       component: menu.component,
       redirect: menu.redirect,
       status: menu.status,
@@ -324,6 +345,13 @@ export default function MenuList() {
       key: 'status',
       width: 90,
       render: (v: string) => <StatusTag value={v} />,
+    },
+    {
+      title: '可见性',
+      dataIndex: 'visibility',
+      key: 'visibility',
+      width: 110,
+      render: (v: string) => renderMenuVisibility(v),
     },
     {
       title: '操作',
@@ -570,6 +598,15 @@ export default function MenuList() {
           <Divider orientation="left" plain style={{ margin: '16px 0 8px', fontSize: 13 }}>
             权限与展示
           </Divider>
+          <Form.Item name="visibility" label="可见性门槛" tooltip="所有人可见（无门槛）/ 任意租户成员可见（登录即可）/ 仅管理员角色可见">
+            <Select
+              options={[
+                { value: 'public', label: '所有人可见' },
+                { value: 'member', label: '租户成员可见' },
+                { value: 'admin', label: '仅管理员可见' },
+              ]}
+            />
+          </Form.Item>
           <div style={{ display: 'flex', gap: 32 }}>
             <Form.Item name="hidden" label="隐藏" valuePropName="checked" getValueFromEvent={(c: boolean) => (c ? 1 : 0)}>
               <Switch checkedChildren="是" unCheckedChildren="否" />

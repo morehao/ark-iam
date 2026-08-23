@@ -73,7 +73,7 @@ func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dto
 		Code:        req.Code,
 		Description: req.Description,
 		Source:      string(model.RoleSourceCustom),
-		AdminLevel:  string(model.SysAdminLevelNone),
+		AdminLevel:  string(model.SysAdminLevelMember),
 		CreatedBy:   gincontext.GetUserIDString(ctx),
 	}
 	if err := dao.NewRoleDao().Insert(ctx, insertEntity); err != nil {
@@ -278,12 +278,70 @@ func (svc *roleSvc) GetMenus(ctx *gin.Context, req *dtotenant.RoleDetailReq) (*d
 	return &dtotenant.RoleMenuTreeResp{List: tree, MenuIDs: menuIDs}, nil
 }
 
-// roleMenuTree 角色可授权的菜单树：有应用归属则取该应用菜单，否则回退全租户控制台菜单（种子角色）。
-func (svc *roleSvc) roleMenuTree(ctx *gin.Context, roleEntity *model.RoleEntity) ([]dtotenant.MenuTreeItem, error) {
+// roleMenuFullTree 角色所属应用（或全控制台）的完整菜单树（含 visibility=admin，不剔除）。
+func (svc *roleSvc) roleMenuFullTree(ctx *gin.Context, roleEntity *model.RoleEntity) ([]dtotenant.MenuTreeItem, error) {
 	if roleEntity.AppID != "" {
 		return buildAppMenuTree(ctx, roleEntity.AppID)
 	}
 	return buildTenantMenuTree(ctx)
+}
+
+// roleMenuTree 角色可授权的菜单树。
+// 有应用归属则取该应用菜单，否则回退全租户控制台菜单（种子角色）。
+// 非内置管理员角色剔除 visibility=admin 的菜单（授权约束），内置管理员角色可见全部。
+func (svc *roleSvc) roleMenuTree(ctx *gin.Context, roleEntity *model.RoleEntity) ([]dtotenant.MenuTreeItem, error) {
+	var tree []dtotenant.MenuTreeItem
+	var err error
+	if roleEntity.AppID != "" {
+		tree, err = buildAppMenuTree(ctx, roleEntity.AppID)
+	} else {
+		tree, err = buildTenantMenuTree(ctx)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if roleEntity.IsBuiltinAdmin() {
+		return tree, nil
+	}
+	return stripAdminVisibilityMenus(tree), nil
+}
+
+// stripAdminVisibilityMenus 剔除 visibility=admin 的菜单节点（父壳保留，子移除），实现普通角色授权约束。
+func stripAdminVisibilityMenus(items []dtotenant.MenuTreeItem) []dtotenant.MenuTreeItem {
+	result := make([]dtotenant.MenuTreeItem, 0, len(items))
+	for _, item := range items {
+		children := stripAdminVisibilityMenus(item.Children)
+		item.Children = children
+		// visibility=admin：该节点（含其 admin 子项）从本角色可选集合剔除；父壳保留以维持层级
+		if model.MenuVisibility(item.Visibility) == model.MenuVisibilityAdmin {
+			// 若父为 admin 但存在非 admin 子项，保留子项；否则整棵剔除
+			if len(children) > 0 {
+				result = append(result, item)
+			}
+			continue
+		}
+		result = append(result, item)
+	}
+	return result
+}
+
+// containAdminVisibilityMenus 判断菜单集合中是否含 visibility=admin 的节点。
+func containAdminVisibilityMenus(tree []dtotenant.MenuTreeItem) bool {
+	found := false
+	var walk func(items []dtotenant.MenuTreeItem)
+	walk = func(items []dtotenant.MenuTreeItem) {
+		for _, m := range items {
+			if model.MenuVisibility(m.Visibility) == model.MenuVisibilityAdmin {
+				found = true
+				return
+			}
+			if len(m.Children) > 0 {
+				walk(m.Children)
+			}
+		}
+	}
+	walk(tree)
+	return found
 }
 
 // UpdateMenus 全量替换角色菜单授权（PUT 集合语义）。
@@ -299,12 +357,21 @@ func (svc *roleSvc) UpdateMenus(ctx *gin.Context, req *dtotenant.RoleMenusUpdate
 	}
 
 	// 校验菜单均属于角色所属应用（无应用归属的种子角色校验全租户控制台菜单）
+	// 授权约束：非内置管理员角色不得提交 visibility=admin 菜单
 	if len(req.MenuIDs) > 0 {
-		tree, err := svc.roleMenuTree(ctx, roleEntity)
+		fullTree, err := svc.roleMenuFullTree(ctx, roleEntity)
 		if err != nil {
 			return err
 		}
-		allowed := collectMenuIDs(tree)
+		allowed := collectMenuIDs(fullTree)
+		adminIDs := collectMenuIDs(stripAdminVisibilityMenus(fullTree)) // 非 admin 可见性菜单
+		if !roleEntity.IsBuiltinAdmin() {
+			for _, menuID := range req.MenuIDs {
+				if allowed[menuID] && !adminIDs[menuID] {
+					return code.GetError(code.RoleMenuAdminVisibilityForbiddenError)
+				}
+			}
+		}
 		for _, menuID := range req.MenuIDs {
 			if !allowed[menuID] {
 				return code.GetError(code.RoleMenuNotExistError)

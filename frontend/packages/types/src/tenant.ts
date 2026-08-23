@@ -1,7 +1,7 @@
 // tenantadmin 领域类型（与 backend/apps/tenantadmin/internal/dto/dtotenant 对齐）
 
 import type { UserOrganizationItem } from './organization'
-import type { MenuItem } from './platform'
+import type { AdminLevel, MenuItem } from './platform'
 
 // ---------- 租户用户 ----------
 export interface TenantUserItem {
@@ -88,7 +88,7 @@ export interface TenantRoleItem {
   code: string
   description: string
   source?: 'builtin' | 'custom' | string
-  adminLevel?: 'none' | 'basic' | 'super' | string
+  adminLevel?: AdminLevel
   memberCount: number
   menuCount: number
   createdAt?: number

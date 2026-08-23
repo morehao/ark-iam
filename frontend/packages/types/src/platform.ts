@@ -1,5 +1,8 @@
 // platformadmin 领域类型（与 backend/apps/platformadmin/internal/dto 对齐）
 
+// 系统管理等级：member=普通租户成员（无系统管理能力），super=超级管理员。
+export type AdminLevel = 'member' | 'super'
+
 // ---------- 用户 ----------
 export interface UserItem {
   userID: string
@@ -79,7 +82,7 @@ export interface RoleItem {
   code: string
   description: string
   source?: 'builtin' | 'custom' | string
-  adminLevel?: 'none' | 'basic' | 'super' | string
+  adminLevel?: AdminLevel
   createdAt?: number
 }
 
@@ -309,6 +312,10 @@ export interface ApiKeyCreateResp {
 }
 
 // ---------- 菜单 ----------
+export type MenuType = 'directory' | 'menu' | 'button'
+export type MenuStatus = 'enable' | 'disable'
+export type MenuVisibility = 'public' | 'member' | 'admin'
+
 export interface MenuItem {
   menuID: string
   appID: string
@@ -318,14 +325,14 @@ export interface MenuItem {
   path: string
   icon: string
   sort: number
-  type: string
-  visibility?: 'public' | 'member' | 'admin' | string
+  type: MenuType
+  visibility?: MenuVisibility
   component: string
   redirect: string
   hidden: number
   externalLink: number
   keepAlive: number
-  status: string
+  status: MenuStatus
   createdAt?: number
   children?: MenuItem[]
 }

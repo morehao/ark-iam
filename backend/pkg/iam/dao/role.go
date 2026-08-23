@@ -66,14 +66,12 @@ func NewRoleDao(opts ...DaoOption) *RoleDao {
 	}
 }
 
-// adminLevelsAtLeast 返回等级 >= threshold 的全部等级取值（none < basic < super）。
+// adminLevelsAtLeast 返回等级 >= threshold 的全部等级取值（member < super）。
 func adminLevelsAtLeast(threshold string) []string {
 	switch model.SysAdminLevel(threshold).SysAdminRank() {
 	case model.SysAdminLevelSuper.SysAdminRank():
 		return []string{string(model.SysAdminLevelSuper)}
-	case model.SysAdminLevelBasic.SysAdminRank():
-		return []string{string(model.SysAdminLevelBasic), string(model.SysAdminLevelSuper)}
 	default:
-		return []string{string(model.SysAdminLevelNone), string(model.SysAdminLevelBasic), string(model.SysAdminLevelSuper)}
+		return []string{string(model.SysAdminLevelMember), string(model.SysAdminLevelSuper)}
 	}
 }

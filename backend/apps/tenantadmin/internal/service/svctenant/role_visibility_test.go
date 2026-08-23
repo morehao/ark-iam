@@ -104,11 +104,11 @@ func TestHasSystemAdminCapability(t *testing.T) {
 		t.Fatalf("admin user should have system admin capability")
 	}
 
-	// 用户 u2 → 角色 r-user（none）→ 不具备
+	// 用户 u2 → 角色 r-user（member）→ 不具备
 	if err := db.Create(&model.RoleEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "r-user"}},
 		TenantID:   "t1", AppID: "app1", Name: "成员", Code: "user",
-		Source: string(model.RoleSourceCustom), AdminLevel: string(model.SysAdminLevelNone),
+		Source: string(model.RoleSourceCustom), AdminLevel: string(model.SysAdminLevelMember),
 		CreatedBy: "t",
 	}).Error; err != nil {
 		t.Fatalf("seed role u2: %v", err)
@@ -128,7 +128,7 @@ func TestHasSystemAdminCapability(t *testing.T) {
 	}
 }
 
-func visItem(vis string, children ...dtotenant.MenuTreeItem) dtotenant.MenuTreeItem {
+func visItem(vis model.MenuVisibility, children ...dtotenant.MenuTreeItem) dtotenant.MenuTreeItem {
 	return dtotenant.MenuTreeItem{
 		MenuBaseInfo: objpermission.MenuBaseInfo{Visibility: vis},
 		Children:     children,
@@ -138,9 +138,9 @@ func visItem(vis string, children ...dtotenant.MenuTreeItem) dtotenant.MenuTreeI
 // sampleVisibilityTree 三级可见性样例树：public / member / admin。
 func sampleVisibilityTree() []dtotenant.MenuTreeItem {
 	return []dtotenant.MenuTreeItem{
-		visItem("public"),
-		visItem("member", visItem("admin"), visItem("public")),
-		visItem("admin"),
+		visItem(model.MenuVisibilityPublic),
+		visItem(model.MenuVisibilityMember, visItem(model.MenuVisibilityAdmin), visItem(model.MenuVisibilityPublic)),
+		visItem(model.MenuVisibilityAdmin),
 	}
 }
 
@@ -160,11 +160,11 @@ func TestPruneMenuTreeMemberHidesStandaloneAdmin(t *testing.T) {
 		t.Fatalf("member should see 2 (public + member父壳), got %d: %+v", len(res), res)
 	}
 	// 第一个独立 admin 项应被剪掉 → 现在仅剩 public 与 member
-	if res[0].Visibility != "public" || res[1].Visibility != "member" {
+	if res[0].Visibility != model.MenuVisibilityPublic || res[1].Visibility != model.MenuVisibilityMember {
 		t.Fatalf("unexpected top-level items: %+v", res)
 	}
 	// member 父壳下应只剩 public 子项（admin 子项被剪）
-	if len(res[1].Children) != 1 || res[1].Children[0].Visibility != "public" {
+	if len(res[1].Children) != 1 || res[1].Children[0].Visibility != model.MenuVisibilityPublic {
 		t.Fatalf("member parent should keep only public child, got %+v", res[1].Children)
 	}
 }
@@ -253,5 +253,150 @@ func TestUpdateRolesAllowWhenOtherAdminExists(t *testing.T) {
 	err := svc.UpdateRoles(newOrgGinCtx(t, "t1", "op"), &dtotenant.UserRolesUpdateReq{UserID: "u1", RoleIDs: []string{}})
 	if err != nil {
 		t.Fatalf("release when another admin remains should be allowed: %v", err)
+	}
+}
+
+// seedAdminVisibilityMenu 在指定应用下种子一个 visibility=admin 的启用菜单。
+func seedAdminVisibilityMenu(t *testing.T, db *gorm.DB, id, appID string) {
+	t.Helper()
+	if err := db.Create(&model.MenuEntity{
+		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: id}},
+		AppID:      appID,
+		Name:       "菜单管理",
+		Code:       "menu",
+		Path:       "/menu",
+		Type:       model.MenuTypeMenu,
+		Visibility: model.MenuVisibilityAdmin,
+		Status:     model.MenuStatusEnable,
+	}).Error; err != nil {
+		t.Fatalf("seed admin menu: %v", err)
+	}
+}
+
+// TestUpdateMenusRejectsAdminVisibilityForNormalRole 授权约束：普通角色提交 visibility=admin 菜单被拒绝；
+// 授权 member 可见性菜单允许。
+func TestUpdateMenusRejectsAdminVisibilityForNormalRole(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.RoleMenuEntity{}, &model.MenuEntity{},
+		&model.ApplicationEntity{}, &model.TenantApplicationEntity{})
+	svc := &roleSvc{}
+	seedTestApp(t, db, "t1", "app1")
+	seedTestRole(t, db, "r1", "t1", "app1", "成员", "member")
+	seedAdminVisibilityMenu(t, db, "m-admin", "app1")
+
+	ginCtx := newOrgGinCtx(t, "t1", "op")
+
+	// 普通角色授权 admin 可见性菜单 → 拒绝
+	if err := svc.UpdateMenus(ginCtx, &dtotenant.RoleMenusUpdateReq{RoleID: "r1", MenuIDs: []string{"m-admin"}}); err == nil {
+		t.Fatalf("expected admin-visibility rejection for normal role")
+	} else if err != code.GetError(code.RoleMenuAdminVisibilityForbiddenError) {
+		t.Fatalf("expected RoleMenuAdminVisibilityForbiddenError, got %v", err)
+	}
+}
+
+// TestUpdateMenusAllowsAdminVisibilityForBuiltinAdmin 豁免：内置管理员（super&&builtin）角色可授权 admin 可见性菜单。
+func TestUpdateMenusAllowsAdminVisibilityForBuiltinAdmin(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.RoleMenuEntity{}, &model.MenuEntity{},
+		&model.ApplicationEntity{}, &model.TenantApplicationEntity{})
+	svc := &roleSvc{}
+	seedTestApp(t, db, "t1", "app1")
+	seedBuiltinSystemRole(t, db, "r-admin", "t1", "app1")
+	seedAdminVisibilityMenu(t, db, "m-admin", "app1")
+
+	ginCtx := newOrgGinCtx(t, "t1", "op")
+	if err := svc.UpdateMenus(ginCtx, &dtotenant.RoleMenusUpdateReq{RoleID: "r-admin", MenuIDs: []string{"m-admin"}}); err != nil {
+		t.Fatalf("builtin admin should be allowed to grant admin menu: %v", err)
+	}
+}
+
+// TestRoleMenuTreeHidesAdminForNormalRole 普通角色的可授权菜单树剔除 visibility=admin 节点；内置管理员可见全部。
+func TestRoleMenuTreeHidesAdminForNormalRole(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.MenuEntity{}, &model.ApplicationEntity{},
+		&model.TenantApplicationEntity{})
+	svc := &roleSvc{}
+	seedTestApp(t, db, "t1", "app1")
+	seedAdminVisibilityMenu(t, db, "m-admin", "app1")
+
+	ginCtx := newOrgGinCtx(t, "t1", "op")
+
+	// 普通角色
+	seedTestRole(t, db, "r1", "t1", "app1", "成员", "member")
+	tree, err := svc.roleMenuTree(ginCtx, &model.RoleEntity{AppID: "app1"})
+	if err != nil {
+		t.Fatalf("roleMenuTree normal: %v", err)
+	}
+	if len(tree) != 0 || containAdminVisibilityMenus(tree) {
+		t.Fatalf("normal role should not see admin menu, got %+v", tree)
+	}
+
+	// 内置管理员
+	tree, err = svc.roleMenuTree(ginCtx, &model.RoleEntity{
+		AppID:      "app1",
+		Source:     string(model.RoleSourceBuiltin),
+		AdminLevel: string(model.SysAdminLevelSuper),
+	})
+	if err != nil {
+		t.Fatalf("roleMenuTree admin: %v", err)
+	}
+	if len(tree) != 1 || tree[0].MenuID != "m-admin" {
+		t.Fatalf("builtin admin should see admin menu, got %+v", tree)
+	}
+}
+
+// TestPruneMenuTreeByAuthed 按授权集合 + 可见等级剪枝：
+// 只保留已授权且可见等级达标的节点，父未命中但子命中时保留父壳。
+func TestPruneMenuTreeByAuthed(t *testing.T) {
+	item := func(id string, vis model.MenuVisibility, children ...dtotenant.MenuTreeItem) dtotenant.MenuTreeItem {
+		return dtotenant.MenuTreeItem{
+			MenuID:       id,
+			MenuBaseInfo: objpermission.MenuBaseInfo{Visibility: vis},
+			Children:     children,
+		}
+	}
+	tree := []dtotenant.MenuTreeItem{
+		item("p1", model.MenuVisibilityPublic),
+		item("p2", model.MenuVisibilityMember,
+			item("c1", model.MenuVisibilityPublic),
+			item("c2", model.MenuVisibilityAdmin)),
+	}
+	// 授权 p1 与 p2；p2 下仅 c1 授权
+	authed := map[string]bool{"p1": true, "p2": true, "c1": true}
+	res := pruneMenuTreeByAuthed(tree, authed, model.MenuVisibilityMember.VisibilityRank())
+	if len(res) != 2 {
+		t.Fatalf("expected p1 and p2(parent shell), got %+v", res)
+	}
+	if res[0].MenuID != "p1" {
+		t.Fatalf("expected p1 first, got %+v", res)
+	}
+	// p2 未授权但 c1 已授权 → 保留 p2 父壳，仅含 c1（c2 admin 且未授权被剪）
+	if res[1].MenuID != "p2" || len(res[1].Children) != 1 || res[1].Children[0].MenuID != "c1" {
+		t.Fatalf("expected p2 shell with only c1 child, got %+v", res[1])
+	}
+}
+
+// TestUserHoldsBuiltinAdmin 判定用户是否持有内置管理员角色：
+// 持有 super&&builtin → true；仅持普通/自定义角色 → false。
+func TestUserHoldsBuiltinAdmin(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{},
+		&model.ApplicationEntity{}, &model.TenantApplicationEntity{})
+	seedTestApp(t, db, "t1", "app1")
+	seedBuiltinSystemRole(t, db, "r-admin", "t1", "app1")
+	seedUserRoleLink(t, db, "ur-admin", "t1", "u-admin", "r-admin")
+	seedTestRole(t, db, "r-member", "t1", "app1", "成员", "member")
+	seedUserRoleLink(t, db, "ur-member", "t1", "u-member", "r-member")
+
+	admin, err := userHoldsBuiltinAdmin(newOrgGinCtx(t, "t1", "u-admin"))
+	if err != nil {
+		t.Fatalf("holds admin: %v", err)
+	}
+	if !admin {
+		t.Fatalf("user with builtin super role should hold builtin admin")
+	}
+
+	mem, err := userHoldsBuiltinAdmin(newOrgGinCtx(t, "t1", "u-member"))
+	if err != nil {
+		t.Fatalf("holds member: %v", err)
+	}
+	if mem {
+		t.Fatalf("member user should NOT hold builtin admin")
 	}
 }
