@@ -10,6 +10,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/iam/person"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
@@ -294,9 +295,10 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 		return nil, code.GetError(code.UserContactRequiredError)
 	}
 
-	// 1. 解析 personID（find-or-create：默认以姓名创建自然人，命中已有全局身份则复用）
+	// 1. 解析 personID：显式提供时校验存在并直接关联；未提供时在事务内 find-or-create
+	// （person 领域能力，见 pkg/iam/person）：命中已有全局身份则复用，未命中则同事务新建。
 	personID := req.PersonID
-	createPerson := false
+	resolvePersonInTx := false
 	if personID != "" {
 		person, err := dao.NewPersonDao().GetByID(ctx, personID)
 		if err != nil {
@@ -307,25 +309,10 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 			return nil, code.GetError(code.UserNotExistError)
 		}
 	} else {
-		personID = svc.findExistingPersonID(ctx, req)
-		if personID == "" {
-			createPerson = true
-		}
+		resolvePersonInTx = true
 	}
 
-	// 2. 同一自然人在本租户内只能有一条 user
-	if personID != "" {
-		existing, err := dao.NewUserDao().GetListByCond(ctx, &dao.UserCond{TenantID: tenantID, PersonID: personID})
-		if err != nil {
-			glog.Errorf(ctx, "[svcuser.Create] query user by person fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-			return nil, code.GetError(code.UserCreateError)
-		}
-		if len(existing) > 0 {
-			return nil, code.GetError(code.UserAlreadyInTenantError)
-		}
-	}
-
-	// 3. 校验归属组织均属于本租户
+	// 2. 校验归属组织均属于本租户
 	orgSet := make(map[string]bool)
 	if len(req.OrganizationIDs) > 0 || len(req.SecondaryOrgIDs) > 0 || len(req.LeaderOrgIDs) > 0 {
 		orgList, err := dao.NewOrganizationDao().GetListByCond(ctx, &dao.OrganizationCond{TenantID: tenantID})
@@ -353,10 +340,10 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 		}
 	}
 
-	// 4. 事务：创建 person（如需）+ 创建 user + 建立组织归属
+	// 3. 事务：person find-or-create + 创建 user + 建立组织归属
 	var createdUserID string
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
-		if createPerson {
+		if resolvePersonInTx {
 			passwordHash := ""
 			if req.Password != "" {
 				hash, hashErr := gcrypto.GeneratePasswordHash(req.Password)
@@ -366,23 +353,31 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 				}
 				passwordHash = hash
 			}
-			personEntity := &model.PersonEntity{
-				Username:          model.StrPtr(req.Username),
-				PrimaryEmail:      model.StrPtr(req.PrimaryEmail),
-				PrimaryPhone:      model.StrPtr(req.PrimaryPhone),
+			personEntity, _, personErr := person.FindOrCreate(ctx, tx, &person.FindOrCreateReq{
+				Username:          req.Username,
+				PrimaryEmail:      req.PrimaryEmail,
+				PrimaryPhone:      req.PrimaryPhone,
 				PasswordEncrypted: passwordHash,
 				PasswordMethod:    "bcrypt",
 				Name:              req.Name,
 				Avatar:            req.Avatar,
-				Profile:           json.RawMessage(`{}`),
-				CustomData:        json.RawMessage(`{}`),
 				CreatedBy:         operatorID,
-			}
-			if insertErr := dao.NewPersonDao().WithTx(tx).Insert(ctx, personEntity); insertErr != nil {
-				glog.Errorf(ctx, "[svcuser.Create] person Insert fail, err:%v", insertErr)
-				return fmt.Errorf("person insert: %w", insertErr)
+			})
+			if personErr != nil {
+				glog.Errorf(ctx, "[svcuser.Create] person FindOrCreate fail, err:%v, req:%s", personErr, gutil.ToJsonString(req))
+				return fmt.Errorf("person find-or-create: %w", personErr)
 			}
 			personID = personEntity.ID
+		}
+
+		// 同一自然人在本租户内只能有一条 user（person 关联/新建后即可确定 personID 校验）
+		existing, err := dao.NewUserDao().WithTx(tx).GetListByCond(ctx, &dao.UserCond{TenantID: tenantID, PersonID: personID})
+		if err != nil {
+			glog.Errorf(ctx, "[svcuser.Create] query user by person fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+			return fmt.Errorf("query user by person: %w", err)
+		}
+		if len(existing) > 0 {
+			return code.GetError(code.UserAlreadyInTenantError)
 		}
 
 		now := time.Now()
@@ -955,27 +950,6 @@ func (svc *userSvc) listRoles(ctx *gin.Context, tenantID, userID string) ([]dtot
 		})
 	}
 	return list, nil
-}
-
-// findExistingPersonID 按 username/email/phone 全局唯一标识查找已有 person（命中其一即返回其 ID）。
-func (svc *userSvc) findExistingPersonID(ctx *gin.Context, req *dtotenant.UserCreateReq) string {
-	personDao := dao.NewPersonDao()
-	if req.Username != "" {
-		if p, _ := personDao.GetByCond(ctx, &dao.PersonCond{Username: req.Username}); p != nil && p.ID != "" {
-			return p.ID
-		}
-	}
-	if req.PrimaryEmail != "" {
-		if p, _ := personDao.GetByCond(ctx, &dao.PersonCond{PrimaryEmail: req.PrimaryEmail}); p != nil && p.ID != "" {
-			return p.ID
-		}
-	}
-	if req.PrimaryPhone != "" {
-		if p, _ := personDao.GetByCond(ctx, &dao.PersonCond{PrimaryPhone: req.PrimaryPhone}); p != nil && p.ID != "" {
-			return p.ID
-		}
-	}
-	return ""
 }
 
 // loadUserPersonMaps 批量加载用户与其关联自然人（IN 查询，避免 N+1）。

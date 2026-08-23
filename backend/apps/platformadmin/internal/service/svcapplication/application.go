@@ -9,7 +9,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
+	"github.com/morehao/ark-iam/pkg/iam/audit"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtoapplication"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
@@ -57,8 +57,8 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.Applicat
 		glog.Errorf(ctx, "[svcapplication.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationCreateError)
 	}
-	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-		Action:     svcaudit.ActionApplicationCreate,
+	audit.WriteAudit(ctx, audit.AuditEntry{
+		Action:     audit.ActionApplicationCreate,
 		TenantID:   "",
 		Result:     "success",
 		TargetType: "application",

@@ -13,7 +13,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
-	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
+	"github.com/morehao/ark-iam/pkg/iam/audit"
 	"github.com/morehao/golib/glog"
 )
 
@@ -111,8 +111,8 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 		return nil, mapAuthRequestError(err)
 	}
 	// 补记密码登录主路径的审计（SelectTenant / CompleteLoginBySession 均已记录）
-	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-		Action:     svcaudit.ActionLogin,
+	audit.WriteAudit(ctx, audit.AuditEntry{
+		Action:     audit.ActionLogin,
 		TenantID:   tenantID,
 		Result:     "success",
 		TargetType: "person",
@@ -196,8 +196,8 @@ func (svc *oidcAuthSvc) SelectTenant(ctx *gin.Context, authRequestID string, ten
 			glog.Warnf(ctx, "[oidcAuthSvc.SelectTenant] failed to create sso session: %v", sErr)
 		}
 	}
-	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-		Action:     svcaudit.ActionTenantSwitch,
+	audit.WriteAudit(ctx, audit.AuditEntry{
+		Action:     audit.ActionTenantSwitch,
 		TenantID:   tenantID,
 		Result:     "success",
 		TargetType: "tenant",
@@ -262,8 +262,8 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID s
 		return "", err
 	}
 
-	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-		Action:     svcaudit.ActionLogin,
+	audit.WriteAudit(ctx, audit.AuditEntry{
+		Action:     audit.ActionLogin,
 		TenantID:   tenantID,
 		Result:     "success",
 		TargetType: "person",

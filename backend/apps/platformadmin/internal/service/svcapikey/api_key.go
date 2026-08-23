@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
+	"github.com/morehao/ark-iam/pkg/iam/audit"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtoapikey"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
@@ -83,8 +83,8 @@ func (svc *createApiKeySvc) Create(ctx *gin.Context, req *dtoapikey.ApiKeyCreate
 		return nil, err
 	}
 
-	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-		Action:     svcaudit.ActionApiKeyCreate,
+	audit.WriteAudit(ctx, audit.AuditEntry{
+		Action:     audit.ActionApiKeyCreate,
 		TenantID:   gincontext.GetTenantIDString(ctx),
 		Result:     "success",
 		TargetType: "api_key",
@@ -105,8 +105,8 @@ func (svc *createApiKeySvc) Revoke(ctx *gin.Context, req *dtoapikey.RevokeApiKey
 		glog.Errorf(ctx, "[svcapikey.Revoke] dao UpdateMap fail, err:%v, id:%s", err, req.ApiKeyID)
 		return err
 	}
-	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-		Action:     svcaudit.ActionApiKeyRevoke,
+	audit.WriteAudit(ctx, audit.AuditEntry{
+		Action:     audit.ActionApiKeyRevoke,
 		TenantID:   gincontext.GetTenantIDString(ctx),
 		Result:     "success",
 		TargetType: "api_key",

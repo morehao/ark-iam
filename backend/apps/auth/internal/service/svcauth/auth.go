@@ -20,7 +20,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/iam/password"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
-	"github.com/morehao/ark-iam/pkg/iam/svcaudit"
+	"github.com/morehao/ark-iam/pkg/iam/audit"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gconstant"
@@ -121,8 +121,8 @@ func (svc *authSvc) TenantsForPerson(ctx *gin.Context, personID string) ([]objau
 func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *model.PersonEntity, userEntity *model.UserEntity, password string) (*model.PersonEntity, *model.UserEntity, error) {
 	ip := gincontext.GetClientIP(ctx)
 	if svcloginguard.Check(ctx, ip, personEntity.ID) {
-		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-			Action:     svcaudit.ActionLogin,
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
 			Result:     "failure",
 			TargetType: "person",
 			Detail:     fmt.Sprintf("personID:%s, reason:login locked", personEntity.ID),
@@ -131,8 +131,8 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 	}
 
 	if personEntity.IsSuspended {
-		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-			Action:     svcaudit.ActionLogin,
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
 			Result:     "failure",
 			TargetType: "person",
 			Detail:     fmt.Sprintf("personID:%s, reason:suspended", personEntity.ID),
@@ -141,8 +141,8 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 	}
 
 	if personEntity.PasswordEncrypted == "" {
-		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-			Action:     svcaudit.ActionLogin,
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
 			Result:     "failure",
 			TargetType: "person",
 			Detail:     fmt.Sprintf("personID:%s, reason:password not set", personEntity.ID),
@@ -362,8 +362,8 @@ func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
 	// access token 依赖其短 TTL 失效（见设计文档 §2.5），此处不维护 HS256 黑名单。
 	if personID != "" {
 		// H13：登出动作记录审计
-		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-			Action:     svcaudit.ActionLogout,
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogout,
 			Result:     "success",
 			TargetType: "person",
 			TargetID:   personID,
@@ -489,8 +489,8 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 
 	personEntity, err := personDao.GetByCond(ctx.Request.Context(), personCond)
 	if err != nil {
-		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-			Action:     svcaudit.ActionLogin,
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
 			Result:     "failure",
 			TargetType: "person",
 			Detail:     fmt.Sprintf("identifier:%s, reason:user lookup error", identifier),
@@ -502,8 +502,8 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 		// H8：未知标识同样计入 IP 维度失败（防口令喷洒绕过 IP 锁）；
 		// 审计 detail 不写"user not found"，避免用户名枚举。
 		svcloginguard.RecordFailure(ctx, gincontext.GetClientIP(ctx), "")
-		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-			Action:     svcaudit.ActionLogin,
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
 			Result:     "failure",
 			TargetType: "person",
 			Detail:     fmt.Sprintf("identifier-hash:%s, reason:auth failed", hashIdentifier(identifier)),
@@ -517,8 +517,8 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 		return nil, nil, nil, err
 	}
 	if userEntity.IsSuspended {
-		svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-			Action:     svcaudit.ActionLogin,
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
 			Result:     "failure",
 			TargetType: "person",
 			Detail:     fmt.Sprintf("userID:%s, reason:suspended", userEntity.ID),
@@ -628,8 +628,8 @@ func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID string, success bo
 	if success {
 		result = "success"
 	}
-	svcaudit.WriteAudit(ctx, svcaudit.AuditEntry{
-		Action:     svcaudit.ActionLogin,
+	audit.WriteAudit(ctx, audit.AuditEntry{
+		Action:     audit.ActionLogin,
 		TenantID:   tenantID,
 		Result:     result,
 		TargetType: "person",

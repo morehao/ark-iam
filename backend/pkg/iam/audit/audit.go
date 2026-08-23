@@ -1,4 +1,4 @@
-package svcaudit
+package audit
 
 import (
 	"context"
@@ -43,7 +43,7 @@ func WriteAudit(ctx *gin.Context, e AuditEntry) {
 	// 都不得阻断业务主流程，统一 recover 后仅记日志。
 	defer func() {
 		if r := recover(); r != nil {
-			glog.Errorf(ctx, "[svcaudit.WriteAudit] panic recovered, action:%s, panic:%v", e.Action, r)
+			glog.Errorf(ctx, "[audit.WriteAudit] panic recovered, action:%s, panic:%v", e.Action, r)
 		}
 	}()
 	entity := &model.AuditLogEntity{
@@ -61,6 +61,6 @@ func WriteAudit(ctx *gin.Context, e AuditEntry) {
 		CreatedBy:     ctx.GetString(gcontext.KeyUserID),
 	}
 	if err := newAuditLogDao().Insert(context.Background(), entity); err != nil {
-		glog.Errorf(ctx, "[svcaudit.WriteAudit] failed, action:%s, err:%v", e.Action, err)
+		glog.Errorf(ctx, "[audit.WriteAudit] failed, action:%s, err:%v", e.Action, err)
 	}
 }
