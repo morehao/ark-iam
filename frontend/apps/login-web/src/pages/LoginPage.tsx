@@ -50,6 +50,13 @@ export default function LoginPage() {
         setPendingAuthRequestID(authRequestID)
         return
       }
+      // 零租户已登录 person：无租户可选，引导创建自己的租户（复用 createTenant → selectTenant 收尾）
+      if (resp.allowPersonCreateTenant && !resp.tenants?.length && resp.personID) {
+        setTenants([])
+        setPendingAuthRequestID('')
+        setMode('createTenant')
+        return
+      }
       if (resp.continueURL) {
         window.location.href = resp.continueURL
       } else {
