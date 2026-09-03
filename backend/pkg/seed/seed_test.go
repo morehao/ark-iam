@@ -171,3 +171,153 @@ func TestSeedIamSQLite(t *testing.T) {
 		t.Fatalf("admin organization relation not found: %v", err)
 	}
 }
+
+// TestSeedPlatformMenuStructure 在全新库上验证平台管理控制台菜单树终稿结构：
+// 开发期按「全新项目」处理（可删库重建），故本测试直接锁定重建后的目标 IA，
+// 防止后续调整 seed 时悄然漂移。
+func TestSeedPlatformMenuStructure(t *testing.T) {
+	db := setupDB(t)
+	ctx := context.Background()
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed fail: %v", err)
+	}
+
+	var adminApp model.ApplicationEntity
+	if err := db.Where("name = ?", "管理后台").First(&adminApp).Error; err != nil {
+		t.Fatalf("admin app not found: %v", err)
+	}
+
+	// 目标 IA：code / name / parentCode / sort / type（全部为管理后台应用菜单）
+	type wantDef struct {
+		code       string
+		name       string
+		parentCode string
+		sort       int
+		dir        bool
+	}
+	wantDefs := []wantDef{
+		{code: "dashboard", name: "工作台", sort: 1},
+		{code: "grp-tenant", name: "租户中心", sort: 2, dir: true},
+		{code: "tenant", name: "租户管理", parentCode: "grp-tenant", sort: 1},
+		{code: "tenant-application", name: "租户应用", parentCode: "grp-tenant", sort: 2},
+		{code: "domain", name: "自定义域名", parentCode: "grp-tenant", sort: 3},
+		{code: "grp-app", name: "应用中心", sort: 3, dir: true},
+		{code: "application", name: "应用管理", parentCode: "grp-app", sort: 1},
+		{code: "oauth-client", name: "OAuth客户端", parentCode: "grp-app", sort: 2},
+		{code: "api-key", name: "API密钥", parentCode: "grp-app", sort: 3},
+		{code: "grp-identity", name: "身份中心", sort: 4, dir: true},
+		{code: "user", name: "用户管理", parentCode: "grp-identity", sort: 1},
+		{code: "role", name: "角色管理", parentCode: "grp-identity", sort: 2},
+		{code: "log", name: "审计日志", sort: 5},
+		{code: "menu", name: "菜单管理", sort: 6},
+	}
+
+	var menus []model.MenuEntity
+	if err := db.Where("app_id = ?", adminApp.ID).Find(&menus).Error; err != nil {
+		t.Fatalf("query admin menus: %v", err)
+	}
+	if len(menus) != len(wantDefs) {
+		t.Fatalf("admin app menu count: want %d, got %d", len(wantDefs), len(menus))
+	}
+
+	byCode := make(map[string]*model.MenuEntity, len(menus))
+	codeOfID := make(map[string]string, len(menus)) // id -> code
+	for i := range menus {
+		byCode[menus[i].Code] = &menus[i]
+		codeOfID[menus[i].ID] = menus[i].Code
+	}
+	parentCodeOf := make(map[string]string, len(menus)) // menu id -> parent code
+	for i := range menus {
+		if menus[i].ParentID != "" {
+			parentCodeOf[menus[i].ID] = codeOfID[menus[i].ParentID]
+		}
+	}
+	wantType := model.MenuTypeMenu
+	wantTypeDir := model.MenuTypeDirectory
+	for _, want := range wantDefs {
+		got := byCode[want.code]
+		if got == nil {
+			t.Fatalf("menu %s not seeded", want.code)
+		}
+		if got.Name != want.name {
+			t.Errorf("menu %s name: want %q, got %q", want.code, want.name, got.Name)
+		}
+		if got.Sort != want.sort {
+			t.Errorf("menu %s sort: want %d, got %d", want.code, want.sort, got.Sort)
+		}
+		wantTyp := wantType
+		if want.dir {
+			wantTyp = wantTypeDir
+		}
+		if got.Type != wantTyp {
+			t.Errorf("menu %s type: want %s, got %s", want.code, wantTyp, got.Type)
+		}
+		if want.parentCode == "" {
+			if got.ParentID != "" {
+				t.Errorf("menu %s should be top-level, got parent %s", want.code, got.ParentID)
+			}
+		} else if parentCodeOf[got.ID] != want.parentCode {
+			t.Errorf("menu %s parent: want %s, got %s", want.code, want.parentCode, parentCodeOf[got.ID])
+		}
+	}
+
+	// 一级菜单展示顺序（sort 升序）：工作台 → 租户中心 → 应用中心 → 身份中心 → 审计日志 → 菜单管理
+	var topMenus []model.MenuEntity
+	if err := db.Where("app_id = ? AND parent_id = ?", adminApp.ID, "").Order("sort asc").Find(&topMenus).Error; err != nil {
+		t.Fatalf("query top menus: %v", err)
+	}
+	wantOrder := []string{"dashboard", "grp-tenant", "grp-app", "grp-identity", "log", "menu"}
+	if len(topMenus) != len(wantOrder) {
+		t.Fatalf("top-level menu count: want %d, got %d", len(wantOrder), len(topMenus))
+	}
+	for i, want := range wantOrder {
+		if topMenus[i].Code != want {
+			t.Errorf("top-level order[%d]: want %s, got %s", i, want, topMenus[i].Code)
+		}
+	}
+
+	// 已下线模块不应再出现：system / grp-ops / 旧目录名 grp-org
+	for _, stale := range []string{"system", "grp-ops", "grp-org"} {
+		if byCode[stale] != nil {
+			t.Errorf("retired menu %s should not be seeded", stale)
+		}
+	}
+
+	// admin 角色菜单授权集合（平台应用菜单 + 租户自服务菜单）
+	var adminRole model.RoleEntity
+	if err := db.Where("app_id = ? AND code = ?", adminApp.ID, "admin").First(&adminRole).Error; err != nil {
+		t.Fatalf("admin role not found: %v", err)
+	}
+	var adminMenuLinks []model.RoleMenuEntity
+	if err := db.Where("role_id = ?", adminRole.ID).Find(&adminMenuLinks).Error; err != nil {
+		t.Fatalf("query admin role_menu: %v", err)
+	}
+	if len(adminMenuLinks) != 14 {
+		t.Fatalf("admin role_menu count: want 14, got %d", len(adminMenuLinks))
+	}
+	// 授权集合涉及平台应用与租户自服务两个应用的菜单，用全量映射解析
+	var allMenus []model.MenuEntity
+	if err := db.Find(&allMenus).Error; err != nil {
+		t.Fatalf("query all menus: %v", err)
+	}
+	codeEntityAll := make(map[string]*model.MenuEntity, len(allMenus))
+	for i := range allMenus {
+		codeEntityAll[allMenus[i].Code] = &allMenus[i]
+	}
+	granted := make(map[string]bool, len(adminMenuLinks))
+	for _, link := range adminMenuLinks {
+		for code, m := range codeEntityAll {
+			if m.ID == link.MenuID {
+				granted[code] = true
+			}
+		}
+	}
+	for _, want := range []string{"dashboard", "user", "role", "menu", "tenant", "application", "tenant-application", "oauth-client", "api-key", "domain", "log", "organization", "tenant-user", "tenant-role"} {
+		if !granted[want] {
+			t.Errorf("admin role missing menu grant %s", want)
+		}
+	}
+	if granted["system"] {
+		t.Error("admin role should not grant retired menu system")
+	}
+}
