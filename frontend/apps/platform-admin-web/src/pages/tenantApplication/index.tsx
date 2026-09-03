@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, InputNumber, message, Modal, Popconfirm, Select, Space, Table } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { IDCell, PageContainer } from '@ark-iam/ui'
+import { fmtTime, IDCell, PageContainer, StatusTag } from '@ark-iam/ui'
 import {
   createTenantApplication,
   deleteTenantApplication,
@@ -10,7 +10,6 @@ import {
   updateTenantApplication,
 } from '@ark-iam/api'
 import type { TenantApplicationItem } from '@ark-iam/types'
-import { fmtTime, StatusTag } from '../../components/common'
 
 export default function TenantApplicationList() {
   const [data, setData] = useState<TenantApplicationItem[]>([])

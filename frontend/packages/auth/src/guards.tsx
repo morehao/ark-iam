@@ -1,5 +1,10 @@
 import { Spin } from 'antd'
 
+// 注：auth 包处于 ui 下层（ui → auth 依赖方向），无法引用 @ark-iam/ui tokens，
+// 这里的中性色与 DESIGN.md「冷白工程台」灰阶保持一致，改动需手动同步。
+const LOADING_BG = '#f6f7f9'
+const LOADING_TEXT = '#94a3b8'
+
 export function FullPageSpinner() {
   return (
     <div
@@ -10,11 +15,11 @@ export function FullPageSpinner() {
         alignItems: 'center',
         justifyContent: 'center',
         gap: 16,
-        background: 'linear-gradient(135deg, #eef2ff 0%, #f5f0ff 100%)',
+        background: LOADING_BG,
       }}
     >
       <Spin size="large" />
-      <span style={{ color: 'rgba(17, 24, 39, 0.45)', fontSize: 13 }}>正在加载 IAM 平台…</span>
+      <span style={{ color: LOADING_TEXT, fontSize: 13 }}>正在加载 IAM 平台…</span>
     </div>
   )
 }

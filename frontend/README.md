@@ -11,6 +11,10 @@ IAM 管理平台前端，基于 React 18 + Vite + Ant Design 5.x 的 pnpm monore
 - UI 组件库：Ant Design 5.x（自定义主题 + 中文语言包）
 - HTTP 客户端：Axios（统一 `{code, msg, data}` 信封处理 + 401 兜底登出）
 
+## 设计约定
+
+前端统一视觉风格 / 设计令牌 / 状态组件规范见 [`DESIGN.md`](./DESIGN.md)。令牌代码唯一事实源为 `packages/ui/src/theme.ts` 的 `tokens`（`brand` 为兼容别名），业务页面与组件一律引用 `tokens`/antd token，禁止硬编码色值；状态展示使用共享 `StatusTag/SuspendedTag/VerifiedTag/TypeTag/SourceTag`，时间格式化使用共享 `fmtTime`。
+
 ## 项目结构
 
 ```

@@ -2,10 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, message } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { IDCell, PageContainer } from '@ark-iam/ui'
+import { fmtTime, IDCell, PageContainer, VerifiedTag } from '@ark-iam/ui'
 import { createDomain, deleteDomain, getDomainDetail, getDomainPageList, updateDomain } from '@ark-iam/api'
 import type { DomainItem } from '@ark-iam/types'
-import { VerifiedTag, fmtTime } from '../../components/common'
 
 export default function DomainList() {
   const [data, setData] = useState<DomainItem[]>([])

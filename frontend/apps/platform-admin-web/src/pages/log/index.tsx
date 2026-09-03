@@ -2,10 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Descriptions, Drawer, Input, Space, Table, Tooltip } from 'antd'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { EllipsisCell, IDCell, PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, fmtTime, IDCell, PageContainer, tokens } from '@ark-iam/ui'
 import { getAuditLogDetail, getAuditLogPageList } from '@ark-iam/api'
 import type { AuditLogItem } from '@ark-iam/types'
-import { fmtTime } from '../../components/common'
 
 /** 序列化 payload：对象 JSON 化，其余转字符串 */
 function formatPayload(value: unknown): string {
@@ -169,8 +168,8 @@ export default function AuditLogList() {
                 fontFamily: 'monospace',
                 fontSize: 12,
                 lineHeight: 1.6,
-                background: '#fafafa',
-                border: '1px solid #f0f0f0',
+                background: tokens.codeBg,
+                border: `1px solid ${tokens.border}`,
                 borderRadius: 8,
               }}
             >

@@ -2,10 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, message, Modal, Popconfirm, Select, Space, Switch, Table } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { EllipsisCell, IDCell, PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, fmtTime, IDCell, PageContainer, SuspendedTag, TypeTag } from '@ark-iam/ui'
 import { createTenant, deleteTenant, getTenantPageList, updateTenant } from '@ark-iam/api'
 import type { TenantItem } from '@ark-iam/types'
-import { fmtTime, SuspendedTag, TypeTag } from '../../components/common'
 
 export default function TenantList() {
   const [data, setData] = useState<TenantItem[]>([])

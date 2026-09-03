@@ -11,8 +11,7 @@ import {
   getUserLoginLogByUser,
 } from '@ark-iam/api'
 import type { UserIdentityItem, UserItem, UserLoginLogItem } from '@ark-iam/types'
-import { fmtTime, SuspendedTag } from '../../components/common'
-import { brand, EllipsisCell, IDCell } from '@ark-iam/ui'
+import { brand, EllipsisCell, fmtTime, IDCell, SuspendedTag, tokens } from '@ark-iam/ui'
 
 export default function UserDetail() {
   const { id } = useParams<{ id: string }>()
@@ -112,7 +111,7 @@ export default function UserDetail() {
         </Button>
       </Space>
 
-      <Card style={{ borderRadius: 12, marginBottom: 16, border: '1px solid #f0f0f0' }} styles={{ body: { padding: 24 } }}>
+      <Card style={{ borderRadius: 12, marginBottom: 16, border: `1px solid ${tokens.border}` }} styles={{ body: { padding: 24 } }}>
         <Space size={20} align="center">
           <Avatar size={64} style={{ background: brand.gradient, fontSize: 26 }}>
             {user.name?.charAt(0)?.toUpperCase() || 'U'}
@@ -129,7 +128,7 @@ export default function UserDetail() {
         </Space>
       </Card>
 
-      <Card style={{ borderRadius: 12, border: '1px solid #f0f0f0' }}>
+      <Card style={{ borderRadius: 12, border: `1px solid ${tokens.border}` }}>
         <Tabs
           items={[
             {

@@ -14,7 +14,7 @@ import { useAuthGuard, useLogout } from '@ark-iam/auth'
 import { useAuth } from 'react-oidc-context'
 import { TenantSwitcher } from './TenantSwitcher'
 import { ProfileCenter } from './ProfileCenter'
-import { brand } from './theme'
+import { brand, tokens } from './theme'
 
 const { Header, Sider, Content } = Layout
 
@@ -76,7 +76,7 @@ export function MainLayout({ title, subtitle, menuItems, hasTenantSwitch = true 
         collapsed={collapsed}
         width={232}
         theme="dark"
-        style={{ boxShadow: '2px 0 12px rgba(15,23,42,0.12)', position: 'sticky', top: 0, height: '100vh' }}
+        style={{ position: 'sticky', top: 0, height: '100vh' }}
       >
         <div
           style={{
@@ -118,7 +118,7 @@ export function MainLayout({ title, subtitle, menuItems, hasTenantSwitch = true 
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            borderBottom: '1px solid #f0f0f0',
+            borderBottom: `1px solid ${tokens.border}`,
             position: 'sticky',
             top: 0,
             zIndex: 10,
@@ -131,7 +131,7 @@ export function MainLayout({ title, subtitle, menuItems, hasTenantSwitch = true 
             </Tooltip>
             {hasTenantSwitch && (
               <>
-                <div style={{ width: 1, height: 22, background: '#e5e7eb' }} />
+                <div style={{ width: 1, height: 22, background: tokens.borderStrong }} />
                 <TenantSwitcher />
               </>
             )}

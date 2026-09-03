@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthGuard, FullPageSpinner } from '@ark-iam/auth'
-import { MainLayout, LoginPage } from '@ark-iam/ui'
+import { MainLayout, LoginPage, tokens } from '@ark-iam/ui'
 import type { MainMenuItems } from '@ark-iam/ui'
 import {
   ApartmentOutlined,
@@ -188,7 +188,7 @@ function App() {
 // EmptyAccess 菜单为空（后端未下发任何权限菜单）时的空态占位，避免重定向到 404 或白屏。
 function EmptyAccess() {
   return (
-    <div style={{ padding: 80, textAlign: 'center', color: '#94a3b8' }}>
+    <div style={{ padding: 80, textAlign: 'center', color: tokens.textPlaceholder }}>
       <div style={{ fontSize: 40 }}>🔒</div>
       <p>暂无可用菜单</p>
       <p style={{ fontSize: 13 }}>当前账号未被授予任何菜单权限，请联系平台管理员。</p>

@@ -2,10 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Descriptions, Drawer, Input, Table, Tag, Typography } from 'antd'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { EllipsisCell, IDCell, PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, fmtTime, IDCell, PageContainer, SourceTag } from '@ark-iam/ui'
 import { getRolePageList, getRoleUsers } from '@ark-iam/api'
 import type { RoleItem, RoleUserItem } from '@ark-iam/types'
-import { fmtTime } from '../../components/common'
 
 /** 系统管理等级展示：super→超管，member→成员 */
 function adminLevelText(level?: string) {
@@ -78,7 +77,7 @@ export default function RoleList() {
       dataIndex: 'source',
       key: 'source',
       width: 100,
-      render: (v: string) => (v === 'builtin' ? <Tag color="gold">内置</Tag> : <Tag color="blue">自定义</Tag>),
+      render: (v: string) => <SourceTag value={v} />,
     },
     {
       title: '系统管理',
@@ -171,7 +170,7 @@ export default function RoleList() {
             <Descriptions.Item label="角色名称">{detailRole.name}</Descriptions.Item>
             <Descriptions.Item label="角色编码">{detailRole.code}</Descriptions.Item>
             <Descriptions.Item label="来源">
-              {detailRole.source === 'builtin' ? <Tag color="gold">内置</Tag> : <Tag color="blue">自定义</Tag>}
+              <SourceTag value={detailRole.source} />
             </Descriptions.Item>
             <Descriptions.Item label="系统管理">{adminLevelText(detailRole.adminLevel)}</Descriptions.Item>
             <Descriptions.Item label="创建时间">{fmtTime(detailRole.createdAt)}</Descriptions.Item>

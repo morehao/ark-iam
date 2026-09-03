@@ -11,7 +11,6 @@ import {
   Space,
   Spin,
   Table,
-  Tag,
   Tree,
   TreeSelect,
   message,
@@ -19,9 +18,8 @@ import {
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
-import { PageContainer } from '@ark-iam/ui'
+import { fmtTime, PageContainer, StatusTag, tokens } from '@ark-iam/ui'
 import type { OrganizationChildItem, OrganizationItem } from '@ark-iam/types'
-import { fmtTime } from '../../components/common'
 import {
   createOrganization,
   deleteOrganization,
@@ -230,7 +228,7 @@ export default function OrganizationPage() {
       dataIndex: 'status',
       key: 'status',
       width: 90,
-      render: (v: string) => (v === 'active' ? <Tag color="green">启用</Tag> : <Tag color="orange">停用</Tag>),
+      render: (v: string) => <StatusTag value={v} />,
     },
     { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 180, render: (v?: number) => (v ? fmtTime(v * 1000) : '-') },
     {
@@ -268,8 +266,8 @@ export default function OrganizationPage() {
           overflow: hidden;
         }
       `}</style>
-      <Space align="start" size={16} style={{ width: '100%' }}>
-        <Card id="org-tree-card" style={{ width: 280, borderRadius: 12 }} styles={{ body: { padding: '16px 16px', maxHeight: 680, overflow: 'auto' } }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+        <Card id="org-tree-card" style={{ width: 280, flexShrink: 0, borderRadius: 12 }} styles={{ body: { padding: '16px 16px', maxHeight: 680, overflow: 'auto' } }}>
           <Input placeholder="搜索部门" allowClear value={treeKeyword} onChange={(e) => setTreeKeyword(e.target.value)} style={{ marginBottom: 12 }} />
           <Spin spinning={treeLoading}>
             {visibleTreeData.length === 0 ? (
@@ -330,7 +328,7 @@ export default function OrganizationPage() {
           </Form>
 
           {/* 分隔线 */}
-          <div style={{ borderBottom: '1px solid rgba(5,5,5,0.06)', marginBottom: 16 }} />
+          <div style={{ borderBottom: `1px solid ${tokens.border}`, marginBottom: 16 }} />
 
           {/* 第二行：工具栏 */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
@@ -340,7 +338,7 @@ export default function OrganizationPage() {
           </div>
 
           {/* 分隔线 */}
-          <div style={{ borderBottom: '1px solid rgba(5,5,5,0.06)', marginBottom: 16 }} />
+          <div style={{ borderBottom: `1px solid ${tokens.border}`, marginBottom: 16 }} />
 
           <Table<OrganizationChildItem>
             rowKey={(r) => r.organizationID}
@@ -361,7 +359,7 @@ export default function OrganizationPage() {
             }}
           />
         </Card>
-      </Space>
+      </div>
 
       <Modal title={editingNode ? '编辑部门（可改父部门实现移动）' : '新建部门'} open={nodeModalOpen} onOk={() => void submitNode()} onCancel={() => setNodeModalOpen(false)} destroyOnClose>
         <Form form={nodeForm} layout="vertical">
