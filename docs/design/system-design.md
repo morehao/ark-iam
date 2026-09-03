@@ -492,7 +492,7 @@ erDiagram
 | 表 | 说明 |
 |---|---|
 | `person` | **自然人**：全局唯一身份。username / primary_email / primary_phone 可空且全局唯一（NULL 不撞唯一索引）；密码 bcrypt 哈希；`is_suspended` 全局挂起 |
-| `user` | **租户账号**：member=真实用户（person × tenant 成员记录，可登录/入组织）；machine=服务账号（`person_id` 恒空，不可登录/不入组织，仅作为角色主体与 API Key 归属）；`is_owner` 仅真实用户可持有；租户内资料（name/description/profile/custom_data） |
+| `user` | **租户账号**：member=真实用户（person × tenant 成员记录，可登录/入组织）；machine=服务账号（`person_id` 恒空，不可登录/无自然人/不可任部门负责人，但**从属部门**：主部门 primary 必填 + 参与部门 secondary 可多条，仅作角色主体与 API Key 归属）；`is_owner` 仅真实用户可持有；租户内资料（name/description/profile/custom_data） |
 | `user_identity` | 外部身份关联：person 在外部 IdP（Connector）的身份映射，`external_subject` 为外部主体标识 |
 | `user_login_log` | 登录日志：记录每次密码登录的时间/IP/UA/类型 |
 
@@ -531,7 +531,7 @@ erDiagram
 | `application` | 业务应用定义：编码/名称/类型（first_party/third_party）/状态/可见性/`tenant_policy`（如允许个人建租户） |
 | `application_client` | **OAuth/OIDC 客户端**：client_id、redirect_uris、grant_types、token_endpoint_auth_method、PKCE、令牌 TTL、是否第三方 |
 | `application_client_secret` | 客户端密钥：只存哈希（`value_hash`）+ 前缀（`value_prefix`），支持过期/吊销 |
-| `api_key` | API Key 机器凭证：只存哈希，支持 scope/过期/吊销；`owner_user_id` 归属主体（真实用户本人=个人密钥 / 服务账号=开发者模式），鉴权按归属主体注入身份；明文仅创建时展示一次，管理在租户端 |
+| `api_key` | API Key 机器凭证：只存哈希，支持 scope/过期/吊销；`owner_user_id` 归属**服务账号**（个人密钥能力已下线，历史 member 数据兼容展示），鉴权按归属服务账号注入身份；明文仅创建时展示一次，管理在租户端（需系统管理能力） |
 
 #### 会话与审计域
 
@@ -729,7 +729,7 @@ sequenceDiagram
     SVC->>API: 请求（Header: x-api-key: ak_xxx...）
     API->>DB: 按 key_hash 定位 + 校验未过期/未吊销
     API->>DB: 解析归属主体（owner_user_id）<br/>校验租户匹配/未挂起
-    API->>API: 注入身份上下文（tenant + owner userID）<br/>owner=真实用户本人或服务账号，非创建人
+    API->>API: 注入身份上下文（tenant + owner userID）<br/>owner=归属服务账号（历史个人密钥数据兼容），非创建人
     API-->>SVC: 业务数据
 ```
 

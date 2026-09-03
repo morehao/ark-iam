@@ -20,8 +20,8 @@ import (
 )
 
 // ApiKeySvc 租户端 API 密钥领域服务。
-// 密钥归属两类主体：真实用户本人（代表用户自身）或服务账号（开发者模式）。
-// 服务账号相关操作（机器密钥创建/管理/全量列表）要求系统管理能力；个人密钥归本人自助管理。
+// 密钥一律归属服务账号（开发者模式，面向服务端集成）；创建/列表/吊销/删除为系统管理操作
+// （服务账号不可登录，不存在"本人自管"通道）。鉴权时按归属服务账号注入身份上下文。
 type ApiKeySvc interface {
 	Create(ctx *gin.Context, req *dtotenant.ApiKeyCreateReq) (*dtotenant.ApiKeyCreateResp, error)
 	PageList(ctx *gin.Context, req *dtotenant.ApiKeyPageListReq) (*dtotenant.ApiKeyPageListResp, error)
@@ -50,56 +50,30 @@ func (svc *apiKeySvc) requireSystemAdmin(ctx *gin.Context, opErr int) error {
 	return nil
 }
 
-// loadOwnerUser 加载指定租户内某用户（真实用户或服务账号均可作为密钥归属）。
-func (svc *apiKeySvc) loadOwnerUser(ctx *gin.Context, tenantID, userID string) (*model.UserEntity, error) {
-	entity, err := dao.NewUserDao().GetByID(ctx, userID)
+// loadOwnerServiceAccount 加载指定租户内作为密钥归属的服务账号（不存在/跨租户/非服务账号均按不存在处理）。
+func (svc *apiKeySvc) loadOwnerServiceAccount(ctx *gin.Context, tenantID, machineUserID string) (*model.UserEntity, error) {
+	entity, err := dao.NewUserDao().GetByID(ctx, machineUserID)
 	if err != nil {
-		glog.Errorf(ctx, "[svcapikey.loadOwnerUser] dao GetByID fail, err:%v, id:%s", err, userID)
+		glog.Errorf(ctx, "[svcapikey.loadOwnerServiceAccount] dao GetByID fail, err:%v, id:%s", err, machineUserID)
 		return nil, code.GetError(code.ApiKeyOwnerNotExistError)
 	}
-	if entity == nil || entity.TenantID != tenantID {
+	if entity == nil || entity.TenantID != tenantID || !entity.IsMachine() {
 		return nil, code.GetError(code.ApiKeyOwnerNotExistError)
 	}
 	return entity, nil
 }
 
-// authorizeKeyOperate 校验操作者对某密钥的写操作权限：
-// 归属本人的密钥本人可管；其余（含全部服务账号密钥）要求系统管理能力。
-func (svc *apiKeySvc) authorizeKeyOperate(ctx *gin.Context, key *model.ApiKeyEntity, opErr int) error {
-	if key.OwnerUserID != "" && key.OwnerUserID == gincontext.GetUserIDString(ctx) {
-		return nil
-	}
-	return svc.requireSystemAdmin(ctx, opErr)
-}
-
 func (svc *apiKeySvc) Create(ctx *gin.Context, req *dtotenant.ApiKeyCreateReq) (*dtotenant.ApiKeyCreateResp, error) {
+	if err := svc.requireSystemAdmin(ctx, code.ApiKeyCreateError); err != nil {
+		return nil, err
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 	operatorID := gincontext.GetUserIDString(ctx)
 
-	ownerID := ""
-	if req.MachineUserID != "" {
-		// 服务账号密钥：归属机器主体，需要系统管理能力
-		if err := svc.requireSystemAdmin(ctx, code.ApiKeyCreateError); err != nil {
-			return nil, err
-		}
-		owner, err := svc.loadOwnerUser(ctx, tenantID, req.MachineUserID)
-		if err != nil {
-			return nil, err
-		}
-		if !owner.IsMachine() {
-			return nil, code.GetError(code.ApiKeyOwnerNotExistError)
-		}
-		ownerID = owner.ID
-	} else {
-		// 个人密钥：代表当前真实用户本人
-		self, err := svc.loadOwnerUser(ctx, tenantID, operatorID)
-		if err != nil {
-			return nil, err
-		}
-		if !self.IsReal() {
-			return nil, code.GetError(code.UserMemberOperationOnlyError)
-		}
-		ownerID = self.ID
+	// 密钥归属服务账号（DTO 已校验 machineUserID 必填）
+	owner, err := svc.loadOwnerServiceAccount(ctx, tenantID, req.MachineUserID)
+	if err != nil {
+		return nil, err
 	}
 
 	rawKey, err := apikey.Generate()
@@ -116,7 +90,7 @@ func (svc *apiKeySvc) Create(ctx *gin.Context, req *dtotenant.ApiKeyCreateReq) (
 	}
 	entity := &model.ApiKeyEntity{
 		TenantID:    tenantID,
-		OwnerUserID: ownerID,
+		OwnerUserID: owner.ID,
 		Name:        req.Name,
 		KeyHash:     apikey.Hash(rawKey),
 		KeyPrefix:   apikey.Prefix(rawKey),
@@ -144,9 +118,13 @@ func (svc *apiKeySvc) Create(ctx *gin.Context, req *dtotenant.ApiKeyCreateReq) (
 	}, nil
 }
 
+// PageList 服务账号密钥分页（管理视角，需系统管理能力）：
+// machineUserID 为空 = 租户全部密钥；指定 = 该服务账号名下密钥。
 func (svc *apiKeySvc) PageList(ctx *gin.Context, req *dtotenant.ApiKeyPageListReq) (*dtotenant.ApiKeyPageListResp, error) {
+	if err := svc.requireSystemAdmin(ctx, code.ApiKeyGetPageListError); err != nil {
+		return nil, err
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
-	operatorID := gincontext.GetUserIDString(ctx)
 
 	cond := &dao.ApiKeyCond{
 		BaseCond: &gormdao.BaseCond{
@@ -156,24 +134,11 @@ func (svc *apiKeySvc) PageList(ctx *gin.Context, req *dtotenant.ApiKeyPageListRe
 		TenantID: tenantID,
 		Name:     req.Name,
 	}
-	switch {
-	case req.MachineUserID != "":
-		// 指定服务账号的密钥（管理视角，需系统管理能力）
-		if err := svc.requireSystemAdmin(ctx, code.ApiKeyGetPageListError); err != nil {
-			return nil, err
-		}
-		if _, err := svc.loadOwnerUser(ctx, tenantID, req.MachineUserID); err != nil {
+	if req.MachineUserID != "" {
+		if _, err := svc.loadOwnerServiceAccount(ctx, tenantID, req.MachineUserID); err != nil {
 			return nil, err
 		}
 		cond.OwnerUserID = req.MachineUserID
-	case req.All:
-		// 租户全量密钥（系统管理能力）
-		if err := svc.requireSystemAdmin(ctx, code.ApiKeyGetPageListError); err != nil {
-			return nil, err
-		}
-	default:
-		// 默认：当前真实用户本人的密钥
-		cond.OwnerUserID = operatorID
 	}
 
 	list, total, err := dao.NewApiKeyDao().GetPageListByCond(ctx, cond)
@@ -216,7 +181,7 @@ func (svc *apiKeySvc) Revoke(ctx *gin.Context, req *dtotenant.ApiKeyRevokeReq) e
 	if err != nil {
 		return err
 	}
-	if err := svc.authorizeKeyOperate(ctx, key, code.ApiKeyRevokeError); err != nil {
+	if err := svc.requireSystemAdmin(ctx, code.ApiKeyRevokeError); err != nil {
 		return err
 	}
 	if err := dao.NewApiKeyDao().UpdateMap(ctx, key.ID, map[string]any{"revoked_at": time.Now()}); err != nil {
@@ -239,7 +204,7 @@ func (svc *apiKeySvc) Delete(ctx *gin.Context, req *dtotenant.ApiKeyDeleteReq) e
 	if err != nil {
 		return err
 	}
-	if err := svc.authorizeKeyOperate(ctx, key, code.ApiKeyDeleteError); err != nil {
+	if err := svc.requireSystemAdmin(ctx, code.ApiKeyDeleteError); err != nil {
 		return err
 	}
 	if err := dao.NewApiKeyDao().Delete(context.Background(), key.ID, gincontext.GetUserIDString(ctx)); err != nil {
@@ -261,7 +226,7 @@ func (svc *apiKeySvc) loadKey(ctx *gin.Context, tenantID, keyID string) (*model.
 	return entity, nil
 }
 
-// loadUserMap 汇总某批密钥中的归属用户与创建人，批量加载租户内用户（含服务账号）。
+// loadUserMap 汇总某批密钥中的归属服务账号与创建人，批量加载租户内用户。
 func (svc *apiKeySvc) loadUserMap(ctx *gin.Context, tenantID string, list model.ApiKeyEntityList) (map[string]*model.UserEntity, error) {
 	idSet := make(map[string]struct{})
 	for _, v := range list {

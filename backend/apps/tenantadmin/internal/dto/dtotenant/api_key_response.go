@@ -6,8 +6,8 @@ type ApiKeyPageListItem struct {
 	KeyID       string `json:"keyID"`       // API密钥ID
 	Name        string `json:"name"`        // 密钥名称
 	KeyPrefix   string `json:"keyPrefix"`   // 密钥前缀
-	OwnerUserID string `json:"ownerUserID"` // 归属用户ID
-	OwnerType   string `json:"ownerType"`   // 归属类型(member真实用户/machine服务账号)
+	OwnerUserID string `json:"ownerUserID"` // 归属服务账号ID
+	OwnerType   string `json:"ownerType"`   // 归属类型(machine服务账号;兼容历史member数据)
 	OwnerName   string `json:"ownerName"`   // 归属用户名称
 	CreatedBy   string `json:"createdBy"`   // 创建人ID
 	CreatorName string `json:"creatorName"` // 创建人名称

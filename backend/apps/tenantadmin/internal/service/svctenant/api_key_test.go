@@ -12,13 +12,13 @@ import (
 	"github.com/morehao/ark-iam/tenantadmin/testutil"
 )
 
-// TestApiKeyOwnerModel 验证密钥归属模型：
-// 个人密钥=真实用户本人（无需 super 自助创建/吊销）；服务账号密钥=开发者模式（需 super 创建/管理）。
-func TestApiKeyOwnerModel(t *testing.T) {
+// TestApiKeyServiceAccountOnly 验证 API 密钥已收敛为「仅服务账号」管理模型：
+// 创建/列表/吊销/删除均为系统管理操作；普通成员无任何密钥通道（个人密钥已下线）。
+func TestApiKeyServiceAccountOnly(t *testing.T) {
 	testutil.SetupSQLite(t, &model.ApiKeyEntity{}, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	tenantID := "t1"
 	superOp := seedTestOperator(t, tenantID, true)
-	self := seedTestOperator(t, tenantID, false)
+	memberOp := seedTestOperator(t, tenantID, false)
 	machine := &model.UserEntity{
 		TenantID:   tenantID,
 		UserType:   model.UserTypeMachine,
@@ -29,46 +29,48 @@ func TestApiKeyOwnerModel(t *testing.T) {
 	if err := dbclient.IamDB(context.Background()).Create(machine).Error; err != nil {
 		t.Fatalf("seed machine owner: %v", err)
 	}
+	machine2 := &model.UserEntity{
+		TenantID:   tenantID,
+		UserType:   model.UserTypeMachine,
+		Name:       "svc-webhook",
+		Profile:    json.RawMessage(`{}`),
+		CustomData: json.RawMessage(`{}`),
+	}
+	if err := dbclient.IamDB(context.Background()).Create(machine2).Error; err != nil {
+		t.Fatalf("seed machine owner 2: %v", err)
+	}
 
 	svc := NewApiKeySvc()
 
-	// 个人密钥：成员自助创建，明文仅此一次返回
-	selfResp, err := svc.Create(newTestTenantCtx(tenantID, self.ID), &dtotenant.ApiKeyCreateReq{Name: "my-key"})
-	if err != nil {
-		t.Fatalf("self create personal key: %v", err)
+	// 普通成员无任何密钥操作通道
+	if _, err := svc.Create(newTestTenantCtx(tenantID, memberOp.ID), &dtotenant.ApiKeyCreateReq{Name: "k", MachineUserID: machine.ID}); err != code.GetError(code.UserSystemAdminRequiredError) {
+		t.Fatalf("member create: want system admin required, got %v", err)
 	}
-	if selfResp.Key == "" || selfResp.KeyPrefix == "" {
+	if _, err := svc.PageList(newTestTenantCtx(tenantID, memberOp.ID), &dtotenant.ApiKeyPageListReq{}); err != code.GetError(code.UserSystemAdminRequiredError) {
+		t.Fatalf("member page list: want system admin required, got %v", err)
+	}
+
+	// super 为服务账号创建密钥：明文仅一次返回、归属 machine
+	created, err := svc.Create(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.ApiKeyCreateReq{Name: "svc-key", MachineUserID: machine.ID})
+	if err != nil {
+		t.Fatalf("super create: %v", err)
+	}
+	if created.Key == "" || created.KeyPrefix == "" {
 		t.Fatal("expected one-time plaintext key and prefix")
 	}
 
-	// 默认列表 = 本人密钥（成员无权看服务账号/全量）
-	myPage, err := svc.PageList(newTestTenantCtx(tenantID, self.ID), &dtotenant.ApiKeyPageListReq{})
-	if err != nil {
-		t.Fatalf("self page list: %v", err)
+	// 成员对已存在的密钥也无吊销/删除通道
+	if err := svc.Revoke(newTestTenantCtx(tenantID, memberOp.ID), &dtotenant.ApiKeyRevokeReq{ApiKeyID: created.ID}); err != code.GetError(code.UserSystemAdminRequiredError) {
+		t.Fatalf("member revoke: want system admin required, got %v", err)
 	}
-	if myPage.Total != 1 || myPage.List[0].OwnerUserID != self.ID {
-		t.Fatalf("personal list mismatch: %+v", myPage)
-	}
-
-	// 成员试图为服务账号创建/查看密钥被拒（需系统管理能力）
-	if _, err := svc.Create(newTestTenantCtx(tenantID, self.ID), &dtotenant.ApiKeyCreateReq{Name: "k", MachineUserID: machine.ID}); err != code.GetError(code.UserSystemAdminRequiredError) {
-		t.Fatalf("member create machine key: want system admin required, got %v", err)
-	}
-	if _, err := svc.PageList(newTestTenantCtx(tenantID, self.ID), &dtotenant.ApiKeyPageListReq{MachineUserID: machine.ID}); err != code.GetError(code.UserSystemAdminRequiredError) {
-		t.Fatalf("member list machine keys: want system admin required, got %v", err)
+	if err := svc.Delete(newTestTenantCtx(tenantID, memberOp.ID), &dtotenant.ApiKeyDeleteReq{ApiKeyID: created.ID}); err != code.GetError(code.UserSystemAdminRequiredError) {
+		t.Fatalf("member delete: want system admin required, got %v", err)
 	}
 
-	// super 为服务账号创建密钥（开发者模式），归属 machine
-	machineResp, err := svc.Create(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.ApiKeyCreateReq{Name: "svc-key", MachineUserID: machine.ID})
-	if err != nil {
-		t.Fatalf("super create machine key: %v", err)
-	}
-	if machineResp.ID == "" {
-		t.Fatal("expected machine key id")
-	}
+	// 指定服务账号过滤列表
 	machinePage, err := svc.PageList(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.ApiKeyPageListReq{MachineUserID: machine.ID})
 	if err != nil {
-		t.Fatalf("super list machine keys: %v", err)
+		t.Fatalf("super list by machine: %v", err)
 	}
 	if machinePage.Total != 1 ||
 		machinePage.List[0].OwnerUserID != machine.ID ||
@@ -77,45 +79,91 @@ func TestApiKeyOwnerModel(t *testing.T) {
 		t.Fatalf("machine key list mismatch: %+v", machinePage)
 	}
 
-	// 成员不能吊销/删除他人(服务账号)密钥；本人密钥成员自管
-	if err := svc.Revoke(newTestTenantCtx(tenantID, self.ID), &dtotenant.ApiKeyRevokeReq{ApiKeyID: machineResp.ID}); err != code.GetError(code.UserSystemAdminRequiredError) {
-		t.Fatalf("member revoke machine key: want system admin required, got %v", err)
+	// 租户全部密钥（不带过滤）同样只见服务账号密钥
+	allPage, err := svc.PageList(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.ApiKeyPageListReq{})
+	if err != nil {
+		t.Fatalf("super list all: %v", err)
 	}
-	if err := svc.Revoke(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.ApiKeyRevokeReq{ApiKeyID: machineResp.ID}); err != nil {
-		t.Fatalf("super revoke machine key: %v", err)
+	if allPage.Total != 1 {
+		t.Fatalf("expected 1 key total, got %d", allPage.Total)
 	}
-	if err := svc.Revoke(newTestTenantCtx(tenantID, self.ID), &dtotenant.ApiKeyRevokeReq{ApiKeyID: selfResp.ID}); err != nil {
-		t.Fatalf("self revoke personal key: %v", err)
+
+	// 第二个服务账号的密钥互不可见（过滤正确）
+	created2, err := svc.Create(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.ApiKeyCreateReq{Name: "webhook-key", MachineUserID: machine2.ID})
+	if err != nil {
+		t.Fatalf("super create key2: %v", err)
+	}
+	filterPage, err := svc.PageList(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.ApiKeyPageListReq{MachineUserID: machine2.ID})
+	if err != nil {
+		t.Fatalf("super list machine2: %v", err)
+	}
+	if filterPage.Total != 1 || filterPage.List[0].KeyID != created2.ID {
+		t.Fatalf("machine2 filter mismatch: %+v", filterPage)
+	}
+
+	// 吊销后列表状态更新；再删除后消失
+	if err := svc.Revoke(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.ApiKeyRevokeReq{ApiKeyID: created2.ID}); err != nil {
+		t.Fatalf("super revoke: %v", err)
+	}
+	if err := svc.Delete(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.ApiKeyDeleteReq{ApiKeyID: created2.ID}); err != nil {
+		t.Fatalf("super delete: %v", err)
+	}
+	afterPage, err := svc.PageList(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.ApiKeyPageListReq{})
+	if err != nil {
+		t.Fatalf("list after delete: %v", err)
+	}
+	if afterPage.Total != 1 {
+		t.Fatalf("expected 1 key after delete, got %d", afterPage.Total)
+	}
+
+	// 非服务账号主体不可作为归属（把真实用户当服务账号归属 → 不存在）
+	if _, err := svc.Create(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.ApiKeyCreateReq{Name: "bad", MachineUserID: memberOp.ID}); err != code.GetError(code.ApiKeyOwnerNotExistError) {
+		t.Fatalf("create with real-user owner: want owner not exist, got %v", err)
 	}
 }
 
-// TestApiKeyDeleteRequiresOwnerOrSuper 验证删除权限与删除后列表不再出现。
-func TestApiKeyDeleteRequiresOwnerOrSuper(t *testing.T) {
+// TestApiKeyDeleteRequiresSuper 验证密钥删除仅限系统管理能力（服务账号不可自登录，无"本人自管"通道）。
+func TestApiKeyDeleteRequiresSuper(t *testing.T) {
 	testutil.SetupSQLite(t, &model.ApiKeyEntity{}, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	tenantID := "t1"
 	superOp := seedTestOperator(t, tenantID, true)
-	alice := seedTestOperator(t, tenantID, false)
-	bob := seedTestOperator(t, tenantID, false)
+	memberOp := seedTestOperator(t, tenantID, false)
+	machine := &model.UserEntity{
+		TenantID:   tenantID,
+		UserType:   model.UserTypeMachine,
+		Name:       "svc-alice",
+		Profile:    json.RawMessage(`{}`),
+		CustomData: json.RawMessage(`{}`),
+	}
+	if err := dbclient.IamDB(context.Background()).Create(machine).Error; err != nil {
+		t.Fatalf("seed machine owner: %v", err)
+	}
+	// 直接落一条既有密钥行，模拟历史数据
+	key := &model.ApiKeyEntity{
+		TenantID: tenantID, OwnerUserID: machine.ID, Name: "legacy",
+		KeyHash: "h", KeyPrefix: "ak_", Scope: json.RawMessage(`{}`), CreatedBy: superOp.ID,
+	}
+	if err := dbclient.IamDB(context.Background()).Create(key).Error; err != nil {
+		t.Fatalf("seed key: %v", err)
+	}
 
 	svc := NewApiKeySvc()
-	aliceKey, err := svc.Create(newTestTenantCtx(tenantID, alice.ID), &dtotenant.ApiKeyCreateReq{Name: "alice-key"})
+	if err := svc.Revoke(newTestTenantCtx(tenantID, memberOp.ID), &dtotenant.ApiKeyRevokeReq{ApiKeyID: key.ID}); err != code.GetError(code.UserSystemAdminRequiredError) {
+		t.Fatalf("member revoke: want system admin required, got %v", err)
+	}
+	if err := svc.Delete(newTestTenantCtx(tenantID, memberOp.ID), &dtotenant.ApiKeyDeleteReq{ApiKeyID: key.ID}); err != code.GetError(code.UserSystemAdminRequiredError) {
+		t.Fatalf("member delete: want system admin required, got %v", err)
+	}
+	// 密钥仍在
+	page, err := svc.PageList(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.ApiKeyPageListReq{})
 	if err != nil {
-		t.Fatalf("alice create: %v", err)
+		t.Fatalf("list: %v", err)
 	}
-
-	// bob 不能删除 alice 的密钥
-	if err := svc.Delete(newTestTenantCtx(tenantID, bob.ID), &dtotenant.ApiKeyDeleteReq{ApiKeyID: aliceKey.ID}); err != code.GetError(code.UserSystemAdminRequiredError) {
-		t.Fatalf("bob delete alice key: want system admin required, got %v", err)
+	if page.Total != 1 {
+		t.Fatalf("expected 1 key, got %d", page.Total)
 	}
-	// super 可以删除任意个人密钥
-	if err := svc.Delete(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.ApiKeyDeleteReq{ApiKeyID: aliceKey.ID}); err != nil {
-		t.Fatalf("super delete alice key: %v", err)
-	}
-	page, err := svc.PageList(newTestTenantCtx(tenantID, alice.ID), &dtotenant.ApiKeyPageListReq{})
-	if err != nil {
-		t.Fatalf("alice list after delete: %v", err)
-	}
-	if page.Total != 0 {
-		t.Fatalf("expected 0 keys after delete, got %d", page.Total)
+	// super 吊销成功
+	if err := svc.Revoke(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.ApiKeyRevokeReq{ApiKeyID: key.ID}); err != nil {
+		t.Fatalf("super revoke: %v", err)
 	}
 }

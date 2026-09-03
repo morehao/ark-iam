@@ -54,6 +54,7 @@ const (
 	MachineUserRoleGetListError   = 100839 // 查看服务账号角色失败
 	MachineUserDeleteHasKeysError = 100840 // 删除服务账号前需先删除其全部API密钥
 	UserMemberOperationOnlyError  = 100841 // 该操作仅支持对真实用户执行
+	MachineUserOrgRequiredError   = 100842 // 服务账号必须从属于一个主部门(且至多一个)
 )
 
 // 租户端 API 密钥领域错误码（归属真实用户本人或服务账号）。
@@ -106,6 +107,7 @@ var userErrorMsgMap = gerror.CodeMsgMap{
 	UserSystemAdminRequiredError:          "需要系统管理能力(admin_level=super)",
 	MachineUserDeleteHasKeysError:         "请先删除该服务账号下的全部API密钥",
 	UserMemberOperationOnlyError:          "该操作仅支持对真实用户执行",
+	MachineUserOrgRequiredError:           "服务账号必须从属于一个主部门(且至多一个)",
 	ApiKeyCreateError:                     "创建API密钥失败",
 	ApiKeyGetPageListError:                "查看API密钥列表失败",
 	ApiKeyRevokeError:                     "吊销API密钥失败",

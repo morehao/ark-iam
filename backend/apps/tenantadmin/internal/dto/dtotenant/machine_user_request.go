@@ -10,14 +10,18 @@ type MachineUserPageListReq struct {
 }
 
 type MachineUserCreateReq struct {
-	Name        string `json:"name" binding:"required"` // 服务账号名称
-	Description string `json:"description"`             // 描述
+	Name            string   `json:"name" binding:"required"`            // 服务账号名称
+	Description     string   `json:"description"`                        // 描述
+	OrganizationIDs []string `json:"organizationIDs" binding:"required"` // 主部门ID列表(primary,至多1个,必传:服务账号必须从属部门)
+	SecondaryOrgIDs []string `json:"secondaryOrgIDs"`                    // 参与部门ID列表(secondary,可多条,可选)
 }
 
 type MachineUserUpdateReq struct {
-	MachineUserID string `json:"-" uri:"machineUserID" binding:"required"` // 服务账号ID
-	Name          string `json:"name" binding:"required"`                  // 服务账号名称
-	Description   string `json:"description"`                              // 描述
+	MachineUserID   string    `json:"-" uri:"machineUserID" binding:"required"` // 服务账号ID
+	Name            string    `json:"name" binding:"required"`                  // 服务账号名称
+	Description     string    `json:"description"`                              // 描述
+	PrimaryOrgID    *string   `json:"primaryOrgID"`                             // 主部门(primary,nil=不变;非nil=替换主部门,不可清空)
+	SecondaryOrgIDs *[]string `json:"secondaryOrgIDs"`                          // 参与部门(secondary,nil=不变;[]=清空;含值=全量替换)
 }
 
 type MachineUserStatusReq struct {

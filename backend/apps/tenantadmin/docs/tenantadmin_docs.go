@@ -29,14 +29,8 @@ const docTemplatetenantadmin = `{
                 "summary": "API密钥列表分页(本人/指定服务账号/全租户)",
                 "parameters": [
                     {
-                        "type": "boolean",
-                        "description": "是否查看租户全部密钥(需系统管理能力)",
-                        "name": "all",
-                        "in": "query"
-                    },
-                    {
                         "type": "string",
-                        "description": "归属服务账号ID(空=当前真实用户本人)",
+                        "description": "归属服务账号ID(空=租户全部密钥)",
                         "name": "machineUserID",
                         "in": "query"
                     },
@@ -1941,6 +1935,7 @@ const docTemplatetenantadmin = `{
         "dtotenant.ApiKeyCreateReq": {
             "type": "object",
             "required": [
+                "machineUserID",
                 "name"
             ],
             "properties": {
@@ -1949,7 +1944,7 @@ const docTemplatetenantadmin = `{
                     "type": "integer"
                 },
                 "machineUserID": {
-                    "description": "归属服务账号ID(空=代表当前真实用户本人)",
+                    "description": "归属服务账号ID",
                     "type": "string"
                 },
                 "name": {
@@ -2023,11 +2018,11 @@ const docTemplatetenantadmin = `{
                     "type": "string"
                 },
                 "ownerType": {
-                    "description": "归属类型(member真实用户/machine服务账号)",
+                    "description": "归属类型(machine服务账号;兼容历史member数据)",
                     "type": "string"
                 },
                 "ownerUserID": {
-                    "description": "归属用户ID",
+                    "description": "归属服务账号ID",
                     "type": "string"
                 },
                 "revokedAt": {
@@ -2118,7 +2113,8 @@ const docTemplatetenantadmin = `{
         "dtotenant.MachineUserCreateReq": {
             "type": "object",
             "required": [
-                "name"
+                "name",
+                "organizationIDs"
             ],
             "properties": {
                 "description": {
@@ -2128,6 +2124,20 @@ const docTemplatetenantadmin = `{
                 "name": {
                     "description": "服务账号名称",
                     "type": "string"
+                },
+                "organizationIDs": {
+                    "description": "主部门ID列表(primary,至多1个,必传:服务账号必须从属部门)",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "secondaryOrgIDs": {
+                    "description": "参与部门ID列表(secondary,可多条,可选)",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -2161,6 +2171,21 @@ const docTemplatetenantadmin = `{
                 },
                 "name": {
                     "description": "名称",
+                    "type": "string"
+                },
+                "organizations": {
+                    "description": "组织归属(primary/secondary)",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.UserOrganizationItem"
+                    }
+                },
+                "primaryOrgID": {
+                    "description": "主部门ID",
+                    "type": "string"
+                },
+                "primaryOrgName": {
+                    "description": "主部门名称",
                     "type": "string"
                 },
                 "roles": {
@@ -2197,6 +2222,14 @@ const docTemplatetenantadmin = `{
                 },
                 "name": {
                     "description": "名称",
+                    "type": "string"
+                },
+                "primaryOrgID": {
+                    "description": "主部门ID",
+                    "type": "string"
+                },
+                "primaryOrgName": {
+                    "description": "主部门名称",
                     "type": "string"
                 },
                 "tenantID": {
@@ -2258,6 +2291,17 @@ const docTemplatetenantadmin = `{
                 "name": {
                     "description": "服务账号名称",
                     "type": "string"
+                },
+                "primaryOrgID": {
+                    "description": "主部门(primary,nil=不变;非nil=替换主部门,不可清空)",
+                    "type": "string"
+                },
+                "secondaryOrgIDs": {
+                    "description": "参与部门(secondary,nil=不变;[]=清空;含值=全量替换)",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -2629,6 +2673,14 @@ const docTemplatetenantadmin = `{
                 "userName": {
                     "description": "用户姓名(租户内)",
                     "type": "string"
+                },
+                "userType": {
+                    "description": "账号类型(member真实用户/machine服务账号)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserType"
+                        }
+                    ]
                 },
                 "username": {
                     "description": "全局用户名",
@@ -3338,6 +3390,25 @@ const docTemplatetenantadmin = `{
                 "OrgUserRelationPrimary",
                 "OrgUserRelationSecondary",
                 "OrgUserRelationLeader"
+            ]
+        },
+        "model.UserType": {
+            "type": "string",
+            "enum": [
+                "member",
+                "machine"
+            ],
+            "x-enum-comments": {
+                "UserTypeMachine": "服务账号：租户内机器主体，不可登录、不入组织，作为 API Key 归属主体",
+                "UserTypeMember": "真实用户：person 映射的租户成员，可登录、可入组织"
+            },
+            "x-enum-descriptions": [
+                "真实用户：person 映射的租户成员，可登录、可入组织",
+                "服务账号：租户内机器主体，不可登录、不入组织，作为 API Key 归属主体"
+            ],
+            "x-enum-varnames": [
+                "UserTypeMember",
+                "UserTypeMachine"
             ]
         }
     }

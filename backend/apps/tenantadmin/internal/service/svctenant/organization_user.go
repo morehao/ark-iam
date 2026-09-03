@@ -58,6 +58,10 @@ func (svc *organizationUserSvc) Create(ctx *gin.Context, req *dtotenant.Organiza
 	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != tenantID {
 		return nil, code.GetError(code.UserNotExistError)
 	}
+	// 负责人必须是真实用户：服务账号(机器主体)不能担任部门负责人。
+	if relationType == model.OrgUserRelationLeader && userEntity.IsMachine() {
+		return nil, code.GetError(code.UserMemberOperationOnlyError)
+	}
 
 	userID := gincontext.GetUserIDString(ctx)
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
@@ -137,6 +141,17 @@ func (svc *organizationUserSvc) Update(ctx *gin.Context, req *dtotenant.Organiza
 	}
 	if len(relationList) == 0 {
 		return code.GetError(code.OrganizationUserNotExistError)
+	}
+	// 负责人必须是真实用户：目标用户为服务账号时禁止收敛为 leader。
+	if relationType == model.OrgUserRelationLeader {
+		userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
+		if err != nil {
+			glog.Errorf(ctx, "[svcorganizationuser.Update] dao GetByID user fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+			return code.GetError(code.OrganizationUserUpdateError)
+		}
+		if userEntity != nil && userEntity.IsMachine() {
+			return code.GetError(code.UserMemberOperationOnlyError)
+		}
 	}
 
 	userID := gincontext.GetUserIDString(ctx)
@@ -347,6 +362,7 @@ func (svc *organizationUserSvc) PageList(ctx *gin.Context, req *dtotenant.Organi
 		item := dtotenant.OrganizationUserPageListItem{
 			OrganizationID: v.OrganizationID,
 			UserID:         v.UserID,
+			UserType:       u.UserType,
 			UserName:       u.Name,
 			Username:       model.DerefStr(person.Username),
 			PrimaryEmail:   model.DerefStr(person.PrimaryEmail),

@@ -24,10 +24,10 @@ import type {
   TenantApiKeyItem,
   TenantMachineUserDetail,
   TenantMachineUserItem,
+  TenantMachineUserUpdateReq,
   TenantRoleItem,
   TenantUserDetail,
   TenantUserItem,
-  UserOrganizationItem,
 } from '@ark-iam/types'
 import {
   createTenantUser,
@@ -563,11 +563,18 @@ function ServiceAccountsPane() {
   const [editing, setEditing] = useState<TenantMachineUserItem | null>(null)
   const [form] = Form.useForm()
   const [submitLoading, setSubmitLoading] = useState(false)
+  // 编辑前的组织快照：仅在组织关系变化时才随 PUT 提交（可空字段语义：不传=不变）
+  const [orgBefore, setOrgBefore] = useState<{ primaryOrgID?: string; secondaryOrgIDs: string[] }>({ secondaryOrgIDs: [] })
 
   // 详情 Drawer
   const [detailOpen, setDetailOpen] = useState(false)
   const [detail, setDetail] = useState<TenantMachineUserDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  // 打开详情时的行记录：Drawer 内「编辑」复用表格行编辑逻辑
+  const [activeRecord, setActiveRecord] = useState<TenantMachineUserItem | null>(null)
+
+  // 组织树（创建/编辑表单组织下拉，与真实用户表单的组织选择一致）
+  const [orgTree, setOrgTree] = useState<OrganizationItem[]>([])
 
   // 角色（详情内）
   const [roleOptions, setRoleOptions] = useState<TenantRoleItem[]>([])
@@ -599,15 +606,31 @@ function ServiceAccountsPane() {
     void fetchData()
   }, [fetchData])
 
+  // 组织树（创建/编辑表单组织下拉共用）
+  useEffect(() => {
+    getOrganizationTree().then((resp) => setOrgTree(resp?.list || [])).catch(() => {})
+  }, [])
+
   const openCreate = () => {
     setEditing(null)
     form.resetFields()
     setModalOpen(true)
   }
 
-  const openEdit = (record: TenantMachineUserItem) => {
+  // 编辑：先取详情回填（主/参与部门在编辑弹窗中一并维护）
+  const openEdit = async (record: TenantMachineUserItem) => {
+    const detail = await getMachineUserDetail(record.machineUserID).catch(() => null)
+    if (!detail) return
+    const nextPrimary = pickOrgs(detail.organizations, 'primary')[0]?.organizationID || detail.primaryOrgID || ''
+    const nextSecondary = pickOrgs(detail.organizations, 'secondary').map((o) => o.organizationID)
+    setOrgBefore({ primaryOrgID: nextPrimary || undefined, secondaryOrgIDs: nextSecondary })
     setEditing(record)
-    form.setFieldsValue({ name: record.name, description: record.description })
+    form.setFieldsValue({
+      name: detail.name,
+      description: detail.description,
+      primaryOrgID: nextPrimary || undefined,
+      secondaryOrgIDs: nextSecondary,
+    })
     setModalOpen(true)
   }
 
@@ -616,14 +639,32 @@ function ServiceAccountsPane() {
       const values = await form.validateFields()
       setSubmitLoading(true)
       if (editing) {
-        await updateMachineUser({ machineUserID: editing.machineUserID, name: values.name, description: values.description || '' })
+        const secondary = values.secondaryOrgIDs || []
+        const req: TenantMachineUserUpdateReq = {
+          machineUserID: editing.machineUserID,
+          name: values.name,
+          description: values.description || '',
+        }
+        // 可空字段仅在变化时提交：primaryOrgID 传值=替换主部门；secondaryOrgIDs 传=全量替换（[]=清空）；不传=不变
+        if (values.primaryOrgID !== orgBefore.primaryOrgID) req.primaryOrgID = values.primaryOrgID
+        if (!sameSet(secondary, orgBefore.secondaryOrgIDs)) req.secondaryOrgIDs = secondary
+        await updateMachineUser(req)
         message.success('保存成功')
       } else {
-        await createMachineUser({ name: values.name, description: values.description || '' })
+        await createMachineUser({
+          name: values.name,
+          description: values.description || '',
+          organizationIDs: [values.primaryOrgID],
+          secondaryOrgIDs: values.secondaryOrgIDs || [],
+        })
         message.success('创建成功')
       }
       setModalOpen(false)
       void fetchData()
+      // 在详情 Drawer 内编辑并保存后，同步刷新详情，保证部门/名称/描述展示最新
+      if (detailOpen && editing && detail && detail.machineUserID === editing.machineUserID) {
+        getMachineUserDetail(editing.machineUserID).then(setDetail).catch(() => {})
+      }
     } catch {
       /* 校验或请求失败 */
     } finally {
@@ -645,6 +686,7 @@ function ServiceAccountsPane() {
 
   const openDetail = async (record: TenantMachineUserItem) => {
     setDetailOpen(true)
+    setActiveRecord(record)
     setDetailLoading(true)
     setDetail(null)
     setMachineKeys([])
@@ -676,6 +718,7 @@ function ServiceAccountsPane() {
 
   const columns: ColumnsType<TenantMachineUserItem> = [
     { title: '名称', dataIndex: 'name', key: 'name', width: 180, render: (v: string) => v || '-' },
+    { title: '主部门', dataIndex: 'primaryOrgName', key: 'primaryOrgName', width: 170, render: (v: string) => v || '-' },
     { title: '描述', dataIndex: 'description', key: 'description', render: (v: string) => v || '-' },
     {
       title: '状态',
@@ -700,7 +743,7 @@ function ServiceAccountsPane() {
           <Button type="link" size="small" onClick={() => void openDetail(r)}>
             详情
           </Button>
-          <Button type="link" size="small" onClick={() => openEdit(r)}>
+          <Button type="link" size="small" onClick={() => void openEdit(r)}>
             编辑
           </Button>
           <Popconfirm title={r.isSuspended ? '确认恢复该服务账号？' : '确认挂起该服务账号？'} onConfirm={() => void toggleSuspended(r, !r.isSuspended)}>
@@ -776,7 +819,7 @@ function ServiceAccountsPane() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 900 }}
+        scroll={{ x: 1000 }}
         pagination={{
           current: page,
           pageSize,
@@ -804,21 +847,53 @@ function ServiceAccountsPane() {
           <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
             <Input placeholder="如：CI 构建服务" />
           </Form.Item>
+          <Form.Item name="primaryOrgID" label="主部门" rules={[{ required: true, message: '请选择主部门' }]}>
+            <TreeSelect
+              treeData={toTreeSelect(orgTree)}
+              treeDefaultExpandAll
+              placeholder="选择主部门（行政归属，唯一；服务账号必须从属部门）"
+            />
+          </Form.Item>
+          <Form.Item name="secondaryOrgIDs" label="参与部门">
+            <TreeSelect
+              treeData={toTreeSelect(orgTree)}
+              treeDefaultExpandAll
+              multiple
+              allowClear
+              placeholder="选择参与部门（可多个，可留空）"
+            />
+          </Form.Item>
           <Form.Item name="description" label="描述">
             <Input.TextArea rows={3} placeholder="选填" />
           </Form.Item>
-          <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>服务账号不可登录、不属部门；仅可被授予普通角色。</div>
+          <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>服务账号不可登录；必须从属主部门（可多条参与部门）；仅可被授予普通角色。</div>
         </Form>
       </Modal>
 
-      {/* 详情 Drawer：基础信息 + 已授权角色 + API 密钥只读列表 */}
-      <Drawer title="服务账号详情" width={680} open={detailOpen} onClose={() => setDetailOpen(false)} destroyOnClose={false}>
+      {/* 详情 Drawer：基础信息 + 所属部门 + 已授权角色 + API 密钥只读列表 */}
+      <Drawer title="服务账号详情" width={680} open={detailOpen} onClose={() => { setDetailOpen(false); setActiveRecord(null) }} destroyOnClose={false}>
         {detailLoading ? (
           <div style={{ padding: 60, textAlign: 'center', color: tokens.textPlaceholder }}>加载中...</div>
         ) : detail ? (
           <Tabs
             items={[
               { key: 'info', label: '基础信息', children: <MachineDetailInfo detail={detail} /> },
+              {
+                key: 'org',
+                label: '所属部门',
+                children: (
+                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                    <OrgRow label="主部门" relation="primary" orgs={pickOrgs(detail.organizations, 'primary')} />
+                    <OrgRow label="参与部门" relation="secondary" orgs={pickOrgs(detail.organizations, 'secondary')} />
+                    <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>
+                      主部门唯一且服务账号必须从属部门；参与部门可多条（可清空）。部门调整请使用「编辑」（主/参与部门全量维护）。
+                    </div>
+                    <Button type="primary" onClick={() => activeRecord && void openEdit(activeRecord)}>
+                      编辑
+                    </Button>
+                  </Space>
+                ),
+              },
               {
                 key: 'role',
                 label: '已授权角色',
@@ -884,7 +959,7 @@ function MachineDetailInfo({ detail }: { detail: TenantMachineUserDetail }) {
       </div>
       <div>描述：{detail.description || '-'}</div>
       <div>创建时间：{fmtTime(detail.createdAt)}</div>
-      <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>服务账号不可登录、不属部门；仅可被授予普通角色。</div>
+      <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>服务账号不可登录；所属部门见「所属部门」页签；仅可被授予普通角色。</div>
     </Space>
   )
 }
@@ -892,7 +967,7 @@ function MachineDetailInfo({ detail }: { detail: TenantMachineUserDetail }) {
 // ==================== 页面容器：用户 / 服务账号 双 Tab ====================
 export default function TenantUserPage() {
   return (
-    <PageContainer title="用户管理" description="租户内的主体管理：真实用户（组织归属、角色分配与账号状态）与服务账号（机器主体）">
+    <PageContainer title="用户管理" description="租户内的主体管理：真实用户（组织归属、角色分配与账号状态）与服务账号（机器主体，须从属主部门）">
       <Tabs
         defaultActiveKey="user"
         items={[
@@ -904,13 +979,13 @@ export default function TenantUserPage() {
   )
 }
 
-// pickOrgs 按关系类型筛出组织列表。
-function pickOrgs(orgs: UserOrganizationItem[], type: string): UserOrganizationItem[] {
+// pickOrgs 按关系类型筛出组织列表（真实用户与机器服务账号通用）。
+function pickOrgs<T extends { relationType: string }>(orgs: T[], type: string): T[] {
   return (orgs || []).filter((o) => o.relationType === type)
 }
 
 // OrgRow 详情中的组织关系行（主/参与/负责）。
-function OrgRow({ label, relation, orgs }: { label: string; relation: string; orgs: UserOrganizationItem[] }) {
+function OrgRow({ label, relation, orgs }: { label: string; relation: string; orgs: { organizationID: string; organizationName?: string }[] }) {
   const tag = RELATION_TAG[relation]
   return (
     <div>
