@@ -13,7 +13,7 @@
     "build:web": "pnpm --filter @ark-iam/platform-admin-web build",
     "build:login": "pnpm --filter @ark-iam/login-web build",
     "build:tenant": "pnpm --filter @ark-iam/tenant-admin-web build",
-    "typecheck": "pnpm -r --filter './packages/*' --filter './apps/*' exec tsc --noEmit -p tsconfig.json",
+    "typecheck": "pnpm -r --filter './packages/*' --filter '!./packages/tsconfig' --filter './apps/*' exec tsc --noEmit -p tsconfig.json",
     "test": "pnpm --filter @ark-iam/platform-admin-web test",
     "test:web": "pnpm --filter @ark-iam/platform-admin-web test",
     "test:all": "pnpm -r --filter './packages/*' --filter './apps/*' test"

@@ -12,13 +12,12 @@ import {
   Switch,
   Table,
   Tabs,
-  Tag,
   TreeSelect,
   message,
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { PageContainer } from '@ark-iam/ui'
+import { fmtTime, PageContainer, SuspendedTag, tokens } from '@ark-iam/ui'
 import type { OrganizationItem, TenantRoleItem, TenantUserDetail, TenantUserItem, UserOrganizationItem } from '@ark-iam/types'
 import {
   createTenantUser,
@@ -30,7 +29,6 @@ import {
 } from '../../api/user'
 import { getOrganizationTree, updateUserOrganizations } from '../../api/organization'
 import { getTenantRolePageList } from '../../api/role'
-import { fmtTime } from '../../components/common'
 
 export default function TenantUserPage() {
   const [data, setData] = useState<TenantUserItem[]>([])
@@ -209,7 +207,7 @@ export default function TenantUserPage() {
           <Avatar size={30}>{r.name?.charAt(0)?.toUpperCase() || 'U'}</Avatar>
           <Space direction="vertical" size={0}>
             <span style={{ fontWeight: 500 }}>{r.name || '-'}</span>
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>@{r.username || '-'}</span>
+            <span style={{ fontSize: 12, color: tokens.textPlaceholder }}>@{r.username || '-'}</span>
           </Space>
         </Space>
       ),
@@ -223,7 +221,7 @@ export default function TenantUserPage() {
       dataIndex: 'isSuspended',
       key: 'isSuspended',
       width: 90,
-      render: (v: boolean) => (v ? <Tag color="red">挂起</Tag> : <Tag color="green">正常</Tag>),
+      render: (v: boolean) => <SuspendedTag value={v} />,
     },
     {
       title: '创建时间',
@@ -401,7 +399,7 @@ export default function TenantUserPage() {
         destroyOnClose={false}
       >
         {detailLoading ? (
-          <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>加载中...</div>
+          <div style={{ padding: 60, textAlign: 'center', color: tokens.textPlaceholder }}>加载中...</div>
         ) : detail ? (
           <Tabs
             items={[
@@ -414,11 +412,11 @@ export default function TenantUserPage() {
                       <Avatar size={48}>{detail.name?.charAt(0)?.toUpperCase() || 'U'}</Avatar>
                       <Space direction="vertical" size={0}>
                         <span style={{ fontWeight: 600, fontSize: 16 }}>{detail.name || '-'}</span>
-                        <span style={{ color: '#94a3b8' }}>@{detail.username || '-'}</span>
+                        <span style={{ color: tokens.textPlaceholder }}>@{detail.username || '-'}</span>
                       </Space>
                     </Space>
                     <div>
-                      <Tag>{detail.isSuspended ? '挂起' : '正常'}</Tag>
+                      <SuspendedTag value={detail.isSuspended} />
                       <span style={{ marginLeft: 8 }}>用户ID：{detail.userID}</span>
                     </div>
                     <div>邮箱：{detail.primaryEmail || '-'}</div>
@@ -442,7 +440,7 @@ export default function TenantUserPage() {
                       style={{ width: '100%' }}
                       placeholder="勾选参与部门（可多选）"
                     />
-                    <div style={{ color: '#94a3b8', fontSize: 12 }}>
+                    <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>
                       参与部门用于跨部门协作；保存时全量替换参与关系（主部门请通过组织关系维护）
                     </div>
                     <Button type="primary" onClick={() => void saveOrgAssignments()}>
@@ -465,7 +463,7 @@ export default function TenantUserPage() {
                       onChange={setRoleIDs}
                       options={roleOptions.map((r) => ({ label: `${r.name}（${r.code}）`, value: r.roleID }))}
                     />
-                    <div style={{ color: '#94a3b8', fontSize: 12 }}>当前已分配角色：{(detail.roles || []).map((r) => r.name).join('、') || '无'}</div>
+                    <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>当前已分配角色：{(detail.roles || []).map((r) => r.name).join('、') || '无'}</div>
                     <Button type="primary" onClick={() => void saveRoleAssignments()}>
                       保存角色
                     </Button>

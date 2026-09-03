@@ -27,10 +27,9 @@ import {
   ThunderboltOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons'
-import { EllipsisCell, PageContainer, brand } from '@ark-iam/ui'
+import { EllipsisCell, PageContainer, StatusTag, tokens } from '@ark-iam/ui'
 import { createMenu, deleteMenu, getApplicationPageList, getMenuTree, updateMenu } from '@ark-iam/api'
 import type { ApplicationItem, MenuItem, MenuStatus, MenuType, MenuVisibility } from '@ark-iam/types'
-import { StatusTag } from '../../components/common'
 
 interface MenuFormValues {
   parentID: string
@@ -54,9 +53,9 @@ type ModalMode = 'createRoot' | 'createChild' | 'edit'
 const STORAGE_KEY = 'ark-iam:menu:appID'
 
 const TYPE_META: Record<string, { label: string; icon: React.ReactNode; color: string; tagColor: string }> = {
-  directory: { label: '目录', icon: <FolderOutlined />, color: '#f59e0b', tagColor: 'orange' },
-  menu: { label: '菜单', icon: <AppstoreOutlined />, color: '#4f6ef7', tagColor: 'blue' },
-  button: { label: '按钮', icon: <ThunderboltOutlined />, color: '#7a5af8', tagColor: 'purple' },
+  directory: { label: '目录', icon: <FolderOutlined />, color: tokens.warning, tagColor: 'orange' },
+  menu: { label: '菜单', icon: <AppstoreOutlined />, color: tokens.primary, tagColor: 'blue' },
+  button: { label: '按钮', icon: <ThunderboltOutlined />, color: tokens.purple, tagColor: 'purple' },
 }
 
 const VISIBILITY_META: Record<MenuVisibility, { label: string; tagColor: string }> = {
@@ -302,12 +301,12 @@ export default function MenuList() {
       key: 'name',
       width: 300,
       render: (_, m) => {
-        const meta = TYPE_META[m.type] || { label: m.type || '菜单', icon: <UnorderedListOutlined />, color: brand.textSecondary, tagColor: 'default' }
+        const meta = TYPE_META[m.type] || { label: m.type || '菜单', icon: <UnorderedListOutlined />, color: tokens.textSecondary, tagColor: 'default' }
         return (
           <Space size={8}>
             <span style={{ color: meta.color, fontSize: 14 }}>{meta.icon}</span>
             <span style={{ fontWeight: 500 }}>{m.name}</span>
-            <span style={{ fontSize: 12, color: brand.textSecondary, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+            <span style={{ fontSize: 12, color: tokens.textSecondary, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
               {m.code}
             </span>
           </Space>
@@ -407,15 +406,15 @@ export default function MenuList() {
           gap: 12px;
         }
         .menu-app-label {
-          color: ${brand.textSecondary};
+          color: ${tokens.textSecondary};
           font-size: 13px;
         }
         .menu-app-stats {
           font-size: 13px;
-          color: ${brand.textSecondary};
+          color: ${tokens.textSecondary};
         }
         .menu-app-stats b {
-          color: ${brand.text};
+          color: ${tokens.text};
           font-size: 16px;
           margin-left: 4px;
         }
@@ -425,7 +424,8 @@ export default function MenuList() {
           gap: 8px;
           padding: 10px 14px;
           border-radius: 8px;
-          background: ${brand.gradientSoft};
+          background: ${tokens.softFill};
+          border: 1px solid ${tokens.border};
           font-size: 13px;
         }
       `}</style>
@@ -474,7 +474,7 @@ export default function MenuList() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <Input
           allowClear
-          prefix={<SearchOutlined style={{ color: brand.textSecondary }} />}
+          prefix={<SearchOutlined style={{ color: tokens.textSecondary }} />}
           placeholder="按名称 / 编码 / 路径过滤"
           style={{ width: 280 }}
           value={keyword}
@@ -524,10 +524,10 @@ export default function MenuList() {
         <Form form={form} layout="vertical">
           {/* 所属应用：以列表页选中为准，只读展示 */}
           <div className="menu-app-fixed">
-            <AppstoreOutlined style={{ color: brand.primary }} />
+            <AppstoreOutlined style={{ color: tokens.primary }} />
             <span>菜单将归属应用：</span>
             <b>{selectedApp ? `${selectedApp.name}（${selectedApp.code}）` : '-'}</b>
-            <span style={{ color: brand.textSecondary, fontSize: 12 }}>（以列表页选中的应用为准，不可修改）</span>
+            <span style={{ color: tokens.textSecondary, fontSize: 12 }}>（以列表页选中的应用为准，不可修改）</span>
           </div>
 
           <Divider orientation="left" plain style={{ margin: '16px 0 8px', fontSize: 13 }}>

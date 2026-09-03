@@ -2,11 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { Table, Button, Space, Input, Modal, Form, Select, Popconfirm, message } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { EllipsisCell, IDCell, PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, fmtTime, IDCell, PageContainer, StatusTag, TypeTag } from '@ark-iam/ui'
 import { createOAuthClient, deleteOAuthClient, getApplicationPageList, getOAuthClientPageList, updateOAuthClient } from '@ark-iam/api'
 import type { OAuthClientItem } from '@ark-iam/types'
 import { useNavigate } from 'react-router-dom'
-import { fmtTime, StatusTag, TypeTag } from '../../components/common'
 
 interface AppOption {
   value: string

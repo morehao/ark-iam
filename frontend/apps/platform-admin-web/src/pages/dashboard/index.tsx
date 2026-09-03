@@ -7,23 +7,24 @@ import {
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { PageContainer, brand } from '@ark-iam/ui'
+import { PageContainer, tokens } from '@ark-iam/ui'
 import { getUserPageList, getRolePageList, getApplicationPageList, getTenantPageList } from '@ark-iam/api'
 
 interface Stat {
   title: string
   value: number | null
   icon: React.ReactNode
-  color: string
 }
 
+const STAT_CARDS: Stat[] = [
+  { title: '用户总数', value: null, icon: <UserOutlined /> },
+  { title: '角色总数', value: null, icon: <SafetyCertificateOutlined /> },
+  { title: '应用总数', value: null, icon: <AppstoreOutlined /> },
+  { title: '租户总数', value: null, icon: <GlobalOutlined /> },
+]
+
 export default function Dashboard() {
-  const [stats, setStats] = useState<Stat[]>([
-    { title: '用户总数', value: null, icon: <UserOutlined />, color: '#4f6ef7' },
-    { title: '角色总数', value: null, icon: <SafetyCertificateOutlined />, color: '#7a5af8' },
-    { title: '应用总数', value: null, icon: <AppstoreOutlined />, color: '#f59e0b' },
-    { title: '租户总数', value: null, icon: <GlobalOutlined />, color: '#22c55e' },
-  ])
+  const [stats, setStats] = useState<Stat[]>(STAT_CARDS)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -37,12 +38,16 @@ export default function Dashboard() {
           getTenantPageList({ page: 1, pageSize: 1 }),
         ])
         if (!mounted) return
-        const count = (r: PromiseSettledResult<unknown>) => (r.status === 'fulfilled' ? ((r.value as { total?: number; list?: unknown[] }).total ?? (Array.isArray((r.value as { list?: unknown[] }).list) ? (r.value as { list: unknown[] }).list.length : 0)) : 0)
+        const count = (r: PromiseSettledResult<unknown>) =>
+          r.status === 'fulfilled'
+            ? ((r.value as { total?: number; list?: unknown[] }).total ??
+              (Array.isArray((r.value as { list?: unknown[] }).list) ? (r.value as { list: unknown[] }).list.length : 0))
+            : 0
         setStats([
-          { title: '用户总数', value: count(users), icon: <UserOutlined />, color: '#4f6ef7' },
-          { title: '角色总数', value: count(roles), icon: <SafetyCertificateOutlined />, color: '#7a5af8' },
-          { title: '应用总数', value: count(apps), icon: <AppstoreOutlined />, color: '#f59e0b' },
-          { title: '租户总数', value: count(tenants), icon: <GlobalOutlined />, color: '#22c55e' },
+          { title: '用户总数', value: count(users), icon: <UserOutlined /> },
+          { title: '角色总数', value: count(roles), icon: <SafetyCertificateOutlined /> },
+          { title: '应用总数', value: count(apps), icon: <AppstoreOutlined /> },
+          { title: '租户总数', value: count(tenants), icon: <GlobalOutlined /> },
         ])
       } finally {
         if (mounted) setLoading(false)
@@ -63,7 +68,7 @@ export default function Dashboard() {
               <Card
                 hoverable
                 styles={{ body: { padding: '22px 24px' } }}
-                style={{ borderRadius: 14, border: '1px solid #f0f0f0' }}
+                style={{ borderRadius: 14, border: `1px solid ${tokens.border}` }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                   <div
@@ -75,15 +80,14 @@ export default function Dashboard() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       fontSize: 24,
-                      color: '#fff',
-                      background: `linear-gradient(135deg, ${s.color} 0%, ${s.color}cc 100%)`,
-                      boxShadow: `0 8px 18px ${s.color}40`,
+                      color: tokens.primary,
+                      background: tokens.softFill,
                     }}
                   >
                     {s.icon}
                   </div>
                   <div>
-                    <Statistic title={s.title} value={s.value ?? 0} valueStyle={{ fontSize: 26, fontWeight: 700, color: brand.text }} />
+                    <Statistic title={s.title} value={s.value ?? 0} valueStyle={{ fontSize: 26, fontWeight: 700, color: tokens.text }} />
                   </div>
                 </div>
               </Card>
@@ -92,7 +96,7 @@ export default function Dashboard() {
         </div>
 
         <Card
-          style={{ marginTop: 20, borderRadius: 14, border: '1px solid #f0f0f0' }}
+          style={{ marginTop: 20, borderRadius: 14, border: `1px solid ${tokens.border}` }}
           styles={{ body: { padding: '24px 28px' } }}
         >
           <Typography.Title level={5} style={{ marginTop: 0 }}>
@@ -110,13 +114,13 @@ export default function Dashboard() {
                   style={{
                     padding: '18px 20px',
                     borderRadius: 12,
-                    background: brand.gradientSoft,
-                    border: '1px solid #ece9ff',
+                    background: tokens.tableHeaderBg,
+                    border: `1px solid ${tokens.border}`,
                   }}
                 >
-                  <div style={{ fontSize: 22, color: brand.primary, marginBottom: 8 }}>{f.icon}</div>
+                  <div style={{ fontSize: 22, color: tokens.primary, marginBottom: 8 }}>{f.icon}</div>
                   <div style={{ fontWeight: 600, marginBottom: 4 }}>{f.title}</div>
-                  <div style={{ fontSize: 12, color: brand.textSecondary }}>{f.desc}</div>
+                  <div style={{ fontSize: 12, color: tokens.textSecondary }}>{f.desc}</div>
                 </div>
               </Col>
             ))}

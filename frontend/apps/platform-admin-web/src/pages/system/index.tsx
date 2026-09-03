@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Popconfirm, Space, Table, message } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { EllipsisCell, IDCell, PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, fmtTime, IDCell, PageContainer } from '@ark-iam/ui'
 import {
   createSystemConfig,
   deleteSystemConfig,
@@ -11,7 +11,6 @@ import {
   updateSystemConfig,
 } from '@ark-iam/api'
 import type { SystemConfigItem } from '@ark-iam/types'
-import { fmtTime } from '../../components/common'
 
 /** 序列化配置值：对象 JSON 化，其余转字符串 */
 function formatValue(value: unknown): string {

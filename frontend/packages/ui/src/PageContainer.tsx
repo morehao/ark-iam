@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Card, Space, Typography } from 'antd'
-import { brand } from './theme'
+import { brand, tokens } from './theme'
 
 interface Props {
   title: string
@@ -35,7 +35,7 @@ export function PageContainer({ title, description, extra, children, loading }: 
         styles={{
           body: { padding: 20 },
         }}
-        style={{ borderRadius: 12, boxShadow: '0 2px 12px rgba(15,23,42,0.05)', border: '1px solid #f0f0f0' }}
+        style={{ borderRadius: 12, border: `1px solid ${tokens.border}` }}
       >
         {children}
       </Card>

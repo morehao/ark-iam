@@ -16,7 +16,7 @@ import {
 import { PlusOutlined, ReloadOutlined, SearchOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
-import { PageContainer } from '@ark-iam/ui'
+import { fmtTime, PageContainer, SourceTag, tokens } from '@ark-iam/ui'
 import type { MenuItem, TenantAppItem, TenantRoleItem } from '@ark-iam/types'
 import {
   createTenantRole,
@@ -27,7 +27,6 @@ import {
   updateTenantRoleMenus,
 } from '../../api/role'
 import { getTenantApps } from '../../api/menu'
-import { fmtTime } from '../../components/common'
 
 /** 系统管理等级展示：super→超管，member→成员 */
 function adminLevelText(level?: string) {
@@ -38,11 +37,6 @@ function adminLevelText(level?: string) {
     default:
       return <Tag>成员</Tag>
   }
-}
-
-/** 来源标签：builtin→内置(金)，其余→自定义(蓝) */
-function sourceTag(source?: string) {
-  return source === 'builtin' ? <Tag color="gold">内置</Tag> : <Tag color="blue">自定义</Tag>
 }
 
 /** 是否为内置管理员角色（source=builtin && admin_level=super） */
@@ -184,7 +178,7 @@ export default function TenantRolePage() {
       dataIndex: 'source',
       key: 'source',
       width: 100,
-      render: (v: string) => (v === 'builtin' ? <Tag color="gold">内置</Tag> : <Tag color="blue">自定义</Tag>),
+      render: (v: string) => <SourceTag value={v} />,
     },
     {
       title: '系统管理',
@@ -298,9 +292,9 @@ export default function TenantRolePage() {
       >
         <Form form={form} layout="vertical">
           {/* 只读：来源 + 系统管理等级（新建固定 custom/none，编辑按记录回显） */}
-          <div style={{ display: 'flex', gap: 24, marginBottom: 20, color: '#475569', fontSize: 13 }}>
+          <div style={{ display: 'flex', gap: 24, marginBottom: 20, color: tokens.textSecondary, fontSize: 13 }}>
             <span>
-              来源：{editing ? sourceTag(editing.source) : sourceTag('custom')}
+              来源：<SourceTag value={editing ? editing.source : 'custom'} />
             </span>
             <span>
               系统管理：{adminLevelText(editing?.adminLevel)}
@@ -338,11 +332,11 @@ export default function TenantRolePage() {
           </Space>
         }
       >
-        <div style={{ marginBottom: 12, color: '#94a3b8', fontSize: 12 }}>
+        <div style={{ marginBottom: 12, color: tokens.textPlaceholder, fontSize: 12 }}>
           勾选该角色可访问的租户控制台页面（父级自动级联）
         </div>
         {menuLoading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>加载中...</div>
+          <div style={{ padding: 40, textAlign: 'center', color: tokens.textPlaceholder }}>加载中...</div>
         ) : (
           <Tree
             checkable

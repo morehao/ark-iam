@@ -18,11 +18,10 @@ import {
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { PageContainer } from '@ark-iam/ui'
+import { fmtTime, PageContainer, SuspendedTag, tokens } from '@ark-iam/ui'
 import type { MemberItem, OrganizationItem, UserOrganizationItem } from '@ark-iam/types'
 import { getOrganizationTree } from '../../api/organization'
 import { createTenantUser, getTenantMemberPageList, getTenantUserDetail, updateTenantUser } from '../../api/user'
-import { fmtTime } from '../../components/common'
 
 type OrgOf = { id: string; name: string }
 
@@ -175,7 +174,7 @@ export default function OrganizationMembersPage() {
           <Avatar size={28}>{r.name?.charAt(0)?.toUpperCase() || 'U'}</Avatar>
           <Space direction="vertical" size={0}>
             <span style={{ fontWeight: 500 }}>{r.name || '-'}</span>
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>@{r.username || '-'}</span>
+            <span style={{ fontSize: 12, color: tokens.textPlaceholder }}>@{r.username || '-'}</span>
           </Space>
         </Space>
       ),
@@ -187,7 +186,7 @@ export default function OrganizationMembersPage() {
       dataIndex: 'isSuspended',
       key: 'isSuspended',
       width: 90,
-      render: (v: boolean) => (v ? <Tag color="red">挂起</Tag> : <Tag color="green">正常</Tag>),
+      render: (v: boolean) => <SuspendedTag value={v} />,
     },
     {
       title: '主部门',
@@ -280,7 +279,7 @@ export default function OrganizationMembersPage() {
           </Form.Item>
         </Form>
 
-        <div style={{ borderBottom: '1px solid rgba(5,5,5,0.06)', marginBottom: 16 }} />
+        <div style={{ borderBottom: `1px solid ${tokens.border}`, marginBottom: 16 }} />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
@@ -288,7 +287,7 @@ export default function OrganizationMembersPage() {
           </Button>
         </div>
 
-        <div style={{ borderBottom: '1px solid rgba(5,5,5,0.06)', marginBottom: 16 }} />
+        <div style={{ borderBottom: `1px solid ${tokens.border}`, marginBottom: 16 }} />
 
         <Table<MemberItem>
           rowKey={(r) => r.userID}
@@ -401,7 +400,7 @@ export default function OrganizationMembersPage() {
                       <Avatar size={48}>{detail.name?.charAt(0)?.toUpperCase() || 'U'}</Avatar>
                       <Space direction="vertical" size={0}>
                         <span style={{ fontWeight: 600, fontSize: 16 }}>{detail.name || '-'}</span>
-                        <span style={{ color: '#94a3b8' }}>@{detail.username || '-'}</span>
+                        <span style={{ color: tokens.textPlaceholder }}>@{detail.username || '-'}</span>
                       </Space>
                     </Space>
                     <div>
@@ -437,7 +436,7 @@ export default function OrganizationMembersPage() {
 function OrgRow({ label, color, orgs }: { label: string; color: string; orgs: OrgOf[] }) {
   return (
     <div>
-      <div style={{ color: '#94a3b8', fontSize: 12, marginBottom: 4 }}>{label}</div>
+      <div style={{ color: tokens.textPlaceholder, fontSize: 12, marginBottom: 4 }}>{label}</div>
       {orgs.length ? (
         <Space size={4} wrap>
           {orgs.map((o) => (
@@ -447,7 +446,7 @@ function OrgRow({ label, color, orgs }: { label: string; color: string; orgs: Or
           ))}
         </Space>
       ) : (
-        <span style={{ color: '#b0b7c3' }}>-</span>
+        <span style={{ color: tokens.textPlaceholder }}>-</span>
       )}
     </div>
   )

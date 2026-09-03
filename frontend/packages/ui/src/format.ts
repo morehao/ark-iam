@@ -1,4 +1,7 @@
-/** 时间渲染：兼容秒级时间戳与字符串 */
+/**
+ * 时间渲染：兼容秒级时间戳与字符串，统一为 `YYYY-MM-DD HH:mm:ss`。
+ * 前后端时间交互约定为秒级 int64 时间戳（见 AGENTS.md），前端展示统一走本函数。
+ */
 export function fmtTime(value?: number | string | null): string {
   if (value == null || value === '' || value === 0) return '-'
   if (typeof value === 'number') {

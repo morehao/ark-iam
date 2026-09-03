@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Table, Button, Space, Input, Modal, Form, Switch, message, Avatar, Tooltip, Tag } from 'antd'
+import { Table, Button, Space, Input, Modal, Form, Switch, message, Avatar, Tooltip } from 'antd'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { PageContainer } from '@ark-iam/ui'
+import { brand, EllipsisCell, fmtTime, PageContainer, SuspendedTag } from '@ark-iam/ui'
 import { getUserPageList, updateUserPassword, updateUserStatus } from '@ark-iam/api'
 import type { UserItem } from '@ark-iam/types'
-import { fmtTime } from '../../components/common'
 import { useNavigate } from 'react-router-dom'
-import { brand, EllipsisCell } from '@ark-iam/ui'
 
 export default function UserList() {
   const navigate = useNavigate()
@@ -89,7 +87,7 @@ export default function UserList() {
       dataIndex: 'isSuspended',
       key: 'isSuspended',
       width: 100,
-      render: (v: number) => (v === 1 ? <Tag color="red">挂起</Tag> : <Tag color="green">正常</Tag>),
+      render: (v: number) => <SuspendedTag value={v} />,
     },
     {
       title: '创建时间',

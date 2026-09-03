@@ -1,6 +1,7 @@
 import { Dropdown, Tag } from 'antd'
 import { SwapOutlined } from '@ant-design/icons'
 import { useTenantSwitching, getCurrentTenantId } from '@ark-iam/auth'
+import { tokens } from './theme'
 
 export function TenantSwitcher() {
   const { tenants, loadTenants, handleSwitchTenant } = useTenantSwitching()
@@ -28,7 +29,7 @@ export function TenantSwitcher() {
     >
       <span
         style={{
-          color: '#333',
+          color: tokens.text,
           cursor: 'pointer',
           fontSize: 13,
           lineHeight: 1,
@@ -38,13 +39,13 @@ export function TenantSwitcher() {
           padding: '0 12px',
           boxSizing: 'border-box',
           borderRadius: 8,
-          border: '1px solid #e5e7eb',
-          background: '#fafbff',
+          border: `1px solid ${tokens.borderStrong}`,
+          background: tokens.tableHeaderBg,
           transition: 'all 0.2s',
         }}
         className="tenant-switcher"
       >
-        <SwapOutlined style={{ color: '#4f6ef7' }} />
+        <SwapOutlined style={{ color: tokens.primary }} />
         <span style={{ fontWeight: 500, lineHeight: 1 }}>{currentName}</span>
       </span>
     </Dropdown>

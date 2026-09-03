@@ -2,10 +2,9 @@ import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { Alert, Button, DatePicker, Form, Input, Modal, Popconfirm, Space, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { CopyOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
-import { EllipsisCell, IDCell, PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, fmtTime, IDCell, PageContainer, tokens } from '@ark-iam/ui'
 import { createApiKey, deleteApiKey, getApiKeyPageList, revokeApiKey } from '@ark-iam/api'
 import type { ApiKeyCreateResp, ApiKeyItem } from '@ark-iam/types'
-import { fmtTime } from '../../components/common'
 
 interface ApiKeyFormValues {
   name: string
@@ -236,8 +235,8 @@ export default function ApiKeyList() {
                 style={{
                   ...monospaceStyle,
                   wordBreak: 'break-all',
-                  background: '#fffbe6',
-                  border: '1px solid #ffe58f',
+                  background: tokens.warningBg,
+                  border: `1px solid ${tokens.warningBorder}`,
                   borderRadius: 8,
                   padding: '10px 12px',
                 }}

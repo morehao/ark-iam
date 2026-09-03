@@ -5,8 +5,7 @@ import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { createOAuthSecret, deleteOAuthSecret, getOAuthClientDetail, listOAuthSecrets } from '@ark-iam/api'
 import type { OAuthClientDetail as OAuthClientDetailType, OAuthSecretCreateResp, OAuthSecretItem } from '@ark-iam/types'
-import { fmtTime, StatusTag, TypeTag } from '../../components/common'
-import { IDCell } from '@ark-iam/ui'
+import { fmtTime, IDCell, StatusTag, tokens, TypeTag } from '@ark-iam/ui'
 
 export default function OAuthClientDetail() {
   const { id } = useParams<{ id: string }>()
@@ -128,7 +127,7 @@ export default function OAuthClientDetail() {
         </Button>
       </Space>
 
-      <Card title="基本信息" style={{ borderRadius: 12, marginBottom: 16, border: '1px solid #f0f0f0' }} styles={{ body: { padding: 24 } }}>
+      <Card title="基本信息" style={{ borderRadius: 12, marginBottom: 16, border: `1px solid ${tokens.border}` }} styles={{ body: { padding: 24 } }}>
         <Descriptions column={2} bordered size="small">
           <Descriptions.Item label="ID"><IDCell value={detail.applicationClientID} /></Descriptions.Item>
           <Descriptions.Item label="租户ID"><IDCell value={detail.tenantID} /></Descriptions.Item>
@@ -170,7 +169,7 @@ export default function OAuthClientDetail() {
         </Descriptions>
       </Card>
 
-      <Card title="密钥管理" style={{ borderRadius: 12, border: '1px solid #f0f0f0' }} styles={{ body: { padding: 24 } }}>
+      <Card title="密钥管理" style={{ borderRadius: 12, border: `1px solid ${tokens.border}` }} styles={{ body: { padding: 24 } }}>
         <Space style={{ marginBottom: 16 }}>
           <Button
             type="primary"

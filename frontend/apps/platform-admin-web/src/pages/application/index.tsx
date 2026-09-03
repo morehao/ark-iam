@@ -2,10 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Descriptions, Drawer, Form, Input, InputNumber, message, Modal, Popconfirm, Select, Space, Table, Tag } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { EllipsisCell, IDCell, PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, fmtTime, IDCell, PageContainer, StatusTag, TypeTag } from '@ark-iam/ui'
 import { createApplication, deleteApplication, getApplicationDetail, getApplicationPageList, updateApplication } from '@ark-iam/api'
 import type { ApplicationItem } from '@ark-iam/types'
-import { fmtTime, StatusTag, TypeTag } from '../../components/common'
 
 export default function ApplicationList() {
   const [data, setData] = useState<ApplicationItem[]>([])
