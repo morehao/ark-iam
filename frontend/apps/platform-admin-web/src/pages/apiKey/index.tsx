@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
-import { Alert, Button, DatePicker, Form, Input, Modal, Popconfirm, Space, Table, Tag, message } from 'antd'
+import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { Alert, Button, DatePicker, Form, Input, Modal, Popconfirm, Space, Table, Tabs, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { CopyOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { EllipsisCell, fmtTime, IDCell, PageContainer, tokens } from '@ark-iam/ui'
-import { createApiKey, deleteApiKey, getApiKeyPageList, revokeApiKey } from '@ark-iam/api'
-import type { ApiKeyCreateResp, ApiKeyItem } from '@ark-iam/types'
+import { createApiKey, deleteApiKey, getApiKeyPageList, getApiKeySupervisionPageList, revokeApiKey } from '@ark-iam/api'
+import type { ApiKeyCreateResp, ApiKeyItem, ApiKeySupervisionItem } from '@ark-iam/types'
 
 interface ApiKeyFormValues {
   name: string
@@ -14,7 +14,58 @@ interface ApiKeyFormValues {
 
 const monospaceStyle: CSSProperties = { fontFamily: 'Consolas, Monaco, monospace' }
 
-export default function ApiKeyList() {
+// 统一的状态推导：已吊销 > 已过期 > 有效
+function keyStateOf(r: { revokedAt: number; expiresAt: number }): { label: string; color: string } {
+  if (r.revokedAt) return { label: '已吊销', color: 'error' }
+  if (r.expiresAt > 0 && r.expiresAt * 1000 <= Date.now()) return { label: '已过期', color: 'warning' }
+  return { label: '有效', color: 'success' }
+}
+
+function KeyStateTag(r: { revokedAt: number; expiresAt: number }) {
+  const st = keyStateOf(r)
+  return <Tag color={st.color}>{st.label}</Tag>
+}
+
+function ToolbarRow({
+  searchPlaceholder,
+  onSearch,
+  onRefresh,
+  extra,
+}: {
+  searchPlaceholder: string
+  onSearch: (v: string) => void
+  onRefresh: () => void
+  extra?: ReactNode
+}) {
+  const [draft, setDraft] = useState('')
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+      <Input.Search
+        allowClear
+        placeholder={searchPlaceholder}
+        prefix={<SearchOutlined />}
+        style={{ width: 240 }}
+        value={draft}
+        onChange={(e) => {
+          const v = e.target.value
+          setDraft(v)
+          // 清空搜索框时立即回到全量列表
+          if (v === '') onSearch('')
+        }}
+        onSearch={onSearch}
+      />
+      <Space>
+        <Button icon={<ReloadOutlined />} onClick={onRefresh}>
+          刷新
+        </Button>
+        {extra}
+      </Space>
+    </div>
+  )
+}
+
+// ==================== 视角一：本租户（平台租户）密钥管理 ====================
+function OwnedApiKeysPane() {
   const [data, setData] = useState<ApiKeyItem[]>([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -119,7 +170,7 @@ export default function ApiKeyList() {
       title: '状态',
       key: 'status',
       width: 90,
-      render: (_, r) => (r.revokedAt ? <Tag color="error">已吊销</Tag> : <Tag color="success">有效</Tag>),
+      render: (_, r) => KeyStateTag(r),
     },
     { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 160, render: (v: number) => fmtTime(v) },
     {
@@ -146,32 +197,20 @@ export default function ApiKeyList() {
   ]
 
   return (
-    <PageContainer
-      title="API Key"
-      description="机器访问凭证管理"
-      extra={
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
-            刷新
-          </Button>
+    <>
+      <ToolbarRow
+        searchPlaceholder="按名称搜索"
+        onSearch={(v) => {
+          setKeyword(v)
+          setPage(1)
+        }}
+        onRefresh={() => void fetchData()}
+        extra={
           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
             新建 API Key
           </Button>
-        </Space>
-      }
-    >
-      <div style={{ marginBottom: 16 }}>
-        <Input.Search
-          allowClear
-          placeholder="按名称搜索"
-          prefix={<SearchOutlined />}
-          style={{ width: 240 }}
-          onSearch={(v) => {
-            setKeyword(v)
-            setPage(1)
-          }}
-        />
-      </div>
+        }
+      />
       <Table<ApiKeyItem>
         rowKey="id"
         columns={columns}
@@ -250,6 +289,108 @@ export default function ApiKeyList() {
           }
         />
       </Modal>
+    </>
+  )
+}
+
+// ==================== 视角二：全租户只读监督（平台排查） ====================
+function SupervisionApiKeysPane() {
+  const [data, setData] = useState<ApiKeySupervisionItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+  const [keyword, setKeyword] = useState('')
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const resp = await getApiKeySupervisionPageList({ page, pageSize, name: keyword })
+      setData(resp?.list || [])
+      setTotal(resp?.total || 0)
+    } catch {
+      /* 拦截器已提示 */
+    } finally {
+      setLoading(false)
+    }
+  }, [page, pageSize, keyword])
+
+  useEffect(() => {
+    void fetchData()
+  }, [fetchData])
+
+  const columns: ColumnsType<ApiKeySupervisionItem> = [
+    { title: '租户', dataIndex: 'tenantName', key: 'tenantName', width: 160, render: (v: string, r) => <EllipsisCell value={v || r.tenantID} /> },
+    { title: '租户ID', dataIndex: 'tenantID', key: 'tenantID', width: 150, render: (v: string) => <IDCell value={v} /> },
+    { title: '名称', dataIndex: 'name', key: 'name', render: (v: string) => <EllipsisCell value={v} /> },
+    {
+      title: '前缀',
+      dataIndex: 'keyPrefix',
+      key: 'keyPrefix',
+      width: 180,
+      render: (v: string) => <span style={{ ...monospaceStyle, fontSize: 12 }}>{v || '-'}</span>,
+    },
+    { title: '创建人', dataIndex: 'creatorName', key: 'creatorName', width: 140, render: (v: string, r) => <EllipsisCell value={v || r.createdBy} /> },
+    {
+      title: '状态',
+      key: 'status',
+      width: 90,
+      render: (_, r) => KeyStateTag(r),
+    },
+    { title: '最后使用', dataIndex: 'lastUsedAt', key: 'lastUsedAt', width: 160, render: (v: number) => fmtTime(v) },
+    { title: '过期时间', dataIndex: 'expiresAt', key: 'expiresAt', width: 160, render: (v: number) => fmtTime(v) },
+    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 160, render: (v: number) => fmtTime(v) },
+  ]
+
+  return (
+    <>
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+        message="平台全租户只读监督视图"
+        description="用于密钥泄漏/僵尸密钥排查：明文密钥永不可见（仅展示前缀），本视图不提供吊销与删除（平台应急吊销暂未纳入）。若发现可疑密钥请联系对应租户管理员处理。"
+      />
+      <ToolbarRow
+        searchPlaceholder="按密钥名称搜索"
+        onSearch={(v) => {
+          setKeyword(v)
+          setPage(1)
+        }}
+        onRefresh={() => void fetchData()}
+      />
+      <Table<ApiKeySupervisionItem>
+        rowKey="id"
+        columns={columns}
+        dataSource={data}
+        loading={loading}
+        scroll={{ x: 1200 }}
+        pagination={{
+          current: page,
+          pageSize,
+          total,
+          showSizeChanger: true,
+          showTotal: (t) => `共 ${t} 条`,
+          onChange: (p, ps) => {
+            setPage(p)
+            setPageSize(ps)
+          },
+        }}
+      />
+    </>
+  )
+}
+
+export default function ApiKeyList() {
+  return (
+    <PageContainer title="API 密钥" description="机器访问凭证：本租户密钥管理；全租户监督为平台只读排查视图">
+      <Tabs
+        defaultActiveKey="owned"
+        items={[
+          { key: 'owned', label: '本租户密钥', children: <OwnedApiKeysPane /> },
+          { key: 'supervision', label: '全租户监督', children: <SupervisionApiKeysPane /> },
+        ]}
+      />
     </PageContainer>
   )
 }

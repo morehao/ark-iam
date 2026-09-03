@@ -15,16 +15,6 @@ func tenantRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.DELETE("/tenants/:tenantID", tenantCtr.Delete)
 }
 
-func systemRouter(groups *ginserver.RouterGroups) {
-	systemCtr := ctrtenant.NewSystemCtr()
-	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.POST("/systems", systemCtr.Create)
-	v1RouterGroup.GET("/systems", systemCtr.PageList)
-	v1RouterGroup.GET("/systems/:systemID", systemCtr.Detail)
-	v1RouterGroup.PUT("/systems/:systemID", systemCtr.Update)
-	v1RouterGroup.DELETE("/systems/:systemID", systemCtr.Delete)
-}
-
 func logRouter(groups *ginserver.RouterGroups) {
 	logCtr := ctrtenant.NewLogCtr()
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)

@@ -9,7 +9,6 @@ import (
 func AllEntities() []any {
 	return []any{
 		&TenantEntity{},
-		&SystemEntity{},
 		&PersonEntity{},
 		&UserEntity{},
 		&UserIdentityEntity{},

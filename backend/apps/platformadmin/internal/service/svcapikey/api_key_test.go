@@ -2,6 +2,7 @@ package svcapikey
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtoapikey"
+	"github.com/morehao/ark-iam/platformadmin/testutil"
 	"github.com/morehao/golib/biz/gcontext"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -228,6 +230,75 @@ func TestCrossTenantIsolation(t *testing.T) {
 		}
 	}
 	_ = resp1
+}
+
+func TestPageListSupervisionCrossTenant(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.ApiKeyEntity{}, &model.UserEntity{}, &model.TenantEntity{})
+	svc := NewCreateApiKeySvc() // 默认 dao getter → 落到 SetupSQLite 注册的全局 iam 测试库
+
+	tenantA := &model.TenantEntity{Code: "tenant-a", Name: "租户A"}
+	tenantB := &model.TenantEntity{Code: "tenant-b", Name: "租户B"}
+	if err := db.Create(tenantA).Error; err != nil {
+		t.Fatalf("seed tenantA: %v", err)
+	}
+	if err := db.Create(tenantB).Error; err != nil {
+		t.Fatalf("seed tenantB: %v", err)
+	}
+	userA := &model.UserEntity{TenantID: tenantA.ID, Name: "A管理员", Profile: json.RawMessage(`{}`), CustomData: json.RawMessage(`{}`)}
+	userB := &model.UserEntity{TenantID: tenantB.ID, Name: "B管理员", Profile: json.RawMessage(`{}`), CustomData: json.RawMessage(`{}`)}
+	if err := db.Create(userA).Error; err != nil {
+		t.Fatalf("seed userA: %v", err)
+	}
+	if err := db.Create(userB).Error; err != nil {
+		t.Fatalf("seed userB: %v", err)
+	}
+
+	keyA, err := svc.Create(newTestGinCtxWithUser(tenantA.ID, userA.ID), &dtoapikey.ApiKeyCreateReq{Name: "A-Key"})
+	if err != nil {
+		t.Fatalf("Create tenantA key: %v", err)
+	}
+	if _, err := svc.Create(newTestGinCtxWithUser(tenantB.ID, userB.ID), &dtoapikey.ApiKeyCreateReq{Name: "B-Key"}); err != nil {
+		t.Fatalf("Create tenantB key: %v", err)
+	}
+
+	// 普通列表仍按上下文租户隔离
+	pageResp, err := svc.PageList(newTestGinCtx(tenantA.ID), &dtoapikey.ApiKeyPageListReq{})
+	if err != nil {
+		t.Fatalf("PageList: %v", err)
+	}
+	if len(pageResp.List) != 1 || pageResp.List[0].ID != keyA.ID {
+		t.Fatalf("tenant-scoped list should contain only tenantA key, got %+v", pageResp.List)
+	}
+
+	// 监督视图忽略上下文租户：两台 key 都能看到，且归属名被解析
+	sup, err := svc.PageListSupervision(newTestGinCtx(tenantA.ID), &dtoapikey.ApiKeySupervisionPageListReq{})
+	if err != nil {
+		t.Fatalf("PageListSupervision: %v", err)
+	}
+	if sup.Total != 2 || len(sup.List) != 2 {
+		t.Fatalf("supervision should list keys of both tenants, got total=%d list=%d", sup.Total, len(sup.List))
+	}
+	byName := map[string]dtoapikey.ApiKeySupervisionItem{}
+	for _, item := range sup.List {
+		byName[item.Name] = item
+	}
+	for _, item := range []dtoapikey.ApiKeySupervisionItem{byName["A-Key"], byName["B-Key"]} {
+		if item.TenantName == "" || item.CreatorName == "" {
+			t.Fatalf("supervision item missing owner names: %+v", item)
+		}
+	}
+	if byName["A-Key"].TenantName != "租户A" || byName["B-Key"].TenantName != "租户B" {
+		t.Fatalf("unexpected tenant names: %+v", byName)
+	}
+
+	// 支持按租户过滤（可选查询参数）
+	supFiltered, err := svc.PageListSupervision(newTestGinCtx(tenantA.ID), &dtoapikey.ApiKeySupervisionPageListReq{TenantID: tenantB.ID})
+	if err != nil {
+		t.Fatalf("PageListSupervision filtered: %v", err)
+	}
+	if supFiltered.Total != 1 || supFiltered.List[0].Name != "B-Key" {
+		t.Fatalf("filtered supervision mismatch: %+v", supFiltered.List)
+	}
 }
 
 func newTestApiKeySvc(t *testing.T) (CreateApiKeySvc, *gorm.DB, func()) {

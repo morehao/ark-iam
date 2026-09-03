@@ -26,8 +26,14 @@ type TenantDeleteReq struct {
 	TenantID string `json:"-" uri:"tenantID" binding:"required"` // 租户ID
 }
 
+// ---------- 日志（审计记录） ----------
 
+type LogDetailReq struct {
+	LogID string `json:"-" uri:"logID" binding:"required"` // 日志ID
+}
 
-
-
-
+type LogPageListReq struct {
+	gobject.PageQuery
+	TenantID string `json:"tenantID" form:"tenantID"` // 租户ID
+	Key      string `json:"key" form:"key"`           // 日志键
+}

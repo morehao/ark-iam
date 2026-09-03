@@ -10,6 +10,7 @@ import (
 type ApiKeyCtr interface {
 	Create(ctx *gin.Context)
 	PageList(ctx *gin.Context)
+	PageListSupervision(ctx *gin.Context)
 	Revoke(ctx *gin.Context)
 	Delete(ctx *gin.Context)
 }
@@ -61,6 +62,27 @@ func (ctr *apiKeyCtr) PageList(ctx *gin.Context) {
 		return
 	}
 	res, err := ctr.apiKeySvc.PageList(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags API密钥管理
+// @Summary API密钥全租户监督列表（平台排查视角，只读）
+// @accept application/json
+// @Produce application/json
+// @Param req query dtoapikey.ApiKeySupervisionPageListReq true "API密钥全租户监督列表"
+// @Success 200 {object} gincontext.DtoRender{data=dtoapikey.ApiKeySupervisionPageListResp}
+// @Router /v1/platform/api-keys/supervision [get]
+func (ctr *apiKeyCtr) PageListSupervision(ctx *gin.Context) {
+	var req dtoapikey.ApiKeySupervisionPageListReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.apiKeySvc.PageListSupervision(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

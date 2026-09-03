@@ -311,6 +311,22 @@ export interface ApiKeyCreateResp {
   expiresAt: number
 }
 
+// 全租户只读监督条目（平台排查视角，明文密钥永不可见）
+export interface ApiKeySupervisionItem {
+  id: string
+  tenantID: string
+  tenantName: string
+  createdBy: string
+  creatorName: string
+  name: string
+  keyPrefix: string
+  scope: string
+  expiresAt: number
+  lastUsedAt: number
+  revokedAt: number
+  createdAt: number
+}
+
 // ---------- 菜单 ----------
 export type MenuType = 'directory' | 'menu' | 'button'
 export type MenuStatus = 'enable' | 'disable'
@@ -353,15 +369,6 @@ export interface DomainItem {
   isVerified: number
   verifiedAt: number | null
   createdAt: number
-}
-
-// ---------- 系统配置 ----------
-export interface SystemConfigItem {
-  systemID: string
-  tenantID: string
-  key: string
-  value?: unknown
-  createdAt?: number
 }
 
 // ---------- 审计日志 ----------

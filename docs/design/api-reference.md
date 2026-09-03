@@ -223,20 +223,18 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | POST | `/v1/platform/api-keys` | 创建 API Key |
-| GET | `/v1/platform/api-keys` | API Key 分页 |
+| GET | `/v1/platform/api-keys` | API Key 分页（本租户） |
+| GET | `/v1/platform/api-keys/supervision` | 全租户只读监督列表（平台排查视角） |
 | POST | `/v1/platform/api-keys/:apiKeyID/revoke` | 吊销（动作） |
 | DELETE | `/v1/platform/api-keys/:apiKeyID` | 删除 |
 | POST | `/v1/platform/domains` | 创建域名 |
 | GET | `/v1/platform/domains` | 域名分页 |
 | GET/PUT/DELETE | `/v1/platform/domains/:domainID` | 域名详情/更新/删除 |
 
-### 5.6 系统与日志
+### 5.6 日志（审计）
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/v1/platform/systems` | 创建系统配置 |
-| GET | `/v1/platform/systems` | 配置分页 |
-| GET/PUT/DELETE | `/v1/platform/systems/:systemID` | 配置详情/更新/删除 |
 | GET | `/v1/platform/logs` | 租户日志分页 |
 | GET | `/v1/platform/logs/:logID` | 日志详情 |
 

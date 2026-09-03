@@ -112,6 +112,66 @@ const docTemplateplatformadmin = `{
                 }
             }
         },
+        "/v1/platform/api-keys/supervision": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "API密钥管理"
+                ],
+                "summary": "API密钥全租户监督列表（平台排查视角，只读）",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1000,
+                        "type": "integer",
+                        "description": "每页数据条数",
+                        "name": "pageSize",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "租户ID（可选过滤）",
+                        "name": "tenantID",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoapikey.ApiKeySupervisionPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/v1/platform/api-keys/{apiKeyID}": {
             "delete": {
                 "consumes": [
@@ -1716,244 +1776,6 @@ const docTemplateplatformadmin = `{
                 }
             }
         },
-        "/v1/platform/systems": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "系统配置"
-                ],
-                "summary": "系统配置列表分页",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "配置键",
-                        "name": "key",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "页码",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "maximum": 1000,
-                        "type": "integer",
-                        "description": "每页数据条数",
-                        "name": "pageSize",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "租户ID",
-                        "name": "tenantID",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtotenant.SystemPageListResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "系统配置"
-                ],
-                "summary": "创建系统配置",
-                "parameters": [
-                    {
-                        "description": "创建系统配置",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtotenant.SystemCreateReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtotenant.SystemCreateResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/platform/systems/{systemID}": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "系统配置"
-                ],
-                "summary": "系统配置详情",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "systemID",
-                        "name": "systemID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtotenant.SystemDetailResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "put": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "系统配置"
-                ],
-                "summary": "修改系统配置",
-                "parameters": [
-                    {
-                        "description": "修改系统配置",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtotenant.SystemUpdateReq"
-                        }
-                    },
-                    {
-                        "type": "integer",
-                        "description": "systemID",
-                        "name": "systemID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "系统配置"
-                ],
-                "summary": "删除系统配置",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "systemID",
-                        "name": "systemID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/v1/platform/tenant-applications": {
             "get": {
                 "consumes": [
@@ -2960,6 +2782,65 @@ const docTemplateplatformadmin = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dtoapikey.ApiKeyPageListItem"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoapikey.ApiKeySupervisionItem": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "创建时间(unix 秒)",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "type": "string"
+                },
+                "creatorName": {
+                    "type": "string"
+                },
+                "expiresAt": {
+                    "description": "过期时间(unix 秒)",
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "keyPrefix": {
+                    "type": "string"
+                },
+                "lastUsedAt": {
+                    "description": "最后使用时间(unix 秒)",
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "revokedAt": {
+                    "description": "撤销时间(unix 秒)",
+                    "type": "integer"
+                },
+                "scope": {
+                    "type": "string"
+                },
+                "tenantID": {
+                    "type": "string"
+                },
+                "tenantName": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtoapikey.ApiKeySupervisionPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtoapikey.ApiKeySupervisionItem"
                     }
                 },
                 "total": {
@@ -4442,135 +4323,6 @@ const docTemplateplatformadmin = `{
                 "total": {
                     "description": "数据总条数",
                     "type": "integer"
-                }
-            }
-        },
-        "dtotenant.SystemCreateReq": {
-            "type": "object",
-            "properties": {
-                "key": {
-                    "description": "配置键",
-                    "type": "string"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "string"
-                },
-                "value": {
-                    "description": "配置值"
-                }
-            }
-        },
-        "dtotenant.SystemCreateResp": {
-            "type": "object",
-            "properties": {
-                "systemID": {
-                    "description": "自增ID",
-                    "type": "string"
-                }
-            }
-        },
-        "dtotenant.SystemDetailResp": {
-            "type": "object",
-            "properties": {
-                "createdAt": {
-                    "description": "创建时间",
-                    "type": "integer"
-                },
-                "createdBy": {
-                    "description": "创建人id",
-                    "type": "integer"
-                },
-                "key": {
-                    "description": "配置键",
-                    "type": "string"
-                },
-                "systemID": {
-                    "description": "自增ID",
-                    "type": "string"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "string"
-                },
-                "updatedAt": {
-                    "description": "更新时间",
-                    "type": "integer"
-                },
-                "updatedBy": {
-                    "description": "更新人id",
-                    "type": "integer"
-                },
-                "value": {
-                    "description": "配置值"
-                }
-            }
-        },
-        "dtotenant.SystemPageListItem": {
-            "type": "object",
-            "properties": {
-                "createdAt": {
-                    "description": "创建时间",
-                    "type": "integer"
-                },
-                "createdBy": {
-                    "description": "创建人id",
-                    "type": "integer"
-                },
-                "key": {
-                    "description": "配置键",
-                    "type": "string"
-                },
-                "systemID": {
-                    "description": "自增ID",
-                    "type": "string"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "string"
-                },
-                "updatedAt": {
-                    "description": "更新时间",
-                    "type": "integer"
-                },
-                "updatedBy": {
-                    "description": "更新人id",
-                    "type": "integer"
-                },
-                "value": {
-                    "description": "配置值"
-                }
-            }
-        },
-        "dtotenant.SystemPageListResp": {
-            "type": "object",
-            "properties": {
-                "list": {
-                    "description": "数据列表",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dtotenant.SystemPageListItem"
-                    }
-                },
-                "total": {
-                    "description": "数据总条数",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtotenant.SystemUpdateReq": {
-            "type": "object",
-            "properties": {
-                "key": {
-                    "description": "配置键",
-                    "type": "string"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "string"
-                },
-                "value": {
-                    "description": "配置值"
                 }
             }
         },

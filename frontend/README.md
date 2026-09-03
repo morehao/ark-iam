@@ -27,7 +27,7 @@ frontend/
 │   └── ui/                # 设计系统：主题、MainLayout、LoginPage、PageContainer 等
 └── apps/
     ├── login-web/         # 登录页（:4000）— OP 登录 UI：凭证登录 / 多租户选择（非 OIDC Client）
-    ├── platform-admin-web/# 平台管理控制台（:4001）— 用户/角色/菜单/部门/应用/OAuth客户端/租户/API Key/域名/系统配置/审计日志
+    ├── platform-admin-web/# 平台管理控制台（:4001）— 用户/角色/菜单/部门/应用/OAuth客户端/租户/API Key/域名/审计日志
     └── tenant-admin-web/  # 租户自服务控制台（:4002）— 组织/组织角色/组织用户/组织角色用户
 ```
 
@@ -72,9 +72,8 @@ Vite dev server 将 `/v1` 与 `/oidc` 代理到后端网关 `http://localhost:81
 - OAuth 客户端：客户端 CRUD、密钥轮换（创建即显示明文）
 - 租户管理：租户 CRUD（类型/挂起）
 - 租户应用：租户订阅关系管理
-- API Key：创建（展示明文一次）、吊销、删除
+- API Key：创建（展示明文一次）、吊销、删除；全租户只读监督
 - 域名管理：域名 CRUD + 验证状态
-- 系统配置：键值配置管理
 - 审计日志：只读查询 + 详情
 - 个人中心：个人信息、修改密码、会话管理（撤销单条/全部）
 - 租户切换：多租户上下文切换

@@ -139,7 +139,7 @@ flowchart TB
 | 应用 | 服务标识 | 独立端口 | 职责 | 主要领域 |
 |---|---|---|---|---|
 | **auth** | `auth` | 8081 | 认证网关：登录/注册/令牌/OIDC Provider/SSO/SLO/Connector | person、user（成员）、refresh_token、session、connector、user_identity |
-| **platformadmin** | `platform` | 8082 | 平台管理：租户/用户/角色/菜单/权限/应用/OAuth 客户端/API Key/域名/系统配置/审计 | tenant、user、role、menu、scope、resource、application、application_client、api_key、domain、system |
+| **platformadmin** | `platform` | 8082 | 平台管理：租户/用户/角色/菜单/权限/应用/OAuth 客户端/API Key/域名/审计 | tenant、user、role、menu、scope、resource、application、application_client、api_key、domain |
 | **tenantadmin** | `tenant` | 8083 | 租户自服务：组织架构（组织树/成员关系）/租户菜单 | organization、organization_user |
 | **gateway** | 聚合 | 8100 | 单体聚合部署，挂载 auth + platformadmin + tenantadmin | 无独立业务 |
 
@@ -501,7 +501,6 @@ erDiagram
 | `tenant` | 租户：`type` 分 customer/platform；`code` 全局唯一；`is_suspended` 挂起 |
 | `tenant_application` | 租户-应用开通关系：`status` 开通状态、`config` 租户级配置、`granted_scope` 租户级 scope 授权 |
 | `domain` | 租户域名（验证状态 `is_verified`） |
-| `system` | 租户系统配置（key-value，value 为 JSON） |
 | `log` | 租户日志（通用 key-payload） |
 
 #### 组织架构域
