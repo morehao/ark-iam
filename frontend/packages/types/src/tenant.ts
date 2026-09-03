@@ -18,22 +18,6 @@ export interface TenantUserItem {
   createdAt?: number
 }
 
-// MemberItem 成员总表条目（以人为维度，含部门关系数组:主/非主/负责）。
-export interface MemberItem {
-  userID: string
-  tenantID: string
-  username: string
-  primaryEmail: string
-  primaryPhone: string
-  name: string
-  avatar: string
-  isSuspended: boolean
-  roleCount: number
-  createdAt?: number
-  primaryOrgID: string
-  organizations: UserOrganizationItem[]
-}
-
 export interface TenantUserCreateReq {
   personID?: string
   username?: string

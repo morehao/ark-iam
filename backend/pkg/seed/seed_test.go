@@ -60,12 +60,12 @@ func TestSeedIamSQLite(t *testing.T) {
 	assertCount("tenant", 1)
 	assertCount("application", 2)
 	assertCount("role", 2)
-	assertCount("menu", 20)
+	assertCount("menu", 19)
 	assertCount("person", 1)
 	assertCount("tenant_user", 1)
 	assertCount("application_client", 2)
 	assertCount("user_role", 2)
-	assertCount("role_menu", 20)
+	assertCount("role_menu", 18)
 	assertCount("tenant_application", 2)
 	assertCount("organization", 1)
 	assertCount("organization_user", 1)
@@ -109,8 +109,8 @@ func TestSeedIamSQLite(t *testing.T) {
 		t.Fatalf("seed tenant_admin role source/appID mismatch: source=%s appID=%s", got.Source, got.AppID)
 	}
 
-	// tenant_admin 预授权租户自服务应用全部 4 个菜单
-	wantMenuCodes := map[string]bool{"organization": false, "organization-member": false, "tenant-user": false, "tenant-role": false}
+	// tenant_admin 预授权租户自服务应用全部 3 个菜单
+	wantMenuCodes := map[string]bool{"organization": false, "tenant-user": false, "tenant-role": false}
 	menuIDByCode := map[string]string{}
 	var menus []model.MenuEntity
 	if err := db.Find(&menus).Error; err != nil {

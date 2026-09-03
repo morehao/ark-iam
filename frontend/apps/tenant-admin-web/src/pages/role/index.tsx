@@ -306,10 +306,10 @@ export default function TenantRolePage() {
             </Form.Item>
           )}
           <Form.Item name="name" label="角色名称" rules={[{ required: true, message: '请输入角色名称' }]}>
-            <Input placeholder="如：部门管理员" />
+            <Input placeholder="如：组织管理员" />
           </Form.Item>
           <Form.Item name="code" label="角色编码" rules={[{ required: true, message: '请输入角色编码' }]}>
-            <Input placeholder="如：dept_admin（应用内唯一）" />
+            <Input placeholder="如：org_admin（应用内唯一）" />
           </Form.Item>
           <Form.Item name="description" label="描述">
             <Input.TextArea rows={3} placeholder="选填" />

@@ -35,9 +35,4 @@ export const updateOrganizationUser = (organizationID: string, userID: string, d
 export const deleteOrganizationUser = (organizationID: string, userID: string) =>
   request.delete<any, string>(`/tenant/organizations/${organizationID}/users/${userID}`)
 
-// ---------- 用户组织归属 ----------
-
-export const updateUserOrganizations = (userID: string, organizationIDs: string[]) =>
-  request.put<any, string>(`/tenant/users/${userID}/organizations`, { organizationIDs })
-
 export type { OrganizationItem }

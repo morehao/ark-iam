@@ -22,6 +22,4 @@ func organizationRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.POST("/organizations/:organizationID/users", organizationUserCtr.Create)
 	v1RouterGroup.PUT("/organizations/:organizationID/users/:userID", organizationUserCtr.Update)
 	v1RouterGroup.DELETE("/organizations/:organizationID/users/:userID", organizationUserCtr.Delete)
-	// 用户归属
-	v1RouterGroup.PUT("/users/:userID/organizations", organizationUserCtr.UpdateUserOrganizations)
 }

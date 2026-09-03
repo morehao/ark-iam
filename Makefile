@@ -33,7 +33,7 @@ PORT              = 8099
 # ============================================================
 .PHONY: all build build-env clean run lint test swag codegen \
         docker-build docker-run check-image \
-        list-apps deps tidy update-dep dev-frontend stop-frontend e2e e2e-sso e2e-test help
+        list-apps deps tidy update-dep dev-all dev-frontend stop-frontend e2e e2e-sso e2e-test help
 
 # ============================================================
 # 通用入口：清理、依赖、构建并运行
@@ -107,6 +107,61 @@ test:
 	@echo "🧪 正在运行测试..."
 	@cd backend && go work sync && cd ..
 	@cd backend && go test ./apps/$(APP)/... -v
+
+# ============================================================
+# 一键开发（后端 + 前端）
+# ============================================================
+
+# 同时启动后端与前端全部开发服务（Ctrl+C 或前端退出时后端一并停止）：
+#   - 后端 gateway：单进程聚合 auth / platformadmin / tenantadmin，监听 :8100
+#   - 前端三应用：login-web(:4000) / platform-admin-web(:4001) / tenant-admin-web(:4002)，/v1、/oidc 代理到 gateway
+# 前置依赖：PostgreSQL 与 Redis 需已启动（详见 docs/design/run-and-deploy.md）
+# 用法：make dev-all
+# 说明：先 go build 生成二进制再 exec 后台运行——直接 kill 该 PID 即为真实服务进程，
+#       可确保退出时端口被正确释放（go run 的包装进程被 kill 后子服务会残留占用端口）。
+dev-all:
+	@echo "🚀 正在启动全部开发服务（后端 gateway + 前端三应用）..."
+	@echo "   后端: gateway → http://localhost:8100（聚合 auth/platformadmin/tenantadmin）"
+	@echo "   前端: login-web(:4000) / platform-admin-web(:4001) / tenant-admin-web(:4002)"
+	@echo "   前置: PostgreSQL 与 Redis 需已启动；Ctrl+C 一并停止全部服务"
+	@cd backend && go work sync && cd ..
+	@echo "🔨 正在构建后端 gateway..."
+	@cd backend/apps/gateway/cmd && go build -o /tmp/ark-iam-gateway-dev .
+	@be_pid=""; \
+	cleanup() { \
+		if [ -n "$$be_pid" ] && kill -0 "$$be_pid" 2>/dev/null; then \
+			echo ""; \
+			echo "🛑 正在停止开发服务..."; \
+			kill "$$be_pid" 2>/dev/null; \
+			wait "$$be_pid" 2>/dev/null; \
+		fi; \
+	}; \
+	trap cleanup EXIT INT TERM; \
+	echo "🚀 启动后端 gateway（:8100）..."; \
+	( cd backend/apps/gateway/cmd && exec /tmp/ark-iam-gateway-dev ) & \
+	be_pid=$$!; \
+	ready=""; \
+	i=0; \
+	while [ -z "$$ready" ] && [ "$$i" -lt 60 ]; do \
+		if curl -fsS http://localhost:8100/oidc/healthz >/dev/null 2>&1; then \
+			ready=1; \
+		elif ! kill -0 "$$be_pid" 2>/dev/null; then \
+			break; \
+		else \
+			i=$$((i + 1)); \
+			sleep 1; \
+		fi; \
+	done; \
+	if [ -z "$$ready" ]; then \
+		echo "❌ 后端 gateway 启动失败或 60s 内未就绪，请检查 PostgreSQL/Redis 是否已启动及上方后端日志"; \
+		exit 1; \
+	fi; \
+	echo "✅ 后端 gateway 已就绪（http://localhost:8100）"; \
+	echo "🚀 启动前端服务（pnpm run dev:all）..."; \
+	cd frontend && pnpm run dev:all; \
+	status=$$?; \
+	echo "前端服务已退出（exit=$$status），正在停止后端..."; \
+	exit $$status
 
 # ============================================================
 # 依赖管理
@@ -305,6 +360,7 @@ help:
 	@echo "    make run       APP=<名称>              go run 直接启动（开发调试）"
 	@echo "    make clean                             清理构建产物"
 	@echo "    make all       APP=<名称>              clean → deps → build → run"
+	@echo "    make dev-all                            一键启动后端 gateway + 全部前端服务（Ctrl+C 停止）"
 	@echo ""
 	@echo "  测试 & 检查"
 	@echo "    make test      APP=<名称>              运行单元测试"

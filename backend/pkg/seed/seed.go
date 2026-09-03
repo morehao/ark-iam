@@ -281,11 +281,10 @@ func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model
 		{appCode: appCodeAdmin, parentCode: "grp-ops", name: "API密钥", code: "api-key", path: "/api-key", icon: "key", sort: 1, component: "/apiKey/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-ops", name: "系统配置", code: "system", path: "/system", icon: "setting", sort: 2, component: "/system/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-ops", name: "审计日志", code: "log", path: "/log", icon: "file", sort: 3, component: "/log/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
-		// 租户自服务一级菜单（组织架构拆为组织管理/成员管理；用户/角色编码加 tenant- 前缀，避免与平台菜单 code 撞名）
+		// 租户自服务一级菜单（组织管理内维护部门节点与组织成员；用户/角色编码加 tenant- 前缀，避免与平台菜单 code 撞名）
 		{appCode: appCodeTenantAdmin, name: "组织管理", code: "organization", path: "/organization", icon: "apartment", sort: 1, component: "pages/organization", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityPublic},
-		{appCode: appCodeTenantAdmin, name: "成员管理", code: "organization-member", path: "/organization/members", icon: "team", sort: 2, component: "pages/organization-member", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityPublic},
-		{appCode: appCodeTenantAdmin, name: "用户管理", code: "tenant-user", path: "/user", icon: "user", sort: 3, component: "pages/user", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
-		{appCode: appCodeTenantAdmin, name: "角色管理", code: "tenant-role", path: "/role", icon: "role", sort: 4, component: "pages/role", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeTenantAdmin, name: "用户管理", code: "tenant-user", path: "/user", icon: "user", sort: 2, component: "pages/user", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeTenantAdmin, name: "角色管理", code: "tenant-role", path: "/role", icon: "role", sort: 3, component: "pages/role", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 	}
 
 	appByCode := map[string]*model.ApplicationEntity{appCodeAdmin: adminApp, appCodeTenantAdmin: tenantAdminApp}
@@ -373,10 +372,10 @@ func seedRoleMenus(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity,
 		{roleCode: "admin", menuCode: []string{
 			"dashboard", "user", "role", "menu", "tenant", "application",
 			"tenant-application", "oauth-client", "api-key", "domain", "system", "log",
-			"organization", "organization-member", "tenant-user", "tenant-role",
+			"organization", "tenant-user", "tenant-role",
 		}},
 		{roleCode: "tenant_admin", menuCode: []string{
-			"organization", "organization-member", "tenant-user", "tenant-role",
+			"organization", "tenant-user", "tenant-role",
 		}},
 	}
 	for _, rel := range relations {

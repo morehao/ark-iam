@@ -12,7 +12,6 @@ type OrganizationUserCtr interface {
 	Update(ctx *gin.Context)
 	Delete(ctx *gin.Context)
 	PageList(ctx *gin.Context)
-	UpdateUserOrganizations(ctx *gin.Context)
 }
 
 type organizationUserCtr struct {
@@ -124,29 +123,4 @@ func (ctr *organizationUserCtr) PageList(ctx *gin.Context) {
 		return
 	}
 	gincontext.Success(ctx, res)
-}
-
-// @Tags 组织关系
-// @Summary 批量替换用户参与部门（全量替换 secondary 关系）
-// @accept application/json
-// @Produce application/json
-// @Param userID path string true "用户ID"
-// @Param req body dtotenant.UserOrganizationsUpdateReq true "批量替换参与部门"
-// @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/tenant/users/{userID}/organizations [put]
-func (ctr *organizationUserCtr) UpdateUserOrganizations(ctx *gin.Context) {
-	var req dtotenant.UserOrganizationsUpdateReq
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctr.organizationUserSvc.UpdateUserOrganizations(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, "修改成功")
 }

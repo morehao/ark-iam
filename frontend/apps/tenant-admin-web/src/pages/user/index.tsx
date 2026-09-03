@@ -12,6 +12,7 @@ import {
   Switch,
   Table,
   Tabs,
+  Tag,
   TreeSelect,
   message,
 } from 'antd'
@@ -27,8 +28,15 @@ import {
   updateTenantUser,
   updateTenantUserRoles,
 } from '../../api/user'
-import { getOrganizationTree, updateUserOrganizations } from '../../api/organization'
+import { getOrganizationTree } from '../../api/organization'
 import { getTenantRolePageList } from '../../api/role'
+
+// 组织关系类型 -> 展示标签
+const RELATION_TAG: Record<string, { color: string; label: string }> = {
+  primary: { color: 'gold', label: '主组织' },
+  secondary: { color: 'blue', label: '参与组织' },
+  leader: { color: 'green', label: '负责组织' },
+}
 
 export default function TenantUserPage() {
   const [data, setData] = useState<TenantUserItem[]>([])
@@ -38,21 +46,26 @@ export default function TenantUserPage() {
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
   const [suspended, setSuspended] = useState<boolean | undefined>()
+  const [organizationID, setOrganizationID] = useState<string>()
 
   // 创建 / 编辑
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<TenantUserItem | null>(null)
   const [form] = Form.useForm()
   const [submitLoading, setSubmitLoading] = useState(false)
+  // 编辑前的组织关系快照：仅在组织关系变化时才随 PATCH 提交，避免无谓地重置 joined_at
+  const [orgBefore, setOrgBefore] = useState<{ primaryOrgID?: string; secondaryOrgIDs: string[]; leaderOrgIDs: string[] }>({
+    secondaryOrgIDs: [],
+    leaderOrgIDs: [],
+  })
 
   // 详情 Drawer
   const [detailOpen, setDetailOpen] = useState(false)
   const [detail, setDetail] = useState<TenantUserDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
 
-  // 组织归属（详情 Tab）
+  // 组织树（创建/编辑表单组织下拉）
   const [orgTree, setOrgTree] = useState<OrganizationItem[]>([])
-  const [orgIDs, setOrgIDs] = useState<string[]>([])
 
   // 角色（详情 Tab）
   const [roleOptions, setRoleOptions] = useState<TenantRoleItem[]>([])
@@ -66,7 +79,13 @@ export default function TenantUserPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const resp = await getTenantUserPageList({ page, pageSize, keyword: keyword || undefined, isSuspended: suspended })
+      const resp = await getTenantUserPageList({
+        page,
+        pageSize,
+        keyword: keyword || undefined,
+        isSuspended: suspended,
+        organizationID: organizationID || undefined,
+      })
       setData(resp?.list || [])
       setTotal(resp?.total || 0)
     } catch {
@@ -74,13 +93,13 @@ export default function TenantUserPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, keyword, suspended])
+  }, [page, pageSize, keyword, suspended, organizationID])
 
   useEffect(() => {
     void fetchData()
   }, [fetchData])
 
-  // 组织树（创建表单部门下拉 + 详情组织归属共用）
+  // 组织树（创建/编辑表单组织下拉共用）
   useEffect(() => {
     getOrganizationTree().then((resp) => setOrgTree(resp?.list || [])).catch(() => {})
   }, [])
@@ -91,15 +110,25 @@ export default function TenantUserPage() {
     setModalOpen(true)
   }
 
-  const openEdit = (record: TenantUserItem) => {
+  // 编辑：先取详情回填（组织关系在编辑弹窗中一并维护：主/参与/负责组织）
+  const openEdit = async (record: TenantUserItem) => {
+    const detail = await getTenantUserDetail(record.userID).catch(() => null)
+    if (!detail) return
+    const nextPrimary = pickOrgs(detail.organizations, 'primary')[0]?.organizationID
+    const nextSecondary = pickOrgs(detail.organizations, 'secondary').map((o) => o.organizationID)
+    const nextLeader = pickOrgs(detail.organizations, 'leader').map((o) => o.organizationID)
+    setOrgBefore({ primaryOrgID: nextPrimary, secondaryOrgIDs: nextSecondary, leaderOrgIDs: nextLeader })
     setEditing(record)
     form.setFieldsValue({
-      name: record.name,
-      username: record.username,
-      primaryEmail: record.primaryEmail,
-      primaryPhone: record.primaryPhone,
-      avatar: record.avatar,
-      isSuspended: record.isSuspended,
+      name: detail.name,
+      username: detail.username,
+      primaryEmail: detail.primaryEmail,
+      primaryPhone: detail.primaryPhone,
+      avatar: detail.avatar,
+      isSuspended: detail.isSuspended,
+      primaryOrgID: nextPrimary,
+      secondaryOrgIDs: nextSecondary,
+      leaderOrgIDs: nextLeader,
     })
     setModalOpen(true)
   }
@@ -109,18 +138,46 @@ export default function TenantUserPage() {
       const values = await form.validateFields()
       setSubmitLoading(true)
       if (editing) {
-        await updateTenantUser({
+        const patch: {
+          userID: string
+          name: string
+          username: string
+          primaryEmail: string
+          primaryPhone: string
+          avatar: string
+          isSuspended: boolean
+          primaryOrgID?: string
+          secondaryOrgIDs?: string[]
+          leaderOrgIDs?: string[]
+        } = {
           userID: editing.userID,
+          name: values.name,
+          username: values.username || '',
+          primaryEmail: values.primaryEmail || '',
+          primaryPhone: values.primaryPhone || '',
+          avatar: values.avatar,
+          isSuspended: values.isSuspended,
+        }
+        // 组织关系仅在变化时提交（PATCH 局部更新语义：不传=不变），避免无谓重写归属行
+        const secondary = values.secondaryOrgIDs || []
+        const leader = values.leaderOrgIDs || []
+        if (values.primaryOrgID !== orgBefore.primaryOrgID) patch.primaryOrgID = values.primaryOrgID
+        if (!sameSet(secondary, orgBefore.secondaryOrgIDs)) patch.secondaryOrgIDs = secondary
+        if (!sameSet(leader, orgBefore.leaderOrgIDs)) patch.leaderOrgIDs = leader
+        await updateTenantUser(patch)
+        message.success('保存成功')
+      } else {
+        await createTenantUser({
           name: values.name,
           username: values.username,
           primaryEmail: values.primaryEmail,
           primaryPhone: values.primaryPhone,
-          avatar: values.avatar,
+          password: values.password,
           isSuspended: values.isSuspended,
+          organizationIDs: [values.primaryOrgID],
+          secondaryOrgIDs: values.secondaryOrgIDs || [],
+          leaderOrgIDs: values.leaderOrgIDs || [],
         })
-        message.success('保存成功')
-      } else {
-        await createTenantUser({ ...values, organizationIDs: [values.organizationID] })
         message.success('创建成功')
       }
       setModalOpen(false)
@@ -143,14 +200,11 @@ export default function TenantUserPage() {
     setDetailLoading(true)
     setDetail(null)
     try {
-      const [d, orgs, roles] = await Promise.all([
+      const [d, roles] = await Promise.all([
         getTenantUserDetail(record.userID),
-        getOrganizationTree(),
         getTenantRolePageList({ page: 1, pageSize: 100 }),
       ])
       setDetail(d)
-      setOrgTree(orgs?.list || [])
-      setOrgIDs((d.organizations || []).filter((o) => o.relationType === 'secondary').map((o) => o.organizationID))
       setRoleOptions(roles?.list || [])
       setRoleIDs((d.roles || []).map((r) => r.roleID))
     } catch {
@@ -158,18 +212,6 @@ export default function TenantUserPage() {
     } finally {
       setDetailLoading(false)
     }
-  }
-
-  const saveOrgAssignments = async () => {
-    if (!detail) return
-    // 业务约束：用户必须参与至少一个部门，禁止清空全部参与关系
-    if (!orgIDs.length) {
-      message.error('用户必须参与至少一个部门')
-      return
-    }
-    await updateUserOrganizations(detail.userID, orgIDs)
-    message.success('参与部门已更新')
-    void openDetail(detail)
   }
 
   const saveRoleAssignments = async () => {
@@ -239,7 +281,7 @@ export default function TenantUserPage() {
           <Button type="link" size="small" onClick={() => void openDetail(r)}>
             详情
           </Button>
-          <Button type="link" size="small" onClick={() => openEdit(r)}>
+          <Button type="link" size="small" onClick={() => void openEdit(r)}>
             编辑
           </Button>
           <Popconfirm title={r.isSuspended ? '确认恢复该用户？' : '确认挂起该用户？'} onConfirm={() => void toggleSuspended(r, !r.isSuspended)}>
@@ -258,7 +300,7 @@ export default function TenantUserPage() {
   return (
     <PageContainer
       title="用户管理"
-      description="租户内的用户目录：创建账号、组织归属、角色分配与账号状态管理"
+      description="租户内的用户目录：创建账号、组织归属（主/参与/负责组织）、角色分配与账号状态管理"
       extra={
         <Space>
           <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
@@ -271,6 +313,18 @@ export default function TenantUserPage() {
       }
     >
       <Space style={{ marginBottom: 16 }} wrap>
+        <TreeSelect
+          allowClear
+          treeData={toTreeSelect(orgTree)}
+          treeDefaultExpandAll
+          placeholder="按组织筛选（恰在该组织）"
+          style={{ width: 220 }}
+          value={organizationID}
+          onChange={(v) => {
+            setOrganizationID(v)
+            setPage(1)
+          }}
+        />
         <Select
           allowClear
           placeholder="状态"
@@ -316,7 +370,7 @@ export default function TenantUserPage() {
         }}
       />
 
-      {/* 新建 / 编辑用户 */}
+      {/* 新建 / 编辑用户：基础信息 + 组织关系（主/参与/负责组织） + 账号状态 */}
       <Modal
         title={editing ? '编辑用户' : '新建用户'}
         open={modalOpen}
@@ -324,32 +378,37 @@ export default function TenantUserPage() {
         onCancel={() => setModalOpen(false)}
         confirmLoading={submitLoading}
         destroyOnClose
-        width={560}
+        width={620}
       >
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}>
             <Input placeholder="如：张三（无匹配自然人时按此姓名创建）" />
           </Form.Item>
-          {!editing && (
-            <>
-              <Form.Item name="organizationID" label="部门" rules={[{ required: true, message: '请选择部门' }]}>
-                <TreeSelect
-                  treeData={toTreeSelect(orgTree)}
-                  treeDefaultExpandAll
-                  placeholder="选择所属部门（同时建立组织归属）"
-                />
-              </Form.Item>
-              <Form.Item name="secondaryOrgIDs" label="参与部门">
-                <TreeSelect
-                  treeData={toTreeSelect(orgTree)}
-                  treeDefaultExpandAll
-                  multiple
-                  allowClear
-                  placeholder="选择参与部门（可多个，跨部门协作）"
-                />
-              </Form.Item>
-            </>
-          )}
+          <Form.Item name="primaryOrgID" label="主组织" rules={[{ required: true, message: '请选择主组织' }]}>
+            <TreeSelect
+              treeData={toTreeSelect(orgTree)}
+              treeDefaultExpandAll
+              placeholder="选择主组织（行政归属，唯一；同时建立组织归属）"
+            />
+          </Form.Item>
+          <Form.Item name="secondaryOrgIDs" label="参与组织">
+            <TreeSelect
+              treeData={toTreeSelect(orgTree)}
+              treeDefaultExpandAll
+              multiple
+              allowClear
+              placeholder="选择参与组织（可多个，跨组织协作）"
+            />
+          </Form.Item>
+          <Form.Item name="leaderOrgIDs" label="负责组织">
+            <TreeSelect
+              treeData={toTreeSelect(orgTree)}
+              treeDefaultExpandAll
+              multiple
+              allowClear
+              placeholder="选择负责组织（可多个，但每组织至多一位负责人）"
+            />
+          </Form.Item>
           <Form.Item
             name="primaryEmail"
             label="邮箱"
@@ -390,14 +449,8 @@ export default function TenantUserPage() {
         </Form>
       </Modal>
 
-      {/* 详情 Drawer：基础信息 / 组织归属 / 角色 */}
-      <Drawer
-        title="用户详情"
-        width={560}
-        open={detailOpen}
-        onClose={() => setDetailOpen(false)}
-        destroyOnClose={false}
-      >
+      {/* 详情 Drawer：基础信息 / 组织关系 / 角色 */}
+      <Drawer title="用户详情" width={560} open={detailOpen} onClose={() => setDetailOpen(false)} destroyOnClose={false}>
         {detailLoading ? (
           <div style={{ padding: 60, textAlign: 'center', color: tokens.textPlaceholder }}>加载中...</div>
         ) : detail ? (
@@ -427,25 +480,15 @@ export default function TenantUserPage() {
               },
               {
                 key: 'org',
-                label: '参与部门',
+                label: '组织关系',
                 children: (
                   <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                    <TreeSelect
-                      treeData={toTreeSelect(orgTree)}
-                      value={orgIDs}
-                      onChange={setOrgIDs}
-                      multiple
-                      allowClear
-                      treeDefaultExpandAll
-                      style={{ width: '100%' }}
-                      placeholder="勾选参与部门（可多选）"
-                    />
+                    <OrgRow label="主组织" relation="primary" orgs={pickOrgs(detail.organizations, 'primary')} />
+                    <OrgRow label="参与组织" relation="secondary" orgs={pickOrgs(detail.organizations, 'secondary')} />
+                    <OrgRow label="负责组织" relation="leader" orgs={pickOrgs(detail.organizations, 'leader')} />
                     <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>
-                      参与部门用于跨部门协作；保存时全量替换参与关系（主部门请通过组织关系维护）
+                      组织关系的调整请使用「编辑」：主/参与/负责组织在编辑弹窗中全量维护
                     </div>
-                    <Button type="primary" onClick={() => void saveOrgAssignments()}>
-                      保存参与部门
-                    </Button>
                   </Space>
                 ),
               },
@@ -487,6 +530,32 @@ export default function TenantUserPage() {
   )
 }
 
+// pickOrgs 按关系类型筛出组织列表。
+function pickOrgs(orgs: UserOrganizationItem[], type: string): UserOrganizationItem[] {
+  return (orgs || []).filter((o) => o.relationType === type)
+}
+
+// OrgRow 详情中的组织关系行（主/参与/负责）。
+function OrgRow({ label, relation, orgs }: { label: string; relation: string; orgs: UserOrganizationItem[] }) {
+  const tag = RELATION_TAG[relation]
+  return (
+    <div>
+      <div style={{ color: tokens.textPlaceholder, fontSize: 12, marginBottom: 4 }}>{label}</div>
+      {orgs.length ? (
+        <Space size={4} wrap>
+          {orgs.map((o) => (
+            <Tag key={o.organizationID} color={tag?.color}>
+              {o.organizationName || '-'}
+            </Tag>
+          ))}
+        </Space>
+      ) : (
+        <span style={{ color: tokens.textPlaceholder }}>-</span>
+      )}
+    </div>
+  )
+}
+
 // toTreeSelect 组织树 -> TreeSelect 数据
 function toTreeSelect(list: OrganizationItem[]): any[] {
   return list.map((n) => ({
@@ -496,4 +565,9 @@ function toTreeSelect(list: OrganizationItem[]): any[] {
   }))
 }
 
-export type { UserOrganizationItem }
+// sameSet 两个数组按集合语义比较（忽略顺序与重复）。
+function sameSet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false
+  const set = new Set(b)
+  return a.every((v) => set.has(v))
+}

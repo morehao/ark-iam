@@ -9,7 +9,6 @@ import (
 
 type UserCtr interface {
 	PageList(ctx *gin.Context)
-	MemberPageList(ctx *gin.Context)
 	Create(ctx *gin.Context)
 	Detail(ctx *gin.Context)
 	Update(ctx *gin.Context)
@@ -65,27 +64,6 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 		return
 	}
 	res, err := ctr.userSvc.Create(ctx, &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-// @Tags 成员
-// @Summary 成员总表分页（以人为维度，含部门关系:主/非主/负责）
-// @accept application/json
-// @Produce application/json
-// @Param req query dtotenant.MemberPageListReq true "成员总表分页"
-// @Success 200 {object} gincontext.DtoRender{data=dtotenant.MemberPageListResp}
-// @Router /v1/tenant/members [get]
-func (ctr *userCtr) MemberPageList(ctx *gin.Context) {
-	var req dtotenant.MemberPageListReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.userSvc.MemberPageList(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
