@@ -139,8 +139,8 @@ flowchart TB
 | 应用 | 服务标识 | 独立端口 | 职责 | 主要领域 |
 |---|---|---|---|---|
 | **auth** | `auth` | 8081 | 认证网关：登录/注册/令牌/OIDC Provider/SSO/SLO/Connector | person、user（成员）、refresh_token、session、connector、user_identity |
-| **platformadmin** | `platform` | 8082 | 平台管理：租户/用户/角色/菜单/权限/应用/OAuth 客户端/API Key/域名/系统配置/审计 | tenant、user、role、menu、scope、resource、application、application_client、api_key、domain、system |
-| **tenantadmin** | `tenant` | 8083 | 租户自服务：组织架构（组织树/成员关系）/租户菜单 | organization、organization_user |
+| **platformadmin** | `platform` | 8082 | 平台管理：租户/用户/角色/菜单/权限/应用/OAuth 客户端/域名/审计（API Key 仅跨租户只读监督，生命周期管理在租户端） | tenant、user、role、menu、scope、resource、application、application_client、api_key、domain |
+| **tenantadmin** | `tenant` | 8083 | 租户自服务：组织架构/用户与角色/服务账号/API 密钥/租户菜单 | organization、organization_user、user、role、api_key |
 | **gateway** | 聚合 | 8100 | 单体聚合部署，挂载 auth + platformadmin + tenantadmin | 无独立业务 |
 
 > 各应用通过 `ginserver.NewRouterGroups(engine, "<服务标识>", ...)` 注册前缀，业务路由形如 `/v1/{auth|platform|tenant}/...`；OIDC 协议端点固定挂在 `/oidc/*`（R3 专用前缀，不走业务路由规范）。
@@ -232,8 +232,10 @@ erDiagram
     user {
         uint id PK
         uint tenant_id FK
-        uint person_id FK
-        string name "租户内姓名"
+        uint person_id FK "服务账号(machine)恒空"
+        string user_type "member真实用户/machine服务账号"
+        string name "租户内姓名/服务账号名称"
+        string description "描述(服务账号用途等)"
         json profile
         json custom_data
         tinyint is_suspended
@@ -490,7 +492,7 @@ erDiagram
 | 表 | 说明 |
 |---|---|
 | `person` | **自然人**：全局唯一身份。username / primary_email / primary_phone 可空且全局唯一（NULL 不撞唯一索引）；密码 bcrypt 哈希；`is_suspended` 全局挂起 |
-| `user` | **租户成员**：person × tenant 的成员记录；`is_owner` 标记租户拥有者；租户内资料（name/profile/custom_data） |
+| `user` | **租户账号**：member=真实用户（person × tenant 成员记录，可登录/入组织）；machine=服务账号（`person_id` 恒空，不可登录/无自然人/不可任部门负责人，但**从属部门**：主部门 primary 必填 + 参与部门 secondary 可多条，仅作角色主体与 API Key 归属）；`is_owner` 仅真实用户可持有；租户内资料（name/description/profile/custom_data） |
 | `user_identity` | 外部身份关联：person 在外部 IdP（Connector）的身份映射，`external_subject` 为外部主体标识 |
 | `user_login_log` | 登录日志：记录每次密码登录的时间/IP/UA/类型 |
 
@@ -501,7 +503,6 @@ erDiagram
 | `tenant` | 租户：`type` 分 customer/platform；`code` 全局唯一；`is_suspended` 挂起 |
 | `tenant_application` | 租户-应用开通关系：`status` 开通状态、`config` 租户级配置、`granted_scope` 租户级 scope 授权 |
 | `domain` | 租户域名（验证状态 `is_verified`） |
-| `system` | 租户系统配置（key-value，value 为 JSON） |
 | `log` | 租户日志（通用 key-payload） |
 
 #### 组织架构域
@@ -530,7 +531,7 @@ erDiagram
 | `application` | 业务应用定义：编码/名称/类型（first_party/third_party）/状态/可见性/`tenant_policy`（如允许个人建租户） |
 | `application_client` | **OAuth/OIDC 客户端**：client_id、redirect_uris、grant_types、token_endpoint_auth_method、PKCE、令牌 TTL、是否第三方 |
 | `application_client_secret` | 客户端密钥：只存哈希（`value_hash`）+ 前缀（`value_prefix`），支持过期/吊销 |
-| `api_key` | API Key：机器凭证，只存哈希，支持 scope/过期/吊销 |
+| `api_key` | API Key 机器凭证：只存哈希，支持 scope/过期/吊销；`owner_user_id` 归属**服务账号**（个人密钥能力已下线，历史 member 数据兼容展示），鉴权按归属服务账号注入身份；明文仅创建时展示一次，管理在租户端（需系统管理能力） |
 
 #### 会话与审计域
 
@@ -726,8 +727,9 @@ sequenceDiagram
     participant DB as PostgreSQL
 
     SVC->>API: 请求（Header: x-api-key: ak_xxx...）
-    API->>DB: 按 key_prefix 定位 + 校验 key_hash<br/>+ 校验未过期/未吊销
-    API->>API: 解析 scope，注入身份上下文（token_usage=machine）
+    API->>DB: 按 key_hash 定位 + 校验未过期/未吊销
+    API->>DB: 解析归属主体（owner_user_id）<br/>校验租户匹配/未挂起
+    API->>API: 注入身份上下文（tenant + owner userID）<br/>owner=归属服务账号（历史个人密钥数据兼容），非创建人
     API-->>SVC: 业务数据
 ```
 

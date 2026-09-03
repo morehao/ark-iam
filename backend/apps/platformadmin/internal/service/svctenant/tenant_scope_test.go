@@ -17,22 +17,6 @@ func newTenantScopeGinCtx(tenantID string) *gin.Context {
 	return ctx
 }
 
-func TestSystemDetailRejectsCrossTenantEntity(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.SystemEntity{})
-	ctx := newTenantScopeGinCtx("61")
-
-	system := &model.SystemEntity{TenantID: "90", Key: "demo", Value: json.RawMessage(`{"enabled":true}`)}
-	if err := db.Create(system).Error; err != nil {
-		t.Fatalf("seed system: %v", err)
-	}
-
-	svc := &systemSvc{}
-	resp, err := svc.Detail(ctx, &dtotenant.SystemDetailReq{SystemID: system.ID})
-	if err == nil {
-		t.Fatalf("expected cross-tenant system detail to fail, resp=%+v", resp)
-	}
-}
-
 func TestLogDetailRejectsCrossTenantEntity(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.LogEntity{})
 	ctx := newTenantScopeGinCtx("71")

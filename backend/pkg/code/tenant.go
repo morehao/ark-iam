@@ -12,17 +12,6 @@ const (
 	TenantCreateAsOwnerForbiddenError = 100206
 )
 
-const ()
-
-const (
-	SystemCreateError      = 100300
-	SystemDeleteError      = 100301
-	SystemUpdateError      = 100302
-	SystemGetDetailError   = 100303
-	SystemGetPageListError = 100304
-	SystemNotExistError    = 100305
-)
-
 const (
 	OrganizationCreateError      = 100120
 	OrganizationDeleteError      = 100121
@@ -59,12 +48,6 @@ var tenantErrorMsgMap = gerror.CodeMsgMap{
 	TenantGetPageListError:              "查看租户管理列表失败",
 	TenantNotExistError:                 "租户管理不存在",
 	TenantCreateAsOwnerForbiddenError:   "当前自然人已拥有租户或应用策略禁止自助创建租户",
-	SystemCreateError:                   "创建系统配置失败",
-	SystemDeleteError:                   "删除系统配置失败",
-	SystemUpdateError:                   "修改系统配置失败",
-	SystemGetDetailError:                "查看系统配置失败",
-	SystemGetPageListError:              "查看系统配置列表失败",
-	SystemNotExistError:                 "系统配置不存在",
 	OrganizationCreateError:             "创建组织失败",
 	OrganizationDeleteError:             "删除组织失败",
 	OrganizationUpdateError:             "修改组织失败",

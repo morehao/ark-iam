@@ -19,7 +19,16 @@ import {
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { fmtTime, PageContainer, SuspendedTag, tokens } from '@ark-iam/ui'
-import type { OrganizationItem, TenantRoleItem, TenantUserDetail, TenantUserItem, UserOrganizationItem } from '@ark-iam/types'
+import type {
+  OrganizationItem,
+  TenantApiKeyItem,
+  TenantMachineUserDetail,
+  TenantMachineUserItem,
+  TenantMachineUserUpdateReq,
+  TenantRoleItem,
+  TenantUserDetail,
+  TenantUserItem,
+} from '@ark-iam/types'
 import {
   createTenantUser,
   getTenantUserDetail,
@@ -28,8 +37,19 @@ import {
   updateTenantUser,
   updateTenantUserRoles,
 } from '../../api/user'
+import {
+  createMachineUser,
+  deleteMachineUser,
+  getMachineUserDetail,
+  getMachineUserPageList,
+  updateMachineUser,
+  updateMachineUserStatus,
+  updateMachineUserRoles,
+} from '../../api/machineUser'
+import { getApiKeyPageList } from '../../api/apiKey'
 import { getOrganizationTree } from '../../api/organization'
 import { getTenantRolePageList } from '../../api/role'
+import { KeyStateTag } from '../apiKey/KeyState'
 
 // 组织关系类型 -> 展示标签
 const RELATION_TAG: Record<string, { color: string; label: string }> = {
@@ -38,7 +58,8 @@ const RELATION_TAG: Record<string, { color: string; label: string }> = {
   leader: { color: 'green', label: '负责组织' },
 }
 
-export default function TenantUserPage() {
+// ==================== Tab：用户（真实用户，保持原逻辑不变） ====================
+function UsersPane() {
   const [data, setData] = useState<TenantUserItem[]>([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -298,10 +319,46 @@ export default function TenantUserPage() {
   ]
 
   return (
-    <PageContainer
-      title="用户管理"
-      description="租户内的用户目录：创建账号、组织归属（主/参与/负责组织）、角色分配与账号状态管理"
-      extra={
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <Space wrap>
+          <TreeSelect
+            allowClear
+            treeData={toTreeSelect(orgTree)}
+            treeDefaultExpandAll
+            placeholder="按组织筛选（恰在该组织）"
+            style={{ width: 220 }}
+            value={organizationID}
+            onChange={(v) => {
+              setOrganizationID(v)
+              setPage(1)
+            }}
+          />
+          <Select
+            allowClear
+            placeholder="状态"
+            style={{ width: 110 }}
+            value={suspended}
+            onChange={(v) => {
+              setSuspended(v)
+              setPage(1)
+            }}
+            options={[
+              { label: '正常', value: false },
+              { label: '挂起', value: true },
+            ]}
+          />
+          <Input.Search
+            allowClear
+            placeholder="姓名/用户名/邮箱/手机"
+            prefix={<SearchOutlined />}
+            style={{ width: 260 }}
+            onSearch={(v) => {
+              setKeyword(v)
+              setPage(1)
+            }}
+          />
+        </Space>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
             刷新
@@ -310,46 +367,7 @@ export default function TenantUserPage() {
             新建用户
           </Button>
         </Space>
-      }
-    >
-      <Space style={{ marginBottom: 16 }} wrap>
-        <TreeSelect
-          allowClear
-          treeData={toTreeSelect(orgTree)}
-          treeDefaultExpandAll
-          placeholder="按组织筛选（恰在该组织）"
-          style={{ width: 220 }}
-          value={organizationID}
-          onChange={(v) => {
-            setOrganizationID(v)
-            setPage(1)
-          }}
-        />
-        <Select
-          allowClear
-          placeholder="状态"
-          style={{ width: 110 }}
-          value={suspended}
-          onChange={(v) => {
-            setSuspended(v)
-            setPage(1)
-          }}
-          options={[
-            { label: '正常', value: false },
-            { label: '挂起', value: true },
-          ]}
-        />
-        <Input.Search
-          allowClear
-          placeholder="姓名/用户名/邮箱/手机"
-          prefix={<SearchOutlined />}
-          style={{ width: 260 }}
-          onSearch={(v) => {
-            setKeyword(v)
-            setPage(1)
-          }}
-        />
-      </Space>
+      </div>
 
       <Table<TenantUserItem>
         rowKey="userID"
@@ -526,17 +544,448 @@ export default function TenantUserPage() {
           </Form.Item>
         </Form>
       </Modal>
+    </>
+  )
+}
+
+// ==================== Tab：服务账号（机器主体，user_type=machine） ====================
+function ServiceAccountsPane() {
+  const [data, setData] = useState<TenantMachineUserItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+  const [keyword, setKeyword] = useState('')
+  const [isSuspended, setIsSuspended] = useState<boolean | undefined>()
+
+  // 创建 / 编辑
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<TenantMachineUserItem | null>(null)
+  const [form] = Form.useForm()
+  const [submitLoading, setSubmitLoading] = useState(false)
+  // 编辑前的组织快照：仅在组织关系变化时才随 PUT 提交（可空字段语义：不传=不变）
+  const [orgBefore, setOrgBefore] = useState<{ primaryOrgID?: string; secondaryOrgIDs: string[] }>({ secondaryOrgIDs: [] })
+
+  // 详情 Drawer
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detail, setDetail] = useState<TenantMachineUserDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  // 打开详情时的行记录：Drawer 内「编辑」复用表格行编辑逻辑
+  const [activeRecord, setActiveRecord] = useState<TenantMachineUserItem | null>(null)
+
+  // 组织树（创建/编辑表单组织下拉，与真实用户表单的组织选择一致）
+  const [orgTree, setOrgTree] = useState<OrganizationItem[]>([])
+
+  // 角色（详情内）
+  const [roleOptions, setRoleOptions] = useState<TenantRoleItem[]>([])
+  const [roleIDs, setRoleIDs] = useState<string[]>([])
+
+  // 服务账号 API 密钥（详情内只读）
+  const [machineKeys, setMachineKeys] = useState<TenantApiKeyItem[]>([])
+  const [machineKeysLoading, setMachineKeysLoading] = useState(false)
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const resp = await getMachineUserPageList({
+        page,
+        pageSize,
+        name: keyword || undefined,
+        isSuspended,
+      })
+      setData(resp?.list || [])
+      setTotal(resp?.total || 0)
+    } catch {
+      /* 拦截器已提示 */
+    } finally {
+      setLoading(false)
+    }
+  }, [page, pageSize, keyword, isSuspended])
+
+  useEffect(() => {
+    void fetchData()
+  }, [fetchData])
+
+  // 组织树（创建/编辑表单组织下拉共用）
+  useEffect(() => {
+    getOrganizationTree().then((resp) => setOrgTree(resp?.list || [])).catch(() => {})
+  }, [])
+
+  const openCreate = () => {
+    setEditing(null)
+    form.resetFields()
+    setModalOpen(true)
+  }
+
+  // 编辑：先取详情回填（主/参与部门在编辑弹窗中一并维护）
+  const openEdit = async (record: TenantMachineUserItem) => {
+    const detail = await getMachineUserDetail(record.machineUserID).catch(() => null)
+    if (!detail) return
+    const nextPrimary = pickOrgs(detail.organizations, 'primary')[0]?.organizationID || detail.primaryOrgID || ''
+    const nextSecondary = pickOrgs(detail.organizations, 'secondary').map((o) => o.organizationID)
+    setOrgBefore({ primaryOrgID: nextPrimary || undefined, secondaryOrgIDs: nextSecondary })
+    setEditing(record)
+    form.setFieldsValue({
+      name: detail.name,
+      description: detail.description,
+      primaryOrgID: nextPrimary || undefined,
+      secondaryOrgIDs: nextSecondary,
+    })
+    setModalOpen(true)
+  }
+
+  const submitMachine = async () => {
+    try {
+      const values = await form.validateFields()
+      setSubmitLoading(true)
+      if (editing) {
+        const secondary = values.secondaryOrgIDs || []
+        const req: TenantMachineUserUpdateReq = {
+          machineUserID: editing.machineUserID,
+          name: values.name,
+          description: values.description || '',
+        }
+        // 可空字段仅在变化时提交：primaryOrgID 传值=替换主部门；secondaryOrgIDs 传=全量替换（[]=清空）；不传=不变
+        if (values.primaryOrgID !== orgBefore.primaryOrgID) req.primaryOrgID = values.primaryOrgID
+        if (!sameSet(secondary, orgBefore.secondaryOrgIDs)) req.secondaryOrgIDs = secondary
+        await updateMachineUser(req)
+        message.success('保存成功')
+      } else {
+        await createMachineUser({
+          name: values.name,
+          description: values.description || '',
+          organizationIDs: [values.primaryOrgID],
+          secondaryOrgIDs: values.secondaryOrgIDs || [],
+        })
+        message.success('创建成功')
+      }
+      setModalOpen(false)
+      void fetchData()
+      // 在详情 Drawer 内编辑并保存后，同步刷新详情，保证部门/名称/描述展示最新
+      if (detailOpen && editing && detail && detail.machineUserID === editing.machineUserID) {
+        getMachineUserDetail(editing.machineUserID).then(setDetail).catch(() => {})
+      }
+    } catch {
+      /* 校验或请求失败 */
+    } finally {
+      setSubmitLoading(false)
+    }
+  }
+
+  const toggleSuspended = async (record: TenantMachineUserItem, checked: boolean) => {
+    await updateMachineUserStatus(record.machineUserID, checked)
+    message.success(checked ? '已挂起' : '已启用')
+    void fetchData()
+  }
+
+  const handleDelete = async (record: TenantMachineUserItem) => {
+    await deleteMachineUser(record.machineUserID)
+    message.success('删除成功')
+    void fetchData()
+  }
+
+  const openDetail = async (record: TenantMachineUserItem) => {
+    setDetailOpen(true)
+    setActiveRecord(record)
+    setDetailLoading(true)
+    setDetail(null)
+    setMachineKeys([])
+    setMachineKeysLoading(true)
+    try {
+      const [d, roles, keys] = await Promise.all([
+        getMachineUserDetail(record.machineUserID),
+        getTenantRolePageList({ page: 1, pageSize: 100 }),
+        getApiKeyPageList({ machineUserID: record.machineUserID, page: 1, pageSize: 50 }).catch(() => ({ list: [], total: 0 })),
+      ])
+      setDetail(d)
+      setRoleOptions(roles?.list || [])
+      setRoleIDs((d.roles || []).map((r) => r.roleID))
+      setMachineKeys(keys?.list || [])
+    } catch {
+      /* 拦截器已提示 */
+    } finally {
+      setDetailLoading(false)
+      setMachineKeysLoading(false)
+    }
+  }
+
+  const saveRoleAssignments = async () => {
+    if (!detail) return
+    await updateMachineUserRoles(detail.machineUserID, roleIDs)
+    message.success('角色已更新')
+    void openDetail(detail)
+  }
+
+  const columns: ColumnsType<TenantMachineUserItem> = [
+    { title: '名称', dataIndex: 'name', key: 'name', width: 180, render: (v: string) => v || '-' },
+    { title: '主部门', dataIndex: 'primaryOrgName', key: 'primaryOrgName', width: 170, render: (v: string) => v || '-' },
+    { title: '描述', dataIndex: 'description', key: 'description', render: (v: string) => v || '-' },
+    {
+      title: '状态',
+      dataIndex: 'isSuspended',
+      key: 'isSuspended',
+      width: 90,
+      render: (v: boolean) => <SuspendedTag value={v} />,
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 160,
+      render: (v?: number) => fmtTime(v),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 230,
+      render: (_, r) => (
+        <Space size={4}>
+          <Button type="link" size="small" onClick={() => void openDetail(r)}>
+            详情
+          </Button>
+          <Button type="link" size="small" onClick={() => void openEdit(r)}>
+            编辑
+          </Button>
+          <Popconfirm title={r.isSuspended ? '确认恢复该服务账号？' : '确认挂起该服务账号？'} onConfirm={() => void toggleSuspended(r, !r.isSuspended)}>
+            <Button type="link" size="small" danger={!r.isSuspended}>
+              {r.isSuspended ? '启用' : '挂起'}
+            </Button>
+          </Popconfirm>
+          <Popconfirm title="确认删除该服务账号？删除前须先删除其全部 API 密钥。" onConfirm={() => void handleDelete(r)}>
+            <Button type="link" size="small" danger>
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ]
+
+  const keyColumns: ColumnsType<TenantApiKeyItem> = [
+    { title: '名称', dataIndex: 'name', key: 'name', render: (v: string) => v || '-' },
+    {
+      title: '前缀',
+      dataIndex: 'keyPrefix',
+      key: 'keyPrefix',
+      width: 180,
+      render: (v: string) => <span style={{ fontFamily: 'Consolas, Monaco, monospace', fontSize: 12 }}>{v || '-'}</span>,
+    },
+    { title: '状态', key: 'status', width: 90, render: (_: unknown, r) => <KeyStateTag {...r} /> },
+    { title: '过期时间', dataIndex: 'expiredAt', key: 'expiredAt', width: 150, render: (v: number | null) => fmtTime(v) },
+    { title: '最近使用', dataIndex: 'lastUsedAt', key: 'lastUsedAt', width: 150, render: (v: number | null) => fmtTime(v) },
+  ]
+
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <Space wrap>
+          <Input.Search
+            allowClear
+            placeholder="按名称搜索"
+            prefix={<SearchOutlined />}
+            style={{ width: 260 }}
+            onSearch={(v) => {
+              setKeyword(v)
+              setPage(1)
+            }}
+          />
+          <Select
+            allowClear
+            placeholder="状态"
+            style={{ width: 110 }}
+            value={isSuspended}
+            onChange={(v) => {
+              setIsSuspended(v)
+              setPage(1)
+            }}
+            options={[
+              { label: '启用', value: false },
+              { label: '挂起', value: true },
+            ]}
+          />
+        </Space>
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
+            刷新
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            新建服务账号
+          </Button>
+        </Space>
+      </div>
+
+      <Table<TenantMachineUserItem>
+        rowKey="machineUserID"
+        columns={columns}
+        dataSource={data}
+        loading={loading}
+        scroll={{ x: 1000 }}
+        pagination={{
+          current: page,
+          pageSize,
+          total,
+          showSizeChanger: true,
+          showTotal: (t) => `共 ${t} 条`,
+          onChange: (p, ps) => {
+            setPage(p)
+            setPageSize(ps)
+          },
+        }}
+      />
+
+      {/* 新建 / 编辑服务账号 */}
+      <Modal
+        title={editing ? '编辑服务账号' : '新建服务账号'}
+        open={modalOpen}
+        onOk={() => void submitMachine()}
+        onCancel={() => setModalOpen(false)}
+        confirmLoading={submitLoading}
+        destroyOnClose
+        width={560}
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
+            <Input placeholder="如：CI 构建服务" />
+          </Form.Item>
+          <Form.Item name="primaryOrgID" label="主部门" rules={[{ required: true, message: '请选择主部门' }]}>
+            <TreeSelect
+              treeData={toTreeSelect(orgTree)}
+              treeDefaultExpandAll
+              placeholder="选择主部门（行政归属，唯一；服务账号必须从属部门）"
+            />
+          </Form.Item>
+          <Form.Item name="secondaryOrgIDs" label="参与部门">
+            <TreeSelect
+              treeData={toTreeSelect(orgTree)}
+              treeDefaultExpandAll
+              multiple
+              allowClear
+              placeholder="选择参与部门（可多个，可留空）"
+            />
+          </Form.Item>
+          <Form.Item name="description" label="描述">
+            <Input.TextArea rows={3} placeholder="选填" />
+          </Form.Item>
+          <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>服务账号不可登录；必须从属主部门（可多条参与部门）；仅可被授予普通角色。</div>
+        </Form>
+      </Modal>
+
+      {/* 详情 Drawer：基础信息 + 所属部门 + 已授权角色 + API 密钥只读列表 */}
+      <Drawer title="服务账号详情" width={680} open={detailOpen} onClose={() => { setDetailOpen(false); setActiveRecord(null) }} destroyOnClose={false}>
+        {detailLoading ? (
+          <div style={{ padding: 60, textAlign: 'center', color: tokens.textPlaceholder }}>加载中...</div>
+        ) : detail ? (
+          <Tabs
+            items={[
+              { key: 'info', label: '基础信息', children: <MachineDetailInfo detail={detail} /> },
+              {
+                key: 'org',
+                label: '所属部门',
+                children: (
+                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                    <OrgRow label="主部门" relation="primary" orgs={pickOrgs(detail.organizations, 'primary')} />
+                    <OrgRow label="参与部门" relation="secondary" orgs={pickOrgs(detail.organizations, 'secondary')} />
+                    <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>
+                      主部门唯一且服务账号必须从属部门；参与部门可多条（可清空）。部门调整请使用「编辑」（主/参与部门全量维护）。
+                    </div>
+                    <Button type="primary" onClick={() => activeRecord && void openEdit(activeRecord)}>
+                      编辑
+                    </Button>
+                  </Space>
+                ),
+              },
+              {
+                key: 'role',
+                label: '已授权角色',
+                children: (
+                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                    <Select
+                      mode="multiple"
+                      allowClear
+                      placeholder="选择角色（全量替换）"
+                      style={{ width: '100%' }}
+                      value={roleIDs}
+                      onChange={setRoleIDs}
+                      options={roleOptions.map((r) => ({ label: `${r.name}（${r.code}）`, value: r.roleID }))}
+                    />
+                    <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>
+                      当前已授权：{(detail.roles || []).map((r) => r.name).join('、') || '无'}。提交含系统管理角色的角色将返回“禁止将系统管理角色授予服务账号”。
+                    </div>
+                    <Button type="primary" onClick={() => void saveRoleAssignments()}>
+                      保存角色
+                    </Button>
+                  </Space>
+                ),
+              },
+              {
+                key: 'keys',
+                label: 'API 密钥',
+                children: (
+                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                    <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>以下为该服务账号的 API 密钥（只读）。密钥管理请前往「API密钥」模块。</div>
+                    <Table<TenantApiKeyItem>
+                      rowKey="keyID"
+                      columns={keyColumns}
+                      dataSource={machineKeys}
+                      loading={machineKeysLoading}
+                      size="small"
+                      pagination={false}
+                      scroll={{ x: 640 }}
+                    />
+                  </Space>
+                ),
+              },
+            ]}
+          />
+        ) : null}
+      </Drawer>
+    </>
+  )
+}
+
+function MachineDetailInfo({ detail }: { detail: TenantMachineUserDetail }) {
+  return (
+    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+      <Space>
+        <Avatar size={48}>{detail.name?.charAt(0)?.toUpperCase() || 'S'}</Avatar>
+        <Space direction="vertical" size={0}>
+          <span style={{ fontWeight: 600, fontSize: 16 }}>{detail.name || '-'}</span>
+          <span style={{ color: tokens.textPlaceholder }}>服务账号</span>
+        </Space>
+      </Space>
+      <div>
+        <SuspendedTag value={detail.isSuspended} />
+        <span style={{ marginLeft: 8 }}>ID：{detail.machineUserID}</span>
+      </div>
+      <div>描述：{detail.description || '-'}</div>
+      <div>创建时间：{fmtTime(detail.createdAt)}</div>
+      <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>服务账号不可登录；所属部门见「所属部门」页签；仅可被授予普通角色。</div>
+    </Space>
+  )
+}
+
+// ==================== 页面容器：用户 / 服务账号 双 Tab ====================
+export default function TenantUserPage() {
+  return (
+    <PageContainer title="用户管理" description="租户内的主体管理：真实用户（组织归属、角色分配与账号状态）与服务账号（机器主体，须从属主部门）">
+      <Tabs
+        defaultActiveKey="user"
+        items={[
+          { key: 'user', label: '用户', children: <UsersPane /> },
+          { key: 'machine', label: '服务账号', children: <ServiceAccountsPane /> },
+        ]}
+      />
     </PageContainer>
   )
 }
 
-// pickOrgs 按关系类型筛出组织列表。
-function pickOrgs(orgs: UserOrganizationItem[], type: string): UserOrganizationItem[] {
+// pickOrgs 按关系类型筛出组织列表（真实用户与机器服务账号通用）。
+function pickOrgs<T extends { relationType: string }>(orgs: T[], type: string): T[] {
   return (orgs || []).filter((o) => o.relationType === type)
 }
 
 // OrgRow 详情中的组织关系行（主/参与/负责）。
-function OrgRow({ label, relation, orgs }: { label: string; relation: string; orgs: UserOrganizationItem[] }) {
+function OrgRow({ label, relation, orgs }: { label: string; relation: string; orgs: { organizationID: string; organizationName?: string }[] }) {
   const tag = RELATION_TAG[relation]
   return (
     <div>

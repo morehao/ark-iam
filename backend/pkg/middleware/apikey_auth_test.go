@@ -26,13 +26,17 @@ func TestApiKeyAuthValidKey(t *testing.T) {
 	apiKeyDao := dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB {
 		return db.WithContext(ctx)
 	}))
+	userDao := dao.NewUserDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB {
+		return db.WithContext(ctx)
+	}))
 
+	owner := seedTestOwnerUser(t, userDao, "1", false)
 	rawKey, keyHash, keyPrefix := generateTestKey()
-	insertTestApiKey(t, apiKeyDao, "1", keyHash, keyPrefix, nil, nil)
+	insertTestApiKey(t, apiKeyDao, "1", owner.ID, keyHash, keyPrefix, nil, nil)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	mw := newApiKeyAuthMiddlewareWithDao(apiKeyDao)
+	mw := newApiKeyAuthMiddlewareWithDao(apiKeyDao, userDao)
 	r.Use(mw.Middleware())
 	r.GET("/test", func(ctx *gin.Context) {
 		tenantID, _ := ctx.Get("tenantID")
@@ -49,6 +53,20 @@ func TestApiKeyAuthValidKey(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
+	var body struct {
+		TenantID string `json:"tenantID"`
+		UserID   string `json:"userID"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	// 鉴权身份应等于密钥归属用户（owner），而非创建人
+	if body.UserID != owner.ID {
+		t.Fatalf("expected ctx userID=owner %s, got %s", owner.ID, body.UserID)
+	}
+	if body.TenantID != "1" {
+		t.Fatalf("expected ctx tenantID=1, got %s", body.TenantID)
+	}
 }
 
 // TestApiKeyAuthViaXApiKeyHeader 验证通过 x-api-key 请求头鉴权（对齐设计文档 §4.4 机器凭证通道）。
@@ -59,18 +77,23 @@ func TestApiKeyAuthViaXApiKeyHeader(t *testing.T) {
 	apiKeyDao := dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB {
 		return db.WithContext(ctx)
 	}))
+	userDao := dao.NewUserDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB {
+		return db.WithContext(ctx)
+	}))
 
+	owner := seedTestOwnerUser(t, userDao, "9", true) // 服务账号归属
 	rawKey, keyHash, keyPrefix := generateTestKey()
-	insertTestApiKey(t, apiKeyDao, "9", keyHash, keyPrefix, nil, nil)
+	insertTestApiKey(t, apiKeyDao, "9", owner.ID, keyHash, keyPrefix, nil, nil)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	mw := newApiKeyAuthMiddlewareWithDao(apiKeyDao)
+	mw := newApiKeyAuthMiddlewareWithDao(apiKeyDao, userDao)
 	r.Use(mw.Middleware())
 	r.GET("/test", func(ctx *gin.Context) {
 		tenantID, _ := ctx.Get("tenantID")
 		userID, _ := ctx.Get("userID")
-		ctx.JSON(http.StatusOK, gin.H{"tenantID": tenantID, "userID": userID})
+		userType, _ := ctx.Get(ContextKeyUserType)
+		ctx.JSON(http.StatusOK, gin.H{"tenantID": tenantID, "userID": userID, "userType": userType})
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
@@ -82,6 +105,59 @@ func TestApiKeyAuthViaXApiKeyHeader(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200 via x-api-key header, got %d: %s", w.Code, w.Body.String())
 	}
+	var body struct {
+		TenantID string `json:"tenantID"`
+		UserID   string `json:"userID"`
+		UserType string `json:"userType"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if body.UserID != owner.ID {
+		t.Fatalf("expected ctx userID=machine owner %s, got %s", owner.ID, body.UserID)
+	}
+	if body.UserType != string(model.UserTypeMachine) {
+		t.Fatalf("expected ctx userType=machine, got %s", body.UserType)
+	}
+}
+
+func TestApiKeyAuthSuspendedOwnerRejected(t *testing.T) {
+	db, cleanup := newTestMiddlewareDB(t)
+	defer cleanup()
+
+	apiKeyDao := dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB {
+		return db.WithContext(ctx)
+	}))
+	userDao := dao.NewUserDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB {
+		return db.WithContext(ctx)
+	}))
+
+	owner := seedTestOwnerUser(t, userDao, "1", false)
+	owner.IsSuspended = true
+	if err := userDao.UpdateMap(context.Background(), owner.ID, map[string]any{"is_suspended": true}); err != nil {
+		t.Fatalf("suspend owner: %v", err)
+	}
+
+	rawKey, keyHash, keyPrefix := generateTestKey()
+	insertTestApiKey(t, apiKeyDao, "1", owner.ID, keyHash, keyPrefix, nil, nil)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	mw := newApiKeyAuthMiddlewareWithDao(apiKeyDao, userDao)
+	r.Use(mw.Middleware())
+	r.GET("/test", func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("x-api-key", rawKey)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for suspended owner, got %d: %s", w.Code, w.Body.String())
+	}
 }
 
 func TestApiKeyAuthInvalidKey(t *testing.T) {
@@ -91,13 +167,16 @@ func TestApiKeyAuthInvalidKey(t *testing.T) {
 	apiKeyDao := dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB {
 		return db.WithContext(ctx)
 	}))
+	userDao := dao.NewUserDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB {
+		return db.WithContext(ctx)
+	}))
 
 	_, keyHash, keyPrefix := generateTestKey()
-	insertTestApiKey(t, apiKeyDao, "1", keyHash, keyPrefix, nil, nil)
+	insertTestApiKey(t, apiKeyDao, "1", "", keyHash, keyPrefix, nil, nil)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	mw := newApiKeyAuthMiddlewareWithDao(apiKeyDao)
+	mw := newApiKeyAuthMiddlewareWithDao(apiKeyDao, userDao)
 	r.Use(mw.Middleware())
 	r.GET("/test", func(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{"ok": true})
@@ -159,13 +238,16 @@ func TestApiKeyAuthRevokedKey(t *testing.T) {
 		return db.WithContext(ctx)
 	}))
 
+	userDao := dao.NewUserDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB {
+		return db.WithContext(ctx)
+	}))
 	rawKey, keyHash, keyPrefix := generateTestKey()
 	now := time.Now()
-	insertTestApiKey(t, apiKeyDao, "1", keyHash, keyPrefix, &now, nil)
+	insertTestApiKey(t, apiKeyDao, "1", "", keyHash, keyPrefix, &now, nil)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	mw := newApiKeyAuthMiddlewareWithDao(apiKeyDao)
+	mw := newApiKeyAuthMiddlewareWithDao(apiKeyDao, userDao)
 	r.Use(mw.Middleware())
 	r.GET("/test", func(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{"ok": true})
@@ -190,13 +272,16 @@ func TestApiKeyAuthExpiredKey(t *testing.T) {
 		return db.WithContext(ctx)
 	}))
 
+	userDao := dao.NewUserDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB {
+		return db.WithContext(ctx)
+	}))
 	rawKey, keyHash, keyPrefix := generateTestKey()
 	past := time.Now().Add(-24 * time.Hour)
-	insertTestApiKey(t, apiKeyDao, "1", keyHash, keyPrefix, nil, &past)
+	insertTestApiKey(t, apiKeyDao, "1", "", keyHash, keyPrefix, nil, &past)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	mw := newApiKeyAuthMiddlewareWithDao(apiKeyDao)
+	mw := newApiKeyAuthMiddlewareWithDao(apiKeyDao, userDao)
 	r.Use(mw.Middleware())
 	r.GET("/test", func(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{"ok": true})
@@ -237,21 +322,44 @@ func generateTestKey() (rawKey, keyHash, keyPrefix string) {
 	return
 }
 
-func insertTestApiKey(t *testing.T, apiKeyDao *dao.ApiKeyDao, tenantID string, keyHash, keyPrefix string, revokedAt *time.Time, expiresAt *time.Time) {
+func insertTestApiKey(t *testing.T, apiKeyDao *dao.ApiKeyDao, tenantID, ownerUserID, keyHash, keyPrefix string, revokedAt *time.Time, expiresAt *time.Time) {
 	t.Helper()
 	entity := &model.ApiKeyEntity{
-		TenantID:  tenantID,
-		Name:      "Test Middleware Key",
-		KeyHash:   keyHash,
-		KeyPrefix: keyPrefix,
-		Scope:     json.RawMessage(`{}`),
-		ExpiredAt: expiresAt,
-		RevokedAt: revokedAt,
-		CreatedBy: "42",
+		TenantID:    tenantID,
+		OwnerUserID: ownerUserID,
+		Name:        "Test Middleware Key",
+		KeyHash:     keyHash,
+		KeyPrefix:   keyPrefix,
+		Scope:       json.RawMessage(`{}`),
+		ExpiredAt:   expiresAt,
+		RevokedAt:   revokedAt,
+		CreatedBy:   "42",
 	}
 	if err := apiKeyDao.Insert(context.Background(), entity); err != nil {
 		t.Fatalf("insert test api key: %v", err)
 	}
+}
+
+// seedTestOwnerUser 播种密钥归属用户（真实用户或服务账号）并返回实体。
+func seedTestOwnerUser(t *testing.T, userDao *dao.UserDao, tenantID string, machine bool) *model.UserEntity {
+	t.Helper()
+	userType := model.UserTypeMember
+	name := "Test Owner"
+	if machine {
+		userType = model.UserTypeMachine
+		name = "Test Service Account"
+	}
+	entity := &model.UserEntity{
+		TenantID:   tenantID,
+		UserType:   userType,
+		Name:       name,
+		Profile:    json.RawMessage(`{}`),
+		CustomData: json.RawMessage(`{}`),
+	}
+	if err := userDao.Insert(context.Background(), entity); err != nil {
+		t.Fatalf("insert test owner user: %v", err)
+	}
+	return entity
 }
 
 func newTestMiddlewareDB(t *testing.T) (*gorm.DB, func()) {
@@ -261,8 +369,8 @@ func newTestMiddlewareDB(t *testing.T) (*gorm.DB, func()) {
 	if err != nil {
 		t.Fatalf("open sqlite db: %v", err)
 	}
-	if err := db.AutoMigrate(&model.ApiKeyEntity{}); err != nil {
-		t.Fatalf("migrate api_key: %v", err)
+	if err := db.AutoMigrate(&model.ApiKeyEntity{}, &model.UserEntity{}); err != nil {
+		t.Fatalf("migrate api_key/user: %v", err)
 	}
 	cleanup := func() {
 		sqlDB, _ := db.DB()

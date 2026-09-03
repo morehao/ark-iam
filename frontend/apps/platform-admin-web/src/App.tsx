@@ -31,7 +31,6 @@ import OAuthClientDetail from './pages/oauthClient/Detail'
 import ApiKeyList from './pages/apiKey'
 import MenuList from './pages/menu'
 import DomainList from './pages/domain'
-import SystemList from './pages/system'
 import LogList from './pages/log'
 
 // 图标映射：后端 menu.icon 存储的字符串 -> antd 图标组件
@@ -63,7 +62,6 @@ const COMPONENT_MAP: Record<string, React.ComponentType> = {
   '/api-key': ApiKeyList,
   '/menu': MenuList,
   '/domain': DomainList,
-  '/system': SystemList,
   '/log': LogList,
   // 详情页（不进侧边栏菜单，由静态路由单独注册）
   '/user/:id': UserDetail,

@@ -1,7 +1,6 @@
 import request from '../request'
 import type {
-  ApiKeyCreateResp,
-  ApiKeyItem,
+  ApiKeySupervisionItem,
   ApplicationCreateReq,
   ApplicationItem,
   ApplicationUpdateReq,
@@ -19,7 +18,6 @@ import type {
   PageListResp,
   RoleItem,
   RoleUserItem,
-  SystemConfigItem,
   TenantApplicationCreateReq,
   TenantApplicationItem,
   TenantApplicationUpdateReq,
@@ -121,12 +119,10 @@ export const deleteTenantApplication = (tenantAppID: string) =>
   request.delete<any, string>(`/platform/tenant-applications/${tenantAppID}`)
 
 // ==================== API Key ====================
-export const getApiKeyPageList = (data: { page: number; pageSize: number; name?: string }) =>
-  request.get<any, PageListResp<ApiKeyItem>>('/platform/api-keys', { params: data })
-export const createApiKey = (data: { name: string; scope?: string; expiresAt?: number }) =>
-  request.post<any, ApiKeyCreateResp>('/platform/api-keys', data)
-export const revokeApiKey = (id: string) => request.post<any, string>(`/platform/api-keys/${id}/revoke`)
-export const deleteApiKey = (id: string) => request.delete<any, string>(`/platform/api-keys/${id}`)
+// 平台侧仅保留全租户只读监督视图；创建/吊销/删除等本租户写接口已下线。
+// 明文密钥永不可见（仅前缀），仅用于泄漏风险监督。
+export const getApiKeySupervisionPageList = (data: { page: number; pageSize: number; name?: string; tenantID?: string }) =>
+  request.get<any, PageListResp<ApiKeySupervisionItem>>('/platform/api-keys/supervision', { params: data })
 
 // ==================== 菜单 ====================
 export const getMenuTree = (appID: string) => request.get<any, MenuTreeResp>('/platform/menus/tree', { params: { appID } })
@@ -148,17 +144,6 @@ export const updateDomain = (data: { id: string; domain?: string; isVerified?: n
   return request.put<any, string>(`/platform/domains/${id}`, body)
 }
 export const deleteDomain = (id: string) => request.delete<any, string>(`/platform/domains/${id}`)
-
-// ==================== 系统配置 ====================
-export const getSystemPageList = (data: { page: number; pageSize: number; key?: string }) =>
-  request.get<any, PageListResp<SystemConfigItem>>('/platform/systems', { params: data })
-export const getSystemDetail = (systemID: string) => request.get<any, SystemConfigItem>(`/platform/systems/${systemID}`)
-export const createSystemConfig = (data: { key: string; value?: unknown }) => request.post<any, { systemID: string }>('/platform/systems', data)
-export const updateSystemConfig = (data: { systemID: string; key?: string; value?: unknown }) => {
-  const { systemID, ...body } = data
-  return request.put<any, string>(`/platform/systems/${systemID}`, body)
-}
-export const deleteSystemConfig = (systemID: string) => request.delete<any, string>(`/platform/systems/${systemID}`)
 
 // ==================== 审计日志 ====================
 export const getAuditLogPageList = (data: { page: number; pageSize: number; key?: string }) =>

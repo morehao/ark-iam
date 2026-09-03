@@ -54,6 +54,7 @@ type OrganizationUserPageListResp struct {
 type OrganizationUserPageListItem struct {
 	OrganizationID string                    `json:"organizationID"` // 组织ID
 	UserID         string                    `json:"userID"`         // 用户ID
+	UserType       model.UserType            `json:"userType"`       // 账号类型(member真实用户/machine服务账号)
 	UserName       string                    `json:"userName"`       // 用户姓名(租户内)
 	Username       string                    `json:"username"`       // 全局用户名
 	PrimaryEmail   string                    `json:"primaryEmail"`   // 主要邮箱

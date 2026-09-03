@@ -13,11 +13,27 @@ import (
 // 由 UserEntity.TableName() 建立映射。
 const TableNameUser = "tenant_user"
 
+// UserType 租户账号类型。
+type UserType string
+
+// 账号类型取值（禁止硬编码）。
+const (
+	UserTypeMember  UserType = "member"  // 真实用户：person 映射的租户成员，可登录、可入组织
+	UserTypeMachine UserType = "machine" // 服务账号：租户内机器主体，不可登录、不入组织，作为 API Key 归属主体
+)
+
+// IsReal 判断是否为真实用户（member）。
+func (t UserType) IsReal() bool {
+	return t == UserTypeMember
+}
+
 type UserEntity struct {
 	gormdao.BaseEntity
 	TenantID     string          `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id"`
-	PersonID     string          `gorm:"column:person_id;type:varchar(36);not null;default:'';comment:自然人ID"`
-	Name         string          `gorm:"column:name;type:varchar(128);not null;default:'';comment:租户内姓名"`
+	PersonID     string          `gorm:"column:person_id;type:varchar(36);not null;default:'';comment:自然人ID(服务账号恒空)"`
+	UserType     UserType        `gorm:"column:user_type;type:varchar(16);not null;default:'member';comment:账号类型(member真实用户/machine服务账号)"`
+	Name         string          `gorm:"column:name;type:varchar(128);not null;default:'';comment:租户内姓名/服务账号名称"`
+	Description  string          `gorm:"column:description;type:varchar(256);not null;default:'';comment:描述(服务账号用途等)"`
 	Avatar       string          `gorm:"column:avatar;type:varchar(2048);not null;default:'';comment:租户内头像URL"`
 	Profile      json.RawMessage `gorm:"column:profile;type:json;not null;default:'{}';comment:租户内配置信息"`
 	CustomData   json.RawMessage `gorm:"column:custom_data;type:json;not null;default:'{}';comment:租户内自定义数据"`
@@ -32,6 +48,16 @@ type UserEntity struct {
 
 func (UserEntity) TableName() string {
 	return TableNameUser
+}
+
+// IsMachine 判断租户账号是否为服务账号。
+func (u *UserEntity) IsMachine() bool {
+	return u != nil && UserType(u.UserType) == UserTypeMachine
+}
+
+// IsReal 判断租户账号是否为真实用户。
+func (u *UserEntity) IsReal() bool {
+	return u != nil && UserType(u.UserType).IsReal()
 }
 
 type UserEntityList []UserEntity

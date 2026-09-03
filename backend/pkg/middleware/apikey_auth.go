@@ -14,23 +14,30 @@ import (
 	"github.com/morehao/golib/glog"
 )
 
+// ContextKeyUserType 上下文中的租户账号类型（member 真实用户 / machine 服务账号），
+// 由 API Key 鉴权按归属主体写入，供下游判断主体性质。
+const ContextKeyUserType = "iam_user_type"
+
 type ApiKeyAuthMiddleware interface {
 	Middleware() gin.HandlerFunc
 }
 
 type apiKeyAuthMiddleware struct {
 	apiKeyDao *dao.ApiKeyDao
+	userDao   *dao.UserDao
 }
 
 func NewApiKeyAuthMiddleware() ApiKeyAuthMiddleware {
 	return &apiKeyAuthMiddleware{
 		apiKeyDao: dao.NewApiKeyDao(),
+		userDao:   dao.NewUserDao(),
 	}
 }
 
-func newApiKeyAuthMiddlewareWithDao(apiKeyDao *dao.ApiKeyDao) ApiKeyAuthMiddleware {
+func newApiKeyAuthMiddlewareWithDao(apiKeyDao *dao.ApiKeyDao, userDao *dao.UserDao) ApiKeyAuthMiddleware {
 	return &apiKeyAuthMiddleware{
 		apiKeyDao: apiKeyDao,
+		userDao:   userDao,
 	}
 }
 
@@ -87,8 +94,34 @@ func (m *apiKeyAuthMiddleware) Authenticate(ctx *gin.Context) bool {
 		return false
 	}
 
+	// 归属主体解析：密钥代表的是其归属用户（真实用户本人或服务账号），而非创建人。
+	if entity.OwnerUserID == "" {
+		writeApiKeyUnauthorized(ctx, http.StatusUnauthorized, "API key owner missing")
+		return false
+	}
+	owner, err := m.userDao.GetByID(ctx, entity.OwnerUserID)
+	if err != nil {
+		glog.Errorf(ctx, "[middleware.ApiKeyAuth] owner GetByID fail, err:%v, ownerID:%s", err, entity.OwnerUserID)
+		writeApiKeyUnauthorized(ctx, http.StatusInternalServerError, "internal server error")
+		return false
+	}
+	if owner == nil {
+		writeApiKeyUnauthorized(ctx, http.StatusUnauthorized, "API key owner not found")
+		return false
+	}
+	if owner.TenantID != entity.TenantID {
+		glog.Errorf(ctx, "[middleware.ApiKeyAuth] owner tenant mismatch, ownerID:%s, keyID:%s", owner.ID, entity.ID)
+		writeApiKeyUnauthorized(ctx, http.StatusUnauthorized, "API key owner mismatch")
+		return false
+	}
+	if owner.IsSuspended {
+		writeApiKeyUnauthorized(ctx, http.StatusUnauthorized, "API key owner suspended")
+		return false
+	}
+
 	ctx.Set(gcontext.KeyTenantID, entity.TenantID)
-	ctx.Set(gcontext.KeyUserID, entity.CreatedBy)
+	ctx.Set(gcontext.KeyUserID, owner.ID)
+	ctx.Set(ContextKeyUserType, owner.UserType)
 
 	go func() {
 		updateCtx := ctx.Copy()
@@ -103,7 +136,10 @@ func (m *apiKeyAuthMiddleware) Authenticate(ctx *gin.Context) bool {
 // AuthenticateApiKey 便捷封装：基于默认 DAO 校验请求中的 API Key，合法则返回 true。
 // 供 oidcauth 等并行鉴权中间件在 OIDC token 校验失败时回退使用。
 func AuthenticateApiKey(ctx *gin.Context) bool {
-	return (&apiKeyAuthMiddleware{apiKeyDao: dao.NewApiKeyDao()}).Authenticate(ctx)
+	return (&apiKeyAuthMiddleware{
+		apiKeyDao: dao.NewApiKeyDao(),
+		userDao:   dao.NewUserDao(),
+	}).Authenticate(ctx)
 }
 
 // ExtractApiKey 从 x-api-key 头或 Authorization: Bearer 头解析 API Key。

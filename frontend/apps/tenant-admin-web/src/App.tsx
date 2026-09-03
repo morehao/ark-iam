@@ -3,18 +3,20 @@ import { Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-
 import { useAuthGuard, FullPageSpinner } from '@ark-iam/auth'
 import { MainLayout, LoginPage, tokens } from '@ark-iam/ui'
 import type { MainMenuItems } from '@ark-iam/ui'
-import { ApartmentOutlined, SafetyCertificateOutlined, UserOutlined } from '@ant-design/icons'
+import { ApartmentOutlined, KeyOutlined, SafetyCertificateOutlined, UserOutlined } from '@ant-design/icons'
 import type { MenuItem } from '@ark-iam/types'
 import { getMyMenuTree } from './api/menu'
 import OrganizationList from './pages/organization'
 import TenantUserList from './pages/user'
 import TenantRoleList from './pages/role'
+import TenantApiKeyList from './pages/apiKey'
 
 // 图标映射：后端 menu.icon 存储的字符串 -> antd 图标组件
 const ICON_MAP: Record<string, React.ReactNode> = {
   apartment: <ApartmentOutlined />,
   user: <UserOutlined />,
   role: <SafetyCertificateOutlined />,
+  key: <KeyOutlined />,
 }
 
 // 组件白名单：只有 path 命中才会渲染路由与侧边栏菜单，避免点击进入 404
@@ -22,6 +24,7 @@ const COMPONENT_MAP: Record<string, React.ComponentType> = {
   '/organization': OrganizationList,
   '/user': TenantUserList,
   '/role': TenantRoleList,
+  '/api-key': TenantApiKeyList,
 }
 
 function iconOf(icon?: string): React.ReactNode {

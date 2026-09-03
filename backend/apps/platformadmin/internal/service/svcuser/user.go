@@ -117,6 +117,7 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtouser.UserPageListReq) (*d
 			PageSize: req.PageSize,
 		},
 		TenantID:    gincontext.GetTenantIDString(ctx),
+		UserType:    model.UserTypeMember,
 		Name:        req.Name,
 		IsSuspended: req.IsSuspended,
 	}

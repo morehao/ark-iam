@@ -10,10 +10,11 @@ import (
 
 type ApiKeyCond struct {
 	*gormdao.BaseCond
-	TenantID  string
-	Name      string
-	KeyHash   string
-	RevokedAt *time.Time
+	TenantID    string
+	OwnerUserID string // 归属用户id(真实用户本人或服务账号)
+	Name        string
+	KeyHash     string
+	RevokedAt   *time.Time
 }
 
 func (c *ApiKeyCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -22,6 +23,9 @@ func (c *ApiKeyCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.TenantID != "" {
 		db.Where(tableName+".tenant_id = ?", c.TenantID)
+	}
+	if c.OwnerUserID != "" {
+		db.Where(tableName+".owner_user_id = ?", c.OwnerUserID)
 	}
 	if c.Name != "" {
 		db.Where(tableName+".name LIKE ?", "%"+c.Name+"%")
