@@ -12,8 +12,8 @@ import (
 func TestRegisterAllRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
-	groups := ginserver.NewRouterGroups(engine, "tenant", ginserver.VersionGroup{
+	groups := ginserver.NewRouterGroups(engine, "tenant", []ginserver.VersionGroup{{
 		Version: ginserver.ApiVersionV1,
-	})
+	}})
 	RegisterRouter(groups)
 }

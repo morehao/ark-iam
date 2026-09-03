@@ -20,12 +20,12 @@ func RegisterRouter(engine *gin.Engine) {
 // registerRouter 注册全部路由；oidcCtr 由调用方提供（生产自装配，测试注入轻量实现）。
 func registerRouter(engine *gin.Engine, oidcCtr *ctroidc.OIDCCtr) {
 	// 业务路由组：auth 作为 OP 自身，鉴权中间件公钥来自本进程 OP 的运行时签名密钥
-	routerGroups := ginserver.NewRouterGroups(engine, "auth", ginserver.VersionGroup{
+	routerGroups := ginserver.NewRouterGroups(engine, "auth", []ginserver.VersionGroup{{
 		Version: ginserver.ApiVersionV1,
 		Middlewares: []gin.HandlerFunc{
 			pkgmiddleware.OIDCCompatibleAuth(func() *rsa.PublicKey { return oidcCtr.PublicKey() }, middleware.OIDCBusinessAuthOptions()...),
 		},
-	})
+	}})
 
 	authRouter(routerGroups)
 	personRouter(routerGroups)
