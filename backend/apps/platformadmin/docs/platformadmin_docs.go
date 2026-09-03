@@ -15,103 +15,6 @@ const docTemplateplatformadmin = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/v1/platform/api-keys": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "API密钥管理"
-                ],
-                "summary": "API密钥列表分页",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "name": "name",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "页码",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "maximum": 1000,
-                        "type": "integer",
-                        "description": "每页数据条数",
-                        "name": "pageSize",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtoapikey.ApiKeyPageListResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "API密钥管理"
-                ],
-                "summary": "创建API密钥",
-                "parameters": [
-                    {
-                        "description": "创建API密钥",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtoapikey.ApiKeyCreateReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtoapikey.ApiKeyCreateResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/v1/platform/api-keys/supervision": {
             "get": {
                 "consumes": [
@@ -121,9 +24,9 @@ const docTemplateplatformadmin = `{
                     "application/json"
                 ],
                 "tags": [
-                    "API密钥管理"
+                    "API密钥监督"
                 ],
-                "summary": "API密钥全租户监督列表（平台排查视角，只读）",
+                "summary": "全租户 API 密钥只读监督列表（平台排查视角，忽略上下文租户）",
                 "parameters": [
                     {
                         "type": "string",
@@ -163,92 +66,6 @@ const docTemplateplatformadmin = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/dtoapikey.ApiKeySupervisionPageListResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/platform/api-keys/{apiKeyID}": {
-            "delete": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "API密钥管理"
-                ],
-                "summary": "删除API密钥",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "apiKeyID",
-                        "name": "apiKeyID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/platform/api-keys/{apiKeyID}/revoke": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "API密钥管理"
-                ],
-                "summary": "撤销API密钥",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "apiKeyID",
-                        "name": "apiKeyID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
                                         }
                                     }
                                 }
@@ -2703,92 +2520,6 @@ const docTemplateplatformadmin = `{
         }
     },
     "definitions": {
-        "dtoapikey.ApiKeyCreateReq": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "expiresAt": {
-                    "description": "过期时间(unix 秒)",
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "scope": {
-                    "type": "string"
-                }
-            }
-        },
-        "dtoapikey.ApiKeyCreateResp": {
-            "type": "object",
-            "properties": {
-                "expiresAt": {
-                    "description": "过期时间(unix 秒)",
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "key": {
-                    "type": "string"
-                },
-                "keyPrefix": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "dtoapikey.ApiKeyPageListItem": {
-            "type": "object",
-            "properties": {
-                "createdAt": {
-                    "description": "创建时间(unix 秒)",
-                    "type": "integer"
-                },
-                "expiresAt": {
-                    "description": "过期时间(unix 秒)",
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "keyPrefix": {
-                    "type": "string"
-                },
-                "lastUsedAt": {
-                    "description": "最后使用时间(unix 秒)",
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "revokedAt": {
-                    "description": "撤销时间(unix 秒)",
-                    "type": "integer"
-                },
-                "scope": {
-                    "type": "string"
-                }
-            }
-        },
-        "dtoapikey.ApiKeyPageListResp": {
-            "type": "object",
-            "properties": {
-                "list": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dtoapikey.ApiKeyPageListItem"
-                    }
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
         "dtoapikey.ApiKeySupervisionItem": {
             "type": "object",
             "properties": {
@@ -2817,6 +2548,18 @@ const docTemplateplatformadmin = `{
                     "type": "integer"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "ownerName": {
+                    "description": "归属用户名称",
+                    "type": "string"
+                },
+                "ownerType": {
+                    "description": "归属类型(member真实用户/machine服务账号)",
+                    "type": "string"
+                },
+                "ownerUserID": {
+                    "description": "归属用户ID（真实用户本人或服务账号）",
                     "type": "string"
                 },
                 "revokedAt": {

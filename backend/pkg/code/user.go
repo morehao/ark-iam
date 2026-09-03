@@ -40,6 +40,33 @@ const (
 	UserRoleRemoveLastAdminForbiddenError = 100755 // 禁止移除最后一个内置管理员角色，防止系统管理能力锁死
 )
 
+// 服务账号（租户内机器主体，user_type=machine）领域错误码。
+const (
+	MachineUserCreateError        = 100830 // 创建服务账号失败
+	MachineUserUpdateError        = 100831 // 修改服务账号失败
+	MachineUserStatusUpdateError  = 100832 // 更新服务账号状态失败
+	MachineUserDeleteError        = 100833 // 删除服务账号失败
+	MachineUserGetPageListError   = 100834 // 查看服务账号列表失败
+	MachineUserGetDetailError     = 100835 // 查看服务账号详情失败
+	MachineUserRoleReplaceError   = 100836 // 更新服务账号角色失败
+	UserSuperRoleAssignForbidden  = 100837 // 禁止将系统管理角色授予服务账号
+	UserSystemAdminRequiredError  = 100838 // 需要系统管理能力(admin_level=super)
+	MachineUserRoleGetListError   = 100839 // 查看服务账号角色失败
+	MachineUserDeleteHasKeysError = 100840 // 删除服务账号前需先删除其全部API密钥
+	UserMemberOperationOnlyError  = 100841 // 该操作仅支持对真实用户执行
+)
+
+// 租户端 API 密钥领域错误码（归属真实用户本人或服务账号）。
+const (
+	ApiKeyCreateError        = 100910 // 创建API密钥失败
+	ApiKeyGetPageListError   = 100911 // 查看API密钥列表失败
+	ApiKeyRevokeError        = 100912 // 吊销API密钥失败
+	ApiKeyDeleteError        = 100913 // 删除API密钥失败
+	ApiKeyNotExistError      = 100914 // API密钥不存在
+	ApiKeyOwnerNotExistError = 100915 // API密钥归属用户不存在
+	ApiKeyOwnerMismatchError = 100916 // API密钥归属用户与租户不匹配
+)
+
 var userErrorMsgMap = gerror.CodeMsgMap{
 	UserCreateError:                       "创建用户失败",
 	UserDeleteError:                       "删除用户失败",
@@ -67,4 +94,23 @@ var userErrorMsgMap = gerror.CodeMsgMap{
 	UserRoleNotExistError:                 "用户角色关联不存在",
 	UserRoleReplaceError:                  "更新用户角色失败",
 	UserRoleRemoveLastAdminForbiddenError: "禁止移除最后一个内置管理员角色，系统管理能力可能锁死",
+	MachineUserCreateError:                "创建服务账号失败",
+	MachineUserUpdateError:                "修改服务账号失败",
+	MachineUserStatusUpdateError:          "更新服务账号状态失败",
+	MachineUserDeleteError:                "删除服务账号失败",
+	MachineUserGetPageListError:           "查看服务账号列表失败",
+	MachineUserGetDetailError:             "查看服务账号详情失败",
+	MachineUserRoleReplaceError:           "更新服务账号角色失败",
+	MachineUserRoleGetListError:           "查看服务账号角色失败",
+	UserSuperRoleAssignForbidden:          "禁止将系统管理角色授予服务账号",
+	UserSystemAdminRequiredError:          "需要系统管理能力(admin_level=super)",
+	MachineUserDeleteHasKeysError:         "请先删除该服务账号下的全部API密钥",
+	UserMemberOperationOnlyError:          "该操作仅支持对真实用户执行",
+	ApiKeyCreateError:                     "创建API密钥失败",
+	ApiKeyGetPageListError:                "查看API密钥列表失败",
+	ApiKeyRevokeError:                     "吊销API密钥失败",
+	ApiKeyDeleteError:                     "删除API密钥失败",
+	ApiKeyNotExistError:                   "API密钥不存在",
+	ApiKeyOwnerNotExistError:              "API密钥归属用户不存在",
+	ApiKeyOwnerMismatchError:              "API密钥归属用户与租户不匹配",
 }

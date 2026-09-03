@@ -1,7 +1,5 @@
 import request from '../request'
 import type {
-  ApiKeyCreateResp,
-  ApiKeyItem,
   ApiKeySupervisionItem,
   ApplicationCreateReq,
   ApplicationItem,
@@ -121,13 +119,8 @@ export const deleteTenantApplication = (tenantAppID: string) =>
   request.delete<any, string>(`/platform/tenant-applications/${tenantAppID}`)
 
 // ==================== API Key ====================
-export const getApiKeyPageList = (data: { page: number; pageSize: number; name?: string }) =>
-  request.get<any, PageListResp<ApiKeyItem>>('/platform/api-keys', { params: data })
-export const createApiKey = (data: { name: string; scope?: string; expiresAt?: number }) =>
-  request.post<any, ApiKeyCreateResp>('/platform/api-keys', data)
-export const revokeApiKey = (id: string) => request.post<any, string>(`/platform/api-keys/${id}/revoke`)
-export const deleteApiKey = (id: string) => request.delete<any, string>(`/platform/api-keys/${id}`)
-// 全租户只读监督（平台排查视角；明文密钥永不可见，仅用于泄漏风险监督）
+// 平台侧仅保留全租户只读监督视图；创建/吊销/删除等本租户写接口已下线。
+// 明文密钥永不可见（仅前缀），仅用于泄漏风险监督。
 export const getApiKeySupervisionPageList = (data: { page: number; pageSize: number; name?: string; tenantID?: string }) =>
   request.get<any, PageListResp<ApiKeySupervisionItem>>('/platform/api-keys/supervision', { params: data })
 

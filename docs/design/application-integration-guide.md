@@ -262,9 +262,9 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 ### 6.2 API Key（推荐，可审计可吊销）
 
-1. 平台管理台创建 API Key（或 `POST /v1/platform/api-keys`），得到 `ak_<前缀>` 明文；
+1. 在**租户控制台「API密钥」模块**为服务账号（开发者模式）或本人（个人密钥）创建 API Key（或 `POST /v1/tenant/api-keys`，body `machineUserID` 指定服务账号、空则代表本人），得到明文（仅展示一次）；
 2. 服务请求时携带 `x-api-key: ak_xxx` 头；
-3. 中间件校验：前缀定位 → 哈希比对 → 未过期/未吊销 → 通过。
+3. 中间件校验：哈希定位 → 未过期/未吊销 → 解析归属主体（真实用户本人或服务账号）注入身份上下文 → 通过。
 
 ```bash
 curl https://my-api.example.com/v1/... -H "x-api-key: ak_8f3ab2c9..."

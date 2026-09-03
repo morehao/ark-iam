@@ -60,12 +60,12 @@ func TestSeedIamSQLite(t *testing.T) {
 	assertCount("tenant", 1)
 	assertCount("application", 2)
 	assertCount("role", 2)
-	assertCount("menu", 17)
+	assertCount("menu", 19)
 	assertCount("person", 1)
 	assertCount("tenant_user", 1)
 	assertCount("application_client", 2)
 	assertCount("user_role", 2)
-	assertCount("role_menu", 17)
+	assertCount("role_menu", 18)
 	assertCount("tenant_application", 2)
 	assertCount("organization", 1)
 	assertCount("organization_user", 1)
@@ -109,8 +109,8 @@ func TestSeedIamSQLite(t *testing.T) {
 		t.Fatalf("seed tenant_admin role source/appID mismatch: source=%s appID=%s", got.Source, got.AppID)
 	}
 
-	// tenant_admin 预授权租户自服务应用全部 3 个菜单
-	wantMenuCodes := map[string]bool{"organization": false, "tenant-user": false, "tenant-role": false}
+	// tenant_admin 预授权租户自服务应用全部 4 个菜单
+	wantMenuCodes := map[string]bool{"organization": false, "tenant-user": false, "tenant-role": false, "tenant-api-key": false}
 	menuIDByCode := map[string]string{}
 	var menus []model.MenuEntity
 	if err := db.Find(&menus).Error; err != nil {
@@ -122,6 +122,9 @@ func TestSeedIamSQLite(t *testing.T) {
 	var tenantAdminMenus []model.RoleMenuEntity
 	if err := db.Where("role_id = ?", roleByCode["tenant_admin"].ID).Find(&tenantAdminMenus).Error; err != nil {
 		t.Fatalf("query tenant_admin role_menu: %v", err)
+	}
+	if len(tenantAdminMenus) != len(wantMenuCodes) {
+		t.Fatalf("tenant_admin role_menu count: want %d, got %d", len(wantMenuCodes), len(tenantAdminMenus))
 	}
 	for _, rm := range tenantAdminMenus {
 		for code, id := range menuIDByCode {
@@ -204,12 +207,13 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 		{code: "grp-app", name: "应用中心", sort: 3, dir: true},
 		{code: "application", name: "应用管理", parentCode: "grp-app", sort: 1},
 		{code: "oauth-client", name: "OAuth客户端", parentCode: "grp-app", sort: 2},
-		{code: "api-key", name: "API密钥", parentCode: "grp-app", sort: 3},
+		{code: "api-key", name: "API密钥监督", parentCode: "grp-app", sort: 3},
 		{code: "grp-identity", name: "身份中心", sort: 4, dir: true},
 		{code: "user", name: "用户管理", parentCode: "grp-identity", sort: 1},
 		{code: "role", name: "角色管理", parentCode: "grp-identity", sort: 2},
-		{code: "log", name: "审计日志", sort: 5},
-		{code: "menu", name: "菜单管理", sort: 6},
+		{code: "grp-platform", name: "平台管理", sort: 5, dir: true},
+		{code: "menu", name: "菜单管理", parentCode: "grp-platform", sort: 1},
+		{code: "log", name: "审计日志", parentCode: "grp-platform", sort: 2},
 	}
 
 	var menus []model.MenuEntity
@@ -261,12 +265,12 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 		}
 	}
 
-	// 一级菜单展示顺序（sort 升序）：工作台 → 租户中心 → 应用中心 → 身份中心 → 审计日志 → 菜单管理
+	// 一级菜单展示顺序（sort 升序）：工作台 → 租户中心 → 应用中心 → 身份中心 → 平台管理
 	var topMenus []model.MenuEntity
 	if err := db.Where("app_id = ? AND parent_id = ?", adminApp.ID, "").Order("sort asc").Find(&topMenus).Error; err != nil {
 		t.Fatalf("query top menus: %v", err)
 	}
-	wantOrder := []string{"dashboard", "grp-tenant", "grp-app", "grp-identity", "log", "menu"}
+	wantOrder := []string{"dashboard", "grp-tenant", "grp-app", "grp-identity", "grp-platform"}
 	if len(topMenus) != len(wantOrder) {
 		t.Fatalf("top-level menu count: want %d, got %d", len(wantOrder), len(topMenus))
 	}

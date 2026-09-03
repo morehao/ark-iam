@@ -89,3 +89,55 @@ export interface TenantRoleMenuResp {
   list: MenuItem[]
   menuIDs: string[]
 }
+
+// ---------- 服务账号（租户内机器主体，user_type=machine） ----------
+export interface TenantMachineUserItem {
+  machineUserID: string
+  tenantID: string
+  name: string
+  description: string
+  isSuspended: boolean
+  createdAt?: number
+}
+
+export interface TenantMachineUserDetail extends TenantMachineUserItem {
+  roles: TenantUserRoleItem[]
+}
+
+export interface TenantMachineUserCreateReq {
+  name: string
+  description?: string
+}
+
+export interface TenantMachineUserUpdateReq {
+  machineUserID: string
+  name: string
+  description?: string
+}
+
+// ---------- 租户 API 密钥 ----------
+// 密钥归属两类主体：真实用户本人（member）或服务账号（machine，开发者模式）。
+export type TenantApiKeyOwnerType = 'member' | 'machine'
+
+export interface TenantApiKeyItem {
+  keyID: string
+  name: string
+  keyPrefix: string
+  ownerUserID: string
+  ownerType: TenantApiKeyOwnerType
+  ownerName: string
+  createdBy: string
+  creatorName: string
+  expiredAt: number | null
+  lastUsedAt: number | null
+  revokedAt: number | null
+  createdAt: number
+}
+
+export interface TenantApiKeyCreateResp {
+  id: string
+  name: string
+  key: string
+  keyPrefix: string
+  expiredAt: number
+}

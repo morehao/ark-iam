@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -196,13 +197,28 @@ func TestAPIKeyParallelAuth(t *testing.T) {
 	t.Cleanup(func() { dbclient.ClearDBForTest(dbclient.ServiceNameIam) })
 
 	rawKey, keyHash := apiKeyHashForTest(t)
+	owner := &model.UserEntity{
+		TenantID:   "1",
+		UserType:   model.UserTypeMachine,
+		Name:       "parallel-auth-service-account",
+		Profile:    json.RawMessage(`{}`),
+		CustomData: json.RawMessage(`{}`),
+	}
+	if err := dao.NewUserDao().Insert(context.Background(), owner); err != nil {
+		t.Fatalf("seed api key owner: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = dbclient.IamDB(context.Background()).Where("id = ?", owner.ID).Delete(&model.UserEntity{}).Error
+	})
+
 	seed := &model.ApiKeyEntity{
-		TenantID:  "1",
-		Name:      "parallel-auth-test",
-		KeyHash:   keyHash,
-		KeyPrefix: rawKey[:7],
-		Scope:     []byte(`{}`),
-		CreatedBy: "1",
+		TenantID:    "1",
+		OwnerUserID: owner.ID,
+		Name:        "parallel-auth-test",
+		KeyHash:     keyHash,
+		KeyPrefix:   rawKey[:7],
+		Scope:       []byte(`{}`),
+		CreatedBy:   "1",
 	}
 	if err := dao.NewApiKeyDao().Insert(context.Background(), seed); err != nil {
 		t.Fatalf("seed api key: %v", err)

@@ -218,15 +218,13 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | GET/POST | `/v1/platform/application-clients/:applicationClientID/secrets` | 密钥列表/创建 |
 | DELETE | `/v1/platform/application-clients/:applicationClientID/secrets/:secretID` | 删除密钥 |
 
-### 5.5 API Key 与域名
+### 5.5 API Key 监督与域名
+
+> 平台端对 API Key 仅保留**跨租户只读监督**（明文不可见，仅前缀）；密钥的创建/吊销/删除等生命周期管理已收敛到租户自服务 `/v1/tenant/api-keys`。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/v1/platform/api-keys` | 创建 API Key |
-| GET | `/v1/platform/api-keys` | API Key 分页（本租户） |
-| GET | `/v1/platform/api-keys/supervision` | 全租户只读监督列表（平台排查视角） |
-| POST | `/v1/platform/api-keys/:apiKeyID/revoke` | 吊销（动作） |
-| DELETE | `/v1/platform/api-keys/:apiKeyID` | 删除 |
+| GET | `/v1/platform/api-keys/supervision` | 全租户 API Key 只读监督列表（?tenantID=&name=，含归属主体 ownerType/ownerName、创建人、租户、状态字段） |
 | POST | `/v1/platform/domains` | 创建域名 |
 | GET | `/v1/platform/domains` | 域名分页 |
 | GET/PUT/DELETE | `/v1/platform/domains/:domainID` | 域名详情/更新/删除 |
@@ -246,13 +244,25 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/v1/tenant/users` | 租户用户分页（?keyword= 姓名/用户名/邮箱/手机，?isSuspended=，含主组织/角色数） |
-| POST | `/v1/tenant/users` | 创建租户用户（姓名/部门 organizationIDs/邮箱/手机/密码；**姓名即自然人信息**：无匹配 person 则按姓名创建，命中 email/phone 复用；部门归属同事务建立，首个为主组织） |
+| GET | `/v1/tenant/users` | 租户**真实用户**（member）分页（?keyword= 姓名/用户名/邮箱/手机，?isSuspended=，含主组织/角色数） |
+| POST | `/v1/tenant/users` | 创建租户真实用户（姓名/部门 organizationIDs/邮箱/手机/密码；**姓名即自然人信息**：无匹配 person 则按姓名创建，命中 email/phone 复用；部门归属同事务建立，首个为主组织） |
 | GET | `/v1/tenant/users/:userID` | 用户详情（基础信息 + 组织归属 + 角色） |
 | PATCH | `/v1/tenant/users/:userID` | 局部更新（姓名/头像/状态） |
 | POST | `/v1/tenant/users/:userID/reset-password` | 重置密码（写入关联 person） |
-| GET | `/v1/tenant/users/:userID/roles` | 用户已分配角色（用户侧授权入口） |
+| GET | `/v1/tenant/users/:userID/roles` | 用户已分配角色（用户侧授权入口；服务账号走 `/machine-users`） |
 | PUT | `/v1/tenant/users/:userID/roles` | 全量替换用户角色 |
+| GET | `/v1/tenant/machine-users` | 服务账号分页（?name=&isSuspended=；服务账号=租户内机器主体 user_type=machine，不可登录/不入组织，仅作为角色主体与 API Key 归属） |
+| POST | `/v1/tenant/machine-users` | 创建服务账号 {name,description}（需系统管理能力 super） |
+| GET | `/v1/tenant/machine-users/:machineUserID` | 服务账号详情（含已授权角色） |
+| PUT | `/v1/tenant/machine-users/:machineUserID` | 更新服务账号（名称/描述） |
+| PATCH | `/v1/tenant/machine-users/:machineUserID` | 挂起/启用（{isSuspended}，挂起后其密钥鉴权失效） |
+| DELETE | `/v1/tenant/machine-users/:machineUserID` | 删除服务账号（须先删除其全部 API Key；级联清理角色关联） |
+| GET | `/v1/tenant/machine-users/:machineUserID/roles` | 服务账号已分配角色 |
+| PUT | `/v1/tenant/machine-users/:machineUserID/roles` | 全量替换服务账号角色（**禁止授予 admin_level=super 的系统管理角色**） |
+| GET | `/v1/tenant/api-keys` | API Key 分页（默认本人；?machineUserID= 指定服务账号；?all=true 全租户——后两者需 super；含归属主体 ownerType/ownerName） |
+| POST | `/v1/tenant/api-keys` | 创建 API Key {name,machineUserID?,expiredAt?}：machineUserID 空=代表本人（个人密钥），指定=归属服务账号（开发者模式，需 super）；明文仅此一次返回 |
+| POST | `/v1/tenant/api-keys/:apiKeyID/revoke` | 吊销（本人/服务账号需 super） |
+| DELETE | `/v1/tenant/api-keys/:apiKeyID` | 删除 |
 | GET | `/v1/tenant/apps` | 租户订阅应用列表（角色归属/菜单授权的应用选项） |
 | POST | `/v1/tenant/roles` | 创建角色（**appID 必选**，角色从属于应用，编码应用内唯一） |
 | GET | `/v1/tenant/roles` | 角色分页（?appID=&keyword=，含成员数/菜单数/所属应用名） |

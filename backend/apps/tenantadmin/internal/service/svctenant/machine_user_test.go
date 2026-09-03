@@ -1,0 +1,179 @@
+package svctenant
+
+import (
+	"context"
+	"encoding/json"
+	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/iam/dao"
+	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
+	"github.com/morehao/ark-iam/tenantadmin/testutil"
+	"github.com/morehao/golib/biz/gcontext"
+)
+
+// seedTestOperator 播种租户 t1 下的真实操作者；super=true 时授予内置超级角色。
+func seedTestOperator(t *testing.T, tenantID string, super bool) *model.UserEntity {
+	t.Helper()
+	db := dbclient.IamDB(context.Background())
+	op := &model.UserEntity{
+		TenantID:   tenantID,
+		UserType:   model.UserTypeMember,
+		Name:       "operator",
+		Profile:    json.RawMessage(`{}`),
+		CustomData: json.RawMessage(`{}`),
+	}
+	if err := db.Create(op).Error; err != nil {
+		t.Fatalf("seed operator: %v", err)
+	}
+	if !super {
+		return op
+	}
+	role := &model.RoleEntity{
+		TenantID:   tenantID,
+		AppID:      "app-admin",
+		Code:       "test-admin",
+		Name:       "测试超级角色",
+		Source:     string(model.RoleSourceBuiltin),
+		AdminLevel: string(model.SysAdminLevelSuper),
+	}
+	if err := db.Create(role).Error; err != nil {
+		t.Fatalf("seed super role: %v", err)
+	}
+	ur := &model.UserRoleEntity{TenantID: tenantID, UserID: op.ID, RoleID: role.ID}
+	if err := db.Create(ur).Error; err != nil {
+		t.Fatalf("bind super role: %v", err)
+	}
+	return op
+}
+
+func newTestTenantCtx(tenantID, userID string) *gin.Context {
+	ctx := &gin.Context{}
+	ctx.Set(gcontext.KeyTenantID, tenantID)
+	ctx.Set(gcontext.KeyUserID, userID)
+	return ctx
+}
+
+// TestMachineUserLifecycleAndGuards 覆盖服务账号全生命周期与关键守卫：
+// 创建(需 super) → 列表/详情 → 改名 → 挂起 → 角色授权(禁授 super 角色) → 删除(有 key 拒绝)。
+func TestMachineUserLifecycleAndGuards(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.ApplicationEntity{}, &model.ApiKeyEntity{}, &model.PersonEntity{})
+	tenantID := "t1"
+	superOp := seedTestOperator(t, tenantID, true)
+
+	svc := NewMachineUserSvc()
+
+	// 非 super 创建被拒
+	memberOp := seedTestOperator(t, tenantID, false)
+	_, err := svc.Create(newTestTenantCtx(tenantID, memberOp.ID), &dtotenant.MachineUserCreateReq{Name: "forbidden"})
+	if err != code.GetError(code.UserSystemAdminRequiredError) {
+		t.Fatalf("member create: want system admin required, got %v", err)
+	}
+
+	// super 创建
+	created, err := svc.Create(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserCreateReq{Name: "svc-pay", Description: "支付回调"})
+	if err != nil {
+		t.Fatalf("create machine user: %v", err)
+	}
+	if created.MachineUserID == "" {
+		t.Fatal("expected machine user id")
+	}
+	machineID := created.MachineUserID
+
+	// 列表/详情
+	page, err := svc.PageList(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserPageListReq{Name: "svc-pay"})
+	if err != nil {
+		t.Fatalf("page list: %v", err)
+	}
+	if page.Total != 1 || page.List[0].MachineUserID != machineID {
+		t.Fatalf("page list mismatch: %+v", page)
+	}
+	detail, err := svc.Detail(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserDetailReq{MachineUserID: machineID})
+	if err != nil {
+		t.Fatalf("detail: %v", err)
+	}
+	if detail.Name != "svc-pay" || len(detail.Roles) != 0 {
+		t.Fatalf("detail mismatch: %+v", detail)
+	}
+
+	// 改名
+	if err := svc.Update(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserUpdateReq{MachineUserID: machineID, Name: "svc-pay-v2", Description: "支付回调V2"}); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	// 挂起
+	if err := svc.UpdateStatus(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserStatusReq{MachineUserID: machineID, IsSuspended: true}); err != nil {
+		t.Fatalf("suspend: %v", err)
+	}
+	reloaded, err := dao.NewUserDao().GetByID(newTestTenantCtx(tenantID, superOp.ID), machineID)
+	if err != nil || reloaded == nil {
+		t.Fatalf("reload machine user: %v", err)
+	}
+	if reloaded.Name != "svc-pay-v2" || !reloaded.IsSuspended {
+		t.Fatalf("reload mismatch: %+v", reloaded)
+	}
+
+	// 普通角色可授
+	devRole := &model.RoleEntity{
+		TenantID:   tenantID,
+		AppID:      "app-tenant",
+		Code:       "dev",
+		Name:       "开发者",
+		Source:     string(model.RoleSourceCustom),
+		AdminLevel: string(model.SysAdminLevelMember),
+	}
+	if err := db.Create(devRole).Error; err != nil {
+		t.Fatalf("seed dev role: %v", err)
+	}
+	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, RoleIDs: []string{devRole.ID}}); err != nil {
+		t.Fatalf("grant dev role: %v", err)
+	}
+	// super 角色禁授服务账号
+	superRole := &model.RoleEntity{
+		TenantID:   tenantID,
+		AppID:      "app-tenant",
+		Code:       "tenant-owner",
+		Name:       "租户管理员",
+		Source:     string(model.RoleSourceBuiltin),
+		AdminLevel: string(model.SysAdminLevelSuper),
+	}
+	if err := db.Create(superRole).Error; err != nil {
+		t.Fatalf("seed super role 2: %v", err)
+	}
+	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, RoleIDs: []string{superRole.ID}}); err != code.GetError(code.UserSuperRoleAssignForbidden) {
+		t.Fatalf("grant super role to machine: want forbidden, got %v", err)
+	}
+
+	// 服务账号下有 key 时禁止删除
+	key := &model.ApiKeyEntity{
+		TenantID:    tenantID,
+		OwnerUserID: machineID,
+		Name:        "machine-key",
+		KeyHash:     "h",
+		KeyPrefix:   "prefix",
+		Scope:       json.RawMessage(`{}`),
+		CreatedBy:   superOp.ID,
+	}
+	if err := db.Create(key).Error; err != nil {
+		t.Fatalf("seed machine key: %v", err)
+	}
+	if err := svc.Delete(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserDeleteReq{MachineUserID: machineID}); err != code.GetError(code.MachineUserDeleteHasKeysError) {
+		t.Fatalf("delete with keys: want has-keys forbidden, got %v", err)
+	}
+	// 清掉 key 后删除成功
+	if err := dao.NewApiKeyDao().Delete(newTestTenantCtx(tenantID, superOp.ID), key.ID, superOp.ID); err != nil {
+		t.Fatalf("delete key: %v", err)
+	}
+	if err := svc.Delete(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserDeleteReq{MachineUserID: machineID}); err != nil {
+		t.Fatalf("delete machine user: %v", err)
+	}
+	gone, err := dao.NewUserDao().GetByID(newTestTenantCtx(tenantID, superOp.ID), machineID)
+	if err != nil {
+		t.Fatalf("query deleted machine user: %v", err)
+	}
+	if gone != nil {
+		t.Fatal("machine user should be soft-deleted")
+	}
+}

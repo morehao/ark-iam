@@ -49,6 +49,7 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (
 			PageSize: req.PageSize,
 		},
 		TenantID:    tenantID,
+		UserType:    model.UserTypeMember,
 		Keyword:     req.Keyword,
 		IsSuspended: req.IsSuspended,
 	}
@@ -645,6 +646,10 @@ func (svc *userSvc) ListRoles(ctx *gin.Context, req *dtotenant.UserRolesListReq)
 	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != tenantID {
 		return nil, code.GetError(code.UserNotExistError)
 	}
+	// 服务账号角色走 /machine-users/{machineUserID}/roles 入口，真实用户接口对服务账号不开放
+	if userEntity.IsMachine() {
+		return nil, code.GetError(code.UserMemberOperationOnlyError)
+	}
 	roles, err := svc.listRoles(ctx, tenantID, req.UserID)
 	if err != nil {
 		return nil, err
@@ -662,6 +667,10 @@ func (svc *userSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.UserRolesUpdate
 	}
 	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != tenantID {
 		return code.GetError(code.UserNotExistError)
+	}
+	// 服务账号角色走 /machine-users/{machineUserID}/roles 入口，真实用户接口对服务账号不开放
+	if userEntity.IsMachine() {
+		return code.GetError(code.UserMemberOperationOnlyError)
 	}
 
 	// 校验角色均属于本租户

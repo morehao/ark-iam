@@ -265,8 +265,8 @@ func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model
 	defs := []seedMenu{
 		// 平台管理控制台：目录分组（type=directory，无页面）+ 页面叶子（type=menu，指向真实前端页面）。
 		// 一级菜单按「对象域」划分（对象名词 + 中心/叶子），不使用「X 与 Y」并列命名：
-		// 租户中心（租户及其资源）/ 应用中心（应用及其接入凭证）/ 身份中心（跨租户身份排查）；
-		// 审计日志、菜单管理为一级叶子（待登录日志等补充后再考虑收编「审计中心」目录）。
+		// 租户中心（租户及其资源）/ 应用中心（应用及其接入凭证）/ 身份中心（跨租户身份排查）/
+		// 平台管理（平台自身治理：菜单字典与审计日志）。
 		{appCode: appCodeAdmin, name: "工作台", code: "dashboard", path: "/dashboard", icon: "dashboard", sort: 1, component: "/dashboard/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityMember},
 		{appCode: appCodeAdmin, name: "租户中心", code: "grp-tenant", icon: "apartment", sort: 2, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-tenant", name: "租户管理", code: "tenant", path: "/tenant", icon: "global", sort: 1, component: "/tenant/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
@@ -275,16 +275,18 @@ func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model
 		{appCode: appCodeAdmin, name: "应用中心", code: "grp-app", icon: "app", sort: 3, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-app", name: "应用管理", code: "application", path: "/application", icon: "app", sort: 1, component: "/application/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-app", name: "OAuth客户端", code: "oauth-client", path: "/oauth-client", icon: "key", sort: 2, component: "/oauthClient/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
-		{appCode: appCodeAdmin, parentCode: "grp-app", name: "API密钥", code: "api-key", path: "/api-key", icon: "key", sort: 3, component: "/apiKey/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, parentCode: "grp-app", name: "API密钥监督", code: "api-key", path: "/api-key", icon: "key", sort: 3, component: "/apiKey/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, name: "身份中心", code: "grp-identity", icon: "team", sort: 4, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-identity", name: "用户管理", code: "user", path: "/user", icon: "user", sort: 1, component: "/user/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-identity", name: "角色管理", code: "role", path: "/role", icon: "role", sort: 2, component: "/role/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
-		{appCode: appCodeAdmin, name: "审计日志", code: "log", path: "/log", icon: "file", sort: 5, component: "/log/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
-		{appCode: appCodeAdmin, name: "菜单管理", code: "menu", path: "/menu", icon: "menu", sort: 6, component: "/menu/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
-		// 租户自服务一级菜单（组织管理内维护部门节点与组织成员；用户/角色编码加 tenant- 前缀，避免与平台菜单 code 撞名）
+		{appCode: appCodeAdmin, name: "平台管理", code: "grp-platform", icon: "setting", sort: 5, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, parentCode: "grp-platform", name: "菜单管理", code: "menu", path: "/menu", icon: "menu", sort: 1, component: "/menu/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, parentCode: "grp-platform", name: "审计日志", code: "log", path: "/log", icon: "file", sort: 2, component: "/log/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+		// 租户自服务一级菜单（组织管理内维护部门节点与组织成员；用户/角色/密钥编码加 tenant- 前缀，避免与平台菜单 code 撞名）
 		{appCode: appCodeTenantAdmin, name: "组织管理", code: "organization", path: "/organization", icon: "apartment", sort: 1, component: "pages/organization", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityPublic},
 		{appCode: appCodeTenantAdmin, name: "用户管理", code: "tenant-user", path: "/user", icon: "user", sort: 2, component: "pages/user", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeTenantAdmin, name: "角色管理", code: "tenant-role", path: "/role", icon: "role", sort: 3, component: "pages/role", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeTenantAdmin, name: "API密钥", code: "tenant-api-key", path: "/api-key", icon: "key", sort: 4, component: "pages/apiKey", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 	}
 
 	appByCode := map[string]*model.ApplicationEntity{appCodeAdmin: adminApp, appCodeTenantAdmin: tenantAdminApp}
@@ -375,7 +377,7 @@ func seedRoleMenus(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity,
 			"organization", "tenant-user", "tenant-role",
 		}},
 		{roleCode: "tenant_admin", menuCode: []string{
-			"organization", "tenant-user", "tenant-role",
+			"organization", "tenant-user", "tenant-role", "tenant-api-key",
 		}},
 	}
 	for _, rel := range relations {

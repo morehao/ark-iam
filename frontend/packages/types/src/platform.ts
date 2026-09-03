@@ -292,39 +292,26 @@ export interface TenantApplicationUpdateReq {
 }
 
 // ---------- API Key ----------
-export interface ApiKeyItem {
-  id: string
-  name: string
-  keyPrefix: string
-  scope: string
-  expiresAt: number
-  lastUsedAt: number
-  revokedAt: number
-  createdAt: number
-}
+/** 归属主体类型：member=真实用户，machine=服务账号 */
+export type ApiKeyOwnerType = 'member' | 'machine'
 
-export interface ApiKeyCreateResp {
-  id: string
-  name: string
-  key: string
-  keyPrefix: string
-  expiresAt: number
-}
-
-// 全租户只读监督条目（平台排查视角，明文密钥永不可见）
+// 全租户只读监督条目（平台排查视角，明文密钥永不可见，仅展示前缀）
 export interface ApiKeySupervisionItem {
   id: string
   tenantID: string
   tenantName: string
+  ownerUserID: string // 归属用户ID（真实用户本人或服务账号）
+  ownerType: ApiKeyOwnerType // 归属类型(member真实用户/machine服务账号)
+  ownerName: string // 归属用户名称
   createdBy: string
   creatorName: string
   name: string
   keyPrefix: string
   scope: string
-  expiresAt: number
-  lastUsedAt: number
-  revokedAt: number
-  createdAt: number
+  expiresAt: number // 过期时间(unix 秒)
+  lastUsedAt: number // 最后使用时间(unix 秒)
+  revokedAt: number // 撤销时间(unix 秒)
+  createdAt: number // 创建时间(unix 秒)
 }
 
 // ---------- 菜单 ----------
