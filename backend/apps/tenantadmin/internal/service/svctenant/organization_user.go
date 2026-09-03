@@ -21,7 +21,6 @@ type OrganizationUserSvc interface {
 	Update(ctx *gin.Context, req *dtotenant.OrganizationUserUpdateReq) error
 	Delete(ctx *gin.Context, req *dtotenant.OrganizationUserDeleteReq) error
 	PageList(ctx *gin.Context, req *dtotenant.OrganizationUserPageListReq) (*dtotenant.OrganizationUserPageListResp, error)
-	UpdateUserOrganizations(ctx *gin.Context, req *dtotenant.UserOrganizationsUpdateReq) error
 }
 
 type organizationUserSvc struct {
@@ -407,70 +406,4 @@ func loadUserOrganizations(ctx *gin.Context, tenantID, userID string) ([]dtotena
 		})
 	}
 	return list, nil
-}
-
-// UpdateUserOrganizations 全量替换用户参与部门（secondary 关系集合）。
-func (svc *organizationUserSvc) UpdateUserOrganizations(ctx *gin.Context, req *dtotenant.UserOrganizationsUpdateReq) error {
-	tenantID := gincontext.GetTenantIDString(ctx)
-	// 用户必须参与至少一个部门（业务约束，防绕过 DTO 校验）
-	if len(req.OrganizationIDs) == 0 {
-		return code.GetError(code.UserOrganizationRequiredError)
-	}
-	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcorganizationuser.UpdateUserOrganizations] dao GetByID user fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.OrganizationUserCreateError)
-	}
-	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != tenantID {
-		return code.GetError(code.UserNotExistError)
-	}
-	orgList, err := dao.NewOrganizationDao().GetListByCond(ctx, &dao.OrganizationCond{TenantID: tenantID})
-	if err != nil {
-		glog.Errorf(ctx, "[svcorganizationuser.UpdateUserOrganizations] query org fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.OrganizationUserCreateError)
-	}
-	orgSet := make(map[string]bool, len(orgList))
-	for _, o := range orgList {
-		orgSet[o.ID] = true
-	}
-	for _, orgID := range req.OrganizationIDs {
-		if !orgSet[orgID] {
-			return code.GetError(code.OrganizationNotExistError)
-		}
-	}
-
-	userID := gincontext.GetUserIDString(ctx)
-	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
-		oldList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
-			TenantID:     tenantID,
-			UserID:       req.UserID,
-			RelationType: model.OrgUserRelationSecondary,
-		})
-		if err != nil {
-			return err
-		}
-		for _, r := range oldList {
-			if err := dao.NewOrganizationUserDao().Delete(ctx, r.ID, userID); err != nil {
-				return err
-			}
-		}
-		for _, orgID := range req.OrganizationIDs {
-			entity := &model.OrganizationUserEntity{
-				TenantID:       tenantID,
-				OrganizationID: orgID,
-				UserID:         req.UserID,
-				RelationType:   model.OrgUserRelationSecondary,
-				CreatedBy:      userID,
-			}
-			if err := dao.NewOrganizationUserDao().Insert(ctx, entity); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if txErr != nil {
-		glog.Errorf(ctx, "[svcorganizationuser.UpdateUserOrganizations] transaction fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))
-		return code.GetError(code.OrganizationUserCreateError)
-	}
-	return nil
 }

@@ -22,7 +22,6 @@ import (
 
 type UserSvc interface {
 	PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (*dtotenant.UserPageListResp, error)
-	MemberPageList(ctx *gin.Context, req *dtotenant.MemberPageListReq) (*dtotenant.MemberPageListResp, error)
 	Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dtotenant.UserCreateResp, error)
 	Detail(ctx *gin.Context, req *dtotenant.UserDetailReq) (*dtotenant.UserDetailResp, error)
 	Update(ctx *gin.Context, req *dtotenant.UserUpdateReq) error
@@ -40,7 +39,8 @@ func NewUserSvc() UserSvc {
 	return &userSvc{}
 }
 
-// PageList 返回当前租户内的用户目录（含自然人基础信息），支持关键词（姓名/用户名/邮箱/手机）与状态过滤。
+// PageList 返回当前租户内的用户目录（含自然人基础信息），支持关键词（姓名/用户名/邮箱/手机）与状态过滤；
+// 传 organizationID 时仅返回"恰在该部门"的用户（含 primary/secondary/leader 任一关系，不含子部门）。
 func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (*dtotenant.UserPageListResp, error) {
 	tenantID := gincontext.GetTenantIDString(ctx)
 	cond := &dao.UserCond{
@@ -52,6 +52,27 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (
 		Keyword:     req.Keyword,
 		IsSuspended: req.IsSuspended,
 	}
+
+	// 部门过滤：仅筛选恰在该部门的用户（member/leader 均可），不掺子部门。
+	if req.OrganizationID != "" {
+		relationList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
+			TenantID:       tenantID,
+			OrganizationID: req.OrganizationID,
+		})
+		if err != nil {
+			glog.Errorf(ctx, "[svcuser.PageList] dao relation GetListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+			return nil, code.GetError(code.UserGetPageListError)
+		}
+		userIDs := make([]string, 0, len(relationList))
+		for _, r := range relationList {
+			userIDs = append(userIDs, r.UserID)
+		}
+		if len(userIDs) == 0 {
+			return &dtotenant.UserPageListResp{List: []dtotenant.UserPageListItem{}, Total: 0}, nil
+		}
+		cond.IDs = userIDs
+	}
+
 	userEntityList, total, err := dao.NewUserDao().GetPageListByCond(ctx, cond)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.PageList] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -92,123 +113,6 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (
 		List:  list,
 		Total: total,
 	}, nil
-}
-
-// MemberPageList 成员总表(以人为维度)：展示租户内全部成员，可选按"恰在该部门"过滤，返回每个成员的部门关系数组(主/非主/负责)。
-func (svc *userSvc) MemberPageList(ctx *gin.Context, req *dtotenant.MemberPageListReq) (*dtotenant.MemberPageListResp, error) {
-	tenantID := gincontext.GetTenantIDString(ctx)
-	cond := &dao.UserCond{
-		BaseCond: &gormdao.BaseCond{
-			Page:     req.Page,
-			PageSize: req.PageSize,
-		},
-		TenantID:    tenantID,
-		Keyword:     req.Keyword,
-		IsSuspended: req.IsSuspended,
-	}
-
-	// 部门过滤：仅筛选恰在该部门(member/leader 均可)的成员，不掺子部门。
-	if req.OrganizationID != "" {
-		relationList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
-			TenantID:       tenantID,
-			OrganizationID: req.OrganizationID,
-		})
-		if err != nil {
-			glog.Errorf(ctx, "[svcuser.MemberPageList] dao relation GetListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-			return nil, code.GetError(code.UserGetPageListError)
-		}
-		userIDs := make([]string, 0, len(relationList))
-		for _, r := range relationList {
-			userIDs = append(userIDs, r.UserID)
-		}
-		if len(userIDs) == 0 {
-			return &dtotenant.MemberPageListResp{List: []dtotenant.MemberPageListItem{}, Total: 0}, nil
-		}
-		cond.IDs = userIDs
-	}
-
-	userEntityList, total, err := dao.NewUserDao().GetPageListByCond(ctx, cond)
-	if err != nil {
-		glog.Errorf(ctx, "[svcuser.MemberPageList] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.UserGetPageListError)
-	}
-
-	userIDs := make([]string, 0, len(userEntityList))
-	for _, v := range userEntityList {
-		userIDs = append(userIDs, v.ID)
-	}
-	_, personMap := svc.loadUserPersonMaps(ctx, userIDs)
-	roleCountMap := loadUserRoleCountMap(ctx, tenantID, userIDs)
-
-	// 批量加载每个用户的部门关系 + 组织名称
-	orgRelationMap := loadUserOrgRelationMap(ctx, tenantID, userIDs)
-
-	list := make([]dtotenant.MemberPageListItem, 0, len(userEntityList))
-	for _, v := range userEntityList {
-		person := personMap[v.PersonID]
-		if person == nil {
-			person = &model.PersonEntity{}
-		}
-		orgs := orgRelationMap[v.ID]
-		item := dtotenant.MemberPageListItem{
-			UserID:        v.ID,
-			TenantID:      v.TenantID,
-			Username:      model.DerefStr(person.Username),
-			PrimaryEmail:  model.DerefStr(person.PrimaryEmail),
-			PrimaryPhone:  model.DerefStr(person.PrimaryPhone),
-			Name:          v.Name,
-			Avatar:        v.Avatar,
-			IsSuspended:   v.IsSuspended,
-			RoleCount:     roleCountMap[v.ID],
-			CreatedAt:     v.CreatedAt.Unix(),
-			Organizations: orgs,
-		}
-		for _, o := range orgs {
-			if o.RelationType == model.OrgUserRelationPrimary {
-				item.PrimaryOrgID = o.OrganizationID
-				break
-			}
-		}
-		list = append(list, item)
-	}
-	return &dtotenant.MemberPageListResp{
-		List:  list,
-		Total: total,
-	}, nil
-}
-
-// loadUserOrgRelationMap 批量加载多个用户的部门关系(含组织名称),按 userID 分组返回。
-func loadUserOrgRelationMap(ctx *gin.Context, tenantID string, userIDs []string) map[string][]dtotenant.UserOrganizationItem {
-	result := make(map[string][]dtotenant.UserOrganizationItem, len(userIDs))
-	if len(userIDs) == 0 {
-		return result
-	}
-	relationList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
-		TenantID: tenantID,
-		UserIDs:  userIDs,
-	})
-	if err != nil {
-		glog.Warnf(ctx, "[svcuser.loadUserOrgRelationMap] relation GetListByCond fail, err:%v", err)
-		return result
-	}
-	orgIDSet := make(map[string]bool, len(relationList))
-	for _, r := range relationList {
-		orgIDSet[r.OrganizationID] = true
-	}
-	orgNameMap := make(map[string]string, len(orgIDSet))
-	for orgID := range orgIDSet {
-		if o, err := dao.NewOrganizationDao().GetByID(ctx, orgID); err == nil && o != nil {
-			orgNameMap[orgID] = o.Name
-		}
-	}
-	for _, r := range relationList {
-		result[r.UserID] = append(result[r.UserID], dtotenant.UserOrganizationItem{
-			OrganizationID:   r.OrganizationID,
-			OrganizationName: orgNameMap[r.OrganizationID],
-			RelationType:     r.RelationType,
-		})
-	}
-	return result
 }
 
 // loadPrimaryOrgNameMap 批量查询用户行政归属组织名称（member 唯一行）。

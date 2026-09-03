@@ -1,10 +1,11 @@
 package dtotenant
 
 type UserPageListReq struct {
-	Page        int    `json:"page" form:"page"`               // 页码
-	PageSize    int    `json:"pageSize" form:"pageSize"`       // 每页数量
-	Keyword     string `json:"keyword" form:"keyword"`         // 关键词(姓名/用户名/邮箱/手机 模糊)
-	IsSuspended *bool  `json:"isSuspended" form:"isSuspended"` // 状态过滤(挂起)
+	Page           int    `json:"page" form:"page"`                     // 页码
+	PageSize       int    `json:"pageSize" form:"pageSize"`             // 每页数量
+	Keyword        string `json:"keyword" form:"keyword"`               // 关键词(姓名/用户名/邮箱/手机 模糊)
+	IsSuspended    *bool  `json:"isSuspended" form:"isSuspended"`       // 状态过滤(挂起)
+	OrganizationID string `json:"organizationID" form:"organizationID"` // 部门ID(仅筛选恰在该部门的用户,不含子部门)
 }
 
 type UserCreateReq struct {
@@ -19,15 +20,6 @@ type UserCreateReq struct {
 	OrganizationIDs []string `json:"organizationIDs" binding:"required"` // 行政主部门ID列表(primary,至多1个,必传:用户必须从属部门)
 	SecondaryOrgIDs []string `json:"secondaryOrgIDs"`                    // 参与部门ID列表(secondary,可多条,可选)
 	LeaderOrgIDs    []string `json:"leaderOrgIDs"`                       // 负责部门ID列表(leader,可多条,可选;每部门至多1负责人)
-}
-
-// MemberPageListReq 成员列表(以人为维度的成员总表)分页查询。
-type MemberPageListReq struct {
-	Page           int    `json:"page" form:"page"`                     // 页码
-	PageSize       int    `json:"pageSize" form:"pageSize"`             // 每页数量
-	Keyword        string `json:"keyword" form:"keyword"`               // 关键词(姓名/用户名/邮箱/手机 模糊)
-	IsSuspended    *bool  `json:"isSuspended" form:"isSuspended"`       // 状态过滤(挂起)
-	OrganizationID string `json:"organizationID" form:"organizationID"` // 部门ID(仅筛选恰在该部门的成员,不含子部门)
 }
 
 type UserDetailReq struct {

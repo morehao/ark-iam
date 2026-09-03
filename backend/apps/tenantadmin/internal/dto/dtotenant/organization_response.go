@@ -64,13 +64,9 @@ type OrganizationUserPageListItem struct {
 	JoinedAt       int64                     `json:"joinedAt"`       // 加入时间(关系创建时间)
 }
 
-// ---------- 用户参与 ----------
-
+// UserOrganizationItem 用户-组织归属条目（用户侧组织关系展示，含主/参与/负责）。
 type UserOrganizationItem struct {
 	OrganizationID   string                    `json:"organizationID"`   // 组织ID
 	OrganizationName string                    `json:"organizationName"` // 组织名称
 	RelationType     model.OrgUserRelationType `json:"relationType"`     // 关系类型
-}
-
-type UserOrganizationsUpdateResp struct {
 }

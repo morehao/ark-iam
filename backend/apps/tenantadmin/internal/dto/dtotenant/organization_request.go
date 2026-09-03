@@ -68,10 +68,3 @@ type OrganizationUserPageListReq struct {
 	RelationType   model.OrgUserRelationType `json:"relationType" form:"relationType"`          // 关系类型过滤
 	Keyword        string                    `json:"keyword" form:"keyword"`                    // 关键词(姓名/用户名/邮箱/手机 模糊)
 }
-
-// ---------- 用户参与 ----------
-
-type UserOrganizationsUpdateReq struct {
-	UserID          string   `json:"-" uri:"userID" binding:"required"`  // 用户ID
-	OrganizationIDs []string `json:"organizationIDs" binding:"required"` // 参与部门ID列表(全量替换participant关系)
-}

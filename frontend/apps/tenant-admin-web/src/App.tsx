@@ -3,11 +3,10 @@ import { Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-
 import { useAuthGuard, FullPageSpinner } from '@ark-iam/auth'
 import { MainLayout, LoginPage, tokens } from '@ark-iam/ui'
 import type { MainMenuItems } from '@ark-iam/ui'
-import { ApartmentOutlined, SafetyCertificateOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons'
+import { ApartmentOutlined, SafetyCertificateOutlined, UserOutlined } from '@ant-design/icons'
 import type { MenuItem } from '@ark-iam/types'
 import { getMyMenuTree } from './api/menu'
 import OrganizationList from './pages/organization'
-import OrganizationMembersList from './pages/organization-members'
 import TenantUserList from './pages/user'
 import TenantRoleList from './pages/role'
 
@@ -16,13 +15,11 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   apartment: <ApartmentOutlined />,
   user: <UserOutlined />,
   role: <SafetyCertificateOutlined />,
-  team: <TeamOutlined />,
 }
 
 // 组件白名单：只有 path 命中才会渲染路由与侧边栏菜单，避免点击进入 404
 const COMPONENT_MAP: Record<string, React.ComponentType> = {
   '/organization': OrganizationList,
-  '/organization/members': OrganizationMembersList,
   '/user': TenantUserList,
   '/role': TenantRoleList,
 }

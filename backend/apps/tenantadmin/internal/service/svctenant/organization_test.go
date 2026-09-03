@@ -278,57 +278,6 @@ func TestOrganizationUserCrossTenantRejected(t *testing.T) {
 	}
 }
 
-func TestUpdateUserOrganizationsReplace(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.UserEntity{})
-	ginCtx := newOrgGinCtx(t, "41", "1001")
-	seedTestUser(t, db, "41", "u1", "用户一")
-
-	orgSvc := &organizationSvc{}
-	root, _ := orgSvc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
-		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "A"},
-	})
-	org2, _ := orgSvc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
-		ParentID:             root.OrganizationID,
-		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "A2"},
-	})
-
-	svc := &organizationUserSvc{}
-	// 全量替换参与部门为 [A, A2]
-	if err := svc.UpdateUserOrganizations(ginCtx, &dtotenant.UserOrganizationsUpdateReq{
-		UserID:          "u1",
-		OrganizationIDs: []string{root.OrganizationID, org2.OrganizationID},
-	}); err != nil {
-		t.Fatalf("replace orgs: %v", err)
-	}
-	list, err := loadUserOrganizations(ginCtx, "41", "u1")
-	if err != nil {
-		t.Fatalf("load user orgs: %v", err)
-	}
-	if len(list) != 2 {
-		t.Fatalf("expected 2 secondary relations, got %d", len(list))
-	}
-	for _, it := range list {
-		if it.RelationType != model.OrgUserRelationSecondary {
-			t.Fatalf("expected secondary relation, got %s", it.RelationType)
-		}
-	}
-
-	// 全量替换为 [A2] → 只剩 1 条
-	if err := svc.UpdateUserOrganizations(ginCtx, &dtotenant.UserOrganizationsUpdateReq{
-		UserID:          "u1",
-		OrganizationIDs: []string{org2.OrganizationID},
-	}); err != nil {
-		t.Fatalf("replace orgs again: %v", err)
-	}
-	list, err = loadUserOrganizations(ginCtx, "41", "u1")
-	if err != nil {
-		t.Fatalf("load user orgs: %v", err)
-	}
-	if len(list) != 1 || list[0].OrganizationID != org2.OrganizationID || list[0].RelationType != model.OrgUserRelationSecondary {
-		t.Fatalf("unexpected relations after second replace: %+v", list)
-	}
-}
-
 func TestOrganizationChildrenPageAndHasChildren(t *testing.T) {
 	_ = testutil.SetupSQLite(t, &model.OrganizationEntity{}, &model.OrganizationUserEntity{})
 	ginCtx := newOrgGinCtx(t, "41", "1001")

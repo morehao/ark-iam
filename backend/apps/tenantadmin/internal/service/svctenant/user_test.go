@@ -654,9 +654,9 @@ func TestUserUpdateContact(t *testing.T) {
 	}
 }
 
-// TestMemberPageList 成员总表：以人为维度返回全部成员，含部门关系数组；
-// 支持按"恰在该部门"(member/leader) 过滤、关键词命中租户内姓名。
-func TestMemberPageList(t *testing.T) {
+// TestUserPageListOrganizationFilter 用户目录：支持按"恰在该部门"过滤（primary/secondary/leader 任一关系命中，不含子部门）、
+// 关键词命中租户内姓名；跨租户用户不可见；主组织名聚合来自 primary 行政主部门关系。
+func TestUserPageListOrganizationFilter(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{},
 		&model.OrganizationUserEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
@@ -702,15 +702,15 @@ func TestMemberPageList(t *testing.T) {
 
 	ginCtx := newOrgGinCtx(t, "t1", "op")
 
-	// 全部成员（不含其他租户）
-	resp, err := svc.MemberPageList(ginCtx, &dtotenant.MemberPageListReq{Page: 1, PageSize: 10})
+	// 全量（不含其他租户）：主组织名仅聚合 primary 关系
+	resp, err := svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10})
 	if err != nil {
-		t.Fatalf("member page list: %v", err)
+		t.Fatalf("user page list: %v", err)
 	}
 	if resp.Total != 2 {
 		t.Fatalf("expected total 2, got %d", resp.Total)
 	}
-	var u1Item, u2Item *dtotenant.MemberPageListItem
+	var u1Item, u2Item *dtotenant.UserPageListItem
 	for i := range resp.List {
 		if resp.List[i].UserID == "u1" {
 			u1Item = &resp.List[i]
@@ -722,46 +722,43 @@ func TestMemberPageList(t *testing.T) {
 	if u1Item == nil || u2Item == nil {
 		t.Fatalf("expected u1/u2 in list, got %+v", resp.List)
 	}
-	if u1Item.PrimaryOrgID != "o1" {
-		t.Fatalf("expected u1 primary o1, got %s", u1Item.PrimaryOrgID)
+	if u1Item.PrimaryOrgName != "组织o1" {
+		t.Fatalf("expected u1 primary org name 组织o1, got %s", u1Item.PrimaryOrgName)
 	}
-	if len(u1Item.Organizations) != 1 || u1Item.Organizations[0].OrganizationName != "组织o1" || u1Item.Organizations[0].RelationType != model.OrgUserRelationPrimary {
-		t.Fatalf("unexpected u1 organizations: %+v", u1Item.Organizations)
-	}
-	if len(u2Item.Organizations) != 1 || u2Item.Organizations[0].RelationType != model.OrgUserRelationLeader {
-		t.Fatalf("unexpected u2 organizations: %+v", u2Item.Organizations)
+	if u2Item.PrimaryOrgName != "" {
+		t.Fatalf("expected u2 empty primary org name (leader only), got %s", u2Item.PrimaryOrgName)
 	}
 
-	// 按部门过滤：o1 命中 u1；o2 命中 u2（leader 也算成员）
-	resp, err = svc.MemberPageList(ginCtx, &dtotenant.MemberPageListReq{Page: 1, PageSize: 10, OrganizationID: "o1"})
+	// 按部门过滤：o1 命中 u1；o2 命中 u2（leader 也算该部门用户）
+	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, OrganizationID: "o1"})
 	if err != nil {
-		t.Fatalf("member page list by org: %v", err)
+		t.Fatalf("user page list by org: %v", err)
 	}
 	if resp.Total != 1 || resp.List[0].UserID != "u1" {
 		t.Fatalf("expected only u1 for o1, got %+v", resp.List)
 	}
 
-	resp, err = svc.MemberPageList(ginCtx, &dtotenant.MemberPageListReq{Page: 1, PageSize: 10, OrganizationID: "o2"})
+	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, OrganizationID: "o2"})
 	if err != nil {
-		t.Fatalf("member page list by org: %v", err)
+		t.Fatalf("user page list by org: %v", err)
 	}
 	if resp.Total != 1 || resp.List[0].UserID != "u2" {
 		t.Fatalf("expected only u2 for o2, got %+v", resp.List)
 	}
 
 	// 关键词命中租户内姓名
-	resp, err = svc.MemberPageList(ginCtx, &dtotenant.MemberPageListReq{Page: 1, PageSize: 10, Keyword: "张三"})
+	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Keyword: "张三"})
 	if err != nil {
-		t.Fatalf("member page list by keyword: %v", err)
+		t.Fatalf("user page list by keyword: %v", err)
 	}
 	if resp.Total != 1 || resp.List[0].UserID != "u1" {
 		t.Fatalf("expected u1 by keyword, got %+v", resp.List)
 	}
 
-	// 部门过滤 + 无任何关系用户 u2 未在其他部门：查询无匹配部门(如空部门)返回空
-	resp, err = svc.MemberPageList(ginCtx, &dtotenant.MemberPageListReq{Page: 1, PageSize: 10, OrganizationID: "o-none"})
+	// 无匹配部门返回空
+	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, OrganizationID: "o-none"})
 	if err != nil {
-		t.Fatalf("member page list by missing org: %v", err)
+		t.Fatalf("user page list by missing org: %v", err)
 	}
 	if resp.Total != 0 || len(resp.List) != 0 {
 		t.Fatalf("expected empty list for missing org, got %+v", resp.List)
