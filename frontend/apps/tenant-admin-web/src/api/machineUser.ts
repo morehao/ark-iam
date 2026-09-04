@@ -46,6 +46,6 @@ export const deleteMachineUser = (machineUserID: string) =>
 export const getMachineUserRoles = (machineUserID: string) =>
   request.get<any, { list: TenantUserRoleItem[] }>(`/tenant/machine-users/${machineUserID}/roles`)
 
-/** 全量替换服务账号角色（禁止授予系统管理角色） */
-export const updateMachineUserRoles = (machineUserID: string, roleIDs: string[]) =>
-  request.put<any, string>(`/tenant/machine-users/${machineUserID}/roles`, { roleIDs })
+/** 按应用全量替换服务账号角色（appID 空串=系统/未归属应用组；仅替换该应用下授权，不影响其它应用；禁授系统管理角色） */
+export const updateMachineUserRoles = (machineUserID: string, appID: string, roleIDs: string[]) =>
+  request.put<any, string>(`/tenant/machine-users/${machineUserID}/roles`, { appID, roleIDs })

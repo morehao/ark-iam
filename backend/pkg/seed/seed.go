@@ -282,8 +282,10 @@ func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model
 		{appCode: appCodeAdmin, name: "平台管理", code: "grp-platform", icon: "setting", sort: 5, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-platform", name: "菜单管理", code: "menu", path: "/menu", icon: "menu", sort: 1, component: "/menu/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-platform", name: "审计日志", code: "log", path: "/log", icon: "file", sort: 2, component: "/log/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
-		// 租户自服务一级菜单（组织管理内维护部门节点与组织成员；用户/角色/密钥编码加 tenant- 前缀，避免与平台菜单 code 撞名）
-		{appCode: appCodeTenantAdmin, name: "组织管理", code: "organization", path: "/organization", icon: "apartment", sort: 1, component: "pages/organization", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityPublic},
+		// 租户自服务一级菜单：控制台定位为「租户管理层专用」（组织/用户/角色/密钥均属管理操作，
+		// 全部 visibility=admin 硬隔离；普通成员不面向该控制台，仅内置管理员/超管角色可见与授权）。
+		// 用户/角色/密钥编码加 tenant- 前缀，避免与平台菜单 code 撞名。
+		{appCode: appCodeTenantAdmin, name: "组织管理", code: "organization", path: "/organization", icon: "apartment", sort: 1, component: "pages/organization", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeTenantAdmin, name: "用户管理", code: "tenant-user", path: "/user", icon: "user", sort: 2, component: "pages/user", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeTenantAdmin, name: "角色管理", code: "tenant-role", path: "/role", icon: "role", sort: 3, component: "pages/role", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeTenantAdmin, name: "API密钥", code: "tenant-api-key", path: "/api-key", icon: "key", sort: 4, component: "pages/apiKey", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},

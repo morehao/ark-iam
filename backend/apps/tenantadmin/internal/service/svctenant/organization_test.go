@@ -38,9 +38,56 @@ func seedTestUser(t *testing.T, db *gorm.DB, tenantID, userID, name string) {
 	}
 }
 
+// seedTenantSuperOperator 为指定租户的操作用户绑定内置超管角色（user_role/role），
+// 使管理写接口的能力校验（requireSystemAdmin）通过；无需在 user 表播种操作者。
+// 注意：调用方 SetupSQLite 需同时注册 &model.RoleEntity{} 与 &model.UserRoleEntity{}。
+func seedTenantSuperOperator(t *testing.T, db *gorm.DB, tenantID, userID string) {
+	t.Helper()
+	roleID := "test-super-" + tenantID + "-" + userID
+	seedBuiltinSystemRole(t, db, roleID, tenantID, "app-admin")
+	seedUserRoleLink(t, db, "test-ur-"+roleID, tenantID, userID, roleID)
+}
+
+// seedTenantCustomSuperOperator 为操作用户绑定「自定义来源」的超管角色：
+// 具备系统管理能力(admin_level=super)但不属于内置系统角色，避免被「最后一个内置管理员」
+// 保护（仅统计内置系统角色持有者）误判为其他持有者。
+func seedTenantCustomSuperOperator(t *testing.T, db *gorm.DB, tenantID, userID string) {
+	t.Helper()
+	roleID := "test-custom-super-" + tenantID + "-" + userID
+	if err := db.Create(&model.RoleEntity{
+		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: roleID}},
+		TenantID:   tenantID,
+		AppID:      "app-admin",
+		Name:       "测试自定义超管",
+		Code:       "test-custom-super",
+		Source:     string(model.RoleSourceCustom),
+		AdminLevel: string(model.SysAdminLevelSuper),
+		CreatedBy:  "t",
+	}).Error; err != nil {
+		t.Fatalf("seed custom super role: %v", err)
+	}
+	seedUserRoleLink(t, db, "test-cur-"+roleID, tenantID, userID, roleID)
+}
+
+// newSuperCtx 创建以「内置超管」身份执行管理写操作的 gin 上下文（自动绑定超管角色）。
+// 前置条件：SetupSQLite 已注册 RoleEntity 与 UserRoleEntity 表。
+func newSuperCtx(t *testing.T, db *gorm.DB, tenantID, userID string) *gin.Context {
+	t.Helper()
+	seedTenantSuperOperator(t, db, tenantID, userID)
+	return newOrgGinCtx(t, tenantID, userID)
+}
+
+// newCustomSuperCtx 同 newSuperCtx，但绑定「自定义来源」的超管角色（见 seedTenantCustomSuperOperator）。
+func newCustomSuperCtx(t *testing.T, db *gorm.DB, tenantID, userID string) *gin.Context {
+	t.Helper()
+	seedTenantCustomSuperOperator(t, db, tenantID, userID)
+	return newOrgGinCtx(t, tenantID, userID)
+}
+
 func TestOrganizationCreateRootAndChildPaths(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.OrganizationEntity{}, &model.OrganizationUserEntity{})
+	db := testutil.SetupSQLite(t, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	ginCtx := newOrgGinCtx(t, "41", "1001")
+	seedTenantSuperOperator(t, db, "41", "1001")
 
 	svc := &organizationSvc{}
 	root, err := svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
@@ -81,8 +128,9 @@ func TestOrganizationCreateRootAndChildPaths(t *testing.T) {
 }
 
 func TestOrganizationMoveCascadesPathAndRejectsCycle(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.OrganizationEntity{}, &model.OrganizationUserEntity{})
+	db := testutil.SetupSQLite(t, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	ginCtx := newOrgGinCtx(t, "41", "1001")
+	seedTenantSuperOperator(t, db, "41", "1001")
 
 	svc := &organizationSvc{}
 	root, _ := svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
@@ -139,8 +187,9 @@ func TestOrganizationMoveCascadesPathAndRejectsCycle(t *testing.T) {
 }
 
 func TestOrganizationDeleteRejectsWithChildrenAndCascade(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.OrganizationEntity{}, &model.OrganizationUserEntity{})
+	db := testutil.SetupSQLite(t, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	ginCtx := newOrgGinCtx(t, "41", "1001")
+	seedTenantSuperOperator(t, db, "41", "1001")
 
 	svc := &organizationSvc{}
 	root, _ := svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
@@ -173,8 +222,9 @@ func TestOrganizationDeleteRejectsWithChildrenAndCascade(t *testing.T) {
 }
 
 func TestOrganizationUserMemberSingletonAndValidTypes(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.UserEntity{})
+	db := testutil.SetupSQLite(t, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	ginCtx := newOrgGinCtx(t, "41", "1001")
+	seedTenantSuperOperator(t, db, "41", "1001")
 	seedTestUser(t, db, "41", "u1", "用户一")
 	seedTestUser(t, db, "41", "u2", "用户二")
 
@@ -257,8 +307,9 @@ func TestOrganizationUserMemberSingletonAndValidTypes(t *testing.T) {
 }
 
 func TestOrganizationUserCrossTenantRejected(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.UserEntity{})
+	db := testutil.SetupSQLite(t, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	ginCtx := newOrgGinCtx(t, "41", "1001")
+	seedTenantSuperOperator(t, db, "41", "1001")
 	seedTestUser(t, db, "41", "u1", "用户一")
 
 	orgSvc := &organizationSvc{}
@@ -279,8 +330,9 @@ func TestOrganizationUserCrossTenantRejected(t *testing.T) {
 }
 
 func TestOrganizationChildrenPageAndHasChildren(t *testing.T) {
-	_ = testutil.SetupSQLite(t, &model.OrganizationEntity{}, &model.OrganizationUserEntity{})
+	db := testutil.SetupSQLite(t, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	ginCtx := newOrgGinCtx(t, "41", "1001")
+	seedTenantSuperOperator(t, db, "41", "1001")
 
 	svc := &organizationSvc{}
 	root, err := svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{

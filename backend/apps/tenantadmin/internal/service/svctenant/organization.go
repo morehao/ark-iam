@@ -42,6 +42,10 @@ func NewOrganizationSvc() OrganizationSvc {
 // Create 创建组织节点：根节点 org_path="/"+id、org_depth=1；
 // 子节点继承父节点路径并做深度上限校验。
 func (svc *organizationSvc) Create(ctx *gin.Context, req *dtotenant.OrganizationCreateReq) (*dtotenant.OrganizationCreateResp, error) {
+	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
+	if err := requireSystemAdmin(ctx, code.OrganizationCreateError); err != nil {
+		return nil, err
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 	insertEntity := &model.OrganizationEntity{
 		TenantID:  tenantID,
@@ -223,6 +227,10 @@ func (svc *organizationSvc) childOrgIDSet(ctx *gin.Context, tenantID string) (ma
 
 // Update 全量更新（含移动：改 parentID 时做环路/深度校验并级联更新子树 org_path/org_depth）。
 func (svc *organizationSvc) Update(ctx *gin.Context, req *dtotenant.OrganizationUpdateReq) error {
+	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
+	if err := requireSystemAdmin(ctx, code.OrganizationUpdateError); err != nil {
+		return err
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 	orgEntity, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
 	if err != nil {
@@ -255,6 +263,10 @@ func (svc *organizationSvc) Update(ctx *gin.Context, req *dtotenant.Organization
 
 // UpdateStatus 局部更新状态（PATCH）。
 func (svc *organizationSvc) UpdateStatus(ctx *gin.Context, req *dtotenant.OrganizationStatusReq) error {
+	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
+	if err := requireSystemAdmin(ctx, code.OrganizationUpdateError); err != nil {
+		return err
+	}
 	orgEntity, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcorganization.UpdateStatus] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -335,6 +347,10 @@ func (svc *organizationSvc) moveNode(ctx *gin.Context, tenantID string, node *mo
 
 // Delete 删除节点：默认拒绝（有子节点或成员时），?cascade=1 级联软删子树并解绑成员。
 func (svc *organizationSvc) Delete(ctx *gin.Context, req *dtotenant.OrganizationDeleteReq) error {
+	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
+	if err := requireSystemAdmin(ctx, code.OrganizationDeleteError); err != nil {
+		return err
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 	orgEntity, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
 	if err != nil {

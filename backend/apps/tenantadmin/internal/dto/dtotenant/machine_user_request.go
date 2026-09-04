@@ -43,5 +43,6 @@ type MachineUserRolesListReq struct {
 
 type MachineUserRolesUpdateReq struct {
 	MachineUserID string   `json:"-" uri:"machineUserID" binding:"required"` // 服务账号ID
-	RoleIDs       []string `json:"roleIDs" binding:"required"`               // 角色ID列表(全量替换)
+	AppID         string   `json:"appID"`                                    // 目标应用ID(按应用授权；空串=系统/未归属应用组)
+	RoleIDs       []string `json:"roleIDs" binding:"required"`               // 角色ID列表(全量替换该应用下的授权)
 }

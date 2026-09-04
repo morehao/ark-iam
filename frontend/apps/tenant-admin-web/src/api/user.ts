@@ -36,6 +36,6 @@ export const resetTenantUserPassword = (userID: string, password: string) =>
 /** 用户已分配角色 */
 export const getTenantUserRoles = (userID: string) => request.get<any, { list: TenantUserRoleItem[] }>(`/tenant/users/${userID}/roles`)
 
-/** 全量替换用户角色 */
-export const updateTenantUserRoles = (userID: string, roleIDs: string[]) =>
-  request.put<any, string>(`/tenant/users/${userID}/roles`, { roleIDs })
+/** 按应用全量替换用户角色（appID 空串=系统/未归属应用组；仅替换该应用下授权，不影响其它应用） */
+export const updateTenantUserRoles = (userID: string, appID: string, roleIDs: string[]) =>
+  request.put<any, string>(`/tenant/users/${userID}/roles`, { appID, roleIDs })

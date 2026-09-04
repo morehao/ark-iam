@@ -188,6 +188,10 @@ func loadUserRoleCountMap(ctx *gin.Context, tenantID string, userIDs []string) m
 // 同时按 organizationIDs 建立行政归属（member，至多 1 个）、leaderOrgIDs 建立负责关系（leader）。
 // 业务约束：用户必须从属于至少一个部门，organizationIDs 必传。
 func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dtotenant.UserCreateResp, error) {
+	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
+	if err := requireSystemAdmin(ctx, code.UserCreateError); err != nil {
+		return nil, err
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 	operatorID := gincontext.GetUserIDString(ctx)
 
@@ -423,6 +427,10 @@ func (svc *userSvc) Detail(ctx *gin.Context, req *dtotenant.UserDetailReq) (*dto
 
 // Update 局部更新用户（PATCH）：姓名/头像/状态 + 主/参与/负责部门更新。
 func (svc *userSvc) Update(ctx *gin.Context, req *dtotenant.UserUpdateReq) error {
+	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
+	if err := requireSystemAdmin(ctx, code.UserUpdateError); err != nil {
+		return err
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
 	if err != nil {
@@ -607,6 +615,10 @@ func strPtrOrNil(p *string) *string {
 
 // ResetPassword 重置密码：更新关联 person 的密码哈希（无自然人关联的用户不可登录，直接拒绝）。
 func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPasswordReq) error {
+	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
+	if err := requireSystemAdmin(ctx, code.UserResetPasswordError); err != nil {
+		return err
+	}
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.ResetPassword] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -657,8 +669,16 @@ func (svc *userSvc) ListRoles(ctx *gin.Context, req *dtotenant.UserRolesListReq)
 	return &dtotenant.UserRolesListResp{List: roles}, nil
 }
 
-// UpdateRoles 全量替换用户角色（PUT 集合语义）。
+// UpdateRoles 按应用全量替换用户角色（PUT 集合语义）。
+// 角色从属于应用(role.app_id)，故授权以「用户 × 应用」为粒度：仅替换目标应用
+// (role.app_id == req.AppID) 下的角色关联，其它应用的角色不受影响；
+// req.AppID 为空串表示「系统/未归属应用组」。req.RoleIDs 必须全部属于当前租户
+// 且归属目标应用，否则拒绝（防跨应用混授）。
 func (svc *userSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.UserRolesUpdateReq) error {
+	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
+	if err := requireSystemAdmin(ctx, code.UserRoleReplaceError); err != nil {
+		return err
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
 	if err != nil {
@@ -673,7 +693,19 @@ func (svc *userSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.UserRolesUpdate
 		return code.GetError(code.UserMemberOperationOnlyError)
 	}
 
-	// 校验角色均属于本租户
+	// 旧关联（事务外读取一次，供删除范围收敛与「最后一个内置管理员」保护使用）
+	oldList, err := dao.NewUserRoleDao().GetListByCond(ctx, &dao.UserRoleCond{TenantID: tenantID, UserID: req.UserID})
+	if err != nil {
+		glog.Errorf(ctx, "[svcuser.UpdateRoles] dao GetListByCond old user_role fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.UserRoleReplaceError)
+	}
+	// 旧角色归属应用映射（缺失的历史角色按不属于任何组处理，不参与删除/保护）
+	oldRoleAppMap, err := svc.roleAppMapOf(ctx, tenantID, oldList)
+	if err != nil {
+		return err
+	}
+
+	// 校验新角色均属于本租户且归属目标应用
 	if len(req.RoleIDs) > 0 {
 		roleList, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{TenantID: tenantID, IDs: req.RoleIDs})
 		if err != nil {
@@ -683,25 +715,44 @@ func (svc *userSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.UserRolesUpdate
 		if len(roleList) != len(req.RoleIDs) {
 			return code.GetError(code.RoleNotExistError)
 		}
+		for i := range roleList {
+			if roleList[i].AppID != req.AppID {
+				return code.GetError(code.RoleNotExistError)
+			}
+		}
 	}
 
+	// 计算替换后的有效角色全集 =（其它应用现有角色）+（本应用新列表），用于管理员兜底保护
+	effectiveRoleIDs := make([]string, 0, len(oldList)+len(req.RoleIDs))
+	kept := make(map[string]struct{}, len(oldList))
+	for _, ur := range oldList {
+		if oldRoleAppMap[ur.RoleID] == req.AppID {
+			continue // 本应用旧关联将被替换移除
+		}
+		if _, ok := kept[ur.RoleID]; ok {
+			continue
+		}
+		kept[ur.RoleID] = struct{}{}
+		effectiveRoleIDs = append(effectiveRoleIDs, ur.RoleID)
+	}
+	effectiveRoleIDs = append(effectiveRoleIDs, req.RoleIDs...)
+
 	// 内置管理员保护：禁止移除「最后一个内置系统管理角色持有者」的系统管理能力，防止平台锁死
-	if keepLastAdmin, err := svc.hasOtherSystemAdminHolder(ctx, tenantID, req.UserID, req.RoleIDs); err != nil {
+	if keepLastAdmin, err := svc.hasOtherSystemAdminHolder(ctx, tenantID, req.UserID, effectiveRoleIDs); err != nil {
 		glog.Errorf(ctx, "[svcuser.UpdateRoles] check other admin holder fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserRoleReplaceError)
 	} else if keepLastAdmin {
 		return code.GetError(code.UserRoleRemoveLastAdminForbiddenError)
 	}
 
-	userID := gincontext.GetUserIDString(ctx)
+	operator := gincontext.GetUserIDString(ctx)
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
-		// 删除旧关联
-		oldList, err := dao.NewUserRoleDao().GetListByCond(ctx, &dao.UserRoleCond{TenantID: tenantID, UserID: req.UserID})
-		if err != nil {
-			return err
-		}
-		for _, r := range oldList {
-			if err := dao.NewUserRoleDao().WithTx(tx).Delete(ctx, r.ID, userID); err != nil {
+		// 仅删除目标应用下的旧关联，其它应用保持不变
+		for _, ur := range oldList {
+			if oldRoleAppMap[ur.RoleID] != req.AppID {
+				continue
+			}
+			if err := dao.NewUserRoleDao().WithTx(tx).Delete(ctx, ur.ID, operator); err != nil {
 				return err
 			}
 		}
@@ -711,7 +762,7 @@ func (svc *userSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.UserRolesUpdate
 				TenantID:  tenantID,
 				UserID:    req.UserID,
 				RoleID:    roleID,
-				CreatedBy: userID,
+				CreatedBy: operator,
 			}
 			if err := dao.NewUserRoleDao().WithTx(tx).Insert(ctx, entity); err != nil {
 				return err
@@ -726,11 +777,34 @@ func (svc *userSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.UserRolesUpdate
 	return nil
 }
 
-// hasOtherSystemAdminHolder 判断本次角色全量替换是否会移除目标用户持有的「最后一个内置系统管理角色」。
+// roleAppMapOf 收集一批 user_role 关联所指向角色的归属应用（缺失角色忽略，不入映射）。
+func (svc *userSvc) roleAppMapOf(ctx *gin.Context, tenantID string, urList []model.UserRoleEntity) (map[string]string, error) {
+	result := make(map[string]string, len(urList))
+	if len(urList) == 0 {
+		return result, nil
+	}
+	roleIDs := make([]string, 0, len(urList))
+	for _, ur := range urList {
+		roleIDs = append(roleIDs, ur.RoleID)
+	}
+	roleList, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{TenantID: tenantID, IDs: roleIDs})
+	if err != nil {
+		glog.Errorf(ctx, "[svcuser.roleAppMapOf] dao GetListByCond roles fail, err:%v", err)
+		return nil, code.GetError(code.UserRoleReplaceError)
+	}
+	for i := range roleList {
+		result[roleList[i].ID] = roleList[i].AppID
+	}
+	return result, nil
+}
+
+// hasOtherSystemAdminHolder 判断本次「按应用全量替换」是否会移除目标用户持有的
+// 「最后一个内置系统管理角色」。newEffectiveRoleIDs 为替换后的有效角色全集
+// （其它应用现有角色 + 本应用新列表），而非仅本应用的新列表。
 // 返回 true 表示应拒绝该操作（防止平台系统管理能力永久锁死）。
-// 规则：目标用户当前持有 ≥1 个内置系统管理角色（source=builtin 且 admin_level>=basic），且新角色列表不包含任何内置系统管理角色，
-// 且当前租户内除目标用户外没有其他用户仍持有内置系统管理角色 → 需保留，返回 true。
-func (svc *userSvc) hasOtherSystemAdminHolder(ctx *gin.Context, tenantID, targetUserID string, newRoleIDs []string) (bool, error) {
+// 规则：目标用户当前持有 ≥1 个内置系统管理角色（source=builtin 且 admin_level>=basic），且替换后的
+// 有效集合不包含任何内置系统管理角色，且当前租户内除目标用户外没有其他用户仍持有内置系统管理角色 → 需保留，返回 true。
+func (svc *userSvc) hasOtherSystemAdminHolder(ctx *gin.Context, tenantID, targetUserID string, newEffectiveRoleIDs []string) (bool, error) {
 	// 1. 目标用户当前角色
 	urList, err := dao.NewUserRoleDao().GetListByCond(ctx, &dao.UserRoleCond{TenantID: tenantID, UserID: targetUserID})
 	if err != nil {
@@ -751,13 +825,13 @@ func (svc *userSvc) hasOtherSystemAdminHolder(ctx *gin.Context, tenantID, target
 	if len(sysRoleIDs) == 0 {
 		return false, nil // 目标用户本就不具备内置系统管理能力
 	}
-	// 3. 新列表中是否还包含内置系统管理角色
-	newSysRoleIDs, err := svc.filterBuiltinSystemRoles(ctx, tenantID, newRoleIDs)
+	// 3. 替换后的有效集合中是否还包含内置系统管理角色
+	newSysRoleIDs, err := svc.filterBuiltinSystemRoles(ctx, tenantID, newEffectiveRoleIDs)
 	if err != nil {
 		return false, err
 	}
 	if len(newSysRoleIDs) > 0 {
-		return false, nil // 新列表仍保留系统管理能力
+		return false, nil // 有效集合仍保留系统管理能力
 	}
 	// 4. 是否还有其他用户持有任一内置系统管理角色
 	allSysRoles, err := svc.listTenantBuiltinSystemRoles(ctx, tenantID)

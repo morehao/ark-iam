@@ -76,10 +76,12 @@ func seedTestMenuTree(t *testing.T, db *gorm.DB, tenantID string) (rootID, child
 
 // TestRoleCreateRequiresApp 角色从属于租户订阅的应用：非法应用拒绝、应用内编码唯一、跨应用同编码允许。
 func TestRoleCreateRequiresApp(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
+	seedTenantSuperOperator(t, db, "t1", "op")
 	seedTestApp(t, db, "t1", "app1")
 	seedTestApp(t, db, "t2", "app2")
+	seedTenantSuperOperator(t, db, "t2", "op2")
 
 	ginCtx := newOrgGinCtx(t, "t1", "op")
 
@@ -146,9 +148,10 @@ func TestRolePageListWithCounts(t *testing.T) {
 
 // TestRoleMenusUpdateAndGet 角色菜单授权：按角色所属应用菜单授权 + 回显 + 非法菜单拒绝。
 func TestRoleMenusUpdateAndGet(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.RoleMenuEntity{}, &model.MenuEntity{},
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.RoleMenuEntity{}, &model.MenuEntity{}, &model.UserRoleEntity{},
 		&model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
+	seedTenantSuperOperator(t, db, "t1", "op")
 	seedTestRole(t, db, "r1", "t1", "app1", "管理员", "admin")
 	rootID, childID := seedTestMenuTree(t, db, "t1")
 

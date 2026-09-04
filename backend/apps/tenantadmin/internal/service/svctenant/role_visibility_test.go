@@ -36,7 +36,7 @@ func TestDeleteRejectsBuiltinRole(t *testing.T) {
 	seedTestApp(t, db, "t1", "app1")
 	seedBuiltinRole(t, db, "r1", "t1", "app1")
 
-	err := svc.Delete(newOrgGinCtx(t, "t1", "op"), &dtotenant.RoleDeleteReq{RoleID: "r1"})
+	err := svc.Delete(newSuperCtx(t, db, "t1", "op"), &dtotenant.RoleDeleteReq{RoleID: "r1"})
 	if err == nil {
 		t.Fatalf("expected builtin delete forbidden error")
 	}
@@ -47,12 +47,12 @@ func TestDeleteRejectsBuiltinRole(t *testing.T) {
 
 // TestUpdateRejectsBuiltinCoreChange 内置角色禁止改核心字段（编码/类别），名称与描述可改。
 func TestUpdateRejectsBuiltinCoreChange(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
 	seedTestApp(t, db, "t1", "app1")
 	seedBuiltinRole(t, db, "r1", "t1", "app1")
 
-	ginCtx := newOrgGinCtx(t, "t1", "op")
+	ginCtx := newSuperCtx(t, db, "t1", "op")
 
 	// 改编码 → 拒绝
 	err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "管理员", Code: "super-admin"})
@@ -209,8 +209,8 @@ func TestUpdateRolesRejectRemovingLastAdmin(t *testing.T) {
 	seedBuiltinSystemRole(t, db, "r-admin", "t1", "app1")
 	seedUserRoleLink(t, db, "ur1", "t1", "u1", "r-admin")
 
-	// u1 是唯一持有内置系统管理角色的人，尝试移除 → 拒绝
-	err := svc.UpdateRoles(newOrgGinCtx(t, "t1", "op"), &dtotenant.UserRolesUpdateReq{UserID: "u1", RoleIDs: []string{}})
+	// u1 是唯一持有内置系统管理角色的人，尝试按应用(app1)移除 → 拒绝
+	err := svc.UpdateRoles(newCustomSuperCtx(t, db, "t1", "op"), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app1", RoleIDs: []string{}})
 	if err == nil {
 		t.Fatalf("expected last-admin removal forbidden")
 	}
@@ -231,7 +231,7 @@ func TestUpdateRolesAllowWhenKeepSystemRole(t *testing.T) {
 	seedUserRoleLink(t, db, "ur1", "t1", "u1", "r-admin")
 
 	// 新列表仍保留一个内置系统管理角色 → 允许（权限不丢失）
-	err := svc.UpdateRoles(newOrgGinCtx(t, "t1", "op"), &dtotenant.UserRolesUpdateReq{UserID: "u1", RoleIDs: []string{"r-sys2"}})
+	err := svc.UpdateRoles(newCustomSuperCtx(t, db, "t1", "op"), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app1", RoleIDs: []string{"r-sys2"}})
 	if err != nil {
 		t.Fatalf("update to another system role should be allowed: %v", err)
 	}
@@ -250,9 +250,38 @@ func TestUpdateRolesAllowWhenOtherAdminExists(t *testing.T) {
 	seedUserRoleLink(t, db, "ur2", "t1", "u2", "r-admin")
 
 	// u2 仍持有内置系统管理角色 → u1 可释放，不锁死
-	err := svc.UpdateRoles(newOrgGinCtx(t, "t1", "op"), &dtotenant.UserRolesUpdateReq{UserID: "u1", RoleIDs: []string{}})
+	err := svc.UpdateRoles(newCustomSuperCtx(t, db, "t1", "op"), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app1", RoleIDs: []string{}})
 	if err != nil {
 		t.Fatalf("release when another admin remains should be allowed: %v", err)
+	}
+}
+
+// TestUpdateRolesKeepAdminHeldInOtherApp 目标应用(app1)内移除系统管理角色，
+// 但用户在另一应用(app2)仍持系统管理角色 → 有效集合仍有系统管理能力，允许。
+func TestUpdateRolesKeepAdminHeldInOtherApp(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserEntity{},
+		&model.ApplicationEntity{}, &model.TenantApplicationEntity{})
+	svc := &userSvc{}
+	seedTestApp(t, db, "t1", "app1")
+	seedTestApp(t, db, "t1", "app2")
+	seedTestUser(t, db, "t1", "u1", "admin")
+	seedBuiltinSystemRole(t, db, "r-admin", "t1", "app1")
+	seedBuiltinSystemRole(t, db, "r-sys2", "t1", "app2")
+	seedUserRoleLink(t, db, "ur1", "t1", "u1", "r-admin")
+	seedUserRoleLink(t, db, "ur2", "t1", "u1", "r-sys2")
+
+	// 仅替换 app1 为空：app2 的系统管理角色仍在有效集合内 → 不应触发「最后一个管理员」保护
+	err := svc.UpdateRoles(newCustomSuperCtx(t, db, "t1", "op"), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app1", RoleIDs: []string{}})
+	if err != nil {
+		t.Fatalf("removing roles of app1 while holding system role in app2 should be allowed: %v", err)
+	}
+	// app2 关联应保留
+	var remain []model.UserRoleEntity
+	if err := db.Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&remain).Error; err != nil {
+		t.Fatalf("re-query user_role: %v", err)
+	}
+	if len(remain) != 1 || remain[0].RoleID != "r-sys2" {
+		t.Fatalf("expected only r-sys2 kept, got %+v", remain)
 	}
 }
 
@@ -276,9 +305,10 @@ func seedAdminVisibilityMenu(t *testing.T, db *gorm.DB, id, appID string) {
 // TestUpdateMenusRejectsAdminVisibilityForNormalRole 授权约束：普通角色提交 visibility=admin 菜单被拒绝；
 // 授权 member 可见性菜单允许。
 func TestUpdateMenusRejectsAdminVisibilityForNormalRole(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.RoleMenuEntity{}, &model.MenuEntity{},
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.RoleMenuEntity{}, &model.MenuEntity{}, &model.UserRoleEntity{},
 		&model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
+	seedTenantSuperOperator(t, db, "t1", "op")
 	seedTestApp(t, db, "t1", "app1")
 	seedTestRole(t, db, "r1", "t1", "app1", "成员", "member")
 	seedAdminVisibilityMenu(t, db, "m-admin", "app1")
@@ -295,9 +325,10 @@ func TestUpdateMenusRejectsAdminVisibilityForNormalRole(t *testing.T) {
 
 // TestUpdateMenusAllowsAdminVisibilityForBuiltinAdmin 豁免：内置管理员（super&&builtin）角色可授权 admin 可见性菜单。
 func TestUpdateMenusAllowsAdminVisibilityForBuiltinAdmin(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.RoleMenuEntity{}, &model.MenuEntity{},
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.RoleMenuEntity{}, &model.MenuEntity{}, &model.UserRoleEntity{},
 		&model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
+	seedTenantSuperOperator(t, db, "t1", "op")
 	seedTestApp(t, db, "t1", "app1")
 	seedBuiltinSystemRole(t, db, "r-admin", "t1", "app1")
 	seedAdminVisibilityMenu(t, db, "m-admin", "app1")

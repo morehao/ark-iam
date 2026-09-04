@@ -54,7 +54,7 @@ func seedTestUserWithPerson(t *testing.T, db *gorm.DB, userID, tenantID, personI
 // 仅姓名→创建仅含姓名的自然人；提供标识→新建 person（姓名即自然人姓名）；标识命中已有 person→关联复用；同租户重复→拒绝。
 // 用户必属部门：所有创建均携带 organizationIDs（t1→o1、t2→o2）。
 func TestUserCreateFindOrCreatePerson(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
 
 	// 部门（用户必属部门）：t1 拥有 o1，t2 拥有 o2
@@ -72,7 +72,7 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 	}
 
 	// 无 personID 且无登录标识：以姓名创建自然人并关联（person 始终存在）
-	ginCtx := newOrgGinCtx(t, "t1", "op")
+	ginCtx := newSuperCtx(t, db, "t1", "op")
 	resp, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "仅姓名用户", PrimaryEmail: "nameonly@x.com", OrganizationIDs: []string{"o1"}})
 	if err != nil {
 		t.Fatalf("create user with name-only person: %v", err)
@@ -113,7 +113,7 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 	}
 
 	// 另一租户提供相同 email：find-or-create 命中已有 person 并关联（复用同一自然人）
-	respC, err := svc.Create(newOrgGinCtx(t, "t2", "op2"), &dtotenant.UserCreateReq{Name: "Bob2", PrimaryEmail: "bob@x.com", OrganizationIDs: []string{"o2"}})
+	respC, err := svc.Create(newSuperCtx(t, db, "t2", "op2"), &dtotenant.UserCreateReq{Name: "Bob2", PrimaryEmail: "bob@x.com", OrganizationIDs: []string{"o2"}})
 	if err != nil {
 		t.Fatalf("create user linking existing person: %v", err)
 	}
@@ -157,9 +157,9 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 // TestUserCreateRequiresOrganization 业务约束：创建用户必须从属于至少一个部门
 // （organizationIDs 必传，缺失或为空一律拒绝；提供合法部门则正常创建）。
 func TestUserCreateRequiresOrganization(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
-	ginCtx := newOrgGinCtx(t, "t1", "op")
+	ginCtx := newSuperCtx(t, db, "t1", "op")
 
 	if err := db.Create(&model.OrganizationEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "o1"}},
@@ -204,7 +204,7 @@ func TestUserCreateRequiresOrganization(t *testing.T) {
 
 // TestUserCreateWithOrganizations 创建用户时建立行政主部门(primary,至多1)与负责关系(leader,可多)。
 func TestUserCreateWithOrganizations(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
 
 	now := time.Now()
@@ -222,7 +222,7 @@ func TestUserCreateWithOrganizations(t *testing.T) {
 		_ = now
 	}
 
-	ginCtx := newOrgGinCtx(t, "t1", "op")
+	ginCtx := newSuperCtx(t, db, "t1", "op")
 	// 创建用户：primary=o1（单个行政主部门）+ leader=o2
 	resp, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", OrganizationIDs: []string{"o1"}, LeaderOrgIDs: []string{"o2"}})
 	if err != nil {
@@ -352,7 +352,7 @@ func TestUserDetailWithOrganizationsAndRoles(t *testing.T) {
 		t.Fatalf("seed user-role: %v", err)
 	}
 
-	ginCtx := newOrgGinCtx(t, "t1", "op")
+	ginCtx := newSuperCtx(t, db, "t1", "op")
 	resp, err := svc.Detail(ginCtx, &dtotenant.UserDetailReq{UserID: "u1"})
 	if err != nil {
 		t.Fatalf("detail: %v", err)
@@ -392,7 +392,7 @@ func TestUserUpdateRolesFullReplace(t *testing.T) {
 		t.Fatalf("seed other role: %v", err)
 	}
 
-	ginCtx := newOrgGinCtx(t, "t1", "op")
+	ginCtx := newSuperCtx(t, db, "t1", "op")
 	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", RoleIDs: []string{"r1", "r2"}}); err != nil {
 		t.Fatalf("update roles: %v", err)
 	}
@@ -421,9 +421,98 @@ func TestUserUpdateRolesFullReplace(t *testing.T) {
 	}
 }
 
+// TestUserUpdateRolesScopedByApp 按应用粒度替换：仅替换目标应用下的角色，其它应用不受影响；
+// 清空仅清空该应用；跨应用/跨租户授予被拒。
+func TestUserUpdateRolesScopedByApp(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	svc := &userSvc{}
+	seedTestUserWithPerson(t, db, "u1", "t1", "", "张三")
+
+	seedRole := func(id, tenantID, appID, code string) {
+		t.Helper()
+		if err := db.Create(&model.RoleEntity{
+			BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: id}},
+			TenantID:   tenantID,
+			AppID:      appID,
+			Name:       code,
+			Code:       code,
+		}).Error; err != nil {
+			t.Fatalf("seed role %s: %v", id, err)
+		}
+	}
+	seedRole("ra1", "t1", "app-a", "role-a1")
+	seedRole("ra2", "t1", "app-a", "role-a2")
+	seedRole("rb1", "t1", "app-b", "role-b1")
+	seedRole("rc1", "t2", "app-c", "role-c1")
+
+	seedUserRole := func(id, userID, roleID string) {
+		t.Helper()
+		if err := db.Create(&model.UserRoleEntity{
+			BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: id}},
+			TenantID:   "t1",
+			UserID:     userID,
+			RoleID:     roleID,
+			CreatedBy:  "t",
+		}).Error; err != nil {
+			t.Fatalf("seed user_role %s: %v", id, err)
+		}
+	}
+	seedUserRole("ur1", "u1", "ra1")
+	seedUserRole("ur2", "u1", "rb1")
+
+	queryRoleIDs := func() []string {
+		var urList []model.UserRoleEntity
+		if err := db.Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&urList).Error; err != nil {
+			t.Fatalf("query user_role: %v", err)
+		}
+		ids := make([]string, 0, len(urList))
+		for _, ur := range urList {
+			ids = append(ids, ur.RoleID)
+		}
+		return ids
+	}
+	hasRole := func(ids []string, id string) bool {
+		for _, v := range ids {
+			if v == id {
+				return true
+			}
+		}
+		return false
+	}
+
+	ginCtx := newSuperCtx(t, db, "t1", "op")
+
+	// 仅替换 app-a：ra1 被移除、ra2 加入，app-b 的 rb1 必须保留
+	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-a", RoleIDs: []string{"ra2"}}); err != nil {
+		t.Fatalf("replace app-a roles: %v", err)
+	}
+	ids := queryRoleIDs()
+	if len(ids) != 2 || !hasRole(ids, "ra2") || !hasRole(ids, "rb1") || hasRole(ids, "ra1") {
+		t.Fatalf("expected [ra2 rb1] after app-a replace, got %+v", ids)
+	}
+
+	// 清空 app-b：仅移除 rb1，app-a 的 ra2 保留
+	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-b", RoleIDs: []string{}}); err != nil {
+		t.Fatalf("clear app-b roles: %v", err)
+	}
+	ids = queryRoleIDs()
+	if len(ids) != 1 || ids[0] != "ra2" {
+		t.Fatalf("expected only ra2 after clearing app-b, got %+v", ids)
+	}
+
+	// 跨应用授予：app-a 下塞 app-b 的角色 → 拒绝
+	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-a", RoleIDs: []string{"rb1"}}); err != code.GetError(code.RoleNotExistError) {
+		t.Fatalf("cross-app role grant: want RoleNotExist, got %v", err)
+	}
+	// 跨租户角色（即使 AppID 相同）→ 拒绝
+	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-c", RoleIDs: []string{"rc1"}}); err != code.GetError(code.RoleNotExistError) {
+		t.Fatalf("cross-tenant role grant: want RoleNotExist, got %v", err)
+	}
+}
+
 // TestUserCreateWithLeaderOrgs 创建用户同时建立行政主部门(primary)、参与部门(secondary)与负责部门(leader)。
 func TestUserCreateWithLeaderOrgs(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
 
 	for _, orgID := range []string{"o1", "o2", "o3"} {
@@ -439,7 +528,7 @@ func TestUserCreateWithLeaderOrgs(t *testing.T) {
 		}
 	}
 
-	ginCtx := newOrgGinCtx(t, "t1", "op")
+	ginCtx := newSuperCtx(t, db, "t1", "op")
 	resp, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{
 		Name:            "张三",
 		PrimaryEmail:    "zs2@x.com",
@@ -486,7 +575,7 @@ func TestUserCreateWithLeaderOrgs(t *testing.T) {
 // TestUserUpdateOrganizations 编辑用户时更新主/参与/负责部门：
 // primary 替换、secondary/leader 全量替换、leader 冲突拒绝。
 func TestUserUpdateOrganizations(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
 
 	for _, orgID := range []string{"o1", "o2", "o3"} {
@@ -502,7 +591,7 @@ func TestUserUpdateOrganizations(t *testing.T) {
 		}
 	}
 
-	ginCtx := newOrgGinCtx(t, "t1", "op")
+	ginCtx := newSuperCtx(t, db, "t1", "op")
 	u1, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{
 		Name:            "张三",
 		PrimaryEmail:    "u1@x.com",
@@ -575,7 +664,7 @@ func TestUserUpdateOrganizations(t *testing.T) {
 // TestUserUpdateContact 编辑成员联系方式：更新 person 的邮箱/手机号/用户名，
 // 校验邮箱与手机号二选一、以及全局唯一性冲突。
 func TestUserUpdateContact(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
 
 	if err := db.Create(&model.OrganizationEntity{
@@ -589,7 +678,7 @@ func TestUserUpdateContact(t *testing.T) {
 		t.Fatalf("seed org: %v", err)
 	}
 
-	ginCtx := newOrgGinCtx(t, "t1", "op")
+	ginCtx := newSuperCtx(t, db, "t1", "op")
 	u1, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", OrganizationIDs: []string{"o1"}})
 	if err != nil {
 		t.Fatalf("create u1: %v", err)

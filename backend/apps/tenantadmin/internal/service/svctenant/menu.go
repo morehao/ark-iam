@@ -200,6 +200,22 @@ func HasSystemAdminCapability(ctx *gin.Context) (bool, error) {
 	return level.HasSystemAdmin(), nil
 }
 
+// requireSystemAdmin 校验当前操作者具备系统管理能力（admin_level=super），否则返回能力不足错误。
+// 租户自服务控制台定位为「管理层专用」：组织/用户/角色/密钥等管理写操作统一以此硬门槛兜底，
+// 菜单可见性仅是 UX 层（前端隐藏不是安全边界），直接调用 API 也必须被拒。
+// opErr 仅在系统错误（角色查询失败等）时兜底返回。
+func requireSystemAdmin(ctx *gin.Context, opErr int) error {
+	ok, err := HasSystemAdminCapability(ctx)
+	if err != nil {
+		glog.Errorf(ctx, "[svctenant.requireSystemAdmin] resolve admin level fail, err:%v", err)
+		return code.GetError(opErr)
+	}
+	if !ok {
+		return code.GetError(code.UserSystemAdminRequiredError)
+	}
+	return nil
+}
+
 // ResolveUserAdminLevel 推导当前用户能达到的最高系统管理等级：聚合该用户全部角色，
 // 取各角色 admin_level（显式能力标签）的最高档位（member < super）。复用公共层 svcmenu。
 func ResolveUserAdminLevel(ctx *gin.Context) (model.SysAdminLevel, error) {

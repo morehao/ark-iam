@@ -175,14 +175,19 @@ func (ctr *machineUserCtr) ListRoles(ctx *gin.Context) {
 }
 
 // @Tags 服务账号
-// @Summary 全量替换服务账号角色
+// @Summary 按应用全量替换服务账号角色
 // @accept application/json
 // @Produce application/json
-// @Param req body dtotenant.MachineUserRolesUpdateReq true "全量替换服务账号角色"
+// @Param machineUserID path string true "服务账号ID"
+// @Param req body dtotenant.MachineUserRolesUpdateReq true "按应用全量替换服务账号角色(appID 空串=系统/未归属应用组;禁授系统管理角色)"
 // @Success 200 {object} gincontext.DtoRender
 // @Router /v1/tenant/machine-users/{machineUserID}/roles [put]
 func (ctr *machineUserCtr) UpdateRoles(ctx *gin.Context) {
 	var req dtotenant.MachineUserRolesUpdateReq
+	if err := ctx.ShouldBindUri(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return

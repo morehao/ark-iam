@@ -644,10 +644,17 @@ const docTemplatetenantadmin = `{
                 "tags": [
                     "服务账号"
                 ],
-                "summary": "全量替换服务账号角色",
+                "summary": "按应用全量替换服务账号角色",
                 "parameters": [
                     {
-                        "description": "全量替换服务账号角色",
+                        "type": "string",
+                        "description": "服务账号ID",
+                        "name": "machineUserID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "按应用全量替换服务账号角色(appID 空串=系统/未归属应用组;禁授系统管理角色)",
                         "name": "req",
                         "in": "body",
                         "required": true,
@@ -1889,7 +1896,7 @@ const docTemplatetenantadmin = `{
                 "tags": [
                     "用户"
                 ],
-                "summary": "全量替换用户角色",
+                "summary": "按应用全量替换用户角色",
                 "parameters": [
                     {
                         "type": "string",
@@ -1899,7 +1906,7 @@ const docTemplatetenantadmin = `{
                         "required": true
                     },
                     {
-                        "description": "全量替换用户角色",
+                        "description": "按应用全量替换用户角色(appID 空串=系统/未归属应用组)",
                         "name": "req",
                         "in": "body",
                         "required": true,
@@ -2260,8 +2267,12 @@ const docTemplatetenantadmin = `{
                 "roleIDs"
             ],
             "properties": {
+                "appID": {
+                    "description": "目标应用ID(按应用授权；空串=系统/未归属应用组)",
+                    "type": "string"
+                },
                 "roleIDs": {
-                    "description": "角色ID列表(全量替换)",
+                    "description": "角色ID列表(全量替换该应用下的授权)",
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -3233,8 +3244,12 @@ const docTemplatetenantadmin = `{
                 "roleIDs"
             ],
             "properties": {
+                "appID": {
+                    "description": "目标应用ID(按应用授权；空串=系统/未归属应用组)",
+                    "type": "string"
+                },
                 "roleIDs": {
-                    "description": "角色ID列表(全量替换)",
+                    "description": "角色ID列表(全量替换该应用下的授权)",
                     "type": "array",
                     "items": {
                         "type": "string"
