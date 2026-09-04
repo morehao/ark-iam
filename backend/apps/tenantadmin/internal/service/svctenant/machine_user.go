@@ -39,17 +39,9 @@ func NewMachineUserSvc() MachineUserSvc {
 }
 
 // checkSystemAdmin 校验当前操作者具备系统管理能力（admin_level=super），否则返回能力不足错误。
-// opErr 仅在系统错误(角色查询失败等)时兜底返回。
+// opErr 仅在系统错误(角色查询失败等)时兜底返回。统一走共享门槛 svctenant.requireSystemAdmin。
 func (svc *machineUserSvc) checkSystemAdmin(ctx *gin.Context, opErr int) error {
-	ok, err := HasSystemAdminCapability(ctx)
-	if err != nil {
-		glog.Errorf(ctx, "[svcmachine.checkSystemAdmin] resolve admin level fail, err:%v", err)
-		return code.GetError(opErr)
-	}
-	if !ok {
-		return code.GetError(code.UserSystemAdminRequiredError)
-	}
-	return nil
+	return requireSystemAdmin(ctx, opErr)
 }
 
 // loadMachineUser 加载指定租户内的服务账号（不存在/跨租户/非服务账号均按不存在处理）。
@@ -408,8 +400,10 @@ func (svc *machineUserSvc) ListRoles(ctx *gin.Context, req *dtotenant.MachineUse
 	return &dtotenant.UserRolesListResp{List: roles}, nil
 }
 
-// UpdateRoles 全量替换服务账号的角色（PUT 集合语义）。
-// 服务账号可被授予普通/自定义角色，禁止授予系统管理角色（admin_level=super），杜绝管理能力落入机器主体。
+// UpdateRoles 按应用全量替换服务账号的角色（PUT 集合语义）。
+// 与真实用户一致：仅替换目标应用(role.app_id == req.AppID)下的角色关联，其它应用不受影响；
+// req.AppID 空串=系统/未归属应用组。服务账号可被授予普通/自定义角色，禁止授予系统管理角色
+// （admin_level=super），杜绝管理能力落入机器主体。
 func (svc *machineUserSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.MachineUserRolesUpdateReq) error {
 	if err := svc.checkSystemAdmin(ctx, code.MachineUserRoleReplaceError); err != nil {
 		return err
@@ -419,6 +413,18 @@ func (svc *machineUserSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.MachineU
 		return err
 	}
 
+	// 旧关联（事务外读取一次）
+	oldList, err := dao.NewUserRoleDao().GetListByCond(ctx, &dao.UserRoleCond{TenantID: tenantID, UserID: req.MachineUserID})
+	if err != nil {
+		glog.Errorf(ctx, "[svcmachine.UpdateRoles] dao GetListByCond old user_role fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.MachineUserRoleReplaceError)
+	}
+	oldRoleAppMap, err := (&userSvc{}).roleAppMapOf(ctx, tenantID, oldList)
+	if err != nil {
+		return err
+	}
+
+	// 校验新角色：均属于本租户、归属目标应用，且非系统管理角色
 	if len(req.RoleIDs) > 0 {
 		roleList, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{TenantID: tenantID, IDs: req.RoleIDs})
 		if err != nil {
@@ -429,6 +435,9 @@ func (svc *machineUserSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.MachineU
 			return code.GetError(code.RoleNotExistError)
 		}
 		for _, r := range roleList {
+			if r.AppID != req.AppID {
+				return code.GetError(code.RoleNotExistError)
+			}
 			if model.SysAdminLevel(r.AdminLevel).HasSystemAdmin() {
 				return code.GetError(code.UserSuperRoleAssignForbidden)
 			}
@@ -437,11 +446,11 @@ func (svc *machineUserSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.MachineU
 
 	operator := gincontext.GetUserIDString(ctx)
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
-		oldList, err := dao.NewUserRoleDao().GetListByCond(ctx, &dao.UserRoleCond{TenantID: tenantID, UserID: req.MachineUserID})
-		if err != nil {
-			return err
-		}
+		// 仅删除目标应用下的旧关联
 		for _, r := range oldList {
+			if oldRoleAppMap[r.RoleID] != req.AppID {
+				continue
+			}
 			if err := dao.NewUserRoleDao().WithTx(tx).Delete(ctx, r.ID, operator); err != nil {
 				return err
 			}

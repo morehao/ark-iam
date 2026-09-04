@@ -38,16 +38,9 @@ func NewApiKeySvc() ApiKeySvc {
 }
 
 // requireSystemAdmin 校验当前操作者具备系统管理能力，opErr 用于系统错误的兜底返回。
+// 统一走共享门槛 svctenant.requireSystemAdmin。
 func (svc *apiKeySvc) requireSystemAdmin(ctx *gin.Context, opErr int) error {
-	ok, err := HasSystemAdminCapability(ctx)
-	if err != nil {
-		glog.Errorf(ctx, "[svcapikey.requireSystemAdmin] resolve admin level fail, err:%v", err)
-		return code.GetError(opErr)
-	}
-	if !ok {
-		return code.GetError(code.UserSystemAdminRequiredError)
-	}
-	return nil
+	return requireSystemAdmin(ctx, opErr)
 }
 
 // loadOwnerServiceAccount 加载指定租户内作为密钥归属的服务账号（不存在/跨租户/非服务账号均按不存在处理）。

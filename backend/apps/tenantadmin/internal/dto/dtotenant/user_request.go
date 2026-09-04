@@ -50,5 +50,6 @@ type UserRolesListReq struct {
 
 type UserRolesUpdateReq struct {
 	UserID  string   `json:"-" uri:"userID" binding:"required"` // 用户ID
-	RoleIDs []string `json:"roleIDs" binding:"required"`        // 角色ID列表(全量替换)
+	AppID   string   `json:"appID"`                             // 目标应用ID(按应用授权；空串=系统/未归属应用组)
+	RoleIDs []string `json:"roleIDs" binding:"required"`        // 角色ID列表(全量替换该应用下的授权)
 }

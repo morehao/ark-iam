@@ -33,6 +33,10 @@ func NewOrganizationUserSvc() OrganizationUserSvc {
 }
 
 func (svc *organizationUserSvc) Create(ctx *gin.Context, req *dtotenant.OrganizationUserCreateReq) (*dtotenant.OrganizationUserCreateResp, error) {
+	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
+	if err := requireSystemAdmin(ctx, code.OrganizationUserCreateError); err != nil {
+		return nil, err
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 	relationType := req.RelationType
 	if relationType == "" {
@@ -121,6 +125,10 @@ func (svc *organizationUserSvc) Create(ctx *gin.Context, req *dtotenant.Organiza
 }
 
 func (svc *organizationUserSvc) Update(ctx *gin.Context, req *dtotenant.OrganizationUserUpdateReq) error {
+	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
+	if err := requireSystemAdmin(ctx, code.OrganizationUserUpdateError); err != nil {
+		return err
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 	relationType := req.RelationType
 	if relationType == "" {
@@ -300,6 +308,10 @@ func ensureSinglePrimary(ctx *gin.Context, tx *gorm.DB, tenantID, userID, except
 }
 
 func (svc *organizationUserSvc) Delete(ctx *gin.Context, req *dtotenant.OrganizationUserDeleteReq) error {
+	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
+	if err := requireSystemAdmin(ctx, code.OrganizationUserDeleteError); err != nil {
+		return err
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 	relationList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
 		TenantID:       tenantID,

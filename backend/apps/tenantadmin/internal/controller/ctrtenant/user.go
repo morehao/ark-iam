@@ -164,11 +164,11 @@ func (ctr *userCtr) ListRoles(ctx *gin.Context) {
 }
 
 // @Tags 用户
-// @Summary 全量替换用户角色
+// @Summary 按应用全量替换用户角色
 // @accept application/json
 // @Produce application/json
 // @Param userID path string true "用户ID"
-// @Param req body dtotenant.UserRolesUpdateReq true "全量替换用户角色"
+// @Param req body dtotenant.UserRolesUpdateReq true "按应用全量替换用户角色(appID 空串=系统/未归属应用组)"
 // @Success 200 {object} gincontext.DtoRender{data=string}
 // @Router /v1/tenant/users/{userID}/roles [put]
 func (ctr *userCtr) UpdateRoles(ctx *gin.Context) {

@@ -25,7 +25,6 @@ import type {
   TenantMachineUserDetail,
   TenantMachineUserItem,
   TenantMachineUserUpdateReq,
-  TenantRoleItem,
   TenantUserDetail,
   TenantUserItem,
 } from '@ark-iam/types'
@@ -35,7 +34,6 @@ import {
   getTenantUserPageList,
   resetTenantUserPassword,
   updateTenantUser,
-  updateTenantUserRoles,
 } from '../../api/user'
 import {
   createMachineUser,
@@ -44,11 +42,10 @@ import {
   getMachineUserPageList,
   updateMachineUser,
   updateMachineUserStatus,
-  updateMachineUserRoles,
 } from '../../api/machineUser'
 import { getApiKeyPageList } from '../../api/apiKey'
 import { getOrganizationTree } from '../../api/organization'
-import { getTenantRolePageList } from '../../api/role'
+import RoleAssignEditor from '../../components/RoleAssignEditor'
 import { KeyStateTag } from '../apiKey/KeyState'
 
 // 组织关系类型 -> 展示标签
@@ -88,9 +85,8 @@ function UsersPane() {
   // 组织树（创建/编辑表单组织下拉）
   const [orgTree, setOrgTree] = useState<OrganizationItem[]>([])
 
-  // 角色（详情 Tab）
-  const [roleOptions, setRoleOptions] = useState<TenantRoleItem[]>([])
-  const [roleIDs, setRoleIDs] = useState<string[]>([])
+  // 授权角色（列表行操作 Modal：按应用授权，逻辑收敛于共享组件 RoleAssignEditor）
+  const [roleTarget, setRoleTarget] = useState<TenantUserItem | null>(null)
 
   // 重置密码
   const [pwdOpen, setPwdOpen] = useState(false)
@@ -221,25 +217,13 @@ function UsersPane() {
     setDetailLoading(true)
     setDetail(null)
     try {
-      const [d, roles] = await Promise.all([
-        getTenantUserDetail(record.userID),
-        getTenantRolePageList({ page: 1, pageSize: 100 }),
-      ])
+      const d = await getTenantUserDetail(record.userID)
       setDetail(d)
-      setRoleOptions(roles?.list || [])
-      setRoleIDs((d.roles || []).map((r) => r.roleID))
     } catch {
       /* 拦截器已提示 */
     } finally {
       setDetailLoading(false)
     }
-  }
-
-  const saveRoleAssignments = async () => {
-    if (!detail) return
-    await updateTenantUserRoles(detail.userID, roleIDs)
-    message.success('角色已更新')
-    void openDetail(detail)
   }
 
   const openResetPassword = (record: TenantUserItem) => {
@@ -296,11 +280,14 @@ function UsersPane() {
     {
       title: '操作',
       key: 'action',
-      width: 260,
+      width: 330,
       render: (_, r) => (
         <Space size={4}>
           <Button type="link" size="small" onClick={() => void openDetail(r)}>
             详情
+          </Button>
+          <Button type="link" size="small" onClick={() => setRoleTarget(r)}>
+            授权角色
           </Button>
           <Button type="link" size="small" onClick={() => void openEdit(r)}>
             编辑
@@ -374,7 +361,7 @@ function UsersPane() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1100 }}
+        scroll={{ x: 1200 }}
         pagination={{
           current: page,
           pageSize,
@@ -513,23 +500,7 @@ function UsersPane() {
               {
                 key: 'role',
                 label: '角色',
-                children: (
-                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                    <Select
-                      mode="multiple"
-                      allowClear
-                      placeholder="选择角色（全量替换）"
-                      style={{ width: '100%' }}
-                      value={roleIDs}
-                      onChange={setRoleIDs}
-                      options={roleOptions.map((r) => ({ label: `${r.name}（${r.code}）`, value: r.roleID }))}
-                    />
-                    <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>当前已分配角色：{(detail.roles || []).map((r) => r.name).join('、') || '无'}</div>
-                    <Button type="primary" onClick={() => void saveRoleAssignments()}>
-                      保存角色
-                    </Button>
-                  </Space>
-                ),
+                children: <RoleAssignEditor kind="user" subjectID={detail.userID} onSaved={() => void fetchData()} />,
               },
             ]}
           />
@@ -543,6 +514,27 @@ function UsersPane() {
             <Input.Password placeholder="重置后用户使用新密码登录" />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 授权角色（列表行操作）：按应用授权，内容收敛于共享组件 */}
+      <Modal
+        title={`授权角色 - ${roleTarget?.name || ''}`}
+        open={!!roleTarget}
+        onCancel={() => setRoleTarget(null)}
+        footer={null}
+        destroyOnClose
+        width={560}
+      >
+        {roleTarget && (
+          <RoleAssignEditor
+            kind="user"
+            subjectID={roleTarget.userID}
+            onSaved={() => {
+              setRoleTarget(null)
+              void fetchData()
+            }}
+          />
+        )}
       </Modal>
     </>
   )
@@ -575,10 +567,6 @@ function ServiceAccountsPane() {
 
   // 组织树（创建/编辑表单组织下拉，与真实用户表单的组织选择一致）
   const [orgTree, setOrgTree] = useState<OrganizationItem[]>([])
-
-  // 角色（详情内）
-  const [roleOptions, setRoleOptions] = useState<TenantRoleItem[]>([])
-  const [roleIDs, setRoleIDs] = useState<string[]>([])
 
   // 服务账号 API 密钥（详情内只读）
   const [machineKeys, setMachineKeys] = useState<TenantApiKeyItem[]>([])
@@ -692,14 +680,11 @@ function ServiceAccountsPane() {
     setMachineKeys([])
     setMachineKeysLoading(true)
     try {
-      const [d, roles, keys] = await Promise.all([
+      const [d, keys] = await Promise.all([
         getMachineUserDetail(record.machineUserID),
-        getTenantRolePageList({ page: 1, pageSize: 100 }),
         getApiKeyPageList({ machineUserID: record.machineUserID, page: 1, pageSize: 50 }).catch(() => ({ list: [], total: 0 })),
       ])
       setDetail(d)
-      setRoleOptions(roles?.list || [])
-      setRoleIDs((d.roles || []).map((r) => r.roleID))
       setMachineKeys(keys?.list || [])
     } catch {
       /* 拦截器已提示 */
@@ -707,13 +692,6 @@ function ServiceAccountsPane() {
       setDetailLoading(false)
       setMachineKeysLoading(false)
     }
-  }
-
-  const saveRoleAssignments = async () => {
-    if (!detail) return
-    await updateMachineUserRoles(detail.machineUserID, roleIDs)
-    message.success('角色已更新')
-    void openDetail(detail)
   }
 
   const columns: ColumnsType<TenantMachineUserItem> = [
@@ -897,25 +875,7 @@ function ServiceAccountsPane() {
               {
                 key: 'role',
                 label: '已授权角色',
-                children: (
-                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                    <Select
-                      mode="multiple"
-                      allowClear
-                      placeholder="选择角色（全量替换）"
-                      style={{ width: '100%' }}
-                      value={roleIDs}
-                      onChange={setRoleIDs}
-                      options={roleOptions.map((r) => ({ label: `${r.name}（${r.code}）`, value: r.roleID }))}
-                    />
-                    <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>
-                      当前已授权：{(detail.roles || []).map((r) => r.name).join('、') || '无'}。提交含系统管理角色的角色将返回“禁止将系统管理角色授予服务账号”。
-                    </div>
-                    <Button type="primary" onClick={() => void saveRoleAssignments()}>
-                      保存角色
-                    </Button>
-                  </Space>
-                ),
+                children: <RoleAssignEditor kind="machine" subjectID={detail.machineUserID} onSaved={() => void fetchData()} />,
               },
               {
                 key: 'keys',

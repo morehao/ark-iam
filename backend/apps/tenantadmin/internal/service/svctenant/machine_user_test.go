@@ -205,7 +205,7 @@ func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
 		t.Fatalf("reload mismatch: %+v", reloaded)
 	}
 
-	// 普通角色可授、super 角色禁授
+	// 普通角色可授、super 角色禁授（按应用授权：role.app_id 须与 req.AppID 一致）
 	devRole := &model.RoleEntity{
 		TenantID: tenantID, AppID: "app-tenant", Code: "dev", Name: "开发者",
 		Source: string(model.RoleSourceCustom), AdminLevel: string(model.SysAdminLevelMember),
@@ -213,7 +213,7 @@ func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
 	if err := db.Create(devRole).Error; err != nil {
 		t.Fatalf("seed dev role: %v", err)
 	}
-	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, RoleIDs: []string{devRole.ID}}); err != nil {
+	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-tenant", RoleIDs: []string{devRole.ID}}); err != nil {
 		t.Fatalf("grant dev role: %v", err)
 	}
 	superRole := &model.RoleEntity{
@@ -223,8 +223,38 @@ func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
 	if err := db.Create(superRole).Error; err != nil {
 		t.Fatalf("seed super role 2: %v", err)
 	}
-	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, RoleIDs: []string{superRole.ID}}); err != code.GetError(code.UserSuperRoleAssignForbidden) {
+	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-tenant", RoleIDs: []string{superRole.ID}}); err != code.GetError(code.UserSuperRoleAssignForbidden) {
 		t.Fatalf("grant super role to machine: want forbidden, got %v", err)
+	}
+
+	// 按应用隔离：授另一个应用的普通角色后，原应用角色不受影响；跨应用角色拒绝
+	opsRole := &model.RoleEntity{
+		TenantID: tenantID, AppID: "app-other", Code: "ops", Name: "运维",
+		Source: string(model.RoleSourceCustom), AdminLevel: string(model.SysAdminLevelMember),
+	}
+	if err := db.Create(opsRole).Error; err != nil {
+		t.Fatalf("seed ops role: %v", err)
+	}
+	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-other", RoleIDs: []string{opsRole.ID}}); err != nil {
+		t.Fatalf("grant ops role: %v", err)
+	}
+	var machRoleIDs []string
+	if err := db.Model(&model.UserRoleEntity{}).Where("tenant_id = ? AND user_id = ?", tenantID, machineID).Pluck("role_id", &machRoleIDs).Error; err != nil {
+		t.Fatalf("query machine roles: %v", err)
+	}
+	hasRole := func(ids []string, id string) bool {
+		for _, v := range ids {
+			if v == id {
+				return true
+			}
+		}
+		return false
+	}
+	if len(machRoleIDs) != 2 || !hasRole(machRoleIDs, devRole.ID) || !hasRole(machRoleIDs, opsRole.ID) {
+		t.Fatalf("expected dev+ops roles kept per-app, got %+v", machRoleIDs)
+	}
+	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-tenant", RoleIDs: []string{opsRole.ID}}); err != code.GetError(code.RoleNotExistError) {
+		t.Fatalf("cross-app role grant: want RoleNotExist, got %v", err)
 	}
 
 	// 服务账号下有 key 时禁止删除

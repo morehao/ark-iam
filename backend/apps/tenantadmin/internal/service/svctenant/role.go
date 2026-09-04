@@ -38,6 +38,10 @@ func NewRoleSvc() RoleSvc {
 
 // Create 创建租户角色（编码租户内唯一）。
 func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dtotenant.RoleCreateResp, error) {
+	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
+	if err := requireSystemAdmin(ctx, code.RoleCreateError); err != nil {
+		return nil, err
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 
 	// 角色从属于租户订阅的应用：校验 appID
@@ -85,6 +89,10 @@ func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dto
 
 // Delete 删除角色：级联清理 user_role / role_menu 关联（事务）。
 func (svc *roleSvc) Delete(ctx *gin.Context, req *dtotenant.RoleDeleteReq) error {
+	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
+	if err := requireSystemAdmin(ctx, code.RoleDeleteError); err != nil {
+		return err
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
 	if err != nil {
@@ -135,6 +143,10 @@ func (svc *roleSvc) Delete(ctx *gin.Context, req *dtotenant.RoleDeleteReq) error
 
 // Update 全量更新角色。
 func (svc *roleSvc) Update(ctx *gin.Context, req *dtotenant.RoleUpdateReq) error {
+	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
+	if err := requireSystemAdmin(ctx, code.RoleUpdateError); err != nil {
+		return err
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
 	if err != nil {
@@ -346,6 +358,10 @@ func containAdminVisibilityMenus(tree []dtotenant.MenuTreeItem) bool {
 
 // UpdateMenus 全量替换角色菜单授权（PUT 集合语义）。
 func (svc *roleSvc) UpdateMenus(ctx *gin.Context, req *dtotenant.RoleMenusUpdateReq) error {
+	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
+	if err := requireSystemAdmin(ctx, code.RoleUpdateError); err != nil {
+		return err
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
 	if err != nil {
