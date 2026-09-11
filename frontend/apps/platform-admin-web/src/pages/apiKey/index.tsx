@@ -103,6 +103,7 @@ export default function ApiKeySupervisionList() {
     timeColumn<ApiKeySupervisionItem>({ title: '过期时间', dataIndex: 'expiresAt', placeholder: '永不过期' }),
     timeColumn<ApiKeySupervisionItem>({ title: '最后使用', dataIndex: 'lastUsedAt', relative: true, placeholder: '从未使用' }),
     timeColumn<ApiKeySupervisionItem>({ title: '创建时间', dataIndex: 'createdAt' }),
+    timeColumn<ApiKeySupervisionItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
   ]
 
   return (
@@ -169,7 +170,7 @@ export default function ApiKeySupervisionList() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1700 }}
+        scroll={{ x: 1880 }}
         pagination={{
           current: page,
           pageSize,

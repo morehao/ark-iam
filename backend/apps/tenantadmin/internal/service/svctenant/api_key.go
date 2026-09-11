@@ -154,6 +154,7 @@ func (svc *apiKeySvc) PageList(ctx *gin.Context, req *dtotenant.ApiKeyPageListRe
 			LastUsedAt:  sqlTimePtrUnix(v.LastUsedAt),
 			RevokedAt:   timePtrUnix(v.RevokedAt),
 			CreatedAt:   v.CreatedAt.Unix(),
+			UpdatedAt:   v.UpdatedAt.Unix(),
 		}
 		if owner, ok := userMap[v.OwnerUserID]; ok {
 			item.OwnerType = string(owner.UserType)

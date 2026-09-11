@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Form, Input, message, Modal, Popconfirm, Select, Space, Switch, Table, Tooltip } from 'antd'
+import { Button, Form, Input, message, Modal, Select, Space, Switch, Table, Tooltip } from 'antd'
 import { PlusOutlined, QuestionCircleOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { EllipsisCell, IDCell, PageContainer, SuspendedTag, timeColumn, TypeTag } from '@ark-iam/ui'
+import { EllipsisCell, IDCell, PageContainer, RowActions, SuspendedTag, timeColumn, TypeTag } from '@ark-iam/ui'
 import { createTenant, deleteTenant, getTenantPageList, updateTenant } from '@ark-iam/api'
 import type { TenantItem, TenantStatus } from '@ark-iam/types'
 
@@ -141,18 +141,14 @@ export default function TenantList() {
     {
       title: '操作',
       key: 'action',
-      width: 140,
+      width: 120,
       render: (_, r) => (
-        <Space size={4}>
-          <Button type="link" size="small" onClick={() => handleEdit(r)}>
-            编辑
-          </Button>
-          <Popconfirm title="确认删除该租户？" onConfirm={() => void handleDelete(r)}>
-            <Button type="link" size="small" danger>
-              删除
-            </Button>
-          </Popconfirm>
-        </Space>
+        <RowActions
+          actions={[
+            { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
+            { key: 'delete', label: '删除', danger: true, confirm: '确认删除该租户？', onClick: () => void handleDelete(r) },
+          ]}
+        />
       ),
     },
   ]

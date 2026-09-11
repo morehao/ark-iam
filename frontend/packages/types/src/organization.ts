@@ -20,6 +20,7 @@ export interface OrganizationChildItem {
   sort: number
   status: string
   createdAt?: number
+  updatedAt?: number
   hasChildren?: boolean
 }
 

@@ -18,6 +18,7 @@ type ApiKeySupervisionItem struct {
 	LastUsedAt  int64  `json:"lastUsedAt"` // 最后使用时间(unix 秒)
 	RevokedAt   int64  `json:"revokedAt"`  // 撤销时间(unix 秒)
 	CreatedAt   int64  `json:"createdAt"`  // 创建时间(unix 秒)
+	UpdatedAt   int64  `json:"updatedAt"`  // 更新时间(unix 秒)
 }
 
 type ApiKeySupervisionPageListResp struct {

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Form, Input, InputNumber, message, Modal, Popconfirm, Select, Space, Table } from 'antd'
+import { Button, Form, Input, InputNumber, message, Modal, Select, Space, Table } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { IDCell, PageContainer, StatusTag, timeColumn } from '@ark-iam/ui'
+import { IDCell, PageContainer, RowActions, StatusTag, timeColumn } from '@ark-iam/ui'
 import {
   createTenantApplication,
   deleteTenantApplication,
@@ -95,21 +95,18 @@ export default function TenantApplicationList() {
     { title: '应用ID', dataIndex: 'appID', key: 'appID', width: 150, render: (v: string) => <IDCell value={v} /> },
     { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (v: string) => <StatusTag value={v} /> },
     timeColumn<TenantApplicationItem>({ title: '创建时间', dataIndex: 'createdAt' }),
+    timeColumn<TenantApplicationItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     {
       title: '操作',
       key: 'action',
-      width: 140,
+      width: 120,
       render: (_, r) => (
-        <Space size={4}>
-          <Button type="link" size="small" onClick={() => handleEdit(r)}>
-            编辑
-          </Button>
-          <Popconfirm title="确认删除该订阅？" onConfirm={() => void handleDelete(r)}>
-            <Button type="link" size="small" danger>
-              删除
-            </Button>
-          </Popconfirm>
-        </Space>
+        <RowActions
+          actions={[
+            { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
+            { key: 'delete', label: '删除', danger: true, confirm: '确认删除该订阅？', onClick: () => void handleDelete(r) },
+          ]}
+        />
       ),
     },
   ]
@@ -150,7 +147,7 @@ export default function TenantApplicationList() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 870 }}
+        scroll={{ x: 1050 }}
         pagination={{
           current: page,
           pageSize,

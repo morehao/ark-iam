@@ -6,7 +6,6 @@ import {
   Input,
   InputNumber,
   Modal,
-  Popconfirm,
   Select,
   Space,
   Spin,
@@ -18,7 +17,7 @@ import {
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
-import { PageContainer, StatusTag, timeColumn, tokens } from '@ark-iam/ui'
+import { NameLink, PageContainer, RowActions, StatusTag, timeColumn, tokens } from '@ark-iam/ui'
 import type { OrganizationChildItem, OrganizationItem } from '@ark-iam/types'
 import {
   createOrganization,
@@ -244,7 +243,7 @@ export default function OrganizationPage() {
       title: '组织名称',
       dataIndex: 'name',
       key: 'name',
-      render: (v: string, r) => <a onClick={() => setSelectedID(r.organizationID)}>{v}</a>,
+      render: (v: string, r) => <NameLink value={v} onClick={() => setSelectedID(r.organizationID)} />,
     },
     {
       title: '状态',
@@ -254,24 +253,29 @@ export default function OrganizationPage() {
       render: (v: string) => <StatusTag value={v} />,
     },
     timeColumn<OrganizationChildItem>({ title: '创建时间', dataIndex: 'createdAt' }),
+    timeColumn<OrganizationChildItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     {
       title: '操作',
       key: 'action',
-      width: 200,
+      width: 180,
       render: (_, r) => (
-        <Space size={0}>
-          <Button type="link" size="small" onClick={() => openEditNode(r)}>
-            编辑
-          </Button>
-          <Button type="link" size="small" onClick={() => void toggleStatus(r)}>
-            {r.status === 'active' ? '停用' : '启用'}
-          </Button>
-          <Popconfirm title="确认删除该组织及其子组织？" onConfirm={() => void removeNode(r.organizationID)}>
-            <Button type="link" size="small" danger>
-              删除
-            </Button>
-          </Popconfirm>
-        </Space>
+        <RowActions
+          actions={[
+            { key: 'edit', label: '编辑', onClick: () => openEditNode(r) },
+            {
+              key: 'toggle',
+              label: r.status === 'active' ? '停用' : '启用',
+              onClick: () => void toggleStatus(r),
+            },
+            {
+              key: 'delete',
+              label: '删除',
+              danger: true,
+              confirm: '确认删除该组织及其子组织？',
+              onClick: () => void removeNode(r.organizationID),
+            },
+          ]}
+        />
       ),
     },
   ]
@@ -361,6 +365,7 @@ export default function OrganizationPage() {
             dataSource={childrenList}
             loading={childrenLoading}
             locale={{ emptyText: '暂无下级组织' }}
+            scroll={{ x: 840 }}
             pagination={{
               current: page,
               pageSize,

@@ -21,6 +21,7 @@ type RolePageListItem struct {
 	MemberCount int64  `json:"memberCount"` // 成员数
 	MenuCount   int64  `json:"menuCount"`   // 授权菜单数
 	CreatedAt   int64  `json:"createdAt"`   // 创建时间
+	UpdatedAt   int64  `json:"updatedAt"`   // 更新时间
 }
 
 type RoleDetailResp struct {

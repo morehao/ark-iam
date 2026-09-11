@@ -88,6 +88,12 @@ func TestPageListSupervisionOwnerResolution(t *testing.T) {
 	if personal.RevokedAt == 0 {
 		t.Fatal("expected revokedAt echoed in supervision item")
 	}
+	// 列表必须同时回传创建时间与更新时间（前端「创建时间」「更新时间」两列直读）
+	for _, item := range sup.List {
+		if item.CreatedAt <= 0 || item.UpdatedAt <= 0 {
+			t.Fatalf("supervision item missing time fields: %+v", item)
+		}
+	}
 
 	// 按租户过滤
 	filtered, err := svc.PageListSupervision(newTestGinCtx(tenantA.ID), &dtoapikey.ApiKeySupervisionPageListReq{TenantID: tenantB.ID})

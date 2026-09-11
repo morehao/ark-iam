@@ -196,6 +196,7 @@ func (svc *organizationSvc) Children(ctx *gin.Context, req *dtotenant.Organizati
 			ParentID:       v.ParentID,
 			OrgDepth:       v.OrgDepth,
 			CreatedAt:      v.CreatedAt.Unix(),
+			UpdatedAt:      v.UpdatedAt.Unix(),
 			HasChildren:    hasChildSet[v.ID],
 			OrganizationBaseInfo: objtenant.OrganizationBaseInfo{
 				Name:   v.Name,

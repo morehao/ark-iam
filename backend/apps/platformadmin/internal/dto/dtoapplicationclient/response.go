@@ -45,6 +45,7 @@ type PageListItem struct {
 	GrantTypes              []string `json:"grantTypes"`              // 授权类型
 	TokenEndpointAuthMethod string   `json:"tokenEndpointAuthMethod"` // 令牌端点认证方式
 	CreatedAt               int64    `json:"createdAt"`               // 创建时间(unix 秒)
+	UpdatedAt               int64    `json:"updatedAt"`               // 更新时间(unix 秒)
 }
 
 type SecretResp struct {

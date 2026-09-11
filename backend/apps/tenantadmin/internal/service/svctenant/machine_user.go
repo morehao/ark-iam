@@ -148,6 +148,7 @@ func (svc *machineUserSvc) PageList(ctx *gin.Context, req *dtotenant.MachineUser
 			Description:   v.Description,
 			IsSuspended:   v.IsSuspended,
 			CreatedAt:     v.CreatedAt.Unix(),
+			UpdatedAt:     v.UpdatedAt.Unix(),
 		})
 	}
 	if err := fillPrimaryOrg(ctx, tenantID, respList); err != nil {

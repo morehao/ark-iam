@@ -22,6 +22,7 @@ export interface ApplicationItem {
   allowPersonCreateTenant?: boolean
   allowJoinByInvite?: boolean
   createdAt?: number
+  updatedAt?: number
 }
 
 export interface ApplicationCreateReq {
@@ -63,6 +64,7 @@ export interface OAuthClientItem {
   grantTypes: string[]
   tokenEndpointAuthMethod: string
   createdAt?: number
+  updatedAt?: number
 }
 
 export interface OAuthClientDetail extends OAuthClientItem {
@@ -177,6 +179,7 @@ export interface TenantApplicationItem {
   config?: string
   grantedScope?: string
   createdAt?: number
+  updatedAt?: number
 }
 
 export interface TenantApplicationCreateReq {
@@ -214,6 +217,7 @@ export interface ApiKeySupervisionItem {
   lastUsedAt: number // 最后使用时间(unix 秒)
   revokedAt: number // 撤销时间(unix 秒)
   createdAt: number // 创建时间(unix 秒)
+  updatedAt: number // 更新时间(unix 秒)
 }
 
 // ---------- 菜单 ----------
@@ -239,6 +243,7 @@ export interface MenuItem {
   keepAlive: number
   status: MenuStatus
   createdAt?: number
+  updatedAt?: number
   children?: MenuItem[]
 }
 
@@ -258,6 +263,7 @@ export interface DomainItem {
   isVerified: number
   verifiedAt: number | null
   createdAt: number
+  updatedAt: number
 }
 
 // ---------- 审计日志 ----------

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Form, Input, Modal, Popconfirm, Space, Table, message } from 'antd'
+import { Button, Form, Input, Modal, Space, Table, message } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { IDCell, timeColumn, tokens } from '@ark-iam/ui'
+import { IDCell, RowActions, timeColumn, tokens } from '@ark-iam/ui'
 import type { TenantUserIdentityItem } from '@ark-iam/types'
 import { createTenantUserIdentity, deleteTenantUserIdentity, getTenantUserIdentities } from '../api/user'
 
@@ -78,11 +78,17 @@ export default function UserIdentityTab({ userID }: UserIdentityTabProps) {
       key: 'action',
       width: 80,
       render: (_, r) => (
-        <Popconfirm title="确认解绑该身份？" onConfirm={() => void unbind(r.userIdentityID)}>
-          <Button type="link" size="small" danger>
-            解绑
-          </Button>
-        </Popconfirm>
+        <RowActions
+          actions={[
+            {
+              key: 'unbind',
+              label: '解绑',
+              danger: true,
+              confirm: '确认解绑该身份？',
+              onClick: () => void unbind(r.userIdentityID),
+            },
+          ]}
+        />
       ),
     },
   ]

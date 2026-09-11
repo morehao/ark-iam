@@ -15,6 +15,7 @@ type ApiKeyPageListItem struct {
 	LastUsedAt  *int64 `json:"lastUsedAt"`  // 最后使用时间(null=从未使用)
 	RevokedAt   *int64 `json:"revokedAt"`   // 吊销时间(null=未吊销)
 	CreatedAt   int64  `json:"createdAt"`   // 创建时间
+	UpdatedAt   int64  `json:"updatedAt"`   // 更新时间
 }
 
 type ApiKeyPageListResp struct {

@@ -16,6 +16,7 @@ export interface TenantUserItem {
   primaryOrgName: string
   roleCount: number
   createdAt?: number
+  updatedAt?: number
 }
 
 export interface TenantUserCreateReq {
@@ -102,6 +103,7 @@ export interface TenantRoleItem {
   memberCount: number
   menuCount: number
   createdAt?: number
+  updatedAt?: number
 }
 
 export interface TenantRoleCreateReq {
@@ -127,6 +129,7 @@ export interface TenantMachineUserItem {
   primaryOrgName: string // 主部门名称
   isSuspended: boolean
   createdAt?: number
+  updatedAt?: number
 }
 
 // 服务账号组织归属条目（详情用）：primary=主部门（唯一），secondary=参与部门（可多条）。
@@ -177,6 +180,7 @@ export interface TenantApiKeyItem {
   lastUsedAt: number | null
   revokedAt: number | null
   createdAt: number
+  updatedAt: number
 }
 
 export interface TenantApiKeyCreateReq {

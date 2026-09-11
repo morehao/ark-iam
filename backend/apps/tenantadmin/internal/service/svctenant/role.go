@@ -256,6 +256,7 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtotenant.RolePageListReq) (
 			MemberCount: memberCount[v.ID],
 			MenuCount:   menuCount[v.ID],
 			CreatedAt:   v.CreatedAt.Unix(),
+			UpdatedAt:   v.UpdatedAt.Unix(),
 		})
 	}
 	return &dtotenant.RolePageListResp{List: list, Total: total}, nil

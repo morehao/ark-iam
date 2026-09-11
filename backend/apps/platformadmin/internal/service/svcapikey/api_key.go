@@ -67,6 +67,7 @@ func (svc *apiKeySupervisionSvc) PageListSupervision(ctx *gin.Context, req *dtoa
 			KeyPrefix:  entity.KeyPrefix,
 			Scope:      string(entity.Scope),
 			CreatedAt:  entity.CreatedAt.Unix(),
+			UpdatedAt:  entity.UpdatedAt.Unix(),
 		}
 		if owner, ok := userMap[entity.OwnerUserID]; ok {
 			item.OwnerUserID = owner.ID

@@ -12,6 +12,7 @@ type UserPageListItem struct {
 	PrimaryOrgName string `json:"primaryOrgName"` // 主组织名称
 	RoleCount      int64  `json:"roleCount"`      // 角色数
 	CreatedAt      int64  `json:"createdAt"`      // 创建时间
+	UpdatedAt      int64  `json:"updatedAt"`      // 更新时间
 }
 
 type UserPageListResp struct {

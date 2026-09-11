@@ -97,6 +97,7 @@ func (svc *domainSvc) PageList(ctx *gin.Context, req *dtodomain.DomainPageListRe
 			IsVerified: v.IsVerified,
 			VerifiedAt: verifiedAt,
 			CreatedAt:  v.CreatedAt.Unix(),
+			UpdatedAt:  v.UpdatedAt.Unix(),
 		})
 	}
 	return &dtodomain.DomainPageListResp{List: items, Total: total}, nil

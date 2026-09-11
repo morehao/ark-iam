@@ -7,7 +7,6 @@ import {
   Input,
   InputNumber,
   Modal,
-  Popconfirm,
   Select,
   Space,
   Spin,
@@ -27,7 +26,7 @@ import {
   ThunderboltOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons'
-import { EllipsisCell, PageContainer, StatusTag, tokens } from '@ark-iam/ui'
+import { EllipsisCell, PageContainer, RowActions, StatusTag, timeColumn, tokens } from '@ark-iam/ui'
 import { createMenu, deleteMenu, getApplicationPageList, getMenuTree, updateMenu } from '@ark-iam/api'
 import type { ApplicationItem, MenuItem, MenuStatus, MenuType, MenuVisibility } from '@ark-iam/types'
 
@@ -352,25 +351,27 @@ export default function MenuList() {
       width: 110,
       render: (v: string) => renderMenuVisibility(v),
     },
+    timeColumn<MenuItem>({ title: '创建时间', dataIndex: 'createdAt' }),
+    timeColumn<MenuItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     {
       title: '操作',
       key: 'action',
-      width: 220,
+      width: 200,
       fixed: 'right',
       render: (_, m) => (
-        <Space size={0}>
-          <Button type="link" size="small" onClick={() => handleCreateChild(m)}>
-            新增子级
-          </Button>
-          <Button type="link" size="small" onClick={() => handleEdit(m)}>
-            编辑
-          </Button>
-          <Popconfirm title={`确认删除「${m.name}」？其子菜单将一并删除`} onConfirm={() => void handleDelete(m)}>
-            <Button type="link" size="small" danger>
-              删除
-            </Button>
-          </Popconfirm>
-        </Space>
+        <RowActions
+          actions={[
+            { key: 'createChild', label: '新增子级', onClick: () => handleCreateChild(m) },
+            { key: 'edit', label: '编辑', onClick: () => handleEdit(m) },
+            {
+              key: 'delete',
+              label: '删除',
+              danger: true,
+              confirm: `确认删除「${m.name}」？其子菜单将一并删除`,
+              onClick: () => void handleDelete(m),
+            },
+          ]}
+        />
       ),
     },
   ]
@@ -502,7 +503,7 @@ export default function MenuList() {
             dataSource={displayList}
             loading={treeLoading}
             pagination={false}
-            scroll={{ x: 1150 }}
+            scroll={{ x: 1510 }}
             expandable={{
               expandedRowKeys: keyword ? collectKeys(displayList) : expandedKeys,
               onExpandedRowsChange: (keys) => setExpandedKeys(keys as string[]),

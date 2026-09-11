@@ -382,6 +382,12 @@ func TestOrganizationChildrenPageAndHasChildren(t *testing.T) {
 	if has["B"] {
 		t.Fatalf("expected B to have no children, got %+v", has)
 	}
+	// 列表必须同时回传创建时间与更新时间（前端「创建时间」「更新时间」两列直读）
+	for _, item := range resp.List {
+		if item.CreatedAt <= 0 || item.UpdatedAt <= 0 {
+			t.Fatalf("children item missing time fields: %+v", item)
+		}
+	}
 
 	// 状态筛选：只返回启用的 A
 	resp, err = svc.Children(ginCtx, &dtotenant.OrganizationChildrenReq{

@@ -155,6 +155,7 @@ func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.Applic
 			AllowPersonCreateTenant: v.AllowPersonCreateTenant,
 			AllowJoinByInvite:       v.AllowJoinByInvite,
 			CreatedAt:               v.CreatedAt.Unix(),
+			UpdatedAt:               v.UpdatedAt.Unix(),
 		})
 	}
 	return &dtoapplication.ApplicationPageListResp{List: items, Total: total}, nil

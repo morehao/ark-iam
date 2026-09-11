@@ -112,6 +112,7 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (
 			PrimaryOrgName: primaryOrgNameMap[v.ID],
 			RoleCount:      roleCountMap[v.ID],
 			CreatedAt:      v.CreatedAt.Unix(),
+			UpdatedAt:      v.UpdatedAt.Unix(),
 		})
 	}
 	return &dtotenant.UserPageListResp{
