@@ -460,6 +460,7 @@ func TestGeneratePassword(t *testing.T) {
 本项目按**全新项目**维护 schema，**不写数据迁移脚本**：`AutoMigrate` 只新增缺失的表/列/索引，**不删不改**既有结构（`db.auto_migrate`），`pkg/seed` 亦只做幂等 upsert。因此**列/表下线（删字段、改名、类型或语义替换）一律按新项目处理**：
 
 - **下线即彻底删代码**：model 字段、DAO Cond、DTO/object、service、controller/router、前端类型与 `docs/design` 同步删除，并全仓 `grep` 确认零残留（参考 `tenant.is_suspended` → `tenant.status`、`system` 模块下线）。
+- **菜单下线额外两步**：从 `seedMenus` 删除定义后，必须在 `pkg/seed/retired_menu.go` 的 `retiredMenus` 登记（父目录与子菜单一并登记），否则存量库会残留指向已删除页面的死链菜单；判断依据是「base 版 `seedMenus` 与当前定义的差集」——`seedMenus` 只 upsert 不下线，而全新库测试永远测不出这类残留。
 - **禁止在代码里写兼容旧库的分支**：不加回填、不加 `DROP COLUMN`、不引入 `information_schema`/`Migrator()` 判定——这会污染 AutoMigrate「只增不删」的契约，且对新项目零收益。
 - **旧库残留列/表属预期**（不再是事实源、不被读写），处置方式是**开发/测试库删库重建**：重建后 AutoMigrate + Seed 产出的结构即目标结构（见 `docs/design/run-and-deploy.md` §2.3）。
 - **确需保全旧数据时**，把一次性 SQL 写进部署文档交执行方在升级前运行，而不是塞进启动流程。

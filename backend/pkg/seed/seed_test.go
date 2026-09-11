@@ -324,46 +324,103 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 	}
 }
 
-// TestSeedIamPrunesRetiredApiKeyMenu 存量库清理：历史版本种子写入的平台端「API密钥监督」菜单
-// （code=api-key）及其 role_menu 授权绑定，应在种子启动后被清除且清理幂等。
-func TestSeedIamPrunesRetiredApiKeyMenu(t *testing.T) {
+// TestSeedIamPrunesRetiredMenus 存量库清理：历史版本种子写入、当前已下线的平台端菜单
+// （api-key 与 身份中心 grp-identity + 其子菜单 user/role）及其 role_menu 授权绑定，
+// 应在种子启动后被清除，且清理幂等。
+//
+// 为什么必须有这条回归：seedMenus 只做幂等 upsert、从不下线菜单，漏登记 retiredMenus
+// 会让存量库持续渲染指向已删除页面的死链菜单——而「全新库菜单结构」测试测不出来，
+// 因为新库根本不会创建这些菜单。
+func TestSeedIamPrunesRetiredMenus(t *testing.T) {
 	db := setupDB(t)
 	ctx := context.Background()
 	if err := seed.SeedIam(ctx, db); err != nil {
 		t.Fatalf("seed fail: %v", err)
 	}
 
-	// 模拟存量库：手工补回已下线菜单行 + admin 角色授权绑定
 	var adminApp model.ApplicationEntity
 	if err := db.Where("code = ?", "platform-admin").First(&adminApp).Error; err != nil {
 		t.Fatalf("admin app not found: %v", err)
-	}
-	var parent model.MenuEntity
-	if err := db.Where("app_id = ? AND code = ?", adminApp.ID, "grp-app").First(&parent).Error; err != nil {
-		t.Fatalf("grp-app menu not found: %v", err)
-	}
-	stale := &model.MenuEntity{
-		AppID:      adminApp.ID,
-		ParentID:   parent.ID,
-		Name:       "API密钥监督",
-		Code:       "api-key",
-		Path:       "/api-key",
-		Icon:       "key",
-		Sort:       3,
-		Type:       model.MenuTypeMenu,
-		Visibility: model.MenuVisibilityAdmin,
-		Component:  "/apiKey/index",
-		Status:     model.MenuStatusEnable,
-	}
-	if err := db.Create(stale).Error; err != nil {
-		t.Fatalf("insert stale menu: %v", err)
 	}
 	var adminRole model.RoleEntity
 	if err := db.Where("app_id = ? AND code = ?", adminApp.ID, "admin").First(&adminRole).Error; err != nil {
 		t.Fatalf("admin role not found: %v", err)
 	}
-	if err := db.Create(&model.RoleMenuEntity{TenantID: adminRole.TenantID, RoleID: adminRole.ID, MenuID: stale.ID}).Error; err != nil {
-		t.Fatalf("insert stale role_menu: %v", err)
+	var grpApp model.MenuEntity
+	if err := db.Where("app_id = ? AND code = ?", adminApp.ID, "grp-app").First(&grpApp).Error; err != nil {
+		t.Fatalf("grp-app menu not found: %v", err)
+	}
+
+	// 模拟存量库：补回历史版本的「身份中心」目录（子菜单需要其 ID），再补三个子/同级菜单
+	legacyIdentity := &model.MenuEntity{
+		AppID:      adminApp.ID,
+		Name:       "身份中心",
+		Code:       "grp-identity",
+		Icon:       "team",
+		Sort:       4,
+		Type:       model.MenuTypeDirectory,
+		Visibility: model.MenuVisibilityAdmin,
+		Status:     model.MenuStatusEnable,
+	}
+	if err := db.Create(legacyIdentity).Error; err != nil {
+		t.Fatalf("insert legacy grp-identity: %v", err)
+	}
+	legacyMenus := []*model.MenuEntity{
+		{
+			AppID:      adminApp.ID,
+			ParentID:   grpApp.ID,
+			Name:       "API密钥监督",
+			Code:       "api-key",
+			Path:       "/api-key",
+			Icon:       "key",
+			Sort:       3,
+			Type:       model.MenuTypeMenu,
+			Visibility: model.MenuVisibilityAdmin,
+			Component:  "/apiKey/index",
+			Status:     model.MenuStatusEnable,
+		},
+		{
+			AppID:      adminApp.ID,
+			ParentID:   legacyIdentity.ID,
+			Name:       "用户管理",
+			Code:       "user",
+			Path:       "/user",
+			Icon:       "user",
+			Sort:       1,
+			Type:       model.MenuTypeMenu,
+			Visibility: model.MenuVisibilityAdmin,
+			Component:  "/user/index",
+			Status:     model.MenuStatusEnable,
+		},
+		{
+			AppID:      adminApp.ID,
+			ParentID:   legacyIdentity.ID,
+			Name:       "角色管理",
+			Code:       "role",
+			Path:       "/role",
+			Icon:       "role",
+			Sort:       2,
+			Type:       model.MenuTypeMenu,
+			Visibility: model.MenuVisibilityAdmin,
+			Component:  "/role/index",
+			Status:     model.MenuStatusEnable,
+		},
+	}
+	for _, legacy := range legacyMenus {
+		if err := db.Create(legacy).Error; err != nil {
+			t.Fatalf("insert legacy menu %s: %v", legacy.Code, err)
+		}
+	}
+	// 存量库中这些菜单都被 admin 角色授权过，父目录同样有绑定
+	allLegacy := append(append([]*model.MenuEntity{}, legacyMenus...), legacyIdentity)
+	for _, legacy := range allLegacy {
+		if err := db.Create(&model.RoleMenuEntity{
+			TenantID: adminRole.TenantID,
+			RoleID:   adminRole.ID,
+			MenuID:   legacy.ID,
+		}).Error; err != nil {
+			t.Fatalf("insert legacy role_menu %s: %v", legacy.Code, err)
+		}
 	}
 
 	// 再次种子启动：菜单行与授权绑定均应被清理；重复执行保持幂等
@@ -373,19 +430,22 @@ func TestSeedIamPrunesRetiredApiKeyMenu(t *testing.T) {
 		}
 	}
 
-	var menuCount int64
-	if err := db.Model(&model.MenuEntity{}).Where("app_id = ? AND code = ?", adminApp.ID, "api-key").Count(&menuCount).Error; err != nil {
-		t.Fatalf("count stale menu: %v", err)
-	}
-	if menuCount != 0 {
-		t.Errorf("retired menu api-key count = %d, want 0", menuCount)
-	}
-	var linkCount int64
-	if err := db.Model(&model.RoleMenuEntity{}).Where("menu_id = ?", stale.ID).Count(&linkCount).Error; err != nil {
-		t.Fatalf("count stale role_menu: %v", err)
-	}
-	if linkCount != 0 {
-		t.Errorf("retired menu api-key role_menu count = %d, want 0", linkCount)
+	for _, legacy := range allLegacy {
+		var menuCount int64
+		if err := db.Model(&model.MenuEntity{}).
+			Where("app_id = ? AND code = ?", adminApp.ID, legacy.Code).Count(&menuCount).Error; err != nil {
+			t.Fatalf("count retired menu %s: %v", legacy.Code, err)
+		}
+		if menuCount != 0 {
+			t.Errorf("retired menu %s count = %d, want 0", legacy.Code, menuCount)
+		}
+		var linkCount int64
+		if err := db.Model(&model.RoleMenuEntity{}).Where("menu_id = ?", legacy.ID).Count(&linkCount).Error; err != nil {
+			t.Fatalf("count retired menu %s role_menu: %v", legacy.Code, err)
+		}
+		if linkCount != 0 {
+			t.Errorf("retired menu %s role_menu count = %d, want 0", legacy.Code, linkCount)
+		}
 	}
 }
 
