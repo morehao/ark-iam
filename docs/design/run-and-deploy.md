@@ -78,6 +78,8 @@ flowchart LR
 
 种子数据：启动时由 `pkg/seed` 幂等写入（配置 `db.seed: true` 开启）。管理员 `admin / admin123`，OAuth 客户端 `platform-admin-web` / `tenant-admin-web`。
 
+> **Schema 变更（列/表下线）**：本项目按新项目处理，不维护数据迁移脚本（AutoMigrate 只增不删，见 `string-id-pg-automigrate-seed.md` §3）。下线列/表后，开发/测试库需**删库重建**：`dropdb iam && createdb iam`（或删掉相关表）后重启后端，AutoMigrate + Seed 会重建全部表与种子数据；旧库中残留的列/表不再被读写，属预期。确需保全旧数据时，在升级前自行执行一次性 SQL 导出/回填。
+
 ### 2.4 验证 OIDC Provider
 
 ```bash

@@ -455,6 +455,15 @@ func TestGeneratePassword(t *testing.T) {
 }
 ```
 
+### 数据库 Schema 变更约定（按新项目处理）
+
+本项目按**全新项目**维护 schema，**不写数据迁移脚本**：`AutoMigrate` 只新增缺失的表/列/索引，**不删不改**既有结构（`db.auto_migrate`），`pkg/seed` 亦只做幂等 upsert。因此**列/表下线（删字段、改名、类型或语义替换）一律按新项目处理**：
+
+- **下线即彻底删代码**：model 字段、DAO Cond、DTO/object、service、controller/router、前端类型与 `docs/design` 同步删除，并全仓 `grep` 确认零残留（参考 `tenant.is_suspended` → `tenant.status`、`system` 模块下线）。
+- **禁止在代码里写兼容旧库的分支**：不加回填、不加 `DROP COLUMN`、不引入 `information_schema`/`Migrator()` 判定——这会污染 AutoMigrate「只增不删」的契约，且对新项目零收益。
+- **旧库残留列/表属预期**（不再是事实源、不被读写），处置方式是**开发/测试库删库重建**：重建后 AutoMigrate + Seed 产出的结构即目标结构（见 `docs/design/run-and-deploy.md` §2.3）。
+- **确需保全旧数据时**，把一次性 SQL 写进部署文档交执行方在升级前运行，而不是塞进启动流程。
+
 ### 代码生成
 
 项目使用 `gocli` 工具进行代码生成：
