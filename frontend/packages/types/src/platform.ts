@@ -153,12 +153,41 @@ export interface TenantItem {
   updatedAt?: number
 }
 
+/**
+ * 建租户时的内置管理员（必填）：建租户即产出可登录的租户管理员。
+ * 不含密码——初始临时密码由服务端生成并仅在创建响应返回一次（见
+ * docs/design/tenant-admin-provisioning-design-20260912.md D2/D3/D6）。
+ */
+export interface TenantAdminCreateReq {
+  name: string
+  username?: string
+  primaryEmail?: string
+  primaryPhone?: string
+}
+
 export interface TenantCreateReq {
   name: string
   dbUser?: string
   status?: TenantStatus
   tag?: string
   type?: string
+  admin: TenantAdminCreateReq
+}
+
+/**
+ * 建租户响应。adminInitialPassword 为空表示该管理员的邮箱/手机命中了已存在的自然人
+ * （其密码未被改动），此时不会回显任何凭据。
+ */
+export interface TenantCreateResp {
+  tenantID: string
+  adminUserID: string
+  adminInitialPassword: string
+}
+
+/** 重置租户内置管理员密码响应：新临时密码仅此一次返回，该管理员下次登录必须改密。 */
+export interface TenantAdminResetPasswordResp {
+  userID: string
+  initialPassword: string
 }
 
 export interface TenantUpdateReq {

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Form, Input, message, Modal, Select, Space, Switch, Table, Tooltip } from 'antd'
+import { Button, Divider, Form, Input, message, Modal, Select, Space, Switch, Table, Tooltip } from 'antd'
 import { PlusOutlined, QuestionCircleOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { EllipsisCell, IDCell, PageContainer, RowActions, SuspendedTag, timeColumn, TypeTag } from '@ark-iam/ui'
-import { createTenant, deleteTenant, getTenantPageList, updateTenant } from '@ark-iam/api'
+import { EllipsisCell, IDCell, InitialPasswordModal, PageContainer, RowActions, SuspendedTag, timeColumn, TypeTag } from '@ark-iam/ui'
+import { createTenant, deleteTenant, getTenantPageList, resetTenantAdminPassword, updateTenant } from '@ark-iam/api'
 import type { TenantItem, TenantStatus } from '@ark-iam/types'
 
 // 租户状态筛选项（后端 model.TenantStatus：active-正常 / suspended-已挂起）。
@@ -37,6 +37,9 @@ export default function TenantList() {
   const [editing, setEditing] = useState<TenantItem | null>(null)
   const [form] = Form.useForm()
   const [submitLoading, setSubmitLoading] = useState(false)
+
+  // 内置管理员初始/临时密码（建租户后或重置后展示一次，关闭即不可再查）
+  const [initialPassword, setInitialPassword] = useState('')
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -82,8 +85,31 @@ export default function TenantList() {
         await updateTenant({ tenantID: editing.tenantID, ...values })
         message.success('修改成功')
       } else {
-        await createTenant(values)
-        message.success('创建成功')
+        const created = await createTenant({
+          name: values.name,
+          type: values.type,
+          tag: values.tag,
+          dbUser: values.dbUser,
+          admin: {
+            name: values.adminName,
+            username: values.adminUsername,
+            primaryEmail: values.adminPrimaryEmail,
+            primaryPhone: values.adminPrimaryPhone,
+          },
+        })
+        setModalOpen(false)
+        void fetchData()
+        if (created.adminInitialPassword) {
+          // 管理员初始临时密码仅此一次返回；该管理员首次登录必须改密
+          message.success('创建成功')
+          setInitialPassword(created.adminInitialPassword)
+        } else {
+          Modal.info({
+            title: '租户已创建',
+            content: '该管理员的邮箱/手机已存在统一身份账号，密码未被改动；如需登录凭据，可在租户列表执行「重置管理员密码」。',
+          })
+        }
+        return
       }
       setModalOpen(false)
       void fetchData()
@@ -91,6 +117,16 @@ export default function TenantList() {
       /* 校验或请求失败 */
     } finally {
       setSubmitLoading(false)
+    }
+  }
+
+  /** 重置内置管理员密码：兜底路径，仅作用于建租户时由平台创建的管理员（source=builtin） */
+  const handleResetAdminPassword = async (record: TenantItem) => {
+    try {
+      const resp = await resetTenantAdminPassword(record.tenantID)
+      setInitialPassword(resp.initialPassword)
+    } catch {
+      /* 拦截器已提示 */
     }
   }
 
@@ -141,11 +177,17 @@ export default function TenantList() {
     {
       title: '操作',
       key: 'action',
-      width: 120,
+      width: 240,
       render: (_, r) => (
         <RowActions
           actions={[
             { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
+            {
+              key: 'resetAdminPassword',
+              label: '重置管理员密码',
+              confirm: '将重置该租户内置管理员的密码：新临时密码仅展示一次，其既有会话立即失效。确认重置？',
+              onClick: () => void handleResetAdminPassword(r),
+            },
             { key: 'delete', label: '删除', danger: true, confirm: '确认删除该租户？', onClick: () => void handleDelete(r) },
           ]}
         />
@@ -196,7 +238,7 @@ export default function TenantList() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1370 }}
+        scroll={{ x: 1490 }}
         pagination={{
           current: page,
           pageSize,
@@ -217,7 +259,7 @@ export default function TenantList() {
         onCancel={() => setModalOpen(false)}
         confirmLoading={submitLoading}
         destroyOnClose
-        width={520}
+        width={560}
       >
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="租户名称" rules={[{ required: true, message: '请输入租户名称' }]}>
@@ -238,6 +280,42 @@ export default function TenantList() {
           <Form.Item name="dbUser" label="数据库用户">
             <Input placeholder="选填" />
           </Form.Item>
+          {!editing && (
+            <>
+              <Divider orientation="left" plain>
+                租户管理员
+              </Divider>
+              <Form.Item
+                name="adminName"
+                label="管理员姓名"
+                rules={[{ required: true, message: '请输入管理员姓名' }]}
+                extra="建租户即创建该租户的初始管理员；初始密码由系统生成，仅在创建后展示一次，首次登录必须修改"
+              >
+                <Input placeholder="管理员姓名" />
+              </Form.Item>
+              <Form.Item name="adminUsername" label="管理员用户名">
+                <Input placeholder="选填，全局用户名" />
+              </Form.Item>
+              <Form.Item
+                name="adminPrimaryEmail"
+                label="管理员邮箱"
+                dependencies={['adminPrimaryPhone']}
+                rules={[
+                  ({ getFieldValue }) => ({
+                    validator(_r, value: string) {
+                      if (value || getFieldValue('adminPrimaryPhone')) return Promise.resolve()
+                      return Promise.reject(new Error('邮箱与手机号至少填写一个'))
+                    },
+                  }),
+                ]}
+              >
+                <Input placeholder="用于登录与密码交接" />
+              </Form.Item>
+              <Form.Item name="adminPrimaryPhone" label="管理员手机号" dependencies={['adminPrimaryEmail']}>
+                <Input placeholder="选填（与邮箱至少一个）" />
+              </Form.Item>
+            </>
+          )}
           {editing && (
             <Form.Item
               name="status"
@@ -252,6 +330,13 @@ export default function TenantList() {
           )}
         </Form>
       </Modal>
+
+      {/* 内置管理员初始/临时密码：仅此一次展示 */}
+      <InitialPasswordModal
+        password={initialPassword}
+        description="该管理员首次登录必须修改密码；如需再次获取凭据，可在租户列表执行「重置管理员密码」。"
+        onClose={() => setInitialPassword('')}
+      />
     </PageContainer>
   )
 }

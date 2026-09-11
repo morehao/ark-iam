@@ -21,6 +21,8 @@ func InitOIDC(engine *gin.Engine, ctr *ctroidc.OIDCCtr) {
 	// 登录端点按 IP 频率限流（防暴力破解/CC，golib ratelimit；Redis 不可用时 fail-open）
 	oidcGroup.POST("/login", middleware.LoginRateLimit(), ctr.Login)
 	oidcGroup.POST("/login/selectTenant", ctr.SelectTenant)
+	// 首次登录强制改密（临时密码）：授权票据已绑定 subject，改密后需重新登录
+	oidcGroup.POST("/login/changePassword", ctr.ChangePassword)
 	oidcGroup.POST("/registerPerson", ctr.RegisterPerson)
 	oidcGroup.POST("/createTenant", ctr.CreateTenant)
 	// login-config 为登录页前置策略查询（如是否允许自助注册/建租户），仅读协议态与应用策略

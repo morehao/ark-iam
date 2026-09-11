@@ -7,9 +7,77 @@ import (
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/iam/password"
+	"github.com/morehao/ark-iam/pkg/iam/tenant"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/platformadmin/testutil"
+	"github.com/morehao/golib/gcrypto"
+	"gorm.io/gorm"
 )
+
+// setupTenantCreateEnv 建租户链路的完整测试环境：租户/组织 + 管理员（person/user/组织关系）
+// + 权限开通所需的全部表，并预置 tenant-admin 应用与其菜单（真实环境由 pkg/seed 写入）。
+func setupTenantCreateEnv(t *testing.T) *gorm.DB {
+	t.Helper()
+	db := testutil.SetupSQLite(t,
+		&model.TenantEntity{},
+		&model.OrganizationEntity{},
+		&model.PersonEntity{},
+		&model.UserEntity{},
+		&model.OrganizationUserEntity{},
+		&model.ApplicationEntity{},
+		&model.MenuEntity{},
+		&model.RoleEntity{},
+		&model.RoleMenuEntity{},
+		&model.TenantApplicationEntity{},
+		&model.UserRoleEntity{},
+	)
+	seedTenantAdminApp(t, db)
+	return db
+}
+
+// seedTenantAdminApp 预置租户自服务应用与其内置菜单（编码取自 pkg/iam/tenant 的单一事实源）。
+func seedTenantAdminApp(t *testing.T, db *gorm.DB) *model.ApplicationEntity {
+	t.Helper()
+	app := &model.ApplicationEntity{Code: tenant.ProvisionAppCode, Name: "租户自服务", Status: model.AppStatusEnable}
+	if err := db.Create(app).Error; err != nil {
+		t.Fatalf("seed application: %v", err)
+	}
+	for i, menuCode := range tenant.ProvisionMenuCodes {
+		menu := &model.MenuEntity{
+			AppID:      app.ID,
+			Name:       menuCode,
+			Code:       menuCode,
+			Path:       "/" + menuCode,
+			Sort:       i + 1,
+			Type:       model.MenuTypeMenu,
+			Visibility: model.MenuVisibilityAdmin,
+			Status:     model.MenuStatusEnable,
+		}
+		if err := db.Create(menu).Error; err != nil {
+			t.Fatalf("seed menu %s: %v", menuCode, err)
+		}
+	}
+	return app
+}
+
+// newTenantCreateReq 构造带管理员的建租户入参（管理员现在必填）。
+func newTenantCreateReq(name, adminEmail string) *dtotenant.TenantCreateReq {
+	req := &dtotenant.TenantCreateReq{}
+	req.Name = name
+	req.Type = string(model.TenantTypeCustomer)
+	req.Admin = &dtotenant.TenantAdminCreateReq{Name: name + "管理员", PrimaryEmail: adminEmail}
+	return req
+}
+
+func countEntities(t *testing.T, db *gorm.DB, entity any, query string, args ...any) int64 {
+	t.Helper()
+	var count int64
+	if err := db.Model(entity).Where(query, args...).Count(&count).Error; err != nil {
+		t.Fatalf("count %T fail: %v", entity, err)
+	}
+	return count
+}
 
 // TestTenantPageListReturnsTimeFields 列表必须同时回传创建时间与更新时间
 // （前端「创建时间」「更新时间」两列都读这两个字段，缺失则渲染为 "-"）。
@@ -67,12 +135,10 @@ func TestTenantPageListNameKeyword(t *testing.T) {
 
 // TestTenantCreateGeneratesCode 建租户时编码由服务端按规则自动生成，客户端传值被忽略。
 func TestTenantCreateGeneratesCode(t *testing.T) {
-	testutil.SetupSQLite(t, &model.TenantEntity{}, &model.OrganizationEntity{})
+	setupTenantCreateEnv(t)
 
 	svc := &tenantSvc{}
-	req := &dtotenant.TenantCreateReq{}
-	req.Name = "Acme Corp"
-	req.Type = string(model.TenantTypeCustomer)
+	req := newTenantCreateReq("Acme Corp", "admin@acme.com")
 	req.Code = "manual-code-should-be-ignored"
 
 	resp, err := svc.Create(newTenantScopeGinCtx(""), req)
@@ -102,12 +168,10 @@ func TestTenantCreateGeneratesCode(t *testing.T) {
 // TestTenantCreateNormalizesStatus 租户状态是白名单枚举：非法值/缺省一律归一为 active，
 // 绝不把脏值落库（脏值会让 IsActive 判定为不可用，导致租户整体无法登录）。
 func TestTenantCreateNormalizesStatus(t *testing.T) {
-	testutil.SetupSQLite(t, &model.TenantEntity{}, &model.OrganizationEntity{})
+	setupTenantCreateEnv(t)
 
 	svc := &tenantSvc{}
-	req := &dtotenant.TenantCreateReq{}
-	req.Name = "Acme Corp"
-	req.Type = string(model.TenantTypeCustomer)
+	req := newTenantCreateReq("Acme Corp", "admin@acme.com")
 	req.Status = model.TenantStatus("bogus")
 
 	resp, err := svc.Create(newTenantScopeGinCtx(""), req)
@@ -126,16 +190,260 @@ func TestTenantCreateNormalizesStatus(t *testing.T) {
 	}
 }
 
+// TestTenantCreateProvisionsBuiltinAdmin 建租户必须同时产出"可用的租户管理员"：
+// builtin 来源 + 归属租户根组织 + 初始临时密码可用且强制改密 + 应用订阅/内置角色/菜单授权/角色绑定齐备。
+func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
+	db := setupTenantCreateEnv(t)
+	ctx := newTenantScopeGinCtx("")
+
+	svc := &tenantSvc{}
+	resp, err := svc.Create(ctx, newTenantCreateReq("Acme Corp", "admin@acme.com"))
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if resp.AdminUserID == "" {
+		t.Fatal("Create returned empty adminUserID")
+	}
+	if resp.AdminInitialPassword == "" {
+		t.Fatal("Create returned empty adminInitialPassword (new person must get a temporary password)")
+	}
+	if err := password.ValidateStrength(resp.AdminInitialPassword); err != nil {
+		t.Errorf("adminInitialPassword %q fails strength: %v", resp.AdminInitialPassword, err)
+	}
+
+	// 管理员用户：builtin 来源、owner、member 类型
+	adminUser, err := dao.NewUserDao().GetByID(ctx, resp.AdminUserID)
+	if err != nil || adminUser == nil {
+		t.Fatalf("load admin user fail, err:%v, user:%+v", err, adminUser)
+	}
+	if adminUser.Source != model.UserSourceBuiltin {
+		t.Errorf("admin source = %q, want %q", adminUser.Source, model.UserSourceBuiltin)
+	}
+	if !adminUser.IsOwner {
+		t.Error("admin should be tenant owner")
+	}
+	if adminUser.TenantID != resp.TenantID {
+		t.Errorf("admin tenantID = %q, want %q", adminUser.TenantID, resp.TenantID)
+	}
+
+	// 密码哈希与返回的临时密码一致，且带强制改密标记
+	person, err := dao.NewPersonDao().GetByID(ctx, adminUser.PersonID)
+	if err != nil || person == nil {
+		t.Fatalf("load admin person fail, err:%v, person:%+v", err, person)
+	}
+	if !person.MustChangePassword {
+		t.Error("admin person must have must_change_password=true (temporary password)")
+	}
+	if err := gcrypto.ComparePasswordHash(person.PasswordEncrypted, resp.AdminInitialPassword); err != nil {
+		t.Errorf("adminInitialPassword does not match stored hash: %v", err)
+	}
+
+	// 归属租户根组织（primary）
+	rootOrg, err := dao.NewOrganizationDao().GetByCond(ctx, &dao.OrganizationCond{TenantID: resp.TenantID})
+	if err != nil || rootOrg == nil {
+		t.Fatalf("load root org fail, err:%v, org:%+v", err, rootOrg)
+	}
+	if got := countEntities(t, db, &model.OrganizationUserEntity{},
+		"tenant_id = ? AND user_id = ? AND organization_id = ? AND relation_type = ?",
+		resp.TenantID, resp.AdminUserID, rootOrg.ID, model.OrgUserRelationPrimary); got != 1 {
+		t.Errorf("primary org relation count = %d, want 1", got)
+	}
+
+	// 权限开通：应用订阅 1 + 内置角色 1 + 菜单授权 4 + 管理员角色绑定 1
+	if got := countEntities(t, db, &model.TenantApplicationEntity{}, "tenant_id = ?", resp.TenantID); got != 1 {
+		t.Errorf("tenant_application count = %d, want 1", got)
+	}
+	role, err := dao.NewRoleDao().GetByCond(ctx, &dao.RoleCond{TenantID: resp.TenantID, Code: tenant.ProvisionRoleCode})
+	if err != nil || role == nil {
+		t.Fatalf("load builtin role fail, err:%v, role:%+v", err, role)
+	}
+	if !role.IsBuiltinAdmin() {
+		t.Errorf("role should be builtin super admin, got source=%q adminLevel=%q", role.Source, role.AdminLevel)
+	}
+	if got := countEntities(t, db, &model.RoleMenuEntity{}, "tenant_id = ? AND role_id = ?", resp.TenantID, role.ID); got != int64(len(tenant.ProvisionMenuCodes)) {
+		t.Errorf("role_menu count = %d, want %d", got, len(tenant.ProvisionMenuCodes))
+	}
+	if got := countEntities(t, db, &model.UserRoleEntity{}, "tenant_id = ? AND user_id = ? AND role_id = ?", resp.TenantID, resp.AdminUserID, role.ID); got != 1 {
+		t.Errorf("user_role count = %d, want 1", got)
+	}
+}
+
+// TestTenantCreateRejectsAdminWithoutContact 管理员必须至少有一个联系方式：
+// 否则既无法识别自然人、也无从交接初始密码。
+func TestTenantCreateRejectsAdminWithoutContact(t *testing.T) {
+	setupTenantCreateEnv(t)
+
+	svc := &tenantSvc{}
+	req := newTenantCreateReq("Acme Corp", "")
+	req.Admin.PrimaryPhone = ""
+	_, err := svc.Create(newTenantScopeGinCtx(""), req)
+	if err == nil || err.Error() != code.GetError(code.UserContactRequiredError).Error() {
+		t.Fatalf("Create err = %v, want %v", err, code.GetError(code.UserContactRequiredError))
+	}
+}
+
+// TestTenantCreateReusesExistingPersonWithoutPassword 管理员的邮箱/手机命中已存在自然人时：
+// 复用该自然人、不覆盖其密码、不置强制改密，且不回显初始密码（响应为空串）。
+func TestTenantCreateReusesExistingPersonWithoutPassword(t *testing.T) {
+	db := setupTenantCreateEnv(t)
+	ctx := newTenantScopeGinCtx("")
+
+	existing := &model.PersonEntity{
+		PrimaryEmail:      model.StrPtr("admin@acme.com"),
+		PasswordEncrypted: "existing-hash",
+		PasswordMethod:    "bcrypt",
+		Name:              "既有账号",
+		Profile:           []byte(`{}`),
+		CustomData:        []byte(`{}`),
+	}
+	if err := db.Create(existing).Error; err != nil {
+		t.Fatalf("seed existing person: %v", err)
+	}
+
+	svc := &tenantSvc{}
+	resp, err := svc.Create(ctx, newTenantCreateReq("Acme Corp", "admin@acme.com"))
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if resp.AdminInitialPassword != "" {
+		t.Errorf("adminInitialPassword = %q, want empty when reusing an existing person", resp.AdminInitialPassword)
+	}
+
+	adminUser, err := dao.NewUserDao().GetByID(ctx, resp.AdminUserID)
+	if err != nil || adminUser == nil {
+		t.Fatalf("load admin user fail, err:%v", err)
+	}
+	if adminUser.PersonID != existing.ID {
+		t.Errorf("admin personID = %q, want existing %q", adminUser.PersonID, existing.ID)
+	}
+	person, err := dao.NewPersonDao().GetByID(ctx, existing.ID)
+	if err != nil || person == nil {
+		t.Fatalf("load person fail, err:%v", err)
+	}
+	if person.PasswordEncrypted != "existing-hash" {
+		t.Errorf("existing person password was overwritten: %q", person.PasswordEncrypted)
+	}
+	if person.MustChangePassword {
+		t.Error("must_change_password must stay false when reusing an existing person")
+	}
+}
+
+// TestResetAdminPasswordReissuesTemporaryPassword 兜底路径：重置内置管理员密码 → 返回新临时密码、
+// 旧密码立即失效、强制改密标记置位。
+func TestResetAdminPasswordReissuesTemporaryPassword(t *testing.T) {
+	setupTenantCreateEnv(t)
+	ctx := newTenantScopeGinCtx("")
+
+	svc := &tenantSvc{}
+	created, err := svc.Create(ctx, newTenantCreateReq("Acme Corp", "admin@acme.com"))
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	reset, err := svc.ResetAdminPassword(ctx, &dtotenant.TenantAdminResetPasswordReq{TenantID: created.TenantID})
+	if err != nil {
+		t.Fatalf("ResetAdminPassword failed: %v", err)
+	}
+	if reset.UserID != created.AdminUserID {
+		t.Errorf("reset userID = %q, want builtin admin %q", reset.UserID, created.AdminUserID)
+	}
+	if reset.InitialPassword == "" {
+		t.Fatal("ResetAdminPassword returned empty password")
+	}
+	if reset.InitialPassword == created.AdminInitialPassword {
+		t.Error("reset must issue a new password, not reuse the previous one")
+	}
+	if err := password.ValidateStrength(reset.InitialPassword); err != nil {
+		t.Errorf("reset password %q fails strength: %v", reset.InitialPassword, err)
+	}
+
+	adminUser, err := dao.NewUserDao().GetByID(ctx, created.AdminUserID)
+	if err != nil || adminUser == nil {
+		t.Fatalf("load admin user fail, err:%v", err)
+	}
+	person, err := dao.NewPersonDao().GetByID(ctx, adminUser.PersonID)
+	if err != nil || person == nil {
+		t.Fatalf("load admin person fail, err:%v", err)
+	}
+	if err := gcrypto.ComparePasswordHash(person.PasswordEncrypted, reset.InitialPassword); err != nil {
+		t.Errorf("reset password does not match stored hash: %v", err)
+	}
+	if err := gcrypto.ComparePasswordHash(person.PasswordEncrypted, created.AdminInitialPassword); err == nil {
+		t.Error("old temporary password must no longer be valid after reset")
+	}
+	if !person.MustChangePassword {
+		t.Error("reset must set must_change_password=true")
+	}
+}
+
+// TestResetAdminPasswordNeverTargetsManualMember 内置管理员被删/租户只有手工成员时，
+// 重置接口不得"顺手"重置某个 manual 成员（授权边界：平台不管理租户内部成员）。
+func TestResetAdminPasswordNeverTargetsManualMember(t *testing.T) {
+	db := setupTenantCreateEnv(t)
+	ctx := newTenantScopeGinCtx("")
+
+	svc := &tenantSvc{}
+	created, err := svc.Create(ctx, newTenantCreateReq("Acme Corp", "admin@acme.com"))
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	// 该租户内再插入一个手工成员
+	manualPerson := &model.PersonEntity{
+		PrimaryEmail:      model.StrPtr("member@acme.com"),
+		PasswordEncrypted: "member-hash",
+		PasswordMethod:    "bcrypt",
+		Name:              "成员",
+		Profile:           []byte(`{}`),
+		CustomData:        []byte(`{}`),
+	}
+	if err := db.Create(manualPerson).Error; err != nil {
+		t.Fatalf("seed manual person: %v", err)
+	}
+	manualUser := &model.UserEntity{
+		TenantID: created.TenantID, PersonID: manualPerson.ID, Source: model.UserSourceManual,
+		UserType: model.UserTypeMember, Name: "成员", Profile: []byte(`{}`), CustomData: []byte(`{}`),
+	}
+	if err := db.Create(manualUser).Error; err != nil {
+		t.Fatalf("seed manual user: %v", err)
+	}
+
+	// 删除内置管理员后，租户只剩 manual 成员 → 必须拒绝，且不得改动 manual 成员
+	if err := db.Where("tenant_id = ? AND source = ?", created.TenantID, model.UserSourceBuiltin).
+		Delete(&model.UserEntity{}).Error; err != nil {
+		t.Fatalf("delete builtin admin: %v", err)
+	}
+	_, err = svc.ResetAdminPassword(ctx, &dtotenant.TenantAdminResetPasswordReq{TenantID: created.TenantID})
+	if err == nil || err.Error() != code.GetError(code.UserNotExistError).Error() {
+		t.Fatalf("ResetAdminPassword err = %v, want %v", err, code.GetError(code.UserNotExistError))
+	}
+	storedManual, err := dao.NewPersonDao().GetByID(ctx, manualPerson.ID)
+	if err != nil || storedManual == nil {
+		t.Fatalf("load manual person fail, err:%v", err)
+	}
+	if storedManual.PasswordEncrypted != "member-hash" {
+		t.Error("manual member password must not be touched by the platform reset endpoint")
+	}
+}
+
+// TestResetAdminPasswordTenantNotFound 租户不存在时返回 TenantNotExistError（区别于"无内置管理员"）。
+func TestResetAdminPasswordTenantNotFound(t *testing.T) {
+	setupTenantCreateEnv(t)
+
+	svc := &tenantSvc{}
+	_, err := svc.ResetAdminPassword(newTenantScopeGinCtx(""), &dtotenant.TenantAdminResetPasswordReq{TenantID: "not-exist"})
+	if err == nil || err.Error() != code.GetError(code.TenantNotExistError).Error() {
+		t.Fatalf("ResetAdminPassword err = %v, want %v", err, code.GetError(code.TenantNotExistError))
+	}
+}
+
 // TestTenantUpdateSuspendsAndListsStatus 挂起他租户：状态落库并在列表出参回传
 // （前端「状态」列读 status，不再读已废弃的 isSuspended）。
 func TestTenantUpdateSuspendsAndListsStatus(t *testing.T) {
-	testutil.SetupSQLite(t, &model.TenantEntity{}, &model.OrganizationEntity{})
+	setupTenantCreateEnv(t)
 
 	svc := &tenantSvc{}
-	createReq := &dtotenant.TenantCreateReq{}
-	createReq.Name = "Acme Corp"
-	createReq.Type = string(model.TenantTypeCustomer)
-	created, err := svc.Create(newTenantScopeGinCtx(""), createReq)
+	created, err := svc.Create(newTenantScopeGinCtx(""), newTenantCreateReq("Acme Corp", "admin@acme.com"))
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -178,13 +486,10 @@ func TestTenantUpdateSuspendsAndListsStatus(t *testing.T) {
 // TestTenantUpdateRefusesSuspendOwnTenant 禁止挂起操作者自己所在的租户：
 // 挂起后该租户无法登录、平台控制台随之失联且无恢复路径（不可逆自锁）。
 func TestTenantUpdateRefusesSuspendOwnTenant(t *testing.T) {
-	testutil.SetupSQLite(t, &model.TenantEntity{}, &model.OrganizationEntity{})
+	setupTenantCreateEnv(t)
 
 	svc := &tenantSvc{}
-	createReq := &dtotenant.TenantCreateReq{}
-	createReq.Name = "Acme Corp"
-	createReq.Type = string(model.TenantTypeCustomer)
-	created, err := svc.Create(newTenantScopeGinCtx(""), createReq)
+	created, err := svc.Create(newTenantScopeGinCtx(""), newTenantCreateReq("Acme Corp", "admin@acme.com"))
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}

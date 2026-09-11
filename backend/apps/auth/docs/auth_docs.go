@@ -15,6 +15,97 @@ const docTemplateauth = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/oidc/login-config": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OIDC"
+                ],
+                "summary": "登录页前置策略查询",
+                "parameters": [
+                    {
+                        "description": "登录页策略查询请求",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtooidc.OIDCLoginConfigReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtooidc.OIDCLoginConfigResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/oidc/login/changePassword": {
+            "post": {
+                "description": "持临时密码（mustChangePassword）的自然人在登录被拦截后调用：校验当前密码与强度，\n设置新密码并清除强制改密标记，同时撤销该自然人既有会话；之后需重新登录。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OIDC"
+                ],
+                "summary": "首次登录修改密码",
+                "parameters": [
+                    {
+                        "description": "首次登录修改密码",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtooidc.OIDCChangePasswordReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/v1/auth/connector-factories": {
             "get": {
                 "consumes": [
@@ -1240,6 +1331,48 @@ const docTemplateauth = `{
                     "type": "string"
                 },
                 "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "dtooidc.OIDCChangePasswordReq": {
+            "type": "object",
+            "required": [
+                "authRequestID",
+                "currentPassword",
+                "newPassword"
+            ],
+            "properties": {
+                "authRequestID": {
+                    "type": "string"
+                },
+                "currentPassword": {
+                    "type": "string",
+                    "maxLength": 128
+                },
+                "newPassword": {
+                    "type": "string",
+                    "maxLength": 128
+                }
+            }
+        },
+        "dtooidc.OIDCLoginConfigReq": {
+            "type": "object",
+            "required": [
+                "authRequestID"
+            ],
+            "properties": {
+                "authRequestID": {
+                    "description": "OIDC 授权票据ID（携带应用上下文）",
+                    "type": "string"
+                }
+            }
+        },
+        "dtooidc.OIDCLoginConfigResp": {
+            "type": "object",
+            "properties": {
+                "allowPersonCreateTenant": {
+                    "description": "应用是否允许自助注册/创建租户",
                     "type": "boolean"
                 }
             }

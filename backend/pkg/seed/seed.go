@@ -18,6 +18,9 @@ import (
 	"time"
 
 	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/iam/password"
+	// 别名：SeedIam 内以 tenant 命名的局部变量会遮蔽同名包
+	iamtenant "github.com/morehao/ark-iam/pkg/iam/tenant"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
 	"gorm.io/gorm"
@@ -31,8 +34,6 @@ const (
 	// tenantCodePlatformLegacy 历史种子编码（旧版本为 "platform"）。
 	// 启动时若命中该编码的平台租户，原地改名（保留主键，避免租户重建导致引用失联）。
 	tenantCodePlatformLegacy = "platform"
-
-	adminPassword = "admin123"
 
 	appCodeAdmin       = "platform-admin"
 	appCodeTenantAdmin = "tenant-admin"
@@ -88,8 +89,8 @@ func SeedIam(ctx context.Context, db *gorm.DB) error {
 		return err
 	}
 
-	// 4. 角色（admin 归属管理后台；tenant_admin 归属租户自服务）
-	roles, err := seedRoles(ctx, db, tenant, adminApp, tenantAdminApp)
+	// 4. 角色（admin 归属管理后台；tenant_admin 由第 10 步的权限开通统一创建）
+	roles, err := seedRoles(ctx, db, tenant, adminApp)
 	if err != nil {
 		return err
 	}
@@ -108,17 +109,17 @@ func SeedIam(ctx context.Context, db *gorm.DB) error {
 		return err
 	}
 
-	// 7. 角色-菜单关联
+	// 7. 角色-菜单关联（仅管理后台 admin 角色；tenant_admin 由第 10 步开通时授权）
 	if err := seedRoleMenus(ctx, db, tenant, roles, menus); err != nil {
 		return err
 	}
 
-	// 8. 租户应用订阅
-	if err := seedTenantApplications(ctx, db, tenant, adminApp, tenantAdminApp); err != nil {
+	// 8. 租户应用订阅（管理后台 platform-admin；租户自服务 tenant-admin 由第 10 步开通时订阅）
+	if err := seedTenantApplications(ctx, db, tenant, adminApp); err != nil {
 		return err
 	}
 
-	// 9. 默认管理员（person + user + user_role + 顶级部门归属）
+	// 9. 默认管理员（person + user + 顶级部门归属）
 	adminUser, err := seedAdminUser(ctx, db, tenant, rootOrg)
 	if err != nil {
 		return err
@@ -127,7 +128,16 @@ func SeedIam(ctx context.Context, db *gorm.DB) error {
 		return err
 	}
 
-	// 10. OIDC 测试客户端
+	// 10. 平台租户的租户自服务权限开通：与"新建租户"共用同一实现
+	// （pkg/iam/tenant.ProvisionTenantAdmin），保证内置角色/菜单授权/订阅只有一份定义。
+	if _, err := iamtenant.ProvisionTenantAdmin(ctx, db, &iamtenant.ProvisionTenantAdminReq{
+		TenantID:    tenant.ID,
+		GrantUserID: adminUser.ID,
+	}); err != nil {
+		return fmt.Errorf("seed provision tenant admin fail: %w", err)
+	}
+
+	// 11. OIDC 测试客户端
 	if err := seedOIDCClients(ctx, db, tenant, adminApp); err != nil {
 		return err
 	}
@@ -257,10 +267,11 @@ func getOrCreateApplication(ctx context.Context, db *gorm.DB, code, name, desc s
 	return entity, nil
 }
 
-func seedRoles(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adminApp, tenantAdminApp *model.ApplicationEntity) (map[string]*model.RoleEntity, error) {
+// seedRoles 只种管理后台 admin 角色：租户自服务的 tenant_admin 由权限开通统一创建
+// （pkg/iam/tenant.ProvisionTenantAdmin），建租户与种子共用同一份角色/授权定义。
+func seedRoles(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adminApp *model.ApplicationEntity) (map[string]*model.RoleEntity, error) {
 	defs := []seedRole{
 		{app: adminApp, code: "admin", name: "管理员", desc: "系统管理员，拥有所有权限", adminLevel: string(model.SysAdminLevelSuper)},
-		{app: tenantAdminApp, code: "tenant_admin", name: "租户管理员", desc: "租户自服务应用管理员，拥有全部租户自服务权限", adminLevel: string(model.SysAdminLevelSuper)},
 	}
 	out := make(map[string]*model.RoleEntity, len(defs))
 	for _, def := range defs {
@@ -420,6 +431,8 @@ func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model
 	return out, nil
 }
 
+// seedRoleMenus 只处理管理后台 admin 角色的菜单授权；
+// tenant_admin 的菜单授权由 pkg/iam/tenant.ProvisionTenantAdmin 统一写入。
 func seedRoleMenus(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, roles map[string]*model.RoleEntity, menus map[string]*model.MenuEntity) error {
 	relations := []struct {
 		roleCode string
@@ -429,9 +442,6 @@ func seedRoleMenus(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity,
 			"dashboard", "menu", "tenant", "application",
 			"tenant-application", "oauth-client", "domain", "log",
 			"organization", "tenant-user", "tenant-role",
-		}},
-		{roleCode: "tenant_admin", menuCode: []string{
-			"organization", "tenant-user", "tenant-role", "tenant-api-key",
 		}},
 	}
 	for _, rel := range relations {
@@ -456,6 +466,8 @@ func seedRoleMenus(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity,
 	return nil
 }
 
+// seedTenantApplications 写入管理后台的应用订阅；租户自服务（tenant-admin）的订阅
+// 由 pkg/iam/tenant.ProvisionTenantAdmin 统一写入。
 func seedTenantApplications(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, apps ...*model.ApplicationEntity) error {
 	for _, app := range apps {
 		var count int64
@@ -481,7 +493,7 @@ func seedAdminUser(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity,
 	if rootOrg == nil || rootOrg.ID == "" {
 		return nil, fmt.Errorf("seed admin user fail: root organization not found")
 	}
-	passwordHash, err := gcrypto.GeneratePasswordHash(adminPassword)
+	passwordHash, err := gcrypto.GeneratePasswordHash(password.BootstrapAdminPassword)
 	if err != nil {
 		return nil, fmt.Errorf("seed admin password hash fail: %w", err)
 	}
@@ -522,6 +534,7 @@ func seedAdminUser(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity,
 			Name:        "系统管理员",
 			Profile:     []byte(`{}`),
 			CustomData:  []byte(`{}`),
+			Source:      model.UserSourceBuiltin,
 			IsOwner:     true,
 			IsSuspended: false,
 			JoinedAt:    &now,
@@ -529,7 +542,17 @@ func seedAdminUser(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity,
 		if err := db.WithContext(ctx).Create(user).Error; err != nil {
 			return nil, fmt.Errorf("seed admin user create fail: %w", err)
 		}
-		glog.Infof(ctx, "[seed] admin user created, id:%s (default password: %s)", user.ID, adminPassword)
+		glog.Infof(ctx, "[seed] admin user created, id:%s (default password: %s, must_change_password: false)", user.ID, password.BootstrapAdminPassword)
+	}
+
+	// 来源回填（幂等，兼容存量库）：种子管理员是内置管理员，source 必须为 builtin，
+	// 平台侧"重置内置管理员密码"依赖该标记定位目标用户。
+	if user.Source != model.UserSourceBuiltin {
+		if uerr := db.WithContext(ctx).Model(&model.UserEntity{}).
+			Where("id = ?", user.ID).Update("source", model.UserSourceBuiltin).Error; uerr != nil {
+			return nil, fmt.Errorf("seed admin user source backfill fail: %w", uerr)
+		}
+		user.Source = model.UserSourceBuiltin
 	}
 
 	// 顶级部门归属（幂等，兼容已有库升级：admin 用户已存在但尚无组织归属的场景）
@@ -565,9 +588,11 @@ func seedAdminUserOrganization(ctx context.Context, db *gorm.DB, tenant *model.T
 	return nil
 }
 
+// seedAdminUserRole 绑定管理后台 admin 角色；默认管理员的 tenant_admin 角色绑定
+// 由后续的权限开通（pkg/iam/tenant.ProvisionTenantAdmin）统一写入。
 func seedAdminUserRole(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adminUser *model.UserEntity, roles map[string]*model.RoleEntity) error {
-	// 默认管理员同时持有管理后台 admin 与租户自服务 tenant_admin 两个内置管理员角色
-	for _, roleCode := range []string{"admin", "tenant_admin"} {
+	// 默认管理员持有管理后台 admin 角色
+	for _, roleCode := range []string{"admin"} {
 		role := roles[roleCode]
 		var count int64
 		if err := db.Model(&model.UserRoleEntity{}).

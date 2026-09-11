@@ -125,11 +125,12 @@ func (ctr *userCtr) Update(ctx *gin.Context) {
 
 // @Tags 用户
 // @Summary 重置密码
+// @Description 重置该成员密码：由服务端生成新临时密码并在响应中仅返回一次，
+// @Description 该成员既有会话立即失效、下次登录必须修改密码。
 // @accept application/json
 // @Produce application/json
 // @Param userID path string true "用户ID"
-// @Param req body dtotenant.UserResetPasswordReq true "重置密码"
-// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Success 200 {object} gincontext.DtoRender{data=dtotenant.UserResetPasswordResp}
 // @Router /v1/tenant/users/{userID}/reset-password [post]
 func (ctr *userCtr) ResetPassword(ctx *gin.Context) {
 	var req dtotenant.UserResetPasswordReq
@@ -137,15 +138,12 @@ func (ctr *userCtr) ResetPassword(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	res, err := ctr.userSvc.ResetPassword(ctx, &req)
+	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.userSvc.ResetPassword(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, "重置成功")
+	gincontext.Success(ctx, res)
 }
 
 // @Tags 用户

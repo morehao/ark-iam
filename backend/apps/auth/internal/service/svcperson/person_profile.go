@@ -89,8 +89,12 @@ func (svc *personProfileSvc) UpdatePassword(ctx *gin.Context, req *dtoperson.Per
 		return code.GetError(code.PasswordHashError)
 	}
 
+	// 自助改密同时清除"首次登录强制改密"标记：用户已亲自设置口令，临时密码的约束随之解除
+	// （正常路径下持临时密码者登录即被拦截，改密只能走 /oidc/login/changePassword；
+	// 此处兜底覆盖标记在会话有效期内被置位的边界场景）。
 	if err := personDao.UpdateMap(ctx.Request.Context(), personID, map[string]interface{}{
-		"password_encrypted": newHash,
+		"password_encrypted":   newHash,
+		"must_change_password": false,
 	}); err != nil {
 		glog.Errorf(ctx, "[svcperson.UpdatePassword] dao UpdateMap fail, err:%v, personID:%s", err, personID)
 		return code.GetError(code.UserUpdateError)

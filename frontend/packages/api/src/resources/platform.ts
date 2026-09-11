@@ -18,7 +18,9 @@ import type {
   TenantApplicationCreateReq,
   TenantApplicationItem,
   TenantApplicationUpdateReq,
+  TenantAdminResetPasswordResp,
   TenantCreateReq,
+  TenantCreateResp,
   TenantItem,
   TenantStatus,
   TenantUpdateReq,
@@ -63,7 +65,10 @@ export const deleteOAuthSecret = (applicationClientID: string, secretID: string)
 // ==================== 租户 ====================
 export const getTenantPageList = (data: { page: number; pageSize: number; name?: string; status?: TenantStatus }) =>
   request.get<any, PageListResp<TenantItem>>('/platform/tenants', { params: data })
-export const createTenant = (data: TenantCreateReq) => request.post<any, { tenantID: string }>('/platform/tenants', data)
+export const createTenant = (data: TenantCreateReq) => request.post<any, TenantCreateResp>('/platform/tenants', data)
+/** 重置租户内置管理员（source=builtin）密码：新临时密码仅此一次返回；不作用于租户手工创建的成员 */
+export const resetTenantAdminPassword = (tenantID: string) =>
+  request.post<any, TenantAdminResetPasswordResp>(`/platform/tenants/${tenantID}/builtin-admin/reset-password`)
 export const updateTenant = (data: TenantUpdateReq) => {
   const { tenantID, ...body } = data
   return request.put<any, string>(`/platform/tenants/${tenantID}`, body)

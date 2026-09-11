@@ -27,11 +27,26 @@ func (t UserType) IsReal() bool {
 	return t == UserTypeMember
 }
 
+// UserSource 租户内用户的来源。
+type UserSource string
+
+// 用户来源取值（禁止硬编码）。
+const (
+	UserSourceBuiltin UserSource = "builtin" // 内置用户：随租户创建由系统自动生成（平台建租户的管理员 / 自助开通租户的 owner / 种子管理员）
+	UserSourceManual  UserSource = "manual"  // 手动创建：控制台手工创建的用户
+)
+
+// IsBuiltin 判断是否为随租户创建自动生成的内置用户。
+func (s UserSource) IsBuiltin() bool {
+	return s == UserSourceBuiltin
+}
+
 type UserEntity struct {
 	gormdao.BaseEntity
 	TenantID     string          `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id"`
 	PersonID     string          `gorm:"column:person_id;type:varchar(36);not null;default:'';comment:自然人ID(服务账号恒空)"`
 	UserType     UserType        `gorm:"column:user_type;type:varchar(16);not null;default:'member';comment:账号类型(member真实用户/machine服务账号)"`
+	Source       UserSource      `gorm:"column:source;type:varchar(16);not null;default:'manual';comment:用户来源(builtin内置/manual手动)"`
 	Name         string          `gorm:"column:name;type:varchar(128);not null;default:'';comment:租户内姓名/服务账号名称"`
 	Description  string          `gorm:"column:description;type:varchar(256);not null;default:'';comment:描述(服务账号用途等)"`
 	Avatar       string          `gorm:"column:avatar;type:varchar(2048);not null;default:'';comment:租户内头像URL"`
@@ -58,6 +73,11 @@ func (u *UserEntity) IsMachine() bool {
 // IsReal 判断租户账号是否为真实用户。
 func (u *UserEntity) IsReal() bool {
 	return u != nil && UserType(u.UserType).IsReal()
+}
+
+// IsBuiltin 判断租户账号是否为随租户创建自动生成的内置用户。
+func (u *UserEntity) IsBuiltin() bool {
+	return u != nil && u.Source.IsBuiltin()
 }
 
 type UserEntityList []UserEntity

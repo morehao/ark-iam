@@ -34,21 +34,36 @@ func RevokeMemberSessions(ctx context.Context, tenantID string) error {
 			continue
 		}
 		seen[personID] = struct{}{}
-		if rErr := dao.NewRefreshTokenDao().RevokeByPersonID(ctx, personID); rErr != nil {
-			glog.Errorf(ctx, "[tenant.RevokeMemberSessions] revoke refresh token fail, personID:%s, err:%v", personID, rErr)
-		}
-		// 顺序要求：先入队 back-channel 通知，再撤销 SSO 会话——登记查询依赖 sso_user_sessions 索引，
-		// 会话撤销后索引即清除，通知将无法投递（与 svcauth.Logout 的处置一致）。
-		if count, bErr := sso.EnqueueLogoutsByPersonID(ctx, personID); bErr != nil {
-			glog.Warnf(ctx, "[tenant.RevokeMemberSessions] enqueue back-channel logout fail, personID:%s, err:%v", personID, bErr)
-		} else if count > 0 {
-			glog.Infof(ctx, "[tenant.RevokeMemberSessions] back-channel logout enqueued, tenantID:%s, personID:%s, count:%d", tenantID, personID, count)
-		}
-		if sErr := sso.RevokeSSOSessionsByPersonID(ctx, personID); sErr != nil {
-			glog.Errorf(ctx, "[tenant.RevokeMemberSessions] revoke sso session fail, personID:%s, err:%v", personID, sErr)
-		}
+		RevokePersonSessions(ctx, personID)
 	}
 	return nil
+}
+
+// RevokePersonSessions 撤销某自然人的全部会话凭证（refresh token + SSO 会话），
+// 并向其已登录的各应用（含第三方 RP）投递 back-channel logout 通知。
+//
+// 用于"改密/重置密码后必须立即全局登出"的场景（自助改密、管理员重置成员密码、
+// 平台侧重置内置管理员密码、首次登录强制改密）：旧会话与 refresh token 必须在改密
+// 成功的同时失效，否则旧口令泄露的影响面不会随改密收敛。
+//
+// 幂等、失败不阻断：单个环节失败只记日志——密码哈希本身已经更新，调用方主流程不应因此失败。
+func RevokePersonSessions(ctx context.Context, personID string) {
+	if personID == "" {
+		return
+	}
+	if err := dao.NewRefreshTokenDao().RevokeByPersonID(ctx, personID); err != nil {
+		glog.Errorf(ctx, "[tenant.RevokePersonSessions] revoke refresh token fail, personID:%s, err:%v", personID, err)
+	}
+	// 顺序要求：先入队 back-channel 通知，再撤销 SSO 会话——登记查询依赖 sso_user_sessions 索引，
+	// 会话撤销后索引即清除，通知将无法投递（与 svcauth.Logout 的处置一致）。
+	if count, bErr := sso.EnqueueLogoutsByPersonID(ctx, personID); bErr != nil {
+		glog.Warnf(ctx, "[tenant.RevokePersonSessions] enqueue back-channel logout fail, personID:%s, err:%v", personID, bErr)
+	} else if count > 0 {
+		glog.Infof(ctx, "[tenant.RevokePersonSessions] back-channel logout enqueued, personID:%s, count:%d", personID, count)
+	}
+	if err := sso.RevokeSSOSessionsByPersonID(ctx, personID); err != nil {
+		glog.Errorf(ctx, "[tenant.RevokePersonSessions] revoke sso session fail, personID:%s, err:%v", personID, err)
+	}
 }
 
 // CreateWithRootOrgReq 构造 CreateWithRootOrg 入参。
@@ -63,8 +78,9 @@ type CreateWithRootOrgReq struct {
 }
 
 // CreateWithRootOrg 在 tx 事务内创建租户 + 同名根组织节点（组织树容器根）。
-// 必须在调用方的事务 tx 内执行（空 tx 会 panic）。返回新建租户实体（含 ID）。
-func CreateWithRootOrg(ctx context.Context, tx *gorm.DB, req *CreateWithRootOrgReq) (*model.TenantEntity, error) {
+// 必须在调用方的事务 tx 内执行（空 tx 会 panic）。返回新建租户实体与根组织实体（均含 ID）：
+// 根组织需要被调用方用作首位成员（内置管理员 / 自助建租户 owner）的行政主部门。
+func CreateWithRootOrg(ctx context.Context, tx *gorm.DB, req *CreateWithRootOrgReq) (*model.TenantEntity, *model.OrganizationEntity, error) {
 	tenantEntity := &model.TenantEntity{
 		Code:      req.Code,
 		Name:      req.Name,
@@ -75,7 +91,7 @@ func CreateWithRootOrg(ctx context.Context, tx *gorm.DB, req *CreateWithRootOrgR
 		CreatedBy: req.CreatedBy,
 	}
 	if err := dao.NewTenantDao().WithTx(tx).Insert(ctx, tenantEntity); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// 每个租户创建时自动创建同名的根组织节点（组织树容器根）
 	rootOrg := &model.OrganizationEntity{
@@ -86,14 +102,14 @@ func CreateWithRootOrg(ctx context.Context, tx *gorm.DB, req *CreateWithRootOrgR
 		CreatedBy: req.CreatedBy,
 	}
 	if err := dao.NewOrganizationDao().WithTx(tx).Insert(ctx, rootOrg); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// 根节点路径："/"+id，深度 1（ID 由 BeforeCreate 生成，需创建后补写）
 	if err := dao.NewOrganizationDao().WithTx(tx).UpdateMap(ctx, rootOrg.ID, map[string]any{
 		"org_path":  "/" + rootOrg.ID,
 		"org_depth": 1,
 	}); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return tenantEntity, nil
+	return tenantEntity, rootOrg, nil
 }

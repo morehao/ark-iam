@@ -4,10 +4,13 @@ import { SuspendedTag, fmtTime } from '@ark-iam/ui'
 import type { TenantItem } from '@ark-iam/types'
 
 const mockGetTenantPageList = vi.fn()
+const mockCreateTenant = vi.fn()
+const mockResetTenantAdminPassword = vi.fn()
 vi.mock('@ark-iam/api', () => ({
-  createTenant: vi.fn(),
+  createTenant: (...args: unknown[]) => mockCreateTenant(...args),
   deleteTenant: vi.fn(),
   getTenantPageList: (...args: unknown[]) => mockGetTenantPageList(...args),
+  resetTenantAdminPassword: (...args: unknown[]) => mockResetTenantAdminPassword(...args),
   updateTenant: vi.fn(),
 }))
 
@@ -44,6 +47,8 @@ const tenants: TenantItem[] = [
 describe('租户列表', () => {
   beforeEach(() => {
     mockGetTenantPageList.mockReset()
+    mockCreateTenant.mockReset()
+    mockResetTenantAdminPassword.mockReset()
   })
 
   it('按 status 枚举渲染状态列，并同时展示创建时间与更新时间', async () => {
@@ -85,6 +90,52 @@ describe('租户列表', () => {
         expect.objectContaining({ page: 1, status: 'suspended' }),
       )
     })
+  })
+  it('新建租户必填管理员，且初始临时密码只在弹窗中展示一次', async () => {
+    mockGetTenantPageList.mockResolvedValue({ list: tenants, total: tenants.length })
+    mockCreateTenant.mockResolvedValue({ tenantID: 't9', adminUserID: 'u9', adminInitialPassword: 'Temp1234' })
+
+    render(<TenantList />)
+    await screen.findByText('Acme Corp')
+
+    fireEvent.click(screen.getByRole('button', { name: /新建租户/ }))
+    fireEvent.change(await screen.findByPlaceholderText('租户名称'), { target: { value: 'New Co' } })
+    fireEvent.change(screen.getByPlaceholderText('管理员姓名'), { target: { value: '张三' } })
+    fireEvent.change(screen.getByPlaceholderText('用于登录与密码交接'), { target: { value: 'admin@new.co' } })
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+
+    // 管理员信息随建租户一并提交（不含密码：密码由服务端生成）
+    await waitFor(() => {
+      expect(mockCreateTenant).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'New Co',
+          admin: expect.objectContaining({ name: '张三', primaryEmail: 'admin@new.co' }),
+        }),
+      )
+    })
+    expect(mockCreateTenant.mock.calls[0][0]).not.toHaveProperty('password')
+    expect(mockCreateTenant.mock.calls[0][0].admin).not.toHaveProperty('password')
+
+    // 初始临时密码仅在弹窗中一次性展示
+    expect(await screen.findByText('Temp1234')).toBeInTheDocument()
+    expect(screen.getByText('请立即保存，关闭后不再显示')).toBeInTheDocument()
+  })
+
+  it('重置内置管理员密码：仅展示一次新临时密码，不弹出密码输入框', async () => {
+    mockGetTenantPageList.mockResolvedValue({ list: tenants, total: tenants.length })
+    mockResetTenantAdminPassword.mockResolvedValue({ userID: 'u1', initialPassword: 'Reset5678' })
+
+    render(<TenantList />)
+    await screen.findByText('Acme Corp')
+
+    fireEvent.click(screen.getAllByText('重置管理员密码')[0])
+    // Popconfirm 的确认按钮（测试环境未注入中文 locale，按钮文案为 OK）
+    fireEvent.click(await screen.findByRole('button', { name: 'OK' }))
+
+    await waitFor(() => {
+      expect(mockResetTenantAdminPassword).toHaveBeenCalledWith('t1')
+    })
+    expect(await screen.findByText('Reset5678')).toBeInTheDocument()
   })
 })
 

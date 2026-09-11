@@ -1,7 +1,6 @@
 package svcoidc
 
 import (
-	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/password"
 	"github.com/morehao/ark-iam/pkg/iam/person"
 	"github.com/morehao/ark-iam/pkg/iam/tenant"
+	"github.com/morehao/ark-iam/pkg/iam/user"
 
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/gerror"
@@ -181,30 +181,25 @@ func (svc *oidcAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenant
 
 	var tenantEntity *model.TenantEntity
 	txErr := dbclient.IamDB(ctx.Request.Context()).Transaction(func(tx *gorm.DB) error {
-		var tErr error
-		tenantEntity, tErr = tenant.CreateWithRootOrg(ctx.Request.Context(), tx, &tenant.CreateWithRootOrgReq{
-			Code:      tenantCode,
-			Name:      req.TenantName,
-			Type:      model.TenantTypeCustomer,
-			CreatedBy: personID,
+		// 建租户 + 内置管理员（即当前登录自然人，沿用其既有密码）+ 租户自服务权限开通：
+		// 与平台侧建租户共用同一实现（pkg/iam/tenant.CreateTenantWithBuiltinAdmin），
+		// owner 同样打 builtin 来源标记，使"平台重置内置管理员密码"的兜底路径对自助租户同样可用（D5）。
+		result, cErr := tenant.CreateTenantWithBuiltinAdmin(ctx.Request.Context(), tx, &tenant.CreateTenantWithBuiltinAdminReq{
+			Tenant: &tenant.CreateWithRootOrgReq{
+				Code:      tenantCode,
+				Name:      req.TenantName,
+				Type:      model.TenantTypeCustomer,
+				CreatedBy: personID,
+			},
+			AdminUser: &user.CreateReq{
+				PersonID:  personID,
+				CreatedBy: personID,
+			},
 		})
-		if tErr != nil {
-			return tErr
+		if cErr != nil {
+			return cErr
 		}
-		now := time.Now()
-		owner := &model.UserEntity{
-			TenantID:   tenantEntity.ID,
-			PersonID:   personID,
-			Name:       "",
-			Profile:    json.RawMessage(`{}`),
-			CustomData: json.RawMessage(`{}`),
-			IsOwner:    true,
-			JoinedAt:   &now,
-			CreatedBy:  personID,
-		}
-		if uErr := dao.NewUserDao().WithTx(tx).Insert(ctx.Request.Context(), owner); uErr != nil {
-			return uErr
-		}
+		tenantEntity = result.Tenant
 		return nil
 	})
 	if txErr != nil {

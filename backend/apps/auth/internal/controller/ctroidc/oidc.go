@@ -96,6 +96,29 @@ func (ctr *OIDCCtr) SelectTenant(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// ChangePassword 首次登录强制改密（临时密码）。
+// @Tags OIDC
+// @Summary 首次登录修改密码
+// @Description 持临时密码（mustChangePassword）的自然人在登录被拦截后调用：校验当前密码与强度，
+// @Description 设置新密码并清除强制改密标记，同时撤销该自然人既有会话；之后需重新登录。
+// @accept application/json
+// @Produce application/json
+// @Param req body dtooidc.OIDCChangePasswordReq true "首次登录修改密码"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /oidc/login/changePassword [post]
+func (ctr *OIDCCtr) ChangePassword(ctx *gin.Context) {
+	var req dtooidc.OIDCChangePasswordReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctr.oidcAuthSvc.ChangePassword(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, "密码修改成功")
+}
+
 func (ctr *OIDCCtr) RegisterPerson(ctx *gin.Context) {
 	var req dtooidc.RegisterPersonReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {

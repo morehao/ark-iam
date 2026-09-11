@@ -10,8 +10,9 @@ type UserCond struct {
 	*gormdao.BaseCond
 	TenantID     string
 	PersonID     string
-	UserType     model.UserType // 账号类型过滤：member(真实用户)/machine(服务账号)
-	IDs          []string       // 主键 IN 批量查询
+	UserType     model.UserType   // 账号类型过滤：member(真实用户)/machine(服务账号)
+	Source       model.UserSource // 来源过滤：builtin(随租户创建内置)/manual(手工创建)
+	IDs          []string         // 主键 IN 批量查询
 	Username     string
 	PrimaryEmail string
 	PrimaryPhone string
@@ -32,6 +33,9 @@ func (c *UserCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.UserType != "" {
 		db.Where(tableName+".user_type = ?", c.UserType)
+	}
+	if c.Source != "" {
+		db.Where(tableName+".source = ?", c.Source)
 	}
 	if len(c.IDs) > 0 {
 		db.Where(tableName+".id IN ?", c.IDs)

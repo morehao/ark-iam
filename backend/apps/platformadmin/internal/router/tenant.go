@@ -13,6 +13,8 @@ func tenantRouter(groups *ginserver.RouterGroups) {
 	v1RouterGroup.GET("/tenants/:tenantID", tenantCtr.Detail)
 	v1RouterGroup.PUT("/tenants/:tenantID", tenantCtr.Update)
 	v1RouterGroup.DELETE("/tenants/:tenantID", tenantCtr.Delete)
+	// 重置内置管理员密码（R2 动作子路径；builtin-admin 为租户下的单体子资源）
+	v1RouterGroup.POST("/tenants/:tenantID/builtin-admin/reset-password", tenantCtr.ResetAdminPassword)
 }
 
 func logRouter(groups *ginserver.RouterGroups) {

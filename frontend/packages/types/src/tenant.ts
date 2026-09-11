@@ -19,6 +19,10 @@ export interface TenantUserItem {
   updatedAt?: number
 }
 
+/**
+ * 建成员入参。不含密码：初始临时密码由服务端生成、仅在创建响应返回一次，
+ * 且该成员首次登录必须改密（见 docs/design/tenant-admin-provisioning-design-20260912.md D3/D7）。
+ */
 export interface TenantUserCreateReq {
   personID?: string
   username?: string
@@ -26,11 +30,25 @@ export interface TenantUserCreateReq {
   primaryPhone?: string
   name: string
   avatar?: string
-  password?: string
   isSuspended?: boolean
   organizationIDs: string[]
   secondaryOrgIDs?: string[]
   leaderOrgIDs?: string[]
+}
+
+/**
+ * 建成员响应。initialPassword 为空表示邮箱/手机命中了已存在的自然人（其密码未被改动），
+ * 此时不会回显任何凭据。
+ */
+export interface TenantUserCreateResp {
+  userID: string
+  initialPassword: string
+}
+
+/** 重置成员密码响应：新临时密码仅此一次返回，成员下次登录必须改密。 */
+export interface TenantUserResetPasswordResp {
+  userID: string
+  initialPassword: string
 }
 
 // TenantUserOrgUpdate 编辑成员时的信息更新（PATCH 局部更新；字段省略=不改变）。

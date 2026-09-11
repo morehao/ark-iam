@@ -1980,6 +1980,7 @@ const docTemplatetenantadmin = `{
         },
         "/v1/tenant/users/{userID}/reset-password": {
             "post": {
+                "description": "重置该成员密码：由服务端生成新临时密码并在响应中仅返回一次，\n该成员既有会话立即失效、下次登录必须修改密码。",
                 "consumes": [
                     "application/json"
                 ],
@@ -1997,15 +1998,6 @@ const docTemplatetenantadmin = `{
                         "name": "userID",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "description": "重置密码",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtotenant.UserResetPasswordReq"
-                        }
                     }
                 ],
                 "responses": {
@@ -2020,7 +2012,7 @@ const docTemplatetenantadmin = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "type": "string"
+                                            "$ref": "#/definitions/dtotenant.UserResetPasswordResp"
                                         }
                                     }
                                 }
@@ -2221,6 +2213,10 @@ const docTemplatetenantadmin = `{
                 "revokedAt": {
                     "description": "吊销时间(null=未吊销)",
                     "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
                 }
             }
         },
@@ -2391,6 +2387,10 @@ const docTemplatetenantadmin = `{
                 "tenantID": {
                     "description": "租户ID",
                     "type": "string"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
                 }
             }
         },
@@ -2428,6 +2428,10 @@ const docTemplatetenantadmin = `{
                 "tenantID": {
                     "description": "租户ID",
                     "type": "string"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
                 }
             }
         },
@@ -2646,6 +2650,10 @@ const docTemplatetenantadmin = `{
                 "status": {
                     "description": "状态: active-启用 inactive-停用",
                     "type": "string"
+                },
+                "updatedAt": {
+                    "description": "更新时间(unix 秒)",
+                    "type": "integer"
                 }
             }
         },
@@ -3082,6 +3090,10 @@ const docTemplatetenantadmin = `{
                 "source": {
                     "description": "角色来源(builtin/custom)",
                     "type": "string"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
                 }
             }
         },
@@ -3184,10 +3196,6 @@ const docTemplatetenantadmin = `{
                         "type": "string"
                     }
                 },
-                "password": {
-                    "description": "初始密码(可选,提供则 person 可登录)",
-                    "type": "string"
-                },
                 "personID": {
                     "description": "已有自然人ID(可选,优先关联)",
                     "type": "string"
@@ -3216,6 +3224,10 @@ const docTemplatetenantadmin = `{
         "dtotenant.UserCreateResp": {
             "type": "object",
             "properties": {
+                "initialPassword": {
+                    "description": "InitialPassword 成员的初始临时密码，仅在此响应中返回一次，不落库、不可再查；\n若邮箱/手机命中已存在自然人（其密码不被改动），该字段为空串。\n待办：邮件/短信通道接入后本字段下线，见 pkg/iam/password 的 TODO(delivery)。",
+                    "type": "string"
+                },
                 "userID": {
                     "description": "用户ID",
                     "type": "string"
@@ -3274,6 +3286,10 @@ const docTemplatetenantadmin = `{
                 "tenantID": {
                     "description": "租户ID",
                     "type": "string"
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
                 },
                 "userID": {
                     "description": "用户ID",
@@ -3455,6 +3471,10 @@ const docTemplatetenantadmin = `{
                     "description": "租户ID",
                     "type": "string"
                 },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
                 "userID": {
                     "description": "用户ID",
                     "type": "string"
@@ -3481,14 +3501,15 @@ const docTemplatetenantadmin = `{
                 }
             }
         },
-        "dtotenant.UserResetPasswordReq": {
+        "dtotenant.UserResetPasswordResp": {
             "type": "object",
-            "required": [
-                "password"
-            ],
             "properties": {
-                "password": {
-                    "description": "新密码",
+                "initialPassword": {
+                    "description": "InitialPassword 新临时密码，仅在此响应中返回一次，不落库、不可再查。",
+                    "type": "string"
+                },
+                "userID": {
+                    "description": "用户ID",
                     "type": "string"
                 }
             }
