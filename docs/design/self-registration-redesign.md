@@ -58,7 +58,7 @@
 ```go
 type RegisterReq struct {
     TenantName string `json:"tenantName" binding:"required,max=128"` // 租户名
-    TenantCode string `json:"tenantCode" binding:"max=64"`           // 可选，空则 tenant-+uuid
+    TenantCode string `json:"tenantCode" binding:"max=64"`           // 可选，空则由 pkg/iam/tenant.GenerateCode 生成（t_<12 位随机 hex>）
     Username     string `json:"username" binding:"max=128"`
     PrimaryEmail string `json:"primaryEmail" binding:"max=128"`
     PrimaryPhone string `json:"primaryPhone" binding:"max=32"`

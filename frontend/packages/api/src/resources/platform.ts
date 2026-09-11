@@ -16,53 +16,18 @@ import type {
   OAuthSecretCreateResp,
   OAuthSecretItem,
   PageListResp,
-  RoleItem,
-  RoleUserItem,
   TenantApplicationCreateReq,
   TenantApplicationItem,
   TenantApplicationUpdateReq,
   TenantCreateReq,
   TenantItem,
+  TenantStatus,
   TenantUpdateReq,
-  UserIdentityCreateReq,
-  UserIdentityItem,
-  UserItem,
-  UserLoginLogItem,
-  UserPasswordUpdateReq,
-  UserStatusUpdateReq,
 } from '@ark-iam/types'
 
-// ==================== 用户（平台排查视角） ====================
-export const getUserPageList = (data: { page: number; pageSize: number; name?: string; isSuspended?: number }) =>
-  request.get<any, PageListResp<UserItem>>('/platform/users', { params: data })
-export const getUserDetail = (userID: string) => request.get<any, UserItem>(`/platform/users/${userID}`)
-export const updateUserStatus = (data: UserStatusUpdateReq) => {
-  const { userID, ...body } = data
-  return request.patch<any, string>(`/platform/users/${userID}`, body)
-}
-export const updateUserPassword = (data: UserPasswordUpdateReq) => {
-  const { userID, ...body } = data
-  return request.post<any, string>(`/platform/users/${userID}/changePassword`, body)
-}
+// 用户与角色无平台端接口：两者按租户归属，读写与成员管理统一收敛到 /tenant/* （见 tenant-admin-web/src/api）。
+// 平台侧仅保留跨租户的「监督/干预」类只读或状态接口：租户、租户应用、API 密钥监督。
 
-export const getUserIdentityByUser = (userID: string) =>
-  request.get<any, PageListResp<UserIdentityItem>>(`/platform/users/${userID}/identities`)
-export const createUserIdentity = (data: UserIdentityCreateReq) => {
-  const { userID, ...body } = data
-  return request.post<any, { userIdentityID: string }>(`/platform/users/${userID}/identities`, body)
-}
-export const deleteUserIdentity = (userID: string, userIdentityID: string) =>
-  request.delete<any, string>(`/platform/users/${userID}/identities/${userIdentityID}`)
-
-export const getUserLoginLogByUser = (userID: string) =>
-  request.get<any, PageListResp<UserLoginLogItem>>(`/platform/users/${userID}/login-logs`)
-
-// ==================== 角色（平台排查视角） ====================
-export const getRolePageList = (data: { page: number; pageSize: number; name?: string }) =>
-  request.get<any, PageListResp<RoleItem>>('/platform/roles', { params: data })
-export const getRoleUsers = (roleID: string) => request.get<any, { total: number; users: RoleUserItem[] }>(`/platform/roles/${roleID}/users`)
-
-// ==================== 部门 ====================
 // ==================== 应用 ====================
 export const getApplicationPageList = (data: { page: number; pageSize: number; name?: string }) =>
   request.get<any, PageListResp<ApplicationItem>>('/platform/applications', { params: data })
@@ -97,7 +62,7 @@ export const deleteOAuthSecret = (applicationClientID: string, secretID: string)
   request.delete<any, string>(`/platform/application-clients/${applicationClientID}/secrets/${secretID}`)
 
 // ==================== 租户 ====================
-export const getTenantPageList = (data: { page: number; pageSize: number; name?: string }) =>
+export const getTenantPageList = (data: { page: number; pageSize: number; name?: string; status?: TenantStatus }) =>
   request.get<any, PageListResp<TenantItem>>('/platform/tenants', { params: data })
 export const createTenant = (data: TenantCreateReq) => request.post<any, { tenantID: string }>('/platform/tenants', data)
 export const updateTenant = (data: TenantUpdateReq) => {

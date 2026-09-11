@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { Alert, Button, DatePicker, Form, Input, Modal, Popconfirm, Select, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { CopyOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
-import { EllipsisCell, fmtTime, PageContainer, tokens } from '@ark-iam/ui'
+import { EllipsisCell, PageContainer, timeColumn, tokens } from '@ark-iam/ui'
 import type { TenantApiKeyCreateResp, TenantApiKeyItem, TenantMachineUserItem } from '@ark-iam/types'
 import { createApiKey, deleteApiKey, getApiKeyPageList, revokeApiKey } from '../../api/apiKey'
 import { getMachineUserPageList } from '../../api/machineUser'
@@ -178,8 +178,8 @@ function ApiKeysPane() {
     },
     { title: '归属服务账号', dataIndex: 'ownerName', key: 'ownerName', width: 170, render: (v: string, r) => `${r.ownerType === 'machine' ? '服务账号 · ' : ''}${v || '-'}` },
     { title: '状态', key: 'status', width: 90, render: (_: unknown, r) => <KeyStateTag {...r} /> },
-    { title: '过期时间', dataIndex: 'expiredAt', key: 'expiredAt', width: 160, render: (v: number | null) => fmtTime(v) },
-    { title: '最近使用', dataIndex: 'lastUsedAt', key: 'lastUsedAt', width: 160, render: (v: number | null) => fmtTime(v) },
+    timeColumn<TenantApiKeyItem>({ title: '过期时间', dataIndex: 'expiredAt', placeholder: '永不过期' }),
+    timeColumn<TenantApiKeyItem>({ title: '最近使用', dataIndex: 'lastUsedAt', relative: true, placeholder: '从未使用' }),
     { title: '创建人', dataIndex: 'creatorName', key: 'creatorName', width: 160, render: (v: string) => v || '-' },
     {
       title: '操作',
@@ -248,7 +248,7 @@ function ApiKeysPane() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1180 }}
+        scroll={{ x: 1160 }}
         pagination={{
           current: page,
           pageSize,

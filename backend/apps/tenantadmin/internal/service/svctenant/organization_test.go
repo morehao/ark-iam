@@ -345,15 +345,19 @@ func TestOrganizationChildrenPageAndHasChildren(t *testing.T) {
 		ParentID:             root.OrganizationID,
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "A", Status: "active"},
 	})
-	svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
+	if _, err := svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
 		ParentID:             root.OrganizationID,
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "B", Status: "inactive"},
-	})
+	}); err != nil {
+		t.Fatalf("create B: %v", err)
+	}
 	// A 下挂一个深层子级，验证 hasChildren
-	svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
+	if _, err := svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
 		ParentID:             a.OrganizationID,
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "A1", Status: "active"},
-	})
+	}); err != nil {
+		t.Fatalf("create A1: %v", err)
+	}
 
 	// 直属子级：应只有 A、B 两项
 	resp, err := svc.Children(ginCtx, &dtotenant.OrganizationChildrenReq{

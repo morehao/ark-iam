@@ -26,9 +26,13 @@ export function StatusTag({ value }: { value?: StatusValue }) {
   return <Tag>{v || '-'}</Tag>
 }
 
-/** 挂起状态：isSuspended 字段，1/true → 挂起(error)；0/false → 正常(success) */
+/**
+ * 挂起状态：兼容 isSuspended 布尔/0-1 字段与 status 枚举（active/suspended）两种后端形态。
+ * 1/true/'suspended' → 挂起(error)；0/false/'active' → 正常(success)。
+ */
 export function SuspendedTag({ value }: { value?: StatusValue | boolean }) {
-  return value === 1 || value === true ? <Tag color="error">挂起</Tag> : <Tag color="success">正常</Tag>
+  const suspended = value === 1 || value === true || value === 'suspended'
+  return suspended ? <Tag color="error">挂起</Tag> : <Tag color="success">正常</Tag>
 }
 
 /** 验证状态：isVerified 字段，1 → 已验证(success)；0 → 未验证(warning) */

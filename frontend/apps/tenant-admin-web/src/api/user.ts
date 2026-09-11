@@ -3,7 +3,10 @@ import type {
   PageListResp,
   TenantUserCreateReq,
   TenantUserDetail,
+  TenantUserIdentityCreateReq,
+  TenantUserIdentityItem,
   TenantUserItem,
+  TenantUserLoginLogItem,
   TenantUserOrgUpdate,
   TenantUserRoleItem,
 } from '@ark-iam/types'
@@ -39,3 +42,21 @@ export const getTenantUserRoles = (userID: string) => request.get<any, { list: T
 /** 按应用全量替换用户角色（appID 空串=系统/未归属应用组；仅替换该应用下授权，不影响其它应用） */
 export const updateTenantUserRoles = (userID: string, appID: string, roleIDs: string[]) =>
   request.put<any, string>(`/tenant/users/${userID}/roles`, { appID, roleIDs })
+
+/** 用户已绑定的第三方身份 */
+export const getTenantUserIdentities = (userID: string) =>
+  request.get<any, PageListResp<TenantUserIdentityItem>>(`/tenant/users/${userID}/identities`)
+
+/** 为用户绑定第三方身份（租户取自登录上下文，不传 tenantID） */
+export const createTenantUserIdentity = (data: TenantUserIdentityCreateReq) => {
+  const { userID, ...body } = data
+  return request.post<any, { userIdentityID: string }>(`/tenant/users/${userID}/identities`, body)
+}
+
+/** 解绑用户的第三方身份 */
+export const deleteTenantUserIdentity = (userID: string, userIdentityID: string) =>
+  request.delete<any, string>(`/tenant/users/${userID}/identities/${userIdentityID}`)
+
+/** 用户登录日志 */
+export const getTenantUserLoginLogs = (userID: string) =>
+  request.get<any, PageListResp<TenantUserLoginLogItem>>(`/tenant/users/${userID}/login-logs`)

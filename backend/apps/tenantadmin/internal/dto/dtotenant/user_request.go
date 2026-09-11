@@ -53,3 +53,28 @@ type UserRolesUpdateReq struct {
 	AppID   string   `json:"appID"`                             // 目标应用ID(按应用授权；空串=系统/未归属应用组)
 	RoleIDs []string `json:"roleIDs" binding:"required"`        // 角色ID列表(全量替换该应用下的授权)
 }
+
+// ---------- 第三方身份（用户子资源） ----------
+// 租户维度一律取自登录上下文，不接受请求体传入 tenantID，避免参数污染。
+
+type UserIdentityListReq struct {
+	UserID string `json:"-" uri:"userID" binding:"required"` // 用户ID（path）
+}
+
+type UserIdentityCreateReq struct {
+	UserID     string `json:"-" uri:"userID" binding:"required"` // 用户ID（path）
+	Issuer     string `json:"issuer" binding:"required"`         // 身份提供商
+	IdentityID string `json:"identityID" binding:"required"`     // 第三方用户ID
+	Detail     any    `json:"detail"`                            // 详细信息
+}
+
+type UserIdentityDeleteReq struct {
+	UserID         string `json:"-" uri:"userID" binding:"required"`     // 用户ID（path）
+	UserIdentityID string `json:"-" uri:"identityID" binding:"required"` // 用户身份ID（path）
+}
+
+// ---------- 登录日志（用户子资源） ----------
+
+type UserLoginLogListReq struct {
+	UserID string `json:"-" uri:"userID" binding:"required"` // 用户ID（path）
+}

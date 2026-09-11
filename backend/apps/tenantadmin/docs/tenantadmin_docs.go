@@ -1792,6 +1792,192 @@ const docTemplatetenantadmin = `{
                 }
             }
         },
+        "/v1/tenant/users/{userID}/identities": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "用户已绑定的第三方身份列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "用户ID",
+                        "name": "userID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.UserIdentityListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "为用户绑定第三方身份",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "用户ID",
+                        "name": "userID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "绑定第三方身份",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.UserIdentityCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.UserIdentityCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/tenant/users/{userID}/identities/{identityID}": {
+            "delete": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "解绑用户的第三方身份",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "用户ID",
+                        "name": "userID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "用户身份ID",
+                        "name": "identityID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/tenant/users/{userID}/login-logs": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "用户登录日志",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "用户ID",
+                        "name": "userID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.UserLoginLogListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/v1/tenant/users/{userID}/reset-password": {
             "post": {
                 "consumes": [
@@ -3096,6 +3282,116 @@ const docTemplatetenantadmin = `{
                 "username": {
                     "description": "用户名",
                     "type": "string"
+                }
+            }
+        },
+        "dtotenant.UserIdentityCreateReq": {
+            "type": "object",
+            "required": [
+                "identityID",
+                "issuer"
+            ],
+            "properties": {
+                "detail": {
+                    "description": "详细信息"
+                },
+                "identityID": {
+                    "description": "第三方用户ID",
+                    "type": "string"
+                },
+                "issuer": {
+                    "description": "身份提供商",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.UserIdentityCreateResp": {
+            "type": "object",
+            "properties": {
+                "userIdentityID": {
+                    "description": "用户身份ID",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.UserIdentityItem": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "创建时间(unix 秒)",
+                    "type": "integer"
+                },
+                "detail": {
+                    "description": "详细信息"
+                },
+                "identityID": {
+                    "description": "第三方用户ID",
+                    "type": "string"
+                },
+                "issuer": {
+                    "description": "身份提供商",
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "description": "更新时间(unix 秒)",
+                    "type": "integer"
+                },
+                "userIdentityID": {
+                    "description": "用户身份ID",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.UserIdentityListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "数据列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.UserIdentityItem"
+                    }
+                },
+                "total": {
+                    "description": "数据总条数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.UserLoginLogItem": {
+            "type": "object",
+            "properties": {
+                "loginIP": {
+                    "description": "登录IP地址",
+                    "type": "string"
+                },
+                "loginTime": {
+                    "description": "登录时间(unix 秒)",
+                    "type": "integer"
+                },
+                "userAgent": {
+                    "description": "用户代理信息",
+                    "type": "string"
+                },
+                "userLoginLogID": {
+                    "description": "登录日志ID",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.UserLoginLogListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "数据列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.UserLoginLogItem"
+                    }
+                },
+                "total": {
+                    "description": "数据总条数",
+                    "type": "integer"
                 }
             }
         },

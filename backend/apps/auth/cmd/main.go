@@ -35,7 +35,11 @@ func main() {
 			panic(err)
 		}
 	} else {
-		engine.SetTrustedProxies(nil)
+		// nil = 不信任任何代理，客户端 IP 直取 RemoteAddr（Gin 对空列表不返回错误，此处仍与上一分支统一处理）
+		if err := engine.SetTrustedProxies(nil); err != nil {
+			glog.Errorf(context.Background(), "%s set trusted proxies fail, err:%v", auth.AppName, err)
+			panic(err)
+		}
 	}
 	auth.Init(engine, config.Conf)
 

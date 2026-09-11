@@ -5,6 +5,7 @@ import type { PersonDetailResp, SessionResp } from '@ark-iam/types'
 import { brand } from './theme'
 import { IDCell } from './IDCell'
 import { EllipsisCell } from './EllipsisCell'
+import { timeColumn } from './TimeCell'
 
 interface Props {
   open: boolean
@@ -89,7 +90,7 @@ export function ProfileCenter({ open, onClose }: Props) {
       key: 'userAgent',
       render: (v: string) => <EllipsisCell value={v} />,
     },
-    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 160 },
+    timeColumn<SessionResp>({ title: '创建时间', dataIndex: 'createdAt' }),
     {
       title: '操作',
       key: 'action',
@@ -202,7 +203,7 @@ export function ProfileCenter({ open, onClose }: Props) {
                   dataSource={sessions}
                   loading={loading}
                   pagination={{ pageSize: 10, showSizeChanger: false, showTotal: (t) => `共 ${t} 条` }}
-                  scroll={{ x: 800 }}
+                  scroll={{ x: 820 }}
                 />
               </>
             ),

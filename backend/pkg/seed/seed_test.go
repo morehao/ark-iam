@@ -60,12 +60,12 @@ func TestSeedIamSQLite(t *testing.T) {
 	assertCount("tenant", 1)
 	assertCount("application", 2)
 	assertCount("role", 2)
-	assertCount("menu", 19)
+	assertCount("menu", 16)
 	assertCount("person", 1)
 	assertCount("tenant_user", 1)
 	assertCount("application_client", 2)
 	assertCount("user_role", 2)
-	assertCount("role_menu", 18)
+	assertCount("role_menu", 16)
 	assertCount("tenant_application", 2)
 	assertCount("organization", 1)
 	assertCount("organization_user", 1)
@@ -140,8 +140,9 @@ func TestSeedIamSQLite(t *testing.T) {
 	}
 
 	// 管理员从属顶级部门（primary 行政主部门）
+	// 平台租户编码为固定值 t_platform（与自动生成规则 t_<12 位随机 hex> 同前缀）
 	var tenant model.TenantEntity
-	if err := db.Where("code = ?", "platform").First(&tenant).Error; err != nil {
+	if err := db.Where("code = ?", "t_platform").First(&tenant).Error; err != nil {
 		t.Fatalf("platform tenant not found: %v", err)
 	}
 	var adminUser model.UserEntity
@@ -208,10 +209,7 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 		{code: "application", name: "应用管理", parentCode: "grp-app", sort: 1},
 		{code: "oauth-client", name: "OAuth客户端", parentCode: "grp-app", sort: 2},
 		{code: "api-key", name: "API密钥监督", parentCode: "grp-app", sort: 3},
-		{code: "grp-identity", name: "身份中心", sort: 4, dir: true},
-		{code: "user", name: "用户管理", parentCode: "grp-identity", sort: 1},
-		{code: "role", name: "角色管理", parentCode: "grp-identity", sort: 2},
-		{code: "grp-platform", name: "平台管理", sort: 5, dir: true},
+		{code: "grp-platform", name: "平台管理", sort: 4, dir: true},
 		{code: "menu", name: "菜单管理", parentCode: "grp-platform", sort: 1},
 		{code: "log", name: "审计日志", parentCode: "grp-platform", sort: 2},
 	}
@@ -265,12 +263,12 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 		}
 	}
 
-	// 一级菜单展示顺序（sort 升序）：工作台 → 租户中心 → 应用中心 → 身份中心 → 平台管理
+	// 一级菜单展示顺序（sort 升序）：工作台 → 租户中心 → 应用中心 → 平台管理
 	var topMenus []model.MenuEntity
 	if err := db.Where("app_id = ? AND parent_id = ?", adminApp.ID, "").Order("sort asc").Find(&topMenus).Error; err != nil {
 		t.Fatalf("query top menus: %v", err)
 	}
-	wantOrder := []string{"dashboard", "grp-tenant", "grp-app", "grp-identity", "grp-platform"}
+	wantOrder := []string{"dashboard", "grp-tenant", "grp-app", "grp-platform"}
 	if len(topMenus) != len(wantOrder) {
 		t.Fatalf("top-level menu count: want %d, got %d", len(wantOrder), len(topMenus))
 	}
@@ -280,8 +278,9 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 		}
 	}
 
-	// 已下线模块不应再出现：system / grp-ops / 旧目录名 grp-org
-	for _, stale := range []string{"system", "grp-ops", "grp-org"} {
+	// 已下线模块不应再出现：system / grp-ops / 旧目录名 grp-org；
+	// 用户与角色已无平台端入口（收敛到租户自服务），平台应用不应再种子 grp-identity / user / role。
+	for _, stale := range []string{"system", "grp-ops", "grp-org", "grp-identity", "user", "role"} {
 		if byCode[stale] != nil {
 			t.Errorf("retired menu %s should not be seeded", stale)
 		}
@@ -296,8 +295,8 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 	if err := db.Where("role_id = ?", adminRole.ID).Find(&adminMenuLinks).Error; err != nil {
 		t.Fatalf("query admin role_menu: %v", err)
 	}
-	if len(adminMenuLinks) != 14 {
-		t.Fatalf("admin role_menu count: want 14, got %d", len(adminMenuLinks))
+	if len(adminMenuLinks) != 12 {
+		t.Fatalf("admin role_menu count: want 12, got %d", len(adminMenuLinks))
 	}
 	// 授权集合涉及平台应用与租户自服务两个应用的菜单，用全量映射解析
 	var allMenus []model.MenuEntity
@@ -316,12 +315,62 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 			}
 		}
 	}
-	for _, want := range []string{"dashboard", "user", "role", "menu", "tenant", "application", "tenant-application", "oauth-client", "api-key", "domain", "log", "organization", "tenant-user", "tenant-role"} {
+	for _, want := range []string{"dashboard", "menu", "tenant", "application", "tenant-application", "oauth-client", "api-key", "domain", "log", "organization", "tenant-user", "tenant-role"} {
 		if !granted[want] {
 			t.Errorf("admin role missing menu grant %s", want)
 		}
 	}
 	if granted["system"] {
 		t.Error("admin role should not grant retired menu system")
+	}
+}
+
+// TestSeedIamMigratesLegacyPlatformTenantCode 存量库平台租户编码为 "platform" 时，
+// 种子启动应原地改名为 t_platform：保留主键、不重复建租户。
+func TestSeedIamMigratesLegacyPlatformTenantCode(t *testing.T) {
+	db := setupDB(t)
+	ctx := context.Background()
+
+	legacy := &model.TenantEntity{
+		Code:   "platform",
+		Name:   "Default Tenant",
+		Type:   model.TenantTypePlatform,
+		Status: model.TenantStatusSuspended, // 同时校验状态回填路径
+	}
+	if err := db.Create(legacy).Error; err != nil {
+		t.Fatalf("seed legacy tenant: %v", err)
+	}
+
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed fail: %v", err)
+	}
+	// 再跑一次：改名后必须幂等（不得因为找不到旧编码而新建租户）
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed (2nd) fail: %v", err)
+	}
+
+	var tenants []model.TenantEntity
+	if err := db.Find(&tenants).Error; err != nil {
+		t.Fatalf("query tenant: %v", err)
+	}
+	if len(tenants) != 1 {
+		t.Fatalf("tenant count = %d, want 1 (legacy code must be renamed, not duplicated)", len(tenants))
+	}
+	if tenants[0].ID != legacy.ID {
+		t.Errorf("tenant id = %s, want legacy id %s (rename must keep primary key)", tenants[0].ID, legacy.ID)
+	}
+	if tenants[0].Code != "t_platform" {
+		t.Errorf("tenant code = %q, want %q", tenants[0].Code, "t_platform")
+	}
+	if tenants[0].Status != model.TenantStatusActive {
+		t.Errorf("tenant status = %q, want %q", tenants[0].Status, model.TenantStatusActive)
+	}
+	// 改名后不得残留旧编码行
+	var legacyCount int64
+	if err := db.Model(&model.TenantEntity{}).Where("code = ?", "platform").Count(&legacyCount).Error; err != nil {
+		t.Fatalf("count legacy tenant: %v", err)
+	}
+	if legacyCount != 0 {
+		t.Errorf("legacy code row count = %d, want 0", legacyCount)
 	}
 }

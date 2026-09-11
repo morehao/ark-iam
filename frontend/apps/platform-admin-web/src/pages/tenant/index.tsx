@@ -1,10 +1,28 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Form, Input, message, Modal, Popconfirm, Select, Space, Switch, Table } from 'antd'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { Button, Form, Input, message, Modal, Popconfirm, Select, Space, Switch, Table, Tooltip } from 'antd'
+import { PlusOutlined, QuestionCircleOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { EllipsisCell, fmtTime, IDCell, PageContainer, SuspendedTag, TypeTag } from '@ark-iam/ui'
+import { EllipsisCell, IDCell, PageContainer, SuspendedTag, timeColumn, TypeTag } from '@ark-iam/ui'
 import { createTenant, deleteTenant, getTenantPageList, updateTenant } from '@ark-iam/api'
-import type { TenantItem } from '@ark-iam/types'
+import type { TenantItem, TenantStatus } from '@ark-iam/types'
+
+// 租户状态筛选项（后端 model.TenantStatus：active-正常 / suspended-已挂起）。
+// 「全部」由 allowClear 的空值表达，无需单独一项。
+const TENANT_STATUS_OPTIONS = [
+  { value: 'active', label: '正常' },
+  { value: 'suspended', label: '挂起' },
+]
+
+// 租户类型（后端 model.TenantType：customer-客户租户 / platform-平台租户）：
+// 用于区分「外部客户租户」与「平台自运营租户」，当前仅作分类标识，
+// 不参与数据隔离与权限判定（隔离一律按 tenant_id）。
+const TENANT_TYPE_OPTIONS = [
+  { value: 'customer', label: '客户租户', title: '外部客户/合作方的独立租户' },
+  { value: 'platform', label: '平台租户', title: '平台自运营租户（种子数据 Default Tenant 即平台租户）' },
+]
+
+const TENANT_TYPE_TIP =
+  '客户租户（customer）：外部客户/合作方的独立数据与权限边界；平台租户（platform）：平台自运营租户（如 Default Tenant）。当前该字段仅作分类标识，不参与数据隔离与权限判定。'
 
 export default function TenantList() {
   const [data, setData] = useState<TenantItem[]>([])
@@ -13,6 +31,7 @@ export default function TenantList() {
   const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
+  const [status, setStatus] = useState<TenantStatus | undefined>(undefined)
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<TenantItem | null>(null)
@@ -22,7 +41,7 @@ export default function TenantList() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const resp = await getTenantPageList({ page, pageSize, name: keyword })
+      const resp = await getTenantPageList({ page, pageSize, name: keyword, status })
       setData(resp?.list || [])
       setTotal(resp?.total || 0)
     } catch {
@@ -30,7 +49,7 @@ export default function TenantList() {
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, keyword])
+  }, [page, pageSize, keyword, status])
 
   useEffect(() => {
     void fetchData()
@@ -49,9 +68,8 @@ export default function TenantList() {
       name: record.name,
       type: record.type,
       tag: record.tag,
-      code: record.code,
       dbUser: record.dbUser,
-      isSuspended: record.isSuspended,
+      status: record.status,
     })
     setModalOpen(true)
   }
@@ -93,19 +111,33 @@ export default function TenantList() {
       title: '编码',
       dataIndex: 'code',
       key: 'code',
-      width: 150,
+      width: 180,
       render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v || '-'}</span>,
     },
-    { title: '类型', dataIndex: 'type', key: 'type', width: 100, render: (v: string) => <TypeTag value={v} /> },
+    {
+      title: (
+        <Space size={4}>
+          类型
+          <Tooltip title={TENANT_TYPE_TIP}>
+            <QuestionCircleOutlined style={{ color: 'rgba(0, 0, 0, 0.45)' }} />
+          </Tooltip>
+        </Space>
+      ),
+      dataIndex: 'type',
+      key: 'type',
+      width: 120,
+      render: (v: string) => <TypeTag value={v} />,
+    },
     { title: '标签', dataIndex: 'tag', key: 'tag', width: 140, render: (v: string) => v || '-' },
     {
       title: '状态',
-      dataIndex: 'isSuspended',
-      key: 'isSuspended',
+      dataIndex: 'status',
+      key: 'status',
       width: 100,
-      render: (v: number) => <SuspendedTag value={v} />,
+      render: (v: string) => <SuspendedTag value={v} />,
     },
-    { title: '创建时间', key: 'createdAt', width: 170, render: (_, r) => fmtTime(r.createdAt) },
+    timeColumn<TenantItem>({ title: '创建时间', dataIndex: 'createdAt' }),
+    timeColumn<TenantItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     {
       title: '操作',
       key: 'action',
@@ -140,7 +172,7 @@ export default function TenantList() {
         </Space>
       }
     >
-      <div style={{ marginBottom: 16 }}>
+      <Space style={{ marginBottom: 16 }} wrap>
         <Input.Search
           allowClear
           placeholder="按租户名搜索"
@@ -151,13 +183,24 @@ export default function TenantList() {
             setPage(1)
           }}
         />
-      </div>
+        <Select
+          allowClear
+          placeholder="全部状态"
+          style={{ width: 140 }}
+          value={status}
+          onChange={(v: TenantStatus | undefined) => {
+            setStatus(v)
+            setPage(1)
+          }}
+          options={TENANT_STATUS_OPTIONS}
+        />
+      </Space>
       <Table<TenantItem>
         rowKey="tenantID"
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1000 }}
+        scroll={{ x: 1370 }}
         pagination={{
           current: page,
           pageSize,
@@ -184,31 +227,29 @@ export default function TenantList() {
           <Form.Item name="name" label="租户名称" rules={[{ required: true, message: '请输入租户名称' }]}>
             <Input placeholder="租户名称" />
           </Form.Item>
-          <Form.Item name="type" label="类型">
-            <Select
-              options={[
-                { value: 'customer', label: '客户' },
-                { value: 'platform', label: '平台' },
-              ]}
-            />
+          <Form.Item name="type" label="类型" tooltip={TENANT_TYPE_TIP}>
+            <Select options={TENANT_TYPE_OPTIONS} />
           </Form.Item>
           <Form.Item name="tag" label="标签">
             <Input placeholder="选填" />
           </Form.Item>
-          <Form.Item name="code" label="编码" extra="留空自动生成">
-            <Input placeholder="选填" />
+          <Form.Item
+            label="编码"
+            extra={editing ? '编码由服务端生成，创建后不可修改' : '保存后由服务端自动生成（t_随机段）'}
+          >
+            <Input value={editing?.code || ''} disabled placeholder="保存后自动生成" />
           </Form.Item>
           <Form.Item name="dbUser" label="数据库用户">
             <Input placeholder="选填" />
           </Form.Item>
           {editing && (
             <Form.Item
-              name="isSuspended"
+              name="status"
               label="状态"
+              tooltip="挂起后该租户成员无法登录、已签发会话会被撤销；不能挂起你当前所在的租户"
               valuePropName="checked"
-              getValueFromEvent={(c: boolean) => (c ? 0 : 1)}
-              getValueProps={(v?: number) => ({ checked: v !== 1 })}
-              initialValue={0}
+              getValueFromEvent={(checked: boolean) => (checked ? 'active' : 'suspended')}
+              getValueProps={(v?: string) => ({ checked: v !== 'suspended' })}
             >
               <Switch checkedChildren="正常" unCheckedChildren="挂起" />
             </Form.Item>

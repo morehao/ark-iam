@@ -833,7 +833,7 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 	defer restoreUserStore()
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
 		return &fakeAuthTenantStore{getListByCondFunc: func(ctx context.Context, cond *dao.TenantCond) (model.TenantEntityList, error) {
-			return model.TenantEntityList{{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "22"}}, Name: "tenant-22", Tag: "t22"}}, nil
+			return model.TenantEntityList{{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "22"}}, Name: "tenant-22", Status: model.TenantStatusActive, Tag: "t22"}}, nil
 		}}
 	})
 	defer restoreTenantStore()
@@ -945,9 +945,15 @@ func TestConnectorServiceCallbackAllowsMissingConnectorID(t *testing.T) {
 	})
 	defer restoreUserStore()
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
-		return &fakeAuthTenantStore{getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
-			return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "22"}}, Name: "tenant-22", Tag: "t22"}, nil
-		}}
+		return &fakeAuthTenantStore{
+			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
+				return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "22"}}, Name: "tenant-22", Status: model.TenantStatusActive, Tag: "t22"}, nil
+			},
+			// 登录选租户路径（listPersonTenants）按 ID 批量查租户，需返回 active 租户
+			getListByCondFunc: func(ctx context.Context, cond *dao.TenantCond) (model.TenantEntityList, error) {
+				return model.TenantEntityList{{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "22"}}, Name: "tenant-22", Status: model.TenantStatusActive, Tag: "t22"}}, nil
+			},
+		}
 	})
 	defer restoreTenantStore()
 
@@ -1050,9 +1056,15 @@ func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 	})
 	defer restoreUserStore()
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
-		return &fakeAuthTenantStore{getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
-			return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "22"}}, Name: "tenant-22", Tag: "t22"}, nil
-		}}
+		return &fakeAuthTenantStore{
+			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
+				return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "22"}}, Name: "tenant-22", Status: model.TenantStatusActive, Tag: "t22"}, nil
+			},
+			// 登录选租户路径（listPersonTenants）按 ID 批量查租户，需返回 active 租户
+			getListByCondFunc: func(ctx context.Context, cond *dao.TenantCond) (model.TenantEntityList, error) {
+				return model.TenantEntityList{{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "22"}}, Name: "tenant-22", Status: model.TenantStatusActive, Tag: "t22"}}, nil
+			},
+		}
 	})
 	defer restoreTenantStore()
 
@@ -1136,9 +1148,16 @@ func TestConnectorCallbackInvokesIdentityResolverTokenGeneratorAndLoginRecorder(
 	})
 	defer restoreUserStore()
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
-		return &fakeAuthTenantStore{getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
-			return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "66"}}, Name: "tenant-66", Tag: "t66"}, nil
-		}}
+		return &fakeAuthTenantStore{
+			getByIDFunc: func(ctx context.Context, id string) (*model.TenantEntity, error) {
+				return &model.TenantEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "66"}}, Name: "tenant-66", Status: model.TenantStatusActive, Tag: "t66"}, nil
+			},
+			// 登录选租户路径（listPersonTenants）按 ID 批量查租户：返回 active 租户，
+			// 否则默认租户为空会被判为"租户已挂起"。
+			getListByCondFunc: func(ctx context.Context, cond *dao.TenantCond) (model.TenantEntityList, error) {
+				return model.TenantEntityList{{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "66"}}, Name: "tenant-66", Status: model.TenantStatusActive, Tag: "t66"}}, nil
+			},
+		}
 	})
 	defer restoreTenantStore()
 

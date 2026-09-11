@@ -5,7 +5,7 @@ import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { createOAuthSecret, deleteOAuthSecret, getOAuthClientDetail, listOAuthSecrets } from '@ark-iam/api'
 import type { OAuthClientDetail as OAuthClientDetailType, OAuthSecretCreateResp, OAuthSecretItem } from '@ark-iam/types'
-import { fmtTime, IDCell, StatusTag, tokens, TypeTag } from '@ark-iam/ui'
+import { fmtTime, IDCell, StatusTag, timeColumn, tokens, TypeTag } from '@ark-iam/ui'
 
 export default function OAuthClientDetail() {
   const { id } = useParams<{ id: string }>()
@@ -82,8 +82,8 @@ export default function OAuthClientDetail() {
       key: 'valuePrefix',
       render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v || '-'}</span>,
     },
-    { title: '过期时间', dataIndex: 'expiresAt', key: 'expiresAt', width: 180, render: (v: number | null) => (v ? fmtTime(v) : '永不过期') },
-    { title: '创建时间', key: 'createdAt', width: 170, render: (_, r) => fmtTime(r.createdAt) },
+    timeColumn<OAuthSecretItem>({ title: '过期时间', dataIndex: 'expiresAt', placeholder: '永不过期' }),
+    timeColumn<OAuthSecretItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     {
       title: '操作',
       key: 'action',

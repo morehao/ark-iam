@@ -30,12 +30,6 @@ func NewApiKeySupervisionSvc() ApiKeySupervisionSvc {
 	}
 }
 
-func newApiKeySupervisionSvcWithDao(apiKeyDao *dao.ApiKeyDao) ApiKeySupervisionSvc {
-	return &apiKeySupervisionSvc{
-		apiKeyDao: apiKeyDao,
-	}
-}
-
 // PageListSupervision 平台排查视角：跨租户只读检索全部 API Key（忽略当前上下文租户）。
 // 明文密钥永不可见（仅前缀）；本接口不提供吊销/删除等写动作（平台级应急吊销暂未纳入）。
 func (svc *apiKeySupervisionSvc) PageListSupervision(ctx *gin.Context, req *dtoapikey.ApiKeySupervisionPageListReq) (*dtoapikey.ApiKeySupervisionPageListResp, error) {

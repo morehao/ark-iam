@@ -6,16 +6,8 @@ import (
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
-// roleRouter 平台排查视角：种子角色与跨租户角色只读查看；
-// 租户内角色 CRUD/成员/菜单授权收敛到 tenantadmin。
-func roleRouter(groups *ginserver.RouterGroups) {
-	roleCtr := ctrpermission.NewRoleCtr()
-	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.GET("/roles", roleCtr.PageList)
-	v1RouterGroup.GET("/roles/:roleID", roleCtr.Detail)
-	v1RouterGroup.GET("/roles/:roleID/users", roleCtr.ListUsers)
-}
-
+// 角色（role）不再有平台端入口：角色按租户归属，读写与成员管理全部收敛到 tenantadmin，
+// 平台侧不再提供跨租户角色只读视图，避免绕过租户授权边界。
 func menuRouter(groups *ginserver.RouterGroups) {
 	menuCtr := ctrpermission.NewMenuCtr()
 	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)

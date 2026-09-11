@@ -24,7 +24,13 @@ import (
 )
 
 const (
-	tenantCodePlatform = "platform"
+	// tenantCodePlatform 平台租户（Default Tenant）编码：固定值，形态与自动生成规则
+	// （pkg/iam/tenant.GenerateCode：t_<12 位随机 hex>）一致——同前缀、后缀可读且固定。
+	// 自动生成编码的随机段只用小写 hex，"platform" 含非 hex 字符，故两者永不冲突。
+	tenantCodePlatform = "t_platform"
+	// tenantCodePlatformLegacy 历史种子编码（旧版本为 "platform"）。
+	// 启动时若命中该编码的平台租户，原地改名（保留主键，避免租户重建导致引用失联）。
+	tenantCodePlatformLegacy = "platform"
 
 	adminPassword = "admin123"
 
@@ -123,22 +129,63 @@ func SeedIam(ctx context.Context, db *gorm.DB) error {
 
 // ---------- 各实体种子实现 ----------
 
-func getOrCreateTenant(ctx context.Context, db *gorm.DB) (*model.TenantEntity, error) {
+// findTenantByCode 按编码查平台租户；不存在返回 (nil, nil)，系统错误返回 (nil, err)。
+func findTenantByCode(db *gorm.DB, code string) (*model.TenantEntity, error) {
 	entity := &model.TenantEntity{}
-	err := db.Where("code = ?", tenantCodePlatform).First(entity).Error
+	err := db.Where("code = ?", code).First(entity).Error
 	if err == nil {
 		return entity, nil
 	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, fmt.Errorf("seed tenant query fail: %w", err)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return nil, fmt.Errorf("seed tenant query fail (code=%s): %w", code, err)
+}
+
+func getOrCreateTenant(ctx context.Context, db *gorm.DB) (*model.TenantEntity, error) {
+	entity, err := findTenantByCode(db, tenantCodePlatform)
+	if err != nil {
+		return nil, err
+	}
+	if entity == nil {
+		// 历史库平台租户编码为 tenantCodePlatformLegacy（"platform"）：原地改名，
+		// 保留主键，避免改编码规则后重复建出第二个平台租户。仅迁移平台类型租户，
+		// 防止误改恰好同名的客户租户。
+		legacy, lErr := findTenantByCode(db, tenantCodePlatformLegacy)
+		if lErr != nil {
+			return nil, lErr
+		}
+		if legacy != nil && legacy.Type == model.TenantTypePlatform {
+			if uErr := db.Model(&model.TenantEntity{}).Where("id = ?", legacy.ID).
+				Update("code", tenantCodePlatform).Error; uErr != nil {
+				return nil, fmt.Errorf("seed tenant code migrate fail: %w", uErr)
+			}
+			legacy.Code = tenantCodePlatform
+			glog.Infof(ctx, "[seed] tenant code migrated (%s -> %s), id:%s",
+				tenantCodePlatformLegacy, tenantCodePlatform, legacy.ID)
+			entity = legacy
+		}
+	}
+	if entity != nil {
+		// 幂等回填：平台租户是平台控制台自身的租户，被挂起会导致整个控制台失联，
+		// 存量库若状态异常，种子启动时纠正为 active。
+		if entity.Status != model.TenantStatusActive {
+			if uErr := db.Model(&model.TenantEntity{}).Where("id = ?", entity.ID).
+				Update("status", model.TenantStatusActive).Error; uErr != nil {
+				return nil, fmt.Errorf("seed tenant status backfill fail: %w", uErr)
+			}
+			entity.Status = model.TenantStatusActive
+			glog.Infof(ctx, "[seed] tenant status backfilled to active, id:%s", entity.ID)
+		}
+		return entity, nil
 	}
 	entity = &model.TenantEntity{
-		Code:        tenantCodePlatform,
-		Name:        "Default Tenant",
-		Type:        model.TenantTypePlatform,
-		DbUser:      "default_user",
-		IsSuspended: false,
-		Tag:         "default",
+		Code:   tenantCodePlatform,
+		Name:   "Default Tenant",
+		Type:   model.TenantTypePlatform,
+		DbUser: "default_user",
+		Status: model.TenantStatusActive,
+		Tag:    "default",
 	}
 	if err := db.WithContext(ctx).Create(entity).Error; err != nil {
 		return nil, fmt.Errorf("seed tenant create fail: %w", err)
@@ -265,8 +312,9 @@ func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model
 	defs := []seedMenu{
 		// 平台管理控制台：目录分组（type=directory，无页面）+ 页面叶子（type=menu，指向真实前端页面）。
 		// 一级菜单按「对象域」划分（对象名词 + 中心/叶子），不使用「X 与 Y」并列命名：
-		// 租户中心（租户及其资源）/ 应用中心（应用及其接入凭证）/ 身份中心（跨租户身份排查）/
+		// 租户中心（租户及其资源）/ 应用中心（应用及其接入凭证）/
 		// 平台管理（平台自身治理：菜单字典与审计日志）。
+		// 用户与角色不再有平台端入口：两者按租户归属，读写与成员管理全部收敛到租户自服务控制台。
 		{appCode: appCodeAdmin, name: "工作台", code: "dashboard", path: "/dashboard", icon: "dashboard", sort: 1, component: "/dashboard/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityMember},
 		{appCode: appCodeAdmin, name: "租户中心", code: "grp-tenant", icon: "apartment", sort: 2, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-tenant", name: "租户管理", code: "tenant", path: "/tenant", icon: "global", sort: 1, component: "/tenant/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
@@ -276,10 +324,7 @@ func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model
 		{appCode: appCodeAdmin, parentCode: "grp-app", name: "应用管理", code: "application", path: "/application", icon: "app", sort: 1, component: "/application/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-app", name: "OAuth客户端", code: "oauth-client", path: "/oauth-client", icon: "key", sort: 2, component: "/oauthClient/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-app", name: "API密钥监督", code: "api-key", path: "/api-key", icon: "key", sort: 3, component: "/apiKey/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
-		{appCode: appCodeAdmin, name: "身份中心", code: "grp-identity", icon: "team", sort: 4, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
-		{appCode: appCodeAdmin, parentCode: "grp-identity", name: "用户管理", code: "user", path: "/user", icon: "user", sort: 1, component: "/user/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
-		{appCode: appCodeAdmin, parentCode: "grp-identity", name: "角色管理", code: "role", path: "/role", icon: "role", sort: 2, component: "/role/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
-		{appCode: appCodeAdmin, name: "平台管理", code: "grp-platform", icon: "setting", sort: 5, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
+		{appCode: appCodeAdmin, name: "平台管理", code: "grp-platform", icon: "setting", sort: 4, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-platform", name: "菜单管理", code: "menu", path: "/menu", icon: "menu", sort: 1, component: "/menu/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-platform", name: "审计日志", code: "log", path: "/log", icon: "file", sort: 2, component: "/log/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		// 租户自服务一级菜单：控制台定位为「租户管理层专用」（组织/用户/角色/密钥均属管理操作，
@@ -374,7 +419,7 @@ func seedRoleMenus(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity,
 		menuCode []string
 	}{
 		{roleCode: "admin", menuCode: []string{
-			"dashboard", "user", "role", "menu", "tenant", "application",
+			"dashboard", "menu", "tenant", "application",
 			"tenant-application", "oauth-client", "api-key", "domain", "log",
 			"organization", "tenant-user", "tenant-role",
 		}},

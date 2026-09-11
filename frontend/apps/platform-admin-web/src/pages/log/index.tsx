@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Descriptions, Drawer, Input, Space, Table, Tooltip } from 'antd'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { EllipsisCell, fmtTime, IDCell, PageContainer, tokens } from '@ark-iam/ui'
+import { EllipsisCell, fmtTime, IDCell, PageContainer, timeColumn, tokens } from '@ark-iam/ui'
 import { getAuditLogDetail, getAuditLogPageList } from '@ark-iam/api'
 import type { AuditLogItem } from '@ark-iam/types'
 
@@ -86,12 +86,7 @@ export default function AuditLogList() {
       },
     },
     { title: '租户ID', dataIndex: 'tenantID', key: 'tenantID', width: 150, render: (v: string) => <IDCell value={v} /> },
-    {
-      title: '创建时间',
-      key: 'createdAt',
-      width: 160,
-      render: (_, r) => fmtTime(r.createdAt),
-    },
+    timeColumn<AuditLogItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     {
       title: '操作',
       key: 'action',
@@ -133,7 +128,7 @@ export default function AuditLogList() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 800 }}
+        scroll={{ x: 820 }}
         pagination={{
           current: page,
           pageSize,

@@ -166,6 +166,9 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 					return nil, uerr
 				}
 				if len(users) > 0 {
+					if tErr := s.tenantTokenGate(ctx, tid, oidc.ErrAccessDenied()); tErr != nil {
+						return nil, tErr
+					}
 					claims := objauth.TokenClaims{TenantID: tid}.OIDCPrivateClaims()
 					// sid：注入 SSO 会话标识，使 access token 携带 sid，
 					// 供 RP 匹配与会话粒度的 back-channel 登出（M4）。
@@ -187,6 +190,11 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 					return nil, uerr
 				}
 				if len(users) > 0 {
+					// 刷新轮换落在挂起租户：以 invalid_grant 拒绝，促使 RP 丢弃该 refresh token
+					// （挂起动作本身也会撤销存量 refresh token，此处是并发窗口内的兜底）。
+					if tErr := s.tenantTokenGate(ctx, tid, oidc.ErrInvalidGrant()); tErr != nil {
+						return nil, tErr
+					}
 					claims := objauth.TokenClaims{TenantID: tid}.OIDCPrivateClaims()
 					// sid：刷新轮换也携带会话标识，保证刷新后的 token 可关联同一中心会话。
 					if rr.GetSessionID() != "" {
@@ -198,6 +206,30 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 		}
 	}
 	return s.GetPrivateClaimsFromScopes(ctx, request.GetSubject(), getClientIDFromRequest(request), restrictedScopes)
+}
+
+// tenantTokenGate 令牌签发前的租户准入门禁：租户状态非 active 时拒绝签发/轮换令牌。
+// suspendedErr 由调用方按授权类型给定（授权码流 access_denied、刷新流 invalid_grant）。
+// 返回 nil 表示放行；系统错误如实上抛，与业务边界判定分离。
+func (s *OIDCStorage) tenantTokenGate(ctx context.Context, tenantID string, suspendedErr *oidc.Error) error {
+	if tenantID == "" {
+		return nil
+	}
+	tenantEntity, err := s.persistentStore.tenantDao().GetByID(ctx, tenantID)
+	if err != nil {
+		glog.Errorf(ctx, "[oidcop.tenantTokenGate] tenant dao GetByID fail, err:%v, tenantID:%s", err, tenantID)
+		return err
+	}
+	// 租户行不存在：数据不一致，如实记录并拒绝，不能报成"已挂起"（会误导排查方向）。
+	if tenantEntity == nil {
+		glog.Errorf(ctx, "[oidcop.tenantTokenGate] tenant not found, reject token, tenantID:%s", tenantID)
+		return suspendedErr.WithDescription("tenant not found")
+	}
+	if !tenantEntity.IsActive() {
+		glog.Warnf(ctx, "[oidcop.tenantTokenGate] reject token for inactive tenant, tenantID:%s", tenantID)
+		return suspendedErr.WithDescription("tenant is suspended")
+	}
+	return nil
 }
 
 func getClientIDFromRequest(request op.TokenRequest) string {

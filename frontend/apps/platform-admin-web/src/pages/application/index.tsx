@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Descriptions, Drawer, Form, Input, InputNumber, message, Modal, Popconfirm, Select, Space, Table, Tag } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { EllipsisCell, fmtTime, IDCell, PageContainer, StatusTag, TypeTag } from '@ark-iam/ui'
+import { EllipsisCell, fmtTime, IDCell, PageContainer, StatusTag, timeColumn, TypeTag } from '@ark-iam/ui'
 import { createApplication, deleteApplication, getApplicationDetail, getApplicationPageList, updateApplication } from '@ark-iam/api'
 import type { ApplicationItem } from '@ark-iam/types'
 
@@ -119,7 +119,7 @@ export default function ApplicationList() {
     { title: '类型', dataIndex: 'type', key: 'type', width: 110, render: (v: string) => <TypeTag value={v} /> },
     { title: '可见性', dataIndex: 'visibility', key: 'visibility', width: 100, render: renderVisibility },
     { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (v: string) => <StatusTag value={v} /> },
-    { title: '创建时间', key: 'createdAt', width: 170, render: (_, r) => fmtTime(r.createdAt) },
+    timeColumn<ApplicationItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     {
       title: '操作',
       key: 'action',
@@ -174,7 +174,7 @@ export default function ApplicationList() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1060 }}
+        scroll={{ x: 1150 }}
         pagination={{
           current: page,
           pageSize,

@@ -13,6 +13,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/golib/glog"
 )
 
 const (
@@ -44,6 +45,46 @@ func (j LogoutJob) encode() string {
 // EnqueueLogout 将一条登出通知任务推入 Redis FIFO 队列，供背信道 worker 异步消费。
 func EnqueueLogout(ctx context.Context, job LogoutJob) error {
 	return enqueueLogout(ctx, ssoLogoutQueueKey, job)
+}
+
+// EnqueueLogoutsByPersonID 将该自然人名下已登记的全部 client 的 back-channel logout 任务入队，
+// 返回成功入队的任务数。
+//
+// 必须在撤销 SSO 会话之前调用：登记查询 ListByPersonID 依赖 sso_user_sessions 索引，
+// 会话一旦撤销索引即被清除，通知就再也发不出去（这是「先入队、再撤销」顺序的根因）。
+//
+// 登记查询失败返回 error 交调用方判断（属系统错误）；单条入队失败只记日志并继续，
+// 尽力而为，绝不阻断登出/挂起等主流程。
+func EnqueueLogoutsByPersonID(ctx context.Context, personID string) (int, error) {
+	return enqueueLogoutsByPersonID(ctx, ssoLogoutQueueKey, personID)
+}
+
+// enqueueLogoutsByPersonID 与 EnqueueLogoutsByPersonID 逻辑相同，但允许指定队列键，
+// 供测试使用独立队列避免与运行中的 worker 共享消费（与 enqueueLogout 的拆法一致）。
+func enqueueLogoutsByPersonID(ctx context.Context, queueKey string, personID string) (int, error) {
+	if personID == "" {
+		return 0, nil
+	}
+	regs, err := NewSLOStore().ListByPersonID(ctx, personID)
+	if err != nil {
+		return 0, fmt.Errorf("list logout registrations: %w", err)
+	}
+	enqueued := 0
+	for _, reg := range regs {
+		if err := enqueueLogout(ctx, queueKey, LogoutJob{
+			SessionID:            reg.SessionID,
+			PersonID:             personID,
+			OIDCSessionID:        reg.OIDCSessionID,
+			ClientID:             reg.ClientID,
+			UserID:               reg.UserID,
+			BackChannelLogoutURI: reg.BackChannelLogoutURI,
+		}); err != nil {
+			glog.Warnf(ctx, "[sso.EnqueueLogoutsByPersonID] enqueue back-channel logout fail, personID:%s, clientID:%s, err:%v", personID, reg.ClientID, err)
+			continue
+		}
+		enqueued++
+	}
+	return enqueued, nil
 }
 
 // enqueueLogout 与 DequeueLogout 类似，但允许指定队列键，

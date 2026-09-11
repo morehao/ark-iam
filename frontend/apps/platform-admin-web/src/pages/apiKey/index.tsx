@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Input, Space, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
-import { EllipsisCell, fmtTime, IDCell, PageContainer } from '@ark-iam/ui'
+import { EllipsisCell, IDCell, PageContainer, timeColumn } from '@ark-iam/ui'
 import { getApiKeySupervisionPageList } from '@ark-iam/api'
 import type { ApiKeySupervisionItem } from '@ark-iam/types'
 
@@ -100,9 +100,9 @@ export default function ApiKeySupervisionList() {
       width: 90,
       render: (_, r) => KeyStateTag(r),
     },
-    { title: '过期时间', dataIndex: 'expiresAt', key: 'expiresAt', width: 160, render: (v: number) => fmtTime(v) },
-    { title: '最后使用', dataIndex: 'lastUsedAt', key: 'lastUsedAt', width: 160, render: (v: number) => fmtTime(v) },
-    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 160, render: (v: number) => fmtTime(v) },
+    timeColumn<ApiKeySupervisionItem>({ title: '过期时间', dataIndex: 'expiresAt', placeholder: '永不过期' }),
+    timeColumn<ApiKeySupervisionItem>({ title: '最后使用', dataIndex: 'lastUsedAt', relative: true, placeholder: '从未使用' }),
+    timeColumn<ApiKeySupervisionItem>({ title: '创建时间', dataIndex: 'createdAt' }),
   ]
 
   return (
@@ -169,7 +169,7 @@ export default function ApiKeySupervisionList() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1600 }}
+        scroll={{ x: 1700 }}
         pagination={{
           current: page,
           pageSize,

@@ -173,7 +173,7 @@ components:
 | 字段语义 | 组件 | 值 → 文案(Tag 色) |
 |---|---|---|
 | 启用/停用（status） | `StatusTag` | enable / 1 / active → 启用（`success`）；disable / 0 / inactive → 停用（`default`）；suspended → 挂起（`error`） |
-| 挂起（isSuspended） | `SuspendedTag` | 1 / true → 挂起（`error`）；0 / false → 正常（`success`） |
+| 挂起（isSuspended / status） | `SuspendedTag` | 1 / true / `suspended` → 挂起（`error`）；0 / false / `active` → 正常（`success`）；兼容布尔字段与 status 枚举两种后端形态 |
 | 验证（isVerified） | `VerifiedTag` | 1 → 已验证（`success`）；0 → 未验证（`warning`） |
 | 会话（isActive） | 内联语义色 | true → 活跃（`success`）；false → 已失效（`default`） |
 | API Key 有效 | 内联语义色 | 有效（`success`）；已吊销（`error`） |
@@ -191,11 +191,19 @@ PageContainer(title, description, extra=刷新 + 主操作[type=primary])
   │    ├─ ID 列 → IDCell（等宽 + 首 8 尾 4 + Tooltip 复制）
   │    ├─ 长文本列 → EllipsisCell
   │    ├─ 状态列 → 7.2 语义组件
-  │    ├─ 时间列 → fmtTime（秒级时间戳，一律 'YYYY-MM-DD HH:mm:ss'）
+  │    ├─ 时间列 → timeColumn()（列宽 TIME_COL_WIDTH=180 + TimeCell 强制单行；秒级时间戳一律 'YYYY-MM-DD HH:mm:ss'）
   │    └─ 操作列（最右，link+small；删除套 Popconfirm，危险按钮 danger）
   └─ 新建/编辑 Modal（layout=vertical + confirmLoading）
      详情 Drawer（Descriptions bordered size=small）
 ```
+
+**时间列硬规则（2026-09 折行问题后收敛）**
+
+- 时间列一律用 `timeColumn<T>({ title, dataIndex })`（或 `TimeCell`），**禁止页面自写列宽**。历史 bug 根因：各页手写 150/160/170，而完整时间串 `2026-09-03 17:19:46` 在 14px + 全站 `tabular-nums` 下实测 146.06px，加 antd 单元格左右各 16px 内边距共需 **178.06px** → 会在唯一的空格处折成「日期 / 时间」两行。
+- 宽度由常量给：绝对时间 `TIME_COL_WIDTH = 180`；相对时间 `TIME_COL_WIDTH_RELATIVE = 120`。
+- `TimeCell` 的 `whiteSpace: nowrap` 与列宽是一对：nowrap 保证任何布局下都不折行，列宽保证不溢出串列，**两者必须同时生效**（故不要绕过组件直接 `fmtTime` + 自定宽度）。
+- 空值语义交给 `placeholder`：`永不过期`（API Key / OAuth Secret 过期时间）、`未验证`（域名验证时间）、`从未使用`（最后使用 / 最近使用），其余默认 `-`。
+- 次要时间字段（`最后使用` / `最近使用` / `登录时间`）用 `relative: true`：展示「3 天前」，悬浮 Tooltip 给完整时间；审计主字段（`创建时间`）一律绝对时间。
 
 ### 7.4 登录页（login-web 凭证页 + ui LoginPage 引导页）
 
@@ -208,7 +216,8 @@ PageContainer(title, description, extra=刷新 + 主操作[type=primary])
 ### Do
 - 改设计值：先改 `packages/ui/src/theme.ts` 的 `tokens`，再同步本文件 front matter（两处一致）。
 - 页面/组件引用颜色一律用 `tokens.*`（`import { tokens } from '@ark-iam/ui'`）或 antd `theme.useToken()`；同包内既有 `brand.*` 为兼容别名，新代码优先 `tokens.*`。
-- 状态用语义 Tag 组件；时间用 `fmtTime`；ID 用 `IDCell`。
+- 状态用语义 Tag 组件；ID 用 `IDCell`；时间列用 `timeColumn()` / `TimeCell`（列宽取 `TIME_COL_WIDTH`），详情/描述区文本可用 `fmtTime`。
+- 时间列不要手写宽度（150/160/170 会折行）；页面上有时间列增删时，同步更新该表的 `scroll.x`。
 - 主色仅用于主操作/链接/选中/焦点；页面表面保持中性灰阶 + 白卡（冷白工程台）。
 - 卡片 hairline-only 无阴影；阴影只给 Modal/浮层；列表页骨架照 7.3 模板。
 - 左右分栏用原生 flex 容器（见 §4）；antd 结构级微修正统一放 `AppShell` 内联 `<style>`（见 §7.1）。
@@ -219,6 +228,7 @@ PageContainer(title, description, extra=刷新 + 主操作[type=primary])
 - 禁止用传统色名 Tag（`color="green"/"red"/"orange"`）表示启用/停用/挂起等**状态**。
 - 禁止 pill 形按钮；禁止把主色渐变当卡片默认背景；禁止同一字段在两端配色不一致。
 - 禁止在页面表面使用主色淡底 tint（如 `#ece9ff`、`#fafbff`、`#f6f8ff` 一类表头/行 hover/卡片）——一律中性灰阶。
+- 禁止绕过 `TimeCell` 直接给时间列写 `render: (v) => fmtTime(v)` 并自定列宽（会让时间折行或溢出串列）；禁止把 `fmtTime` 的输出再乘 1000（`fmtTime` 已按秒/毫秒自动识别）。
 - 不要在 auth/login-web 等**不依赖 ui 的层**复制渐变/颜色（依赖方向限制：下层包不能 import @ark-iam/ui）。
 - 不要新增 css 文件承载后台样式；样式以 inline style + tokens 表达（登录页除外）。antd 结构级微修正统一放 `AppShell` 内联 `<style>`（见 §7.1），不新增 css 文件、不散落页面级 `<style>`。
 

@@ -2,13 +2,12 @@ import { useEffect, useState } from 'react'
 import { Card, Col, Row, Statistic, Typography, Spin } from 'antd'
 import {
   AppstoreOutlined,
+  FileSearchOutlined,
   GlobalOutlined,
-  SafetyCertificateOutlined,
-  TeamOutlined,
-  UserOutlined,
+  KeyOutlined,
 } from '@ant-design/icons'
 import { PageContainer, tokens } from '@ark-iam/ui'
-import { getUserPageList, getRolePageList, getApplicationPageList, getTenantPageList } from '@ark-iam/api'
+import { getApiKeySupervisionPageList, getApplicationPageList, getAuditLogPageList, getTenantPageList } from '@ark-iam/api'
 
 interface Stat {
   title: string
@@ -17,10 +16,10 @@ interface Stat {
 }
 
 const STAT_CARDS: Stat[] = [
-  { title: '用户总数', value: null, icon: <UserOutlined /> },
-  { title: '角色总数', value: null, icon: <SafetyCertificateOutlined /> },
   { title: '应用总数', value: null, icon: <AppstoreOutlined /> },
   { title: '租户总数', value: null, icon: <GlobalOutlined /> },
+  { title: 'API 密钥', value: null, icon: <KeyOutlined /> },
+  { title: '审计日志', value: null, icon: <FileSearchOutlined /> },
 ]
 
 export default function Dashboard() {
@@ -31,11 +30,11 @@ export default function Dashboard() {
     let mounted = true
     const load = async () => {
       try {
-        const [users, roles, apps, tenants] = await Promise.allSettled([
-          getUserPageList({ page: 1, pageSize: 1 }),
-          getRolePageList({ page: 1, pageSize: 1 }),
+        const [apps, tenants, apiKeys, logs] = await Promise.allSettled([
           getApplicationPageList({ page: 1, pageSize: 1 }),
           getTenantPageList({ page: 1, pageSize: 1 }),
+          getApiKeySupervisionPageList({ page: 1, pageSize: 1 }),
+          getAuditLogPageList({ page: 1, pageSize: 1 }),
         ])
         if (!mounted) return
         const count = (r: PromiseSettledResult<unknown>) =>
@@ -44,10 +43,10 @@ export default function Dashboard() {
               (Array.isArray((r.value as { list?: unknown[] }).list) ? (r.value as { list: unknown[] }).list.length : 0))
             : 0
         setStats([
-          { title: '用户总数', value: count(users), icon: <UserOutlined /> },
-          { title: '角色总数', value: count(roles), icon: <SafetyCertificateOutlined /> },
           { title: '应用总数', value: count(apps), icon: <AppstoreOutlined /> },
           { title: '租户总数', value: count(tenants), icon: <GlobalOutlined /> },
+          { title: 'API 密钥', value: count(apiKeys), icon: <KeyOutlined /> },
+          { title: '审计日志', value: count(logs), icon: <FileSearchOutlined /> },
         ])
       } finally {
         if (mounted) setLoading(false)
@@ -104,10 +103,10 @@ export default function Dashboard() {
           </Typography.Title>
           <Row gutter={[16, 16]}>
             {[
-              { icon: <TeamOutlined />, title: '统一身份', desc: '用户 · 角色 · 组织，一套身份体系' },
-              { icon: <SafetyCertificateOutlined />, title: '权限体系', desc: '菜单 · 权限域 · 资源 · 角色授权' },
-              { icon: <AppstoreOutlined />, title: '应用接入', desc: '应用 · OAuth 客户端 · 域名 · 租户应用' },
-              { icon: <GlobalOutlined />, title: '多租户', desc: '租户隔离 · 自助开通 · 租户切换' },
+              { icon: <GlobalOutlined />, title: '多租户治理', desc: '租户状态 · 应用订阅 · 自定义域名' },
+              { icon: <AppstoreOutlined />, title: '应用接入', desc: '应用 · OAuth 客户端 · 租户应用' },
+              { icon: <KeyOutlined />, title: '密钥监督', desc: '全租户 API 密钥只读监督（仅前缀）' },
+              { icon: <FileSearchOutlined />, title: '平台治理', desc: '菜单字典 · 审计日志' },
             ].map((f) => (
               <Col xs={24} sm={12} lg={6} key={f.title}>
                 <div

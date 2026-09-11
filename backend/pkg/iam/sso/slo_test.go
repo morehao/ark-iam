@@ -86,3 +86,61 @@ func TestLogoutQueueEnqueueDequeue(t *testing.T) {
 	require.Equal(t, "sid-1", got.SessionID)
 	require.Equal(t, "42", got.PersonID)
 }
+
+// TestEnqueueLogoutsByPersonID 验证「按自然人批量投递背信道通知」：
+// 该自然人跨全部 SSO 会话登记的 client 都要入队（登出/租户挂起都依赖它），
+// 返回值为实际入队数量，空 personID 不入队任何任务。
+func TestEnqueueLogoutsByPersonID(t *testing.T) {
+	testsetup.Initialize(testsetup.AppNameAuth)
+	defer testsetup.Done(testsetup.AppNameAuth)
+
+	ctx := context.Background()
+	store := NewSLOStore()
+	// 独立队列键，避免与运行中的 logout worker 争抢消费。
+	queueKey := fmt.Sprintf("iam:oidc:slo_queue:test:%d", time.Now().UnixNano())
+	personID := fmt.Sprintf("bcl-person-%d", time.Now().UnixNano())
+
+	// 空 personID：不入队，且不触碰 Redis
+	count, err := enqueueLogoutsByPersonID(ctx, queueKey, "")
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	// 无登记：入队数为 0
+	count, err = enqueueLogoutsByPersonID(ctx, queueKey, personID)
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	// 同一自然人的两个 SSO 会话，各登记一个 client
+	sidOne, err := NewSSOSessionStore().CreateSession(ctx, personID, []string{"pwd"})
+	require.NoError(t, err)
+	defer func() { _ = NewSSOSessionStore().RevokeSessionsByPersonID(ctx, personID) }()
+	sidTwo, err := NewSSOSessionStore().CreateSession(ctx, personID, []string{"pwd"})
+	require.NoError(t, err)
+
+	require.NoError(t, store.Register(ctx, sidOne, LogoutRegistration{
+		OIDCSessionID: "at-one", ClientID: "client-one",
+		UserID: "person:" + personID, BackChannelLogoutURI: "https://one.example.com/bc",
+	}))
+	require.NoError(t, store.Register(ctx, sidTwo, LogoutRegistration{
+		OIDCSessionID: "at-two", ClientID: "client-two",
+		UserID: "person:" + personID, BackChannelLogoutURI: "https://two.example.com/bc",
+	}))
+
+	count, err = enqueueLogoutsByPersonID(ctx, queueKey, personID)
+	require.NoError(t, err)
+	require.Equal(t, 2, count, "两个会话的登记都应入队")
+
+	got := make(map[string]LogoutJob)
+	for i := 0; i < 2; i++ {
+		job, ok, err := dequeueLogout(ctx, queueKey, 5*time.Second)
+		require.NoError(t, err)
+		require.True(t, ok)
+		require.Equal(t, personID, job.PersonID)
+		require.False(t, job.CreatedAt.IsZero(), "任务必须带入队时间戳")
+		got[job.ClientID] = job
+	}
+	require.Equal(t, "at-one", got["client-one"].OIDCSessionID)
+	require.Equal(t, "https://one.example.com/bc", got["client-one"].BackChannelLogoutURI)
+	require.Equal(t, "at-two", got["client-two"].OIDCSessionID)
+	require.Equal(t, "https://two.example.com/bc", got["client-two"].BackChannelLogoutURI)
+}

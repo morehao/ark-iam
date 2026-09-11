@@ -20,6 +20,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// userLoginLogPageSize 登录日志按子资源整段展示，取足够大的单页容量。
+const userLoginLogPageSize = 100
+
 type UserSvc interface {
 	PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (*dtotenant.UserPageListResp, error)
 	Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dtotenant.UserCreateResp, error)
@@ -28,6 +31,7 @@ type UserSvc interface {
 	ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPasswordReq) error
 	ListRoles(ctx *gin.Context, req *dtotenant.UserRolesListReq) (*dtotenant.UserRolesListResp, error)
 	UpdateRoles(ctx *gin.Context, req *dtotenant.UserRolesUpdateReq) error
+	ListLoginLogs(ctx *gin.Context, req *dtotenant.UserLoginLogListReq) (*dtotenant.UserLoginLogListResp, error)
 }
 
 type userSvc struct {
@@ -970,4 +974,33 @@ func (svc *userSvc) loadUserPersonMaps(ctx *gin.Context, userIDs []string) (map[
 		}
 	}
 	return userMap, personMap
+}
+
+// ListLoginLogs 返回租户内某用户的登录日志（只读）。
+// 先校验用户属于当前租户，再以「租户 + 用户」双重条件查询，避免跨租户读取。
+func (svc *userSvc) ListLoginLogs(ctx *gin.Context, req *dtotenant.UserLoginLogListReq) (*dtotenant.UserLoginLogListResp, error) {
+	if _, err := resolveTenantUser(ctx, req.UserID); err != nil {
+		return nil, err
+	}
+
+	entityList, total, err := dao.NewUserLoginLogDao().GetPageListByCond(ctx, &dao.UserLoginLogCond{
+		BaseCond: &gormdao.BaseCond{Page: 1, PageSize: userLoginLogPageSize},
+		TenantID: gincontext.GetTenantIDString(ctx),
+		UserID:   req.UserID,
+	})
+	if err != nil {
+		glog.Errorf(ctx, "[svcuser.ListLoginLogs] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.UserLoginLogGetPageListError)
+	}
+
+	list := make([]dtotenant.UserLoginLogItem, 0, len(entityList))
+	for _, v := range entityList {
+		list = append(list, dtotenant.UserLoginLogItem{
+			UserLoginLogID: v.ID,
+			LoginIP:        v.LoginIP,
+			UserAgent:      v.UserAgent,
+			LoginTime:      v.LoginTime.Unix(),
+		})
+	}
+	return &dtotenant.UserLoginLogListResp{List: list, Total: total}, nil
 }

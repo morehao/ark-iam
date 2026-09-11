@@ -41,22 +41,3 @@ type MenuTreeResp struct {
 type MenuMyTreeResp struct {
 	List []objpermission.MenuItemNode `json:"list"` // 当前用户可见菜单树
 }
-
-
-type RoleDetailResp struct {
-	RoleID string `json:"roleID"` // 角色ID
-	objpermission.RoleBaseInfo
-	OperatorBaseInfo gobject.OperatorBaseInfo `json:"operatorBaseInfo"` // 操作人信息
-}
-
-type RolePageListItem struct {
-	RoleID string `json:"roleID"` // 角色ID
-	objpermission.RoleBaseInfo
-	OperatorBaseInfo gobject.OperatorBaseInfo `json:"operatorBaseInfo"` // 操作人信息
-}
-
-type RolePageListResp struct {
-	List  []RolePageListItem `json:"list"`  // 列表
-	Total int64              `json:"total"` // 总数
-}
-

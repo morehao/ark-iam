@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, message } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { fmtTime, IDCell, PageContainer, VerifiedTag } from '@ark-iam/ui'
+import { IDCell, PageContainer, timeColumn, VerifiedTag } from '@ark-iam/ui'
 import { createDomain, deleteDomain, getDomainDetail, getDomainPageList, updateDomain } from '@ark-iam/api'
 import type { DomainItem } from '@ark-iam/types'
 
@@ -91,20 +91,8 @@ export default function DomainList() {
       width: 120,
       render: (v: number) => <VerifiedTag value={v} />,
     },
-    {
-      title: '验证时间',
-      dataIndex: 'verifiedAt',
-      key: 'verifiedAt',
-      width: 160,
-      render: (v: number | null) => fmtTime(v),
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 160,
-      render: (v: number) => fmtTime(v),
-    },
+    timeColumn<DomainItem>({ title: '验证时间', dataIndex: 'verifiedAt', placeholder: '未验证' }),
+    timeColumn<DomainItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     {
       title: '操作',
       key: 'action',
@@ -164,7 +152,7 @@ export default function DomainList() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 850 }}
+        scroll={{ x: 990 }}
         pagination={{
           current: page,
           pageSize,

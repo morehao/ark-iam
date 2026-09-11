@@ -18,7 +18,7 @@ import {
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { fmtTime, PageContainer, SuspendedTag, tokens } from '@ark-iam/ui'
+import { fmtTime, PageContainer, SuspendedTag, timeColumn, tokens } from '@ark-iam/ui'
 import type {
   OrganizationItem,
   TenantApiKeyItem,
@@ -46,6 +46,8 @@ import {
 import { getApiKeyPageList } from '../../api/apiKey'
 import { getOrganizationTree } from '../../api/organization'
 import RoleAssignEditor from '../../components/RoleAssignEditor'
+import UserIdentityTab from '../../components/UserIdentityTab'
+import UserLoginLogTab from '../../components/UserLoginLogTab'
 import { KeyStateTag } from '../apiKey/KeyState'
 
 // 组织关系类型 -> 展示标签
@@ -270,13 +272,7 @@ function UsersPane() {
       width: 90,
       render: (v: boolean) => <SuspendedTag value={v} />,
     },
-    {
-      title: '创建时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 160,
-      render: (v?: number) => fmtTime(v),
-    },
+    timeColumn<TenantUserItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     {
       title: '操作',
       key: 'action',
@@ -361,7 +357,7 @@ function UsersPane() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1200 }}
+        scroll={{ x: 1220 }}
         pagination={{
           current: page,
           pageSize,
@@ -501,6 +497,16 @@ function UsersPane() {
                 key: 'role',
                 label: '角色',
                 children: <RoleAssignEditor kind="user" subjectID={detail.userID} onSaved={() => void fetchData()} />,
+              },
+              {
+                key: 'identity',
+                label: '第三方身份',
+                children: <UserIdentityTab userID={detail.userID} />,
+              },
+              {
+                key: 'loginLog',
+                label: '登录日志',
+                children: <UserLoginLogTab userID={detail.userID} />,
               },
             ]}
           />
@@ -705,13 +711,7 @@ function ServiceAccountsPane() {
       width: 90,
       render: (v: boolean) => <SuspendedTag value={v} />,
     },
-    {
-      title: '创建时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 160,
-      render: (v?: number) => fmtTime(v),
-    },
+    timeColumn<TenantMachineUserItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     {
       title: '操作',
       key: 'action',
@@ -749,8 +749,8 @@ function ServiceAccountsPane() {
       render: (v: string) => <span style={{ fontFamily: 'Consolas, Monaco, monospace', fontSize: 12 }}>{v || '-'}</span>,
     },
     { title: '状态', key: 'status', width: 90, render: (_: unknown, r) => <KeyStateTag {...r} /> },
-    { title: '过期时间', dataIndex: 'expiredAt', key: 'expiredAt', width: 150, render: (v: number | null) => fmtTime(v) },
-    { title: '最近使用', dataIndex: 'lastUsedAt', key: 'lastUsedAt', width: 150, render: (v: number | null) => fmtTime(v) },
+    timeColumn<TenantApiKeyItem>({ title: '过期时间', dataIndex: 'expiredAt', placeholder: '永不过期' }),
+    timeColumn<TenantApiKeyItem>({ title: '最近使用', dataIndex: 'lastUsedAt', relative: true, placeholder: '从未使用' }),
   ]
 
   return (
@@ -797,7 +797,7 @@ function ServiceAccountsPane() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1000 }}
+        scroll={{ x: 1020 }}
         pagination={{
           current: page,
           pageSize,

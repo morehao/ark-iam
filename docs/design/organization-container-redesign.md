@@ -212,15 +212,10 @@ CREATE INDEX idx_organization_path  ON organization (org_path text_pattern_ops);
 | GET | `/v1/tenant/users/:userID/organizations` | 用户归属列表（含各节点面包屑） |
 | PUT | `/v1/tenant/users/:userID/organizations` | 批量替换参与部门（全量替换 secondary） |
 
-### 4.2 platformadmin（只读视角，`/v1/platform`）
+### 4.2 platformadmin（不提供，已作废）
 
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| GET | `/v1/platform/organizations` | 只读分页（?tenantID= 必填，跨租户排查） |
-| GET | `/v1/platform/organizations/tree` | 跨租户只读树（?tenantID= 必填） |
-| GET | `/v1/platform/users/:userID/organizations` | 用户归属只读查询（原 `/users/:userID/departments` 迁移） |
-
-> 原 platformadmin 的 `PUT /users/:userID/departments`（批量分配部门）下线，归属维护收敛到 tenantadmin；platformadmin 不再写组织数据。
+> **本节方案已作废**：平台端不提供任何组织只读接口与页面。组织归属属于租户数据，只在 `/v1/tenant/organizations/*` 维护；平台运维如确实需要排查某租户组织，应切换到该租户的租户控制台（见 `tenant-admin-console-redesign.md` §3.2）。
+> 原 platformadmin 的 `PUT /users/:userID/departments`（批量分配部门）亦已下线。
 
 ### 4.3 路由注册
 
@@ -371,12 +366,12 @@ DROP TABLE organization_role;
 - `svctenant/organization.go`：Tree / Create / Update（含移动）/ Delete（级联）/ Detail（含面包屑）
 - `svctenant/organization_user.go`：AddRelation / RemoveRelation / UpdateRelation / PageList / SubtreeMembers（按 `relation_type` 单值过滤；primary 行政主部门每用户至多 1 行由服务层校验，换保/新增时覆盖或拒绝重复行）
 - 用户归属：`GET/PUT /v1/tenant/users/:userID/organizations`
-- platformadmin 只读：`GET /v1/platform/organizations`、`GET /v1/platform/organizations/tree`、`GET /v1/platform/users/:userID/organizations`
+- platformadmin：**不新增组织接口**（只读方案已作废，见 §4.2）
 
 ### 7.2 前端
 
 - **tenantadmin**：4 个组织页面 → 1 个「组织架构」页（左侧树 + 成员抽屉）；`App.tsx` 菜单/路由/默认落地页；`api/organization.ts`、`types/organization.ts` 重写
-- **platformadmin**：删除部门菜单/页面/API；用户详情部门归属改只读组织归属或移除
+- **platformadmin**：删除部门菜单/页面/API；用户页已整页删除（含部门归属），无遗留（见 `tenant-admin-console-redesign.md` §8）
 - **packages/types**：`OrganizationItem` 字段更新（parentID/orgPath/orgDepth/code/sort/status）
 
 ### 7.3 文档与测试

@@ -83,22 +83,6 @@ func TestMenuTreeUsesAppID(t *testing.T) {
 	}
 }
 
-func TestRoleDetailRejectsCrossTenantEntity(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{})
-	ctx := newGinCtx("31", "0")
-
-	role := &model.RoleEntity{TenantID: "77", Name: "other-tenant-role"}
-	if err := db.Create(role).Error; err != nil {
-		t.Fatalf("seed role: %v", err)
-	}
-
-	svc := &roleSvc{}
-	_, err := svc.Detail(ctx, &dtopermission.RoleDetailReq{RoleID: role.ID})
-	if err == nil {
-		t.Fatalf("expected cross-tenant role detail to fail")
-	}
-}
-
 func TestMenuCreatePersistsVisibilityAndStatusAndType(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.MenuEntity{})
 	ctx := newGinCtx("20", "0")
@@ -198,26 +182,5 @@ func TestMenuUpdatePersistsVisibility(t *testing.T) {
 	}
 	if got.Visibility != model.MenuVisibilityAdmin {
 		t.Fatalf("expected visibility admin after update, got %q", got.Visibility)
-	}
-}
-
-func TestRolePageListUsesContextTenant(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{})
-	ctx := newGinCtx("32", "0")
-
-	if err := db.Create(&model.RoleEntity{TenantID: "32", Name: "r32"}).Error; err != nil {
-		t.Fatalf("seed tenant32: %v", err)
-	}
-	if err := db.Create(&model.RoleEntity{TenantID: "99", Name: "r99"}).Error; err != nil {
-		t.Fatalf("seed tenant99: %v", err)
-	}
-
-	svc := &roleSvc{}
-	resp, err := svc.PageList(ctx, &dtopermission.RolePageListReq{TenantID: "99"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.Total != 1 || len(resp.List) != 1 || resp.List[0].TenantID != "32" {
-		t.Fatalf("expected tenant 32 from context, got %+v", resp.List)
 	}
 }

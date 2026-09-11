@@ -18,7 +18,7 @@ import {
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
-import { fmtTime, PageContainer, StatusTag, tokens } from '@ark-iam/ui'
+import { PageContainer, StatusTag, timeColumn, tokens } from '@ark-iam/ui'
 import type { OrganizationChildItem, OrganizationItem } from '@ark-iam/types'
 import {
   createOrganization,
@@ -253,7 +253,7 @@ export default function OrganizationPage() {
       width: 90,
       render: (v: string) => <StatusTag value={v} />,
     },
-    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 180, render: (v?: number) => (v ? fmtTime(v * 1000) : '-') },
+    timeColumn<OrganizationChildItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     {
       title: '操作',
       key: 'action',

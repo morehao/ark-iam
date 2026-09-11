@@ -16,7 +16,7 @@ import {
 import { PlusOutlined, ReloadOutlined, SearchOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
-import { fmtTime, PageContainer, SourceTag, tokens } from '@ark-iam/ui'
+import { PageContainer, SourceTag, timeColumn, tokens } from '@ark-iam/ui'
 import type { MenuItem, TenantAppItem, TenantRoleItem } from '@ark-iam/types'
 import {
   createTenantRole,
@@ -190,13 +190,7 @@ export default function TenantRolePage() {
     { title: '描述', dataIndex: 'description', key: 'description', render: (v: string) => v || '-' },
     { title: '成员数', dataIndex: 'memberCount', key: 'memberCount', width: 80, render: (v: number) => v || 0 },
     { title: '授权菜单', dataIndex: 'menuCount', key: 'menuCount', width: 80, render: (v: number) => v || 0 },
-    {
-      title: '创建时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 150,
-      render: (v?: number) => fmtTime(v),
-    },
+    timeColumn<TenantRoleItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     {
       title: '操作',
       key: 'action',
@@ -266,7 +260,7 @@ export default function TenantRolePage() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1050 }}
+        scroll={{ x: 1080 }}
         pagination={{
           current: page,
           pageSize,
