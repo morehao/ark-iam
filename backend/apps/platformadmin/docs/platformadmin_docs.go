@@ -15,66 +15,6 @@ const docTemplateplatformadmin = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/v1/platform/api-keys/supervision": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "API密钥监督"
-                ],
-                "summary": "全租户 API 密钥只读监督列表（平台排查视角，忽略上下文租户）",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "name": "name",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "页码",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "maximum": 1000,
-                        "type": "integer",
-                        "description": "每页数据条数",
-                        "name": "pageSize",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "租户ID（可选过滤）",
-                        "name": "tenantID",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtoapikey.ApiKeySupervisionPageListResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/v1/platform/application-clients": {
             "get": {
                 "consumes": [
@@ -1928,77 +1868,6 @@ const docTemplateplatformadmin = `{
         }
     },
     "definitions": {
-        "dtoapikey.ApiKeySupervisionItem": {
-            "type": "object",
-            "properties": {
-                "createdAt": {
-                    "description": "创建时间(unix 秒)",
-                    "type": "integer"
-                },
-                "createdBy": {
-                    "type": "string"
-                },
-                "creatorName": {
-                    "type": "string"
-                },
-                "expiresAt": {
-                    "description": "过期时间(unix 秒)",
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "keyPrefix": {
-                    "type": "string"
-                },
-                "lastUsedAt": {
-                    "description": "最后使用时间(unix 秒)",
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "ownerName": {
-                    "description": "归属用户名称",
-                    "type": "string"
-                },
-                "ownerType": {
-                    "description": "归属类型(member真实用户/machine服务账号)",
-                    "type": "string"
-                },
-                "ownerUserID": {
-                    "description": "归属用户ID（真实用户本人或服务账号）",
-                    "type": "string"
-                },
-                "revokedAt": {
-                    "description": "撤销时间(unix 秒)",
-                    "type": "integer"
-                },
-                "scope": {
-                    "type": "string"
-                },
-                "tenantID": {
-                    "type": "string"
-                },
-                "tenantName": {
-                    "type": "string"
-                }
-            }
-        },
-        "dtoapikey.ApiKeySupervisionPageListResp": {
-            "type": "object",
-            "properties": {
-                "list": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dtoapikey.ApiKeySupervisionItem"
-                    }
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
         "dtoapplication.ApplicationCreateReq": {
             "type": "object",
             "required": [
@@ -2222,6 +2091,10 @@ const docTemplateplatformadmin = `{
                 "type": {
                     "description": "应用类型",
                     "type": "string"
+                },
+                "updatedAt": {
+                    "description": "更新时间(unix 秒)",
+                    "type": "integer"
                 },
                 "visibility": {
                     "description": "可见性",
@@ -2588,6 +2461,10 @@ const docTemplateplatformadmin = `{
                 "type": {
                     "description": "客户端类型",
                     "type": "string"
+                },
+                "updatedAt": {
+                    "description": "更新时间(unix 秒)",
+                    "type": "integer"
                 }
             }
         },
@@ -2741,6 +2618,10 @@ const docTemplateplatformadmin = `{
                 "isVerified": {
                     "description": "是否验证(0-未验证 1-已验证)",
                     "type": "boolean"
+                },
+                "updatedAt": {
+                    "description": "更新时间(unix 秒)",
+                    "type": "integer"
                 },
                 "verifiedAt": {
                     "description": "验证时间(unix 秒)",
@@ -3598,6 +3479,10 @@ const docTemplateplatformadmin = `{
                 "tenantID": {
                     "description": "租户ID",
                     "type": "string"
+                },
+                "updatedAt": {
+                    "description": "更新时间(unix 秒)",
+                    "type": "integer"
                 }
             }
         },

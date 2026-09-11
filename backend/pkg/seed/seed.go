@@ -100,17 +100,25 @@ func SeedIam(ctx context.Context, db *gorm.DB) error {
 		return err
 	}
 
-	// 6. 角色-菜单关联
+	// 6. 已下线菜单清理（菜单行 + role_menu 授权绑定）
+	if err := pruneRetiredMenus(ctx, db, map[string]*model.ApplicationEntity{
+		appCodeAdmin:       adminApp,
+		appCodeTenantAdmin: tenantAdminApp,
+	}); err != nil {
+		return err
+	}
+
+	// 7. 角色-菜单关联
 	if err := seedRoleMenus(ctx, db, tenant, roles, menus); err != nil {
 		return err
 	}
 
-	// 7. 租户应用订阅
+	// 8. 租户应用订阅
 	if err := seedTenantApplications(ctx, db, tenant, adminApp, tenantAdminApp); err != nil {
 		return err
 	}
 
-	// 8. 默认管理员（person + user + user_role + 顶级部门归属）
+	// 9. 默认管理员（person + user + user_role + 顶级部门归属）
 	adminUser, err := seedAdminUser(ctx, db, tenant, rootOrg)
 	if err != nil {
 		return err
@@ -119,7 +127,7 @@ func SeedIam(ctx context.Context, db *gorm.DB) error {
 		return err
 	}
 
-	// 9. OIDC 测试客户端
+	// 10. OIDC 测试客户端
 	if err := seedOIDCClients(ctx, db, tenant, adminApp); err != nil {
 		return err
 	}
@@ -323,7 +331,6 @@ func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model
 		{appCode: appCodeAdmin, name: "应用中心", code: "grp-app", icon: "app", sort: 3, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-app", name: "应用管理", code: "application", path: "/application", icon: "app", sort: 1, component: "/application/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-app", name: "OAuth客户端", code: "oauth-client", path: "/oauth-client", icon: "key", sort: 2, component: "/oauthClient/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
-		{appCode: appCodeAdmin, parentCode: "grp-app", name: "API密钥监督", code: "api-key", path: "/api-key", icon: "key", sort: 3, component: "/apiKey/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, name: "平台管理", code: "grp-platform", icon: "setting", sort: 4, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-platform", name: "菜单管理", code: "menu", path: "/menu", icon: "menu", sort: 1, component: "/menu/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-platform", name: "审计日志", code: "log", path: "/log", icon: "file", sort: 2, component: "/log/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
@@ -420,7 +427,7 @@ func seedRoleMenus(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity,
 	}{
 		{roleCode: "admin", menuCode: []string{
 			"dashboard", "menu", "tenant", "application",
-			"tenant-application", "oauth-client", "api-key", "domain", "log",
+			"tenant-application", "oauth-client", "domain", "log",
 			"organization", "tenant-user", "tenant-role",
 		}},
 		{roleCode: "tenant_admin", menuCode: []string{

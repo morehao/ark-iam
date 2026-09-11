@@ -22,7 +22,6 @@ import TenantList from './pages/tenant'
 import TenantApplicationList from './pages/tenantApplication'
 import OAuthClientList from './pages/oauthClient'
 import OAuthClientDetail from './pages/oauthClient/Detail'
-import ApiKeyList from './pages/apiKey'
 import MenuList from './pages/menu'
 import DomainList from './pages/domain'
 import LogList from './pages/log'
@@ -49,7 +48,6 @@ const COMPONENT_MAP: Record<string, React.ComponentType> = {
   '/tenant': TenantList,
   '/tenant-application': TenantApplicationList,
   '/oauth-client': OAuthClientList,
-  '/api-key': ApiKeyList,
   '/menu': MenuList,
   '/domain': DomainList,
   '/log': LogList,

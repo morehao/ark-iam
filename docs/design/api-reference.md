@@ -219,13 +219,12 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | GET/POST | `/v1/platform/application-clients/:applicationClientID/secrets` | 密钥列表/创建 |
 | DELETE | `/v1/platform/application-clients/:applicationClientID/secrets/:secretID` | 删除密钥 |
 
-### 5.5 API Key 监督与域名
+### 5.5 域名
 
-> 平台端对 API Key 仅保留**跨租户只读监督**（明文不可见，仅前缀）；密钥的创建/吊销/删除等生命周期管理已收敛到租户自服务 `/v1/tenant/api-keys`。
+> 平台端不提供 API Key 接口（原跨租户只读监督 `/v1/platform/api-keys/supervision` 已下线）；密钥的创建/吊销/删除等生命周期管理统一在租户自服务 `/v1/tenant/api-keys`。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/v1/platform/api-keys/supervision` | 全租户 API Key 只读监督列表（?tenantID=&name=，含归属主体 ownerType/ownerName、创建人、租户、状态字段） |
 | POST | `/v1/platform/domains` | 创建域名 |
 | GET | `/v1/platform/domains` | 域名分页 |
 | GET/PUT/DELETE | `/v1/platform/domains/:domainID` | 域名详情/更新/删除 |

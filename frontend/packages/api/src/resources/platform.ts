@@ -1,6 +1,5 @@
 import request from '../request'
 import type {
-  ApiKeySupervisionItem,
   ApplicationCreateReq,
   ApplicationItem,
   ApplicationUpdateReq,
@@ -26,7 +25,7 @@ import type {
 } from '@ark-iam/types'
 
 // 用户与角色无平台端接口：两者按租户归属，读写与成员管理统一收敛到 /tenant/* （见 tenant-admin-web/src/api）。
-// 平台侧仅保留跨租户的「监督/干预」类只读或状态接口：租户、租户应用、API 密钥监督。
+// 平台侧仅保留跨租户的「监督/干预」类只读或状态接口：租户、租户应用。
 
 // ==================== 应用 ====================
 export const getApplicationPageList = (data: { page: number; pageSize: number; name?: string }) =>
@@ -82,12 +81,6 @@ export const updateTenantApplication = (data: TenantApplicationUpdateReq) => {
 }
 export const deleteTenantApplication = (tenantAppID: string) =>
   request.delete<any, string>(`/platform/tenant-applications/${tenantAppID}`)
-
-// ==================== API Key ====================
-// 平台侧仅保留全租户只读监督视图；创建/吊销/删除等本租户写接口已下线。
-// 明文密钥永不可见（仅前缀），仅用于泄漏风险监督。
-export const getApiKeySupervisionPageList = (data: { page: number; pageSize: number; name?: string; tenantID?: string }) =>
-  request.get<any, PageListResp<ApiKeySupervisionItem>>('/platform/api-keys/supervision', { params: data })
 
 // ==================== 菜单 ====================
 export const getMenuTree = (appID: string) => request.get<any, MenuTreeResp>('/platform/menus/tree', { params: { appID } })

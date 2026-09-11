@@ -360,7 +360,7 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 **三条硬规则（新增路由必须按序判定）**：
 
 - **R1 资源 CRUD → REST**：资源的增删改查/列表/详情/树，用「集合 + 方法 + ID」表达。路径格式 `/{版本}/{服务标识}/{资源}[/{id}[/{子资源}]]`（如 `/v1/platform/users/{userID}/identities`；`服务标识` 即应用标识段：auth → `/v1/auth`、platformadmin → `/v1/platform`、tenantadmin → `/v1/tenant`，各应用路径互不相同；资源名可跨应用复用，由服务标识段区分归属）
-- **R2 业务动作 → 动作子路径**：状态流转/触发副作用类操作用 `POST /资源/{id}/动作`（如 `POST /v1/platform/api-keys/{apiKeyID}/revoke`）；认证/会话类动作挂 `/v1/auth` 动作式专用段（`register`/`joinTenant`/`logout`/`logoutAll`/`userinfo` 原样保留）
+- **R2 业务动作 → 动作子路径**：状态流转/触发副作用类操作用 `POST /资源/{id}/动作`（如 `POST /v1/tenant/api-keys/{apiKeyID}/revoke`）；认证/会话类动作挂 `/v1/auth` 动作式专用段（`register`/`joinTenant`/`logout`/`logoutAll`/`userinfo` 原样保留）
 - **R3 标准协议 → 专用前缀**：`/oidc/*`、back-channel logout、docs 不走业务路由规范，保持不动
 
 **资源命名**：复数 + kebab-case（`users`、`application-clients`、`api-keys`、`tenant-applications`），禁止驼峰（`applicationClient`）。ID 路径参数一律 `{xxxID}` 全大写（`{userID}`、`{roleID}`、`{appID}`），与 DTO JSON tag 及 swagger 注解同步。
@@ -380,7 +380,7 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 | user | 创建 | `POST /v1/platform/users` |
 | user | 分配部门（全量替换） | `PUT /v1/platform/users/{userID}/departments` |
 | role | 分页列表 | `GET /v1/platform/roles?page=&pageSize=` |
-| apiKey | 吊销（动作） | `POST /v1/platform/api-keys/{apiKeyID}/revoke` |
+| apiKey | 吊销（动作） | `POST /v1/tenant/api-keys/{apiKeyID}/revoke` |
 | 认证操作 | 注册 | `POST /v1/auth/register`（auth 应用认证操作直接挂服务段，避免 `/v1/auth/auth/*`） |
 
 #### 路由注册

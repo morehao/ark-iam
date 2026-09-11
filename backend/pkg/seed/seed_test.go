@@ -60,12 +60,12 @@ func TestSeedIamSQLite(t *testing.T) {
 	assertCount("tenant", 1)
 	assertCount("application", 2)
 	assertCount("role", 2)
-	assertCount("menu", 16)
+	assertCount("menu", 15)
 	assertCount("person", 1)
 	assertCount("tenant_user", 1)
 	assertCount("application_client", 2)
 	assertCount("user_role", 2)
-	assertCount("role_menu", 16)
+	assertCount("role_menu", 15)
 	assertCount("tenant_application", 2)
 	assertCount("organization", 1)
 	assertCount("organization_user", 1)
@@ -208,7 +208,6 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 		{code: "grp-app", name: "应用中心", sort: 3, dir: true},
 		{code: "application", name: "应用管理", parentCode: "grp-app", sort: 1},
 		{code: "oauth-client", name: "OAuth客户端", parentCode: "grp-app", sort: 2},
-		{code: "api-key", name: "API密钥监督", parentCode: "grp-app", sort: 3},
 		{code: "grp-platform", name: "平台管理", sort: 4, dir: true},
 		{code: "menu", name: "菜单管理", parentCode: "grp-platform", sort: 1},
 		{code: "log", name: "审计日志", parentCode: "grp-platform", sort: 2},
@@ -295,8 +294,8 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 	if err := db.Where("role_id = ?", adminRole.ID).Find(&adminMenuLinks).Error; err != nil {
 		t.Fatalf("query admin role_menu: %v", err)
 	}
-	if len(adminMenuLinks) != 12 {
-		t.Fatalf("admin role_menu count: want 12, got %d", len(adminMenuLinks))
+	if len(adminMenuLinks) != 11 {
+		t.Fatalf("admin role_menu count: want 11, got %d", len(adminMenuLinks))
 	}
 	// 授权集合涉及平台应用与租户自服务两个应用的菜单，用全量映射解析
 	var allMenus []model.MenuEntity
@@ -315,13 +314,78 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 			}
 		}
 	}
-	for _, want := range []string{"dashboard", "menu", "tenant", "application", "tenant-application", "oauth-client", "api-key", "domain", "log", "organization", "tenant-user", "tenant-role"} {
+	for _, want := range []string{"dashboard", "menu", "tenant", "application", "tenant-application", "oauth-client", "domain", "log", "organization", "tenant-user", "tenant-role"} {
 		if !granted[want] {
 			t.Errorf("admin role missing menu grant %s", want)
 		}
 	}
 	if granted["system"] {
 		t.Error("admin role should not grant retired menu system")
+	}
+}
+
+// TestSeedIamPrunesRetiredApiKeyMenu 存量库清理：历史版本种子写入的平台端「API密钥监督」菜单
+// （code=api-key）及其 role_menu 授权绑定，应在种子启动后被清除且清理幂等。
+func TestSeedIamPrunesRetiredApiKeyMenu(t *testing.T) {
+	db := setupDB(t)
+	ctx := context.Background()
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed fail: %v", err)
+	}
+
+	// 模拟存量库：手工补回已下线菜单行 + admin 角色授权绑定
+	var adminApp model.ApplicationEntity
+	if err := db.Where("code = ?", "platform-admin").First(&adminApp).Error; err != nil {
+		t.Fatalf("admin app not found: %v", err)
+	}
+	var parent model.MenuEntity
+	if err := db.Where("app_id = ? AND code = ?", adminApp.ID, "grp-app").First(&parent).Error; err != nil {
+		t.Fatalf("grp-app menu not found: %v", err)
+	}
+	stale := &model.MenuEntity{
+		AppID:      adminApp.ID,
+		ParentID:   parent.ID,
+		Name:       "API密钥监督",
+		Code:       "api-key",
+		Path:       "/api-key",
+		Icon:       "key",
+		Sort:       3,
+		Type:       model.MenuTypeMenu,
+		Visibility: model.MenuVisibilityAdmin,
+		Component:  "/apiKey/index",
+		Status:     model.MenuStatusEnable,
+	}
+	if err := db.Create(stale).Error; err != nil {
+		t.Fatalf("insert stale menu: %v", err)
+	}
+	var adminRole model.RoleEntity
+	if err := db.Where("app_id = ? AND code = ?", adminApp.ID, "admin").First(&adminRole).Error; err != nil {
+		t.Fatalf("admin role not found: %v", err)
+	}
+	if err := db.Create(&model.RoleMenuEntity{TenantID: adminRole.TenantID, RoleID: adminRole.ID, MenuID: stale.ID}).Error; err != nil {
+		t.Fatalf("insert stale role_menu: %v", err)
+	}
+
+	// 再次种子启动：菜单行与授权绑定均应被清理；重复执行保持幂等
+	for i := 0; i < 2; i++ {
+		if err := seed.SeedIam(ctx, db); err != nil {
+			t.Fatalf("seed (%d) fail: %v", i+2, err)
+		}
+	}
+
+	var menuCount int64
+	if err := db.Model(&model.MenuEntity{}).Where("app_id = ? AND code = ?", adminApp.ID, "api-key").Count(&menuCount).Error; err != nil {
+		t.Fatalf("count stale menu: %v", err)
+	}
+	if menuCount != 0 {
+		t.Errorf("retired menu api-key count = %d, want 0", menuCount)
+	}
+	var linkCount int64
+	if err := db.Model(&model.RoleMenuEntity{}).Where("menu_id = ?", stale.ID).Count(&linkCount).Error; err != nil {
+		t.Fatalf("count stale role_menu: %v", err)
+	}
+	if linkCount != 0 {
+		t.Errorf("retired menu api-key role_menu count = %d, want 0", linkCount)
 	}
 }
 
