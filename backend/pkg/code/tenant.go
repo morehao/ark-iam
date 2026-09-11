@@ -13,6 +13,7 @@ const (
 	TenantSuspendedError              = 100207
 	TenantSuspendSelfForbiddenError   = 100208
 	TenantPageListStatusInvalidError  = 100209
+	TenantAdminResetPasswordError     = 100210
 )
 
 const (
@@ -54,6 +55,7 @@ var tenantErrorMsgMap = gerror.CodeMsgMap{
 	TenantSuspendedError:                "该租户已被挂起",
 	TenantSuspendSelfForbiddenError:     "不能挂起当前所在租户",
 	TenantPageListStatusInvalidError:    "租户状态筛选值不合法",
+	TenantAdminResetPasswordError:       "重置租户内置管理员密码失败",
 	OrganizationCreateError:             "创建组织失败",
 	OrganizationDeleteError:             "删除组织失败",
 	OrganizationUpdateError:             "修改组织失败",

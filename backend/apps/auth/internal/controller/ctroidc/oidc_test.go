@@ -21,6 +21,7 @@ type fakeOIDCAuthSvc struct {
 	completeLoginBySession func(ctx *gin.Context, authRequestID string, sessionID string) (string, error)
 	registerPerson         func(ctx *gin.Context, req *dtooidc.RegisterPersonReq) (*dtooidc.RegisterPersonResp, error)
 	createTenant           func(ctx *gin.Context, req *dtooidc.CreateTenantReq) (*dtooidc.CreateTenantResp, error)
+	changePassword         func(ctx *gin.Context, req *dtooidc.OIDCChangePasswordReq) error
 	loginConfig            func(ctx *gin.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error)
 }
 
@@ -54,6 +55,13 @@ func (f *fakeOIDCAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTena
 		return f.createTenant(ctx, req)
 	}
 	return nil, errors.New("createTenant not implemented in fake")
+}
+
+func (f *fakeOIDCAuthSvc) ChangePassword(ctx *gin.Context, req *dtooidc.OIDCChangePasswordReq) error {
+	if f.changePassword != nil {
+		return f.changePassword(ctx, req)
+	}
+	return errors.New("changePassword not implemented in fake")
 }
 
 func (f *fakeOIDCAuthSvc) LoginConfig(ctx *gin.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error) {

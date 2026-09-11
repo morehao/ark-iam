@@ -1865,6 +1865,50 @@ const docTemplateplatformadmin = `{
                     }
                 }
             }
+        },
+        "/v1/platform/tenants/{tenantID}/builtin-admin/reset-password": {
+            "post": {
+                "description": "重置该租户内置管理员（source=builtin）的密码：生成新临时密码并在响应中仅返回一次，\n该管理员既有会话立即失效、下次登录必须修改密码。不作用于租户手工创建的成员。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "租户管理"
+                ],
+                "summary": "重置租户内置管理员密码",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "tenantID",
+                        "name": "tenantID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.TenantAdminResetPasswordResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -3260,9 +3304,57 @@ const docTemplateplatformadmin = `{
                 }
             }
         },
-        "dtotenant.TenantCreateReq": {
+        "dtotenant.TenantAdminCreateReq": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "description": "姓名(必填)",
+                    "type": "string"
+                },
+                "primaryEmail": {
+                    "description": "主要邮箱(与手机号至少一个)",
+                    "type": "string"
+                },
+                "primaryPhone": {
+                    "description": "主要手机号(与邮箱至少一个)",
+                    "type": "string"
+                },
+                "username": {
+                    "description": "全局用户名(可选)",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.TenantAdminResetPasswordResp": {
             "type": "object",
             "properties": {
+                "initialPassword": {
+                    "description": "InitialPassword 新临时密码，仅在此响应中返回一次，不落库、不可再查。\n待办：邮件/短信通道接入后本字段下线，见 pkg/iam/password 的 TODO(delivery)。",
+                    "type": "string"
+                },
+                "userID": {
+                    "description": "被重置的内置管理员用户ID",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.TenantCreateReq": {
+            "type": "object",
+            "required": [
+                "admin"
+            ],
+            "properties": {
+                "admin": {
+                    "description": "租户管理员(必填：每个租户都必须有管理员)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dtotenant.TenantAdminCreateReq"
+                        }
+                    ]
+                },
                 "code": {
                     "description": "Code 租户编码：由服务端自动生成（pkg/iam/tenant.GenerateCode，t_\u003c12 位随机 hex\u003e，\n例 t_3f7a9c1d2e4b），创建/更新入参传入无效，创建后不可修改；仅在明细/列表出参中回显。",
                     "type": "string"
@@ -3296,6 +3388,14 @@ const docTemplateplatformadmin = `{
         "dtotenant.TenantCreateResp": {
             "type": "object",
             "properties": {
+                "adminInitialPassword": {
+                    "description": "AdminInitialPassword 租户管理员的初始临时密码，仅在此响应中返回一次，不落库、不可再查；\n若管理员的邮箱/手机命中已存在自然人（其密码不被改动），该字段为空串。\n待办：邮件/短信通道接入后本字段下线，见 pkg/iam/password 的 TODO(delivery)。",
+                    "type": "string"
+                },
+                "adminUserID": {
+                    "description": "租户管理员用户ID",
+                    "type": "string"
+                },
                 "tenantID": {
                     "description": "租户ID",
                     "type": "string"

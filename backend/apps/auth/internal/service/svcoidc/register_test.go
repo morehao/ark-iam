@@ -15,6 +15,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
+	"github.com/morehao/ark-iam/pkg/iam/tenant"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
@@ -32,8 +33,16 @@ func newSeedDB(t *testing.T, apps []appSeedApp) *gorm.DB {
 	// 迁移全表：person/tenant/user/organization 供 createTenant 落库；app/client 供策略判定。
 	db := testutil.SetupSQLite(t,
 		&model.PersonEntity{}, &model.TenantEntity{}, &model.UserEntity{}, &model.OrganizationEntity{},
+		&model.OrganizationUserEntity{},
 		&model.ApplicationClientEntity{}, &model.ApplicationEntity{},
+		// 建租户链路还会写入租户自服务的角色/授权/订阅（权限开通）
+		&model.MenuEntity{}, &model.RoleEntity{}, &model.RoleMenuEntity{},
+		&model.TenantApplicationEntity{}, &model.UserRoleEntity{},
 	)
+	// 权限开通依赖租户自服务应用（真实环境由 pkg/seed 写入）
+	if err := db.Create(&model.ApplicationEntity{Code: tenant.ProvisionAppCode, Name: "租户自服务", Status: model.AppStatusEnable}).Error; err != nil {
+		t.Fatalf("seed tenant-admin application: %v", err)
+	}
 	for _, a := range apps {
 		appEntity := &model.ApplicationEntity{Code: "app-" + a.clientCode, AllowPersonCreateTenant: a.allow}
 		if err := db.Create(appEntity).Error; err != nil {
@@ -72,8 +81,8 @@ func newAuthReq(t *testing.T, provider *OIDCProvider, clientID string) op.AuthRe
 
 func registerSvc(provider *OIDCProvider, db *gorm.DB, tenants func(*gin.Context, string) ([]objauth.TenantOption, error)) *oidcAuthSvc {
 	return &oidcAuthSvc{
-		provider: provider,
-		authSvc:  &fakePasswordAuthenticator{tenantsForPerson: tenants},
+		provider:             provider,
+		authSvc:              &fakePasswordAuthenticator{tenantsForPerson: tenants},
 		applicationClientDao: func() *dao.ApplicationClientDao { return dao.NewApplicationClientDao(dao.WithDBGetter(dbGetter(db))) },
 		applicationDao:       func() *dao.ApplicationDao { return dao.NewApplicationDao(dao.WithDBGetter(dbGetter(db))) },
 	}
@@ -232,6 +241,30 @@ func TestCreateTenantSucceedsForZeroTenantPerson(t *testing.T) {
 	users, uErr := dao.NewUserDao().GetListByCond(t.Context(), &dao.UserCond{PersonID: p.ID, TenantID: res.TenantID})
 	if uErr != nil || len(users) == 0 || !users[0].IsOwner {
 		t.Fatalf("expected owner user, got users:%#v err:%v", users, uErr)
+	}
+	// owner 走与平台侧同一份开通实现：builtin 来源 + 归属根组织 + 内置租户管理员角色
+	if users[0].Source != model.UserSourceBuiltin {
+		t.Errorf("owner source = %q, want %q (平台重置内置管理员密码依赖该标记)", users[0].Source, model.UserSourceBuiltin)
+	}
+	rootOrg, oErr := dao.NewOrganizationDao().GetByCond(t.Context(), &dao.OrganizationCond{TenantID: res.TenantID})
+	if oErr != nil || rootOrg == nil {
+		t.Fatalf("expected root organization, err:%v org:%#v", oErr, rootOrg)
+	}
+	orgUsers, ouErr := dao.NewOrganizationUserDao().GetListByCond(t.Context(), &dao.OrganizationUserCond{
+		TenantID: res.TenantID, UserID: users[0].ID, RelationType: model.OrgUserRelationPrimary,
+	})
+	if ouErr != nil || len(orgUsers) != 1 || orgUsers[0].OrganizationID != rootOrg.ID {
+		t.Fatalf("expected owner attached to root org, got %#v err:%v", orgUsers, ouErr)
+	}
+	role, rErr := dao.NewRoleDao().GetByCond(t.Context(), &dao.RoleCond{TenantID: res.TenantID, Code: tenant.ProvisionRoleCode})
+	if rErr != nil || role == nil {
+		t.Fatalf("expected provisioned tenant admin role, err:%v role:%#v", rErr, role)
+	}
+	userRoles, urErr := dao.NewUserRoleDao().GetListByCond(t.Context(), &dao.UserRoleCond{
+		TenantID: res.TenantID, UserID: users[0].ID, RoleID: role.ID,
+	})
+	if urErr != nil || len(userRoles) != 1 {
+		t.Fatalf("expected owner granted tenant admin role, got %#v err:%v", userRoles, urErr)
 	}
 }
 

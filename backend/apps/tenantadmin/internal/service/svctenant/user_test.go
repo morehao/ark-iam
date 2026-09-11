@@ -11,6 +11,7 @@ import (
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/tenantadmin/testutil"
 	"github.com/morehao/golib/dbaccess/gormdao"
+	"github.com/morehao/golib/gcrypto"
 	"gorm.io/gorm"
 )
 
@@ -92,10 +93,13 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 		t.Fatalf("expected person name from 姓名, got %s", nameOnlyPerson.Name)
 	}
 
-	// 提供 email+password：新建 person（姓名=req.Name，bcrypt 哈希）
-	respB, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "Bob", PrimaryEmail: "bob@x.com", Password: "secret123", OrganizationIDs: []string{"o1"}})
+	// 提供 email：新建 person（姓名=req.Name，bcrypt 哈希），临时密码仅创建响应返回一次
+	respB, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "Bob", PrimaryEmail: "bob@x.com", OrganizationIDs: []string{"o1"}})
 	if err != nil {
 		t.Fatalf("create user with new person: %v", err)
+	}
+	if respB.InitialPassword == "" {
+		t.Fatalf("expected initial temporary password for newly created person")
 	}
 	var bob model.UserEntity
 	if err := db.First(&bob, "id = ?", respB.UserID).Error; err != nil {
@@ -111,11 +115,20 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 	if bobPerson.PasswordEncrypted == "" || bobPerson.PasswordMethod != "bcrypt" {
 		t.Fatalf("expected bcrypt password on person")
 	}
+	if err := gcrypto.ComparePasswordHash(bobPerson.PasswordEncrypted, respB.InitialPassword); err != nil {
+		t.Fatalf("initial password does not match stored hash: %v", err)
+	}
+	if !bobPerson.MustChangePassword {
+		t.Fatalf("newly created person must be forced to change password on first login")
+	}
 
 	// 另一租户提供相同 email：find-or-create 命中已有 person 并关联（复用同一自然人）
 	respC, err := svc.Create(newSuperCtx(t, db, "t2", "op2"), &dtotenant.UserCreateReq{Name: "Bob2", PrimaryEmail: "bob@x.com", OrganizationIDs: []string{"o2"}})
 	if err != nil {
 		t.Fatalf("create user linking existing person: %v", err)
+	}
+	if respC.InitialPassword != "" {
+		t.Fatalf("reusing an existing person must not return an initial password, got %q", respC.InitialPassword)
 	}
 	var bob2 model.UserEntity
 	if err := db.First(&bob2, "id = ?", respC.UserID).Error; err != nil {
@@ -136,10 +149,13 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 		t.Fatalf("expected error when linking person already in tenant")
 	}
 
-	// 提供密码但无任何登录标识：仍创建自然人（姓名），密码哈希落库
-	respPwd, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "NoID", PrimaryPhone: "13000000001", Password: "x123456", OrganizationIDs: []string{"o1"}})
+	// 仅有手机号（无邮箱）：同样创建自然人并返回临时密码
+	respPwd, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "NoID", PrimaryPhone: "13000000001", OrganizationIDs: []string{"o1"}})
 	if err != nil {
-		t.Fatalf("create user with password only: %v", err)
+		t.Fatalf("create user with phone only: %v", err)
+	}
+	if respPwd.InitialPassword == "" {
+		t.Fatalf("expected initial temporary password for newly created person")
 	}
 	var noID model.UserEntity
 	if err := db.First(&noID, "id = ?", respPwd.UserID).Error; err != nil {
@@ -151,6 +167,9 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 	}
 	if noIDPerson.PasswordEncrypted == "" {
 		t.Fatalf("expected password hash on person")
+	}
+	if err := gcrypto.ComparePasswordHash(noIDPerson.PasswordEncrypted, respPwd.InitialPassword); err != nil {
+		t.Fatalf("initial password does not match stored hash: %v", err)
 	}
 }
 
@@ -855,5 +874,98 @@ func TestUserPageListOrganizationFilter(t *testing.T) {
 	}
 	if resp.Total != 0 || len(resp.List) != 0 {
 		t.Fatalf("expected empty list for missing org, got %+v", resp.List)
+	}
+}
+
+// TestUserResetPasswordIssuesTemporaryPassword 重置成员密码（D7）：
+// 服务端生成新临时密码并仅返回一次、落库哈希与之匹配、强制下次登录改密、旧密码立即失效。
+func TestUserResetPasswordIssuesTemporaryPassword(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{},
+		&model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	svc := &userSvc{}
+
+	if err := db.Create(&model.OrganizationEntity{
+		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "o1"}},
+		TenantID:   "t1", OrgPath: "/o1", OrgDepth: 1, Name: "组织o1", Status: "active",
+	}).Error; err != nil {
+		t.Fatalf("seed org: %v", err)
+	}
+	ginCtx := newSuperCtx(t, db, "t1", "op1")
+
+	created, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", OrganizationIDs: []string{"o1"}})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	var createdUser model.UserEntity
+	if err := db.First(&createdUser, "id = ?", created.UserID).Error; err != nil {
+		t.Fatalf("query user: %v", err)
+	}
+	var createdPerson model.PersonEntity
+	if err := db.First(&createdPerson, "id = ?", createdUser.PersonID).Error; err != nil {
+		t.Fatalf("query person: %v", err)
+	}
+	oldHash := createdPerson.PasswordEncrypted
+
+	reset, err := svc.ResetPassword(ginCtx, &dtotenant.UserResetPasswordReq{UserID: created.UserID})
+	if err != nil {
+		t.Fatalf("reset password: %v", err)
+	}
+	if reset.UserID != created.UserID {
+		t.Fatalf("reset userID = %q, want %q", reset.UserID, created.UserID)
+	}
+	if reset.InitialPassword == "" {
+		t.Fatalf("expected temporary password in reset response")
+	}
+	if reset.InitialPassword == created.InitialPassword {
+		t.Fatalf("reset must issue a new password, not reuse the initial one")
+	}
+
+	var personAfterReset model.PersonEntity
+	if err := db.First(&personAfterReset, "id = ?", createdUser.PersonID).Error; err != nil {
+		t.Fatalf("query person after reset: %v", err)
+	}
+	if err := gcrypto.ComparePasswordHash(personAfterReset.PasswordEncrypted, reset.InitialPassword); err != nil {
+		t.Fatalf("reset password does not match stored hash: %v", err)
+	}
+	if personAfterReset.PasswordEncrypted == oldHash {
+		t.Fatalf("password hash must change after reset")
+	}
+	if err := gcrypto.ComparePasswordHash(personAfterReset.PasswordEncrypted, created.InitialPassword); err == nil {
+		t.Fatalf("old temporary password must no longer be valid after reset")
+	}
+	if !personAfterReset.MustChangePassword {
+		t.Fatalf("reset must set must_change_password=true")
+	}
+}
+
+// TestUserResetPasswordRejectsMachineUser 服务账号无口令语义：即使 userID 存在也必须拒绝，
+// 且绝不动其关联 person（若有）的密码。
+func TestUserResetPasswordRejectsMachineUser(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{},
+		&model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	svc := &userSvc{}
+	ginCtx := newSuperCtx(t, db, "t1", "op1")
+
+	machinePerson := seedTestPerson(t, db, "pm1", "sa", "sa@x.com")
+	if err := db.Model(&model.PersonEntity{}).Where("id = ?", machinePerson.ID).
+		Update("password_encrypted", "machine-hash").Error; err != nil {
+		t.Fatalf("seed machine person password: %v", err)
+	}
+	seedTestUserWithPerson(t, db, "um1", "t1", machinePerson.ID, "服务账号")
+	if err := db.Model(&model.UserEntity{}).Where("id = ?", "um1").
+		Update("user_type", model.UserTypeMachine).Error; err != nil {
+		t.Fatalf("mark machine user: %v", err)
+	}
+
+	_, err := svc.ResetPassword(ginCtx, &dtotenant.UserResetPasswordReq{UserID: "um1"})
+	if err == nil || err.Error() != code.GetError(code.UserNotExistError).Error() {
+		t.Fatalf("ResetPassword err = %v, want %v", err, code.GetError(code.UserNotExistError))
+	}
+	var stored model.PersonEntity
+	if err := db.First(&stored, "id = ?", machinePerson.ID).Error; err != nil {
+		t.Fatalf("query machine person: %v", err)
+	}
+	if stored.PasswordEncrypted != "machine-hash" {
+		t.Fatalf("machine user password must not be touched, got %q", stored.PasswordEncrypted)
 	}
 }

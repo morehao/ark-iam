@@ -8,6 +8,22 @@ import (
 
 type TenantCreateReq struct {
 	objtenant.TenantBaseInfo
+	Admin *TenantAdminCreateReq `json:"admin" binding:"required"` // 租户管理员(必填：每个租户都必须有管理员)
+}
+
+// TenantAdminCreateReq 建租户时一并创建的租户管理员。
+// 不含密码：初始临时密码由系统生成并仅在创建响应中返回一次
+// （见 docs/design/tenant-admin-provisioning-design-20260912.md D3/D6）。
+type TenantAdminCreateReq struct {
+	Name         string `json:"name" binding:"required"` // 姓名(必填)
+	Username     string `json:"username"`                // 全局用户名(可选)
+	PrimaryEmail string `json:"primaryEmail"`            // 主要邮箱(与手机号至少一个)
+	PrimaryPhone string `json:"primaryPhone"`            // 主要手机号(与邮箱至少一个)
+}
+
+// TenantAdminResetPasswordReq 重置租户内置管理员(builtin)密码；tenantID 只来自 path。
+type TenantAdminResetPasswordReq struct {
+	TenantID string `json:"-" uri:"tenantID" binding:"required"` // 租户ID
 }
 
 type TenantUpdateReq struct {

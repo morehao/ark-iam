@@ -13,9 +13,17 @@ export interface ApiResponse<T> {
 export interface OIDCLoginResp {
   continueURL: string
   requiresTenantSelection?: boolean
+  /** 该账号持临时密码，必须先用 changePassword 设置新密码后才能继续登录 */
+  requiresPasswordChange?: boolean
   tenants?: { tenantID: string; name: string; tag?: string; userID?: string; isOwner?: number }[]
   personID?: string
   allowPersonCreateTenant?: boolean
+}
+
+export interface OIDCChangePasswordReq {
+  authRequestID: string
+  currentPassword: string
+  newPassword: string
 }
 
 export interface OIDCSelectTenantReq {

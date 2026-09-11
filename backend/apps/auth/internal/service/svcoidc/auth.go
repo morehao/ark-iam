@@ -9,11 +9,11 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/auth/internal/service/svcauth"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/audit"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
 	"github.com/morehao/ark-iam/pkg/iam/sso"
-	"github.com/morehao/ark-iam/pkg/iam/audit"
 	"github.com/morehao/golib/glog"
 )
 
@@ -23,6 +23,7 @@ type OIDCAuthSvc interface {
 	CompleteLoginBySession(ctx *gin.Context, authRequestID string, sessionID string) (string, error)
 	RegisterPerson(ctx *gin.Context, req *dtooidc.RegisterPersonReq) (*dtooidc.RegisterPersonResp, error)
 	CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenantReq) (*dtooidc.CreateTenantResp, error)
+	ChangePassword(ctx *gin.Context, req *dtooidc.OIDCChangePasswordReq) error
 	LoginConfig(ctx *gin.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error)
 }
 
@@ -80,6 +81,24 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	personEntity, userEntity, tenants, err := svc.authSvc.AuthenticatePassword(ctx, req.Identifier, req.Password)
 	if err != nil {
 		return nil, err
+	}
+	// 首次登录强制改密（D3）：持临时密码的自然人（must_change_password）一律先改密，
+	// 不完成授权（done=false）、不发 code、不建 SSO 会话，只把 subject 绑到授权票据，
+	// 供 POST /oidc/login/changePassword 识别身份。该判定刻意放在租户分支之前：
+	// 无论零租户、单租户还是多租户，"临时密码必须先改"都成立。
+	//
+	// 由此得到一个不变式：SSO 会话只可能建立在已完成密码登录之上，而完成登录要求
+	// must_change_password=false，因此无需在 SSO/静默登录路径重复该判定。
+	if personEntity != nil && personEntity.MustChangePassword {
+		if cErr := svc.provider.Storage.CompleteAuthRequest(ctx.Request.Context(), req.AuthRequestID,
+			oidcop.BuildSubject(personEntity.ID), time.Now(), []string{"pwd"}, "", "", false); cErr != nil {
+			return nil, mapAuthRequestError(cErr)
+		}
+		return &dtooidc.OIDCLoginResp{
+			PersonID:               personEntity.ID,
+			RequiresPasswordChange: true,
+			Tenants:                tenants,
+		}, nil
 	}
 	// 零租户已验密 person（person 存在但无租户成员）：绑定 authRequest(done=false)，
 	// 返回"可建租户"信号，不发 code、不建 SSO 会话（无租户上下文无法发 token）。

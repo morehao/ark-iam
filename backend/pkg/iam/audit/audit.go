@@ -16,6 +16,7 @@ const (
 	ActionLogout                        = "logout"
 	ActionTenantSwitch                  = "tenant.switch"
 	ActionTenantCreate                  = "tenant.create"
+	ActionTenantAdminPasswordReset      = "tenant.admin_password_reset"
 	ActionApplicationCreate             = "application.create"
 	ActionApplicationClientCreate       = "application_client.create"
 	ActionApplicationClientCreateSecret = "application_client.create_secret"

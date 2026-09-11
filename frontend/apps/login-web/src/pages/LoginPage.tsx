@@ -1,8 +1,8 @@
 import { useState, useEffect, type FormEvent } from 'react'
-import { oidcLogin, oidcSelectTenant, registerPerson, createTenant, getLoginConfig } from '../api'
+import { oidcLogin, oidcSelectTenant, registerPerson, createTenant, getLoginConfig, oidcChangePassword } from '../api'
 import '../LoginPage.css'
 
-type Mode = 'login' | 'register' | 'createTenant'
+type Mode = 'login' | 'register' | 'createTenant' | 'changePassword'
 
 export default function LoginPage() {
   const authRequestID = new URLSearchParams(window.location.search).get('authRequestID')
@@ -26,6 +26,11 @@ export default function LoginPage() {
   const [registerPassword, setRegisterPassword] = useState('')
   const [tenantName, setTenantName] = useState('')
   const [tenantCode, setTenantCode] = useState('')
+
+  // 首次登录强制改密（临时密码）：当前密码 + 新密码 + 确认新密码
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [notice, setNotice] = useState('')
 
   useEffect(() => {
     if (!authRequestID) {
@@ -52,6 +57,12 @@ export default function LoginPage() {
     setError('')
     try {
       const resp = await oidcLogin({ authRequestID, identifier, password })
+      // 临时密码首次登录：先把密码改掉，再回登录页用新密码登录（会话在改密时已全局撤销）
+      if (resp.requiresPasswordChange) {
+        setMode('changePassword')
+        setNotice('该账号正在使用初始临时密码，请先设置新密码')
+        return
+      }
       if (resp.requiresTenantSelection && resp.tenants?.length) {
         setTenants(resp.tenants)
         setPendingAuthRequestID(authRequestID)
@@ -100,6 +111,7 @@ export default function LoginPage() {
 
   const enableRegister = () => {
     setError('')
+    setNotice('')
     setTenants([])
     setPendingAuthRequestID('')
     setMode('register')
@@ -151,6 +163,46 @@ export default function LoginPage() {
       setError('当前应用未开放自助注册')
     } catch (err: any) {
       setError(err?.message || '注册失败，请重试')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const submitChangePassword = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!authRequestID) {
+      setError('缺少认证请求 ID，请从应用重新发起登录')
+      return
+    }
+    if (!password.trim() || !newPassword.trim()) {
+      setError('请填写当前密码与新密码')
+      return
+    }
+    if (newPassword.length < 8) {
+      setError('新密码至少 8 位')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setError('两次输入的新密码不一致')
+      return
+    }
+    if (newPassword === password) {
+      setError('新密码不能与当前密码相同')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    try {
+      await oidcChangePassword({ authRequestID, currentPassword: password, newPassword })
+      // 改密成功：清空口令并回到登录表单，用新密码重新登录
+      setPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setMode('login')
+      setNotice('密码修改成功，请使用新密码登录')
+    } catch (err: any) {
+      setError(err?.message || '修改密码失败，请重试')
     } finally {
       setLoading(false)
     }
@@ -212,13 +264,26 @@ export default function LoginPage() {
       <div className="login-main">
         <div className="login-card">
           <h2 className="card-title">
-            {mode === 'register' ? '注册账号' : mode === 'createTenant' ? '创建租户' : '欢迎回来'}
+            {mode === 'register'
+              ? '注册账号'
+              : mode === 'createTenant'
+                ? '创建租户'
+                : mode === 'changePassword'
+                  ? '设置新密码'
+                  : '欢迎回来'}
           </h2>
           <p className="card-subtitle">
-            {mode === 'register' ? '创建你的统一身份账号' : mode === 'createTenant' ? '注册成功，请创建你的租户' : '使用统一身份账号登录'}
+            {mode === 'register'
+              ? '创建你的统一身份账号'
+              : mode === 'createTenant'
+                ? '注册成功，请创建你的租户'
+                : mode === 'changePassword'
+                  ? '首次登录需修改初始密码'
+                  : '使用统一身份账号登录'}
           </p>
 
           {error && <div className="error-msg">{error}</div>}
+          {!error && notice && <div className="notice-msg">{notice}</div>}
 
           {tenants.length > 0 ? (
             <div className="tenant-selection">
@@ -273,6 +338,48 @@ export default function LoginPage() {
                 <button type="submit" className="login-btn" disabled={loading}>
                   {loading ? '创建中...' : '创建租户'}
                 </button>
+              </form>
+            ) : mode === 'changePassword' ? (
+              <form onSubmit={submitChangePassword}>
+                <div className="form-group">
+                  <label htmlFor="current-password">当前密码</label>
+                  <input
+                    id="current-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="请输入下发的临时密码"
+                    autoComplete="current-password"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="new-password">新密码</label>
+                  <input
+                    id="new-password"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="至少 8 位，含大小写与数字"
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="confirm-password">确认新密码</label>
+                  <input
+                    id="confirm-password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="再次输入新密码"
+                    autoComplete="new-password"
+                  />
+                </div>
+                <button type="submit" className="login-btn" disabled={loading}>
+                  {loading ? '提交中...' : '设置新密码'}
+                </button>
+                <p style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: '#8b93a7' }}>
+                  修改成功后需用新密码重新登录
+                </p>
               </form>
             ) : (
               <>

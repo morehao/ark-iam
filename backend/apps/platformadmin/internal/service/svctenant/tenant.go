@@ -10,11 +10,15 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objtenant"
+	"github.com/morehao/ark-iam/pkg/iam/password"
+	"github.com/morehao/ark-iam/pkg/iam/person"
 	"github.com/morehao/ark-iam/pkg/iam/tenant"
+	"github.com/morehao/ark-iam/pkg/iam/user"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
+	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 	"gorm.io/gorm"
@@ -22,6 +26,7 @@ import (
 
 type TenantSvc interface {
 	Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (*dtotenant.TenantCreateResp, error)
+	ResetAdminPassword(ctx *gin.Context, req *dtotenant.TenantAdminResetPasswordReq) (*dtotenant.TenantAdminResetPasswordResp, error)
 	Delete(ctx *gin.Context, req *dtotenant.TenantDeleteReq) error
 	Update(ctx *gin.Context, req *dtotenant.TenantUpdateReq) error
 	Detail(ctx *gin.Context, req *dtotenant.TenantDetailReq) (*dtotenant.TenantDetailResp, error)
@@ -40,49 +45,81 @@ func NewTenantSvc() TenantSvc {
 // Create 创建租户管理。
 // 租户编码由服务端按统一规则自动生成（见 pkg/iam/tenant.GenerateCode），入参不接收编码；
 // 编码创建后不可变更（Update 不修改 code）。
+//
+// 一个事务内完成：租户 + 同名根组织 + 内置管理员用户（source=builtin）+ 租户自服务权限开通
+// （应用订阅 / 内置角色 / 菜单授权 / 角色绑定）。管理员初始密码为系统生成的临时密码，
+// 仅在响应中返回一次，且该管理员首次登录必须改密（见
+// docs/design/tenant-admin-provisioning-design-20260912.md D1/D2/D3/D6）。
 func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (*dtotenant.TenantCreateResp, error) {
+	admin := req.Admin
+	if admin == nil {
+		return nil, code.GetError(code.UserContactRequiredError)
+	}
+	// 邮箱或手机号至少填写一个：既是自然人识别键，也是后续"密码找回/交接"的唯一联系信息
+	if admin.PrimaryEmail == "" && admin.PrimaryPhone == "" {
+		return nil, code.GetError(code.UserContactRequiredError)
+	}
+
 	tenantCode, err := tenant.GenerateCode()
 	if err != nil {
 		glog.Errorf(ctx, "[svctenant.TenantCreate] generate tenant code fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantCreateError)
 	}
+	// 临时密码：每个租户管理员各不相同，规则统一走 pkg/iam/password（需求②）
+	tempPassword, err := password.GenerateTemporary()
+	if err != nil {
+		glog.Errorf(ctx, "[svctenant.TenantCreate] generate temporary password fail, err:%v", err)
+		return nil, code.GetError(code.TenantCreateError)
+	}
+	passwordHash, err := gcrypto.GeneratePasswordHash(tempPassword)
+	if err != nil {
+		glog.Errorf(ctx, "[svctenant.TenantCreate] GeneratePasswordHash fail, err:%v", err)
+		return nil, code.GetError(code.PasswordHashError)
+	}
+
 	userID := gincontext.GetUserIDString(ctx)
 	tenantType := model.TenantType(req.Type)
 	if tenantType != model.TenantTypeCustomer && tenantType != model.TenantTypePlatform {
 		tenantType = model.TenantTypeCustomer
 	}
-	insertEntity := &model.TenantEntity{
-		Code:      tenantCode,
-		CreatedBy: userID,
-		DbUser:    req.DbUser,
-		Name:      req.Name,
-		Status:    model.NormalizeTenantStatus(req.Status),
-		Tag:       req.Tag,
-		Type:      tenantType,
-	}
 
+	var (
+		tenantID         string
+		adminUserID      string
+		adminPersonIsNew bool
+	)
 	txErr := dbclient.IamDB(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := dao.NewTenantDao().WithTx(tx).Insert(ctx, insertEntity); err != nil {
-			return err
+		result, cErr := tenant.CreateTenantWithBuiltinAdmin(ctx, tx, &tenant.CreateTenantWithBuiltinAdminReq{
+			Tenant: &tenant.CreateWithRootOrgReq{
+				Code:      tenantCode,
+				CreatedBy: userID,
+				DbUser:    req.DbUser,
+				Name:      req.Name,
+				Status:    model.NormalizeTenantStatus(req.Status),
+				Tag:       req.Tag,
+				Type:      tenantType,
+			},
+			AdminUser: &user.CreateReq{
+				Person: &person.FindOrCreateReq{
+					Username:           admin.Username,
+					PrimaryEmail:       admin.PrimaryEmail,
+					PrimaryPhone:       admin.PrimaryPhone,
+					PasswordEncrypted:  passwordHash,
+					PasswordMethod:     "bcrypt",
+					MustChangePassword: true,
+					Name:               admin.Name,
+					CreatedBy:          userID,
+				},
+				Name:      admin.Name,
+				CreatedBy: userID,
+			},
+		})
+		if cErr != nil {
+			return cErr
 		}
-		// 每个租户创建时自动创建同名的根组织节点（组织树容器根）
-		rootOrg := &model.OrganizationEntity{
-			TenantID:  insertEntity.ID,
-			ParentID:  "",
-			Name:      req.Name,
-			Status:    string(model.OrgNodeStatusActive),
-			CreatedBy: userID,
-		}
-		if err := dao.NewOrganizationDao().WithTx(tx).Insert(ctx, rootOrg); err != nil {
-			return err
-		}
-		// 根节点路径："/"+id，深度 1（ID 由 BeforeCreate 生成，需创建后补写）
-		if err := dao.NewOrganizationDao().WithTx(tx).UpdateMap(ctx, rootOrg.ID, map[string]any{
-			"org_path":  "/" + rootOrg.ID,
-			"org_depth": 1,
-		}); err != nil {
-			return err
-		}
+		tenantID = result.Tenant.ID
+		adminUserID = result.AdminUser.ID
+		adminPersonIsNew = result.AdminPersonCreated
 		return nil
 	})
 	if txErr != nil {
@@ -91,13 +128,96 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 	}
 	audit.WriteAudit(ctx, audit.AuditEntry{
 		Action:     audit.ActionTenantCreate,
-		TenantID:   insertEntity.ID,
+		TenantID:   tenantID,
 		Result:     "success",
 		TargetType: "tenant",
-		TargetID:   insertEntity.ID,
+		TargetID:   tenantID,
 	})
-	return &dtotenant.TenantCreateResp{
-		TenantID: insertEntity.ID,
+
+	resp := &dtotenant.TenantCreateResp{
+		TenantID:    tenantID,
+		AdminUserID: adminUserID,
+	}
+	// 命中已有自然人时不回显初始密码：其密码未被改动（见 person.FindOrCreate 约定），
+	// 此时若仍需交付凭据，由运营调用 ResetAdminPassword 重新生成。
+	if adminPersonIsNew {
+		// TODO(delivery): 临时密码目前只能在本响应中回显一次（系统尚无邮件/短信通道）；
+		// 接入通道后改为下发给账号本人，本响应不再返回明文。
+		// 见 docs/design/tenant-admin-provisioning-design-20260912.md T1/Q4。
+		resp.AdminInitialPassword = tempPassword
+	}
+	return resp, nil
+}
+
+// ResetAdminPassword 重置租户内置管理员（source=builtin）的密码（兜底路径，D5）。
+//
+// 授权边界：只作用于该租户 source=builtin + user_type=member 的首位用户，
+// 即建租户时由平台创建的管理员（自助建租户场景下为 owner）；**不触碰**租户手工创建的
+// manual 成员——平台没有管理租户内部成员的正当场景（见 tenant-admin-console-redesign.md §3.2）。
+// 命中不到（含只有 manual 成员）与"不允许"统一返回 UserNotExistError，不暴露租户成员结构。
+//
+// 生成新临时密码 → 置 must_change_password=true → 撤销该自然人既有会话 → 写审计；
+// 明文只在响应中返回一次，不落库、不写日志。
+func (svc *tenantSvc) ResetAdminPassword(ctx *gin.Context, req *dtotenant.TenantAdminResetPasswordReq) (*dtotenant.TenantAdminResetPasswordResp, error) {
+	tenantEntity, err := dao.NewTenantDao().GetByID(ctx, req.TenantID)
+	if err != nil {
+		glog.Errorf(ctx, "[svctenant.ResetAdminPassword] dao GetByID tenant fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.TenantAdminResetPasswordError)
+	}
+	if tenantEntity == nil || tenantEntity.ID == "" {
+		return nil, code.GetError(code.TenantNotExistError)
+	}
+
+	builtinAdmin, err := dao.NewUserDao().GetByCond(ctx, &dao.UserCond{
+		TenantID: tenantEntity.ID,
+		Source:   model.UserSourceBuiltin,
+		UserType: model.UserTypeMember,
+	})
+	if err != nil {
+		glog.Errorf(ctx, "[svctenant.ResetAdminPassword] dao GetByCond builtin admin fail, err:%v, tenantID:%s", err, tenantEntity.ID)
+		return nil, code.GetError(code.TenantAdminResetPasswordError)
+	}
+	if builtinAdmin == nil || builtinAdmin.ID == "" || builtinAdmin.PersonID == "" {
+		return nil, code.GetError(code.UserNotExistError)
+	}
+
+	tempPassword, err := password.GenerateTemporary()
+	if err != nil {
+		glog.Errorf(ctx, "[svctenant.ResetAdminPassword] generate temporary password fail, err:%v", err)
+		return nil, code.GetError(code.TenantAdminResetPasswordError)
+	}
+	passwordHash, err := gcrypto.GeneratePasswordHash(tempPassword)
+	if err != nil {
+		glog.Errorf(ctx, "[svctenant.ResetAdminPassword] GeneratePasswordHash fail, err:%v", err)
+		return nil, code.GetError(code.PasswordHashError)
+	}
+	operatorID := gincontext.GetUserIDString(ctx)
+	if err := dao.NewPersonDao().UpdateMap(ctx, builtinAdmin.PersonID, map[string]any{
+		"password_encrypted":   passwordHash,
+		"password_method":      "bcrypt",
+		"must_change_password": true,
+		"updated_by":           operatorID,
+	}); err != nil {
+		glog.Errorf(ctx, "[svctenant.ResetAdminPassword] person UpdateMap fail, err:%v, personID:%s", err, builtinAdmin.PersonID)
+		return nil, code.GetError(code.TenantAdminResetPasswordError)
+	}
+
+	// 改密即全局登出：旧会话/refresh token 立即失效，新口令首次登录必须改密
+	tenant.RevokePersonSessions(ctx, builtinAdmin.PersonID)
+
+	audit.WriteAudit(ctx, audit.AuditEntry{
+		Action:     audit.ActionTenantAdminPasswordReset,
+		TenantID:   tenantEntity.ID,
+		Result:     "success",
+		TargetType: "user",
+		TargetID:   builtinAdmin.ID,
+	})
+	// TODO(delivery): 临时密码目前只能在本响应中回显一次（系统尚无邮件/短信通道）；
+	// 接入通道后改为下发给账号本人，本响应不再返回明文。
+	// 见 docs/design/tenant-admin-provisioning-design-20260912.md T1/Q4。
+	return &dtotenant.TenantAdminResetPasswordResp{
+		UserID:          builtinAdmin.ID,
+		InitialPassword: tempPassword,
 	}, nil
 }
 

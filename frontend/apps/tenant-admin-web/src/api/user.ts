@@ -8,7 +8,9 @@ import type {
   TenantUserItem,
   TenantUserLoginLogItem,
   TenantUserOrgUpdate,
+  TenantUserResetPasswordResp,
   TenantUserRoleItem,
+  TenantUserCreateResp,
 } from '@ark-iam/types'
 
 /** 获取当前租户内的用户目录（分页，关键词=姓名/用户名/邮箱/手机；organizationID=仅筛选恰在该组织的用户） */
@@ -21,7 +23,7 @@ export const getTenantUserPageList = (params?: {
 }) => request.get<any, PageListResp<TenantUserItem>>('/tenant/users', { params })
 
 /** 创建租户用户（person 不存在则先创建；含行政主组织[primary,单] + 参与组织[secondary] + 负责组织[leader]） */
-export const createTenantUser = (data: TenantUserCreateReq) => request.post<any, { userID: string }>('/tenant/users', data)
+export const createTenantUser = (data: TenantUserCreateReq) => request.post<any, TenantUserCreateResp>('/tenant/users', data)
 
 /** 用户详情（基础信息 + 组织归属 + 角色） */
 export const getTenantUserDetail = (userID: string) => request.get<any, TenantUserDetail>(`/tenant/users/${userID}`)
@@ -32,9 +34,9 @@ export const updateTenantUser = (data: { userID: string } & TenantUserOrgUpdate 
   return request.patch<any, string>(`/tenant/users/${userID}`, body)
 }
 
-/** 重置密码 */
-export const resetTenantUserPassword = (userID: string, password: string) =>
-  request.post<any, string>(`/tenant/users/${userID}/reset-password`, { password })
+/** 重置成员密码：新临时密码由服务端生成并仅此一次返回，成员下次登录必须改密 */
+export const resetTenantUserPassword = (userID: string) =>
+  request.post<any, TenantUserResetPasswordResp>(`/tenant/users/${userID}/reset-password`)
 
 /** 用户已分配角色 */
 export const getTenantUserRoles = (userID: string) => request.get<any, { list: TenantUserRoleItem[] }>(`/tenant/users/${userID}/roles`)

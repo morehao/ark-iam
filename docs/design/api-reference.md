@@ -102,6 +102,7 @@ flowchart LR
 |---|---|---|
 | `/oidc/login` | POST | 登录页提交凭证（identifier + password + authRequestID） |
 | `/oidc/login/selectTenant` | POST | 多租户用户选择租户（authRequestID + tenantID） |
+| `/oidc/login/changePassword` | POST | **首次登录强制改密**（authRequestID + currentPassword + newPassword）：`/oidc/login` 对持临时密码的账号返回 `requiresPasswordChange=true` 且不完成授权，改密成功后需重新登录（会话已全局撤销） |
 | `/oidc/sso-login` | GET | SSO 免密续登（携带 `iam_sso_session` Cookie，`?authRequestID=`） |
 | `/oidc/logged-out` | GET | 登出落地页（清除 SSO Cookie 后跳前端登录页） |
 | `/oidc/bc-logout` | POST | **反向通道登出接收端**（各 RP 应用也挂载此路径族，如 `/oidc/bc-logout/platform`） |
@@ -195,16 +196,19 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/v1/platform/tenants` | 创建租户 |
+| POST | `/v1/platform/tenants` | 创建租户（**必带 `admin`**：同事务建根组织 + 内置管理员 user + 租户管理员角色授权；响应 `adminInitialPassword` 为一次性临时密码） |
 | GET | `/v1/platform/tenants` | 租户分页 |
 | GET/PUT/DELETE | `/v1/platform/tenants/:tenantID` | 租户详情/更新/删除 |
+| POST | `/v1/platform/tenants/:tenantID/builtin-admin/reset-password` | 重置租户内置管理员密码（仅 `source=builtin`，即建租户时由平台创建的管理员；返回一次性临时密码并撤销其会话） |
 | POST | `/v1/platform/tenant-applications` | 开通租户-应用 |
 | GET | `/v1/platform/tenant-applications` | 租户应用分页 |
 | GET/PUT/DELETE | `/v1/platform/tenant-applications/:tenantAppID` | 详情/更新/删除 |
 
 > 租户编码 `code` 由服务端自动生成（规则 `t_<12 位随机 hex>`，如 `t_3f7a9c1d2e4b`，平台租户固定 `t_platform`），创建/更新入参无需传 `code`，创建后不可修改；列表支持 `GET /v1/platform/tenants?name=<关键词>&status=<active|suspended>`（`name` 按租户名模糊搜索，`status` 按状态精确筛选、留空不筛选、非法值报 `100209`），并返回 `createdAt`/`updatedAt`（秒级时间戳）。
 >
-> 租户状态 `status`（`active` 正常 / `suspended` 已挂起）：非法值/缺省归一为 `active`；`suspended` 会撤销该租户成员的 refresh token 与 SSO 会话，非 active 租户的成员无法登录、令牌不签发；`PUT /v1/platform/tenants/:tenantID` 拒绝挂起操作者自己所在的租户（`100208`）。
+> 租户状态 `status`（`active` 正常 / `suspended` 已挂起）：非法值/缺省归一为 `active`；`suspended` 会撤销该租户成员的 refresh token 与 SSO 会话，非 active 租户的成员无法登录、令牌不签发；`PUT /v1/platform/tenants/:tenantID` 拒绝挂起操作者自己所在的租户（`100208`）；重置内置管理员密码失败报 `100210`。
+>
+> **建租户的管理员约定**（D2/D3/D6）：`admin` 必填且邮箱/手机至少一个（缺联系方式报 `100521`）；管理员在同事务内创建为 `tenant_user.source=builtin`、`is_owner=true`，并绑定根组织与内置 `tenant_admin` 角色（该角色随租户开通 `tenant-admin` 应用订阅；应用/菜单种子缺失会整体回滚并报 `100200`）。`adminInitialPassword` 只在**新建自然人**时非空——命中已存在自然人时沿用其原密码、不回显凭据（可改用重置内置管理员密码接口兜底）。该管理员首次登录强制改密：`/oidc/login` 返回 `requiresPasswordChange=true`，改完（`/oidc/login/changePassword`）须重新登录。详见 `tenant-admin-provisioning-design-20260912.md`。
 
 ### 5.4 应用与客户端（OIDC 配置）
 
@@ -245,10 +249,10 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/v1/tenant/users` | 租户**真实用户**（member）分页（?keyword= 姓名/用户名/邮箱/手机，?isSuspended=，含主组织/角色数） |
-| POST | `/v1/tenant/users` | 创建租户真实用户（姓名/部门 organizationIDs/邮箱/手机/密码；**姓名即自然人信息**：无匹配 person 则按姓名创建，命中 email/phone 复用；部门归属同事务建立，首个为主组织） |
+| POST | `/v1/tenant/users` | 创建租户真实用户（姓名/部门 organizationIDs/邮箱/手机；**不含密码**：服务端生成临时密码，响应 `initialPassword` 仅此一次返回；**姓名即自然人信息**：无匹配 person 则按姓名创建，命中 email/phone 复用——复用时密码不变、`initialPassword` 为空；部门归属同事务建立，首个为主组织） |
 | GET | `/v1/tenant/users/:userID` | 用户详情（基础信息 + 组织归属 + 角色） |
 | PATCH | `/v1/tenant/users/:userID` | 局部更新（姓名/头像/状态） |
-| POST | `/v1/tenant/users/:userID/reset-password` | 重置密码（写入关联 person） |
+| POST | `/v1/tenant/users/:userID/reset-password` | 重置密码（无入参，仅 `user_type=member`）：服务端生成临时密码写入关联 person，响应 `initialPassword` 仅此一次返回，并撤销该成员全部会话 |
 | GET | `/v1/tenant/users/:userID/roles` | 用户已分配角色（用户侧授权入口；服务账号走 `/machine-users`） |
 | PUT | `/v1/tenant/users/:userID/roles` | 全量替换用户角色 |
 | GET | `/v1/tenant/users/:userID/identities` | 用户已绑定的第三方身份列表（身份按 person 归属，借道"该 person 在本租户有 user"做可见性校验） |

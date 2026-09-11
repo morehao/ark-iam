@@ -17,7 +17,7 @@ import {
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { fmtTime, NameLink, PageContainer, RowActions, SuspendedTag, timeColumn, tokens } from '@ark-iam/ui'
+import { fmtTime, InitialPasswordModal, NameLink, PageContainer, RowActions, SuspendedTag, timeColumn, tokens } from '@ark-iam/ui'
 import type {
   OrganizationItem,
   TenantApiKeyItem,
@@ -89,10 +89,8 @@ function UsersPane() {
   // 授权角色（列表行操作 Modal：按应用授权，逻辑收敛于共享组件 RoleAssignEditor）
   const [roleTarget, setRoleTarget] = useState<TenantUserItem | null>(null)
 
-  // 重置密码
-  const [pwdOpen, setPwdOpen] = useState(false)
-  const [pwdTarget, setPwdTarget] = useState<TenantUserItem | null>(null)
-  const [pwdForm] = Form.useForm()
+  // 一次性初始/临时密码（建成员或重置密码后展示，关闭即不可再查）
+  const [initialPassword, setInitialPassword] = useState('')
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -185,18 +183,29 @@ function UsersPane() {
         await updateTenantUser(patch)
         message.success('保存成功')
       } else {
-        await createTenantUser({
+        const created = await createTenantUser({
           name: values.name,
           username: values.username,
           primaryEmail: values.primaryEmail,
           primaryPhone: values.primaryPhone,
-          password: values.password,
           isSuspended: values.isSuspended,
           organizationIDs: [values.primaryOrgID],
           secondaryOrgIDs: values.secondaryOrgIDs || [],
           leaderOrgIDs: values.leaderOrgIDs || [],
         })
-        message.success('创建成功')
+        setModalOpen(false)
+        void fetchData()
+        if (created.initialPassword) {
+          // 初始临时密码仅在创建响应返回一次；该成员首次登录必须改密
+          message.success('创建成功')
+          setInitialPassword(created.initialPassword)
+        } else {
+          Modal.info({
+            title: '成员已创建',
+            content: '该邮箱/手机已存在统一身份账号，密码未被改动；如需登录凭据，可对该成员执行「重置密码」。',
+          })
+        }
+        return
       }
       setModalOpen(false)
       void fetchData()
@@ -227,21 +236,13 @@ function UsersPane() {
     }
   }
 
-  const openResetPassword = (record: TenantUserItem) => {
-    setPwdTarget(record)
-    pwdForm.resetFields()
-    setPwdOpen(true)
-  }
-
-  const submitResetPassword = async () => {
+  /** 重置成员密码：二次确认由 RowActions 的行内确认承担；成功后一次性展示新临时密码 */
+  const resetPassword = async (record: TenantUserItem) => {
     try {
-      const values = await pwdForm.validateFields()
-      if (!pwdTarget) return
-      await resetTenantUserPassword(pwdTarget.userID, values.password)
-      message.success('密码已重置')
-      setPwdOpen(false)
+      const resp = await resetTenantUserPassword(record.userID)
+      setInitialPassword(resp.initialPassword)
     } catch {
-      /* 校验或请求失败 */
+      /* 拦截器已提示 */
     }
   }
 
@@ -282,7 +283,7 @@ function UsersPane() {
           actions={[
             { key: 'edit', label: '编辑', onClick: () => void openEdit(r) },
             { key: 'roles', label: '授权角色', onClick: () => setRoleTarget(r) },
-            { key: 'resetPwd', label: '重置密码', onClick: () => openResetPassword(r) },
+            { key: 'resetPwd', label: '重置密码', confirm: '重置后系统生成新的临时密码并仅展示一次，该成员既有会话将失效。确认重置？', onClick: () => void resetPassword(r) },
             {
               key: 'toggle',
               label: r.isSuspended ? '恢复' : '挂起',
@@ -430,8 +431,8 @@ function UsersPane() {
             <Input placeholder="可空，全局用户名" />
           </Form.Item>
           {!editing && (
-            <Form.Item name="password" label="初始密码">
-              <Input.Password placeholder="可空；提供后该用户可登录" />
+            <Form.Item label="初始密码" extra="由系统生成临时密码，创建后仅在弹窗中展示一次；该成员首次登录必须修改密码">
+              <Input value="创建后自动生成" disabled />
             </Form.Item>
           )}
           {editing && (
@@ -508,14 +509,14 @@ function UsersPane() {
         ) : null}
       </Drawer>
 
-      {/* 重置密码 */}
-      <Modal title={`重置密码 - ${pwdTarget?.name || ''}`} open={pwdOpen} onOk={() => void submitResetPassword()} onCancel={() => setPwdOpen(false)} destroyOnClose>
-        <Form form={pwdForm} layout="vertical">
-          <Form.Item name="password" label="新密码" rules={[{ required: true, message: '请输入新密码' }]}>
-            <Input.Password placeholder="重置后用户使用新密码登录" />
-          </Form.Item>
-        </Form>
-      </Modal>
+      {/* 一次性初始/临时密码（建成员、重置密码共用同一交互） */}
+      <InitialPasswordModal
+        password={initialPassword}
+        description="该成员首次登录必须修改密码；其既有会话已失效。"
+        onClose={() => setInitialPassword('')}
+      />
+
+
 
       {/* 授权角色（列表行操作）：按应用授权，内容收敛于共享组件 */}
       <Modal

@@ -9,6 +9,7 @@ import (
 
 type TenantCtr interface {
 	Create(ctx *gin.Context)
+	ResetAdminPassword(ctx *gin.Context)
 	Delete(ctx *gin.Context)
 	Update(ctx *gin.Context)
 	Detail(ctx *gin.Context)
@@ -41,6 +42,29 @@ func (ctr *tenantCtr) Create(ctx *gin.Context) {
 		return
 	}
 	res, err := ctr.tenantSvc.Create(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 租户管理
+// @Summary 重置租户内置管理员密码
+// @Description 重置该租户内置管理员（source=builtin）的密码：生成新临时密码并在响应中仅返回一次，
+// @Description 该管理员既有会话立即失效、下次登录必须修改密码。不作用于租户手工创建的成员。
+// @accept application/json
+// @Produce application/json
+// @Param tenantID path string true "tenantID"
+// @Success 200 {object} gincontext.DtoRender{data=dtotenant.TenantAdminResetPasswordResp}
+// @Router /v1/platform/tenants/{tenantID}/builtin-admin/reset-password [post]
+func (ctr *tenantCtr) ResetAdminPassword(ctx *gin.Context) {
+	var req dtotenant.TenantAdminResetPasswordReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.tenantSvc.ResetAdminPassword(ctx, &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

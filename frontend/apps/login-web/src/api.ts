@@ -10,6 +10,7 @@ import type {
   CreateTenantResp,
   OIDCLoginConfigReq,
   OIDCLoginConfigResp,
+  OIDCChangePasswordReq,
 } from './types'
 
 const api = axios.create({
@@ -34,6 +35,15 @@ export async function oidcSelectTenant(data: OIDCSelectTenantReq): Promise<OIDCL
     throw new Error(body.msg || '选择租户失败，请重试')
   }
   return body.data
+}
+
+/** 首次登录强制改密（临时密码）：改密成功后需重新登录（会话已全局撤销）。 */
+export async function oidcChangePassword(data: OIDCChangePasswordReq): Promise<void> {
+  const resp = await api.post<ApiResponse<string>>('/login/changePassword', data)
+  const body = resp.data
+  if (body.code !== 0) {
+    throw new Error(body.msg || '修改密码失败，请重试')
+  }
 }
 
 export async function registerPerson(data: RegisterPersonReq): Promise<RegisterPersonResp> {

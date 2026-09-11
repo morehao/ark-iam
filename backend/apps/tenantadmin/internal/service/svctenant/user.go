@@ -1,16 +1,18 @@
 package svctenant
 
 import (
-	"encoding/json"
-	"fmt"
-	"time"
+	"errors"
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/iam/audit"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/iam/password"
 	"github.com/morehao/ark-iam/pkg/iam/person"
+	"github.com/morehao/ark-iam/pkg/iam/tenant"
+	"github.com/morehao/ark-iam/pkg/iam/user"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
@@ -28,7 +30,7 @@ type UserSvc interface {
 	Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dtotenant.UserCreateResp, error)
 	Detail(ctx *gin.Context, req *dtotenant.UserDetailReq) (*dtotenant.UserDetailResp, error)
 	Update(ctx *gin.Context, req *dtotenant.UserUpdateReq) error
-	ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPasswordReq) error
+	ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPasswordReq) (*dtotenant.UserResetPasswordResp, error)
 	ListRoles(ctx *gin.Context, req *dtotenant.UserRolesListReq) (*dtotenant.UserRolesListResp, error)
 	UpdateRoles(ctx *gin.Context, req *dtotenant.UserRolesUpdateReq) error
 	ListLoginLogs(ctx *gin.Context, req *dtotenant.UserLoginLogListReq) (*dtotenant.UserLoginLogListResp, error)
@@ -192,6 +194,11 @@ func loadUserRoleCountMap(ctx *gin.Context, tenantID string, userIDs []string) m
 // 提供 personID 直接关联；否则按 email/phone 命中已有 person 则复用；未命中则同事务创建 person（姓名即自然人姓名）；
 // 同时按 organizationIDs 建立行政归属（member，至多 1 个）、leaderOrgIDs 建立负责关系（leader）。
 // 业务约束：用户必须从属于至少一个部门，organizationIDs 必传。
+//
+// 口径与平台侧建租户内置管理员完全一致（需求①/D7）：
+//   - 密码不由调用方提供，统一由 pkg/iam/password 生成临时密码，仅本次响应返回一次；
+//   - 仅新建自然人时置 must_change_password=true（复用既有自然人绝不改动其密码）；
+//   - person/user/组织关系同事务写入，共用 pkg/iam/user.Create。
 func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dtotenant.UserCreateResp, error) {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
 	if err := requireSystemAdmin(ctx, code.UserCreateError); err != nil {
@@ -209,171 +216,116 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 		return nil, code.GetError(code.UserContactRequiredError)
 	}
 
-	// 1. 解析 personID：显式提供时校验存在并直接关联；未提供时在事务内 find-or-create
-	// （person 领域能力，见 pkg/iam/person）：命中已有全局身份则复用，未命中则同事务新建。
-	personID := req.PersonID
-	resolvePersonInTx := false
-	if personID != "" {
-		person, err := dao.NewPersonDao().GetByID(ctx, personID)
+	// 1. 显式 personID 时先校验存在性（err 为系统错误、nil 为业务边界，两者分开判断）
+	if req.PersonID != "" {
+		personEntity, err := dao.NewPersonDao().GetByID(ctx, req.PersonID)
 		if err != nil {
 			glog.Errorf(ctx, "[svcuser.Create] dao GetByID person fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 			return nil, code.GetError(code.UserCreateError)
 		}
-		if person == nil || person.ID == "" {
+		if personEntity == nil || personEntity.ID == "" {
 			return nil, code.GetError(code.UserNotExistError)
 		}
-	} else {
-		resolvePersonInTx = true
 	}
 
 	// 2. 校验归属组织均属于本租户
-	orgSet := make(map[string]bool)
-	if len(req.OrganizationIDs) > 0 || len(req.SecondaryOrgIDs) > 0 || len(req.LeaderOrgIDs) > 0 {
-		orgList, err := dao.NewOrganizationDao().GetListByCond(ctx, &dao.OrganizationCond{TenantID: tenantID})
-		if err != nil {
-			glog.Errorf(ctx, "[svcuser.Create] query org fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-			return nil, code.GetError(code.UserCreateError)
+	orgList, err := dao.NewOrganizationDao().GetListByCond(ctx, &dao.OrganizationCond{TenantID: tenantID})
+	if err != nil {
+		glog.Errorf(ctx, "[svcuser.Create] query org fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.UserCreateError)
+	}
+	orgSet := make(map[string]bool, len(orgList))
+	for _, o := range orgList {
+		orgSet[o.ID] = true
+	}
+	for _, orgID := range req.OrganizationIDs {
+		if !orgSet[orgID] {
+			return nil, code.GetError(code.OrganizationNotExistError)
 		}
-		for _, o := range orgList {
-			orgSet[o.ID] = true
+	}
+	for _, orgID := range req.SecondaryOrgIDs {
+		if !orgSet[orgID] {
+			return nil, code.GetError(code.OrganizationNotExistError)
 		}
-		for _, orgID := range req.OrganizationIDs {
-			if !orgSet[orgID] {
-				return nil, code.GetError(code.OrganizationNotExistError)
-			}
-		}
-		for _, orgID := range req.SecondaryOrgIDs {
-			if !orgSet[orgID] {
-				return nil, code.GetError(code.OrganizationNotExistError)
-			}
-		}
-		for _, orgID := range req.LeaderOrgIDs {
-			if !orgSet[orgID] {
-				return nil, code.GetError(code.OrganizationNotExistError)
-			}
+	}
+	for _, orgID := range req.LeaderOrgIDs {
+		if !orgSet[orgID] {
+			return nil, code.GetError(code.OrganizationNotExistError)
 		}
 	}
 
-	// 3. 事务：person find-or-create + 创建 user + 建立组织归属
+	// 3. 初始临时密码：系统生成，仅新建自然人时生效（复用既有自然人时密码保持不变）
+	tempPassword, err := password.GenerateTemporary()
+	if err != nil {
+		glog.Errorf(ctx, "[svcuser.Create] generate temporary password fail, err:%v", err)
+		return nil, code.GetError(code.UserCreateError)
+	}
+	passwordHash, err := gcrypto.GeneratePasswordHash(tempPassword)
+	if err != nil {
+		glog.Errorf(ctx, "[svcuser.Create] GeneratePasswordHash fail, err:%v", err)
+		return nil, code.GetError(code.PasswordHashError)
+	}
+
+	// 4. 事务：person find-or-create + user 主体 + 组织归属（共用 pkg/iam/user.Create）
 	var createdUserID string
+	personCreated := false
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
-		if resolvePersonInTx {
-			passwordHash := ""
-			if req.Password != "" {
-				hash, hashErr := gcrypto.GeneratePasswordHash(req.Password)
-				if hashErr != nil {
-					glog.Errorf(ctx, "[svcuser.Create] GeneratePasswordHash fail, err:%v", hashErr)
-					return code.GetError(code.PasswordHashError)
-				}
-				passwordHash = hash
-			}
-			personEntity, _, personErr := person.FindOrCreate(ctx, tx, &person.FindOrCreateReq{
-				Username:          req.Username,
-				PrimaryEmail:      req.PrimaryEmail,
-				PrimaryPhone:      req.PrimaryPhone,
-				PasswordEncrypted: passwordHash,
-				PasswordMethod:    "bcrypt",
-				Name:              req.Name,
-				Avatar:            req.Avatar,
-				CreatedBy:         operatorID,
-			})
-			if personErr != nil {
-				glog.Errorf(ctx, "[svcuser.Create] person FindOrCreate fail, err:%v, req:%s", personErr, gutil.ToJsonString(req))
-				return fmt.Errorf("person find-or-create: %w", personErr)
-			}
-			personID = personEntity.ID
+		createReq := &user.CreateReq{
+			TenantID:        tenantID,
+			PersonID:        req.PersonID,
+			Name:            req.Name,
+			Avatar:          req.Avatar,
+			IsSuspended:     req.IsSuspended,
+			CreatedBy:       operatorID,
+			PrimaryOrgIDs:   req.OrganizationIDs,
+			SecondaryOrgIDs: req.SecondaryOrgIDs,
+			LeaderOrgIDs:    req.LeaderOrgIDs,
 		}
-
-		// 同一自然人在本租户内只能有一条 user（person 关联/新建后即可确定 personID 校验）
-		existing, err := dao.NewUserDao().WithTx(tx).GetListByCond(ctx, &dao.UserCond{TenantID: tenantID, PersonID: personID})
-		if err != nil {
-			glog.Errorf(ctx, "[svcuser.Create] query user by person fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-			return fmt.Errorf("query user by person: %w", err)
-		}
-		if len(existing) > 0 {
-			return code.GetError(code.UserAlreadyInTenantError)
-		}
-
-		now := time.Now()
-		insertEntity := &model.UserEntity{
-			TenantID:    tenantID,
-			PersonID:    personID,
-			Name:        req.Name,
-			Avatar:      req.Avatar,
-			Profile:     json.RawMessage(`{}`),
-			CustomData:  json.RawMessage(`{}`),
-			IsSuspended: req.IsSuspended,
-			IsOwner:     false,
-			JoinedAt:    &now,
-			CreatedBy:   operatorID,
-		}
-		if insertErr := dao.NewUserDao().WithTx(tx).Insert(ctx, insertEntity); insertErr != nil {
-			glog.Errorf(ctx, "[svcuser.Create] dao Insert fail, err:%v, req:%s", insertErr, gutil.ToJsonString(req))
-			return fmt.Errorf("user insert: %w", insertErr)
-		}
-		createdUserID = insertEntity.ID
-
-		// 建立行政主部门（primary 关系，至多 1 条）
-		if len(req.OrganizationIDs) > 1 {
-			return code.GetError(code.UserOrganizationRequiredError)
-		}
-		for _, orgID := range req.OrganizationIDs {
-			relation := &model.OrganizationUserEntity{
-				TenantID:       tenantID,
-				OrganizationID: orgID,
-				UserID:         insertEntity.ID,
-				RelationType:   model.OrgUserRelationPrimary,
-				CreatedBy:      operatorID,
-			}
-			if insertErr := dao.NewOrganizationUserDao().WithTx(tx).Insert(ctx, relation); insertErr != nil {
-				glog.Errorf(ctx, "[svcuser.Create] org relation Insert fail, err:%v", insertErr)
-				return fmt.Errorf("org relation insert: %w", insertErr)
+		if req.PersonID == "" {
+			createReq.Person = &person.FindOrCreateReq{
+				Username:           req.Username,
+				PrimaryEmail:       req.PrimaryEmail,
+				PrimaryPhone:       req.PrimaryPhone,
+				PasswordEncrypted:  passwordHash,
+				PasswordMethod:     "bcrypt",
+				MustChangePassword: true,
+				Name:               req.Name,
+				Avatar:             req.Avatar,
+				CreatedBy:          operatorID,
 			}
 		}
-		// 建立负责部门关系（leader，独立于归属；一个部门至多一个负责人）
-		for _, orgID := range req.LeaderOrgIDs {
-			if err := ensureOrgLeaderUnique(ctx, tx, tenantID, orgID, insertEntity.ID); err != nil {
-				return err
-			}
-			relation := &model.OrganizationUserEntity{
-				TenantID:       tenantID,
-				OrganizationID: orgID,
-				UserID:         insertEntity.ID,
-				RelationType:   model.OrgUserRelationLeader,
-				CreatedBy:      operatorID,
-			}
-			if insertErr := dao.NewOrganizationUserDao().WithTx(tx).Insert(ctx, relation); insertErr != nil {
-				glog.Errorf(ctx, "[svcuser.Create] leader relation Insert fail, err:%v", insertErr)
-				return fmt.Errorf("leader relation insert: %w", insertErr)
-			}
+		createdUser, isNewPerson, createErr := user.Create(ctx, tx, createReq)
+		if createErr != nil {
+			return createErr
 		}
-		// 建立参与部门关系（secondary，可多条）
-		for _, orgID := range req.SecondaryOrgIDs {
-			relation := &model.OrganizationUserEntity{
-				TenantID:       tenantID,
-				OrganizationID: orgID,
-				UserID:         insertEntity.ID,
-				RelationType:   model.OrgUserRelationSecondary,
-				CreatedBy:      operatorID,
-			}
-			if insertErr := dao.NewOrganizationUserDao().WithTx(tx).Insert(ctx, relation); insertErr != nil {
-				glog.Errorf(ctx, "[svcuser.Create] secondary relation Insert fail, err:%v", insertErr)
-				return fmt.Errorf("secondary relation insert: %w", insertErr)
-			}
-		}
+		createdUserID = createdUser.ID
+		personCreated = isNewPerson
 		return nil
 	})
 	if txErr != nil {
-		if txErr == code.GetError(code.PasswordHashError) {
-			return nil, txErr
+		// 公共层哨兵错误 → 本应用错误码（err 与业务边界判定分离）
+		switch {
+		case errors.Is(txErr, user.ErrAlreadyInTenant):
+			return nil, code.GetError(code.UserAlreadyInTenantError)
+		case errors.Is(txErr, user.ErrPersonNotFound):
+			return nil, code.GetError(code.UserNotExistError)
+		case errors.Is(txErr, user.ErrMultiplePrimaryOrg):
+			return nil, code.GetError(code.UserOrganizationRequiredError)
+		case errors.Is(txErr, user.ErrOrgLeaderConflict):
+			return nil, code.GetError(code.OrganizationUserLeaderConflictError)
 		}
 		glog.Errorf(ctx, "[svcuser.Create] transaction fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserCreateError)
 	}
 
-	return &dtotenant.UserCreateResp{
-		UserID: createdUserID,
-	}, nil
+	resp := &dtotenant.UserCreateResp{UserID: createdUserID}
+	if personCreated {
+		resp.InitialPassword = tempPassword
+	}
+	// TODO(delivery): 临时密码目前只能在本响应中回显一次（系统尚无邮件/短信通道）；
+	// 接入通道后改为下发给账号本人，本响应不再返回明文。
+	// 见 docs/design/tenant-admin-provisioning-design-20260912.md T1/Q4。
+	return resp, nil
 }
 
 // Detail 用户详情：基础信息（含自然人）+ 组织归属 + 已分配角色。
@@ -618,38 +570,68 @@ func strPtrOrNil(p *string) *string {
 	return p
 }
 
-// ResetPassword 重置密码：更新关联 person 的密码哈希（无自然人关联的用户不可登录，直接拒绝）。
-func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPasswordReq) error {
+// ResetPassword 重置成员密码（D7：与平台侧重置内置管理员的口径完全一致）。
+// 不接收新密码：由服务端生成临时密码并在响应中返回一次；置 must_change_password=true
+// 使新口令首次登录必须改密，并撤销该自然人既有 SSO 会话与 refresh token（改密即全局登出）。
+// 无自然人关联的用户（服务账号等）不可登录，也没有口令语义，直接拒绝。
+func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPasswordReq) (*dtotenant.UserResetPasswordResp, error) {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
 	if err := requireSystemAdmin(ctx, code.UserResetPasswordError); err != nil {
-		return err
+		return nil, err
 	}
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.ResetPassword] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.UserUpdateError)
+		return nil, code.GetError(code.UserUpdateError)
 	}
 	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gincontext.GetTenantIDString(ctx) {
-		return code.GetError(code.UserNotExistError)
+		return nil, code.GetError(code.UserNotExistError)
+	}
+	// 服务账号（user_type=machine）不使用口令，归属其自身的密钥管理，不在此处重置
+	if userEntity.UserType != model.UserTypeMember {
+		return nil, code.GetError(code.UserNotExistError)
 	}
 	if userEntity.PersonID == "" {
-		return code.GetError(code.UserNotExistError)
+		return nil, code.GetError(code.UserNotExistError)
 	}
 
-	hash, hashErr := gcrypto.GeneratePasswordHash(req.Password)
-	if hashErr != nil {
-		glog.Errorf(ctx, "[svcuser.ResetPassword] GeneratePasswordHash fail, err:%v", hashErr)
-		return code.GetError(code.PasswordHashError)
+	tempPassword, err := password.GenerateTemporary()
+	if err != nil {
+		glog.Errorf(ctx, "[svcuser.ResetPassword] generate temporary password fail, err:%v", err)
+		return nil, code.GetError(code.UserResetPasswordError)
+	}
+	hash, err := gcrypto.GeneratePasswordHash(tempPassword)
+	if err != nil {
+		glog.Errorf(ctx, "[svcuser.ResetPassword] GeneratePasswordHash fail, err:%v", err)
+		return nil, code.GetError(code.PasswordHashError)
 	}
 	if err := dao.NewPersonDao().UpdateMap(ctx, userEntity.PersonID, map[string]any{
-		"password_encrypted": hash,
-		"password_method":    "bcrypt",
-		"updated_by":         gincontext.GetUserIDString(ctx),
+		"password_encrypted":   hash,
+		"password_method":      "bcrypt",
+		"must_change_password": true,
+		"updated_by":           gincontext.GetUserIDString(ctx),
 	}); err != nil {
 		glog.Errorf(ctx, "[svcuser.ResetPassword] person UpdateMap fail, err:%v", err)
-		return code.GetError(code.UserResetPasswordError)
+		return nil, code.GetError(code.UserResetPasswordError)
 	}
-	return nil
+
+	// 改密即全局登出：旧 SSO 会话与 refresh token 立即失效
+	tenant.RevokePersonSessions(ctx, userEntity.PersonID)
+
+	audit.WriteAudit(ctx, audit.AuditEntry{
+		Action:     audit.ActionTenantAdminPasswordReset,
+		TenantID:   gincontext.GetTenantIDString(ctx),
+		Result:     "success",
+		TargetType: "user",
+		TargetID:   userEntity.ID,
+	})
+	// TODO(delivery): 临时密码目前只能在本响应中回显一次（系统尚无邮件/短信通道）；
+	// 接入通道后改为下发给账号本人，本响应不再返回明文。
+	// 见 docs/design/tenant-admin-provisioning-design-20260912.md T1/Q4。
+	return &dtotenant.UserResetPasswordResp{
+		UserID:          userEntity.ID,
+		InitialPassword: tempPassword,
+	}, nil
 }
 
 // ListRoles 用户已分配角色列表。
