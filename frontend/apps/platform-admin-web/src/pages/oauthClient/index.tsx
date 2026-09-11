@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Table, Button, Space, Input, Modal, Form, Select, Popconfirm, message } from 'antd'
+import { Table, Button, Space, Input, Modal, Form, Select, message } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { EllipsisCell, fmtTime, IDCell, PageContainer, StatusTag, TypeTag } from '@ark-iam/ui'
+import { IDCell, NameLink, PageContainer, RowActions, StatusTag, timeColumn, TypeTag } from '@ark-iam/ui'
 import { createOAuthClient, deleteOAuthClient, getApplicationPageList, getOAuthClientPageList, updateOAuthClient } from '@ark-iam/api'
 import type { OAuthClientItem } from '@ark-iam/types'
 import { useNavigate } from 'react-router-dom'
@@ -95,6 +95,16 @@ export default function OAuthClientList() {
     }
   }
 
+  const handleDelete = async (record: OAuthClientItem) => {
+    try {
+      await deleteOAuthClient(record.applicationClientID)
+      message.success('删除成功')
+      void fetchData()
+    } catch {
+      /* 拦截器已提示 */
+    }
+  }
+
   const columns: ColumnsType<OAuthClientItem> = [
     { title: 'ID', dataIndex: 'applicationClientID', key: 'applicationClientID', width: 150, render: (v: string) => <IDCell value={v} /> },
     {
@@ -104,40 +114,28 @@ export default function OAuthClientList() {
       width: 150,
       render: (v: string) => <IDCell value={v} />,
     },
-    { title: '名称', dataIndex: 'name', key: 'name', render: (v: string) => <EllipsisCell value={v} /> },
+    {
+      title: '名称',
+      dataIndex: 'name',
+      key: 'name',
+      render: (v: string, r) => <NameLink value={v} onClick={() => navigate(`/oauthClient/${r.applicationClientID}`)} />,
+    },
     { title: '所属应用ID', dataIndex: 'appID', key: 'appID', width: 150, render: (v: string) => <IDCell value={v} /> },
     { title: '类型', dataIndex: 'type', key: 'type', width: 100, render: (v: string) => <TypeTag value={v} /> },
     { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (v: string) => <StatusTag value={v} /> },
-    { title: '创建时间', key: 'createdAt', width: 160, render: (_, r) => fmtTime(r.createdAt) },
+    timeColumn<OAuthClientItem>({ title: '创建时间', dataIndex: 'createdAt' }),
+    timeColumn<OAuthClientItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     {
       title: '操作',
       key: 'action',
-      width: 180,
+      width: 120,
       render: (_, r) => (
-        <Space size={4}>
-          <Button type="link" size="small" onClick={() => navigate(`/oauthClient/${r.applicationClientID}`)}>
-            详情
-          </Button>
-          <Button type="link" size="small" onClick={() => handleEdit(r)}>
-            编辑
-          </Button>
-          <Popconfirm
-            title="确认删除该客户端？"
-            onConfirm={async () => {
-              try {
-                await deleteOAuthClient(r.applicationClientID)
-                message.success('删除成功')
-                void fetchData()
-              } catch {
-                /* 拦截器已提示 */
-              }
-            }}
-          >
-            <Button type="link" size="small" danger>
-              删除
-            </Button>
-          </Popconfirm>
-        </Space>
+        <RowActions
+          actions={[
+            { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
+            { key: 'delete', label: '删除', danger: true, confirm: '确认删除该客户端？', onClick: () => void handleDelete(r) },
+          ]}
+        />
       ),
     },
   ]
@@ -171,7 +169,7 @@ export default function OAuthClientList() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1100 }}
+        scroll={{ x: 1300 }}
         pagination={{
           current: page,
           pageSize,

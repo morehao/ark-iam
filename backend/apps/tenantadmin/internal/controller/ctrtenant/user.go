@@ -15,17 +15,23 @@ type UserCtr interface {
 	ResetPassword(ctx *gin.Context)
 	ListRoles(ctx *gin.Context)
 	UpdateRoles(ctx *gin.Context)
+	ListIdentities(ctx *gin.Context)
+	CreateIdentity(ctx *gin.Context)
+	DeleteIdentity(ctx *gin.Context)
+	ListLoginLogs(ctx *gin.Context)
 }
 
 type userCtr struct {
-	userSvc svctenant.UserSvc
+	userSvc         svctenant.UserSvc
+	userIdentitySvc svctenant.UserIdentitySvc
 }
 
 var _ UserCtr = (*userCtr)(nil)
 
 func NewUserCtr() UserCtr {
 	return &userCtr{
-		userSvc: svctenant.NewUserSvc(),
+		userSvc:         svctenant.NewUserSvc(),
+		userIdentitySvc: svctenant.NewUserIdentitySvc(),
 	}
 }
 
@@ -186,4 +192,93 @@ func (ctr *userCtr) UpdateRoles(ctx *gin.Context) {
 		return
 	}
 	gincontext.Success(ctx, "更新成功")
+}
+
+// @Tags 用户
+// @Summary 用户已绑定的第三方身份列表
+// @accept application/json
+// @Produce application/json
+// @Param userID path string true "用户ID"
+// @Success 200 {object} gincontext.DtoRender{data=dtotenant.UserIdentityListResp}
+// @Router /v1/tenant/users/{userID}/identities [get]
+func (ctr *userCtr) ListIdentities(ctx *gin.Context) {
+	var req dtotenant.UserIdentityListReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.userIdentitySvc.ListByUser(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 用户
+// @Summary 为用户绑定第三方身份
+// @accept application/json
+// @Produce application/json
+// @Param userID path string true "用户ID"
+// @Param req body dtotenant.UserIdentityCreateReq true "绑定第三方身份"
+// @Success 200 {object} gincontext.DtoRender{data=dtotenant.UserIdentityCreateResp}
+// @Router /v1/tenant/users/{userID}/identities [post]
+func (ctr *userCtr) CreateIdentity(ctx *gin.Context) {
+	var req dtotenant.UserIdentityCreateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.userIdentitySvc.Create(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 用户
+// @Summary 解绑用户的第三方身份
+// @accept application/json
+// @Produce application/json
+// @Param userID path string true "用户ID"
+// @Param identityID path string true "用户身份ID"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/tenant/users/{userID}/identities/{identityID} [delete]
+func (ctr *userCtr) DeleteIdentity(ctx *gin.Context) {
+	var req dtotenant.UserIdentityDeleteReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctr.userIdentitySvc.Delete(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, "解绑成功")
+}
+
+// @Tags 用户
+// @Summary 用户登录日志
+// @accept application/json
+// @Produce application/json
+// @Param userID path string true "用户ID"
+// @Success 200 {object} gincontext.DtoRender{data=dtotenant.UserLoginLogListResp}
+// @Router /v1/tenant/users/{userID}/login-logs [get]
+func (ctr *userCtr) ListLoginLogs(ctx *gin.Context) {
+	var req dtotenant.UserLoginLogListReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.userSvc.ListLoginLogs(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
 }

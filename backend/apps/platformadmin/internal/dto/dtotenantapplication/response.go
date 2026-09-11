@@ -20,6 +20,7 @@ type PageListItem struct {
 	AppID       string `json:"appID"`       // 应用ID
 	Status      string `json:"status"`      // 状态
 	CreatedAt   int64  `json:"createdAt"`   // 创建时间(unix 秒)
+	UpdatedAt   int64  `json:"updatedAt"`   // 更新时间(unix 秒)
 }
 
 type TenantApplicationPageListResp struct {

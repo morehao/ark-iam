@@ -123,9 +123,12 @@ func (i *baseAppInitializer) initResources() error {
 	return nil
 }
 
+// Close 释放测试期资源。
+//
+// 刻意不调用 glog.Close()：logger 是进程级全局单例，同一测试二进制内的多组用例共享它，
+// 一旦被某个用例的 teardown 关闭（zap BufferedWriteSyncer 的写入端被置空），
+// 其后任何用例再写日志都会 nil panic（表现为"某用例莫名 panic 在 zap Write"）。
+// 生产侧的优雅关闭在 cmd/main.go 独立执行，与测试无关。
 func (i *baseAppInitializer) Close() error {
-	if err := glog.Close(); err != nil {
-		return fmt.Errorf("close logger: %w", err)
-	}
 	return nil
 }

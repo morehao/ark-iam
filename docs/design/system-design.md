@@ -245,9 +245,9 @@ erDiagram
     }
     tenant {
         uint id PK
-        string code UK "租户编码"
+        string code UK "租户编码(服务端自动生成 t_<12位随机hex>,创建后不可改)"
         string name
-        string type "customer/platform"
+        string type "customer/platform(分类标识)"
         string db_user
         tinyint is_suspended
         string tag
@@ -500,7 +500,7 @@ erDiagram
 
 | 表 | 说明 |
 |---|---|
-| `tenant` | 租户：`type` 分 customer/platform；`code` 全局唯一；`is_suspended` 挂起 |
+| `tenant` | 租户：`type` 分 customer/platform（分类标识，不参与隔离判定）；`code` 全局唯一且由服务端自动生成（`t_<12 位随机 hex>`，平台租户种子固定为 `t_platform`，创建后不可改）；`status` 生命周期状态（active/suspended） |
 | `tenant_application` | 租户-应用开通关系：`status` 开通状态、`config` 租户级配置、`granted_scope` 租户级 scope 授权 |
 | `domain` | 租户域名（验证状态 `is_verified`） |
 | `log` | 租户日志（通用 key-payload） |
@@ -603,7 +603,7 @@ sequenceDiagram
     A-->>U: { userID }
 ```
 
-**要点**：落哪个租户由**邀请码**决定（租户侧授权），**禁止裸 `tenantID` 直入**——这是软隔离多租户模型下的必要门禁（对标 keycloak 落当前 realm / zitadel org scope）。加入者永远是普通成员，owner 由 `PUT /v1/platform/users/{userID}/owner`（平台管理员）显式指派。
+**要点**：落哪个租户由**邀请码**决定（租户侧授权），**禁止裸 `tenantID` 直入**——这是软隔离多租户模型下的必要门禁（对标 keycloak 落当前 realm / zitadel org scope）。加入者永远是普通成员：`is_owner` 只在**自助开通租户**时由注册人获得，平台端不提供 owner 指派接口（`PUT /v1/platform/users/{userID}/owner` 已下线），该字段仅用于展示、不参与鉴权。
 
 ### 5.2 密码登录（OIDC 授权码流程中的认证环节）
 

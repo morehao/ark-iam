@@ -2,6 +2,8 @@ package svctenant
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -11,8 +13,11 @@ import (
 	"github.com/morehao/golib/biz/gcontext"
 )
 
+// newTenantScopeGinCtx 构造带租户上下文的测试 gin.Context；
+// 同时挂上真实 Request（生产链路必有），避免服务内 ctx.Request.Context() 空指针。
 func newTenantScopeGinCtx(tenantID string) *gin.Context {
 	ctx, _ := gin.CreateTestContext(nil)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 	ctx.Set(gcontext.KeyTenantID, tenantID)
 	return ctx
 }

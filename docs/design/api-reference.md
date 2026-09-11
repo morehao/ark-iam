@@ -47,6 +47,14 @@
 
 路径参数一律 `{xxxID}` 全大写（`{userID}`、`{roleID}`、`{appID}`、`{connectorID}`…），与 DTO JSON tag 及 Swagger 注解同步；**path 是 ID 的唯一来源**，不可被 body/query 覆盖。
 
+### 1.4 列表时间字段
+
+所有前后端交互的时间字段统一为**秒级 int64 Unix 时间戳**；列表项出参统一回传 `createdAt`/`updatedAt`：
+
+- 记录可被编辑/状态流转的业务主体（租户、应用、OAuth 客户端、域名、租户应用、菜单、角色、成员、服务账号、部门、API Key）**两者都回传**，前端列表对应展示「创建时间」「更新时间」两列；
+- 纯追加型 / 不可变记录（审计日志、登录日志、OAuth Secret、第三方身份绑定）的 `updatedAt` 恒等于 `createdAt`，仅作字段兼容回传，前端不展示「更新时间」列；
+- 出参可空时间用指针 `*int64`（无值返回 `null`），入参可空时间用 `int64`（无值传 `0`）。
+
 ---
 
 ## 2. 认证与鉴权方式
@@ -159,30 +167,19 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 > 前缀 `platform`：`/v1/platform/...`。全部需 Bearer 令牌（平台管理员）。
 
-### 5.1 用户与身份（平台排查视角）
+### 5.1 用户与身份
 
-> 平台端用户管理为**跨租户排查视角**：只读目录 + 挂起/恢复 + 重置密码；租户内账号创建/编辑/删除、组织归属与角色分配收敛到 `/v1/tenant/*`。
+> **平台端不提供用户接口**：用户按租户归属，列表/详情/挂起恢复/重置密码/第三方身份/登录日志全部在 `/v1/tenant/users/*`（见 §6）。
+> 平台端只保留租户级"监督/干预"能力：租户状态（挂起/恢复）见 §5.3。
 
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| GET | `/v1/platform/users` | 用户分页列表 |
-| GET | `/v1/platform/users/:userID` | 用户详情 |
-| PATCH | `/v1/platform/users/:userID` | 更新状态（挂起/恢复） |
-| POST | `/v1/platform/users/:userID/changePassword` | 重置/修改密码 |
-| GET | `/v1/platform/users/:userID/identities` | 用户外部身份列表 |
-| POST | `/v1/platform/users/:userID/identities` | 关联外部身份 |
-| DELETE | `/v1/platform/users/:userID/identities/:identityID` | 解绑外部身份 |
-| GET | `/v1/platform/users/:userID/login-logs` | 某用户登录日志 |
+### 5.2 角色与权限
 
-### 5.2 角色与权限（平台排查视角）
-
-> 平台端角色为**排查视角**：列表/详情/成员只读；租户内角色 CRUD 与授权（成员/菜单）收敛到 `/v1/tenant/*`。
+> **平台端不提供角色接口**：角色按租户归属，CRUD 与授权（成员/菜单）全部在 `/v1/tenant/roles/*`（见 §6）。
+> 原 `GET /v1/platform/roles/:roleID/users` 缺少租户校验、返回跨租户成员，已随平台角色路由一并删除。
+> 平台端保留平台级权限字典（菜单 / 权限点 / 资源）：
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/v1/platform/roles` | 角色分页 |
-| GET | `/v1/platform/roles/:roleID` | 角色详情 |
-| GET | `/v1/platform/roles/:roleID/users` | 角色成员（只读） |
 | POST | `/v1/platform/menus` | 创建菜单 |
 | GET | `/v1/platform/menus` | 菜单分页 |
 | GET | `/v1/platform/menus/tree` | 菜单树 |
@@ -205,6 +202,10 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | GET | `/v1/platform/tenant-applications` | 租户应用分页 |
 | GET/PUT/DELETE | `/v1/platform/tenant-applications/:tenantAppID` | 详情/更新/删除 |
 
+> 租户编码 `code` 由服务端自动生成（规则 `t_<12 位随机 hex>`，如 `t_3f7a9c1d2e4b`，平台租户固定 `t_platform`），创建/更新入参无需传 `code`，创建后不可修改；列表支持 `GET /v1/platform/tenants?name=<关键词>&status=<active|suspended>`（`name` 按租户名模糊搜索，`status` 按状态精确筛选、留空不筛选、非法值报 `100209`），并返回 `createdAt`/`updatedAt`（秒级时间戳）。
+>
+> 租户状态 `status`（`active` 正常 / `suspended` 已挂起）：非法值/缺省归一为 `active`；`suspended` 会撤销该租户成员的 refresh token 与 SSO 会话，非 active 租户的成员无法登录、令牌不签发；`PUT /v1/platform/tenants/:tenantID` 拒绝挂起操作者自己所在的租户（`100208`）。
+
 ### 5.4 应用与客户端（OIDC 配置）
 
 | 方法 | 路径 | 说明 |
@@ -218,13 +219,12 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | GET/POST | `/v1/platform/application-clients/:applicationClientID/secrets` | 密钥列表/创建 |
 | DELETE | `/v1/platform/application-clients/:applicationClientID/secrets/:secretID` | 删除密钥 |
 
-### 5.5 API Key 监督与域名
+### 5.5 域名
 
-> 平台端对 API Key 仅保留**跨租户只读监督**（明文不可见，仅前缀）；密钥的创建/吊销/删除等生命周期管理已收敛到租户自服务 `/v1/tenant/api-keys`。
+> 平台端不提供 API Key 接口（原跨租户只读监督 `/v1/platform/api-keys/supervision` 已下线）；密钥的创建/吊销/删除等生命周期管理统一在租户自服务 `/v1/tenant/api-keys`。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/v1/platform/api-keys/supervision` | 全租户 API Key 只读监督列表（?tenantID=&name=，含归属主体 ownerType/ownerName、创建人、租户、状态字段） |
 | POST | `/v1/platform/domains` | 创建域名 |
 | GET | `/v1/platform/domains` | 域名分页 |
 | GET/PUT/DELETE | `/v1/platform/domains/:domainID` | 域名详情/更新/删除 |
@@ -251,6 +251,10 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | POST | `/v1/tenant/users/:userID/reset-password` | 重置密码（写入关联 person） |
 | GET | `/v1/tenant/users/:userID/roles` | 用户已分配角色（用户侧授权入口；服务账号走 `/machine-users`） |
 | PUT | `/v1/tenant/users/:userID/roles` | 全量替换用户角色 |
+| GET | `/v1/tenant/users/:userID/identities` | 用户已绑定的第三方身份列表（身份按 person 归属，借道"该 person 在本租户有 user"做可见性校验） |
+| POST | `/v1/tenant/users/:userID/identities` | 绑定第三方身份 {issuer, identityID, detail?}（租户取自登录上下文，不传 tenantID；同 issuer+identityID 全局唯一） |
+| DELETE | `/v1/tenant/users/:userID/identities/:identityID` | 解绑第三方身份 |
+| GET | `/v1/tenant/users/:userID/login-logs` | 用户登录日志（只读，租户 + 用户双重过滤） |
 | GET | `/v1/tenant/machine-users` | 服务账号分页（?name=&isSuspended=，含 primaryOrgID/primaryOrgName；服务账号=租户内机器主体 user_type=machine，不可登录/无自然人/不可任部门负责人，作为角色主体与 API Key 归属） |
 | POST | `/v1/tenant/machine-users` | 创建服务账号 {name,description,organizationIDs(主部门,至多1个,必传),secondaryOrgIDs?(参与部门)}（需系统管理能力 super） |
 | GET | `/v1/tenant/machine-users/:machineUserID` | 服务账号详情（组织归属 organizations + 已授权角色） |

@@ -47,6 +47,7 @@ type PersistentStore struct {
 	applicationClientDao       func(opts ...dao.DaoOption) *dao.ApplicationClientDao
 	applicationClientSecretDao func(opts ...dao.DaoOption) *dao.ApplicationClientSecretDao
 	personDao                  func(opts ...dao.DaoOption) *dao.PersonDao
+	tenantDao                  func(opts ...dao.DaoOption) *dao.TenantDao
 	userDao                    func(opts ...dao.DaoOption) *dao.UserDao
 	refreshTokenDao            func(opts ...dao.DaoOption) *dao.RefreshTokenDao
 	apiKeyDao                  func(opts ...dao.DaoOption) *dao.ApiKeyDao
@@ -65,6 +66,7 @@ func NewPersistentStore(opts ...PersistentStoreOption) *PersistentStore {
 		applicationClientDao:       func(opts ...dao.DaoOption) *dao.ApplicationClientDao { return dao.NewApplicationClientDao() },
 		applicationClientSecretDao: dao.NewApplicationClientSecretDao,
 		personDao:                  dao.NewPersonDao,
+		tenantDao:                  dao.NewTenantDao,
 		userDao:                    dao.NewUserDao,
 		refreshTokenDao:            dao.NewRefreshTokenDao,
 		apiKeyDao:                  func(opts ...dao.DaoOption) *dao.ApiKeyDao { return dao.NewApiKeyDao() },

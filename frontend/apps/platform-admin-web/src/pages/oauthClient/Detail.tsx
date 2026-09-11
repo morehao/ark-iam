@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Alert, Button, Card, DatePicker, Descriptions, Form, Input, Modal, Popconfirm, Space, Spin, Table, message } from 'antd'
+import { Alert, Button, Card, DatePicker, Descriptions, Form, Input, Modal, Space, Spin, Table, message } from 'antd'
 import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { createOAuthSecret, deleteOAuthSecret, getOAuthClientDetail, listOAuthSecrets } from '@ark-iam/api'
 import type { OAuthClientDetail as OAuthClientDetailType, OAuthSecretCreateResp, OAuthSecretItem } from '@ark-iam/types'
-import { fmtTime, IDCell, StatusTag, tokens, TypeTag } from '@ark-iam/ui'
+import { fmtTime, IDCell, RowActions, StatusTag, timeColumn, tokens, TypeTag } from '@ark-iam/ui'
 
 export default function OAuthClientDetail() {
   const { id } = useParams<{ id: string }>()
@@ -73,6 +73,16 @@ export default function OAuthClientDetail() {
     }
   }
 
+  const handleDeleteSecret = async (secretID: string) => {
+    try {
+      await deleteOAuthSecret(clientID, secretID)
+      message.success('删除成功')
+      void fetchSecrets()
+    } catch {
+      /* 拦截器已提示 */
+    }
+  }
+
   const secretColumns: ColumnsType<OAuthSecretItem> = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 150, render: (v: string) => <IDCell value={v} /> },
     { title: '名称', dataIndex: 'name', key: 'name' },
@@ -82,29 +92,24 @@ export default function OAuthClientDetail() {
       key: 'valuePrefix',
       render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v || '-'}</span>,
     },
-    { title: '过期时间', dataIndex: 'expiresAt', key: 'expiresAt', width: 180, render: (v: number | null) => (v ? fmtTime(v) : '永不过期') },
-    { title: '创建时间', key: 'createdAt', width: 170, render: (_, r) => fmtTime(r.createdAt) },
+    timeColumn<OAuthSecretItem>({ title: '过期时间', dataIndex: 'expiresAt', placeholder: '永不过期' }),
+    timeColumn<OAuthSecretItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     {
       title: '操作',
       key: 'action',
       width: 90,
       render: (_, r) => (
-        <Popconfirm
-          title="确认删除该密钥？"
-          onConfirm={async () => {
-            try {
-              await deleteOAuthSecret(clientID, r.id)
-              message.success('删除成功')
-              void fetchSecrets()
-            } catch {
-              /* 拦截器已提示 */
-            }
-          }}
-        >
-          <Button type="link" size="small" danger>
-            删除
-          </Button>
-        </Popconfirm>
+        <RowActions
+          actions={[
+            {
+              key: 'delete',
+              label: '删除',
+              danger: true,
+              confirm: '确认删除该密钥？',
+              onClick: () => void handleDeleteSecret(r.id),
+            },
+          ]}
+        />
       ),
     },
   ]

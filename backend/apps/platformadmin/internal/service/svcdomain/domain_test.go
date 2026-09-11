@@ -136,6 +136,10 @@ func TestDomainSvc_PageList(t *testing.T) {
 	if len(resp.List) != 1 || resp.List[0].Domain != "alpha.com" {
 		t.Fatalf("expected alpha.com, got %+v", resp.List)
 	}
+	// 列表必须同时回传创建时间与更新时间（前端「创建时间」「更新时间」两列直读）
+	if item := resp.List[0]; item.CreatedAt <= 0 || item.UpdatedAt <= 0 {
+		t.Fatalf("createdAt/updatedAt not returned: %+v", item)
+	}
 }
 
 func TestDomainSvc_Delete_Success(t *testing.T) {

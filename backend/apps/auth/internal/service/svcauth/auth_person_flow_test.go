@@ -101,8 +101,8 @@ func TestMyTenantsReturnsCurrentPersonTenantList(t *testing.T) {
 		return &fakeAuthTenantStore{
 			getListByCondFunc: func(ctx context.Context, cond *dao.TenantCond) (model.TenantEntityList, error) {
 				return model.TenantEntityList{
-					{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "11"}}, Name: "租户A", Tag: "a"},
-					{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "12"}}, Name: "租户B", Tag: "b"},
+					{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "11"}}, Name: "租户A", Status: model.TenantStatusActive, Tag: "a"},
+					{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "12"}}, Name: "租户B", Status: model.TenantStatusActive, Tag: "b"},
 				}, nil
 			},
 		}
@@ -123,6 +123,71 @@ func TestMyTenantsReturnsCurrentPersonTenantList(t *testing.T) {
 	if resp.List[0].TenantID != "11" || resp.List[1].TenantID != "12" {
 		t.Fatalf("expected joined tenant IDs [11 12], got %#v", resp.List)
 	}
+}
+
+// TestMyTenantsRejectsWhenAllTenantsSuspended 挂起租户既不进选择列表也不能作为默认租户；
+// 成员关系全部指向挂起租户时明确拒绝（100207），不与"零租户可自助建租户"路径混同。
+func TestMyTenantsRejectsWhenAllTenantsSuspended(t *testing.T) {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = httptestRequest(t)
+	ginCtx.Set(gcontext.KeyPersonID, "88")
+
+	restoreUserStore := swapUserStoreFactory(func() authUserStore {
+		return &fakeAuthUserStore{
+			getListByCondFunc: func(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, error) {
+				return model.UserEntityList{
+					{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "101"}}, TenantID: "11", PersonID: "88", Name: "tenant-user-a"},
+				}, nil
+			},
+		}
+	})
+	defer restoreUserStore()
+	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
+		return &fakeAuthTenantStore{
+			getListByCondFunc: func(ctx context.Context, cond *dao.TenantCond) (model.TenantEntityList, error) {
+				return model.TenantEntityList{
+					{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "11"}}, Name: "租户A", Status: model.TenantStatusSuspended, Tag: "a"},
+				}, nil
+			},
+		}
+	})
+	defer restoreTenantStore()
+
+	svc := &authSvc{}
+	_, err := svc.MyTenants(ginCtx, &dtoauth.MyTenantsReq{})
+	assertCode(t, err, code.TenantSuspendedError)
+}
+
+// TestMyTenantsReportsMissingTenantRowsAsDataError 成员关系存在但租户行查不到属数据不一致，
+// 必须报数据类错误而不是"该租户已被挂起"（否则掩盖真实根因）。
+func TestMyTenantsReportsMissingTenantRowsAsDataError(t *testing.T) {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = httptestRequest(t)
+	ginCtx.Set(gcontext.KeyPersonID, "88")
+
+	restoreUserStore := swapUserStoreFactory(func() authUserStore {
+		return &fakeAuthUserStore{
+			getListByCondFunc: func(ctx context.Context, cond *dao.UserCond) (model.UserEntityList, error) {
+				return model.UserEntityList{
+					{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "101"}}, TenantID: "11", PersonID: "88", Name: "tenant-user-a"},
+				}, nil
+			},
+		}
+	})
+	defer restoreUserStore()
+	// 租户列表查询返回空：成员关系指向的租户行不存在
+	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
+		return &fakeAuthTenantStore{
+			getListByCondFunc: func(ctx context.Context, cond *dao.TenantCond) (model.TenantEntityList, error) {
+				return model.TenantEntityList{}, nil
+			},
+		}
+	})
+	defer restoreTenantStore()
+
+	svc := &authSvc{}
+	_, err := svc.MyTenants(ginCtx, &dtoauth.MyTenantsReq{})
+	assertCode(t, err, code.UserGetDetailError)
 }
 
 func TestJoinTenantRejectsMissingInviteCode(t *testing.T) {

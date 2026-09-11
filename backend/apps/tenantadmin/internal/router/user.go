@@ -17,4 +17,10 @@ func userRouter(groups *ginserver.RouterGroups) {
 	// 用户角色（用户侧授权入口）
 	v1RouterGroup.GET("/users/:userID/roles", userCtr.ListRoles)
 	v1RouterGroup.PUT("/users/:userID/roles", userCtr.UpdateRoles)
+	// 用户第三方身份（用户视角子资源）
+	v1RouterGroup.GET("/users/:userID/identities", userCtr.ListIdentities)
+	v1RouterGroup.POST("/users/:userID/identities", userCtr.CreateIdentity)
+	v1RouterGroup.DELETE("/users/:userID/identities/:identityID", userCtr.DeleteIdentity)
+	// 用户登录日志（用户视角子资源）
+	v1RouterGroup.GET("/users/:userID/login-logs", userCtr.ListLoginLogs)
 }

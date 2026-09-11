@@ -10,6 +10,9 @@ const (
 	TenantGetPageListError            = 100204
 	TenantNotExistError               = 100205
 	TenantCreateAsOwnerForbiddenError = 100206
+	TenantSuspendedError              = 100207
+	TenantSuspendSelfForbiddenError   = 100208
+	TenantPageListStatusInvalidError  = 100209
 )
 
 const (
@@ -48,6 +51,9 @@ var tenantErrorMsgMap = gerror.CodeMsgMap{
 	TenantGetPageListError:              "查看租户管理列表失败",
 	TenantNotExistError:                 "租户管理不存在",
 	TenantCreateAsOwnerForbiddenError:   "当前自然人已拥有租户或应用策略禁止自助创建租户",
+	TenantSuspendedError:                "该租户已被挂起",
+	TenantSuspendSelfForbiddenError:     "不能挂起当前所在租户",
+	TenantPageListStatusInvalidError:    "租户状态筛选值不合法",
 	OrganizationCreateError:             "创建组织失败",
 	OrganizationDeleteError:             "删除组织失败",
 	OrganizationUpdateError:             "修改组织失败",

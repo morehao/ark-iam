@@ -25,19 +25,22 @@ type ApiKeyAuthMiddleware interface {
 type apiKeyAuthMiddleware struct {
 	apiKeyDao *dao.ApiKeyDao
 	userDao   *dao.UserDao
+	tenantDao *dao.TenantDao
 }
 
 func NewApiKeyAuthMiddleware() ApiKeyAuthMiddleware {
 	return &apiKeyAuthMiddleware{
 		apiKeyDao: dao.NewApiKeyDao(),
 		userDao:   dao.NewUserDao(),
+		tenantDao: dao.NewTenantDao(),
 	}
 }
 
-func newApiKeyAuthMiddlewareWithDao(apiKeyDao *dao.ApiKeyDao, userDao *dao.UserDao) ApiKeyAuthMiddleware {
+func newApiKeyAuthMiddlewareWithDao(apiKeyDao *dao.ApiKeyDao, userDao *dao.UserDao, tenantDao *dao.TenantDao) ApiKeyAuthMiddleware {
 	return &apiKeyAuthMiddleware{
 		apiKeyDao: apiKeyDao,
 		userDao:   userDao,
+		tenantDao: tenantDao,
 	}
 }
 
@@ -94,6 +97,25 @@ func (m *apiKeyAuthMiddleware) Authenticate(ctx *gin.Context) bool {
 		return false
 	}
 
+	// 租户门禁：密钥从属于某个租户，租户非 active（已挂起）或行已不存在时，其名下全部机器凭证立即失效。
+	// 挂起只撤销了成员 refresh token 与 SSO 会话，而 API Key 没有可依赖的 TTL，因此必须在每次请求上校验；
+	// 该成本是本请求内的一次主键查询，低于紧随其后的 last_used_at 写入。
+	if entity.TenantID == "" {
+		writeApiKeyUnauthorized(ctx, http.StatusUnauthorized, "API key tenant missing")
+		return false
+	}
+	tenantEntity, err := m.tenantDao.GetByID(ctx, entity.TenantID)
+	if err != nil {
+		glog.Errorf(ctx, "[middleware.ApiKeyAuth] tenant GetByID fail, err:%v, tenantID:%s", err, entity.TenantID)
+		writeApiKeyUnauthorized(ctx, http.StatusInternalServerError, "internal server error")
+		return false
+	}
+	if tenantEntity == nil || !tenantEntity.IsActive() {
+		glog.Warnf(ctx, "[middleware.ApiKeyAuth] reject API key for inactive tenant, tenantID:%s, keyID:%s", entity.TenantID, entity.ID)
+		writeApiKeyUnauthorized(ctx, http.StatusUnauthorized, "tenant is not active")
+		return false
+	}
+
 	// 归属主体解析：密钥代表的是其归属用户（真实用户本人或服务账号），而非创建人。
 	if entity.OwnerUserID == "" {
 		writeApiKeyUnauthorized(ctx, http.StatusUnauthorized, "API key owner missing")
@@ -139,6 +161,7 @@ func AuthenticateApiKey(ctx *gin.Context) bool {
 	return (&apiKeyAuthMiddleware{
 		apiKeyDao: dao.NewApiKeyDao(),
 		userDao:   dao.NewUserDao(),
+		tenantDao: dao.NewTenantDao(),
 	}).Authenticate(ctx)
 }
 

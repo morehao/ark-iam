@@ -360,7 +360,7 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 **三条硬规则（新增路由必须按序判定）**：
 
 - **R1 资源 CRUD → REST**：资源的增删改查/列表/详情/树，用「集合 + 方法 + ID」表达。路径格式 `/{版本}/{服务标识}/{资源}[/{id}[/{子资源}]]`（如 `/v1/platform/users/{userID}/identities`；`服务标识` 即应用标识段：auth → `/v1/auth`、platformadmin → `/v1/platform`、tenantadmin → `/v1/tenant`，各应用路径互不相同；资源名可跨应用复用，由服务标识段区分归属）
-- **R2 业务动作 → 动作子路径**：状态流转/触发副作用类操作用 `POST /资源/{id}/动作`（如 `POST /v1/platform/api-keys/{apiKeyID}/revoke`）；认证/会话类动作挂 `/v1/auth` 动作式专用段（`register`/`joinTenant`/`logout`/`logoutAll`/`userinfo` 原样保留）
+- **R2 业务动作 → 动作子路径**：状态流转/触发副作用类操作用 `POST /资源/{id}/动作`（如 `POST /v1/tenant/api-keys/{apiKeyID}/revoke`）；认证/会话类动作挂 `/v1/auth` 动作式专用段（`register`/`joinTenant`/`logout`/`logoutAll`/`userinfo` 原样保留）
 - **R3 标准协议 → 专用前缀**：`/oidc/*`、back-channel logout、docs 不走业务路由规范，保持不动
 
 **资源命名**：复数 + kebab-case（`users`、`application-clients`、`api-keys`、`tenant-applications`），禁止驼峰（`applicationClient`）。ID 路径参数一律 `{xxxID}` 全大写（`{userID}`、`{roleID}`、`{appID}`），与 DTO JSON tag 及 swagger 注解同步。
@@ -380,7 +380,7 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 | user | 创建 | `POST /v1/platform/users` |
 | user | 分配部门（全量替换） | `PUT /v1/platform/users/{userID}/departments` |
 | role | 分页列表 | `GET /v1/platform/roles?page=&pageSize=` |
-| apiKey | 吊销（动作） | `POST /v1/platform/api-keys/{apiKeyID}/revoke` |
+| apiKey | 吊销（动作） | `POST /v1/tenant/api-keys/{apiKeyID}/revoke` |
 | 认证操作 | 注册 | `POST /v1/auth/register`（auth 应用认证操作直接挂服务段，避免 `/v1/auth/auth/*`） |
 
 #### 路由注册
@@ -455,6 +455,16 @@ func TestGeneratePassword(t *testing.T) {
 }
 ```
 
+### 数据库 Schema 变更约定（按新项目处理）
+
+本项目按**全新项目**维护 schema，**不写数据迁移脚本**：`AutoMigrate` 只新增缺失的表/列/索引，**不删不改**既有结构（`db.auto_migrate`），`pkg/seed` 亦只做幂等 upsert。因此**列/表下线（删字段、改名、类型或语义替换）一律按新项目处理**：
+
+- **下线即彻底删代码**：model 字段、DAO Cond、DTO/object、service、controller/router、前端类型与 `docs/design` 同步删除，并全仓 `grep` 确认零残留（参考 `tenant.is_suspended` → `tenant.status`、`system` 模块下线）。
+- **菜单下线额外两步**：从 `seedMenus` 删除定义后，必须在 `pkg/seed/retired_menu.go` 的 `retiredMenus` 登记（父目录与子菜单一并登记），否则存量库会残留指向已删除页面的死链菜单；判断依据是「base 版 `seedMenus` 与当前定义的差集」——`seedMenus` 只 upsert 不下线，而全新库测试永远测不出这类残留。
+- **禁止在代码里写兼容旧库的分支**：不加回填、不加 `DROP COLUMN`、不引入 `information_schema`/`Migrator()` 判定——这会污染 AutoMigrate「只增不删」的契约，且对新项目零收益。
+- **旧库残留列/表属预期**（不再是事实源、不被读写），处置方式是**开发/测试库删库重建**：重建后 AutoMigrate + Seed 产出的结构即目标结构（见 `docs/design/run-and-deploy.md` §2.3）。
+- **确需保全旧数据时**，把一次性 SQL 写进部署文档交执行方在升级前运行，而不是塞进启动流程。
+
 ### 代码生成
 
 项目使用 `gocli` 工具进行代码生成：
@@ -479,6 +489,62 @@ make docker-build APP=auth
 # 运行 Docker 容器
 make docker-run APP=auth
 ```
+
+## 前端规范
+
+前端工作区为 pnpm monorepo（`frontend/`）：`packages/{types,api,auth,ui}` 为共享包，`apps/{login-web,platform-admin-web,tenant-admin-web}` 为业务应用。统一视觉语言与设计令牌见 `frontend/DESIGN.md`（代码事实源为 `frontend/packages/ui/src/theme.ts` 的 `tokens`），业务页面一律复用 `@ark-iam/ui` 共享组件，禁止硬编码色值与自造样式。
+
+### 列表页操作列规范（操作列收敛 + 名称即详情入口）
+
+所有列表页（Table）的操作列遵守以下两条硬规则。规范细节同步维护在 `frontend/DESIGN.md` §7.3，实现统一收敛到 `@ark-iam/ui` 的 `RowActions` 与 `NameLink`。
+
+**R1 操作列最多横排 3 个操作，超过即纵向展开为「更多」下拉。**
+
+- 操作数 ≤ 3：全部以 `Button type="link" size="small"` 横排；危险操作加 `danger`。
+- 操作数 > 3：保留前 2 个高频操作横排，其余收进「更多」下拉（菜单项纵向排列），避免操作列被撑宽、行内按钮挤成一团。这是后台表格的主流做法，与 Ant Design Table 官方「操作」示例的 `Delete + More actions` 形态一致。
+- 统一用 `RowActions` 渲染，**禁止**在页面内手写 `Space + Button/Popconfirm` 拼装操作列：
+
+```tsx
+import { RowActions } from '@ark-iam/ui'
+
+{
+  title: '操作',
+  key: 'action',
+  width: 180,
+  render: (_, r) => (
+    <RowActions
+      actions={[
+        { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
+        { key: 'roles', label: '授权角色', onClick: () => handleAuth(r) },
+        { key: 'reset', label: '重置密码', onClick: () => handleReset(r) },
+        { key: 'delete', label: '删除', danger: true, confirm: '确认删除？', onClick: () => void handleDelete(r) },
+      ]}
+    />
+  ),
+}
+```
+
+- 二次确认统一通过 `RowAction.confirm` 声明：横排操作用 `Popconfirm` 就地气泡确认，下拉菜单项用 `Modal.confirm`（下拉会先关闭，气泡无法稳定锚定）。页面不得再自行包裹 `Popconfirm`。
+- 运行时隐藏某操作（如已吊销密钥不再展示「吊销」）用 `RowAction.hidden`，不要写条件 JSX 破坏操作数量统计。
+- 操作列表顺序按重要程度从高到低排列，被收起的是次要/危险操作。
+
+**R2 详情通过点击名称进入，名称必须有可点击的 UI 展示。**
+
+- 列表不再提供独立的「详情」操作按钮，详情入口收敛到名称列：名称渲染为主色链接（hover 下划线 + 手型光标），让用户一眼看出可点击。
+- 统一用 `NameLink`：`<NameLink value={r.name} onClick={() => void openDetail(r)} />`；名称过长自动省略号截断并悬浮展示全称，编码/日志键类名称传 `monospace`。
+- 名称成为详情入口后，操作列删除「详情」项；若某表删除「详情」后已无任何操作，则整体移除操作列并同步收窄该表的 `scroll.x`。
+
+### 列表页时间列规范（创建时间 + 更新时间）
+
+所有列表页（Table）的时间列遵守以下硬规则，规范细节同步维护在 `frontend/DESIGN.md` §7.3。
+
+**R3 一律展示「创建时间」，可编辑业务主体同时展示「更新时间」。**
+
+- 所有列表页必须有**创建时间**列；记录本身可被编辑/状态流转的**业务主体**（租户、应用、OAuth 客户端、域名、租户应用、菜单、角色、成员、服务账号、部门、API Key 等）还必须同时有**更新时间**列。
+- 后端列表 DTO 必须同步回传 `createdAt`/`updatedAt`（秒级 int64 时间戳）：DTO 加字段、service 出参用 `x.Unix()` 赋值、并补测试断言两个字段均 `> 0`（参考 `TestTenantPageListReturnsTimeFields`）。**禁止前端用其他字段派生更新时间**。
+- **纯追加型 / 不可变记录不设更新时间列**：审计日志、登录日志、客户端密钥（OAuth Secret）、第三方身份绑定等 `updated_at` 恒等于 `created_at`，展示无意义。这类记录若已有事件时间列（如登录日志的「登录时间」）即视为已承担创建时间语义，不再重复加「创建时间」列。
+- 时间列一律用 `timeColumn<T>({ title, dataIndex })`（列宽由 `TIME_COL_WIDTH` / `TIME_COL_WIDTH_RELATIVE` 给，禁止手写 150/160/170 造成折行）；两列位置统一在状态列之后、操作列之前，增删时间列时同步更新该表的 `scroll.x`。
+- 可空时间（`过期时间`/`最后使用`/`验证时间`）用 `placeholder` 表达空值语义，次要时间用 `relative: true`；`创建时间`/`更新时间` 一律绝对时间。
 
 ## 常用工具
 

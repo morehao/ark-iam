@@ -38,6 +38,10 @@ func newOIDCAuthTestDB(t *testing.T) *gorm.DB {
 	if err := db.AutoMigrate(&model.UserEntity{}); err != nil {
 		t.Fatalf("migrate user: %v", err)
 	}
+	// API Key 鉴权会校验密钥所属租户状态，测试需有 tenant 表。
+	if err := db.AutoMigrate(&model.TenantEntity{}); err != nil {
+		t.Fatalf("migrate tenant: %v", err)
+	}
 	dbclient.RegisterDBForTest(dbclient.ServiceNameIam, db)
 	t.Cleanup(func() {
 		sqlDB, _ := db.DB()
@@ -197,6 +201,19 @@ func TestAPIKeyParallelAuth(t *testing.T) {
 	t.Cleanup(func() { dbclient.ClearDBForTest(dbclient.ServiceNameIam) })
 
 	rawKey, keyHash := apiKeyHashForTest(t)
+
+	// API Key 鉴权要求所属租户存在且为 active。
+	tenant := &model.TenantEntity{
+		Code:   "parallel-auth-tenant",
+		Name:   "Parallel Auth Tenant",
+		Type:   model.TenantTypeCustomer,
+		Status: model.TenantStatusActive,
+	}
+	tenant.ID = "1"
+	if err := dao.NewTenantDao().Insert(context.Background(), tenant); err != nil {
+		t.Fatalf("seed api key tenant: %v", err)
+	}
+
 	owner := &model.UserEntity{
 		TenantID:   "1",
 		UserType:   model.UserTypeMachine,

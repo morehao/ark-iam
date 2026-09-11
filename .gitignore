@@ -48,6 +48,10 @@ backend/.tmp/
 **/.gocache
 __debug_bin*
 
+# 本地开发工具（gitignore 的 bin 目录与工具缓存）
+**/.bin/
+**/.golangci-cache/
+
 # TS 构建缓存
 *.tsbuildinfo
 

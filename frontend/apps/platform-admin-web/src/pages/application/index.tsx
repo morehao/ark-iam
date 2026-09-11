@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Descriptions, Drawer, Form, Input, InputNumber, message, Modal, Popconfirm, Select, Space, Table, Tag } from 'antd'
+import { Button, Descriptions, Drawer, Form, Input, InputNumber, message, Modal, Select, Space, Table, Tag } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { EllipsisCell, fmtTime, IDCell, PageContainer, StatusTag, TypeTag } from '@ark-iam/ui'
+import { fmtTime, IDCell, NameLink, PageContainer, RowActions, StatusTag, timeColumn, TypeTag } from '@ark-iam/ui'
 import { createApplication, deleteApplication, getApplicationDetail, getApplicationPageList, updateApplication } from '@ark-iam/api'
 import type { ApplicationItem } from '@ark-iam/types'
 
@@ -108,7 +108,13 @@ export default function ApplicationList() {
 
   const columns: ColumnsType<ApplicationItem> = [
     { title: 'ID', dataIndex: 'appID', key: 'appID', width: 150, render: (v: string) => <IDCell value={v} /> },
-    { title: '应用名', dataIndex: 'name', key: 'name', width: 180, render: (v: string) => <EllipsisCell value={v} /> },
+    {
+      title: '应用名',
+      dataIndex: 'name',
+      key: 'name',
+      width: 180,
+      render: (v: string, r) => <NameLink value={v} onClick={() => void handleOpenDetail(r)} />,
+    },
     {
       title: '编码',
       dataIndex: 'code',
@@ -119,25 +125,19 @@ export default function ApplicationList() {
     { title: '类型', dataIndex: 'type', key: 'type', width: 110, render: (v: string) => <TypeTag value={v} /> },
     { title: '可见性', dataIndex: 'visibility', key: 'visibility', width: 100, render: renderVisibility },
     { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (v: string) => <StatusTag value={v} /> },
-    { title: '创建时间', key: 'createdAt', width: 170, render: (_, r) => fmtTime(r.createdAt) },
+    timeColumn<ApplicationItem>({ title: '创建时间', dataIndex: 'createdAt' }),
+    timeColumn<ApplicationItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     {
       title: '操作',
       key: 'action',
-      width: 180,
+      width: 120,
       render: (_, r) => (
-        <Space size={4}>
-          <Button type="link" size="small" onClick={() => void handleOpenDetail(r)}>
-            详情
-          </Button>
-          <Button type="link" size="small" onClick={() => handleEdit(r)}>
-            编辑
-          </Button>
-          <Popconfirm title="确认删除该应用？" onConfirm={() => void handleDelete(r)}>
-            <Button type="link" size="small" danger>
-              删除
-            </Button>
-          </Popconfirm>
-        </Space>
+        <RowActions
+          actions={[
+            { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
+            { key: 'delete', label: '删除', danger: true, confirm: '确认删除该应用？', onClick: () => void handleDelete(r) },
+          ]}
+        />
       ),
     },
   ]
@@ -174,7 +174,7 @@ export default function ApplicationList() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1060 }}
+        scroll={{ x: 1330 }}
         pagination={{
           current: page,
           pageSize,

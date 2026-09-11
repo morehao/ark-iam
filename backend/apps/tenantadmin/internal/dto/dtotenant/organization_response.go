@@ -37,6 +37,7 @@ type OrganizationChildItem struct {
 	ParentID       string `json:"parentID"`       // 父节点ID
 	OrgDepth       int    `json:"orgDepth"`       // 节点深度
 	CreatedAt      int64  `json:"createdAt"`      // 创建时间(unix 秒)
+	UpdatedAt      int64  `json:"updatedAt"`      // 更新时间(unix 秒)
 	HasChildren    bool   `json:"hasChildren"`    // 是否还有下级
 	objtenant.OrganizationBaseInfo
 }

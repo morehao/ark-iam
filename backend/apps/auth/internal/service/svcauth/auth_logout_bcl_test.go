@@ -3,8 +3,6 @@ package svcauth
 import (
 	"context"
 	"encoding/json"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -52,7 +50,9 @@ func setupBCLTestEnv(t *testing.T) {
 	})
 
 	oldCli := dbclient.RedisCli
-	require.NoError(t, dbclient.InitRedis(dbredis.RedisConfig{Service: "iam", Addr: "127.0.0.1:6379"}, nil))
+	// 用独立 Redis 逻辑库（DB 5）承载 SSO 会话/SLO 登记/队列：开发环境常有 logout worker 挂在 DB 0 上
+	// 持续 BRPop，会把待断言的任务立刻取走，逼得本测试只能跳过。隔离到 DB 5 后断言变为确定性执行。
+	require.NoError(t, dbclient.InitRedis(dbredis.RedisConfig{Service: "iam", Addr: "127.0.0.1:6379", DB: 5}, nil))
 	t.Cleanup(func() { dbclient.RedisCli = oldCli })
 }
 
@@ -89,49 +89,10 @@ func removeLogoutJob(t *testing.T, job sso.LogoutJob) {
 	_ = dbclient.RedisCli.LRem(context.Background(), bclQueueKey, 1, string(raw)).Err()
 }
 
-// sloQueueContended 检测共享 SLO 队列是否正被运行中的服务（logout worker）持续消费。
-// 若被外部消费，队列内容无法稳定断言（任务会被立即取走），测试应跳过而非误报失败。
-// 仅把连接存活超过 contentionMinAge 的 BRPop 消费者视为外部 worker：
-// 本测试套件自身的短超时 BRPop（几秒内）不算，避免跨包并行时误判。
-func sloQueueContended(t *testing.T) bool {
-	t.Helper()
-	const contentionMinAge = 5 * time.Second
-	clients, err := dbclient.RedisCli.ClientList(context.Background()).Result()
-	if err != nil {
-		return true // 无法探测时保守跳过
-	}
-	for _, line := range strings.Split(clients, "\n") {
-		if !strings.Contains(line, "cmd=brpop") {
-			continue
-		}
-		if age, ok := parseClientAge(line); ok && age > contentionMinAge {
-			return true
-		}
-	}
-	return false
-}
-
-// parseClientAge 从 redis CLIENT LIST 单行中解析 age=<秒> 字段。
-func parseClientAge(line string) (time.Duration, bool) {
-	for _, field := range strings.Fields(line) {
-		if strings.HasPrefix(field, "age=") {
-			secs, err := strconv.ParseInt(strings.TrimPrefix(field, "age="), 10, 64)
-			if err != nil {
-				return 0, false
-			}
-			return time.Duration(secs) * time.Second, true
-		}
-	}
-	return 0, false
-}
-
 // TestLogoutEnqueuesBackChannelLogoutForPerson 验证业务侧登出（Logout）会为该 person
 // 已登记的 client 入队 back-channel logout 任务（一处登出 → 处处登出的 OP 侧补充）。
 func TestLogoutEnqueuesBackChannelLogoutForPerson(t *testing.T) {
 	setupBCLTestEnv(t)
-	if sloQueueContended(t) {
-		t.Skip("shared SLO queue is being consumed by a running logout worker; skip queue assertion")
-	}
 	ctx := context.Background()
 
 	personID := "99"

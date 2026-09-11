@@ -5,7 +5,6 @@ import {
   Form,
   Input,
   Modal,
-  Popconfirm,
   Select,
   Space,
   Table,
@@ -16,7 +15,7 @@ import {
 import { PlusOutlined, ReloadOutlined, SearchOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
-import { fmtTime, PageContainer, SourceTag, tokens } from '@ark-iam/ui'
+import { PageContainer, RowActions, SourceTag, timeColumn, tokens } from '@ark-iam/ui'
 import type { MenuItem, TenantAppItem, TenantRoleItem } from '@ark-iam/types'
 import {
   createTenantRole,
@@ -190,13 +189,8 @@ export default function TenantRolePage() {
     { title: '描述', dataIndex: 'description', key: 'description', render: (v: string) => v || '-' },
     { title: '成员数', dataIndex: 'memberCount', key: 'memberCount', width: 80, render: (v: number) => v || 0 },
     { title: '授权菜单', dataIndex: 'menuCount', key: 'menuCount', width: 80, render: (v: number) => v || 0 },
-    {
-      title: '创建时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 150,
-      render: (v?: number) => fmtTime(v),
-    },
+    timeColumn<TenantRoleItem>({ title: '创建时间', dataIndex: 'createdAt' }),
+    timeColumn<TenantRoleItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     {
       title: '操作',
       key: 'action',
@@ -204,19 +198,25 @@ export default function TenantRolePage() {
       render: (_, r) => {
         const isBuiltin = r.source === 'builtin'
         return (
-          <Space size={4}>
-            <Button type="link" size="small" icon={<SafetyCertificateOutlined />} onClick={() => void openMenuAuth(r)}>
-              菜单权限
-            </Button>
-            <Button type="link" size="small" disabled={isBuiltin} onClick={() => openEdit(r)}>
-              编辑
-            </Button>
-            <Popconfirm title="确认删除该角色？（级联清理成员/菜单关联）" onConfirm={() => void handleDelete(r)}>
-              <Button type="link" size="small" danger disabled={isBuiltin}>
-                删除
-              </Button>
-            </Popconfirm>
-          </Space>
+          <RowActions
+            actions={[
+              {
+                key: 'menu',
+                label: '菜单权限',
+                icon: <SafetyCertificateOutlined />,
+                onClick: () => void openMenuAuth(r),
+              },
+              { key: 'edit', label: '编辑', disabled: isBuiltin, onClick: () => openEdit(r) },
+              {
+                key: 'delete',
+                label: '删除',
+                danger: true,
+                disabled: isBuiltin,
+                confirm: '确认删除该角色？（级联清理成员/菜单关联）',
+                onClick: () => void handleDelete(r),
+              },
+            ]}
+          />
         )
       },
     },
@@ -266,7 +266,7 @@ export default function TenantRolePage() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1050 }}
+        scroll={{ x: 1260 }}
         pagination={{
           current: page,
           pageSize,

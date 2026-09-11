@@ -1,6 +1,7 @@
 package dtotenant
 
 import (
+	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/object/objtenant"
 	"github.com/morehao/golib/biz/gobject"
 )
@@ -20,6 +21,9 @@ type TenantDetailReq struct {
 
 type TenantPageListReq struct {
 	gobject.PageQuery
+	Name string `json:"name" form:"name"` // 租户名称（模糊搜索）
+	// Status 状态筛选（active-正常 / suspended-已挂起）；空值表示不筛选。
+	Status model.TenantStatus `json:"status" form:"status"`
 }
 
 type TenantDeleteReq struct {

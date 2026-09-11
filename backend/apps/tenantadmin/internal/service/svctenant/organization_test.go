@@ -345,15 +345,19 @@ func TestOrganizationChildrenPageAndHasChildren(t *testing.T) {
 		ParentID:             root.OrganizationID,
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "A", Status: "active"},
 	})
-	svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
+	if _, err := svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
 		ParentID:             root.OrganizationID,
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "B", Status: "inactive"},
-	})
+	}); err != nil {
+		t.Fatalf("create B: %v", err)
+	}
 	// A 下挂一个深层子级，验证 hasChildren
-	svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
+	if _, err := svc.Create(ginCtx, &dtotenant.OrganizationCreateReq{
 		ParentID:             a.OrganizationID,
 		OrganizationBaseInfo: objtenant.OrganizationBaseInfo{Name: "A1", Status: "active"},
-	})
+	}); err != nil {
+		t.Fatalf("create A1: %v", err)
+	}
 
 	// 直属子级：应只有 A、B 两项
 	resp, err := svc.Children(ginCtx, &dtotenant.OrganizationChildrenReq{
@@ -377,6 +381,12 @@ func TestOrganizationChildrenPageAndHasChildren(t *testing.T) {
 	}
 	if has["B"] {
 		t.Fatalf("expected B to have no children, got %+v", has)
+	}
+	// 列表必须同时回传创建时间与更新时间（前端「创建时间」「更新时间」两列直读）
+	for _, item := range resp.List {
+		if item.CreatedAt <= 0 || item.UpdatedAt <= 0 {
+			t.Fatalf("children item missing time fields: %+v", item)
+		}
 	}
 
 	// 状态筛选：只返回启用的 A

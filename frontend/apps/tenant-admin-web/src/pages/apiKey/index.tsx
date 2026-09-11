@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
-import { Alert, Button, DatePicker, Form, Input, Modal, Popconfirm, Select, Space, Table, message } from 'antd'
+import { Alert, Button, DatePicker, Form, Input, Modal, Select, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { CopyOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
-import { EllipsisCell, fmtTime, PageContainer, tokens } from '@ark-iam/ui'
+import { EllipsisCell, PageContainer, RowActions, timeColumn, tokens } from '@ark-iam/ui'
 import type { TenantApiKeyCreateResp, TenantApiKeyItem, TenantMachineUserItem } from '@ark-iam/types'
 import { createApiKey, deleteApiKey, getApiKeyPageList, revokeApiKey } from '../../api/apiKey'
 import { getMachineUserPageList } from '../../api/machineUser'
@@ -178,28 +178,35 @@ function ApiKeysPane() {
     },
     { title: '归属服务账号', dataIndex: 'ownerName', key: 'ownerName', width: 170, render: (v: string, r) => `${r.ownerType === 'machine' ? '服务账号 · ' : ''}${v || '-'}` },
     { title: '状态', key: 'status', width: 90, render: (_: unknown, r) => <KeyStateTag {...r} /> },
-    { title: '过期时间', dataIndex: 'expiredAt', key: 'expiredAt', width: 160, render: (v: number | null) => fmtTime(v) },
-    { title: '最近使用', dataIndex: 'lastUsedAt', key: 'lastUsedAt', width: 160, render: (v: number | null) => fmtTime(v) },
+    timeColumn<TenantApiKeyItem>({ title: '过期时间', dataIndex: 'expiredAt', placeholder: '永不过期' }),
+    timeColumn<TenantApiKeyItem>({ title: '最近使用', dataIndex: 'lastUsedAt', relative: true, placeholder: '从未使用' }),
     { title: '创建人', dataIndex: 'creatorName', key: 'creatorName', width: 160, render: (v: string) => v || '-' },
+    timeColumn<TenantApiKeyItem>({ title: '创建时间', dataIndex: 'createdAt' }),
+    timeColumn<TenantApiKeyItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     {
       title: '操作',
       key: 'action',
-      width: 160,
+      width: 140,
       render: (_, r) => (
-        <Space size={4}>
-          {!r.revokedAt && (
-            <Popconfirm title="确认吊销该密钥？吊销后立即失效" onConfirm={() => void handleRevoke(r)}>
-              <Button type="link" size="small" danger>
-                吊销
-              </Button>
-            </Popconfirm>
-          )}
-          <Popconfirm title="确认删除该密钥？" onConfirm={() => void handleDelete(r)}>
-            <Button type="link" size="small" danger>
-              删除
-            </Button>
-          </Popconfirm>
-        </Space>
+        <RowActions
+          actions={[
+            {
+              key: 'revoke',
+              label: '吊销',
+              danger: true,
+              hidden: !!r.revokedAt,
+              confirm: '确认吊销该密钥？吊销后立即失效',
+              onClick: () => void handleRevoke(r),
+            },
+            {
+              key: 'delete',
+              label: '删除',
+              danger: true,
+              confirm: '确认删除该密钥？',
+              onClick: () => void handleDelete(r),
+            },
+          ]}
+        />
       ),
     },
   ]
@@ -248,7 +255,7 @@ function ApiKeysPane() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1180 }}
+        scroll={{ x: 1520 }}
         pagination={{
           current: page,
           pageSize,

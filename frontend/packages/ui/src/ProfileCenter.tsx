@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Modal, Tabs, Descriptions, Form, Input, Button, Table, message, Popconfirm, Space, Avatar, Tag } from 'antd'
+import { Modal, Tabs, Descriptions, Form, Input, Button, Table, message, Space, Avatar, Tag } from 'antd'
 import { getPersonDetail, updatePassword, getSessionList, revokeSession, revokeAllSessions } from '@ark-iam/api'
 import type { PersonDetailResp, SessionResp } from '@ark-iam/types'
 import { brand } from './theme'
 import { IDCell } from './IDCell'
 import { EllipsisCell } from './EllipsisCell'
+import { RowActions } from './RowActions'
+import { timeColumn } from './TimeCell'
 
 interface Props {
   open: boolean
@@ -89,27 +91,30 @@ export function ProfileCenter({ open, onClose }: Props) {
       key: 'userAgent',
       render: (v: string) => <EllipsisCell value={v} />,
     },
-    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 160 },
+    timeColumn<SessionResp>({ title: '创建时间', dataIndex: 'createdAt' }),
     {
       title: '操作',
       key: 'action',
       width: 90,
       render: (_: unknown, record: SessionResp) => (
-        <Popconfirm
-          title="确认撤销该会话？"
-          onConfirm={() =>
-            void revokeSession(record.id)
-              .then(() => {
-                message.success('已撤销')
-                void loadSessions()
-              })
-              .catch(() => message.error('撤销会话失败'))
-          }
-        >
-          <Button size="small" danger>
-            撤销
-          </Button>
-        </Popconfirm>
+        <RowActions
+          actions={[
+            {
+              key: 'revoke',
+              label: '撤销',
+              danger: true,
+              confirm: '确认撤销该会话？',
+              onClick: () => {
+                void revokeSession(record.id)
+                  .then(() => {
+                    message.success('已撤销')
+                    void loadSessions()
+                  })
+                  .catch(() => message.error('撤销会话失败'))
+              },
+            },
+          ]}
+        />
       ),
     },
   ]
@@ -202,7 +207,7 @@ export function ProfileCenter({ open, onClose }: Props) {
                   dataSource={sessions}
                   loading={loading}
                   pagination={{ pageSize: 10, showSizeChanger: false, showTotal: (t) => `共 ${t} 条` }}
-                  scroll={{ x: 800 }}
+                  scroll={{ x: 820 }}
                 />
               </>
             ),

@@ -89,8 +89,8 @@ func TestConnectorCallbackReturnsPersonTokenWhenPersonHasMultipleTenants(t *test
 		return &fakeAuthTenantStore{
 			getListByCondFunc: func(ctx context.Context, cond *dao.TenantCond) (model.TenantEntityList, error) {
 				return model.TenantEntityList{
-					{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "11"}}, Name: "tenant-a", Tag: "a"},
-					{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "12"}}, Name: "tenant-b", Tag: "b"},
+					{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "11"}}, Name: "tenant-a", Status: model.TenantStatusActive, Tag: "a"},
+					{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "12"}}, Name: "tenant-b", Status: model.TenantStatusActive, Tag: "b"},
 				}, nil
 			},
 		}
@@ -184,7 +184,7 @@ func TestConnectorCallbackUsesIdentityResolverPath(t *testing.T) {
 	defer restoreUserStore()
 	restoreTenantStore := swapTenantStoreFactory(func() authTenantStore {
 		return &fakeAuthTenantStore{getListByCondFunc: func(ctx context.Context, cond *dao.TenantCond) (model.TenantEntityList, error) {
-			return model.TenantEntityList{{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "31"}}, Name: "tenant-a", Tag: "a"}}, nil
+			return model.TenantEntityList{{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "31"}}, Name: "tenant-a", Status: model.TenantStatusActive, Tag: "a"}}, nil
 		}}
 	})
 	defer restoreTenantStore()

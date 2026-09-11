@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
@@ -171,7 +170,13 @@ func (svc *oidcAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenant
 
 	tenantCode := strings.TrimSpace(req.TenantCode)
 	if tenantCode == "" {
-		tenantCode = "tenant-" + uuid.NewString()
+		// 与平台建租户共用同一编码规则（pkg/iam/tenant.GenerateCode）：t_<12 位随机 hex>
+		generatedCode, cErr := tenant.GenerateCode()
+		if cErr != nil {
+			glog.Errorf(ctx, "[oidcAuthSvc.CreateTenant] generate tenant code fail, err:%v, req:%s", cErr, gutil.ToJsonString(req))
+			return nil, code.GetError(code.AuthRegisterFailedError)
+		}
+		tenantCode = generatedCode
 	}
 
 	var tenantEntity *model.TenantEntity

@@ -234,6 +234,7 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.
 			GrantTypes:              grantTypes,
 			TokenEndpointAuthMethod: v.TokenEndpointAuthMethod,
 			CreatedAt:               v.CreatedAt.Unix(),
+			UpdatedAt:               v.UpdatedAt.Unix(),
 		})
 	}
 	return &dtoapplicationclient.ApplicationClientPageListResp{

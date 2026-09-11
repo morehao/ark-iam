@@ -145,6 +145,10 @@ func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
 		page.List[0].PrimaryOrgID != rd.ID || page.List[0].PrimaryOrgName != "研发部" {
 		t.Fatalf("page list mismatch: %+v", page)
 	}
+	// 列表必须同时回传创建时间与更新时间（前端「创建时间」「更新时间」两列直读）
+	if item := page.List[0]; item.CreatedAt <= 0 || item.UpdatedAt <= 0 {
+		t.Fatalf("createdAt/updatedAt not returned: %+v", item)
+	}
 
 	// 详情：组织归属 + 角色
 	detail, err := svc.Detail(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserDetailReq{MachineUserID: machineID})

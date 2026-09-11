@@ -138,6 +138,7 @@ func (svc *tenantApplicationSvc) PageList(ctx *gin.Context, req *dtotenantapplic
 			AppID:       v.AppID,
 			Status:      v.Status,
 			CreatedAt:   v.CreatedAt.Unix(),
+			UpdatedAt:   v.UpdatedAt.Unix(),
 		})
 	}
 	return &dtotenantapplication.TenantApplicationPageListResp{List: items, Total: total}, nil

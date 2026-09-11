@@ -33,6 +33,7 @@ type PageListItem struct {
 	AllowPersonCreateTenant *bool  `json:"allowPersonCreateTenant"` // 个人是否可自助创建租户
 	AllowJoinByInvite       *bool  `json:"allowJoinByInvite"`       // 是否允许通过邀请加入租户
 	CreatedAt               int64  `json:"createdAt"`              // 创建时间(unix 秒)
+	UpdatedAt               int64  `json:"updatedAt"`              // 更新时间(unix 秒)
 }
 
 type ApplicationPageListResp struct {

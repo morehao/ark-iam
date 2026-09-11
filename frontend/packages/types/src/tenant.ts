@@ -16,6 +16,7 @@ export interface TenantUserItem {
   primaryOrgName: string
   roleCount: number
   createdAt?: number
+  updatedAt?: number
 }
 
 export interface TenantUserCreateReq {
@@ -56,6 +57,32 @@ export interface TenantUserRoleItem {
   description: string
 }
 
+// ---------- 租户用户第三方身份（用户子资源） ----------
+// 身份按自然人归属，租户维度由后端从登录上下文取得，入参不传 tenantID。
+export interface TenantUserIdentityItem {
+  userIdentityID: string
+  issuer: string
+  identityID: string
+  detail?: unknown
+  createdAt: number
+  updatedAt: number
+}
+
+export interface TenantUserIdentityCreateReq {
+  userID: string
+  issuer: string
+  identityID: string
+  detail?: unknown
+}
+
+// ---------- 租户用户登录日志（用户子资源） ----------
+export interface TenantUserLoginLogItem {
+  userLoginLogID: string
+  loginIP: string
+  userAgent: string
+  loginTime: number
+}
+
 // ---------- 租户订阅应用 ----------
 export interface TenantAppItem {
   appID: string
@@ -76,6 +103,7 @@ export interface TenantRoleItem {
   memberCount: number
   menuCount: number
   createdAt?: number
+  updatedAt?: number
 }
 
 export interface TenantRoleCreateReq {
@@ -101,6 +129,7 @@ export interface TenantMachineUserItem {
   primaryOrgName: string // 主部门名称
   isSuspended: boolean
   createdAt?: number
+  updatedAt?: number
 }
 
 // 服务账号组织归属条目（详情用）：primary=主部门（唯一），secondary=参与部门（可多条）。
@@ -151,6 +180,7 @@ export interface TenantApiKeyItem {
   lastUsedAt: number | null
   revokedAt: number | null
   createdAt: number
+  updatedAt: number
 }
 
 export interface TenantApiKeyCreateReq {

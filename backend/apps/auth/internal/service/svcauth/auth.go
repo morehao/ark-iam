@@ -287,24 +287,10 @@ func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
 // enqueueBackChannelLogouts 将该 person 已登记的全部 client 的 back-channel logout
 // 任务入队（在撤销 SSO 会话前调用，此时会话索引仍可用），使其它已登录应用（含第三方 RP）
 // 即时收到 logout_token。入队失败仅告警，不影响登出主流程；任务由 oidcop 的 logoutWorker 异步消费。
+// 具体登记遍历复用 sso.EnqueueLogoutsByPersonID（租户挂起等场景走同一实现，避免两处逻辑漂移）。
 func (svc *authSvc) enqueueBackChannelLogouts(ctx *gin.Context, personID string) {
-	slo := sso.NewSLOStore()
-	regs, err := slo.ListByPersonID(ctx.Request.Context(), personID)
-	if err != nil {
-		glog.Warnf(ctx, "[svcauth.Logout] list logout registrations fail, personID:%s, err:%v", personID, err)
-		return
-	}
-	for _, reg := range regs {
-		if err := sso.EnqueueLogout(ctx.Request.Context(), sso.LogoutJob{
-			SessionID:            reg.SessionID,
-			PersonID:             personID,
-			OIDCSessionID:        reg.OIDCSessionID,
-			ClientID:             reg.ClientID,
-			UserID:               reg.UserID,
-			BackChannelLogoutURI: reg.BackChannelLogoutURI,
-		}); err != nil {
-			glog.Warnf(ctx, "[svcauth.Logout] enqueue back-channel logout fail, clientID:%s, err:%v", reg.ClientID, err)
-		}
+	if _, err := sso.EnqueueLogoutsByPersonID(ctx.Request.Context(), personID); err != nil {
+		glog.Warnf(ctx, "[svcauth.Logout] enqueue back-channel logouts fail, personID:%s, err:%v", personID, err)
 	}
 }
 
@@ -473,14 +459,47 @@ func (svc *authSvc) listPersonTenants(ctx *gin.Context, personID string) (*model
 		}
 	}
 	options := make([]objauth.TenantOption, 0, len(joinedUsers))
-	for _, joinedUser := range joinedUsers {
+	var defaultUser *model.UserEntity
+	missingTenantCount := 0
+	for i := range joinedUsers {
+		joinedUser := joinedUsers[i]
 		tenantEntity := tenantMap[joinedUser.TenantID]
 		if tenantEntity == nil {
+			// 成员关系存在但租户行查不到：属数据不一致，与"租户被挂起"是两回事，
+			// 分开计数，避免被下面的挂起分支掩盖真实根因。
+			missingTenantCount++
 			continue
+		}
+		// 挂起租户：既不出现在租户选择列表（避免选中后又被令牌环节拒绝），
+		// 也不能作为默认租户进入。
+		if !tenantEntity.IsActive() {
+			continue
+		}
+		if defaultUser == nil {
+			defaultUser = &joinedUsers[i]
 		}
 		options = append(options, objauth.TenantOption{TenantID: tenantEntity.ID, Name: tenantEntity.Name, Tag: tenantEntity.Tag, UserID: joinedUser.ID, IsOwner: joinedUser.IsOwner})
 	}
-	return &joinedUsers[0], options, nil
+	if missingTenantCount > 0 {
+		glog.Errorf(ctx, "[svcauth.listPersonTenants] tenant row missing for user memberships, personID:%s, missing:%d, joined:%d, tenantIDs:%v",
+			personID, missingTenantCount, len(joinedUsers), tenantIDs)
+	}
+	if defaultUser == nil {
+		// 全部成员关系都指向不存在的租户行：数据不一致，如实报系统级错误，
+		// 不能报"已挂起"（会误导排查方向）。
+		if missingTenantCount == len(joinedUsers) {
+			return nil, nil, code.GetError(code.UserGetDetailError)
+		}
+		// 租户确实存在但全部被挂起：明确拒绝，不与"零租户可自助建租户"路径混同。
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
+			Result:     "failure",
+			TargetType: "person",
+			Detail:     fmt.Sprintf("personID:%s, reason:all tenants suspended", personID),
+		})
+		return nil, nil, code.GetError(code.TenantSuspendedError)
+	}
+	return defaultUser, options, nil
 }
 
 // toAnySlice 把 []string 转为 []any（供 gormdao.BaseCond.IDs 使用）。

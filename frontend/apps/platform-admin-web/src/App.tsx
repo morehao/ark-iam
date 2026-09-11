@@ -11,24 +11,17 @@ import {
   GlobalOutlined,
   KeyOutlined,
   MenuOutlined,
-  SafetyCertificateOutlined,
   SettingOutlined,
   ShoppingOutlined,
-  TeamOutlined,
-  UserOutlined,
 } from '@ant-design/icons'
 import type { MenuItem } from '@ark-iam/types'
 import { getMyMenuTree } from '@ark-iam/api'
 import Dashboard from './pages/dashboard'
-import UserList from './pages/user'
-import UserDetail from './pages/user/Detail'
-import RoleList from './pages/role'
 import ApplicationList from './pages/application'
 import TenantList from './pages/tenant'
 import TenantApplicationList from './pages/tenantApplication'
 import OAuthClientList from './pages/oauthClient'
 import OAuthClientDetail from './pages/oauthClient/Detail'
-import ApiKeyList from './pages/apiKey'
 import MenuList from './pages/menu'
 import DomainList from './pages/domain'
 import LogList from './pages/log'
@@ -36,10 +29,7 @@ import LogList from './pages/log'
 // 图标映射：后端 menu.icon 存储的字符串 -> antd 图标组件
 const ICON_MAP: Record<string, React.ReactNode> = {
   dashboard: <DashboardOutlined />,
-  user: <UserOutlined />,
-  team: <TeamOutlined />,
   apartment: <ApartmentOutlined />,
-  role: <SafetyCertificateOutlined />,
   app: <AppstoreOutlined />,
   menu: <MenuOutlined />,
   global: <GlobalOutlined />,
@@ -51,20 +41,17 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 
 // 组件白名单：只有 path 命中才会渲染路由与侧边栏菜单，避免点击进入 404。
 // 关键：path 必须与后端动态菜单的 path 一致（均为绝对路径）。
+// 用户与角色不在其中：两者按租户归属，平台端不提供入口。
 const COMPONENT_MAP: Record<string, React.ComponentType> = {
   '/dashboard': Dashboard,
-  '/user': UserList,
-  '/role': RoleList,
   '/application': ApplicationList,
   '/tenant': TenantList,
   '/tenant-application': TenantApplicationList,
   '/oauth-client': OAuthClientList,
-  '/api-key': ApiKeyList,
   '/menu': MenuList,
   '/domain': DomainList,
   '/log': LogList,
   // 详情页（不进侧边栏菜单，由静态路由单独注册）
-  '/user/:id': UserDetail,
   '/oauth-client/:id': OAuthClientDetail,
 }
 
@@ -176,7 +163,6 @@ function App() {
         )}
         {dynamicRoutes}
         {/* 详情路由（静态注册，不进侧边栏菜单） */}
-        <Route path="/user/:id" element={<UserDetail />} />
         <Route path="/oauth-client/:id" element={<OAuthClientDetail />} />
       </Route>
     </Routes>

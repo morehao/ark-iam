@@ -6,7 +6,6 @@ import {
   Form,
   Input,
   Modal,
-  Popconfirm,
   Select,
   Space,
   Switch,
@@ -18,7 +17,7 @@ import {
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { fmtTime, PageContainer, SuspendedTag, tokens } from '@ark-iam/ui'
+import { fmtTime, NameLink, PageContainer, RowActions, SuspendedTag, timeColumn, tokens } from '@ark-iam/ui'
 import type {
   OrganizationItem,
   TenantApiKeyItem,
@@ -46,6 +45,8 @@ import {
 import { getApiKeyPageList } from '../../api/apiKey'
 import { getOrganizationTree } from '../../api/organization'
 import RoleAssignEditor from '../../components/RoleAssignEditor'
+import UserIdentityTab from '../../components/UserIdentityTab'
+import UserLoginLogTab from '../../components/UserLoginLogTab'
 import { KeyStateTag } from '../apiKey/KeyState'
 
 // 组织关系类型 -> 展示标签
@@ -253,7 +254,7 @@ function UsersPane() {
         <Space>
           <Avatar size={30}>{r.name?.charAt(0)?.toUpperCase() || 'U'}</Avatar>
           <Space direction="vertical" size={0}>
-            <span style={{ fontWeight: 500 }}>{r.name || '-'}</span>
+            <NameLink value={r.name || '-'} onClick={() => void openDetail(r)} />
             <span style={{ fontSize: 12, color: tokens.textPlaceholder }}>@{r.username || '-'}</span>
           </Space>
         </Space>
@@ -270,37 +271,27 @@ function UsersPane() {
       width: 90,
       render: (v: boolean) => <SuspendedTag value={v} />,
     },
-    {
-      title: '创建时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 160,
-      render: (v?: number) => fmtTime(v),
-    },
+    timeColumn<TenantUserItem>({ title: '创建时间', dataIndex: 'createdAt' }),
+    timeColumn<TenantUserItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     {
       title: '操作',
       key: 'action',
-      width: 330,
+      width: 180,
       render: (_, r) => (
-        <Space size={4}>
-          <Button type="link" size="small" onClick={() => void openDetail(r)}>
-            详情
-          </Button>
-          <Button type="link" size="small" onClick={() => setRoleTarget(r)}>
-            授权角色
-          </Button>
-          <Button type="link" size="small" onClick={() => void openEdit(r)}>
-            编辑
-          </Button>
-          <Popconfirm title={r.isSuspended ? '确认恢复该用户？' : '确认挂起该用户？'} onConfirm={() => void toggleSuspended(r, !r.isSuspended)}>
-            <Button type="link" size="small" danger={!r.isSuspended}>
-              {r.isSuspended ? '恢复' : '挂起'}
-            </Button>
-          </Popconfirm>
-          <Button type="link" size="small" onClick={() => openResetPassword(r)}>
-            重置密码
-          </Button>
-        </Space>
+        <RowActions
+          actions={[
+            { key: 'edit', label: '编辑', onClick: () => void openEdit(r) },
+            { key: 'roles', label: '授权角色', onClick: () => setRoleTarget(r) },
+            { key: 'resetPwd', label: '重置密码', onClick: () => openResetPassword(r) },
+            {
+              key: 'toggle',
+              label: r.isSuspended ? '恢复' : '挂起',
+              danger: !r.isSuspended,
+              confirm: r.isSuspended ? '确认恢复该用户？' : '确认挂起该用户？',
+              onClick: () => void toggleSuspended(r, !r.isSuspended),
+            },
+          ]}
+        />
       ),
     },
   ]
@@ -361,7 +352,7 @@ function UsersPane() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1200 }}
+        scroll={{ x: 1400 }}
         pagination={{
           current: page,
           pageSize,
@@ -501,6 +492,16 @@ function UsersPane() {
                 key: 'role',
                 label: '角色',
                 children: <RoleAssignEditor kind="user" subjectID={detail.userID} onSaved={() => void fetchData()} />,
+              },
+              {
+                key: 'identity',
+                label: '第三方身份',
+                children: <UserIdentityTab userID={detail.userID} />,
+              },
+              {
+                key: 'loginLog',
+                label: '登录日志',
+                children: <UserLoginLogTab userID={detail.userID} />,
               },
             ]}
           />
@@ -695,7 +696,7 @@ function ServiceAccountsPane() {
   }
 
   const columns: ColumnsType<TenantMachineUserItem> = [
-    { title: '名称', dataIndex: 'name', key: 'name', width: 180, render: (v: string) => v || '-' },
+    { title: '名称', dataIndex: 'name', key: 'name', width: 180, render: (v: string, r) => <NameLink value={v} onClick={() => void openDetail(r)} /> },
     { title: '主部门', dataIndex: 'primaryOrgName', key: 'primaryOrgName', width: 170, render: (v: string) => v || '-' },
     { title: '描述', dataIndex: 'description', key: 'description', render: (v: string) => v || '-' },
     {
@@ -705,36 +706,32 @@ function ServiceAccountsPane() {
       width: 90,
       render: (v: boolean) => <SuspendedTag value={v} />,
     },
-    {
-      title: '创建时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 160,
-      render: (v?: number) => fmtTime(v),
-    },
+    timeColumn<TenantMachineUserItem>({ title: '创建时间', dataIndex: 'createdAt' }),
+    timeColumn<TenantMachineUserItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     {
       title: '操作',
       key: 'action',
-      width: 230,
+      width: 180,
       render: (_, r) => (
-        <Space size={4}>
-          <Button type="link" size="small" onClick={() => void openDetail(r)}>
-            详情
-          </Button>
-          <Button type="link" size="small" onClick={() => void openEdit(r)}>
-            编辑
-          </Button>
-          <Popconfirm title={r.isSuspended ? '确认恢复该服务账号？' : '确认挂起该服务账号？'} onConfirm={() => void toggleSuspended(r, !r.isSuspended)}>
-            <Button type="link" size="small" danger={!r.isSuspended}>
-              {r.isSuspended ? '启用' : '挂起'}
-            </Button>
-          </Popconfirm>
-          <Popconfirm title="确认删除该服务账号？删除前须先删除其全部 API 密钥。" onConfirm={() => void handleDelete(r)}>
-            <Button type="link" size="small" danger>
-              删除
-            </Button>
-          </Popconfirm>
-        </Space>
+        <RowActions
+          actions={[
+            { key: 'edit', label: '编辑', onClick: () => void openEdit(r) },
+            {
+              key: 'toggle',
+              label: r.isSuspended ? '启用' : '挂起',
+              danger: !r.isSuspended,
+              confirm: r.isSuspended ? '确认恢复该服务账号？' : '确认挂起该服务账号？',
+              onClick: () => void toggleSuspended(r, !r.isSuspended),
+            },
+            {
+              key: 'delete',
+              label: '删除',
+              danger: true,
+              confirm: '确认删除该服务账号？删除前须先删除其全部 API 密钥。',
+              onClick: () => void handleDelete(r),
+            },
+          ]}
+        />
       ),
     },
   ]
@@ -749,8 +746,10 @@ function ServiceAccountsPane() {
       render: (v: string) => <span style={{ fontFamily: 'Consolas, Monaco, monospace', fontSize: 12 }}>{v || '-'}</span>,
     },
     { title: '状态', key: 'status', width: 90, render: (_: unknown, r) => <KeyStateTag {...r} /> },
-    { title: '过期时间', dataIndex: 'expiredAt', key: 'expiredAt', width: 150, render: (v: number | null) => fmtTime(v) },
-    { title: '最近使用', dataIndex: 'lastUsedAt', key: 'lastUsedAt', width: 150, render: (v: number | null) => fmtTime(v) },
+    timeColumn<TenantApiKeyItem>({ title: '过期时间', dataIndex: 'expiredAt', placeholder: '永不过期' }),
+    timeColumn<TenantApiKeyItem>({ title: '最近使用', dataIndex: 'lastUsedAt', relative: true, placeholder: '从未使用' }),
+    timeColumn<TenantApiKeyItem>({ title: '创建时间', dataIndex: 'createdAt' }),
+    timeColumn<TenantApiKeyItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
   ]
 
   return (
@@ -797,7 +796,7 @@ function ServiceAccountsPane() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1000 }}
+        scroll={{ x: 1200 }}
         pagination={{
           current: page,
           pageSize,
@@ -890,7 +889,7 @@ function ServiceAccountsPane() {
                       loading={machineKeysLoading}
                       size="small"
                       pagination={false}
-                      scroll={{ x: 640 }}
+                      scroll={{ x: 1000 }}
                     />
                   </Space>
                 ),

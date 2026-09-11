@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, message } from 'antd'
+import { Button, Form, Input, Modal, Select, Space, Table, message } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { fmtTime, IDCell, PageContainer, VerifiedTag } from '@ark-iam/ui'
+import { IDCell, PageContainer, RowActions, timeColumn, VerifiedTag } from '@ark-iam/ui'
 import { createDomain, deleteDomain, getDomainDetail, getDomainPageList, updateDomain } from '@ark-iam/api'
 import type { DomainItem } from '@ark-iam/types'
 
@@ -75,6 +75,16 @@ export default function DomainList() {
     }
   }
 
+  const handleDelete = async (record: DomainItem) => {
+    try {
+      await deleteDomain(record.id)
+      message.success('删除成功')
+      void fetchData()
+    } catch {
+      /* 拦截器已提示 */
+    }
+  }
+
   const columns: ColumnsType<DomainItem> = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 150, render: (v: string) => <IDCell value={v} /> },
     {
@@ -91,46 +101,20 @@ export default function DomainList() {
       width: 120,
       render: (v: number) => <VerifiedTag value={v} />,
     },
-    {
-      title: '验证时间',
-      dataIndex: 'verifiedAt',
-      key: 'verifiedAt',
-      width: 160,
-      render: (v: number | null) => fmtTime(v),
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 160,
-      render: (v: number) => fmtTime(v),
-    },
+    timeColumn<DomainItem>({ title: '验证时间', dataIndex: 'verifiedAt', placeholder: '未验证' }),
+    timeColumn<DomainItem>({ title: '创建时间', dataIndex: 'createdAt' }),
+    timeColumn<DomainItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     {
       title: '操作',
       key: 'action',
       width: 120,
       render: (_, r) => (
-        <Space size={4}>
-          <Button type="link" size="small" onClick={() => handleEdit(r)}>
-            编辑
-          </Button>
-          <Popconfirm
-            title="确认删除该域名？"
-            onConfirm={async () => {
-              try {
-                await deleteDomain(r.id)
-                message.success('删除成功')
-                void fetchData()
-              } catch {
-                /* 拦截器已提示 */
-              }
-            }}
-          >
-            <Button type="link" size="small" danger>
-              删除
-            </Button>
-          </Popconfirm>
-        </Space>
+        <RowActions
+          actions={[
+            { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
+            { key: 'delete', label: '删除', danger: true, confirm: '确认删除该域名？', onClick: () => void handleDelete(r) },
+          ]}
+        />
       ),
     },
   ]
@@ -164,7 +148,7 @@ export default function DomainList() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 850 }}
+        scroll={{ x: 1170 }}
         pagination={{
           current: page,
           pageSize,

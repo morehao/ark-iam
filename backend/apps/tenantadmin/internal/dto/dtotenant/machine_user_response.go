@@ -11,6 +11,7 @@ type MachineUserPageListItem struct {
 	PrimaryOrgName string `json:"primaryOrgName"` // 主部门名称
 	IsSuspended    bool   `json:"isSuspended"`    // 是否挂起
 	CreatedAt      int64  `json:"createdAt"`      // 创建时间
+	UpdatedAt      int64  `json:"updatedAt"`      // 更新时间
 }
 
 type MachineUserPageListResp struct {

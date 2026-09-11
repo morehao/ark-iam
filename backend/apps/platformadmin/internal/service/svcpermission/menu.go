@@ -226,6 +226,7 @@ func (svc *menuSvc) PageList(ctx *gin.Context, req *dtopermission.MenuPageListRe
 				Status:       v.Status,
 			},
 			OperatorBaseInfo: gobject.OperatorBaseInfo{
+				CreatedAt: v.CreatedAt.Unix(),
 				UpdatedAt: v.UpdatedAt.Unix(),
 			},
 		})
@@ -272,6 +273,7 @@ func (svc *menuSvc) Tree(ctx *gin.Context, req *dtopermission.MenuTreeReq) (*dto
 						Status:       menu.Status,
 					},
 					OperatorBaseInfo: gobject.OperatorBaseInfo{
+						CreatedAt: menu.CreatedAt.Unix(),
 						UpdatedAt: menu.UpdatedAt.Unix(),
 					},
 					Children: buildTree(menu.ID),

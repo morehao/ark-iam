@@ -134,7 +134,7 @@ components:
 - **左右分栏**（固定宽左栏 + 弹性右栏，如组织架构「左部门树 + 右子部门表」）用原生 flex 容器：`display:flex; alignItems:flex-start; gap:16`，左栏 `flexShrink:0` 定宽、右栏 `flex:1` 撑满剩余宽度。**禁止用 antd `<Space>` 包裹左右卡片并依赖内层 `flex:1` 撑满**：`Space` 会把子项再包一层不参与 grow 的 `.ant-space-item`，右卡片不会拉伸、页面右侧出现大片空白。
 - 布局内边距：`Content` 外边距 20（MainLayout），卡片间距 16–20。
 - 搜索区：`Input.Search allowClear prefix={<SearchOutlined/>}`，宽度统一 240–260（可按筛选项 180）。
-- Table：`rowKey`、`loading`、分页 `showSizeChanger + showTotal: (t) => \`共 ${t} 条\``；操作列放最右，用 `Button type="link" size="small"`（危险操作加 `danger`）。
+- Table：`rowKey`、`loading`、分页 `showSizeChanger + showTotal: (t) => \`共 ${t} 条\``；操作列放最右，统一用共享组件 `RowActions` 渲染（≤3 横排，>3 收「更多」纵向下拉，见 §7.3 操作列硬规则）。
 - 弹窗表单：`Modal + Form layout="vertical"`、提交按钮 `confirmLoading`、`destroyOnClose`；详情用 `Drawer + Descriptions bordered size="small"`。
 - 栅格/断点：业务控制台以桌面优先；卡片 `Row/Col` 用 `xs/sm/lg`（仪表盘 `xs=24 sm=12 lg=6`）。整体不做窄屏降级，最小宽度建议 ≥ 1100px。
 
@@ -173,7 +173,7 @@ components:
 | 字段语义 | 组件 | 值 → 文案(Tag 色) |
 |---|---|---|
 | 启用/停用（status） | `StatusTag` | enable / 1 / active → 启用（`success`）；disable / 0 / inactive → 停用（`default`）；suspended → 挂起（`error`） |
-| 挂起（isSuspended） | `SuspendedTag` | 1 / true → 挂起（`error`）；0 / false → 正常（`success`） |
+| 挂起（isSuspended / status） | `SuspendedTag` | 1 / true / `suspended` → 挂起（`error`）；0 / false / `active` → 正常（`success`）；兼容布尔字段与 status 枚举两种后端形态 |
 | 验证（isVerified） | `VerifiedTag` | 1 → 已验证（`success`）；0 → 未验证（`warning`） |
 | 会话（isActive） | 内联语义色 | true → 活跃（`success`）；false → 已失效（`default`） |
 | API Key 有效 | 内联语义色 | 有效（`success`）；已吊销（`error`） |
@@ -189,13 +189,30 @@ PageContainer(title, description, extra=刷新 + 主操作[type=primary])
   ├─ 搜索区（Input.Search 240 / Select 筛选）
   ├─ Table(rowKey, loading, scroll.x, pagination.showTotal)
   │    ├─ ID 列 → IDCell（等宽 + 首 8 尾 4 + Tooltip 复制）
+  │    ├─ 名称列 → NameLink（详情/下级入口，主色可点击链接）
   │    ├─ 长文本列 → EllipsisCell
   │    ├─ 状态列 → 7.2 语义组件
-  │    ├─ 时间列 → fmtTime（秒级时间戳，一律 'YYYY-MM-DD HH:mm:ss'）
-  │    └─ 操作列（最右，link+small；删除套 Popconfirm，危险按钮 danger）
+  │    ├─ 时间列 → timeColumn()（列宽 TIME_COL_WIDTH=180 + TimeCell 强制单行；秒级时间戳一律 'YYYY-MM-DD HH:mm:ss'）
+  │    └─ 操作列（最右，RowActions：≤3 横排；>3 收「更多」纵向下拉）
   └─ 新建/编辑 Modal（layout=vertical + confirmLoading）
      详情 Drawer（Descriptions bordered size=small）
 ```
+
+**操作列与详情入口硬规则（2026-09 收敛）**
+
+- **操作列最多横排 3 个操作**：≤3 用 `RowActions` 全部横排（`Button type="link" size="small"`，危险操作 `danger`）；**>3 时保留前 2 个高频操作横排，其余收进「更多」下拉**（菜单项纵向排列）。该形态与 Ant Design Table 官方「操作」示例的 `Delete + More actions` 一致，避免操作列被撑宽、按钮挤成一团。
+- 操作列一律用共享组件 `RowActions`（`@ark-iam/ui`）声明式配置，**禁止页面内手写 `Space + Button/Popconfirm` 拼装**；`actions` 数组顺序即优先级，被收起的应是次要/危险操作。
+- `RowAction.confirm` 声明二次确认：横排操作走 `Popconfirm`，下拉菜单项走 `Modal.confirm`（下拉会先关闭，气泡无法稳定锚定）；`RowAction.hidden` 表达运行时隐藏（如已吊销密钥不再展示「吊销」）。
+- **详情入口是名称，不是操作按钮**：列表不设「详情」操作，名称一律用共享组件 `NameLink` 渲染为主色可点击链接（hover 下划线 + 手型光标；过长省略号截断并悬浮展示全称，编码/日志键类名称传 `monospace`）。删除「详情」后操作列为空的表，直接移除操作列并同步收窄该表的 `scroll.x`。
+
+**时间列硬规则（2026-09 折行问题后收敛）**
+
+- 时间列一律用 `timeColumn<T>({ title, dataIndex })`（或 `TimeCell`），**禁止页面自写列宽**。历史 bug 根因：各页手写 150/160/170，而完整时间串 `2026-09-03 17:19:46` 在 14px + 全站 `tabular-nums` 下实测 146.06px，加 antd 单元格左右各 16px 内边距共需 **178.06px** → 会在唯一的空格处折成「日期 / 时间」两行。
+- 宽度由常量给：绝对时间 `TIME_COL_WIDTH = 180`；相对时间 `TIME_COL_WIDTH_RELATIVE = 120`。
+- `TimeCell` 的 `whiteSpace: nowrap` 与列宽是一对：nowrap 保证任何布局下都不折行，列宽保证不溢出串列，**两者必须同时生效**（故不要绕过组件直接 `fmtTime` + 自定宽度）。
+- 空值语义交给 `placeholder`：`永不过期`（API Key / OAuth Secret 过期时间）、`未验证`（域名验证时间）、`从未使用`（最后使用 / 最近使用），其余默认 `-`。
+- 次要时间字段（`最后使用` / `最近使用` / `登录时间`）用 `relative: true`：展示「3 天前」，悬浮 Tooltip 给完整时间；审计主字段（`创建时间`）一律绝对时间。
+- **列表时间列必须成对**：所有列表都有「创建时间」列；记录可被编辑/状态流转的业务主体（租户、应用、OAuth 客户端、域名、租户应用、菜单、角色、成员、服务账号、部门、API Key）还必须有「更新时间」列，且后端列表 DTO 同步回传 `updatedAt`。纯追加型 / 不可变记录（审计日志、登录日志、OAuth Secret、第三方身份绑定）不设「更新时间」列——其 `updated_at` 恒等于 `created_at`；这类记录若已有事件时间列（登录日志的「登录时间」）即视为已表达创建语义，不重复加「创建时间」。两列均放状态列之后、操作列之前，时间列增删须同步 `scroll.x`。
 
 ### 7.4 登录页（login-web 凭证页 + ui LoginPage 引导页）
 
@@ -208,7 +225,9 @@ PageContainer(title, description, extra=刷新 + 主操作[type=primary])
 ### Do
 - 改设计值：先改 `packages/ui/src/theme.ts` 的 `tokens`，再同步本文件 front matter（两处一致）。
 - 页面/组件引用颜色一律用 `tokens.*`（`import { tokens } from '@ark-iam/ui'`）或 antd `theme.useToken()`；同包内既有 `brand.*` 为兼容别名，新代码优先 `tokens.*`。
-- 状态用语义 Tag 组件；时间用 `fmtTime`；ID 用 `IDCell`。
+- 状态用语义 Tag 组件；ID 用 `IDCell`；时间列用 `timeColumn()` / `TimeCell`（列宽取 `TIME_COL_WIDTH`），详情/描述区文本可用 `fmtTime`。
+- 时间列不要手写宽度（150/160/170 会折行）；页面上有时间列增删时，同步更新该表的 `scroll.x`。
+- 列表操作列用 `RowActions`（≤3 横排，>3 收「更多」纵向下拉）；名称列用 `NameLink` 作为详情入口，不再设「详情」按钮（见 §7.3）。
 - 主色仅用于主操作/链接/选中/焦点；页面表面保持中性灰阶 + 白卡（冷白工程台）。
 - 卡片 hairline-only 无阴影；阴影只给 Modal/浮层；列表页骨架照 7.3 模板。
 - 左右分栏用原生 flex 容器（见 §4）；antd 结构级微修正统一放 `AppShell` 内联 `<style>`（见 §7.1）。
@@ -219,6 +238,8 @@ PageContainer(title, description, extra=刷新 + 主操作[type=primary])
 - 禁止用传统色名 Tag（`color="green"/"red"/"orange"`）表示启用/停用/挂起等**状态**。
 - 禁止 pill 形按钮；禁止把主色渐变当卡片默认背景；禁止同一字段在两端配色不一致。
 - 禁止在页面表面使用主色淡底 tint（如 `#ece9ff`、`#fafbff`、`#f6f8ff` 一类表头/行 hover/卡片）——一律中性灰阶。
+- 禁止绕过 `TimeCell` 直接给时间列写 `render: (v) => fmtTime(v)` 并自定列宽（会让时间折行或溢出串列）；禁止把 `fmtTime` 的输出再乘 1000（`fmtTime` 已按秒/毫秒自动识别）。
+- 禁止页面自写操作列（`Space + Button/Popconfirm`）；禁止为列表新增独立「详情」按钮——详情一律走名称点击（见 §7.3）。
 - 不要在 auth/login-web 等**不依赖 ui 的层**复制渐变/颜色（依赖方向限制：下层包不能 import @ark-iam/ui）。
 - 不要新增 css 文件承载后台样式；样式以 inline style + tokens 表达（登录页除外）。antd 结构级微修正统一放 `AppShell` 内联 `<style>`（见 §7.1），不新增 css 文件、不散落页面级 `<style>`。
 

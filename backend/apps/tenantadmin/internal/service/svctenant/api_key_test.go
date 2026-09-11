@@ -78,6 +78,10 @@ func TestApiKeyServiceAccountOnly(t *testing.T) {
 		machinePage.List[0].OwnerName != "svc-notify" {
 		t.Fatalf("machine key list mismatch: %+v", machinePage)
 	}
+	// 列表必须同时回传创建时间与更新时间（前端「创建时间」「更新时间」两列直读）
+	if item := machinePage.List[0]; item.CreatedAt <= 0 || item.UpdatedAt <= 0 {
+		t.Fatalf("createdAt/updatedAt not returned: %+v", item)
+	}
 
 	// 租户全部密钥（不带过滤）同样只见服务账号密钥
 	allPage, err := svc.PageList(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.ApiKeyPageListReq{})

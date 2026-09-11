@@ -3,111 +3,8 @@
 // 系统管理等级：member=普通租户成员（无系统管理能力），super=超级管理员。
 export type AdminLevel = 'member' | 'super'
 
-// ---------- 用户 ----------
-export interface UserItem {
-  userID: string
-  tenantID: string
-  username: string
-  primaryEmail: string
-  primaryPhone: string
-  name: string
-  avatar: string
-  isSuspended: number
-  createdAt?: number
-}
-
-export interface UserCreateReq {
-  personID?: string
-  password?: string
-  tenantID?: string
-  username?: string
-  primaryEmail?: string
-  primaryPhone?: string
-  name?: string
-  avatar?: string
-  isSuspended?: number
-}
-
-export interface UserUpdateReq {
-  userID: string
-  tenantID?: string
-  name?: string
-  avatar?: string
-  isSuspended?: number
-}
-
-export interface UserStatusUpdateReq {
-  userID: string
-  isSuspended: number
-}
-
-export interface UserPasswordUpdateReq {
-  userID: string
-  password: string
-}
-
-export interface UserIdentityItem {
-  userIdentityID: string
-  tenantID: string
-  userID: string
-  issuer: string
-  identityID: string
-  detail?: unknown
-  createdAt?: number
-}
-
-export interface UserIdentityCreateReq {
-  tenantID: string
-  userID: string
-  issuer: string
-  identityID: string
-  detail?: unknown
-}
-
-export interface UserLoginLogItem {
-  userLoginLogID: string
-  tenantID: string
-  userID: string
-  loginIP: string
-  userAgent: string
-  loginTime: number
-  createdAt?: number
-}
-
-// ---------- 角色 ----------
-export interface RoleItem {
-  roleID: string
-  tenantID: string
-  name: string
-  code: string
-  description: string
-  source?: 'builtin' | 'custom' | string
-  adminLevel?: AdminLevel
-  createdAt?: number
-}
-
-export interface RoleCreateReq {
-  tenantID?: string
-  name: string
-  code: string
-  description?: string
-}
-
-export interface RoleUpdateReq {
-  roleID: string
-  name?: string
-  code?: string
-  description?: string
-}
-
-export interface RoleUserItem {
-  userID: string
-  username: string
-  name: string
-  email: string
-  roleID: string
-  createdAt: number
-}
+// 用户与角色的平台端类型已下线：两者按租户归属，类型见 tenant.ts
+// （TenantUserItem / TenantUserIdentityItem / TenantUserLoginLogItem / TenantRoleItem 等）。
 
 // ---------- 部门 ----------
 // ---------- 应用 ----------
@@ -125,6 +22,7 @@ export interface ApplicationItem {
   allowPersonCreateTenant?: boolean
   allowJoinByInvite?: boolean
   createdAt?: number
+  updatedAt?: number
 }
 
 export interface ApplicationCreateReq {
@@ -166,6 +64,7 @@ export interface OAuthClientItem {
   grantTypes: string[]
   tokenEndpointAuthMethod: string
   createdAt?: number
+  updatedAt?: number
 }
 
 export interface OAuthClientDetail extends OAuthClientItem {
@@ -236,22 +135,28 @@ export interface OAuthSecretCreateResp {
 }
 
 // ---------- 租户 ----------
+// 租户编码由服务端自动生成（规则 t_<12 位随机 hex>，例 t_3f7a9c1d2e4b），创建/编辑入参均不传 code。
+// 时间字段为秒级时间戳（见 AGENTS.md）。
+// 租户状态（后端 model.TenantStatus）：active-正常 / suspended-已挂起；
+// 非 active 的租户其成员无法登录、令牌不签发，且不能挂起操作者自己所在租户。
+export type TenantStatus = 'active' | 'suspended'
+
 export interface TenantItem {
   tenantID: string
   code: string
   dbUser: string
-  isSuspended: number
   name: string
+  status: TenantStatus
   tag: string
   type: string
   createdAt?: number
+  updatedAt?: number
 }
 
 export interface TenantCreateReq {
   name: string
-  code?: string
   dbUser?: string
-  isSuspended?: number
+  status?: TenantStatus
   tag?: string
   type?: string
 }
@@ -259,9 +164,8 @@ export interface TenantCreateReq {
 export interface TenantUpdateReq {
   tenantID: string
   name?: string
-  code?: string
   dbUser?: string
-  isSuspended?: number
+  status?: TenantStatus
   tag?: string
   type?: string
 }
@@ -275,6 +179,7 @@ export interface TenantApplicationItem {
   config?: string
   grantedScope?: string
   createdAt?: number
+  updatedAt?: number
 }
 
 export interface TenantApplicationCreateReq {
@@ -289,29 +194,6 @@ export interface TenantApplicationUpdateReq {
   status?: string
   config?: string
   grantedScope?: string
-}
-
-// ---------- API Key ----------
-/** 归属主体类型：member=真实用户，machine=服务账号 */
-export type ApiKeyOwnerType = 'member' | 'machine'
-
-// 全租户只读监督条目（平台排查视角，明文密钥永不可见，仅展示前缀）
-export interface ApiKeySupervisionItem {
-  id: string
-  tenantID: string
-  tenantName: string
-  ownerUserID: string // 归属用户ID（真实用户本人或服务账号）
-  ownerType: ApiKeyOwnerType // 归属类型(member真实用户/machine服务账号)
-  ownerName: string // 归属用户名称
-  createdBy: string
-  creatorName: string
-  name: string
-  keyPrefix: string
-  scope: string
-  expiresAt: number // 过期时间(unix 秒)
-  lastUsedAt: number // 最后使用时间(unix 秒)
-  revokedAt: number // 撤销时间(unix 秒)
-  createdAt: number // 创建时间(unix 秒)
 }
 
 // ---------- 菜单 ----------
@@ -337,6 +219,7 @@ export interface MenuItem {
   keepAlive: number
   status: MenuStatus
   createdAt?: number
+  updatedAt?: number
   children?: MenuItem[]
 }
 
@@ -356,6 +239,7 @@ export interface DomainItem {
   isVerified: number
   verifiedAt: number | null
   createdAt: number
+  updatedAt: number
 }
 
 // ---------- 审计日志 ----------

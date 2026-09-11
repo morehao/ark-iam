@@ -24,7 +24,7 @@ func newTenantClaimTestStore(t *testing.T, users []model.UserEntity) (storage *O
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	if err := db.AutoMigrate(&model.UserEntity{}, &model.RefreshTokenEntity{}, &model.ApplicationClientEntity{}); err != nil {
+	if err := db.AutoMigrate(&model.UserEntity{}, &model.RefreshTokenEntity{}, &model.ApplicationClientEntity{}, &model.TenantEntity{}); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
 	for i := range users {
@@ -37,8 +37,33 @@ func newTenantClaimTestStore(t *testing.T, users []model.UserEntity) (storage *O
 			t.Fatalf("insert user: %v", err)
 		}
 	}
+	// 每个用户所属租户建为 active：令牌签发前的租户准入门禁（tenantTokenGate）
+	// 会按 tenant_id 回查租户状态，非 active 一律拒绝签发。
+	seededTenants := map[string]bool{}
+	for i := range users {
+		tenantID := users[i].TenantID
+		if tenantID == "" || seededTenants[tenantID] {
+			continue
+		}
+		seededTenants[tenantID] = true
+		if err := db.Create(&model.TenantEntity{
+			BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: tenantID}},
+			Code:       "t_" + tenantID,
+			Name:       "tenant-" + tenantID,
+			Status:     model.TenantStatusActive,
+			Type:       model.TenantTypeCustomer,
+		}).Error; err != nil {
+			t.Fatalf("insert tenant: %v", err)
+		}
+	}
 
 	persistentStore := NewPersistentStore()
+	persistentStore.tenantDao = func(opts ...dao.DaoOption) *dao.TenantDao {
+		return &dao.TenantDao{Dao: gormdao.NewDao[model.TenantEntity, model.TenantEntityList, string](
+			model.TableNameTenant, "TenantDao",
+			func(c context.Context) *gorm.DB { return db.WithContext(c) },
+		)}
+	}
 	persistentStore.userDao = func(opts ...dao.DaoOption) *dao.UserDao {
 		return &dao.UserDao{Dao: gormdao.NewDao[model.UserEntity, model.UserEntityList, string](
 			model.TableNameUser, "UserDao",

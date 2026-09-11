@@ -144,6 +144,10 @@ func TestRolePageListWithCounts(t *testing.T) {
 	if item.AppID != "app1" {
 		t.Fatalf("expected appID app1, got %s", item.AppID)
 	}
+	// 列表必须同时回传创建时间与更新时间（前端「创建时间」「更新时间」两列直读）
+	if item.CreatedAt <= 0 || item.UpdatedAt <= 0 {
+		t.Fatalf("createdAt/updatedAt not returned: %+v", item)
+	}
 }
 
 // TestRoleMenusUpdateAndGet 角色菜单授权：按角色所属应用菜单授权 + 回显 + 非法菜单拒绝。

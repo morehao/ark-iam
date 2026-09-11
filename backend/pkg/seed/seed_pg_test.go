@@ -4,6 +4,9 @@ package seed_test
 
 import (
 	"context"
+	"net/url"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/morehao/ark-iam/pkg/iam/model"
@@ -13,12 +16,36 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+// defaultPGTestDSN 默认指向专用测试库，绝不复用开发库 iam（本用例会 DROP 其中的业务表）。
+const defaultPGTestDSN = "postgres://postgres:123456@127.0.0.1:5432/iam_seedtest?sslmode=disable"
+
+// pgTestDSN 取测试 DSN（可用 IAM_PG_TEST_DSN 覆盖），并强制目标库名含 test——
+// 本用例执行 DROP TABLE，误指开发库会清掉本地数据。
+func pgTestDSN(t *testing.T) string {
+	t.Helper()
+	dsn := defaultPGTestDSN
+	if v := os.Getenv("IAM_PG_TEST_DSN"); v != "" {
+		dsn = v
+	}
+	u, err := url.Parse(dsn)
+	if err != nil {
+		t.Fatalf("parse dsn: %v", err)
+	}
+	dbName := strings.TrimPrefix(u.Path, "/")
+	if !strings.Contains(dbName, "test") {
+		t.Fatalf("拒绝在非测试库 %q 上执行破坏性种子用例：请把 IAM_PG_TEST_DSN 指向专用测试库（库名含 test）", dbName)
+	}
+	return dsn
+}
+
 // TestSeedIamAgainstPostgres 针对本地 PostgreSQL 验证 AutoMigrate + 种子数据的幂等性。
+//
 // 运行方式: go test -tags pg ./pkg/seed/ -run TestSeedIamAgainstPostgres -v
-// 前置条件: 本地 127.0.0.1:5432 存在 postgres/postgres 且已创建 iam 库。
+// 前置条件: 本地 127.0.0.1:5432 存在 postgres/<pwd> 且已创建测试库（默认 iam_seedtest）：
+//
+//	docker exec postgres18 psql -U postgres -c "CREATE DATABASE iam_seedtest;"
 func TestSeedIamAgainstPostgres(t *testing.T) {
-	dsn := "postgres://postgres:123456@127.0.0.1:5432/iam?sslmode=disable"
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Warn)})
+	db, err := gorm.Open(postgres.Open(pgTestDSN(t)), &gorm.Config{Logger: logger.Default.LogMode(logger.Warn)})
 	if err != nil {
 		t.Fatalf("open postgres: %v", err)
 	}
@@ -62,19 +89,20 @@ func TestSeedIamAgainstPostgres(t *testing.T) {
 		if err := db.Table(tbl).Count(&n).Error; err != nil {
 			t.Fatalf("count %s: %v", tbl, err)
 		}
+		// 用 Errorf 而非 Fatalf：一次跑完给出全部数量偏差，避免逐个试错。
 		if n != want {
-			t.Fatalf("table %s: want %d rows, got %d", tbl, want, n)
+			t.Errorf("table %s: want %d rows, got %d", tbl, want, n)
 		}
 	}
 	assertCount("tenant", 1)
 	assertCount("application", 2)
-	assertCount("role", 1)
-	assertCount("menu", 13)
+	assertCount("role", 2)
+	assertCount("menu", 15)
 	assertCount("person", 1)
 	assertCount("tenant_user", 1)
 	assertCount("application_client", 2)
-	assertCount("user_role", 1)
-	assertCount("role_menu", 13)
+	assertCount("user_role", 2)
+	assertCount("role_menu", 15)
 	assertCount("tenant_application", 2)
 	assertCount("organization", 1)
 	assertCount("organization_user", 1)
