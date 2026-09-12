@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Space, Table, message } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { IDCell, RowActions, timeColumn, tokens } from '@ark-iam/ui'
+import { actionColumn, idColumn, NAME_COL_WIDTH, tableScrollX, textColumn, TEXT_COL_WIDTH, timeColumn, tokens } from '@ark-iam/ui'
 import type { TenantUserIdentityItem } from '@ark-iam/types'
 import { createTenantUserIdentity, deleteTenantUserIdentity, getTenantUserIdentities } from '../api/user'
 
@@ -69,28 +69,22 @@ export default function UserIdentityTab({ userID }: UserIdentityTabProps) {
   }
 
   const columns: ColumnsType<TenantUserIdentityItem> = [
-    { title: 'ID', dataIndex: 'userIdentityID', key: 'userIdentityID', width: 140, render: (v: string) => <IDCell value={v} /> },
-    { title: '身份提供商', dataIndex: 'issuer', key: 'issuer', render: (v: string) => v || '-' },
-    { title: '第三方用户ID', dataIndex: 'identityID', key: 'identityID', render: (v: string) => v || '-' },
+    idColumn<TenantUserIdentityItem>({ dataIndex: 'userIdentityID' }),
+    textColumn<TenantUserIdentityItem>({ title: '身份提供商', dataIndex: 'issuer', width: TEXT_COL_WIDTH, monospace: true }),
+    textColumn<TenantUserIdentityItem>({ title: '第三方用户ID', dataIndex: 'identityID', width: NAME_COL_WIDTH, monospace: true }),
     timeColumn<TenantUserIdentityItem>({ title: '创建时间', dataIndex: 'createdAt' }),
-    {
-      title: '操作',
-      key: 'action',
-      width: 80,
-      render: (_, r) => (
-        <RowActions
-          actions={[
-            {
-              key: 'unbind',
-              label: '解绑',
-              danger: true,
-              confirm: '确认解绑该身份？',
-              onClick: () => void unbind(r.userIdentityID),
-            },
-          ]}
-        />
-      ),
-    },
+    actionColumn<TenantUserIdentityItem>({
+      max: 1,
+      actions: (r) => [
+        {
+          key: 'unbind',
+          label: '解绑',
+          danger: true,
+          confirm: '确认解绑该身份？',
+          onClick: () => void unbind(r.userIdentityID),
+        },
+      ],
+    }),
   ]
 
   return (
@@ -110,7 +104,8 @@ export default function UserIdentityTab({ userID }: UserIdentityTabProps) {
         columns={columns}
         dataSource={data}
         pagination={false}
-        scroll={{ x: 660 }}
+        tableLayout="fixed"
+        scroll={tableScrollX(columns)}
       />
 
       <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>

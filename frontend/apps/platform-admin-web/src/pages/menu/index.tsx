@@ -26,7 +26,7 @@ import {
   ThunderboltOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons'
-import { EllipsisCell, PageContainer, RowActions, StatusTag, timeColumn, tokens } from '@ark-iam/ui'
+import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, PageContainer, STATUS_COL_WIDTH, StatusTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
 import { createMenu, deleteMenu, getApplicationPageList, getMenuTree, updateMenu } from '@ark-iam/api'
 import type { ApplicationItem, MenuItem, MenuStatus, MenuType, MenuVisibility } from '@ark-iam/types'
 
@@ -298,7 +298,8 @@ export default function MenuList() {
       title: '菜单名称',
       dataIndex: 'name',
       key: 'name',
-      width: 300,
+      // 复合单元格（类型图标 + 名称 + code），比普通名称列更宽
+      width: 260,
       render: (_, m) => {
         const meta = TYPE_META[m.type] || { label: m.type || '菜单', icon: <UnorderedListOutlined />, color: tokens.textSecondary, tagColor: 'default' }
         return (
@@ -316,24 +317,18 @@ export default function MenuList() {
       title: '类型',
       dataIndex: 'type',
       key: 'type',
-      width: 90,
+      width: TAG_COL_WIDTH,
       render: (v: string) => {
         const meta = TYPE_META[v]
         return meta ? <Tag color={meta.tagColor}>{meta.label}</Tag> : <Tag>{v || '-'}</Tag>
       },
     },
-    {
-      title: '路由路径',
-      dataIndex: 'path',
-      key: 'path',
-      width: 180,
-      render: (v: string) => <EllipsisCell value={v} monospace />,
-    },
+    textColumn<MenuItem>({ title: '路由路径', dataIndex: 'path', width: CODE_COL_WIDTH, monospace: true }),
     {
       title: '排序',
       dataIndex: 'sort',
       key: 'sort',
-      width: 70,
+      width: COUNT_COL_WIDTH,
       align: 'center',
       render: (v: number) => v ?? 0,
     },
@@ -341,39 +336,32 @@ export default function MenuList() {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 90,
+      width: STATUS_COL_WIDTH,
       render: (v: string) => <StatusTag value={v} />,
     },
     {
       title: '可见性',
       dataIndex: 'visibility',
       key: 'visibility',
-      width: 110,
+      width: TAG_COL_WIDTH,
       render: (v: string) => renderMenuVisibility(v),
     },
     timeColumn<MenuItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<MenuItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
-    {
-      title: '操作',
-      key: 'action',
-      width: 200,
-      fixed: 'right',
-      render: (_, m) => (
-        <RowActions
-          actions={[
-            { key: 'createChild', label: '新增子级', onClick: () => handleCreateChild(m) },
-            { key: 'edit', label: '编辑', onClick: () => handleEdit(m) },
-            {
-              key: 'delete',
-              label: '删除',
-              danger: true,
-              confirm: `确认删除「${m.name}」？其子菜单将一并删除`,
-              onClick: () => void handleDelete(m),
-            },
-          ]}
-        />
-      ),
-    },
+    actionColumn<MenuItem>({
+      max: 3,
+      actions: (m) => [
+        { key: 'createChild', label: '新增子级', onClick: () => handleCreateChild(m) },
+        { key: 'edit', label: '编辑', onClick: () => handleEdit(m) },
+        {
+          key: 'delete',
+          label: '删除',
+          danger: true,
+          confirm: `确认删除「${m.name}」？其子菜单将一并删除`,
+          onClick: () => void handleDelete(m),
+        },
+      ],
+    }),
   ]
 
   const modalTitle =
@@ -503,7 +491,8 @@ export default function MenuList() {
             dataSource={displayList}
             loading={treeLoading}
             pagination={false}
-            scroll={{ x: 1510 }}
+            tableLayout="fixed"
+            scroll={tableScrollX(columns)}
             expandable={{
               expandedRowKeys: keyword ? collectKeys(displayList) : expandedKeys,
               onExpandedRowsChange: (keys) => setExpandedKeys(keys as string[]),

@@ -187,23 +187,33 @@ components:
 ```
 PageContainer(title, description, extra=刷新 + 主操作[type=primary])
   ├─ 搜索区（Input.Search 240 / Select 筛选）
-  ├─ Table(rowKey, loading, scroll.x, pagination.showTotal)
-  │    ├─ ID 列 → IDCell（等宽 + 首 8 尾 4 + Tooltip 复制）
-  │    ├─ 名称列 → NameLink（详情/下级入口，主色可点击链接）
-  │    ├─ 长文本列 → EllipsisCell
-  │    ├─ 状态列 → 7.2 语义组件
+  ├─ Table(rowKey, loading, tableLayout="fixed", scroll={tableScrollX(columns)}, pagination.showTotal)
+  │    ├─ ID 列 → idColumn()（IDCell：等宽 + 首 8 尾 4 + Tooltip 复制）
+  │    ├─ 名称列 → nameColumn()（NameLink：详情/下级入口，主色可点击链接）
+  │    ├─ 文本列 → textColumn()（EllipsisCell：超长省略号截断 + 悬浮全文，列宽固定不随内容膨胀）
+  │    ├─ 编码/key/域名列 → textColumn({ monospace: true })
+  │    ├─ 状态列 → 7.2 语义组件（列宽 STATUS_COL_WIDTH）
   │    ├─ 时间列 → timeColumn()（列宽 TIME_COL_WIDTH=180 + TimeCell 强制单行；秒级时间戳一律 'YYYY-MM-DD HH:mm:ss'）
-  │    └─ 操作列（最右，RowActions：≤3 横排；>3 收「更多」纵向下拉）
+  │    └─ 操作列 → actionColumn()（最右，fixed:'right'，RowActions：≤max 横排；>max 收「更多」纵向下拉）
   └─ 新建/编辑 Modal（layout=vertical + confirmLoading）
      详情 Drawer（Descriptions bordered size=small）
 ```
 
+**列宽与横向滚动硬规则（2026-09 横滚 + 操作列不可见问题后收敛）**
+
+- **所有列都必须有显式列宽，优先取共享常量 / 工厂**：`ID_COL_WIDTH`(130) / `NAME_COL_WIDTH`(180) / `CODE_COL_WIDTH`(150) / `TAG_COL_WIDTH`(110) / `STATUS_COL_WIDTH`(100) / `COUNT_COL_WIDTH`(90) / `TEXT_COL_WIDTH`(200) / `LONG_TEXT_COL_WIDTH`(320)，时间列用 `timeColumn`。常量不合适时可在工厂调用处传显式 `width`（`scroll.x` 已由 `tableScrollX` 求和，不再有漂移风险），但**同类列在各页必须同宽**——禁止同一字段一处 150、一处 180，也禁止写与内容无关的整百"凑数宽度"。历史 bug 根因：租户列表 ID 150 + 租户名 180 + 编码 180 + 类型 120 + 标签 140 + 状态 100 + 双时间列 360 + 操作 240 = 1470px，远超内容区，一进页面就有横滚条。
+- **列宽必须严格生效**：Table 一律 `tableLayout="fixed"`。auto 布局下列宽只是建议值，长文本会把列撑开，`EllipsisCell` / `TimeCell` 的省略号与不换行都会失效（表现为列宽失控 + 横滚加剧）。
+- **`scroll.x` 由列宽求和得出**：写 `scroll={tableScrollX(columns)}`，**禁止手写 `scroll={{ x: 1490 }}`**。手写值会随列增删漂移（历史上 API Key 页实际合计 1580 却仍写 1520），且写大了会让本可放下的表格强制出现横滚条。总宽小于容器时表格按 `min-width: 100%` 铺满，既不留白也无滚动条。
+- **操作列必须 `fixed: 'right'`**：一律用 `actionColumn()` 声明，横滚时钉在右侧可见。这是「操作列要横滑很久才看得到」的结构性修复——含两列 180px 时间列的宽表在窄窗口必然横滚，靠压列宽压不掉。
+- **操作列宽度由 `actionColumnWidth(max)` 统一计算**：横排按钮文案保持简短（≤4 个汉字）；文案更长时降低 `max` 让其落入「更多」下拉，或显式传 `width`。页面禁止再手写 120/200/240。
+- **文本列一律走 `textColumn()`**（内部 `EllipsisCell`）：既不让长文本撑列，也不让它换行把行高撑成两行；等宽语义（编码 / key / 域名 / IP）传 `monospace: true`。
+
 **操作列与详情入口硬规则（2026-09 收敛）**
 
-- **操作列最多横排 3 个操作**：≤3 用 `RowActions` 全部横排（`Button type="link" size="small"`，危险操作 `danger`）；**>3 时保留前 2 个高频操作横排，其余收进「更多」下拉**（菜单项纵向排列）。该形态与 Ant Design Table 官方「操作」示例的 `Delete + More actions` 一致，避免操作列被撑宽、按钮挤成一团。
-- 操作列一律用共享组件 `RowActions`（`@ark-iam/ui`）声明式配置，**禁止页面内手写 `Space + Button/Popconfirm` 拼装**；`actions` 数组顺序即优先级，被收起的应是次要/危险操作。
-- `RowAction.confirm` 声明二次确认：横排操作走 `Popconfirm`，下拉菜单项走 `Modal.confirm`（下拉会先关闭，气泡无法稳定锚定）；`RowAction.hidden` 表达运行时隐藏（如已吊销密钥不再展示「吊销」）。
-- **详情入口是名称，不是操作按钮**：列表不设「详情」操作，名称一律用共享组件 `NameLink` 渲染为主色可点击链接（hover 下划线 + 手型光标；过长省略号截断并悬浮展示全称，编码/日志键类名称传 `monospace`）。删除「详情」后操作列为空的表，直接移除操作列并同步收窄该表的 `scroll.x`。
+- **操作列最多横排 3 个操作**：≤max（默认 3）时全部横排（`Button type="link" size="small"`，危险操作 `danger`）；超过时保留前 `max-1` 个高频操作横排，其余收进「更多」下拉（菜单项纵向排列）。该形态与 Ant Design Table 官方「操作」示例的 `Delete + More actions` 一致，避免操作列被撑宽、按钮挤成一团。
+- 操作列一律用共享的 `actionColumn()`（内部 `RowActions`，`@ark-iam/ui`）声明式配置，**禁止页面内手写 `Space + Button/Popconfirm` 拼装，也禁止给操作列另写 `title/key/width/fixed`**；`actions` 数组顺序即优先级，被收起的应是次要/危险操作。运行时隐藏用 `RowAction.hidden`（如已吊销密钥不再展示「吊销」）。
+- `RowAction.confirm` 声明二次确认：横排操作走 `Popconfirm`，下拉菜单项走 `Modal.confirm`（下拉会先关闭，气泡无法稳定锚定）。
+- **详情入口是名称，不是操作按钮**：列表不设「详情」操作，名称一律用 `nameColumn()`（内部 `NameLink`）渲染为主色可点击链接（hover 下划线 + 手型光标；过长省略号截断并悬浮展示全称，编码/日志键类名称传 `monospace`）。删除「详情」后操作列为空的表，直接移除操作列（`scroll.x` 由 `tableScrollX` 自动跟随收窄，无需手改）。
 
 **时间列硬规则（2026-09 折行问题后收敛）**
 
@@ -212,7 +222,7 @@ PageContainer(title, description, extra=刷新 + 主操作[type=primary])
 - `TimeCell` 的 `whiteSpace: nowrap` 与列宽是一对：nowrap 保证任何布局下都不折行，列宽保证不溢出串列，**两者必须同时生效**（故不要绕过组件直接 `fmtTime` + 自定宽度）。
 - 空值语义交给 `placeholder`：`永不过期`（API Key / OAuth Secret 过期时间）、`未验证`（域名验证时间）、`从未使用`（最后使用 / 最近使用），其余默认 `-`。
 - 次要时间字段（`最后使用` / `最近使用` / `登录时间`）用 `relative: true`：展示「3 天前」，悬浮 Tooltip 给完整时间；审计主字段（`创建时间`）一律绝对时间。
-- **列表时间列必须成对**：所有列表都有「创建时间」列；记录可被编辑/状态流转的业务主体（租户、应用、OAuth 客户端、域名、租户应用、菜单、角色、成员、服务账号、部门、API Key）还必须有「更新时间」列，且后端列表 DTO 同步回传 `updatedAt`。纯追加型 / 不可变记录（审计日志、登录日志、OAuth Secret、第三方身份绑定）不设「更新时间」列——其 `updated_at` 恒等于 `created_at`；这类记录若已有事件时间列（登录日志的「登录时间」）即视为已表达创建语义，不重复加「创建时间」。两列均放状态列之后、操作列之前，时间列增删须同步 `scroll.x`。
+- **列表时间列必须成对**：所有列表都有「创建时间」列；记录可被编辑/状态流转的业务主体（租户、应用、OAuth 客户端、域名、租户应用、菜单、角色、成员、服务账号、部门、API Key）还必须有「更新时间」列，且后端列表 DTO 同步回传 `updatedAt`。纯追加型 / 不可变记录（审计日志、登录日志、OAuth Secret、第三方身份绑定）不设「更新时间」列——其 `updated_at` 恒等于 `created_at`；这类记录若已有事件时间列（登录日志的「登录时间」）即视为已表达创建语义，不重复加「创建时间」。两列均放状态列之后、操作列之前（`scroll.x` 由 `tableScrollX(columns)` 自动跟随，无需手改）。
 
 ### 7.4 登录页（login-web 凭证页 + ui LoginPage 引导页）
 
@@ -226,8 +236,8 @@ PageContainer(title, description, extra=刷新 + 主操作[type=primary])
 - 改设计值：先改 `packages/ui/src/theme.ts` 的 `tokens`，再同步本文件 front matter（两处一致）。
 - 页面/组件引用颜色一律用 `tokens.*`（`import { tokens } from '@ark-iam/ui'`）或 antd `theme.useToken()`；同包内既有 `brand.*` 为兼容别名，新代码优先 `tokens.*`。
 - 状态用语义 Tag 组件；ID 用 `IDCell`；时间列用 `timeColumn()` / `TimeCell`（列宽取 `TIME_COL_WIDTH`），详情/描述区文本可用 `fmtTime`。
-- 时间列不要手写宽度（150/160/170 会折行）；页面上有时间列增删时，同步更新该表的 `scroll.x`。
-- 列表操作列用 `RowActions`（≤3 横排，>3 收「更多」纵向下拉）；名称列用 `NameLink` 作为详情入口，不再设「详情」按钮（见 §7.3）。
+- 列宽只取共享常量 / 工厂（`idColumn` / `nameColumn` / `textColumn` / `timeColumn` / `actionColumn` 与 `*_COL_WIDTH`）；Table 一律 `tableLayout="fixed"` + `scroll={tableScrollX(columns)}`。
+- 操作列用 `actionColumn()`（自动 `fixed: 'right'`，横滚也可见）；名称列用 `nameColumn()` 作为详情入口，不再设「详情」按钮（见 §7.3）。
 - 主色仅用于主操作/链接/选中/焦点；页面表面保持中性灰阶 + 白卡（冷白工程台）。
 - 卡片 hairline-only 无阴影；阴影只给 Modal/浮层；列表页骨架照 7.3 模板。
 - 左右分栏用原生 flex 容器（见 §4）；antd 结构级微修正统一放 `AppShell` 内联 `<style>`（见 §7.1）。
@@ -240,12 +250,13 @@ PageContainer(title, description, extra=刷新 + 主操作[type=primary])
 - 禁止在页面表面使用主色淡底 tint（如 `#ece9ff`、`#fafbff`、`#f6f8ff` 一类表头/行 hover/卡片）——一律中性灰阶。
 - 禁止绕过 `TimeCell` 直接给时间列写 `render: (v) => fmtTime(v)` 并自定列宽（会让时间折行或溢出串列）；禁止把 `fmtTime` 的输出再乘 1000（`fmtTime` 已按秒/毫秒自动识别）。
 - 禁止页面自写操作列（`Space + Button/Popconfirm`）；禁止为列表新增独立「详情」按钮——详情一律走名称点击（见 §7.3）。
+- 禁止在列表页手写列宽数字（`width: 150/180/240`）与 `scroll={{ x: 1490 }}`；禁止给操作列写裸 `RowActions`（必须走 `actionColumn()`，以保证 `fixed: 'right'` 与统一列宽）；禁止省略 `tableLayout="fixed"`（列宽会失效、长文本会撑列）。
 - 不要在 auth/login-web 等**不依赖 ui 的层**复制渐变/颜色（依赖方向限制：下层包不能 import @ark-iam/ui）。
 - 不要新增 css 文件承载后台样式；样式以 inline style + tokens 表达（登录页除外）。antd 结构级微修正统一放 `AppShell` 内联 `<style>`（见 §7.1），不新增 css 文件、不散落页面级 `<style>`。
 
 ## 9. 响应式
 
-- 管理台桌面优先：页面级断点行为不单独处理，宽度不足时 Table 用 `scroll={{x}}` 横向滚动。
+- 管理台桌面优先：页面级断点行为不单独处理，宽度不足时由 `tableScrollX(columns)` + `tableLayout="fixed"` 产生横向滚动；操作列 `fixed: 'right'` 始终可见，不需要用户横滑找操作。
 - 登录页 `< 900px` 折叠品牌区；仪表盘卡片 `xs 24 / sm 12 / lg 6` 自动换行。
 
 ## 10. 令牌清单速查（与 theme.ts tokens 对齐）

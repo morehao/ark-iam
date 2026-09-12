@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { Alert, Button, DatePicker, Form, Input, Modal, Select, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { CopyOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
-import { EllipsisCell, PageContainer, RowActions, timeColumn, tokens } from '@ark-iam/ui'
+import { actionColumn, CODE_COL_WIDTH, EllipsisCell, NAME_COL_WIDTH, PageContainer, STATUS_COL_WIDTH, tableScrollX, textColumn, timeColumn, tokens } from '@ark-iam/ui'
 import type { TenantApiKeyCreateResp, TenantApiKeyItem, TenantMachineUserItem } from '@ark-iam/types'
 import { createApiKey, deleteApiKey, getApiKeyPageList, revokeApiKey } from '../../api/apiKey'
 import { getMachineUserPageList } from '../../api/machineUser'
@@ -168,47 +168,41 @@ function ApiKeysPane() {
   }
 
   const columns: ColumnsType<TenantApiKeyItem> = [
-    { title: '名称', dataIndex: 'name', key: 'name', render: (v: string) => <EllipsisCell value={v} /> },
+    textColumn<TenantApiKeyItem>({ title: '名称', dataIndex: 'name', width: NAME_COL_WIDTH }),
+    textColumn<TenantApiKeyItem>({ title: '密钥前缀', dataIndex: 'keyPrefix', width: CODE_COL_WIDTH, monospace: true }),
     {
-      title: '密钥前缀',
-      dataIndex: 'keyPrefix',
-      key: 'keyPrefix',
-      width: 180,
-      render: (v: string) => <span style={{ ...monospaceStyle, fontSize: 12 }}>{v || '-'}</span>,
+      title: '归属服务账号',
+      dataIndex: 'ownerName',
+      key: 'ownerName',
+      width: NAME_COL_WIDTH,
+      render: (v: string, r) => <EllipsisCell value={`${r.ownerType === 'machine' ? '服务账号 · ' : ''}${v || '-'}`} />,
     },
-    { title: '归属服务账号', dataIndex: 'ownerName', key: 'ownerName', width: 170, render: (v: string, r) => `${r.ownerType === 'machine' ? '服务账号 · ' : ''}${v || '-'}` },
-    { title: '状态', key: 'status', width: 90, render: (_: unknown, r) => <KeyStateTag {...r} /> },
+    { title: '状态', key: 'status', width: STATUS_COL_WIDTH, render: (_: unknown, r) => <KeyStateTag {...r} /> },
     timeColumn<TenantApiKeyItem>({ title: '过期时间', dataIndex: 'expiredAt', placeholder: '永不过期' }),
     timeColumn<TenantApiKeyItem>({ title: '最近使用', dataIndex: 'lastUsedAt', relative: true, placeholder: '从未使用' }),
-    { title: '创建人', dataIndex: 'creatorName', key: 'creatorName', width: 160, render: (v: string) => v || '-' },
+    textColumn<TenantApiKeyItem>({ title: '创建人', dataIndex: 'creatorName', width: NAME_COL_WIDTH }),
     timeColumn<TenantApiKeyItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<TenantApiKeyItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
-    {
-      title: '操作',
-      key: 'action',
-      width: 140,
-      render: (_, r) => (
-        <RowActions
-          actions={[
-            {
-              key: 'revoke',
-              label: '吊销',
-              danger: true,
-              hidden: !!r.revokedAt,
-              confirm: '确认吊销该密钥？吊销后立即失效',
-              onClick: () => void handleRevoke(r),
-            },
-            {
-              key: 'delete',
-              label: '删除',
-              danger: true,
-              confirm: '确认删除该密钥？',
-              onClick: () => void handleDelete(r),
-            },
-          ]}
-        />
-      ),
-    },
+    actionColumn<TenantApiKeyItem>({
+      max: 2,
+      actions: (r) => [
+        {
+          key: 'revoke',
+          label: '吊销',
+          danger: true,
+          hidden: !!r.revokedAt,
+          confirm: '确认吊销该密钥？吊销后立即失效',
+          onClick: () => void handleRevoke(r),
+        },
+        {
+          key: 'delete',
+          label: '删除',
+          danger: true,
+          confirm: '确认删除该密钥？',
+          onClick: () => void handleDelete(r),
+        },
+      ],
+    }),
   ]
 
   return (
@@ -255,7 +249,8 @@ function ApiKeysPane() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1520 }}
+        scroll={tableScrollX(columns)}
+        tableLayout="fixed"
         pagination={{
           current: page,
           pageSize,

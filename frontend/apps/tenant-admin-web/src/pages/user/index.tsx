@@ -17,7 +17,7 @@ import {
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { fmtTime, InitialPasswordModal, NameLink, PageContainer, RowActions, SuspendedTag, timeColumn, tokens } from '@ark-iam/ui'
+import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, fmtTime, InitialPasswordModal, NAME_COL_WIDTH, NameLink, nameColumn, PageContainer, STATUS_COL_WIDTH, SuspendedTag, tableScrollX, textColumn, TEXT_COL_WIDTH, timeColumn, tokens } from '@ark-iam/ui'
 import type {
   OrganizationItem,
   TenantApiKeyItem,
@@ -250,7 +250,8 @@ function UsersPane() {
     {
       title: '用户',
       key: 'user',
-      width: 210,
+      // 复合单元格（头像 + 名称 + @用户名 双行），比普通名称列更宽
+      width: 200,
       render: (_, r) => (
         <Space>
           <Avatar size={30}>{r.name?.charAt(0)?.toUpperCase() || 'U'}</Avatar>
@@ -261,40 +262,34 @@ function UsersPane() {
         </Space>
       ),
     },
-    { title: '邮箱', dataIndex: 'primaryEmail', key: 'primaryEmail', render: (v: string) => v || '-' },
-    { title: '手机号', dataIndex: 'primaryPhone', key: 'primaryPhone', width: 130, render: (v: string) => v || '-' },
-    { title: '主组织', dataIndex: 'primaryOrgName', key: 'primaryOrgName', width: 150, render: (v: string) => v || '-' },
-    { title: '角色数', dataIndex: 'roleCount', key: 'roleCount', width: 80, render: (v: number) => v || 0 },
+    textColumn<TenantUserItem>({ title: '邮箱', dataIndex: 'primaryEmail', width: TEXT_COL_WIDTH }),
+    textColumn<TenantUserItem>({ title: '手机号', dataIndex: 'primaryPhone', width: CODE_COL_WIDTH, monospace: true }),
+    textColumn<TenantUserItem>({ title: '主组织', dataIndex: 'primaryOrgName', width: NAME_COL_WIDTH }),
+    { title: '角色数', dataIndex: 'roleCount', key: 'roleCount', width: COUNT_COL_WIDTH, render: (v: number) => v || 0 },
     {
       title: '状态',
       dataIndex: 'isSuspended',
       key: 'isSuspended',
-      width: 90,
+      width: STATUS_COL_WIDTH,
       render: (v: boolean) => <SuspendedTag value={v} />,
     },
     timeColumn<TenantUserItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<TenantUserItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
-    {
-      title: '操作',
-      key: 'action',
-      width: 180,
-      render: (_, r) => (
-        <RowActions
-          actions={[
-            { key: 'edit', label: '编辑', onClick: () => void openEdit(r) },
-            { key: 'roles', label: '授权角色', onClick: () => setRoleTarget(r) },
-            { key: 'resetPwd', label: '重置密码', confirm: '重置后系统生成新的临时密码并仅展示一次，该成员既有会话将失效。确认重置？', onClick: () => void resetPassword(r) },
-            {
-              key: 'toggle',
-              label: r.isSuspended ? '恢复' : '挂起',
-              danger: !r.isSuspended,
-              confirm: r.isSuspended ? '确认恢复该用户？' : '确认挂起该用户？',
-              onClick: () => void toggleSuspended(r, !r.isSuspended),
-            },
-          ]}
-        />
-      ),
-    },
+    actionColumn<TenantUserItem>({
+      max: 3,
+      actions: (r) => [
+        { key: 'edit', label: '编辑', onClick: () => void openEdit(r) },
+        { key: 'roles', label: '授权角色', onClick: () => setRoleTarget(r) },
+        { key: 'resetPwd', label: '重置密码', confirm: '重置后系统生成新的临时密码并仅展示一次，该成员既有会话将失效。确认重置？', onClick: () => void resetPassword(r) },
+        {
+          key: 'toggle',
+          label: r.isSuspended ? '恢复' : '挂起',
+          danger: !r.isSuspended,
+          confirm: r.isSuspended ? '确认恢复该用户？' : '确认挂起该用户？',
+          onClick: () => void toggleSuspended(r, !r.isSuspended),
+        },
+      ],
+    }),
   ]
 
   return (
@@ -353,7 +348,8 @@ function UsersPane() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1400 }}
+        tableLayout="fixed"
+        scroll={tableScrollX(columns)}
         pagination={{
           current: page,
           pageSize,
@@ -697,56 +693,48 @@ function ServiceAccountsPane() {
   }
 
   const columns: ColumnsType<TenantMachineUserItem> = [
-    { title: '名称', dataIndex: 'name', key: 'name', width: 180, render: (v: string, r) => <NameLink value={v} onClick={() => void openDetail(r)} /> },
-    { title: '主部门', dataIndex: 'primaryOrgName', key: 'primaryOrgName', width: 170, render: (v: string) => v || '-' },
-    { title: '描述', dataIndex: 'description', key: 'description', render: (v: string) => v || '-' },
+    nameColumn<TenantMachineUserItem>({
+      title: '名称',
+      dataIndex: 'name',
+      onClick: (r) => void openDetail(r),
+    }),
+    textColumn<TenantMachineUserItem>({ title: '主部门', dataIndex: 'primaryOrgName', width: NAME_COL_WIDTH }),
+    textColumn<TenantMachineUserItem>({ title: '描述', dataIndex: 'description', width: TEXT_COL_WIDTH }),
     {
       title: '状态',
       dataIndex: 'isSuspended',
       key: 'isSuspended',
-      width: 90,
+      width: STATUS_COL_WIDTH,
       render: (v: boolean) => <SuspendedTag value={v} />,
     },
     timeColumn<TenantMachineUserItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<TenantMachineUserItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
-    {
-      title: '操作',
-      key: 'action',
-      width: 180,
-      render: (_, r) => (
-        <RowActions
-          actions={[
-            { key: 'edit', label: '编辑', onClick: () => void openEdit(r) },
-            {
-              key: 'toggle',
-              label: r.isSuspended ? '启用' : '挂起',
-              danger: !r.isSuspended,
-              confirm: r.isSuspended ? '确认恢复该服务账号？' : '确认挂起该服务账号？',
-              onClick: () => void toggleSuspended(r, !r.isSuspended),
-            },
-            {
-              key: 'delete',
-              label: '删除',
-              danger: true,
-              confirm: '确认删除该服务账号？删除前须先删除其全部 API 密钥。',
-              onClick: () => void handleDelete(r),
-            },
-          ]}
-        />
-      ),
-    },
+    actionColumn<TenantMachineUserItem>({
+      max: 3,
+      actions: (r) => [
+        { key: 'edit', label: '编辑', onClick: () => void openEdit(r) },
+        {
+          key: 'toggle',
+          label: r.isSuspended ? '启用' : '挂起',
+          danger: !r.isSuspended,
+          confirm: r.isSuspended ? '确认恢复该服务账号？' : '确认挂起该服务账号？',
+          onClick: () => void toggleSuspended(r, !r.isSuspended),
+        },
+        {
+          key: 'delete',
+          label: '删除',
+          danger: true,
+          confirm: '确认删除该服务账号？删除前须先删除其全部 API 密钥。',
+          onClick: () => void handleDelete(r),
+        },
+      ],
+    }),
   ]
 
   const keyColumns: ColumnsType<TenantApiKeyItem> = [
-    { title: '名称', dataIndex: 'name', key: 'name', render: (v: string) => v || '-' },
-    {
-      title: '前缀',
-      dataIndex: 'keyPrefix',
-      key: 'keyPrefix',
-      width: 180,
-      render: (v: string) => <span style={{ fontFamily: 'Consolas, Monaco, monospace', fontSize: 12 }}>{v || '-'}</span>,
-    },
-    { title: '状态', key: 'status', width: 90, render: (_: unknown, r) => <KeyStateTag {...r} /> },
+    textColumn<TenantApiKeyItem>({ title: '名称', dataIndex: 'name', width: NAME_COL_WIDTH }),
+    textColumn<TenantApiKeyItem>({ title: '前缀', dataIndex: 'keyPrefix', width: CODE_COL_WIDTH, monospace: true }),
+    { title: '状态', key: 'status', width: STATUS_COL_WIDTH, render: (_: unknown, r) => <KeyStateTag {...r} /> },
     timeColumn<TenantApiKeyItem>({ title: '过期时间', dataIndex: 'expiredAt', placeholder: '永不过期' }),
     timeColumn<TenantApiKeyItem>({ title: '最近使用', dataIndex: 'lastUsedAt', relative: true, placeholder: '从未使用' }),
     timeColumn<TenantApiKeyItem>({ title: '创建时间', dataIndex: 'createdAt' }),
@@ -797,7 +785,8 @@ function ServiceAccountsPane() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1200 }}
+        tableLayout="fixed"
+        scroll={tableScrollX(columns)}
         pagination={{
           current: page,
           pageSize,
@@ -890,7 +879,8 @@ function ServiceAccountsPane() {
                       loading={machineKeysLoading}
                       size="small"
                       pagination={false}
-                      scroll={{ x: 1000 }}
+                      tableLayout="fixed"
+                      scroll={tableScrollX(keyColumns)}
                     />
                   </Space>
                 ),

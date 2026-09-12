@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Divider, Form, Input, message, Modal, Select, Space, Switch, Table, Tooltip } from 'antd'
 import { PlusOutlined, QuestionCircleOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { EllipsisCell, IDCell, InitialPasswordModal, PageContainer, RowActions, SuspendedTag, timeColumn, TypeTag } from '@ark-iam/ui'
+import { actionColumn, CODE_COL_WIDTH, idColumn, InitialPasswordModal, NAME_COL_WIDTH, PageContainer, STATUS_COL_WIDTH, SuspendedTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, TypeTag } from '@ark-iam/ui'
 import { createTenant, deleteTenant, getTenantPageList, resetTenantAdminPassword, updateTenant } from '@ark-iam/api'
 import type { TenantItem, TenantStatus } from '@ark-iam/types'
 
@@ -141,15 +141,9 @@ export default function TenantList() {
   }
 
   const columns: ColumnsType<TenantItem> = [
-    { title: 'ID', dataIndex: 'tenantID', key: 'tenantID', width: 150, render: (v: string) => <IDCell value={v} /> },
-    { title: '租户名', dataIndex: 'name', key: 'name', width: 180, render: (v: string) => <EllipsisCell value={v} /> },
-    {
-      title: '编码',
-      dataIndex: 'code',
-      key: 'code',
-      width: 180,
-      render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v || '-'}</span>,
-    },
+    idColumn<TenantItem>({ dataIndex: 'tenantID' }),
+    textColumn<TenantItem>({ title: '租户名', dataIndex: 'name', width: NAME_COL_WIDTH }),
+    textColumn<TenantItem>({ title: '编码', dataIndex: 'code', width: CODE_COL_WIDTH, monospace: true }),
     {
       title: (
         <Space size={4}>
@@ -161,38 +155,34 @@ export default function TenantList() {
       ),
       dataIndex: 'type',
       key: 'type',
-      width: 120,
+      width: TAG_COL_WIDTH,
       render: (v: string) => <TypeTag value={v} />,
     },
-    { title: '标签', dataIndex: 'tag', key: 'tag', width: 140, render: (v: string) => v || '-' },
+    textColumn<TenantItem>({ title: '标签', dataIndex: 'tag', width: TAG_COL_WIDTH }),
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 100,
+      width: STATUS_COL_WIDTH,
       render: (v: string) => <SuspendedTag value={v} />,
     },
     timeColumn<TenantItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<TenantItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
-    {
-      title: '操作',
-      key: 'action',
-      width: 240,
-      render: (_, r) => (
-        <RowActions
-          actions={[
-            { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
-            {
-              key: 'resetAdminPassword',
-              label: '重置管理员密码',
-              confirm: '将重置该租户内置管理员的密码：新临时密码仅展示一次，其既有会话立即失效。确认重置？',
-              onClick: () => void handleResetAdminPassword(r),
-            },
-            { key: 'delete', label: '删除', danger: true, confirm: '确认删除该租户？', onClick: () => void handleDelete(r) },
-          ]}
-        />
-      ),
-    },
+    // 3 个操作中「重置管理员密码」文案较长（7 字），降为横排 1 个 + 「更多」，
+    // 操作列因此收窄到 150 且 fixed: 'right'，任何窗口下都无需横滑即可操作。
+    actionColumn<TenantItem>({
+      max: 2,
+      actions: (r) => [
+        { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
+        {
+          key: 'resetAdminPassword',
+          label: '重置管理员密码',
+          confirm: '将重置该租户内置管理员的密码：新临时密码仅展示一次，其既有会话立即失效。确认重置？',
+          onClick: () => void handleResetAdminPassword(r),
+        },
+        { key: 'delete', label: '删除', danger: true, confirm: '确认删除该租户？', onClick: () => void handleDelete(r) },
+      ],
+    }),
   ]
 
   return (
@@ -238,7 +228,8 @@ export default function TenantList() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1490 }}
+        tableLayout="fixed"
+        scroll={tableScrollX(columns)}
         pagination={{
           current: page,
           pageSize,

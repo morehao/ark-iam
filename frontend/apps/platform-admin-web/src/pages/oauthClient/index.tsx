@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Table, Button, Space, Input, Modal, Form, Select, message } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { IDCell, NameLink, PageContainer, RowActions, StatusTag, timeColumn, TypeTag } from '@ark-iam/ui'
+import { actionColumn, idColumn, nameColumn, PageContainer, STATUS_COL_WIDTH, StatusTag, tableScrollX, TAG_COL_WIDTH, timeColumn, TypeTag } from '@ark-iam/ui'
 import { createOAuthClient, deleteOAuthClient, getApplicationPageList, getOAuthClientPageList, updateOAuthClient } from '@ark-iam/api'
 import type { OAuthClientItem } from '@ark-iam/types'
 import { useNavigate } from 'react-router-dom'
@@ -106,38 +106,25 @@ export default function OAuthClientList() {
   }
 
   const columns: ColumnsType<OAuthClientItem> = [
-    { title: 'ID', dataIndex: 'applicationClientID', key: 'applicationClientID', width: 150, render: (v: string) => <IDCell value={v} /> },
-    {
-      title: '客户端ID',
-      dataIndex: 'clientID',
-      key: 'clientID',
-      width: 150,
-      render: (v: string) => <IDCell value={v} />,
-    },
-    {
+    idColumn<OAuthClientItem>({ dataIndex: 'applicationClientID' }),
+    idColumn<OAuthClientItem>({ dataIndex: 'clientID', title: '客户端ID' }),
+    nameColumn<OAuthClientItem>({
       title: '名称',
       dataIndex: 'name',
-      key: 'name',
-      render: (v: string, r) => <NameLink value={v} onClick={() => navigate(`/oauthClient/${r.applicationClientID}`)} />,
-    },
-    { title: '所属应用ID', dataIndex: 'appID', key: 'appID', width: 150, render: (v: string) => <IDCell value={v} /> },
-    { title: '类型', dataIndex: 'type', key: 'type', width: 100, render: (v: string) => <TypeTag value={v} /> },
-    { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (v: string) => <StatusTag value={v} /> },
+      onClick: (r) => navigate(`/oauthClient/${r.applicationClientID}`),
+    }),
+    idColumn<OAuthClientItem>({ dataIndex: 'appID', title: '所属应用ID' }),
+    { title: '类型', dataIndex: 'type', key: 'type', width: TAG_COL_WIDTH, render: (v: string) => <TypeTag value={v} /> },
+    { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <StatusTag value={v} /> },
     timeColumn<OAuthClientItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<OAuthClientItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
-    {
-      title: '操作',
-      key: 'action',
-      width: 120,
-      render: (_, r) => (
-        <RowActions
-          actions={[
-            { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
-            { key: 'delete', label: '删除', danger: true, confirm: '确认删除该客户端？', onClick: () => void handleDelete(r) },
-          ]}
-        />
-      ),
-    },
+    actionColumn<OAuthClientItem>({
+      max: 2,
+      actions: (r) => [
+        { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
+        { key: 'delete', label: '删除', danger: true, confirm: '确认删除该客户端？', onClick: () => void handleDelete(r) },
+      ],
+    }),
   ]
 
   return (
@@ -169,7 +156,8 @@ export default function OAuthClientList() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1300 }}
+        tableLayout="fixed"
+        scroll={tableScrollX(columns)}
         pagination={{
           current: page,
           pageSize,

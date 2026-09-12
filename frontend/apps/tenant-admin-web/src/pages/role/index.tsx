@@ -12,10 +12,10 @@ import {
   Tree,
   message,
 } from 'antd'
-import { PlusOutlined, ReloadOutlined, SearchOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
-import { PageContainer, RowActions, SourceTag, timeColumn, tokens } from '@ark-iam/ui'
+import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, NAME_COL_WIDTH, PageContainer, SourceTag, STATUS_COL_WIDTH, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
 import type { MenuItem, TenantAppItem, TenantRoleItem } from '@ark-iam/types'
 import {
   createTenantRole,
@@ -169,57 +169,46 @@ export default function TenantRolePage() {
   }
 
   const columns: ColumnsType<TenantRoleItem> = [
-    { title: '角色名称', dataIndex: 'name', key: 'name', width: 150, render: (v: string) => v || '-' },
-    { title: '所属应用', dataIndex: 'appName', key: 'appName', width: 130, render: (_: string, r) => <Tag>{r.appName || '系统角色'}</Tag> },
-    { title: '角色编码', dataIndex: 'code', key: 'code', width: 150, render: (v: string) => v || '-' },
+    textColumn<TenantRoleItem>({ title: '角色名称', dataIndex: 'name', width: NAME_COL_WIDTH }),
+    { title: '所属应用', dataIndex: 'appName', key: 'appName', width: 120, render: (_: string, r) => <Tag>{r.appName || '系统角色'}</Tag> },
+    textColumn<TenantRoleItem>({ title: '角色编码', dataIndex: 'code', width: CODE_COL_WIDTH, monospace: true }),
     {
       title: '来源',
       dataIndex: 'source',
       key: 'source',
-      width: 100,
+      width: TAG_COL_WIDTH,
       render: (v: string) => <SourceTag value={v} />,
     },
     {
       title: '系统管理',
       dataIndex: 'adminLevel',
       key: 'adminLevel',
-      width: 110,
+      width: STATUS_COL_WIDTH,
       render: (v: string) => adminLevelText(v),
     },
-    { title: '描述', dataIndex: 'description', key: 'description', render: (v: string) => v || '-' },
-    { title: '成员数', dataIndex: 'memberCount', key: 'memberCount', width: 80, render: (v: number) => v || 0 },
-    { title: '授权菜单', dataIndex: 'menuCount', key: 'menuCount', width: 80, render: (v: number) => v || 0 },
+    textColumn<TenantRoleItem>({ title: '描述', dataIndex: 'description', width: 160 }),
+    { title: '成员数', dataIndex: 'memberCount', key: 'memberCount', width: COUNT_COL_WIDTH, render: (v: number) => v || 0 },
+    { title: '授权菜单', dataIndex: 'menuCount', key: 'menuCount', width: COUNT_COL_WIDTH, render: (v: number) => v || 0 },
     timeColumn<TenantRoleItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<TenantRoleItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
-    {
-      title: '操作',
-      key: 'action',
-      width: 200,
-      render: (_, r) => {
+    actionColumn<TenantRoleItem>({
+      max: 3,
+      actions: (r) => {
         const isBuiltin = r.source === 'builtin'
-        return (
-          <RowActions
-            actions={[
-              {
-                key: 'menu',
-                label: '菜单权限',
-                icon: <SafetyCertificateOutlined />,
-                onClick: () => void openMenuAuth(r),
-              },
-              { key: 'edit', label: '编辑', disabled: isBuiltin, onClick: () => openEdit(r) },
-              {
-                key: 'delete',
-                label: '删除',
-                danger: true,
-                disabled: isBuiltin,
-                confirm: '确认删除该角色？（级联清理成员/菜单关联）',
-                onClick: () => void handleDelete(r),
-              },
-            ]}
-          />
-        )
+        return [
+          { key: 'menu', label: '菜单权限', onClick: () => void openMenuAuth(r) },
+          { key: 'edit', label: '编辑', disabled: isBuiltin, onClick: () => openEdit(r) },
+          {
+            key: 'delete',
+            label: '删除',
+            danger: true,
+            disabled: isBuiltin,
+            confirm: '确认删除该角色？（级联清理成员/菜单关联）',
+            onClick: () => void handleDelete(r),
+          },
+        ]
       },
-    },
+    }),
   ]
 
   return (
@@ -266,7 +255,8 @@ export default function TenantRolePage() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1260 }}
+        tableLayout="fixed"
+        scroll={tableScrollX(columns)}
         pagination={{
           current: page,
           pageSize,

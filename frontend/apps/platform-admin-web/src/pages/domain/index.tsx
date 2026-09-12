@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Select, Space, Table, message } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { IDCell, PageContainer, RowActions, timeColumn, VerifiedTag } from '@ark-iam/ui'
+import { actionColumn, CODE_COL_WIDTH, idColumn, PageContainer, STATUS_COL_WIDTH, tableScrollX, textColumn, timeColumn, VerifiedTag } from '@ark-iam/ui'
 import { createDomain, deleteDomain, getDomainDetail, getDomainPageList, updateDomain } from '@ark-iam/api'
 import type { DomainItem } from '@ark-iam/types'
 
@@ -86,37 +86,25 @@ export default function DomainList() {
   }
 
   const columns: ColumnsType<DomainItem> = [
-    { title: 'ID', dataIndex: 'id', key: 'id', width: 150, render: (v: string) => <IDCell value={v} /> },
-    {
-      title: '域名',
-      dataIndex: 'domain',
-      key: 'domain',
-      width: 240,
-      render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v || '-'}</span>,
-    },
+    idColumn<DomainItem>({ dataIndex: 'id' }),
+    textColumn<DomainItem>({ title: '域名', dataIndex: 'domain', width: CODE_COL_WIDTH, monospace: true }),
     {
       title: '验证状态',
       dataIndex: 'isVerified',
       key: 'isVerified',
-      width: 120,
+      width: STATUS_COL_WIDTH,
       render: (v: number) => <VerifiedTag value={v} />,
     },
     timeColumn<DomainItem>({ title: '验证时间', dataIndex: 'verifiedAt', placeholder: '未验证' }),
     timeColumn<DomainItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<DomainItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
-    {
-      title: '操作',
-      key: 'action',
-      width: 120,
-      render: (_, r) => (
-        <RowActions
-          actions={[
-            { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
-            { key: 'delete', label: '删除', danger: true, confirm: '确认删除该域名？', onClick: () => void handleDelete(r) },
-          ]}
-        />
-      ),
-    },
+    actionColumn<DomainItem>({
+      max: 2,
+      actions: (r) => [
+        { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
+        { key: 'delete', label: '删除', danger: true, confirm: '确认删除该域名？', onClick: () => void handleDelete(r) },
+      ],
+    }),
   ]
 
   return (
@@ -148,7 +136,8 @@ export default function DomainList() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1170 }}
+        tableLayout="fixed"
+        scroll={tableScrollX(columns)}
         pagination={{
           current: page,
           pageSize,
