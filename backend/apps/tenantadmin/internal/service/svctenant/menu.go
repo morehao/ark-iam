@@ -201,7 +201,7 @@ func HasSystemAdminCapability(ctx *gin.Context) (bool, error) {
 }
 
 // requireSystemAdmin 校验当前操作者具备系统管理能力（admin_type=admin），否则返回能力不足错误。
-// 租户自服务控制台定位为「管理层专用」：组织/用户/角色/密钥等管理写操作统一以此硬门槛兜底，
+// 租户自服务控制台定位为「管理层专用」：部门/用户/角色/密钥等管理写操作统一以此硬门槛兜底，
 // 菜单可见性仅是 UX 层（前端隐藏不是安全边界），直接调用 API 也必须被拒。
 // opErr 仅在系统错误（角色查询失败等）时兜底返回。
 func requireSystemAdmin(ctx *gin.Context, opErr int) error {

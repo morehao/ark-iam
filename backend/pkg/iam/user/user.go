@@ -1,5 +1,5 @@
 // Package user 承载租户内用户（tenant_user）聚合的跨表写能力：
-// person 解析/find-or-create + 用户主体 + 组织归属（primary/leader/secondary）的原子写入。
+// person 解析/find-or-create + 用户主体 + 部门归属（primary/leader/secondary）的原子写入。
 //
 // 供 platformadmin（建租户时创建内置管理员）与 tenantadmin（控制台建成员）共用同一实现，
 // 避免"平台侧复制一份建用户逻辑"造成的漂移（见 docs/design/tenant-admin-provisioning-design-20260912.md 需求①）。
@@ -23,8 +23,7 @@ var (
 	ErrNilTx              = errors.New("iam/user: tx is required")
 	ErrPersonNotFound     = errors.New("iam/user: person not found")
 	ErrAlreadyInTenant    = errors.New("iam/user: person already in tenant")
-	ErrMultiplePrimaryOrg = errors.New("iam/user: at most one primary organization")
-	ErrOrgLeaderConflict  = errors.New("iam/user: organization already has another leader")
+	ErrDeptLeaderConflict = errors.New("iam/user: department already has another leader")
 )
 
 // CreateReq 构造 Create 入参。
@@ -47,14 +46,14 @@ type CreateReq struct {
 	JoinedAt    *time.Time // 空 => now
 	CreatedBy   string
 
-	PrimaryOrgIDs   []string // 行政主部门（至多 1 个）
-	SecondaryOrgIDs []string // 参与部门（可多条）
-	LeaderOrgIDs    []string // 负责部门（可多条，每部门至多一个负责人）
+	PrimaryDepartmentID    string   // 行政主部门（唯一，空 = 无主部门）
+	SecondaryDepartmentIDs []string // 参与部门（可多条）
+	LeaderDepartmentIDs    []string // 负责部门（可多条，每部门至多一个负责人）
 }
 
-// Create 在 tx 事务内创建用户主体并建立组织归属关系。
+// Create 在 tx 事务内创建用户主体并建立部门归属关系。
 //
-// 必须在调用方的事务 tx 内执行（tx 为空返回 ErrNilTx），保证 person/user/组织关系同事务原子。
+// 必须在调用方的事务 tx 内执行（tx 为空返回 ErrNilTx），保证 person/user/部门关系同事务原子。
 // 返回：新建的用户实体、本次是否新建了 person（供调用方决定是否回显临时密码）、错误。
 // 数据库/网络等系统错误原样上抛（由调用方包装为功能级错误码并记日志）；
 // 业务边界（person 不存在、重复入租户、多主部门、负责人冲突）返回上面的哨兵错误。
@@ -97,9 +96,6 @@ func Create(ctx context.Context, tx *gorm.DB, req *CreateReq) (*model.UserEntity
 	}
 
 	// 3. 用户主体
-	if len(req.PrimaryOrgIDs) > 1 {
-		return nil, false, ErrMultiplePrimaryOrg
-	}
 	userType := req.UserType
 	if userType == "" {
 		userType = model.UserTypeMember
@@ -132,53 +128,53 @@ func Create(ctx context.Context, tx *gorm.DB, req *CreateReq) (*model.UserEntity
 		return nil, false, err
 	}
 
-	// 4. 组织归属：primary（行政主部门）/ leader（负责人）/ secondary（参与部门）
-	for _, orgID := range req.PrimaryOrgIDs {
-		if err := insertOrgRelation(ctx, tx, req, insertEntity.ID, orgID, model.OrgUserRelationPrimary); err != nil {
+	// 4. 部门归属：primary（行政主部门，至多 1 条）/ leader（负责人）/ secondary（参与部门）
+	if req.PrimaryDepartmentID != "" {
+		if err := insertDeptRelation(ctx, tx, req, insertEntity.ID, req.PrimaryDepartmentID, model.DeptUserRelationPrimary); err != nil {
 			return nil, false, err
 		}
 	}
-	for _, orgID := range req.LeaderOrgIDs {
-		if err := ensureOrgLeaderUnique(ctx, tx, req.TenantID, orgID, insertEntity.ID); err != nil {
+	for _, deptID := range req.LeaderDepartmentIDs {
+		if err := ensureDeptLeaderUnique(ctx, tx, req.TenantID, deptID, insertEntity.ID); err != nil {
 			return nil, false, err
 		}
-		if err := insertOrgRelation(ctx, tx, req, insertEntity.ID, orgID, model.OrgUserRelationLeader); err != nil {
+		if err := insertDeptRelation(ctx, tx, req, insertEntity.ID, deptID, model.DeptUserRelationLeader); err != nil {
 			return nil, false, err
 		}
 	}
-	for _, orgID := range req.SecondaryOrgIDs {
-		if err := insertOrgRelation(ctx, tx, req, insertEntity.ID, orgID, model.OrgUserRelationSecondary); err != nil {
+	for _, deptID := range req.SecondaryDepartmentIDs {
+		if err := insertDeptRelation(ctx, tx, req, insertEntity.ID, deptID, model.DeptUserRelationSecondary); err != nil {
 			return nil, false, err
 		}
 	}
 	return insertEntity, personCreated, nil
 }
 
-// insertOrgRelation 在事务内写入一条组织归属关系。
-func insertOrgRelation(ctx context.Context, tx *gorm.DB, req *CreateReq, userID, orgID string, relationType model.OrgUserRelationType) error {
-	return dao.NewOrganizationUserDao().WithTx(tx).Insert(ctx, &model.OrganizationUserEntity{
-		TenantID:       req.TenantID,
-		OrganizationID: orgID,
-		UserID:         userID,
-		RelationType:   relationType,
-		CreatedBy:      req.CreatedBy,
+// insertDeptRelation 在事务内写入一条部门归属关系。
+func insertDeptRelation(ctx context.Context, tx *gorm.DB, req *CreateReq, userID, deptID string, relationType model.DeptUserRelationType) error {
+	return dao.NewDepartmentUserDao().WithTx(tx).Insert(ctx, &model.DepartmentUserEntity{
+		TenantID:     req.TenantID,
+		DepartmentID: deptID,
+		UserID:       userID,
+		RelationType: relationType,
+		CreatedBy:    req.CreatedBy,
 	})
 }
 
-// ensureOrgLeaderUnique 保证一个部门至多一个负责人：
-// 该部门已有 leader 关系且属于其他用户时返回 ErrOrgLeaderConflict。须在事务内传入 tx。
-func ensureOrgLeaderUnique(ctx context.Context, tx *gorm.DB, tenantID, orgID, exceptUserID string) error {
-	leaderList, err := dao.NewOrganizationUserDao().WithTx(tx).GetListByCond(ctx, &dao.OrganizationUserCond{
-		TenantID:       tenantID,
-		OrganizationID: orgID,
-		RelationType:   model.OrgUserRelationLeader,
+// ensureDeptLeaderUnique 保证一个部门至多一个负责人：
+// 该部门已有 leader 关系且属于其他用户时返回 ErrDeptLeaderConflict。须在事务内传入 tx。
+func ensureDeptLeaderUnique(ctx context.Context, tx *gorm.DB, tenantID, deptID, exceptUserID string) error {
+	leaderList, err := dao.NewDepartmentUserDao().WithTx(tx).GetListByCond(ctx, &dao.DepartmentUserCond{
+		TenantID:     tenantID,
+		DepartmentID: deptID,
+		RelationType: model.DeptUserRelationLeader,
 	})
 	if err != nil {
 		return err
 	}
 	for i := range leaderList {
 		if leaderList[i].UserID != exceptUserID {
-			return ErrOrgLeaderConflict
+			return ErrDeptLeaderConflict
 		}
 	}
 	return nil

@@ -14,16 +14,16 @@ type SessionRevokeReq struct {
 type SessionRevokeAllReq struct{}
 
 type SessionResp struct {
-	ID         string  `json:"id"`
-	SessionID  string  `json:"sessionID"`
-	AppID      string  `json:"appID"`
-	TenantID   string  `json:"tenantID"`
-	ClientType string  `json:"clientType"`
-	ClientIP   string  `json:"clientIP"`
-	UserAgent  string  `json:"userAgent"`
+	ID         string `json:"id"`
+	SessionID  string `json:"sessionID"`
+	AppID      string `json:"appID"`
+	TenantID   string `json:"tenantID"`
+	ClientType string `json:"clientType"`
+	ClientIP   string `json:"clientIP"`
+	UserAgent  string `json:"userAgent"`
 	ExpiredAt  *int64 `json:"expiresAt"` // 过期时间(unix 秒)
 	CreatedAt  int64  `json:"createdAt"` // 创建时间(unix 秒)
-	IsActive   bool    `json:"isActive"`
+	IsActive   bool   `json:"isActive"`
 }
 
 type SessionListResp struct {

@@ -12,10 +12,10 @@ const TableNameInvite = "tenant_invite"
 type InviteStatus string
 
 const (
-	InviteStatusPending  InviteStatus = "pending"   // 待使用
-	InviteStatusAccepted InviteStatus = "accepted"  // 已使用
-	InviteStatusRevoked  InviteStatus = "revoked"   // 已撤销
-	InviteStatusExpired  InviteStatus = "expired"   // 已过期
+	InviteStatusPending  InviteStatus = "pending"  // 待使用
+	InviteStatusAccepted InviteStatus = "accepted" // 已使用
+	InviteStatusRevoked  InviteStatus = "revoked"  // 已撤销
+	InviteStatusExpired  InviteStatus = "expired"  // 已过期
 )
 
 // InviteEntity 加入租户的邀请单：租户 owner/管理员生成，凭证持有者凭 inviteCode 加入该租户。

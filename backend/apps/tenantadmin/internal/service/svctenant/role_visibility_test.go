@@ -96,7 +96,7 @@ func TestHasSystemAdminCapability(t *testing.T) {
 		t.Fatalf("seed user_role: %v", err)
 	}
 
-	has, err := HasSystemAdminCapability(newOrgGinCtx(t, "t1", "u1"))
+	has, err := HasSystemAdminCapability(newDeptGinCtx(t, "t1", "u1"))
 	if err != nil {
 		t.Fatalf("hasadmin: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestHasSystemAdminCapability(t *testing.T) {
 	}).Error; err != nil {
 		t.Fatalf("seed user_role u2: %v", err)
 	}
-	has, err = HasSystemAdminCapability(newOrgGinCtx(t, "t1", "u2"))
+	has, err = HasSystemAdminCapability(newDeptGinCtx(t, "t1", "u2"))
 	if err != nil {
 		t.Fatalf("hasadmin u2: %v", err)
 	}
@@ -313,7 +313,7 @@ func TestUpdateMenusRejectsAdminVisibilityForNormalRole(t *testing.T) {
 	seedTestRole(t, db, "r1", "t1", "app1", "成员", "member")
 	seedAdminVisibilityMenu(t, db, "m-admin", "app1")
 
-	ginCtx := newOrgGinCtx(t, "t1", "op")
+	ginCtx := newDeptGinCtx(t, "t1", "op")
 
 	// 普通角色授权 admin 可见性菜单 → 拒绝
 	if err := svc.UpdateMenus(ginCtx, &dtotenant.RoleMenusUpdateReq{RoleID: "r1", MenuIDs: []string{"m-admin"}}); err == nil {
@@ -333,7 +333,7 @@ func TestUpdateMenusAllowsAdminVisibilityForBuiltinAdmin(t *testing.T) {
 	seedBuiltinSystemRole(t, db, "r-admin", "t1", "app1")
 	seedAdminVisibilityMenu(t, db, "m-admin", "app1")
 
-	ginCtx := newOrgGinCtx(t, "t1", "op")
+	ginCtx := newDeptGinCtx(t, "t1", "op")
 	if err := svc.UpdateMenus(ginCtx, &dtotenant.RoleMenusUpdateReq{RoleID: "r-admin", MenuIDs: []string{"m-admin"}}); err != nil {
 		t.Fatalf("builtin admin should be allowed to grant admin menu: %v", err)
 	}
@@ -347,7 +347,7 @@ func TestRoleMenuTreeHidesAdminForNormalRole(t *testing.T) {
 	seedTestApp(t, db, "t1", "app1")
 	seedAdminVisibilityMenu(t, db, "m-admin", "app1")
 
-	ginCtx := newOrgGinCtx(t, "t1", "op")
+	ginCtx := newDeptGinCtx(t, "t1", "op")
 
 	// 普通角色
 	seedTestRole(t, db, "r1", "t1", "app1", "成员", "member")
@@ -415,7 +415,7 @@ func TestUserHoldsBuiltinAdmin(t *testing.T) {
 	seedTestRole(t, db, "r-member", "t1", "app1", "成员", "member")
 	seedUserRoleLink(t, db, "ur-member", "t1", "u-member", "r-member")
 
-	admin, err := userHoldsBuiltinAdmin(newOrgGinCtx(t, "t1", "u-admin"))
+	admin, err := userHoldsBuiltinAdmin(newDeptGinCtx(t, "t1", "u-admin"))
 	if err != nil {
 		t.Fatalf("holds admin: %v", err)
 	}
@@ -423,7 +423,7 @@ func TestUserHoldsBuiltinAdmin(t *testing.T) {
 		t.Fatalf("user with builtin super role should hold builtin admin")
 	}
 
-	mem, err := userHoldsBuiltinAdmin(newOrgGinCtx(t, "t1", "u-member"))
+	mem, err := userHoldsBuiltinAdmin(newDeptGinCtx(t, "t1", "u-member"))
 	if err != nil {
 		t.Fatalf("holds member: %v", err)
 	}

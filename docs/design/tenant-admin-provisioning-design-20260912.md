@@ -21,8 +21,8 @@
 
 | 链路 | 入口 | 现状行为 |
 |---|---|---|
-| 平台建租户 | `POST /v1/platform/tenants` → `platformadmin/internal/service/svctenant/tenant.go:43` | 一个事务内建 `tenant` + 同名根组织节点；**不创建任何用户**；且内联复制了 `pkg/iam/tenant.CreateWithRootOrg` 的建租户/建根组织逻辑（重复实现） |
-| 租户内建用户 | `POST /v1/tenant/users` → `tenantadmin/internal/service/svctenant/user.go:195` | person find-or-create → 插入 `tenant_user` → 建组织归属（primary/leader/secondary，leader 部门唯一）；密码可选，不传则 person 无密码哈希、无法登录 |
+| 平台建租户 | `POST /v1/platform/tenants` → `platformadmin/internal/service/svctenant/tenant.go:43` | 一个事务内建 `tenant` + 同名根部门节点；**不创建任何用户**；且内联复制了 `pkg/iam/tenant.CreateWithRootDept` 的建租户/建根部门逻辑（重复实现） |
+| 租户内建用户 | `POST /v1/tenant/users` → `tenantadmin/internal/service/svctenant/user.go:195` | person find-or-create → 插入 `tenant_user` → 建部门归属（primary/leader/secondary，leader 部门唯一）；密码可选，不传则 person 无密码哈希、无法登录 |
 | 自助建租户 | `POST /oidc/createTenant` → `auth/internal/service/svcoidc/register.go:143` | 自然人自助注册（`/oidc/registerPerson`）后，若其零租户且 OAuth 客户端所属应用 `allowPersonCreateTenant=true`（`svcoidc/helper.go:27`），可自建租户并把**自己**作为 `is_owner=true` 成员插入；**不做任何权限开通** |
 | 密码登录 | `POST /oidc/login` → `svcoidc/auth.go:75` → `svcauth.authenticateResolvedPerson`（`auth.go:122`） | 校验 bcrypt 哈希后直接完成 authRequest 并发 code/建 SSO 会话，**没有"必须先改密"的中断点** |
 | 改密 | `PUT /v1/auth/me/password` → `svcperson.UpdatePassword`（`person_profile.go:44`） | 需旧密码；改密后撤销该 person 全部 SSO 会话与 refresh token |
@@ -36,7 +36,7 @@
 ### 痛点分析
 
 1. **建完租户是"空壳"**：新建客户租户没有任何角色、没有 `tenant_application` 订阅，`tenantadmin` 的 `loadTenantApps`（`menu.go:57`）返回空 → 租户控制台无菜单；`svcmenu.ResolveUserAdminType` 查不到角色 → `admin_type=normal`，所有管理写操作被 `requireSystemAdmin`（`menu.go:207`）拒绝。租户连一个能管理它的人都没有。自助建租户同理。
-2. **创建用户逻辑有第二份实现风险**：平台侧若为建租户管理员再写一套 person/user/组织归属逻辑，就会与 `tenantadmin` 的实现漂移。
+2. **创建用户逻辑有第二份实现风险**：平台侧若为建租户管理员再写一套 person/user/部门归属逻辑，就会与 `tenantadmin` 的实现漂移。
 3. **初始凭据没有体系**：目前只有种子里一个固定默认口令字面量。按主流安全实践，管理员代建的账号应使用**每用户随机的临时密码 + 首次登录强制修改**；固定默认口令属 [CWE-1392](https://cwe.mitre.org/data/definitions/1392.html)/[CWE-1393](https://cwe.mitre.org/data/definitions/1393.html) 缺陷模式。
 4. **无强制改密能力**：登录链路在密码校验通过后立即完成认证，没有"先改密再放行"的中断点；`ResetPassword` 重置成员密码后既不强制改密也不撤销既有会话——管理员设一个已知口令即可长期冒用该账号。
 5. **初始凭据丢失无兜底**：本期不建消息通道，临时密码只在响应里出现一次，运营未保存即无法交付；且平台侧用户管理页此前已整体下线（`tenant-admin-console-redesign.md` §3.2），没有任何重置入口。
@@ -46,7 +46,7 @@
 
 **目标**
 
-- G1：`POST /v1/platform/tenants` 支持并**要求**创建租户管理员（姓名 + 手机/邮箱），与租户、根组织同事务（D2）。
+- G1：`POST /v1/platform/tenants` 支持并**要求**创建租户管理员（姓名 + 手机/邮箱），与租户、根部门同事务（D2）。
 - G2：创建用户的"核心写逻辑"收敛为一份公共实现，`platformadmin` 与 `tenantadmin` 共用（需求①）。
 - G3：管理员初始密码由系统按**统一规则**生成**每用户随机的临时密码**，调用方无需传入；全系统临时/默认密码的生成规则只有一处实现（需求②）。
 - G4：建租户创建的 user 带专用来源标识 `source=builtin`，仅后端语义、不在租户控制台展示（需求③ + D4）。
@@ -69,7 +69,7 @@
 
 - 技术栈约束：Gin + GORM + PostgreSQL（AutoMigrate 只增不删），跨 app 共享只能走 `pkg`（`go.work` 下 `apps/*` 之间不互相 import）。
 - 路由约束：新增路由按 `docs/design/api-routing-convention.md` 的 R1/R2 判定，层级 ≤ 6 段。
-- 数据一致性：租户、根组织、管理员、角色授权必须在**同一事务**内成功或全部回滚，不允许"有租户无管理员"或"有管理员无角色"的半成品。
+- 数据一致性：租户、根部门、管理员、角色授权必须在**同一事务**内成功或全部回滚，不允许"有租户无管理员"或"有管理员无角色"的半成品。
 - 幂等性：权限开通逻辑必须可重复执行且不产生重复行（`tenant_application`/`role`/`role_menu`/`user_role` 四张表均无唯一索引，靠应用层查重）。
 - 凭据安全：临时密码必须由 CSPRNG 生成；只存 bcrypt 哈希；明文只在创建/重置响应中出现一次；**禁止进入 `glog`、审计日志等任何落盘**（`AGENTS.md` 安全约定 + OWASP 要求）。
 - 性能：建租户、改密、重置都是**低频操作**（运营建租户、账号首次激活、口令丢失兜底）。量化口径见下表及其后的写入量/存储量估算。
@@ -83,17 +83,17 @@
 | 开通幂等 | 重复执行后 `role`/`tenant_application` 各 1 行、`role_menu` 4 行 | 单测对同一租户调用两次后计数断言 |
 | 重置边界 | 仅 `source=builtin` 可被平台重置；对 `manual` 成员请求返回"不存在" | `platformadmin` 单测（用 `manual` 用户构造请求断言拒绝） |
 
-建租户单次事务的写入量（**估算，待实测校验**）：`tenant` 1 + `organization` 1 + `organization` 路径回写 1 + `person` 0–1 + `tenant_user` 1 + `organization_user` 1 + `tenant_application` 1 + `role` 1 + `role_menu` 4 + `user_role` 1 ≈ **11–12 条语句**。单租户新增数据 ≈ 5KB（账号/租户/角色/关联行原始大小），按索引与副本膨胀系数 ×3 计 ≈ **15KB/租户**；1 万租户 ≈ **150MB**，相对既有 `audit_log`/`user_login_log` 增量可忽略（假设：平台侧建租户 ≤ 100 次/日、峰值系数 1–2，属纯运营低频操作）。重置接口只更新 1 行 person + 撤销会话，量级更低。
+建租户单次事务的写入量（**估算，待实测校验**）：`tenant` 1 + `department` 1 + `department` 路径回写 1 + `person` 0–1 + `tenant_user` 1 + `department_user` 1 + `tenant_application` 1 + `role` 1 + `role_menu` 4 + `user_role` 1 ≈ **11–12 条语句**。单租户新增数据 ≈ 5KB（账号/租户/角色/关联行原始大小），按索引与副本膨胀系数 ×3 计 ≈ **15KB/租户**；1 万租户 ≈ **150MB**，相对既有 `audit_log`/`user_login_log` 增量可忽略（假设：平台侧建租户 ≤ 100 次/日、峰值系数 1–2，属纯运营低频操作）。重置接口只更新 1 行 person + 撤销会话，量级更低。
 
 ### 验收标准
 
 | 编号 | 验收内容 | 验证方式 | 责任方 |
 |---|---|---|---|
 | A1 | `POST /v1/platform/tenants` 缺 `admin` 或邮箱/手机都为空时报错；成功后返回 `tenantID` + `adminUserID` + `adminInitialPassword` | 接口联调 + `svctenant` 单测 | 后端 |
-| A2 | 建租户后：`tenant_user.source=builtin`、`user_type=member`、`person_id` 非空、组织归属为租户根组织（primary） | `platformadmin/testutil.SetupSQLite` 单测逐项断言 | 后端 |
+| A2 | 建租户后：`tenant_user.source=builtin`、`user_type=member`、`person_id` 非空、部门归属为租户根部门（primary） | `platformadmin/testutil.SetupSQLite` 单测逐项断言 | 后端 |
 | A3 | 用响应中的 `adminInitialPassword` 明文校验 person 密码哈希通过；该密码满足 `ValidateStrength`；再查任意接口都**取不回**该明文 | `pkg/iam/password` + `svctenant` 单测（`gcrypto.ComparePasswordHash`） | 后端 |
 | A4 | 新建租户存在 1 条 `tenant_application`(tenant-admin)、1 条 builtin `tenant_admin` 角色（`admin_type=admin`）、4 条 `role_menu`、1 条指向管理员的 `user_role` | 单测计数断言；重复调用后计数不变 | 后端 |
-| A5 | 该管理员登录租户控制台可见 4 个菜单，且对组织/用户/角色写接口通过 `requireSystemAdmin` | 前端联调 | 后端 + 前端 |
+| A5 | 该管理员登录租户控制台可见 4 个菜单，且对部门/用户/角色写接口通过 `requireSystemAdmin` | 前端联调 | 后端 + 前端 |
 | A6 | 持临时密码首次登录：`/oidc/login` 返回 `requiresPasswordChange=true`，无 `continueURL`/`sessionID`；调 `/oidc/login/changePassword` 成功后再次登录才拿到 code | `svcoidc` 单测 + 路由冒烟测试 | 后端 |
 | A7 | 强制改密页拒绝弱密码与"新旧相同"；改密成功后 `person.must_change_password=false` | `svcoidc` 单测 | 后端 |
 | A8 | 管理员重置成员密码后：该成员既有 SSO 会话与 refresh token 被撤销、下次登录被强制改密 | `tenantadmin` 单测 | 后端 |
@@ -122,7 +122,7 @@
 
 | 需求 | 落地 |
 |---|---|
-| ① 共用内部创建用户逻辑 | 新增 `pkg/iam/user.Create`，两处 service 都调它；顺带复用 `pkg/iam/tenant.CreateWithRootOrg` 消除重复 |
+| ① 共用内部创建用户逻辑 | 新增 `pkg/iam/user.Create`，两处 service 都调它；顺带复用 `pkg/iam/tenant.CreateWithRootDept` 消除重复 |
 | ② 密码无需手填、规则统一 | `pkg/iam/password.GenerateTemporary()` 唯一实现；调用方不传密码；种子 bootstrap 口令作为显式例外登记在同包 |
 | ③ 特殊标识 | `tenant_user.source`（`builtin`/`manual`），仅后端语义 + 兜底接口边界 |
 | D1 权限开通 | `pkg/iam/tenant.ProvisionTenantAdmin`，建租户与 `pkg/seed` 共用 |
@@ -148,7 +148,7 @@ flowchart TB
     loginWeb["login-web 强制改密页"]
 
     subgraph iam["pkg/iam（跨 app 公共领域能力，单一实现）"]
-        tenantCap["tenant.CreateWithRootOrg<br>tenant.ProvisionTenantAdmin"]
+        tenantCap["tenant.CreateWithRootDept<br>tenant.ProvisionTenantAdmin"]
         userCap["user.Create"]
         personCap["person.FindOrCreate"]
         pwdCap["password.GenerateTemporary<br>password.ValidateStrength"]
@@ -172,8 +172,8 @@ flowchart TB
 
 | 模块 | 职责 | 可写表 |
 |---|---|---|
-| `pkg/iam/user` | 用户聚合写入：person 解析/find-or-create、`tenant_user` 插入、组织归属 | `person`(经 `person` 包)、`tenant_user`、`organization_user` |
-| `pkg/iam/tenant` | 租户聚合：`CreateWithRootOrg`（已有）、`ProvisionTenantAdmin`（新增） | `tenant`、`organization`、`tenant_application`、`role`、`role_menu`、`user_role` |
+| `pkg/iam/user` | 用户聚合写入：person 解析/find-or-create、`tenant_user` 插入、部门归属 | `person`(经 `person` 包)、`tenant_user`、`department_user` |
+| `pkg/iam/tenant` | 租户聚合：`CreateWithRootDept`（已有）、`ProvisionTenantAdmin`（新增） | `tenant`、`department`、`tenant_application`、`role`、`role_menu`、`user_role` |
 | `pkg/iam/password` | 强度校验（已有）、临时密码生成（新增）、bootstrap 口令登记（新增） | 无 |
 | `auth/svcoidc` | 登录/建租户编排、强制改密拦截与改密接口 | 经 `dao` 更新 `person.must_change_password`/密码哈希 |
 | `auth/svcauth` | 密码校验、登录审计与登录守卫 | 不写业务表 |
@@ -192,8 +192,8 @@ flowchart TD
     validate -- 合法 --> code["tenant.GenerateCode()"]
     code --> temp["password.GenerateTemporary() → bcrypt 哈希"]
     temp --> txBegin["开启事务"]
-    txBegin --> createTenant["tenant.CreateWithRootOrg（复用现有）"]
-    createTenant --> createUser["user.Create(source=builtin)<br>is_owner=true, 主部门=根组织, must_change_password=true"]
+    txBegin --> createTenant["tenant.CreateWithRootDept（复用现有）"]
+    createTenant --> createUser["user.Create(source=builtin)<br>is_owner=true, 主部门=根部门, must_change_password=true"]
     createUser --> provision["tenant.ProvisionTenantAdmin<br>(tenantID, grantUserID)"]
     provision --> commit{"全部成功?"}
     commit -- 否 --> rollback["回滚整事务 → TenantCreateError"]
@@ -273,11 +273,11 @@ flowchart TD
 | `pkg/iam/model/user.go` | 改 | 具名类型 `UserSource` + 常量 `UserSourceBuiltin`/`UserSourceManual`、字段 `Source`、方法 `IsBuiltin()` |
 | `pkg/iam/model/person.go` | 改 | 字段 `MustChangePassword bool`（`must_change_password`，默认 false） |
 | `pkg/iam/dao/user.go` | 改 | `UserCond` 增 `Source model.UserSource` 过滤项（重置接口定位 builtin 管理员用） |
-| `pkg/iam/user/user.go` | 新增 | `CreateReq` + `Create(ctx, tx, req)`；哨兵错误 `ErrAlreadyInTenant`、`ErrMultiplePrimaryOrg`、`ErrOrgLeaderConflict` |
+| `pkg/iam/user/user.go` | 新增 | `CreateReq` + `Create(ctx, tx, req)`；哨兵错误 `ErrAlreadyInTenant`、`ErrDeptLeaderConflict`（主部门为单值，无"多主部门"哨兵） |
 | `pkg/iam/tenant/provision.go` | 新增 | `ProvisionTenantAdmin` + 内置角色/菜单/应用编码常量（单一事实源） |
 | `pkg/iam/audit/audit.go` | 改 | 新增动作常量 `ActionTenantAdminPasswordReset = "tenant.admin_password_reset"` |
 | `platformadmin/internal/dto/dtotenant/*` | 改 | `TenantCreateReq.Admin *TenantAdminCreateReq`；`TenantCreateResp.AdminUserID/AdminInitialPassword`；新增 `TenantAdminResetPasswordReq/Resp` |
-| `platformadmin/internal/service/svctenant/tenant.go` | 改 | `Create` 编排（复用 `CreateWithRootOrg`/`user.Create`/`ProvisionTenantAdmin`）；新增 `ResetAdminPassword` |
+| `platformadmin/internal/service/svctenant/tenant.go` | 改 | `Create` 编排（复用 `CreateWithRootDept`/`user.Create`/`ProvisionTenantAdmin`）；新增 `ResetAdminPassword` |
 | `platformadmin/internal/controller/ctrtenant/tenant.go`、`router/tenant.go` | 改 | 新增重置接口 handler 与路由（`POST /v1/platform/tenants/:tenantID/builtin-admin/reset-password`，单体子资源 + 动作子路径） |
 | `tenantadmin/internal/service/svctenant/user.go` | 改 | `Create` 改调 `pkg/iam/user.Create`（`source=manual`）；`ResetPassword` 置 `must_change_password=true` + 撤销该 person 会话/refresh token |
 | `auth/internal/dto/dtooidc/*` | 改 | `OIDCLoginResp.RequiresPasswordChange`；新增 `OIDCChangePasswordReq` |
@@ -379,7 +379,7 @@ type TenantAdminResetPasswordResp struct {
 - 路由定性：`builtin-admin` 是租户下的**单体子资源**（每租户恰好一个内置管理员，与 `/v1/auth/me` 同类），因此不引入 `{userID}`；`reset-password` 为 R2 动作子路径。路径共 6 段（`v1/platform/tenants/{tenantID}/builtin-admin/reset-password`），符合层级上限。选它而不是 `.../admins/{userID}/reset-password`（7 段、越界），也把 D5 的边界写进了路径本身。
 - 定位对象 = 该租户 `source=builtin` + `user_type=member` 的**首位**用户（即平台建租户时创建的管理员，或自助建租户时创建的 owner）；查不到（含只有 `manual` 成员的情况）一律 `UserNotExistError`，**不区分**"不存在"与"不允许"，避免暴露租户成员结构。
 - 操作 = 生成新临时密码 → 更新 person 哈希 + `must_change_password=true` → 撤销该 person 的 SSO 会话与 refresh token → 写审计。
-- 只影响凭据本身：不改角色、不改组织归属、不改租户状态。
+- 只影响凭据本身：不改角色、不改部门归属、不改租户状态。
 - 返回的明文与建租户同一个约定：仅此一次、不落库、不写日志；同样带 `TODO(delivery)`。
 - 幂等性：**非幂等**（每次调用生成新口令并使旧口令立即失效）；前端必须二次确认。
 
@@ -408,7 +408,7 @@ type TenantAdminResetPasswordResp struct {
 
 ```
 POST /v1/tenant/users
-{ "name": "...", "primaryEmail": "...", "organizationIDs": ["..."], ... }
+{ "name": "...", "primaryEmail": "...", "departmentIDs": ["..."], ... }
 → { "userID": "<uuid7>", "initialPassword": "<16 位随机临时密码>" }
 ```
 
@@ -422,9 +422,9 @@ type UserCreateReq struct {
     Name            string   `json:"name" binding:"required"`
     Avatar          string   `json:"avatar"`
     IsSuspended     bool     `json:"isSuspended"`
-    OrganizationIDs []string `json:"organizationIDs" binding:"required"`
-    SecondaryOrgIDs []string `json:"secondaryOrgIDs"`
-    LeaderOrgIDs    []string `json:"leaderOrgIDs"`
+    DepartmentIDs []string `json:"departmentIDs" binding:"required"`
+    SecondaryDepartmentIDs []string `json:"secondaryDepartmentIDs"`
+    LeaderDepartmentIDs    []string `json:"leaderDepartmentIDs"`
 }
 
 type UserCreateResp struct {
@@ -527,7 +527,8 @@ type CreateReq struct {
     IsSuspended, IsOwner bool
     JoinedAt   *time.Time
     CreatedBy  string
-    PrimaryOrgIDs, SecondaryOrgIDs, LeaderOrgIDs []string
+    PrimaryDepartmentID  string   // 行政主部门（单值，空 = 无主部门）
+    SecondaryDepartmentIDs, LeaderDepartmentIDs []string
 }
 
 func Create(ctx context.Context, tx *gorm.DB, req *CreateReq) (*model.UserEntity, bool, error)
@@ -537,7 +538,7 @@ func Create(ctx context.Context, tx *gorm.DB, req *CreateReq) (*model.UserEntity
 
 边界与失败处理：
 - 必须传入非空 `tx`（与 `person.FindOrCreate` 同约定）。
-- `len(PrimaryOrgIDs) > 1` → `ErrMultiplePrimaryOrg`；目标部门已有其他 leader → `ErrOrgLeaderConflict`；同一 person 在本租户已有 user → `ErrAlreadyInTenant`。哨兵由各 service 映射为各自错误码。
+- `PrimaryDepartmentID` 为单值（`string`，空 = 无主部门，不再有"多主部门"非法态）；目标部门已有其他 leader → `ErrDeptLeaderConflict`；同一 person 在本租户已有 user → `ErrAlreadyInTenant`。哨兵由各 service 映射为各自错误码。
 - `Profile`/`CustomData` 初始化为 `{}`，`JoinedAt` 由调用方给出，与现有实现逐字段对齐。
 
 **3）租户权限开通 `pkg/iam/tenant.ProvisionTenantAdmin`**
@@ -550,7 +551,7 @@ const (
     ProvisionRoleName   = "租户管理员"
     ProvisionRoleDesc   = "租户自服务应用管理员，拥有全部租户自服务权限"
     ProvisionAdminType = model.SysAdminTypeAdmin
-    ProvisionMenuCodes  = "organization,tenant-user,tenant-role,tenant-api-key"
+    ProvisionMenuCodes  = "department,tenant-user,tenant-role,tenant-api-key"
 )
 
 type ProvisionTenantAdminReq struct {
@@ -576,23 +577,23 @@ func ProvisionTenantAdmin(ctx context.Context, tx *gorm.DB, req *ProvisionTenant
 
 ```go
 type CreateTenantWithBuiltinAdminReq struct {
-    Tenant   *CreateWithRootOrgReq // 租户 + 根组织入参
+    Tenant   *CreateWithRootDeptReq // 租户 + 根部门入参
     AdminUser *user.CreateReq      // 管理员入参（Person 或 PersonID 二选一）
 }
 
 type CreateTenantWithBuiltinAdminResult struct {
     Tenant            *model.TenantEntity
-    RootOrg           *model.OrganizationEntity
+    RootDept           *model.DepartmentEntity
     AdminUser         *model.UserEntity
     AdminPersonCreated bool         // false = 命中已有自然人，临时密码不生效
 }
 
-// 覆盖规则：AdminUser.TenantID/Source=builtin/IsOwner=true/PrimaryOrgIDs=[根组织] 由本函数统一设置，
+// 覆盖规则：AdminUser.TenantID/Source=builtin/IsOwner=true/PrimaryDepartmentID=根部门 由本函数统一设置，
 // 调用方无需（也不应）自行拼接，避免两处编排漂移。
 func CreateTenantWithBuiltinAdmin(ctx context.Context, tx *gorm.DB, req *CreateTenantWithBuiltinAdminReq) (*CreateTenantWithBuiltinAdminResult, error)
 ```
 
-`CreateWithRootOrg` 相应改为返回 `(*model.TenantEntity, *model.OrganizationEntity, error)`（原为只返回租户），以便调用方拿到根组织 ID 建立管理员的主组织归属。
+`CreateWithRootDept` 相应改为返回 `(*model.TenantEntity, *model.DepartmentEntity, error)`（原为只返回租户），以便调用方拿到根部门 ID 建立管理员的主部门归属。
 
 **5）`platformadmin.svctenant.Create` 编排（薄编排）**
 
@@ -605,7 +606,7 @@ var result *tenant.CreateTenantWithBuiltinAdminResult
 txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
     var err error
     result, err = tenant.CreateTenantWithBuiltinAdmin(ctx, tx, &tenant.CreateTenantWithBuiltinAdminReq{
-        Tenant: &tenant.CreateWithRootOrgReq{ /* name/type/tag/dbUser/code */ },
+        Tenant: &tenant.CreateWithRootDeptReq{ /* name/type/tag/dbUser/code */ },
         AdminUser: &user.CreateReq{
             Person: &person.FindOrCreateReq{
                 Username: admin.Username, Name: admin.Name,
@@ -622,7 +623,7 @@ txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
 // TODO(delivery): 接入邮件/短信后改为通道下发，响应不再回显明文
 ```
 
-自助建租户（`auth/internal/service/svcoidc/register.go`）调同一个函数，只是 `AdminUser.PersonID = 当前登录 person`——owner 因此同时获得"根组织主归属 + `source=builtin` + 租户管理员角色/应用订阅"，与平台侧完全同构。
+自助建租户（`auth/internal/service/svcoidc/register.go`）调同一个函数，只是 `AdminUser.PersonID = 当前登录 person`——owner 因此同时获得"根部门主归属 + `source=builtin` + 租户管理员角色/应用订阅"，与平台侧完全同构。
 
 **6）强制改密拦截与改密接口（`auth`）**
 
@@ -675,7 +676,7 @@ func (svc *tenantSvc) ResetAdminPassword(ctx *gin.Context, req *dtotenant.Tenant
 
 **8）`tenantadmin.svctenant.user.Create` 改造**
 
-保留全部请求级策略（`requireSystemAdmin`、组织必传、联系方式必填、组织归属校验、`personID` 存在性校验、`OrganizationIDs > 1` 拒绝），事务体替换为 `user.Create(source=manual, MustChangePassword=true)`（D7）：
+保留全部请求级策略（`requireSystemAdmin`、部门必传、联系方式必填、部门归属校验、`personID` 存在性校验、`DepartmentIDs > 1` 拒绝），事务体替换为 `user.Create(source=manual, MustChangePassword=true)`（D7）：
 
 ```go
 // 事务外：先生成临时密码与其哈希（只有在本次新建 person 时才会被写入）
@@ -692,7 +693,7 @@ tx := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
         Source: model.UserSourceManual,
         Name: req.Name, Avatar: req.Avatar, IsSuspended: req.IsSuspended,
         JoinedAt: now, CreatedBy: operatorID,
-        PrimaryOrgIDs: req.OrganizationIDs, SecondaryOrgIDs: req.SecondaryOrgIDs, LeaderOrgIDs: req.LeaderOrgIDs,
+        PrimaryDepartmentID: req.PrimaryDepartmentID, SecondaryDepartmentIDs: req.SecondaryDepartmentIDs, LeaderDepartmentIDs: req.LeaderDepartmentIDs,
     })
     personCreated = created   // 只有 created=true 时 initialPassword 才回显
     return nil
@@ -744,7 +745,7 @@ func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPass
 | 回归项 | 现有测试 | 本次补充 |
 |---|---|---|
 | 平台租户种子（角色/菜单/订阅/管理员/管理员角色） | `pkg/seed/seed_test.go` | 断言 tenant_admin 相关行数不变 + admin `source=builtin` 且 `must_change_password=false` |
-| 租户内建用户（含 person find-or-create、组织关系、leader 唯一） | `tenantadmin/.../user_test.go`、`organization_test.go` | 断言 `source=manual`；保持全部既有断言 |
+| 租户内建用户（含 person find-or-create、部门关系、leader 唯一） | `tenantadmin/.../user_test.go`、`department_test.go` | 断言 `source=manual`；保持全部既有断言 |
 | 租户内重置密码 | `tenantadmin/.../user_test.go` | 新增断言：`must_change_password=true` + 会话/refresh token 被撤销 |
 | 登录/选租户/SSO/静默登录 | `auth/.../oidc_login_test.go`、`provider_flow_test.go`、`sso_cookie_domain_test.go` | 新增：`must_change_password=true` 时不发 code、不建会话；`false` 路径逐字段不变 |
 | 自助注册/建租户 | `auth/.../register_test.go`、`allow_person_create_tenant_test.go` | 断言 owner `source=builtin` + 角色开通 |
@@ -764,7 +765,7 @@ func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPass
 | 里程碑 | 内容 | 可独立交付/回退 |
 |---|---|---|
 | M1 公共能力 | `password.GenerateTemporary`（含 `TODO(delivery)`）+ `BootstrapAdminPassword`；`model.UserSource`；`person.MustChangePassword`；`dao.UserCond.Source`；`audit.ActionTenantAdminPasswordReset`；`pkg/iam/user.Create`；`pkg/iam/tenant.ProvisionTenantAdmin`；单测 | 是（纯新增，无行为变化） |
-| M2 平台建租户 | `dtotenant` DTO + `svctenant.Create` 编排 + 复用 `CreateWithRootOrg` + swagger + 单测 | 是 |
+| M2 平台建租户 | `dtotenant` DTO + `svctenant.Create` 编排 + 复用 `CreateWithRootDept` + swagger + 单测 | 是 |
 | M3 重置兜底（D5） | `ResetAdminPassword` + 路由 + swagger + 单测（含 manual 拒绝与审计） | 是（依赖 M1） |
 | M4 种子复用 | `pkg/seed` 改调 `ProvisionTenantAdmin` + `BootstrapAdminPassword` + admin 补 `builtin`；`seed_test` 绿 | 是 |
 | M5 tenantadmin 改造（D7） | `svcuser.Create` 改调公共函数 + 去 `password` 入参 + 回显 `initialPassword`；`ResetPassword` 改系统生成临时密码 + 返回 `initialPassword` + 强制改密 + 撤销会话；router/controller/swagger 同步；单测 | 是 |
@@ -778,12 +779,12 @@ func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPass
 | 里程碑 | 状态 | 实际产出（与设计的差异在此登记） |
 |---|---|---|
 | M1 公共能力 | ✅ | `pkg/iam/password/temporary.go`（`GenerateTemporary` + `BootstrapAdminPassword`）、`user.go` 的 `UserSource`、`person.MustChangePassword`、`dao.UserCond.Source`、`audit.ActionTenantAdminPasswordReset`、`pkg/iam/user/user.go`（`Create` 返回 `(user, personCreated, error)` + 哨兵错误）、`pkg/iam/tenant/provision.go`（`ProvisionTenantAdmin`）。**新增**：`tenant.CreateTenantWithBuiltinAdmin`（见 §关键逻辑与算法 4）——原设计只在 `svctenant` 内编排，实现时上提为公共函数，使 `auth` 自助建租户与平台侧共用同一份编排 |
-| M2 平台建租户 | ✅ | `TenantCreateReq.Admin`（`binding:"required"`）、`TenantCreateResp{tenantID, adminUserID, adminInitialPassword}`、`svctenant.Create` 薄编排；`svctenant.Create` 不再内联建租户/根组织逻辑 |
+| M2 平台建租户 | ✅ | `TenantCreateReq.Admin`（`binding:"required"`）、`TenantCreateResp{tenantID, adminUserID, adminInitialPassword}`、`svctenant.Create` 薄编排；`svctenant.Create` 不再内联建租户/根部门逻辑 |
 | M3 重置兜底 | ✅ | `ResetAdminPassword` + `POST /v1/platform/tenants/:tenantID/builtin-admin/reset-password`（6 段，符合层级限制）+ 新错误码 `TenantAdminResetPasswordError(100210)` |
 | M4 种子复用 | ✅ | `pkg/seed` 的 `tenant_admin` 角色/菜单/订阅改由 `ProvisionTenantAdmin` 承担；`adminPassword` 常量改用 `password.BootstrapAdminPassword`；种子 admin 补 `source=builtin` 且**不**强制改密（bootstrap 例外，e2e 的 `admin123` 路径不变） |
-| M5 tenantadmin 改造 | ✅ | 建成员/重置密码去 `password` 入参、回显 `initialPassword`；`errors.Is` 映射 `pkg/iam/user` 哨兵错误到 `UserAlreadyInTenantError`/`UserNotExistError`/`UserOrganizationRequiredError`/`OrganizationUserLeaderConflictError`；机器账号（`user_type=machine`）拒绝走重置密码 |
+| M5 tenantadmin 改造 | ✅ | 建成员/重置密码去 `password` 入参、回显 `initialPassword`；`errors.Is` 映射 `pkg/iam/user` 哨兵错误到 `UserAlreadyInTenantError`/`UserNotExistError`/`UserDepartmentRequiredError`/`DepartmentUserLeaderConflictError`；机器账号（`user_type=machine`）拒绝走重置密码 |
 | M6 强制改密后端 | ✅ | `OIDCLoginResp.RequiresPasswordChange`、`CompleteLogin` 拦截、`POST /oidc/login/changePassword`（`dtooidc.OIDCChangePasswordReq`）、`svcperson.UpdatePassword` 清标记 |
-| M7 自助建租户 | ✅ | `svcoidc.CreateTenant` 改调 `CreateTenantWithBuiltinAdmin`，owner 得根组织主归属 + `source=builtin` + 租户管理员角色 |
+| M7 自助建租户 | ✅ | `svcoidc.CreateTenant` 改调 `CreateTenantWithBuiltinAdmin`，owner 得根部门主归属 + `source=builtin` + 租户管理员角色 |
 | M8 前端 | ✅ | `@ark-iam/ui` 新增共享 `InitialPasswordModal`（平台/租户两侧同一交互，落实 D7）；`platform-admin-web` 建租户表单新增必填管理员分组 + 重置管理员密码入口；`tenant-admin-web` 建成员/重置密码改"系统生成 + 一次性展示"；`login-web` 新增强制改密表单（`mode='changePassword'`） |
 | M9 文档与回归 | ✅ | `docs/design/api-reference.md` §3.2/§5.3/§6 同步；三端 swagger 重生成；后端全量测试 + 前端 typecheck/vitest 绿 |
 

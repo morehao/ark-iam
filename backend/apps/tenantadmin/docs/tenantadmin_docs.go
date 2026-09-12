@@ -214,6 +214,559 @@ const docTemplatetenantadmin = `{
                 }
             }
         },
+        "/v1/tenant/departments": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "部门"
+                ],
+                "summary": "创建部门节点",
+                "parameters": [
+                    {
+                        "description": "创建部门",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.DepartmentCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.DepartmentCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/tenant/departments/tree": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "部门"
+                ],
+                "summary": "部门树",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "部门名称过滤",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "状态过滤",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.DepartmentTreeResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/tenant/departments/{departmentID}": {
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "部门"
+                ],
+                "summary": "修改部门（改 parentID 即移动节点）",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "部门ID",
+                        "name": "departmentID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "修改部门",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.DepartmentUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "部门"
+                ],
+                "summary": "删除部门（有子节点/成员需 ?cascade=1）",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "部门ID",
+                        "name": "departmentID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "级联删除子树与成员",
+                        "name": "cascade",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "部门"
+                ],
+                "summary": "更新部门状态（启停用）",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "部门ID",
+                        "name": "departmentID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "更新状态",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.DepartmentStatusReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/tenant/departments/{departmentID}/children": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "部门"
+                ],
+                "summary": "某部门直属子部门分页列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "部门ID(父节点)",
+                        "name": "departmentID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "部门名称过滤",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页数量",
+                        "name": "pageSize",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "状态过滤",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.DepartmentChildrenResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/tenant/departments/{departmentID}/users": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "部门关系"
+                ],
+                "summary": "部门关系分页",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "部门ID",
+                        "name": "departmentID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "关键词(姓名/用户名/邮箱/手机 模糊)",
+                        "name": "keyword",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页数量",
+                        "name": "pageSize",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "primary",
+                            "secondary",
+                            "leader"
+                        ],
+                        "type": "string",
+                        "x-enum-comments": {
+                            "DeptUserRelationLeader": "负责：部门负责人身份，可多条",
+                            "DeptUserRelationPrimary": "归属：行政主部门，每人全局唯一",
+                            "DeptUserRelationSecondary": "参与：跨部门协作，可多条"
+                        },
+                        "x-enum-descriptions": [
+                            "归属：行政主部门，每人全局唯一",
+                            "参与：跨部门协作，可多条",
+                            "负责：部门负责人身份，可多条"
+                        ],
+                        "x-enum-varnames": [
+                            "DeptUserRelationPrimary",
+                            "DeptUserRelationSecondary",
+                            "DeptUserRelationLeader"
+                        ],
+                        "description": "关系类型过滤",
+                        "name": "relationType",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.DepartmentUserPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "部门关系"
+                ],
+                "summary": "添加部门关系（primary/secondary/leader）",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "部门ID",
+                        "name": "departmentID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "添加关系",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.DepartmentUserCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.DepartmentUserCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/tenant/departments/{departmentID}/users/{userID}": {
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "部门关系"
+                ],
+                "summary": "更新部门关系（relationType）",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "部门ID",
+                        "name": "departmentID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "用户ID",
+                        "name": "userID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "更新关系",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.DepartmentUserUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "部门关系"
+                ],
+                "summary": "移除部门关系（含 primary/secondary/leader）",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "部门ID",
+                        "name": "departmentID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "用户ID",
+                        "name": "userID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/v1/tenant/invites": {
             "get": {
                 "consumes": [
@@ -707,559 +1260,6 @@ const docTemplatetenantadmin = `{
                 }
             }
         },
-        "/v1/tenant/organizations": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "组织"
-                ],
-                "summary": "创建组织节点",
-                "parameters": [
-                    {
-                        "description": "创建组织",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtotenant.OrganizationCreateReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtotenant.OrganizationCreateResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/tenant/organizations/tree": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "组织"
-                ],
-                "summary": "组织树",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "组织名称过滤",
-                        "name": "name",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "状态过滤",
-                        "name": "status",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtotenant.OrganizationTreeResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/tenant/organizations/{organizationID}": {
-            "put": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "组织"
-                ],
-                "summary": "修改组织（改 parentID 即移动节点）",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "组织ID",
-                        "name": "organizationID",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "修改组织",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtotenant.OrganizationUpdateReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "组织"
-                ],
-                "summary": "删除组织（有子节点/成员需 ?cascade=1）",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "组织ID",
-                        "name": "organizationID",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "boolean",
-                        "description": "级联删除子树与成员",
-                        "name": "cascade",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "patch": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "组织"
-                ],
-                "summary": "更新组织状态（启停用）",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "组织ID",
-                        "name": "organizationID",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "更新状态",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtotenant.OrganizationStatusReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/tenant/organizations/{organizationID}/children": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "组织"
-                ],
-                "summary": "某部门直属子部门分页列表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "部门ID(父节点)",
-                        "name": "organizationID",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "部门名称过滤",
-                        "name": "name",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "页码",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "每页数量",
-                        "name": "pageSize",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "状态过滤",
-                        "name": "status",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtotenant.OrganizationChildrenResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/tenant/organizations/{organizationID}/users": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "组织关系"
-                ],
-                "summary": "组织关系分页",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "组织ID",
-                        "name": "organizationID",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "关键词(姓名/用户名/邮箱/手机 模糊)",
-                        "name": "keyword",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "页码",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "每页数量",
-                        "name": "pageSize",
-                        "in": "query"
-                    },
-                    {
-                        "enum": [
-                            "primary",
-                            "secondary",
-                            "leader"
-                        ],
-                        "type": "string",
-                        "x-enum-comments": {
-                            "OrgUserRelationLeader": "负责：部门负责人身份，可多条",
-                            "OrgUserRelationPrimary": "归属：行政主部门，每人全局唯一",
-                            "OrgUserRelationSecondary": "参与：跨部门协作，可多条"
-                        },
-                        "x-enum-descriptions": [
-                            "归属：行政主部门，每人全局唯一",
-                            "参与：跨部门协作，可多条",
-                            "负责：部门负责人身份，可多条"
-                        ],
-                        "x-enum-varnames": [
-                            "OrgUserRelationPrimary",
-                            "OrgUserRelationSecondary",
-                            "OrgUserRelationLeader"
-                        ],
-                        "description": "关系类型过滤",
-                        "name": "relationType",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtotenant.OrganizationUserPageListResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "组织关系"
-                ],
-                "summary": "添加组织关系（primary/secondary/leader）",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "组织ID",
-                        "name": "organizationID",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "添加关系",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtotenant.OrganizationUserCreateReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtotenant.OrganizationUserCreateResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/tenant/organizations/{organizationID}/users/{userID}": {
-            "put": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "组织关系"
-                ],
-                "summary": "更新组织关系（relationType）",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "组织ID",
-                        "name": "organizationID",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "用户ID",
-                        "name": "userID",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "更新关系",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtotenant.OrganizationUserUpdateReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "组织关系"
-                ],
-                "summary": "移除组织关系（含 primary/secondary/leader）",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "组织ID",
-                        "name": "organizationID",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "用户ID",
-                        "name": "userID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/v1/tenant/roles": {
             "get": {
                 "consumes": [
@@ -1604,6 +1604,12 @@ const docTemplatetenantadmin = `{
                 "summary": "租户内用户列表分页",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "部门ID(仅筛选恰在该部门的用户,不含子部门)",
+                        "name": "departmentID",
+                        "in": "query"
+                    },
+                    {
                         "type": "boolean",
                         "description": "状态过滤(挂起)",
                         "name": "isSuspended",
@@ -1613,12 +1619,6 @@ const docTemplatetenantadmin = `{
                         "type": "string",
                         "description": "关键词(姓名/用户名/邮箱/手机 模糊)",
                         "name": "keyword",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "部门ID(仅筛选恰在该部门的用户,不含子部门)",
-                        "name": "organizationID",
                         "in": "query"
                     },
                     {
@@ -1710,7 +1710,7 @@ const docTemplatetenantadmin = `{
                 "tags": [
                     "用户"
                 ],
-                "summary": "用户详情（基础信息 + 组织归属 + 角色）",
+                "summary": "用户详情（基础信息 + 部门归属 + 角色）",
                 "parameters": [
                     {
                         "type": "string",
@@ -2236,6 +2236,319 @@ const docTemplatetenantadmin = `{
                 }
             }
         },
+        "dtotenant.DepartmentChildItem": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "code": {
+                    "description": "部门编码(可空)",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间(unix 秒)",
+                    "type": "integer"
+                },
+                "departmentID": {
+                    "description": "部门ID",
+                    "type": "string"
+                },
+                "deptDepth": {
+                    "description": "节点深度",
+                    "type": "integer"
+                },
+                "hasChildren": {
+                    "description": "是否还有下级",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "部门名称",
+                    "type": "string"
+                },
+                "parentID": {
+                    "description": "父节点ID",
+                    "type": "string"
+                },
+                "sort": {
+                    "description": "同级排序",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "状态: active-启用 inactive-停用",
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "description": "更新时间(unix 秒)",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.DepartmentChildrenResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "直属子部门",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.DepartmentChildItem"
+                    }
+                },
+                "total": {
+                    "description": "总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.DepartmentCreateReq": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "code": {
+                    "description": "部门编码(可空)",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "部门名称",
+                    "type": "string"
+                },
+                "parentID": {
+                    "description": "父节点ID,空为根节点",
+                    "type": "string"
+                },
+                "sort": {
+                    "description": "同级排序",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "状态: active-启用 inactive-停用",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.DepartmentCreateResp": {
+            "type": "object",
+            "properties": {
+                "departmentID": {
+                    "description": "部门ID",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.DepartmentStatusReq": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "status": {
+                    "description": "状态: active-启用 inactive-停用",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.DepartmentTreeItem": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "children": {
+                    "description": "子节点",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.DepartmentTreeItem"
+                    }
+                },
+                "code": {
+                    "description": "部门编码(可空)",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间(unix 秒)",
+                    "type": "integer"
+                },
+                "departmentID": {
+                    "description": "部门ID",
+                    "type": "string"
+                },
+                "deptDepth": {
+                    "description": "节点深度(根=1)",
+                    "type": "integer"
+                },
+                "deptPath": {
+                    "description": "祖先链路径(含自身)",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "部门名称",
+                    "type": "string"
+                },
+                "parentID": {
+                    "description": "父节点ID",
+                    "type": "string"
+                },
+                "sort": {
+                    "description": "同级排序",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "状态: active-启用 inactive-停用",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.DepartmentTreeResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "部门树",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.DepartmentTreeItem"
+                    }
+                }
+            }
+        },
+        "dtotenant.DepartmentUpdateReq": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "code": {
+                    "description": "部门编码(可空)",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "部门名称",
+                    "type": "string"
+                },
+                "parentID": {
+                    "description": "父节点ID,空为根节点(改此字段=移动节点)",
+                    "type": "string"
+                },
+                "sort": {
+                    "description": "同级排序",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "状态: active-启用 inactive-停用",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.DepartmentUserCreateReq": {
+            "type": "object",
+            "required": [
+                "userID"
+            ],
+            "properties": {
+                "relationType": {
+                    "description": "关系类型: primary-行政主部门(每用户至多1) secondary-跨部门参与 leader-负责",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.DeptUserRelationType"
+                        }
+                    ]
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.DepartmentUserCreateResp": {
+            "type": "object"
+        },
+        "dtotenant.DepartmentUserPageListItem": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "description": "头像URL",
+                    "type": "string"
+                },
+                "departmentID": {
+                    "description": "部门ID",
+                    "type": "string"
+                },
+                "isSuspended": {
+                    "description": "是否挂起",
+                    "type": "boolean"
+                },
+                "joinedAt": {
+                    "description": "加入时间(关系创建时间)",
+                    "type": "integer"
+                },
+                "primaryEmail": {
+                    "description": "主要邮箱",
+                    "type": "string"
+                },
+                "primaryPhone": {
+                    "description": "主要手机号",
+                    "type": "string"
+                },
+                "relationType": {
+                    "description": "关系类型",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.DeptUserRelationType"
+                        }
+                    ]
+                },
+                "userID": {
+                    "description": "用户ID",
+                    "type": "string"
+                },
+                "userName": {
+                    "description": "用户姓名(租户内)",
+                    "type": "string"
+                },
+                "userType": {
+                    "description": "账号类型(member真实用户/machine服务账号)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserType"
+                        }
+                    ]
+                },
+                "username": {
+                    "description": "全局用户名",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.DepartmentUserPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "关系列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.DepartmentUserPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.DepartmentUserUpdateReq": {
+            "type": "object",
+            "properties": {
+                "relationType": {
+                    "description": "关系类型",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.DeptUserRelationType"
+                        }
+                    ]
+                }
+            }
+        },
         "dtotenant.InviteCreateReq": {
             "type": "object",
             "properties": {
@@ -2303,7 +2616,7 @@ const docTemplatetenantadmin = `{
             "type": "object",
             "required": [
                 "name",
-                "organizationIDs"
+                "primaryDepartmentID"
             ],
             "properties": {
                 "description": {
@@ -2314,14 +2627,11 @@ const docTemplatetenantadmin = `{
                     "description": "服务账号名称",
                     "type": "string"
                 },
-                "organizationIDs": {
-                    "description": "主部门ID列表(primary,至多1个,必传:服务账号必须从属部门)",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
+                "primaryDepartmentID": {
+                    "description": "主部门ID(primary,单值,必传:服务账号必须从属部门)",
+                    "type": "string"
                 },
-                "secondaryOrgIDs": {
+                "secondaryDepartmentIDs": {
                     "description": "参与部门ID列表(secondary,可多条,可选)",
                     "type": "array",
                     "items": {
@@ -2346,6 +2656,13 @@ const docTemplatetenantadmin = `{
                     "description": "创建时间",
                     "type": "integer"
                 },
+                "departments": {
+                    "description": "部门归属(primary/secondary)",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.UserDepartmentItem"
+                    }
+                },
                 "description": {
                     "description": "描述",
                     "type": "string"
@@ -2362,18 +2679,11 @@ const docTemplatetenantadmin = `{
                     "description": "名称",
                     "type": "string"
                 },
-                "organizations": {
-                    "description": "组织归属(primary/secondary)",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dtotenant.UserOrganizationItem"
-                    }
-                },
-                "primaryOrgID": {
+                "primaryDepartmentID": {
                     "description": "主部门ID",
                     "type": "string"
                 },
-                "primaryOrgName": {
+                "primaryDepartmentName": {
                     "description": "主部门名称",
                     "type": "string"
                 },
@@ -2417,11 +2727,11 @@ const docTemplatetenantadmin = `{
                     "description": "名称",
                     "type": "string"
                 },
-                "primaryOrgID": {
+                "primaryDepartmentID": {
                     "description": "主部门ID",
                     "type": "string"
                 },
-                "primaryOrgName": {
+                "primaryDepartmentName": {
                     "description": "主部门名称",
                     "type": "string"
                 },
@@ -2493,11 +2803,11 @@ const docTemplatetenantadmin = `{
                     "description": "服务账号名称",
                     "type": "string"
                 },
-                "primaryOrgID": {
+                "primaryDepartmentID": {
                     "description": "主部门(primary,nil=不变;非nil=替换主部门,不可清空)",
                     "type": "string"
                 },
-                "secondaryOrgIDs": {
+                "secondaryDepartmentIDs": {
                     "description": "参与部门(secondary,nil=不变;[]=清空;含值=全量替换)",
                     "type": "array",
                     "items": {
@@ -2606,319 +2916,6 @@ const docTemplatetenantadmin = `{
                     "items": {
                         "$ref": "#/definitions/dtotenant.MenuTreeItem"
                     }
-                }
-            }
-        },
-        "dtotenant.OrganizationChildItem": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "code": {
-                    "description": "组织编码(可空)",
-                    "type": "string"
-                },
-                "createdAt": {
-                    "description": "创建时间(unix 秒)",
-                    "type": "integer"
-                },
-                "hasChildren": {
-                    "description": "是否还有下级",
-                    "type": "boolean"
-                },
-                "name": {
-                    "description": "组织名称",
-                    "type": "string"
-                },
-                "orgDepth": {
-                    "description": "节点深度",
-                    "type": "integer"
-                },
-                "organizationID": {
-                    "description": "组织ID",
-                    "type": "string"
-                },
-                "parentID": {
-                    "description": "父节点ID",
-                    "type": "string"
-                },
-                "sort": {
-                    "description": "同级排序",
-                    "type": "integer"
-                },
-                "status": {
-                    "description": "状态: active-启用 inactive-停用",
-                    "type": "string"
-                },
-                "updatedAt": {
-                    "description": "更新时间(unix 秒)",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtotenant.OrganizationChildrenResp": {
-            "type": "object",
-            "properties": {
-                "list": {
-                    "description": "直属子部门",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dtotenant.OrganizationChildItem"
-                    }
-                },
-                "total": {
-                    "description": "总数",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtotenant.OrganizationCreateReq": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "code": {
-                    "description": "组织编码(可空)",
-                    "type": "string"
-                },
-                "name": {
-                    "description": "组织名称",
-                    "type": "string"
-                },
-                "parentID": {
-                    "description": "父节点ID,空为根节点",
-                    "type": "string"
-                },
-                "sort": {
-                    "description": "同级排序",
-                    "type": "integer"
-                },
-                "status": {
-                    "description": "状态: active-启用 inactive-停用",
-                    "type": "string"
-                }
-            }
-        },
-        "dtotenant.OrganizationCreateResp": {
-            "type": "object",
-            "properties": {
-                "organizationID": {
-                    "description": "组织ID",
-                    "type": "string"
-                }
-            }
-        },
-        "dtotenant.OrganizationStatusReq": {
-            "type": "object",
-            "required": [
-                "status"
-            ],
-            "properties": {
-                "status": {
-                    "description": "状态: active-启用 inactive-停用",
-                    "type": "string"
-                }
-            }
-        },
-        "dtotenant.OrganizationTreeItem": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "children": {
-                    "description": "子节点",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dtotenant.OrganizationTreeItem"
-                    }
-                },
-                "code": {
-                    "description": "组织编码(可空)",
-                    "type": "string"
-                },
-                "createdAt": {
-                    "description": "创建时间(unix 秒)",
-                    "type": "integer"
-                },
-                "name": {
-                    "description": "组织名称",
-                    "type": "string"
-                },
-                "orgDepth": {
-                    "description": "节点深度(根=1)",
-                    "type": "integer"
-                },
-                "orgPath": {
-                    "description": "祖先链路径(含自身)",
-                    "type": "string"
-                },
-                "organizationID": {
-                    "description": "组织ID",
-                    "type": "string"
-                },
-                "parentID": {
-                    "description": "父节点ID",
-                    "type": "string"
-                },
-                "sort": {
-                    "description": "同级排序",
-                    "type": "integer"
-                },
-                "status": {
-                    "description": "状态: active-启用 inactive-停用",
-                    "type": "string"
-                }
-            }
-        },
-        "dtotenant.OrganizationTreeResp": {
-            "type": "object",
-            "properties": {
-                "list": {
-                    "description": "组织树",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dtotenant.OrganizationTreeItem"
-                    }
-                }
-            }
-        },
-        "dtotenant.OrganizationUpdateReq": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "code": {
-                    "description": "组织编码(可空)",
-                    "type": "string"
-                },
-                "name": {
-                    "description": "组织名称",
-                    "type": "string"
-                },
-                "parentID": {
-                    "description": "父节点ID,空为根节点(改此字段=移动节点)",
-                    "type": "string"
-                },
-                "sort": {
-                    "description": "同级排序",
-                    "type": "integer"
-                },
-                "status": {
-                    "description": "状态: active-启用 inactive-停用",
-                    "type": "string"
-                }
-            }
-        },
-        "dtotenant.OrganizationUserCreateReq": {
-            "type": "object",
-            "required": [
-                "userID"
-            ],
-            "properties": {
-                "relationType": {
-                    "description": "关系类型: primary-行政主部门(每用户至多1) secondary-跨部门参与 leader-负责",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.OrgUserRelationType"
-                        }
-                    ]
-                },
-                "userID": {
-                    "description": "用户ID",
-                    "type": "string"
-                }
-            }
-        },
-        "dtotenant.OrganizationUserCreateResp": {
-            "type": "object"
-        },
-        "dtotenant.OrganizationUserPageListItem": {
-            "type": "object",
-            "properties": {
-                "avatar": {
-                    "description": "头像URL",
-                    "type": "string"
-                },
-                "isSuspended": {
-                    "description": "是否挂起",
-                    "type": "boolean"
-                },
-                "joinedAt": {
-                    "description": "加入时间(关系创建时间)",
-                    "type": "integer"
-                },
-                "organizationID": {
-                    "description": "组织ID",
-                    "type": "string"
-                },
-                "primaryEmail": {
-                    "description": "主要邮箱",
-                    "type": "string"
-                },
-                "primaryPhone": {
-                    "description": "主要手机号",
-                    "type": "string"
-                },
-                "relationType": {
-                    "description": "关系类型",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.OrgUserRelationType"
-                        }
-                    ]
-                },
-                "userID": {
-                    "description": "用户ID",
-                    "type": "string"
-                },
-                "userName": {
-                    "description": "用户姓名(租户内)",
-                    "type": "string"
-                },
-                "userType": {
-                    "description": "账号类型(member真实用户/machine服务账号)",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.UserType"
-                        }
-                    ]
-                },
-                "username": {
-                    "description": "全局用户名",
-                    "type": "string"
-                }
-            }
-        },
-        "dtotenant.OrganizationUserPageListResp": {
-            "type": "object",
-            "properties": {
-                "list": {
-                    "description": "关系列表",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dtotenant.OrganizationUserPageListItem"
-                    }
-                },
-                "total": {
-                    "description": "总数",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtotenant.OrganizationUserUpdateReq": {
-            "type": "object",
-            "properties": {
-                "relationType": {
-                    "description": "关系类型",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.OrgUserRelationType"
-                        }
-                    ]
                 }
             }
         },
@@ -3175,7 +3172,7 @@ const docTemplatetenantadmin = `{
             "type": "object",
             "required": [
                 "name",
-                "organizationIDs"
+                "primaryDepartmentID"
             ],
             "properties": {
                 "avatar": {
@@ -3186,7 +3183,7 @@ const docTemplatetenantadmin = `{
                     "description": "是否挂起",
                     "type": "boolean"
                 },
-                "leaderOrgIDs": {
+                "leaderDepartmentIDs": {
                     "description": "负责部门ID列表(leader,可多条,可选;每部门至多1负责人)",
                     "type": "array",
                     "items": {
@@ -3197,15 +3194,12 @@ const docTemplatetenantadmin = `{
                     "description": "姓名(新建 person 时的自然人姓名)",
                     "type": "string"
                 },
-                "organizationIDs": {
-                    "description": "行政主部门ID列表(primary,至多1个,必传:用户必须从属部门)",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
                 "personID": {
                     "description": "已有自然人ID(可选,优先关联)",
+                    "type": "string"
+                },
+                "primaryDepartmentID": {
+                    "description": "行政主部门ID(primary,单值,必传:用户必须从属部门)",
                     "type": "string"
                 },
                 "primaryEmail": {
@@ -3216,7 +3210,7 @@ const docTemplatetenantadmin = `{
                     "description": "主要手机号",
                     "type": "string"
                 },
-                "secondaryOrgIDs": {
+                "secondaryDepartmentIDs": {
                     "description": "参与部门ID列表(secondary,可多条,可选)",
                     "type": "array",
                     "items": {
@@ -3242,6 +3236,27 @@ const docTemplatetenantadmin = `{
                 }
             }
         },
+        "dtotenant.UserDepartmentItem": {
+            "type": "object",
+            "properties": {
+                "departmentID": {
+                    "description": "部门ID",
+                    "type": "string"
+                },
+                "departmentName": {
+                    "description": "部门名称",
+                    "type": "string"
+                },
+                "relationType": {
+                    "description": "关系类型",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.DeptUserRelationType"
+                        }
+                    ]
+                }
+            }
+        },
         "dtotenant.UserDetailResp": {
             "type": "object",
             "properties": {
@@ -3253,6 +3268,13 @@ const docTemplatetenantadmin = `{
                     "description": "创建时间",
                     "type": "integer"
                 },
+                "departments": {
+                    "description": "部门归属",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.UserDepartmentItem"
+                    }
+                },
                 "isSuspended": {
                     "description": "是否挂起",
                     "type": "boolean"
@@ -3261,19 +3283,12 @@ const docTemplatetenantadmin = `{
                     "description": "姓名",
                     "type": "string"
                 },
-                "organizations": {
-                    "description": "组织归属",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dtotenant.UserOrganizationItem"
-                    }
+                "primaryDepartmentName": {
+                    "description": "主部门名称",
+                    "type": "string"
                 },
                 "primaryEmail": {
                     "description": "主要邮箱",
-                    "type": "string"
-                },
-                "primaryOrgName": {
-                    "description": "主组织名称",
                     "type": "string"
                 },
                 "primaryPhone": {
@@ -3419,27 +3434,6 @@ const docTemplatetenantadmin = `{
                 }
             }
         },
-        "dtotenant.UserOrganizationItem": {
-            "type": "object",
-            "properties": {
-                "organizationID": {
-                    "description": "组织ID",
-                    "type": "string"
-                },
-                "organizationName": {
-                    "description": "组织名称",
-                    "type": "string"
-                },
-                "relationType": {
-                    "description": "关系类型",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.OrgUserRelationType"
-                        }
-                    ]
-                }
-            }
-        },
         "dtotenant.UserPageListItem": {
             "type": "object",
             "properties": {
@@ -3459,12 +3453,12 @@ const docTemplatetenantadmin = `{
                     "description": "姓名",
                     "type": "string"
                 },
-                "primaryEmail": {
-                    "description": "主要邮箱",
+                "primaryDepartmentName": {
+                    "description": "主部门名称",
                     "type": "string"
                 },
-                "primaryOrgName": {
-                    "description": "主组织名称",
+                "primaryEmail": {
+                    "description": "主要邮箱",
                     "type": "string"
                 },
                 "primaryPhone": {
@@ -3593,7 +3587,7 @@ const docTemplatetenantadmin = `{
                     "description": "是否挂起",
                     "type": "boolean"
                 },
-                "leaderOrgIDs": {
+                "leaderDepartmentIDs": {
                     "description": "负责部门(leader,nil=不变;[]=清空;含值=全量替换;每部门至多1负责人)",
                     "type": "array",
                     "items": {
@@ -3604,19 +3598,19 @@ const docTemplatetenantadmin = `{
                     "description": "姓名",
                     "type": "string"
                 },
-                "primaryEmail": {
-                    "description": "主要邮箱(nil=不变)",
+                "primaryDepartmentID": {
+                    "description": "主部门(primary,nil=不变;非nil=替换主部门,不可清空)",
                     "type": "string"
                 },
-                "primaryOrgID": {
-                    "description": "主部门(primary,nil=不变;非nil=替换主部门,不可清空)",
+                "primaryEmail": {
+                    "description": "主要邮箱(nil=不变)",
                     "type": "string"
                 },
                 "primaryPhone": {
                     "description": "主要手机号(nil=不变)",
                     "type": "string"
                 },
-                "secondaryOrgIDs": {
+                "secondaryDepartmentIDs": {
                     "description": "参与部门(secondary,nil=不变;[]=清空;含值=全量替换)",
                     "type": "array",
                     "items": {
@@ -3643,6 +3637,29 @@ const docTemplatetenantadmin = `{
                     "type": "string"
                 }
             }
+        },
+        "model.DeptUserRelationType": {
+            "type": "string",
+            "enum": [
+                "primary",
+                "secondary",
+                "leader"
+            ],
+            "x-enum-comments": {
+                "DeptUserRelationLeader": "负责：部门负责人身份，可多条",
+                "DeptUserRelationPrimary": "归属：行政主部门，每人全局唯一",
+                "DeptUserRelationSecondary": "参与：跨部门协作，可多条"
+            },
+            "x-enum-descriptions": [
+                "归属：行政主部门，每人全局唯一",
+                "参与：跨部门协作，可多条",
+                "负责：部门负责人身份，可多条"
+            ],
+            "x-enum-varnames": [
+                "DeptUserRelationPrimary",
+                "DeptUserRelationSecondary",
+                "DeptUserRelationLeader"
+            ]
         },
         "model.MenuStatus": {
             "type": "string",
@@ -3709,29 +3726,6 @@ const docTemplatetenantadmin = `{
                 "MenuVisibilityAdmin"
             ]
         },
-        "model.OrgUserRelationType": {
-            "type": "string",
-            "enum": [
-                "primary",
-                "secondary",
-                "leader"
-            ],
-            "x-enum-comments": {
-                "OrgUserRelationLeader": "负责：部门负责人身份，可多条",
-                "OrgUserRelationPrimary": "归属：行政主部门，每人全局唯一",
-                "OrgUserRelationSecondary": "参与：跨部门协作，可多条"
-            },
-            "x-enum-descriptions": [
-                "归属：行政主部门，每人全局唯一",
-                "参与：跨部门协作，可多条",
-                "负责：部门负责人身份，可多条"
-            ],
-            "x-enum-varnames": [
-                "OrgUserRelationPrimary",
-                "OrgUserRelationSecondary",
-                "OrgUserRelationLeader"
-            ]
-        },
         "model.SysAdminType": {
             "type": "string",
             "enum": [
@@ -3739,11 +3733,11 @@ const docTemplatetenantadmin = `{
                 "normal"
             ],
             "x-enum-comments": {
-                "SysAdminTypeAdmin": "管理员角色：具备系统管理能力（可管理租户成员/组织/角色/密钥等）",
+                "SysAdminTypeAdmin": "管理员角色：具备系统管理能力（可管理租户成员/部门/角色/密钥等）",
                 "SysAdminTypeNormal": "普通角色：不具备系统管理能力"
             },
             "x-enum-descriptions": [
-                "管理员角色：具备系统管理能力（可管理租户成员/组织/角色/密钥等）",
+                "管理员角色：具备系统管理能力（可管理租户成员/部门/角色/密钥等）",
                 "普通角色：不具备系统管理能力"
             ],
             "x-enum-varnames": [
@@ -3758,12 +3752,12 @@ const docTemplatetenantadmin = `{
                 "machine"
             ],
             "x-enum-comments": {
-                "UserTypeMachine": "服务账号：租户内机器主体，不可登录、不入组织，作为 API Key 归属主体",
-                "UserTypeMember": "真实用户：person 映射的租户成员，可登录、可入组织"
+                "UserTypeMachine": "服务账号：租户内机器主体，不可登录、不入部门，作为 API Key 归属主体",
+                "UserTypeMember": "真实用户：person 映射的租户成员，可登录、可入部门"
             },
             "x-enum-descriptions": [
-                "真实用户：person 映射的租户成员，可登录、可入组织",
-                "服务账号：租户内机器主体，不可登录、不入组织，作为 API Key 归属主体"
+                "真实用户：person 映射的租户成员，可登录、可入部门",
+                "服务账号：租户内机器主体，不可登录、不入部门，作为 API Key 归属主体"
             ],
             "x-enum-varnames": [
                 "UserTypeMember",

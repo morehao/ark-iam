@@ -26,11 +26,6 @@ type JoinTenantReq struct {
 type UserinfoReq struct {
 }
 
-type AssignDepartmentsReq struct {
-	UserID        string   `json:"userID" binding:"required"`        // 用户ID
-	DepartmentIDs []string `json:"departmentIDs" binding:"required"` // 部门ID列表
-}
-
 type ConnectorDeleteReq struct {
 	ConnectorID string `json:"-" uri:"connectorID" binding:"required"` // 连接器ID
 }

@@ -78,7 +78,7 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 }
 
 // @Tags 用户
-// @Summary 用户详情（基础信息 + 组织归属 + 角色）
+// @Summary 用户详情（基础信息 + 部门归属 + 角色）
 // @accept application/json
 // @Produce application/json
 // @Param userID path string true "用户ID"

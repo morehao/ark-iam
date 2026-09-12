@@ -94,7 +94,6 @@ func makeInternalHS256Token(t *testing.T, sub string) string {
 			"userId":    float64(1),
 			"personId":  float64(88),
 			"tenantId":  float64(1),
-			"orgId":     float64(1),
 			"deptId":    float64(1),
 			"userType":  "user",
 			"tokenType": "auth",

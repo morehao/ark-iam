@@ -1,5 +1,5 @@
 export * from './response'
 export * from './auth'
-export * from './organization'
+export * from './department'
 export * from './platform'
 export * from './tenant'

@@ -67,8 +67,8 @@ func TestSeedIamSQLite(t *testing.T) {
 	assertCount("user_role", 2)
 	assertCount("role_menu", 15)
 	assertCount("tenant_application", 2)
-	assertCount("organization", 1)
-	assertCount("organization_user", 1)
+	assertCount("department", 1)
+	assertCount("department_user", 1)
 
 	// 内置唯一角色 admin 的 admin_type = admin（种子显式能力标签，非 scope 推导）
 	adminTypeByCode := map[string]model.SysAdminType{}
@@ -110,7 +110,7 @@ func TestSeedIamSQLite(t *testing.T) {
 	}
 
 	// tenant_admin 预授权租户自服务应用全部 4 个菜单
-	wantMenuCodes := map[string]bool{"organization": false, "tenant-user": false, "tenant-role": false, "tenant-api-key": false}
+	wantMenuCodes := map[string]bool{"department": false, "tenant-user": false, "tenant-role": false, "tenant-api-key": false}
 	menuIDByCode := map[string]string{}
 	var menus []model.MenuEntity
 	if err := db.Find(&menus).Error; err != nil {
@@ -165,14 +165,14 @@ func TestSeedIamSQLite(t *testing.T) {
 		t.Fatalf("admin user roles want {admin, tenant_admin}, got %v", roleIDsOfAdmin)
 	}
 
-	var rootOrg model.OrganizationEntity
-	if err := db.Where("tenant_id = ? AND parent_id = ?", tenant.ID, "").First(&rootOrg).Error; err != nil {
-		t.Fatalf("root organization not found: %v", err)
+	var rootDept model.DepartmentEntity
+	if err := db.Where("tenant_id = ? AND parent_id = ?", tenant.ID, "").First(&rootDept).Error; err != nil {
+		t.Fatalf("root department not found: %v", err)
 	}
-	var ou model.OrganizationUserEntity
-	if err := db.Where("tenant_id = ? AND user_id = ? AND organization_id = ? AND relation_type = ?",
-		tenant.ID, adminUser.ID, rootOrg.ID, model.OrgUserRelationPrimary).First(&ou).Error; err != nil {
-		t.Fatalf("admin organization relation not found: %v", err)
+	var ou model.DepartmentUserEntity
+	if err := db.Where("tenant_id = ? AND user_id = ? AND department_id = ? AND relation_type = ?",
+		tenant.ID, adminUser.ID, rootDept.ID, model.DeptUserRelationPrimary).First(&ou).Error; err != nil {
+		t.Fatalf("admin department relation not found: %v", err)
 	}
 }
 
@@ -314,7 +314,7 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 			}
 		}
 	}
-	for _, want := range []string{"dashboard", "menu", "tenant", "application", "tenant-application", "oauth-client", "domain", "log", "organization", "tenant-user", "tenant-role"} {
+	for _, want := range []string{"dashboard", "menu", "tenant", "application", "tenant-application", "oauth-client", "domain", "log", "department", "tenant-user", "tenant-role"} {
 		if !granted[want] {
 			t.Errorf("admin role missing menu grant %s", want)
 		}

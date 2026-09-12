@@ -19,7 +19,7 @@ import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, fmtTime, InitialPasswordModal, NAME_COL_WIDTH, NameLink, nameColumn, PageContainer, STATUS_COL_WIDTH, SuspendedTag, tableScrollX, textColumn, TEXT_COL_WIDTH, timeColumn, tokens } from '@ark-iam/ui'
 import type {
-  OrganizationItem,
+  DepartmentItem,
   TenantApiKeyItem,
   TenantMachineUserDetail,
   TenantMachineUserItem,
@@ -43,17 +43,17 @@ import {
   updateMachineUserStatus,
 } from '../../api/machineUser'
 import { getApiKeyPageList } from '../../api/apiKey'
-import { getOrganizationTree } from '../../api/organization'
+import { getDepartmentTree } from '../../api/department'
 import RoleAssignEditor from '../../components/RoleAssignEditor'
 import UserIdentityTab from '../../components/UserIdentityTab'
 import UserLoginLogTab from '../../components/UserLoginLogTab'
 import { KeyStateTag } from '../apiKey/KeyState'
 
-// 组织关系类型 -> 展示标签
+// 部门关系类型 -> 展示标签
 const RELATION_TAG: Record<string, { color: string; label: string }> = {
-  primary: { color: 'gold', label: '主组织' },
-  secondary: { color: 'blue', label: '参与组织' },
-  leader: { color: 'green', label: '负责组织' },
+  primary: { color: 'gold', label: '主部门' },
+  secondary: { color: 'blue', label: '参与部门' },
+  leader: { color: 'green', label: '负责部门' },
 }
 
 // ==================== Tab：用户（真实用户，保持原逻辑不变） ====================
@@ -65,17 +65,17 @@ function UsersPane() {
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
   const [suspended, setSuspended] = useState<boolean | undefined>()
-  const [organizationID, setOrganizationID] = useState<string>()
+  const [departmentID, setDepartmentID] = useState<string>()
 
   // 创建 / 编辑
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<TenantUserItem | null>(null)
   const [form] = Form.useForm()
   const [submitLoading, setSubmitLoading] = useState(false)
-  // 编辑前的组织关系快照：仅在组织关系变化时才随 PATCH 提交，避免无谓地重置 joined_at
-  const [orgBefore, setOrgBefore] = useState<{ primaryOrgID?: string; secondaryOrgIDs: string[]; leaderOrgIDs: string[] }>({
-    secondaryOrgIDs: [],
-    leaderOrgIDs: [],
+  // 编辑前的部门关系快照：仅在部门关系变化时才随 PATCH 提交，避免无谓地重置 joined_at
+  const [deptBefore, setDeptBefore] = useState<{ primaryDepartmentID?: string; secondaryDepartmentIDs: string[]; leaderDepartmentIDs: string[] }>({
+    secondaryDepartmentIDs: [],
+    leaderDepartmentIDs: [],
   })
 
   // 详情 Drawer
@@ -83,8 +83,8 @@ function UsersPane() {
   const [detail, setDetail] = useState<TenantUserDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
 
-  // 组织树（创建/编辑表单组织下拉）
-  const [orgTree, setOrgTree] = useState<OrganizationItem[]>([])
+  // 部门树（创建/编辑表单部门下拉）
+  const [deptTree, setDeptTree] = useState<DepartmentItem[]>([])
 
   // 授权角色（列表行操作 Modal：按应用授权，逻辑收敛于共享组件 RoleAssignEditor）
   const [roleTarget, setRoleTarget] = useState<TenantUserItem | null>(null)
@@ -100,7 +100,7 @@ function UsersPane() {
         pageSize,
         keyword: keyword || undefined,
         isSuspended: suspended,
-        organizationID: organizationID || undefined,
+        departmentID: departmentID || undefined,
       })
       setData(resp?.list || [])
       setTotal(resp?.total || 0)
@@ -109,15 +109,15 @@ function UsersPane() {
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, keyword, suspended, organizationID])
+  }, [page, pageSize, keyword, suspended, departmentID])
 
   useEffect(() => {
     void fetchData()
   }, [fetchData])
 
-  // 组织树（创建/编辑表单组织下拉共用）
+  // 部门树（创建/编辑表单部门下拉共用）
   useEffect(() => {
-    getOrganizationTree().then((resp) => setOrgTree(resp?.list || [])).catch(() => {})
+    getDepartmentTree().then((resp) => setDeptTree(resp?.list || [])).catch(() => {})
   }, [])
 
   const openCreate = () => {
@@ -126,14 +126,14 @@ function UsersPane() {
     setModalOpen(true)
   }
 
-  // 编辑：先取详情回填（组织关系在编辑弹窗中一并维护：主/参与/负责组织）
+  // 编辑：先取详情回填（部门关系在编辑弹窗中一并维护：主/参与/负责部门）
   const openEdit = async (record: TenantUserItem) => {
     const detail = await getTenantUserDetail(record.userID).catch(() => null)
     if (!detail) return
-    const nextPrimary = pickOrgs(detail.organizations, 'primary')[0]?.organizationID
-    const nextSecondary = pickOrgs(detail.organizations, 'secondary').map((o) => o.organizationID)
-    const nextLeader = pickOrgs(detail.organizations, 'leader').map((o) => o.organizationID)
-    setOrgBefore({ primaryOrgID: nextPrimary, secondaryOrgIDs: nextSecondary, leaderOrgIDs: nextLeader })
+    const nextPrimary = pickDepts(detail.departments, 'primary')[0]?.departmentID
+    const nextSecondary = pickDepts(detail.departments, 'secondary').map((o) => o.departmentID)
+    const nextLeader = pickDepts(detail.departments, 'leader').map((o) => o.departmentID)
+    setDeptBefore({ primaryDepartmentID: nextPrimary, secondaryDepartmentIDs: nextSecondary, leaderDepartmentIDs: nextLeader })
     setEditing(record)
     form.setFieldsValue({
       name: detail.name,
@@ -142,9 +142,9 @@ function UsersPane() {
       primaryPhone: detail.primaryPhone,
       avatar: detail.avatar,
       isSuspended: detail.isSuspended,
-      primaryOrgID: nextPrimary,
-      secondaryOrgIDs: nextSecondary,
-      leaderOrgIDs: nextLeader,
+      primaryDepartmentID: nextPrimary,
+      secondaryDepartmentIDs: nextSecondary,
+      leaderDepartmentIDs: nextLeader,
     })
     setModalOpen(true)
   }
@@ -162,9 +162,9 @@ function UsersPane() {
           primaryPhone: string
           avatar: string
           isSuspended: boolean
-          primaryOrgID?: string
-          secondaryOrgIDs?: string[]
-          leaderOrgIDs?: string[]
+          primaryDepartmentID?: string
+          secondaryDepartmentIDs?: string[]
+          leaderDepartmentIDs?: string[]
         } = {
           userID: editing.userID,
           name: values.name,
@@ -174,12 +174,12 @@ function UsersPane() {
           avatar: values.avatar,
           isSuspended: values.isSuspended,
         }
-        // 组织关系仅在变化时提交（PATCH 局部更新语义：不传=不变），避免无谓重写归属行
-        const secondary = values.secondaryOrgIDs || []
-        const leader = values.leaderOrgIDs || []
-        if (values.primaryOrgID !== orgBefore.primaryOrgID) patch.primaryOrgID = values.primaryOrgID
-        if (!sameSet(secondary, orgBefore.secondaryOrgIDs)) patch.secondaryOrgIDs = secondary
-        if (!sameSet(leader, orgBefore.leaderOrgIDs)) patch.leaderOrgIDs = leader
+        // 部门关系仅在变化时提交（PATCH 局部更新语义：不传=不变），避免无谓重写归属行
+        const secondary = values.secondaryDepartmentIDs || []
+        const leader = values.leaderDepartmentIDs || []
+        if (values.primaryDepartmentID !== deptBefore.primaryDepartmentID) patch.primaryDepartmentID = values.primaryDepartmentID
+        if (!sameSet(secondary, deptBefore.secondaryDepartmentIDs)) patch.secondaryDepartmentIDs = secondary
+        if (!sameSet(leader, deptBefore.leaderDepartmentIDs)) patch.leaderDepartmentIDs = leader
         await updateTenantUser(patch)
         message.success('保存成功')
       } else {
@@ -189,9 +189,9 @@ function UsersPane() {
           primaryEmail: values.primaryEmail,
           primaryPhone: values.primaryPhone,
           isSuspended: values.isSuspended,
-          organizationIDs: [values.primaryOrgID],
-          secondaryOrgIDs: values.secondaryOrgIDs || [],
-          leaderOrgIDs: values.leaderOrgIDs || [],
+          primaryDepartmentID: values.primaryDepartmentID,
+          secondaryDepartmentIDs: values.secondaryDepartmentIDs || [],
+          leaderDepartmentIDs: values.leaderDepartmentIDs || [],
         })
         setModalOpen(false)
         void fetchData()
@@ -264,7 +264,7 @@ function UsersPane() {
     },
     textColumn<TenantUserItem>({ title: '邮箱', dataIndex: 'primaryEmail', width: TEXT_COL_WIDTH }),
     textColumn<TenantUserItem>({ title: '手机号', dataIndex: 'primaryPhone', width: CODE_COL_WIDTH, monospace: true }),
-    textColumn<TenantUserItem>({ title: '主组织', dataIndex: 'primaryOrgName', width: NAME_COL_WIDTH }),
+    textColumn<TenantUserItem>({ title: '主部门', dataIndex: 'primaryDepartmentName', width: NAME_COL_WIDTH }),
     { title: '角色数', dataIndex: 'roleCount', key: 'roleCount', width: COUNT_COL_WIDTH, render: (v: number) => v || 0 },
     {
       title: '状态',
@@ -298,13 +298,13 @@ function UsersPane() {
         <Space wrap>
           <TreeSelect
             allowClear
-            treeData={toTreeSelect(orgTree)}
+            treeData={toTreeSelect(deptTree)}
             treeDefaultExpandAll
-            placeholder="按组织筛选（恰在该组织）"
+            placeholder="按部门筛选（恰在该部门）"
             style={{ width: 220 }}
-            value={organizationID}
+            value={departmentID}
             onChange={(v) => {
-              setOrganizationID(v)
+              setDepartmentID(v)
               setPage(1)
             }}
           />
@@ -363,7 +363,7 @@ function UsersPane() {
         }}
       />
 
-      {/* 新建 / 编辑用户：基础信息 + 组织关系（主/参与/负责组织） + 账号状态 */}
+      {/* 新建 / 编辑用户：基础信息 + 部门关系（主/参与/负责部门） + 账号状态 */}
       <Modal
         title={editing ? '编辑用户' : '新建用户'}
         open={modalOpen}
@@ -377,29 +377,29 @@ function UsersPane() {
           <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}>
             <Input placeholder="如：张三（无匹配自然人时按此姓名创建）" />
           </Form.Item>
-          <Form.Item name="primaryOrgID" label="主组织" rules={[{ required: true, message: '请选择主组织' }]}>
+          <Form.Item name="primaryDepartmentID" label="主部门" rules={[{ required: true, message: '请选择主部门' }]}>
             <TreeSelect
-              treeData={toTreeSelect(orgTree)}
+              treeData={toTreeSelect(deptTree)}
               treeDefaultExpandAll
-              placeholder="选择主组织（行政归属，唯一；同时建立组织归属）"
+              placeholder="选择主部门（行政归属，唯一；同时建立部门归属）"
             />
           </Form.Item>
-          <Form.Item name="secondaryOrgIDs" label="参与组织">
+          <Form.Item name="secondaryDepartmentIDs" label="参与部门">
             <TreeSelect
-              treeData={toTreeSelect(orgTree)}
+              treeData={toTreeSelect(deptTree)}
               treeDefaultExpandAll
               multiple
               allowClear
-              placeholder="选择参与组织（可多个，跨组织协作）"
+              placeholder="选择参与部门（可多个，跨部门协作）"
             />
           </Form.Item>
-          <Form.Item name="leaderOrgIDs" label="负责组织">
+          <Form.Item name="leaderDepartmentIDs" label="负责部门">
             <TreeSelect
-              treeData={toTreeSelect(orgTree)}
+              treeData={toTreeSelect(deptTree)}
               treeDefaultExpandAll
               multiple
               allowClear
-              placeholder="选择负责组织（可多个，但每组织至多一位负责人）"
+              placeholder="选择负责部门（可多个，但每部门至多一位负责人）"
             />
           </Form.Item>
           <Form.Item
@@ -442,7 +442,7 @@ function UsersPane() {
         </Form>
       </Modal>
 
-      {/* 详情 Drawer：基础信息 / 组织关系 / 角色 */}
+      {/* 详情 Drawer：基础信息 / 部门关系 / 角色 */}
       <Drawer title="用户详情" width={560} open={detailOpen} onClose={() => setDetailOpen(false)} destroyOnClose={false}>
         {detailLoading ? (
           <div style={{ padding: 60, textAlign: 'center', color: tokens.textPlaceholder }}>加载中...</div>
@@ -472,15 +472,15 @@ function UsersPane() {
                 ),
               },
               {
-                key: 'org',
-                label: '组织关系',
+                key: 'dept',
+                label: '部门关系',
                 children: (
                   <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                    <OrgRow label="主组织" relation="primary" orgs={pickOrgs(detail.organizations, 'primary')} />
-                    <OrgRow label="参与组织" relation="secondary" orgs={pickOrgs(detail.organizations, 'secondary')} />
-                    <OrgRow label="负责组织" relation="leader" orgs={pickOrgs(detail.organizations, 'leader')} />
+                    <DeptRow label="主部门" relation="primary" depts={pickDepts(detail.departments, 'primary')} />
+                    <DeptRow label="参与部门" relation="secondary" depts={pickDepts(detail.departments, 'secondary')} />
+                    <DeptRow label="负责部门" relation="leader" depts={pickDepts(detail.departments, 'leader')} />
                     <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>
-                      组织关系的调整请使用「编辑」：主/参与/负责组织在编辑弹窗中全量维护
+                      部门关系的调整请使用「编辑」：主/参与/负责部门在编辑弹窗中全量维护
                     </div>
                   </Space>
                 ),
@@ -553,8 +553,8 @@ function ServiceAccountsPane() {
   const [editing, setEditing] = useState<TenantMachineUserItem | null>(null)
   const [form] = Form.useForm()
   const [submitLoading, setSubmitLoading] = useState(false)
-  // 编辑前的组织快照：仅在组织关系变化时才随 PUT 提交（可空字段语义：不传=不变）
-  const [orgBefore, setOrgBefore] = useState<{ primaryOrgID?: string; secondaryOrgIDs: string[] }>({ secondaryOrgIDs: [] })
+  // 编辑前的部门快照：仅在部门关系变化时才随 PUT 提交（可空字段语义：不传=不变）
+  const [deptBefore, setDeptBefore] = useState<{ primaryDepartmentID?: string; secondaryDepartmentIDs: string[] }>({ secondaryDepartmentIDs: [] })
 
   // 详情 Drawer
   const [detailOpen, setDetailOpen] = useState(false)
@@ -563,8 +563,8 @@ function ServiceAccountsPane() {
   // 打开详情时的行记录：Drawer 内「编辑」复用表格行编辑逻辑
   const [activeRecord, setActiveRecord] = useState<TenantMachineUserItem | null>(null)
 
-  // 组织树（创建/编辑表单组织下拉，与真实用户表单的组织选择一致）
-  const [orgTree, setOrgTree] = useState<OrganizationItem[]>([])
+  // 部门树（创建/编辑表单部门下拉，与真实用户表单的部门选择一致）
+  const [deptTree, setDeptTree] = useState<DepartmentItem[]>([])
 
   // 服务账号 API 密钥（详情内只读）
   const [machineKeys, setMachineKeys] = useState<TenantApiKeyItem[]>([])
@@ -592,9 +592,9 @@ function ServiceAccountsPane() {
     void fetchData()
   }, [fetchData])
 
-  // 组织树（创建/编辑表单组织下拉共用）
+  // 部门树（创建/编辑表单部门下拉共用）
   useEffect(() => {
-    getOrganizationTree().then((resp) => setOrgTree(resp?.list || [])).catch(() => {})
+    getDepartmentTree().then((resp) => setDeptTree(resp?.list || [])).catch(() => {})
   }, [])
 
   const openCreate = () => {
@@ -607,15 +607,15 @@ function ServiceAccountsPane() {
   const openEdit = async (record: TenantMachineUserItem) => {
     const detail = await getMachineUserDetail(record.machineUserID).catch(() => null)
     if (!detail) return
-    const nextPrimary = pickOrgs(detail.organizations, 'primary')[0]?.organizationID || detail.primaryOrgID || ''
-    const nextSecondary = pickOrgs(detail.organizations, 'secondary').map((o) => o.organizationID)
-    setOrgBefore({ primaryOrgID: nextPrimary || undefined, secondaryOrgIDs: nextSecondary })
+    const nextPrimary = pickDepts(detail.departments, 'primary')[0]?.departmentID || detail.primaryDepartmentID || ''
+    const nextSecondary = pickDepts(detail.departments, 'secondary').map((o) => o.departmentID)
+    setDeptBefore({ primaryDepartmentID: nextPrimary || undefined, secondaryDepartmentIDs: nextSecondary })
     setEditing(record)
     form.setFieldsValue({
       name: detail.name,
       description: detail.description,
-      primaryOrgID: nextPrimary || undefined,
-      secondaryOrgIDs: nextSecondary,
+      primaryDepartmentID: nextPrimary || undefined,
+      secondaryDepartmentIDs: nextSecondary,
     })
     setModalOpen(true)
   }
@@ -625,23 +625,23 @@ function ServiceAccountsPane() {
       const values = await form.validateFields()
       setSubmitLoading(true)
       if (editing) {
-        const secondary = values.secondaryOrgIDs || []
+        const secondary = values.secondaryDepartmentIDs || []
         const req: TenantMachineUserUpdateReq = {
           machineUserID: editing.machineUserID,
           name: values.name,
           description: values.description || '',
         }
-        // 可空字段仅在变化时提交：primaryOrgID 传值=替换主部门；secondaryOrgIDs 传=全量替换（[]=清空）；不传=不变
-        if (values.primaryOrgID !== orgBefore.primaryOrgID) req.primaryOrgID = values.primaryOrgID
-        if (!sameSet(secondary, orgBefore.secondaryOrgIDs)) req.secondaryOrgIDs = secondary
+        // 可空字段仅在变化时提交：primaryDepartmentID 传值=替换主部门；secondaryDepartmentIDs 传=全量替换（[]=清空）；不传=不变
+        if (values.primaryDepartmentID !== deptBefore.primaryDepartmentID) req.primaryDepartmentID = values.primaryDepartmentID
+        if (!sameSet(secondary, deptBefore.secondaryDepartmentIDs)) req.secondaryDepartmentIDs = secondary
         await updateMachineUser(req)
         message.success('保存成功')
       } else {
         await createMachineUser({
           name: values.name,
           description: values.description || '',
-          organizationIDs: [values.primaryOrgID],
-          secondaryOrgIDs: values.secondaryOrgIDs || [],
+          primaryDepartmentID: values.primaryDepartmentID,
+          secondaryDepartmentIDs: values.secondaryDepartmentIDs || [],
         })
         message.success('创建成功')
       }
@@ -698,7 +698,7 @@ function ServiceAccountsPane() {
       dataIndex: 'name',
       onClick: (r) => void openDetail(r),
     }),
-    textColumn<TenantMachineUserItem>({ title: '主部门', dataIndex: 'primaryOrgName', width: NAME_COL_WIDTH }),
+    textColumn<TenantMachineUserItem>({ title: '主部门', dataIndex: 'primaryDepartmentName', width: NAME_COL_WIDTH }),
     textColumn<TenantMachineUserItem>({ title: '描述', dataIndex: 'description', width: TEXT_COL_WIDTH }),
     {
       title: '状态',
@@ -814,16 +814,16 @@ function ServiceAccountsPane() {
           <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
             <Input placeholder="如：CI 构建服务" />
           </Form.Item>
-          <Form.Item name="primaryOrgID" label="主部门" rules={[{ required: true, message: '请选择主部门' }]}>
+          <Form.Item name="primaryDepartmentID" label="主部门" rules={[{ required: true, message: '请选择主部门' }]}>
             <TreeSelect
-              treeData={toTreeSelect(orgTree)}
+              treeData={toTreeSelect(deptTree)}
               treeDefaultExpandAll
               placeholder="选择主部门（行政归属，唯一；服务账号必须从属部门）"
             />
           </Form.Item>
-          <Form.Item name="secondaryOrgIDs" label="参与部门">
+          <Form.Item name="secondaryDepartmentIDs" label="参与部门">
             <TreeSelect
-              treeData={toTreeSelect(orgTree)}
+              treeData={toTreeSelect(deptTree)}
               treeDefaultExpandAll
               multiple
               allowClear
@@ -846,12 +846,12 @@ function ServiceAccountsPane() {
             items={[
               { key: 'info', label: '基础信息', children: <MachineDetailInfo detail={detail} /> },
               {
-                key: 'org',
+                key: 'dept',
                 label: '所属部门',
                 children: (
                   <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                    <OrgRow label="主部门" relation="primary" orgs={pickOrgs(detail.organizations, 'primary')} />
-                    <OrgRow label="参与部门" relation="secondary" orgs={pickOrgs(detail.organizations, 'secondary')} />
+                    <DeptRow label="主部门" relation="primary" depts={pickDepts(detail.departments, 'primary')} />
+                    <DeptRow label="参与部门" relation="secondary" depts={pickDepts(detail.departments, 'secondary')} />
                     <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>
                       主部门唯一且服务账号必须从属部门；参与部门可多条（可清空）。部门调整请使用「编辑」（主/参与部门全量维护）。
                     </div>
@@ -917,7 +917,7 @@ function MachineDetailInfo({ detail }: { detail: TenantMachineUserDetail }) {
 // ==================== 页面容器：用户 / 服务账号 双 Tab ====================
 export default function TenantUserPage() {
   return (
-    <PageContainer title="用户管理" description="租户内的主体管理：真实用户（组织归属、角色分配与账号状态）与服务账号（机器主体，须从属主部门）">
+    <PageContainer title="用户管理" description="租户内的主体管理：真实用户（部门归属、角色分配与账号状态）与服务账号（机器主体，须从属主部门）">
       <Tabs
         defaultActiveKey="user"
         items={[
@@ -929,22 +929,22 @@ export default function TenantUserPage() {
   )
 }
 
-// pickOrgs 按关系类型筛出组织列表（真实用户与机器服务账号通用）。
-function pickOrgs<T extends { relationType: string }>(orgs: T[], type: string): T[] {
-  return (orgs || []).filter((o) => o.relationType === type)
+// pickDepts 按关系类型筛出部门列表（真实用户与机器服务账号通用）。
+function pickDepts<T extends { relationType: string }>(depts: T[], type: string): T[] {
+  return (depts || []).filter((o) => o.relationType === type)
 }
 
-// OrgRow 详情中的组织关系行（主/参与/负责）。
-function OrgRow({ label, relation, orgs }: { label: string; relation: string; orgs: { organizationID: string; organizationName?: string }[] }) {
+// DeptRow 详情中的部门关系行（主/参与/负责）。
+function DeptRow({ label, relation, depts }: { label: string; relation: string; depts: { departmentID: string; departmentName?: string }[] }) {
   const tag = RELATION_TAG[relation]
   return (
     <div>
       <div style={{ color: tokens.textPlaceholder, fontSize: 12, marginBottom: 4 }}>{label}</div>
-      {orgs.length ? (
+      {depts.length ? (
         <Space size={4} wrap>
-          {orgs.map((o) => (
-            <Tag key={o.organizationID} color={tag?.color}>
-              {o.organizationName || '-'}
+          {depts.map((o) => (
+            <Tag key={o.departmentID} color={tag?.color}>
+              {o.departmentName || '-'}
             </Tag>
           ))}
         </Space>
@@ -955,11 +955,11 @@ function OrgRow({ label, relation, orgs }: { label: string; relation: string; or
   )
 }
 
-// toTreeSelect 组织树 -> TreeSelect 数据
-function toTreeSelect(list: OrganizationItem[]): any[] {
+// toTreeSelect 部门树 -> TreeSelect 数据
+function toTreeSelect(list: DepartmentItem[]): any[] {
   return list.map((n) => ({
     title: n.name,
-    value: n.organizationID,
+    value: n.departmentID,
     children: n.children?.length ? toTreeSelect(n.children) : undefined,
   }))
 }

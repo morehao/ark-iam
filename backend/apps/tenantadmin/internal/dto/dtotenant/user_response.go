@@ -1,18 +1,18 @@
 package dtotenant
 
 type UserPageListItem struct {
-	UserID         string `json:"userID"`         // 用户ID
-	TenantID       string `json:"tenantID"`       // 租户ID
-	Username       string `json:"username"`       // 用户名
-	PrimaryEmail   string `json:"primaryEmail"`   // 主要邮箱
-	PrimaryPhone   string `json:"primaryPhone"`   // 主要手机号
-	Name           string `json:"name"`           // 姓名
-	Avatar         string `json:"avatar"`         // 头像URL
-	IsSuspended    bool   `json:"isSuspended"`    // 是否挂起
-	PrimaryOrgName string `json:"primaryOrgName"` // 主组织名称
-	RoleCount      int64  `json:"roleCount"`      // 角色数
-	CreatedAt      int64  `json:"createdAt"`      // 创建时间
-	UpdatedAt      int64  `json:"updatedAt"`      // 更新时间
+	UserID                string `json:"userID"`                // 用户ID
+	TenantID              string `json:"tenantID"`              // 租户ID
+	Username              string `json:"username"`              // 用户名
+	PrimaryEmail          string `json:"primaryEmail"`          // 主要邮箱
+	PrimaryPhone          string `json:"primaryPhone"`          // 主要手机号
+	Name                  string `json:"name"`                  // 姓名
+	Avatar                string `json:"avatar"`                // 头像URL
+	IsSuspended           bool   `json:"isSuspended"`           // 是否挂起
+	PrimaryDepartmentName string `json:"primaryDepartmentName"` // 主部门名称
+	RoleCount             int64  `json:"roleCount"`             // 角色数
+	CreatedAt             int64  `json:"createdAt"`             // 创建时间
+	UpdatedAt             int64  `json:"updatedAt"`             // 更新时间
 }
 
 type UserPageListResp struct {
@@ -37,8 +37,8 @@ type UserResetPasswordResp struct {
 
 type UserDetailResp struct {
 	UserPageListItem
-	Organizations []UserOrganizationItem `json:"organizations"` // 组织归属
-	Roles         []UserRoleItem         `json:"roles"`         // 已分配角色
+	Departments []UserDepartmentItem `json:"departments"` // 部门归属
+	Roles       []UserRoleItem       `json:"roles"`       // 已分配角色
 }
 
 type UserRoleItem struct {

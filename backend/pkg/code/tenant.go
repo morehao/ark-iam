@@ -17,21 +17,21 @@ const (
 )
 
 const (
-	OrganizationCreateError      = 100120
-	OrganizationDeleteError      = 100121
-	OrganizationUpdateError      = 100122
-	OrganizationGetDetailError   = 100123
-	OrganizationGetPageListError = 100124
-	OrganizationNotExistError    = 100125
+	DepartmentCreateError      = 100120
+	DepartmentDeleteError      = 100121
+	DepartmentUpdateError      = 100122
+	DepartmentGetDetailError   = 100123
+	DepartmentGetPageListError = 100124
+	DepartmentNotExistError    = 100125
 )
 
 const (
-	OrganizationUserCreateError         = 100140
-	OrganizationUserDeleteError         = 100141
-	OrganizationUserGetPageListError    = 100142
-	OrganizationUserNotExistError       = 100143
-	OrganizationUserUpdateError         = 100144
-	OrganizationUserLeaderConflictError = 100145
+	DepartmentUserCreateError         = 100140
+	DepartmentUserDeleteError         = 100141
+	DepartmentUserGetPageListError    = 100142
+	DepartmentUserNotExistError       = 100143
+	DepartmentUserUpdateError         = 100144
+	DepartmentUserLeaderConflictError = 100145
 )
 
 const (
@@ -45,34 +45,34 @@ const (
 )
 
 var tenantErrorMsgMap = gerror.CodeMsgMap{
-	TenantCreateError:                   "创建租户管理失败",
-	TenantDeleteError:                   "删除租户管理失败",
-	TenantUpdateError:                   "修改租户管理失败",
-	TenantGetDetailError:                "查看租户管理失败",
-	TenantGetPageListError:              "查看租户管理列表失败",
-	TenantNotExistError:                 "租户管理不存在",
-	TenantCreateAsOwnerForbiddenError:   "当前自然人已拥有租户或应用策略禁止自助创建租户",
-	TenantSuspendedError:                "该租户已被挂起",
-	TenantSuspendSelfForbiddenError:     "不能挂起当前所在租户",
-	TenantPageListStatusInvalidError:    "租户状态筛选值不合法",
-	TenantAdminResetPasswordError:       "重置租户内置管理员密码失败",
-	OrganizationCreateError:             "创建组织失败",
-	OrganizationDeleteError:             "删除组织失败",
-	OrganizationUpdateError:             "修改组织失败",
-	OrganizationGetDetailError:          "查看组织详情失败",
-	OrganizationGetPageListError:        "查看组织列表失败",
-	OrganizationNotExistError:           "组织不存在",
-	OrganizationUserCreateError:         "创建组织用户失败",
-	OrganizationUserDeleteError:         "删除组织用户失败",
-	OrganizationUserGetPageListError:    "查看组织用户列表失败",
-	OrganizationUserNotExistError:       "组织用户不存在",
-	OrganizationUserUpdateError:         "修改组织用户失败",
-	OrganizationUserLeaderConflictError: "该部门已有负责人",
-	DomainCreateError:                   "创建域名失败",
-	DomainDeleteError:                   "删除域名失败",
-	DomainGetPageListError:              "查看域名列表失败",
-	DomainNotExistError:                 "域名不存在",
-	DomainAlreadyExistError:             "域名已存在",
-	DomainUpdateError:                   "更新域名失败",
-	DomainDetailError:                   "查看域名详情失败",
+	TenantCreateError:                 "创建租户管理失败",
+	TenantDeleteError:                 "删除租户管理失败",
+	TenantUpdateError:                 "修改租户管理失败",
+	TenantGetDetailError:              "查看租户管理失败",
+	TenantGetPageListError:            "查看租户管理列表失败",
+	TenantNotExistError:               "租户管理不存在",
+	TenantCreateAsOwnerForbiddenError: "当前自然人已拥有租户或应用策略禁止自助创建租户",
+	TenantSuspendedError:              "该租户已被挂起",
+	TenantSuspendSelfForbiddenError:   "不能挂起当前所在租户",
+	TenantPageListStatusInvalidError:  "租户状态筛选值不合法",
+	TenantAdminResetPasswordError:     "重置租户内置管理员密码失败",
+	DepartmentCreateError:             "创建部门失败",
+	DepartmentDeleteError:             "删除部门失败",
+	DepartmentUpdateError:             "修改部门失败",
+	DepartmentGetDetailError:          "查看部门详情失败",
+	DepartmentGetPageListError:        "查看部门列表失败",
+	DepartmentNotExistError:           "部门不存在",
+	DepartmentUserCreateError:         "创建部门成员失败",
+	DepartmentUserDeleteError:         "删除部门成员失败",
+	DepartmentUserGetPageListError:    "查看部门成员列表失败",
+	DepartmentUserNotExistError:       "部门成员不存在",
+	DepartmentUserUpdateError:         "修改部门成员失败",
+	DepartmentUserLeaderConflictError: "该部门已有负责人",
+	DomainCreateError:                 "创建域名失败",
+	DomainDeleteError:                 "删除域名失败",
+	DomainGetPageListError:            "查看域名列表失败",
+	DomainNotExistError:               "域名不存在",
+	DomainAlreadyExistError:           "域名已存在",
+	DomainUpdateError:                 "更新域名失败",
+	DomainDetailError:                 "查看域名详情失败",
 }

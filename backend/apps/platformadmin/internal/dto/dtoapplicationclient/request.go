@@ -13,8 +13,8 @@ type ApplicationClientCreateReq struct {
 	ResponseTypes           []string `json:"responseTypes"`           // 响应类型
 	TokenEndpointAuthMethod string   `json:"tokenEndpointAuthMethod"` // 令牌端点认证方式
 	AllowedOrigins          []string `json:"allowedOrigins"`          // CORS白名单
-	RequirePKCE bool     `json:"requirePKCE"`             // 是否强制PKCE
-	RequireAuthTime bool     `json:"requireAuthTime"`         // 是否需要auth_time声明
+	RequirePKCE             bool     `json:"requirePKCE"`             // 是否强制PKCE
+	RequireAuthTime         bool     `json:"requireAuthTime"`         // 是否需要auth_time声明
 	DefaultScopes           []string `json:"defaultScopes"`           // 默认权限范围
 	AccessTokenTTL          int64    `json:"accessTokenTTL"`          // 访问令牌有效期(秒)
 	RefreshTokenTTL         int64    `json:"refreshTokenTTL"`         // 刷新令牌有效期(秒)
@@ -25,7 +25,7 @@ type ApplicationClientUpdateReq struct {
 	Name                string `json:"name"`                                           // 客户端名称
 	Type                string `json:"type"`                                           // 客户端类型
 	Status              string `json:"status"`                                         // 状态: enable-启用, disable-停用
-	IsThirdParty bool   `json:"isThirdParty"`                                   // 是否第三方应用
+	IsThirdParty        bool   `json:"isThirdParty"`                                   // 是否第三方应用
 
 	RedirectURIs            []string `json:"redirectURIs"`            // 授权回调地址
 	PostLogoutRedirectURIs  []string `json:"postLogoutRedirectURIs"`  // 登出回调地址
@@ -34,8 +34,8 @@ type ApplicationClientUpdateReq struct {
 	ResponseTypes           []string `json:"responseTypes"`           // 响应类型
 	TokenEndpointAuthMethod string   `json:"tokenEndpointAuthMethod"` // 令牌端点认证方式
 	AllowedOrigins          []string `json:"allowedOrigins"`          // CORS白名单
-	RequirePKCE bool     `json:"requirePKCE"`             // 是否强制PKCE
-	RequireAuthTime bool     `json:"requireAuthTime"`         // 是否需要auth_time声明
+	RequirePKCE             bool     `json:"requirePKCE"`             // 是否强制PKCE
+	RequireAuthTime         bool     `json:"requireAuthTime"`         // 是否需要auth_time声明
 	DefaultScopes           []string `json:"defaultScopes"`           // 默认权限范围
 	AccessTokenTTL          int64    `json:"accessTokenTTL"`          // 访问令牌有效期(秒)
 	RefreshTokenTTL         int64    `json:"refreshTokenTTL"`         // 刷新令牌有效期(秒)
@@ -64,7 +64,7 @@ type SecretListReq struct {
 type SecretCreateReq struct {
 	ApplicationClientID string `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
 	Name                string `json:"name" binding:"required"`                        // 密钥名称
-	ExpiredAt           int64  `json:"expiresAt"` // 过期时间(unix 秒)
+	ExpiredAt           int64  `json:"expiresAt"`                                      // 过期时间(unix 秒)
 }
 
 type SecretDeleteReq struct {

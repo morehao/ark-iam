@@ -12,7 +12,7 @@ import (
 
 // SetupSQLite 打开独立的内存 SQLite，并注册为全局 iam 库，使 service 内部直接
 // dao.NewXxxDao() 的调用自动落到测试库，无需任何注入 seam。
-// entities 为需要 AutoMigrate 的 model 结构体（如 &model.OrganizationEntity{}）。
+// entities 为需要 AutoMigrate 的 model 结构体（如 &model.DepartmentEntity{}）。
 func SetupSQLite(t *testing.T, entities ...any) *gorm.DB {
 	t.Helper()
 	dsn := fmt.Sprintf("file:test_%d?mode=memory&cache=shared", time.Now().UnixNano())

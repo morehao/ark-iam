@@ -18,8 +18,8 @@ type UserType string
 
 // 账号类型取值（禁止硬编码）。
 const (
-	UserTypeMember  UserType = "member"  // 真实用户：person 映射的租户成员，可登录、可入组织
-	UserTypeMachine UserType = "machine" // 服务账号：租户内机器主体，不可登录、不入组织，作为 API Key 归属主体
+	UserTypeMember  UserType = "member"  // 真实用户：person 映射的租户成员，可登录、可入部门
+	UserTypeMachine UserType = "machine" // 服务账号：租户内机器主体，不可登录、不入部门，作为 API Key 归属主体
 )
 
 // IsReal 判断是否为真实用户（member）。

@@ -3,17 +3,17 @@ package code
 import "github.com/morehao/golib/gerror"
 
 const (
-	AuthIdentifierRequiredError    = 110010
-	AuthLoginFailedError           = 110011
-	AuthRegisterFailedError        = 110012
-	AuthJoinNotAllowedError        = 110013
+	AuthIdentifierRequiredError       = 110010
+	AuthLoginFailedError              = 110011
+	AuthRegisterFailedError           = 110012
+	AuthJoinNotAllowedError           = 110013
 	AuthTenantRegisterNotAllowedError = 110014
-	InviteGetDetailError           = 110030
-	InviteInvalidError             = 110031
-	InviteExpiredError             = 110032
-	InviteCreateError              = 110033
-	InviteRevokeError              = 110034
-	InviteGetPageListError         = 110035
+	InviteGetDetailError              = 110030
+	InviteInvalidError                = 110031
+	InviteExpiredError                = 110032
+	InviteCreateError                 = 110033
+	InviteRevokeError                 = 110034
+	InviteGetPageListError            = 110035
 )
 
 const (

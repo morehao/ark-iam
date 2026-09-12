@@ -28,7 +28,7 @@ const (
 )
 
 // ProvisionMenuCodes 内置租户管理员默认授权的菜单编码（tenant-admin 应用下的叶子菜单）。
-var ProvisionMenuCodes = []string{"organization", "tenant-user", "tenant-role", "tenant-api-key"}
+var ProvisionMenuCodes = []string{"department", "tenant-user", "tenant-role", "tenant-api-key"}
 
 // ProvisionTenantAdminReq 构造 ProvisionTenantAdmin 入参。
 type ProvisionTenantAdminReq struct {
@@ -217,24 +217,24 @@ func ensureUserRole(ctx context.Context, tx *gorm.DB, req *ProvisionTenantAdminR
 
 // CreateTenantWithBuiltinAdminReq 构造 CreateTenantWithBuiltinAdmin 入参。
 type CreateTenantWithBuiltinAdminReq struct {
-	Tenant *CreateWithRootOrgReq // 租户与根组织定义（编码/名称/类型等）
-	// AdminUser 内置管理员的用户定义；其中 TenantID、PrimaryOrgIDs、Source 由本函数统一覆盖：
-	// 租户必为新建租户、行政主部门必为新建根组织、来源必为 builtin（D2/D4）。
+	Tenant *CreateWithRootDeptReq // 租户与根部门定义（编码/名称/类型等）
+	// AdminUser 内置管理员的用户定义；其中 TenantID、PrimaryDepartmentID、Source 由本函数统一覆盖：
+	// 租户必为新建租户、行政主部门必为新建根部门、来源必为 builtin（D2/D4）。
 	AdminUser *user.CreateReq
 }
 
 // CreateTenantWithBuiltinAdminResult 建租户链路的产出（调用方决定如何回显/审计）。
 type CreateTenantWithBuiltinAdminResult struct {
 	Tenant             *model.TenantEntity
-	RootOrg            *model.OrganizationEntity
+	RootDept           *model.DepartmentEntity
 	AdminUser          *model.UserEntity
 	AdminPersonCreated bool // 内置管理员的自然人是否为本次新建（决定是否回显初始临时密码）
 }
 
 // CreateTenantWithBuiltinAdmin 在 tx 事务内一次性完成"建租户 + 内置管理员 + 租户自服务权限开通"：
 //
-//	租户 + 同名根组织（CreateWithRootOrg）
-//	→ 内置管理员用户（user.Create，source=builtin、is_owner、归属根组织）
+//	租户 + 同名根部门（CreateWithRootDept）
+//	→ 内置管理员用户（user.Create，source=builtin、is_owner、归属根部门）
 //	→ 权限开通（ProvisionTenantAdmin：应用订阅/内置角色/菜单授权/角色绑定）
 //
 // 平台建租户（管理员为新建自然人，持临时密码）与自助建租户（管理员即当前登录自然人）
@@ -253,16 +253,16 @@ func CreateTenantWithBuiltinAdmin(ctx context.Context, tx *gorm.DB, req *CreateT
 		return nil, fmt.Errorf("iam/tenant: admin user is required")
 	}
 
-	tenantEntity, rootOrg, err := CreateWithRootOrg(ctx, tx, req.Tenant)
+	tenantEntity, rootDept, err := CreateWithRootDept(ctx, tx, req.Tenant)
 	if err != nil {
-		return nil, fmt.Errorf("create tenant with root org: %w", err)
+		return nil, fmt.Errorf("create tenant with root dept: %w", err)
 	}
 
 	adminReq := *req.AdminUser
 	adminReq.TenantID = tenantEntity.ID
 	adminReq.Source = model.UserSourceBuiltin
 	adminReq.IsOwner = true
-	adminReq.PrimaryOrgIDs = []string{rootOrg.ID}
+	adminReq.PrimaryDepartmentID = rootDept.ID
 	adminUser, personCreated, err := user.Create(ctx, tx, &adminReq)
 	if err != nil {
 		return nil, fmt.Errorf("create tenant admin user: %w", err)
@@ -278,7 +278,7 @@ func CreateTenantWithBuiltinAdmin(ctx context.Context, tx *gorm.DB, req *CreateT
 
 	return &CreateTenantWithBuiltinAdminResult{
 		Tenant:             tenantEntity,
-		RootOrg:            rootOrg,
+		RootDept:           rootDept,
 		AdminUser:          adminUser,
 		AdminPersonCreated: personCreated,
 	}, nil

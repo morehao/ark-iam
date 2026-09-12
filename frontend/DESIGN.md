@@ -131,7 +131,7 @@ components:
 ## 4. 布局与间距
 
 - 间距基数 4px；管理页由 `PageContainer` 统一骨架：页标题 + 描述 + 右上操作区（extra），下方白色内容卡（body padding 20、圆角 12、hairline 边）。
-- **左右分栏**（固定宽左栏 + 弹性右栏，如组织架构「左部门树 + 右子部门表」）用原生 flex 容器：`display:flex; alignItems:flex-start; gap:16`，左栏 `flexShrink:0` 定宽、右栏 `flex:1` 撑满剩余宽度。**禁止用 antd `<Space>` 包裹左右卡片并依赖内层 `flex:1` 撑满**：`Space` 会把子项再包一层不参与 grow 的 `.ant-space-item`，右卡片不会拉伸、页面右侧出现大片空白。
+- **左右分栏**（固定宽左栏 + 弹性右栏，如部门架构「左部门树 + 右子部门表」）用原生 flex 容器：`display:flex; alignItems:flex-start; gap:16`，左栏 `flexShrink:0` 定宽、右栏 `flex:1` 撑满剩余宽度。**禁止用 antd `<Space>` 包裹左右卡片并依赖内层 `flex:1` 撑满**：`Space` 会把子项再包一层不参与 grow 的 `.ant-space-item`，右卡片不会拉伸、页面右侧出现大片空白。
 - 布局内边距：`Content` 外边距 20（MainLayout），卡片间距 16–20。
 - 搜索区：`Input.Search allowClear prefix={<SearchOutlined/>}`，宽度统一 240–260（可按筛选项 180）。
 - Table：`rowKey`、`loading`、分页 `showSizeChanger + showTotal: (t) => \`共 ${t} 条\``；操作列放最右，统一用共享组件 `RowActions` 渲染（≤3 横排，>3 收「更多」纵向下拉，见 §7.3 操作列硬规则）。
@@ -163,7 +163,7 @@ components:
 - Sider `232px`、深底 `surface-sidebar` 且**无投影**；Menu 选中项为 `{colors.surface-selected-bg}` 柔和半透明高亮 + 白字（不用整块亮色填充），hover 用 `rgba(255,255,255,0.08)`；Logo 区 64px 主渐变底白字（品牌高光）；支持折叠。
 - Header 白底 56px sticky、底部 hairline 分割，含折叠图标 / 租户切换器 / 用户头像（渐变底）+ 下拉。
 - 全局主题由 `AppShell`（`ConfigProvider` zhCN + themeConfig）在每个 app 的 main.tsx 包裹；AppShell 根容器开启 `font-variant-numeric: tabular-nums`，**全站 ID/时间/数字等宽对齐**。
-- **antd「结构级」微修正统一收口在 `AppShell` 的内联 `<style>`**：此类修正针对 antd 内部 DOM / portal 渲染的下拉等，无法用组件 inline style 或 token 表达（如 TreeSelect 下拉树去掉顶层左侧空白：`.ant-select-dropdown .ant-select-tree .ant-select-tree-switcher { width: 0; overflow: hidden; }`，子级缩进由 `.ant-select-tree-indent-unit` 独立控制、不受影响）。**禁止各 app 新增 css 文件、禁止在页面散落重复的全局 `<style>`**；页面级单例 tweak（如组织架构页 `#org-tree-card` 的树）可内联保留。
+- **antd「结构级」微修正统一收口在 `AppShell` 的内联 `<style>`**：此类修正针对 antd 内部 DOM / portal 渲染的下拉等，无法用组件 inline style 或 token 表达（如 TreeSelect 下拉树去掉顶层左侧空白：`.ant-select-dropdown .ant-select-tree .ant-select-tree-switcher { width: 0; overflow: hidden; }`，子级缩进由 `.ant-select-tree-indent-unit` 独立控制、不受影响）。**禁止各 app 新增 css 文件、禁止在页面散落重复的全局 `<style>`**；页面级单例 tweak（如部门架构页 `#dept-tree-card` 的树）可内联保留。
 - 骨架相关：`TenantSwitcher` 胶囊条 `border-strong` 边 + `table-header` 中性底 + 主色换租户图标。
 
 ### 7.2 状态 Tag 字典（唯一规范）
@@ -282,5 +282,5 @@ PageContainer(title, description, extra=刷新 + 主操作[type=primary])
 
 1. `packages/auth/src/guards.tsx`（FullPageSpinner）已中性化（`#f6f7f9` 底），但 auth 在 ui 依赖方向下层、无法 import @ark-iam/ui，仍需字面 hex；login-web 同理。长期方案：把 tokens 下沉到叶子共享包（如 @ark-iam/types 同级）或由宿主注入 CSS 变量。
 2. `apps/login-web/src/LoginPage.css` 用独立 CSS（brand 渐变、focus、错误色）未走 tokens，且其渐变仍为“品牌高光”允许范围；重构需 login-web 依赖 ui 或 CSS 变量注入，本分支未做。
-3. 页面内少量**分类色**（如 role「超管」红色、application public/private、organization 主部门 gold、menu 类型蓝/橙/紫）以 antd Tag 预设色内联，未全部收敛为共享组件；按 7.2「分类标识」规则允许，后续可逐步上提。
+3. 页面内少量**分类色**（如 role「超管」红色、application public/private、department 主部门 gold、menu 类型蓝/橙/紫）以 antd Tag 预设色内联，未全部收敛为共享组件；按 7.2「分类标识」规则允许，后续可逐步上提。
 4. `theme.ts` 与 DESIGN.md 为人工同步，暂无 lint/test 强制一致。

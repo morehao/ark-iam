@@ -14,8 +14,8 @@ func AllEntities() []any {
 		&UserIdentityEntity{},
 		&UserRoleEntity{},
 		&UserLoginLogEntity{},
-		&OrganizationEntity{},
-		&OrganizationUserEntity{},
+		&DepartmentEntity{},
+		&DepartmentUserEntity{},
 		&ApplicationEntity{},
 		&ApplicationClientEntity{},
 		&ApplicationClientSecretEntity{},
@@ -54,6 +54,9 @@ var partialUniqueIndexes = []string{
 	`CREATE UNIQUE INDEX IF NOT EXISTS idx_person_primary_phone ON person (primary_phone) WHERE deleted_at IS NULL`,
 	`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_identity_issuer_subject ON user_identity (issuer, external_subject) WHERE deleted_at IS NULL`,
 	`CREATE UNIQUE INDEX IF NOT EXISTS idx_invite_code ON tenant_invite (code) WHERE deleted_at IS NULL`,
+	// 部门关系唯一性：同一 (租户, 部门, 用户, 关系类型) 只允许一行未删除记录。
+	// 关系类型互斥（primary 每用户至多 1 行 / leader 每部门至多 1 人）除服务层校验外，此处提供 DB 级兜底。
+	`CREATE UNIQUE INDEX IF NOT EXISTS uk_dept_user ON department_user (tenant_id, department_id, user_id, relation_type) WHERE deleted_at IS NULL`,
 }
 
 // EnsurePartialUniqueIndexes 创建/校验软删除表的部分唯一索引（幂等）。

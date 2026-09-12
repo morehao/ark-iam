@@ -53,28 +53,28 @@ func seedTestUserWithPerson(t *testing.T, db *gorm.DB, userID, tenantID, personI
 
 // TestUserCreateFindOrCreatePerson 覆盖 person find-or-create 全路径：
 // 仅姓名→创建仅含姓名的自然人；提供标识→新建 person（姓名即自然人姓名）；标识命中已有 person→关联复用；同租户重复→拒绝。
-// 用户必属部门：所有创建均携带 organizationIDs（t1→o1、t2→o2）。
+// 用户必属部门：所有创建均携带 departmentIDs（t1→o1、t2→o2）。
 func TestUserCreateFindOrCreatePerson(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
 
 	// 部门（用户必属部门）：t1 拥有 o1，t2 拥有 o2
 	for _, o := range []struct{ tenantID, id string }{{"t1", "o1"}, {"t2", "o2"}} {
-		if err := db.Create(&model.OrganizationEntity{
+		if err := db.Create(&model.DepartmentEntity{
 			BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: o.id}},
 			TenantID:   o.tenantID,
-			OrgPath:    "/" + o.id,
-			OrgDepth:   1,
-			Name:       "组织" + o.id,
+			DeptPath:   "/" + o.id,
+			DeptDepth:  1,
+			Name:       "部门" + o.id,
 			Status:     "active",
 		}).Error; err != nil {
-			t.Fatalf("seed org %s: %v", o.id, err)
+			t.Fatalf("seed dept %s: %v", o.id, err)
 		}
 	}
 
 	// 无 personID 且无登录标识：以姓名创建自然人并关联（person 始终存在）
 	ginCtx := newAdminCtx(t, db, "t1", "op")
-	resp, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "仅姓名用户", PrimaryEmail: "nameonly@x.com", OrganizationIDs: []string{"o1"}})
+	resp, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "仅姓名用户", PrimaryEmail: "nameonly@x.com", PrimaryDepartmentID: "o1"})
 	if err != nil {
 		t.Fatalf("create user with name-only person: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 	}
 
 	// 提供 email：新建 person（姓名=req.Name，bcrypt 哈希），临时密码仅创建响应返回一次
-	respB, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "Bob", PrimaryEmail: "bob@x.com", OrganizationIDs: []string{"o1"}})
+	respB, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "Bob", PrimaryEmail: "bob@x.com", PrimaryDepartmentID: "o1"})
 	if err != nil {
 		t.Fatalf("create user with new person: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 	}
 
 	// 另一租户提供相同 email：find-or-create 命中已有 person 并关联（复用同一自然人）
-	respC, err := svc.Create(newAdminCtx(t, db, "t2", "op2"), &dtotenant.UserCreateReq{Name: "Bob2", PrimaryEmail: "bob@x.com", OrganizationIDs: []string{"o2"}})
+	respC, err := svc.Create(newAdminCtx(t, db, "t2", "op2"), &dtotenant.UserCreateReq{Name: "Bob2", PrimaryEmail: "bob@x.com", PrimaryDepartmentID: "o2"})
 	if err != nil {
 		t.Fatalf("create user linking existing person: %v", err)
 	}
@@ -139,18 +139,18 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 	}
 
 	// 同租户重复加入：拒绝
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "Bob3", PrimaryEmail: "bob@x.com", OrganizationIDs: []string{"o1"}}); err == nil {
+	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "Bob3", PrimaryEmail: "bob@x.com", PrimaryDepartmentID: "o1"}); err == nil {
 		t.Fatalf("expected duplicate-in-tenant error")
 	}
 
 	// 指定 personID 直接关联；同一 person 在本租户已有 user 时拒绝
 	personID := bob.PersonID
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "Bob4", PersonID: personID, PrimaryEmail: "bob4@x.com", OrganizationIDs: []string{"o1"}}); err == nil {
+	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "Bob4", PersonID: personID, PrimaryEmail: "bob4@x.com", PrimaryDepartmentID: "o1"}); err == nil {
 		t.Fatalf("expected error when linking person already in tenant")
 	}
 
 	// 仅有手机号（无邮箱）：同样创建自然人并返回临时密码
-	respPwd, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "NoID", PrimaryPhone: "13000000001", OrganizationIDs: []string{"o1"}})
+	respPwd, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "NoID", PrimaryPhone: "13000000001", PrimaryDepartmentID: "o1"})
 	if err != nil {
 		t.Fatalf("create user with phone only: %v", err)
 	}
@@ -173,110 +173,110 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 	}
 }
 
-// TestUserCreateRequiresOrganization 业务约束：创建用户必须从属于至少一个部门
-// （organizationIDs 必传，缺失或为空一律拒绝；提供合法部门则正常创建）。
-func TestUserCreateRequiresOrganization(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+// TestUserCreateRequiresDepartment 业务约束：创建用户必须从属于至少一个部门
+// （departmentIDs 必传，缺失或为空一律拒绝；提供合法部门则正常创建）。
+func TestUserCreateRequiresDepartment(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
 	ginCtx := newAdminCtx(t, db, "t1", "op")
 
-	if err := db.Create(&model.OrganizationEntity{
+	if err := db.Create(&model.DepartmentEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "o1"}},
 		TenantID:   "t1",
-		OrgPath:    "/o1",
-		OrgDepth:   1,
+		DeptPath:   "/o1",
+		DeptDepth:  1,
 		Name:       "研发部",
 		Status:     "active",
 	}).Error; err != nil {
-		t.Fatalf("seed org: %v", err)
+		t.Fatalf("seed dept: %v", err)
 	}
 
-	requiredErr := code.GetError(code.UserOrganizationRequiredError)
+	requiredErr := code.GetError(code.UserDepartmentRequiredError)
 	for name, req := range map[string]*dtotenant.UserCreateReq{
 		"missing": {Name: "张三"},
-		"empty":   {Name: "李四", OrganizationIDs: []string{}},
+		"empty":   {Name: "李四", PrimaryDepartmentID: ""},
 	} {
 		if _, err := svc.Create(ginCtx, req); !errors.Is(err, requiredErr) {
-			t.Fatalf("case %s: expected UserOrganizationRequiredError, got %v", name, err)
+			t.Fatalf("case %s: expected UserDepartmentRequiredError, got %v", name, err)
 		}
 	}
 
 	// 邮箱、手机号二选一：都为空拒绝
 	contactErr := code.GetError(code.UserContactRequiredError)
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "无联系方式", OrganizationIDs: []string{"o1"}}); !errors.Is(err, contactErr) {
+	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "无联系方式", PrimaryDepartmentID: "o1"}); !errors.Is(err, contactErr) {
 		t.Fatalf("expected UserContactRequiredError, got %v", err)
 	}
 	// 仅手机号可创建
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "仅手机", PrimaryPhone: "15011112222", OrganizationIDs: []string{"o1"}}); err != nil {
+	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "仅手机", PrimaryPhone: "15011112222", PrimaryDepartmentID: "o1"}); err != nil {
 		t.Fatalf("create with phone only should succeed: %v", err)
 	}
 	// 仅邮箱可创建
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "仅邮箱", PrimaryEmail: "only@x.com", OrganizationIDs: []string{"o1"}}); err != nil {
+	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "仅邮箱", PrimaryEmail: "only@x.com", PrimaryDepartmentID: "o1"}); err != nil {
 		t.Fatalf("create with email only should succeed: %v", err)
 	}
 
 	// 提供合法部门：正常创建
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "王五", PrimaryEmail: "ww@x.com", OrganizationIDs: []string{"o1"}}); err != nil {
-		t.Fatalf("create user with valid org: %v", err)
+	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "王五", PrimaryEmail: "ww@x.com", PrimaryDepartmentID: "o1"}); err != nil {
+		t.Fatalf("create user with valid dept: %v", err)
 	}
 }
 
-// TestUserCreateWithOrganizations 创建用户时建立行政主部门(primary,至多1)与负责关系(leader,可多)。
-func TestUserCreateWithOrganizations(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+// TestUserCreateWithDepartments 创建用户时建立行政主部门(primary,至多1)与负责关系(leader,可多)。
+func TestUserCreateWithDepartments(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
 
 	now := time.Now()
-	for i, orgID := range []string{"o1", "o2"} {
-		if err := db.Create(&model.OrganizationEntity{
-			BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: orgID}},
+	for i, deptID := range []string{"o1", "o2"} {
+		if err := db.Create(&model.DepartmentEntity{
+			BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: deptID}},
 			TenantID:   "t1",
-			OrgPath:    "/" + orgID,
-			OrgDepth:   1,
-			Name:       "组织" + orgID,
+			DeptPath:   "/" + deptID,
+			DeptDepth:  1,
+			Name:       "部门" + deptID,
 			Status:     "active",
 		}).Error; err != nil {
-			t.Fatalf("seed org %d: %v", i, err)
+			t.Fatalf("seed dept %d: %v", i, err)
 		}
 		_ = now
 	}
 
 	ginCtx := newAdminCtx(t, db, "t1", "op")
 	// 创建用户：primary=o1（单个行政主部门）+ leader=o2
-	resp, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", OrganizationIDs: []string{"o1"}, LeaderOrgIDs: []string{"o2"}})
+	resp, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", PrimaryDepartmentID: "o1", LeaderDepartmentIDs: []string{"o2"}})
 	if err != nil {
-		t.Fatalf("create user with orgs: %v", err)
+		t.Fatalf("create user with depts: %v", err)
 	}
-	var relations []model.OrganizationUserEntity
+	var relations []model.DepartmentUserEntity
 	if err := db.Where("tenant_id = ? AND user_id = ?", "t1", resp.UserID).Find(&relations).Error; err != nil {
 		t.Fatalf("query relations: %v", err)
 	}
 	if len(relations) != 2 {
-		t.Fatalf("expected 2 org relations, got %d", len(relations))
+		t.Fatalf("expected 2 dept relations, got %d", len(relations))
 	}
-	byType := map[model.OrgUserRelationType]string{}
+	byType := map[model.DeptUserRelationType]string{}
 	for _, r := range relations {
-		byType[r.RelationType] = r.OrganizationID
+		byType[r.RelationType] = r.DepartmentID
 	}
-	if byType[model.OrgUserRelationPrimary] != "o1" || byType[model.OrgUserRelationLeader] != "o2" {
+	if byType[model.DeptUserRelationPrimary] != "o1" || byType[model.DeptUserRelationLeader] != "o2" {
 		t.Fatalf("unexpected relations: %+v", relations)
 	}
 
-	// primary 至多 1 行：传多个行政主部门应拒绝
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "李四", PrimaryEmail: "lis@x.com", OrganizationIDs: []string{"o1", "o2"}}); err == nil {
-		t.Fatalf("expected multi-primary create to fail")
+	// 主部门为单值入参：多主部门在类型层面已不可表达，改验"空主部门被拒"（防绕过 DTO 校验）
+	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "李四", PrimaryEmail: "lis@x.com"}); !errors.Is(err, code.GetError(code.UserDepartmentRequiredError)) {
+		t.Fatalf("expected primary department required, got %v", err)
 	}
 
-	// 非法组织（非本租户）拒绝
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "王五", PrimaryPhone: "15000000002", OrganizationIDs: []string{"o-other"}}); err == nil {
-		t.Fatalf("expected invalid org error")
+	// 非法部门（非本租户）拒绝
+	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "王五", PrimaryPhone: "15000000002", PrimaryDepartmentID: "o-other"}); err == nil {
+		t.Fatalf("expected invalid dept error")
 	}
 }
 
 // TestUserPageListKeyword 关键词过滤：姓名 / person 的 username / email 均命中。
 func TestUserPageListKeyword(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{},
-		&model.OrganizationUserEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{},
+		&model.DepartmentUserEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
 
 	p1 := seedTestPerson(t, db, "p1", "zhangsan", "")
@@ -285,7 +285,7 @@ func TestUserPageListKeyword(t *testing.T) {
 	p3 := seedTestPerson(t, db, "p3", "", "wang@x.com")
 	seedTestUserWithPerson(t, db, "u3", "t1", p3.ID, "王五")
 
-	ginCtx := newOrgGinCtx(t, "t1", "op")
+	ginCtx := newDeptGinCtx(t, "t1", "op")
 
 	// 按 person username 命中
 	resp, err := svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Keyword: "zhangsan"})
@@ -328,34 +328,34 @@ func TestUserPageListKeyword(t *testing.T) {
 	}
 }
 
-// TestUserDetailWithOrganizationsAndRoles 详情含组织归属与角色列表。
-func TestUserDetailWithOrganizationsAndRoles(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{},
-		&model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{},
+// TestUserDetailWithDepartmentsAndRoles 详情含部门归属与角色列表。
+func TestUserDetailWithDepartmentsAndRoles(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{},
+		&model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{},
 		&model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &userSvc{}
 
 	now := time.Now()
 	seedTestUserWithPerson(t, db, "u1", "t1", "", "张三")
 
-	if err := db.Create(&model.OrganizationEntity{
+	if err := db.Create(&model.DepartmentEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "o1"}},
 		TenantID:   "t1",
-		OrgPath:    "/o1",
-		OrgDepth:   1,
+		DeptPath:   "/o1",
+		DeptDepth:  1,
 		Name:       "研发部",
 		Status:     "active",
 	}).Error; err != nil {
-		t.Fatalf("seed org: %v", err)
+		t.Fatalf("seed dept: %v", err)
 	}
-	if err := db.Create(&model.OrganizationUserEntity{
-		BaseEntity:     gormdao.BaseEntity{StringID: gormdao.StringID{ID: "ou1"}},
-		TenantID:       "t1",
-		OrganizationID: "o1",
-		UserID:         "u1",
-		RelationType:   model.OrgUserRelationPrimary,
+	if err := db.Create(&model.DepartmentUserEntity{
+		BaseEntity:   gormdao.BaseEntity{StringID: gormdao.StringID{ID: "ou1"}},
+		TenantID:     "t1",
+		DepartmentID: "o1",
+		UserID:       "u1",
+		RelationType: model.DeptUserRelationPrimary,
 	}).Error; err != nil {
-		t.Fatalf("seed org-user: %v", err)
+		t.Fatalf("seed dept-user: %v", err)
 	}
 	if err := db.Create(&model.RoleEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "r1"}},
@@ -380,8 +380,8 @@ func TestUserDetailWithOrganizationsAndRoles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("detail: %v", err)
 	}
-	if len(resp.Organizations) != 1 || resp.Organizations[0].OrganizationName != "研发部" || resp.Organizations[0].RelationType != model.OrgUserRelationPrimary {
-		t.Fatalf("unexpected organizations: %+v", resp.Organizations)
+	if len(resp.Departments) != 1 || resp.Departments[0].DepartmentName != "研发部" || resp.Departments[0].RelationType != model.DeptUserRelationPrimary {
+		t.Fatalf("unexpected departments: %+v", resp.Departments)
 	}
 	if len(resp.Roles) != 1 || resp.Roles[0].Code != "admin" {
 		t.Fatalf("unexpected roles: %+v", resp.Roles)
@@ -533,36 +533,36 @@ func TestUserUpdateRolesScopedByApp(t *testing.T) {
 	}
 }
 
-// TestUserCreateWithLeaderOrgs 创建用户同时建立行政主部门(primary)、参与部门(secondary)与负责部门(leader)。
-func TestUserCreateWithLeaderOrgs(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+// TestUserCreateWithLeaderDepts 创建用户同时建立行政主部门(primary)、参与部门(secondary)与负责部门(leader)。
+func TestUserCreateWithLeaderDepts(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
 
-	for _, orgID := range []string{"o1", "o2", "o3"} {
-		if err := db.Create(&model.OrganizationEntity{
-			BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: orgID}},
+	for _, deptID := range []string{"o1", "o2", "o3"} {
+		if err := db.Create(&model.DepartmentEntity{
+			BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: deptID}},
 			TenantID:   "t1",
-			OrgPath:    "/" + orgID,
-			OrgDepth:   1,
-			Name:       "组织" + orgID,
+			DeptPath:   "/" + deptID,
+			DeptDepth:  1,
+			Name:       "部门" + deptID,
 			Status:     "active",
 		}).Error; err != nil {
-			t.Fatalf("seed org %s: %v", orgID, err)
+			t.Fatalf("seed dept %s: %v", deptID, err)
 		}
 	}
 
 	ginCtx := newAdminCtx(t, db, "t1", "op")
 	resp, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{
-		Name:            "张三",
-		PrimaryEmail:    "zs2@x.com",
-		OrganizationIDs: []string{"o1"},
-		SecondaryOrgIDs: []string{"o2"},
-		LeaderOrgIDs:    []string{"o3"},
+		Name:                   "张三",
+		PrimaryEmail:           "zs2@x.com",
+		PrimaryDepartmentID:    "o1",
+		SecondaryDepartmentIDs: []string{"o2"},
+		LeaderDepartmentIDs:    []string{"o3"},
 	})
 	if err != nil {
-		t.Fatalf("create user with leader orgs: %v", err)
+		t.Fatalf("create user with leader depts: %v", err)
 	}
-	var relations []model.OrganizationUserEntity
+	var relations []model.DepartmentUserEntity
 	if err := db.Where("tenant_id = ? AND user_id = ?", "t1", resp.UserID).Find(&relations).Error; err != nil {
 		t.Fatalf("query relations: %v", err)
 	}
@@ -572,11 +572,11 @@ func TestUserCreateWithLeaderOrgs(t *testing.T) {
 	var primaryCount, secondaryCount, leaderCount int
 	for _, r := range relations {
 		switch r.RelationType {
-		case model.OrgUserRelationPrimary:
+		case model.DeptUserRelationPrimary:
 			primaryCount++
-		case model.OrgUserRelationSecondary:
+		case model.DeptUserRelationSecondary:
 			secondaryCount++
-		case model.OrgUserRelationLeader:
+		case model.DeptUserRelationLeader:
 			leaderCount++
 		}
 	}
@@ -585,77 +585,77 @@ func TestUserCreateWithLeaderOrgs(t *testing.T) {
 	}
 
 	// 一个部门至多一个负责人：新用户再负责 o3 应拒绝
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "李四", PrimaryPhone: "15000000003", OrganizationIDs: []string{"o1"}, LeaderOrgIDs: []string{"o3"}}); err == nil {
+	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "李四", PrimaryPhone: "15000000003", PrimaryDepartmentID: "o1", LeaderDepartmentIDs: []string{"o3"}}); err == nil {
 		t.Fatalf("expected leader conflict to be rejected")
 	}
 
 	// 负责部门非法（非本租户）拒绝
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "王五", PrimaryEmail: "ww5@x.com", OrganizationIDs: []string{"o1"}, LeaderOrgIDs: []string{"o-other"}}); err == nil {
-		t.Fatalf("expected invalid leader org error")
+	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "王五", PrimaryEmail: "ww5@x.com", PrimaryDepartmentID: "o1", LeaderDepartmentIDs: []string{"o-other"}}); err == nil {
+		t.Fatalf("expected invalid leader dept error")
 	}
 }
 
-// TestUserUpdateOrganizations 编辑用户时更新主/参与/负责部门：
+// TestUserUpdateDepartments 编辑用户时更新主/参与/负责部门：
 // primary 替换、secondary/leader 全量替换、leader 冲突拒绝。
-func TestUserUpdateOrganizations(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+func TestUserUpdateDepartments(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
 
-	for _, orgID := range []string{"o1", "o2", "o3"} {
-		if err := db.Create(&model.OrganizationEntity{
-			BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: orgID}},
+	for _, deptID := range []string{"o1", "o2", "o3"} {
+		if err := db.Create(&model.DepartmentEntity{
+			BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: deptID}},
 			TenantID:   "t1",
-			OrgPath:    "/" + orgID,
-			OrgDepth:   1,
-			Name:       "组织" + orgID,
+			DeptPath:   "/" + deptID,
+			DeptDepth:  1,
+			Name:       "部门" + deptID,
 			Status:     "active",
 		}).Error; err != nil {
-			t.Fatalf("seed org %s: %v", orgID, err)
+			t.Fatalf("seed dept %s: %v", deptID, err)
 		}
 	}
 
 	ginCtx := newAdminCtx(t, db, "t1", "op")
 	u1, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{
-		Name:            "张三",
-		PrimaryEmail:    "u1@x.com",
-		OrganizationIDs: []string{"o1"},
-		SecondaryOrgIDs: []string{"o2"},
-		LeaderOrgIDs:    []string{"o3"},
+		Name:                   "张三",
+		PrimaryEmail:           "u1@x.com",
+		PrimaryDepartmentID:    "o1",
+		SecondaryDepartmentIDs: []string{"o2"},
+		LeaderDepartmentIDs:    []string{"o3"},
 	})
 	if err != nil {
 		t.Fatalf("create u1: %v", err)
 	}
 
-	countByType := func(userID string) map[model.OrgUserRelationType]string {
-		var rows []model.OrganizationUserEntity
+	countByType := func(userID string) map[model.DeptUserRelationType]string {
+		var rows []model.DepartmentUserEntity
 		if err := db.Where("tenant_id = ? AND user_id = ?", "t1", userID).Find(&rows).Error; err != nil {
 			t.Fatalf("query relations: %v", err)
 		}
-		m := map[model.OrgUserRelationType]string{}
+		m := map[model.DeptUserRelationType]string{}
 		for _, r := range rows {
-			m[r.RelationType] = r.OrganizationID
+			m[r.RelationType] = r.DepartmentID
 		}
 		return m
 	}
 
 	// 替换主部门 o1 -> o2
 	prim := "o2"
-	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: u1.UserID, PrimaryOrgID: &prim}); err != nil {
+	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: u1.UserID, PrimaryDepartmentID: &prim}); err != nil {
 		t.Fatalf("update primary: %v", err)
 	}
 	m := countByType(u1.UserID)
-	if m[model.OrgUserRelationPrimary] != "o2" {
+	if m[model.DeptUserRelationPrimary] != "o2" {
 		t.Fatalf("expected primary o2, got %+v", m)
 	}
 
 	// 全量替换参与部门 o2 -> [o3, o1]
 	sec := []string{"o3", "o1"}
-	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: u1.UserID, SecondaryOrgIDs: &sec}); err != nil {
+	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: u1.UserID, SecondaryDepartmentIDs: &sec}); err != nil {
 		t.Fatalf("update secondary: %v", err)
 	}
 	var secCount int64
-	if err := db.Model(&model.OrganizationUserEntity{}).
-		Where("tenant_id = ? AND user_id = ? AND relation_type = ?", "t1", u1.UserID, model.OrgUserRelationSecondary).
+	if err := db.Model(&model.DepartmentUserEntity{}).
+		Where("tenant_id = ? AND user_id = ? AND relation_type = ?", "t1", u1.UserID, model.DeptUserRelationSecondary).
 		Count(&secCount).Error; err != nil {
 		t.Fatalf("count secondary: %v", err)
 	}
@@ -665,21 +665,21 @@ func TestUserUpdateOrganizations(t *testing.T) {
 
 	// 全量替换负责部门 o3 -> [o1]
 	lead := []string{"o1"}
-	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: u1.UserID, LeaderOrgIDs: &lead}); err != nil {
+	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: u1.UserID, LeaderDepartmentIDs: &lead}); err != nil {
 		t.Fatalf("update leader: %v", err)
 	}
 	m = countByType(u1.UserID)
-	if m[model.OrgUserRelationLeader] != "o1" {
+	if m[model.DeptUserRelationLeader] != "o1" {
 		t.Fatalf("expected leader o1, got %+v", m)
 	}
 
 	// leader 冲突：另建用户 u2 负责 o1（已被 u1 负责）应拒绝
-	u2, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "李四", PrimaryPhone: "15000000004", OrganizationIDs: []string{"o1"}})
+	u2, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "李四", PrimaryPhone: "15000000004", PrimaryDepartmentID: "o1"})
 	if err != nil {
 		t.Fatalf("create u2: %v", err)
 	}
 	conflictLead := []string{"o1"}
-	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: u2.UserID, LeaderOrgIDs: &conflictLead}); err == nil {
+	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: u2.UserID, LeaderDepartmentIDs: &conflictLead}); err == nil {
 		t.Fatalf("expected leader conflict rejected")
 	}
 }
@@ -687,22 +687,22 @@ func TestUserUpdateOrganizations(t *testing.T) {
 // TestUserUpdateContact 编辑成员联系方式：更新 person 的邮箱/手机号/用户名，
 // 校验邮箱与手机号二选一、以及全局唯一性冲突。
 func TestUserUpdateContact(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
 
-	if err := db.Create(&model.OrganizationEntity{
+	if err := db.Create(&model.DepartmentEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "o1"}},
 		TenantID:   "t1",
-		OrgPath:    "/o1",
-		OrgDepth:   1,
+		DeptPath:   "/o1",
+		DeptDepth:  1,
 		Name:       "研发部",
 		Status:     "active",
 	}).Error; err != nil {
-		t.Fatalf("seed org: %v", err)
+		t.Fatalf("seed dept: %v", err)
 	}
 
 	ginCtx := newAdminCtx(t, db, "t1", "op")
-	u1, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", OrganizationIDs: []string{"o1"}})
+	u1, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", PrimaryDepartmentID: "o1"})
 	if err != nil {
 		t.Fatalf("create u1: %v", err)
 	}
@@ -745,7 +745,7 @@ func TestUserUpdateContact(t *testing.T) {
 	}
 
 	// 唯一性：另建用户占 u1 的手机号，编辑 u1 撞库应拒绝
-	u2, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "李四", PrimaryPhone: "15000000002", OrganizationIDs: []string{"o1"}})
+	u2, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "李四", PrimaryPhone: "15000000002", PrimaryDepartmentID: "o1"})
 	if err != nil {
 		t.Fatalf("create u2: %v", err)
 	}
@@ -766,24 +766,24 @@ func TestUserUpdateContact(t *testing.T) {
 	}
 }
 
-// TestUserPageListOrganizationFilter 用户目录：支持按"恰在该部门"过滤（primary/secondary/leader 任一关系命中，不含子部门）、
-// 关键词命中租户内姓名；跨租户用户不可见；主组织名聚合来自 primary 行政主部门关系。
-func TestUserPageListOrganizationFilter(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{},
-		&model.OrganizationUserEntity{}, &model.UserRoleEntity{})
+// TestUserPageListDepartmentFilter 用户目录：支持按"恰在该部门"过滤（primary/secondary/leader 任一关系命中，不含子部门）、
+// 关键词命中租户内姓名；跨租户用户不可见；主部门名聚合来自 primary 行政主部门关系。
+func TestUserPageListDepartmentFilter(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{},
+		&model.DepartmentUserEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
 
-	// 组织
-	for _, orgID := range []string{"o1", "o2"} {
-		if err := db.Create(&model.OrganizationEntity{
-			BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: orgID}},
+	// 部门
+	for _, deptID := range []string{"o1", "o2"} {
+		if err := db.Create(&model.DepartmentEntity{
+			BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: deptID}},
 			TenantID:   "t1",
-			OrgPath:    "/" + orgID,
-			OrgDepth:   1,
-			Name:       "组织" + orgID,
+			DeptPath:   "/" + deptID,
+			DeptDepth:  1,
+			Name:       "部门" + deptID,
 			Status:     "active",
 		}).Error; err != nil {
-			t.Fatalf("seed org %s: %v", orgID, err)
+			t.Fatalf("seed dept %s: %v", deptID, err)
 		}
 	}
 
@@ -793,28 +793,28 @@ func TestUserPageListOrganizationFilter(t *testing.T) {
 	// 其他租户用户（不应出现）
 	seedTestUserWithPerson(t, db, "u-other", "t2", "", "外人")
 
-	if err := db.Create(&model.OrganizationUserEntity{
-		BaseEntity:     gormdao.BaseEntity{StringID: gormdao.StringID{ID: "ou1"}},
-		TenantID:       "t1",
-		OrganizationID: "o1",
-		UserID:         "u1",
-		RelationType:   model.OrgUserRelationPrimary,
+	if err := db.Create(&model.DepartmentUserEntity{
+		BaseEntity:   gormdao.BaseEntity{StringID: gormdao.StringID{ID: "ou1"}},
+		TenantID:     "t1",
+		DepartmentID: "o1",
+		UserID:       "u1",
+		RelationType: model.DeptUserRelationPrimary,
 	}).Error; err != nil {
 		t.Fatalf("seed rel ou1: %v", err)
 	}
-	if err := db.Create(&model.OrganizationUserEntity{
-		BaseEntity:     gormdao.BaseEntity{StringID: gormdao.StringID{ID: "ou2"}},
-		TenantID:       "t1",
-		OrganizationID: "o2",
-		UserID:         "u2",
-		RelationType:   model.OrgUserRelationLeader,
+	if err := db.Create(&model.DepartmentUserEntity{
+		BaseEntity:   gormdao.BaseEntity{StringID: gormdao.StringID{ID: "ou2"}},
+		TenantID:     "t1",
+		DepartmentID: "o2",
+		UserID:       "u2",
+		RelationType: model.DeptUserRelationLeader,
 	}).Error; err != nil {
 		t.Fatalf("seed rel ou2: %v", err)
 	}
 
-	ginCtx := newOrgGinCtx(t, "t1", "op")
+	ginCtx := newDeptGinCtx(t, "t1", "op")
 
-	// 全量（不含其他租户）：主组织名仅聚合 primary 关系
+	// 全量（不含其他租户）：主部门名仅聚合 primary 关系
 	resp, err := svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10})
 	if err != nil {
 		t.Fatalf("user page list: %v", err)
@@ -834,25 +834,25 @@ func TestUserPageListOrganizationFilter(t *testing.T) {
 	if u1Item == nil || u2Item == nil {
 		t.Fatalf("expected u1/u2 in list, got %+v", resp.List)
 	}
-	if u1Item.PrimaryOrgName != "组织o1" {
-		t.Fatalf("expected u1 primary org name 组织o1, got %s", u1Item.PrimaryOrgName)
+	if u1Item.PrimaryDepartmentName != "部门o1" {
+		t.Fatalf("expected u1 primary dept name 部门o1, got %s", u1Item.PrimaryDepartmentName)
 	}
-	if u2Item.PrimaryOrgName != "" {
-		t.Fatalf("expected u2 empty primary org name (leader only), got %s", u2Item.PrimaryOrgName)
+	if u2Item.PrimaryDepartmentName != "" {
+		t.Fatalf("expected u2 empty primary dept name (leader only), got %s", u2Item.PrimaryDepartmentName)
 	}
 
 	// 按部门过滤：o1 命中 u1；o2 命中 u2（leader 也算该部门用户）
-	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, OrganizationID: "o1"})
+	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, DepartmentID: "o1"})
 	if err != nil {
-		t.Fatalf("user page list by org: %v", err)
+		t.Fatalf("user page list by dept: %v", err)
 	}
 	if resp.Total != 1 || resp.List[0].UserID != "u1" {
 		t.Fatalf("expected only u1 for o1, got %+v", resp.List)
 	}
 
-	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, OrganizationID: "o2"})
+	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, DepartmentID: "o2"})
 	if err != nil {
-		t.Fatalf("user page list by org: %v", err)
+		t.Fatalf("user page list by dept: %v", err)
 	}
 	if resp.Total != 1 || resp.List[0].UserID != "u2" {
 		t.Fatalf("expected only u2 for o2, got %+v", resp.List)
@@ -868,31 +868,31 @@ func TestUserPageListOrganizationFilter(t *testing.T) {
 	}
 
 	// 无匹配部门返回空
-	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, OrganizationID: "o-none"})
+	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, DepartmentID: "o-none"})
 	if err != nil {
-		t.Fatalf("user page list by missing org: %v", err)
+		t.Fatalf("user page list by missing dept: %v", err)
 	}
 	if resp.Total != 0 || len(resp.List) != 0 {
-		t.Fatalf("expected empty list for missing org, got %+v", resp.List)
+		t.Fatalf("expected empty list for missing dept, got %+v", resp.List)
 	}
 }
 
 // TestUserResetPasswordIssuesTemporaryPassword 重置成员密码（D7）：
 // 服务端生成新临时密码并仅返回一次、落库哈希与之匹配、强制下次登录改密、旧密码立即失效。
 func TestUserResetPasswordIssuesTemporaryPassword(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{},
-		&model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{},
+		&model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
 
-	if err := db.Create(&model.OrganizationEntity{
+	if err := db.Create(&model.DepartmentEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "o1"}},
-		TenantID:   "t1", OrgPath: "/o1", OrgDepth: 1, Name: "组织o1", Status: "active",
+		TenantID:   "t1", DeptPath: "/o1", DeptDepth: 1, Name: "部门o1", Status: "active",
 	}).Error; err != nil {
-		t.Fatalf("seed org: %v", err)
+		t.Fatalf("seed dept: %v", err)
 	}
 	ginCtx := newAdminCtx(t, db, "t1", "op1")
 
-	created, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", OrganizationIDs: []string{"o1"}})
+	created, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", PrimaryDepartmentID: "o1"})
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -941,8 +941,8 @@ func TestUserResetPasswordIssuesTemporaryPassword(t *testing.T) {
 // TestUserResetPasswordRejectsMachineUser 服务账号无口令语义：即使 userID 存在也必须拒绝，
 // 且绝不动其关联 person（若有）的密码。
 func TestUserResetPasswordRejectsMachineUser(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{},
-		&model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{},
+		&model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
 	ginCtx := newAdminCtx(t, db, "t1", "op1")
 

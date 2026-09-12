@@ -30,10 +30,10 @@ type appSeedApp struct {
 
 func newSeedDB(t *testing.T, apps []appSeedApp) *gorm.DB {
 	t.Helper()
-	// 迁移全表：person/tenant/user/organization 供 createTenant 落库；app/client 供策略判定。
+	// 迁移全表：person/tenant/user/department 供 createTenant 落库；app/client 供策略判定。
 	db := testutil.SetupSQLite(t,
-		&model.PersonEntity{}, &model.TenantEntity{}, &model.UserEntity{}, &model.OrganizationEntity{},
-		&model.OrganizationUserEntity{},
+		&model.PersonEntity{}, &model.TenantEntity{}, &model.UserEntity{}, &model.DepartmentEntity{},
+		&model.DepartmentUserEntity{},
 		&model.ApplicationClientEntity{}, &model.ApplicationEntity{},
 		// 建租户链路还会写入租户自服务的角色/授权/订阅（权限开通）
 		&model.MenuEntity{}, &model.RoleEntity{}, &model.RoleMenuEntity{},
@@ -242,19 +242,19 @@ func TestCreateTenantSucceedsForZeroTenantPerson(t *testing.T) {
 	if uErr != nil || len(users) == 0 || !users[0].IsOwner {
 		t.Fatalf("expected owner user, got users:%#v err:%v", users, uErr)
 	}
-	// owner 走与平台侧同一份开通实现：builtin 来源 + 归属根组织 + 内置租户管理员角色
+	// owner 走与平台侧同一份开通实现：builtin 来源 + 归属根部门 + 内置租户管理员角色
 	if users[0].Source != model.UserSourceBuiltin {
 		t.Errorf("owner source = %q, want %q (平台重置内置管理员密码依赖该标记)", users[0].Source, model.UserSourceBuiltin)
 	}
-	rootOrg, oErr := dao.NewOrganizationDao().GetByCond(t.Context(), &dao.OrganizationCond{TenantID: res.TenantID})
-	if oErr != nil || rootOrg == nil {
-		t.Fatalf("expected root organization, err:%v org:%#v", oErr, rootOrg)
+	rootDept, oErr := dao.NewDepartmentDao().GetByCond(t.Context(), &dao.DepartmentCond{TenantID: res.TenantID})
+	if oErr != nil || rootDept == nil {
+		t.Fatalf("expected root department, err:%v dept:%#v", oErr, rootDept)
 	}
-	orgUsers, ouErr := dao.NewOrganizationUserDao().GetListByCond(t.Context(), &dao.OrganizationUserCond{
-		TenantID: res.TenantID, UserID: users[0].ID, RelationType: model.OrgUserRelationPrimary,
+	deptUsers, ouErr := dao.NewDepartmentUserDao().GetListByCond(t.Context(), &dao.DepartmentUserCond{
+		TenantID: res.TenantID, UserID: users[0].ID, RelationType: model.DeptUserRelationPrimary,
 	})
-	if ouErr != nil || len(orgUsers) != 1 || orgUsers[0].OrganizationID != rootOrg.ID {
-		t.Fatalf("expected owner attached to root org, got %#v err:%v", orgUsers, ouErr)
+	if ouErr != nil || len(deptUsers) != 1 || deptUsers[0].DepartmentID != rootDept.ID {
+		t.Fatalf("expected owner attached to root dept, got %#v err:%v", deptUsers, ouErr)
 	}
 	role, rErr := dao.NewRoleDao().GetByCond(t.Context(), &dao.RoleCond{TenantID: res.TenantID, Code: tenant.ProvisionRoleCode})
 	if rErr != nil || role == nil {

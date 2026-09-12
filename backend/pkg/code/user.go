@@ -3,17 +3,17 @@ package code
 import "github.com/morehao/golib/gerror"
 
 const (
-	UserCreateError               = 100500
-	UserDeleteError               = 100501
-	UserUpdateError               = 100502
-	UserGetDetailError            = 100503
-	UserGetPageListError          = 100504
-	UserNotExistError             = 100505
-	UserOrganizationRequiredError = 100518 // 用户必须从属于至少一个部门
-	UserAlreadyInTenantError      = 100516 // 自然人已在本租户内
-	UserResetPasswordError        = 100517 // 重置密码失败
-	UserContactRequiredError      = 100521 // 邮箱或手机号至少填写一个
-	UserOwnerUpdateError          = 100522 // 指派/取消租户拥有者失败
+	UserCreateError             = 100500
+	UserDeleteError             = 100501
+	UserUpdateError             = 100502
+	UserGetDetailError          = 100503
+	UserGetPageListError        = 100504
+	UserNotExistError           = 100505
+	UserDepartmentRequiredError = 100518 // 用户必须从属于至少一个部门
+	UserAlreadyInTenantError    = 100516 // 自然人已在本租户内
+	UserResetPasswordError      = 100517 // 重置密码失败
+	UserContactRequiredError    = 100521 // 邮箱或手机号至少填写一个
+	UserOwnerUpdateError        = 100522 // 指派/取消租户拥有者失败
 )
 
 const (
@@ -42,19 +42,19 @@ const (
 
 // 服务账号（租户内机器主体，user_type=machine）领域错误码。
 const (
-	MachineUserCreateError        = 100830 // 创建服务账号失败
-	MachineUserUpdateError        = 100831 // 修改服务账号失败
-	MachineUserStatusUpdateError  = 100832 // 更新服务账号状态失败
-	MachineUserDeleteError        = 100833 // 删除服务账号失败
-	MachineUserGetPageListError   = 100834 // 查看服务账号列表失败
-	MachineUserGetDetailError     = 100835 // 查看服务账号详情失败
-	MachineUserRoleReplaceError   = 100836 // 更新服务账号角色失败
-	UserAdminRoleAssignForbidden  = 100837 // 禁止将管理员角色授予服务账号
-	UserSystemAdminRequiredError  = 100838 // 需要系统管理能力(admin_type=admin)
-	MachineUserRoleGetListError   = 100839 // 查看服务账号角色失败
-	MachineUserDeleteHasKeysError = 100840 // 删除服务账号前需先删除其全部API密钥
-	UserMemberOperationOnlyError  = 100841 // 该操作仅支持对真实用户执行
-	MachineUserOrgRequiredError   = 100842 // 服务账号必须从属于一个主部门(且至多一个)
+	MachineUserCreateError             = 100830 // 创建服务账号失败
+	MachineUserUpdateError             = 100831 // 修改服务账号失败
+	MachineUserStatusUpdateError       = 100832 // 更新服务账号状态失败
+	MachineUserDeleteError             = 100833 // 删除服务账号失败
+	MachineUserGetPageListError        = 100834 // 查看服务账号列表失败
+	MachineUserGetDetailError          = 100835 // 查看服务账号详情失败
+	MachineUserRoleReplaceError        = 100836 // 更新服务账号角色失败
+	UserAdminRoleAssignForbidden       = 100837 // 禁止将管理员角色授予服务账号
+	UserSystemAdminRequiredError       = 100838 // 需要系统管理能力(admin_type=admin)
+	MachineUserRoleGetListError        = 100839 // 查看服务账号角色失败
+	MachineUserDeleteHasKeysError      = 100840 // 删除服务账号前需先删除其全部API密钥
+	UserMemberOperationOnlyError       = 100841 // 该操作仅支持对真实用户执行
+	MachineUserDepartmentRequiredError = 100842 // 服务账号必须从属于一个主部门(且至多一个)
 )
 
 // 租户端 API 密钥领域错误码（归属真实用户本人或服务账号）。
@@ -75,7 +75,7 @@ var userErrorMsgMap = gerror.CodeMsgMap{
 	UserGetDetailError:                    "查看用户详情失败",
 	UserGetPageListError:                  "查看用户列表失败",
 	UserNotExistError:                     "用户不存在",
-	UserOrganizationRequiredError:         "用户必须从属于至少一个部门",
+	UserDepartmentRequiredError:           "用户必须从属于至少一个部门",
 	UserAlreadyInTenantError:              "该用户已在本租户内",
 	UserResetPasswordError:                "重置密码失败",
 	UserContactRequiredError:              "邮箱或手机号至少填写一个",
@@ -107,7 +107,7 @@ var userErrorMsgMap = gerror.CodeMsgMap{
 	UserSystemAdminRequiredError:          "需要系统管理能力(admin_type=admin)",
 	MachineUserDeleteHasKeysError:         "请先删除该服务账号下的全部API密钥",
 	UserMemberOperationOnlyError:          "该操作仅支持对真实用户执行",
-	MachineUserOrgRequiredError:           "服务账号必须从属于一个主部门(且至多一个)",
+	MachineUserDepartmentRequiredError:    "服务账号必须从属于一个主部门(且至多一个)",
 	ApiKeyCreateError:                     "创建API密钥失败",
 	ApiKeyGetPageListError:                "查看API密钥列表失败",
 	ApiKeyRevokeError:                     "吊销API密钥失败",

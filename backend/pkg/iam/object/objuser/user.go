@@ -13,7 +13,7 @@ type UserBaseInfo struct {
 	AppID             string `json:"appID" form:"appID"`                         // 应用ID
 	Identities        any    `json:"identities" form:"identities"`               // 第三方身份
 	CustomData        any    `json:"customData" form:"customData"`               // 自定义数据
-	IsSuspended bool   `json:"isSuspended" form:"isSuspended"`             // 是否挂起
+	IsSuspended       bool   `json:"isSuspended" form:"isSuspended"`             // 是否挂起
 }
 
 type UserPasswordInfo struct {
@@ -41,4 +41,3 @@ type UserLoginLogBaseInfo struct {
 	UserAgent string `json:"userAgent" form:"userAgent"` // 用户代理信息
 	LoginTime int64  `json:"loginTime" form:"loginTime"` // 登录时间
 }
-

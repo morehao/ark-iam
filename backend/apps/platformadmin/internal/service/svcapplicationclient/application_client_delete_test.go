@@ -26,7 +26,7 @@ func newOAuthDeleteCtx(tenantID, userID string) *gin.Context {
 func newTestClientEntity(name, clientID string, isSystem bool) *model.ApplicationClientEntity {
 	return &model.ApplicationClientEntity{
 		TenantID:                "1",
-		Code:                   clientID,
+		Code:                    clientID,
 		Name:                    name,
 		RedirectURIs:            datatypes.JSON("[]"),
 		PostLogoutRedirectURIs:  datatypes.JSON("[]"),

@@ -30,7 +30,7 @@ test.describe('实时统一登出', () => {
     // 2. 同 context 新开标签页访问 RP1（3002），应免密 SSO 登录
     const rp1 = await context.newPage();
     await rp1.goto('http://localhost:3002/', { waitUntil: 'domcontentloaded', timeout: 20000 });
-    await expect(rp1.getByText('组织管理', { exact: true }).first()).toBeVisible({ timeout: 30000 });
+    await expect(rp1.getByText('部门管理', { exact: true }).first()).toBeVisible({ timeout: 30000 });
 
     // 3. 确认 RP1 本地持有未过期的 access token（未清理任何状态）
     const rp1Tokens = await rp1.evaluate(() => {

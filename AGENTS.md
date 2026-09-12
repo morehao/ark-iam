@@ -118,7 +118,7 @@ pkg/                          # 公共包（跨应用共享：config/middleware/
 - **接口名**: 以 `I` 结尾或使用角色后缀，如 `UserSvc`, `UserCtr`
 - **结构体**: 导出使用大驼峰 `UserSvc`，非导出使用小驼峰 `userSvc`
 - **文件命名**: 小写下划线，如 `user_service.go`，测试文件 `*_test.go`
-- **数据库表**: 下划线命名，如 `user_department`
+- **数据库表**: 下划线命名，如 `department_user`
 
 ### 模块划分规范
 
@@ -163,21 +163,21 @@ apps/platformadmin/
 **凡定义成常量的一组字典字符串，必须声明具名类型，并让实体/DAO/DTO/Service/测试全链路复用该类型与常量。**
 
 ```go
-// model/organization_user.go
+// model/department_user.go
 // 具名类型 + 常量（禁止硬编码、禁止在其他层裸写字符串）
-type OrgUserRelationType string
+type DeptUserRelationType string
 
 const (
-    OrgUserRelationPrimary   OrgUserRelationType = "primary"   // 行政主部门，每用户至多 1 行
-    OrgUserRelationSecondary OrgUserRelationType = "secondary" // 跨部门参与，可多条
-    OrgUserRelationLeader    OrgUserRelationType = "leader"    // 负责人，可多条
+    DeptUserRelationPrimary   DeptUserRelationType = "primary"   // 行政主部门，每用户至多 1 行
+    DeptUserRelationSecondary DeptUserRelationType = "secondary" // 跨部门参与，可多条
+    DeptUserRelationLeader    DeptUserRelationType = "leader"    // 负责人，可多条
 )
 ```
 
 **硬规则（新增字典枚举必守）：**
 
-1. **字段类型用具名类型，不用 `string`**：实体、DAO Cond、DTO 请求/响应的枚举字段一律声明为该具名类型（如 `RelationType OrgUserRelationType`），而非 `string`——编译期即可杜绝拼错枚举值。
-2. **全链路用常量**：赋值、传参、比较一律引用常量，如 `model.OrgUserRelationPrimary`，**禁止** `string(model.OrgUserRelationX)` 强转、**禁止**显式类型转换换别的枚举类型、**禁止**裸字面量 `"primary"`/`"admin"` 出现在非定义处。
+1. **字段类型用具名类型，不用 `string`**：实体、DAO Cond、DTO 请求/响应的枚举字段一律声明为该具名类型（如 `RelationType DeptUserRelationType`），而非 `string`——编译期即可杜绝拼错枚举值。
+2. **全链路用常量**：赋值、传参、比较一律引用常量，如 `model.DeptUserRelationPrimary`，**禁止** `string(model.DeptUserRelationX)` 强转、**禁止**显式类型转换换别的枚举类型、**禁止**裸字面量 `"primary"`/`"admin"` 出现在非定义处。
 3. **非法值校验归 service**：请求来自前端（JSON/form 绑定原始类型），service 入口用 `switch` + 常量白名单判合法，非法返回对应功能级错误码；合法值命中常量直接使用。
 4. **JSON/DB 向下兼容**：具名类型的底层是 `string`，JSON 序列化仍是普通字符串、gorm 存 varchar，前端和数据库均无感知；DTO 包允许 import `pkg/iam/model`（单向下游，无环）。
 
@@ -187,7 +187,7 @@ const (
 // model/department.go
 
 // 数据表名
-const TableNameDepartment = "iam_department"
+const TableNameDepartment = "department"
 
 // 业务枚举类型
 type DeptStatus string
@@ -295,23 +295,23 @@ if err != nil {
 错误示范（err 与边界混写）：
 
 ```go
-// 错误：系统错误被掩盖为 OrganizationNotExistError，且未记日志
-parent, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
-if err != nil || !organizationVisibleToTenant(parent, tenantID) {
-    return nil, code.GetError(code.OrganizationNotExistError)
+// 错误：系统错误被掩盖为 DepartmentNotExistError，且未记日志
+parent, err := dao.NewDepartmentDao().GetByID(ctx, req.DepartmentID)
+if err != nil || !departmentVisibleToTenant(parent, tenantID) {
+    return nil, code.GetError(code.DepartmentNotExistError)
 }
 ```
 
 正确示范（分离）：
 
 ```go
-parent, err := dao.NewOrganizationDao().GetByID(ctx, req.OrganizationID)
+parent, err := dao.NewDepartmentDao().GetByID(ctx, req.DepartmentID)
 if err != nil {
-    glog.Errorf(ctx, "[svcorganization.Children] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-    return nil, code.GetError(code.OrganizationGetPageListError)
+    glog.Errorf(ctx, "[svcdepartment.Children] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+    return nil, code.GetError(code.DepartmentGetPageListError)
 }
-if !organizationVisibleToTenant(parent, tenantID) {
-    return nil, code.GetError(code.OrganizationNotExistError)
+if !departmentVisibleToTenant(parent, tenantID) {
+    return nil, code.GetError(code.DepartmentNotExistError)
 }
 ```
 
@@ -378,8 +378,8 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 | 资源 | 操作 | 完整路径 |
 |------|------|----------|
 | user | 创建 | `POST /v1/platform/users` |
-| user | 分配部门（全量替换） | `PUT /v1/platform/users/{userID}/departments` |
-| role | 分页列表 | `GET /v1/platform/roles?page=&pageSize=` |
+| department | 创建部门节点 | `POST /v1/tenant/departments` |
+| department | 部门树 | `GET /v1/tenant/departments/tree` |
 | apiKey | 吊销（动作） | `POST /v1/tenant/api-keys/{apiKeyID}/revoke` |
 | 认证操作 | 注册 | `POST /v1/auth/register`（auth 应用认证操作直接挂服务段，避免 `/v1/auth/auth/*`） |
 
