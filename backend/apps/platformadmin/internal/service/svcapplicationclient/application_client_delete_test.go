@@ -32,10 +32,10 @@ func newTestClientEntity(name, clientID string, source model.ApplicationClientSo
 		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
 		GrantTypes:              datatypes.JSON("[]"),
 		ResponseTypes:           datatypes.JSON("[]"),
-		TokenEndpointAuthMethod: "client_secret_basic",
+		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodBasic,
 		AllowedOrigins:          datatypes.JSON("[]"),
 		DefaultScopes:           datatypes.JSON("[]"),
-		Status:                  "enable",
+		Status:                  model.ApplicationClientStatusEnable,
 		Source:                  source,
 	}
 }

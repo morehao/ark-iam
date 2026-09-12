@@ -54,7 +54,7 @@ func seedTempPasswordPerson(t *testing.T, db *gorm.DB, tempPassword string) *mod
 		Username:           model.StrPtr("temp-user"),
 		PrimaryEmail:       model.StrPtr("temp@example.com"),
 		PasswordEncrypted:  hash,
-		PasswordMethod:     "bcrypt",
+		PasswordMethod:     model.PasswordMethodBcrypt,
 		MustChangePassword: true,
 		Name:               "临时口令用户",
 		Profile:            json.RawMessage(`{}`),

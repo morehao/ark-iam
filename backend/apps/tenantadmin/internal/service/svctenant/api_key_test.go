@@ -74,7 +74,7 @@ func TestApiKeyServiceAccountOnly(t *testing.T) {
 	}
 	if machinePage.Total != 1 ||
 		machinePage.List[0].OwnerUserID != machine.ID ||
-		machinePage.List[0].OwnerType != string(model.UserTypeMachine) ||
+		machinePage.List[0].OwnerType != model.UserTypeMachine ||
 		machinePage.List[0].OwnerName != "svc-notify" {
 		t.Fatalf("machine key list mismatch: %+v", machinePage)
 	}

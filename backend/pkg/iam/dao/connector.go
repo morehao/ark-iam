@@ -9,8 +9,8 @@ import (
 type ConnectorCond struct {
 	*gormdao.BaseCond
 	TenantID    string
-	Protocol    string
-	Provider    string
+	Protocol    model.ConnectorProtocol
+	Provider    model.ConnectorProvider
 	Status      model.ConnectorStatus
 	Name        string
 	DisplayName string

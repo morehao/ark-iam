@@ -8,12 +8,20 @@ import (
 
 const TableNameUserLoginLog = "user_login_log"
 
+// LoginType 登录方式（字典值，落 user_login_log.login_type）。
+type LoginType string
+
+// 登录方式取值（禁止硬编码）。
+const (
+	LoginTypePassword LoginType = "password" // 账号密码登录
+)
+
 type UserLoginLogEntity struct {
 	gormdao.BaseEntity
 	PersonID  string    `gorm:"column:person_id;type:varchar(36);not null;default:'';comment:自然人ID"`
 	TenantID  string    `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id"`
 	UserID    string    `gorm:"column:user_id;type:varchar(36);not null;default:'';comment:用户ID"`
-	LoginType string    `gorm:"column:login_type;type:varchar(32);not null;default:'';comment:登录类型"`
+	LoginType LoginType `gorm:"column:login_type;type:varchar(32);not null;default:'';comment:登录类型"`
 	LoginIP   string    `gorm:"column:login_ip;type:varchar(64);comment:登录IP地址"`
 	UserAgent string    `gorm:"column:user_agent;type:varchar(512);comment:用户代理信息"`
 	LoginTime time.Time `gorm:"column:login_time;not null;default:CURRENT_TIMESTAMP;comment:登录时间"`

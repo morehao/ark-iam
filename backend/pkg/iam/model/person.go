@@ -9,16 +9,24 @@ import (
 
 const TableNamePerson = "person"
 
+// PasswordMethod 密码加密方式（字典值，落 person.password_method）。
+type PasswordMethod string
+
+// 密码加密方式取值（禁止硬编码）。
+const (
+	PasswordMethodBcrypt PasswordMethod = "bcrypt" // bcrypt 哈希
+)
+
 type PersonEntity struct {
 	gormdao.BaseEntity
 	// Username/PrimaryEmail/PrimaryPhone 为可选全局标识，空值存 NULL。
 	// 唯一性由部分唯一索引保证（WHERE deleted_at IS NULL，见 automigrate.go
 	// EnsurePartialUniqueIndexes），软删除记录不占用标识、也不与新增记录冲突。
-	Username          *string `gorm:"column:username;type:varchar(128);default:null;comment:全局用户名"`
-	PrimaryEmail      *string `gorm:"column:primary_email;type:varchar(128);default:null;comment:主要邮箱"`
-	PrimaryPhone      *string `gorm:"column:primary_phone;type:varchar(128);default:null;comment:主要手机号"`
-	PasswordEncrypted string  `gorm:"column:password_encrypted;type:varchar(256);not null;default:'';comment:加密密码"`
-	PasswordMethod    string  `gorm:"column:password_method;type:varchar(32);not null;default:'';comment:密码加密方式"`
+	Username          *string        `gorm:"column:username;type:varchar(128);default:null;comment:全局用户名"`
+	PrimaryEmail      *string        `gorm:"column:primary_email;type:varchar(128);default:null;comment:主要邮箱"`
+	PrimaryPhone      *string        `gorm:"column:primary_phone;type:varchar(128);default:null;comment:主要手机号"`
+	PasswordEncrypted string         `gorm:"column:password_encrypted;type:varchar(256);not null;default:'';comment:加密密码"`
+	PasswordMethod    PasswordMethod `gorm:"column:password_method;type:varchar(32);not null;default:'';comment:密码加密方式"`
 	// MustChangePassword 为 true 时，该自然人持临时密码（或密码刚被管理员重置），
 	// 登录链路会在认证通过后拦截并强制其先设置新密码，改密成功前不签发 code / 不建会话。
 	// 放在 person（而非 tenant_user）是因为密码是自然人全局凭据，同一个人在多个租户共享一套密码。

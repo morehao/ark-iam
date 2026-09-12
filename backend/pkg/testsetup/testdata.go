@@ -44,7 +44,7 @@ func PrepareTestPerson(ctx context.Context, username, email, phone, password, na
 		PrimaryEmail:      model.StrPtr(email),
 		PrimaryPhone:      model.StrPtr(phone),
 		PasswordEncrypted: passwordHash,
-		PasswordMethod:    "bcrypt",
+		PasswordMethod:    model.PasswordMethodBcrypt,
 		Name:              name,
 		Profile:           json.RawMessage("{}"),
 		CustomData:        json.RawMessage("{}"),

@@ -110,14 +110,14 @@ func (f *fakeConnectorStateStore) Consume(ctx context.Context, state string) (*C
 }
 
 type fakeConnectorDriver struct {
-	driverType                string
+	driverType                model.ConnectorProtocol
 	validateConfigFunc        func(config ConnectorConfig) error
 	buildAuthorizationURLFunc func(ctx *gin.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error)
 	exchangeCallbackFunc      func(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error)
 	testConnectionFunc        func(ctx *gin.Context, input *ConnectorTestInput) (*ConnectorTestOutput, error)
 }
 
-func (f *fakeConnectorDriver) DriverType() string {
+func (f *fakeConnectorDriver) DriverType() model.ConnectorProtocol {
 	return f.driverType
 }
 

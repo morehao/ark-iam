@@ -525,7 +525,7 @@ func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID string, success bo
 	loginLogEntity := &model.UserLoginLogEntity{
 		TenantID:  tenantID,
 		UserID:    userID,
-		LoginType: "password",
+		LoginType: model.LoginTypePassword,
 		LoginIP:   loginIP,
 		UserAgent: userAgent,
 		LoginTime: time.Now(),

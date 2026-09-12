@@ -36,10 +36,10 @@ func TestAuditLogDao_InsertAndGetByCond(t *testing.T) {
 		ActorUserID:   "22",
 		TenantID:      "1",
 		ClientID:      "test-client",
-		Action:        "application.create",
-		TargetType:    "application",
+		Action:        model.AuditActionApplicationCreate,
+		TargetType:    model.AuditTargetTypeApplication,
 		TargetID:      "99",
-		Result:        "success",
+		Result:        model.AuditResultSuccess,
 		IP:            "127.0.0.1",
 		UserAgent:     "go-test",
 		Detail:        "created app",
@@ -54,8 +54,8 @@ func TestAuditLogDao_InsertAndGetByCond(t *testing.T) {
 
 	got, err := auditDao.GetByCond(context.Background(), &AuditLogCond{
 		PersonID: "11",
-		Action:   "application.create",
-		Result:   "success",
+		Action:   model.AuditActionApplicationCreate,
+		Result:   model.AuditResultSuccess,
 	})
 	if err != nil {
 		t.Fatalf("GetByCond failed: %v", err)

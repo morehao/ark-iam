@@ -30,16 +30,24 @@ const (
 	ApplicationClientStatusDisable ApplicationClientStatus = "disable" // 停用
 )
 
+// GrantType OAuth 2.0 授权类型（grant_types JSON 数组元素，见 RFC 6749）。
+type GrantType string
+
+// 授权类型取值（禁止硬编码），取值为 OAuth2/OIDC 协议标准字面量。
 const (
-	GrantTypeAuthorizationCode = "authorization_code"
-	GrantTypeClientCredentials = "client_credentials"
-	GrantTypeRefreshToken      = "refresh_token"
+	GrantTypeAuthorizationCode GrantType = "authorization_code"
+	GrantTypeClientCredentials GrantType = "client_credentials"
+	GrantTypeRefreshToken      GrantType = "refresh_token"
 )
 
+// TokenEndpointAuthMethod 令牌端点客户端认证方式（token_endpoint_auth_method，见 RFC 8414）。
+type TokenEndpointAuthMethod string
+
+// 令牌端点认证方式取值（禁止硬编码），取值为 OAuth2/OIDC 协议标准字面量。
 const (
-	TokenEndpointAuthMethodBasic = "client_secret_basic"
-	TokenEndpointAuthMethodPost  = "client_secret_post"
-	TokenEndpointAuthMethodNone  = "none"
+	TokenEndpointAuthMethodBasic TokenEndpointAuthMethod = "client_secret_basic"
+	TokenEndpointAuthMethodPost  TokenEndpointAuthMethod = "client_secret_post"
+	TokenEndpointAuthMethodNone  TokenEndpointAuthMethod = "none"
 )
 
 type ApplicationClientEntity struct {
@@ -54,7 +62,7 @@ type ApplicationClientEntity struct {
 	BackChannelLogoutURI    string                  `gorm:"column:back_channel_logout_uri;type:varchar(512);not null;default:'';comment:OIDC背信道登出通知地址" json:"backChannelLogoutURI"`
 	GrantTypes              datatypes.JSON          `gorm:"column:grant_types;type:json;not null;default:('[\"authorization_code\"]');comment:授权类型" json:"grantTypes"`
 	ResponseTypes           datatypes.JSON          `gorm:"column:response_types;type:json;not null;default:('[\"code\"]');comment:响应类型" json:"responseTypes"`
-	TokenEndpointAuthMethod string                  `gorm:"column:token_endpoint_auth_method;type:varchar(32);not null;default:'client_secret_basic';comment:令牌端点认证方式" json:"tokenEndpointAuthMethod"`
+	TokenEndpointAuthMethod TokenEndpointAuthMethod `gorm:"column:token_endpoint_auth_method;type:varchar(32);not null;default:'client_secret_basic';comment:令牌端点认证方式" json:"tokenEndpointAuthMethod"`
 	AllowedOrigins          datatypes.JSON          `gorm:"column:allowed_origins;type:json;not null;default:('[]');comment:CORS白名单" json:"allowedOrigins"`
 	RequirePKCE             bool                    `gorm:"column:require_pkce;type:boolean;not null;default:false;comment:是否强制PKCE" json:"requirePKCE"`
 	RequireAuthTime         bool                    `gorm:"column:require_auth_time;type:boolean;not null;default:false;comment:是否需要auth_time声明" json:"requireAuthTime"`

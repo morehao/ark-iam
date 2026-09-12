@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
 	"github.com/morehao/golib/glog"
 )
 
@@ -38,15 +39,15 @@ func accessTokenRevokedKey(tokenID string) string { return accessTokenRevokedKey
 
 // accessTokenMeta 是一次 access token 签发时的上下文快照。
 type accessTokenMeta struct {
-	Subject    string    `json:"subject"`
-	ClientID   string    `json:"clientID"`
-	Scopes     []string  `json:"scopes"`
-	IssuedAt   time.Time `json:"issuedAt"`
-	ExpiresAt  time.Time `json:"expiresAt"`
-	TenantID   string    `json:"tenantID,omitempty"`
-	SessionID  string    `json:"sessionID,omitempty"`
-	TokenUsage string    `json:"tokenUsage,omitempty"`
-	Username   string    `json:"username,omitempty"`
+	Subject    string             `json:"subject"`
+	ClientID   string             `json:"clientID"`
+	Scopes     []string           `json:"scopes"`
+	IssuedAt   time.Time          `json:"issuedAt"`
+	ExpiresAt  time.Time          `json:"expiresAt"`
+	TenantID   string             `json:"tenantID,omitempty"`
+	SessionID  string             `json:"sessionID,omitempty"`
+	TokenUsage objauth.TokenUsage `json:"tokenUsage,omitempty"`
+	Username   string             `json:"username,omitempty"`
 }
 
 // storeAccessTokenMeta 尽力写入 access token 元数据；Redis 不可用时仅记日志，

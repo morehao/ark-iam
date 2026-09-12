@@ -401,12 +401,12 @@ func TestConnectorTypesExposeNewContractFields(t *testing.T) {
 	}
 	factoryResp := dtoconnector.ConnectorFactoryResp{
 		FactoryID:     "oidc-google",
-		Protocol:      "oidc",
-		Provider:      "google",
+		Protocol:      model.ConnectorProtocolOIDC,
+		Provider:      model.ConnectorProviderGoogle,
 		DisplayName:   "Google",
 		IsStandard:    true,
 		DefaultScopes: []string{"openid", "profile", "email"},
-		Capabilities:  []string{"authorize", "callback"},
+		Capabilities:  []model.ConnectorCapability{model.ConnectorCapabilityAuthorize, model.ConnectorCapabilityCallback},
 		ConfigSchema: map[string]any{
 			"type": "object",
 		},

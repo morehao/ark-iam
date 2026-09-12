@@ -61,9 +61,11 @@ func generateClientCode() string {
 	return uuid.New().String()
 }
 
-func marshalStringSlice(s []string) datatypes.JSON {
+// marshalJSONSlice 将切片序列化为 JSON 列（nil 落空数组）。
+// 元素可为任意类型：枚举具名类型底层是 string，序列化结果与 []string 一致。
+func marshalJSONSlice[T any](s []T) datatypes.JSON {
 	if s == nil {
-		s = []string{}
+		s = []T{}
 	}
 	b, _ := json.Marshal(s)
 	return datatypes.JSON(b)
@@ -75,16 +77,16 @@ func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.Ap
 		AppID:                   req.AppID,
 		Code:                    generateClientCode(),
 		Name:                    req.Name,
-		RedirectURIs:            marshalStringSlice(req.RedirectURIs),
-		PostLogoutRedirectURIs:  marshalStringSlice(req.PostLogoutRedirectURIs),
+		RedirectURIs:            marshalJSONSlice(req.RedirectURIs),
+		PostLogoutRedirectURIs:  marshalJSONSlice(req.PostLogoutRedirectURIs),
 		BackChannelLogoutURI:    req.BackChannelLogoutURI,
-		GrantTypes:              marshalStringSlice(req.GrantTypes),
-		ResponseTypes:           marshalStringSlice(req.ResponseTypes),
+		GrantTypes:              marshalJSONSlice(req.GrantTypes),
+		ResponseTypes:           marshalJSONSlice(req.ResponseTypes),
 		TokenEndpointAuthMethod: req.TokenEndpointAuthMethod,
-		AllowedOrigins:          marshalStringSlice(req.AllowedOrigins),
+		AllowedOrigins:          marshalJSONSlice(req.AllowedOrigins),
 		RequirePKCE:             req.RequirePKCE,
 		RequireAuthTime:         req.RequireAuthTime,
-		DefaultScopes:           marshalStringSlice(req.DefaultScopes),
+		DefaultScopes:           marshalJSONSlice(req.DefaultScopes),
 		AccessTokenTTL:          req.AccessTokenTTL,
 		RefreshTokenTTL:         req.RefreshTokenTTL,
 		Source:                  model.ApplicationClientSourceThirdParty, // 控制台创建的客户端恒为第三方接入
@@ -146,16 +148,16 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.Ap
 	userID := gincontext.GetUserIDString(ctx)
 	updateMap := map[string]any{
 		"name":                       req.Name,
-		"redirect_uris":              marshalStringSlice(req.RedirectURIs),
-		"post_logout_redirect_uris":  marshalStringSlice(req.PostLogoutRedirectURIs),
+		"redirect_uris":              marshalJSONSlice(req.RedirectURIs),
+		"post_logout_redirect_uris":  marshalJSONSlice(req.PostLogoutRedirectURIs),
 		"back_channel_logout_uri":    req.BackChannelLogoutURI,
-		"grant_types":                marshalStringSlice(req.GrantTypes),
-		"response_types":             marshalStringSlice(req.ResponseTypes),
+		"grant_types":                marshalJSONSlice(req.GrantTypes),
+		"response_types":             marshalJSONSlice(req.ResponseTypes),
 		"token_endpoint_auth_method": req.TokenEndpointAuthMethod,
-		"allowed_origins":            marshalStringSlice(req.AllowedOrigins),
+		"allowed_origins":            marshalJSONSlice(req.AllowedOrigins),
 		"require_pkce":               req.RequirePKCE,
 		"require_auth_time":          req.RequireAuthTime,
-		"default_scopes":             marshalStringSlice(req.DefaultScopes),
+		"default_scopes":             marshalJSONSlice(req.DefaultScopes),
 		"access_token_ttl":           req.AccessTokenTTL,
 		"refresh_token_ttl":          req.RefreshTokenTTL,
 		"updated_by":                 userID,
@@ -182,7 +184,8 @@ func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtoapplicationclient.Ap
 	}
 
 	var redirectURIs, postLogoutRedirectURIs []string
-	var grantTypes, responseTypes []string
+	var grantTypes []model.GrantType
+	var responseTypes []string
 	var allowedOrigins, defaultScopes []string
 	_ = json.Unmarshal(entity.RedirectURIs, &redirectURIs)
 	_ = json.Unmarshal(entity.PostLogoutRedirectURIs, &postLogoutRedirectURIs)
@@ -243,7 +246,7 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.
 
 	items := make([]dtoapplicationclient.PageListItem, 0, len(list))
 	for _, v := range list {
-		var grantTypes []string
+		var grantTypes []model.GrantType
 		_ = json.Unmarshal(v.GrantTypes, &grantTypes)
 
 		items = append(items, dtoapplicationclient.PageListItem{
@@ -277,7 +280,8 @@ func (svc *oAuthClientSvc) GetByClientID(ctx *gin.Context, clientID string) (*dt
 		return nil, code.GetError(code.ApplicationClientNotExistError)
 	}
 	var redirectURIs, postLogoutRedirectURIs []string
-	var grantTypes, responseTypes []string
+	var grantTypes []model.GrantType
+	var responseTypes []string
 	var allowedOrigins, defaultScopes []string
 	_ = json.Unmarshal(entity.RedirectURIs, &redirectURIs)
 	_ = json.Unmarshal(entity.PostLogoutRedirectURIs, &postLogoutRedirectURIs)

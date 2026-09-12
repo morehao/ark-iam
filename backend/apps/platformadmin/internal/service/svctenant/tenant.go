@@ -78,7 +78,7 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 	}
 
 	userID := gincontext.GetUserIDString(ctx)
-	tenantType := model.TenantType(req.Type)
+	tenantType := req.Type
 	if tenantType != model.TenantTypeCustomer && tenantType != model.TenantTypePlatform {
 		tenantType = model.TenantTypeCustomer
 	}
@@ -105,7 +105,7 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 					PrimaryEmail:       admin.PrimaryEmail,
 					PrimaryPhone:       admin.PrimaryPhone,
 					PasswordEncrypted:  passwordHash,
-					PasswordMethod:     "bcrypt",
+					PasswordMethod:     model.PasswordMethodBcrypt,
 					MustChangePassword: true,
 					Name:               admin.Name,
 					CreatedBy:          userID,
@@ -194,7 +194,7 @@ func (svc *tenantSvc) ResetAdminPassword(ctx *gin.Context, req *dtotenant.Tenant
 	operatorID := gincontext.GetUserIDString(ctx)
 	if err := dao.NewPersonDao().UpdateMap(ctx, builtinAdmin.PersonID, map[string]any{
 		"password_encrypted":   passwordHash,
-		"password_method":      "bcrypt",
+		"password_method":      model.PasswordMethodBcrypt,
 		"must_change_password": true,
 		"updated_by":           operatorID,
 	}); err != nil {
@@ -252,7 +252,7 @@ func (svc *tenantSvc) Update(ctx *gin.Context, req *dtotenant.TenantUpdateReq) e
 	}
 
 	userID := gincontext.GetUserIDString(ctx)
-	tenantType := model.TenantType(req.Type)
+	tenantType := req.Type
 	if tenantType != model.TenantTypeCustomer && tenantType != model.TenantTypePlatform {
 		tenantType = model.TenantTypeCustomer
 	}
@@ -304,7 +304,7 @@ func (svc *tenantSvc) Detail(ctx *gin.Context, req *dtotenant.TenantDetailReq) (
 			Name:   tenantEntity.Name,
 			Status: tenantEntity.Status,
 			Tag:    tenantEntity.Tag,
-			Type:   string(tenantEntity.Type),
+			Type:   tenantEntity.Type,
 		},
 		OperatorBaseInfo: gobject.OperatorBaseInfo{
 			CreatedAt: tenantEntity.CreatedAt.Unix(),
@@ -347,7 +347,7 @@ func (svc *tenantSvc) PageList(ctx *gin.Context, req *dtotenant.TenantPageListRe
 				Name:   v.Name,
 				Status: v.Status,
 				Tag:    v.Tag,
-				Type:   string(v.Type),
+				Type:   v.Type,
 			},
 			OperatorBaseInfo: gobject.OperatorBaseInfo{
 				CreatedAt: v.CreatedAt.Unix(),

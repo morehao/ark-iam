@@ -6,6 +6,23 @@ import (
 
 const TableNameAuditLog = "audit_log"
 
+// AuditAction 审计动作标识（字典值，落 audit_log.action）。
+type AuditAction string
+
+// 审计动作取值（禁止硬编码）。
+const (
+	AuditActionLogin                         AuditAction = "login"                            // 登录
+	AuditActionLogout                        AuditAction = "logout"                           // 登出
+	AuditActionTenantSwitch                  AuditAction = "tenant.switch"                    // 切换租户
+	AuditActionTenantCreate                  AuditAction = "tenant.create"                    // 创建租户
+	AuditActionTenantAdminPasswordReset      AuditAction = "tenant.admin_password_reset"      // 重置租户管理员密码
+	AuditActionApplicationCreate             AuditAction = "application.create"               // 创建应用
+	AuditActionApplicationClientCreate       AuditAction = "application_client.create"        // 创建 OAuth 客户端
+	AuditActionApplicationClientCreateSecret AuditAction = "application_client.create_secret" // 创建 OAuth 客户端密钥
+	AuditActionApiKeyCreate                  AuditAction = "api_key.create"                   // 创建 API Key
+	AuditActionApiKeyRevoke                  AuditAction = "api_key.revoke"                   // 吊销 API Key
+)
+
 // AuditResult 审计结果。
 type AuditResult string
 
@@ -34,7 +51,7 @@ type AuditLogEntity struct {
 	ActorUserID   string          `gorm:"column:actor_user_id;type:varchar(36);not null;default:'';comment:操作人user id"`
 	TenantID      string          `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id"`
 	ClientID      string          `gorm:"column:client_id;type:varchar(64);not null;default:'';comment:客户端id"`
-	Action        string          `gorm:"column:action;type:varchar(64);not null;default:'';comment:动作标识"`
+	Action        AuditAction     `gorm:"column:action;type:varchar(64);not null;default:'';comment:动作标识"`
 	TargetType    AuditTargetType `gorm:"column:target_type;type:varchar(64);not null;default:'';comment:目标类型"`
 	TargetID      string          `gorm:"column:target_id;type:varchar(36);not null;default:'';comment:目标id"`
 	Result        AuditResult     `gorm:"column:result;type:varchar(16);not null;default:'';comment:结果 success/failure"`

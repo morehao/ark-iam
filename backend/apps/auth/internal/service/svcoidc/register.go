@@ -65,7 +65,7 @@ func (svc *oidcAuthSvc) RegisterPerson(ctx *gin.Context, req *dtooidc.RegisterPe
 			PrimaryEmail:      req.PrimaryEmail,
 			PrimaryPhone:      req.PrimaryPhone,
 			PasswordEncrypted: passwordHash,
-			PasswordMethod:    "bcrypt",
+			PasswordMethod:    model.PasswordMethodBcrypt,
 			Name:              req.Name,
 			CreatedBy:         "",
 		})

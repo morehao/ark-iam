@@ -13,15 +13,14 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/glog"
 )
-
-const connectorProviderWechat = "wechat"
 
 type oauth2IdentityNormalizer func(config ConnectorConfig, claims map[string]any) (StandardIdentity, error)
 
 type OAuth2Driver struct {
-	normalizers     map[string]oauth2IdentityNormalizer
+	normalizers     map[model.ConnectorProvider]oauth2IdentityNormalizer
 	tokenExchanger  func(ctx context.Context, config oauth2.Config, code string, codeVerifier string) (*oauth2.Token, error)
 	userInfoFetcher func(ctx context.Context, token *oauth2.Token, config ConnectorConfig) (map[string]any, error)
 }
@@ -30,14 +29,14 @@ var _ ConnectorDriver = (*OAuth2Driver)(nil)
 
 func NewOAuth2Driver() ConnectorDriver {
 	return &OAuth2Driver{
-		normalizers: map[string]oauth2IdentityNormalizer{
+		normalizers: map[model.ConnectorProvider]oauth2IdentityNormalizer{
 			connectorProviderGithub: normalizeGitHubIdentity,
 			connectorProviderWechat: normalizeOAuth2IdentityPassthrough,
 		},
 	}
 }
 
-func (d *OAuth2Driver) DriverType() string {
+func (d *OAuth2Driver) DriverType() model.ConnectorProtocol {
 	return connectorDriverTypeOAuth2
 }
 
@@ -154,7 +153,7 @@ func (d *OAuth2Driver) normalizeIdentity(config ConnectorConfig, claims map[stri
 	return normalizer(config, claims)
 }
 
-func (d *OAuth2Driver) getNormalizers() map[string]oauth2IdentityNormalizer {
+func (d *OAuth2Driver) getNormalizers() map[model.ConnectorProvider]oauth2IdentityNormalizer {
 	if d.normalizers != nil {
 		return d.normalizers
 	}
@@ -203,7 +202,7 @@ func normalizeGitHubIdentity(config ConnectorConfig, claims map[string]any) (Sta
 		return StandardIdentity{}, err
 	}
 	return StandardIdentity{
-		Issuer:      config.Provider,
+		Issuer:      string(config.Provider),
 		Subject:     subject,
 		Username:    oauth2OptionalClaimString(claims, "login"),
 		DisplayName: oauth2OptionalClaimString(claims, "name"),
@@ -214,7 +213,7 @@ func normalizeGitHubIdentity(config ConnectorConfig, claims map[string]any) (Sta
 
 func normalizeOAuth2IdentityPassthrough(config ConnectorConfig, claims map[string]any) (StandardIdentity, error) {
 	return StandardIdentity{
-		Issuer: config.Provider,
+		Issuer: string(config.Provider),
 		Claims: claims,
 	}, nil
 }

@@ -45,7 +45,7 @@ func resolveConnectorRedirectURI(input *ConnectorAuthorizeInput) string {
 }
 
 type ConnectorDriver interface {
-	DriverType() string
+	DriverType() model.ConnectorProtocol
 	ValidateConfig(config ConnectorConfig) error
 	BuildAuthorizationURL(ctx *gin.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error)
 	ExchangeCallback(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error)
@@ -53,11 +53,11 @@ type ConnectorDriver interface {
 }
 
 type connectorDriverRegistry struct {
-	drivers map[string]ConnectorDriver
+	drivers map[model.ConnectorProtocol]ConnectorDriver
 }
 
 func newConnectorDriverRegistry(drivers ...ConnectorDriver) *connectorDriverRegistry {
-	registry := &connectorDriverRegistry{drivers: make(map[string]ConnectorDriver, len(drivers))}
+	registry := &connectorDriverRegistry{drivers: make(map[model.ConnectorProtocol]ConnectorDriver, len(drivers))}
 	for _, driver := range drivers {
 		if driver == nil {
 			continue
@@ -74,7 +74,7 @@ func defaultConnectorDriverRegistry() *connectorDriverRegistry {
 	)
 }
 
-func (r *connectorDriverRegistry) Get(driverType string) (ConnectorDriver, bool) {
+func (r *connectorDriverRegistry) Get(driverType model.ConnectorProtocol) (ConnectorDriver, bool) {
 	if r == nil {
 		return nil, false
 	}
@@ -128,14 +128,14 @@ func selectDriverForConnector(registry *connectorDriverRegistry, connector *mode
 }
 
 type stubConnectorDriver struct {
-	driverType string
+	driverType model.ConnectorProtocol
 }
 
-func newStubConnectorDriver(driverType string) ConnectorDriver {
+func newStubConnectorDriver(driverType model.ConnectorProtocol) ConnectorDriver {
 	return &stubConnectorDriver{driverType: driverType}
 }
 
-func (d *stubConnectorDriver) DriverType() string {
+func (d *stubConnectorDriver) DriverType() model.ConnectorProtocol {
 	return d.driverType
 }
 

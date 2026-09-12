@@ -1,5 +1,7 @@
 package dtoconnector
 
+import "github.com/morehao/ark-iam/pkg/iam/model"
+
 type ConnectorIDReq struct {
 	ConnectorID string `json:"-" uri:"connectorID" binding:"required"`
 }
@@ -19,6 +21,6 @@ type ConnectorCallbackReq struct {
 }
 
 type ConnectorFactoryListReq struct {
-	Protocol string `json:"protocol" form:"protocol"`
-	Provider string `json:"provider" form:"provider"`
+	Protocol model.ConnectorProtocol `json:"protocol" form:"protocol"`
+	Provider model.ConnectorProvider `json:"provider" form:"provider"`
 }

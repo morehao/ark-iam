@@ -2262,7 +2262,11 @@ const docTemplatetenantadmin = `{
                 },
                 "ownerType": {
                     "description": "归属类型(machine服务账号;兼容历史member数据)",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserType"
+                        }
+                    ]
                 },
                 "ownerUserID": {
                     "description": "归属服务账号ID",

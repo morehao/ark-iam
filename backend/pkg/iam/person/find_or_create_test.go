@@ -39,7 +39,7 @@ func seedPerson(t *testing.T, db *gorm.DB, email string) {
 		Profile:           []byte(`{}`),
 		CustomData:        []byte(`{}`),
 		PasswordEncrypted: "hash",
-		PasswordMethod:    "bcrypt",
+		PasswordMethod:    model.PasswordMethodBcrypt,
 	}).Error; err != nil {
 		t.Fatalf("seed person: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestFindOrCreate_CreateWhenNoMatch(t *testing.T) {
 		PrimaryEmail:      "new@example.com",
 		Name:              "Alice",
 		PasswordEncrypted: "hash",
-		PasswordMethod:    "bcrypt",
+		PasswordMethod:    model.PasswordMethodBcrypt,
 	}
 	p, created, err := FindOrCreate(context.Background(), db, req)
 	if err != nil {

@@ -2272,7 +2272,7 @@ const docTemplateplatformadmin = `{
                     "description": "授权类型",
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/model.GrantType"
                     }
                 },
                 "name": {
@@ -2314,7 +2314,11 @@ const docTemplateplatformadmin = `{
                 },
                 "tokenEndpointAuthMethod": {
                     "description": "令牌端点认证方式",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.TokenEndpointAuthMethod"
+                        }
+                    ]
                 }
             }
         },
@@ -2376,7 +2380,7 @@ const docTemplateplatformadmin = `{
                     "description": "授权类型",
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/model.GrantType"
                     }
                 },
                 "name": {
@@ -2438,7 +2442,11 @@ const docTemplateplatformadmin = `{
                 },
                 "tokenEndpointAuthMethod": {
                     "description": "令牌端点认证方式",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.TokenEndpointAuthMethod"
+                        }
+                    ]
                 }
             }
         },
@@ -2487,7 +2495,7 @@ const docTemplateplatformadmin = `{
                     "description": "授权类型",
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/model.GrantType"
                     }
                 },
                 "name": {
@@ -2537,7 +2545,11 @@ const docTemplateplatformadmin = `{
                 },
                 "tokenEndpointAuthMethod": {
                     "description": "令牌端点认证方式",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.TokenEndpointAuthMethod"
+                        }
+                    ]
                 }
             }
         },
@@ -2564,7 +2576,7 @@ const docTemplateplatformadmin = `{
                     "description": "授权类型",
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/model.GrantType"
                     }
                 },
                 "name": {
@@ -2589,7 +2601,11 @@ const docTemplateplatformadmin = `{
                 },
                 "tokenEndpointAuthMethod": {
                     "description": "令牌端点认证方式",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.TokenEndpointAuthMethod"
+                        }
+                    ]
                 },
                 "updatedAt": {
                     "description": "更新时间(unix 秒)",
@@ -3466,7 +3482,11 @@ const docTemplateplatformadmin = `{
                 },
                 "type": {
                     "description": "租户类型: customer-客户租户, platform-平台租户(分类标识,不参与隔离判定)",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.TenantType"
+                        }
+                    ]
                 }
             }
         },
@@ -3528,7 +3548,11 @@ const docTemplateplatformadmin = `{
                 },
                 "type": {
                     "description": "租户类型: customer-客户租户, platform-平台租户(分类标识,不参与隔离判定)",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.TenantType"
+                        }
+                    ]
                 },
                 "updatedAt": {
                     "description": "更新时间",
@@ -3581,7 +3605,11 @@ const docTemplateplatformadmin = `{
                 },
                 "type": {
                     "description": "租户类型: customer-客户租户, platform-平台租户(分类标识,不参与隔离判定)",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.TenantType"
+                        }
+                    ]
                 },
                 "updatedAt": {
                     "description": "更新时间",
@@ -3638,7 +3666,11 @@ const docTemplateplatformadmin = `{
                 },
                 "type": {
                     "description": "租户类型: customer-客户租户, platform-平台租户(分类标识,不参与隔离判定)",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.TenantType"
+                        }
+                    ]
                 }
             }
         },
@@ -3906,6 +3938,19 @@ const docTemplateplatformadmin = `{
                 "ApplicationClientStatusDisable"
             ]
         },
+        "model.GrantType": {
+            "type": "string",
+            "enum": [
+                "authorization_code",
+                "client_credentials",
+                "refresh_token"
+            ],
+            "x-enum-varnames": [
+                "GrantTypeAuthorizationCode",
+                "GrantTypeClientCredentials",
+                "GrantTypeRefreshToken"
+            ]
+        },
         "model.MenuStatus": {
             "type": "string",
             "enum": [
@@ -4007,6 +4052,30 @@ const docTemplateplatformadmin = `{
             "x-enum-varnames": [
                 "TenantStatusActive",
                 "TenantStatusSuspended"
+            ]
+        },
+        "model.TenantType": {
+            "type": "string",
+            "enum": [
+                "customer",
+                "platform"
+            ],
+            "x-enum-varnames": [
+                "TenantTypeCustomer",
+                "TenantTypePlatform"
+            ]
+        },
+        "model.TokenEndpointAuthMethod": {
+            "type": "string",
+            "enum": [
+                "client_secret_basic",
+                "client_secret_post",
+                "none"
+            ],
+            "x-enum-varnames": [
+                "TokenEndpointAuthMethodBasic",
+                "TokenEndpointAuthMethodPost",
+                "TokenEndpointAuthMethodNone"
             ]
         },
         "objpermission.MenuItemNode": {

@@ -528,7 +528,7 @@ func tenantIDFromRequest(request op.TokenRequest) string {
 	return ""
 }
 
-func tokenUsageFromRequest(request op.TokenRequest) string {
+func tokenUsageFromRequest(request op.TokenRequest) objauth.TokenUsage {
 	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok && ccReq.isApiKey {
 		return objauth.TokenUsageMachine
 	}

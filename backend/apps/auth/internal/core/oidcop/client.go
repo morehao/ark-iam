@@ -53,11 +53,11 @@ func (c *OIDCClient) ApplicationType() op.ApplicationType {
 
 func (c *OIDCClient) AuthMethod() oidc.AuthMethod {
 	switch c.clientEntity.TokenEndpointAuthMethod {
-	case "client_secret_post":
+	case model.TokenEndpointAuthMethodPost:
 		return oidc.AuthMethodPost
-	case "none":
+	case model.TokenEndpointAuthMethodNone:
 		return oidc.AuthMethodNone
-	case "client_secret_basic":
+	case model.TokenEndpointAuthMethodBasic:
 		return oidc.AuthMethodBasic
 	default:
 		// M5：private_key_jwt / client_secret_jwt 等未实现的认证方式显式失败（fail-closed），
@@ -86,18 +86,18 @@ func (c *OIDCClient) ResponseTypes() []oidc.ResponseType {
 }
 
 func (c *OIDCClient) GrantTypes() []oidc.GrantType {
-	var rawTypes []string
+	var rawTypes []model.GrantType
 	if err := json.Unmarshal(c.clientEntity.GrantTypes, &rawTypes); err != nil {
 		return nil
 	}
 	types := make([]oidc.GrantType, 0, len(rawTypes))
 	for _, gt := range rawTypes {
 		switch gt {
-		case "authorization_code":
+		case model.GrantTypeAuthorizationCode:
 			types = append(types, oidc.GrantTypeCode)
-		case "client_credentials":
+		case model.GrantTypeClientCredentials:
 			types = append(types, oidc.GrantTypeClientCredentials)
-		case "refresh_token":
+		case model.GrantTypeRefreshToken:
 			types = append(types, oidc.GrantTypeRefreshToken)
 		}
 		// M5：token-exchange / jwt-bearer 尚未实现（无 TokenExchangeStorage / JWT 公钥注册），

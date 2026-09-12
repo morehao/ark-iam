@@ -11,21 +11,23 @@ import (
 	"github.com/morehao/golib/glog"
 )
 
+// 审计动作短名别名：取值事实源在 model.AuditAction*（落库枚举定义在 model 层），
+// 此处仅保留 audit.ActionXxx 写法供调用方复用，禁止再出现裸字面量。
 const (
-	ActionLogin                         = "login"
-	ActionLogout                        = "logout"
-	ActionTenantSwitch                  = "tenant.switch"
-	ActionTenantCreate                  = "tenant.create"
-	ActionTenantAdminPasswordReset      = "tenant.admin_password_reset"
-	ActionApplicationCreate             = "application.create"
-	ActionApplicationClientCreate       = "application_client.create"
-	ActionApplicationClientCreateSecret = "application_client.create_secret"
-	ActionApiKeyCreate                  = "api_key.create"
-	ActionApiKeyRevoke                  = "api_key.revoke"
+	ActionLogin                         = model.AuditActionLogin
+	ActionLogout                        = model.AuditActionLogout
+	ActionTenantSwitch                  = model.AuditActionTenantSwitch
+	ActionTenantCreate                  = model.AuditActionTenantCreate
+	ActionTenantAdminPasswordReset      = model.AuditActionTenantAdminPasswordReset
+	ActionApplicationCreate             = model.AuditActionApplicationCreate
+	ActionApplicationClientCreate       = model.AuditActionApplicationClientCreate
+	ActionApplicationClientCreateSecret = model.AuditActionApplicationClientCreateSecret
+	ActionApiKeyCreate                  = model.AuditActionApiKeyCreate
+	ActionApiKeyRevoke                  = model.AuditActionApiKeyRevoke
 )
 
 type AuditEntry struct {
-	Action     string
+	Action     model.AuditAction
 	TenantID   string
 	TargetType model.AuditTargetType
 	TargetID   string

@@ -1,6 +1,9 @@
 package svcauth
 
-import "github.com/morehao/ark-iam/auth/internal/dto/dtoconnector"
+import (
+	"github.com/morehao/ark-iam/auth/internal/dto/dtoconnector"
+	"github.com/morehao/ark-iam/pkg/iam/model"
+)
 
 // defaultConnectorFactoriesOnce 只构建一次工厂列表（只读共享），避免每次请求重建。
 var defaultConnectorFactoriesOnce = func() []dtoconnector.ConnectorFactoryResp {
@@ -12,7 +15,7 @@ var defaultConnectorFactoriesOnce = func() []dtoconnector.ConnectorFactoryResp {
 			DisplayName:   "Google",
 			IsStandard:    true,
 			DefaultScopes: []string{"openid", "profile", "email"},
-			Capabilities:  []string{connectorCapabilityAuthorize, connectorCapabilityCallback, connectorCapabilityClaimMapping, connectorCapabilityDomainPolicy},
+			Capabilities:  []model.ConnectorCapability{connectorCapabilityAuthorize, connectorCapabilityCallback, connectorCapabilityClaimMapping, connectorCapabilityDomainPolicy},
 			ConfigSchema: map[string]any{
 				"type":     "object",
 				"required": []string{"issuer", "clientId", "clientSecret", "redirectUri"},
@@ -25,7 +28,7 @@ var defaultConnectorFactoriesOnce = func() []dtoconnector.ConnectorFactoryResp {
 			DisplayName:   "GitHub",
 			IsStandard:    true,
 			DefaultScopes: []string{"read:user", "user:email"},
-			Capabilities:  []string{connectorCapabilityAuthorize, connectorCapabilityCallback, connectorCapabilityProfileSync},
+			Capabilities:  []model.ConnectorCapability{connectorCapabilityAuthorize, connectorCapabilityCallback, connectorCapabilityProfileSync},
 			ConfigSchema: map[string]any{
 				"type":     "object",
 				"required": []string{"authUrl", "tokenUrl", "userInfoUrl", "clientId", "clientSecret", "redirectUri"},
@@ -38,7 +41,7 @@ var defaultConnectorFactoriesOnce = func() []dtoconnector.ConnectorFactoryResp {
 			DisplayName:   "Microsoft Entra ID",
 			IsStandard:    true,
 			DefaultScopes: []string{"openid", "profile", "email"},
-			Capabilities:  []string{connectorCapabilityAuthorize, connectorCapabilityCallback, connectorCapabilityClaimMapping, connectorCapabilityDomainPolicy},
+			Capabilities:  []model.ConnectorCapability{connectorCapabilityAuthorize, connectorCapabilityCallback, connectorCapabilityClaimMapping, connectorCapabilityDomainPolicy},
 			ConfigSchema: map[string]any{
 				"type":     "object",
 				"required": []string{"issuer", "clientId", "clientSecret", "redirectUri", "tenant"},

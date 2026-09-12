@@ -66,6 +66,11 @@ export interface ApplicationUpdateReq {
 }
 
 // ---------- OAuth 客户端 ----------
+/** 授权类型（后端具名类型 model.GrantType，RFC 6749 标准字面量）。 */
+export type GrantType = 'authorization_code' | 'client_credentials' | 'refresh_token'
+/** 令牌端点认证方式（后端具名类型 model.TokenEndpointAuthMethod，RFC 8414 标准字面量）。 */
+export type TokenEndpointAuthMethod = 'client_secret_basic' | 'client_secret_post' | 'none'
+
 export interface OAuthClientItem {
   applicationClientID: string
   appID: string
@@ -73,8 +78,8 @@ export interface OAuthClientItem {
   name: string
   source: AppSource
   status: ApplicationClientStatus
-  grantTypes: string[]
-  tokenEndpointAuthMethod: string
+  grantTypes: GrantType[]
+  tokenEndpointAuthMethod: TokenEndpointAuthMethod
   createdAt?: number
   updatedAt?: number
 }
@@ -98,9 +103,9 @@ export interface OAuthClientCreateReq {
   name: string
   redirectURIs?: string[]
   postLogoutRedirectURIs?: string[]
-  grantTypes?: string[]
+  grantTypes?: GrantType[]
   responseTypes?: string[]
-  tokenEndpointAuthMethod?: string
+  tokenEndpointAuthMethod?: TokenEndpointAuthMethod
   allowedOrigins?: string[]
   requirePKCE?: number
   requireAuthTime?: number
@@ -115,9 +120,9 @@ export interface OAuthClientUpdateReq {
   status?: ApplicationClientStatus
   redirectURIs?: string[]
   postLogoutRedirectURIs?: string[]
-  grantTypes?: string[]
+  grantTypes?: GrantType[]
   responseTypes?: string[]
-  tokenEndpointAuthMethod?: string
+  tokenEndpointAuthMethod?: TokenEndpointAuthMethod
   allowedOrigins?: string[]
   requirePKCE?: number
   requireAuthTime?: number
@@ -148,6 +153,11 @@ export interface OAuthSecretCreateResp {
 // 租户状态（后端 model.TenantStatus）：active-正常 / suspended-已挂起；
 // 非 active 的租户其成员无法登录、令牌不签发，且不能挂起操作者自己所在租户。
 export type TenantStatus = 'active' | 'suspended'
+/**
+ * 租户类型（后端具名类型 model.TenantType）：
+ * customer-客户租户 / platform-平台租户（分类标识，不参与隔离判定）。
+ */
+export type TenantType = 'customer' | 'platform'
 
 export interface TenantItem {
   tenantID: string
@@ -156,7 +166,7 @@ export interface TenantItem {
   name: string
   status: TenantStatus
   tag: string
-  type: string
+  type: TenantType
   createdAt?: number
   updatedAt?: number
 }
@@ -178,7 +188,7 @@ export interface TenantCreateReq {
   dbUser?: string
   status?: TenantStatus
   tag?: string
-  type?: string
+  type?: TenantType
   admin: TenantAdminCreateReq
 }
 
@@ -204,7 +214,7 @@ export interface TenantUpdateReq {
   dbUser?: string
   status?: TenantStatus
   tag?: string
-  type?: string
+  type?: TenantType
 }
 
 // ---------- 租户应用 ----------
@@ -292,13 +302,20 @@ export interface AuditLogItem {
 }
 
 // ---------- Connector（auth） ----------
+/** 连接器协议（后端具名类型 model.ConnectorProtocol）。 */
+export type ConnectorProtocol = 'oidc' | 'oauth2'
+/** 连接器身份提供商（后端具名类型 model.ConnectorProvider）。 */
+export type ConnectorProvider = 'google' | 'github' | 'microsoft' | 'wechat'
+/** 连接器能力（后端具名类型 model.ConnectorCapability）。 */
+export type ConnectorCapability = 'authorize' | 'callback' | 'claim_mapping' | 'domain_policy' | 'profile_sync'
+
 export interface ConnectorItem {
   connectorID: string
   tenantID: string
   name: string
   displayName: string
-  protocol: string
-  provider: string
+  protocol: ConnectorProtocol
+  provider: ConnectorProvider
   status: ConnectorStatus
   allowAutoCreateUser: number
   allowAccountLink: number
@@ -312,11 +329,11 @@ export interface ConnectorItem {
 
 export interface ConnectorFactoryItem {
   factoryID: string
-  protocol: string
-  provider: string
+  protocol: ConnectorProtocol
+  provider: ConnectorProvider
   displayName: string
   isStandard: boolean
   defaultScopes: string[]
-  capabilities: string[]
+  capabilities: ConnectorCapability[]
   configSchema?: unknown
 }
