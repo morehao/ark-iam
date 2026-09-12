@@ -22,7 +22,7 @@ const applications: ApplicationItem[] = [
   {
     appID: 'app-1',
     code: 'platform_admin',
-    name: '管理后台',
+    name: '平台管理后台',
     description: '',
     logoUrl: '',
     homepageUrl: '',
@@ -43,7 +43,7 @@ describe('应用列表', () => {
   it('同时展示创建时间与更新时间两列', async () => {
     render(<ApplicationList />)
 
-    expect(await screen.findByText('管理后台')).toBeInTheDocument()
+    expect(await screen.findByText('平台管理后台')).toBeInTheDocument()
     // 时间列读 createdAt/updatedAt（回归：字段缺失会渲染 '-'）
     expect(screen.getByText(fmtTime(createdAt))).toBeInTheDocument()
     expect(screen.getByText(fmtTime(updatedAt))).toBeInTheDocument()
@@ -76,5 +76,28 @@ describe('应用列表', () => {
     await waitFor(() =>
       expect(mockCreateApplication).toHaveBeenCalledWith(expect.objectContaining({ code: 'my_app' })),
     )
+  })
+})
+
+/**
+ * 内置应用（source=builtin）的名称/描述由平台版本定义（后端字段权威矩阵 reconcile，控制台拒写），
+ * 前端必须置灰并给出说明；启停与排序仍可改。回归背景：种子会收敛 name/description，
+ * 若前端仍可编辑，运维改完重启就被收回（双写者）。
+ */
+describe('内置应用的身份字段只读', () => {
+  it('编辑内置应用时名称与描述置灰', async () => {
+    mockGetApplicationPageList.mockResolvedValue({
+      list: [{ ...applications[0], source: 'builtin' as const }],
+      total: 1,
+    })
+    render(<ApplicationList />)
+
+    fireEvent.click(await screen.findByText('编辑'))
+    const nameInput = await screen.findByPlaceholderText('应用名称')
+    await waitFor(() => expect(nameInput).toBeDisabled())
+    expect(screen.getByPlaceholderText('选填')).toBeDisabled()
+    expect(screen.getByText('内置应用的名称由平台版本定义，不可修改')).toBeInTheDocument()
+    // 排序归运维，仍可编辑
+    expect(screen.getByPlaceholderText('数字越小越靠前')).not.toBeDisabled()
   })
 })

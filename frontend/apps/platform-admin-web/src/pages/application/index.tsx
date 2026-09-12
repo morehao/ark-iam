@@ -24,6 +24,9 @@ export default function ApplicationList() {
 
   const [detailOpen, setDetailOpen] = useState(false)
   const [detail, setDetail] = useState<ApplicationItem | null>(null)
+  // 内置应用（source=builtin）的名称/描述由种子收敛（后端字段权威矩阵 reconcile），控制台拒写；
+  // 启停与排序仍归运维。与 svcapplication.Update 的拒写规则同源。
+  const seedOwned = editing?.source === 'builtin'
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -192,8 +195,13 @@ export default function ApplicationList() {
           >
             <Input placeholder="唯一编码，如 iam_web" disabled={!!editing} />
           </Form.Item>
-          <Form.Item name="name" label="应用名称" rules={[{ required: true, message: '请输入应用名称' }]}>
-            <Input placeholder="应用名称" />
+          <Form.Item
+            name="name"
+            label="应用名称"
+            rules={[{ required: true, message: '请输入应用名称' }]}
+            extra={seedOwned ? '内置应用的名称由平台版本定义，不可修改' : undefined}
+          >
+            <Input placeholder="应用名称" disabled={seedOwned} />
           </Form.Item>
           {editing && (
             <Form.Item label="来源">
@@ -211,8 +219,8 @@ export default function ApplicationList() {
               />
             </Form.Item>
           )}
-          <Form.Item name="description" label="描述">
-            <Input.TextArea rows={3} placeholder="选填" />
+          <Form.Item name="description" label="描述" extra={seedOwned ? '内置应用的描述由平台版本定义，不可修改' : undefined}>
+            <Input.TextArea rows={3} placeholder="选填" disabled={seedOwned} />
           </Form.Item>
           <Form.Item name="logoUrl" label="Logo 地址">
             <Input placeholder="https://... 选填" />

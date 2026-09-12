@@ -77,10 +77,36 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.Applicat
 	}, nil
 }
 
+// applicationSeedFieldsChanged 判断请求是否改动了种子拥有的字段（字段权威矩阵：
+// application 的 reconcile 字段 = name/description）。控制台对这些字段必须拒写，
+// 否则会出现"运维改完、重启被种子收敛回去"的双写者。
+func applicationSeedFieldsChanged(entity *model.ApplicationEntity, req *dtoapplication.ApplicationUpdateReq) bool {
+	current := map[string]any{"name": entity.Name, "description": entity.Description}
+	desired := map[string]any{"name": req.Name, "description": req.Description}
+	for field, want := range desired {
+		if model.SeedOwnsField(model.SeedEntityApplication, field) && current[field] != want {
+			return true
+		}
+	}
+	return false
+}
+
 func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.ApplicationUpdateReq) error {
 	if !isValidAppStatus(req.Status) {
 		glog.Errorf(ctx, "[svcapplication.Update] 非法应用状态, req:%s", gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationUpdateError)
+	}
+	entity, err := dao.NewApplicationDao().GetByID(ctx, req.AppID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcapplication.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.ApplicationUpdateError)
+	}
+	if entity == nil || entity.ID == "" {
+		return code.GetError(code.ApplicationNotExistError)
+	}
+	if entity.Source.IsBuiltin() && applicationSeedFieldsChanged(entity, req) {
+		glog.Errorf(ctx, "[svcapplication.Update] 拒绝修改内置应用身份字段, appID:%s, req:%s", req.AppID, gutil.ToJsonString(req))
+		return code.GetError(code.ApplicationBuiltInFieldImmutableError)
 	}
 	updateMap := map[string]any{
 		"name":         req.Name,

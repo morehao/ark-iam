@@ -37,7 +37,7 @@ func (svc *tenantMenuSvc) Tree(ctx *gin.Context) (*dtotenant.MenuTreeResp, error
 	}, nil
 }
 
-// Apps 当前租户订阅的启用应用（角色归属/菜单授权的应用选项，含内置应用如管理后台）。
+// Apps 当前租户订阅的启用应用（角色归属/菜单授权的应用选项，含内置应用如平台管理后台）。
 func (svc *tenantMenuSvc) Apps(ctx *gin.Context) (*dtotenant.TenantAppsResp, error) {
 	appList, err := loadSubscribedApps(ctx)
 	if err != nil {
@@ -54,7 +54,7 @@ func (svc *tenantMenuSvc) Apps(ctx *gin.Context) (*dtotenant.TenantAppsResp, err
 	return &dtotenant.TenantAppsResp{List: list}, nil
 }
 
-// loadSubscribedApps 当前租户订阅的启用应用（含内置应用，如管理后台）。
+// loadSubscribedApps 当前租户订阅的启用应用（含内置应用，如平台管理后台）。
 // 两道门槛都需满足：订阅关系 tenant_application.status=enable，且应用本身 application.status=enable
 // —— 应用被停用后不应再把它的菜单/角色归属继续暴露给已订阅租户。
 // 角色归属/应用名映射的应用选项集合：凡租户订阅且启用的应用均可选，
@@ -98,14 +98,14 @@ func loadSubscribedApps(ctx *gin.Context) ([]model.ApplicationEntity, error) {
 	return appList, nil
 }
 
-// tenantAdminAppCode 租户自服务应用的种子编码（见 pkg/seed，appCodeTenantAdmin）。
+// tenantAdminAppCode 租户管理后台应用的种子编码（见 pkg/seed，appCodeTenantAdmin）。
 // 它是本控制台菜单的载体：内置应用的菜单默认不并入租户侧边栏，唯独它必须留下。
 const tenantAdminAppCode = "tenant_admin"
 
 // loadConsoleApps 租户控制台菜单范围的订阅应用：订阅且启用的应用。
 // 内置应用（source=builtin）的菜单归属各自专属控制台，不并入租户控制台侧边栏——
-// 例如管理后台（platform_admin）的「租户管理/应用管理」不能串台到租户侧边栏；
-// 但租户自服务（tenant_admin）同样是内置应用、又是本控制台菜单的唯一载体，必须保留，否则侧边栏会空。
+// 例如平台管理后台（platform_admin）的「租户管理/应用管理」不能串台到租户侧边栏；
+// 但租户管理后台（tenant_admin）同样是内置应用、又是本控制台菜单的唯一载体，必须保留，否则侧边栏会空。
 // 即：内置性只决定「是否并入本控制台」，与 loadSubscribedApps 的「角色可选应用」口径不同（后者含全部内置应用）。
 func loadConsoleApps(ctx *gin.Context) ([]model.ApplicationEntity, error) {
 	appList, err := loadSubscribedApps(ctx)
@@ -225,7 +225,7 @@ func HasSystemAdminCapability(ctx *gin.Context) (bool, error) {
 }
 
 // requireSystemAdmin 校验当前操作者具备系统管理能力（admin_type=admin），否则返回能力不足错误。
-// 租户自服务控制台定位为「管理层专用」：部门/用户/角色/密钥等管理写操作统一以此硬门槛兜底，
+// 租户管理后台定位为「管理层专用」：部门/用户/角色/密钥等管理写操作统一以此硬门槛兜底，
 // 菜单可见性仅是 UX 层（前端隐藏不是安全边界），直接调用 API 也必须被拒。
 // opErr 仅在系统错误（角色查询失败等）时兜底返回。
 func requireSystemAdmin(ctx *gin.Context, opErr int) error {

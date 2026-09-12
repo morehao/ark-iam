@@ -1,7 +1,7 @@
 ---
 version: 1.0
 name: ark-iam-frontend-design
-description: "Ark IAM 前端（登录门户 / 平台管理控制台 / 租户自服务控制台）统一视觉语言。方向为「冷白工程台」收敛（方法论受 Stripe / Vercel 工程控制台启发）：靛蓝 #4f6ef7 是唯一强调色，仅用于主按钮 / 链接 / 选中态 / 登录与 Logo 品牌区；深蓝黑 #0f172a 侧栏；页面表面一律中性灰阶（禁用靛蓝淡底 tint）；卡片与内容区用冷调 hairline 边框分层、不使用卡片阴影（阴影仅留给 Modal 等浮层）；文字为三级 hex 灰阶并全站开启 tabular-nums（ID/时间/数字等宽）。语义状态一律用 success/default/error/warning 语义色渲染为 Tag，禁止在业务代码散落硬编码色值。代码事实源：packages/ui/src/theme.ts 的 tokens 对象（本文件与之一一对应，改动需同步两处）。"
+description: "Ark IAM 前端（登录门户 / 平台管理后台 / 租户管理后台）统一视觉语言。方向为「冷白工程台」收敛（方法论受 Stripe / Vercel 工程控制台启发）：靛蓝 #4f6ef7 是唯一强调色，仅用于主按钮 / 链接 / 选中态 / 登录与 Logo 品牌区；深蓝黑 #0f172a 侧栏；页面表面一律中性灰阶（禁用靛蓝淡底 tint）；卡片与内容区用冷调 hairline 边框分层、不使用卡片阴影（阴影仅留给 Modal 等浮层）；文字为三级 hex 灰阶并全站开启 tabular-nums（ID/时间/数字等宽）。语义状态一律用 success/default/error/warning 语义色渲染为 Tag，禁止在业务代码散落硬编码色值。代码事实源：packages/ui/src/theme.ts 的 tokens 对象（本文件与之一一对应，改动需同步两处）。"
 
 colors:
   brand-primary: "#4f6ef7"

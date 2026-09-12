@@ -15,7 +15,7 @@ func seedTestApp(t *testing.T, db *gorm.DB, tenantID, appID string) {
 	if err := db.Create(&model.ApplicationEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: appID}},
 		Code:       "app-" + appID,
-		Name:       "租户自服务",
+		Name:       "租户管理后台",
 		Status:     "enable",
 	}).Error; err != nil {
 		t.Fatalf("seed app: %v", err)

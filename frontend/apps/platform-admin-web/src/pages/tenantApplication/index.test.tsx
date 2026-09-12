@@ -22,7 +22,7 @@ describe('租户应用订阅', () => {
     mockGetTenantApplicationPageList.mockReset().mockResolvedValue({ list: [], total: 0 })
     mockGetTenantPageList.mockReset().mockResolvedValue({ list: [{ tenantID: 't2', name: '租户二' }], total: 1 })
     mockGetApplicationPageList.mockReset().mockResolvedValue({
-      list: [{ appID: 'app-1', name: '管理后台' }],
+      list: [{ appID: 'app-1', name: '平台管理后台' }],
       total: 1,
     })
     mockCreateTenantApplication.mockReset().mockResolvedValue({ tenantAppID: 'ta-1' })
@@ -48,7 +48,7 @@ describe('租户应用订阅', () => {
     fireEvent.mouseDown(selects[0])
     fireEvent.click(await screen.findByText('租户二'))
     fireEvent.mouseDown(modal.querySelectorAll('.ant-select-selector')[1])
-    fireEvent.click(await screen.findByText('管理后台'))
+    fireEvent.click(await screen.findByText('平台管理后台'))
     fireEvent.click(modal.querySelector('.ant-modal-footer .ant-btn-primary') as HTMLElement)
 
     await waitFor(() =>

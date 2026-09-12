@@ -150,8 +150,8 @@ flowchart TB
 | 应用 | 端口 | 说明 |
 |---|---|---|
 | login-web | 4000 | 登录门户：凭证登录、多租户选择（非 OIDC Client，直接调用 `/oidc/login`） |
-| platform-admin-web | 4001 | 平台管理控制台（OIDC Client，client_id `platform-admin-web`） |
-| tenant-admin-web | 4002 | 租户自服务控制台（OIDC Client，client_id `tenant-admin-web`） |
+| platform-admin-web | 4001 | 平台管理后台（OIDC Client，client_id `platform-admin-web`） |
+| tenant-admin-web | 4002 | 租户管理后台（OIDC Client，client_id `tenant-admin-web`） |
 
 ### 3.3 技术栈
 

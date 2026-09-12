@@ -38,7 +38,7 @@ func newProvisionTestDB(t *testing.T) *gorm.DB {
 func seedTenantAdminApp(t *testing.T, db *gorm.DB, menuCodes ...string) *model.ApplicationEntity {
 	t.Helper()
 	ctx := context.Background()
-	app := &model.ApplicationEntity{Code: ProvisionAppCode, Name: "租户自服务", Status: model.AppStatusEnable}
+	app := &model.ApplicationEntity{Code: ProvisionAppCode, Name: "租户管理后台", Status: model.AppStatusEnable}
 	require.NoError(t, db.WithContext(ctx).Create(app).Error)
 	for i, code := range menuCodes {
 		require.NoError(t, db.WithContext(ctx).Create(&model.MenuEntity{

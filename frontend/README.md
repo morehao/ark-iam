@@ -27,8 +27,8 @@ frontend/
 │   └── ui/                # 设计系统：主题、MainLayout、LoginPage、PageContainer 等
 └── apps/
     ├── login-web/         # 登录页（:4000）— OP 登录 UI：凭证登录 / 多租户选择（非 OIDC Client）
-    ├── platform-admin-web/# 平台管理控制台（:4001）— 用户/角色/菜单/部门/应用/OAuth客户端/租户/API Key/域名/审计日志
-    └── tenant-admin-web/  # 租户自服务控制台（:4002）— 部门/部门角色/部门用户/部门角色用户
+    ├── platform-admin-web/# 平台管理后台（:4001）— 用户/角色/菜单/部门/应用/OAuth客户端/租户/API Key/域名/审计日志
+    └── tenant-admin-web/  # 租户管理后台（:4002）— 部门/部门角色/部门用户/部门角色用户
 ```
 
 依赖方向：`ui → auth → api → types`，业务 app 消费共享包。
@@ -42,7 +42,7 @@ pnpm install
 # 开发模式（单应用）
 pnpm dev              # 平台管理（:4001）
 pnpm dev:login        # 登录门户（:4000）
-pnpm dev:tenant       # 租户自服务（:4002）
+pnpm dev:tenant       # 租户管理后台（:4002）
 
 # 同时启动三个应用
 pnpm dev:all
@@ -62,7 +62,7 @@ Vite dev server 将 `/v1` 与 `/oidc` 代理到后端网关 `http://localhost:81
 
 ## 主要功能
 
-### 平台管理控制台（platform-admin-web）
+### 平台管理后台（platform-admin-web）
 - 菜单管理：菜单树 + CRUD（目录/菜单/按钮）
 - 权限域 / 资源：细粒度权限配置
 - 应用管理：应用 CRUD + 详情
@@ -73,9 +73,9 @@ Vite dev server 将 `/v1` 与 `/oidc` 代理到后端网关 `http://localhost:81
 - 审计日志：只读查询 + 详情（与菜单管理同属「平台管理」目录）
 - 个人中心：个人信息、修改密码、会话管理（撤销单条/全部）
 - 租户切换：多租户上下文切换
-- **不含用户 / 角色页面**：两者按租户归属，只在租户自服务控制台管理（平台端不再提供跨租户用户目录与角色视图）
+- **不含用户 / 角色页面**：两者按租户归属，只在租户管理后台管理（平台端不再提供跨租户用户目录与角色视图）
 
-### 租户自服务控制台（tenant-admin-web）
+### 租户管理后台（tenant-admin-web）
 - 部门管理：部门树 CRUD + 成员关系（primary/secondary/leader）
 - 用户管理：Tab「用户」= 真实用户 CRUD/部门/角色/第三方身份绑定/登录日志；Tab「服务账号」= 创建(必选主部门+可选参与部门)/编辑/换部门/挂起/删除/角色授权（不可登录、无自然人、不可任部门负责人；详情内嵌其密钥只读列表）
 - 角色管理：角色 CRUD、菜单授权、成员分配

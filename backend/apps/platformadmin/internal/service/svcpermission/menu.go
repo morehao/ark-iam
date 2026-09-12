@@ -61,6 +61,10 @@ func (svc *menuSvc) Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (
 	if !validateMenuEnums(&req.MenuBaseInfo) {
 		return nil, code.GetError(code.MenuCreateError)
 	}
+	// 内置应用的菜单树随平台版本交付：不允许在控制台新增（新增后既改不了也删不掉）
+	if err := rejectBuiltinAppMenuWrite(ctx, req.AppID, &req.MenuBaseInfo, nil, code.MenuCreateError); err != nil {
+		return nil, err
+	}
 	insertEntity := &model.MenuEntity{
 		AppID:        req.AppID,
 		ParentID:     req.ParentID,
@@ -98,6 +102,10 @@ func (svc *menuSvc) Delete(ctx *gin.Context, req *dtopermission.MenuDeleteReq) e
 	if !menuVisible(menuEntity) {
 		return code.GetError(code.MenuNotExistError)
 	}
+	// 内置应用的菜单树由种子收敛：删除会在下次启动被重新播种（并丢掉授权），故直接拒写
+	if err := rejectBuiltinAppMenuWrite(ctx, menuEntity.AppID, nil, menuEntity, code.MenuDeleteError); err != nil {
+		return err
+	}
 
 	userID := gincontext.GetUserIDString(ctx)
 	if err := dao.NewMenuDao().Delete(ctx, req.MenuID, userID); err != nil {
@@ -105,6 +113,46 @@ func (svc *menuSvc) Delete(ctx *gin.Context, req *dtopermission.MenuDeleteReq) e
 		return code.GetError(code.MenuDeleteError)
 	}
 	return nil
+}
+
+// rejectBuiltinAppMenuWrite 内置应用（source=builtin）的菜单树由平台版本定义，种子是该树唯一写者：
+// 新增（current=nil）与删除（base=nil）一律拒写；更新时只在本次提交改动了结构/展示字段时拒写
+// （status 归运维，只改状态的更新放行）。非内置应用不受约束。
+func rejectBuiltinAppMenuWrite(ctx *gin.Context, appID string, base *objpermission.MenuBaseInfo, current *model.MenuEntity, failCode int) error {
+	app, err := dao.NewApplicationDao().GetByID(ctx, appID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcpermission] dao GetByID(app) fail, err:%v, appID:%s", err, appID)
+		return code.GetError(failCode)
+	}
+	if app == nil || !app.Source.IsBuiltin() {
+		return nil
+	}
+	if base == nil || current == nil || menuSeedFieldsChanged(current, base) {
+		glog.Errorf(ctx, "[svcpermission] 拒绝修改内置应用的菜单树, appID:%s", appID)
+		return code.GetError(code.MenuBuiltInFieldImmutableError)
+	}
+	return nil
+}
+
+// menuSeedFieldsChanged 判断请求是否改动了种子拥有的菜单字段（字段权威矩阵：menu 的 reconcile
+// 字段 = code/parent_id/name/path/icon/sort/component/type/visibility）。
+func menuSeedFieldsChanged(entity *model.MenuEntity, req *objpermission.MenuBaseInfo) bool {
+	current := map[string]any{
+		"code": entity.Code, "parent_id": entity.ParentID, "name": entity.Name, "path": entity.Path,
+		"icon": entity.Icon, "sort": entity.Sort, "component": entity.Component,
+		"type": entity.Type, "visibility": entity.Visibility,
+	}
+	desired := map[string]any{
+		"code": req.Code, "parent_id": req.ParentID, "name": req.Name, "path": req.Path,
+		"icon": req.Icon, "sort": req.Sort, "component": req.Component,
+		"type": req.Type, "visibility": req.Visibility,
+	}
+	for field, want := range desired {
+		if model.SeedOwnsField(model.SeedEntityMenu, field) && current[field] != want {
+			return true
+		}
+	}
+	return false
 }
 
 func (svc *menuSvc) Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) error {
@@ -118,6 +166,11 @@ func (svc *menuSvc) Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) e
 	}
 	if !validateMenuEnums(&req.MenuBaseInfo) {
 		return code.GetError(code.MenuUpdateError)
+	}
+	// 内置应用的菜单树归平台版本定义：结构与展示字段拒写（status 可改），
+	// 与 pkg/seed 的 reconcile 收敛构成单一写者（见 pkg/model/seed_authority.go）。
+	if err := rejectBuiltinAppMenuWrite(ctx, menuEntity.AppID, &req.MenuBaseInfo, menuEntity, code.MenuUpdateError); err != nil {
+		return err
 	}
 
 	userID := gincontext.GetUserIDString(ctx)

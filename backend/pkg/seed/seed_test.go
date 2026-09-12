@@ -70,7 +70,7 @@ func TestSeedIamSQLite(t *testing.T) {
 	assertCount("department", 1)
 	assertCount("department_user", 1)
 
-	// 内置角色：admin 属管理后台、tenant_admin 属租户自服务（source=builtin、admin_type=admin）。
+	// 内置角色：admin 属平台管理后台、tenant_admin 属租户管理后台（source=builtin、admin_type=admin）。
 	// 角色无业务编码，按所属应用定位（每种内置角色在其应用内唯一）。
 	appIDByName := map[string]string{}
 	var apps []model.ApplicationEntity
@@ -95,8 +95,8 @@ func TestSeedIamSQLite(t *testing.T) {
 			}
 		}
 	}
-	adminRole := roleByAppName["管理后台"]
-	tenantAdminRole := roleByAppName["租户自服务"]
+	adminRole := roleByAppName["平台管理后台"]
+	tenantAdminRole := roleByAppName["租户管理后台"]
 	if adminRole == nil || adminRole.AdminType != model.SysAdminTypeAdmin || adminRole.Name != "管理员" {
 		t.Fatalf("seed admin role mismatch: %+v", adminRole)
 	}
@@ -104,7 +104,7 @@ func TestSeedIamSQLite(t *testing.T) {
 		t.Fatalf("seed tenant_admin role mismatch: %+v", tenantAdminRole)
 	}
 
-	// tenant_admin 预授权租户自服务应用全部 4 个菜单
+	// tenant_admin 预授权租户管理后台应用全部 4 个菜单
 	wantMenuCodes := map[string]bool{"department": false, "tenant-user": false, "tenant-role": false, "tenant-api-key": false}
 	menuIDByCode := map[string]string{}
 	var menus []model.MenuEntity
@@ -171,7 +171,7 @@ func TestSeedIamSQLite(t *testing.T) {
 	}
 }
 
-// TestSeedPlatformMenuStructure 在全新库上验证平台管理控制台菜单树终稿结构：
+// TestSeedPlatformMenuStructure 在全新库上验证平台管理后台菜单树终稿结构：
 // 开发期按「全新项目」处理（可删库重建），故本测试直接锁定重建后的目标 IA，
 // 防止后续调整 seed 时悄然漂移。
 func TestSeedPlatformMenuStructure(t *testing.T) {
@@ -182,11 +182,11 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 	}
 
 	var adminApp model.ApplicationEntity
-	if err := db.Where("name = ?", "管理后台").First(&adminApp).Error; err != nil {
+	if err := db.Where("name = ?", "平台管理后台").First(&adminApp).Error; err != nil {
 		t.Fatalf("admin app not found: %v", err)
 	}
 
-	// 目标 IA：code / name / parentCode / sort / type（全部为管理后台应用菜单）
+	// 目标 IA：code / name / parentCode / sort / type（全部为平台管理后台应用菜单）
 	type wantDef struct {
 		code       string
 		name       string
@@ -273,14 +273,14 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 	}
 
 	// 已下线模块不应再出现：system / grp-ops / 旧目录名 grp-org；
-	// 用户与角色已无平台端入口（收敛到租户自服务），平台应用不应再种子 grp-identity / user / role。
+	// 用户与角色已无平台端入口（收敛到租户管理后台），平台应用不应再种子 grp-identity / user / role。
 	for _, stale := range []string{"system", "grp-ops", "grp-org", "grp-identity", "user", "role"} {
 		if byCode[stale] != nil {
 			t.Errorf("retired menu %s should not be seeded", stale)
 		}
 	}
 
-	// admin 角色菜单授权集合（平台应用菜单 + 租户自服务菜单）
+	// admin 角色菜单授权集合（平台应用菜单 + 租户管理后台菜单）
 	var adminRole model.RoleEntity
 	if err := db.Where("app_id = ? AND source = ?", adminApp.ID, model.RoleSourceBuiltin).First(&adminRole).Error; err != nil {
 		t.Fatalf("admin role not found: %v", err)
@@ -292,7 +292,7 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 	if len(adminMenuLinks) != 11 {
 		t.Fatalf("admin role_menu count: want 11, got %d", len(adminMenuLinks))
 	}
-	// 授权集合涉及平台应用与租户自服务两个应用的菜单，用全量映射解析
+	// 授权集合涉及平台应用与租户管理后台两个应用的菜单，用全量映射解析
 	var allMenus []model.MenuEntity
 	if err := db.Find(&allMenus).Error; err != nil {
 		t.Fatalf("query all menus: %v", err)
@@ -444,15 +444,128 @@ func TestSeedIamPrunesRetiredMenus(t *testing.T) {
 	}
 }
 
+// TestSeedIamBackfillsSeedDisplayNames 种子自有的展示身份（平台租户名、与租户同名的根部门名、
+// 两个内置应用的名称/描述、种子客户端名）在存量库或被控制台改过时必须随启动收敛到种子定义；
+// 运行时编排字段（application.status/sort）由控制台掌握，种子不得覆盖。
+func TestSeedIamBackfillsSeedDisplayNames(t *testing.T) {
+	db := setupDB(t)
+	ctx := context.Background()
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed fail: %v", err)
+	}
+
+	var tenant model.TenantEntity
+	if err := db.Where("code = ?", "t_platform").First(&tenant).Error; err != nil {
+		t.Fatalf("query tenant: %v", err)
+	}
+	// 模拟旧库/控制台改动：展示身份回退为旧名（或自定义名），运行时字段改成非种子值
+	if err := db.Model(&model.TenantEntity{}).Where("id = ?", tenant.ID).
+		Update("name", "Default Tenant").Error; err != nil {
+		t.Fatalf("degrade tenant name: %v", err)
+	}
+	if err := db.Model(&model.DepartmentEntity{}).Where("tenant_id = ? AND parent_id = ?", tenant.ID, "").
+		Update("name", "Default Tenant").Error; err != nil {
+		t.Fatalf("degrade root department name: %v", err)
+	}
+	if err := db.Model(&model.ApplicationEntity{}).Where("code = ?", "platform_admin").
+		Updates(map[string]any{
+			"name":        "管理后台",
+			"description": "平台管理后台应用",
+			"status":      model.AppStatusDisable, // 控制台改过的启停，种子不得覆盖
+			"sort":        9,                      // 控制台改过的排序，种子不得覆盖
+		}).Error; err != nil {
+		t.Fatalf("degrade admin application: %v", err)
+	}
+	if err := db.Model(&model.ApplicationEntity{}).Where("code = ?", "tenant_admin").
+		Updates(map[string]any{"name": "租户自服务", "description": "租户自服务控制台应用"}).Error; err != nil {
+		t.Fatalf("degrade tenant admin application: %v", err)
+	}
+	if err := db.Model(&model.ApplicationClientEntity{}).Where("code = ?", "platform-admin-web").
+		Update("name", "IAM管理平台").Error; err != nil {
+		t.Fatalf("degrade platform client name: %v", err)
+	}
+	if err := db.Model(&model.ApplicationClientEntity{}).Where("code = ?", "tenant-admin-web").
+		Update("name", "租户管理平台").Error; err != nil {
+		t.Fatalf("degrade tenant client name: %v", err)
+	}
+
+	// 二次种子：展示身份回填
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed (2nd) fail: %v", err)
+	}
+	// 三次种子：回填后保持幂等
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed (3rd) fail: %v", err)
+	}
+
+	if err := db.Where("code = ?", "t_platform").First(&tenant).Error; err != nil {
+		t.Fatalf("query tenant after backfill: %v", err)
+	}
+	if tenant.Name != "平台运营中心" {
+		t.Errorf("tenant name = %q, want %q", tenant.Name, "平台运营中心")
+	}
+	if tenant.Status != model.TenantStatusActive {
+		t.Errorf("tenant status = %q, want %q", tenant.Status, model.TenantStatusActive)
+	}
+
+	var rootDept model.DepartmentEntity
+	if err := db.Where("tenant_id = ? AND parent_id = ?", tenant.ID, "").First(&rootDept).Error; err != nil {
+		t.Fatalf("query root department: %v", err)
+	}
+	if rootDept.Name != tenant.Name {
+		t.Errorf("root department name = %q, want %q (根部门与租户同名)", rootDept.Name, tenant.Name)
+	}
+
+	wantApps := map[string]struct{ name, desc string }{
+		"platform_admin": {"平台管理后台", "平台管理后台应用"},
+		"tenant_admin":   {"租户管理后台", "租户管理后台应用"},
+	}
+	for code, want := range wantApps {
+		var app model.ApplicationEntity
+		if err := db.Where("code = ?", code).First(&app).Error; err != nil {
+			t.Fatalf("query application %s: %v", code, err)
+		}
+		if app.Name != want.name || app.Description != want.desc {
+			t.Errorf("application %s = (%q, %q), want (%q, %q)", code, app.Name, app.Description, want.name, want.desc)
+		}
+	}
+
+	// 运行时编排字段保持控制台改动，种子不覆盖
+	var adminApp model.ApplicationEntity
+	if err := db.Where("code = ?", "platform_admin").First(&adminApp).Error; err != nil {
+		t.Fatalf("query admin application: %v", err)
+	}
+	if adminApp.Status != model.AppStatusDisable {
+		t.Errorf("application status = %q, want %q (种子不得覆盖控制台启停)", adminApp.Status, model.AppStatusDisable)
+	}
+	if adminApp.Sort != 9 {
+		t.Errorf("application sort = %d, want 9 (种子不得覆盖控制台排序)", adminApp.Sort)
+	}
+
+	wantClients := map[string]string{
+		"platform-admin-web": "平台管理后台",
+		"tenant-admin-web":   "租户管理后台",
+	}
+	for code, want := range wantClients {
+		var client model.ApplicationClientEntity
+		if err := db.Where("code = ?", code).First(&client).Error; err != nil {
+			t.Fatalf("query application_client %s: %v", code, err)
+		}
+		if client.Name != want {
+			t.Errorf("application_client %s name = %q, want %q", code, client.Name, want)
+		}
+	}
+}
+
 // TestSeedIamMigratesLegacyPlatformTenantCode 存量库平台租户编码为 "platform" 时，
-// 种子启动应原地改名为 t_platform：保留主键、不重复建租户。
+// 种子启动应原地改名为 t_platform：保留主键、不重复建租户；同时回填租户名与状态。
 func TestSeedIamMigratesLegacyPlatformTenantCode(t *testing.T) {
 	db := setupDB(t)
 	ctx := context.Background()
 
 	legacy := &model.TenantEntity{
 		Code:   "platform",
-		Name:   "Default Tenant",
+		Name:   "Default Tenant", // 旧库遗留名：种子启动时应回填为平台运营中心
 		Type:   model.TenantTypePlatform,
 		Status: model.TenantStatusSuspended, // 同时校验状态回填路径
 	}
@@ -481,6 +594,9 @@ func TestSeedIamMigratesLegacyPlatformTenantCode(t *testing.T) {
 	if tenants[0].Code != "t_platform" {
 		t.Errorf("tenant code = %q, want %q", tenants[0].Code, "t_platform")
 	}
+	if tenants[0].Name != "平台运营中心" {
+		t.Errorf("tenant name = %q, want %q (旧库遗留名必须随启动回填)", tenants[0].Name, "平台运营中心")
+	}
 	if tenants[0].Status != model.TenantStatusActive {
 		t.Errorf("tenant status = %q, want %q", tenants[0].Status, model.TenantStatusActive)
 	}
@@ -496,7 +612,7 @@ func TestSeedIamMigratesLegacyPlatformTenantCode(t *testing.T) {
 
 // TestSeedIamBackfillsApplicationSource 存量库（source 由 AutoMigrate 补列时取列默认值
 // `third_party`）在种子启动后必须被原地纠正：
-// 两个种子应用（管理后台、租户自服务）与种子 OAuth 客户端 → builtin（否则丢删除保护）。
+// 两个种子应用（平台管理后台、租户管理后台）与种子 OAuth 客户端 → builtin（否则丢删除保护）。
 // 回归背景：种子数据的两个应用都不是第三方接入，误判会同时污染删除保护与租户控制台菜单范围
 // （见 docs/design/application-source-rename.md §12.3、§14）。
 func TestSeedIamBackfillsApplicationSource(t *testing.T) {
@@ -546,7 +662,7 @@ func TestSeedIamBackfillsApplicationSource(t *testing.T) {
 		t.Fatalf("query admin app: %v", err)
 	}
 	if adminApp.Source != model.AppSourceBuiltin {
-		t.Errorf("管理后台 source = %q, want %q", adminApp.Source, model.AppSourceBuiltin)
+		t.Errorf("平台管理后台 source = %q, want %q", adminApp.Source, model.AppSourceBuiltin)
 	}
 
 	var tenantAdminApp model.ApplicationEntity
@@ -554,7 +670,7 @@ func TestSeedIamBackfillsApplicationSource(t *testing.T) {
 		t.Fatalf("query tenant-admin app: %v", err)
 	}
 	if tenantAdminApp.Source != model.AppSourceBuiltin {
-		t.Errorf("租户自服务 source = %q, want %q", tenantAdminApp.Source, model.AppSourceBuiltin)
+		t.Errorf("租户管理后台 source = %q, want %q", tenantAdminApp.Source, model.AppSourceBuiltin)
 	}
 
 	// 种子客户端全部为内置客户端：存量库里不得残留 third_party
@@ -583,7 +699,7 @@ func TestSeedIamMigratesLegacyApplicationCode(t *testing.T) {
 
 	legacy := &model.ApplicationEntity{
 		Code:   "platform-admin",
-		Name:   "管理后台",
+		Name:   "管理后台",                    // 旧库遗留名：种子启动时应回填为平台管理后台
 		Source: model.AppSourceThirdParty, // 旧库补列后的默认值，种子应一并纠正为 builtin
 		Status: model.AppStatusEnable,
 	}
@@ -637,6 +753,9 @@ func TestSeedIamMigratesLegacyApplicationCode(t *testing.T) {
 	if migrated.Source != model.AppSourceBuiltin {
 		t.Errorf("application source = %q, want %q", migrated.Source, model.AppSourceBuiltin)
 	}
+	if migrated.Name != "平台管理后台" {
+		t.Errorf("application name = %q, want %q (旧库遗留名必须随启动回填)", migrated.Name, "平台管理后台")
+	}
 
 	var menuCount int64
 	if err := db.Model(&model.MenuEntity{}).
@@ -656,7 +775,7 @@ func TestSeedIamRejectsConflictingApplicationCode(t *testing.T) {
 	ctx := context.Background()
 
 	if err := db.Create(&model.ApplicationEntity{
-		Code: "platform-admin", Name: "管理后台", Source: model.AppSourceBuiltin, Status: model.AppStatusEnable,
+		Code: "platform-admin", Name: "平台管理后台", Source: model.AppSourceBuiltin, Status: model.AppStatusEnable,
 	}).Error; err != nil {
 		t.Fatalf("seed legacy application: %v", err)
 	}

@@ -18,9 +18,9 @@
 
 | 测试用例 | 覆盖内容 |
 |----------|----------|
-| RP1 首次登录 | 访问租户管理平台 → 自动跳转 login-web → 填写凭证 → 回调展示首页 |
+| RP1 首次登录 | 访问租户管理后台 → 自动跳转 login-web → 填写凭证 → 回调展示首页 |
 | Admin 直接登录 | 访问管理平台 → 自动跳转 login-web → 填写凭证 → 进入仪表盘 |
-| Admin 登录后 SSO 免密 | 先登录 Admin → 租户管理平台（同 context）自动免密登录 |
+| Admin 登录后 SSO 免密 | 先登录 Admin → 租户管理后台（同 context）自动免密登录 |
 | Admin 登出后自身需重认证 | Admin 登录 → 登出 → 访问需重新跳转 login-web |
 | RP1 登录后 Admin SSO | RP1 登录后 → Admin 管理平台静默 SSO 免密登录 |
 | RP1→Admin→Admin 登出→RP1 | RP1 登录 → Admin SSO → Admin 登出 → 兄弟应用需重新认证 |
@@ -37,8 +37,8 @@
 |------|------|-----------------|------|
 | gateway | 8100 | - | IAM 后端（`/oidc`） |
 | login-web | 3000 | - | 登录页（凭证表单，非 OIDC Client） |
-| platform-admin-web | 3001 | `platform-admin-web` | 管理平台（Admin） |
-| tenant-admin-web | 3002 | `tenant-admin-web` | 租户管理平台（RP1） |
+| platform-admin-web | 3001 | `platform-admin-web` | 平台管理后台（Admin） |
+| tenant-admin-web | 3002 | `tenant-admin-web` | 租户管理后台（RP1） |
 
 ## 前置条件
 

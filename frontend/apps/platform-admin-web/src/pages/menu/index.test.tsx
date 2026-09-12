@@ -21,7 +21,7 @@ const apps: ApplicationItem[] = [
   {
     appID: 'app-1',
     code: 'console',
-    name: '管理后台',
+    name: '平台管理后台',
     description: '',
     logoUrl: '',
     homepageUrl: '',
@@ -87,5 +87,53 @@ describe('菜单页应用切换器', () => {
     // 回退到列表第一个；无效 ID 不应被用来拉菜单树
     await waitFor(() => expect(mockGetMenuTree).toHaveBeenCalledWith('app-1'))
     expect(mockGetMenuTree).not.toHaveBeenCalledWith('app-deleted')
+  })
+})
+
+/**
+ * 内置应用（source=builtin）的菜单树由平台版本定义（后端 Create/Update/Delete 均拒写）：
+ * 前端必须禁用「新建根菜单」并提示只读，避免用户改了却被后端拒绝或重启被种子收回。
+ */
+describe('内置应用的菜单树只读', () => {
+  it('选中内置应用时禁用新建根菜单，编辑弹窗内结构字段置灰（状态可改）', async () => {
+    mockGetApplicationPageList.mockResolvedValue({ list: apps, total: apps.length })
+    mockGetApplicationDetail.mockResolvedValue(apps[0])
+    mockGetMenuTree.mockResolvedValue({
+      list: [
+        {
+          menuID: 'm1',
+          appID: 'app-1',
+          parentID: '',
+          name: '工作台',
+          code: 'dashboard',
+          path: '/dashboard',
+          icon: 'dashboard',
+          sort: 1,
+          type: 'menu',
+          visibility: 'member',
+          component: '/dashboard/index',
+          redirect: '',
+          hidden: 0,
+          externalLink: 0,
+          keepAlive: 0,
+          status: 'enable',
+        },
+      ],
+      total: 1,
+    })
+
+    render(<MenuList />)
+
+    const createButton = await screen.findByRole('button', { name: /新建根菜单/ })
+    await waitFor(() => expect(createButton).toBeDisabled())
+
+    // 打开编辑弹窗：内置应用的菜单只读提示出现，9 个结构/展示字段置灰，状态仍可改
+    fireEvent.click(await screen.findByText('编辑'))
+    const nameInput = await screen.findByPlaceholderText('菜单显示名称')
+    await waitFor(() => expect(nameInput).toBeDisabled())
+    expect(screen.getByPlaceholderText('唯一编码，如 user:list')).toBeDisabled()
+    expect(screen.getByPlaceholderText('如 /user/list')).toBeDisabled()
+    expect(screen.getByPlaceholderText('如 UserOutlined')).toBeDisabled()
+    expect(screen.getByText(/内置应用：名称\/编码\/路径等由平台版本定义，只读；状态可改/)).toBeInTheDocument()
   })
 })

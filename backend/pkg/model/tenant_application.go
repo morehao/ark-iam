@@ -19,8 +19,8 @@ const (
 
 type TenantApplicationEntity struct {
 	gormdao.BaseEntity
-	TenantID     string                  `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id" json:"tenantID"`
-	AppID        string                  `gorm:"column:app_id;type:varchar(36);not null;default:'';comment:应用id" json:"appID"`
+	TenantID     string                  `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id;uniqueIndex:uk_tenant_application_active,where:deleted_at IS NULL" json:"tenantID"`
+	AppID        string                  `gorm:"column:app_id;type:varchar(36);not null;default:'';comment:应用id;uniqueIndex:uk_tenant_application_active,where:deleted_at IS NULL" json:"appID"`
 	Status       TenantApplicationStatus `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态" json:"status"`
 	Config       datatypes.JSON          `gorm:"column:config;type:json;not null;default:('{}');comment:租户级应用配置" json:"config"`
 	GrantedScope datatypes.JSON          `gorm:"column:granted_scope;type:json;not null;default:('[]');comment:租户级scope授权" json:"grantedScope"`

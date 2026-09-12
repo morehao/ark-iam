@@ -20,7 +20,7 @@ func IsValidAppCode(code string) bool { return appCodeRegexp.MatchString(code) }
 // AppSource 应用来源。
 //
 // builtin 是 first_party 中受保护的子集（内置应用同样由平台自有），枚举取最具体值：
-// 平台随产品交付的控制台应用（管理后台、租户自服务）都落 builtin；
+// 平台随产品交付的控制台应用（平台管理后台、租户管理后台）都落 builtin；
 // first_party 留给「平台自建但非内置」的应用（当前种子未产生该来源，控制台也不再创建）。
 type AppSource string
 

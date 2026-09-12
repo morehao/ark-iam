@@ -28,6 +28,7 @@
 | [run-and-deploy.md](run-and-deploy.md) | **运行与部署**。本地开发环境准备、构建运行、测试、Docker、多环境关键配置与安全注意事项 |
 | [glossary.md](glossary.md) | **术语表**。SSO / OIDC / IAM / 租户 / 自然人 / 应用 / Client / 令牌等术语的统一定义 |
 | [tenant-custom-domain-redesign.md](tenant-custom-domain-redesign.md) | **租户级自定义域名实施方案（B 档，待评审）**。按域名识别租户、登录预设与品牌化、`domain` 表重做保留；顺带移除冗余 `system` 模块 |
+| [seed-initialization-redesign-20260912.md](seed-initialization-redesign-20260912.md) | **种子数据初始化语义重构（标准档，待评审）**。字段权威矩阵（Reconcile / CreateOnly / MigrateOnce）、控制台对种子字段拒写、值匹配一次性迁移、并发保护与变更报告 |
 
 ## 核心概念速览
 
