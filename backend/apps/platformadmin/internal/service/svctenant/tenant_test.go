@@ -258,7 +258,7 @@ func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
 		t.Fatalf("load builtin role fail, err:%v, role:%+v", err, role)
 	}
 	if !role.IsBuiltinAdmin() {
-		t.Errorf("role should be builtin super admin, got source=%q adminLevel=%q", role.Source, role.AdminLevel)
+		t.Errorf("role should be builtin super admin, got source=%q adminType=%q", role.Source, role.AdminType)
 	}
 	if got := countEntities(t, db, &model.RoleMenuEntity{}, "tenant_id = ? AND role_id = ?", resp.TenantID, role.ID); got != int64(len(tenant.ProvisionMenuCodes)) {
 		t.Errorf("role_menu count = %d, want %d", got, len(tenant.ProvisionMenuCodes))

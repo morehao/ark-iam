@@ -9,7 +9,7 @@ export const getTenantRolePageList = (params?: { page?: number; pageSize?: numbe
 export const createTenantRole = (data: TenantRoleCreateReq) => request.post<any, { roleID: string }>('/tenant/roles', data)
 
 /** 更新租户角色 */
-export const updateTenantRole = (data: { roleID: string; name?: string; code?: string; description?: string; type?: string }) => {
+export const updateTenantRole = (data: { roleID: string; name?: string; code?: string; description?: string }) => {
   const { roleID, ...body } = data
   return request.put<any, string>(`/tenant/roles/${roleID}`, body)
 }

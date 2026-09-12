@@ -724,7 +724,7 @@ func (svc *userSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.UserRolesUpdate
 	}
 	effectiveRoleIDs = append(effectiveRoleIDs, req.RoleIDs...)
 
-	// 内置管理员保护：禁止移除「最后一个内置系统管理角色持有者」的系统管理能力，防止平台锁死
+	// 内置管理员保护：禁止移除「最后一个内置管理员角色持有者」的系统管理能力，防止平台锁死
 	if keepLastAdmin, err := svc.hasOtherSystemAdminHolder(ctx, tenantID, req.UserID, effectiveRoleIDs); err != nil {
 		glog.Errorf(ctx, "[svcuser.UpdateRoles] check other admin holder fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.UserRoleReplaceError)
@@ -786,11 +786,11 @@ func (svc *userSvc) roleAppMapOf(ctx *gin.Context, tenantID string, urList []mod
 }
 
 // hasOtherSystemAdminHolder 判断本次「按应用全量替换」是否会移除目标用户持有的
-// 「最后一个内置系统管理角色」。newEffectiveRoleIDs 为替换后的有效角色全集
+// 「最后一个内置管理员角色」。newEffectiveRoleIDs 为替换后的有效角色全集
 // （其它应用现有角色 + 本应用新列表），而非仅本应用的新列表。
 // 返回 true 表示应拒绝该操作（防止平台系统管理能力永久锁死）。
-// 规则：目标用户当前持有 ≥1 个内置系统管理角色（source=builtin 且 admin_level>=basic），且替换后的
-// 有效集合不包含任何内置系统管理角色，且当前租户内除目标用户外没有其他用户仍持有内置系统管理角色 → 需保留，返回 true。
+// 规则：目标用户当前持有 ≥1 个内置管理员角色（source=builtin 且 admin_type=admin），且替换后的
+// 有效集合不包含任何内置管理员角色，且当前租户内除目标用户外没有其他用户仍持有内置管理员角色 → 需保留，返回 true。
 func (svc *userSvc) hasOtherSystemAdminHolder(ctx *gin.Context, tenantID, targetUserID string, newEffectiveRoleIDs []string) (bool, error) {
 	// 1. 目标用户当前角色
 	urList, err := dao.NewUserRoleDao().GetListByCond(ctx, &dao.UserRoleCond{TenantID: tenantID, UserID: targetUserID})
@@ -804,7 +804,7 @@ func (svc *userSvc) hasOtherSystemAdminHolder(ctx *gin.Context, tenantID, target
 	for _, r := range urList {
 		currentRoleIDs = append(currentRoleIDs, r.RoleID)
 	}
-	// 2. 目标用户当前持有的内置系统管理角色
+	// 2. 目标用户当前持有的内置管理员角色
 	sysRoleIDs, err := svc.filterBuiltinSystemRoles(ctx, tenantID, currentRoleIDs)
 	if err != nil {
 		return false, err
@@ -812,7 +812,7 @@ func (svc *userSvc) hasOtherSystemAdminHolder(ctx *gin.Context, tenantID, target
 	if len(sysRoleIDs) == 0 {
 		return false, nil // 目标用户本就不具备内置系统管理能力
 	}
-	// 3. 替换后的有效集合中是否还包含内置系统管理角色
+	// 3. 替换后的有效集合中是否还包含内置管理员角色
 	newSysRoleIDs, err := svc.filterBuiltinSystemRoles(ctx, tenantID, newEffectiveRoleIDs)
 	if err != nil {
 		return false, err
@@ -820,7 +820,7 @@ func (svc *userSvc) hasOtherSystemAdminHolder(ctx *gin.Context, tenantID, target
 	if len(newSysRoleIDs) > 0 {
 		return false, nil // 有效集合仍保留系统管理能力
 	}
-	// 4. 是否还有其他用户持有任一内置系统管理角色
+	// 4. 是否还有其他用户持有任一内置管理员角色
 	allSysRoles, err := svc.listTenantBuiltinSystemRoles(ctx, tenantID)
 	if err != nil {
 		return false, err
@@ -839,14 +839,14 @@ func (svc *userSvc) hasOtherSystemAdminHolder(ctx *gin.Context, tenantID, target
 				continue
 			}
 			if _, ok := sysRoleSet[ur.RoleID]; ok {
-				return false, nil // 其他用户仍持有系统管理角色，允许释放目标用户
+				return false, nil // 其他用户仍持有管理员角色，允许释放目标用户
 			}
 		}
 	}
 	return true, nil
 }
 
-// filterBuiltinSystemRoles 从 roleIDs 中筛出「内置 + 系统管理」的角色 ID（内置管理员：source=builtin && admin_level=super）。
+// filterBuiltinSystemRoles 从 roleIDs 中筛出「内置 + 系统管理」的角色 ID（内置管理员：source=builtin && admin_type=admin）。
 func (svc *userSvc) filterBuiltinSystemRoles(ctx *gin.Context, tenantID string, roleIDs []string) ([]string, error) {
 	result := make([]string, 0)
 	if len(roleIDs) == 0 {
@@ -868,9 +868,9 @@ func (svc *userSvc) filterBuiltinSystemRoles(ctx *gin.Context, tenantID string, 
 // listTenantBuiltinSystemRoles 返回当前租户内全部内置管理员角色 ID。
 func (svc *userSvc) listTenantBuiltinSystemRoles(ctx *gin.Context, tenantID string) ([]string, error) {
 	roles, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{
-		TenantID:          tenantID,
-		Source:            string(model.RoleSourceBuiltin),
-		AdminLevelAtLeast: string(model.SysAdminLevelSuper),
+		TenantID:  tenantID,
+		Source:    string(model.RoleSourceBuiltin),
+		AdminType: model.SysAdminTypeAdmin,
 	})
 	if err != nil {
 		return nil, err

@@ -21,11 +21,11 @@ func seedTestApp(t *testing.T, db *gorm.DB, tenantID, appID string) {
 		t.Fatalf("seed app: %v", err)
 	}
 	if err := db.Create(&model.TenantApplicationEntity{
-		BaseEntity:  gormdao.BaseEntity{StringID: gormdao.StringID{ID: "ta-" + appID}},
-		TenantID:    tenantID,
-		AppID:       appID,
-		Status:      "enable",
-		Config:      []byte("{}"),
+		BaseEntity:   gormdao.BaseEntity{StringID: gormdao.StringID{ID: "ta-" + appID}},
+		TenantID:     tenantID,
+		AppID:        appID,
+		Status:       "enable",
+		Config:       []byte("{}"),
 		GrantedScope: []byte("[]"),
 	}).Error; err != nil {
 		t.Fatalf("seed tenant application: %v", err)
@@ -78,10 +78,10 @@ func seedTestMenuTree(t *testing.T, db *gorm.DB, tenantID string) (rootID, child
 func TestRoleCreateRequiresApp(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
-	seedTenantSuperOperator(t, db, "t1", "op")
+	seedTenantAdminOperator(t, db, "t1", "op")
 	seedTestApp(t, db, "t1", "app1")
 	seedTestApp(t, db, "t2", "app2")
-	seedTenantSuperOperator(t, db, "t2", "op2")
+	seedTenantAdminOperator(t, db, "t2", "op2")
 
 	ginCtx := newOrgGinCtx(t, "t1", "op")
 
@@ -155,7 +155,7 @@ func TestRoleMenusUpdateAndGet(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.RoleMenuEntity{}, &model.MenuEntity{}, &model.UserRoleEntity{},
 		&model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
-	seedTenantSuperOperator(t, db, "t1", "op")
+	seedTenantAdminOperator(t, db, "t1", "op")
 	seedTestRole(t, db, "r1", "t1", "app1", "管理员", "admin")
 	rootID, childID := seedTestMenuTree(t, db, "t1")
 

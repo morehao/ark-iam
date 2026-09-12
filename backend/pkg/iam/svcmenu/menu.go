@@ -1,6 +1,6 @@
 // Package svcmenu 提供跨应用（tenantadmin / platformadmin）复用的菜单可见性逻辑：
 //   - 构建指定应用的启用菜单树；
-//   - 判断用户是否持有内置管理员角色（超管豁免全量）；
+//   - 判断用户是否持有内置管理员角色（管理员角色豁免全量）；
 //   - 计算用户在租户内的角色授权菜单集合；
 //   - 按「授权集合 + 可见性门槛」剪枝菜单树。
 //
@@ -66,7 +66,7 @@ func BuildAppMenuTree(ctx *gin.Context, appID string) ([]objpermission.MenuItemN
 }
 
 // BuildMyMenuTree 构建当前用户在指定应用范围内可见的菜单树：
-//   - 内置管理员豁免：持有内置管理员角色（source=builtin && admin_level=super）→ 全量菜单（含 visibility=admin，免授权）；
+//   - 内置管理员豁免：持有内置管理员角色（source=builtin && admin_type=admin）→ 全量菜单（含 visibility=admin，免授权）；
 //   - 普通用户：按该用户授权菜单集合（role_menu 并集）过滤 + visibility 门槛（public/member）二次过滤；
 //     父子收敛：父未达标/未授权时若存在可见子项则保留父壳，保证层级连贯。
 func BuildMyMenuTree(ctx *gin.Context, tenantID, userID string, appIDs []string) ([]objpermission.MenuItemNode, error) {
@@ -93,7 +93,7 @@ func BuildMyMenuTree(ctx *gin.Context, tenantID, userID string, appIDs []string)
 	return PruneMenuTreeByAuthed(full, authed, model.MenuVisibilityMember.VisibilityRank()), nil
 }
 
-// UserHoldsBuiltinAdmin 判断用户（租户内）是否持有内置管理员角色（source=builtin && admin_level=super）。
+// UserHoldsBuiltinAdmin 判断用户（租户内）是否持有内置管理员角色（source=builtin && admin_type=admin）。
 func UserHoldsBuiltinAdmin(ctx *gin.Context, tenantID, userID string) (bool, error) {
 	if tenantID == "" || userID == "" {
 		return false, nil
@@ -153,19 +153,19 @@ func UserAuthorizedMenuIDs(ctx *gin.Context, tenantID, userID string) (map[strin
 	return result, nil
 }
 
-// ResolveUserAdminLevel 推导用户能达到的最高系统管理等级：聚合其全部角色，
-// 取各角色 admin_level（显式能力标签）的最高档位（member < super）。
-func ResolveUserAdminLevel(ctx *gin.Context, tenantID, userID string) (model.SysAdminLevel, error) {
+// ResolveUserAdminType 推导用户的系统管理类型：聚合其全部角色，
+// 任一角色为管理员类型（admin）即视为管理员类型，否则为普通类型（normal）。
+func ResolveUserAdminType(ctx *gin.Context, tenantID, userID string) (model.SysAdminType, error) {
 	if tenantID == "" || userID == "" {
-		return model.SysAdminLevelMember, nil
+		return model.SysAdminTypeNormal, nil
 	}
 	urList, err := dao.NewUserRoleDao().GetListByCond(ctx, &dao.UserRoleCond{TenantID: tenantID, UserID: userID})
 	if err != nil {
-		glog.Errorf(ctx, "[svcmenu.ResolveUserAdminLevel] query user_role fail, err:%v, tenantID:%s, userID:%s", err, tenantID, userID)
-		return model.SysAdminLevelMember, err
+		glog.Errorf(ctx, "[svcmenu.ResolveUserAdminType] query user_role fail, err:%v, tenantID:%s, userID:%s", err, tenantID, userID)
+		return model.SysAdminTypeNormal, err
 	}
 	if len(urList) == 0 {
-		return model.SysAdminLevelMember, nil
+		return model.SysAdminTypeNormal, nil
 	}
 	roleIDs := make([]string, 0, len(urList))
 	for _, r := range urList {
@@ -173,17 +173,15 @@ func ResolveUserAdminLevel(ctx *gin.Context, tenantID, userID string) (model.Sys
 	}
 	roleList, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{TenantID: tenantID, IDs: roleIDs})
 	if err != nil {
-		glog.Errorf(ctx, "[svcmenu.ResolveUserAdminLevel] query role fail, err:%v, tenantID:%s", err, tenantID)
-		return model.SysAdminLevelMember, err
+		glog.Errorf(ctx, "[svcmenu.ResolveUserAdminType] query role fail, err:%v, tenantID:%s", err, tenantID)
+		return model.SysAdminTypeNormal, err
 	}
-	level := model.SysAdminLevelMember
 	for i := range roleList {
-		lv := model.SysAdminLevel(roleList[i].AdminLevel)
-		if lv.SysAdminRank() > level.SysAdminRank() {
-			level = lv
+		if roleList[i].AdminType.HasSystemAdmin() {
+			return model.SysAdminTypeAdmin, nil
 		}
 	}
-	return level, nil
+	return model.SysAdminTypeNormal, nil
 }
 
 // PruneMenuTree 按可见等级剪枝菜单树：可见(保留下钻) 或略过，父菜单达标则递归保留子树。

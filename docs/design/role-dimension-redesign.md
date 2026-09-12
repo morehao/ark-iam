@@ -2,6 +2,8 @@
 
 > ⚠️ **本方案已废弃（superseded）**。下文的核心设计——「业务权限 scope（`resource`/`scope`/`role_scope`）+ 授权驱动推导 `admin_level`」——已在后续调整中**彻底移除**：业务权限点不再由 IAM 承载，`admin_level` 改为角色的**显式能力标签**（由租户管理员直接勾选 none/basic/super），权限职责回归业务应用，IAM/auth 仅做身份。若需追溯当时的拆解依据，保留本文作为历史记录；**勿再按本方案的 scope 授权驱动落地**。
 >
+> 字段更名（后续调整）：`role.admin_level` 已更名为 `role.admin_type`，取值由 `none/basic/super` 收敛为 `admin/normal`；本文内出现的 `admin_level`/`AdminLevel`/`SysAdminLevel`/`ResolveUserAdminLevel` 均按新名阅读。
+>
 > 说明：本文在此前的会话中已记录了「内置/自定义 × 管理员/普通成员」两维度的落地（`role.source`/`role.admin_level` 字段保留、`role.type` 移除），其中 `source` 与 `admin_level` 两项仍有效；**仅「由 scope 推导 admin_level」的授权驱动部分已废弃**。
 
 > 关联需求：角色表需要体现「内置角色/自定义角色」与「管理员角色/普通成员角色」两个维度。

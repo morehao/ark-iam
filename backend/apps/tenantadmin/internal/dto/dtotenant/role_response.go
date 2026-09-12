@@ -1,5 +1,7 @@
 package dtotenant
 
+import "github.com/morehao/ark-iam/pkg/iam/model"
+
 type RoleCreateResp struct {
 	RoleID string `json:"roleID"` // 角色ID
 }
@@ -10,33 +12,33 @@ type RolePageListResp struct {
 }
 
 type RolePageListItem struct {
-	RoleID      string `json:"roleID"`      // 角色ID
-	AppID       string `json:"appID"`       // 所属应用ID
-	AppName     string `json:"appName"`     // 所属应用名称
-	Name        string `json:"name"`        // 角色名称
-	Code        string `json:"code"`        // 角色编码
-	Description string `json:"description"` // 角色描述
-	Source      string `json:"source"`      // 角色来源(builtin/custom)
-	AdminLevel  string `json:"adminLevel"`  // 系统管理等级(member/super)
-	MemberCount int64  `json:"memberCount"` // 成员数
-	MenuCount   int64  `json:"menuCount"`   // 授权菜单数
-	CreatedAt   int64  `json:"createdAt"`   // 创建时间
-	UpdatedAt   int64  `json:"updatedAt"`   // 更新时间
+	RoleID      string             `json:"roleID"`      // 角色ID
+	AppID       string             `json:"appID"`       // 所属应用ID
+	AppName     string             `json:"appName"`     // 所属应用名称
+	Name        string             `json:"name"`        // 角色名称
+	Code        string             `json:"code"`        // 角色编码
+	Description string             `json:"description"` // 角色描述
+	Source      string             `json:"source"`      // 角色来源(builtin/custom)
+	AdminType   model.SysAdminType `json:"adminType"`   // 系统管理类型(admin/normal)
+	MemberCount int64              `json:"memberCount"` // 成员数
+	MenuCount   int64              `json:"menuCount"`   // 授权菜单数
+	CreatedAt   int64              `json:"createdAt"`   // 创建时间
+	UpdatedAt   int64              `json:"updatedAt"`   // 更新时间
 }
 
 type RoleDetailResp struct {
-	RoleID      string `json:"roleID"`      // 角色ID
-	AppID       string `json:"appID"`       // 所属应用ID
-	AppName     string `json:"appName"`     // 所属应用名称
-	Name        string `json:"name"`        // 角色名称
-	Code        string `json:"code"`        // 角色编码
-	Description string `json:"description"` // 角色描述
-	Source      string `json:"source"`      // 角色来源(builtin/custom)
-	AdminLevel  string `json:"adminLevel"`  // 系统管理等级(member/super)
-	MemberCount int64  `json:"memberCount"` // 成员数
-	MenuCount   int64  `json:"menuCount"`   // 授权菜单数
-	CreatedAt   int64  `json:"createdAt"`   // 创建时间
-	UpdatedAt   int64  `json:"updatedAt"`   // 更新时间
+	RoleID      string             `json:"roleID"`      // 角色ID
+	AppID       string             `json:"appID"`       // 所属应用ID
+	AppName     string             `json:"appName"`     // 所属应用名称
+	Name        string             `json:"name"`        // 角色名称
+	Code        string             `json:"code"`        // 角色编码
+	Description string             `json:"description"` // 角色描述
+	Source      string             `json:"source"`      // 角色来源(builtin/custom)
+	AdminType   model.SysAdminType `json:"adminType"`   // 系统管理类型(admin/normal)
+	MemberCount int64              `json:"memberCount"` // 成员数
+	MenuCount   int64              `json:"menuCount"`   // 授权菜单数
+	CreatedAt   int64              `json:"createdAt"`   // 创建时间
+	UpdatedAt   int64              `json:"updatedAt"`   // 更新时间
 }
 
 // RoleMenuTreeResp 角色菜单授权回显：租户控制台完整菜单树 + 已授权菜单ID。

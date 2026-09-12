@@ -183,7 +183,7 @@ export default function RoleAssignEditor({ kind, subjectID, onSaved }: RoleAssig
             />
           </div>
           <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>
-            {kind === 'machine' && '仅可授予普通角色，系统管理角色不可授予服务账号；'}
+            {kind === 'machine' && '仅可授予普通角色，管理员角色不可授予服务账号；'}
             当前「{currentAppLabel}」已分配：{currentAppRoles.map((r) => r.name).join('、') || '无'}。保存仅替换该应用，不影响其它应用。
           </div>
           <Button type="primary" loading={saving} onClick={() => void save()} style={{ alignSelf: 'flex-start' }}>

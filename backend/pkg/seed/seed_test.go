@@ -70,22 +70,22 @@ func TestSeedIamSQLite(t *testing.T) {
 	assertCount("organization", 1)
 	assertCount("organization_user", 1)
 
-	// 内置唯一角色 admin 的 admin_level = super（种子显式能力标签，非 scope 推导）
-	adminLevelByCode := map[string]string{}
+	// 内置唯一角色 admin 的 admin_type = admin（种子显式能力标签，非 scope 推导）
+	adminTypeByCode := map[string]model.SysAdminType{}
 	var roles []model.RoleEntity
 	if err := db.Find(&roles).Error; err != nil {
 		t.Fatalf("query roles: %v", err)
 	}
 	for _, r := range roles {
-		adminLevelByCode[r.Code] = r.AdminLevel
+		adminTypeByCode[r.Code] = r.AdminType
 	}
-	wantLevels := map[string]string{
-		"admin":        string(model.SysAdminLevelSuper),
-		"tenant_admin": string(model.SysAdminLevelSuper),
+	wantTypes := map[string]model.SysAdminType{
+		"admin":        model.SysAdminTypeAdmin,
+		"tenant_admin": model.SysAdminTypeAdmin,
 	}
-	for code, want := range wantLevels {
-		if adminLevelByCode[code] != want {
-			t.Fatalf("role %s admin_level = %q, want %q", code, adminLevelByCode[code], want)
+	for code, want := range wantTypes {
+		if adminTypeByCode[code] != want {
+			t.Fatalf("role %s admin_type = %q, want %q", code, adminTypeByCode[code], want)
 		}
 	}
 

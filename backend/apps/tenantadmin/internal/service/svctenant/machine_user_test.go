@@ -33,12 +33,12 @@ func seedTestOperator(t *testing.T, tenantID string, super bool) *model.UserEnti
 		return op
 	}
 	role := &model.RoleEntity{
-		TenantID:   tenantID,
-		AppID:      "app-admin",
-		Code:       "test-admin",
-		Name:       "测试超级角色",
-		Source:     string(model.RoleSourceBuiltin),
-		AdminLevel: string(model.SysAdminLevelSuper),
+		TenantID:  tenantID,
+		AppID:     "app-admin",
+		Code:      "test-admin",
+		Name:      "测试超级角色",
+		Source:    string(model.RoleSourceBuiltin),
+		AdminType: model.SysAdminTypeAdmin,
 	}
 	if err := db.Create(role).Error; err != nil {
 		t.Fatalf("seed super role: %v", err)
@@ -82,7 +82,7 @@ func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
 		&model.ApplicationEntity{}, &model.ApiKeyEntity{}, &model.PersonEntity{},
 		&model.OrganizationEntity{}, &model.OrganizationUserEntity{})
 	tenantID := "t1"
-	superOp := seedTestOperator(t, tenantID, true)
+	adminOp := seedTestOperator(t, tenantID, true)
 	memberOp := seedTestOperator(t, tenantID, false)
 	rd := seedTestOrg(t, tenantID, "研发部")
 	op := seedTestOrg(t, tenantID, "运维部")
@@ -99,23 +99,23 @@ func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
 		t.Fatalf("member create: want system admin required, got %v", err)
 	}
 	// 缺主部门 / 多主部门被拒
-	if _, err := svc.Create(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserCreateReq{Name: "no-org"}); err != code.GetError(code.MachineUserOrgRequiredError) {
+	if _, err := svc.Create(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserCreateReq{Name: "no-org"}); err != code.GetError(code.MachineUserOrgRequiredError) {
 		t.Fatalf("create without primary org: want org required, got %v", err)
 	}
-	if _, err := svc.Create(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserCreateReq{
+	if _, err := svc.Create(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserCreateReq{
 		Name: "two-primary", OrganizationIDs: []string{rd.ID, op.ID},
 	}); err != code.GetError(code.MachineUserOrgRequiredError) {
 		t.Fatalf("create with two primary orgs: want org required, got %v", err)
 	}
 	// 跨租户组织被拒
-	if _, err := svc.Create(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserCreateReq{
+	if _, err := svc.Create(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserCreateReq{
 		Name: "cross", OrganizationIDs: []string{"org-other-tenant"},
 	}); err != code.GetError(code.OrganizationNotExistError) {
 		t.Fatalf("create with foreign org: want not exist, got %v", err)
 	}
 
 	// super 创建：主部门 rd + 参与 op
-	created, err := svc.Create(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserCreateReq{
+	created, err := svc.Create(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserCreateReq{
 		Name: "svc-pay", Description: "支付回调", OrganizationIDs: []string{rd.ID}, SecondaryOrgIDs: []string{op.ID},
 	})
 	if err != nil {
@@ -124,7 +124,7 @@ func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
 	machineID := created.MachineUserID
 
 	// 组织归属落库：1 primary(rd) + 1 secondary(op)
-	relList, err := dao.NewOrganizationUserDao().GetListByCond(newTestTenantCtx(tenantID, superOp.ID), &dao.OrganizationUserCond{TenantID: tenantID, UserID: machineID})
+	relList, err := dao.NewOrganizationUserDao().GetListByCond(newTestTenantCtx(tenantID, adminOp.ID), &dao.OrganizationUserCond{TenantID: tenantID, UserID: machineID})
 	if err != nil {
 		t.Fatalf("query org relations: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
 	}
 
 	// 列表：主部门名称回填
-	page, err := svc.PageList(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserPageListReq{Name: "svc-pay"})
+	page, err := svc.PageList(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserPageListReq{Name: "svc-pay"})
 	if err != nil {
 		t.Fatalf("page list: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
 	}
 
 	// 详情：组织归属 + 角色
-	detail, err := svc.Detail(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserDetailReq{MachineUserID: machineID})
+	detail, err := svc.Detail(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserDetailReq{MachineUserID: machineID})
 	if err != nil {
 		t.Fatalf("detail: %v", err)
 	}
@@ -173,13 +173,13 @@ func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
 
 	// 更新：改主部门→fin、参与部门全量替换为 [op, fin]
 	newSecondary := []string{op.ID, fin.ID}
-	if err := svc.Update(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserUpdateReq{
+	if err := svc.Update(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserUpdateReq{
 		MachineUserID: machineID, Name: "svc-pay-v2", Description: "支付回调V2",
 		PrimaryOrgID: &fin.ID, SecondaryOrgIDs: &newSecondary,
 	}); err != nil {
 		t.Fatalf("update org: %v", err)
 	}
-	relList, err = dao.NewOrganizationUserDao().GetListByCond(newTestTenantCtx(tenantID, superOp.ID), &dao.OrganizationUserCond{TenantID: tenantID, UserID: machineID})
+	relList, err = dao.NewOrganizationUserDao().GetListByCond(newTestTenantCtx(tenantID, adminOp.ID), &dao.OrganizationUserCond{TenantID: tenantID, UserID: machineID})
 	if err != nil {
 		t.Fatalf("re-query org relations: %v", err)
 	}
@@ -192,16 +192,16 @@ func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
 	}
 
 	// 主部门不可清空
-	if err := svc.Update(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserUpdateReq{
+	if err := svc.Update(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserUpdateReq{
 		MachineUserID: machineID, Name: "svc-pay-v2", PrimaryOrgID: strPtr(""),
 	}); err != code.GetError(code.MachineUserOrgRequiredError) {
 		t.Fatalf("clear primary: want org required, got %v", err)
 	}
 	// 挂起
-	if err := svc.UpdateStatus(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserStatusReq{MachineUserID: machineID, IsSuspended: true}); err != nil {
+	if err := svc.UpdateStatus(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserStatusReq{MachineUserID: machineID, IsSuspended: true}); err != nil {
 		t.Fatalf("suspend: %v", err)
 	}
-	reloaded, err := dao.NewUserDao().GetByID(newTestTenantCtx(tenantID, superOp.ID), machineID)
+	reloaded, err := dao.NewUserDao().GetByID(newTestTenantCtx(tenantID, adminOp.ID), machineID)
 	if err != nil || reloaded == nil {
 		t.Fatalf("reload machine user: %v", err)
 	}
@@ -212,34 +212,34 @@ func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
 	// 普通角色可授、super 角色禁授（按应用授权：role.app_id 须与 req.AppID 一致）
 	devRole := &model.RoleEntity{
 		TenantID: tenantID, AppID: "app-tenant", Code: "dev", Name: "开发者",
-		Source: string(model.RoleSourceCustom), AdminLevel: string(model.SysAdminLevelMember),
+		Source: string(model.RoleSourceCustom), AdminType: model.SysAdminTypeNormal,
 	}
 	if err := db.Create(devRole).Error; err != nil {
 		t.Fatalf("seed dev role: %v", err)
 	}
-	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-tenant", RoleIDs: []string{devRole.ID}}); err != nil {
+	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-tenant", RoleIDs: []string{devRole.ID}}); err != nil {
 		t.Fatalf("grant dev role: %v", err)
 	}
-	superRole := &model.RoleEntity{
+	adminRole := &model.RoleEntity{
 		TenantID: tenantID, AppID: "app-tenant", Code: "tenant-owner", Name: "租户管理员",
-		Source: string(model.RoleSourceBuiltin), AdminLevel: string(model.SysAdminLevelSuper),
+		Source: string(model.RoleSourceBuiltin), AdminType: model.SysAdminTypeAdmin,
 	}
-	if err := db.Create(superRole).Error; err != nil {
+	if err := db.Create(adminRole).Error; err != nil {
 		t.Fatalf("seed super role 2: %v", err)
 	}
-	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-tenant", RoleIDs: []string{superRole.ID}}); err != code.GetError(code.UserSuperRoleAssignForbidden) {
+	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-tenant", RoleIDs: []string{adminRole.ID}}); err != code.GetError(code.UserAdminRoleAssignForbidden) {
 		t.Fatalf("grant super role to machine: want forbidden, got %v", err)
 	}
 
 	// 按应用隔离：授另一个应用的普通角色后，原应用角色不受影响；跨应用角色拒绝
 	opsRole := &model.RoleEntity{
 		TenantID: tenantID, AppID: "app-other", Code: "ops", Name: "运维",
-		Source: string(model.RoleSourceCustom), AdminLevel: string(model.SysAdminLevelMember),
+		Source: string(model.RoleSourceCustom), AdminType: model.SysAdminTypeNormal,
 	}
 	if err := db.Create(opsRole).Error; err != nil {
 		t.Fatalf("seed ops role: %v", err)
 	}
-	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-other", RoleIDs: []string{opsRole.ID}}); err != nil {
+	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-other", RoleIDs: []string{opsRole.ID}}); err != nil {
 		t.Fatalf("grant ops role: %v", err)
 	}
 	var machRoleIDs []string
@@ -257,29 +257,29 @@ func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
 	if len(machRoleIDs) != 2 || !hasRole(machRoleIDs, devRole.ID) || !hasRole(machRoleIDs, opsRole.ID) {
 		t.Fatalf("expected dev+ops roles kept per-app, got %+v", machRoleIDs)
 	}
-	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-tenant", RoleIDs: []string{opsRole.ID}}); err != code.GetError(code.RoleNotExistError) {
+	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-tenant", RoleIDs: []string{opsRole.ID}}); err != code.GetError(code.RoleNotExistError) {
 		t.Fatalf("cross-app role grant: want RoleNotExist, got %v", err)
 	}
 
 	// 服务账号下有 key 时禁止删除
 	key := &model.ApiKeyEntity{
 		TenantID: tenantID, OwnerUserID: machineID, Name: "machine-key",
-		KeyHash: "h", KeyPrefix: "prefix", Scope: json.RawMessage(`{}`), CreatedBy: superOp.ID,
+		KeyHash: "h", KeyPrefix: "prefix", Scope: json.RawMessage(`{}`), CreatedBy: adminOp.ID,
 	}
 	if err := db.Create(key).Error; err != nil {
 		t.Fatalf("seed machine key: %v", err)
 	}
-	if err := svc.Delete(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserDeleteReq{MachineUserID: machineID}); err != code.GetError(code.MachineUserDeleteHasKeysError) {
+	if err := svc.Delete(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserDeleteReq{MachineUserID: machineID}); err != code.GetError(code.MachineUserDeleteHasKeysError) {
 		t.Fatalf("delete with keys: want has-keys forbidden, got %v", err)
 	}
 	// 清掉 key 后删除成功：用户软删 + 角色/部门关系级联清理
-	if err := dao.NewApiKeyDao().Delete(newTestTenantCtx(tenantID, superOp.ID), key.ID, superOp.ID); err != nil {
+	if err := dao.NewApiKeyDao().Delete(newTestTenantCtx(tenantID, adminOp.ID), key.ID, adminOp.ID); err != nil {
 		t.Fatalf("delete key: %v", err)
 	}
-	if err := svc.Delete(newTestTenantCtx(tenantID, superOp.ID), &dtotenant.MachineUserDeleteReq{MachineUserID: machineID}); err != nil {
+	if err := svc.Delete(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserDeleteReq{MachineUserID: machineID}); err != nil {
 		t.Fatalf("delete machine user: %v", err)
 	}
-	gone, err := dao.NewUserDao().GetByID(newTestTenantCtx(tenantID, superOp.ID), machineID)
+	gone, err := dao.NewUserDao().GetByID(newTestTenantCtx(tenantID, adminOp.ID), machineID)
 	if err != nil {
 		t.Fatalf("query deleted machine user: %v", err)
 	}
@@ -311,7 +311,7 @@ func TestServiceAccountCannotBeLeader(t *testing.T) {
 	testutil.SetupSQLite(t, &model.UserEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{},
 		&model.RoleEntity{}, &model.UserRoleEntity{})
 	tenantID := "t1"
-	superOp := seedTestOperator(t, tenantID, true)
+	adminOp := seedTestOperator(t, tenantID, true)
 	org := seedTestOrg(t, tenantID, "研发部")
 	machine := &model.UserEntity{
 		TenantID:   tenantID,
@@ -325,7 +325,7 @@ func TestServiceAccountCannotBeLeader(t *testing.T) {
 	}
 
 	svc := NewOrganizationUserSvc()
-	ctx := newTestTenantCtx(tenantID, superOp.ID)
+	ctx := newTestTenantCtx(tenantID, adminOp.ID)
 	// leader：拒绝
 	if _, err := svc.Create(ctx, &dtotenant.OrganizationUserCreateReq{
 		OrganizationID: org.ID,

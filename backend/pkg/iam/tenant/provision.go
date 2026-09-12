@@ -23,8 +23,8 @@ const (
 	ProvisionRoleName = "租户管理员"
 	// ProvisionRoleDesc 内置租户管理员角色描述。
 	ProvisionRoleDesc = "租户自服务应用管理员，拥有全部租户自服务权限"
-	// ProvisionAdminLevel 内置租户管理员角色的系统管理等级（super=具备系统管理能力）。
-	ProvisionAdminLevel = model.SysAdminLevelSuper
+	// ProvisionAdminType 内置管理员角色的系统管理类型（租户 tenant_admin 与平台 admin 种子共用；admin=具备系统管理能力）。
+	ProvisionAdminType = model.SysAdminTypeAdmin
 )
 
 // ProvisionMenuCodes 内置租户管理员默认授权的菜单编码（tenant-admin 应用下的叶子菜单）。
@@ -67,7 +67,7 @@ func ProvisionTenantAdmin(ctx context.Context, tx *gorm.DB, req *ProvisionTenant
 		return nil, err
 	}
 
-	// 3. 内置管理员角色（source=builtin、admin_level=super）
+	// 3. 内置管理员角色（source=builtin、admin_type=admin）
 	role, err := ensureBuiltinRole(ctx, tx, req, app.ID)
 	if err != nil {
 		return nil, err
@@ -111,7 +111,7 @@ func ensureTenantApplication(ctx context.Context, tx *gorm.DB, req *ProvisionTen
 	return nil
 }
 
-// ensureBuiltinRole 幂等写入内置租户管理员角色，并回填 source/admin_level（存量数据可能缺省）。
+// ensureBuiltinRole 幂等写入内置租户管理员角色，并回填 source/admin_type（存量数据可能缺省）。
 func ensureBuiltinRole(ctx context.Context, tx *gorm.DB, req *ProvisionTenantAdminReq, appID string) (*model.RoleEntity, error) {
 	roleDao := dao.NewRoleDao().WithTx(tx)
 	role, err := roleDao.GetByCond(ctx, &dao.RoleCond{
@@ -123,7 +123,7 @@ func ensureBuiltinRole(ctx context.Context, tx *gorm.DB, req *ProvisionTenantAdm
 		return nil, fmt.Errorf("query role %s fail: %w", ProvisionRoleCode, err)
 	}
 	builtinSource := string(model.RoleSourceBuiltin)
-	adminLevel := string(ProvisionAdminLevel)
+	adminType := ProvisionAdminType
 	if role == nil || role.ID == "" {
 		role = &model.RoleEntity{
 			TenantID:    req.TenantID,
@@ -132,7 +132,7 @@ func ensureBuiltinRole(ctx context.Context, tx *gorm.DB, req *ProvisionTenantAdm
 			Code:        ProvisionRoleCode,
 			Description: ProvisionRoleDesc,
 			Source:      builtinSource,
-			AdminLevel:  adminLevel,
+			AdminType:   adminType,
 			CreatedBy:   req.CreatedBy,
 		}
 		if err := roleDao.Insert(ctx, role); err != nil {
@@ -140,20 +140,20 @@ func ensureBuiltinRole(ctx context.Context, tx *gorm.DB, req *ProvisionTenantAdm
 		}
 		return role, nil
 	}
-	// 幂等回填：确保内置管理员角色不会被误置为 custom/member
+	// 幂等回填：确保内置管理员角色不会被误置为 custom/normal
 	updateMap := map[string]any{}
 	if role.Source != builtinSource {
 		updateMap["source"] = builtinSource
 	}
-	if role.AdminLevel != adminLevel {
-		updateMap["admin_level"] = adminLevel
+	if role.AdminType != adminType {
+		updateMap["admin_type"] = adminType
 	}
 	if len(updateMap) > 0 {
 		if err := roleDao.UpdateMap(ctx, role.ID, updateMap); err != nil {
 			return nil, fmt.Errorf("update role %s fail: %w", ProvisionRoleCode, err)
 		}
 		role.Source = builtinSource
-		role.AdminLevel = adminLevel
+		role.AdminType = adminType
 	}
 	return role, nil
 }

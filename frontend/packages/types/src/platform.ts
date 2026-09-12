@@ -1,7 +1,7 @@
 // platformadmin 领域类型（与 backend/apps/platformadmin/internal/dto 对齐）
 
-// 系统管理等级：member=普通租户成员（无系统管理能力），super=超级管理员。
-export type AdminLevel = 'member' | 'super'
+// 系统管理类型：admin=管理员角色（具备系统管理能力），normal=普通角色（不具备）。
+export type SysAdminType = 'admin' | 'normal'
 
 // 用户与角色的平台端类型已下线：两者按租户归属，类型见 tenant.ts
 // （TenantUserItem / TenantUserIdentityItem / TenantUserLoginLogItem / TenantRoleItem 等）。

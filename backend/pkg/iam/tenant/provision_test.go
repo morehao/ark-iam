@@ -76,7 +76,7 @@ func TestProvisionTenantAdmin_CreatesSubscriptionRoleMenusAndGrant(t *testing.T)
 	require.Equal(t, ProvisionRoleCode, role.Code)
 	require.Equal(t, app.ID, role.AppID)
 	require.Equal(t, string(model.RoleSourceBuiltin), role.Source)
-	require.Equal(t, string(ProvisionAdminLevel), role.AdminLevel)
+	require.Equal(t, ProvisionAdminType, role.AdminType)
 	require.True(t, role.IsBuiltinAdmin())
 
 	// 应用订阅 1 + 角色 1 + 授权 4 + 管理员绑定 1
@@ -108,20 +108,20 @@ func TestProvisionTenantAdmin_Idempotent(t *testing.T) {
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.UserRoleEntity{}, "tenant_id = ?", "t1"))
 }
 
-func TestProvisionTenantAdmin_BackfillsSourceAndAdminLevel(t *testing.T) {
+func TestProvisionTenantAdmin_BackfillsSourceAndAdminType(t *testing.T) {
 	db := newProvisionTestDB(t)
 	app := seedTenantAdminApp(t, db, ProvisionMenuCodes...)
 	ctx := context.Background()
 
-	// 存量脏数据：内置角色被置成 custom/member
-	legacy := &model.RoleEntity{TenantID: "t1", AppID: app.ID, Code: ProvisionRoleCode, Name: "租户管理员", Source: string(model.RoleSourceCustom), AdminLevel: string(model.SysAdminLevelMember)}
+	// 存量脏数据：内置角色被置成 custom/normal
+	legacy := &model.RoleEntity{TenantID: "t1", AppID: app.ID, Code: ProvisionRoleCode, Name: "租户管理员", Source: string(model.RoleSourceCustom), AdminType: model.SysAdminTypeNormal}
 	require.NoError(t, db.WithContext(ctx).Create(legacy).Error)
 
 	role, err := ProvisionTenantAdmin(ctx, db, &ProvisionTenantAdminReq{TenantID: "t1"})
 	require.NoError(t, err)
 	require.Equal(t, legacy.ID, role.ID)
 	require.Equal(t, string(model.RoleSourceBuiltin), role.Source)
-	require.Equal(t, string(ProvisionAdminLevel), role.AdminLevel)
+	require.Equal(t, ProvisionAdminType, role.AdminType)
 }
 
 func TestProvisionTenantAdmin_ApplicationMissing(t *testing.T) {

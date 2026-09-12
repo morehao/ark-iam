@@ -35,7 +35,7 @@
 
 ### 痛点分析
 
-1. **建完租户是"空壳"**：新建客户租户没有任何角色、没有 `tenant_application` 订阅，`tenantadmin` 的 `loadTenantApps`（`menu.go:57`）返回空 → 租户控制台无菜单；`svcmenu.ResolveUserAdminLevel` 查不到角色 → `admin_level=member`，所有管理写操作被 `requireSystemAdmin`（`menu.go:207`）拒绝。租户连一个能管理它的人都没有。自助建租户同理。
+1. **建完租户是"空壳"**：新建客户租户没有任何角色、没有 `tenant_application` 订阅，`tenantadmin` 的 `loadTenantApps`（`menu.go:57`）返回空 → 租户控制台无菜单；`svcmenu.ResolveUserAdminType` 查不到角色 → `admin_type=normal`，所有管理写操作被 `requireSystemAdmin`（`menu.go:207`）拒绝。租户连一个能管理它的人都没有。自助建租户同理。
 2. **创建用户逻辑有第二份实现风险**：平台侧若为建租户管理员再写一套 person/user/组织归属逻辑，就会与 `tenantadmin` 的实现漂移。
 3. **初始凭据没有体系**：目前只有种子里一个固定默认口令字面量。按主流安全实践，管理员代建的账号应使用**每用户随机的临时密码 + 首次登录强制修改**；固定默认口令属 [CWE-1392](https://cwe.mitre.org/data/definitions/1392.html)/[CWE-1393](https://cwe.mitre.org/data/definitions/1393.html) 缺陷模式。
 4. **无强制改密能力**：登录链路在密码校验通过后立即完成认证，没有"先改密再放行"的中断点；`ResetPassword` 重置成员密码后既不强制改密也不撤销既有会话——管理员设一个已知口令即可长期冒用该账号。
@@ -92,7 +92,7 @@
 | A1 | `POST /v1/platform/tenants` 缺 `admin` 或邮箱/手机都为空时报错；成功后返回 `tenantID` + `adminUserID` + `adminInitialPassword` | 接口联调 + `svctenant` 单测 | 后端 |
 | A2 | 建租户后：`tenant_user.source=builtin`、`user_type=member`、`person_id` 非空、组织归属为租户根组织（primary） | `platformadmin/testutil.SetupSQLite` 单测逐项断言 | 后端 |
 | A3 | 用响应中的 `adminInitialPassword` 明文校验 person 密码哈希通过；该密码满足 `ValidateStrength`；再查任意接口都**取不回**该明文 | `pkg/iam/password` + `svctenant` 单测（`gcrypto.ComparePasswordHash`） | 后端 |
-| A4 | 新建租户存在 1 条 `tenant_application`(tenant-admin)、1 条 builtin `tenant_admin` 角色（`admin_level=super`）、4 条 `role_menu`、1 条指向管理员的 `user_role` | 单测计数断言；重复调用后计数不变 | 后端 |
+| A4 | 新建租户存在 1 条 `tenant_application`(tenant-admin)、1 条 builtin `tenant_admin` 角色（`admin_type=admin`）、4 条 `role_menu`、1 条指向管理员的 `user_role` | 单测计数断言；重复调用后计数不变 | 后端 |
 | A5 | 该管理员登录租户控制台可见 4 个菜单，且对组织/用户/角色写接口通过 `requireSystemAdmin` | 前端联调 | 后端 + 前端 |
 | A6 | 持临时密码首次登录：`/oidc/login` 返回 `requiresPasswordChange=true`，无 `continueURL`/`sessionID`；调 `/oidc/login/changePassword` 成功后再次登录才拿到 code | `svcoidc` 单测 + 路由冒烟测试 | 后端 |
 | A7 | 强制改密页拒绝弱密码与"新旧相同"；改密成功后 `person.must_change_password=false` | `svcoidc` 单测 | 后端 |
@@ -549,7 +549,7 @@ const (
     ProvisionRoleCode   = "tenant_admin"  // 内置租户管理员角色
     ProvisionRoleName   = "租户管理员"
     ProvisionRoleDesc   = "租户自服务应用管理员，拥有全部租户自服务权限"
-    ProvisionAdminLevel = model.SysAdminLevelSuper
+    ProvisionAdminType = model.SysAdminTypeAdmin
     ProvisionMenuCodes  = "organization,tenant-user,tenant-role,tenant-api-key"
 )
 
@@ -565,7 +565,7 @@ func ProvisionTenantAdmin(ctx context.Context, tx *gorm.DB, req *ProvisionTenant
 步骤（全部在调用方事务内，逐步应用层查重后 upsert，幂等）：
 1. 按 `code=tenant-admin` 查应用；不存在则返回错误（应用/菜单是全局种子数据，缺失说明种子未跑完，属系统错误，不静默跳过）。
 2. upsert `tenant_application(tenant_id, app_id=tenant-admin, status=enable, config='{}', granted_scope='[]')`。
-3. upsert `role(tenant_id, app_id, code=tenant_admin, source=builtin, admin_level=super, name/description)`。
+3. upsert `role(tenant_id, app_id, code=tenant_admin, source=builtin, admin_type=admin, name/description)`。
 4. 按 `app_id + code` 取 4 个菜单，逐个 upsert `role_menu(tenant_id, role_id, menu_id)`；缺失菜单仅 `glog.Warnf` 跳过（菜单可能被下线，不应阻断建租户）。
 5. `GrantUserID != ""` 时 upsert `user_role(tenant_id, user_id, role_id)`。
 6. 返回角色实体，供 seed 继续给默认管理员授权。
