@@ -11,7 +11,7 @@ type RoleSource string
 
 // 角色来源取值（禁止硬编码）。
 const (
-	RoleSourceBuiltin RoleSource = "builtin" // 内置角色：系统种子数据，禁止删除/改核心字段
+	RoleSourceBuiltin RoleSource = "builtin" // 内置角色：系统种子数据，禁止删除、禁止改 admin_type
 	RoleSourceCustom  RoleSource = "custom"  // 自定义角色：租户管理员创建
 )
 
@@ -39,7 +39,6 @@ type RoleEntity struct {
 	TenantID    string       `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id" json:"tenantID"`
 	AppID       string       `gorm:"column:app_id;type:varchar(36);not null;default:'';comment:所属应用id" json:"appID"`
 	Name        string       `gorm:"column:name;type:varchar(128);not null;default:'';comment:角色名称" json:"name"`
-	Code        string       `gorm:"column:code;type:varchar(64);not null;default:'';comment:角色编码" json:"code"`
 	Description string       `gorm:"column:description;type:varchar(256);not null;default:'';comment:角色描述" json:"description"`
 	Source      string       `gorm:"column:source;type:varchar(16);not null;default:'custom';comment:角色来源(builtin/custom)" json:"source"`
 	AdminType   SysAdminType `gorm:"column:admin_type;type:varchar(16);not null;default:'normal';comment:系统管理类型(admin/normal)" json:"adminType"`

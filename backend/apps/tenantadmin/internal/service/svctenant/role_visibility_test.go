@@ -19,7 +19,6 @@ func seedBuiltinRole(t *testing.T, db *gorm.DB, id, tenantID, appID string) {
 		TenantID:   tenantID,
 		AppID:      appID,
 		Name:       "管理员",
-		Code:       "admin",
 		Source:     string(model.RoleSourceBuiltin),
 		AdminType:  model.SysAdminTypeAdmin,
 		CreatedBy:  "seed",
@@ -45,34 +44,6 @@ func TestDeleteRejectsBuiltinRole(t *testing.T) {
 	}
 }
 
-// TestUpdateRejectsBuiltinCoreChange 内置角色禁止改核心字段（编码/类别），名称与描述可改。
-func TestUpdateRejectsBuiltinCoreChange(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
-	svc := &roleSvc{}
-	seedTestApp(t, db, "t1", "app1")
-	seedBuiltinRole(t, db, "r1", "t1", "app1")
-
-	ginCtx := newAdminCtx(t, db, "t1", "op")
-
-	// 改编码 → 拒绝
-	err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "管理员", Code: "super-admin"})
-	if err == nil || err != code.GetError(code.RoleUpdateBuiltinForbiddenError) {
-		t.Fatalf("expected builtin update forbidden, got %v", err)
-	}
-
-	// 改名 + 改描述 → 允许（核心字段不变）
-	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "超级管理员", Code: "admin", Description: "系统内置"}); err != nil {
-		t.Fatalf("update name/desc should be allowed: %v", err)
-	}
-	var got model.RoleEntity
-	if err := db.First(&got, "id = ?", "r1").Error; err != nil {
-		t.Fatalf("load role: %v", err)
-	}
-	if got.Name != "超级管理员" || got.Code != "admin" {
-		t.Fatalf("unexpected role after update: name=%s code=%s", got.Name, got.Code)
-	}
-}
-
 // TestHasSystemAdminCapability 系统管理能力判定（按角色显式 admin_type 标签）：
 // admin 角色 admin_type=admin 则具备能力；普通类型角色 admin_type=normal 不具备。
 func TestHasSystemAdminCapability(t *testing.T) {
@@ -83,7 +54,7 @@ func TestHasSystemAdminCapability(t *testing.T) {
 	// 用户 u1 → 角色 r-admin（super）→ 具备
 	if err := db.Create(&model.RoleEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "r-admin"}},
-		TenantID:   "t1", AppID: "app1", Name: "管理员", Code: "admin",
+		TenantID:   "t1", AppID: "app1", Name: "管理员",
 		Source: string(model.RoleSourceCustom), AdminType: model.SysAdminTypeAdmin,
 		CreatedBy: "t",
 	}).Error; err != nil {
@@ -107,7 +78,7 @@ func TestHasSystemAdminCapability(t *testing.T) {
 	// 用户 u2 → 角色 r-user（member）→ 不具备
 	if err := db.Create(&model.RoleEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "r-user"}},
-		TenantID:   "t1", AppID: "app1", Name: "成员", Code: "user",
+		TenantID:   "t1", AppID: "app1", Name: "成员",
 		Source: string(model.RoleSourceCustom), AdminType: model.SysAdminTypeNormal,
 		CreatedBy: "t",
 	}).Error; err != nil {
@@ -177,7 +148,6 @@ func seedBuiltinSystemRole(t *testing.T, db *gorm.DB, id, tenantID, appID string
 		TenantID:   tenantID,
 		AppID:      appID,
 		Name:       "管理员",
-		Code:       "admin",
 		Source:     string(model.RoleSourceBuiltin),
 		AdminType:  model.SysAdminTypeAdmin,
 		CreatedBy:  "seed",
@@ -310,7 +280,7 @@ func TestUpdateMenusRejectsAdminVisibilityForNormalRole(t *testing.T) {
 	svc := &roleSvc{}
 	seedTenantAdminOperator(t, db, "t1", "op")
 	seedTestApp(t, db, "t1", "app1")
-	seedTestRole(t, db, "r1", "t1", "app1", "成员", "member")
+	seedTestRole(t, db, "r1", "t1", "app1", "成员")
 	seedAdminVisibilityMenu(t, db, "m-admin", "app1")
 
 	ginCtx := newDeptGinCtx(t, "t1", "op")
@@ -350,7 +320,7 @@ func TestRoleMenuTreeHidesAdminForNormalRole(t *testing.T) {
 	ginCtx := newDeptGinCtx(t, "t1", "op")
 
 	// 普通角色
-	seedTestRole(t, db, "r1", "t1", "app1", "成员", "member")
+	seedTestRole(t, db, "r1", "t1", "app1", "成员")
 	tree, err := svc.roleMenuTree(ginCtx, &model.RoleEntity{AppID: "app1"})
 	if err != nil {
 		t.Fatalf("roleMenuTree normal: %v", err)
@@ -412,7 +382,7 @@ func TestUserHoldsBuiltinAdmin(t *testing.T) {
 	seedTestApp(t, db, "t1", "app1")
 	seedBuiltinSystemRole(t, db, "r-admin", "t1", "app1")
 	seedUserRoleLink(t, db, "ur-admin", "t1", "u-admin", "r-admin")
-	seedTestRole(t, db, "r-member", "t1", "app1", "成员", "member")
+	seedTestRole(t, db, "r-member", "t1", "app1", "成员")
 	seedUserRoleLink(t, db, "ur-member", "t1", "u-member", "r-member")
 
 	admin, err := userHoldsBuiltinAdmin(newDeptGinCtx(t, "t1", "u-admin"))

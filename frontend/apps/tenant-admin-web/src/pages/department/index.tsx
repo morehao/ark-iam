@@ -111,7 +111,7 @@ export default function DepartmentPage() {
   const defaultRootID = useMemo(() => deptList[0]?.departmentID || '', [deptList])
 
   const [nodeModalOpen, setNodeModalOpen] = useState(false)
-  const [editingNode, setEditingNode] = useState<{ departmentID: string; parentID?: string; name: string; code?: string; sort?: number; status: string } | null>(null)
+  const [editingNode, setEditingNode] = useState<{ departmentID: string; parentID?: string; name: string; sort?: number; status: string } | null>(null)
   const [nodeForm] = Form.useForm()
 
   // 左侧树加载
@@ -170,12 +170,11 @@ export default function DepartmentPage() {
     setNodeModalOpen(true)
   }
 
-  const openEditNode = (node: { departmentID: string; parentID?: string; name: string; code?: string; sort?: number; status: string }) => {
+  const openEditNode = (node: { departmentID: string; parentID?: string; name: string; sort?: number; status: string }) => {
     setEditingNode(node)
     nodeForm.setFieldsValue({
       parentID: node.parentID || undefined,
       name: node.name,
-      code: node.code,
       sort: node.sort,
       status: node.status,
     })
@@ -390,9 +389,6 @@ export default function DepartmentPage() {
           )}
           <Form.Item name="name" label="部门名称" rules={[{ required: true, message: '请输入部门名称' }]}>
             <Input placeholder="如：产品研发部" />
-          </Form.Item>
-          <Form.Item name="code" label="部门编码">
-            <Input placeholder="可空，外部系统同步用" />
           </Form.Item>
           <Form.Item name="sort" label="同级排序" initialValue={0}>
             <InputNumber min={0} style={{ width: '100%' }} />

@@ -13,7 +13,6 @@ type DepartmentCond struct {
 	// DeptPath 子树条件（含自身）：dept_path = X OR dept_path LIKE X||'/%
 	DeptPath string
 	Status   string
-	Code     string
 	Name     string
 }
 
@@ -32,9 +31,6 @@ func (c *DepartmentCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.Status != "" {
 		db.Where(tableName+".status = ?", c.Status)
-	}
-	if c.Code != "" {
-		db.Where(tableName+".code = ?", c.Code)
 	}
 	if c.Name != "" {
 		db.Where(tableName+".name = ?", c.Name)

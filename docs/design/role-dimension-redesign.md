@@ -4,6 +4,8 @@
 >
 > 字段更名（后续调整）：`role.admin_level` 已更名为 `role.admin_type`，取值由 `none/basic/super` 收敛为 `admin/normal`；本文内出现的 `admin_level`/`AdminLevel`/`SysAdminLevel`/`ResolveUserAdminLevel` 均按新名阅读。
 >
+> 字段下线（后续调整）：`role.code` 已**彻底下线**，角色以名称作为应用内唯一标识；本文内出现的「`code`」「编码应用内唯一」「内置角色禁改 code」等表述均按此阅读，详见 [`role-code-retirement.md`](./role-code-retirement.md)。
+>
 > 说明：本文在此前的会话中已记录了「内置/自定义 × 管理员/普通成员」两维度的落地（`role.source`/`role.admin_level` 字段保留、`role.type` 移除），其中 `source` 与 `admin_level` 两项仍有效；**仅「由 scope 推导 admin_level」的授权驱动部分已废弃**。
 
 > 关联需求：角色表需要体现「内置角色/自定义角色」与「管理员角色/普通成员角色」两个维度。

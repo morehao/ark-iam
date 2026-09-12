@@ -42,15 +42,6 @@ const (
 	oauthClientTenantAdminWeb   = "tenant-admin-web"
 )
 
-// seedRole 角色种子定义。
-type seedRole struct {
-	app       *model.ApplicationEntity // 角色所属应用
-	code      string
-	name      string
-	desc      string
-	adminType model.SysAdminType // 系统管理类型(admin/normal)，内置角色必须显式声明（无隐式缺省）
-}
-
 // seedMenu 菜单种子定义；parentCode 为空表示顶级菜单。visibility 缺省为 public。
 type seedMenu struct {
 	appCode    string
@@ -90,7 +81,7 @@ func SeedIam(ctx context.Context, db *gorm.DB) error {
 	}
 
 	// 4. 角色（admin 归属管理后台；tenant_admin 由第 10 步的权限开通统一创建）
-	roles, err := seedRoles(ctx, db, tenant, adminApp)
+	adminRole, err := seedRoles(ctx, db, tenant, adminApp)
 	if err != nil {
 		return err
 	}
@@ -110,7 +101,7 @@ func SeedIam(ctx context.Context, db *gorm.DB) error {
 	}
 
 	// 7. 角色-菜单关联（仅管理后台 admin 角色；tenant_admin 由第 10 步开通时授权）
-	if err := seedRoleMenus(ctx, db, tenant, roles, menus); err != nil {
+	if err := seedRoleMenus(ctx, db, tenant, adminRole, menus); err != nil {
 		return err
 	}
 
@@ -124,7 +115,7 @@ func SeedIam(ctx context.Context, db *gorm.DB) error {
 	if err != nil {
 		return err
 	}
-	if err := seedAdminUserRole(ctx, db, tenant, adminUser, roles); err != nil {
+	if err := seedAdminUserRole(ctx, db, tenant, adminUser, adminRole); err != nil {
 		return err
 	}
 
@@ -226,7 +217,6 @@ func seedRootDepartment(ctx context.Context, db *gorm.DB, tenant *model.TenantEn
 	dept = &model.DepartmentEntity{
 		TenantID: tenant.ID,
 		Name:     tenant.Name,
-		Code:     tenant.Code,
 		Status:   string(model.DeptNodeStatusActive),
 	}
 	if err := db.WithContext(ctx).Create(dept).Error; err != nil {
@@ -269,58 +259,45 @@ func getOrCreateApplication(ctx context.Context, db *gorm.DB, code, name, desc s
 
 // seedRoles 只种管理后台 admin 角色：租户自服务的 tenant_admin 由权限开通统一创建
 // （pkg/iam/tenant.ProvisionTenantAdmin），建租户与种子共用同一份角色/授权定义。
-func seedRoles(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adminApp *model.ApplicationEntity) (map[string]*model.RoleEntity, error) {
-	defs := []seedRole{
-		{app: adminApp, code: "admin", name: "管理员", desc: "系统管理员，拥有所有权限", adminType: iamtenant.ProvisionAdminType},
+// 角色无业务编码，内置角色以 (tenant_id, app_id, source=builtin) 为幂等定位键。
+func seedRoles(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adminApp *model.ApplicationEntity) (*model.RoleEntity, error) {
+	// 系统管理类型是内置角色的显式声明，不设隐式缺省：未声明/非法值直接失败，
+	// 避免内置管理员角色被静默播种成普通类型（IsBuiltinAdmin 依赖 admin_type=admin）。
+	adminType := iamtenant.ProvisionAdminType
+	switch adminType {
+	case model.SysAdminTypeAdmin, model.SysAdminTypeNormal:
+	default:
+		return nil, fmt.Errorf("seed admin role: 非法系统管理类型 %q(必须显式声明 admin/normal)", adminType)
 	}
-	out := make(map[string]*model.RoleEntity, len(defs))
-	for _, def := range defs {
-		// 系统管理类型是内置角色的显式声明，不设隐式缺省：未声明/非法值直接失败，
-		// 避免内置管理员角色被静默播种成普通类型（IsBuiltinAdmin 依赖 admin_type=admin）。
-		switch def.adminType {
-		case model.SysAdminTypeAdmin, model.SysAdminTypeNormal:
-		default:
-			return nil, fmt.Errorf("seed role %s: 非法系统管理类型 %q(必须显式声明 admin/normal)", def.code, def.adminType)
-		}
-		adminType := def.adminType
-		entity := &model.RoleEntity{}
-		err := db.Where("tenant_id = ? AND code = ?", tenant.ID, def.code).First(entity).Error
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("seed role %s query fail: %w", def.code, err)
-		}
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			entity = &model.RoleEntity{
-				TenantID:    tenant.ID,
-				AppID:       def.app.ID,
-				Name:        def.name,
-				Code:        def.code,
-				Description: def.desc,
-				Source:      string(model.RoleSourceBuiltin),
-				AdminType:   adminType,
-			}
-			if err := db.WithContext(ctx).Create(entity).Error; err != nil {
-				return nil, fmt.Errorf("seed role %s create fail: %w", def.code, err)
-			}
-		} else {
-			// 幂等回填：存量内置角色的 source / admin_type 随种子定义更新
-			updateMap := map[string]any{}
-			if entity.Source != string(model.RoleSourceBuiltin) {
-				updateMap["source"] = string(model.RoleSourceBuiltin)
-			}
-			if entity.AdminType != adminType {
-				updateMap["admin_type"] = adminType
-			}
-			if len(updateMap) > 0 {
-				if uerr := db.Model(&model.RoleEntity{}).Where("id = ?", entity.ID).Updates(updateMap).Error; uerr != nil {
-					return nil, fmt.Errorf("seed role %s update fail: %w", def.code, uerr)
-				}
-				entity.Source = string(model.RoleSourceBuiltin)
-				entity.AdminType = adminType
-			}
-		}
-		out[def.code] = entity
+
+	entity := &model.RoleEntity{}
+	err := db.Where("tenant_id = ? AND app_id = ? AND source = ?", tenant.ID, adminApp.ID, string(model.RoleSourceBuiltin)).First(entity).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("seed admin role query fail: %w", err)
 	}
-	return out, nil
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		entity = &model.RoleEntity{
+			TenantID:    tenant.ID,
+			AppID:       adminApp.ID,
+			Name:        "管理员",
+			Description: "系统管理员，拥有所有权限",
+			Source:      string(model.RoleSourceBuiltin),
+			AdminType:   adminType,
+		}
+		if err := db.WithContext(ctx).Create(entity).Error; err != nil {
+			return nil, fmt.Errorf("seed admin role create fail: %w", err)
+		}
+		return entity, nil
+	}
+	// 幂等回填：存量内置角色的 admin_type 随种子定义更新
+	if entity.AdminType != adminType {
+		if uerr := db.Model(&model.RoleEntity{}).Where("id = ?", entity.ID).
+			Update("admin_type", adminType).Error; uerr != nil {
+			return nil, fmt.Errorf("seed admin role update fail: %w", uerr)
+		}
+		entity.AdminType = adminType
+	}
+	return entity, nil
 }
 
 // menuTypeOf 返回菜单种子定义的 type；未显式指定时缺省为 menu。
@@ -437,34 +414,26 @@ func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model
 
 // seedRoleMenus 只处理管理后台 admin 角色的菜单授权；
 // tenant_admin 的菜单授权由 pkg/iam/tenant.ProvisionTenantAdmin 统一写入。
-func seedRoleMenus(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, roles map[string]*model.RoleEntity, menus map[string]*model.MenuEntity) error {
-	relations := []struct {
-		roleCode string
-		menuCode []string
-	}{
-		{roleCode: "admin", menuCode: []string{
-			"dashboard", "menu", "tenant", "application",
-			"tenant-application", "oauth-client", "domain", "log",
-			"department", "tenant-user", "tenant-role",
-		}},
+func seedRoleMenus(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adminRole *model.RoleEntity, menus map[string]*model.MenuEntity) error {
+	menuCodes := []string{
+		"dashboard", "menu", "tenant", "application",
+		"tenant-application", "oauth-client", "domain", "log",
+		"department", "tenant-user", "tenant-role",
 	}
-	for _, rel := range relations {
-		role := roles[rel.roleCode]
-		for _, menuCode := range rel.menuCode {
-			menu := menus[menuCode]
-			var count int64
-			if err := db.Model(&model.RoleMenuEntity{}).
-				Where("tenant_id = ? AND role_id = ? AND menu_id = ?", tenant.ID, role.ID, menu.ID).
-				Count(&count).Error; err != nil {
-				return fmt.Errorf("seed role_menu count fail: %w", err)
-			}
-			if count > 0 {
-				continue
-			}
-			rm := &model.RoleMenuEntity{TenantID: tenant.ID, RoleID: role.ID, MenuID: menu.ID}
-			if err := db.WithContext(ctx).Create(rm).Error; err != nil {
-				return fmt.Errorf("seed role_menu create fail: %w", err)
-			}
+	for _, menuCode := range menuCodes {
+		menu := menus[menuCode]
+		var count int64
+		if err := db.Model(&model.RoleMenuEntity{}).
+			Where("tenant_id = ? AND role_id = ? AND menu_id = ?", tenant.ID, adminRole.ID, menu.ID).
+			Count(&count).Error; err != nil {
+			return fmt.Errorf("seed role_menu count fail: %w", err)
+		}
+		if count > 0 {
+			continue
+		}
+		rm := &model.RoleMenuEntity{TenantID: tenant.ID, RoleID: adminRole.ID, MenuID: menu.ID}
+		if err := db.WithContext(ctx).Create(rm).Error; err != nil {
+			return fmt.Errorf("seed role_menu create fail: %w", err)
 		}
 	}
 	return nil
@@ -594,23 +563,20 @@ func seedAdminUserDepartment(ctx context.Context, db *gorm.DB, tenant *model.Ten
 
 // seedAdminUserRole 绑定管理后台 admin 角色；默认管理员的 tenant_admin 角色绑定
 // 由后续的权限开通（pkg/iam/tenant.ProvisionTenantAdmin）统一写入。
-func seedAdminUserRole(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adminUser *model.UserEntity, roles map[string]*model.RoleEntity) error {
+func seedAdminUserRole(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adminUser *model.UserEntity, adminRole *model.RoleEntity) error {
 	// 默认管理员持有管理后台 admin 角色
-	for _, roleCode := range []string{"admin"} {
-		role := roles[roleCode]
-		var count int64
-		if err := db.Model(&model.UserRoleEntity{}).
-			Where("tenant_id = ? AND user_id = ? AND role_id = ?", tenant.ID, adminUser.ID, role.ID).
-			Count(&count).Error; err != nil {
-			return fmt.Errorf("seed user_role count fail: %w", err)
-		}
-		if count > 0 {
-			continue
-		}
-		ur := &model.UserRoleEntity{TenantID: tenant.ID, UserID: adminUser.ID, RoleID: role.ID}
-		if err := db.WithContext(ctx).Create(ur).Error; err != nil {
-			return fmt.Errorf("seed user_role create fail: %w", err)
-		}
+	var count int64
+	if err := db.Model(&model.UserRoleEntity{}).
+		Where("tenant_id = ? AND user_id = ? AND role_id = ?", tenant.ID, adminUser.ID, adminRole.ID).
+		Count(&count).Error; err != nil {
+		return fmt.Errorf("seed user_role count fail: %w", err)
+	}
+	if count > 0 {
+		return nil
+	}
+	ur := &model.UserRoleEntity{TenantID: tenant.ID, UserID: adminUser.ID, RoleID: adminRole.ID}
+	if err := db.WithContext(ctx).Create(ur).Error; err != nil {
+		return fmt.Errorf("seed user_role create fail: %w", err)
 	}
 	return nil
 }

@@ -73,7 +73,7 @@ func TestProvisionTenantAdmin_CreatesSubscriptionRoleMenusAndGrant(t *testing.T)
 	})
 	require.NoError(t, err)
 	require.NotNil(t, role)
-	require.Equal(t, ProvisionRoleCode, role.Code)
+	require.Equal(t, ProvisionRoleName, role.Name)
 	require.Equal(t, app.ID, role.AppID)
 	require.Equal(t, string(model.RoleSourceBuiltin), role.Source)
 	require.Equal(t, ProvisionAdminType, role.AdminType)
@@ -81,7 +81,7 @@ func TestProvisionTenantAdmin_CreatesSubscriptionRoleMenusAndGrant(t *testing.T)
 
 	// 应用订阅 1 + 角色 1 + 授权 4 + 管理员绑定 1
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.TenantApplicationEntity{}, "tenant_id = ? AND app_id = ?", "t1", app.ID))
-	require.Equal(t, int64(1), countProvisionRows(t, db, &model.RoleEntity{}, "tenant_id = ? AND code = ?", "t1", ProvisionRoleCode))
+	require.Equal(t, int64(1), countProvisionRows(t, db, &model.RoleEntity{}, "tenant_id = ? AND app_id = ? AND source = ?", "t1", app.ID, string(model.RoleSourceBuiltin)))
 	require.Equal(t, int64(len(ProvisionMenuCodes)), countProvisionRows(t, db, &model.RoleMenuEntity{}, "tenant_id = ? AND role_id = ?", "t1", role.ID))
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.UserRoleEntity{}, "tenant_id = ? AND user_id = ? AND role_id = ?", "t1", "u1", role.ID))
 
@@ -108,19 +108,21 @@ func TestProvisionTenantAdmin_Idempotent(t *testing.T) {
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.UserRoleEntity{}, "tenant_id = ?", "t1"))
 }
 
-func TestProvisionTenantAdmin_BackfillsSourceAndAdminType(t *testing.T) {
+// TestProvisionTenantAdmin_BackfillsAdminType 存量库内置角色被误置为普通类型时，
+// 权限开通应命中同一行（(tenant_id, app_id, source=builtin) 即内置角色幂等键）并回填 admin_type。
+func TestProvisionTenantAdmin_BackfillsAdminType(t *testing.T) {
 	db := newProvisionTestDB(t)
 	app := seedTenantAdminApp(t, db, ProvisionMenuCodes...)
 	ctx := context.Background()
 
-	// 存量脏数据：内置角色被置成 custom/normal
-	legacy := &model.RoleEntity{TenantID: "t1", AppID: app.ID, Code: ProvisionRoleCode, Name: "租户管理员", Source: string(model.RoleSourceCustom), AdminType: model.SysAdminTypeNormal}
+	// 存量脏数据：内置角色被改错系统管理类型
+	legacy := &model.RoleEntity{TenantID: "t1", AppID: app.ID, Name: ProvisionRoleName,
+		Source: string(model.RoleSourceBuiltin), AdminType: model.SysAdminTypeNormal}
 	require.NoError(t, db.WithContext(ctx).Create(legacy).Error)
 
 	role, err := ProvisionTenantAdmin(ctx, db, &ProvisionTenantAdminReq{TenantID: "t1"})
 	require.NoError(t, err)
 	require.Equal(t, legacy.ID, role.ID)
-	require.Equal(t, string(model.RoleSourceBuiltin), role.Source)
 	require.Equal(t, ProvisionAdminType, role.AdminType)
 }
 

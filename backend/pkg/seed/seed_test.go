@@ -70,26 +70,8 @@ func TestSeedIamSQLite(t *testing.T) {
 	assertCount("department", 1)
 	assertCount("department_user", 1)
 
-	// 内置唯一角色 admin 的 admin_type = admin（种子显式能力标签，非 scope 推导）
-	adminTypeByCode := map[string]model.SysAdminType{}
-	var roles []model.RoleEntity
-	if err := db.Find(&roles).Error; err != nil {
-		t.Fatalf("query roles: %v", err)
-	}
-	for _, r := range roles {
-		adminTypeByCode[r.Code] = r.AdminType
-	}
-	wantTypes := map[string]model.SysAdminType{
-		"admin":        model.SysAdminTypeAdmin,
-		"tenant_admin": model.SysAdminTypeAdmin,
-	}
-	for code, want := range wantTypes {
-		if adminTypeByCode[code] != want {
-			t.Fatalf("role %s admin_type = %q, want %q", code, adminTypeByCode[code], want)
-		}
-	}
-
-	// 内置角色归属应用：admin 属管理后台、tenant_admin 属租户自服务（source=builtin）
+	// 内置角色：admin 属管理后台、tenant_admin 属租户自服务（source=builtin、admin_type=admin）。
+	// 角色无业务编码，按所属应用定位（每种内置角色在其应用内唯一）。
 	appIDByName := map[string]string{}
 	var apps []model.ApplicationEntity
 	if err := db.Find(&apps).Error; err != nil {
@@ -98,15 +80,28 @@ func TestSeedIamSQLite(t *testing.T) {
 	for _, a := range apps {
 		appIDByName[a.Name] = a.ID
 	}
-	roleByCode := map[string]*model.RoleEntity{}
+	var roles []model.RoleEntity
+	if err := db.Find(&roles).Error; err != nil {
+		t.Fatalf("query roles: %v", err)
+	}
+	roleByAppName := map[string]*model.RoleEntity{}
 	for i := range roles {
-		roleByCode[roles[i].Code] = &roles[i]
+		if roles[i].Source != string(model.RoleSourceBuiltin) {
+			continue
+		}
+		for appName, appID := range appIDByName {
+			if appID == roles[i].AppID {
+				roleByAppName[appName] = &roles[i]
+			}
+		}
 	}
-	if got := roleByCode["admin"]; got.Source != string(model.RoleSourceBuiltin) || got.AppID != appIDByName["管理后台"] {
-		t.Fatalf("seed admin role source/appID mismatch: source=%s appID=%s", got.Source, got.AppID)
+	adminRole := roleByAppName["管理后台"]
+	tenantAdminRole := roleByAppName["租户自服务"]
+	if adminRole == nil || adminRole.AdminType != model.SysAdminTypeAdmin || adminRole.Name != "管理员" {
+		t.Fatalf("seed admin role mismatch: %+v", adminRole)
 	}
-	if got := roleByCode["tenant_admin"]; got.Source != string(model.RoleSourceBuiltin) || got.AppID != appIDByName["租户自服务"] {
-		t.Fatalf("seed tenant_admin role source/appID mismatch: source=%s appID=%s", got.Source, got.AppID)
+	if tenantAdminRole == nil || tenantAdminRole.AdminType != model.SysAdminTypeAdmin || tenantAdminRole.Name != "租户管理员" {
+		t.Fatalf("seed tenant_admin role mismatch: %+v", tenantAdminRole)
 	}
 
 	// tenant_admin 预授权租户自服务应用全部 4 个菜单
@@ -120,7 +115,7 @@ func TestSeedIamSQLite(t *testing.T) {
 		menuIDByCode[m.Code] = m.ID
 	}
 	var tenantAdminMenus []model.RoleMenuEntity
-	if err := db.Where("role_id = ?", roleByCode["tenant_admin"].ID).Find(&tenantAdminMenus).Error; err != nil {
+	if err := db.Where("role_id = ?", tenantAdminRole.ID).Find(&tenantAdminMenus).Error; err != nil {
 		t.Fatalf("query tenant_admin role_menu: %v", err)
 	}
 	if len(tenantAdminMenus) != len(wantMenuCodes) {
@@ -160,8 +155,8 @@ func TestSeedIamSQLite(t *testing.T) {
 		roleIDsOfAdmin[ur.RoleID] = true
 	}
 	if len(roleIDsOfAdmin) != 2 ||
-		!roleIDsOfAdmin[roleByCode["admin"].ID] ||
-		!roleIDsOfAdmin[roleByCode["tenant_admin"].ID] {
+		!roleIDsOfAdmin[adminRole.ID] ||
+		!roleIDsOfAdmin[tenantAdminRole.ID] {
 		t.Fatalf("admin user roles want {admin, tenant_admin}, got %v", roleIDsOfAdmin)
 	}
 
@@ -287,7 +282,7 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 
 	// admin 角色菜单授权集合（平台应用菜单 + 租户自服务菜单）
 	var adminRole model.RoleEntity
-	if err := db.Where("app_id = ? AND code = ?", adminApp.ID, "admin").First(&adminRole).Error; err != nil {
+	if err := db.Where("app_id = ? AND source = ?", adminApp.ID, string(model.RoleSourceBuiltin)).First(&adminRole).Error; err != nil {
 		t.Fatalf("admin role not found: %v", err)
 	}
 	var adminMenuLinks []model.RoleMenuEntity
@@ -343,7 +338,7 @@ func TestSeedIamPrunesRetiredMenus(t *testing.T) {
 		t.Fatalf("admin app not found: %v", err)
 	}
 	var adminRole model.RoleEntity
-	if err := db.Where("app_id = ? AND code = ?", adminApp.ID, "admin").First(&adminRole).Error; err != nil {
+	if err := db.Where("app_id = ? AND source = ?", adminApp.ID, string(model.RoleSourceBuiltin)).First(&adminRole).Error; err != nil {
 		t.Fatalf("admin role not found: %v", err)
 	}
 	var grpApp model.MenuEntity

@@ -17,9 +17,7 @@ import (
 const (
 	// ProvisionAppCode 租户自服务控制台应用编码（application.code）。
 	ProvisionAppCode = "tenant-admin"
-	// ProvisionRoleCode 内置租户管理员角色编码（role.code）。
-	ProvisionRoleCode = "tenant_admin"
-	// ProvisionRoleName 内置租户管理员角色名称。
+	// ProvisionRoleName 内置租户管理员角色名称（角色无业务编码，(tenant_id, app_id, source=builtin) 即其业务唯一键）。
 	ProvisionRoleName = "租户管理员"
 	// ProvisionRoleDesc 内置租户管理员角色描述。
 	ProvisionRoleDesc = "租户自服务应用管理员，拥有全部租户自服务权限"
@@ -111,48 +109,40 @@ func ensureTenantApplication(ctx context.Context, tx *gorm.DB, req *ProvisionTen
 	return nil
 }
 
-// ensureBuiltinRole 幂等写入内置租户管理员角色，并回填 source/admin_type（存量数据可能缺省）。
+// ensureBuiltinRole 幂等写入内置租户管理员角色，并回填 admin_type（存量数据可能被改错）。
+// 角色无业务编码，幂等定位键为 (tenant_id, app_id, source=builtin)。
 func ensureBuiltinRole(ctx context.Context, tx *gorm.DB, req *ProvisionTenantAdminReq, appID string) (*model.RoleEntity, error) {
 	roleDao := dao.NewRoleDao().WithTx(tx)
+	builtinSource := string(model.RoleSourceBuiltin)
 	role, err := roleDao.GetByCond(ctx, &dao.RoleCond{
 		TenantID: req.TenantID,
 		AppID:    appID,
-		Code:     ProvisionRoleCode,
+		Source:   builtinSource,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("query role %s fail: %w", ProvisionRoleCode, err)
+		return nil, fmt.Errorf("query builtin role fail: %w", err)
 	}
-	builtinSource := string(model.RoleSourceBuiltin)
 	adminType := ProvisionAdminType
 	if role == nil || role.ID == "" {
 		role = &model.RoleEntity{
 			TenantID:    req.TenantID,
 			AppID:       appID,
 			Name:        ProvisionRoleName,
-			Code:        ProvisionRoleCode,
 			Description: ProvisionRoleDesc,
 			Source:      builtinSource,
 			AdminType:   adminType,
 			CreatedBy:   req.CreatedBy,
 		}
 		if err := roleDao.Insert(ctx, role); err != nil {
-			return nil, fmt.Errorf("insert role %s fail: %w", ProvisionRoleCode, err)
+			return nil, fmt.Errorf("insert builtin role fail: %w", err)
 		}
 		return role, nil
 	}
-	// 幂等回填：确保内置管理员角色不会被误置为 custom/normal
-	updateMap := map[string]any{}
-	if role.Source != builtinSource {
-		updateMap["source"] = builtinSource
-	}
+	// 幂等回填：确保内置管理员角色不会被误置为普通类型
 	if role.AdminType != adminType {
-		updateMap["admin_type"] = adminType
-	}
-	if len(updateMap) > 0 {
-		if err := roleDao.UpdateMap(ctx, role.ID, updateMap); err != nil {
-			return nil, fmt.Errorf("update role %s fail: %w", ProvisionRoleCode, err)
+		if err := roleDao.UpdateMap(ctx, role.ID, map[string]any{"admin_type": adminType}); err != nil {
+			return nil, fmt.Errorf("update builtin role fail: %w", err)
 		}
-		role.Source = builtinSource
 		role.AdminType = adminType
 	}
 	return role, nil

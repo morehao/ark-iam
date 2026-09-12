@@ -179,7 +179,7 @@ export default function RoleAssignEditor({ kind, subjectID, onSaved }: RoleAssig
               style={{ width: '100%' }}
               value={checked}
               onChange={setChecked}
-              options={options.map((r) => ({ label: `${r.name}（${r.code}）`, value: r.roleID }))}
+              options={options.map((r) => ({ label: r.name, value: r.roleID }))}
             />
           </div>
           <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>

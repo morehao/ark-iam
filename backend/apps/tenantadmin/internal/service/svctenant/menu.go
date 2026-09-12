@@ -9,6 +9,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/iam/svcmenu"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 )
 
@@ -36,9 +37,9 @@ func (svc *tenantMenuSvc) Tree(ctx *gin.Context) (*dtotenant.MenuTreeResp, error
 	}, nil
 }
 
-// Apps 当前租户订阅的启用非系统应用（角色归属/菜单授权的应用选项）。
+// Apps 当前租户订阅的启用应用（角色归属/菜单授权的应用选项，含系统内置应用如管理后台）。
 func (svc *tenantMenuSvc) Apps(ctx *gin.Context) (*dtotenant.TenantAppsResp, error) {
-	appList, err := loadTenantApps(ctx)
+	appList, err := loadSubscribedApps(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -53,19 +54,21 @@ func (svc *tenantMenuSvc) Apps(ctx *gin.Context) (*dtotenant.TenantAppsResp, err
 	return &dtotenant.TenantAppsResp{List: list}, nil
 }
 
-// loadTenantApps 当前租户订阅的启用非系统应用（排除平台系统内置应用，如管理后台）。
-func loadTenantApps(ctx *gin.Context) ([]model.ApplicationEntity, error) {
+// loadSubscribedApps 当前租户订阅的启用应用（含系统内置应用，如管理后台）。
+// 角色归属/应用名映射的应用选项集合：凡租户订阅且订阅状态为启用的应用均可选，
+// 不再区分是否系统内置（`application.is_system` 只用于保护内置记录不被删除/篡改）。
+func loadSubscribedApps(ctx *gin.Context) ([]model.ApplicationEntity, error) {
 	tenantID := gincontext.GetTenantIDString(ctx)
 	tenantAppList, _, err := dao.NewTenantApplicationDao().GetPageListByCond(ctx, &dao.TenantApplicationCond{
 		TenantID: tenantID,
 		Status:   model.AppStatusEnable,
 	})
 	if err != nil {
-		glog.Errorf(ctx, "[svctenant.loadTenantApps] dao tenantApplication GetPageListByCond fail, err:%v, tenantID:%s", err, tenantID)
+		glog.Errorf(ctx, "[svctenant.loadSubscribedApps] dao tenantApplication GetPageListByCond fail, err:%v, tenantID:%s", err, tenantID)
 		return nil, code.GetError(code.MenuGetPageListError)
 	}
 
-	appIDSet := make(map[string]struct{})
+	appIDSet := make(map[string]struct{}, len(tenantAppList))
 	appIDs := make([]string, 0, len(tenantAppList))
 	for _, item := range tenantAppList {
 		if item.AppID == "" {
@@ -74,30 +77,40 @@ func loadTenantApps(ctx *gin.Context) ([]model.ApplicationEntity, error) {
 		if _, ok := appIDSet[item.AppID]; ok {
 			continue
 		}
-		appEntity, err := dao.NewApplicationDao().GetByID(ctx, item.AppID)
-		if err != nil {
-			glog.Errorf(ctx, "[svctenant.loadTenantApps] application GetByID fail, err:%v, appID:%s", err, item.AppID)
-			continue
-		}
-		if appEntity == nil || appEntity.ID == "" {
-			glog.Warnf(ctx, "[svctenant.loadTenantApps] application not exist, appID:%s", item.AppID)
-			continue
-		}
-		if appEntity.IsSystem {
-			continue
-		}
 		appIDSet[item.AppID] = struct{}{}
 		appIDs = append(appIDs, item.AppID)
 	}
 	if len(appIDs) == 0 {
 		return nil, nil
 	}
-	appList, err := dao.NewApplicationDao().GetListByCond(ctx, &dao.ApplicationCond{IDs: appIDs})
+	// 下拉/映射顺序与平台侧应用排序一致（application.sort），避免多应用时顺序漂移
+	appList, err := dao.NewApplicationDao().GetListByCond(ctx, &dao.ApplicationCond{
+		BaseCond: &gormdao.BaseCond{OrderField: "sort, code"},
+		IDs:      appIDs,
+	})
 	if err != nil {
-		glog.Errorf(ctx, "[svctenant.loadTenantApps] dao application GetListByCond fail, err:%v", err)
+		glog.Errorf(ctx, "[svctenant.loadSubscribedApps] dao application GetListByCond fail, err:%v", err)
 		return nil, code.GetError(code.MenuGetPageListError)
 	}
 	return appList, nil
+}
+
+// loadConsoleApps 租户控制台菜单范围的订阅应用：订阅且启用的非系统内置应用。
+// 系统内置应用（如管理后台）的菜单归属各自专属控制台，不并入租户控制台侧边栏，
+// 故菜单树场景仍排除（与 loadSubscribedApps 的「角色可选应用」口径不同）。
+func loadConsoleApps(ctx *gin.Context) ([]model.ApplicationEntity, error) {
+	appList, err := loadSubscribedApps(ctx)
+	if err != nil {
+		return nil, err
+	}
+	consoleApps := make([]model.ApplicationEntity, 0, len(appList))
+	for _, app := range appList {
+		if app.IsSystem {
+			continue
+		}
+		consoleApps = append(consoleApps, app)
+	}
+	return consoleApps, nil
 }
 
 // buildAppMenuTree 构建指定应用的启用菜单树（角色菜单授权用），基于公共层 svcmenu.BuildAppMenuTree。
@@ -147,7 +160,7 @@ func pruneMenuTreeByAuthed(items []dtotenant.MenuTreeItem, authed map[string]boo
 
 // buildTenantMenuTree 构建租户控制台菜单树（全部订阅的非系统应用），供侧边栏使用。
 func buildTenantMenuTree(ctx *gin.Context) ([]dtotenant.MenuTreeItem, error) {
-	appList, err := loadTenantApps(ctx)
+	appList, err := loadConsoleApps(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -166,10 +179,12 @@ func buildTenantMenuTree(ctx *gin.Context) ([]dtotenant.MenuTreeItem, error) {
 //   - 内置管理员豁免：持有内置管理员角色（source=builtin && admin_type=admin）→ 全量菜单（含 visibility=admin，免授权）；
 //   - 普通成员：按该用户授权菜单集合（role_menu 并集）过滤 + visibility 门槛（public/member）二次过滤；
 //     父子收敛：父未达标/未授权时若存在可见子项则保留父壳，保证层级连贯。
+//
+// 应用范围取租户控制台应用（loadConsoleApps）：系统内置应用的菜单由其专属控制台呈现，不并入本控制台。
 func buildMyMenuTree(ctx *gin.Context) ([]dtotenant.MenuTreeItem, error) {
 	tenantID := gincontext.GetTenantIDString(ctx)
 	userID := gincontext.GetUserIDString(ctx)
-	appList, err := loadTenantApps(ctx)
+	appList, err := loadConsoleApps(ctx)
 	if err != nil {
 		return nil, err
 	}

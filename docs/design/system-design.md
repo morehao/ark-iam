@@ -309,7 +309,6 @@ erDiagram
         string dept_path "祖先链(含自身)"
         int dept_depth "深度(根=1)"
         string name
-        string code "外部同步编码(可空)"
         int sort
         string status "active/inactive"
     }
@@ -324,8 +323,7 @@ erDiagram
         uint id PK
         uint tenant_id FK
         uint app_id FK
-        string name
-        string code
+        string name "应用内唯一"
         string type "User/Machine"
         tinyint is_default
     }

@@ -12,10 +12,9 @@ type RoleCond struct {
 	AppID     string
 	IDs       []string
 	Name      string
-	Code      string
 	Source    string
 	AdminType model.SysAdminType // 精确匹配系统管理类型(admin/normal)
-	Keyword   string             // 模糊搜索: 名称/编码 LIKE
+	Keyword   string             // 模糊搜索: 名称 LIKE
 }
 
 func (c *RoleCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -33,13 +32,10 @@ func (c *RoleCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.Keyword != "" {
 		k := "%" + c.Keyword + "%"
-		db.Where(tableName+".name LIKE ? OR "+tableName+".code LIKE ?", k, k)
+		db.Where(tableName+".name LIKE ?", k)
 	}
 	if c.Name != "" {
 		db.Where(tableName+".name = ?", c.Name)
-	}
-	if c.Code != "" {
-		db.Where(tableName+".code = ?", c.Code)
 	}
 	if c.Source != "" {
 		db.Where(tableName+".source = ?", c.Source)

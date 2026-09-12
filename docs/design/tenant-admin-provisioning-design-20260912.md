@@ -547,8 +547,7 @@ func Create(ctx context.Context, tx *gorm.DB, req *CreateReq) (*model.UserEntity
 // 内置定义（单一事实源，seed 与建租户共用）
 const (
     ProvisionAppCode    = "tenant-admin"  // 租户自服务应用
-    ProvisionRoleCode   = "tenant_admin"  // 内置租户管理员角色
-    ProvisionRoleName   = "租户管理员"
+    ProvisionRoleName   = "租户管理员"     // 内置租户管理员角色（角色无业务编码，(tenant_id, app_id, source=builtin) 即其幂等键）
     ProvisionRoleDesc   = "租户自服务应用管理员，拥有全部租户自服务权限"
     ProvisionAdminType = model.SysAdminTypeAdmin
     ProvisionMenuCodes  = "department,tenant-user,tenant-role,tenant-api-key"
@@ -566,7 +565,7 @@ func ProvisionTenantAdmin(ctx context.Context, tx *gorm.DB, req *ProvisionTenant
 步骤（全部在调用方事务内，逐步应用层查重后 upsert，幂等）：
 1. 按 `code=tenant-admin` 查应用；不存在则返回错误（应用/菜单是全局种子数据，缺失说明种子未跑完，属系统错误，不静默跳过）。
 2. upsert `tenant_application(tenant_id, app_id=tenant-admin, status=enable, config='{}', granted_scope='[]')`。
-3. upsert `role(tenant_id, app_id, code=tenant_admin, source=builtin, admin_type=admin, name/description)`。
+3. upsert `role(tenant_id, app_id, source=builtin, admin_type=admin, name/description)`（角色无业务编码，`(tenant_id, app_id, source=builtin)` 即内置角色幂等键）。
 4. 按 `app_id + code` 取 4 个菜单，逐个 upsert `role_menu(tenant_id, role_id, menu_id)`；缺失菜单仅 `glog.Warnf` 跳过（菜单可能被下线，不应阻断建租户）。
 5. `GrantUserID != ""` 时 upsert `user_role(tenant_id, user_id, role_id)`。
 6. 返回角色实体，供 seed 继续给默认管理员授权。

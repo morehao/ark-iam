@@ -4,7 +4,6 @@ export interface DepartmentItem {
   deptPath: string
   deptDepth: number
   name: string
-  code: string
   sort: number
   status: string
   createdAt?: number
@@ -16,7 +15,6 @@ export interface DepartmentChildItem {
   parentID: string
   deptDepth: number
   name: string
-  code: string
   sort: number
   status: string
   createdAt?: number

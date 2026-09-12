@@ -6,6 +6,8 @@
 > 取代/修订：`organization-container-redesign.md` 的**命名层**（该文 §1.2 的定位表述、§2 表/字段名、§4 API 路径、§5.3、§7 影响面清单，一律按本文执行）。
 > **结构层设计不变**：`parent_id` 树 + 物化路径 + 关系表 `relation_type(primary/secondary/leader)` + 租户隔离 + 高频读物化路径，全部保留。
 > 影响一句话：2 张表、10 条 API、13 个错误码常量、1 个种子菜单、16 个文件重命名；后端 38 文件 807 处、前端 9 文件 131 处、文档约 146 处。
+>
+> 字段下线（后续调整）：`department.code` 已**彻底下线**，部门仅有名称（无业务编码）；本文出现的 `name`/`code` 字段并列表述按此阅读，见 [`department-code-retirement.md`](./department-code-retirement.md)。
 
 ---
 
