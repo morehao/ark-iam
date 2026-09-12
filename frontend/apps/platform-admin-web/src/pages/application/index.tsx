@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Descriptions, Drawer, Form, Input, InputNumber, message, Modal, Select, Space, Table, Tag } from 'antd'
+import { Button, Descriptions, Drawer, Form, Input, InputNumber, message, Modal, Select, Space, Table } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { actionColumn, CODE_COL_WIDTH, fmtTime, IDCell, idColumn, nameColumn, PageContainer, STATUS_COL_WIDTH, StatusTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, TypeTag } from '@ark-iam/ui'
@@ -42,7 +42,7 @@ export default function ApplicationList() {
   const handleCreate = () => {
     setEditing(null)
     form.resetFields()
-    form.setFieldsValue({ type: 'first_party', visibility: 'public', sort: 0 })
+    form.setFieldsValue({ type: 'first_party', sort: 0 })
     setModalOpen(true)
   }
 
@@ -52,7 +52,6 @@ export default function ApplicationList() {
       code: record.code,
       name: record.name,
       type: record.type,
-      visibility: record.visibility,
       status: record.status,
       description: record.description,
       logoUrl: record.logoUrl,
@@ -103,9 +102,6 @@ export default function ApplicationList() {
     }
   }
 
-  const renderVisibility = (v: string) =>
-    v === 'public' ? <Tag color="blue">公开</Tag> : <Tag color="orange">私有</Tag>
-
   const columns: ColumnsType<ApplicationItem> = [
     idColumn<ApplicationItem>({ dataIndex: 'appID' }),
     nameColumn<ApplicationItem>({
@@ -115,7 +111,6 @@ export default function ApplicationList() {
     }),
     textColumn<ApplicationItem>({ title: '编码', dataIndex: 'code', width: CODE_COL_WIDTH, monospace: true }),
     { title: '类型', dataIndex: 'type', key: 'type', width: TAG_COL_WIDTH, render: (v: string) => <TypeTag value={v} /> },
-    { title: '可见性', dataIndex: 'visibility', key: 'visibility', width: TAG_COL_WIDTH, render: renderVisibility },
     { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <StatusTag value={v} /> },
     timeColumn<ApplicationItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<ApplicationItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
@@ -199,14 +194,6 @@ export default function ApplicationList() {
               ]}
             />
           </Form.Item>
-          <Form.Item name="visibility" label="可见性" rules={[{ required: true, message: '请选择可见性' }]}>
-            <Select
-              options={[
-                { value: 'public', label: '公开' },
-                { value: 'private', label: '私有' },
-              ]}
-            />
-          </Form.Item>
           {editing && (
             <Form.Item name="status" label="状态">
               <Select
@@ -246,7 +233,6 @@ export default function ApplicationList() {
             <Descriptions.Item label="类型">
               <TypeTag value={detail.type} />
             </Descriptions.Item>
-            <Descriptions.Item label="可见性">{renderVisibility(detail.visibility)}</Descriptions.Item>
             <Descriptions.Item label="状态">
               <StatusTag value={detail.status} />
             </Descriptions.Item>

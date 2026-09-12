@@ -55,7 +55,9 @@ func (svc *tenantMenuSvc) Apps(ctx *gin.Context) (*dtotenant.TenantAppsResp, err
 }
 
 // loadSubscribedApps 当前租户订阅的启用应用（含系统内置应用，如管理后台）。
-// 角色归属/应用名映射的应用选项集合：凡租户订阅且订阅状态为启用的应用均可选，
+// 两道门槛都需满足：订阅关系 tenant_application.status=enable，且应用本身 application.status=enable
+// —— 应用被停用后不应再把它的菜单/角色归属继续暴露给已订阅租户。
+// 角色归属/应用名映射的应用选项集合：凡租户订阅且启用的应用均可选，
 // 不再区分是否系统内置（`application.is_system` 只用于保护内置记录不被删除/篡改）。
 func loadSubscribedApps(ctx *gin.Context) ([]model.ApplicationEntity, error) {
 	tenantID := gincontext.GetTenantIDString(ctx)
@@ -87,6 +89,7 @@ func loadSubscribedApps(ctx *gin.Context) ([]model.ApplicationEntity, error) {
 	appList, err := dao.NewApplicationDao().GetListByCond(ctx, &dao.ApplicationCond{
 		BaseCond: &gormdao.BaseCond{OrderField: "sort, code"},
 		IDs:      appIDs,
+		Status:   model.AppStatusEnable,
 	})
 	if err != nil {
 		glog.Errorf(ctx, "[svctenant.loadSubscribedApps] dao application GetListByCond fail, err:%v", err)

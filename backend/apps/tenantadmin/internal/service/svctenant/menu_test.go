@@ -83,6 +83,28 @@ func TestTenantAppsIncludeSubscribedSystemApp(t *testing.T) {
 	}
 }
 
+// TestTenantAppsExcludeDisabledApplication 应用被平台停用（application.status=disable）后，
+// 即便订阅关系仍是启用，也不再作为租户可选应用暴露（两道门槛：订阅启用 + 应用启用）。
+func TestTenantAppsExcludeDisabledApplication(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.TenantApplicationEntity{},
+		&model.RoleEntity{}, &model.UserRoleEntity{})
+	seedTenantAdminOperator(t, db, "t1", "op")
+	seedSubscribedApp(t, db, "t1", "app-console", "租户自服务", false, 0)
+	// 平台停用该应用（订阅关系保持 enable）
+	if err := db.Model(&model.ApplicationEntity{}).Where("id = ?", "app-console").
+		Update("status", model.AppStatusDisable).Error; err != nil {
+		t.Fatalf("disable application: %v", err)
+	}
+
+	resp, err := NewTenantMenuSvc().Apps(newDeptGinCtx(t, "t1", "op"))
+	if err != nil {
+		t.Fatalf("apps: %v", err)
+	}
+	if len(resp.List) != 0 {
+		t.Fatalf("disabled application must not be selectable, got %+v", resp.List)
+	}
+}
+
 // TestConsoleMenuScopeExcludesSystemApp 租户控制台菜单范围仍排除系统内置应用：
 // 系统内置订阅应用的菜单由其专属控制台呈现，不并入租户控制台侧边栏（避免串台页面）。
 func TestConsoleMenuScopeExcludesSystemApp(t *testing.T) {

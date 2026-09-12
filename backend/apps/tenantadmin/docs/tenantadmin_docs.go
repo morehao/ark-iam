@@ -1296,6 +1296,12 @@ const docTemplatetenantadmin = `{
                         "description": "每页数量",
                         "name": "pageSize",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Unassigned 仅查询未归属应用的角色（app_id 为空串，即平台内置的系统角色）；\nfalse/缺省表示不按归属过滤。空串 appID 在查询里语义是\"不过滤\"，故需要这个显式开关。",
+                        "name": "unassigned",
+                        "in": "query"
                     }
                 ],
                 "responses": {

@@ -35,6 +35,17 @@ const (
 	ApplicationSecretNotExistError = 100739
 )
 
+// 租户应用订阅（tenant_application）
+const (
+	TenantApplicationCreateError      = 100740
+	TenantApplicationUpdateError      = 100741
+	TenantApplicationDeleteError      = 100742
+	TenantApplicationGetDetailError   = 100743
+	TenantApplicationGetPageListError = 100744
+	TenantApplicationNotExistError    = 100745
+	TenantApplicationExistError       = 100747 // 该租户已订阅该应用
+)
+
 const (
 	ApplicationClientCreateError         = 100810
 	ApplicationClientDeleteError         = 100811
@@ -88,6 +99,13 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	ApplicationGetDetailError:             "查看应用详情失败",
 	ApplicationGetPageListError:           "查看应用列表失败",
 	ApplicationNotExistError:              "应用不存在",
+	TenantApplicationCreateError:          "创建租户应用订阅失败",
+	TenantApplicationUpdateError:          "修改租户应用订阅失败",
+	TenantApplicationDeleteError:          "删除租户应用订阅失败",
+	TenantApplicationGetDetailError:       "查看租户应用订阅详情失败",
+	TenantApplicationGetPageListError:     "查看租户应用订阅列表失败",
+	TenantApplicationNotExistError:        "租户应用订阅不存在",
+	TenantApplicationExistError:           "该租户已订阅该应用",
 	ApplicationSystemBuiltInErr:           "应用为系统内置，不可删除",
 	ApplicationSecretCreateError:          "创建应用密钥失败",
 	ApplicationSecretGetListError:         "查看应用密钥列表失败",

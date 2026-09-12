@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
-import { Alert, Button, DatePicker, Form, Input, Modal, Select, Space, Table, message } from 'antd'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { Alert, Button, DatePicker, Form, Input, Modal, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { CopyOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
-import { actionColumn, CODE_COL_WIDTH, EllipsisCell, NAME_COL_WIDTH, PageContainer, STATUS_COL_WIDTH, tableScrollX, textColumn, timeColumn, tokens } from '@ark-iam/ui'
-import type { TenantApiKeyCreateResp, TenantApiKeyItem, TenantMachineUserItem } from '@ark-iam/types'
+import { actionColumn, CODE_COL_WIDTH, EllipsisCell, NAME_COL_WIDTH, PageContainer, RemoteSelect, STATUS_COL_WIDTH, tableScrollX, textColumn, timeColumn, tokens } from '@ark-iam/ui'
+import type { TenantApiKeyCreateResp, TenantApiKeyItem } from '@ark-iam/types'
 import { createApiKey, deleteApiKey, getApiKeyPageList, revokeApiKey } from '../../api/apiKey'
 import { getMachineUserPageList } from '../../api/machineUser'
 import { KeyStateTag } from './KeyState'
@@ -85,17 +85,17 @@ function ApiKeysPane() {
   // 归属服务账号筛选：空=租户全部密钥
   const [machineUserID, setMachineUserID] = useState<string>()
 
-  const [machineOptions, setMachineOptions] = useState<TenantMachineUserItem[]>([])
-
   const [modalOpen, setModalOpen] = useState(false)
   const [form] = Form.useForm<ApiKeyFormValues>()
   const [submitLoading, setSubmitLoading] = useState(false)
   const [created, setCreated] = useState<TenantApiKeyCreateResp | null>(null)
 
-  useEffect(() => {
-    getMachineUserPageList({ page: 1, pageSize: 100 })
-      .then((resp) => setMachineOptions(resp?.list || []))
-      .catch(() => {})
+  // 服务账号可增长：下拉走服务端搜索（远程搜索组件），两个下拉共享「值 → 名称」缓存
+  // （筛选区选过的账号，创建弹窗里直接显示名称而不是 ID）。
+  const machineLabelCacheRef = useRef(new Map<string, string>())
+  const fetchMachineOptions = useCallback(async (search: string) => {
+    const resp = await getMachineUserPageList({ page: 1, pageSize: 50, name: search || undefined })
+    return (resp?.list || []).map((m) => ({ value: m.machineUserID, label: m.name }))
   }, [])
 
   const fetchData = useCallback(async () => {
@@ -209,19 +209,18 @@ function ApiKeysPane() {
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <Space wrap>
-          <Select
+          <RemoteSelect
             allowClear
-            showSearch
-            optionFilterProp="label"
-            placeholder="归属服务账号（不选=租户全部）"
-            style={{ width: 300 }}
+            width={300}
+            placeholder="归属服务账号（不选=租户全部，可输入名称搜索）"
             value={machineUserID}
             onChange={(v) => {
               setMachineUserID(v)
               setPage(1)
               setData([])
             }}
-            options={machineOptions.map((m) => ({ label: m.name, value: m.machineUserID }))}
+            fetchOptions={fetchMachineOptions}
+            labelCache={machineLabelCacheRef.current}
           />
           <Input.Search
             allowClear
@@ -278,11 +277,10 @@ function ApiKeysPane() {
             密钥归属于所选服务账号，供服务端集成调用平台 API；创建后明文仅展示一次，请立即保存。创建与管理密钥需系统管理能力。
           </div>
           <Form.Item name="machineUserID" label="归属服务账号" rules={[{ required: true, message: '请选择归属服务账号' }]}>
-            <Select
-              showSearch
-              optionFilterProp="label"
-              placeholder="选择该密钥归属的服务账号"
-              options={machineOptions.map((m) => ({ label: m.name, value: m.machineUserID }))}
+            <RemoteSelect
+              placeholder="选择该密钥归属的服务账号（输入名称搜索）"
+              fetchOptions={fetchMachineOptions}
+              labelCache={machineLabelCacheRef.current}
             />
           </Form.Item>
           <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>

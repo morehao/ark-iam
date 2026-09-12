@@ -1,9 +1,14 @@
 import { request } from '@ark-iam/api'
 import type { PageListResp, TenantRoleCreateReq, TenantRoleItem, TenantRoleMenuResp } from '@ark-iam/types'
 
-/** 租户角色分页列表 */
-export const getTenantRolePageList = (params?: { page?: number; pageSize?: number; appID?: string; keyword?: string }) =>
-  request.get<any, PageListResp<TenantRoleItem>>('/tenant/roles', { params })
+/** 租户角色分页列表（`unassigned=true` 只查未归属应用的系统角色） */
+export const getTenantRolePageList = (params?: {
+  page?: number
+  pageSize?: number
+  appID?: string
+  keyword?: string
+  unassigned?: boolean
+}) => request.get<any, PageListResp<TenantRoleItem>>('/tenant/roles', { params })
 
 /** 创建租户角色 */
 export const createTenantRole = (data: TenantRoleCreateReq) => request.post<any, { roleID: string }>('/tenant/roles', data)

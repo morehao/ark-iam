@@ -31,7 +31,7 @@
 
 | 术语 | 英文 | 说明 |
 |---|---|---|
-| 应用 ✅ | Application | 一个业务系统定义（编码/名称/类型/状态/可见性）。如"平台管理台" |
+| 应用 ✅ | Application | 一个业务系统定义（编码/名称/类型/状态）。如"平台管理台" |
 | OAuth 客户端 ✅ | Application Client | 应用下的 OIDC 接入凭证：client_id、回调白名单、授权类型、令牌 TTL 等 |
 | 客户端密钥 ✅ | Client Secret | 机密客户端在令牌端点的认证凭证（库中只存哈希） |
 | 第一方应用 | First-party App | 自有应用（`application.type=first_party`） |

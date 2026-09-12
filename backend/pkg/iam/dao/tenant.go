@@ -8,6 +8,7 @@ import (
 
 type TenantCond struct {
 	*gormdao.BaseCond
+	IDs       []string // 批量按主键取（名称回填等场景）
 	CreatedBy string
 	DbUser    string
 	DeletedBy string
@@ -21,6 +22,9 @@ type TenantCond struct {
 func (c *TenantCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
+	}
+	if len(c.IDs) > 0 {
+		db.Where(tableName+".id IN ?", c.IDs)
 	}
 	if c.CreatedBy != "" {
 		db.Where(tableName+".created_by = ?", c.CreatedBy)

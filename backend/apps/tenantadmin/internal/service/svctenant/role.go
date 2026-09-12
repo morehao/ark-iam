@@ -210,9 +210,10 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtotenant.RolePageListReq) (
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID: tenantID,
-		AppID:    req.AppID,
-		Keyword:  req.Keyword,
+		TenantID:   tenantID,
+		AppID:      req.AppID,
+		Keyword:    req.Keyword,
+		Unassigned: req.Unassigned,
 	}
 	roleEntityList, total, err := dao.NewRoleDao().GetPageListByCond(ctx, cond)
 	if err != nil {

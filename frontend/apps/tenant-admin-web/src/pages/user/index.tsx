@@ -566,8 +566,9 @@ function ServiceAccountsPane() {
   // 部门树（创建/编辑表单部门下拉，与真实用户表单的部门选择一致）
   const [deptTree, setDeptTree] = useState<DepartmentItem[]>([])
 
-  // 服务账号 API 密钥（详情内只读）
+  // 服务账号 API 密钥（详情内只读速览：只取最近一页，故必须把服务端总数显式展示出来）
   const [machineKeys, setMachineKeys] = useState<TenantApiKeyItem[]>([])
+  const [machineKeysTotal, setMachineKeysTotal] = useState(0)
   const [machineKeysLoading, setMachineKeysLoading] = useState(false)
 
   const fetchData = useCallback(async () => {
@@ -676,6 +677,7 @@ function ServiceAccountsPane() {
     setDetailLoading(true)
     setDetail(null)
     setMachineKeys([])
+    setMachineKeysTotal(0)
     setMachineKeysLoading(true)
     try {
       const [d, keys] = await Promise.all([
@@ -684,6 +686,7 @@ function ServiceAccountsPane() {
       ])
       setDetail(d)
       setMachineKeys(keys?.list || [])
+      setMachineKeysTotal(keys?.total || 0)
     } catch {
       /* 拦截器已提示 */
     } finally {
@@ -871,7 +874,12 @@ function ServiceAccountsPane() {
                 label: 'API 密钥',
                 children: (
                   <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                    <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>以下为该服务账号的 API 密钥（只读）。密钥管理请前往「API密钥」模块。</div>
+                    <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>
+                      以下为该服务账号的 API 密钥（只读），共 {machineKeysTotal} 条。密钥管理请前往「API密钥」模块。
+                      {machineKeysTotal > machineKeys.length
+                        ? `详情内仅展示最近 ${machineKeys.length} 条，完整列表请在「API密钥」模块按该服务账号筛选查看。`
+                        : ''}
+                    </div>
                     <Table<TenantApiKeyItem>
                       rowKey="keyID"
                       columns={keyColumns}

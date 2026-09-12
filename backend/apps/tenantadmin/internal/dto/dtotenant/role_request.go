@@ -21,6 +21,9 @@ type RolePageListReq struct {
 	PageSize int    `json:"pageSize" form:"pageSize"` // 每页数量
 	AppID    string `json:"appID" form:"appID"`       // 应用过滤
 	Keyword  string `json:"keyword" form:"keyword"`   // 关键词(名称 模糊)
+	// Unassigned 仅查询未归属应用的角色（app_id 为空串，即平台内置的系统角色）；
+	// false/缺省表示不按归属过滤。空串 appID 在查询里语义是"不过滤"，故需要这个显式开关。
+	Unassigned bool `json:"unassigned" form:"unassigned"`
 }
 
 type RoleDeleteReq struct {

@@ -258,7 +258,6 @@ erDiagram
         string name
         string type "first_party/third_party"
         string status "enable/disable"
-        string visibility "public/private"
         json tenant_policy "允许个人建租户等策略"
         string homepage_url
         string logo_url
@@ -526,7 +525,7 @@ erDiagram
 
 | 表 | 说明 |
 |---|---|
-| `application` | 业务应用定义：编码/名称/类型（first_party/third_party）/状态/可见性/`tenant_policy`（如允许个人建租户） |
+| `application` | 业务应用定义：编码/名称/类型（first_party/third_party）/状态/`tenant_policy`（如允许个人建租户） |
 | `application_client` | **OAuth/OIDC 客户端**：client_id、redirect_uris、grant_types、token_endpoint_auth_method、PKCE、令牌 TTL、是否第三方 |
 | `application_client_secret` | 客户端密钥：只存哈希（`value_hash`）+ 前缀（`value_prefix`），支持过期/吊销 |
 | `api_key` | API Key 机器凭证：只存哈希，支持 scope/过期/吊销；`owner_user_id` 归属**服务账号**（个人密钥能力已下线，历史 member 数据兼容展示），鉴权按归属服务账号注入身份；明文仅创建时展示一次，管理在租户端（需系统管理能力） |

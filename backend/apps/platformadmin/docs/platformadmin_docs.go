@@ -1411,6 +1411,12 @@ const docTemplateplatformadmin = `{
                         "description": "状态",
                         "name": "status",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "租户ID（筛选，留空为全部租户）",
+                        "name": "tenantID",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1916,8 +1922,7 @@ const docTemplateplatformadmin = `{
             "type": "object",
             "required": [
                 "code",
-                "name",
-                "visibility"
+                "name"
             ],
             "properties": {
                 "allowJoinByInvite": {
@@ -1954,10 +1959,6 @@ const docTemplateplatformadmin = `{
                 },
                 "type": {
                     "description": "应用类型: first_party-第一方, third_party-第三方",
-                    "type": "string"
-                },
-                "visibility": {
-                    "description": "可见性: public-所有租户, private-仅平台租户",
                     "type": "string"
                 }
             }
@@ -2025,10 +2026,6 @@ const docTemplateplatformadmin = `{
                 "type": {
                     "description": "应用类型",
                     "type": "string"
-                },
-                "visibility": {
-                    "description": "可见性",
-                    "type": "string"
                 }
             }
         },
@@ -2086,10 +2083,6 @@ const docTemplateplatformadmin = `{
                 "type": {
                     "description": "应用类型: first_party-第一方, third_party-第三方",
                     "type": "string"
-                },
-                "visibility": {
-                    "description": "可见性: public-所有租户, private-仅平台租户",
-                    "type": "string"
                 }
             }
         },
@@ -2139,10 +2132,6 @@ const docTemplateplatformadmin = `{
                 "updatedAt": {
                     "description": "更新时间(unix 秒)",
                     "type": "integer"
-                },
-                "visibility": {
-                    "description": "可见性",
-                    "type": "string"
                 }
             }
         },
@@ -3564,6 +3553,10 @@ const docTemplateplatformadmin = `{
                     "description": "应用ID",
                     "type": "string"
                 },
+                "appName": {
+                    "description": "应用名称",
+                    "type": "string"
+                },
                 "createdAt": {
                     "description": "创建时间(unix 秒)",
                     "type": "integer"
@@ -3580,6 +3573,10 @@ const docTemplateplatformadmin = `{
                     "description": "租户ID",
                     "type": "string"
                 },
+                "tenantName": {
+                    "description": "租户名称",
+                    "type": "string"
+                },
                 "updatedAt": {
                     "description": "更新时间(unix 秒)",
                     "type": "integer"
@@ -3589,7 +3586,8 @@ const docTemplateplatformadmin = `{
         "dtotenantapplication.TenantApplicationCreateReq": {
             "type": "object",
             "required": [
-                "appID"
+                "appID",
+                "tenantID"
             ],
             "properties": {
                 "appID": {
@@ -3606,6 +3604,10 @@ const docTemplateplatformadmin = `{
                 },
                 "status": {
                     "description": "状态: enable-启用, disable-停用",
+                    "type": "string"
+                },
+                "tenantID": {
+                    "description": "租户ID（平台侧指定归属租户）",
                     "type": "string"
                 }
             }
@@ -3626,6 +3628,10 @@ const docTemplateplatformadmin = `{
                     "description": "应用ID",
                     "type": "string"
                 },
+                "appName": {
+                    "description": "应用名称",
+                    "type": "string"
+                },
                 "config": {
                     "description": "租户级应用配置(JSON)",
                     "type": "string"
@@ -3648,6 +3654,10 @@ const docTemplateplatformadmin = `{
                 },
                 "tenantID": {
                     "description": "租户ID",
+                    "type": "string"
+                },
+                "tenantName": {
+                    "description": "租户名称",
                     "type": "string"
                 }
             }

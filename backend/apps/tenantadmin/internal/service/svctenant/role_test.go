@@ -149,6 +149,43 @@ func TestRolePageListWithCounts(t *testing.T) {
 	}
 }
 
+// TestRolePageListUnassigned 未归属应用的系统角色（app_id 为空串）必须能由服务端过滤：
+// 前端「系统角色」下拉若靠"全量拉一页再客户端过滤"，租户角色超过一页时会漏掉未归属角色。
+func TestRolePageListUnassigned(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.RoleMenuEntity{},
+		&model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
+	svc := &roleSvc{}
+	seedTestApp(t, db, "t1", "app1")
+	seedTestRole(t, db, "r1", "t1", "app1", "应用管理员")
+	seedTestRole(t, db, "r2", "t1", "", "系统管理员")
+
+	resp, err := svc.PageList(newDeptGinCtx(t, "t1", "op"), &dtotenant.RolePageListReq{Page: 1, PageSize: 10, Unassigned: true})
+	if err != nil {
+		t.Fatalf("page list unassigned: %v", err)
+	}
+	if resp.Total != 1 || len(resp.List) != 1 || resp.List[0].RoleID != "r2" {
+		t.Fatalf("expected only unassigned role r2, got total=%d list=%+v", resp.Total, resp.List)
+	}
+
+	// 不传 unassigned 时不过滤（空串 appID 语义是"不过滤"）
+	all, err := svc.PageList(newDeptGinCtx(t, "t1", "op"), &dtotenant.RolePageListReq{Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("page list all: %v", err)
+	}
+	if all.Total != 2 {
+		t.Fatalf("expected 2 roles without filter, got %d", all.Total)
+	}
+
+	// 与关键词组合：未归属 + 名称模糊命中
+	hit, err := svc.PageList(newDeptGinCtx(t, "t1", "op"), &dtotenant.RolePageListReq{Page: 1, PageSize: 10, Unassigned: true, Keyword: "系统"})
+	if err != nil {
+		t.Fatalf("page list unassigned+keyword: %v", err)
+	}
+	if hit.Total != 1 || hit.List[0].RoleID != "r2" {
+		t.Fatalf("expected r2 for unassigned+keyword, got total=%d list=%+v", hit.Total, hit.List)
+	}
+}
+
 // TestRoleMenusUpdateAndGet 角色菜单授权：按角色所属应用菜单授权 + 回显 + 非法菜单拒绝。
 func TestRoleMenusUpdateAndGet(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.RoleMenuEntity{}, &model.MenuEntity{}, &model.UserRoleEntity{},

@@ -27,7 +27,6 @@ const applications: ApplicationItem[] = [
     homepageUrl: '',
     type: 'first_party',
     status: 'enable',
-    visibility: 'public',
     sort: 0,
     createdAt,
     updatedAt,

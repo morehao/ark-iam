@@ -17,7 +17,6 @@ export interface ApplicationItem {
   homepageUrl: string
   type: string
   status: string
-  visibility: string
   sort: number
   allowPersonCreateTenant?: boolean
   allowJoinByInvite?: boolean
@@ -32,7 +31,6 @@ export interface ApplicationCreateReq {
   logoUrl?: string
   homepageUrl?: string
   type?: string
-  visibility: string
   sort?: number
   allowPersonCreateTenant?: boolean
   allowJoinByInvite?: boolean
@@ -45,7 +43,6 @@ export interface ApplicationUpdateReq {
   logoUrl?: string
   homepageUrl?: string
   type?: string
-  visibility?: string
   status?: string
   sort?: number
   allowPersonCreateTenant?: boolean
@@ -203,7 +200,9 @@ export interface TenantUpdateReq {
 export interface TenantApplicationItem {
   tenantAppID: string
   tenantID: string
+  tenantName?: string
   appID: string
+  appName?: string
   status: string
   config?: string
   grantedScope?: string
@@ -212,6 +211,7 @@ export interface TenantApplicationItem {
 }
 
 export interface TenantApplicationCreateReq {
+  tenantID: string
   appID: string
   status?: string
   config?: string

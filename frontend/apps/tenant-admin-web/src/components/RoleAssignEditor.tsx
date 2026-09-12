@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Select, message } from 'antd'
-import { tokens } from '@ark-iam/ui'
-import type { TenantAppItem, TenantRoleItem, TenantUserRoleItem } from '@ark-iam/types'
+import { RemoteMultiSelect, tokens } from '@ark-iam/ui'
+import type { TenantAppItem, TenantUserRoleItem } from '@ark-iam/types'
 import { getMachineUserRoles, updateMachineUserRoles } from '../api/machineUser'
 import { getTenantApps } from '../api/menu'
 import { getTenantRolePageList } from '../api/role'
@@ -49,8 +49,6 @@ export default function RoleAssignEditor({ kind, subjectID, onSaved }: RoleAssig
   const [roles, setRoles] = useState<TenantUserRoleItem[]>([]) // 当前已分配（全应用）
   const [loading, setLoading] = useState(true)
   const [appID, setAppID] = useState<string>()
-  const [options, setOptions] = useState<TenantRoleItem[]>([]) // 选中应用下的可授角色
-  const [optionsLoading, setOptionsLoading] = useState(false)
   const [checked, setChecked] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
@@ -89,37 +87,34 @@ export default function RoleAssignEditor({ kind, subjectID, onSaved }: RoleAssig
 
   const appOptions = useMemo(() => buildAppOptions(apps, roles), [apps, roles])
 
-  const fetchRoleOptions = useCallback(async (target: string): Promise<TenantRoleItem[]> => {
-    if (target === SYS_APP_ID) {
-      // 空串无法作为 appID 过滤参数（=不过滤全部），全量拉取后客户端过滤出未归属角色
-      const all = await getTenantRolePageList({ page: 1, pageSize: 100 })
-      return (all?.list || []).filter((r) => !r.appID)
-    }
-    const resp = await getTenantRolePageList({ appID: target, page: 1, pageSize: 100 })
-    return resp?.list || []
-  }, [])
+  // 角色候选集走服务端搜索（角色可增长，不能只取前 100 条在前端过滤）：按目标应用过滤；
+  // 「系统角色」组是 app_id 为空串的未归属角色，而空串 appID 在查询里语义是"不过滤"，故用 unassigned 开关。
+  const fetchRoleOptions = useCallback(
+    async (keyword: string) => {
+      if (appID === undefined) return []
+      const params =
+        appID === SYS_APP_ID
+          ? { page: 1, pageSize: 50, unassigned: true, keyword: keyword || undefined }
+          : { appID, page: 1, pageSize: 50, keyword: keyword || undefined }
+      const resp = await getTenantRolePageList(params)
+      return (resp?.list || []).map((r) => ({ value: r.roleID, label: r.name }))
+    },
+    [appID],
+  )
 
+  // 切换目标应用时重置勾选：默认勾上该主体已持有的该应用角色
   useEffect(() => {
-    if (appID === undefined) {
-      setOptions([])
-      setChecked([])
-      return
-    }
-    let alive = true
-    setOptionsLoading(true)
-    fetchRoleOptions(appID)
-      .then((list) => {
-        if (alive) setOptions(list)
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (alive) setOptionsLoading(false)
-      })
-    setChecked(roles.filter((r) => r.appID === appID).map((r) => r.roleID))
-    return () => {
-      alive = false
-    }
-  }, [appID, fetchRoleOptions, roles])
+    setChecked(appID === undefined ? [] : roles.filter((r) => r.appID === appID).map((r) => r.roleID))
+  }, [appID, roles])
+
+  // 已持有角色的名称：多选框据此回显已选项（已选项可能不在当前搜索结果里）
+  const checkedLabels = useMemo(() => {
+    const map: Record<string, string> = {}
+    roles.forEach((r) => {
+      if (r.roleID && r.name) map[r.roleID] = r.name
+    })
+    return map
+  }, [roles])
 
   const save = async () => {
     if (appID === undefined) {
@@ -169,17 +164,14 @@ export default function RoleAssignEditor({ kind, subjectID, onSaved }: RoleAssig
         <>
           <div>
             <div style={{ color: tokens.textPlaceholder, fontSize: 12, marginBottom: 4 }}>角色（保存后全量替换「{currentAppLabel}」的授权）</div>
-            <Select
-              mode="multiple"
+            <RemoteMultiSelect
               allowClear
-              showSearch
-              optionFilterProp="label"
-              loading={optionsLoading}
-              placeholder="选择角色"
+              placeholder="选择角色（输入名称搜索）"
               style={{ width: '100%' }}
               value={checked}
-              onChange={setChecked}
-              options={options.map((r) => ({ label: r.name, value: r.roleID }))}
+              onChange={(v) => setChecked(v ?? [])}
+              fetchOptions={fetchRoleOptions}
+              initialLabels={checkedLabels}
             />
           </div>
           <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>

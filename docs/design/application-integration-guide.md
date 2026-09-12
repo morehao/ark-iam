@@ -72,7 +72,6 @@ curl -X POST http://localhost:8082/v1/platform/applications \
     "name": "我的业务应用",
     "type": "first_party",
     "status": "enable",
-    "visibility": "public",
     "homepageURL": "https://my-app.example.com",
     "logoURL": "https://my-app.example.com/logo.png"
   }'

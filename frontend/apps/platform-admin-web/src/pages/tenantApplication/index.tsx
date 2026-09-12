@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Form, Input, InputNumber, message, Modal, Select, Space, Table } from 'antd'
+import { Button, Form, Input, message, Modal, Select, Space, Table } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, idColumn, PageContainer, STATUS_COL_WIDTH, StatusTag, tableScrollX, timeColumn } from '@ark-iam/ui'
+import { actionColumn, idColumn, NAME_COL_WIDTH, PageContainer, RemoteSelect, STATUS_COL_WIDTH, StatusTag, tableScrollX, textColumn, timeColumn } from '@ark-iam/ui'
 import {
   createTenantApplication,
   deleteTenantApplication,
+  getApplicationPageList,
   getTenantApplicationPageList,
+  getTenantPageList,
   updateTenantApplication,
 } from '@ark-iam/api'
 import type { TenantApplicationItem } from '@ark-iam/types'
@@ -17,6 +19,7 @@ export default function TenantApplicationList() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
+  const [tenantFilter, setTenantFilter] = useState<string | undefined>(undefined)
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined)
 
   const [modalOpen, setModalOpen] = useState(false)
@@ -24,10 +27,27 @@ export default function TenantApplicationList() {
   const [form] = Form.useForm()
   const [submitLoading, setSubmitLoading] = useState(false)
 
+  // 租户/应用主键都是 UUID 字符串（只能选择不能手输），且两者都会增长：
+  // 下拉一律走 RemoteSelect 服务端搜索，不再一次性只取前 100 条。
+  const fetchTenantOptions = useCallback(async (keyword: string) => {
+    const resp = await getTenantPageList({ page: 1, pageSize: 50, name: keyword || undefined })
+    return (resp?.list || []).map((t) => ({ value: t.tenantID, label: t.name }))
+  }, [])
+
+  const fetchAppOptions = useCallback(async (keyword: string) => {
+    const resp = await getApplicationPageList({ page: 1, pageSize: 50, name: keyword || undefined })
+    return (resp?.list || []).map((a) => ({ value: a.appID, label: a.name }))
+  }, [])
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const resp = await getTenantApplicationPageList({ page, pageSize, status: statusFilter })
+      const resp = await getTenantApplicationPageList({
+        page,
+        pageSize,
+        tenantID: tenantFilter,
+        status: statusFilter,
+      })
       setData(resp?.list || [])
       setTotal(resp?.total || 0)
     } catch {
@@ -35,7 +55,7 @@ export default function TenantApplicationList() {
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, statusFilter])
+  }, [page, pageSize, tenantFilter, statusFilter])
 
   useEffect(() => {
     void fetchData()
@@ -51,6 +71,7 @@ export default function TenantApplicationList() {
   const handleEdit = (record: TenantApplicationItem) => {
     setEditing(record)
     form.setFieldsValue({
+      tenantID: record.tenantID,
       appID: record.appID,
       status: record.status,
       config: record.config,
@@ -63,7 +84,7 @@ export default function TenantApplicationList() {
       const values = await form.validateFields()
       setSubmitLoading(true)
       if (editing) {
-        const { appID: _appId, ...rest } = values
+        const { tenantID: _tenantID, appID: _appID, ...rest } = values
         await updateTenantApplication({ tenantAppID: editing.tenantAppID, ...rest })
         message.success('修改成功')
       } else {
@@ -91,8 +112,8 @@ export default function TenantApplicationList() {
 
   const columns: ColumnsType<TenantApplicationItem> = [
     idColumn<TenantApplicationItem>({ dataIndex: 'tenantAppID' }),
-    idColumn<TenantApplicationItem>({ dataIndex: 'tenantID', title: '租户ID' }),
-    idColumn<TenantApplicationItem>({ dataIndex: 'appID', title: '应用ID' }),
+    textColumn<TenantApplicationItem>({ title: '租户', dataIndex: 'tenantName', width: NAME_COL_WIDTH }),
+    textColumn<TenantApplicationItem>({ title: '应用', dataIndex: 'appName', width: NAME_COL_WIDTH }),
     { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <StatusTag value={v} /> },
     timeColumn<TenantApplicationItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<TenantApplicationItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
@@ -108,7 +129,7 @@ export default function TenantApplicationList() {
   return (
     <PageContainer
       title="租户应用"
-      description="租户对应用的订阅关系"
+      description="租户对应用的订阅关系（平台侧跨租户开通，归属租户按选择指定）"
       extra={
         <Space>
           <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
@@ -120,7 +141,18 @@ export default function TenantApplicationList() {
         </Space>
       }
     >
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 16, display: 'flex', gap: 12 }}>
+        <RemoteSelect
+          allowClear
+          width={220}
+          placeholder="租户筛选（输入名称搜索）"
+          value={tenantFilter}
+          onChange={(v) => {
+            setTenantFilter(v)
+            setPage(1)
+          }}
+          fetchOptions={fetchTenantOptions}
+        />
         <Select
           allowClear
           placeholder="状态筛选"
@@ -166,8 +198,22 @@ export default function TenantApplicationList() {
         width={520}
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="appID" label="应用ID" rules={[{ required: true, message: '请输入应用ID' }]}>
-            <InputNumber style={{ width: '100%' }} placeholder="应用ID" disabled={!!editing} />
+          <Form.Item name="tenantID" label="租户" rules={[{ required: true, message: '请选择租户' }]}>
+            {/* 编辑态归属不可改（更新接口不含 tenantID/appID），下拉只用于回显名称 */}
+            <RemoteSelect
+              placeholder="选择租户（输入名称搜索）"
+              fetchOptions={fetchTenantOptions}
+              disabled={!!editing}
+              initialLabel={editing?.tenantName}
+            />
+          </Form.Item>
+          <Form.Item name="appID" label="应用" rules={[{ required: true, message: '请选择应用' }]}>
+            <RemoteSelect
+              placeholder="选择应用（输入名称搜索）"
+              fetchOptions={fetchAppOptions}
+              disabled={!!editing}
+              initialLabel={editing?.appName}
+            />
           </Form.Item>
           <Form.Item name="status" label="状态">
             <Select
