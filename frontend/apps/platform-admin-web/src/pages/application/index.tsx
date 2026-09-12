@@ -21,12 +21,11 @@ export default function ApplicationList() {
   const [editing, setEditing] = useState<ApplicationItem | null>(null)
   const [form] = Form.useForm()
   const [submitLoading, setSubmitLoading] = useState(false)
+  // 内置应用（source=builtin）：编码是控制台菜单入口的定位值（platform_admin/tenant_admin），保持只读
+  const builtinApp = editing?.source === 'builtin'
 
   const [detailOpen, setDetailOpen] = useState(false)
   const [detail, setDetail] = useState<ApplicationItem | null>(null)
-  // 内置应用（source=builtin）的名称/描述由种子收敛（后端字段权威矩阵 reconcile），控制台拒写；
-  // 启停与排序仍归运维。与 svcapplication.Update 的拒写规则同源。
-  const seedOwned = editing?.source === 'builtin'
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -123,7 +122,16 @@ export default function ApplicationList() {
       max: 2,
       actions: (r) => [
         { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
-        { key: 'delete', label: '删除', danger: true, confirm: '确认删除该应用？', onClick: () => void handleDelete(r) },
+        {
+          key: 'delete',
+          label: '删除',
+          danger: true,
+          // 内置应用（source=builtin，平台管理后台/租户管理后台）由平台版本交付，禁删：置灰保留展示；
+          // 后端 svcapplication.Delete 以 ApplicationBuiltInErr 兜底。
+          disabled: r.source === 'builtin',
+          confirm: '确认删除该应用？',
+          onClick: () => void handleDelete(r),
+        },
       ],
     }),
   ]
@@ -188,20 +196,24 @@ export default function ApplicationList() {
           <Form.Item
             name="code"
             label="应用编码"
+            tooltip={
+              builtinApp
+                ? '内置应用的编码由平台版本定义，控制台菜单入口按它定位，不可修改'
+                : '应用编码可修改；菜单/订阅/角色按应用 ID 关联，改编码不影响它们'
+            }
             rules={[
               { required: true, message: '请输入应用编码' },
               { pattern: APP_CODE_PATTERN, message: '以小写字母开头，仅含小写字母、数字与下划线' },
             ]}
           >
-            <Input placeholder="唯一编码，如 iam_web" disabled={!!editing} />
+            <Input placeholder="唯一编码，如 iam_web" disabled={builtinApp} />
           </Form.Item>
           <Form.Item
             name="name"
             label="应用名称"
             rules={[{ required: true, message: '请输入应用名称' }]}
-            extra={seedOwned ? '内置应用的名称由平台版本定义，不可修改' : undefined}
           >
-            <Input placeholder="应用名称" disabled={seedOwned} />
+            <Input placeholder="应用名称" />
           </Form.Item>
           {editing && (
             <Form.Item label="来源">
@@ -219,8 +231,8 @@ export default function ApplicationList() {
               />
             </Form.Item>
           )}
-          <Form.Item name="description" label="描述" extra={seedOwned ? '内置应用的描述由平台版本定义，不可修改' : undefined}>
-            <Input.TextArea rows={3} placeholder="选填" disabled={seedOwned} />
+          <Form.Item name="description" label="描述">
+            <Input.TextArea rows={3} placeholder="选填" />
           </Form.Item>
           <Form.Item name="logoUrl" label="Logo 地址">
             <Input placeholder="https://... 选填" />

@@ -86,6 +86,7 @@ curl -X POST http://localhost:8082/v1/platform/application-clients \
   -H "Content-Type: application/json" \
   -d '{
     "appID": <上一步返回的 appID>,
+    "code": "my_app_web",
     "name": "我的业务应用 Web 端",
     "redirectURIs": ["https://my-app.example.com/callback"],
     "postLogoutRedirectURIs": ["https://my-app.example.com/logged-out"],
@@ -101,10 +102,15 @@ curl -X POST http://localhost:8082/v1/platform/application-clients \
 # 响应：{"applicationClientID": "<控制台内部主键>", "code": "<OIDC client_id>"}
 ```
 
-> **客户端编码（`code`，即 OIDC `client_id`）由服务端生成，请求里不要传**：创建接口不接受 `clientID`/`code` 入参，
-> 响应里的 `code` 就是 OIDC 的 `client_id`（随机 UUID），把它填到 RP 配置的 `client_id`（§4.1）。
-> 注意两个「编码」规则不同：**应用编码**（`application.code`）要求下划线连接；**客户端编码**是协议标识符，
-> 允许连字符（内置客户端即为 `platform-admin-web` / `tenant-admin-web`），不受 `AppCodePattern` 约束。
+> **客户端编码（`code`，即 OIDC `client_id`）是创建时的必填入参**：小写字母开头，**仅含小写字母与下划线**
+> （`model.ClientCodePattern`，`^[a-z][a-z_]*$`——不允许数字，禁连字符），前端表单与后端 service 各校验一份，
+> 非法值直接返回 400。**自建客户端创建后可改**（`ApplicationClientUpdateReq.code`，改名后该 RP 需同步自己的
+> `client_id`，其旧令牌按新 aud 失效）；**内置客户端只读**（报 `100823`）。把它填到 RP 配置的 `client_id`（§4.1）。
+> 注意两套「编码」规则刻意不同：**应用编码**（`application.code`）受 `AppCodePattern` 约束（允许数字，
+> 如 `my_app_2`；自建应用可改、内置应用只读报 `100749`）；**客户端编码**受 `ClientCodePattern` 约束
+> （内置客户端为 `platform_admin_web` / `tenant_admin_web`）。
+> 由于 `client_id` 同时是令牌 audience，内置客户端编码必须与网关 aud 白名单、前端默认值保持一致
+> （前两者已统一引用 `pkg/model` 的 `SeedBuiltinClient*` 常量）。
 
 | 参数 | 建议值 | 说明 |
 |---|---|---|

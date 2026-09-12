@@ -7,7 +7,11 @@ import "github.com/morehao/ark-iam/pkg/model"
 // builtin / first_party 只能由种子与运维产生。
 type ApplicationClientCreateReq struct {
 	AppID string `json:"appID" binding:"required"` // 所属应用ID
-	Name  string `json:"name" binding:"required"`  // 客户端名称
+	// Code 即 OIDC client_id，由调用方填写（不再由服务端生成）：
+	// 小写字母开头，仅含小写字母与下划线（model.ClientCodePattern），非法值由 service 拦截。
+	// 与前端表单 platform-admin-web 的 CLIENT_CODE_PATTERN 同口径。
+	Code string `json:"code" binding:"required"` // 客户端编码（= OIDC client_id）
+	Name string `json:"name" binding:"required"` // 客户端名称
 
 	RedirectURIs            []string                      `json:"redirectURIs"`            // 授权回调地址
 	PostLogoutRedirectURIs  []string                      `json:"postLogoutRedirectURIs"`  // 登出回调地址
@@ -25,9 +29,13 @@ type ApplicationClientCreateReq struct {
 
 // ApplicationClientUpdateReq 修改 OAuth 客户端。source 不可改。
 type ApplicationClientUpdateReq struct {
-	ApplicationClientID string                        `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
-	Name                string                        `json:"name"`                                           // 客户端名称
-	Status              model.ApplicationClientStatus `json:"status"`                                         // 状态: enable-启用, disable-停用
+	ApplicationClientID string `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
+	// Code 客户端编码（= OIDC client_id）：可改（留空表示不修改），规则与创建一致（model.ClientCodePattern）。
+	// **内置客户端**（source=builtin）拒改——它是控制台自身的 OIDC 身份，网关 audience 白名单与
+	// 前端构建期默认值都按它取值，改了会当场把该控制台锁死且无法从界面恢复。
+	Code   string                        `json:"code"`   // 客户端编码（留空不修改）
+	Name   string                        `json:"name"`   // 客户端名称
+	Status model.ApplicationClientStatus `json:"status"` // 状态: enable-启用, disable-停用
 
 	RedirectURIs            []string                      `json:"redirectURIs"`            // 授权回调地址
 	PostLogoutRedirectURIs  []string                      `json:"postLogoutRedirectURIs"`  // 登出回调地址

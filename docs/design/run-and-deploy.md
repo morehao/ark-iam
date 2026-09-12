@@ -76,7 +76,7 @@ flowchart LR
     FE --> TEST["访问 platform-admin-web 验证登录"]
 ```
 
-种子数据：启动时由 `pkg/seed` 幂等写入（配置 `db.seed: true` 开启）。管理员 `admin / admin123`，OAuth 客户端 `platform-admin-web` / `tenant-admin-web`。
+种子数据：启动时由 `pkg/seed` 幂等写入（配置 `db.seed: true` 开启）。管理员 `admin / admin123`，OAuth 客户端 `platform_admin_web` / `tenant_admin_web`（存量库的连字符编码会在启动时原地改名，保留主键）。
 
 > **Schema 变更（列/表下线）**：本项目按新项目处理，不维护数据迁移脚本（AutoMigrate 只增不删，见 `string-id-pg-automigrate-seed.md` §3）。下线列/表后，开发/测试库需**删库重建**。本地 PostgreSQL 跑在 Docker 里（容器名以 `docker ps` 为准，下例为 `postgres18`）：
 >

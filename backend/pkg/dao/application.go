@@ -8,11 +8,12 @@ import (
 
 type ApplicationCond struct {
 	*gormdao.BaseCond
-	IDs    []string
-	Name   string
-	Source model.AppSource
-	Status model.AppStatus
-	Code   string
+	IDs     []string
+	Name    string
+	Source  model.AppSource
+	Status  model.AppStatus
+	Code    string
+	SeedKey string // 种子身份键：内置应用的稳定标识（定位内置应用请用它，而不是可被改名的 Code）
 }
 
 func (c *ApplicationCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -33,6 +34,9 @@ func (c *ApplicationCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.Code != "" {
 		db.Where(tableName+".code = ?", c.Code)
+	}
+	if c.SeedKey != "" {
+		db.Where(tableName+".seed_key = ?", c.SeedKey)
 	}
 }
 

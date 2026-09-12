@@ -221,6 +221,11 @@ func (svc *tenantSvc) ResetAdminPassword(ctx *gin.Context, req *dtotenant.Tenant
 	}, nil
 }
 
+// Delete 删除租户。
+//
+// 平台自运营租户（种子租户 t_platform）禁删：它是平台控制台自身所在租户，删除即整栈失联，
+// 且产品内没有恢复路径（只能改库）。判定依据与 Update 的「不可挂起」同源——平台租户编码是
+// 种子身份（model.SeedPlatformTenantCode），与租户改名无关。
 func (svc *tenantSvc) Delete(ctx *gin.Context, req *dtotenant.TenantDeleteReq) error {
 	tenantEntity, err := dao.NewTenantDao().GetByID(ctx, req.TenantID)
 	if err != nil {
@@ -229,6 +234,10 @@ func (svc *tenantSvc) Delete(ctx *gin.Context, req *dtotenant.TenantDeleteReq) e
 	}
 	if tenantEntity == nil || tenantEntity.ID == "" {
 		return code.GetError(code.TenantNotExistError)
+	}
+	if tenantEntity.Code == model.SeedPlatformTenantCode {
+		glog.Errorf(ctx, "[svctenant.TenantDelete] refuse to delete platform tenant, tenantID:%s, req:%s", req.TenantID, gutil.ToJsonString(req))
+		return code.GetError(code.TenantBuiltInDeleteForbiddenError)
 	}
 
 	userID := gincontext.GetUserIDString(ctx)

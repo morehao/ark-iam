@@ -75,7 +75,7 @@ async function navigateToLoginWeb(page: Page, targetUrl: string): Promise<void> 
 export async function verifyRp1HomePage(page: Page): Promise<void> {
   // SPA 的 useSSOSessionProbe 会间歇触发 silent renew，导致 body 周期性清空，
   // 因此不能依赖一次性 innerText 断言，改用自动重试的 locator 等待稳定可见。
-  // RP1 现由 tenant-admin-web（:3002 / tenant-admin-web client）承担，其首页展示租户部门管理。
+  // RP1 现由 tenant-admin-web（:3002 / tenant_admin_web client）承担，其首页展示租户部门管理。
   await expect(page.getByText('部门管理', { exact: true }).first()).toBeVisible({ timeout: 30000 });
   await expect(page.getByText('租户管理', { exact: true }).first()).toBeVisible({ timeout: 30000 });
 }

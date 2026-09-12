@@ -36,26 +36,28 @@ func setupTenantCreateEnv(t *testing.T) *gorm.DB {
 	return db
 }
 
-// seedTenantAdminApp 预置租户管理后台应用与其内置菜单（编码取自 pkg/core/tenant 的单一事实源）。
+// seedTenantAdminApp 预置租户管理后台应用与其内置菜单（身份键取自 pkg/core/tenant 的单一事实源）。
+// 开通链路按种子身份键（SeedKey）定位，故 fixture 的 Code 与 SeedKey 都写同一个值。
 func seedTenantAdminApp(t *testing.T, db *gorm.DB) *model.ApplicationEntity {
 	t.Helper()
-	app := &model.ApplicationEntity{Code: tenant.ProvisionAppCode, Name: "租户管理后台", Status: model.AppStatusEnable}
+	app := &model.ApplicationEntity{Code: tenant.ProvisionAppSeedKey, SeedKey: tenant.ProvisionAppSeedKey, Name: "租户管理后台", Status: model.AppStatusEnable}
 	if err := db.Create(app).Error; err != nil {
 		t.Fatalf("seed application: %v", err)
 	}
-	for i, menuCode := range tenant.ProvisionMenuCodes {
+	for i, menuSeedKey := range tenant.ProvisionMenuSeedKeys {
 		menu := &model.MenuEntity{
 			AppID:      app.ID,
-			Name:       menuCode,
-			Code:       menuCode,
-			Path:       "/" + menuCode,
+			Name:       menuSeedKey,
+			Code:       menuSeedKey,
+			SeedKey:    menuSeedKey,
+			Path:       "/" + menuSeedKey,
 			Sort:       i + 1,
 			Type:       model.MenuTypeMenu,
 			Visibility: model.MenuVisibilityAdmin,
 			Status:     model.MenuStatusEnable,
 		}
 		if err := db.Create(menu).Error; err != nil {
-			t.Fatalf("seed menu %s: %v", menuCode, err)
+			t.Fatalf("seed menu %s: %v", menuSeedKey, err)
 		}
 	}
 	return app
@@ -264,8 +266,8 @@ func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
 	if !role.IsBuiltinAdmin() {
 		t.Errorf("role should be builtin super admin, got source=%q adminType=%q", role.Source, role.AdminType)
 	}
-	if got := countEntities(t, db, &model.RoleMenuEntity{}, "tenant_id = ? AND role_id = ?", resp.TenantID, role.ID); got != int64(len(tenant.ProvisionMenuCodes)) {
-		t.Errorf("role_menu count = %d, want %d", got, len(tenant.ProvisionMenuCodes))
+	if got := countEntities(t, db, &model.RoleMenuEntity{}, "tenant_id = ? AND role_id = ?", resp.TenantID, role.ID); got != int64(len(tenant.ProvisionMenuSeedKeys)) {
+		t.Errorf("role_menu count = %d, want %d", got, len(tenant.ProvisionMenuSeedKeys))
 	}
 	if got := countEntities(t, db, &model.UserRoleEntity{}, "tenant_id = ? AND user_id = ? AND role_id = ?", resp.TenantID, resp.AdminUserID, role.ID); got != 1 {
 		t.Errorf("user_role count = %d, want 1", got)

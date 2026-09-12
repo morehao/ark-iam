@@ -37,14 +37,14 @@
 |------|------|-----------------|------|
 | gateway | 8100 | - | IAM 后端（`/oidc`） |
 | login-web | 3000 | - | 登录页（凭证表单，非 OIDC Client） |
-| platform-admin-web | 3001 | `platform-admin-web` | 平台管理后台（Admin） |
-| tenant-admin-web | 3002 | `tenant-admin-web` | 租户管理后台（RP1） |
+| platform-admin-web | 3001 | `platform_admin_web` | 平台管理后台（Admin） |
+| tenant-admin-web | 3002 | `tenant_admin_web` | 租户管理后台（RP1） |
 
 ## 前置条件
 
 - Node.js 18+
 - MySQL + Redis 已运行
-- 后端种子数据已导入（`admin` / `admin123` + OAuth 客户端 `platform-admin-web` / `tenant-admin-web`）
+- 后端种子数据已导入（`admin` / `admin123` + OAuth 客户端 `platform_admin_web` / `tenant_admin_web`）
 - 后端需使用 `config.yaml` 启动（OIDC 端点前缀 `/oidc`）
 
 ## 安装

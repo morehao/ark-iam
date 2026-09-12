@@ -80,12 +80,13 @@ describe('应用列表', () => {
 })
 
 /**
- * 内置应用（source=builtin）的名称/描述由平台版本定义（后端字段权威矩阵 reconcile，控制台拒写），
- * 前端必须置灰并给出说明；启停与排序仍可改。回归背景：种子会收敛 name/description，
- * 若前端仍可编辑，运维改完重启就被收回（双写者）。
+ * 内置应用（source=builtin）的展示类字段归运维：名称/描述/排序都可改，前端不置灰。
+ * 回归背景：名称与描述一度是 reconcile（前端置灰 + 后端拒写），编码一度只读（种子按 code 定位）；
+ * 引入 seed_key 后种子不再按 code 认行，名称/描述/排序交还运维。
+ * **唯编码仍只读**（见下一组用例）：控制台菜单入口按它定位。
  */
-describe('内置应用的身份字段只读', () => {
-  it('编辑内置应用时名称与描述置灰', async () => {
+describe('内置应用的字段可编辑', () => {
+  it('编辑内置应用时名称、描述与排序均可编辑', async () => {
     mockGetApplicationPageList.mockResolvedValue({
       list: [{ ...applications[0], source: 'builtin' as const }],
       total: 1,
@@ -94,10 +95,69 @@ describe('内置应用的身份字段只读', () => {
 
     fireEvent.click(await screen.findByText('编辑'))
     const nameInput = await screen.findByPlaceholderText('应用名称')
-    await waitFor(() => expect(nameInput).toBeDisabled())
-    expect(screen.getByPlaceholderText('选填')).toBeDisabled()
-    expect(screen.getByText('内置应用的名称由平台版本定义，不可修改')).toBeInTheDocument()
+    await waitFor(() => expect(nameInput).not.toBeDisabled())
+    expect(screen.getByPlaceholderText('选填')).not.toBeDisabled()
     // 排序归运维，仍可编辑
     expect(screen.getByPlaceholderText('数字越小越靠前')).not.toBeDisabled()
+  })
+})
+
+/**
+ * 应用编码可改，但**内置应用保持只读**：`platform_admin` / `tenant_admin` 是控制台菜单入口的
+ * 定位值（svcpermission.MyTree 按编码查应用、tenantadmin loadConsoleApps 只保留 tenant_admin），
+ * 从控制台改名会当场让对应控制台侧边栏失联且无法从界面恢复。
+ * 后端 svcapplication.Update 以 ApplicationBuiltInCodeImmutableError 兜底。
+ */
+describe('编辑态应用编码的可写性', () => {
+  it('内置应用编码置灰且回显当前值', async () => {
+    mockGetApplicationPageList.mockResolvedValue({
+      list: [{ ...applications[0], appID: 'app-builtin', code: 'platform_admin', source: 'builtin' as const }],
+      total: 1,
+    })
+    render(<ApplicationList />)
+
+    fireEvent.click(await screen.findByText('编辑'))
+    const codeInput = await screen.findByPlaceholderText('唯一编码，如 iam_web')
+    await waitFor(() => expect(codeInput).toBeDisabled())
+    expect(codeInput).toHaveValue('platform_admin')
+  })
+
+  it('第三方应用编码可改且回显当前值', async () => {
+    mockGetApplicationPageList.mockResolvedValue({
+      list: [{ ...applications[0], appID: 'app-custom', code: 'customer_app', name: '客户应用', source: 'third_party' as const }],
+      total: 1,
+    })
+    render(<ApplicationList />)
+
+    fireEvent.click(await screen.findByText('编辑'))
+    const codeInput = await screen.findByPlaceholderText('唯一编码，如 iam_web')
+    expect(codeInput).not.toBeDisabled()
+    expect(codeInput).toHaveValue('customer_app')
+  })
+})
+
+/**
+ * 内置应用（source=builtin，平台管理后台/租户管理后台）禁删：它们由平台版本交付，
+ * 删除会让对应控制台失去应用主体。前端把「删除」置灰保留展示（不隐藏），
+ * 后端 svcapplication.Delete 以 ApplicationBuiltInErr 兜底。
+ */
+describe('内置应用不可删除', () => {
+  it('内置应用行的「删除」置灰不可点', async () => {
+    mockGetApplicationPageList.mockResolvedValue({
+      list: [{ ...applications[0], source: 'builtin' as const }],
+      total: 1,
+    })
+    render(<ApplicationList />)
+
+    expect(await screen.findByText('平台管理后台')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '删除' })).toBeDisabled()
+  })
+
+  it('第三方应用行的「删除」可点', async () => {
+    mockGetApplicationPageList.mockResolvedValue({ list: applications, total: 1 })
+    render(<ApplicationList />)
+
+    expect(await screen.findByText('平台管理后台')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '删除' })).not.toBeDisabled()
   })
 })

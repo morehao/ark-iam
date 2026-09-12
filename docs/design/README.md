@@ -29,6 +29,10 @@
 | [glossary.md](glossary.md) | **术语表**。SSO / OIDC / IAM / 租户 / 自然人 / 应用 / Client / 令牌等术语的统一定义 |
 | [tenant-custom-domain-redesign.md](tenant-custom-domain-redesign.md) | **租户级自定义域名实施方案（B 档，待评审）**。按域名识别租户、登录预设与品牌化、`domain` 表重做保留；顺带移除冗余 `system` 模块 |
 | [seed-initialization-redesign-20260912.md](seed-initialization-redesign-20260912.md) | **种子数据初始化语义重构（标准档，待评审）**。字段权威矩阵（Reconcile / CreateOnly / MigrateOnce）、控制台对种子字段拒写、值匹配一次性迁移、并发保护与变更报告 |
+| [seed-authority-scope-revision-20260912.md](seed-authority-scope-revision-20260912.md) | **种子权威矩阵收窄（reconcile 准入判据，已落地）**。把 reconcile 收窄到「定位键 + 安全不变式」，内置应用/客户端/菜单的展示与结构字段归还运维：控制台完全可改、重启不被回写 |
+| [client-code-convention-20260912.md](client-code-convention-20260912.md) | **客户端编码（client_id）改为创建时必填 + 前后端双重校验（已落地）**。`client_id` 从"服务端随机生成、无人校验"改为创建方填写，前端表单 `pattern` 与后端 service 各校验一份（`ClientCodePattern`：仅小写字母与下划线）；内置 client_id 收敛为 `pkg/model` 单一常量源，存量库原地改名 |
+| [seed-identity-key-20260912.md](seed-identity-key-20260912.md) | **种子身份键 seed_key：把「定位」与「业务编码」解耦（已落地）**。菜单的 `code`（含归属应用）与**自建**应用/客户端的 `code` 交还运维可改——种子改按不可见的 `seed_key` 认行，存量库启动时回填；保留只读的是内置应用的 `code`（控制台菜单入口按它定位）与内置控制台 `client_id`（网关 aud 信任边界 + 改名会自我锁死） |
+| [menu-console-crud-20260912.md](menu-console-crud-20260912.md) | **菜单控制台全量增删：删除即持久删除（软删墓碑，已落地）**。菜单的"行"也交还运维：可新增根菜单/子菜单、可删除任意菜单（含内置菜单）；删除留软删墓碑使种子不再复活，删除级联子树并解绑 `role_menu`，退役菜单改物理删除不留墓碑 |
 
 ## 核心概念速览
 

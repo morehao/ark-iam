@@ -43,7 +43,7 @@ func isValidTenantApplicationStatus(status model.TenantApplicationStatus) bool {
 
 // 平台侧跨租户运维：订阅的归属租户来自请求参数（而非调用者 token 里的租户），
 // 读改删同样不校验 ctx 租户归属——与 /v1/platform/tenants/{tenantID} 同一信任模型
-// （能拿到 platform-admin-web 令牌即可运维任意租户）。
+// （能拿到 platform_admin_web 令牌即可运维任意租户）。
 func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplication.TenantApplicationCreateReq) (*dtotenantapplication.TenantApplicationCreateResp, error) {
 	if !isValidTenantApplicationStatus(req.Status) {
 		glog.Errorf(ctx, "[svctenantapplication.Create] 非法订阅状态, req:%s", gutil.ToJsonString(req))
@@ -110,6 +110,12 @@ func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplicat
 	return &dtotenantapplication.TenantApplicationCreateResp{TenantAppID: entity.ID}, nil
 }
 
+// Delete 删除租户应用订阅。
+//
+// 内置应用的订阅禁删：种子为平台租户写入 platform_admin 订阅、ProvisionTenantAdmin 为每个租户
+// 写入 tenant_admin 订阅——它们由系统开通，删除会让对应控制台当场失去菜单（平台侧整栈失联、
+// 租户侧无法自救）。判定口径取「订阅的应用 source=builtin」，与 svcapplication.Delete 的
+// 内置应用禁删同源；需要下线时改 status=disable（Update 不受限）。
 func (svc *tenantApplicationSvc) Delete(ctx *gin.Context, req *dtotenantapplication.TenantApplicationDeleteReq) error {
 	entity, err := dao.NewTenantApplicationDao().GetByID(ctx, req.TenantAppID)
 	if err != nil {
@@ -118,6 +124,15 @@ func (svc *tenantApplicationSvc) Delete(ctx *gin.Context, req *dtotenantapplicat
 	}
 	if entity == nil || entity.ID == "" {
 		return code.GetError(code.TenantApplicationNotExistError)
+	}
+	app, err := dao.NewApplicationDao().GetByID(ctx, entity.AppID)
+	if err != nil {
+		glog.Errorf(ctx, "[svctenantapplication.Delete] dao application GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.TenantApplicationDeleteError)
+	}
+	// app 为空表示应用已被删除（悬空订阅）：不属内置，放行删除以清理脏数据。
+	if app != nil && app.Source.IsBuiltin() {
+		return code.GetError(code.TenantApplicationBuiltInErr)
 	}
 	if err := dao.NewTenantApplicationDao().Delete(ctx, req.TenantAppID, gincontext.GetUserIDString(ctx)); err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -168,9 +183,9 @@ func (svc *tenantApplicationSvc) Detail(ctx *gin.Context, req *dtotenantapplicat
 	if entity == nil || entity.ID == "" {
 		return nil, code.GetError(code.TenantApplicationNotExistError)
 	}
-	tenantNames, appNames, err := loadNameMaps(ctx, model.TenantApplicationEntityList{*entity})
+	tenantNames, appNames, appSources, err := loadRefs(ctx, model.TenantApplicationEntityList{*entity})
 	if err != nil {
-		glog.Errorf(ctx, "[svctenantapplication.Detail] loadNameMaps fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		glog.Errorf(ctx, "[svctenantapplication.Detail] loadRefs fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantApplicationGetDetailError)
 	}
 	return &dtotenantapplication.TenantApplicationDetailResp{
@@ -179,6 +194,7 @@ func (svc *tenantApplicationSvc) Detail(ctx *gin.Context, req *dtotenantapplicat
 		TenantName:   tenantNames[entity.TenantID],
 		AppID:        entity.AppID,
 		AppName:      appNames[entity.AppID],
+		AppSource:    appSources[entity.AppID],
 		Status:       entity.Status,
 		Config:       string(entity.Config),
 		GrantedScope: string(entity.GrantedScope),
@@ -197,9 +213,9 @@ func (svc *tenantApplicationSvc) PageList(ctx *gin.Context, req *dtotenantapplic
 		glog.Errorf(ctx, "[svctenantapplication.PageList] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantApplicationGetPageListError)
 	}
-	tenantNames, appNames, err := loadNameMaps(ctx, list)
+	tenantNames, appNames, appSources, err := loadRefs(ctx, list)
 	if err != nil {
-		glog.Errorf(ctx, "[svctenantapplication.PageList] loadNameMaps fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		glog.Errorf(ctx, "[svctenantapplication.PageList] loadRefs fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantApplicationGetPageListError)
 	}
 	items := make([]dtotenantapplication.PageListItem, 0, len(list))
@@ -210,6 +226,7 @@ func (svc *tenantApplicationSvc) PageList(ctx *gin.Context, req *dtotenantapplic
 			TenantName:  tenantNames[v.TenantID],
 			AppID:       v.AppID,
 			AppName:     appNames[v.AppID],
+			AppSource:   appSources[v.AppID],
 			Status:      v.Status,
 			CreatedAt:   v.CreatedAt.Unix(),
 			UpdatedAt:   v.UpdatedAt.Unix(),
@@ -218,9 +235,9 @@ func (svc *tenantApplicationSvc) PageList(ctx *gin.Context, req *dtotenantapplic
 	return &dtotenantapplication.TenantApplicationPageListResp{List: items, Total: total}, nil
 }
 
-// loadNameMaps 批量回填租户名与应用名（列表/详情一次查询，避免前端按行再查或 N+1）。
-// 名称缺失不报错：调用方以空名返回，前端退化为展示 ID。
-func loadNameMaps(ctx *gin.Context, list model.TenantApplicationEntityList) (map[string]string, map[string]string, error) {
+// loadRefs 批量回填租户名与应用名/来源（列表/详情一次查询，避免前端按行再查或 N+1）。
+// 名称缺失不报错：调用方以空名返回，前端退化为展示 ID；应用来源供前端判断内置订阅（禁删）。
+func loadRefs(ctx *gin.Context, list model.TenantApplicationEntityList) (map[string]string, map[string]string, map[string]model.AppSource, error) {
 	tenantIDs := make([]string, 0, len(list))
 	appIDs := make([]string, 0, len(list))
 	seenTenant := make(map[string]struct{}, len(list))
@@ -244,7 +261,7 @@ func loadNameMaps(ctx *gin.Context, list model.TenantApplicationEntityList) (map
 	if len(tenantIDs) > 0 {
 		tenants, err := dao.NewTenantDao().GetListByCond(ctx, &dao.TenantCond{IDs: tenantIDs})
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		for _, t := range tenants {
 			tenantNames[t.ID] = t.Name
@@ -252,14 +269,16 @@ func loadNameMaps(ctx *gin.Context, list model.TenantApplicationEntityList) (map
 	}
 
 	appNames := make(map[string]string, len(appIDs))
+	appSources := make(map[string]model.AppSource, len(appIDs))
 	if len(appIDs) > 0 {
 		apps, err := dao.NewApplicationDao().GetListByCond(ctx, &dao.ApplicationCond{IDs: appIDs})
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		for _, a := range apps {
 			appNames[a.ID] = a.Name
+			appSources[a.ID] = a.Source
 		}
 	}
-	return tenantNames, appNames, nil
+	return tenantNames, appNames, appSources, nil
 }

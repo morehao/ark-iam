@@ -207,10 +207,8 @@ export default function MenuList() {
 
   const displayList = useMemo(() => filterMenuTree(menuTree, keyword), [menuTree, keyword])
 
-  // 内置应用（source=builtin）的菜单树由平台版本定义（种子是唯一写者，后端 Update/Delete/Create 均拒写）：
-  // 结构与展示字段只读、不可新增/删除；状态归运维，仍可通过「编辑」调整。
-  const seedOwnedMenu = selectedApp?.source === 'builtin'
-
+  // 菜单增删改对任何应用（含内置应用）都放行：新增行不带种子身份键，种子不会认领；
+  // 删除内置菜单会留下软删"墓碑"，种子下次启动不再复活它——功能扩展/调整无需改代码发版。
   const openModal = (nextMode: ModalMode, parent: MenuItem | null, baseValues: Partial<MenuFormValues>) => {
     setMode(nextMode)
     setEditing(null)
@@ -377,13 +375,12 @@ export default function MenuList() {
     actionColumn<MenuItem>({
       max: 3,
       actions: (m) => [
-        { key: 'createChild', label: '新增子级', hidden: seedOwnedMenu, onClick: () => handleCreateChild(m) },
+        { key: 'createChild', label: '新增子级', onClick: () => handleCreateChild(m) },
         { key: 'edit', label: '编辑', onClick: () => handleEdit(m) },
         {
           key: 'delete',
           label: '删除',
           danger: true,
-          hidden: seedOwnedMenu,
           confirm: `确认删除「${m.name}」？其子菜单将一并删除`,
           onClick: () => void handleDelete(m),
         },
@@ -407,7 +404,7 @@ export default function MenuList() {
           <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
             刷新
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateRoot} disabled={seedOwnedMenu}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateRoot}>
             新建根菜单
           </Button>
         </Space>
@@ -540,11 +537,6 @@ export default function MenuList() {
             <span>菜单将归属应用：</span>
             <b>{selectedApp ? `${selectedApp.name}（${selectedApp.code}）` : '-'}</b>
             <span style={{ color: tokens.textSecondary, fontSize: 12 }}>（以列表页选中的应用为准，不可修改）</span>
-            {seedOwnedMenu && (
-              <span style={{ color: tokens.textSecondary, fontSize: 12 }}>
-                （内置应用：名称/编码/路径等由平台版本定义，只读；状态可改）
-              </span>
-            )}
           </div>
 
           <Divider orientation="left" plain style={{ margin: '16px 0 8px', fontSize: 13 }}>
@@ -559,21 +551,25 @@ export default function MenuList() {
               showSearch
               treeNodeFilterProp="title"
               style={{ width: '100%' }}
-              disabled={seedOwnedMenu}
             />
           </Form.Item>
           <div style={{ display: 'flex', gap: 16 }}>
             <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入菜单名称' }]} style={{ flex: 1 }}>
-              <Input placeholder="菜单显示名称" disabled={seedOwnedMenu} />
+              <Input placeholder="菜单显示名称" />
             </Form.Item>
-            <Form.Item name="code" label="编码" rules={[{ required: true, message: '请输入菜单编码' }]} style={{ flex: 1 }}>
-              <Input placeholder="唯一编码，如 user:list" disabled={seedOwnedMenu} />
+            <Form.Item
+              name="code"
+              label="编码"
+              tooltip="应用内唯一；内置菜单的编码也可修改——种子按内部身份键认行，改名不会重建菜单"
+              rules={[{ required: true, message: '请输入菜单编码' }]}
+              style={{ flex: 1 }}
+            >
+              <Input placeholder="唯一编码，如 user:list" />
             </Form.Item>
           </div>
           <div style={{ display: 'flex', gap: 16 }}>
             <Form.Item name="type" label="类型" style={{ flex: 1 }}>
               <Select
-                disabled={seedOwnedMenu}
                 options={[
                   { value: 'directory', label: '目录' },
                   { value: 'menu', label: '菜单' },
@@ -590,7 +586,7 @@ export default function MenuList() {
               />
             </Form.Item>
             <Form.Item name="sort" label="排序" style={{ flex: 1 }}>
-              <InputNumber style={{ width: '100%' }} placeholder="默认 0" disabled={seedOwnedMenu} />
+              <InputNumber style={{ width: '100%' }} placeholder="默认 0" />
             </Form.Item>
           </div>
 
@@ -599,10 +595,10 @@ export default function MenuList() {
           </Divider>
           <div style={{ display: 'flex', gap: 16 }}>
             <Form.Item name="path" label="路径" style={{ flex: 1 }}>
-              <Input placeholder="如 /user/list" disabled={seedOwnedMenu} />
+              <Input placeholder="如 /user/list" />
             </Form.Item>
             <Form.Item name="component" label="组件" style={{ flex: 1 }}>
-              <Input placeholder="如 pages/user/list" disabled={seedOwnedMenu} />
+              <Input placeholder="如 pages/user/list" />
             </Form.Item>
           </div>
           <div style={{ display: 'flex', gap: 16 }}>
@@ -610,7 +606,7 @@ export default function MenuList() {
               <Input placeholder="选填" />
             </Form.Item>
             <Form.Item name="icon" label="图标" style={{ flex: 1 }}>
-              <Input placeholder="如 UserOutlined" disabled={seedOwnedMenu} />
+              <Input placeholder="如 UserOutlined" />
             </Form.Item>
           </div>
 
@@ -619,7 +615,6 @@ export default function MenuList() {
           </Divider>
           <Form.Item name="visibility" label="可见性门槛" tooltip="所有人可见（无门槛）/ 任意租户成员可见（登录即可）/ 仅管理员角色可见">
             <Select
-              disabled={seedOwnedMenu}
               options={[
                 { value: 'public', label: '所有人可见' },
                 { value: 'member', label: '租户成员可见' },

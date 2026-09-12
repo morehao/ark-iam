@@ -4,7 +4,6 @@ go 1.26.1
 
 require (
 	github.com/gin-gonic/gin v1.12.0
-	github.com/google/uuid v1.6.0
 	github.com/morehao/golib v1.32.13
 	github.com/swaggo/swag v1.16.6
 	gorm.io/datatypes v1.2.7
@@ -44,6 +43,7 @@ require (
 	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect

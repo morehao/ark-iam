@@ -12,6 +12,7 @@ type MenuCond struct {
 	ParentID   string
 	Name       string
 	Code       string
+	SeedKey    string // 种子身份键：内置菜单的稳定标识（定位内置菜单请用它，而不是可被改名的 Code）
 	Type       model.MenuType
 	Status     model.MenuStatus
 	Visibility model.MenuVisibility
@@ -32,6 +33,9 @@ func (c *MenuCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.Code != "" {
 		db.Where(tableName+".code = ?", c.Code)
+	}
+	if c.SeedKey != "" {
+		db.Where(tableName+".seed_key = ?", c.SeedKey)
 	}
 	if c.Type != "" {
 		db.Where(tableName+".type = ?", c.Type)

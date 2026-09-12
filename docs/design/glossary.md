@@ -33,12 +33,13 @@
 | 术语 | 英文 | 说明 |
 |---|---|---|
 | 应用 ✅ | Application | 一个业务系统定义（编码/名称/来源/状态）。如"平台管理台" |
-| 应用编码 ✅ | App Code | `application.code`：唯一且**下划线连接**（`model.AppCodePattern`：小写字母开头，仅小写字母/数字/下划线，如 `platform_admin`），连字符/大写被服务端拒绝 |
-| 客户端编码 ✅ | Client Code (`client_id`) | `application_client.code`，即 OIDC 的 `client_id`（控制台列表/详情与 API 字段同名，都叫「客户端编码」/`code`）：控制台创建时由服务端生成 UUID，内置客户端为可读值（如 `platform-admin-web`）。**「编码」在此指协议标识符，不适用 `AppCodePattern`——允许连字符**（两个「编码」的规则口径见 [sso-oidc-concepts.md](sso-oidc-concepts.md) §3.2）；与 `application_client.id`（控制台内部主键，供密钥/令牌表外键引用）不是一回事 |
+| 应用编码 ✅ | App Code | `application.code`：唯一且**下划线连接**（`model.AppCodePattern`：小写字母开头，仅小写字母/数字/下划线，如 `platform_admin`），连字符/大写被服务端拒绝；**自建应用可改**，**内置应用只读**（控制台菜单入口按 `platform_admin`/`tenant_admin` 定位，改名会当场让对应控制台侧边栏失联，报 `100749`） |
+| 客户端编码 ✅ | Client Code (`client_id`) | `application_client.code`，即 OIDC 的 `client_id`（控制台列表/详情与 API 字段同名，都叫「客户端编码」/`code`）：**创建时由调用方填写（必填）**；**用户自建客户端可改**，**内置客户端只读**（它是网关 aud 白名单与前端构建期默认值的取值来源，改名会当场把该控制台锁死且界面无法自救）。受 `model.ClientCodePattern` 约束——小写字母开头，**仅小写字母与下划线（不允许数字），禁连字符**；前端表单 `pattern` 与后端 service 各校验一份（口径见 [sso-oidc-concepts.md](sso-oidc-concepts.md) §3.2）。与 `application_client.id`（控制台内部主键，供密钥/令牌表外键引用）不是一回事 |
 | OAuth 客户端 ✅ | Application Client | 应用下的 OIDC 接入凭证：client_id、回调白名单、授权类型、令牌 TTL 等 |
 | 客户端密钥 ✅ | Client Secret | 机密客户端在令牌端点的认证凭证（库中只存哈希） |
-| 内置应用 | Built-in App | 平台随产品交付的控制台应用（`application.source=builtin`）：**平台管理后台**与**租户管理后台**两个种子应用，受删除保护，菜单只在各自所属的控制台呈现 |
-| 字段权威矩阵 ✅ | Seed Field Authority | 声明内置种子数据每个字段归谁写的唯一真相源（`pkg/model/seed_authority.go`）：`reconcile` 种子收敛且控制台拒写 / `create_only` 只播种、归运维 / `migrate_once` 值匹配一次性改名。种子与控制台共用同一份声明，避免"改了又被收回"的双写者；见 [seed-initialization-redesign-20260912.md](seed-initialization-redesign-20260912.md) |
+| 内置应用 | Built-in App | 平台随产品交付的控制台应用（`application.source=builtin`）：**平台管理后台**与**租户管理后台**两个种子应用，受删除保护（报 `100746`）、编码只读（报 `100749`），菜单只在各自所属的控制台呈现 |
+| 字段权威矩阵 ✅ | Seed Field Authority | 声明内置种子数据每个字段归谁写的唯一真相源（`pkg/model/seed_authority.go`）：`reconcile` 种子收敛且控制台拒写 / `create_only` 只播种、归运维 / `migrate_once` 值匹配一次性改名。种子与控制台共用同一份声明，避免"改了又被收回"的双写者。**reconcile 准入判据**：只保留安全不变式（`source`/`admin_type`/平台租户 `status`），展示、结构与编码字段一律归运维——种子认行由**种子身份键**承担，不再经由控制台可写字段；见 [seed-authority-scope-revision-20260912.md](seed-authority-scope-revision-20260912.md) |
+| 种子身份键 ✅ | Seed Identity Key (`seed_key`) | `menu` / `application` 上的内部列：内置行的**稳定标识**（= 种子定义时的 `code`），创建时写入后不再变化，**控制台不可见也不可写**（API 出参也不返回）。种子认行、租户开通（`ProvisionTenantAdmin`）与退役菜单清理都以它为依据，因此业务字段 `code`（乃至菜单归属应用）可以自由修改而不触发"查不到 → 重建一行"——**例外是内置应用与内置客户端的 `code`**：它们仍被控制台菜单入口 / 网关 aud 边界按值引用，由 service 拒改。控制台自建行恒为空串（部分唯一索引排除空值）。见 [seed-identity-key-20260912.md](seed-identity-key-20260912.md) |
 | 第一方应用 | First-party App | 平台自建但非内置的应用（`application.source=first_party`），可删除；当前种子不产生该来源，仅运维自建时出现 |
 | 第三方应用 | Third-party App | 外部接入应用（`application.source=third_party`）；控制台新建的应用恒为此类 |
 | 来源 | Source | 应用/客户端的归属与内置性（`source`：builtin/first_party/third_party）与角色的产生方式（`role.source`：builtin/custom） |

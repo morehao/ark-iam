@@ -444,10 +444,11 @@ func TestSeedIamPrunesRetiredMenus(t *testing.T) {
 	}
 }
 
-// TestSeedIamBackfillsSeedDisplayNames 种子自有的展示身份（平台租户名、与租户同名的根部门名、
-// 两个内置应用的名称/描述、种子客户端名）在存量库或被控制台改过时必须随启动收敛到种子定义；
-// 运行时编排字段（application.status/sort）由控制台掌握，种子不得覆盖。
-func TestSeedIamBackfillsSeedDisplayNames(t *testing.T) {
+// TestSeedIamMigratesLegacyNamesOnly 展示名的跨版本处理分两种语义，本用例锁定两者边界：
+//   - 历史种子名（Default Tenant）走 migrate_once：值匹配才改写，租户与根部门同步到「平台运营中心」；
+//   - 其余展示名（内置应用名/描述、内置客户端名）归运维（create_only）：控制台改过之后种子一律
+//     不回写，也不再"回填"成种子定义值（reconcile 已收窄到定位键 + 安全不变式）。
+func TestSeedIamMigratesLegacyNamesOnly(t *testing.T) {
 	db := setupDB(t)
 	ctx := context.Background()
 	if err := seed.SeedIam(ctx, db); err != nil {
@@ -458,7 +459,7 @@ func TestSeedIamBackfillsSeedDisplayNames(t *testing.T) {
 	if err := db.Where("code = ?", "t_platform").First(&tenant).Error; err != nil {
 		t.Fatalf("query tenant: %v", err)
 	}
-	// 模拟旧库/控制台改动：展示身份回退为旧名（或自定义名），运行时字段改成非种子值
+	// 模拟旧库遗留名：命中 migrate_once 的历史种子值，应被一次性改名为 平台运营中心
 	if err := db.Model(&model.TenantEntity{}).Where("id = ?", tenant.ID).
 		Update("name", "Default Tenant").Error; err != nil {
 		t.Fatalf("degrade tenant name: %v", err)
@@ -467,10 +468,11 @@ func TestSeedIamBackfillsSeedDisplayNames(t *testing.T) {
 		Update("name", "Default Tenant").Error; err != nil {
 		t.Fatalf("degrade root department name: %v", err)
 	}
+	// 模拟控制台改动：内置应用的展示名/描述（归运维）+ 启停/排序
 	if err := db.Model(&model.ApplicationEntity{}).Where("code = ?", "platform_admin").
 		Updates(map[string]any{
-			"name":        "管理后台",
-			"description": "平台管理后台应用",
+			"name":        "运维控制台",
+			"description": "运维自定描述",
 			"status":      model.AppStatusDisable, // 控制台改过的启停，种子不得覆盖
 			"sort":        9,                      // 控制台改过的排序，种子不得覆盖
 		}).Error; err != nil {
@@ -480,29 +482,28 @@ func TestSeedIamBackfillsSeedDisplayNames(t *testing.T) {
 		Updates(map[string]any{"name": "租户自服务", "description": "租户自服务控制台应用"}).Error; err != nil {
 		t.Fatalf("degrade tenant admin application: %v", err)
 	}
-	if err := db.Model(&model.ApplicationClientEntity{}).Where("code = ?", "platform-admin-web").
+	if err := db.Model(&model.ApplicationClientEntity{}).Where("code = ?", "platform_admin_web").
 		Update("name", "IAM管理平台").Error; err != nil {
 		t.Fatalf("degrade platform client name: %v", err)
 	}
-	if err := db.Model(&model.ApplicationClientEntity{}).Where("code = ?", "tenant-admin-web").
+	if err := db.Model(&model.ApplicationClientEntity{}).Where("code = ?", "tenant_admin_web").
 		Update("name", "租户管理平台").Error; err != nil {
 		t.Fatalf("degrade tenant client name: %v", err)
 	}
 
-	// 二次种子：展示身份回填
+	// 二次种子：一次性改名生效；三次种子：保持幂等
 	if err := seed.SeedIam(ctx, db); err != nil {
 		t.Fatalf("seed (2nd) fail: %v", err)
 	}
-	// 三次种子：回填后保持幂等
 	if err := seed.SeedIam(ctx, db); err != nil {
 		t.Fatalf("seed (3rd) fail: %v", err)
 	}
 
 	if err := db.Where("code = ?", "t_platform").First(&tenant).Error; err != nil {
-		t.Fatalf("query tenant after backfill: %v", err)
+		t.Fatalf("query tenant after reseed: %v", err)
 	}
 	if tenant.Name != "平台运营中心" {
-		t.Errorf("tenant name = %q, want %q", tenant.Name, "平台运营中心")
+		t.Errorf("tenant name = %q, want %q（历史种子值应一次性改名）", tenant.Name, "平台运营中心")
 	}
 	if tenant.Status != model.TenantStatusActive {
 		t.Errorf("tenant status = %q, want %q", tenant.Status, model.TenantStatusActive)
@@ -513,12 +514,13 @@ func TestSeedIamBackfillsSeedDisplayNames(t *testing.T) {
 		t.Fatalf("query root department: %v", err)
 	}
 	if rootDept.Name != tenant.Name {
-		t.Errorf("root department name = %q, want %q (根部门与租户同名)", rootDept.Name, tenant.Name)
+		t.Errorf("root department name = %q, want %q (根部门随租户名一次性改名)", rootDept.Name, tenant.Name)
 	}
 
+	// 内置应用的名称/描述归运维：种子的值只是创建时初值，重启不得回写
 	wantApps := map[string]struct{ name, desc string }{
-		"platform_admin": {"平台管理后台", "平台管理后台应用"},
-		"tenant_admin":   {"租户管理后台", "租户管理后台应用"},
+		"platform_admin": {"运维控制台", "运维自定描述"},
+		"tenant_admin":   {"租户自服务", "租户自服务控制台应用"},
 	}
 	for code, want := range wantApps {
 		var app model.ApplicationEntity
@@ -526,7 +528,8 @@ func TestSeedIamBackfillsSeedDisplayNames(t *testing.T) {
 			t.Fatalf("query application %s: %v", code, err)
 		}
 		if app.Name != want.name || app.Description != want.desc {
-			t.Errorf("application %s = (%q, %q), want (%q, %q)", code, app.Name, app.Description, want.name, want.desc)
+			t.Errorf("application %s = (%q, %q), want (%q, %q)（展示名归运维，种子不得回写）",
+				code, app.Name, app.Description, want.name, want.desc)
 		}
 	}
 
@@ -542,9 +545,10 @@ func TestSeedIamBackfillsSeedDisplayNames(t *testing.T) {
 		t.Errorf("application sort = %d, want 9 (种子不得覆盖控制台排序)", adminApp.Sort)
 	}
 
+	// 内置客户端名归运维：同样不得回写
 	wantClients := map[string]string{
-		"platform-admin-web": "平台管理后台",
-		"tenant-admin-web":   "租户管理后台",
+		"platform_admin_web": "IAM管理平台",
+		"tenant_admin_web":   "租户管理平台",
 	}
 	for code, want := range wantClients {
 		var client model.ApplicationClientEntity
@@ -552,8 +556,77 @@ func TestSeedIamBackfillsSeedDisplayNames(t *testing.T) {
 			t.Fatalf("query application_client %s: %v", code, err)
 		}
 		if client.Name != want {
-			t.Errorf("application_client %s name = %q, want %q", code, client.Name, want)
+			t.Errorf("application_client %s name = %q, want %q（展示名归运维，种子不得回写）", code, client.Name, want)
 		}
+	}
+}
+
+// TestSeedIamKeepsOperatorMenuEdits 内置应用菜单的展示与结构字段归运维：在控制台改过之后
+// （名称/路径/组件/图标/排序/类型/可见性/父级），重启种子不得回写——这是本次 reconcile 收窄的
+// 核心诉求（此前菜单树整体不可编辑）。
+func TestSeedIamKeepsOperatorMenuEdits(t *testing.T) {
+	db := setupDB(t)
+	ctx := context.Background()
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed fail: %v", err)
+	}
+
+	var adminApp model.ApplicationEntity
+	if err := db.Where("code = ?", "platform_admin").First(&adminApp).Error; err != nil {
+		t.Fatalf("query admin app: %v", err)
+	}
+	var editors []model.MenuEntity
+	if err := db.Where("app_id = ? AND parent_id != ?", adminApp.ID, "").Find(&editors).Error; err != nil {
+		t.Fatalf("query child menus: %v", err)
+	}
+	if len(editors) == 0 {
+		t.Fatal("没有可验证的内置子菜单")
+	}
+
+	// 控制台改动：整体重命名 + 改结构（含把菜单挂到根节点，验证父级不再被收敛）
+	custom := map[string]any{
+		"name":       "运维自定菜单名",
+		"path":       "/ops-custom",
+		"component":  "pages/opsCustom",
+		"icon":       "SettingOutlined",
+		"sort":       99,
+		"type":       model.MenuTypeMenu,
+		"visibility": model.MenuVisibilityPublic,
+		"parent_id":  "",
+		"status":     model.MenuStatusDisable,
+	}
+	edited := editors[0]
+	if err := db.Model(&model.MenuEntity{}).Where("id = ?", edited.ID).Updates(custom).Error; err != nil {
+		t.Fatalf("degrade menu: %v", err)
+	}
+
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed (2nd) fail: %v", err)
+	}
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed (3rd) fail: %v", err)
+	}
+
+	var got model.MenuEntity
+	if err := db.Where("id = ?", edited.ID).First(&got).Error; err != nil {
+		t.Fatalf("query menu: %v", err)
+	}
+	if got.Name != "运维自定菜单名" || got.Path != "/ops-custom" || got.Component != "pages/opsCustom" ||
+		got.Icon != "SettingOutlined" || got.Sort != 99 || got.ParentID != "" ||
+		got.Visibility != model.MenuVisibilityPublic || got.Status != model.MenuStatusDisable {
+		t.Errorf("内置菜单被种子回写: name=%q path=%q component=%q icon=%q sort=%d parent=%q visibility=%q status=%q",
+			got.Name, got.Path, got.Component, got.Icon, got.Sort, got.ParentID, got.Visibility, got.Status)
+	}
+	if got.Code != edited.Code {
+		t.Errorf("定位键 code 不得变化: %q -> %q", edited.Code, got.Code)
+	}
+	// 内置菜单自愈的边界：种子不再创建缺失行以外的动作，菜单总数保持不变（未因重命名重建）
+	var total int64
+	if err := db.Model(&model.MenuEntity{}).Where("app_id = ?", adminApp.ID).Count(&total).Error; err != nil {
+		t.Fatalf("count menus: %v", err)
+	}
+	if total != 11 {
+		t.Errorf("平台应用菜单数 = %d, want 11（改菜单不得触发种子重建行）", total)
 	}
 }
 
@@ -711,8 +784,8 @@ func TestSeedIamBindsBuiltinClientsToTheirApps(t *testing.T) {
 		appIDByCode[a.Code] = a.ID
 	}
 	wantAppCode := map[string]string{
-		"platform-admin-web": "platform_admin",
-		"tenant-admin-web":   "tenant_admin",
+		"platform_admin_web": "platform_admin",
+		"tenant_admin_web":   "tenant_admin",
 	}
 	assertClientBinding := func(stage string) {
 		t.Helper()
@@ -748,6 +821,73 @@ func TestSeedIamBindsBuiltinClientsToTheirApps(t *testing.T) {
 	}
 }
 
+// TestSeedIamMigratesLegacyClientCode 存量库的内置客户端编码为连字符形态（platform-admin-web /
+// tenant-admin-web）时，种子启动必须原地改名为下划线形态（platform_admin_web / tenant_admin_web）：
+// 保留主键，因此以客户端 id 为外键的 refresh_token / application_client_secret 不失联，
+// 也不会重建出第二个内置客户端（code 是唯一键，重复建会直接撞唯一索引）。
+// 回归背景：客户端编码统一为下划线口径（model.ClientCodePattern）后，若不迁移旧编码，
+// 种子按新编码查不到旧行 → 另建两个客户端，库里会同时存在 4 行、控制台的 client_id 与网关
+// audience 白名单也随之错配。
+func TestSeedIamMigratesLegacyClientCode(t *testing.T) {
+	db := setupDB(t)
+	ctx := context.Background()
+
+	legacyPlatform := &model.ApplicationClientEntity{
+		TenantID: "t1", AppID: "a1", Code: "platform-admin-web", Name: "平台管理后台",
+		Source: model.ApplicationClientSourceThirdParty, Status: model.ApplicationClientStatusEnable,
+	}
+	legacyTenant := &model.ApplicationClientEntity{
+		TenantID: "t1", AppID: "a1", Code: "tenant-admin-web", Name: "租户管理后台",
+		Source: model.ApplicationClientSourceThirdParty, Status: model.ApplicationClientStatusEnable,
+	}
+	for _, client := range []*model.ApplicationClientEntity{legacyPlatform, legacyTenant} {
+		if err := db.Create(client).Error; err != nil {
+			t.Fatalf("seed legacy client: %v", err)
+		}
+	}
+	wantIDs := map[string]string{
+		model.SeedBuiltinClientPlatformAdminWeb: legacyPlatform.ID,
+		model.SeedBuiltinClientTenantAdminWeb:   legacyTenant.ID,
+	}
+
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed fail: %v", err)
+	}
+	// 再跑一次：改名后必须幂等（不得因为旧编码缺席而新建客户端）
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed (2nd) fail: %v", err)
+	}
+
+	var clients []model.ApplicationClientEntity
+	if err := db.Find(&clients).Error; err != nil {
+		t.Fatalf("query application_client: %v", err)
+	}
+	if len(clients) != 2 {
+		t.Fatalf("application_client count = %d, want 2（旧编码必须原地改名而非新建）", len(clients))
+	}
+	var legacyCount int64
+	if err := db.Model(&model.ApplicationClientEntity{}).
+		Where("code IN ?", []string{"platform-admin-web", "tenant-admin-web"}).Count(&legacyCount).Error; err != nil {
+		t.Fatalf("count legacy clients: %v", err)
+	}
+	if legacyCount != 0 {
+		t.Errorf("legacy client code row count = %d, want 0", legacyCount)
+	}
+
+	for code, wantID := range wantIDs {
+		var got model.ApplicationClientEntity
+		if err := db.Where("code = ?", code).First(&got).Error; err != nil {
+			t.Fatalf("query migrated client %s: %v", code, err)
+		}
+		if got.ID != wantID {
+			t.Errorf("client %s id = %s, want legacy id %s（改名必须保留主键）", code, got.ID, wantID)
+		}
+		if got.Source != model.ApplicationClientSourceBuiltin {
+			t.Errorf("client %s source = %q, want %q（安全不变式必须收敛）", code, got.Source, model.ApplicationClientSourceBuiltin)
+		}
+	}
+}
+
 // TestSeedIamMigratesLegacyApplicationCode 存量库的应用编码为连字符形态（platform-admin /
 // tenant-admin）时，种子启动必须原地改名为下划线形态（platform_admin / tenant_admin）：
 // 保留主键，因此以 app_id 关联的菜单/订阅/角色全部随之迁移，不会重建出第二个内置应用。
@@ -759,7 +899,7 @@ func TestSeedIamMigratesLegacyApplicationCode(t *testing.T) {
 
 	legacy := &model.ApplicationEntity{
 		Code:   "platform-admin",
-		Name:   "管理后台",                    // 旧库遗留名：种子启动时应回填为平台管理后台
+		Name:   "管理后台",                    // 旧库遗留展示名：归运维，种子不回写
 		Source: model.AppSourceThirdParty, // 旧库补列后的默认值，种子应一并纠正为 builtin
 		Status: model.AppStatusEnable,
 	}
@@ -813,8 +953,9 @@ func TestSeedIamMigratesLegacyApplicationCode(t *testing.T) {
 	if migrated.Source != model.AppSourceBuiltin {
 		t.Errorf("application source = %q, want %q", migrated.Source, model.AppSourceBuiltin)
 	}
-	if migrated.Name != "平台管理后台" {
-		t.Errorf("application name = %q, want %q (旧库遗留名必须随启动回填)", migrated.Name, "平台管理后台")
+	// 展示名归运维（create_only）：编码迁移不得顺带回填名称，旧库/控制台的值原样保留
+	if migrated.Name != "管理后台" {
+		t.Errorf("application name = %q, want %q (展示名归运维，种子不回写)", migrated.Name, "管理后台")
 	}
 
 	var menuCount int64

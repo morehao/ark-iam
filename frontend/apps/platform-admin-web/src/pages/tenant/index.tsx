@@ -24,6 +24,13 @@ const TENANT_TYPE_OPTIONS = [
 const TENANT_TYPE_TIP =
   '客户租户（customer）：外部客户/合作方的独立数据与权限边界；平台租户（platform）：平台自运营租户（如“平台运营中心”）。当前该字段仅作分类标识，不参与数据隔离与权限判定。'
 
+/**
+ * 平台自运营租户编码（后端 model.SeedPlatformTenantCode）：种子写入的平台控制台自身所在租户，
+ * 既不可挂起（挂起即整栈失联），也不可删除。判定按编码而非 type——控制台可创建 type=platform 的
+ * 普通租户，只有种子租户是产品内置。
+ */
+const PLATFORM_TENANT_CODE = 't_platform'
+
 export default function TenantList() {
   const [data, setData] = useState<TenantItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -180,14 +187,23 @@ export default function TenantList() {
           confirm: '将重置该租户内置管理员的密码：新临时密码仅展示一次，其既有会话立即失效。确认重置？',
           onClick: () => void handleResetAdminPassword(r),
         },
-        { key: 'delete', label: '删除', danger: true, confirm: '确认删除该租户？', onClick: () => void handleDelete(r) },
+        {
+          key: 'delete',
+          label: '删除',
+          danger: true,
+          // 平台自运营租户（种子租户 t_platform）禁删：删除即整栈控制台失联且无恢复路径；
+          // 置灰保留展示，后端 svctenant.Delete 以 TenantBuiltInDeleteForbiddenError 兜底。
+          disabled: r.code === PLATFORM_TENANT_CODE,
+          confirm: '确认删除该租户？',
+          onClick: () => void handleDelete(r),
+        },
       ],
     }),
   ]
 
   // 平台自运营租户（种子租户 t_platform）不可挂起：它是平台控制台自身所在租户，挂起即整栈失联；
   // 与后端 svctenant.Update 的拒写规则同源。平台租户改名仍归运维（migrate_once 不覆盖自定义值）。
-  const platformTenant = editing?.code === 't_platform'
+  const platformTenant = editing?.code === PLATFORM_TENANT_CODE
 
   return (
     <PageContainer

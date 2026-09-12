@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"gorm.io/datatypes"
 
 	"github.com/morehao/ark-iam/pkg/audit"
@@ -55,10 +54,6 @@ func isValidApplicationClientStatus(status model.ApplicationClientStatus) bool {
 	}
 }
 
-func generateClientCode() string {
-	return uuid.New().String()
-}
-
 // marshalJSONSlice 将切片序列化为 JSON 列（nil 落空数组）。
 // 元素可为任意类型：枚举具名类型底层是 string，序列化结果与 []string 一致。
 func marshalJSONSlice[T any](s []T) datatypes.JSON {
@@ -70,10 +65,17 @@ func marshalJSONSlice[T any](s []T) datatypes.JSON {
 }
 
 func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientCreateReq) (*dtoapplicationclient.ApplicationClientCreateResp, error) {
+	// 编码规则校验（校验归 service，与 svcapplication.Create 同款）：客户端编码即 OIDC client_id，
+	// 同时是网关侧 audience 白名单值；非法值（连字符/数字/大写/空）必须在此拦截，
+	// 而不是落库后再靠人工纠正——写错一个字符会让该客户端签发的令牌全部 401。
+	if !model.IsValidClientCode(req.Code) {
+		glog.Errorf(ctx, "[svcapplicationclient.Create] 非法客户端编码, req:%s", gutil.ToJsonString(req))
+		return nil, code.GetError(code.ApplicationClientCodeInvalidError)
+	}
 	insertEntity := &model.ApplicationClientEntity{
 		TenantID:                gincontext.GetTenantIDString(ctx),
 		AppID:                   req.AppID,
-		Code:                    generateClientCode(),
+		Code:                    req.Code,
 		Name:                    req.Name,
 		RedirectURIs:            marshalJSONSlice(req.RedirectURIs),
 		PostLogoutRedirectURIs:  marshalJSONSlice(req.PostLogoutRedirectURIs),
@@ -129,19 +131,11 @@ func (svc *oAuthClientSvc) Delete(ctx *gin.Context, req *dtoapplicationclient.Ap
 	return nil
 }
 
-// clientSeedFieldsChanged 判断请求是否改动了种子拥有的客户端字段（字段权威矩阵：
-// application_client 的 reconcile 字段 = name）。内置客户端名称由平台版本定义，控制台拒写。
-func clientSeedFieldsChanged(entity *model.ApplicationClientEntity, req *dtoapplicationclient.ApplicationClientUpdateReq) bool {
-	current := map[string]any{"name": entity.Name}
-	desired := map[string]any{"name": req.Name}
-	for field, want := range desired {
-		if model.SeedOwnsField(model.SeedEntityApplicationClient, field) && current[field] != want {
-			return true
-		}
-	}
-	return false
-}
-
+// 内置客户端的写入约束：字段权威矩阵里 application_client 的 reconcile 字段只有 source 与
+// app_id（内置标记与归属应用），两者都不在 ApplicationClientUpdateReq 中，控制台无写入入口。
+// code（= client_id）**可改，但内置客户端拒改**：它同时是网关 aud 白名单与前端构建期
+// client_id 的取值来源，从控制台改会当场把该控制台锁死且无法从界面恢复（见客户端编码方案文档）。
+// 名称/回调地址/授权类型/TTL 都归运维（create_only）。
 func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientUpdateReq) error {
 	if !isValidApplicationClientStatus(req.Status) {
 		glog.Errorf(ctx, "[svcapplicationclient.Update] 非法客户端状态, req:%s", gutil.ToJsonString(req))
@@ -154,10 +148,6 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.Ap
 	}
 	if !applicationClientVisibleToTenant(entity, gincontext.GetTenantIDString(ctx)) {
 		return code.GetError(code.ApplicationClientNotExistError)
-	}
-	if entity.Source == model.ApplicationClientSourceBuiltin && clientSeedFieldsChanged(entity, req) {
-		glog.Errorf(ctx, "[svcapplicationclient.Update] 拒绝修改内置客户端名称, clientID:%s, req:%s", req.ApplicationClientID, gutil.ToJsonString(req))
-		return code.GetError(code.ApplicationClientBuiltInFieldImmutableError)
 	}
 
 	userID := gincontext.GetUserIDString(ctx)
@@ -180,6 +170,19 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.Ap
 	// status 留空表示不修改：不写该列，避免把状态覆盖为空串
 	if req.Status != "" {
 		updateMap["status"] = req.Status
+	}
+	// code 留空表示不修改；确有变化时：内置客户端拒改（见函数头注释），其余按创建时的规则校验。
+	if req.Code != "" && req.Code != entity.Code {
+		if entity.Source.IsBuiltin() {
+			glog.Errorf(ctx, "[svcapplicationclient.Update] 拒绝修改内置客户端编码, clientID:%s, req:%s",
+				req.ApplicationClientID, gutil.ToJsonString(req))
+			return code.GetError(code.ApplicationClientBuiltInCodeImmutableError)
+		}
+		if !model.IsValidClientCode(req.Code) {
+			glog.Errorf(ctx, "[svcapplicationclient.Update] 非法客户端编码, req:%s", gutil.ToJsonString(req))
+			return code.GetError(code.ApplicationClientCodeInvalidError)
+		}
+		updateMap["code"] = req.Code
 	}
 	if err := dao.NewApplicationClientDao().UpdateMap(ctx, req.ApplicationClientID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))

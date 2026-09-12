@@ -88,21 +88,13 @@ func TestMenuTreeUsesAppID(t *testing.T) {
 }
 
 func TestMenuCreatePersistsVisibilityAndStatusAndType(t *testing.T) {
-	// 菜单新增会回查所属应用（内置应用的菜单树只读），故测试库需具备 application 表
-	db := testutil.SetupSQLite(t, &model.MenuEntity{}, &model.ApplicationEntity{})
+	db := testutil.SetupSQLite(t, &model.MenuEntity{})
 	ctx := newGinCtx("20", "0")
-
-	app := &model.ApplicationEntity{
-		Code: "customer_app", Name: "客户应用", Source: model.AppSourceThirdParty, Status: model.AppStatusEnable,
-	}
-	if err := db.Create(app).Error; err != nil {
-		t.Fatalf("seed app: %v", err)
-	}
 
 	svc := &menuSvc{}
 	resp, err := svc.Create(ctx, &dtopermission.MenuCreateReq{
 		MenuBaseInfo: objpermission.MenuBaseInfo{
-			AppID:      app.ID,
+			AppID:      "10",
 			Name:       "工作台",
 			Code:       "dashboard",
 			Type:       model.MenuTypeMenu,
@@ -157,19 +149,11 @@ func TestMenuCreateRejectsInvalidEnums(t *testing.T) {
 }
 
 func TestMenuUpdatePersistsVisibility(t *testing.T) {
-	// 菜单更新会回查所属应用（判定是否内置应用的菜单），故测试库需同时具备 application 表
-	db := testutil.SetupSQLite(t, &model.MenuEntity{}, &model.ApplicationEntity{})
+	db := testutil.SetupSQLite(t, &model.MenuEntity{})
 	ctx := newGinCtx("22", "0")
 
-	app := &model.ApplicationEntity{
-		Code: "customer_app", Name: "客户应用", Source: model.AppSourceThirdParty, Status: model.AppStatusEnable,
-	}
-	if err := db.Create(app).Error; err != nil {
-		t.Fatalf("seed app: %v", err)
-	}
-
 	menu := &model.MenuEntity{
-		AppID:      app.ID,
+		AppID:      "10",
 		Name:       "m",
 		Code:       "m",
 		Type:       model.MenuTypeMenu,
@@ -184,7 +168,7 @@ func TestMenuUpdatePersistsVisibility(t *testing.T) {
 	err := svc.Update(ctx, &dtopermission.MenuUpdateReq{
 		MenuID: menu.ID,
 		MenuBaseInfo: objpermission.MenuBaseInfo{
-			AppID:      app.ID,
+			AppID:      "10",
 			Name:       "m",
 			Code:       "m",
 			Type:       model.MenuTypeMenu,

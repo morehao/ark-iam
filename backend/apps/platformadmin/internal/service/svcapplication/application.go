@@ -77,20 +77,12 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.Applicat
 	}, nil
 }
 
-// applicationSeedFieldsChanged 判断请求是否改动了种子拥有的字段（字段权威矩阵：
-// application 的 reconcile 字段 = name/description）。控制台对这些字段必须拒写，
-// 否则会出现"运维改完、重启被种子收敛回去"的双写者。
-func applicationSeedFieldsChanged(entity *model.ApplicationEntity, req *dtoapplication.ApplicationUpdateReq) bool {
-	current := map[string]any{"name": entity.Name, "description": entity.Description}
-	desired := map[string]any{"name": req.Name, "description": req.Description}
-	for field, want := range desired {
-		if model.SeedOwnsField(model.SeedEntityApplication, field) && current[field] != want {
-			return true
-		}
-	}
-	return false
-}
-
+// 内置应用的写入约束：字段权威矩阵里 application 的 reconcile 字段只有 source（内置标记），
+// 而 source 不在 ApplicationUpdateReq 中（控制台无写入入口），故 Update 无需再做种子字段校验。
+// 名称/描述/启停/排序/logo/主页都归运维（create_only）：控制台改完重启不被种子回写。
+// code（应用编码）自建应用可改，**内置应用拒改**：控制台菜单入口仍按该编码定位
+// （svcpermission.MyTree 按 platform_admin 查应用、tenantadmin loadConsoleApps 只保留 tenant_admin），
+// 改名会当场让对应控制台侧边栏失联且无法从界面恢复（真要换属版本级动作）。种子定位用 seed_key，与此无关。
 func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.ApplicationUpdateReq) error {
 	if !isValidAppStatus(req.Status) {
 		glog.Errorf(ctx, "[svcapplication.Update] 非法应用状态, req:%s", gutil.ToJsonString(req))
@@ -104,10 +96,6 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.Applicat
 	if entity == nil || entity.ID == "" {
 		return code.GetError(code.ApplicationNotExistError)
 	}
-	if entity.Source.IsBuiltin() && applicationSeedFieldsChanged(entity, req) {
-		glog.Errorf(ctx, "[svcapplication.Update] 拒绝修改内置应用身份字段, appID:%s, req:%s", req.AppID, gutil.ToJsonString(req))
-		return code.GetError(code.ApplicationBuiltInFieldImmutableError)
-	}
 	updateMap := map[string]any{
 		"name":         req.Name,
 		"description":  req.Description,
@@ -119,6 +107,20 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.Applicat
 	// status 留空表示不修改：不写该列，避免把状态覆盖为空串
 	if req.Status != "" {
 		updateMap["status"] = req.Status
+	}
+	// code 留空表示不修改；非空且确有变化时：内置应用拒改（见函数头注释），其余按创建时的规则校验
+	// （model.AppCodePattern）。应用内唯一由唯一索引兜底，撞重返回本领域更新错误码。
+	if req.Code != "" && req.Code != entity.Code {
+		if entity.Source.IsBuiltin() {
+			glog.Errorf(ctx, "[svcapplication.Update] 拒绝修改内置应用编码, appID:%s, req:%s",
+				req.AppID, gutil.ToJsonString(req))
+			return code.GetError(code.ApplicationBuiltInCodeImmutableError)
+		}
+		if !model.IsValidAppCode(req.Code) {
+			glog.Errorf(ctx, "[svcapplication.Update] 非法应用编码, req:%s", gutil.ToJsonString(req))
+			return code.GetError(code.ApplicationCodeInvalidError)
+		}
+		updateMap["code"] = req.Code
 	}
 	if req.AllowPersonCreateTenant != nil {
 		updateMap["allow_person_create_tenant"] = *req.AllowPersonCreateTenant

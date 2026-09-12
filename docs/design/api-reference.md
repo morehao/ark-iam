@@ -112,12 +112,12 @@ flowchart LR
 ```bash
 # 授权码换令牌（client_secret_basic）
 curl -X POST http://localhost:8081/oidc/oauth/token \
-  -u "platform-admin-web:客户端密钥" \
+  -u "platform_admin_web:客户端密钥" \
   -d "grant_type=authorization_code&code=xxx&redirect_uri=http://localhost:4001/callback&code_verifier=xxx"
 
 # 刷新令牌
 curl -X POST http://localhost:8081/oidc/oauth/token \
-  -u "platform-admin-web:客户端密钥" \
+  -u "platform_admin_web:客户端密钥" \
   -d "grant_type=refresh_token&refresh_token=xxx"
 ```
 
@@ -184,7 +184,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | POST | `/v1/platform/menus` | 创建菜单 |
 | GET | `/v1/platform/menus` | 菜单分页 |
 | GET | `/v1/platform/menus/tree` | 菜单树 |
-| GET/PUT/DELETE | `/v1/platform/menus/:menuID` | 菜单详情/更新/删除 |
+| GET/PUT/DELETE | `/v1/platform/menus/:menuID` | 菜单详情/更新/删除（**删除级联整棵子树**并在同事务内解绑 `role_menu`；控制台可增删任意应用的菜单，含内置应用——删除留下软删"墓碑"，种子不再复活，见 `menu-console-crud-20260912.md`） |
 | POST | `/v1/platform/scopes` | 创建权限点 |
 | GET | `/v1/platform/scopes` | 权限点分页 |
 | GET/PUT/DELETE | `/v1/platform/scopes/:scopeID` | 权限点详情/更新/删除 |
@@ -198,11 +198,11 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 |---|---|---|
 | POST | `/v1/platform/tenants` | 创建租户（**必带 `admin`**：同事务建根部门 + 内置管理员 user + 租户管理员角色授权；响应 `adminInitialPassword` 为一次性临时密码） |
 | GET | `/v1/platform/tenants` | 租户分页 |
-| GET/PUT/DELETE | `/v1/platform/tenants/:tenantID` | 租户详情/更新/删除 |
+| GET/PUT/DELETE | `/v1/platform/tenants/:tenantID` | 租户详情/更新/删除（**平台自运营租户 `t_platform` 禁删**，删除报 `100212`：它是平台控制台自身所在租户，删除即整栈失联且无恢复路径；判定按种子编码而非 `type`——控制台可建 `type=platform` 的普通租户） |
 | POST | `/v1/platform/tenants/:tenantID/builtin-admin/reset-password` | 重置租户内置管理员密码（仅 `source=builtin`，即建租户时由平台创建的管理员；返回一次性临时密码并撤销其会话） |
 | POST | `/v1/platform/tenant-applications` | 开通租户-应用（**必带 `tenantID`** 指定归属租户；同租户同应用重复订阅报 `100747`，租户不存在报 `100205`，应用不存在报 `100735`） |
-| GET | `/v1/platform/tenant-applications` | 租户应用分页（`tenantID` 按归属租户筛选、留空＝全部租户；`status` 筛选状态；返回 `tenantName`/`appName` 便于回显） |
-| GET/PUT/DELETE | `/v1/platform/tenant-applications/:tenantAppID` | 详情/更新/删除（平台侧跨租户运维：归属租户来自 `tenantID`/资源本身，不校验 ctx 租户，与 `/v1/platform/tenants` 同一信任模型；订阅不存在报 `100745`） |
+| GET | `/v1/platform/tenant-applications` | 租户应用分页（`tenantID` 按归属租户筛选、留空＝全部租户；`status` 筛选状态；返回 `tenantName`/`appName`/`appSource` 便于回显与判定内置订阅） |
+| GET/PUT/DELETE | `/v1/platform/tenant-applications/:tenantAppID` | 详情/更新/删除（平台侧跨租户运维：归属租户来自 `tenantID`/资源本身，不校验 ctx 租户，与 `/v1/platform/tenants` 同一信任模型；订阅不存在报 `100745`；**订阅的是内置应用（`appSource=builtin`）时禁删报 `100756`**——种子与 `ProvisionTenantAdmin` 系统开通的订阅删除后对应控制台会失去菜单，下线请改 `status=disable`） |
 
 > 租户编码 `code` 由服务端自动生成（规则 `t_<12 位随机 hex>`，如 `t_3f7a9c1d2e4b`，平台租户固定 `t_platform`），创建/更新入参无需传 `code`，创建后不可修改；列表支持 `GET /v1/platform/tenants?name=<关键词>&status=<active|suspended>`（`name` 按租户名模糊搜索，`status` 按状态精确筛选、留空不筛选、非法值报 `100209`），并返回 `createdAt`/`updatedAt`（秒级时间戳）。
 >
@@ -216,10 +216,10 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 |---|---|---|
 | POST | `/v1/platform/applications` | 创建应用（`code` 为下划线连接：小写字母开头，仅含小写字母/数字/下划线，如 `my_app`；非法编码报 `100748`） |
 | GET | `/v1/platform/applications` | 应用分页 |
-| GET/PUT/DELETE | `/v1/platform/applications/:appID` | 应用详情/更新/删除 |
+| GET/PUT/DELETE | `/v1/platform/applications/:appID` | 应用详情/更新/删除（内置应用 `source=builtin` 禁删报 `100746`：平台管理后台 / 租户管理后台由平台版本交付；其编码不可改报 `100749`：控制台菜单入口按它定位，改名即失去侧边栏。自建应用可改编码，非法值报 `100748`） |
 | POST | `/v1/platform/application-clients` | 创建 OAuth 客户端 |
 | GET | `/v1/platform/application-clients` | 客户端分页 |
-| GET/PUT/DELETE | `/v1/platform/application-clients/:applicationClientID` | 详情/更新/删除 |
+| GET/PUT/DELETE | `/v1/platform/application-clients/:applicationClientID` | 详情/更新/删除（内置客户端 `source=builtin` 禁删报 `100820`，其编码不可改报 `100823`：`client_id` 是网关 aud 白名单与前端构建期默认值的来源） |
 | GET/POST | `/v1/platform/application-clients/:applicationClientID/secrets` | 密钥列表/创建 |
 | DELETE | `/v1/platform/application-clients/:applicationClientID/secrets/:secretID` | 删除密钥 |
 

@@ -77,3 +77,43 @@ describe('租户应用订阅', () => {
     )
   })
 })
+
+/**
+ * 内置应用的订阅禁删：种子为平台租户写入 platform_admin 订阅、ProvisionTenantAdmin 为每个租户
+ * 写入 tenant_admin 订阅，删除会让对应控制台当场失去菜单。前端按后端回填的 appSource 把「删除」
+ * 置灰保留展示（不隐藏），后端 svctenantapplication.Delete 以 TenantApplicationBuiltInErr 兜底。
+ */
+describe('内置应用的订阅不可删除', () => {
+  const builtinRow = {
+    tenantAppID: 'ta-1',
+    tenantID: 't1',
+    tenantName: '平台运营中心',
+    appID: 'app-1',
+    appName: '平台管理后台',
+    appSource: 'builtin' as const,
+    status: 'enable' as const,
+  }
+  const thirdPartyRow = { ...builtinRow, tenantAppID: 'ta-2', appSource: 'third_party' as const }
+
+  beforeEach(() => {
+    mockGetTenantApplicationPageList.mockReset()
+  })
+
+  it('订阅内置应用的行「删除」置灰不可点', async () => {
+    mockGetTenantApplicationPageList.mockResolvedValue({ list: [builtinRow], total: 1 })
+
+    render(<TenantApplicationList />)
+
+    expect(await screen.findByText('平台管理后台')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '删除' })).toBeDisabled()
+  })
+
+  it('订阅第三方应用的行「删除」可点', async () => {
+    mockGetTenantApplicationPageList.mockResolvedValue({ list: [thirdPartyRow], total: 1 })
+
+    render(<TenantApplicationList />)
+
+    expect(await screen.findByText('平台管理后台')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '删除' })).not.toBeDisabled()
+  })
+})
