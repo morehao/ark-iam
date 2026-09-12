@@ -12,6 +12,7 @@ import (
 
 	"github.com/morehao/ark-iam/pkg/iam/dao"
 	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"gorm.io/driver/sqlite"
@@ -172,7 +173,7 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 	if got := claims["client_id"]; got != "ak_1234567" {
 		t.Fatalf("expected client_id claim %q, got %v", "ak_1234567", got)
 	}
-	if got := claims["token_usage"]; got != "machine" {
+	if got := claims["token_usage"]; got != objauth.TokenUsageMachine {
 		t.Fatalf("expected token_usage claim machine, got %v", got)
 	}
 }

@@ -46,10 +46,10 @@ type ConnectorDetailReq struct {
 
 type ConnectorPageListReq struct {
 	gobject.PageQuery
-	TenantID    string                `json:"tenantID" form:"tenantID"`       // 租户ID
-	Protocol    string                `json:"protocol" form:"protocol"`       // 协议类型
-	Provider    string                `json:"provider" form:"provider"`       // 提供商
-	Status      model.ConnectorStatus `json:"status" form:"status"`           // 状态
-	Name        string                `json:"name" form:"name"`               // 名称
-	DisplayName string                `json:"displayName" form:"displayName"` // 显示名称
+	TenantID    string                  `json:"tenantID" form:"tenantID"`       // 租户ID
+	Protocol    model.ConnectorProtocol `json:"protocol" form:"protocol"`       // 协议类型
+	Provider    model.ConnectorProvider `json:"provider" form:"provider"`       // 提供商
+	Status      model.ConnectorStatus   `json:"status" form:"status"`           // 状态
+	Name        string                  `json:"name" form:"name"`               // 名称
+	DisplayName string                  `json:"displayName" form:"displayName"` // 显示名称
 }

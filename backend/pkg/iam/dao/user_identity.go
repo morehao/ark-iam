@@ -15,7 +15,7 @@ type UserIdentityCond struct {
 	*gormdao.BaseCond
 	PersonID        string
 	ConnectorID     string
-	Provider        string
+	Provider        model.ConnectorProvider
 	Issuer          string
 	ExternalSubject string
 }

@@ -13,6 +13,7 @@ package seed
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -540,7 +541,7 @@ func seedAdminUser(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity,
 			PrimaryEmail:      model.StrPtr("admin@example.com"),
 			PrimaryPhone:      model.StrPtr("13800000000"),
 			PasswordEncrypted: passwordHash,
-			PasswordMethod:    "bcrypt",
+			PasswordMethod:    model.PasswordMethodBcrypt,
 			Name:              "系统管理员",
 			Profile:           []byte(`{}`),
 			CustomData:        []byte(`{}`),
@@ -638,6 +639,13 @@ func seedAdminUserRole(ctx context.Context, db *gorm.DB, tenant *model.TenantEnt
 	return nil
 }
 
+// seedOIDCClientGrantTypes 种子 OAuth 客户端授权类型：由 model.GrantType 常量序列化，
+// 避免在种子数据里裸写 JSON 字面量导致取值漂移。
+var seedOIDCClientGrantTypes = func() []byte {
+	b, _ := json.Marshal([]model.GrantType{model.GrantTypeAuthorizationCode, model.GrantTypeRefreshToken})
+	return b
+}()
+
 func seedOIDCClients(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, app *model.ApplicationEntity) error {
 	type clientDef struct {
 		code                 string
@@ -690,9 +698,9 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, tenant *model.TenantEntit
 			RedirectURIs:            []byte(def.redirectURIs),
 			PostLogoutRedirectURIs:  []byte(def.postLogoutRedirect),
 			BackChannelLogoutURI:    def.backChannelLogoutURI,
-			GrantTypes:              []byte(`["authorization_code","refresh_token"]`),
+			GrantTypes:              seedOIDCClientGrantTypes,
 			ResponseTypes:           []byte(`["code"]`),
-			TokenEndpointAuthMethod: "none",
+			TokenEndpointAuthMethod: model.TokenEndpointAuthMethodNone,
 			RequirePKCE:             true,
 			DefaultScopes:           []byte(`["openid","profile","email"]`),
 			Source:                  model.ApplicationClientSourceBuiltin,

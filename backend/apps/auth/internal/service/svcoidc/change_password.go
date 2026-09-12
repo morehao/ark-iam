@@ -6,6 +6,7 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/iam/dao"
+	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/ark-iam/pkg/iam/password"
 	"github.com/morehao/ark-iam/pkg/iam/tenant"
 	"github.com/morehao/golib/gcrypto"
@@ -69,7 +70,7 @@ func (svc *oidcAuthSvc) ChangePassword(ctx *gin.Context, req *dtooidc.OIDCChange
 	}
 	if err := personDao.UpdateMap(reqCtx, personID, map[string]any{
 		"password_encrypted":   newHash,
-		"password_method":      "bcrypt",
+		"password_method":      model.PasswordMethodBcrypt,
 		"must_change_password": false,
 		"updated_by":           personID,
 	}); err != nil {

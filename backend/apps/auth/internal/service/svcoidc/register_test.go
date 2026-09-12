@@ -161,7 +161,7 @@ func TestRegisterPersonExistingPersonRequiresPasswordLogin(t *testing.T) {
 	existing := &model.PersonEntity{
 		Username:          model.StrPtr("alice"),
 		PasswordEncrypted: "keep-me",
-		PasswordMethod:    "bcrypt",
+		PasswordMethod:    model.PasswordMethodBcrypt,
 		Profile:           json.RawMessage(`{}`),
 		CustomData:        json.RawMessage(`{}`),
 	}

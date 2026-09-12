@@ -157,7 +157,7 @@ func (svc *apiKeySvc) PageList(ctx *gin.Context, req *dtotenant.ApiKeyPageListRe
 			UpdatedAt:   v.UpdatedAt.Unix(),
 		}
 		if owner, ok := userMap[v.OwnerUserID]; ok {
-			item.OwnerType = string(owner.UserType)
+			item.OwnerType = owner.UserType
 			item.OwnerName = owner.Name
 		}
 		if creator, ok := userMap[v.CreatedBy]; ok {

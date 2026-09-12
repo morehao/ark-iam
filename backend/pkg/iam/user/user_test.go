@@ -53,7 +53,7 @@ func TestCreate_NewPersonWithDeptRelations(t *testing.T) {
 			Username:           "acme-admin",
 			PrimaryEmail:       "admin@acme.com",
 			PasswordEncrypted:  "hash",
-			PasswordMethod:     "bcrypt",
+			PasswordMethod:     model.PasswordMethodBcrypt,
 			MustChangePassword: true,
 			Name:               "张三",
 		},
@@ -93,7 +93,7 @@ func TestCreate_BuiltinSourcePersisted(t *testing.T) {
 	created, personCreated, err := Create(context.Background(), db, &CreateReq{
 		TenantID: "t1",
 		Person: &person.FindOrCreateReq{
-			Username: "acme-admin", PasswordEncrypted: "hash", PasswordMethod: "bcrypt", Name: "张三",
+			Username: "acme-admin", PasswordEncrypted: "hash", PasswordMethod: model.PasswordMethodBcrypt, Name: "张三",
 		},
 		Source:              model.UserSourceBuiltin,
 		Name:                "张三",
@@ -113,7 +113,7 @@ func TestCreate_ExplicitPersonKeepsExistingPassword(t *testing.T) {
 		Username:          model.StrPtr("existing"),
 		PrimaryEmail:      model.StrPtr("existing@example.com"),
 		PasswordEncrypted: "existing-hash",
-		PasswordMethod:    "bcrypt",
+		PasswordMethod:    model.PasswordMethodBcrypt,
 		Name:              "既有账号",
 		Profile:           json.RawMessage(`{}`),
 		CustomData:        json.RawMessage(`{}`),
@@ -140,7 +140,7 @@ func TestCreate_DuplicatePersonInSameTenant(t *testing.T) {
 	db := newTestDB(t)
 	ctx := context.Background()
 	existing := &model.PersonEntity{
-		Username: model.StrPtr("dup"), PasswordEncrypted: "hash", PasswordMethod: "bcrypt",
+		Username: model.StrPtr("dup"), PasswordEncrypted: "hash", PasswordMethod: model.PasswordMethodBcrypt,
 		Profile: json.RawMessage(`{}`), CustomData: json.RawMessage(`{}`),
 	}
 	require.NoError(t, db.WithContext(ctx).Create(existing).Error)
@@ -162,7 +162,7 @@ func TestCreate_PrimaryDepartmentSingleRow(t *testing.T) {
 	withPrimary, _, err := Create(ctx, db, &CreateReq{
 		TenantID: "t1",
 		Person: &person.FindOrCreateReq{
-			Username: "single", PasswordEncrypted: "hash", PasswordMethod: "bcrypt", Name: "single",
+			Username: "single", PasswordEncrypted: "hash", PasswordMethod: model.PasswordMethodBcrypt, Name: "single",
 		},
 		Name:                "single",
 		PrimaryDepartmentID: "dept-1",
@@ -174,7 +174,7 @@ func TestCreate_PrimaryDepartmentSingleRow(t *testing.T) {
 	withoutPrimary, _, err := Create(ctx, db, &CreateReq{
 		TenantID: "t1",
 		Person: &person.FindOrCreateReq{
-			Username: "noprimary", PasswordEncrypted: "hash", PasswordMethod: "bcrypt", Name: "noprimary",
+			Username: "noprimary", PasswordEncrypted: "hash", PasswordMethod: model.PasswordMethodBcrypt, Name: "noprimary",
 		},
 		Name: "noprimary",
 	})
@@ -197,7 +197,7 @@ func TestCreate_LeaderConflict(t *testing.T) {
 	_, _, err := Create(ctx, db, &CreateReq{
 		TenantID: "t1",
 		Person: &person.FindOrCreateReq{
-			Username: "newleader", PasswordEncrypted: "hash", PasswordMethod: "bcrypt", Name: "newleader",
+			Username: "newleader", PasswordEncrypted: "hash", PasswordMethod: model.PasswordMethodBcrypt, Name: "newleader",
 		},
 		Name:                "newleader",
 		PrimaryDepartmentID: "dept-root",
@@ -211,7 +211,7 @@ func TestCreate_LeaderSameDeptAllowedForSingleLeader(t *testing.T) {
 	created, _, err := Create(context.Background(), db, &CreateReq{
 		TenantID: "t1",
 		Person: &person.FindOrCreateReq{
-			Username: "leader", PasswordEncrypted: "hash", PasswordMethod: "bcrypt", Name: "leader",
+			Username: "leader", PasswordEncrypted: "hash", PasswordMethod: model.PasswordMethodBcrypt, Name: "leader",
 		},
 		Name:                "leader",
 		PrimaryDepartmentID: "dept-root",

@@ -50,7 +50,7 @@ func seedTestLoginLog(t *testing.T, db *gorm.DB, personID, tenantID, userID stri
 		PersonID:  personID,
 		TenantID:  tenantID,
 		UserID:    userID,
-		LoginType: "password",
+		LoginType: model.LoginTypePassword,
 		LoginIP:   "10.0.0.1",
 		UserAgent: "test-agent",
 		LoginTime: loginTime,

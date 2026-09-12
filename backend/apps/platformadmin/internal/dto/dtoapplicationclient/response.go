@@ -16,9 +16,9 @@ type ApplicationClientDetailResp struct {
 	RedirectURIs            []string                      `json:"redirectURIs"`            // 授权回调地址
 	PostLogoutRedirectURIs  []string                      `json:"postLogoutRedirectURIs"`  // 登出回调地址
 	BackChannelLogoutURI    string                        `json:"backChannelLogoutURI"`    // OIDC背信道登出通知地址
-	GrantTypes              []string                      `json:"grantTypes"`              // 授权类型
+	GrantTypes              []model.GrantType             `json:"grantTypes"`              // 授权类型
 	ResponseTypes           []string                      `json:"responseTypes"`           // 响应类型
-	TokenEndpointAuthMethod string                        `json:"tokenEndpointAuthMethod"` // 令牌端点认证方式
+	TokenEndpointAuthMethod model.TokenEndpointAuthMethod `json:"tokenEndpointAuthMethod"` // 令牌端点认证方式
 	AllowedOrigins          []string                      `json:"allowedOrigins"`          // CORS白名单
 	RequirePKCE             bool                          `json:"requirePKCE"`             // 是否强制PKCE
 	RequireAuthTime         bool                          `json:"requireAuthTime"`         // 是否需要auth_time声明
@@ -42,8 +42,8 @@ type PageListItem struct {
 	Name                    string                        `json:"name"`                    // 客户端名称
 	Source                  model.ApplicationClientSource `json:"source"`                  // 客户端来源
 	Status                  model.ApplicationClientStatus `json:"status"`                  // 状态
-	GrantTypes              []string                      `json:"grantTypes"`              // 授权类型
-	TokenEndpointAuthMethod string                        `json:"tokenEndpointAuthMethod"` // 令牌端点认证方式
+	GrantTypes              []model.GrantType             `json:"grantTypes"`              // 授权类型
+	TokenEndpointAuthMethod model.TokenEndpointAuthMethod `json:"tokenEndpointAuthMethod"` // 令牌端点认证方式
 	CreatedAt               int64                         `json:"createdAt"`               // 创建时间(unix 秒)
 	UpdatedAt               int64                         `json:"updatedAt"`               // 更新时间(unix 秒)
 }

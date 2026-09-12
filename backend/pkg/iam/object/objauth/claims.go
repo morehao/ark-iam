@@ -6,12 +6,18 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// TokenUsage token 用途（私有 claim token_usage 的取值）。
+// 空值表示自然人 token（非机器凭证）。
+type TokenUsage string
+
+const (
+	// TokenUsageMachine 标识机器凭证签发的 token（API Key / client_credentials）。
+	TokenUsageMachine TokenUsage = "machine"
+)
+
 const (
 	// personSubjectPrefix 是 OIDC sub 中自然人标识的前缀（如 person:0198d5f6-xxxx）。
 	personSubjectPrefix = "person:"
-
-	// TokenUsageMachine 标识机器凭证签发的 token（API Key / client_credentials）。
-	TokenUsageMachine = "machine"
 
 	// claimTokenUsage 是 token 用途 claim 名。
 	claimTokenUsage = "token_usage"
@@ -31,10 +37,10 @@ const (
 // 自 string-id 改造起，TenantID/UserID 均为字符串主键（UUID v7）。
 type TokenClaims struct {
 	jwt.RegisteredClaims
-	TokenUsage string `json:"token_usage,omitempty"`
-	TenantID   string `json:"tenant_id,omitempty"`
-	UserID     string `json:"user_id,omitempty"`
-	ClientID   string `json:"client_id,omitempty"`
+	TokenUsage TokenUsage `json:"token_usage,omitempty"`
+	TenantID   string     `json:"tenant_id,omitempty"`
+	UserID     string     `json:"user_id,omitempty"`
+	ClientID   string     `json:"client_id,omitempty"`
 }
 
 // OIDCPrivateClaims 把强类型编码为 op.Storage 需要的扁平 map（签发侧复用）。

@@ -120,12 +120,52 @@ const docTemplateauth = `{
                 "summary": "连接器工厂列表",
                 "parameters": [
                     {
+                        "enum": [
+                            "oidc",
+                            "oauth2"
+                        ],
                         "type": "string",
+                        "x-enum-comments": {
+                            "ConnectorProtocolOAuth2": "OAuth2 协议",
+                            "ConnectorProtocolOIDC": "OIDC 协议"
+                        },
+                        "x-enum-descriptions": [
+                            "OIDC 协议",
+                            "OAuth2 协议"
+                        ],
+                        "x-enum-varnames": [
+                            "ConnectorProtocolOIDC",
+                            "ConnectorProtocolOAuth2"
+                        ],
                         "name": "protocol",
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "google",
+                            "github",
+                            "microsoft",
+                            "wechat"
+                        ],
                         "type": "string",
+                        "x-enum-comments": {
+                            "ConnectorProviderGithub": "GitHub",
+                            "ConnectorProviderGoogle": "Google",
+                            "ConnectorProviderMicrosoft": "Microsoft Entra ID",
+                            "ConnectorProviderWechat": "微信"
+                        },
+                        "x-enum-descriptions": [
+                            "Google",
+                            "GitHub",
+                            "Microsoft Entra ID",
+                            "微信"
+                        ],
+                        "x-enum-varnames": [
+                            "ConnectorProviderGoogle",
+                            "ConnectorProviderGithub",
+                            "ConnectorProviderMicrosoft",
+                            "ConnectorProviderWechat"
+                        ],
                         "name": "provider",
                         "in": "query"
                     }
@@ -191,13 +231,53 @@ const docTemplateauth = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "oidc",
+                            "oauth2"
+                        ],
                         "type": "string",
+                        "x-enum-comments": {
+                            "ConnectorProtocolOAuth2": "OAuth2 协议",
+                            "ConnectorProtocolOIDC": "OIDC 协议"
+                        },
+                        "x-enum-descriptions": [
+                            "OIDC 协议",
+                            "OAuth2 协议"
+                        ],
+                        "x-enum-varnames": [
+                            "ConnectorProtocolOIDC",
+                            "ConnectorProtocolOAuth2"
+                        ],
                         "description": "协议类型",
                         "name": "protocol",
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "google",
+                            "github",
+                            "microsoft",
+                            "wechat"
+                        ],
                         "type": "string",
+                        "x-enum-comments": {
+                            "ConnectorProviderGithub": "GitHub",
+                            "ConnectorProviderGoogle": "Google",
+                            "ConnectorProviderMicrosoft": "Microsoft Entra ID",
+                            "ConnectorProviderWechat": "微信"
+                        },
+                        "x-enum-descriptions": [
+                            "Google",
+                            "GitHub",
+                            "Microsoft Entra ID",
+                            "微信"
+                        ],
+                        "x-enum-varnames": [
+                            "ConnectorProviderGoogle",
+                            "ConnectorProviderGithub",
+                            "ConnectorProviderMicrosoft",
+                            "ConnectorProviderWechat"
+                        ],
                         "description": "提供商",
                         "name": "provider",
                         "in": "query"
@@ -967,11 +1047,19 @@ const docTemplateauth = `{
                 },
                 "protocol": {
                     "description": "协议类型",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProtocol"
+                        }
+                    ]
                 },
                 "provider": {
                     "description": "提供商",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProvider"
+                        }
+                    ]
                 },
                 "status": {
                     "description": "状态",
@@ -1046,11 +1134,19 @@ const docTemplateauth = `{
                 },
                 "protocol": {
                     "description": "协议类型",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProtocol"
+                        }
+                    ]
                 },
                 "provider": {
                     "description": "提供商",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProvider"
+                        }
+                    ]
                 },
                 "status": {
                     "description": "状态",
@@ -1124,11 +1220,19 @@ const docTemplateauth = `{
                 },
                 "protocol": {
                     "description": "协议类型",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProtocol"
+                        }
+                    ]
                 },
                 "provider": {
                     "description": "提供商",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProvider"
+                        }
+                    ]
                 },
                 "status": {
                     "description": "状态",
@@ -1206,11 +1310,19 @@ const docTemplateauth = `{
                 },
                 "protocol": {
                     "description": "协议类型",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProtocol"
+                        }
+                    ]
                 },
                 "provider": {
                     "description": "提供商",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProvider"
+                        }
+                    ]
                 },
                 "status": {
                     "description": "状态",
@@ -1329,7 +1441,7 @@ const docTemplateauth = `{
                 "capabilities": {
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/model.ConnectorCapability"
                     }
                 },
                 "configSchema": {},
@@ -1349,10 +1461,10 @@ const docTemplateauth = `{
                     "type": "boolean"
                 },
                 "protocol": {
-                    "type": "string"
+                    "$ref": "#/definitions/model.ConnectorProtocol"
                 },
                 "provider": {
-                    "type": "string"
+                    "$ref": "#/definitions/model.ConnectorProvider"
                 }
             }
         },
@@ -1515,6 +1627,83 @@ const docTemplateauth = `{
                     "type": "string"
                 }
             }
+        },
+        "model.ConnectorCapability": {
+            "type": "string",
+            "enum": [
+                "authorize",
+                "callback",
+                "claim_mapping",
+                "domain_policy",
+                "profile_sync"
+            ],
+            "x-enum-comments": {
+                "ConnectorCapabilityAuthorize": "发起授权",
+                "ConnectorCapabilityCallback": "处理回调",
+                "ConnectorCapabilityClaimMapping": "声明映射",
+                "ConnectorCapabilityDomainPolicy": "域策略",
+                "ConnectorCapabilityProfileSync": "资料同步"
+            },
+            "x-enum-descriptions": [
+                "发起授权",
+                "处理回调",
+                "声明映射",
+                "域策略",
+                "资料同步"
+            ],
+            "x-enum-varnames": [
+                "ConnectorCapabilityAuthorize",
+                "ConnectorCapabilityCallback",
+                "ConnectorCapabilityClaimMapping",
+                "ConnectorCapabilityDomainPolicy",
+                "ConnectorCapabilityProfileSync"
+            ]
+        },
+        "model.ConnectorProtocol": {
+            "type": "string",
+            "enum": [
+                "oidc",
+                "oauth2"
+            ],
+            "x-enum-comments": {
+                "ConnectorProtocolOAuth2": "OAuth2 协议",
+                "ConnectorProtocolOIDC": "OIDC 协议"
+            },
+            "x-enum-descriptions": [
+                "OIDC 协议",
+                "OAuth2 协议"
+            ],
+            "x-enum-varnames": [
+                "ConnectorProtocolOIDC",
+                "ConnectorProtocolOAuth2"
+            ]
+        },
+        "model.ConnectorProvider": {
+            "type": "string",
+            "enum": [
+                "google",
+                "github",
+                "microsoft",
+                "wechat"
+            ],
+            "x-enum-comments": {
+                "ConnectorProviderGithub": "GitHub",
+                "ConnectorProviderGoogle": "Google",
+                "ConnectorProviderMicrosoft": "Microsoft Entra ID",
+                "ConnectorProviderWechat": "微信"
+            },
+            "x-enum-descriptions": [
+                "Google",
+                "GitHub",
+                "Microsoft Entra ID",
+                "微信"
+            ],
+            "x-enum-varnames": [
+                "ConnectorProviderGoogle",
+                "ConnectorProviderGithub",
+                "ConnectorProviderMicrosoft",
+                "ConnectorProviderWechat"
+            ]
         },
         "model.ConnectorStatus": {
             "type": "string",

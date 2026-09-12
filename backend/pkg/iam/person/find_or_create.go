@@ -13,11 +13,11 @@ import (
 
 // FindOrCreateReq 构造 FindOrCreate 入参。
 type FindOrCreateReq struct {
-	Username          string // 全局用户名（可选）
-	PrimaryEmail      string // 主要邮箱（可选）
-	PrimaryPhone      string // 主要手机号（可选）
-	PasswordEncrypted string // 新建 person 时的加密密码
-	PasswordMethod    string // 密码加密方式（如 bcrypt）
+	Username          string               // 全局用户名（可选）
+	PrimaryEmail      string               // 主要邮箱（可选）
+	PrimaryPhone      string               // 主要手机号（可选）
+	PasswordEncrypted string               // 新建 person 时的加密密码
+	PasswordMethod    model.PasswordMethod // 密码加密方式（取 model.PasswordMethod* 常量）
 	// MustChangePassword 仅对**本次新建**的 person 生效：置 true 表示其持有临时密码，
 	// 首次登录必须先改密。命中已有 person 时该字段被忽略——绝不改动既有账号的密码与登录方式。
 	MustChangePassword bool

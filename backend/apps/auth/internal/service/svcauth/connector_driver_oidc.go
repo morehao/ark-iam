@@ -12,6 +12,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/iam/model"
 	"github.com/morehao/golib/glog"
 )
 
@@ -56,7 +57,7 @@ func NewOIDCDriver() ConnectorDriver {
 	}
 }
 
-func (d *OIDCDriver) DriverType() string {
+func (d *OIDCDriver) DriverType() model.ConnectorProtocol {
 	return connectorDriverTypeOIDC
 }
 

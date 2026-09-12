@@ -12,5 +12,5 @@ type TenantBaseInfo struct {
 	// 仅 active 允许该租户成员登录与签发令牌。
 	Status model.TenantStatus `json:"status" form:"status"` // 租户状态
 	Tag    string             `json:"tag" form:"tag"`       // 标签
-	Type   string             `json:"type" form:"type"`     // 租户类型: customer-客户租户, platform-平台租户(分类标识,不参与隔离判定)
+	Type   model.TenantType   `json:"type" form:"type"`     // 租户类型: customer-客户租户, platform-平台租户(分类标识,不参与隔离判定)
 }

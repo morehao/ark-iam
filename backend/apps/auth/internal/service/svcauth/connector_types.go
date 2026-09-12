@@ -1,33 +1,39 @@
 package svcauth
 
+import "github.com/morehao/ark-iam/pkg/iam/model"
+
+// 连接器字典常量的 svcauth 包内短名别名：取值事实源在 model
+// （model.ConnectorProtocol* / ConnectorProvider* / ConnectorCapability*），
+// 此处保留短名供驱动注册、工厂描述与测试复用，禁止再出现裸字面量。
 const (
-	connectorDriverTypeOIDC   = "oidc"
-	connectorDriverTypeOAuth2 = "oauth2"
+	connectorDriverTypeOIDC   = model.ConnectorProtocolOIDC
+	connectorDriverTypeOAuth2 = model.ConnectorProtocolOAuth2
 
-	connectorProviderGoogle    = "google"
-	connectorProviderGithub    = "github"
-	connectorProviderMicrosoft = "microsoft"
+	connectorProviderGoogle    = model.ConnectorProviderGoogle
+	connectorProviderGithub    = model.ConnectorProviderGithub
+	connectorProviderMicrosoft = model.ConnectorProviderMicrosoft
+	connectorProviderWechat    = model.ConnectorProviderWechat
 
-	connectorCapabilityAuthorize    = "authorize"
-	connectorCapabilityCallback     = "callback"
-	connectorCapabilityClaimMapping = "claim_mapping"
-	connectorCapabilityDomainPolicy = "domain_policy"
-	connectorCapabilityProfileSync  = "profile_sync"
+	connectorCapabilityAuthorize    = model.ConnectorCapabilityAuthorize
+	connectorCapabilityCallback     = model.ConnectorCapabilityCallback
+	connectorCapabilityClaimMapping = model.ConnectorCapabilityClaimMapping
+	connectorCapabilityDomainPolicy = model.ConnectorCapabilityDomainPolicy
+	connectorCapabilityProfileSync  = model.ConnectorCapabilityProfileSync
 )
 
 type ConnectorConfig struct {
-	Protocol     string         `json:"protocol"`
-	Provider     string         `json:"provider"`
-	Issuer       string         `json:"issuer"`
-	AuthURL      string         `json:"authUrl"`
-	TokenURL     string         `json:"tokenUrl"`
-	UserInfoURL  string         `json:"userInfoUrl"`
-	ClientID     string         `json:"clientID"`
-	ClientSecret string         `json:"clientSecret"`
-	RedirectURI  string         `json:"redirectUri"`
-	Scopes       []string       `json:"scopes"`
-	Raw          map[string]any `json:"-"`
-	Extra        map[string]any `json:"extra"`
+	Protocol     model.ConnectorProtocol `json:"protocol"`
+	Provider     model.ConnectorProvider `json:"provider"`
+	Issuer       string                  `json:"issuer"`
+	AuthURL      string                  `json:"authUrl"`
+	TokenURL     string                  `json:"tokenUrl"`
+	UserInfoURL  string                  `json:"userInfoUrl"`
+	ClientID     string                  `json:"clientID"`
+	ClientSecret string                  `json:"clientSecret"`
+	RedirectURI  string                  `json:"redirectUri"`
+	Scopes       []string                `json:"scopes"`
+	Raw          map[string]any          `json:"-"`
+	Extra        map[string]any          `json:"extra"`
 }
 
 type StandardIdentity struct {

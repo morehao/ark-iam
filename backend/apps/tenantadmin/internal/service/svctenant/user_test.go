@@ -112,7 +112,7 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 	if err := db.First(&bobPerson, "id = ?", bob.PersonID).Error; err != nil {
 		t.Fatalf("query bob person: %v", err)
 	}
-	if bobPerson.PasswordEncrypted == "" || bobPerson.PasswordMethod != "bcrypt" {
+	if bobPerson.PasswordEncrypted == "" || bobPerson.PasswordMethod != model.PasswordMethodBcrypt {
 		t.Fatalf("expected bcrypt password on person")
 	}
 	if err := gcrypto.ComparePasswordHash(bobPerson.PasswordEncrypted, respB.InitialPassword); err != nil {

@@ -10,7 +10,7 @@ type AuditLogCond struct {
 	*gormdao.BaseCond
 	PersonID string
 	TenantID string
-	Action   string
+	Action   model.AuditAction
 	Result   model.AuditResult
 }
 

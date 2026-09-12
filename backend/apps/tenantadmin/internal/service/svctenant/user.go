@@ -286,7 +286,7 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 				PrimaryEmail:       req.PrimaryEmail,
 				PrimaryPhone:       req.PrimaryPhone,
 				PasswordEncrypted:  passwordHash,
-				PasswordMethod:     "bcrypt",
+				PasswordMethod:     model.PasswordMethodBcrypt,
 				MustChangePassword: true,
 				Name:               req.Name,
 				Avatar:             req.Avatar,
@@ -604,7 +604,7 @@ func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPass
 	}
 	if err := dao.NewPersonDao().UpdateMap(ctx, userEntity.PersonID, map[string]any{
 		"password_encrypted":   hash,
-		"password_method":      "bcrypt",
+		"password_method":      model.PasswordMethodBcrypt,
 		"must_change_password": true,
 		"updated_by":           gincontext.GetUserIDString(ctx),
 	}); err != nil {

@@ -30,7 +30,7 @@ func seedZeroTenantPerson(t *testing.T, identifier, password string) {
 	person := &model.PersonEntity{
 		Username:          model.StrPtr(identifier),
 		PasswordEncrypted: hash,
-		PasswordMethod:    "bcrypt",
+		PasswordMethod:    model.PasswordMethodBcrypt,
 		Profile:           json.RawMessage(`{}`),
 		CustomData:        json.RawMessage(`{}`),
 	}
@@ -112,7 +112,7 @@ func TestAuthenticatePasswordZeroTenantPersonVariableIdentifierForms(t *testing.
 				PrimaryEmail:      email,
 				PrimaryPhone:      phone,
 				PasswordEncrypted: hash,
-				PasswordMethod:    "bcrypt",
+				PasswordMethod:    model.PasswordMethodBcrypt,
 				Profile:           json.RawMessage(`{}`),
 				CustomData:        json.RawMessage(`{}`),
 			}).Error; err != nil {
@@ -143,7 +143,7 @@ func TestAuthenticatePasswordPersonWithTenantPreservesOriginalBehavior(t *testin
 		BaseEntity:        gormdao.BaseEntity{StringID: gormdao.StringID{ID: "p1"}},
 		PrimaryEmail:      model.StrPtr("member@example.com"),
 		PasswordEncrypted: hash,
-		PasswordMethod:    "bcrypt",
+		PasswordMethod:    model.PasswordMethodBcrypt,
 		Profile:           json.RawMessage(`{}`),
 		CustomData:        json.RawMessage(`{}`),
 	}).Error; err != nil {

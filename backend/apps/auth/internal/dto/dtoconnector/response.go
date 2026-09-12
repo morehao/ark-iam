@@ -1,14 +1,16 @@
 package dtoconnector
 
+import "github.com/morehao/ark-iam/pkg/iam/model"
+
 type ConnectorFactoryResp struct {
-	FactoryID     string   `json:"factoryID"`
-	Protocol      string   `json:"protocol"`
-	Provider      string   `json:"provider"`
-	DisplayName   string   `json:"displayName"`
-	IsStandard    bool     `json:"isStandard"`
-	DefaultScopes []string `json:"defaultScopes"`
-	Capabilities  []string `json:"capabilities"`
-	ConfigSchema  any      `json:"configSchema"`
+	FactoryID     string                      `json:"factoryID"`
+	Protocol      model.ConnectorProtocol     `json:"protocol"`
+	Provider      model.ConnectorProvider     `json:"provider"`
+	DisplayName   string                      `json:"displayName"`
+	IsStandard    bool                        `json:"isStandard"`
+	DefaultScopes []string                    `json:"defaultScopes"`
+	Capabilities  []model.ConnectorCapability `json:"capabilities"`
+	ConfigSchema  any                         `json:"configSchema"`
 }
 
 type ConnectorFactoryListResp struct {

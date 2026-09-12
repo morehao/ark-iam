@@ -65,7 +65,7 @@ func seedTenantAdminApp(t *testing.T, db *gorm.DB) *model.ApplicationEntity {
 func newTenantCreateReq(name, adminEmail string) *dtotenant.TenantCreateReq {
 	req := &dtotenant.TenantCreateReq{}
 	req.Name = name
-	req.Type = string(model.TenantTypeCustomer)
+	req.Type = model.TenantTypeCustomer
 	req.Admin = &dtotenant.TenantAdminCreateReq{Name: name + "管理员", PrimaryEmail: adminEmail}
 	return req
 }
@@ -295,7 +295,7 @@ func TestTenantCreateReusesExistingPersonWithoutPassword(t *testing.T) {
 	existing := &model.PersonEntity{
 		PrimaryEmail:      model.StrPtr("admin@acme.com"),
 		PasswordEncrypted: "existing-hash",
-		PasswordMethod:    "bcrypt",
+		PasswordMethod:    model.PasswordMethodBcrypt,
 		Name:              "既有账号",
 		Profile:           []byte(`{}`),
 		CustomData:        []byte(`{}`),
@@ -396,7 +396,7 @@ func TestResetAdminPasswordNeverTargetsManualMember(t *testing.T) {
 	manualPerson := &model.PersonEntity{
 		PrimaryEmail:      model.StrPtr("member@acme.com"),
 		PasswordEncrypted: "member-hash",
-		PasswordMethod:    "bcrypt",
+		PasswordMethod:    model.PasswordMethodBcrypt,
 		Name:              "成员",
 		Profile:           []byte(`{}`),
 		CustomData:        []byte(`{}`),
@@ -454,7 +454,7 @@ func TestTenantUpdateSuspendsAndListsStatus(t *testing.T) {
 
 	updateReq := &dtotenant.TenantUpdateReq{TenantID: created.TenantID}
 	updateReq.Name = "Acme Corp"
-	updateReq.Type = string(model.TenantTypeCustomer)
+	updateReq.Type = model.TenantTypeCustomer
 	updateReq.Status = model.TenantStatusSuspended
 	// 操作者所在租户是另一个租户，允许挂起
 	if err := svc.Update(newTenantScopeGinCtx("other-tenant"), updateReq); err != nil {
@@ -500,7 +500,7 @@ func TestTenantUpdateRefusesSuspendOwnTenant(t *testing.T) {
 
 	updateReq := &dtotenant.TenantUpdateReq{TenantID: created.TenantID}
 	updateReq.Name = "Acme Corp"
-	updateReq.Type = string(model.TenantTypeCustomer)
+	updateReq.Type = model.TenantTypeCustomer
 	updateReq.Status = model.TenantStatusSuspended
 	err = svc.Update(newTenantScopeGinCtx(created.TenantID), updateReq)
 	if err == nil || err.Error() != code.GetError(code.TenantSuspendSelfForbiddenError).Error() {
