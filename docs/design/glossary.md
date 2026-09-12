@@ -9,7 +9,7 @@
 | 术语 | 英文 | 说明 |
 |---|---|---|
 | 自然人 ✅ | Person | 跨租户的**全局身份**。用户名/邮箱/手机号全局唯一（可空），密码、全局状态（挂起）在此维护。OIDC `sub` 为 `person:<id>` |
-| 租户成员 ✅ | User | 自然人（person）在某个**租户内**的成员记录。租户内姓名/资料/角色、是否拥有者（`is_owner`）、加入时间 |
+| 租户成员 ✅ | User | 自然人（person）在某个**租户内**的成员记录（表 **`tenant_user`**——`user` 是 PostgreSQL 保留字，故物理表名加前缀；领域实体为 `UserEntity`）。租户内姓名/资料/角色、是否拥有者（`is_owner`）、加入时间 |
 | 租户 | Tenant | 独立的客户边界（业务主体的隔离单元）。数据与权限按租户隔离；类型分 `customer`（客户租户）/`platform`（平台租户） |
 | 租户类型 | Tenant Type | **分类标识**：`customer` = 外部客户/合作方的独立租户；`platform` = 平台自运营租户（种子数据“平台运营中心”即平台租户）。当前仅用于分类展示，不参与数据隔离与权限判定（隔离一律按 `tenant_id`） |
 | 租户编码 | Tenant Code | 租户的业务编码，全局唯一、创建后不可修改。由服务端自动生成，规则 `t_<12 位随机小写 hex>`（如 `t_3f7a9c1d2e4b`），见 `pkg/core/tenant.GenerateCode`；平台租户（种子数据“平台运营中心”）为固定值 `t_platform`——同前缀、后缀固定可读，因自动生成的随机段只用小写 hex，两者不会冲突 |
@@ -38,8 +38,8 @@
 | OAuth 客户端 ✅ | Application Client | 应用下的 OIDC 接入凭证：client_id、回调白名单、授权类型、令牌 TTL 等 |
 | 客户端密钥 ✅ | Client Secret | 机密客户端在令牌端点的认证凭证（库中只存哈希） |
 | 内置应用 | Built-in App | 平台随产品交付的控制台应用（`application.source=builtin`）：**平台管理后台**与**租户管理后台**两个种子应用，受删除保护（报 `100746`）、编码只读（报 `100749`），菜单只在各自所属的控制台呈现 |
-| 字段权威矩阵 ✅ | Seed Field Authority | 声明内置种子数据每个字段归谁写的唯一真相源（`pkg/model/seed_authority.go`）：`reconcile` 种子收敛且控制台拒写 / `create_only` 只播种、归运维 / `migrate_once` 值匹配一次性改名。种子与控制台共用同一份声明，避免"改了又被收回"的双写者。**reconcile 准入判据**：只保留安全不变式（`source`/`admin_type`/平台租户 `status`），展示、结构与编码字段一律归运维——种子认行由**种子身份键**承担，不再经由控制台可写字段；见 [seed-authority-scope-revision-20260912.md](seed-authority-scope-revision-20260912.md) |
-| 种子身份键 ✅ | Seed Identity Key (`seed_key`) | `menu` / `application` 上的内部列：内置行的**稳定标识**（= 种子定义时的 `code`），创建时写入后不再变化，**控制台不可见也不可写**（API 出参也不返回）。种子认行、租户开通（`ProvisionTenantAdmin`）与退役菜单清理都以它为依据，因此业务字段 `code`（乃至菜单归属应用）可以自由修改而不触发"查不到 → 重建一行"——**例外是内置应用与内置客户端的 `code`**：它们仍被控制台菜单入口 / 网关 aud 边界按值引用，由 service 拒改。控制台自建行恒为空串（部分唯一索引排除空值）。见 [seed-identity-key-20260912.md](seed-identity-key-20260912.md) |
+| 字段权威矩阵 ✅ | Seed Field Authority | 声明内置种子数据每个字段归谁写的唯一真相源（`pkg/model/seed_authority.go`）：`reconcile` 种子收敛且控制台拒写 / `create_only` 只播种、归运维 / `migrate_once` 值匹配一次性改名。种子与控制台共用同一份声明，避免"改了又被收回"的双写者。**reconcile 准入判据**：只保留安全不变式（`source`/`admin_type`/平台租户 `status`），展示、结构与编码字段一律归运维——种子认行由**种子身份键**承担，不再经由控制台可写字段。详见 [system-design.md](system-design.md) §4.5 |
+| 种子身份键 ✅ | Seed Identity Key (`seed_key`) | `menu` / `application` 上的内部列：内置行的**稳定标识**（= 种子定义时的 `code`），创建时写入后不再变化，**控制台不可见也不可写**（API 出参也不返回）。种子认行、租户开通（`ProvisionTenantAdmin`）与退役菜单清理都以它为依据，因此业务字段 `code`（乃至菜单归属应用）可以自由修改而不触发"查不到 → 重建一行"——**例外是内置应用与内置客户端的 `code`**：它们仍被控制台菜单入口 / 网关 aud 边界按值引用，由 service 拒改。控制台自建行恒为空串（部分唯一索引排除空值）。详见 [system-design.md](system-design.md) §4.5 |
 | 第一方应用 | First-party App | 平台自建但非内置的应用（`application.source=first_party`），可删除；当前种子不产生该来源，仅运维自建时出现 |
 | 第三方应用 | Third-party App | 外部接入应用（`application.source=third_party`）；控制台新建的应用恒为此类 |
 | 来源 | Source | 应用/客户端的归属与内置性（`source`：builtin/first_party/third_party）与角色的产生方式（`role.source`：builtin/custom） |
@@ -72,23 +72,25 @@
 
 | 术语 | 英文 | 说明 |
 |---|---|---|
-| 角色 | Role | 权限载体（租户内、按应用作用域），类型 User/Machine。**无业务编码**：以名称作为应用内可读标识（同一应用内名称唯一），内置角色以「所属应用 + `source=builtin`」定位 |
-| 菜单 | Menu | 前端可访问的菜单/路由（树形，按应用管理） |
-| 权限点 | Scope | 细粒度权限标识（隶属于资源） |
-| 资源 | Resource | 受保护资源（`indicator` 标识符，可配令牌 TTL） |
-| 用户-角色 | User-Role | 用户与角色的多对多关联 |
-| 角色-菜单 | Role-Menu | 角色可访问菜单的授权 |
-| 角色-权限点 | Role-Scope | 角色拥有的权限点授权 |
+| 角色 ✅ | Role | 权限载体（租户内、按应用 `app_id` 作用域）。**无类型字段、无业务编码**：以名称作为应用内可读标识（同一应用内名称唯一）；另以 `source`（builtin 内置 / custom 自定义）区分产生方式、以 `admin_type`（admin / normal）标记**系统管理能力**（内置角色的 `admin_type` 禁改） |
+| 菜单 ✅ | Menu | 前端可访问的菜单/路由（树形，按应用 `app_id` 管理；`visibility` 分 public/member/admin 可见性门槛） |
+| 用户-角色 ✅ | User-Role | 用户与角色的多对多关联（表 `user_role`） |
+| 角色-菜单 ✅ | Role-Menu | 角色可访问菜单的授权（表 `role_menu`） |
+
+> 资源级权限（权限点 Scope / 资源 Resource / 角色-权限点 Role-Scope）**已从 IAM 移除**，相关表与接口不再存在；IAM 的授权粒度到「角色—菜单」，业务细粒度鉴权由各业务应用自行实现。
 
 ## 六、认证通道与凭证
 
 | 术语 | 英文 | 说明 |
 |---|---|---|
 | 密码登录 | Password Login | 用户名/邮箱/手机号 + 密码（bcrypt） |
-| 连接器 | Connector | 外部身份源接入配置（OIDC/OAuth2 驱动，如企业微信、Google） |
+| 连接器 | Connector | 外部身份源接入配置（OIDC/OAuth2 驱动；内置工厂当前提供 Google、GitHub、Microsoft Entra ID） |
 | 登录风控 | Login Guard | 失败次数窗口与锁定（默认 5 次/5 分钟/锁 15 分钟） |
-| API Key ✅ | API Key | 机器凭证（`x-api-key` 头携带，哈希存储、可过期/吊销/scope） |
-| 机器令牌 ✅ | Machine Token | `token_usage=machine` 的令牌（client_credentials / API Key 签发），不依赖浏览器会话 |
+| API Key ✅ | API Key | 机器凭证（`x-api-key` 头或 `Authorization: Bearer` 携带，SHA-256 哈希存储、可过期/吊销；`scope` 列保留但**当前不参与鉴权**） |
+| 机器令牌 ✅ | Machine Token | 带 `token_usage=machine` 的令牌（**仅 API Key 签发**，含「API Key 当 client credential」路径），不依赖浏览器会话；普通 `client_credentials` 令牌不带该标记，也不能访问业务 API |
+| 通道 A ✅ | Channel A: Self-Serve Signup | 自助注册自然人并开通自己的租户（`POST /oidc/registerPerson` → `POST /oidc/createTenant`），注册人成为该租户**拥有者**（`is_owner=1`）；门禁是应用级 `application.allow_person_create_tenant`（非全局开关） |
+| 通道 B ✅ | Channel B: Join by Invite | 已登录用户凭邀请码加入**已有**租户（`POST /v1/auth/joinTenant`），加入者恒为**普通成员**；门禁是应用级 `application.allow_join_by_invite` 加邀请单自身有效——详见 `system-design.md` §5.1 |
+| 入口策略 ✅ | Entry Policy | `application` 上按两条自助通道各一个的可空布尔位（`allow_person_create_tenant`、`allow_join_by_invite`）：NULL 与 false 同义；判定时按调用方 `client_id` 解析应用后读取，解析不出应用一律拒绝（fail-closed） |
 
 ## 七、基础设施
 
@@ -96,7 +98,7 @@
 |---|---|---|
 | 认证 Redis ✅ | Auth Redis | 存放 SSO 会话/授权状态/令牌元数据/SLO 队列的 Redis（多应用共享） |
 | 中心会话 ✅ | SSO Session | Redis 中的认证态（`iam:oidc:sso_session:*`），对应浏览器 `iam_sso_session` Cookie |
-| 会话审计 ✅ | Session Audit | `session` 表记录，会话创建/撤销的审计落库 |
+| 会话审计 ✅ | Session Audit | `session` 表只追加记录**会话创建（登录）**；该表无状态列，会话撤销时间由 `refresh_token.revoked_at` 承担 |
 | 登录日志 ✅ | Login Log | `user_login_log` 表，每次密码登录的 IP/UA/时间 |
 | 审计日志 ✅ | Audit Log | `audit_log` 表，业务操作审计（动作/目标/结果/详情） |
 | 网关聚合 ✅ | Gateway | gateway 应用（:8100）单进程挂载 auth/platformadmin/tenantadmin |

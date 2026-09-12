@@ -87,7 +87,7 @@ const (
 // TODO(delivery): 接入邮件/短信通道后，临时密码改为由通道下发给账号本人，
 // 创建/重置响应不再回显明文。这是本文件所有"一次性回显"约定的收敛点：
 // 全仓 grep TODO(delivery) 可定位到每个待改造的回显位置。
-// 见 docs/design/tenant-admin-provisioning-design-20260912.md T1（通道立项）、Q4（通道排期）。
+// 见 docs/design/system-design.md §5.8。
 func GenerateTemporaryPassword() (string, error) {
 	allChars := lowerChars + upperChars + digitChars
 

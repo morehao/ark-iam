@@ -321,7 +321,7 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 	}
 	// TODO(delivery): 临时密码目前只能在本响应中回显一次（系统尚无邮件/短信通道）；
 	// 接入通道后改为下发给账号本人，本响应不再返回明文。
-	// 见 docs/design/tenant-admin-provisioning-design-20260912.md T1/Q4。
+	// 见 docs/design/system-design.md §5.8。
 	return resp, nil
 }
 
@@ -624,7 +624,7 @@ func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPass
 	})
 	// TODO(delivery): 临时密码目前只能在本响应中回显一次（系统尚无邮件/短信通道）；
 	// 接入通道后改为下发给账号本人，本响应不再返回明文。
-	// 见 docs/design/tenant-admin-provisioning-design-20260912.md T1/Q4。
+	// 见 docs/design/system-design.md §5.8。
 	return &dtotenant.UserResetPasswordResp{
 		UserID:          userEntity.ID,
 		InitialPassword: tempPassword,

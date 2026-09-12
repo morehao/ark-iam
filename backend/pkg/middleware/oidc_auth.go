@@ -26,6 +26,21 @@ const (
 	AuthBearer    = "Bearer "
 )
 
+// ContextKeyClientID 是 access token 中 client_id 声明在 gin 上下文里的键。
+// 它标识"本次请求是经由哪个 OIDC 客户端进来的"，是应用级入口策略
+// （pkg/core/application 的两个开关）唯一的解析入口。
+// golib 的 gcontext 没有对应常量，因此在本包内定义并配套 ClientIDFromContext 读取。
+const ContextKeyClientID = "oidcClientID"
+
+// ClientIDFromContext 读取鉴权中间件注入的 client_id；未注入（如 skip path、
+// API Key 通道）时返回空字符串，调用方应对空值 fail-closed。
+func ClientIDFromContext(ctx *gin.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	return ctx.GetString(ContextKeyClientID)
+}
+
 type authConfig struct {
 	skipPaths       []string
 	validateOIDCSSO func(ctx *gin.Context, personID string, isMachineToken bool) bool
@@ -207,12 +222,15 @@ func parsePrivateKey(der []byte) (*rsa.PrivateKey, error) {
 //     将 userID 写入 KeyUserID。反查失败视为非法访问（该自然人非当前租户成员或无对应账户）。
 //   - 机器凭证（token_usage=machine）：仅注入 personID/tenantID/authToken，不反查用户
 //     （机器凭证不隶属某个租户成员，KeyUserID 由 API Key 通道负责注入）。
+//
+// 两条通道都会注入 client_id（若 token 携带该声明），供应用级入口策略判定使用。
 func setOIDCContext(ctx *gin.Context, claims *objauth.TokenClaims, tokenStr string) error {
 	personID := claims.PersonID()
 
 	ctx.Set(gcontext.KeyPersonID, personID)
 	ctx.Set(gcontext.KeyTenantID, claims.TenantID)
 	ctx.Set(gcontext.KeyAuthToken, tokenStr)
+	ctx.Set(ContextKeyClientID, claims.ClientID)
 
 	// 机器凭证不需要反查租户用户。
 	if claims.IsMachine() || personID == "" {

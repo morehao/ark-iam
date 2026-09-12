@@ -21,7 +21,7 @@ export interface TenantUserItem {
 
 /**
  * 建成员入参。不含密码：初始临时密码由服务端生成、仅在创建响应返回一次，
- * 且该成员首次登录必须改密（见 docs/design/tenant-admin-provisioning-design-20260912.md D3/D7）。
+ * 且该成员首次登录必须改密（见 docs/design/system-design.md §5.8）。
  */
 export interface TenantUserCreateReq {
   personID?: string

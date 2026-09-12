@@ -10,7 +10,7 @@ type UserPageListReq struct {
 
 // UserCreateReq 创建租户成员。
 // 不接收密码：新建自然人的初始临时密码由服务端生成、仅创建响应返回一次，且该成员首次登录必须改密
-// （见 docs/design/tenant-admin-provisioning-design-20260912.md D3/D6/D7）。
+// （见 docs/design/system-design.md §5.8/D6/D7）。
 type UserCreateReq struct {
 	PersonID               string   `json:"personID"`                               // 已有自然人ID(可选,优先关联)
 	Username               string   `json:"username"`                               // 全局用户名(可选)

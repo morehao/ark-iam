@@ -29,7 +29,7 @@ const (
 
 // isValidConnectorStatus 校验连接器状态取值：空值表示「不指定/不修改」，非空必须命中白名单常量。
 // 校验归 service（AGENTS.md 硬规则 3）：DTO 绑定的是前端传来的原始字符串，非法值在此拦截。
-// 取值统一为 enable/disable（见 docs/design/status-source-consistency-design-20260912.md D1）。
+// 取值统一为 enable/disable（见 docs/design/glossary.md「启停状态」）。
 func isValidConnectorStatus(status model.ConnectorStatus) bool {
 	switch status {
 	case "", model.ConnectorStatusEnable, model.ConnectorStatusDisable:

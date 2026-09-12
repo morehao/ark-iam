@@ -49,7 +49,7 @@ func NewTenantSvc() TenantSvc {
 // 一个事务内完成：租户 + 同名根部门 + 内置管理员用户（source=builtin）+ 租户自服务权限开通
 // （应用订阅 / 内置角色 / 菜单授权 / 角色绑定）。管理员初始密码为系统生成的临时密码，
 // 仅在响应中返回一次，且该管理员首次登录必须改密（见
-// docs/design/tenant-admin-provisioning-design-20260912.md D1/D2/D3/D6）。
+// docs/design/system-design.md §5.8）。
 func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (*dtotenant.TenantCreateResp, error) {
 	admin := req.Admin
 	if admin == nil {
@@ -143,7 +143,7 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 	if adminPersonIsNew {
 		// TODO(delivery): 临时密码目前只能在本响应中回显一次（系统尚无邮件/短信通道）；
 		// 接入通道后改为下发给账号本人，本响应不再返回明文。
-		// 见 docs/design/tenant-admin-provisioning-design-20260912.md T1/Q4。
+		// 见 docs/design/system-design.md §5.8。
 		resp.AdminInitialPassword = tempPassword
 	}
 	return resp, nil
@@ -153,7 +153,7 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 //
 // 授权边界：只作用于该租户 source=builtin + user_type=member 的首位用户，
 // 即建租户时由平台创建的管理员（自助建租户场景下为 owner）；**不触碰**租户手工创建的
-// manual 成员——平台没有管理租户内部成员的正当场景（见 tenant-admin-console-redesign.md §3.2）。
+// manual 成员——平台没有管理租户内部成员的正当场景（见 docs/design/system-design.md §5.8）。
 // 命中不到（含只有 manual 成员）与"不允许"统一返回 UserNotExistError，不暴露租户成员结构。
 //
 // 生成新临时密码 → 置 must_change_password=true → 撤销该自然人既有会话 → 写审计；
@@ -214,7 +214,7 @@ func (svc *tenantSvc) ResetAdminPassword(ctx *gin.Context, req *dtotenant.Tenant
 	})
 	// TODO(delivery): 临时密码目前只能在本响应中回显一次（系统尚无邮件/短信通道）；
 	// 接入通道后改为下发给账号本人，本响应不再返回明文。
-	// 见 docs/design/tenant-admin-provisioning-design-20260912.md T1/Q4。
+	// 见 docs/design/system-design.md §5.8。
 	return &dtotenant.TenantAdminResetPasswordResp{
 		UserID:          builtinAdmin.ID,
 		InitialPassword: tempPassword,

@@ -1,17 +1,13 @@
 package svcoidc
 
 import (
-	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/auth/testutil"
 	"github.com/morehao/ark-iam/pkg/model"
 	"gorm.io/datatypes"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
 func TestResolveAllowPersonCreateTenant(t *testing.T) {
@@ -77,7 +73,7 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			db := newAllowPersonCreateTenantTestDB(t)
+			db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{}, &model.ApplicationEntity{})
 			if c.client != nil && c.clientID != "" {
 				client := c.client
 				client.ID = client.AppID
@@ -100,15 +96,7 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 					t.Fatalf("seed app: %v", err)
 				}
 			}
-
-			svc := &oidcAuthSvc{
-				applicationClientDao: func() *dao.ApplicationClientDao {
-					return dao.NewApplicationClientDao(dao.WithDBGetter(dbGetter(db)))
-				},
-				applicationDao: func() *dao.ApplicationDao {
-					return dao.NewApplicationDao(dao.WithDBGetter(dbGetter(db)))
-				},
-			}
+			svc := &oidcAuthSvc{}
 
 			ginCtx, _ := gin.CreateTestContext(nil)
 			got := svc.resolveAllowPersonCreateTenant(ginCtx, c.clientID, c.tenantCount)
@@ -131,7 +119,7 @@ func TestAppAllowsPersonCreateTenant(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			db := newAllowPersonCreateTenantTestDB(t)
+			db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{}, &model.ApplicationEntity{})
 			app := &model.ApplicationEntity{Code: "app-x", AllowPersonCreateTenant: c.allow}
 			if err := db.Create(app).Error; err != nil {
 				t.Fatalf("seed app: %v", err)
@@ -147,36 +135,11 @@ func TestAppAllowsPersonCreateTenant(t *testing.T) {
 			if err := db.Create(client).Error; err != nil {
 				t.Fatalf("seed client: %v", err)
 			}
-			svc := &oidcAuthSvc{
-				applicationClientDao: func() *dao.ApplicationClientDao { return dao.NewApplicationClientDao(dao.WithDBGetter(dbGetter(db))) },
-				applicationDao:       func() *dao.ApplicationDao { return dao.NewApplicationDao(dao.WithDBGetter(dbGetter(db))) },
-			}
+			svc := &oidcAuthSvc{}
 			ginCtx, _ := gin.CreateTestContext(nil)
 			if got := svc.appAllowsPersonCreateTenant(ginCtx, "cid-x"); got != c.want {
 				t.Fatalf("expected %v, got %v", c.want, got)
 			}
 		})
 	}
-}
-
-func dbGetter(db *gorm.DB) func(context.Context) *gorm.DB {
-	return func(c context.Context) *gorm.DB { return db.WithContext(c) }
-}
-
-func newAllowPersonCreateTenantTestDB(t *testing.T) *gorm.DB {
-	t.Helper()
-	dsn := fmt.Sprintf("file:allow_person_create_tenant_%d?mode=memory&cache=shared", time.Now().UnixNano())
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	if err := db.AutoMigrate(&model.ApplicationClientEntity{}, &model.ApplicationEntity{}); err != nil {
-		t.Fatalf("auto migrate: %v", err)
-	}
-	t.Cleanup(func() {
-		if sqlDB, err := db.DB(); err == nil {
-			_ = sqlDB.Close()
-		}
-	})
-	return db
 }

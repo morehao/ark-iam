@@ -8,6 +8,7 @@ const (
 	AuthRegisterFailedError           = 110012
 	AuthJoinNotAllowedError           = 110013
 	AuthTenantRegisterNotAllowedError = 110014
+	AuthJoinPolicyCheckError          = 110015
 	InviteGetDetailError              = 110030
 	InviteInvalidError                = 110031
 	InviteExpiredError                = 110032
@@ -55,6 +56,7 @@ var authErrorMsgMap = gerror.CodeMsgMap{
 	AuthRegisterFailedError:           "注册失败",
 	AuthJoinNotAllowedError:           "无权加入该租户",
 	AuthTenantRegisterNotAllowedError: "该应用未开放注册",
+	AuthJoinPolicyCheckError:          "加入租户策略校验失败",
 	InviteGetDetailError:              "获取邀请信息失败",
 	InviteInvalidError:                "邀请码无效",
 	InviteExpiredError:                "邀请码已过期",

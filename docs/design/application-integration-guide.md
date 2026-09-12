@@ -70,13 +70,12 @@ curl -X POST http://localhost:8082/v1/platform/applications \
   -d '{
     "code": "my_app",
     "name": "我的业务应用",
-    "status": "enable",
-    "homepageURL": "https://my-app.example.com",
-    "logoURL": "https://my-app.example.com/logo.png"
+    "homepageUrl": "https://my-app.example.com",
+    "logoUrl": "https://my-app.example.com/logo.png"
   }'
 ```
 
-> `code` 即应用编码：**下划线连接**，以小写字母开头，仅含小写字母、数字与下划线（如 `my_app`、`platform_admin`）；连字符/大写会被服务端拒绝。
+> `code` 即应用编码：**下划线连接**，以小写字母开头，仅含小写字母、数字与下划线（如 `my_app`、`platform_admin`；`AppCodePattern`），连字符/大写会被服务端拒绝。创建入参**不含 `status`**：控制台创建的应用来源固定为 `third_party`、状态固定 `enable`，之后用 `PUT /v1/platform/applications/{appID}` 改状态。
 
 ### 3.2 创建 OAuth 客户端（Application Client）
 
@@ -104,7 +103,7 @@ curl -X POST http://localhost:8082/v1/platform/application-clients \
 
 > **客户端编码（`code`，即 OIDC `client_id`）是创建时的必填入参**：小写字母开头，**仅含小写字母与下划线**
 > （`model.ClientCodePattern`，`^[a-z][a-z_]*$`——不允许数字，禁连字符），前端表单与后端 service 各校验一份，
-> 非法值直接返回 400。**自建客户端创建后可改**（`ApplicationClientUpdateReq.code`，改名后该 RP 需同步自己的
+> 非法值由 service 拒绝并返回业务错误码 `100822`（HTTP 200，错误码在响应体 `code` 字段）。**自建客户端创建后可改**（`ApplicationClientUpdateReq.code`，改名后该 RP 需同步自己的
 > `client_id`，其旧令牌按新 aud 失效）；**内置客户端只读**（报 `100823`）。把它填到 RP 配置的 `client_id`（§4.1）。
 > 注意两套「编码」规则刻意不同：**应用编码**（`application.code`）受 `AppCodePattern` 约束（允许数字，
 > 如 `my_app_2`；自建应用可改、内置应用只读报 `100749`）；**客户端编码**受 `ClientCodePattern` 约束
@@ -127,7 +126,7 @@ curl -X POST http://localhost:8082/v1/platform/application-clients \
 curl -X POST http://localhost:8082/v1/platform/application-clients/{applicationClientID}/secrets \
   -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
   -d '{"name": "prod-key"}'
-# 返回的 value 只显示一次，妥善保存；库中仅存哈希
+# 响应字段 secret（明文）只显示一次，妥善保存；列表仅回显 valuePrefix，库中仅存哈希
 ```
 
 ---
@@ -146,10 +145,12 @@ export const oidcConfig = {
   redirect_uri: 'https://my-app.example.com/callback',
   post_logout_redirect_uri: 'https://my-app.example.com/logged-out',
   response_type: 'code',                            // 授权码
-  scope: 'openid profile',                          // openid 必须
+  scope: 'openid profile email offline_access',     // openid 必须；offline_access 才会下发 refresh_token
   automaticSilentRenew: true,
-  userStore: new WebStorageStateStore({ store: window.localStorage }),
+  userStore: new WebStorageStateStore({ store: sessionStorage }), // 与平台管理台一致，缩小 XSS 暴露窗口
 };
+
+// 说明：refresh_token 仅在 scope 含 `offline_access` 且客户端 grantTypes 含 refresh_token 时才签发（zitadel OP 行为）。
 
 // main.tsx
 import { AuthProvider } from 'react-oidc-context';
@@ -202,7 +203,7 @@ flowchart TB
     REQ["请求进入"] --> SKIP{"路径在白名单?"}
     SKIP -->|是| NEXT["放行"]
     SKIP -->|否| AK{"带 x-api-key?"}
-    AK -->|是| AKAUTH["API Key 校验<br/>（哈希/过期/吊销/scope）"]
+    AK -->|是| AKAUTH["API Key 校验<br/>（哈希/过期/吊销/归属主体/租户状态）"]
     AKAUTH -->|通过| NEXT
     AKAUTH -->|失败| 401["401"]
     AK -->|否| TOKEN{"带 Bearer token?"}
@@ -231,19 +232,19 @@ oidcAuthOpts := []middleware.AuthOption{
 }
 if Conf.OIDC.EnableSSOSessionValidation {
     oidcAuthOpts = append(oidcAuthOpts,
-        middleware.WithOIDCSSOValidation(func(ctx *gin.Context, personID uint, isMachineToken bool) bool {
+        middleware.WithOIDCSSOValidation(func(ctx *gin.Context, personID string, isMachineToken bool) bool {
             if isMachineToken { return true } // 机器凭证不依赖浏览器会话
             active, err := ssoStore.HasActiveSession(ctx.Request.Context(), personID)
             return err == nil && active
         }))
 }
 
-routerGroups := ginserver.NewRouterGroups(engine, "myapp", ginserver.VersionGroup{
+routerGroups := ginserver.NewRouterGroups(engine, "myapp", []ginserver.VersionGroup{{
     Version: ginserver.ApiVersionV1,
     Middlewares: []gin.HandlerFunc{
         middleware.OIDCCompatibleAuth(getOIDCPublicKey, oidcAuthOpts...),
     },
-})
+}})
 ```
 
 **令牌声明读取**（校验通过后注入 gin context）：
@@ -252,9 +253,10 @@ routerGroups := ginserver.NewRouterGroups(engine, "myapp", ginserver.VersionGrou
 |---|---|
 | `gcontext.KeyPersonID` | 自然人 ID（`sub=person:<id>` 解析） |
 | `gcontext.KeyTenantID` | 租户 ID |
+| `gcontext.KeyUserID` | 该 person 在当前租户的成员 ID（由 (tenantID, personID) 反查得到；API Key 通道为归属服务账号 ID） |
 | `gcontext.KeyAuthToken` | 原始 access_token |
 
-> 非 Gin 技术栈（Java/Node/Python）：自行实现等价的 JWT 校验——从 `/oidc/keys`（JWKS）取公钥，验 RS256 签名，校验 `iss`/`aud`/`exp`，解析 `tenant_id`/`user_id`。`resource`/`scope` 可按业务需要进一步鉴权。
+> 非 Gin 技术栈（Java/Node/Python）：自行实现等价的 JWT 校验——从 `/oidc/keys`（JWKS）取公钥，验 RS256 签名，校验 `iss`/`aud`/`exp`；人登录令牌的私有声明是 `tenant_id`（有中心会话时另含 `sid`），API Key 机器令牌另含 `token_usage=machine` 与 `user_id`。业务侧的资源级鉴权请自行基于这些身份声明实现（IAM 不承载 `resource`/`scope`）。
 
 ---
 
@@ -268,17 +270,19 @@ routerGroups := ginserver.NewRouterGroups(engine, "myapp", ginserver.VersionGrou
 curl -X POST http://localhost:8081/oidc/oauth/token \
   -u "my-app-backend:客户端密钥" \
   -d "grant_type=client_credentials&scope=openid"
-# 返回 access_token，sub=client_id，token_usage=machine
+# 返回 access_token，sub=client_id（标准 client_credentials 的私有声明仅此一项，无 token_usage）
 ```
+
+> ⚠️ **标准 `client_credentials` 令牌不能直接访问本系统的业务 API**：它既不是人令牌（无 `sub=person:<id>` / `tenant_id`），也不是机器令牌（无 `token_usage=machine`），会被 `OIDCCompatibleAuth` 直接拒绝（401）。业务场景的机器凭证请用 **API Key**（见 §6.2）——包括「把 API Key 当 client credential 换 token」的用法，那条路径才会签发 `sub=<keyPrefix>` + `token_usage=machine` 的令牌。`client_credentials` 仅用于 OIDC 端点自身的交互。
 
 ### 6.2 API Key（推荐，可审计可吊销）
 
 1. 在**租户控制台「API密钥」模块**为服务账号创建 API Key（或 `POST /v1/tenant/api-keys`，body `machineUserID` 指定归属服务账号），得到明文（仅展示一次）；
-2. 服务请求时携带 `x-api-key: ak_xxx` 头；
+2. 服务请求时携带 `x-api-key: <64 位 hex 明文>` 头（明文为 32 字节随机数的 64 位小写 hex，无 `ak_` 前缀；也可放进 `Authorization: Bearer`）；
 3. 中间件校验：哈希定位 → 未过期/未吊销 → 解析归属服务账号注入身份上下文 → 通过。
 
 ```bash
-curl https://my-api.example.com/v1/... -H "x-api-key: ak_8f3ab2c9..."
+curl https://my-api.example.com/v1/... -H "x-api-key: 8f3ab2c9d0e1..."
 ```
 
 **差异对比**：
@@ -290,7 +294,7 @@ curl https://my-api.example.com/v1/... -H "x-api-key: ak_8f3ab2c9..."
 | 生命周期 | 随客户端配置 | 可独立过期/吊销 |
 | 适用 | 标准 OAuth 客户端 | 轻量服务/脚本/集成 |
 
-> 机器凭证签发的 token（`token_usage=machine`）**不依赖浏览器 SSO 会话活性**，登出不会使其失效，需通过吊销/过期管理。
+> **API Key 签发的 token**（`token_usage=machine`）**不依赖浏览器 SSO 会话活性**，登出不会使其失效，需通过吊销/过期管理。（普通 `client_credentials` 令牌没有该标记，也过不了业务中间件，见 §6.1。）
 
 ---
 
@@ -314,8 +318,12 @@ import "github.com/morehao/ark-iam/pkg/goidc"
 
 // 挂载接收端点（路径与客户端注册的 backChannelLogoutURI 一致）
 group := engine.Group("/oidc")
-basePath := Conf.OIDC.BackChannelLogoutPath // 默认 /bc-logout/myapp
-goidc.RegisterReceiverRoutes(group, basePath, getOIDCPublicKey, Conf.OIDC.Issuer, "<本应用 client_id>", nil)
+basePath := Conf.OIDC.BackChannelLogoutPath // 本仓约定 /bc-logout/<app>（如 /bc-logout/platform）；pkg/goidc 通用兜底为 /oidc/bc-logout
+goidc.RegisterReceiverRoutes(group, basePath, getOIDCPublicKey, Conf.OIDC.Issuer, "<本应用 client_id>",
+    func(ctx *gin.Context, claims *goidc.LogoutTokenClaims) error {
+        // 验签通过后作废本地会话：传 nil 只会验签、不会登出
+        return localSessionStore.RevokeBySessionID(ctx.Request.Context(), claims.SessionID)
+    })
 ```
 
 **接收端职责**（`pkg/goidc` 已实现）：
@@ -329,12 +337,12 @@ sequenceDiagram
     OP->>RP: POST /oidc/bc-logout/myapp（form: logout_token）
     RP->>RP: 验签 RS256 + 校验 iss/aud/exp
     RP->>RP: 校验 events 含 backchannel-logout 事件
-    RP->>RP: 校验 jti 存在（防重放，按 jti 去重）
+    RP->>RP: 校验 jti 存在（jti 去重需 RP 自行实现）
     RP->>RP: 按 sid 作废本地会话
     RP-->>OP: 200 OK（此后可删除登记，幂等）
 ```
 
-> **重要**：logout_token 的校验项必须完整实现，不可仅验签名——详见 `ParseLogoutToken` 的注释（事件、jti、aud 缺一不可）。
+> **重要**：logout_token 的校验项必须完整实现，不可仅验签名——详见 `ParseLogoutToken` 的注释（`events`、`sub`、`jti`、`aud` 缺一不可；其中 **jti 去重由 RP 自行实现**，接收端只校验其存在）。`RegisterReceiverRoutes` 的最后一个参数是 `SessionRevoker` 回调，传 `nil` 表示「只验签、不作废本地会话」。
 
 ### 7.3 不接入 SLO 的降级行为
 
@@ -381,7 +389,7 @@ flowchart LR
 可以：不开启 `EnableSSOSessionValidation`，仅做 JWT 验签 + iss/aud 校验；登出即时性退化为"access_token 过期后失效"。
 
 **Q5：token 里能拿到什么身份信息？**
-access_token 私有声明：`tenant_id`、`user_id`、`client_id`、`token_usage`；`sub=person:<id>`。更多资料（姓名/头像/邮箱）走 `/oidc/userinfo` 或本系统 `GET /v1/auth/userinfo`。
+标准声明：`sub`（人登录为 `person:<id>`）、`client_id`、`iss`/`aud`/`exp` 等。私有声明：**人登录令牌**只有 `tenant_id`（有中心会话时另含 `sid`）；**API Key 机器令牌**另有 `token_usage=machine` 与 `user_id`。更多资料：`/oidc/userinfo` 按 scope 返回 `name`/`preferred_username`/`email`/`phone`（**不含头像**）；头像与租户内资料走本系统 `GET /v1/auth/userinfo`。
 
 **Q6：前端如何获取用户资料？**
 `GET /v1/auth/userinfo`（`Authorization: Bearer <access_token>`）返回 `personInfo` + `userInfo`（租户内信息）。

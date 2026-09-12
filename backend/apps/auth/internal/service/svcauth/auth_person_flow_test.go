@@ -11,9 +11,11 @@ import (
 	"github.com/morehao/ark-iam/auth/testutil"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -195,7 +197,8 @@ func TestJoinTenantRejectsMissingInviteCode(t *testing.T) {
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
-	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{})
+	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{}, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
+	ginCtx.Set(middleware.ContextKeyClientID, seedJoinByInviteApp(t, db, true))
 
 	svc := &authSvc{}
 	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: ""})
@@ -210,7 +213,8 @@ func TestJoinTenantRejectsInvalidInvite(t *testing.T) {
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
-	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{})
+	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{}, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
+	ginCtx.Set(middleware.ContextKeyClientID, seedJoinByInviteApp(t, db, true))
 	seedInvite(t, db, "invite-abc", "22", model.InviteStatusPending, nil)
 
 	svc := &authSvc{}
@@ -223,7 +227,8 @@ func TestJoinTenantRejectsRevokedInvite(t *testing.T) {
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
-	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{})
+	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{}, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
+	ginCtx.Set(middleware.ContextKeyClientID, seedJoinByInviteApp(t, db, true))
 	seedInvite(t, db, "invite-abc", "22", model.InviteStatusRevoked, nil)
 
 	svc := &authSvc{}
@@ -238,7 +243,8 @@ func TestJoinTenantRejectsExpiredInvite(t *testing.T) {
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
-	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{})
+	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{}, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
+	ginCtx.Set(middleware.ContextKeyClientID, seedJoinByInviteApp(t, db, true))
 	past := time.Now().Add(-time.Hour)
 	seedInvite(t, db, "invite-abc", "22", model.InviteStatusPending, &past)
 
@@ -254,7 +260,8 @@ func TestJoinTenantAcceptsInviteNotYetExpired(t *testing.T) {
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
-	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{})
+	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{}, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
+	ginCtx.Set(middleware.ContextKeyClientID, seedJoinByInviteApp(t, db, true))
 	future := time.Now().Add(time.Hour)
 	seedInvite(t, db, "invite-abc", "22", model.InviteStatusPending, &future)
 
@@ -273,7 +280,8 @@ func TestJoinTenantRejectsAlreadyJoinedTenant(t *testing.T) {
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
-	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{})
+	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{}, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
+	ginCtx.Set(middleware.ContextKeyClientID, seedJoinByInviteApp(t, db, true))
 	seedInvite(t, db, "invite-abc", "22", model.InviteStatusPending, nil)
 	now := time.Now()
 	existing := &model.UserEntity{
@@ -299,7 +307,8 @@ func TestJoinTenantCreatesNonOwnerUser(t *testing.T) {
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
-	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{})
+	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{}, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
+	ginCtx.Set(middleware.ContextKeyClientID, seedJoinByInviteApp(t, db, true))
 	seedInvite(t, db, "invite-abc", "22", model.InviteStatusPending, nil)
 
 	svc := &authSvc{}
@@ -335,6 +344,81 @@ func TestJoinTenantCreatesNonOwnerUser(t *testing.T) {
 	}
 	if invite.Status != model.InviteStatusAccepted {
 		t.Fatalf("expected invite marked accepted, got %s", invite.Status)
+	}
+}
+
+// seedJoinByInviteApp 播种一个应用及其 OIDC 客户端，返回该客户端的 client_id。
+//
+// 通道 B（凭邀请加入租户）的应用级门禁按调用方 access token 的 client_id 解析应用
+// （见 pkg/core/application），因此凡是要走到邀请校验之后的 JoinTenant 用例，都必须先
+// 具备一个带 AllowJoinByInvite 的应用；allow=false 用于验证门禁关闭时的拒绝路径。
+func seedJoinByInviteApp(t *testing.T, db *gorm.DB, allow bool) string {
+	t.Helper()
+	appEntity := &model.ApplicationEntity{Code: "app_join", AllowJoinByInvite: model.BoolPtr(allow)}
+	if err := db.Create(appEntity).Error; err != nil {
+		t.Fatalf("seed application: %v", err)
+	}
+	client := &model.ApplicationClientEntity{Code: "join_client", AppID: appEntity.ID}
+	client.ID = client.AppID
+	client.RedirectURIs = datatypes.JSON(`[]`)
+	client.PostLogoutRedirectURIs = datatypes.JSON(`[]`)
+	client.GrantTypes = datatypes.JSON(`["authorization_code"]`)
+	client.ResponseTypes = datatypes.JSON(`["code"]`)
+	client.AllowedOrigins = datatypes.JSON(`[]`)
+	client.DefaultScopes = datatypes.JSON(`["openid"]`)
+	if err := db.Create(client).Error; err != nil {
+		t.Fatalf("seed application client: %v", err)
+	}
+	return client.Code
+}
+
+// TestJoinTenantRejectsWhenAppDisallowsInvite 应用级门禁（通道 B）：
+// 应用未开启 allow_join_by_invite 时，即使邀请本身完全有效也必须拒绝，
+// 且门禁先于邀请解析——被拒时不得消费邀请。
+func TestJoinTenantRejectsWhenAppDisallowsInvite(t *testing.T) {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = httptestRequest(t)
+	ginCtx.Set(gcontext.KeyPersonID, "88")
+
+	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{},
+		&model.ApplicationEntity{}, &model.ApplicationClientEntity{})
+	seedInvite(t, db, "invite-abc", "22", model.InviteStatusPending, nil)
+	ginCtx.Set(middleware.ContextKeyClientID, seedJoinByInviteApp(t, db, false))
+
+	svc := &authSvc{}
+	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: "invite-abc"})
+	assertCode(t, err, code.AuthJoinNotAllowedError)
+
+	var invite model.InviteEntity
+	if err := db.Where("code = ?", "invite-abc").First(&invite).Error; err != nil {
+		t.Fatalf("expected invite persisted: %v", err)
+	}
+	if invite.Status != model.InviteStatusPending {
+		t.Fatalf("门禁拒绝时邀请应保持 pending，实际为 %s", invite.Status)
+	}
+}
+
+// TestJoinTenantRejectsWhenClientUnresolvable 解析不出应用（无 client_id、客户端或应用不存在，
+// 例如 API Key 通道）一律 fail-closed，不得退化成放行。
+func TestJoinTenantRejectsWhenClientUnresolvable(t *testing.T) {
+	for _, c := range []struct{ name, clientID string }{
+		{name: "empty client id", clientID: ""},
+		{name: "unknown client id", clientID: "no_such_client"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			ginCtx, _ := gin.CreateTestContext(nil)
+			ginCtx.Request = httptestRequest(t)
+			ginCtx.Set(gcontext.KeyPersonID, "88")
+			ginCtx.Set(middleware.ContextKeyClientID, c.clientID)
+
+			db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{},
+				&model.ApplicationEntity{}, &model.ApplicationClientEntity{})
+			seedInvite(t, db, "invite-abc", "22", model.InviteStatusPending, nil)
+
+			svc := &authSvc{}
+			_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: "invite-abc"})
+			assertCode(t, err, code.AuthJoinNotAllowedError)
+		})
 	}
 }
 

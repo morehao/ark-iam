@@ -10,7 +10,6 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/service/svcauth"
 	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objauth"
 	"github.com/morehao/ark-iam/pkg/sso"
@@ -56,20 +55,16 @@ type passwordAuthenticator interface {
 }
 
 type oidcAuthSvc struct {
-	provider             *OIDCProvider
-	authSvc              passwordAuthenticator
-	ssoSessionStore      sso.SSOSessionStore
-	applicationClientDao func() *dao.ApplicationClientDao
-	applicationDao       func() *dao.ApplicationDao
+	provider        *OIDCProvider
+	authSvc         passwordAuthenticator
+	ssoSessionStore sso.SSOSessionStore
 }
 
 func NewOIDCAuthSvc(provider *OIDCProvider) OIDCAuthSvc {
 	return &oidcAuthSvc{
-		provider:             provider,
-		authSvc:              svcauth.NewAuthSvc(),
-		ssoSessionStore:      sso.NewSSOSessionStore(),
-		applicationClientDao: func() *dao.ApplicationClientDao { return dao.NewApplicationClientDao() },
-		applicationDao:       func() *dao.ApplicationDao { return dao.NewApplicationDao() },
+		provider:        provider,
+		authSvc:         svcauth.NewAuthSvc(),
+		ssoSessionStore: sso.NewSSOSessionStore(),
 	}
 }
 

@@ -21,10 +21,11 @@ func OIDCBusinessAuthOptions() []pkgmiddleware.AuthOption {
 	ssoStore := sso.NewSSOSessionStore()
 	opts = append(opts,
 		pkgmiddleware.WithAuthSkipPaths(
-			"/v1/auth/register",
-			// 注意：必须与 router/auth.go 中注册的路由完全一致（复数 connectors）。
+			// 注意：必须与 router/auth.go 中 connectorRouter 注册的路由完全一致（复数 connectors）。
 			// 第三方 IdP 回调（GET，无 Authorization 头）若被鉴权中间件拦截将直接 401，
 			// 导致连接器登录不可用（曾有单复数拼写不一致的回归）。
+			// 自助注册的 /v1/auth/register 已下线（收口到 /oidc/registerPerson + /oidc/createTenant），
+			// 其 skip path 一并移除，避免留下指向不存在端点的死配置。
 			"/v1/auth/connectors/callback",
 		),
 		pkgmiddleware.WithOIDCSSOValidation(func(ctx *gin.Context, personID string, isMachineToken bool) bool {

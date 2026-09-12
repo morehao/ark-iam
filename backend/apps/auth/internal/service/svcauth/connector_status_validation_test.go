@@ -15,7 +15,7 @@ import (
 )
 
 // TestIsValidConnectorStatus 白名单本身：只认 enable/disable 与空值（空值语义为「不指定/不修改」）。
-// 取值统一见 status-source-consistency-design-20260912.md D1/D4。
+// 取值统一见 docs/design/glossary.md「启停状态」。
 func TestIsValidConnectorStatus(t *testing.T) {
 	for _, s := range []model.ConnectorStatus{"", model.ConnectorStatusEnable, model.ConnectorStatusDisable} {
 		if !isValidConnectorStatus(s) {

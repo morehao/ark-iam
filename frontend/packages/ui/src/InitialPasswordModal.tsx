@@ -7,7 +7,7 @@ const monospaceStyle: CSSProperties = { fontFamily: 'Consolas, Monaco, monospace
 
 // TODO(delivery): 本组件是"一次性回显临时密码"的前端出口（系统尚无邮件/短信通道）；
 // 接入通道后临时密码改为直接下发给账号本人，本组件应改为"已通过邮件/短信发送"的提示，
-// 或整体下线。见 docs/design/tenant-admin-provisioning-design-20260912.md T1/Q4。
+// 或整体下线。见 docs/design/system-design.md §5.8。
 export interface InitialPasswordModalProps {
   /**
    * 一次性初始/临时密码明文。为空表示未生成（如复用了既有自然人，其密码未被改动），
@@ -24,7 +24,7 @@ export interface InitialPasswordModalProps {
 /**
  * 一次性初始密码展示 Modal：密码由服务端生成、仅在本次响应返回一次，关闭后不可再查。
  * 平台侧（建租户/重置内置管理员密码）与租户侧（建成员/重置成员密码）共用同一交互，
- * 保证两边"密码相关交互一致"（见 docs/design/tenant-admin-provisioning-design-20260912.md D7）。
+ * 保证两边"密码相关交互一致"（见 docs/design/system-design.md §5.8）。
  */
 export function InitialPasswordModal({ password, title, description, onClose }: InitialPasswordModalProps) {
   const handleCopy = async () => {

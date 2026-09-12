@@ -687,7 +687,7 @@ func TestSeedIamMigratesLegacyPlatformTenantCode(t *testing.T) {
 // `third_party`）在种子启动后必须被原地纠正：
 // 两个种子应用（平台管理后台、租户管理后台）与种子 OAuth 客户端 → builtin（否则丢删除保护）。
 // 回归背景：种子数据的两个应用都不是第三方接入，误判会同时污染删除保护与租户控制台菜单范围
-// （见 docs/design/application-source-rename.md §12.3、§14）。
+// （见 docs/design/system-design.md §4.3、§4.5）。
 func TestSeedIamBackfillsApplicationSource(t *testing.T) {
 	db := setupDB(t)
 	ctx := context.Background()

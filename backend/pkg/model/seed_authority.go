@@ -3,7 +3,7 @@ package model
 // 种子字段权威矩阵（single writer per field）——本文件是「内置种子数据的哪个字段归谁写」的
 // 唯一真相源，pkg/seed 按它决定收敛哪些字段，控制台服务按它拒写种子拥有的字段。
 //
-// 三条语义（与 docs/design/seed-initialization-redesign-20260912.md 一致）：
+// 三条语义（与 docs/design/system-design.md §4.5 一致）：
 //
 //	reconcile   种子收敛：启动时必须与种子定义一致；写者唯一为种子，控制台对这些字段一律拒写
 //	            （否则会出现"运维改完、重启被收回"的双写者）。
@@ -11,7 +11,7 @@ package model
 //	migrate_once 一次性迁移：跨版本的标识改名，以「当前值 == 历史种子值」为条件触发；
 //	            迁移完成后自然失效，运维自定义值一律不动。迁移清单位于 pkg/seed。
 //
-// reconcile 的准入判据（2026-09-12 收窄，见 docs/design/seed-authority-scope-revision-20260912.md）：
+// reconcile 的准入判据（2026-09-12 收窄，见 docs/design/system-design.md §4.5）：
 // 只有「被控制台改写后会导致种子定位失效或鉴权被绕过」的字段才进 reconcile，共两类——
 //   - 定位键：pkg/seed 靠它查行（tenant/application/application_client 的 code、
 //     menu 的 app_id + code）。键一变，下次启动查不到该行 → 重复建一行，幂等性直接失效；

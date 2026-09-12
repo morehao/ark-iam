@@ -13,7 +13,7 @@ const TableNameSession = "session"
 // 定位与 user_login_log 一致——会话的事实源是 Redis（撤销走删 key），
 // 撤销时间由 refresh_token.revoked_at 承担，因此本表不承载任何状态流转。
 // 原 status / revoked_at / last_active_at 三列已下线（见
-// status-source-consistency-design-20260912.md D5/R1）：status 恒为 active 且无读取路径，
+// docs/design/glossary.md「会话审计」）：status 恒为 active 且无读取路径，
 // 另两列从未被写入，留着会让读者误以为可以查 `WHERE status='revoked'`。
 type SessionAuditEntity struct {
 	gormdao.BaseEntity

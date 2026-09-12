@@ -14,7 +14,7 @@ import (
 )
 
 // ChangePassword 首次登录强制改密（临时密码场景，见
-// docs/design/tenant-admin-provisioning-design-20260912.md D3）。
+// docs/design/system-design.md §5.8）。
 //
 // 前置：CompleteLogin 命中 person.must_change_password=true 时不完成授权（done=false），
 // 仅把 subject 绑到授权票据并返回 RequiresPasswordChange，前端据此引导用户设置新密码。

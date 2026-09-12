@@ -12,7 +12,6 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
-	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objauth"
 	"github.com/morehao/ark-iam/pkg/sso"
@@ -343,7 +342,7 @@ func TestCompleteLoginZeroTenantVerifiedPersonBindsDoneFalseAndReturnsCreateTena
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider failed: %v", err)
 	}
-	db := newSeedDB(t, []appSeedApp{{clientCode: "client-1", allow: model.BoolPtr(true)}})
+	newSeedDB(t, []appSeedApp{{clientCode: "client-1", allow: model.BoolPtr(true)}})
 	request, err := provider.Storage.CreateAuthRequest(t.Context(), &oidc.AuthRequest{
 		ClientID:     "client-1",
 		RedirectURI:  "https://client.example.com/callback",
@@ -362,9 +361,7 @@ func TestCompleteLoginZeroTenantVerifiedPersonBindsDoneFalseAndReturnsCreateTena
 			// 零租户已验密 person：无 user、无 tenants
 			return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}}}, nil, nil, nil
 		}},
-		applicationClientDao: func() *dao.ApplicationClientDao { return dao.NewApplicationClientDao(dao.WithDBGetter(dbGetter(db))) },
-		applicationDao:       func() *dao.ApplicationDao { return dao.NewApplicationDao(dao.WithDBGetter(dbGetter(db))) },
-		ssoSessionStore:      &fakeSSOSessionStore{},
+		ssoSessionStore: &fakeSSOSessionStore{},
 	}
 
 	ginCtx, _ := gin.CreateTestContext(nil)
@@ -419,7 +416,7 @@ func TestCompleteLoginZeroTenantAppDisallowFalse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider failed: %v", err)
 	}
-	db := newSeedDB(t, []appSeedApp{{clientCode: "client-1", allow: model.BoolPtr(false)}})
+	newSeedDB(t, []appSeedApp{{clientCode: "client-1", allow: model.BoolPtr(false)}})
 	request, err := provider.Storage.CreateAuthRequest(t.Context(), &oidc.AuthRequest{
 		ClientID:     "client-1",
 		RedirectURI:  "https://client.example.com/callback",
@@ -437,9 +434,7 @@ func TestCompleteLoginZeroTenantAppDisallowFalse(t *testing.T) {
 		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 			return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}}}, nil, nil, nil
 		}},
-		applicationClientDao: func() *dao.ApplicationClientDao { return dao.NewApplicationClientDao(dao.WithDBGetter(dbGetter(db))) },
-		applicationDao:       func() *dao.ApplicationDao { return dao.NewApplicationDao(dao.WithDBGetter(dbGetter(db))) },
-		ssoSessionStore:      &fakeSSOSessionStore{},
+		ssoSessionStore: &fakeSSOSessionStore{},
 	}
 
 	ginCtx, _ := gin.CreateTestContext(nil)
