@@ -13,8 +13,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/credential"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/model"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -378,9 +379,12 @@ func TestApiKeyAuthExpiredKey(t *testing.T) {
 	}
 }
 
-func TestHashApiKey(t *testing.T) {
+// TestApiKeyHashMatchesPlainSHA256 中间件用于查表的摘要必须等于明文 SHA-256 的 hex。
+// 期望值在此独立计算（不调用被测函数），因此本用例是"摘要契约"在中间件边界的独立交叉校验：
+// 一旦 credential.HashSecret 的算法或编码漂移，存量 API Key 将无法命中，本用例会先失败。
+func TestApiKeyHashMatchesPlainSHA256(t *testing.T) {
 	key := "test-key-64-chars-1234567890123456789012345678901234567890123456"
-	hash := hashApiKey(key)
+	hash := credential.HashSecret(key)
 	if len(hash) != 64 {
 		t.Fatalf("expected SHA256 hex length 64, got %d", len(hash))
 	}

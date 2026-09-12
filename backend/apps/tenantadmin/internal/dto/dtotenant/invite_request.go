@@ -1,7 +1,7 @@
 package dtotenant
 
 import (
-	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/biz/gobject"
 )
 

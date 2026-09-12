@@ -13,7 +13,7 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/auth/internal/middleware"
 	"github.com/morehao/ark-iam/auth/internal/service/svcoidc"
-	"github.com/morehao/ark-iam/pkg/iam/sso"
+	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 

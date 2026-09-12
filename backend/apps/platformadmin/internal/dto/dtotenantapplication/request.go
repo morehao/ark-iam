@@ -1,6 +1,6 @@
 package dtotenantapplication
 
-import "github.com/morehao/ark-iam/pkg/iam/model"
+import "github.com/morehao/ark-iam/pkg/model"
 
 type TenantApplicationCreateReq struct {
 	TenantID     string                        `json:"tenantID" binding:"required"` // 租户ID（平台侧指定归属租户）

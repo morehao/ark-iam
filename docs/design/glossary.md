@@ -12,7 +12,7 @@
 | 租户成员 ✅ | User | 自然人（person）在某个**租户内**的成员记录。租户内姓名/资料/角色、是否拥有者（`is_owner`）、加入时间 |
 | 租户 | Tenant | 独立的客户边界（业务主体的隔离单元）。数据与权限按租户隔离；类型分 `customer`（客户租户）/`platform`（平台租户） |
 | 租户类型 | Tenant Type | **分类标识**：`customer` = 外部客户/合作方的独立租户；`platform` = 平台自运营租户（种子数据 Default Tenant 即平台租户）。当前仅用于分类展示，不参与数据隔离与权限判定（隔离一律按 `tenant_id`） |
-| 租户编码 | Tenant Code | 租户的业务编码，全局唯一、创建后不可修改。由服务端自动生成，规则 `t_<12 位随机小写 hex>`（如 `t_3f7a9c1d2e4b`），见 `pkg/iam/tenant.GenerateCode`；平台租户（种子数据 Default Tenant）为固定值 `t_platform`——同前缀、后缀固定可读，因自动生成的随机段只用小写 hex，两者不会冲突 |
+| 租户编码 | Tenant Code | 租户的业务编码，全局唯一、创建后不可修改。由服务端自动生成，规则 `t_<12 位随机小写 hex>`（如 `t_3f7a9c1d2e4b`），见 `pkg/core/tenant.GenerateCode`；平台租户（种子数据 Default Tenant）为固定值 `t_platform`——同前缀、后缀固定可读，因自动生成的随机段只用小写 hex，两者不会冲突 |
 | 租户拥有者 | Tenant Owner | 租户的拥有者成员（注册即成为首个拥有者），拥有租户管理权限 |
 | 外部身份 | User Identity | person 在外部身份源（Connector）中的身份映射（issuer + external_subject） |
 | 多租户 | Multi-tenant | 一个 person 可同时属于多个租户；登录时需选择租户（或由 `tenant` hint 指定） |

@@ -2,9 +2,7 @@ package oidcop
 
 import (
 	"context"
-	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,12 +13,12 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
 
+	"github.com/morehao/ark-iam/pkg/credential"
+	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
-	"github.com/morehao/ark-iam/pkg/iam/sso"
-	"github.com/morehao/ark-iam/pkg/token"
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objauth"
+	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/glog"
 	"gorm.io/gorm"
 )
@@ -86,8 +84,7 @@ func (s *PersistentStore) txDB(ctx context.Context) *gorm.DB {
 }
 
 func (s *PersistentStore) LookupApiKeyByRawKey(ctx context.Context, rawKey string) (*model.ApiKeyEntity, error) {
-	sum := sha256.Sum256([]byte(rawKey))
-	hash := hex.EncodeToString(sum[:])
+	hash := credential.HashSecret(rawKey)
 	entity, err := s.apiKeyDao().GetByCond(ctx, &dao.ApiKeyCond{KeyHash: hash})
 	if err != nil || entity == nil || entity.ID == "" {
 		return nil, nil
@@ -127,8 +124,7 @@ func (s *PersistentStore) GetClientByClientID(ctx context.Context, clientID stri
 }
 
 func (s *PersistentStore) AuthorizeClientIDSecret(ctx context.Context, clientID, clientSecret string) error {
-	secretHash := sha256.Sum256([]byte(clientSecret))
-	clientHash := hex.EncodeToString(secretHash[:])
+	clientHash := credential.HashSecret(clientSecret)
 
 	// H4：停用 client 的 secret 一律拒绝
 	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID, Status: model.ApplicationClientStatusEnable})
@@ -435,7 +431,7 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 		return "", "", time.Time{}, fmt.Errorf("generate refresh token: %w", err)
 	}
 
-	refreshTokenHash := token.HashToken(refreshTokenValue)
+	refreshTokenHash := credential.HashSecret(refreshTokenValue)
 	scopesJSON, _ := json.Marshal(scopes)
 	amrJSON, _ := json.Marshal(amr)
 	refreshEntity := &model.RefreshTokenEntity{
@@ -465,7 +461,7 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 			return err
 		}
 		if currentRefreshToken != "" {
-			oldTokenHash := token.HashToken(currentRefreshToken)
+			oldTokenHash := credential.HashSecret(currentRefreshToken)
 			res := tx.Model(&model.RefreshTokenEntity{}).Table(model.TableNameRefreshToken).
 				Where("token = ? AND revoked_at IS NULL", oldTokenHash).
 				Update("revoked_at", &now)
@@ -536,7 +532,7 @@ func tokenUsageFromRequest(request op.TokenRequest) objauth.TokenUsage {
 }
 
 func (s *PersistentStore) TokenRequestByRefreshToken(ctx context.Context, refreshToken string) (op.RefreshTokenRequest, error) {
-	refreshTokenHash := token.HashToken(refreshToken)
+	refreshTokenHash := credential.HashSecret(refreshToken)
 	storedToken, err := s.refreshTokenDao().GetByCond(ctx, &dao.RefreshTokenCond{Token: refreshTokenHash})
 	if err != nil || storedToken == nil || storedToken.ID == "" {
 		return nil, op.ErrInvalidRefreshToken
@@ -680,7 +676,7 @@ func (s *PersistentStore) RevokeToken(ctx context.Context, tokenOrTokenID string
 }
 
 func (s *PersistentStore) GetRefreshTokenInfo(ctx context.Context, clientID string, tokenValue string) (userID string, tokenID string, err error) {
-	refreshTokenHash := token.HashToken(tokenValue)
+	refreshTokenHash := credential.HashSecret(tokenValue)
 	storedToken, err := s.refreshTokenDao().GetByCond(ctx, &dao.RefreshTokenCond{Token: refreshTokenHash})
 	if err != nil || storedToken == nil || storedToken.ID == "" {
 		return "", "", op.ErrInvalidRefreshToken

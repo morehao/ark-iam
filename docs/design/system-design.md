@@ -116,8 +116,8 @@ flowchart TB
         C["controller/ctrxxx 控制器<br/>参数绑定、响应封装"]
         S["service/svcxxx 服务层<br/>业务逻辑、事务、审计"]
         D["dao/ 数据访问层"]
-        M["model/ 数据模型<br/>（跨应用共享于 pkg/iam/model）"]
-        O["object/ 领域对象<br/>（跨应用共享于 pkg/iam/object）"]
+        M["model/ 数据模型<br/>（跨应用共享于 pkg/model）"]
+        O["object/ 领域对象<br/>（跨应用共享于 pkg/object）"]
         DTO["dto/dtoxxx 请求/响应对象"]
     end
     R --> C --> S --> D --> M
@@ -126,7 +126,7 @@ flowchart TB
     S --> DTO
 ```
 
-- **跨应用共享**的 model / dao / object 抽到 `pkg/iam`，通用中间件抽到 `pkg/middleware`（含 OIDC 鉴权中间件）；
+- **跨应用共享**的 model / dao / object 抽到 `pkg/model`、`pkg/dao`、`pkg/object`（模块路径已表达域名，不再套域容器），可复用的领域不变式下沉 `pkg/core/<域>`（与各应用 `internal/core/<域>` 对称），通用中间件抽到 `pkg/middleware`（含 OIDC 鉴权中间件），凭证生成与摘要统一在 `pkg/credential`；
 - 服务层依赖接口 + 构造函数注入，控制器统一 `gincontext.Success/Fail` 返回 `{code, msg, data}` 信封；
 - 数据库访问基于 GORM，事务用 `dbclient.IamDB(ctx).Transaction(...)` 封装。
 

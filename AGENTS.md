@@ -16,7 +16,7 @@ ark-iam/
 │   │   ├── platformadmin/ # 平台管理，:8082
 │   │   ├── tenantadmin/   # 租户自服务，:8083
 │   │   └── gateway/       # 聚合应用（挂载上述三者，单体部署），:8100
-│   ├── pkg/               # 公共包（config/middleware/iam/stdb/testsetup 等）
+│   ├── pkg/               # 公共层，5 模块之一（model/dao/object/core/credential/…）
 │   └── Makefile
 ├── frontend/             # React 前端项目
 ├── docs/                  # 文档目录
@@ -59,8 +59,11 @@ make test APP=gateway
 # 运行所有测试
 go test ./...
 
-# 运行单个测试函数
-go test ./pkg/iam/service/svcuser -run TestGeneratePassword -v
+# 运行单个测试函数（共享层领域能力）
+go test ./pkg/core/user/ -run TestCreate_NewPersonWithDeptRelations -v
+
+# 运行单个测试函数（凭证摘要契约）
+go test ./pkg/credential/ -run TestHashSecret_Golden -v
 
 # 运行特定包测试
 go test ./apps/auth/internal/router/... -v
@@ -103,12 +106,14 @@ apps/
 ├── platformadmin/              # 平台管理（结构同 auth）
 ├── tenantadmin/                # 租户自服务（结构同 auth）
 ├── gateway/                    # 聚合应用（挂载 auth/platformadmin/tenantadmin）
-pkg/                          # 公共包（跨应用共享：config/middleware/goidc/ginserver/iam 等）
+pkg/                          # 公共层（跨应用共享，见下方「公共层约定」）
 ```
 
-> 跨应用共享的 model/dao/object 抽取到 `pkg/iam`，通用中间件抽取到 `pkg/middleware`（OIDC 鉴权中间件在 `pkg/middleware/oidc_auth.go`），RP 侧 back-channel logout 接收端在 `pkg/goidc`，避免分体间重复代码。
+> **公共层约定（`pkg/`）**：与应用内层级一一对应，**共享即上提同名目录**——`internal/middleware` ↔ `pkg/middleware`、`internal/core/<域>` ↔ `pkg/core/<域>`、`dto/dto<域>` ↔ `object/obj<域>`；跨应用共享的 model/dao/object 直接平铺在 `pkg/model`、`pkg/dao`、`pkg/object`（**不再套业务域容器**：模块路径 `github.com/morehao/ark-iam/pkg` 已表达域名，套一层会重复且与 `pkg/goidc`、`pkg/seed` 等兄弟包边界矛盾）。
 >
-> **领域层容器约定**：应用内领域层统一放 `internal/core/<领域名>`（当前为 `oidcop`）。`core` 只承载绑定框架/协议的领域逻辑，禁止放置工具与辅助代码；`op` 为 OpenID Provider 术语（对应 RP 侧 `pkg/goidc`），非领域层通用后缀，其他领域层按领域名命名（如 `core/session`）。
+> 公共层**禁止**复用应用侧 `svc` 前缀：`svc` 专指应用内服务层，编排不外提；共享层只承载领域不变式（跨表、在调用方事务内、返回实体/哨兵错误）与基础能力，可复用的领域不变式下沉 `pkg/core/<域>`，其余留在各应用。凭证（口令强度 / 临时口令 / API Key·OAuth client secret·refresh token 的生成与摘要）统一在 `pkg/credential`，**全系统只允许一份摘要实现**；OIDC 鉴权中间件在 `pkg/middleware/oidc_auth.go`，RP 侧 back-channel logout 接收端在 `pkg/goidc`。
+>
+> **领域层容器约定**：应用内领域层统一放 `internal/core/<领域名>`（当前为 `oidcop`）。`core` 只承载绑定框架/协议的领域逻辑，禁止放置工具与辅助代码；`op` 为 OpenID Provider 术语（对应 RP 侧 `pkg/goidc`），非领域层通用后缀，其他领域层按领域名命名（如 `core/session`）。公共层同理：`pkg/core/<域>` 是平铺的领域层容器，**只放领域不变式，不放工具与辅助代码**（工具/基础能力直接放 `pkg/<name>`）。
 >
 > **OIDC 分层约定**：OP（Provider）侧领域层在 `apps/auth/internal/core/oidcop`（仅 auth 使用，绑定 auth 实体与 zitadel op 框架）；跨应用共享的 OIDC 能力（当前为 RP 侧 `pkg/goidc`）才放 `pkg`。若未来出现第二个 OP 消费者，将 `oidcop` 上提至 `pkg/goidc`。
 
@@ -179,7 +184,7 @@ const (
 1. **字段类型用具名类型，不用 `string`**：实体、DAO Cond、DTO 请求/响应的枚举字段一律声明为该具名类型（如 `RelationType DeptUserRelationType`），而非 `string`——编译期即可杜绝拼错枚举值。
 2. **全链路用常量**：赋值、传参、比较一律引用常量，如 `model.DeptUserRelationPrimary`，**禁止** `string(model.DeptUserRelationX)` 强转、**禁止**显式类型转换换别的枚举类型、**禁止**裸字面量 `"primary"`/`"admin"` 出现在非定义处。
 3. **非法值校验归 service**：请求来自前端（JSON/form 绑定原始类型），service 入口用 `switch` + 常量白名单判合法，非法返回对应功能级错误码；合法值命中常量直接使用。
-4. **JSON/DB 向下兼容**：具名类型的底层是 `string`，JSON 序列化仍是普通字符串、gorm 存 varchar，前端和数据库均无感知；DTO 包允许 import `pkg/iam/model`（单向下游，无环）。
+4. **JSON/DB 向下兼容**：具名类型的底层是 `string`，JSON 序列化仍是普通字符串、gorm 存 varchar，前端和数据库均无感知；DTO 包允许 import `pkg/model`（单向下游，无环）。
 
 #### 数据表常量（model 层）
 

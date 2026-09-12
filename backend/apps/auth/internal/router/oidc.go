@@ -4,7 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/controller/ctroidc"
 	"github.com/morehao/ark-iam/auth/internal/middleware"
-	"github.com/morehao/ark-iam/pkg/iam/sso"
+	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 )

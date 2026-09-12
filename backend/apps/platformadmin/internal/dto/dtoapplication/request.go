@@ -1,6 +1,6 @@
 package dtoapplication
 
-import "github.com/morehao/ark-iam/pkg/iam/model"
+import "github.com/morehao/ark-iam/pkg/model"
 
 // ApplicationCreateReq 创建应用。
 // 来源（source）不由控制台决定：控制台创建的应用恒为 model.AppSourceThirdParty，

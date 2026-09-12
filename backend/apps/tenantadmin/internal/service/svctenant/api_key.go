@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/iam/apikey"
-	"github.com/morehao/ark-iam/pkg/iam/audit"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/credential"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
@@ -69,9 +69,9 @@ func (svc *apiKeySvc) Create(ctx *gin.Context, req *dtotenant.ApiKeyCreateReq) (
 		return nil, err
 	}
 
-	rawKey, err := apikey.Generate()
+	rawKey, err := credential.GenerateSecret(credential.APIKeyBytes)
 	if err != nil {
-		glog.Errorf(ctx, "[svcapikey.Create] apikey.Generate fail, err:%v", err)
+		glog.Errorf(ctx, "[svcapikey.Create] credential.GenerateSecret fail, err:%v", err)
 		return nil, code.GetError(code.ApiKeyCreateError)
 	}
 	var expiresAt *time.Time
@@ -85,8 +85,8 @@ func (svc *apiKeySvc) Create(ctx *gin.Context, req *dtotenant.ApiKeyCreateReq) (
 		TenantID:    tenantID,
 		OwnerUserID: owner.ID,
 		Name:        req.Name,
-		KeyHash:     apikey.Hash(rawKey),
-		KeyPrefix:   apikey.Prefix(rawKey),
+		KeyHash:     credential.HashSecret(rawKey),
+		KeyPrefix:   credential.Prefix(rawKey, credential.APIKeyPrefixLen),
 		Scope:       json.RawMessage(`{}`),
 		ExpiredAt:   expiresAt,
 		CreatedBy:   operatorID,

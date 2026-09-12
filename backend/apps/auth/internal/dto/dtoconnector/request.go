@@ -1,6 +1,6 @@
 package dtoconnector
 
-import "github.com/morehao/ark-iam/pkg/iam/model"
+import "github.com/morehao/ark-iam/pkg/model"
 
 type ConnectorIDReq struct {
 	ConnectorID string `json:"-" uri:"connectorID" binding:"required"`

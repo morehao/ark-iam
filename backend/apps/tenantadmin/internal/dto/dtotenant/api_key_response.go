@@ -1,6 +1,6 @@
 package dtotenant
 
-import "github.com/morehao/ark-iam/pkg/iam/model"
+import "github.com/morehao/ark-iam/pkg/model"
 
 // 租户端 API 密钥响应 DTO。
 

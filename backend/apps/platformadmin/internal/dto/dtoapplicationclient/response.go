@@ -1,6 +1,6 @@
 package dtoapplicationclient
 
-import "github.com/morehao/ark-iam/pkg/iam/model"
+import "github.com/morehao/ark-iam/pkg/model"
 
 type ApplicationClientCreateResp struct {
 	ApplicationClientID string `json:"applicationClientID"` // OAuth客户端ID

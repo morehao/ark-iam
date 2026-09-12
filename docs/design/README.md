@@ -39,3 +39,19 @@
 ## 目录约定
 
 本文档面向中文读者，术语首次出现时给出英文原文。所有 mermaid 图使用 `mermaid` 代码块包裹；无 mermaid 渲染环境时，图下方附简要文字说明。
+
+## 共享层（`backend/pkg`）路径迁移说明
+
+2026-09-12 完成公共层重划分（方案见 [pkg-shared-layer-design-20260912.md](pkg-shared-layer-design-20260912.md)）：**删除 `pkg/iam` 业务域容器**（模块路径 `github.com/morehao/ark-iam/pkg` 已表达域名），容器内按数据层 / 领域层 / 基础能力平铺到 `pkg` 根下；三个纯工具包合并为 `pkg/credential`。旧→新对照：
+
+| 旧路径 | 新路径 |
+|---|---|
+| `pkg/iam/model` | `pkg/model` |
+| `pkg/iam/dao` | `pkg/dao` |
+| `pkg/iam/object/obj<域>` | `pkg/object/obj<域>` |
+| `pkg/iam/{person,user,tenant}` | `pkg/core/{person,user,tenant}` |
+| `pkg/iam/svcmenu` | `pkg/core/menu` |
+| `pkg/iam/sso` · `pkg/iam/audit` | `pkg/sso` · `pkg/audit` |
+| `pkg/iam/password` · `pkg/iam/apikey` · `pkg/token` | `pkg/credential` |
+
+**本目录下的历史方案文档（如 `tenant-admin-provisioning-design-20260912.md`、`role-dimension-redesign.md` 等）保留文中的 `pkg/iam/...` 旧路径不改写**——它们是当时决策的事实记录，改写会让"当时的代码长什么样"失真。阅读时请按上表换算；`system-design.md`、`glossary.md`、`run-and-deploy.md` 等**长期维护文档**已同步更新为新路径。

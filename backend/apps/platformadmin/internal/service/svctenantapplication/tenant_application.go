@@ -5,8 +5,8 @@ import (
 	"gorm.io/datatypes"
 
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenantapplication"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
@@ -70,7 +70,7 @@ func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplicat
 		return nil, code.GetError(code.ApplicationNotExistError)
 	}
 
-	// 3) tenant_application 无唯一索引（幂等只能由应用层保证，见 pkg/iam/tenant.ProvisionTenantAdmin），
+	// 3) tenant_application 无唯一索引（幂等只能由应用层保证，见 pkg/core/tenant.ProvisionTenantAdmin），
 	// 故同一租户对同一应用只允许一条订阅，重复订阅在这里拦截。
 	existing, err := dao.NewTenantApplicationDao().GetByCond(ctx, &dao.TenantApplicationCond{TenantID: req.TenantID, AppID: req.AppID})
 	if err != nil {

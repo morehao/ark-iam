@@ -1,0 +1,46 @@
+package dao
+
+import (
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/golib/dbaccess/gormdao"
+	"gorm.io/gorm"
+)
+
+type RoleMenuCond struct {
+	*gormdao.BaseCond
+	TenantID string
+	RoleID   string
+	RoleIDs  []string
+	MenuID   string
+}
+
+func (c *RoleMenuCond) BuildCondition(db *gorm.DB, tableName string) {
+	if c.BaseCond != nil {
+		c.BaseCond.BuildCondition(db, tableName)
+	}
+	if c.TenantID != "" {
+		db.Where(tableName+".tenant_id = ?", c.TenantID)
+	}
+	if c.RoleID != "" {
+		db.Where(tableName+".role_id = ?", c.RoleID)
+	}
+	if len(c.RoleIDs) > 0 {
+		db.Where(tableName+".role_id IN ?", c.RoleIDs)
+	}
+	if c.MenuID != "" {
+		db.Where(tableName+".menu_id = ?", c.MenuID)
+	}
+}
+
+type RoleMenuDao struct {
+	*gormdao.Dao[model.RoleMenuEntity, model.RoleMenuEntityList, string]
+}
+
+func NewRoleMenuDao(opts ...DaoOption) *RoleMenuDao {
+	return &RoleMenuDao{
+		Dao: gormdao.NewDao[model.RoleMenuEntity, model.RoleMenuEntityList, string](
+			model.TableNameRoleMenu, "RoleMenuDao",
+			resolveDBGetter(opts...),
+		),
+	}
+}

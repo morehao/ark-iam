@@ -158,7 +158,8 @@ make test APP=gateway
 go test ./...
 
 # 指定包 / 单个用例
-go test ./pkg/iam/service/svcuser -run TestGeneratePassword -v
+go test ./pkg/core/user/ -run TestCreate_NewPersonWithDeptRelations -v
+go test ./pkg/credential/ -run TestHashSecret_Golden -v
 
 # 覆盖率
 go test ./apps/platformadmin/internal/... -coverprofile=coverage.out

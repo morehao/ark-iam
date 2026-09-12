@@ -1,6 +1,6 @@
 package dtooidc
 
-import "github.com/morehao/ark-iam/pkg/iam/object/objauth"
+import "github.com/morehao/ark-iam/pkg/object/objauth"
 
 // RegisterPersonReq 注册 person 请求。OIDC 认证请求内完成 person 注册，
 // 应用是否允许由 authRequestID 反查的 client→app 的 AllowPersonCreateTenant 决定。

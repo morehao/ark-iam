@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/seed"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

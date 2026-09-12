@@ -1,6 +1,6 @@
 package dtoapplication
 
-import "github.com/morehao/ark-iam/pkg/iam/model"
+import "github.com/morehao/ark-iam/pkg/model"
 
 type ApplicationCreateResp struct {
 	AppID string `json:"appID"` // 应用ID

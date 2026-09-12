@@ -1,6 +1,6 @@
 package dtotenant
 
-import "github.com/morehao/ark-iam/pkg/iam/model"
+import "github.com/morehao/ark-iam/pkg/model"
 
 type RoleCreateResp struct {
 	RoleID string `json:"roleID"` // 角色ID

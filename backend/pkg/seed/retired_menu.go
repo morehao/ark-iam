@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/model"
 	"gorm.io/gorm"
 )
 

@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/model"
 )
 
 // generatePKCEVerifier 生成 PKCE code_verifier（43 字符，CSPRNG，RFC 7636 §4.1）。

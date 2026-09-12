@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/sso"
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/zitadel/oidc/v3/pkg/oidc"

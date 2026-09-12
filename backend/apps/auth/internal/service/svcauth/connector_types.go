@@ -1,6 +1,6 @@
 package svcauth
 
-import "github.com/morehao/ark-iam/pkg/iam/model"
+import "github.com/morehao/ark-iam/pkg/model"
 
 // 连接器字典常量的 svcauth 包内短名别名：取值事实源在 model
 // （model.ConnectorProtocol* / ConnectorProvider* / ConnectorCapability*），

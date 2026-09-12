@@ -3433,7 +3433,7 @@ const docTemplateplatformadmin = `{
             "type": "object",
             "properties": {
                 "initialPassword": {
-                    "description": "InitialPassword 新临时密码，仅在此响应中返回一次，不落库、不可再查。\n待办：邮件/短信通道接入后本字段下线，见 pkg/iam/password 的 TODO(delivery)。",
+                    "description": "InitialPassword 新临时密码，仅在此响应中返回一次，不落库、不可再查。\n待办：邮件/短信通道接入后本字段下线，见 pkg/credential 的 TODO(delivery)。",
                     "type": "string"
                 },
                 "userID": {
@@ -3457,7 +3457,7 @@ const docTemplateplatformadmin = `{
                     ]
                 },
                 "code": {
-                    "description": "Code 租户编码：由服务端自动生成（pkg/iam/tenant.GenerateCode，t_\u003c12 位随机 hex\u003e，\n例 t_3f7a9c1d2e4b），创建/更新入参传入无效，创建后不可修改；仅在明细/列表出参中回显。",
+                    "description": "Code 租户编码：由服务端自动生成（pkg/core/tenant.GenerateCode，t_\u003c12 位随机 hex\u003e，\n例 t_3f7a9c1d2e4b），创建/更新入参传入无效，创建后不可修改；仅在明细/列表出参中回显。",
                     "type": "string"
                 },
                 "dbUser": {
@@ -3494,7 +3494,7 @@ const docTemplateplatformadmin = `{
             "type": "object",
             "properties": {
                 "adminInitialPassword": {
-                    "description": "AdminInitialPassword 租户管理员的初始临时密码，仅在此响应中返回一次，不落库、不可再查；\n若管理员的邮箱/手机命中已存在自然人（其密码不被改动），该字段为空串。\n待办：邮件/短信通道接入后本字段下线，见 pkg/iam/password 的 TODO(delivery)。",
+                    "description": "AdminInitialPassword 租户管理员的初始临时密码，仅在此响应中返回一次，不落库、不可再查；\n若管理员的邮箱/手机命中已存在自然人（其密码不被改动），该字段为空串。\n待办：邮件/短信通道接入后本字段下线，见 pkg/credential 的 TODO(delivery)。",
                     "type": "string"
                 },
                 "adminUserID": {
@@ -3511,7 +3511,7 @@ const docTemplateplatformadmin = `{
             "type": "object",
             "properties": {
                 "code": {
-                    "description": "Code 租户编码：由服务端自动生成（pkg/iam/tenant.GenerateCode，t_\u003c12 位随机 hex\u003e，\n例 t_3f7a9c1d2e4b），创建/更新入参传入无效，创建后不可修改；仅在明细/列表出参中回显。",
+                    "description": "Code 租户编码：由服务端自动生成（pkg/core/tenant.GenerateCode，t_\u003c12 位随机 hex\u003e，\n例 t_3f7a9c1d2e4b），创建/更新入参传入无效，创建后不可修改；仅在明细/列表出参中回显。",
                     "type": "string"
                 },
                 "createdAt": {
@@ -3568,7 +3568,7 @@ const docTemplateplatformadmin = `{
             "type": "object",
             "properties": {
                 "code": {
-                    "description": "Code 租户编码：由服务端自动生成（pkg/iam/tenant.GenerateCode，t_\u003c12 位随机 hex\u003e，\n例 t_3f7a9c1d2e4b），创建/更新入参传入无效，创建后不可修改；仅在明细/列表出参中回显。",
+                    "description": "Code 租户编码：由服务端自动生成（pkg/core/tenant.GenerateCode，t_\u003c12 位随机 hex\u003e，\n例 t_3f7a9c1d2e4b），创建/更新入参传入无效，创建后不可修改；仅在明细/列表出参中回显。",
                     "type": "string"
                 },
                 "createdAt": {
@@ -3641,7 +3641,7 @@ const docTemplateplatformadmin = `{
             "type": "object",
             "properties": {
                 "code": {
-                    "description": "Code 租户编码：由服务端自动生成（pkg/iam/tenant.GenerateCode，t_\u003c12 位随机 hex\u003e，\n例 t_3f7a9c1d2e4b），创建/更新入参传入无效，创建后不可修改；仅在明细/列表出参中回显。",
+                    "description": "Code 租户编码：由服务端自动生成（pkg/core/tenant.GenerateCode，t_\u003c12 位随机 hex\u003e，\n例 t_3f7a9c1d2e4b），创建/更新入参传入无效，创建后不可修改；仅在明细/列表出参中回显。",
                     "type": "string"
                 },
                 "dbUser": {

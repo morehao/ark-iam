@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/token"
+	"github.com/morehao/ark-iam/pkg/credential"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -111,7 +111,7 @@ func TestCreateAccessAndRefreshTokensSelectsTenantFromAuthRequest(t *testing.T) 
 	}
 
 	var stored model.RefreshTokenEntity
-	if err := db.Table(model.TableNameRefreshToken).Where("token = ?", token.HashToken(refreshToken)).First(&stored).Error; err != nil {
+	if err := db.Table(model.TableNameRefreshToken).Where("token = ?", credential.HashSecret(refreshToken)).First(&stored).Error; err != nil {
 		t.Fatalf("refresh token not stored: %v", err)
 	}
 	if stored.TenantID != "9" {
@@ -139,7 +139,7 @@ func TestCreateAccessAndRefreshTokensFallsBackToFirstUserWhenNoTenant(t *testing
 	}
 
 	var stored model.RefreshTokenEntity
-	if err := db.Table(model.TableNameRefreshToken).Where("token = ?", token.HashToken(refreshToken)).First(&stored).Error; err != nil {
+	if err := db.Table(model.TableNameRefreshToken).Where("token = ?", credential.HashSecret(refreshToken)).First(&stored).Error; err != nil {
 		t.Fatalf("refresh token not stored: %v", err)
 	}
 	if stored.TenantID != "1" {
@@ -214,7 +214,7 @@ func TestCreateAccessAndRefreshTokensSelectsTenantFromRefreshTokenRequest(t *tes
 	}
 
 	var stored model.RefreshTokenEntity
-	if err := db.Table(model.TableNameRefreshToken).Where("token = ?", token.HashToken(refreshToken)).First(&stored).Error; err != nil {
+	if err := db.Table(model.TableNameRefreshToken).Where("token = ?", credential.HashSecret(refreshToken)).First(&stored).Error; err != nil {
 		t.Fatalf("refresh token not stored: %v", err)
 	}
 	if stored.TenantID != "6" {

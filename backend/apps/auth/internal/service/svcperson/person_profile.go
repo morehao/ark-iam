@@ -4,10 +4,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoperson"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/password"
-	"github.com/morehao/ark-iam/pkg/iam/sso"
+	"github.com/morehao/ark-iam/pkg/credential"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
@@ -69,7 +69,7 @@ func (svc *personProfileSvc) UpdatePassword(ctx *gin.Context, req *dtoperson.Per
 		return code.GetError(code.PasswordNotSetError)
 	}
 
-	if err := password.ValidateStrength(req.NewPassword); err != nil {
+	if err := credential.ValidateStrength(req.NewPassword); err != nil {
 		return code.GetError(code.PasswordValidationError)
 	}
 
@@ -112,5 +112,5 @@ func (svc *personProfileSvc) UpdatePassword(ctx *gin.Context, req *dtoperson.Per
 	return nil
 }
 
-// 注意：密码强度规则统一走公共包 pkg/iam/password（8~128 位，含大小写数字），
+// 注意：密码强度规则统一走公共包 pkg/credential（8~128 位，含大小写数字），
 // 与注册流程（svcauth.validatePasswordStrength）保持一致。
