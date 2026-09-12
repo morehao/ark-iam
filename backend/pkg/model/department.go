@@ -8,7 +8,7 @@ const TableNameDepartment = "department"
 
 // DeptNodeStatus 部门节点启停状态。
 // 取值属全局启停语义，与其它领域统一为 enable/disable
-// （见 status-source-consistency-design-20260912.md D1）。
+// （见 docs/design/glossary.md「启停状态」）。
 type DeptNodeStatus string
 
 // 部门节点状态取值（禁止硬编码）。

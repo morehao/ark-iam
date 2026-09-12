@@ -9,9 +9,9 @@ import (
 const TableNameInvite = "tenant_invite"
 
 // InviteStatus 邀请单状态。
-// 「已过期」不是存储态：由 expires_at 在读取时派生（见
-// status-source-consistency-design-20260912.md D6/R2）——若写成存储态，会引入
+// 「已过期」不是存储态：由 expires_at 在读取时派生——若写成存储态，会引入
 // 「已过期但定时任务还没跑到」的一致性窗口，反而更差。
+// 判定位置见 docs/design/system-design.md §5.1（通道 B）。
 type InviteStatus string
 
 const (
@@ -21,7 +21,11 @@ const (
 )
 
 // InviteEntity 加入租户的邀请单：租户 owner/管理员生成，凭证持有者凭 inviteCode 加入该租户。
-// 用户侧能否自助加入的开关由租户策略 AllowJoinByInvite 控制（见 ApplicationEntity.AllowJoinByInvite）。
+//
+// 能否加入由**两道门禁**按序判定（见 docs/design/system-design.md §5.1 通道 B）：
+//  1. 应用级策略 application.AllowJoinByInvite——按调用方 access token 的 client_id 解析出应用
+//     再读该开关；解析不出应用或字段未配置（NULL）一律拒绝（fail-closed），且该判定先于邀请解析；
+//  2. 邀请单自身——存在、status=pending、未过期（ExpiresAt 为空表示永久）。
 type InviteEntity struct {
 	gormdao.BaseEntity
 	TenantID  string       `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:归属租户"`

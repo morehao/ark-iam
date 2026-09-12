@@ -1,8 +1,9 @@
 # 租户级自定义域名（Tenant Custom Domain）实施方案
 
-> 状态：待评审（B 档 · 租户级定制域名，设计稿未实施）
-> 涉及：`auth`（登录/OIDC 入口按域名识别租户）、`pkg/iam`（`domain` 表语义重定义与消费）、`login-web`（按域名品牌化/跳租户选择）、`platformadmin`（域名管理页面保留并富化）；顺带移除 `system`（系统配置）冗余模块。
-> 结论速览：**`domain` 模块重做保留**（作为被消费的租户域名源），**`system` 模块移除**。
+> 状态：**待实施**（B 档 · 租户级定制域名）。`domain` 表与控制台 CRUD 已存在（纯 CRUD），auth 侧按域名识别租户的主体方案尚未实施。
+> 涉及：`auth`（登录/OIDC 入口按域名识别租户）、`pkg/model` + `pkg/dao`（`domain` 表语义重定义与消费）、`login-web`（按域名品牌化/跳租户选择）、`platformadmin/internal/service/svcdomain`（域名管理页面保留并富化）。
+> 结论速览：**`domain` 模块重做保留**（作为被消费的租户域名源）。
+> 已完成项：`system`（系统配置）冗余模块与其 `system` 表**已移除**；`pkg/iam` 业务域容器**已拆除**，本文路径均已换算为当前扁平化布局（`pkg/model`、`pkg/dao`，领域层放 `pkg/core/<域>`）。
 
 ## 1. 背景与目标
 
@@ -39,7 +40,7 @@
 
 ### 3.1 `DomainEntity` 字段补充
 
-当前（`pkg/iam/model/domain.go`）：
+当前（`pkg/model/domain.go`）：
 
 ```go
 type DomainEntity struct {
@@ -77,9 +78,9 @@ type DomainEntity struct {
 
 ## 4. 后端改造
 
-### 4.1 新增 `pkg/iam/svcdomain` 或复用 dao —— 按域名反查租户
+### 4.1 新增领域层（`pkg/core/domain`）或复用 dao —— 按域名反查租户
 
-在 `pkg/iam/dao/domain.go` 补充查询（供 auth 侧使用，避免 auth 依赖 platformadmin 的 `svcdomain`）：
+在 `pkg/dao/domain.go` 补充查询（供 auth 侧使用，避免 auth 依赖 platformadmin 的 `svcdomain`）：
 
 ```go
 // GetPublicByDomain 精确匹配未停用且已验证(或未校验但启用)的域名，返回其租户id。
@@ -87,7 +88,7 @@ type DomainEntity struct {
 func (d *DomainDao) GetPublicByDomain(ctx context.Context, domain string) (*model.DomainEntity, error)
 ```
 
-> 依赖方向注意：`auth` 属于 `pkg` 消费者，查询逻辑放 `pkg/iam` 而不是 `platformadmin/internal`，保证 auth 不反向依赖 platformadmin。
+> 依赖方向注意：`auth` 属于 `pkg` 消费者，查询逻辑放 `pkg/core/domain`（或 `pkg/dao`）而不是 `platformadmin/internal`，保证 auth 不反向依赖 platformadmin。
 
 ### 4.2 新增域名中间件 `apps/auth/internal/middleware/domain.go`
 
@@ -143,7 +144,6 @@ oidcGroup.GET("/authorize",
   - `apps/platformadmin/internal/service/svctenant/system.go`
   - `apps/platformadmin/internal/controller/ctrtenant/system.go`
   - `apps/platformadmin/internal/dto/dtotenant/system_request.go`、`system_response.go`
-  - `pkg/iam/{model/system.go, dao/system.go}`
   - 测试 `apps/platformadmin/internal/service/svctenant/tenant_scope_test.go` 的 `TestSystemDetailRejectsCrossTenantEntity`
 - 删注册：`router/tenant.go` 的 `systemRouter(...)` 函数、`router/router.go` 的 `systemRouter(groups)` 调用。
 - `automigrate`：删 `&SystemEntity{}`。
@@ -192,10 +192,10 @@ oidcGroup.GET("/authorize",
 ### 后端 pkg
 | 文件 | 变更 |
 |---|---|
-| `pkg/iam/model/domain.go` | 增 `IsPrimary/Status` 字段 |
-| `pkg/iam/dao/domain.go` | 增 `GetPublicByDomain` |
-| `pkg/iam/model/automigrate.go` | 保留 `DomainEntity`；删 `SystemEntity` |
-| `pkg/iam/model/system.go`、`pkg/iam/dao/system.go` | **删除** |
+| `pkg/model/domain.go` | 增 `IsPrimary/Status` 字段 |
+| `pkg/dao/domain.go` | 增 `GetPublicByDomain` |
+| `pkg/model/automigrate.go` | 保留 `DomainEntity`（`SystemEntity` 已删除） |
+| ~~`pkg/model/system.go`、`pkg/dao/system.go`~~ | **已删除**，无需再处理 |
 
 ### 后端 platformadmin
 | 文件 | 变更 |
@@ -217,7 +217,7 @@ oidcGroup.GET("/authorize",
 ## 9. 验证
 
 1. `make build APP=auth` / `make build APP=platformadmin` 编译通过。
-2. `go test ... ./pkg/iam/... ./apps/auth/internal/... ./apps/platformadmin/internal/...` 全绿。
+2. `cd backend && go test ./pkg/... ./apps/auth/internal/... ./apps/platformadmin/internal/...` 全绿。
 3. `make swag APP=auth`、`make swag APP=platformadmin` 重新生成 API 文档。
 4. `pnpm build` 前端通过。
 5. 手动验收：

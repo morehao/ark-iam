@@ -81,10 +81,8 @@ func newAuthReq(t *testing.T, provider *OIDCProvider, clientID string) op.AuthRe
 
 func registerSvc(provider *OIDCProvider, db *gorm.DB, tenants func(*gin.Context, string) ([]objauth.TenantOption, error)) *oidcAuthSvc {
 	return &oidcAuthSvc{
-		provider:             provider,
-		authSvc:              &fakePasswordAuthenticator{tenantsForPerson: tenants},
-		applicationClientDao: func() *dao.ApplicationClientDao { return dao.NewApplicationClientDao(dao.WithDBGetter(dbGetter(db))) },
-		applicationDao:       func() *dao.ApplicationDao { return dao.NewApplicationDao(dao.WithDBGetter(dbGetter(db))) },
+		provider: provider,
+		authSvc:  &fakePasswordAuthenticator{tenantsForPerson: tenants},
 	}
 }
 

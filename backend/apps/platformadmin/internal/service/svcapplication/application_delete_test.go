@@ -46,7 +46,7 @@ func TestDeleteBuiltInApplication(t *testing.T) {
 
 // TestDeleteFirstPartyApplication：source=first_party（平台自建但非内置）可删——
 // 删 is_system 后这类应用不得被误判为内置而拒绝删除。注意：种子的两个控制台应用都是 builtin，
-// first_party 目前只可能来自运维自建（见 docs/design/application-source-rename.md §14）。
+// first_party 目前只可能来自运维自建（见 docs/design/system-design.md §4.3）。
 func TestDeleteFirstPartyApplication(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ApplicationEntity{})
 

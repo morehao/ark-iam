@@ -1,7 +1,7 @@
 // Package sso 提供 SSO 中心会话（认证态）的存储与校验能力。
 //
 // 定位：跨应用共享的基础会话层，供 auth（OP）等持有会话的一侧使用。
-// 业务应用（RP）作为无状态侧不直接依赖本包（见 docs/design/oidc-slo-unified-logout.md）。
+// 业务应用（RP）作为无状态侧不直接依赖本包（见 docs/design/system-design.md §5.5）。
 package sso
 
 import (

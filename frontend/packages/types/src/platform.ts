@@ -183,7 +183,7 @@ export interface TenantItem {
 /**
  * 建租户时的内置管理员（必填）：建租户即产出可登录的租户管理员。
  * 不含密码——初始临时密码由服务端生成并仅在创建响应返回一次（见
- * docs/design/tenant-admin-provisioning-design-20260912.md D2/D3/D6）。
+ * docs/design/system-design.md §5.8）。
  */
 export interface TenantAdminCreateReq {
   name: string

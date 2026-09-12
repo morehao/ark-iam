@@ -27,9 +27,8 @@ frontend/packages/*/dist/
 *.cert
 certs/
 
-# 设计文档
-docs/superpowers/specs/
-docs/superpowers/plans/
+# 设计文档（docs/superpowers 是本地 SDD 工作产物：spec/plan 一律不入库）
+docs/superpowers/
 
 # Playwright E2E 产物
 e2e/test-results/

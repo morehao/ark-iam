@@ -2,7 +2,7 @@
 // person 解析/find-or-create + 用户主体 + 部门归属（primary/leader/secondary）的原子写入。
 //
 // 供 platformadmin（建租户时创建内置管理员）与 tenantadmin（控制台建成员）共用同一实现，
-// 避免"平台侧复制一份建用户逻辑"造成的漂移（见 docs/design/tenant-admin-provisioning-design-20260912.md 需求①）。
+// 避免"平台侧复制一份建用户逻辑"造成的漂移（见 docs/design/system-design.md §5.8）。
 package user
 
 import (

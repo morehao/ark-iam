@@ -37,7 +37,7 @@ func (s AppSource) IsBuiltin() bool { return s == AppSourceBuiltin }
 // IsPlatformOwned 判断是否平台自有（内置或自建），供「自有 vs 外部」口径使用，避免调用方枚举三值。
 func (s AppSource) IsPlatformOwned() bool { return s == AppSourceBuiltin || s == AppSourceFirstParty }
 
-// AppStatus 应用启停状态（启停语义统一使用 enable/disable，见 docs/design/status-source-consistency-design-20260912.md D1）。
+// AppStatus 应用启停状态（启停语义统一使用 enable/disable，见 docs/design/glossary.md「启停状态」）。
 type AppStatus string
 
 // 应用状态取值（禁止硬编码）。

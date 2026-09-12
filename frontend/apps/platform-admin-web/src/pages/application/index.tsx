@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Descriptions, Drawer, Form, Input, InputNumber, message, Modal, Select, Space, Table } from 'antd'
+import { Button, Descriptions, Drawer, Form, Input, InputNumber, message, Modal, Select, Space, Switch, Table } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { actionColumn, CODE_COL_WIDTH, fmtTime, IDCell, idColumn, nameColumn, PageContainer, SourceTag, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
@@ -47,7 +47,8 @@ export default function ApplicationList() {
   const handleCreate = () => {
     setEditing(null)
     form.resetFields()
-    form.setFieldsValue({ sort: 0 })
+    // 两个入口策略默认关闭（与后端列默认值 false 一致）；不开则对应自助通道的整体拒绝
+    form.setFieldsValue({ sort: 0, allowPersonCreateTenant: false, allowJoinByInvite: false })
     setModalOpen(true)
   }
 
@@ -61,6 +62,9 @@ export default function ApplicationList() {
       logoUrl: record.logoUrl,
       homepageUrl: record.homepageUrl,
       sort: record.sort,
+      // 后端列为可空 *bool，未配置（NULL）时语义等同关闭，此处归一成 false 交给 Switch
+      allowPersonCreateTenant: !!record.allowPersonCreateTenant,
+      allowJoinByInvite: !!record.allowJoinByInvite,
     })
     setModalOpen(true)
   }
@@ -242,6 +246,22 @@ export default function ApplicationList() {
           </Form.Item>
           <Form.Item name="sort" label="排序">
             <InputNumber style={{ width: '100%' }} placeholder="数字越小越靠前" />
+          </Form.Item>
+          <Form.Item
+            name="allowPersonCreateTenant"
+            label="个人自助创建租户"
+            valuePropName="checked"
+            tooltip="开启后，经本应用登录的零租户用户可自助注册并开通自己的租户（通道 A），注册人成为该租户拥有者"
+          >
+            <Switch checkedChildren="允许" unCheckedChildren="禁止" />
+          </Form.Item>
+          <Form.Item
+            name="allowJoinByInvite"
+            label="允许邀请加入租户"
+            valuePropName="checked"
+            tooltip="开启后，经本应用登录的用户可凭邀请码加入已有租户（通道 B），加入者恒为普通成员；关闭时 joinTenant 一律拒绝"
+          >
+            <Switch checkedChildren="允许" unCheckedChildren="禁止" />
           </Form.Item>
         </Form>
       </Modal>

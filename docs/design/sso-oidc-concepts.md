@@ -116,14 +116,14 @@ RP 接入前必须在 OP 注册一个 **OAuth Client**，核心注册字段（�
 |---|---|---|
 | `client_id` | 客户端唯一标识 | 如 `platform_admin_web` |
 | `client_secret` | 客户端密钥（仅机密客户端需要，库中只存哈希） | - |
-| `redirect_uris` | 授权码回调地址（**必须白名单精确匹配**） | 如 `http://localhost:4001/callback` |
+| `redirect_uris` | 授权码回调地址（**必须白名单精确匹配**） | 如 `http://localhost:4001/auth/callback` |
 | `grant_types` | 允许的授权类型 | `["authorization_code"]` |
 | `response_types` | 允许的响应类型 | `["code"]` |
 | `token_endpoint_auth_method` | 令牌端点客户端认证方式 | `client_secret_basic` / `client_secret_post` / `none` |
 | `post_logout_redirect_uris` | 登出后跳转白名单 | - |
 | `back_channel_logout_uri` | 反向通道登出通知地址（SLO，即服务端登出通知） | - |
 | `require_pkce` | 是否强制 PKCE | 默认否（协议侧始终支持 S256） |
-| `default_scopes` | 默认授权 scope | `["openid","profile"]` |
+| `default_scopes` | 默认授权 scope | 列默认 `["openid","profile"]`；两个内置客户端种子值为 `["openid","profile","email"]` |
 | `access_token_ttl` / `refresh_token_ttl` | 令牌有效期（秒） | 900 / 2592000 |
 
 > **`client_id` 在库中的落位与命名**：本系统存在 `application_client.code` 列，它就是这里的 `client_id`（唯一索引），
@@ -131,7 +131,7 @@ RP 接入前必须在 OP 注册一个 **OAuth Client**，核心注册字段（�
 > **创建时由调用方填写**（`ApplicationClientCreateReq.code` 必填，控制台表单「客户端编码」），
 > **用户自建客户端创建后可改**（`ApplicationClientUpdateReq.code`）；
 > **内置客户端只读**——它是网关 aud 白名单与前端 `VITE_OIDC_CLIENT_ID` 的取值来源，
-> 从控制台改名会当场把该控制台锁死且界面无法自救（见 [seed-identity-key-20260912.md](seed-identity-key-20260912.md)）。
+> 从控制台改名会当场把该控制台锁死且界面无法自救（见 [system-design.md](system-design.md) §4.5）。
 > 应用编码同理：**自建应用可改，内置应用只读**——控制台菜单入口仍按 `platform_admin` / `tenant_admin` 定位，
 > 改名会让对应控制台侧边栏失联（`100749`）。
 > 内置客户端由种子写入可读值（`platform_admin_web` / `tenant_admin_web`，
@@ -156,7 +156,7 @@ flowchart TB
     GT -.不推荐/未启用.-> IMP["implicit 隐式流"]
     GT -.未实现.-> TE["token_exchange / jwt-bearer"]
     AC -->|"本系统：前端应用"| USE1["react-oidc-context + oidc-client-ts"]
-    CC -->|"本系统：API Key / 服务间调用"| USE2["x-api-key / client_credentials"]
+    CC -->|"本系统：业务 API 机器凭证用 API Key"| USE2["x-api-key；client_credentials 仅供 OP 端点"]
 ```
 
 - **authorization_code**：前端 / 原生应用标准流程，配合 **PKCE** 防止授权码拦截。
@@ -168,25 +168,28 @@ flowchart TB
 | 令牌 | 载体 | 用途 | 关键点 |
 |---|---|---|---|
 | **ID Token** | JWT | 证明"用户是谁" | 必须校验签名、`iss`、`aud`、`nonce`；有效期短（本系统 10 分钟） |
-| **Access Token** | JWT（本系统为 JWT，RS256） | 访问业务 API 的凭证 | 携带 `sub`、`tenant_id`、`user_id`、`client_id`、`token_usage` 等声明 |
+| **Access Token** | JWT（本系统为 JWT，RS256） | 访问业务 API 的凭证 | 携带标准声明 `sub`、`client_id`，以及私有声明 `tenant_id`（有中心会话时含 `sid`）；**API Key 机器令牌**另含 `token_usage`/`user_id` |
 | **Refresh Token** | 不透明字符串 | 换取新的 Access Token | 库中只存哈希；支持轮换与吊销 |
 | **ID Token 声明（Claims）** | JWT 载荷 | 用户身份信息 | `sub`/`iss`/`aud`/`exp`/`iat`/`amr`/`auth_time`/`sid` 等 |
 
-**本系统 Access Token 的私有声明**（`pkg/iam/object/objauth`）：
+**本系统 Access Token 的声明**（代码在 `pkg/object/objauth`）：
 
-| Claim | 含义 |
-|---|---|
-| `sub` | 主体标识，自然人格式为 `person:<personID>` |
-| `tenant_id` | 用户当前所在的租户 |
-| `user_id` | 用户在租户内的成员 ID |
-| `client_id` | 签发该令牌的 OAuth Client |
-| `token_usage` | 令牌用途：`machine`（机器凭证签发）或空（人登录签发） |
+| Claim | 来源 | 含义 |
+|---|---|---|
+| `sub` | 标准 | 主体标识：人登录为 `person:<personID>`；API Key 机器令牌为 `<keyPrefix>` |
+| `client_id` | 标准（zitadel 写入） | 签发该令牌的 OAuth Client |
+| `tenant_id` | 私有 | 用户当前所在的租户（人登录令牌） |
+| `sid` | 私有 | 中心会话 ID（有 SSO 会话时写入，用于反向通道登出定位） |
+| `user_id` | 私有 | 租户内成员 ID（**仅 API Key 机器令牌**） |
+| `token_usage` | 私有 | 令牌用途 `machine`（**仅 API Key 机器令牌**）；人登录令牌与普通 `client_credentials` 令牌都不写该声明 |
+
+> 业务中间件并不读取 `user_id` claim 来定位成员，而是用 `(tenant_id, personID)` 反查该 person 在本租户的成员记录。
 
 ### 3.5 Scope 与 Claims
 
 - **Scope** 是权限范围：`openid`（必须，声明启用 OIDC）、`profile`、`email`、`phone`、`offline_access`（允许发 Refresh Token）等。
 - **Claims** 是 ID Token / UserInfo 中的身份声明，按 scope 裁剪返回。
-- 本系统在 `application_client.default_scopes` 中配置客户端默认 scope；`resource`/`scope` 表用于资源级权限建模（见 [system-design.md](system-design.md)）。
+- 本系统在 `application_client.default_scopes` 中配置客户端默认 scope。**资源级权限（`resource`/`scope`/`role_scope`）已从 IAM 移除**，IAM 只到「角色—菜单」粒度，业务细粒度鉴权由各业务应用自行实现。
 
 ---
 
@@ -198,7 +201,7 @@ OIDC 端点基于 **issuer（签发者标识）** 派生，本系统 issuer 默�
 flowchart LR
     subgraph OP["OP（auth 应用 :8081）"]
         D["GET /oidc/.well-known/openid-configuration<br/>（Discovery 元数据）"]
-        A["GET/POST /oidc/authorize<br/>（认证 + 授权端点）"]
+        A["GET /oidc/authorize<br/>（认证 + 授权端点，仅 GET）"]
         T["POST /oidc/oauth/token<br/>（令牌端点）"]
         U["GET /oidc/userinfo<br/>（用户信息端点）"]
         R["POST /oidc/revoke<br/>（吊销令牌）"]
@@ -216,7 +219,8 @@ flowchart LR
 | 端点 | 方法 | 作用 |
 |---|---|---|
 | `/.well-known/openid-configuration` | GET | 服务发现：返回 issuer、各端点地址、支持的算法/scope |
-| `/authorize` | GET/POST | 认证用户、征求授权、返回授权码（`code`） |
+| `/authorize` | GET | 认证用户、征求授权、返回授权码（`code`）；按 OIDC Core §3.1.2.1 **仅 GET** |
+| `/authorize/callback` | GET/POST | 授权回调（登录完成后回跳 OP 继续授权流程） |
 | `/oauth/token` | POST | 用授权码/刷新令牌/客户端凭证换取令牌 |
 | `/userinfo` | GET | 返回当前用户的标准声明（按 scope 裁剪） |
 | `/revoke` | POST | 吊销 Refresh Token |
@@ -299,7 +303,7 @@ sequenceDiagram
 
     SVC->>OP: POST /oidc/oauth/token<br/>（grant_type=client_credentials<br/>+ client 认证）
     OP->>OP: 校验 client_id / client_secret
-    OP-->>SVC: access_token（token_usage=machine，<br/>sub=client_id）
+    OP-->>SVC: access_token（sub=client_id；<br/>仅 API Key 路径带 token_usage=machine）
     SVC->>API: 请求业务接口<br/>（Authorization: Bearer access_token）
     API->>API: 校验令牌（机器凭证<br/>不依赖浏览器 SSO 会话）
     API-->>SVC: 业务数据
@@ -412,7 +416,7 @@ flowchart LR
 | 签名算法白名单 | 拒绝 HS256 等对称算法混淆 | 校验仅允许 `RS256` |
 | iss / aud 校验 | 防止跨 issuer / 跨客户端串用令牌 | RP 中间件 `WithOIDCIssuer` / `WithOIDCAudiences` |
 | 密钥管理 | 非开发环境未配置密钥直接启动失败 | 签名/加密密钥 fail-closed |
-| 令牌存储 | 刷新令牌、客户端密钥只存 SHA-256 哈希 | `pkg/token.HashToken` |
+| 令牌存储 | 刷新令牌、客户端密钥只存 SHA-256 哈希 | `pkg/credential.HashSecret` |
 
 ---
 
