@@ -6,6 +6,13 @@ import (
 	"gorm.io/gorm"
 )
 
+// MenuOrderBySort 菜单的规范排序字段：先按控制台可维护的「排序」(sort) 升序，
+// 再按 code 升序兜底（同应用内 code 唯一，保证顺序确定）。
+// 菜单树按 parent_id 分组构建，该排序等价于「同一父级下按 sort 升序」。
+// 菜单顺序是运维字段（种子 create_only，控制台可改），因此所有面向界面的菜单查询都必须显式带上它——
+// 缺省时数据库不保证任何顺序，控制台里改「排序」将完全看不到效果。
+const MenuOrderBySort = "sort, code"
+
 type MenuCond struct {
 	*gormdao.BaseCond
 	AppID      string

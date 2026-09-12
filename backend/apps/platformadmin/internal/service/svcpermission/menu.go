@@ -296,8 +296,9 @@ func (svc *menuSvc) PageList(ctx *gin.Context, req *dtopermission.MenuPageListRe
 	menuRepo := dao.NewMenuDao()
 	cond := &dao.MenuCond{
 		BaseCond: &gormdao.BaseCond{
-			Page:     req.Page,
-			PageSize: req.PageSize,
+			Page:       req.Page,
+			PageSize:   req.PageSize,
+			OrderField: dao.MenuOrderBySort,
 		},
 		AppID:      req.AppID,
 		ParentID:   req.ParentID,
@@ -348,8 +349,11 @@ func (svc *menuSvc) PageList(ctx *gin.Context, req *dtopermission.MenuPageListRe
 
 func (svc *menuSvc) Tree(ctx *gin.Context, req *dtopermission.MenuTreeReq) (*dtopermission.MenuTreeResp, error) {
 	menuRepo := dao.NewMenuDao()
+	// 菜单管理页展示顺序与两端侧边栏同源（dao.MenuOrderBySort）：控制台里改「排序」后，
+	// 这里与侧边栏必须同时按新顺序呈现，否则运维无法确认排序是否生效。
 	cond := &dao.MenuCond{
-		AppID: req.AppID,
+		BaseCond: &gormdao.BaseCond{OrderField: dao.MenuOrderBySort},
+		AppID:    req.AppID,
 	}
 	menuEntityList, _, err := menuRepo.GetPageListByCond(ctx, cond)
 	if err != nil {
