@@ -163,7 +163,7 @@ func buildTenantMenuTree(ctx *gin.Context) ([]dtotenant.MenuTreeItem, error) {
 }
 
 // buildMyMenuTree 构建当前用户可见的租户控制台菜单树：
-//   - 内置管理员豁免：持有内置管理员角色（source=builtin && admin_level=super）→ 全量菜单（含 visibility=admin，免授权）；
+//   - 内置管理员豁免：持有内置管理员角色（source=builtin && admin_type=admin）→ 全量菜单（含 visibility=admin，免授权）；
 //   - 普通成员：按该用户授权菜单集合（role_menu 并集）过滤 + visibility 门槛（public/member）二次过滤；
 //     父子收敛：父未达标/未授权时若存在可见子项则保留父壳，保证层级连贯。
 func buildMyMenuTree(ctx *gin.Context) ([]dtotenant.MenuTreeItem, error) {
@@ -184,23 +184,23 @@ func buildMyMenuTree(ctx *gin.Context) ([]dtotenant.MenuTreeItem, error) {
 	return convertMenuNodes(nodes), nil
 }
 
-// userHoldsBuiltinAdmin 判断当前用户是否持有内置管理员角色（source=builtin && admin_level=super）。
+// userHoldsBuiltinAdmin 判断当前用户是否持有内置管理员角色（source=builtin && admin_type=admin）。
 // 保留薄包装以复用公共层实现并维持既有测试契约。
 func userHoldsBuiltinAdmin(ctx *gin.Context) (bool, error) {
 	return svcmenu.UserHoldsBuiltinAdmin(ctx, gincontext.GetTenantIDString(ctx), gincontext.GetUserIDString(ctx))
 }
 
 // HasSystemAdminCapability 判断当前用户（按 gin 上下文取租户/用户）是否具备「系统管理能力」
-// （admin_level == super）。授权驱动：聚合该用户全部角色取最高 admin_level。
+// （admin_type == admin）：任一角色为管理员类型即具备。
 func HasSystemAdminCapability(ctx *gin.Context) (bool, error) {
-	level, err := ResolveUserAdminLevel(ctx)
+	adminType, err := ResolveUserAdminType(ctx)
 	if err != nil {
 		return false, err
 	}
-	return level.HasSystemAdmin(), nil
+	return adminType.HasSystemAdmin(), nil
 }
 
-// requireSystemAdmin 校验当前操作者具备系统管理能力（admin_level=super），否则返回能力不足错误。
+// requireSystemAdmin 校验当前操作者具备系统管理能力（admin_type=admin），否则返回能力不足错误。
 // 租户自服务控制台定位为「管理层专用」：组织/用户/角色/密钥等管理写操作统一以此硬门槛兜底，
 // 菜单可见性仅是 UX 层（前端隐藏不是安全边界），直接调用 API 也必须被拒。
 // opErr 仅在系统错误（角色查询失败等）时兜底返回。
@@ -216,8 +216,8 @@ func requireSystemAdmin(ctx *gin.Context, opErr int) error {
 	return nil
 }
 
-// ResolveUserAdminLevel 推导当前用户能达到的最高系统管理等级：聚合该用户全部角色，
-// 取各角色 admin_level（显式能力标签）的最高档位（member < super）。复用公共层 svcmenu。
-func ResolveUserAdminLevel(ctx *gin.Context) (model.SysAdminLevel, error) {
-	return svcmenu.ResolveUserAdminLevel(ctx, gincontext.GetTenantIDString(ctx), gincontext.GetUserIDString(ctx))
+// ResolveUserAdminType 推导当前用户的系统管理类型：聚合该用户全部角色，
+// 任一角色为管理员类型（admin）即视为管理员类型，否则为普通类型（normal）。复用公共层 svcmenu。
+func ResolveUserAdminType(ctx *gin.Context) (model.SysAdminType, error) {
+	return svcmenu.ResolveUserAdminType(ctx, gincontext.GetTenantIDString(ctx), gincontext.GetUserIDString(ctx))
 }

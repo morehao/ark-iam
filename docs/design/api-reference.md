@@ -266,7 +266,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | PATCH | `/v1/tenant/machine-users/:machineUserID` | 挂起/启用（{isSuspended}，挂起后其密钥鉴权失效） |
 | DELETE | `/v1/tenant/machine-users/:machineUserID` | 删除服务账号（须先删除其全部 API Key；级联清理角色与部门关系） |
 | GET | `/v1/tenant/machine-users/:machineUserID/roles` | 服务账号已分配角色 |
-| PUT | `/v1/tenant/machine-users/:machineUserID/roles` | 全量替换服务账号角色（**禁止授予 admin_level=super 的系统管理角色**） |
+| PUT | `/v1/tenant/machine-users/:machineUserID/roles` | 全量替换服务账号角色（**禁止授予 admin_type=admin 的管理员类型角色**） |
 | GET | `/v1/tenant/api-keys` | 服务账号密钥分页（?name=&machineUserID= 指定服务账号，空=租户全部；需 super；含归属 ownerType/ownerName） |
 | POST | `/v1/tenant/api-keys` | 创建 API Key {name,machineUserID(必填:归属服务账号),expiredAt?}（需 super；明文仅此一次返回；个人密钥能力已下线） |
 | POST | `/v1/tenant/api-keys/:apiKeyID/revoke` | 吊销（需 super） |

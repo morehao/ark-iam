@@ -18,7 +18,7 @@ import (
 
 // MachineUserSvc 服务账号（租户内机器主体，user_type=machine）领域服务。
 // 服务账号不可登录、无自然人；从属于部门（primary 主部门必填 + secondary 参与可多条），
-// 可被授权角色并作为 API Key 归属主体；系统管理角色（admin_level=super）禁止授予服务账号。
+// 可被授权角色并作为 API Key 归属主体；管理员角色（admin_type=admin）禁止授予服务账号。
 type MachineUserSvc interface {
 	PageList(ctx *gin.Context, req *dtotenant.MachineUserPageListReq) (*dtotenant.MachineUserPageListResp, error)
 	Create(ctx *gin.Context, req *dtotenant.MachineUserCreateReq) (*dtotenant.MachineUserCreateResp, error)
@@ -38,7 +38,7 @@ func NewMachineUserSvc() MachineUserSvc {
 	return &machineUserSvc{}
 }
 
-// checkSystemAdmin 校验当前操作者具备系统管理能力（admin_level=super），否则返回能力不足错误。
+// checkSystemAdmin 校验当前操作者具备系统管理能力（admin_type=admin），否则返回能力不足错误。
 // opErr 仅在系统错误(角色查询失败等)时兜底返回。统一走共享门槛 svctenant.requireSystemAdmin。
 func (svc *machineUserSvc) checkSystemAdmin(ctx *gin.Context, opErr int) error {
 	return requireSystemAdmin(ctx, opErr)
@@ -403,8 +403,8 @@ func (svc *machineUserSvc) ListRoles(ctx *gin.Context, req *dtotenant.MachineUse
 
 // UpdateRoles 按应用全量替换服务账号的角色（PUT 集合语义）。
 // 与真实用户一致：仅替换目标应用(role.app_id == req.AppID)下的角色关联，其它应用不受影响；
-// req.AppID 空串=系统/未归属应用组。服务账号可被授予普通/自定义角色，禁止授予系统管理角色
-// （admin_level=super），杜绝管理能力落入机器主体。
+// req.AppID 空串=系统/未归属应用组。服务账号可被授予普通/自定义角色，禁止授予管理员角色
+// （admin_type=admin），杜绝管理能力落入机器主体。
 func (svc *machineUserSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.MachineUserRolesUpdateReq) error {
 	if err := svc.checkSystemAdmin(ctx, code.MachineUserRoleReplaceError); err != nil {
 		return err
@@ -425,7 +425,7 @@ func (svc *machineUserSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.MachineU
 		return err
 	}
 
-	// 校验新角色：均属于本租户、归属目标应用，且非系统管理角色
+	// 校验新角色：均属于本租户、归属目标应用，且非管理员角色
 	if len(req.RoleIDs) > 0 {
 		roleList, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{TenantID: tenantID, IDs: req.RoleIDs})
 		if err != nil {
@@ -439,8 +439,8 @@ func (svc *machineUserSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.MachineU
 			if r.AppID != req.AppID {
 				return code.GetError(code.RoleNotExistError)
 			}
-			if model.SysAdminLevel(r.AdminLevel).HasSystemAdmin() {
-				return code.GetError(code.UserSuperRoleAssignForbidden)
+			if r.AdminType.HasSystemAdmin() {
+				return code.GetError(code.UserAdminRoleAssignForbidden)
 			}
 		}
 	}

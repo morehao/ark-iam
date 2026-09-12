@@ -654,7 +654,7 @@ const docTemplatetenantadmin = `{
                         "required": true
                     },
                     {
-                        "description": "按应用全量替换服务账号角色(appID 空串=系统/未归属应用组;禁授系统管理角色)",
+                        "description": "按应用全量替换服务账号角色(appID 空串=系统/未归属应用组;禁授管理员角色)",
                         "name": "req",
                         "in": "body",
                         "required": true,
@@ -2960,9 +2960,13 @@ const docTemplatetenantadmin = `{
         "dtotenant.RoleDetailResp": {
             "type": "object",
             "properties": {
-                "adminLevel": {
-                    "description": "系统管理等级(member/super)",
-                    "type": "string"
+                "adminType": {
+                    "description": "系统管理类型(admin/normal)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.SysAdminType"
+                        }
+                    ]
                 },
                 "appID": {
                     "description": "所属应用ID",
@@ -3047,9 +3051,13 @@ const docTemplatetenantadmin = `{
         "dtotenant.RolePageListItem": {
             "type": "object",
             "properties": {
-                "adminLevel": {
-                    "description": "系统管理等级(member/super)",
-                    "type": "string"
+                "adminType": {
+                    "description": "系统管理类型(admin/normal)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.SysAdminType"
+                        }
+                    ]
                 },
                 "appID": {
                     "description": "所属应用ID",
@@ -3722,6 +3730,25 @@ const docTemplatetenantadmin = `{
                 "OrgUserRelationPrimary",
                 "OrgUserRelationSecondary",
                 "OrgUserRelationLeader"
+            ]
+        },
+        "model.SysAdminType": {
+            "type": "string",
+            "enum": [
+                "admin",
+                "normal"
+            ],
+            "x-enum-comments": {
+                "SysAdminTypeAdmin": "管理员角色：具备系统管理能力（可管理租户成员/组织/角色/密钥等）",
+                "SysAdminTypeNormal": "普通角色：不具备系统管理能力"
+            },
+            "x-enum-descriptions": [
+                "管理员角色：具备系统管理能力（可管理租户成员/组织/角色/密钥等）",
+                "普通角色：不具备系统管理能力"
+            ],
+            "x-enum-varnames": [
+                "SysAdminTypeAdmin",
+                "SysAdminTypeNormal"
             ]
         },
         "model.UserType": {

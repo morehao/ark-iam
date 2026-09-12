@@ -293,7 +293,7 @@ func (svc *menuSvc) Tree(ctx *gin.Context, req *dtopermission.MenuTreeReq) (*dto
 const platformAdminAppCode = "platform-admin"
 
 // MyTree 返回当前用户可见的平台菜单树（侧边栏动态菜单）。
-// 平台菜单固定归属平台管理后台应用（platform-admin），按用户的角色授权（超管全量 + role_menu 授权 + visibility）过滤，
+// 平台菜单固定归属平台管理后台应用（platform-admin），按用户的角色授权（管理员角色全量 + role_menu 授权 + visibility）过滤，
 // 与租户控制台菜单逻辑保持一致，复用公共层 svcmenu。
 func (svc *menuSvc) MyTree(ctx *gin.Context) (*dtopermission.MenuMyTreeResp, error) {
 	tenantID := gincontext.GetTenantIDString(ctx)

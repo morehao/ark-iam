@@ -44,11 +44,11 @@ const (
 
 // seedRole 角色种子定义。
 type seedRole struct {
-	app        *model.ApplicationEntity // 角色所属应用
-	code       string
-	name       string
-	desc       string
-	adminLevel string // 系统管理等级(member/super)，空=无系统管理能力
+	app       *model.ApplicationEntity // 角色所属应用
+	code      string
+	name      string
+	desc      string
+	adminType model.SysAdminType // 系统管理类型(admin/normal)，内置角色必须显式声明（无隐式缺省）
 }
 
 // seedMenu 菜单种子定义；parentCode 为空表示顶级菜单。visibility 缺省为 public。
@@ -271,14 +271,18 @@ func getOrCreateApplication(ctx context.Context, db *gorm.DB, code, name, desc s
 // （pkg/iam/tenant.ProvisionTenantAdmin），建租户与种子共用同一份角色/授权定义。
 func seedRoles(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adminApp *model.ApplicationEntity) (map[string]*model.RoleEntity, error) {
 	defs := []seedRole{
-		{app: adminApp, code: "admin", name: "管理员", desc: "系统管理员，拥有所有权限", adminLevel: string(model.SysAdminLevelSuper)},
+		{app: adminApp, code: "admin", name: "管理员", desc: "系统管理员，拥有所有权限", adminType: iamtenant.ProvisionAdminType},
 	}
 	out := make(map[string]*model.RoleEntity, len(defs))
 	for _, def := range defs {
-		adminLevel := def.adminLevel
-		if adminLevel == "" {
-			adminLevel = string(model.SysAdminLevelMember)
+		// 系统管理类型是内置角色的显式声明，不设隐式缺省：未声明/非法值直接失败，
+		// 避免内置管理员角色被静默播种成普通类型（IsBuiltinAdmin 依赖 admin_type=admin）。
+		switch def.adminType {
+		case model.SysAdminTypeAdmin, model.SysAdminTypeNormal:
+		default:
+			return nil, fmt.Errorf("seed role %s: 非法系统管理类型 %q(必须显式声明 admin/normal)", def.code, def.adminType)
 		}
+		adminType := def.adminType
 		entity := &model.RoleEntity{}
 		err := db.Where("tenant_id = ? AND code = ?", tenant.ID, def.code).First(entity).Error
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -292,26 +296,26 @@ func seedRoles(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adm
 				Code:        def.code,
 				Description: def.desc,
 				Source:      string(model.RoleSourceBuiltin),
-				AdminLevel:  adminLevel,
+				AdminType:   adminType,
 			}
 			if err := db.WithContext(ctx).Create(entity).Error; err != nil {
 				return nil, fmt.Errorf("seed role %s create fail: %w", def.code, err)
 			}
 		} else {
-			// 幂等回填：存量内置角色的 source / admin_level 随种子定义更新
+			// 幂等回填：存量内置角色的 source / admin_type 随种子定义更新
 			updateMap := map[string]any{}
 			if entity.Source != string(model.RoleSourceBuiltin) {
 				updateMap["source"] = string(model.RoleSourceBuiltin)
 			}
-			if entity.AdminLevel != adminLevel {
-				updateMap["admin_level"] = adminLevel
+			if entity.AdminType != adminType {
+				updateMap["admin_type"] = adminType
 			}
 			if len(updateMap) > 0 {
 				if uerr := db.Model(&model.RoleEntity{}).Where("id = ?", entity.ID).Updates(updateMap).Error; uerr != nil {
 					return nil, fmt.Errorf("seed role %s update fail: %w", def.code, uerr)
 				}
 				entity.Source = string(model.RoleSourceBuiltin)
-				entity.AdminLevel = adminLevel
+				entity.AdminType = adminType
 			}
 		}
 		out[def.code] = entity
@@ -346,7 +350,7 @@ func seedMenus(ctx context.Context, db *gorm.DB, adminApp, tenantAdminApp *model
 		{appCode: appCodeAdmin, parentCode: "grp-platform", name: "菜单管理", code: "menu", path: "/menu", icon: "menu", sort: 1, component: "/menu/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-platform", name: "审计日志", code: "log", path: "/log", icon: "file", sort: 2, component: "/log/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		// 租户自服务一级菜单：控制台定位为「租户管理层专用」（组织/用户/角色/密钥均属管理操作，
-		// 全部 visibility=admin 硬隔离；普通成员不面向该控制台，仅内置管理员/超管角色可见与授权）。
+		// 全部 visibility=admin 硬隔离；普通成员不面向该控制台，仅内置管理员角色可见与授权）。
 		// 用户/角色/密钥编码加 tenant- 前缀，避免与平台菜单 code 撞名。
 		{appCode: appCodeTenantAdmin, name: "组织管理", code: "organization", path: "/organization", icon: "apartment", sort: 1, component: "pages/organization", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeTenantAdmin, name: "用户管理", code: "tenant-user", path: "/user", icon: "user", sort: 2, component: "pages/user", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},

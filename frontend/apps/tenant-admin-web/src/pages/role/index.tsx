@@ -27,20 +27,20 @@ import {
 } from '../../api/role'
 import { getTenantApps } from '../../api/menu'
 
-/** 系统管理等级展示：super→超管，member→成员 */
-function adminLevelText(level?: string) {
-  switch (level) {
-    case 'super':
-      return <Tag color="red">超管</Tag>
-    case 'member':
+/** 系统管理类型展示：admin→管理员角色，normal→普通角色 */
+function adminTypeText(adminType?: string) {
+  switch (adminType) {
+    case 'admin':
+      return <Tag color="red">管理员角色</Tag>
+    case 'normal':
     default:
-      return <Tag>成员</Tag>
+      return <Tag>普通角色</Tag>
   }
 }
 
-/** 是否为内置管理员角色（source=builtin && admin_level=super） */
+/** 是否为内置管理员角色（source=builtin && admin_type=admin） */
 function isBuiltinAdminRole(r?: TenantRoleItem): boolean {
-  return !!r && r.source === 'builtin' && r.adminLevel === 'super'
+  return !!r && r.source === 'builtin' && r.adminType === 'admin'
 }
 
 // 菜单树 -> Tree 数据；非内置管理员角色剔除 visibility=admin 节点（授权约束，前端兜底）
@@ -180,11 +180,11 @@ export default function TenantRolePage() {
       render: (v: string) => <SourceTag value={v} />,
     },
     {
-      title: '系统管理',
-      dataIndex: 'adminLevel',
-      key: 'adminLevel',
+      title: '角色类型',
+      dataIndex: 'adminType',
+      key: 'adminType',
       width: STATUS_COL_WIDTH,
-      render: (v: string) => adminLevelText(v),
+      render: (v: string) => adminTypeText(v),
     },
     textColumn<TenantRoleItem>({ title: '描述', dataIndex: 'description', width: 160 }),
     { title: '成员数', dataIndex: 'memberCount', key: 'memberCount', width: COUNT_COL_WIDTH, render: (v: number) => v || 0 },
@@ -281,13 +281,13 @@ export default function TenantRolePage() {
         width={560}
       >
         <Form form={form} layout="vertical">
-          {/* 只读：来源 + 系统管理等级（新建固定 custom/none，编辑按记录回显） */}
+          {/* 只读：来源 + 系统管理类型（新建固定 custom/normal，编辑按记录回显） */}
           <div style={{ display: 'flex', gap: 24, marginBottom: 20, color: tokens.textSecondary, fontSize: 13 }}>
             <span>
               来源：<SourceTag value={editing ? editing.source : 'custom'} />
             </span>
             <span>
-              系统管理：{adminLevelText(editing?.adminLevel)}
+              角色类型：{adminTypeText(editing?.adminType)}
             </span>
           </div>
           {!editing && (

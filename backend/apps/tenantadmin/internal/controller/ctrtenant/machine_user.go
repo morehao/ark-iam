@@ -179,7 +179,7 @@ func (ctr *machineUserCtr) ListRoles(ctx *gin.Context) {
 // @accept application/json
 // @Produce application/json
 // @Param machineUserID path string true "服务账号ID"
-// @Param req body dtotenant.MachineUserRolesUpdateReq true "按应用全量替换服务账号角色(appID 空串=系统/未归属应用组;禁授系统管理角色)"
+// @Param req body dtotenant.MachineUserRolesUpdateReq true "按应用全量替换服务账号角色(appID 空串=系统/未归属应用组;禁授管理员角色)"
 // @Success 200 {object} gincontext.DtoRender
 // @Router /v1/tenant/machine-users/{machineUserID}/roles [put]
 func (ctr *machineUserCtr) UpdateRoles(ctx *gin.Context) {

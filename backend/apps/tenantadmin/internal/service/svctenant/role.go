@@ -77,7 +77,7 @@ func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dto
 		Code:        req.Code,
 		Description: req.Description,
 		Source:      string(model.RoleSourceCustom),
-		AdminLevel:  string(model.SysAdminLevelMember),
+		AdminType:   model.SysAdminTypeNormal,
 		CreatedBy:   gincontext.GetUserIDString(ctx),
 	}
 	if err := dao.NewRoleDao().Insert(ctx, insertEntity); err != nil {
@@ -203,7 +203,7 @@ func (svc *roleSvc) Detail(ctx *gin.Context, req *dtotenant.RoleDetailReq) (*dto
 		Code:        roleEntity.Code,
 		Description: roleEntity.Description,
 		Source:      roleEntity.Source,
-		AdminLevel:  roleEntity.AdminLevel,
+		AdminType:   roleEntity.AdminType,
 		MemberCount: memberCount[req.RoleID],
 		MenuCount:   menuCount[req.RoleID],
 		CreatedAt:   roleEntity.CreatedAt.Unix(),
@@ -252,7 +252,7 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtotenant.RolePageListReq) (
 			Code:        v.Code,
 			Description: v.Description,
 			Source:      v.Source,
-			AdminLevel:  v.AdminLevel,
+			AdminType:   v.AdminType,
 			MemberCount: memberCount[v.ID],
 			MenuCount:   menuCount[v.ID],
 			CreatedAt:   v.CreatedAt.Unix(),

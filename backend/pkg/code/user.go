@@ -49,8 +49,8 @@ const (
 	MachineUserGetPageListError   = 100834 // 查看服务账号列表失败
 	MachineUserGetDetailError     = 100835 // 查看服务账号详情失败
 	MachineUserRoleReplaceError   = 100836 // 更新服务账号角色失败
-	UserSuperRoleAssignForbidden  = 100837 // 禁止将系统管理角色授予服务账号
-	UserSystemAdminRequiredError  = 100838 // 需要系统管理能力(admin_level=super)
+	UserAdminRoleAssignForbidden  = 100837 // 禁止将管理员角色授予服务账号
+	UserSystemAdminRequiredError  = 100838 // 需要系统管理能力(admin_type=admin)
 	MachineUserRoleGetListError   = 100839 // 查看服务账号角色失败
 	MachineUserDeleteHasKeysError = 100840 // 删除服务账号前需先删除其全部API密钥
 	UserMemberOperationOnlyError  = 100841 // 该操作仅支持对真实用户执行
@@ -103,8 +103,8 @@ var userErrorMsgMap = gerror.CodeMsgMap{
 	MachineUserGetDetailError:             "查看服务账号详情失败",
 	MachineUserRoleReplaceError:           "更新服务账号角色失败",
 	MachineUserRoleGetListError:           "查看服务账号角色失败",
-	UserSuperRoleAssignForbidden:          "禁止将系统管理角色授予服务账号",
-	UserSystemAdminRequiredError:          "需要系统管理能力(admin_level=super)",
+	UserAdminRoleAssignForbidden:          "禁止将管理员角色授予服务账号",
+	UserSystemAdminRequiredError:          "需要系统管理能力(admin_type=admin)",
 	MachineUserDeleteHasKeysError:         "请先删除该服务账号下的全部API密钥",
 	UserMemberOperationOnlyError:          "该操作仅支持对真实用户执行",
 	MachineUserOrgRequiredError:           "服务账号必须从属于一个主部门(且至多一个)",

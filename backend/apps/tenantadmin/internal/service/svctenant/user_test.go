@@ -73,7 +73,7 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 	}
 
 	// 无 personID 且无登录标识：以姓名创建自然人并关联（person 始终存在）
-	ginCtx := newSuperCtx(t, db, "t1", "op")
+	ginCtx := newAdminCtx(t, db, "t1", "op")
 	resp, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "仅姓名用户", PrimaryEmail: "nameonly@x.com", OrganizationIDs: []string{"o1"}})
 	if err != nil {
 		t.Fatalf("create user with name-only person: %v", err)
@@ -123,7 +123,7 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 	}
 
 	// 另一租户提供相同 email：find-or-create 命中已有 person 并关联（复用同一自然人）
-	respC, err := svc.Create(newSuperCtx(t, db, "t2", "op2"), &dtotenant.UserCreateReq{Name: "Bob2", PrimaryEmail: "bob@x.com", OrganizationIDs: []string{"o2"}})
+	respC, err := svc.Create(newAdminCtx(t, db, "t2", "op2"), &dtotenant.UserCreateReq{Name: "Bob2", PrimaryEmail: "bob@x.com", OrganizationIDs: []string{"o2"}})
 	if err != nil {
 		t.Fatalf("create user linking existing person: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 func TestUserCreateRequiresOrganization(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
-	ginCtx := newSuperCtx(t, db, "t1", "op")
+	ginCtx := newAdminCtx(t, db, "t1", "op")
 
 	if err := db.Create(&model.OrganizationEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "o1"}},
@@ -241,7 +241,7 @@ func TestUserCreateWithOrganizations(t *testing.T) {
 		_ = now
 	}
 
-	ginCtx := newSuperCtx(t, db, "t1", "op")
+	ginCtx := newAdminCtx(t, db, "t1", "op")
 	// 创建用户：primary=o1（单个行政主部门）+ leader=o2
 	resp, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", OrganizationIDs: []string{"o1"}, LeaderOrgIDs: []string{"o2"}})
 	if err != nil {
@@ -375,7 +375,7 @@ func TestUserDetailWithOrganizationsAndRoles(t *testing.T) {
 		t.Fatalf("seed user-role: %v", err)
 	}
 
-	ginCtx := newSuperCtx(t, db, "t1", "op")
+	ginCtx := newAdminCtx(t, db, "t1", "op")
 	resp, err := svc.Detail(ginCtx, &dtotenant.UserDetailReq{UserID: "u1"})
 	if err != nil {
 		t.Fatalf("detail: %v", err)
@@ -415,7 +415,7 @@ func TestUserUpdateRolesFullReplace(t *testing.T) {
 		t.Fatalf("seed other role: %v", err)
 	}
 
-	ginCtx := newSuperCtx(t, db, "t1", "op")
+	ginCtx := newAdminCtx(t, db, "t1", "op")
 	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", RoleIDs: []string{"r1", "r2"}}); err != nil {
 		t.Fatalf("update roles: %v", err)
 	}
@@ -503,7 +503,7 @@ func TestUserUpdateRolesScopedByApp(t *testing.T) {
 		return false
 	}
 
-	ginCtx := newSuperCtx(t, db, "t1", "op")
+	ginCtx := newAdminCtx(t, db, "t1", "op")
 
 	// 仅替换 app-a：ra1 被移除、ra2 加入，app-b 的 rb1 必须保留
 	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-a", RoleIDs: []string{"ra2"}}); err != nil {
@@ -551,7 +551,7 @@ func TestUserCreateWithLeaderOrgs(t *testing.T) {
 		}
 	}
 
-	ginCtx := newSuperCtx(t, db, "t1", "op")
+	ginCtx := newAdminCtx(t, db, "t1", "op")
 	resp, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{
 		Name:            "张三",
 		PrimaryEmail:    "zs2@x.com",
@@ -614,7 +614,7 @@ func TestUserUpdateOrganizations(t *testing.T) {
 		}
 	}
 
-	ginCtx := newSuperCtx(t, db, "t1", "op")
+	ginCtx := newAdminCtx(t, db, "t1", "op")
 	u1, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{
 		Name:            "张三",
 		PrimaryEmail:    "u1@x.com",
@@ -701,7 +701,7 @@ func TestUserUpdateContact(t *testing.T) {
 		t.Fatalf("seed org: %v", err)
 	}
 
-	ginCtx := newSuperCtx(t, db, "t1", "op")
+	ginCtx := newAdminCtx(t, db, "t1", "op")
 	u1, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", OrganizationIDs: []string{"o1"}})
 	if err != nil {
 		t.Fatalf("create u1: %v", err)
@@ -890,7 +890,7 @@ func TestUserResetPasswordIssuesTemporaryPassword(t *testing.T) {
 	}).Error; err != nil {
 		t.Fatalf("seed org: %v", err)
 	}
-	ginCtx := newSuperCtx(t, db, "t1", "op1")
+	ginCtx := newAdminCtx(t, db, "t1", "op1")
 
 	created, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", OrganizationIDs: []string{"o1"}})
 	if err != nil {
@@ -944,7 +944,7 @@ func TestUserResetPasswordRejectsMachineUser(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.OrganizationEntity{},
 		&model.OrganizationUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	svc := &userSvc{}
-	ginCtx := newSuperCtx(t, db, "t1", "op1")
+	ginCtx := newAdminCtx(t, db, "t1", "op1")
 
 	machinePerson := seedTestPerson(t, db, "pm1", "sa", "sa@x.com")
 	if err := db.Model(&model.PersonEntity{}).Where("id = ?", machinePerson.ID).
