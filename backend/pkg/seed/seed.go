@@ -300,8 +300,8 @@ func seedAll(ctx context.Context, db *gorm.DB, rep *Report) error {
 		return fmt.Errorf("seed provision tenant admin fail: %w", err)
 	}
 
-	// 11. OIDC 测试客户端
-	if err := seedOIDCClients(ctx, db, rep, tenant, adminApp); err != nil {
+	// 11. OIDC 测试客户端（平台管理后台客户端挂 platform_admin，租户管理后台客户端挂 tenant_admin）
+	if err := seedOIDCClients(ctx, db, rep, tenant, adminApp, tenantAdminApp); err != nil {
 		return err
 	}
 
@@ -850,10 +850,14 @@ var seedOIDCClientGrantTypes = func() []byte {
 	return b
 }()
 
-func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.TenantEntity, app *model.ApplicationEntity) error {
+// seedOIDCClients 播种内置 OAuth 客户端（OIDC RP）。
+// 归属应用按控制台一一对应：平台管理后台客户端 → platform_admin 应用，租户管理后台客户端 → tenant_admin 应用。
+// app_id 是种子收敛字段（矩阵声明 reconcile）：存量库把两者都挂到 platform_admin 的错误绑定由此自愈。
+func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.TenantEntity, adminApp, tenantAdminApp *model.ApplicationEntity) error {
 	type clientDef struct {
 		code                 string
 		name                 string
+		appID                string
 		redirectURIs         string
 		postLogoutRedirect   string
 		backChannelLogoutURI string
@@ -862,6 +866,7 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 		{
 			code:                 oauthClientPlatformAdminWeb,
 			name:                 "平台管理后台",
+			appID:                adminApp.ID,
 			redirectURIs:         `["http://localhost:4001/auth/callback"]`,
 			postLogoutRedirect:   `["http://localhost:4001/login"]`,
 			backChannelLogoutURI: "http://localhost:8100/oidc/bc-logout/platform",
@@ -869,6 +874,7 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 		{
 			code:                 oauthClientTenantAdminWeb,
 			name:                 "租户管理后台",
+			appID:                tenantAdminApp.ID,
 			redirectURIs:         `["http://localhost:4002/auth/callback"]`,
 			postLogoutRedirect:   `["http://localhost:4002/login"]`,
 			backChannelLogoutURI: "http://localhost:8100/oidc/bc-logout/tenant",
@@ -878,11 +884,11 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 		entity := &model.ApplicationClientEntity{}
 		err := db.Where("code = ?", def.code).First(entity).Error
 		if err == nil {
-			// 幂等回填（按字段权威矩阵）：source（内置性）与 name（控制台展示名）归种子，启动即收敛；
+			// 幂等回填（按字段权威矩阵）：source（内置性）/ name（控制台展示名）/ app_id（归属应用，产品结构）归种子；
 			// 回调地址/授权类型/令牌 TTL 等运行参数是 create_only（归运维），种子不覆盖。
 			changes, uErr := reconcileFields(ctx, db, model.SeedEntityApplicationClient, model.TableNameApplicationClient, entity.ID,
-				map[string]any{"source": entity.Source, "name": entity.Name},
-				map[string]any{"source": model.ApplicationClientSourceBuiltin, "name": def.name})
+				map[string]any{"source": entity.Source, "name": entity.Name, "app_id": entity.AppID},
+				map[string]any{"source": model.ApplicationClientSourceBuiltin, "name": def.name, "app_id": def.appID})
 			if uErr != nil {
 				return fmt.Errorf("seed oauth client %s reconcile fail: %w", def.code, uErr)
 			}
@@ -897,7 +903,7 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 		}
 		entity = &model.ApplicationClientEntity{
 			TenantID:                tenant.ID,
-			AppID:                   app.ID,
+			AppID:                   def.appID,
 			Code:                    def.code,
 			Name:                    def.name,
 			RedirectURIs:            []byte(def.redirectURIs),

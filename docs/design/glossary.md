@@ -33,6 +33,8 @@
 | 术语 | 英文 | 说明 |
 |---|---|---|
 | 应用 ✅ | Application | 一个业务系统定义（编码/名称/来源/状态）。如"平台管理台" |
+| 应用编码 ✅ | App Code | `application.code`：唯一且**下划线连接**（`model.AppCodePattern`：小写字母开头，仅小写字母/数字/下划线，如 `platform_admin`），连字符/大写被服务端拒绝 |
+| 客户端编码 ✅ | Client Code (`client_id`) | `application_client.code`，即 OIDC 的 `client_id`（控制台列表/详情与 API 字段同名，都叫「客户端编码」/`code`）：控制台创建时由服务端生成 UUID，内置客户端为可读值（如 `platform-admin-web`）。**「编码」在此指协议标识符，不适用 `AppCodePattern`——允许连字符**（两个「编码」的规则口径见 [sso-oidc-concepts.md](sso-oidc-concepts.md) §3.2）；与 `application_client.id`（控制台内部主键，供密钥/令牌表外键引用）不是一回事 |
 | OAuth 客户端 ✅ | Application Client | 应用下的 OIDC 接入凭证：client_id、回调白名单、授权类型、令牌 TTL 等 |
 | 客户端密钥 ✅ | Client Secret | 机密客户端在令牌端点的认证凭证（库中只存哈希） |
 | 内置应用 | Built-in App | 平台随产品交付的控制台应用（`application.source=builtin`）：**平台管理后台**与**租户管理后台**两个种子应用，受删除保护，菜单只在各自所属的控制台呈现 |

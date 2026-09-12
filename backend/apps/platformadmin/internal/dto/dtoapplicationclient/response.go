@@ -4,14 +4,15 @@ import "github.com/morehao/ark-iam/pkg/model"
 
 type ApplicationClientCreateResp struct {
 	ApplicationClientID string `json:"applicationClientID"` // OAuth客户端ID
-	Code                string `json:"code"`                // 客户端编码(OIDC client_id)
+	Code                string `json:"code"`                // 客户端编码（= OIDC client_id，客户端唯一标识）
 }
 
 type ApplicationClientDetailResp struct {
 	ApplicationClientID     string                        `json:"applicationClientID"`     // OAuth客户端ID
 	TenantID                string                        `json:"tenantID"`                // 租户ID
 	AppID                   string                        `json:"appID"`                   // 所属应用ID
-	Code                    string                        `json:"code"`                    // 客户端编码(OIDC client_id)
+	AppName                 string                        `json:"appName"`                 // 所属应用名称
+	Code                    string                        `json:"code"`                    // 客户端编码（= OIDC client_id，客户端唯一标识）
 	Name                    string                        `json:"name"`                    // 客户端名称
 	RedirectURIs            []string                      `json:"redirectURIs"`            // 授权回调地址
 	PostLogoutRedirectURIs  []string                      `json:"postLogoutRedirectURIs"`  // 登出回调地址
@@ -38,7 +39,8 @@ type ApplicationClientPageListResp struct {
 type PageListItem struct {
 	ApplicationClientID     string                        `json:"applicationClientID"`     // OAuth客户端ID
 	AppID                   string                        `json:"appID"`                   // 所属应用ID
-	Code                    string                        `json:"code"`                    // 客户端编码(OIDC client_id)
+	AppName                 string                        `json:"appName"`                 // 所属应用名称
+	Code                    string                        `json:"code"`                    // 客户端编码（= OIDC client_id，客户端唯一标识）
 	Name                    string                        `json:"name"`                    // 客户端名称
 	Source                  model.ApplicationClientSource `json:"source"`                  // 客户端来源
 	Status                  model.ApplicationClientStatus `json:"status"`                  // 状态

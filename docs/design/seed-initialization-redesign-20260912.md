@@ -247,6 +247,7 @@ func Run(ctx context.Context, db *gorm.DB) (Report, error)
 | | `admin_type` | Reconcile（安全不变式） | 否 | Reconcile（`provision.go:141-147`） |
 | application_client（`code`） | `source` | Reconcile | 否 | Reconcile（`seed.go:715-723`） |
 | | `name` | **Reconcile** | **否（改为拒写）** | 本次改造引入（`seed.go:713-730`）+ 可写（`oAuthClientSvc.Update`，`application_client.go:132-173`） |
+| | `app_id`（归属应用） | Reconcile | 否（控制台无改归属入口） | 内置客户端与内置应用一一对应（platform-admin-web→platform_admin、tenant-admin-web→tenant_admin）；历史库两者都挂 platform_admin，靠该声明启动自愈 |
 | | 回调地址/授权类型/TTL 等运行参数 | CreateOnly | 是 | 不回填 |
 | person+user（`username=admin`） | `password_encrypted` | CreateOnly（**绝不覆盖**） | 是（走重置接口） | 不回填（`seed.go:561-635`）✓ |
 | | `source`/`is_owner`/部门归属 | Reconcile（安全不变式）/CreateOnly | 否 / 是 | 部分回填 |

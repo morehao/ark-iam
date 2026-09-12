@@ -54,8 +54,13 @@ type ApplicationClientEntity struct {
 	gormdao.BaseEntity
 	TenantID string `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id" json:"tenantID"`
 	AppID    string `gorm:"column:app_id;type:varchar(36);not null;default:'';comment:所属应用id" json:"appID"`
-	Code     string `gorm:"column:code;type:varchar(64);not null;default:'';uniqueIndex;comment:客户端编码(OIDC client_id)" json:"code"`
-	Name     string `gorm:"column:name;type:varchar(256);not null;default:'';comment:客户端名称" json:"name"`
+	// Code 是客户端编码，即 OIDC 协议里的 client_id（客户端唯一标识）：
+	// - 控制台创建时随机生成（generateClientCode → UUID），内置客户端由种子写入可读值（如 platform-admin-web）；
+	// - 「编码」在本表指协议标识符，**不适用** AppCodePattern（那条规则只管 application.code，禁连字符）：
+	//   客户端编码允许连字符，取值口径见 docs/design/sso-oidc-concepts.md §3.2；
+	// - 与 application_client.id（控制台内部主键，其他表以其为外键）不是一回事。
+	Code string `gorm:"column:code;type:varchar(64);not null;default:'';uniqueIndex;comment:客户端编码(= OIDC client_id)" json:"code"`
+	Name string `gorm:"column:name;type:varchar(256);not null;default:'';comment:客户端名称" json:"name"`
 
 	RedirectURIs            datatypes.JSON          `gorm:"column:redirect_uris;type:json;not null;default:('[]');comment:授权回调地址" json:"redirectURIs"`
 	PostLogoutRedirectURIs  datatypes.JSON          `gorm:"column:post_logout_redirect_uris;type:json;not null;default:('[]');comment:登出回调地址" json:"postLogoutRedirectURIs"`

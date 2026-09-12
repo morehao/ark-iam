@@ -76,8 +76,12 @@ var SeedFieldAuthorities = []SeedFieldAuthority{
 	{SeedEntityApplication, "sort", SeedFieldCreateOnly},
 	{SeedEntityApplication, "logo_url", SeedFieldCreateOnly},
 	{SeedEntityApplication, "homepage_url", SeedFieldCreateOnly},
-	// 内置应用的 OAuth 客户端：回调地址/授权类型/TTL 与环境相关，归运维。
+	// 内置应用的 OAuth 客户端：归属应用（app_id）是产品结构的一部分——平台管理后台客户端挂
+	// platform_admin、租户管理后台客户端挂 tenant_admin，控制台不提供改归属的入口，故归种子收敛
+	// （历史版本把两个客户端都挂在 platform_admin，靠这条声明自愈）；
+	// 回调地址/授权类型/TTL 与环境相关，归运维。
 	{SeedEntityApplicationClient, "code", SeedFieldMigrateOnce},
+	{SeedEntityApplicationClient, "app_id", SeedFieldReconcile},
 	{SeedEntityApplicationClient, "source", SeedFieldReconcile},
 	{SeedEntityApplicationClient, "name", SeedFieldReconcile},
 	{SeedEntityApplicationClient, "redirect_uris", SeedFieldCreateOnly},

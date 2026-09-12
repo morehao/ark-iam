@@ -126,6 +126,13 @@ RP 接入前必须在 OP 注册一个 **OAuth Client**，核心注册字段（�
 | `default_scopes` | 默认授权 scope | `["openid","profile"]` |
 | `access_token_ttl` / `refresh_token_ttl` | 令牌有效期（秒） | 900 / 2592000 |
 
+> **`client_id` 在库中的落位与命名**：本系统存在 `application_client.code` 列，它就是这里的 `client_id`（唯一索引），
+> 中文名统一叫**客户端编码**（与 API 字段名 `code` 同构，控制台列表/详情即用此列名）。
+> 控制台/接口创建的客户端由服务端随机生成（UUID），内置客户端由种子写入可读值（如 `platform-admin-web`）。
+> **两个「编码」规则不同**，不要混用：`application.code`（应用编码）受 `model.AppCodePattern` 约束（下划线连接、禁连字符）；
+> 而客户端编码是**协议标识符**，**不适用 `AppCodePattern`**，允许连字符（`platform-admin-web` 这类取值合法）。
+> 它也与 `application_client.id`（控制台内部主键，`application_client_secret` / `refresh_token` 等以其为外键）不是一回事。
+
 ### 3.3 授权类型（Grant Types）
 
 ```mermaid
