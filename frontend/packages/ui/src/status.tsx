@@ -5,7 +5,7 @@ import { Tag } from 'antd'
  *
  * 两类字典严格区分：
  * - 语义状态（enable/disable/挂起/验证）→ 语义色 success/default/error/warning；
- * - 分类标识（类型/内置来源等）→ 固定分类色，不做状态语义。
+ * - 分类标识（类型/来源等）→ 固定分类色，不做状态语义。
  * 禁止在页面内联用 green/red/orange 等传统色名表示状态，避免跨 app 配色漂移。
  */
 
@@ -40,11 +40,10 @@ export function VerifiedTag({ value }: { value?: StatusValue }) {
   return value === 1 ? <Tag color="success">已验证</Tag> : <Tag color="warning">未验证</Tag>
 }
 
+/** 类型标识（分类色，非状态语义）：租户类型 platform→geekblue、customer→cyan；其余原样回显 */
 const TYPE_META: Record<string, { label: string; color: string }> = {
   platform: { label: '平台', color: 'geekblue' },
   customer: { label: '客户', color: 'cyan' },
-  first_party: { label: '第一方', color: 'blue' },
-  third_party: { label: '第三方', color: 'orange' },
 }
 
 /** 应用/租户类型标识（分类色，非状态语义） */
@@ -53,7 +52,20 @@ export function TypeTag({ value }: { value?: string }) {
   return meta ? <Tag color={meta.color}>{meta.label}</Tag> : <Tag>{value || '-'}</Tag>
 }
 
-/** 角色来源标识：builtin → 内置(gold)；其余 → 自定义(blue) */
+/**
+ * 来源标识（分类色，非状态语义），一套映射覆盖两种来源字典：
+ * - 应用 / OAuth 客户端 `source`（`model.AppSource`）：builtin→内置(gold)、first_party→第一方(blue)、third_party→第三方(orange)；
+ * - 角色 `source`（`model.RoleSource`）：builtin→内置(gold)、custom→自定义(blue)。
+ */
+const SOURCE_META: Record<string, { label: string; color: string }> = {
+  builtin: { label: '内置', color: 'gold' },
+  first_party: { label: '第一方', color: 'blue' },
+  third_party: { label: '第三方', color: 'orange' },
+  custom: { label: '自定义', color: 'blue' },
+}
+
+/** 来源标识：应用/客户端 source 与角色 source 共用 */
 export function SourceTag({ value }: { value?: string }) {
-  return value === 'builtin' ? <Tag color="gold">内置</Tag> : <Tag color="blue">自定义</Tag>
+  const meta = SOURCE_META[value ?? '']
+  return meta ? <Tag color={meta.color}>{meta.label}</Tag> : <Tag>{value || '-'}</Tag>
 }

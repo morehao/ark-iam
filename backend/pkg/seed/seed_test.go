@@ -334,7 +334,7 @@ func TestSeedIamPrunesRetiredMenus(t *testing.T) {
 	}
 
 	var adminApp model.ApplicationEntity
-	if err := db.Where("code = ?", "platform-admin").First(&adminApp).Error; err != nil {
+	if err := db.Where("code = ?", "platform_admin").First(&adminApp).Error; err != nil {
 		t.Fatalf("admin app not found: %v", err)
 	}
 	var adminRole model.RoleEntity
@@ -491,5 +491,199 @@ func TestSeedIamMigratesLegacyPlatformTenantCode(t *testing.T) {
 	}
 	if legacyCount != 0 {
 		t.Errorf("legacy code row count = %d, want 0", legacyCount)
+	}
+}
+
+// TestSeedIamBackfillsApplicationSource 存量库（source 由 AutoMigrate 补列时取列默认值
+// `third_party`）在种子启动后必须被原地纠正：
+// 两个种子应用（管理后台、租户自服务）与种子 OAuth 客户端 → builtin（否则丢删除保护）。
+// 回归背景：种子数据的两个应用都不是第三方接入，误判会同时污染删除保护与租户控制台菜单范围
+// （见 docs/design/application-source-rename.md §12.3、§14）。
+func TestSeedIamBackfillsApplicationSource(t *testing.T) {
+	db := setupDB(t)
+	ctx := context.Background()
+
+	// 首次种子：库由本次改造后的定义写入正确 source
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed fail: %v", err)
+	}
+
+	// 模拟存量库：两应用与种子客户端的 source 都被列默认值覆盖为 third_party
+	// （等同旧库被 AutoMigrate 补列后的状态）
+	if err := db.Model(&model.ApplicationEntity{}).Where("code = ?", "platform_admin").
+		Update("source", model.AppSourceThirdParty).Error; err != nil {
+		t.Fatalf("degrade platform-admin source: %v", err)
+	}
+	if err := db.Model(&model.ApplicationEntity{}).Where("code = ?", "tenant_admin").
+		Update("source", model.AppSourceThirdParty).Error; err != nil {
+		t.Fatalf("degrade tenant-admin source: %v", err)
+	}
+	if err := db.Model(&model.ApplicationClientEntity{}).Where("1 = 1").
+		Update("source", model.ApplicationClientSourceThirdParty).Error; err != nil {
+		t.Fatalf("degrade application_client source: %v", err)
+	}
+
+	// 二次种子：必须原地回填，不得新建记录
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed (2nd) fail: %v", err)
+	}
+
+	// 三次种子：回填后保持幂等
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed (3rd) fail: %v", err)
+	}
+
+	var appCount int64
+	if err := db.Model(&model.ApplicationEntity{}).Count(&appCount).Error; err != nil {
+		t.Fatalf("count application: %v", err)
+	}
+	if appCount != 2 {
+		t.Fatalf("application count = %d, want 2 (回填不得新建应用)", appCount)
+	}
+
+	var adminApp model.ApplicationEntity
+	if err := db.Where("code = ?", "platform_admin").First(&adminApp).Error; err != nil {
+		t.Fatalf("query admin app: %v", err)
+	}
+	if adminApp.Source != model.AppSourceBuiltin {
+		t.Errorf("管理后台 source = %q, want %q", adminApp.Source, model.AppSourceBuiltin)
+	}
+
+	var tenantAdminApp model.ApplicationEntity
+	if err := db.Where("code = ?", "tenant_admin").First(&tenantAdminApp).Error; err != nil {
+		t.Fatalf("query tenant-admin app: %v", err)
+	}
+	if tenantAdminApp.Source != model.AppSourceBuiltin {
+		t.Errorf("租户自服务 source = %q, want %q", tenantAdminApp.Source, model.AppSourceBuiltin)
+	}
+
+	// 种子客户端全部为内置客户端：存量库里不得残留 third_party
+	var clients []model.ApplicationClientEntity
+	if err := db.Find(&clients).Error; err != nil {
+		t.Fatalf("query application_client: %v", err)
+	}
+	if len(clients) == 0 {
+		t.Fatal("no seeded application_client found")
+	}
+	for _, c := range clients {
+		if c.Source != model.ApplicationClientSourceBuiltin {
+			t.Errorf("客户端 %s source = %q, want %q", c.Code, c.Source, model.ApplicationClientSourceBuiltin)
+		}
+	}
+}
+
+// TestSeedIamMigratesLegacyApplicationCode 存量库的应用编码为连字符形态（platform-admin /
+// tenant-admin）时，种子启动必须原地改名为下划线形态（platform_admin / tenant_admin）：
+// 保留主键，因此以 app_id 关联的菜单/订阅/角色全部随之迁移，不会重建出第二个内置应用。
+// 回归背景：应用编码规则统一为下划线连接后，若不迁移旧编码，种子会按新编码再建一套应用，
+// 而旧应用仍占着 platform-admin 这一唯一键，造成菜单/订阅/删除保护全部错位。
+func TestSeedIamMigratesLegacyApplicationCode(t *testing.T) {
+	db := setupDB(t)
+	ctx := context.Background()
+
+	legacy := &model.ApplicationEntity{
+		Code:   "platform-admin",
+		Name:   "管理后台",
+		Source: model.AppSourceThirdParty, // 旧库补列后的默认值，种子应一并纠正为 builtin
+		Status: model.AppStatusEnable,
+	}
+	if err := db.Create(legacy).Error; err != nil {
+		t.Fatalf("seed legacy application: %v", err)
+	}
+	// 旧编码应用名下已有一棵菜单：改名后必须仍挂在同一个 app_id 上
+	legacyMenu := &model.MenuEntity{
+		AppID:      legacy.ID,
+		Name:       "工作台",
+		Code:       "dashboard",
+		Path:       "/dashboard",
+		Type:       model.MenuTypeMenu,
+		Visibility: model.MenuVisibilityMember,
+		Status:     model.MenuStatusEnable,
+	}
+	if err := db.Create(legacyMenu).Error; err != nil {
+		t.Fatalf("seed legacy menu: %v", err)
+	}
+
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed fail: %v", err)
+	}
+	// 再跑一次：改名后必须幂等（不得因为旧编码缺席而新建应用）
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed (2nd) fail: %v", err)
+	}
+
+	var apps []model.ApplicationEntity
+	if err := db.Find(&apps).Error; err != nil {
+		t.Fatalf("query application: %v", err)
+	}
+	if len(apps) != 2 {
+		t.Fatalf("application count = %d, want 2 (旧编码必须原地改名而非新建)", len(apps))
+	}
+	var legacyCount int64
+	if err := db.Model(&model.ApplicationEntity{}).Where("code = ?", "platform-admin").Count(&legacyCount).Error; err != nil {
+		t.Fatalf("count legacy application: %v", err)
+	}
+	if legacyCount != 0 {
+		t.Errorf("legacy application code row count = %d, want 0", legacyCount)
+	}
+
+	var migrated model.ApplicationEntity
+	if err := db.Where("code = ?", "platform_admin").First(&migrated).Error; err != nil {
+		t.Fatalf("query migrated application: %v", err)
+	}
+	if migrated.ID != legacy.ID {
+		t.Errorf("application id = %s, want legacy id %s (改名必须保留主键)", migrated.ID, legacy.ID)
+	}
+	if migrated.Source != model.AppSourceBuiltin {
+		t.Errorf("application source = %q, want %q", migrated.Source, model.AppSourceBuiltin)
+	}
+
+	var menuCount int64
+	if err := db.Model(&model.MenuEntity{}).
+		Where("app_id = ? AND code = ?", legacy.ID, "dashboard").Count(&menuCount).Error; err != nil {
+		t.Fatalf("count migrated menu: %v", err)
+	}
+	if menuCount != 1 {
+		t.Errorf("menu rows under preserved app_id = %d, want 1", menuCount)
+	}
+}
+
+// TestSeedIamRejectsConflictingApplicationCode 新旧编码并存（既有连字符内置应用，
+// 又有用户自建的 platform_admin）时必须中断种子，而不是静默择一：无法判断哪一行才是内置应用，
+// 若按新编码命中就回填 source，会把用户自建应用改写成内置（获得删除保护并接管菜单范围）。
+func TestSeedIamRejectsConflictingApplicationCode(t *testing.T) {
+	db := setupDB(t)
+	ctx := context.Background()
+
+	if err := db.Create(&model.ApplicationEntity{
+		Code: "platform-admin", Name: "管理后台", Source: model.AppSourceBuiltin, Status: model.AppStatusEnable,
+	}).Error; err != nil {
+		t.Fatalf("seed legacy application: %v", err)
+	}
+	userApp := &model.ApplicationEntity{
+		Code: "platform_admin", Name: "用户自建应用", Source: model.AppSourceThirdParty, Status: model.AppStatusEnable,
+	}
+	if err := db.Create(userApp).Error; err != nil {
+		t.Fatalf("seed user application: %v", err)
+	}
+
+	if err := seed.SeedIam(ctx, db); err == nil {
+		t.Fatal("expected conflict error when legacy and new application codes coexist")
+	}
+
+	// 冲突行不得被改写：用户自建应用仍为第三方，旧内置应用仍在且未被改名
+	var got model.ApplicationEntity
+	if err := db.Where("id = ?", userApp.ID).First(&got).Error; err != nil {
+		t.Fatalf("query user application: %v", err)
+	}
+	if got.Source != model.AppSourceThirdParty {
+		t.Errorf("user application source = %q, want %q (冲突时不得改写)", got.Source, model.AppSourceThirdParty)
+	}
+	var legacyCount int64
+	if err := db.Model(&model.ApplicationEntity{}).Where("code = ?", "platform-admin").Count(&legacyCount).Error; err != nil {
+		t.Fatalf("count legacy application: %v", err)
+	}
+	if legacyCount != 1 {
+		t.Errorf("legacy application row count = %d, want 1 (冲突时不得改名)", legacyCount)
 	}
 }

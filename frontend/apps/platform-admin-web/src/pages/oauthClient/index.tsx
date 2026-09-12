@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Table, Button, Space, Input, Modal, Form, Select, message } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, idColumn, nameColumn, PageContainer, RemoteSelect, STATUS_COL_WIDTH, StatusTag, tableScrollX, TAG_COL_WIDTH, timeColumn, TypeTag } from '@ark-iam/ui'
+import { actionColumn, idColumn, nameColumn, PageContainer, RemoteSelect, SourceTag, STATUS_COL_WIDTH, StatusTag, tableScrollX, TAG_COL_WIDTH, timeColumn, tokens } from '@ark-iam/ui'
 import { createOAuthClient, deleteOAuthClient, getApplicationPageList, getOAuthClientPageList, updateOAuthClient } from '@ark-iam/api'
 import type { OAuthClientItem } from '@ark-iam/types'
 import { useNavigate } from 'react-router-dom'
@@ -54,7 +54,6 @@ export default function OAuthClientList() {
     setEditing(record)
     form.setFieldsValue({
       name: record.name,
-      type: record.type,
       status: record.status,
       tokenEndpointAuthMethod: record.tokenEndpointAuthMethod,
     })
@@ -100,7 +99,7 @@ export default function OAuthClientList() {
       onClick: (r) => navigate(`/oauthClient/${r.applicationClientID}`),
     }),
     idColumn<OAuthClientItem>({ dataIndex: 'appID', title: '所属应用ID' }),
-    { title: '类型', dataIndex: 'type', key: 'type', width: TAG_COL_WIDTH, render: (v: string) => <TypeTag value={v} /> },
+    { title: '来源', dataIndex: 'source', key: 'source', width: TAG_COL_WIDTH, render: (v: string) => <SourceTag value={v} /> },
     { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <StatusTag value={v} /> },
     timeColumn<OAuthClientItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<OAuthClientItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
@@ -175,14 +174,12 @@ export default function OAuthClientList() {
           <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
             <Input placeholder="客户端名称" />
           </Form.Item>
-          <Form.Item name="type" label="类型" initialValue="first_party" rules={[{ required: true, message: '请选择类型' }]}>
-            <Select
-              options={[
-                { value: 'first_party', label: '第一方' },
-                { value: 'third_party', label: '第三方' },
-              ]}
-            />
-          </Form.Item>
+          {editing && (
+            <Form.Item label="来源">
+              <SourceTag value={editing.source} />
+              <span style={{ marginLeft: 8, color: tokens.textSecondary }}>来源不可修改</span>
+            </Form.Item>
+          )}
           <Form.Item
             name="tokenEndpointAuthMethod"
             label="令牌端点认证方式"

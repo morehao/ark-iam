@@ -15,8 +15,8 @@ import (
 // 租户自服务权限开通的内置定义（单一事实源）：
 // pkg/seed（平台租户 bootstrap）与各建租户链路共用同一份编码，避免"角色/菜单集合"出现两份定义而漂移。
 const (
-	// ProvisionAppCode 租户自服务控制台应用编码（application.code）。
-	ProvisionAppCode = "tenant-admin"
+	// ProvisionAppCode 租户自服务控制台应用编码（application.code，规则见 model.AppCodePattern）。
+	ProvisionAppCode = "tenant_admin"
 	// ProvisionRoleName 内置租户管理员角色名称（角色无业务编码，(tenant_id, app_id, source=builtin) 即其业务唯一键）。
 	ProvisionRoleName = "租户管理员"
 	// ProvisionRoleDesc 内置租户管理员角色描述。
@@ -25,7 +25,7 @@ const (
 	ProvisionAdminType = model.SysAdminTypeAdmin
 )
 
-// ProvisionMenuCodes 内置租户管理员默认授权的菜单编码（tenant-admin 应用下的叶子菜单）。
+// ProvisionMenuCodes 内置租户管理员默认授权的菜单编码（tenant_admin 应用下的叶子菜单）。
 var ProvisionMenuCodes = []string{"department", "tenant-user", "tenant-role", "tenant-api-key"}
 
 // ProvisionTenantAdminReq 构造 ProvisionTenantAdmin 入参。

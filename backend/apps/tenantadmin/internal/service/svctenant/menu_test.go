@@ -10,15 +10,16 @@ import (
 	"gorm.io/gorm"
 )
 
-// seedSubscribedApp 种子「应用 + 当前租户对其的启用订阅」；isSystem 用于区分系统内置应用。
-func seedSubscribedApp(t *testing.T, db *gorm.DB, tenantID, appID, name string, isSystem bool, sort int) {
+// seedSubscribedApp 种子「应用 + 当前租户对其的启用订阅」；source 区分内置（builtin）与第一方/第三方应用；
+// code 传真实种子编码（见 pkg/seed），因为菜单范围按控制台归属（code）判定。
+func seedSubscribedApp(t *testing.T, db *gorm.DB, tenantID, appID, code, name string, source model.AppSource, sort int) {
 	t.Helper()
 	if err := db.Create(&model.ApplicationEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: appID}},
-		Code:       "code-" + appID,
+		Code:       code,
 		Name:       name,
 		Status:     model.AppStatusEnable,
-		IsSystem:   isSystem,
+		Source:     source,
 		Sort:       sort,
 	}).Error; err != nil {
 		t.Fatalf("seed app: %v", err)
@@ -35,15 +36,15 @@ func seedSubscribedApp(t *testing.T, db *gorm.DB, tenantID, appID, name string, 
 	}
 }
 
-// TestTenantAppsIncludeSubscribedSystemApp 应用选项 = 租户订阅的启用应用：
-// 系统内置应用（is_system，如管理后台）只要被订阅同样可选；未订阅的应用不出现；
-// 角色创建与下拉同口径（订阅的系统内置应用可作为角色归属）。
-func TestTenantAppsIncludeSubscribedSystemApp(t *testing.T) {
+// TestTenantAppsIncludeSubscribedBuiltInApp 应用选项 = 租户订阅的启用应用：
+// 内置应用（source=builtin，如管理后台）只要被订阅同样可选；未订阅的应用不出现；
+// 角色创建与下拉同口径（订阅的内置应用可作为角色归属）。
+func TestTenantAppsIncludeSubscribedBuiltInApp(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.TenantApplicationEntity{},
 		&model.RoleEntity{}, &model.UserRoleEntity{})
 	seedTenantAdminOperator(t, db, "t1", "op")
-	seedSubscribedApp(t, db, "t1", "app-admin", "管理后台", true, 0)
-	seedSubscribedApp(t, db, "t1", "app-console", "租户自服务", false, 1)
+	seedSubscribedApp(t, db, "t1", "app-admin", "platform_admin", "管理后台", model.AppSourceBuiltin, 0)
+	seedSubscribedApp(t, db, "t1", "app-console", tenantAdminAppCode, "租户自服务", model.AppSourceBuiltin, 1)
 	// 平台已建但该租户未订阅的应用：不可选
 	if err := db.Create(&model.ApplicationEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "app-unsub"}},
@@ -64,7 +65,7 @@ func TestTenantAppsIncludeSubscribedSystemApp(t *testing.T) {
 		got[item.AppID] = item.Name
 	}
 	if len(got) != 2 {
-		t.Fatalf("expected 2 subscribed apps (system app included), got %+v", resp.List)
+		t.Fatalf("expected 2 subscribed apps (built-in app included), got %+v", resp.List)
 	}
 	if got["app-console"] != "租户自服务" || got["app-admin"] != "管理后台" {
 		t.Fatalf("unexpected app options: %+v", resp.List)
@@ -77,9 +78,9 @@ func TestTenantAppsIncludeSubscribedSystemApp(t *testing.T) {
 		t.Fatalf("unsubscribed app must not be selectable: %+v", resp.List)
 	}
 
-	// 订阅的系统内置应用可作为角色归属
+	// 订阅的内置应用可作为角色归属
 	if _, err := NewRoleSvc().Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app-admin", Name: "后台管理员"}); err != nil {
-		t.Fatalf("create role on subscribed system app: %v", err)
+		t.Fatalf("create role on subscribed built-in app: %v", err)
 	}
 }
 
@@ -89,7 +90,7 @@ func TestTenantAppsExcludeDisabledApplication(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.TenantApplicationEntity{},
 		&model.RoleEntity{}, &model.UserRoleEntity{})
 	seedTenantAdminOperator(t, db, "t1", "op")
-	seedSubscribedApp(t, db, "t1", "app-console", "租户自服务", false, 0)
+	seedSubscribedApp(t, db, "t1", "app-console", tenantAdminAppCode, "租户自服务", model.AppSourceBuiltin, 0)
 	// 平台停用该应用（订阅关系保持 enable）
 	if err := db.Model(&model.ApplicationEntity{}).Where("id = ?", "app-console").
 		Update("status", model.AppStatusDisable).Error; err != nil {
@@ -105,14 +106,15 @@ func TestTenantAppsExcludeDisabledApplication(t *testing.T) {
 	}
 }
 
-// TestConsoleMenuScopeExcludesSystemApp 租户控制台菜单范围仍排除系统内置应用：
-// 系统内置订阅应用的菜单由其专属控制台呈现，不并入租户控制台侧边栏（避免串台页面）。
-func TestConsoleMenuScopeExcludesSystemApp(t *testing.T) {
+// TestConsoleMenuScopeExcludesBuiltInApp 租户控制台菜单范围排除「归属其它控制台的内置应用」：
+// 管理后台（source=builtin，code=platform_admin）的菜单由其专属控制台呈现，不并入租户控制台侧边栏（避免串台页面）；
+// 租户自服务同为 builtin，但它是本控制台菜单的载体（code=tenant_admin），必须留在范围内。
+func TestConsoleMenuScopeExcludesBuiltInApp(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.TenantApplicationEntity{},
 		&model.MenuEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
 	seedTenantAdminOperator(t, db, "t1", "op")
-	seedSubscribedApp(t, db, "t1", "app-admin", "管理后台", true, 0)
-	seedSubscribedApp(t, db, "t1", "app-console", "租户自服务", false, 1)
+	seedSubscribedApp(t, db, "t1", "app-admin", "platform_admin", "管理后台", model.AppSourceBuiltin, 0)
+	seedSubscribedApp(t, db, "t1", "app-console", tenantAdminAppCode, "租户自服务", model.AppSourceBuiltin, 1)
 
 	menus := []*model.MenuEntity{
 		{
@@ -146,6 +148,6 @@ func TestConsoleMenuScopeExcludesSystemApp(t *testing.T) {
 		t.Fatalf("build my menu tree: %v", err)
 	}
 	if len(tree) != 1 || tree[0].MenuID != "m-console" {
-		t.Fatalf("console menu tree must exclude system app menus, got %+v", tree)
+		t.Fatalf("console menu tree must keep tenant console menus and drop platform console menus, got %+v", tree)
 	}
 }

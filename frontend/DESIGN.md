@@ -178,7 +178,7 @@ components:
 | 会话（isActive） | 内联语义色 | true → 活跃（`success`）；false → 已失效（`default`） |
 | API Key 有效 | 内联语义色 | 有效（`success`）；已吊销（`error`） |
 
-**分类标识（非状态，用固定分类色，不用语义组件）**：类型/来源/可见性等保持固定传统 Tag 色但收敛出处——租户/应用类型用共享 `TypeTag`（platform→geekblue、customer→cyan、first_party→blue、third_party→orange）；角色来源用共享 `SourceTag`（builtin→gold「内置」，其余→blue「自定义」）；页面私有分类如 public/private、菜单类型、超管等允许内联但遵循「分类色」规则，禁止出现三态以上随意取色。
+**分类标识（非状态，用固定分类色，不用语义组件）**：类型/来源/可见性等保持固定传统 Tag 色但收敛出处——租户类型用共享 `TypeTag`（platform→geekblue、customer→cyan）；应用/客户端来源与角色来源共用 `SourceTag`（builtin→gold「内置」、first_party→blue「第一方」、third_party→orange「第三方」、custom→blue「自定义」）；页面私有分类如 public/private、菜单类型、超管等允许内联但遵循「分类色」规则，禁止出现三态以上随意取色。
 
 ### 7.3 列表页模板（List 骨架）
 

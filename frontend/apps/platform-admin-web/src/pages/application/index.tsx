@@ -2,9 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Descriptions, Drawer, Form, Input, InputNumber, message, Modal, Select, Space, Table } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, CODE_COL_WIDTH, fmtTime, IDCell, idColumn, nameColumn, PageContainer, STATUS_COL_WIDTH, StatusTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, TypeTag } from '@ark-iam/ui'
+import { actionColumn, CODE_COL_WIDTH, fmtTime, IDCell, idColumn, nameColumn, PageContainer, SourceTag, STATUS_COL_WIDTH, StatusTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
 import { createApplication, deleteApplication, getApplicationDetail, getApplicationPageList, updateApplication } from '@ark-iam/api'
 import type { ApplicationItem } from '@ark-iam/types'
+
+// 应用编码规则（与后端 model.AppCodePattern 同口径）：以小写字母开头，仅含小写字母、数字与下划线。
+const APP_CODE_PATTERN = /^[a-z][a-z0-9_]*$/
 
 export default function ApplicationList() {
   const [data, setData] = useState<ApplicationItem[]>([])
@@ -42,7 +45,7 @@ export default function ApplicationList() {
   const handleCreate = () => {
     setEditing(null)
     form.resetFields()
-    form.setFieldsValue({ type: 'first_party', sort: 0 })
+    form.setFieldsValue({ sort: 0 })
     setModalOpen(true)
   }
 
@@ -51,7 +54,6 @@ export default function ApplicationList() {
     form.setFieldsValue({
       code: record.code,
       name: record.name,
-      type: record.type,
       status: record.status,
       description: record.description,
       logoUrl: record.logoUrl,
@@ -110,7 +112,7 @@ export default function ApplicationList() {
       onClick: (r) => void handleOpenDetail(r),
     }),
     textColumn<ApplicationItem>({ title: '编码', dataIndex: 'code', width: CODE_COL_WIDTH, monospace: true }),
-    { title: '类型', dataIndex: 'type', key: 'type', width: TAG_COL_WIDTH, render: (v: string) => <TypeTag value={v} /> },
+    { title: '来源', dataIndex: 'source', key: 'source', width: TAG_COL_WIDTH, render: (v: string) => <SourceTag value={v} /> },
     { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <StatusTag value={v} /> },
     timeColumn<ApplicationItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<ApplicationItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
@@ -180,20 +182,25 @@ export default function ApplicationList() {
         width={560}
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="code" label="应用编码" rules={[{ required: true, message: '请输入应用编码' }]}>
-            <Input placeholder="唯一编码，如 iam-web" disabled={!!editing} />
+          <Form.Item
+            name="code"
+            label="应用编码"
+            rules={[
+              { required: true, message: '请输入应用编码' },
+              { pattern: APP_CODE_PATTERN, message: '以小写字母开头，仅含小写字母、数字与下划线' },
+            ]}
+          >
+            <Input placeholder="唯一编码，如 iam_web" disabled={!!editing} />
           </Form.Item>
           <Form.Item name="name" label="应用名称" rules={[{ required: true, message: '请输入应用名称' }]}>
             <Input placeholder="应用名称" />
           </Form.Item>
-          <Form.Item name="type" label="应用类型">
-            <Select
-              options={[
-                { value: 'first_party', label: '第一方' },
-                { value: 'third_party', label: '第三方' },
-              ]}
-            />
-          </Form.Item>
+          {editing && (
+            <Form.Item label="来源">
+              <SourceTag value={editing.source} />
+              <span style={{ marginLeft: 8, color: tokens.textSecondary }}>来源不可修改</span>
+            </Form.Item>
+          )}
           {editing && (
             <Form.Item name="status" label="状态">
               <Select
@@ -230,8 +237,8 @@ export default function ApplicationList() {
             <Descriptions.Item label="应用ID"><IDCell value={detail.appID} /></Descriptions.Item>
             <Descriptions.Item label="编码">{detail.code || '-'}</Descriptions.Item>
             <Descriptions.Item label="名称">{detail.name || '-'}</Descriptions.Item>
-            <Descriptions.Item label="类型">
-              <TypeTag value={detail.type} />
+            <Descriptions.Item label="来源">
+              <SourceTag value={detail.source} />
             </Descriptions.Item>
             <Descriptions.Item label="状态">
               <StatusTag value={detail.status} />

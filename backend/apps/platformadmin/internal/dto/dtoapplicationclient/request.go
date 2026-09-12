@@ -1,10 +1,13 @@
 package dtoapplicationclient
 
+import "github.com/morehao/ark-iam/pkg/iam/model"
+
+// ApplicationClientCreateReq 创建 OAuth 客户端。
+// 来源（source）不由控制台决定：控制台创建的客户端恒为 model.ApplicationClientSourceThirdParty，
+// builtin / first_party 只能由种子与运维产生。
 type ApplicationClientCreateReq struct {
-	AppID        string `json:"appID" binding:"required"` // 所属应用ID
-	Name         string `json:"name" binding:"required"`  // 客户端名称
-	Type         string `json:"type"`                     // 客户端类型: first_party-第一方, third_party-第三方
-	IsThirdParty bool   `json:"isThirdParty"`             // 是否第三方应用
+	AppID string `json:"appID" binding:"required"` // 所属应用ID
+	Name  string `json:"name" binding:"required"`  // 客户端名称
 
 	RedirectURIs            []string `json:"redirectURIs"`            // 授权回调地址
 	PostLogoutRedirectURIs  []string `json:"postLogoutRedirectURIs"`  // 登出回调地址
@@ -20,12 +23,11 @@ type ApplicationClientCreateReq struct {
 	RefreshTokenTTL         int64    `json:"refreshTokenTTL"`         // 刷新令牌有效期(秒)
 }
 
+// ApplicationClientUpdateReq 修改 OAuth 客户端。source 不可改。
 type ApplicationClientUpdateReq struct {
 	ApplicationClientID string `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
 	Name                string `json:"name"`                                           // 客户端名称
-	Type                string `json:"type"`                                           // 客户端类型
 	Status              string `json:"status"`                                         // 状态: enable-启用, disable-停用
-	IsThirdParty        bool   `json:"isThirdParty"`                                   // 是否第三方应用
 
 	RedirectURIs            []string `json:"redirectURIs"`            // 授权回调地址
 	PostLogoutRedirectURIs  []string `json:"postLogoutRedirectURIs"`  // 登出回调地址
@@ -50,11 +52,11 @@ type ApplicationClientDetailReq struct {
 }
 
 type ApplicationClientPageListReq struct {
-	Page     int    `json:"page" form:"page"`         // 页码
-	PageSize int    `json:"pageSize" form:"pageSize"` // 每页条数
-	Name     string `json:"name" form:"name"`         // 客户端名称（模糊搜索）
-	Type     string `json:"type" form:"type"`         // 客户端类型
-	Status   string `json:"status" form:"status"`     // 状态
+	Page     int                           `json:"page" form:"page"`         // 页码
+	PageSize int                           `json:"pageSize" form:"pageSize"` // 每页条数
+	Name     string                        `json:"name" form:"name"`         // 客户端名称（模糊搜索）
+	Source   model.ApplicationClientSource `json:"source" form:"source"`     // 客户端来源: builtin-内置, first_party-第一方, third_party-第三方
+	Status   string                        `json:"status" form:"status"`     // 状态
 }
 
 type SecretListReq struct {

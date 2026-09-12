@@ -34,7 +34,7 @@ func newProvisionTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-// seedTenantAdminApp 写入 tenant-admin 应用与指定菜单（模拟 pkg/seed 的全局种子数据）。
+// seedTenantAdminApp 写入 tenant_admin 应用与指定菜单（模拟 pkg/seed 的全局种子数据）。
 func seedTenantAdminApp(t *testing.T, db *gorm.DB, menuCodes ...string) *model.ApplicationEntity {
 	t.Helper()
 	ctx := context.Background()

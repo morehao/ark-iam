@@ -31,13 +31,19 @@ func NewApplicationSvc() ApplicationSvc {
 }
 
 func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.ApplicationCreateReq) (*dtoapplication.ApplicationCreateResp, error) {
+	// 编码规则（model.AppCodePattern）：小写字母开头，仅含小写字母/数字/下划线。
+	// 非法编码（如连字符）在此拦截，避免落库后再靠人工纠正。
+	if !model.IsValidAppCode(req.Code) {
+		glog.Errorf(ctx, "[svcapplication.Create] 非法应用编码, req:%s", gutil.ToJsonString(req))
+		return nil, code.GetError(code.ApplicationCodeInvalidError)
+	}
 	entity := &model.ApplicationEntity{
 		Code:                    req.Code,
 		Name:                    req.Name,
 		Description:             req.Description,
 		LogoURL:                 req.LogoURL,
 		HomepageURL:             req.HomepageURL,
-		Type:                    req.Type,
+		Source:                  model.AppSourceThirdParty, // 控制台创建的应用恒为第三方接入，builtin/first_party 仅由种子与运维产生
 		AllowPersonCreateTenant: req.AllowPersonCreateTenant,
 		AllowJoinByInvite:       req.AllowJoinByInvite,
 		Sort:                    req.Sort,
@@ -66,7 +72,6 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.Applicat
 		"description":  req.Description,
 		"logo_url":     req.LogoURL,
 		"homepage_url": req.HomepageURL,
-		"type":         req.Type,
 		"status":       req.Status,
 		"sort":         req.Sort,
 		"updated_by":   gincontext.GetUserIDString(ctx),
@@ -90,8 +95,8 @@ func (svc *applicationSvc) Delete(ctx *gin.Context, req *dtoapplication.Applicat
 		glog.Errorf(ctx, "[svcapplication.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationDeleteError)
 	}
-	if entity != nil && entity.IsSystem {
-		return code.GetError(code.ApplicationSystemBuiltInErr)
+	if entity != nil && entity.Source.IsBuiltin() {
+		return code.GetError(code.ApplicationBuiltInErr)
 	}
 	userID := gincontext.GetUserIDString(ctx)
 	if err := dao.NewApplicationDao().Delete(ctx, req.AppID, userID); err != nil {
@@ -103,9 +108,12 @@ func (svc *applicationSvc) Delete(ctx *gin.Context, req *dtoapplication.Applicat
 
 func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.ApplicationDetailReq) (*dtoapplication.ApplicationDetailResp, error) {
 	entity, err := dao.NewApplicationDao().GetByID(ctx, req.AppID)
-	if err != nil || entity == nil || entity.ID == "" {
+	if err != nil {
 		glog.Errorf(ctx, "[svcapplication.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationGetDetailError)
+	}
+	if entity == nil || entity.ID == "" {
+		return nil, code.GetError(code.ApplicationNotExistError)
 	}
 	return &dtoapplication.ApplicationDetailResp{
 		AppID:                   entity.ID,
@@ -114,7 +122,7 @@ func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.Applicat
 		Description:             entity.Description,
 		LogoURL:                 entity.LogoURL,
 		HomepageURL:             entity.HomepageURL,
-		Type:                    entity.Type,
+		Source:                  entity.Source,
 		Status:                  entity.Status,
 		Sort:                    entity.Sort,
 		AllowPersonCreateTenant: entity.AllowPersonCreateTenant,
@@ -124,13 +132,22 @@ func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.Applicat
 }
 
 func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.ApplicationPageListReq) (*dtoapplication.ApplicationPageListResp, error) {
+	// 非法来源过滤值直接拒绝，避免 DAO 落成「查不到任何数据」的空结果而看不出原因
+	if req.Source != "" {
+		switch req.Source {
+		case model.AppSourceBuiltin, model.AppSourceFirstParty, model.AppSourceThirdParty:
+		default:
+			glog.Errorf(ctx, "[svcapplication.PageList] 非法 source 过滤值, req:%s", gutil.ToJsonString(req))
+			return nil, code.GetError(code.ApplicationGetPageListError)
+		}
+	}
 	cond := &dao.ApplicationCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
 		Name:   req.Name,
-		Type:   req.Type,
+		Source: req.Source,
 		Status: req.Status,
 	}
 	list, total, err := dao.NewApplicationDao().GetPageListByCond(ctx, cond)
@@ -145,7 +162,7 @@ func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.Applic
 			Code:                    v.Code,
 			Name:                    v.Name,
 			Description:             v.Description,
-			Type:                    v.Type,
+			Source:                  v.Source,
 			Status:                  v.Status,
 			Sort:                    v.Sort,
 			AllowPersonCreateTenant: v.AllowPersonCreateTenant,

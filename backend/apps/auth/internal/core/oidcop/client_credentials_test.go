@@ -50,7 +50,7 @@ func TestClientCredentialsStorage(t *testing.T) {
 		AllowedOrigins:          datatypes.JSON("[]"),
 		DefaultScopes:           datatypes.JSON(`["openid"]`),
 		Status:                  model.ApplicationClientStatusEnable,
-		Type:                    model.ApplicationClientTypeFirstParty,
+		Source:                  model.ApplicationClientSourceFirstParty,
 	}
 	if err := db.Create(clientEntity).Error; err != nil {
 		t.Fatalf("insert application_client: %v", err)
@@ -147,7 +147,7 @@ func TestClientCredentialsRejectsPublicClient(t *testing.T) {
 		AllowedOrigins:          datatypes.JSON("[]"),
 		DefaultScopes:           datatypes.JSON(`["openid"]`),
 		Status:                  model.ApplicationClientStatusEnable,
-		Type:                    model.ApplicationClientTypeFirstParty,
+		Source:                  model.ApplicationClientSourceFirstParty,
 	}
 	if err := db.Create(publicClient).Error; err != nil {
 		t.Fatalf("insert application_client: %v", err)
@@ -290,7 +290,7 @@ func newClientCredentialsTestDB(t *testing.T, clientID string, accessTokenTTL in
 		DefaultScopes:           datatypes.JSON(`["openid"]`),
 		AccessTokenTTL:          accessTokenTTL,
 		Status:                  model.ApplicationClientStatusEnable,
-		Type:                    model.ApplicationClientTypeFirstParty,
+		Source:                  model.ApplicationClientSourceFirstParty,
 	}
 	if err := db.Create(clientEntity).Error; err != nil {
 		t.Fatalf("insert application_client: %v", err)

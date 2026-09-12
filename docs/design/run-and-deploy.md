@@ -88,6 +88,45 @@ flowchart LR
 >
 > `WITH (FORCE)`（PG 13+）会断开仍连着该库的会话，因此后端不必先停。旧库中残留的列/表不再被读写，属预期。确需保全旧数据时，在升级前自行执行一次性 SQL 导出/回填。
 >
+> **已有库升级到 `application.source`（2026-09-12 改造，详见 `application-source-rename.md`）**：`application.type` / `is_system` 与 `application_client.type` / `is_system` / `is_third_party` 已下线，归属统一收敛为 `source`（`builtin` / `first_party` / `third_party`）。AutoMigrate 只会给新列补上列默认值 `third_party`，存量行必须回填——**请在部署新代码之前执行**（新代码不再写 `type`，升级后旧列只剩列默认值，无法再据以推断）：
+>
+> ```sql
+> -- application：is_system(内置) 优先，其次 third_party，其余归 first_party
+> UPDATE application SET source = CASE
+>   WHEN is_system THEN 'builtin'
+>   WHEN type = 'third_party' THEN 'third_party'
+>   ELSE 'first_party'
+> END
+> WHERE source IS DISTINCT FROM (CASE
+>   WHEN is_system THEN 'builtin'
+>   WHEN type = 'third_party' THEN 'third_party'
+>   ELSE 'first_party'
+> END);
+>
+> -- application_client：同规则（种子客户端 is_system=true → builtin）
+> UPDATE application_client SET source = CASE
+>   WHEN is_system THEN 'builtin'
+>   WHEN type = 'third_party' THEN 'third_party'
+>   ELSE 'first_party'
+> END
+> WHERE source IS DISTINCT FROM (CASE
+>   WHEN is_system THEN 'builtin'
+>   WHEN type = 'third_party' THEN 'third_party'
+>   ELSE 'first_party'
+> END);
+> ```
+>
+> `WHERE ... IS DISTINCT FROM ...` 让脚本**幂等**（重复执行 0 行受影响），可安全重跑。只有在升级**之后**才补做时，无条件安全的只有第一步（`is_system = true` → `builtin`，它决定删除保护与租户控制台菜单范围），其余行按新策略保持 `third_party` 即可；种子数据（`platform_admin` / `tenant_admin` 与两个内置 OAuth 客户端）由 `pkg/seed` 启动时自行回填为 `builtin`，无需人工介入（归属口径见 `application-source-rename.md` §14）。
+>
+> **已有库应用编码改为下划线连接（2026-09-12 改造，详见 `application-source-rename.md` §15）**：`application.code` 统一为下划线形态，两个内置应用 `platform-admin` → `platform_admin`、`tenant-admin` → `tenant_admin`。编码是应用的业务唯一键，改名即原地 `UPDATE`，菜单/租户订阅/角色都按 `app_id` 关联，无需一起改。**请在部署新代码之前执行**（否则种子会按新编码另建一套内置应用，旧应用仍占着旧唯一键，菜单与订阅会分裂到两套应用上）：
+>
+> ```sql
+> UPDATE application SET code = 'platform_admin' WHERE code = 'platform-admin';
+> UPDATE application SET code = 'tenant_admin'   WHERE code = 'tenant-admin';
+> ```
+>
+> 漏做时 `pkg/seed` 也会在启动时把命中的旧编码原地改名（保留主键，幂等），因此上述 SQL 是「先改名再上代码」的稳妥做法，而非唯一路径。本次只动 `application.code`，菜单编码与 OAuth `client_id` 不变。
+>
 > 重建后若出现登录态异常（Redis 里仍有指向已消失用户的 SSO 会话），**按前缀**清理本项目的键即可，不要 `FLUSHDB`——本地 Redis 容器常与其它项目共用：
 >
 > ```bash

@@ -47,15 +47,35 @@ const docTemplateplatformadmin = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "builtin",
+                            "first_party",
+                            "third_party"
+                        ],
                         "type": "string",
-                        "description": "状态",
-                        "name": "status",
+                        "x-enum-comments": {
+                            "ApplicationClientSourceBuiltin": "平台内置：种子播种，禁删",
+                            "ApplicationClientSourceFirstParty": "平台自建：非内置的第一方客户端",
+                            "ApplicationClientSourceThirdParty": "第三方接入：外部/租户接入的客户端"
+                        },
+                        "x-enum-descriptions": [
+                            "平台内置：种子播种，禁删",
+                            "平台自建：非内置的第一方客户端",
+                            "第三方接入：外部/租户接入的客户端"
+                        ],
+                        "x-enum-varnames": [
+                            "ApplicationClientSourceBuiltin",
+                            "ApplicationClientSourceFirstParty",
+                            "ApplicationClientSourceThirdParty"
+                        ],
+                        "description": "客户端来源: builtin-内置, first_party-第一方, third_party-第三方",
+                        "name": "source",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "客户端类型",
-                        "name": "type",
+                        "description": "状态",
+                        "name": "status",
                         "in": "query"
                     }
                 ],
@@ -433,15 +453,35 @@ const docTemplateplatformadmin = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "builtin",
+                            "first_party",
+                            "third_party"
+                        ],
                         "type": "string",
-                        "description": "状态",
-                        "name": "status",
+                        "x-enum-comments": {
+                            "AppSourceBuiltin": "平台内置：种子播种/随产品交付，禁删，菜单归各自专属控制台",
+                            "AppSourceFirstParty": "平台自建但非内置：可删，菜单并入所在控制台",
+                            "AppSourceThirdParty": "第三方接入：外部/租户接入的应用"
+                        },
+                        "x-enum-descriptions": [
+                            "平台内置：种子播种/随产品交付，禁删，菜单归各自专属控制台",
+                            "平台自建但非内置：可删，菜单并入所在控制台",
+                            "第三方接入：外部/租户接入的应用"
+                        ],
+                        "x-enum-varnames": [
+                            "AppSourceBuiltin",
+                            "AppSourceFirstParty",
+                            "AppSourceThirdParty"
+                        ],
+                        "description": "应用来源: builtin-内置, first_party-第一方, third_party-第三方",
+                        "name": "source",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "应用类型",
-                        "name": "type",
+                        "description": "状态",
+                        "name": "status",
                         "in": "query"
                     }
                 ],
@@ -1934,7 +1974,7 @@ const docTemplateplatformadmin = `{
                     "type": "boolean"
                 },
                 "code": {
-                    "description": "应用编码",
+                    "description": "应用编码：下划线连接（小写字母开头，仅含小写字母、数字与下划线，见 model.AppCodePattern）",
                     "type": "string"
                 },
                 "description": {
@@ -1956,10 +1996,6 @@ const docTemplateplatformadmin = `{
                 "sort": {
                     "description": "排序",
                     "type": "integer"
-                },
-                "type": {
-                    "description": "应用类型: first_party-第一方, third_party-第三方",
-                    "type": "string"
                 }
             }
         },
@@ -2019,12 +2055,16 @@ const docTemplateplatformadmin = `{
                     "description": "排序",
                     "type": "integer"
                 },
+                "source": {
+                    "description": "应用来源",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppSource"
+                        }
+                    ]
+                },
                 "status": {
                     "description": "状态",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "应用类型",
                     "type": "string"
                 }
             }
@@ -2079,10 +2119,6 @@ const docTemplateplatformadmin = `{
                 "status": {
                     "description": "状态: enable-启用, disable-停用",
                     "type": "string"
-                },
-                "type": {
-                    "description": "应用类型: first_party-第一方, third_party-第三方",
-                    "type": "string"
                 }
             }
         },
@@ -2121,12 +2157,16 @@ const docTemplateplatformadmin = `{
                     "description": "排序",
                     "type": "integer"
                 },
+                "source": {
+                    "description": "应用来源",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppSource"
+                        }
+                    ]
+                },
                 "status": {
                     "description": "状态",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "应用类型",
                     "type": "string"
                 },
                 "updatedAt": {
@@ -2175,10 +2215,6 @@ const docTemplateplatformadmin = `{
                         "type": "string"
                     }
                 },
-                "isThirdParty": {
-                    "description": "是否第三方应用",
-                    "type": "boolean"
-                },
                 "name": {
                     "description": "客户端名称",
                     "type": "string"
@@ -2218,10 +2254,6 @@ const docTemplateplatformadmin = `{
                 },
                 "tokenEndpointAuthMethod": {
                     "description": "令牌端点认证方式",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "客户端类型: first_party-第一方, third_party-第三方",
                     "type": "string"
                 }
             }
@@ -2287,10 +2319,6 @@ const docTemplateplatformadmin = `{
                         "type": "string"
                     }
                 },
-                "isThirdParty": {
-                    "description": "是否第三方应用",
-                    "type": "boolean"
-                },
                 "name": {
                     "description": "客户端名称",
                     "type": "string"
@@ -2328,6 +2356,14 @@ const docTemplateplatformadmin = `{
                         "type": "string"
                     }
                 },
+                "source": {
+                    "description": "客户端来源",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ApplicationClientSource"
+                        }
+                    ]
+                },
                 "status": {
                     "description": "状态",
                     "type": "string"
@@ -2338,10 +2374,6 @@ const docTemplateplatformadmin = `{
                 },
                 "tokenEndpointAuthMethod": {
                     "description": "令牌端点认证方式",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "客户端类型",
                     "type": "string"
                 }
             }
@@ -2394,10 +2426,6 @@ const docTemplateplatformadmin = `{
                         "type": "string"
                     }
                 },
-                "isThirdParty": {
-                    "description": "是否第三方应用",
-                    "type": "boolean"
-                },
                 "name": {
                     "description": "客户端名称",
                     "type": "string"
@@ -2442,10 +2470,6 @@ const docTemplateplatformadmin = `{
                 "tokenEndpointAuthMethod": {
                     "description": "令牌端点认证方式",
                     "type": "string"
-                },
-                "type": {
-                    "description": "客户端类型",
-                    "type": "string"
                 }
             }
         },
@@ -2475,13 +2499,17 @@ const docTemplateplatformadmin = `{
                         "type": "string"
                     }
                 },
-                "isThirdParty": {
-                    "description": "是否第三方应用",
-                    "type": "boolean"
-                },
                 "name": {
                     "description": "客户端名称",
                     "type": "string"
+                },
+                "source": {
+                    "description": "客户端来源",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ApplicationClientSource"
+                        }
+                    ]
                 },
                 "status": {
                     "description": "状态",
@@ -2489,10 +2517,6 @@ const docTemplateplatformadmin = `{
                 },
                 "tokenEndpointAuthMethod": {
                     "description": "令牌端点认证方式",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "客户端类型",
                     "type": "string"
                 },
                 "updatedAt": {
@@ -3709,6 +3733,52 @@ const docTemplateplatformadmin = `{
                     "type": "string"
                 }
             }
+        },
+        "model.AppSource": {
+            "type": "string",
+            "enum": [
+                "builtin",
+                "first_party",
+                "third_party"
+            ],
+            "x-enum-comments": {
+                "AppSourceBuiltin": "平台内置：种子播种/随产品交付，禁删，菜单归各自专属控制台",
+                "AppSourceFirstParty": "平台自建但非内置：可删，菜单并入所在控制台",
+                "AppSourceThirdParty": "第三方接入：外部/租户接入的应用"
+            },
+            "x-enum-descriptions": [
+                "平台内置：种子播种/随产品交付，禁删，菜单归各自专属控制台",
+                "平台自建但非内置：可删，菜单并入所在控制台",
+                "第三方接入：外部/租户接入的应用"
+            ],
+            "x-enum-varnames": [
+                "AppSourceBuiltin",
+                "AppSourceFirstParty",
+                "AppSourceThirdParty"
+            ]
+        },
+        "model.ApplicationClientSource": {
+            "type": "string",
+            "enum": [
+                "builtin",
+                "first_party",
+                "third_party"
+            ],
+            "x-enum-comments": {
+                "ApplicationClientSourceBuiltin": "平台内置：种子播种，禁删",
+                "ApplicationClientSourceFirstParty": "平台自建：非内置的第一方客户端",
+                "ApplicationClientSourceThirdParty": "第三方接入：外部/租户接入的客户端"
+            },
+            "x-enum-descriptions": [
+                "平台内置：种子播种，禁删",
+                "平台自建：非内置的第一方客户端",
+                "第三方接入：外部/租户接入的客户端"
+            ],
+            "x-enum-varnames": [
+                "ApplicationClientSourceBuiltin",
+                "ApplicationClientSourceFirstParty",
+                "ApplicationClientSourceThirdParty"
+            ]
         },
         "model.MenuStatus": {
             "type": "string",

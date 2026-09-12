@@ -8,6 +8,14 @@ export type SysAdminType = 'admin' | 'normal'
 
 // ---------- 部门 ----------
 // ---------- 应用 ----------
+/**
+ * 应用/客户端来源（后端 model.AppSource / model.ApplicationClientSource）：
+ * builtin-内置（平台随产品交付的控制台应用：管理后台 / 租户自服务，受删除保护）、
+ * first_party-第一方受控应用（平台自建但非内置，当前由运维产生）、third_party-第三方接入。
+ * 控制台创建的资源恒为 third_party；builtin / first_party 只能由种子与运维产生。
+ */
+export type AppSource = 'builtin' | 'first_party' | 'third_party'
+
 export interface ApplicationItem {
   appID: string
   code: string
@@ -15,7 +23,7 @@ export interface ApplicationItem {
   description: string
   logoUrl: string
   homepageUrl: string
-  type: string
+  source: AppSource
   status: string
   sort: number
   allowPersonCreateTenant?: boolean
@@ -30,7 +38,6 @@ export interface ApplicationCreateReq {
   description?: string
   logoUrl?: string
   homepageUrl?: string
-  type?: string
   sort?: number
   allowPersonCreateTenant?: boolean
   allowJoinByInvite?: boolean
@@ -42,7 +49,6 @@ export interface ApplicationUpdateReq {
   description?: string
   logoUrl?: string
   homepageUrl?: string
-  type?: string
   status?: string
   sort?: number
   allowPersonCreateTenant?: boolean
@@ -55,9 +61,8 @@ export interface OAuthClientItem {
   appID: string
   clientID: string
   name: string
-  type: string
+  source: AppSource
   status: string
-  isThirdParty: number
   grantTypes: string[]
   tokenEndpointAuthMethod: string
   createdAt?: number
@@ -81,8 +86,6 @@ export interface OAuthClientDetail extends OAuthClientItem {
 export interface OAuthClientCreateReq {
   appID: string
   name: string
-  type?: string
-  isThirdParty?: number
   redirectURIs?: string[]
   postLogoutRedirectURIs?: string[]
   grantTypes?: string[]
@@ -99,9 +102,7 @@ export interface OAuthClientCreateReq {
 export interface OAuthClientUpdateReq {
   applicationClientID: string
   name?: string
-  type?: string
   status?: string
-  isThirdParty?: number
   redirectURIs?: string[]
   postLogoutRedirectURIs?: string[]
   grantTypes?: string[]

@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { fmtTime } from '@ark-iam/ui'
 import type { ApplicationItem } from '@ark-iam/types'
 
 const mockGetApplicationPageList = vi.fn()
+const mockCreateApplication = vi.fn()
 vi.mock('@ark-iam/api', () => ({
-  createApplication: vi.fn(),
+  createApplication: (...args: unknown[]) => mockCreateApplication(...args),
   deleteApplication: vi.fn(),
   getApplicationDetail: vi.fn(),
   getApplicationPageList: (...args: unknown[]) => mockGetApplicationPageList(...args),
@@ -20,12 +21,12 @@ const updatedAt = 1789228800
 const applications: ApplicationItem[] = [
   {
     appID: 'app-1',
-    code: 'platform-admin',
+    code: 'platform_admin',
     name: '管理后台',
     description: '',
     logoUrl: '',
     homepageUrl: '',
-    type: 'first_party',
+    source: 'third_party',
     status: 'enable',
     sort: 0,
     createdAt,
@@ -35,17 +36,45 @@ const applications: ApplicationItem[] = [
 
 describe('应用列表', () => {
   beforeEach(() => {
-    mockGetApplicationPageList.mockReset()
+    mockGetApplicationPageList.mockReset().mockResolvedValue({ list: applications, total: applications.length })
+    mockCreateApplication.mockReset().mockResolvedValue({ appID: 'app-2', code: 'my_app' })
   })
 
   it('同时展示创建时间与更新时间两列', async () => {
-    mockGetApplicationPageList.mockResolvedValue({ list: applications, total: applications.length })
-
     render(<ApplicationList />)
 
     expect(await screen.findByText('管理后台')).toBeInTheDocument()
     // 时间列读 createdAt/updatedAt（回归：字段缺失会渲染 '-'）
     expect(screen.getByText(fmtTime(createdAt))).toBeInTheDocument()
     expect(screen.getByText(fmtTime(updatedAt))).toBeInTheDocument()
+  })
+
+  /**
+   * 应用编码规则为下划线连接（与后端 model.AppCodePattern 同口径）：
+   * 连字符/大写等非法编码必须在表单层被拦下，不得发起创建请求；改为下划线形态后放行。
+   */
+  it('应用编码只接受小写字母、数字与下划线', async () => {
+    render(<ApplicationList />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /新建应用/ }))
+
+    const codeInput = await screen.findByPlaceholderText('唯一编码，如 iam_web')
+    const nameInput = screen.getByPlaceholderText('应用名称')
+    const modal = document.querySelector('.ant-modal') as HTMLElement
+    const submit = () => fireEvent.click(modal.querySelector('.ant-modal-footer .ant-btn-primary') as HTMLElement)
+
+    fireEvent.change(codeInput, { target: { value: 'my-app' } })
+    fireEvent.change(nameInput, { target: { value: '测试应用' } })
+    submit()
+
+    expect(await screen.findByText('以小写字母开头，仅含小写字母、数字与下划线')).toBeInTheDocument()
+    expect(mockCreateApplication).not.toHaveBeenCalled()
+
+    fireEvent.change(codeInput, { target: { value: 'my_app' } })
+    submit()
+
+    await waitFor(() =>
+      expect(mockCreateApplication).toHaveBeenCalledWith(expect.objectContaining({ code: 'my_app' })),
+    )
   })
 })

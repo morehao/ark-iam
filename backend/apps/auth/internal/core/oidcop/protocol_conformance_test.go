@@ -159,7 +159,7 @@ func TestRefreshTokenTTLUsesClientConfig(t *testing.T) {
 		AccessTokenTTL:          900,
 		RefreshTokenTTL:         7200,
 		Status:                  model.ApplicationClientStatusEnable,
-		Type:                    model.ApplicationClientTypeFirstParty,
+		Source:                  model.ApplicationClientSourceFirstParty,
 	}).Error; err != nil {
 		t.Fatalf("seed client: %v", err)
 	}
@@ -318,7 +318,7 @@ func TestCreateAuthRequestEnforcesRequirePKCE(t *testing.T) {
 		AllowedOrigins:          datatypes.JSON("[]"),
 		DefaultScopes:           datatypes.JSON(`["openid"]`),
 		Status:                  model.ApplicationClientStatusEnable,
-		Type:                    model.ApplicationClientTypeFirstParty,
+		Source:                  model.ApplicationClientSourceFirstParty,
 	}).Error; err != nil {
 		t.Fatalf("seed pkce client: %v", err)
 	}

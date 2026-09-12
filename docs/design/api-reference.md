@@ -214,7 +214,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/v1/platform/applications` | 创建应用 |
+| POST | `/v1/platform/applications` | 创建应用（`code` 为下划线连接：小写字母开头，仅含小写字母/数字/下划线，如 `my_app`；非法编码报 `100748`） |
 | GET | `/v1/platform/applications` | 应用分页 |
 | GET/PUT/DELETE | `/v1/platform/applications/:appID` | 应用详情/更新/删除 |
 | POST | `/v1/platform/application-clients` | 创建 OAuth 客户端 |
