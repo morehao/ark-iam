@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/seed"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

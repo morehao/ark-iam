@@ -15,7 +15,7 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/crypto"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 
-	"github.com/morehao/ark-iam/pkg/iam/sso"
+	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/glog"
 )
 

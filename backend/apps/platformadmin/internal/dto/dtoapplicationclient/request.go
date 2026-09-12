@@ -1,6 +1,6 @@
 package dtoapplicationclient
 
-import "github.com/morehao/ark-iam/pkg/iam/model"
+import "github.com/morehao/ark-iam/pkg/model"
 
 // ApplicationClientCreateReq 创建 OAuth 客户端。
 // 来源（source）不由控制台决定：控制台创建的客户端恒为 model.ApplicationClientSourceThirdParty，

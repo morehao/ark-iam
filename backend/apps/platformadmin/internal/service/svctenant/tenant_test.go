@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/password"
-	"github.com/morehao/ark-iam/pkg/iam/tenant"
+	"github.com/morehao/ark-iam/pkg/core/tenant"
+	"github.com/morehao/ark-iam/pkg/credential"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/platformadmin/testutil"
 	"github.com/morehao/golib/gcrypto"
@@ -36,7 +36,7 @@ func setupTenantCreateEnv(t *testing.T) *gorm.DB {
 	return db
 }
 
-// seedTenantAdminApp 预置租户自服务应用与其内置菜单（编码取自 pkg/iam/tenant 的单一事实源）。
+// seedTenantAdminApp 预置租户自服务应用与其内置菜单（编码取自 pkg/core/tenant 的单一事实源）。
 func seedTenantAdminApp(t *testing.T, db *gorm.DB) *model.ApplicationEntity {
 	t.Helper()
 	app := &model.ApplicationEntity{Code: tenant.ProvisionAppCode, Name: "租户自服务", Status: model.AppStatusEnable}
@@ -207,7 +207,7 @@ func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
 	if resp.AdminInitialPassword == "" {
 		t.Fatal("Create returned empty adminInitialPassword (new person must get a temporary password)")
 	}
-	if err := password.ValidateStrength(resp.AdminInitialPassword); err != nil {
+	if err := credential.ValidateStrength(resp.AdminInitialPassword); err != nil {
 		t.Errorf("adminInitialPassword %q fails strength: %v", resp.AdminInitialPassword, err)
 	}
 
@@ -357,7 +357,7 @@ func TestResetAdminPasswordReissuesTemporaryPassword(t *testing.T) {
 	if reset.InitialPassword == created.AdminInitialPassword {
 		t.Error("reset must issue a new password, not reuse the previous one")
 	}
-	if err := password.ValidateStrength(reset.InitialPassword); err != nil {
+	if err := credential.ValidateStrength(reset.InitialPassword); err != nil {
 		t.Errorf("reset password %q fails strength: %v", reset.InitialPassword, err)
 	}
 

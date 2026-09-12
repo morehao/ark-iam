@@ -7,9 +7,9 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/auth/testutil"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objauth"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/gerror"
 )

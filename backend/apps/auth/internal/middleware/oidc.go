@@ -6,8 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/morehao/ark-iam/auth/internal/service/svcoidc"
-	"github.com/morehao/ark-iam/pkg/iam/sso"
 	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
+	"github.com/morehao/ark-iam/pkg/sso"
 )
 
 // gin 上下文暂存键：OIDC hint 先经 c.Set 暂存在 gin 上下文（handler 链内可见），

@@ -1,8 +1,8 @@
 package dtoauth
 
 import (
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objauth"
 	"github.com/morehao/golib/biz/gobject"
 )
 

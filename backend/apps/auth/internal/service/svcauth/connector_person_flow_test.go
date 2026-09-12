@@ -9,9 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoconnector"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/sso"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 

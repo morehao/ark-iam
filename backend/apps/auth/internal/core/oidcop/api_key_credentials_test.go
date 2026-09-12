@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objauth"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"gorm.io/driver/sqlite"

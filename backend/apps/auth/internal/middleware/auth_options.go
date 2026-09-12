@@ -4,8 +4,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/ark-iam/pkg/iam/sso"
 	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
+	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/glog"
 )
 

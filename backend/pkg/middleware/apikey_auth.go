@@ -1,14 +1,13 @@
 package middleware
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
+	"github.com/morehao/ark-iam/pkg/credential"
+	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
@@ -67,7 +66,7 @@ func (m *apiKeyAuthMiddleware) Authenticate(ctx *gin.Context) bool {
 		return false
 	}
 
-	keyHash := hashApiKey(rawKey)
+	keyHash := credential.HashSecret(rawKey)
 
 	cond := &dao.ApiKeyCond{
 		BaseCond:  &gormdao.BaseCond{Page: 1, PageSize: 1},
@@ -186,9 +185,4 @@ func writeApiKeyUnauthorized(ctx *gin.Context, status int, message string) {
 // and returns its handler. For use in router registration without DI.
 func ApiKeyAuth() gin.HandlerFunc {
 	return NewApiKeyAuthMiddleware().Middleware()
-}
-
-func hashApiKey(key string) string {
-	sum := sha256.Sum256([]byte(key))
-	return hex.EncodeToString(sum[:])
 }

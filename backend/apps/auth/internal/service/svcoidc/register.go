@@ -10,13 +10,13 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/core/person"
+	"github.com/morehao/ark-iam/pkg/core/tenant"
+	"github.com/morehao/ark-iam/pkg/core/user"
+	"github.com/morehao/ark-iam/pkg/credential"
+	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/password"
-	"github.com/morehao/ark-iam/pkg/iam/person"
-	"github.com/morehao/ark-iam/pkg/iam/tenant"
-	"github.com/morehao/ark-iam/pkg/iam/user"
+	"github.com/morehao/ark-iam/pkg/model"
 
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/gerror"
@@ -31,7 +31,7 @@ import (
 // 进入 selectTenant（有租户）或 createTenant（零租户且应用允许）。
 // 本方法仅绑定 person 到 authRequest（done=false），不发 code，认证收尾交 selectTenant。
 func (svc *oidcAuthSvc) RegisterPerson(ctx *gin.Context, req *dtooidc.RegisterPersonReq) (*dtooidc.RegisterPersonResp, error) {
-	if err := password.ValidateStrength(req.Password); err != nil {
+	if err := credential.ValidateStrength(req.Password); err != nil {
 		return nil, code.GetError(code.PasswordValidationError)
 	}
 	if req.Username == "" && req.PrimaryEmail == "" && req.PrimaryPhone == "" {
@@ -170,7 +170,7 @@ func (svc *oidcAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenant
 
 	tenantCode := strings.TrimSpace(req.TenantCode)
 	if tenantCode == "" {
-		// 与平台建租户共用同一编码规则（pkg/iam/tenant.GenerateCode）：t_<12 位随机 hex>
+		// 与平台建租户共用同一编码规则（pkg/core/tenant.GenerateCode）：t_<12 位随机 hex>
 		generatedCode, cErr := tenant.GenerateCode()
 		if cErr != nil {
 			glog.Errorf(ctx, "[oidcAuthSvc.CreateTenant] generate tenant code fail, err:%v, req:%s", cErr, gutil.ToJsonString(req))
@@ -182,7 +182,7 @@ func (svc *oidcAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenant
 	var tenantEntity *model.TenantEntity
 	txErr := dbclient.IamDB(ctx.Request.Context()).Transaction(func(tx *gorm.DB) error {
 		// 建租户 + 内置管理员（即当前登录自然人，沿用其既有密码）+ 租户自服务权限开通：
-		// 与平台侧建租户共用同一实现（pkg/iam/tenant.CreateTenantWithBuiltinAdmin），
+		// 与平台侧建租户共用同一实现（pkg/core/tenant.CreateTenantWithBuiltinAdmin），
 		// owner 同样打 builtin 来源标记，使"平台重置内置管理员密码"的兜底路径对自助租户同样可用（D5）。
 		result, cErr := tenant.CreateTenantWithBuiltinAdmin(ctx.Request.Context(), tx, &tenant.CreateTenantWithBuiltinAdminReq{
 			Tenant: &tenant.CreateWithRootDeptReq{

@@ -3,10 +3,10 @@ package svcpermission
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/object/objpermission"
-	"github.com/morehao/ark-iam/pkg/iam/svcmenu"
+	"github.com/morehao/ark-iam/pkg/core/menu"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objpermission"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtopermission"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
@@ -294,7 +294,7 @@ const platformAdminAppCode = "platform_admin"
 
 // MyTree 返回当前用户可见的平台菜单树（侧边栏动态菜单）。
 // 平台菜单固定归属平台管理后台应用（platform_admin），按用户的角色授权（管理员角色全量 + role_menu 授权 + visibility）过滤，
-// 与租户控制台菜单逻辑保持一致，复用公共层 svcmenu。
+// 与租户控制台菜单逻辑保持一致，复用公共层 menu。
 func (svc *menuSvc) MyTree(ctx *gin.Context) (*dtopermission.MenuMyTreeResp, error) {
 	tenantID := gincontext.GetTenantIDString(ctx)
 	userID := gincontext.GetUserIDString(ctx)
@@ -312,7 +312,7 @@ func (svc *menuSvc) MyTree(ctx *gin.Context) (*dtopermission.MenuMyTreeResp, err
 		return nil, code.GetError(code.MenuGetPageListError)
 	}
 
-	nodes, err := svcmenu.BuildMyMenuTree(ctx, tenantID, userID, []string{appList[0].ID})
+	nodes, err := menu.BuildMyMenuTree(ctx, tenantID, userID, []string{appList[0].ID})
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.MyTree] build my menu tree fail, err:%v", err)
 		return nil, code.GetError(code.MenuGetPageListError)

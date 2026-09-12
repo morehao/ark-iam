@@ -24,7 +24,7 @@ type UserCreateResp struct {
 	UserID string `json:"userID"` // 用户ID
 	// InitialPassword 成员的初始临时密码，仅在此响应中返回一次，不落库、不可再查；
 	// 若邮箱/手机命中已存在自然人（其密码不被改动），该字段为空串。
-	// 待办：邮件/短信通道接入后本字段下线，见 pkg/iam/password 的 TODO(delivery)。
+	// 待办：邮件/短信通道接入后本字段下线，见 pkg/credential 的 TODO(delivery)。
 	InitialPassword string `json:"initialPassword"` // 初始临时密码(仅此一次返回)
 }
 

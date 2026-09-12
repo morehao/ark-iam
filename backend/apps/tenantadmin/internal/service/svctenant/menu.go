@@ -3,10 +3,10 @@ package svctenant
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/object/objpermission"
-	"github.com/morehao/ark-iam/pkg/iam/svcmenu"
+	"github.com/morehao/ark-iam/pkg/core/menu"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objpermission"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
@@ -122,9 +122,9 @@ func loadConsoleApps(ctx *gin.Context) ([]model.ApplicationEntity, error) {
 	return consoleApps, nil
 }
 
-// buildAppMenuTree 构建指定应用的启用菜单树（角色菜单授权用），基于公共层 svcmenu.BuildAppMenuTree。
+// buildAppMenuTree 构建指定应用的启用菜单树（角色菜单授权用），基于公共层 menu.BuildAppMenuTree。
 func buildAppMenuTree(ctx *gin.Context, appID string) ([]dtotenant.MenuTreeItem, error) {
-	nodes, err := svcmenu.BuildAppMenuTree(ctx, appID)
+	nodes, err := menu.BuildAppMenuTree(ctx, appID)
 	if err != nil {
 		return nil, code.GetError(code.MenuGetPageListError)
 	}
@@ -157,14 +157,14 @@ func toMenuNodes(items []dtotenant.MenuTreeItem) []objpermission.MenuItemNode {
 	return result
 }
 
-// pruneMenuTree 按可见等级剪枝菜单树（适配租户侧 DTO，复用公共层 svcmenu）。
+// pruneMenuTree 按可见等级剪枝菜单树（适配租户侧 DTO，复用公共层 menu）。
 func pruneMenuTree(items []dtotenant.MenuTreeItem, level int) []dtotenant.MenuTreeItem {
-	return convertMenuNodes(svcmenu.PruneMenuTree(toMenuNodes(items), level))
+	return convertMenuNodes(menu.PruneMenuTree(toMenuNodes(items), level))
 }
 
-// pruneMenuTreeByAuthed 按「授权集合 + 可见等级」剪枝菜单树（适配租户侧 DTO，复用公共层 svcmenu）。
+// pruneMenuTreeByAuthed 按「授权集合 + 可见等级」剪枝菜单树（适配租户侧 DTO，复用公共层 menu）。
 func pruneMenuTreeByAuthed(items []dtotenant.MenuTreeItem, authed map[string]bool, level int) []dtotenant.MenuTreeItem {
-	return convertMenuNodes(svcmenu.PruneMenuTreeByAuthed(toMenuNodes(items), authed, level))
+	return convertMenuNodes(menu.PruneMenuTreeByAuthed(toMenuNodes(items), authed, level))
 }
 
 // buildTenantMenuTree 构建租户控制台菜单树（全部订阅的非系统应用），供侧边栏使用。
@@ -201,7 +201,7 @@ func buildMyMenuTree(ctx *gin.Context) ([]dtotenant.MenuTreeItem, error) {
 	for _, app := range appList {
 		appIDs = append(appIDs, app.ID)
 	}
-	nodes, err := svcmenu.BuildMyMenuTree(ctx, tenantID, userID, appIDs)
+	nodes, err := menu.BuildMyMenuTree(ctx, tenantID, userID, appIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func buildMyMenuTree(ctx *gin.Context) ([]dtotenant.MenuTreeItem, error) {
 // userHoldsBuiltinAdmin 判断当前用户是否持有内置管理员角色（source=builtin && admin_type=admin）。
 // 保留薄包装以复用公共层实现并维持既有测试契约。
 func userHoldsBuiltinAdmin(ctx *gin.Context) (bool, error) {
-	return svcmenu.UserHoldsBuiltinAdmin(ctx, gincontext.GetTenantIDString(ctx), gincontext.GetUserIDString(ctx))
+	return menu.UserHoldsBuiltinAdmin(ctx, gincontext.GetTenantIDString(ctx), gincontext.GetUserIDString(ctx))
 }
 
 // HasSystemAdminCapability 判断当前用户（按 gin 上下文取租户/用户）是否具备「系统管理能力」
@@ -241,7 +241,7 @@ func requireSystemAdmin(ctx *gin.Context, opErr int) error {
 }
 
 // ResolveUserAdminType 推导当前用户的系统管理类型：聚合该用户全部角色，
-// 任一角色为管理员类型（admin）即视为管理员类型，否则为普通类型（normal）。复用公共层 svcmenu。
+// 任一角色为管理员类型（admin）即视为管理员类型，否则为普通类型（normal）。复用公共层 menu。
 func ResolveUserAdminType(ctx *gin.Context) (model.SysAdminType, error) {
-	return svcmenu.ResolveUserAdminType(ctx, gincontext.GetTenantIDString(ctx), gincontext.GetUserIDString(ctx))
+	return menu.ResolveUserAdminType(ctx, gincontext.GetTenantIDString(ctx), gincontext.GetUserIDString(ctx))
 }

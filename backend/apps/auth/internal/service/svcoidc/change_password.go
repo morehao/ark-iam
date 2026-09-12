@@ -5,10 +5,10 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/password"
-	"github.com/morehao/ark-iam/pkg/iam/tenant"
+	"github.com/morehao/ark-iam/pkg/core/tenant"
+	"github.com/morehao/ark-iam/pkg/credential"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
 )
@@ -52,7 +52,7 @@ func (svc *oidcAuthSvc) ChangePassword(ctx *gin.Context, req *dtooidc.OIDCChange
 	if personEntity.PasswordEncrypted == "" {
 		return code.GetError(code.PasswordNotSetError)
 	}
-	if err := password.ValidateStrength(req.NewPassword); err != nil {
+	if err := credential.ValidateStrength(req.NewPassword); err != nil {
 		return code.GetError(code.PasswordValidationError)
 	}
 	if req.CurrentPassword == req.NewPassword {

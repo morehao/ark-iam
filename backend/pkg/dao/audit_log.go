@@ -1,0 +1,43 @@
+package dao
+
+import (
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/golib/dbaccess/gormdao"
+	"gorm.io/gorm"
+)
+
+type AuditLogCond struct {
+	*gormdao.BaseCond
+	PersonID string
+	TenantID string
+	Action   model.AuditAction
+	Result   model.AuditResult
+}
+
+func (c *AuditLogCond) BuildCondition(db *gorm.DB, tableName string) {
+	if c.BaseCond != nil {
+		c.BaseCond.BuildCondition(db, tableName)
+	}
+	if c.PersonID != "" {
+		db.Where(tableName+".actor_person_id = ?", c.PersonID)
+	}
+	if c.TenantID != "" {
+		db.Where(tableName+".tenant_id = ?", c.TenantID)
+	}
+	if c.Action != "" {
+		db.Where(tableName+".action = ?", c.Action)
+	}
+	if c.Result != "" {
+		db.Where(tableName+".result = ?", c.Result)
+	}
+}
+
+type AuditLogDao struct {
+	*gormdao.Dao[model.AuditLogEntity, model.AuditLogEntityList, string]
+}
+
+func NewAuditLogDao(opts ...DaoOption) *AuditLogDao {
+	return &AuditLogDao{
+		Dao: gormdao.NewDao[model.AuditLogEntity, model.AuditLogEntityList, string](model.TableNameAuditLog, "AuditLogDao", resolveDBGetter(opts...)),
+	}
+}

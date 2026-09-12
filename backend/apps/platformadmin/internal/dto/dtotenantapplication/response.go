@@ -1,6 +1,6 @@
 package dtotenantapplication
 
-import "github.com/morehao/ark-iam/pkg/iam/model"
+import "github.com/morehao/ark-iam/pkg/model"
 
 type TenantApplicationCreateResp struct {
 	TenantAppID string `json:"tenantAppID"` // 租户应用订阅ID

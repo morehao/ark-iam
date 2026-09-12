@@ -4,16 +4,16 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/core/person"
+	"github.com/morehao/ark-iam/pkg/core/tenant"
+	"github.com/morehao/ark-iam/pkg/core/user"
+	"github.com/morehao/ark-iam/pkg/credential"
+	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/ark-iam/pkg/iam/audit"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/object/objtenant"
-	"github.com/morehao/ark-iam/pkg/iam/password"
-	"github.com/morehao/ark-iam/pkg/iam/person"
-	"github.com/morehao/ark-iam/pkg/iam/tenant"
-	"github.com/morehao/ark-iam/pkg/iam/user"
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objtenant"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
@@ -43,7 +43,7 @@ func NewTenantSvc() TenantSvc {
 }
 
 // Create 创建租户管理。
-// 租户编码由服务端按统一规则自动生成（见 pkg/iam/tenant.GenerateCode），入参不接收编码；
+// 租户编码由服务端按统一规则自动生成（见 pkg/core/tenant.GenerateCode），入参不接收编码；
 // 编码创建后不可变更（Update 不修改 code）。
 //
 // 一个事务内完成：租户 + 同名根部门 + 内置管理员用户（source=builtin）+ 租户自服务权限开通
@@ -65,8 +65,8 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 		glog.Errorf(ctx, "[svctenant.TenantCreate] generate tenant code fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantCreateError)
 	}
-	// 临时密码：每个租户管理员各不相同，规则统一走 pkg/iam/password（需求②）
-	tempPassword, err := password.GenerateTemporary()
+	// 临时密码：每个租户管理员各不相同，规则统一走 pkg/credential（需求②）
+	tempPassword, err := credential.GenerateTemporaryPassword()
 	if err != nil {
 		glog.Errorf(ctx, "[svctenant.TenantCreate] generate temporary password fail, err:%v", err)
 		return nil, code.GetError(code.TenantCreateError)
@@ -181,7 +181,7 @@ func (svc *tenantSvc) ResetAdminPassword(ctx *gin.Context, req *dtotenant.Tenant
 		return nil, code.GetError(code.UserNotExistError)
 	}
 
-	tempPassword, err := password.GenerateTemporary()
+	tempPassword, err := credential.GenerateTemporaryPassword()
 	if err != nil {
 		glog.Errorf(ctx, "[svctenant.ResetAdminPassword] generate temporary password fail, err:%v", err)
 		return nil, code.GetError(code.TenantAdminResetPasswordError)

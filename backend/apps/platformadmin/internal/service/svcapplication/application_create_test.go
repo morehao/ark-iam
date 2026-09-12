@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtoapplication"
 	"github.com/morehao/ark-iam/platformadmin/testutil"
 	"github.com/morehao/golib/gerror"

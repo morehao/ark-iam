@@ -1,0 +1,54 @@
+package dao
+
+import (
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/golib/dbaccess/gormdao"
+	"gorm.io/gorm"
+)
+
+type PersonCond struct {
+	*gormdao.BaseCond
+	IDs          []string // 主键 IN 批量查询
+	Username     string
+	PrimaryEmail string
+	PrimaryPhone string
+	Name         string
+	IsSuspended  *bool
+}
+
+func (c *PersonCond) BuildCondition(db *gorm.DB, tableName string) {
+	if c.BaseCond != nil {
+		c.BaseCond.BuildCondition(db, tableName)
+	}
+	if len(c.IDs) > 0 {
+		db.Where(tableName+".id IN ?", c.IDs)
+	}
+	if c.Username != "" {
+		db.Where(tableName+".username = ?", c.Username)
+	}
+	if c.PrimaryEmail != "" {
+		db.Where(tableName+".primary_email = ?", c.PrimaryEmail)
+	}
+	if c.PrimaryPhone != "" {
+		db.Where(tableName+".primary_phone = ?", c.PrimaryPhone)
+	}
+	if c.Name != "" {
+		db.Where(tableName+".name = ?", c.Name)
+	}
+	if c.IsSuspended != nil {
+		db.Where(tableName+".is_suspended = ?", *c.IsSuspended)
+	}
+}
+
+type PersonDao struct {
+	*gormdao.Dao[model.PersonEntity, model.PersonEntityList, string]
+}
+
+func NewPersonDao(opts ...DaoOption) *PersonDao {
+	return &PersonDao{
+		Dao: gormdao.NewDao[model.PersonEntity, model.PersonEntityList, string](
+			model.TableNamePerson, "PersonDao",
+			resolveDBGetter(opts...),
+		),
+	}
+}

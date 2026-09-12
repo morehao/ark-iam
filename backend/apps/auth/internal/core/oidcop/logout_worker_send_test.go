@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/morehao/ark-iam/pkg/iam/sso"
+	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/stretchr/testify/require"
 )

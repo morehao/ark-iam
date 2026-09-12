@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/seed"
 	"github.com/morehao/ark-iam/tenantadmin"
 	"github.com/morehao/ark-iam/tenantadmin/config"

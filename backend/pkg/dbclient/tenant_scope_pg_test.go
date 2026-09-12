@@ -6,7 +6,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/biz/gcontext"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

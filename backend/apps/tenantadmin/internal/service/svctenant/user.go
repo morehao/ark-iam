@@ -4,15 +4,15 @@ import (
 	"errors"
 
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/core/person"
+	"github.com/morehao/ark-iam/pkg/core/tenant"
+	"github.com/morehao/ark-iam/pkg/core/user"
+	"github.com/morehao/ark-iam/pkg/credential"
+	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/ark-iam/pkg/iam/audit"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/password"
-	"github.com/morehao/ark-iam/pkg/iam/person"
-	"github.com/morehao/ark-iam/pkg/iam/tenant"
-	"github.com/morehao/ark-iam/pkg/iam/user"
+	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
@@ -197,9 +197,9 @@ func loadUserRoleCountMap(ctx *gin.Context, tenantID string, userIDs []string) m
 // 业务约束：用户必须从属于一个主部门，primaryDepartmentID 必传。
 //
 // 口径与平台侧建租户内置管理员完全一致（需求①/D7）：
-//   - 密码不由调用方提供，统一由 pkg/iam/password 生成临时密码，仅本次响应返回一次；
+//   - 密码不由调用方提供，统一由 pkg/credential 生成临时密码，仅本次响应返回一次；
 //   - 仅新建自然人时置 must_change_password=true（复用既有自然人绝不改动其密码）；
-//   - person/user/部门关系同事务写入，共用 pkg/iam/user.Create。
+//   - person/user/部门关系同事务写入，共用 pkg/core/user.Create。
 func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dtotenant.UserCreateResp, error) {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
 	if err := requireSystemAdmin(ctx, code.UserCreateError); err != nil {
@@ -254,7 +254,7 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 	}
 
 	// 3. 初始临时密码：系统生成，仅新建自然人时生效（复用既有自然人时密码保持不变）
-	tempPassword, err := password.GenerateTemporary()
+	tempPassword, err := credential.GenerateTemporaryPassword()
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.Create] generate temporary password fail, err:%v", err)
 		return nil, code.GetError(code.UserCreateError)
@@ -265,7 +265,7 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 		return nil, code.GetError(code.PasswordHashError)
 	}
 
-	// 4. 事务：person find-or-create + user 主体 + 部门归属（共用 pkg/iam/user.Create）
+	// 4. 事务：person find-or-create + user 主体 + 部门归属（共用 pkg/core/user.Create）
 	var createdUserID string
 	personCreated := false
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
@@ -592,7 +592,7 @@ func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPass
 		return nil, code.GetError(code.UserNotExistError)
 	}
 
-	tempPassword, err := password.GenerateTemporary()
+	tempPassword, err := credential.GenerateTemporaryPassword()
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.ResetPassword] generate temporary password fail, err:%v", err)
 		return nil, code.GetError(code.UserResetPasswordError)

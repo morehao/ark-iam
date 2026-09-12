@@ -8,7 +8,7 @@ import (
 	"github.com/morehao/ark-iam/gateway"
 	"github.com/morehao/ark-iam/gateway/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/seed"
 	"github.com/morehao/golib/glog"
 	_ "github.com/morehao/golib/glog/driver/zap"

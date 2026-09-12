@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/model"
 )
 
 // TestEnumFieldsJSONCompatibility 具名枚举类型的 JSON 向下兼容（AGENTS.md 硬规则 4）：

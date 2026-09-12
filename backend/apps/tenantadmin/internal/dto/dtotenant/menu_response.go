@@ -1,6 +1,6 @@
 package dtotenant
 
-import "github.com/morehao/ark-iam/pkg/iam/object/objpermission"
+import "github.com/morehao/ark-iam/pkg/object/objpermission"
 
 // MenuTreeItem 租户侧菜单树节点（含所属应用）
 type MenuTreeItem struct {

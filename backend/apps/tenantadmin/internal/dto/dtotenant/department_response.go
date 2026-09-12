@@ -1,8 +1,8 @@
 package dtotenant
 
 import (
-	"github.com/morehao/ark-iam/pkg/iam/model"
-	"github.com/morehao/ark-iam/pkg/iam/object/objtenant"
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objtenant"
 )
 
 // ---------- 部门节点 ----------

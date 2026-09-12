@@ -1,8 +1,6 @@
 package svcapplicationclient
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"time"
 
@@ -10,14 +8,14 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 
+	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/iam/audit"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/model"
+	"github.com/morehao/ark-iam/pkg/credential"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtoapplicationclient"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
-	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
@@ -359,21 +357,13 @@ func (svc *oAuthClientSvc) CreateSecret(ctx *gin.Context, req *dtoapplicationcli
 		return nil, code.GetError(code.ApplicationClientNotExistError)
 	}
 
-	randomBytes, err := gcrypto.GenerateRandomBytes(32)
+	secretValue, err := credential.GenerateSecret(credential.ClientSecretBytes)
 	if err != nil {
-		glog.Errorf(ctx, "[svcapplicationclient.CreateSecret] generate secret fail, err:%v", err)
+		glog.Errorf(ctx, "[svcapplicationclient.CreateSecret] credential.GenerateSecret fail, err:%v", err)
 		return nil, code.GetError(code.ApplicationClientSecretCreateError)
 	}
-	secretValue := hex.EncodeToString(randomBytes)
-
-	hash := sha256.Sum256([]byte(secretValue))
-	valueHash := hex.EncodeToString(hash[:])
-
-	prefixLen := 8
-	if len(secretValue) < prefixLen {
-		prefixLen = len(secretValue)
-	}
-	valuePrefix := secretValue[:prefixLen]
+	valueHash := credential.HashSecret(secretValue)
+	valuePrefix := credential.Prefix(secretValue, credential.ClientSecretPrefixLen)
 
 	var expiresAt *time.Time
 	if req.ExpiredAt > 0 {

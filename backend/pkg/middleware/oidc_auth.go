@@ -14,8 +14,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/morehao/ark-iam/pkg/config"
-	"github.com/morehao/ark-iam/pkg/iam/dao"
-	"github.com/morehao/ark-iam/pkg/iam/object/objauth"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/object/objauth"
 
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/glog"

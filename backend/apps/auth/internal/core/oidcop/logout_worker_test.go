@@ -5,7 +5,7 @@ import (
 	"crypto/rsa"
 	"testing"
 
-	"github.com/morehao/ark-iam/pkg/iam/sso"
+	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/stretchr/testify/require"
 )
 
