@@ -12,7 +12,7 @@ type RoleCond struct {
 	AppID      string
 	IDs        []string
 	Name       string
-	Source     string
+	Source     model.RoleSource
 	AdminType  model.SysAdminType // 精确匹配系统管理类型(admin/normal)
 	Keyword    string             // 模糊搜索: 名称 LIKE
 	Unassigned bool               // 仅未归属应用的角色(app_id 为空串)

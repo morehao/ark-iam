@@ -30,6 +30,17 @@ func NewApplicationSvc() ApplicationSvc {
 	return &applicationSvc{}
 }
 
+// isValidAppStatus 校验应用状态取值：空值表示「本次不修改状态」，非空必须命中白名单常量。
+// 校验归 service（AGENTS.md 硬规则 3）：DTO 绑定的是前端传来的原始字符串，非法值在此拦截。
+func isValidAppStatus(status model.AppStatus) bool {
+	switch status {
+	case "", model.AppStatusEnable, model.AppStatusDisable:
+		return true
+	default:
+		return false
+	}
+}
+
 func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.ApplicationCreateReq) (*dtoapplication.ApplicationCreateResp, error) {
 	// 编码规则（model.AppCodePattern）：小写字母开头，仅含小写字母/数字/下划线。
 	// 非法编码（如连字符）在此拦截，避免落库后再靠人工纠正。
@@ -56,8 +67,8 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.Applicat
 	audit.WriteAudit(ctx, audit.AuditEntry{
 		Action:     audit.ActionApplicationCreate,
 		TenantID:   "",
-		Result:     "success",
-		TargetType: "application",
+		Result:     model.AuditResultSuccess,
+		TargetType: model.AuditTargetTypeApplication,
 		TargetID:   entity.ID,
 	})
 	return &dtoapplication.ApplicationCreateResp{
@@ -67,14 +78,21 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.Applicat
 }
 
 func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.ApplicationUpdateReq) error {
+	if !isValidAppStatus(req.Status) {
+		glog.Errorf(ctx, "[svcapplication.Update] 非法应用状态, req:%s", gutil.ToJsonString(req))
+		return code.GetError(code.ApplicationUpdateError)
+	}
 	updateMap := map[string]any{
 		"name":         req.Name,
 		"description":  req.Description,
 		"logo_url":     req.LogoURL,
 		"homepage_url": req.HomepageURL,
-		"status":       req.Status,
 		"sort":         req.Sort,
 		"updated_by":   gincontext.GetUserIDString(ctx),
+	}
+	// status 留空表示不修改：不写该列，避免把状态覆盖为空串
+	if req.Status != "" {
+		updateMap["status"] = req.Status
 	}
 	if req.AllowPersonCreateTenant != nil {
 		updateMap["allow_person_create_tenant"] = *req.AllowPersonCreateTenant

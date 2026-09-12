@@ -10,7 +10,6 @@ type SessionAuditCond struct {
 	*gormdao.BaseCond
 	PersonID  string
 	SessionID string
-	Status    string
 }
 
 func (c *SessionAuditCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -22,9 +21,6 @@ func (c *SessionAuditCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.SessionID != "" {
 		db.Where(tableName+".session_id = ?", c.SessionID)
-	}
-	if c.Status != "" {
-		db.Where(tableName+".status = ?", c.Status)
 	}
 }
 

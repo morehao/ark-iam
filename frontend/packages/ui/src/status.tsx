@@ -11,19 +11,15 @@ import { Tag } from 'antd'
 
 export type StatusValue = string | number | null | undefined
 
-/** 启用/停用状态：enable|1|active → 启用(success)；disable|0|inactive → 停用(default)；suspended → 挂起(error) */
-export function StatusTag({ value }: { value?: StatusValue }) {
-  const v = String(value ?? '')
-  if (v === 'enable' || v === '1' || v === 'active') {
+/** 启用/停用状态：enable → 启用(success)；disable → 停用(default)；其余原样回显 */
+export function EnableTag({ value }: { value?: string }) {
+  if (value === 'enable') {
     return <Tag color="success">启用</Tag>
   }
-  if (v === 'disable' || v === '0' || v === 'inactive') {
+  if (value === 'disable') {
     return <Tag color="default">停用</Tag>
   }
-  if (v === 'suspended') {
-    return <Tag color="error">挂起</Tag>
-  }
-  return <Tag>{v || '-'}</Tag>
+  return <Tag>{value || '-'}</Tag>
 }
 
 /**

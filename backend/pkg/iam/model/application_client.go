@@ -21,9 +21,13 @@ const (
 // IsBuiltin 判断是否为平台内置客户端（禁删）。
 func (s ApplicationClientSource) IsBuiltin() bool { return s == ApplicationClientSourceBuiltin }
 
+// ApplicationClientStatus 应用客户端启停状态（启停语义统一使用 enable/disable）。
+type ApplicationClientStatus string
+
+// 客户端状态取值（禁止硬编码）。
 const (
-	ApplicationClientStatusEnable  = "enable"
-	ApplicationClientStatusDisable = "disable"
+	ApplicationClientStatusEnable  ApplicationClientStatus = "enable"  // 启用
+	ApplicationClientStatusDisable ApplicationClientStatus = "disable" // 停用
 )
 
 const (
@@ -58,7 +62,7 @@ type ApplicationClientEntity struct {
 	AccessTokenTTL          int64                   `gorm:"column:access_token_ttl;type:bigint;not null;default:900;comment:访问令牌有效期(秒)" json:"accessTokenTTL"`
 	RefreshTokenTTL         int64                   `gorm:"column:refresh_token_ttl;type:bigint;not null;default:2592000;comment:刷新令牌有效期(秒)" json:"refreshTokenTTL"`
 	Source                  ApplicationClientSource `gorm:"column:source;type:varchar(32);not null;default:'third_party';comment:客户端来源(builtin内置/first_party第一方/third_party第三方)" json:"source"`
-	Status                  string                  `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态" json:"status"`
+	Status                  ApplicationClientStatus `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态" json:"status"`
 
 	CreatedBy string `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id" json:"createdBy"`
 	UpdatedBy string `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id" json:"updatedBy"`

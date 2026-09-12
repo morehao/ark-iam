@@ -37,9 +37,13 @@ func (s AppSource) IsBuiltin() bool { return s == AppSourceBuiltin }
 // IsPlatformOwned 判断是否平台自有（内置或自建），供「自有 vs 外部」口径使用，避免调用方枚举三值。
 func (s AppSource) IsPlatformOwned() bool { return s == AppSourceBuiltin || s == AppSourceFirstParty }
 
+// AppStatus 应用启停状态（启停语义统一使用 enable/disable，见 docs/design/status-source-consistency-design-20260912.md D1）。
+type AppStatus string
+
+// 应用状态取值（禁止硬编码）。
 const (
-	AppStatusEnable  = "enable"
-	AppStatusDisable = "disable"
+	AppStatusEnable  AppStatus = "enable"  // 启用
+	AppStatusDisable AppStatus = "disable" // 停用
 )
 
 type ApplicationEntity struct {
@@ -52,7 +56,7 @@ type ApplicationEntity struct {
 	LogoURL                 string    `gorm:"column:logo_url;type:varchar(2048);not null;default:'';comment:应用logo" json:"logoURL"`
 	HomepageURL             string    `gorm:"column:homepage_url;type:varchar(2048);not null;default:'';comment:应用主页" json:"homepageURL"`
 	Source                  AppSource `gorm:"column:source;type:varchar(32);not null;default:'third_party';comment:应用来源(builtin内置/first_party第一方/third_party第三方)" json:"source"`
-	Status                  string    `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态" json:"status"`
+	Status                  AppStatus `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态" json:"status"`
 	Sort                    int       `gorm:"column:sort;type:int;not null;default:0;comment:排序" json:"sort"`
 	CreatedBy               string    `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id" json:"createdBy"`
 	UpdatedBy               string    `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id" json:"updatedBy"`

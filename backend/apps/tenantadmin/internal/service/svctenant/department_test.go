@@ -59,7 +59,7 @@ func seedTenantCustomAdminOperator(t *testing.T, db *gorm.DB, tenantID, userID s
 		TenantID:   tenantID,
 		AppID:      "app-admin",
 		Name:       "测试自定义管理员角色",
-		Source:     string(model.RoleSourceCustom),
+		Source:     model.RoleSourceCustom,
 		AdminType:  model.SysAdminTypeAdmin,
 		CreatedBy:  "t",
 	}).Error; err != nil {
@@ -90,7 +90,7 @@ func TestDepartmentCreateRootAndChildPaths(t *testing.T) {
 
 	svc := &departmentSvc{}
 	root, err := svc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
-		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "总公司", Status: "active"},
+		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "总公司", Status: model.DeptNodeStatusEnable},
 	})
 	if err != nil {
 		t.Fatalf("create root: %v", err)
@@ -150,7 +150,7 @@ func TestDepartmentMoveCascadesPathAndRejectsCycle(t *testing.T) {
 		ParentID:     root.DepartmentID,
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{
 			Name:   "C",
-			Status: "active",
+			Status: model.DeptNodeStatusEnable,
 		},
 	}); err != nil {
 		t.Fatalf("move C under A: %v", err)
@@ -169,7 +169,7 @@ func TestDepartmentMoveCascadesPathAndRejectsCycle(t *testing.T) {
 		ParentID:     c.DepartmentID,
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{
 			Name:   "A",
-			Status: "active",
+			Status: model.DeptNodeStatusEnable,
 		},
 	})
 	if err == nil {
@@ -335,25 +335,25 @@ func TestDepartmentChildrenPageAndHasChildren(t *testing.T) {
 
 	svc := &departmentSvc{}
 	root, err := svc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
-		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "总公司", Status: "active"},
+		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "总公司", Status: model.DeptNodeStatusEnable},
 	})
 	if err != nil {
 		t.Fatalf("create root: %v", err)
 	}
 	a, _ := svc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
 		ParentID:           root.DepartmentID,
-		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "A", Status: "active"},
+		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "A", Status: model.DeptNodeStatusEnable},
 	})
 	if _, err := svc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
 		ParentID:           root.DepartmentID,
-		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "B", Status: "inactive"},
+		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "B", Status: model.DeptNodeStatusDisable},
 	}); err != nil {
 		t.Fatalf("create B: %v", err)
 	}
 	// A 下挂一个深层子级，验证 hasChildren
 	if _, err := svc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
 		ParentID:           a.DepartmentID,
-		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "A1", Status: "active"},
+		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "A1", Status: model.DeptNodeStatusEnable},
 	}); err != nil {
 		t.Fatalf("create A1: %v", err)
 	}
@@ -391,7 +391,7 @@ func TestDepartmentChildrenPageAndHasChildren(t *testing.T) {
 	// 状态筛选：只返回启用的 A
 	resp, err = svc.Children(ginCtx, &dtotenant.DepartmentChildrenReq{
 		DepartmentID: root.DepartmentID,
-		Status:       "active",
+		Status:       model.DeptNodeStatusEnable,
 		Page:         1,
 		PageSize:     10,
 	})

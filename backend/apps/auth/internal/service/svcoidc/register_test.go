@@ -258,7 +258,7 @@ func TestCreateTenantSucceedsForZeroTenantPerson(t *testing.T) {
 	}
 	role, rErr := dao.NewRoleDao().GetByCond(t.Context(), &dao.RoleCond{
 		TenantID:  res.TenantID,
-		Source:    string(model.RoleSourceBuiltin),
+		Source:    model.RoleSourceBuiltin,
 		AdminType: model.SysAdminTypeAdmin,
 	})
 	if rErr != nil || role == nil {

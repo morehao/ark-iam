@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Table, Button, Space, Input, Modal, Form, Select, message } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, idColumn, nameColumn, PageContainer, RemoteSelect, SourceTag, STATUS_COL_WIDTH, StatusTag, tableScrollX, TAG_COL_WIDTH, timeColumn, tokens } from '@ark-iam/ui'
+import { actionColumn, idColumn, nameColumn, PageContainer, RemoteSelect, SourceTag, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, timeColumn, tokens } from '@ark-iam/ui'
 import { createOAuthClient, deleteOAuthClient, getApplicationPageList, getOAuthClientPageList, updateOAuthClient } from '@ark-iam/api'
 import type { OAuthClientItem } from '@ark-iam/types'
 import { useNavigate } from 'react-router-dom'
@@ -100,7 +100,7 @@ export default function OAuthClientList() {
     }),
     idColumn<OAuthClientItem>({ dataIndex: 'appID', title: '所属应用ID' }),
     { title: '来源', dataIndex: 'source', key: 'source', width: TAG_COL_WIDTH, render: (v: string) => <SourceTag value={v} /> },
-    { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <StatusTag value={v} /> },
+    { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <EnableTag value={v} /> },
     timeColumn<OAuthClientItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<OAuthClientItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     actionColumn<OAuthClientItem>({

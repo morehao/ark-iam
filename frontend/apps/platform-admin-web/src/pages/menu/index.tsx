@@ -26,7 +26,7 @@ import {
   ThunderboltOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons'
-import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, PageContainer, RemoteSelect, STATUS_COL_WIDTH, StatusTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
+import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, PageContainer, RemoteSelect, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
 import { createMenu, deleteMenu, getApplicationDetail, getApplicationPageList, getMenuTree, updateMenu } from '@ark-iam/api'
 import type { ApplicationItem, MenuItem, MenuStatus, MenuType, MenuVisibility } from '@ark-iam/types'
 
@@ -359,7 +359,7 @@ export default function MenuList() {
       dataIndex: 'status',
       key: 'status',
       width: STATUS_COL_WIDTH,
-      render: (v: string) => <StatusTag value={v} />,
+      render: (v: string) => <EnableTag value={v} />,
     },
     {
       title: '可见性',

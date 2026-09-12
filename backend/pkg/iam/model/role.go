@@ -31,7 +31,7 @@ func (t SysAdminType) HasSystemAdmin() bool {
 
 // IsBuiltinAdmin 判断角色是否为内置管理员（source=builtin 且 admin_type=admin）。
 func (r *RoleEntity) IsBuiltinAdmin() bool {
-	return r != nil && r.Source == string(RoleSourceBuiltin) && r.AdminType == SysAdminTypeAdmin
+	return r != nil && r.Source == RoleSourceBuiltin && r.AdminType == SysAdminTypeAdmin
 }
 
 type RoleEntity struct {
@@ -40,7 +40,7 @@ type RoleEntity struct {
 	AppID       string       `gorm:"column:app_id;type:varchar(36);not null;default:'';comment:所属应用id" json:"appID"`
 	Name        string       `gorm:"column:name;type:varchar(128);not null;default:'';comment:角色名称" json:"name"`
 	Description string       `gorm:"column:description;type:varchar(256);not null;default:'';comment:角色描述" json:"description"`
-	Source      string       `gorm:"column:source;type:varchar(16);not null;default:'custom';comment:角色来源(builtin/custom)" json:"source"`
+	Source      RoleSource   `gorm:"column:source;type:varchar(16);not null;default:'custom';comment:角色来源(builtin/custom)" json:"source"`
 	AdminType   SysAdminType `gorm:"column:admin_type;type:varchar(16);not null;default:'normal';comment:系统管理类型(admin/normal)" json:"adminType"`
 	CreatedBy   string       `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id" json:"createdBy"`
 	UpdatedBy   string       `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id" json:"updatedBy"`

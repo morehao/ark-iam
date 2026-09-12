@@ -66,7 +66,7 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 			DeptPath:   "/" + o.id,
 			DeptDepth:  1,
 			Name:       "部门" + o.id,
-			Status:     "active",
+			Status:     model.DeptNodeStatusEnable,
 		}).Error; err != nil {
 			t.Fatalf("seed dept %s: %v", o.id, err)
 		}
@@ -186,7 +186,7 @@ func TestUserCreateRequiresDepartment(t *testing.T) {
 		DeptPath:   "/o1",
 		DeptDepth:  1,
 		Name:       "研发部",
-		Status:     "active",
+		Status:     model.DeptNodeStatusEnable,
 	}).Error; err != nil {
 		t.Fatalf("seed dept: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestUserCreateWithDepartments(t *testing.T) {
 			DeptPath:   "/" + deptID,
 			DeptDepth:  1,
 			Name:       "部门" + deptID,
-			Status:     "active",
+			Status:     model.DeptNodeStatusEnable,
 		}).Error; err != nil {
 			t.Fatalf("seed dept %d: %v", i, err)
 		}
@@ -344,7 +344,7 @@ func TestUserDetailWithDepartmentsAndRoles(t *testing.T) {
 		DeptPath:   "/o1",
 		DeptDepth:  1,
 		Name:       "研发部",
-		Status:     "active",
+		Status:     model.DeptNodeStatusEnable,
 	}).Error; err != nil {
 		t.Fatalf("seed dept: %v", err)
 	}
@@ -541,7 +541,7 @@ func TestUserCreateWithLeaderDepts(t *testing.T) {
 			DeptPath:   "/" + deptID,
 			DeptDepth:  1,
 			Name:       "部门" + deptID,
-			Status:     "active",
+			Status:     model.DeptNodeStatusEnable,
 		}).Error; err != nil {
 			t.Fatalf("seed dept %s: %v", deptID, err)
 		}
@@ -604,7 +604,7 @@ func TestUserUpdateDepartments(t *testing.T) {
 			DeptPath:   "/" + deptID,
 			DeptDepth:  1,
 			Name:       "部门" + deptID,
-			Status:     "active",
+			Status:     model.DeptNodeStatusEnable,
 		}).Error; err != nil {
 			t.Fatalf("seed dept %s: %v", deptID, err)
 		}
@@ -692,7 +692,7 @@ func TestUserUpdateContact(t *testing.T) {
 		DeptPath:   "/o1",
 		DeptDepth:  1,
 		Name:       "研发部",
-		Status:     "active",
+		Status:     model.DeptNodeStatusEnable,
 	}).Error; err != nil {
 		t.Fatalf("seed dept: %v", err)
 	}
@@ -777,7 +777,7 @@ func TestUserPageListDepartmentFilter(t *testing.T) {
 			DeptPath:   "/" + deptID,
 			DeptDepth:  1,
 			Name:       "部门" + deptID,
-			Status:     "active",
+			Status:     model.DeptNodeStatusEnable,
 		}).Error; err != nil {
 			t.Fatalf("seed dept %s: %v", deptID, err)
 		}
@@ -882,7 +882,7 @@ func TestUserResetPasswordIssuesTemporaryPassword(t *testing.T) {
 
 	if err := db.Create(&model.DepartmentEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "o1"}},
-		TenantID:   "t1", DeptPath: "/o1", DeptDepth: 1, Name: "部门o1", Status: "active",
+		TenantID:   "t1", DeptPath: "/o1", DeptDepth: 1, Name: "部门o1", Status: model.DeptNodeStatusEnable,
 	}).Error; err != nil {
 		t.Fatalf("seed dept: %v", err)
 	}

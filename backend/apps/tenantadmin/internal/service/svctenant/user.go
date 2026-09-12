@@ -618,8 +618,8 @@ func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPass
 	audit.WriteAudit(ctx, audit.AuditEntry{
 		Action:     audit.ActionTenantAdminPasswordReset,
 		TenantID:   gincontext.GetTenantIDString(ctx),
-		Result:     "success",
-		TargetType: "user",
+		Result:     model.AuditResultSuccess,
+		TargetType: model.AuditTargetTypeUser,
 		TargetID:   userEntity.ID,
 	})
 	// TODO(delivery): 临时密码目前只能在本响应中回显一次（系统尚无邮件/短信通道）；
@@ -866,7 +866,7 @@ func (svc *userSvc) filterBuiltinSystemRoles(ctx *gin.Context, tenantID string, 
 func (svc *userSvc) listTenantBuiltinSystemRoles(ctx *gin.Context, tenantID string) ([]string, error) {
 	roles, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{
 		TenantID:  tenantID,
-		Source:    string(model.RoleSourceBuiltin),
+		Source:    model.RoleSourceBuiltin,
 		AdminType: model.SysAdminTypeAdmin,
 	})
 	if err != nil {

@@ -18,15 +18,15 @@ type ApplicationCreateReq struct {
 
 // ApplicationUpdateReq 修改应用。source 不可改（内置应用不可被改写为第三方）。
 type ApplicationUpdateReq struct {
-	AppID                   string `json:"-" uri:"appID" binding:"required"` // 应用ID
-	Name                    string `json:"name"`                             // 应用名称
-	Description             string `json:"description"`                      // 应用描述
-	LogoURL                 string `json:"logoUrl"`                          // 应用logo
-	HomepageURL             string `json:"homepageUrl"`                      // 应用主页
-	Status                  string `json:"status"`                           // 状态: enable-启用, disable-停用
-	Sort                    int    `json:"sort"`                             // 排序
-	AllowPersonCreateTenant *bool  `json:"allowPersonCreateTenant"`          // 个人是否可自助创建租户
-	AllowJoinByInvite       *bool  `json:"allowJoinByInvite"`                // 是否允许通过邀请加入租户
+	AppID                   string          `json:"-" uri:"appID" binding:"required"` // 应用ID
+	Name                    string          `json:"name"`                             // 应用名称
+	Description             string          `json:"description"`                      // 应用描述
+	LogoURL                 string          `json:"logoUrl"`                          // 应用logo
+	HomepageURL             string          `json:"homepageUrl"`                      // 应用主页
+	Status                  model.AppStatus `json:"status"`                           // 状态: enable-启用, disable-停用
+	Sort                    int             `json:"sort"`                             // 排序
+	AllowPersonCreateTenant *bool           `json:"allowPersonCreateTenant"`          // 个人是否可自助创建租户
+	AllowJoinByInvite       *bool           `json:"allowJoinByInvite"`                // 是否允许通过邀请加入租户
 }
 
 type ApplicationDetailReq struct {
@@ -42,5 +42,5 @@ type ApplicationPageListReq struct {
 	PageSize int             `json:"pageSize" form:"pageSize"` // 每页条数
 	Name     string          `json:"name" form:"name"`         // 应用名称（模糊搜索）
 	Source   model.AppSource `json:"source" form:"source"`     // 应用来源: builtin-内置, first_party-第一方, third_party-第三方
-	Status   string          `json:"status" form:"status"`     // 状态
+	Status   model.AppStatus `json:"status" form:"status"`     // 状态
 }

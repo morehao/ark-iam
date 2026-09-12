@@ -25,9 +25,9 @@ type ApplicationClientCreateReq struct {
 
 // ApplicationClientUpdateReq 修改 OAuth 客户端。source 不可改。
 type ApplicationClientUpdateReq struct {
-	ApplicationClientID string `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
-	Name                string `json:"name"`                                           // 客户端名称
-	Status              string `json:"status"`                                         // 状态: enable-启用, disable-停用
+	ApplicationClientID string                        `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
+	Name                string                        `json:"name"`                                           // 客户端名称
+	Status              model.ApplicationClientStatus `json:"status"`                                         // 状态: enable-启用, disable-停用
 
 	RedirectURIs            []string `json:"redirectURIs"`            // 授权回调地址
 	PostLogoutRedirectURIs  []string `json:"postLogoutRedirectURIs"`  // 登出回调地址
@@ -56,7 +56,7 @@ type ApplicationClientPageListReq struct {
 	PageSize int                           `json:"pageSize" form:"pageSize"` // 每页条数
 	Name     string                        `json:"name" form:"name"`         // 客户端名称（模糊搜索）
 	Source   model.ApplicationClientSource `json:"source" form:"source"`     // 客户端来源: builtin-内置, first_party-第一方, third_party-第三方
-	Status   string                        `json:"status" form:"status"`     // 状态
+	Status   model.ApplicationClientStatus `json:"status" form:"status"`     // 状态
 }
 
 type SecretListReq struct {

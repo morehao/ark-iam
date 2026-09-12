@@ -16,6 +16,16 @@ export type SysAdminType = 'admin' | 'normal'
  */
 export type AppSource = 'builtin' | 'first_party' | 'third_party'
 
+/**
+ * 启停状态（后端具名类型 model.AppStatus / ApplicationClientStatus / TenantApplicationStatus）。
+ * 取值与后端常量一一对应，禁止在页面里裸写字面量。
+ */
+export type AppStatus = 'enable' | 'disable'
+export type ApplicationClientStatus = 'enable' | 'disable'
+export type TenantApplicationStatus = 'enable' | 'disable'
+/** 连接器状态（后端具名类型 model.ConnectorStatus）：全局启停语义 enable/disable */
+export type ConnectorStatus = 'enable' | 'disable'
+
 export interface ApplicationItem {
   appID: string
   code: string
@@ -24,7 +34,7 @@ export interface ApplicationItem {
   logoUrl: string
   homepageUrl: string
   source: AppSource
-  status: string
+  status: AppStatus
   sort: number
   allowPersonCreateTenant?: boolean
   allowJoinByInvite?: boolean
@@ -49,7 +59,7 @@ export interface ApplicationUpdateReq {
   description?: string
   logoUrl?: string
   homepageUrl?: string
-  status?: string
+  status?: AppStatus
   sort?: number
   allowPersonCreateTenant?: boolean
   allowJoinByInvite?: boolean
@@ -62,7 +72,7 @@ export interface OAuthClientItem {
   clientID: string
   name: string
   source: AppSource
-  status: string
+  status: ApplicationClientStatus
   grantTypes: string[]
   tokenEndpointAuthMethod: string
   createdAt?: number
@@ -102,7 +112,7 @@ export interface OAuthClientCreateReq {
 export interface OAuthClientUpdateReq {
   applicationClientID: string
   name?: string
-  status?: string
+  status?: ApplicationClientStatus
   redirectURIs?: string[]
   postLogoutRedirectURIs?: string[]
   grantTypes?: string[]
@@ -204,7 +214,7 @@ export interface TenantApplicationItem {
   tenantName?: string
   appID: string
   appName?: string
-  status: string
+  status: TenantApplicationStatus
   config?: string
   grantedScope?: string
   createdAt?: number
@@ -214,14 +224,14 @@ export interface TenantApplicationItem {
 export interface TenantApplicationCreateReq {
   tenantID: string
   appID: string
-  status?: string
+  status?: TenantApplicationStatus
   config?: string
   grantedScope?: string
 }
 
 export interface TenantApplicationUpdateReq {
   tenantAppID: string
-  status?: string
+  status?: TenantApplicationStatus
   config?: string
   grantedScope?: string
 }
@@ -289,7 +299,7 @@ export interface ConnectorItem {
   displayName: string
   protocol: string
   provider: string
-  status: string
+  status: ConnectorStatus
   allowAutoCreateUser: number
   allowAccountLink: number
   syncProfile: number

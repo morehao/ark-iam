@@ -63,7 +63,7 @@ func loadSubscribedApps(ctx *gin.Context) ([]model.ApplicationEntity, error) {
 	tenantID := gincontext.GetTenantIDString(ctx)
 	tenantAppList, _, err := dao.NewTenantApplicationDao().GetPageListByCond(ctx, &dao.TenantApplicationCond{
 		TenantID: tenantID,
-		Status:   model.AppStatusEnable,
+		Status:   model.TenantApplicationStatusEnable,
 	})
 	if err != nil {
 		glog.Errorf(ctx, "[svctenant.loadSubscribedApps] dao tenantApplication GetPageListByCond fail, err:%v, tenantID:%s", err, tenantID)

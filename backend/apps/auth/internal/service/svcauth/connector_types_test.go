@@ -338,7 +338,7 @@ func TestConnectorTypesExposeNewContractFields(t *testing.T) {
 			DisplayName:         "Google Workspace",
 			Protocol:            "oidc",
 			Provider:            "google",
-			Status:              "enabled",
+			Status:              model.ConnectorStatusEnable,
 			AllowAutoCreateUser: true,
 			AllowAccountLink:    true,
 			SyncProfile:         true,
@@ -358,7 +358,7 @@ func TestConnectorTypesExposeNewContractFields(t *testing.T) {
 		TenantID:    "1",
 		Protocol:    "oidc",
 		Provider:    "google",
-		Status:      "enabled",
+		Status:      model.ConnectorStatusEnable,
 		Name:        "google-workspace",
 		DisplayName: "Google Workspace",
 	}

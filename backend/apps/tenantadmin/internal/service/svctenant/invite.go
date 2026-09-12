@@ -70,7 +70,7 @@ func (svc *inviteSvc) Revoke(ctx *gin.Context, req *dtotenant.InviteRevokeReq) e
 		return code.GetError(code.InviteInvalidError)
 	}
 	if err := dao.NewInviteDao().UpdateMap(ctx, req.InviteID, map[string]any{
-		"status":     string(model.InviteStatusRevoked),
+		"status":     model.InviteStatusRevoked,
 		"updated_by": gincontext.GetUserIDString(ctx),
 	}); err != nil {
 		glog.Errorf(ctx, "[svcinvite.Revoke] dao UpdateMap fail, err:%v, inviteID:%s", err, req.InviteID)
@@ -105,7 +105,7 @@ func (svc *inviteSvc) PageList(ctx *gin.Context, req *dtotenant.InvitePageListRe
 		items = append(items, dtotenant.InvitePageListItem{
 			InviteID:  v.ID,
 			Code:      v.Code,
-			Status:    string(v.Status),
+			Status:    v.Status,
 			ExpiresAt: exp,
 			CreatedAt: v.CreatedAt.Unix(),
 		})

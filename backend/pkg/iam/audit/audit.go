@@ -27,9 +27,9 @@ const (
 type AuditEntry struct {
 	Action     string
 	TenantID   string
-	TargetType string
+	TargetType model.AuditTargetType
 	TargetID   string
-	Result     string // success / failure
+	Result     model.AuditResult
 	Detail     string
 	ClientID   string
 }

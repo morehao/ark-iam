@@ -39,7 +39,6 @@ func TestSessionAuditDao_InsertAndGetByCond(t *testing.T) {
 		ClientIP:  "10.0.0.1",
 		UserAgent: "go-test-ua",
 		LoginTime: now,
-		Status:    "active",
 		CreatedBy: "55",
 		UpdatedBy: "55",
 	}
@@ -53,7 +52,6 @@ func TestSessionAuditDao_InsertAndGetByCond(t *testing.T) {
 	got, err := sessionAuditDao.GetByCond(context.Background(), &SessionAuditCond{
 		PersonID:  "55",
 		SessionID: "sess-abc-123",
-		Status:    "active",
 	})
 	if err != nil {
 		t.Fatalf("GetByCond failed: %v", err)
@@ -75,9 +73,6 @@ func TestSessionAuditDao_InsertAndGetByCond(t *testing.T) {
 	}
 	if got.ClientIP != "10.0.0.1" {
 		t.Fatalf("expected client_ip '10.0.0.1', got '%s'", got.ClientIP)
-	}
-	if got.Status != "active" {
-		t.Fatalf("expected status 'active', got '%s'", got.Status)
 	}
 }
 

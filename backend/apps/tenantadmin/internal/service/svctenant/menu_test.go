@@ -28,7 +28,7 @@ func seedSubscribedApp(t *testing.T, db *gorm.DB, tenantID, appID, code, name st
 		BaseEntity:   gormdao.BaseEntity{StringID: gormdao.StringID{ID: "ta-" + appID}},
 		TenantID:     tenantID,
 		AppID:        appID,
-		Status:       model.AppStatusEnable,
+		Status:       model.TenantApplicationStatusEnable,
 		Config:       []byte("{}"),
 		GrantedScope: []byte("[]"),
 	}).Error; err != nil {

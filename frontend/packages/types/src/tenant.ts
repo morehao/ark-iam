@@ -108,13 +108,16 @@ export interface TenantAppItem {
 }
 
 // ---------- 租户角色 ----------
+// 角色来源（后端具名类型 model.RoleSource）：builtin-内置（禁删）/ custom-租户自建。
+export type RoleSource = 'builtin' | 'custom'
+
 export interface TenantRoleItem {
   roleID: string
   appID: string
   appName: string
   name: string
   description: string
-  source?: 'builtin' | 'custom' | string
+  source?: RoleSource
   adminType: SysAdminType
   memberCount: number
   menuCount: number

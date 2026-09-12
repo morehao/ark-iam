@@ -2,7 +2,7 @@
 
 > 状态：**待评审**（方案与全部决策均已定稿，评审只做确认）
 > 决策日期：2026-09-12
-> 决策口径：**合理性优先**——原先的开放项已逐条拍定，每条给出「结论 / 理由 / 代价 / 改判条件」，见 §7 决策记录；本文不留任何"待定"
+> 决策口径：**合理性优先**——原先的开放项已逐条拍定，每条给出「结论 / 理由 / 代价 / 改判条件」，见「决策记录」；本文不留任何"待定"
 > 场景：**S2 增量改造**（主场景，因为阶段 2 改变对外可观察的取值）；补充义务来自 **S3 结构重构**（阶段 1 纯类型化需行为基线 + 等价性验证）与 **S5 下线与废弃**（阶段 3 需消费者盘点 + 数据处置）
 > 档位：**标准档**（已删除不适用章节：成本分析、容量规划、压测方案、容灾备份、消息与异步——本方案不涉及性能、容量、部署形态与第三方依赖）
 > 专题：**数据模型设计**（枚举类型与常量布局）+ **API 设计**（契约取值迁移 + swagger 枚举重生成）
@@ -47,7 +47,7 @@
 1. **"启用"有 3 种英文写法**：`enable`（application / application_client / menu / tenant_application）、`active`（department）、`enabled`（connector）。三者在同一系统内表达同一语义，跨表排查与前端字典复用都要额外记忆。
 2. **同一个字面量 `active` 渲染出两个中文标签**：`StatusTag`（`frontend/packages/ui/src/status.tsx:17`）把 `active` 映射为**启用**，`SuspendedTag`（同文件 `:34`）把 `active` 映射为**正常**。租户页（`apps/platform-admin-web/src/pages/tenant/index.tsx:167`）与部门页（`apps/tenant-admin-web/src/pages/department/index.tsx:252`）因此对同一个值显示不同文案——这是现状里最容易让使用者困惑的一点。
 3. **非法 status 会被静默写库**：`application` / `application_client` / `tenant_application` / `connector` 四个 status 从入参直落 DB，无白名单（`apps/platformadmin/internal/service/svcapplication/application.go:75`、`svcapplicationclient/application_client.go:134`、`svctenantapplication/tenant_application.go:72`）。写进 `"ENABLE"` 之类非法值后，DAO 的 `Status: model.AppStatusEnable` 过滤会查不到该行——**"停用"表现为"记录消失"而非报错**。
-4. **声明的枚举永不流转（文档化谎言）**：`session.status` 注释写 `active/revoked`、并有 `revoked_at` 列，但全仓**没有任何代码写入 `revoked` 或 `revoked_at`**；同表的 `last_active_at` 也从未被写入。三列在生产代码里只有 `CreateSession` 的 `status='active'` 一次写入，**零读取路径**（完整消费者盘点见 §4.2）。会话撤销实际走 Redis 删 key，该表只写不读（会话列表来自 `refresh_token`，见 `apps/auth/internal/service/svcsession/session.go:34`）。读代码的人会误以为可以查 `status=revoked`。同类幽灵值还有 `InviteStatusExpired`（`model/invite.go:18`，全仓零引用）——过期已由 `expires_at` 时间列在读取时派生（`apps/auth/internal/service/svcauth/auth.go:211-213`：`ExpiresAt != nil && time.Now().After(*ExpiresAt)` → `InviteExpiredError`），存储态从未被写入。
+4. **声明的枚举永不流转（文档化谎言）**：`session.status` 注释写 `active/revoked`、并有 `revoked_at` 列，但全仓**没有任何代码写入 `revoked` 或 `revoked_at`**；同表的 `last_active_at` 也从未被写入。三列在生产代码里只有 `CreateSession` 的 `status='active'` 一次写入，**零读取路径**（完整消费者盘点见「阶段 3 的消费者盘点」）。会话撤销实际走 Redis 删 key，该表只写不读（会话列表来自 `refresh_token`，见 `apps/auth/internal/service/svcsession/session.go:34`）。读代码的人会误以为可以查 `status=revoked`。同类幽灵值还有 `InviteStatusExpired`（`model/invite.go:18`，全仓零引用）——过期已由 `expires_at` 时间列在读取时派生（`apps/auth/internal/service/svcauth/auth.go:211-213`：`ExpiresAt != nil && time.Now().After(*ExpiresAt)` → `InviteExpiredError`），存储态从未被写入。
 5. **审计 `result` 21 处硬编码**：`audit.AuditEntry.Result` 是裸 `string`（`pkg/iam/audit/audit.go:32`），19 处 `Result: "success"/"failure"` 字面量加 `apps/auth/internal/service/svcauth/auth.go:548,550` 的 2 处局部变量字面量（合计 21 处），散布 7 个文件。同一个结构体里 `Action` 用了常量、`Result` 和 `TargetType`（20 处字面量）却是裸字符串。
 6. **违反 `AGENTS.md` 强类型枚举硬规则**：`DeptNodeStatus` 已声明具名类型但实体字段是 `string`（`model/department.go:29`），并出现 `string(model.DeptNodeStatusActive)` 显式转换（`apps/tenantadmin/internal/service/svctenant/department.go:59,275`）；`model/role.go:34` 同样出现 `string(RoleSourceBuiltin)`；`AppStatus*` / `ApplicationClientStatus*` 是**无类型常量**（`AppStatusEnable = "enable"`），无法靠类型约束调用方、也无法标注 DTO。
 
@@ -55,8 +55,8 @@
 
 **目标**
 
-1. 建立一条可判定的词汇判定规则，把"启用"收敛到唯一写法（见 §2.2 D1）。
-2. 所有字符串枚举达成 `AGENTS.md` 三件套：**具名类型全链路 + 常量定义在 `model` + service 入口白名单**。
+1. 建立一条可判定的词汇判定规则，把"启用"收敛到唯一写法（见「目标口径（决策表）」D1）。
+2. 所有字符串枚举达成 `AGENTS.md` 三件套：**具名类型全链路 + 常量定义在 `model` + service 入口白名单**（白名单须配非法值拒绝用例，见 R6）。
 3. 消除枚举值的硬编码（审计 `result` / `targetType`）。
 4. 消除"声明了却永不流转"的枚举与死列。
 
@@ -73,10 +73,10 @@
 | 约束 | 内容 | 来源 |
 |---|---|---|
 | 兼容约束 | 具名类型的底层是 `string`，JSON 序列化仍是普通字符串、GORM 仍存 varchar，**前端与数据库对类型化无感知** | `AGENTS.md` 强类型枚举硬规则 4 |
-| 兼容约束 | 阶段 2 改变落库值，因此**前后端不可分开发布** | 本文 §4.2 |
+| 兼容约束 | 阶段 2 改变落库值，因此**前后端不可分开发布** | 本文「兼容性策略与旧库处置」 |
 | Schema 约定 | 不写迁移脚本、不加兼容旧库分支；旧库残留列属预期，处置方式是删库重建 | `AGENTS.md` |
 | 测试约定 | 单测走 `testutil.SetupSQLite(t, entities...)`；SQLite 对 `not null` JSON 列需显式播种 | `AGENTS.md` |
-| 交付约定 | 每个阶段必须独立可上线、独立可回滚 | 本文 §5.1 |
+| 交付约定 | 每个阶段必须独立可上线、独立可回滚 | 本文「阶段与里程碑」 |
 
 本方案不涉及性能、可用性、容量与成本目标（无新增运行时组件、无新查询路径、无请求量变化）。
 
@@ -84,9 +84,9 @@
 
 | 阶段 | 谁验 | 怎么验 | 阈值 |
 |---|---|---|---|
-| 阶段 1 | 开发 | 5 个 Go 模块 `go build`；`make test APP=auth/platformadmin/tenantadmin`；前端 `typecheck` + `test` | 全绿；对改造前后同一组 API 请求抓取响应，**响应体字节级一致**；`grep -rn 'Result:\s*"' apps pkg --include='*.go' \| grep -v _test \| wc -l` 结果为 **0** |
+| 阶段 1 | 开发 | 5 个 Go 模块 `go build`；`make test APP=auth/platformadmin/tenantadmin`；前端 `typecheck` + `test`；白名单负向用例（R6） | 全绿；对改造前后同一组 API 请求抓取响应，**响应体字节级一致**；`grep -rn 'Result:\s*"\|TargetType:\s*"' apps pkg --include='*.go' \| grep -v _test \| wc -l` 结果为 **0**；4 条非法值用例全部被拒 |
 | 阶段 2 | 开发 + 前端 | 部门启停 E2E、连接器授权/回调 E2E；旧库删库重建后执行 seed 并抽查 | 全绿；`grep -rn "'active'\|'inactive'\|\"active\"\|\"inactive\"\|enabled"` 在 department / connector 相关文件（含 seed、swagger、前端页面）为 **0** |
-| 阶段 3 | 开发 + 架构 + DBA | 全仓 `grep` 零残留；全量测试；DBA 按 §4.2 完成 SQL 审计并连续观察 7 天确认无外部读取 | 零残留且测试全绿；`session` 三列与 `InviteStatusExpired` 的读写引用数为 **0**；DBA 书面确认无外部消费者 |
+| 阶段 3 | 开发 + 架构 + DBA | 全仓 `grep` 零残留；全量测试；DBA 按「阶段 3 的消费者盘点」完成 SQL 审计并连续观察 7 天确认无外部读取 | 零残留且测试全绿；`session` 三列与 `InviteStatusExpired` 的读写引用数为 **0**；DBA 书面确认无外部消费者 |
 
 ---
 
@@ -203,15 +203,51 @@ const (
 | `ConnectorStatus` | enable/disable | `model/connector.go` |
 | `SessionStatus` | active/revoked | `model/session.go`（阶段 3 删除） |
 | `AuditResult` | success/failure | `model/audit_log.go` |
-| `AuditTargetType` | tenant/application/application_client/api_key… | `model/audit_log.go` |
+| `AuditTargetType` | person / user / tenant / application / application_client / api_key（6 值已盘点，见「决策记录」R3） | `model/audit_log.go` |
 
-同时补一条判定方法（供未来调用方避免枚举三值）：`func (s AppStatus) IsEnable() bool { return s == AppStatusEnable }`。
+同时补一条判定方法（供未来调用方避免枚举三值）：`func (s AppStatus) IsEnable() bool { return s == AppStatusEnable }`（按需添加，见 R6）。
 
 > **为什么 `SessionStatus` 在阶段 1 建、阶段 3 又删？** 阶段 1 的门禁是"`model` 之外不得存在字典常量"，所以必须先把它从 `pkg/iam/sso` 收进 `model` 并给实体字段具名类型；阶段 3 的下线受 S5 义务约束（消费者盘点 + DBA 侧 7 天观察），不能与阶段 1 合并。两阶段之间该类型是**有意义的过渡态**——它让"这列其实从不流转"在类型系统里显式可见，而不是被一个散落的 service 私有常量掩盖。
 
+### 执行记录（2026-09-12）
+
+**阶段 1、阶段 2 均已执行完成**（阶段 3 未启动，受 S5 的 DBA 7 天观察门禁约束）。
+
+阶段 2 的实际落地与两处执行期修正：
+
+| 项 | 计划 | 实际 |
+|---|---|---|
+| `StatusTag` 调用方 | 6 处 | **7 处**——原清单漏计部门页 `department/index.tsx`（该页正是"同值两种文案"的当事页面之一），已一并切到 `EnableTag` |
+| `connector.status` 默认值 | 改列默认值 `'enable'` | 列默认值改为 `'enable'`，**并且在 `buildConnectorInsertEntity` 里显式兜底**——不依赖驱动回读默认值，出参与落库都确定是 `enable` |
+| 前端 `status` 链路类型 | 未在计划中 | 顺带收紧：`api/department.ts` 的 4 个 `status?: string` 与页面的 `query`/`editingNode`/`onFinish`/`openEditNode` 全部改为 `DeptNodeStatus`。**收紧后 typecheck 立刻报了 4 处真实类型漂移**（`string` 与枚举混用），证明这条链路此前是松的 |
+
+**未做**：计划里阶段 2 的验收含「E2E 通过」，本机无 E2E 环境（需起服务 + Postgres），**未执行**；替代证据为后端 288→**292** 个用例、前端 45+6 个用例全绿 + 生产构建通过。发布前建议补一次真实 E2E。
+
+**阶段 3 的代码侧已完成**（2026-09-12），但**下线判据第 2 条未满足**，据此发布前必须补做：
+
+| 判据 | 状态 |
+|---|---|
+| ① 代码侧三列与 `InviteStatusExpired` 的 `grep` 引用归零 | ✅ 已满足（实测均为 0） |
+| ② DBA 侧 SQL 审计连续 7 天只见 `INSERT ... session` | ❌ **未满足**——本机无目标库，无法执行；属部署时验证 |
+| ③ 全量测试通过且 5 模块 `go build` 通过 | ✅ 已满足（292 后端用例 + 51 前端用例 + 3 端生产构建） |
+
+**为什么在 ② 未满足时仍执行代码侧**：② 验证的是「目标库有没有外部报表/离线作业读这三列」，属部署环境事实，不改变代码应长什么样；而本阶段**不含任何 `DROP COLUMN` 与数据变更**（见上文「数据处置」），
+外部读取方即使存在，读到的仍是与今天完全相同的 `active`/NULL 值，行为不变。因此代码侧可先落地，**风险为零且可 `git revert`**；
+但**在拿到 DBA 的 7 天审计结论之前，不要把这次改动发布到生产**。
+
+代码侧实际落地：删除 `SessionStatus` 类型与常量、`session` 三列实体字段、`SessionAuditCond.Status` 过滤字段、`CreateSession` 的 `status` 写入；
+删除 `InviteStatusExpired`；`system-design.md` 的 session 表 DDL 删三行；`swag` 重生成（`InviteStatus` 枚举由 4 值收敛为 3 值）。
+表本身**保留**并显式定位为「登录会话审计（只追加、不可变）」。
+
+顺带补了 2 条此前缺失的用例（`TestJoinTenantRejectsExpiredInvite`、`TestJoinTenantAcceptsInviteNotYetExpired`）——
+R2 的结论是「过期由 `expires_at` 派生」，但原仓库**没有任何用例断言这条路径**；删掉 `InviteStatusExpired` 后，
+这成了「邀请会过期」这一事实的唯一表达处，必须锁住。
+
 ### 接口设计（契约影响面）
 
-**阶段 1 不改任何接口契约**：具名类型的 JSON 序列化与 `string` 完全一致，swagger 的字段类型仍是 `string`。
+**阶段 1 不改任何接口契约（已实测验证）**：具名类型的 JSON 序列化与 `string` 完全一致，swagger 中的字段类型仍是 `string`。
+
+**一处执行期修正（2026-09-12 实测）**：swag 会把具名枚举类型渲染为 `enum` + `x-enum-varnames`/`x-enum-comments` 元数据，而裸 `string` 不产生这些字段。因此**阶段 1 也需要 `make swag` 重生成**（原方案只把它列在阶段 2），否则 swagger 会停留在旧口径。这是**文档口径变精确**——枚举取值从「未声明」变为「已声明且与服务白名单一致」——不是运行时行为变更：HTTP 请求/响应体字节不变（已由 `dtoapplication` 的 JSON 兼容性用例与全量测试锁定）。
 
 **阶段 2 改变 2 个字段的取值域**，涉及以下对外契约：
 
@@ -246,12 +282,12 @@ func validateAppStatus(s model.AppStatus) bool {
 
    | 组件 | 现状 | 目标 |
    |---|---|---|
-   | `StatusTag` | 认 `enable`/`1`/`active`/`disable`/`0`/`inactive`/`suspended` 七种输入 | **废弃**：从导出中移除；其调用方（6 处）改用 `EnableTag` |
+   | `StatusTag` | 认 `enable`/`1`/`active`/`disable`/`0`/`inactive`/`suspended` 七种输入 | **废弃**：从导出中移除；其调用方（**7 处**，含部门页 `department/index.tsx`）改用 `EnableTag` |
    | `EnableTag`（新增） | — | 只认 `enable` → 启用(success)、`disable` → 停用(default)，不做数字兼容 |
    | `SuspendedTag` | 认 `1`/`true`/`suspended` 与 `0`/`false`/`active` | **保持不变**：`apps/tenant-admin-web/src/pages/user/index.tsx:274,711` 仍传布尔 `isSuspended`，待 D8 的升格决策落地后再收紧 |
    | `SourceTag` | 一套 map 覆盖应用/客户端/角色来源 | 保持不变 |
 
-   关于移除数字分支的依据：`StatusTag` 的 6 个调用方（`tenantApplication/index.tsx:117`、`menu/index.tsx:362`、`application/index.tsx:113,234`、`oauthClient/index.tsx:103`、`oauthClient/Detail.tsx:137`）全部传字符串 `status`，`'1'`/`'0'` 分支当前**无调用方**。
+   关于移除数字分支的依据：`StatusTag` 的 6 个调用方（`tenantApplication/index.tsx:117`、`menu/index.tsx:362`、`application/index.tsx:113,234`、`oauthClient/index.tsx:103`、`oauthClient/Detail.tsx:137`）全部传字符串 `status`；**执行期修正**：实际还有第 7 处——部门页 `department/index.tsx:252`，原清单漏计，已一并切到 `EnableTag`，`'1'`/`'0'` 分支当前**无调用方**。
 
 3. **TS 类型补齐**（`frontend/packages/types/`）：`platform.ts` 的 `ApplicationItem`/`OAuthClientItem`/`TenantApplicationItem`/`ConnectorItem` 的 `status` 由 `string` 改为对应联合类型（`EnableStatus`、`TenantStatus` 等）；`department.ts:8,19` 的 `status` 改为 `EnableStatus`；`tenant.ts:117` 的 `source?: 'builtin' | 'custom' | string` **去掉末尾的 `| string`**（该写法会让联合类型失效）。
 
@@ -269,7 +305,7 @@ func validateAppStatus(s model.AppStatus) bool {
 | 后端测试 | **25 个测试文件**引用枚举常量；**29 个**含 status 字面量（实测） | 覆盖 `svcapplication`、`svcapplicationclient`、`svctenantapplication`、`svctenant`、`svcpermission`、`svcoidc`、`oidcop`、`svcsession`、`seed`、`middleware` 等 |
 | 审计硬编码 | **7 个文件 / 19 处** `Result:` 字面量 + `auth.go:548,550` 的 2 处局部变量字面量（合计 **21 处**）+ **20 处** `TargetType` 字面量（实测） | auth 8 处、svcoidc 3、tenantadmin 3、platformadmin 5 |
 | seed | `backend/pkg/seed/seed.go` 6 处 status 赋值（`:204,228,301,422,505,693`） | 阶段 2 需同步 `:228` 的 `DeptNodeStatusActive` |
-| swagger 产物 | **2 个文件**含枚举值 | `backend/apps/platformadmin/docs/platformadmin_docs.go`、`backend/apps/tenantadmin/docs/tenantadmin_docs.go`，需 `make swag APP=...` 重生成 |
+| swagger 产物 | **3 个文件**含枚举值 | `backend/apps/{auth,platformadmin,tenantadmin}/docs/*_docs.go`：阶段 1 因具名类型新增 `enum`/`x-enum-*` 元数据，阶段 2 因取值变更再次重生成；两阶段都需 `make swag APP=...` |
 | 前端 | **13 个文件**含 status/source 字面量（实测） | 5 个 platform-admin 页面 + 3 个测试 + tenant-admin 的 role/department 页 + `packages/ui/src/status.tsx` + `packages/types/{platform,tenant}.ts`；另有 `packages/types/src/department.ts` 不含字面量、仅需类型补齐 |
 | living doc | 3 份 | `frontend/DESIGN.md` §7.2（第 169-181 行）、`docs/design/glossary.md`（第 20 行「租户状态」、第 40 行「来源」）、`docs/design/system-design.md:441-443`（`session` 表 DDL 中阶段 3 待删的三行） |
 | E2E | **0**（实测） | `e2e/tests/` 与 `e2e/helpers/` 无 status/source 字面量，本方案不影响 E2E 用例 |
@@ -339,9 +375,9 @@ func validateAppStatus(s model.AppStatus) bool {
 
 | 阶段 | 步骤 | 完成判据 |
 |---|---|---|
-| **1** | ① 补 4 个 `enable/disable` 具名类型 + `AuditResult`/`AuditTargetType`；② 改 `DeptNodeStatus`/`RoleSource`/`InviteStatus` 的实体与 DTO 字段类型；③ 常量下沉；④ 补 4 处白名单；⑤ 41 处审计字面量改常量；⑥ 前端 TS 联合类型 | 5 模块 `go build` 通过；三端 `make test` 全绿；响应体比对零差异；`Result:` 字面量归零 |
+| **1** | ① 补 4 个 `enable/disable` 具名类型 + `AuditResult`/`AuditTargetType`（6 值，见 R3）；② 改 `DeptNodeStatus`/`RoleSource`/`InviteStatus` 的实体与 DTO 字段类型；③ 常量下沉；④ 补 4 处白名单 + 各 1 条非法值负向用例（R6）；⑤ 41 处审计字面量改常量；⑥ 前端 TS 联合类型；⑦ `make swag` 重生成（具名类型会新增 enum 元数据，见下） | 5 模块 `go build` 通过；三端 `make test` 全绿；响应体比对零差异；`Result:` 与 `TargetType:` 字面量归零；4 条负向用例通过 |
 | **2** | ① 改 `DeptNodeStatus*` 与 `ConnectorStatus*` 常量值；② `connector.status` 默认值改 `'enable'`；③ seed 与前端 7 处字面量同步；④ 新增 `EnableTag` 并移除 `StatusTag`；⑤ `make swag` 重生成；⑥ `DESIGN.md` + `glossary.md` 更新 | department/connector 相关 `active`/`inactive`/`enabled` 字面量归零；E2E 通过；前端 typecheck + test 通过 |
-| **3** | ① 按 §4.2 完成消费者盘点（含 DBA 侧 SQL 审计，观察 7 天）；② 删除 `session` 三列相关代码与测试断言；③ 删除 `InviteStatusExpired`；④ 同步 `system-design.md` DDL | `session` 三列引用归零；`InviteStatusExpired` 引用归零；全量测试通过；DBA 确认无外部读取 |
+| **3** | ① 按「阶段 3 的消费者盘点」完成消费者盘点（含 DBA 侧 SQL 审计，观察 7 天）；② 删除 `session` 三列相关代码与测试断言；③ 删除 `InviteStatusExpired`；④ 同步 `system-design.md` DDL | ②③④ **代码侧已完成**；① 的 DBA 侧 7 天审计**待补**（发布前必须完成） |
 
 每阶段结束提交一次、独立可上线。依赖顺序：**阶段 2 必须在阶段 1 之后**（依赖具名类型与 service 白名单）；阶段 3 与阶段 1 无代码依赖，**可在阶段 1 之后任意时点执行**，仅受 S5 的 DBA 观察窗口约束。
 
@@ -352,7 +388,7 @@ func validateAppStatus(s model.AppStatus) bool {
 | 1 | **1.5–3 人日** | 1 名熟悉本仓库的 Go + React 全栈工程师；含改代码、跑测试、响应体比对；不含评审等待与 swagger 生成排队 |
 | 2 | **1–2 人日** | 含前端组件拆分与 living doc 更新 |
 | 3 | **0.5–1 人日** | 删除为主，工作量集中在零残留核查 |
-| 合计 | **3–6 人日** | 若 `TargetType`（Q3）不纳入阶段 1，阶段 1 下浮约 0.3 人日 |
+| 合计 | **3–6 人日** | 已含 R3（`TargetType` 纳入阶段 1）的约 0.3 人日 |
 
 估算上调条件：若阶段 1 的响应体比对发现既有 API 已存在非法 status 脏数据（会暴露为字段差异），需追加清洗决策，+0.5 人日。
 
@@ -372,7 +408,7 @@ func validateAppStatus(s model.AppStatus) bool {
 
 ## 决策记录
 
-评审只做确认。每条给出**结论 / 理由 / 代价 / 改判条件**——改判条件即"什么情况下应该推翻本决策"，便于日后回溯。
+评审只做确认。每条给出**结论 / 理由 / 代价 / 改判条件**——改判条件即"什么情况下应该推翻本决策"，便于日后回溯；R6 为明细项，省略代价列。
 
 ### R1 `session` 三列下线（对应 D5）
 
@@ -390,14 +426,14 @@ func validateAppStatus(s model.AppStatus) bool {
 
 ### R3 `TargetType` 纳入阶段 1（对应 D7）
 
-- **结论**：纳入。取值集合已盘点完毕，定为 6 值：`person`(11 处) / `user`(2) / `tenant`(2) / `application`(1) / `application_client`(2) / `api_key`(2)，共 20 处字面量、6 个文件。
-- **理由**：`AuditEntry` 里 `Action` 已是常量、`Result` 与 `TargetType` 是裸字符串——只修 `Result` 会留下一个"半类型化"的结构体，下一个改动者仍需再盘一次这 6 个文件。且审计字段无前端消费者，改动风险与 `result` 同级。
+- **结论**：纳入。取值集合已盘点完毕，定为 6 值：`person`(11 处) / `user`(2) / `tenant`(2) / `application`(1) / `application_client`(2) / `api_key`(2)，共 20 处字面量、7 个文件。
+- **理由**：`AuditEntry` 里 `Action` 已是常量、`Result` 与 `TargetType` 是裸字符串——只修 `Result` 会留下一个"半类型化"的结构体，下一个改动者仍需再盘一次这 7 个文件。且审计字段无前端消费者，改动风险与 `result` 同级。
 - **代价**：阶段 1 多约 0.3 人日（已计入估算）。
-- **改判条件**：若审计字段即将被 `system` 模块或外部日志管道重构，则不值得先类型化——应先确认审计域的归属。
+- **改判条件**：若审计字段即将随 `system` 模块或外部日志管道一起重构，则不值得先类型化——应先确认审计域的归属与最终形态。
 
 ### R4 移除 `StatusTag` 而非保留别名（对应 D9）
 
-- **结论**：阶段 2 从 `@ark-iam/ui` 导出中移除 `StatusTag`，6 个调用方一次性切到新增的 `EnableTag`。
+- **结论**：阶段 2 从 `@ark-iam/ui` 导出中移除 `StatusTag`，7 个调用方一次性切到新增的 `EnableTag`。
 - **理由**：`StatusTag` 把 `active` 标为**启用**、`SuspendedTag` 把 `active` 标为**正常**——保留 deprecated 别名等于把"同一字面量两种文案"的错标能力留在公共包里，正是本次要消除的缺陷。移除是唯一能保证不再复发的做法。附带效果：阶段 2 之后 `active` 只剩"租户正常"一个含义（department 迁到 `enable/disable`、`session` 不参与渲染），一值两标签问题**从根上消失**。
 - **代价**：跨越 `packages/ui` 的破坏性导出变更。该包是 monorepo 内部包、无外部消费者，且 6 个调用方同批改完，实际代价仅为一次批量替换。
 - **改判条件**：无。若阶段 2 被无限期推迟，则应保留 `StatusTag` 现状而不做半吊子收紧（避免出现"部分页面用新组件、部分用旧组件"的更差中间态）。
@@ -422,7 +458,6 @@ func validateAppStatus(s model.AppStatus) bool {
 - 布尔状态（`is_suspended` / `is_verified`）升格为具名枚举——触发条件见 `tenant-admin-provisioning-design-20260912.md:496`（出现第三态时）。
 - `source` 同名不同义（role/user 是"创建方式"、application/client 是"归属方"）的命名澄清。
 - `DeptNodeStatus` / `AppStatus` 等类型名的对齐重命名。
-
 
 ---
 
@@ -451,29 +486,31 @@ func validateAppStatus(s model.AppStatus) bool {
 
 ### C. 评审检查清单
 
+决策已定（见「决策记录」R1–R7），评审只做确认；下列各条若不同意，请在对应条目上给出改判理由。
+
 **目标与范围**
-- [ ] 两套词汇（启停 / 生命周期）的判定规则是否被认可？边界字段（`tenant.status`、`invite.status`、`session.status`）归类是否正确？
+- [ ] 两套词汇（启停 / 生命周期）的判定规则是否认可？边界字段（`tenant.status`、`invite.status`、`session.status`）的归类是否正确？
 - [ ] 非目标（布尔不升格、时间戳不统一、类型不改名）的取舍理由是否接受？
 - [ ] 档位是否匹配？（已删除成本/容量/压测/容灾章节，是否同意本方案不涉及这些维度）
 
 **影响面与兼容**
 - [ ] 38 个后端文件 + 13 个前端文件的影响面盘点是否完整？是否有遗漏的消费者（如离线作业、报表、外部系统）？
-- [ ] 阶段 2「前后端同批发布」的约束在发布流程中如何保证？谁做发布前断言？
-- [ ] 存量库处置选哪条路径（删库重建 / 一次性 SQL）？若走 SQL，谁执行、何时执行？
+- [ ] 阶段 2「前后端同批发布」在发布流程中如何保证？谁执行发布前的 `grep` 断言？
+- [ ] R5 以「删库重建」为唯一常规路径是否确认？当前是否存在需保全的非开发环境（若有，按例外流程处理）？
 
 **回归与等价性**
 - [ ] 阶段 1 的"响应体字节级一致"作为等价性判据是否充分？是否需要补充双跑比对？
 - [ ] 回归清单覆盖的风险面是否完整（尤其 DAO Cond 类型变更）？
 
 **数据模型**
-- [ ] 具名类型粒度选「每字段一个」而非共享 `EnableStatus`，是否认同？
-- [ ] D5（删三列）与 D6（删 `InviteStatusExpired`）是否批准？
-- [ ] 新类型是否都需要 `IsEnable()` 之类的判定方法，还是按需再加？
+- [ ] 具名类型粒度选「每字段一个」而非共享 `EnableStatus`，是否确认？
+- [ ] R1（删 `session` 三列）与 R2（删 `InviteStatusExpired`）是否确认？二者的改判条件是否已记录清楚？
+- [ ] `IsEnable()` 类方法按需添加（R6）是否确认？
 
 **测试与验收**
 - [ ] 三个阶段的验收阈值（响应体一致 / 字面量归零 / 引用归零）是否可执行？
-- [ ] 是否需要为「非法 status 被拒」补一条负向测试用例？
+- [ ] R6 要求每个白名单补 1 条非法值负向用例，是否确认纳入阶段 1 完成判据？
 
 **风险控制**
 - [ ] 阶段 2 回滚需修补数据这一唯一高危点，是否接受？
-- [ ] 非法存量值（若存在）的清洗责任方与时机是否明确？
+- [ ] 非法存量值（若存在）的清洗责任方与时机是否明确？（阶段 1 上线前用 `SELECT DISTINCT status` 探明）

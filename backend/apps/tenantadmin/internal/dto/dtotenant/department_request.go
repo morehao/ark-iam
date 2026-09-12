@@ -19,8 +19,8 @@ type DepartmentUpdateReq struct {
 }
 
 type DepartmentStatusReq struct {
-	DepartmentID string `json:"-" uri:"departmentID" binding:"required"` // 部门ID
-	Status       string `json:"status" binding:"required"`               // 状态: active-启用 inactive-停用
+	DepartmentID string               `json:"-" uri:"departmentID" binding:"required"` // 部门ID
+	Status       model.DeptNodeStatus `json:"status" binding:"required"`               // 状态: enable-启用 disable-停用
 }
 
 type DepartmentDeleteReq struct {
@@ -29,17 +29,17 @@ type DepartmentDeleteReq struct {
 }
 
 type DepartmentTreeReq struct {
-	Name   string `json:"name" form:"name"`     // 部门名称过滤
-	Status string `json:"status" form:"status"` // 状态过滤
+	Name   string               `json:"name" form:"name"`     // 部门名称过滤
+	Status model.DeptNodeStatus `json:"status" form:"status"` // 状态过滤
 }
 
 // DepartmentChildrenReq 某部门直属子部门分页查询。
 type DepartmentChildrenReq struct {
-	DepartmentID string `json:"-" uri:"departmentID" binding:"required"` // 部门ID(父节点)
-	Name         string `json:"name" form:"name"`                        // 部门名称过滤
-	Status       string `json:"status" form:"status"`                    // 状态过滤
-	Page         int    `json:"page" form:"page"`                        // 页码
-	PageSize     int    `json:"pageSize" form:"pageSize"`                // 每页数量
+	DepartmentID string               `json:"-" uri:"departmentID" binding:"required"` // 部门ID(父节点)
+	Name         string               `json:"name" form:"name"`                        // 部门名称过滤
+	Status       model.DeptNodeStatus `json:"status" form:"status"`                    // 状态过滤
+	Page         int                  `json:"page" form:"page"`                        // 页码
+	PageSize     int                  `json:"pageSize" form:"pageSize"`                // 每页数量
 }
 
 // ---------- 部门关系 ----------

@@ -1,3 +1,6 @@
+// 部门节点状态（后端具名类型 model.DeptNodeStatus）：全局启停语义 enable/disable。
+export type DeptNodeStatus = 'enable' | 'disable'
+
 export interface DepartmentItem {
   departmentID: string
   parentID: string
@@ -5,7 +8,7 @@ export interface DepartmentItem {
   deptDepth: number
   name: string
   sort: number
-  status: string
+  status: DeptNodeStatus
   createdAt?: number
   children?: DepartmentItem[]
 }
@@ -16,7 +19,7 @@ export interface DepartmentChildItem {
   deptDepth: number
   name: string
   sort: number
-  status: string
+  status: DeptNodeStatus
   createdAt?: number
   updatedAt?: number
   hasChildren?: boolean

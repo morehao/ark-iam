@@ -64,7 +64,7 @@ func TestConnectorCallbackReturnsPersonTokenWhenPersonHasMultipleTenants(t *test
 	conn := &model.ConnectorEntity{
 		Protocol:            connectorDriverTypeOAuth2,
 		Provider:            connectorProviderGithub,
-		Status:              connectorStatusEnabled,
+		Status:              model.ConnectorStatusEnable,
 		AllowAutoCreateUser: true,
 		Config:              json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
 	}
@@ -144,7 +144,7 @@ func TestConnectorCallbackUsesIdentityResolverPath(t *testing.T) {
 		t.Fatalf("stateStore.Save returned error: %v", err)
 	}
 
-	conn := &model.ConnectorEntity{Protocol: connectorDriverTypeOAuth2, Provider: connectorProviderGithub, Status: connectorStatusEnabled, AllowAutoCreateUser: true, Config: json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`)}
+	conn := &model.ConnectorEntity{Protocol: connectorDriverTypeOAuth2, Provider: connectorProviderGithub, Status: model.ConnectorStatusEnable, AllowAutoCreateUser: true, Config: json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`)}
 	conn.ID = "19"
 	conn.TenantID = "19"
 

@@ -17,8 +17,8 @@ import {
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
-import { actionColumn, NAME_COL_WIDTH, nameColumn, PageContainer, STATUS_COL_WIDTH, StatusTag, tableScrollX, timeColumn, tokens } from '@ark-iam/ui'
-import type { DepartmentChildItem, DepartmentItem } from '@ark-iam/types'
+import { actionColumn, NAME_COL_WIDTH, nameColumn, PageContainer, STATUS_COL_WIDTH, EnableTag, tableScrollX, timeColumn, tokens } from '@ark-iam/ui'
+import type { DepartmentChildItem, DepartmentItem, DeptNodeStatus } from '@ark-iam/types'
 import {
   createDepartment,
   deleteDepartment,
@@ -105,13 +105,13 @@ export default function DepartmentPage() {
   const [page, setPage] = useState(1)
   const pageSize = 10
   const [filterForm] = Form.useForm()
-  const [query, setQuery] = useState<{ name?: string; status?: string }>({})
+  const [query, setQuery] = useState<{ name?: string; status?: DeptNodeStatus }>({})
 
   // 顶级部门（根节点）：未选中任何部门时，右侧默认展示其下级部门
   const defaultRootID = useMemo(() => deptList[0]?.departmentID || '', [deptList])
 
   const [nodeModalOpen, setNodeModalOpen] = useState(false)
-  const [editingNode, setEditingNode] = useState<{ departmentID: string; parentID?: string; name: string; sort?: number; status: string } | null>(null)
+  const [editingNode, setEditingNode] = useState<{ departmentID: string; parentID?: string; name: string; sort?: number; status: DeptNodeStatus } | null>(null)
   const [nodeForm] = Form.useForm()
 
   // 左侧树加载
@@ -170,7 +170,7 @@ export default function DepartmentPage() {
     setNodeModalOpen(true)
   }
 
-  const openEditNode = (node: { departmentID: string; parentID?: string; name: string; sort?: number; status: string }) => {
+  const openEditNode = (node: { departmentID: string; parentID?: string; name: string; sort?: number; status: DeptNodeStatus }) => {
     setEditingNode(node)
     nodeForm.setFieldsValue({
       parentID: node.parentID || undefined,
@@ -212,8 +212,8 @@ export default function DepartmentPage() {
     }
   }
 
-  const toggleStatus = async (node: { departmentID: string; status: string }) => {
-    const next = node.status === 'active' ? 'inactive' : 'active'
+  const toggleStatus = async (node: { departmentID: string; status: DeptNodeStatus }) => {
+    const next = node.status === 'enable' ? 'disable' : 'enable'
     await updateDepartmentStatus(node.departmentID, next)
     message.success('状态已更新')
     void loadTree()
@@ -249,7 +249,7 @@ export default function DepartmentPage() {
       dataIndex: 'status',
       key: 'status',
       width: STATUS_COL_WIDTH,
-      render: (v: string) => <StatusTag value={v} />,
+      render: (v: string) => <EnableTag value={v} />,
     },
     timeColumn<DepartmentChildItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<DepartmentChildItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
@@ -259,7 +259,7 @@ export default function DepartmentPage() {
         { key: 'edit', label: '编辑', onClick: () => openEditNode(r) },
         {
           key: 'toggle',
-          label: r.status === 'active' ? '停用' : '启用',
+          label: r.status === 'enable' ? '停用' : '启用',
           onClick: () => void toggleStatus(r),
         },
         {
@@ -310,7 +310,7 @@ export default function DepartmentPage() {
             form={filterForm}
             layout="inline"
             style={{ marginBottom: 16, rowGap: 12 }}
-            onFinish={(v: { name?: string; status?: string }) => {
+            onFinish={(v: { name?: string; status?: DeptNodeStatus }) => {
               setQuery({ name: v.name, status: v.status })
             }}
           >
@@ -323,8 +323,8 @@ export default function DepartmentPage() {
                 placeholder="请选择状态"
                 style={{ width: 160 }}
                 options={[
-                  { label: '启用', value: 'active' },
-                  { label: '停用', value: 'inactive' },
+                  { label: '启用', value: 'enable' },
+                  { label: '停用', value: 'disable' },
                 ]}
               />
             </Form.Item>
@@ -393,11 +393,11 @@ export default function DepartmentPage() {
           <Form.Item name="sort" label="同级排序" initialValue={0}>
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="status" label="状态" initialValue="active">
+          <Form.Item name="status" label="状态" initialValue="enable">
             <Select
               options={[
-                { label: '启用', value: 'active' },
-                { label: '停用', value: 'inactive' },
+                { label: '启用', value: 'enable' },
+                { label: '停用', value: 'disable' },
               ]}
             />
           </Form.Item>

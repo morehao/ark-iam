@@ -15,7 +15,7 @@ type ApplicationDetailResp struct {
 	LogoURL                 string          `json:"logoUrl"`                 // 应用logo
 	HomepageURL             string          `json:"homepageUrl"`             // 应用主页
 	Source                  model.AppSource `json:"source"`                  // 应用来源
-	Status                  string          `json:"status"`                  // 状态
+	Status                  model.AppStatus `json:"status"`                  // 状态
 	Sort                    int             `json:"sort"`                    // 排序
 	AllowPersonCreateTenant *bool           `json:"allowPersonCreateTenant"` // 个人是否可自助创建租户
 	AllowJoinByInvite       *bool           `json:"allowJoinByInvite"`       // 是否允许通过邀请加入租户
@@ -28,7 +28,7 @@ type PageListItem struct {
 	Name                    string          `json:"name"`                    // 应用名称
 	Description             string          `json:"description"`             // 应用描述
 	Source                  model.AppSource `json:"source"`                  // 应用来源
-	Status                  string          `json:"status"`                  // 状态
+	Status                  model.AppStatus `json:"status"`                  // 状态
 	Sort                    int             `json:"sort"`                    // 排序
 	AllowPersonCreateTenant *bool           `json:"allowPersonCreateTenant"` // 个人是否可自助创建租户
 	AllowJoinByInvite       *bool           `json:"allowJoinByInvite"`       // 是否允许通过邀请加入租户

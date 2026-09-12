@@ -279,7 +279,23 @@ const docTemplatetenantadmin = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "enable",
+                            "disable"
+                        ],
                         "type": "string",
+                        "x-enum-comments": {
+                            "DeptNodeStatusDisable": "停用",
+                            "DeptNodeStatusEnable": "启用"
+                        },
+                        "x-enum-descriptions": [
+                            "启用",
+                            "停用"
+                        ],
+                        "x-enum-varnames": [
+                            "DeptNodeStatusEnable",
+                            "DeptNodeStatusDisable"
+                        ],
                         "description": "状态过滤",
                         "name": "status",
                         "in": "query"
@@ -495,7 +511,23 @@ const docTemplatetenantadmin = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "enable",
+                            "disable"
+                        ],
                         "type": "string",
+                        "x-enum-comments": {
+                            "DeptNodeStatusDisable": "停用",
+                            "DeptNodeStatusEnable": "启用"
+                        },
+                        "x-enum-descriptions": [
+                            "启用",
+                            "停用"
+                        ],
+                        "x-enum-varnames": [
+                            "DeptNodeStatusEnable",
+                            "DeptNodeStatusDisable"
+                        ],
                         "description": "状态过滤",
                         "name": "status",
                         "in": "query"
@@ -794,7 +826,27 @@ const docTemplatetenantadmin = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "pending",
+                            "accepted",
+                            "revoked"
+                        ],
                         "type": "string",
+                        "x-enum-comments": {
+                            "InviteStatusAccepted": "已使用",
+                            "InviteStatusPending": "待使用",
+                            "InviteStatusRevoked": "已撤销"
+                        },
+                        "x-enum-descriptions": [
+                            "待使用",
+                            "已使用",
+                            "已撤销"
+                        ],
+                        "x-enum-varnames": [
+                            "InviteStatusPending",
+                            "InviteStatusAccepted",
+                            "InviteStatusRevoked"
+                        ],
                         "description": "状态过滤",
                         "name": "status",
                         "in": "query"
@@ -2277,8 +2329,12 @@ const docTemplatetenantadmin = `{
                     "type": "integer"
                 },
                 "status": {
-                    "description": "状态: active-启用 inactive-停用",
-                    "type": "string"
+                    "description": "状态: enable-启用 disable-停用",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.DeptNodeStatus"
+                        }
+                    ]
                 },
                 "updatedAt": {
                     "description": "更新时间(unix 秒)",
@@ -2321,8 +2377,12 @@ const docTemplatetenantadmin = `{
                     "type": "integer"
                 },
                 "status": {
-                    "description": "状态: active-启用 inactive-停用",
-                    "type": "string"
+                    "description": "状态: enable-启用 disable-停用",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.DeptNodeStatus"
+                        }
+                    ]
                 }
             }
         },
@@ -2342,8 +2402,12 @@ const docTemplatetenantadmin = `{
             ],
             "properties": {
                 "status": {
-                    "description": "状态: active-启用 inactive-停用",
-                    "type": "string"
+                    "description": "状态: enable-启用 disable-停用",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.DeptNodeStatus"
+                        }
+                    ]
                 }
             }
         },
@@ -2389,8 +2453,12 @@ const docTemplatetenantadmin = `{
                     "type": "integer"
                 },
                 "status": {
-                    "description": "状态: active-启用 inactive-停用",
-                    "type": "string"
+                    "description": "状态: enable-启用 disable-停用",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.DeptNodeStatus"
+                        }
+                    ]
                 }
             }
         },
@@ -2425,8 +2493,12 @@ const docTemplatetenantadmin = `{
                     "type": "integer"
                 },
                 "status": {
-                    "description": "状态: active-启用 inactive-停用",
-                    "type": "string"
+                    "description": "状态: enable-启用 disable-停用",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.DeptNodeStatus"
+                        }
+                    ]
                 }
             }
         },
@@ -2582,7 +2654,11 @@ const docTemplatetenantadmin = `{
                 },
                 "status": {
                     "description": "状态",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.InviteStatus"
+                        }
+                    ]
                 }
             }
         },
@@ -2984,7 +3060,11 @@ const docTemplatetenantadmin = `{
                 },
                 "source": {
                     "description": "角色来源(builtin/custom)",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.RoleSource"
+                        }
+                    ]
                 },
                 "updatedAt": {
                     "description": "更新时间",
@@ -3071,7 +3151,11 @@ const docTemplatetenantadmin = `{
                 },
                 "source": {
                     "description": "角色来源(builtin/custom)",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.RoleSource"
+                        }
+                    ]
                 },
                 "updatedAt": {
                     "description": "更新时间",
@@ -3606,6 +3690,25 @@ const docTemplatetenantadmin = `{
                 }
             }
         },
+        "model.DeptNodeStatus": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-comments": {
+                "DeptNodeStatusDisable": "停用",
+                "DeptNodeStatusEnable": "启用"
+            },
+            "x-enum-descriptions": [
+                "启用",
+                "停用"
+            ],
+            "x-enum-varnames": [
+                "DeptNodeStatusEnable",
+                "DeptNodeStatusDisable"
+            ]
+        },
         "model.DeptUserRelationType": {
             "type": "string",
             "enum": [
@@ -3627,6 +3730,29 @@ const docTemplatetenantadmin = `{
                 "DeptUserRelationPrimary",
                 "DeptUserRelationSecondary",
                 "DeptUserRelationLeader"
+            ]
+        },
+        "model.InviteStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "accepted",
+                "revoked"
+            ],
+            "x-enum-comments": {
+                "InviteStatusAccepted": "已使用",
+                "InviteStatusPending": "待使用",
+                "InviteStatusRevoked": "已撤销"
+            },
+            "x-enum-descriptions": [
+                "待使用",
+                "已使用",
+                "已撤销"
+            ],
+            "x-enum-varnames": [
+                "InviteStatusPending",
+                "InviteStatusAccepted",
+                "InviteStatusRevoked"
             ]
         },
         "model.MenuStatus": {
@@ -3692,6 +3818,25 @@ const docTemplatetenantadmin = `{
                 "MenuVisibilityPublic",
                 "MenuVisibilityMember",
                 "MenuVisibilityAdmin"
+            ]
+        },
+        "model.RoleSource": {
+            "type": "string",
+            "enum": [
+                "builtin",
+                "custom"
+            ],
+            "x-enum-comments": {
+                "RoleSourceBuiltin": "内置角色：系统种子数据，禁止删除、禁止改 admin_type",
+                "RoleSourceCustom": "自定义角色：租户管理员创建"
+            },
+            "x-enum-descriptions": [
+                "内置角色：系统种子数据，禁止删除、禁止改 admin_type",
+                "自定义角色：租户管理员创建"
+            ],
+            "x-enum-varnames": [
+                "RoleSourceBuiltin",
+                "RoleSourceCustom"
             ]
         },
         "model.SysAdminType": {

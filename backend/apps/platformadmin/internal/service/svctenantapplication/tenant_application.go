@@ -30,10 +30,25 @@ func NewTenantApplicationSvc() TenantApplicationSvc {
 	return &tenantApplicationSvc{}
 }
 
+// isValidTenantApplicationStatus 校验订阅状态取值：空值表示「不指定/不修改」（Create 落默认值、Update 跳过），
+// 非空必须命中白名单常量。校验归 service（AGENTS.md 硬规则 3）。
+func isValidTenantApplicationStatus(status model.TenantApplicationStatus) bool {
+	switch status {
+	case "", model.TenantApplicationStatusEnable, model.TenantApplicationStatusDisable:
+		return true
+	default:
+		return false
+	}
+}
+
 // 平台侧跨租户运维：订阅的归属租户来自请求参数（而非调用者 token 里的租户），
 // 读改删同样不校验 ctx 租户归属——与 /v1/platform/tenants/{tenantID} 同一信任模型
 // （能拿到 platform-admin-web 令牌即可运维任意租户）。
 func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplication.TenantApplicationCreateReq) (*dtotenantapplication.TenantApplicationCreateResp, error) {
+	if !isValidTenantApplicationStatus(req.Status) {
+		glog.Errorf(ctx, "[svctenantapplication.Create] 非法订阅状态, req:%s", gutil.ToJsonString(req))
+		return nil, code.GetError(code.TenantApplicationCreateError)
+	}
 	// 1) 归属租户必须存在
 	tenantEntity, err := dao.NewTenantDao().GetByID(ctx, req.TenantID)
 	if err != nil {
@@ -73,7 +88,7 @@ func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplicat
 		CreatedBy: gincontext.GetUserIDString(ctx),
 	}
 	if entity.Status == "" {
-		entity.Status = model.AppStatusEnable
+		entity.Status = model.TenantApplicationStatusEnable
 	}
 	// PG 下 not null JSON 列不接受 NULL：无配置时显式给默认值（与租户自建订阅路径一致）。
 	if entity.Config == nil {
@@ -112,6 +127,10 @@ func (svc *tenantApplicationSvc) Delete(ctx *gin.Context, req *dtotenantapplicat
 }
 
 func (svc *tenantApplicationSvc) Update(ctx *gin.Context, req *dtotenantapplication.TenantApplicationUpdateReq) error {
+	if !isValidTenantApplicationStatus(req.Status) {
+		glog.Errorf(ctx, "[svctenantapplication.Update] 非法订阅状态, req:%s", gutil.ToJsonString(req))
+		return code.GetError(code.TenantApplicationUpdateError)
+	}
 	entity, err := dao.NewTenantApplicationDao().GetByID(ctx, req.TenantAppID)
 	if err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -121,8 +140,11 @@ func (svc *tenantApplicationSvc) Update(ctx *gin.Context, req *dtotenantapplicat
 		return code.GetError(code.TenantApplicationNotExistError)
 	}
 	updateMap := map[string]any{
-		"status":     req.Status,
 		"updated_by": gincontext.GetUserIDString(ctx),
+	}
+	// status 留空表示不修改：不写该列，避免把状态覆盖为空串
+	if req.Status != "" {
+		updateMap["status"] = req.Status
 	}
 	if req.Config != "" {
 		updateMap["config"] = datatypes.JSON([]byte(req.Config))

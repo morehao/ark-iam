@@ -307,7 +307,7 @@ erDiagram
         int dept_depth "深度(根=1)"
         string name
         int sort
-        string status "active/inactive"
+        string status "enable/disable"
     }
     department_user {
         string id PK "UUID v7"
@@ -438,9 +438,6 @@ erDiagram
         string client_ip
         string user_agent
         datetime login_time
-        datetime last_active_at
-        datetime revoked_at
-        string status "active/revoked"
     }
     user_login_log {
         uint id PK

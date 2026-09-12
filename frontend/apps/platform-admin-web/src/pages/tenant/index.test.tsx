@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { App as AntdApp } from 'antd'
-import { SuspendedTag, fmtTime } from '@ark-iam/ui'
+import { EnableTag, SuspendedTag, fmtTime } from '@ark-iam/ui'
 import type { TenantItem } from '@ark-iam/types'
 
 const mockGetTenantPageList = vi.fn()
@@ -173,5 +173,26 @@ describe('SuspendedTag 租户状态映射', () => {
 
     rerender(<SuspendedTag value={false} />)
     expect(screen.getByText('正常')).toBeInTheDocument()
+  })
+})
+
+describe('EnableTag 启用/停用映射', () => {
+  it("只认 enable/disable：'enable' → 启用，'disable' → 停用", () => {
+    const { rerender } = render(<EnableTag value="enable" />)
+    expect(screen.getByText('启用')).toBeInTheDocument()
+
+    rerender(<EnableTag value="disable" />)
+    expect(screen.getByText('停用')).toBeInTheDocument()
+  })
+
+  it('不再兼容 active/inactive/1/0 等历史与数字取值，一律原样回显', () => {
+    // 这正是本次收敛要消除的能力：把 active 错标成「启用」（应归 SuspendedTag 的「正常」）
+    for (const v of ['active', 'inactive', 'enabled', '1', '0', '']) {
+      const { unmount } = render(<EnableTag value={v} />)
+      expect(screen.queryByText('启用')).not.toBeInTheDocument()
+      expect(screen.queryByText('停用')).not.toBeInTheDocument()
+      expect(screen.getByText(v || '-')).toBeInTheDocument()
+      unmount()
+    }
   })
 })

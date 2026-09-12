@@ -86,7 +86,7 @@ func TestSeedIamSQLite(t *testing.T) {
 	}
 	roleByAppName := map[string]*model.RoleEntity{}
 	for i := range roles {
-		if roles[i].Source != string(model.RoleSourceBuiltin) {
+		if roles[i].Source != model.RoleSourceBuiltin {
 			continue
 		}
 		for appName, appID := range appIDByName {
@@ -282,7 +282,7 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 
 	// admin 角色菜单授权集合（平台应用菜单 + 租户自服务菜单）
 	var adminRole model.RoleEntity
-	if err := db.Where("app_id = ? AND source = ?", adminApp.ID, string(model.RoleSourceBuiltin)).First(&adminRole).Error; err != nil {
+	if err := db.Where("app_id = ? AND source = ?", adminApp.ID, model.RoleSourceBuiltin).First(&adminRole).Error; err != nil {
 		t.Fatalf("admin role not found: %v", err)
 	}
 	var adminMenuLinks []model.RoleMenuEntity
@@ -338,7 +338,7 @@ func TestSeedIamPrunesRetiredMenus(t *testing.T) {
 		t.Fatalf("admin app not found: %v", err)
 	}
 	var adminRole model.RoleEntity
-	if err := db.Where("app_id = ? AND source = ?", adminApp.ID, string(model.RoleSourceBuiltin)).First(&adminRole).Error; err != nil {
+	if err := db.Where("app_id = ? AND source = ?", adminApp.ID, model.RoleSourceBuiltin).First(&adminRole).Error; err != nil {
 		t.Fatalf("admin role not found: %v", err)
 	}
 	var grpApp model.MenuEntity

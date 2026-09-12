@@ -13,7 +13,7 @@ type ApplicationClientCond struct {
 	Code     string
 	Name     string
 	Source   model.ApplicationClientSource
-	Status   string
+	Status   model.ApplicationClientStatus
 }
 
 func (c *ApplicationClientCond) BuildCondition(db *gorm.DB, tableName string) {

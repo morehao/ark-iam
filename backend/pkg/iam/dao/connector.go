@@ -11,7 +11,7 @@ type ConnectorCond struct {
 	TenantID    string
 	Protocol    string
 	Provider    string
-	Status      string
+	Status      model.ConnectorStatus
 	Name        string
 	DisplayName string
 }

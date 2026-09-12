@@ -255,7 +255,7 @@ func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
 	}
 	role, err := dao.NewRoleDao().GetByCond(ctx, &dao.RoleCond{
 		TenantID:  resp.TenantID,
-		Source:    string(model.RoleSourceBuiltin),
+		Source:    model.RoleSourceBuiltin,
 		AdminType: model.SysAdminTypeAdmin,
 	})
 	if err != nil || role == nil {

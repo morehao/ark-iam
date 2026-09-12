@@ -5,7 +5,7 @@ import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { createOAuthSecret, deleteOAuthSecret, getOAuthClientDetail, listOAuthSecrets } from '@ark-iam/api'
 import type { OAuthClientDetail as OAuthClientDetailType, OAuthSecretCreateResp, OAuthSecretItem } from '@ark-iam/types'
-import { actionColumn, CODE_COL_WIDTH, fmtTime, IDCell, idColumn, NAME_COL_WIDTH, SourceTag, StatusTag, tableScrollX, textColumn, timeColumn, tokens } from '@ark-iam/ui'
+import { actionColumn, CODE_COL_WIDTH, fmtTime, IDCell, idColumn, NAME_COL_WIDTH, SourceTag, EnableTag, tableScrollX, textColumn, timeColumn, tokens } from '@ark-iam/ui'
 
 export default function OAuthClientDetail() {
   const { id } = useParams<{ id: string }>()
@@ -134,7 +134,7 @@ export default function OAuthClientDetail() {
             <SourceTag value={detail.source} />
           </Descriptions.Item>
           <Descriptions.Item label="状态">
-            <StatusTag value={detail.status} />
+            <EnableTag value={detail.status} />
           </Descriptions.Item>
           <Descriptions.Item label="令牌端点认证方式">{detail.tokenEndpointAuthMethod || '-'}</Descriptions.Item>
           <Descriptions.Item label="创建时间">{fmtTime(detail.createdAt)}</Descriptions.Item>

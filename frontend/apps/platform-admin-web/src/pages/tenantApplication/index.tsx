@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, message, Modal, Select, Space, Table } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, idColumn, NAME_COL_WIDTH, PageContainer, RemoteSelect, STATUS_COL_WIDTH, StatusTag, tableScrollX, textColumn, timeColumn } from '@ark-iam/ui'
+import { actionColumn, idColumn, NAME_COL_WIDTH, PageContainer, RemoteSelect, STATUS_COL_WIDTH, EnableTag, tableScrollX, textColumn, timeColumn } from '@ark-iam/ui'
 import {
   createTenantApplication,
   deleteTenantApplication,
@@ -114,7 +114,7 @@ export default function TenantApplicationList() {
     idColumn<TenantApplicationItem>({ dataIndex: 'tenantAppID' }),
     textColumn<TenantApplicationItem>({ title: '租户', dataIndex: 'tenantName', width: NAME_COL_WIDTH }),
     textColumn<TenantApplicationItem>({ title: '应用', dataIndex: 'appName', width: NAME_COL_WIDTH }),
-    { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <StatusTag value={v} /> },
+    { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <EnableTag value={v} /> },
     timeColumn<TenantApplicationItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<TenantApplicationItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     actionColumn<TenantApplicationItem>({

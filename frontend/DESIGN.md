@@ -172,7 +172,7 @@ components:
 
 | 字段语义 | 组件 | 值 → 文案(Tag 色) |
 |---|---|---|
-| 启用/停用（status） | `StatusTag` | enable / 1 / active → 启用（`success`）；disable / 0 / inactive → 停用（`default`）；suspended → 挂起（`error`） |
+| 启用/停用（status） | `EnableTag` | `enable` → 启用（`success`）；`disable` → 停用（`default`）；其余原样回显。**只认这一套取值**，不做数字/历史值兼容 |
 | 挂起（isSuspended / status） | `SuspendedTag` | 1 / true / `suspended` → 挂起（`error`）；0 / false / `active` → 正常（`success`）；兼容布尔字段与 status 枚举两种后端形态 |
 | 验证（isVerified） | `VerifiedTag` | 1 → 已验证（`success`）；0 → 未验证（`warning`） |
 | 会话（isActive） | 内联语义色 | true → 活跃（`success`）；false → 已失效（`default`） |

@@ -17,7 +17,8 @@
 | 外部身份 | User Identity | person 在外部身份源（Connector）中的身份映射（issuer + external_subject） |
 | 多租户 | Multi-tenant | 一个 person 可同时属于多个租户；登录时需选择租户（或由 `tenant` hint 指定） |
 | 挂起 | Suspended | person/user 被停用，禁止登录（`is_suspended`） |
-| 租户状态 | Tenant Status | 租户生命周期状态（`tenant.status`）：`active` 正常 / `suspended` 已挂起。仅 active 允许其成员登录、签发与轮换令牌；挂起会撤销该租户成员的 refresh token 与 SSO 会话；禁止挂起操作者自己所在的租户（不可逆自锁） |
+| 启停状态 | Enable Status | 全局统一的「启用/停用」词汇：`enable` 启用 / `disable` 停用。凡表达「这条记录还能不能参与业务」的字段一律用它——`application.status`、`application_client.status`、`tenant_application.status`、`department.status`、`connector.status`、`menu.status` 均属此类，禁止再出现 `active`/`inactive`/`enabled` 等同义异写 |
+| 租户状态 | Tenant Status | 租户**生命周期**状态（`tenant.status`）：`active` 正常 / `suspended` 已挂起，属生命周期词汇而**不是**启停状态（`suspended` 有「禁止该租户成员登录与签发令牌」的独立语义，降级为 `disable` 会丢失语义）。仅 active 允许其成员登录、签发与轮换令牌；挂起会撤销该租户成员的 refresh token 与 SSO 会话；禁止挂起操作者自己所在的租户（不可逆自锁） |
 
 ## 二、部门与归属
 

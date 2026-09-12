@@ -203,7 +203,23 @@ const docTemplateauth = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "enable",
+                            "disable"
+                        ],
                         "type": "string",
+                        "x-enum-comments": {
+                            "ConnectorStatusDisable": "停用：保留配置但不参与授权",
+                            "ConnectorStatusEnable": "启用：可用，参与授权与回调"
+                        },
+                        "x-enum-descriptions": [
+                            "启用：可用，参与授权与回调",
+                            "停用：保留配置但不参与授权"
+                        ],
+                        "x-enum-varnames": [
+                            "ConnectorStatusEnable",
+                            "ConnectorStatusDisable"
+                        ],
                         "description": "状态",
                         "name": "status",
                         "in": "query"
@@ -959,7 +975,11 @@ const docTemplateauth = `{
                 },
                 "status": {
                     "description": "状态",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorStatus"
+                        }
+                    ]
                 },
                 "syncProfile": {
                     "description": "是否同步资料",
@@ -1034,7 +1054,11 @@ const docTemplateauth = `{
                 },
                 "status": {
                     "description": "状态",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorStatus"
+                        }
+                    ]
                 },
                 "syncProfile": {
                     "description": "是否同步资料",
@@ -1108,7 +1132,11 @@ const docTemplateauth = `{
                 },
                 "status": {
                     "description": "状态",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorStatus"
+                        }
+                    ]
                 },
                 "syncProfile": {
                     "description": "是否同步资料",
@@ -1186,7 +1214,11 @@ const docTemplateauth = `{
                 },
                 "status": {
                     "description": "状态",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorStatus"
+                        }
+                    ]
                 },
                 "syncProfile": {
                     "description": "是否同步资料",
@@ -1483,6 +1515,25 @@ const docTemplateauth = `{
                     "type": "string"
                 }
             }
+        },
+        "model.ConnectorStatus": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-comments": {
+                "ConnectorStatusDisable": "停用：保留配置但不参与授权",
+                "ConnectorStatusEnable": "启用：可用，参与授权与回调"
+            },
+            "x-enum-descriptions": [
+                "启用：可用，参与授权与回调",
+                "停用：保留配置但不参与授权"
+            ],
+            "x-enum-varnames": [
+                "ConnectorStatusEnable",
+                "ConnectorStatusDisable"
+            ]
         },
         "objauth.PersonInfo": {
             "type": "object",

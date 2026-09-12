@@ -225,7 +225,7 @@ func seedRootDepartment(ctx context.Context, db *gorm.DB, tenant *model.TenantEn
 	dept = &model.DepartmentEntity{
 		TenantID: tenant.ID,
 		Name:     tenant.Name,
-		Status:   string(model.DeptNodeStatusActive),
+		Status:   model.DeptNodeStatusEnable,
 	}
 	if err := db.WithContext(ctx).Create(dept).Error; err != nil {
 		return nil, fmt.Errorf("seed root department create fail: %w", err)
@@ -328,7 +328,7 @@ func seedRoles(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adm
 	}
 
 	entity := &model.RoleEntity{}
-	err := db.Where("tenant_id = ? AND app_id = ? AND source = ?", tenant.ID, adminApp.ID, string(model.RoleSourceBuiltin)).First(entity).Error
+	err := db.Where("tenant_id = ? AND app_id = ? AND source = ?", tenant.ID, adminApp.ID, model.RoleSourceBuiltin).First(entity).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("seed admin role query fail: %w", err)
 	}
@@ -338,7 +338,7 @@ func seedRoles(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adm
 			AppID:       adminApp.ID,
 			Name:        "管理员",
 			Description: "系统管理员，拥有所有权限",
-			Source:      string(model.RoleSourceBuiltin),
+			Source:      model.RoleSourceBuiltin,
 			AdminType:   adminType,
 		}
 		if err := db.WithContext(ctx).Create(entity).Error; err != nil {
@@ -508,7 +508,7 @@ func seedTenantApplications(ctx context.Context, db *gorm.DB, tenant *model.Tena
 		if count > 0 {
 			continue
 		}
-		ta := &model.TenantApplicationEntity{TenantID: tenant.ID, AppID: app.ID, Status: model.AppStatusEnable, Config: []byte(`{}`), GrantedScope: []byte(`[]`)}
+		ta := &model.TenantApplicationEntity{TenantID: tenant.ID, AppID: app.ID, Status: model.TenantApplicationStatusEnable, Config: []byte(`{}`), GrantedScope: []byte(`[]`)}
 		if err := db.WithContext(ctx).Create(ta).Error; err != nil {
 			return fmt.Errorf("seed tenant_application create fail: %w", err)
 		}

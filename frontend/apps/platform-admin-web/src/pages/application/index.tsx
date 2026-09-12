@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Descriptions, Drawer, Form, Input, InputNumber, message, Modal, Select, Space, Table } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, CODE_COL_WIDTH, fmtTime, IDCell, idColumn, nameColumn, PageContainer, SourceTag, STATUS_COL_WIDTH, StatusTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
+import { actionColumn, CODE_COL_WIDTH, fmtTime, IDCell, idColumn, nameColumn, PageContainer, SourceTag, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
 import { createApplication, deleteApplication, getApplicationDetail, getApplicationPageList, updateApplication } from '@ark-iam/api'
 import type { ApplicationItem } from '@ark-iam/types'
 
@@ -113,7 +113,7 @@ export default function ApplicationList() {
     }),
     textColumn<ApplicationItem>({ title: '编码', dataIndex: 'code', width: CODE_COL_WIDTH, monospace: true }),
     { title: '来源', dataIndex: 'source', key: 'source', width: TAG_COL_WIDTH, render: (v: string) => <SourceTag value={v} /> },
-    { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <StatusTag value={v} /> },
+    { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <EnableTag value={v} /> },
     timeColumn<ApplicationItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<ApplicationItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     actionColumn<ApplicationItem>({
@@ -241,7 +241,7 @@ export default function ApplicationList() {
               <SourceTag value={detail.source} />
             </Descriptions.Item>
             <Descriptions.Item label="状态">
-              <StatusTag value={detail.status} />
+              <EnableTag value={detail.status} />
             </Descriptions.Item>
             <Descriptions.Item label="描述">{detail.description || '-'}</Descriptions.Item>
             <Descriptions.Item label="Logo 地址">{detail.logoUrl || '-'}</Descriptions.Item>

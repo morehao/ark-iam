@@ -98,7 +98,7 @@ func ensureTenantApplication(ctx context.Context, tx *gorm.DB, req *ProvisionTen
 	entity := &model.TenantApplicationEntity{
 		TenantID:     req.TenantID,
 		AppID:        appID,
-		Status:       model.AppStatusEnable,
+		Status:       model.TenantApplicationStatusEnable,
 		Config:       datatypes.JSON([]byte(`{}`)),
 		GrantedScope: datatypes.JSON([]byte(`[]`)),
 		CreatedBy:    req.CreatedBy,
@@ -113,7 +113,7 @@ func ensureTenantApplication(ctx context.Context, tx *gorm.DB, req *ProvisionTen
 // 角色无业务编码，幂等定位键为 (tenant_id, app_id, source=builtin)。
 func ensureBuiltinRole(ctx context.Context, tx *gorm.DB, req *ProvisionTenantAdminReq, appID string) (*model.RoleEntity, error) {
 	roleDao := dao.NewRoleDao().WithTx(tx)
-	builtinSource := string(model.RoleSourceBuiltin)
+	builtinSource := model.RoleSourceBuiltin
 	role, err := roleDao.GetByCond(ctx, &dao.RoleCond{
 		TenantID: req.TenantID,
 		AppID:    appID,

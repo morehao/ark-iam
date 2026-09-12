@@ -11,7 +11,7 @@ type ApplicationCond struct {
 	IDs    []string
 	Name   string
 	Source model.AppSource
-	Status string
+	Status model.AppStatus
 	Code   string
 }
 

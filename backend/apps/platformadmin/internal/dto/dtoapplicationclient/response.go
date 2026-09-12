@@ -26,7 +26,7 @@ type ApplicationClientDetailResp struct {
 	AccessTokenTTL          int64                         `json:"accessTokenTTL"`          // 访问令牌有效期(秒)
 	RefreshTokenTTL         int64                         `json:"refreshTokenTTL"`         // 刷新令牌有效期(秒)
 	Source                  model.ApplicationClientSource `json:"source"`                  // 客户端来源
-	Status                  string                        `json:"status"`                  // 状态
+	Status                  model.ApplicationClientStatus `json:"status"`                  // 状态
 	CreatedAt               int64                         `json:"createdAt"`               // 创建时间(unix 秒)
 }
 
@@ -41,7 +41,7 @@ type PageListItem struct {
 	Code                    string                        `json:"code"`                    // 客户端编码(OIDC client_id)
 	Name                    string                        `json:"name"`                    // 客户端名称
 	Source                  model.ApplicationClientSource `json:"source"`                  // 客户端来源
-	Status                  string                        `json:"status"`                  // 状态
+	Status                  model.ApplicationClientStatus `json:"status"`                  // 状态
 	GrantTypes              []string                      `json:"grantTypes"`              // 授权类型
 	TokenEndpointAuthMethod string                        `json:"tokenEndpointAuthMethod"` // 令牌端点认证方式
 	CreatedAt               int64                         `json:"createdAt"`               // 创建时间(unix 秒)

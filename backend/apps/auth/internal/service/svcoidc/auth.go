@@ -154,8 +154,8 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	audit.WriteAudit(ctx, audit.AuditEntry{
 		Action:     audit.ActionLogin,
 		TenantID:   tenantID,
-		Result:     "success",
-		TargetType: "person",
+		Result:     model.AuditResultSuccess,
+		TargetType: model.AuditTargetTypePerson,
 		TargetID:   personEntity.ID,
 	})
 
@@ -239,8 +239,8 @@ func (svc *oidcAuthSvc) SelectTenant(ctx *gin.Context, authRequestID string, ten
 	audit.WriteAudit(ctx, audit.AuditEntry{
 		Action:     audit.ActionTenantSwitch,
 		TenantID:   tenantID,
-		Result:     "success",
-		TargetType: "tenant",
+		Result:     model.AuditResultSuccess,
+		TargetType: model.AuditTargetTypeTenant,
 		TargetID:   tenantID,
 	})
 	return resp, nil
@@ -305,8 +305,8 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID s
 	audit.WriteAudit(ctx, audit.AuditEntry{
 		Action:     audit.ActionLogin,
 		TenantID:   tenantID,
-		Result:     "success",
-		TargetType: "person",
+		Result:     model.AuditResultSuccess,
+		TargetType: model.AuditTargetTypePerson,
 		TargetID:   personID,
 	})
 
