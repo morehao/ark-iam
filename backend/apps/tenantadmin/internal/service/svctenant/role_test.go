@@ -32,14 +32,13 @@ func seedTestApp(t *testing.T, db *gorm.DB, tenantID, appID string) {
 	}
 }
 
-func seedTestRole(t *testing.T, db *gorm.DB, id, tenantID, appID, name, code string) {
+func seedTestRole(t *testing.T, db *gorm.DB, id, tenantID, appID, name string) {
 	t.Helper()
 	if err := db.Create(&model.RoleEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: id}},
 		TenantID:   tenantID,
 		AppID:      appID,
 		Name:       name,
-		Code:       code,
 		CreatedBy:  "t",
 	}).Error; err != nil {
 		t.Fatalf("seed role: %v", err)
@@ -74,7 +73,7 @@ func seedTestMenuTree(t *testing.T, db *gorm.DB, tenantID string) (rootID, child
 	return "m1", "m2"
 }
 
-// TestRoleCreateRequiresApp 角色从属于租户订阅的应用：非法应用拒绝、应用内编码唯一、跨应用同编码允许。
+// TestRoleCreateRequiresApp 角色从属于租户订阅的应用：非法应用拒绝、应用内名称唯一、跨应用/租户同名允许。
 func TestRoleCreateRequiresApp(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
@@ -86,20 +85,20 @@ func TestRoleCreateRequiresApp(t *testing.T) {
 	ginCtx := newDeptGinCtx(t, "t1", "op")
 
 	// 非法应用
-	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app-bad", Name: "管理员", Code: "admin"}); err == nil {
+	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app-bad", Name: "管理员"}); err == nil {
 		t.Fatalf("expected invalid app error")
 	}
 	// 创建成功
-	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app1", Name: "管理员", Code: "admin"}); err != nil {
+	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app1", Name: "管理员"}); err != nil {
 		t.Fatalf("create role: %v", err)
 	}
-	// 同应用编码唯一
-	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app1", Name: "重复", Code: "admin"}); err == nil {
-		t.Fatalf("expected duplicate code error")
+	// 同应用名称唯一
+	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app1", Name: "管理员"}); err == nil {
+		t.Fatalf("expected duplicate name error")
 	}
-	// 其他租户同编码不冲突
-	if _, err := svc.Create(newDeptGinCtx(t, "t2", "op2"), &dtotenant.RoleCreateReq{AppID: "app2", Name: "管理员", Code: "admin"}); err != nil {
-		t.Fatalf("cross-tenant same code should be allowed: %v", err)
+	// 其他租户同名不冲突
+	if _, err := svc.Create(newDeptGinCtx(t, "t2", "op2"), &dtotenant.RoleCreateReq{AppID: "app2", Name: "管理员"}); err != nil {
+		t.Fatalf("cross-tenant same name should be allowed: %v", err)
 	}
 }
 
@@ -109,7 +108,7 @@ func TestRolePageListWithCounts(t *testing.T) {
 		&model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
 	seedTestApp(t, db, "t1", "app1")
-	seedTestRole(t, db, "r1", "t1", "app1", "管理员", "admin")
+	seedTestRole(t, db, "r1", "t1", "app1", "管理员")
 
 	if err := db.Create(&model.UserRoleEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "ur1"}},
@@ -156,7 +155,7 @@ func TestRoleMenusUpdateAndGet(t *testing.T) {
 		&model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
 	seedTenantAdminOperator(t, db, "t1", "op")
-	seedTestRole(t, db, "r1", "t1", "app1", "管理员", "admin")
+	seedTestRole(t, db, "r1", "t1", "app1", "管理员")
 	rootID, childID := seedTestMenuTree(t, db, "t1")
 
 	ginCtx := newDeptGinCtx(t, "t1", "op")

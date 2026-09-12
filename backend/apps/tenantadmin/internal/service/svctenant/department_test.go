@@ -59,7 +59,6 @@ func seedTenantCustomAdminOperator(t *testing.T, db *gorm.DB, tenantID, userID s
 		TenantID:   tenantID,
 		AppID:      "app-admin",
 		Name:       "测试自定义管理员角色",
-		Code:       "test-custom-super",
 		Source:     string(model.RoleSourceCustom),
 		AdminType:  model.SysAdminTypeAdmin,
 		CreatedBy:  "t",

@@ -25,7 +25,6 @@ type DepartmentEntity struct {
 	DeptPath  string `gorm:"column:dept_path;type:varchar(1024);not null;default:'';index:idx_department_path;comment:祖先链路径,含自身,如 /rootID/midID/nodeID" json:"deptPath"`
 	DeptDepth int    `gorm:"column:dept_depth;type:int;not null;default:1;comment:节点深度,根=1" json:"deptDepth"`
 	Name      string `gorm:"column:name;type:varchar(128);not null;default:'';comment:部门名称" json:"name"`
-	Code      string `gorm:"column:code;type:varchar(64);not null;default:'';comment:部门编码(租户内唯一,可空,外部系统同步用)" json:"code"`
 	Sort      int    `gorm:"column:sort;type:int;not null;default:0;comment:同级排序" json:"sort"`
 	Status    string `gorm:"column:status;type:varchar(32);not null;default:'active';comment:状态(字符串枚举)" json:"status"`
 	CreatedBy string `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id" json:"createdBy"`

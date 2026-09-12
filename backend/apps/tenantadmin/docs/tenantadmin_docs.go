@@ -191,7 +191,7 @@ const docTemplatetenantadmin = `{
                 "tags": [
                     "租户菜单"
                 ],
-                "summary": "当前租户订阅的应用列表（角色归属应用选项）",
+                "summary": "当前租户订阅的启用应用列表（角色归属应用选项，含系统内置应用）",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1281,7 +1281,7 @@ const docTemplatetenantadmin = `{
                     },
                     {
                         "type": "string",
-                        "description": "关键词(名称/编码 模糊)",
+                        "description": "关键词(名称 模糊)",
                         "name": "keyword",
                         "in": "query"
                     },
@@ -2242,10 +2242,6 @@ const docTemplatetenantadmin = `{
                 "name"
             ],
             "properties": {
-                "code": {
-                    "description": "部门编码(可空)",
-                    "type": "string"
-                },
                 "createdAt": {
                     "description": "创建时间(unix 秒)",
                     "type": "integer"
@@ -2306,10 +2302,6 @@ const docTemplatetenantadmin = `{
                 "name"
             ],
             "properties": {
-                "code": {
-                    "description": "部门编码(可空)",
-                    "type": "string"
-                },
                 "name": {
                     "description": "部门名称",
                     "type": "string"
@@ -2361,10 +2353,6 @@ const docTemplatetenantadmin = `{
                     "items": {
                         "$ref": "#/definitions/dtotenant.DepartmentTreeItem"
                     }
-                },
-                "code": {
-                    "description": "部门编码(可空)",
-                    "type": "string"
                 },
                 "createdAt": {
                     "description": "创建时间(unix 秒)",
@@ -2418,10 +2406,6 @@ const docTemplatetenantadmin = `{
                 "name"
             ],
             "properties": {
-                "code": {
-                    "description": "部门编码(可空)",
-                    "type": "string"
-                },
                 "name": {
                     "description": "部门名称",
                     "type": "string"
@@ -2923,16 +2907,11 @@ const docTemplatetenantadmin = `{
             "type": "object",
             "required": [
                 "appID",
-                "code",
                 "name"
             ],
             "properties": {
                 "appID": {
-                    "description": "所属应用ID（租户订阅的非系统应用）",
-                    "type": "string"
-                },
-                "code": {
-                    "description": "角色编码(应用内唯一)",
+                    "description": "所属应用ID（租户订阅的启用应用，含系统内置应用）",
                     "type": "string"
                 },
                 "description": {
@@ -2940,7 +2919,7 @@ const docTemplatetenantadmin = `{
                     "type": "string"
                 },
                 "name": {
-                    "description": "角色名称",
+                    "description": "角色名称(应用内唯一)",
                     "type": "string"
                 }
             }
@@ -2971,10 +2950,6 @@ const docTemplatetenantadmin = `{
                 },
                 "appName": {
                     "description": "所属应用名称",
-                    "type": "string"
-                },
-                "code": {
-                    "description": "角色编码",
                     "type": "string"
                 },
                 "createdAt": {
@@ -3064,10 +3039,6 @@ const docTemplatetenantadmin = `{
                     "description": "所属应用名称",
                     "type": "string"
                 },
-                "code": {
-                    "description": "角色编码",
-                    "type": "string"
-                },
                 "createdAt": {
                     "description": "创建时间",
                     "type": "integer"
@@ -3121,20 +3092,15 @@ const docTemplatetenantadmin = `{
         "dtotenant.RoleUpdateReq": {
             "type": "object",
             "required": [
-                "code",
                 "name"
             ],
             "properties": {
-                "code": {
-                    "description": "角色编码",
-                    "type": "string"
-                },
                 "description": {
                     "description": "角色描述",
                     "type": "string"
                 },
                 "name": {
-                    "description": "角色名称",
+                    "description": "角色名称(应用内唯一)",
                     "type": "string"
                 }
             }
@@ -3525,10 +3491,6 @@ const docTemplatetenantadmin = `{
                 },
                 "appName": {
                     "description": "所属应用名称",
-                    "type": "string"
-                },
-                "code": {
-                    "description": "角色编码",
                     "type": "string"
                 },
                 "description": {

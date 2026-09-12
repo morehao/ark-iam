@@ -15,7 +15,7 @@ import {
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
-import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, NAME_COL_WIDTH, PageContainer, SourceTag, STATUS_COL_WIDTH, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
+import { actionColumn, COUNT_COL_WIDTH, NAME_COL_WIDTH, PageContainer, SourceTag, STATUS_COL_WIDTH, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
 import type { MenuItem, TenantAppItem, TenantRoleItem } from '@ark-iam/types'
 import {
   createTenantRole,
@@ -107,7 +107,7 @@ export default function TenantRolePage() {
 
   const openEdit = (record: TenantRoleItem) => {
     setEditing(record)
-    form.setFieldsValue({ name: record.name, code: record.code, description: record.description })
+    form.setFieldsValue({ name: record.name, description: record.description })
     setModalOpen(true)
   }
 
@@ -171,7 +171,6 @@ export default function TenantRolePage() {
   const columns: ColumnsType<TenantRoleItem> = [
     textColumn<TenantRoleItem>({ title: '角色名称', dataIndex: 'name', width: NAME_COL_WIDTH }),
     { title: '所属应用', dataIndex: 'appName', key: 'appName', width: 120, render: (_: string, r) => <Tag>{r.appName || '系统角色'}</Tag> },
-    textColumn<TenantRoleItem>({ title: '角色编码', dataIndex: 'code', width: CODE_COL_WIDTH, monospace: true }),
     {
       title: '来源',
       dataIndex: 'source',
@@ -240,7 +239,7 @@ export default function TenantRolePage() {
         />
         <Input.Search
           allowClear
-          placeholder="按角色名称/编码搜索"
+          placeholder="按角色名称搜索"
           prefix={<SearchOutlined />}
           style={{ width: 260 }}
           onSearch={(v) => {
@@ -296,10 +295,7 @@ export default function TenantRolePage() {
             </Form.Item>
           )}
           <Form.Item name="name" label="角色名称" rules={[{ required: true, message: '请输入角色名称' }]}>
-            <Input placeholder="如：部门管理员" />
-          </Form.Item>
-          <Form.Item name="code" label="角色编码" rules={[{ required: true, message: '请输入角色编码' }]}>
-            <Input placeholder="如：dept_admin（应用内唯一）" />
+            <Input placeholder="如：部门管理员（应用内唯一）" />
           </Form.Item>
           <Form.Item name="description" label="描述">
             <Input.TextArea rows={3} placeholder="选填" />

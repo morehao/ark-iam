@@ -39,7 +39,7 @@ func (ctr *tenantMenuCtr) Tree(ctx *gin.Context) {
 }
 
 // @Tags 租户菜单
-// @Summary 当前租户订阅的应用列表（角色归属应用选项）
+// @Summary 当前租户订阅的启用应用列表（角色归属应用选项，含系统内置应用）
 // @accept application/json
 // @Produce application/json
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.TenantAppsResp}

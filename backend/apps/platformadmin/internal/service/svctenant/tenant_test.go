@@ -253,7 +253,11 @@ func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
 	if got := countEntities(t, db, &model.TenantApplicationEntity{}, "tenant_id = ?", resp.TenantID); got != 1 {
 		t.Errorf("tenant_application count = %d, want 1", got)
 	}
-	role, err := dao.NewRoleDao().GetByCond(ctx, &dao.RoleCond{TenantID: resp.TenantID, Code: tenant.ProvisionRoleCode})
+	role, err := dao.NewRoleDao().GetByCond(ctx, &dao.RoleCond{
+		TenantID:  resp.TenantID,
+		Source:    string(model.RoleSourceBuiltin),
+		AdminType: model.SysAdminTypeAdmin,
+	})
 	if err != nil || role == nil {
 		t.Fatalf("load builtin role fail, err:%v, role:%+v", err, role)
 	}

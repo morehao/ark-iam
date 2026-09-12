@@ -208,7 +208,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 >
 > 租户状态 `status`（`active` 正常 / `suspended` 已挂起）：非法值/缺省归一为 `active`；`suspended` 会撤销该租户成员的 refresh token 与 SSO 会话，非 active 租户的成员无法登录、令牌不签发；`PUT /v1/platform/tenants/:tenantID` 拒绝挂起操作者自己所在的租户（`100208`）；重置内置管理员密码失败报 `100210`。
 >
-> **建租户的管理员约定**（D2/D3/D6）：`admin` 必填且邮箱/手机至少一个（缺联系方式报 `100521`）；管理员在同事务内创建为 `tenant_user.source=builtin`、`is_owner=true`，并绑定根部门与内置 `tenant_admin` 角色（该角色随租户开通 `tenant-admin` 应用订阅；应用/菜单种子缺失会整体回滚并报 `100200`）。`adminInitialPassword` 只在**新建自然人**时非空——命中已存在自然人时沿用其原密码、不回显凭据（可改用重置内置管理员密码接口兜底）。该管理员首次登录强制改密：`/oidc/login` 返回 `requiresPasswordChange=true`，改完（`/oidc/login/changePassword`）须重新登录。详见 `tenant-admin-provisioning-design-20260912.md`。
+> **建租户的管理员约定**（D2/D3/D6）：`admin` 必填且邮箱/手机至少一个（缺联系方式报 `100521`）；管理员在同事务内创建为 `tenant_user.source=builtin`、`is_owner=true`，并绑定根部门与内置「租户管理员」角色（`source=builtin`、`admin_type=admin`，该角色随租户开通 `tenant-admin` 应用订阅；应用/菜单种子缺失会整体回滚并报 `100200`）。`adminInitialPassword` 只在**新建自然人**时非空——命中已存在自然人时沿用其原密码、不回显凭据（可改用重置内置管理员密码接口兜底）。该管理员首次登录强制改密：`/oidc/login` 返回 `requiresPasswordChange=true`，改完（`/oidc/login/changePassword`）须重新登录。详见 `tenant-admin-provisioning-design-20260912.md`。
 
 ### 5.4 应用与客户端（OIDC 配置）
 
@@ -271,8 +271,8 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | POST | `/v1/tenant/api-keys` | 创建 API Key {name,machineUserID(必填:归属服务账号),expiredAt?}（需 super；明文仅此一次返回；个人密钥能力已下线） |
 | POST | `/v1/tenant/api-keys/:apiKeyID/revoke` | 吊销（需 super） |
 | DELETE | `/v1/tenant/api-keys/:apiKeyID` | 删除（需 super） |
-| GET | `/v1/tenant/apps` | 租户订阅应用列表（角色归属/菜单授权的应用选项） |
-| POST | `/v1/tenant/roles` | 创建角色（**appID 必选**，角色从属于应用，编码应用内唯一） |
+| GET | `/v1/tenant/apps` | 租户订阅的启用应用列表（角色归属/菜单授权的应用选项，含系统内置应用） |
+| POST | `/v1/tenant/roles` | 创建角色（**appID 必选**，角色从属于应用，名称应用内唯一；角色无业务编码，见 `role-code-retirement.md`） |
 | GET | `/v1/tenant/roles` | 角色分页（?appID=&keyword=，含成员数/菜单数/所属应用名） |
 | GET | `/v1/tenant/roles/:roleID` | 角色详情 |
 | PUT | `/v1/tenant/roles/:roleID` | 更新角色 |

@@ -71,7 +71,6 @@ export interface TenantUserRoleItem {
   appID: string
   appName: string
   name: string
-  code: string
   description: string
 }
 
@@ -114,7 +113,6 @@ export interface TenantRoleItem {
   appID: string
   appName: string
   name: string
-  code: string
   description: string
   source?: 'builtin' | 'custom' | string
   adminType: SysAdminType
@@ -127,7 +125,6 @@ export interface TenantRoleItem {
 export interface TenantRoleCreateReq {
   appID: string
   name: string
-  code: string
   description?: string
 }
 

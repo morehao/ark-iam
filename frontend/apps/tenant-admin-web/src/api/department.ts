@@ -14,9 +14,9 @@ export const getDepartmentChildren = (
   departmentID: string,
   params?: { page?: number; pageSize?: number; name?: string; status?: string },
 ) => request.get<any, DepartmentChildrenResp>(`/tenant/departments/${departmentID}/children`, { params })
-export const createDepartment = (data: { parentID?: string; name: string; code?: string; sort?: number; status?: string }) =>
+export const createDepartment = (data: { parentID?: string; name: string; sort?: number; status?: string }) =>
   request.post<any, { departmentID: string }>('/tenant/departments', data)
-export const updateDepartment = (data: { departmentID: string; parentID?: string; name?: string; code?: string; sort?: number; status?: string }) => {
+export const updateDepartment = (data: { departmentID: string; parentID?: string; name?: string; sort?: number; status?: string }) => {
   const { departmentID, ...body } = data
   return request.put<any, string>(`/tenant/departments/${departmentID}`, body)
 }

@@ -46,7 +46,6 @@ type UserRoleItem struct {
 	AppID       string `json:"appID"`       // 所属应用ID
 	AppName     string `json:"appName"`     // 所属应用名称
 	Name        string `json:"name"`        // 角色名称
-	Code        string `json:"code"`        // 角色编码
 	Description string `json:"description"` // 角色描述
 }
 

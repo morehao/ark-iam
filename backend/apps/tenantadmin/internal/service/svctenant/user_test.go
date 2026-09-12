@@ -361,7 +361,6 @@ func TestUserDetailWithDepartmentsAndRoles(t *testing.T) {
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "r1"}},
 		TenantID:   "t1",
 		Name:       "管理员",
-		Code:       "admin",
 	}).Error; err != nil {
 		t.Fatalf("seed role: %v", err)
 	}
@@ -383,7 +382,7 @@ func TestUserDetailWithDepartmentsAndRoles(t *testing.T) {
 	if len(resp.Departments) != 1 || resp.Departments[0].DepartmentName != "研发部" || resp.Departments[0].RelationType != model.DeptUserRelationPrimary {
 		t.Fatalf("unexpected departments: %+v", resp.Departments)
 	}
-	if len(resp.Roles) != 1 || resp.Roles[0].Code != "admin" {
+	if len(resp.Roles) != 1 || resp.Roles[0].Name != "管理员" {
 		t.Fatalf("unexpected roles: %+v", resp.Roles)
 	}
 	_ = now
@@ -395,12 +394,11 @@ func TestUserUpdateRolesFullReplace(t *testing.T) {
 	svc := &userSvc{}
 	seedTestUserWithPerson(t, db, "u1", "t1", "", "张三")
 
-	for _, r := range []struct{ id, code string }{{"r1", "admin"}, {"r2", "user"}, {"r3", "guest"}} {
+	for _, r := range []struct{ id, name string }{{"r1", "管理员"}, {"r2", "成员"}, {"r3", "访客"}} {
 		if err := db.Create(&model.RoleEntity{
 			BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: r.id}},
 			TenantID:   "t1",
-			Name:       r.code,
-			Code:       r.code,
+			Name:       r.name,
 		}).Error; err != nil {
 			t.Fatalf("seed role %s: %v", r.id, err)
 		}
@@ -410,7 +408,6 @@ func TestUserUpdateRolesFullReplace(t *testing.T) {
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "r-other"}},
 		TenantID:   "t2",
 		Name:       "other",
-		Code:       "other",
 	}).Error; err != nil {
 		t.Fatalf("seed other role: %v", err)
 	}
@@ -451,22 +448,21 @@ func TestUserUpdateRolesScopedByApp(t *testing.T) {
 	svc := &userSvc{}
 	seedTestUserWithPerson(t, db, "u1", "t1", "", "张三")
 
-	seedRole := func(id, tenantID, appID, code string) {
+	seedRole := func(id, tenantID, appID, name string) {
 		t.Helper()
 		if err := db.Create(&model.RoleEntity{
 			BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: id}},
 			TenantID:   tenantID,
 			AppID:      appID,
-			Name:       code,
-			Code:       code,
+			Name:       name,
 		}).Error; err != nil {
 			t.Fatalf("seed role %s: %v", id, err)
 		}
 	}
-	seedRole("ra1", "t1", "app-a", "role-a1")
-	seedRole("ra2", "t1", "app-a", "role-a2")
-	seedRole("rb1", "t1", "app-b", "role-b1")
-	seedRole("rc1", "t2", "app-c", "role-c1")
+	seedRole("ra1", "t1", "app-a", "角色A1")
+	seedRole("ra2", "t1", "app-a", "角色A2")
+	seedRole("rb1", "t1", "app-b", "角色B1")
+	seedRole("rc1", "t2", "app-c", "角色C1")
 
 	seedUserRole := func(id, userID, roleID string) {
 		t.Helper()

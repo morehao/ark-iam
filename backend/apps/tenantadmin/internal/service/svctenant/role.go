@@ -36,7 +36,7 @@ func NewRoleSvc() RoleSvc {
 	return &roleSvc{}
 }
 
-// Create 创建租户角色（编码租户内唯一）。
+// Create 创建租户角色（名称租户 + 应用内唯一）。
 func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dtotenant.RoleCreateResp, error) {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
 	if err := requireSystemAdmin(ctx, code.RoleCreateError); err != nil {
@@ -44,8 +44,8 @@ func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dto
 	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 
-	// 角色从属于租户订阅的应用：校验 appID
-	appList, err := loadTenantApps(ctx)
+	// 角色从属于租户订阅的应用：校验 appID（订阅且启用的应用均可选，含系统内置应用）
+	appList, err := loadSubscribedApps(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -60,10 +60,10 @@ func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dto
 		return nil, code.GetError(code.RoleCreateError)
 	}
 
-	// 编码应用内唯一
-	existing, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{TenantID: tenantID, AppID: req.AppID, Code: req.Code})
+	// 名称应用内唯一（角色无业务编码，名称即应用内可读标识）
+	existing, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{TenantID: tenantID, AppID: req.AppID, Name: req.Name})
 	if err != nil {
-		glog.Errorf(ctx, "[svcrole.Create] query role by code fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		glog.Errorf(ctx, "[svcrole.Create] query role by name fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.RoleCreateError)
 	}
 	if len(existing) > 0 {
@@ -74,7 +74,6 @@ func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dto
 		TenantID:    tenantID,
 		AppID:       req.AppID,
 		Name:        req.Name,
-		Code:        req.Code,
 		Description: req.Description,
 		Source:      string(model.RoleSourceCustom),
 		AdminType:   model.SysAdminTypeNormal,
@@ -159,15 +158,8 @@ func (svc *roleSvc) Update(ctx *gin.Context, req *dtotenant.RoleUpdateReq) error
 
 	updateMap := map[string]any{
 		"name":        req.Name,
-		"code":        req.Code,
 		"description": req.Description,
 		"updated_by":  gincontext.GetUserIDString(ctx),
-	}
-	// 内置角色保护：禁止改核心字段（编码），名称与描述仍可改
-	if roleEntity.Source == string(model.RoleSourceBuiltin) {
-		if req.Code != roleEntity.Code {
-			return code.GetError(code.RoleUpdateBuiltinForbiddenError)
-		}
 	}
 	if err := dao.NewRoleDao().UpdateMap(ctx, req.RoleID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcrole.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -200,7 +192,6 @@ func (svc *roleSvc) Detail(ctx *gin.Context, req *dtotenant.RoleDetailReq) (*dto
 		AppID:       roleEntity.AppID,
 		AppName:     appNameMap[roleEntity.AppID],
 		Name:        roleEntity.Name,
-		Code:        roleEntity.Code,
 		Description: roleEntity.Description,
 		Source:      roleEntity.Source,
 		AdminType:   roleEntity.AdminType,
@@ -249,7 +240,6 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtotenant.RolePageListReq) (
 			AppID:       v.AppID,
 			AppName:     appNameMap[v.AppID],
 			Name:        v.Name,
-			Code:        v.Code,
 			Description: v.Description,
 			Source:      v.Source,
 			AdminType:   v.AdminType,
@@ -486,9 +476,9 @@ func collectMenuIDs(tree []dtotenant.MenuTreeItem) map[string]bool {
 	return result
 }
 
-// tenantAppNameMap 租户订阅应用 ID -> 名称 映射。
+// tenantAppNameMap 租户订阅应用 ID -> 名称 映射（含系统内置应用，与角色可选应用集合口径一致）。
 func tenantAppNameMap(ctx *gin.Context) (map[string]string, error) {
-	appList, err := loadTenantApps(ctx)
+	appList, err := loadSubscribedApps(ctx)
 	if err != nil {
 		return nil, err
 	}

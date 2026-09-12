@@ -256,7 +256,11 @@ func TestCreateTenantSucceedsForZeroTenantPerson(t *testing.T) {
 	if ouErr != nil || len(deptUsers) != 1 || deptUsers[0].DepartmentID != rootDept.ID {
 		t.Fatalf("expected owner attached to root dept, got %#v err:%v", deptUsers, ouErr)
 	}
-	role, rErr := dao.NewRoleDao().GetByCond(t.Context(), &dao.RoleCond{TenantID: res.TenantID, Code: tenant.ProvisionRoleCode})
+	role, rErr := dao.NewRoleDao().GetByCond(t.Context(), &dao.RoleCond{
+		TenantID:  res.TenantID,
+		Source:    string(model.RoleSourceBuiltin),
+		AdminType: model.SysAdminTypeAdmin,
+	})
 	if rErr != nil || role == nil {
 		t.Fatalf("expected provisioned tenant admin role, err:%v role:%#v", rErr, role)
 	}

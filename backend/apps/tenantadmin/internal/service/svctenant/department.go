@@ -51,7 +51,6 @@ func (svc *departmentSvc) Create(ctx *gin.Context, req *dtotenant.DepartmentCrea
 		TenantID:  tenantID,
 		ParentID:  req.ParentID,
 		Name:      req.Name,
-		Code:      req.Code,
 		Sort:      req.Sort,
 		Status:    req.Status,
 		CreatedBy: gincontext.GetUserIDString(ctx),
@@ -131,7 +130,6 @@ func (svc *departmentSvc) Tree(ctx *gin.Context, req *dtotenant.DepartmentTreeRe
 			CreatedAt:    v.CreatedAt.Unix(),
 			DepartmentBaseInfo: objtenant.DepartmentBaseInfo{
 				Name:   v.Name,
-				Code:   v.Code,
 				Sort:   v.Sort,
 				Status: v.Status,
 			},
@@ -200,7 +198,6 @@ func (svc *departmentSvc) Children(ctx *gin.Context, req *dtotenant.DepartmentCh
 			HasChildren:  hasChildSet[v.ID],
 			DepartmentBaseInfo: objtenant.DepartmentBaseInfo{
 				Name:   v.Name,
-				Code:   v.Code,
 				Sort:   v.Sort,
 				Status: v.Status,
 			},
@@ -250,7 +247,6 @@ func (svc *departmentSvc) Update(ctx *gin.Context, req *dtotenant.DepartmentUpda
 	}
 	updateMap := map[string]any{
 		"name":       req.Name,
-		"code":       req.Code,
 		"sort":       req.Sort,
 		"status":     req.Status,
 		"updated_by": userID,

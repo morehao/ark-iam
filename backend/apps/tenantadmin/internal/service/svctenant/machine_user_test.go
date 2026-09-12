@@ -35,7 +35,6 @@ func seedTestOperator(t *testing.T, tenantID string, super bool) *model.UserEnti
 	role := &model.RoleEntity{
 		TenantID:  tenantID,
 		AppID:     "app-admin",
-		Code:      "test-admin",
 		Name:      "测试超级角色",
 		Source:    string(model.RoleSourceBuiltin),
 		AdminType: model.SysAdminTypeAdmin,
@@ -206,7 +205,7 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 
 	// 普通角色可授、super 角色禁授（按应用授权：role.app_id 须与 req.AppID 一致）
 	devRole := &model.RoleEntity{
-		TenantID: tenantID, AppID: "app-tenant", Code: "dev", Name: "开发者",
+		TenantID: tenantID, AppID: "app-tenant", Name: "开发者",
 		Source: string(model.RoleSourceCustom), AdminType: model.SysAdminTypeNormal,
 	}
 	if err := db.Create(devRole).Error; err != nil {
@@ -216,7 +215,7 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 		t.Fatalf("grant dev role: %v", err)
 	}
 	adminRole := &model.RoleEntity{
-		TenantID: tenantID, AppID: "app-tenant", Code: "tenant-owner", Name: "租户管理员",
+		TenantID: tenantID, AppID: "app-tenant", Name: "租户管理员",
 		Source: string(model.RoleSourceBuiltin), AdminType: model.SysAdminTypeAdmin,
 	}
 	if err := db.Create(adminRole).Error; err != nil {
@@ -228,7 +227,7 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 
 	// 按应用隔离：授另一个应用的普通角色后，原应用角色不受影响；跨应用角色拒绝
 	opsRole := &model.RoleEntity{
-		TenantID: tenantID, AppID: "app-other", Code: "ops", Name: "运维",
+		TenantID: tenantID, AppID: "app-other", Name: "运维",
 		Source: string(model.RoleSourceCustom), AdminType: model.SysAdminTypeNormal,
 	}
 	if err := db.Create(opsRole).Error; err != nil {

@@ -19,7 +19,6 @@ const (
 	RoleGetPageListError            = 100704
 	RoleNotExistError               = 100705
 	RoleDeleteBuiltinForbiddenError = 100706
-	RoleUpdateBuiltinForbiddenError = 100707
 )
 
 const (
@@ -83,7 +82,6 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	RoleGetPageListError:                  "查看角色列表失败",
 	RoleNotExistError:                     "角色不存在",
 	RoleDeleteBuiltinForbiddenError:       "内置角色禁止删除",
-	RoleUpdateBuiltinForbiddenError:       "内置角色禁止修改核心字段",
 	ApplicationCreateError:                "创建应用失败",
 	ApplicationDeleteError:                "删除应用失败",
 	ApplicationUpdateError:                "修改应用失败",

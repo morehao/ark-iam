@@ -290,7 +290,7 @@ DROP TABLE organization_role;
 | 资源标识（`resource.indicator`） | `urn:ark:iam:admin` | `urn:ark:iam:platform-admin` |
 | 权限/scope 编码（`scope.name`） | `admin:user:read` 等 12 个 | `platform-admin:user:read` 等 |
 | 菜单 permission 字段 | `admin:*` | `platform-admin:*` |
-| 角色编码（`role.code`） | `admin` / `user` / `guest` | **保留**（"管理员/普通用户/访客"语义本身清晰） |
+| 角色编码（`role.code`） | `admin` / `user` / `guest` | **保留**（"管理员/普通用户/访客"语义本身清晰）｜注：`role.code` 后续已整体下线（角色不再有业务编码），见 [`role-code-retirement.md`](./role-code-retirement.md) |
 | 前端 OIDC client_id | `platform-admin-web` | **不变**（已是 platform-admin 前缀） |
 
 > 本项目处于开发期，**无兼容性顾虑**：直接改常量并重置开发库即可（种子按 `application.code` 幂等查重，编码变更在已初始化库中会视为新应用，重置即消解）。
