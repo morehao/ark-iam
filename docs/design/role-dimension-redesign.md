@@ -206,13 +206,13 @@ const (
 
 ### 5.1.2 扩展性预留（权限表，本轮不建）
 
-**单调门槛枚举的下半场**：对"加档位"（仅超管/仅 owner/灰度渐进）扩展充分——加常量 + 更新 `userLevel` 即可。但对"多主体并集/特批"（给某角色/某用户/某组织单独可见、灰度白名单）单调枚举不够，需**预留 `menu_authorization`（菜单-主体授权）关联表**：
+**单调门槛枚举的下半场**：对"加档位"（仅超管/仅 owner/灰度渐进）扩展充分——加常量 + 更新 `userLevel` 即可。但对"多主体并集/特批"（给某角色/某用户/某部门单独可见、灰度白名单）单调枚举不够，需**预留 `menu_authorization`（菜单-主体授权）关联表**：
 
 ```go
 // 预留：menu_authorization —— 菜单对特定主体可见（多主体横向扩展，本轮不建表）
 type MenuAuthorizationEntity struct { // 设计预留
     MenuID     string  // 目标菜单
-    TargetType string  // everyone | admin | role | user | org | ...
+    TargetType string  // everyone | admin | role | user | dept | ...
     TargetID   string  // 目标ID
     // TenantID / 审计字段
 }
@@ -228,7 +228,7 @@ type MenuAuthorizationEntity struct { // 设计预留
 
 当前侧边栏菜单**不做任何权限过滤**：
 - 后端 `buildTenantMenuTree` → `buildAppMenuTree`（`svctenant/menu.go`）只按「租户订阅应用 + `status=enable`」平铺全部菜单，**不查 `role_menu`、不查 `visibility`，也不区分当前用户/角色**。
-- 前端 `tenant-admin-web/App.tsx` 还有一份 `STATIC_MENU_TREE`（组织架构/用户管理/角色管理）硬编码，与后端返回重叠。
+- 前端 `tenant-admin-web/App.tsx` 还有一份 `STATIC_MENU_TREE`（部门管理/用户管理/角色管理）硬编码，与后端返回重叠。
 - 于是管理员与普通成员看到的侧边栏相同，普通成员也能看到用户/角色管理等管理菜单 —— 与本需求相悖。
 
 好消息： seed 里内置唯一角色 admin 已配全量管理菜单；将来如新增差异化角色，只需在 `role_menu`/`role_scope` 上按角色授权即可，**扩展三级可见性时有现成数据可映射**。
@@ -275,15 +275,15 @@ type MenuAuthorizationEntity struct { // 设计预留
 ### 7.1 菜单可见性（角色驱动 + 三级门槛）
 - `pkg/iam/model/menu.go`：新增 `Visibility` 字段、`MenuVisibility` 常量、`VisibilityRank`。
 - `pkg/iam/dao/menu.go`：`MenuCond` 新增 `Visibility` 过滤。
-- `pkg/seed/seed.go`：`seedMenu.visibility` 映射（管理后台管理菜单 `admin`、工作台 `member`、租户侧组织架构 `public`、租户侧用户/角色管理 `admin`）＋ 存量幂等回填。
+- `pkg/seed/seed.go`：`seedMenu.visibility` 映射（管理后台管理菜单 `admin`、工作台 `member`、租户侧部门管理 `public`、租户侧用户/角色管理 `admin`）＋ 存量幂等回填。
   > **后续调整（本段为当时一期的落地记录）**：租户自服务控制台定位收敛为「租户管理层专用」（普通成员不面向该控制台、但不在 OIDC 层拦截登录），
-  > 故「组织管理」的 `visibility` 亦由 `public` 调整为 `admin`——租户自服务四个菜单（组织管理/用户管理/角色管理/API 密钥）现在全部为 `admin` 硬隔离，
+  > 故「部门管理」的 `visibility` 亦由 `public` 调整为 `admin`——租户自服务四个菜单（部门管理/用户管理/角色管理/API 密钥）现在全部为 `admin` 硬隔离，
   > 仅内置管理员（超管）角色可见与授权；自定义成员角色在该控制台无菜单可授。改动见 `pkg/seed/seed.go`（`appCodeTenantAdmin` 段）。
   >
   > 配套后端硬门槛：菜单可见性只是 UX 层（非安全边界），直接调 API 的普通成员仍可绕过页面。
   > 因此 `svctenant` 对租户自服务的管理写接口统一加 `requireSystemAdmin`（`admin_level=super`）能力校验：
-  > 组织/组织成员、用户（创建/编辑/重置密码/角色替换）、角色（创建/删除/更新/菜单授权）在 service 层入口即拒（`code.UserSystemAdminRequiredError`），
-  > 与既有 API 密钥、服务账号写操作的校验方式一致；普通成员即使持有合法 token 直连接口也无法变更组织/用户/角色数据。
+  > 部门/部门成员、用户（创建/编辑/重置密码/角色替换）、角色（创建/删除/更新/菜单授权）在 service 层入口即拒（`code.UserSystemAdminRequiredError`），
+  > 与既有 API 密钥、服务账号写操作的校验方式一致；普通成员即使持有合法 token 直连接口也无法变更部门/用户/角色数据。
 - `svctenant/menu.go`：新增 `buildMyMenuTree`（按 `visibility <= userLevel` 剪枝，父子收敛）、`pruneMenuTree`、`resolveUserMenuLevel`、`HasSystemAdminCapability`（授权驱动，读 `role_scope`）。`Tree` 接口改走 `buildMyMenuTree`。
 - 前端 `tenant-admin-web/App.tsx`：静态 fallback 收敛为仅含公共菜单（移除管理菜单），避免后端故障时暴露管理入口；types 补 `visibility`。
 

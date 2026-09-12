@@ -52,9 +52,9 @@ func seedTestMenuTree(t *testing.T, db *gorm.DB, tenantID string) (rootID, child
 	root := &model.MenuEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "m1"}},
 		AppID:      "app1",
-		Name:       "组织架构",
-		Code:       "organization",
-		Path:       "/organization",
+		Name:       "部门架构",
+		Code:       "department",
+		Path:       "/department",
 		Status:     "enable",
 	}
 	child := &model.MenuEntity{
@@ -83,7 +83,7 @@ func TestRoleCreateRequiresApp(t *testing.T) {
 	seedTestApp(t, db, "t2", "app2")
 	seedTenantAdminOperator(t, db, "t2", "op2")
 
-	ginCtx := newOrgGinCtx(t, "t1", "op")
+	ginCtx := newDeptGinCtx(t, "t1", "op")
 
 	// 非法应用
 	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app-bad", Name: "管理员", Code: "admin"}); err == nil {
@@ -98,7 +98,7 @@ func TestRoleCreateRequiresApp(t *testing.T) {
 		t.Fatalf("expected duplicate code error")
 	}
 	// 其他租户同编码不冲突
-	if _, err := svc.Create(newOrgGinCtx(t, "t2", "op2"), &dtotenant.RoleCreateReq{AppID: "app2", Name: "管理员", Code: "admin"}); err != nil {
+	if _, err := svc.Create(newDeptGinCtx(t, "t2", "op2"), &dtotenant.RoleCreateReq{AppID: "app2", Name: "管理员", Code: "admin"}); err != nil {
 		t.Fatalf("cross-tenant same code should be allowed: %v", err)
 	}
 }
@@ -106,7 +106,7 @@ func TestRoleCreateRequiresApp(t *testing.T) {
 // TestRolePageListWithCounts 分页列表带成员数/菜单数聚合。
 func TestRolePageListWithCounts(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.RoleMenuEntity{},
-		&model.OrganizationEntity{}, &model.OrganizationUserEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
+		&model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
 	seedTestApp(t, db, "t1", "app1")
 	seedTestRole(t, db, "r1", "t1", "app1", "管理员", "admin")
@@ -130,7 +130,7 @@ func TestRolePageListWithCounts(t *testing.T) {
 		t.Fatalf("seed role_menu: %v", err)
 	}
 
-	resp, err := svc.PageList(newOrgGinCtx(t, "t1", "op"), &dtotenant.RolePageListReq{Page: 1, PageSize: 10})
+	resp, err := svc.PageList(newDeptGinCtx(t, "t1", "op"), &dtotenant.RolePageListReq{Page: 1, PageSize: 10})
 	if err != nil {
 		t.Fatalf("page list: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestRoleMenusUpdateAndGet(t *testing.T) {
 	seedTestRole(t, db, "r1", "t1", "app1", "管理员", "admin")
 	rootID, childID := seedTestMenuTree(t, db, "t1")
 
-	ginCtx := newOrgGinCtx(t, "t1", "op")
+	ginCtx := newDeptGinCtx(t, "t1", "op")
 
 	// 非法菜单（不在角色所属应用菜单集合内）
 	if err := svc.UpdateMenus(ginCtx, &dtotenant.RoleMenusUpdateReq{RoleID: "r1", MenuIDs: []string{"m-bad"}}); err == nil {

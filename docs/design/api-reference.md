@@ -192,11 +192,11 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | GET | `/v1/platform/resources` | 资源分页 |
 | GET/PUT/DELETE | `/v1/platform/resources/:resourceID` | 资源详情/更新/删除 |
 
-### 5.3 租户与组织
+### 5.3 租户与部门
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/v1/platform/tenants` | 创建租户（**必带 `admin`**：同事务建根组织 + 内置管理员 user + 租户管理员角色授权；响应 `adminInitialPassword` 为一次性临时密码） |
+| POST | `/v1/platform/tenants` | 创建租户（**必带 `admin`**：同事务建根部门 + 内置管理员 user + 租户管理员角色授权；响应 `adminInitialPassword` 为一次性临时密码） |
 | GET | `/v1/platform/tenants` | 租户分页 |
 | GET/PUT/DELETE | `/v1/platform/tenants/:tenantID` | 租户详情/更新/删除 |
 | POST | `/v1/platform/tenants/:tenantID/builtin-admin/reset-password` | 重置租户内置管理员密码（仅 `source=builtin`，即建租户时由平台创建的管理员；返回一次性临时密码并撤销其会话） |
@@ -208,7 +208,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 >
 > 租户状态 `status`（`active` 正常 / `suspended` 已挂起）：非法值/缺省归一为 `active`；`suspended` 会撤销该租户成员的 refresh token 与 SSO 会话，非 active 租户的成员无法登录、令牌不签发；`PUT /v1/platform/tenants/:tenantID` 拒绝挂起操作者自己所在的租户（`100208`）；重置内置管理员密码失败报 `100210`。
 >
-> **建租户的管理员约定**（D2/D3/D6）：`admin` 必填且邮箱/手机至少一个（缺联系方式报 `100521`）；管理员在同事务内创建为 `tenant_user.source=builtin`、`is_owner=true`，并绑定根组织与内置 `tenant_admin` 角色（该角色随租户开通 `tenant-admin` 应用订阅；应用/菜单种子缺失会整体回滚并报 `100200`）。`adminInitialPassword` 只在**新建自然人**时非空——命中已存在自然人时沿用其原密码、不回显凭据（可改用重置内置管理员密码接口兜底）。该管理员首次登录强制改密：`/oidc/login` 返回 `requiresPasswordChange=true`，改完（`/oidc/login/changePassword`）须重新登录。详见 `tenant-admin-provisioning-design-20260912.md`。
+> **建租户的管理员约定**（D2/D3/D6）：`admin` 必填且邮箱/手机至少一个（缺联系方式报 `100521`）；管理员在同事务内创建为 `tenant_user.source=builtin`、`is_owner=true`，并绑定根部门与内置 `tenant_admin` 角色（该角色随租户开通 `tenant-admin` 应用订阅；应用/菜单种子缺失会整体回滚并报 `100200`）。`adminInitialPassword` 只在**新建自然人**时非空——命中已存在自然人时沿用其原密码、不回显凭据（可改用重置内置管理员密码接口兜底）。该管理员首次登录强制改密：`/oidc/login` 返回 `requiresPasswordChange=true`，改完（`/oidc/login/changePassword`）须重新登录。详见 `tenant-admin-provisioning-design-20260912.md`。
 
 ### 5.4 应用与客户端（OIDC 配置）
 
@@ -248,10 +248,10 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/v1/tenant/users` | 租户**真实用户**（member）分页（?keyword= 姓名/用户名/邮箱/手机，?isSuspended=，含主组织/角色数） |
-| POST | `/v1/tenant/users` | 创建租户真实用户（姓名/部门 organizationIDs/邮箱/手机；**不含密码**：服务端生成临时密码，响应 `initialPassword` 仅此一次返回；**姓名即自然人信息**：无匹配 person 则按姓名创建，命中 email/phone 复用——复用时密码不变、`initialPassword` 为空；部门归属同事务建立，首个为主组织） |
-| GET | `/v1/tenant/users/:userID` | 用户详情（基础信息 + 组织归属 + 角色） |
-| PATCH | `/v1/tenant/users/:userID` | 局部更新（姓名/头像/状态） |
+| GET | `/v1/tenant/users` | 租户**真实用户**（member）分页（?keyword= 姓名/用户名/邮箱/手机，?isSuspended=，含主部门/角色数） |
+| POST | `/v1/tenant/users` | 创建租户真实用户（姓名/主部门 primaryDepartmentID/邮箱/手机；**不含密码**：服务端生成临时密码，响应 `initialPassword` 仅此一次返回；**姓名即自然人信息**：无匹配 person 则按姓名创建，命中 email/phone 复用——复用时密码不变、`initialPassword` 为空；部门归属同事务建立：primaryDepartmentID 单值主部门 + secondaryDepartmentIDs/leaderDepartmentIDs 可选） |
+| GET | `/v1/tenant/users/:userID` | 用户详情（基础信息 + 部门归属 + 角色） |
+| PATCH | `/v1/tenant/users/:userID` | 局部更新（姓名/头像/状态 + primaryDepartmentID 换主部门不可清空 + secondaryDepartmentIDs/leaderDepartmentIDs 全量替换，nil=不变） |
 | POST | `/v1/tenant/users/:userID/reset-password` | 重置密码（无入参，仅 `user_type=member`）：服务端生成临时密码写入关联 person，响应 `initialPassword` 仅此一次返回，并撤销该成员全部会话 |
 | GET | `/v1/tenant/users/:userID/roles` | 用户已分配角色（用户侧授权入口；服务账号走 `/machine-users`） |
 | PUT | `/v1/tenant/users/:userID/roles` | 全量替换用户角色 |
@@ -259,10 +259,10 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | POST | `/v1/tenant/users/:userID/identities` | 绑定第三方身份 {issuer, identityID, detail?}（租户取自登录上下文，不传 tenantID；同 issuer+identityID 全局唯一） |
 | DELETE | `/v1/tenant/users/:userID/identities/:identityID` | 解绑第三方身份 |
 | GET | `/v1/tenant/users/:userID/login-logs` | 用户登录日志（只读，租户 + 用户双重过滤） |
-| GET | `/v1/tenant/machine-users` | 服务账号分页（?name=&isSuspended=，含 primaryOrgID/primaryOrgName；服务账号=租户内机器主体 user_type=machine，不可登录/无自然人/不可任部门负责人，作为角色主体与 API Key 归属） |
-| POST | `/v1/tenant/machine-users` | 创建服务账号 {name,description,organizationIDs(主部门,至多1个,必传),secondaryOrgIDs?(参与部门)}（需系统管理能力 super） |
-| GET | `/v1/tenant/machine-users/:machineUserID` | 服务账号详情（组织归属 organizations + 已授权角色） |
-| PUT | `/v1/tenant/machine-users/:machineUserID` | 更新服务账号（名称/描述 + primaryOrgID? 换主部门不可清空 + secondaryOrgIDs? 参与部门全量替换,nil=不变） |
+| GET | `/v1/tenant/machine-users` | 服务账号分页（?name=&isSuspended=，含 primaryDepartmentID/primaryDepartmentName；服务账号=租户内机器主体 user_type=machine，不可登录/无自然人/不可任部门负责人，作为角色主体与 API Key 归属） |
+| POST | `/v1/tenant/machine-users` | 创建服务账号 {name,description,primaryDepartmentID(主部门,单值,必传),secondaryDepartmentIDs?(参与部门)}（需系统管理能力 super） |
+| GET | `/v1/tenant/machine-users/:machineUserID` | 服务账号详情（部门归属 departments + 已授权角色） |
+| PUT | `/v1/tenant/machine-users/:machineUserID` | 更新服务账号（名称/描述 + primaryDepartmentID? 换主部门不可清空 + secondaryDepartmentIDs? 参与部门全量替换,nil=不变） |
 | PATCH | `/v1/tenant/machine-users/:machineUserID` | 挂起/启用（{isSuspended}，挂起后其密钥鉴权失效） |
 | DELETE | `/v1/tenant/machine-users/:machineUserID` | 删除服务账号（须先删除其全部 API Key；级联清理角色与部门关系） |
 | GET | `/v1/tenant/machine-users/:machineUserID/roles` | 服务账号已分配角色 |
@@ -279,18 +279,16 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | DELETE | `/v1/tenant/roles/:roleID` | 删除角色（级联清理成员/菜单关联） |
 | GET | `/v1/tenant/roles/:roleID/menus` | 角色菜单授权回显（**所属应用的菜单树** + 已授权ID，角色侧授权入口） |
 | PUT | `/v1/tenant/roles/:roleID/menus` | 全量替换角色菜单授权 |
-| POST | `/v1/tenant/organizations` | 创建组织节点 |
-| GET | `/v1/tenant/organizations/tree` | 组织树 |
-| GET | `/v1/tenant/organizations/:organizationID` | 节点详情（含面包屑祖先链） |
-| PUT | `/v1/tenant/organizations/:organizationID` | 更新节点（改 parentID 即移动） |
-| PATCH | `/v1/tenant/organizations/:organizationID` | 更新状态（启停用） |
-| DELETE | `/v1/tenant/organizations/:organizationID` | 删除节点（有子/成员需 ?cascade=1） |
-| GET | `/v1/tenant/organizations/:organizationID/users` | 节点关系分页（?relationType=&keyword=，含用户基础信息；relationType: primary/secondary/leader） || POST | `/v1/tenant/organizations/:organizationID/users` | 添加关系 {userID, relationType}（primary 至多 1 行/用户） |
-| PUT | `/v1/tenant/organizations/:organizationID/users/:userID` | 更新关系（relationType） |
-| DELETE | `/v1/tenant/organizations/:organizationID/users/:userID` | 移除关系 |
-| GET | `/v1/tenant/organizations/:organizationID/users/descendants` | 子树成员聚合（去重） |
-| GET | `/v1/tenant/users/:userID/organizations` | 用户组织归属 |
-| PUT | `/v1/tenant/users/:userID/organizations` | 批量替换参与部门（全量替换 secondary） |
+| POST | `/v1/tenant/departments` | 创建部门节点 |
+| GET | `/v1/tenant/departments/tree` | 部门树（全量，前端自行组树） |
+| GET | `/v1/tenant/departments/:departmentID/children` | 子节点分页（懒加载；含 each 节点 hasChildren） |
+| PUT | `/v1/tenant/departments/:departmentID` | 更新节点（改 parentID 即移动，含面包屑祖先链校验） |
+| PATCH | `/v1/tenant/departments/:departmentID` | 更新状态（启停用） |
+| DELETE | `/v1/tenant/departments/:departmentID` | 删除节点（有子/成员需 ?cascade=1） |
+| GET | `/v1/tenant/departments/:departmentID/users` | 节点成员分页（?relationType=&keyword=，含用户基础信息；relationType: primary/secondary/leader） |
+| POST | `/v1/tenant/departments/:departmentID/users` | 添加成员关系 {userID, relationType}（primary 每用户至多 1 行） |
+| PUT | `/v1/tenant/departments/:departmentID/users/:userID` | 更新成员关系（relationType） |
+| DELETE | `/v1/tenant/departments/:departmentID/users/:userID` | 移除成员关系 |
 | GET | `/v1/tenant/menus/tree` | 租户动态菜单树 |
 
 ---

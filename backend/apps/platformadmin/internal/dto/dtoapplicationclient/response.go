@@ -18,13 +18,13 @@ type ApplicationClientDetailResp struct {
 	ResponseTypes           []string `json:"responseTypes"`           // 响应类型
 	TokenEndpointAuthMethod string   `json:"tokenEndpointAuthMethod"` // 令牌端点认证方式
 	AllowedOrigins          []string `json:"allowedOrigins"`          // CORS白名单
-	RequirePKCE bool     `json:"requirePKCE"`             // 是否强制PKCE
-	RequireAuthTime bool     `json:"requireAuthTime"`         // 是否需要auth_time声明
+	RequirePKCE             bool     `json:"requirePKCE"`             // 是否强制PKCE
+	RequireAuthTime         bool     `json:"requireAuthTime"`         // 是否需要auth_time声明
 	DefaultScopes           []string `json:"defaultScopes"`           // 默认权限范围
 	AccessTokenTTL          int64    `json:"accessTokenTTL"`          // 访问令牌有效期(秒)
 	RefreshTokenTTL         int64    `json:"refreshTokenTTL"`         // 刷新令牌有效期(秒)
 	Type                    string   `json:"type"`                    // 客户端类型
-	IsThirdParty bool     `json:"isThirdParty"`            // 是否第三方应用
+	IsThirdParty            bool     `json:"isThirdParty"`            // 是否第三方应用
 	Status                  string   `json:"status"`                  // 状态
 	CreatedAt               int64    `json:"createdAt"`               // 创建时间(unix 秒)
 }
@@ -41,7 +41,7 @@ type PageListItem struct {
 	Name                    string   `json:"name"`                    // 客户端名称
 	Type                    string   `json:"type"`                    // 客户端类型
 	Status                  string   `json:"status"`                  // 状态
-	IsThirdParty bool     `json:"isThirdParty"`            // 是否第三方应用
+	IsThirdParty            bool     `json:"isThirdParty"`            // 是否第三方应用
 	GrantTypes              []string `json:"grantTypes"`              // 授权类型
 	TokenEndpointAuthMethod string   `json:"tokenEndpointAuthMethod"` // 令牌端点认证方式
 	CreatedAt               int64    `json:"createdAt"`               // 创建时间(unix 秒)
@@ -49,10 +49,10 @@ type PageListItem struct {
 }
 
 type SecretResp struct {
-	ID                  string  `json:"id"`                  // 密钥ID
-	ApplicationClientID string  `json:"applicationClientID"` // OAuth客户端ID
-	Name                string  `json:"name"`                // 密钥名称
-	ValuePrefix         string  `json:"valuePrefix"`         // 密钥前缀
+	ID                  string `json:"id"`                  // 密钥ID
+	ApplicationClientID string `json:"applicationClientID"` // OAuth客户端ID
+	Name                string `json:"name"`                // 密钥名称
+	ValuePrefix         string `json:"valuePrefix"`         // 密钥前缀
 	ExpiredAt           *int64 `json:"expiresAt"`           // 过期时间(unix 秒)
 	CreatedAt           int64  `json:"createdAt"`           // 创建时间(unix 秒)
 }

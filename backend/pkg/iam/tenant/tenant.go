@@ -66,8 +66,8 @@ func RevokePersonSessions(ctx context.Context, personID string) {
 	}
 }
 
-// CreateWithRootOrgReq 构造 CreateWithRootOrg 入参。
-type CreateWithRootOrgReq struct {
+// CreateWithRootDeptReq 构造 CreateWithRootDept 入参。
+type CreateWithRootDeptReq struct {
 	Code      string // 租户编码（可空，由调用方生成后传入）
 	Name      string // 租户名
 	Type      model.TenantType
@@ -77,10 +77,10 @@ type CreateWithRootOrgReq struct {
 	CreatedBy string
 }
 
-// CreateWithRootOrg 在 tx 事务内创建租户 + 同名根组织节点（组织树容器根）。
-// 必须在调用方的事务 tx 内执行（空 tx 会 panic）。返回新建租户实体与根组织实体（均含 ID）：
-// 根组织需要被调用方用作首位成员（内置管理员 / 自助建租户 owner）的行政主部门。
-func CreateWithRootOrg(ctx context.Context, tx *gorm.DB, req *CreateWithRootOrgReq) (*model.TenantEntity, *model.OrganizationEntity, error) {
+// CreateWithRootDept 在 tx 事务内创建租户 + 同名根部门节点（部门树容器根）。
+// 必须在调用方的事务 tx 内执行（空 tx 会 panic）。返回新建租户实体与根部门实体（均含 ID）：
+// 根部门需要被调用方用作首位成员（内置管理员 / 自助建租户 owner）的行政主部门。
+func CreateWithRootDept(ctx context.Context, tx *gorm.DB, req *CreateWithRootDeptReq) (*model.TenantEntity, *model.DepartmentEntity, error) {
 	tenantEntity := &model.TenantEntity{
 		Code:      req.Code,
 		Name:      req.Name,
@@ -93,23 +93,23 @@ func CreateWithRootOrg(ctx context.Context, tx *gorm.DB, req *CreateWithRootOrgR
 	if err := dao.NewTenantDao().WithTx(tx).Insert(ctx, tenantEntity); err != nil {
 		return nil, nil, err
 	}
-	// 每个租户创建时自动创建同名的根组织节点（组织树容器根）
-	rootOrg := &model.OrganizationEntity{
+	// 每个租户创建时自动创建同名的根部门节点（部门树容器根）
+	rootDept := &model.DepartmentEntity{
 		TenantID:  tenantEntity.ID,
 		ParentID:  "",
 		Name:      req.Name,
-		Status:    string(model.OrgNodeStatusActive),
+		Status:    string(model.DeptNodeStatusActive),
 		CreatedBy: req.CreatedBy,
 	}
-	if err := dao.NewOrganizationDao().WithTx(tx).Insert(ctx, rootOrg); err != nil {
+	if err := dao.NewDepartmentDao().WithTx(tx).Insert(ctx, rootDept); err != nil {
 		return nil, nil, err
 	}
 	// 根节点路径："/"+id，深度 1（ID 由 BeforeCreate 生成，需创建后补写）
-	if err := dao.NewOrganizationDao().WithTx(tx).UpdateMap(ctx, rootOrg.ID, map[string]any{
-		"org_path":  "/" + rootOrg.ID,
-		"org_depth": 1,
+	if err := dao.NewDepartmentDao().WithTx(tx).UpdateMap(ctx, rootDept.ID, map[string]any{
+		"dept_path":  "/" + rootDept.ID,
+		"dept_depth": 1,
 	}); err != nil {
 		return nil, nil, err
 	}
-	return tenantEntity, rootOrg, nil
+	return tenantEntity, rootDept, nil
 }

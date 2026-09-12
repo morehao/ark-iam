@@ -6,7 +6,7 @@ import type { MainMenuItems } from '@ark-iam/ui'
 import { ApartmentOutlined, KeyOutlined, SafetyCertificateOutlined, UserOutlined } from '@ant-design/icons'
 import type { MenuItem } from '@ark-iam/types'
 import { getMyMenuTree } from './api/menu'
-import OrganizationList from './pages/organization'
+import DepartmentList from './pages/department'
 import TenantUserList from './pages/user'
 import TenantRoleList from './pages/role'
 import TenantApiKeyList from './pages/apiKey'
@@ -21,7 +21,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 
 // 组件白名单：只有 path 命中才会渲染路由与侧边栏菜单，避免点击进入 404
 const COMPONENT_MAP: Record<string, React.ComponentType> = {
-  '/organization': OrganizationList,
+  '/department': DepartmentList,
   '/user': TenantUserList,
   '/role': TenantRoleList,
   '/api-key': TenantApiKeyList,

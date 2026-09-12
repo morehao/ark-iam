@@ -56,7 +56,7 @@ func TestSeedIamAgainstPostgres(t *testing.T) {
 			"user_role", "role_menu", "tenant_application",
 			"application_client_secret", "application_client", "menu",
 			"role", "user_identity", "user_login_log",
-			"organization_user", "organization", "tenant_user", "person",
+			"department_user", "department", "tenant_user", "person",
 			"refresh_token", "session", "audit_log", "api_key", "connector",
 			"domain", "system", "log", "application", "tenant",
 		}
@@ -104,8 +104,8 @@ func TestSeedIamAgainstPostgres(t *testing.T) {
 	assertCount("user_role", 2)
 	assertCount("role_menu", 15)
 	assertCount("tenant_application", 2)
-	assertCount("organization", 1)
-	assertCount("organization_user", 1)
+	assertCount("department", 1)
+	assertCount("department_user", 1)
 
 	// 验证管理员用户归属
 	var u model.UserEntity
@@ -118,16 +118,16 @@ func TestSeedIamAgainstPostgres(t *testing.T) {
 	t.Logf("admin user id=%s tenant=%s person=%s", u.ID, u.TenantID, u.PersonID)
 
 	// 验证管理员从属顶级部门（primary 行政主部门）
-	var rootOrg model.OrganizationEntity
-	if err := db.Where("tenant_id = ? AND parent_id = ?", u.TenantID, "").First(&rootOrg).Error; err != nil {
-		t.Fatalf("root organization not found: %v", err)
+	var rootDept model.DepartmentEntity
+	if err := db.Where("tenant_id = ? AND parent_id = ?", u.TenantID, "").First(&rootDept).Error; err != nil {
+		t.Fatalf("root department not found: %v", err)
 	}
-	var ou model.OrganizationUserEntity
-	if err := db.Where("tenant_id = ? AND user_id = ? AND organization_id = ? AND relation_type = ?",
-		u.TenantID, u.ID, rootOrg.ID, model.OrgUserRelationPrimary).First(&ou).Error; err != nil {
-		t.Fatalf("admin organization relation not found: %v", err)
+	var ou model.DepartmentUserEntity
+	if err := db.Where("tenant_id = ? AND user_id = ? AND department_id = ? AND relation_type = ?",
+		u.TenantID, u.ID, rootDept.ID, model.DeptUserRelationPrimary).First(&ou).Error; err != nil {
+		t.Fatalf("admin department relation not found: %v", err)
 	}
-	t.Logf("admin org relation: org=%s relation=%s", ou.OrganizationID, ou.RelationType)
+	t.Logf("admin dept relation: dept=%s relation=%s", ou.DepartmentID, ou.RelationType)
 
 	cleanup()
 	t.Log("PG AutoMigrate + Seed idempotency check passed")

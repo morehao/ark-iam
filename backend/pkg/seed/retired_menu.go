@@ -35,6 +35,10 @@ var retiredMenus = []retiredMenu{
 	{appCode: appCodeAdmin, menuCode: "grp-identity"},
 	{appCode: appCodeAdmin, menuCode: "user"},
 	{appCode: appCodeAdmin, menuCode: "role"},
+	// 租户端「组织管理」页改名为「部门管理」（organization → department）：
+	// 菜单 code/path/component 全变更，登记旧 code 以清理存量库残留
+	// （seedMenus 只 upsert 不下线，漏登记即存量库死链菜单 + role_menu 脏授权）。
+	{appCode: appCodeTenantAdmin, menuCode: "organization"},
 }
 
 // pruneRetiredMenus 幂等清理已下线菜单：先解除 role_menu 授权绑定，再删除菜单行（软删除）。

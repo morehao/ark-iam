@@ -1,20 +1,20 @@
-export interface OrganizationItem {
-  organizationID: string
+export interface DepartmentItem {
+  departmentID: string
   parentID: string
-  orgPath: string
-  orgDepth: number
+  deptPath: string
+  deptDepth: number
   name: string
   code: string
   sort: number
   status: string
   createdAt?: number
-  children?: OrganizationItem[]
+  children?: DepartmentItem[]
 }
 
-export interface OrganizationChildItem {
-  organizationID: string
+export interface DepartmentChildItem {
+  departmentID: string
   parentID: string
-  orgDepth: number
+  deptDepth: number
   name: string
   code: string
   sort: number
@@ -24,8 +24,8 @@ export interface OrganizationChildItem {
   hasChildren?: boolean
 }
 
-export interface OrganizationUserItem {
-  organizationID: string
+export interface DepartmentUserItem {
+  departmentID: string
   userID: string
   userName: string
   username: string
@@ -37,18 +37,18 @@ export interface OrganizationUserItem {
   joinedAt?: number
 }
 
-export interface UserOrganizationItem {
-  organizationID: string
-  organizationName: string
+export interface UserDepartmentItem {
+  departmentID: string
+  departmentName: string
   relationType: string
 }
 
-export interface OrganizationTreeResp {
-  list: OrganizationItem[]
+export interface DepartmentTreeResp {
+  list: DepartmentItem[]
 }
 
-export interface OrganizationChildrenResp {
-  list: OrganizationChildItem[]
+export interface DepartmentChildrenResp {
+  list: DepartmentChildItem[]
   total: number
 }
 

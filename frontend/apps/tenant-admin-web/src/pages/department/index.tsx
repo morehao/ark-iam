@@ -18,32 +18,32 @@ import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
 import { actionColumn, NAME_COL_WIDTH, nameColumn, PageContainer, STATUS_COL_WIDTH, StatusTag, tableScrollX, timeColumn, tokens } from '@ark-iam/ui'
-import type { OrganizationChildItem, OrganizationItem } from '@ark-iam/types'
+import type { DepartmentChildItem, DepartmentItem } from '@ark-iam/types'
 import {
-  createOrganization,
-  deleteOrganization,
-  getOrganizationChildren,
-  getOrganizationTree,
-  updateOrganization,
-  updateOrganizationStatus,
-} from '../../api/organization'
+  createDepartment,
+  deleteDepartment,
+  getDepartmentChildren,
+  getDepartmentTree,
+  updateDepartment,
+  updateDepartmentStatus,
+} from '../../api/department'
 
-// 树节点：纯组织名称
-function buildTree(list: OrganizationItem[]): DataNode[] {
+// 树节点：纯部门名称
+function buildTree(list: DepartmentItem[]): DataNode[] {
   return list.map((n) => ({
-    key: n.organizationID,
+    key: n.departmentID,
     title: n.name,
     children: n.children?.length ? buildTree(n.children) : undefined,
   }))
 }
 
 // 按关键字在树上过滤节点（命中节点保留其祖先链）
-function filterTree(list: OrganizationItem[], keyword: string): OrganizationItem[] {
+function filterTree(list: DepartmentItem[], keyword: string): DepartmentItem[] {
   const kw = keyword.trim().toLowerCase()
   if (!kw) return list
-  const hit = (n: OrganizationItem) => n.name.toLowerCase().includes(kw)
-  const walk = (items: OrganizationItem[]): OrganizationItem[] => {
-    const out: OrganizationItem[] = []
+  const hit = (n: DepartmentItem) => n.name.toLowerCase().includes(kw)
+  const walk = (items: DepartmentItem[]): DepartmentItem[] => {
+    const out: DepartmentItem[] = []
     for (const n of items) {
       const children = n.children?.length ? walk(n.children) : []
       if (hit(n) || children.length) {
@@ -56,12 +56,12 @@ function filterTree(list: OrganizationItem[], keyword: string): OrganizationItem
 }
 
 // 收集目标节点及其全部子孙 ID
-function collectSelfAndDescendants(list: OrganizationItem[], id: string): Set<string> {
+function collectSelfAndDescendants(list: DepartmentItem[], id: string): Set<string> {
   const result = new Set<string>()
   const node = findNode(list, id)
   if (!node) return result
-  const collect = (n: OrganizationItem) => {
-    result.add(n.organizationID)
+  const collect = (n: DepartmentItem) => {
+    result.add(n.departmentID)
     if (n.children?.length) n.children.forEach(collect)
   }
   collect(node)
@@ -69,9 +69,9 @@ function collectSelfAndDescendants(list: OrganizationItem[], id: string): Set<st
 }
 
 // findNode 在树列表中按 ID 查找节点
-function findNode(list: OrganizationItem[], id: string): OrganizationItem | null {
+function findNode(list: DepartmentItem[], id: string): DepartmentItem | null {
   for (const n of list) {
-    if (n.organizationID === id) return n
+    if (n.departmentID === id) return n
     if (n.children?.length) {
       const found = findNode(n.children, id)
       if (found) return found
@@ -80,26 +80,26 @@ function findNode(list: OrganizationItem[], id: string): OrganizationItem | null
   return null
 }
 
-// toTreeSelect 组织树 -> TreeSelect 数据
-function toTreeSelect(list: OrganizationItem[]): any[] {
+// toTreeSelect 部门树 -> TreeSelect 数据
+function toTreeSelect(list: DepartmentItem[]): any[] {
   return list.map((n) => ({
     title: n.name,
-    value: n.organizationID,
+    value: n.departmentID,
     children: n.children?.length ? toTreeSelect(n.children) : undefined,
   }))
 }
 
-export default function OrganizationPage() {
-  const [orgList, setOrgList] = useState<OrganizationItem[]>([])
-  // 左侧树当前被选中的组织；为空表示未选中，右侧展示顶级组织的下级组织
+export default function DepartmentPage() {
+  const [deptList, setDeptList] = useState<DepartmentItem[]>([])
+  // 左侧树当前被选中的部门；为空表示未选中，右侧展示顶级部门的下级部门
   const [selectedID, setSelectedID] = useState<string>('')
   const [treeLoading, setTreeLoading] = useState(false)
 
   // 左侧树搜索关键字（仅影响树展示）
   const [treeKeyword, setTreeKeyword] = useState('')
 
-  // ---------- 右侧下级组织列表 ----------
-  const [childrenList, setChildrenList] = useState<OrganizationChildItem[]>([])
+  // ---------- 右侧下级部门列表 ----------
+  const [childrenList, setChildrenList] = useState<DepartmentChildItem[]>([])
   const [childrenTotal, setChildrenTotal] = useState(0)
   const [childrenLoading, setChildrenLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -107,19 +107,19 @@ export default function OrganizationPage() {
   const [filterForm] = Form.useForm()
   const [query, setQuery] = useState<{ name?: string; status?: string }>({})
 
-  // 顶级组织（根节点）：未选中任何组织时，右侧默认展示其下级组织
-  const defaultRootID = useMemo(() => orgList[0]?.organizationID || '', [orgList])
+  // 顶级部门（根节点）：未选中任何部门时，右侧默认展示其下级部门
+  const defaultRootID = useMemo(() => deptList[0]?.departmentID || '', [deptList])
 
   const [nodeModalOpen, setNodeModalOpen] = useState(false)
-  const [editingNode, setEditingNode] = useState<{ organizationID: string; parentID?: string; name: string; code?: string; sort?: number; status: string } | null>(null)
+  const [editingNode, setEditingNode] = useState<{ departmentID: string; parentID?: string; name: string; code?: string; sort?: number; status: string } | null>(null)
   const [nodeForm] = Form.useForm()
 
   // 左侧树加载
   const loadTree = useCallback(async () => {
     setTreeLoading(true)
     try {
-      const resp = await getOrganizationTree()
-      setOrgList(resp.list || [])
+      const resp = await getDepartmentTree()
+      setDeptList(resp.list || [])
     } finally {
       setTreeLoading(false)
     }
@@ -129,7 +129,7 @@ export default function OrganizationPage() {
     void loadTree()
   }, [loadTree])
 
-  // 右侧下级组织列表加载（入参：选中组织或顶级组织 + 筛选 + 分页）
+  // 右侧下级部门列表加载（入参：选中部门或顶级部门 + 筛选 + 分页）
   const loadChildren = useCallback(
     async (p: number) => {
       const parentID = selectedID || defaultRootID
@@ -140,7 +140,7 @@ export default function OrganizationPage() {
       }
       setChildrenLoading(true)
       try {
-        const resp = await getOrganizationChildren(parentID, {
+        const resp = await getDepartmentChildren(parentID, {
           page: p,
           pageSize,
           name: query.name,
@@ -160,7 +160,7 @@ export default function OrganizationPage() {
     void loadChildren(1)
   }, [loadChildren])
 
-  const visibleTree = useMemo(() => filterTree(orgList, treeKeyword), [orgList, treeKeyword])
+  const visibleTree = useMemo(() => filterTree(deptList, treeKeyword), [deptList, treeKeyword])
   const visibleTreeData = useMemo(() => buildTree(visibleTree), [visibleTree])
 
   const openCreateNode = (parentID?: string) => {
@@ -170,7 +170,7 @@ export default function OrganizationPage() {
     setNodeModalOpen(true)
   }
 
-  const openEditNode = (node: { organizationID: string; parentID?: string; name: string; code?: string; sort?: number; status: string }) => {
+  const openEditNode = (node: { departmentID: string; parentID?: string; name: string; code?: string; sort?: number; status: string }) => {
     setEditingNode(node)
     nodeForm.setFieldsValue({
       parentID: node.parentID || undefined,
@@ -186,10 +186,10 @@ export default function OrganizationPage() {
     try {
       const values = await nodeForm.validateFields()
       if (editingNode) {
-        await updateOrganization({ organizationID: editingNode.organizationID, ...values })
+        await updateDepartment({ departmentID: editingNode.departmentID, ...values })
         message.success('保存成功')
       } else {
-        await createOrganization(values)
+        await createDepartment(values)
         message.success('创建成功')
       }
       setNodeModalOpen(false)
@@ -202,7 +202,7 @@ export default function OrganizationPage() {
 
   const removeNode = async (id: string) => {
     try {
-      await deleteOrganization(id, true)
+      await deleteDepartment(id, true)
       message.success('删除成功')
       if (selectedID === id) setSelectedID('')
       if (page > 1 && childrenList.length === 1) setPage(page - 1)
@@ -213,37 +213,37 @@ export default function OrganizationPage() {
     }
   }
 
-  const toggleStatus = async (node: { organizationID: string; status: string }) => {
+  const toggleStatus = async (node: { departmentID: string; status: string }) => {
     const next = node.status === 'active' ? 'inactive' : 'active'
-    await updateOrganizationStatus(node.organizationID, next)
+    await updateDepartmentStatus(node.departmentID, next)
     message.success('状态已更新')
     void loadTree()
     void loadChildren(page)
   }
 
-  // 编辑时可选的父组织：排除当前节点及其子孙，避免环路
+  // 编辑时可选的父部门：排除当前节点及其子孙，避免环路
   const parentTreeData = useMemo(() => {
-    const baseID = editingNode?.organizationID
+    const baseID = editingNode?.departmentID
     if (!baseID) return []
-    const exclude = collectSelfAndDescendants(orgList, baseID)
-    const toTree = (items: OrganizationItem[]): any[] =>
+    const exclude = collectSelfAndDescendants(deptList, baseID)
+    const toTree = (items: DepartmentItem[]): any[] =>
       items
-        .filter((n) => !exclude.has(n.organizationID))
+        .filter((n) => !exclude.has(n.departmentID))
         .map((n) => ({
           title: n.name,
-          value: n.organizationID,
+          value: n.departmentID,
           children: n.children?.length ? toTree(n.children) : undefined,
         }))
-    return toTree(orgList)
-  }, [orgList, editingNode])
+    return toTree(deptList)
+  }, [deptList, editingNode])
 
-  // 右侧下级组织列
-  const childrenColumns: ColumnsType<OrganizationChildItem> = [
-    nameColumn<OrganizationChildItem>({
-      title: '组织名称',
+  // 右侧下级部门列
+  const childrenColumns: ColumnsType<DepartmentChildItem> = [
+    nameColumn<DepartmentChildItem>({
+      title: '部门名称',
       dataIndex: 'name',
       width: NAME_COL_WIDTH,
-      onClick: (r) => setSelectedID(r.organizationID),
+      onClick: (r) => setSelectedID(r.departmentID),
     }),
     {
       title: '状态',
@@ -252,9 +252,9 @@ export default function OrganizationPage() {
       width: STATUS_COL_WIDTH,
       render: (v: string) => <StatusTag value={v} />,
     },
-    timeColumn<OrganizationChildItem>({ title: '创建时间', dataIndex: 'createdAt' }),
-    timeColumn<OrganizationChildItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
-    actionColumn<OrganizationChildItem>({
+    timeColumn<DepartmentChildItem>({ title: '创建时间', dataIndex: 'createdAt' }),
+    timeColumn<DepartmentChildItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
+    actionColumn<DepartmentChildItem>({
       max: 3,
       actions: (r) => [
         { key: 'edit', label: '编辑', onClick: () => openEditNode(r) },
@@ -267,31 +267,31 @@ export default function OrganizationPage() {
           key: 'delete',
           label: '删除',
           danger: true,
-          confirm: '确认删除该组织及其子组织？',
-          onClick: () => void removeNode(r.organizationID),
+          confirm: '确认删除该部门及其子部门？',
+          onClick: () => void removeNode(r.departmentID),
         },
       ],
     }),
   ]
 
   return (
-    <PageContainer title="组织管理" description="组织树维护：组织层级与组织节点管理">
+    <PageContainer title="部门管理" description="部门树维护：部门层级与部门节点管理">
       <style>{`
-        #org-tree-card .ant-tree-treenode {
+        #dept-tree-card .ant-tree-treenode {
           padding-inline: 0;
         }
-        #org-tree-card .ant-tree-switcher {
+        #dept-tree-card .ant-tree-switcher {
           width: 0;
           overflow: hidden;
         }
       `}</style>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-        <Card id="org-tree-card" style={{ width: 280, flexShrink: 0, borderRadius: 12 }} styles={{ body: { padding: '16px 16px', maxHeight: 680, overflow: 'auto' } }}>
-          <Input placeholder="搜索组织" allowClear value={treeKeyword} onChange={(e) => setTreeKeyword(e.target.value)} style={{ marginBottom: 12 }} />
+        <Card id="dept-tree-card" style={{ width: 280, flexShrink: 0, borderRadius: 12 }} styles={{ body: { padding: '16px 16px', maxHeight: 680, overflow: 'auto' } }}>
+          <Input placeholder="搜索部门" allowClear value={treeKeyword} onChange={(e) => setTreeKeyword(e.target.value)} style={{ marginBottom: 12 }} />
           <Spin spinning={treeLoading}>
             {visibleTreeData.length === 0 ? (
               <Button type="dashed" block icon={<PlusOutlined />} onClick={() => openCreateNode()}>
-                创建组织
+                创建部门
               </Button>
             ) : (
               <Tree
@@ -315,8 +315,8 @@ export default function OrganizationPage() {
               setQuery({ name: v.name, status: v.status })
             }}
           >
-            <Form.Item name="name" label="组织名称">
-              <Input placeholder="请输入组织名称" allowClear style={{ width: 200 }} />
+            <Form.Item name="name" label="部门名称">
+              <Input placeholder="请输入部门名称" allowClear style={{ width: 200 }} />
             </Form.Item>
             <Form.Item name="status" label="状态">
               <Select
@@ -348,17 +348,17 @@ export default function OrganizationPage() {
           <div style={{ borderBottom: `1px solid ${tokens.border}`, marginBottom: 16 }} />
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
             <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreateNode(selectedID || defaultRootID || undefined)}>
-              新增组织
+              新增部门
             </Button>
           </div>
           <div style={{ borderBottom: `1px solid ${tokens.border}`, marginBottom: 16 }} />
-          <Table<OrganizationChildItem>
-            rowKey={(r) => r.organizationID}
+          <Table<DepartmentChildItem>
+            rowKey={(r) => r.departmentID}
             size="middle"
             columns={childrenColumns}
             dataSource={childrenList}
             loading={childrenLoading}
-            locale={{ emptyText: '暂无下级组织' }}
+            locale={{ emptyText: '暂无下级部门' }}
             scroll={tableScrollX(childrenColumns)}
             tableLayout="fixed"
             pagination={{
@@ -375,23 +375,23 @@ export default function OrganizationPage() {
         </Card>
       </div>
 
-      {/* 新建 / 编辑组织 */}
-      <Modal title={editingNode ? '编辑组织（可改父组织实现移动）' : '新建组织'} open={nodeModalOpen} onOk={() => void submitNode()} onCancel={() => setNodeModalOpen(false)} destroyOnClose>
+      {/* 新建 / 编辑部门 */}
+      <Modal title={editingNode ? '编辑部门（可改父部门实现移动）' : '新建部门'} open={nodeModalOpen} onOk={() => void submitNode()} onCancel={() => setNodeModalOpen(false)} destroyOnClose>
         <Form form={nodeForm} layout="vertical">
           {editingNode && (
-            <Form.Item name="parentID" label="父组织（不选为根节点；移动会级联更新子组织路径）">
-              <TreeSelect allowClear treeDefaultExpandAll treeData={parentTreeData} placeholder="选择父组织" />
+            <Form.Item name="parentID" label="父部门（不选为根节点；移动会级联更新子部门路径）">
+              <TreeSelect allowClear treeDefaultExpandAll treeData={parentTreeData} placeholder="选择父部门" />
             </Form.Item>
           )}
           {!editingNode && (
-            <Form.Item name="parentID" label="父组织（不选为根节点）">
-              <TreeSelect allowClear treeDefaultExpandAll treeData={orgList.length ? toTreeSelect(orgList) : []} placeholder="选择父组织" />
+            <Form.Item name="parentID" label="父部门（不选为根节点）">
+              <TreeSelect allowClear treeDefaultExpandAll treeData={deptList.length ? toTreeSelect(deptList) : []} placeholder="选择父部门" />
             </Form.Item>
           )}
-          <Form.Item name="name" label="组织名称" rules={[{ required: true, message: '请输入组织名称' }]}>
+          <Form.Item name="name" label="部门名称" rules={[{ required: true, message: '请输入部门名称' }]}>
             <Input placeholder="如：产品研发部" />
           </Form.Item>
-          <Form.Item name="code" label="组织编码">
+          <Form.Item name="code" label="部门编码">
             <Input placeholder="可空，外部系统同步用" />
           </Form.Item>
           <Form.Item name="sort" label="同级排序" initialValue={0}>

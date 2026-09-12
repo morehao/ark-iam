@@ -6,19 +6,19 @@ type ApplicationCreateResp struct {
 }
 
 type ApplicationDetailResp struct {
-	AppID                   string `json:"appID"`                 // 应用ID
-	Code                    string `json:"code"`                  // 应用编码
-	Name                    string `json:"name"`                  // 应用名称
-	Description             string `json:"description"`           // 应用描述
-	LogoURL                 string `json:"logoUrl"`               // 应用logo
-	HomepageURL             string `json:"homepageUrl"`           // 应用主页
-	Type                    string `json:"type"`                  // 应用类型
-	Status                  string `json:"status"`                // 状态
-	Visibility              string `json:"visibility"`            // 可见性
-	Sort                    int    `json:"sort"`                  // 排序
+	AppID                   string `json:"appID"`                   // 应用ID
+	Code                    string `json:"code"`                    // 应用编码
+	Name                    string `json:"name"`                    // 应用名称
+	Description             string `json:"description"`             // 应用描述
+	LogoURL                 string `json:"logoUrl"`                 // 应用logo
+	HomepageURL             string `json:"homepageUrl"`             // 应用主页
+	Type                    string `json:"type"`                    // 应用类型
+	Status                  string `json:"status"`                  // 状态
+	Visibility              string `json:"visibility"`              // 可见性
+	Sort                    int    `json:"sort"`                    // 排序
 	AllowPersonCreateTenant *bool  `json:"allowPersonCreateTenant"` // 个人是否可自助创建租户
-	AllowJoinByInvite       *bool  `json:"allowJoinByInvite"`     // 是否允许通过邀请加入租户
-	CreatedAt               int64  `json:"createdAt"`             // 创建时间(unix 秒)
+	AllowJoinByInvite       *bool  `json:"allowJoinByInvite"`       // 是否允许通过邀请加入租户
+	CreatedAt               int64  `json:"createdAt"`               // 创建时间(unix 秒)
 }
 
 type PageListItem struct {
@@ -32,8 +32,8 @@ type PageListItem struct {
 	Sort                    int    `json:"sort"`                    // 排序
 	AllowPersonCreateTenant *bool  `json:"allowPersonCreateTenant"` // 个人是否可自助创建租户
 	AllowJoinByInvite       *bool  `json:"allowJoinByInvite"`       // 是否允许通过邀请加入租户
-	CreatedAt               int64  `json:"createdAt"`              // 创建时间(unix 秒)
-	UpdatedAt               int64  `json:"updatedAt"`              // 更新时间(unix 秒)
+	CreatedAt               int64  `json:"createdAt"`               // 创建时间(unix 秒)
+	UpdatedAt               int64  `json:"updatedAt"`               // 更新时间(unix 秒)
 }
 
 type ApplicationPageListResp struct {

@@ -10,10 +10,10 @@ type ApplicationClientCond struct {
 	*gormdao.BaseCond
 	TenantID string
 	AppID    string
-	Code   string
-	Name   string
-	Type   string
-	Status string
+	Code     string
+	Name     string
+	Type     string
+	Status   string
 }
 
 func (c *ApplicationClientCond) BuildCondition(db *gorm.DB, tableName string) {

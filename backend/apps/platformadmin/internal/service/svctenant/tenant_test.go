@@ -15,16 +15,16 @@ import (
 	"gorm.io/gorm"
 )
 
-// setupTenantCreateEnv 建租户链路的完整测试环境：租户/组织 + 管理员（person/user/组织关系）
+// setupTenantCreateEnv 建租户链路的完整测试环境：租户/部门 + 管理员（person/user/部门关系）
 // + 权限开通所需的全部表，并预置 tenant-admin 应用与其菜单（真实环境由 pkg/seed 写入）。
 func setupTenantCreateEnv(t *testing.T) *gorm.DB {
 	t.Helper()
 	db := testutil.SetupSQLite(t,
 		&model.TenantEntity{},
-		&model.OrganizationEntity{},
+		&model.DepartmentEntity{},
 		&model.PersonEntity{},
 		&model.UserEntity{},
-		&model.OrganizationUserEntity{},
+		&model.DepartmentUserEntity{},
 		&model.ApplicationEntity{},
 		&model.MenuEntity{},
 		&model.RoleEntity{},
@@ -191,7 +191,7 @@ func TestTenantCreateNormalizesStatus(t *testing.T) {
 }
 
 // TestTenantCreateProvisionsBuiltinAdmin 建租户必须同时产出"可用的租户管理员"：
-// builtin 来源 + 归属租户根组织 + 初始临时密码可用且强制改密 + 应用订阅/内置角色/菜单授权/角色绑定齐备。
+// builtin 来源 + 归属租户根部门 + 初始临时密码可用且强制改密 + 应用订阅/内置角色/菜单授权/角色绑定齐备。
 func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
 	db := setupTenantCreateEnv(t)
 	ctx := newTenantScopeGinCtx("")
@@ -238,15 +238,15 @@ func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
 		t.Errorf("adminInitialPassword does not match stored hash: %v", err)
 	}
 
-	// 归属租户根组织（primary）
-	rootOrg, err := dao.NewOrganizationDao().GetByCond(ctx, &dao.OrganizationCond{TenantID: resp.TenantID})
-	if err != nil || rootOrg == nil {
-		t.Fatalf("load root org fail, err:%v, org:%+v", err, rootOrg)
+	// 归属租户根部门（primary）
+	rootDept, err := dao.NewDepartmentDao().GetByCond(ctx, &dao.DepartmentCond{TenantID: resp.TenantID})
+	if err != nil || rootDept == nil {
+		t.Fatalf("load root dept fail, err:%v, dept:%+v", err, rootDept)
 	}
-	if got := countEntities(t, db, &model.OrganizationUserEntity{},
-		"tenant_id = ? AND user_id = ? AND organization_id = ? AND relation_type = ?",
-		resp.TenantID, resp.AdminUserID, rootOrg.ID, model.OrgUserRelationPrimary); got != 1 {
-		t.Errorf("primary org relation count = %d, want 1", got)
+	if got := countEntities(t, db, &model.DepartmentUserEntity{},
+		"tenant_id = ? AND user_id = ? AND department_id = ? AND relation_type = ?",
+		resp.TenantID, resp.AdminUserID, rootDept.ID, model.DeptUserRelationPrimary); got != 1 {
+		t.Errorf("primary dept relation count = %d, want 1", got)
 	}
 
 	// 权限开通：应用订阅 1 + 内置角色 1 + 菜单授权 4 + 管理员角色绑定 1

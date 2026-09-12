@@ -185,7 +185,7 @@ func (svc *oidcAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenant
 		// 与平台侧建租户共用同一实现（pkg/iam/tenant.CreateTenantWithBuiltinAdmin），
 		// owner 同样打 builtin 来源标记，使"平台重置内置管理员密码"的兜底路径对自助租户同样可用（D5）。
 		result, cErr := tenant.CreateTenantWithBuiltinAdmin(ctx.Request.Context(), tx, &tenant.CreateTenantWithBuiltinAdminReq{
-			Tenant: &tenant.CreateWithRootOrgReq{
+			Tenant: &tenant.CreateWithRootDeptReq{
 				Code:      tenantCode,
 				Name:      req.TenantName,
 				Type:      model.TenantTypeCustomer,

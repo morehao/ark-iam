@@ -20,7 +20,7 @@ type SysAdminType string
 
 // 系统管理类型取值（禁止硬编码）。
 const (
-	SysAdminTypeAdmin  SysAdminType = "admin"  // 管理员角色：具备系统管理能力（可管理租户成员/组织/角色/密钥等）
+	SysAdminTypeAdmin  SysAdminType = "admin"  // 管理员角色：具备系统管理能力（可管理租户成员/部门/角色/密钥等）
 	SysAdminTypeNormal SysAdminType = "normal" // 普通角色：不具备系统管理能力
 )
 

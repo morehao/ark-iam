@@ -1,6 +1,13 @@
 # 组织架构容器化设计（organization = 租户下用户容器）
 
-> 状态：已落地（feat/organization-container 分支）
+> ⚠️ **命名层已被取代（2026-09-12）**：容器名 `organization` 已全链路回归 **`department`**，见
+> [`department-container-rename.md`](./department-container-rename.md)。本文的**结构层设计全部有效**
+> （`parent_id` 树 + 物化路径 `dept_path`/`dept_depth` + 关系表 `relation_type(primary/secondary/leader)` + 租户隔离），
+> 但下文出现的 `organization` / `organization_user` / `org_path` / `OrgUserRelationType` 等**旧名请按新名阅读**：
+> `organization`→`department`、`organization_user`→`department_user`、`org_path`/`org_depth`→`dept_path`/`dept_depth`、
+> `/v1/tenant/organizations/*`→`/v1/tenant/departments/*`。本文其余内容保持发布时的原貌作为历史记录。
+>
+> 状态：已落地（feat/organization-container 分支；命名层后由上述文档修订）
 > 涉及：`organization` / `organization_user` 两张表重构为"租户下用户容器"；删除 `department` / `user_department` / `organization_role` / `organization_role_user` 四张表；tenantadmin 组织树 API 重建；platformadmin 部门管理下线（组织树只读）；平台管理应用编码 `admin` → `platform-admin`；`application_client.client_id` → `code`。项目处于开发期，无兼容性顾虑，直接改 + 重置开发库。
 
 ## 1. 背景与目标

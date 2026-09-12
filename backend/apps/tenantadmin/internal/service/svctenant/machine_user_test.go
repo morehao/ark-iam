@@ -57,83 +57,78 @@ func newTestTenantCtx(tenantID, userID string) *gin.Context {
 	return ctx
 }
 
-// seedTestOrg 播种租户下的组织节点。
-func seedTestOrg(t *testing.T, tenantID, name string) *model.OrganizationEntity {
+// seedTestDept 播种租户下的部门节点。
+func seedTestDept(t *testing.T, tenantID, name string) *model.DepartmentEntity {
 	t.Helper()
 	db := dbclient.IamDB(context.Background())
-	org := &model.OrganizationEntity{
+	dept := &model.DepartmentEntity{
 		TenantID: tenantID,
 		ParentID: "",
 		Name:     name,
 		Sort:     0,
-		Status:   string(model.OrgNodeStatusActive),
+		Status:   string(model.DeptNodeStatusActive),
 	}
-	if err := db.Create(org).Error; err != nil {
-		t.Fatalf("seed org %s: %v", name, err)
+	if err := db.Create(dept).Error; err != nil {
+		t.Fatalf("seed dept %s: %v", name, err)
 	}
-	return org
+	return dept
 }
 
-// TestMachineUserOrgLifecycleAndGuards 覆盖服务账号组织归属生命周期与守卫：
+// TestMachineUserDeptLifecycleAndGuards 覆盖服务账号部门归属生命周期与守卫：
 // 创建(需 super+主部门) → 列表主部门 → 详情归属 → 改主部门/清参与 → 挂起 → 角色(禁授 super) →
 // 删除(有 key 拒绝;成功后级联清理角色与部门关系)。
-func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
+func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{},
 		&model.ApplicationEntity{}, &model.ApiKeyEntity{}, &model.PersonEntity{},
-		&model.OrganizationEntity{}, &model.OrganizationUserEntity{})
+		&model.DepartmentEntity{}, &model.DepartmentUserEntity{})
 	tenantID := "t1"
 	adminOp := seedTestOperator(t, tenantID, true)
 	memberOp := seedTestOperator(t, tenantID, false)
-	rd := seedTestOrg(t, tenantID, "研发部")
-	op := seedTestOrg(t, tenantID, "运维部")
-	fin := seedTestOrg(t, tenantID, "财务部")
+	rd := seedTestDept(t, tenantID, "研发部")
+	op := seedTestDept(t, tenantID, "运维部")
+	fin := seedTestDept(t, tenantID, "财务部")
 
 	svc := NewMachineUserSvc()
 
 	// 非 super 创建被拒
 	_, err := svc.Create(newTestTenantCtx(tenantID, memberOp.ID), &dtotenant.MachineUserCreateReq{
-		Name:            "forbidden",
-		OrganizationIDs: []string{rd.ID},
+		Name:                "forbidden",
+		PrimaryDepartmentID: rd.ID,
 	})
 	if err != code.GetError(code.UserSystemAdminRequiredError) {
 		t.Fatalf("member create: want system admin required, got %v", err)
 	}
-	// 缺主部门 / 多主部门被拒
-	if _, err := svc.Create(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserCreateReq{Name: "no-org"}); err != code.GetError(code.MachineUserOrgRequiredError) {
-		t.Fatalf("create without primary org: want org required, got %v", err)
+	// 缺主部门被拒（主部门为单值入参，"多主部门"在类型层面已不可表达）
+	if _, err := svc.Create(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserCreateReq{Name: "no-dept"}); err != code.GetError(code.MachineUserDepartmentRequiredError) {
+		t.Fatalf("create without primary dept: want dept required, got %v", err)
 	}
+	// 跨租户部门被拒
 	if _, err := svc.Create(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserCreateReq{
-		Name: "two-primary", OrganizationIDs: []string{rd.ID, op.ID},
-	}); err != code.GetError(code.MachineUserOrgRequiredError) {
-		t.Fatalf("create with two primary orgs: want org required, got %v", err)
-	}
-	// 跨租户组织被拒
-	if _, err := svc.Create(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserCreateReq{
-		Name: "cross", OrganizationIDs: []string{"org-other-tenant"},
-	}); err != code.GetError(code.OrganizationNotExistError) {
-		t.Fatalf("create with foreign org: want not exist, got %v", err)
+		Name: "cross", PrimaryDepartmentID: "dept-other-tenant",
+	}); err != code.GetError(code.DepartmentNotExistError) {
+		t.Fatalf("create with foreign dept: want not exist, got %v", err)
 	}
 
 	// super 创建：主部门 rd + 参与 op
 	created, err := svc.Create(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserCreateReq{
-		Name: "svc-pay", Description: "支付回调", OrganizationIDs: []string{rd.ID}, SecondaryOrgIDs: []string{op.ID},
+		Name: "svc-pay", Description: "支付回调", PrimaryDepartmentID: rd.ID, SecondaryDepartmentIDs: []string{op.ID},
 	})
 	if err != nil {
 		t.Fatalf("create machine user: %v", err)
 	}
 	machineID := created.MachineUserID
 
-	// 组织归属落库：1 primary(rd) + 1 secondary(op)
-	relList, err := dao.NewOrganizationUserDao().GetListByCond(newTestTenantCtx(tenantID, adminOp.ID), &dao.OrganizationUserCond{TenantID: tenantID, UserID: machineID})
+	// 部门归属落库：1 primary(rd) + 1 secondary(op)
+	relList, err := dao.NewDepartmentUserDao().GetListByCond(newTestTenantCtx(tenantID, adminOp.ID), &dao.DepartmentUserCond{TenantID: tenantID, UserID: machineID})
 	if err != nil {
-		t.Fatalf("query org relations: %v", err)
+		t.Fatalf("query dept relations: %v", err)
 	}
-	byType := map[model.OrgUserRelationType]string{}
+	byType := map[model.DeptUserRelationType]string{}
 	for _, r := range relList {
-		byType[r.RelationType] = r.OrganizationID
+		byType[r.RelationType] = r.DepartmentID
 	}
-	if byType[model.OrgUserRelationPrimary] != rd.ID || byType[model.OrgUserRelationSecondary] != op.ID {
-		t.Fatalf("org relations mismatch: %+v", byType)
+	if byType[model.DeptUserRelationPrimary] != rd.ID || byType[model.DeptUserRelationSecondary] != op.ID {
+		t.Fatalf("dept relations mismatch: %+v", byType)
 	}
 
 	// 列表：主部门名称回填
@@ -142,7 +137,7 @@ func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
 		t.Fatalf("page list: %v", err)
 	}
 	if page.Total != 1 || page.List[0].MachineUserID != machineID ||
-		page.List[0].PrimaryOrgID != rd.ID || page.List[0].PrimaryOrgName != "研发部" {
+		page.List[0].PrimaryDepartmentID != rd.ID || page.List[0].PrimaryDepartmentName != "研发部" {
 		t.Fatalf("page list mismatch: %+v", page)
 	}
 	// 列表必须同时回传创建时间与更新时间（前端「创建时间」「更新时间」两列直读）
@@ -150,7 +145,7 @@ func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
 		t.Fatalf("createdAt/updatedAt not returned: %+v", item)
 	}
 
-	// 详情：组织归属 + 角色
+	// 详情：部门归属 + 角色
 	detail, err := svc.Detail(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserDetailReq{MachineUserID: machineID})
 	if err != nil {
 		t.Fatalf("detail: %v", err)
@@ -159,43 +154,43 @@ func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
 		t.Fatalf("detail mismatch: %+v", detail)
 	}
 	foundPrimary, foundSecondary := false, false
-	for _, org := range detail.Organizations {
-		switch org.RelationType {
-		case model.OrgUserRelationPrimary:
-			foundPrimary = org.OrganizationID == rd.ID
-		case model.OrgUserRelationSecondary:
-			foundSecondary = org.OrganizationID == op.ID
+	for _, dept := range detail.Departments {
+		switch dept.RelationType {
+		case model.DeptUserRelationPrimary:
+			foundPrimary = dept.DepartmentID == rd.ID
+		case model.DeptUserRelationSecondary:
+			foundSecondary = dept.DepartmentID == op.ID
 		}
 	}
 	if !foundPrimary || !foundSecondary {
-		t.Fatalf("detail organizations mismatch: %+v", detail.Organizations)
+		t.Fatalf("detail departments mismatch: %+v", detail.Departments)
 	}
 
 	// 更新：改主部门→fin、参与部门全量替换为 [op, fin]
 	newSecondary := []string{op.ID, fin.ID}
 	if err := svc.Update(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserUpdateReq{
 		MachineUserID: machineID, Name: "svc-pay-v2", Description: "支付回调V2",
-		PrimaryOrgID: &fin.ID, SecondaryOrgIDs: &newSecondary,
+		PrimaryDepartmentID: &fin.ID, SecondaryDepartmentIDs: &newSecondary,
 	}); err != nil {
-		t.Fatalf("update org: %v", err)
+		t.Fatalf("update dept: %v", err)
 	}
-	relList, err = dao.NewOrganizationUserDao().GetListByCond(newTestTenantCtx(tenantID, adminOp.ID), &dao.OrganizationUserCond{TenantID: tenantID, UserID: machineID})
+	relList, err = dao.NewDepartmentUserDao().GetListByCond(newTestTenantCtx(tenantID, adminOp.ID), &dao.DepartmentUserCond{TenantID: tenantID, UserID: machineID})
 	if err != nil {
-		t.Fatalf("re-query org relations: %v", err)
+		t.Fatalf("re-query dept relations: %v", err)
 	}
-	byType = map[model.OrgUserRelationType]string{}
+	byType = map[model.DeptUserRelationType]string{}
 	for _, r := range relList {
-		byType[r.RelationType] = r.OrganizationID
+		byType[r.RelationType] = r.DepartmentID
 	}
-	if byType[model.OrgUserRelationPrimary] != fin.ID {
-		t.Fatalf("primary should move to fin, got %s", byType[model.OrgUserRelationPrimary])
+	if byType[model.DeptUserRelationPrimary] != fin.ID {
+		t.Fatalf("primary should move to fin, got %s", byType[model.DeptUserRelationPrimary])
 	}
 
 	// 主部门不可清空
 	if err := svc.Update(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserUpdateReq{
-		MachineUserID: machineID, Name: "svc-pay-v2", PrimaryOrgID: strPtr(""),
-	}); err != code.GetError(code.MachineUserOrgRequiredError) {
-		t.Fatalf("clear primary: want org required, got %v", err)
+		MachineUserID: machineID, Name: "svc-pay-v2", PrimaryDepartmentID: strPtr(""),
+	}); err != code.GetError(code.MachineUserDepartmentRequiredError) {
+		t.Fatalf("clear primary: want dept required, got %v", err)
 	}
 	// 挂起
 	if err := svc.UpdateStatus(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserStatusReq{MachineUserID: machineID, IsSuspended: true}); err != nil {
@@ -286,12 +281,12 @@ func TestMachineUserOrgLifecycleAndGuards(t *testing.T) {
 	if gone != nil {
 		t.Fatal("machine user should be soft-deleted")
 	}
-	var orgRelCount int64
-	if err := db.Model(&model.OrganizationUserEntity{}).Where("user_id = ?", machineID).Count(&orgRelCount).Error; err != nil {
-		t.Fatalf("count org relations: %v", err)
+	var deptRelCount int64
+	if err := db.Model(&model.DepartmentUserEntity{}).Where("user_id = ?", machineID).Count(&deptRelCount).Error; err != nil {
+		t.Fatalf("count dept relations: %v", err)
 	}
-	if orgRelCount != 0 {
-		t.Fatalf("org relations should be cascade cleaned, got %d", orgRelCount)
+	if deptRelCount != 0 {
+		t.Fatalf("dept relations should be cascade cleaned, got %d", deptRelCount)
 	}
 	var roleRelCount int64
 	if err := db.Model(&model.UserRoleEntity{}).Where("user_id = ?", machineID).Count(&roleRelCount).Error; err != nil {
@@ -308,11 +303,11 @@ func strPtr(s string) *string {
 
 // TestServiceAccountCannotBeLeader 服务账号不可被设为主管(leader)；参与(secondary)关系允许。
 func TestServiceAccountCannotBeLeader(t *testing.T) {
-	testutil.SetupSQLite(t, &model.UserEntity{}, &model.OrganizationEntity{}, &model.OrganizationUserEntity{},
+	testutil.SetupSQLite(t, &model.UserEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{},
 		&model.RoleEntity{}, &model.UserRoleEntity{})
 	tenantID := "t1"
 	adminOp := seedTestOperator(t, tenantID, true)
-	org := seedTestOrg(t, tenantID, "研发部")
+	dept := seedTestDept(t, tenantID, "研发部")
 	machine := &model.UserEntity{
 		TenantID:   tenantID,
 		UserType:   model.UserTypeMachine,
@@ -324,29 +319,29 @@ func TestServiceAccountCannotBeLeader(t *testing.T) {
 		t.Fatalf("seed machine: %v", err)
 	}
 
-	svc := NewOrganizationUserSvc()
+	svc := NewDepartmentUserSvc()
 	ctx := newTestTenantCtx(tenantID, adminOp.ID)
 	// leader：拒绝
-	if _, err := svc.Create(ctx, &dtotenant.OrganizationUserCreateReq{
-		OrganizationID: org.ID,
-		UserID:         machine.ID,
-		RelationType:   model.OrgUserRelationLeader,
+	if _, err := svc.Create(ctx, &dtotenant.DepartmentUserCreateReq{
+		DepartmentID: dept.ID,
+		UserID:       machine.ID,
+		RelationType: model.DeptUserRelationLeader,
 	}); err != code.GetError(code.UserMemberOperationOnlyError) {
 		t.Fatalf("machine as leader: want member-operation-only, got %v", err)
 	}
 	// secondary：允许
-	if _, err := svc.Create(ctx, &dtotenant.OrganizationUserCreateReq{
-		OrganizationID: org.ID,
-		UserID:         machine.ID,
-		RelationType:   model.OrgUserRelationSecondary,
+	if _, err := svc.Create(ctx, &dtotenant.DepartmentUserCreateReq{
+		DepartmentID: dept.ID,
+		UserID:       machine.ID,
+		RelationType: model.DeptUserRelationSecondary,
 	}); err != nil {
 		t.Fatalf("machine as secondary member: %v", err)
 	}
 	// 已挂 primary 关系的服务账号收敛为 leader 同样拒绝
-	if err := svc.Update(ctx, &dtotenant.OrganizationUserUpdateReq{
-		OrganizationID: org.ID,
-		UserID:         machine.ID,
-		RelationType:   model.OrgUserRelationLeader,
+	if err := svc.Update(ctx, &dtotenant.DepartmentUserUpdateReq{
+		DepartmentID: dept.ID,
+		UserID:       machine.ID,
+		RelationType: model.DeptUserRelationLeader,
 	}); err != code.GetError(code.UserMemberOperationOnlyError) {
 		t.Fatalf("converge machine to leader: want member-operation-only, got %v", err)
 	}

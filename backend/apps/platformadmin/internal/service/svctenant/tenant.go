@@ -46,7 +46,7 @@ func NewTenantSvc() TenantSvc {
 // 租户编码由服务端按统一规则自动生成（见 pkg/iam/tenant.GenerateCode），入参不接收编码；
 // 编码创建后不可变更（Update 不修改 code）。
 //
-// 一个事务内完成：租户 + 同名根组织 + 内置管理员用户（source=builtin）+ 租户自服务权限开通
+// 一个事务内完成：租户 + 同名根部门 + 内置管理员用户（source=builtin）+ 租户自服务权限开通
 // （应用订阅 / 内置角色 / 菜单授权 / 角色绑定）。管理员初始密码为系统生成的临时密码，
 // 仅在响应中返回一次，且该管理员首次登录必须改密（见
 // docs/design/tenant-admin-provisioning-design-20260912.md D1/D2/D3/D6）。
@@ -90,7 +90,7 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 	)
 	txErr := dbclient.IamDB(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		result, cErr := tenant.CreateTenantWithBuiltinAdmin(ctx, tx, &tenant.CreateTenantWithBuiltinAdminReq{
-			Tenant: &tenant.CreateWithRootOrgReq{
+			Tenant: &tenant.CreateWithRootDeptReq{
 				Code:      tenantCode,
 				CreatedBy: userID,
 				DbUser:    req.DbUser,

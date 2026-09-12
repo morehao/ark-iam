@@ -1,6 +1,6 @@
 // tenantadmin 领域类型（与 backend/apps/tenantadmin/internal/dto/dtotenant 对齐）
 
-import type { UserOrganizationItem } from './organization'
+import type { UserDepartmentItem } from './department'
 import type { MenuItem, SysAdminType } from './platform'
 
 // ---------- 租户用户 ----------
@@ -13,7 +13,7 @@ export interface TenantUserItem {
   name: string
   avatar: string
   isSuspended: boolean
-  primaryOrgName: string
+  primaryDepartmentName: string
   roleCount: number
   createdAt?: number
   updatedAt?: number
@@ -31,9 +31,9 @@ export interface TenantUserCreateReq {
   name: string
   avatar?: string
   isSuspended?: boolean
-  organizationIDs: string[]
-  secondaryOrgIDs?: string[]
-  leaderOrgIDs?: string[]
+  primaryDepartmentID: string // 行政主部门ID（primary，单值，必填：用户必须从属部门）
+  secondaryDepartmentIDs?: string[]
+  leaderDepartmentIDs?: string[]
 }
 
 /**
@@ -51,18 +51,18 @@ export interface TenantUserResetPasswordResp {
   initialPassword: string
 }
 
-// TenantUserOrgUpdate 编辑成员时的信息更新（PATCH 局部更新；字段省略=不改变）。
-export interface TenantUserOrgUpdate {
+// TenantUserDepartmentUpdate 编辑成员时的信息更新（PATCH 局部更新；字段省略=不改变）。
+export interface TenantUserDepartmentUpdate {
   username?: string
   primaryEmail?: string
   primaryPhone?: string
-  primaryOrgID?: string
-  secondaryOrgIDs?: string[]
-  leaderOrgIDs?: string[]
+  primaryDepartmentID?: string
+  secondaryDepartmentIDs?: string[]
+  leaderDepartmentIDs?: string[]
 }
 
 export interface TenantUserDetail extends TenantUserItem {
-  organizations: UserOrganizationItem[]
+  departments: UserDepartmentItem[]
   roles: TenantUserRoleItem[]
 }
 
@@ -143,41 +143,41 @@ export interface TenantMachineUserItem {
   tenantID: string
   name: string
   description: string
-  primaryOrgID: string // 主部门ID（服务账号必有主部门）
-  primaryOrgName: string // 主部门名称
+  primaryDepartmentID: string // 主部门ID（服务账号必有主部门）
+  primaryDepartmentName: string // 主部门名称
   isSuspended: boolean
   createdAt?: number
   updatedAt?: number
 }
 
-// 服务账号组织归属条目（详情用）：primary=主部门（唯一），secondary=参与部门（可多条）。
-export interface TenantMachineUserOrganization {
-  organizationID: string
-  organizationName: string
+// 服务账号部门归属条目（详情用）：primary=主部门（唯一），secondary=参与部门（可多条）。
+export interface TenantMachineUserDepartment {
+  departmentID: string
+  departmentName: string
   relationType: 'primary' | 'secondary'
 }
 
 export interface TenantMachineUserDetail extends TenantMachineUserItem {
-  organizations: TenantMachineUserOrganization[]
+  departments: TenantMachineUserDepartment[]
   roles: TenantUserRoleItem[]
 }
 
 export interface TenantMachineUserCreateReq {
   name: string
   description?: string
-  organizationIDs: string[] // 主部门ID数组（primary，仅允许1个，必填）
-  secondaryOrgIDs?: string[] // 参与部门ID数组（secondary，可多条，可选）
+  primaryDepartmentID: string // 主部门ID（primary，单值，必填：服务账号必须从属部门）
+  secondaryDepartmentIDs?: string[] // 参与部门ID数组（secondary，可多条，可选）
 }
 
 // 全量更新服务账号；可空字段语义：
-// primaryOrgID：不传/null=不变；传值=替换主部门（禁止传空串清空）
-// secondaryOrgIDs：不传/null=不变；传[]=清空参与部门；传值=全量替换参与部门
+// primaryDepartmentID：不传/null=不变；传值=替换主部门（禁止传空串清空）
+// secondaryDepartmentIDs：不传/null=不变；传[]=清空参与部门；传值=全量替换参与部门
 export interface TenantMachineUserUpdateReq {
   machineUserID: string
   name: string
   description?: string
-  primaryOrgID?: string | null
-  secondaryOrgIDs?: string[] | null
+  primaryDepartmentID?: string | null
+  secondaryDepartmentIDs?: string[] | null
 }
 
 // ---------- 租户 API 密钥 ----------

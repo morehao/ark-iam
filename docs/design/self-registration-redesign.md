@@ -77,7 +77,7 @@ type RegisterResp struct {
    a. `person.FindOrCreate` → personID
    b. 插 `TenantEntity{Code, Name, Type=customer}`（Code 空生成，撞唯一索引走 conflict 处理）
    c. 插 `UserEntity{TenantID, PersonID, IsOwner: true, JoinedAt}`
-   d. 建根组织节点（复用 `svctenant.tenant.go:64-87`，逻辑上提到 pkg/iam 共用）
+   d. 建根部门节点（复用 `svctenant.tenant.go:64-87`，逻辑上提到 pkg/iam 共用）
 4. 注册即登录：`ssoSessionStore.CreateSession(personID, ["pwd"])` + 关联默认租户=新租户（走 S8 封装）
 5. 返回 `RegisterResp{UserID, TenantID}`
 6. 审计：`audit.ActionTenantCreate` + 新注册动作
@@ -109,7 +109,7 @@ type InviteEntity struct {
     TenantID   string          // 归属租户
     Code       string          `uniqueIndex` // 邀请码
     Role       json.RawMessage // 可带角色集合 []
-    OrgNodeID  string          // 可带部门节点
+    DeptNodeID  string          // 可带部门节点
     ExpiresAt  *time.Time
     Status     InviteStatus
     MaxUses    int
@@ -151,7 +151,7 @@ type InviteEntity struct {
 - `/login` 加「注册」入口（对标 `prompt=create`）
 - `/register/org`（通道A：租户名+编码+姓名+邮箱+密码）
 - `/join`（通道B：邀请码 + 邮箱/密码）
-- `api.ts` 补 `registerOrg` / `joinWithInvite` 封装
+- `api.ts` 补 `createTenant` / `joinWithInvite` 封装
 - vite proxy 已指向 gateway:8100，无需改
 
 ### S10. 破坏性面同步
@@ -167,7 +167,7 @@ type InviteEntity struct {
 1. **owner 鉴权环**：授予 owner 方自身须为 owner/管理员，否则人人自封 owner——S6/S7 必须优先落地
 2. **通道A 风控**：影响面大（对标 zitadel 全局可关）。需 `LoginRateLimit` + 全局开关 + 审计，默认生产关闭
 3. **注册即登录**：`svcauth.Register` 当前独立表单、非 OIDC authorize 流程，建 `CreateSession` 需复用 `svcoidc` 会话存储，注意幂等
-4. **根组织复用**：通道A 与平台建租户共用根组织逻辑，上提到 `pkg/iam` 避免复制
+4. **根部门复用**：通道A 与平台建租户共用根部门逻辑，上提到 `pkg/iam` 避免复制
 5. **Code 唯一冲突**：通道A 建租户撞 `tenant_code` 唯一索引的处理
 6. **Invite 一次性/过期**：状态机 pending→accepted/revoked/expired
 

@@ -30,7 +30,7 @@ ark-iam/
 │   ├── apps/
 │   │   ├── auth/          # Authentication gateway (login/register/token/OIDC), :8081
 │   │   ├── platformadmin/ # Platform management (user/role/menu/tenant), :8082
-│   │   ├── tenantadmin/   # Tenant self-service (organization/orgRole), :8083
+│   │   ├── tenantadmin/   # Tenant self-service (department/user/role), :8083
 │   │   └── gateway/       # Aggregate app mounting all three, :8100
 │   ├── pkg/               # Common packages (shared across apps)
 │   ├── scripts/           # Scripts

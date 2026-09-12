@@ -21,7 +21,7 @@ test('全局登出后，SSO 会话失效且兄弟应用需重新认证', async (
   // 2. 新开标签页访问 3002（租户管理平台），应免密登录（共享 SSO session）
   const rp1 = await context.newPage();
   await rp1.goto('http://localhost:3002/', { waitUntil: 'domcontentloaded', timeout: 20000 });
-  await expect(rp1.getByText('组织管理', { exact: true }).first()).toBeVisible({ timeout: 30000 });
+  await expect(rp1.getByText('部门管理', { exact: true }).first()).toBeVisible({ timeout: 30000 });
   // SSO session cookie 已建立
   const ssoCookies = await context.cookies('http://localhost:8100');
   expect(ssoCookies.some((c) => c.name === 'iam_sso_session')).toBe(true);

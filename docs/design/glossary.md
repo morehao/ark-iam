@@ -10,7 +10,7 @@
 |---|---|---|
 | 自然人 ✅ | Person | 跨租户的**全局身份**。用户名/邮箱/手机号全局唯一（可空），密码、全局状态（挂起）在此维护。OIDC `sub` 为 `person:<id>` |
 | 租户成员 ✅ | User | 自然人（person）在某个**租户内**的成员记录。租户内姓名/资料/角色、是否拥有者（`is_owner`）、加入时间 |
-| 租户 | Tenant | 独立的客户/组织边界。数据与权限按租户隔离；类型分 `customer`（客户租户）/`platform`（平台租户） |
+| 租户 | Tenant | 独立的客户边界（业务主体的隔离单元）。数据与权限按租户隔离；类型分 `customer`（客户租户）/`platform`（平台租户） |
 | 租户类型 | Tenant Type | **分类标识**：`customer` = 外部客户/合作方的独立租户；`platform` = 平台自运营租户（种子数据 Default Tenant 即平台租户）。当前仅用于分类展示，不参与数据隔离与权限判定（隔离一律按 `tenant_id`） |
 | 租户编码 | Tenant Code | 租户的业务编码，全局唯一、创建后不可修改。由服务端自动生成，规则 `t_<12 位随机小写 hex>`（如 `t_3f7a9c1d2e4b`），见 `pkg/iam/tenant.GenerateCode`；平台租户（种子数据 Default Tenant）为固定值 `t_platform`——同前缀、后缀固定可读，因自动生成的随机段只用小写 hex，两者不会冲突 |
 | 租户拥有者 | Tenant Owner | 租户的拥有者成员（注册即成为首个拥有者），拥有租户管理权限 |
@@ -19,7 +19,15 @@
 | 挂起 | Suspended | person/user 被停用，禁止登录（`is_suspended`） |
 | 租户状态 | Tenant Status | 租户生命周期状态（`tenant.status`）：`active` 正常 / `suspended` 已挂起。仅 active 允许其成员登录、签发与轮换令牌；挂起会撤销该租户成员的 refresh token 与 SSO 会话；禁止挂起操作者自己所在的租户（不可逆自锁） |
 
-## 二、应用与客户端
+## 二、部门与归属
+
+| 术语 | 英文 | 说明 |
+|---|---|---|
+| 部门 ✅ | Department | 租户内用户归属的容器（树形，可嵌套）。表 `department`，`dept_path`/`dept_depth` 物化祖先链与深度；每租户唯一根部门由建租户时创建 |
+| 部门关系 ✅ | Department User | 用户与部门的归属关系（表 `department_user`），`relation_type` 三值：`primary` 行政主部门（每用户至多 1 条）、`secondary` 参与部门（可多条）、`leader` 部门负责人（每部门至多 1 人） |
+| 根部门 ✅ | Root Department | 建租户时自动创建的顶级部门节点（`parent_id` 为空），同时是租户管理员的行政主部门 |
+
+## 三、应用与客户端
 
 | 术语 | 英文 | 说明 |
 |---|---|---|
@@ -30,7 +38,7 @@
 | 第三方应用 | Third-party App | 外部接入应用（`application.type=third_party`） |
 | 回调地址 | Redirect URI | 授权码回传地址，**必须精确白名单匹配** |
 
-## 三、协议与令牌
+## 四、协议与令牌
 
 | 术语 | 英文 | 说明 |
 |---|---|---|
@@ -53,7 +61,7 @@
 | 会话 ID | sid | SSO 会话标识，用于登出关联与 token 关联 |
 | 认证方法引用 | AMR | 认证方法引用（如 `["pwd"]`），还原到 id_token |
 
-## 四、权限模型
+## 五、权限模型
 
 | 术语 | 英文 | 说明 |
 |---|---|---|
@@ -65,7 +73,7 @@
 | 角色-菜单 | Role-Menu | 角色可访问菜单的授权 |
 | 角色-权限点 | Role-Scope | 角色拥有的权限点授权 |
 
-## 五、认证通道与凭证
+## 六、认证通道与凭证
 
 | 术语 | 英文 | 说明 |
 |---|---|---|
@@ -75,7 +83,7 @@
 | API Key ✅ | API Key | 机器凭证（`x-api-key` 头携带，哈希存储、可过期/吊销/scope） |
 | 机器令牌 ✅ | Machine Token | `token_usage=machine` 的令牌（client_credentials / API Key 签发），不依赖浏览器会话 |
 
-## 六、基础设施
+## 七、基础设施
 
 | 术语 | 英文 | 说明 |
 |---|---|---|

@@ -46,7 +46,7 @@ func NewUserSvc() UserSvc {
 }
 
 // PageList 返回当前租户内的用户目录（含自然人基础信息），支持关键词（姓名/用户名/邮箱/手机）与状态过滤；
-// 传 organizationID 时仅返回"恰在该部门"的用户（含 primary/secondary/leader 任一关系，不含子部门）。
+// 传 departmentID 时仅返回"恰在该部门"的用户（含 primary/secondary/leader 任一关系，不含子部门）。
 func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (*dtotenant.UserPageListResp, error) {
 	tenantID := gincontext.GetTenantIDString(ctx)
 	cond := &dao.UserCond{
@@ -61,10 +61,10 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (
 	}
 
 	// 部门过滤：仅筛选恰在该部门的用户（member/leader 均可），不掺子部门。
-	if req.OrganizationID != "" {
-		relationList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
-			TenantID:       tenantID,
-			OrganizationID: req.OrganizationID,
+	if req.DepartmentID != "" {
+		relationList, err := dao.NewDepartmentUserDao().GetListByCond(ctx, &dao.DepartmentUserCond{
+			TenantID:     tenantID,
+			DepartmentID: req.DepartmentID,
 		})
 		if err != nil {
 			glog.Errorf(ctx, "[svcuser.PageList] dao relation GetListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -92,8 +92,8 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (
 	}
 	_, personMap := svc.loadUserPersonMaps(ctx, userIDs)
 
-	// 主组织 + 角色数 聚合（批量，避免 N+1）
-	primaryOrgNameMap := loadPrimaryOrgNameMap(ctx, tenantID, userIDs)
+	// 主部门 + 角色数 聚合（批量，避免 N+1）
+	primaryDepartmentNameMap := loadPrimaryDepartmentNameMap(ctx, tenantID, userIDs)
 	roleCountMap := loadUserRoleCountMap(ctx, tenantID, userIDs)
 
 	list := make([]dtotenant.UserPageListItem, 0, len(userEntityList))
@@ -103,18 +103,18 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (
 			person = &model.PersonEntity{}
 		}
 		list = append(list, dtotenant.UserPageListItem{
-			UserID:         v.ID,
-			TenantID:       v.TenantID,
-			Username:       model.DerefStr(person.Username),
-			PrimaryEmail:   model.DerefStr(person.PrimaryEmail),
-			PrimaryPhone:   model.DerefStr(person.PrimaryPhone),
-			Name:           v.Name,
-			Avatar:         v.Avatar,
-			IsSuspended:    v.IsSuspended,
-			PrimaryOrgName: primaryOrgNameMap[v.ID],
-			RoleCount:      roleCountMap[v.ID],
-			CreatedAt:      v.CreatedAt.Unix(),
-			UpdatedAt:      v.UpdatedAt.Unix(),
+			UserID:                v.ID,
+			TenantID:              v.TenantID,
+			Username:              model.DerefStr(person.Username),
+			PrimaryEmail:          model.DerefStr(person.PrimaryEmail),
+			PrimaryPhone:          model.DerefStr(person.PrimaryPhone),
+			Name:                  v.Name,
+			Avatar:                v.Avatar,
+			IsSuspended:           v.IsSuspended,
+			PrimaryDepartmentName: primaryDepartmentNameMap[v.ID],
+			RoleCount:             roleCountMap[v.ID],
+			CreatedAt:             v.CreatedAt.Unix(),
+			UpdatedAt:             v.UpdatedAt.Unix(),
 		})
 	}
 	return &dtotenant.UserPageListResp{
@@ -123,46 +123,46 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (
 	}, nil
 }
 
-// loadPrimaryOrgNameMap 批量查询用户行政归属组织名称（member 唯一行）。
-func loadPrimaryOrgNameMap(ctx *gin.Context, tenantID string, userIDs []string) map[string]string {
+// loadPrimaryDepartmentNameMap 批量查询用户行政归属部门名称（member 唯一行）。
+func loadPrimaryDepartmentNameMap(ctx *gin.Context, tenantID string, userIDs []string) map[string]string {
 	result := make(map[string]string, len(userIDs))
 	if len(userIDs) == 0 {
 		return result
 	}
-	relationList, err := dao.NewOrganizationUserDao().GetListByCond(ctx, &dao.OrganizationUserCond{
+	relationList, err := dao.NewDepartmentUserDao().GetListByCond(ctx, &dao.DepartmentUserCond{
 		TenantID:     tenantID,
-		RelationType: model.OrgUserRelationPrimary,
+		RelationType: model.DeptUserRelationPrimary,
 		UserIDs:      userIDs,
 	})
 	if err != nil {
-		glog.Warnf(ctx, "[svcuser.loadPrimaryOrgNameMap] query member org fail, err:%v", err)
+		glog.Warnf(ctx, "[svcuser.loadPrimaryDepartmentNameMap] query member dept fail, err:%v", err)
 		return result
 	}
-	userOrgMap := make(map[string]string, len(relationList))
-	orgIDs := make([]string, 0, len(relationList))
+	userDeptMap := make(map[string]string, len(relationList))
+	deptIDs := make([]string, 0, len(relationList))
 	for _, r := range relationList {
-		if _, ok := userOrgMap[r.UserID]; ok {
+		if _, ok := userDeptMap[r.UserID]; ok {
 			continue
 		}
-		userOrgMap[r.UserID] = r.OrganizationID
-		orgIDs = append(orgIDs, r.OrganizationID)
+		userDeptMap[r.UserID] = r.DepartmentID
+		deptIDs = append(deptIDs, r.DepartmentID)
 	}
-	if len(orgIDs) == 0 {
+	if len(deptIDs) == 0 {
 		return result
 	}
-	var orgList []model.OrganizationEntity
-	if err := dbclient.IamDB(ctx).Model(&model.OrganizationEntity{}).
-		Where("tenant_id = ? AND id IN ?", tenantID, orgIDs).
-		Find(&orgList).Error; err != nil {
-		glog.Warnf(ctx, "[svcuser.loadPrimaryOrgNameMap] query org name fail, err:%v", err)
+	var deptList []model.DepartmentEntity
+	if err := dbclient.IamDB(ctx).Model(&model.DepartmentEntity{}).
+		Where("tenant_id = ? AND id IN ?", tenantID, deptIDs).
+		Find(&deptList).Error; err != nil {
+		glog.Warnf(ctx, "[svcuser.loadPrimaryDepartmentNameMap] query dept name fail, err:%v", err)
 		return result
 	}
-	orgNameMap := make(map[string]string, len(orgList))
-	for _, o := range orgList {
-		orgNameMap[o.ID] = o.Name
+	deptNameMap := make(map[string]string, len(deptList))
+	for _, o := range deptList {
+		deptNameMap[o.ID] = o.Name
 	}
-	for userID, orgID := range userOrgMap {
-		result[userID] = orgNameMap[orgID]
+	for userID, deptID := range userDeptMap {
+		result[userID] = deptNameMap[deptID]
 	}
 	return result
 }
@@ -192,13 +192,14 @@ func loadUserRoleCountMap(ctx *gin.Context, tenantID string, userIDs []string) m
 
 // Create 创建租户用户：person find-or-create（见设计文档 §4.4）。
 // 提供 personID 直接关联；否则按 email/phone 命中已有 person 则复用；未命中则同事务创建 person（姓名即自然人姓名）；
-// 同时按 organizationIDs 建立行政归属（member，至多 1 个）、leaderOrgIDs 建立负责关系（leader）。
-// 业务约束：用户必须从属于至少一个部门，organizationIDs 必传。
+// 同时按 primaryDepartmentID 建立行政归属（primary，单值）、secondaryDepartmentIDs 参与部门、
+// leaderDepartmentIDs 负责关系（leader）。
+// 业务约束：用户必须从属于一个主部门，primaryDepartmentID 必传。
 //
 // 口径与平台侧建租户内置管理员完全一致（需求①/D7）：
 //   - 密码不由调用方提供，统一由 pkg/iam/password 生成临时密码，仅本次响应返回一次；
 //   - 仅新建自然人时置 must_change_password=true（复用既有自然人绝不改动其密码）；
-//   - person/user/组织关系同事务写入，共用 pkg/iam/user.Create。
+//   - person/user/部门关系同事务写入，共用 pkg/iam/user.Create。
 func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dtotenant.UserCreateResp, error) {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
 	if err := requireSystemAdmin(ctx, code.UserCreateError); err != nil {
@@ -207,9 +208,9 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 	tenantID := gincontext.GetTenantIDString(ctx)
 	operatorID := gincontext.GetUserIDString(ctx)
 
-	// 0. 用户必须从属于至少一个部门（业务约束，防绕过 DTO 校验）
-	if len(req.OrganizationIDs) == 0 {
-		return nil, code.GetError(code.UserOrganizationRequiredError)
+	// 0. 用户必须从属于一个主部门（业务约束，防绕过 DTO 校验）
+	if req.PrimaryDepartmentID == "" {
+		return nil, code.GetError(code.UserDepartmentRequiredError)
 	}
 	// 0.1 邮箱或手机号至少填写一个（联系方式是用户识别/找回的必需信息）
 	if req.PrimaryEmail == "" && req.PrimaryPhone == "" {
@@ -228,29 +229,27 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 		}
 	}
 
-	// 2. 校验归属组织均属于本租户
-	orgList, err := dao.NewOrganizationDao().GetListByCond(ctx, &dao.OrganizationCond{TenantID: tenantID})
+	// 2. 校验归属部门均属于本租户
+	deptList, err := dao.NewDepartmentDao().GetListByCond(ctx, &dao.DepartmentCond{TenantID: tenantID})
 	if err != nil {
-		glog.Errorf(ctx, "[svcuser.Create] query org fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		glog.Errorf(ctx, "[svcuser.Create] query dept fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserCreateError)
 	}
-	orgSet := make(map[string]bool, len(orgList))
-	for _, o := range orgList {
-		orgSet[o.ID] = true
+	deptSet := make(map[string]bool, len(deptList))
+	for _, o := range deptList {
+		deptSet[o.ID] = true
 	}
-	for _, orgID := range req.OrganizationIDs {
-		if !orgSet[orgID] {
-			return nil, code.GetError(code.OrganizationNotExistError)
+	if !deptSet[req.PrimaryDepartmentID] {
+		return nil, code.GetError(code.DepartmentNotExistError)
+	}
+	for _, deptID := range req.SecondaryDepartmentIDs {
+		if !deptSet[deptID] {
+			return nil, code.GetError(code.DepartmentNotExistError)
 		}
 	}
-	for _, orgID := range req.SecondaryOrgIDs {
-		if !orgSet[orgID] {
-			return nil, code.GetError(code.OrganizationNotExistError)
-		}
-	}
-	for _, orgID := range req.LeaderOrgIDs {
-		if !orgSet[orgID] {
-			return nil, code.GetError(code.OrganizationNotExistError)
+	for _, deptID := range req.LeaderDepartmentIDs {
+		if !deptSet[deptID] {
+			return nil, code.GetError(code.DepartmentNotExistError)
 		}
 	}
 
@@ -266,20 +265,20 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 		return nil, code.GetError(code.PasswordHashError)
 	}
 
-	// 4. 事务：person find-or-create + user 主体 + 组织归属（共用 pkg/iam/user.Create）
+	// 4. 事务：person find-or-create + user 主体 + 部门归属（共用 pkg/iam/user.Create）
 	var createdUserID string
 	personCreated := false
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
 		createReq := &user.CreateReq{
-			TenantID:        tenantID,
-			PersonID:        req.PersonID,
-			Name:            req.Name,
-			Avatar:          req.Avatar,
-			IsSuspended:     req.IsSuspended,
-			CreatedBy:       operatorID,
-			PrimaryOrgIDs:   req.OrganizationIDs,
-			SecondaryOrgIDs: req.SecondaryOrgIDs,
-			LeaderOrgIDs:    req.LeaderOrgIDs,
+			TenantID:               tenantID,
+			PersonID:               req.PersonID,
+			Name:                   req.Name,
+			Avatar:                 req.Avatar,
+			IsSuspended:            req.IsSuspended,
+			CreatedBy:              operatorID,
+			PrimaryDepartmentID:    req.PrimaryDepartmentID,
+			SecondaryDepartmentIDs: req.SecondaryDepartmentIDs,
+			LeaderDepartmentIDs:    req.LeaderDepartmentIDs,
 		}
 		if req.PersonID == "" {
 			createReq.Person = &person.FindOrCreateReq{
@@ -309,10 +308,8 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 			return nil, code.GetError(code.UserAlreadyInTenantError)
 		case errors.Is(txErr, user.ErrPersonNotFound):
 			return nil, code.GetError(code.UserNotExistError)
-		case errors.Is(txErr, user.ErrMultiplePrimaryOrg):
-			return nil, code.GetError(code.UserOrganizationRequiredError)
-		case errors.Is(txErr, user.ErrOrgLeaderConflict):
-			return nil, code.GetError(code.OrganizationUserLeaderConflictError)
+		case errors.Is(txErr, user.ErrDeptLeaderConflict):
+			return nil, code.GetError(code.DepartmentUserLeaderConflictError)
 		}
 		glog.Errorf(ctx, "[svcuser.Create] transaction fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserCreateError)
@@ -328,7 +325,7 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 	return resp, nil
 }
 
-// Detail 用户详情：基础信息（含自然人）+ 组织归属 + 已分配角色。
+// Detail 用户详情：基础信息（含自然人）+ 部门归属 + 已分配角色。
 func (svc *userSvc) Detail(ctx *gin.Context, req *dtotenant.UserDetailReq) (*dtotenant.UserDetailResp, error) {
 	tenantID := gincontext.GetTenantIDString(ctx)
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
@@ -364,13 +361,13 @@ func (svc *userSvc) Detail(ctx *gin.Context, req *dtotenant.UserDetailReq) (*dto
 		},
 	}
 
-	// 组织归属
-	organizations, err := loadUserOrganizations(ctx, tenantID, req.UserID)
+	// 部门归属
+	departments, err := loadUserDepartments(ctx, tenantID, req.UserID)
 	if err != nil {
-		glog.Errorf(ctx, "[svcuser.Detail] load organizations fail, err:%v", err)
+		glog.Errorf(ctx, "[svcuser.Detail] load departments fail, err:%v", err)
 		return nil, code.GetError(code.UserGetDetailError)
 	}
-	resp.Organizations = organizations
+	resp.Departments = departments
 
 	// 已分配角色
 	roles, err := svc.listRoles(ctx, tenantID, req.UserID)
@@ -400,8 +397,8 @@ func (svc *userSvc) Update(ctx *gin.Context, req *dtotenant.UserUpdateReq) error
 	operatorID := gincontext.GetUserIDString(ctx)
 
 	// 主部门不可清空：显式传 "" 拒绝。
-	if req.PrimaryOrgID != nil && *req.PrimaryOrgID == "" {
-		return code.GetError(code.UserOrganizationRequiredError)
+	if req.PrimaryDepartmentID != nil && *req.PrimaryDepartmentID == "" {
+		return code.GetError(code.UserDepartmentRequiredError)
 	}
 
 	// 编辑联系方式（person 全局标识）：加载当前 person 以便做二选一与唯一性校验。
@@ -432,29 +429,29 @@ func (svc *userSvc) Update(ctx *gin.Context, req *dtotenant.UserUpdateReq) error
 		}
 	}
 
-	// 校验传入的组织均属本租户。
-	orgSet := make(map[string]bool)
-	if (req.PrimaryOrgID != nil && *req.PrimaryOrgID != "") || req.SecondaryOrgIDs != nil || req.LeaderOrgIDs != nil {
-		orgList, err := dao.NewOrganizationDao().GetListByCond(ctx, &dao.OrganizationCond{TenantID: tenantID})
+	// 校验传入的部门均属本租户。
+	deptSet := make(map[string]bool)
+	if (req.PrimaryDepartmentID != nil && *req.PrimaryDepartmentID != "") || req.SecondaryDepartmentIDs != nil || req.LeaderDepartmentIDs != nil {
+		deptList, err := dao.NewDepartmentDao().GetListByCond(ctx, &dao.DepartmentCond{TenantID: tenantID})
 		if err != nil {
-			glog.Errorf(ctx, "[svcuser.Update] query org fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+			glog.Errorf(ctx, "[svcuser.Update] query dept fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 			return code.GetError(code.UserUpdateError)
 		}
-		for _, o := range orgList {
-			orgSet[o.ID] = true
+		for _, o := range deptList {
+			deptSet[o.ID] = true
 		}
-		checkOwnership := func(id string) bool { return id == "" || orgSet[id] }
-		if req.PrimaryOrgID != nil && !checkOwnership(*req.PrimaryOrgID) {
-			return code.GetError(code.OrganizationNotExistError)
+		checkOwnership := func(id string) bool { return id == "" || deptSet[id] }
+		if req.PrimaryDepartmentID != nil && !checkOwnership(*req.PrimaryDepartmentID) {
+			return code.GetError(code.DepartmentNotExistError)
 		}
-		for _, id := range derefSlice(req.SecondaryOrgIDs) {
-			if !orgSet[id] {
-				return code.GetError(code.OrganizationNotExistError)
+		for _, id := range derefSlice(req.SecondaryDepartmentIDs) {
+			if !deptSet[id] {
+				return code.GetError(code.DepartmentNotExistError)
 			}
 		}
-		for _, id := range derefSlice(req.LeaderOrgIDs) {
-			if !orgSet[id] {
-				return code.GetError(code.OrganizationNotExistError)
+		for _, id := range derefSlice(req.LeaderDepartmentIDs) {
+			if !deptSet[id] {
+				return code.GetError(code.DepartmentNotExistError)
 			}
 		}
 	}
@@ -480,26 +477,26 @@ func (svc *userSvc) Update(ctx *gin.Context, req *dtotenant.UserUpdateReq) error
 				return err
 			}
 		}
-		if req.PrimaryOrgID != nil {
+		if req.PrimaryDepartmentID != nil {
 			// 替换主部门：删旧 primary（至多 1 行）后建新。
-			if err := replaceOrgRelationList(ctx, tx, tenantID, req.UserID, []string{*req.PrimaryOrgID}, model.OrgUserRelationPrimary, operatorID); err != nil {
+			if err := replaceDeptRelationList(ctx, tx, tenantID, req.UserID, []string{*req.PrimaryDepartmentID}, model.DeptUserRelationPrimary, operatorID); err != nil {
 				return err
 			}
 		}
-		if req.SecondaryOrgIDs != nil {
-			if err := replaceOrgRelationList(ctx, tx, tenantID, req.UserID, *req.SecondaryOrgIDs, model.OrgUserRelationSecondary, operatorID); err != nil {
+		if req.SecondaryDepartmentIDs != nil {
+			if err := replaceDeptRelationList(ctx, tx, tenantID, req.UserID, *req.SecondaryDepartmentIDs, model.DeptUserRelationSecondary, operatorID); err != nil {
 				return err
 			}
 		}
-		if req.LeaderOrgIDs != nil {
-			if err := replaceOrgRelationList(ctx, tx, tenantID, req.UserID, *req.LeaderOrgIDs, model.OrgUserRelationLeader, operatorID); err != nil {
+		if req.LeaderDepartmentIDs != nil {
+			if err := replaceDeptRelationList(ctx, tx, tenantID, req.UserID, *req.LeaderDepartmentIDs, model.DeptUserRelationLeader, operatorID); err != nil {
 				return err
 			}
 		}
 		return nil
 	})
 	if txErr != nil {
-		if txErr == code.GetError(code.OrganizationUserLeaderConflictError) {
+		if txErr == code.GetError(code.DepartmentUserLeaderConflictError) {
 			return txErr
 		}
 		glog.Errorf(ctx, "[svcuser.Update] transaction fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))

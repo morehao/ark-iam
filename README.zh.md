@@ -30,7 +30,7 @@ ark-iam/
 │   ├── apps/
 │   │   ├── auth/          # 认证网关（登录/注册/token/OIDC）, :8081
 │   │   ├── platformadmin/ # 平台管理（user/role/menu/tenant）, :8082
-│   │   ├── tenantadmin/   # 租户自服务（organization/orgRole）, :8083
+│   │   ├── tenantadmin/   # 租户自服务（department/user/role）, :8083
 │   │   └── gateway/       # 聚合应用，挂载上述三个, :8100
 │   ├── pkg/               # 公共包（多应用共享）
 │   ├── scripts/           # 脚本

@@ -21,14 +21,14 @@ IAM 管理平台前端，基于 React 18 + Vite + Ant Design 5.x 的 pnpm monore
 frontend/
 ├── packages/
 │   ├── tsconfig/          # 共享 TS 配置
-│   ├── types/             # 领域类型（auth / organization / platform）
+│   ├── types/             # 领域类型（auth / department / platform）
 │   ├── api/               # Axios 实例 + 全量领域 API 资源
 │   ├── auth/              # OIDC Provider、租户切换、登出、鉴权守卫
 │   └── ui/                # 设计系统：主题、MainLayout、LoginPage、PageContainer 等
 └── apps/
     ├── login-web/         # 登录页（:4000）— OP 登录 UI：凭证登录 / 多租户选择（非 OIDC Client）
     ├── platform-admin-web/# 平台管理控制台（:4001）— 用户/角色/菜单/部门/应用/OAuth客户端/租户/API Key/域名/审计日志
-    └── tenant-admin-web/  # 租户自服务控制台（:4002）— 组织/组织角色/组织用户/组织角色用户
+    └── tenant-admin-web/  # 租户自服务控制台（:4002）— 部门/部门角色/部门用户/部门角色用户
 ```
 
 依赖方向：`ui → auth → api → types`，业务 app 消费共享包。
@@ -76,7 +76,7 @@ Vite dev server 将 `/v1` 与 `/oidc` 代理到后端网关 `http://localhost:81
 - **不含用户 / 角色页面**：两者按租户归属，只在租户自服务控制台管理（平台端不再提供跨租户用户目录与角色视图）
 
 ### 租户自服务控制台（tenant-admin-web）
-- 组织管理：组织树 CRUD + 成员关系（primary/secondary/leader）
+- 部门管理：部门树 CRUD + 成员关系（primary/secondary/leader）
 - 用户管理：Tab「用户」= 真实用户 CRUD/部门/角色/第三方身份绑定/登录日志；Tab「服务账号」= 创建(必选主部门+可选参与部门)/编辑/换部门/挂起/删除/角色授权（不可登录、无自然人、不可任部门负责人；详情内嵌其密钥只读列表）
 - 角色管理：角色 CRUD、菜单授权、成员分配
 - API密钥：服务账号密钥管理（归属服务账号，服务端集成；需系统管理能力；个人密钥能力已下线），支持按服务账号筛选/新建（明文一次）/吊销/删除
