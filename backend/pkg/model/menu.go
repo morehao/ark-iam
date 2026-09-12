@@ -49,10 +49,17 @@ const (
 
 type MenuEntity struct {
 	gormdao.BaseEntity
-	AppID        string         `gorm:"column:app_id;type:varchar(36);not null;default:'';comment:所属应用id"`
-	ParentID     string         `gorm:"column:parent_id;type:varchar(36);not null;default:'';comment:父菜单ID"`
-	Name         string         `gorm:"column:name;type:varchar(128);not null;default:'';comment:菜单名称"`
-	Code         string         `gorm:"column:code;type:varchar(64);not null;default:'';comment:菜单编码"`
+	AppID    string `gorm:"column:app_id;type:varchar(36);not null;default:'';comment:所属应用id;uniqueIndex:uk_menu_app_code_active,where:deleted_at IS NULL"`
+	ParentID string `gorm:"column:parent_id;type:varchar(36);not null;default:'';comment:父菜单ID"`
+	Name     string `gorm:"column:name;type:varchar(128);not null;default:'';comment:菜单名称"`
+	// Code 菜单编码：业务标识，**控制台可改**（应用内唯一，由 uk_menu_app_code_active 保证）。
+	// 它不是种子的认行依据——种子身份由 SeedKey 承担，因此改名不会导致种子重建菜单行。
+	Code string `gorm:"column:code;type:varchar(64);not null;default:'';comment:菜单编码;uniqueIndex:uk_menu_app_code_active,where:deleted_at IS NULL"`
+	// SeedKey 种子身份键：内置菜单的稳定标识（= 种子定义时的 code），创建时写入后**不再变化**，
+	// 控制台不可见也不可写。种子查行、退役清理、租户开通授权都以它为依据，
+	// 因此业务字段 Code 可以自由修改，不会触发「按 code 查不到 → 重建一行」。
+	// 控制台自建菜单恒为空串；空串不进唯一索引（uk_menu_seed_key_active 是部分唯一索引）。
+	SeedKey      string         `gorm:"column:seed_key;type:varchar(64);not null;default:'';comment:种子身份键(内置菜单稳定标识,控制台不可见);uniqueIndex:uk_menu_seed_key_active,where:deleted_at IS NULL AND seed_key <> ''"`
 	Path         string         `gorm:"column:path;type:varchar(512);not null;default:'';comment:菜单路径"`
 	Icon         string         `gorm:"column:icon;type:varchar(256);not null;default:'';comment:菜单图标"`
 	Sort         int            `gorm:"column:sort;type:int;not null;default:0;comment:排序"`

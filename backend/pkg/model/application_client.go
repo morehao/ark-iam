@@ -1,6 +1,8 @@
 package model
 
 import (
+	"regexp"
+
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/datatypes"
 )
@@ -50,14 +52,26 @@ const (
 	TokenEndpointAuthMethodNone  TokenEndpointAuthMethod = "none"
 )
 
+// ClientCodePattern 客户端编码（= OIDC client_id）规则：小写字母开头，仅含**小写字母与下划线**
+// （如 platform_admin_web、iam_client）。比 AppCodePattern 更严——不出现数字，也禁连字符。
+// 由创建方（控制台表单 / 接口调用方）填写，服务端与前端各自校验一份，口径必须一致：
+// 后端 model.IsValidClientCode（service 入口拦截），前端见 platform-admin-web 的 CLIENT_CODE_PATTERN。
+const ClientCodePattern = `^[a-z][a-z_]*$`
+
+var clientCodeRegexp = regexp.MustCompile(ClientCodePattern)
+
+// IsValidClientCode 判断客户端编码是否符合 ClientCodePattern。
+func IsValidClientCode(code string) bool { return clientCodeRegexp.MatchString(code) }
+
 type ApplicationClientEntity struct {
 	gormdao.BaseEntity
 	TenantID string `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id" json:"tenantID"`
 	AppID    string `gorm:"column:app_id;type:varchar(36);not null;default:'';comment:所属应用id" json:"appID"`
 	// Code 是客户端编码，即 OIDC 协议里的 client_id（客户端唯一标识）：
-	// - 控制台创建时随机生成（generateClientCode → UUID），内置客户端由种子写入可读值（如 platform-admin-web）；
-	// - 「编码」在本表指协议标识符，**不适用** AppCodePattern（那条规则只管 application.code，禁连字符）：
-	//   客户端编码允许连字符，取值口径见 docs/design/sso-oidc-concepts.md §3.2；
+	// - 控制台/接口**创建时由调用方填写**（ApplicationClientCreateReq.Code，必填），不再由服务端生成；
+	//   内置客户端由种子写入可读值（model.SeedBuiltinClientPlatformAdminWeb 等）。
+	// - 必须满足 model.ClientCodePattern（小写字母开头，仅小写字母与下划线，禁数字与连字符）；
+	//   取值口径见 docs/design/sso-oidc-concepts.md §3.2；
 	// - 与 application_client.id（控制台内部主键，其他表以其为外键）不是一回事。
 	Code string `gorm:"column:code;type:varchar(64);not null;default:'';uniqueIndex;comment:客户端编码(= OIDC client_id)" json:"code"`
 	Name string `gorm:"column:name;type:varchar(256);not null;default:'';comment:客户端名称" json:"name"`

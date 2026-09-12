@@ -2148,6 +2148,10 @@ const docTemplateplatformadmin = `{
                     "description": "个人是否可自助创建租户",
                     "type": "boolean"
                 },
+                "code": {
+                    "description": "Code 应用编码：自建应用可改（留空表示不修改），规则同创建（model.AppCodePattern，小写字母开头、\n仅小写字母/数字/下划线）；改它不影响菜单/订阅/角色——那些都挂 app_id。\n**内置应用**（source=builtin）拒改——控制台菜单入口仍按该编码定位（platform_admin/tenant_admin），\n改名会当场让对应控制台侧边栏失联且无法从界面恢复。",
+                    "type": "string"
+                },
                 "description": {
                     "description": "应用描述",
                     "type": "string"
@@ -2239,6 +2243,7 @@ const docTemplateplatformadmin = `{
             "type": "object",
             "required": [
                 "appID",
+                "code",
                 "name"
             ],
             "properties": {
@@ -2259,6 +2264,10 @@ const docTemplateplatformadmin = `{
                 },
                 "backChannelLogoutURI": {
                     "description": "OIDC背信道登出通知地址",
+                    "type": "string"
+                },
+                "code": {
+                    "description": "Code 即 OIDC client_id，由调用方填写（不再由服务端生成）：\n小写字母开头，仅含小写字母与下划线（model.ClientCodePattern），非法值由 service 拦截。\n与前端表单 platform-admin-web 的 CLIENT_CODE_PATTERN 同口径。",
                     "type": "string"
                 },
                 "defaultScopes": {
@@ -2486,6 +2495,10 @@ const docTemplateplatformadmin = `{
                 },
                 "backChannelLogoutURI": {
                     "description": "OIDC背信道登出通知地址",
+                    "type": "string"
+                },
+                "code": {
+                    "description": "Code 客户端编码（= OIDC client_id）：可改（留空表示不修改），规则与创建一致（model.ClientCodePattern）。\n**内置客户端**（source=builtin）拒改——它是控制台自身的 OIDC 身份，网关 audience 白名单与\n前端构建期默认值都按它取值，改了会当场把该控制台锁死且无法从界面恢复。",
                     "type": "string"
                 },
                 "defaultScopes": {
@@ -3693,6 +3706,14 @@ const docTemplateplatformadmin = `{
                     "description": "应用名称",
                     "type": "string"
                 },
+                "appSource": {
+                    "description": "所属应用来源（builtin=内置应用，其订阅由系统开通、不可删除）",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppSource"
+                        }
+                    ]
+                },
                 "createdAt": {
                     "description": "创建时间(unix 秒)",
                     "type": "integer"
@@ -3775,6 +3796,14 @@ const docTemplateplatformadmin = `{
                 "appName": {
                     "description": "应用名称",
                     "type": "string"
+                },
+                "appSource": {
+                    "description": "所属应用来源（builtin=内置应用，其订阅由系统开通、不可删除）",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppSource"
+                        }
+                    ]
                 },
                 "config": {
                     "description": "租户级应用配置(JSON)",

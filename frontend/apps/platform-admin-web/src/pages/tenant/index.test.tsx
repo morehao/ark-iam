@@ -227,3 +227,54 @@ describe('平台租户不可挂起', () => {
     await waitFor(() => expect(suspendSwitch).toBeDisabled())
   })
 })
+
+/**
+ * 平台自运营租户（种子租户 t_platform）不可删除：删除会让平台控制台整体失联且无恢复路径。
+ * 前端按种子编码（而非 type）把「删除」置灰保留展示（不隐藏），
+ * 后端 svctenant.Delete 以 TenantBuiltInDeleteForbiddenError 兜底。
+ */
+describe('平台租户不可删除', () => {
+  const platformTenant: TenantItem = {
+    tenantID: 't0',
+    code: 't_platform',
+    name: '平台运营中心',
+    status: 'active',
+    type: 'platform',
+    tag: 'default',
+    dbUser: 'default_user',
+    createdAt,
+    updatedAt,
+  }
+
+  it('平台租户行的「删除」置灰不可点', async () => {
+    mockGetTenantPageList.mockResolvedValue({ list: [platformTenant], total: 1 })
+
+    render(
+      <AntdApp>
+        <TenantList />
+      </AntdApp>,
+    )
+
+    expect(await screen.findByText('平台运营中心')).toBeInTheDocument()
+    // 3 个操作（编辑/重置管理员密码/删除）→ 删除收在「更多」下拉中，菜单项置灰
+    fireEvent.click(screen.getByRole('button', { name: /更多/ }))
+    const deleteItem = await screen.findByRole('menuitem', { name: '删除' })
+    expect(deleteItem).toHaveClass('ant-dropdown-menu-item-disabled')
+  })
+
+  it('同 type=platform 但非种子编码的租户「删除」可点', async () => {
+    const ordinary: TenantItem = { ...platformTenant, tenantID: 't2', code: 't_000000000002', name: 'Globex' }
+    mockGetTenantPageList.mockResolvedValue({ list: [ordinary], total: 1 })
+
+    render(
+      <AntdApp>
+        <TenantList />
+      </AntdApp>,
+    )
+    expect(await screen.findByText('Globex')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /更多/ }))
+    const deleteItem = await screen.findByRole('menuitem', { name: '删除' })
+    expect(deleteItem).not.toHaveClass('ant-dropdown-menu-item-disabled')
+  })
+})

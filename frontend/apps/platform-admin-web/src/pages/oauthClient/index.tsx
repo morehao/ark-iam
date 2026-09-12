@@ -8,6 +8,10 @@ import type { OAuthClientItem } from '@ark-iam/types'
 import { useNavigate } from 'react-router-dom'
 import { oauthClientDetailPath } from '../../routes'
 
+// 客户端编码（= OIDC client_id）规则，与后端 model.ClientCodePattern 同口径：
+// 小写字母开头，仅含小写字母与下划线（禁数字与连字符）。前端与后端各校验一份，改一处必须同步另一处。
+const CLIENT_CODE_PATTERN = /^[a-z][a-z_]*$/
+
 export default function OAuthClientList() {
   const navigate = useNavigate()
   const [data, setData] = useState<OAuthClientItem[]>([])
@@ -21,6 +25,8 @@ export default function OAuthClientList() {
   const [editing, setEditing] = useState<OAuthClientItem | null>(null)
   const [form] = Form.useForm()
   const [submitLoading, setSubmitLoading] = useState(false)
+  // 内置控制台客户端：编码（= client_id）是网关 aud 白名单与前端构建期默认值的取值来源，保持只读
+  const builtinClient = editing?.source === 'builtin'
 
   // 应用可增长，所属应用下拉走服务端搜索（RemoteSelect），不再一次性只取前 100 条
   const fetchAppOptions = useCallback(async (search: string) => {
@@ -54,6 +60,7 @@ export default function OAuthClientList() {
   const handleEdit = (record: OAuthClientItem) => {
     setEditing(record)
     form.setFieldsValue({
+      code: record.code,
       name: record.name,
       status: record.status,
       tokenEndpointAuthMethod: record.tokenEndpointAuthMethod,
@@ -110,7 +117,16 @@ export default function OAuthClientList() {
       max: 2,
       actions: (r) => [
         { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
-        { key: 'delete', label: '删除', danger: true, confirm: '确认删除该客户端？', onClick: () => void handleDelete(r) },
+        {
+          key: 'delete',
+          label: '删除',
+          danger: true,
+          // 内置客户端（source=builtin，网关 aud 白名单与前端构建期 client_id 的来源）禁删：置灰保留展示；
+          // 后端 svcapplicationclient.Delete 以 ApplicationClientBuiltInErr 兜底。
+          disabled: r.source === 'builtin',
+          confirm: '确认删除该客户端？',
+          onClick: () => void handleDelete(r),
+        },
       ],
     }),
   ]
@@ -175,12 +191,26 @@ export default function OAuthClientList() {
             </Form.Item>
           )}
           <Form.Item
+            name="code"
+            label="客户端编码"
+            tooltip={
+              builtinClient
+                ? '内置控制台的 OIDC 身份，由平台版本定义，不可修改'
+                : '即 OIDC 的 client_id。改动后使用它的应用需同步自己的 client_id 配置，且其已签发令牌会失效'
+            }
+            rules={[
+              { required: true, message: '请输入客户端编码' },
+              { pattern: CLIENT_CODE_PATTERN, message: '以小写字母开头，仅含小写字母与下划线' },
+            ]}
+          >
+            <Input placeholder="唯一编码，如 iam_client" disabled={builtinClient} />
+          </Form.Item>
+          <Form.Item
             name="name"
             label="名称"
             rules={[{ required: true, message: '请输入名称' }]}
-            extra={editing?.source === 'builtin' ? '内置客户端的名称由平台版本定义，不可修改' : undefined}
           >
-            <Input placeholder="客户端名称" disabled={editing?.source === 'builtin'} />
+            <Input placeholder="客户端名称" />
           </Form.Item>
           {editing && (
             <Form.Item label="来源">

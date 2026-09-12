@@ -18,15 +18,20 @@ type ApplicationCreateReq struct {
 
 // ApplicationUpdateReq 修改应用。source 不可改（内置应用不可被改写为第三方）。
 type ApplicationUpdateReq struct {
-	AppID                   string          `json:"-" uri:"appID" binding:"required"` // 应用ID
-	Name                    string          `json:"name"`                             // 应用名称
-	Description             string          `json:"description"`                      // 应用描述
-	LogoURL                 string          `json:"logoUrl"`                          // 应用logo
-	HomepageURL             string          `json:"homepageUrl"`                      // 应用主页
-	Status                  model.AppStatus `json:"status"`                           // 状态: enable-启用, disable-停用
-	Sort                    int             `json:"sort"`                             // 排序
-	AllowPersonCreateTenant *bool           `json:"allowPersonCreateTenant"`          // 个人是否可自助创建租户
-	AllowJoinByInvite       *bool           `json:"allowJoinByInvite"`                // 是否允许通过邀请加入租户
+	AppID string `json:"-" uri:"appID" binding:"required"` // 应用ID
+	// Code 应用编码：自建应用可改（留空表示不修改），规则同创建（model.AppCodePattern，小写字母开头、
+	// 仅小写字母/数字/下划线）；改它不影响菜单/订阅/角色——那些都挂 app_id。
+	// **内置应用**（source=builtin）拒改——控制台菜单入口仍按该编码定位（platform_admin/tenant_admin），
+	// 改名会当场让对应控制台侧边栏失联且无法从界面恢复。
+	Code                    string          `json:"code"`                    // 应用编码（留空不修改）
+	Name                    string          `json:"name"`                    // 应用名称
+	Description             string          `json:"description"`             // 应用描述
+	LogoURL                 string          `json:"logoUrl"`                 // 应用logo
+	HomepageURL             string          `json:"homepageUrl"`             // 应用主页
+	Status                  model.AppStatus `json:"status"`                  // 状态: enable-启用, disable-停用
+	Sort                    int             `json:"sort"`                    // 排序
+	AllowPersonCreateTenant *bool           `json:"allowPersonCreateTenant"` // 个人是否可自助创建租户
+	AllowJoinByInvite       *bool           `json:"allowJoinByInvite"`       // 是否允许通过邀请加入租户
 }
 
 type ApplicationDetailReq struct {

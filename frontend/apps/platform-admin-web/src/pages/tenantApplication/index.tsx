@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, message, Modal, Select, Space, Table } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, idColumn, NAME_COL_WIDTH, PageContainer, RemoteSelect, STATUS_COL_WIDTH, EnableTag, tableScrollX, textColumn, timeColumn } from '@ark-iam/ui'
+import { actionColumn, idColumn, NAME_COL_WIDTH, PageContainer, RemoteSelect, SourceTag, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn } from '@ark-iam/ui'
 import {
   createTenantApplication,
   deleteTenantApplication,
@@ -114,6 +114,9 @@ export default function TenantApplicationList() {
     idColumn<TenantApplicationItem>({ dataIndex: 'tenantAppID' }),
     textColumn<TenantApplicationItem>({ title: '租户', dataIndex: 'tenantName', width: NAME_COL_WIDTH }),
     textColumn<TenantApplicationItem>({ title: '应用', dataIndex: 'appName', width: NAME_COL_WIDTH }),
+    // 应用来源（后端回填所属应用 source）：builtin=内置应用，其订阅由系统开通、不可删除，
+    // 展示出来才能解释该行为何没有「删除」。
+    { title: '应用来源', dataIndex: 'appSource', key: 'appSource', width: TAG_COL_WIDTH, render: (v: string) => <SourceTag value={v} /> },
     { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <EnableTag value={v} /> },
     timeColumn<TenantApplicationItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<TenantApplicationItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
@@ -121,7 +124,17 @@ export default function TenantApplicationList() {
       max: 2,
       actions: (r) => [
         { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
-        { key: 'delete', label: '删除', danger: true, confirm: '确认删除该订阅？', onClick: () => void handleDelete(r) },
+        {
+          key: 'delete',
+          label: '删除',
+          danger: true,
+          // 订阅的是内置应用（source=builtin，平台管理后台/租户管理后台）即禁删：它由种子或
+          // ProvisionTenantAdmin 系统开通，删除会让对应控制台失去菜单；置灰保留展示，下线请改用「停用」。
+          // 后端 svctenantapplication.Delete 以 TenantApplicationBuiltInErr 兜底。
+          disabled: r.appSource === 'builtin',
+          confirm: '确认删除该订阅？',
+          onClick: () => void handleDelete(r),
+        },
       ],
     }),
   ]

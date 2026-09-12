@@ -15,6 +15,7 @@ const (
 	TenantPageListStatusInvalidError    = 100209
 	TenantAdminResetPasswordError       = 100210
 	TenantPlatformSuspendForbiddenError = 100211 // 平台自运营租户不可挂起（被挂起会导致整栈控制台失联，且无恢复路径）
+	TenantBuiltInDeleteForbiddenError   = 100212 // 平台自运营租户（种子租户 t_platform）不可删除（删除即整栈控制台失联，且无恢复路径）
 )
 
 const (
@@ -56,6 +57,7 @@ var tenantErrorMsgMap = gerror.CodeMsgMap{
 	TenantSuspendedError:                "该租户已被挂起",
 	TenantSuspendSelfForbiddenError:     "不能挂起当前所在租户",
 	TenantPlatformSuspendForbiddenError: "平台自运营租户不可挂起",
+	TenantBuiltInDeleteForbiddenError:   "平台自运营租户由平台版本内置，不可删除",
 	TenantPageListStatusInvalidError:    "租户状态筛选值不合法",
 	TenantAdminResetPasswordError:       "重置租户内置管理员密码失败",
 	DepartmentCreateError:               "创建部门失败",

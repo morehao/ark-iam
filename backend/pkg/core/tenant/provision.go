@@ -15,8 +15,10 @@ import (
 // 租户自服务权限开通的内置定义（单一事实源）：
 // pkg/seed（平台租户 bootstrap）与各建租户链路共用同一份编码，避免"角色/菜单集合"出现两份定义而漂移。
 const (
-	// ProvisionAppCode 租户管理后台（租户自服务控制台）应用编码（application.code，规则见 model.AppCodePattern）。
-	ProvisionAppCode = "tenant_admin"
+	// ProvisionAppSeedKey 租户管理后台（租户自服务控制台）应用的**种子身份键**（model.ApplicationEntity.SeedKey）。
+	// 开通链路按它定位应用，而不是按 application.code——code 是运营可改的业务标识；
+	// 该值与种子定义（pkg/seed 的 appCodeTenantAdmin）一致，改定义时两处同步。
+	ProvisionAppSeedKey = "tenant_admin"
 	// ProvisionRoleName 内置租户管理员角色名称（角色无业务编码，(tenant_id, app_id, source=builtin) 即其业务唯一键）。
 	ProvisionRoleName = "租户管理员"
 	// ProvisionRoleDesc 内置租户管理员角色描述。
@@ -25,8 +27,9 @@ const (
 	ProvisionAdminType = model.SysAdminTypeAdmin
 )
 
-// ProvisionMenuCodes 内置租户管理员默认授权的菜单编码（tenant_admin 应用下的叶子菜单）。
-var ProvisionMenuCodes = []string{"department", "tenant-user", "tenant-role", "tenant-api-key"}
+// ProvisionMenuSeedKeys 内置租户管理员默认授权的**菜单种子身份键**（tenant_admin 应用下的叶子菜单，见 model.MenuEntity.SeedKey）。
+// 用身份键而非菜单编码：运营在控制台改过菜单 code 之后，新开通的租户仍能授权到同一批菜单。
+var ProvisionMenuSeedKeys = []string{"department", "tenant-user", "tenant-role", "tenant-api-key"}
 
 // ProvisionTenantAdminReq 构造 ProvisionTenantAdmin 入参。
 type ProvisionTenantAdminReq struct {
@@ -51,13 +54,14 @@ func ProvisionTenantAdmin(ctx context.Context, tx *gorm.DB, req *ProvisionTenant
 		return nil, fmt.Errorf("core/tenant: tenant id is required")
 	}
 
-	// 1. 定位租户管理后台应用（全局种子数据，缺失即种子未跑完）
-	app, err := dao.NewApplicationDao().WithTx(tx).GetByCond(ctx, &dao.ApplicationCond{Code: ProvisionAppCode})
+	// 1. 定位租户管理后台应用（全局种子数据，缺失即种子未跑完）：按种子身份键定位，
+	// 运营改过 application.code 后依然命中同一行。
+	app, err := dao.NewApplicationDao().WithTx(tx).GetByCond(ctx, &dao.ApplicationCond{SeedKey: ProvisionAppSeedKey})
 	if err != nil {
-		return nil, fmt.Errorf("query application %s fail: %w", ProvisionAppCode, err)
+		return nil, fmt.Errorf("query application %s fail: %w", ProvisionAppSeedKey, err)
 	}
 	if app == nil || app.ID == "" {
-		return nil, fmt.Errorf("application %s not found (seed not ready)", ProvisionAppCode)
+		return nil, fmt.Errorf("application %s not found (seed not ready)", ProvisionAppSeedKey)
 	}
 
 	// 2. 应用订阅：新租户默认开通（已存在则保持现状，不覆盖租户侧的启停选择）
@@ -72,7 +76,7 @@ func ProvisionTenantAdmin(ctx context.Context, tx *gorm.DB, req *ProvisionTenant
 	}
 
 	// 4. 角色菜单授权
-	if err := ensureRoleMenus(ctx, tx, req, app.ID, role.ID); err != nil {
+	if err := ensureRoleMenus(ctx, tx, req, role.ID); err != nil {
 		return nil, err
 	}
 
@@ -149,21 +153,23 @@ func ensureBuiltinRole(ctx context.Context, tx *gorm.DB, req *ProvisionTenantAdm
 }
 
 // ensureRoleMenus 幂等写入角色-菜单授权；菜单缺失只告警跳过。
-func ensureRoleMenus(ctx context.Context, tx *gorm.DB, req *ProvisionTenantAdminReq, appID, roleID string) error {
+// 按菜单的**种子身份键**定位（不用菜单编码，也不限定应用）：运营改过菜单 code
+// 或把内置菜单移到别的应用后，新开通租户仍授权到同一批菜单。
+func ensureRoleMenus(ctx context.Context, tx *gorm.DB, req *ProvisionTenantAdminReq, roleID string) error {
 	menuDao := dao.NewMenuDao().WithTx(tx)
 	roleMenuDao := dao.NewRoleMenuDao().WithTx(tx)
-	for _, menuCode := range ProvisionMenuCodes {
-		menu, err := menuDao.GetByCond(ctx, &dao.MenuCond{AppID: appID, Code: menuCode})
+	for _, menuSeedKey := range ProvisionMenuSeedKeys {
+		menu, err := menuDao.GetByCond(ctx, &dao.MenuCond{SeedKey: menuSeedKey})
 		if err != nil {
-			return fmt.Errorf("query menu %s fail: %w", menuCode, err)
+			return fmt.Errorf("query menu %s fail: %w", menuSeedKey, err)
 		}
 		if menu == nil || menu.ID == "" {
-			glog.Warnf(ctx, "[tenant.ProvisionTenantAdmin] menu not found, skip grant, tenantID:%s, code:%s", req.TenantID, menuCode)
+			glog.Warnf(ctx, "[tenant.ProvisionTenantAdmin] menu not found, skip grant, tenantID:%s, seedKey:%s", req.TenantID, menuSeedKey)
 			continue
 		}
 		existing, err := roleMenuDao.GetByCond(ctx, &dao.RoleMenuCond{TenantID: req.TenantID, RoleID: roleID, MenuID: menu.ID})
 		if err != nil {
-			return fmt.Errorf("query role_menu %s fail: %w", menuCode, err)
+			return fmt.Errorf("query role_menu %s fail: %w", menuSeedKey, err)
 		}
 		if existing != nil && existing.ID != "" {
 			continue
@@ -174,7 +180,7 @@ func ensureRoleMenus(ctx context.Context, tx *gorm.DB, req *ProvisionTenantAdmin
 			MenuID:    menu.ID,
 			CreatedBy: req.CreatedBy,
 		}); err != nil {
-			return fmt.Errorf("insert role_menu %s fail: %w", menuCode, err)
+			return fmt.Errorf("insert role_menu %s fail: %w", menuSeedKey, err)
 		}
 	}
 	return nil

@@ -104,7 +104,7 @@ flowchart LR
 |---|---|---|
 | **End User** | 终端用户 | 自然人（person），跨租户的全局身份 |
 | **OP / IdP** | OpenID Provider / Identity Provider | `auth` 应用的 `/oidc` 服务（OIDC Provider） |
-| **RP / Client** | Relying Party | 业务应用前端/后端，如 platform-admin-web、tenant-admin-web |
+| **RP / Client** | Relying Party | 业务应用前端/后端，如 platform-admin-web、tenant-admin-web（其 client_id 分别是 `platform_admin_web`、`tenant_admin_web`） |
 | **Resource Server** | 资源服务器 | 业务应用后端 API（platformadmin / tenantadmin 等） |
 | **Authorization Server** | 授权服务器 | 同 OP，负责认证用户并签发令牌 |
 
@@ -114,7 +114,7 @@ RP 接入前必须在 OP 注册一个 **OAuth Client**，核心注册字段（�
 
 | 字段 | 说明 | 本系统默认值 |
 |---|---|---|
-| `client_id` | 客户端唯一标识 | 如 `platform-admin-web` |
+| `client_id` | 客户端唯一标识 | 如 `platform_admin_web` |
 | `client_secret` | 客户端密钥（仅机密客户端需要，库中只存哈希） | - |
 | `redirect_uris` | 授权码回调地址（**必须白名单精确匹配**） | 如 `http://localhost:4001/callback` |
 | `grant_types` | 允许的授权类型 | `["authorization_code"]` |
@@ -128,9 +128,22 @@ RP 接入前必须在 OP 注册一个 **OAuth Client**，核心注册字段（�
 
 > **`client_id` 在库中的落位与命名**：本系统存在 `application_client.code` 列，它就是这里的 `client_id`（唯一索引），
 > 中文名统一叫**客户端编码**（与 API 字段名 `code` 同构，控制台列表/详情即用此列名）。
-> 控制台/接口创建的客户端由服务端随机生成（UUID），内置客户端由种子写入可读值（如 `platform-admin-web`）。
-> **两个「编码」规则不同**，不要混用：`application.code`（应用编码）受 `model.AppCodePattern` 约束（下划线连接、禁连字符）；
-> 而客户端编码是**协议标识符**，**不适用 `AppCodePattern`**，允许连字符（`platform-admin-web` 这类取值合法）。
+> **创建时由调用方填写**（`ApplicationClientCreateReq.code` 必填，控制台表单「客户端编码」），
+> **用户自建客户端创建后可改**（`ApplicationClientUpdateReq.code`）；
+> **内置客户端只读**——它是网关 aud 白名单与前端 `VITE_OIDC_CLIENT_ID` 的取值来源，
+> 从控制台改名会当场把该控制台锁死且界面无法自救（见 [seed-identity-key-20260912.md](seed-identity-key-20260912.md)）。
+> 应用编码同理：**自建应用可改，内置应用只读**——控制台菜单入口仍按 `platform_admin` / `tenant_admin` 定位，
+> 改名会让对应控制台侧边栏失联（`100749`）。
+> 内置客户端由种子写入可读值（`platform_admin_web` / `tenant_admin_web`，
+> 常量在 `model.SeedBuiltinClientPlatformAdminWeb` / `model.SeedBuiltinClientTenantAdminWeb`）。
+> **两套「编码」规则刻意不同**：`application.code`（应用编码）受 `model.AppCodePattern` 约束
+> （`^[a-z][a-z0-9_]*$`，允许数字）；客户端编码受 `model.ClientCodePattern` 约束
+> （`^[a-z][a-z_]*$`：小写字母开头，**仅小写字母与下划线，不允许数字，禁连字符**）。
+> 两者都**前后端各校验一份**（前端表单 `pattern` + 后端 service 入口 `IsValidAppCode` / `IsValidClientCode`，
+> 非法值返回领域错误码），正则跨语言无法共享，改一处必须同步另一处。
+> 注意 `client_id` 同时是**令牌 audience**：`platformadmin` / `tenantadmin` 的 aud 白名单、
+> back-channel logout 的客户端识别、前端 `VITE_OIDC_CLIENT_ID` 默认值都必须与它一致，改名时四处同步
+> （前两处已改为引用 `pkg/model` 的种子身份常量，不会再漂移）。
 > 它也与 `application_client.id`（控制台内部主键，`application_client_secret` / `refresh_token` 等以其为外键）不是一回事。
 
 ### 3.3 授权类型（Grant Types）

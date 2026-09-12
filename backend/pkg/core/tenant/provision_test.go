@@ -35,17 +35,19 @@ func newProvisionTestDB(t *testing.T) *gorm.DB {
 }
 
 // seedTenantAdminApp 写入 tenant_admin 应用与指定菜单（模拟 pkg/seed 的全局种子数据）。
-func seedTenantAdminApp(t *testing.T, db *gorm.DB, menuCodes ...string) *model.ApplicationEntity {
+// 应用与菜单都按种子身份键（SeedKey）播种——开通链路按身份键定位，而非可被运营改名的 code。
+func seedTenantAdminApp(t *testing.T, db *gorm.DB, menuSeedKeys ...string) *model.ApplicationEntity {
 	t.Helper()
 	ctx := context.Background()
-	app := &model.ApplicationEntity{Code: ProvisionAppCode, Name: "租户管理后台", Status: model.AppStatusEnable}
+	app := &model.ApplicationEntity{Code: ProvisionAppSeedKey, SeedKey: ProvisionAppSeedKey, Name: "租户管理后台", Status: model.AppStatusEnable}
 	require.NoError(t, db.WithContext(ctx).Create(app).Error)
-	for i, code := range menuCodes {
+	for i, seedKey := range menuSeedKeys {
 		require.NoError(t, db.WithContext(ctx).Create(&model.MenuEntity{
 			AppID:      app.ID,
-			Name:       code,
-			Code:       code,
-			Path:       "/" + code,
+			Name:       seedKey,
+			Code:       seedKey,
+			SeedKey:    seedKey,
+			Path:       "/" + seedKey,
 			Sort:       i + 1,
 			Type:       model.MenuTypeMenu,
 			Visibility: model.MenuVisibilityAdmin,
@@ -64,7 +66,7 @@ func countProvisionRows(t *testing.T, db *gorm.DB, entity any, query string, arg
 
 func TestProvisionTenantAdmin_CreatesSubscriptionRoleMenusAndGrant(t *testing.T) {
 	db := newProvisionTestDB(t)
-	app := seedTenantAdminApp(t, db, ProvisionMenuCodes...)
+	app := seedTenantAdminApp(t, db, ProvisionMenuSeedKeys...)
 
 	role, err := ProvisionTenantAdmin(context.Background(), db, &ProvisionTenantAdminReq{
 		TenantID:    "t1",
@@ -82,7 +84,7 @@ func TestProvisionTenantAdmin_CreatesSubscriptionRoleMenusAndGrant(t *testing.T)
 	// 应用订阅 1 + 角色 1 + 授权 4 + 管理员绑定 1
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.TenantApplicationEntity{}, "tenant_id = ? AND app_id = ?", "t1", app.ID))
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.RoleEntity{}, "tenant_id = ? AND app_id = ? AND source = ?", "t1", app.ID, model.RoleSourceBuiltin))
-	require.Equal(t, int64(len(ProvisionMenuCodes)), countProvisionRows(t, db, &model.RoleMenuEntity{}, "tenant_id = ? AND role_id = ?", "t1", role.ID))
+	require.Equal(t, int64(len(ProvisionMenuSeedKeys)), countProvisionRows(t, db, &model.RoleMenuEntity{}, "tenant_id = ? AND role_id = ?", "t1", role.ID))
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.UserRoleEntity{}, "tenant_id = ? AND user_id = ? AND role_id = ?", "t1", "u1", role.ID))
 
 	// 租户隔离：不得污染其他租户
@@ -91,7 +93,7 @@ func TestProvisionTenantAdmin_CreatesSubscriptionRoleMenusAndGrant(t *testing.T)
 
 func TestProvisionTenantAdmin_Idempotent(t *testing.T) {
 	db := newProvisionTestDB(t)
-	app := seedTenantAdminApp(t, db, ProvisionMenuCodes...)
+	app := seedTenantAdminApp(t, db, ProvisionMenuSeedKeys...)
 	ctx := context.Background()
 	req := &ProvisionTenantAdminReq{TenantID: "t1", GrantUserID: "u1"}
 
@@ -104,7 +106,7 @@ func TestProvisionTenantAdmin_Idempotent(t *testing.T) {
 	require.Equal(t, first.ID, second.ID)
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.TenantApplicationEntity{}, "tenant_id = ? AND app_id = ?", "t1", app.ID))
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.RoleEntity{}, "tenant_id = ?", "t1"))
-	require.Equal(t, int64(len(ProvisionMenuCodes)), countProvisionRows(t, db, &model.RoleMenuEntity{}, "tenant_id = ?", "t1"))
+	require.Equal(t, int64(len(ProvisionMenuSeedKeys)), countProvisionRows(t, db, &model.RoleMenuEntity{}, "tenant_id = ?", "t1"))
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.UserRoleEntity{}, "tenant_id = ?", "t1"))
 }
 
@@ -112,7 +114,7 @@ func TestProvisionTenantAdmin_Idempotent(t *testing.T) {
 // 权限开通应命中同一行（(tenant_id, app_id, source=builtin) 即内置角色幂等键）并回填 admin_type。
 func TestProvisionTenantAdmin_BackfillsAdminType(t *testing.T) {
 	db := newProvisionTestDB(t)
-	app := seedTenantAdminApp(t, db, ProvisionMenuCodes...)
+	app := seedTenantAdminApp(t, db, ProvisionMenuSeedKeys...)
 	ctx := context.Background()
 
 	// 存量脏数据：内置角色被改错系统管理类型
@@ -135,7 +137,7 @@ func TestProvisionTenantAdmin_ApplicationMissing(t *testing.T) {
 func TestProvisionTenantAdmin_MissingMenuSkipsGrant(t *testing.T) {
 	db := newProvisionTestDB(t)
 	// 只种 3 个菜单（少一个 tenant-api-key）
-	app := seedTenantAdminApp(t, db, ProvisionMenuCodes[:3]...)
+	app := seedTenantAdminApp(t, db, ProvisionMenuSeedKeys[:3]...)
 
 	role, err := ProvisionTenantAdmin(context.Background(), db, &ProvisionTenantAdminReq{TenantID: "t1"})
 	require.NoError(t, err, "缺失菜单只应告警跳过，不阻断建租户")
@@ -145,7 +147,7 @@ func TestProvisionTenantAdmin_MissingMenuSkipsGrant(t *testing.T) {
 
 func TestProvisionTenantAdmin_NoGrantUserSkipsUserRole(t *testing.T) {
 	db := newProvisionTestDB(t)
-	seedTenantAdminApp(t, db, ProvisionMenuCodes...)
+	seedTenantAdminApp(t, db, ProvisionMenuSeedKeys...)
 
 	_, err := ProvisionTenantAdmin(context.Background(), db, &ProvisionTenantAdminReq{TenantID: "t1"})
 	require.NoError(t, err)
@@ -158,4 +160,21 @@ func TestProvisionTenantAdmin_NilTxOrTenant(t *testing.T) {
 	require.Error(t, err)
 	_, err = ProvisionTenantAdmin(context.Background(), db, &ProvisionTenantAdminReq{})
 	require.Error(t, err)
+}
+
+// TestProvisionTenantAdmin_ResolvesMenusBySeedKey 开通链路按**菜单种子身份键**定位菜单：
+// 运营在控制台把菜单编码改名后，新开通的租户仍能授权到同一批菜单（不会漏授权或授权到幽灵行）。
+func TestProvisionTenantAdmin_ResolvesMenusBySeedKey(t *testing.T) {
+	db := newProvisionTestDB(t)
+	app := seedTenantAdminApp(t, db, ProvisionMenuSeedKeys...)
+
+	// 模拟控制台改名：改掉第一个菜单的编码，seed_key 保持不变
+	require.NoError(t, db.Model(&model.MenuEntity{}).
+		Where("seed_key = ?", ProvisionMenuSeedKeys[0]).
+		Update("code", "renamed_menu").Error)
+
+	role, err := ProvisionTenantAdmin(context.Background(), db, &ProvisionTenantAdminReq{TenantID: "t1"})
+	require.NoError(t, err)
+	require.Equal(t, int64(len(ProvisionMenuSeedKeys)), countProvisionRows(t, db, &model.RoleMenuEntity{}, "tenant_id = ? AND role_id = ?", "t1", role.ID))
+	require.Equal(t, app.ID, role.AppID)
 }

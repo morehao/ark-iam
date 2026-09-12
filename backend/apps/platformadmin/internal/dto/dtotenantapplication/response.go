@@ -12,6 +12,7 @@ type TenantApplicationDetailResp struct {
 	TenantName   string                        `json:"tenantName"`   // 租户名称
 	AppID        string                        `json:"appID"`        // 应用ID
 	AppName      string                        `json:"appName"`      // 应用名称
+	AppSource    model.AppSource               `json:"appSource"`    // 所属应用来源（builtin=内置应用，其订阅由系统开通、不可删除）
 	Status       model.TenantApplicationStatus `json:"status"`       // 状态
 	Config       string                        `json:"config"`       // 租户级应用配置(JSON)
 	GrantedScope string                        `json:"grantedScope"` // 租户级scope授权(JSON)
@@ -24,6 +25,7 @@ type PageListItem struct {
 	TenantName  string                        `json:"tenantName"`  // 租户名称
 	AppID       string                        `json:"appID"`       // 应用ID
 	AppName     string                        `json:"appName"`     // 应用名称
+	AppSource   model.AppSource               `json:"appSource"`   // 所属应用来源（builtin=内置应用，其订阅由系统开通、不可删除）
 	Status      model.TenantApplicationStatus `json:"status"`      // 状态
 	CreatedAt   int64                         `json:"createdAt"`   // 创建时间(unix 秒)
 	UpdatedAt   int64                         `json:"updatedAt"`   // 更新时间(unix 秒)

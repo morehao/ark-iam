@@ -40,7 +40,7 @@ func newSeedDB(t *testing.T, apps []appSeedApp) *gorm.DB {
 		&model.TenantApplicationEntity{}, &model.UserRoleEntity{},
 	)
 	// 权限开通依赖租户管理后台应用（真实环境由 pkg/seed 写入）
-	if err := db.Create(&model.ApplicationEntity{Code: tenant.ProvisionAppCode, Name: "租户管理后台", Status: model.AppStatusEnable}).Error; err != nil {
+	if err := db.Create(&model.ApplicationEntity{Code: tenant.ProvisionAppSeedKey, SeedKey: tenant.ProvisionAppSeedKey, Name: "租户管理后台", Status: model.AppStatusEnable}).Error; err != nil {
 		t.Fatalf("seed tenant_admin application: %v", err)
 	}
 	for _, a := range apps {

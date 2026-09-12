@@ -91,11 +91,12 @@ describe('菜单页应用切换器', () => {
 })
 
 /**
- * 内置应用（source=builtin）的菜单树由平台版本定义（后端 Create/Update/Delete 均拒写）：
- * 前端必须禁用「新建根菜单」并提示只读，避免用户改了却被后端拒绝或重启被种子收回。
+ * 内置应用（source=builtin）的菜单同样支持新增/删除：新增行不带种子身份键（seed_key 为空），
+ * 种子不会认领；删除内置菜单会留下软删"墓碑"，种子下次启动不再复活它。
+ * 回归背景：此前内置应用整棵树禁止增删，「功能扩展/调整」必须改代码发版。
  */
-describe('内置应用的菜单树只读', () => {
-  it('选中内置应用时禁用新建根菜单，编辑弹窗内结构字段置灰（状态可改）', async () => {
+describe('内置应用的菜单支持增删', () => {
+  it('选中内置应用时可新建根菜单，行内提供新增子级/删除，编辑弹窗内字段（含编码）均可改', async () => {
     mockGetApplicationPageList.mockResolvedValue({ list: apps, total: apps.length })
     mockGetApplicationDetail.mockResolvedValue(apps[0])
     mockGetMenuTree.mockResolvedValue({
@@ -124,16 +125,22 @@ describe('内置应用的菜单树只读', () => {
 
     render(<MenuList />)
 
+    // 新建根菜单不再被内置应用禁用
     const createButton = await screen.findByRole('button', { name: /新建根菜单/ })
-    await waitFor(() => expect(createButton).toBeDisabled())
+    await waitFor(() => expect(createButton).toBeEnabled())
 
-    // 打开编辑弹窗：内置应用的菜单只读提示出现，9 个结构/展示字段置灰，状态仍可改
+    // 行内操作齐备：新增子级 / 编辑 / 删除
+    expect(await screen.findByText('新增子级')).toBeInTheDocument()
+    expect(await screen.findByText('删除')).toBeInTheDocument()
+
+    // 打开编辑弹窗：名称/编码/路径/图标全部可改（种子按 seed_key 认行，改名不重建）
     fireEvent.click(await screen.findByText('编辑'))
     const nameInput = await screen.findByPlaceholderText('菜单显示名称')
-    await waitFor(() => expect(nameInput).toBeDisabled())
-    expect(screen.getByPlaceholderText('唯一编码，如 user:list')).toBeDisabled()
-    expect(screen.getByPlaceholderText('如 /user/list')).toBeDisabled()
-    expect(screen.getByPlaceholderText('如 UserOutlined')).toBeDisabled()
-    expect(screen.getByText(/内置应用：名称\/编码\/路径等由平台版本定义，只读；状态可改/)).toBeInTheDocument()
+    await waitFor(() => expect(nameInput).not.toBeDisabled())
+    expect(screen.getByPlaceholderText('唯一编码，如 user:list')).not.toBeDisabled()
+    expect(screen.getByPlaceholderText('如 /user/list')).not.toBeDisabled()
+    expect(screen.getByPlaceholderText('如 UserOutlined')).not.toBeDisabled()
+    // 不再出现「内置应用不可新增/删除」的提示
+    expect(screen.queryByText(/不可新增\/删除/)).not.toBeInTheDocument()
   })
 })

@@ -1,8 +1,10 @@
 // Package seed 提供 IAM 基础种子数据的幂等写入能力。
 //
 // 替代历史 MySQL 方言建表/种子脚本（scripts/sql/*.sql 已废弃删除）：服务启动时
-// 基于唯一键（code / client_id / username 等）查重，已存在则跳过、不存在则创建，
-// 因此可安全重复执行，兼容全新数据库与已有数据的升级场景。
+// 基于唯一键（code / client_id / username 等）查重，不存在则创建；已存在时不盲目跳过——
+// 写哪些字段由 pkg/model.SeedFieldAuthorities（字段权威矩阵）决定，默认归运维
+// （create_only：种子只在创建时写），仅定位键与安全不变式由种子每次启动收敛（reconcile）。
+// 因此可安全重复执行，兼容全新数据库与已有数据的升级场景，且控制台改过的数据重启不被收回。
 // 自 string-id 改造起所有主键为字符串（UUID v7），实体间关联在写入时动态接线，
 // 不再依赖固定的数字主键。
 //
@@ -57,8 +59,15 @@ const (
 	appCodeAdminLegacy       = "platform-admin"
 	appCodeTenantAdminLegacy = "tenant-admin"
 
-	oauthClientPlatformAdminWeb = "platform-admin-web"
-	oauthClientTenantAdminWeb   = "tenant-admin-web"
+	// 内置 OAuth 客户端编码（= OIDC client_id）取自 pkg/model 的种子身份常量：
+	// 网关侧用它做令牌 audience 校验，两处必须是同一个值。
+	oauthClientPlatformAdminWeb = model.SeedBuiltinClientPlatformAdminWeb
+	oauthClientTenantAdminWeb   = model.SeedBuiltinClientTenantAdminWeb
+	// oauthClientPlatformAdminWebLegacy / oauthClientTenantAdminWebLegacy 历史种子编码（连字符形态）。
+	// 启动时若命中旧编码，原地改名（保留主键，避免编码规则调整后重复建出第二个内置客户端——
+	// refresh_token、application_client_secret 等都以客户端 id 为外键）。
+	oauthClientPlatformAdminWebLegacy = "platform-admin-web"
+	oauthClientTenantAdminWebLegacy   = "tenant-admin-web"
 )
 
 // seedMigration 一次性改名条目：仅当字段当前值等于 from 时改写为 to（值匹配，不改运维自定义值）。
@@ -444,13 +453,36 @@ func findApplicationByCode(db *gorm.DB, code string) (*model.ApplicationEntity, 
 	return nil, fmt.Errorf("seed application query fail (code=%s): %w", code, err)
 }
 
+// findApplicationBySeedKey 按种子身份键查内置应用；不存在返回 (nil, nil)，系统错误返回 (nil, err)。
+func findApplicationBySeedKey(db *gorm.DB, seedKey string) (*model.ApplicationEntity, error) {
+	entity := &model.ApplicationEntity{}
+	err := db.Where("seed_key = ?", seedKey).First(entity).Error
+	if err == nil {
+		return entity, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return nil, fmt.Errorf("seed application query fail (seed_key=%s): %w", seedKey, err)
+}
+
 // getOrCreateApplication 幂等获取内置应用。
-// legacyCode 非空时，把历史库的旧编码（连字符形态）原地改名为新编码：
-// 编码是应用的业务唯一键，改名不影响任何以 app_id 关联的菜单/订阅/角色。
+// 认行顺序（与种子身份键配套，见 model.ApplicationEntity.SeedKey）：
+//  1. seed_key：内置应用的稳定身份——运营在控制台改过 code 后仍命中同一行；
+//  2. code：存量库首次升级时该行还没有 seed_key，按旧口径认领并回填；
+//  3. legacyCode：历史库的连字符编码，把 code 与 seed_key 一并原地迁移到新定义值。
+//
+// 编码改名不影响任何以 app_id 关联的菜单/订阅/角色。
 func getOrCreateApplication(ctx context.Context, db *gorm.DB, rep *Report, code, legacyCode, name, desc string, sort int, source model.AppSource) (*model.ApplicationEntity, error) {
-	entity, err := findApplicationByCode(db, code)
+	entity, err := findApplicationBySeedKey(db, code)
 	if err != nil {
 		return nil, err
+	}
+	if entity == nil {
+		entity, err = findApplicationByCode(db, code)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if legacyCode != "" {
 		legacy, lErr := findApplicationByCode(db, legacyCode)
@@ -465,20 +497,33 @@ func getOrCreateApplication(ctx context.Context, db *gorm.DB, rep *Report, code,
 			// 改写成内置（获得删除保护并接管菜单范围），故宁可中断启动，交人工确认后删除其一。
 			return nil, fmt.Errorf("seed application code conflict: %q 与 %q 同时存在，请人工确认哪一行是内置应用并删除另一行", code, legacyCode)
 		default:
-			// 历史库编码迁移（platform-admin -> platform_admin）
+			// 历史库编码迁移（platform-admin -> platform_admin）：code 与 seed_key 同批迁移到定义值，
+			// 否则下次启动会因 seed_key 不匹配而退回按 code 认行，运营改名后就会重建应用。
 			if uErr := db.WithContext(ctx).Model(&model.ApplicationEntity{}).Where("id = ?", legacy.ID).
-				Update("code", code).Error; uErr != nil {
+				Updates(map[string]any{"code": code, "seed_key": code}).Error; uErr != nil {
 				return nil, fmt.Errorf("seed application code migrate fail (%s -> %s): %w", legacyCode, code, uErr)
 			}
 			legacy.Code = code
+			legacy.SeedKey = code
 			glog.Infof(ctx, "[seed] application code migrated (%s -> %s), id:%s", legacyCode, code, legacy.ID)
 			entity = legacy
 		}
 	}
+	if entity != nil && entity.SeedKey == "" {
+		// 一次性回填种子身份键：此后该行即使被改名也能被种子认出，不会重建
+		if uErr := db.WithContext(ctx).Model(&model.ApplicationEntity{}).Where("id = ?", entity.ID).
+			Update("seed_key", code).Error; uErr != nil {
+			return nil, fmt.Errorf("seed application %s seed_key backfill fail: %w", code, uErr)
+		}
+		glog.Infof(ctx, "[seed] application seed_key backfilled (code:%s), id:%s", code, entity.ID)
+		rep.migrated(model.SeedEntityApplication, code, "seed_key", "", code)
+		entity.SeedKey = code
+	}
 	if entity != nil {
-		// 幂等回填（按字段权威矩阵）：source（内置性）+ name/description（控制台身份）归种子，
-		// 每次启动收敛；控制台对这些字段已拒写（svcapplication.Update），故不存在双写者。
-		// sort/status/logo_url/homepage_url 是 create_only（归运维），种子不覆盖。
+		// 幂等回填（按字段权威矩阵）：desired 覆盖种子定义的全部字段，真正写谁由矩阵决定。
+		// 当前只有 source（内置标记，安全不变式）是 reconcile，每次启动收敛；
+		// name/description/sort/status/logo_url/homepage_url 归运维（create_only）：
+		// 控制台改名/改描述后重启不回写，跨版本改名按需登记 seedMigrations。
 		changes, uErr := reconcileFields(ctx, db, model.SeedEntityApplication, model.TableNameApplication, entity.ID,
 			map[string]any{"source": entity.Source, "name": entity.Name, "description": entity.Description},
 			map[string]any{"source": source, "name": name, "description": desc})
@@ -488,14 +533,15 @@ func getOrCreateApplication(ctx context.Context, db *gorm.DB, rep *Report, code,
 		if len(changes) > 0 {
 			glog.Infof(ctx, "[seed] application reconciled, code:%s fields:%v", code, changes)
 			rep.updated(model.SeedEntityApplication, code, changes)
+			// 只回写落在实体上的收敛字段：name/description 可能已被运维改过，
+			// 用种子定义覆盖内存态会让调用方拿到与库不一致的值。
 			entity.Source = source
-			entity.Name = name
-			entity.Description = desc
 		}
 		return entity, nil
 	}
 	entity = &model.ApplicationEntity{
 		Code:        code,
+		SeedKey:     code,
 		Name:        name,
 		Description: desc,
 		Source:      source,
@@ -593,16 +639,51 @@ func seedMenus(ctx context.Context, db *gorm.DB, rep *Report, adminApp, tenantAd
 	out := make(map[string]*model.MenuEntity, len(defs))
 	for _, def := range defs {
 		app := appByCode[def.appCode]
-		entity := &model.MenuEntity{}
-		err := db.Where("app_id = ? AND code = ?", app.ID, def.code).First(entity).Error
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("seed menu %s query fail: %w", def.code, err)
+		// 认行顺序（与种子身份键配套，见 model.MenuEntity.SeedKey）：
+		//  1) seed_key：内置菜单的稳定身份——运营在控制台改过 code/换了所属应用后仍命中同一行；
+		//  2) 墓碑：该 seed_key 存在软删行 → 该内置菜单已被控制台删除，跳过创建（不再复活）；
+		//  3) 兜底 (app_id, code)：存量库首次升级时该行还没有 seed_key，按旧口径认领并回填；
+		//  4) 都没有 → 新建（同时写入 seed_key 与定义值）。
+		// 菜单的展示与结构字段全部归运维（矩阵 create_only），故命中后不再收敛任何字段；
+		// 行的"存在性"在首次创建后同样归运维：控制台删除即持久删除，种子不再重建。
+		entity, err := findMenuBySeedKey(db, def.code)
+		if err != nil {
+			return nil, err
+		}
+		if entity == nil {
+			// 墓碑检查必须早于 (app_id, code) 兜底：否则运营删除内置菜单后自建一个同 code 的菜单，
+			// 会被兜底分支误认领并回填 seed_key，运营自建行当场被"变成"内置行。
+			removed, err := menuSeedKeyRemoved(db, def.code)
+			if err != nil {
+				return nil, err
+			}
+			if removed {
+				glog.Warnf(ctx, "[seed] menu %s 已由控制台删除(墓碑)，跳过创建", def.code)
+				continue
+			}
+			entity, err = findMenuByAppAndCode(db, app.ID, def.code)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if entity != nil && entity.SeedKey == "" {
+			// 一次性回填种子身份键：此后该行即使被改名也能被种子认出，不会重建
+			if uErr := db.WithContext(ctx).Model(&model.MenuEntity{}).Where("id = ?", entity.ID).
+				Update("seed_key", def.code).Error; uErr != nil {
+				return nil, fmt.Errorf("seed menu %s seed_key backfill fail: %w", def.code, uErr)
+			}
+			glog.Infof(ctx, "[seed] menu seed_key backfilled (code:%s), id:%s", def.code, entity.ID)
+			rep.migrated(model.SeedEntityMenu, def.code, "seed_key", "", def.code)
+			entity.SeedKey = def.code
 		}
 		parentID := ""
 		if def.parentCode != "" {
 			parent, ok := out[def.parentCode]
-			if !ok {
-				return nil, fmt.Errorf("seed menu %s parent %s not found", def.code, def.parentCode)
+			if !ok || parent == nil {
+				// 父级已被删除（墓碑）或随之跳过：跳过该子菜单，而不是中断启动。
+				// 不把它改挂成根菜单——种子的层级定义不该被静默改写，重建层级由运维在控制台完成。
+				glog.Warnf(ctx, "[seed] menu %s 的父级 %s 不可用，跳过创建", def.code, def.parentCode)
+				continue
 			}
 			parentID = parent.ID
 		}
@@ -610,9 +691,10 @@ func seedMenus(ctx context.Context, db *gorm.DB, rep *Report, adminApp, tenantAd
 		if visibility == "" {
 			visibility = model.MenuVisibilityPublic
 		}
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if entity == nil {
 			entity = &model.MenuEntity{
 				AppID:      app.ID,
+				SeedKey:    def.code,
 				ParentID:   parentID,
 				Name:       def.name,
 				Code:       def.code,
@@ -628,41 +710,56 @@ func seedMenus(ctx context.Context, db *gorm.DB, rep *Report, adminApp, tenantAd
 				return nil, fmt.Errorf("seed menu %s create fail: %w", def.code, err)
 			}
 			rep.created(model.SeedEntityMenu, def.code)
-		} else {
-			// 幂等回填（按字段权威矩阵）：内置应用菜单的结构与展示字段归种子，启动即收敛；
-			// status 是 create_only（运维可停用菜单），种子不覆盖。
-			changes, uErr := reconcileFields(ctx, db, model.SeedEntityMenu, model.TableNameMenu, entity.ID,
-				map[string]any{
-					"name":       entity.Name,
-					"path":       entity.Path,
-					"icon":       entity.Icon,
-					"sort":       entity.Sort,
-					"component":  entity.Component,
-					"visibility": entity.Visibility,
-					"type":       entity.Type,
-					"parent_id":  entity.ParentID,
-				},
-				map[string]any{
-					"name":       def.name,
-					"path":       def.path,
-					"icon":       def.icon,
-					"sort":       def.sort,
-					"component":  def.component,
-					"visibility": visibility,
-					"type":       menuTypeOf(def),
-					"parent_id":  parentID,
-				})
-			if uErr != nil {
-				return nil, fmt.Errorf("seed menu %s reconcile fail: %w", def.code, uErr)
-			}
-			if len(changes) > 0 {
-				glog.Infof(ctx, "[seed] menu reconciled, code:%s fields:%v", def.code, changes)
-				rep.updated(model.SeedEntityMenu, def.code, changes)
-			}
 		}
 		out[def.code] = entity
 	}
 	return out, nil
+}
+
+// findMenuBySeedKey 按种子身份键查内置菜单；不存在返回 (nil, nil)，系统错误返回 (nil, err)。
+func findMenuBySeedKey(db *gorm.DB, seedKey string) (*model.MenuEntity, error) {
+	entity := &model.MenuEntity{}
+	err := db.Where("seed_key = ?", seedKey).First(entity).Error
+	if err == nil {
+		return entity, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return nil, fmt.Errorf("seed menu query fail (seed_key=%s): %w", seedKey, err)
+}
+
+// findMenuByAppAndCode 按 (app_id, code) 查菜单：仅用于存量库回填 seed_key（旧口径的认行方式）。
+func findMenuByAppAndCode(db *gorm.DB, appID, code string) (*model.MenuEntity, error) {
+	entity := &model.MenuEntity{}
+	err := db.Where("app_id = ? AND code = ?", appID, code).First(entity).Error
+	if err == nil {
+		return entity, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return nil, fmt.Errorf("seed menu query fail (app_id=%s, code=%s): %w", appID, code, err)
+}
+
+// menuSeedKeyRemoved 判断某内置菜单（按 seed_key）是否已被控制台删除。
+//
+// 控制台删除菜单是软删除，软删行仍带 seed_key，即"该内置菜单已被人为下线"的**墓碑**：
+// 种子据此跳过创建。否则删除操作会在下次启动被撤销——菜单行被重建、role_menu 授权分叉，
+// 控制台就永远无法真正删除一个内置菜单（功能扩展/调整只能靠改代码发版）。
+//
+// 注意：退役菜单（retiredMenus）走物理删除、不留墓碑——版本级下线与运维级删除是两种语义，
+// 前者允许未来重新上线同名菜单，后者是运维的确定选择。
+func menuSeedKeyRemoved(db *gorm.DB, seedKey string) (bool, error) {
+	entity := &model.MenuEntity{}
+	err := db.Unscoped().Where("seed_key = ?", seedKey).First(entity).Error
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	return false, fmt.Errorf("seed menu tombstone query fail (seed_key=%s): %w", seedKey, err)
 }
 
 // seedRoleMenus 只处理平台管理后台 admin 角色的菜单授权；
@@ -675,6 +772,10 @@ func seedRoleMenus(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity,
 	}
 	for _, menuCode := range menuCodes {
 		menu := menus[menuCode]
+		if menu == nil || menu.ID == "" {
+			// 该内置菜单已被控制台删除（墓碑）：authorization 已随删除清理，不补授权
+			continue
+		}
 		var count int64
 		if err := db.Model(&model.RoleMenuEntity{}).
 			Where("tenant_id = ? AND role_id = ? AND menu_id = ?", tenant.ID, adminRole.ID, menu.ID).
@@ -850,12 +951,27 @@ var seedOIDCClientGrantTypes = func() []byte {
 	return b
 }()
 
+// findApplicationClientByCode 按编码查客户端（code 即 OIDC client_id）；
+// 不存在返回 (nil, nil)，系统错误返回 (nil, err)。
+func findApplicationClientByCode(db *gorm.DB, code string) (*model.ApplicationClientEntity, error) {
+	entity := &model.ApplicationClientEntity{}
+	err := db.Where("code = ?", code).First(entity).Error
+	if err == nil {
+		return entity, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return nil, fmt.Errorf("seed application_client query fail (code=%s): %w", code, err)
+}
+
 // seedOIDCClients 播种内置 OAuth 客户端（OIDC RP）。
 // 归属应用按控制台一一对应：平台管理后台客户端 → platform_admin 应用，租户管理后台客户端 → tenant_admin 应用。
 // app_id 是种子收敛字段（矩阵声明 reconcile）：存量库把两者都挂到 platform_admin 的错误绑定由此自愈。
 func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.TenantEntity, adminApp, tenantAdminApp *model.ApplicationEntity) error {
 	type clientDef struct {
 		code                 string
+		legacyCode           string
 		name                 string
 		appID                string
 		redirectURIs         string
@@ -865,6 +981,7 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 	defs := []clientDef{
 		{
 			code:                 oauthClientPlatformAdminWeb,
+			legacyCode:           oauthClientPlatformAdminWebLegacy,
 			name:                 "平台管理后台",
 			appID:                adminApp.ID,
 			redirectURIs:         `["http://localhost:4001/auth/callback"]`,
@@ -873,6 +990,7 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 		},
 		{
 			code:                 oauthClientTenantAdminWeb,
+			legacyCode:           oauthClientTenantAdminWebLegacy,
 			name:                 "租户管理后台",
 			appID:                tenantAdminApp.ID,
 			redirectURIs:         `["http://localhost:4002/auth/callback"]`,
@@ -881,11 +999,44 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 		},
 	}
 	for _, def := range defs {
-		entity := &model.ApplicationClientEntity{}
-		err := db.Where("code = ?", def.code).First(entity).Error
-		if err == nil {
-			// 幂等回填（按字段权威矩阵）：source（内置性）/ name（控制台展示名）/ app_id（归属应用，产品结构）归种子；
-			// 回调地址/授权类型/令牌 TTL 等运行参数是 create_only（归运维），种子不覆盖。
+		// 编码规则在种子入口先行校验：内置 client_id 同时是网关侧的 audience 白名单值，
+		// 写错一个字符就会让该控制台的令牌全部 401，宁可阻断启动也不要落库。
+		if !model.IsValidClientCode(def.code) {
+			return fmt.Errorf("seed oauth client 编码 %q 不符合规则 %s", def.code, model.ClientCodePattern)
+		}
+		entity, err := findApplicationClientByCode(db, def.code)
+		if err != nil {
+			return err
+		}
+		if def.legacyCode != "" {
+			legacy, lErr := findApplicationClientByCode(db, def.legacyCode)
+			if lErr != nil {
+				return lErr
+			}
+			switch {
+			case legacy == nil:
+				// 正常路径：旧编码不存在（全新库或已迁移过）
+			case entity != nil:
+				// 新旧编码并存：无法判断哪一行才是内置客户端。此时回填 source/app_id 会把用户自建客户端
+				// 改写成内置（获得删除保护并接管回调白名单），故宁可中断启动，交人工确认后删除其一。
+				return fmt.Errorf("seed oauth client code conflict: %q 与 %q 同时存在，请人工确认哪一行是内置客户端并删除另一行", def.code, def.legacyCode)
+			default:
+				// 历史库编码迁移（platform-admin-web -> platform_admin_web）：保留主键，
+				// 使 refresh_token / application_client_secret 等以 id 为外键的引用不失联。
+				if uErr := db.WithContext(ctx).Model(&model.ApplicationClientEntity{}).Where("id = ?", legacy.ID).
+					Update("code", def.code).Error; uErr != nil {
+					return fmt.Errorf("seed oauth client code migrate fail (%s -> %s): %w", def.legacyCode, def.code, uErr)
+				}
+				glog.Infof(ctx, "[seed] oauth client code migrated (%s -> %s), id:%s", def.legacyCode, def.code, legacy.ID)
+				rep.migrated(model.SeedEntityApplicationClient, def.code, "code", def.legacyCode, def.code)
+				legacy.Code = def.code
+				entity = legacy
+			}
+		}
+		if entity != nil {
+			// 幂等回填（按字段权威矩阵）：desired 覆盖种子定义的全部字段，真正写谁由矩阵决定。
+			// 当前 source（内置标记）与 app_id（归属应用）是 reconcile；name 归运维（create_only）——
+			// 控制台改客户端名后重启不回写。回调地址/授权类型/令牌 TTL 等运行参数同为 create_only。
 			changes, uErr := reconcileFields(ctx, db, model.SeedEntityApplicationClient, model.TableNameApplicationClient, entity.ID,
 				map[string]any{"source": entity.Source, "name": entity.Name, "app_id": entity.AppID},
 				map[string]any{"source": model.ApplicationClientSourceBuiltin, "name": def.name, "app_id": def.appID})
@@ -897,9 +1048,6 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 				rep.updated(model.SeedEntityApplicationClient, def.code, changes)
 			}
 			continue
-		}
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("seed oauth client %s query fail: %w", def.code, err)
 		}
 		entity = &model.ApplicationClientEntity{
 			TenantID:                tenant.ID,

@@ -55,6 +55,8 @@ export interface ApplicationCreateReq {
 
 export interface ApplicationUpdateReq {
   appID: string
+  /** 应用编码（自建应用可改，留空不修改；内置应用 source=builtin 恒只读）：小写字母开头，仅含小写字母、数字与下划线（后端 model.AppCodePattern）。 */
+  code?: string
   name?: string
   description?: string
   logoUrl?: string
@@ -103,6 +105,8 @@ export interface OAuthClientDetail extends OAuthClientItem {
 
 export interface OAuthClientCreateReq {
   appID: string
+  /** 客户端编码（= OIDC client_id）：小写字母开头，仅含小写字母与下划线（后端 model.ClientCodePattern）。 */
+  code: string
   name: string
   redirectURIs?: string[]
   postLogoutRedirectURIs?: string[]
@@ -119,6 +123,8 @@ export interface OAuthClientCreateReq {
 
 export interface OAuthClientUpdateReq {
   applicationClientID: string
+  /** 客户端编码（= OIDC client_id，可改，留空不修改）：仅小写字母与下划线；内置客户端拒改。 */
+  code?: string
   name?: string
   status?: ApplicationClientStatus
   redirectURIs?: string[]
@@ -227,6 +233,11 @@ export interface TenantApplicationItem {
   tenantName?: string
   appID: string
   appName?: string
+  /**
+   * 所属应用来源（后端 model.AppSource）。builtin=订阅的是内置应用（平台管理后台/租户管理后台），
+   * 该订阅由系统开通（种子 / ProvisionTenantAdmin），不可删除——前端据此隐藏「删除」。
+   */
+  appSource?: AppSource
   status: TenantApplicationStatus
   config?: string
   grantedScope?: string

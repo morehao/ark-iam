@@ -48,7 +48,13 @@ const (
 
 type ApplicationEntity struct {
 	gormdao.BaseEntity
-	Code                    string    `gorm:"column:code;type:varchar(64);not null;default:'';uniqueIndex;comment:应用编码" json:"code"`
+	// Code 应用编码：业务标识，**控制台可改**（应用级唯一；改它不影响菜单/订阅/角色——那些都挂 app_id）。
+	// 种子的认行依据是 SeedKey，因此改名不会导致种子重建应用行。
+	Code string `gorm:"column:code;type:varchar(64);not null;default:'';uniqueIndex;comment:应用编码" json:"code"`
+	// SeedKey 种子身份键：内置应用的稳定标识（= 种子定义时的 code），创建时写入后不再变化，
+	// 控制台不可见也不可写。种子查行与租户开通（ProvisionTenantAdmin 定位 tenant_admin 应用）
+	// 都以它为依据；控制台自建应用恒为空串（空串不进部分唯一索引）。
+	SeedKey                 string    `gorm:"column:seed_key;type:varchar(64);not null;default:'';comment:种子身份键(内置应用稳定标识,控制台不可见);uniqueIndex:uk_application_seed_key_active,where:deleted_at IS NULL AND seed_key <> ''" json:"-"`
 	AllowPersonCreateTenant *bool     `gorm:"column:allow_person_create_tenant;type:boolean;not null;default:false;comment:个人是否可自助创建租户" json:"allowPersonCreateTenant"`
 	AllowJoinByInvite       *bool     `gorm:"column:allow_join_by_invite;type:boolean;not null;default:false;comment:是否允许通过邀请加入租户" json:"allowJoinByInvite"`
 	Name                    string    `gorm:"column:name;type:varchar(128);not null;default:'';comment:应用名称" json:"name"`

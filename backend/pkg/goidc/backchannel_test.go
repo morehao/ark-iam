@@ -19,7 +19,7 @@ import (
 
 const (
 	testIssuer  = "http://localhost:8081/oidc"
-	testClient  = "platform-admin-web"
+	testClient  = "platform_admin_web"
 	testSID     = "sess-12345"
 	testSubject = "person:42"
 )

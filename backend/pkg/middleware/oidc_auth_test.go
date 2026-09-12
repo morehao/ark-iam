@@ -326,13 +326,13 @@ func TestRejectsTokenWithWrongAudience(t *testing.T) {
 	r := gin.New()
 	r.Use(OIDCCompatibleAuth(func() *rsa.PublicKey { return &key.PublicKey },
 		WithOIDCIssuer("http://localhost:8099/oidc"),
-		WithOIDCAudiences("platform-admin-web")))
+		WithOIDCAudiences("platform_admin_web")))
 	r.GET("/v1/test", func(ctx *gin.Context) { ctx.Status(http.StatusOK) })
 
 	claims := jwt.MapClaims{
 		"sub":       "person:88",
 		"tenant_id": "1",
-		"aud":       "tenant-admin-web", // 另一个 client 的 token
+		"aud":       "tenant_admin_web", // 另一个 client 的 token
 		"iss":       "http://localhost:8099/oidc",
 		"exp":       time.Now().Add(time.Hour).Unix(),
 		"iat":       time.Now().Unix(),
@@ -360,14 +360,14 @@ func TestAcceptsTokenWithMatchingIssuerAndAudience(t *testing.T) {
 	r := gin.New()
 	r.Use(OIDCCompatibleAuth(func() *rsa.PublicKey { return &key.PublicKey },
 		WithOIDCIssuer("http://localhost:8099/oidc"),
-		WithOIDCAudiences("platform-admin-web"),
+		WithOIDCAudiences("platform_admin_web"),
 		WithOIDCSSOValidation(func(ctx *gin.Context, personID string, isMachineToken bool) bool { return true })))
 	r.GET("/v1/test", func(ctx *gin.Context) { ctx.Status(http.StatusOK) })
 
 	claims := jwt.MapClaims{
 		"sub":       "person:88",
 		"tenant_id": "1",
-		"aud":       "platform-admin-web",
+		"aud":       "platform_admin_web",
 		"iss":       "http://localhost:8099/oidc",
 		"exp":       time.Now().Add(time.Hour).Unix(),
 		"iat":       time.Now().Unix(),

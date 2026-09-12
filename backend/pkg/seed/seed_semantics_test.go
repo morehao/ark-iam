@@ -60,10 +60,10 @@ func TestRunReportsChanges(t *testing.T) {
 	}
 }
 
-// TestSeedIamRespectsOperatorOwnedFields 单一写者语义：
-//   - 运维字段（平台租户名、根部门名、应用启停/排序、客户端回调地址）改过之后，种子不得回写；
-//   - 种子字段（应用/客户端名称、客户端 source）仍按矩阵收敛；
-//   - 安全性不变式（平台租户 status=active）仍被纠正。
+// TestSeedIamRespectsOperatorOwnedFields 单一写者语义（reconcile 收窄到定位键+安全不变式后）：
+//   - 归运维的字段（平台租户名、根部门名、应用名与描述、应用启停/排序、客户端名与回调地址）
+//     改过之后，种子不得回写；
+//   - 安全不变式（内置对象的 source、平台租户 status=active）仍被纠正。
 func TestSeedIamRespectsOperatorOwnedFields(t *testing.T) {
 	db := setupDB(t)
 	ctx := context.Background()
@@ -85,15 +85,22 @@ func TestSeedIamRespectsOperatorOwnedFields(t *testing.T) {
 		Update("name", "ACME 技术中心").Error; err != nil {
 		t.Fatalf("degrade department: %v", err)
 	}
-	// 运维改动：应用启停/排序（create_only）
+	// 运维改动：应用名/描述（控制台可改）+ 启停/排序；同时把 source 降级以验证安全不变式仍收敛
 	if err := db.Model(&model.ApplicationEntity{}).Where("code = ?", "platform_admin").
-		Updates(map[string]any{"status": model.AppStatusDisable, "sort": 9}).Error; err != nil {
+		Updates(map[string]any{
+			"name": "ACME 控制台", "description": "ACME 自定描述",
+			"status": model.AppStatusDisable, "sort": 9,
+			"source": model.AppSourceThirdParty,
+		}).Error; err != nil {
 		t.Fatalf("degrade application: %v", err)
 	}
-	// 运维改动：客户端回调地址（环境相关，create_only）
+	// 运维改动：客户端名（控制台可改）+ 回调地址（环境相关）；source 同样降级
 	customRedirect := `["https://sso.example.com/auth/callback"]`
-	if err := db.Model(&model.ApplicationClientEntity{}).Where("code = ?", "platform-admin-web").
-		Update("redirect_uris", []byte(customRedirect)).Error; err != nil {
+	if err := db.Model(&model.ApplicationClientEntity{}).Where("code = ?", "platform_admin_web").
+		Updates(map[string]any{
+			"name": "ACME SSO 客户端", "redirect_uris": []byte(customRedirect),
+			"source": model.ApplicationClientSourceThirdParty,
+		}).Error; err != nil {
 		t.Fatalf("degrade client: %v", err)
 	}
 
@@ -108,7 +115,7 @@ func TestSeedIamRespectsOperatorOwnedFields(t *testing.T) {
 		t.Errorf("平台租户名 = %q, want 运维自定义值（migrate_once 不得覆盖运维改名）", tenant.Name)
 	}
 	if tenant.Status != model.TenantStatusActive {
-		t.Errorf("平台租户 status = %q, want %q（reconcile 不变式）", tenant.Status, model.TenantStatusActive)
+		t.Errorf("平台租户 status = %q, want %q（reconcile 安全不变式）", tenant.Status, model.TenantStatusActive)
 	}
 
 	var rootDept model.DepartmentEntity
@@ -123,22 +130,29 @@ func TestSeedIamRespectsOperatorOwnedFields(t *testing.T) {
 	if err := db.Where("code = ?", "platform_admin").First(&adminApp).Error; err != nil {
 		t.Fatalf("query application: %v", err)
 	}
+	if adminApp.Name != "ACME 控制台" || adminApp.Description != "ACME 自定描述" {
+		t.Errorf("应用 (name, description) = (%q, %q), want 运维自定义值（create_only 字段种子不得回写）",
+			adminApp.Name, adminApp.Description)
+	}
 	if adminApp.Status != model.AppStatusDisable || adminApp.Sort != 9 {
 		t.Errorf("应用 status/sort = (%q, %d), want (disable, 9)：create_only 字段种子不得回写", adminApp.Status, adminApp.Sort)
 	}
-	if adminApp.Name != "平台管理后台" {
-		t.Errorf("应用名 = %q, want 平台管理后台（reconcile 字段必须收敛）", adminApp.Name)
+	if adminApp.Source != model.AppSourceBuiltin {
+		t.Errorf("应用 source = %q, want %q（安全不变式必须收敛）", adminApp.Source, model.AppSourceBuiltin)
 	}
 
 	var client model.ApplicationClientEntity
-	if err := db.Where("code = ?", "platform-admin-web").First(&client).Error; err != nil {
+	if err := db.Where("code = ?", "platform_admin_web").First(&client).Error; err != nil {
 		t.Fatalf("query application_client: %v", err)
+	}
+	if client.Name != "ACME SSO 客户端" {
+		t.Errorf("客户端名 = %q, want 运维自定义值（create_only 字段种子不得回写）", client.Name)
 	}
 	if string(client.RedirectURIs) != customRedirect {
 		t.Errorf("客户端回调地址 = %s, want %s（create_only 字段种子不得回写）", client.RedirectURIs, customRedirect)
 	}
-	if client.Name != "平台管理后台" {
-		t.Errorf("客户端名 = %q, want 平台管理后台（reconcile 字段必须收敛）", client.Name)
+	if client.Source != model.ApplicationClientSourceBuiltin {
+		t.Errorf("客户端 source = %q, want %q（安全不变式必须收敛）", client.Source, model.ApplicationClientSourceBuiltin)
 	}
 }
 
