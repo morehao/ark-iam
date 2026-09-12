@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Descriptions, Drawer, Form, Input, InputNumber, message, Modal, Select, Space, Table, Tag } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { fmtTime, IDCell, NameLink, PageContainer, RowActions, StatusTag, timeColumn, TypeTag } from '@ark-iam/ui'
+import { actionColumn, CODE_COL_WIDTH, fmtTime, IDCell, idColumn, nameColumn, PageContainer, STATUS_COL_WIDTH, StatusTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, TypeTag } from '@ark-iam/ui'
 import { createApplication, deleteApplication, getApplicationDetail, getApplicationPageList, updateApplication } from '@ark-iam/api'
 import type { ApplicationItem } from '@ark-iam/types'
 
@@ -107,39 +107,25 @@ export default function ApplicationList() {
     v === 'public' ? <Tag color="blue">公开</Tag> : <Tag color="orange">私有</Tag>
 
   const columns: ColumnsType<ApplicationItem> = [
-    { title: 'ID', dataIndex: 'appID', key: 'appID', width: 150, render: (v: string) => <IDCell value={v} /> },
-    {
+    idColumn<ApplicationItem>({ dataIndex: 'appID' }),
+    nameColumn<ApplicationItem>({
       title: '应用名',
       dataIndex: 'name',
-      key: 'name',
-      width: 180,
-      render: (v: string, r) => <NameLink value={v} onClick={() => void handleOpenDetail(r)} />,
-    },
-    {
-      title: '编码',
-      dataIndex: 'code',
-      key: 'code',
-      width: 150,
-      render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v || '-'}</span>,
-    },
-    { title: '类型', dataIndex: 'type', key: 'type', width: 110, render: (v: string) => <TypeTag value={v} /> },
-    { title: '可见性', dataIndex: 'visibility', key: 'visibility', width: 100, render: renderVisibility },
-    { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (v: string) => <StatusTag value={v} /> },
+      onClick: (r) => void handleOpenDetail(r),
+    }),
+    textColumn<ApplicationItem>({ title: '编码', dataIndex: 'code', width: CODE_COL_WIDTH, monospace: true }),
+    { title: '类型', dataIndex: 'type', key: 'type', width: TAG_COL_WIDTH, render: (v: string) => <TypeTag value={v} /> },
+    { title: '可见性', dataIndex: 'visibility', key: 'visibility', width: TAG_COL_WIDTH, render: renderVisibility },
+    { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <StatusTag value={v} /> },
     timeColumn<ApplicationItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<ApplicationItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
-    {
-      title: '操作',
-      key: 'action',
-      width: 120,
-      render: (_, r) => (
-        <RowActions
-          actions={[
-            { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
-            { key: 'delete', label: '删除', danger: true, confirm: '确认删除该应用？', onClick: () => void handleDelete(r) },
-          ]}
-        />
-      ),
-    },
+    actionColumn<ApplicationItem>({
+      max: 2,
+      actions: (r) => [
+        { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
+        { key: 'delete', label: '删除', danger: true, confirm: '确认删除该应用？', onClick: () => void handleDelete(r) },
+      ],
+    }),
   ]
 
   return (
@@ -174,7 +160,8 @@ export default function ApplicationList() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1330 }}
+        tableLayout="fixed"
+        scroll={tableScrollX(columns)}
         pagination={{
           current: page,
           pageSize,

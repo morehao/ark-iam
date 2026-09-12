@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { App as AntdApp } from 'antd'
 import { SuspendedTag, fmtTime } from '@ark-iam/ui'
 import type { TenantItem } from '@ark-iam/types'
 
@@ -54,7 +55,11 @@ describe('租户列表', () => {
   it('按 status 枚举渲染状态列，并同时展示创建时间与更新时间', async () => {
     mockGetTenantPageList.mockResolvedValue({ list: tenants, total: tenants.length })
 
-    render(<TenantList />)
+    render(
+      <AntdApp>
+        <TenantList />
+      </AntdApp>,
+    )
 
     expect(await screen.findByText('Acme Corp')).toBeInTheDocument()
     expect(screen.getByText('Globex')).toBeInTheDocument()
@@ -74,7 +79,11 @@ describe('租户列表', () => {
   it('状态筛选：选择「挂起」后带 status=suspended 重新请求，并回到第 1 页', async () => {
     mockGetTenantPageList.mockResolvedValue({ list: tenants, total: tenants.length })
 
-    render(<TenantList />)
+    render(
+      <AntdApp>
+        <TenantList />
+      </AntdApp>,
+    )
     await screen.findByText('Acme Corp')
 
     // 默认不筛选：请求不携带 status
@@ -95,7 +104,11 @@ describe('租户列表', () => {
     mockGetTenantPageList.mockResolvedValue({ list: tenants, total: tenants.length })
     mockCreateTenant.mockResolvedValue({ tenantID: 't9', adminUserID: 'u9', adminInitialPassword: 'Temp1234' })
 
-    render(<TenantList />)
+    render(
+      <AntdApp>
+        <TenantList />
+      </AntdApp>,
+    )
     await screen.findByText('Acme Corp')
 
     fireEvent.click(screen.getByRole('button', { name: /新建租户/ }))
@@ -125,11 +138,17 @@ describe('租户列表', () => {
     mockGetTenantPageList.mockResolvedValue({ list: tenants, total: tenants.length })
     mockResetTenantAdminPassword.mockResolvedValue({ userID: 'u1', initialPassword: 'Reset5678' })
 
-    render(<TenantList />)
+    render(
+      <AntdApp>
+        <TenantList />
+      </AntdApp>,
+    )
     await screen.findByText('Acme Corp')
 
-    fireEvent.click(screen.getAllByText('重置管理员密码')[0])
-    // Popconfirm 的确认按钮（测试环境未注入中文 locale，按钮文案为 OK）
+    // 「重置管理员密码」是次要危险操作，收在「更多」下拉里（操作列不因长文案被撑宽）
+    fireEvent.click(screen.getAllByRole('button', { name: /更多/ })[0])
+    fireEvent.click(await screen.findByText('重置管理员密码'))
+    // Modal.confirm 的确认按钮（测试环境未注入中文 locale，按钮文案为 OK）
     fireEvent.click(await screen.findByRole('button', { name: 'OK' }))
 
     await waitFor(() => {

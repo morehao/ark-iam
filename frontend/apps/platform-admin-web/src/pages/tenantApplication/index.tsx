@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, InputNumber, message, Modal, Select, Space, Table } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { IDCell, PageContainer, RowActions, StatusTag, timeColumn } from '@ark-iam/ui'
+import { actionColumn, idColumn, PageContainer, STATUS_COL_WIDTH, StatusTag, tableScrollX, timeColumn } from '@ark-iam/ui'
 import {
   createTenantApplication,
   deleteTenantApplication,
@@ -90,25 +90,19 @@ export default function TenantApplicationList() {
   }
 
   const columns: ColumnsType<TenantApplicationItem> = [
-    { title: 'ID', dataIndex: 'tenantAppID', key: 'tenantAppID', width: 150, render: (v: string) => <IDCell value={v} /> },
-    { title: '租户ID', dataIndex: 'tenantID', key: 'tenantID', width: 150, render: (v: string) => <IDCell value={v} /> },
-    { title: '应用ID', dataIndex: 'appID', key: 'appID', width: 150, render: (v: string) => <IDCell value={v} /> },
-    { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (v: string) => <StatusTag value={v} /> },
+    idColumn<TenantApplicationItem>({ dataIndex: 'tenantAppID' }),
+    idColumn<TenantApplicationItem>({ dataIndex: 'tenantID', title: '租户ID' }),
+    idColumn<TenantApplicationItem>({ dataIndex: 'appID', title: '应用ID' }),
+    { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <StatusTag value={v} /> },
     timeColumn<TenantApplicationItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<TenantApplicationItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
-    {
-      title: '操作',
-      key: 'action',
-      width: 120,
-      render: (_, r) => (
-        <RowActions
-          actions={[
-            { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
-            { key: 'delete', label: '删除', danger: true, confirm: '确认删除该订阅？', onClick: () => void handleDelete(r) },
-          ]}
-        />
-      ),
-    },
+    actionColumn<TenantApplicationItem>({
+      max: 2,
+      actions: (r) => [
+        { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
+        { key: 'delete', label: '删除', danger: true, confirm: '确认删除该订阅？', onClick: () => void handleDelete(r) },
+      ],
+    }),
   ]
 
   return (
@@ -147,7 +141,8 @@ export default function TenantApplicationList() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1050 }}
+        tableLayout="fixed"
+        scroll={tableScrollX(columns)}
         pagination={{
           current: page,
           pageSize,

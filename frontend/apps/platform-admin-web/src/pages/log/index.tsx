@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Descriptions, Drawer, Input, Space, Table, Tooltip } from 'antd'
+import { Button, Descriptions, Drawer, Input, Space, Table } from 'antd'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { fmtTime, IDCell, NameLink, PageContainer, timeColumn, tokens } from '@ark-iam/ui'
+import { EllipsisCell, fmtTime, IDCell, idColumn, LONG_TEXT_COL_WIDTH, nameColumn, PageContainer, tableScrollX, timeColumn, tokens } from '@ark-iam/ui'
 import { getAuditLogDetail, getAuditLogPageList } from '@ark-iam/api'
 import type { AuditLogItem } from '@ark-iam/types'
 
@@ -17,11 +17,6 @@ function formatPayload(value: unknown): string {
     }
   }
   return String(value)
-}
-
-/** 超长文本截断 */
-function truncate(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max)}...` : text
 }
 
 export default function AuditLogList() {
@@ -63,29 +58,21 @@ export default function AuditLogList() {
   }
 
   const columns: ColumnsType<AuditLogItem> = [
-    { title: 'ID', dataIndex: 'logID', key: 'logID', width: 150, render: (v: string) => <IDCell value={v} /> },
-    {
+    idColumn<AuditLogItem>({ dataIndex: 'logID' }),
+    nameColumn<AuditLogItem>({
       title: '日志键',
       dataIndex: 'key',
-      key: 'key',
-      width: 220,
-      render: (v: string, r) => <NameLink value={v} monospace onClick={() => void handleDetail(r)} />,
-    },
+      monospace: true,
+      onClick: (r) => void handleDetail(r),
+    }),
     {
       title: '内容',
       dataIndex: 'payload',
       key: 'payload',
-      ellipsis: { showTitle: false },
-      render: (_, r) => {
-        const text = formatPayload(r.payload)
-        return (
-          <Tooltip title={text}>
-            <span style={{ fontFamily: 'monospace' }}>{truncate(text, 60)}</span>
-          </Tooltip>
-        )
-      },
+      width: LONG_TEXT_COL_WIDTH,
+      render: (_, r) => <EllipsisCell value={formatPayload(r.payload)} limit={60} monospace />,
     },
-    { title: '租户ID', dataIndex: 'tenantID', key: 'tenantID', width: 150, render: (v: string) => <IDCell value={v} /> },
+    idColumn<AuditLogItem>({ dataIndex: 'tenantID', title: '租户ID' }),
     timeColumn<AuditLogItem>({ title: '创建时间', dataIndex: 'createdAt' }),
   ]
 
@@ -118,7 +105,8 @@ export default function AuditLogList() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 720 }}
+        tableLayout="fixed"
+        scroll={tableScrollX(columns)}
         pagination={{
           current: page,
           pageSize,

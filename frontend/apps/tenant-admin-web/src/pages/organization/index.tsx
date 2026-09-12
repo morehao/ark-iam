@@ -17,7 +17,7 @@ import {
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
-import { NameLink, PageContainer, RowActions, StatusTag, timeColumn, tokens } from '@ark-iam/ui'
+import { actionColumn, NAME_COL_WIDTH, nameColumn, PageContainer, STATUS_COL_WIDTH, StatusTag, tableScrollX, timeColumn, tokens } from '@ark-iam/ui'
 import type { OrganizationChildItem, OrganizationItem } from '@ark-iam/types'
 import {
   createOrganization,
@@ -239,45 +239,39 @@ export default function OrganizationPage() {
 
   // 右侧下级组织列
   const childrenColumns: ColumnsType<OrganizationChildItem> = [
-    {
+    nameColumn<OrganizationChildItem>({
       title: '组织名称',
       dataIndex: 'name',
-      key: 'name',
-      render: (v: string, r) => <NameLink value={v} onClick={() => setSelectedID(r.organizationID)} />,
-    },
+      width: NAME_COL_WIDTH,
+      onClick: (r) => setSelectedID(r.organizationID),
+    }),
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 90,
+      width: STATUS_COL_WIDTH,
       render: (v: string) => <StatusTag value={v} />,
     },
     timeColumn<OrganizationChildItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<OrganizationChildItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
-    {
-      title: '操作',
-      key: 'action',
-      width: 180,
-      render: (_, r) => (
-        <RowActions
-          actions={[
-            { key: 'edit', label: '编辑', onClick: () => openEditNode(r) },
-            {
-              key: 'toggle',
-              label: r.status === 'active' ? '停用' : '启用',
-              onClick: () => void toggleStatus(r),
-            },
-            {
-              key: 'delete',
-              label: '删除',
-              danger: true,
-              confirm: '确认删除该组织及其子组织？',
-              onClick: () => void removeNode(r.organizationID),
-            },
-          ]}
-        />
-      ),
-    },
+    actionColumn<OrganizationChildItem>({
+      max: 3,
+      actions: (r) => [
+        { key: 'edit', label: '编辑', onClick: () => openEditNode(r) },
+        {
+          key: 'toggle',
+          label: r.status === 'active' ? '停用' : '启用',
+          onClick: () => void toggleStatus(r),
+        },
+        {
+          key: 'delete',
+          label: '删除',
+          danger: true,
+          confirm: '确认删除该组织及其子组织？',
+          onClick: () => void removeNode(r.organizationID),
+        },
+      ],
+    }),
   ]
 
   return (
@@ -365,7 +359,8 @@ export default function OrganizationPage() {
             dataSource={childrenList}
             loading={childrenLoading}
             locale={{ emptyText: '暂无下级组织' }}
-            scroll={{ x: 840 }}
+            scroll={tableScrollX(childrenColumns)}
+            tableLayout="fixed"
             pagination={{
               current: page,
               pageSize,

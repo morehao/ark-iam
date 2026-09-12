@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Space, Table } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { EllipsisCell, IDCell, timeColumn, tokens } from '@ark-iam/ui'
+import { CODE_COL_WIDTH, idColumn, tableScrollX, textColumn, TEXT_COL_WIDTH, timeColumn, tokens } from '@ark-iam/ui'
 import type { TenantUserLoginLogItem } from '@ark-iam/types'
 import { getTenantUserLoginLogs } from '../api/user'
 
@@ -32,9 +32,9 @@ export default function UserLoginLogTab({ userID }: UserLoginLogTabProps) {
   }, [fetchData])
 
   const columns: ColumnsType<TenantUserLoginLogItem> = [
-    { title: 'ID', dataIndex: 'userLoginLogID', key: 'userLoginLogID', width: 140, render: (v: string) => <IDCell value={v} /> },
-    { title: '登录IP', dataIndex: 'loginIP', key: 'loginIP', width: 140, render: (v: string) => v || '-' },
-    { title: 'UserAgent', dataIndex: 'userAgent', key: 'userAgent', render: (v: string) => <EllipsisCell value={v} /> },
+    idColumn<TenantUserLoginLogItem>({ dataIndex: 'userLoginLogID' }),
+    textColumn<TenantUserLoginLogItem>({ title: '登录IP', dataIndex: 'loginIP', width: CODE_COL_WIDTH, monospace: true }),
+    textColumn<TenantUserLoginLogItem>({ title: 'UserAgent', dataIndex: 'userAgent', width: TEXT_COL_WIDTH }),
     timeColumn<TenantUserLoginLogItem>({ title: '登录时间', dataIndex: 'loginTime', relative: true }),
   ]
 
@@ -52,7 +52,8 @@ export default function UserLoginLogTab({ userID }: UserLoginLogTabProps) {
         columns={columns}
         dataSource={data}
         pagination={false}
-        scroll={{ x: 660 }}
+        tableLayout="fixed"
+        scroll={tableScrollX(columns)}
       />
 
       {!loading && data.length === 0 ? (

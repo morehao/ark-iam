@@ -5,7 +5,7 @@ import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { createOAuthSecret, deleteOAuthSecret, getOAuthClientDetail, listOAuthSecrets } from '@ark-iam/api'
 import type { OAuthClientDetail as OAuthClientDetailType, OAuthSecretCreateResp, OAuthSecretItem } from '@ark-iam/types'
-import { fmtTime, IDCell, RowActions, StatusTag, timeColumn, tokens, TypeTag } from '@ark-iam/ui'
+import { actionColumn, CODE_COL_WIDTH, fmtTime, IDCell, idColumn, NAME_COL_WIDTH, StatusTag, tableScrollX, textColumn, timeColumn, tokens, TypeTag } from '@ark-iam/ui'
 
 export default function OAuthClientDetail() {
   const { id } = useParams<{ id: string }>()
@@ -84,34 +84,23 @@ export default function OAuthClientDetail() {
   }
 
   const secretColumns: ColumnsType<OAuthSecretItem> = [
-    { title: 'ID', dataIndex: 'id', key: 'id', width: 150, render: (v: string) => <IDCell value={v} /> },
-    { title: '名称', dataIndex: 'name', key: 'name' },
-    {
-      title: '前缀',
-      dataIndex: 'valuePrefix',
-      key: 'valuePrefix',
-      render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v || '-'}</span>,
-    },
+    idColumn<OAuthSecretItem>({ dataIndex: 'id' }),
+    textColumn<OAuthSecretItem>({ title: '名称', dataIndex: 'name', width: NAME_COL_WIDTH }),
+    textColumn<OAuthSecretItem>({ title: '前缀', dataIndex: 'valuePrefix', width: CODE_COL_WIDTH, monospace: true }),
     timeColumn<OAuthSecretItem>({ title: '过期时间', dataIndex: 'expiresAt', placeholder: '永不过期' }),
     timeColumn<OAuthSecretItem>({ title: '创建时间', dataIndex: 'createdAt' }),
-    {
-      title: '操作',
-      key: 'action',
-      width: 90,
-      render: (_, r) => (
-        <RowActions
-          actions={[
-            {
-              key: 'delete',
-              label: '删除',
-              danger: true,
-              confirm: '确认删除该密钥？',
-              onClick: () => void handleDeleteSecret(r.id),
-            },
-          ]}
-        />
-      ),
-    },
+    actionColumn<OAuthSecretItem>({
+      max: 1,
+      actions: (r) => [
+        {
+          key: 'delete',
+          label: '删除',
+          danger: true,
+          confirm: '确认删除该密钥？',
+          onClick: () => void handleDeleteSecret(r.id),
+        },
+      ],
+    }),
   ]
 
   if (loading && !detail) {
@@ -210,6 +199,8 @@ export default function OAuthClientDetail() {
           dataSource={secrets}
           loading={secretLoading}
           pagination={false}
+          tableLayout="fixed"
+          scroll={tableScrollX(secretColumns)}
         />
       </Card>
 

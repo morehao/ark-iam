@@ -1,12 +1,14 @@
 import { Tooltip } from 'antd'
 
 export interface EllipsisCellProps {
-  /** 文本内容；空值展示为 - */
+  /** 文本内容；空值展示为 placeholder */
   value?: string | number | null
   /** 展示前先截断到该字符数（仅影响展示，悬浮提示仍为完整内容） */
   limit?: number
   /** 使用等宽字体 */
   monospace?: boolean
+  /** 空值占位文案，默认 `-` */
+  placeholder?: string
 }
 
 /**
@@ -14,9 +16,9 @@ export interface EllipsisCellProps {
  * - 超出单元格宽度即省略号截断
  * - 鼠标悬浮展示完整内容（可拖选直接复制）
  */
-export function EllipsisCell({ value, limit, monospace = false }: EllipsisCellProps) {
+export function EllipsisCell({ value, limit, monospace = false, placeholder = '-' }: EllipsisCellProps) {
   const text = value == null ? '' : String(value)
-  if (!text) return <span>-</span>
+  if (!text) return <span>{placeholder}</span>
   const display = limit && text.length > limit ? `${text.slice(0, limit)}…` : text
   return (
     <Tooltip
