@@ -12,14 +12,18 @@ import (
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objpermission"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 )
 
 // BuildAppMenuTree 构建指定应用的启用菜单树（角色菜单授权 / 侧边栏可见树共用）。
+// 展示顺序取 dao.MenuOrderBySort：同一父级下按控制台维护的「排序」升序——
+// 侧边栏与角色授权树的顺序必须是「排序」字段的唯一函数，否则控制台里改排序看不到任何效果。
 func BuildAppMenuTree(ctx *gin.Context, appID string) ([]objpermission.MenuItemNode, error) {
 	menuEntityList, _, err := dao.NewMenuDao().GetPageListByCond(ctx, &dao.MenuCond{
-		AppID:  appID,
-		Status: model.MenuStatusEnable,
+		BaseCond: &gormdao.BaseCond{OrderField: dao.MenuOrderBySort},
+		AppID:    appID,
+		Status:   model.MenuStatusEnable,
 	})
 	if err != nil {
 		glog.Errorf(ctx, "[menu.BuildAppMenuTree] dao menu GetPageListByCond fail, err:%v, appID:%s", err, appID)

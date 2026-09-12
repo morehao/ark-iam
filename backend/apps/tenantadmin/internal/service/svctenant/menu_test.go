@@ -151,3 +151,44 @@ func TestConsoleMenuScopeExcludesBuiltInApp(t *testing.T) {
 		t.Fatalf("console menu tree must keep tenant console menus and drop platform console menus, got %+v", tree)
 	}
 }
+
+// TestTenantSidebarFollowsMenuSort 租户控制台侧边栏顺序必须是菜单「排序」字段的函数：
+// 平台端「菜单管理」里改 sort 后，租户侧边栏应立刻按新顺序呈现。
+// 回归背景：菜单查询缺 ORDER BY，侧边栏顺序完全不受 sort 影响（用户可见 bug）。
+func TestTenantSidebarFollowsMenuSort(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.TenantApplicationEntity{},
+		&model.MenuEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	seedTenantAdminOperator(t, db, "t1", "op")
+	seedSubscribedApp(t, db, "t1", "app-console", tenantAdminAppCode, "租户管理后台", model.AppSourceBuiltin, 1)
+
+	// 播种顺序 = 现场截图顺序（API密钥 4 → 部门 1 → 用户 2 → 角色 3）
+	seedMenus := []*model.MenuEntity{
+		{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "m-key"}}, AppID: "app-console", Name: "API密钥", Code: "tenant-api-key", Path: "/api-key", Sort: 4, Type: model.MenuTypeMenu, Status: model.MenuStatusEnable},
+		{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "m-dept"}}, AppID: "app-console", Name: "部门管理", Code: "department", Path: "/department", Sort: 1, Type: model.MenuTypeMenu, Status: model.MenuStatusEnable},
+		{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "m-user"}}, AppID: "app-console", Name: "用户管理", Code: "tenant-user", Path: "/user", Sort: 2, Type: model.MenuTypeMenu, Status: model.MenuStatusEnable},
+		{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "m-role"}}, AppID: "app-console", Name: "角色管理", Code: "tenant-role", Path: "/role", Sort: 3, Type: model.MenuTypeMenu, Status: model.MenuStatusEnable},
+	}
+	for _, m := range seedMenus {
+		if err := db.Create(m).Error; err != nil {
+			t.Fatalf("seed menu %s: %v", m.Code, err)
+		}
+	}
+
+	tree, err := buildMyMenuTree(newDeptGinCtx(t, "t1", "op"))
+	if err != nil {
+		t.Fatalf("build my menu tree: %v", err)
+	}
+	got := make([]string, 0, len(tree))
+	for _, node := range tree {
+		got = append(got, node.MenuID)
+	}
+	want := []string{"m-dept", "m-user", "m-role", "m-key"}
+	if len(got) != len(want) {
+		t.Fatalf("侧边栏菜单数不符, got %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("租户侧边栏必须按菜单 sort 升序, got %v, want %v", got, want)
+		}
+	}
+}
