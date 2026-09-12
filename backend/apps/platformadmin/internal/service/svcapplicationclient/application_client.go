@@ -129,6 +129,19 @@ func (svc *oAuthClientSvc) Delete(ctx *gin.Context, req *dtoapplicationclient.Ap
 	return nil
 }
 
+// clientSeedFieldsChanged 判断请求是否改动了种子拥有的客户端字段（字段权威矩阵：
+// application_client 的 reconcile 字段 = name）。内置客户端名称由平台版本定义，控制台拒写。
+func clientSeedFieldsChanged(entity *model.ApplicationClientEntity, req *dtoapplicationclient.ApplicationClientUpdateReq) bool {
+	current := map[string]any{"name": entity.Name}
+	desired := map[string]any{"name": req.Name}
+	for field, want := range desired {
+		if model.SeedOwnsField(model.SeedEntityApplicationClient, field) && current[field] != want {
+			return true
+		}
+	}
+	return false
+}
+
 func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientUpdateReq) error {
 	if !isValidApplicationClientStatus(req.Status) {
 		glog.Errorf(ctx, "[svcapplicationclient.Update] 非法客户端状态, req:%s", gutil.ToJsonString(req))
@@ -141,6 +154,10 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.Ap
 	}
 	if !applicationClientVisibleToTenant(entity, gincontext.GetTenantIDString(ctx)) {
 		return code.GetError(code.ApplicationClientNotExistError)
+	}
+	if entity.Source == model.ApplicationClientSourceBuiltin && clientSeedFieldsChanged(entity, req) {
+		glog.Errorf(ctx, "[svcapplicationclient.Update] 拒绝修改内置客户端名称, clientID:%s, req:%s", req.ApplicationClientID, gutil.ToJsonString(req))
+		return code.GetError(code.ApplicationClientBuiltInFieldImmutableError)
 	}
 
 	userID := gincontext.GetUserIDString(ctx)

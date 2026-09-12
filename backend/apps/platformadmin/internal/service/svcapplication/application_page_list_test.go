@@ -51,7 +51,7 @@ func TestApplicationPageListReturnsTimeFields(t *testing.T) {
 func TestApplicationPageListFiltersBySource(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ApplicationEntity{})
 	seeds := []model.ApplicationEntity{
-		{Code: "admin", Name: "管理后台", Source: model.AppSourceBuiltin},
+		{Code: "admin", Name: "平台管理后台", Source: model.AppSourceBuiltin},
 		{Code: "ops-app", Name: "运维自建应用", Source: model.AppSourceFirstParty},
 		{Code: "blog", Name: "博客", Source: model.AppSourceThirdParty},
 	}

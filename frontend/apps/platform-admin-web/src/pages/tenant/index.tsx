@@ -18,11 +18,11 @@ const TENANT_STATUS_OPTIONS = [
 // 不参与数据隔离与权限判定（隔离一律按 tenant_id）。
 const TENANT_TYPE_OPTIONS = [
   { value: 'customer', label: '客户租户', title: '外部客户/合作方的独立租户' },
-  { value: 'platform', label: '平台租户', title: '平台自运营租户（种子数据 Default Tenant 即平台租户）' },
+  { value: 'platform', label: '平台租户', title: '平台自运营租户（种子数据“平台运营中心”即平台租户）' },
 ]
 
 const TENANT_TYPE_TIP =
-  '客户租户（customer）：外部客户/合作方的独立数据与权限边界；平台租户（platform）：平台自运营租户（如 Default Tenant）。当前该字段仅作分类标识，不参与数据隔离与权限判定。'
+  '客户租户（customer）：外部客户/合作方的独立数据与权限边界；平台租户（platform）：平台自运营租户（如“平台运营中心”）。当前该字段仅作分类标识，不参与数据隔离与权限判定。'
 
 export default function TenantList() {
   const [data, setData] = useState<TenantItem[]>([])
@@ -185,6 +185,10 @@ export default function TenantList() {
     }),
   ]
 
+  // 平台自运营租户（种子租户 t_platform）不可挂起：它是平台控制台自身所在租户，挂起即整栈失联；
+  // 与后端 svctenant.Update 的拒写规则同源。平台租户改名仍归运维（migrate_once 不覆盖自定义值）。
+  const platformTenant = editing?.code === 't_platform'
+
   return (
     <PageContainer
       title="租户管理"
@@ -311,12 +315,16 @@ export default function TenantList() {
             <Form.Item
               name="status"
               label="状态"
-              tooltip="挂起后该租户成员无法登录、已签发会话会被撤销；不能挂起你当前所在的租户"
+              tooltip={
+                platformTenant
+                  ? '平台自运营租户不可挂起（挂起后平台控制台会整体失联）'
+                  : '挂起后该租户成员无法登录、已签发会话会被撤销；不能挂起你当前所在的租户'
+              }
               valuePropName="checked"
               getValueFromEvent={(checked: boolean) => (checked ? 'active' : 'suspended')}
               getValueProps={(v?: string) => ({ checked: v !== 'suspended' })}
             >
-              <Switch checkedChildren="正常" unCheckedChildren="挂起" />
+              <Switch checkedChildren="正常" unCheckedChildren="挂起" disabled={platformTenant} />
             </Form.Item>
           )}
         </Form>

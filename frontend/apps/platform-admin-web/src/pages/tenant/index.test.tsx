@@ -196,3 +196,34 @@ describe('EnableTag 启用/停用映射', () => {
     }
   })
 })
+
+/**
+ * 平台自运营租户（种子租户 t_platform）不可挂起：它是平台控制台自身所在租户，
+ * 挂起后整栈失联；后端 svctenant.Update 会拒写，前端必须同步置灰。
+ */
+describe('平台租户不可挂起', () => {
+  it('编辑平台租户时挂起开关置灰', async () => {
+    const platform: TenantItem = {
+      tenantID: 't0',
+      code: 't_platform',
+      name: '平台运营中心',
+      status: 'active',
+      type: 'platform',
+      tag: 'default',
+      dbUser: 'default_user',
+      createdAt,
+      updatedAt,
+    }
+    mockGetTenantPageList.mockResolvedValue({ list: [platform], total: 1 })
+
+    render(
+      <AntdApp>
+        <TenantList />
+      </AntdApp>,
+    )
+
+    fireEvent.click(await screen.findByText('编辑'))
+    const suspendSwitch = await screen.findByRole('switch')
+    await waitFor(() => expect(suspendSwitch).toBeDisabled())
+  })
+})

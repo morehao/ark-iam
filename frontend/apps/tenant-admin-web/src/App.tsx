@@ -124,9 +124,9 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage title="租户管理" subtitle="租户自服务控制台" />} />
+      <Route path="/login" element={<LoginPage title="租户管理" subtitle="租户管理后台" />} />
       <Route path="/auth/callback" element={<FullPageSpinner />} />
-      <Route path="/" element={<MainLayout title="Ark IAM" subtitle="租户自服务" menuItems={sidebarMenu} />}>
+      <Route path="/" element={<MainLayout title="Ark IAM" subtitle="租户管理后台" menuItems={sidebarMenu} />}>
         {defaultPath ? (
           <Route index element={<Navigate to={defaultPath} replace />} />
         ) : (

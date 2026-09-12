@@ -171,8 +171,13 @@ export default function OAuthClientList() {
               <RemoteSelect placeholder="选择所属应用（输入名称搜索）" fetchOptions={fetchAppOptions} />
             </Form.Item>
           )}
-          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
-            <Input placeholder="客户端名称" />
+          <Form.Item
+            name="name"
+            label="名称"
+            rules={[{ required: true, message: '请输入名称' }]}
+            extra={editing?.source === 'builtin' ? '内置客户端的名称由平台版本定义，不可修改' : undefined}
+          >
+            <Input placeholder="客户端名称" disabled={editing?.source === 'builtin'} />
           </Form.Item>
           {editing && (
             <Form.Item label="来源">

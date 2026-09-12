@@ -15,12 +15,12 @@ import (
 // 租户自服务权限开通的内置定义（单一事实源）：
 // pkg/seed（平台租户 bootstrap）与各建租户链路共用同一份编码，避免"角色/菜单集合"出现两份定义而漂移。
 const (
-	// ProvisionAppCode 租户自服务控制台应用编码（application.code，规则见 model.AppCodePattern）。
+	// ProvisionAppCode 租户管理后台（租户自服务控制台）应用编码（application.code，规则见 model.AppCodePattern）。
 	ProvisionAppCode = "tenant_admin"
 	// ProvisionRoleName 内置租户管理员角色名称（角色无业务编码，(tenant_id, app_id, source=builtin) 即其业务唯一键）。
 	ProvisionRoleName = "租户管理员"
 	// ProvisionRoleDesc 内置租户管理员角色描述。
-	ProvisionRoleDesc = "租户自服务应用管理员，拥有全部租户自服务权限"
+	ProvisionRoleDesc = "租户管理后台应用管理员，拥有全部租户管理后台权限"
 	// ProvisionAdminType 内置管理员角色的系统管理类型（租户 tenant_admin 与平台 admin 种子共用；admin=具备系统管理能力）。
 	ProvisionAdminType = model.SysAdminTypeAdmin
 )
@@ -51,7 +51,7 @@ func ProvisionTenantAdmin(ctx context.Context, tx *gorm.DB, req *ProvisionTenant
 		return nil, fmt.Errorf("core/tenant: tenant id is required")
 	}
 
-	// 1. 定位租户自服务应用（全局种子数据，缺失即种子未跑完）
+	// 1. 定位租户管理后台应用（全局种子数据，缺失即种子未跑完）
 	app, err := dao.NewApplicationDao().WithTx(tx).GetByCond(ctx, &dao.ApplicationCond{Code: ProvisionAppCode})
 	if err != nil {
 		return nil, fmt.Errorf("query application %s fail: %w", ProvisionAppCode, err)

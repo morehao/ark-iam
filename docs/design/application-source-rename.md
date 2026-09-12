@@ -9,6 +9,8 @@
 >
 > 第三处冗余归属列 `application_client.is_third_party` 已**同批下线**（§13）——三处归属列最终收敛为一列 `source`。
 > **归属再修正（§14）**：平台随产品交付的两个控制台应用（管理后台、租户自服务）**都归 `builtin`**；§2.3 把租户自服务留在 `first_party` 的判断已被取代，菜单归属改由「属于哪个控制台」判定，不再由内置性兼任。
+> **后续更名（本文成文之后）**：两个内置应用的**展示名**已调整为**平台管理后台**（`platform_admin`）与**租户管理后台**（`tenant_admin`），种子平台租户名由 `Default Tenant` 调整为**平台运营中心**；本文及 §14 沿用当时的「管理后台 / 租户自服务」称呼，特此说明，编码与归属口径未变。
+> 随之**种子自愈范围扩大**：`pkg/seed` 命中既有行时，除 `application`/`application_client` 的 `source` 与平台租户的 `status=active` 外，还会把**种子自有的展示身份**回填为定义值——平台租户名、与租户同名的根部门名、两个内置应用的 `name`/`description`、种子 OAuth 客户端的 `name`；`application.status`/`sort` 与客户端回调地址等**运行时编排字段仍由控制台掌握，种子不覆盖**（§12.1/§12.3-4 中「不覆盖 name/description」的表述据此更新）。
 > 本文取代 `organization-container-redesign.md:359` 中「`application.is_system` 属布尔字段改造成果」的表述——该列将在本次改造后下线。
 
 ---

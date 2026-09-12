@@ -18,7 +18,7 @@ test('全局登出后，SSO 会话失效且兄弟应用需重新认证', async (
   await page.waitForURL((url) => url.port === '3001' && !url.pathname.includes('/auth/callback'), { timeout: 30000 });
   await expect(page.getByText('仪表盘', { exact: true }).first()).toBeVisible({ timeout: 30000 });
 
-  // 2. 新开标签页访问 3002（租户管理平台），应免密登录（共享 SSO session）
+  // 2. 新开标签页访问 3002（租户管理后台），应免密登录（共享 SSO session）
   const rp1 = await context.newPage();
   await rp1.goto('http://localhost:3002/', { waitUntil: 'domcontentloaded', timeout: 20000 });
   await expect(rp1.getByText('部门管理', { exact: true }).first()).toBeVisible({ timeout: 30000 });

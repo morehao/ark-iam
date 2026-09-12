@@ -27,18 +27,18 @@ vi.mock('../api/user', () => ({
 const RoleAssignEditor = (await import('./RoleAssignEditor')).default
 
 const assignedRoles: TenantUserRoleItem[] = [
-  { roleID: 'r1', appID: 'app1', appName: '管理后台', name: '租户管理员', description: '' },
+  { roleID: 'r1', appID: 'app1', appName: '平台管理后台', name: '租户管理员', description: '' },
 ]
 
 const pageRoles: TenantRoleItem[] = [
-  { roleID: 'r1', appID: 'app1', appName: '管理后台', name: '租户管理员', description: '', adminType: 'normal', memberCount: 0, menuCount: 0 },
-  { roleID: 'r2', appID: 'app1', appName: '管理后台', name: '只读成员', description: '', adminType: 'normal', memberCount: 0, menuCount: 0 },
+  { roleID: 'r1', appID: 'app1', appName: '平台管理后台', name: '租户管理员', description: '', adminType: 'normal', memberCount: 0, menuCount: 0 },
+  { roleID: 'r2', appID: 'app1', appName: '平台管理后台', name: '只读成员', description: '', adminType: 'normal', memberCount: 0, menuCount: 0 },
 ]
 
 const searchedRole: TenantRoleItem = {
   roleID: 'r9',
   appID: 'app1',
-  appName: '管理后台',
+  appName: '平台管理后台',
   name: '运维管理员',
   description: '',
   adminType: 'normal',
@@ -58,7 +58,7 @@ describe('按应用授权编辑器', () => {
     mockUpdateTenantUserRoles.mockReset()
     mockGetTenantApps.mockReset().mockResolvedValue({
       list: [
-        { appID: 'app1', code: 'console', name: '管理后台' },
+        { appID: 'app1', code: 'console', name: '平台管理后台' },
         { appID: 'app2', code: 'order', name: '订单中心' },
       ],
     })

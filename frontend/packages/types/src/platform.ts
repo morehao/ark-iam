@@ -10,7 +10,7 @@ export type SysAdminType = 'admin' | 'normal'
 // ---------- 应用 ----------
 /**
  * 应用/客户端来源（后端 model.AppSource / model.ApplicationClientSource）：
- * builtin-内置（平台随产品交付的控制台应用：管理后台 / 租户自服务，受删除保护）、
+ * builtin-内置（平台随产品交付的控制台应用：平台管理后台 / 租户管理后台，受删除保护）、
  * first_party-第一方受控应用（平台自建但非内置，当前由运维产生）、third_party-第三方接入。
  * 控制台创建的资源恒为 third_party；builtin / first_party 只能由种子与运维产生。
  */

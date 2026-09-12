@@ -21,13 +21,13 @@ func newDeleteCtx(userID string) *gin.Context {
 	return ctx
 }
 
-// TestDeleteBuiltInApplication：source=builtin（管理后台）禁删。
+// TestDeleteBuiltInApplication：source=builtin（平台管理后台）禁删。
 func TestDeleteBuiltInApplication(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ApplicationEntity{})
 
 	entity := &model.ApplicationEntity{
 		Code:   "admin",
-		Name:   "管理后台",
+		Name:   "平台管理后台",
 		Source: model.AppSourceBuiltin,
 	}
 	if err := db.Create(entity).Error; err != nil {

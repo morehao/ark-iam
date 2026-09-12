@@ -36,10 +36,10 @@ func setupTenantCreateEnv(t *testing.T) *gorm.DB {
 	return db
 }
 
-// seedTenantAdminApp 预置租户自服务应用与其内置菜单（编码取自 pkg/core/tenant 的单一事实源）。
+// seedTenantAdminApp 预置租户管理后台应用与其内置菜单（编码取自 pkg/core/tenant 的单一事实源）。
 func seedTenantAdminApp(t *testing.T, db *gorm.DB) *model.ApplicationEntity {
 	t.Helper()
-	app := &model.ApplicationEntity{Code: tenant.ProvisionAppCode, Name: "租户自服务", Status: model.AppStatusEnable}
+	app := &model.ApplicationEntity{Code: tenant.ProvisionAppCode, Name: "租户管理后台", Status: model.AppStatusEnable}
 	if err := db.Create(app).Error; err != nil {
 		t.Fatalf("seed application: %v", err)
 	}
