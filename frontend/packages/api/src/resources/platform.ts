@@ -46,7 +46,7 @@ export const getOAuthClientPageList = (data: { page: number; pageSize: number; n
 export const getOAuthClientDetail = (applicationClientID: string) =>
   request.get<any, OAuthClientDetail>(`/platform/application-clients/${applicationClientID}`)
 export const createOAuthClient = (data: OAuthClientCreateReq) =>
-  request.post<any, { applicationClientID: string; clientID: string }>('/platform/application-clients', data)
+  request.post<any, { applicationClientID: string; code: string }>('/platform/application-clients', data)
 export const updateOAuthClient = (data: OAuthClientUpdateReq) => {
   const { applicationClientID, ...body } = data
   return request.put<any, string>(`/platform/application-clients/${applicationClientID}`, body)

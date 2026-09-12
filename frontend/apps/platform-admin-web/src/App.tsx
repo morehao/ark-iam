@@ -25,6 +25,7 @@ import OAuthClientDetail from './pages/oauthClient/Detail'
 import MenuList from './pages/menu'
 import DomainList from './pages/domain'
 import LogList from './pages/log'
+import { OAUTH_CLIENT_DETAIL_ROUTE } from './routes'
 
 // 图标映射：后端 menu.icon 存储的字符串 -> antd 图标组件
 const ICON_MAP: Record<string, React.ReactNode> = {
@@ -51,8 +52,8 @@ const COMPONENT_MAP: Record<string, React.ComponentType> = {
   '/menu': MenuList,
   '/domain': DomainList,
   '/log': LogList,
-  // 详情页（不进侧边栏菜单，由静态路由单独注册）
-  '/oauth-client/:id': OAuthClientDetail,
+  // 详情页（不进侧边栏菜单，由静态路由单独注册；path 取自 routes.ts 单一真相源）
+  [OAUTH_CLIENT_DETAIL_ROUTE]: OAuthClientDetail,
 }
 
 function iconOf(icon?: string): React.ReactNode {
@@ -163,7 +164,7 @@ function App() {
         )}
         {dynamicRoutes}
         {/* 详情路由（静态注册，不进侧边栏菜单） */}
-        <Route path="/oauth-client/:id" element={<OAuthClientDetail />} />
+        <Route path={OAUTH_CLIENT_DETAIL_ROUTE} element={<OAuthClientDetail />} />
       </Route>
     </Routes>
   )

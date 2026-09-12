@@ -86,8 +86,7 @@ curl -X POST http://localhost:8082/v1/platform/application-clients \
   -H "Content-Type: application/json" \
   -d '{
     "appID": <上一步返回的 appID>,
-    "name": "my-app-web",
-    "clientID": "my-app-web",
+    "name": "我的业务应用 Web 端",
     "redirectURIs": ["https://my-app.example.com/callback"],
     "postLogoutRedirectURIs": ["https://my-app.example.com/logged-out"],
     "backChannelLogoutURI": "https://my-app.example.com/oidc/bc-logout",
@@ -99,7 +98,13 @@ curl -X POST http://localhost:8082/v1/platform/application-clients \
     "accessTokenTTL": 900,
     "refreshTokenTTL": 2592000
   }'
+# 响应：{"applicationClientID": "<控制台内部主键>", "code": "<OIDC client_id>"}
 ```
+
+> **客户端编码（`code`，即 OIDC `client_id`）由服务端生成，请求里不要传**：创建接口不接受 `clientID`/`code` 入参，
+> 响应里的 `code` 就是 OIDC 的 `client_id`（随机 UUID），把它填到 RP 配置的 `client_id`（§4.1）。
+> 注意两个「编码」规则不同：**应用编码**（`application.code`）要求下划线连接；**客户端编码**是协议标识符，
+> 允许连字符（内置客户端即为 `platform-admin-web` / `tenant-admin-web`），不受 `AppCodePattern` 约束。
 
 | 参数 | 建议值 | 说明 |
 |---|---|---|
@@ -131,7 +136,7 @@ import { WebStorageStateStore } from 'oidc-client-ts';
 
 export const oidcConfig = {
   authority: 'http://localhost:8081/oidc',          // issuer
-  client_id: 'my-app-web',
+  client_id: '<创建 OAuth 客户端时响应返回的 code>',
   redirect_uri: 'https://my-app.example.com/callback',
   post_logout_redirect_uri: 'https://my-app.example.com/logged-out',
   response_type: 'code',                            // 授权码
@@ -215,7 +220,7 @@ getOIDCPublicKey := middleware.LoadSigningPublicKey(Conf) // 从配置加载 OP 
 
 oidcAuthOpts := []middleware.AuthOption{
     middleware.WithOIDCIssuer(Conf.OIDC.Issuer),            // 必须：校验 iss
-    middleware.WithOIDCAudiences("my-app-web"),             // 必须：校验 aud = 本应用 client_id
+    middleware.WithOIDCAudiences("<本应用 client_id，即创建客户端响应里的 code>"), // 必须：校验 aud = 本应用 client_id
     middleware.WithAuthSkipPaths("/v1/myapp/register"),     // 可选：免鉴权路径
 }
 if Conf.OIDC.EnableSSOSessionValidation {
@@ -304,7 +309,7 @@ import "github.com/morehao/ark-iam/pkg/goidc"
 // 挂载接收端点（路径与客户端注册的 backChannelLogoutURI 一致）
 group := engine.Group("/oidc")
 basePath := Conf.OIDC.BackChannelLogoutPath // 默认 /bc-logout/myapp
-goidc.RegisterReceiverRoutes(group, basePath, getOIDCPublicKey, Conf.OIDC.Issuer, "my-app-web", nil)
+goidc.RegisterReceiverRoutes(group, basePath, getOIDCPublicKey, Conf.OIDC.Issuer, "<本应用 client_id>", nil)
 ```
 
 **接收端职责**（`pkg/goidc` 已实现）：

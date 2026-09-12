@@ -55,7 +55,7 @@ export interface IDColumnConfig<T> {
 /**
  * ID 列：`IDCell`（等宽 + 首 8 尾 4 + Tooltip 可拖选复制）。
  *
- * 同一行已有对外可读业务键（编码 / key / 域名 / 客户端ID）时，内部 UUID 列通常是噪声，
+ * 同一行已有对外可读业务键（编码 / 客户端编码 / key / 域名）时，内部 UUID 列通常是噪声，
  * 可按需省略；保留时一律用本工厂（默认 130，而非手写 150）。
  */
 export function idColumn<T>({ dataIndex, title = 'ID', width }: IDColumnConfig<T>): ColumnType<T> {

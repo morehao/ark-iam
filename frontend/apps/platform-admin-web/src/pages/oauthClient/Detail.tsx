@@ -6,6 +6,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { createOAuthSecret, deleteOAuthSecret, getOAuthClientDetail, listOAuthSecrets } from '@ark-iam/api'
 import type { OAuthClientDetail as OAuthClientDetailType, OAuthSecretCreateResp, OAuthSecretItem } from '@ark-iam/types'
 import { actionColumn, CODE_COL_WIDTH, fmtTime, IDCell, idColumn, NAME_COL_WIDTH, SourceTag, EnableTag, tableScrollX, textColumn, timeColumn, tokens } from '@ark-iam/ui'
+import { OAUTH_CLIENT_LIST_PATH } from '../../routes'
 
 export default function OAuthClientDetail() {
   const { id } = useParams<{ id: string }>()
@@ -19,33 +20,34 @@ export default function OAuthClientDetail() {
   const [submitLoading, setSubmitLoading] = useState(false)
   const [createdSecret, setCreatedSecret] = useState<OAuthSecretCreateResp | null>(null)
 
-  const clientID = id ?? ""
+  // 路由参数是控制台内部主键 applicationClientID（非 OIDC client_id/code）
+  const applicationClientID = id ?? ""
 
   const fetchAll = useCallback(async () => {
     if (!id) return
     setLoading(true)
     try {
-      const resp = await getOAuthClientDetail(clientID)
+      const resp = await getOAuthClientDetail(applicationClientID)
       setDetail(resp)
     } catch {
       /* 拦截器已提示 */
     } finally {
       setLoading(false)
     }
-  }, [id, clientID])
+  }, [id, applicationClientID])
 
   const fetchSecrets = useCallback(async () => {
     if (!id) return
     setSecretLoading(true)
     try {
-      const resp = await listOAuthSecrets(clientID)
+      const resp = await listOAuthSecrets(applicationClientID)
       setSecrets(resp?.secrets || [])
     } catch {
       /* 拦截器已提示 */
     } finally {
       setSecretLoading(false)
     }
-  }, [id, clientID])
+  }, [id, applicationClientID])
 
   useEffect(() => {
     void fetchAll()
@@ -57,7 +59,7 @@ export default function OAuthClientDetail() {
       const values = await secretForm.validateFields()
       setSubmitLoading(true)
       const resp = await createOAuthSecret({
-        applicationClientID: clientID,
+        applicationClientID,
         name: values.name,
         expiresAt: values.expiresAt ? Math.floor(values.expiresAt.valueOf() / 1000) : undefined,
       })
@@ -75,7 +77,7 @@ export default function OAuthClientDetail() {
 
   const handleDeleteSecret = async (secretID: string) => {
     try {
-      await deleteOAuthSecret(clientID, secretID)
+      await deleteOAuthSecret(applicationClientID, secretID)
       message.success('删除成功')
       void fetchSecrets()
     } catch {
@@ -116,7 +118,7 @@ export default function OAuthClientDetail() {
   return (
     <div>
       <Space style={{ marginBottom: 16 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/oauthClient')}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(OAUTH_CLIENT_LIST_PATH)}>
           返回列表
         </Button>
       </Space>
@@ -125,10 +127,8 @@ export default function OAuthClientDetail() {
         <Descriptions column={2} bordered size="small">
           <Descriptions.Item label="ID"><IDCell value={detail.applicationClientID} /></Descriptions.Item>
           <Descriptions.Item label="租户ID"><IDCell value={detail.tenantID} /></Descriptions.Item>
-          <Descriptions.Item label="所属应用ID"><IDCell value={detail.appID} /></Descriptions.Item>
-          <Descriptions.Item label="客户端ID">
-            <IDCell value={detail.clientID} />
-          </Descriptions.Item>
+          <Descriptions.Item label="所属应用">{detail.appName || '-'}</Descriptions.Item>
+          <Descriptions.Item label="客户端编码">{detail.code || '-'}</Descriptions.Item>
           <Descriptions.Item label="名称">{detail.name || '-'}</Descriptions.Item>
           <Descriptions.Item label="来源">
             <SourceTag value={detail.source} />

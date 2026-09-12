@@ -74,7 +74,10 @@ export type TokenEndpointAuthMethod = 'client_secret_basic' | 'client_secret_pos
 export interface OAuthClientItem {
   applicationClientID: string
   appID: string
-  clientID: string
+  /** 所属应用名称（后端列表/详情回填，避免前端只拿到 appID） */
+  appName: string
+  /** 客户端编码 = OIDC client_id（后端 model.ApplicationClientEntity.Code，全局唯一；允许连字符） */
+  code: string
   name: string
   source: AppSource
   status: ApplicationClientStatus

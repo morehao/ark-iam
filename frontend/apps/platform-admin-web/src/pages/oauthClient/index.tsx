@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { Table, Button, Space, Input, Modal, Form, Select, message } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, idColumn, nameColumn, PageContainer, RemoteSelect, SourceTag, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, timeColumn, tokens } from '@ark-iam/ui'
+import { actionColumn, CODE_COL_WIDTH, idColumn, NAME_COL_WIDTH, nameColumn, PageContainer, RemoteSelect, SourceTag, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
 import { createOAuthClient, deleteOAuthClient, getApplicationPageList, getOAuthClientPageList, updateOAuthClient } from '@ark-iam/api'
 import type { OAuthClientItem } from '@ark-iam/types'
 import { useNavigate } from 'react-router-dom'
+import { oauthClientDetailPath } from '../../routes'
 
 export default function OAuthClientList() {
   const navigate = useNavigate()
@@ -92,13 +93,15 @@ export default function OAuthClientList() {
 
   const columns: ColumnsType<OAuthClientItem> = [
     idColumn<OAuthClientItem>({ dataIndex: 'applicationClientID' }),
-    idColumn<OAuthClientItem>({ dataIndex: 'clientID', title: '客户端ID' }),
     nameColumn<OAuthClientItem>({
       title: '名称',
       dataIndex: 'name',
-      onClick: (r) => navigate(`/oauthClient/${r.applicationClientID}`),
+      // 名称即详情入口（列规范 R2）；路由 path 取自 routes.ts，与 App.tsx 注册保持一致
+      onClick: (r) => navigate(oauthClientDetailPath(r.applicationClientID)),
     }),
-    idColumn<OAuthClientItem>({ dataIndex: 'appID', title: '所属应用ID' }),
+    // 列名与后端字段名同构（DTO/DB 都是 code）：客户端编码 = OIDC client_id
+    textColumn<OAuthClientItem>({ title: '客户端编码', dataIndex: 'code', width: CODE_COL_WIDTH, monospace: true }),
+    textColumn<OAuthClientItem>({ title: '所属应用', dataIndex: 'appName', width: NAME_COL_WIDTH }),
     { title: '来源', dataIndex: 'source', key: 'source', width: TAG_COL_WIDTH, render: (v: string) => <SourceTag value={v} /> },
     { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <EnableTag value={v} /> },
     timeColumn<OAuthClientItem>({ title: '创建时间', dataIndex: 'createdAt' }),

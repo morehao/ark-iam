@@ -688,6 +688,66 @@ func TestSeedIamBackfillsApplicationSource(t *testing.T) {
 	}
 }
 
+// TestSeedIamBindsBuiltinClientsToTheirApps 内置 OAuth 客户端必须挂在各自的控制台应用上：
+// 平台管理后台客户端 → platform_admin，租户管理后台客户端 → tenant_admin。
+// 回归背景：历史种子把两个客户端都挂在 platform_admin，后果有二：
+//  1. 控制台「所属应用」列把租户管理后台客户端显示成"平台管理后台"（归属不可辨认）；
+//  2. auth 侧 appAllowsPersonCreateTenant 按 client.AppID 解析应用策略，读到的是错误应用。
+//
+// app_id 已在字段权威矩阵声明为 reconcile：存量库的错误绑定在下次启动自愈，且不得新建客户端。
+func TestSeedIamBindsBuiltinClientsToTheirApps(t *testing.T) {
+	db := setupDB(t)
+	ctx := context.Background()
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed fail: %v", err)
+	}
+
+	appIDByCode := map[string]string{}
+	var apps []model.ApplicationEntity
+	if err := db.Find(&apps).Error; err != nil {
+		t.Fatalf("query applications: %v", err)
+	}
+	for _, a := range apps {
+		appIDByCode[a.Code] = a.ID
+	}
+	wantAppCode := map[string]string{
+		"platform-admin-web": "platform_admin",
+		"tenant-admin-web":   "tenant_admin",
+	}
+	assertClientBinding := func(stage string) {
+		t.Helper()
+		for clientCode, appCode := range wantAppCode {
+			var client model.ApplicationClientEntity
+			if err := db.Where("code = ?", clientCode).First(&client).Error; err != nil {
+				t.Fatalf("%s: query client %s: %v", stage, clientCode, err)
+			}
+			if client.AppID != appIDByCode[appCode] {
+				t.Errorf("%s: 客户端 %s 挂在 app_id=%s, want %s(%s)",
+					stage, clientCode, client.AppID, appCode, appIDByCode[appCode])
+			}
+		}
+	}
+	assertClientBinding("fresh seed")
+
+	// 模拟存量库：两个客户端都被错误绑定到 platform_admin
+	if err := db.Model(&model.ApplicationClientEntity{}).Where("1 = 1").
+		Update("app_id", appIDByCode["platform_admin"]).Error; err != nil {
+		t.Fatalf("degrade client app_id: %v", err)
+	}
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed (2nd) fail: %v", err)
+	}
+	assertClientBinding("reconcile")
+
+	var count int64
+	if err := db.Model(&model.ApplicationClientEntity{}).Count(&count).Error; err != nil {
+		t.Fatalf("count application_client: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("application_client count = %d, want 2（收敛不得新建客户端）", count)
+	}
+}
+
 // TestSeedIamMigratesLegacyApplicationCode 存量库的应用编码为连字符形态（platform-admin /
 // tenant-admin）时，种子启动必须原地改名为下划线形态（platform_admin / tenant_admin）：
 // 保留主键，因此以 app_id 关联的菜单/订阅/角色全部随之迁移，不会重建出第二个内置应用。

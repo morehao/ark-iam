@@ -198,6 +198,20 @@ func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtoapplicationclient.Ap
 		return nil, code.GetError(code.ApplicationClientNotExistError)
 	}
 
+	detail, err := buildDetailResp(ctx, entity)
+	if err != nil {
+		glog.Errorf(ctx, "[svcapplicationclient.Detail] buildDetailResp fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.ApplicationClientGetDetailError)
+	}
+	return detail, nil
+}
+
+// buildDetailResp 由实体组装详情出参：解码 JSON 列 + 回填所属应用名称。
+func buildDetailResp(ctx *gin.Context, entity *model.ApplicationClientEntity) (*dtoapplicationclient.ApplicationClientDetailResp, error) {
+	appNames, err := loadAppNames(ctx, model.ApplicationClientEntityList{*entity})
+	if err != nil {
+		return nil, err
+	}
 	var redirectURIs, postLogoutRedirectURIs []string
 	var grantTypes []model.GrantType
 	var responseTypes []string
@@ -213,6 +227,7 @@ func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtoapplicationclient.Ap
 		ApplicationClientID:     entity.ID,
 		TenantID:                entity.TenantID,
 		AppID:                   entity.AppID,
+		AppName:                 appNames[entity.AppID],
 		Code:                    entity.Code,
 		Name:                    entity.Name,
 		RedirectURIs:            redirectURIs,
@@ -258,6 +273,11 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.
 		glog.Errorf(ctx, "[svcapplicationclient.PageList] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationClientGetPageListError)
 	}
+	appNames, err := loadAppNames(ctx, list)
+	if err != nil {
+		glog.Errorf(ctx, "[svcapplicationclient.PageList] loadAppNames fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.ApplicationClientGetPageListError)
+	}
 
 	items := make([]dtoapplicationclient.PageListItem, 0, len(list))
 	for _, v := range list {
@@ -267,6 +287,7 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.
 		items = append(items, dtoapplicationclient.PageListItem{
 			ApplicationClientID:     v.ID,
 			AppID:                   v.AppID,
+			AppName:                 appNames[v.AppID],
 			Code:                    v.Code,
 			Name:                    v.Name,
 			Source:                  v.Source,
@@ -294,39 +315,41 @@ func (svc *oAuthClientSvc) GetByClientID(ctx *gin.Context, clientID string) (*dt
 	if entity == nil || entity.ID == "" {
 		return nil, code.GetError(code.ApplicationClientNotExistError)
 	}
-	var redirectURIs, postLogoutRedirectURIs []string
-	var grantTypes []model.GrantType
-	var responseTypes []string
-	var allowedOrigins, defaultScopes []string
-	_ = json.Unmarshal(entity.RedirectURIs, &redirectURIs)
-	_ = json.Unmarshal(entity.PostLogoutRedirectURIs, &postLogoutRedirectURIs)
-	_ = json.Unmarshal(entity.GrantTypes, &grantTypes)
-	_ = json.Unmarshal(entity.ResponseTypes, &responseTypes)
-	_ = json.Unmarshal(entity.AllowedOrigins, &allowedOrigins)
-	_ = json.Unmarshal(entity.DefaultScopes, &defaultScopes)
+	detail, err := buildDetailResp(ctx, entity)
+	if err != nil {
+		glog.Errorf(ctx, "[svcapplicationclient.GetByClientID] buildDetailResp fail, err:%v, clientID:%s", err, clientID)
+		return nil, code.GetError(code.ApplicationClientGetDetailError)
+	}
+	return detail, nil
+}
 
-	return &dtoapplicationclient.ApplicationClientDetailResp{
-		ApplicationClientID:     entity.ID,
-		TenantID:                entity.TenantID,
-		AppID:                   entity.AppID,
-		Code:                    entity.Code,
-		Name:                    entity.Name,
-		RedirectURIs:            redirectURIs,
-		PostLogoutRedirectURIs:  postLogoutRedirectURIs,
-		BackChannelLogoutURI:    entity.BackChannelLogoutURI,
-		GrantTypes:              grantTypes,
-		ResponseTypes:           responseTypes,
-		TokenEndpointAuthMethod: entity.TokenEndpointAuthMethod,
-		AllowedOrigins:          allowedOrigins,
-		RequirePKCE:             entity.RequirePKCE,
-		RequireAuthTime:         entity.RequireAuthTime,
-		DefaultScopes:           defaultScopes,
-		AccessTokenTTL:          entity.AccessTokenTTL,
-		RefreshTokenTTL:         entity.RefreshTokenTTL,
-		Source:                  entity.Source,
-		Status:                  entity.Status,
-		CreatedAt:               entity.CreatedAt.Unix(),
-	}, nil
+// loadAppNames 批量回填所属应用名称（列表/详情一次查询，避免前端按行再查或 N+1）。
+// 名称缺失不报错：调用方以空名返回，前端退化为展示应用 ID。
+func loadAppNames(ctx *gin.Context, list model.ApplicationClientEntityList) (map[string]string, error) {
+	appIDs := make([]string, 0, len(list))
+	seen := make(map[string]struct{}, len(list))
+	for _, v := range list {
+		if v.AppID == "" {
+			continue
+		}
+		if _, ok := seen[v.AppID]; ok {
+			continue
+		}
+		seen[v.AppID] = struct{}{}
+		appIDs = append(appIDs, v.AppID)
+	}
+	appNames := make(map[string]string, len(appIDs))
+	if len(appIDs) == 0 {
+		return appNames, nil
+	}
+	apps, err := dao.NewApplicationDao().GetListByCond(ctx, &dao.ApplicationCond{IDs: appIDs})
+	if err != nil {
+		return nil, err
+	}
+	for _, a := range apps {
+		appNames[a.ID] = a.Name
+	}
+	return appNames, nil
 }
 
 func (svc *oAuthClientSvc) ListSecrets(ctx *gin.Context, req *dtoapplicationclient.SecretListReq) (*dtoapplicationclient.SecretListResp, error) {

@@ -2330,7 +2330,7 @@ const docTemplateplatformadmin = `{
                     "type": "string"
                 },
                 "code": {
-                    "description": "客户端编码(OIDC client_id)",
+                    "description": "客户端编码（= OIDC client_id，客户端唯一标识）",
                     "type": "string"
                 }
             }
@@ -2353,6 +2353,10 @@ const docTemplateplatformadmin = `{
                     "description": "所属应用ID",
                     "type": "string"
                 },
+                "appName": {
+                    "description": "所属应用名称",
+                    "type": "string"
+                },
                 "applicationClientID": {
                     "description": "OAuth客户端ID",
                     "type": "string"
@@ -2362,7 +2366,7 @@ const docTemplateplatformadmin = `{
                     "type": "string"
                 },
                 "code": {
-                    "description": "客户端编码(OIDC client_id)",
+                    "description": "客户端编码（= OIDC client_id，客户端唯一标识）",
                     "type": "string"
                 },
                 "createdAt": {
@@ -2560,12 +2564,16 @@ const docTemplateplatformadmin = `{
                     "description": "所属应用ID",
                     "type": "string"
                 },
+                "appName": {
+                    "description": "所属应用名称",
+                    "type": "string"
+                },
                 "applicationClientID": {
                     "description": "OAuth客户端ID",
                     "type": "string"
                 },
                 "code": {
-                    "description": "客户端编码(OIDC client_id)",
+                    "description": "客户端编码（= OIDC client_id，客户端唯一标识）",
                     "type": "string"
                 },
                 "createdAt": {
