@@ -56,7 +56,7 @@ func (svc *departmentSvc) Create(ctx *gin.Context, req *dtotenant.DepartmentCrea
 		CreatedBy: gincontext.GetUserIDString(ctx),
 	}
 	if insertEntity.Status == "" {
-		insertEntity.Status = string(model.DeptNodeStatusActive)
+		insertEntity.Status = model.DeptNodeStatusEnable
 	}
 
 	if req.ParentID != "" {
@@ -272,7 +272,9 @@ func (svc *departmentSvc) UpdateStatus(ctx *gin.Context, req *dtotenant.Departme
 	if !departmentVisibleToTenant(deptEntity, gincontext.GetTenantIDString(ctx)) {
 		return code.GetError(code.DepartmentNotExistError)
 	}
-	if req.Status != string(model.DeptNodeStatusActive) && req.Status != string(model.DeptNodeStatusInactive) {
+	switch req.Status {
+	case model.DeptNodeStatusEnable, model.DeptNodeStatusDisable:
+	default:
 		return code.GetError(code.DepartmentUpdateError)
 	}
 	if err := dao.NewDepartmentDao().UpdateMap(ctx, req.DepartmentID, map[string]any{

@@ -75,7 +75,7 @@ func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dto
 		AppID:       req.AppID,
 		Name:        req.Name,
 		Description: req.Description,
-		Source:      string(model.RoleSourceCustom),
+		Source:      model.RoleSourceCustom,
 		AdminType:   model.SysAdminTypeNormal,
 		CreatedBy:   gincontext.GetUserIDString(ctx),
 	}
@@ -102,7 +102,7 @@ func (svc *roleSvc) Delete(ctx *gin.Context, req *dtotenant.RoleDeleteReq) error
 		return code.GetError(code.RoleNotExistError)
 	}
 	// 内置角色禁止删除（防止系统管理能力失控且 seed 幂等不自动重建）
-	if roleEntity.Source == string(model.RoleSourceBuiltin) {
+	if roleEntity.Source == model.RoleSourceBuiltin {
 		return code.GetError(code.RoleDeleteBuiltinForbiddenError)
 	}
 
@@ -210,9 +210,10 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtotenant.RolePageListReq) (
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID: tenantID,
-		AppID:    req.AppID,
-		Keyword:  req.Keyword,
+		TenantID:   tenantID,
+		AppID:      req.AppID,
+		Keyword:    req.Keyword,
+		Unassigned: req.Unassigned,
 	}
 	roleEntityList, total, err := dao.NewRoleDao().GetPageListByCond(ctx, cond)
 	if err != nil {

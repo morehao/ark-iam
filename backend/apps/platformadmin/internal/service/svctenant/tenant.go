@@ -129,8 +129,8 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 	audit.WriteAudit(ctx, audit.AuditEntry{
 		Action:     audit.ActionTenantCreate,
 		TenantID:   tenantID,
-		Result:     "success",
-		TargetType: "tenant",
+		Result:     model.AuditResultSuccess,
+		TargetType: model.AuditTargetTypeTenant,
 		TargetID:   tenantID,
 	})
 
@@ -208,8 +208,8 @@ func (svc *tenantSvc) ResetAdminPassword(ctx *gin.Context, req *dtotenant.Tenant
 	audit.WriteAudit(ctx, audit.AuditEntry{
 		Action:     audit.ActionTenantAdminPasswordReset,
 		TenantID:   tenantEntity.ID,
-		Result:     "success",
-		TargetType: "user",
+		Result:     model.AuditResultSuccess,
+		TargetType: model.AuditTargetTypeUser,
 		TargetID:   builtinAdmin.ID,
 	})
 	// TODO(delivery): 临时密码目前只能在本响应中回显一次（系统尚无邮件/短信通道）；

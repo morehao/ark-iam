@@ -28,11 +28,23 @@ const (
 	ApplicationGetDetailError      = 100733
 	ApplicationGetPageListError    = 100734
 	ApplicationNotExistError       = 100735
-	ApplicationSystemBuiltInErr    = 100746
+	ApplicationCodeInvalidError    = 100748 // 应用编码须为小写字母开头，仅含小写字母/数字/下划线
+	ApplicationBuiltInErr          = 100746
 	ApplicationSecretCreateError   = 100736
 	ApplicationSecretGetListError  = 100737
 	ApplicationSecretDeleteError   = 100738
 	ApplicationSecretNotExistError = 100739
+)
+
+// 租户应用订阅（tenant_application）
+const (
+	TenantApplicationCreateError      = 100740
+	TenantApplicationUpdateError      = 100741
+	TenantApplicationDeleteError      = 100742
+	TenantApplicationGetDetailError   = 100743
+	TenantApplicationGetPageListError = 100744
+	TenantApplicationNotExistError    = 100745
+	TenantApplicationExistError       = 100747 // 该租户已订阅该应用
 )
 
 const (
@@ -42,7 +54,7 @@ const (
 	ApplicationClientGetDetailError      = 100813
 	ApplicationClientGetPageListError    = 100814
 	ApplicationClientNotExistError       = 100815
-	ApplicationClientSystemBuiltInErr    = 100820
+	ApplicationClientBuiltInErr          = 100820
 	ApplicationClientSecretCreateError   = 100816
 	ApplicationClientSecretGetListError  = 100817
 	ApplicationClientSecretDeleteError   = 100818
@@ -88,7 +100,15 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	ApplicationGetDetailError:             "查看应用详情失败",
 	ApplicationGetPageListError:           "查看应用列表失败",
 	ApplicationNotExistError:              "应用不存在",
-	ApplicationSystemBuiltInErr:           "应用为系统内置，不可删除",
+	ApplicationCodeInvalidError:           "应用编码格式不正确（以小写字母开头，仅含小写字母、数字与下划线）",
+	TenantApplicationCreateError:          "创建租户应用订阅失败",
+	TenantApplicationUpdateError:          "修改租户应用订阅失败",
+	TenantApplicationDeleteError:          "删除租户应用订阅失败",
+	TenantApplicationGetDetailError:       "查看租户应用订阅详情失败",
+	TenantApplicationGetPageListError:     "查看租户应用订阅列表失败",
+	TenantApplicationNotExistError:        "租户应用订阅不存在",
+	TenantApplicationExistError:           "该租户已订阅该应用",
+	ApplicationBuiltInErr:                 "内置应用不可删除",
 	ApplicationSecretCreateError:          "创建应用密钥失败",
 	ApplicationSecretGetListError:         "查看应用密钥列表失败",
 	ApplicationSecretDeleteError:          "删除应用密钥失败",
@@ -99,7 +119,7 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	ApplicationClientGetDetailError:       "查看OAuth客户端详情失败",
 	ApplicationClientGetPageListError:     "查看OAuth客户端列表失败",
 	ApplicationClientNotExistError:        "OAuth客户端不存在",
-	ApplicationClientSystemBuiltInErr:     "OAuth客户端为系统内置，不可删除",
+	ApplicationClientBuiltInErr:           "内置OAuth客户端不可删除",
 	ApplicationClientSecretCreateError:    "创建OAuth客户端密钥失败",
 	ApplicationClientSecretGetListError:   "查看OAuth客户端密钥列表失败",
 	ApplicationClientSecretDeleteError:    "删除OAuth客户端密钥失败",

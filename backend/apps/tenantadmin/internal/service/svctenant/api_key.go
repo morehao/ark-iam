@@ -98,8 +98,8 @@ func (svc *apiKeySvc) Create(ctx *gin.Context, req *dtotenant.ApiKeyCreateReq) (
 	audit.WriteAudit(ctx, audit.AuditEntry{
 		Action:     audit.ActionApiKeyCreate,
 		TenantID:   tenantID,
-		Result:     "success",
-		TargetType: "api_key",
+		Result:     model.AuditResultSuccess,
+		TargetType: model.AuditTargetTypeAPIKey,
 		TargetID:   entity.ID,
 	})
 	return &dtotenant.ApiKeyCreateResp{
@@ -185,8 +185,8 @@ func (svc *apiKeySvc) Revoke(ctx *gin.Context, req *dtotenant.ApiKeyRevokeReq) e
 	audit.WriteAudit(ctx, audit.AuditEntry{
 		Action:     audit.ActionApiKeyRevoke,
 		TenantID:   tenantID,
-		Result:     "success",
-		TargetType: "api_key",
+		Result:     model.AuditResultSuccess,
+		TargetType: model.AuditTargetTypeAPIKey,
 		TargetID:   key.ID,
 	})
 	return nil

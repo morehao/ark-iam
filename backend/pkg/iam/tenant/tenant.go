@@ -98,7 +98,7 @@ func CreateWithRootDept(ctx context.Context, tx *gorm.DB, req *CreateWithRootDep
 		TenantID:  tenantEntity.ID,
 		ParentID:  "",
 		Name:      req.Name,
-		Status:    string(model.DeptNodeStatusActive),
+		Status:    model.DeptNodeStatusEnable,
 		CreatedBy: req.CreatedBy,
 	}
 	if err := dao.NewDepartmentDao().WithTx(tx).Insert(ctx, rootDept); err != nil {

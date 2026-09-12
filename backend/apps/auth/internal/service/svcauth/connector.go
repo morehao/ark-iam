@@ -24,9 +24,20 @@ import (
 )
 
 const (
-	connectorStatusEnabled = "enabled"
-	connectorStateTTL      = 10 * time.Minute
+	connectorStateTTL = 10 * time.Minute
 )
+
+// isValidConnectorStatus 校验连接器状态取值：空值表示「不指定/不修改」，非空必须命中白名单常量。
+// 校验归 service（AGENTS.md 硬规则 3）：DTO 绑定的是前端传来的原始字符串，非法值在此拦截。
+// 取值统一为 enable/disable（见 docs/design/status-source-consistency-design-20260912.md D1）。
+func isValidConnectorStatus(status model.ConnectorStatus) bool {
+	switch status {
+	case "", model.ConnectorStatusEnable, model.ConnectorStatusDisable:
+		return true
+	default:
+		return false
+	}
+}
 
 type ConnectorSvc interface {
 	Create(ctx *gin.Context, req *dtoauth.ConnectorCreateReq) (*dtoauth.ConnectorCreateResp, error)
@@ -151,6 +162,12 @@ func buildConnectorInsertEntity(req *dtoauth.ConnectorCreateReq, tenantID string
 		return nil, fmt.Errorf("marshal domainPolicy fail: %w", err)
 	}
 
+	// status 未指定时落默认值 enable（与列默认值一致，且不依赖驱动回读默认值）
+	status := req.Status
+	if status == "" {
+		status = model.ConnectorStatusEnable
+	}
+
 	return &model.ConnectorEntity{
 		// H11：租户归属一律取自鉴权上下文，不信任请求体 tenantID（防跨租户创建）
 		TenantID:            tenantID,
@@ -158,7 +175,7 @@ func buildConnectorInsertEntity(req *dtoauth.ConnectorCreateReq, tenantID string
 		DisplayName:         req.DisplayName,
 		Protocol:            req.Protocol,
 		Provider:            req.Provider,
-		Status:              req.Status,
+		Status:              status,
 		AllowAutoCreateUser: req.AllowAutoCreateUser,
 		AllowAccountLink:    req.AllowAccountLink,
 		SyncProfile:         req.SyncProfile,
@@ -184,13 +201,12 @@ func buildConnectorUpdateMap(req *dtoauth.ConnectorUpdateReq, updatedBy string) 
 		return nil, fmt.Errorf("marshal domainPolicy fail: %w", err)
 	}
 
-	return map[string]any{
+	updateMap := map[string]any{
 		// 注意：tenant_id 不可更新（连接器归属租户固定，防跨租户迁移）
 		"name":                   req.Name,
 		"display_name":           req.DisplayName,
 		"protocol":               req.Protocol,
 		"provider":               req.Provider,
-		"status":                 req.Status,
 		"allow_auto_create_user": req.AllowAutoCreateUser,
 		"allow_account_link":     req.AllowAccountLink,
 		"sync_profile":           req.SyncProfile,
@@ -199,7 +215,12 @@ func buildConnectorUpdateMap(req *dtoauth.ConnectorUpdateReq, updatedBy string) 
 		"claim_mapping":          claimMapping,
 		"domain_policy":          domainPolicy,
 		"updated_by":             updatedBy,
-	}, nil
+	}
+	// status 留空表示不修改：不写该列，避免把状态覆盖为空串
+	if req.Status != "" {
+		updateMap["status"] = req.Status
+	}
+	return updateMap, nil
 }
 
 // marshalJSON 序列化 JSON 字段；nil / "null" 输出 "{}"。
@@ -218,6 +239,10 @@ func marshalJSON(value any) (json.RawMessage, error) {
 }
 
 func (svc *connectorSvc) Create(ctx *gin.Context, req *dtoauth.ConnectorCreateReq) (*dtoauth.ConnectorCreateResp, error) {
+	if !isValidConnectorStatus(req.Status) {
+		glog.Errorf(ctx, "[svcauth.CreateConnector] 非法连接器状态, req:%s", gutil.ToJsonString(req))
+		return nil, code.GetError(code.ConnectorCreateError)
+	}
 	insertEntity, err := buildConnectorInsertEntity(req, gincontext.GetTenantIDString(ctx), gincontext.GetUserIDString(ctx))
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.CreateConnector] build insert entity fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -252,6 +277,10 @@ func (svc *connectorSvc) Delete(ctx *gin.Context, req *dtoauth.ConnectorDeleteRe
 }
 
 func (svc *connectorSvc) Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateReq) error {
+	if !isValidConnectorStatus(req.Status) {
+		glog.Errorf(ctx, "[svcauth.UpdateConnector] 非法连接器状态, req:%s", gutil.ToJsonString(req))
+		return code.GetError(code.ConnectorUpdateError)
+	}
 	connectorEntity, err := dao.NewConnectorDao().GetByID(ctx, req.ConnectorID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.UpdateConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -413,7 +442,7 @@ func (svc *connectorSvc) Authorize(ctx *gin.Context, req *dtoconnector.Connector
 		glog.Errorf(ctx, "[svcauth.Authorize] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
-	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantIDString(ctx)) || connectorEntity.Status != connectorStatusEnabled {
+	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantIDString(ctx)) || connectorEntity.Status != model.ConnectorStatusEnable {
 		return nil, code.GetError(code.ConnectorNotExistError)
 	}
 	// H12：redirect_uri 必须与本连接器配置的回调地址同源且为 https，
@@ -483,7 +512,7 @@ func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorC
 		glog.Errorf(ctx, "[svcauth.Callback] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
-	if connectorEntity == nil || connectorEntity.ID == "" || connectorEntity.Status != connectorStatusEnabled {
+	if connectorEntity == nil || connectorEntity.ID == "" || connectorEntity.Status != model.ConnectorStatusEnable {
 		return nil, code.GetError(code.ConnectorNotExistError)
 	}
 	driver, config, err := selectDriverForConnector(svc.getDriverRegistry(), connectorEntity)

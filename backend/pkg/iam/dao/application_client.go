@@ -12,8 +12,8 @@ type ApplicationClientCond struct {
 	AppID    string
 	Code     string
 	Name     string
-	Type     string
-	Status   string
+	Source   model.ApplicationClientSource
+	Status   model.ApplicationClientStatus
 }
 
 func (c *ApplicationClientCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -32,8 +32,8 @@ func (c *ApplicationClientCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.Name != "" {
 		db.Where(tableName+".name = ?", c.Name)
 	}
-	if c.Type != "" {
-		db.Where(tableName+".type = ?", c.Type)
+	if c.Source != "" {
+		db.Where(tableName+".source = ?", c.Source)
 	}
 	if c.Status != "" {
 		db.Where(tableName+".status = ?", c.Status)

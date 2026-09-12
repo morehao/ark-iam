@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Button,
   Divider,
@@ -26,8 +26,8 @@ import {
   ThunderboltOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons'
-import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, PageContainer, STATUS_COL_WIDTH, StatusTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
-import { createMenu, deleteMenu, getApplicationPageList, getMenuTree, updateMenu } from '@ark-iam/api'
+import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, PageContainer, RemoteSelect, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
+import { createMenu, deleteMenu, getApplicationDetail, getApplicationPageList, getMenuTree, updateMenu } from '@ark-iam/api'
 import type { ApplicationItem, MenuItem, MenuStatus, MenuType, MenuVisibility } from '@ark-iam/types'
 
 interface MenuFormValues {
@@ -97,9 +97,10 @@ function filterMenuTree(list: MenuItem[], keyword: string): MenuItem[] {
 }
 
 export default function MenuList() {
-  const [apps, setApps] = useState<ApplicationItem[]>([])
-  const [appLoading, setAppLoading] = useState(false)
   const [selectedAppId, setSelectedAppId] = useState<string | undefined>()
+  const [selectedApp, setSelectedApp] = useState<ApplicationItem | null>(null)
+  // 应用搜索结果的本地缓存：切换应用时直接取名称/编码，省掉一次详情请求
+  const appCacheRef = useRef(new Map<string, ApplicationItem>())
 
   const [menuTree, setMenuTree] = useState<MenuItem[]>([])
   const [expandedKeys, setExpandedKeys] = useState<string[]>([])
@@ -113,31 +114,51 @@ export default function MenuList() {
   const [form] = Form.useForm<MenuFormValues>()
   const [submitLoading, setSubmitLoading] = useState(false)
 
-  const selectedApp = useMemo(
-    () => apps.find((a) => a.appID === selectedAppId) || null,
-    [apps, selectedAppId],
-  )
+  // 应用切换器选项：按关键字走服务端搜索（应用可增长，不能只取前 100 条在前端本地过滤）
+  const fetchAppOptions = useCallback(async (keyword: string) => {
+    const resp = await getApplicationPageList({ page: 1, pageSize: 50, name: keyword || undefined })
+    const list = resp?.list || []
+    list.forEach((a) => appCacheRef.current.set(a.appID, a))
+    return list.map((a) => ({ value: a.appID, label: `${a.name}（${a.code}）` }))
+  }, [])
 
-  // 加载应用列表，用于应用切换器
-  const loadApps = useCallback(async () => {
-    setAppLoading(true)
+  // 选中应用：名称/编码优先取搜索缓存；缓存未命中（如上次选择的应用不在已搜索到的结果里）再按 ID 补查详情。
+  // 只有确实拿到了应用才落到 selectedAppId，避免用一个无效 ID 去拉菜单树。
+  const selectApp = useCallback(async (appID: string) => {
+    const cached = appCacheRef.current.get(appID)
+    if (cached) {
+      setSelectedApp(cached)
+      setSelectedAppId(appID)
+      return true
+    }
     try {
-      const resp = await getApplicationPageList({ page: 1, pageSize: 100 })
-      const list = resp?.list || []
-      setApps(list)
-      const saved = localStorage.getItem(STORAGE_KEY) || ""
-      const next = list.find((a) => a.appID === saved) || list[0]
-      setSelectedAppId(next?.appID)
+      const detail = await getApplicationDetail(appID)
+      setSelectedApp(detail)
+      setSelectedAppId(appID)
+      return true
     } catch {
-      /* 拦截器已提示 */
-    } finally {
-      setAppLoading(false)
+      return false
     }
   }, [])
 
+  // 首屏恢复上次选择的应用；恢复失败（应用已删除等）回退到应用列表第一个，避免整页空白
   useEffect(() => {
-    void loadApps()
-  }, [loadApps])
+    void (async () => {
+      const saved = localStorage.getItem(STORAGE_KEY) || ''
+      if (saved && (await selectApp(saved))) return
+      try {
+        const resp = await getApplicationPageList({ page: 1, pageSize: 1 })
+        const first = resp?.list?.[0]
+        if (first) {
+          appCacheRef.current.set(first.appID, first)
+          setSelectedApp(first)
+          setSelectedAppId(first.appID)
+        }
+      } catch {
+        /* 拦截器已提示 */
+      }
+    })()
+  }, [selectApp])
 
   // 按选中应用加载菜单树
   const fetchData = useCallback(async () => {
@@ -159,9 +180,10 @@ export default function MenuList() {
     void fetchData()
   }, [fetchData])
 
-  const handleAppChange = (appID: string) => {
-    setSelectedAppId(appID)
-    localStorage.setItem(STORAGE_KEY, String(appID))
+  const handleAppChange = (appID?: string) => {
+    if (!appID) return
+    localStorage.setItem(STORAGE_KEY, appID)
+    void selectApp(appID)
   }
 
   // 统计当前应用的菜单构成
@@ -337,7 +359,7 @@ export default function MenuList() {
       dataIndex: 'status',
       key: 'status',
       width: STATUS_COL_WIDTH,
-      render: (v: string) => <StatusTag value={v} />,
+      render: (v: string) => <EnableTag value={v} />,
     },
     {
       title: '可见性',
@@ -423,18 +445,13 @@ export default function MenuList() {
       <div className="menu-app-bar">
         <Space size={12}>
           <span className="menu-app-label">所属应用</span>
-          <Select
-            showSearch
-            optionFilterProp="label"
-            loading={appLoading}
-            placeholder="选择应用"
-            style={{ width: 300 }}
+          <RemoteSelect
+            placeholder="选择应用（输入名称搜索）"
+            width={300}
             value={selectedAppId}
             onChange={handleAppChange}
-            options={apps.map((a) => ({
-              value: a.appID,
-              label: `${a.name}（${a.code}）`,
-            }))}
+            fetchOptions={fetchAppOptions}
+            initialLabel={selectedApp ? `${selectedApp.name}（${selectedApp.code}）` : undefined}
           />
           {selectedApp && <Tag color="blue">{selectedApp.code}</Tag>}
         </Space>

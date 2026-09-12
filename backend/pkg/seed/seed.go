@@ -35,8 +35,16 @@ const (
 	// 启动时若命中该编码的平台租户，原地改名（保留主键，避免租户重建导致引用失联）。
 	tenantCodePlatformLegacy = "platform"
 
-	appCodeAdmin       = "platform-admin"
-	appCodeTenantAdmin = "tenant-admin"
+	// 应用编码规则：小写字母开头，仅含小写字母/数字/下划线（model.AppCodePattern），
+	// 与自动生成的租户编码（t_<hex>）同为下划线连接。
+	appCodeAdmin       = "platform_admin"
+	appCodeTenantAdmin = "tenant_admin"
+
+	// appCodeAdminLegacy / appCodeTenantAdminLegacy 历史种子编码（旧版本为连字符形态）。
+	// 启动时若命中旧编码，原地改名（保留主键，避免改编码规则后重复建出第二个内置应用——
+	// 菜单、租户订阅、角色都挂在 app_id 上）。
+	appCodeAdminLegacy       = "platform-admin"
+	appCodeTenantAdminLegacy = "tenant-admin"
 
 	oauthClientPlatformAdminWeb = "platform-admin-web"
 	oauthClientTenantAdminWeb   = "tenant-admin-web"
@@ -70,12 +78,12 @@ func SeedIam(ctx context.Context, db *gorm.DB) error {
 		return err
 	}
 
-	// 3. 应用
-	adminApp, err := getOrCreateApplication(ctx, db, appCodeAdmin, "管理后台", "平台管理后台应用", 0, true)
+	// 3. 应用（历史库的连字符编码由 getOrCreateApplication 原地改名）
+	adminApp, err := getOrCreateApplication(ctx, db, appCodeAdmin, appCodeAdminLegacy, "管理后台", "平台管理后台应用", 0, model.AppSourceBuiltin)
 	if err != nil {
 		return err
 	}
-	tenantAdminApp, err := getOrCreateApplication(ctx, db, appCodeTenantAdmin, "租户自服务", "租户自服务控制台应用", 1, false)
+	tenantAdminApp, err := getOrCreateApplication(ctx, db, appCodeTenantAdmin, appCodeTenantAdminLegacy, "租户自服务", "租户自服务控制台应用", 1, model.AppSourceBuiltin)
 	if err != nil {
 		return err
 	}
@@ -105,7 +113,7 @@ func SeedIam(ctx context.Context, db *gorm.DB) error {
 		return err
 	}
 
-	// 8. 租户应用订阅（管理后台 platform-admin；租户自服务 tenant-admin 由第 10 步开通时订阅）
+	// 8. 租户应用订阅（管理后台 platform_admin；租户自服务 tenant_admin 由第 10 步开通时订阅）
 	if err := seedTenantApplications(ctx, db, tenant, adminApp); err != nil {
 		return err
 	}
@@ -217,7 +225,7 @@ func seedRootDepartment(ctx context.Context, db *gorm.DB, tenant *model.TenantEn
 	dept = &model.DepartmentEntity{
 		TenantID: tenant.ID,
 		Name:     tenant.Name,
-		Status:   string(model.DeptNodeStatusActive),
+		Status:   model.DeptNodeStatusEnable,
 	}
 	if err := db.WithContext(ctx).Create(dept).Error; err != nil {
 		return nil, fmt.Errorf("seed root department create fail: %w", err)
@@ -232,23 +240,72 @@ func seedRootDepartment(ctx context.Context, db *gorm.DB, tenant *model.TenantEn
 	return dept, nil
 }
 
-func getOrCreateApplication(ctx context.Context, db *gorm.DB, code, name, desc string, sort int, isSystem bool) (*model.ApplicationEntity, error) {
+// findApplicationByCode 按编码查应用；不存在返回 (nil, nil)，系统错误返回 (nil, err)。
+func findApplicationByCode(db *gorm.DB, code string) (*model.ApplicationEntity, error) {
 	entity := &model.ApplicationEntity{}
 	err := db.Where("code = ?", code).First(entity).Error
 	if err == nil {
 		return entity, nil
 	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, fmt.Errorf("seed application %s query fail: %w", code, err)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return nil, fmt.Errorf("seed application query fail (code=%s): %w", code, err)
+}
+
+// getOrCreateApplication 幂等获取内置应用。
+// legacyCode 非空时，把历史库的旧编码（连字符形态）原地改名为新编码：
+// 编码是应用的业务唯一键，改名不影响任何以 app_id 关联的菜单/订阅/角色。
+func getOrCreateApplication(ctx context.Context, db *gorm.DB, code, legacyCode, name, desc string, sort int, source model.AppSource) (*model.ApplicationEntity, error) {
+	entity, err := findApplicationByCode(db, code)
+	if err != nil {
+		return nil, err
+	}
+	if legacyCode != "" {
+		legacy, lErr := findApplicationByCode(db, legacyCode)
+		if lErr != nil {
+			return nil, lErr
+		}
+		switch {
+		case legacy == nil:
+			// 正常路径：旧编码不存在（全新库或已迁移过）
+		case entity != nil:
+			// 新旧编码并存：无法判断哪一行才是内置应用。此时回填 source 会把用户自建应用
+			// 改写成内置（获得删除保护并接管菜单范围），故宁可中断启动，交人工确认后删除其一。
+			return nil, fmt.Errorf("seed application code conflict: %q 与 %q 同时存在，请人工确认哪一行是内置应用并删除另一行", code, legacyCode)
+		default:
+			// 历史库编码迁移（platform-admin -> platform_admin）
+			if uErr := db.WithContext(ctx).Model(&model.ApplicationEntity{}).Where("id = ?", legacy.ID).
+				Update("code", code).Error; uErr != nil {
+				return nil, fmt.Errorf("seed application code migrate fail (%s -> %s): %w", legacyCode, code, uErr)
+			}
+			legacy.Code = code
+			glog.Infof(ctx, "[seed] application code migrated (%s -> %s), id:%s", legacyCode, code, legacy.ID)
+			entity = legacy
+		}
+	}
+	if entity != nil {
+		// 幂等回填 source：存量库的 source 是 AutoMigrate 补列时按列默认值 third_party 落下的，
+		// 会把管理后台/租户自服务误判为第三方接入（前者丢删除保护、后者菜单还会串进租户控制台），
+		// 故种子启动时按定义原地纠正。只回填 source —— name/description/sort/status 在控制台可改，
+		// 种子不得覆盖运维改动。
+		if entity.Source != source {
+			if uErr := db.WithContext(ctx).Model(&model.ApplicationEntity{}).Where("id = ?", entity.ID).
+				Update("source", source).Error; uErr != nil {
+				return nil, fmt.Errorf("seed application %s source backfill fail: %w", code, uErr)
+			}
+			glog.Infof(ctx, "[seed] application source backfilled (%s -> %s), code:%s", entity.Source, source, code)
+			entity.Source = source
+		}
+		return entity, nil
 	}
 	entity = &model.ApplicationEntity{
 		Code:        code,
 		Name:        name,
 		Description: desc,
-		Type:        model.AppTypeFirstParty,
+		Source:      source,
 		Status:      model.AppStatusEnable,
 		Sort:        sort,
-		IsSystem:    isSystem,
 	}
 	if err := db.WithContext(ctx).Create(entity).Error; err != nil {
 		return nil, fmt.Errorf("seed application %s create fail: %w", code, err)
@@ -271,7 +328,7 @@ func seedRoles(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adm
 	}
 
 	entity := &model.RoleEntity{}
-	err := db.Where("tenant_id = ? AND app_id = ? AND source = ?", tenant.ID, adminApp.ID, string(model.RoleSourceBuiltin)).First(entity).Error
+	err := db.Where("tenant_id = ? AND app_id = ? AND source = ?", tenant.ID, adminApp.ID, model.RoleSourceBuiltin).First(entity).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("seed admin role query fail: %w", err)
 	}
@@ -281,7 +338,7 @@ func seedRoles(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adm
 			AppID:       adminApp.ID,
 			Name:        "管理员",
 			Description: "系统管理员，拥有所有权限",
-			Source:      string(model.RoleSourceBuiltin),
+			Source:      model.RoleSourceBuiltin,
 			AdminType:   adminType,
 		}
 		if err := db.WithContext(ctx).Create(entity).Error; err != nil {
@@ -439,7 +496,7 @@ func seedRoleMenus(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity,
 	return nil
 }
 
-// seedTenantApplications 写入管理后台的应用订阅；租户自服务（tenant-admin）的订阅
+// seedTenantApplications 写入管理后台的应用订阅；租户自服务（tenant_admin）的订阅
 // 由 pkg/iam/tenant.ProvisionTenantAdmin 统一写入。
 func seedTenantApplications(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, apps ...*model.ApplicationEntity) error {
 	for _, app := range apps {
@@ -451,7 +508,7 @@ func seedTenantApplications(ctx context.Context, db *gorm.DB, tenant *model.Tena
 		if count > 0 {
 			continue
 		}
-		ta := &model.TenantApplicationEntity{TenantID: tenant.ID, AppID: app.ID, Status: model.AppStatusEnable, Config: []byte(`{}`), GrantedScope: []byte(`[]`)}
+		ta := &model.TenantApplicationEntity{TenantID: tenant.ID, AppID: app.ID, Status: model.TenantApplicationStatusEnable, Config: []byte(`{}`), GrantedScope: []byte(`[]`)}
 		if err := db.WithContext(ctx).Create(ta).Error; err != nil {
 			return fmt.Errorf("seed tenant_application create fail: %w", err)
 		}
@@ -609,6 +666,17 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, tenant *model.TenantEntit
 		entity := &model.ApplicationClientEntity{}
 		err := db.Where("code = ?", def.code).First(entity).Error
 		if err == nil {
+			// 幂等回填 source：同 getOrCreateApplication，存量库补列默认 third_party，
+			// 而种子客户端是平台内置客户端，必须纠正为 builtin，否则失去删除保护。
+			// 其余字段（回调地址/名称等）在控制台可改，种子不覆盖。
+			if entity.Source != model.ApplicationClientSourceBuiltin {
+				if uErr := db.WithContext(ctx).Model(&model.ApplicationClientEntity{}).Where("id = ?", entity.ID).
+					Update("source", model.ApplicationClientSourceBuiltin).Error; uErr != nil {
+					return fmt.Errorf("seed oauth client %s source backfill fail: %w", def.code, uErr)
+				}
+				glog.Infof(ctx, "[seed] oauth client source backfilled (%s -> %s), code:%s",
+					entity.Source, model.ApplicationClientSourceBuiltin, def.code)
+			}
 			continue
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -627,9 +695,8 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, tenant *model.TenantEntit
 			TokenEndpointAuthMethod: "none",
 			RequirePKCE:             true,
 			DefaultScopes:           []byte(`["openid","profile","email"]`),
-			Type:                    model.AppTypeFirstParty,
-			Status:                  model.AppStatusEnable,
-			IsSystem:                true,
+			Source:                  model.ApplicationClientSourceBuiltin,
+			Status:                  model.ApplicationClientStatusEnable,
 		}
 		if err := db.WithContext(ctx).Create(entity).Error; err != nil {
 			return fmt.Errorf("seed oauth client %s create fail: %w", def.code, err)

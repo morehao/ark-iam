@@ -17,7 +17,7 @@ type RolePageListItem struct {
 	AppName     string             `json:"appName"`     // 所属应用名称
 	Name        string             `json:"name"`        // 角色名称
 	Description string             `json:"description"` // 角色描述
-	Source      string             `json:"source"`      // 角色来源(builtin/custom)
+	Source      model.RoleSource   `json:"source"`      // 角色来源(builtin/custom)
 	AdminType   model.SysAdminType `json:"adminType"`   // 系统管理类型(admin/normal)
 	MemberCount int64              `json:"memberCount"` // 成员数
 	MenuCount   int64              `json:"menuCount"`   // 授权菜单数
@@ -31,7 +31,7 @@ type RoleDetailResp struct {
 	AppName     string             `json:"appName"`     // 所属应用名称
 	Name        string             `json:"name"`        // 角色名称
 	Description string             `json:"description"` // 角色描述
-	Source      string             `json:"source"`      // 角色来源(builtin/custom)
+	Source      model.RoleSource   `json:"source"`      // 角色来源(builtin/custom)
 	AdminType   model.SysAdminType `json:"adminType"`   // 系统管理类型(admin/normal)
 	MemberCount int64              `json:"memberCount"` // 成员数
 	MenuCount   int64              `json:"menuCount"`   // 授权菜单数

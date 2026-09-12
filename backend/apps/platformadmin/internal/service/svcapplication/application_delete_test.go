@@ -21,13 +21,14 @@ func newDeleteCtx(userID string) *gin.Context {
 	return ctx
 }
 
-func TestDeleteSystemApplication(t *testing.T) {
+// TestDeleteBuiltInApplication：source=builtin（管理后台）禁删。
+func TestDeleteBuiltInApplication(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ApplicationEntity{})
 
 	entity := &model.ApplicationEntity{
-		Code:     "admin",
-		Name:     "管理后台",
-		IsSystem: true,
+		Code:   "admin",
+		Name:   "管理后台",
+		Source: model.AppSourceBuiltin,
 	}
 	if err := db.Create(entity).Error; err != nil {
 		t.Fatalf("seed: %v", err)
@@ -36,20 +37,43 @@ func TestDeleteSystemApplication(t *testing.T) {
 	svc := NewApplicationSvc()
 	err := svc.Delete(newDeleteCtx("0"), &dtoapplication.ApplicationDeleteReq{AppID: entity.ID})
 	if err == nil {
-		t.Fatal("expected error for system-built-in application")
+		t.Fatal("expected error for built-in application")
 	}
-	if gerror.GetCode(err) != int(code.ApplicationSystemBuiltInErr) {
-		t.Fatalf("expected ApplicationSystemBuiltInErr, got %v", err)
+	if gerror.GetCode(err) != int(code.ApplicationBuiltInErr) {
+		t.Fatalf("expected ApplicationBuiltInErr, got %v", err)
 	}
 }
 
-func TestDeleteNonSystemApplication(t *testing.T) {
+// TestDeleteFirstPartyApplication：source=first_party（平台自建但非内置）可删——
+// 删 is_system 后这类应用不得被误判为内置而拒绝删除。注意：种子的两个控制台应用都是 builtin，
+// first_party 目前只可能来自运维自建（见 docs/design/application-source-rename.md §14）。
+func TestDeleteFirstPartyApplication(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ApplicationEntity{})
 
 	entity := &model.ApplicationEntity{
-		Code:     "blog",
-		Name:     "博客",
-		IsSystem: false,
+		Code:   "ops-app",
+		Name:   "运维自建应用",
+		Source: model.AppSourceFirstParty,
+	}
+	if err := db.Create(entity).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	ctx := newDeleteCtx("7")
+	svc := NewApplicationSvc()
+	if err := svc.Delete(ctx, &dtoapplication.ApplicationDeleteReq{AppID: entity.ID}); err != nil {
+		t.Fatalf("Delete returned error: %v", err)
+	}
+}
+
+// TestDeleteThirdPartyApplication：source=third_party 可删，且删除人写入上下文用户。
+func TestDeleteThirdPartyApplication(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{})
+
+	entity := &model.ApplicationEntity{
+		Code:   "blog",
+		Name:   "博客",
+		Source: model.AppSourceThirdParty,
 	}
 	if err := db.Create(entity).Error; err != nil {
 		t.Fatalf("seed: %v", err)

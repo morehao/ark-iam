@@ -8,6 +8,24 @@ export type SysAdminType = 'admin' | 'normal'
 
 // ---------- 部门 ----------
 // ---------- 应用 ----------
+/**
+ * 应用/客户端来源（后端 model.AppSource / model.ApplicationClientSource）：
+ * builtin-内置（平台随产品交付的控制台应用：管理后台 / 租户自服务，受删除保护）、
+ * first_party-第一方受控应用（平台自建但非内置，当前由运维产生）、third_party-第三方接入。
+ * 控制台创建的资源恒为 third_party；builtin / first_party 只能由种子与运维产生。
+ */
+export type AppSource = 'builtin' | 'first_party' | 'third_party'
+
+/**
+ * 启停状态（后端具名类型 model.AppStatus / ApplicationClientStatus / TenantApplicationStatus）。
+ * 取值与后端常量一一对应，禁止在页面里裸写字面量。
+ */
+export type AppStatus = 'enable' | 'disable'
+export type ApplicationClientStatus = 'enable' | 'disable'
+export type TenantApplicationStatus = 'enable' | 'disable'
+/** 连接器状态（后端具名类型 model.ConnectorStatus）：全局启停语义 enable/disable */
+export type ConnectorStatus = 'enable' | 'disable'
+
 export interface ApplicationItem {
   appID: string
   code: string
@@ -15,9 +33,8 @@ export interface ApplicationItem {
   description: string
   logoUrl: string
   homepageUrl: string
-  type: string
-  status: string
-  visibility: string
+  source: AppSource
+  status: AppStatus
   sort: number
   allowPersonCreateTenant?: boolean
   allowJoinByInvite?: boolean
@@ -31,8 +48,6 @@ export interface ApplicationCreateReq {
   description?: string
   logoUrl?: string
   homepageUrl?: string
-  type?: string
-  visibility: string
   sort?: number
   allowPersonCreateTenant?: boolean
   allowJoinByInvite?: boolean
@@ -44,9 +59,7 @@ export interface ApplicationUpdateReq {
   description?: string
   logoUrl?: string
   homepageUrl?: string
-  type?: string
-  visibility?: string
-  status?: string
+  status?: AppStatus
   sort?: number
   allowPersonCreateTenant?: boolean
   allowJoinByInvite?: boolean
@@ -58,9 +71,8 @@ export interface OAuthClientItem {
   appID: string
   clientID: string
   name: string
-  type: string
-  status: string
-  isThirdParty: number
+  source: AppSource
+  status: ApplicationClientStatus
   grantTypes: string[]
   tokenEndpointAuthMethod: string
   createdAt?: number
@@ -84,8 +96,6 @@ export interface OAuthClientDetail extends OAuthClientItem {
 export interface OAuthClientCreateReq {
   appID: string
   name: string
-  type?: string
-  isThirdParty?: number
   redirectURIs?: string[]
   postLogoutRedirectURIs?: string[]
   grantTypes?: string[]
@@ -102,9 +112,7 @@ export interface OAuthClientCreateReq {
 export interface OAuthClientUpdateReq {
   applicationClientID: string
   name?: string
-  type?: string
-  status?: string
-  isThirdParty?: number
+  status?: ApplicationClientStatus
   redirectURIs?: string[]
   postLogoutRedirectURIs?: string[]
   grantTypes?: string[]
@@ -203,8 +211,10 @@ export interface TenantUpdateReq {
 export interface TenantApplicationItem {
   tenantAppID: string
   tenantID: string
+  tenantName?: string
   appID: string
-  status: string
+  appName?: string
+  status: TenantApplicationStatus
   config?: string
   grantedScope?: string
   createdAt?: number
@@ -212,15 +222,16 @@ export interface TenantApplicationItem {
 }
 
 export interface TenantApplicationCreateReq {
+  tenantID: string
   appID: string
-  status?: string
+  status?: TenantApplicationStatus
   config?: string
   grantedScope?: string
 }
 
 export interface TenantApplicationUpdateReq {
   tenantAppID: string
-  status?: string
+  status?: TenantApplicationStatus
   config?: string
   grantedScope?: string
 }
@@ -288,7 +299,7 @@ export interface ConnectorItem {
   displayName: string
   protocol: string
   provider: string
-  status: string
+  status: ConnectorStatus
   allowAutoCreateUser: number
   allowAccountLink: number
   syncProfile: number

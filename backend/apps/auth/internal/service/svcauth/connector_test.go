@@ -178,7 +178,7 @@ func TestBuildConnectorInsertEntityKeepsLegacyBusinessIdentifier(t *testing.T) {
 			DisplayName:         "Google Workspace",
 			Protocol:            "oidc",
 			Provider:            "google",
-			Status:              "enabled",
+			Status:              model.ConnectorStatusEnable,
 			AllowAutoCreateUser: true,
 			AllowAccountLink:    true,
 			SyncProfile:         true,
@@ -218,7 +218,7 @@ func TestBuildConnectorInsertEntityDoesNotPersistLegacyMetadataAsClaimMapping(t 
 			DisplayName:         "Google Workspace",
 			Protocol:            "oidc",
 			Provider:            "google",
-			Status:              "enabled",
+			Status:              model.ConnectorStatusEnable,
 			AllowAutoCreateUser: true,
 			AllowAccountLink:    true,
 			SyncProfile:         true,
@@ -256,7 +256,7 @@ func TestBuildConnectorUpdateMapDoesNotWritePrimaryKeyIntoNameFields(t *testing.
 			DisplayName:         "Google Workspace",
 			Protocol:            "oidc",
 			Provider:            "google",
-			Status:              "enabled",
+			Status:              model.ConnectorStatusEnable,
 			AllowAutoCreateUser: true,
 			AllowAccountLink:    true,
 			SyncProfile:         true,
@@ -676,7 +676,7 @@ func TestConnectorServiceAuthorizeStoresStateAndReturnsAuthorizationURL(t *testi
 		Name:     "github-sso",
 		Protocol: connectorDriverTypeOAuth2,
 		Provider: connectorProviderGithub,
-		Status:   connectorStatusEnabled,
+		Status:   model.ConnectorStatusEnable,
 		Config:   json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
 	}
 	connectorEntity.ID = "101"
@@ -783,7 +783,7 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 		Name:     "github-sso",
 		Protocol: connectorDriverTypeOAuth2,
 		Provider: connectorProviderGithub,
-		Status:   connectorStatusEnabled,
+		Status:   model.ConnectorStatusEnable,
 		Config:   json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
 	}
 	connectorEntity.ID = "101"
@@ -896,7 +896,7 @@ func TestConnectorServiceCallbackAllowsMissingConnectorID(t *testing.T) {
 		Name:     "github-sso",
 		Protocol: connectorDriverTypeOAuth2,
 		Provider: connectorProviderGithub,
-		Status:   connectorStatusEnabled,
+		Status:   model.ConnectorStatusEnable,
 		Config:   json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
 	}
 	connectorEntity.ID = "101"
@@ -1002,7 +1002,7 @@ func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 		TenantID:            "22",
 		Protocol:            connectorDriverTypeOAuth2,
 		Provider:            connectorProviderGithub,
-		Status:              connectorStatusEnabled,
+		Status:              model.ConnectorStatusEnable,
 		AllowAutoCreateUser: true,
 		Config:              json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
 	}
@@ -1098,7 +1098,7 @@ func TestConnectorCallbackInvokesIdentityResolverTokenGeneratorAndLoginRecorder(
 		TenantID:            "66",
 		Protocol:            connectorDriverTypeOAuth2,
 		Provider:            connectorProviderGithub,
-		Status:              connectorStatusEnabled,
+		Status:              model.ConnectorStatusEnable,
 		AllowAutoCreateUser: true,
 		Config:              json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
 	}
@@ -1195,7 +1195,7 @@ func TestConnectorServiceCallbackRetainsStateWhenDriverExchangeFails(t *testing.
 		TenantID: "22",
 		Protocol: connectorDriverTypeOAuth2,
 		Provider: connectorProviderGithub,
-		Status:   connectorStatusEnabled,
+		Status:   model.ConnectorStatusEnable,
 		Config:   json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
 	}
 	conn.ID = "101"

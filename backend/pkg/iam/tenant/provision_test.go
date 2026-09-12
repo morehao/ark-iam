@@ -34,7 +34,7 @@ func newProvisionTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-// seedTenantAdminApp 写入 tenant-admin 应用与指定菜单（模拟 pkg/seed 的全局种子数据）。
+// seedTenantAdminApp 写入 tenant_admin 应用与指定菜单（模拟 pkg/seed 的全局种子数据）。
 func seedTenantAdminApp(t *testing.T, db *gorm.DB, menuCodes ...string) *model.ApplicationEntity {
 	t.Helper()
 	ctx := context.Background()
@@ -75,13 +75,13 @@ func TestProvisionTenantAdmin_CreatesSubscriptionRoleMenusAndGrant(t *testing.T)
 	require.NotNil(t, role)
 	require.Equal(t, ProvisionRoleName, role.Name)
 	require.Equal(t, app.ID, role.AppID)
-	require.Equal(t, string(model.RoleSourceBuiltin), role.Source)
+	require.Equal(t, model.RoleSourceBuiltin, role.Source)
 	require.Equal(t, ProvisionAdminType, role.AdminType)
 	require.True(t, role.IsBuiltinAdmin())
 
 	// 应用订阅 1 + 角色 1 + 授权 4 + 管理员绑定 1
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.TenantApplicationEntity{}, "tenant_id = ? AND app_id = ?", "t1", app.ID))
-	require.Equal(t, int64(1), countProvisionRows(t, db, &model.RoleEntity{}, "tenant_id = ? AND app_id = ? AND source = ?", "t1", app.ID, string(model.RoleSourceBuiltin)))
+	require.Equal(t, int64(1), countProvisionRows(t, db, &model.RoleEntity{}, "tenant_id = ? AND app_id = ? AND source = ?", "t1", app.ID, model.RoleSourceBuiltin))
 	require.Equal(t, int64(len(ProvisionMenuCodes)), countProvisionRows(t, db, &model.RoleMenuEntity{}, "tenant_id = ? AND role_id = ?", "t1", role.ID))
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.UserRoleEntity{}, "tenant_id = ? AND user_id = ? AND role_id = ?", "t1", "u1", role.ID))
 
@@ -117,7 +117,7 @@ func TestProvisionTenantAdmin_BackfillsAdminType(t *testing.T) {
 
 	// 存量脏数据：内置角色被改错系统管理类型
 	legacy := &model.RoleEntity{TenantID: "t1", AppID: app.ID, Name: ProvisionRoleName,
-		Source: string(model.RoleSourceBuiltin), AdminType: model.SysAdminTypeNormal}
+		Source: model.RoleSourceBuiltin, AdminType: model.SysAdminTypeNormal}
 	require.NoError(t, db.WithContext(ctx).Create(legacy).Error)
 
 	role, err := ProvisionTenantAdmin(ctx, db, &ProvisionTenantAdminReq{TenantID: "t1"})

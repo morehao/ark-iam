@@ -92,7 +92,7 @@
 | A1 | `POST /v1/platform/tenants` 缺 `admin` 或邮箱/手机都为空时报错；成功后返回 `tenantID` + `adminUserID` + `adminInitialPassword` | 接口联调 + `svctenant` 单测 | 后端 |
 | A2 | 建租户后：`tenant_user.source=builtin`、`user_type=member`、`person_id` 非空、部门归属为租户根部门（primary） | `platformadmin/testutil.SetupSQLite` 单测逐项断言 | 后端 |
 | A3 | 用响应中的 `adminInitialPassword` 明文校验 person 密码哈希通过；该密码满足 `ValidateStrength`；再查任意接口都**取不回**该明文 | `pkg/iam/password` + `svctenant` 单测（`gcrypto.ComparePasswordHash`） | 后端 |
-| A4 | 新建租户存在 1 条 `tenant_application`(tenant-admin)、1 条 builtin `tenant_admin` 角色（`admin_type=admin`）、4 条 `role_menu`、1 条指向管理员的 `user_role` | 单测计数断言；重复调用后计数不变 | 后端 |
+| A4 | 新建租户存在 1 条 `tenant_application`(tenant_admin)、1 条 builtin `tenant_admin` 角色（`admin_type=admin`）、4 条 `role_menu`、1 条指向管理员的 `user_role` | 单测计数断言；重复调用后计数不变 | 后端 |
 | A5 | 该管理员登录租户控制台可见 4 个菜单，且对部门/用户/角色写接口通过 `requireSystemAdmin` | 前端联调 | 后端 + 前端 |
 | A6 | 持临时密码首次登录：`/oidc/login` 返回 `requiresPasswordChange=true`，无 `continueURL`/`sessionID`；调 `/oidc/login/changePassword` 成功后再次登录才拿到 code | `svcoidc` 单测 + 路由冒烟测试 | 后端 |
 | A7 | 强制改密页拒绝弱密码与"新旧相同"；改密成功后 `person.must_change_password=false` | `svcoidc` 单测 | 后端 |
@@ -546,7 +546,7 @@ func Create(ctx context.Context, tx *gorm.DB, req *CreateReq) (*model.UserEntity
 ```go
 // 内置定义（单一事实源，seed 与建租户共用）
 const (
-    ProvisionAppCode    = "tenant-admin"  // 租户自服务应用
+    ProvisionAppCode    = "tenant_admin"  // 租户自服务应用（编码规则：下划线连接，见 application-source-rename.md §15）
     ProvisionRoleName   = "租户管理员"     // 内置租户管理员角色（角色无业务编码，(tenant_id, app_id, source=builtin) 即其幂等键）
     ProvisionRoleDesc   = "租户自服务应用管理员，拥有全部租户自服务权限"
     ProvisionAdminType = model.SysAdminTypeAdmin
@@ -563,8 +563,8 @@ func ProvisionTenantAdmin(ctx context.Context, tx *gorm.DB, req *ProvisionTenant
 ```
 
 步骤（全部在调用方事务内，逐步应用层查重后 upsert，幂等）：
-1. 按 `code=tenant-admin` 查应用；不存在则返回错误（应用/菜单是全局种子数据，缺失说明种子未跑完，属系统错误，不静默跳过）。
-2. upsert `tenant_application(tenant_id, app_id=tenant-admin, status=enable, config='{}', granted_scope='[]')`。
+1. 按 `code=tenant_admin` 查应用；不存在则返回错误（应用/菜单是全局种子数据，缺失说明种子未跑完，属系统错误，不静默跳过）。
+2. upsert `tenant_application(tenant_id, app_id=tenant_admin, status=enable, config='{}', granted_scope='[]')`。
 3. upsert `role(tenant_id, app_id, source=builtin, admin_type=admin, name/description)`（角色无业务编码，`(tenant_id, app_id, source=builtin)` 即内置角色幂等键）。
 4. 按 `app_id + code` 取 4 个菜单，逐个 upsert `role_menu(tenant_id, role_id, menu_id)`；缺失菜单仅 `glog.Warnf` 跳过（菜单可能被下线，不应阻断建租户）。
 5. `GrantUserID != ""` 时 upsert `user_role(tenant_id, user_id, role_id)`。

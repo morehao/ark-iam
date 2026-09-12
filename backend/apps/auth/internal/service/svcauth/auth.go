@@ -134,8 +134,8 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 	if svcloginguard.Check(ctx, ip, personEntity.ID) {
 		audit.WriteAudit(ctx, audit.AuditEntry{
 			Action:     audit.ActionLogin,
-			Result:     "failure",
-			TargetType: "person",
+			Result:     model.AuditResultFailure,
+			TargetType: model.AuditTargetTypePerson,
 			Detail:     fmt.Sprintf("personID:%s, reason:login locked", personEntity.ID),
 		})
 		return nil, nil, code.GetError(code.LoginLockedError)
@@ -144,8 +144,8 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 	if personEntity.IsSuspended {
 		audit.WriteAudit(ctx, audit.AuditEntry{
 			Action:     audit.ActionLogin,
-			Result:     "failure",
-			TargetType: "person",
+			Result:     model.AuditResultFailure,
+			TargetType: model.AuditTargetTypePerson,
 			Detail:     fmt.Sprintf("personID:%s, reason:suspended", personEntity.ID),
 		})
 		return nil, nil, code.GetError(code.UserSuspendedError)
@@ -154,8 +154,8 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 	if personEntity.PasswordEncrypted == "" {
 		audit.WriteAudit(ctx, audit.AuditEntry{
 			Action:     audit.ActionLogin,
-			Result:     "failure",
-			TargetType: "person",
+			Result:     model.AuditResultFailure,
+			TargetType: model.AuditTargetTypePerson,
 			Detail:     fmt.Sprintf("personID:%s, reason:password not set", personEntity.ID),
 		})
 		return nil, nil, code.GetError(code.PasswordNotSetError)
@@ -243,7 +243,7 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 		userID = userEntity.ID
 		// 标记邀请已使用
 		if uErr := dao.NewInviteDao().WithTx(tx).UpdateMap(ctx.Request.Context(), inviteEntity.ID, map[string]any{
-			"status":     string(model.InviteStatusAccepted),
+			"status":     model.InviteStatusAccepted,
 			"updated_by": personID,
 		}); uErr != nil {
 			return uErr
@@ -268,8 +268,8 @@ func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
 		// H13：登出动作记录审计
 		audit.WriteAudit(ctx, audit.AuditEntry{
 			Action:     audit.ActionLogout,
-			Result:     "success",
-			TargetType: "person",
+			Result:     model.AuditResultSuccess,
+			TargetType: model.AuditTargetTypePerson,
 			TargetID:   personID,
 		})
 		if err := newAuthRefreshTokenStore().RevokeByPersonID(ctx.Request.Context(), personID); err != nil {
@@ -381,8 +381,8 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 	if err != nil {
 		audit.WriteAudit(ctx, audit.AuditEntry{
 			Action:     audit.ActionLogin,
-			Result:     "failure",
-			TargetType: "person",
+			Result:     model.AuditResultFailure,
+			TargetType: model.AuditTargetTypePerson,
 			Detail:     fmt.Sprintf("identifier:%s, reason:user lookup error", identifier),
 		})
 		glog.Errorf(ctx, "[svcauth.resolvePersonLogin] person dao GetByCond fail, err:%v", err)
@@ -394,8 +394,8 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 		svcloginguard.RecordFailure(ctx, gincontext.GetClientIP(ctx), "")
 		audit.WriteAudit(ctx, audit.AuditEntry{
 			Action:     audit.ActionLogin,
-			Result:     "failure",
-			TargetType: "person",
+			Result:     model.AuditResultFailure,
+			TargetType: model.AuditTargetTypePerson,
 			Detail:     fmt.Sprintf("identifier-hash:%s, reason:auth failed", hashIdentifier(identifier)),
 		})
 		return nil, nil, nil, code.GetError(code.AuthLoginFailedError)
@@ -413,8 +413,8 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 	if userEntity.IsSuspended {
 		audit.WriteAudit(ctx, audit.AuditEntry{
 			Action:     audit.ActionLogin,
-			Result:     "failure",
-			TargetType: "person",
+			Result:     model.AuditResultFailure,
+			TargetType: model.AuditTargetTypePerson,
 			Detail:     fmt.Sprintf("userID:%s, reason:suspended", userEntity.ID),
 		})
 		return nil, nil, nil, code.GetError(code.UserSuspendedError)
@@ -493,8 +493,8 @@ func (svc *authSvc) listPersonTenants(ctx *gin.Context, personID string) (*model
 		// 租户确实存在但全部被挂起：明确拒绝，不与"零租户可自助建租户"路径混同。
 		audit.WriteAudit(ctx, audit.AuditEntry{
 			Action:     audit.ActionLogin,
-			Result:     "failure",
-			TargetType: "person",
+			Result:     model.AuditResultFailure,
+			TargetType: model.AuditTargetTypePerson,
 			Detail:     fmt.Sprintf("personID:%s, reason:all tenants suspended", personID),
 		})
 		return nil, nil, code.GetError(code.TenantSuspendedError)
@@ -545,15 +545,15 @@ func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID string, success bo
 		}
 	}
 
-	result := "failure"
+	result := model.AuditResultFailure
 	if success {
-		result = "success"
+		result = model.AuditResultSuccess
 	}
 	audit.WriteAudit(ctx, audit.AuditEntry{
 		Action:     audit.ActionLogin,
 		TenantID:   tenantID,
 		Result:     result,
-		TargetType: "person",
+		TargetType: model.AuditTargetTypePerson,
 		TargetID:   userID,
 		Detail:     fmt.Sprintf("userID:%s", userID),
 	})

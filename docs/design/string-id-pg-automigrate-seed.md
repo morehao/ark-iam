@@ -93,7 +93,7 @@ func AutoMigrateAll(db *gorm.DB) error {
 
 `pkg/seed/seed.go`：以 Go 代码取代历史 MySQL 方言种子脚本 `scripts/sql/iam_seed_data.sql`（已废弃删除）。
 
-- **写入内容**：平台租户、顶级部门、应用（admin/tenant-admin）、角色（admin/user/guest）、
+- **写入内容**：平台租户、顶级部门、应用（platform_admin/tenant_admin）、角色（admin/user/guest）、
   资源与 12 个 scope、角色-scope 关联、15 个菜单、角色-menu 关联、租户应用订阅、
   管理员账号（`admin / admin123`）、两个 OIDC 测试客户端。
 - **用户必属部门**：用户必须从属于某个部门（部门节点），种子管理员同样从属于

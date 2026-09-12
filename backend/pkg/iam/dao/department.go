@@ -12,7 +12,7 @@ type DepartmentCond struct {
 	ParentID string
 	// DeptPath 子树条件（含自身）：dept_path = X OR dept_path LIKE X||'/%
 	DeptPath string
-	Status   string
+	Status   model.DeptNodeStatus
 	Name     string
 }
 

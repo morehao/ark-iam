@@ -46,6 +46,17 @@ func NewApplicationClientSvc() ApplicationClientSvc {
 	return &oAuthClientSvc{}
 }
 
+// isValidApplicationClientStatus 校验客户端状态取值：空值表示「本次不修改状态」，非空必须命中白名单常量。
+// 校验归 service（AGENTS.md 硬规则 3）：DTO 绑定的是前端传来的原始字符串，非法值在此拦截。
+func isValidApplicationClientStatus(status model.ApplicationClientStatus) bool {
+	switch status {
+	case "", model.ApplicationClientStatusEnable, model.ApplicationClientStatusDisable:
+		return true
+	default:
+		return false
+	}
+}
+
 func generateClientCode() string {
 	return uuid.New().String()
 }
@@ -76,8 +87,7 @@ func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.Ap
 		DefaultScopes:           marshalStringSlice(req.DefaultScopes),
 		AccessTokenTTL:          req.AccessTokenTTL,
 		RefreshTokenTTL:         req.RefreshTokenTTL,
-		Type:                    req.Type,
-		IsThirdParty:            req.IsThirdParty,
+		Source:                  model.ApplicationClientSourceThirdParty, // 控制台创建的客户端恒为第三方接入
 		CreatedBy:               gincontext.GetUserIDString(ctx),
 	}
 
@@ -88,8 +98,8 @@ func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.Ap
 	audit.WriteAudit(ctx, audit.AuditEntry{
 		Action:     audit.ActionApplicationClientCreate,
 		TenantID:   insertEntity.TenantID,
-		Result:     "success",
-		TargetType: "application_client",
+		Result:     model.AuditResultSuccess,
+		TargetType: model.AuditTargetTypeApplicationClient,
 		TargetID:   insertEntity.ID,
 	})
 	return &dtoapplicationclient.ApplicationClientCreateResp{
@@ -107,8 +117,8 @@ func (svc *oAuthClientSvc) Delete(ctx *gin.Context, req *dtoapplicationclient.Ap
 	if !applicationClientVisibleToTenant(entity, gincontext.GetTenantIDString(ctx)) {
 		return code.GetError(code.ApplicationClientNotExistError)
 	}
-	if entity.IsSystem {
-		return code.GetError(code.ApplicationClientSystemBuiltInErr)
+	if entity.Source.IsBuiltin() {
+		return code.GetError(code.ApplicationClientBuiltInErr)
 	}
 
 	userID := gincontext.GetUserIDString(ctx)
@@ -120,6 +130,10 @@ func (svc *oAuthClientSvc) Delete(ctx *gin.Context, req *dtoapplicationclient.Ap
 }
 
 func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientUpdateReq) error {
+	if !isValidApplicationClientStatus(req.Status) {
+		glog.Errorf(ctx, "[svcapplicationclient.Update] 非法客户端状态, req:%s", gutil.ToJsonString(req))
+		return code.GetError(code.ApplicationClientUpdateError)
+	}
 	entity, err := dao.NewApplicationClientDao().GetByID(ctx, req.ApplicationClientID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -132,9 +146,6 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.Ap
 	userID := gincontext.GetUserIDString(ctx)
 	updateMap := map[string]any{
 		"name":                       req.Name,
-		"type":                       req.Type,
-		"status":                     req.Status,
-		"is_third_party":             req.IsThirdParty,
 		"redirect_uris":              marshalStringSlice(req.RedirectURIs),
 		"post_logout_redirect_uris":  marshalStringSlice(req.PostLogoutRedirectURIs),
 		"back_channel_logout_uri":    req.BackChannelLogoutURI,
@@ -148,6 +159,10 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.Ap
 		"access_token_ttl":           req.AccessTokenTTL,
 		"refresh_token_ttl":          req.RefreshTokenTTL,
 		"updated_by":                 userID,
+	}
+	// status 留空表示不修改：不写该列，避免把状态覆盖为空串
+	if req.Status != "" {
+		updateMap["status"] = req.Status
 	}
 	if err := dao.NewApplicationClientDao().UpdateMap(ctx, req.ApplicationClientID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -194,14 +209,22 @@ func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtoapplicationclient.Ap
 		DefaultScopes:           defaultScopes,
 		AccessTokenTTL:          entity.AccessTokenTTL,
 		RefreshTokenTTL:         entity.RefreshTokenTTL,
-		Type:                    entity.Type,
-		IsThirdParty:            entity.IsThirdParty,
+		Source:                  entity.Source,
 		Status:                  entity.Status,
 		CreatedAt:               entity.CreatedAt.Unix(),
 	}, nil
 }
 
 func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientPageListReq) (*dtoapplicationclient.ApplicationClientPageListResp, error) {
+	// 非法来源过滤值直接拒绝，避免 DAO 落成「查不到任何数据」的空结果而看不出原因
+	if req.Source != "" {
+		switch req.Source {
+		case model.ApplicationClientSourceBuiltin, model.ApplicationClientSourceFirstParty, model.ApplicationClientSourceThirdParty:
+		default:
+			glog.Errorf(ctx, "[svcapplicationclient.PageList] 非法 source 过滤值, req:%s", gutil.ToJsonString(req))
+			return nil, code.GetError(code.ApplicationClientGetPageListError)
+		}
+	}
 	cond := &dao.ApplicationClientCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
@@ -209,7 +232,7 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.
 		},
 		TenantID: gincontext.GetTenantIDString(ctx),
 		Name:     req.Name,
-		Type:     req.Type,
+		Source:   req.Source,
 		Status:   req.Status,
 	}
 	list, total, err := dao.NewApplicationClientDao().GetPageListByCond(ctx, cond)
@@ -228,9 +251,8 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.
 			AppID:                   v.AppID,
 			Code:                    v.Code,
 			Name:                    v.Name,
-			Type:                    v.Type,
+			Source:                  v.Source,
 			Status:                  v.Status,
-			IsThirdParty:            v.IsThirdParty,
 			GrantTypes:              grantTypes,
 			TokenEndpointAuthMethod: v.TokenEndpointAuthMethod,
 			CreatedAt:               v.CreatedAt.Unix(),
@@ -282,8 +304,7 @@ func (svc *oAuthClientSvc) GetByClientID(ctx *gin.Context, clientID string) (*dt
 		DefaultScopes:           defaultScopes,
 		AccessTokenTTL:          entity.AccessTokenTTL,
 		RefreshTokenTTL:         entity.RefreshTokenTTL,
-		Type:                    entity.Type,
-		IsThirdParty:            entity.IsThirdParty,
+		Source:                  entity.Source,
 		Status:                  entity.Status,
 		CreatedAt:               entity.CreatedAt.Unix(),
 	}, nil
@@ -373,8 +394,8 @@ func (svc *oAuthClientSvc) CreateSecret(ctx *gin.Context, req *dtoapplicationcli
 	audit.WriteAudit(ctx, audit.AuditEntry{
 		Action:     audit.ActionApplicationClientCreateSecret,
 		TenantID:   entity.TenantID,
-		Result:     "success",
-		TargetType: "application_client",
+		Result:     model.AuditResultSuccess,
+		TargetType: model.AuditTargetTypeApplicationClient,
 		TargetID:   secretEntity.ApplicationClientID,
 	})
 

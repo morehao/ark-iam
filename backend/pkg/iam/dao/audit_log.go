@@ -11,7 +11,7 @@ type AuditLogCond struct {
 	PersonID string
 	TenantID string
 	Action   string
-	Result   string
+	Result   model.AuditResult
 }
 
 func (c *AuditLogCond) BuildCondition(db *gorm.DB, tableName string) {

@@ -200,9 +200,9 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | GET | `/v1/platform/tenants` | 租户分页 |
 | GET/PUT/DELETE | `/v1/platform/tenants/:tenantID` | 租户详情/更新/删除 |
 | POST | `/v1/platform/tenants/:tenantID/builtin-admin/reset-password` | 重置租户内置管理员密码（仅 `source=builtin`，即建租户时由平台创建的管理员；返回一次性临时密码并撤销其会话） |
-| POST | `/v1/platform/tenant-applications` | 开通租户-应用 |
-| GET | `/v1/platform/tenant-applications` | 租户应用分页 |
-| GET/PUT/DELETE | `/v1/platform/tenant-applications/:tenantAppID` | 详情/更新/删除 |
+| POST | `/v1/platform/tenant-applications` | 开通租户-应用（**必带 `tenantID`** 指定归属租户；同租户同应用重复订阅报 `100747`，租户不存在报 `100205`，应用不存在报 `100735`） |
+| GET | `/v1/platform/tenant-applications` | 租户应用分页（`tenantID` 按归属租户筛选、留空＝全部租户；`status` 筛选状态；返回 `tenantName`/`appName` 便于回显） |
+| GET/PUT/DELETE | `/v1/platform/tenant-applications/:tenantAppID` | 详情/更新/删除（平台侧跨租户运维：归属租户来自 `tenantID`/资源本身，不校验 ctx 租户，与 `/v1/platform/tenants` 同一信任模型；订阅不存在报 `100745`） |
 
 > 租户编码 `code` 由服务端自动生成（规则 `t_<12 位随机 hex>`，如 `t_3f7a9c1d2e4b`，平台租户固定 `t_platform`），创建/更新入参无需传 `code`，创建后不可修改；列表支持 `GET /v1/platform/tenants?name=<关键词>&status=<active|suspended>`（`name` 按租户名模糊搜索，`status` 按状态精确筛选、留空不筛选、非法值报 `100209`），并返回 `createdAt`/`updatedAt`（秒级时间戳）。
 >
@@ -214,7 +214,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/v1/platform/applications` | 创建应用 |
+| POST | `/v1/platform/applications` | 创建应用（`code` 为下划线连接：小写字母开头，仅含小写字母/数字/下划线，如 `my_app`；非法编码报 `100748`） |
 | GET | `/v1/platform/applications` | 应用分页 |
 | GET/PUT/DELETE | `/v1/platform/applications/:appID` | 应用详情/更新/删除 |
 | POST | `/v1/platform/application-clients` | 创建 OAuth 客户端 |
@@ -273,7 +273,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | DELETE | `/v1/tenant/api-keys/:apiKeyID` | 删除（需 super） |
 | GET | `/v1/tenant/apps` | 租户订阅的启用应用列表（角色归属/菜单授权的应用选项，含系统内置应用） |
 | POST | `/v1/tenant/roles` | 创建角色（**appID 必选**，角色从属于应用，名称应用内唯一；角色无业务编码，见 `role-code-retirement.md`） |
-| GET | `/v1/tenant/roles` | 角色分页（?appID=&keyword=，含成员数/菜单数/所属应用名） |
+| GET | `/v1/tenant/roles` | 角色分页（?appID=&keyword=&unassigned=，含成员数/菜单数/所属应用名；`unassigned=true` 只查未归属应用的系统角色，供角色授权下拉按名称服务端搜索） |
 | GET | `/v1/tenant/roles/:roleID` | 角色详情 |
 | PUT | `/v1/tenant/roles/:roleID` | 更新角色 |
 | DELETE | `/v1/tenant/roles/:roleID` | 删除角色（级联清理成员/菜单关联） |

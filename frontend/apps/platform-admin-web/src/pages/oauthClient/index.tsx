@@ -2,15 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { Table, Button, Space, Input, Modal, Form, Select, message } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, idColumn, nameColumn, PageContainer, STATUS_COL_WIDTH, StatusTag, tableScrollX, TAG_COL_WIDTH, timeColumn, TypeTag } from '@ark-iam/ui'
+import { actionColumn, idColumn, nameColumn, PageContainer, RemoteSelect, SourceTag, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, timeColumn, tokens } from '@ark-iam/ui'
 import { createOAuthClient, deleteOAuthClient, getApplicationPageList, getOAuthClientPageList, updateOAuthClient } from '@ark-iam/api'
 import type { OAuthClientItem } from '@ark-iam/types'
 import { useNavigate } from 'react-router-dom'
-
-interface AppOption {
-  value: string
-  label: string
-}
 
 export default function OAuthClientList() {
   const navigate = useNavigate()
@@ -25,8 +20,12 @@ export default function OAuthClientList() {
   const [editing, setEditing] = useState<OAuthClientItem | null>(null)
   const [form] = Form.useForm()
   const [submitLoading, setSubmitLoading] = useState(false)
-  const [appOptions, setAppOptions] = useState<AppOption[]>([])
-  const [appLoading, setAppLoading] = useState(false)
+
+  // 应用可增长，所属应用下拉走服务端搜索（RemoteSelect），不再一次性只取前 100 条
+  const fetchAppOptions = useCallback(async (search: string) => {
+    const resp = await getApplicationPageList({ page: 1, pageSize: 50, name: search || undefined })
+    return (resp?.list || []).map((a) => ({ value: a.appID, label: a.name }))
+  }, [])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -45,30 +44,16 @@ export default function OAuthClientList() {
     void fetchData()
   }, [fetchData])
 
-  const loadApps = async () => {
-    setAppLoading(true)
-    try {
-      const resp = await getApplicationPageList({ page: 1, pageSize: 100 })
-      setAppOptions((resp?.list || []).map((a) => ({ value: a.appID, label: a.name })))
-    } catch {
-      /* 拦截器已提示 */
-    } finally {
-      setAppLoading(false)
-    }
-  }
-
   const handleCreate = () => {
     setEditing(null)
     form.resetFields()
     setModalOpen(true)
-    void loadApps()
   }
 
   const handleEdit = (record: OAuthClientItem) => {
     setEditing(record)
     form.setFieldsValue({
       name: record.name,
-      type: record.type,
       status: record.status,
       tokenEndpointAuthMethod: record.tokenEndpointAuthMethod,
     })
@@ -114,8 +99,8 @@ export default function OAuthClientList() {
       onClick: (r) => navigate(`/oauthClient/${r.applicationClientID}`),
     }),
     idColumn<OAuthClientItem>({ dataIndex: 'appID', title: '所属应用ID' }),
-    { title: '类型', dataIndex: 'type', key: 'type', width: TAG_COL_WIDTH, render: (v: string) => <TypeTag value={v} /> },
-    { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <StatusTag value={v} /> },
+    { title: '来源', dataIndex: 'source', key: 'source', width: TAG_COL_WIDTH, render: (v: string) => <SourceTag value={v} /> },
+    { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <EnableTag value={v} /> },
     timeColumn<OAuthClientItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<OAuthClientItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     actionColumn<OAuthClientItem>({
@@ -183,26 +168,18 @@ export default function OAuthClientList() {
         <Form form={form} layout="vertical">
           {!editing && (
             <Form.Item name="appID" label="所属应用" rules={[{ required: true, message: '请选择所属应用' }]}>
-              <Select
-                placeholder="选择所属应用"
-                loading={appLoading}
-                options={appOptions}
-                showSearch
-                optionFilterProp="label"
-              />
+              <RemoteSelect placeholder="选择所属应用（输入名称搜索）" fetchOptions={fetchAppOptions} />
             </Form.Item>
           )}
           <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
             <Input placeholder="客户端名称" />
           </Form.Item>
-          <Form.Item name="type" label="类型" initialValue="first_party" rules={[{ required: true, message: '请选择类型' }]}>
-            <Select
-              options={[
-                { value: 'first_party', label: '第一方' },
-                { value: 'third_party', label: '第三方' },
-              ]}
-            />
-          </Form.Item>
+          {editing && (
+            <Form.Item label="来源">
+              <SourceTag value={editing.source} />
+              <span style={{ marginLeft: 8, color: tokens.textSecondary }}>来源不可修改</span>
+            </Form.Item>
+          )}
           <Form.Item
             name="tokenEndpointAuthMethod"
             label="令牌端点认证方式"

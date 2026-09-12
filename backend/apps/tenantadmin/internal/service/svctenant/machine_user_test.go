@@ -36,7 +36,7 @@ func seedTestOperator(t *testing.T, tenantID string, super bool) *model.UserEnti
 		TenantID:  tenantID,
 		AppID:     "app-admin",
 		Name:      "测试超级角色",
-		Source:    string(model.RoleSourceBuiltin),
+		Source:    model.RoleSourceBuiltin,
 		AdminType: model.SysAdminTypeAdmin,
 	}
 	if err := db.Create(role).Error; err != nil {
@@ -65,7 +65,7 @@ func seedTestDept(t *testing.T, tenantID, name string) *model.DepartmentEntity {
 		ParentID: "",
 		Name:     name,
 		Sort:     0,
-		Status:   string(model.DeptNodeStatusActive),
+		Status:   model.DeptNodeStatusEnable,
 	}
 	if err := db.Create(dept).Error; err != nil {
 		t.Fatalf("seed dept %s: %v", name, err)
@@ -206,7 +206,7 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 	// 普通角色可授、super 角色禁授（按应用授权：role.app_id 须与 req.AppID 一致）
 	devRole := &model.RoleEntity{
 		TenantID: tenantID, AppID: "app-tenant", Name: "开发者",
-		Source: string(model.RoleSourceCustom), AdminType: model.SysAdminTypeNormal,
+		Source: model.RoleSourceCustom, AdminType: model.SysAdminTypeNormal,
 	}
 	if err := db.Create(devRole).Error; err != nil {
 		t.Fatalf("seed dev role: %v", err)
@@ -216,7 +216,7 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 	}
 	adminRole := &model.RoleEntity{
 		TenantID: tenantID, AppID: "app-tenant", Name: "租户管理员",
-		Source: string(model.RoleSourceBuiltin), AdminType: model.SysAdminTypeAdmin,
+		Source: model.RoleSourceBuiltin, AdminType: model.SysAdminTypeAdmin,
 	}
 	if err := db.Create(adminRole).Error; err != nil {
 		t.Fatalf("seed super role 2: %v", err)
@@ -228,7 +228,7 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 	// 按应用隔离：授另一个应用的普通角色后，原应用角色不受影响；跨应用角色拒绝
 	opsRole := &model.RoleEntity{
 		TenantID: tenantID, AppID: "app-other", Name: "运维",
-		Source: string(model.RoleSourceCustom), AdminType: model.SysAdminTypeNormal,
+		Source: model.RoleSourceCustom, AdminType: model.SysAdminTypeNormal,
 	}
 	if err := db.Create(opsRole).Error; err != nil {
 		t.Fatalf("seed ops role: %v", err)

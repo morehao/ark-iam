@@ -256,9 +256,8 @@ erDiagram
         uint id PK
         string code UK "应用编码"
         string name
-        string type "first_party/third_party"
+        string source "builtin/first_party/third_party"
         string status "enable/disable"
-        string visibility "public/private"
         json tenant_policy "允许个人建租户等策略"
         string homepage_url
         string logo_url
@@ -280,10 +279,8 @@ erDiagram
         json default_scopes
         bigint access_token_ttl
         bigint refresh_token_ttl
-        string type "first_party/third_party"
-        tinyint is_third_party
+        string source "builtin/first_party/third_party"
         string status
-        tinyint is_system
     }
     application_client_secret {
         uint id PK
@@ -310,7 +307,7 @@ erDiagram
         int dept_depth "深度(根=1)"
         string name
         int sort
-        string status "active/inactive"
+        string status "enable/disable"
     }
     department_user {
         string id PK "UUID v7"
@@ -441,9 +438,6 @@ erDiagram
         string client_ip
         string user_agent
         datetime login_time
-        datetime last_active_at
-        datetime revoked_at
-        string status "active/revoked"
     }
     user_login_log {
         uint id PK
@@ -526,8 +520,8 @@ erDiagram
 
 | 表 | 说明 |
 |---|---|
-| `application` | 业务应用定义：编码/名称/类型（first_party/third_party）/状态/可见性/`tenant_policy`（如允许个人建租户） |
-| `application_client` | **OAuth/OIDC 客户端**：client_id、redirect_uris、grant_types、token_endpoint_auth_method、PKCE、令牌 TTL、是否第三方 |
+| `application` | 业务应用定义：编码/名称/来源（`source`：builtin/first_party/third_party）/状态/`tenant_policy`（如允许个人建租户） |
+| `application_client` | **OAuth/OIDC 客户端**：client_id、redirect_uris、grant_types、token_endpoint_auth_method、PKCE、令牌 TTL、来源（`source`） |
 | `application_client_secret` | 客户端密钥：只存哈希（`value_hash`）+ 前缀（`value_prefix`），支持过期/吊销 |
 | `api_key` | API Key 机器凭证：只存哈希，支持 scope/过期/吊销；`owner_user_id` 归属**服务账号**（个人密钥能力已下线，历史 member 数据兼容展示），鉴权按归属服务账号注入身份；明文仅创建时展示一次，管理在租户端（需系统管理能力） |
 
@@ -778,7 +772,7 @@ flowchart TB
 
 | 步骤 | 说明 | 关键接口 |
 |---|---|---|
-| 1. 应用定义 | 应用编码全局唯一，`first_party` 或 `third_party` | `application` 表 |
+| 1. 应用定义 | 应用编码全局唯一，来源为 `third_party`（控制台创建） | `application` 表 |
 | 2. 创建应用 | 平台管理员创建应用并配置租户策略 | `POST /v1/platform/applications` |
 | 3. 创建客户端 | 一个应用可多个客户端（多端/多环境），**redirect_uri 必须精确白名单** | `POST /v1/platform/application-clients` |
 | 4. 前端接入 | Authorization Code + PKCE，`state`/`nonce` 由 SDK 处理 | `/oidc/*` 端点 |

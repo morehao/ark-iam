@@ -41,7 +41,7 @@ func newSeedDB(t *testing.T, apps []appSeedApp) *gorm.DB {
 	)
 	// 权限开通依赖租户自服务应用（真实环境由 pkg/seed 写入）
 	if err := db.Create(&model.ApplicationEntity{Code: tenant.ProvisionAppCode, Name: "租户自服务", Status: model.AppStatusEnable}).Error; err != nil {
-		t.Fatalf("seed tenant-admin application: %v", err)
+		t.Fatalf("seed tenant_admin application: %v", err)
 	}
 	for _, a := range apps {
 		appEntity := &model.ApplicationEntity{Code: "app-" + a.clientCode, AllowPersonCreateTenant: a.allow}
@@ -258,7 +258,7 @@ func TestCreateTenantSucceedsForZeroTenantPerson(t *testing.T) {
 	}
 	role, rErr := dao.NewRoleDao().GetByCond(t.Context(), &dao.RoleCond{
 		TenantID:  res.TenantID,
-		Source:    string(model.RoleSourceBuiltin),
+		Source:    model.RoleSourceBuiltin,
 		AdminType: model.SysAdminTypeAdmin,
 	})
 	if rErr != nil || role == nil {

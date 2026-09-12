@@ -16,7 +16,7 @@ import (
 )
 
 // setupTenantCreateEnv 建租户链路的完整测试环境：租户/部门 + 管理员（person/user/部门关系）
-// + 权限开通所需的全部表，并预置 tenant-admin 应用与其菜单（真实环境由 pkg/seed 写入）。
+// + 权限开通所需的全部表，并预置 tenant_admin 应用与其菜单（真实环境由 pkg/seed 写入）。
 func setupTenantCreateEnv(t *testing.T) *gorm.DB {
 	t.Helper()
 	db := testutil.SetupSQLite(t,
@@ -255,7 +255,7 @@ func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
 	}
 	role, err := dao.NewRoleDao().GetByCond(ctx, &dao.RoleCond{
 		TenantID:  resp.TenantID,
-		Source:    string(model.RoleSourceBuiltin),
+		Source:    model.RoleSourceBuiltin,
 		AdminType: model.SysAdminTypeAdmin,
 	})
 	if err != nil || role == nil {

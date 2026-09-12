@@ -47,15 +47,51 @@ const docTemplateplatformadmin = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "builtin",
+                            "first_party",
+                            "third_party"
+                        ],
                         "type": "string",
-                        "description": "状态",
-                        "name": "status",
+                        "x-enum-comments": {
+                            "ApplicationClientSourceBuiltin": "平台内置：种子播种，禁删",
+                            "ApplicationClientSourceFirstParty": "平台自建：非内置的第一方客户端",
+                            "ApplicationClientSourceThirdParty": "第三方接入：外部/租户接入的客户端"
+                        },
+                        "x-enum-descriptions": [
+                            "平台内置：种子播种，禁删",
+                            "平台自建：非内置的第一方客户端",
+                            "第三方接入：外部/租户接入的客户端"
+                        ],
+                        "x-enum-varnames": [
+                            "ApplicationClientSourceBuiltin",
+                            "ApplicationClientSourceFirstParty",
+                            "ApplicationClientSourceThirdParty"
+                        ],
+                        "description": "客户端来源: builtin-内置, first_party-第一方, third_party-第三方",
+                        "name": "source",
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "enable",
+                            "disable"
+                        ],
                         "type": "string",
-                        "description": "客户端类型",
-                        "name": "type",
+                        "x-enum-comments": {
+                            "ApplicationClientStatusDisable": "停用",
+                            "ApplicationClientStatusEnable": "启用"
+                        },
+                        "x-enum-descriptions": [
+                            "启用",
+                            "停用"
+                        ],
+                        "x-enum-varnames": [
+                            "ApplicationClientStatusEnable",
+                            "ApplicationClientStatusDisable"
+                        ],
+                        "description": "状态",
+                        "name": "status",
                         "in": "query"
                     }
                 ],
@@ -433,15 +469,51 @@ const docTemplateplatformadmin = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "builtin",
+                            "first_party",
+                            "third_party"
+                        ],
                         "type": "string",
-                        "description": "状态",
-                        "name": "status",
+                        "x-enum-comments": {
+                            "AppSourceBuiltin": "平台内置：种子播种/随产品交付，禁删，菜单归各自专属控制台",
+                            "AppSourceFirstParty": "平台自建但非内置：可删，菜单并入所在控制台",
+                            "AppSourceThirdParty": "第三方接入：外部/租户接入的应用"
+                        },
+                        "x-enum-descriptions": [
+                            "平台内置：种子播种/随产品交付，禁删，菜单归各自专属控制台",
+                            "平台自建但非内置：可删，菜单并入所在控制台",
+                            "第三方接入：外部/租户接入的应用"
+                        ],
+                        "x-enum-varnames": [
+                            "AppSourceBuiltin",
+                            "AppSourceFirstParty",
+                            "AppSourceThirdParty"
+                        ],
+                        "description": "应用来源: builtin-内置, first_party-第一方, third_party-第三方",
+                        "name": "source",
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "enable",
+                            "disable"
+                        ],
                         "type": "string",
-                        "description": "应用类型",
-                        "name": "type",
+                        "x-enum-comments": {
+                            "AppStatusDisable": "停用",
+                            "AppStatusEnable": "启用"
+                        },
+                        "x-enum-descriptions": [
+                            "启用",
+                            "停用"
+                        ],
+                        "x-enum-varnames": [
+                            "AppStatusEnable",
+                            "AppStatusDisable"
+                        ],
+                        "description": "状态",
+                        "name": "status",
                         "in": "query"
                     }
                 ],
@@ -1407,9 +1479,31 @@ const docTemplateplatformadmin = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "enable",
+                            "disable"
+                        ],
                         "type": "string",
+                        "x-enum-comments": {
+                            "TenantApplicationStatusDisable": "已停用",
+                            "TenantApplicationStatusEnable": "已订阅"
+                        },
+                        "x-enum-descriptions": [
+                            "已订阅",
+                            "已停用"
+                        ],
+                        "x-enum-varnames": [
+                            "TenantApplicationStatusEnable",
+                            "TenantApplicationStatusDisable"
+                        ],
                         "description": "状态",
                         "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "租户ID（筛选，留空为全部租户）",
+                        "name": "tenantID",
                         "in": "query"
                     }
                 ],
@@ -1916,8 +2010,7 @@ const docTemplateplatformadmin = `{
             "type": "object",
             "required": [
                 "code",
-                "name",
-                "visibility"
+                "name"
             ],
             "properties": {
                 "allowJoinByInvite": {
@@ -1929,7 +2022,7 @@ const docTemplateplatformadmin = `{
                     "type": "boolean"
                 },
                 "code": {
-                    "description": "应用编码",
+                    "description": "应用编码：下划线连接（小写字母开头，仅含小写字母、数字与下划线，见 model.AppCodePattern）",
                     "type": "string"
                 },
                 "description": {
@@ -1951,14 +2044,6 @@ const docTemplateplatformadmin = `{
                 "sort": {
                     "description": "排序",
                     "type": "integer"
-                },
-                "type": {
-                    "description": "应用类型: first_party-第一方, third_party-第三方",
-                    "type": "string"
-                },
-                "visibility": {
-                    "description": "可见性: public-所有租户, private-仅平台租户",
-                    "type": "string"
                 }
             }
         },
@@ -2018,17 +2103,21 @@ const docTemplateplatformadmin = `{
                     "description": "排序",
                     "type": "integer"
                 },
+                "source": {
+                    "description": "应用来源",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppSource"
+                        }
+                    ]
+                },
                 "status": {
                     "description": "状态",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "应用类型",
-                    "type": "string"
-                },
-                "visibility": {
-                    "description": "可见性",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppStatus"
+                        }
+                    ]
                 }
             }
         },
@@ -2081,15 +2170,11 @@ const docTemplateplatformadmin = `{
                 },
                 "status": {
                     "description": "状态: enable-启用, disable-停用",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "应用类型: first_party-第一方, third_party-第三方",
-                    "type": "string"
-                },
-                "visibility": {
-                    "description": "可见性: public-所有租户, private-仅平台租户",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppStatus"
+                        }
+                    ]
                 }
             }
         },
@@ -2128,21 +2213,25 @@ const docTemplateplatformadmin = `{
                     "description": "排序",
                     "type": "integer"
                 },
+                "source": {
+                    "description": "应用来源",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppSource"
+                        }
+                    ]
+                },
                 "status": {
                     "description": "状态",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "应用类型",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppStatus"
+                        }
+                    ]
                 },
                 "updatedAt": {
                     "description": "更新时间(unix 秒)",
                     "type": "integer"
-                },
-                "visibility": {
-                    "description": "可见性",
-                    "type": "string"
                 }
             }
         },
@@ -2186,10 +2275,6 @@ const docTemplateplatformadmin = `{
                         "type": "string"
                     }
                 },
-                "isThirdParty": {
-                    "description": "是否第三方应用",
-                    "type": "boolean"
-                },
                 "name": {
                     "description": "客户端名称",
                     "type": "string"
@@ -2229,10 +2314,6 @@ const docTemplateplatformadmin = `{
                 },
                 "tokenEndpointAuthMethod": {
                     "description": "令牌端点认证方式",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "客户端类型: first_party-第一方, third_party-第三方",
                     "type": "string"
                 }
             }
@@ -2298,10 +2379,6 @@ const docTemplateplatformadmin = `{
                         "type": "string"
                     }
                 },
-                "isThirdParty": {
-                    "description": "是否第三方应用",
-                    "type": "boolean"
-                },
                 "name": {
                     "description": "客户端名称",
                     "type": "string"
@@ -2339,9 +2416,21 @@ const docTemplateplatformadmin = `{
                         "type": "string"
                     }
                 },
+                "source": {
+                    "description": "客户端来源",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ApplicationClientSource"
+                        }
+                    ]
+                },
                 "status": {
                     "description": "状态",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ApplicationClientStatus"
+                        }
+                    ]
                 },
                 "tenantID": {
                     "description": "租户ID",
@@ -2349,10 +2438,6 @@ const docTemplateplatformadmin = `{
                 },
                 "tokenEndpointAuthMethod": {
                     "description": "令牌端点认证方式",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "客户端类型",
                     "type": "string"
                 }
             }
@@ -2405,10 +2490,6 @@ const docTemplateplatformadmin = `{
                         "type": "string"
                     }
                 },
-                "isThirdParty": {
-                    "description": "是否第三方应用",
-                    "type": "boolean"
-                },
                 "name": {
                     "description": "客户端名称",
                     "type": "string"
@@ -2448,14 +2529,14 @@ const docTemplateplatformadmin = `{
                 },
                 "status": {
                     "description": "状态: enable-启用, disable-停用",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ApplicationClientStatus"
+                        }
+                    ]
                 },
                 "tokenEndpointAuthMethod": {
                     "description": "令牌端点认证方式",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "客户端类型",
                     "type": "string"
                 }
             }
@@ -2486,24 +2567,28 @@ const docTemplateplatformadmin = `{
                         "type": "string"
                     }
                 },
-                "isThirdParty": {
-                    "description": "是否第三方应用",
-                    "type": "boolean"
-                },
                 "name": {
                     "description": "客户端名称",
                     "type": "string"
                 },
+                "source": {
+                    "description": "客户端来源",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ApplicationClientSource"
+                        }
+                    ]
+                },
                 "status": {
                     "description": "状态",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ApplicationClientStatus"
+                        }
+                    ]
                 },
                 "tokenEndpointAuthMethod": {
                     "description": "令牌端点认证方式",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "客户端类型",
                     "type": "string"
                 },
                 "updatedAt": {
@@ -3564,13 +3649,21 @@ const docTemplateplatformadmin = `{
                     "description": "应用ID",
                     "type": "string"
                 },
+                "appName": {
+                    "description": "应用名称",
+                    "type": "string"
+                },
                 "createdAt": {
                     "description": "创建时间(unix 秒)",
                     "type": "integer"
                 },
                 "status": {
                     "description": "状态",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.TenantApplicationStatus"
+                        }
+                    ]
                 },
                 "tenantAppID": {
                     "description": "租户应用订阅ID",
@@ -3578,6 +3671,10 @@ const docTemplateplatformadmin = `{
                 },
                 "tenantID": {
                     "description": "租户ID",
+                    "type": "string"
+                },
+                "tenantName": {
+                    "description": "租户名称",
                     "type": "string"
                 },
                 "updatedAt": {
@@ -3589,7 +3686,8 @@ const docTemplateplatformadmin = `{
         "dtotenantapplication.TenantApplicationCreateReq": {
             "type": "object",
             "required": [
-                "appID"
+                "appID",
+                "tenantID"
             ],
             "properties": {
                 "appID": {
@@ -3606,6 +3704,14 @@ const docTemplateplatformadmin = `{
                 },
                 "status": {
                     "description": "状态: enable-启用, disable-停用",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.TenantApplicationStatus"
+                        }
+                    ]
+                },
+                "tenantID": {
+                    "description": "租户ID（平台侧指定归属租户）",
                     "type": "string"
                 }
             }
@@ -3626,6 +3732,10 @@ const docTemplateplatformadmin = `{
                     "description": "应用ID",
                     "type": "string"
                 },
+                "appName": {
+                    "description": "应用名称",
+                    "type": "string"
+                },
                 "config": {
                     "description": "租户级应用配置(JSON)",
                     "type": "string"
@@ -3640,7 +3750,11 @@ const docTemplateplatformadmin = `{
                 },
                 "status": {
                     "description": "状态",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.TenantApplicationStatus"
+                        }
+                    ]
                 },
                 "tenantAppID": {
                     "description": "租户应用订阅ID",
@@ -3648,6 +3762,10 @@ const docTemplateplatformadmin = `{
                 },
                 "tenantID": {
                     "description": "租户ID",
+                    "type": "string"
+                },
+                "tenantName": {
+                    "description": "租户名称",
                     "type": "string"
                 }
             }
@@ -3681,7 +3799,11 @@ const docTemplateplatformadmin = `{
                 },
                 "status": {
                     "description": "状态",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.TenantApplicationStatus"
+                        }
+                    ]
                 }
             }
         },
@@ -3699,6 +3821,90 @@ const docTemplateplatformadmin = `{
                     "type": "string"
                 }
             }
+        },
+        "model.AppSource": {
+            "type": "string",
+            "enum": [
+                "builtin",
+                "first_party",
+                "third_party"
+            ],
+            "x-enum-comments": {
+                "AppSourceBuiltin": "平台内置：种子播种/随产品交付，禁删，菜单归各自专属控制台",
+                "AppSourceFirstParty": "平台自建但非内置：可删，菜单并入所在控制台",
+                "AppSourceThirdParty": "第三方接入：外部/租户接入的应用"
+            },
+            "x-enum-descriptions": [
+                "平台内置：种子播种/随产品交付，禁删，菜单归各自专属控制台",
+                "平台自建但非内置：可删，菜单并入所在控制台",
+                "第三方接入：外部/租户接入的应用"
+            ],
+            "x-enum-varnames": [
+                "AppSourceBuiltin",
+                "AppSourceFirstParty",
+                "AppSourceThirdParty"
+            ]
+        },
+        "model.AppStatus": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-comments": {
+                "AppStatusDisable": "停用",
+                "AppStatusEnable": "启用"
+            },
+            "x-enum-descriptions": [
+                "启用",
+                "停用"
+            ],
+            "x-enum-varnames": [
+                "AppStatusEnable",
+                "AppStatusDisable"
+            ]
+        },
+        "model.ApplicationClientSource": {
+            "type": "string",
+            "enum": [
+                "builtin",
+                "first_party",
+                "third_party"
+            ],
+            "x-enum-comments": {
+                "ApplicationClientSourceBuiltin": "平台内置：种子播种，禁删",
+                "ApplicationClientSourceFirstParty": "平台自建：非内置的第一方客户端",
+                "ApplicationClientSourceThirdParty": "第三方接入：外部/租户接入的客户端"
+            },
+            "x-enum-descriptions": [
+                "平台内置：种子播种，禁删",
+                "平台自建：非内置的第一方客户端",
+                "第三方接入：外部/租户接入的客户端"
+            ],
+            "x-enum-varnames": [
+                "ApplicationClientSourceBuiltin",
+                "ApplicationClientSourceFirstParty",
+                "ApplicationClientSourceThirdParty"
+            ]
+        },
+        "model.ApplicationClientStatus": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-comments": {
+                "ApplicationClientStatusDisable": "停用",
+                "ApplicationClientStatusEnable": "启用"
+            },
+            "x-enum-descriptions": [
+                "启用",
+                "停用"
+            ],
+            "x-enum-varnames": [
+                "ApplicationClientStatusEnable",
+                "ApplicationClientStatusDisable"
+            ]
         },
         "model.MenuStatus": {
             "type": "string",
@@ -3763,6 +3969,25 @@ const docTemplateplatformadmin = `{
                 "MenuVisibilityPublic",
                 "MenuVisibilityMember",
                 "MenuVisibilityAdmin"
+            ]
+        },
+        "model.TenantApplicationStatus": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-comments": {
+                "TenantApplicationStatusDisable": "已停用",
+                "TenantApplicationStatusEnable": "已订阅"
+            },
+            "x-enum-descriptions": [
+                "已订阅",
+                "已停用"
+            ],
+            "x-enum-varnames": [
+                "TenantApplicationStatusEnable",
+                "TenantApplicationStatusDisable"
             ]
         },
         "model.TenantStatus": {

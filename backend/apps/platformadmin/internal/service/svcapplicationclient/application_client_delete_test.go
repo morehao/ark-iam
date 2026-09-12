@@ -22,8 +22,8 @@ func newOAuthDeleteCtx(tenantID, userID string) *gin.Context {
 	return ctx
 }
 
-// newTestClientEntity 构造一条完整的应用客户端记录（IsSystem 按需传入，其余取常规默认值）。
-func newTestClientEntity(name, clientID string, isSystem bool) *model.ApplicationClientEntity {
+// newTestClientEntity 构造一条完整的应用客户端记录（source 按需传入，其余取常规默认值）。
+func newTestClientEntity(name, clientID string, source model.ApplicationClientSource) *model.ApplicationClientEntity {
 	return &model.ApplicationClientEntity{
 		TenantID:                "1",
 		Code:                    clientID,
@@ -36,15 +36,14 @@ func newTestClientEntity(name, clientID string, isSystem bool) *model.Applicatio
 		AllowedOrigins:          datatypes.JSON("[]"),
 		DefaultScopes:           datatypes.JSON("[]"),
 		Status:                  "enable",
-		Type:                    "first_party",
-		IsSystem:                isSystem,
+		Source:                  source,
 	}
 }
 
-func TestDeleteSystemApplicationClient(t *testing.T) {
+func TestDeleteBuiltInApplicationClient(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{}, &model.ApplicationClientSecretEntity{})
 
-	entity := newTestClientEntity("System Client", "x", true)
+	entity := newTestClientEntity("System Client", "x", model.ApplicationClientSourceBuiltin)
 	if err := db.Create(entity).Error; err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -52,17 +51,17 @@ func TestDeleteSystemApplicationClient(t *testing.T) {
 	svc := NewApplicationClientSvc()
 	err := svc.Delete(newOAuthDeleteCtx("1", "0"), &dtoapplicationclient.ApplicationClientDeleteReq{ApplicationClientID: entity.ID})
 	if err == nil {
-		t.Fatal("expected error for system-built-in oauth client")
+		t.Fatal("expected error for built-in oauth client")
 	}
-	if gerror.GetCode(err) != int(code.ApplicationClientSystemBuiltInErr) {
-		t.Fatalf("expected ApplicationClientSystemBuiltInErr, got %v", err)
+	if gerror.GetCode(err) != int(code.ApplicationClientBuiltInErr) {
+		t.Fatalf("expected ApplicationClientBuiltInErr, got %v", err)
 	}
 }
 
-func TestDeleteNonSystemApplicationClient(t *testing.T) {
+func TestDeleteNonBuiltInApplicationClient(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{}, &model.ApplicationClientSecretEntity{})
 
-	entity := newTestClientEntity("Blog Client", "y", false)
+	entity := newTestClientEntity("Blog Client", "y", model.ApplicationClientSourceThirdParty)
 	if err := db.Create(entity).Error; err != nil {
 		t.Fatalf("seed: %v", err)
 	}

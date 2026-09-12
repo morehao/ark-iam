@@ -76,7 +76,7 @@ export const updateTenant = (data: TenantUpdateReq) => {
 export const deleteTenant = (tenantID: string) => request.delete<any, string>(`/platform/tenants/${tenantID}`)
 
 // ==================== 租户应用 ====================
-export const getTenantApplicationPageList = (data: { page: number; pageSize: number; status?: string }) =>
+export const getTenantApplicationPageList = (data: { page: number; pageSize: number; tenantID?: string; status?: string }) =>
   request.get<any, PageListResp<TenantApplicationItem>>('/platform/tenant-applications', { params: data })
 export const createTenantApplication = (data: TenantApplicationCreateReq) =>
   request.post<any, { tenantAppID: string }>('/platform/tenant-applications', data)

@@ -10,7 +10,7 @@ type TenantApplicationCond struct {
 	*gormdao.BaseCond
 	TenantID string
 	AppID    string
-	Status   string
+	Status   model.TenantApplicationStatus
 }
 
 func (c *TenantApplicationCond) BuildCondition(db *gorm.DB, tableName string) {

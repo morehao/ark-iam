@@ -19,7 +19,7 @@ func seedBuiltinRole(t *testing.T, db *gorm.DB, id, tenantID, appID string) {
 		TenantID:   tenantID,
 		AppID:      appID,
 		Name:       "管理员",
-		Source:     string(model.RoleSourceBuiltin),
+		Source:     model.RoleSourceBuiltin,
 		AdminType:  model.SysAdminTypeAdmin,
 		CreatedBy:  "seed",
 	}).Error; err != nil {
@@ -55,7 +55,7 @@ func TestHasSystemAdminCapability(t *testing.T) {
 	if err := db.Create(&model.RoleEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "r-admin"}},
 		TenantID:   "t1", AppID: "app1", Name: "管理员",
-		Source: string(model.RoleSourceCustom), AdminType: model.SysAdminTypeAdmin,
+		Source: model.RoleSourceCustom, AdminType: model.SysAdminTypeAdmin,
 		CreatedBy: "t",
 	}).Error; err != nil {
 		t.Fatalf("seed role: %v", err)
@@ -79,7 +79,7 @@ func TestHasSystemAdminCapability(t *testing.T) {
 	if err := db.Create(&model.RoleEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "r-user"}},
 		TenantID:   "t1", AppID: "app1", Name: "成员",
-		Source: string(model.RoleSourceCustom), AdminType: model.SysAdminTypeNormal,
+		Source: model.RoleSourceCustom, AdminType: model.SysAdminTypeNormal,
 		CreatedBy: "t",
 	}).Error; err != nil {
 		t.Fatalf("seed role u2: %v", err)
@@ -148,7 +148,7 @@ func seedBuiltinSystemRole(t *testing.T, db *gorm.DB, id, tenantID, appID string
 		TenantID:   tenantID,
 		AppID:      appID,
 		Name:       "管理员",
-		Source:     string(model.RoleSourceBuiltin),
+		Source:     model.RoleSourceBuiltin,
 		AdminType:  model.SysAdminTypeAdmin,
 		CreatedBy:  "seed",
 	}).Error; err != nil {
@@ -332,7 +332,7 @@ func TestRoleMenuTreeHidesAdminForNormalRole(t *testing.T) {
 	// 内置管理员
 	tree, err = svc.roleMenuTree(ginCtx, &model.RoleEntity{
 		AppID:     "app1",
-		Source:    string(model.RoleSourceBuiltin),
+		Source:    model.RoleSourceBuiltin,
 		AdminType: model.SysAdminTypeAdmin,
 	})
 	if err != nil {

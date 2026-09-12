@@ -41,7 +41,7 @@ flowchart TB
 | 问题 | 影响 |
 |---|---|
 | 应用有前端页面吗？ | 前端用授权码 + PKCE；无前端用 client_credentials |
-| 是自有应用还是第三方应用？ | `first_party` / `third_party`（`application.type`） |
+| 是自有应用还是第三方应用？ | 来源（`application.source`）：控制台创建恒为 `third_party`；`builtin`/`first_party` 仅由种子与运维产生 |
 | 回调地址是什么？ | `redirect_uri` 必须**精确白名单**（HTTPS 生产必填） |
 | 需要免登录串访吗？ | 需要 → 确保与 IAM 同浏览器环境（SSO Cookie 生效） |
 | 需要服务端到服务端调用吗？ | 需要 → 额外申请 API Key 或 client_credentials |
@@ -68,15 +68,15 @@ curl -X POST http://localhost:8082/v1/platform/applications \
   -H "Authorization: Bearer <平台管理员 access_token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "code": "my-app",
+    "code": "my_app",
     "name": "我的业务应用",
-    "type": "first_party",
     "status": "enable",
-    "visibility": "public",
     "homepageURL": "https://my-app.example.com",
     "logoURL": "https://my-app.example.com/logo.png"
   }'
 ```
+
+> `code` 即应用编码：**下划线连接**，以小写字母开头，仅含小写字母、数字与下划线（如 `my_app`、`platform_admin`）；连字符/大写会被服务端拒绝。
 
 ### 3.2 创建 OAuth 客户端（Application Client）
 

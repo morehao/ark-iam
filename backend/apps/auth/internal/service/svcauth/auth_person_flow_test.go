@@ -231,6 +231,43 @@ func TestJoinTenantRejectsRevokedInvite(t *testing.T) {
 	assertCode(t, err, code.InviteInvalidError)
 }
 
+// TestJoinTenantRejectsExpiredInvite 过期由 expires_at 在读取时派生，而非存储态（D6/R2）：
+// 库里没有 "expired" 这个状态值，能否加入只取决于 expires_at 是否已过。
+func TestJoinTenantRejectsExpiredInvite(t *testing.T) {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = httptestRequest(t)
+	ginCtx.Set(gcontext.KeyPersonID, "88")
+
+	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{})
+	past := time.Now().Add(-time.Hour)
+	seedInvite(t, db, "invite-abc", "22", model.InviteStatusPending, &past)
+
+	svc := &authSvc{}
+	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: "invite-abc"})
+	assertCode(t, err, code.InviteExpiredError)
+}
+
+// TestJoinTenantAcceptsInviteNotYetExpired 未到期的邀请仍可加入——
+// 防止把过期比较写反（ExpiresAt 在未来却被判过期）。
+func TestJoinTenantAcceptsInviteNotYetExpired(t *testing.T) {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx.Request = httptestRequest(t)
+	ginCtx.Set(gcontext.KeyPersonID, "88")
+
+	db := testutil.SetupSQLite(t, &model.InviteEntity{}, &model.UserEntity{})
+	future := time.Now().Add(time.Hour)
+	seedInvite(t, db, "invite-abc", "22", model.InviteStatusPending, &future)
+
+	svc := &authSvc{}
+	resp, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: "invite-abc"})
+	if err != nil {
+		t.Fatalf("未过期邀请应可加入, got err: %v", err)
+	}
+	if resp == nil || resp.UserID == "" {
+		t.Fatalf("expected created user id, got %#v", resp)
+	}
+}
+
 func TestJoinTenantRejectsAlreadyJoinedTenant(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	ginCtx.Request = httptestRequest(t)

@@ -35,9 +35,15 @@ export { RowActions } from './RowActions'
 export type { RowAction, RowActionsProps } from './RowActions'
 export { NameLink } from './NameLink'
 export type { NameLinkProps } from './NameLink'
+export { RemoteSelect, RemoteMultiSelect } from './RemoteSelect'
+export type {
+  RemoteMultiSelectProps,
+  RemoteSelectOption,
+  RemoteSelectProps,
+} from './RemoteSelect'
 export { AppShell } from './AppShell'
 export { themeConfig, brand, tokens } from './theme'
-export { StatusTag, SuspendedTag, VerifiedTag, TypeTag, SourceTag } from './status'
+export { EnableTag, SuspendedTag, VerifiedTag, TypeTag, SourceTag } from './status'
 export { fmtTime, fmtRelativeTime, toMillis } from './format'
 export { TimeCell, TIME_COL_WIDTH, TIME_COL_WIDTH_RELATIVE, timeColumn } from './TimeCell'
 export type { TimeCellProps, TimeColumnConfig } from './TimeCell'

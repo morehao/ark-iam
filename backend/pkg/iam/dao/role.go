@@ -8,13 +8,14 @@ import (
 
 type RoleCond struct {
 	*gormdao.BaseCond
-	TenantID  string
-	AppID     string
-	IDs       []string
-	Name      string
-	Source    string
-	AdminType model.SysAdminType // 精确匹配系统管理类型(admin/normal)
-	Keyword   string             // 模糊搜索: 名称 LIKE
+	TenantID   string
+	AppID      string
+	IDs        []string
+	Name       string
+	Source     model.RoleSource
+	AdminType  model.SysAdminType // 精确匹配系统管理类型(admin/normal)
+	Keyword    string             // 模糊搜索: 名称 LIKE
+	Unassigned bool               // 仅未归属应用的角色(app_id 为空串)
 }
 
 func (c *RoleCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -26,6 +27,10 @@ func (c *RoleCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.AppID != "" {
 		db.Where(tableName+".app_id = ?", c.AppID)
+	}
+	// app_id 为空串是"未归属应用"（系统角色）的存储值，而 AppID 空值语义是"不过滤"，故用独立开关表达
+	if c.Unassigned {
+		db.Where(tableName + ".app_id = ''")
 	}
 	if len(c.IDs) > 0 {
 		db.Where(tableName+".id IN ?", c.IDs)

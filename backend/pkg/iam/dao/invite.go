@@ -10,7 +10,7 @@ type InviteCond struct {
 	*gormdao.BaseCond
 	TenantID string
 	Code     string
-	Status   string
+	Status   model.InviteStatus
 	IDs      []string
 }
 

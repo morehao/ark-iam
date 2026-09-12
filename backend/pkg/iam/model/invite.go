@@ -9,13 +9,15 @@ import (
 const TableNameInvite = "tenant_invite"
 
 // InviteStatus 邀请单状态。
+// 「已过期」不是存储态：由 expires_at 在读取时派生（见
+// status-source-consistency-design-20260912.md D6/R2）——若写成存储态，会引入
+// 「已过期但定时任务还没跑到」的一致性窗口，反而更差。
 type InviteStatus string
 
 const (
 	InviteStatusPending  InviteStatus = "pending"  // 待使用
 	InviteStatusAccepted InviteStatus = "accepted" // 已使用
 	InviteStatusRevoked  InviteStatus = "revoked"  // 已撤销
-	InviteStatusExpired  InviteStatus = "expired"  // 已过期
 )
 
 // InviteEntity 加入租户的邀请单：租户 owner/管理员生成，凭证持有者凭 inviteCode 加入该租户。

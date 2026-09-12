@@ -62,7 +62,6 @@ func TestCreateSessionRecordsSessionAudit(t *testing.T) {
 	require.NotNil(t, captured, "session audit should be written")
 	require.Equal(t, "88", captured.PersonID)
 	require.Equal(t, sid, captured.SessionID)
-	require.Equal(t, sessionAuditStatusActive, captured.Status)
 	require.False(t, captured.LoginTime.IsZero())
 	require.Equal(t, "77", captured.TenantID, "session audit should carry resolved tenant_id from ctx")
 

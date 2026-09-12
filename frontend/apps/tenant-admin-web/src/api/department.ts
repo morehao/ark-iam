@@ -4,23 +4,24 @@ import type {
   DepartmentItem,
   DepartmentTreeResp,
   DepartmentUserItem,
+  DeptNodeStatus,
   PageListResp,
 } from '@ark-iam/types'
 
 // ---------- 部门树 ----------
-export const getDepartmentTree = (params?: { name?: string; status?: string }) =>
+export const getDepartmentTree = (params?: { name?: string; status?: DeptNodeStatus }) =>
   request.get<any, DepartmentTreeResp>('/tenant/departments/tree', { params })
 export const getDepartmentChildren = (
   departmentID: string,
-  params?: { page?: number; pageSize?: number; name?: string; status?: string },
+  params?: { page?: number; pageSize?: number; name?: string; status?: DeptNodeStatus },
 ) => request.get<any, DepartmentChildrenResp>(`/tenant/departments/${departmentID}/children`, { params })
-export const createDepartment = (data: { parentID?: string; name: string; sort?: number; status?: string }) =>
+export const createDepartment = (data: { parentID?: string; name: string; sort?: number; status?: DeptNodeStatus }) =>
   request.post<any, { departmentID: string }>('/tenant/departments', data)
-export const updateDepartment = (data: { departmentID: string; parentID?: string; name?: string; sort?: number; status?: string }) => {
+export const updateDepartment = (data: { departmentID: string; parentID?: string; name?: string; sort?: number; status?: DeptNodeStatus }) => {
   const { departmentID, ...body } = data
   return request.put<any, string>(`/tenant/departments/${departmentID}`, body)
 }
-export const updateDepartmentStatus = (departmentID: string, status: string) =>
+export const updateDepartmentStatus = (departmentID: string, status: DeptNodeStatus) =>
   request.patch<any, string>(`/tenant/departments/${departmentID}`, { status })
 export const deleteDepartment = (id: string, cascade = false) =>
   request.delete<any, string>(`/tenant/departments/${id}`, { params: { cascade } })

@@ -21,10 +21,6 @@ import (
 )
 
 const (
-	sessionAuditStatusActive = "active"
-)
-
-const (
 	ssoSessionKeyPrefix      = "iam:oidc:sso_session:"
 	ssoUserSessionsKeyPrefix = "iam:oidc:sso_user_sessions:"
 )
@@ -113,7 +109,7 @@ var sessionAuditWriter = func(ctx context.Context, entity *model.SessionAuditEnt
 
 // recordSessionAuditBestEffort Session 创建后尽力落库一条 session 审计记录。
 // 审计写入失败仅记录日志，绝不阻断 SSO 会话本身（Redis 会话必须照常可用）。
-// CreateSession 无 gin 上下文，仅能记录 person_id/session_id/tenant_id/login_time/status，
+// CreateSession 无 gin 上下文，仅能记录 person_id/session_id/tenant_id/login_time，
 // client_ip 与 user_agent 暂留空。
 func recordSessionAuditBestEffort(ctx context.Context, sid string, personID string) {
 	tenantID := ""
@@ -127,7 +123,6 @@ func recordSessionAuditBestEffort(ctx context.Context, sid string, personID stri
 		SessionID: sid,
 		TenantID:  tenantID,
 		LoginTime: time.Now(),
-		Status:    sessionAuditStatusActive,
 		CreatedBy: personID,
 	}
 	if err := sessionAuditWriter(ctx, entity); err != nil {

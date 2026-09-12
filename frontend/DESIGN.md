@@ -172,13 +172,13 @@ components:
 
 | 字段语义 | 组件 | 值 → 文案(Tag 色) |
 |---|---|---|
-| 启用/停用（status） | `StatusTag` | enable / 1 / active → 启用（`success`）；disable / 0 / inactive → 停用（`default`）；suspended → 挂起（`error`） |
+| 启用/停用（status） | `EnableTag` | `enable` → 启用（`success`）；`disable` → 停用（`default`）；其余原样回显。**只认这一套取值**，不做数字/历史值兼容 |
 | 挂起（isSuspended / status） | `SuspendedTag` | 1 / true / `suspended` → 挂起（`error`）；0 / false / `active` → 正常（`success`）；兼容布尔字段与 status 枚举两种后端形态 |
 | 验证（isVerified） | `VerifiedTag` | 1 → 已验证（`success`）；0 → 未验证（`warning`） |
 | 会话（isActive） | 内联语义色 | true → 活跃（`success`）；false → 已失效（`default`） |
 | API Key 有效 | 内联语义色 | 有效（`success`）；已吊销（`error`） |
 
-**分类标识（非状态，用固定分类色，不用语义组件）**：类型/来源/可见性等保持固定传统 Tag 色但收敛出处——租户/应用类型用共享 `TypeTag`（platform→geekblue、customer→cyan、first_party→blue、third_party→orange）；角色来源用共享 `SourceTag`（builtin→gold「内置」，其余→blue「自定义」）；页面私有分类如 public/private、菜单类型、超管等允许内联但遵循「分类色」规则，禁止出现三态以上随意取色。
+**分类标识（非状态，用固定分类色，不用语义组件）**：类型/来源/可见性等保持固定传统 Tag 色但收敛出处——租户类型用共享 `TypeTag`（platform→geekblue、customer→cyan）；应用/客户端来源与角色来源共用 `SourceTag`（builtin→gold「内置」、first_party→blue「第一方」、third_party→orange「第三方」、custom→blue「自定义」）；页面私有分类如 public/private、菜单类型、超管等允许内联但遵循「分类色」规则，禁止出现三态以上随意取色。
 
 ### 7.3 列表页模板（List 骨架）
 
@@ -214,6 +214,13 @@ PageContainer(title, description, extra=刷新 + 主操作[type=primary])
 - 操作列一律用共享的 `actionColumn()`（内部 `RowActions`，`@ark-iam/ui`）声明式配置，**禁止页面内手写 `Space + Button/Popconfirm` 拼装，也禁止给操作列另写 `title/key/width/fixed`**；`actions` 数组顺序即优先级，被收起的应是次要/危险操作。运行时隐藏用 `RowAction.hidden`（如已吊销密钥不再展示「吊销」）。
 - `RowAction.confirm` 声明二次确认：横排操作走 `Popconfirm`，下拉菜单项走 `Modal.confirm`（下拉会先关闭，气泡无法稳定锚定）。
 - **详情入口是名称，不是操作按钮**：列表不设「详情」操作，名称一律用 `nameColumn()`（内部 `NameLink`）渲染为主色可点击链接（hover 下划线 + 手型光标；过长省略号截断并悬浮展示全称，编码/日志键类名称传 `monospace`）。删除「详情」后操作列为空的表，直接移除操作列（`scroll.x` 由 `tableScrollX` 自动跟随收窄，无需手改）。
+
+**可增长资源下拉硬规则（2026-09「只取前 100 条 → 选不到目标」后收敛）**
+
+- 租户、应用等**可持续增长**的资源做下拉（列表筛选 / 表单选择）时，禁止一次性 `getXxxPageList({ page: 1, pageSize: 100 })` 全量铺选项——数据量上百后目标根本不在下拉里。一律用共享组件 **`RemoteSelect`**（单选）/ **`RemoteMultiSelect`**（多选，如角色授权，`@ark-iam/ui`）：选项由 `fetchOptions(keyword)` 按关键字从服务端取，内部 `filterOption={false}`（过滤交给服务端，否则只能搜到已加载的那一页），输入去抖后重新拉取。
+- 两个组件保证同样两条不变量：**过期响应被丢弃**（快速输入时旧关键字的结果不会覆盖新结果）、**已选值始终显示名称**（`initialLabel` / `initialLabels` + 历史结果累积，搜索结果替换选项后不会回退成裸 UUID）。`onChange(value, option)` 的第二参是普通 `{ value, label }` 对象（不回传属性不可枚举的 antd 内部展平对象）；多选回传 `(values, options)` 数组。同一页面多个下拉可用 `labelCache` 共享「值 → 名称」，如筛选区选过的服务账号在弹窗表单里直接显示名称。
+- **过滤条件必须能表达「空值」语义**：未归属应用的系统角色存储值是 `app_id = ''`，而空串查询参数在 DAO 里语义是「不过滤」，靠前端「全量拉一页再客户端过滤」实现等于把 100 条上限换个地方踩。此类维度加显式服务端开关（如租户角色列表的 `unassigned=true`），不要拿空串参数冒充过滤条件。
+- 候选集天然有界且很小（状态枚举、令牌认证方式等）仍用普通 `Select` + 静态 `options`，不必包一层远程搜索。
 
 **时间列硬规则（2026-09 折行问题后收敛）**
 
