@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/gin-gonic/gin v1.12.0
-	github.com/morehao/golib v1.32.13
+	github.com/morehao/golib v1.32.16
 	github.com/swaggo/swag v1.16.6
 	gorm.io/datatypes v1.2.7
 	gorm.io/driver/sqlite v1.6.0
