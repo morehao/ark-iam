@@ -68,7 +68,7 @@ func NewLoginRateLimit(keyPrefix string) gin.HandlerFunc {
 	}
 	return func(ctx *gin.Context) {
 		key := keyPrefix + gincontext.GetClientIP(ctx)
-		if !limiter.Allow(ctx.Request.Context(), key) {
+		if !limiter.Allow(ctx, key) {
 			gincontext.Fail(ctx, code.GetError(code.LoginRateLimitedError))
 			ctx.Abort()
 			return

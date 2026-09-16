@@ -10,6 +10,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/seed"
 	"github.com/morehao/ark-iam/tenantadmin"
 	"github.com/morehao/ark-iam/tenantadmin/config"
+	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/glog"
 	_ "github.com/morehao/golib/glog/driver/zap"
 	"github.com/morehao/golib/gtrace/otel"
@@ -48,13 +49,17 @@ func resourceInit() error {
 	if err := dbclient.InitMultiDB(config.Conf.DBConfigs, gormLogConfig); err != nil {
 		return fmt.Errorf("init db failed: %w", err)
 	}
+	// 启动期不隶属任何租户：显式声明「全部租户」作用域。
+	// fail-closed 下不允许用缺失作用域来获得跨租户可见性（会直接报错），
+	// 因此 AutoMigrate 与种子写入必须在此显式声明。
+	bootstrapCtx := gcontext.WithTenantScope(context.Background(), gcontext.AllScope())
 	if config.Conf.DB.AutoMigrate {
-		if err := model.AutoMigrateAll(dbclient.IamDB(context.Background())); err != nil {
+		if err := model.AutoMigrateAll(dbclient.IamDB(bootstrapCtx)); err != nil {
 			return fmt.Errorf("auto migrate failed: %w", err)
 		}
 	}
 	if config.Conf.DB.Seed {
-		if err := seed.SeedIam(context.Background(), dbclient.IamDB(context.Background())); err != nil {
+		if err := seed.SeedIam(bootstrapCtx, dbclient.IamDB(bootstrapCtx)); err != nil {
 			return fmt.Errorf("seed data failed: %w", err)
 		}
 	}

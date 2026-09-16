@@ -18,6 +18,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/object/objauth"
 
 	"github.com/morehao/golib/biz/gcontext"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/glog"
 )
 
@@ -228,7 +229,10 @@ func setOIDCContext(ctx *gin.Context, claims *objauth.TokenClaims, tokenStr stri
 	personID := claims.PersonID()
 
 	ctx.Set(gcontext.KeyPersonID, personID)
-	ctx.Set(gcontext.KeyTenantID, claims.TenantID)
+	// 租户作用域：类型化值写入请求上下文（协议层 / 异步任务同样可见），
+	// 同时投影 gin Keys 的 tenantID 供既有身份读取点使用。
+	// 必须写在下面的"租户内用户反查"之前，该查询依赖租户隔离。
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope(claims.TenantID))
 	ctx.Set(gcontext.KeyAuthToken, tokenStr)
 	ctx.Set(ContextKeyClientID, claims.ClientID)
 

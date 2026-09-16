@@ -8,7 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/credential"
 	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/golib/biz/gcontext"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 )
@@ -73,7 +75,9 @@ func (m *apiKeyAuthMiddleware) Authenticate(ctx *gin.Context) bool {
 		KeyHash:   keyHash,
 		RevokedAt: &time.Time{},
 	}
-	list, _, err := m.apiKeyDao.GetPageListByCond(ctx, cond)
+	// 按密钥摘要反查归属租户：此刻租户未知，必须**显式**声明"全租户"作用域。
+	// 禁止靠"ctx 没有租户作用域"来获得跨租户可见性——那会被 fail-closed 拒绝。
+	list, _, err := m.apiKeyDao.GetPageListByCond(dbclient.CrossTenantContext(ctx), cond)
 	if err != nil {
 		glog.Errorf(ctx, "[middleware.ApiKeyAuth] GetPageListByCond fail, err:%v", err)
 		writeApiKeyUnauthorized(ctx, http.StatusInternalServerError, "internal server error")
@@ -116,11 +120,13 @@ func (m *apiKeyAuthMiddleware) Authenticate(ctx *gin.Context) bool {
 	}
 
 	// 归属主体解析：密钥代表的是其归属用户（真实用户本人或服务账号），而非创建人。
+	// 此处租户已由密钥行确定但尚未写入 ctx，因此用"指定租户"作用域查询归属用户。
 	if entity.OwnerUserID == "" {
 		writeApiKeyUnauthorized(ctx, http.StatusUnauthorized, "API key owner missing")
 		return false
 	}
-	owner, err := m.userDao.GetByID(ctx, entity.OwnerUserID)
+	ownerCtx := dbclient.ExplicitTenantContext(ctx, entity.TenantID)
+	owner, err := m.userDao.GetByID(ownerCtx, entity.OwnerUserID)
 	if err != nil {
 		glog.Errorf(ctx, "[middleware.ApiKeyAuth] owner GetByID fail, err:%v, ownerID:%s", err, entity.OwnerUserID)
 		writeApiKeyUnauthorized(ctx, http.StatusInternalServerError, "internal server error")
@@ -140,12 +146,14 @@ func (m *apiKeyAuthMiddleware) Authenticate(ctx *gin.Context) bool {
 		return false
 	}
 
-	ctx.Set(gcontext.KeyTenantID, entity.TenantID)
+	// 写入租户作用域（类型化值 + gin Keys 投影），此后本请求的数据访问默认按该租户隔离。
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope(entity.TenantID))
 	ctx.Set(gcontext.KeyUserID, owner.ID)
 	ctx.Set(ContextKeyUserType, owner.UserType)
 
 	go func() {
-		updateCtx := ctx.Copy()
+		// 异步续跑：不持有池化的 *gin.Context，作用域随请求上下文一并带走。
+		updateCtx := gincontext.AsyncContext(ctx)
 		if err := m.apiKeyDao.UpdateMap(updateCtx, entity.ID, map[string]any{"last_used_at": time.Now()}); err != nil {
 			glog.Errorf(updateCtx, "[middleware.ApiKeyAuth] UpdateMap fail, err:%v, id:%s", err, entity.ID)
 		}

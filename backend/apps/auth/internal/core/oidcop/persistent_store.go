@@ -73,6 +73,18 @@ func NewPersistentStore(opts ...PersistentStoreOption) *PersistentStore {
 	}
 }
 
+// 协议层（op.Storage 适配）的租户作用域策略
+//
+// 协议端点（/oidc/*）没有「当前租户」：调用 ctx 要么来自 zitadel 透传的请求上下文，
+// 要么来自后台 worker。因此本文件每一次数据访问都必须自证可见范围：
+//
+//   - 按全局唯一键（client_id、API Key 摘要、refresh token 摘要、行 ID）或自然人级范围
+//     读取 → dbclient.CrossTenantContext(ctx)（跨全部租户）；
+//   - 已解析出目标租户的行级读写 → dbclient.ExplicitTenantContext(ctx, tenantID)。
+//
+// 禁止用「ctx 恰好没有作用域」表达跨租户可见：那样上游一旦带上租户，查询会变成静默误过滤
+// （少读不报错、UPDATE 命中 0 行不报错），而 fail-closed 会把真正的缺声明当场暴露。
+
 // txDB 返回事务用 DB；未注入时回退全局 iam 库。
 func (s *PersistentStore) txDB(ctx context.Context) *gorm.DB {
 	if s.db != nil {
@@ -84,6 +96,8 @@ func (s *PersistentStore) txDB(ctx context.Context) *gorm.DB {
 }
 
 func (s *PersistentStore) LookupApiKeyByRawKey(ctx context.Context, rawKey string) (*model.ApiKeyEntity, error) {
+	// API Key 摘要全局唯一，且本查询发生在「租户确定之前」：显式声明跨全部租户。
+	ctx = dbclient.CrossTenantContext(ctx)
 	hash := credential.HashSecret(rawKey)
 	entity, err := s.apiKeyDao().GetByCond(ctx, &dao.ApiKeyCond{KeyHash: hash})
 	if err != nil || entity == nil || entity.ID == "" {
@@ -97,7 +111,8 @@ func (s *PersistentStore) LookupApiKeyByRawKey(ctx context.Context, rawKey strin
 	}
 	// last_used_at 写入降频：一分钟窗口内不重复写，避免每个请求都触发一次 DB 写
 	if !entity.LastUsedAt.Valid || time.Since(entity.LastUsedAt.Time) > time.Minute {
-		if err := s.apiKeyDao().UpdateMap(ctx, entity.ID, map[string]any{
+		// 写回的是刚读出的那一行：按该行所属租户显式声明，避免 UPDATE 被过滤成 0 行。
+		if err := s.apiKeyDao().UpdateMap(dbclient.ExplicitTenantContext(ctx, entity.TenantID), entity.ID, map[string]any{
 			"last_used_at": time.Now(),
 		}); err != nil {
 			glog.Warnf(ctx, "[PersistentStore.LookupApiKeyByRawKey] update last_used_at fail, apiKeyID:%s, err:%v", entity.ID, err)
@@ -115,6 +130,8 @@ func (s *PersistentStore) GetApiKeyClientByRawKey(ctx context.Context, rawKey st
 }
 
 func (s *PersistentStore) GetClientByClientID(ctx context.Context, clientID string) (op.Client, error) {
+	// client_id 全局唯一（租户确定之前即需校验）：显式声明跨全部租户。
+	ctx = dbclient.CrossTenantContext(ctx)
 	// H4：仅返回启用状态的 client，管理员停用后 authorize/token/client_credentials 立即失效
 	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID, Status: model.ApplicationClientStatusEnable})
 	if err != nil || clientEntity == nil || clientEntity.ID == "" {
@@ -124,6 +141,8 @@ func (s *PersistentStore) GetClientByClientID(ctx context.Context, clientID stri
 }
 
 func (s *PersistentStore) AuthorizeClientIDSecret(ctx context.Context, clientID, clientSecret string) error {
+	// client_id + 密钥摘要校验同样发生在租户确定之前：显式声明跨全部租户。
+	ctx = dbclient.CrossTenantContext(ctx)
 	clientHash := credential.HashSecret(clientSecret)
 
 	// H4：停用 client 的 secret 一律拒绝
@@ -250,6 +269,8 @@ func (s *PersistentStore) SetIntrospectionFromToken(ctx context.Context, introsp
 }
 
 func (s *PersistentStore) GetPrivateClaimsFromScopes(ctx context.Context, userID, clientID string, scopes []string) (map[string]any, error) {
+	// 需要看到该自然人在**全部租户**的成员关系（多租户时宁可不产出 claim）：显式声明跨全部租户。
+	ctx = dbclient.CrossTenantContext(ctx)
 	pid, err := ParseSubject(userID)
 	if err != nil {
 		return nil, nil
@@ -275,6 +296,8 @@ func (s *PersistentStore) ValidateJWTProfileScopes(ctx context.Context, userID s
 }
 
 func (s *PersistentStore) CreateAccessToken(ctx context.Context, request op.TokenRequest) (accessTokenID string, expiration time.Time, err error) {
+	// 本方法只按 client_id 取配置，不做租户内行级读写：显式声明跨全部租户。
+	ctx = dbclient.CrossTenantContext(ctx)
 	accessTokenID, err = randomTokenID("at")
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("generate access token id: %w", err)
@@ -336,6 +359,8 @@ func (s *PersistentStore) CreateAccessToken(ctx context.Context, request op.Toke
 }
 
 func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, request op.TokenRequest, currentRefreshToken string) (accessTokenID string, newRefreshToken string, expiration time.Time, err error) {
+	// 先按自然人列出其全部租户成员关系（再在内存中按 selectedTenantID 选定）：显式声明跨全部租户。
+	ctx = dbclient.CrossTenantContext(ctx)
 	accessTokenID, err = randomTokenID("at")
 	if err != nil {
 		return "", "", time.Time{}, fmt.Errorf("generate access token id: %w", err)
@@ -365,6 +390,9 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 	if userEntity == nil {
 		userEntity = &users[0]
 	}
+	// 选中的租户在此刻才确定：后续 refresh token 的插入/条件撤销都属于该租户，
+	// 显式声明「指定租户」作用域（事务必须在声明之后创建，插件按事务自身的 ctx 注入）。
+	tenantCtx := dbclient.ExplicitTenantContext(ctx, userEntity.TenantID)
 
 	clientID := ""
 	if authReq, ok := request.(op.AuthRequest); ok {
@@ -456,7 +484,7 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 	// 杜绝并发刷新时两个请求都通过校验、各自产出一套新 token 的分裂。
 	// 条件撤销命中 0 行说明旧 token 已被并发轮换/撤销 → 视为复用攻击
 	// （RFC 9706 §4.1），撤销该 person 全部 refresh token（token 家族）。
-	txErr := s.txDB(ctx).Transaction(func(tx *gorm.DB) error {
+	txErr := s.txDB(tenantCtx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(refreshEntity).Error; err != nil {
 			return err
 		}
@@ -532,6 +560,8 @@ func tokenUsageFromRequest(request op.TokenRequest) objauth.TokenUsage {
 }
 
 func (s *PersistentStore) TokenRequestByRefreshToken(ctx context.Context, refreshToken string) (op.RefreshTokenRequest, error) {
+	// refresh token 摘要全局唯一（刷新时租户由该行还原）：显式声明跨全部租户。
+	ctx = dbclient.CrossTenantContext(ctx)
 	refreshTokenHash := credential.HashSecret(refreshToken)
 	storedToken, err := s.refreshTokenDao().GetByCond(ctx, &dao.RefreshTokenCond{Token: refreshTokenHash})
 	if err != nil || storedToken == nil || storedToken.ID == "" {
@@ -625,6 +655,8 @@ func selectedTenantFromRequest(request op.TokenRequest) string {
 }
 
 func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, clientID string) error {
+	// 自然人级全局登出：显式声明跨全部租户。
+	ctx = dbclient.CrossTenantContext(ctx)
 	personID, err := ParseSubject(userID)
 	if err != nil {
 		glog.Warnf(ctx, "[PersistentStore.TerminateSession] ParseSubject fail, userID:%s, err:%v", userID, err)
@@ -647,6 +679,8 @@ func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, c
 }
 
 func (s *PersistentStore) RevokeToken(ctx context.Context, tokenOrTokenID string, userID string, clientID string) *oidc.Error {
+	// 按 token 行 ID / 自然人 / client_id 撤销：三者都不是租户内定位，显式声明跨全部租户。
+	ctx = dbclient.CrossTenantContext(ctx)
 	if tokenOrTokenID == "" {
 		return nil
 	}
@@ -676,6 +710,8 @@ func (s *PersistentStore) RevokeToken(ctx context.Context, tokenOrTokenID string
 }
 
 func (s *PersistentStore) GetRefreshTokenInfo(ctx context.Context, clientID string, tokenValue string) (userID string, tokenID string, err error) {
+	// refresh token 摘要全局唯一（撤销前需先定位）：显式声明跨全部租户。
+	ctx = dbclient.CrossTenantContext(ctx)
 	refreshTokenHash := credential.HashSecret(tokenValue)
 	storedToken, err := s.refreshTokenDao().GetByCond(ctx, &dao.RefreshTokenCond{Token: refreshTokenHash})
 	if err != nil || storedToken == nil || storedToken.ID == "" {

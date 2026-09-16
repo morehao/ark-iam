@@ -1,13 +1,12 @@
 package middleware
 
 import (
-	"context"
-
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/morehao/ark-iam/auth/internal/service/svcoidc"
 	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/morehao/ark-iam/pkg/sso"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
 // gin 上下文暂存键：OIDC hint 先经 c.Set 暂存在 gin 上下文（handler 链内可见），
@@ -44,14 +43,12 @@ func ResourceHint() gin.HandlerFunc {
 // gin.Context 不会跨过该边界，因此必须在透传前完成这次搬运；
 // 这是全仓库唯一修改 c.Request 的地方，其余中间件一律只读。
 func CarryOIDCHints(ctx *gin.Context) {
-	reqCtx := ctx.Request.Context()
 	if t := ctx.GetString(ginKeyTenantHint); t != "" {
-		reqCtx = context.WithValue(reqCtx, oidcop.TenantHintKey, t)
+		gincontext.WithRequestValue(ctx, oidcop.TenantHintKey, t)
 	}
 	if r := ctx.GetString(ginKeyResourceHint); r != "" {
-		reqCtx = context.WithValue(reqCtx, oidcop.ResourceHintKey, r)
+		gincontext.WithRequestValue(ctx, oidcop.ResourceHintKey, r)
 	}
-	ctx.Request = ctx.Request.WithContext(reqCtx)
 }
 
 // OIDCSilentAuth 组装 /authorize 的静默登录中间件（L1）：
@@ -61,7 +58,7 @@ func OIDCSilentAuth(provider *svcoidc.OIDCProvider, ssoSessionCookieName string)
 	ssoStore := sso.NewSSOSessionStore()
 	return pkgmiddleware.SilentSSORequired(ssoSessionCookieName,
 		pkgmiddleware.WithSessionValidator(func(ctx *gin.Context, sessionID string) error {
-			_, err := ssoStore.ValidateSession(ctx.Request.Context(), sessionID)
+			_, err := ssoStore.ValidateSession(ctx, sessionID)
 			return err
 		}),
 		pkgmiddleware.WithRedirectURIVerifier(provider.RedirectURIVerifier()),

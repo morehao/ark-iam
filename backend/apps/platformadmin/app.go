@@ -46,7 +46,7 @@ func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 				if dbclient.RedisCli == nil {
 					return true // fail-open：无 Redis 时无法校验
 				}
-				active, err := ssoStore.HasActiveSession(ctx.Request.Context(), personID)
+				active, err := ssoStore.HasActiveSession(ctx, personID)
 				if err != nil {
 					glog.Warnf(ctx, "[platformadmin.Init] HasActiveSession fail, personID:%s, err:%v", personID, err)
 					return true

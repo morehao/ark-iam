@@ -218,8 +218,8 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 		return nil, code.GetError(code.AuthJoinNotAllowedError)
 	}
 
-	// 1. 解析邀请
-	inviteEntity, err := dao.NewInviteDao().GetByCond(ctx.Request.Context(), &dao.InviteCond{Code: req.InviteCode})
+	// 1. 解析邀请：邀请码全局唯一，解析阶段尚不知归属租户，必须显式声明「全租户」作用域。
+	inviteEntity, err := dao.NewInviteDao().GetByCond(dbclient.CrossTenantContext(ctx), &dao.InviteCond{Code: req.InviteCode})
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.JoinTenant] invite dao GetByCond fail, err:%v, code:%s", err, req.InviteCode)
 		return nil, code.GetError(code.InviteGetDetailError)
@@ -231,9 +231,11 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 		return nil, code.GetError(code.InviteExpiredError)
 	}
 	tenantID := inviteEntity.TenantID
+	// 邀请归属租户已确定：后续成员读写一律用「指定租户」作用域（与调用方当前租户无关）。
+	joinCtx := dbclient.ExplicitTenantContext(ctx, tenantID)
 
 	userDao := newAuthUserStore()
-	existingUser, err := userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{PersonID: personID, TenantID: tenantID})
+	existingUser, err := userDao.GetByCond(joinCtx, &dao.UserCond{PersonID: personID, TenantID: tenantID})
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.JoinTenant] user dao GetByCond fail, err:%v", err)
 		return nil, code.GetError(code.UserGetDetailError)
@@ -244,7 +246,7 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 
 	// 2. 建成员 user（非 owner）+ 标记邀请已用
 	var userID string
-	txErr := dbclient.IamDB(ctx.Request.Context()).Transaction(func(tx *gorm.DB) error {
+	txErr := dbclient.IamDB(joinCtx).Transaction(func(tx *gorm.DB) error {
 		now := time.Now()
 		userEntity := &model.UserEntity{
 			TenantID:   tenantID,
@@ -256,12 +258,12 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 			JoinedAt:   &now,
 			CreatedBy:  personID,
 		}
-		if uErr := dao.NewUserDao().WithTx(tx).Insert(ctx.Request.Context(), userEntity); uErr != nil {
+		if uErr := dao.NewUserDao().WithTx(tx).Insert(joinCtx, userEntity); uErr != nil {
 			return uErr
 		}
 		userID = userEntity.ID
 		// 标记邀请已使用
-		if uErr := dao.NewInviteDao().WithTx(tx).UpdateMap(ctx.Request.Context(), inviteEntity.ID, map[string]any{
+		if uErr := dao.NewInviteDao().WithTx(tx).UpdateMap(joinCtx, inviteEntity.ID, map[string]any{
 			"status":     model.InviteStatusAccepted,
 			"updated_by": personID,
 		}); uErr != nil {
@@ -291,12 +293,14 @@ func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
 			TargetType: model.AuditTargetTypePerson,
 			TargetID:   personID,
 		})
-		if err := newAuthRefreshTokenStore().RevokeByPersonID(ctx.Request.Context(), personID); err != nil {
+		// person 级全局登出：跨该自然人的全部租户撤销，显式声明「全租户」作用域。
+		personCtx := dbclient.CrossTenantContext(ctx)
+		if err := newAuthRefreshTokenStore().RevokeByPersonID(personCtx, personID); err != nil {
 			glog.Errorf(ctx, "[svcauth.Logout] RevokeByPersonID fail, personID:%s, err:%v", personID, err)
 		}
 		// 先入队 back-channel 通知（ListByPersonID 依赖 sso_user_sessions 索引），再撤销 SSO 会话。
 		svc.enqueueBackChannelLogouts(ctx, personID)
-		if err := sso.RevokeSSOSessionsByPersonID(ctx.Request.Context(), personID); err != nil {
+		if err := sso.RevokeSSOSessionsByPersonID(personCtx, personID); err != nil {
 			glog.Errorf(ctx, "[svcauth.Logout] RevokeSSOSessionsByPersonID fail, personID:%s, err:%v", personID, err)
 		}
 	}
@@ -308,7 +312,7 @@ func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
 // 即时收到 logout_token。入队失败仅告警，不影响登出主流程；任务由 oidcop 的 logoutWorker 异步消费。
 // 具体登记遍历复用 sso.EnqueueLogoutsByPersonID（租户挂起等场景走同一实现，避免两处逻辑漂移）。
 func (svc *authSvc) enqueueBackChannelLogouts(ctx *gin.Context, personID string) {
-	if _, err := sso.EnqueueLogoutsByPersonID(ctx.Request.Context(), personID); err != nil {
+	if _, err := sso.EnqueueLogoutsByPersonID(dbclient.CrossTenantContext(ctx), personID); err != nil {
 		glog.Warnf(ctx, "[svcauth.Logout] enqueue back-channel logouts fail, personID:%s, err:%v", personID, err)
 	}
 }
@@ -329,9 +333,9 @@ func (svc *authSvc) Userinfo(ctx *gin.Context, req *dtoauth.UserinfoReq) (*dtoau
 	var err error
 
 	if userID != "" {
-		userEntity, err = userDao.GetByID(ctx.Request.Context(), userID)
+		userEntity, err = userDao.GetByID(ctx, userID)
 	} else if personID != "" && tenantID != "" {
-		userEntity, err = userDao.GetByCond(ctx.Request.Context(), &dao.UserCond{PersonID: personID, TenantID: tenantID})
+		userEntity, err = userDao.GetByCond(ctx, &dao.UserCond{PersonID: personID, TenantID: tenantID})
 	} else {
 		return nil, code.GetError(gconstant.UnauthorizedErr)
 	}
@@ -351,7 +355,7 @@ func (svc *authSvc) Userinfo(ctx *gin.Context, req *dtoauth.UserinfoReq) (*dtoau
 	personInfo := objauth.PersonInfo{}
 	if personID != "" {
 		personDao := newAuthPersonStore()
-		personEntity, personErr := personDao.GetByID(ctx.Request.Context(), personID)
+		personEntity, personErr := personDao.GetByID(ctx, personID)
 		if personErr != nil {
 			// 不再静默吞错：DB 故障时如实报错，避免返回残缺 personInfo 误导调用方
 			glog.Errorf(ctx, "[svcauth.Userinfo] person dao GetByID fail, err:%v, personID:%s", personErr, personID)
@@ -396,7 +400,7 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 		personCond.Username = identifier
 	}
 
-	personEntity, err := personDao.GetByCond(ctx.Request.Context(), personCond)
+	personEntity, err := personDao.GetByCond(ctx, personCond)
 	if err != nil {
 		audit.WriteAudit(ctx, audit.AuditEntry{
 			Action:     audit.ActionLogin,
@@ -446,7 +450,9 @@ func (svc *authSvc) listPersonTenants(ctx *gin.Context, personID string) (*model
 	tenantDao := newAuthTenantStore()
 	// 一次取全部租户成员，按加入时间排序：第一条即"默认租户"（确定性），
 	// 消除原先 GetByCond 无 ORDER BY 时默认租户随机的问题。
-	joinedUsers, err := userDao.GetListByCond(ctx.Request.Context(), &dao.UserCond{
+	// 按自然人列出其全部租户成员关系：这是"跨租户"读取（此时尚未确定当前租户），
+	// 必须显式声明「全租户」作用域。
+	joinedUsers, err := userDao.GetListByCond(dbclient.CrossTenantContext(ctx), &dao.UserCond{
 		BaseCond: &gormdao.BaseCond{OrderField: "joined_at, id"},
 		PersonID: personID,
 	})
@@ -466,7 +472,7 @@ func (svc *authSvc) listPersonTenants(ctx *gin.Context, personID string) (*model
 	}
 	tenantMap := map[string]*model.TenantEntity{}
 	if len(tenantIDs) > 0 {
-		tenants, qErr := tenantDao.GetListByCond(ctx.Request.Context(), &dao.TenantCond{
+		tenants, qErr := tenantDao.GetListByCond(ctx, &dao.TenantCond{
 			BaseCond: &gormdao.BaseCond{IDs: toAnySlice(tenantIDs)},
 		})
 		if qErr != nil {
@@ -557,7 +563,7 @@ func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID string, success bo
 
 	if success {
 		userDao := newAuthUserStore()
-		if err := userDao.UpdateMap(ctx.Request.Context(), userID, map[string]interface{}{
+		if err := userDao.UpdateMap(ctx, userID, map[string]interface{}{
 			"last_sign_in_at": time.Now(),
 		}); err != nil {
 			glog.Errorf(ctx, "[svcauth.defaultRecordLoginLog] update last_sign_in_at fail, err:%v", err)

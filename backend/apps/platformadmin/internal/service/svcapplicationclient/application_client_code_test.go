@@ -43,7 +43,7 @@ func TestCreateRejectsInvalidClientCode(t *testing.T) {
 	}
 
 	var count int64
-	if err := db.Model(&model.ApplicationClientEntity{}).Count(&count).Error; err != nil {
+	if err := db.WithContext(ctx).Model(&model.ApplicationClientEntity{}).Count(&count).Error; err != nil {
 		t.Fatalf("count application_client: %v", err)
 	}
 	if count != 0 {

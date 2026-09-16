@@ -96,7 +96,7 @@ func TestDepartmentCreateRootAndChildPaths(t *testing.T) {
 		t.Fatalf("create root: %v", err)
 	}
 	var rootEntity model.DepartmentEntity
-	if err := db.First(&rootEntity, "id = ?", root.DepartmentID).Error; err != nil {
+	if err := db.WithContext(ginCtx).First(&rootEntity, "id = ?", root.DepartmentID).Error; err != nil {
 		t.Fatalf("query root: %v", err)
 	}
 	if rootEntity.DeptPath != "/"+root.DepartmentID || rootEntity.DeptDepth != 1 {
@@ -111,7 +111,7 @@ func TestDepartmentCreateRootAndChildPaths(t *testing.T) {
 		t.Fatalf("create child: %v", err)
 	}
 	var childEntity model.DepartmentEntity
-	if err := db.First(&childEntity, "id = ?", child.DepartmentID).Error; err != nil {
+	if err := db.WithContext(ginCtx).First(&childEntity, "id = ?", child.DepartmentID).Error; err != nil {
 		t.Fatalf("query child: %v", err)
 	}
 	if childEntity.DeptPath != "/"+root.DepartmentID+"/"+child.DepartmentID || childEntity.DeptDepth != 2 {
@@ -156,7 +156,7 @@ func TestDepartmentMoveCascadesPathAndRejectsCycle(t *testing.T) {
 		t.Fatalf("move C under A: %v", err)
 	}
 	var cEntity model.DepartmentEntity
-	if err := db.First(&cEntity, "id = ?", c.DepartmentID).Error; err != nil {
+	if err := db.WithContext(ginCtx).First(&cEntity, "id = ?", c.DepartmentID).Error; err != nil {
 		t.Fatalf("query C: %v", err)
 	}
 	if cEntity.DeptPath != "/"+root.DepartmentID+"/"+c.DepartmentID || cEntity.DeptDepth != 2 {
@@ -177,7 +177,7 @@ func TestDepartmentMoveCascadesPathAndRejectsCycle(t *testing.T) {
 	}
 	// 环路移动失败后 A 的路径不应被破坏
 	var aEntity model.DepartmentEntity
-	if err := db.First(&aEntity, "id = ?", root.DepartmentID).Error; err != nil {
+	if err := db.WithContext(ginCtx).First(&aEntity, "id = ?", root.DepartmentID).Error; err != nil {
 		t.Fatalf("query A: %v", err)
 	}
 	if aEntity.DeptPath != "/"+root.DepartmentID {
@@ -208,14 +208,14 @@ func TestDepartmentDeleteRejectsWithChildrenAndCascade(t *testing.T) {
 		t.Fatalf("cascade delete: %v", err)
 	}
 	var count int64
-	if err := db.Model(&model.DepartmentEntity{}).Unscoped().Count(&count).Error; err != nil {
+	if err := db.WithContext(ginCtx).Model(&model.DepartmentEntity{}).Unscoped().Count(&count).Error; err != nil {
 		t.Fatalf("count depts: %v", err)
 	}
 	if count != 2 {
 		t.Fatalf("expected 2 soft-deleted rows, got %d", count)
 	}
 	var childEntity model.DepartmentEntity
-	if err := db.First(&childEntity, "id = ?", child.DepartmentID).Error; err == nil {
+	if err := db.WithContext(ginCtx).First(&childEntity, "id = ?", child.DepartmentID).Error; err == nil {
 		t.Fatalf("expected child soft-deleted")
 	}
 }
@@ -254,7 +254,7 @@ func TestDepartmentUserMemberSingletonAndValidTypes(t *testing.T) {
 		t.Fatalf("reassign primary u1 to A1: %v", err)
 	}
 	var primaryCount int64
-	if err := db.Model(&model.DepartmentUserEntity{}).
+	if err := db.WithContext(ginCtx).Model(&model.DepartmentUserEntity{}).
 		Where("user_id = ? AND relation_type = ?", "u1", model.DeptUserRelationPrimary).
 		Count(&primaryCount).Error; err != nil {
 		t.Fatalf("count primary: %v", err)

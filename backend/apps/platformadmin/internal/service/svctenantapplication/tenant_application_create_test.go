@@ -10,17 +10,13 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenantapplication"
 	"github.com/morehao/ark-iam/platformadmin/testutil"
-	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-// newCreateCtx 构造请求上下文：ctx 租户固定为 t1，用于验证平台侧按请求参数跨租户运维
-// ——订阅归属取自 req.TenantID，而非调用者 token 里的租户。
+// newCreateCtx 构造平台侧请求上下文：平台控制台是跨租户运维入口，租户作用域声明为
+// 「全部租户」——订阅归属取自 req.TenantID，而非调用者 token 里的租户。
 func newCreateCtx() *gin.Context {
-	ctx, _ := gin.CreateTestContext(nil)
-	ctx.Set(gcontext.KeyTenantID, "t1")
-	ctx.Set(gcontext.KeyUserID, "u1")
-	return ctx
+	return testutil.NewGinCtx("", "u1")
 }
 
 func seedTenantEntity(t *testing.T, db *gorm.DB, tenantID, name string) {

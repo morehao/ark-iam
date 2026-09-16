@@ -237,7 +237,7 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 		t.Fatalf("grant ops role: %v", err)
 	}
 	var machRoleIDs []string
-	if err := db.Model(&model.UserRoleEntity{}).Where("tenant_id = ? AND user_id = ?", tenantID, machineID).Pluck("role_id", &machRoleIDs).Error; err != nil {
+	if err := db.WithContext(newTestTenantCtx(tenantID, adminOp.ID)).Model(&model.UserRoleEntity{}).Where("tenant_id = ? AND user_id = ?", tenantID, machineID).Pluck("role_id", &machRoleIDs).Error; err != nil {
 		t.Fatalf("query machine roles: %v", err)
 	}
 	hasRole := func(ids []string, id string) bool {
@@ -281,14 +281,14 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 		t.Fatal("machine user should be soft-deleted")
 	}
 	var deptRelCount int64
-	if err := db.Model(&model.DepartmentUserEntity{}).Where("user_id = ?", machineID).Count(&deptRelCount).Error; err != nil {
+	if err := db.WithContext(newTestTenantCtx(tenantID, adminOp.ID)).Model(&model.DepartmentUserEntity{}).Where("user_id = ?", machineID).Count(&deptRelCount).Error; err != nil {
 		t.Fatalf("count dept relations: %v", err)
 	}
 	if deptRelCount != 0 {
 		t.Fatalf("dept relations should be cascade cleaned, got %d", deptRelCount)
 	}
 	var roleRelCount int64
-	if err := db.Model(&model.UserRoleEntity{}).Where("user_id = ?", machineID).Count(&roleRelCount).Error; err != nil {
+	if err := db.WithContext(newTestTenantCtx(tenantID, adminOp.ID)).Model(&model.UserRoleEntity{}).Where("user_id = ?", machineID).Count(&roleRelCount).Error; err != nil {
 		t.Fatalf("count role relations: %v", err)
 	}
 	if roleRelCount != 0 {

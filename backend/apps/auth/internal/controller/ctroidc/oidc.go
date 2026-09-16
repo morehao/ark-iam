@@ -248,8 +248,7 @@ func (ctr *OIDCCtr) ProviderHandler() gin.HandlerFunc {
 // 供 storage 回退按会话确定撤销目标（H15）。
 func (ctr *OIDCCtr) EndSession(ctx *gin.Context) {
 	if sessionID, err := ctx.Cookie(sso.SessionCookieName); err == nil && sessionID != "" {
-		reqCtx := context.WithValue(ctx.Request.Context(), oidcop.SSOSessionHintKey, sessionID)
-		ctx.Request = ctx.Request.WithContext(reqCtx)
+		gincontext.WithRequestValue(ctx, oidcop.SSOSessionHintKey, sessionID)
 	}
 	clearSSOCookie(ctx)
 	ctr.ProviderHandler()(ctx)

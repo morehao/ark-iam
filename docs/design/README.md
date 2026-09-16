@@ -13,6 +13,7 @@
 | 业务应用（RP）开发 | 如何把新应用接入 SSO / OIDC | [application-integration-guide.md](application-integration-guide.md) |
 | 前端开发对接 | 登录页 / 管理台调用哪些接口、OIDC 端点契约 | [api-reference.md](api-reference.md) |
 | 后端开发 | 路由规范、接口清单、权限模型、种子与字段权威 | [api-reference.md](api-reference.md) → [system-design.md](system-design.md) §4.5 |
+| 后端开发（改数据访问/中间件） | ctx 怎么传、租户隔离怎么生效、跨租户查询怎么写 | [context-and-tenant-scope.md](context-and-tenant-scope.md) |
 | 部署运维 | 配置项含义、构建运行、Docker | [configuration-reference.md](configuration-reference.md) + [run-and-deploy.md](run-and-deploy.md) |
 | 快速查词 | 术语、缩写、角色定义 | [glossary.md](glossary.md) |
 
@@ -28,6 +29,7 @@
 | [run-and-deploy.md](run-and-deploy.md) | **运行与部署**。本地开发环境准备、构建运行、测试、Docker、多环境部署拓扑、常见排障 |
 | [glossary.md](glossary.md) | **术语表**。SSO / OIDC / IAM / 租户 / 自然人 / 应用 / Client / 令牌等术语的统一定义 |
 | [tenant-custom-domain-redesign.md](tenant-custom-domain-redesign.md) | **租户级自定义域名实施方案（待实施）**。按域名识别租户、登录预设与品牌化、`domain` 表重做。**当前实现状态：`domain` 表与控制台 CRUD 已落地，但 auth 侧尚未按域名解析租户，本文方案的主体仍未实施** |
+| [context-and-tenant-scope.md](context-and-tenant-scope.md) | **上下文传递与租户作用域（已落地）**。ctx 只保留一种传法（handler 的 `*gin.Context` 直传，非测试代码零 `.Request.Context()`）、租户作用域改为「中间件写默认 + 调用点显式声明 + 缺省 fail-closed」，含两条红线守卫测试、验收结果、实施记录与 fail-closed 暴露的真实缺陷目录。规则速查见 `AGENTS.md`「上下文传递与租户作用域（must）」，安全定位见 `system-design.md` §7.1 |
 
 > **过程性设计稿（spec / plan）不入库**：本仓库用本地 SDD 工作流产出的方案与计划文档统一放在 `docs/superpowers/`（已 gitignore）。已落地的改造不再在 `docs/design/` 留过程文档——结论一律收敛进上表的长期维护文档：字段权威矩阵与种子身份键见 `system-design.md` §4.5、租户开通与内置管理员见 §5.8、共享层分层见 §2.3、schema 变更策略见 §4.1、运行与升级见 `run-and-deploy.md`。
 

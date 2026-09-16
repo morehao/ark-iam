@@ -69,7 +69,7 @@ func NewOIDCAuthSvc(provider *OIDCProvider) OIDCAuthSvc {
 }
 
 func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
-	authReq, err := svc.provider.Storage.AuthRequestByID(ctx.Request.Context(), req.AuthRequestID)
+	authReq, err := svc.provider.Storage.AuthRequestByID(ctx, req.AuthRequestID)
 	if err != nil {
 		return nil, mapAuthRequestError(err)
 	}
@@ -85,7 +85,7 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	// 由此得到一个不变式：SSO 会话只可能建立在已完成密码登录之上，而完成登录要求
 	// must_change_password=false，因此无需在 SSO/静默登录路径重复该判定。
 	if personEntity != nil && personEntity.MustChangePassword {
-		if cErr := svc.provider.Storage.CompleteAuthRequest(ctx.Request.Context(), req.AuthRequestID,
+		if cErr := svc.provider.Storage.CompleteAuthRequest(ctx, req.AuthRequestID,
 			oidcop.BuildSubject(personEntity.ID), time.Now(), []string{"pwd"}, "", "", false); cErr != nil {
 			return nil, mapAuthRequestError(cErr)
 		}
@@ -99,7 +99,7 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	// 返回"可建租户"信号，不发 code、不建 SSO 会话（无租户上下文无法发 token）。
 	// 在访问 userEntity.TenantID 之前返回，避免 nil 解引用 panic。
 	if personEntity != nil && userEntity == nil && len(tenants) == 0 {
-		if cErr := svc.provider.Storage.CompleteAuthRequest(ctx.Request.Context(), req.AuthRequestID,
+		if cErr := svc.provider.Storage.CompleteAuthRequest(ctx, req.AuthRequestID,
 			oidcop.BuildSubject(personEntity.ID), time.Now(), []string{"pwd"}, "", "", false); cErr != nil {
 			return nil, mapAuthRequestError(cErr)
 		}
@@ -129,7 +129,7 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	}
 	// 多租户：除非有合法的 tenant hint，否则暂不 done、不发 code，需用户先选租户
 	if resolvedTenant == "" && len(tenants) > 1 {
-		if err := svc.provider.Storage.CompleteAuthRequest(ctx.Request.Context(), req.AuthRequestID, subject, authTime, []string{"pwd"}, "", "", false); err != nil {
+		if err := svc.provider.Storage.CompleteAuthRequest(ctx, req.AuthRequestID, subject, authTime, []string{"pwd"}, "", "", false); err != nil {
 			return nil, mapAuthRequestError(err)
 		}
 		return &dtooidc.OIDCLoginResp{
@@ -142,7 +142,7 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	if tenantID == "" {
 		tenantID = userEntity.TenantID
 	}
-	if err := svc.provider.Storage.CompleteAuthRequest(ctx.Request.Context(), req.AuthRequestID, subject, authTime, []string{"pwd"}, "", tenantID, true); err != nil {
+	if err := svc.provider.Storage.CompleteAuthRequest(ctx, req.AuthRequestID, subject, authTime, []string{"pwd"}, "", tenantID, true); err != nil {
 		return nil, mapAuthRequestError(err)
 	}
 	// 补记密码登录主路径的审计（SelectTenant / CompleteLoginBySession 均已记录）
@@ -160,19 +160,19 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	}
 
 	resp := &dtooidc.OIDCLoginResp{
-		ContinueURL:             svc.provider.BuildAuthCallbackURL(ctx.Request.Context(), req.AuthRequestID),
+		ContinueURL:             svc.provider.BuildAuthCallbackURL(ctx, req.AuthRequestID),
 		TenantID:                tenantID,
 		Tenants:                 tenants,
 		AllowPersonCreateTenant: allowPersonCreateTenant,
 	}
 
 	if svc.ssoSessionStore != nil {
-		sessionID, err := svc.ssoSessionStore.CreateSession(sessionAuditContext(ctx.Request.Context(), tenantID), personEntity.ID, []string{"pwd"})
+		sessionID, err := svc.ssoSessionStore.CreateSession(sessionAuditContext(ctx, tenantID), personEntity.ID, []string{"pwd"})
 		if err != nil {
 			glog.Warnf(ctx, "[oidcAuthSvc.CompleteLogin] failed to create sso session: %v", err)
 		} else {
 			resp.SessionID = sessionID
-			if aErr := svc.provider.Storage.AssociateSession(ctx.Request.Context(), req.AuthRequestID, sessionID); aErr != nil {
+			if aErr := svc.provider.Storage.AssociateSession(ctx, req.AuthRequestID, sessionID); aErr != nil {
 				glog.Warnf(ctx, "[oidcAuthSvc.CompleteLogin] associate session fail, err:%v, authRequestID:%s, sessionID:%s", aErr, req.AuthRequestID, sessionID)
 			}
 		}
@@ -182,7 +182,7 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 }
 
 func (svc *oidcAuthSvc) SelectTenant(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error) {
-	reqCtx := ctx.Request.Context()
+	reqCtx := ctx
 	authReq, err := svc.provider.Storage.AuthRequestByID(reqCtx, authRequestID)
 	if err != nil {
 		return nil, mapAuthRequestError(err)
@@ -242,7 +242,7 @@ func (svc *oidcAuthSvc) SelectTenant(ctx *gin.Context, authRequestID string, ten
 }
 
 func (svc *oidcAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID string, sessionID string) (string, error) {
-	reqCtx := ctx.Request.Context()
+	reqCtx := ctx
 	personID, err := svc.ssoSessionStore.ValidateSession(reqCtx, sessionID)
 	if err != nil {
 		return "", err

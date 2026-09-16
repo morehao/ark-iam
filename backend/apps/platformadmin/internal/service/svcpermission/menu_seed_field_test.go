@@ -163,7 +163,7 @@ func TestCreateAndDeleteBuiltinAppMenuAllowed(t *testing.T) {
 		t.Fatalf("内置菜单删除应留下软删墓碑, count=%d", tombstone)
 	}
 	var linkCount int64
-	if err := db.Model(&model.RoleMenuEntity{}).Where("menu_id = ?", seedMenu.ID).Count(&linkCount).Error; err != nil {
+	if err := db.WithContext(ctx).Model(&model.RoleMenuEntity{}).Where("menu_id = ?", seedMenu.ID).Count(&linkCount).Error; err != nil {
 		t.Fatalf("count role_menu: %v", err)
 	}
 	if linkCount != 0 {
