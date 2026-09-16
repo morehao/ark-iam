@@ -37,7 +37,7 @@ func OIDCBusinessAuthOptions() []pkgmiddleware.AuthOption {
 			if dbclient.RedisCli == nil {
 				return true
 			}
-			active, err := ssoStore.HasActiveSession(ctx.Request.Context(), personID)
+			active, err := ssoStore.HasActiveSession(ctx, personID)
 			if err != nil {
 				glog.Warnf(ctx, "[middleware.OIDCBusinessAuthOptions] HasActiveSession fail, personID:%s, err:%v", personID, err)
 				return true

@@ -43,11 +43,6 @@ func InitMultiDB(configs []dbgorm.Config, logConfig *glog.LogConfig) error {
 		return fmt.Errorf("mysql config is empty")
 	}
 
-	tenantPlugin, err := newTenantScopePlugin(tenantScopeSkipTables)
-	if err != nil {
-		return fmt.Errorf("init tenant plugin failed: %v", err)
-	}
-
 	var opts []dbgorm.Option
 	if logConfig != nil {
 		opts = append(opts, dbgorm.WithLogConfig(logConfig))
@@ -58,7 +53,7 @@ func InitMultiDB(configs []dbgorm.Config, logConfig *glog.LogConfig) error {
 		if err != nil {
 			return fmt.Errorf("init mysql failed: %v", err)
 		}
-		if err := client.Use(tenantPlugin); err != nil {
+		if err := UseTenantScopePlugin(client); err != nil {
 			return fmt.Errorf("register tenant plugin failed: %v", err)
 		}
 		dbMutex.Lock()
@@ -84,9 +79,26 @@ func IamDB(ctx context.Context) *gorm.DB {
 	return GetDB(ctx, dbNameIam)
 }
 
+// UseTenantScopePlugin 为 db 挂载租户隔离插件（服务初始化与测试脚手架共用同一份配置）。
+func UseTenantScopePlugin(db *gorm.DB) error {
+	if db == nil {
+		return fmt.Errorf("dbclient: db is nil")
+	}
+	plugin, err := newTenantScopePlugin(tenantScopeSkipTables)
+	if err != nil {
+		return fmt.Errorf("new tenant scope plugin failed: %w", err)
+	}
+	return db.Use(plugin)
+}
+
 // RegisterDBForTest injects a gorm DB for a service name (test-only usage).
+// 测试库与生产库挂载同一份租户隔离配置：未声明租户作用域的查询会 fail-closed，
+// 因此测试必须像生产一样显式声明作用域（gin 上下文写租户或 gcontext.WithTenantScope）。
 // Callers are responsible for closing the underlying connection.
 func RegisterDBForTest(service string, db *gorm.DB) {
+	if err := UseTenantScopePlugin(db); err != nil {
+		panic(fmt.Sprintf("dbclient: register tenant scope plugin for test db failed: %v", err))
+	}
 	dbMutex.Lock()
 	defer dbMutex.Unlock()
 	dbMap[service] = db

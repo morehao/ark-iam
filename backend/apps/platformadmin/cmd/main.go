@@ -25,6 +25,9 @@ func main() {
 	}()
 
 	engine := gin.New()
+	// 让 gin 上下文可当作 context.Context 传给任何下游（OIDC provider、glog、异步任务）：
+	// 仅在开启该开关时 gin 才把 Done/Err/Deadline/Value 转发到请求的 context。
+	engine.ContextWithFallback = true
 	engine.Use(gin.Recovery())
 	platformadmin.Init(engine, config.Conf)
 

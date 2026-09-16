@@ -12,6 +12,7 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/op"
 
 	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/object/objauth"
 	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/glog"
@@ -159,7 +160,8 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 	if authReq, ok := request.(*AuthRequest); ok {
 		if tid := authReq.GetTenantID(); tid != "" {
 			if pid, perr := ParseSubject(authReq.GetSubject()); perr == nil {
-				users, uerr := s.persistentStore.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid, TenantID: tid})
+				// 目标租户在协议流程中解析得出（非调用方当前租户）：显式声明「指定租户」作用域。
+				users, uerr := s.persistentStore.userDao().GetListByCond(dbclient.ExplicitTenantContext(ctx, tid), &dao.UserCond{PersonID: pid, TenantID: tid})
 				if uerr != nil {
 					// 查询失败不再静默降级：缺少 tenant_id 的 token 会破坏下游授权，直接报错
 					glog.Errorf(ctx, "[oidcop.GetPrivateClaimsFromRequest] user dao GetListByCond fail, err:%v", uerr)
@@ -184,7 +186,8 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 	if rr, ok := request.(*refreshTokenRequest); ok {
 		if tid := rr.GetTenantID(); tid != "" {
 			if pid, perr := ParseSubject(rr.GetSubject()); perr == nil {
-				users, uerr := s.persistentStore.userDao().GetListByCond(ctx, &dao.UserCond{PersonID: pid, TenantID: tid})
+				// 目标租户在协议流程中解析得出（非调用方当前租户）：显式声明「指定租户」作用域。
+				users, uerr := s.persistentStore.userDao().GetListByCond(dbclient.ExplicitTenantContext(ctx, tid), &dao.UserCond{PersonID: pid, TenantID: tid})
 				if uerr != nil {
 					glog.Errorf(ctx, "[oidcop.GetPrivateClaimsFromRequest] user dao GetListByCond fail, err:%v", uerr)
 					return nil, uerr

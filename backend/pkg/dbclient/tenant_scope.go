@@ -2,155 +2,109 @@ package dbclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strings"
+	"sync/atomic"
 
-	"github.com/gin-gonic/gin"
 	"github.com/morehao/golib/biz/gcontext"
+	"github.com/morehao/golib/dbaccess/gormplugin"
+	"github.com/morehao/golib/glog"
 	"gorm.io/gorm"
 )
 
-// tenantScopeSkipKey 与 golib gormplugin.SkipKey 保持一致，
-// 保证外部若使用 gormplugin.Skip(db) 跳过租户过滤时同样对本插件生效。
-const tenantScopeSkipKey = "gorm:condition:skip"
+// tenantScopeField 是租户隔离字段名；所有按租户隔离的表都使用该列。
+const tenantScopeField = "tenant_id"
 
-// tenantScopePlugin 是租户数据隔离插件（PostgreSQL 兼容实现）。
+// ErrTenantScopeMissing 表示 ctx 未声明租户作用域：查询/更新/删除被 fail-closed 拒绝。
+// 调用方可用 errors.Is 判定；也可用 SetMissingTenantScopeMode 在灰度期降级为告警。
+var ErrTenantScopeMissing = errors.New("dbclient: tenant scope missing")
+
+// MissingTenantScopeMode 控制"ctx 未声明租户作用域"时的处置方式。
+type MissingTenantScopeMode uint32
+
+const (
+	// MissingTenantScopeError fail-closed（默认）：不执行 SQL 并返回 ErrTenantScopeMissing。
+	// 缺少作用域的失败模式必须是"响亮报错"，而不是静默跨租户读。
+	MissingTenantScopeError MissingTenantScopeMode = iota
+	// MissingTenantScopeWarn 仅告警并按历史行为放行（灰度期与紧急回退用）。
+	MissingTenantScopeWarn
+)
+
+var missingTenantScopeMode atomic.Uint32
+
+func init() {
+	missingTenantScopeMode.Store(uint32(MissingTenantScopeError))
+}
+
+// SetMissingTenantScopeMode 切换未声明作用域的处置方式，返回旧值。
+// 仅供灰度回退与测试使用；生产默认缺省为 fail-closed。
+func SetMissingTenantScopeMode(mode MissingTenantScopeMode) MissingTenantScopeMode {
+	return MissingTenantScopeMode(missingTenantScopeMode.Swap(uint32(mode)))
+}
+
+// CurrentMissingTenantScopeMode 返回当前处置方式。
+func CurrentMissingTenantScopeMode() MissingTenantScopeMode {
+	return MissingTenantScopeMode(missingTenantScopeMode.Load())
+}
+
+// tenantScopeResolver 解析本次数据访问的租户作用域，返回 (过滤值, 是否注入, 是否已声明)。
 //
-// golib gormplugin.ScopePlugin 生成 MySQL 反引号限定符（`table`.tenant_id = ?），
-// 在 PostgreSQL 上报 syntax error at or near "."（反引号不是 PG 标识符引用符）；
-// 本项目主库为 PG，故在 dbclient 内自建等价实现，限定符改用标准双引号
-// （PG / SQLite 均兼容；全部表名已确认非 PG 保留字）。
-type tenantScopePlugin struct {
-	fieldName   string
-	skipTables  map[string]struct{}
-	extractFunc func(context.Context) (any, bool)
+// 声明方式有两类，语义等价，类型化作用域优先：
+//  1. gcontext.TenantScope（规范声明）：中间件写入请求上下文，跨 http.Handler 边界的
+//     协议层与异步任务同样可见；
+//  2. gcontext.KeyTenantID 字符串投影（gin Keys）：gin 对 string key 的 Value 查询
+//     无需 ContextWithFallback，因此即使某个引擎漏开开关、或旧代码只写了 gin Keys，
+//     隔离也不会静默失效。
+//
+// 两类都不存在时才判定为"未声明"，交由 MissingScope 钩子决定告警或 fail-closed。
+func tenantScopeResolver(ctx context.Context) (any, bool, bool) {
+	if value, inject, declared := gcontext.TenantScopeFilter(ctx); declared {
+		return value, inject, true
+	}
+	if value, ok := ctx.Value(gcontext.KeyTenantID).(string); ok && value != "" {
+		return value, true, true
+	}
+	return nil, false, false
 }
 
-var _ gorm.Plugin = (*tenantScopePlugin)(nil)
-
-// newTenantScopePlugin 构造租户过滤插件，同一份配置供业务初始化与测试复用。
-// ExtractFunc 从 gin 上下文（或 context）读取 KeyTenantID：无租户上下文时不注入条件。
-func newTenantScopePlugin(skipTables []string) (*tenantScopePlugin, error) {
-	skip := make(map[string]struct{}, len(skipTables))
-	for _, t := range skipTables {
-		if normalized := normalizeTableName(t); normalized != "" {
-			skip[normalized] = struct{}{}
-		}
+// handleMissingTenantScope 处置"未声明作用域"的数据访问。
+func handleMissingTenantScope(db *gorm.DB, tableName string) error {
+	if CurrentMissingTenantScopeMode() == MissingTenantScopeWarn {
+		glog.Warnf(db.Statement.Context,
+			"[dbclient.tenantScope] 缺少租户作用域，已按历史行为放行（无租户过滤）, table:%s", tableName)
+		return nil
 	}
-	return &tenantScopePlugin{
-		fieldName: "tenant_id",
-		extractFunc: func(ctx context.Context) (any, bool) {
-			if ginCtx, ok := ctx.(*gin.Context); ok {
-				return ginCtx.Get(gcontext.KeyTenantID)
-			}
-			value := ctx.Value(gcontext.KeyTenantID)
-			if value == nil {
-				return nil, false
-			}
-			return value, true
-		},
-		skipTables: skip,
-	}, nil
+	return fmt.Errorf("%w: table=%s; 中间件需用 gincontext.SetTenantScope 写入作用域，"+
+		"跨租户访问需在 dao 层用 gcontext.WithTenantScope(ctx, gcontext.AllScope()/ExplicitScope(tenantID)) 显式声明",
+		ErrTenantScopeMissing, tableName)
 }
 
-// Name 返回插件名（与 golib 一致，便于日志排查）。
-func (p *tenantScopePlugin) Name() string { return "scope_condition_plugin" }
-
-// Initialize 注册 query/update/delete 三个阶段的条件注入回调。
-func (p *tenantScopePlugin) Initialize(db *gorm.DB) error {
-	if strings.TrimSpace(p.fieldName) == "" || p.extractFunc == nil {
-		return fmt.Errorf("dbclient: FieldName and ExtractFunc are required")
-	}
-	callbacks := []struct {
-		name   string
-		typ    string
-		before string
-		fn     func(*gorm.DB)
-	}{
-		{"dbclient:tenant_scope:query", "query", "gorm:query", p.addScope},
-		{"dbclient:tenant_scope:update", "update", "gorm:update", p.addScope},
-		{"dbclient:tenant_scope:delete", "delete", "gorm:delete", p.addScope},
-	}
-	for _, cb := range callbacks {
-		var registerErr error
-		switch cb.typ {
-		case "query":
-			registerErr = db.Callback().Query().Before(cb.before).Register(cb.name, cb.fn)
-		case "update":
-			registerErr = db.Callback().Update().Before(cb.before).Register(cb.name, cb.fn)
-		case "delete":
-			registerErr = db.Callback().Delete().Before(cb.before).Register(cb.name, cb.fn)
-		}
-		if registerErr != nil {
-			return fmt.Errorf("register %s callback: %w", cb.name, registerErr)
-		}
-	}
-	return nil
+// newTenantScopePlugin 构造租户隔离插件（同一份配置供服务与测试复用）。
+//
+// 实现复用 golib gormplugin.ScopePlugin：其条件构造使用 clause.Column 方言化引用标识符
+// （PostgreSQL 生成 "table"."tenant_id"），因此不再需要本项目自建插件。
+func newTenantScopePlugin(skipTables []string) (gorm.Plugin, error) {
+	return gormplugin.New(&gormplugin.ScopeConfig{
+		FieldName:    tenantScopeField,
+		Resolver:     tenantScopeResolver,
+		MissingScope: handleMissingTenantScope,
+		SkipTables:   skipTables,
+	})
 }
 
-func (p *tenantScopePlugin) addScope(db *gorm.DB) {
-	if db.Statement == nil || db.Statement.Context == nil {
-		return
-	}
-	if v, ok := db.Get(tenantScopeSkipKey); ok {
-		if skip, ok := v.(bool); ok && skip {
-			return
-		}
-	}
-	tableName := resolveTableName(db)
-	if tableName == "" {
-		return
-	}
-	if p.isSkipped(tableName) {
-		return
-	}
-	value, ok := p.extractFunc(db.Statement.Context)
-	if !ok {
-		return
-	}
-	// PostgreSQL / SQLite 使用双引号作为标识符引用符；
-	// 表名与字段名均来自代码常量，非用户输入，无注入风险。
-	db.Statement.Where(fmt.Sprintf("\"%s\".\"%s\" = ?", tableName, p.fieldName), value)
+// CrossTenantContext 返回"全部租户"作用域的 ctx：用于按主键/唯一键先定位、再判租户的场景
+// （如按 API Key 摘要反查归属租户），必须显式声明，禁止靠"没有作用域"来获得跨租户可见性。
+func CrossTenantContext(ctx context.Context) context.Context {
+	return gcontext.WithTenantScope(ctx, gcontext.AllScope())
 }
 
-func (p *tenantScopePlugin) isSkipped(tableName string) bool {
-	normalized := normalizeTableName(tableName)
-	if normalized == "" {
-		return false
-	}
-	_, ok := p.skipTables[normalized]
-	return ok
+// ExplicitTenantContext 返回"指定租户"作用域的 ctx：用于当前请求租户之外的目标租户访问。
+func ExplicitTenantContext(ctx context.Context, tenantID string) context.Context {
+	return gcontext.WithTenantScope(ctx, gcontext.ExplicitScope(tenantID))
 }
 
-// normalizeTableName 归一化表名：去空白/引号/反引号、剥离 schema 前缀、转小写。
-func normalizeTableName(tableName string) string {
-	tableName = strings.TrimSpace(tableName)
-	tableName = strings.Trim(tableName, "`\"")
-	if tableName == "" {
-		return ""
-	}
-	fields := strings.Fields(tableName)
-	if len(fields) == 0 {
-		return ""
-	}
-	base := strings.Trim(fields[0], "`\"")
-	if idx := strings.LastIndex(base, "."); idx >= 0 {
-		base = base[idx+1:]
-	}
-	return strings.ToLower(base)
-}
-
-// resolveTableName 获取当前操作的主表名。
-func resolveTableName(db *gorm.DB) string {
-	if db.Statement.Table != "" {
-		return db.Statement.Table
-	}
-	if db.Statement.Model != nil {
-		stmt := &gorm.Statement{DB: db}
-		if err := stmt.Parse(db.Statement.Model); err != nil {
-			return ""
-		}
-		return stmt.Table
-	}
-	return ""
+// CurrentTenantContext 返回"当前租户"作用域的 ctx：用于非请求入口（后台任务、worker）
+// 需要显式声明归属租户的场景。
+func CurrentTenantContext(ctx context.Context, tenantID string) context.Context {
+	return gcontext.WithTenantScope(ctx, gcontext.CurrentScope(tenantID))
 }

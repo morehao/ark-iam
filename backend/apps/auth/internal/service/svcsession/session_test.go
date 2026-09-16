@@ -10,6 +10,7 @@ import (
 	"github.com/morehao/ark-iam/auth/testutil"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/biz/gcontext"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
 func TestSessionListReturnsPersonAwareTenantSessions(t *testing.T) {
@@ -17,7 +18,8 @@ func TestSessionListReturnsPersonAwareTenantSessions(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 	ginCtx.Request = req
 	ginCtx.Set(gcontext.KeyPersonID, "101")
-	ginCtx.Set(gcontext.KeyTenantID, "11")
+	// 与生产中间件写法一致：类型化作用域写入请求上下文，并投影 gin Keys
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("11"))
 
 	db := testutil.SetupSQLite(t, &model.RefreshTokenEntity{})
 	expiresAt := time.Now().Add(time.Hour)

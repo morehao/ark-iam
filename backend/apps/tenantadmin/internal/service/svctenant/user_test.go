@@ -79,7 +79,7 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 		t.Fatalf("create user with name-only person: %v", err)
 	}
 	var nameOnly model.UserEntity
-	if err := db.First(&nameOnly, "id = ?", resp.UserID).Error; err != nil {
+	if err := db.WithContext(ginCtx).First(&nameOnly, "id = ?", resp.UserID).Error; err != nil {
 		t.Fatalf("query name-only user: %v", err)
 	}
 	if nameOnly.PersonID == "" {
@@ -102,7 +102,7 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 		t.Fatalf("expected initial temporary password for newly created person")
 	}
 	var bob model.UserEntity
-	if err := db.First(&bob, "id = ?", respB.UserID).Error; err != nil {
+	if err := db.WithContext(ginCtx).First(&bob, "id = ?", respB.UserID).Error; err != nil {
 		t.Fatalf("query bob: %v", err)
 	}
 	if bob.PersonID == "" {
@@ -123,7 +123,8 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 	}
 
 	// 另一租户提供相同 email：find-or-create 命中已有 person 并关联（复用同一自然人）
-	respC, err := svc.Create(newAdminCtx(t, db, "t2", "op2"), &dtotenant.UserCreateReq{Name: "Bob2", PrimaryEmail: "bob@x.com", PrimaryDepartmentID: "o2"})
+	ginCtxT2 := newAdminCtx(t, db, "t2", "op2")
+	respC, err := svc.Create(ginCtxT2, &dtotenant.UserCreateReq{Name: "Bob2", PrimaryEmail: "bob@x.com", PrimaryDepartmentID: "o2"})
 	if err != nil {
 		t.Fatalf("create user linking existing person: %v", err)
 	}
@@ -131,7 +132,7 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 		t.Fatalf("reusing an existing person must not return an initial password, got %q", respC.InitialPassword)
 	}
 	var bob2 model.UserEntity
-	if err := db.First(&bob2, "id = ?", respC.UserID).Error; err != nil {
+	if err := db.WithContext(ginCtxT2).First(&bob2, "id = ?", respC.UserID).Error; err != nil {
 		t.Fatalf("query bob2: %v", err)
 	}
 	if bob2.PersonID != bob.PersonID {
@@ -158,7 +159,7 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 		t.Fatalf("expected initial temporary password for newly created person")
 	}
 	var noID model.UserEntity
-	if err := db.First(&noID, "id = ?", respPwd.UserID).Error; err != nil {
+	if err := db.WithContext(ginCtx).First(&noID, "id = ?", respPwd.UserID).Error; err != nil {
 		t.Fatalf("query no-id user: %v", err)
 	}
 	var noIDPerson model.PersonEntity
@@ -248,7 +249,7 @@ func TestUserCreateWithDepartments(t *testing.T) {
 		t.Fatalf("create user with depts: %v", err)
 	}
 	var relations []model.DepartmentUserEntity
-	if err := db.Where("tenant_id = ? AND user_id = ?", "t1", resp.UserID).Find(&relations).Error; err != nil {
+	if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ?", "t1", resp.UserID).Find(&relations).Error; err != nil {
 		t.Fatalf("query relations: %v", err)
 	}
 	if len(relations) != 2 {
@@ -417,7 +418,7 @@ func TestUserUpdateRolesFullReplace(t *testing.T) {
 		t.Fatalf("update roles: %v", err)
 	}
 	var urList []model.UserRoleEntity
-	if err := db.Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&urList).Error; err != nil {
+	if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&urList).Error; err != nil {
 		t.Fatalf("query user_role: %v", err)
 	}
 	if len(urList) != 2 {
@@ -428,7 +429,7 @@ func TestUserUpdateRolesFullReplace(t *testing.T) {
 	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", RoleIDs: []string{"r2"}}); err != nil {
 		t.Fatalf("update roles: %v", err)
 	}
-	if err := db.Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&urList).Error; err != nil {
+	if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&urList).Error; err != nil {
 		t.Fatalf("query user_role: %v", err)
 	}
 	if len(urList) != 1 || urList[0].RoleID != "r2" {
@@ -479,9 +480,11 @@ func TestUserUpdateRolesScopedByApp(t *testing.T) {
 	seedUserRole("ur1", "u1", "ra1")
 	seedUserRole("ur2", "u1", "rb1")
 
+	ginCtx := newAdminCtx(t, db, "t1", "op")
+
 	queryRoleIDs := func() []string {
 		var urList []model.UserRoleEntity
-		if err := db.Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&urList).Error; err != nil {
+		if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&urList).Error; err != nil {
 			t.Fatalf("query user_role: %v", err)
 		}
 		ids := make([]string, 0, len(urList))
@@ -498,8 +501,6 @@ func TestUserUpdateRolesScopedByApp(t *testing.T) {
 		}
 		return false
 	}
-
-	ginCtx := newAdminCtx(t, db, "t1", "op")
 
 	// 仅替换 app-a：ra1 被移除、ra2 加入，app-b 的 rb1 必须保留
 	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-a", RoleIDs: []string{"ra2"}}); err != nil {
@@ -559,7 +560,7 @@ func TestUserCreateWithLeaderDepts(t *testing.T) {
 		t.Fatalf("create user with leader depts: %v", err)
 	}
 	var relations []model.DepartmentUserEntity
-	if err := db.Where("tenant_id = ? AND user_id = ?", "t1", resp.UserID).Find(&relations).Error; err != nil {
+	if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ?", "t1", resp.UserID).Find(&relations).Error; err != nil {
 		t.Fatalf("query relations: %v", err)
 	}
 	if len(relations) != 3 {
@@ -624,7 +625,7 @@ func TestUserUpdateDepartments(t *testing.T) {
 
 	countByType := func(userID string) map[model.DeptUserRelationType]string {
 		var rows []model.DepartmentUserEntity
-		if err := db.Where("tenant_id = ? AND user_id = ?", "t1", userID).Find(&rows).Error; err != nil {
+		if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ?", "t1", userID).Find(&rows).Error; err != nil {
 			t.Fatalf("query relations: %v", err)
 		}
 		m := map[model.DeptUserRelationType]string{}
@@ -650,7 +651,7 @@ func TestUserUpdateDepartments(t *testing.T) {
 		t.Fatalf("update secondary: %v", err)
 	}
 	var secCount int64
-	if err := db.Model(&model.DepartmentUserEntity{}).
+	if err := db.WithContext(ginCtx).Model(&model.DepartmentUserEntity{}).
 		Where("tenant_id = ? AND user_id = ? AND relation_type = ?", "t1", u1.UserID, model.DeptUserRelationSecondary).
 		Count(&secCount).Error; err != nil {
 		t.Fatalf("count secondary: %v", err)
@@ -705,7 +706,7 @@ func TestUserUpdateContact(t *testing.T) {
 
 	loadPerson := func() *model.PersonEntity {
 		var user model.UserEntity
-		if err := db.First(&user, "id = ?", u1.UserID).Error; err != nil {
+		if err := db.WithContext(ginCtx).First(&user, "id = ?", u1.UserID).Error; err != nil {
 			t.Fatalf("query user: %v", err)
 		}
 		var p model.PersonEntity
@@ -893,7 +894,7 @@ func TestUserResetPasswordIssuesTemporaryPassword(t *testing.T) {
 		t.Fatalf("create user: %v", err)
 	}
 	var createdUser model.UserEntity
-	if err := db.First(&createdUser, "id = ?", created.UserID).Error; err != nil {
+	if err := db.WithContext(ginCtx).First(&createdUser, "id = ?", created.UserID).Error; err != nil {
 		t.Fatalf("query user: %v", err)
 	}
 	var createdPerson model.PersonEntity
@@ -948,7 +949,7 @@ func TestUserResetPasswordRejectsMachineUser(t *testing.T) {
 		t.Fatalf("seed machine person password: %v", err)
 	}
 	seedTestUserWithPerson(t, db, "um1", "t1", machinePerson.ID, "服务账号")
-	if err := db.Model(&model.UserEntity{}).Where("id = ?", "um1").
+	if err := db.WithContext(ginCtx).Model(&model.UserEntity{}).Where("id = ?", "um1").
 		Update("user_type", model.UserTypeMachine).Error; err != nil {
 		t.Fatalf("mark machine user: %v", err)
 	}

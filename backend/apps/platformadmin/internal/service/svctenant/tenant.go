@@ -168,7 +168,9 @@ func (svc *tenantSvc) ResetAdminPassword(ctx *gin.Context, req *dtotenant.Tenant
 		return nil, code.GetError(code.TenantNotExistError)
 	}
 
-	builtinAdmin, err := dao.NewUserDao().GetByCond(ctx, &dao.UserCond{
+	// 目标租户来自请求参数（可能不是调用方所在的平台租户）：显式声明「指定租户」作用域，
+	// 否则 tenant_user 查询会被当前租户过滤成 0 行，"内置管理员不存在"变成静默误判。
+	builtinAdmin, err := dao.NewUserDao().GetByCond(dbclient.ExplicitTenantContext(ctx, tenantEntity.ID), &dao.UserCond{
 		TenantID: tenantEntity.ID,
 		Source:   model.UserSourceBuiltin,
 		UserType: model.UserTypeMember,
@@ -294,7 +296,7 @@ func (svc *tenantSvc) Update(ctx *gin.Context, req *dtotenant.TenantUpdateReq) e
 	// 切断既有登录态（access token 依赖其短 TTL 自然过期）。撤销失败仅告警，
 	// 不阻断挂起本身——租户状态已在库中生效，登录/签发令牌两个门禁会独立拦截。
 	if tenantStatus == model.TenantStatusSuspended && tenantEntity.Status != model.TenantStatusSuspended {
-		if rErr := tenant.RevokeMemberSessions(ctx.Request.Context(), req.TenantID); rErr != nil {
+		if rErr := tenant.RevokeMemberSessions(ctx, req.TenantID); rErr != nil {
 			glog.Errorf(ctx, "[svctenant.TenantUpdate] revoke member sessions fail, tenantID:%s, err:%v", req.TenantID, rErr)
 		}
 	}

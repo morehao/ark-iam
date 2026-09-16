@@ -15,6 +15,7 @@ package application
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/glog"
 )
@@ -27,7 +28,9 @@ func GetByClientID(ctx *gin.Context, clientID string) (*model.ApplicationEntity,
 	if clientID == "" {
 		return nil, nil
 	}
-	clientEntity, err := dao.NewApplicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID})
+	// client_id 全局唯一，且本函数在"租户确定之前"的协议层入口被调用（注册/加入租户通道），
+	// 因此必须显式声明「全租户」作用域：跨租户可见性只能来自显式声明，不能来自缺失作用域。
+	clientEntity, err := dao.NewApplicationClientDao().GetByCond(dbclient.CrossTenantContext(ctx), &dao.ApplicationClientCond{Code: clientID})
 	if err != nil {
 		glog.Errorf(ctx, "[application.GetByClientID] dao applicationClient GetByCond fail, err:%v, clientID:%s", err, clientID)
 		return nil, err

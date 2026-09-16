@@ -77,7 +77,8 @@ func TestConnectorCreateWithoutStatusDefaultsEnable(t *testing.T) {
 	}
 
 	var entity model.ConnectorEntity
-	if err := db.Where("id = ?", resp.ConnectorID).First(&entity).Error; err != nil {
+	// 断言使用与 svc.Create 同一个租户上下文，避免绕过租户隔离插件
+	if err := db.WithContext(ctx).Where("id = ?", resp.ConnectorID).First(&entity).Error; err != nil {
 		t.Fatalf("查询连接器失败: %v", err)
 	}
 	if entity.Status != model.ConnectorStatusEnable {

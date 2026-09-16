@@ -14,6 +14,7 @@ import (
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/core/tenant"
 	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objauth"
 	"github.com/morehao/ark-iam/pkg/testsetup"
@@ -236,7 +237,9 @@ func TestCreateTenantSucceedsForZeroTenantPerson(t *testing.T) {
 	if tErr != nil || len(tenants) == 0 {
 		t.Fatalf("expected tenant persisted, err:%v", tErr)
 	}
-	users, uErr := dao.NewUserDao().GetListByCond(t.Context(), &dao.UserCond{PersonID: p.ID, TenantID: res.TenantID})
+	// 断言查询按新建租户的显式作用域声明，与 CreateTenant 内部一致，避免绕过租户隔离插件
+	tenantCtx := dbclient.ExplicitTenantContext(t.Context(), res.TenantID)
+	users, uErr := dao.NewUserDao().GetListByCond(tenantCtx, &dao.UserCond{PersonID: p.ID, TenantID: res.TenantID})
 	if uErr != nil || len(users) == 0 || !users[0].IsOwner {
 		t.Fatalf("expected owner user, got users:%#v err:%v", users, uErr)
 	}
@@ -244,17 +247,17 @@ func TestCreateTenantSucceedsForZeroTenantPerson(t *testing.T) {
 	if users[0].Source != model.UserSourceBuiltin {
 		t.Errorf("owner source = %q, want %q (平台重置内置管理员密码依赖该标记)", users[0].Source, model.UserSourceBuiltin)
 	}
-	rootDept, oErr := dao.NewDepartmentDao().GetByCond(t.Context(), &dao.DepartmentCond{TenantID: res.TenantID})
+	rootDept, oErr := dao.NewDepartmentDao().GetByCond(tenantCtx, &dao.DepartmentCond{TenantID: res.TenantID})
 	if oErr != nil || rootDept == nil {
 		t.Fatalf("expected root department, err:%v dept:%#v", oErr, rootDept)
 	}
-	deptUsers, ouErr := dao.NewDepartmentUserDao().GetListByCond(t.Context(), &dao.DepartmentUserCond{
+	deptUsers, ouErr := dao.NewDepartmentUserDao().GetListByCond(tenantCtx, &dao.DepartmentUserCond{
 		TenantID: res.TenantID, UserID: users[0].ID, RelationType: model.DeptUserRelationPrimary,
 	})
 	if ouErr != nil || len(deptUsers) != 1 || deptUsers[0].DepartmentID != rootDept.ID {
 		t.Fatalf("expected owner attached to root dept, got %#v err:%v", deptUsers, ouErr)
 	}
-	role, rErr := dao.NewRoleDao().GetByCond(t.Context(), &dao.RoleCond{
+	role, rErr := dao.NewRoleDao().GetByCond(tenantCtx, &dao.RoleCond{
 		TenantID:  res.TenantID,
 		Source:    model.RoleSourceBuiltin,
 		AdminType: model.SysAdminTypeAdmin,
@@ -262,7 +265,7 @@ func TestCreateTenantSucceedsForZeroTenantPerson(t *testing.T) {
 	if rErr != nil || role == nil {
 		t.Fatalf("expected provisioned tenant admin role, err:%v role:%#v", rErr, role)
 	}
-	userRoles, urErr := dao.NewUserRoleDao().GetListByCond(t.Context(), &dao.UserRoleCond{
+	userRoles, urErr := dao.NewUserRoleDao().GetListByCond(tenantCtx, &dao.UserRoleCond{
 		TenantID: res.TenantID, UserID: users[0].ID, RoleID: role.ID,
 	})
 	if urErr != nil || len(userRoles) != 1 {

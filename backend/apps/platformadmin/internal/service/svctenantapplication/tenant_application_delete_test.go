@@ -92,8 +92,9 @@ func TestDeleteThirdPartyApplicationSubscription(t *testing.T) {
 		t.Fatalf("expected subscription soft-deleted, got %+v", got)
 	}
 
+	// 断言软删行用被测服务同一个租户作用域（订阅归属 t1，非跨租户查询）
 	var deleted model.TenantApplicationEntity
-	if err := db.Unscoped().Where("id = ?", sub.ID).First(&deleted).Error; err != nil {
+	if err := db.WithContext(ctx).Unscoped().Where("id = ?", sub.ID).First(&deleted).Error; err != nil {
 		t.Fatalf("query deleted row: %v", err)
 	}
 	if deleted.DeletedBy != "u1" {

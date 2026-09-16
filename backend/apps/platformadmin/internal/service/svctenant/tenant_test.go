@@ -245,14 +245,14 @@ func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
 	if err != nil || rootDept == nil {
 		t.Fatalf("load root dept fail, err:%v, dept:%+v", err, rootDept)
 	}
-	if got := countEntities(t, db, &model.DepartmentUserEntity{},
+	if got := countEntities(t, db.WithContext(ctx), &model.DepartmentUserEntity{},
 		"tenant_id = ? AND user_id = ? AND department_id = ? AND relation_type = ?",
 		resp.TenantID, resp.AdminUserID, rootDept.ID, model.DeptUserRelationPrimary); got != 1 {
 		t.Errorf("primary dept relation count = %d, want 1", got)
 	}
 
 	// 权限开通：应用订阅 1 + 内置角色 1 + 菜单授权 4 + 管理员角色绑定 1
-	if got := countEntities(t, db, &model.TenantApplicationEntity{}, "tenant_id = ?", resp.TenantID); got != 1 {
+	if got := countEntities(t, db.WithContext(ctx), &model.TenantApplicationEntity{}, "tenant_id = ?", resp.TenantID); got != 1 {
 		t.Errorf("tenant_application count = %d, want 1", got)
 	}
 	role, err := dao.NewRoleDao().GetByCond(ctx, &dao.RoleCond{
@@ -266,10 +266,10 @@ func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
 	if !role.IsBuiltinAdmin() {
 		t.Errorf("role should be builtin super admin, got source=%q adminType=%q", role.Source, role.AdminType)
 	}
-	if got := countEntities(t, db, &model.RoleMenuEntity{}, "tenant_id = ? AND role_id = ?", resp.TenantID, role.ID); got != int64(len(tenant.ProvisionMenuSeedKeys)) {
+	if got := countEntities(t, db.WithContext(ctx), &model.RoleMenuEntity{}, "tenant_id = ? AND role_id = ?", resp.TenantID, role.ID); got != int64(len(tenant.ProvisionMenuSeedKeys)) {
 		t.Errorf("role_menu count = %d, want %d", got, len(tenant.ProvisionMenuSeedKeys))
 	}
-	if got := countEntities(t, db, &model.UserRoleEntity{}, "tenant_id = ? AND user_id = ? AND role_id = ?", resp.TenantID, resp.AdminUserID, role.ID); got != 1 {
+	if got := countEntities(t, db.WithContext(ctx), &model.UserRoleEntity{}, "tenant_id = ? AND user_id = ? AND role_id = ?", resp.TenantID, resp.AdminUserID, role.ID); got != 1 {
 		t.Errorf("user_role count = %d, want 1", got)
 	}
 }
@@ -415,7 +415,7 @@ func TestResetAdminPasswordNeverTargetsManualMember(t *testing.T) {
 	}
 
 	// 删除内置管理员后，租户只剩 manual 成员 → 必须拒绝，且不得改动 manual 成员
-	if err := db.Where("tenant_id = ? AND source = ?", created.TenantID, model.UserSourceBuiltin).
+	if err := db.WithContext(ctx).Where("tenant_id = ? AND source = ?", created.TenantID, model.UserSourceBuiltin).
 		Delete(&model.UserEntity{}).Error; err != nil {
 		t.Fatalf("delete builtin admin: %v", err)
 	}

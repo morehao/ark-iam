@@ -62,7 +62,10 @@ func Done(appName string) {
 }
 
 func NewCtx(opts ...testkit.Option) *gin.Context {
-	ginCtx, _ := gin.CreateTestContext(nil)
+	ginCtx, engine := gin.CreateTestContext(nil)
+	// 与生产引擎保持一致：开启 ContextWithFallback，gin 上下文才能当作 context.Context
+	// 使用（取租户作用域、透传 Done/Err），否则类型化作用域在 gin ctx 上不可见。
+	engine.ContextWithFallback = true
 	ginCtx.Request = &http.Request{
 		URL:    &url.URL{},
 		Header: http.Header{},

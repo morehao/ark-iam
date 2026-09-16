@@ -1,7 +1,6 @@
 package svctenant
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"time"
@@ -91,7 +90,7 @@ func (svc *apiKeySvc) Create(ctx *gin.Context, req *dtotenant.ApiKeyCreateReq) (
 		ExpiredAt:   expiresAt,
 		CreatedBy:   operatorID,
 	}
-	if err := dao.NewApiKeyDao().Insert(context.Background(), entity); err != nil {
+	if err := dao.NewApiKeyDao().Insert(ctx, entity); err != nil {
 		glog.Errorf(ctx, "[svcapikey.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApiKeyCreateError)
 	}
@@ -201,7 +200,7 @@ func (svc *apiKeySvc) Delete(ctx *gin.Context, req *dtotenant.ApiKeyDeleteReq) e
 	if err := svc.requireSystemAdmin(ctx, code.ApiKeyDeleteError); err != nil {
 		return err
 	}
-	if err := dao.NewApiKeyDao().Delete(context.Background(), key.ID, gincontext.GetUserIDString(ctx)); err != nil {
+	if err := dao.NewApiKeyDao().Delete(ctx, key.ID, gincontext.GetUserIDString(ctx)); err != nil {
 		glog.Errorf(ctx, "[svcapikey.Delete] dao Delete fail, err:%v, id:%s", err, key.ID)
 		return code.GetError(code.ApiKeyDeleteError)
 	}

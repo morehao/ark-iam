@@ -83,7 +83,7 @@ func TestDeleteNonBuiltInApplicationClient(t *testing.T) {
 
 	// 删除人应写入 7（对应原 stub 断言 deletedBy == 7）
 	var deleted model.ApplicationClientEntity
-	if err := db.Unscoped().Where("id = ?", entity.ID).First(&deleted).Error; err != nil {
+	if err := db.WithContext(ctx).Unscoped().Where("id = ?", entity.ID).First(&deleted).Error; err != nil {
 		t.Fatalf("query deleted row: %v", err)
 	}
 	if deleted.DeletedBy != "7" {

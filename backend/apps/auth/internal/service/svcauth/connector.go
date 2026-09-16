@@ -587,7 +587,7 @@ func defaultConnectorStateGenerator() (string, error) {
 
 func runtimeContext(ctx *gin.Context) context.Context {
 	if ctx != nil && ctx.Request != nil {
-		return ctx.Request.Context()
+		return ctx
 	}
 	return context.Background()
 }

@@ -348,6 +348,20 @@ if txErr != nil {
 }
 ```
 
+### 上下文传递与租户作用域（must）
+
+含 `tenant_id` 列的表，其 SELECT/UPDATE/DELETE 由租户隔离插件（`pkg/dbclient/tenant_scope.go`）自动注入 `tenant_id = ?`；**ctx 未声明作用域时 fail-closed 报错**（`dbclient.ErrTenantScopeMissing`），绝不静默放行成跨租户读。
+
+1. **ctx 一路直传 `*gin.Context`**：controller → service → dao → 第三方（OIDC provider、glog、限流器）都传同一个 gin ctx（引擎已开 `ContextWithFallback`，gin 上下文本身即合法 `context.Context`）。**禁止 `ctx.Request.Context()`**（全仓白名单为空）；异步/后台续跑用 `gincontext.AsyncContext(ctx)`（保留取值与作用域、去掉取消，且不持有会被复用的 gin 上下文）。
+2. **作用域只能显式声明**，禁止用"ctx 碰巧没有作用域"表达跨租户可见：
+   - 当前租户：中间件调用一次 `gincontext.SetTenantScope(ctx, gcontext.CurrentScope(tenantID))`（写入请求上下文，并投影 gin Keys 供 `gincontext.Get*String` 读取）；
+   - 指定它租户：`dbclient.ExplicitTenantContext(ctx, tenantID)`（写在具名 dao 方法内，调用方零判断）；
+   - 跨全部租户：`dbclient.CrossTenantContext(ctx)`（按全局唯一键反查、自然人级操作、启动期迁移/种子）；
+   - 非请求入口（seed、worker、后台任务）：显式 `gcontext.WithTenantScope(ctx, gcontext.AllScope()/CurrentScope(tenantID))`。
+3. **新增不含 `tenant_id` 的全局表**必须同步登记到 `pkg/dbclient/gorm.go` 的 `tenantScopeSkipTables`，否则带租户上下文查询会报 `no such column`。
+4. **测试同样受约束**：`testutil.SetupSQLite` 挂载同一份插件，测试里对租户表的断言查询也必须带作用域（用被测服务同一个 gin ctx，或 `dbclient.CrossTenantContext(...)` 显式跨租户）。
+5. 灰度回退仅有 `dbclient.SetMissingTenantScopeMode(dbclient.MissingTenantScopeWarn)` 一个开关（只告警不拦截），**不得**作为长期方案。
+
 ### Controller 返回模式
 
 统一使用 `gincontext` 封装响应：

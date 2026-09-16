@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/glog"
@@ -20,7 +21,10 @@ func RevokeMemberSessions(ctx context.Context, tenantID string) error {
 	if tenantID == "" {
 		return nil
 	}
-	users, err := dao.NewUserDao().GetListByCond(ctx, &dao.UserCond{TenantID: tenantID})
+	// 目标租户由参数指定，可能不是调用方当前租户（平台侧停用/重置他人租户）：
+	// 显式声明「指定租户」作用域，禁止依赖调用方 ctx 里恰好是同一个租户。
+	memberCtx := dbclient.ExplicitTenantContext(ctx, tenantID)
+	users, err := dao.NewUserDao().GetListByCond(memberCtx, &dao.UserCond{TenantID: tenantID})
 	if err != nil {
 		return err
 	}
@@ -51,17 +55,19 @@ func RevokePersonSessions(ctx context.Context, personID string) {
 	if personID == "" {
 		return
 	}
-	if err := dao.NewRefreshTokenDao().RevokeByPersonID(ctx, personID); err != nil {
+	// 语义是"该自然人的全部会话凭证"，跨其所属的全部租户：显式声明「全租户」作用域。
+	crossCtx := dbclient.CrossTenantContext(ctx)
+	if err := dao.NewRefreshTokenDao().RevokeByPersonID(crossCtx, personID); err != nil {
 		glog.Errorf(ctx, "[tenant.RevokePersonSessions] revoke refresh token fail, personID:%s, err:%v", personID, err)
 	}
 	// 顺序要求：先入队 back-channel 通知，再撤销 SSO 会话——登记查询依赖 sso_user_sessions 索引，
 	// 会话撤销后索引即清除，通知将无法投递（与 svcauth.Logout 的处置一致）。
-	if count, bErr := sso.EnqueueLogoutsByPersonID(ctx, personID); bErr != nil {
+	if count, bErr := sso.EnqueueLogoutsByPersonID(crossCtx, personID); bErr != nil {
 		glog.Warnf(ctx, "[tenant.RevokePersonSessions] enqueue back-channel logout fail, personID:%s, err:%v", personID, bErr)
 	} else if count > 0 {
 		glog.Infof(ctx, "[tenant.RevokePersonSessions] back-channel logout enqueued, personID:%s, count:%d", personID, count)
 	}
-	if err := sso.RevokeSSOSessionsByPersonID(ctx, personID); err != nil {
+	if err := sso.RevokeSSOSessionsByPersonID(crossCtx, personID); err != nil {
 		glog.Errorf(ctx, "[tenant.RevokePersonSessions] revoke sso session fail, personID:%s, err:%v", personID, err)
 	}
 }
@@ -93,6 +99,8 @@ func CreateWithRootDept(ctx context.Context, tx *gorm.DB, req *CreateWithRootDep
 	if err := dao.NewTenantDao().WithTx(tx).Insert(ctx, tenantEntity); err != nil {
 		return nil, nil, err
 	}
+	// 新建租户的根部门属于该租户：显式声明「指定租户」作用域（此 ctx 尚未携带任何租户）。
+	newTenantCtx := dbclient.ExplicitTenantContext(ctx, tenantEntity.ID)
 	// 每个租户创建时自动创建同名的根部门节点（部门树容器根）
 	rootDept := &model.DepartmentEntity{
 		TenantID:  tenantEntity.ID,
@@ -101,11 +109,11 @@ func CreateWithRootDept(ctx context.Context, tx *gorm.DB, req *CreateWithRootDep
 		Status:    model.DeptNodeStatusEnable,
 		CreatedBy: req.CreatedBy,
 	}
-	if err := dao.NewDepartmentDao().WithTx(tx).Insert(ctx, rootDept); err != nil {
+	if err := dao.NewDepartmentDao().WithTx(tx).Insert(newTenantCtx, rootDept); err != nil {
 		return nil, nil, err
 	}
 	// 根节点路径："/"+id，深度 1（ID 由 BeforeCreate 生成，需创建后补写）
-	if err := dao.NewDepartmentDao().WithTx(tx).UpdateMap(ctx, rootDept.ID, map[string]any{
+	if err := dao.NewDepartmentDao().WithTx(tx).UpdateMap(newTenantCtx, rootDept.ID, map[string]any{
 		"dept_path":  "/" + rootDept.ID,
 		"dept_depth": 1,
 	}); err != nil {

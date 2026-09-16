@@ -241,13 +241,14 @@ func TestUpdateRolesKeepAdminHeldInOtherApp(t *testing.T) {
 	seedUserRoleLink(t, db, "ur2", "t1", "u1", "r-sys2")
 
 	// 仅替换 app1 为空：app2 的管理员角色仍在有效集合内 → 不应触发「最后一个管理员」保护
-	err := svc.UpdateRoles(newCustomAdminCtx(t, db, "t1", "op"), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app1", RoleIDs: []string{}})
+	ginCtx := newCustomAdminCtx(t, db, "t1", "op")
+	err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app1", RoleIDs: []string{}})
 	if err != nil {
 		t.Fatalf("removing roles of app1 while holding system role in app2 should be allowed: %v", err)
 	}
 	// app2 关联应保留
 	var remain []model.UserRoleEntity
-	if err := db.Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&remain).Error; err != nil {
+	if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&remain).Error; err != nil {
 		t.Fatalf("re-query user_role: %v", err)
 	}
 	if len(remain) != 1 || remain[0].RoleID != "r-sys2" {

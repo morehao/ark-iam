@@ -11,6 +11,7 @@ import (
 	"github.com/morehao/ark-iam/auth/testutil"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/biz/gcontext"
@@ -321,7 +322,8 @@ func TestJoinTenantCreatesNonOwnerUser(t *testing.T) {
 	}
 
 	var insertedUser model.UserEntity
-	if err := db.Where("id = ?", resp.UserID).First(&insertedUser).Error; err != nil {
+	// 目标是邀请码解析出的租户 22：显式声明该租户作用域，与 JoinTenant 内部一致
+	if err := db.WithContext(dbclient.ExplicitTenantContext(ginCtx, "22")).Where("id = ?", resp.UserID).First(&insertedUser).Error; err != nil {
 		t.Fatalf("expected user persisted: %v", err)
 	}
 	if insertedUser.TenantID != "22" {
@@ -337,9 +339,9 @@ func TestJoinTenantCreatesNonOwnerUser(t *testing.T) {
 		t.Fatal("expected join-tenant user to have joined_at set")
 	}
 
-	// 邀请应被标记为已使用
+	// 邀请应被标记为已使用；邀请码全局唯一，按 code 反查需显式声明跨租户作用域
 	var invite model.InviteEntity
-	if err := db.Where("code = ?", "invite-abc").First(&invite).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).Where("code = ?", "invite-abc").First(&invite).Error; err != nil {
 		t.Fatalf("expected invite persisted: %v", err)
 	}
 	if invite.Status != model.InviteStatusAccepted {
@@ -389,8 +391,9 @@ func TestJoinTenantRejectsWhenAppDisallowsInvite(t *testing.T) {
 	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: "invite-abc"})
 	assertCode(t, err, code.AuthJoinNotAllowedError)
 
+	// 邀请码全局唯一，按 code 反查需显式声明跨租户作用域
 	var invite model.InviteEntity
-	if err := db.Where("code = ?", "invite-abc").First(&invite).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).Where("code = ?", "invite-abc").First(&invite).Error; err != nil {
 		t.Fatalf("expected invite persisted: %v", err)
 	}
 	if invite.Status != model.InviteStatusPending {

@@ -155,7 +155,9 @@ func TestRevokeMemberSessionsEmptyTenantID(t *testing.T) {
 func refreshTokenRevoked(t *testing.T, db *gorm.DB, idPrefix string, suffix int64) bool {
 	t.Helper()
 	var entity model.RefreshTokenEntity
-	require.NoError(t, db.Where("id = ?", fmt.Sprintf("%s-%d", idPrefix, suffix)).First(&entity).Error)
+	// 断言要同时看到"本租户"与"其它租户"的 token 行，属跨租户读取：显式声明全租户作用域。
+	require.NoError(t, db.WithContext(dbclient.CrossTenantContext(context.Background())).
+		Where("id = ?", fmt.Sprintf("%s-%d", idPrefix, suffix)).First(&entity).Error)
 	return entity.RevokedAt != nil
 }
 

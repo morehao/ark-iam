@@ -24,7 +24,7 @@ import (
 // 撤销既有 SSO 会话与 refresh token。改密后不续跑登录流程——租户选择与应用策略需要在
 // 重新登录时按最新状态重新判定，前端回到登录页用新密码重新登录。
 func (svc *oidcAuthSvc) ChangePassword(ctx *gin.Context, req *dtooidc.OIDCChangePasswordReq) error {
-	reqCtx := ctx.Request.Context()
+	reqCtx := ctx
 	authReq, err := svc.provider.Storage.AuthRequestByID(reqCtx, req.AuthRequestID)
 	if err != nil {
 		return mapAuthRequestError(err)

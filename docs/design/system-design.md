@@ -904,6 +904,25 @@ flowchart TB
 | 会话 | SSO Cookie `iam_sso_session`（SameSite 默认 Lax，生产 Secure）；Redis 会话 TTL + 活跃续期；登出撤销全部会话与刷新令牌 |
 | 审计 | 登录成功/失败、租户切换、操作动作全量写 `audit_log`；登录写 `user_login_log` |
 | 中间件 | OIDC 鉴权：无 token 401、API Key 通道独立（`x-api-key`）、机器凭证豁免 SSO 会话活性校验 |
+| 租户隔离 | 见下方「7.1 租户数据隔离（fail-closed）」 |
+
+### 7.1 租户数据隔离（fail-closed）
+
+**机制**：含 `tenant_id` 列的表，其 SELECT/UPDATE/DELETE 由 `pkg/dbclient` 挂载的租户插件（golib `gormplugin`）自动注入 `tenant_id = ?`，条件由**上下文里的租户作用域**决定；不含该列的全局表登记在 `pkg/dbclient/gorm.go` 的 `tenantScopeSkipTables`。
+
+**作用域是一等值**（golib `biz/gcontext`）：`TenantScope{Kind, TenantID}`，`Kind ∈ {Current, Explicit, All}`。
+
+| 声明方式 | 用途 | 写入点 |
+|---|---|---|
+| `gincontext.SetTenantScope(ctx, gcontext.CurrentScope(tenantID))` | 当前租户（默认） | 认证中间件：`pkg/middleware/oidc_auth.go`（OIDC claims）、`pkg/middleware/apikey_auth.go`（API Key 归属租户）各写一次 |
+| `dbclient.ExplicitTenantContext(ctx, tenantID)` | 指定它租户（加入租户、平台侧操作他人租户、新建租户的根部门） | 具名 dao/领域方法内，调用方零判断 |
+| `dbclient.CrossTenantContext(ctx)` | 跨全部租户（按全局唯一键反查 client_id/邀请码/API Key 摘要、自然人级全局登出、启动期 AutoMigrate 与种子） | 调用点显式书写并注释理由 |
+
+**fail-closed**：ctx 未声明作用域时，插件拒绝执行 SQL 并返回 `dbclient.ErrTenantScopeMissing`（错误信息含表名与修复指引），**绝不静默放行成跨租户读**。灰度回退开关为 `dbclient.SetMissingTenantScopeMode(dbclient.MissingTenantScopeWarn)`（只告警不拦截）。
+
+**两层载体**：规范存储是**请求上下文**里的类型化作用域（跨 `http.Handler` 的协议层、异步任务同样可见，OIDC provider 的 `op.Storage` 因此零改造）；同一 helper 同时把当前租户投影到 gin Keys，使 `gincontext.Get*String` 的 135 处读取点与历史写法继续可用。两者语义等价、类型化优先——因此即使某个引擎漏开 `ContextWithFallback`，隔离也不会静默失效。
+
+**验收测试**：`pkg/dbclient/tenant_scope_enforcement_test.go` 覆盖「gin ctx 与 `ctx.Request.Context()` 解析逐字节一致（G2）」「未声明作用域 fail-closed」「All/Explicit/Current 三类语义」「开关关闭时投影仍生效」「AsyncContext 带走作用域且不继承取消」。
 
 ---
 

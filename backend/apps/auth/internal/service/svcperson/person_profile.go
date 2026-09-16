@@ -6,6 +6,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/credential"
 	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -28,7 +29,7 @@ func (svc *personProfileSvc) Detail(ctx *gin.Context, req *dtoperson.PersonDetai
 	}
 
 	personDao := dao.NewPersonDao()
-	personEntity, err := personDao.GetByID(ctx.Request.Context(), personID)
+	personEntity, err := personDao.GetByID(ctx, personID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcperson.Detail] dao GetByID fail, err:%v, personID:%s", err, personID)
 		return nil, code.GetError(code.UserGetDetailError)
@@ -55,7 +56,7 @@ func (svc *personProfileSvc) UpdatePassword(ctx *gin.Context, req *dtoperson.Per
 	}
 
 	personDao := dao.NewPersonDao()
-	personEntity, err := personDao.GetByID(ctx.Request.Context(), personID)
+	personEntity, err := personDao.GetByID(ctx, personID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcperson.UpdatePassword] dao GetByID fail, err:%v, personID:%s", err, personID)
 		return code.GetError(code.UserGetDetailError)
@@ -92,7 +93,7 @@ func (svc *personProfileSvc) UpdatePassword(ctx *gin.Context, req *dtoperson.Per
 	// 自助改密同时清除"首次登录强制改密"标记：用户已亲自设置口令，临时密码的约束随之解除
 	// （正常路径下持临时密码者登录即被拦截，改密只能走 /oidc/login/changePassword；
 	// 此处兜底覆盖标记在会话有效期内被置位的边界场景）。
-	if err := personDao.UpdateMap(ctx.Request.Context(), personID, map[string]interface{}{
+	if err := personDao.UpdateMap(ctx, personID, map[string]interface{}{
 		"password_encrypted":   newHash,
 		"must_change_password": false,
 	}); err != nil {
@@ -102,10 +103,12 @@ func (svc *personProfileSvc) UpdatePassword(ctx *gin.Context, req *dtoperson.Per
 
 	// H7：改密即全局登出——撤销该 person 的全部 SSO 会话与 refresh token，
 	// 使已泄露/被盗的旧会话在改密后立即失效（与 Logout 的"一处登出、处处登出"语义一致）。
-	if err := sso.RevokeSSOSessionsByPersonID(ctx.Request.Context(), personID); err != nil {
+	// 改密即全局登出：撤销该自然人名下**全部租户**的会话，显式声明「全租户」作用域。
+	personCtx := dbclient.CrossTenantContext(ctx)
+	if err := sso.RevokeSSOSessionsByPersonID(personCtx, personID); err != nil {
 		glog.Warnf(ctx, "[svcperson.UpdatePassword] revoke sso sessions fail, personID:%s, err:%v", personID, err)
 	}
-	if err := dao.NewRefreshTokenDao().RevokeByPersonID(ctx.Request.Context(), personID); err != nil {
+	if err := dao.NewRefreshTokenDao().RevokeByPersonID(personCtx, personID); err != nil {
 		glog.Warnf(ctx, "[svcperson.UpdatePassword] revoke refresh tokens fail, personID:%s, err:%v", personID, err)
 	}
 

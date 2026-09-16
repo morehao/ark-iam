@@ -63,7 +63,9 @@ func WriteAudit(ctx *gin.Context, e AuditEntry) {
 		Detail:        e.Detail,
 		CreatedBy:     ctx.GetString(gcontext.KeyUserID),
 	}
-	if err := newAuditLogDao().Insert(context.Background(), entity); err != nil {
+	// 审计是跨租户旁路写入（实体自带 TenantID）：显式声明「全部租户」作用域。
+	// 不用缺失作用域表达跨租户，否则 fail-closed 下审计写入会整体失败。
+	if err := newAuditLogDao().Insert(gcontext.WithTenantScope(context.Background(), gcontext.AllScope()), entity); err != nil {
 		glog.Errorf(ctx, "[audit.WriteAudit] failed, action:%s, err:%v", e.Action, err)
 	}
 }

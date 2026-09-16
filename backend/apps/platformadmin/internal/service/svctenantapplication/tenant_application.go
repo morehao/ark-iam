@@ -1,11 +1,14 @@
 package svctenantapplication
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/datatypes"
 
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenantapplication"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -49,8 +52,11 @@ func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplicat
 		glog.Errorf(ctx, "[svctenantapplication.Create] 非法订阅状态, req:%s", gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantApplicationCreateError)
 	}
+	// 平台侧跨租户运维：订阅归属租户来自请求参数，调用方 ctx 携带的是平台租户，
+	// 因此这里必须显式声明「全租户」作用域——跨租户可见性不能来自「ctx 恰好没有作用域」。
+	crossCtx := dbclient.CrossTenantContext(ctx)
 	// 1) 归属租户必须存在
-	tenantEntity, err := dao.NewTenantDao().GetByID(ctx, req.TenantID)
+	tenantEntity, err := dao.NewTenantDao().GetByID(crossCtx, req.TenantID)
 	if err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Create] dao tenant GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantApplicationCreateError)
@@ -61,7 +67,7 @@ func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplicat
 
 	// 2) 订阅必须指向真实存在的应用：否则租户侧按订阅反查应用时会静默丢弃（loadSubscribedApps），
 	// 留下一条永远不生效的悬空订阅。
-	app, err := dao.NewApplicationDao().GetByID(ctx, req.AppID)
+	app, err := dao.NewApplicationDao().GetByID(crossCtx, req.AppID)
 	if err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Create] dao application GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantApplicationCreateError)
@@ -72,7 +78,7 @@ func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplicat
 
 	// 3) tenant_application 无唯一索引（幂等只能由应用层保证，见 pkg/core/tenant.ProvisionTenantAdmin），
 	// 故同一租户对同一应用只允许一条订阅，重复订阅在这里拦截。
-	existing, err := dao.NewTenantApplicationDao().GetByCond(ctx, &dao.TenantApplicationCond{TenantID: req.TenantID, AppID: req.AppID})
+	existing, err := dao.NewTenantApplicationDao().GetByCond(crossCtx, &dao.TenantApplicationCond{TenantID: req.TenantID, AppID: req.AppID})
 	if err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Create] dao tenantApplication GetByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantApplicationCreateError)
@@ -103,7 +109,7 @@ func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplicat
 	if req.GrantedScope != "" {
 		entity.GrantedScope = datatypes.JSON([]byte(req.GrantedScope))
 	}
-	if err := dao.NewTenantApplicationDao().Insert(ctx, entity); err != nil {
+	if err := dao.NewTenantApplicationDao().Insert(crossCtx, entity); err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantApplicationCreateError)
 	}
@@ -117,7 +123,10 @@ func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplicat
 // 租户侧无法自救）。判定口径取「订阅的应用 source=builtin」，与 svcapplication.Delete 的
 // 内置应用禁删同源；需要下线时改 status=disable（Update 不受限）。
 func (svc *tenantApplicationSvc) Delete(ctx *gin.Context, req *dtotenantapplication.TenantApplicationDeleteReq) error {
-	entity, err := dao.NewTenantApplicationDao().GetByID(ctx, req.TenantAppID)
+	// 平台侧跨租户运维：订阅归属租户来自请求参数，调用方 ctx 携带的是平台租户，
+	// 因此这里必须显式声明「全租户」作用域——跨租户可见性不能来自「ctx 恰好没有作用域」。
+	crossCtx := dbclient.CrossTenantContext(ctx)
+	entity, err := dao.NewTenantApplicationDao().GetByID(crossCtx, req.TenantAppID)
 	if err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.TenantApplicationDeleteError)
@@ -125,7 +134,7 @@ func (svc *tenantApplicationSvc) Delete(ctx *gin.Context, req *dtotenantapplicat
 	if entity == nil || entity.ID == "" {
 		return code.GetError(code.TenantApplicationNotExistError)
 	}
-	app, err := dao.NewApplicationDao().GetByID(ctx, entity.AppID)
+	app, err := dao.NewApplicationDao().GetByID(crossCtx, entity.AppID)
 	if err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Delete] dao application GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.TenantApplicationDeleteError)
@@ -134,7 +143,7 @@ func (svc *tenantApplicationSvc) Delete(ctx *gin.Context, req *dtotenantapplicat
 	if app != nil && app.Source.IsBuiltin() {
 		return code.GetError(code.TenantApplicationBuiltInErr)
 	}
-	if err := dao.NewTenantApplicationDao().Delete(ctx, req.TenantAppID, gincontext.GetUserIDString(ctx)); err != nil {
+	if err := dao.NewTenantApplicationDao().Delete(crossCtx, req.TenantAppID, gincontext.GetUserIDString(ctx)); err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.TenantApplicationDeleteError)
 	}
@@ -146,7 +155,10 @@ func (svc *tenantApplicationSvc) Update(ctx *gin.Context, req *dtotenantapplicat
 		glog.Errorf(ctx, "[svctenantapplication.Update] 非法订阅状态, req:%s", gutil.ToJsonString(req))
 		return code.GetError(code.TenantApplicationUpdateError)
 	}
-	entity, err := dao.NewTenantApplicationDao().GetByID(ctx, req.TenantAppID)
+	// 平台侧跨租户运维：订阅归属租户来自请求参数，调用方 ctx 携带的是平台租户，
+	// 因此这里必须显式声明「全租户」作用域——跨租户可见性不能来自「ctx 恰好没有作用域」。
+	crossCtx := dbclient.CrossTenantContext(ctx)
+	entity, err := dao.NewTenantApplicationDao().GetByID(crossCtx, req.TenantAppID)
 	if err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.TenantApplicationUpdateError)
@@ -167,7 +179,7 @@ func (svc *tenantApplicationSvc) Update(ctx *gin.Context, req *dtotenantapplicat
 	if req.GrantedScope != "" {
 		updateMap["granted_scope"] = datatypes.JSON([]byte(req.GrantedScope))
 	}
-	if err := dao.NewTenantApplicationDao().UpdateMap(ctx, req.TenantAppID, updateMap); err != nil {
+	if err := dao.NewTenantApplicationDao().UpdateMap(crossCtx, req.TenantAppID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.TenantApplicationUpdateError)
 	}
@@ -175,7 +187,10 @@ func (svc *tenantApplicationSvc) Update(ctx *gin.Context, req *dtotenantapplicat
 }
 
 func (svc *tenantApplicationSvc) Detail(ctx *gin.Context, req *dtotenantapplication.TenantApplicationDetailReq) (*dtotenantapplication.TenantApplicationDetailResp, error) {
-	entity, err := dao.NewTenantApplicationDao().GetByID(ctx, req.TenantAppID)
+	// 平台侧跨租户运维：订阅归属租户来自请求参数，调用方 ctx 携带的是平台租户，
+	// 因此这里必须显式声明「全租户」作用域——跨租户可见性不能来自「ctx 恰好没有作用域」。
+	crossCtx := dbclient.CrossTenantContext(ctx)
+	entity, err := dao.NewTenantApplicationDao().GetByID(crossCtx, req.TenantAppID)
 	if err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantApplicationGetDetailError)
@@ -183,7 +198,7 @@ func (svc *tenantApplicationSvc) Detail(ctx *gin.Context, req *dtotenantapplicat
 	if entity == nil || entity.ID == "" {
 		return nil, code.GetError(code.TenantApplicationNotExistError)
 	}
-	tenantNames, appNames, appSources, err := loadRefs(ctx, model.TenantApplicationEntityList{*entity})
+	tenantNames, appNames, appSources, err := loadRefs(crossCtx, model.TenantApplicationEntityList{*entity})
 	if err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Detail] loadRefs fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantApplicationGetDetailError)
@@ -203,17 +218,20 @@ func (svc *tenantApplicationSvc) Detail(ctx *gin.Context, req *dtotenantapplicat
 }
 
 func (svc *tenantApplicationSvc) PageList(ctx *gin.Context, req *dtotenantapplication.TenantApplicationPageListReq) (*dtotenantapplication.TenantApplicationPageListResp, error) {
+	// 平台侧跨租户运维：订阅归属租户来自请求参数，调用方 ctx 携带的是平台租户，
+	// 因此这里必须显式声明「全租户」作用域——跨租户可见性不能来自「ctx 恰好没有作用域」。
+	crossCtx := dbclient.CrossTenantContext(ctx)
 	cond := &dao.TenantApplicationCond{
 		BaseCond: &gormdao.BaseCond{Page: req.Page, PageSize: req.PageSize},
 		TenantID: req.TenantID, // 留空即全部租户（平台侧跨租户视角）
 		Status:   req.Status,
 	}
-	list, total, err := dao.NewTenantApplicationDao().GetPageListByCond(ctx, cond)
+	list, total, err := dao.NewTenantApplicationDao().GetPageListByCond(crossCtx, cond)
 	if err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.PageList] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantApplicationGetPageListError)
 	}
-	tenantNames, appNames, appSources, err := loadRefs(ctx, list)
+	tenantNames, appNames, appSources, err := loadRefs(crossCtx, list)
 	if err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.PageList] loadRefs fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantApplicationGetPageListError)
@@ -237,7 +255,10 @@ func (svc *tenantApplicationSvc) PageList(ctx *gin.Context, req *dtotenantapplic
 
 // loadRefs 批量回填租户名与应用名/来源（列表/详情一次查询，避免前端按行再查或 N+1）。
 // 名称缺失不报错：调用方以空名返回，前端退化为展示 ID；应用来源供前端判断内置订阅（禁删）。
-func loadRefs(ctx *gin.Context, list model.TenantApplicationEntityList) (map[string]string, map[string]string, map[string]model.AppSource, error) {
+func loadRefs(ctx context.Context, list model.TenantApplicationEntityList) (map[string]string, map[string]string, map[string]model.AppSource, error) {
+	// 平台侧跨租户运维：订阅归属租户来自请求参数，调用方 ctx 携带的是平台租户，
+	// 因此这里必须显式声明「全租户」作用域——跨租户可见性不能来自「ctx 恰好没有作用域」。
+	crossCtx := dbclient.CrossTenantContext(ctx)
 	tenantIDs := make([]string, 0, len(list))
 	appIDs := make([]string, 0, len(list))
 	seenTenant := make(map[string]struct{}, len(list))
@@ -259,7 +280,7 @@ func loadRefs(ctx *gin.Context, list model.TenantApplicationEntityList) (map[str
 
 	tenantNames := make(map[string]string, len(tenantIDs))
 	if len(tenantIDs) > 0 {
-		tenants, err := dao.NewTenantDao().GetListByCond(ctx, &dao.TenantCond{IDs: tenantIDs})
+		tenants, err := dao.NewTenantDao().GetListByCond(crossCtx, &dao.TenantCond{IDs: tenantIDs})
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -271,7 +292,7 @@ func loadRefs(ctx *gin.Context, list model.TenantApplicationEntityList) (map[str
 	appNames := make(map[string]string, len(appIDs))
 	appSources := make(map[string]model.AppSource, len(appIDs))
 	if len(appIDs) > 0 {
-		apps, err := dao.NewApplicationDao().GetListByCond(ctx, &dao.ApplicationCond{IDs: appIDs})
+		apps, err := dao.NewApplicationDao().GetListByCond(crossCtx, &dao.ApplicationCond{IDs: appIDs})
 		if err != nil {
 			return nil, nil, nil, err
 		}

@@ -38,7 +38,7 @@ func (svc *oidcAuthSvc) RegisterPerson(ctx *gin.Context, req *dtooidc.RegisterPe
 		return nil, code.GetError(code.AuthIdentifierRequiredError)
 	}
 
-	authReq, err := svc.provider.Storage.AuthRequestByID(ctx.Request.Context(), req.AuthRequestID)
+	authReq, err := svc.provider.Storage.AuthRequestByID(ctx, req.AuthRequestID)
 	if err != nil {
 		return nil, mapAuthRequestError(err)
 	}
@@ -59,8 +59,8 @@ func (svc *oidcAuthSvc) RegisterPerson(ctx *gin.Context, req *dtooidc.RegisterPe
 
 	var personEntity *model.PersonEntity
 	personCreated := false
-	txErr := dbclient.IamDB(ctx.Request.Context()).Transaction(func(tx *gorm.DB) error {
-		p, created, fErr := person.FindOrCreate(ctx.Request.Context(), tx, &person.FindOrCreateReq{
+	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
+		p, created, fErr := person.FindOrCreate(ctx, tx, &person.FindOrCreateReq{
 			Username:          req.Username,
 			PrimaryEmail:      req.PrimaryEmail,
 			PrimaryPhone:      req.PrimaryPhone,
@@ -101,7 +101,7 @@ func (svc *oidcAuthSvc) RegisterPerson(ctx *gin.Context, req *dtooidc.RegisterPe
 		glog.Errorf(ctx, "[oidcAuthSvc.RegisterPerson] TenantsForPerson fail, err:%v, personID:%s", tErr, personEntity.ID)
 		return nil, code.GetError(code.AuthRegisterFailedError)
 	}
-	if cErr := svc.provider.Storage.CompleteAuthRequest(ctx.Request.Context(), req.AuthRequestID,
+	if cErr := svc.provider.Storage.CompleteAuthRequest(ctx, req.AuthRequestID,
 		oidcop.BuildSubject(personEntity.ID), time.Now(), []string{"pwd"}, "", "", false); cErr != nil {
 		return nil, mapAuthRequestError(cErr)
 	}
@@ -119,17 +119,17 @@ func (svc *oidcAuthSvc) RegisterPerson(ctx *gin.Context, req *dtooidc.RegisterPe
 func svcResolvePersonConflict(ctx *gin.Context, req *dtooidc.RegisterPersonReq) error {
 	personDao := dao.NewPersonDao()
 	if req.Username != "" {
-		if p, qErr := personDao.GetByCond(ctx.Request.Context(), &dao.PersonCond{Username: req.Username}); qErr == nil && p != nil && p.ID != "" {
+		if p, qErr := personDao.GetByCond(ctx, &dao.PersonCond{Username: req.Username}); qErr == nil && p != nil && p.ID != "" {
 			return code.GetError(code.UsernameAlreadyExistsError)
 		}
 	}
 	if req.PrimaryEmail != "" {
-		if p, qErr := personDao.GetByCond(ctx.Request.Context(), &dao.PersonCond{PrimaryEmail: req.PrimaryEmail}); qErr == nil && p != nil && p.ID != "" {
+		if p, qErr := personDao.GetByCond(ctx, &dao.PersonCond{PrimaryEmail: req.PrimaryEmail}); qErr == nil && p != nil && p.ID != "" {
 			return code.GetError(code.EmailAlreadyExistsError)
 		}
 	}
 	if req.PrimaryPhone != "" {
-		if p, qErr := personDao.GetByCond(ctx.Request.Context(), &dao.PersonCond{PrimaryPhone: req.PrimaryPhone}); qErr == nil && p != nil && p.ID != "" {
+		if p, qErr := personDao.GetByCond(ctx, &dao.PersonCond{PrimaryPhone: req.PrimaryPhone}); qErr == nil && p != nil && p.ID != "" {
 			return code.GetError(code.PhoneAlreadyExistsError)
 		}
 	}
@@ -141,7 +141,7 @@ func svcResolvePersonConflict(ctx *gin.Context, req *dtooidc.RegisterPersonReq) 
 // I1：createTenant 无幂等、不置 done，同一 authRequest 可被重复调用批量建多个租户，但这是
 // 新建 person 的自建动作（C1 修复后仅新建 person 可达此），非跨用户/冒用风险，判定可接受。
 func (svc *oidcAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenantReq) (*dtooidc.CreateTenantResp, error) {
-	authReq, err := svc.provider.Storage.AuthRequestByID(ctx.Request.Context(), req.AuthRequestID)
+	authReq, err := svc.provider.Storage.AuthRequestByID(ctx, req.AuthRequestID)
 	if err != nil {
 		return nil, mapAuthRequestError(err)
 	}
@@ -180,11 +180,11 @@ func (svc *oidcAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenant
 	}
 
 	var tenantEntity *model.TenantEntity
-	txErr := dbclient.IamDB(ctx.Request.Context()).Transaction(func(tx *gorm.DB) error {
+	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
 		// 建租户 + 内置管理员（即当前登录自然人，沿用其既有密码）+ 租户自服务权限开通：
 		// 与平台侧建租户共用同一实现（pkg/core/tenant.CreateTenantWithBuiltinAdmin），
 		// owner 同样打 builtin 来源标记，使"平台重置内置管理员密码"的兜底路径对自助租户同样可用（D5）。
-		result, cErr := tenant.CreateTenantWithBuiltinAdmin(ctx.Request.Context(), tx, &tenant.CreateTenantWithBuiltinAdminReq{
+		result, cErr := tenant.CreateTenantWithBuiltinAdmin(ctx, tx, &tenant.CreateTenantWithBuiltinAdminReq{
 			Tenant: &tenant.CreateWithRootDeptReq{
 				Code:      tenantCode,
 				Name:      req.TenantName,
@@ -221,7 +221,7 @@ func (svc *oidcAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenant
 // 供登录页在渲染前决定是否展示"注册账号"入口；仅读 OIDC 协议态与应用策略，
 // 不改变任何状态。判定链与 RegisterPerson/CreateTenant 同源，保证 UI 判断与门禁一致。
 func (svc *oidcAuthSvc) LoginConfig(ctx *gin.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error) {
-	authReq, err := svc.provider.Storage.AuthRequestByID(ctx.Request.Context(), authRequestID)
+	authReq, err := svc.provider.Storage.AuthRequestByID(ctx, authRequestID)
 	if err != nil {
 		return nil, mapAuthRequestError(err)
 	}

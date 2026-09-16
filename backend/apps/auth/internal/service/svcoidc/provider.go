@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	appconfig "github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"golang.org/x/text/language"
 )
@@ -312,7 +313,9 @@ func (p *OIDCProvider) RedirectURIVerifier() func(ctx *gin.Context, clientID, re
 		if clientID == "" || redirectURI == "" {
 			return false
 		}
-		client, err := storage.GetClientByClientID(ctx.Request.Context(), clientID)
+		// client_id 全局唯一，且本校验发生在「租户确定之前」的授权请求入口：
+		// 必须显式声明「全租户」作用域，跨租户可见性不能来自缺失作用域。
+		client, err := storage.GetClientByClientID(dbclient.CrossTenantContext(ctx), clientID)
 		if err != nil {
 			return false
 		}

@@ -63,9 +63,8 @@ func TestTenantApplicationUpdateRejectsIllegalStatus(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
-	ctx, _ := gin.CreateTestContext(nil)
-	ctx.Set(gcontext.KeyTenantID, "1")
-	ctx.Set(gcontext.KeyUserID, "0")
+	// 断言查询与 Update 用同一个带租户作用域的 ctx：订阅归属租户即该作用域，否则查不到既有行。
+	ctx := testutil.NewGinCtx("t1", "0")
 	svc := NewTenantApplicationSvc()
 
 	err := svc.Update(ctx, &dtotenantapplication.TenantApplicationUpdateReq{

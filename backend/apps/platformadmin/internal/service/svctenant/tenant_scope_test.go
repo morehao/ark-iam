@@ -2,24 +2,19 @@ package svctenant
 
 import (
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/platformadmin/testutil"
-	"github.com/morehao/golib/biz/gcontext"
 )
 
-// newTenantScopeGinCtx 构造带租户上下文的测试 gin.Context；
-// 同时挂上真实 Request（生产链路必有），避免服务内 ctx.Request.Context() 空指针。
+// newTenantScopeGinCtx 构造带租户作用域的测试 gin.Context；tenantID 为空表示平台侧
+// 「全部租户」视角（按主键列表、建租户链路）。同时挂上真实 Request（生产链路必有），
+// 避免服务内 ctx.Request.Context() 空指针。
 func newTenantScopeGinCtx(tenantID string) *gin.Context {
-	ctx, _ := gin.CreateTestContext(nil)
-	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx.Set(gcontext.KeyTenantID, tenantID)
-	return ctx
+	return testutil.NewGinCtx(tenantID, "")
 }
 
 func TestLogDetailRejectsCrossTenantEntity(t *testing.T) {

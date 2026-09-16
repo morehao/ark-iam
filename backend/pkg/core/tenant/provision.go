@@ -6,6 +6,7 @@ import (
 
 	"github.com/morehao/ark-iam/pkg/core/user"
 	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/glog"
 	"gorm.io/datatypes"
@@ -53,6 +54,9 @@ func ProvisionTenantAdmin(ctx context.Context, tx *gorm.DB, req *ProvisionTenant
 	if req == nil || req.TenantID == "" {
 		return nil, fmt.Errorf("core/tenant: tenant id is required")
 	}
+	// 开通目标租户由 req.TenantID 指定，可能与调用方当前租户不同（平台侧/协议层建租户）：
+	// 显式声明「指定租户」作用域，让本函数不依赖调用方 ctx 恰好携带目标租户。
+	ctx = dbclient.ExplicitTenantContext(ctx, req.TenantID)
 
 	// 1. 定位租户管理后台应用（全局种子数据，缺失即种子未跑完）：按种子身份键定位，
 	// 运营改过 application.code 后依然命中同一行。
@@ -254,12 +258,17 @@ func CreateTenantWithBuiltinAdmin(ctx context.Context, tx *gorm.DB, req *CreateT
 		return nil, fmt.Errorf("create tenant with root dept: %w", err)
 	}
 
+	// 后续成员/权限写入都属于"刚建出来的这个租户"：租户 ID 在本行之前才生成，
+	// 因此显式声明「指定租户」作用域，既覆盖请求 ctx 无作用域（协议层建租户），
+	// 也覆盖请求 ctx 携带的是平台租户（平台侧建租户）——两者都不该影响新租户的写入。
+	newTenantCtx := dbclient.ExplicitTenantContext(ctx, tenantEntity.ID)
+
 	adminReq := *req.AdminUser
 	adminReq.TenantID = tenantEntity.ID
 	adminReq.Source = model.UserSourceBuiltin
 	adminReq.IsOwner = true
 	adminReq.PrimaryDepartmentID = rootDept.ID
-	adminUser, personCreated, err := user.Create(ctx, tx, &adminReq)
+	adminUser, personCreated, err := user.Create(newTenantCtx, tx, &adminReq)
 	if err != nil {
 		return nil, fmt.Errorf("create tenant admin user: %w", err)
 	}
