@@ -286,11 +286,11 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | GET | `/v1/tenant/invites` | 邀请分页 |
 | DELETE | `/v1/tenant/invites/{inviteID}` | 撤销邀请 |
 | GET | `/v1/tenant/apps` | 租户订阅的启用应用列表（角色归属/菜单授权的应用选项，含系统内置应用） |
-| POST | `/v1/tenant/roles` | 创建角色（**appID 必选**，角色从属于应用，名称应用内唯一；角色无业务编码，以名称作为应用内唯一标识） |
-| GET | `/v1/tenant/roles` | 角色分页（?appID=&keyword=&unassigned=，含成员数/菜单数/所属应用名；`unassigned=true` 只查未归属应用的系统角色，供角色授权下拉按名称服务端搜索） |
-| GET | `/v1/tenant/roles/{roleID}` | 角色详情 |
-| PUT | `/v1/tenant/roles/{roleID}` | 更新角色 |
-| DELETE | `/v1/tenant/roles/{roleID}` | 删除角色（级联清理成员/菜单关联） |
+| POST | `/v1/tenant/roles` | 创建角色（**appID 必选**，角色从属于应用，名称应用内唯一；**`code` 必填**：`^[a-z][a-z0-9_]*$`、租户内唯一、**不得占用系统保留编码**，是 OIDC `groups` 取值与下游策略名契约，非法报 `100707`、重码报 `100708`、保留编码报 `100710`） |
+| GET | `/v1/tenant/roles` | 角色分页（?appID=&keyword=&unassigned=，含成员数/菜单数/所属应用名/编码；`keyword` 同时模糊匹配名称与编码；`unassigned=true` 只查未归属应用的系统角色，供角色授权下拉按名称服务端搜索） |
+| GET | `/v1/tenant/roles/{roleID}` | 角色详情（含 `code`） |
+| PUT | `/v1/tenant/roles/{roleID}` | 更新角色（**仅自建角色**：`code` 可改，改动即改变下游按编码授予的权限，需同步下游策略配置；形状/保留编码/唯一性校验同创建。**内置角色整体只读**，报 `100709`——编码是下游策略供给锚点） |
+| DELETE | `/v1/tenant/roles/{roleID}` | 删除角色（级联清理成员/菜单关联；**内置角色禁止删除**，报 `100706`） |
 | GET | `/v1/tenant/roles/{roleID}/menus` | 角色菜单授权回显（**所属应用的菜单树** + 已授权ID，角色侧授权入口） |
 | PUT | `/v1/tenant/roles/{roleID}/menus` | 全量替换角色菜单授权 |
 | POST | `/v1/tenant/departments` | 创建部门节点 |

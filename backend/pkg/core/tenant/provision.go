@@ -20,8 +20,11 @@ const (
 	// 开通链路按它定位应用，而不是按 application.code——code 是运营可改的业务标识；
 	// 该值与种子定义（pkg/seed 的 appCodeTenantAdmin）一致，改定义时两处同步。
 	ProvisionAppSeedKey = "tenant_admin"
-	// ProvisionRoleName 内置租户管理员角色名称（角色无业务编码，(tenant_id, app_id, source=builtin) 即其业务唯一键）。
+	// ProvisionRoleName 内置租户管理员角色名称（幂等定位键为 (tenant_id, app_id, source=builtin)）。
 	ProvisionRoleName = "租户管理员"
+	// ProvisionRoleCode 内置租户管理员角色编码：跨系统授权契约值，也是 OIDC ID token `groups`
+	// 的取值（下游按「前缀 + 编码」认策略名）。中性命名，不写下游产品语义。
+	ProvisionRoleCode = model.RoleCodeTenantAdmin
 	// ProvisionRoleDesc 内置租户管理员角色描述。
 	ProvisionRoleDesc = "租户管理后台应用管理员，拥有全部租户管理后台权限"
 	// ProvisionAdminType 内置管理员角色的系统管理类型（租户 tenant_admin 与平台 admin 种子共用；admin=具备系统管理能力）。
@@ -118,7 +121,7 @@ func ensureTenantApplication(ctx context.Context, tx *gorm.DB, req *ProvisionTen
 }
 
 // ensureBuiltinRole 幂等写入内置租户管理员角色，并回填 admin_type（存量数据可能被改错）。
-// 角色无业务编码，幂等定位键为 (tenant_id, app_id, source=builtin)。
+// 幂等定位键为 (tenant_id, app_id, source=builtin)；编码按 create_only 语义只在创建时写入。
 func ensureBuiltinRole(ctx context.Context, tx *gorm.DB, req *ProvisionTenantAdminReq, appID string) (*model.RoleEntity, error) {
 	roleDao := dao.NewRoleDao().WithTx(tx)
 	builtinSource := model.RoleSourceBuiltin
@@ -136,6 +139,7 @@ func ensureBuiltinRole(ctx context.Context, tx *gorm.DB, req *ProvisionTenantAdm
 			TenantID:    req.TenantID,
 			AppID:       appID,
 			Name:        ProvisionRoleName,
+			Code:        ProvisionRoleCode,
 			Description: ProvisionRoleDesc,
 			Source:      builtinSource,
 			AdminType:   adminType,

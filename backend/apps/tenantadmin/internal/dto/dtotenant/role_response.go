@@ -15,6 +15,7 @@ type RolePageListItem struct {
 	RoleID      string             `json:"roleID"`      // 角色ID
 	AppID       string             `json:"appID"`       // 所属应用ID
 	AppName     string             `json:"appName"`     // 所属应用名称
+	Code        model.RoleCode     `json:"code"`        // 角色编码(跨系统授权契约值，即 OIDC groups 取值)
 	Name        string             `json:"name"`        // 角色名称
 	Description string             `json:"description"` // 角色描述
 	Source      model.RoleSource   `json:"source"`      // 角色来源(builtin/custom)
@@ -29,6 +30,7 @@ type RoleDetailResp struct {
 	RoleID      string             `json:"roleID"`      // 角色ID
 	AppID       string             `json:"appID"`       // 所属应用ID
 	AppName     string             `json:"appName"`     // 所属应用名称
+	Code        model.RoleCode     `json:"code"`        // 角色编码(跨系统授权契约值，即 OIDC groups 取值)
 	Name        string             `json:"name"`        // 角色名称
 	Description string             `json:"description"` // 角色描述
 	Source      model.RoleSource   `json:"source"`      // 角色来源(builtin/custom)

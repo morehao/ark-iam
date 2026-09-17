@@ -119,25 +119,31 @@ func (s *OIDCStorage) SetIntrospectionFromToken(ctx context.Context, introspecti
 
 var _ op.CanSetUserinfoFromRequest = (*OIDCStorage)(nil)
 
-// SetUserinfoFromRequest 在 ID token 签发时注入会话级声明（sid），
-// 使 id_token_hint 可携带 sid，从而支持会话粒度的 RP-Initiated Logout（M4）。
-// 授权码流取授权票据关联的会话；刷新流取 refresh token 存储的会话。
+// SetUserinfoFromRequest 在 ID token 签发时注入会话级与授权级声明：
+//   - sid：使 id_token_hint 可携带 sid，从而支持会话粒度的 RP-Initiated Logout（M4）。
+//     授权码流取授权票据关联的会话；刷新流取 refresh token 存储的会话。
+//   - groups：该租户内的角色编码（跨系统授权契约，见 PersistentStore.appendRoleGroupClaims）。
+//     放在这里而非 SetUserinfoFromScopes，是因为只有本回调能拿到本次签发的租户。
 func (s *OIDCStorage) SetUserinfoFromRequest(ctx context.Context, userinfo *oidc.UserInfo, request op.IDTokenRequest, scopes []string) error {
-	var sessionID string
-	if ar, ok := request.(*AuthRequest); ok {
-		sessionID = ar.SessionID
+	var (
+		sessionID string
+		tenantID  string
+	)
+	switch req := request.(type) {
+	case *AuthRequest:
+		sessionID = req.SessionID
+		tenantID = req.TenantID
+	case *refreshTokenRequest:
+		sessionID = req.GetSessionID()
+		tenantID = req.GetTenantID()
 	}
-	if rr, ok := request.(*refreshTokenRequest); ok {
-		sessionID = rr.GetSessionID()
+	if sessionID != "" {
+		if userinfo.Claims == nil {
+			userinfo.Claims = make(map[string]any, 1)
+		}
+		userinfo.Claims["sid"] = sessionID
 	}
-	if sessionID == "" {
-		return nil
-	}
-	if userinfo.Claims == nil {
-		userinfo.Claims = make(map[string]any, 1)
-	}
-	userinfo.Claims["sid"] = sessionID
-	return nil
+	return s.persistentStore.appendRoleGroupClaims(ctx, userinfo, tenantID, request.GetSubject(), scopes)
 }
 
 func (s *OIDCStorage) GetPrivateClaimsFromScopes(ctx context.Context, userID, clientID string, scopes []string) (map[string]any, error) {

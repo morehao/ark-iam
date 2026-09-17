@@ -133,10 +133,12 @@ var SeedFieldAuthorities = []SeedFieldAuthority{
 	{SeedEntityMenu, "type", SeedFieldCreateOnly},
 	{SeedEntityMenu, "visibility", SeedFieldCreateOnly},
 	{SeedEntityMenu, "status", SeedFieldCreateOnly},
-	// 内置角色：admin_type 是系统管理能力的安全不变式（归种子），名称/描述归运维。
+	// 内置角色：admin_type 是系统管理能力的安全不变式（归种子），
+	// 名称/描述/编码归运维——编码是下游授权契约值（OIDC groups 取值），改动需人工决策，种子不回写。
 	{SeedEntityRole, "admin_type", SeedFieldReconcile},
 	{SeedEntityRole, "name", SeedFieldCreateOnly},
 	{SeedEntityRole, "description", SeedFieldCreateOnly},
+	{SeedEntityRole, "code", SeedFieldCreateOnly},
 	// 种子管理员：口令绝不覆盖（重置走专用接口），source 是内置标记（安全不变式）。
 	{SeedEntityPerson, "password_encrypted", SeedFieldCreateOnly},
 	{SeedEntityUser, "source", SeedFieldReconcile},

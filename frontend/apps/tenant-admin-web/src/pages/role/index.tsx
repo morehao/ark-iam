@@ -15,7 +15,7 @@ import {
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
-import { actionColumn, COUNT_COL_WIDTH, NAME_COL_WIDTH, PageContainer, SourceTag, STATUS_COL_WIDTH, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
+import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, NAME_COL_WIDTH, PageContainer, SourceTag, STATUS_COL_WIDTH, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
 import type { MenuItem, TenantAppItem, TenantRoleItem } from '@ark-iam/types'
 import {
   createTenantRole,
@@ -26,6 +26,16 @@ import {
   updateTenantRoleMenus,
 } from '../../api/role'
 import { getTenantApps } from '../../api/menu'
+
+/**
+ * 角色编码形状：小写字母开头，仅小写字母/数字/下划线。
+ * 与后端 `model.RoleCodePattern`（`^[a-z][a-z0-9_]*$`）同口径——正则跨语言无法共享，改一处必须同步另一处。
+ */
+export const ROLE_CODE_PATTERN = /^[a-z][a-z0-9_]*$/
+
+/** 编码通用提示：说明它是跨系统授权契约值（OIDC ID token 的 groups 声明）。 */
+const ROLE_CODE_HINT =
+  '角色编码是跨系统授权契约值：会作为 OIDC ID token 的 groups 声明，下游系统按「前缀 + 编码」认策略名，改动即改变下游系统授予的权限'
 
 /** 系统管理类型展示：admin→管理员角色，normal→普通角色 */
 function adminTypeText(adminType?: string) {
@@ -107,7 +117,10 @@ export default function TenantRolePage() {
 
   const openEdit = (record: TenantRoleItem) => {
     setEditing(record)
-    form.setFieldsValue({ name: record.name, description: record.description })
+    // 先清掉新建态残留（如 appID 之外的字段），再按记录回显
+    form.resetFields()
+    // 编码必须回显：更新是全量覆盖，漏传会把下游认策略名的契约值清空
+    form.setFieldsValue({ code: record.code, name: record.name, description: record.description })
     setModalOpen(true)
   }
 
@@ -170,6 +183,8 @@ export default function TenantRolePage() {
 
   const columns: ColumnsType<TenantRoleItem> = [
     textColumn<TenantRoleItem>({ title: '角色名称', dataIndex: 'name', width: NAME_COL_WIDTH }),
+    // 编码列：列名与后端字段名同构（DTO/DB 都是 code），等宽展示便于与下游策略名逐字比对
+    textColumn<TenantRoleItem>({ title: '编码', dataIndex: 'code', width: CODE_COL_WIDTH, monospace: true }),
     { title: '所属应用', dataIndex: 'appName', key: 'appName', width: 120, render: (_: string, r) => <Tag>{r.appName || '系统角色'}</Tag> },
     {
       title: '来源',
@@ -196,6 +211,8 @@ export default function TenantRolePage() {
         const isBuiltin = r.source === 'builtin'
         return [
           { key: 'menu', label: '菜单权限', onClick: () => void openMenuAuth(r) },
+          // 内置角色整体只读：编码是下游策略供给锚点（改名即改授权语义），后端同样拒改（100709）；
+          // 菜单授权走独立接口，不受影响
           { key: 'edit', label: '编辑', disabled: isBuiltin, onClick: () => openEdit(r) },
           {
             key: 'delete',
@@ -294,6 +311,17 @@ export default function TenantRolePage() {
               <Select placeholder="选择该角色归属的应用" options={apps.map((a) => ({ label: a.name, value: a.appID }))} />
             </Form.Item>
           )}
+          <Form.Item
+            name="code"
+            label="角色编码"
+            tooltip={ROLE_CODE_HINT}
+            rules={[
+              { required: true, message: '请输入角色编码' },
+              { pattern: ROLE_CODE_PATTERN, message: '以小写字母开头，仅含小写字母、数字与下划线' },
+            ]}
+          >
+            <Input placeholder="唯一编码，如 dept_manager" />
+          </Form.Item>
           <Form.Item name="name" label="角色名称" rules={[{ required: true, message: '请输入角色名称' }]}>
             <Input placeholder="如：部门管理员（应用内唯一）" />
           </Form.Item>

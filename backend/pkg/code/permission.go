@@ -19,6 +19,10 @@ const (
 	RoleGetPageListError            = 100704
 	RoleNotExistError               = 100705
 	RoleDeleteBuiltinForbiddenError = 100706
+	RoleCodeInvalidError            = 100707 // 角色编码须为小写字母开头，仅含小写字母/数字/下划线
+	RoleCodeExistsError             = 100708 // 角色编码租户内唯一（下游系统按编码认策略名，重码即授权歧义）
+	RoleUpdateBuiltinForbiddenError = 100709 // 内置角色整体只读：编码是下游策略供给锚点，名称/描述由种子与运维负责
+	RoleCodeReservedError           = 100710 // 编码为系统保留：下游已按该编码供给策略，自建角色不得占用（跨租户提权）
 )
 
 const (
@@ -100,6 +104,10 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	RoleGetPageListError:                       "查看角色列表失败",
 	RoleNotExistError:                          "角色不存在",
 	RoleDeleteBuiltinForbiddenError:            "内置角色禁止删除",
+	RoleCodeInvalidError:                       "角色编码不合法（小写字母开头，仅含小写字母/数字/下划线）",
+	RoleCodeExistsError:                        "角色编码已存在（租户内唯一）",
+	RoleUpdateBuiltinForbiddenError:            "内置角色禁止编辑",
+	RoleCodeReservedError:                      "角色编码为系统保留（仅内置角色可用）",
 	ApplicationCreateError:                     "创建应用失败",
 	ApplicationDeleteError:                     "删除应用失败",
 	ApplicationUpdateError:                     "修改应用失败",

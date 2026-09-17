@@ -152,8 +152,9 @@ export default function OAuthClientDetail() {
           <Descriptions.Item label="CORS 白名单" span={2}>
             {detail.allowedOrigins?.join(', ') || '-'}
           </Descriptions.Item>
-          <Descriptions.Item label="强制 PKCE">{detail.requirePKCE === 1 ? '是' : '否'}</Descriptions.Item>
-          <Descriptions.Item label="需要 auth_time">{detail.requireAuthTime === 1 ? '是' : '否'}</Descriptions.Item>
+          {/* 后端 requirePKCE/requireAuthTime 是 Go bool（JSON true/false）：曾按 0/1 判断，导致永远显示"否" */}
+          <Descriptions.Item label="强制 PKCE">{detail.requirePKCE ? '是' : '否'}</Descriptions.Item>
+          <Descriptions.Item label="需要 auth_time">{detail.requireAuthTime ? '是' : '否'}</Descriptions.Item>
           <Descriptions.Item label="默认 Scopes" span={2}>
             {detail.defaultScopes?.join(', ') || '-'}
           </Descriptions.Item>

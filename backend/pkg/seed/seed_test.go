@@ -100,8 +100,15 @@ func TestSeedIamSQLite(t *testing.T) {
 	if adminRole == nil || adminRole.AdminType != model.SysAdminTypeAdmin || adminRole.Name != "管理员" {
 		t.Fatalf("seed admin role mismatch: %+v", adminRole)
 	}
+	// 编码是跨系统授权契约值（OIDC groups 取值），跑通下游策略映射依赖它被播种
+	if adminRole.Code != model.RoleCodePlatformAdmin {
+		t.Fatalf("seed admin role code mismatch: %+v", adminRole)
+	}
 	if tenantAdminRole == nil || tenantAdminRole.AdminType != model.SysAdminTypeAdmin || tenantAdminRole.Name != "租户管理员" {
 		t.Fatalf("seed tenant_admin role mismatch: %+v", tenantAdminRole)
+	}
+	if tenantAdminRole.Code != model.RoleCodeTenantAdmin {
+		t.Fatalf("seed tenant_admin role code mismatch: %+v", tenantAdminRole)
 	}
 
 	// tenant_admin 预授权租户管理后台应用全部 4 个菜单

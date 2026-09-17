@@ -12,9 +12,10 @@ type RoleCond struct {
 	AppID      string
 	IDs        []string
 	Name       string
+	Code       model.RoleCode // 精确匹配角色编码（跨系统授权契约值，租户内唯一）
 	Source     model.RoleSource
 	AdminType  model.SysAdminType // 精确匹配系统管理类型(admin/normal)
-	Keyword    string             // 模糊搜索: 名称 LIKE
+	Keyword    string             // 模糊搜索: 名称/编码 LIKE
 	Unassigned bool               // 仅未归属应用的角色(app_id 为空串)
 }
 
@@ -37,10 +38,13 @@ func (c *RoleCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.Keyword != "" {
 		k := "%" + c.Keyword + "%"
-		db.Where(tableName+".name LIKE ?", k)
+		db.Where(tableName+".name LIKE ? OR "+tableName+".code LIKE ?", k, k)
 	}
 	if c.Name != "" {
 		db.Where(tableName+".name = ?", c.Name)
+	}
+	if c.Code != "" {
+		db.Where(tableName+".code = ?", c.Code)
 	}
 	if c.Source != "" {
 		db.Where(tableName+".source = ?", c.Source)

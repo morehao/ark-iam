@@ -86,6 +86,10 @@ jwt:
   signKey: "your-jwt-secret-key"
 
 oidc:
+  # 本地联调：RustFS 容器用 host 网络（见 docker-compose），容器内的 localhost 就是宿主机，
+  # 因此 issuer 用 loopback 即可两端同时可达；浏览器侧也只走 loopback（不受代理/私网 IP 影响），
+  # 且 SSO 会话 cookie 与 localhost:4000 的登录页同源（免重复登录）。
+  # 配套的 RustFS 出站白名单见 docker-compose 的 RUSTFS_OUTBOUND_ALLOW_ORIGINS。
   issuer: "http://localhost:8100/oidc"
   frontendLoginURL: "http://localhost:4000/login"
   signingKeyID: "dev-oidc-key"

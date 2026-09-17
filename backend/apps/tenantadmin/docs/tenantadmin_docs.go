@@ -1333,7 +1333,7 @@ const docTemplatetenantadmin = `{
                     },
                     {
                         "type": "string",
-                        "description": "关键词(名称 模糊)",
+                        "description": "关键词(名称/编码 模糊)",
                         "name": "keyword",
                         "in": "query"
                     },
@@ -2993,12 +2993,21 @@ const docTemplatetenantadmin = `{
             "type": "object",
             "required": [
                 "appID",
+                "code",
                 "name"
             ],
             "properties": {
                 "appID": {
                     "description": "所属应用ID（租户订阅的启用应用，含系统内置应用）",
                     "type": "string"
+                },
+                "code": {
+                    "description": "角色编码(租户内唯一)：跨系统授权契约值，即 OIDC groups 取值",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.RoleCode"
+                        }
+                    ]
                 },
                 "description": {
                     "description": "角色描述",
@@ -3037,6 +3046,14 @@ const docTemplatetenantadmin = `{
                 "appName": {
                     "description": "所属应用名称",
                     "type": "string"
+                },
+                "code": {
+                    "description": "角色编码(跨系统授权契约值，即 OIDC groups 取值)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.RoleCode"
+                        }
+                    ]
                 },
                 "createdAt": {
                     "description": "创建时间",
@@ -3129,6 +3146,14 @@ const docTemplatetenantadmin = `{
                     "description": "所属应用名称",
                     "type": "string"
                 },
+                "code": {
+                    "description": "角色编码(跨系统授权契约值，即 OIDC groups 取值)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.RoleCode"
+                        }
+                    ]
+                },
                 "createdAt": {
                     "description": "创建时间",
                     "type": "integer"
@@ -3186,9 +3211,18 @@ const docTemplatetenantadmin = `{
         "dtotenant.RoleUpdateReq": {
             "type": "object",
             "required": [
+                "code",
                 "name"
             ],
             "properties": {
+                "code": {
+                    "description": "角色编码(租户内唯一)：改动会改变下游系统按编码授予的权限",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.RoleCode"
+                        }
+                    ]
+                },
                 "description": {
                     "description": "角色描述",
                     "type": "string"
@@ -3822,6 +3856,25 @@ const docTemplatetenantadmin = `{
                 "MenuVisibilityPublic",
                 "MenuVisibilityMember",
                 "MenuVisibilityAdmin"
+            ]
+        },
+        "model.RoleCode": {
+            "type": "string",
+            "enum": [
+                "platform_admin",
+                "tenant_admin"
+            ],
+            "x-enum-comments": {
+                "RoleCodePlatformAdmin": "内置「管理员」角色编码",
+                "RoleCodeTenantAdmin": "内置「租户管理员」角色编码"
+            },
+            "x-enum-descriptions": [
+                "内置「管理员」角色编码",
+                "内置「租户管理员」角色编码"
+            ],
+            "x-enum-varnames": [
+                "RoleCodePlatformAdmin",
+                "RoleCodeTenantAdmin"
             ]
         },
         "model.RoleSource": {

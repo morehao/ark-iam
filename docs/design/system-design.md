@@ -520,7 +520,7 @@ erDiagram
 
 | 表 | 说明 |
 |---|---|
-| `role` | 角色：租户内 + 按应用（`app_id`）作用域；`source` builtin/custom；`admin_type` admin/normal 是系统管理能力标签（内置角色禁删、禁改 admin_type）。**无 `code`、无 `type`、无 `is_default`** |
+| `role` | 角色：租户内 + 按应用（`app_id`）作用域；`source` builtin/custom；`admin_type` admin/normal 是系统管理能力标签（**内置角色整体只读**：禁删、禁编辑——名称/描述/编码一律不可改，`admin_type` 由种子定）。`code` 是**跨系统授权契约值**（`^[a-z][a-z0-9_]*$`，租户内唯一，创建必填；**仅自建角色可改**）：它是 OIDC ID token `groups` 声明的取值，下游系统按「前缀 + 编码」认自己的策略名（如对象存储 `claim_prefix=iam_` → 策略 `iam_platform_admin`）；内置角色编码 `platform_admin`/`tenant_admin` 集中在 `pkg/model` 定义并**登记为保留编码**（`model.IsReservedRoleCode`，自建角色不得创建或改名为这些值——下游前缀只隔离命名空间、隔离不了同码，否则任何租户都能自造撞上内置策略的编码；凡为某编码在下游供给过策略就必须登记），作为下游策略供给锚点必须稳定。**无 `type`、无 `is_default`** |
 | `menu` | 菜单：按应用管理（`app_id`），支持树（`parent_id`）；`type` directory/menu/button；`visibility` public/member/admin 为可见性门槛；`seed_key` 为种子身份键（控制台不可见不可写）。**顺序由 `sort` 唯一决定**（升序，同值按 `code`，见 `pkg/dao.MenuOrderBySort`）：所有面向界面的菜单查询（两端侧边栏、角色授权树、菜单管理树/列表）都必须显式 ORDER BY，缺省顺序数据库不保证、控制台改排序会看不到效果。**无 `tenant_id`、无 `permission`** |
 | `user_role` | 用户-角色关联 |
 | `role_menu` | 角色-菜单关联（可访问菜单） |
@@ -572,7 +572,7 @@ erDiagram
 | `create_only`（只播种） | 运维 | 仅在行不存在时写入初值，此后永不回写；控制台可自由修改 |
 | `migrate_once`（一次性迁移） | 种子 | 以「当前值 == 历史种子值」为条件的一次性改名，迁移完成后自然失效，运维自定义值一律不动 |
 
-**`reconcile` 的准入判据**：只有"被控制台改写后会导致种子定位失效或鉴权被绕过"的字段才准入，即**安全不变式**——`tenant`/`application`/`application_client` 的 `source`（内置标记）、`role.admin_type`、平台租户 `status`、`tenant_user.source`，外加内置客户端的归属 `app_id`。展示 / 结构 / 编码类字段（应用名与描述、客户端名、菜单的名/图标/排序/可见性/路径/组件/层级）一律 `create_only` 归运维；矩阵之外的字段视为 `create_only`。跨版本改名一律用 `migrate_once` 登记（`pkg/seed` 的迁移清单），**禁止用 `reconcile` 表达改名**。
+**`reconcile` 的准入判据**：只有"被控制台改写后会导致种子定位失效或鉴权被绕过"的字段才准入，即**安全不变式**——`tenant`/`application`/`application_client` 的 `source`（内置标记）、`role.admin_type`、平台租户 `status`、`tenant_user.source`，外加内置客户端的归属 `app_id`。展示 / 结构 / 编码类字段（应用名与描述、客户端名、角色名/描述/编码、菜单的名/图标/排序/可见性/路径/组件/层级）一律 `create_only` 归运维；矩阵之外的字段视为 `create_only`。跨版本改名一律用 `migrate_once` 登记（`pkg/seed` 的迁移清单），**禁止用 `reconcile` 表达改名**。
 
 **种子认行靠 `seed_key`，不靠业务编码**：`menu` 与 `application` 各有一个控制台**不可见不可写**的内部列 `seed_key`（创建时写入、此后不变），种子按它定位既有行。因此菜单的 `code` 与归属应用、自建应用 / 客户端的 `code` 都可以自由修改而不触发"重复建行"。`application_client` 仍按 `code`（= `client_id`）认行。
 
@@ -738,6 +738,15 @@ sequenceDiagram
     end
     API-->>RP: 业务数据
 ```
+
+> **ID token 声明与 `groups`（跨系统授权契约）**：`IDTokenUserinfoClaimsAssertion()` 必须为 `true`
+> （`apps/auth/internal/core/oidcop/client.go`）——zitadel 在 `false` 时会把 `profile`/`email`/`phone`
+> 从 ID token 的 scope 里裁掉（`pkg/op/token.go` 的 `removeUserinfoScopes`），ID token 只剩 `sub`；
+> 而只读 ID token 的 RP（对象存储控制台这类）需要 `groups` 与 `preferred_username`。
+> `groups` = **本次签发租户内的角色编码**（`model.RoleCode`），在 `OIDCStorage.SetUserinfoFromRequest`
+> 注入：授权码流取授权票据的租户、刷新流取 refresh token 的租户，userinfo 端点则按 access token
+> 元数据的租户产出；仅随 `profile` scope 授权，未请求 `profile` 不产出。角色读取失败按 **fail-closed**
+> 返回错误拒绝该次签发——宁可登录失败，也不签发缺 `groups` 的令牌让下游把用户当「无策略」静默降权。
 
 ### 5.5 登出与全局登出（SLO）
 

@@ -1,5 +1,11 @@
 import { request } from '@ark-iam/api'
-import type { PageListResp, TenantRoleCreateReq, TenantRoleItem, TenantRoleMenuResp } from '@ark-iam/types'
+import type {
+  PageListResp,
+  TenantRoleCreateReq,
+  TenantRoleItem,
+  TenantRoleMenuResp,
+  TenantRoleUpdateReq,
+} from '@ark-iam/types'
 
 /** 租户角色分页列表（`unassigned=true` 只查未归属应用的系统角色） */
 export const getTenantRolePageList = (params?: {
@@ -13,8 +19,8 @@ export const getTenantRolePageList = (params?: {
 /** 创建租户角色 */
 export const createTenantRole = (data: TenantRoleCreateReq) => request.post<any, { roleID: string }>('/tenant/roles', data)
 
-/** 更新租户角色 */
-export const updateTenantRole = (data: { roleID: string; name?: string; description?: string }) => {
+/** 更新租户角色（全量更新，code 必填：它是对下游系统的授权契约值） */
+export const updateTenantRole = (data: TenantRoleUpdateReq) => {
   const { roleID, ...body } = data
   return request.put<any, string>(`/tenant/roles/${roleID}`, body)
 }

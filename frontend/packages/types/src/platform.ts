@@ -96,8 +96,10 @@ export interface OAuthClientDetail extends OAuthClientItem {
   backChannelLogoutURI: string
   responseTypes: string[]
   allowedOrigins: string[]
-  requirePKCE: number
-  requireAuthTime: number
+  /** 是否强制 PKCE：后端 DTO 是 Go bool，JSON 为 true/false（不是 0/1） */
+  requirePKCE: boolean
+  /** 是否要求 id_token 带 auth_time：后端 DTO 是 Go bool，JSON 为 true/false */
+  requireAuthTime: boolean
   defaultScopes: string[]
   accessTokenTTL: number
   refreshTokenTTL: number
@@ -110,12 +112,14 @@ export interface OAuthClientCreateReq {
   name: string
   redirectURIs?: string[]
   postLogoutRedirectURIs?: string[]
+  backChannelLogoutURI?: string
   grantTypes?: GrantType[]
   responseTypes?: string[]
   tokenEndpointAuthMethod?: TokenEndpointAuthMethod
   allowedOrigins?: string[]
-  requirePKCE?: number
-  requireAuthTime?: number
+  /** 后端 DTO 是 Go bool（true/false）：传 1/0 会被 binding 拒绝 */
+  requirePKCE?: boolean
+  requireAuthTime?: boolean
   defaultScopes?: string[]
   accessTokenTTL?: number
   refreshTokenTTL?: number
@@ -129,12 +133,14 @@ export interface OAuthClientUpdateReq {
   status?: ApplicationClientStatus
   redirectURIs?: string[]
   postLogoutRedirectURIs?: string[]
+  backChannelLogoutURI?: string
   grantTypes?: GrantType[]
   responseTypes?: string[]
   tokenEndpointAuthMethod?: TokenEndpointAuthMethod
   allowedOrigins?: string[]
-  requirePKCE?: number
-  requireAuthTime?: number
+  /** 后端 DTO 是 Go bool（true/false）：传 1/0 会被 binding 拒绝 */
+  requirePKCE?: boolean
+  requireAuthTime?: boolean
   defaultScopes?: string[]
   accessTokenTTL?: number
   refreshTokenTTL?: number

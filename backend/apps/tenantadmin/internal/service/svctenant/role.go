@@ -60,7 +60,27 @@ func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dto
 		return nil, code.GetError(code.RoleCreateError)
 	}
 
-	// 名称应用内唯一（角色无业务编码，名称即应用内可读标识）
+	// 角色编码是跨系统授权契约值（OIDC ID token `groups` 取值，下游按编码认策略名）：
+	// 形状在 service 入口白名单校验；编码不合法/保留/重复属可预期业务边界，分别返回专用错误码。
+	if !model.IsValidRoleCode(req.Code) {
+		return nil, code.GetError(code.RoleCodeInvalidError)
+	}
+	// 系统保留编码（内置角色的下游策略锚点）不得被自建角色占用：下游按「前缀 + 编码」认策略名，
+	// 前缀隔离不了同码——放开即等于允许任何租户自造一个名字撞上内置策略的角色（跨租户提权）。
+	if model.IsReservedRoleCode(req.Code) {
+		return nil, code.GetError(code.RoleCodeReservedError)
+	}
+	// 编码租户内唯一：命名空间是租户而非应用——下游只看到编码，重码会让授权含义产生歧义
+	codeExists, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{TenantID: tenantID, Code: req.Code})
+	if err != nil {
+		glog.Errorf(ctx, "[svcrole.Create] query role by code fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.RoleCreateError)
+	}
+	if len(codeExists) > 0 {
+		return nil, code.GetError(code.RoleCodeExistsError)
+	}
+
+	// 名称应用内唯一
 	existing, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{TenantID: tenantID, AppID: req.AppID, Name: req.Name})
 	if err != nil {
 		glog.Errorf(ctx, "[svcrole.Create] query role by name fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -73,6 +93,7 @@ func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dto
 	insertEntity := &model.RoleEntity{
 		TenantID:    tenantID,
 		AppID:       req.AppID,
+		Code:        req.Code,
 		Name:        req.Name,
 		Description: req.Description,
 		Source:      model.RoleSourceCustom,
@@ -155,8 +176,35 @@ func (svc *roleSvc) Update(ctx *gin.Context, req *dtotenant.RoleUpdateReq) error
 	if !roleVisibleToTenant(roleEntity, tenantID) {
 		return code.GetError(code.RoleNotExistError)
 	}
+	// 内置角色整体只读：它是随租户创建播种的授权锚点（编码即下游策略名取值，名称/描述由种子与运维负责），
+	// 放开编辑等于允许租户自行改写下游授权语义。菜单授权不经此接口（见 UpdateMenus），不受影响。
+	if roleEntity.Source == model.RoleSourceBuiltin {
+		return code.GetError(code.RoleUpdateBuiltinForbiddenError)
+	}
+
+	// 自建角色编码可改（它不是本系统的定位键，改错的代价只是下游按新编码找策略，可在本控制台改回），
+	// 但改动即改变下游授权：形状、保留字与租户内唯一仍必须守住，唯一性校验排除自身。
+	if !model.IsValidRoleCode(req.Code) {
+		return code.GetError(code.RoleCodeInvalidError)
+	}
+	// 保留编码对自建角色同样封闭：不得把已有自建角色改名为内置策略锚点（提权路径与创建一致）。
+	// 仅在**改码时**拦截：本守卫上线前已占用保留码的存量行，仍需允许改名称/描述等其他字段。
+	if req.Code != roleEntity.Code && model.IsReservedRoleCode(req.Code) {
+		return code.GetError(code.RoleCodeReservedError)
+	}
+	codeExists, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{TenantID: tenantID, Code: req.Code})
+	if err != nil {
+		glog.Errorf(ctx, "[svcrole.Update] query role by code fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return code.GetError(code.RoleUpdateError)
+	}
+	for _, existRole := range codeExists {
+		if existRole.ID != req.RoleID {
+			return code.GetError(code.RoleCodeExistsError)
+		}
+	}
 
 	updateMap := map[string]any{
+		"code":        req.Code,
 		"name":        req.Name,
 		"description": req.Description,
 		"updated_by":  gincontext.GetUserIDString(ctx),
@@ -191,6 +239,7 @@ func (svc *roleSvc) Detail(ctx *gin.Context, req *dtotenant.RoleDetailReq) (*dto
 		RoleID:      roleEntity.ID,
 		AppID:       roleEntity.AppID,
 		AppName:     appNameMap[roleEntity.AppID],
+		Code:        roleEntity.Code,
 		Name:        roleEntity.Name,
 		Description: roleEntity.Description,
 		Source:      roleEntity.Source,
@@ -240,6 +289,7 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtotenant.RolePageListReq) (
 			RoleID:      v.ID,
 			AppID:       v.AppID,
 			AppName:     appNameMap[v.AppID],
+			Code:        v.Code,
 			Name:        v.Name,
 			Description: v.Description,
 			Source:      v.Source,

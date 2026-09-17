@@ -115,6 +115,11 @@ export interface TenantRoleItem {
   roleID: string
   appID: string
   appName: string
+  /**
+   * 角色编码（后端具名类型 model.RoleCode）：跨系统授权契约值，即 OIDC ID token 的 `groups` 声明，
+   * 下游系统按「前缀 + 编码」认策略名，形状 `^[a-z][a-z0-9_]*$`、租户内唯一。
+   */
+  code: string
   name: string
   description: string
   source?: RoleSource
@@ -127,6 +132,17 @@ export interface TenantRoleItem {
 
 export interface TenantRoleCreateReq {
   appID: string
+  /** 角色编码（必填）：改动即改变下游系统授予的权限，见 TenantRoleItem.code */
+  code: string
+  name: string
+  description?: string
+}
+
+/** 角色全量更新入参（PUT，body 不含 roleID，path 是 ID 唯一来源）。 */
+export interface TenantRoleUpdateReq {
+  roleID: string
+  /** 角色编码（必填，可改）：改动即改变下游系统授予的权限，见 TenantRoleItem.code */
+  code: string
   name: string
   description?: string
 }

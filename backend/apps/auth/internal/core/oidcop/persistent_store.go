@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -49,6 +50,8 @@ type PersistentStore struct {
 	userDao                    func(opts ...dao.DaoOption) *dao.UserDao
 	refreshTokenDao            func(opts ...dao.DaoOption) *dao.RefreshTokenDao
 	apiKeyDao                  func(opts ...dao.DaoOption) *dao.ApiKeyDao
+	userRoleDao                func(opts ...dao.DaoOption) *dao.UserRoleDao
+	roleDao                    func(opts ...dao.DaoOption) *dao.RoleDao
 	issuer                     string
 	// db 返回用于事务的 DB 句柄（轮换原子性等）。默认全局 iam 库，
 	// 测试可注入独立 SQLite 连接。
@@ -68,6 +71,8 @@ func NewPersistentStore(opts ...PersistentStoreOption) *PersistentStore {
 		userDao:                    dao.NewUserDao,
 		refreshTokenDao:            dao.NewRefreshTokenDao,
 		apiKeyDao:                  func(opts ...dao.DaoOption) *dao.ApiKeyDao { return dao.NewApiKeyDao() },
+		userRoleDao:                dao.NewUserRoleDao,
+		roleDao:                    dao.NewRoleDao,
 		issuer:                     cfg.issuer,
 		db:                         dbclient.IamDB,
 	}
@@ -185,6 +190,97 @@ func fillUserInfoByScopes(userinfo *oidc.UserInfo, person *model.PersonEntity, s
 	}
 }
 
+// ClaimGroups 是 ID token / userinfo 的角色组声明名（非标准 OIDC 声明，跨系统授权契约）：
+// 值为该租户内的角色编码（model.RoleCode）。下游系统按编码认自己的权限策略
+// （如对象存储的 claim_prefix + 策略名），故角色编码即契约、租户内唯一。
+const ClaimGroups = "groups"
+
+// hasScope 判断 scope 列表是否包含指定 scope。
+func hasScope(scopes []string, want string) bool {
+	for _, scope := range scopes {
+		if scope == want {
+			return true
+		}
+	}
+	return false
+}
+
+// appendRoleGroupClaims 在 profile scope 下把「该租户内的角色编码」写入 groups 声明。
+//
+// 租户必须由调用方显式给出（授权码流取授权票据的租户、刷新流取 refresh token 的租户、
+// userinfo 端点取 access token 元数据的租户）：角色与角色绑定都是租户维度实体，多租户自然人的
+// 角色集合只能按本次请求的租户裁剪——不跨租户兜底、也不猜租户。
+//
+// 读取失败按 fail-closed 处理（返回 error 让 op 层拒绝本次签发）：宁可登录失败，
+// 也不签发缺 groups 的 token——那会让下游把用户当作「无任何策略」而静默降权。
+func (s *PersistentStore) appendRoleGroupClaims(ctx context.Context, userinfo *oidc.UserInfo, tenantID, subject string, scopes []string) error {
+	if tenantID == "" || !hasScope(scopes, oidc.ScopeProfile) {
+		return nil
+	}
+	pid, err := ParseSubject(subject)
+	if err != nil {
+		return nil
+	}
+	// 角色/角色绑定都带 tenant_id：协议层没有「当前租户」，显式声明指定租户作用域。
+	tctx := dbclient.ExplicitTenantContext(ctx, tenantID)
+	// user_role.user_id 是**租户成员**（tenant_user）主键，不是自然人 ID：协议层只拿得到
+	// subject(person:<id>)，必须先按 (person_id, tenant_id) 解析出成员行。少这一步会恒查不到角色，
+	// 并「静默产出空 groups」——下游按 groups 认策略名且是 fail-closed，会直接拒绝登录（端到端已实测）。
+	members, err := s.userDao().GetListByCond(tctx, &dao.UserCond{PersonID: pid, TenantID: tenantID})
+	if err != nil {
+		glog.Errorf(ctx, "[PersistentStore.appendRoleGroupClaims] query tenant_user fail, tenantID:%s, err:%v", tenantID, err)
+		return err
+	}
+	if len(members) == 0 {
+		return nil
+	}
+	roleIDs := make([]string, 0, len(members))
+	seenRoleID := make(map[string]struct{}, len(members))
+	for _, member := range members {
+		userRoles, uerr := s.userRoleDao().GetListByCond(tctx, &dao.UserRoleCond{TenantID: tenantID, UserID: member.ID})
+		if uerr != nil {
+			glog.Errorf(ctx, "[PersistentStore.appendRoleGroupClaims] query user_role fail, tenantID:%s, userID:%s, err:%v", tenantID, member.ID, uerr)
+			return uerr
+		}
+		for _, userRole := range userRoles {
+			if _, ok := seenRoleID[userRole.RoleID]; ok {
+				continue
+			}
+			seenRoleID[userRole.RoleID] = struct{}{}
+			roleIDs = append(roleIDs, userRole.RoleID)
+		}
+	}
+	if len(roleIDs) == 0 {
+		return nil
+	}
+	roles, err := s.roleDao().GetListByCond(tctx, &dao.RoleCond{TenantID: tenantID, IDs: roleIDs})
+	if err != nil {
+		glog.Errorf(ctx, "[PersistentStore.appendRoleGroupClaims] query role fail, tenantID:%s, err:%v", tenantID, err)
+		return err
+	}
+	codes := make([]string, 0, len(roles))
+	seen := make(map[string]struct{}, len(roles))
+	for _, role := range roles {
+		code := string(role.Code)
+		// 空编码不产出声明：空串在下游会被当成一个"策略名"去匹配，属静默错配。
+		if code == "" {
+			continue
+		}
+		if _, ok := seen[code]; ok {
+			continue
+		}
+		seen[code] = struct{}{}
+		codes = append(codes, code)
+	}
+	if len(codes) == 0 {
+		return nil
+	}
+	// 稳定排序：同一用户的 groups 每次签发顺序一致，便于下游比对与排障。
+	sort.Strings(codes)
+	userinfo.AppendClaims(ClaimGroups, codes)
+	return nil
+}
+
 func (s *PersistentStore) SetUserinfoFromScopes(ctx context.Context, userinfo *oidc.UserInfo, userID, clientID string, scopes []string) error {
 	userinfo.Subject = userID
 	pid, err := ParseSubject(userID)
@@ -220,6 +316,10 @@ func (s *PersistentStore) SetUserinfoFromToken(ctx context.Context, userinfo *oi
 		return nil
 	}
 	fillUserInfoByScopes(userinfo, person, meta.Scopes)
+	// userinfo 端点回查场景：groups 同样按该 access token 所属租户裁剪（与 ID token 口径一致）。
+	if err := s.appendRoleGroupClaims(ctx, userinfo, meta.TenantID, subject, meta.Scopes); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -544,10 +644,20 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 	return accessTokenID, refreshTokenValue, expiration, nil
 }
 
-// tenantIDFromRequest / tokenUsageFromRequest 供 client_credentials 的 access token 元数据使用。
+// tenantCarrier 由授权票据（*AuthRequest）与刷新令牌（*refreshTokenRequest）实现：
+// 人 token 的租户是授权链路里显式解析出来的上下文，必须落到 access token 元数据上，
+// userinfo（groups）与 introspection（tenant_id）才能在不跨租户兜底的前提下还原该 token 的租户。
+type tenantCarrier interface {
+	GetTenantID() string
+}
+
+// tenantIDFromRequest / tokenUsageFromRequest 供 access token 元数据使用。
 func tenantIDFromRequest(request op.TokenRequest) string {
 	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok {
 		return ccReq.ownerTenantID
+	}
+	if carrier, ok := request.(tenantCarrier); ok {
+		return carrier.GetTenantID()
 	}
 	return ""
 }
