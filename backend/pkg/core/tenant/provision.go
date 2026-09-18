@@ -76,6 +76,16 @@ func ProvisionTenantAdmin(ctx context.Context, tx *gorm.DB, req *ProvisionTenant
 		return nil, err
 	}
 
+	// 2.1 角色模板物化：订阅建立即把该应用的角色模板落到本租户（内置应用的模板通常为空，
+	// 是幂等空操作）。产品锚点角色不受影响——模板撤下逻辑显式跳过锚点编码。
+	if err := SyncAppRoleTemplate(ctx, tx, &SyncAppRoleTemplateReq{
+		TenantID:  req.TenantID,
+		AppID:     app.ID,
+		CreatedBy: req.CreatedBy,
+	}); err != nil {
+		return nil, err
+	}
+
 	// 3. 内置管理员角色（source=builtin、admin_type=admin）
 	role, err := ensureBuiltinRole(ctx, tx, req, app.ID)
 	if err != nil {
@@ -291,4 +301,180 @@ func CreateTenantWithBuiltinAdmin(ctx context.Context, tx *gorm.DB, req *CreateT
 		AdminUser:          adminUser,
 		AdminPersonCreated: personCreated,
 	}, nil
+}
+
+// SyncAppRoleTemplateReq 构造 SyncAppRoleTemplate 入参。
+type SyncAppRoleTemplateReq struct {
+	TenantID  string
+	AppID     string
+	CreatedBy string
+}
+
+// SyncAppRoleTemplateToTenantsReq 构造 SyncAppRoleTemplateToTenants 入参。
+type SyncAppRoleTemplateToTenantsReq struct {
+	AppID     string
+	CreatedBy string
+}
+
+// SyncAppRoleTemplate 在 tx 事务内把某应用的**角色模板**（application.role_template）物化到指定租户。
+//
+// 模板是跨系统授权契约值的唯一来源（产品锚点除外），物化规则：
+//
+//  1. **模板新增/改名**：按 (tenant_id, app_id, code) 定位，命中 source=builtin 的行则回写名称，
+//     缺失则新建（source=builtin、admin_type=normal）；命中 source=custom 的同码存量行只告警跳过
+//     ——不劫持租户自建角色（新模型下租户已无法写入 code，这只防御存量数据）。
+//  2. **模板移除**：该应用下 source=builtin 且 code 不在模板中的行（产品锚点除外）连同
+//     user_role / role_menu 关联一并删除。契约值撤下必须是真撤下：否则被撤的 code 仍在 ID token
+//     的 groups 里，继续拿到下游策略（下游按「前缀 + 编码」认策略名）。
+//
+// 幂等：可重复执行，不产生重复行（role 表无唯一索引，幂等由应用层定位保证）。
+// 必须在调用方的事务 tx 内执行（tx 为空返回错误）；应用不存在返回错误让调用方回滚。
+func SyncAppRoleTemplate(ctx context.Context, tx *gorm.DB, req *SyncAppRoleTemplateReq) error {
+	if tx == nil {
+		return fmt.Errorf("core/tenant: tx is required")
+	}
+	if req == nil || req.TenantID == "" || req.AppID == "" {
+		return fmt.Errorf("core/tenant: tenant id and app id are required")
+	}
+	// 目标租户显式声明，不依赖调用方 ctx 恰好携带目标租户（平台侧 fan-out 时 ctx 是跨租户作用域）。
+	ctx = dbclient.ExplicitTenantContext(ctx, req.TenantID)
+
+	app, err := dao.NewApplicationDao().WithTx(tx).GetByID(ctx, req.AppID)
+	if err != nil {
+		return fmt.Errorf("query application %s fail: %w", req.AppID, err)
+	}
+	if app == nil || app.ID == "" {
+		return fmt.Errorf("application %s not found", req.AppID)
+	}
+	template := app.RoleTemplateList()
+
+	roleDao := dao.NewRoleDao().WithTx(tx)
+	for _, item := range template {
+		// 产品锚点（platform_admin/tenant_admin）属平台自身的策略命名空间，模板永远不得定义或覆盖它们。
+		// 写入侧（svcapplication）已拒绝锚点编码，这里再挡一次：role_template 是普通 JSON 列，
+		// 直连改库/历史数据都可能绕过写入侧校验。
+		if model.IsProductAnchorRoleCode(item.Code) {
+			glog.Warnf(ctx, "[tenant.SyncAppRoleTemplate] product anchor code in template, skip, tenantID:%s, appID:%s, code:%s",
+				req.TenantID, req.AppID, item.Code)
+			continue
+		}
+		existing, err := roleDao.GetByCond(ctx, &dao.RoleCond{
+			TenantID: req.TenantID,
+			AppID:    req.AppID,
+			Code:     item.Code,
+		})
+		if err != nil {
+			return fmt.Errorf("query role %s fail: %w", item.Code, err)
+		}
+		if existing == nil || existing.ID == "" {
+			if err := roleDao.Insert(ctx, &model.RoleEntity{
+				TenantID:    req.TenantID,
+				AppID:       req.AppID,
+				Name:        item.Name,
+				Code:        item.Code,
+				Source:      model.RoleSourceBuiltin,
+				AdminType:   model.SysAdminTypeNormal,
+				CreatedBy:   req.CreatedBy,
+				Description: fmt.Sprintf("%s（应用角色模板下发）", app.Name),
+			}); err != nil {
+				return fmt.Errorf("insert template role %s fail: %w", item.Code, err)
+			}
+			continue
+		}
+		if existing.Source != model.RoleSourceBuiltin {
+			glog.Warnf(ctx, "[tenant.SyncAppRoleTemplate] role code occupied by custom role, skip, tenantID:%s, appID:%s, code:%s",
+				req.TenantID, req.AppID, item.Code)
+			continue
+		}
+		if existing.Name == item.Name {
+			continue
+		}
+		if err := roleDao.UpdateMap(ctx, existing.ID, map[string]any{
+			"name":       item.Name,
+			"updated_by": req.CreatedBy,
+		}); err != nil {
+			return fmt.Errorf("update template role %s fail: %w", item.Code, err)
+		}
+	}
+
+	return withdrawStaleTemplateRoles(ctx, tx, req, template)
+}
+
+// withdrawStaleTemplateRoles 撤下应用内已从模板中移除的模板角色（产品锚点不在此列，见调用方注释）。
+func withdrawStaleTemplateRoles(ctx context.Context, tx *gorm.DB, req *SyncAppRoleTemplateReq, template model.RoleTemplateItemList) error {
+	stale, err := dao.NewRoleDao().WithTx(tx).GetListByCond(ctx, &dao.RoleCond{
+		TenantID: req.TenantID,
+		AppID:    req.AppID,
+		Source:   model.RoleSourceBuiltin,
+	})
+	if err != nil {
+		return fmt.Errorf("query builtin roles fail: %w", err)
+	}
+	for i := range stale {
+		role := stale[i]
+		if role.Code == "" || model.IsProductAnchorRoleCode(role.Code) || template.HasCode(role.Code) {
+			continue
+		}
+		if err := deleteRoleWithRelations(ctx, tx, req.TenantID, role.ID, req.CreatedBy); err != nil {
+			return fmt.Errorf("withdraw template role %s fail: %w", role.Code, err)
+		}
+		glog.Infof(ctx, "[tenant.SyncAppRoleTemplate] template role withdrawn, tenantID:%s, appID:%s, code:%s",
+			req.TenantID, req.AppID, role.Code)
+	}
+	return nil
+}
+
+// deleteRoleWithRelations 删除角色并清理其 user_role / role_menu 关联（与租户侧删角色同一口径）。
+func deleteRoleWithRelations(ctx context.Context, tx *gorm.DB, tenantID, roleID, operatorID string) error {
+	if err := dao.NewRoleDao().WithTx(tx).Delete(ctx, roleID, operatorID); err != nil {
+		return err
+	}
+	userRoles, err := dao.NewUserRoleDao().WithTx(tx).GetListByCond(ctx, &dao.UserRoleCond{TenantID: tenantID, RoleID: roleID})
+	if err != nil {
+		return err
+	}
+	for _, r := range userRoles {
+		if err := dao.NewUserRoleDao().WithTx(tx).Delete(ctx, r.ID, operatorID); err != nil {
+			return err
+		}
+	}
+	roleMenus, err := dao.NewRoleMenuDao().WithTx(tx).GetListByCond(ctx, &dao.RoleMenuCond{TenantID: tenantID, RoleID: roleID})
+	if err != nil {
+		return err
+	}
+	for _, r := range roleMenus {
+		if err := dao.NewRoleMenuDao().WithTx(tx).Delete(ctx, r.ID, operatorID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SyncAppRoleTemplateToTenants 在 tx 事务内把某应用的角色模板同步到**所有订阅了该应用的租户**：
+// 平台侧改模板后调用一次，避免已开通租户的角色集合与新模板漂移。
+// tenant_application 是租户表，跨租户列举必须显式声明跨租户作用域（见 AGENTS「上下文传递与租户作用域」）。
+func SyncAppRoleTemplateToTenants(ctx context.Context, tx *gorm.DB, req *SyncAppRoleTemplateToTenantsReq) error {
+	if tx == nil {
+		return fmt.Errorf("core/tenant: tx is required")
+	}
+	if req == nil || req.AppID == "" {
+		return fmt.Errorf("core/tenant: app id is required")
+	}
+	subs, err := dao.NewTenantApplicationDao().WithTx(tx).GetListByCond(
+		dbclient.CrossTenantContext(ctx),
+		&dao.TenantApplicationCond{AppID: req.AppID},
+	)
+	if err != nil {
+		return fmt.Errorf("query tenant_application fail: %w", err)
+	}
+	for i := range subs {
+		if err := SyncAppRoleTemplate(ctx, tx, &SyncAppRoleTemplateReq{
+			TenantID:  subs[i].TenantID,
+			AppID:     req.AppID,
+			CreatedBy: req.CreatedBy,
+		}); err != nil {
+			return fmt.Errorf("sync app role template to tenant %s: %w", subs[i].TenantID, err)
+		}
+	}
+	return nil
 }

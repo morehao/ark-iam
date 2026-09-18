@@ -36,7 +36,13 @@ func NewRoleSvc() RoleSvc {
 	return &roleSvc{}
 }
 
-// Create 创建租户角色（名称租户 + 应用内唯一）。
+// Create 创建租户自建角色（名称租户 + 应用内唯一）。
+//
+// **不接收也不写角色编码**：编码是跨系统授权契约值（OIDC ID token `groups` 取值，下游按「前缀 + 编码」
+// 认策略名），而下游策略是全局命名实体、全租户共用一条——只能由应用方在应用角色模板
+// （application.role_template）里定义一次并物化到各租户（见 pkg/core/tenant.SyncAppRoleTemplate）。
+// 自建角色只承载本系统内的菜单权限，code 恒为空串，因此**结构上不可能**与模板角色/产品锚点撞码，
+// 也不可能自造一个值去命中下游已有策略（这是"契约值归应用方"的落点）。
 func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dtotenant.RoleCreateResp, error) {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
 	if err := requireSystemAdmin(ctx, code.RoleCreateError); err != nil {
@@ -49,35 +55,15 @@ func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dto
 	if err != nil {
 		return nil, err
 	}
-	appValid := false
-	for _, app := range appList {
-		if app.ID == req.AppID {
-			appValid = true
+	var targetApp *model.ApplicationEntity
+	for i := range appList {
+		if appList[i].ID == req.AppID {
+			targetApp = &appList[i]
 			break
 		}
 	}
-	if !appValid {
+	if targetApp == nil {
 		return nil, code.GetError(code.RoleCreateError)
-	}
-
-	// 角色编码是跨系统授权契约值（OIDC ID token `groups` 取值，下游按编码认策略名）：
-	// 形状在 service 入口白名单校验；编码不合法/保留/重复属可预期业务边界，分别返回专用错误码。
-	if !model.IsValidRoleCode(req.Code) {
-		return nil, code.GetError(code.RoleCodeInvalidError)
-	}
-	// 系统保留编码（内置角色的下游策略锚点）不得被自建角色占用：下游按「前缀 + 编码」认策略名，
-	// 前缀隔离不了同码——放开即等于允许任何租户自造一个名字撞上内置策略的角色（跨租户提权）。
-	if model.IsReservedRoleCode(req.Code) {
-		return nil, code.GetError(code.RoleCodeReservedError)
-	}
-	// 编码租户内唯一：命名空间是租户而非应用——下游只看到编码，重码会让授权含义产生歧义
-	codeExists, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{TenantID: tenantID, Code: req.Code})
-	if err != nil {
-		glog.Errorf(ctx, "[svcrole.Create] query role by code fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.RoleCreateError)
-	}
-	if len(codeExists) > 0 {
-		return nil, code.GetError(code.RoleCodeExistsError)
 	}
 
 	// 名称应用内唯一
@@ -93,7 +79,7 @@ func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dto
 	insertEntity := &model.RoleEntity{
 		TenantID:    tenantID,
 		AppID:       req.AppID,
-		Code:        req.Code,
+		Code:        "", // 自建角色不参与跨系统契约：编码恒为空串（契约值只能来自应用角色模板/产品锚点）
 		Name:        req.Name,
 		Description: req.Description,
 		Source:      model.RoleSourceCustom,
@@ -176,35 +162,27 @@ func (svc *roleSvc) Update(ctx *gin.Context, req *dtotenant.RoleUpdateReq) error
 	if !roleVisibleToTenant(roleEntity, tenantID) {
 		return code.GetError(code.RoleNotExistError)
 	}
-	// 内置角色整体只读：它是随租户创建播种的授权锚点（编码即下游策略名取值，名称/描述由种子与运维负责），
-	// 放开编辑等于允许租户自行改写下游授权语义。菜单授权不经此接口（见 UpdateMenus），不受影响。
+	// 内置角色整体只读：模板角色（source=builtin，由应用角色模板物化）与产品锚点都不得由租户改写
+	// ——编码与名称都由应用方定义，放开编辑等于允许租户自行改写下游授权语义。
+	// 菜单授权不经此接口（见 UpdateMenus），不受影响。
 	if roleEntity.Source == model.RoleSourceBuiltin {
 		return code.GetError(code.RoleUpdateBuiltinForbiddenError)
 	}
 
-	// 自建角色编码可改（它不是本系统的定位键，改错的代价只是下游按新编码找策略，可在本控制台改回），
-	// 但改动即改变下游授权：形状、保留字与租户内唯一仍必须守住，唯一性校验排除自身。
-	if !model.IsValidRoleCode(req.Code) {
-		return code.GetError(code.RoleCodeInvalidError)
-	}
-	// 保留编码对自建角色同样封闭：不得把已有自建角色改名为内置策略锚点（提权路径与创建一致）。
-	// 仅在**改码时**拦截：本守卫上线前已占用保留码的存量行，仍需允许改名称/描述等其他字段。
-	if req.Code != roleEntity.Code && model.IsReservedRoleCode(req.Code) {
-		return code.GetError(code.RoleCodeReservedError)
-	}
-	codeExists, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{TenantID: tenantID, Code: req.Code})
+	// 自建角色可改的只有名称/描述：编码不在入参里，恒为空串（不参与跨系统契约，见 Create 注释）。
+	// 名称仍需在「租户 × 应用」内唯一（校验排除自身）。
+	nameExists, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{TenantID: tenantID, AppID: roleEntity.AppID, Name: req.Name})
 	if err != nil {
-		glog.Errorf(ctx, "[svcrole.Update] query role by code fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		glog.Errorf(ctx, "[svcrole.Update] query role by name fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.RoleUpdateError)
 	}
-	for _, existRole := range codeExists {
+	for _, existRole := range nameExists {
 		if existRole.ID != req.RoleID {
-			return code.GetError(code.RoleCodeExistsError)
+			return code.GetError(code.RoleUpdateError)
 		}
 	}
 
 	updateMap := map[string]any{
-		"code":        req.Code,
 		"name":        req.Name,
 		"description": req.Description,
 		"updated_by":  gincontext.GetUserIDString(ctx),

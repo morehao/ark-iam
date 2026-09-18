@@ -1,6 +1,7 @@
 package svctenant
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/morehao/ark-iam/pkg/code"
@@ -34,6 +35,7 @@ func seedTestApp(t *testing.T, db *gorm.DB, tenantID, appID string) {
 	}
 }
 
+// seedTestRole 播种**空编码**的自建角色（新模型下租户自建角色的常态形态）。
 func seedTestRole(t *testing.T, db *gorm.DB, id, tenantID, appID, name string) {
 	t.Helper()
 	if err := db.Create(&model.RoleEntity{
@@ -101,138 +103,66 @@ func TestRoleCreateRequiresApp(t *testing.T) {
 
 	ginCtx := newDeptGinCtx(t, "t1", "op")
 
-	// 非法应用（编码合法且非保留，确保失败原因是应用而非编码）
-	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app-bad", Code: "custom_admin", Name: "管理员"}); err == nil {
+	// 非法应用（非本租户订阅的应用）
+	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app-bad", Name: "管理员"}); err == nil {
 		t.Fatalf("expected invalid app error")
 	}
 	// 创建成功
-	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app1", Code: "custom_admin", Name: "管理员"}); err != nil {
+	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app1", Name: "管理员"}); err != nil {
 		t.Fatalf("create role: %v", err)
 	}
-	// 同应用名称唯一（换编码，确保失败原因是名称而非编码）
-	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app1", Code: "other_admin", Name: "管理员"}); err == nil {
-		t.Fatalf("expected duplicate name error")
+	// 同应用名称唯一
+	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app1", Name: "管理员"}); gerror.GetCode(err) != int(code.RoleCreateError) {
+		t.Fatalf("expected duplicate name error, got %v", err)
 	}
-	// 其他租户同名同码都不冲突（编码唯一性是租户维度）
-	if _, err := svc.Create(newDeptGinCtx(t, "t2", "op2"), &dtotenant.RoleCreateReq{AppID: "app2", Code: "custom_admin", Name: "管理员"}); err != nil {
-		t.Fatalf("cross-tenant same name/code should be allowed: %v", err)
-	}
-}
-
-// TestRoleCreateValidatesCode 角色编码是跨系统授权契约值（OIDC groups 取值）：
-// 形状白名单 + 租户内唯一，均属可预期业务边界，必须返回各自的专用错误码。
-func TestRoleCreateValidatesCode(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
-	svc := &roleSvc{}
-	seedTenantAdminOperator(t, db, "t1", "op")
-	seedTenantAdminOperator(t, db, "t2", "op2")
-	seedTestApp(t, db, "t1", "app1")
-	seedTestApp(t, db, "t2", "app2")
-
-	ginCtx := newDeptGinCtx(t, "t1", "op")
-
-	// 形状非法：空串 / 大写 / 数字开头 / 连字符 / 下划线开头 / 空格
-	for _, badCode := range []model.RoleCode{"", "Platform_Admin", "1admin", "platform-admin", "_admin", "platform admin"} {
-		_, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app1", Code: badCode, Name: "角色" + string(badCode)})
-		if gerror.GetCode(err) != int(code.RoleCodeInvalidError) {
-			t.Fatalf("expected invalid code error for %q, got %v", badCode, err)
-		}
-	}
-
-	// 合法编码
-	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app1", Code: "custom_admin", Name: "管理员"}); err != nil {
-		t.Fatalf("create role: %v", err)
-	}
-	// 同租户重码拒绝：下游只看到编码，跨应用重码同样产生授权歧义
-	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app1", Code: "custom_admin", Name: "另一个角色"}); gerror.GetCode(err) != int(code.RoleCodeExistsError) {
-		t.Fatalf("expected duplicate code error, got %v", err)
-	}
-	// 跨租户同码允许
-	if _, err := svc.Create(newDeptGinCtx(t, "t2", "op2"), &dtotenant.RoleCreateReq{AppID: "app2", Code: "custom_admin", Name: "管理员"}); err != nil {
-		t.Fatalf("cross-tenant same code should be allowed: %v", err)
+	// 其他租户同名不冲突（名称唯一性在「租户 × 应用」维度）
+	if _, err := svc.Create(newDeptGinCtx(t, "t2", "op2"), &dtotenant.RoleCreateReq{AppID: "app2", Name: "管理员"}); err != nil {
+		t.Fatalf("cross-tenant same name should be allowed: %v", err)
 	}
 }
 
-// TestRoleCreateReservedCodeForbidden 系统保留编码（内置角色的下游策略锚点）不得被自建角色占用：
-// 下游按「前缀 + 编码」认策略名，前缀隔离不了同码，放开即等于允许任何租户自造一个撞上内置策略的编码。
-func TestRoleCreateReservedCodeForbidden(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
-	svc := &roleSvc{}
-	seedTenantAdminOperator(t, db, "t1", "op")
-	seedTestApp(t, db, "t1", "app1")
-
-	ginCtx := newDeptGinCtx(t, "t1", "op")
-	// 普通租户里内置 platform_admin 并不存在（只随种子/平台租户出现），租户内唯一性校验会放行，必须由保留字拦住
-	for _, reserved := range []model.RoleCode{model.RoleCodePlatformAdmin, model.RoleCodeTenantAdmin} {
-		_, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app1", Code: reserved, Name: "伪装角色"})
-		if gerror.GetCode(err) != int(code.RoleCodeReservedError) {
-			t.Fatalf("expected reserved code error for %q, got %v", reserved, err)
-		}
-	}
-	// 非保留编码不受影响
-	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app1", Code: "storage_readonly", Name: "只读"}); err != nil {
-		t.Fatalf("non-reserved code should be allowed: %v", err)
-	}
-	// 存量行（本守卫上线前已占用保留码的自建角色）仍可改名称/描述：只在把编码改成保留码时拦截
-	seedTestRoleWithCode(t, db, "legacy", "t1", "app1", "历史角色", model.RoleCodePlatformAdmin)
-	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "legacy", Code: model.RoleCodePlatformAdmin, Name: "改名"}); err != nil {
-		t.Fatalf("legacy row with unchanged reserved code should allow name update: %v", err)
-	}
-	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "legacy", Code: model.RoleCodeTenantAdmin, Name: "改名"}); gerror.GetCode(err) != int(code.RoleCodeReservedError) {
-		t.Fatalf("expected reserved code error when renaming into reserved code, got %v", err)
-	}
-}
-
-// TestRoleUpdateCode 编码可改（不是本系统的定位键，改错可在本控制台改回），
-// 但改动即改变下游授权：形状与租户内唯一必须守住，且列表/详情要回传最新值。
-func TestRoleUpdateCode(t *testing.T) {
+// TestRoleCreateCannotInjectCode 租户侧在**结构上**没有写入角色编码的入口：请求体里即使带了 code，
+// 绑定层也没有字段接收它，落库的自建角色编码恒为空串。这是"契约值归应用方"的编译期 + 运行期双重保证
+// ——自建角色因此不可能与模板角色/产品锚点撞码，也不可能自造一个值去命中下游已有策略。
+func TestRoleCreateCannotInjectCode(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.RoleMenuEntity{},
 		&model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
 	seedTenantAdminOperator(t, db, "t1", "op")
 	seedTestApp(t, db, "t1", "app1")
-	seedTestRoleWithCode(t, db, "r1", "t1", "app1", "管理员", "custom_admin")
-	seedTestRoleWithCode(t, db, "r2", "t1", "app1", "只读", "storage_readonly")
 
 	ginCtx := newDeptGinCtx(t, "t1", "op")
-
-	// 非法形状
-	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Code: "Platform", Name: "管理员"}); gerror.GetCode(err) != int(code.RoleCodeInvalidError) {
-		t.Fatalf("expected invalid code error, got %v", err)
+	// 直接喂 JSON：模拟前端/裸调 API 试图夹带契约值
+	var req dtotenant.RoleCreateReq
+	if err := json.Unmarshal([]byte(`{"appID":"app1","name":"管理员","code":"tenant_admin"}`), &req); err != nil {
+		t.Fatalf("bind req: %v", err)
 	}
-	// 与他人重码
-	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Code: "storage_readonly", Name: "管理员"}); gerror.GetCode(err) != int(code.RoleCodeExistsError) {
-		t.Fatalf("expected duplicate code error, got %v", err)
+	resp, err := svc.Create(ginCtx, &req)
+	if err != nil {
+		t.Fatalf("create role: %v", err)
 	}
-	// 改名为系统保留编码拒绝（与创建同一条提权路径）
-	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Code: model.RoleCodeTenantAdmin, Name: "管理员"}); gerror.GetCode(err) != int(code.RoleCodeReservedError) {
-		t.Fatalf("expected reserved code error, got %v", err)
-	}
-	// 编码不变（唯一性校验排除自身）应放行
-	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Code: "custom_admin", Name: "管理员"}); err != nil {
-		t.Fatalf("update with unchanged code: %v", err)
-	}
-	// 改码生效并回传
-	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Code: "console_admin", Name: "管理员"}); err != nil {
-		t.Fatalf("update code: %v", err)
-	}
-	detail, err := svc.Detail(ginCtx, &dtotenant.RoleDetailReq{RoleID: "r1"})
+	detail, err := svc.Detail(ginCtx, &dtotenant.RoleDetailReq{RoleID: resp.RoleID})
 	if err != nil {
 		t.Fatalf("detail: %v", err)
 	}
-	if detail.Code != "console_admin" {
-		t.Fatalf("expected updated code console_admin, got %q", detail.Code)
+	if detail.Code != "" {
+		t.Fatalf("自建角色编码必须为空串，实际 %q（租户不得写入契约值）", detail.Code)
+	}
+	if detail.Source != model.RoleSourceCustom {
+		t.Fatalf("source = %s, want custom", detail.Source)
 	}
 }
 
-// TestRoleUpdateBuiltinForbidden 内置角色整体只读：编码是下游策略供给锚点，名称/描述由种子与运维负责。
-// 权威判定必须在服务层（前端置灰只是 UX 兜底），且不得因为「编码没变」而放行整条更新。
+// TestRoleUpdateBuiltinForbidden 内置角色整体只读：模板角色（应用角色模板物化）与产品锚点的编码/名称
+// 都由应用方定义，租户不得改名——权威判定必须在服务层（前端置灰只是 UX 兜底），
+// 且不得因为「字段原样回传」而放行整条更新。
 func TestRoleUpdateBuiltinForbidden(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.RoleMenuEntity{},
 		&model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
 	seedTenantAdminOperator(t, db, "t1", "op")
 	seedTestApp(t, db, "t1", "app1")
+	// 产品锚点角色
 	if err := db.Create(&model.RoleEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "rb"}},
 		TenantID:   "t1",
@@ -245,13 +175,26 @@ func TestRoleUpdateBuiltinForbidden(t *testing.T) {
 	}).Error; err != nil {
 		t.Fatalf("seed builtin role: %v", err)
 	}
+	// 模板角色（由应用角色模板物化的普通内置角色）
+	if err := db.Create(&model.RoleEntity{
+		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "rt"}},
+		TenantID:   "t1",
+		AppID:      "app1",
+		Code:       "storage_admin",
+		Name:       "存储管理员",
+		Source:     model.RoleSourceBuiltin,
+		AdminType:  model.SysAdminTypeNormal,
+		CreatedBy:  "t",
+	}).Error; err != nil {
+		t.Fatalf("seed template role: %v", err)
+	}
 
 	ginCtx := newDeptGinCtx(t, "t1", "op")
-	// 改码、改名称、以及「三字段原样回传」都必须拒绝：只读语义与内容是否变化无关
+	// 改名与「原样回传」都必须拒绝：只读语义与内容是否变化无关
 	for _, req := range []*dtotenant.RoleUpdateReq{
-		{RoleID: "rb", Code: "storage_readonly", Name: "租户管理员"},
-		{RoleID: "rb", Code: model.RoleCodeTenantAdmin, Name: "改名试试"},
-		{RoleID: "rb", Code: model.RoleCodeTenantAdmin, Name: "租户管理员"},
+		{RoleID: "rb", Name: "改名试试"},
+		{RoleID: "rb", Name: "租户管理员"},
+		{RoleID: "rt", Name: "存储超管"},
 	} {
 		if err := svc.Update(ginCtx, req); gerror.GetCode(err) != int(code.RoleUpdateBuiltinForbiddenError) {
 			t.Fatalf("expected builtin-forbidden error for %+v, got %v", req, err)
@@ -264,6 +207,43 @@ func TestRoleUpdateBuiltinForbidden(t *testing.T) {
 	}
 	if detail.Code != model.RoleCodeTenantAdmin || detail.Name != "租户管理员" {
 		t.Fatalf("builtin role must stay untouched, got code=%q name=%q", detail.Code, detail.Name)
+	}
+}
+
+// TestRoleUpdateCustomRoleKeepsCode 自建角色的更新只作用于名称/描述：编码不在入参里，
+// 更新既不会写入也不会清掉存量行的编码（存量行可能带着历史编码）。
+func TestRoleUpdateCustomRoleKeepsCode(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.RoleMenuEntity{},
+		&model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
+	svc := &roleSvc{}
+	seedTenantAdminOperator(t, db, "t1", "op")
+	seedTestApp(t, db, "t1", "app1")
+	seedTestRoleWithCode(t, db, "r1", "t1", "app1", "管理员", "custom_admin")
+	seedTestRoleWithCode(t, db, "r2", "t1", "app1", "只读", "storage_readonly")
+
+	ginCtx := newDeptGinCtx(t, "t1", "op")
+
+	// 与他人重名拒绝
+	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "只读"}); gerror.GetCode(err) != int(code.RoleUpdateError) {
+		t.Fatalf("expected duplicate name error, got %v", err)
+	}
+	// 自身同名放行（唯一性校验排除自身）
+	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "管理员"}); err != nil {
+		t.Fatalf("update with unchanged name: %v", err)
+	}
+	// 改名生效，编码保持不变
+	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "存储管理员", Description: "负责存储"}); err != nil {
+		t.Fatalf("update name: %v", err)
+	}
+	detail, err := svc.Detail(ginCtx, &dtotenant.RoleDetailReq{RoleID: "r1"})
+	if err != nil {
+		t.Fatalf("detail: %v", err)
+	}
+	if detail.Name != "存储管理员" || detail.Description != "负责存储" {
+		t.Fatalf("name/description not updated, got %q/%q", detail.Name, detail.Description)
+	}
+	if detail.Code != "custom_admin" {
+		t.Fatalf("encode must stay untouched by update, got %q", detail.Code)
 	}
 }
 

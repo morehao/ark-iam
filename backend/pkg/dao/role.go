@@ -12,7 +12,7 @@ type RoleCond struct {
 	AppID      string
 	IDs        []string
 	Name       string
-	Code       model.RoleCode // 精确匹配角色编码（跨系统授权契约值，租户内唯一）
+	Code       model.RoleCode // 精确匹配角色编码（跨系统授权契约值，(租户, 应用) 内唯一）
 	Source     model.RoleSource
 	AdminType  model.SysAdminType // 精确匹配系统管理类型(admin/normal)
 	Keyword    string             // 模糊搜索: 名称/编码 LIKE

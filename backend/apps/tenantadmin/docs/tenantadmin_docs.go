@@ -2993,21 +2993,12 @@ const docTemplatetenantadmin = `{
             "type": "object",
             "required": [
                 "appID",
-                "code",
                 "name"
             ],
             "properties": {
                 "appID": {
                     "description": "所属应用ID（租户订阅的启用应用，含系统内置应用）",
                     "type": "string"
-                },
-                "code": {
-                    "description": "角色编码(租户内唯一)：跨系统授权契约值，即 OIDC groups 取值",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.RoleCode"
-                        }
-                    ]
                 },
                 "description": {
                     "description": "角色描述",
@@ -3048,7 +3039,7 @@ const docTemplatetenantadmin = `{
                     "type": "string"
                 },
                 "code": {
-                    "description": "角色编码(跨系统授权契约值，即 OIDC groups 取值)",
+                    "description": "角色编码(跨系统授权契约值，即 OIDC groups 取值；由应用角色模板下发，自建角色为空串)",
                     "allOf": [
                         {
                             "$ref": "#/definitions/model.RoleCode"
@@ -3147,7 +3138,7 @@ const docTemplatetenantadmin = `{
                     "type": "string"
                 },
                 "code": {
-                    "description": "角色编码(跨系统授权契约值，即 OIDC groups 取值)",
+                    "description": "角色编码(跨系统授权契约值，即 OIDC groups 取值；由应用角色模板下发，自建角色为空串)",
                     "allOf": [
                         {
                             "$ref": "#/definitions/model.RoleCode"
@@ -3211,18 +3202,9 @@ const docTemplatetenantadmin = `{
         "dtotenant.RoleUpdateReq": {
             "type": "object",
             "required": [
-                "code",
                 "name"
             ],
             "properties": {
-                "code": {
-                    "description": "角色编码(租户内唯一)：改动会改变下游系统按编码授予的权限",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.RoleCode"
-                        }
-                    ]
-                },
                 "description": {
                     "description": "角色描述",
                     "type": "string"

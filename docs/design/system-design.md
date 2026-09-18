@@ -288,6 +288,7 @@ erDiagram
         int sort
         bool allow_person_create_tenant "允许个人自助建租户"
         bool allow_join_by_invite "允许凭邀请加入"
+        json role_template "应用角色模板：[{code,name}]，开通应用时物化到各租户"
     }
     application_client {
         string id PK "UUID v7"
@@ -348,7 +349,8 @@ erDiagram
         string id PK "UUID v7"
         string tenant_id FK
         string app_id FK "作用域：租户内按应用"
-        string name "应用内唯一（无 code）"
+        string code "跨系统授权契约值（OIDC groups 取值）；仅产品锚点与应用角色模板物化的角色非空"
+        string name "应用内唯一"
         string description
         string source "builtin 内置 / custom 自定义"
         string admin_type "admin 管理员 / normal 普通"
@@ -520,7 +522,7 @@ erDiagram
 
 | 表 | 说明 |
 |---|---|
-| `role` | 角色：租户内 + 按应用（`app_id`）作用域；`source` builtin/custom；`admin_type` admin/normal 是系统管理能力标签（**内置角色整体只读**：禁删、禁编辑——名称/描述/编码一律不可改，`admin_type` 由种子定）。`code` 是**跨系统授权契约值**（`^[a-z][a-z0-9_]*$`，租户内唯一，创建必填；**仅自建角色可改**）：它是 OIDC ID token `groups` 声明的取值，下游系统按「前缀 + 编码」认自己的策略名（如对象存储 `claim_prefix=iam_` → 策略 `iam_platform_admin`）；内置角色编码 `platform_admin`/`tenant_admin` 集中在 `pkg/model` 定义并**登记为保留编码**（`model.IsReservedRoleCode`，自建角色不得创建或改名为这些值——下游前缀只隔离命名空间、隔离不了同码，否则任何租户都能自造撞上内置策略的编码；凡为某编码在下游供给过策略就必须登记），作为下游策略供给锚点必须稳定。**无 `type`、无 `is_default`** |
+| `role` | 角色：租户内 + 按应用（`app_id`）作用域；`source` builtin/custom；`admin_type` admin/normal 是系统管理能力标签（**内置角色整体只读**：禁删、禁编辑——名称/描述/编码一律不可改）。`code` 是**跨系统授权契约值**（`^[a-z][a-z0-9_]*$`）：它是 OIDC ID token `groups` 声明的取值，下游系统按「前缀 + 编码」认自己的策略名（如对象存储 `claim_prefix=iam_` → 策略 `iam_platform_admin`）。**编码只有两个来源，租户侧没有任何写入入口**：① 产品锚点角色（`platform_admin`/`tenant_admin`，`source=builtin && admin_type=admin`，随种子/建租户产生）；② **应用角色模板**（`application.role_template`，开通应用时物化到该租户，`source=builtin && admin_type=normal`）。**租户自建角色（`source=custom`）的 `code` 恒为空串、不进入 `groups` 声明**——下游策略是全局命名实体（策略名 = `claim_prefix` + 编码，全租户共用一条、无映射表可回查），若允许租户写编码，任何租户管理员都能造出一个撞上既有策略的编码从而自提权；把契约值收归应用方定义后，「定义值的人」与「在下游供给策略的人」是同一主体，不再需要保留字护栏。**该声明只下发给「本角色所属应用的客户端」**（作用域键 = `application_client.app_id`，见 §5.4）：下游只认自己那个应用的编码，跨应用的角色不会进入其策略命名空间；反之若按租户全量下发，在无关应用里造一个同码角色即可命中下游策略（跨应用越权）。**无 `type`、无 `is_default`** |
 | `menu` | 菜单：按应用管理（`app_id`），支持树（`parent_id`）；`type` directory/menu/button；`visibility` public/member/admin 为可见性门槛；`seed_key` 为种子身份键（控制台不可见不可写）。**顺序由 `sort` 唯一决定**（升序，同值按 `code`，见 `pkg/dao.MenuOrderBySort`）：所有面向界面的菜单查询（两端侧边栏、角色授权树、菜单管理树/列表）都必须显式 ORDER BY，缺省顺序数据库不保证、控制台改排序会看不到效果。**无 `tenant_id`、无 `permission`** |
 | `user_role` | 用户-角色关联 |
 | `role_menu` | 角色-菜单关联（可访问菜单） |
@@ -531,7 +533,7 @@ erDiagram
 
 | 表 | 说明 |
 |---|---|
-| `application` | 业务应用定义：编码/名称/描述/来源（`source`：builtin/first_party/third_party）/状态/排序/两个**入口策略**布尔位（`allow_person_create_tenant` 通道 A、`allow_join_by_invite` 通道 B；NULL 与 false 同义，判定见 §5.1）/`seed_key`（内置应用的种子身份键）。控制台只能创建 `third_party` |
+| `application` | 业务应用定义：编码/名称/描述/来源（`source`：builtin/first_party/third_party）/状态/排序/两个**入口策略**布尔位（`allow_person_create_tenant` 通道 A、`allow_join_by_invite` 通道 B；NULL 与 false 同义，判定见 §5.1）/`seed_key`（内置应用的种子身份键）/`role_template`（**应用角色模板**：`[{code,name}]`，本应用对外的契约角色清单，见 §5.4；平台侧维护，`create_only`）。控制台只能创建 `third_party` |
 | `application_client` | **OAuth/OIDC 客户端**：`code` 即 `client_id`（创建时必填，`^[a-z][a-z_]*$`：小写字母开头，仅小写字母与下划线）、`app_id` 归属、redirect_uris / post_logout_redirect_uris、grant_types、token_endpoint_auth_method、PKCE、令牌 TTL、来源（`source`） |
 | `application_client_secret` | 客户端密钥：只存哈希（`value_hash`）+ 前缀（`value_prefix`），支持过期/吊销 |
 | `api_key` | API Key 机器凭证：只存哈希（`key_hash`）+ 前缀（`key_prefix`，明文前 7 位，仅列表展示），支持 scope/过期/吊销；`owner_user_id` 归属**服务账号**（个人密钥能力已下线，历史 member 数据兼容展示），鉴权按归属服务账号注入身份；明文仅创建时展示一次，管理在租户端（需系统管理能力） |
@@ -572,14 +574,15 @@ erDiagram
 | `create_only`（只播种） | 运维 | 仅在行不存在时写入初值，此后永不回写；控制台可自由修改 |
 | `migrate_once`（一次性迁移） | 种子 | 以「当前值 == 历史种子值」为条件的一次性改名，迁移完成后自然失效，运维自定义值一律不动 |
 
-**`reconcile` 的准入判据**：只有"被控制台改写后会导致种子定位失效或鉴权被绕过"的字段才准入，即**安全不变式**——`tenant`/`application`/`application_client` 的 `source`（内置标记）、`role.admin_type`、平台租户 `status`、`tenant_user.source`，外加内置客户端的归属 `app_id`。展示 / 结构 / 编码类字段（应用名与描述、客户端名、角色名/描述/编码、菜单的名/图标/排序/可见性/路径/组件/层级）一律 `create_only` 归运维；矩阵之外的字段视为 `create_only`。跨版本改名一律用 `migrate_once` 登记（`pkg/seed` 的迁移清单），**禁止用 `reconcile` 表达改名**。
+**`reconcile` 的准入判据**：只有"被控制台改写后会导致种子定位失效或鉴权被绕过"的字段才准入，即**安全不变式**——`tenant`/`application`/`application_client` 的 `source`（内置标记）、`role.admin_type`、平台租户 `status`、`tenant_user.source`，外加内置客户端的归属 `app_id`。展示 / 结构 / 编码类字段（应用名与描述、**应用角色模板 `role_template`**、客户端名、角色名/描述/编码、菜单的名/图标/排序/可见性/路径/组件/层级）一律 `create_only` 归运维；矩阵之外的字段视为 `create_only`。跨版本改名一律用 `migrate_once` 登记（`pkg/seed` 的迁移清单），**禁止用 `reconcile` 表达改名**。
 
 **种子认行靠 `seed_key`，不靠业务编码**：`menu` 与 `application` 各有一个控制台**不可见不可写**的内部列 `seed_key`（创建时写入、此后不变），种子按它定位既有行。因此菜单的 `code` 与归属应用、自建应用 / 客户端的 `code` 都可以自由修改而不触发"重复建行"。`application_client` 仍按 `code`（= `client_id`）认行。
 
 **仍保持只读的编码**（不是矩阵规则，而是 service 层拒改）：
 
 - **内置应用的 `code`**：各控制台的菜单入口按它定位（platformadmin 的 `MyTree` 按 `platform_admin` 查应用，tenantadmin 的 `loadConsoleApps` 只保留 `tenant_admin`），改名会当场锁死对应控制台且界面无法自救；
-- **内置客户端的 `code`**（= `client_id`：`platform_admin_web` / `tenant_admin_web`）：同时是网关 aud 白名单、back-channel logout 的客户端识别与前端 `VITE_OIDC_CLIENT_ID` 默认值的取值来源。两者定义在 `pkg/model`（`SeedBuiltinClientPlatformAdminWeb` / `SeedBuiltinClientTenantAdminWeb`），更换属版本级动作。
+- **内置客户端的 `code`**（= `client_id`：`platform_admin_web` / `tenant_admin_web`）：同时是网关 aud 白名单、back-channel logout 的客户端识别与前端 `VITE_OIDC_CLIENT_ID` 默认值的取值来源。两者定义在 `pkg/model`（`SeedBuiltinClientPlatformAdminWeb` / `SeedBuiltinClientTenantAdminWeb`），更换属版本级动作；
+- **角色的 `code`**（`role.code`，跨系统授权契约值）：**租户侧在结构上没有写入入口**——`dtotenant.RoleCreateReq`/`RoleUpdateReq` 不含该字段，service 创建自建角色时恒写空串、更新只改名称/描述。取值只能由产品锚点（种子）与应用角色模板（`application.role_template`）产生，见 §5.4。
 
 **菜单的"行"归运维**：控制台可新增根菜单 / 子菜单，也可删除任意菜单（含内置菜单）。删除是**软删除**，软删行仍带 `seed_key`，等于"该菜单已被人为下线"的**墓碑**——`seedMenus` 命中墓碑即跳过创建（该检查必须早于 `(app_id, code)` 兜底，否则会误认领运维自建的同 code 菜单）。因此**不要假设内置菜单行一定存在**，也不要指望从控制台删除后种子会把它建回来。版本级下线另在 `pkg/seed/retired_menu.go` 的 `retiredMenus` 登记（父目录与子菜单一并登记），并**物理删除**、不留墓碑。
 
@@ -743,10 +746,31 @@ sequenceDiagram
 > （`apps/auth/internal/core/oidcop/client.go`）——zitadel 在 `false` 时会把 `profile`/`email`/`phone`
 > 从 ID token 的 scope 里裁掉（`pkg/op/token.go` 的 `removeUserinfoScopes`），ID token 只剩 `sub`；
 > 而只读 ID token 的 RP（对象存储控制台这类）需要 `groups` 与 `preferred_username`。
-> `groups` = **本次签发租户内的角色编码**（`model.RoleCode`），在 `OIDCStorage.SetUserinfoFromRequest`
-> 注入：授权码流取授权票据的租户、刷新流取 refresh token 的租户，userinfo 端点则按 access token
-> 元数据的租户产出；仅随 `profile` scope 授权，未请求 `profile` 不产出。角色读取失败按 **fail-closed**
-> 返回错误拒绝该次签发——宁可登录失败，也不签发缺 `groups` 的令牌让下游把用户当「无策略」静默降权。
+> `groups` = **本次签发租户内、且属于本次请求客户端所属应用的角色编码**（`model.RoleCode`），在
+> `OIDCStorage.SetUserinfoFromRequest` 注入：授权码流取授权票据的租户与 client、刷新流取 refresh token
+> 的租户与 client，userinfo 端点则按 access token 元数据的租户与 client 产出；仅随 `profile` scope
+> 授权，未请求 `profile` 不产出。**应用作用域（`application_client.app_id`）是声明的命名空间边界**：
+> 下游只可能认自己那个应用的角色编码，若把租户内所有应用的编码一起下发，任何应用里的角色都会进入
+> 每个下游的策略命名空间（在无关应用里造一个同码角色即可命中下游策略），下游无从分辨来源。
+> 客户端未知（记录不存在）或角色读取失败按 **fail-closed** 返回错误拒绝该次签发——宁可登录失败，
+> 也不签发作用域不明或缺 `groups` 的令牌让下游把用户当「无策略」静默降权；客户端为空或未绑定应用时
+> 视为「无命名空间」而不产出声明（与「租户未定不猜租户」同构）。
+>
+> **契约值只由应用方定义（这是「前缀隔离不了同码」的根本解）**：下游按「`claim_prefix` + 编码」逐字拼
+> 策略名，前缀只隔离命名空间、隔离不了同码——而且策略在下游是**全局命名实体**（一条策略全租户共用，
+> 下游没有「角色 ↔ 策略」的映射表可回查），所以「哪个编码会在下游存在一条策略」**只能由应用方说了算**。
+> 据此 `role.code` 只有两个来源，租户侧没有任何写入入口（请求 DTO 里没有该字段，service 恒写空串）：
+> ①**产品锚点**（`model.productAnchorRoleCodes`：`platform_admin`/`tenant_admin`）写死在制品代码里，
+> 语义是「平台自己的策略命名空间」；
+> ②**应用角色模板**（`application.role_template` = `[{code,name}]`）：平台侧维护该应用对外的契约角色
+> 清单，开通应用时物化到租户（`source=builtin && admin_type=normal`，见 §5.8 建租户流程），租户侧对这些
+> 角色整体只读（连改名也拒——名称同样由应用方定义），成员授权仍归租户。
+> 租户自建角色（`source=custom`）的 `code` 恒为空串，因此**不可能**撞上模板编码或产品锚点，也就无需
+> 保留字护栏（早先的 `reserved_role_codes` 是「租户可写编码」前提下的补丁式 blocklist，已被本模型取代）。
+> 模板是**单一事实源**：更新模板时对每个已开通租户做差量同步——新增物化、改名回写、**移除即从各租户
+> 撤下该角色并级联删除其 `user_role`/`role_menu`**（撤权是模板收敛的必然结果，故平台控制台必须二次
+> 确认，见 api-reference 的应用更新接口）；若某租户存在同码的**自建**存量角色（本模型上线前的历史数据），
+> 同步只告警跳过、不接管（防御性：接管等于悄悄改掉租户自己的角色）。
 
 ### 5.5 登出与全局登出（SLO）
 
@@ -840,12 +864,14 @@ sequenceDiagram
     PA->>DB: 3) tenant_user（person_id 关联/新建，source=builtin，is_owner=1）
     PA->>DB: 4) person.must_change_password = true
     PA->>DB: 5) 绑定内置管理员角色 + 根部门 primary 关系 + 应用订阅
+    PA->>DB: 6) 按各订阅应用的 role_template 物化契约角色（source=builtin）
     PA-->>P: { tenantID, adminUserID, 临时口令明文（仅此一次展示） }
 ```
 
 **要点**：
 
 - **每个租户都必须有管理员**：建租户的管理员入参为必填，避免出现无人可登录的租户。
+- **应用订阅即契约角色物化**：`tenant_application` 落行时（建租户内的订阅、以及平台侧单独开通应用）在同一事务里按该应用的 `role_template` 在租户内 upsert 对应角色（`source=builtin && admin_type=normal`，`description` 标注来源）；租户侧对这些角色只读。模板更新走 `SyncAppRoleTemplateToTenants` 对各已开通租户做差量同步（新增/改名/移除撤权），详见 §5.4。
 - **口令不由创建人手填**：服务端用 `pkg/credential.GenerateTemporaryPassword` 生成每用户随机临时口令，全系统口令强度规则一致；**明文只在创建响应中回显一次**，库里只存 bcrypt 哈希。
 - **内置标记 `source=builtin`**：该成员由系统随租户创建生成（区别于控制台手工创建的 `manual`），仅作为后端语义，不在租户控制台展示为可编辑字段。
 - **首次登录强制改密**：`person.must_change_password=true`，改密前不建会话、不发令牌（见 §5.2）。

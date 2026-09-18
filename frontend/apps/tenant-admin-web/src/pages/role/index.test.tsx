@@ -24,12 +24,12 @@ const TenantRolePage = (await import('./index')).default
 
 const appID = '01a09372-0000-7000-8000-00000000a1b1'
 const appName = '租户控制台'
-/** 自建角色：编码是跨系统授权契约值（OIDC groups 取值），可改。 */
+/** 自建角色：不参与跨系统契约，编码恒为空串（契约值只能来自应用角色模板）。 */
 const customRole: TenantRoleItem = {
   roleID: '01a09372-0000-7000-8000-00000000r001',
   appID,
   appName,
-  code: 'dept_manager',
+  code: '',
   name: '部门管理员',
   description: '管理本部门成员',
   source: 'custom',
@@ -39,7 +39,22 @@ const customRole: TenantRoleItem = {
   createdAt: 1789142400,
   updatedAt: 1789228800,
 }
-/** 内置角色（种子 RoleCodeTenantAdmin）：编码是下游策略供给的锚点，删除禁用、编辑提示更强。 */
+/** 模板角色：由应用角色模板物化（source=builtin、admin_type=normal），编码是下游认策略名的契约值。 */
+const templateRole: TenantRoleItem = {
+  roleID: '01a09372-0000-7000-8000-00000000r003',
+  appID,
+  appName,
+  code: 'storage_readonly',
+  name: '存储只读',
+  description: '',
+  source: 'builtin',
+  adminType: 'normal',
+  memberCount: 0,
+  menuCount: 0,
+  createdAt: 1789142400,
+  updatedAt: 1789228800,
+}
+/** 产品锚点角色（种子 RoleCodeTenantAdmin）：删除禁用、编辑提示更强。 */
 const builtinRole: TenantRoleItem = {
   roleID: '01a09372-0000-7000-8000-00000000r002',
   appID: '',
@@ -70,7 +85,6 @@ function submitModal() {
 
 const CODE_INPUT_PLACEHOLDER = '唯一编码，如 dept_manager'
 const CODE_NAME_PLACEHOLDER = '如：部门管理员（应用内唯一）'
-const CODE_INVALID_MESSAGE = '以小写字母开头，仅含小写字母、数字与下划线'
 
 beforeEach(() => {
   mockGetTenantRolePageList.mockReset().mockResolvedValue({ list: [customRole], total: 1 })
@@ -97,102 +111,80 @@ describe('ROLE_CODE_PATTERN 与后端 model.RoleCodePattern 同口径', () => {
 })
 
 describe('租户角色列表的编码列', () => {
-  /** 回归：编码是下游认策略名的契约值，列表必须能逐字看到（后端 DTO/DB 字段名都是 code）。 */
-  it('展示后端 code 且有「编码」表头', async () => {
+  /** 编码是下游认策略名的契约值，模板角色必须能逐字看到（后端 DTO/DB 字段名都是 code）。 */
+  it('模板角色展示编码，自建角色展示「不参与契约」文案', async () => {
+    mockGetTenantRolePageList.mockResolvedValue({ list: [customRole, templateRole], total: 2 })
     render(<TenantRolePage />)
 
-    expect(await screen.findByText('dept_manager')).toBeInTheDocument()
+    expect(await screen.findByText('storage_readonly')).toBeInTheDocument()
+    expect(screen.getByText('自建（不参与契约）')).toBeInTheDocument()
     // 表头在 antd 内部会渲染多份（度量行），只断言存在
     expect(screen.getAllByText('编码').length).toBeGreaterThan(0)
   })
 
   /** 列顺序：编码紧随角色名称之后（名称是主键、编码其次）。 */
   it('编码列排在角色名称列之后', async () => {
+    mockGetTenantRolePageList.mockResolvedValue({ list: [templateRole], total: 1 })
     render(<TenantRolePage />)
 
-    await screen.findByText('dept_manager')
+    await screen.findByText('storage_readonly')
     const headers = screen.getAllByRole('columnheader').map((th) => th.textContent)
     expect(headers.indexOf('角色名称')).toBeGreaterThanOrEqual(0)
     expect(headers.indexOf('角色名称')).toBeLessThan(headers.indexOf('编码'))
   })
 })
 
-describe('新建角色提交编码', () => {
-  it('提交 payload 含 code / name / appID', async () => {
-    render(<TenantRolePage />)
-
-    fireEvent.click(await screen.findByRole('button', { name: /新建角色/ }))
-    fireEvent.change(await screen.findByPlaceholderText(CODE_INPUT_PLACEHOLDER), {
-      target: { value: 'dept_manager' },
-    })
-    fireEvent.change(screen.getByPlaceholderText(CODE_NAME_PLACEHOLDER), { target: { value: '部门管理员' } })
-    await selectApp(appName)
-    submitModal()
-
-    await waitFor(() => expect(mockCreateTenantRole).toHaveBeenCalledTimes(1))
-    expect(mockCreateTenantRole.mock.calls[0][0]).toMatchObject({
-      appID,
-      code: 'dept_manager',
-      name: '部门管理员',
-    })
-  })
-
+describe('租户侧不能写入角色编码', () => {
   /**
-   * 回归：编码是创建时的必填入参（服务端不再生成），形状必须在表单层拦下——
-   * 大写/连字符/数字开头/空格/点 全部非法，且非法时不得发出创建请求。
+   * 契约值归应用方：租户控制台**结构上没有**编码入口（表单无该字段，提交也不带 code）。
+   * 这是「自建角色不可能撞码/自造下游策略名」的前端一半保证，后端一半见
+   * dtotenant.RoleCreateReq（无 Code 字段）+ svcrole.Create（Code 恒为空串）。
    */
-  it('编码非法时拦截提交，不发创建请求', async () => {
-    render(<TenantRolePage />)
-
-    fireEvent.click(await screen.findByRole('button', { name: /新建角色/ }))
-    const codeInput = await screen.findByPlaceholderText(CODE_INPUT_PLACEHOLDER)
-    fireEvent.change(screen.getByPlaceholderText(CODE_NAME_PLACEHOLDER), { target: { value: '部门管理员' } })
-    await selectApp(appName)
-
-    for (const badCode of ['Dept_Manager', 'dept-manager', '1dept', 'dept manager']) {
-      fireEvent.change(codeInput, { target: { value: badCode } })
-      submitModal()
-      expect(await screen.findByText(CODE_INVALID_MESSAGE)).toBeInTheDocument()
-    }
-    expect(mockCreateTenantRole).not.toHaveBeenCalled()
-
-    // 换成合法编码后放行
-    fireEvent.change(codeInput, { target: { value: 'dept_manager' } })
-    submitModal()
-    await waitFor(() => expect(mockCreateTenantRole).toHaveBeenCalledTimes(1))
-  })
-
-  /** 编码为空同样被必填规则拦下（创建必填，服务端 binding:"required"）。 */
-  it('编码为空时拦截提交', async () => {
+  it('新建弹窗没有编码输入项，提交 payload 不含 code', async () => {
     render(<TenantRolePage />)
 
     fireEvent.click(await screen.findByRole('button', { name: /新建角色/ }))
     fireEvent.change(await screen.findByPlaceholderText(CODE_NAME_PLACEHOLDER), { target: { value: '部门管理员' } })
+    expect(screen.queryByPlaceholderText(CODE_INPUT_PLACEHOLDER)).not.toBeInTheDocument()
     await selectApp(appName)
     submitModal()
 
-    expect(await screen.findByText('请输入角色编码')).toBeInTheDocument()
+    await waitFor(() => expect(mockCreateTenantRole).toHaveBeenCalledTimes(1))
+    expect(mockCreateTenantRole.mock.calls[0][0]).toMatchObject({ appID, name: '部门管理员' })
+    expect(mockCreateTenantRole.mock.calls[0][0]).not.toHaveProperty('code')
+  })
+
+  it('名称必填（编码已不再是必填项）', async () => {
+    render(<TenantRolePage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /新建角色/ }))
+    await selectApp(appName)
+    submitModal()
+
+    expect(await screen.findByText('请输入角色名称')).toBeInTheDocument()
     expect(mockCreateTenantRole).not.toHaveBeenCalled()
   })
 })
 
-describe('编辑角色回显并提交编码', () => {
-  /** 更新是全量覆盖：编码必须回显并回传，漏传会把下游认策略名的契约值清空。 */
-  it('编辑态回显 code 且提交 payload 含 code', async () => {
+describe('编辑自建角色只提交名称/描述', () => {
+  /** 更新只改名称/描述：编码不在入参里（自建角色恒为空串），也不得回传清空契约值。 */
+  it('编辑态无编码项，提交 payload 不含 code', async () => {
     render(<TenantRolePage />)
 
     fireEvent.click(await screen.findByText('编辑'))
-    const codeInput = await screen.findByPlaceholderText(CODE_INPUT_PLACEHOLDER)
-    expect(codeInput).toHaveValue('dept_manager')
+    const nameInput = await screen.findByPlaceholderText(CODE_NAME_PLACEHOLDER)
+    expect(nameInput).toHaveValue('部门管理员')
+    expect(screen.queryByPlaceholderText(CODE_INPUT_PLACEHOLDER)).not.toBeInTheDocument()
 
     submitModal()
 
     await waitFor(() => expect(mockUpdateTenantRole).toHaveBeenCalledTimes(1))
     expect(mockUpdateTenantRole.mock.calls[0][0]).toMatchObject({
       roleID: customRole.roleID,
-      code: 'dept_manager',
       name: '部门管理员',
+      description: '管理本部门成员',
     })
+    expect(mockUpdateTenantRole.mock.calls[0][0]).not.toHaveProperty('code')
   })
 })
 
@@ -202,13 +194,20 @@ describe('编辑角色回显并提交编码', () => {
  * 菜单授权走独立接口，仍可点。
  */
 describe('内置角色只读', () => {
-  it('内置角色的「编辑」「删除」置灰，「菜单权限」仍可点', async () => {
-    mockGetTenantRolePageList.mockResolvedValue({ list: [builtinRole], total: 1 })
+  it('产品锚点与模板角色的「编辑」「删除」置灰，「菜单权限」仍可点', async () => {
+    mockGetTenantRolePageList.mockResolvedValue({ list: [builtinRole, templateRole], total: 2 })
     render(<TenantRolePage />)
 
     expect(await screen.findByText('tenant_admin')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '编辑' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: '删除' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: '菜单权限' })).not.toBeDisabled()
+    expect(screen.getByText('storage_readonly')).toBeInTheDocument()
+    // 两个内置角色的编辑/删除都置灰（模板角色的编码与名称由应用方定义，租户不得改写）
+    expect(screen.getAllByRole('button', { name: '编辑' })).toHaveLength(2)
+    for (const btn of screen.getAllByRole('button', { name: '编辑' })) {
+      expect(btn).toBeDisabled()
+    }
+    for (const btn of screen.getAllByRole('button', { name: '删除' })) {
+      expect(btn).toBeDisabled()
+    }
+    expect(screen.getAllByRole('button', { name: '菜单权限' })).toHaveLength(2)
   })
 })

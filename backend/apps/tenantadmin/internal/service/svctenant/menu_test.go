@@ -78,8 +78,8 @@ func TestTenantAppsIncludeSubscribedBuiltInApp(t *testing.T) {
 		t.Fatalf("unsubscribed app must not be selectable: %+v", resp.List)
 	}
 
-	// 订阅的内置应用可作为角色归属（编码用非保留值：保留编码属内置角色锚点，见 TestRoleCreateReservedCodeForbidden）
-	if _, err := NewRoleSvc().Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app-admin", Code: "console_custom", Name: "后台管理员"}); err != nil {
+	// 订阅的内置应用可作为角色归属（自建角色不写编码，编码只能来自应用角色模板）
+	if _, err := NewRoleSvc().Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app-admin", Name: "后台管理员"}); err != nil {
 		t.Fatalf("create role on subscribed built-in app: %v", err)
 	}
 }

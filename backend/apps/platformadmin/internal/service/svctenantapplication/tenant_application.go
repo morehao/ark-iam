@@ -5,8 +5,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/core/tenant"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
@@ -109,8 +111,21 @@ func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplicat
 	if req.GrantedScope != "" {
 		entity.GrantedScope = datatypes.JSON([]byte(req.GrantedScope))
 	}
-	if err := dao.NewTenantApplicationDao().Insert(crossCtx, entity); err != nil {
-		glog.Errorf(ctx, "[svctenantapplication.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+	// 4) 订阅落行即代表该应用在此租户内可用，故同事务把应用角色模板物化到该租户：
+	// 缺少物化时租户下没有该应用的角色、用户 ID token 的 groups 为空，下游策略集为空即 Deny
+	// （见 docs/design/application-integration-guide.md §3.4）。
+	txErr := dbclient.IamDB(crossCtx).Transaction(func(tx *gorm.DB) error {
+		if err := dao.NewTenantApplicationDao().WithTx(tx).Insert(crossCtx, entity); err != nil {
+			return err
+		}
+		return tenant.SyncAppRoleTemplate(crossCtx, tx, &tenant.SyncAppRoleTemplateReq{
+			TenantID:  req.TenantID,
+			AppID:     req.AppID,
+			CreatedBy: gincontext.GetUserIDString(ctx),
+		})
+	})
+	if txErr != nil {
+		glog.Errorf(ctx, "[svctenantapplication.Create] insert subscription/sync role template fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantApplicationCreateError)
 	}
 	return &dtotenantapplication.TenantApplicationCreateResp{TenantAppID: entity.ID}, nil

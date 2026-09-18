@@ -45,8 +45,9 @@ func seedAppEntity(t *testing.T, db *gorm.DB, appID, name string) {
 
 func setupTenantAppDB(t *testing.T) *gorm.DB {
 	t.Helper()
+	// RoleEntity：订阅落行时会顺带把应用角色模板物化到该租户（本用例模板为空，只需 role 表存在）。
 	return testutil.SetupSQLite(t,
-		&model.TenantEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
+		&model.TenantEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{}, &model.RoleEntity{})
 }
 
 // TestCreateRejectsUnknownTenant 归属租户必须存在：订阅不能指向不存在的租户。

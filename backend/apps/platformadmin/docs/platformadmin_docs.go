@@ -2041,6 +2041,13 @@ const docTemplateplatformadmin = `{
                     "description": "应用名称",
                     "type": "string"
                 },
+                "roleTemplate": {
+                    "description": "RoleTemplate 应用角色模板：本应用对外提供的跨系统授权契约值（code + 展示名）。\n下游按「claim_prefix + code」认策略名（策略在下游是全局命名实体、全租户共用一条），\n故契约值由应用方在此定义一次，租户只能授权、不能定义；开通应用时物化到各租户。",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.RoleTemplateItem"
+                    }
+                },
                 "sort": {
                     "description": "排序",
                     "type": "integer"
@@ -2098,6 +2105,13 @@ const docTemplateplatformadmin = `{
                 "name": {
                     "description": "应用名称",
                     "type": "string"
+                },
+                "roleTemplate": {
+                    "description": "应用角色模板（跨系统授权契约值：code + 展示名）",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.RoleTemplateItem"
+                    }
                 },
                 "sort": {
                     "description": "排序",
@@ -2168,6 +2182,13 @@ const docTemplateplatformadmin = `{
                     "description": "应用名称",
                     "type": "string"
                 },
+                "roleTemplate": {
+                    "description": "RoleTemplate 应用角色模板：传 null 表示不修改，传 [] 表示清空，传值即全量替换。\n全量替换会**撤下**已不在模板中的模板角色（连带清理其用户/菜单授权），界面需二次确认。",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.RoleTemplateItem"
+                    }
+                },
                 "sort": {
                     "description": "排序",
                     "type": "integer"
@@ -2212,6 +2233,13 @@ const docTemplateplatformadmin = `{
                 "name": {
                     "description": "应用名称",
                     "type": "string"
+                },
+                "roleTemplate": {
+                    "description": "应用角色模板（跨系统授权契约值：code + 展示名）",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.RoleTemplateItem"
+                    }
                 },
                 "sort": {
                     "description": "排序",
@@ -4052,6 +4080,36 @@ const docTemplateplatformadmin = `{
                 "MenuVisibilityMember",
                 "MenuVisibilityAdmin"
             ]
+        },
+        "model.RoleCode": {
+            "type": "string",
+            "enum": [
+                "platform_admin",
+                "tenant_admin"
+            ],
+            "x-enum-comments": {
+                "RoleCodePlatformAdmin": "内置「管理员」角色编码",
+                "RoleCodeTenantAdmin": "内置「租户管理员」角色编码"
+            },
+            "x-enum-descriptions": [
+                "内置「管理员」角色编码",
+                "内置「租户管理员」角色编码"
+            ],
+            "x-enum-varnames": [
+                "RoleCodePlatformAdmin",
+                "RoleCodeTenantAdmin"
+            ]
+        },
+        "model.RoleTemplateItem": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "$ref": "#/definitions/model.RoleCode"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
         },
         "model.TenantApplicationStatus": {
             "type": "string",

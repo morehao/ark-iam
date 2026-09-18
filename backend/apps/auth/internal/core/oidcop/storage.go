@@ -122,8 +122,9 @@ var _ op.CanSetUserinfoFromRequest = (*OIDCStorage)(nil)
 // SetUserinfoFromRequest 在 ID token 签发时注入会话级与授权级声明：
 //   - sid：使 id_token_hint 可携带 sid，从而支持会话粒度的 RP-Initiated Logout（M4）。
 //     授权码流取授权票据关联的会话；刷新流取 refresh token 存储的会话。
-//   - groups：该租户内的角色编码（跨系统授权契约，见 PersistentStore.appendRoleGroupClaims）。
-//     放在这里而非 SetUserinfoFromScopes，是因为只有本回调能拿到本次签发的租户。
+//   - groups：该租户内、且属于本次请求客户端所属应用的角色编码（跨系统授权契约，
+//     见 PersistentStore.appendRoleGroupClaims）。放在这里而非 SetUserinfoFromScopes，
+//     是因为只有本回调能同时拿到本次签发的租户与客户端。
 func (s *OIDCStorage) SetUserinfoFromRequest(ctx context.Context, userinfo *oidc.UserInfo, request op.IDTokenRequest, scopes []string) error {
 	var (
 		sessionID string
@@ -143,7 +144,7 @@ func (s *OIDCStorage) SetUserinfoFromRequest(ctx context.Context, userinfo *oidc
 		}
 		userinfo.Claims["sid"] = sessionID
 	}
-	return s.persistentStore.appendRoleGroupClaims(ctx, userinfo, tenantID, request.GetSubject(), scopes)
+	return s.persistentStore.appendRoleGroupClaims(ctx, userinfo, tenantID, request.GetClientID(), request.GetSubject(), scopes)
 }
 
 func (s *OIDCStorage) GetPrivateClaimsFromScopes(ctx context.Context, userID, clientID string, scopes []string) (map[string]any, error) {
