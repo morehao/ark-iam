@@ -558,7 +558,8 @@ func getOrCreateApplication(ctx context.Context, db *gorm.DB, rep *Report, code,
 
 // seedRoles 只种平台管理后台 admin 角色：租户管理后台的 tenant_admin 由权限开通统一创建
 // （pkg/core/tenant.ProvisionTenantAdmin），建租户与种子共用同一份角色/授权定义。
-// 角色无业务编码，内置角色以 (tenant_id, app_id, source=builtin) 为幂等定位键。
+// 角色编码（model.RoleCode）是跨系统授权契约值，两种内置角色的取值都在 pkg/model 集中定义；
+// 幂等定位键为 (tenant_id, app_id, source=builtin)，编码按 create_only 语义只在创建时写入。
 func seedRoles(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.TenantEntity, adminApp *model.ApplicationEntity) (*model.RoleEntity, error) {
 	// 系统管理类型是内置角色的显式声明，不设隐式缺省：未声明/非法值直接失败，
 	// 避免内置管理员角色被静默播种成普通类型（IsBuiltinAdmin 依赖 admin_type=admin）。
@@ -578,6 +579,7 @@ func seedRoles(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.Tena
 		entity = &model.RoleEntity{
 			TenantID:    tenant.ID,
 			AppID:       adminApp.ID,
+			Code:        model.RoleCodePlatformAdmin,
 			Name:        "管理员",
 			Description: "系统管理员，拥有所有权限",
 			Source:      model.RoleSourceBuiltin,

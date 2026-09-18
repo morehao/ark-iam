@@ -15,7 +15,7 @@ import {
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
-import { actionColumn, COUNT_COL_WIDTH, NAME_COL_WIDTH, PageContainer, SourceTag, STATUS_COL_WIDTH, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
+import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, NAME_COL_WIDTH, PageContainer, SourceTag, STATUS_COL_WIDTH, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
 import type { MenuItem, TenantAppItem, TenantRoleItem } from '@ark-iam/types'
 import {
   createTenantRole,
@@ -26,6 +26,20 @@ import {
   updateTenantRoleMenus,
 } from '../../api/role'
 import { getTenantApps } from '../../api/menu'
+
+/**
+ * 角色模板的契约值编码形状：小写字母开头，仅小写字母/数字/下划线。
+ * 与后端 `model.RoleCodePattern`（`^[a-z][a-z0-9_]*$`）同口径——正则跨语言无法共享，改一处必须同步另一处。
+ * 注意：租户侧不提供写入入口（契约值由应用角色模板下发），本常量只用于展示与校验模板角色的编码形态。
+ */
+export const ROLE_CODE_PATTERN = /^[a-z][a-z0-9_]*$/
+
+/**
+ * 编码通用提示：编码是跨系统授权契约值（仅「所属应用的客户端」拿到的 OIDC ID token groups 声明），
+ * 由**应用角色模板**统一定义并物化到各租户，租户只能授权、不能定义——故这里只解释、不提供编辑入口。
+ */
+const ROLE_CODE_HINT =
+  '角色编码是跨系统授权契约值：仅在该角色「所属应用的客户端」签发的 OIDC ID token 里作为 groups 声明下发，下游系统按「前缀 + 编码」认策略名。编码由应用角色模板统一定义（下游策略是全局命名实体、全租户共用一条），租户只能把角色授权给成员，不能改编码；自建角色不参与跨系统契约，编码为空'
 
 /** 系统管理类型展示：admin→管理员角色，normal→普通角色 */
 function adminTypeText(adminType?: string) {
@@ -107,6 +121,9 @@ export default function TenantRolePage() {
 
   const openEdit = (record: TenantRoleItem) => {
     setEditing(record)
+    // 先清掉新建态残留（如 appID 之外的字段），再按记录回显
+    form.resetFields()
+    // 编码必须回显：更新是全量覆盖，漏传会把下游认策略名的契约值清空
     form.setFieldsValue({ name: record.name, description: record.description })
     setModalOpen(true)
   }
@@ -170,6 +187,15 @@ export default function TenantRolePage() {
 
   const columns: ColumnsType<TenantRoleItem> = [
     textColumn<TenantRoleItem>({ title: '角色名称', dataIndex: 'name', width: NAME_COL_WIDTH }),
+    // 编码列：列名与后端字段名同构（DTO/DB 都是 code），等宽展示便于与下游策略名逐字比对；
+    // 自建角色编码恒为空串（不参与跨系统契约），空值给出明确文案而非 "-"
+    textColumn<TenantRoleItem>({
+      title: '编码',
+      dataIndex: 'code',
+      width: CODE_COL_WIDTH,
+      monospace: true,
+      placeholder: '自建（不参与契约）',
+    }),
     { title: '所属应用', dataIndex: 'appName', key: 'appName', width: 120, render: (_: string, r) => <Tag>{r.appName || '系统角色'}</Tag> },
     {
       title: '来源',
@@ -196,6 +222,8 @@ export default function TenantRolePage() {
         const isBuiltin = r.source === 'builtin'
         return [
           { key: 'menu', label: '菜单权限', onClick: () => void openMenuAuth(r) },
+          // 内置角色整体只读：编码是下游策略供给锚点（改名即改授权语义），后端同样拒改（100709）；
+          // 菜单授权走独立接口，不受影响
           { key: 'edit', label: '编辑', disabled: isBuiltin, onClick: () => openEdit(r) },
           {
             key: 'delete',
@@ -280,6 +308,8 @@ export default function TenantRolePage() {
         width={560}
       >
         <Form form={form} layout="vertical">
+          {/* 契约角色（带编码，由应用角色模板下发）不接受改写，故这里说明编码从何而来、租户能改什么 */}
+          <div style={{ marginBottom: 16, color: tokens.textPlaceholder, fontSize: 12 }}>{ROLE_CODE_HINT}</div>
           {/* 只读：来源 + 系统管理类型（新建固定 custom/normal，编辑按记录回显） */}
           <div style={{ display: 'flex', gap: 24, marginBottom: 20, color: tokens.textSecondary, fontSize: 13 }}>
             <span>
@@ -294,6 +324,8 @@ export default function TenantRolePage() {
               <Select placeholder="选择该角色归属的应用" options={apps.map((a) => ({ label: a.name, value: a.appID }))} />
             </Form.Item>
           )}
+          {/* 自建角色不参与跨系统契约：本弹窗没有编码输入项——契约值只能由应用角色模板下达
+              （见 ROLE_CODE_HINT）。有编码的角色恒为内置（模板角色/产品锚点），列表页已禁用编辑。 */}
           <Form.Item name="name" label="角色名称" rules={[{ required: true, message: '请输入角色名称' }]}>
             <Input placeholder="如：部门管理员（应用内唯一）" />
           </Form.Item>

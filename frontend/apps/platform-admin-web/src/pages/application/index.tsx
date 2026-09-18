@@ -4,10 +4,43 @@ import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { actionColumn, CODE_COL_WIDTH, fmtTime, IDCell, idColumn, nameColumn, PageContainer, SourceTag, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
 import { createApplication, deleteApplication, getApplicationDetail, getApplicationPageList, updateApplication } from '@ark-iam/api'
-import type { ApplicationItem } from '@ark-iam/types'
+import type { ApplicationItem, ApplicationRoleTemplateItem } from '@ark-iam/types'
 
 // 应用编码规则（与后端 model.AppCodePattern 同口径）：以小写字母开头，仅含小写字母、数字与下划线。
 const APP_CODE_PATTERN = /^[a-z][a-z0-9_]*$/
+// 角色模板的契约值编码规则（与后端 model.RoleCodePattern 同口径，跨语言无法共享正则，改一处必须同步另一处）。
+const ROLE_CODE_PATTERN = /^[a-z][a-z0-9_]*$/
+
+/**
+ * 计算本次更新相对原模板被移除的编码。
+ * 编码（而非名称）是各租户物化角色的定位值，故撤下判定只看编码。
+ */
+function removedTemplateCodes(
+  before?: ApplicationRoleTemplateItem[],
+  after?: ApplicationRoleTemplateItem[],
+): string[] {
+  if (!before?.length) return []
+  const next = new Set((after ?? []).map((item) => item.code))
+  return before.filter((item) => !next.has(item.code)).map((item) => item.code)
+}
+
+/**
+ * 撤下已下发角色的二次确认：模板移除会在**各租户**删除该角色并级联删除成员授权与菜单授权，
+ * 不可从控制台恢复（只能重新加回模板并要求租户重新授权），因此必须显式确认。
+ */
+function confirmTemplateWithdraw(codes: string[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    Modal.confirm({
+      title: '确认撤下已下发的角色？',
+      content: `将从所有已开通该应用的租户中删除角色：${codes.join('、')}，其成员授权与菜单授权一并撤销且不可恢复。`,
+      okText: '确认撤下',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false),
+    })
+  })
+}
 
 export default function ApplicationList() {
   const [data, setData] = useState<ApplicationItem[]>([])
@@ -48,7 +81,7 @@ export default function ApplicationList() {
     setEditing(null)
     form.resetFields()
     // 两个入口策略默认关闭（与后端列默认值 false 一致）；不开则对应自助通道的整体拒绝
-    form.setFieldsValue({ sort: 0, allowPersonCreateTenant: false, allowJoinByInvite: false })
+    form.setFieldsValue({ sort: 0, allowPersonCreateTenant: false, allowJoinByInvite: false, roleTemplate: [] })
     setModalOpen(true)
   }
 
@@ -65,6 +98,7 @@ export default function ApplicationList() {
       // 后端列为可空 *bool，未配置（NULL）时语义等同关闭，此处归一成 false 交给 Switch
       allowPersonCreateTenant: !!record.allowPersonCreateTenant,
       allowJoinByInvite: !!record.allowJoinByInvite,
+      roleTemplate: record.roleTemplate ?? [],
     })
     setModalOpen(true)
   }
@@ -83,6 +117,15 @@ export default function ApplicationList() {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
+      // 模板是单一事实源：从模板移除的编码会在各已开通租户里删掉该角色（连同成员与菜单授权），
+      // 属不可逆撤权，提交前必须二次确认（后端同步逻辑见 pkg/core/tenant.SyncAppRoleTemplateToTenants）
+      if (editing) {
+        const removed = removedTemplateCodes(editing.roleTemplate, values.roleTemplate)
+        if (removed.length > 0) {
+          const confirmed = await confirmTemplateWithdraw(removed)
+          if (!confirmed) return
+        }
+      }
       setSubmitLoading(true)
       if (editing) {
         await updateApplication({ appID: editing.appID, ...values })
@@ -263,6 +306,47 @@ export default function ApplicationList() {
           >
             <Switch checkedChildren="允许" unCheckedChildren="禁止" />
           </Form.Item>
+          {/*
+            应用角色模板：本应用对外提供的跨系统授权契约值（= OIDC ID token 的 groups 取值）。
+            下游按「claim_prefix + 编码」认策略名，而策略在下游是全局命名实体、全租户共用一条，
+            因此契约值只能在这里定义一次，租户侧只能授权、不能造值。
+          */}
+          <Form.List name="roleTemplate">
+            {(fields, { add, remove }) => (
+              <Form.Item
+                label="角色模板"
+                tooltip="本应用对外的契约角色：编码即下游策略名取值（下游按「claim_prefix + 编码」认策略），名称会作为租户侧角色的展示名。开通本应用的租户会自动获得这些角色；保存时会同步到所有已开通租户——从模板中移除的编码会连同其在各租户的角色与授权一并撤下。"
+              >
+                {fields.map((field) => (
+                  <Space key={field.key} align="baseline" style={{ display: 'flex', marginBottom: 8 }}>
+                    <Form.Item
+                      name={[field.name, 'code']}
+                      rules={[
+                        { required: true, message: '请输入编码' },
+                        { pattern: ROLE_CODE_PATTERN, message: '以小写字母开头，仅含小写字母、数字与下划线' },
+                      ]}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Input placeholder="编码，如 storage_admin" style={{ width: 220 }} />
+                    </Form.Item>
+                    <Form.Item
+                      name={[field.name, 'name']}
+                      rules={[{ required: true, message: '请输入名称' }]}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Input placeholder="名称，如 存储管理员" style={{ width: 220 }} />
+                    </Form.Item>
+                    <Button type="link" danger onClick={() => remove(field.name)}>
+                      移除
+                    </Button>
+                  </Space>
+                ))}
+                <Button type="dashed" block icon={<PlusOutlined />} onClick={() => add({ code: '', name: '' })}>
+                  添加契约角色
+                </Button>
+              </Form.Item>
+            )}
+          </Form.List>
         </Form>
       </Modal>
 
@@ -290,6 +374,11 @@ export default function ApplicationList() {
             <Descriptions.Item label="创建时间">{fmtTime(detail.createdAt)}</Descriptions.Item>
             <Descriptions.Item label="个人自助创建租户">{detail.allowPersonCreateTenant ? '是' : '否'}</Descriptions.Item>
             <Descriptions.Item label="允许邀请加入租户">{detail.allowJoinByInvite ? '是' : '否'}</Descriptions.Item>
+            <Descriptions.Item label="角色模板">
+              {detail.roleTemplate?.length
+                ? detail.roleTemplate.map((item) => `${item.name}（${item.code}）`).join('、')
+                : '-'}
+            </Descriptions.Item>
           </Descriptions>
         )}
       </Drawer>

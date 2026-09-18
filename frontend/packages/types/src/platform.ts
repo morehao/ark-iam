@@ -26,6 +26,18 @@ export type TenantApplicationStatus = 'enable' | 'disable'
 /** 连接器状态（后端具名类型 model.ConnectorStatus）：全局启停语义 enable/disable */
 export type ConnectorStatus = 'enable' | 'disable'
 
+/**
+ * 应用角色模板项：本应用对外提供的一个跨系统授权契约值。
+ * 下游按「claim_prefix + code」认策略名（策略在下游是全局命名实体、全租户共用一条），
+ * 故 code 由应用方在这里定义一次，租户只能"授权"、不能造值（后端 model.RoleTemplateItem）。
+ */
+export interface ApplicationRoleTemplateItem {
+  /** 契约值（= OIDC ID token 的 groups 取值）：小写字母开头，仅含小写字母、数字与下划线，模板内唯一 */
+  code: string
+  /** 展示名：物化为租户角色的名称，非空且不超过 128 字符 */
+  name: string
+}
+
 export interface ApplicationItem {
   appID: string
   code: string
@@ -38,6 +50,8 @@ export interface ApplicationItem {
   sort: number
   allowPersonCreateTenant?: boolean
   allowJoinByInvite?: boolean
+  /** 应用角色模板：本应用对外的契约值清单，开通应用时物化到各租户（后端 model.ApplicationEntity.RoleTemplate）。 */
+  roleTemplate?: ApplicationRoleTemplateItem[]
   createdAt?: number
   updatedAt?: number
 }
@@ -51,6 +65,8 @@ export interface ApplicationCreateReq {
   sort?: number
   allowPersonCreateTenant?: boolean
   allowJoinByInvite?: boolean
+  /** 应用角色模板：见 ApplicationItem.roleTemplate，留空表示无。 */
+  roleTemplate?: ApplicationRoleTemplateItem[]
 }
 
 export interface ApplicationUpdateReq {
@@ -65,6 +81,8 @@ export interface ApplicationUpdateReq {
   sort?: number
   allowPersonCreateTenant?: boolean
   allowJoinByInvite?: boolean
+  /** 应用角色模板：不传表示不修改，传 [] 表示清空，传值即全量替换（移除项会在各租户撤下该角色及其授权）。 */
+  roleTemplate?: ApplicationRoleTemplateItem[]
 }
 
 // ---------- OAuth 客户端 ----------
@@ -96,8 +114,10 @@ export interface OAuthClientDetail extends OAuthClientItem {
   backChannelLogoutURI: string
   responseTypes: string[]
   allowedOrigins: string[]
-  requirePKCE: number
-  requireAuthTime: number
+  /** 是否强制 PKCE：后端 DTO 是 Go bool，JSON 为 true/false（不是 0/1） */
+  requirePKCE: boolean
+  /** 是否要求 id_token 带 auth_time：后端 DTO 是 Go bool，JSON 为 true/false */
+  requireAuthTime: boolean
   defaultScopes: string[]
   accessTokenTTL: number
   refreshTokenTTL: number
@@ -110,12 +130,14 @@ export interface OAuthClientCreateReq {
   name: string
   redirectURIs?: string[]
   postLogoutRedirectURIs?: string[]
+  backChannelLogoutURI?: string
   grantTypes?: GrantType[]
   responseTypes?: string[]
   tokenEndpointAuthMethod?: TokenEndpointAuthMethod
   allowedOrigins?: string[]
-  requirePKCE?: number
-  requireAuthTime?: number
+  /** 后端 DTO 是 Go bool（true/false）：传 1/0 会被 binding 拒绝 */
+  requirePKCE?: boolean
+  requireAuthTime?: boolean
   defaultScopes?: string[]
   accessTokenTTL?: number
   refreshTokenTTL?: number
@@ -129,12 +151,14 @@ export interface OAuthClientUpdateReq {
   status?: ApplicationClientStatus
   redirectURIs?: string[]
   postLogoutRedirectURIs?: string[]
+  backChannelLogoutURI?: string
   grantTypes?: GrantType[]
   responseTypes?: string[]
   tokenEndpointAuthMethod?: TokenEndpointAuthMethod
   allowedOrigins?: string[]
-  requirePKCE?: number
-  requireAuthTime?: number
+  /** 后端 DTO 是 Go bool（true/false）：传 1/0 会被 binding 拒绝 */
+  requirePKCE?: boolean
+  requireAuthTime?: boolean
   defaultScopes?: string[]
   accessTokenTTL?: number
   refreshTokenTTL?: number

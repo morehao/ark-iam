@@ -1,11 +1,18 @@
 package svcapplication
 
 import (
+	"encoding/json"
+	"strings"
+
 	"github.com/gin-gonic/gin"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 
 	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/core/tenant"
 	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtoapplication"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -41,12 +48,58 @@ func isValidAppStatus(status model.AppStatus) bool {
 	}
 }
 
+// maxRoleTemplateItems 单个应用的角色模板条目上限：模板是"本应用对外提供的契约值"清单，
+// 实际只有个位数；设上限只为拦住把整张下游策略表灌进来的误用。
+const maxRoleTemplateItems = 64
+
+// maxRoleTemplateItemNameLen 模板角色名称长度上限（对齐 role.name 列宽 varchar(128)）。
+const maxRoleTemplateItemNameLen = 128
+
+// buildRoleTemplate 校验并归一化应用角色模板（名称去空白），编码成列存的 JSON 数组。
+// 返回 ok=false 表示入参非法：条目数超限、code 形状不符 model.RoleCodePattern、code 在模板内重复、
+// 名称为空或超长、或声明了产品锚点编码（锚点由开通链路按常量写入，模板占用同码会改写锚点角色名称）。
+// json.Marshal 对结构体切片不会失败，故此处不存在被折叠成"非法"的系统错误。
+func buildRoleTemplate(items []model.RoleTemplateItem) (datatypes.JSON, bool) {
+	if len(items) == 0 {
+		return datatypes.JSON([]byte("[]")), true
+	}
+	if len(items) > maxRoleTemplateItems {
+		return nil, false
+	}
+	seen := make(map[model.RoleCode]struct{}, len(items))
+	normalized := make(model.RoleTemplateItemList, 0, len(items))
+	for _, item := range items {
+		name := strings.TrimSpace(item.Name)
+		if !model.IsValidRoleCode(item.Code) || model.IsProductAnchorRoleCode(item.Code) {
+			return nil, false
+		}
+		if name == "" || len(name) > maxRoleTemplateItemNameLen {
+			return nil, false
+		}
+		if _, ok := seen[item.Code]; ok {
+			return nil, false
+		}
+		seen[item.Code] = struct{}{}
+		normalized = append(normalized, model.RoleTemplateItem{Code: item.Code, Name: name})
+	}
+	raw, err := json.Marshal(normalized)
+	if err != nil {
+		return nil, false
+	}
+	return datatypes.JSON(raw), true
+}
+
 func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.ApplicationCreateReq) (*dtoapplication.ApplicationCreateResp, error) {
 	// 编码规则（model.AppCodePattern）：小写字母开头，仅含小写字母/数字/下划线。
 	// 非法编码（如连字符）在此拦截，避免落库后再靠人工纠正。
 	if !model.IsValidAppCode(req.Code) {
 		glog.Errorf(ctx, "[svcapplication.Create] 非法应用编码, req:%s", gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationCodeInvalidError)
+	}
+	roleTemplate, ok := buildRoleTemplate(req.RoleTemplate)
+	if !ok {
+		glog.Errorf(ctx, "[svcapplication.Create] 非法应用角色模板, req:%s", gutil.ToJsonString(req))
+		return nil, code.GetError(code.ApplicationRoleTemplateInvalidError)
 	}
 	entity := &model.ApplicationEntity{
 		Code:                    req.Code,
@@ -57,6 +110,7 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.Applicat
 		Source:                  model.AppSourceThirdParty, // 控制台创建的应用恒为第三方接入，builtin/first_party 仅由种子与运维产生
 		AllowPersonCreateTenant: req.AllowPersonCreateTenant,
 		AllowJoinByInvite:       req.AllowJoinByInvite,
+		RoleTemplate:            roleTemplate,
 		Sort:                    req.Sort,
 		CreatedBy:               gincontext.GetUserIDString(ctx),
 	}
@@ -128,8 +182,32 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.Applicat
 	if req.AllowJoinByInvite != nil {
 		updateMap["allow_join_by_invite"] = *req.AllowJoinByInvite
 	}
-	if err := dao.NewApplicationDao().UpdateMap(ctx, req.AppID, updateMap); err != nil {
-		glog.Errorf(ctx, "[svcapplication.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+	// 角色模板：null 表示不修改（与本结构其余可选字段一致），[] 表示清空，传值即全量替换。
+	// 模板是契约值的唯一来源，改动后必须同步到所有已订阅该应用的租户（新增/改名 → 物化角色，
+	// 移除 → 撤下角色），故与本次更新同事务：模板落库与租户侧物化要么都生效、要么都不生效。
+	templateChanged := req.RoleTemplate != nil
+	if templateChanged {
+		roleTemplate, ok := buildRoleTemplate(req.RoleTemplate)
+		if !ok {
+			glog.Errorf(ctx, "[svcapplication.Update] 非法应用角色模板, req:%s", gutil.ToJsonString(req))
+			return code.GetError(code.ApplicationRoleTemplateInvalidError)
+		}
+		updateMap["role_template"] = roleTemplate
+	}
+	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := dao.NewApplicationDao().WithTx(tx).UpdateMap(ctx, req.AppID, updateMap); err != nil {
+			return err
+		}
+		if !templateChanged {
+			return nil
+		}
+		return tenant.SyncAppRoleTemplateToTenants(ctx, tx, &tenant.SyncAppRoleTemplateToTenantsReq{
+			AppID:     req.AppID,
+			CreatedBy: gincontext.GetUserIDString(ctx),
+		})
+	})
+	if txErr != nil {
+		glog.Errorf(ctx, "[svcapplication.Update] update app/role template fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationUpdateError)
 	}
 	return nil
@@ -173,6 +251,7 @@ func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.Applicat
 		Sort:                    entity.Sort,
 		AllowPersonCreateTenant: entity.AllowPersonCreateTenant,
 		AllowJoinByInvite:       entity.AllowJoinByInvite,
+		RoleTemplate:            entity.RoleTemplateList(),
 		CreatedAt:               entity.CreatedAt.Unix(),
 	}, nil
 }
@@ -213,8 +292,10 @@ func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.Applic
 			Sort:                    v.Sort,
 			AllowPersonCreateTenant: v.AllowPersonCreateTenant,
 			AllowJoinByInvite:       v.AllowJoinByInvite,
-			CreatedAt:               v.CreatedAt.Unix(),
-			UpdatedAt:               v.UpdatedAt.Unix(),
+			// 列表带上角色模板：编辑弹窗以列表行为初值，缺了它会把"未修改"误判成"清空"
+			RoleTemplate: v.RoleTemplateList(),
+			CreatedAt:    v.CreatedAt.Unix(),
+			UpdatedAt:    v.UpdatedAt.Unix(),
 		})
 	}
 	return &dtoapplication.ApplicationPageListResp{List: items, Total: total}, nil

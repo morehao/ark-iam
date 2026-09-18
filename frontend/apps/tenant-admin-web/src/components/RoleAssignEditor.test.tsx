@@ -31,14 +31,15 @@ const assignedRoles: TenantUserRoleItem[] = [
 ]
 
 const pageRoles: TenantRoleItem[] = [
-  { roleID: 'r1', appID: 'app1', appName: '平台管理后台', name: '租户管理员', description: '', adminType: 'normal', memberCount: 0, menuCount: 0 },
-  { roleID: 'r2', appID: 'app1', appName: '平台管理后台', name: '只读成员', description: '', adminType: 'normal', memberCount: 0, menuCount: 0 },
+  { roleID: 'r1', appID: 'app1', appName: '平台管理后台', code: 'tenant_admin', name: '租户管理员', description: '', adminType: 'normal', memberCount: 0, menuCount: 0 },
+  { roleID: 'r2', appID: 'app1', appName: '平台管理后台', code: 'readonly_member', name: '只读成员', description: '', adminType: 'normal', memberCount: 0, menuCount: 0 },
 ]
 
 const searchedRole: TenantRoleItem = {
   roleID: 'r9',
   appID: 'app1',
   appName: '平台管理后台',
+  code: 'ops_admin',
   name: '运维管理员',
   description: '',
   adminType: 'normal',

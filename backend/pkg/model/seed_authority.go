@@ -101,6 +101,8 @@ var SeedFieldAuthorities = []SeedFieldAuthority{
 	{SeedEntityApplication, "sort", SeedFieldCreateOnly},
 	{SeedEntityApplication, "logo_url", SeedFieldCreateOnly},
 	{SeedEntityApplication, "homepage_url", SeedFieldCreateOnly},
+	// 应用角色模板：部署事实（该应用对外提供哪些跨系统契约值），归运维；种子只在创建时给初值，不回写。
+	{SeedEntityApplication, "role_template", SeedFieldCreateOnly},
 	// 内置应用的 OAuth 客户端：code 是种子定位键（migrate_once 处理历史编码改名），app_id 是归属应用
 	// ——平台管理后台客户端挂 platform_admin、租户管理后台客户端挂 tenant_admin，控制台不提供改归属的
 	// 入口，故归种子收敛（历史版本把两个客户端都挂在 platform_admin，靠这条声明自愈）。
@@ -133,10 +135,14 @@ var SeedFieldAuthorities = []SeedFieldAuthority{
 	{SeedEntityMenu, "type", SeedFieldCreateOnly},
 	{SeedEntityMenu, "visibility", SeedFieldCreateOnly},
 	{SeedEntityMenu, "status", SeedFieldCreateOnly},
-	// 内置角色：admin_type 是系统管理能力的安全不变式（归种子），名称/描述归运维。
+	// 内置角色：admin_type 是系统管理能力的安全不变式（归种子）。名称/描述/编码归"定义方"而非种子回写：
+	// 编码是下游授权契约值（OIDC groups 取值），只有两个来源——产品锚点（种子定义，如 tenant_admin）
+	// 与应用角色模板（application.role_template，开通应用时物化到各租户）；租户控制台对角色整体只读、
+	// 没有写入入口，模板改名由 SyncAppRoleTemplateToTenants 同步（不是种子回写）。
 	{SeedEntityRole, "admin_type", SeedFieldReconcile},
 	{SeedEntityRole, "name", SeedFieldCreateOnly},
 	{SeedEntityRole, "description", SeedFieldCreateOnly},
+	{SeedEntityRole, "code", SeedFieldCreateOnly},
 	// 种子管理员：口令绝不覆盖（重置走专用接口），source 是内置标记（安全不变式）。
 	{SeedEntityPerson, "password_encrypted", SeedFieldCreateOnly},
 	{SeedEntityUser, "source", SeedFieldReconcile},

@@ -153,8 +153,14 @@ func (c *OIDCClient) IsScopeAllowed(scope string) bool {
 	return false
 }
 
+// IDTokenUserinfoClaimsAssertion 声明「把 userinfo 声明合并进 ID token」。
+//
+// 必须为 true：zitadel 在 false 时会从 ID token 的 scope 里裁掉 profile/email/phone
+// （见 pkg/op/token.go 的 removeUserinfoScopes），ID token 只剩 sub；而本系统依赖 profile
+// scope 承载 groups（角色编码，见 PersistentStore.appendRoleGroupClaims）这类跨系统授权声明
+// ——RP 通常只校验 ID token 而不回查 userinfo，被裁掉就等于授权信息静默丢失。
 func (c *OIDCClient) IDTokenUserinfoClaimsAssertion() bool {
-	return false
+	return true
 }
 
 func (c *OIDCClient) ClockSkew() time.Duration {

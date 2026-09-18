@@ -225,14 +225,22 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/v1/platform/applications` | 创建应用（`code` 为下划线连接：小写字母开头，仅含小写字母/数字/下划线，如 `my_app`；非法编码报 `100748`） |
+| POST | `/v1/platform/applications` | 创建应用（`code` 为下划线连接：小写字母开头，仅含小写字母/数字/下划线，如 `my_app`；非法编码报 `100748`。可选 `roleTemplate`：**应用角色模板** `[{code,name}]`，即本应用对外的跨系统授权契约值（下游策略名取值），开通本应用的租户会自动获得这些角色；`code` 形状非法/模板内重复/名称为空或超长/占用产品锚点编码报 `100765`） |
 | GET | `/v1/platform/applications` | 应用分页 |
-| GET/PUT/DELETE | `/v1/platform/applications/{appID}` | 应用详情/更新/删除（内置应用 `source=builtin` 禁删报 `100746`：平台管理后台 / 租户管理后台由平台版本交付；其编码不可改报 `100749`：控制台菜单入口按它定位，改名即失去侧边栏。自建应用可改编码，非法值报 `100748`） |
+| GET/PUT/DELETE | `/v1/platform/applications/{appID}` | 应用详情/更新/删除（内置应用 `source=builtin` 禁删报 `100746`：平台管理后台 / 租户管理后台由平台版本交付；其编码不可改报 `100749`：控制台菜单入口按它定位，改名即失去侧边栏。自建应用可改编码，非法值报 `100748`。`roleTemplate` 传 `null` 不修改、传 `[]` 清空、传值全量替换（全量语义见下）；形状非法报 `100765`） |
 | POST | `/v1/platform/application-clients` | 创建 OAuth 客户端 |
 | GET | `/v1/platform/application-clients` | 客户端分页 |
 | GET/PUT/DELETE | `/v1/platform/application-clients/{applicationClientID}` | 详情/更新/删除（内置客户端 `source=builtin` 禁删报 `100820`，其编码不可改报 `100823`：`client_id` 是网关 aud 白名单与前端构建期默认值的来源） |
 | GET/POST | `/v1/platform/application-clients/{applicationClientID}/secrets` | 密钥列表/创建 |
 | DELETE | `/v1/platform/application-clients/{applicationClientID}/secrets/{secretID}` | 删除密钥 |
+
+> **`roleTemplate` 的全量语义（撤权操作）**：模板是应用契约角色的**单一事实源**，更新即全量替换——
+> 新增的编码会在**所有已开通该应用的租户**里物化出新角色（`source=builtin`、`admin_type=normal`，租户侧只读）；
+> 名称变化会同步回写；**从模板移除的编码会连同该角色在各租户的成员授权（`user_role`）与菜单授权（`role_menu`）
+> 一并删除**，且不可从控制台恢复（只能重新加回模板并要求租户重新授权）——平台控制台提交前二次确认，
+> 直接调 API 的一方需自行确认。若某租户存在同码的**自建**存量角色（历史数据），同步只告警跳过、不接管。
+> 约束：≤64 项、`code` 形状同角色编码（`^[a-z][a-z0-9_]*$`）且模板内唯一、`name` 非空且 ≤128 字符、
+> 不得使用产品锚点编码（`platform_admin`/`tenant_admin`），违反报 `100765`。
 
 ### 5.5 域名
 
@@ -286,11 +294,11 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | GET | `/v1/tenant/invites` | 邀请分页 |
 | DELETE | `/v1/tenant/invites/{inviteID}` | 撤销邀请 |
 | GET | `/v1/tenant/apps` | 租户订阅的启用应用列表（角色归属/菜单授权的应用选项，含系统内置应用） |
-| POST | `/v1/tenant/roles` | 创建角色（**appID 必选**，角色从属于应用，名称应用内唯一；角色无业务编码，以名称作为应用内唯一标识） |
-| GET | `/v1/tenant/roles` | 角色分页（?appID=&keyword=&unassigned=，含成员数/菜单数/所属应用名；`unassigned=true` 只查未归属应用的系统角色，供角色授权下拉按名称服务端搜索） |
-| GET | `/v1/tenant/roles/{roleID}` | 角色详情 |
-| PUT | `/v1/tenant/roles/{roleID}` | 更新角色 |
-| DELETE | `/v1/tenant/roles/{roleID}` | 删除角色（级联清理成员/菜单关联） |
+| POST | `/v1/tenant/roles` | 创建角色（**appID 必选**，角色从属于已订阅应用，名称应用内唯一；**请求体不含 `code`**——跨系统授权契约值只能由应用角色模板下发，自建角色编码恒为空串、不进入 OIDC `groups` 声明，见 `system-design.md` §5.4。重名报 `100700`） |
+| GET | `/v1/tenant/roles` | 角色分页（?appID=&keyword=&unassigned=，含成员数/菜单数/所属应用名/编码；`keyword` 同时模糊匹配名称与编码；`unassigned=true` 只查未归属应用的系统角色，供角色授权下拉按名称服务端搜索） |
+| GET | `/v1/tenant/roles/{roleID}` | 角色详情（含 `code`：模板角色/产品锚点非空，自建角色为空串） |
+| PUT | `/v1/tenant/roles/{roleID}` | 更新角色（**仅自建角色，且只改名称/描述**：重名报 `100702`；请求体同样不含 `code`。**内置角色（应用角色模板物化 + 产品锚点）整体只读**，报 `100709`——其名称与编码均由应用方定义） |
+| DELETE | `/v1/tenant/roles/{roleID}` | 删除角色（级联清理成员/菜单关联；**内置角色禁止删除**，报 `100706`） |
 | GET | `/v1/tenant/roles/{roleID}/menus` | 角色菜单授权回显（**所属应用的菜单树** + 已授权ID，角色侧授权入口） |
 | PUT | `/v1/tenant/roles/{roleID}/menus` | 全量替换角色菜单授权 |
 | POST | `/v1/tenant/departments` | 创建部门节点 |
