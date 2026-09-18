@@ -173,8 +173,8 @@ components:
 | 字段语义 | 组件 | 值 → 文案(Tag 色) |
 |---|---|---|
 | 启用/停用（status） | `EnableTag` | `enable` → 启用（`success`）；`disable` → 停用（`default`）；其余原样回显。**只认这一套取值**，不做数字/历史值兼容 |
-| 挂起（isSuspended / status） | `SuspendedTag` | 1 / true / `suspended` → 挂起（`error`）；0 / false / `active` → 正常（`success`）；兼容布尔字段与 status 枚举两种后端形态 |
-| 验证（isVerified） | `VerifiedTag` | 1 → 已验证（`success`）；0 → 未验证（`warning`） |
+| 挂起（status） | `SuspendedTag` | `suspended` → 挂起（`error`）；`active` → 正常（`success`）。**只认这一套取值**，不兼容历史 `isSuspended` 的 1/true/0/false（保留兼容会掩盖读错字段的缺陷） |
+| 验证（verificationStatus） | `VerifiedTag` | `verified` → 已验证（`success`）；`unverified` → 未验证（`warning`）。**只认这一套取值**，不兼容历史 `isVerified` 的 1/0 |
 | 会话（isActive） | 内联语义色 | true → 活跃（`success`）；false → 已失效（`default`） |
 | API Key 有效 | 内联语义色 | 有效（`success`）；已吊销（`error`） |
 
@@ -227,8 +227,8 @@ PageContainer(title, description, extra=刷新 + 主操作[type=primary])
 - 时间列一律用 `timeColumn<T>({ title, dataIndex })`（或 `TimeCell`），**禁止页面自写列宽**。历史 bug 根因：各页手写 150/160/170，而完整时间串 `2026-09-03 17:19:46` 在 14px + 全站 `tabular-nums` 下实测 146.06px，加 antd 单元格左右各 16px 内边距共需 **178.06px** → 会在唯一的空格处折成「日期 / 时间」两行。
 - 宽度由常量给：绝对时间 `TIME_COL_WIDTH = 180`；相对时间 `TIME_COL_WIDTH_RELATIVE = 120`。
 - `TimeCell` 的 `whiteSpace: nowrap` 与列宽是一对：nowrap 保证任何布局下都不折行，列宽保证不溢出串列，**两者必须同时生效**（故不要绕过组件直接 `fmtTime` + 自定宽度）。
-- 空值语义交给 `placeholder`：`永不过期`（API Key / OAuth Secret 过期时间）、`未验证`（域名验证时间）、`从未使用`（最后使用 / 最近使用），其余默认 `-`。
-- 次要时间字段（`最后使用` / `最近使用` / `登录时间`）用 `relative: true`：展示「3 天前」，悬浮 Tooltip 给完整时间；审计主字段（`创建时间`）一律绝对时间。
+- 空值语义交给 `placeholder`：`永不过期`（API Key / OAuth Secret 过期时间），其余默认 `-`。（`未验证` 现为域名**状态** Tag，见 `status.tsx`；「最后使用」类时间列已随 `api_key` / `user_identity` 的 `last_used_at` 下线。）
+- 次要时间字段（`登录时间`）用 `relative: true`：展示「3 天前」，悬浮 Tooltip 给完整时间；审计主字段（`创建时间`）一律绝对时间。
 - **列表时间列必须成对**：所有列表都有「创建时间」列；记录可被编辑/状态流转的业务主体（租户、应用、OAuth 客户端、域名、租户应用、菜单、角色、成员、服务账号、部门、API Key）还必须有「更新时间」列，且后端列表 DTO 同步回传 `updatedAt`。纯追加型 / 不可变记录（审计日志、登录日志、OAuth Secret、第三方身份绑定）不设「更新时间」列——其 `updated_at` 恒等于 `created_at`；这类记录若已有事件时间列（登录日志的「登录时间」）即视为已表达创建语义，不重复加「创建时间」。两列均放状态列之后、操作列之前（`scroll.x` 由 `tableScrollX(columns)` 自动跟随，无需手改）。
 
 ### 7.4 登录页（login-web 凭证页 + ui LoginPage 引导页）

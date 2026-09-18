@@ -40,7 +40,7 @@ func TestConnectorAndUserIdentityModelDoNotKeepLegacyCompatFields(t *testing.T) 
 
 func TestUserModelUsesPersonCenteredFields(t *testing.T) {
 	userType := reflect.TypeOf(UserEntity{})
-	for _, fieldName := range []string{"PersonID", "IsOwner", "JoinedAt"} {
+	for _, fieldName := range []string{"PersonID", "OwnerType", "JoinedAt"} {
 		if _, ok := userType.FieldByName(fieldName); !ok {
 			t.Fatalf("user model missing field: %s", fieldName)
 		}
@@ -54,7 +54,7 @@ func TestUserModelUsesPersonCenteredFields(t *testing.T) {
 
 func TestUserIdentityModelUsesPersonCenteredFields(t *testing.T) {
 	identityType := reflect.TypeOf(UserIdentityEntity{})
-	for _, fieldName := range []string{"PersonID", "Provider", "LastUsedAt"} {
+	for _, fieldName := range []string{"PersonID", "Provider"} {
 		if _, ok := identityType.FieldByName(fieldName); !ok {
 			t.Fatalf("user identity model missing field: %s", fieldName)
 		}
@@ -94,7 +94,6 @@ func TestBusinessTimeFieldsUseTimePointerInsteadOfDeletedAt(t *testing.T) {
 		{name: "person last sign in", modelType: reflect.TypeOf(PersonEntity{}), fieldName: "LastSignInAt"},
 		{name: "user joined at", modelType: reflect.TypeOf(UserEntity{}), fieldName: "JoinedAt"},
 		{name: "user last sign in", modelType: reflect.TypeOf(UserEntity{}), fieldName: "LastSignInAt"},
-		{name: "user identity last used", modelType: reflect.TypeOf(UserIdentityEntity{}), fieldName: "LastUsedAt"},
 		{name: "refresh token expires at", modelType: reflect.TypeOf(RefreshTokenEntity{}), fieldName: "ExpiredAt"},
 		{name: "refresh token revoked at", modelType: reflect.TypeOf(RefreshTokenEntity{}), fieldName: "RevokedAt"},
 	}

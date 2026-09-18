@@ -1,5 +1,7 @@
 package objauth
 
+import "github.com/morehao/ark-iam/pkg/model"
+
 type LoginReq struct {
 	Identifier string `json:"identifier" form:"identifier"` // 用户名/邮箱/手机号
 	Password   string `json:"password" form:"password"`     // 密码
@@ -26,11 +28,11 @@ type TokenInfo struct {
 }
 
 type TenantOption struct {
-	TenantID string `json:"tenantID"` // 租户ID
-	Name     string `json:"name"`     // 租户名称
-	Tag      string `json:"tag"`      // 租户标识
-	UserID   string `json:"userID"`   // 用户ID
-	IsOwner  bool   `json:"isOwner"`  // 是否租户拥有者
+	TenantID  string          `json:"tenantID"`  // 租户ID
+	Name      string          `json:"name"`      // 租户名称
+	Tag       string          `json:"tag"`       // 租户标识
+	UserID    string          `json:"userID"`    // 用户ID
+	OwnerType model.OwnerType `json:"ownerType"` // 租户拥有者类型(owner/normal)
 }
 
 type UserInfo struct {
@@ -50,8 +52,8 @@ type PersonInfo struct {
 }
 
 type TenantUserInfo struct {
-	UserID   string `json:"userID"`   // 用户ID
-	TenantID string `json:"tenantID"` // 租户ID
-	Name     string `json:"name"`     // 姓名
-	IsOwner  bool   `json:"isOwner"`  // 是否租户拥有者
+	UserID    string          `json:"userID"`    // 用户ID
+	TenantID  string          `json:"tenantID"`  // 租户ID
+	Name      string          `json:"name"`      // 姓名
+	OwnerType model.OwnerType `json:"ownerType"` // 租户拥有者类型(owner/normal)
 }

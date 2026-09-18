@@ -20,10 +20,12 @@ import (
 // 因此协议层若漏声明作用域，这里会以 ErrTenantScopeMissing 失败，
 // 而不是在线上退化成"静默跨租户读"或"静默 0 行 UPDATE"。
 //
-// 覆盖三类真实形态：
+// 覆盖两类真实形态：
 //  1. 按全局唯一键反查（client_id / API Key 摘要）→ 跨全部租户；
-//  2. 按行所属租户写回（last_used_at）→ 指定该租户；
-//  3. 按自然人列出成员关系（私有 claim 的 tenant_id）→ 跨全部租户。
+//  2. 按自然人列出成员关系（私有 claim 的 tenant_id）→ 跨全部租户。
+//
+// 注：原第 3 类「按行所属租户写回 last_used_at」的用例随 `api_key.last_used_at` 下线一并删除
+// （P4：该列与降频写回块已整体移除，协议层不再有行级写回路径）。
 func TestProtocolStoreDeclaresTenantScope(t *testing.T) {
 	db := testutil.SetupSQLite(t,
 		&model.ApplicationClientEntity{},
@@ -48,16 +50,12 @@ func TestProtocolStoreDeclaresTenantScope(t *testing.T) {
 		Name:        "probe-key",
 		KeyHash:     credential.HashSecret(rawAPIKey),
 		KeyPrefix:   "probe-r",
-		// sqlite 对 not null json 列需显式播种值（同 AGENTS「服务层数据访问与测试约定」）
-		Scope: []byte("{}"),
 	}).Error)
 	require.NoError(t, db.Create(&model.UserEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "u-a"}},
 		TenantID:   "t-a",
 		PersonID:   "p-probe",
 		UserType:   model.UserTypeMember,
-		Profile:    []byte("{}"),
-		CustomData: []byte("{}"),
 		JoinedAt:   &probeNow,
 	}).Error)
 
@@ -82,14 +80,8 @@ func TestProtocolStoreDeclaresTenantScope(t *testing.T) {
 	require.NotNil(t, apiKey)
 	require.Equal(t, "t-a", apiKey.TenantID)
 
-	// 2. 行级写回：last_used_at 必须真的落库（显式指定该行所属租户 F，缺声明会命中 0 行且不报错）
-	var stored model.ApiKeyEntity
-	require.NoError(t, db.WithContext(dbclient.CrossTenantContext(context.Background())).
-		Where("id = ?", "ak-a").First(&stored).Error)
-	require.True(t, stored.LastUsedAt.Valid, "last_used_at 必须写回（显式租户作用域）")
-
-	// 3. 自然人范围：私有 claim 的 tenant_id（多租户列表在协议层可见）
-	claims, err := store.GetPrivateClaimsFromScopes(protocolCtx, BuildSubject("p-probe"), "probe_client_b", []string{"openid"})
+	// 2. 自然人范围：私有 claim 的 tenant_id（多租户列表在协议层可见）
+	claims, err := store.GetPrivateClaimsFromScopes(protocolCtx, BuildSubject("p-probe"), "probe_client_b", []string{model.ScopeOpenID})
 	require.NoError(t, err)
 	require.Equal(t, "t-a", claims["tenant_id"])
 }

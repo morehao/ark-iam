@@ -60,12 +60,12 @@ func TestSeedIamSQLite(t *testing.T) {
 	assertCount("tenant", 1)
 	assertCount("application", 2)
 	assertCount("role", 2)
-	assertCount("menu", 15)
+	assertCount("menu", 14)
 	assertCount("person", 1)
 	assertCount("tenant_user", 1)
 	assertCount("application_client", 2)
 	assertCount("user_role", 2)
-	assertCount("role_menu", 15)
+	assertCount("role_menu", 14)
 	assertCount("tenant_application", 2)
 	assertCount("department", 1)
 	assertCount("department_user", 1)
@@ -148,7 +148,7 @@ func TestSeedIamSQLite(t *testing.T) {
 		t.Fatalf("platform tenant not found: %v", err)
 	}
 	var adminUser model.UserEntity
-	if err := db.Where("tenant_id = ? AND is_owner = ?", tenant.ID, true).First(&adminUser).Error; err != nil {
+	if err := db.Where("tenant_id = ? AND owner_type = ?", tenant.ID, model.OwnerTypeOwner).First(&adminUser).Error; err != nil {
 		t.Fatalf("admin user not found: %v", err)
 	}
 
@@ -212,7 +212,6 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 		{code: "oauth-client", name: "OAuth客户端", parentCode: "grp-app", sort: 2},
 		{code: "grp-platform", name: "平台管理", sort: 4, dir: true},
 		{code: "menu", name: "菜单管理", parentCode: "grp-platform", sort: 1},
-		{code: "log", name: "审计日志", parentCode: "grp-platform", sort: 2},
 	}
 
 	var menus []model.MenuEntity
@@ -296,8 +295,8 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 	if err := db.Where("role_id = ?", adminRole.ID).Find(&adminMenuLinks).Error; err != nil {
 		t.Fatalf("query admin role_menu: %v", err)
 	}
-	if len(adminMenuLinks) != 11 {
-		t.Fatalf("admin role_menu count: want 11, got %d", len(adminMenuLinks))
+	if len(adminMenuLinks) != 10 {
+		t.Fatalf("admin role_menu count: want 10, got %d", len(adminMenuLinks))
 	}
 	// 授权集合涉及平台应用与租户管理后台两个应用的菜单，用全量映射解析
 	var allMenus []model.MenuEntity
@@ -316,7 +315,7 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 			}
 		}
 	}
-	for _, want := range []string{"dashboard", "menu", "tenant", "application", "tenant-application", "oauth-client", "domain", "log", "department", "tenant-user", "tenant-role"} {
+	for _, want := range []string{"dashboard", "menu", "tenant", "application", "tenant-application", "oauth-client", "domain", "department", "tenant-user", "tenant-role"} {
 		if !granted[want] {
 			t.Errorf("admin role missing menu grant %s", want)
 		}
@@ -632,8 +631,8 @@ func TestSeedIamKeepsOperatorMenuEdits(t *testing.T) {
 	if err := db.Model(&model.MenuEntity{}).Where("app_id = ?", adminApp.ID).Count(&total).Error; err != nil {
 		t.Fatalf("count menus: %v", err)
 	}
-	if total != 11 {
-		t.Errorf("平台应用菜单数 = %d, want 11（改菜单不得触发种子重建行）", total)
+	if total != 10 {
+		t.Errorf("平台应用菜单数 = %d, want 10（改菜单不得触发种子重建行）", total)
 	}
 }
 

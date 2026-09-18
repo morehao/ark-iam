@@ -21,7 +21,8 @@ func menuVisible(entity *model.MenuEntity) bool {
 	return entity != nil && entity.ID != ""
 }
 
-// validateMenuEnums 校验菜单字典枚举合法值：Type/Status/Visibility 必须命中间断白名单常量。
+// validateMenuEnums 校验菜单字典枚举合法值：Type/Status/Visibility 必须命中白名单常量；
+// Hidden/ExternalLink/KeepAlive 三个开关允许空串（＝调用方未提供，按 disable 归一）。
 func validateMenuEnums(req *objpermission.MenuBaseInfo) bool {
 	switch req.Type {
 	case model.MenuTypeDirectory, model.MenuTypeMenu, model.MenuTypeButton:
@@ -38,7 +39,37 @@ func validateMenuEnums(req *objpermission.MenuBaseInfo) bool {
 	default:
 		return false
 	}
+	switch req.Hidden {
+	case "", model.MenuHiddenFlagEnable, model.MenuHiddenFlagDisable:
+	default:
+		return false
+	}
+	switch req.ExternalLink {
+	case "", model.MenuExternalLinkFlagEnable, model.MenuExternalLinkFlagDisable:
+	default:
+		return false
+	}
+	switch req.KeepAlive {
+	case "", model.MenuKeepAliveFlagEnable, model.MenuKeepAliveFlagDisable:
+	default:
+		return false
+	}
 	return true
+}
+
+// normalizeMenuSwitches 把未提供的开关（空串）归一为 disable：列默认值即 disable，
+// 而更新走 UpdateMap（map 不经过 GORM 的默认值省略），空串直写会落成脏枚举值；
+// 归一后语义与原 bool 字段的 false（未勾选）完全一致。
+func normalizeMenuSwitches(req *objpermission.MenuBaseInfo) {
+	if req.Hidden == "" {
+		req.Hidden = model.MenuHiddenFlagDisable
+	}
+	if req.ExternalLink == "" {
+		req.ExternalLink = model.MenuExternalLinkFlagDisable
+	}
+	if req.KeepAlive == "" {
+		req.KeepAlive = model.MenuKeepAliveFlagDisable
+	}
 }
 
 type MenuSvc interface {
@@ -63,6 +94,7 @@ func (svc *menuSvc) Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (
 	if !validateMenuEnums(&req.MenuBaseInfo) {
 		return nil, code.GetError(code.MenuCreateError)
 	}
+	normalizeMenuSwitches(&req.MenuBaseInfo)
 	if req.Code == "" {
 		glog.Errorf(ctx, "[svcpermission.CreateMenu] 菜单编码不得为空, req:%s", gutil.ToJsonString(req))
 		return nil, code.GetError(code.MenuCreateError)
@@ -200,6 +232,7 @@ func (svc *menuSvc) Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) e
 	if !validateMenuEnums(&req.MenuBaseInfo) {
 		return code.GetError(code.MenuUpdateError)
 	}
+	normalizeMenuSwitches(&req.MenuBaseInfo)
 	// 菜单编码可改（含内置菜单）：种子按 seed_key 认行，改 code/app_id 都不会导致重建行。
 	// 仅要求非空——应用内唯一由唯一索引 uk_menu_app_code_active 兜底（撞重返回本领域更新错误码）。
 	if req.Code == "" {

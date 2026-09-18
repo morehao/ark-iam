@@ -3,7 +3,6 @@ package svctenantapplication
 import (
 	"testing"
 
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	"github.com/morehao/ark-iam/pkg/code"
@@ -28,15 +27,13 @@ func seedAppEntityWithSource(t *testing.T, db *gorm.DB, appID, name string, sour
 	}
 }
 
-// seedTenantAppEntity 播种一条租户应用订阅（not null JSON 列显式给值，sqlite 不接受 NULL）。
+// seedTenantAppEntity 播种一条租户应用订阅。
 func seedTenantAppEntity(t *testing.T, db *gorm.DB, tenantID, appID string) *model.TenantApplicationEntity {
 	t.Helper()
 	entity := &model.TenantApplicationEntity{
-		TenantID:     tenantID,
-		AppID:        appID,
-		Status:       model.TenantApplicationStatusEnable,
-		Config:       datatypes.JSON([]byte(`{}`)),
-		GrantedScope: datatypes.JSON([]byte(`[]`)),
+		TenantID: tenantID,
+		AppID:    appID,
+		Status:   model.TenantApplicationStatusEnable,
 	}
 	if err := db.Create(entity).Error; err != nil {
 		t.Fatalf("seed tenant_application(%s,%s): %v", tenantID, appID, err)

@@ -14,7 +14,7 @@ var defaultConnectorFactoriesOnce = func() []dtoconnector.ConnectorFactoryResp {
 			Provider:      connectorProviderGoogle,
 			DisplayName:   "Google",
 			IsStandard:    true,
-			DefaultScopes: []string{"openid", "profile", "email"},
+			DefaultScopes: []string{model.ScopeOpenID, model.ScopeProfile, model.ScopeEmail},
 			Capabilities:  []model.ConnectorCapability{connectorCapabilityAuthorize, connectorCapabilityCallback, connectorCapabilityClaimMapping, connectorCapabilityDomainPolicy},
 			ConfigSchema: map[string]any{
 				"type":     "object",
@@ -40,7 +40,7 @@ var defaultConnectorFactoriesOnce = func() []dtoconnector.ConnectorFactoryResp {
 			Provider:      connectorProviderMicrosoft,
 			DisplayName:   "Microsoft Entra ID",
 			IsStandard:    true,
-			DefaultScopes: []string{"openid", "profile", "email"},
+			DefaultScopes: []string{model.ScopeOpenID, model.ScopeProfile, model.ScopeEmail},
 			Capabilities:  []model.ConnectorCapability{connectorCapabilityAuthorize, connectorCapabilityCallback, connectorCapabilityClaimMapping, connectorCapabilityDomainPolicy},
 			ConfigSchema: map[string]any{
 				"type":     "object",

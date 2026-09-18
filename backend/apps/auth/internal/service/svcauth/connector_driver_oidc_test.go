@@ -107,9 +107,7 @@ func TestOIDCDriverValidateConfigMatchesSharedValidator(t *testing.T) {
 		ClientID:     "client-id",
 		ClientSecret: "client-secret",
 		RedirectURI:  "https://console.example.com/callback",
-		Raw: map[string]any{
-			"tenant": "common",
-		},
+		Tenant:       "common",
 	}
 
 	driver := &OIDCDriver{}

@@ -18,7 +18,7 @@ func TestRegisterPersonRespJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	want := `{"personID":"p-1","requiresTenantSelection":true,"tenants":[{"tenantID":"t-1","name":"租户A","tag":"","userID":"","isOwner":false}],"allowPersonCreateTenant":true}`
+	want := `{"personID":"p-1","requiresTenantSelection":true,"tenants":[{"tenantID":"t-1","name":"租户A","tag":"","userID":"","ownerType":""}],"allowPersonCreateTenant":true}`
 	if string(b) != want {
 		t.Fatalf("\ngot  %s\nwant %s", b, want)
 	}

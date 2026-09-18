@@ -9,7 +9,7 @@
 
 ### 1.1 现状问题
 
-现有 `domain`（域名管理）模块是**「只录入、不消费」**的纯 CRUD：`DomainEntity{TenantID, Domain, IsVerified}` 在平台管理「域名管理」页配置后，**登录、OIDC、SSO、前端路由均不读取它**。经排查：
+现有 `domain`（域名管理）模块是**「只录入、不消费」**的纯 CRUD：`DomainEntity{TenantID, Domain, VerificationStatus}` 在平台管理「域名管理」页配置后，**登录、OIDC、SSO、前端路由均不读取它**。经排查：
 
 - `DomainDao` / `DomainEntity` 的**唯一调用方是 `svcdomain` 自身**（5 个 CRUD 方法）。
 - OIDC `redirect_uri` 白名单来自 `application_client.RedirectURIs`；issuer 来自 `config.OIDC.Issuer`；SSO cookie 域名来自 `config.OIDC.SSOCookieDomain()` —— **三者均与 `domain` 表无关**。
@@ -47,8 +47,7 @@ type DomainEntity struct {
     gormdao.BaseEntity
     TenantID   string       // 租户id
     Domain     string       // 域名
-    IsVerified bool         // 是否验证
-    VerifiedAt sql.NullTime // 验证时间
+    VerificationStatus model.DomainVerificationStatus // 验证状态：unverified/verified
     CreatedBy, UpdatedBy, DeletedBy string
 }
 ```
@@ -61,15 +60,14 @@ type DomainEntity struct {
     TenantID   string       `comment:租户id`
     Domain     string       `comment:登录域名(host，不含协议)`
     IsPrimary  bool         `comment:是否该租户主域名(优先级最高的标识域名)`
-    IsVerified bool         `comment:是否已验证`
-    VerifiedAt sql.NullTime
+    VerificationStatus model.DomainVerificationStatus `comment:验证状态 unverified/verified`
     Status     string       `comment:enable/disable`          // 软停用不再对外识别
     CreatedBy, UpdatedBy, DeletedBy string
 }
 ```
 
 - `Domain` 建议**强制小写、不含 scheme/path**（统一存 host），录入时归一化。
-- 校验标识：新增 `CheckDomainRecord` 能力（见 §5），`IsVerified` 仅作展示，不阻塞录入。
+- 校验标识：新增 `CheckDomainRecord` 能力（见 §5），`VerificationStatus` 仅作展示，不阻塞录入。
 
 ### 3.2 迁移
 
@@ -136,7 +134,7 @@ oidcGroup.GET("/authorize",
 
 - 保留现有 CRUD（`svcdomain`/`ctrdomain`/`dtodomain`/`router/domain.go` 不改）。
 - DTO 补齐 `isPrimary`/`status` 字段，供前端管理。
-- **不做** 域名验证强流程：`IsVerified` 由运维手动置位即可（B 档够用）。
+- **不做** 域名验证强流程：`verification_status` 由运维手动置位即可（B 档够用）。
 
 ### 4.6 移除 `system` 模块
 
@@ -156,7 +154,7 @@ oidcGroup.GET("/authorize",
 
 - 新增 `POST /v1/platform/domains/{id}/verify`（动作子路径，R2 规范）。
 - 校验方式：返回一段随机 token，要求 `Host` 或根路径返回该 token，平台探测比对。
-- B 档 MVP 可**延迟到二期**，先用 `IsVerified` 手置 + admin 人工复核。
+- B 档 MVP 可**延迟到二期**，先用 `verification_status` 手置 + admin 人工复核。
 
 ## 6. 安全考虑
 

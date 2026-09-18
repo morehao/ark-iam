@@ -1,8 +1,6 @@
 package model
 
 import (
-	"encoding/json"
-
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
@@ -52,24 +50,60 @@ const (
 	ConnectorCapabilityProfileSync  ConnectorCapability = "profile_sync"  // 资料同步
 )
 
+// ConnectorAutoCreateUserFlag connector.allow_auto_create_user。
+type ConnectorAutoCreateUserFlag string
+
+// 自动建用户开关取值（禁止硬编码）。
+const (
+	ConnectorAutoCreateUserFlagEnable  ConnectorAutoCreateUserFlag = "enable"
+	ConnectorAutoCreateUserFlagDisable ConnectorAutoCreateUserFlag = "disable"
+)
+
+// ConnectorAccountLinkFlag connector.allow_account_link。
+type ConnectorAccountLinkFlag string
+
+// 账号关联开关取值（禁止硬编码）。
+const (
+	ConnectorAccountLinkFlagEnable  ConnectorAccountLinkFlag = "enable"
+	ConnectorAccountLinkFlagDisable ConnectorAccountLinkFlag = "disable"
+)
+
+// ConnectorSyncProfileFlag connector.sync_profile。
+type ConnectorSyncProfileFlag string
+
+// 资料同步开关取值（禁止硬编码）。
+const (
+	ConnectorSyncProfileFlagEnable  ConnectorSyncProfileFlag = "enable"
+	ConnectorSyncProfileFlagDisable ConnectorSyncProfileFlag = "disable"
+)
+
+// ConnectorTokenStorageFlag connector.enable_token_storage。
+type ConnectorTokenStorageFlag string
+
+// 令牌存储开关取值（禁止硬编码）。
+const (
+	ConnectorTokenStorageFlagEnable  ConnectorTokenStorageFlag = "enable"
+	ConnectorTokenStorageFlagDisable ConnectorTokenStorageFlag = "disable"
+)
+
 type ConnectorEntity struct {
 	gormdao.BaseEntity
-	TenantID            string            `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id"`
-	Name                string            `gorm:"column:name;type:varchar(128);not null;default:'';comment:连接器名称"`
-	DisplayName         string            `gorm:"column:display_name;type:varchar(128);not null;default:'';comment:显示名称"`
-	Protocol            ConnectorProtocol `gorm:"column:protocol;type:varchar(64);not null;default:'';comment:协议类型"`
-	Provider            ConnectorProvider `gorm:"column:provider;type:varchar(128);not null;default:'';comment:提供商"`
-	Status              ConnectorStatus   `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态(enable启用/disable停用)"`
-	AllowAutoCreateUser bool              `gorm:"column:allow_auto_create_user;type:boolean;not null;default:false;comment:是否允许自动创建用户"`
-	AllowAccountLink    bool              `gorm:"column:allow_account_link;type:boolean;not null;default:false;comment:是否允许账号关联"`
-	SyncProfile         bool              `gorm:"column:sync_profile;type:boolean;not null;default:false;comment:是否同步资料"`
-	EnableTokenStorage  bool              `gorm:"column:enable_token_storage;type:boolean;not null;default:false;comment:是否启用令牌存储"`
-	Config              json.RawMessage   `gorm:"column:config;type:json;not null;default:'{}';comment:连接器配置"`
-	ClaimMapping        json.RawMessage   `gorm:"column:claim_mapping;type:json;not null;default:'{}';comment:声明映射"`
-	DomainPolicy        json.RawMessage   `gorm:"column:domain_policy;type:json;not null;default:'{}';comment:域策略"`
-	CreatedBy           string            `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人ID"`
-	UpdatedBy           string            `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人ID"`
-	DeletedBy           string            `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人ID"`
+	TenantID            string                      `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id"`
+	Name                string                      `gorm:"column:name;type:varchar(128);not null;default:'';comment:连接器名称"`
+	DisplayName         string                      `gorm:"column:display_name;type:varchar(128);not null;default:'';comment:显示名称"`
+	Protocol            ConnectorProtocol           `gorm:"column:protocol;type:varchar(64);not null;default:'';comment:协议类型"`
+	Provider            ConnectorProvider           `gorm:"column:provider;type:varchar(128);not null;default:'';comment:提供商"`
+	Status              ConnectorStatus             `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态(enable启用/disable停用)"`
+	AllowAutoCreateUser ConnectorAutoCreateUserFlag `gorm:"column:allow_auto_create_user;type:varchar(16);not null;default:'disable';comment:是否允许自动创建用户(enable/disable)"`
+	AllowAccountLink    ConnectorAccountLinkFlag    `gorm:"column:allow_account_link;type:varchar(16);not null;default:'disable';comment:是否允许账号关联(enable/disable)"`
+	SyncProfile         ConnectorSyncProfileFlag    `gorm:"column:sync_profile;type:varchar(16);not null;default:'disable';comment:是否同步资料(enable/disable)"`
+	EnableTokenStorage  ConnectorTokenStorageFlag   `gorm:"column:enable_token_storage;type:varchar(16);not null;default:'disable';comment:是否启用令牌存储(enable/disable)"`
+	Config              ConnectorConfig             `gorm:"column:config;type:json;serializer:json;not null;default:'{}';comment:连接器配置"`
+	ClaimMapping        ConnectorClaimMapping       `gorm:"column:claim_mapping;type:json;serializer:json;not null;default:'{}';comment:声明映射"`
+	DomainPolicy        ConnectorDomainPolicy       `gorm:"column:domain_policy;type:json;serializer:json;not null;default:'{}';comment:域策略"`
+	CreatedBy           string                      `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人ID"`
+	UpdatedBy           string                      `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人ID"`
+	DeletedBy           string                      `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人ID"`
 }
 
 func (ConnectorEntity) TableName() string {

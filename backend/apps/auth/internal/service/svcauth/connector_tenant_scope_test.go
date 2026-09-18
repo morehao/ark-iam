@@ -20,9 +20,9 @@ func TestConnectorDetailRejectsCrossTenantEntity(t *testing.T) {
 		BaseEntity:   gormdao.BaseEntity{StringID: gormdao.StringID{ID: "10"}},
 		TenantID:     "99",
 		Name:         "cross",
-		Config:       []byte("{}"),
-		ClaimMapping: []byte("{}"),
-		DomainPolicy: []byte("{}"),
+		Config:       model.ConnectorConfig{},
+		ClaimMapping: model.ConnectorClaimMapping{},
+		DomainPolicy: model.ConnectorDomainPolicy{},
 	}).Error; err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -42,18 +42,18 @@ func TestConnectorPageListUsesContextTenant(t *testing.T) {
 	if err := db.Create(&model.ConnectorEntity{
 		TenantID:     "72",
 		Name:         "tenant-72",
-		Config:       []byte("{}"),
-		ClaimMapping: []byte("{}"),
-		DomainPolicy: []byte("{}"),
+		Config:       model.ConnectorConfig{},
+		ClaimMapping: model.ConnectorClaimMapping{},
+		DomainPolicy: model.ConnectorDomainPolicy{},
 	}).Error; err != nil {
 		t.Fatalf("seed tenant 72: %v", err)
 	}
 	if err := db.Create(&model.ConnectorEntity{
 		TenantID:     "99",
 		Name:         "tenant-99",
-		Config:       []byte("{}"),
-		ClaimMapping: []byte("{}"),
-		DomainPolicy: []byte("{}"),
+		Config:       model.ConnectorConfig{},
+		ClaimMapping: model.ConnectorClaimMapping{},
+		DomainPolicy: model.ConnectorDomainPolicy{},
 	}).Error; err != nil {
 		t.Fatalf("seed tenant 99: %v", err)
 	}

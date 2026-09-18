@@ -1,11 +1,9 @@
 package svcapplicationclient
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/datatypes"
 
 	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
@@ -54,14 +52,70 @@ func isValidApplicationClientStatus(status model.ApplicationClientStatus) bool {
 	}
 }
 
-// marshalJSONSlice 将切片序列化为 JSON 列（nil 落空数组）。
-// 元素可为任意类型：枚举具名类型底层是 string，序列化结果与 []string 一致。
-func marshalJSONSlice[T any](s []T) datatypes.JSON {
-	if s == nil {
-		s = []T{}
+// isValidClientPKCEPolicy 校验 PKCE 强制策略：空串表示未提供（按 disable 处理）。
+func isValidClientPKCEPolicy(policy model.ClientPKCEPolicy) bool {
+	switch policy {
+	case "", model.ClientPKCEPolicyEnable, model.ClientPKCEPolicyDisable:
+		return true
+	default:
+		return false
 	}
-	b, _ := json.Marshal(s)
-	return datatypes.JSON(b)
+}
+
+// normalizeClientPKCEPolicy 把未提供的策略（空串）归一为 disable：列默认值即 disable，
+// 且为空串时原 bool 字段绑定出的 false 正是 disable，行为保持不变。
+func normalizeClientPKCEPolicy(policy model.ClientPKCEPolicy) model.ClientPKCEPolicy {
+	if policy == "" {
+		return model.ClientPKCEPolicyDisable
+	}
+	return policy
+}
+
+// isValidClientAuthTimeClaimPolicy 校验 auth_time 声明策略：空串表示未提供（按 disable 处理）。
+func isValidClientAuthTimeClaimPolicy(policy model.ClientAuthTimeClaimPolicy) bool {
+	switch policy {
+	case "", model.ClientAuthTimeClaimPolicyEnable, model.ClientAuthTimeClaimPolicyDisable:
+		return true
+	default:
+		return false
+	}
+}
+
+// normalizeClientAuthTimeClaimPolicy 把未提供的策略（空串）归一为 disable（NULL ≡ disable）。
+func normalizeClientAuthTimeClaimPolicy(policy model.ClientAuthTimeClaimPolicy) model.ClientAuthTimeClaimPolicy {
+	if policy == "" {
+		return model.ClientAuthTimeClaimPolicyDisable
+	}
+	return policy
+}
+
+// emptyIfNil 把请求里缺省的 nil 切片落成空切片（沿用本服务原有的「nil 落空数组」口径）。
+// 不可把 nil 直接交给 serializer：GORM 对 NOT NULL 的 JSON 列会把 nil 序列化为空串，
+// 在 PostgreSQL 的 json 列上是非法 JSON（更新路径必须显式 Select，nil 字段会被写进去）。
+func emptyIfNil[T any](values []T) []T {
+	if values == nil {
+		return []T{}
+	}
+	return values
+}
+
+// toResponseTypeList 把请求里的响应类型字符串转成列载具类型：元素是具名枚举，
+// 切片之间不能直接转换，逐项转一次（nil 落空切片，与其余 JSON 列的落库口径一致）。
+func toResponseTypeList(values []string) model.ResponseTypeList {
+	list := make(model.ResponseTypeList, 0, len(values))
+	for _, v := range values {
+		list = append(list, model.ResponseType(v))
+	}
+	return list
+}
+
+// responseTypeStrings 把列的响应类型读成出参用的 []string。
+func responseTypeStrings(list model.ResponseTypeList) []string {
+	values := make([]string, 0, len(list))
+	for _, v := range list {
+		values = append(values, string(v))
+	}
+	return values
 }
 
 func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientCreateReq) (*dtoapplicationclient.ApplicationClientCreateResp, error) {
@@ -72,21 +126,30 @@ func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.Ap
 		glog.Errorf(ctx, "[svcapplicationclient.Create] 非法客户端编码, req:%s", gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationClientCodeInvalidError)
 	}
+	// PKCE 与 auth_time 两个策略来自前端：未提供按 disable 处理，非法值直接拒绝。
+	if !isValidClientPKCEPolicy(req.RequirePKCE) {
+		glog.Errorf(ctx, "[svcapplicationclient.Create] 非法 PKCE 策略, req:%s", gutil.ToJsonString(req))
+		return nil, code.GetError(code.ApplicationClientCreateError)
+	}
+	if !isValidClientAuthTimeClaimPolicy(req.RequireAuthTime) {
+		glog.Errorf(ctx, "[svcapplicationclient.Create] 非法 auth_time 策略, req:%s", gutil.ToJsonString(req))
+		return nil, code.GetError(code.ApplicationClientCreateError)
+	}
 	insertEntity := &model.ApplicationClientEntity{
 		TenantID:                gincontext.GetTenantIDString(ctx),
 		AppID:                   req.AppID,
 		Code:                    req.Code,
 		Name:                    req.Name,
-		RedirectURIs:            marshalJSONSlice(req.RedirectURIs),
-		PostLogoutRedirectURIs:  marshalJSONSlice(req.PostLogoutRedirectURIs),
+		RedirectURIs:            model.RedirectURIList(emptyIfNil(req.RedirectURIs)),
+		PostLogoutRedirectURIs:  model.PostLogoutRedirectURIList(emptyIfNil(req.PostLogoutRedirectURIs)),
 		BackChannelLogoutURI:    req.BackChannelLogoutURI,
-		GrantTypes:              marshalJSONSlice(req.GrantTypes),
-		ResponseTypes:           marshalJSONSlice(req.ResponseTypes),
+		GrantTypes:              model.GrantTypeList(emptyIfNil(req.GrantTypes)),
+		ResponseTypes:           toResponseTypeList(req.ResponseTypes),
 		TokenEndpointAuthMethod: req.TokenEndpointAuthMethod,
-		AllowedOrigins:          marshalJSONSlice(req.AllowedOrigins),
-		RequirePKCE:             req.RequirePKCE,
-		RequireAuthTime:         req.RequireAuthTime,
-		DefaultScopes:           marshalJSONSlice(req.DefaultScopes),
+		AllowedOrigins:          model.AllowedOriginList(emptyIfNil(req.AllowedOrigins)),
+		RequirePKCE:             normalizeClientPKCEPolicy(req.RequirePKCE),
+		RequireAuthTime:         normalizeClientAuthTimeClaimPolicy(req.RequireAuthTime),
+		DefaultScopes:           model.DefaultScopeList(emptyIfNil(req.DefaultScopes)),
 		AccessTokenTTL:          req.AccessTokenTTL,
 		RefreshTokenTTL:         req.RefreshTokenTTL,
 		Source:                  model.ApplicationClientSourceThirdParty, // 控制台创建的客户端恒为第三方接入
@@ -141,6 +204,14 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.Ap
 		glog.Errorf(ctx, "[svcapplicationclient.Update] 非法客户端状态, req:%s", gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationClientUpdateError)
 	}
+	if !isValidClientPKCEPolicy(req.RequirePKCE) {
+		glog.Errorf(ctx, "[svcapplicationclient.Update] 非法 PKCE 策略, req:%s", gutil.ToJsonString(req))
+		return code.GetError(code.ApplicationClientUpdateError)
+	}
+	if !isValidClientAuthTimeClaimPolicy(req.RequireAuthTime) {
+		glog.Errorf(ctx, "[svcapplicationclient.Update] 非法 auth_time 策略, req:%s", gutil.ToJsonString(req))
+		return code.GetError(code.ApplicationClientUpdateError)
+	}
 	entity, err := dao.NewApplicationClientDao().GetByID(ctx, req.ApplicationClientID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -151,25 +222,45 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.Ap
 	}
 
 	userID := gincontext.GetUserIDString(ctx)
-	updateMap := map[string]any{
-		"name":                       req.Name,
-		"redirect_uris":              marshalJSONSlice(req.RedirectURIs),
-		"post_logout_redirect_uris":  marshalJSONSlice(req.PostLogoutRedirectURIs),
-		"back_channel_logout_uri":    req.BackChannelLogoutURI,
-		"grant_types":                marshalJSONSlice(req.GrantTypes),
-		"response_types":             marshalJSONSlice(req.ResponseTypes),
-		"token_endpoint_auth_method": req.TokenEndpointAuthMethod,
-		"allowed_origins":            marshalJSONSlice(req.AllowedOrigins),
-		"require_pkce":               req.RequirePKCE,
-		"require_auth_time":          req.RequireAuthTime,
-		"default_scopes":             marshalJSONSlice(req.DefaultScopes),
-		"access_token_ttl":           req.AccessTokenTTL,
-		"refresh_token_ttl":          req.RefreshTokenTTL,
-		"updated_by":                 userID,
+	// 走 dao.UpdateFields（结构化 Updates）而非 UpdateMap：JSON 列必须经 GORM serializer 落库，
+	// 用 map 写会绕过 serializer 静默落脏值（设计文档 D6）。只填要改的字段，列名与 model 的 column tag 一致。
+	updateEntity := &model.ApplicationClientEntity{
+		Name:                    req.Name,
+		RedirectURIs:            model.RedirectURIList(emptyIfNil(req.RedirectURIs)),
+		PostLogoutRedirectURIs:  model.PostLogoutRedirectURIList(emptyIfNil(req.PostLogoutRedirectURIs)),
+		BackChannelLogoutURI:    req.BackChannelLogoutURI,
+		GrantTypes:              model.GrantTypeList(emptyIfNil(req.GrantTypes)),
+		ResponseTypes:           toResponseTypeList(req.ResponseTypes),
+		TokenEndpointAuthMethod: req.TokenEndpointAuthMethod,
+		AllowedOrigins:          model.AllowedOriginList(emptyIfNil(req.AllowedOrigins)),
+		// 两个策略在更新中是全量字段（原 bool 亦为全量写入）：空串归一为 disable，保持原「未提供 = false」行为
+		RequirePKCE:     normalizeClientPKCEPolicy(req.RequirePKCE),
+		RequireAuthTime: normalizeClientAuthTimeClaimPolicy(req.RequireAuthTime),
+		DefaultScopes:   model.DefaultScopeList(emptyIfNil(req.DefaultScopes)),
+		AccessTokenTTL:  req.AccessTokenTTL,
+		RefreshTokenTTL: req.RefreshTokenTTL,
+		UpdatedBy:       userID,
+	}
+	fields := []string{
+		"name",
+		"redirect_uris",
+		"post_logout_redirect_uris",
+		"back_channel_logout_uri",
+		"grant_types",
+		"response_types",
+		"token_endpoint_auth_method",
+		"allowed_origins",
+		"require_pkce",
+		"require_auth_time",
+		"default_scopes",
+		"access_token_ttl",
+		"refresh_token_ttl",
+		"updated_by",
 	}
 	// status 留空表示不修改：不写该列，避免把状态覆盖为空串
 	if req.Status != "" {
-		updateMap["status"] = req.Status
+		updateEntity.Status = req.Status
+		fields = append(fields, "status")
 	}
 	// code 留空表示不修改；确有变化时：内置客户端拒改（见函数头注释），其余按创建时的规则校验。
 	if req.Code != "" && req.Code != entity.Code {
@@ -182,10 +273,11 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.Ap
 			glog.Errorf(ctx, "[svcapplicationclient.Update] 非法客户端编码, req:%s", gutil.ToJsonString(req))
 			return code.GetError(code.ApplicationClientCodeInvalidError)
 		}
-		updateMap["code"] = req.Code
+		updateEntity.Code = req.Code
+		fields = append(fields, "code")
 	}
-	if err := dao.NewApplicationClientDao().UpdateMap(ctx, req.ApplicationClientID, updateMap); err != nil {
-		glog.Errorf(ctx, "[svcapplicationclient.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+	if err := dao.UpdateFields(ctx, dao.NewApplicationClientDao().Dao, req.ApplicationClientID, updateEntity, fields...); err != nil {
+		glog.Errorf(ctx, "[svcapplicationclient.Update] dao UpdateFields fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationClientUpdateError)
 	}
 	return nil
@@ -209,22 +301,16 @@ func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtoapplicationclient.Ap
 	return detail, nil
 }
 
-// buildDetailResp 由实体组装详情出参：解码 JSON 列 + 回填所属应用名称。
+// buildDetailResp 由实体组装详情出参：读取 JSON 列（具名切片）+ 回填所属应用名称。
 func buildDetailResp(ctx *gin.Context, entity *model.ApplicationClientEntity) (*dtoapplicationclient.ApplicationClientDetailResp, error) {
 	appNames, err := loadAppNames(ctx, model.ApplicationClientEntityList{*entity})
 	if err != nil {
 		return nil, err
 	}
-	var redirectURIs, postLogoutRedirectURIs []string
-	var grantTypes []model.GrantType
-	var responseTypes []string
-	var allowedOrigins, defaultScopes []string
-	_ = json.Unmarshal(entity.RedirectURIs, &redirectURIs)
-	_ = json.Unmarshal(entity.PostLogoutRedirectURIs, &postLogoutRedirectURIs)
-	_ = json.Unmarshal(entity.GrantTypes, &grantTypes)
-	_ = json.Unmarshal(entity.ResponseTypes, &responseTypes)
-	_ = json.Unmarshal(entity.AllowedOrigins, &allowedOrigins)
-	_ = json.Unmarshal(entity.DefaultScopes, &defaultScopes)
+	// JSON 列已是具名切片：GrantTypes 元素类型与出参一致可直接转换，
+	// ResponseTypes 元素是具名枚举需逐项转，无需再手工 Unmarshal
+	grantTypes := []model.GrantType(entity.GrantTypes)
+	responseTypes := responseTypeStrings(entity.ResponseTypes)
 
 	return &dtoapplicationclient.ApplicationClientDetailResp{
 		ApplicationClientID:     entity.ID,
@@ -233,16 +319,16 @@ func buildDetailResp(ctx *gin.Context, entity *model.ApplicationClientEntity) (*
 		AppName:                 appNames[entity.AppID],
 		Code:                    entity.Code,
 		Name:                    entity.Name,
-		RedirectURIs:            redirectURIs,
-		PostLogoutRedirectURIs:  postLogoutRedirectURIs,
+		RedirectURIs:            entity.RedirectURIs.Strings(),
+		PostLogoutRedirectURIs:  entity.PostLogoutRedirectURIs.Strings(),
 		BackChannelLogoutURI:    entity.BackChannelLogoutURI,
 		GrantTypes:              grantTypes,
 		ResponseTypes:           responseTypes,
 		TokenEndpointAuthMethod: entity.TokenEndpointAuthMethod,
-		AllowedOrigins:          allowedOrigins,
+		AllowedOrigins:          entity.AllowedOrigins.Strings(),
 		RequirePKCE:             entity.RequirePKCE,
 		RequireAuthTime:         entity.RequireAuthTime,
-		DefaultScopes:           defaultScopes,
+		DefaultScopes:           entity.DefaultScopes.Strings(),
 		AccessTokenTTL:          entity.AccessTokenTTL,
 		RefreshTokenTTL:         entity.RefreshTokenTTL,
 		Source:                  entity.Source,
@@ -284,9 +370,6 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.
 
 	items := make([]dtoapplicationclient.PageListItem, 0, len(list))
 	for _, v := range list {
-		var grantTypes []model.GrantType
-		_ = json.Unmarshal(v.GrantTypes, &grantTypes)
-
 		items = append(items, dtoapplicationclient.PageListItem{
 			ApplicationClientID:     v.ID,
 			AppID:                   v.AppID,
@@ -295,7 +378,7 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.
 			Name:                    v.Name,
 			Source:                  v.Source,
 			Status:                  v.Status,
-			GrantTypes:              grantTypes,
+			GrantTypes:              []model.GrantType(v.GrantTypes),
 			TokenEndpointAuthMethod: v.TokenEndpointAuthMethod,
 			CreatedAt:               v.CreatedAt.Unix(),
 			UpdatedAt:               v.UpdatedAt.Unix(),

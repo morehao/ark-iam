@@ -1,18 +1,22 @@
 package dtotenant
 
+import (
+	"github.com/morehao/ark-iam/pkg/model"
+)
+
 type UserPageListItem struct {
-	UserID                string `json:"userID"`                // 用户ID
-	TenantID              string `json:"tenantID"`              // 租户ID
-	Username              string `json:"username"`              // 用户名
-	PrimaryEmail          string `json:"primaryEmail"`          // 主要邮箱
-	PrimaryPhone          string `json:"primaryPhone"`          // 主要手机号
-	Name                  string `json:"name"`                  // 姓名
-	Avatar                string `json:"avatar"`                // 头像URL
-	IsSuspended           bool   `json:"isSuspended"`           // 是否挂起
-	PrimaryDepartmentName string `json:"primaryDepartmentName"` // 主部门名称
-	RoleCount             int64  `json:"roleCount"`             // 角色数
-	CreatedAt             int64  `json:"createdAt"`             // 创建时间
-	UpdatedAt             int64  `json:"updatedAt"`             // 更新时间
+	UserID                string           `json:"userID"`                // 用户ID
+	TenantID              string           `json:"tenantID"`              // 租户ID
+	Username              string           `json:"username"`              // 用户名
+	PrimaryEmail          string           `json:"primaryEmail"`          // 主要邮箱
+	PrimaryPhone          string           `json:"primaryPhone"`          // 主要手机号
+	Name                  string           `json:"name"`                  // 姓名
+	Avatar                string           `json:"avatar"`                // 头像URL
+	Status                model.UserStatus `json:"status"`                // 状态(active正常/suspended挂起)
+	PrimaryDepartmentName string           `json:"primaryDepartmentName"` // 主部门名称
+	RoleCount             int64            `json:"roleCount"`             // 角色数
+	CreatedAt             int64            `json:"createdAt"`             // 创建时间
+	UpdatedAt             int64            `json:"updatedAt"`             // 更新时间
 }
 
 type UserPageListResp struct {
@@ -56,12 +60,12 @@ type UserRolesListResp struct {
 // ---------- 第三方身份（用户子资源） ----------
 
 type UserIdentityItem struct {
-	UserIdentityID string `json:"userIdentityID"` // 用户身份ID
-	Issuer         string `json:"issuer"`         // 身份提供商
-	IdentityID     string `json:"identityID"`     // 第三方用户ID
-	Detail         any    `json:"detail"`         // 详细信息
-	CreatedAt      int64  `json:"createdAt"`      // 创建时间(unix 秒)
-	UpdatedAt      int64  `json:"updatedAt"`      // 更新时间(unix 秒)
+	UserIdentityID string                   `json:"userIdentityID"` // 用户身份ID
+	Issuer         string                   `json:"issuer"`         // 身份提供商
+	IdentityID     string                   `json:"identityID"`     // 第三方用户ID
+	Detail         model.UserIdentityDetail `json:"detail"`         // 详细信息
+	CreatedAt      int64                    `json:"createdAt"`      // 创建时间(unix 秒)
+	UpdatedAt      int64                    `json:"updatedAt"`      // 更新时间(unix 秒)
 }
 
 type UserIdentityListResp struct {

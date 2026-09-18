@@ -112,7 +112,7 @@ flowchart LR
 | `/oidc/login/selectTenant` | POST | 多租户用户选择租户（authRequestID + tenantID）；SSO 会话在此步建立 |
 | `/oidc/login-config` | POST | 登录页前置策略查询（authRequestID）：返回该应用是否允许自助注册 / 自助建租户 |
 | `/oidc/registerPerson` | POST | **自助注册自然人**（用户名/邮箱/手机号、密码、姓名）：person find-or-create，返回 `personID` |
-| `/oidc/createTenant` | POST | **自助开通租户**（租户名）：按 `application.allow_person_create_tenant` 门禁，事务创建租户 + 根部门 + 内置管理员，返回 `{tenantID, personID}` |
+| `/oidc/createTenant` | POST | **自助开通租户**（租户名）：按 `application.allow_person_create_tenant`（枚举 `enable`/`disable`，NULL≡`disable`）门禁，事务创建租户 + 根部门 + 内置管理员，返回 `{tenantID, personID}` |
 | `/oidc/login/changePassword` | POST | **首次登录强制改密**（authRequestID + currentPassword + newPassword）：`/oidc/login` 对持临时密码的账号返回 `requiresPasswordChange=true` 且不完成授权，改密成功后需重新登录（会话已全局撤销） |
 | `/oidc/sso-login` | GET | SSO 免密续登（携带 `iam_sso_session` Cookie，`?authRequestID=`） |
 | `/oidc/logged-out` | GET | 登出落地页（清除 SSO Cookie 后跳前端登录页） |
@@ -157,7 +157,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/v1/auth/joinTenant` | 凭邀请码加入已有租户（通道 B）。门禁：① 应用级 `application.allow_join_by_invite`——按 access token 的 `client_id` 解析应用后判定，解析不出应用或未配置一律拒绝（fail-closed）；② 邀请本身有效、未过期、未使用。入参只有 `inviteCode`，**不接受 `tenantID`**（落哪个租户由邀请码决定） |
+| POST | `/v1/auth/joinTenant` | 凭邀请码加入已有租户（通道 B）。门禁：① 应用级 `application.allow_join_by_invite`（枚举 `enable`/`disable`，NULL≡`disable`）——按 access token 的 `client_id` 解析应用后判定，解析不出应用或未配置一律拒绝（fail-closed）；② 邀请本身有效、未过期、未使用。入参只有 `inviteCode`，**不接受 `tenantID`**（落哪个租户由邀请码决定） |
 | POST | `/v1/auth/logout` | 登出（撤销全部 Refresh Token + SSO 会话 + 触发 SLO） |
 | POST | `/v1/auth/logoutAll` | 全端登出（同 logout） |
 | GET | `/v1/auth/userinfo` | 当前用户信息（personInfo + userInfo） |
@@ -219,7 +219,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 >
 > 租户状态 `status`（`active` 正常 / `suspended` 已挂起）：非法值/缺省归一为 `active`；`suspended` 会撤销该租户成员的 refresh token 与 SSO 会话，非 active 租户的成员无法登录、令牌不签发；`PUT /v1/platform/tenants/{tenantID}` 拒绝挂起操作者自己所在的租户（`100208`）；重置内置管理员密码失败报 `100210`。
 >
-> **建租户的管理员约定**（D2/D3/D6）：`admin` 必填且邮箱/手机至少一个（缺联系方式报 `100521`）；管理员在同事务内创建为 `tenant_user.source=builtin`、`is_owner=true`，并绑定根部门与内置「租户管理员」角色（`source=builtin`、`admin_type=admin`，该角色随租户开通 `tenant-admin` 应用订阅；应用/菜单种子缺失会整体回滚并报 `100200`）。`adminInitialPassword` 只在**新建自然人**时非空——命中已存在自然人时沿用其原密码、不回显凭据（可改用重置内置管理员密码接口兜底）。该管理员首次登录强制改密：`/oidc/login` 返回 `requiresPasswordChange=true`，改完（`/oidc/login/changePassword`）须重新登录。详见 `system-design.md` §5.8。
+> **建租户的管理员约定**（D2/D3/D6）：`admin` 必填且邮箱/手机至少一个（缺联系方式报 `100521`）；管理员在同事务内创建为 `tenant_user.source=builtin`、`owner_type=owner`，并绑定根部门与内置「租户管理员」角色（`source=builtin`、`admin_type=admin`，该角色随租户开通 `tenant-admin` 应用订阅；应用/菜单种子缺失会整体回滚并报 `100200`）。`adminInitialPassword` 只在**新建自然人**时非空——命中已存在自然人时沿用其原密码、不回显凭据（可改用重置内置管理员密码接口兜底）。该管理员首次登录强制改密：`/oidc/login` 返回 `requiresPasswordChange=true`，改完（`/oidc/login/changePassword`）须重新登录。详见 `system-design.md` §5.8。
 
 ### 5.4 应用与客户端（OIDC 配置）
 
@@ -256,8 +256,6 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/v1/platform/logs` | 租户日志分页 |
-| GET | `/v1/platform/logs/{logID}` | 日志详情 |
 
 ---
 
@@ -267,7 +265,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/v1/tenant/users` | 租户**真实用户**（member）分页（?keyword= 姓名/用户名/邮箱/手机，?isSuspended=，含主部门/角色数） |
+| GET | `/v1/tenant/users` | 租户**真实用户**（member）分页（?keyword= 姓名/用户名/邮箱/手机，?status=active/suspended 枚举筛选，含主部门/角色数） |
 | POST | `/v1/tenant/users` | 创建租户真实用户（姓名/主部门 primaryDepartmentID/邮箱/手机；**不含密码**：服务端生成临时密码，响应 `initialPassword` 仅此一次返回；**姓名即自然人信息**：无匹配 person 则按姓名创建，命中 email/phone 复用——复用时密码不变、`initialPassword` 为空；部门归属同事务建立：primaryDepartmentID 单值主部门 + secondaryDepartmentIDs/leaderDepartmentIDs 可选） |
 | GET | `/v1/tenant/users/{userID}` | 用户详情（基础信息 + 部门归属 + 角色） |
 | PATCH | `/v1/tenant/users/{userID}` | 局部更新（姓名/头像/状态 + primaryDepartmentID 换主部门不可清空 + secondaryDepartmentIDs/leaderDepartmentIDs 全量替换，nil=不变） |
@@ -278,11 +276,11 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | POST | `/v1/tenant/users/{userID}/identities` | 绑定第三方身份 {issuer, identityID, detail?}（租户取自登录上下文，不传 tenantID；同 issuer+identityID 全局唯一） |
 | DELETE | `/v1/tenant/users/{userID}/identities/{identityID}` | 解绑第三方身份 |
 | GET | `/v1/tenant/users/{userID}/login-logs` | 用户登录日志（只读，租户 + 用户双重过滤） |
-| GET | `/v1/tenant/machine-users` | 服务账号分页（?name=&isSuspended=，含 primaryDepartmentID/primaryDepartmentName；服务账号=租户内机器主体 user_type=machine，不可登录/无自然人/不可任部门负责人，作为角色主体与 API Key 归属） |
+| GET | `/v1/tenant/machine-users` | 服务账号分页（?name=&status=active/suspended 枚举筛选，含 primaryDepartmentID/primaryDepartmentName；服务账号=租户内机器主体 user_type=machine，不可登录/无自然人/不可任部门负责人，作为角色主体与 API Key 归属） |
 | POST | `/v1/tenant/machine-users` | 创建服务账号 {name,description,primaryDepartmentID(主部门,单值,必传),secondaryDepartmentIDs?(参与部门)}（需系统管理能力 super） |
 | GET | `/v1/tenant/machine-users/{machineUserID}` | 服务账号详情（部门归属 departments + 已授权角色） |
 | PUT | `/v1/tenant/machine-users/{machineUserID}` | 更新服务账号（名称/描述 + primaryDepartmentID? 换主部门不可清空 + secondaryDepartmentIDs? 参与部门全量替换,nil=不变） |
-| PATCH | `/v1/tenant/machine-users/{machineUserID}` | 挂起/启用（{isSuspended}，挂起后其密钥鉴权失效） |
+| PATCH | `/v1/tenant/machine-users/{machineUserID}` | 挂起/启用（{status}：active/suspended，挂起后其密钥鉴权失效） |
 | DELETE | `/v1/tenant/machine-users/{machineUserID}` | 删除服务账号（须先删除其全部 API Key；级联清理角色与部门关系） |
 | GET | `/v1/tenant/machine-users/{machineUserID}/roles` | 服务账号已分配角色 |
 | PUT | `/v1/tenant/machine-users/{machineUserID}/roles` | 全量替换服务账号角色（**禁止授予 admin_type=admin 的管理员类型角色**） |

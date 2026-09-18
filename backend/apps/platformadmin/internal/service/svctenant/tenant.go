@@ -101,14 +101,14 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 			},
 			AdminUser: &user.CreateReq{
 				Person: &person.FindOrCreateReq{
-					Username:           admin.Username,
-					PrimaryEmail:       admin.PrimaryEmail,
-					PrimaryPhone:       admin.PrimaryPhone,
-					PasswordEncrypted:  passwordHash,
-					PasswordMethod:     model.PasswordMethodBcrypt,
-					MustChangePassword: true,
-					Name:               admin.Name,
-					CreatedBy:          userID,
+					Username:          admin.Username,
+					PrimaryEmail:      admin.PrimaryEmail,
+					PrimaryPhone:      admin.PrimaryPhone,
+					PasswordEncrypted: passwordHash,
+					PasswordMethod:    model.PasswordMethodBcrypt,
+					PasswordStatus:    model.PasswordStatusMustChange,
+					Name:              admin.Name,
+					CreatedBy:         userID,
 				},
 				Name:      admin.Name,
 				CreatedBy: userID,
@@ -156,7 +156,7 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 // manual 成员——平台没有管理租户内部成员的正当场景（见 docs/design/system-design.md §5.8）。
 // 命中不到（含只有 manual 成员）与"不允许"统一返回 UserNotExistError，不暴露租户成员结构。
 //
-// 生成新临时密码 → 置 must_change_password=true → 撤销该自然人既有会话 → 写审计；
+// 生成新临时密码 → 置 password_status=must_change → 撤销该自然人既有会话 → 写审计；
 // 明文只在响应中返回一次，不落库、不写日志。
 func (svc *tenantSvc) ResetAdminPassword(ctx *gin.Context, req *dtotenant.TenantAdminResetPasswordReq) (*dtotenant.TenantAdminResetPasswordResp, error) {
 	tenantEntity, err := dao.NewTenantDao().GetByID(ctx, req.TenantID)
@@ -195,10 +195,10 @@ func (svc *tenantSvc) ResetAdminPassword(ctx *gin.Context, req *dtotenant.Tenant
 	}
 	operatorID := gincontext.GetUserIDString(ctx)
 	if err := dao.NewPersonDao().UpdateMap(ctx, builtinAdmin.PersonID, map[string]any{
-		"password_encrypted":   passwordHash,
-		"password_method":      model.PasswordMethodBcrypt,
-		"must_change_password": true,
-		"updated_by":           operatorID,
+		"password_encrypted": passwordHash,
+		"password_method":    model.PasswordMethodBcrypt,
+		"password_status":    model.PasswordStatusMustChange,
+		"updated_by":         operatorID,
 	}); err != nil {
 		glog.Errorf(ctx, "[svctenant.ResetAdminPassword] person UpdateMap fail, err:%v, personID:%s", err, builtinAdmin.PersonID)
 		return nil, code.GetError(code.TenantAdminResetPasswordError)

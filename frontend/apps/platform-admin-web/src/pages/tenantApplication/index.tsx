@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Form, Input, message, Modal, Select, Space, Table } from 'antd'
+import { Button, Form, message, Modal, Select, Space, Table } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { actionColumn, idColumn, NAME_COL_WIDTH, PageContainer, RemoteSelect, SourceTag, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn } from '@ark-iam/ui'
@@ -74,7 +74,6 @@ export default function TenantApplicationList() {
       tenantID: record.tenantID,
       appID: record.appID,
       status: record.status,
-      config: record.config,
     })
     setModalOpen(true)
   }
@@ -235,9 +234,6 @@ export default function TenantApplicationList() {
                 { value: 'disable', label: '停用' },
               ]}
             />
-          </Form.Item>
-          <Form.Item name="config" label="配置（JSON）">
-            <Input.TextArea rows={4} placeholder='选填，如 {"region":"cn"}' />
           </Form.Item>
         </Form>
       </Modal>

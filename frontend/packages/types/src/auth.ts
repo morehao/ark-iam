@@ -1,3 +1,14 @@
+import type { OwnerType } from './tenant'
+
+/**
+ * 自然人可用性（后端具名类型 model.PersonStatus）：active-正常 / suspended-已挂起
+ * （suspended 禁止登录与签发令牌，语义对齐 tenant.status 的挂起）。
+ */
+export type PersonStatus = 'active' | 'suspended'
+
+/** 自然人密码状态（后端具名类型 model.PasswordStatus）：normal-正常 / must_change-必须改密。 */
+export type PasswordStatus = 'normal' | 'must_change'
+
 export interface PersonInfo {
   personID: string
   name: string
@@ -6,7 +17,7 @@ export interface PersonInfo {
 
 export interface UserinfoResp {
   personInfo: PersonInfo
-  userInfo: { userID: string; tenantID: string; name: string; isOwner: number }
+  userInfo: { userID: string; tenantID: string; name: string; ownerType: OwnerType }
 }
 
 export interface MyTenantsResp {
@@ -20,7 +31,8 @@ export interface PersonDetailResp {
   primaryPhone: string
   name: string
   avatar: string
-  isSuspended: number
+  status: PersonStatus
+  passwordStatus: PasswordStatus
 }
 
 export interface PersonUpdatePasswordReq {

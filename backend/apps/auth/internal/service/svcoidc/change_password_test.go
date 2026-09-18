@@ -1,7 +1,6 @@
 package svcoidc
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -51,14 +50,12 @@ func seedTempPasswordPerson(t *testing.T, db *gorm.DB, tempPassword string) *mod
 		t.Fatalf("GeneratePasswordHash failed: %v", err)
 	}
 	person := &model.PersonEntity{
-		Username:           model.StrPtr("temp-user"),
-		PrimaryEmail:       model.StrPtr("temp@example.com"),
-		PasswordEncrypted:  hash,
-		PasswordMethod:     model.PasswordMethodBcrypt,
-		MustChangePassword: true,
-		Name:               "临时口令用户",
-		Profile:            json.RawMessage(`{}`),
-		CustomData:         json.RawMessage(`{}`),
+		Username:          model.StrPtr("temp-user"),
+		PrimaryEmail:      model.StrPtr("temp@example.com"),
+		PasswordEncrypted: hash,
+		PasswordMethod:    model.PasswordMethodBcrypt,
+		PasswordStatus:    model.PasswordStatusMustChange,
+		Name:              "临时口令用户",
 	}
 	if err := db.Create(person).Error; err != nil {
 		t.Fatalf("seed person: %v", err)
@@ -97,8 +94,8 @@ func TestCompleteLoginTempPasswordRequiresChange(t *testing.T) {
 		provider: provider,
 		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 			return &model.PersonEntity{
-					BaseEntity:         gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}},
-					MustChangePassword: true,
+					BaseEntity:     gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}},
+					PasswordStatus: model.PasswordStatusMustChange,
 				},
 				&model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "66"}}, TenantID: "1", PersonID: "88"},
 				[]objauth.TenantOption{{TenantID: "1", Name: "tenant-1"}},
@@ -174,8 +171,8 @@ func TestChangePasswordRotatesAndClearsFlag(t *testing.T) {
 	if err := gcrypto.ComparePasswordHash(stored.PasswordEncrypted, "Temp1234"); err == nil {
 		t.Error("temporary password must no longer be valid")
 	}
-	if stored.MustChangePassword {
-		t.Error("must_change_password must be cleared after a successful change")
+	if stored.PasswordStatus != model.PasswordStatusNormal {
+		t.Errorf("password_status = %q, want %q after a successful change", stored.PasswordStatus, model.PasswordStatusNormal)
 	}
 }
 
@@ -184,24 +181,24 @@ func TestChangePasswordRotatesAndClearsFlag(t *testing.T) {
 func TestChangePasswordRejections(t *testing.T) {
 	cases := []struct {
 		name            string
-		mustChange      bool
+		passwordStatus  model.PasswordStatus
 		currentPassword string
 		newPassword     string
 		wantErr         int
 	}{
-		{name: "非强制改密不可经此端点改密", mustChange: false, currentPassword: "Temp1234", newPassword: "Fresh1234", wantErr: code.OIDCSessionNotFound},
-		{name: "当前密码错误", mustChange: true, currentPassword: "Wrong1234", newPassword: "Fresh1234", wantErr: code.PasswordMismatchError},
-		{name: "新密码不满足强度", mustChange: true, currentPassword: "Temp1234", newPassword: "weak", wantErr: code.PasswordValidationError},
-		{name: "新旧密码相同", mustChange: true, currentPassword: "Temp1234", newPassword: "Temp1234", wantErr: code.PasswordValidationError},
+		{name: "非强制改密不可经此端点改密", passwordStatus: model.PasswordStatusNormal, currentPassword: "Temp1234", newPassword: "Fresh1234", wantErr: code.OIDCSessionNotFound},
+		{name: "当前密码错误", passwordStatus: model.PasswordStatusMustChange, currentPassword: "Wrong1234", newPassword: "Fresh1234", wantErr: code.PasswordMismatchError},
+		{name: "新密码不满足强度", passwordStatus: model.PasswordStatusMustChange, currentPassword: "Temp1234", newPassword: "weak", wantErr: code.PasswordValidationError},
+		{name: "新旧密码相同", passwordStatus: model.PasswordStatusMustChange, currentPassword: "Temp1234", newPassword: "Temp1234", wantErr: code.PasswordValidationError},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			provider, db := newChangePasswordEnv(t)
 			person := seedTempPasswordPerson(t, db, "Temp1234")
-			if !tc.mustChange {
+			if tc.passwordStatus != model.PasswordStatusMustChange {
 				if err := db.Model(&model.PersonEntity{}).Where("id = ?", person.ID).
-					Update("must_change_password", false).Error; err != nil {
-					t.Fatalf("clear must_change_password: %v", err)
+					Update("password_status", tc.passwordStatus).Error; err != nil {
+					t.Fatalf("set password_status: %v", err)
 				}
 			}
 			authReq := newAuthReq(t, provider, "client-1")
@@ -227,8 +224,8 @@ func TestChangePasswordRejections(t *testing.T) {
 			if err := gcrypto.ComparePasswordHash(stored.PasswordEncrypted, "Temp1234"); err != nil {
 				t.Errorf("password must stay unchanged on rejection: %v", err)
 			}
-			if stored.MustChangePassword != tc.mustChange {
-				t.Errorf("must_change_password = %v, want unchanged %v", stored.MustChangePassword, tc.mustChange)
+			if stored.PasswordStatus != tc.passwordStatus {
+				t.Errorf("password_status = %q, want unchanged %q", stored.PasswordStatus, tc.passwordStatus)
 			}
 		})
 	}

@@ -1,8 +1,6 @@
 package svctenant
 
 import (
-	"encoding/json"
-
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dao"
@@ -123,16 +121,21 @@ func fillPrimaryDept(ctx *gin.Context, tenantID string, respList []dtotenant.Mac
 }
 
 func (svc *machineUserSvc) PageList(ctx *gin.Context, req *dtotenant.MachineUserPageListReq) (*dtotenant.MachineUserPageListResp, error) {
+	// 状态过滤：空串=不过滤，非空必须命中白名单常量
+	if req.Status != "" && !isValidUserStatus(req.Status) {
+		glog.Errorf(ctx, "[svcmachine.PageList] 非法用户状态, req:%s", gutil.ToJsonString(req))
+		return nil, code.GetError(code.MachineUserGetPageListError)
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 	cond := &dao.UserCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID:    tenantID,
-		UserType:    model.UserTypeMachine,
-		Keyword:     req.Name,
-		IsSuspended: req.IsSuspended,
+		TenantID: tenantID,
+		UserType: model.UserTypeMachine,
+		Keyword:  req.Name,
+		Status:   req.Status,
 	}
 	list, total, err := dao.NewUserDao().GetPageListByCond(ctx, cond)
 	if err != nil {
@@ -146,7 +149,7 @@ func (svc *machineUserSvc) PageList(ctx *gin.Context, req *dtotenant.MachineUser
 			TenantID:      v.TenantID,
 			Name:          v.Name,
 			Description:   v.Description,
-			IsSuspended:   v.IsSuspended,
+			Status:        v.Status,
 			CreatedAt:     v.CreatedAt.Unix(),
 			UpdatedAt:     v.UpdatedAt.Unix(),
 		})
@@ -184,8 +187,6 @@ func (svc *machineUserSvc) Create(ctx *gin.Context, req *dtotenant.MachineUserCr
 		UserType:    model.UserTypeMachine,
 		Name:        req.Name,
 		Description: req.Description,
-		Profile:     json.RawMessage(`{}`),
-		CustomData:  json.RawMessage(`{}`),
 		CreatedBy:   operatorID,
 	}
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
@@ -289,13 +290,18 @@ func (svc *machineUserSvc) UpdateStatus(ctx *gin.Context, req *dtotenant.Machine
 	if err := svc.checkSystemAdmin(ctx, code.MachineUserStatusUpdateError); err != nil {
 		return err
 	}
+	// 状态流转入口无「不修改」语义：必须显式命中白名单常量
+	if !isValidUserStatus(req.Status) {
+		glog.Errorf(ctx, "[svcmachine.UpdateStatus] 非法用户状态, req:%s", gutil.ToJsonString(req))
+		return code.GetError(code.MachineUserStatusUpdateError)
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 	if _, err := svc.loadMachineUser(ctx, tenantID, req.MachineUserID); err != nil {
 		return err
 	}
 	if err := dao.NewUserDao().UpdateMap(ctx, req.MachineUserID, map[string]any{
-		"is_suspended": req.IsSuspended,
-		"updated_by":   gincontext.GetUserIDString(ctx),
+		"status":     req.Status,
+		"updated_by": gincontext.GetUserIDString(ctx),
 	}); err != nil {
 		glog.Errorf(ctx, "[svcmachine.UpdateStatus] dao UpdateMap fail, err:%v, id:%s", err, req.MachineUserID)
 		return code.GetError(code.MachineUserStatusUpdateError)
@@ -379,7 +385,7 @@ func (svc *machineUserSvc) Detail(ctx *gin.Context, req *dtotenant.MachineUserDe
 			TenantID:      entity.TenantID,
 			Name:          entity.Name,
 			Description:   entity.Description,
-			IsSuspended:   entity.IsSuspended,
+			Status:        entity.Status,
 			CreatedAt:     entity.CreatedAt.Unix(),
 		},
 		Departments: departments,

@@ -27,6 +27,18 @@ export type TenantApplicationStatus = 'enable' | 'disable'
 export type ConnectorStatus = 'enable' | 'disable'
 
 /**
+ * 应用策略开关（后端具名类型，取值 enable/disable；语义等价旧 bool：true=enable / false=disable）：
+ * - AppPersonCreateTenantPolicy：application.allow_person_create_tenant（个人自助创建租户）
+ * - AppJoinByInvitePolicy：application.allow_join_by_invite（凭邀请码加入租户）
+ */
+export type AppPersonCreateTenantPolicy = 'enable' | 'disable'
+export type AppJoinByInvitePolicy = 'enable' | 'disable'
+
+/** 客户端协议开关（后端具名类型）：requirePKCE / requireAuthTime，取值 enable/disable。 */
+export type ClientPKCEPolicy = 'enable' | 'disable'
+export type ClientAuthTimeClaimPolicy = 'enable' | 'disable'
+
+/**
  * 应用角色模板项：本应用对外提供的一个跨系统授权契约值。
  * 下游按「claim_prefix + code」认策略名（策略在下游是全局命名实体、全租户共用一条），
  * 故 code 由应用方在这里定义一次，租户只能"授权"、不能造值（后端 model.RoleTemplateItem）。
@@ -48,8 +60,8 @@ export interface ApplicationItem {
   source: AppSource
   status: AppStatus
   sort: number
-  allowPersonCreateTenant?: boolean
-  allowJoinByInvite?: boolean
+  allowPersonCreateTenant?: AppPersonCreateTenantPolicy
+  allowJoinByInvite?: AppJoinByInvitePolicy
   /** 应用角色模板：本应用对外的契约值清单，开通应用时物化到各租户（后端 model.ApplicationEntity.RoleTemplate）。 */
   roleTemplate?: ApplicationRoleTemplateItem[]
   createdAt?: number
@@ -63,8 +75,8 @@ export interface ApplicationCreateReq {
   logoUrl?: string
   homepageUrl?: string
   sort?: number
-  allowPersonCreateTenant?: boolean
-  allowJoinByInvite?: boolean
+  allowPersonCreateTenant?: AppPersonCreateTenantPolicy
+  allowJoinByInvite?: AppJoinByInvitePolicy
   /** 应用角色模板：见 ApplicationItem.roleTemplate，留空表示无。 */
   roleTemplate?: ApplicationRoleTemplateItem[]
 }
@@ -79,8 +91,8 @@ export interface ApplicationUpdateReq {
   homepageUrl?: string
   status?: AppStatus
   sort?: number
-  allowPersonCreateTenant?: boolean
-  allowJoinByInvite?: boolean
+  allowPersonCreateTenant?: AppPersonCreateTenantPolicy
+  allowJoinByInvite?: AppJoinByInvitePolicy
   /** 应用角色模板：不传表示不修改，传 [] 表示清空，传值即全量替换（移除项会在各租户撤下该角色及其授权）。 */
   roleTemplate?: ApplicationRoleTemplateItem[]
 }
@@ -114,10 +126,10 @@ export interface OAuthClientDetail extends OAuthClientItem {
   backChannelLogoutURI: string
   responseTypes: string[]
   allowedOrigins: string[]
-  /** 是否强制 PKCE：后端 DTO 是 Go bool，JSON 为 true/false（不是 0/1） */
-  requirePKCE: boolean
-  /** 是否要求 id_token 带 auth_time：后端 DTO 是 Go bool，JSON 为 true/false */
-  requireAuthTime: boolean
+  /** 是否强制 PKCE（后端 model.ClientPKCEPolicy）：enable/disable。 */
+  requirePKCE: ClientPKCEPolicy
+  /** 是否要求 id_token 带 auth_time（后端 model.ClientAuthTimeClaimPolicy）：enable/disable。 */
+  requireAuthTime: ClientAuthTimeClaimPolicy
   defaultScopes: string[]
   accessTokenTTL: number
   refreshTokenTTL: number
@@ -135,9 +147,9 @@ export interface OAuthClientCreateReq {
   responseTypes?: string[]
   tokenEndpointAuthMethod?: TokenEndpointAuthMethod
   allowedOrigins?: string[]
-  /** 后端 DTO 是 Go bool（true/false）：传 1/0 会被 binding 拒绝 */
-  requirePKCE?: boolean
-  requireAuthTime?: boolean
+  /** 规则开关（后端具名类型 ClientPKCEPolicy）：enable/disable */
+  requirePKCE?: ClientPKCEPolicy
+  requireAuthTime?: ClientAuthTimeClaimPolicy
   defaultScopes?: string[]
   accessTokenTTL?: number
   refreshTokenTTL?: number
@@ -156,9 +168,9 @@ export interface OAuthClientUpdateReq {
   responseTypes?: string[]
   tokenEndpointAuthMethod?: TokenEndpointAuthMethod
   allowedOrigins?: string[]
-  /** 后端 DTO 是 Go bool（true/false）：传 1/0 会被 binding 拒绝 */
-  requirePKCE?: boolean
-  requireAuthTime?: boolean
+  /** 规则开关（后端具名类型 ClientPKCEPolicy）：enable/disable */
+  requirePKCE?: ClientPKCEPolicy
+  requireAuthTime?: ClientAuthTimeClaimPolicy
   defaultScopes?: string[]
   accessTokenTTL?: number
   refreshTokenTTL?: number
@@ -263,8 +275,6 @@ export interface TenantApplicationItem {
    */
   appSource?: AppSource
   status: TenantApplicationStatus
-  config?: string
-  grantedScope?: string
   createdAt?: number
   updatedAt?: number
 }
@@ -273,21 +283,24 @@ export interface TenantApplicationCreateReq {
   tenantID: string
   appID: string
   status?: TenantApplicationStatus
-  config?: string
-  grantedScope?: string
 }
 
 export interface TenantApplicationUpdateReq {
   tenantAppID: string
   status?: TenantApplicationStatus
-  config?: string
-  grantedScope?: string
 }
 
 // ---------- 菜单 ----------
 export type MenuType = 'directory' | 'menu' | 'button'
 export type MenuStatus = 'enable' | 'disable'
 export type MenuVisibility = 'public' | 'member' | 'admin'
+/**
+ * 菜单展示开关（后端具名类型，取值 enable/disable；语义等价旧 0/1：1=enable / 0=disable）：
+ * MenuHiddenFlag / MenuExternalLinkFlag / MenuKeepAliveFlag。
+ */
+export type MenuHiddenFlag = 'enable' | 'disable'
+export type MenuExternalLinkFlag = 'enable' | 'disable'
+export type MenuKeepAliveFlag = 'enable' | 'disable'
 
 export interface MenuItem {
   menuID: string
@@ -302,9 +315,12 @@ export interface MenuItem {
   visibility?: MenuVisibility
   component: string
   redirect: string
-  hidden: number
-  externalLink: number
-  keepAlive: number
+  /** 是否隐藏（后端 model.MenuHiddenFlag）：enable/disable */
+  hidden: MenuHiddenFlag
+  /** 是否外链（后端 model.MenuExternalLinkFlag）：enable/disable */
+  externalLink: MenuExternalLinkFlag
+  /** 是否缓存（后端 model.MenuKeepAliveFlag）：enable/disable */
+  keepAlive: MenuKeepAliveFlag
   status: MenuStatus
   createdAt?: number
   updatedAt?: number
@@ -321,22 +337,16 @@ export interface MenuMyTreeResp {
 }
 
 // ---------- 域名 ----------
+/** 域名验证状态（后端具名类型 model.DomainVerificationStatus）：unverified/verified。 */
+export type DomainVerificationStatus = 'unverified' | 'verified'
+
 export interface DomainItem {
   id: string
   domain: string
-  isVerified: number
-  verifiedAt: number | null
+  /** 验证状态（后端 domain.verification_status）；后端 verified_at 已下线，不再回传验证时间。 */
+  verificationStatus: DomainVerificationStatus
   createdAt: number
   updatedAt: number
-}
-
-// ---------- 审计日志 ----------
-export interface AuditLogItem {
-  logID: string
-  tenantID: string
-  key: string
-  payload?: unknown
-  createdAt?: number
 }
 
 // ---------- Connector（auth） ----------
@@ -347,6 +357,15 @@ export type ConnectorProvider = 'google' | 'github' | 'microsoft' | 'wechat'
 /** 连接器能力（后端具名类型 model.ConnectorCapability）。 */
 export type ConnectorCapability = 'authorize' | 'callback' | 'claim_mapping' | 'domain_policy' | 'profile_sync'
 
+/**
+ * 连接器开关（后端具名类型，取值 enable/disable；语义等价旧 bool：true=enable / false=disable）：
+ * ConnectorAutoCreateUserFlag / ConnectorAccountLinkFlag / ConnectorSyncProfileFlag / ConnectorTokenStorageFlag。
+ */
+export type ConnectorAutoCreateUserFlag = 'enable' | 'disable'
+export type ConnectorAccountLinkFlag = 'enable' | 'disable'
+export type ConnectorSyncProfileFlag = 'enable' | 'disable'
+export type ConnectorTokenStorageFlag = 'enable' | 'disable'
+
 export interface ConnectorItem {
   connectorID: string
   tenantID: string
@@ -355,10 +374,10 @@ export interface ConnectorItem {
   protocol: ConnectorProtocol
   provider: ConnectorProvider
   status: ConnectorStatus
-  allowAutoCreateUser: number
-  allowAccountLink: number
-  syncProfile: number
-  enableTokenStorage: number
+  allowAutoCreateUser: ConnectorAutoCreateUserFlag
+  allowAccountLink: ConnectorAccountLinkFlag
+  syncProfile: ConnectorSyncProfileFlag
+  enableTokenStorage: ConnectorTokenStorageFlag
   config?: unknown
   claimMapping?: unknown
   domainPolicy?: unknown

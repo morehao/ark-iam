@@ -1,7 +1,6 @@
 package svcoidc
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -20,13 +19,12 @@ import (
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 type appSeedApp struct {
 	clientCode string
-	allow      *bool
+	allow      model.AppPersonCreateTenantPolicy
 }
 
 func newSeedDB(t *testing.T, apps []appSeedApp) *gorm.DB {
@@ -51,12 +49,12 @@ func newSeedDB(t *testing.T, apps []appSeedApp) *gorm.DB {
 		}
 		client := &model.ApplicationClientEntity{Code: a.clientCode, AppID: appEntity.ID}
 		client.ID = client.AppID
-		client.RedirectURIs = datatypes.JSON(`[]`)
-		client.PostLogoutRedirectURIs = datatypes.JSON(`[]`)
-		client.GrantTypes = datatypes.JSON(`["authorization_code"]`)
-		client.ResponseTypes = datatypes.JSON(`["code"]`)
-		client.AllowedOrigins = datatypes.JSON(`[]`)
-		client.DefaultScopes = datatypes.JSON(`["openid"]`)
+		client.RedirectURIs = model.RedirectURIList{}
+		client.PostLogoutRedirectURIs = model.PostLogoutRedirectURIList{}
+		client.GrantTypes = model.GrantTypeList{model.GrantTypeAuthorizationCode}
+		client.ResponseTypes = model.ResponseTypeList{model.ResponseTypeCode}
+		client.AllowedOrigins = model.AllowedOriginList{}
+		client.DefaultScopes = model.DefaultScopeList{model.ScopeOpenID}
 		if err := db.Create(client).Error; err != nil {
 			t.Fatalf("seed client %s: %v", a.clientCode, err)
 		}
@@ -95,7 +93,7 @@ func TestRegisterPersonDisallowedWhenAppPolicyFalse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider: %v", err)
 	}
-	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", allow: model.BoolPtr(false)}})
+	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", allow: model.AppPersonCreateTenantPolicyDisable}})
 	authReq := newAuthReq(t, provider, "cid-1")
 
 	svc := registerSvc(provider, db, nil)
@@ -114,7 +112,7 @@ func TestRegisterPersonCreatesAndBindsPerson(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider: %v", err)
 	}
-	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", allow: model.BoolPtr(true)}})
+	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", allow: model.AppPersonCreateTenantPolicyEnable}})
 	authReq := newAuthReq(t, provider, "cid-1")
 
 	svc := registerSvc(provider, db, func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
@@ -156,13 +154,11 @@ func TestRegisterPersonExistingPersonRequiresPasswordLogin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider: %v", err)
 	}
-	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", allow: model.BoolPtr(true)}})
+	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", allow: model.AppPersonCreateTenantPolicyEnable}})
 	existing := &model.PersonEntity{
 		Username:          model.StrPtr("alice"),
 		PasswordEncrypted: "keep-me",
 		PasswordMethod:    model.PasswordMethodBcrypt,
-		Profile:           json.RawMessage(`{}`),
-		CustomData:        json.RawMessage(`{}`),
 	}
 	if err := db.Create(existing).Error; err != nil {
 		t.Fatalf("seed existing person: %v", err)
@@ -211,8 +207,8 @@ func TestCreateTenantSucceedsForZeroTenantPerson(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider: %v", err)
 	}
-	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", allow: model.BoolPtr(true)}})
-	p := &model.PersonEntity{Username: model.StrPtr("bob"), Name: "Bob", Profile: json.RawMessage(`{}`), CustomData: json.RawMessage(`{}`)}
+	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", allow: model.AppPersonCreateTenantPolicyEnable}})
+	p := &model.PersonEntity{Username: model.StrPtr("bob"), Name: "Bob"}
 	if err := db.Create(p).Error; err != nil {
 		t.Fatalf("create person: %v", err)
 	}
@@ -240,7 +236,7 @@ func TestCreateTenantSucceedsForZeroTenantPerson(t *testing.T) {
 	// 断言查询按新建租户的显式作用域声明，与 CreateTenant 内部一致，避免绕过租户隔离插件
 	tenantCtx := dbclient.ExplicitTenantContext(t.Context(), res.TenantID)
 	users, uErr := dao.NewUserDao().GetListByCond(tenantCtx, &dao.UserCond{PersonID: p.ID, TenantID: res.TenantID})
-	if uErr != nil || len(users) == 0 || !users[0].IsOwner {
+	if uErr != nil || len(users) == 0 || users[0].OwnerType != model.OwnerTypeOwner {
 		t.Fatalf("expected owner user, got users:%#v err:%v", users, uErr)
 	}
 	// owner 走与平台侧同一份开通实现：builtin 来源 + 归属根部门 + 内置租户管理员角色
@@ -287,7 +283,7 @@ func TestLoginConfig(t *testing.T) {
 
 	t.Run("allow register => true", func(t *testing.T) {
 		provider := newProvider(t)
-		db := newSeedDB(t, []appSeedApp{{clientCode: "cfg-1", allow: model.BoolPtr(true)}})
+		db := newSeedDB(t, []appSeedApp{{clientCode: "cfg-1", allow: model.AppPersonCreateTenantPolicyEnable}})
 		authReq := newAuthReq(t, provider, "cfg-1")
 		svc := registerSvc(provider, db, nil)
 		ginCtx, _ := gin.CreateTestContext(nil)
@@ -303,7 +299,7 @@ func TestLoginConfig(t *testing.T) {
 
 	t.Run("disallow register => false", func(t *testing.T) {
 		provider := newProvider(t)
-		db := newSeedDB(t, []appSeedApp{{clientCode: "cfg-2", allow: model.BoolPtr(false)}})
+		db := newSeedDB(t, []appSeedApp{{clientCode: "cfg-2", allow: model.AppPersonCreateTenantPolicyDisable}})
 		authReq := newAuthReq(t, provider, "cfg-2")
 		svc := registerSvc(provider, db, nil)
 		ginCtx, _ := gin.CreateTestContext(nil)

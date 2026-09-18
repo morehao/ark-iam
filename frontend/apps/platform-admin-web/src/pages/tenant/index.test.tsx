@@ -167,12 +167,14 @@ describe('SuspendedTag 租户状态映射', () => {
     expect(screen.getByText('正常')).toBeInTheDocument()
   })
 
-  it('兼容历史的 isSuspended 布尔/0-1 字段（用户列表等仍在用）', () => {
-    const { rerender } = render(<SuspendedTag value={1} />)
-    expect(screen.getByText('挂起')).toBeInTheDocument()
-
-    rerender(<SuspendedTag value={false} />)
-    expect(screen.getByText('正常')).toBeInTheDocument()
+  it('不再兼容历史的 isSuspended 布尔/0-1 字段：1/true/0/false 一律显示「正常」', () => {
+    // P3 起 person/user 状态统一为 status 枚举；继续兼容 1/true 会掩盖读错字段的缺陷
+    for (const v of [1, true, 0, false]) {
+      const { unmount } = render(<SuspendedTag value={v} />)
+      expect(screen.queryByText('挂起')).not.toBeInTheDocument()
+      expect(screen.getByText('正常')).toBeInTheDocument()
+      unmount()
+    }
   })
 })
 

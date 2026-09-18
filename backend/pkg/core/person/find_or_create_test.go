@@ -36,8 +36,6 @@ func seedPerson(t *testing.T, db *gorm.DB, email string) {
 		PrimaryEmail:      model.StrPtr(email),
 		PrimaryPhone:      model.StrPtr(""),
 		Name:              "seed",
-		Profile:           []byte(`{}`),
-		CustomData:        []byte(`{}`),
 		PasswordEncrypted: "hash",
 		PasswordMethod:    model.PasswordMethodBcrypt,
 	}).Error; err != nil {

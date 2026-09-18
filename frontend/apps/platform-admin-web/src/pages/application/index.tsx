@@ -42,6 +42,17 @@ function confirmTemplateWithdraw(codes: string[]): Promise<boolean> {
   })
 }
 
+/**
+ * 入口策略开关（allowPersonCreateTenant/allowJoinByInvite）已为字符串枚举 enable/disable：
+ * Switch 需要 boolean，回显用 getValueProps 把 'enable' 显式转成 checked，
+ * 提交用 getValueFromEvent 转回字符串枚举（P3 前是 boolean，不得残留）。
+ */
+const ENABLE_FLAG_FORM_PROPS = {
+  valuePropName: 'checked' as const,
+  getValueProps: (value: unknown) => ({ checked: value === 'enable' }),
+  getValueFromEvent: (checked: boolean) => (checked ? 'enable' : 'disable'),
+}
+
 export default function ApplicationList() {
   const [data, setData] = useState<ApplicationItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -80,8 +91,8 @@ export default function ApplicationList() {
   const handleCreate = () => {
     setEditing(null)
     form.resetFields()
-    // 两个入口策略默认关闭（与后端列默认值 false 一致）；不开则对应自助通道的整体拒绝
-    form.setFieldsValue({ sort: 0, allowPersonCreateTenant: false, allowJoinByInvite: false, roleTemplate: [] })
+    // 两个入口策略默认关闭（与后端列默认值一致）；不开则对应自助通道的整体拒绝
+    form.setFieldsValue({ sort: 0, allowPersonCreateTenant: 'disable', allowJoinByInvite: 'disable', roleTemplate: [] })
     setModalOpen(true)
   }
 
@@ -95,9 +106,9 @@ export default function ApplicationList() {
       logoUrl: record.logoUrl,
       homepageUrl: record.homepageUrl,
       sort: record.sort,
-      // 后端列为可空 *bool，未配置（NULL）时语义等同关闭，此处归一成 false 交给 Switch
-      allowPersonCreateTenant: !!record.allowPersonCreateTenant,
-      allowJoinByInvite: !!record.allowJoinByInvite,
+      // 后端列已去可空（NULL ≡ disable）：未配置时归一成 'disable' 交给 Switch
+      allowPersonCreateTenant: record.allowPersonCreateTenant ?? 'disable',
+      allowJoinByInvite: record.allowJoinByInvite ?? 'disable',
       roleTemplate: record.roleTemplate ?? [],
     })
     setModalOpen(true)
@@ -293,7 +304,7 @@ export default function ApplicationList() {
           <Form.Item
             name="allowPersonCreateTenant"
             label="个人自助创建租户"
-            valuePropName="checked"
+            {...ENABLE_FLAG_FORM_PROPS}
             tooltip="开启后，经本应用登录的零租户用户可自助注册并开通自己的租户（通道 A），注册人成为该租户拥有者"
           >
             <Switch checkedChildren="允许" unCheckedChildren="禁止" />
@@ -301,7 +312,7 @@ export default function ApplicationList() {
           <Form.Item
             name="allowJoinByInvite"
             label="允许邀请加入租户"
-            valuePropName="checked"
+            {...ENABLE_FLAG_FORM_PROPS}
             tooltip="开启后，经本应用登录的用户可凭邀请码加入已有租户（通道 B），加入者恒为普通成员；关闭时 joinTenant 一律拒绝"
           >
             <Switch checkedChildren="允许" unCheckedChildren="禁止" />
@@ -372,8 +383,8 @@ export default function ApplicationList() {
             <Descriptions.Item label="首页地址">{detail.homepageUrl || '-'}</Descriptions.Item>
             <Descriptions.Item label="排序">{detail.sort ?? '-'}</Descriptions.Item>
             <Descriptions.Item label="创建时间">{fmtTime(detail.createdAt)}</Descriptions.Item>
-            <Descriptions.Item label="个人自助创建租户">{detail.allowPersonCreateTenant ? '是' : '否'}</Descriptions.Item>
-            <Descriptions.Item label="允许邀请加入租户">{detail.allowJoinByInvite ? '是' : '否'}</Descriptions.Item>
+            <Descriptions.Item label="个人自助创建租户">{detail.allowPersonCreateTenant === 'enable' ? '是' : '否'}</Descriptions.Item>
+            <Descriptions.Item label="允许邀请加入租户">{detail.allowJoinByInvite === 'enable' ? '是' : '否'}</Descriptions.Item>
             <Descriptions.Item label="角色模板">
               {detail.roleTemplate?.length
                 ? detail.roleTemplate.map((item) => `${item.name}（${item.code}）`).join('、')

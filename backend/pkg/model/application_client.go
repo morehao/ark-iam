@@ -4,7 +4,6 @@ import (
 	"regexp"
 
 	"github.com/morehao/golib/dbaccess/gormdao"
-	"gorm.io/datatypes"
 )
 
 const TableNameApplicationClient = "application_client"
@@ -52,6 +51,24 @@ const (
 	TokenEndpointAuthMethodNone  TokenEndpointAuthMethod = "none"
 )
 
+// ClientPKCEPolicy application_client.require_pkce。
+type ClientPKCEPolicy string
+
+// PKCE 强制开关取值（禁止硬编码）。
+const (
+	ClientPKCEPolicyEnable  ClientPKCEPolicy = "enable"
+	ClientPKCEPolicyDisable ClientPKCEPolicy = "disable"
+)
+
+// ClientAuthTimeClaimPolicy application_client.require_auth_time。
+type ClientAuthTimeClaimPolicy string
+
+// auth_time 声明开关取值（禁止硬编码）。
+const (
+	ClientAuthTimeClaimPolicyEnable  ClientAuthTimeClaimPolicy = "enable"
+	ClientAuthTimeClaimPolicyDisable ClientAuthTimeClaimPolicy = "disable"
+)
+
 // ClientCodePattern 客户端编码（= OIDC client_id）规则：小写字母开头，仅含**小写字母与下划线**
 // （如 platform_admin_web、iam_client）。比 AppCodePattern 更严——不出现数字，也禁连字符。
 // 由创建方（控制台表单 / 接口调用方）填写，服务端与前端各自校验一份，口径必须一致：
@@ -76,20 +93,20 @@ type ApplicationClientEntity struct {
 	Code string `gorm:"column:code;type:varchar(64);not null;default:'';uniqueIndex;comment:客户端编码(= OIDC client_id)" json:"code"`
 	Name string `gorm:"column:name;type:varchar(256);not null;default:'';comment:客户端名称" json:"name"`
 
-	RedirectURIs            datatypes.JSON          `gorm:"column:redirect_uris;type:json;not null;default:('[]');comment:授权回调地址" json:"redirectURIs"`
-	PostLogoutRedirectURIs  datatypes.JSON          `gorm:"column:post_logout_redirect_uris;type:json;not null;default:('[]');comment:登出回调地址" json:"postLogoutRedirectURIs"`
-	BackChannelLogoutURI    string                  `gorm:"column:back_channel_logout_uri;type:varchar(512);not null;default:'';comment:OIDC背信道登出通知地址" json:"backChannelLogoutURI"`
-	GrantTypes              datatypes.JSON          `gorm:"column:grant_types;type:json;not null;default:('[\"authorization_code\"]');comment:授权类型" json:"grantTypes"`
-	ResponseTypes           datatypes.JSON          `gorm:"column:response_types;type:json;not null;default:('[\"code\"]');comment:响应类型" json:"responseTypes"`
-	TokenEndpointAuthMethod TokenEndpointAuthMethod `gorm:"column:token_endpoint_auth_method;type:varchar(32);not null;default:'client_secret_basic';comment:令牌端点认证方式" json:"tokenEndpointAuthMethod"`
-	AllowedOrigins          datatypes.JSON          `gorm:"column:allowed_origins;type:json;not null;default:('[]');comment:CORS白名单" json:"allowedOrigins"`
-	RequirePKCE             bool                    `gorm:"column:require_pkce;type:boolean;not null;default:false;comment:是否强制PKCE" json:"requirePKCE"`
-	RequireAuthTime         bool                    `gorm:"column:require_auth_time;type:boolean;not null;default:false;comment:是否需要auth_time声明" json:"requireAuthTime"`
-	DefaultScopes           datatypes.JSON          `gorm:"column:default_scopes;type:json;not null;default:('[\"openid\",\"profile\"]');comment:默认权限范围" json:"defaultScopes"`
-	AccessTokenTTL          int64                   `gorm:"column:access_token_ttl;type:bigint;not null;default:900;comment:访问令牌有效期(秒)" json:"accessTokenTTL"`
-	RefreshTokenTTL         int64                   `gorm:"column:refresh_token_ttl;type:bigint;not null;default:2592000;comment:刷新令牌有效期(秒)" json:"refreshTokenTTL"`
-	Source                  ApplicationClientSource `gorm:"column:source;type:varchar(32);not null;default:'third_party';comment:客户端来源(builtin内置/first_party第一方/third_party第三方)" json:"source"`
-	Status                  ApplicationClientStatus `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态" json:"status"`
+	RedirectURIs            RedirectURIList           `gorm:"column:redirect_uris;type:json;serializer:json;not null;default:('[]');comment:授权回调地址" json:"redirectURIs"`
+	PostLogoutRedirectURIs  PostLogoutRedirectURIList `gorm:"column:post_logout_redirect_uris;type:json;serializer:json;not null;default:('[]');comment:登出回调地址" json:"postLogoutRedirectURIs"`
+	BackChannelLogoutURI    string                    `gorm:"column:back_channel_logout_uri;type:varchar(512);not null;default:'';comment:OIDC背信道登出通知地址" json:"backChannelLogoutURI"`
+	GrantTypes              GrantTypeList             `gorm:"column:grant_types;type:json;serializer:json;not null;default:('[\"authorization_code\"]');comment:授权类型" json:"grantTypes"`
+	ResponseTypes           ResponseTypeList          `gorm:"column:response_types;type:json;serializer:json;not null;default:('[\"code\"]');comment:响应类型" json:"responseTypes"`
+	TokenEndpointAuthMethod TokenEndpointAuthMethod   `gorm:"column:token_endpoint_auth_method;type:varchar(32);not null;default:'client_secret_basic';comment:令牌端点认证方式" json:"tokenEndpointAuthMethod"`
+	AllowedOrigins          AllowedOriginList         `gorm:"column:allowed_origins;type:json;serializer:json;not null;default:('[]');comment:CORS白名单" json:"allowedOrigins"`
+	RequirePKCE             ClientPKCEPolicy          `gorm:"column:require_pkce;type:varchar(16);not null;default:'disable';comment:是否强制PKCE(enable/disable)" json:"requirePKCE"`
+	RequireAuthTime         ClientAuthTimeClaimPolicy `gorm:"column:require_auth_time;type:varchar(16);not null;default:'disable';comment:是否需要auth_time声明(enable/disable)" json:"requireAuthTime"`
+	DefaultScopes           DefaultScopeList          `gorm:"column:default_scopes;type:json;serializer:json;not null;default:('[\"openid\",\"profile\"]');comment:默认权限范围" json:"defaultScopes"`
+	AccessTokenTTL          int64                     `gorm:"column:access_token_ttl;type:bigint;not null;default:900;comment:访问令牌有效期(秒)" json:"accessTokenTTL"`
+	RefreshTokenTTL         int64                     `gorm:"column:refresh_token_ttl;type:bigint;not null;default:2592000;comment:刷新令牌有效期(秒)" json:"refreshTokenTTL"`
+	Source                  ApplicationClientSource   `gorm:"column:source;type:varchar(32);not null;default:'third_party';comment:客户端来源(builtin内置/first_party第一方/third_party第三方)" json:"source"`
+	Status                  ApplicationClientStatus   `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态" json:"status"`
 
 	CreatedBy string `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id" json:"createdBy"`
 	UpdatedBy string `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id" json:"updatedBy"`

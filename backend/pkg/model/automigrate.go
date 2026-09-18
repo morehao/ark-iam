@@ -29,7 +29,6 @@ func AllEntities() []any {
 		&RefreshTokenEntity{},
 		&SessionAuditEntity{},
 		&AuditLogEntity{},
-		&LogEntity{},
 		&InviteEntity{},
 	}
 }

@@ -2,7 +2,6 @@ package svcauth
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
 
@@ -35,7 +34,7 @@ type connectorPersonRepository interface {
 type connectorUserIdentityRepository interface {
 	GetByIssuerAndExternalSubject(ctx context.Context, issuer, externalSubject string) (*model.UserIdentityEntity, error)
 	Insert(ctx context.Context, entity *model.UserIdentityEntity) error
-	UpdateBinding(ctx context.Context, identityID, personID string, issuer string, detail []byte) error
+	UpdateBinding(ctx context.Context, identityID, personID string, issuer string, detail model.UserIdentityDetail) error
 }
 
 // connectorUserRepository 负责写入租户成员关系（UserEntity）。
@@ -183,13 +182,17 @@ func (r *connectorUserIdentityRepoAdapter) Insert(ctx context.Context, entity *m
 	return r.mapper.repoDB(ctx).Create(entity).Error
 }
 
-func (r *connectorUserIdentityRepoAdapter) UpdateBinding(ctx context.Context, identityID, personID string, issuer string, detail []byte) error {
-	updateMap := map[string]any{
-		"person_id": personID,
-		"issuer":    issuer,
-		"detail":    json.RawMessage(detail),
+func (r *connectorUserIdentityRepoAdapter) UpdateBinding(ctx context.Context, identityID, personID string, issuer string, detail model.UserIdentityDetail) error {
+	entity := &model.UserIdentityEntity{
+		PersonID: personID,
+		Issuer:   issuer,
+		Detail:   detail,
 	}
-	return r.mapper.repoDB(ctx).Model(&model.UserIdentityEntity{}).Where("id = ?", identityID).Updates(updateMap).Error
+	// 结构化 Updates + 显式列：detail 是 JSON 列，map 更新不经过 serializer 会写坏数据。
+	return r.mapper.repoDB(ctx).Model(&model.UserIdentityEntity{}).
+		Where("id = ?", identityID).
+		Select("person_id", "issuer", "detail").
+		Updates(entity).Error
 }
 
 // connectorUserRepoAdapter 写入租户成员（UserEntity）。
@@ -220,8 +223,6 @@ func (m *identityMapper) Resolve(ctx context.Context, input identityResolveInput
 		PrimaryEmail: model.StrPtr(input.Identity.Email),
 		Name:         input.Identity.DisplayName,
 		Avatar:       input.Identity.AvatarURL,
-		Profile:      json.RawMessage("{}"),
-		CustomData:   json.RawMessage("{}"),
 		CreatedBy:    "",
 	}
 	if person.Name == "" {
@@ -235,13 +236,11 @@ func (m *identityMapper) Resolve(ctx context.Context, input identityResolveInput
 		// 否则后续登录流程（Callback → listPersonTenants）查不到成员而失败。
 		now := time.Now()
 		user := &model.UserEntity{
-			TenantID:   input.Connector.TenantID,
-			PersonID:   person.ID,
-			Name:       person.Name,
-			Profile:    json.RawMessage("{}"),
-			CustomData: json.RawMessage("{}"),
-			JoinedAt:   &now,
-			CreatedBy:  "",
+			TenantID:  input.Connector.TenantID,
+			PersonID:  person.ID,
+			Name:      person.Name,
+			JoinedAt:  &now,
+			CreatedBy: "",
 		}
 		if err := m.userRepo.Insert(txCtx, user); err != nil {
 			return err
@@ -258,10 +257,7 @@ func (m *identityMapper) Resolve(ctx context.Context, input identityResolveInput
 
 func (m *identityMapper) bindIdentity(ctx context.Context, connector ConnectorRuntime, person *model.PersonEntity, identity StandardIdentity, existingIdentity *model.UserIdentityEntity) error {
 	_ = connector
-	detail, err := json.Marshal(identity)
-	if err != nil {
-		return err
-	}
+	detail := toUserIdentityDetail(identity)
 	if existingIdentity != nil {
 		return m.userIdentityRepo.UpdateBinding(ctx, existingIdentity.ID, person.ID, identity.Issuer, detail)
 	}
@@ -273,6 +269,23 @@ func (m *identityMapper) bindIdentity(ctx context.Context, connector ConnectorRu
 		Detail:          detail,
 		CreatedBy:       "",
 	})
+}
+
+// toUserIdentityDetail 在写入边界把驱动输出收敛到持久化白名单：claims 等非白名单字段不落库。
+func toUserIdentityDetail(identity StandardIdentity) model.UserIdentityDetail {
+	emailVerified := model.EmailVerificationUnverified
+	if identity.EmailVerified {
+		emailVerified = model.EmailVerificationVerified
+	}
+	return model.UserIdentityDetail{
+		Issuer:        identity.Issuer,
+		Subject:       identity.Subject,
+		Email:         identity.Email,
+		EmailVerified: emailVerified,
+		Username:      identity.Username,
+		DisplayName:   identity.DisplayName,
+		AvatarURL:     identity.AvatarURL,
+	}
 }
 
 func resolveIdentityUsername(identity StandardIdentity) string {

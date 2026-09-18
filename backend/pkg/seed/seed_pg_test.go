@@ -97,19 +97,19 @@ func TestSeedIamAgainstPostgres(t *testing.T) {
 	assertCount("tenant", 1)
 	assertCount("application", 2)
 	assertCount("role", 2)
-	assertCount("menu", 15)
+	assertCount("menu", 14)
 	assertCount("person", 1)
 	assertCount("tenant_user", 1)
 	assertCount("application_client", 2)
 	assertCount("user_role", 2)
-	assertCount("role_menu", 15)
+	assertCount("role_menu", 14)
 	assertCount("tenant_application", 2)
 	assertCount("department", 1)
 	assertCount("department_user", 1)
 
 	// 验证管理员用户归属
 	var u model.UserEntity
-	if err := db.Where("is_owner = ?", true).First(&u).Error; err != nil {
+	if err := db.Where("owner_type = ?", model.OwnerTypeOwner).First(&u).Error; err != nil {
 		t.Fatalf("admin user not found: %v", err)
 	}
 	if u.TenantID == "" || u.PersonID == "" {
@@ -128,6 +128,160 @@ func TestSeedIamAgainstPostgres(t *testing.T) {
 		t.Fatalf("admin department relation not found: %v", err)
 	}
 	t.Logf("admin dept relation: dept=%s relation=%s", ou.DepartmentID, ou.RelationType)
+
+	// AC-6：PG 侧结构断言——AutoMigrate 实际产出的列类型必须与模型声明一致。
+	// SQLite 会忽略 varchar 长度与 jsonb，只有真实 PG 才能验证「16 列确实是 varchar(16)」与
+	// 「JSON 列确实是 jsonb」，以及「已下线列/表确实没有被重新创建」。
+	type columnRow struct {
+		TableName  string
+		ColumnName string
+		DataType   string
+		CharMax    *int64
+	}
+	columnOf := func(table, column string) (columnRow, bool) {
+		t.Helper()
+		var row columnRow
+		err := db.Raw(`SELECT table_name, column_name, data_type, character_maximum_length AS char_max
+			FROM information_schema.columns WHERE table_schema = current_schema()
+			  AND table_name = ? AND column_name = ?`, table, column).Scan(&row).Error
+		if err != nil {
+			t.Fatalf("query column %s.%s: %v", table, column, err)
+		}
+		return row, row.ColumnName != ""
+	}
+
+	// 16 个布尔语义列：抽查各表代表列，必须是 varchar(16)（具名枚举列统一宽度）
+	for _, col := range []struct{ table, column string }{
+		{"person", "status"},
+		{"person", "password_status"},
+		{"tenant_user", "status"},
+		{"tenant_user", "owner_type"},
+		{"domain", "verification_status"},
+		{"application", "allow_person_create_tenant"},
+		{"application", "allow_join_by_invite"},
+		{"application_client", "require_pkce"},
+		{"application_client", "require_auth_time"},
+		{"menu", "hidden"},
+		{"menu", "external_link"},
+		{"menu", "keep_alive"},
+		{"connector", "allow_auto_create_user"},
+		{"connector", "allow_account_link"},
+		{"connector", "sync_profile"},
+		{"connector", "enable_token_storage"},
+	} {
+		row, ok := columnOf(col.table, col.column)
+		if !ok {
+			t.Errorf("列 %s.%s 不存在（P3 改名/枚举化未生效）", col.table, col.column)
+			continue
+		}
+		if row.DataType != "character varying" || row.CharMax == nil || *row.CharMax != 16 {
+			t.Errorf("列 %s.%s 类型 = %s(%v)，want varchar(16)", col.table, col.column, row.DataType, row.CharMax)
+		}
+	}
+
+	// JSON 列：必须是 jsonb（serializer:json + 具名载具类型），抽查覆盖 3 类载具
+	for _, col := range []struct{ table, column string }{
+		{"application", "role_template"},
+		{"application_client", "redirect_uris"},
+		{"connector", "config"},
+		{"refresh_token", "scopes"},
+		{"user_identity", "detail"},
+	} {
+		row, ok := columnOf(col.table, col.column)
+		if !ok {
+			t.Errorf("JSON 列 %s.%s 不存在", col.table, col.column)
+			continue
+		}
+		if row.DataType != "jsonb" && row.DataType != "json" {
+			t.Errorf("列 %s.%s 类型 = %s，want jsonb/json", col.table, col.column, row.DataType)
+		}
+	}
+
+	// 已下线列必须不存在（AutoMigrate 只增不删：全新库更不该有）
+	for _, col := range []struct{ table, column string }{
+		{"tenant_application", "config"},
+		{"tenant_application", "granted_scope"},
+		{"person", "profile"},
+		{"person", "custom_data"},
+		{"person", "must_change_password"},
+		{"person", "is_suspended"},
+		{"tenant_user", "profile"},
+		{"tenant_user", "custom_data"},
+		{"tenant_user", "is_owner"},
+		{"tenant_user", "is_suspended"},
+		{"api_key", "scope"},
+		{"api_key", "last_used_at"},
+		{"user_identity", "last_used_at"},
+		{"domain", "is_verified"},
+		{"domain", "verified_at"},
+	} {
+		if row, ok := columnOf(col.table, col.column); ok {
+			t.Errorf("已下线列 %s.%s 仍存在（type=%s）", col.table, col.column, row.DataType)
+		}
+	}
+
+	// 已下线表必须不存在
+	for _, tbl := range []string{"log", "system", "scope", "resource", "role_scope"} {
+		var n int64
+		if err := db.Raw(`SELECT count(*) FROM information_schema.tables
+			WHERE table_schema = current_schema() AND table_name = ?`, tbl).Scan(&n).Error; err != nil {
+			t.Fatalf("query table %s: %v", tbl, err)
+		}
+		if n != 0 {
+			t.Errorf("已下线表 %s 仍存在", tbl)
+		}
+	}
+
+	// AC-6 值域断言（校验存量值，不只是列类型）：只断言 DDL 挡不住「不删库直接升级」——
+	// AutoMigrate 不改既有列，手工 ALTER ... USING bool::varchar 会把存量值留成文本
+	// 'true'/'false'，它们都不是合法枚举值：判 active/suspended、enable/disable 会全部落到
+	// 默认分支，其中 require_pkce='true' 还会 fail-open 让 PKCE 静默失守。故逐列校验存量值。
+	allowedValues := func(vs ...string) []string { return vs }
+	for _, col := range []struct {
+		table   string
+		column  string
+		allowed []string
+	}{
+		{"person", "status", allowedValues(string(model.PersonStatusActive), string(model.PersonStatusSuspended))},
+		{"person", "password_status", allowedValues(string(model.PasswordStatusNormal), string(model.PasswordStatusMustChange))},
+		{"tenant_user", "status", allowedValues(string(model.UserStatusActive), string(model.UserStatusSuspended))},
+		{"tenant_user", "owner_type", allowedValues(string(model.OwnerTypeOwner), string(model.OwnerTypeNormal))},
+		{"domain", "verification_status", allowedValues(string(model.DomainVerificationUnverified), string(model.DomainVerificationVerified))},
+		{"application", "allow_person_create_tenant", allowedValues(string(model.AppPersonCreateTenantPolicyEnable), string(model.AppPersonCreateTenantPolicyDisable))},
+		{"application", "allow_join_by_invite", allowedValues(string(model.AppJoinByInvitePolicyEnable), string(model.AppJoinByInvitePolicyDisable))},
+		{"application_client", "require_pkce", allowedValues(string(model.ClientPKCEPolicyEnable), string(model.ClientPKCEPolicyDisable))},
+		{"application_client", "require_auth_time", allowedValues(string(model.ClientAuthTimeClaimPolicyEnable), string(model.ClientAuthTimeClaimPolicyDisable))},
+		{"menu", "hidden", allowedValues(string(model.MenuHiddenFlagEnable), string(model.MenuHiddenFlagDisable))},
+		{"menu", "external_link", allowedValues(string(model.MenuExternalLinkFlagEnable), string(model.MenuExternalLinkFlagDisable))},
+		{"menu", "keep_alive", allowedValues(string(model.MenuKeepAliveFlagEnable), string(model.MenuKeepAliveFlagDisable))},
+		{"connector", "allow_auto_create_user", allowedValues(string(model.ConnectorAutoCreateUserFlagEnable), string(model.ConnectorAutoCreateUserFlagDisable))},
+		{"connector", "allow_account_link", allowedValues(string(model.ConnectorAccountLinkFlagEnable), string(model.ConnectorAccountLinkFlagDisable))},
+		{"connector", "sync_profile", allowedValues(string(model.ConnectorSyncProfileFlagEnable), string(model.ConnectorSyncProfileFlagDisable))},
+		{"connector", "enable_token_storage", allowedValues(string(model.ConnectorTokenStorageFlagEnable), string(model.ConnectorTokenStorageFlagDisable))},
+	} {
+		var illegal int64
+		if err := db.Table(col.table).
+			Where(col.column+" IS NULL OR "+col.column+" NOT IN ?", col.allowed).
+			Count(&illegal).Error; err != nil {
+			t.Fatalf("count illegal %s.%s: %v", col.table, col.column, err)
+		}
+		if illegal != 0 {
+			t.Errorf("列 %s.%s 有 %d 行非法枚举值（合法值 %v；boolean→varchar 脏值会留成 'true'/'false'）",
+				col.table, col.column, illegal, col.allowed)
+		}
+	}
+
+	// 值域内的错值抓不住安全不变式：内置客户端的 require_pkce 即使写成合法的 'disable' 也通过了上面的断言，
+	// 但 PKCE 未强制意味着授权码可被截获重放，故显式钉住种子必须写 enable。
+	for _, code := range []string{model.SeedBuiltinClientPlatformAdminWeb, model.SeedBuiltinClientTenantAdminWeb} {
+		var policy string
+		if err := db.Raw(`SELECT require_pkce FROM application_client WHERE code = ?`, code).Scan(&policy).Error; err != nil {
+			t.Fatalf("query require_pkce of %s: %v", code, err)
+		}
+		if policy != string(model.ClientPKCEPolicyEnable) {
+			t.Errorf("内置客户端 %s 的 require_pkce = %q，want %q", code, policy, model.ClientPKCEPolicyEnable)
+		}
+	}
 
 	cleanup()
 	t.Log("PG AutoMigrate + Seed idempotency check passed")

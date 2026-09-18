@@ -1,7 +1,6 @@
 package svctenant
 
 import (
-	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -24,8 +23,6 @@ func seedTestPerson(t *testing.T, db *gorm.DB, id, username, email string) *mode
 		PasswordEncrypted: "",
 		PasswordMethod:    "",
 		Name:              "张三",
-		Profile:           json.RawMessage("{}"),
-		CustomData:        json.RawMessage("{}"),
 		CreatedBy:         "t",
 	}
 	if err := db.Create(entity).Error; err != nil {
@@ -42,8 +39,6 @@ func seedTestUserWithPerson(t *testing.T, db *gorm.DB, userID, tenantID, personI
 		TenantID:   tenantID,
 		PersonID:   personID,
 		Name:       name,
-		Profile:    json.RawMessage("{}"),
-		CustomData: json.RawMessage("{}"),
 		JoinedAt:   &now,
 		CreatedBy:  "t",
 	}).Error; err != nil {
@@ -118,7 +113,7 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 	if err := gcrypto.ComparePasswordHash(bobPerson.PasswordEncrypted, respB.InitialPassword); err != nil {
 		t.Fatalf("initial password does not match stored hash: %v", err)
 	}
-	if !bobPerson.MustChangePassword {
+	if bobPerson.PasswordStatus != model.PasswordStatusMustChange {
 		t.Fatalf("newly created person must be forced to change password on first login")
 	}
 
@@ -326,6 +321,103 @@ func TestUserPageListKeyword(t *testing.T) {
 	}
 	if resp.Total != 3 {
 		t.Fatalf("expected total 3, got %d", resp.Total)
+	}
+}
+
+// TestUserStatusEnumContract 用户状态枚举契约（P3）：
+// 筛选入参空串=不过滤、命中白名单才生效；创建/更新入口对非法枚举值返回各自的功能级错误码且不落库。
+func TestUserStatusEnumContract(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{},
+		&model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	svc := &userSvc{}
+	ginCtx := newAdminCtx(t, db, "t1", "op")
+
+	if err := db.Create(&model.DepartmentEntity{
+		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "o1"}},
+		TenantID:   "t1",
+		DeptPath:   "/o1",
+		DeptDepth:  1,
+		Name:       "研发部",
+		Status:     model.DeptNodeStatusEnable,
+	}).Error; err != nil {
+		t.Fatalf("seed dept: %v", err)
+	}
+	statusPtr := func(status model.UserStatus) *model.UserStatus { return &status }
+
+	// 创建：合法枚举落库
+	created, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{
+		Name: "张三", PrimaryEmail: "zs@x.com", PrimaryDepartmentID: "o1",
+		Status: model.UserStatusSuspended,
+	})
+	if err != nil {
+		t.Fatalf("create suspended user: %v", err)
+	}
+	var createdEntity model.UserEntity
+	if err := db.WithContext(ginCtx).First(&createdEntity, "id = ?", created.UserID).Error; err != nil {
+		t.Fatalf("query created user: %v", err)
+	}
+	if createdEntity.Status != model.UserStatusSuspended {
+		t.Fatalf("created status = %q, want %q", createdEntity.Status, model.UserStatusSuspended)
+	}
+
+	// 创建：非法枚举被拒
+	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{
+		Name: "李四", PrimaryEmail: "ls@x.com", PrimaryDepartmentID: "o1",
+		Status: model.UserStatus("bogus"),
+	}); !errors.Is(err, code.GetError(code.UserCreateError)) {
+		t.Fatalf("create with invalid status: want %v, got %v", code.GetError(code.UserCreateError), err)
+	}
+
+	// 筛选：命中枚举按状态过滤，空串不过滤
+	resp, err := svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Status: model.UserStatusSuspended})
+	if err != nil {
+		t.Fatalf("page list suspended: %v", err)
+	}
+	if resp.Total != 1 || len(resp.List) != 1 || resp.List[0].Status != model.UserStatusSuspended {
+		t.Fatalf("suspended filter mismatch: %+v", resp)
+	}
+	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Status: model.UserStatusActive})
+	if err != nil {
+		t.Fatalf("page list active: %v", err)
+	}
+	if resp.Total != 0 {
+		t.Fatalf("active filter should be empty, got %d", resp.Total)
+	}
+	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("page list without status: %v", err)
+	}
+	if resp.Total != 1 {
+		t.Fatalf("empty status must not filter, got total %d", resp.Total)
+	}
+
+	// 筛选：非法枚举被拒
+	if _, err := svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Status: model.UserStatus("bogus")}); !errors.Is(err, code.GetError(code.UserGetPageListError)) {
+		t.Fatalf("page list with invalid status: want %v, got %v", code.GetError(code.UserGetPageListError), err)
+	}
+
+	// 更新：非法枚举被拒且不落库
+	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: created.UserID, Status: statusPtr(model.UserStatus("bogus"))}); !errors.Is(err, code.GetError(code.UserUpdateError)) {
+		t.Fatalf("update with invalid status: want %v, got %v", code.GetError(code.UserUpdateError), err)
+	}
+	var afterInvalid model.UserEntity
+	if err := db.WithContext(ginCtx).First(&afterInvalid, "id = ?", created.UserID).Error; err != nil {
+		t.Fatalf("reload after invalid update: %v", err)
+	}
+	if afterInvalid.Status != model.UserStatusSuspended {
+		t.Fatalf("invalid update must not change status, got %q", afterInvalid.Status)
+	}
+
+	// 更新：合法枚举生效
+	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: created.UserID, Status: statusPtr(model.UserStatusActive)}); err != nil {
+		t.Fatalf("activate user: %v", err)
+	}
+	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Status: model.UserStatusActive})
+	if err != nil {
+		t.Fatalf("page list active after update: %v", err)
+	}
+	if resp.Total != 1 || len(resp.List) != 1 || resp.List[0].Status != model.UserStatusActive {
+		t.Fatalf("update status not applied: %+v", resp)
 	}
 }
 
@@ -930,8 +1022,8 @@ func TestUserResetPasswordIssuesTemporaryPassword(t *testing.T) {
 	if err := gcrypto.ComparePasswordHash(personAfterReset.PasswordEncrypted, created.InitialPassword); err == nil {
 		t.Fatalf("old temporary password must no longer be valid after reset")
 	}
-	if !personAfterReset.MustChangePassword {
-		t.Fatalf("reset must set must_change_password=true")
+	if personAfterReset.PasswordStatus != model.PasswordStatusMustChange {
+		t.Fatalf("reset must set password_status=must_change")
 	}
 }
 

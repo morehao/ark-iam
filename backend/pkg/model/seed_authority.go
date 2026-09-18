@@ -146,7 +146,7 @@ var SeedFieldAuthorities = []SeedFieldAuthority{
 	// 种子管理员：口令绝不覆盖（重置走专用接口），source 是内置标记（安全不变式）。
 	{SeedEntityPerson, "password_encrypted", SeedFieldCreateOnly},
 	{SeedEntityUser, "source", SeedFieldReconcile},
-	{SeedEntityUser, "is_owner", SeedFieldCreateOnly},
+	{SeedEntityUser, "owner_type", SeedFieldCreateOnly},
 }
 
 // seedFieldModeIndex 矩阵的 (entity, field) → mode 索引（包初始化时构建，只读）。

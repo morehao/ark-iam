@@ -26,7 +26,7 @@ describe('TimeCell / timeColumn', () => {
   it('列宽常量覆盖完整时间串所需的最小宽度', () => {
     // 14px + 全站 tabular-nums 实测 146.06px；antd v5 单元格左右内边距各 16px
     expect(TIME_COL_WIDTH).toBeGreaterThanOrEqual(178.06)
-    // 相对时间列（「3 天前」/「从未使用」）可以明显更窄
+    // 相对时间列（「3 天前」）可以明显更窄
     expect(TIME_COL_WIDTH_RELATIVE).toBeLessThan(TIME_COL_WIDTH)
   })
 
@@ -37,7 +37,7 @@ describe('TimeCell / timeColumn', () => {
     expect(el).toHaveStyle({ whiteSpace: 'nowrap' })
   })
 
-  it('空值走 placeholder：默认 -、永不过期、从未使用', () => {
+  it('空值走 placeholder：默认 -、永不过期', () => {
     const { unmount } = render(<TimeCell value={null} />)
     expect(screen.getByText('-')).toBeInTheDocument()
     unmount()
@@ -56,7 +56,7 @@ describe('TimeCell / timeColumn', () => {
 
   it('timeColumn 统一列宽与渲染，禁止各页自写 150/160/170', () => {
     const absolute = timeColumn<{ createdAt: number }>({ title: '创建时间', dataIndex: 'createdAt' })
-    const relative = timeColumn<{ lastUsedAt: number }>({ title: '最后使用', dataIndex: 'lastUsedAt', relative: true })
+    const relative = timeColumn<{ loginTime: number }>({ title: '登录时间', dataIndex: 'loginTime', relative: true })
 
     expect(absolute.title).toBe('创建时间')
     expect(absolute.key).toBe('createdAt')

@@ -13,6 +13,7 @@ import (
 
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objauth"
 	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/glog"
@@ -272,14 +273,14 @@ func (s *OIDCStorage) CreateAuthRequest(ctx context.Context, authReq *oidc.AuthR
 	if v, ok := ctx.Value(TenantHintKey).(string); ok {
 		tenantID = v
 	}
-	// M3：客户端配置 require_pkce=1 时强制 PKCE（RFC 7636），缺失 code_challenge 直接拒绝。
+	// M3：客户端配置 require_pkce=enable 时强制 PKCE（RFC 7636），缺失 code_challenge 直接拒绝。
 	if err := s.enforceRequirePKCE(ctx, authReq); err != nil {
 		return nil, err
 	}
 	return s.protocolStore.CreateAuthRequest(ctx, authReq, userID, tenantID)
 }
 
-// enforceRequirePKCE 对 require_pkce=1 的客户端强制 PKCE。
+// enforceRequirePKCE 对 require_pkce=enable 的客户端强制 PKCE。
 // 客户端不存在或持久化存储不可用时不做额外判定（由协议流程后续统一报错）。
 func (s *OIDCStorage) enforceRequirePKCE(ctx context.Context, authReq *oidc.AuthRequest) error {
 	if s.persistentStore == nil {
@@ -290,7 +291,8 @@ func (s *OIDCStorage) enforceRequirePKCE(ctx context.Context, authReq *oidc.Auth
 		return nil
 	}
 	oc, ok := client.(*OIDCClient)
-	if !ok || !oc.clientEntity.RequirePKCE {
+	// 枚举列必须与常量比较：'disable' 是非空字符串，真值判断恒为 true 会误强制 PKCE。
+	if !ok || oc.clientEntity.RequirePKCE != model.ClientPKCEPolicyEnable {
 		return nil
 	}
 	if authReq.CodeChallenge == "" {

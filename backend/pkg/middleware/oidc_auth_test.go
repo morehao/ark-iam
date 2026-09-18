@@ -6,7 +6,6 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -217,8 +216,6 @@ func TestAPIKeyParallelAuth(t *testing.T) {
 		TenantID:   "1",
 		UserType:   model.UserTypeMachine,
 		Name:       "parallel-auth-service-account",
-		Profile:    json.RawMessage(`{}`),
-		CustomData: json.RawMessage(`{}`),
 	}
 	if err := dao.NewUserDao().Insert(context.Background(), owner); err != nil {
 		t.Fatalf("seed api key owner: %v", err)
@@ -233,7 +230,6 @@ func TestAPIKeyParallelAuth(t *testing.T) {
 		Name:        "parallel-auth-test",
 		KeyHash:     keyHash,
 		KeyPrefix:   rawKey[:7],
-		Scope:       []byte(`{}`),
 		CreatedBy:   "1",
 	}
 	if err := dao.NewApiKeyDao().Insert(context.Background(), seed); err != nil {
@@ -275,13 +271,11 @@ func seedDefaultOIDCUser(t *testing.T) {
 	t.Helper()
 	now := time.Now()
 	user := &model.UserEntity{
-		TenantID:    "1",
-		PersonID:    "88",
-		Name:        "oidc-user",
-		Profile:     []byte(`{}`),
-		CustomData:  []byte(`{}`),
-		JoinedAt:    &now,
-		IsSuspended: false,
+		TenantID:   "1",
+		PersonID:   "88",
+		Name:       "oidc-user",
+		JoinedAt:   &now,
+		Status:     model.UserStatusActive,
 	}
 	if err := dao.NewUserDao().Insert(context.Background(), user); err != nil {
 		t.Fatalf("seed oidc user: %v", err)

@@ -6,14 +6,15 @@ import type {
   TenantMachineUserItem,
   TenantMachineUserUpdateReq,
   TenantUserRoleItem,
+  UserStatus,
 } from '@ark-iam/types'
 
-/** 服务账号分页列表（租户内机器主体，user_type=machine；name=名称模糊，isSuspended=挂起过滤；条目含主部门 primaryDepartmentID/primaryDepartmentName） */
+/** 服务账号分页列表（租户内机器主体，user_type=machine；name=名称模糊，status=状态过滤（空串=不过滤）；条目含主部门 primaryDepartmentID/primaryDepartmentName） */
 export const getMachineUserPageList = (params?: {
   page?: number
   pageSize?: number
   name?: string
-  isSuspended?: boolean
+  status?: UserStatus
 }) => request.get<any, PageListResp<TenantMachineUserItem>>('/tenant/machine-users', { params })
 
 /** 创建服务账号（需系统管理能力 super）：primaryDepartmentID=主部门ID(primary,单值,必填)，secondaryDepartmentIDs=参与部门(secondary,可多条,可选) */
@@ -34,9 +35,9 @@ export const updateMachineUser = (data: TenantMachineUserUpdateReq) => {
   return request.put<any, string>(`/tenant/machine-users/${machineUserID}`, body)
 }
 
-/** 局部更新服务账号状态（isSuspended：挂起/启用） */
-export const updateMachineUserStatus = (machineUserID: string, isSuspended: boolean) =>
-  request.patch<any, string>(`/tenant/machine-users/${machineUserID}`, { isSuspended })
+/** 局部更新服务账号状态（status：active=启用 / suspended=挂起） */
+export const updateMachineUserStatus = (machineUserID: string, status: UserStatus) =>
+  request.patch<any, string>(`/tenant/machine-users/${machineUserID}`, { status })
 
 /** 删除服务账号（须先删除其全部 API 密钥） */
 export const deleteMachineUser = (machineUserID: string) =>

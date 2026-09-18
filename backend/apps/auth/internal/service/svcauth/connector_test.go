@@ -2,7 +2,6 @@ package svcauth
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -57,7 +56,7 @@ func (f *fakeConnectorUserRepository) Insert(ctx context.Context, user *model.Us
 type fakeConnectorUserIdentityRepository struct {
 	getByIssuerAndExternalSubjectFunc func(ctx context.Context, issuer, externalSubject string) (*model.UserIdentityEntity, error)
 	insertFunc                        func(ctx context.Context, entity *model.UserIdentityEntity) error
-	updateBindingFunc                 func(ctx context.Context, identityID, personID string, issuer string, detail []byte) error
+	updateBindingFunc                 func(ctx context.Context, identityID, personID string, issuer string, detail model.UserIdentityDetail) error
 }
 
 type fakeConnectorRuntimeRepository struct {
@@ -163,7 +162,7 @@ func (f *fakeConnectorUserIdentityRepository) Insert(ctx context.Context, entity
 	return f.insertFunc(ctx, entity)
 }
 
-func (f *fakeConnectorUserIdentityRepository) UpdateBinding(ctx context.Context, identityID, personID string, issuer string, detail []byte) error {
+func (f *fakeConnectorUserIdentityRepository) UpdateBinding(ctx context.Context, identityID, personID string, issuer string, detail model.UserIdentityDetail) error {
 	if f.updateBindingFunc == nil {
 		return nil
 	}
@@ -179,26 +178,23 @@ func TestBuildConnectorInsertEntityKeepsLegacyBusinessIdentifier(t *testing.T) {
 			Protocol:            "oidc",
 			Provider:            "google",
 			Status:              model.ConnectorStatusEnable,
-			AllowAutoCreateUser: true,
-			AllowAccountLink:    true,
-			SyncProfile:         true,
-			EnableTokenStorage:  true,
-			Config: map[string]any{
-				"clientId": "abc",
+			AllowAutoCreateUser: model.ConnectorAutoCreateUserFlagEnable,
+			AllowAccountLink:    model.ConnectorAccountLinkFlagEnable,
+			SyncProfile:         model.ConnectorSyncProfileFlagEnable,
+			EnableTokenStorage:  model.ConnectorTokenStorageFlagEnable,
+			Config: model.ConnectorConfig{
+				ClientID: "abc",
 			},
-			ClaimMapping: map[string]any{
-				"email": "email",
+			ClaimMapping: model.ConnectorClaimMapping{
+				Email: "email",
 			},
-			DomainPolicy: map[string]any{
-				"mode": "allow_all",
+			DomainPolicy: model.ConnectorDomainPolicy{
+				AllowedDomains: model.DomainList{"example.com"},
 			},
 		},
 	}
 
-	entity, err := buildConnectorInsertEntity(req, "99", "created-by")
-	if err != nil {
-		t.Fatalf("buildConnectorInsertEntity returned error: %v", err)
-	}
+	entity := buildConnectorInsertEntity(req, "99", "created-by")
 	if entity.Name != "google-workspace" {
 		t.Fatalf("name should use new connector name, got: %q", entity.Name)
 	}
@@ -219,35 +215,32 @@ func TestBuildConnectorInsertEntityDoesNotPersistLegacyMetadataAsClaimMapping(t 
 			Protocol:            "oidc",
 			Provider:            "google",
 			Status:              model.ConnectorStatusEnable,
-			AllowAutoCreateUser: true,
-			AllowAccountLink:    true,
-			SyncProfile:         true,
-			EnableTokenStorage:  true,
-			Config: map[string]any{
-				"clientId": "abc",
+			AllowAutoCreateUser: model.ConnectorAutoCreateUserFlagEnable,
+			AllowAccountLink:    model.ConnectorAccountLinkFlagEnable,
+			SyncProfile:         model.ConnectorSyncProfileFlagEnable,
+			EnableTokenStorage:  model.ConnectorTokenStorageFlagEnable,
+			Config: model.ConnectorConfig{
+				ClientID: "abc",
 			},
-			ClaimMapping: map[string]any{
-				"email": "email",
+			ClaimMapping: model.ConnectorClaimMapping{
+				Email: "email",
 			},
-			DomainPolicy: map[string]any{
-				"mode": "allow_all",
+			DomainPolicy: model.ConnectorDomainPolicy{
+				AllowedDomains: model.DomainList{"example.com"},
 			},
 		},
 	}
 
-	entity, err := buildConnectorInsertEntity(req, "99", "created-by")
-	if err != nil {
-		t.Fatalf("buildConnectorInsertEntity returned error: %v", err)
+	entity := buildConnectorInsertEntity(req, "99", "created-by")
+	if entity.ClaimMapping.Email != "email" {
+		t.Fatalf("claim mapping should persist new contract data, got: %+v", entity.ClaimMapping)
 	}
-	if string(entity.ClaimMapping) != `{"email":"email"}` {
-		t.Fatalf("claim mapping should persist new contract data, got: %s", string(entity.ClaimMapping))
-	}
-	if string(entity.DomainPolicy) != `{"mode":"allow_all"}` {
-		t.Fatalf("domain policy should persist new contract data, got: %s", string(entity.DomainPolicy))
+	if len(entity.DomainPolicy.AllowedDomains) != 1 || entity.DomainPolicy.AllowedDomains[0] != "example.com" {
+		t.Fatalf("domain policy should persist new contract data, got: %+v", entity.DomainPolicy)
 	}
 }
 
-func TestBuildConnectorUpdateMapDoesNotWritePrimaryKeyIntoNameFields(t *testing.T) {
+func TestBuildConnectorUpdateEntityDoesNotWritePrimaryKeyIntoNameFields(t *testing.T) {
 	req := &dtoauth.ConnectorUpdateReq{
 		ConnectorID: "42",
 		ConnectorBaseInfo: objauth.ConnectorBaseInfo{
@@ -257,34 +250,36 @@ func TestBuildConnectorUpdateMapDoesNotWritePrimaryKeyIntoNameFields(t *testing.
 			Protocol:            "oidc",
 			Provider:            "google",
 			Status:              model.ConnectorStatusEnable,
-			AllowAutoCreateUser: true,
-			AllowAccountLink:    true,
-			SyncProfile:         true,
-			EnableTokenStorage:  true,
-			Config: map[string]any{
-				"clientId": "abc",
+			AllowAutoCreateUser: model.ConnectorAutoCreateUserFlagEnable,
+			AllowAccountLink:    model.ConnectorAccountLinkFlagEnable,
+			SyncProfile:         model.ConnectorSyncProfileFlagEnable,
+			EnableTokenStorage:  model.ConnectorTokenStorageFlagEnable,
+			Config: model.ConnectorConfig{
+				ClientID: "abc",
 			},
-			ClaimMapping: map[string]any{
-				"email": "email",
+			ClaimMapping: model.ConnectorClaimMapping{
+				Email: "email",
 			},
-			DomainPolicy: map[string]any{
-				"mode": "allow_all",
+			DomainPolicy: model.ConnectorDomainPolicy{
+				AllowedDomains: model.DomainList{"example.com"},
 			},
 		},
 	}
 
-	updateMap, err := buildConnectorUpdateMap(req, "100")
-	if err != nil {
-		t.Fatalf("buildConnectorUpdateMap returned error: %v", err)
+	entity, fields := buildConnectorUpdateEntity(req, "100")
+	if entity.Name != "google-workspace" {
+		t.Fatalf("update entity should write name from new dto")
 	}
-	if updateMap["name"] != "google-workspace" {
-		t.Fatalf("update map should write name from new dto")
+	if entity.DisplayName != "Google Workspace" {
+		t.Fatalf("update entity should write display_name from new dto")
 	}
-	if updateMap["display_name"] != "Google Workspace" {
-		t.Fatalf("update map should write display_name from new dto")
+	if entity.ClaimMapping.Email != "email" {
+		t.Fatalf("update entity should persist claim_mapping from new dto")
 	}
-	if string(updateMap["claim_mapping"].(json.RawMessage)) != `{"email":"email"}` {
-		t.Fatalf("update map should persist claim_mapping from new dto")
+	for _, field := range fields {
+		if field == "id" || field == "tenant_id" {
+			t.Fatalf("update fields must not contain identity columns, got %v", fields)
+		}
 	}
 }
 
@@ -442,22 +437,17 @@ func TestIdentityMapperAutoCreatesPersonAndBindsIdentity(t *testing.T) {
 	if insertedUser.PersonID != "44" || insertedUser.TenantID != "22" {
 		t.Fatalf("unexpected user membership person=%s tenant=%s", insertedUser.PersonID, insertedUser.TenantID)
 	}
-	var detail StandardIdentity
-	if err := json.Unmarshal(insertedIdentity.Detail, &detail); err != nil {
-		t.Fatalf("unmarshal inserted identity detail failed: %v", err)
-	}
-	if !reflect.DeepEqual(detail, StandardIdentity{
-		Issuer:      "https://issuer.example.com",
-		Subject:     "external-subject-1",
-		Email:       "user@example.com",
-		Username:    "preferred-user",
-		DisplayName: "Preferred User",
-		AvatarURL:   "https://cdn.example.com/avatar.png",
-		Claims: map[string]any{
-			"department": "engineering",
-		},
+	// 写入边界收敛到持久化白名单：claims 等非白名单字段不落库（见 UserIdentityDetail）。
+	if !reflect.DeepEqual(insertedIdentity.Detail, model.UserIdentityDetail{
+		Issuer:        "https://issuer.example.com",
+		Subject:       "external-subject-1",
+		Email:         "user@example.com",
+		EmailVerified: model.EmailVerificationUnverified,
+		Username:      "preferred-user",
+		DisplayName:   "Preferred User",
+		AvatarURL:     "https://cdn.example.com/avatar.png",
 	}) {
-		t.Fatalf("expected detail to persist standard identity, got %+v", detail)
+		t.Fatalf("expected detail to persist whitelisted identity, got %+v", insertedIdentity.Detail)
 	}
 }
 
@@ -587,7 +577,7 @@ func TestIdentityMapperRepairsOrphanBindingInsteadOfReinserting(t *testing.T) {
 	var updatedIdentityID string
 	var updatedUserID string
 	var updatedIssuer string
-	var updatedDetail StandardIdentity
+	var updatedDetail model.UserIdentityDetail
 
 	mapper := newIdentityMapper(
 		&fakeConnectorPersonRepository{
@@ -609,11 +599,12 @@ func TestIdentityMapperRepairsOrphanBindingInsteadOfReinserting(t *testing.T) {
 				inserted = true
 				return nil
 			},
-			updateBindingFunc: func(ctx context.Context, identityID, personID string, issuer string, detail []byte) error {
+			updateBindingFunc: func(ctx context.Context, identityID, personID string, issuer string, detail model.UserIdentityDetail) error {
 				updatedIdentityID = identityID
 				updatedUserID = personID
 				updatedIssuer = issuer
-				return json.Unmarshal(detail, &updatedDetail)
+				updatedDetail = detail
+				return nil
 			},
 		},
 		WithIdentityMapperTxRunner(connectorRunInTransactionNoop),
@@ -677,7 +668,7 @@ func TestConnectorServiceAuthorizeStoresStateAndReturnsAuthorizationURL(t *testi
 		Protocol: connectorDriverTypeOAuth2,
 		Provider: connectorProviderGithub,
 		Status:   model.ConnectorStatusEnable,
-		Config:   json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
+		Config:   model.ConnectorConfig{AuthURL: "https://github.com/login/oauth/authorize", TokenURL: "https://github.com/login/oauth/access_token", UserInfoURL: "https://api.github.com/user", ClientID: "client-id", ClientSecret: "client-secret", RedirectURI: "https://iam.example.com/callback"},
 	}
 	connectorEntity.ID = "101"
 
@@ -784,7 +775,7 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 		Protocol: connectorDriverTypeOAuth2,
 		Provider: connectorProviderGithub,
 		Status:   model.ConnectorStatusEnable,
-		Config:   json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
+		Config:   model.ConnectorConfig{AuthURL: "https://github.com/login/oauth/authorize", TokenURL: "https://github.com/login/oauth/access_token", UserInfoURL: "https://api.github.com/user", ClientID: "client-id", ClientSecret: "client-secret", RedirectURI: "https://iam.example.com/callback"},
 	}
 	connectorEntity.ID = "101"
 
@@ -897,7 +888,7 @@ func TestConnectorServiceCallbackAllowsMissingConnectorID(t *testing.T) {
 		Protocol: connectorDriverTypeOAuth2,
 		Provider: connectorProviderGithub,
 		Status:   model.ConnectorStatusEnable,
-		Config:   json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
+		Config:   model.ConnectorConfig{AuthURL: "https://github.com/login/oauth/authorize", TokenURL: "https://github.com/login/oauth/access_token", UserInfoURL: "https://api.github.com/user", ClientID: "client-id", ClientSecret: "client-secret", RedirectURI: "https://iam.example.com/callback"},
 	}
 	connectorEntity.ID = "101"
 
@@ -1003,8 +994,8 @@ func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 		Protocol:            connectorDriverTypeOAuth2,
 		Provider:            connectorProviderGithub,
 		Status:              model.ConnectorStatusEnable,
-		AllowAutoCreateUser: true,
-		Config:              json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
+		AllowAutoCreateUser: model.ConnectorAutoCreateUserFlagEnable,
+		Config:              model.ConnectorConfig{AuthURL: "https://github.com/login/oauth/authorize", TokenURL: "https://github.com/login/oauth/access_token", UserInfoURL: "https://api.github.com/user", ClientID: "client-id", ClientSecret: "client-secret", RedirectURI: "https://iam.example.com/callback"},
 	}
 	connectorEntity.ID = "101"
 
@@ -1099,8 +1090,8 @@ func TestConnectorCallbackInvokesIdentityResolverTokenGeneratorAndLoginRecorder(
 		Protocol:            connectorDriverTypeOAuth2,
 		Provider:            connectorProviderGithub,
 		Status:              model.ConnectorStatusEnable,
-		AllowAutoCreateUser: true,
-		Config:              json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
+		AllowAutoCreateUser: model.ConnectorAutoCreateUserFlagEnable,
+		Config:              model.ConnectorConfig{AuthURL: "https://github.com/login/oauth/authorize", TokenURL: "https://github.com/login/oauth/access_token", UserInfoURL: "https://api.github.com/user", ClientID: "client-id", ClientSecret: "client-secret", RedirectURI: "https://iam.example.com/callback"},
 	}
 	connectorEntity.ID = "202"
 
@@ -1196,7 +1187,7 @@ func TestConnectorServiceCallbackRetainsStateWhenDriverExchangeFails(t *testing.
 		Protocol: connectorDriverTypeOAuth2,
 		Provider: connectorProviderGithub,
 		Status:   model.ConnectorStatusEnable,
-		Config:   json.RawMessage(`{"authUrl":"https://github.com/login/oauth/authorize","tokenUrl":"https://github.com/login/oauth/access_token","userInfoUrl":"https://api.github.com/user","clientId":"client-id","clientSecret":"client-secret","redirectUri":"https://iam.example.com/callback"}`),
+		Config:   model.ConnectorConfig{AuthURL: "https://github.com/login/oauth/authorize", TokenURL: "https://github.com/login/oauth/access_token", UserInfoURL: "https://api.github.com/user", ClientID: "client-id", ClientSecret: "client-secret", RedirectURI: "https://iam.example.com/callback"},
 	}
 	conn.ID = "101"
 

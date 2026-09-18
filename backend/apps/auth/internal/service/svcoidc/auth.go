@@ -77,14 +77,14 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	if err != nil {
 		return nil, err
 	}
-	// 首次登录强制改密（D3）：持临时密码的自然人（must_change_password）一律先改密，
+	// 首次登录强制改密（D3）：持临时密码的自然人（password_status=must_change）一律先改密，
 	// 不完成授权（done=false）、不发 code、不建 SSO 会话，只把 subject 绑到授权票据，
 	// 供 POST /oidc/login/changePassword 识别身份。该判定刻意放在租户分支之前：
 	// 无论零租户、单租户还是多租户，"临时密码必须先改"都成立。
 	//
 	// 由此得到一个不变式：SSO 会话只可能建立在已完成密码登录之上，而完成登录要求
-	// must_change_password=false，因此无需在 SSO/静默登录路径重复该判定。
-	if personEntity != nil && personEntity.MustChangePassword {
+	// password_status=normal，因此无需在 SSO/静默登录路径重复该判定。
+	if personEntity != nil && personEntity.PasswordStatus == model.PasswordStatusMustChange {
 		if cErr := svc.provider.Storage.CompleteAuthRequest(ctx, req.AuthRequestID,
 			oidcop.BuildSubject(personEntity.ID), time.Now(), []string{"pwd"}, "", "", false); cErr != nil {
 			return nil, mapAuthRequestError(cErr)

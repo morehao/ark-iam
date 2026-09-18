@@ -2,6 +2,20 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { message } from 'antd'
 import { BizCode } from '@ark-iam/types'
 
+/**
+ * silent：本次请求属于 best-effort 探测，失败由调用方自行兜底
+ * （典型场景：菜单页首屏恢复"上次选择的应用"，该应用可能已被删除或换库，旧 ID 失效），
+ * 此时不弹全局提示，避免每次进页面都弹一个调用方已经处理掉的错误。
+ *
+ * 语义边界：silent 只抑制「提示」（message.error / message.warning）；
+ * 401/令牌失效的会话处置（handleSessionExpired → 跳登录页）是流程控制，不受 silent 影响。
+ */
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    silent?: boolean
+  }
+}
+
 let userProvider: (() => { access_token: string } | null | undefined) | null = null
 
 // sessionExpiredHandler 由 auth 层注册（见 @ark-iam/auth hooks）：
@@ -46,10 +60,10 @@ request.interceptors.response.use(
       return Promise.reject(new Error(msg || '未认证'))
     }
     if (code === BizCode.Forbidden || code === BizCode.PermissionDenied) {
-      message.warning('暂无权限访问')
+      if (!response.config.silent) message.warning('暂无权限访问')
       return Promise.reject(new Error(msg || '暂无权限'))
     }
-    message.error(msg || '请求失败')
+    if (!response.config.silent) message.error(msg || '请求失败')
     return Promise.reject(new Error(msg || '请求失败'))
   },
   async (error: AxiosError) => {
@@ -58,7 +72,7 @@ request.interceptors.response.use(
       return Promise.reject(error)
     }
     const data = error.response?.data as any
-    message.error(data?.msg || '请求失败')
+    if (!error.config?.silent) message.error(data?.msg || '请求失败')
     return Promise.reject(error)
   },
 )

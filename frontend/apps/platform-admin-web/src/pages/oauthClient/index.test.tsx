@@ -55,8 +55,8 @@ const detail: OAuthClientDetailType = {
   backChannelLogoutURI: 'http://localhost:8100/oidc/bc-logout/platform',
   responseTypes: ['code'],
   allowedOrigins: [],
-  requirePKCE: true,
-  requireAuthTime: false,
+  requirePKCE: 'enable',
+  requireAuthTime: 'disable',
   defaultScopes: ['openid', 'profile', 'email'],
   accessTokenTTL: 900,
   refreshTokenTTL: 2592000,
@@ -285,7 +285,8 @@ describe('客户端协议参数（回调地址 / 授权类型 / Scopes / PKCE）
     expect(payload.grantTypes).toEqual(['authorization_code', 'refresh_token'])
     expect(payload.responseTypes).toEqual(['code'])
     expect(payload.defaultScopes).toEqual(['openid', 'profile', 'email'])
-    expect(payload.requirePKCE).toBe(true)
+    expect(payload.requirePKCE).toBe('enable')
+    expect(payload.requireAuthTime).toBe('disable')
     expect(payload.accessTokenTTL).toBe(900)
     expect(payload.refreshTokenTTL).toBe(2592000)
   })
@@ -305,14 +306,29 @@ describe('客户端协议参数（回调地址 / 授权类型 / Scopes / PKCE）
   })
 })
 
-/** 详情页的 requirePKCE/requireAuthTime 是 Go bool：曾按 === 1 判断，恒为假 → 永远显示"否" */
+/**
+ * D3 回归（P3 枚举契约）：requirePKCE/requireAuthTime 由 Go bool 改为字符串枚举 enable/disable。
+ * 详情页若写成 `detail.requirePKCE ? …`，'disable' 是恒真值 → 永远显示"是"；必须判 `=== 'enable'`。
+ */
 describe('详情页 PKCE 展示', () => {
-  it('requirePKCE=true 显示"是"', async () => {
+  it("requirePKCE='enable' 显示\"是\"", async () => {
     renderApp(oauthClientDetailPath(clients[0].applicationClientID))
 
     const label = await screen.findByText('强制 PKCE')
     // bordered 布局下标签是 th、内容是同级 td：按所在行（tr）定位，不能按单元格容器定位
     const row = label.closest('tr') as HTMLElement
     expect(within(row).getByText('是')).toBeInTheDocument()
+  })
+
+  it("requirePKCE='disable' 显示\"否\"（枚举真值判断回归）", async () => {
+    mockGetOAuthClientDetail.mockResolvedValue({ ...detail, requirePKCE: 'disable', requireAuthTime: 'enable' })
+
+    renderApp(oauthClientDetailPath(clients[0].applicationClientID))
+
+    const pkceRow = (await screen.findByText('强制 PKCE')).closest('tr') as HTMLElement
+    expect(within(pkceRow).getByText('否')).toBeInTheDocument()
+
+    const authTimeRow = (await screen.findByText('需要 auth_time')).closest('tr') as HTMLElement
+    expect(within(authTimeRow).getByText('是')).toBeInTheDocument()
   })
 })

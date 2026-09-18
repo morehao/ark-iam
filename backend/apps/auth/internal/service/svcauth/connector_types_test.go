@@ -1,7 +1,6 @@
 package svcauth
 
 import (
-	"encoding/json"
 	"net/url"
 	"reflect"
 	"testing"
@@ -59,20 +58,15 @@ func TestDriverRegistryReturnsOAuth2Driver(t *testing.T) {
 func TestSelectDriverForConnector(t *testing.T) {
 	registry := defaultConnectorDriverRegistry()
 
-	oidcConfig, err := json.Marshal(map[string]any{
-		"issuer":       "https://accounts.google.com",
-		"clientId":     "oidc-client",
-		"clientSecret": "secret",
-		"redirectUri":  "https://console.example.com/callback",
-	})
-	if err != nil {
-		t.Fatalf("marshal oidc config failed: %v", err)
-	}
-
 	driver, config, err := selectDriverForConnector(registry, &model.ConnectorEntity{
 		Protocol: connectorDriverTypeOIDC,
 		Provider: connectorProviderGoogle,
-		Config:   oidcConfig,
+		Config: model.ConnectorConfig{
+			Issuer:       "https://accounts.google.com",
+			ClientID:     "oidc-client",
+			ClientSecret: "secret",
+			RedirectURI:  "https://console.example.com/callback",
+		},
 	})
 	if err != nil {
 		t.Fatalf("selectDriverForConnector returned error for oidc connector: %v", err)
@@ -84,22 +78,17 @@ func TestSelectDriverForConnector(t *testing.T) {
 		t.Fatalf("expected oidc connector config, got protocol=%q provider=%q", config.Protocol, config.Provider)
 	}
 
-	oauth2Config, err := json.Marshal(map[string]any{
-		"authUrl":      "https://github.com/login/oauth/authorize",
-		"tokenUrl":     "https://github.com/login/oauth/access_token",
-		"userInfoUrl":  "https://api.github.com/user",
-		"clientId":     "oauth-client",
-		"clientSecret": "secret",
-		"redirectUri":  "https://console.example.com/callback",
-	})
-	if err != nil {
-		t.Fatalf("marshal oauth2 config failed: %v", err)
-	}
-
 	driver, config, err = selectDriverForConnector(registry, &model.ConnectorEntity{
 		Protocol: connectorDriverTypeOAuth2,
 		Provider: connectorProviderGithub,
-		Config:   oauth2Config,
+		Config: model.ConnectorConfig{
+			AuthURL:      "https://github.com/login/oauth/authorize",
+			TokenURL:     "https://github.com/login/oauth/access_token",
+			UserInfoURL:  "https://api.github.com/user",
+			ClientID:     "oauth-client",
+			ClientSecret: "secret",
+			RedirectURI:  "https://console.example.com/callback",
+		},
 	})
 	if err != nil {
 		t.Fatalf("selectDriverForConnector returned error for oauth2 connector: %v", err)
@@ -116,14 +105,10 @@ func TestSelectDriverForConnector(t *testing.T) {
 		t.Fatalf("expected connector not exist error for nil connector, got: %#v", err)
 	}
 
-	unsupportedConfig, err := json.Marshal(map[string]any{"redirectUri": "https://console.example.com/callback"})
-	if err != nil {
-		t.Fatalf("marshal unsupported config failed: %v", err)
-	}
 	_, _, err = selectDriverForConnector(registry, &model.ConnectorEntity{
 		Protocol: "saml",
 		Provider: "okta",
-		Config:   unsupportedConfig,
+		Config:   model.ConnectorConfig{RedirectURI: "https://console.example.com/callback"},
 	})
 	if err == nil || err.Error() != code.GetError(code.ConnectorGetDetailError).Error() {
 		t.Fatalf("expected connector detail error for unsupported protocol, got: %#v", err)
@@ -136,7 +121,7 @@ func TestSelectDriverForConnectorRejectsInvalidConfig(t *testing.T) {
 	_, _, err := selectDriverForConnector(registry, &model.ConnectorEntity{
 		Protocol: connectorDriverTypeOIDC,
 		Provider: connectorProviderGoogle,
-		Config:   json.RawMessage(`{}`),
+		Config:   model.ConnectorConfig{},
 	})
 	if err == nil || err.Error() != code.GetError(code.ConnectorGetDetailError).Error() {
 		t.Fatalf("expected stable error for empty oidc config, got: %#v", err)
@@ -145,7 +130,7 @@ func TestSelectDriverForConnectorRejectsInvalidConfig(t *testing.T) {
 	_, _, err = selectDriverForConnector(registry, &model.ConnectorEntity{
 		Protocol: connectorDriverTypeOAuth2,
 		Provider: connectorProviderGithub,
-		Config:   json.RawMessage(`{}`),
+		Config:   model.ConnectorConfig{},
 	})
 	if err == nil || err.Error() != code.GetError(code.ConnectorGetDetailError).Error() {
 		t.Fatalf("expected stable error for empty oauth2 config, got: %#v", err)
@@ -153,21 +138,16 @@ func TestSelectDriverForConnectorRejectsInvalidConfig(t *testing.T) {
 }
 
 func TestBuildConnectorConfigKeepsProviderSpecificFields(t *testing.T) {
-	configData, err := json.Marshal(map[string]any{
-		"issuer":       "https://login.microsoftonline.com/common/v2.0",
-		"clientId":     "entra-client",
-		"clientSecret": "secret",
-		"redirectUri":  "https://console.example.com/callback",
-		"tenant":       "common",
-	})
-	if err != nil {
-		t.Fatalf("marshal config failed: %v", err)
-	}
-
 	config, err := buildConnectorConfig(&model.ConnectorEntity{
 		Protocol: connectorDriverTypeOIDC,
 		Provider: connectorProviderMicrosoft,
-		Config:   configData,
+		Config: model.ConnectorConfig{
+			Issuer:       "https://login.microsoftonline.com/common/v2.0",
+			ClientID:     "entra-client",
+			ClientSecret: "secret",
+			RedirectURI:  "https://console.example.com/callback",
+			Tenant:       "common",
+		},
 	})
 	if err != nil {
 		t.Fatalf("buildConnectorConfig returned error: %v", err)
@@ -175,52 +155,38 @@ func TestBuildConnectorConfigKeepsProviderSpecificFields(t *testing.T) {
 	if config.Protocol != connectorDriverTypeOIDC || config.Provider != connectorProviderMicrosoft {
 		t.Fatalf("expected connector protocol/provider to be preserved, got protocol=%q provider=%q", config.Protocol, config.Provider)
 	}
-	tenant, ok := config.Raw["tenant"]
-	if !ok {
-		t.Fatalf("expected provider-specific field tenant to be preserved")
-	}
-	if tenant != "common" {
-		t.Fatalf("expected tenant field to equal common, got %#v", tenant)
+	if config.Tenant != "common" {
+		t.Fatalf("expected tenant field to equal common, got %#v", config.Tenant)
 	}
 }
 
 func TestSelectDriverForConnectorRequiresMicrosoftTenant(t *testing.T) {
 	registry := defaultConnectorDriverRegistry()
 
-	missingTenantConfig, err := json.Marshal(map[string]any{
-		"issuer":       "https://login.microsoftonline.com/common/v2.0",
-		"clientId":     "entra-client",
-		"clientSecret": "secret",
-		"redirectUri":  "https://console.example.com/callback",
-	})
-	if err != nil {
-		t.Fatalf("marshal missing tenant config failed: %v", err)
-	}
-
-	_, _, err = selectDriverForConnector(registry, &model.ConnectorEntity{
+	_, _, err := selectDriverForConnector(registry, &model.ConnectorEntity{
 		Protocol: connectorDriverTypeOIDC,
 		Provider: connectorProviderMicrosoft,
-		Config:   missingTenantConfig,
+		Config: model.ConnectorConfig{
+			Issuer:       "https://login.microsoftonline.com/common/v2.0",
+			ClientID:     "entra-client",
+			ClientSecret: "secret",
+			RedirectURI:  "https://console.example.com/callback",
+		},
 	})
 	if err == nil || err.Error() != code.GetError(code.ConnectorGetDetailError).Error() {
 		t.Fatalf("expected stable error for microsoft oidc config without tenant, got: %#v", err)
 	}
 
-	validConfig, err := json.Marshal(map[string]any{
-		"issuer":       "https://login.microsoftonline.com/common/v2.0",
-		"clientId":     "entra-client",
-		"clientSecret": "secret",
-		"redirectUri":  "https://console.example.com/callback",
-		"tenant":       "common",
-	})
-	if err != nil {
-		t.Fatalf("marshal valid microsoft config failed: %v", err)
-	}
-
 	driver, config, err := selectDriverForConnector(registry, &model.ConnectorEntity{
 		Protocol: connectorDriverTypeOIDC,
 		Provider: connectorProviderMicrosoft,
-		Config:   validConfig,
+		Config: model.ConnectorConfig{
+			Issuer:       "https://login.microsoftonline.com/common/v2.0",
+			ClientID:     "entra-client",
+			ClientSecret: "secret",
+			RedirectURI:  "https://console.example.com/callback",
+			Tenant:       "common",
+		},
 	})
 	if err != nil {
 		t.Fatalf("expected microsoft oidc config with tenant to pass, got: %v", err)
@@ -228,8 +194,8 @@ func TestSelectDriverForConnectorRequiresMicrosoftTenant(t *testing.T) {
 	if driver.DriverType() != connectorDriverTypeOIDC {
 		t.Fatalf("expected oidc driver, got %q", driver.DriverType())
 	}
-	if config.Raw["tenant"] != "common" {
-		t.Fatalf("expected tenant to remain readable, got %#v", config.Raw["tenant"])
+	if config.Tenant != "common" {
+		t.Fatalf("expected tenant to remain readable, got %#v", config.Tenant)
 	}
 }
 
@@ -339,18 +305,18 @@ func TestConnectorTypesExposeNewContractFields(t *testing.T) {
 			Protocol:            "oidc",
 			Provider:            "google",
 			Status:              model.ConnectorStatusEnable,
-			AllowAutoCreateUser: true,
-			AllowAccountLink:    true,
-			SyncProfile:         true,
-			EnableTokenStorage:  true,
-			Config: map[string]any{
-				"issuer": "https://accounts.google.com",
+			AllowAutoCreateUser: model.ConnectorAutoCreateUserFlagEnable,
+			AllowAccountLink:    model.ConnectorAccountLinkFlagEnable,
+			SyncProfile:         model.ConnectorSyncProfileFlagEnable,
+			EnableTokenStorage:  model.ConnectorTokenStorageFlagEnable,
+			Config: model.ConnectorConfig{
+				Issuer: "https://accounts.google.com",
 			},
-			ClaimMapping: map[string]any{
-				"email": "email",
+			ClaimMapping: model.ConnectorClaimMapping{
+				Email: "email",
 			},
-			DomainPolicy: map[string]any{
-				"mode": "allow_all",
+			DomainPolicy: model.ConnectorDomainPolicy{
+				AllowedDomains: model.DomainList{"example.com"},
 			},
 		},
 	}
@@ -405,7 +371,7 @@ func TestConnectorTypesExposeNewContractFields(t *testing.T) {
 		Provider:      model.ConnectorProviderGoogle,
 		DisplayName:   "Google",
 		IsStandard:    true,
-		DefaultScopes: []string{"openid", "profile", "email"},
+		DefaultScopes: []string{model.ScopeOpenID, model.ScopeProfile, model.ScopeEmail},
 		Capabilities:  []model.ConnectorCapability{model.ConnectorCapabilityAuthorize, model.ConnectorCapabilityCallback},
 		ConfigSchema: map[string]any{
 			"type": "object",

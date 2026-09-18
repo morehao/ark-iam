@@ -11,14 +11,15 @@ import type {
   TenantUserResetPasswordResp,
   TenantUserRoleItem,
   TenantUserCreateResp,
+  UserStatus,
 } from '@ark-iam/types'
 
-/** 获取当前租户内的用户目录（分页，关键词=姓名/用户名/邮箱/手机；departmentID=仅筛选恰在该部门的用户） */
+/** 获取当前租户内的用户目录（分页，关键词=姓名/用户名/邮箱/手机；status=状态过滤，空串=不过滤；departmentID=仅筛选恰在该部门的用户） */
 export const getTenantUserPageList = (params?: {
   page?: number
   pageSize?: number
   keyword?: string
-  isSuspended?: boolean
+  status?: UserStatus
   departmentID?: string
 }) => request.get<any, PageListResp<TenantUserItem>>('/tenant/users', { params })
 
@@ -28,8 +29,8 @@ export const createTenantUser = (data: TenantUserCreateReq) => request.post<any,
 /** 用户详情（基础信息 + 部门归属 + 角色） */
 export const getTenantUserDetail = (userID: string) => request.get<any, TenantUserDetail>(`/tenant/users/${userID}`)
 
-/** 局部更新用户（姓名/头像/状态 + 主/参与/负责部门） */
-export const updateTenantUser = (data: { userID: string } & TenantUserDepartmentUpdate & { name?: string; avatar?: string; isSuspended?: boolean }) => {
+/** 局部更新用户（姓名/头像/状态 + 主/参与/负责部门；status 省略=不变） */
+export const updateTenantUser = (data: { userID: string } & TenantUserDepartmentUpdate & { name?: string; avatar?: string; status?: UserStatus }) => {
   const { userID, ...body } = data
   return request.patch<any, string>(`/tenant/users/${userID}`, body)
 }

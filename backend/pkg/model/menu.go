@@ -47,6 +47,33 @@ const (
 	MenuStatusDisable MenuStatus = "disable" // 停用
 )
 
+// MenuHiddenFlag menu.hidden。
+type MenuHiddenFlag string
+
+// 菜单隐藏开关取值（禁止硬编码）。
+const (
+	MenuHiddenFlagEnable  MenuHiddenFlag = "enable"
+	MenuHiddenFlagDisable MenuHiddenFlag = "disable"
+)
+
+// MenuExternalLinkFlag menu.external_link。
+type MenuExternalLinkFlag string
+
+// 菜单外链开关取值（禁止硬编码）。
+const (
+	MenuExternalLinkFlagEnable  MenuExternalLinkFlag = "enable"
+	MenuExternalLinkFlagDisable MenuExternalLinkFlag = "disable"
+)
+
+// MenuKeepAliveFlag menu.keep_alive。
+type MenuKeepAliveFlag string
+
+// 菜单缓存开关取值（禁止硬编码）。
+const (
+	MenuKeepAliveFlagEnable  MenuKeepAliveFlag = "enable"
+	MenuKeepAliveFlagDisable MenuKeepAliveFlag = "disable"
+)
+
 type MenuEntity struct {
 	gormdao.BaseEntity
 	AppID    string `gorm:"column:app_id;type:varchar(36);not null;default:'';comment:所属应用id;uniqueIndex:uk_menu_app_code_active,where:deleted_at IS NULL"`
@@ -59,21 +86,21 @@ type MenuEntity struct {
 	// 控制台不可见也不可写。种子查行、退役清理、租户开通授权都以它为依据，
 	// 因此业务字段 Code 可以自由修改，不会触发「按 code 查不到 → 重建一行」。
 	// 控制台自建菜单恒为空串；空串不进唯一索引（uk_menu_seed_key_active 是部分唯一索引）。
-	SeedKey      string         `gorm:"column:seed_key;type:varchar(64);not null;default:'';comment:种子身份键(内置菜单稳定标识,控制台不可见);uniqueIndex:uk_menu_seed_key_active,where:deleted_at IS NULL AND seed_key <> ''"`
-	Path         string         `gorm:"column:path;type:varchar(512);not null;default:'';comment:菜单路径"`
-	Icon         string         `gorm:"column:icon;type:varchar(256);not null;default:'';comment:菜单图标"`
-	Sort         int            `gorm:"column:sort;type:int;not null;default:0;comment:排序"`
-	Type         MenuType       `gorm:"column:type;type:varchar(32);not null;default:'';comment:菜单类型"`
-	Visibility   MenuVisibility `gorm:"column:visibility;type:varchar(32);not null;default:'public';comment:可见性门槛(public/member/admin)" json:"visibility"`
-	Component    string         `gorm:"column:component;type:varchar(256);not null;default:'';comment:组件路径"`
-	Redirect     string         `gorm:"column:redirect;type:varchar(512);not null;default:'';comment:重定向路径"`
-	Hidden       bool           `gorm:"column:hidden;type:boolean;not null;default:false;comment:是否隐藏"`
-	ExternalLink bool           `gorm:"column:external_link;type:boolean;not null;default:false;comment:是否外链"`
-	KeepAlive    bool           `gorm:"column:keep_alive;type:boolean;not null;default:false;comment:是否缓存"`
-	Status       MenuStatus     `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态"`
-	CreatedBy    string         `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id"`
-	UpdatedBy    string         `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id"`
-	DeletedBy    string         `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人id"`
+	SeedKey      string               `gorm:"column:seed_key;type:varchar(64);not null;default:'';comment:种子身份键(内置菜单稳定标识,控制台不可见);uniqueIndex:uk_menu_seed_key_active,where:deleted_at IS NULL AND seed_key <> ''"`
+	Path         string               `gorm:"column:path;type:varchar(512);not null;default:'';comment:菜单路径"`
+	Icon         string               `gorm:"column:icon;type:varchar(256);not null;default:'';comment:菜单图标"`
+	Sort         int                  `gorm:"column:sort;type:int;not null;default:0;comment:排序"`
+	Type         MenuType             `gorm:"column:type;type:varchar(32);not null;default:'';comment:菜单类型"`
+	Visibility   MenuVisibility       `gorm:"column:visibility;type:varchar(32);not null;default:'public';comment:可见性门槛(public/member/admin)" json:"visibility"`
+	Component    string               `gorm:"column:component;type:varchar(256);not null;default:'';comment:组件路径"`
+	Redirect     string               `gorm:"column:redirect;type:varchar(512);not null;default:'';comment:重定向路径"`
+	Hidden       MenuHiddenFlag       `gorm:"column:hidden;type:varchar(16);not null;default:'disable';comment:是否隐藏(enable隐藏/disable显示)"`
+	ExternalLink MenuExternalLinkFlag `gorm:"column:external_link;type:varchar(16);not null;default:'disable';comment:是否外链(enable外链/disable内链)"`
+	KeepAlive    MenuKeepAliveFlag    `gorm:"column:keep_alive;type:varchar(16);not null;default:'disable';comment:是否缓存(enable缓存/disable不缓存)"`
+	Status       MenuStatus           `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态"`
+	CreatedBy    string               `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id"`
+	UpdatedBy    string               `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id"`
+	DeletedBy    string               `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人id"`
 }
 
 func (MenuEntity) TableName() string {

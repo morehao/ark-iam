@@ -1,18 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ApplicationItem } from '@ark-iam/types'
 
 const mockGetApplicationPageList = vi.fn()
 const mockGetApplicationDetail = vi.fn()
 const mockGetMenuTree = vi.fn()
+const mockCreateMenu = vi.fn()
+const mockUpdateMenu = vi.fn()
 
 vi.mock('@ark-iam/api', () => ({
-  createMenu: vi.fn(),
+  createMenu: (...args: unknown[]) => mockCreateMenu(...args),
   deleteMenu: vi.fn(),
   getApplicationDetail: (...args: unknown[]) => mockGetApplicationDetail(...args),
   getApplicationPageList: (...args: unknown[]) => mockGetApplicationPageList(...args),
   getMenuTree: (...args: unknown[]) => mockGetMenuTree(...args),
-  updateMenu: vi.fn(),
+  updateMenu: (...args: unknown[]) => mockUpdateMenu(...args),
 }))
 
 const MenuList = (await import('./index')).default
@@ -77,13 +79,14 @@ describe('菜单页应用切换器', () => {
     await waitFor(() => expect(mockGetMenuTree).toHaveBeenCalledWith('app-2'))
   })
 
-  it('上次选择的应用已不存在时回退到应用列表第一个', async () => {
+  it('上次选择的应用已不存在时回退到应用列表第一个，且不弹全局错误提示（silent）', async () => {
     localStorage.setItem('ark-iam:menu:appID', 'app-deleted')
     mockGetApplicationDetail.mockRejectedValue(new Error('应用不存在'))
 
     render(<MenuList />)
 
-    await waitFor(() => expect(mockGetApplicationDetail).toHaveBeenCalledWith('app-deleted'))
+    // 首屏恢复属 best-effort 探测：必须带 silent，失败由页面自行回退（见 packages/api request.ts）
+    await waitFor(() => expect(mockGetApplicationDetail).toHaveBeenCalledWith('app-deleted', { silent: true }))
     // 回退到列表第一个；无效 ID 不应被用来拉菜单树
     await waitFor(() => expect(mockGetMenuTree).toHaveBeenCalledWith('app-1'))
     expect(mockGetMenuTree).not.toHaveBeenCalledWith('app-deleted')
@@ -114,9 +117,9 @@ describe('内置应用的菜单支持增删', () => {
           visibility: 'member',
           component: '/dashboard/index',
           redirect: '',
-          hidden: 0,
-          externalLink: 0,
-          keepAlive: 0,
+          hidden: 'disable',
+          externalLink: 'disable',
+          keepAlive: 'disable',
           status: 'enable',
         },
       ],
@@ -142,5 +145,88 @@ describe('内置应用的菜单支持增删', () => {
     expect(screen.getByPlaceholderText('如 UserOutlined')).not.toBeDisabled()
     // 不再出现「内置应用不可新增/删除」的提示
     expect(screen.queryByText(/不可新增\/删除/)).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * D1 回归（P3 枚举契约）：menu.hidden / external_link / keep_alive 已从 boolean/0-1
+ * 改为字符串枚举 enable/disable，表单必须提交 'enable'/'disable'，不得再出现 1/0。
+ * 回归背景：此前用 getValueFromEvent={(c) => (c ? 1 : 0)} 把 Switch 的 boolean 转成数字提交。
+ */
+describe('菜单开关提交字符串枚举', () => {
+  const menuRow = {
+    menuID: 'm1',
+    appID: 'app-1',
+    parentID: '',
+    name: '工作台',
+    code: 'dashboard',
+    path: '/dashboard',
+    icon: 'dashboard',
+    sort: 1,
+    type: 'menu' as const,
+    visibility: 'member' as const,
+    component: '/dashboard/index',
+    redirect: '',
+    hidden: 'enable' as const,
+    externalLink: 'disable' as const,
+    keepAlive: 'enable' as const,
+    status: 'enable' as const,
+  }
+
+  beforeEach(() => {
+    mockGetApplicationPageList.mockResolvedValue({ list: apps, total: apps.length })
+    mockGetApplicationDetail.mockResolvedValue(apps[0])
+    mockGetMenuTree.mockResolvedValue({ list: [menuRow], total: 1 })
+    mockCreateMenu.mockReset()
+    mockUpdateMenu.mockReset()
+  })
+
+  it('新建菜单：切换开关后提交（含新建时的三个开关）均须为 enable/disable 字符串', async () => {
+    render(<MenuList />)
+
+    const createButton = await screen.findByRole('button', { name: /新建根菜单/ })
+    await waitFor(() => expect(createButton).toBeEnabled())
+    fireEvent.click(createButton)
+
+    fireEvent.change(await screen.findByPlaceholderText('菜单显示名称'), { target: { value: '报表中心' } })
+    fireEvent.change(screen.getByPlaceholderText('唯一编码，如 user:list'), { target: { value: 'report:list' } })
+
+    const modal = document.querySelector('.ant-modal') as HTMLElement
+    const switches = within(modal).getAllByRole('switch')
+    expect(switches).toHaveLength(3)
+    // 三个开关默认关闭 → 逐个打开
+    switches.forEach((s) => fireEvent.click(s))
+
+    fireEvent.click(modal.querySelector('.ant-modal-footer .ant-btn-primary') as HTMLElement)
+
+    await waitFor(() => expect(mockCreateMenu).toHaveBeenCalledTimes(1))
+    const payload = mockCreateMenu.mock.calls[0][0] as Record<string, unknown>
+    expect(payload.hidden).toBe('enable')
+    expect(payload.externalLink).toBe('enable')
+    expect(payload.keepAlive).toBe('enable')
+  })
+
+  it('编辑菜单：按枚举回显开关（enable→开、disable→关），切换后提交仍为字符串枚举', async () => {
+    render(<MenuList />)
+
+    fireEvent.click(await screen.findByText('编辑'))
+    await screen.findByPlaceholderText('菜单显示名称')
+
+    const modal = document.querySelector('.ant-modal') as HTMLElement
+    const switches = within(modal).getAllByRole('switch')
+    // 回显：hidden=enable → 开；externalLink=disable → 关；keepAlive=enable → 开
+    expect(switches[0]).toHaveAttribute('aria-checked', 'true')
+    expect(switches[1]).toHaveAttribute('aria-checked', 'false')
+    expect(switches[2]).toHaveAttribute('aria-checked', 'true')
+
+    // 关闭「隐藏」后提交：三个开关都必须是字符串枚举
+    fireEvent.click(switches[0])
+    fireEvent.click(modal.querySelector('.ant-modal-footer .ant-btn-primary') as HTMLElement)
+
+    await waitFor(() => expect(mockUpdateMenu).toHaveBeenCalledTimes(1))
+    const payload = mockUpdateMenu.mock.calls[0][0] as Record<string, unknown>
+    expect(payload.hidden).toBe('disable')
+    expect(payload.externalLink).toBe('disable')
+    expect(payload.keepAlive).toBe('enable')
   })
 })

@@ -42,6 +42,9 @@ var retiredMenus = []retiredMenu{
 	// 菜单 code/path/component 全变更，登记旧 code 以清理存量库残留
 	// （seedMenus 只 upsert 不下线，漏登记即存量库死链菜单 + role_menu 脏授权）。
 	{appCode: appCodeTenantAdmin, menuSeedKey: "organization"},
+	// 平台端「审计日志」页已随 log 表下线：日志无写入方、无字段权威矩阵与查询契约，
+	// 保留只会是空页（log 表、payload 列与 LogDao 已在同批删除）。
+	{appCode: appCodeAdmin, menuSeedKey: "log"},
 }
 
 // pruneRetiredMenus 幂等清理已下线菜单：先解除 role_menu 授权绑定，再**物理删除**菜单行。

@@ -9,6 +9,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/credential"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
@@ -102,7 +103,7 @@ func (m *apiKeyAuthMiddleware) Authenticate(ctx *gin.Context) bool {
 
 	// 租户门禁：密钥从属于某个租户，租户非 active（已挂起）或行已不存在时，其名下全部机器凭证立即失效。
 	// 挂起只撤销了成员 refresh token 与 SSO 会话，而 API Key 没有可依赖的 TTL，因此必须在每次请求上校验；
-	// 该成本是本请求内的一次主键查询，低于紧随其后的 last_used_at 写入。
+	// 该成本是本请求内的一次主键查询。
 	if entity.TenantID == "" {
 		writeApiKeyUnauthorized(ctx, http.StatusUnauthorized, "API key tenant missing")
 		return false
@@ -141,7 +142,7 @@ func (m *apiKeyAuthMiddleware) Authenticate(ctx *gin.Context) bool {
 		writeApiKeyUnauthorized(ctx, http.StatusUnauthorized, "API key owner mismatch")
 		return false
 	}
-	if owner.IsSuspended {
+	if owner.Status == model.UserStatusSuspended {
 		writeApiKeyUnauthorized(ctx, http.StatusUnauthorized, "API key owner suspended")
 		return false
 	}
@@ -150,14 +151,6 @@ func (m *apiKeyAuthMiddleware) Authenticate(ctx *gin.Context) bool {
 	gincontext.SetTenantScope(ctx, gcontext.CurrentScope(entity.TenantID))
 	ctx.Set(gcontext.KeyUserID, owner.ID)
 	ctx.Set(ContextKeyUserType, owner.UserType)
-
-	go func() {
-		// 异步续跑：不持有池化的 *gin.Context，作用域随请求上下文一并带走。
-		updateCtx := gincontext.AsyncContext(ctx)
-		if err := m.apiKeyDao.UpdateMap(updateCtx, entity.ID, map[string]any{"last_used_at": time.Now()}); err != nil {
-			glog.Errorf(updateCtx, "[middleware.ApiKeyAuth] UpdateMap fail, err:%v, id:%s", err, entity.ID)
-		}
-	}()
 
 	return true
 }

@@ -14,8 +14,6 @@ type TenantApplicationDetailResp struct {
 	AppName      string                        `json:"appName"`      // 应用名称
 	AppSource    model.AppSource               `json:"appSource"`    // 所属应用来源（builtin=内置应用，其订阅由系统开通、不可删除）
 	Status       model.TenantApplicationStatus `json:"status"`       // 状态
-	Config       string                        `json:"config"`       // 租户级应用配置(JSON)
-	GrantedScope string                        `json:"grantedScope"` // 租户级scope授权(JSON)
 	CreatedAt    int64                         `json:"createdAt"`    // 创建时间(unix 秒)
 }
 

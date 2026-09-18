@@ -30,6 +30,17 @@ func NewDomainSvc() DomainSvc {
 	return &domainSvc{}
 }
 
+// isValidDomainVerificationStatus 校验域名验证状态：空值表示「本次不修改」，非空必须命中白名单常量。
+// 校验归 service（AGENTS.md 硬规则 3）：DTO 绑定的是前端传来的原始字符串，非法值在此拦截。
+func isValidDomainVerificationStatus(status model.DomainVerificationStatus) bool {
+	switch status {
+	case "", model.DomainVerificationUnverified, model.DomainVerificationVerified:
+		return true
+	default:
+		return false
+	}
+}
+
 func (svc *domainSvc) Create(ctx *gin.Context, req *dtodomain.DomainCreateReq) (*dtodomain.DomainCreateResp, error) {
 	domain := strings.TrimSpace(req.Domain)
 	if domain == "" {
@@ -52,11 +63,11 @@ func (svc *domainSvc) Create(ctx *gin.Context, req *dtodomain.DomainCreateReq) (
 	}
 
 	entity := &model.DomainEntity{
-		TenantID:   tenantID,
-		Domain:     domain,
-		IsVerified: false,
-		CreatedBy:  gincontext.GetUserIDString(ctx),
-		UpdatedBy:  gincontext.GetUserIDString(ctx),
+		TenantID:           tenantID,
+		Domain:             domain,
+		VerificationStatus: model.DomainVerificationUnverified,
+		CreatedBy:          gincontext.GetUserIDString(ctx),
+		UpdatedBy:          gincontext.GetUserIDString(ctx),
 	}
 	if err := repo.Insert(ctx, entity); err != nil {
 		glog.Errorf(ctx, "[svcdomain.Create] Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -86,18 +97,12 @@ func (svc *domainSvc) PageList(ctx *gin.Context, req *dtodomain.DomainPageListRe
 
 	items := make([]dtodomain.DomainPageListItem, 0, len(list))
 	for _, v := range list {
-		var verifiedAt *int64
-		if v.VerifiedAt.Valid {
-			t := v.VerifiedAt.Time.Unix()
-			verifiedAt = &t
-		}
 		items = append(items, dtodomain.DomainPageListItem{
-			ID:         v.ID,
-			Domain:     v.Domain,
-			IsVerified: v.IsVerified,
-			VerifiedAt: verifiedAt,
-			CreatedAt:  v.CreatedAt.Unix(),
-			UpdatedAt:  v.UpdatedAt.Unix(),
+			ID:                 v.ID,
+			Domain:             v.Domain,
+			VerificationStatus: v.VerificationStatus,
+			CreatedAt:          v.CreatedAt.Unix(),
+			UpdatedAt:          v.UpdatedAt.Unix(),
 		})
 	}
 	return &dtodomain.DomainPageListResp{List: items, Total: total}, nil
@@ -137,14 +142,19 @@ func (svc *domainSvc) Update(ctx *gin.Context, req *dtodomain.DomainUpdateReq) e
 		return code.GetError(code.DomainNotExistError)
 	}
 
+	if !isValidDomainVerificationStatus(req.VerificationStatus) {
+		glog.Errorf(ctx, "[svcdomain.Update] 非法验证状态, req:%s", gutil.ToJsonString(req))
+		return code.GetError(code.DomainUpdateError)
+	}
 	updateMap := map[string]any{
 		"updated_by": gincontext.GetUserIDString(ctx),
 	}
 	if req.Domain != "" {
 		updateMap["domain"] = req.Domain
 	}
-	if req.IsVerified != nil {
-		updateMap["is_verified"] = *req.IsVerified
+	// 验证状态留空表示不修改：不写该列，避免把状态覆盖为空串
+	if req.VerificationStatus != "" {
+		updateMap["verification_status"] = req.VerificationStatus
 	}
 
 	if err := repo.UpdateMap(ctx, req.DomainID, updateMap); err != nil {
@@ -167,17 +177,11 @@ func (svc *domainSvc) Detail(ctx *gin.Context, req *dtodomain.DomainDetailReq) (
 		return nil, code.GetError(code.DomainNotExistError)
 	}
 
-	var verifiedAt *int64
-	if entity.VerifiedAt.Valid {
-		t := entity.VerifiedAt.Time.Unix()
-		verifiedAt = &t
-	}
 	return &dtodomain.DomainDetailResp{
-		ID:         entity.ID,
-		Domain:     entity.Domain,
-		IsVerified: entity.IsVerified,
-		VerifiedAt: verifiedAt,
-		CreatedAt:  entity.CreatedAt.Unix(),
-		UpdatedAt:  entity.UpdatedAt.Unix(),
+		ID:                 entity.ID,
+		Domain:             entity.Domain,
+		VerificationStatus: entity.VerificationStatus,
+		CreatedAt:          entity.CreatedAt.Unix(),
+		UpdatedAt:          entity.UpdatedAt.Unix(),
 	}, nil
 }

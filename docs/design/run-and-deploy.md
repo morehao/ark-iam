@@ -91,6 +91,8 @@ flowchart LR
 >
 > `WITH (FORCE)`（PG 13+）会断开仍连着该库的会话，因此后端不必先停。旧库中残留的列/表不再被读写，属预期。确需保全旧数据时，在升级前自行执行一次性 SQL 导出/回填。
 >
+> **为什么本批不能只删列（存量库必须重建）**：本批把 16 个 `boolean` 列改名并改成 `varchar(16)` 枚举（如 `person.is_suspended` → `person.status`、`menu.hidden` → `hidden='enable'\|'disable'`）。AutoMigrate **不删不改**既有列，所以旧库里这些列会原样留着（新列另建、取列默认值），旧列值也不会被转换；即使手工 `ALTER COLUMN ... TYPE varchar USING bool::varchar`，得到的也是 `'true'`/`'false'`——**不是合法枚举值**，读取端按 `active`/`suspended`、`enable`/`disable` 判定会全部落到"非挂起/未启用"的默认分支。正确处置只有删库重建（上面三条命令）；确需保全业务数据时，先导出数据，再按新枚举口径人工映射后重新导入。
+>
 > **存量库升级到 `application.source`（2026-09-12 改造；仅在需要保全旧库数据时执行）**：`application.type` / `is_system` 与 `application_client.type` / `is_system` / `is_third_party` 已下线，归属统一收敛为 `source`（`builtin` / `first_party` / `third_party`）。AutoMigrate 只会给新列补上列默认值 `third_party`，存量行必须回填——**请在部署新代码之前执行**（新代码不再写 `type`，升级后旧列只剩列默认值，无法再据以推断）：
 >
 > ```sql
@@ -135,6 +137,12 @@ flowchart LR
 > ```bash
 > docker exec -i redis7 redis-cli --scan --pattern 'iam:oidc:*' | xargs -r docker exec -i redis7 redis-cli DEL
 > ```
+>
+> **重建会让 RP 侧（Gitea / RustFS 等）的 OIDC 绑定失效——这是预期现象，不是 bug**。OIDC `sub` 为 `person:<personID>`，而 `personID` 是 `person` 表主键、随行创建（见 `sso-oidc-concepts.md` §3.4），因此同一自然人重建后 `sub` 改变：
+>
+> - RP 侧按 `sub` 存的账号绑定全部失效 → 表现为**重复建号**，或停在 RP 的「关联账号/绑定已有账号」页（Gitea 的典型表现）；
+> - 若浏览器仍持有重建前的 IAM 会话（Redis 未清理），授权请求会用**旧** `sub` 找 person，查不到时 userinfo 只返回 `sub`，RP 会报"缺少 email/preferred_username"之类的字段缺失错误——这正是上面按前缀清 `iam:oidc:*` 的原因；
+> - 处置：清 Redis 会话后用 IAM 账号重新登录一次，RP 侧重新建号或重新关联即可（本地开发无业务数据，重建绑定最省事）。
 
 ### 2.4 验证 OIDC Provider
 

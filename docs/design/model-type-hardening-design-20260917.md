@@ -16,12 +16,12 @@
 
 | 议题 | 结论 | 关键代价 |
 |---|---|---|
-| JSON 列（20 个 / 9 表） | **12 列**改为每列一个具名 Go 类型 + `gorm:"serializer:json"`；**8 列**无消费者，删除；移除 `gorm.io/datatypes` 依赖 | 5 处 `UpdateMap` 必须改结构化更新，否则**静默脏写**（实测，见 §4.2） |
+| JSON 列（21 个 / 10 表） | **13 列**改为每列一个具名 Go 类型 + `gorm:"serializer:json"`；**8 列**无消费者，删除；移除 `gorm.io/datatypes` 依赖 | **6 处** `UpdateMap` 必须改结构化更新，否则**静默脏写**（实测，见 §4.1、D6；`application.role_template` 就是现成实例） |
 | bool 列（16 个 / 7 表） | 全部改**字段级具名字符串枚举**（11 个开关类型 + 5 个语义类型，互不共用） | 同名列 `boolean → varchar` 变更；本项目以**删库重建**消除该风险（§8.1） |
-| `sql.NullTime`（2 处） | `api_key.last_used_at` → `*time.Time`；`domain.verified_at` **删除**（无写入方） | 无 |
+| `sql.NullTime`（2 处） | 两列**均删除**（执行修订）：`api_key.last_used_at` 的语义已由 `revoked_at`/`expired_at` 承担、且是唯一残留 `sql.NullTime`，随 P4 列下线一并删除；`domain.verified_at` 无写入方，P3 删除 | 无（全仓 `sql.Null*` 归零） |
 | 无消费者列/表 | 删除 **8 个 JSON 列 + 2 个死时间列 + `log` 表** | 删库重建后无残留 |
 | 自由 JSON | `user_identity.detail` → **显式白名单结构体**（非白名单 claim 丢弃）；`connector.config` → 显式字段（删 `Raw`/`Extra` 双逃生舱） | 控制台不再能看到外部 IdP 的非标准 claim（行为收窄，§6.4） |
-| 顺带修复 | 3 个已存在的**前后端契约缺陷**（bool ↔ 0/1 漂移）在本方案中自然消解 | 前端 3 个页面必须同步改，先补回归用例 |
+| 顺带修复 | **2 个**已存在的**前后端契约缺陷**（bool ↔ 0/1 漂移，D1/D2）在本方案中自然消解；D3 已由 #68 修复，但 P3 会把该处改成枚举判定（不改则 `'disable'` 恒真） | 前端 2 个页面必须先补回归用例；`oauthClient/Detail.tsx` 与其在 #68 新增的断言随 P3 再改一次 |
 
 **开放问题已全部关闭**（§12 决策记录）：`tenant_application.config/granted_scope` **删除**；`connector.claim_mapping/domain_policy` **保留并显式建模**；`user_identity.detail` 采用**标准声明白名单**（非白名单 claim 丢弃）；`connector.config.scopes` 单独具名。
 
@@ -58,14 +58,15 @@
 
 ## 3. 现状勘察（量化）
 
-计数口径统一为：`grep -rn` 于 `backend/`，非测试文件（除特别注明）。
+计数口径统一为：`grep -rn` 于 `backend/`，非测试文件（除特别注明）。**基线：`58d95f9`（#68 合并后，2026-09-18 复核）**；本文档首版按 `4dae721` 盘点，本次已把 #68 新增的 `application.role_template` 与前端改动计入。
 
-### 3.1 JSON 列：20 个字段 / 9 张表
+### 3.1 JSON 列：21 个字段 / 10 张表
 
 | 表 | 列 | 现值类型 | 消费者 |
 |---|---|---|---|
 | `application_client` | redirect_uris / post_logout_redirect_uris / allowed_origins / default_scopes | `datatypes.JSON` | OIDC 客户端适配器（真实消费） |
 | `application_client` | grant_types / response_types | `datatypes.JSON` | OIDC 客户端适配器（映射到 zitadel 枚举） |
+| `application` | role_template | `datatypes.JSON` | 应用角色模板（应用侧定义跨系统契约值；`RoleTemplateList()` 手工解析，`svcapplication` 与 `pkg/core/tenant` 消费） |
 | `connector` | config | `json.RawMessage` | 驱动工厂（`buildConnectorConfig`） |
 | `connector` | claim_mapping / domain_policy | `json.RawMessage` | **仅存取，无消费方** |
 | `refresh_token` | scopes / amr | `datatypes.JSON` | 刷新链路还原（H2 契约） |
@@ -75,9 +76,9 @@
 | `person` / `tenant_user` | profile / custom_data | `json.RawMessage` | **只写 `{}`，无读方** |
 | `log` | payload | `json.RawMessage` | 读方存在（platformadmin `/logs`），**但全仓无任何写入方** |
 
-- **69 处**非测试代码直接操作上述列或为其写 `{}`/`[]` 占位值（口径：`json.Marshal|json.Unmarshal|datatypes.JSON|json.RawMessage` 命中 109 行，剔除 oidcop/sso 协议态 Redis 序列化 20 行与 model 字段声明 20 行）。
-- 其中 **5 处 `UpdateMap` 携带 JSON 值 / 13 个键**：`svcapplicationclient`（6）、`svctenantapplication`（2）、`svcauth/connector.go`（3）、`pkg/dao/user_identity.go`（1）、`svcauth/connector_identity.go`（1）。
-- 占位写入 `json.RawMessage("{}")`：`auth.go`、`connector_identity.go`×4、`machine_user.go`×2、`api_key.go`、`find_or_create.go`×2、`user.go`×2、`testsetup/testdata.go`×4、`seed.go`×2。
+- **78 处**非测试代码直接操作上述列或为其写 `{}`/`[]` 占位值（口径：`json.Marshal|json.Unmarshal|datatypes.JSON|json.RawMessage` 命中 116 行，剔除 oidcop/sso 协议态 Redis 序列化 17 行与 model 字段声明 21 行；随 #68 合并后复算）。
+- 其中 **6 处 `UpdateMap` 携带 JSON 值 / 14 个键**：`svcapplicationclient`（6）、`svctenantapplication`（2）、`svcauth/connector.go`（3）、`svcapplication/application.go`（1，`role_template`）、`pkg/dao/user_identity.go`（1）、`svcauth/connector_identity.go`（1）。
+- 占位写入 `json.RawMessage("{}")`：`auth.go`、`connector_identity.go`×4、`connector.go`×2（默认配置 fallback）、`machine_user.go`×2、`api_key.go`、`find_or_create.go`×2、`user.go`×2、`testsetup/testdata.go`×4、`seed.go`×2；另有 `svcapplication/application.go`×1 与 `pkg/core/tenant/provision.go`×2 直接构造 `datatypes.JSON` 占位（后者的 `tenant_application` 两列随 Q1 删除一并消失）。
 
 ### 3.2 bool 列：16 个字段 / 7 张表
 
@@ -93,14 +94,16 @@
 
 引用面：**52 个非测试文件 + 21 个测试文件**（含 DTO/object 层同名字段）。
 
-### 3.3 `sql.NullTime`：2 处
+### 3.3 `sql.NullTime`：2 处（处置在执行中收敛为「全部删除」）
 
-| 位置 | 写入方 | 处置 |
-|---|---|---|
-| `api_key.last_used_at` | `pkg/middleware/apikey_auth.go:157`、`oidcop/persistent_store.go:116`（降频 1 分钟） | → `*time.Time` |
-| `domain.verified_at` | **无**（`svcdomain.Update` 只写 `is_verified`） | **删除** |
+| 位置 | 写入方 | 原计划 | 执行结果 |
+|---|---|---|---|
+| `api_key.last_used_at` | `pkg/middleware/apikey_auth.go:157`、`oidcop/persistent_store.go:116`（降频 1 分钟） | → `*time.Time` | **列删除**（P4）：这是全仓唯一残留的 `sql.NullTime`，而「最后一次使用」对 API Key 无业务消费方（列表已不再展示、审计另有 `audit_log`）；原生化一个即将下线的列没有收益，故连列带写入点一并删除 |
+| `domain.verified_at` | **无**（`svcdomain.Update` 只写 `is_verified`） | **删除** | **删除**（P3，如期执行） |
 
-附带同源发现：`user_identity.last_used_at`（`*time.Time`）**同样无写入方**，已定一并删除。
+附带同源发现：`user_identity.last_used_at`（`*time.Time`）**同样无写入方**，一并删除（P4）。
+
+> 结论：目标「全仓不再出现 `sql.Null*`」以**删除**达成，`pkg/model` 与 `pkg/middleware` 中不再有时间列需要原生化；AC-1/AC-2 的判定不受影响。
 
 ### 3.4 已确认的在制缺陷（本方案的直接动因）
 
@@ -108,7 +111,7 @@
 |---|---|---|---|
 | D1 | **菜单创建/编辑恒失败** | 前端以数字提交 `hidden/externalLink/keepAlive`（`menu/index.tsx:221-223`，`getValueFromEvent={(c) => c ? 1 : 0}`——`c` 是事件对象恒真，永远得 `1`）；后端 `objpermission.MenuBaseInfo.Hidden bool` | `encoding/json` 拒绝 number→bool，菜单增改全量报错 |
 | D2 | **域名验证状态恒显示"未验证"** | 后端 `isVerified` 序列化为 `true/false`；前端 `VerifiedTag` 判 `value === 1`（`packages/ui/src/status.tsx:35`） | 列表恒误导；编辑弹窗又以 `0/1` 提交（`domain/index.tsx:168-176`）→ `DomainUpdateReq.IsVerified *bool` 绑定失败，改不动 |
-| D3 | **OAuth 客户端详情"强制 PKCE / 需要 auth_time"恒显示"否"** | `oauthClient/Detail.tsx:155-156` 判 `=== 1` | 误判安全配置 |
+| D3 | ~~**OAuth 客户端详情"强制 PKCE / 需要 auth_time"恒显示"否"**~~ **已由 #68 修复，不再是在制缺陷** | 修复前 `oauthClient/Detail.tsx` 判 `=== 1`；现改为 `detail.requirePKCE ? … / detail.requireAuthTime ? …`，类型也已从 `number` 改为 `boolean` | 当前无缺陷。**但 P3 把该字段改成 `enable/disable` 后，这个真值判断会让 `'disable'` 恒真（永远显示"是"）**——该页面与 #68 新增的断言必须随 P3 再改一次（见 §7.2） |
 | D4 | **`*bool` 无法表达"未配置"** | 实测：插入 nil 指针时字段为零值被 GORM 跳过、落列默认值，读回**必为非 nil** | `boolPtrValue` 的 nil 分支永不触发（当前 NULL≡false 故未越权，但模型谎报能力） |
 | D5 | **bool 默认值陷阱** | 实测：`default:true` 的列在 Go 侧显式传 `false`，GORM 跳过该列 → DB 存 `true` | 当前 16 列默认均为 false 故未踩中；将来新增"默认开启"开关即静默失效 |
 | D6 | **`UpdateMap` 传原始 Go 值到 JSON 列＝静默脏写** | 实测：`Updates(map{"list": []string{"x"}})` 无报错，读出 `invalid character 'x'` | 现有代码靠手工 `datatypes.JSON(...)`/`json.RawMessage(...)` 包一层 `driver.Valuer` 才没炸；`serializer:json` 不覆盖 map 路径 |
@@ -163,7 +166,11 @@ Status     string `gorm:"column:status;type:varchar(16);not null;default:'enable
 
 ## 5. 目标设计
 
-### 5.1 枚举类型（`pkg/model/enum.go`，新文件）——每字段一个类型，互不共用
+### 5.1 枚举类型（分散在 `pkg/model/<实体>.go`）——每字段一个类型，互不共用
+
+> **落位（收口修订）**：P0 曾集中在新文件 `pkg/model/enum.go`。收口时按实体拆回各自的 model 文件——`person.go`（`PersonStatus`/`PasswordStatus`）、`user.go`（`UserStatus`/`OwnerType`）、`domain.go`（`DomainVerificationStatus`）、`user_identity.go`（`EmailVerificationState`）、`application.go`（`AppPersonCreateTenantPolicy`/`AppJoinByInvitePolicy`）、`application_client.go`（`ClientPKCEPolicy`/`ClientAuthTimeClaimPolicy`）、`connector.go`（4 个 `Connector*Flag`）、`menu.go`（3 个 `Menu*Flag`），与表名/实体同文件。17 个枚举仍**互不共用**，`enum_test.go` 是这些不变式的唯一集中校验点。
+
+> **既有具名类型不在新增清单内（#68 合并后补充）**：`model.RoleCode`（`role.code`）、`RoleTemplateItem`、`RoleTemplateItemList`（`pkg/model/role.go`）已是具名类型，P0 **不得重复定义**；本方案新增的仍是下方 17 个枚举类型与 14 个载具类型（`RoleTemplateItemList` 复用既有类型，故载具新增数不变）。
 
 **语义型（5 个 + 1 个邮箱验证态）**
 
@@ -304,7 +311,8 @@ func (l ConnectorScopeList) Strings() []string        { return []string(l) }
 | 10 | refresh_token.scopes | `ScopeList` | `+serializer:json` | **保持可空** |
 | 11 | refresh_token.amr | `AuthMethodList` | `+serializer:json` | **保持可空** |
 | 12 | user_identity.detail | `UserIdentityDetail` | `+serializer:json` | 见 §5.4、§6.4 |
-| 13-20 | tenant_application.granted_scope / tenant_application.config / person.profile / person.custom_data / tenant_user.profile / tenant_user.custom_data / api_key.scope / log.payload | — | — | **删除**（无消费方；随 §12 决策） |
+| 13 | application.role_template | `RoleTemplateItemList`（**已存在**，`pkg/model/role.go`） | `+serializer:json` | 随 #68 新增；删 `ApplicationEntity.RoleTemplateList()` 手工解析（见 §6.7） |
+| 14-21 | tenant_application.granted_scope / tenant_application.config / person.profile / person.custom_data / tenant_user.profile / tenant_user.custom_data / api_key.scope / log.payload | — | — | **删除**（无消费方；随 §12 决策） |
 
 ```go
 // ConnectorConfig 连接器配置：显式字段取代原 map[string]any + Raw/Extra 双逃生舱。
@@ -397,7 +405,8 @@ type UserIdentityDetail struct {
 - `pkg/object/objauth` 的 `TenantOption.IsOwner` / `UserInfo.IsOwner`（响应契约）→ `OwnerType`。
 - DTO 筛选参数：`UserPageListReq.IsSuspended *bool` / `MachineUserPageListReq.IsSuspended *bool` → `Status model.UserStatus`（空串＝不过滤）。
 - 流转请求：`MachineUserStatusReq.IsSuspended bool` → `Status model.UserStatus`；`UserUpdateReq.IsSuspended *bool` → `Status *model.UserStatus`（nil＝不变，保持 PATCH 语义）。
-- `pkg/seed`：`IsOwner: true / IsSuspended: false / RequirePKCE: true` → 枚举常量；`seedOIDCClientGrantTypes` 的 `json.Marshal` 与 `[]byte(def.redirectURIs)` 字面量 → 类型化赋值。
+- `pkg/seed`：`IsOwner: true / IsSuspended: false / RequirePKCE: true` → 枚举常量；`seedOIDCClientGrantTypes` 的 `json.Marshal` 与 `[]byte(def.redirectURIs)` 字面量 → 类型化赋值（`role.code` 已在 #68 用 `model.RoleCodePlatformAdmin` 常量，无需再改）。
+- `dtoapplication.ApplicationCreateReq/UpdateReq.RoleTemplate` 现为 `[]model.RoleTemplateItem` → 改 `model.RoleTemplateItemList`（"每列一个具名类型"）；`svcapplication.buildRoleTemplate` 的 `json.Marshal + datatypes.JSON` 构造随之删除，改为类型化赋值。
 
 ### 5.6 边界规则（判定"要不要枚举化 / 能不能保留 map"的唯一标准）
 
@@ -415,7 +424,7 @@ type UserIdentityDetail struct {
 
 | 方案 | 优点 | 代价 | 结论 |
 |---|---|---|---|
-| **A. 具名类型 + `serializer:json`** | GORM 官方机制；`Create`/结构化 `Updates`/`First` 全自动；列 DDL 不变（仍 `type:json`）→ **零 DDL 变更**；可删 `gorm.io/datatypes` 依赖 | `UpdateMap` 路径不覆盖（须改 5 处）；零值字段在 Create 时被跳过（依赖 DB 默认值，实测符合预期） | ✅ **采纳** |
+| **A. 具名类型 + `serializer:json`** | GORM 官方机制；`Create`/结构化 `Updates`/`First` 全自动；列 DDL 不变（仍 `type:json`）→ **零 DDL 变更**；可删 `gorm.io/datatypes` 依赖 | `UpdateMap` 路径不覆盖（须改 6 处）；零值字段在 Create 时被跳过（依赖 DB 默认值，实测符合预期） | ✅ **采纳** |
 | B. 自定义类型实现 `driver.Valuer`+`sql.Scanner` | map 更新也能用 | 每个类型都要写 `Value/Scan` 样板；等于自己重造 `datatypes.JSON`，与"显式结构体"诉求背道而驰 | ✗ |
 | C. 保留 `datatypes.JSON`，只加类型别名 | 零改动 | 不解决任何诉求 | ✗ |
 
@@ -464,6 +473,30 @@ type UserIdentityDetail struct {
 | B. 各 service 直接用 GORM 原生 `Select(...).Updates(&model.X{...})` | 不加 DAO 能力 | 把拼接门槛下放到 service，破坏"service 只调 DAO"约定 | ✗ |
 | C. map 值改传 `[]byte` / 自定义 Valuer | 零 DAO 改动 | 又回到手工 `Marshal`，失去类型安全 | ✗ |
 
+**实现补充（P1 实测）**：除 `UpdateMap` 外，`Update("col", v)` / `UpdateColumn("col", v)` 同样**不经过 serializer**（GORM 只对结构化 `Updates(entity)` 分支做字段解析，`Update` 的二元组走裸参数绑定，sqlite 下直接报 `unsupported type model.RoleTemplateItem`）。因此 serialized 列的写路径只有两条：`Create(entity)` 与 `Select(fields).Updates(entity)`（即 `UpdateFields`）；测试/种子里的 `Update("role_template", ...)` 也必须一并改结构化写法。
+
+**实现补充 2（P1 实测，nil 切片的两种形状）**：`serializer:json` 对 nil 切片的行为在两条路径上不同，写入侧必须区分对待：
+
+| 路径 | nil 切片落库 | 后果 |
+|---|---|---|
+| `Create(entity)` | 列被省略（`NOT NULL` 列走 DB 默认值 → `'[]'`；可空列落 `NULL`，回读为 nil） | 安全，保持原语义 |
+| `Select(fields).Updates(entity)` | 显式写入 **空串 `""`** | PostgreSQL `json` 列**非法**（`invalid input syntax for type json`），详情出参由 `[]` 变 `null` |
+
+故更新路径不得把请求里缺省的 nil 切片直接交给 serializer：`NOT NULL` 的 JSON 列在写入侧归一到空切片（`platformadmin` 的 `emptyIfNil` 即此口径，并有断言原始列值 `== "[]"` 的回归测试）。`pkg/model` 侧同步用 golden 测试固化两种形状（`TestNullableJSONColumnKeepsNullShape`、`TestStructuredUpdateWritesValidJSON`）。
+
+**实现补充 3**：`WithTx(tx)` 定义在内嵌的 `*gormdao.Dao` 上，返回值本身就是 `*gormdao.Dao`（不是包装 DAO，没有 `.Dao` 字段），事务内直接写 `dao.UpdateFields(ctx, dao.NewApplicationDao().WithTx(tx), ...)`；非事务处用 `dao.NewApplicationDao().Dao`。
+
+### 6.7 `role_template` 的坏 JSON 读取语义（#68 合并后新增取舍）
+
+`RoleTemplateList()` 现有实现是"解码失败返回 nil"（`pkg/model/application.go` 注释明确依赖该方向：畸形 JSON → 空模板 → 撤下模板角色，fail-toward-withdraw）。改成 `serializer:json` 后，解码发生在 GORM 读路径，坏 JSON 会**报错**而非静默为空，方向变为 fail-loud。必须显式选定，不能默认继承：
+
+| 方案 | 优点 | 代价 | 结论 |
+|---|---|---|---|
+| **A. fail-loud + 写入侧唯一校验** | 结构契约单一，坏数据立刻暴露；`role_template` 只有 `svcapplication`（入口校验 `buildRoleTemplate`）与种子两条写路径，写入原子可保证 | 历史坏数据（本方案已删库重建，不存在）会让读取链路直接报错 | ✅ **采纳** |
+| B. 保留宽容解析（读侧兜底为空） | 与现状行为一致 | 需要为 13 个类型化列单独保留一个手工解析 helper，正是 P1 要消灭的形态；且"静默撤空角色"本身是隐蔽的授权变更 | ✗ |
+
+> 即：删除 `RoleTemplateList()`，`svcapplication/application.go:254,296` 与 `pkg/core/tenant/provision.go:349` 直接读类型化字段；畸形数据的防线收敛到写入侧（`buildRoleTemplate` 白名单校验 + `role_template` 列 `not null`）。
+
 ---
 
 ## 7. 影响面与改动清单
@@ -472,38 +505,39 @@ type UserIdentityDetail struct {
 
 | 层 | 文件数（估） | 改动 |
 |---|---|---|
-| `pkg/model` | 9 个 model 文件 + 2 个新文件 | 12 个 JSON 字段类型化（另 8 列删除）、16 个 bool 字段枚举化、2 处 `sql.NullTime`、新增 17 个枚举类型与 14 个载具类型（10 个具名切片 + 4 个结构体）、`seed_authority` 矩阵键（`is_owner→owner_type`）、`automigrate` 删 `LogEntity` |
+| `pkg/model` | 10 个 model 文件 + 2 个新文件 | 13 个 JSON 字段类型化（含 `application.role_template`，并删其 `RoleTemplateList()` 手工解析；另 8 列删除）、16 个 bool 字段枚举化、2 处 `sql.NullTime`、新增 17 个枚举类型与 14 个载具类型（10 个具名切片 + 4 个结构体）、`seed_authority` 矩阵键（`is_owner→owner_type`）、`automigrate` 删 `LogEntity` |
 | `pkg/dao` | 4 | `user_identity.UpdateBinding` 签名 `[]byte → model.UserIdentityDetail` 并改结构化更新；新增 `UpdateFields`；删 `LogDao` |
 | `pkg/object` | 3 | `objauth.ConnectorBaseInfo` / `objpermission.MenuBaseInfo` / `objauth` 的 bool + `any` 字段类型化 |
-| `pkg/core` | 3 | `user.CreateUserReq`、`person.FindOrCreateReq` 枚举化；`tenant.ProvisionTenantAdmin` 去掉 `datatypes.JSON` 占位 |
+| `pkg/core` | 3 | `user.CreateUserReq`、`person.FindOrCreateReq` 枚举化；`tenant.ProvisionTenantAdmin` / `SyncAppRoleTemplateToTenants` / `withdrawStaleTemplateRoles` 去掉 `datatypes.JSON` 占位并改读类型化 `role_template` |
 | `pkg/seed` | 1 | 端侧 JSON 字面量 → 类型化赋值；`IsOwner/IsSuspended/RequirePKCE` → 枚举 |
 | `pkg/testsetup` | 1 | 删 4 处 `Profile/CustomData` 占位 |
-| `pkg/middleware` | 1 | `apikey_auth` 的 `last_used_at` 路径（`sql.NullTime` → `*time.Time`） |
+| `pkg/middleware` | 1 | `apikey_auth` 的 `last_used_at` 路径（随列下线整体删除，见 §3.3 执行修订） |
 | `apps/auth` | 12 | `oidcop/client.go`（6 处 Unmarshal 删除）、`persistent_store.go`（`decodeJSONStringSlice` 删除）、`svcauth/connector*.go`（config 类型化 + 3 处 map 更新 + detail 白名单提取）、`dtoauth`、测试 |
-| `apps/platformadmin` | 9 | `svcapplicationclient`（`marshalJSONSlice` + 6 处 Unmarshal 删除 + map 更新改结构化）、`svctenantapplication`（删 `config`/`granted_scope` 与 `datatypes.JSON` 用法）、`svcdomain`（枚举 + 删 `verified_at`）、`svcpermission/menu`、`svcapplication.allow_*`、`svctenant/log`（随表删除）与 DTO |
-| `apps/tenantadmin` | 8 | `svctenant/api_key`（删 `scope`、`sql.NullTime`）、`user`/`machine_user`/`department_user`（`is_suspended→status`）、`user_identity`（detail 结构化）、DTO |
+| `apps/platformadmin` | 9 | `svcapplicationclient`（`marshalJSONSlice` + 6 处 Unmarshal 删除 + map 更新改结构化）、`svcapplication`（`buildRoleTemplate` 去 `json.Marshal`/`datatypes.JSON`；`role_template` 写路径改 `UpdateFields`；DTO `[]RoleTemplateItem → RoleTemplateItemList`）、`svctenantapplication`（删 `config`/`granted_scope` 与 `datatypes.JSON` 用法）、`svcdomain`（枚举 + 删 `verified_at`）、`svcpermission/menu`、`svcapplication.allow_*`、`svctenant/log`（随表删除）与 DTO |
+| `apps/tenantadmin` | 8 | `svctenant/api_key`（删 `scope`、`last_used_at` 出参）、`user`/`machine_user`/`department_user`（`is_suspended→status`）、`user_identity`（detail 结构化）、DTO |
 | `go.mod` | 1 | `pkg` 删除 `gorm.io/datatypes` direct 依赖；swagger 产物重跑 |
 
 ### 7.2 前端（`frontend/`）
 
 | 文件 | 改动 |
 |---|---|
-| `packages/types/src/{platform,tenant,auth,department}.ts` | 逐字段字符串枚举类型（如 `export type MenuHiddenFlag = 'enable' \| 'disable'`，**与后端同名同形**）；`claimMapping/domainPolicy: unknown` → 具名类型 |
+| `packages/types/src/{platform,tenant,auth,department}.ts` | 逐字段字符串枚举类型（如 `export type MenuHiddenFlag = 'enable' \| 'disable'`，**与后端同名同形**）；`claimMapping/domainPolicy: unknown` → 具名类型；`responseTypes: string[]` → `ResponseType[]`（P1）；`ApplicationRoleTemplateItem` 保持与 `model.RoleTemplateItem` 同形；`requirePKCE/requireAuthTime` 已由 #68 改为 `boolean`，P3 再改枚举 |
 | `packages/ui/src/status.tsx` | `VerifiedTag` 改判 `'verified'`；`SuspendedTag` 收敛为只认 `'suspended'`（**修 D2**） |
 | `packages/ui/src/ProfileCenter.tsx` | `person.isSuspended === 1` → `status === 'suspended'` |
 | `apps/platform-admin-web/src/pages/menu/index.tsx` | 3 个 `getValueFromEvent` 数字转换删除，改枚举字符串（**修 D1**） |
 | `apps/platform-admin-web/src/pages/domain/index.tsx` | 验证状态 Select 的 `0/1` → `unverified/verified`（**修 D2**）；删"验证时间"列 |
-| `apps/platform-admin-web/src/pages/oauthClient/Detail.tsx` | `=== 1` → `=== 'enable'`（**修 D3**） |
-| `apps/platform-admin-web/src/pages/application/index.tsx` | `!!record.allowJoinByInvite` → 枚举比较 |
+| `apps/platform-admin-web/src/pages/oauthClient/Detail.tsx` | **D3 已由 #68 用 `detail.requirePKCE ? …` 修复**；P3 必须改成 `=== 'enable'` 判定——否则 `'disable'` 恒真、永远显示"是" |
+| `apps/platform-admin-web/src/pages/oauthClient/index.tsx` | #68 新增的 grantTypes / responseTypes / backChannelLogoutURI 表单项随 P1 改 `GrantTypeList` / `ResponseTypeList`；`requirePKCE/requireAuthTime` 开关随 P3 改枚举提交 |
+| `apps/platform-admin-web/src/pages/application/index.tsx` | `!!record.allowPersonCreateTenant` / `!!record.allowJoinByInvite` → 枚举比较；#68 新增的角色模板编辑区（`roleTemplate`）随 P1 改具名类型 |
 | `apps/tenant-admin-web/src/pages/{user,machineUser,department}/index.tsx` | 挂起筛选/表单项改枚举 |
 | `apps/platform-admin-web/src/pages/tenantApplication/index.tsx` | 删「配置（JSON）」`Form.Item`（`config`）与提交字段 |
-| 3 个页面测试 | 先补 D1/D2/D3 的**红**用例，改造后转绿 |
+| 页面测试 | 先补 D1/D2 的**红**用例，改造后转绿；#68 新增的 PKCE 断言（`oauthClient/index.test.tsx` 的 `aria-checked`/`toBe(true)` 与详情页用例）随 P3 由 boolean 改为 `enable/disable` |
 
 > TS 是结构化类型，**无法**像 Go 那样为每个字段提供名义上的独立类型；前端只能做到"每字段一个同名 union 别名"。字段身份约束由后端承担，前端负责取值正确性（§10 规则 7）。
 
 ### 7.3 文档
 
-`docs/design/glossary.md`（挂起/入口策略/API Key `scope` 三处）、`docs/design/system-design.md` §4.1/§4.5/§6（表定义与字段权威矩阵）、`docs/design/api-reference.md`（受影响字段类型）、`docs/design/tenant-custom-domain-redesign.md` §3.1（`IsVerified` → `verification_status`）、`docs/design/run-and-deploy.md`（§2.3 补本批 `boolean→varchar` 脏值说明）、AGENTS.md（枚举粒度与 JSON 列硬规则）。
+`docs/design/glossary.md`（挂起/入口策略/API Key `scope` 三处）、`docs/design/system-design.md` §4.1/§4.5/§6（表定义与字段权威矩阵）**与 §5.4（角色编码归属，随 #68 新增）**、`docs/design/api-reference.md`（受影响字段类型，含 `application.role_template` 的类型口径）、`docs/design/application-integration-guide.md`（**role_template / `groups` claim 说明，随 #68 新增**）、`docs/design/tenant-custom-domain-redesign.md` §3.1（`IsVerified` → `verification_status`）、`docs/design/run-and-deploy.md`（§2.3 补本批 `boolean→varchar` 脏值说明）、AGENTS.md（枚举粒度与 JSON 列硬规则）。
 
 ---
 
@@ -543,11 +577,11 @@ type UserIdentityDetail struct {
 
 - **基线**：改动前记录 `cd backend && go test ./apps/auth/... ./apps/gateway/... ./apps/platformadmin/... ./apps/tenantadmin/... ./pkg/...` 的通过清单（预期全绿），并留存 `make swag APP=<app>` 产物快照用于对比。
 - **等价性验证**（新写测试，全部可执行）：
-  1. **JSON 落库形状 golden**：对 12 个类型化列各写一条"写入 → 直读原始列文本（`db.Raw`）"的断言，确保与改造前字节形状一致（含默认值 `'[]'`/`'{}'`）。
+  1. **JSON 落库形状 golden**：对 13 个类型化列（含 `application.role_template`）各写一条"写入 → 直读原始列文本（`db.Raw`）"的断言，确保与改造前字节形状一致（含默认值 `'[]'`/`'{}'`）。
   2. **枚举双向映射**：表驱动断言 `枚举 → DB 值 → JSON 值` 与 `JSON 入参 → 枚举 → DB 值` 闭环（含空串/非法值拒绝）。
   3. **枚举类型独占性**：反射遍历 `model.AllEntities()`，断言"同一个具名枚举类型不被两个不同 DB 列引用"（把评审要求 2/4 变成可执行的回归）。
   4. **协议回归**（JSON 列的真实消费者）：OIDC 授权码流 + refresh 轮换（scopes/amr 还原）+ PKCE 校验 + CORS 白名单，4 条既有用例必须全绿。
-  5. **前端契约**：D1/D2/D3 三个先红后绿用例。
+  5. **前端契约**：D1/D2 两个先红后绿用例；`oauthClient/Detail.tsx` 与 `oauthClient/index.test.tsx` 的 PKCE 断言随 P3 从 boolean 改为 `enable/disable`（#68 已修的 D3 在这里被第二次改动）。
 - **回滚**：本方案是编译期类型替换 + 删库重建，回滚＝`git revert` 对应批次 + 再删库重建一次。无数据兼容负担。
 
 ---
@@ -558,11 +592,11 @@ type UserIdentityDetail struct {
 |---|---|---|
 | AC-1 | `pkg/model` 中不再有 `datatypes.JSON` / `json.RawMessage` / `type:boolean` / `sql.Null` | `grep -rn "datatypes\.JSON\|json\.RawMessage\|type:boolean\|sql\.Null" backend/pkg/model` → 0 行 |
 | AC-2 | 全仓不再有 `datatypes.JSON` / `json.RawMessage` / `sql.NullTime` | `grep -rn` 于 `backend/`（`*_test.go` 之外）→ 0 行；`pkg/go.mod` 无 `gorm.io/datatypes` |
-| AC-3 | 5 处 `UpdateMap` 不再携带 JSON 值 | 逐一核对，JSON 列一律走 `UpdateFields` |
+| AC-3 | 6 处 `UpdateMap` 不再携带 JSON 值 | 逐一核对，JSON 列一律走 `UpdateFields`（含 `svcapplication/application.go` 的 `role_template`） |
 | AC-4 | 全部模块测试通过 | `cd backend && go test ./apps/auth/... ./apps/gateway/... ./apps/platformadmin/... ./apps/tenantadmin/... ./pkg/...` |
 | AC-5 | 全量 `AutoMigrate + Seed` 在**空库**上成功 | `testutil.SetupSQLite` 全实体 + `Seed`，断言无错误且目标表/列齐备 |
 | AC-6 | **PG 上**空库 `AutoMigrate + Seed` + 核心协议回归全绿 | 一次性 PG 集成验证（docker 起 PG，跑完即弃），验证 `serializer:json` 与 `UpdateFields` 在 pgx 下的行为 |
-| AC-7 | 前端测试与类型检查全绿，D1/D2/D3 用例转绿 | `pnpm -C frontend test` + 各 app `tsc --noEmit` |
+| AC-7 | 前端测试与类型检查全绿，D1/D2 用例转绿；`oauthClient` 的 PKCE 展示/提交断言已随 P3 改为枚举口径 | `pnpm -C frontend test` + 各 app `tsc --noEmit` |
 | AC-8 | swagger 产物仅含预期字段差异 | `make swag APP=auth\|platformadmin\|tenantadmin` 后 `git diff --stat` 审查 |
 | AC-9 | 仓库内**不存在**回填 SQL / 兼容旧库分支；`run-and-deploy.md` §2.3 已补本批脏值说明 | `grep -rn "information_schema\|Migrator()\|DROP COLUMN\|USING " backend/`（Go 代码）→ 0 行；`run-and-deploy.md` 评审 |
 | AC-10 | 枚举类型独占性测试通过（同类型不被两列引用） | §8.3 第 3 项反射测试 |
@@ -586,8 +620,8 @@ type UserIdentityDetail struct {
 
 ```mermaid
 flowchart LR
-    P0["P0 前置<br>枚举/载具类型 + golden 与独占性测试骨架<br>前端 D1-D3 红用例"] --> P1["P1 JSON 显式化<br>model + oidcop + 三应用 + seed<br>删 datatypes 依赖"]
-    P1 --> P2["P2 UpdateMap 改造<br>DAO UpdateFields + 5 处调用点"]
+    P0["P0 前置<br>枚举/载具类型 + 形状 golden 与独占性测试<br>（前端 D1-D2 红用例并入 P3）"] --> P1["P1 JSON 显式化<br>model + oidcop + 三应用 + seed"]
+    P1 --> P2["P2 UpdateMap 改造<br>DAO UpdateFields + 6 处调用点"]
     P2 --> P3["P3 bool 枚举化<br>model + DTO + object + seed + 前端<br>（单提交完成，不留半枚举态）"]
     P3 --> P4["P4 下线删除<br>10 列 + log 表 + 死代码"]
     P4 --> P5["P5 文档与验收<br>glossary/system-design/部署清单/swagger"]
@@ -595,14 +629,39 @@ flowchart LR
 
 | 批次 | 内容 | 验收锚点 | 回滚粒度 |
 |---|---|---|---|
-| P0 | 新增 `enum.go`/`jsontypes.go` 与载具结构体（暂不接线）；golden + 独占性测试骨架；前端 D1–D3 用例先红 | AC-11 | 无风险 |
-| P1 | 12 个 JSON 列类型化 + 删除全部手工 `Marshal/Unmarshal` 与 3 个 helper；`pkg/go.mod` 去 `datatypes` | AC-1（model 部分）、AC-2、AC-4 | 单批 revert |
-| P2 | `UpdateFields` + 5 处调用点 | AC-3 | 单批 revert |
-| P3 | 16 个 bool 列枚举化（含 5 处改名）+ DTO/object/seed/前端 | AC-1、AC-4、AC-7、AC-10 | 单批 revert（**不可拆：留半枚举半 bool 的中间态会让 DTO 契约自相矛盾**） |
-| P4 | 删除 8 个 JSON 列 + 2 个死时间列（含 `tenant_application.config/granted_scope`、`domain.verified_at`、`user_identity.last_used_at`）+ `log` 表；删 `LogDao`/`svctenant/log.go`/路由/前端 log 页、租户应用「配置（JSON）」文本域 | AC-4 | 单批 revert |
-| P5 | 文档、部署清单、swagger 重生成；PG 空库验收 | AC-6、AC-8、AC-9 | — |
+| P0 | 新增 `enum.go`/`jsontypes.go` 与载具结构体（暂不接线）；载具 JSON 形状 golden + 枚举独占性测试（DB 落库 golden 随 P1 接线后补）；前端 D1–D2 红用例与 P3 同批（用例引用 P3 的类型，须与类型变更同批才能过 `tsc`）（`RoleCode` / `RoleTemplateItem` / `RoleTemplateItemList` 已存在，勿重复定义） | AC-11 | 无风险 |
+| P1 | 13 个 JSON 列类型化（含 `application.role_template`）+ 删除全部手工 `Marshal/Unmarshal` 与 4 个 helper（含 `RoleTemplateList()`）；`gorm.io/datatypes` 依赖随 P4 删除（P1 之后仍有 8 个待删列在用）；DB 落库 golden（原始列文本）落在 `pkg/model`，覆盖 `Create` / 结构化 `Updates` / 可空列 NULL 三种形状 | AC-1（model 部分）、AC-4 | 单批 revert |
+| P2 | `UpdateFields`（`pkg/dao/update.go` 泛型函数）+ 4 处调用点（`svcapplicationclient`、`svcapplication/role_template`、`svcauth/connector`、两处 `user_identity`）；`svctenantapplication` 的 2 处 `config`/`granted_scope` 是 P4 待删列，故意不改造（改造即白做，随后删除）；`Update("col", v)` 同 `UpdateMap` 一并纳入禁用面（见 §6.6 实现补充） | AC-3 | 与 P1 同一批（类型化的列经 map 写入会脏写，不可分开合并） |
+| P3 | 16 个 bool 列枚举化（含 5 处改名）+ DTO/object/seed/前端；前端 D1/D2 用例先红后绿（同批）；`oauthClient/Detail.tsx` 与 #68 新增的 PKCE 断言由 boolean 改枚举；`domain.verified_at` 随本批删除（字段、DTO、前端「验证时间」列） | AC-1、AC-4、AC-7、AC-10 | 单批 revert（**不可拆：留半枚举半 bool 的中间态会让 DTO 契约自相矛盾**） |
+| P4 | 删除 8 个 JSON 列 + 死时间列（含 `tenant_application.config/granted_scope`、`user_identity.last_used_at`、`api_key.last_used_at`；`domain.verified_at` 已随 P3 删除）+ `log` 表；删 `LogDao`/`svctenant/log.go`/路由/前端 log 页、租户应用「配置（JSON）」文本域；`pkg/go.mod` 去 `datatypes`（AC-2 在此批达成） | AC-2、AC-4 | 单批 revert |
+| P5 | 文档（含随 #68 新增的 `application-integration-guide.md` 与 `system-design.md` §5.4）、部署清单、swagger 重生成；PG 空库验收 | AC-6、AC-8、AC-9 | — |
 
 > 为什么 P1/P2 先于 P3：JSON 列改造与 bool 改造互不耦合，但都触碰 `pkg/model`。先把"纯类型替换、零 DB 语义"的 JSON 批做完，bool 批即可专注处理改名与枚举映射。
+
+**实现补充（P3）**：`pkg` 侧已落地并全绿，`apps/*` 与前端同批收口。执行中的确定口径：
+
+- 改名列的对外字段名同步改名：`status`（person/user）、`passwordStatus`、`ownerType`、`verificationStatus`；`objauth.TenantOption`/`UserInfo`/`TenantUserInfo` 的 `isOwner` 亦改为 `ownerType`。前端类型与本批一起改，不留兼容期。
+- `application.allow_person_create_tenant` / `allow_join_by_invite` 由 `*bool` 改为非指针枚举，NULL ≡ `disable`；`pkg/core/application.AllowsPersonCreateTenant/AllowsJoinByInvite` 的 `boolPtrValue` 读取器删除，改为显式 `== ...Enable`。
+- 16 列绑定用 `pkg/model` 的 `TestHardenedColumnsUseNamedEnums` 固化（表.列 → 具名枚举 + `varchar(16)`）：改名或回退成 bool 会直接失败。
+- `domain.verified_at` 随本批删除（模型字段、DTO、前端「验证时间」列），P4 不再重复。
+
+**实现补充（P4）**：`pkg` 侧已完成，`apps/*` 与前端同批收口。
+
+- 删除的列以「列即代码」的方式整体移除：model 字段、DTO、service 读写点、前端类型/列一并删，无兼容分支、无迁移 SQL（符合 §8.1 的删库重建约定）。
+- `log` 表下线同时登记退役菜单：`pkg/seed` 删除「审计日志」菜单定义并在 `retiredMenus` 登记 `log`，否则存量库会残留指向已删页面的死链菜单（且 `role_menu` 授权不清理）。种子菜单总数 15 → 14，相关计数断言同步修正。
+- `pkg/go.mod` 移除 `gorm.io/datatypes`（`go mod tidy` 连带移除 mysql driver 等间接依赖）；`pkg/model.BoolPtr` 随旧 `*bool` 策略字段一并删除（死代码）。
+- 「时间类型原生化」在本批由删除达成：`api_key.last_used_at`（唯一残留 `sql.NullTime`）随列下线，全仓 `sql.Null*` 归零；`user_identity.last_used_at` 本就是 `*time.Time`。
+- AC-1 达成：`pkg/model` 中 `datatypes.JSON` / `json.RawMessage` / `type:boolean` / `sql.Null` 全部为 0。
+- 下线到「零残留」：`log` 模块的孤儿代码一并删除——`pkg/code/audit.go`（`Log*Error` 100900–100902，零引用）及其注册项、`pkg/object/objaudit`（仅 `LogBaseInfo`，零 importer）；`pkg/audit` 与 `AuditLogEntity` 仍有消费者，保留。
+- AC-6 在真实 PG 空库上达成：`pkg/seed/seed_pg_test.go` 增加结构断言（16 个布尔语义列 = `varchar(16)`、JSON 列 = `jsonb`、15 个下线列与 `log`/`system`/`scope`/`resource`/`role_scope` 表均不存在），并在新建空库上跑 `AutoMigrate + Seed` 通过；另补 `TestSeedIamRetiresLogMenuWithRoleBindings`（存量库残留 `log` 菜单 + `role_menu` 授权 → 种子后物理删除 + 授权清零，已做反证）。
+- AC-2/AC-3/AC-4/AC-7/AC-8/AC-9/AC-10 的复跑命令收敛在 `.dsh/docs/plans/2026-09-18-p5-acceptance.sh`（AC-10 记录 3 处白名单例外：`AllowPersonCreateTenant` 计算标志、`normalizeConnectorSwitch` 多值赋值、`ConnectorRuntime` 运行时投影）。
+
+> P3 执行中发现的超范围问题（不在本批修）：① 平台端 `MenuPageListReq.Type/Status/Visibility`、`ApplicationPageListReq.Status`、`ApplicationClientPageListReq.Status`、auth 侧 `ConnectorPageListReq.Status/Protocol/Provider` 等**既有具名枚举筛选入参缺 service 侧白名单校验**，非法值会被 DAO 静默当作空结果（对照 `TenantPageListReq.Status` 已有校验），应作为独立小任务统一；② 前端 `tenant-admin-web` 的用户/服务账号状态筛选、应用入口策略提交 payload 尚缺断言级回归。
+
+**实现补充（收口，P5 之后）**：两处结构收敛。
+
+- `pkg/model/enum.go` 删除，17 个枚举按所属实体拆回各自的 model 文件（见 §5.1 落位说明）；`enum_test.go` 保留为跨实体不变式（列独占、`varchar(16)` 绑定、`enable/disable` 与语义取值）的唯一集中校验点。
+- OIDC 标准 scope 常量化：新增 `pkg/model/scope.go`（`ScopeOpenID`/`ScopeProfile`/`ScopeEmail`/`ScopePhone`）。scope 是开放集合（RFC 6749 允许自定义 scope），故常量声明为**无类型字符串**而非具名类型——可直接用于 `DefaultScopeList`/`ScopeList`/`ConnectorScopeList` 的 `[]string` 元素与 `switch` case，不必在字面量处强转；`oidcop.OIDCClient.IsScopeAllowed`、连接器工厂默认 scope、内置客户端种子与相关测试的裸字面量同步替换（`oidc.Scope*` 库常量保持不变）。
 
 ---
 
@@ -610,10 +669,11 @@ flowchart LR
 
 | ID | 议题 | 决策 | 落地影响 |
 |---|---|---|---|
-| Q1 | `tenant_application.config` / `granted_scope`（仅前端 JSON 文本域存取，零消费方） | **删除**：删 2 列 + `svctenantapplication`/DTO 相关字段 + 前端「配置（JSON）」`Form.Item` + `packages/types` 的 3 处 `config/grantedScope` | 类型化列由 14 降为 12；P4 多删 2 列 |
+| Q1 | `tenant_application.config` / `granted_scope`（仅前端 JSON 文本域存取，零消费方） | **删除**：删 2 列 + `svctenantapplication`/DTO 相关字段 + 前端「配置（JSON）」`Form.Item` + `packages/types` 的 3 处 `config/grantedScope` | 类型化列由 15 降为 13（已含 #68 新增的 `application.role_template`）；P4 多删 2 列 |
 | Q2 | `connector.claim_mapping` / `domain_policy`（无消费方，但驱动工厂已声明能力位） | **保留并显式建模**：新增 `ConnectorClaimMapping` / `ConnectorDomainPolicy` 两个结构体，文档标注"待接线" | §5.3 第 8/9 行；P1 含 2 个结构体 |
 | Q3 | `user_identity.detail` 只保留标准 OIDC 声明白名单、丢弃非白名单 claim | **接受**（§6.4-A）；将来若必须保全量，升级到 `identity_claim` 子表（§6.4-B） | detail 信息完整度收窄（仅标准声明 10 个字段） |
 | Q4 | `connector.config.scopes` 是否单独具名 | **具名** `ConnectorScopeList`，不复用外部列表类型 | §5.2 |
+| Q5 | `role_template` 坏 JSON 的读取语义（#68 合并后新增；原 `RoleTemplateList()` 是"解码失败返回 nil"） | **fail-loud**（§6.7-A）：删宽容解析，防线收敛到写入侧校验；不保留"静默撤空角色"的读侧兜底 | §5.3 第 13 行、§6.7、P1 |
 
 > 更早已随评审关闭：`Toggle` vs 每字段类型 → **每字段独立**（策略 2）；`map[string]string` vs 白名单 → **显式白名单结构体**（策略 3）；`person.status` 与 `tenant_user.status` 是否共用 → **不共用**（策略 4）；是否写回填 SQL → **不写，删库重建**（策略 1）。
 
@@ -624,7 +684,8 @@ flowchart LR
 ## 13. 评审检查清单（结构重构 + 下线 双场景）
 
 - [ ] 每个关键选型（§6）都有 ≥2 备选、代价与否决理由？（已满足）
-- [ ] 行为基线与等价性验证已定义（§8.3），含 4 条协议回归 + 3 个前端缺陷用例 + 枚举独占性反射测试？（已满足）
+- [ ] 行为基线与等价性验证已定义（§8.3），含 4 条协议回归 + 2 个前端缺陷用例（D1/D2）+ 枚举独占性反射测试？（已满足）
+- [ ] 盘点基线已对齐最新合并（#68 的 `application.role_template`、`role.code`、前端 oauthClient/application 改动均已计入 §3/§7）？（已满足）
 - [ ] 下线项有消费者盘点与下线判据（§3.1/§3.3）；数据处置写明（§8.1/§8.2）？（已满足）
 - [ ] 破坏性变更的**具体部署动作与失败模式**已写明（§8.1 含"不删库会写脏值"的逐列后果），而非"加强监控"？（已满足）
 - [ ] 所有量化论断带口径（§3 各节）？GORM 结论带可复现证据（§4）？（已满足）

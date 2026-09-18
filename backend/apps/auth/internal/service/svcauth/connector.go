@@ -4,8 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -37,6 +35,40 @@ func isValidConnectorStatus(status model.ConnectorStatus) bool {
 	default:
 		return false
 	}
+}
+
+// normalizeConnectorSwitch 校验并归一化单个连接器开关枚举：空串按 disable 处理
+// （列默认值即 disable，保持「未提交即关闭」的既有行为），非空必须命中白名单常量。
+// 四个开关列虽语义相同，但类型刻意分列（跨字段误赋值必须编译不过），故由调用方各自传入常量。
+func normalizeConnectorSwitch[T ~string](value T, enable T, disable T) (T, bool) {
+	switch value {
+	case "":
+		return disable, true
+	case enable, disable:
+		return value, true
+	default:
+		return "", false
+	}
+}
+
+// normalizeConnectorSwitches 就地校验并归一化连接器的 4 个开关列（allow_auto_create_user /
+// allow_account_link / sync_profile / enable_token_storage），任一非法值即整体返回 false，
+// 由调用方返回该操作既有的功能级错误码。
+func normalizeConnectorSwitches(info *objauth.ConnectorBaseInfo) bool {
+	var ok bool
+	if info.AllowAutoCreateUser, ok = normalizeConnectorSwitch(info.AllowAutoCreateUser, model.ConnectorAutoCreateUserFlagEnable, model.ConnectorAutoCreateUserFlagDisable); !ok {
+		return false
+	}
+	if info.AllowAccountLink, ok = normalizeConnectorSwitch(info.AllowAccountLink, model.ConnectorAccountLinkFlagEnable, model.ConnectorAccountLinkFlagDisable); !ok {
+		return false
+	}
+	if info.SyncProfile, ok = normalizeConnectorSwitch(info.SyncProfile, model.ConnectorSyncProfileFlagEnable, model.ConnectorSyncProfileFlagDisable); !ok {
+		return false
+	}
+	if info.EnableTokenStorage, ok = normalizeConnectorSwitch(info.EnableTokenStorage, model.ConnectorTokenStorageFlagEnable, model.ConnectorTokenStorageFlagDisable); !ok {
+		return false
+	}
+	return true
 }
 
 type ConnectorSvc interface {
@@ -148,20 +180,7 @@ func (svc *connectorSvc) getNowFunc() func() time.Time {
 	return svc.nowFunc
 }
 
-func buildConnectorInsertEntity(req *dtoauth.ConnectorCreateReq, tenantID string, createdBy string) (*model.ConnectorEntity, error) {
-	configJson, err := json.Marshal(req.Config)
-	if err != nil {
-		return nil, fmt.Errorf("marshal config fail: %w", err)
-	}
-	claimMapping, err := marshalJSON(req.ClaimMapping)
-	if err != nil {
-		return nil, fmt.Errorf("marshal claimMapping fail: %w", err)
-	}
-	domainPolicy, err := marshalJSON(req.DomainPolicy)
-	if err != nil {
-		return nil, fmt.Errorf("marshal domainPolicy fail: %w", err)
-	}
-
+func buildConnectorInsertEntity(req *dtoauth.ConnectorCreateReq, tenantID string, createdBy string) *model.ConnectorEntity {
 	// status 未指定时落默认值 enable（与列默认值一致，且不依赖驱动回读默认值）
 	status := req.Status
 	if status == "" {
@@ -180,62 +199,42 @@ func buildConnectorInsertEntity(req *dtoauth.ConnectorCreateReq, tenantID string
 		AllowAccountLink:    req.AllowAccountLink,
 		SyncProfile:         req.SyncProfile,
 		EnableTokenStorage:  req.EnableTokenStorage,
-		Config:              configJson,
-		ClaimMapping:        claimMapping,
-		DomainPolicy:        domainPolicy,
+		Config:              req.Config,
+		ClaimMapping:        req.ClaimMapping,
+		DomainPolicy:        req.DomainPolicy,
 		CreatedBy:           createdBy,
-	}, nil
+	}
 }
 
-func buildConnectorUpdateMap(req *dtoauth.ConnectorUpdateReq, updatedBy string) (map[string]any, error) {
-	configJson, err := json.Marshal(req.Config)
-	if err != nil {
-		return nil, fmt.Errorf("marshal config fail: %w", err)
+// buildConnectorUpdateEntity 组装连接器更新实体与显式列清单。
+// JSON 列必须走结构化 Updates（DAO UpdateFields），map 更新不经过 serializer，会写坏 JSON 列。
+func buildConnectorUpdateEntity(req *dtoauth.ConnectorUpdateReq, updatedBy string) (*model.ConnectorEntity, []string) {
+	entity := &model.ConnectorEntity{
+		Name:                req.Name,
+		DisplayName:         req.DisplayName,
+		Protocol:            req.Protocol,
+		Provider:            req.Provider,
+		AllowAutoCreateUser: req.AllowAutoCreateUser,
+		AllowAccountLink:    req.AllowAccountLink,
+		SyncProfile:         req.SyncProfile,
+		EnableTokenStorage:  req.EnableTokenStorage,
+		Config:              req.Config,
+		ClaimMapping:        req.ClaimMapping,
+		DomainPolicy:        req.DomainPolicy,
+		UpdatedBy:           updatedBy,
 	}
-	claimMapping, err := marshalJSON(req.ClaimMapping)
-	if err != nil {
-		return nil, fmt.Errorf("marshal claimMapping fail: %w", err)
-	}
-	domainPolicy, err := marshalJSON(req.DomainPolicy)
-	if err != nil {
-		return nil, fmt.Errorf("marshal domainPolicy fail: %w", err)
-	}
-
-	updateMap := map[string]any{
-		// 注意：tenant_id 不可更新（连接器归属租户固定，防跨租户迁移）
-		"name":                   req.Name,
-		"display_name":           req.DisplayName,
-		"protocol":               req.Protocol,
-		"provider":               req.Provider,
-		"allow_auto_create_user": req.AllowAutoCreateUser,
-		"allow_account_link":     req.AllowAccountLink,
-		"sync_profile":           req.SyncProfile,
-		"enable_token_storage":   req.EnableTokenStorage,
-		"config":                 configJson,
-		"claim_mapping":          claimMapping,
-		"domain_policy":          domainPolicy,
-		"updated_by":             updatedBy,
+	// 注意：tenant_id 不可更新（连接器归属租户固定，防跨租户迁移）
+	fields := []string{
+		"name", "display_name", "protocol", "provider",
+		"allow_auto_create_user", "allow_account_link", "sync_profile", "enable_token_storage",
+		"config", "claim_mapping", "domain_policy", "updated_by",
 	}
 	// status 留空表示不修改：不写该列，避免把状态覆盖为空串
 	if req.Status != "" {
-		updateMap["status"] = req.Status
+		entity.Status = req.Status
+		fields = append(fields, "status")
 	}
-	return updateMap, nil
-}
-
-// marshalJSON 序列化 JSON 字段；nil / "null" 输出 "{}"。
-func marshalJSON(value any) (json.RawMessage, error) {
-	if value == nil {
-		return json.RawMessage("{}"), nil
-	}
-	data, err := json.Marshal(value)
-	if err != nil {
-		return nil, err
-	}
-	if len(data) == 0 || string(data) == "null" {
-		return json.RawMessage("{}"), nil
-	}
-	return data, nil
+	return entity, fields
 }
 
 func (svc *connectorSvc) Create(ctx *gin.Context, req *dtoauth.ConnectorCreateReq) (*dtoauth.ConnectorCreateResp, error) {
@@ -243,12 +242,11 @@ func (svc *connectorSvc) Create(ctx *gin.Context, req *dtoauth.ConnectorCreateRe
 		glog.Errorf(ctx, "[svcauth.CreateConnector] 非法连接器状态, req:%s", gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorCreateError)
 	}
-	insertEntity, err := buildConnectorInsertEntity(req, gincontext.GetTenantIDString(ctx), gincontext.GetUserIDString(ctx))
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.CreateConnector] build insert entity fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+	if !normalizeConnectorSwitches(&req.ConnectorBaseInfo) {
+		glog.Errorf(ctx, "[svcauth.CreateConnector] 非法连接器开关, req:%s", gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorCreateError)
 	}
-
+	insertEntity := buildConnectorInsertEntity(req, gincontext.GetTenantIDString(ctx), gincontext.GetUserIDString(ctx))
 	if err := dao.NewConnectorDao().Insert(ctx, insertEntity); err != nil {
 		glog.Errorf(ctx, "[svcauth.CreateConnector] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorCreateError)
@@ -281,6 +279,10 @@ func (svc *connectorSvc) Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateRe
 		glog.Errorf(ctx, "[svcauth.UpdateConnector] 非法连接器状态, req:%s", gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorUpdateError)
 	}
+	if !normalizeConnectorSwitches(&req.ConnectorBaseInfo) {
+		glog.Errorf(ctx, "[svcauth.UpdateConnector] 非法连接器开关, req:%s", gutil.ToJsonString(req))
+		return code.GetError(code.ConnectorUpdateError)
+	}
 	connectorEntity, err := dao.NewConnectorDao().GetByID(ctx, req.ConnectorID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.UpdateConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -290,13 +292,9 @@ func (svc *connectorSvc) Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateRe
 		return code.GetError(code.ConnectorNotExistError)
 	}
 
-	updateMap, err := buildConnectorUpdateMap(req, gincontext.GetUserIDString(ctx))
-	if err != nil {
-		glog.Errorf(ctx, "[svcauth.UpdateConnector] build update map fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.ConnectorUpdateError)
-	}
-	if err := dao.NewConnectorDao().UpdateMap(ctx, req.ConnectorID, updateMap); err != nil {
-		glog.Errorf(ctx, "[svcauth.UpdateConnector] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+	updateEntity, fields := buildConnectorUpdateEntity(req, gincontext.GetUserIDString(ctx))
+	if err := dao.UpdateFields(ctx, dao.NewConnectorDao().Dao, req.ConnectorID, updateEntity, fields...); err != nil {
+		glog.Errorf(ctx, "[svcauth.UpdateConnector] dao UpdateFields fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorUpdateError)
 	}
 	return nil
@@ -312,13 +310,6 @@ func (svc *connectorSvc) Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailRe
 		return nil, code.GetError(code.ConnectorNotExistError)
 	}
 
-	var config any
-	if err := json.Unmarshal(connectorEntity.Config, &config); err != nil {
-		glog.Errorf(ctx, "[svcauth.DetailConnector] json.Unmarshal config fail, err:%v", err)
-		return nil, code.GetError(code.ConnectorGetDetailError)
-	}
-	// H3：返回前对 Config 脱敏（clientSecret/token 等敏感字段不落地前端）
-	config = sanitizeConnectorConfig(config)
 	resp := &dtoauth.ConnectorDetailResp{
 		ConnectorID: connectorEntity.ID,
 		ConnectorBaseInfo: objauth.ConnectorBaseInfo{
@@ -332,9 +323,10 @@ func (svc *connectorSvc) Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailRe
 			AllowAccountLink:    connectorEntity.AllowAccountLink,
 			SyncProfile:         connectorEntity.SyncProfile,
 			EnableTokenStorage:  connectorEntity.EnableTokenStorage,
-			Config:              config,
-			ClaimMapping:        unmarshalJSON(connectorEntity.ClaimMapping),
-			DomainPolicy:        unmarshalJSON(connectorEntity.DomainPolicy),
+			// H3：返回前对 Config 脱敏（clientSecret 不落地前端）
+			Config:       sanitizeConnectorConfig(connectorEntity.Config),
+			ClaimMapping: connectorEntity.ClaimMapping,
+			DomainPolicy: connectorEntity.DomainPolicy,
 		},
 		OperatorBaseInfo: gobject.OperatorBaseInfo{
 			CreatedAt: connectorEntity.CreatedAt.Unix(),
@@ -366,13 +358,6 @@ func (svc *connectorSvc) PageList(ctx *gin.Context, req *dtoauth.ConnectorPageLi
 
 	list := make([]dtoauth.ConnectorPageListItem, 0, len(connectorEntityList))
 	for _, v := range connectorEntityList {
-		var config any
-		if err := json.Unmarshal(v.Config, &config); err != nil {
-			glog.Errorf(ctx, "[svcauth.PageListConnector] json.Unmarshal config fail, err:%v", err)
-			continue
-		}
-		// H3：列表同样脱敏，避免 clientSecret 等敏感字段泄露
-		config = sanitizeConnectorConfig(config)
 		list = append(list, dtoauth.ConnectorPageListItem{
 			ConnectorID: v.ID,
 			ConnectorBaseInfo: objauth.ConnectorBaseInfo{
@@ -386,9 +371,10 @@ func (svc *connectorSvc) PageList(ctx *gin.Context, req *dtoauth.ConnectorPageLi
 				AllowAccountLink:    v.AllowAccountLink,
 				SyncProfile:         v.SyncProfile,
 				EnableTokenStorage:  v.EnableTokenStorage,
-				Config:              config,
-				ClaimMapping:        unmarshalJSON(v.ClaimMapping),
-				DomainPolicy:        unmarshalJSON(v.DomainPolicy),
+				// H3：列表同样脱敏，避免 clientSecret 等敏感字段泄露
+				Config:       sanitizeConnectorConfig(v.Config),
+				ClaimMapping: v.ClaimMapping,
+				DomainPolicy: v.DomainPolicy,
 			},
 			OperatorBaseInfo: gobject.OperatorBaseInfo{
 				CreatedAt: v.CreatedAt.Unix(),
@@ -533,9 +519,10 @@ func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorC
 	}
 	resolvedPerson, err := svc.getIdentityResolver().Resolve(runtimeContext(ctx), identityResolveInput{
 		Connector: ConnectorRuntime{
-			ID:                  connectorEntity.ID,
-			TenantID:            connectorEntity.TenantID,
-			AllowAutoCreateUser: connectorEntity.AllowAutoCreateUser,
+			ID:       connectorEntity.ID,
+			TenantID: connectorEntity.TenantID,
+			// 内部运行时结构体保持 bool：在 model 边界显式映射枚举，禁止把枚举值当布尔用。
+			AllowAutoCreateUser: connectorEntity.AllowAutoCreateUser == model.ConnectorAutoCreateUserFlagEnable,
 		},
 		Identity: callbackOutput.Identity,
 	})
@@ -561,20 +548,6 @@ func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorC
 		return nil, err
 	}
 	return &dtoauth.LoginResp{SSOSessionID: sessionID, Tenants: tenants}, nil
-}
-
-func unmarshalJSON(data json.RawMessage) any {
-	if len(data) == 0 {
-		return map[string]any{}
-	}
-	var result any
-	if err := json.Unmarshal(data, &result); err != nil {
-		return map[string]any{}
-	}
-	if result == nil {
-		return map[string]any{}
-	}
-	return result
 }
 
 func defaultConnectorStateGenerator() (string, error) {

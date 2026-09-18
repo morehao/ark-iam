@@ -147,8 +147,7 @@ func TestApiKeyAuthSuspendedOwnerRejected(t *testing.T) {
 	owner := seedTestOwnerUser(t, userDao, "1", false)
 	// 租户本身保持 active：本用例只验证归属主体被挂起这条独立门禁。
 	seedTestTenant(t, tenantDao, "1", model.TenantStatusActive)
-	owner.IsSuspended = true
-	if err := userDao.UpdateMap(context.Background(), owner.ID, map[string]any{"is_suspended": true}); err != nil {
+	if err := userDao.UpdateMap(context.Background(), owner.ID, map[string]any{"status": model.UserStatusSuspended}); err != nil {
 		t.Fatalf("suspend owner: %v", err)
 	}
 
@@ -414,7 +413,6 @@ func insertTestApiKey(t *testing.T, apiKeyDao *dao.ApiKeyDao, tenantID, ownerUse
 		Name:        "Test Middleware Key",
 		KeyHash:     keyHash,
 		KeyPrefix:   keyPrefix,
-		Scope:       json.RawMessage(`{}`),
 		ExpiredAt:   expiresAt,
 		RevokedAt:   revokedAt,
 		CreatedBy:   "42",
@@ -437,8 +435,6 @@ func seedTestOwnerUser(t *testing.T, userDao *dao.UserDao, tenantID string, mach
 		TenantID:   tenantID,
 		UserType:   userType,
 		Name:       name,
-		Profile:    json.RawMessage(`{}`),
-		CustomData: json.RawMessage(`{}`),
 	}
 	if err := userDao.Insert(context.Background(), entity); err != nil {
 		t.Fatalf("insert test owner user: %v", err)

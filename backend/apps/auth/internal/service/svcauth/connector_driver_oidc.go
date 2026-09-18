@@ -96,7 +96,7 @@ func (d *OIDCDriver) BuildAuthorizationURL(ctx *gin.Context, input *ConnectorAut
 		ClientID:     input.Config.ClientID,
 		ClientSecret: input.Config.ClientSecret,
 		RedirectURL:  resolveConnectorRedirectURI(input),
-		Scopes:       input.Config.Scopes,
+		Scopes:       input.Config.Scopes.Strings(),
 		Endpoint:     provider.Endpoint(),
 	}
 	authURL := oauthConfig.AuthCodeURL(input.State,
@@ -131,7 +131,7 @@ func (d *OIDCDriver) ExchangeCallback(ctx *gin.Context, input *ConnectorCallback
 		ClientID:     input.Config.ClientID,
 		ClientSecret: input.Config.ClientSecret,
 		RedirectURL:  resolveConnectorCallbackRedirectURI(input),
-		Scopes:       input.Config.Scopes,
+		Scopes:       input.Config.Scopes.Strings(),
 		Endpoint:     provider.Endpoint(),
 	}
 	token, err := d.exchangeToken(runtimeContext(ctx), oauthConfig, input.Code, input.CodeVerifier)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -42,7 +41,6 @@ func TestLookupApiKeyByRawKey(t *testing.T) {
 		Name:      "test-key",
 		KeyHash:   hash,
 		KeyPrefix: "ak_12345",
-		Scope:     json.RawMessage("{}"),
 		CreatedBy: "7",
 	}).Error; err != nil {
 		t.Fatalf("create api key: %v", err)
@@ -93,7 +91,6 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 		Name:      "service-key",
 		KeyHash:   hash,
 		KeyPrefix: "ak_1234567",
-		Scope:     json.RawMessage("{}"),
 		CreatedBy: "7",
 	}).Error; err != nil {
 		t.Fatalf("create api key: %v", err)
@@ -101,11 +98,9 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 	// owner user：ID=7（对应 apiKey.CreatedBy），person_id=5
 	now := time.Now()
 	ownerUser := &model.UserEntity{
-		TenantID:   "1",
-		PersonID:   "5",
-		Profile:    json.RawMessage("{}"),
-		CustomData: json.RawMessage("{}"),
-		JoinedAt:   &now,
+		TenantID: "1",
+		PersonID: "5",
+		JoinedAt: &now,
 	}
 	ownerUser.ID = "7"
 	if err := db.Create(ownerUser).Error; err != nil {

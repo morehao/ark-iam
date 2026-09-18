@@ -9,7 +9,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/glog"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -120,8 +119,6 @@ func ensureTenantApplication(ctx context.Context, tx *gorm.DB, req *ProvisionTen
 		TenantID:     req.TenantID,
 		AppID:        appID,
 		Status:       model.TenantApplicationStatusEnable,
-		Config:       datatypes.JSON([]byte(`{}`)),
-		GrantedScope: datatypes.JSON([]byte(`[]`)),
 		CreatedBy:    req.CreatedBy,
 	}
 	if err := appDao.Insert(ctx, entity); err != nil {
@@ -248,7 +245,7 @@ type CreateTenantWithBuiltinAdminResult struct {
 // CreateTenantWithBuiltinAdmin 在 tx 事务内一次性完成"建租户 + 内置管理员 + 租户自服务权限开通"：
 //
 //	租户 + 同名根部门（CreateWithRootDept）
-//	→ 内置管理员用户（user.Create，source=builtin、is_owner、归属根部门）
+//	→ 内置管理员用户（user.Create，source=builtin、owner_type=owner、归属根部门）
 //	→ 权限开通（ProvisionTenantAdmin：应用订阅/内置角色/菜单授权/角色绑定）
 //
 // 平台建租户（管理员为新建自然人，持临时密码）与自助建租户（管理员即当前登录自然人）
@@ -280,7 +277,7 @@ func CreateTenantWithBuiltinAdmin(ctx context.Context, tx *gorm.DB, req *CreateT
 	adminReq := *req.AdminUser
 	adminReq.TenantID = tenantEntity.ID
 	adminReq.Source = model.UserSourceBuiltin
-	adminReq.IsOwner = true
+	adminReq.OwnerType = model.OwnerTypeOwner
 	adminReq.PrimaryDepartmentID = rootDept.ID
 	adminUser, personCreated, err := user.Create(newTenantCtx, tx, &adminReq)
 	if err != nil {
@@ -346,7 +343,7 @@ func SyncAppRoleTemplate(ctx context.Context, tx *gorm.DB, req *SyncAppRoleTempl
 	if app == nil || app.ID == "" {
 		return fmt.Errorf("application %s not found", req.AppID)
 	}
-	template := app.RoleTemplateList()
+	template := app.RoleTemplate
 
 	roleDao := dao.NewRoleDao().WithTx(tx)
 	for _, item := range template {

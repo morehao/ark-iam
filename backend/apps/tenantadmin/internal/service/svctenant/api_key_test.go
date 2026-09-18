@@ -2,7 +2,6 @@ package svctenant
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/morehao/ark-iam/pkg/code"
@@ -23,8 +22,6 @@ func TestApiKeyServiceAccountOnly(t *testing.T) {
 		TenantID:   tenantID,
 		UserType:   model.UserTypeMachine,
 		Name:       "svc-notify",
-		Profile:    json.RawMessage(`{}`),
-		CustomData: json.RawMessage(`{}`),
 	}
 	if err := dbclient.IamDB(context.Background()).Create(machine).Error; err != nil {
 		t.Fatalf("seed machine owner: %v", err)
@@ -33,8 +30,6 @@ func TestApiKeyServiceAccountOnly(t *testing.T) {
 		TenantID:   tenantID,
 		UserType:   model.UserTypeMachine,
 		Name:       "svc-webhook",
-		Profile:    json.RawMessage(`{}`),
-		CustomData: json.RawMessage(`{}`),
 	}
 	if err := dbclient.IamDB(context.Background()).Create(machine2).Error; err != nil {
 		t.Fatalf("seed machine owner 2: %v", err)
@@ -136,8 +131,6 @@ func TestApiKeyDeleteRequiresAdmin(t *testing.T) {
 		TenantID:   tenantID,
 		UserType:   model.UserTypeMachine,
 		Name:       "svc-alice",
-		Profile:    json.RawMessage(`{}`),
-		CustomData: json.RawMessage(`{}`),
 	}
 	if err := dbclient.IamDB(context.Background()).Create(machine).Error; err != nil {
 		t.Fatalf("seed machine owner: %v", err)
@@ -145,7 +138,7 @@ func TestApiKeyDeleteRequiresAdmin(t *testing.T) {
 	// 直接落一条既有密钥行，模拟历史数据
 	key := &model.ApiKeyEntity{
 		TenantID: tenantID, OwnerUserID: machine.ID, Name: "legacy",
-		KeyHash: "h", KeyPrefix: "ak_", Scope: json.RawMessage(`{}`), CreatedBy: adminOp.ID,
+		KeyHash: "h", KeyPrefix: "ak_", CreatedBy: adminOp.ID,
 	}
 	if err := dbclient.IamDB(context.Background()).Create(key).Error; err != nil {
 		t.Fatalf("seed key: %v", err)

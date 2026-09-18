@@ -31,11 +31,11 @@ func TestSeedIamKeepsMenuIdentityAfterCodeRename(t *testing.T) {
 
 	// 模拟控制台改名：编码 + 名称 + 路径
 	var menu model.MenuEntity
-	if err := db.Where("seed_key = ?", "log").First(&menu).Error; err != nil {
+	if err := db.Where("seed_key = ?", "oauth-client").First(&menu).Error; err != nil {
 		t.Fatalf("query menu by seed_key: %v", err)
 	}
 	if err := db.Model(&model.MenuEntity{}).Where("id = ?", menu.ID).
-		Updates(map[string]any{"code": "audit_log", "name": "操作审计", "path": "/audit"}).Error; err != nil {
+		Updates(map[string]any{"code": "oauth_client_console", "name": "客户端控制台", "path": "/oauth-client-console"}).Error; err != nil {
 		t.Fatalf("rename menu: %v", err)
 	}
 
@@ -57,20 +57,20 @@ func TestSeedIamKeepsMenuIdentityAfterCodeRename(t *testing.T) {
 	if err := db.Where("id = ?", menu.ID).First(&got).Error; err != nil {
 		t.Fatalf("query renamed menu: %v", err)
 	}
-	if got.Code != "audit_log" || got.Name != "操作审计" || got.Path != "/audit" {
+	if got.Code != "oauth_client_console" || got.Name != "客户端控制台" || got.Path != "/oauth-client-console" {
 		t.Errorf("改名被种子回写: code=%q name=%q path=%q", got.Code, got.Name, got.Path)
 	}
-	if got.SeedKey != "log" {
-		t.Errorf("seed_key = %q, want log（种子身份键不可变）", got.SeedKey)
+	if got.SeedKey != "oauth-client" {
+		t.Errorf("seed_key = %q, want oauth-client（种子身份键不可变）", got.SeedKey)
 	}
 	// 被改掉的旧编码不得残留（也不得被种子重新建出来）
 	var staleCount int64
-	if err := db.Model(&model.MenuEntity{}).Where("app_id = ? AND code = ?", adminApp.ID, "log").
+	if err := db.Model(&model.MenuEntity{}).Where("app_id = ? AND code = ?", adminApp.ID, "oauth-client").
 		Count(&staleCount).Error; err != nil {
 		t.Fatalf("count stale menu: %v", err)
 	}
 	if staleCount != 0 {
-		t.Errorf("旧编码 log 残留 %d 行，want 0", staleCount)
+		t.Errorf("旧编码 oauth-client 残留 %d 行，want 0", staleCount)
 	}
 }
 
@@ -118,8 +118,8 @@ func TestSeedIamKeepsApplicationIdentityAfterCodeRename(t *testing.T) {
 	if err := db.Model(&model.MenuEntity{}).Where("app_id = ?", adminApp.ID).Count(&menuCount).Error; err != nil {
 		t.Fatalf("count menus: %v", err)
 	}
-	if menuCount != 11 {
-		t.Errorf("应用下菜单数 = %d, want 11", menuCount)
+	if menuCount != 10 {
+		t.Errorf("应用下菜单数 = %d, want 10", menuCount)
 	}
 }
 
@@ -134,7 +134,7 @@ func TestSeedIamDoesNotPruneMenuRenamedToRetiredKey(t *testing.T) {
 	}
 
 	var menu model.MenuEntity
-	if err := db.Where("seed_key = ?", "log").First(&menu).Error; err != nil {
+	if err := db.Where("seed_key = ?", "oauth-client").First(&menu).Error; err != nil {
 		t.Fatalf("query menu by seed_key: %v", err)
 	}
 	if err := db.Model(&model.MenuEntity{}).Where("id = ?", menu.ID).
@@ -200,7 +200,7 @@ func TestSeedIamBackfillsSeedKeyForExistingRows(t *testing.T) {
 	}
 
 	// 每个内置菜单/应用都拿到了与定义一致的 seed_key
-	for _, seedKey := range []string{"dashboard", "grp-tenant", "tenant", "log", "department", "tenant-api-key"} {
+	for _, seedKey := range []string{"dashboard", "grp-tenant", "tenant", "oauth-client", "department", "tenant-api-key"} {
 		var count int64
 		if err := db.Model(&model.MenuEntity{}).Where("seed_key = ?", seedKey).Count(&count).Error; err != nil {
 			t.Fatalf("count menu seed_key %s: %v", seedKey, err)

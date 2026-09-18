@@ -17,7 +17,8 @@ type UserCond struct {
 	PrimaryEmail string
 	PrimaryPhone string
 	Name         string
-	IsSuspended  *bool
+	Status       model.UserStatus
+	OwnerType    model.OwnerType
 	Keyword      string // 模糊搜索: 租户内姓名 LIKE 或关联 person 的 username/email/phone LIKE
 }
 
@@ -52,8 +53,11 @@ func (c *UserCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.Name != "" {
 		db.Where(tableName+".name = ?", c.Name)
 	}
-	if c.IsSuspended != nil {
-		db.Where(tableName+".is_suspended = ?", *c.IsSuspended)
+	if c.Status != "" {
+		db.Where(tableName+".status = ?", c.Status)
+	}
+	if c.OwnerType != "" {
+		db.Where(tableName+".owner_type = ?", c.OwnerType)
 	}
 	if c.Keyword != "" {
 		k := "%" + c.Keyword + "%"

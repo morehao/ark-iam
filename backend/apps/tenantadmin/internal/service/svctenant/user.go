@@ -45,19 +45,36 @@ func NewUserSvc() UserSvc {
 	return &userSvc{}
 }
 
+// isValidUserStatus 白名单校验用户状态取值：仅接受已定义的枚举常量。
+// 空串的「不过滤/不修改/默认 active」语义由调用方在调用前自行放行（AGENTS.md 硬规则 3：
+// DTO 绑定的是前端传来的原始字符串，非法值在 service 入口拦截）。
+func isValidUserStatus(status model.UserStatus) bool {
+	switch status {
+	case model.UserStatusActive, model.UserStatusSuspended:
+		return true
+	default:
+		return false
+	}
+}
+
 // PageList 返回当前租户内的用户目录（含自然人基础信息），支持关键词（姓名/用户名/邮箱/手机）与状态过滤；
 // 传 departmentID 时仅返回"恰在该部门"的用户（含 primary/secondary/leader 任一关系，不含子部门）。
 func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (*dtotenant.UserPageListResp, error) {
+	// 状态过滤：空串=不过滤，非空必须命中白名单常量
+	if req.Status != "" && !isValidUserStatus(req.Status) {
+		glog.Errorf(ctx, "[svcuser.PageList] 非法用户状态, req:%s", gutil.ToJsonString(req))
+		return nil, code.GetError(code.UserGetPageListError)
+	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 	cond := &dao.UserCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID:    tenantID,
-		UserType:    model.UserTypeMember,
-		Keyword:     req.Keyword,
-		IsSuspended: req.IsSuspended,
+		TenantID: tenantID,
+		UserType: model.UserTypeMember,
+		Keyword:  req.Keyword,
+		Status:   req.Status,
 	}
 
 	// 部门过滤：仅筛选恰在该部门的用户（member/leader 均可），不掺子部门。
@@ -110,7 +127,7 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (
 			PrimaryPhone:          model.DerefStr(person.PrimaryPhone),
 			Name:                  v.Name,
 			Avatar:                v.Avatar,
-			IsSuspended:           v.IsSuspended,
+			Status:                v.Status,
 			PrimaryDepartmentName: primaryDepartmentNameMap[v.ID],
 			RoleCount:             roleCountMap[v.ID],
 			CreatedAt:             v.CreatedAt.Unix(),
@@ -198,7 +215,7 @@ func loadUserRoleCountMap(ctx *gin.Context, tenantID string, userIDs []string) m
 //
 // 口径与平台侧建租户内置管理员完全一致（需求①/D7）：
 //   - 密码不由调用方提供，统一由 pkg/credential 生成临时密码，仅本次响应返回一次；
-//   - 仅新建自然人时置 must_change_password=true（复用既有自然人绝不改动其密码）；
+//   - 仅新建自然人时置 password_status=must_change（复用既有自然人绝不改动其密码）；
 //   - person/user/部门关系同事务写入，共用 pkg/core/user.Create。
 func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dtotenant.UserCreateResp, error) {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
@@ -207,6 +224,12 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 	}
 	tenantID := gincontext.GetTenantIDString(ctx)
 	operatorID := gincontext.GetUserIDString(ctx)
+
+	// 状态入参白名单校验：空串=默认 active（由 pkg/core/user.Create 落默认值）
+	if req.Status != "" && !isValidUserStatus(req.Status) {
+		glog.Errorf(ctx, "[svcuser.Create] 非法用户状态, req:%s", gutil.ToJsonString(req))
+		return nil, code.GetError(code.UserCreateError)
+	}
 
 	// 0. 用户必须从属于一个主部门（业务约束，防绕过 DTO 校验）
 	if req.PrimaryDepartmentID == "" {
@@ -274,7 +297,7 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 			PersonID:               req.PersonID,
 			Name:                   req.Name,
 			Avatar:                 req.Avatar,
-			IsSuspended:            req.IsSuspended,
+			Status:                 req.Status,
 			CreatedBy:              operatorID,
 			PrimaryDepartmentID:    req.PrimaryDepartmentID,
 			SecondaryDepartmentIDs: req.SecondaryDepartmentIDs,
@@ -282,15 +305,15 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 		}
 		if req.PersonID == "" {
 			createReq.Person = &person.FindOrCreateReq{
-				Username:           req.Username,
-				PrimaryEmail:       req.PrimaryEmail,
-				PrimaryPhone:       req.PrimaryPhone,
-				PasswordEncrypted:  passwordHash,
-				PasswordMethod:     model.PasswordMethodBcrypt,
-				MustChangePassword: true,
-				Name:               req.Name,
-				Avatar:             req.Avatar,
-				CreatedBy:          operatorID,
+				Username:          req.Username,
+				PrimaryEmail:      req.PrimaryEmail,
+				PrimaryPhone:      req.PrimaryPhone,
+				PasswordEncrypted: passwordHash,
+				PasswordMethod:    model.PasswordMethodBcrypt,
+				PasswordStatus:    model.PasswordStatusMustChange,
+				Name:              req.Name,
+				Avatar:            req.Avatar,
+				CreatedBy:         operatorID,
 			}
 		}
 		createdUser, isNewPerson, createErr := user.Create(ctx, tx, createReq)
@@ -356,7 +379,7 @@ func (svc *userSvc) Detail(ctx *gin.Context, req *dtotenant.UserDetailReq) (*dto
 			PrimaryPhone: model.DerefStr(person.PrimaryPhone),
 			Name:         u.Name,
 			Avatar:       u.Avatar,
-			IsSuspended:  u.IsSuspended,
+			Status:       u.Status,
 			CreatedAt:    u.CreatedAt.Unix(),
 		},
 	}
@@ -386,6 +409,11 @@ func (svc *userSvc) Update(ctx *gin.Context, req *dtotenant.UserUpdateReq) error
 		return err
 	}
 	tenantID := gincontext.GetTenantIDString(ctx)
+	// 状态入参白名单校验：nil=不修改，非 nil 必须命中白名单常量
+	if req.Status != nil && !isValidUserStatus(*req.Status) {
+		glog.Errorf(ctx, "[svcuser.Update] 非法用户状态, req:%s", gutil.ToJsonString(req))
+		return code.GetError(code.UserUpdateError)
+	}
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -464,8 +492,8 @@ func (svc *userSvc) Update(ctx *gin.Context, req *dtotenant.UserUpdateReq) error
 		if req.Avatar != "" {
 			updateMap["avatar"] = req.Avatar
 		}
-		if req.IsSuspended != nil {
-			updateMap["is_suspended"] = *req.IsSuspended
+		if req.Status != nil {
+			updateMap["status"] = *req.Status
 		}
 		if len(updateMap) > 0 {
 			if err := dao.NewUserDao().UpdateMap(ctx, req.UserID, updateMap); err != nil {
@@ -568,7 +596,7 @@ func strPtrOrNil(p *string) *string {
 }
 
 // ResetPassword 重置成员密码（D7：与平台侧重置内置管理员的口径完全一致）。
-// 不接收新密码：由服务端生成临时密码并在响应中返回一次；置 must_change_password=true
+// 不接收新密码：由服务端生成临时密码并在响应中返回一次；置 password_status=must_change
 // 使新口令首次登录必须改密，并撤销该自然人既有 SSO 会话与 refresh token（改密即全局登出）。
 // 无自然人关联的用户（服务账号等）不可登录，也没有口令语义，直接拒绝。
 func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPasswordReq) (*dtotenant.UserResetPasswordResp, error) {
@@ -603,10 +631,10 @@ func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPass
 		return nil, code.GetError(code.PasswordHashError)
 	}
 	if err := dao.NewPersonDao().UpdateMap(ctx, userEntity.PersonID, map[string]any{
-		"password_encrypted":   hash,
-		"password_method":      model.PasswordMethodBcrypt,
-		"must_change_password": true,
-		"updated_by":           gincontext.GetUserIDString(ctx),
+		"password_encrypted": hash,
+		"password_method":    model.PasswordMethodBcrypt,
+		"password_status":    model.PasswordStatusMustChange,
+		"updated_by":         gincontext.GetUserIDString(ctx),
 	}); err != nil {
 		glog.Errorf(ctx, "[svcuser.ResetPassword] person UpdateMap fail, err:%v", err)
 		return nil, code.GetError(code.UserResetPasswordError)

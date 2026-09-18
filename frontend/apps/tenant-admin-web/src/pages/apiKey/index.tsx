@@ -179,7 +179,6 @@ function ApiKeysPane() {
     },
     { title: '状态', key: 'status', width: STATUS_COL_WIDTH, render: (_: unknown, r) => <KeyStateTag {...r} /> },
     timeColumn<TenantApiKeyItem>({ title: '过期时间', dataIndex: 'expiredAt', placeholder: '永不过期' }),
-    timeColumn<TenantApiKeyItem>({ title: '最近使用', dataIndex: 'lastUsedAt', relative: true, placeholder: '从未使用' }),
     textColumn<TenantApiKeyItem>({ title: '创建人', dataIndex: 'creatorName', width: NAME_COL_WIDTH }),
     timeColumn<TenantApiKeyItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<TenantApiKeyItem>({ title: '更新时间', dataIndex: 'updatedAt' }),

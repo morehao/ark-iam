@@ -1,7 +1,6 @@
 package svcauth
 
 import (
-	"encoding/json"
 	"net/url"
 
 	"github.com/gin-gonic/gin"
@@ -16,12 +15,7 @@ func validateOIDCConnectorConfig(config ConnectorConfig) error {
 	if config.Provider != connectorProviderMicrosoft {
 		return nil
 	}
-	tenant, ok := config.Raw["tenant"]
-	if !ok {
-		return code.GetError(code.ConnectorGetDetailError)
-	}
-	tenantStr, ok := tenant.(string)
-	if !ok || tenantStr == "" {
+	if config.Tenant == "" {
 		return code.GetError(code.ConnectorGetDetailError)
 	}
 	return nil
@@ -87,28 +81,13 @@ func (r *connectorDriverRegistry) Select(config ConnectorConfig) (ConnectorDrive
 }
 
 func buildConnectorConfig(connector *model.ConnectorEntity) (ConnectorConfig, error) {
-	if connector == nil || connector.ID == "" && connector.Protocol == "" && connector.Provider == "" && len(connector.Config) == 0 {
+	if connector == nil || connector.ID == "" && connector.Protocol == "" && connector.Provider == "" {
 		return ConnectorConfig{}, code.GetError(code.ConnectorNotExistError)
 	}
 
-	config := ConnectorConfig{
-		Protocol: connector.Protocol,
-		Provider: connector.Provider,
-	}
-	if len(connector.Config) == 0 {
-		config.Raw = map[string]any{}
-		return config, nil
-	}
-	raw := make(map[string]any)
-	if err := json.Unmarshal(connector.Config, &raw); err != nil {
-		return ConnectorConfig{}, code.GetError(code.ConnectorGetDetailError)
-	}
-	if err := json.Unmarshal(connector.Config, &config); err != nil {
-		return ConnectorConfig{}, code.GetError(code.ConnectorGetDetailError)
-	}
+	config := connector.Config
 	config.Protocol = connector.Protocol
 	config.Provider = connector.Provider
-	config.Raw = raw
 	return config, nil
 }
 

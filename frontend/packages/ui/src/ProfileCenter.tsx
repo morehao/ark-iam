@@ -135,7 +135,7 @@ export function ProfileCenter({ open, onClose }: Props) {
                   <div>
                     <div style={{ fontSize: 18, fontWeight: 700 }}>
                       {person?.name || '-'}
-                      {person?.isSuspended === 1 && <Tag color="error" style={{ marginLeft: 8 }}>已挂起</Tag>}
+                      {person?.status === 'suspended' && <Tag color="error" style={{ marginLeft: 8 }}>已挂起</Tag>}
                     </div>
                     <div style={{ color: brand.textSecondary }}>@{person?.username || '-'}</div>
                   </div>

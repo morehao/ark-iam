@@ -16,7 +16,6 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
-	"gorm.io/datatypes"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -42,13 +41,13 @@ func TestClientCredentialsStorage(t *testing.T) {
 		TenantID:                "1",
 		Code:                    clientID,
 		Name:                    "Machine Client",
-		RedirectURIs:            datatypes.JSON("[]"),
-		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
-		GrantTypes:              datatypes.JSON(fmt.Sprintf(`["%s"]`, model.GrantTypeClientCredentials)),
-		ResponseTypes:           datatypes.JSON("[]"),
+		RedirectURIs:            model.RedirectURIList{},
+		PostLogoutRedirectURIs:  model.PostLogoutRedirectURIList{},
+		GrantTypes:              model.GrantTypeList{model.GrantTypeClientCredentials},
+		ResponseTypes:           model.ResponseTypeList{},
 		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodBasic,
-		AllowedOrigins:          datatypes.JSON("[]"),
-		DefaultScopes:           datatypes.JSON(`["openid"]`),
+		AllowedOrigins:          model.AllowedOriginList{},
+		DefaultScopes:           model.DefaultScopeList{model.ScopeOpenID},
 		Status:                  model.ApplicationClientStatusEnable,
 		Source:                  model.ApplicationClientSourceFirstParty,
 	}
@@ -139,13 +138,13 @@ func TestClientCredentialsRejectsPublicClient(t *testing.T) {
 		TenantID:                "1",
 		Code:                    clientID,
 		Name:                    "Public Client",
-		RedirectURIs:            datatypes.JSON("[]"),
-		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
-		GrantTypes:              datatypes.JSON(fmt.Sprintf(`["%s"]`, model.GrantTypeClientCredentials)),
-		ResponseTypes:           datatypes.JSON("[]"),
+		RedirectURIs:            model.RedirectURIList{},
+		PostLogoutRedirectURIs:  model.PostLogoutRedirectURIList{},
+		GrantTypes:              model.GrantTypeList{model.GrantTypeClientCredentials},
+		ResponseTypes:           model.ResponseTypeList{},
 		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodNone,
-		AllowedOrigins:          datatypes.JSON("[]"),
-		DefaultScopes:           datatypes.JSON(`["openid"]`),
+		AllowedOrigins:          model.AllowedOriginList{},
+		DefaultScopes:           model.DefaultScopeList{model.ScopeOpenID},
 		Status:                  model.ApplicationClientStatusEnable,
 		Source:                  model.ApplicationClientSourceFirstParty,
 	}
@@ -207,7 +206,7 @@ func TestCreateAccessTokenForClientCredentials(t *testing.T) {
 		subject:  clientID,
 		audience: []string{"urn:ark:iam:platform-admin"},
 		clientID: clientID,
-		scopes:   []string{"openid"},
+		scopes:   []string{model.ScopeOpenID},
 	})
 	if err != nil {
 		t.Fatalf("CreateAccessToken failed: %v", err)
@@ -281,13 +280,13 @@ func newClientCredentialsTestDB(t *testing.T, clientID string, accessTokenTTL in
 		TenantID:                "1",
 		Code:                    clientID,
 		Name:                    "TTL Client",
-		RedirectURIs:            datatypes.JSON("[]"),
-		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
-		GrantTypes:              datatypes.JSON(fmt.Sprintf(`["%s"]`, model.GrantTypeClientCredentials)),
-		ResponseTypes:           datatypes.JSON("[]"),
+		RedirectURIs:            model.RedirectURIList{},
+		PostLogoutRedirectURIs:  model.PostLogoutRedirectURIList{},
+		GrantTypes:              model.GrantTypeList{model.GrantTypeClientCredentials},
+		ResponseTypes:           model.ResponseTypeList{},
 		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodBasic,
-		AllowedOrigins:          datatypes.JSON("[]"),
-		DefaultScopes:           datatypes.JSON(`["openid"]`),
+		AllowedOrigins:          model.AllowedOriginList{},
+		DefaultScopes:           model.DefaultScopeList{model.ScopeOpenID},
 		AccessTokenTTL:          accessTokenTTL,
 		Status:                  model.ApplicationClientStatusEnable,
 		Source:                  model.ApplicationClientSourceFirstParty,

@@ -62,7 +62,7 @@ const docTemplateauth = `{
         },
         "/oidc/login/changePassword": {
             "post": {
-                "description": "持临时密码（mustChangePassword）的自然人在登录被拦截后调用：校验当前密码与强度，\n设置新密码并清除强制改密标记，同时撤销该自然人既有会话；之后需重新登录。",
+                "description": "持临时密码（person.password_status = must_change）的自然人在登录被拦截后调用：校验当前密码与强度，\n设置新密码并清除强制改密标记，同时撤销该自然人既有会话；之后需重新登录。",
                 "consumes": [
                     "application/json"
                 ],
@@ -1017,29 +1017,56 @@ const docTemplateauth = `{
             "type": "object",
             "properties": {
                 "allowAccountLink": {
-                    "description": "是否允许账号关联",
-                    "type": "boolean"
+                    "description": "是否允许账号关联(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorAccountLinkFlag"
+                        }
+                    ]
                 },
                 "allowAutoCreateUser": {
-                    "description": "是否允许自动创建用户",
-                    "type": "boolean"
+                    "description": "是否允许自动创建用户(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorAutoCreateUserFlag"
+                        }
+                    ]
                 },
                 "claimMapping": {
-                    "description": "声明映射"
+                    "description": "声明映射",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorClaimMapping"
+                        }
+                    ]
                 },
                 "config": {
-                    "description": "连接器配置"
+                    "description": "连接器配置",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorConfig"
+                        }
+                    ]
                 },
                 "displayName": {
                     "description": "显示名称",
                     "type": "string"
                 },
                 "domainPolicy": {
-                    "description": "域策略"
+                    "description": "域策略",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorDomainPolicy"
+                        }
+                    ]
                 },
                 "enableTokenStorage": {
-                    "description": "是否启用令牌存储",
-                    "type": "boolean"
+                    "description": "是否启用令牌存储(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorTokenStorageFlag"
+                        }
+                    ]
                 },
                 "name": {
                     "description": "连接器名称",
@@ -1070,8 +1097,12 @@ const docTemplateauth = `{
                     ]
                 },
                 "syncProfile": {
-                    "description": "是否同步资料",
-                    "type": "boolean"
+                    "description": "是否同步资料(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorSyncProfileFlag"
+                        }
+                    ]
                 },
                 "tenantID": {
                     "description": "租户ID",
@@ -1092,18 +1123,36 @@ const docTemplateauth = `{
             "type": "object",
             "properties": {
                 "allowAccountLink": {
-                    "description": "是否允许账号关联",
-                    "type": "boolean"
+                    "description": "是否允许账号关联(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorAccountLinkFlag"
+                        }
+                    ]
                 },
                 "allowAutoCreateUser": {
-                    "description": "是否允许自动创建用户",
-                    "type": "boolean"
+                    "description": "是否允许自动创建用户(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorAutoCreateUserFlag"
+                        }
+                    ]
                 },
                 "claimMapping": {
-                    "description": "声明映射"
+                    "description": "声明映射",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorClaimMapping"
+                        }
+                    ]
                 },
                 "config": {
-                    "description": "连接器配置"
+                    "description": "连接器配置",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorConfig"
+                        }
+                    ]
                 },
                 "connectorID": {
                     "description": "连接器ID",
@@ -1122,11 +1171,20 @@ const docTemplateauth = `{
                     "type": "string"
                 },
                 "domainPolicy": {
-                    "description": "域策略"
+                    "description": "域策略",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorDomainPolicy"
+                        }
+                    ]
                 },
                 "enableTokenStorage": {
-                    "description": "是否启用令牌存储",
-                    "type": "boolean"
+                    "description": "是否启用令牌存储(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorTokenStorageFlag"
+                        }
+                    ]
                 },
                 "name": {
                     "description": "连接器名称",
@@ -1157,8 +1215,12 @@ const docTemplateauth = `{
                     ]
                 },
                 "syncProfile": {
-                    "description": "是否同步资料",
-                    "type": "boolean"
+                    "description": "是否同步资料(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorSyncProfileFlag"
+                        }
+                    ]
                 },
                 "tenantID": {
                     "description": "租户ID",
@@ -1178,18 +1240,36 @@ const docTemplateauth = `{
             "type": "object",
             "properties": {
                 "allowAccountLink": {
-                    "description": "是否允许账号关联",
-                    "type": "boolean"
+                    "description": "是否允许账号关联(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorAccountLinkFlag"
+                        }
+                    ]
                 },
                 "allowAutoCreateUser": {
-                    "description": "是否允许自动创建用户",
-                    "type": "boolean"
+                    "description": "是否允许自动创建用户(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorAutoCreateUserFlag"
+                        }
+                    ]
                 },
                 "claimMapping": {
-                    "description": "声明映射"
+                    "description": "声明映射",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorClaimMapping"
+                        }
+                    ]
                 },
                 "config": {
-                    "description": "连接器配置"
+                    "description": "连接器配置",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorConfig"
+                        }
+                    ]
                 },
                 "connectorID": {
                     "description": "连接器ID",
@@ -1208,11 +1288,20 @@ const docTemplateauth = `{
                     "type": "string"
                 },
                 "domainPolicy": {
-                    "description": "域策略"
+                    "description": "域策略",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorDomainPolicy"
+                        }
+                    ]
                 },
                 "enableTokenStorage": {
-                    "description": "是否启用令牌存储",
-                    "type": "boolean"
+                    "description": "是否启用令牌存储(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorTokenStorageFlag"
+                        }
+                    ]
                 },
                 "name": {
                     "description": "连接器名称",
@@ -1243,8 +1332,12 @@ const docTemplateauth = `{
                     ]
                 },
                 "syncProfile": {
-                    "description": "是否同步资料",
-                    "type": "boolean"
+                    "description": "是否同步资料(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorSyncProfileFlag"
+                        }
+                    ]
                 },
                 "tenantID": {
                     "description": "租户ID",
@@ -1280,29 +1373,56 @@ const docTemplateauth = `{
             "type": "object",
             "properties": {
                 "allowAccountLink": {
-                    "description": "是否允许账号关联",
-                    "type": "boolean"
+                    "description": "是否允许账号关联(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorAccountLinkFlag"
+                        }
+                    ]
                 },
                 "allowAutoCreateUser": {
-                    "description": "是否允许自动创建用户",
-                    "type": "boolean"
+                    "description": "是否允许自动创建用户(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorAutoCreateUserFlag"
+                        }
+                    ]
                 },
                 "claimMapping": {
-                    "description": "声明映射"
+                    "description": "声明映射",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorClaimMapping"
+                        }
+                    ]
                 },
                 "config": {
-                    "description": "连接器配置"
+                    "description": "连接器配置",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorConfig"
+                        }
+                    ]
                 },
                 "displayName": {
                     "description": "显示名称",
                     "type": "string"
                 },
                 "domainPolicy": {
-                    "description": "域策略"
+                    "description": "域策略",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorDomainPolicy"
+                        }
+                    ]
                 },
                 "enableTokenStorage": {
-                    "description": "是否启用令牌存储",
-                    "type": "boolean"
+                    "description": "是否启用令牌存储(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorTokenStorageFlag"
+                        }
+                    ]
                 },
                 "name": {
                     "description": "连接器名称",
@@ -1333,8 +1453,12 @@ const docTemplateauth = `{
                     ]
                 },
                 "syncProfile": {
-                    "description": "是否同步资料",
-                    "type": "boolean"
+                    "description": "是否同步资料(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorSyncProfileFlag"
+                        }
+                    ]
                 },
                 "tenantID": {
                     "description": "租户ID",
@@ -1527,9 +1651,6 @@ const docTemplateauth = `{
                 "avatar": {
                     "type": "string"
                 },
-                "isSuspended": {
-                    "type": "boolean"
-                },
                 "name": {
                     "type": "string"
                 },
@@ -1541,6 +1662,9 @@ const docTemplateauth = `{
                 },
                 "primaryPhone": {
                     "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/model.PersonStatus"
                 },
                 "username": {
                     "type": "string"
@@ -1628,6 +1752,28 @@ const docTemplateauth = `{
                 }
             }
         },
+        "model.ConnectorAccountLinkFlag": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-varnames": [
+                "ConnectorAccountLinkFlagEnable",
+                "ConnectorAccountLinkFlagDisable"
+            ]
+        },
+        "model.ConnectorAutoCreateUserFlag": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-varnames": [
+                "ConnectorAutoCreateUserFlagEnable",
+                "ConnectorAutoCreateUserFlagDisable"
+            ]
+        },
         "model.ConnectorCapability": {
             "type": "string",
             "enum": [
@@ -1658,6 +1804,84 @@ const docTemplateauth = `{
                 "ConnectorCapabilityDomainPolicy",
                 "ConnectorCapabilityProfileSync"
             ]
+        },
+        "model.ConnectorClaimMapping": {
+            "type": "object",
+            "properties": {
+                "avatarUrl": {
+                    "type": "string"
+                },
+                "displayName": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "subject": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.ConnectorConfig": {
+            "type": "object",
+            "properties": {
+                "authUrl": {
+                    "type": "string"
+                },
+                "clientID": {
+                    "type": "string"
+                },
+                "clientSecret": {
+                    "type": "string"
+                },
+                "issuer": {
+                    "type": "string"
+                },
+                "protocol": {
+                    "$ref": "#/definitions/model.ConnectorProtocol"
+                },
+                "provider": {
+                    "$ref": "#/definitions/model.ConnectorProvider"
+                },
+                "redirectUri": {
+                    "type": "string"
+                },
+                "scopes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "tenant": {
+                    "type": "string"
+                },
+                "tokenUrl": {
+                    "type": "string"
+                },
+                "userInfoUrl": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.ConnectorDomainPolicy": {
+            "type": "object",
+            "properties": {
+                "allowedDomains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "blockedDomains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
         },
         "model.ConnectorProtocol": {
             "type": "string",
@@ -1724,6 +1948,50 @@ const docTemplateauth = `{
                 "ConnectorStatusDisable"
             ]
         },
+        "model.ConnectorSyncProfileFlag": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-varnames": [
+                "ConnectorSyncProfileFlagEnable",
+                "ConnectorSyncProfileFlagDisable"
+            ]
+        },
+        "model.ConnectorTokenStorageFlag": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-varnames": [
+                "ConnectorTokenStorageFlagEnable",
+                "ConnectorTokenStorageFlagDisable"
+            ]
+        },
+        "model.OwnerType": {
+            "type": "string",
+            "enum": [
+                "owner",
+                "normal"
+            ],
+            "x-enum-varnames": [
+                "OwnerTypeOwner",
+                "OwnerTypeNormal"
+            ]
+        },
+        "model.PersonStatus": {
+            "type": "string",
+            "enum": [
+                "active",
+                "suspended"
+            ],
+            "x-enum-varnames": [
+                "PersonStatusActive",
+                "PersonStatusSuspended"
+            ]
+        },
         "objauth.PersonInfo": {
             "type": "object",
             "properties": {
@@ -1744,13 +2012,17 @@ const docTemplateauth = `{
         "objauth.TenantOption": {
             "type": "object",
             "properties": {
-                "isOwner": {
-                    "description": "是否租户拥有者",
-                    "type": "boolean"
-                },
                 "name": {
                     "description": "租户名称",
                     "type": "string"
+                },
+                "ownerType": {
+                    "description": "租户拥有者类型(owner/normal)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.OwnerType"
+                        }
+                    ]
                 },
                 "tag": {
                     "description": "租户标识",
@@ -1769,13 +2041,17 @@ const docTemplateauth = `{
         "objauth.TenantUserInfo": {
             "type": "object",
             "properties": {
-                "isOwner": {
-                    "description": "是否租户拥有者",
-                    "type": "boolean"
-                },
                 "name": {
                     "description": "姓名",
                     "type": "string"
+                },
+                "ownerType": {
+                    "description": "租户拥有者类型(owner/normal)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.OwnerType"
+                        }
+                    ]
                 },
                 "tenantID": {
                     "description": "租户ID",

@@ -380,7 +380,7 @@ func (svc *departmentUserSvc) PageList(ctx *gin.Context, req *dtotenant.Departme
 			PrimaryEmail: model.DerefStr(person.PrimaryEmail),
 			PrimaryPhone: model.DerefStr(person.PrimaryPhone),
 			Avatar:       u.Avatar,
-			IsSuspended:  u.IsSuspended,
+			Status:       u.Status,
 			RelationType: v.RelationType,
 			JoinedAt:     v.CreatedAt.Unix(),
 		}

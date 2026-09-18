@@ -14,7 +14,6 @@ type ApiKeyPageListItem struct {
 	CreatedBy   string         `json:"createdBy"`   // 创建人ID
 	CreatorName string         `json:"creatorName"` // 创建人名称
 	ExpiredAt   *int64         `json:"expiredAt"`   // 过期时间(unix秒,永不过期=null)
-	LastUsedAt  *int64         `json:"lastUsedAt"`  // 最后使用时间(null=从未使用)
 	RevokedAt   *int64         `json:"revokedAt"`   // 吊销时间(null=未吊销)
 	CreatedAt   int64          `json:"createdAt"`   // 创建时间
 	UpdatedAt   int64          `json:"updatedAt"`   // 更新时间

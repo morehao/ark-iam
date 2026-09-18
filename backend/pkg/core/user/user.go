@@ -7,7 +7,6 @@ package user
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
 
@@ -41,9 +40,9 @@ type CreateReq struct {
 	Name        string
 	Description string
 	Avatar      string
-	IsSuspended bool
-	IsOwner     bool
-	JoinedAt    *time.Time // 空 => now
+	Status      model.UserStatus // 空 => active
+	OwnerType   model.OwnerType  // 空 => normal
+	JoinedAt    *time.Time       // 空 => now
 	CreatedBy   string
 
 	PrimaryDepartmentID    string   // 行政主部门（唯一，空 = 无主部门）
@@ -109,6 +108,14 @@ func Create(ctx context.Context, tx *gorm.DB, req *CreateReq) (*model.UserEntity
 		now := time.Now()
 		joinedAt = &now
 	}
+	status := req.Status
+	if status == "" {
+		status = model.UserStatusActive
+	}
+	ownerType := req.OwnerType
+	if ownerType == "" {
+		ownerType = model.OwnerTypeNormal
+	}
 	insertEntity := &model.UserEntity{
 		TenantID:    req.TenantID,
 		PersonID:    personID,
@@ -117,10 +124,8 @@ func Create(ctx context.Context, tx *gorm.DB, req *CreateReq) (*model.UserEntity
 		Name:        req.Name,
 		Description: req.Description,
 		Avatar:      req.Avatar,
-		Profile:     json.RawMessage(`{}`),
-		CustomData:  json.RawMessage(`{}`),
-		IsSuspended: req.IsSuspended,
-		IsOwner:     req.IsOwner,
+		Status:      status,
+		OwnerType:   ownerType,
 		JoinedAt:    joinedAt,
 		CreatedBy:   req.CreatedBy,
 	}

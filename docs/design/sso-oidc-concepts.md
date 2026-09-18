@@ -122,7 +122,7 @@ RP 接入前必须在 OP 注册一个 **OAuth Client**，核心注册字段（�
 | `token_endpoint_auth_method` | 令牌端点客户端认证方式 | `client_secret_basic` / `client_secret_post` / `none` |
 | `post_logout_redirect_uris` | 登出后跳转白名单 | - |
 | `back_channel_logout_uri` | 反向通道登出通知地址（SLO，即服务端登出通知） | - |
-| `require_pkce` | 是否强制 PKCE | 默认否（协议侧始终支持 S256） |
+| `require_pkce` | 是否强制 PKCE（`ClientPKCEPolicy`，`enable`/`disable`） | 默认 `disable`（协议侧始终支持 S256；判定必须写 `== enable`，`'disable'` 真值为 true） |
 | `default_scopes` | 默认授权 scope | 列默认 `["openid","profile"]`；两个内置客户端种子值为 `["openid","profile","email"]` |
 | `access_token_ttl` / `refresh_token_ttl` | 令牌有效期（秒） | 900 / 2592000 |
 
@@ -184,6 +184,13 @@ flowchart TB
 | `token_usage` | 私有 | 令牌用途 `machine`（**仅 API Key 机器令牌**）；人登录令牌与普通 `client_credentials` 令牌都不写该声明 |
 
 > 业务中间件并不读取 `user_id` claim 来定位成员，而是用 `(tenant_id, personID)` 反查该 person 在本租户的成员记录。
+
+> ⚠️ **`sub` 的稳定性与生命周期**：`sub = person:<personID>`，其中 `<personID>` 就是 `person` 表主键（UUID v7，随行创建生成），因此 **`sub` 与 person 行同生命周期**。生产环境该行不会被重建，同一自然人的 `sub` 长期稳定；但**删库重建（见 `run-and-deploy.md` §2.3）会生成新的 personID**，`sub` 随之改变，带来两类后果：
+>
+> 1. **RP 侧绑定全部失效**：外部应用按 `sub` 保存的账号关联（Gitea 的 `external_login_user`、RustFS 的 OIDC 绑定等）指向旧 personID，重建后 RP 会重新建号，或落到「关联账号/绑定已有账号」流程；
+> 2. **userinfo 静默降级**：重建前建立的中心会话仍指向旧 personID，`SetUserinfoFromToken` 查不到 person 时只写入 `sub` 并返回（不报错），下游会收到"缺少 email/preferred_username"这类**间接**错误——排查时不要误判为 scope 或 client secret 问题，先核对会话里的 personID 是否还存在。
+>
+> **待确认**：若将来需要在数据库重建/迁移后保持 RP 侧绑定，需要引入独立于主键的稳定 subject 标识（例如独立的 subject 列或 person 级不可变标识）；当前设计没有这一层。
 
 ### 3.5 Scope 与 Claims
 

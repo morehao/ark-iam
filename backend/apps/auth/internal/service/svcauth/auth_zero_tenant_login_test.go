@@ -1,7 +1,6 @@
 package svcauth
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -31,8 +30,6 @@ func seedZeroTenantPerson(t *testing.T, identifier, password string) {
 		Username:          model.StrPtr(identifier),
 		PasswordEncrypted: hash,
 		PasswordMethod:    model.PasswordMethodBcrypt,
-		Profile:           json.RawMessage(`{}`),
-		CustomData:        json.RawMessage(`{}`),
 	}
 	if strings.Contains(identifier, "@") {
 		person.Username = nil
@@ -113,8 +110,6 @@ func TestAuthenticatePasswordZeroTenantPersonVariableIdentifierForms(t *testing.
 				PrimaryPhone:      phone,
 				PasswordEncrypted: hash,
 				PasswordMethod:    model.PasswordMethodBcrypt,
-				Profile:           json.RawMessage(`{}`),
-				CustomData:        json.RawMessage(`{}`),
 			}).Error; err != nil {
 				t.Fatalf("seed person: %v", err)
 			}
@@ -144,8 +139,6 @@ func TestAuthenticatePasswordPersonWithTenantPreservesOriginalBehavior(t *testin
 		PrimaryEmail:      model.StrPtr("member@example.com"),
 		PasswordEncrypted: hash,
 		PasswordMethod:    model.PasswordMethodBcrypt,
-		Profile:           json.RawMessage(`{}`),
-		CustomData:        json.RawMessage(`{}`),
 	}).Error; err != nil {
 		t.Fatalf("seed person: %v", err)
 	}
@@ -161,8 +154,6 @@ func TestAuthenticatePasswordPersonWithTenantPreservesOriginalBehavior(t *testin
 		TenantID:   "t1",
 		PersonID:   "p1",
 		Name:       "member",
-		Profile:    json.RawMessage(`{}`),
-		CustomData: json.RawMessage(`{}`),
 		JoinedAt:   &now,
 	}).Error; err != nil {
 		t.Fatalf("seed user: %v", err)

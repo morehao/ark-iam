@@ -26,6 +26,7 @@ import type {
   TenantMachineUserUpdateReq,
   TenantUserDetail,
   TenantUserItem,
+  UserStatus,
 } from '@ark-iam/types'
 import {
   createTenantUser,
@@ -56,6 +57,17 @@ const RELATION_TAG: Record<string, { color: string; label: string }> = {
   leader: { color: 'green', label: '负责部门' },
 }
 
+/**
+ * 用户/服务账号状态已为字符串枚举 active/suspended（后端 model.UserStatus）：Switch 需要 boolean，
+ * 回显用 getValueProps 把 'suspended' 显式转成 checked，提交用 getValueFromEvent 转回字符串枚举
+ * （P3 前是 isSuspended 布尔，不得残留）。
+ */
+const SUSPENDED_FLAG_FORM_PROPS = {
+  valuePropName: 'checked' as const,
+  getValueProps: (value: unknown) => ({ checked: value === 'suspended' }),
+  getValueFromEvent: (checked: boolean) => (checked ? 'suspended' : 'active'),
+}
+
 // ==================== Tab：用户（真实用户，保持原逻辑不变） ====================
 function UsersPane() {
   const [data, setData] = useState<TenantUserItem[]>([])
@@ -64,7 +76,7 @@ function UsersPane() {
   const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
-  const [suspended, setSuspended] = useState<boolean | undefined>()
+  const [status, setStatus] = useState<UserStatus | undefined>()
   const [departmentID, setDepartmentID] = useState<string>()
 
   // 创建 / 编辑
@@ -99,7 +111,7 @@ function UsersPane() {
         page,
         pageSize,
         keyword: keyword || undefined,
-        isSuspended: suspended,
+        status,
         departmentID: departmentID || undefined,
       })
       setData(resp?.list || [])
@@ -109,7 +121,7 @@ function UsersPane() {
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, keyword, suspended, departmentID])
+  }, [page, pageSize, keyword, status, departmentID])
 
   useEffect(() => {
     void fetchData()
@@ -141,7 +153,7 @@ function UsersPane() {
       primaryEmail: detail.primaryEmail,
       primaryPhone: detail.primaryPhone,
       avatar: detail.avatar,
-      isSuspended: detail.isSuspended,
+      status: detail.status,
       primaryDepartmentID: nextPrimary,
       secondaryDepartmentIDs: nextSecondary,
       leaderDepartmentIDs: nextLeader,
@@ -161,7 +173,7 @@ function UsersPane() {
           primaryEmail: string
           primaryPhone: string
           avatar: string
-          isSuspended: boolean
+          status: UserStatus
           primaryDepartmentID?: string
           secondaryDepartmentIDs?: string[]
           leaderDepartmentIDs?: string[]
@@ -172,7 +184,7 @@ function UsersPane() {
           primaryEmail: values.primaryEmail || '',
           primaryPhone: values.primaryPhone || '',
           avatar: values.avatar,
-          isSuspended: values.isSuspended,
+          status: values.status,
         }
         // 部门关系仅在变化时提交（PATCH 局部更新语义：不传=不变），避免无谓重写归属行
         const secondary = values.secondaryDepartmentIDs || []
@@ -188,7 +200,7 @@ function UsersPane() {
           username: values.username,
           primaryEmail: values.primaryEmail,
           primaryPhone: values.primaryPhone,
-          isSuspended: values.isSuspended,
+          status: values.status,
           primaryDepartmentID: values.primaryDepartmentID,
           secondaryDepartmentIDs: values.secondaryDepartmentIDs || [],
           leaderDepartmentIDs: values.leaderDepartmentIDs || [],
@@ -216,9 +228,9 @@ function UsersPane() {
     }
   }
 
-  const toggleSuspended = async (record: TenantUserItem, checked: boolean) => {
-    await updateTenantUser({ userID: record.userID, isSuspended: checked })
-    message.success(checked ? '已挂起' : '已恢复')
+  const toggleSuspended = async (record: TenantUserItem, next: UserStatus) => {
+    await updateTenantUser({ userID: record.userID, status: next })
+    message.success(next === 'suspended' ? '已挂起' : '已恢复')
     void fetchData()
   }
 
@@ -268,10 +280,10 @@ function UsersPane() {
     { title: '角色数', dataIndex: 'roleCount', key: 'roleCount', width: COUNT_COL_WIDTH, render: (v: number) => v || 0 },
     {
       title: '状态',
-      dataIndex: 'isSuspended',
-      key: 'isSuspended',
+      dataIndex: 'status',
+      key: 'status',
       width: STATUS_COL_WIDTH,
-      render: (v: boolean) => <SuspendedTag value={v} />,
+      render: (v: UserStatus) => <SuspendedTag value={v} />,
     },
     timeColumn<TenantUserItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<TenantUserItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
@@ -283,10 +295,10 @@ function UsersPane() {
         { key: 'resetPwd', label: '重置密码', confirm: '重置后系统生成新的临时密码并仅展示一次，该成员既有会话将失效。确认重置？', onClick: () => void resetPassword(r) },
         {
           key: 'toggle',
-          label: r.isSuspended ? '恢复' : '挂起',
-          danger: !r.isSuspended,
-          confirm: r.isSuspended ? '确认恢复该用户？' : '确认挂起该用户？',
-          onClick: () => void toggleSuspended(r, !r.isSuspended),
+          label: r.status === 'suspended' ? '恢复' : '挂起',
+          danger: r.status !== 'suspended',
+          confirm: r.status === 'suspended' ? '确认恢复该用户？' : '确认挂起该用户？',
+          onClick: () => void toggleSuspended(r, r.status === 'suspended' ? 'active' : 'suspended'),
         },
       ],
     }),
@@ -312,14 +324,14 @@ function UsersPane() {
             allowClear
             placeholder="状态"
             style={{ width: 110 }}
-            value={suspended}
-            onChange={(v) => {
-              setSuspended(v)
+            value={status}
+            onChange={(v: UserStatus | undefined) => {
+              setStatus(v)
               setPage(1)
             }}
             options={[
-              { label: '正常', value: false },
-              { label: '挂起', value: true },
+              { label: '正常', value: 'active' },
+              { label: '挂起', value: 'suspended' },
             ]}
           />
           <Input.Search
@@ -436,7 +448,7 @@ function UsersPane() {
               <Input placeholder="可空" />
             </Form.Item>
           )}
-          <Form.Item name="isSuspended" label="状态" valuePropName="checked" initialValue={false}>
+          <Form.Item name="status" label="状态" {...SUSPENDED_FLAG_FORM_PROPS} initialValue="active">
             <Switch checkedChildren="挂起" unCheckedChildren="正常" />
           </Form.Item>
         </Form>
@@ -462,7 +474,7 @@ function UsersPane() {
                       </Space>
                     </Space>
                     <div>
-                      <SuspendedTag value={detail.isSuspended} />
+                      <SuspendedTag value={detail.status} />
                       <span style={{ marginLeft: 8 }}>用户ID：{detail.userID}</span>
                     </div>
                     <div>邮箱：{detail.primaryEmail || '-'}</div>
@@ -546,7 +558,7 @@ function ServiceAccountsPane() {
   const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
-  const [isSuspended, setIsSuspended] = useState<boolean | undefined>()
+  const [status, setStatus] = useState<UserStatus | undefined>()
 
   // 创建 / 编辑
   const [modalOpen, setModalOpen] = useState(false)
@@ -578,7 +590,7 @@ function ServiceAccountsPane() {
         page,
         pageSize,
         name: keyword || undefined,
-        isSuspended,
+        status,
       })
       setData(resp?.list || [])
       setTotal(resp?.total || 0)
@@ -587,7 +599,7 @@ function ServiceAccountsPane() {
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, keyword, isSuspended])
+  }, [page, pageSize, keyword, status])
 
   useEffect(() => {
     void fetchData()
@@ -659,9 +671,9 @@ function ServiceAccountsPane() {
     }
   }
 
-  const toggleSuspended = async (record: TenantMachineUserItem, checked: boolean) => {
-    await updateMachineUserStatus(record.machineUserID, checked)
-    message.success(checked ? '已挂起' : '已启用')
+  const toggleSuspended = async (record: TenantMachineUserItem, next: UserStatus) => {
+    await updateMachineUserStatus(record.machineUserID, next)
+    message.success(next === 'suspended' ? '已挂起' : '已启用')
     void fetchData()
   }
 
@@ -705,10 +717,10 @@ function ServiceAccountsPane() {
     textColumn<TenantMachineUserItem>({ title: '描述', dataIndex: 'description', width: TEXT_COL_WIDTH }),
     {
       title: '状态',
-      dataIndex: 'isSuspended',
-      key: 'isSuspended',
+      dataIndex: 'status',
+      key: 'status',
       width: STATUS_COL_WIDTH,
-      render: (v: boolean) => <SuspendedTag value={v} />,
+      render: (v: UserStatus) => <SuspendedTag value={v} />,
     },
     timeColumn<TenantMachineUserItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<TenantMachineUserItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
@@ -718,10 +730,10 @@ function ServiceAccountsPane() {
         { key: 'edit', label: '编辑', onClick: () => void openEdit(r) },
         {
           key: 'toggle',
-          label: r.isSuspended ? '启用' : '挂起',
-          danger: !r.isSuspended,
-          confirm: r.isSuspended ? '确认恢复该服务账号？' : '确认挂起该服务账号？',
-          onClick: () => void toggleSuspended(r, !r.isSuspended),
+          label: r.status === 'suspended' ? '启用' : '挂起',
+          danger: r.status !== 'suspended',
+          confirm: r.status === 'suspended' ? '确认恢复该服务账号？' : '确认挂起该服务账号？',
+          onClick: () => void toggleSuspended(r, r.status === 'suspended' ? 'active' : 'suspended'),
         },
         {
           key: 'delete',
@@ -739,7 +751,6 @@ function ServiceAccountsPane() {
     textColumn<TenantApiKeyItem>({ title: '前缀', dataIndex: 'keyPrefix', width: CODE_COL_WIDTH, monospace: true }),
     { title: '状态', key: 'status', width: STATUS_COL_WIDTH, render: (_: unknown, r) => <KeyStateTag {...r} /> },
     timeColumn<TenantApiKeyItem>({ title: '过期时间', dataIndex: 'expiredAt', placeholder: '永不过期' }),
-    timeColumn<TenantApiKeyItem>({ title: '最近使用', dataIndex: 'lastUsedAt', relative: true, placeholder: '从未使用' }),
     timeColumn<TenantApiKeyItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<TenantApiKeyItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
   ]
@@ -762,14 +773,14 @@ function ServiceAccountsPane() {
             allowClear
             placeholder="状态"
             style={{ width: 110 }}
-            value={isSuspended}
-            onChange={(v) => {
-              setIsSuspended(v)
+            value={status}
+            onChange={(v: UserStatus | undefined) => {
+              setStatus(v)
               setPage(1)
             }}
             options={[
-              { label: '启用', value: false },
-              { label: '挂起', value: true },
+              { label: '启用', value: 'active' },
+              { label: '挂起', value: 'suspended' },
             ]}
           />
         </Space>
@@ -912,7 +923,7 @@ function MachineDetailInfo({ detail }: { detail: TenantMachineUserDetail }) {
         </Space>
       </Space>
       <div>
-        <SuspendedTag value={detail.isSuspended} />
+        <SuspendedTag value={detail.status} />
         <span style={{ marginLeft: 8 }}>ID：{detail.machineUserID}</span>
       </div>
       <div>描述：{detail.description || '-'}</div>

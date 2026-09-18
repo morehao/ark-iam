@@ -189,6 +189,8 @@ flowchart TB
 - 统一前缀/命名：表名小写下划线；主键统一 `gormdao.BaseEntity.StringID`——`varchar(36)` **UUID v7**（时间有序，由 `BaseEntity` 自动生成，DTO 侧一律 `string`），审计字段 `created_by/updated_by/deleted_by`；
 - **person 为中心的跨租户模型**：身份类字段（username/email/phone/password）只放 `person`，`user`（物理表 `tenant_user`）只放租户内成员关系与租户内资料；
 - **字典值全部声明为具名类型 + 常量**（如 `TenantStatus`、`AppSource`、`RoleSource`、`AdminType`、`DeptUserRelationType`），实体/DAO/DTO/service 全链路复用该类型与常量，禁止硬编码字符串与 `string(x)` 强转；非法取值校验归 service 入口；
+- **布尔语义一律用枚举表达**：表达字典语义的开/关列（`...Flag` / `...Policy`，如 `menu.hidden`、`application.allow_join_by_invite`、`application_client.require_pkce`、`connector.allow_account_link`）一律是 `varchar(16)` + 具名类型 + `enable`/`disable` 常量，禁止 Go `bool`、禁止 `0/1`、禁止真值判断（比较必须写 `== XxxEnable`，`'disable'` 是非空字符串、真值恒为 true）；
+- **JSON 列必须显式化**：列一律 `type:json` 且 `serializer:json` + **具名载具类型**（如 `RoleTemplateItemList`、`ConnectorConfig`、`RedirectURIList`），禁止 `datatypes.JSON`、`json.RawMessage`、`[]byte`、`map[string]any`、`any` 承载；写路径只允许 `Create(entity)` 与 `pkg/dao.UpdateFields`（`Select(fields).Updates(entity)`），**禁止** `UpdateMap`、`Update("col", v)`、`UpdateColumn` 写 JSON 列（它们绕过 serializer，会静默写入脏值）；nil 切片入库前归一为空切片；
 - 关联表（多对多）独立建表：`user_role`、`role_menu`、`department_user`；
 - 令牌/密钥类敏感字段只存**哈希**（`refresh_token.token`、`application_client_secret.value_hash`、`api_key.key_hash`）；
 - 空值可空标识字段存 `NULL`（`person.username/primary_email/primary_phone` 均为可空指针，配唯一索引），避免唯一索引撞空串；
@@ -244,12 +246,10 @@ erDiagram
         string primary_phone UK "主要手机号，可空"
         string password_encrypted "bcrypt 哈希"
         string password_method "bcrypt"
-        bool must_change_password "临时密码/被重置后必须先改密"
+        string password_status "normal 正常 / must_change 必须先改密（PasswordStatus）"
         string name "姓名"
         string avatar
-        json profile
-        json custom_data
-        bool is_suspended "全局挂起"
+        string status "active 正常 / suspended 挂起（PersonStatus）"
         datetime last_sign_in_at
     }
     tenant_user {
@@ -261,10 +261,8 @@ erDiagram
         string name "租户内姓名 / 服务账号名称"
         string description "描述(服务账号用途等)"
         string avatar
-        json profile
-        json custom_data
-        bool is_suspended
-        bool is_owner "是否租户拥有者"
+        string status "active 正常 / suspended 挂起（UserStatus）"
+        string owner_type "owner 租户拥有者 / normal 普通成员（OwnerType）"
         datetime joined_at
         datetime last_sign_in_at
     }
@@ -286,9 +284,9 @@ erDiagram
         string source "builtin/first_party/third_party"
         string status "enable/disable"
         int sort
-        bool allow_person_create_tenant "允许个人自助建租户"
-        bool allow_join_by_invite "允许凭邀请加入"
-        json role_template "应用角色模板：[{code,name}]，开通应用时物化到各租户"
+        string allow_person_create_tenant "enable/disable（AppPersonCreateTenantPolicy）"
+        string allow_join_by_invite "enable/disable（AppJoinByInvitePolicy）"
+        json role_template "应用角色模板：[{code,name}]，具名类型 RoleTemplateItemList（serializer:json），开通应用时物化到各租户"
     }
     application_client {
         string id PK "UUID v7"
@@ -303,8 +301,8 @@ erDiagram
         json response_types
         string token_endpoint_auth_method "client_secret_basic/client_secret_post/none"
         json allowed_origins
-        bool require_pkce
-        bool require_auth_time
+        string require_pkce "enable/disable（ClientPKCEPolicy）"
+        string require_auth_time "enable/disable（ClientAuthTimeClaimPolicy）"
         json default_scopes
         bigint access_token_ttl "秒"
         bigint refresh_token_ttl "秒"
@@ -325,8 +323,6 @@ erDiagram
         string tenant_id FK
         string app_id FK
         string status "enable/disable"
-        json config "租户级应用配置"
-        json granted_scope "租户级 scope 授权"
     }
     department {
         string id PK "UUID v7"
@@ -369,9 +365,9 @@ erDiagram
         string visibility "public/member/admin"
         string component
         string redirect
-        bool hidden
-        bool external_link
-        bool keep_alive
+        string hidden "enable/disable（MenuHiddenFlag）"
+        string external_link "enable/disable（MenuExternalLinkFlag）"
+        string keep_alive "enable/disable（MenuKeepAliveFlag）"
         string status "enable/disable"
     }
     user_role {
@@ -394,10 +390,10 @@ erDiagram
         string protocol "OIDC/OAuth2"
         string provider
         string status "enable/disable"
-        bool allow_auto_create_user
-        bool allow_account_link
-        bool sync_profile
-        bool enable_token_storage
+        string allow_auto_create_user "enable/disable（ConnectorAutoCreateUserFlag）"
+        string allow_account_link "enable/disable（ConnectorAccountLinkFlag）"
+        string sync_profile "enable/disable（ConnectorSyncProfileFlag）"
+        string enable_token_storage "enable/disable（ConnectorTokenStorageFlag）"
         json config "连接器配置"
         json claim_mapping "声明映射"
         json domain_policy "域策略"
@@ -409,15 +405,13 @@ erDiagram
         string provider
         string issuer
         string external_subject "外部主体标识"
-        json detail
-        datetime last_used_at
+        json detail "具名类型 UserIdentityDetail（serializer:json）"
     }
     domain {
         string id PK "UUID v7"
         string tenant_id FK
         string domain
-        bool is_verified
-        datetime verified_at
+        string verification_status "unverified 未验证 / verified 已验证（DomainVerificationStatus）"
     }
     api_key {
         string id PK "UUID v7"
@@ -426,9 +420,7 @@ erDiagram
         string name
         string key_hash "SHA-256 哈希"
         string key_prefix "明文前 7 位，仅列表展示"
-        json scope
         datetime expired_at
-        datetime last_used_at
         datetime revoked_at
     }
     refresh_token {
@@ -482,12 +474,6 @@ erDiagram
         string user_agent
         text detail
     }
-    log {
-        string id PK "UUID v7"
-        string tenant_id FK
-        string key "日志键"
-        json payload "日志内容"
-    }
 ```
 
 ### 4.3 表说明（按业务域）
@@ -496,8 +482,8 @@ erDiagram
 
 | 表 | 说明 |
 |---|---|
-| `person` | **自然人**：全局唯一身份。username / primary_email / primary_phone 可空且全局唯一（NULL 不撞唯一索引）；密码 bcrypt 哈希；`must_change_password` 标识"临时密码 / 被重置后必须先改密"（登录链路据此拦截）；`is_suspended` 全局挂起 |
-| `tenant_user` | **租户账号**（领域实体 `UserEntity`，物理表名 `tenant_user`：`user` 是 PG 保留字）：member=真实用户（person × tenant 成员记录，可登录/入部门）；machine=服务账号（`person_id` 恒空，不可登录/无自然人/不可任部门负责人，但**从属部门**：主部门 primary 必填 + 参与部门 secondary 可多条，仅作角色主体与 API Key 归属）；`source` 区分 builtin（随租户创建由系统生成：平台建租户的管理员 / 自助开通租户的 owner / 种子管理员）与 manual；`is_owner` 仅真实用户可持有；租户内资料（name/description/avatar/profile/custom_data） |
+| `person` | **自然人**：全局唯一身份。username / primary_email / primary_phone 可空且全局唯一（NULL 不撞唯一索引）；密码 bcrypt 哈希；`password_status`（`PasswordStatus`：normal/must_change）标识"临时密码 / 被重置后必须先改密"（登录链路据此拦截）；`status`（`PersonStatus`：active/suspended）全局挂起。**无 profile / custom_data**（通用 JSON 兜底列已下线） |
+| `tenant_user` | **租户账号**（领域实体 `UserEntity`，物理表名 `tenant_user`：`user` 是 PG 保留字）：member=真实用户（person × tenant 成员记录，可登录/入部门）；machine=服务账号（`person_id` 恒空，不可登录/无自然人/不可任部门负责人，但**从属部门**：主部门 primary 必填 + 参与部门 secondary 可多条，仅作角色主体与 API Key 归属）；`source` 区分 builtin（随租户创建由系统生成：平台建租户的管理员 / 自助开通租户的 owner / 种子管理员）与 manual；`owner_type`（`OwnerType`：owner/normal）仅真实用户可持有；租户内资料仅 name/description/avatar（**无 profile / custom_data**） |
 | `user_identity` | 外部身份关联：person 在外部 IdP（Connector）的身份映射，`external_subject` 为外部主体标识 |
 | `user_login_log` | 登录日志：记录每次登录的时间/IP/UA/类型 |
 
@@ -507,9 +493,8 @@ erDiagram
 |---|---|
 | `tenant` | 租户：`type` 分 customer/platform（分类标识，不参与隔离判定）；`code` 全局唯一且由服务端自动生成（`t_<12 位随机 hex>`，平台租户种子固定为 `t_platform`，创建后不可改）；`status` 生命周期状态（active/suspended，取代早期 `is_suspended`） |
 | `tenant_invite` | 加入邀请：通道 B 的凭据，`code` 邀请码 + `status`（pending/accepted/revoked）+ 可空 `expires_at` |
-| `tenant_application` | 租户-应用开通关系：`status` 开通状态、`config` 租户级配置、`granted_scope` 租户级 scope 授权 |
-| `domain` | 租户域名：`is_verified` + `verified_at`（当前仅平台端录入与管理，登录链路尚未按域名识别租户） |
-| `log` | 租户日志（通用 key-payload） |
+| `tenant_application` | 租户-应用开通关系：`status` 开通状态（`config` / `granted_scope` 两个通用 JSON 兜底列已下线） |
+| `domain` | 租户域名：`verification_status`（`DomainVerificationStatus`：unverified/verified；旧 `is_verified` + `verified_at` 已下线），当前仅平台端录入与管理，登录链路尚未按域名识别租户 |
 
 #### 部门架构域
 
@@ -533,10 +518,10 @@ erDiagram
 
 | 表 | 说明 |
 |---|---|
-| `application` | 业务应用定义：编码/名称/描述/来源（`source`：builtin/first_party/third_party）/状态/排序/两个**入口策略**布尔位（`allow_person_create_tenant` 通道 A、`allow_join_by_invite` 通道 B；NULL 与 false 同义，判定见 §5.1）/`seed_key`（内置应用的种子身份键）/`role_template`（**应用角色模板**：`[{code,name}]`，本应用对外的契约角色清单，见 §5.4；平台侧维护，`create_only`）。控制台只能创建 `third_party` |
-| `application_client` | **OAuth/OIDC 客户端**：`code` 即 `client_id`（创建时必填，`^[a-z][a-z_]*$`：小写字母开头，仅小写字母与下划线）、`app_id` 归属、redirect_uris / post_logout_redirect_uris、grant_types、token_endpoint_auth_method、PKCE、令牌 TTL、来源（`source`） |
+| `application` | 业务应用定义：编码/名称/描述/来源（`source`：builtin/first_party/third_party）/状态/排序/两个**入口策略**具名枚举开关列（`allow_person_create_tenant` 通道 A：`AppPersonCreateTenantPolicy`、`allow_join_by_invite` 通道 B：`AppJoinByInvitePolicy`，取值 enable/disable；NULL ≡ disable，判定见 §5.1）/`seed_key`（内置应用的种子身份键）/`role_template`（**应用角色模板**：`RoleTemplateItemList`（`[{code,name}]`，`serializer:json`），本应用对外的契约角色清单，见 §5.4；平台侧维护，`create_only`）。控制台只能创建 `third_party` |
+| `application_client` | **OAuth/OIDC 客户端**：`code` 即 `client_id`（创建时必填，`^[a-z][a-z_]*$`：小写字母开头，仅小写字母与下划线）、`app_id` 归属、redirect_uris / post_logout_redirect_uris、grant_types、token_endpoint_auth_method、`require_pkce`/`require_auth_time`（`ClientPKCEPolicy`/`ClientAuthTimeClaimPolicy`，enable/disable）、令牌 TTL、来源（`source`） |
 | `application_client_secret` | 客户端密钥：只存哈希（`value_hash`）+ 前缀（`value_prefix`），支持过期/吊销 |
-| `api_key` | API Key 机器凭证：只存哈希（`key_hash`）+ 前缀（`key_prefix`，明文前 7 位，仅列表展示），支持 scope/过期/吊销；`owner_user_id` 归属**服务账号**（个人密钥能力已下线，历史 member 数据兼容展示），鉴权按归属服务账号注入身份；明文仅创建时展示一次，管理在租户端（需系统管理能力） |
+| `api_key` | API Key 机器凭证：只存哈希（`key_hash`）+ 前缀（`key_prefix`，明文前 7 位，仅列表展示），支持过期/吊销（通用 `scope` JSON 列与 `last_used_at` 已下线）；`owner_user_id` 归属**服务账号**（个人密钥能力已下线，历史 member 数据兼容展示），鉴权按归属服务账号注入身份；明文仅创建时展示一次，管理在租户端（需系统管理能力） |
 
 #### 会话与审计域
 
@@ -624,7 +609,7 @@ sequenceDiagram
 - **解析实现与通道 B 共用一份**：`client_id` → 应用 → 读开关统一走 `pkg/core/application`（`GetByClientID` / `AllowsPersonCreateTenant`），禁止各通道各写一套；字段为 NULL（未配置）与解析不出应用都视为不允许（fail-closed）。
 - **注册与建租户拆成两步**：`registerPerson` 只做 person 的 find-or-create（复用既有自然人时不覆盖口令、也不置强制改密）；`createTenant` 才落租户、根部门与内置管理员。
 - **SSO 会话不在注册时建立**：会话在 `POST /oidc/login/selectTenant` 完成授权时创建，因此注册后仍需走一次登录收尾。
-- 通道 A 的注册人自任该新租户的**拥有者**（`is_owner=1`，`source=builtin`），对标 zitadel `register/org`；**平台建租户同样置 `is_owner=1` + `source=builtin`**（见 §5.8）。
+- 通道 A 的注册人自任该新租户的**拥有者**（`owner_type=owner`，`source=builtin`），对标 zitadel `register/org`；**平台建租户同样置 `owner_type=owner` + `source=builtin`**（见 §5.8）。
 
 **通道 B：凭邀请加入已有租户（`POST /v1/auth/joinTenant`）**
 
@@ -641,11 +626,11 @@ sequenceDiagram
     A->>A: 校验应用策略 allow_join_by_invite<br/>（按 token 的 client_id 解析应用）
     A->>A: 校验邀请（有效、未过期、未使用）→ 解析租户
     A->>DB: 查重 user（person_id + tenant_id）
-    A->>DB: 事务创建 user（is_owner=0）+ 标记邀请已用
+    A->>DB: 事务创建 user（owner_type=normal）+ 标记邀请已用
     A-->>U: { userID }
 ```
 
-**要点**：落哪个租户由**邀请码**决定（租户侧授权）；`joinTenant` **禁止裸 `tenantID` 直入**——这是软隔离多租户模型下的必要门禁（对标 keycloak 落当前 realm / zitadel org scope）。加入者永远是普通成员：`is_owner` 只在**自助开通租户或平台建租户**时产生，平台端不提供 owner 指派接口（`PUT /v1/platform/users/{userID}/owner` 已下线），该字段仅用于展示、不参与鉴权。
+**要点**：落哪个租户由**邀请码**决定（租户侧授权）；`joinTenant` **禁止裸 `tenantID` 直入**——这是软隔离多租户模型下的必要门禁（对标 keycloak 落当前 realm / zitadel org scope）。加入者永远是普通成员：`owner_type=owner` 只在**自助开通租户或平台建租户**时产生，平台端不提供 owner 指派接口（`PUT /v1/platform/users/{userID}/owner` 已下线），该字段仅用于展示、不参与鉴权。
 
 通道 B 有**两道门禁**，按序判定（见 `backend/apps/auth/internal/service/svcauth/auth.go` 的 `JoinTenant`）：
 
@@ -691,7 +676,7 @@ sequenceDiagram
     end
 ```
 
-**首次登录强制改密**：登录校验通过后若命中 `person.must_change_password`（临时口令，或口令刚被管理员重置），auth **不建立 SSO 会话、也不签发授权码**，而是返回需改密状态；login-web 随即引导调用 `POST /oidc/login/changePassword`（改密后必须重新登录）。已登录用户的自助改密走 `POST /v1/auth/me/changePassword`。
+**首次登录强制改密**：登录校验通过后若命中 `person.password_status = must_change`（临时口令，或口令刚被管理员重置），auth **不建立 SSO 会话、也不签发授权码**，而是返回需改密状态；login-web 随即引导调用 `POST /oidc/login/changePassword`（改密后必须重新登录）。已登录用户的自助改密走 `POST /v1/auth/me/changePassword`。
 
 ### 5.3 免密续登（SSO）
 
@@ -861,8 +846,8 @@ sequenceDiagram
     PA->>DB: 事务创建
     PA->>DB: 1) tenant（code 自动生成）
     PA->>DB: 2) 根部门节点
-    PA->>DB: 3) tenant_user（person_id 关联/新建，source=builtin，is_owner=1）
-    PA->>DB: 4) person.must_change_password = true
+    PA->>DB: 3) tenant_user（person_id 关联/新建，source=builtin，owner_type=owner）
+    PA->>DB: 4) person.password_status = must_change
     PA->>DB: 5) 绑定内置管理员角色 + 根部门 primary 关系 + 应用订阅
     PA->>DB: 6) 按各订阅应用的 role_template 物化契约角色（source=builtin）
     PA-->>P: { tenantID, adminUserID, 临时口令明文（仅此一次展示） }
@@ -874,8 +859,8 @@ sequenceDiagram
 - **应用订阅即契约角色物化**：`tenant_application` 落行时（建租户内的订阅、以及平台侧单独开通应用）在同一事务里按该应用的 `role_template` 在租户内 upsert 对应角色（`source=builtin && admin_type=normal`，`description` 标注来源）；租户侧对这些角色只读。模板更新走 `SyncAppRoleTemplateToTenants` 对各已开通租户做差量同步（新增/改名/移除撤权），详见 §5.4。
 - **口令不由创建人手填**：服务端用 `pkg/credential.GenerateTemporaryPassword` 生成每用户随机临时口令，全系统口令强度规则一致；**明文只在创建响应中回显一次**，库里只存 bcrypt 哈希。
 - **内置标记 `source=builtin`**：该成员由系统随租户创建生成（区别于控制台手工创建的 `manual`），仅作为后端语义，不在租户控制台展示为可编辑字段。
-- **首次登录强制改密**：`person.must_change_password=true`，改密前不建会话、不发令牌（见 §5.2）。
-- **口令丢失的兜底**：平台侧提供 `POST /v1/platform/tenants/{tenantID}/builtin-admin/reset-password`，重置后同样回显一次性临时口令并重新置 `must_change_password`。该接口**仅允许作用于 `source=builtin` 的内置管理员**，不得触碰租户手工创建的成员。
+- **首次登录强制改密**：`person.password_status=must_change`，改密前不建会话、不发令牌（见 §5.2）。
+- **口令丢失的兜底**：平台侧提供 `POST /v1/platform/tenants/{tenantID}/builtin-admin/reset-password`，重置后同样回显一次性临时口令并重新置 `password_status=must_change`。该接口**仅允许作用于 `source=builtin` 的内置管理员**，不得触碰租户手工创建的成员。
 
 ---
 

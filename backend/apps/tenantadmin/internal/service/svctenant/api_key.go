@@ -1,8 +1,6 @@
 package svctenant
 
 import (
-	"database/sql"
-	"encoding/json"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -86,7 +84,6 @@ func (svc *apiKeySvc) Create(ctx *gin.Context, req *dtotenant.ApiKeyCreateReq) (
 		Name:        req.Name,
 		KeyHash:     credential.HashSecret(rawKey),
 		KeyPrefix:   credential.Prefix(rawKey, credential.APIKeyPrefixLen),
-		Scope:       json.RawMessage(`{}`),
 		ExpiredAt:   expiresAt,
 		CreatedBy:   operatorID,
 	}
@@ -150,7 +147,6 @@ func (svc *apiKeySvc) PageList(ctx *gin.Context, req *dtotenant.ApiKeyPageListRe
 			KeyPrefix:   v.KeyPrefix,
 			OwnerUserID: v.OwnerUserID,
 			ExpiredAt:   timePtrUnix(v.ExpiredAt),
-			LastUsedAt:  sqlTimePtrUnix(v.LastUsedAt),
 			RevokedAt:   timePtrUnix(v.RevokedAt),
 			CreatedAt:   v.CreatedAt.Unix(),
 			UpdatedAt:   v.UpdatedAt.Unix(),
@@ -255,14 +251,5 @@ func timePtrUnix(t *time.Time) *int64 {
 		return nil
 	}
 	v := t.Unix()
-	return &v
-}
-
-// sqlTimePtrUnix sql.NullTime → *int64(unix秒,无效为空)。
-func sqlTimePtrUnix(t sql.NullTime) *int64 {
-	if !t.Valid {
-		return nil
-	}
-	v := t.Time.Unix()
 	return &v
 }

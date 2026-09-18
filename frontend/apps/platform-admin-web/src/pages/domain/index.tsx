@@ -4,7 +4,7 @@ import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { actionColumn, CODE_COL_WIDTH, idColumn, PageContainer, STATUS_COL_WIDTH, tableScrollX, textColumn, timeColumn, VerifiedTag } from '@ark-iam/ui'
 import { createDomain, deleteDomain, getDomainDetail, getDomainPageList, updateDomain } from '@ark-iam/api'
-import type { DomainItem } from '@ark-iam/types'
+import type { DomainItem, DomainVerificationStatus } from '@ark-iam/types'
 
 export default function DomainList() {
   const [data, setData] = useState<DomainItem[]>([])
@@ -44,11 +44,11 @@ export default function DomainList() {
 
   const handleEdit = (record: DomainItem) => {
     setEditing(record)
-    form.setFieldsValue({ domain: record.domain, isVerified: record.isVerified })
+    form.setFieldsValue({ domain: record.domain, verificationStatus: record.verificationStatus })
     setModalOpen(true)
     getDomainDetail(record.id)
       .then((detail) => {
-        form.setFieldsValue({ domain: detail.domain, isVerified: detail.isVerified })
+        form.setFieldsValue({ domain: detail.domain, verificationStatus: detail.verificationStatus })
       })
       .catch(() => {
         /* 详情拉取失败，回退行数据 */
@@ -60,7 +60,7 @@ export default function DomainList() {
       const values = await form.validateFields()
       setSubmitLoading(true)
       if (editing) {
-        await updateDomain({ id: editing.id, domain: values.domain, isVerified: values.isVerified })
+        await updateDomain({ id: editing.id, domain: values.domain, verificationStatus: values.verificationStatus })
         message.success('修改成功')
       } else {
         await createDomain(values.domain)
@@ -90,12 +90,11 @@ export default function DomainList() {
     textColumn<DomainItem>({ title: '域名', dataIndex: 'domain', width: CODE_COL_WIDTH, monospace: true }),
     {
       title: '验证状态',
-      dataIndex: 'isVerified',
-      key: 'isVerified',
+      dataIndex: 'verificationStatus',
+      key: 'verificationStatus',
       width: STATUS_COL_WIDTH,
-      render: (v: number) => <VerifiedTag value={v} />,
+      render: (v: DomainVerificationStatus) => <VerifiedTag value={v} />,
     },
-    timeColumn<DomainItem>({ title: '验证时间', dataIndex: 'verifiedAt', placeholder: '未验证' }),
     timeColumn<DomainItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<DomainItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     actionColumn<DomainItem>({
@@ -165,11 +164,11 @@ export default function DomainList() {
             <Input placeholder="如：example.com" />
           </Form.Item>
           {editing && (
-            <Form.Item name="isVerified" label="验证状态" rules={[{ required: true, message: '请选择验证状态' }]}>
+            <Form.Item name="verificationStatus" label="验证状态" rules={[{ required: true, message: '请选择验证状态' }]}>
               <Select
                 options={[
-                  { value: 0, label: '未验证' },
-                  { value: 1, label: '已验证' },
+                  { value: 'unverified', label: '未验证' },
+                  { value: 'verified', label: '已验证' },
                 ]}
               />
             </Form.Item>

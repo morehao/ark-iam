@@ -156,7 +156,8 @@ IAM 通过 **ID token 的 `groups` 声明**把"用户在本租户内拥有哪些
 > **`roleTemplate`（应用角色模板）**：下游策略是**全局命名实体**（策略名 = `claim_prefix` + 编码，一条策略
 > 全租户共用，下游没有"角色 ↔ 策略"的映射表可回查），所以"某个编码会在下游存在一条策略"这件事只能由
 > **应用方**说了算。据此 IAM 把契约值的定义权收归应用：创建/更新应用时声明模板（详见
-> [api-reference.md](api-reference.md)），租户侧只能授权成员、不能造值——
+> [api-reference.md](api-reference.md)），租户侧只能授权成员、不能造值
+> （存储层为 `application.role_template` 列，`serializer:json` + 具名类型 `model.RoleTemplateItemList`）——
 > 如果允许租户写编码，任何租户管理员都能创建一个同码角色直接拿到你那条策略（跨租户提权）。
 >
 > ```bash
@@ -352,10 +353,12 @@ curl https://my-api.example.com/v1/... -H "x-api-key: 8f3ab2c9d0e1..."
 // react-oidc-context
 auth.signoutRedirect({ post_logout_redirect_uri: 'https://my-app.example.com/logged-out' });
 // 或直接调用 OP 端点
-// window.location = 'http://localhost:8081/oidc/end_session?post_logout_redirect_uri=...'
+// window.location = 'http://localhost:8081/oidc/end_session?client_id=<client_id>&post_logout_redirect_uri=...'
 ```
 
 OP 收到登出请求后：清除 `iam_sso_session` Cookie → 撤销该 person 全部 SSO 会话与 Refresh Token → 入队反向通道登出通知。
+
+> ⚠️ **前置条件：`post_logout_redirect_uri` 必须在客户端白名单里**（`application_client.post_logout_redirect_uris`，控制台字段「登出回调地址」）。`/oidc/end_session` 对该参数做**精确匹配**（含末尾斜杠是否一致），不匹配时返回 `400 {"error":"invalid_request","error_description":"post_logout_redirect_uri invalid"}`——**它不会跳回你的应用**，用户只会看到这段 JSON 错误。实践中最容易漏配的形态是「客户端建好了、登出回调地址留空」：登录/令牌一切正常，一点退出就报这个错（Gitea 接入时即如此，补 `["http://localhost:3009/"]` 后恢复 302）。RP 发起登出时建议同时带上 `client_id`（Gitea 的做法：`end_session?client_id=…&post_logout_redirect_uri=<AppURL>/`）。
 
 ### 7.2 反向通道登出接收端（Gin 示例）
 

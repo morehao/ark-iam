@@ -2,7 +2,6 @@ package dao
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 
 	"github.com/morehao/ark-iam/pkg/dbclient"
@@ -69,11 +68,12 @@ func (dao *UserIdentityDao) GetByIssuerAndExternalSubject(ctx context.Context, i
 	return &entity, nil
 }
 
-func (dao *UserIdentityDao) UpdateBinding(ctx context.Context, identityID, personID string, issuer string, detail []byte) error {
-	return dao.UpdateMap(ctx, identityID, map[string]any{
-		"person_id":  personID,
-		"issuer":     issuer,
-		"detail":     json.RawMessage(detail),
-		"updated_by": personID,
-	})
+func (dao *UserIdentityDao) UpdateBinding(ctx context.Context, identityID, personID string, issuer string, detail model.UserIdentityDetail) error {
+	entity := &model.UserIdentityEntity{
+		PersonID:  personID,
+		Issuer:    issuer,
+		Detail:    detail,
+		UpdatedBy: personID,
+	}
+	return UpdateFields(ctx, dao.Dao, identityID, entity, "person_id", "issuer", "detail", "updated_by")
 }

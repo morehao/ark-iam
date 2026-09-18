@@ -2,33 +2,27 @@ package tenant
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"testing"
 
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/stretchr/testify/require"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 // templateJSON 构造 application.role_template 列值（应用侧写入的形状）。
-func templateJSON(t *testing.T, items ...model.RoleTemplateItem) datatypes.JSON {
+func templateJSON(t *testing.T, items ...model.RoleTemplateItem) model.RoleTemplateItemList {
 	t.Helper()
-	raw, err := json.Marshal(model.RoleTemplateItemList(items))
-	require.NoError(t, err)
-	return datatypes.JSON(raw)
+	return model.RoleTemplateItemList(items)
 }
 
-// seedSubscribedTenant 播种一条租户订阅（not null JSON 列显式给值，sqlite 不接受 NULL）。
+// seedSubscribedTenant 播种一条租户订阅。
 func seedSubscribedTenant(t *testing.T, db *gorm.DB, tenantID, appID string) {
 	t.Helper()
 	require.NoError(t, db.WithContext(context.Background()).Create(&model.TenantApplicationEntity{
 		TenantID:     tenantID,
 		AppID:        appID,
 		Status:       model.TenantApplicationStatusEnable,
-		Config:       datatypes.JSON("{}"),
-		GrantedScope: datatypes.JSON("[]"),
 	}).Error)
 }
 
@@ -114,8 +108,10 @@ func TestSyncAppRoleTemplateMaterializeAndWithdraw(t *testing.T) {
 		model.RoleTemplateItem{Code: "storage_admin", Name: "存储超级管理员"},
 		model.RoleTemplateItem{Code: "readonly", Name: "只读用户"},
 	)
+	// 结构化 Updates + Select：Update("col", v) 不经过 serializer，会写坏 JSON 列。
 	require.NoError(t, db.WithContext(ctx).Model(&model.ApplicationEntity{}).
-		Where("id = ?", app.ID).Update("role_template", app.RoleTemplate).Error)
+		Where("id = ?", app.ID).Select("role_template").
+		Updates(&model.ApplicationEntity{RoleTemplate: app.RoleTemplate}).Error)
 	require.NoError(t, SyncAppRoleTemplateToTenants(ctx, db, &SyncAppRoleTemplateToTenantsReq{AppID: app.ID, CreatedBy: "op"}))
 	require.Equal(t, "存储超级管理员", findTemplateRole(t, db, "t2", app.ID, "storage_admin").Name)
 
@@ -133,7 +129,8 @@ func TestSyncAppRoleTemplateMaterializeAndWithdraw(t *testing.T) {
 
 	app.RoleTemplate = templateJSON(t, model.RoleTemplateItem{Code: "storage_admin", Name: "存储超级管理员"})
 	require.NoError(t, db.WithContext(ctx).Model(&model.ApplicationEntity{}).
-		Where("id = ?", app.ID).Update("role_template", app.RoleTemplate).Error)
+		Where("id = ?", app.ID).Select("role_template").
+		Updates(&model.ApplicationEntity{RoleTemplate: app.RoleTemplate}).Error)
 	require.NoError(t, SyncAppRoleTemplateToTenants(ctx, db, &SyncAppRoleTemplateToTenantsReq{AppID: app.ID, CreatedBy: "op"}))
 
 	require.Nil(t, findTemplateRole(t, db, "t2", app.ID, "readonly"))

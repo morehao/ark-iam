@@ -15,15 +15,15 @@ import { tokens } from './theme'
 export const TIME_COL_WIDTH = 180
 
 /**
- * 相对时间列宽度（px）：如「3 天前」实测 40.47px、最长档「10 个月前」约 63px、
- * 占位文案「从未使用」56px，加 32px 内边距后 120 有充足余量。
+ * 相对时间列宽度（px）：如「3 天前」实测 40.47px、最长档「10 个月前」约 63px，
+ * 加 32px 内边距后 120 有充足余量。
  */
 export const TIME_COL_WIDTH_RELATIVE = 120
 
 export interface TimeCellProps {
   /** 秒级时间戳（约定见 AGENTS.md），兼容字符串与毫秒值 */
   value?: number | string | null
-  /** 空值占位文案（默认 '-'），如「永不过期」「从未使用」 */
+  /** 空值占位文案（默认 '-'），如「永不过期」 */
   placeholder?: string
   /** 相对时间模式：展示「3 天前」，悬浮给出完整 `YYYY-MM-DD HH:mm:ss` */
   relative?: boolean
@@ -67,7 +67,7 @@ export interface TimeColumnConfig<T> {
  * ```tsx
  * const columns: ColumnsType<TenantItem> = [
  *   timeColumn<TenantItem>({ title: '创建时间', dataIndex: 'createdAt' }),
- *   timeColumn<TenantItem>({ title: '最后使用', dataIndex: 'lastUsedAt', relative: true, placeholder: '从未使用' }),
+ *   timeColumn<TenantUserLoginLogItem>({ title: '登录时间', dataIndex: 'loginTime', relative: true }),
  * ]
  * ```
  */

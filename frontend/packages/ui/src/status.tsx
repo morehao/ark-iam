@@ -23,17 +23,22 @@ export function EnableTag({ value }: { value?: string }) {
 }
 
 /**
- * 挂起状态：兼容 isSuspended 布尔/0-1 字段与 status 枚举（active/suspended）两种后端形态。
- * 1/true/'suspended' → 挂起(error)；0/false/'active' → 正常(success)。
+ * 挂起状态：只认 status 枚举（后端 model.UserStatus / PersonStatus），
+ * 'suspended' → 挂起(error)；'active' → 正常(success)。
+ *
+ * **不再兼容 isSuspended 的 1/true/0/false**：P3 起 user/person 状态统一为 status 枚举，
+ * 保留对布尔/数字的兼容会掩盖「读了已下线字段」的缺陷（值恒为 undefined → 恒显示「正常」）。
  */
 export function SuspendedTag({ value }: { value?: StatusValue | boolean }) {
-  const suspended = value === 1 || value === true || value === 'suspended'
-  return suspended ? <Tag color="error">挂起</Tag> : <Tag color="success">正常</Tag>
+  return value === 'suspended' ? <Tag color="error">挂起</Tag> : <Tag color="success">正常</Tag>
 }
 
-/** 验证状态：isVerified 字段，1 → 已验证(success)；0 → 未验证(warning) */
+/**
+ * 验证状态（后端具名类型 model.DomainVerificationStatus）：只认 'verified' → 已验证(success)；
+ * 'unverified' 及其它取值 → 未验证(warning)。不再兼容 isVerified 的 1/0。
+ */
 export function VerifiedTag({ value }: { value?: StatusValue }) {
-  return value === 1 ? <Tag color="success">已验证</Tag> : <Tag color="warning">未验证</Tag>
+  return value === 'verified' ? <Tag color="success">已验证</Tag> : <Tag color="warning">未验证</Tag>
 }
 
 /** 类型标识（分类色，非状态语义）：租户类型 platform→geekblue、customer→cyan；其余原样回显 */

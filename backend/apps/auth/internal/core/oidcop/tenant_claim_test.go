@@ -29,8 +29,6 @@ func newTenantClaimTestStore(t *testing.T, users []model.UserEntity) (storage *O
 	}
 	for i := range users {
 		now := time.Now()
-		users[i].Profile = []byte("{}")
-		users[i].CustomData = []byte("{}")
 		users[i].JoinedAt = &now
 		users[i].LastSignInAt = &now
 		if err := db.Create(&users[i]).Error; err != nil {
@@ -161,7 +159,7 @@ func TestGetPrivateClaimsFromRequestSelectsTenantFromAuthRequest(t *testing.T) {
 
 	authReq := &AuthRequest{Subject: BuildSubject("88"), ClientID: "client-1", TenantID: "7"}
 
-	claims, err := storage.GetPrivateClaimsFromRequest(ctx, authReq, []string{"openid"})
+	claims, err := storage.GetPrivateClaimsFromRequest(ctx, authReq, []string{model.ScopeOpenID})
 	if err != nil {
 		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
 	}
@@ -183,7 +181,7 @@ func TestGetPrivateClaimsFromRequestOmitsTenantWhenAmbiguous(t *testing.T) {
 	// 也不静默取 users[0]（L4）。
 	authReq := &AuthRequest{Subject: BuildSubject("88"), ClientID: "client-1"}
 
-	claims, err := storage.GetPrivateClaimsFromRequest(ctx, authReq, []string{"openid"})
+	claims, err := storage.GetPrivateClaimsFromRequest(ctx, authReq, []string{model.ScopeOpenID})
 	if err != nil {
 		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
 	}
@@ -240,7 +238,7 @@ func TestGetPrivateClaimsFromRequestSelectsTenantFromRefreshTokenRequest(t *test
 		tenantID: "8",
 	}
 
-	claims, err := storage.GetPrivateClaimsFromRequest(ctx, refreshReq, []string{"openid"})
+	claims, err := storage.GetPrivateClaimsFromRequest(ctx, refreshReq, []string{model.ScopeOpenID})
 	if err != nil {
 		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
 	}
@@ -264,7 +262,7 @@ func TestGetPrivateClaimsFromRequestInjectsSidFromAuthRequest(t *testing.T) {
 		SessionID: "sid-xyz",
 	}
 
-	claims, err := storage.GetPrivateClaimsFromRequest(ctx, authReq, []string{"openid"})
+	claims, err := storage.GetPrivateClaimsFromRequest(ctx, authReq, []string{model.ScopeOpenID})
 	if err != nil {
 		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
 	}
@@ -283,7 +281,7 @@ func TestGetPrivateClaimsFromAuthRequestOmitsSidWhenEmpty(t *testing.T) {
 
 	authReq := &AuthRequest{Subject: BuildSubject("88"), ClientID: "client-1", TenantID: "1"}
 
-	claims, err := storage.GetPrivateClaimsFromRequest(ctx, authReq, []string{"openid"})
+	claims, err := storage.GetPrivateClaimsFromRequest(ctx, authReq, []string{model.ScopeOpenID})
 	if err != nil {
 		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
 	}

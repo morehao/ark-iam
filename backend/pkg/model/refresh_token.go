@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/morehao/golib/dbaccess/gormdao"
-	"gorm.io/datatypes"
 )
 
 const TableNameRefreshToken = "refresh_token"
@@ -19,9 +18,9 @@ type RefreshTokenEntity struct {
 	Token               string `gorm:"column:token;type:varchar(256);not null;default:'';comment:token哈希"`
 	// Scopes 授权时授予的 scope 列表（JSON 数组）。刷新时必须还原原始 scope，
 	// 否则刷新后 token 的 scope 会缩水（RFC 6749 §6）。可空：历史数据无该列。
-	Scopes datatypes.JSON `gorm:"column:scopes;type:json;comment:授权scope"`
+	Scopes ScopeList `gorm:"column:scopes;type:json;serializer:json;comment:授权scope"`
 	// AMR 原始认证方法引用（JSON 数组），刷新与审计时还原。可空：历史数据无该列。
-	AMR datatypes.JSON `gorm:"column:amr;type:json;comment:认证方法引用"`
+	AMR AuthMethodList `gorm:"column:amr;type:json;serializer:json;comment:认证方法引用"`
 	// AuthTime 原始认证时间，刷新 token 时还原到 auth_time 声明。
 	AuthTime      *time.Time `gorm:"column:auth_time;comment:原始认证时间"`
 	ClientType    string     `gorm:"column:client_type;type:varchar(32);not null;default:'';comment:客户端类型"`

@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/testutil"
 	"github.com/morehao/ark-iam/pkg/model"
-	"gorm.io/datatypes"
 )
 
 func TestResolveAllowPersonCreateTenant(t *testing.T) {
@@ -25,7 +24,7 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			tenantCount: 1,
 			client:      &model.ApplicationClientEntity{AppID: "7"},
 			app: &model.ApplicationEntity{
-				AllowPersonCreateTenant: model.BoolPtr(true),
+				AllowPersonCreateTenant: model.AppPersonCreateTenantPolicyEnable,
 			},
 			want: false,
 		},
@@ -41,7 +40,7 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			tenantCount: 0,
 			client:      &model.ApplicationClientEntity{AppID: "7"},
 			app: &model.ApplicationEntity{
-				AllowPersonCreateTenant: model.BoolPtr(true),
+				AllowPersonCreateTenant: model.AppPersonCreateTenantPolicyEnable,
 			},
 			want: true,
 		},
@@ -51,7 +50,7 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			tenantCount: 0,
 			client:      &model.ApplicationClientEntity{AppID: "8"},
 			app: &model.ApplicationEntity{
-				AllowPersonCreateTenant: model.BoolPtr(false),
+				AllowPersonCreateTenant: model.AppPersonCreateTenantPolicyDisable,
 			},
 			want: false,
 		},
@@ -78,12 +77,12 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 				client := c.client
 				client.ID = client.AppID
 				client.Code = c.clientID
-				client.RedirectURIs = datatypes.JSON(`[]`)
-				client.PostLogoutRedirectURIs = datatypes.JSON(`[]`)
-				client.GrantTypes = datatypes.JSON(`["authorization_code"]`)
-				client.ResponseTypes = datatypes.JSON(`["code"]`)
-				client.AllowedOrigins = datatypes.JSON(`[]`)
-				client.DefaultScopes = datatypes.JSON(`["openid"]`)
+				client.RedirectURIs = model.RedirectURIList{}
+				client.PostLogoutRedirectURIs = model.PostLogoutRedirectURIList{}
+				client.GrantTypes = model.GrantTypeList{model.GrantTypeAuthorizationCode}
+				client.ResponseTypes = model.ResponseTypeList{model.ResponseTypeCode}
+				client.AllowedOrigins = model.AllowedOriginList{}
+				client.DefaultScopes = model.DefaultScopeList{model.ScopeOpenID}
 				if err := db.Create(client).Error; err != nil {
 					t.Fatalf("seed client: %v", err)
 				}
@@ -110,12 +109,12 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 func TestAppAllowsPersonCreateTenant(t *testing.T) {
 	cases := []struct {
 		name  string
-		allow *bool
+		allow model.AppPersonCreateTenantPolicy
 		want  bool
 	}{
-		{name: "true", allow: model.BoolPtr(true), want: true},
-		{name: "false", allow: model.BoolPtr(false), want: false},
-		{name: "absent", allow: nil, want: false},
+		{name: "enable", allow: model.AppPersonCreateTenantPolicyEnable, want: true},
+		{name: "disable", allow: model.AppPersonCreateTenantPolicyDisable, want: false},
+		{name: "absent", allow: "", want: false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -126,12 +125,12 @@ func TestAppAllowsPersonCreateTenant(t *testing.T) {
 			}
 			client := &model.ApplicationClientEntity{Code: "cid-x", AppID: app.ID}
 			client.ID = client.AppID
-			client.RedirectURIs = datatypes.JSON(`[]`)
-			client.PostLogoutRedirectURIs = datatypes.JSON(`[]`)
-			client.GrantTypes = datatypes.JSON(`["authorization_code"]`)
-			client.ResponseTypes = datatypes.JSON(`["code"]`)
-			client.AllowedOrigins = datatypes.JSON(`[]`)
-			client.DefaultScopes = datatypes.JSON(`["openid"]`)
+			client.RedirectURIs = model.RedirectURIList{}
+			client.PostLogoutRedirectURIs = model.PostLogoutRedirectURIList{}
+			client.GrantTypes = model.GrantTypeList{model.GrantTypeAuthorizationCode}
+			client.ResponseTypes = model.ResponseTypeList{model.ResponseTypeCode}
+			client.AllowedOrigins = model.AllowedOriginList{}
+			client.DefaultScopes = model.DefaultScopeList{model.ScopeOpenID}
 			if err := db.Create(client).Error; err != nil {
 				t.Fatalf("seed client: %v", err)
 			}

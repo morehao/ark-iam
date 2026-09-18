@@ -9,15 +9,15 @@
 | 术语 | 英文 | 说明 |
 |---|---|---|
 | 自然人 ✅ | Person | 跨租户的**全局身份**。用户名/邮箱/手机号全局唯一（可空），密码、全局状态（挂起）在此维护。OIDC `sub` 为 `person:<id>` |
-| 租户成员 ✅ | User | 自然人（person）在某个**租户内**的成员记录（表 **`tenant_user`**——`user` 是 PostgreSQL 保留字，故物理表名加前缀；领域实体为 `UserEntity`）。租户内姓名/资料/角色、是否拥有者（`is_owner`）、加入时间 |
+| 租户成员 ✅ | User | 自然人（person）在某个**租户内**的成员记录（表 **`tenant_user`**——`user` 是 PostgreSQL 保留字，故物理表名加前缀；领域实体为 `UserEntity`）。租户内姓名/资料/角色、归属类型（`owner_type`：`owner` 拥有者 / `normal` 普通成员）、加入时间 |
 | 租户 | Tenant | 独立的客户边界（业务主体的隔离单元）。数据与权限按租户隔离；类型分 `customer`（客户租户）/`platform`（平台租户） |
 | 租户类型 | Tenant Type | **分类标识**：`customer` = 外部客户/合作方的独立租户；`platform` = 平台自运营租户（种子数据“平台运营中心”即平台租户）。当前仅用于分类展示，不参与数据隔离与权限判定（隔离一律按 `tenant_id`） |
 | 租户编码 | Tenant Code | 租户的业务编码，全局唯一、创建后不可修改。由服务端自动生成，规则 `t_<12 位随机小写 hex>`（如 `t_3f7a9c1d2e4b`），见 `pkg/core/tenant.GenerateCode`；平台租户（种子数据“平台运营中心”）为固定值 `t_platform`——同前缀、后缀固定可读，因自动生成的随机段只用小写 hex，两者不会冲突 |
 | 租户拥有者 | Tenant Owner | 租户的拥有者成员（注册即成为首个拥有者），拥有租户管理权限 |
 | 外部身份 | User Identity | person 在外部身份源（Connector）中的身份映射（issuer + external_subject） |
 | 多租户 | Multi-tenant | 一个 person 可同时属于多个租户；登录时需选择租户（或由 `tenant` hint 指定） |
-| 挂起 | Suspended | person/user 被停用，禁止登录（`is_suspended`） |
-| 启停状态 | Enable Status | 全局统一的「启用/停用」词汇：`enable` 启用 / `disable` 停用。凡表达「这条记录还能不能参与业务」的字段一律用它——`application.status`、`application_client.status`、`tenant_application.status`、`department.status`、`connector.status`、`menu.status` 均属此类，禁止再出现 `active`/`inactive`/`enabled` 等同义异写 |
+| 挂起 | Suspended | person/user 被停用，禁止登录（`person.status` / `tenant_user.status` = `suspended`；旧 `is_suspended` 布尔列已下线） |
+| 启停状态 | Enable Status | 全局统一的「启用/停用」词汇：`enable` 启用 / `disable` 停用。凡表达「这条记录还能不能参与业务」的字段一律用它——`application.status`、`application_client.status`、`tenant_application.status`、`department.status`、`connector.status`、`menu.status` 均属此类，禁止再出现 `active`/`inactive`/`enabled` 等同义异写。**布尔开关一律具名枚举化**：同名的 `...Flag` / `...Policy` 列（如 `menu.hidden`、`application_client.require_pkce`、`connector.allow_account_link`）同样是 `enable`/`disable` 的 `varchar(16)` 列 + 具名类型 + 常量，禁止用 Go `bool` 表达字典语义、禁止裸字面量 |
 | 租户状态 | Tenant Status | 租户**生命周期**状态（`tenant.status`）：`active` 正常 / `suspended` 已挂起，属生命周期词汇而**不是**启停状态（`suspended` 有「禁止该租户成员登录与签发令牌」的独立语义，降级为 `disable` 会丢失语义）。仅 active 允许其成员登录、签发与轮换令牌；挂起会撤销该租户成员的 refresh token 与 SSO 会话；禁止挂起操作者自己所在的租户（不可逆自锁） |
 
 ## 二、部门与归属
@@ -90,9 +90,9 @@
 | 登录风控 | Login Guard | 失败次数窗口与锁定（默认 5 次/5 分钟/锁 15 分钟） |
 | API Key ✅ | API Key | 机器凭证（`x-api-key` 头或 `Authorization: Bearer` 携带，SHA-256 哈希存储、可过期/吊销；`scope` 列保留但**当前不参与鉴权**） |
 | 机器令牌 ✅ | Machine Token | 带 `token_usage=machine` 的令牌（**仅 API Key 签发**，含「API Key 当 client credential」路径），不依赖浏览器会话；普通 `client_credentials` 令牌不带该标记，也不能访问业务 API |
-| 通道 A ✅ | Channel A: Self-Serve Signup | 自助注册自然人并开通自己的租户（`POST /oidc/registerPerson` → `POST /oidc/createTenant`），注册人成为该租户**拥有者**（`is_owner=1`）；门禁是应用级 `application.allow_person_create_tenant`（非全局开关） |
+| 通道 A ✅ | Channel A: Self-Serve Signup | 自助注册自然人并开通自己的租户（`POST /oidc/registerPerson` → `POST /oidc/createTenant`），注册人成为该租户**拥有者**（`tenant_user.owner_type=owner`）；门禁是应用级 `application.allow_person_create_tenant`（非全局开关） |
 | 通道 B ✅ | Channel B: Join by Invite | 已登录用户凭邀请码加入**已有**租户（`POST /v1/auth/joinTenant`），加入者恒为**普通成员**；门禁是应用级 `application.allow_join_by_invite` 加邀请单自身有效——详见 `system-design.md` §5.1 |
-| 入口策略 ✅ | Entry Policy | `application` 上按两条自助通道各一个的可空布尔位（`allow_person_create_tenant`、`allow_join_by_invite`）：NULL 与 false 同义；判定时按调用方 `client_id` 解析应用后读取，解析不出应用一律拒绝（fail-closed） |
+| 入口策略 ✅ | Entry Policy | `application` 上按两条自助通道各一个的**具名枚举开关列**（`allow_person_create_tenant`：`AppPersonCreateTenantPolicy`、`allow_join_by_invite`：`AppJoinByInvitePolicy`，取值 `enable`/`disable`，列类型 `varchar(16)`；NULL ≡ `disable`）；判定时按调用方 `client_id` 解析应用后读取，解析不出应用一律拒绝（fail-closed） |
 
 ## 七、基础设施
 
