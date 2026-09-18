@@ -50,21 +50,13 @@ func GetByClientID(ctx *gin.Context, clientID string) (*model.ApplicationEntity,
 }
 
 // AllowsPersonCreateTenant 应用是否允许其用户自助开通租户（通道 A）。
-// 字段可空（NULL = 未配置），未配置视为不允许。
+// 枚举列无"未配置"态（NULL 已归一为 disable），仅显式 enable 视为允许。
 func AllowsPersonCreateTenant(app *model.ApplicationEntity) bool {
-	return boolPtrValue(app, func(a *model.ApplicationEntity) *bool { return a.AllowPersonCreateTenant })
+	return app != nil && app.AllowPersonCreateTenant == model.AppPersonCreateTenantPolicyEnable
 }
 
 // AllowsJoinByInvite 应用是否允许其用户凭邀请加入已有租户（通道 B）。
-// 字段可空（NULL = 未配置），未配置视为不允许。
+// 枚举列无"未配置"态（NULL 已归一为 disable），仅显式 enable 视为允许。
 func AllowsJoinByInvite(app *model.ApplicationEntity) bool {
-	return boolPtrValue(app, func(a *model.ApplicationEntity) *bool { return a.AllowJoinByInvite })
-}
-
-func boolPtrValue(app *model.ApplicationEntity, pick func(*model.ApplicationEntity) *bool) bool {
-	if app == nil {
-		return false
-	}
-	v := pick(app)
-	return v != nil && *v
+	return app != nil && app.AllowJoinByInvite == model.AppJoinByInvitePolicyEnable
 }

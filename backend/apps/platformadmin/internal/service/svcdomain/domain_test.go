@@ -73,10 +73,8 @@ func TestDomainSvc_Create_Success(t *testing.T) {
 	if entity.TenantID != "10" {
 		t.Fatalf("expected tenantID 10, got %s", entity.TenantID)
 	}
-	if entity.IsVerified {
-		if entity.IsVerified {
-			t.Fatalf("expected isVerified false, got true")
-		}
+	if entity.VerificationStatus != model.DomainVerificationUnverified {
+		t.Fatalf("expected verificationStatus %q, got %q", model.DomainVerificationUnverified, entity.VerificationStatus)
 	}
 	if entity.CreatedBy != "100" {
 		t.Fatalf("expected createdBy 100, got %s", entity.CreatedBy)
@@ -176,5 +174,47 @@ func TestDomainSvc_Delete_NotExist(t *testing.T) {
 	err := svc.Delete(ctx, &dtodomain.DomainDeleteReq{DomainID: "999"})
 	if err == nil {
 		t.Fatalf("expected error for non-existent domain")
+	}
+}
+
+// TestDomainSvc_Update_VerificationStatus 验证状态是具名枚举：合法值落库，非法值被拒且不落库。
+func TestDomainSvc_Update_VerificationStatus(t *testing.T) {
+	db := newTestDB(t)
+	ctx := newGinCtx("10", "100")
+
+	entity := &model.DomainEntity{TenantID: "10", Domain: "example.com"}
+	if err := db.Create(entity).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	svc := NewDomainSvc()
+	if err := svc.Update(ctx, &dtodomain.DomainUpdateReq{
+		DomainID:           entity.ID,
+		VerificationStatus: model.DomainVerificationVerified,
+	}); err != nil {
+		t.Fatalf("合法验证状态应被接受: %v", err)
+	}
+	got, err := dao.NewDomainDao().GetByID(ctx, entity.ID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if got.VerificationStatus != model.DomainVerificationVerified {
+		t.Fatalf("verificationStatus = %q, want %q", got.VerificationStatus, model.DomainVerificationVerified)
+	}
+
+	// 非法值必须返回既有功能级错误码，且不得落库
+	err = svc.Update(ctx, &dtodomain.DomainUpdateReq{
+		DomainID:           entity.ID,
+		VerificationStatus: model.DomainVerificationStatus("yes"),
+	})
+	if err == nil || gerror.GetCode(err) != int(code.DomainUpdateError) {
+		t.Fatalf("非法验证状态应返回 DomainUpdateError, got %v", err)
+	}
+	got, err = dao.NewDomainDao().GetByID(ctx, entity.ID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if got.VerificationStatus != model.DomainVerificationVerified {
+		t.Fatalf("非法验证状态不应落库, got %q", got.VerificationStatus)
 	}
 }

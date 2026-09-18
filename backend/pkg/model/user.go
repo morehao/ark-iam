@@ -1,7 +1,6 @@
 package model
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/morehao/golib/dbaccess/gormdao"
@@ -41,24 +40,42 @@ func (s UserSource) IsBuiltin() bool {
 	return s == UserSourceBuiltin
 }
 
+// UserStatus 租户成员可用性（tenant_user.status）。
+// 与 PersonStatus 刻意分列：两者是不同实体的生命周期，共用类型会让
+// 「把 person 的状态写进 user」编译通过。
+type UserStatus string
+
+// 租户成员状态取值（禁止硬编码）。
+const (
+	UserStatusActive    UserStatus = "active"
+	UserStatusSuspended UserStatus = "suspended"
+)
+
+// OwnerType 租户拥有者类型（tenant_user.owner_type），取值风格对齐 role.admin_type。
+type OwnerType string
+
+// 租户拥有者类型取值（禁止硬编码）。
+const (
+	OwnerTypeOwner  OwnerType = "owner"
+	OwnerTypeNormal OwnerType = "normal"
+)
+
 type UserEntity struct {
 	gormdao.BaseEntity
-	TenantID     string          `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id"`
-	PersonID     string          `gorm:"column:person_id;type:varchar(36);not null;default:'';comment:自然人ID(服务账号恒空)"`
-	UserType     UserType        `gorm:"column:user_type;type:varchar(16);not null;default:'member';comment:账号类型(member真实用户/machine服务账号)"`
-	Source       UserSource      `gorm:"column:source;type:varchar(16);not null;default:'manual';comment:用户来源(builtin内置/manual手动)"`
-	Name         string          `gorm:"column:name;type:varchar(128);not null;default:'';comment:租户内姓名/服务账号名称"`
-	Description  string          `gorm:"column:description;type:varchar(256);not null;default:'';comment:描述(服务账号用途等)"`
-	Avatar       string          `gorm:"column:avatar;type:varchar(2048);not null;default:'';comment:租户内头像URL"`
-	Profile      json.RawMessage `gorm:"column:profile;type:json;not null;default:'{}';comment:租户内配置信息"`
-	CustomData   json.RawMessage `gorm:"column:custom_data;type:json;not null;default:'{}';comment:租户内自定义数据"`
-	IsSuspended  bool            `gorm:"column:is_suspended;type:boolean;not null;default:false;comment:是否挂起"`
-	IsOwner      bool            `gorm:"column:is_owner;type:boolean;not null;default:false;comment:是否租户拥有者"`
-	JoinedAt     *time.Time      `gorm:"column:joined_at;not null;default:CURRENT_TIMESTAMP;comment:加入租户时间"`
-	LastSignInAt *time.Time      `gorm:"column:last_sign_in_at;comment:最后登录时间"`
-	CreatedBy    string          `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id"`
-	UpdatedBy    string          `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id"`
-	DeletedBy    string          `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人id"`
+	TenantID     string     `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id"`
+	PersonID     string     `gorm:"column:person_id;type:varchar(36);not null;default:'';comment:自然人ID(服务账号恒空)"`
+	UserType     UserType   `gorm:"column:user_type;type:varchar(16);not null;default:'member';comment:账号类型(member真实用户/machine服务账号)"`
+	Source       UserSource `gorm:"column:source;type:varchar(16);not null;default:'manual';comment:用户来源(builtin内置/manual手动)"`
+	Name         string     `gorm:"column:name;type:varchar(128);not null;default:'';comment:租户内姓名/服务账号名称"`
+	Description  string     `gorm:"column:description;type:varchar(256);not null;default:'';comment:描述(服务账号用途等)"`
+	Avatar       string     `gorm:"column:avatar;type:varchar(2048);not null;default:'';comment:租户内头像URL"`
+	Status       UserStatus `gorm:"column:status;type:varchar(16);not null;default:'active';comment:状态(active正常/suspended挂起)"`
+	OwnerType    OwnerType  `gorm:"column:owner_type;type:varchar(16);not null;default:'normal';comment:租户拥有者类型(owner拥有者/normal普通成员)"`
+	JoinedAt     *time.Time `gorm:"column:joined_at;not null;default:CURRENT_TIMESTAMP;comment:加入租户时间"`
+	LastSignInAt *time.Time `gorm:"column:last_sign_in_at;comment:最后登录时间"`
+	CreatedBy    string     `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id"`
+	UpdatedBy    string     `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id"`
+	DeletedBy    string     `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人id"`
 }
 
 func (UserEntity) TableName() string {

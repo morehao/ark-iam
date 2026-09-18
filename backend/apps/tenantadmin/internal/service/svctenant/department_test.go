@@ -1,7 +1,6 @@
 package svctenant
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -30,8 +29,6 @@ func seedTestUser(t *testing.T, db *gorm.DB, tenantID, userID, name string) {
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: userID}},
 		TenantID:   tenantID,
 		Name:       name,
-		Profile:    json.RawMessage("{}"),
-		CustomData: json.RawMessage("{}"),
 		JoinedAt:   &now,
 	}).Error; err != nil {
 		t.Fatalf("seed user: %v", err)

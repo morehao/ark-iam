@@ -28,7 +28,7 @@ func TestRunReportsChanges(t *testing.T) {
 		model.SeedEntityTenant:            1,
 		model.SeedEntityDepartment:        1,
 		model.SeedEntityApplication:       2,
-		model.SeedEntityMenu:              15,
+		model.SeedEntityMenu:              14,
 		model.SeedEntityApplicationClient: 2,
 		model.SeedEntityRole:              1,
 		model.SeedEntityPerson:            1,
@@ -95,11 +95,12 @@ func TestSeedIamRespectsOperatorOwnedFields(t *testing.T) {
 		t.Fatalf("degrade application: %v", err)
 	}
 	// 运维改动：客户端名（控制台可改）+ 回调地址（环境相关）；source 同样降级
-	customRedirect := `["https://sso.example.com/auth/callback"]`
+	customRedirect := "https://sso.example.com/auth/callback"
 	if err := db.Model(&model.ApplicationClientEntity{}).Where("code = ?", "platform_admin_web").
-		Updates(map[string]any{
-			"name": "ACME SSO 客户端", "redirect_uris": []byte(customRedirect),
-			"source": model.ApplicationClientSourceThirdParty,
+		Updates(&model.ApplicationClientEntity{
+			Name:         "ACME SSO 客户端",
+			RedirectURIs: model.RedirectURIList{customRedirect},
+			Source:       model.ApplicationClientSourceThirdParty,
 		}).Error; err != nil {
 		t.Fatalf("degrade client: %v", err)
 	}
@@ -148,8 +149,8 @@ func TestSeedIamRespectsOperatorOwnedFields(t *testing.T) {
 	if client.Name != "ACME SSO 客户端" {
 		t.Errorf("客户端名 = %q, want 运维自定义值（create_only 字段种子不得回写）", client.Name)
 	}
-	if string(client.RedirectURIs) != customRedirect {
-		t.Errorf("客户端回调地址 = %s, want %s（create_only 字段种子不得回写）", client.RedirectURIs, customRedirect)
+	if len(client.RedirectURIs) != 1 || client.RedirectURIs[0] != customRedirect {
+		t.Errorf("客户端回调地址 = %v, want %s（create_only 字段种子不得回写）", client.RedirectURIs, customRedirect)
 	}
 	if client.Source != model.ApplicationClientSourceBuiltin {
 		t.Errorf("客户端 source = %q, want %q（安全不变式必须收敛）", client.Source, model.ApplicationClientSourceBuiltin)
@@ -169,7 +170,6 @@ func TestSeedAssociationPartialUniqueIndexes(t *testing.T) {
 		{"tenant_application", func() any {
 			return &model.TenantApplicationEntity{
 				TenantID: "t1", AppID: "a1", Status: model.TenantApplicationStatusEnable,
-				Config: []byte(`{}`), GrantedScope: []byte(`[]`),
 			}
 		}},
 		{"role_menu", func() any {

@@ -66,8 +66,6 @@ func seedTenantUser(t *testing.T, db *gorm.DB, id, tenantID, personID string) {
 		TenantID:   tenantID,
 		PersonID:   personID,
 		Name:       "user-" + id,
-		Profile:    []byte(`{}`),
-		CustomData: []byte(`{}`),
 		JoinedAt:   &now,
 	}
 	require.NoError(t, db.Create(entity).Error)

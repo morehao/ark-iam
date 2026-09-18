@@ -13,7 +13,7 @@ type PersonCond struct {
 	PrimaryEmail string
 	PrimaryPhone string
 	Name         string
-	IsSuspended  *bool
+	Status       model.PersonStatus
 }
 
 func (c *PersonCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -35,8 +35,8 @@ func (c *PersonCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.Name != "" {
 		db.Where(tableName+".name = ?", c.Name)
 	}
-	if c.IsSuspended != nil {
-		db.Where(tableName+".is_suspended = ?", *c.IsSuspended)
+	if c.Status != "" {
+		db.Where(tableName+".status = ?", c.Status)
 	}
 }
 

@@ -31,11 +31,11 @@ func setupBCLTestEnv(t *testing.T) {
 	if err := db.Create(seedTenant).Error; err != nil {
 		t.Fatalf("seed tenant: %v", err)
 	}
-	seedPerson := &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}}, Name: "seed", Profile: []byte(`{}`), CustomData: []byte(`{}`)}
+	seedPerson := &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}}, Name: "seed"}
 	if err := db.Create(seedPerson).Error; err != nil {
 		t.Fatalf("seed person: %v", err)
 	}
-	seedUser := &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}}, TenantID: "1", PersonID: "1", Name: "seed", Profile: []byte(`{}`), CustomData: []byte(`{}`), JoinedAt: &now}
+	seedUser := &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}}, TenantID: "1", PersonID: "1", Name: "seed", JoinedAt: &now}
 	if err := db.Create(seedUser).Error; err != nil {
 		t.Fatalf("seed user: %v", err)
 	}

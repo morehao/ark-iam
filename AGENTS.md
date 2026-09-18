@@ -195,6 +195,8 @@ const (
 2. **全链路用常量**：赋值、传参、比较一律引用常量，如 `model.DeptUserRelationPrimary`，**禁止** `string(model.DeptUserRelationX)` 强转、**禁止**显式类型转换换别的枚举类型、**禁止**裸字面量 `"primary"`/`"admin"` 出现在非定义处。
 3. **非法值校验归 service**：请求来自前端（JSON/form 绑定原始类型），service 入口用 `switch` + 常量白名单判合法，非法返回对应功能级错误码；合法值命中常量直接使用。
 4. **JSON/DB 向下兼容**：具名类型的底层是 `string`，JSON 序列化仍是普通字符串、gorm 存 varchar，前端和数据库均无感知；DTO 包允许 import `pkg/model`（单向下游，无环）。
+5. **布尔语义一律枚举化，禁止 Go `bool` 承载字典语义**：表达开/关的列（`...Flag` / `...Policy`，如 `menu.hidden`、`application.allow_join_by_invite`、`application_client.require_pkce`、`connector.allow_account_link`）一律 `varchar(16)` + 具名类型 + `enable`/`disable` 常量，**禁止** `bool`、`0/1`、`type:boolean`；**真值判断是错误写法**——比较必须写 `== XxxEnable`（`'disable'` 是非空字符串、真值恒为 true，`if x` 会把停用当启用，前端同理）。历史布尔列的改名与去 `is_`/`is_verified` 前缀一并按此收敛（如 `person.is_suspended` → `person.status`、`tenant_user.is_owner` → `owner_type`、`domain.is_verified` → `verification_status`）。
+6. **JSON 列必须显式化**：列一律 `type:json` + `serializer:json` 且用**具名载具类型**（如 `RoleTemplateItemList`、`ConnectorConfig`、`RedirectURIList`），**禁止** `datatypes.JSON`、`json.RawMessage`、`[]byte`、`map[string]any`、`any` 承载；写路径只允许 `Create(entity)` 与 `pkg/dao.UpdateFields`（`Select(fields).Updates(entity)`），**禁止** `UpdateMap`、`Update("col", v)`、`UpdateColumn` 写 JSON 列——它们绕过 serializer，会静默写入 `map[...]`/`[123 34 ...]` 脏值且不报错；nil 切片入库前归一为空切片`[]T{}`。
 
 #### 数据表常量（model 层）
 
@@ -285,7 +287,7 @@ func NewUserSvc() UserSvc {
 - **DTO 命名**：统一 `<业务名词><动词>Req/Resp`（如 `UserCreateReq`、`DomainCreateReq`），禁止 `CreateDomainReq`、裸 `CreateReq` 等变体。
 - **DTO ID 类型**：统一 `string`（字符串主键，UUID v7，由 `gormdao.BaseEntity` 自动生成；见 `docs/design/system-design.md` §4.1），禁止 `uint`/`uint64`。
 - **前后端时间交互**：前后端交互的所有时间字段统一使用**秒级 int64 时间戳**（Unix 秒，即 `.Unix()`）。包括新建、编辑、筛选、展示等一切 DTO 请求与响应字段，禁止用 `string` 承载格式化时间（如 `"2006-01-02 15:04:05"`）。出参可空时间用指针 `*int64`（无值返回 `null`），入参可空时间用 `int64`（无值传 `0`）；`gobject.OperatorBaseInfo` 内嵌的 `CreatedAt`/`UpdatedAt` 已是 int64，禁止覆盖为 string。service 层出参用 `x.Unix()`，入参解析用 `time.Unix(req.ExpiredAt, 0)`。
-- **单元测试**：统一使用各 app `testutil.SetupSQLite(t, entities...)`（内存 SQLite 注册为全局 iam 库），服务内部 `dao.NewXxxDao()` 自动落测试库，直接断言真实 dao 行为；不写 stub/注入 seam。注意 sqlite 对 `not null` JSON 列（`profile`/`config` 等）与 `joined_at` 需要显式播种值。
+- **单元测试**：统一使用各 app `testutil.SetupSQLite(t, entities...)`（内存 SQLite 注册为全局 iam 库），服务内部 `dao.NewXxxDao()` 自动落测试库，直接断言真实 dao 行为；不写 stub/注入 seam。注意 sqlite 对 `not null` JSON 列（`application.role_template`、`application_client.redirect_uris`、`connector.config`、`refresh_token.scopes` 等）与 `joined_at` 需要显式播种值。
 
 ### 错误处理
 
@@ -493,6 +495,7 @@ func TestGeneratePassword(t *testing.T) {
 - **菜单的"行"归运维**（见 `docs/design/system-design.md` §4.5）：控制台可新增根菜单/子菜单、可删除任意菜单（含内置菜单）。删除是软删除，软删行仍带 `seed_key`，即"该菜单已被人为下线"的**墓碑**——`seedMenus` 命中墓碑即跳过创建（检查必须早于 `(app_id, code)` 兜底，否则会误认领运维自建的同 code 菜单）。因此不要假设"内置菜单行一定存在"，也不要从控制台删除后又指望种子把它建回来。
 - **禁止在代码里写兼容旧库的分支**：不加回填、不加 `DROP COLUMN`、不引入 `information_schema`/`Migrator()` 判定——这会污染 AutoMigrate「只增不删」的契约，且对新项目零收益。
 - **旧库残留列/表属预期**（不再是事实源、不被读写），处置方式是**开发/测试库删库重建**：重建后 AutoMigrate + Seed 产出的结构即目标结构（见 `docs/design/run-and-deploy.md` §2.3）。
+- **改名列 / 改类型的列不能靠 AutoMigrate 过渡**：AutoMigrate 不会转换既有列，旧列原样留着、新列取列默认值；即使手工 `ALTER COLUMN ... TYPE varchar USING bool::varchar`，`true`/`false` 也**不是合法枚举值**（读取端按 `active`/`suspended`、`enable`/`disable` 判定会全部落到默认分支）。因此布尔→枚举这类改造必须删库重建；确需保全数据时先导出、按新枚举口径人工映射再导入（`docs/design/run-and-deploy.md` §2.3）。
 - **种子写入遵循字段权威矩阵**（单一写者，见 `pkg/model/seed_authority.go` 与 `docs/design/system-design.md` §4.5）：每字段显式声明 `reconcile`（种子收敛，控制台必须拒写）/ `create_only`（只播种，归运维，种子不回写）/ `migrate_once`（值匹配一次性改名，登记在 `pkg/seed` 的 `seedMigrations`）；禁止绕过矩阵手写回填 `if`、禁止用 `reconcile` 表达改名（会覆盖运维改动），新增内置字段必须先声明语义再实现。
 - **`reconcile` 的准入判据**（2026-09-12 两轮收窄后的最终形态见 `docs/design/system-design.md` §4.5）：只保留**安全不变式**——`source`（内置标记）、`admin_type`、平台租户 `status`（被挂起整栈失联）。**种子认行不再经由任何控制台可写字段**：菜单/应用按不可见的 `seed_key` 认行，`application_client` 按 `code` 认行。因此展示、结构、编码类字段一律 `create_only` 归运维——种子不回写；其中**内置应用与内置客户端的 `code` 另由 service 拒改**（见上方「`code` 的可改性」）。种子在执行侧只按矩阵过滤（`reconcileFields`），**禁止**在 `pkg/seed` 里硬编码字段归属。
 - **确需保全旧数据时**，把一次性 SQL 写进部署文档交执行方在升级前运行，而不是塞进启动流程。

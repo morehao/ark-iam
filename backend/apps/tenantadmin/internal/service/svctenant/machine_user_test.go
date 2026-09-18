@@ -2,7 +2,6 @@ package svctenant
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -23,8 +22,6 @@ func seedTestOperator(t *testing.T, tenantID string, super bool) *model.UserEnti
 		TenantID:   tenantID,
 		UserType:   model.UserTypeMember,
 		Name:       "operator",
-		Profile:    json.RawMessage(`{}`),
-		CustomData: json.RawMessage(`{}`),
 	}
 	if err := db.Create(op).Error; err != nil {
 		t.Fatalf("seed operator: %v", err)
@@ -143,6 +140,24 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 	if item := page.List[0]; item.CreatedAt <= 0 || item.UpdatedAt <= 0 {
 		t.Fatalf("createdAt/updatedAt not returned: %+v", item)
 	}
+	// 状态枚举筛选：空串=不过滤；命中白名单按状态过滤；非法枚举被拒
+	page, err = svc.PageList(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserPageListReq{Status: model.UserStatusActive})
+	if err != nil {
+		t.Fatalf("page list active: %v", err)
+	}
+	if page.Total != 1 || page.List[0].Status != model.UserStatusActive {
+		t.Fatalf("active filter mismatch: %+v", page)
+	}
+	page, err = svc.PageList(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserPageListReq{Status: model.UserStatusSuspended})
+	if err != nil {
+		t.Fatalf("page list suspended: %v", err)
+	}
+	if page.Total != 0 {
+		t.Fatalf("suspended filter should be empty, got %d", page.Total)
+	}
+	if _, err := svc.PageList(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserPageListReq{Status: model.UserStatus("bogus")}); err != code.GetError(code.MachineUserGetPageListError) {
+		t.Fatalf("page list with invalid status: want %v, got %v", code.GetError(code.MachineUserGetPageListError), err)
+	}
 
 	// 详情：部门归属 + 角色
 	detail, err := svc.Detail(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserDetailReq{MachineUserID: machineID})
@@ -192,15 +207,30 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 		t.Fatalf("clear primary: want dept required, got %v", err)
 	}
 	// 挂起
-	if err := svc.UpdateStatus(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserStatusReq{MachineUserID: machineID, IsSuspended: true}); err != nil {
+	if err := svc.UpdateStatus(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserStatusReq{MachineUserID: machineID, Status: model.UserStatusSuspended}); err != nil {
 		t.Fatalf("suspend: %v", err)
 	}
 	reloaded, err := dao.NewUserDao().GetByID(newTestTenantCtx(tenantID, adminOp.ID), machineID)
 	if err != nil || reloaded == nil {
 		t.Fatalf("reload machine user: %v", err)
 	}
-	if reloaded.Name != "svc-pay-v2" || !reloaded.IsSuspended {
+	if reloaded.Name != "svc-pay-v2" || reloaded.Status != model.UserStatusSuspended {
 		t.Fatalf("reload mismatch: %+v", reloaded)
+	}
+
+	// 非法枚举值被拒（service 入口白名单校验），且不落库
+	if err := svc.UpdateStatus(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserStatusReq{MachineUserID: machineID, Status: model.UserStatus("bogus")}); err != code.GetError(code.MachineUserStatusUpdateError) {
+		t.Fatalf("invalid status: want %v, got %v", code.GetError(code.MachineUserStatusUpdateError), err)
+	}
+	if err := svc.UpdateStatus(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserStatusReq{MachineUserID: machineID}); err != code.GetError(code.MachineUserStatusUpdateError) {
+		t.Fatalf("empty status: want %v, got %v", code.GetError(code.MachineUserStatusUpdateError), err)
+	}
+	reloaded, err = dao.NewUserDao().GetByID(newTestTenantCtx(tenantID, adminOp.ID), machineID)
+	if err != nil || reloaded == nil {
+		t.Fatalf("reload machine user after invalid status: %v", err)
+	}
+	if reloaded.Status != model.UserStatusSuspended {
+		t.Fatalf("invalid status must not change stored value, got %q", reloaded.Status)
 	}
 
 	// 普通角色可授、super 角色禁授（按应用授权：role.app_id 须与 req.AppID 一致）
@@ -258,7 +288,7 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 	// 服务账号下有 key 时禁止删除
 	key := &model.ApiKeyEntity{
 		TenantID: tenantID, OwnerUserID: machineID, Name: "machine-key",
-		KeyHash: "h", KeyPrefix: "prefix", Scope: json.RawMessage(`{}`), CreatedBy: adminOp.ID,
+		KeyHash: "h", KeyPrefix: "prefix", CreatedBy: adminOp.ID,
 	}
 	if err := db.Create(key).Error; err != nil {
 		t.Fatalf("seed machine key: %v", err)
@@ -311,8 +341,6 @@ func TestServiceAccountCannotBeLeader(t *testing.T) {
 		TenantID:   tenantID,
 		UserType:   model.UserTypeMachine,
 		Name:       "svc-pay",
-		Profile:    json.RawMessage(`{}`),
-		CustomData: json.RawMessage(`{}`),
 	}
 	if err := dbclient.IamDB(context.Background()).Create(machine).Error; err != nil {
 		t.Fatalf("seed machine: %v", err)

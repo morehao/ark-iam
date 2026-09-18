@@ -42,6 +42,5 @@ func init() {
 	registerError(authErrorMsgMap)
 	registerError(userAuthErrorMsgMap)
 	registerError(connectorErrorMsgMap)
-	registerError(auditErrorMsgMap)
 	registerError(oidcErrorMsgMap)
 }

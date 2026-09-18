@@ -974,12 +974,6 @@ const docTemplatetenantadmin = `{
                 "summary": "服务账号列表分页",
                 "parameters": [
                     {
-                        "type": "boolean",
-                        "description": "状态过滤(挂起)",
-                        "name": "isSuspended",
-                        "in": "query"
-                    },
-                    {
                         "type": "string",
                         "description": "名称(模糊)",
                         "name": "name",
@@ -995,6 +989,20 @@ const docTemplatetenantadmin = `{
                         "type": "integer",
                         "description": "每页数量",
                         "name": "pageSize",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "active",
+                            "suspended"
+                        ],
+                        "type": "string",
+                        "x-enum-varnames": [
+                            "UserStatusActive",
+                            "UserStatusSuspended"
+                        ],
+                        "description": "状态过滤(active正常/suspended挂起;空=不过滤)",
+                        "name": "status",
                         "in": "query"
                     }
                 ],
@@ -1668,12 +1676,6 @@ const docTemplatetenantadmin = `{
                         "in": "query"
                     },
                     {
-                        "type": "boolean",
-                        "description": "状态过滤(挂起)",
-                        "name": "isSuspended",
-                        "in": "query"
-                    },
-                    {
                         "type": "string",
                         "description": "关键词(姓名/用户名/邮箱/手机 模糊)",
                         "name": "keyword",
@@ -1689,6 +1691,20 @@ const docTemplatetenantadmin = `{
                         "type": "integer",
                         "description": "每页数量",
                         "name": "pageSize",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "active",
+                            "suspended"
+                        ],
+                        "type": "string",
+                        "x-enum-varnames": [
+                            "UserStatusActive",
+                            "UserStatusSuspended"
+                        ],
+                        "description": "状态过滤(active正常/suspended挂起;空=不过滤)",
+                        "name": "status",
                         "in": "query"
                     }
                 ],
@@ -2248,10 +2264,6 @@ const docTemplatetenantadmin = `{
                     "description": "密钥前缀",
                     "type": "string"
                 },
-                "lastUsedAt": {
-                    "description": "最后使用时间(null=从未使用)",
-                    "type": "integer"
-                },
                 "name": {
                     "description": "密钥名称",
                     "type": "string"
@@ -2540,10 +2552,6 @@ const docTemplatetenantadmin = `{
                     "description": "部门ID",
                     "type": "string"
                 },
-                "isSuspended": {
-                    "description": "是否挂起",
-                    "type": "boolean"
-                },
                 "joinedAt": {
                     "description": "加入时间(关系创建时间)",
                     "type": "integer"
@@ -2561,6 +2569,14 @@ const docTemplatetenantadmin = `{
                     "allOf": [
                         {
                             "$ref": "#/definitions/model.DeptUserRelationType"
+                        }
+                    ]
+                },
+                "status": {
+                    "description": "状态(active正常/suspended挂起)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserStatus"
                         }
                     ]
                 },
@@ -2737,10 +2753,6 @@ const docTemplatetenantadmin = `{
                     "description": "描述",
                     "type": "string"
                 },
-                "isSuspended": {
-                    "description": "是否挂起",
-                    "type": "boolean"
-                },
                 "machineUserID": {
                     "description": "服务账号ID",
                     "type": "string"
@@ -2764,6 +2776,14 @@ const docTemplatetenantadmin = `{
                         "$ref": "#/definitions/dtotenant.UserRoleItem"
                     }
                 },
+                "status": {
+                    "description": "状态(active正常/suspended挂起)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserStatus"
+                        }
+                    ]
+                },
                 "tenantID": {
                     "description": "租户ID",
                     "type": "string"
@@ -2785,10 +2805,6 @@ const docTemplatetenantadmin = `{
                     "description": "描述",
                     "type": "string"
                 },
-                "isSuspended": {
-                    "description": "是否挂起",
-                    "type": "boolean"
-                },
                 "machineUserID": {
                     "description": "服务账号ID",
                     "type": "string"
@@ -2804,6 +2820,14 @@ const docTemplatetenantadmin = `{
                 "primaryDepartmentName": {
                     "description": "主部门名称",
                     "type": "string"
+                },
+                "status": {
+                    "description": "状态(active正常/suspended挂起)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserStatus"
+                        }
+                    ]
                 },
                 "tenantID": {
                     "description": "租户ID",
@@ -2853,9 +2877,13 @@ const docTemplatetenantadmin = `{
         "dtotenant.MachineUserStatusReq": {
             "type": "object",
             "properties": {
-                "isSuspended": {
-                    "description": "true=挂起 false=启用",
-                    "type": "boolean"
+                "status": {
+                    "description": "状态(active正常/suspended挂起)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserStatus"
+                        }
+                    ]
                 }
             }
         },
@@ -2912,20 +2940,32 @@ const docTemplatetenantadmin = `{
                     "type": "string"
                 },
                 "externalLink": {
-                    "description": "是否外链",
-                    "type": "boolean"
+                    "description": "是否外链(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuExternalLinkFlag"
+                        }
+                    ]
                 },
                 "hidden": {
-                    "description": "是否隐藏",
-                    "type": "boolean"
+                    "description": "是否隐藏(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuHiddenFlag"
+                        }
+                    ]
                 },
                 "icon": {
                     "description": "菜单图标",
                     "type": "string"
                 },
                 "keepAlive": {
-                    "description": "是否缓存",
-                    "type": "boolean"
+                    "description": "是否缓存(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuKeepAliveFlag"
+                        }
+                    ]
                 },
                 "menuID": {
                     "description": "菜单ID",
@@ -3255,10 +3295,6 @@ const docTemplatetenantadmin = `{
                     "description": "头像URL",
                     "type": "string"
                 },
-                "isSuspended": {
-                    "description": "是否挂起",
-                    "type": "boolean"
-                },
                 "leaderDepartmentIDs": {
                     "description": "负责部门ID列表(leader,可多条,可选;每部门至多1负责人)",
                     "type": "array",
@@ -3292,6 +3328,14 @@ const docTemplatetenantadmin = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "status": {
+                    "description": "状态(active正常/suspended挂起;空=active)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserStatus"
+                        }
+                    ]
                 },
                 "username": {
                     "description": "全局用户名(可选)",
@@ -3351,10 +3395,6 @@ const docTemplatetenantadmin = `{
                         "$ref": "#/definitions/dtotenant.UserDepartmentItem"
                     }
                 },
-                "isSuspended": {
-                    "description": "是否挂起",
-                    "type": "boolean"
-                },
                 "name": {
                     "description": "姓名",
                     "type": "string"
@@ -3382,6 +3422,14 @@ const docTemplatetenantadmin = `{
                         "$ref": "#/definitions/dtotenant.UserRoleItem"
                     }
                 },
+                "status": {
+                    "description": "状态(active正常/suspended挂起)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserStatus"
+                        }
+                    ]
+                },
                 "tenantID": {
                     "description": "租户ID",
                     "type": "string"
@@ -3408,7 +3456,12 @@ const docTemplatetenantadmin = `{
             ],
             "properties": {
                 "detail": {
-                    "description": "详细信息"
+                    "description": "详细信息（写入白名单以 model 载具类型为准）",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserIdentityDetail"
+                        }
+                    ]
                 },
                 "identityID": {
                     "description": "第三方用户ID",
@@ -3437,7 +3490,12 @@ const docTemplatetenantadmin = `{
                     "type": "integer"
                 },
                 "detail": {
-                    "description": "详细信息"
+                    "description": "详细信息",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserIdentityDetail"
+                        }
+                    ]
                 },
                 "identityID": {
                     "description": "第三方用户ID",
@@ -3521,10 +3579,6 @@ const docTemplatetenantadmin = `{
                     "description": "创建时间",
                     "type": "integer"
                 },
-                "isSuspended": {
-                    "description": "是否挂起",
-                    "type": "boolean"
-                },
                 "name": {
                     "description": "姓名",
                     "type": "string"
@@ -3544,6 +3598,14 @@ const docTemplatetenantadmin = `{
                 "roleCount": {
                     "description": "角色数",
                     "type": "integer"
+                },
+                "status": {
+                    "description": "状态(active正常/suspended挂起)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserStatus"
+                        }
+                    ]
                 },
                 "tenantID": {
                     "description": "租户ID",
@@ -3655,10 +3717,6 @@ const docTemplatetenantadmin = `{
                     "description": "头像URL",
                     "type": "string"
                 },
-                "isSuspended": {
-                    "description": "是否挂起",
-                    "type": "boolean"
-                },
                 "leaderDepartmentIDs": {
                     "description": "负责部门(leader,nil=不变;[]=清空;含值=全量替换;每部门至多1负责人)",
                     "type": "array",
@@ -3688,6 +3746,14 @@ const docTemplatetenantadmin = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "status": {
+                    "description": "状态(active正常/suspended挂起;nil=不变)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserStatus"
+                        }
+                    ]
                 },
                 "username": {
                     "description": "用户名(nil=不变)",
@@ -3752,6 +3818,17 @@ const docTemplatetenantadmin = `{
                 "DeptUserRelationLeader"
             ]
         },
+        "model.EmailVerificationState": {
+            "type": "string",
+            "enum": [
+                "verified",
+                "unverified"
+            ],
+            "x-enum-varnames": [
+                "EmailVerificationVerified",
+                "EmailVerificationUnverified"
+            ]
+        },
         "model.InviteStatus": {
             "type": "string",
             "enum": [
@@ -3773,6 +3850,39 @@ const docTemplatetenantadmin = `{
                 "InviteStatusPending",
                 "InviteStatusAccepted",
                 "InviteStatusRevoked"
+            ]
+        },
+        "model.MenuExternalLinkFlag": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-varnames": [
+                "MenuExternalLinkFlagEnable",
+                "MenuExternalLinkFlagDisable"
+            ]
+        },
+        "model.MenuHiddenFlag": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-varnames": [
+                "MenuHiddenFlagEnable",
+                "MenuHiddenFlagDisable"
+            ]
+        },
+        "model.MenuKeepAliveFlag": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-varnames": [
+                "MenuKeepAliveFlagEnable",
+                "MenuKeepAliveFlagDisable"
             ]
         },
         "model.MenuStatus": {
@@ -3895,6 +4005,52 @@ const docTemplatetenantadmin = `{
             "x-enum-varnames": [
                 "SysAdminTypeAdmin",
                 "SysAdminTypeNormal"
+            ]
+        },
+        "model.UserIdentityDetail": {
+            "type": "object",
+            "properties": {
+                "avatarUrl": {
+                    "type": "string"
+                },
+                "displayName": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "emailVerified": {
+                    "$ref": "#/definitions/model.EmailVerificationState"
+                },
+                "familyName": {
+                    "type": "string"
+                },
+                "givenName": {
+                    "type": "string"
+                },
+                "issuer": {
+                    "type": "string"
+                },
+                "locale": {
+                    "type": "string"
+                },
+                "subject": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.UserStatus": {
+            "type": "string",
+            "enum": [
+                "active",
+                "suspended"
+            ],
+            "x-enum-varnames": [
+                "UserStatusActive",
+                "UserStatusSuspended"
             ]
         },
         "model.UserType": {

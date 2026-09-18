@@ -11,6 +11,7 @@
 | 新同学、整体认知 | IAM 是什么、SSO/OIDC 是什么、总体架构 | [sso-oidc-concepts.md](sso-oidc-concepts.md) → [system-design.md](system-design.md) |
 | 产品 / 架构评审 | 背景、架构、数据模型、核心流程、安全 | [system-design.md](system-design.md) 全篇 |
 | 业务应用（RP）开发 | 如何把新应用接入 SSO / OIDC | [application-integration-guide.md](application-integration-guide.md) |
+| 接入**存量 / 第三方**应用 | 对方不改代码、自带权限模型、不支持反向通道登出时怎么接 | [rustfs-integration-case.md](rustfs-integration-case.md) |
 | 前端开发对接 | 登录页 / 管理台调用哪些接口、OIDC 端点契约 | [api-reference.md](api-reference.md) |
 | 后端开发 | 路由规范、接口清单、权限模型、种子与字段权威 | [api-reference.md](api-reference.md) → [system-design.md](system-design.md) §4.5 |
 | 后端开发（改数据访问/中间件） | ctx 怎么传、租户隔离怎么生效、跨租户查询怎么写 | [context-and-tenant-scope.md](context-and-tenant-scope.md) |
@@ -24,6 +25,7 @@
 | [sso-oidc-concepts.md](sso-oidc-concepts.md) | **SSO 与 OIDC 概念、协议、流程说明**（建议先读）。回答：什么是 SSO、OIDC 为什么出现、核心概念（Client / Authorization Server / Token / Scope / Claims / 授权码+PKCE / 刷新令牌 / 单点登出）、协议端点与令牌生命周期 |
 | [system-design.md](system-design.md) | **系统设计文档（核心主文档，单一事实源）**。背景与目标、总体架构、应用划分（auth / platformadmin / tenantadmin / gateway）与内部分层、技术栈、数据库设计（ER 图 + 表说明 + Redis Key + **种子数据与字段权威矩阵**）、核心业务流程（自助开通租户 / 登录 / SSO / 登出 / 授权 / 令牌签发 / Connector / **建租户与内置管理员**）、路由规范、安全设计、演进方向 |
 | [application-integration-guide.md](application-integration-guide.md) | **新应用接入指南**。从零把业务应用接入 IAM：前置准备、创建应用与 OAuth 客户端、RP 侧 OIDC 配置示例、SSO 单点登录体验、单点登出接入、API Key / client_credentials 机器凭证接入、验收清单 |
+| [rustfs-integration-case.md](rustfs-integration-case.md) | **存量第三方应用接入实战案例**。以 RustFS（自带 canned policy 权限模型、代码不可改、仅支持单向 SLO）为例，记录：契约设计（IAM 角色编码 ↔ 下游策略名）、**下游策略解析为 fail-closed 所推出的供给顺序硬约束**、登出方向不对称与三种 SLO 处置取舍（接受窗口 / 外部吊销 / 对方实现接收端）、逐条实测的验收结果、可复用的接入检查清单 |
 | [api-reference.md](api-reference.md) | **API 参考**。四类端点总览（OIDC 协议端点 / auth 认证端点 / platform 平台管理端点 / tenant 租户自服务端点）、认证与鉴权方式、通用响应信封、路由规范摘要 |
 | [configuration-reference.md](configuration-reference.md) | **配置参考**。各应用 `config.yaml` 全量配置项说明（server / log / trace / db_configs / redis_config / security / oidc / jwt / client / password / es_configs / masterKey） |
 | [run-and-deploy.md](run-and-deploy.md) | **运行与部署**。本地开发环境准备、构建运行、测试、Docker、多环境部署拓扑、常见排障 |

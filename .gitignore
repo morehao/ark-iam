@@ -5,6 +5,7 @@
 .DS_Store
 .history
 .opencode/*
+.dsh
 .superpowers/
 .worktrees/
 

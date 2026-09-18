@@ -61,7 +61,7 @@ type DepartmentUserPageListItem struct {
 	PrimaryEmail string                     `json:"primaryEmail"` // 主要邮箱
 	PrimaryPhone string                     `json:"primaryPhone"` // 主要手机号
 	Avatar       string                     `json:"avatar"`       // 头像URL
-	IsSuspended  bool                       `json:"isSuspended"`  // 是否挂起
+	Status       model.UserStatus           `json:"status"`       // 状态(active正常/suspended挂起)
 	RelationType model.DeptUserRelationType `json:"relationType"` // 关系类型
 	JoinedAt     int64                      `json:"joinedAt"`     // 加入时间(关系创建时间)
 }

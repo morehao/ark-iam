@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
@@ -65,8 +64,6 @@ func seedTenantMember(t *testing.T, db *gorm.DB, id, tenantID, personID string) 
 		UserType:   model.UserTypeMember,
 		Source:     model.UserSourceBuiltin,
 		Name:       "成员-" + id,
-		Profile:    json.RawMessage(`{}`),
-		CustomData: json.RawMessage(`{}`),
 	}).Error; err != nil {
 		t.Fatalf("seed tenant_user: %v", err)
 	}
@@ -125,8 +122,6 @@ func seedPersonForUserinfo(t *testing.T, db *gorm.DB, id string) {
 		Name:              "自然人-" + id,
 		Username:          model.StrPtr("user-" + id),
 		PrimaryEmail:      model.StrPtr(id + "@example.com"),
-		Profile:           json.RawMessage(`{}`),
-		CustomData:        json.RawMessage(`{}`),
 		PasswordEncrypted: "hash",
 	}).Error; err != nil {
 		t.Fatalf("seed person: %v", err)

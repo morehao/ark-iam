@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -50,15 +49,15 @@ func TestCreate_NewPersonWithDeptRelations(t *testing.T) {
 	created, personCreated, err := Create(ctx, db, &CreateReq{
 		TenantID: "t1",
 		Person: &person.FindOrCreateReq{
-			Username:           "acme-admin",
-			PrimaryEmail:       "admin@acme.com",
-			PasswordEncrypted:  "hash",
-			PasswordMethod:     model.PasswordMethodBcrypt,
-			MustChangePassword: true,
-			Name:               "张三",
+			Username:          "acme-admin",
+			PrimaryEmail:      "admin@acme.com",
+			PasswordEncrypted: "hash",
+			PasswordMethod:    model.PasswordMethodBcrypt,
+			PasswordStatus:    model.PasswordStatusMustChange,
+			Name:              "张三",
 		},
 		Name:                "张三",
-		IsOwner:             true,
+		OwnerType:           model.OwnerTypeOwner,
 		CreatedBy:           "operator1",
 		PrimaryDepartmentID: "dept-root",
 		SecondaryDepartmentIDs: []string{
@@ -72,14 +71,14 @@ func TestCreate_NewPersonWithDeptRelations(t *testing.T) {
 	// 来源/类型默认值：未显式指定 source 时落 manual
 	require.Equal(t, model.UserSourceManual, created.Source)
 	require.Equal(t, model.UserTypeMember, created.UserType)
-	require.True(t, created.IsOwner)
+	require.Equal(t, model.OwnerTypeOwner, created.OwnerType)
 	require.False(t, created.IsBuiltin())
 
 	// person 的强制改密标记随新建落库
 	storedPerson, err := dao.NewPersonDao().WithTx(db).GetByID(ctx, created.PersonID)
 	require.NoError(t, err)
 	require.NotNil(t, storedPerson)
-	require.True(t, storedPerson.MustChangePassword)
+	require.Equal(t, model.PasswordStatusMustChange, storedPerson.PasswordStatus)
 
 	// 部门归属：1 primary + 2 secondary
 	require.Equal(t, int64(1), countRows(t, db, &model.DepartmentUserEntity{},
@@ -115,8 +114,6 @@ func TestCreate_ExplicitPersonKeepsExistingPassword(t *testing.T) {
 		PasswordEncrypted: "existing-hash",
 		PasswordMethod:    model.PasswordMethodBcrypt,
 		Name:              "既有账号",
-		Profile:           json.RawMessage(`{}`),
-		CustomData:        json.RawMessage(`{}`),
 	}
 	require.NoError(t, db.WithContext(ctx).Create(existing).Error)
 
@@ -133,7 +130,7 @@ func TestCreate_ExplicitPersonKeepsExistingPassword(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, storedPerson)
 	require.Equal(t, "existing-hash", storedPerson.PasswordEncrypted, "绝不覆盖既有自然人的密码")
-	require.False(t, storedPerson.MustChangePassword, "复用既有自然人时不得置强制改密")
+	require.Equal(t, model.PasswordStatusNormal, storedPerson.PasswordStatus, "复用既有自然人时不得置强制改密")
 }
 
 func TestCreate_DuplicatePersonInSameTenant(t *testing.T) {
@@ -141,7 +138,6 @@ func TestCreate_DuplicatePersonInSameTenant(t *testing.T) {
 	ctx := context.Background()
 	existing := &model.PersonEntity{
 		Username: model.StrPtr("dup"), PasswordEncrypted: "hash", PasswordMethod: model.PasswordMethodBcrypt,
-		Profile: json.RawMessage(`{}`), CustomData: json.RawMessage(`{}`),
 	}
 	require.NoError(t, db.WithContext(ctx).Create(existing).Error)
 
@@ -188,7 +184,7 @@ func TestCreate_LeaderConflict(t *testing.T) {
 	ctx := context.Background()
 
 	// 已有用户占用了 dept-1 的负责人
-	occupier := &model.UserEntity{TenantID: "t1", PersonID: "p-occupier", Name: "occupier", Profile: json.RawMessage(`{}`), CustomData: json.RawMessage(`{}`)}
+	occupier := &model.UserEntity{TenantID: "t1", PersonID: "p-occupier", Name: "occupier"}
 	require.NoError(t, db.WithContext(ctx).Create(occupier).Error)
 	require.NoError(t, db.WithContext(ctx).Create(&model.DepartmentUserEntity{
 		TenantID: "t1", DepartmentID: "dept-1", UserID: occupier.ID, RelationType: model.DeptUserRelationLeader,

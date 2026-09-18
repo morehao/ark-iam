@@ -1,4 +1,6 @@
 // 部门节点状态（后端具名类型 model.DeptNodeStatus）：全局启停语义 enable/disable。
+import type { UserStatus } from './tenant'
+
 export type DeptNodeStatus = 'enable' | 'disable'
 
 export interface DepartmentItem {
@@ -33,7 +35,7 @@ export interface DepartmentUserItem {
   primaryEmail: string
   primaryPhone: string
   avatar: string
-  isSuspended: boolean
+  status: UserStatus
   relationType: string
   joinedAt?: number
 }

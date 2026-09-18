@@ -47,11 +47,51 @@ func TestUpdateBuiltInClientAllowsName(t *testing.T) {
 	if got.Name != "运维自定名" {
 		t.Fatalf("改名未落库, got %q", got.Name)
 	}
-	if string(got.RedirectURIs) == "" || string(got.RedirectURIs) == "[]" {
-		t.Fatalf("回调地址未落库: %s", got.RedirectURIs)
+	// JSON 列经 serializer 落库后读回即为具名切片，直接断言元素本身
+	if len(got.RedirectURIs) != 1 || got.RedirectURIs[0] != "https://sso.example.com/auth/callback" {
+		t.Fatalf("回调地址未落库: %v", got.RedirectURIs)
 	}
 	// source（安全不变式）不在 Update 请求里，控制台无法改写内置标记
 	if got.Source != model.ApplicationClientSourceBuiltin {
 		t.Fatalf("source 不得被控制台改写: %q", got.Source)
+	}
+}
+
+// TestUpdateClientKeepsJSONColumnsValidWhenOmitted 更新请求未提交的 JSON 列（nil）必须落成空数组。
+// 回归背景：GORM 对 NOT NULL 的 JSON 列会把 nil 切片序列化为空串，而更新路径用 Select 显式列出列，
+// nil 字段会被写进去——空串在 PostgreSQL 的 json 列上是非法 JSON，客户端详情还会把 [] 读成 null。
+func TestUpdateClientKeepsJSONColumnsValidWhenOmitted(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
+	ctx := newOAuthDeleteCtx("1", "0")
+	client := newTestClientEntity("客户端1", "client_1", model.ApplicationClientSourceThirdParty)
+	client.AppID = "app1"
+	if err := db.Create(client).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	if err := NewApplicationClientSvc().Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+		ApplicationClientID: client.ID,
+		Name:                "客户端1改名",
+	}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	got, err := dao.NewApplicationClientDao().GetByID(ctx, client.ID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if got.RedirectURIs == nil || got.GrantTypes == nil || got.ResponseTypes == nil {
+		t.Fatalf("未提交的 JSON 列应为空切片而非 nil: %+v", got)
+	}
+
+	// 原始列值必须是合法 JSON（NOT NULL 的 json 列不得出现空串）
+	var raw struct {
+		RedirectURIs string `gorm:"column:redirect_uris"`
+	}
+	if err := db.WithContext(ctx).Raw("select redirect_uris from application_client where id = ?", client.ID).Scan(&raw).Error; err != nil {
+		t.Fatalf("raw query: %v", err)
+	}
+	if raw.RedirectURIs != "[]" {
+		t.Fatalf("redirect_uris 原始列值 = %q, want []", raw.RedirectURIs)
 	}
 }

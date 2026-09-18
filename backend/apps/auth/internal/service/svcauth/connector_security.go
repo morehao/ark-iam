@@ -103,42 +103,11 @@ func connectorConfiguredRedirectURI(connectorEntity *model.ConnectorEntity) stri
 	return config.RedirectURI
 }
 
-// connectorSensitiveConfigKeys 连接器配置中不得返回给前端的敏感字段。
-var connectorSensitiveConfigKeys = []string{
-	"clientSecret",
-	"client_secret",
-	"accessToken",
-	"refreshToken",
-}
-
-// sanitizeConnectorConfig 对返回给前端的连接器配置脱敏：删除敏感字段
-// （clientSecret / token 等），防止凭据经 Detail / PageList 接口泄露。
-// 返回脱敏后的配置对象（map），原配置不变。
-func sanitizeConnectorConfig(config any) any {
-	if config == nil {
-		return map[string]any{}
+// sanitizeConnectorConfig 对返回给前端的连接器配置脱敏：clientSecret 不回传明文，
+// 防止凭据经 Detail / PageList 接口泄露。原配置不变。
+func sanitizeConnectorConfig(config model.ConnectorConfig) model.ConnectorConfig {
+	if config.ClientSecret != "" {
+		config.ClientSecret = "******"
 	}
-	m, ok := config.(map[string]any)
-	if !ok {
-		// 非对象配置（如数组/字符串）直接按原样返回
-		return config
-	}
-	out := make(map[string]any, len(m))
-	for k, v := range m {
-		if isConnectorSensitiveKey(k) {
-			out[k] = "******"
-			continue
-		}
-		out[k] = v
-	}
-	return out
-}
-
-func isConnectorSensitiveKey(key string) bool {
-	for _, k := range connectorSensitiveConfigKeys {
-		if strings.EqualFold(key, k) {
-			return true
-		}
-	}
-	return false
+	return config
 }

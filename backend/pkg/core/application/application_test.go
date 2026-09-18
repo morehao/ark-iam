@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
-	"gorm.io/datatypes"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -35,7 +34,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func seedAppWithClient(t *testing.T, db *gorm.DB, appCode, clientCode string, allowJoin *bool) {
+func seedAppWithClient(t *testing.T, db *gorm.DB, appCode, clientCode string, allowJoin model.AppJoinByInvitePolicy) {
 	t.Helper()
 	appEntity := &model.ApplicationEntity{Code: appCode, AllowJoinByInvite: allowJoin}
 	if err := db.Create(appEntity).Error; err != nil {
@@ -43,12 +42,12 @@ func seedAppWithClient(t *testing.T, db *gorm.DB, appCode, clientCode string, al
 	}
 	client := &model.ApplicationClientEntity{Code: clientCode, AppID: appEntity.ID}
 	client.ID = client.AppID
-	client.RedirectURIs = datatypes.JSON(`[]`)
-	client.PostLogoutRedirectURIs = datatypes.JSON(`[]`)
-	client.GrantTypes = datatypes.JSON(`["authorization_code"]`)
-	client.ResponseTypes = datatypes.JSON(`["code"]`)
-	client.AllowedOrigins = datatypes.JSON(`[]`)
-	client.DefaultScopes = datatypes.JSON(`["openid"]`)
+	client.RedirectURIs = model.RedirectURIList{}
+	client.PostLogoutRedirectURIs = model.PostLogoutRedirectURIList{}
+	client.GrantTypes = model.GrantTypeList{model.GrantTypeAuthorizationCode}
+	client.ResponseTypes = model.ResponseTypeList{model.ResponseTypeCode}
+	client.AllowedOrigins = model.AllowedOriginList{}
+	client.DefaultScopes = model.DefaultScopeList{model.ScopeOpenID}
 	if err := db.Create(client).Error; err != nil {
 		t.Fatalf("seed application client: %v", err)
 	}
@@ -57,7 +56,7 @@ func seedAppWithClient(t *testing.T, db *gorm.DB, appCode, clientCode string, al
 // TestGetByClientID 按 client_id 解析归属应用：命中返回应用，其余可预期边界一律 (nil, nil)。
 func TestGetByClientID(t *testing.T) {
 	db := newTestDB(t)
-	seedAppWithClient(t, db, "app_join", "join_client", model.BoolPtr(true))
+	seedAppWithClient(t, db, "app_join", "join_client", model.AppJoinByInvitePolicyEnable)
 
 	cases := []struct {
 		name     string
@@ -86,7 +85,7 @@ func TestGetByClientID(t *testing.T) {
 	}
 }
 
-// TestPolicyReaders 两个入口策略读取器：nil 应用、NULL 字段、false 一律 false，只有显式 true 才放行。
+// TestPolicyReaders 两个入口策略读取器：nil 应用、零值（未配置）、disable 一律不放行，只有显式 enable 才放行。
 func TestPolicyReaders(t *testing.T) {
 	cases := []struct {
 		name string
@@ -94,14 +93,14 @@ func TestPolicyReaders(t *testing.T) {
 		want bool
 	}{
 		{name: "nil 应用", app: nil, want: false},
-		{name: "字段为 NULL", app: &model.ApplicationEntity{}, want: false},
-		{name: "显式 false", app: &model.ApplicationEntity{
-			AllowJoinByInvite:       model.BoolPtr(false),
-			AllowPersonCreateTenant: model.BoolPtr(false),
+		{name: "零值（未配置）", app: &model.ApplicationEntity{}, want: false},
+		{name: "显式 disable", app: &model.ApplicationEntity{
+			AllowJoinByInvite:       model.AppJoinByInvitePolicyDisable,
+			AllowPersonCreateTenant: model.AppPersonCreateTenantPolicyDisable,
 		}, want: false},
-		{name: "显式 true", app: &model.ApplicationEntity{
-			AllowJoinByInvite:       model.BoolPtr(true),
-			AllowPersonCreateTenant: model.BoolPtr(true),
+		{name: "显式 enable", app: &model.ApplicationEntity{
+			AllowJoinByInvite:       model.AppJoinByInvitePolicyEnable,
+			AllowPersonCreateTenant: model.AppPersonCreateTenantPolicyEnable,
 		}, want: true},
 	}
 	for _, c := range cases {
@@ -119,8 +118,8 @@ func TestPolicyReaders(t *testing.T) {
 // TestPolicyReadersAreIndependent 两个开关互相独立，不得串味。
 func TestPolicyReadersAreIndependent(t *testing.T) {
 	app := &model.ApplicationEntity{
-		AllowJoinByInvite:       model.BoolPtr(true),
-		AllowPersonCreateTenant: model.BoolPtr(false),
+		AllowJoinByInvite:       model.AppJoinByInvitePolicyEnable,
+		AllowPersonCreateTenant: model.AppPersonCreateTenantPolicyDisable,
 	}
 	if !AllowsJoinByInvite(app) {
 		t.Fatal("AllowsJoinByInvite 应为 true")

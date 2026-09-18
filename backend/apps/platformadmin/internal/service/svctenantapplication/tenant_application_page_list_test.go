@@ -8,19 +8,16 @@ import (
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenantapplication"
 	"github.com/morehao/ark-iam/platformadmin/testutil"
 	"github.com/morehao/golib/biz/gcontext"
-	"gorm.io/datatypes"
 )
 
 // TestTenantApplicationPageListReturnsTimeFields 列表必须同时回传创建时间与更新时间
 // （前端「创建时间」「更新时间」两列都读这两个字段，缺失则渲染为 "-"）。
 func TestTenantApplicationPageListReturnsTimeFields(t *testing.T) {
-	// 名称回填会查 tenant/application 两张表，故一并注册；sqlite 对 not null 的 JSON 列需要显式播种值。
+	// 名称回填会查 tenant/application 两张表，故一并注册。
 	db := testutil.SetupSQLite(t, &model.TenantApplicationEntity{}, &model.TenantEntity{}, &model.ApplicationEntity{})
 	if err := db.Create(&model.TenantApplicationEntity{
-		TenantID:     "t1",
-		AppID:        "app1",
-		Config:       datatypes.JSON(`{}`),
-		GrantedScope: datatypes.JSON(`[]`),
+		TenantID: "t1",
+		AppID:    "app1",
 	}).Error; err != nil {
 		t.Fatalf("seed tenant application: %v", err)
 	}

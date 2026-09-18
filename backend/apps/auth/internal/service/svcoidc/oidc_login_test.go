@@ -342,7 +342,7 @@ func TestCompleteLoginZeroTenantVerifiedPersonBindsDoneFalseAndReturnsCreateTena
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider failed: %v", err)
 	}
-	newSeedDB(t, []appSeedApp{{clientCode: "client-1", allow: model.BoolPtr(true)}})
+	newSeedDB(t, []appSeedApp{{clientCode: "client-1", allow: model.AppPersonCreateTenantPolicyEnable}})
 	request, err := provider.Storage.CreateAuthRequest(t.Context(), &oidc.AuthRequest{
 		ClientID:     "client-1",
 		RedirectURI:  "https://client.example.com/callback",
@@ -416,7 +416,7 @@ func TestCompleteLoginZeroTenantAppDisallowFalse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetupOIDCProvider failed: %v", err)
 	}
-	newSeedDB(t, []appSeedApp{{clientCode: "client-1", allow: model.BoolPtr(false)}})
+	newSeedDB(t, []appSeedApp{{clientCode: "client-1", allow: model.AppPersonCreateTenantPolicyDisable}})
 	request, err := provider.Storage.CreateAuthRequest(t.Context(), &oidc.AuthRequest{
 		ClientID:     "client-1",
 		RedirectURI:  "https://client.example.com/callback",

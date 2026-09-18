@@ -1,17 +1,21 @@
 package dtotenant
 
+import (
+	"github.com/morehao/ark-iam/pkg/model"
+)
+
 // 服务账号（租户内机器主体，user_type=machine）响应 DTO。
 
 type MachineUserPageListItem struct {
-	MachineUserID         string `json:"machineUserID"`         // 服务账号ID
-	TenantID              string `json:"tenantID"`              // 租户ID
-	Name                  string `json:"name"`                  // 名称
-	Description           string `json:"description"`           // 描述
-	PrimaryDepartmentID   string `json:"primaryDepartmentID"`   // 主部门ID
-	PrimaryDepartmentName string `json:"primaryDepartmentName"` // 主部门名称
-	IsSuspended           bool   `json:"isSuspended"`           // 是否挂起
-	CreatedAt             int64  `json:"createdAt"`             // 创建时间
-	UpdatedAt             int64  `json:"updatedAt"`             // 更新时间
+	MachineUserID         string           `json:"machineUserID"`         // 服务账号ID
+	TenantID              string           `json:"tenantID"`              // 租户ID
+	Name                  string           `json:"name"`                  // 名称
+	Description           string           `json:"description"`           // 描述
+	PrimaryDepartmentID   string           `json:"primaryDepartmentID"`   // 主部门ID
+	PrimaryDepartmentName string           `json:"primaryDepartmentName"` // 主部门名称
+	Status                model.UserStatus `json:"status"`                // 状态(active正常/suspended挂起)
+	CreatedAt             int64            `json:"createdAt"`             // 创建时间
+	UpdatedAt             int64            `json:"updatedAt"`             // 更新时间
 }
 
 type MachineUserPageListResp struct {

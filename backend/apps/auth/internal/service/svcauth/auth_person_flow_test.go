@@ -2,7 +2,6 @@ package svcauth
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -290,8 +288,6 @@ func TestJoinTenantRejectsAlreadyJoinedTenant(t *testing.T) {
 		TenantID:   "22",
 		PersonID:   "88",
 		Name:       "existing",
-		Profile:    json.RawMessage(`{}`),
-		CustomData: json.RawMessage(`{}`),
 		JoinedAt:   &now,
 	}
 	if err := db.Create(existing).Error; err != nil {
@@ -332,8 +328,8 @@ func TestJoinTenantCreatesNonOwnerUser(t *testing.T) {
 	if insertedUser.PersonID != "88" {
 		t.Fatalf("expected person id 88, got %s", insertedUser.PersonID)
 	}
-	if insertedUser.IsOwner {
-		t.Fatalf("expected join-tenant user to be non-owner (isOwner=false), got %t", insertedUser.IsOwner)
+	if insertedUser.OwnerType != model.OwnerTypeNormal {
+		t.Fatalf("expected join-tenant user to be non-owner (ownerType=normal), got %q", insertedUser.OwnerType)
 	}
 	if insertedUser.JoinedAt == nil {
 		t.Fatal("expected join-tenant user to have joined_at set")
@@ -349,25 +345,33 @@ func TestJoinTenantCreatesNonOwnerUser(t *testing.T) {
 	}
 }
 
+// joinPolicy 把测试用的 bool 语义映射为应用的邀请加入策略枚举。
+func joinPolicy(allow bool) model.AppJoinByInvitePolicy {
+	if allow {
+		return model.AppJoinByInvitePolicyEnable
+	}
+	return model.AppJoinByInvitePolicyDisable
+}
+
 // seedJoinByInviteApp 播种一个应用及其 OIDC 客户端，返回该客户端的 client_id。
 //
 // 通道 B（凭邀请加入租户）的应用级门禁按调用方 access token 的 client_id 解析应用
 // （见 pkg/core/application），因此凡是要走到邀请校验之后的 JoinTenant 用例，都必须先
-// 具备一个带 AllowJoinByInvite 的应用；allow=false 用于验证门禁关闭时的拒绝路径。
+// 具备一个带 AllowJoinByInvite 的应用；allow=false（落 disable）用于验证门禁关闭时的拒绝路径。
 func seedJoinByInviteApp(t *testing.T, db *gorm.DB, allow bool) string {
 	t.Helper()
-	appEntity := &model.ApplicationEntity{Code: "app_join", AllowJoinByInvite: model.BoolPtr(allow)}
+	appEntity := &model.ApplicationEntity{Code: "app_join", AllowJoinByInvite: joinPolicy(allow)}
 	if err := db.Create(appEntity).Error; err != nil {
 		t.Fatalf("seed application: %v", err)
 	}
 	client := &model.ApplicationClientEntity{Code: "join_client", AppID: appEntity.ID}
 	client.ID = client.AppID
-	client.RedirectURIs = datatypes.JSON(`[]`)
-	client.PostLogoutRedirectURIs = datatypes.JSON(`[]`)
-	client.GrantTypes = datatypes.JSON(`["authorization_code"]`)
-	client.ResponseTypes = datatypes.JSON(`["code"]`)
-	client.AllowedOrigins = datatypes.JSON(`[]`)
-	client.DefaultScopes = datatypes.JSON(`["openid"]`)
+	client.RedirectURIs = model.RedirectURIList{}
+	client.PostLogoutRedirectURIs = model.PostLogoutRedirectURIList{}
+	client.GrantTypes = model.GrantTypeList{model.GrantTypeAuthorizationCode}
+	client.ResponseTypes = model.ResponseTypeList{model.ResponseTypeCode}
+	client.AllowedOrigins = model.AllowedOriginList{}
+	client.DefaultScopes = model.DefaultScopeList{model.ScopeOpenID}
 	if err := db.Create(client).Error; err != nil {
 		t.Fatalf("seed application client: %v", err)
 	}

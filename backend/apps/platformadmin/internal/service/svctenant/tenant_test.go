@@ -221,8 +221,8 @@ func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
 	if adminUser.Source != model.UserSourceBuiltin {
 		t.Errorf("admin source = %q, want %q", adminUser.Source, model.UserSourceBuiltin)
 	}
-	if !adminUser.IsOwner {
-		t.Error("admin should be tenant owner")
+	if adminUser.OwnerType != model.OwnerTypeOwner {
+		t.Errorf("admin ownerType = %q, want %q", adminUser.OwnerType, model.OwnerTypeOwner)
 	}
 	if adminUser.TenantID != resp.TenantID {
 		t.Errorf("admin tenantID = %q, want %q", adminUser.TenantID, resp.TenantID)
@@ -233,8 +233,8 @@ func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
 	if err != nil || person == nil {
 		t.Fatalf("load admin person fail, err:%v, person:%+v", err, person)
 	}
-	if !person.MustChangePassword {
-		t.Error("admin person must have must_change_password=true (temporary password)")
+	if person.PasswordStatus != model.PasswordStatusMustChange {
+		t.Errorf("admin passwordStatus = %q, want %q (temporary password)", person.PasswordStatus, model.PasswordStatusMustChange)
 	}
 	if err := gcrypto.ComparePasswordHash(person.PasswordEncrypted, resp.AdminInitialPassword); err != nil {
 		t.Errorf("adminInitialPassword does not match stored hash: %v", err)
@@ -299,8 +299,6 @@ func TestTenantCreateReusesExistingPersonWithoutPassword(t *testing.T) {
 		PasswordEncrypted: "existing-hash",
 		PasswordMethod:    model.PasswordMethodBcrypt,
 		Name:              "既有账号",
-		Profile:           []byte(`{}`),
-		CustomData:        []byte(`{}`),
 	}
 	if err := db.Create(existing).Error; err != nil {
 		t.Fatalf("seed existing person: %v", err)
@@ -329,8 +327,8 @@ func TestTenantCreateReusesExistingPersonWithoutPassword(t *testing.T) {
 	if person.PasswordEncrypted != "existing-hash" {
 		t.Errorf("existing person password was overwritten: %q", person.PasswordEncrypted)
 	}
-	if person.MustChangePassword {
-		t.Error("must_change_password must stay false when reusing an existing person")
+	if person.PasswordStatus != model.PasswordStatusNormal {
+		t.Errorf("passwordStatus = %q, want %q when reusing an existing person", person.PasswordStatus, model.PasswordStatusNormal)
 	}
 }
 
@@ -377,8 +375,8 @@ func TestResetAdminPasswordReissuesTemporaryPassword(t *testing.T) {
 	if err := gcrypto.ComparePasswordHash(person.PasswordEncrypted, created.AdminInitialPassword); err == nil {
 		t.Error("old temporary password must no longer be valid after reset")
 	}
-	if !person.MustChangePassword {
-		t.Error("reset must set must_change_password=true")
+	if person.PasswordStatus != model.PasswordStatusMustChange {
+		t.Errorf("reset must set passwordStatus = %q, got %q", model.PasswordStatusMustChange, person.PasswordStatus)
 	}
 }
 
@@ -400,15 +398,13 @@ func TestResetAdminPasswordNeverTargetsManualMember(t *testing.T) {
 		PasswordEncrypted: "member-hash",
 		PasswordMethod:    model.PasswordMethodBcrypt,
 		Name:              "成员",
-		Profile:           []byte(`{}`),
-		CustomData:        []byte(`{}`),
 	}
 	if err := db.Create(manualPerson).Error; err != nil {
 		t.Fatalf("seed manual person: %v", err)
 	}
 	manualUser := &model.UserEntity{
 		TenantID: created.TenantID, PersonID: manualPerson.ID, Source: model.UserSourceManual,
-		UserType: model.UserTypeMember, Name: "成员", Profile: []byte(`{}`), CustomData: []byte(`{}`),
+		UserType: model.UserTypeMember, Name: "成员",
 	}
 	if err := db.Create(manualUser).Error; err != nil {
 		t.Fatalf("seed manual user: %v", err)

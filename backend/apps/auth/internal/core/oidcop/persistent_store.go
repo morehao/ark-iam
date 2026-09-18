@@ -3,7 +3,6 @@ package oidcop
 import (
 	"context"
 	"crypto/subtle"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -113,15 +112,6 @@ func (s *PersistentStore) LookupApiKeyByRawKey(ctx context.Context, rawKey strin
 	}
 	if entity.ExpiredAt != nil && entity.ExpiredAt.Before(time.Now()) {
 		return nil, nil
-	}
-	// last_used_at 写入降频：一分钟窗口内不重复写，避免每个请求都触发一次 DB 写
-	if !entity.LastUsedAt.Valid || time.Since(entity.LastUsedAt.Time) > time.Minute {
-		// 写回的是刚读出的那一行：按该行所属租户显式声明，避免 UPDATE 被过滤成 0 行。
-		if err := s.apiKeyDao().UpdateMap(dbclient.ExplicitTenantContext(ctx, entity.TenantID), entity.ID, map[string]any{
-			"last_used_at": time.Now(),
-		}); err != nil {
-			glog.Warnf(ctx, "[PersistentStore.LookupApiKeyByRawKey] update last_used_at fail, apiKeyID:%s, err:%v", entity.ID, err)
-		}
 	}
 	return entity, nil
 }
@@ -606,8 +596,6 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 	}
 
 	refreshTokenHash := credential.HashSecret(refreshTokenValue)
-	scopesJSON, _ := json.Marshal(scopes)
-	amrJSON, _ := json.Marshal(amr)
 	refreshEntity := &model.RefreshTokenEntity{
 		PersonID:            personID,
 		TenantID:            userEntity.TenantID,
@@ -615,8 +603,8 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 		ApplicationClientID: applicationClientID,
 		SessionID:           sessionID,
 		Token:               refreshTokenHash,
-		Scopes:              scopesJSON,
-		AMR:                 amrJSON,
+		Scopes:              model.ScopeList(scopes),
+		AMR:                 model.AuthMethodList(amr),
 		AuthTime:            &authTime,
 		ExpiredAt:           &refreshTokenExp,
 		CreatedBy:           userEntity.ID,
@@ -740,11 +728,11 @@ func (s *PersistentStore) TokenRequestByRefreshToken(ctx context.Context, refres
 
 	// H2：还原授权时持久化的 scope / amr / auth_time / session_id，
 	// 保证刷新后的 token 与原始授权一致（RFC 6749 §6），并让刷新后的 token 携带 sid。
-	scopes := decodeJSONStringSlice(storedToken.Scopes)
+	scopes := storedToken.Scopes.Strings()
 	if len(scopes) == 0 {
 		scopes = []string{oidc.ScopeOpenID, oidc.ScopeProfile}
 	}
-	amr := decodeJSONStringSlice(storedToken.AMR)
+	amr := storedToken.AMR.Strings()
 	if len(amr) == 0 {
 		amr = []string{"pwd"}
 	}
@@ -785,18 +773,6 @@ func (r *refreshTokenRequest) GetSubject() string               { return r.subje
 func (r *refreshTokenRequest) SetCurrentScopes(scopes []string) { r.scopes = scopes }
 func (r *refreshTokenRequest) GetTenantID() string              { return r.tenantID }
 func (r *refreshTokenRequest) GetSessionID() string             { return r.sessionID }
-
-// decodeJSONStringSlice 解析 JSON 字符串数组；解析失败返回 nil。
-func decodeJSONStringSlice(raw []byte) []string {
-	if len(raw) == 0 {
-		return nil
-	}
-	var out []string
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil
-	}
-	return out
-}
 
 // selectedTenantFromRequest 返回请求携带的租户 ID（authorization code 或 refresh token 轮换时从其存储的 tenant 读取）。
 // 未设置（TenantID == ""）时返回 0，由调用方决定回退逻辑。

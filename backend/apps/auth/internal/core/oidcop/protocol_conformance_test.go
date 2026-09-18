@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -14,7 +13,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
-	"gorm.io/datatypes"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -59,8 +57,6 @@ func seedPerson(t *testing.T, db *gorm.DB, id string, email string) {
 		Name:              "test-user",
 		Username:          model.StrPtr("user-" + fmt.Sprint(id)),
 		PrimaryEmail:      emailPtr,
-		Profile:           json.RawMessage(`{}`),
-		CustomData:        json.RawMessage(`{}`),
 		PasswordEncrypted: "hash",
 	}).Error; err != nil {
 		t.Fatalf("seed person: %v", err)
@@ -74,8 +70,6 @@ func seedUser(t *testing.T, db *gorm.DB, id, personID, tenantID string) {
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: id}},
 		TenantID:   tenantID,
 		PersonID:   personID,
-		Profile:    json.RawMessage(`{}`),
-		CustomData: json.RawMessage(`{}`),
 		JoinedAt:   &now,
 	}).Error; err != nil {
 		t.Fatalf("seed user: %v", err)
@@ -110,11 +104,11 @@ func TestRefreshTokenPersistsAndRestoresScopeAMRAuthTime(t *testing.T) {
 	if err := db.Where("token = ?", hashToken(refreshToken)).First(&stored).Error; err != nil {
 		t.Fatalf("refresh token not stored: %v", err)
 	}
-	gotScopes := decodeJSONStringSlice(stored.Scopes)
+	gotScopes := stored.Scopes.Strings()
 	if len(gotScopes) != 4 || gotScopes[3] != "offline_access" {
 		t.Fatalf("expected persisted scopes [openid profile email offline_access], got %v", gotScopes)
 	}
-	gotAMR := decodeJSONStringSlice(stored.AMR)
+	gotAMR := stored.AMR.Strings()
 	if len(gotAMR) != 1 || gotAMR[0] != "pwd" {
 		t.Fatalf("expected persisted amr [pwd], got %v", gotAMR)
 	}
@@ -149,13 +143,13 @@ func TestRefreshTokenTTLUsesClientConfig(t *testing.T) {
 	if err := db.Create(&model.ApplicationClientEntity{
 		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
 		Code:                    "client-ttl",
-		RedirectURIs:            datatypes.JSON("[]"),
-		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
-		GrantTypes:              datatypes.JSON(`["authorization_code"]`),
-		ResponseTypes:           datatypes.JSON(`["code"]`),
+		RedirectURIs:            model.RedirectURIList{},
+		PostLogoutRedirectURIs:  model.PostLogoutRedirectURIList{},
+		GrantTypes:              model.GrantTypeList{model.GrantTypeAuthorizationCode},
+		ResponseTypes:           model.ResponseTypeList{model.ResponseTypeCode},
 		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodBasic,
-		AllowedOrigins:          datatypes.JSON("[]"),
-		DefaultScopes:           datatypes.JSON(`["openid"]`),
+		AllowedOrigins:          model.AllowedOriginList{},
+		DefaultScopes:           model.DefaultScopeList{model.ScopeOpenID},
 		AccessTokenTTL:          900,
 		RefreshTokenTTL:         7200,
 		Status:                  model.ApplicationClientStatusEnable,
@@ -300,7 +294,7 @@ func TestSetUserinfoFromScopesEmailVerifiedFalse(t *testing.T) {
 }
 
 // TestCreateAuthRequestEnforcesRequirePKCE 覆盖 M3：
-// require_pkce=1 的客户端必须携带 code_challenge，否则授权请求被拒绝。
+// require_pkce=enable 的客户端必须携带 code_challenge，否则授权请求被拒绝。
 func TestCreateAuthRequestEnforcesRequirePKCE(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameAuth)
 	defer testsetup.Done(testsetup.AppNameAuth)
@@ -309,18 +303,36 @@ func TestCreateAuthRequestEnforcesRequirePKCE(t *testing.T) {
 	if err := db.Create(&model.ApplicationClientEntity{
 		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
 		Code:                    "pkce-client",
-		RequirePKCE:             true,
-		RedirectURIs:            datatypes.JSON(`["https://client.example.com/callback"]`),
-		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
-		GrantTypes:              datatypes.JSON(`["authorization_code"]`),
-		ResponseTypes:           datatypes.JSON(`["code"]`),
+		RequirePKCE:             model.ClientPKCEPolicyEnable,
+		RedirectURIs:            model.RedirectURIList{"https://client.example.com/callback"},
+		PostLogoutRedirectURIs:  model.PostLogoutRedirectURIList{},
+		GrantTypes:              model.GrantTypeList{model.GrantTypeAuthorizationCode},
+		ResponseTypes:           model.ResponseTypeList{model.ResponseTypeCode},
 		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodBasic,
-		AllowedOrigins:          datatypes.JSON("[]"),
-		DefaultScopes:           datatypes.JSON(`["openid"]`),
+		AllowedOrigins:          model.AllowedOriginList{},
+		DefaultScopes:           model.DefaultScopeList{model.ScopeOpenID},
 		Status:                  model.ApplicationClientStatusEnable,
 		Source:                  model.ApplicationClientSourceFirstParty,
 	}).Error; err != nil {
 		t.Fatalf("seed pkce client: %v", err)
+	}
+	// 对照组：require_pkce=disable 的客户端不得被强制 PKCE。'disable' 是非空字符串，
+	// 若把它当真值判断会恒为 true（D3 类回归），必须由本用例锁住。
+	if err := db.Create(&model.ApplicationClientEntity{
+		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "2"}},
+		Code:                    "no-pkce-client",
+		RequirePKCE:             model.ClientPKCEPolicyDisable,
+		RedirectURIs:            model.RedirectURIList{"https://client.example.com/callback"},
+		PostLogoutRedirectURIs:  model.PostLogoutRedirectURIList{},
+		GrantTypes:              model.GrantTypeList{model.GrantTypeAuthorizationCode},
+		ResponseTypes:           model.ResponseTypeList{model.ResponseTypeCode},
+		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodBasic,
+		AllowedOrigins:          model.AllowedOriginList{},
+		DefaultScopes:           model.DefaultScopeList{model.ScopeOpenID},
+		Status:                  model.ApplicationClientStatusEnable,
+		Source:                  model.ApplicationClientSourceFirstParty,
+	}).Error; err != nil {
+		t.Fatalf("seed non-pkce client: %v", err)
 	}
 
 	storage := NewOIDCStorage(NewRedisProtocolStateStore(), ps, nil, "test-key")
@@ -352,6 +364,17 @@ func TestCreateAuthRequestEnforcesRequirePKCE(t *testing.T) {
 	}
 	if req == nil {
 		t.Fatal("expected non-nil auth request")
+	}
+
+	// require_pkce=disable → 缺 code_challenge 也必须放行（枚举判定不得退化为真值判断）
+	if _, err := storage.CreateAuthRequest(context.Background(), &oidc.AuthRequest{
+		ClientID:     "no-pkce-client",
+		RedirectURI:  "https://client.example.com/callback",
+		Scopes:       []string{oidc.ScopeOpenID},
+		ResponseType: oidc.ResponseTypeCode,
+		ResponseMode: oidc.ResponseModeQuery,
+	}, ""); err != nil {
+		t.Fatalf("expected CreateAuthRequest to pass for require_pkce=disable client, got %v", err)
 	}
 }
 

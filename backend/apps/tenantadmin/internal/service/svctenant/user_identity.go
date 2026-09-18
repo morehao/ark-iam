@@ -1,8 +1,6 @@
 package svctenant
 
 import (
-	"encoding/json"
-
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dao"
@@ -54,16 +52,11 @@ func (svc *userIdentitySvc) ListByUser(ctx *gin.Context, req *dtotenant.UserIden
 
 	list := make([]dtotenant.UserIdentityItem, 0, len(entityList))
 	for _, v := range entityList {
-		var detail any
-		if uErr := json.Unmarshal(v.Detail, &detail); uErr != nil {
-			// 明细反序列化失败不阻断列表：置空明细并告警，避免单条脏数据隐藏整个身份列表。
-			glog.Warnf(ctx, "[svcuserIdentity.ListByUser] json.Unmarshal detail fail, identityID:%s, err:%v", v.ID, uErr)
-		}
 		list = append(list, dtotenant.UserIdentityItem{
 			UserIdentityID: v.ID,
 			Issuer:         v.Issuer,
 			IdentityID:     v.ExternalSubject,
-			Detail:         detail,
+			Detail:         v.Detail,
 			CreatedAt:      v.CreatedAt.Unix(),
 			UpdatedAt:      v.UpdatedAt.Unix(),
 		})
@@ -80,17 +73,11 @@ func (svc *userIdentitySvc) Create(ctx *gin.Context, req *dtotenant.UserIdentity
 		return nil, code.GetError(code.UserIdentityCreateError)
 	}
 
-	detailJSON, mErr := json.Marshal(req.Detail)
-	if mErr != nil {
-		glog.Errorf(ctx, "[svcuserIdentity.Create] json.Marshal detail fail, err:%v, req:%s", mErr, gutil.ToJsonString(req))
-		return nil, code.GetError(code.UserIdentityCreateError)
-	}
-
 	entity := &model.UserIdentityEntity{
 		PersonID:        userEntity.PersonID,
 		Issuer:          req.Issuer,
 		ExternalSubject: req.IdentityID,
-		Detail:          detailJSON,
+		Detail:          req.Detail,
 		CreatedBy:       gincontext.GetUserIDString(ctx),
 	}
 	// 同一外部主体（issuer + external_subject）全局唯一，由部分唯一索引兜底，

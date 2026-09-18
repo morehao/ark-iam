@@ -3,6 +3,15 @@
 import type { UserDepartmentItem } from './department'
 import type { MenuItem, SysAdminType } from './platform'
 
+/**
+ * 租户成员可用性（后端具名类型 model.UserStatus）：active-正常 / suspended-已挂起。
+ * 与 person 的 PersonStatus（auth.ts）刻意分列：两者是不同实体的生命周期。
+ */
+export type UserStatus = 'active' | 'suspended'
+
+/** 租户拥有者类型（后端具名类型 model.OwnerType）：owner-租户拥有者 / normal-普通成员。 */
+export type OwnerType = 'owner' | 'normal'
+
 // ---------- 租户用户 ----------
 export interface TenantUserItem {
   userID: string
@@ -12,7 +21,7 @@ export interface TenantUserItem {
   primaryPhone: string
   name: string
   avatar: string
-  isSuspended: boolean
+  status: UserStatus
   primaryDepartmentName: string
   roleCount: number
   createdAt?: number
@@ -30,7 +39,8 @@ export interface TenantUserCreateReq {
   primaryPhone?: string
   name: string
   avatar?: string
-  isSuspended?: boolean
+  /** 初始状态（后端 model.UserStatus）：缺省/空串按 active 落库。 */
+  status?: UserStatus
   primaryDepartmentID: string // 行政主部门ID（primary，单值，必填：用户必须从属部门）
   secondaryDepartmentIDs?: string[]
   leaderDepartmentIDs?: string[]
@@ -160,7 +170,7 @@ export interface TenantMachineUserItem {
   description: string
   primaryDepartmentID: string // 主部门ID（服务账号必有主部门）
   primaryDepartmentName: string // 主部门名称
-  isSuspended: boolean
+  status: UserStatus
   createdAt?: number
   updatedAt?: number
 }
@@ -210,7 +220,6 @@ export interface TenantApiKeyItem {
   createdBy: string
   creatorName: string // 创建人名称
   expiredAt: number | null
-  lastUsedAt: number | null
   revokedAt: number | null
   createdAt: number
   updatedAt: number

@@ -28,7 +28,7 @@ import {
 } from '@ant-design/icons'
 import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, PageContainer, RemoteSelect, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
 import { createMenu, deleteMenu, getApplicationDetail, getApplicationPageList, getMenuTree, updateMenu } from '@ark-iam/api'
-import type { ApplicationItem, MenuItem, MenuStatus, MenuType, MenuVisibility } from '@ark-iam/types'
+import type { ApplicationItem, MenuExternalLinkFlag, MenuHiddenFlag, MenuItem, MenuKeepAliveFlag, MenuStatus, MenuType, MenuVisibility } from '@ark-iam/types'
 
 interface MenuFormValues {
   parentID: string
@@ -42,9 +42,9 @@ interface MenuFormValues {
   component?: string
   redirect?: string
   status?: MenuStatus
-  hidden: number
-  externalLink: number
-  keepAlive: number
+  hidden: MenuHiddenFlag
+  externalLink: MenuExternalLinkFlag
+  keepAlive: MenuKeepAliveFlag
 }
 
 type ModalMode = 'createRoot' | 'createChild' | 'edit'
@@ -61,6 +61,17 @@ const VISIBILITY_META: Record<MenuVisibility, { label: string; tagColor: string 
   public: { label: '所有人', tagColor: 'green' },
   member: { label: '租户成员', tagColor: 'blue' },
   admin: { label: '管理员', tagColor: 'orange' },
+}
+
+/**
+ * 菜单开关（hidden/externalLink/keepAlive）已为字符串枚举 enable/disable：Switch 需要 boolean，
+ * 回显用 getValueProps 把 'enable' 显式转成 checked，提交用 getValueFromEvent 转回字符串枚举
+ * （P3 前是 0/1，不得残留）。
+ */
+const ENABLE_FLAG_FORM_PROPS = {
+  valuePropName: 'checked' as const,
+  getValueProps: (value: unknown) => ({ checked: value === 'enable' }),
+  getValueFromEvent: (checked: boolean) => (checked ? 'enable' : 'disable'),
 }
 
 function renderMenuVisibility(v: string) {
@@ -124,7 +135,9 @@ export default function MenuList() {
 
   // 选中应用：名称/编码优先取搜索缓存；缓存未命中（如上次选择的应用不在已搜索到的结果里）再按 ID 补查详情。
   // 只有确实拿到了应用才落到 selectedAppId，避免用一个无效 ID 去拉菜单树。
-  const selectApp = useCallback(async (appID: string) => {
+  // silent：首屏恢复上次选择的应用时该 ID 可能已失效（应用被删、或开发库删库重建换了主键），
+  // 属调用方已兜底的预期分支，不弹全局提示（见 packages/api 的 request.ts）。
+  const selectApp = useCallback(async (appID: string, opts?: { silent?: boolean }) => {
     const cached = appCacheRef.current.get(appID)
     if (cached) {
       setSelectedApp(cached)
@@ -132,7 +145,7 @@ export default function MenuList() {
       return true
     }
     try {
-      const detail = await getApplicationDetail(appID)
+      const detail = await getApplicationDetail(appID, opts?.silent ? { silent: true } : undefined)
       setSelectedApp(detail)
       setSelectedAppId(appID)
       return true
@@ -145,7 +158,7 @@ export default function MenuList() {
   useEffect(() => {
     void (async () => {
       const saved = localStorage.getItem(STORAGE_KEY) || ''
-      if (saved && (await selectApp(saved))) return
+      if (saved && (await selectApp(saved, { silent: true }))) return
       try {
         const resp = await getApplicationPageList({ page: 1, pageSize: 1 })
         const first = resp?.list?.[0]
@@ -218,9 +231,9 @@ export default function MenuList() {
       type: 'menu',
       status: 'enable',
       visibility: 'public',
-      hidden: 0,
-      externalLink: 0,
-      keepAlive: 0,
+      hidden: 'disable',
+      externalLink: 'disable',
+      keepAlive: 'disable',
       ...baseValues,
     })
     setModalOpen(true)
@@ -623,13 +636,13 @@ export default function MenuList() {
             />
           </Form.Item>
           <div style={{ display: 'flex', gap: 32 }}>
-            <Form.Item name="hidden" label="隐藏" valuePropName="checked" getValueFromEvent={(c: boolean) => (c ? 1 : 0)}>
+            <Form.Item name="hidden" label="隐藏" {...ENABLE_FLAG_FORM_PROPS}>
               <Switch checkedChildren="是" unCheckedChildren="否" />
             </Form.Item>
-            <Form.Item name="externalLink" label="外链" valuePropName="checked" getValueFromEvent={(c: boolean) => (c ? 1 : 0)}>
+            <Form.Item name="externalLink" label="外链" {...ENABLE_FLAG_FORM_PROPS}>
               <Switch checkedChildren="是" unCheckedChildren="否" />
             </Form.Item>
-            <Form.Item name="keepAlive" label="缓存" valuePropName="checked" getValueFromEvent={(c: boolean) => (c ? 1 : 0)}>
+            <Form.Item name="keepAlive" label="缓存" {...ENABLE_FLAG_FORM_PROPS}>
               <Switch checkedChildren="是" unCheckedChildren="否" />
             </Form.Item>
           </div>

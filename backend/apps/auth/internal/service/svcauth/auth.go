@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -143,7 +142,7 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 		return nil, nil, code.GetError(code.LoginLockedError)
 	}
 
-	if personEntity.IsSuspended {
+	if personEntity.Status == model.PersonStatusSuspended {
 		audit.WriteAudit(ctx, audit.AuditEntry{
 			Action:     audit.ActionLogin,
 			Result:     model.AuditResultFailure,
@@ -249,14 +248,12 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 	txErr := dbclient.IamDB(joinCtx).Transaction(func(tx *gorm.DB) error {
 		now := time.Now()
 		userEntity := &model.UserEntity{
-			TenantID:   tenantID,
-			PersonID:   personID,
-			Name:       "",
-			Profile:    json.RawMessage(`{}`),
-			CustomData: json.RawMessage(`{}`),
-			IsOwner:    false,
-			JoinedAt:   &now,
-			CreatedBy:  personID,
+			TenantID:  tenantID,
+			PersonID:  personID,
+			Name:      "",
+			OwnerType: model.OwnerTypeNormal,
+			JoinedAt:  &now,
+			CreatedBy: personID,
 		}
 		if uErr := dao.NewUserDao().WithTx(tx).Insert(joinCtx, userEntity); uErr != nil {
 			return uErr
@@ -377,10 +374,10 @@ func (svc *authSvc) Userinfo(ctx *gin.Context, req *dtoauth.UserinfoReq) (*dtoau
 	return &dtoauth.UserinfoResp{
 		PersonInfo: personInfo,
 		UserInfo: objauth.TenantUserInfo{
-			UserID:   userEntity.ID,
-			TenantID: userEntity.TenantID,
-			Name:     userEntity.Name,
-			IsOwner:  userEntity.IsOwner,
+			UserID:    userEntity.ID,
+			TenantID:  userEntity.TenantID,
+			Name:      userEntity.Name,
+			OwnerType: userEntity.OwnerType,
 		},
 	}, nil
 }
@@ -433,7 +430,7 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 		}
 		return nil, nil, nil, err
 	}
-	if userEntity.IsSuspended {
+	if userEntity.Status == model.UserStatusSuspended {
 		audit.WriteAudit(ctx, audit.AuditEntry{
 			Action:     audit.ActionLogin,
 			Result:     model.AuditResultFailure,
@@ -503,7 +500,7 @@ func (svc *authSvc) listPersonTenants(ctx *gin.Context, personID string) (*model
 		if defaultUser == nil {
 			defaultUser = &joinedUsers[i]
 		}
-		options = append(options, objauth.TenantOption{TenantID: tenantEntity.ID, Name: tenantEntity.Name, Tag: tenantEntity.Tag, UserID: joinedUser.ID, IsOwner: joinedUser.IsOwner})
+		options = append(options, objauth.TenantOption{TenantID: tenantEntity.ID, Name: tenantEntity.Name, Tag: tenantEntity.Tag, UserID: joinedUser.ID, OwnerType: joinedUser.OwnerType})
 	}
 	if missingTenantCount > 0 {
 		glog.Errorf(ctx, "[svcauth.listPersonTenants] tenant row missing for user memberships, personID:%s, missing:%d, joined:%d, tenantIDs:%v",
@@ -563,7 +560,10 @@ func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID string, success bo
 
 	if success {
 		userDao := newAuthUserStore()
-		if err := userDao.UpdateMap(ctx, userID, map[string]interface{}{
+		// last_sign_in_at 落在 tenant_user（含 tenant_id 的租户表）：/oidc/login 链路没有租户中间件，
+		// ctx 未声明作用域，fail-closed 插件会把这次 UPDATE 拦下（登录仍成功，只在日志里留 error，
+		// 因而极易漏掉）。故按本次登录的租户显式声明作用域，与 JoinTenant 的 joinCtx 同口径。
+		if err := userDao.UpdateMap(dbclient.ExplicitTenantContext(ctx, tenantID), userID, map[string]interface{}{
 			"last_sign_in_at": time.Now(),
 		}); err != nil {
 			glog.Errorf(ctx, "[svcauth.defaultRecordLoginLog] update last_sign_in_at fail, err:%v", err)

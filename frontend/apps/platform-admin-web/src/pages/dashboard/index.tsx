@@ -6,7 +6,7 @@ import {
   GlobalOutlined,
 } from '@ant-design/icons'
 import { PageContainer, tokens } from '@ark-iam/ui'
-import { getApplicationPageList, getAuditLogPageList, getTenantPageList } from '@ark-iam/api'
+import { getApplicationPageList, getTenantPageList } from '@ark-iam/api'
 
 interface Stat {
   title: string
@@ -17,7 +17,6 @@ interface Stat {
 const STAT_CARDS: Stat[] = [
   { title: '应用总数', value: null, icon: <AppstoreOutlined /> },
   { title: '租户总数', value: null, icon: <GlobalOutlined /> },
-  { title: '审计日志', value: null, icon: <FileSearchOutlined /> },
 ]
 
 export default function Dashboard() {
@@ -28,10 +27,9 @@ export default function Dashboard() {
     let mounted = true
     const load = async () => {
       try {
-        const [apps, tenants, logs] = await Promise.allSettled([
+        const [apps, tenants] = await Promise.allSettled([
           getApplicationPageList({ page: 1, pageSize: 1 }),
           getTenantPageList({ page: 1, pageSize: 1 }),
-          getAuditLogPageList({ page: 1, pageSize: 1 }),
         ])
         if (!mounted) return
         const count = (r: PromiseSettledResult<unknown>) =>
@@ -42,7 +40,6 @@ export default function Dashboard() {
         setStats([
           { title: '应用总数', value: count(apps), icon: <AppstoreOutlined /> },
           { title: '租户总数', value: count(tenants), icon: <GlobalOutlined /> },
-          { title: '审计日志', value: count(logs), icon: <FileSearchOutlined /> },
         ])
       } finally {
         if (mounted) setLoading(false)
@@ -101,7 +98,7 @@ export default function Dashboard() {
             {[
               { icon: <GlobalOutlined />, title: '多租户治理', desc: '租户状态 · 应用订阅 · 自定义域名' },
               { icon: <AppstoreOutlined />, title: '应用接入', desc: '应用 · OAuth 客户端 · 租户应用' },
-              { icon: <FileSearchOutlined />, title: '平台治理', desc: '菜单字典 · 审计日志' },
+              { icon: <FileSearchOutlined />, title: '平台治理', desc: '菜单字典 · 自定义域名' },
             ].map((f) => (
               <Col xs={24} sm={12} lg={8} key={f.title}>
                 <div

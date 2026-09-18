@@ -1,11 +1,9 @@
 package svcapplication
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	"github.com/morehao/ark-iam/pkg/audit"
@@ -48,6 +46,43 @@ func isValidAppStatus(status model.AppStatus) bool {
 	}
 }
 
+// isValidPersonCreateTenantPolicy 校验「个人可自助建租户」策略：空值＝未提供（创建按 disable，更新不修改）。
+func isValidPersonCreateTenantPolicy(policy model.AppPersonCreateTenantPolicy) bool {
+	switch policy {
+	case "", model.AppPersonCreateTenantPolicyEnable, model.AppPersonCreateTenantPolicyDisable:
+		return true
+	default:
+		return false
+	}
+}
+
+// normalizePersonCreateTenantPolicy 把未提供的策略（空串）归一为 disable：
+// 列默认值即 disable（NULL ≡ disable），原 *bool 语义下 nil/缺省同样等价于关闭。
+func normalizePersonCreateTenantPolicy(policy model.AppPersonCreateTenantPolicy) model.AppPersonCreateTenantPolicy {
+	if policy == "" {
+		return model.AppPersonCreateTenantPolicyDisable
+	}
+	return policy
+}
+
+// isValidJoinByInvitePolicy 校验「允许邀请加入租户」策略：空值＝未提供（创建按 disable，更新不修改）。
+func isValidJoinByInvitePolicy(policy model.AppJoinByInvitePolicy) bool {
+	switch policy {
+	case "", model.AppJoinByInvitePolicyEnable, model.AppJoinByInvitePolicyDisable:
+		return true
+	default:
+		return false
+	}
+}
+
+// normalizeJoinByInvitePolicy 把未提供的策略（空串）归一为 disable（NULL ≡ disable）。
+func normalizeJoinByInvitePolicy(policy model.AppJoinByInvitePolicy) model.AppJoinByInvitePolicy {
+	if policy == "" {
+		return model.AppJoinByInvitePolicyDisable
+	}
+	return policy
+}
+
 // maxRoleTemplateItems 单个应用的角色模板条目上限：模板是"本应用对外提供的契约值"清单，
 // 实际只有个位数；设上限只为拦住把整张下游策略表灌进来的误用。
 const maxRoleTemplateItems = 64
@@ -55,13 +90,13 @@ const maxRoleTemplateItems = 64
 // maxRoleTemplateItemNameLen 模板角色名称长度上限（对齐 role.name 列宽 varchar(128)）。
 const maxRoleTemplateItemNameLen = 128
 
-// buildRoleTemplate 校验并归一化应用角色模板（名称去空白），编码成列存的 JSON 数组。
+// buildRoleTemplate 校验并归一化应用角色模板（名称去空白），返回可直接落 JSON 列的具名切片。
 // 返回 ok=false 表示入参非法：条目数超限、code 形状不符 model.RoleCodePattern、code 在模板内重复、
 // 名称为空或超长、或声明了产品锚点编码（锚点由开通链路按常量写入，模板占用同码会改写锚点角色名称）。
-// json.Marshal 对结构体切片不会失败，故此处不存在被折叠成"非法"的系统错误。
-func buildRoleTemplate(items []model.RoleTemplateItem) (datatypes.JSON, bool) {
+// 序列化交由 GORM 的 serializer:json，此处不存在会被折叠成"非法"的系统错误。
+func buildRoleTemplate(items []model.RoleTemplateItem) (model.RoleTemplateItemList, bool) {
 	if len(items) == 0 {
-		return datatypes.JSON([]byte("[]")), true
+		return model.RoleTemplateItemList{}, true
 	}
 	if len(items) > maxRoleTemplateItems {
 		return nil, false
@@ -82,11 +117,7 @@ func buildRoleTemplate(items []model.RoleTemplateItem) (datatypes.JSON, bool) {
 		seen[item.Code] = struct{}{}
 		normalized = append(normalized, model.RoleTemplateItem{Code: item.Code, Name: name})
 	}
-	raw, err := json.Marshal(normalized)
-	if err != nil {
-		return nil, false
-	}
-	return datatypes.JSON(raw), true
+	return normalized, true
 }
 
 func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.ApplicationCreateReq) (*dtoapplication.ApplicationCreateResp, error) {
@@ -101,6 +132,15 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.Applicat
 		glog.Errorf(ctx, "[svcapplication.Create] 非法应用角色模板, req:%s", gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationRoleTemplateInvalidError)
 	}
+	// 自助建租户/邀请加入两个策略来自前端：未提供按列默认 disable 处理，非法值直接拒绝。
+	if !isValidPersonCreateTenantPolicy(req.AllowPersonCreateTenant) {
+		glog.Errorf(ctx, "[svcapplication.Create] 非法个人建租户策略, req:%s", gutil.ToJsonString(req))
+		return nil, code.GetError(code.ApplicationCreateError)
+	}
+	if !isValidJoinByInvitePolicy(req.AllowJoinByInvite) {
+		glog.Errorf(ctx, "[svcapplication.Create] 非法邀请加入策略, req:%s", gutil.ToJsonString(req))
+		return nil, code.GetError(code.ApplicationCreateError)
+	}
 	entity := &model.ApplicationEntity{
 		Code:                    req.Code,
 		Name:                    req.Name,
@@ -108,8 +148,8 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.Applicat
 		LogoURL:                 req.LogoURL,
 		HomepageURL:             req.HomepageURL,
 		Source:                  model.AppSourceThirdParty, // 控制台创建的应用恒为第三方接入，builtin/first_party 仅由种子与运维产生
-		AllowPersonCreateTenant: req.AllowPersonCreateTenant,
-		AllowJoinByInvite:       req.AllowJoinByInvite,
+		AllowPersonCreateTenant: normalizePersonCreateTenantPolicy(req.AllowPersonCreateTenant),
+		AllowJoinByInvite:       normalizeJoinByInvitePolicy(req.AllowJoinByInvite),
 		RoleTemplate:            roleTemplate,
 		Sort:                    req.Sort,
 		CreatedBy:               gincontext.GetUserIDString(ctx),
@@ -142,6 +182,14 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.Applicat
 		glog.Errorf(ctx, "[svcapplication.Update] 非法应用状态, req:%s", gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationUpdateError)
 	}
+	if !isValidPersonCreateTenantPolicy(req.AllowPersonCreateTenant) {
+		glog.Errorf(ctx, "[svcapplication.Update] 非法个人建租户策略, req:%s", gutil.ToJsonString(req))
+		return code.GetError(code.ApplicationUpdateError)
+	}
+	if !isValidJoinByInvitePolicy(req.AllowJoinByInvite) {
+		glog.Errorf(ctx, "[svcapplication.Update] 非法邀请加入策略, req:%s", gutil.ToJsonString(req))
+		return code.GetError(code.ApplicationUpdateError)
+	}
 	entity, err := dao.NewApplicationDao().GetByID(ctx, req.AppID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplication.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -150,17 +198,21 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.Applicat
 	if entity == nil || entity.ID == "" {
 		return code.GetError(code.ApplicationNotExistError)
 	}
-	updateMap := map[string]any{
-		"name":         req.Name,
-		"description":  req.Description,
-		"logo_url":     req.LogoURL,
-		"homepage_url": req.HomepageURL,
-		"sort":         req.Sort,
-		"updated_by":   gincontext.GetUserIDString(ctx),
+	// 走 dao.UpdateFields（结构化 Updates）而非 UpdateMap：role_template 是 serializer:json 列，
+	// 用 map 写会绕过 serializer 静默落脏值（设计文档 D6）。只填要改的字段，列名与 model 的 column tag 一致。
+	updateEntity := &model.ApplicationEntity{
+		Name:        req.Name,
+		Description: req.Description,
+		LogoURL:     req.LogoURL,
+		HomepageURL: req.HomepageURL,
+		Sort:        req.Sort,
+		UpdatedBy:   gincontext.GetUserIDString(ctx),
 	}
+	fields := []string{"name", "description", "logo_url", "homepage_url", "sort", "updated_by"}
 	// status 留空表示不修改：不写该列，避免把状态覆盖为空串
 	if req.Status != "" {
-		updateMap["status"] = req.Status
+		updateEntity.Status = req.Status
+		fields = append(fields, "status")
 	}
 	// code 留空表示不修改；非空且确有变化时：内置应用拒改（见函数头注释），其余按创建时的规则校验
 	// （model.AppCodePattern）。应用内唯一由唯一索引兜底，撞重返回本领域更新错误码。
@@ -174,13 +226,17 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.Applicat
 			glog.Errorf(ctx, "[svcapplication.Update] 非法应用编码, req:%s", gutil.ToJsonString(req))
 			return code.GetError(code.ApplicationCodeInvalidError)
 		}
-		updateMap["code"] = req.Code
+		updateEntity.Code = req.Code
+		fields = append(fields, "code")
 	}
-	if req.AllowPersonCreateTenant != nil {
-		updateMap["allow_person_create_tenant"] = *req.AllowPersonCreateTenant
+	// 两个策略留空表示不修改：非空值已通过白名单校验，直接按常量写入
+	if req.AllowPersonCreateTenant != "" {
+		updateEntity.AllowPersonCreateTenant = req.AllowPersonCreateTenant
+		fields = append(fields, "allow_person_create_tenant")
 	}
-	if req.AllowJoinByInvite != nil {
-		updateMap["allow_join_by_invite"] = *req.AllowJoinByInvite
+	if req.AllowJoinByInvite != "" {
+		updateEntity.AllowJoinByInvite = req.AllowJoinByInvite
+		fields = append(fields, "allow_join_by_invite")
 	}
 	// 角色模板：null 表示不修改（与本结构其余可选字段一致），[] 表示清空，传值即全量替换。
 	// 模板是契约值的唯一来源，改动后必须同步到所有已订阅该应用的租户（新增/改名 → 物化角色，
@@ -192,10 +248,12 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.Applicat
 			glog.Errorf(ctx, "[svcapplication.Update] 非法应用角色模板, req:%s", gutil.ToJsonString(req))
 			return code.GetError(code.ApplicationRoleTemplateInvalidError)
 		}
-		updateMap["role_template"] = roleTemplate
+		updateEntity.RoleTemplate = roleTemplate
+		fields = append(fields, "role_template")
 	}
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := dao.NewApplicationDao().WithTx(tx).UpdateMap(ctx, req.AppID, updateMap); err != nil {
+		// WithTx 定义在内嵌的 *gormdao.Dao 上，返回值本身就是 *gormdao.Dao，直接传给 UpdateFields
+		if err := dao.UpdateFields(ctx, dao.NewApplicationDao().WithTx(tx), req.AppID, updateEntity, fields...); err != nil {
 			return err
 		}
 		if !templateChanged {
@@ -251,7 +309,7 @@ func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.Applicat
 		Sort:                    entity.Sort,
 		AllowPersonCreateTenant: entity.AllowPersonCreateTenant,
 		AllowJoinByInvite:       entity.AllowJoinByInvite,
-		RoleTemplate:            entity.RoleTemplateList(),
+		RoleTemplate:            entity.RoleTemplate,
 		CreatedAt:               entity.CreatedAt.Unix(),
 	}, nil
 }
@@ -293,7 +351,7 @@ func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.Applic
 			AllowPersonCreateTenant: v.AllowPersonCreateTenant,
 			AllowJoinByInvite:       v.AllowJoinByInvite,
 			// 列表带上角色模板：编辑弹窗以列表行为初值，缺了它会把"未修改"误判成"清空"
-			RoleTemplate: v.RoleTemplateList(),
+			RoleTemplate: v.RoleTemplate,
 			CreatedAt:    v.CreatedAt.Unix(),
 			UpdatedAt:    v.UpdatedAt.Unix(),
 		})

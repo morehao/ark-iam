@@ -27,7 +27,7 @@ import {
   getOAuthClientPageList,
   updateOAuthClient,
 } from '@ark-iam/api'
-import type { GrantType, OAuthClientItem, TokenEndpointAuthMethod } from '@ark-iam/types'
+import type { ClientAuthTimeClaimPolicy, ClientPKCEPolicy, GrantType, OAuthClientItem, TokenEndpointAuthMethod } from '@ark-iam/types'
 import { useNavigate } from 'react-router-dom'
 import { oauthClientDetailPath } from '../../routes'
 
@@ -58,15 +58,26 @@ const SCOPE_OPTIONS = [
 
 // 新建缺省协议参数，与后端 application_client 的列默认值同口径（授权类型/响应类型/Scopes/TTL）。
 // PKCE 默认关闭以对齐列默认值：公开客户端（none）与 RustFS 这类 S256 接入方需在表单里显式开启。
+// requirePKCE/requireAuthTime 已为字符串枚举 enable/disable（P3），不能再出现 boolean/0-1。
 const CREATE_DEFAULTS = {
   tokenEndpointAuthMethod: 'client_secret_basic' as TokenEndpointAuthMethod,
   grantTypes: ['authorization_code'] as GrantType[],
   responseTypes: ['code'],
   defaultScopes: ['openid', 'profile', 'email'],
-  requirePKCE: false,
-  requireAuthTime: false,
+  requirePKCE: 'disable' as ClientPKCEPolicy,
+  requireAuthTime: 'disable' as ClientAuthTimeClaimPolicy,
   accessTokenTTL: 900,
   refreshTokenTTL: 2592000,
+}
+
+/**
+ * 协议开关（requirePKCE/requireAuthTime）是字符串枚举 enable/disable：Switch 需要 boolean，
+ * 回显用 getValueProps 把 'enable' 显式转成 checked，提交用 getValueFromEvent 转回字符串枚举。
+ */
+const ENABLE_FLAG_FORM_PROPS = {
+  valuePropName: 'checked' as const,
+  getValueProps: (value: unknown) => ({ checked: value === 'enable' }),
+  getValueFromEvent: (checked: boolean) => (checked ? 'enable' : 'disable'),
 }
 
 /** 字符串数组字段清洗：丢掉 Form.List 的空行与首尾空白，避免把空串写进 redirect_uris 等 JSON 列 */
@@ -182,8 +193,8 @@ export default function OAuthClientList() {
           responseTypes: detail.responseTypes || [],
           defaultScopes: detail.defaultScopes || [],
           allowedOrigins: detail.allowedOrigins || [],
-          requirePKCE: Boolean(detail.requirePKCE),
-          requireAuthTime: Boolean(detail.requireAuthTime),
+          requirePKCE: detail.requirePKCE,
+          requireAuthTime: detail.requireAuthTime,
           accessTokenTTL: detail.accessTokenTTL,
           refreshTokenTTL: detail.refreshTokenTTL,
         })
@@ -424,7 +435,7 @@ export default function OAuthClientList() {
             <Form.Item
               name="requirePKCE"
               label="强制 PKCE"
-              valuePropName="checked"
+              {...ENABLE_FLAG_FORM_PROPS}
               tooltip="开启后授权请求必须携带 code_challenge；公开客户端（none）与使用 S256 PKCE 的接入方（如 RustFS 控制台）需要开启"
             >
               <Switch />
@@ -432,7 +443,7 @@ export default function OAuthClientList() {
             <Form.Item
               name="requireAuthTime"
               label="需要 auth_time"
-              valuePropName="checked"
+              {...ENABLE_FLAG_FORM_PROPS}
               tooltip="要求 id_token 带 auth_time 声明（max_age / 强制重新认证场景）"
             >
               <Switch />

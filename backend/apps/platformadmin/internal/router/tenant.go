@@ -16,10 +16,3 @@ func tenantRouter(groups *ginserver.RouterGroups) {
 	// 重置内置管理员密码（R2 动作子路径；builtin-admin 为租户下的单体子资源）
 	v1RouterGroup.POST("/tenants/:tenantID/builtin-admin/reset-password", tenantCtr.ResetAdminPassword)
 }
-
-func logRouter(groups *ginserver.RouterGroups) {
-	logCtr := ctrtenant.NewLogCtr()
-	v1RouterGroup := groups.MustGetGroup(ginserver.ApiVersionV1)
-	v1RouterGroup.GET("/logs", logCtr.PageList)
-	v1RouterGroup.GET("/logs/:logID", logCtr.Detail)
-}

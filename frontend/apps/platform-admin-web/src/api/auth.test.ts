@@ -4,7 +4,7 @@ vi.mock('@ark-iam/api', () => ({
   getUserinfo: vi.fn(() =>
     Promise.resolve({
       personInfo: { personID: "1", name: 'Test', avatar: '' },
-      userInfo: { userID: "1", tenantID: "1", name: 'Test', isOwner: 1 },
+      userInfo: { userID: "1", tenantID: "1", name: 'Test', ownerType: 'owner' },
     }),
   ),
   getMyTenants: vi.fn(() => Promise.resolve({ list: [{ tenantID: "1", name: 'Default' }] })),

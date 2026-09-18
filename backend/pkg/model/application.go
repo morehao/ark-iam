@@ -1,11 +1,9 @@
 package model
 
 import (
-	"encoding/json"
 	"regexp"
 
 	"github.com/morehao/golib/dbaccess/gormdao"
-	"gorm.io/datatypes"
 )
 
 const TableNameApplication = "application"
@@ -48,6 +46,24 @@ const (
 	AppStatusDisable AppStatus = "disable" // 停用
 )
 
+// AppPersonCreateTenantPolicy application.allow_person_create_tenant。
+type AppPersonCreateTenantPolicy string
+
+// 个人自助建租户开关取值（禁止硬编码）。
+const (
+	AppPersonCreateTenantPolicyEnable  AppPersonCreateTenantPolicy = "enable"
+	AppPersonCreateTenantPolicyDisable AppPersonCreateTenantPolicy = "disable"
+)
+
+// AppJoinByInvitePolicy application.allow_join_by_invite。
+type AppJoinByInvitePolicy string
+
+// 邀请加入开关取值（禁止硬编码）。
+const (
+	AppJoinByInvitePolicyEnable  AppJoinByInvitePolicy = "enable"
+	AppJoinByInvitePolicyDisable AppJoinByInvitePolicy = "disable"
+)
+
 type ApplicationEntity struct {
 	gormdao.BaseEntity
 	// Code 应用编码：业务标识，**控制台可改**（应用级唯一；改它不影响菜单/订阅/角色——那些都挂 app_id）。
@@ -56,9 +72,9 @@ type ApplicationEntity struct {
 	// SeedKey 种子身份键：内置应用的稳定标识（= 种子定义时的 code），创建时写入后不再变化，
 	// 控制台不可见也不可写。种子查行与租户开通（ProvisionTenantAdmin 定位 tenant_admin 应用）
 	// 都以它为依据；控制台自建应用恒为空串（空串不进部分唯一索引）。
-	SeedKey                 string `gorm:"column:seed_key;type:varchar(64);not null;default:'';comment:种子身份键(内置应用稳定标识,控制台不可见);uniqueIndex:uk_application_seed_key_active,where:deleted_at IS NULL AND seed_key <> ''" json:"-"`
-	AllowPersonCreateTenant *bool  `gorm:"column:allow_person_create_tenant;type:boolean;not null;default:false;comment:个人是否可自助创建租户" json:"allowPersonCreateTenant"`
-	AllowJoinByInvite       *bool  `gorm:"column:allow_join_by_invite;type:boolean;not null;default:false;comment:是否允许通过邀请加入租户" json:"allowJoinByInvite"`
+	SeedKey                 string                      `gorm:"column:seed_key;type:varchar(64);not null;default:'';comment:种子身份键(内置应用稳定标识,控制台不可见);uniqueIndex:uk_application_seed_key_active,where:deleted_at IS NULL AND seed_key <> ''" json:"-"`
+	AllowPersonCreateTenant AppPersonCreateTenantPolicy `gorm:"column:allow_person_create_tenant;type:varchar(16);not null;default:'disable';comment:个人是否可自助创建租户(enable/disable)" json:"allowPersonCreateTenant"`
+	AllowJoinByInvite       AppJoinByInvitePolicy       `gorm:"column:allow_join_by_invite;type:varchar(16);not null;default:'disable';comment:是否允许通过邀请加入租户(enable/disable)" json:"allowJoinByInvite"`
 	// RoleTemplate 应用角色模板：本应用对外提供的跨系统授权契约值清单（code + 展示名）。
 	//
 	// 契约值的**唯一来源**（产品锚点除外）：下游按「claim_prefix + code」认策略名，策略在下游是
@@ -67,34 +83,20 @@ type ApplicationEntity struct {
 	// 幂等物化为各租户的角色行（见 pkg/core/tenant.SyncAppRoleTemplate）。
 	//
 	// 归属：部署数据，由平台侧维护（seed 权威 create_only，控制台不写种子值）。
-	RoleTemplate datatypes.JSON `gorm:"column:role_template;type:json;not null;default:('[]');comment:应用角色模板(跨系统授权契约值清单: code+name)" json:"roleTemplate"`
-	Name         string         `gorm:"column:name;type:varchar(128);not null;default:'';comment:应用名称" json:"name"`
-	Description  string         `gorm:"column:description;type:text;comment:应用描述" json:"description"`
-	LogoURL      string         `gorm:"column:logo_url;type:varchar(2048);not null;default:'';comment:应用logo" json:"logoURL"`
-	HomepageURL  string         `gorm:"column:homepage_url;type:varchar(2048);not null;default:'';comment:应用主页" json:"homepageURL"`
-	Source       AppSource      `gorm:"column:source;type:varchar(32);not null;default:'third_party';comment:应用来源(builtin内置/first_party第一方/third_party第三方)" json:"source"`
-	Status       AppStatus      `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态" json:"status"`
-	Sort         int            `gorm:"column:sort;type:int;not null;default:0;comment:排序" json:"sort"`
-	CreatedBy    string         `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id" json:"createdBy"`
-	UpdatedBy    string         `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id" json:"updatedBy"`
-	DeletedBy    string         `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人id" json:"deletedBy"`
+	RoleTemplate RoleTemplateItemList `gorm:"column:role_template;type:json;serializer:json;not null;default:('[]');comment:应用角色模板(跨系统授权契约值清单: code+name)" json:"roleTemplate"`
+	Name         string               `gorm:"column:name;type:varchar(128);not null;default:'';comment:应用名称" json:"name"`
+	Description  string               `gorm:"column:description;type:text;comment:应用描述" json:"description"`
+	LogoURL      string               `gorm:"column:logo_url;type:varchar(2048);not null;default:'';comment:应用logo" json:"logoURL"`
+	HomepageURL  string               `gorm:"column:homepage_url;type:varchar(2048);not null;default:'';comment:应用主页" json:"homepageURL"`
+	Source       AppSource            `gorm:"column:source;type:varchar(32);not null;default:'third_party';comment:应用来源(builtin内置/first_party第一方/third_party第三方)" json:"source"`
+	Status       AppStatus            `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态" json:"status"`
+	Sort         int                  `gorm:"column:sort;type:int;not null;default:0;comment:排序" json:"sort"`
+	CreatedBy    string               `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id" json:"createdBy"`
+	UpdatedBy    string               `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id" json:"updatedBy"`
+	DeletedBy    string               `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人id" json:"deletedBy"`
 }
 
 func (ApplicationEntity) TableName() string { return TableNameApplication }
-
-// RoleTemplateList 解析应用角色模板；解析失败按空数组处理（畸形 JSON 不应让物化链路 panic，
-// 但形状由**写入侧**保证，读取侧只兜底——物化会撤下"模板里已没有的模板角色"，
-// 故畸形 JSON 的失效方向是"撤空"，不会留下越权角色）。
-func (a *ApplicationEntity) RoleTemplateList() RoleTemplateItemList {
-	if a == nil || len(a.RoleTemplate) == 0 {
-		return nil
-	}
-	var items RoleTemplateItemList
-	if err := json.Unmarshal(a.RoleTemplate, &items); err != nil {
-		return nil
-	}
-	return items
-}
 
 type ApplicationEntityList []ApplicationEntity
 

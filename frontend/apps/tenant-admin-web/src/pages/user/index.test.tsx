@@ -49,7 +49,7 @@ const machineUser: TenantMachineUserItem = {
   description: '',
   primaryDepartmentID: 'd1',
   primaryDepartmentName: '平台组',
-  isSuspended: false,
+  status: 'active',
 }
 
 const machineDetail: TenantMachineUserDetail = {
@@ -69,7 +69,6 @@ const keys: TenantApiKeyItem[] = Array.from({ length: 50 }, (_, i) => ({
   createdBy: 'op',
   creatorName: '运维',
   expiredAt: null,
-  lastUsedAt: null,
   revokedAt: null,
   createdAt: 1700000000,
   updatedAt: 1700000000,

@@ -99,7 +99,7 @@ func (ctr *OIDCCtr) SelectTenant(ctx *gin.Context) {
 // ChangePassword 首次登录强制改密（临时密码）。
 // @Tags OIDC
 // @Summary 首次登录修改密码
-// @Description 持临时密码（mustChangePassword）的自然人在登录被拦截后调用：校验当前密码与强度，
+// @Description 持临时密码（person.password_status = must_change）的自然人在登录被拦截后调用：校验当前密码与强度，
 // @Description 设置新密码并清除强制改密标记，同时撤销该自然人既有会话；之后需重新登录。
 // @accept application/json
 // @Produce application/json

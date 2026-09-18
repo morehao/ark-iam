@@ -27,7 +27,7 @@ func TestSeedIamDoesNotResurrectDeletedMenu(t *testing.T) {
 		t.Fatalf("count menus: %v", err)
 	}
 	var menu model.MenuEntity
-	if err := db.Where("seed_key = ?", "log").First(&menu).Error; err != nil {
+	if err := db.Where("seed_key = ?", "oauth-client").First(&menu).Error; err != nil {
 		t.Fatalf("query menu by seed_key: %v", err)
 	}
 	if err := db.Delete(&model.MenuEntity{}, "id = ?", menu.ID).Error; err != nil {
@@ -42,7 +42,7 @@ func TestSeedIamDoesNotResurrectDeletedMenu(t *testing.T) {
 	}
 
 	var resurrected int64
-	if err := db.Model(&model.MenuEntity{}).Where("seed_key = ?", "log").Count(&resurrected).Error; err != nil {
+	if err := db.Model(&model.MenuEntity{}).Where("seed_key = ?", "oauth-client").Count(&resurrected).Error; err != nil {
 		t.Fatalf("count resurrected menu: %v", err)
 	}
 	if resurrected != 0 {
@@ -74,7 +74,7 @@ func TestSeedIamDoesNotResurrectDeletedMenuSubtree(t *testing.T) {
 		t.Fatalf("seed fail: %v", err)
 	}
 
-	deletedSeedKeys := []string{"grp-platform", "menu", "log"}
+	deletedSeedKeys := []string{"grp-platform", "menu"}
 	for _, seedKey := range deletedSeedKeys {
 		var menu model.MenuEntity
 		if err := db.Where("seed_key = ?", seedKey).First(&menu).Error; err != nil {
@@ -161,7 +161,7 @@ func TestSeedIamDoesNotAdoptOperatorMenuWithSeedCode(t *testing.T) {
 		t.Fatalf("query admin app: %v", err)
 	}
 	var seedMenu model.MenuEntity
-	if err := db.Where("seed_key = ?", "log").First(&seedMenu).Error; err != nil {
+	if err := db.Where("seed_key = ?", "oauth-client").First(&seedMenu).Error; err != nil {
 		t.Fatalf("query menu by seed_key: %v", err)
 	}
 	if err := db.Delete(&model.MenuEntity{}, "id = ?", seedMenu.ID).Error; err != nil {
@@ -169,7 +169,7 @@ func TestSeedIamDoesNotAdoptOperatorMenuWithSeedCode(t *testing.T) {
 	}
 
 	operatorMenu := &model.MenuEntity{
-		AppID: adminApp.ID, Name: "运维自建审计", Code: "log", Path: "/ops-log",
+		AppID: adminApp.ID, Name: "运维自建客户端", Code: "oauth-client", Path: "/ops-client",
 		Type: model.MenuTypeMenu, Visibility: model.MenuVisibilityAdmin, Status: model.MenuStatusEnable,
 	}
 	if err := db.Create(operatorMenu).Error; err != nil {
@@ -187,7 +187,7 @@ func TestSeedIamDoesNotAdoptOperatorMenuWithSeedCode(t *testing.T) {
 	if got.SeedKey != "" {
 		t.Fatalf("运维自建菜单被种子认领为内置行: seed_key=%q", got.SeedKey)
 	}
-	if got.Path != "/ops-log" || got.Name != "运维自建审计" {
+	if got.Path != "/ops-client" || got.Name != "运维自建客户端" {
 		t.Fatalf("运维自建菜单被种子回写: %+v", got)
 	}
 }
@@ -224,5 +224,70 @@ func TestSeedIamRetiredMenuLeavesNoTombstone(t *testing.T) {
 	}
 	if remaining != 0 {
 		t.Fatalf("退役菜单必须物理删除（不留墓碑）, count=%d", remaining)
+	}
+}
+
+// TestSeedIamRetiresLogMenuWithRoleBindings 本批（P4）下线的「审计日志」菜单：存量库首次升级时
+// 必须连同 role_menu 授权一并清理——`log` 表与前端页面已删除，留下菜单行就是死链，
+// 留下授权则是指向不存在菜单的脏绑定。
+//
+// 全新库测试测不出这类残留（新库根本没有该行），故这里显式模拟存量库：先建出历史行与授权，
+// 再跑种子，断言「菜单物理删除 + role_menu 清零」。
+func TestSeedIamRetiresLogMenuWithRoleBindings(t *testing.T) {
+	db := setupDB(t)
+	ctx := context.Background()
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed fail: %v", err)
+	}
+
+	var adminApp model.ApplicationEntity
+	if err := db.Where("code = ?", "platform_admin").First(&adminApp).Error; err != nil {
+		t.Fatalf("query admin app: %v", err)
+	}
+	var adminRole model.RoleEntity
+	if err := db.Where("app_id = ? AND source = ?", adminApp.ID, model.RoleSourceBuiltin).First(&adminRole).Error; err != nil {
+		t.Fatalf("query admin role: %v", err)
+	}
+
+	// 模拟存量库：历史版本种子写入的「审计日志」菜单（seed_key=log）+ 内置管理员角色的授权
+	legacy := &model.MenuEntity{
+		AppID: adminApp.ID, SeedKey: "log", Name: "审计日志", Code: "log", Path: "/log",
+		Component: "/log/index", Sort: 2, Type: model.MenuTypeMenu,
+		Visibility: model.MenuVisibilityAdmin, Status: model.MenuStatusEnable,
+	}
+	if err := db.Create(legacy).Error; err != nil {
+		t.Fatalf("create legacy log menu: %v", err)
+	}
+	if err := db.Create(&model.RoleMenuEntity{
+		TenantID: adminRole.TenantID, RoleID: adminRole.ID, MenuID: legacy.ID,
+	}).Error; err != nil {
+		t.Fatalf("create legacy role_menu: %v", err)
+	}
+
+	if err := seed.SeedIam(ctx, db); err != nil {
+		t.Fatalf("seed (2nd) fail: %v", err)
+	}
+
+	var remaining int64
+	if err := db.Unscoped().Model(&model.MenuEntity{}).Where("seed_key = ?", "log").Count(&remaining).Error; err != nil {
+		t.Fatalf("count retired log menu: %v", err)
+	}
+	if remaining != 0 {
+		t.Errorf("退役的「审计日志」菜单必须物理删除, count=%d", remaining)
+	}
+	var links int64
+	if err := db.Model(&model.RoleMenuEntity{}).Where("menu_id = ?", legacy.ID).Count(&links).Error; err != nil {
+		t.Fatalf("count role_menu: %v", err)
+	}
+	if links != 0 {
+		t.Errorf("退役菜单的 role_menu 授权必须一并清理, count=%d", links)
+	}
+	// 未连带影响其它菜单：菜单管理（platform 的 menu 子项）仍在
+	var kept int64
+	if err := db.Model(&model.MenuEntity{}).Where("seed_key = ?", "menu").Count(&kept).Error; err != nil {
+		t.Fatalf("count menu seed_key: %v", err)
+	}
+	if kept != 1 {
+		t.Errorf("未退役菜单不得受影响, count=%d", kept)
 	}
 }

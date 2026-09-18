@@ -38,7 +38,7 @@ func seedTestIdentity(t *testing.T, db *gorm.DB, id, personID, issuer, subject s
 		PersonID:        personID,
 		Issuer:          issuer,
 		ExternalSubject: subject,
-		Detail:          []byte(`{"source":"test"}`),
+		Detail:          model.UserIdentityDetail{Email: "seed@example.com"},
 	}).Error; err != nil {
 		t.Fatalf("seed identity %s: %v", id, err)
 	}
@@ -69,7 +69,7 @@ func TestUserIdentityCreateBindsPersonOfUser(t *testing.T) {
 		UserID:     "user1",
 		Issuer:     "https://accounts.example.com",
 		IdentityID: "sub-1",
-		Detail:     map[string]any{"email": "u1@example.com"},
+		Detail:     model.UserIdentityDetail{Email: "u1@example.com"},
 	})
 	if err != nil {
 		t.Fatalf("create identity: %v", err)
@@ -93,7 +93,7 @@ func TestUserIdentityCreateBindsPersonOfUser(t *testing.T) {
 	if list.Total != 1 || len(list.List) != 1 {
 		t.Fatalf("expected 1 identity, got %+v", list)
 	}
-	if list.List[0].IdentityID != "sub-1" || list.List[0].Detail == nil {
+	if list.List[0].IdentityID != "sub-1" || list.List[0].Detail.Email != "u1@example.com" {
 		t.Fatalf("expected identity subject and parsed detail, got %+v", list.List[0])
 	}
 }

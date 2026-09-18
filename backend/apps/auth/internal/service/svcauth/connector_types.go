@@ -21,20 +21,9 @@ const (
 	connectorCapabilityProfileSync  = model.ConnectorCapabilityProfileSync
 )
 
-type ConnectorConfig struct {
-	Protocol     model.ConnectorProtocol `json:"protocol"`
-	Provider     model.ConnectorProvider `json:"provider"`
-	Issuer       string                  `json:"issuer"`
-	AuthURL      string                  `json:"authUrl"`
-	TokenURL     string                  `json:"tokenUrl"`
-	UserInfoURL  string                  `json:"userInfoUrl"`
-	ClientID     string                  `json:"clientID"`
-	ClientSecret string                  `json:"clientSecret"`
-	RedirectURI  string                  `json:"redirectUri"`
-	Scopes       []string                `json:"scopes"`
-	Raw          map[string]any          `json:"-"`
-	Extra        map[string]any          `json:"extra"`
-}
+// ConnectorConfig 连接器配置载具：结构定义在 model（对应 connector.config 列，serializer:json），
+// 包内保留短名别名以复用驱动签名。
+type ConnectorConfig = model.ConnectorConfig
 
 type StandardIdentity struct {
 	Issuer        string         `json:"issuer"`

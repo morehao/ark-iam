@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	"github.com/morehao/ark-iam/pkg/code"
@@ -98,19 +97,6 @@ func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplicat
 	if entity.Status == "" {
 		entity.Status = model.TenantApplicationStatusEnable
 	}
-	// PG 下 not null JSON 列不接受 NULL：无配置时显式给默认值（与租户自建订阅路径一致）。
-	if entity.Config == nil {
-		entity.Config = datatypes.JSON("{}")
-	}
-	if entity.GrantedScope == nil {
-		entity.GrantedScope = datatypes.JSON("[]")
-	}
-	if req.Config != "" {
-		entity.Config = datatypes.JSON([]byte(req.Config))
-	}
-	if req.GrantedScope != "" {
-		entity.GrantedScope = datatypes.JSON([]byte(req.GrantedScope))
-	}
 	// 4) 订阅落行即代表该应用在此租户内可用，故同事务把应用角色模板物化到该租户：
 	// 缺少物化时租户下没有该应用的角色、用户 ID token 的 groups 为空，下游策略集为空即 Deny
 	// （见 docs/design/application-integration-guide.md §3.4）。
@@ -188,12 +174,6 @@ func (svc *tenantApplicationSvc) Update(ctx *gin.Context, req *dtotenantapplicat
 	if req.Status != "" {
 		updateMap["status"] = req.Status
 	}
-	if req.Config != "" {
-		updateMap["config"] = datatypes.JSON([]byte(req.Config))
-	}
-	if req.GrantedScope != "" {
-		updateMap["granted_scope"] = datatypes.JSON([]byte(req.GrantedScope))
-	}
 	if err := dao.NewTenantApplicationDao().UpdateMap(crossCtx, req.TenantAppID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.TenantApplicationUpdateError)
@@ -226,8 +206,6 @@ func (svc *tenantApplicationSvc) Detail(ctx *gin.Context, req *dtotenantapplicat
 		AppName:      appNames[entity.AppID],
 		AppSource:    appSources[entity.AppID],
 		Status:       entity.Status,
-		Config:       string(entity.Config),
-		GrantedScope: string(entity.GrantedScope),
 		CreatedAt:    entity.CreatedAt.Unix(),
 	}, nil
 }

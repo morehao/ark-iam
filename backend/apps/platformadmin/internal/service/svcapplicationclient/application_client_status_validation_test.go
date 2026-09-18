@@ -103,3 +103,126 @@ func TestApplicationClientUpdateStatusEmptyMeansKeep(t *testing.T) {
 		t.Fatalf("其它字段应正常更新, got name=%q", got.Name)
 	}
 }
+
+// TestIsValidApplicationClientPolicies PKCE / auth_time 两个策略白名单本身：
+// 只认 enable/disable 与空值（空值表示未提供）。
+func TestIsValidApplicationClientPolicies(t *testing.T) {
+	for _, p := range []model.ClientPKCEPolicy{"", model.ClientPKCEPolicyEnable, model.ClientPKCEPolicyDisable} {
+		if !isValidClientPKCEPolicy(p) {
+			t.Fatalf("requirePKCE=%q 应合法", p)
+		}
+	}
+	for _, p := range []model.ClientPKCEPolicy{"true", "false", "on", "off", "1", "0", "ENABLE", "Enable"} {
+		if isValidClientPKCEPolicy(p) {
+			t.Fatalf("requirePKCE=%q 应非法", p)
+		}
+	}
+	for _, p := range []model.ClientAuthTimeClaimPolicy{"", model.ClientAuthTimeClaimPolicyEnable, model.ClientAuthTimeClaimPolicyDisable} {
+		if !isValidClientAuthTimeClaimPolicy(p) {
+			t.Fatalf("requireAuthTime=%q 应合法", p)
+		}
+	}
+	for _, p := range []model.ClientAuthTimeClaimPolicy{"true", "false", "on", "off", "1", "0", "ENABLE", "Enable"} {
+		if isValidClientAuthTimeClaimPolicy(p) {
+			t.Fatalf("requireAuthTime=%q 应非法", p)
+		}
+	}
+}
+
+// TestApplicationClientUpdateRejectsIllegalPolicy 非法 PKCE/auth_time 策略返回功能级错误码且不落库；
+// 空串表示未提供，归一为 disable（原 bool 字段在更新中同样按 false 全量写入）。
+func TestApplicationClientUpdateRejectsIllegalPolicy(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
+	entity := &model.ApplicationClientEntity{
+		TenantID:        "1",
+		AppID:           "app1",
+		Code:            "client_policy",
+		Name:            "策略客户端",
+		Source:          model.ApplicationClientSourceThirdParty,
+		Status:          model.ApplicationClientStatusEnable,
+		RequirePKCE:     model.ClientPKCEPolicyEnable,
+		RequireAuthTime: model.ClientAuthTimeClaimPolicyEnable,
+	}
+	if err := db.Create(entity).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	ctx := newOAuthDeleteCtx("1", "0")
+	svc := NewApplicationClientSvc()
+
+	err := svc.Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+		ApplicationClientID: entity.ID,
+		Name:                "策略客户端",
+		RequirePKCE:         "true",
+	})
+	if err == nil || gerror.GetCode(err) != int(code.ApplicationClientUpdateError) {
+		t.Fatalf("非法 PKCE 策略应返回 ApplicationClientUpdateError, got %v", err)
+	}
+	err = svc.Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+		ApplicationClientID: entity.ID,
+		Name:                "策略客户端",
+		RequireAuthTime:     "yes",
+	})
+	if err == nil || gerror.GetCode(err) != int(code.ApplicationClientUpdateError) {
+		t.Fatalf("非法 auth_time 策略应返回 ApplicationClientUpdateError, got %v", err)
+	}
+	got, err := dao.NewApplicationClientDao().GetByID(ctx, entity.ID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if got.RequirePKCE != model.ClientPKCEPolicyEnable || got.RequireAuthTime != model.ClientAuthTimeClaimPolicyEnable {
+		t.Fatalf("非法策略不应落库: %+v", got)
+	}
+
+	// 空串表示未提供 → 归一 disable
+	if err := svc.Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+		ApplicationClientID: entity.ID,
+		Name:                "策略客户端改名",
+	}); err != nil {
+		t.Fatalf("策略留空应允许: %v", err)
+	}
+	got, err = dao.NewApplicationClientDao().GetByID(ctx, entity.ID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if got.RequirePKCE != model.ClientPKCEPolicyDisable || got.RequireAuthTime != model.ClientAuthTimeClaimPolicyDisable {
+		t.Fatalf("空串策略应归一为 disable: %+v", got)
+	}
+
+	// 合法值可正常流转
+	if err := svc.Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+		ApplicationClientID: entity.ID,
+		Name:                "策略客户端改名",
+		RequirePKCE:         model.ClientPKCEPolicyEnable,
+		RequireAuthTime:     model.ClientAuthTimeClaimPolicyDisable,
+	}); err != nil {
+		t.Fatalf("合法策略应允许: %v", err)
+	}
+	got, err = dao.NewApplicationClientDao().GetByID(ctx, entity.ID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if got.RequirePKCE != model.ClientPKCEPolicyEnable || got.RequireAuthTime != model.ClientAuthTimeClaimPolicyDisable {
+		t.Fatalf("合法策略应生效: %+v", got)
+	}
+}
+
+// TestApplicationClientCreatePolicyDefaultsToDisable 创建未提供策略时按列默认 disable 落库。
+func TestApplicationClientCreatePolicyDefaultsToDisable(t *testing.T) {
+	testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
+
+	ctx := newOAuthDeleteCtx("1", "0")
+	resp, err := NewApplicationClientSvc().Create(ctx, &dtoapplicationclient.ApplicationClientCreateReq{
+		AppID: "app1", Code: "client_default", Name: "缺省策略客户端",
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	got, err := dao.NewApplicationClientDao().GetByID(ctx, resp.ApplicationClientID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if got.RequirePKCE != model.ClientPKCEPolicyDisable || got.RequireAuthTime != model.ClientAuthTimeClaimPolicyDisable {
+		t.Fatalf("缺省策略应为 disable: %+v", got)
+	}
+}

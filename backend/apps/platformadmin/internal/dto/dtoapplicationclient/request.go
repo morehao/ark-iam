@@ -13,18 +13,18 @@ type ApplicationClientCreateReq struct {
 	Code string `json:"code" binding:"required"` // 客户端编码（= OIDC client_id）
 	Name string `json:"name" binding:"required"` // 客户端名称
 
-	RedirectURIs            []string                      `json:"redirectURIs"`            // 授权回调地址
-	PostLogoutRedirectURIs  []string                      `json:"postLogoutRedirectURIs"`  // 登出回调地址
-	BackChannelLogoutURI    string                        `json:"backChannelLogoutURI"`    // OIDC背信道登出通知地址
-	GrantTypes              []model.GrantType             `json:"grantTypes"`              // 授权类型
-	ResponseTypes           []string                      `json:"responseTypes"`           // 响应类型
-	TokenEndpointAuthMethod model.TokenEndpointAuthMethod `json:"tokenEndpointAuthMethod"` // 令牌端点认证方式
-	AllowedOrigins          []string                      `json:"allowedOrigins"`          // CORS白名单
-	RequirePKCE             bool                          `json:"requirePKCE"`             // 是否强制PKCE
-	RequireAuthTime         bool                          `json:"requireAuthTime"`         // 是否需要auth_time声明
-	DefaultScopes           []string                      `json:"defaultScopes"`           // 默认权限范围
-	AccessTokenTTL          int64                         `json:"accessTokenTTL"`          // 访问令牌有效期(秒)
-	RefreshTokenTTL         int64                         `json:"refreshTokenTTL"`         // 刷新令牌有效期(秒)
+	RedirectURIs            []string                        `json:"redirectURIs"`            // 授权回调地址
+	PostLogoutRedirectURIs  []string                        `json:"postLogoutRedirectURIs"`  // 登出回调地址
+	BackChannelLogoutURI    string                          `json:"backChannelLogoutURI"`    // OIDC背信道登出通知地址
+	GrantTypes              []model.GrantType               `json:"grantTypes"`              // 授权类型
+	ResponseTypes           []string                        `json:"responseTypes"`           // 响应类型
+	TokenEndpointAuthMethod model.TokenEndpointAuthMethod   `json:"tokenEndpointAuthMethod"` // 令牌端点认证方式
+	AllowedOrigins          []string                        `json:"allowedOrigins"`          // CORS白名单
+	RequirePKCE             model.ClientPKCEPolicy          `json:"requirePKCE"`             // 是否强制PKCE(enable/disable，留空按 disable)
+	RequireAuthTime         model.ClientAuthTimeClaimPolicy `json:"requireAuthTime"`         // 是否需要auth_time声明(enable/disable，留空按 disable)
+	DefaultScopes           []string                        `json:"defaultScopes"`           // 默认权限范围
+	AccessTokenTTL          int64                           `json:"accessTokenTTL"`          // 访问令牌有效期(秒)
+	RefreshTokenTTL         int64                           `json:"refreshTokenTTL"`         // 刷新令牌有效期(秒)
 }
 
 // ApplicationClientUpdateReq 修改 OAuth 客户端。source 不可改。
@@ -37,18 +37,18 @@ type ApplicationClientUpdateReq struct {
 	Name   string                        `json:"name"`   // 客户端名称
 	Status model.ApplicationClientStatus `json:"status"` // 状态: enable-启用, disable-停用
 
-	RedirectURIs            []string                      `json:"redirectURIs"`            // 授权回调地址
-	PostLogoutRedirectURIs  []string                      `json:"postLogoutRedirectURIs"`  // 登出回调地址
-	BackChannelLogoutURI    string                        `json:"backChannelLogoutURI"`    // OIDC背信道登出通知地址
-	GrantTypes              []model.GrantType             `json:"grantTypes"`              // 授权类型
-	ResponseTypes           []string                      `json:"responseTypes"`           // 响应类型
-	TokenEndpointAuthMethod model.TokenEndpointAuthMethod `json:"tokenEndpointAuthMethod"` // 令牌端点认证方式
-	AllowedOrigins          []string                      `json:"allowedOrigins"`          // CORS白名单
-	RequirePKCE             bool                          `json:"requirePKCE"`             // 是否强制PKCE
-	RequireAuthTime         bool                          `json:"requireAuthTime"`         // 是否需要auth_time声明
-	DefaultScopes           []string                      `json:"defaultScopes"`           // 默认权限范围
-	AccessTokenTTL          int64                         `json:"accessTokenTTL"`          // 访问令牌有效期(秒)
-	RefreshTokenTTL         int64                         `json:"refreshTokenTTL"`         // 刷新令牌有效期(秒)
+	RedirectURIs            []string                        `json:"redirectURIs"`            // 授权回调地址
+	PostLogoutRedirectURIs  []string                        `json:"postLogoutRedirectURIs"`  // 登出回调地址
+	BackChannelLogoutURI    string                          `json:"backChannelLogoutURI"`    // OIDC背信道登出通知地址
+	GrantTypes              []model.GrantType               `json:"grantTypes"`              // 授权类型
+	ResponseTypes           []string                        `json:"responseTypes"`           // 响应类型
+	TokenEndpointAuthMethod model.TokenEndpointAuthMethod   `json:"tokenEndpointAuthMethod"` // 令牌端点认证方式
+	AllowedOrigins          []string                        `json:"allowedOrigins"`          // CORS白名单
+	RequirePKCE             model.ClientPKCEPolicy          `json:"requirePKCE"`             // 是否强制PKCE(enable/disable，留空按 disable)
+	RequireAuthTime         model.ClientAuthTimeClaimPolicy `json:"requireAuthTime"`         // 是否需要auth_time声明(enable/disable，留空按 disable)
+	DefaultScopes           []string                        `json:"defaultScopes"`           // 默认权限范围
+	AccessTokenTTL          int64                           `json:"accessTokenTTL"`          // 访问令牌有效期(秒)
+	RefreshTokenTTL         int64                           `json:"refreshTokenTTL"`         // 刷新令牌有效期(秒)
 }
 
 type ApplicationClientDeleteReq struct {

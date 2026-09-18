@@ -2,7 +2,6 @@ package testsetup
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -46,8 +45,6 @@ func PrepareTestPerson(ctx context.Context, username, email, phone, password, na
 		PasswordEncrypted: passwordHash,
 		PasswordMethod:    model.PasswordMethodBcrypt,
 		Name:              name,
-		Profile:           json.RawMessage("{}"),
-		CustomData:        json.RawMessage("{}"),
 	}
 	if err := db.Create(entity).Error; err != nil {
 		return nil, fmt.Errorf("create person: %w", err)
@@ -58,13 +55,16 @@ func PrepareTestPerson(ctx context.Context, username, email, phone, password, na
 func PrepareTestUser(ctx context.Context, tenantID, personID string, name string, isOwner bool) (*model.UserEntity, error) {
 	db := dbclient.IamDB(ctx)
 	now := time.Now()
+	ownerType := model.OwnerTypeNormal
+	if isOwner {
+		ownerType = model.OwnerTypeOwner
+	}
 	entity := &model.UserEntity{
 		TenantID:   tenantID,
 		PersonID:   personID,
 		Name:       name,
-		Profile:    json.RawMessage("{}"),
-		CustomData: json.RawMessage("{}"),
-		IsOwner:    isOwner,
+		OwnerType:  ownerType,
+		Status:     model.UserStatusActive,
 		JoinedAt:   &now,
 	}
 	if err := db.Create(entity).Error; err != nil {

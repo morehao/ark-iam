@@ -1,10 +1,12 @@
+import type { AxiosRequestConfig } from 'axios'
+
 import request from '../request'
 import type {
   ApplicationCreateReq,
   ApplicationItem,
   ApplicationUpdateReq,
-  AuditLogItem,
   DomainItem,
+  DomainVerificationStatus,
   MenuItem,
   MenuMyTreeResp,
   MenuTreeResp,
@@ -32,7 +34,10 @@ import type {
 // ==================== 应用 ====================
 export const getApplicationPageList = (data: { page: number; pageSize: number; name?: string }) =>
   request.get<any, PageListResp<ApplicationItem>>('/platform/applications', { params: data })
-export const getApplicationDetail = (appID: string) => request.get<any, ApplicationItem>(`/platform/applications/${appID}`)
+// config 用于传递 silent 等请求级选项：菜单页首屏恢复"上次选择的应用"属 best-effort 探测，
+// 应用已被删除/换库（旧 ID 失效）时静默回退，不弹全局提示（见 request.ts 的 silent）。
+export const getApplicationDetail = (appID: string, config?: AxiosRequestConfig) =>
+  request.get<any, ApplicationItem>(`/platform/applications/${appID}`, config)
 export const createApplication = (data: ApplicationCreateReq) => request.post<any, { appID: string; code: string }>('/platform/applications', data)
 export const updateApplication = (data: ApplicationUpdateReq) => {
   const { appID, ...body } = data
@@ -102,13 +107,8 @@ export const getDomainPageList = (data: { page: number; pageSize: number; domain
   request.get<any, PageListResp<DomainItem>>('/platform/domains', { params: data })
 export const getDomainDetail = (id: string) => request.get<any, DomainItem>(`/platform/domains/${id}`)
 export const createDomain = (domain: string) => request.post<any, { id: string }>('/platform/domains', { domain })
-export const updateDomain = (data: { id: string; domain?: string; isVerified?: number }) => {
+export const updateDomain = (data: { id: string; domain?: string; verificationStatus?: DomainVerificationStatus }) => {
   const { id, ...body } = data
   return request.put<any, string>(`/platform/domains/${id}`, body)
 }
 export const deleteDomain = (id: string) => request.delete<any, string>(`/platform/domains/${id}`)
-
-// ==================== 审计日志 ====================
-export const getAuditLogPageList = (data: { page: number; pageSize: number; key?: string }) =>
-  request.get<any, PageListResp<AuditLogItem>>('/platform/logs', { params: data })
-export const getAuditLogDetail = (logID: string) => request.get<any, AuditLogItem>(`/platform/logs/${logID}`)

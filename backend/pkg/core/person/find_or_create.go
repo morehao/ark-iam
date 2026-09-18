@@ -4,7 +4,6 @@ package person
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
@@ -18,12 +17,13 @@ type FindOrCreateReq struct {
 	PrimaryPhone      string               // 主要手机号（可选）
 	PasswordEncrypted string               // 新建 person 时的加密密码
 	PasswordMethod    model.PasswordMethod // 密码加密方式（取 model.PasswordMethod* 常量）
-	// MustChangePassword 仅对**本次新建**的 person 生效：置 true 表示其持有临时密码，
-	// 首次登录必须先改密。命中已有 person 时该字段被忽略——绝不改动既有账号的密码与登录方式。
-	MustChangePassword bool
-	Name               string // 姓名
-	Avatar             string // 头像 URL
-	CreatedBy          string // 创建人
+	// PasswordStatus 仅对**本次新建**的 person 生效：取 must_change 表示其持有临时密码，
+	// 首次登录必须先改密；空值按 normal 处理。命中已有 person 时该字段被忽略——
+	// 绝不改动既有账号的密码与登录方式。
+	PasswordStatus model.PasswordStatus
+	Name           string // 姓名
+	Avatar         string // 头像 URL
+	CreatedBy      string // 创建人
 }
 
 // FindOrCreate person 聚合根的 find-or-create：
@@ -60,18 +60,21 @@ func FindOrCreate(ctx context.Context, tx *gorm.DB, req *FindOrCreateReq) (*mode
 	}
 
 	// 2. 未命中：事务内创建
+	passwordStatus := req.PasswordStatus
+	if passwordStatus == "" {
+		passwordStatus = model.PasswordStatusNormal
+	}
 	entity := &model.PersonEntity{
-		Username:           model.StrPtr(req.Username),
-		PrimaryEmail:       model.StrPtr(req.PrimaryEmail),
-		PrimaryPhone:       model.StrPtr(req.PrimaryPhone),
-		PasswordEncrypted:  req.PasswordEncrypted,
-		PasswordMethod:     req.PasswordMethod,
-		MustChangePassword: req.MustChangePassword,
-		Name:               req.Name,
-		Avatar:             req.Avatar,
-		Profile:            json.RawMessage(`{}`),
-		CustomData:         json.RawMessage(`{}`),
-		CreatedBy:          req.CreatedBy,
+		Username:          model.StrPtr(req.Username),
+		PrimaryEmail:      model.StrPtr(req.PrimaryEmail),
+		PrimaryPhone:      model.StrPtr(req.PrimaryPhone),
+		PasswordEncrypted: req.PasswordEncrypted,
+		PasswordMethod:    req.PasswordMethod,
+		PasswordStatus:    passwordStatus,
+		Status:            model.PersonStatusActive,
+		Name:              req.Name,
+		Avatar:            req.Avatar,
+		CreatedBy:         req.CreatedBy,
 	}
 	if err := personDao.Insert(ctx, entity); err != nil {
 		return nil, false, err

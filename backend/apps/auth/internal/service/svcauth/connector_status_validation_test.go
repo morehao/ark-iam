@@ -68,8 +68,8 @@ func TestConnectorCreateWithoutStatusDefaultsEnable(t *testing.T) {
 			Name:         "连接器1",
 			Protocol:     "oauth2",
 			Provider:     "github",
-			ClaimMapping: map[string]any{"email": "email"},
-			DomainPolicy: map[string]any{"mode": "allow_all"},
+			ClaimMapping: model.ConnectorClaimMapping{Email: "email"},
+			DomainPolicy: model.ConnectorDomainPolicy{AllowedDomains: model.DomainList{"example.com"}},
 		},
 	})
 	if err != nil {
@@ -95,9 +95,9 @@ func TestConnectorUpdateRejectsIllegalStatus(t *testing.T) {
 		Protocol:     "oauth2",
 		Provider:     "github",
 		Status:       model.ConnectorStatusEnable,
-		Config:       []byte("{}"),
-		ClaimMapping: []byte("{}"),
-		DomainPolicy: []byte("{}"),
+		Config:       model.ConnectorConfig{},
+		ClaimMapping: model.ConnectorClaimMapping{},
+		DomainPolicy: model.ConnectorDomainPolicy{},
 	}
 	if err := db.Create(entity).Error; err != nil {
 		t.Fatalf("seed: %v", err)
@@ -136,9 +136,9 @@ func TestConnectorUpdateStatusDisable(t *testing.T) {
 		Protocol:     "oauth2",
 		Provider:     "github",
 		Status:       model.ConnectorStatusEnable,
-		Config:       []byte("{}"),
-		ClaimMapping: []byte("{}"),
-		DomainPolicy: []byte("{}"),
+		Config:       model.ConnectorConfig{},
+		ClaimMapping: model.ConnectorClaimMapping{},
+		DomainPolicy: model.ConnectorDomainPolicy{},
 	}
 	if err := db.Create(entity).Error; err != nil {
 		t.Fatalf("seed: %v", err)
@@ -161,5 +161,149 @@ func TestConnectorUpdateStatusDisable(t *testing.T) {
 	}
 	if got.Status != model.ConnectorStatusDisable {
 		t.Fatalf("status 应更新为 disable, got %q", got.Status)
+	}
+}
+
+// TestNormalizeConnectorSwitch 开关枚举白名单本身：空串归一为 disable（与列默认值一致），
+// enable/disable 原样通过，布尔字面量/数字/大小写脏值一律拒绝。
+func TestNormalizeConnectorSwitch(t *testing.T) {
+	enable, disable := model.ConnectorAutoCreateUserFlagEnable, model.ConnectorAutoCreateUserFlagDisable
+	cases := []struct {
+		in     model.ConnectorAutoCreateUserFlag
+		want   model.ConnectorAutoCreateUserFlag
+		wantOK bool
+	}{
+		{in: "", want: disable, wantOK: true},
+		{in: enable, want: enable, wantOK: true},
+		{in: disable, want: disable, wantOK: true},
+		{in: "true", want: "", wantOK: false},
+		{in: "false", want: "", wantOK: false},
+		{in: "1", want: "", wantOK: false},
+		{in: "0", want: "", wantOK: false},
+		{in: "ENABLE", want: "", wantOK: false},
+		{in: " enable", want: "", wantOK: false},
+	}
+	for _, tc := range cases {
+		got, ok := normalizeConnectorSwitch(tc.in, enable, disable)
+		if ok != tc.wantOK || got != tc.want {
+			t.Fatalf("normalizeConnectorSwitch(%q) = (%q, %v), want (%q, %v)", tc.in, got, ok, tc.want, tc.wantOK)
+		}
+	}
+}
+
+// TestConnectorCreateRejectsIllegalSwitch 四个开关列同属前端枚举入参，非法值必须在
+// service 入口被拒（且不落库），错误码沿用该操作既有的 ConnectorCreateError。
+func TestConnectorCreateRejectsIllegalSwitch(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.ConnectorEntity{})
+
+	ctx, _ := gin.CreateTestContext(nil)
+	ctx.Set(gcontext.KeyTenantID, "1")
+	ctx.Set(gcontext.KeyUserID, "0")
+	svc := NewConnectorSvc()
+
+	_, err := svc.Create(ctx, &dtoauth.ConnectorCreateReq{
+		ConnectorBaseInfo: objauth.ConnectorBaseInfo{
+			Name:                "连接器1",
+			Protocol:            "oauth2",
+			Provider:            "github",
+			Status:              model.ConnectorStatusEnable,
+			AllowAutoCreateUser: "true", // 阶段 3 前的布尔字面量，已不在枚举白名单内
+		},
+	})
+	if err == nil {
+		t.Fatal("非法开关值应被拒绝")
+	}
+	if gerror.GetCode(err) != int(code.ConnectorCreateError) {
+		t.Fatalf("期望 ConnectorCreateError, got %v", err)
+	}
+	var count int64
+	if err := db.WithContext(ctx).Model(&model.ConnectorEntity{}).Count(&count).Error; err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("非法开关值不应落库, got %d rows", count)
+	}
+}
+
+// TestConnectorCreateWithoutSwitchesDefaultsDisable 未提交开关字段时落 disable（列默认值），
+// 保持改造前"未提交 bool 即 false"的既有行为。
+func TestConnectorCreateWithoutSwitchesDefaultsDisable(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.ConnectorEntity{})
+
+	ctx, _ := gin.CreateTestContext(nil)
+	ctx.Set(gcontext.KeyTenantID, "1")
+	ctx.Set(gcontext.KeyUserID, "0")
+	svc := NewConnectorSvc()
+
+	resp, err := svc.Create(ctx, &dtoauth.ConnectorCreateReq{
+		ConnectorBaseInfo: objauth.ConnectorBaseInfo{
+			Name:     "连接器1",
+			Protocol: "oauth2",
+			Provider: "github",
+		},
+	})
+	if err != nil {
+		t.Fatalf("未提交开关字段应允许创建: %v", err)
+	}
+
+	var entity model.ConnectorEntity
+	if err := db.WithContext(ctx).Where("id = ?", resp.ConnectorID).First(&entity).Error; err != nil {
+		t.Fatalf("查询连接器失败: %v", err)
+	}
+	if entity.AllowAutoCreateUser != model.ConnectorAutoCreateUserFlagDisable ||
+		entity.AllowAccountLink != model.ConnectorAccountLinkFlagDisable ||
+		entity.SyncProfile != model.ConnectorSyncProfileFlagDisable ||
+		entity.EnableTokenStorage != model.ConnectorTokenStorageFlagDisable {
+		t.Fatalf("未提交的开关应落 disable, got %q/%q/%q/%q",
+			entity.AllowAutoCreateUser, entity.AllowAccountLink, entity.SyncProfile, entity.EnableTokenStorage)
+	}
+}
+
+// TestConnectorUpdateRejectsIllegalSwitch 更新入口同样做白名单校验：非法开关值不落库。
+func TestConnectorUpdateRejectsIllegalSwitch(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.ConnectorEntity{})
+	entity := &model.ConnectorEntity{
+		TenantID:            "1",
+		Name:                "连接器1",
+		Protocol:            "oauth2",
+		Provider:            "github",
+		Status:              model.ConnectorStatusEnable,
+		AllowAutoCreateUser: model.ConnectorAutoCreateUserFlagEnable,
+		AllowAccountLink:    model.ConnectorAccountLinkFlagEnable,
+		SyncProfile:         model.ConnectorSyncProfileFlagEnable,
+		EnableTokenStorage:  model.ConnectorTokenStorageFlagEnable,
+		Config:              model.ConnectorConfig{},
+		ClaimMapping:        model.ConnectorClaimMapping{},
+		DomainPolicy:        model.ConnectorDomainPolicy{},
+	}
+	if err := db.Create(entity).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	ctx, _ := gin.CreateTestContext(nil)
+	ctx.Set(gcontext.KeyTenantID, "1")
+	ctx.Set(gcontext.KeyUserID, "0")
+	svc := NewConnectorSvc()
+
+	err := svc.Update(ctx, &dtoauth.ConnectorUpdateReq{
+		ConnectorID: entity.ID,
+		ConnectorBaseInfo: objauth.ConnectorBaseInfo{
+			Name:             "连接器1",
+			SyncProfile:      "yes", // 非法枚举值
+			AllowAccountLink: model.ConnectorAccountLinkFlagDisable,
+		},
+	})
+	if err == nil {
+		t.Fatal("非法开关值应被拒绝")
+	}
+	if gerror.GetCode(err) != int(code.ConnectorUpdateError) {
+		t.Fatalf("期望 ConnectorUpdateError, got %v", err)
+	}
+	got, err := dao.NewConnectorDao().GetByID(ctx, entity.ID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if got.AllowAccountLink != model.ConnectorAccountLinkFlagEnable {
+		t.Fatalf("非法开关值整批不应落库, allow_account_link got %q", got.AllowAccountLink)
 	}
 }

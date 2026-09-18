@@ -948,110 +948,6 @@ const docTemplateplatformadmin = `{
                 }
             }
         },
-        "/v1/platform/logs": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "日志"
-                ],
-                "summary": "日志列表分页",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "日志键",
-                        "name": "key",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "页码",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "maximum": 1000,
-                        "type": "integer",
-                        "description": "每页数据条数",
-                        "name": "pageSize",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "租户ID",
-                        "name": "tenantID",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtotenant.LogPageListResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/platform/logs/{logID}": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "日志"
-                ],
-                "summary": "日志详情",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "logID",
-                        "name": "logID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtotenant.LogDetailResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/v1/platform/menus": {
             "get": {
                 "consumes": [
@@ -2014,12 +1910,20 @@ const docTemplateplatformadmin = `{
             ],
             "properties": {
                 "allowJoinByInvite": {
-                    "description": "是否允许通过邀请加入租户",
-                    "type": "boolean"
+                    "description": "是否允许通过邀请加入租户(enable/disable，留空按 disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppJoinByInvitePolicy"
+                        }
+                    ]
                 },
                 "allowPersonCreateTenant": {
-                    "description": "个人是否可自助创建租户",
-                    "type": "boolean"
+                    "description": "个人是否可自助创建租户(enable/disable，留空按 disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppPersonCreateTenantPolicy"
+                        }
+                    ]
                 },
                 "code": {
                     "description": "应用编码：下划线连接（小写字母开头，仅含小写字母、数字与下划线，见 model.AppCodePattern）",
@@ -2071,12 +1975,20 @@ const docTemplateplatformadmin = `{
             "type": "object",
             "properties": {
                 "allowJoinByInvite": {
-                    "description": "是否允许通过邀请加入租户",
-                    "type": "boolean"
+                    "description": "是否允许通过邀请加入租户(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppJoinByInvitePolicy"
+                        }
+                    ]
                 },
                 "allowPersonCreateTenant": {
-                    "description": "个人是否可自助创建租户",
-                    "type": "boolean"
+                    "description": "个人是否可自助创建租户(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppPersonCreateTenantPolicy"
+                        }
+                    ]
                 },
                 "appID": {
                     "description": "应用ID",
@@ -2155,12 +2067,20 @@ const docTemplateplatformadmin = `{
             "type": "object",
             "properties": {
                 "allowJoinByInvite": {
-                    "description": "是否允许通过邀请加入租户",
-                    "type": "boolean"
+                    "description": "是否允许通过邀请加入租户(enable/disable，留空不修改)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppJoinByInvitePolicy"
+                        }
+                    ]
                 },
                 "allowPersonCreateTenant": {
-                    "description": "个人是否可自助创建租户",
-                    "type": "boolean"
+                    "description": "个人是否可自助创建租户(enable/disable，留空不修改)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppPersonCreateTenantPolicy"
+                        }
+                    ]
                 },
                 "code": {
                     "description": "Code 应用编码：自建应用可改（留空表示不修改），规则同创建（model.AppCodePattern，小写字母开头、\n仅小写字母/数字/下划线）；改它不影响菜单/订阅/角色——那些都挂 app_id。\n**内置应用**（source=builtin）拒改——控制台菜单入口仍按该编码定位（platform_admin/tenant_admin），\n改名会当场让对应控制台侧边栏失联且无法从界面恢复。",
@@ -2207,12 +2127,20 @@ const docTemplateplatformadmin = `{
             "type": "object",
             "properties": {
                 "allowJoinByInvite": {
-                    "description": "是否允许通过邀请加入租户",
-                    "type": "boolean"
+                    "description": "是否允许通过邀请加入租户(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppJoinByInvitePolicy"
+                        }
+                    ]
                 },
                 "allowPersonCreateTenant": {
-                    "description": "个人是否可自助创建租户",
-                    "type": "boolean"
+                    "description": "个人是否可自助创建租户(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppPersonCreateTenantPolicy"
+                        }
+                    ]
                 },
                 "appID": {
                     "description": "应用ID",
@@ -2335,12 +2263,20 @@ const docTemplateplatformadmin = `{
                     "type": "integer"
                 },
                 "requireAuthTime": {
-                    "description": "是否需要auth_time声明",
-                    "type": "boolean"
+                    "description": "是否需要auth_time声明(enable/disable，留空按 disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ClientAuthTimeClaimPolicy"
+                        }
+                    ]
                 },
                 "requirePKCE": {
-                    "description": "是否强制PKCE",
-                    "type": "boolean"
+                    "description": "是否强制PKCE(enable/disable，留空按 disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ClientPKCEPolicy"
+                        }
+                    ]
                 },
                 "responseTypes": {
                     "description": "响应类型",
@@ -2447,12 +2383,20 @@ const docTemplateplatformadmin = `{
                     "type": "integer"
                 },
                 "requireAuthTime": {
-                    "description": "是否需要auth_time声明",
-                    "type": "boolean"
+                    "description": "是否需要auth_time声明(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ClientAuthTimeClaimPolicy"
+                        }
+                    ]
                 },
                 "requirePKCE": {
-                    "description": "是否强制PKCE",
-                    "type": "boolean"
+                    "description": "是否强制PKCE(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ClientPKCEPolicy"
+                        }
+                    ]
                 },
                 "responseTypes": {
                     "description": "响应类型",
@@ -2566,12 +2510,20 @@ const docTemplateplatformadmin = `{
                     "type": "integer"
                 },
                 "requireAuthTime": {
-                    "description": "是否需要auth_time声明",
-                    "type": "boolean"
+                    "description": "是否需要auth_time声明(enable/disable，留空按 disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ClientAuthTimeClaimPolicy"
+                        }
+                    ]
                 },
                 "requirePKCE": {
-                    "description": "是否强制PKCE",
-                    "type": "boolean"
+                    "description": "是否强制PKCE(enable/disable，留空按 disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ClientPKCEPolicy"
+                        }
+                    ]
                 },
                 "responseTypes": {
                     "description": "响应类型",
@@ -2780,17 +2732,17 @@ const docTemplateplatformadmin = `{
                     "description": "域名ID",
                     "type": "string"
                 },
-                "isVerified": {
-                    "description": "是否验证(0-未验证 1-已验证)",
-                    "type": "boolean"
-                },
                 "updatedAt": {
                     "description": "更新时间(unix 秒)",
                     "type": "integer"
                 },
-                "verifiedAt": {
-                    "description": "验证时间(unix 秒)",
-                    "type": "integer"
+                "verificationStatus": {
+                    "description": "验证状态: unverified-未验证, verified-已验证",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.DomainVerificationStatus"
+                        }
+                    ]
                 }
             }
         },
@@ -2809,17 +2761,17 @@ const docTemplateplatformadmin = `{
                     "description": "域名ID",
                     "type": "string"
                 },
-                "isVerified": {
-                    "description": "是否验证(0-未验证 1-已验证)",
-                    "type": "boolean"
-                },
                 "updatedAt": {
                     "description": "更新时间(unix 秒)",
                     "type": "integer"
                 },
-                "verifiedAt": {
-                    "description": "验证时间(unix 秒)",
-                    "type": "integer"
+                "verificationStatus": {
+                    "description": "验证状态: unverified-未验证, verified-已验证",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.DomainVerificationStatus"
+                        }
+                    ]
                 }
             }
         },
@@ -2844,9 +2796,13 @@ const docTemplateplatformadmin = `{
                     "description": "域名",
                     "type": "string"
                 },
-                "isVerified": {
-                    "description": "是否验证(0-未验证 1-已验证)",
-                    "type": "boolean"
+                "verificationStatus": {
+                    "description": "VerificationStatus 验证状态: unverified-未验证, verified-已验证；留空表示不修改。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.DomainVerificationStatus"
+                        }
+                    ]
                 }
             }
         },
@@ -2869,20 +2825,32 @@ const docTemplateplatformadmin = `{
                     "type": "string"
                 },
                 "externalLink": {
-                    "description": "是否外链",
-                    "type": "boolean"
+                    "description": "是否外链(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuExternalLinkFlag"
+                        }
+                    ]
                 },
                 "hidden": {
-                    "description": "是否隐藏",
-                    "type": "boolean"
+                    "description": "是否隐藏(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuHiddenFlag"
+                        }
+                    ]
                 },
                 "icon": {
                     "description": "菜单图标",
                     "type": "string"
                 },
                 "keepAlive": {
-                    "description": "是否缓存",
-                    "type": "boolean"
+                    "description": "是否缓存(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuKeepAliveFlag"
+                        }
+                    ]
                 },
                 "name": {
                     "description": "菜单名称",
@@ -2966,20 +2934,32 @@ const docTemplateplatformadmin = `{
                     "type": "integer"
                 },
                 "externalLink": {
-                    "description": "是否外链",
-                    "type": "boolean"
+                    "description": "是否外链(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuExternalLinkFlag"
+                        }
+                    ]
                 },
                 "hidden": {
-                    "description": "是否隐藏",
-                    "type": "boolean"
+                    "description": "是否隐藏(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuHiddenFlag"
+                        }
+                    ]
                 },
                 "icon": {
                     "description": "菜单图标",
                     "type": "string"
                 },
                 "keepAlive": {
-                    "description": "是否缓存",
-                    "type": "boolean"
+                    "description": "是否缓存(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuKeepAliveFlag"
+                        }
+                    ]
                 },
                 "menuID": {
                     "description": "菜单ID",
@@ -3078,20 +3058,32 @@ const docTemplateplatformadmin = `{
                     "type": "integer"
                 },
                 "externalLink": {
-                    "description": "是否外链",
-                    "type": "boolean"
+                    "description": "是否外链(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuExternalLinkFlag"
+                        }
+                    ]
                 },
                 "hidden": {
-                    "description": "是否隐藏",
-                    "type": "boolean"
+                    "description": "是否隐藏(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuHiddenFlag"
+                        }
+                    ]
                 },
                 "icon": {
                     "description": "菜单图标",
                     "type": "string"
                 },
                 "keepAlive": {
-                    "description": "是否缓存",
-                    "type": "boolean"
+                    "description": "是否缓存(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuKeepAliveFlag"
+                        }
+                    ]
                 },
                 "menuID": {
                     "description": "菜单ID",
@@ -3201,20 +3193,32 @@ const docTemplateplatformadmin = `{
                     "type": "integer"
                 },
                 "externalLink": {
-                    "description": "是否外链",
-                    "type": "boolean"
+                    "description": "是否外链(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuExternalLinkFlag"
+                        }
+                    ]
                 },
                 "hidden": {
-                    "description": "是否隐藏",
-                    "type": "boolean"
+                    "description": "是否隐藏(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuHiddenFlag"
+                        }
+                    ]
                 },
                 "icon": {
                     "description": "菜单图标",
                     "type": "string"
                 },
                 "keepAlive": {
-                    "description": "是否缓存",
-                    "type": "boolean"
+                    "description": "是否缓存(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuKeepAliveFlag"
+                        }
+                    ]
                 },
                 "menuID": {
                     "description": "菜单ID",
@@ -3305,20 +3309,32 @@ const docTemplateplatformadmin = `{
                     "type": "string"
                 },
                 "externalLink": {
-                    "description": "是否外链",
-                    "type": "boolean"
+                    "description": "是否外链(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuExternalLinkFlag"
+                        }
+                    ]
                 },
                 "hidden": {
-                    "description": "是否隐藏",
-                    "type": "boolean"
+                    "description": "是否隐藏(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuHiddenFlag"
+                        }
+                    ]
                 },
                 "icon": {
                     "description": "菜单图标",
                     "type": "string"
                 },
                 "keepAlive": {
-                    "description": "是否缓存",
-                    "type": "boolean"
+                    "description": "是否缓存(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuKeepAliveFlag"
+                        }
+                    ]
                 },
                 "name": {
                     "description": "菜单名称",
@@ -3363,94 +3379,6 @@ const docTemplateplatformadmin = `{
                             "$ref": "#/definitions/model.MenuVisibility"
                         }
                     ]
-                }
-            }
-        },
-        "dtotenant.LogDetailResp": {
-            "type": "object",
-            "properties": {
-                "createdAt": {
-                    "description": "创建时间",
-                    "type": "integer"
-                },
-                "createdBy": {
-                    "description": "创建人id",
-                    "type": "integer"
-                },
-                "key": {
-                    "description": "日志键",
-                    "type": "string"
-                },
-                "logID": {
-                    "description": "日志ID",
-                    "type": "string"
-                },
-                "payload": {
-                    "description": "日志内容"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "string"
-                },
-                "updatedAt": {
-                    "description": "更新时间",
-                    "type": "integer"
-                },
-                "updatedBy": {
-                    "description": "更新人id",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtotenant.LogPageListItem": {
-            "type": "object",
-            "properties": {
-                "createdAt": {
-                    "description": "创建时间",
-                    "type": "integer"
-                },
-                "createdBy": {
-                    "description": "创建人id",
-                    "type": "integer"
-                },
-                "key": {
-                    "description": "日志键",
-                    "type": "string"
-                },
-                "logID": {
-                    "description": "日志ID",
-                    "type": "string"
-                },
-                "payload": {
-                    "description": "日志内容"
-                },
-                "tenantID": {
-                    "description": "租户ID",
-                    "type": "string"
-                },
-                "updatedAt": {
-                    "description": "更新时间",
-                    "type": "integer"
-                },
-                "updatedBy": {
-                    "description": "更新人id",
-                    "type": "integer"
-                }
-            }
-        },
-        "dtotenant.LogPageListResp": {
-            "type": "object",
-            "properties": {
-                "list": {
-                    "description": "数据列表",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dtotenant.LogPageListItem"
-                    }
-                },
-                "total": {
-                    "description": "数据总条数",
-                    "type": "integer"
                 }
             }
         },
@@ -3783,14 +3711,6 @@ const docTemplateplatformadmin = `{
                     "description": "应用ID",
                     "type": "string"
                 },
-                "config": {
-                    "description": "租户级应用配置(JSON)",
-                    "type": "string"
-                },
-                "grantedScope": {
-                    "description": "租户级scope授权(JSON)",
-                    "type": "string"
-                },
                 "status": {
                     "description": "状态: enable-启用, disable-停用",
                     "allOf": [
@@ -3833,17 +3753,9 @@ const docTemplateplatformadmin = `{
                         }
                     ]
                 },
-                "config": {
-                    "description": "租户级应用配置(JSON)",
-                    "type": "string"
-                },
                 "createdAt": {
                     "description": "创建时间(unix 秒)",
                     "type": "integer"
-                },
-                "grantedScope": {
-                    "description": "租户级scope授权(JSON)",
-                    "type": "string"
                 },
                 "status": {
                     "description": "状态",
@@ -3886,14 +3798,6 @@ const docTemplateplatformadmin = `{
         "dtotenantapplication.TenantApplicationUpdateReq": {
             "type": "object",
             "properties": {
-                "config": {
-                    "description": "租户级应用配置(JSON)",
-                    "type": "string"
-                },
-                "grantedScope": {
-                    "description": "租户级scope授权(JSON)",
-                    "type": "string"
-                },
                 "status": {
                     "description": "状态",
                     "allOf": [
@@ -3918,6 +3822,28 @@ const docTemplateplatformadmin = `{
                     "type": "string"
                 }
             }
+        },
+        "model.AppJoinByInvitePolicy": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-varnames": [
+                "AppJoinByInvitePolicyEnable",
+                "AppJoinByInvitePolicyDisable"
+            ]
+        },
+        "model.AppPersonCreateTenantPolicy": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-varnames": [
+                "AppPersonCreateTenantPolicyEnable",
+                "AppPersonCreateTenantPolicyDisable"
+            ]
         },
         "model.AppSource": {
             "type": "string",
@@ -4003,6 +3929,39 @@ const docTemplateplatformadmin = `{
                 "ApplicationClientStatusDisable"
             ]
         },
+        "model.ClientAuthTimeClaimPolicy": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-varnames": [
+                "ClientAuthTimeClaimPolicyEnable",
+                "ClientAuthTimeClaimPolicyDisable"
+            ]
+        },
+        "model.ClientPKCEPolicy": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-varnames": [
+                "ClientPKCEPolicyEnable",
+                "ClientPKCEPolicyDisable"
+            ]
+        },
+        "model.DomainVerificationStatus": {
+            "type": "string",
+            "enum": [
+                "unverified",
+                "verified"
+            ],
+            "x-enum-varnames": [
+                "DomainVerificationUnverified",
+                "DomainVerificationVerified"
+            ]
+        },
         "model.GrantType": {
             "type": "string",
             "enum": [
@@ -4014,6 +3973,39 @@ const docTemplateplatformadmin = `{
                 "GrantTypeAuthorizationCode",
                 "GrantTypeClientCredentials",
                 "GrantTypeRefreshToken"
+            ]
+        },
+        "model.MenuExternalLinkFlag": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-varnames": [
+                "MenuExternalLinkFlagEnable",
+                "MenuExternalLinkFlagDisable"
+            ]
+        },
+        "model.MenuHiddenFlag": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-varnames": [
+                "MenuHiddenFlagEnable",
+                "MenuHiddenFlagDisable"
+            ]
+        },
+        "model.MenuKeepAliveFlag": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-varnames": [
+                "MenuKeepAliveFlagEnable",
+                "MenuKeepAliveFlagDisable"
             ]
         },
         "model.MenuStatus": {
@@ -4199,20 +4191,32 @@ const docTemplateplatformadmin = `{
                     "type": "string"
                 },
                 "externalLink": {
-                    "description": "是否外链",
-                    "type": "boolean"
+                    "description": "是否外链(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuExternalLinkFlag"
+                        }
+                    ]
                 },
                 "hidden": {
-                    "description": "是否隐藏",
-                    "type": "boolean"
+                    "description": "是否隐藏(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuHiddenFlag"
+                        }
+                    ]
                 },
                 "icon": {
                     "description": "菜单图标",
                     "type": "string"
                 },
                 "keepAlive": {
-                    "description": "是否缓存",
-                    "type": "boolean"
+                    "description": "是否缓存(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuKeepAliveFlag"
+                        }
+                    ]
                 },
                 "menuID": {
                     "description": "菜单ID",

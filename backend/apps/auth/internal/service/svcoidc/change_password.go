@@ -16,7 +16,7 @@ import (
 // ChangePassword 首次登录强制改密（临时密码场景，见
 // docs/design/system-design.md §5.8）。
 //
-// 前置：CompleteLogin 命中 person.must_change_password=true 时不完成授权（done=false），
+// 前置：CompleteLogin 命中 person.password_status=must_change 时不完成授权（done=false），
 // 仅把 subject 绑到授权票据并返回 RequiresPasswordChange，前端据此引导用户设置新密码。
 //
 // 本接口只做"改密"这一件事：由授权票据的 subject 定位自然人（不接受请求体传 personID，
@@ -45,7 +45,7 @@ func (svc *oidcAuthSvc) ChangePassword(ctx *gin.Context, req *dtooidc.OIDCChange
 	}
 	// 只服务"临时密码首次登录"场景：非强制改密的改密走 /v1/auth/me/password，
 	// 此处收紧可减少一条仅凭授权票据即可改密的入口。
-	if !personEntity.MustChangePassword {
+	if personEntity.PasswordStatus != model.PasswordStatusMustChange {
 		return code.GetError(code.OIDCSessionNotFound)
 	}
 	// 连接器注册的账号可能没有本地密码，此时提示"密码未设置"而非"密码错误"
@@ -69,10 +69,10 @@ func (svc *oidcAuthSvc) ChangePassword(ctx *gin.Context, req *dtooidc.OIDCChange
 		return code.GetError(code.PasswordHashError)
 	}
 	if err := personDao.UpdateMap(reqCtx, personID, map[string]any{
-		"password_encrypted":   newHash,
-		"password_method":      model.PasswordMethodBcrypt,
-		"must_change_password": false,
-		"updated_by":           personID,
+		"password_encrypted": newHash,
+		"password_method":    model.PasswordMethodBcrypt,
+		"password_status":    model.PasswordStatusNormal,
+		"updated_by":         personID,
 	}); err != nil {
 		glog.Errorf(ctx, "[oidcAuthSvc.ChangePassword] dao UpdateMap fail, err:%v, personID:%s", err, personID)
 		return code.GetError(code.UserUpdateError)

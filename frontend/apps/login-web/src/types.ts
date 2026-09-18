@@ -1,3 +1,18 @@
+/**
+ * 租户拥有者类型（后端具名类型 model.OwnerType）：owner-拥有者 / normal-普通成员。
+ * login-web 不依赖 @ark-iam/types，故在此按后端同名同形定义一份。
+ */
+export type OwnerType = 'owner' | 'normal'
+
+/** 租户选择项（登录/注册响应回传，ownerType 标识该租户内的归属） */
+export interface TenantSelectionItem {
+  tenantID: string
+  name: string
+  tag?: string
+  userID?: string
+  ownerType?: OwnerType
+}
+
 export interface OIDCLoginReq {
   authRequestID: string
   identifier: string
@@ -15,8 +30,9 @@ export interface OIDCLoginResp {
   requiresTenantSelection?: boolean
   /** 该账号持临时密码，必须先用 changePassword 设置新密码后才能继续登录 */
   requiresPasswordChange?: boolean
-  tenants?: { tenantID: string; name: string; tag?: string; userID?: string; isOwner?: number }[]
+  tenants?: TenantSelectionItem[]
   personID?: string
+  /** 计算结果（应用策略 ∧ 零租户），后端 dtooidc 为 bool，非字典列 */
   allowPersonCreateTenant?: boolean
 }
 
@@ -44,7 +60,8 @@ export interface RegisterPersonResp {
   personID: string
   requiresPasswordLogin?: boolean
   requiresTenantSelection: boolean
-  tenants?: { tenantID: string; name: string; tag?: string; userID?: string; isOwner?: number }[]
+  tenants?: TenantSelectionItem[]
+  /** 计算结果（应用策略 ∧ 零租户），后端 dtooidc 为 bool，非字典列 */
   allowPersonCreateTenant: boolean
 }
 
@@ -64,5 +81,6 @@ export interface OIDCLoginConfigReq {
 }
 
 export interface OIDCLoginConfigResp {
+  /** 计算结果（应用策略），后端 dtooidc 为 bool，非字典列 */
   allowPersonCreateTenant: boolean
 }

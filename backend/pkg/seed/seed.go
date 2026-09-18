@@ -15,7 +15,6 @@ package seed
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -627,7 +626,6 @@ func seedMenus(ctx context.Context, db *gorm.DB, rep *Report, adminApp, tenantAd
 		{appCode: appCodeAdmin, parentCode: "grp-app", name: "OAuth客户端", code: "oauth-client", path: "/oauth-client", icon: "key", sort: 2, component: "/oauthClient/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, name: "平台管理", code: "grp-platform", icon: "setting", sort: 4, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
 		{appCode: appCodeAdmin, parentCode: "grp-platform", name: "菜单管理", code: "menu", path: "/menu", icon: "menu", sort: 1, component: "/menu/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
-		{appCode: appCodeAdmin, parentCode: "grp-platform", name: "审计日志", code: "log", path: "/log", icon: "file", sort: 2, component: "/log/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 		// 租户管理后台一级菜单：控制台定位为「租户管理层专用」（部门/用户/角色/密钥均属管理操作，
 		// 全部 visibility=admin 硬隔离；普通成员不面向该控制台，仅内置管理员角色可见与授权）。
 		// 用户/角色/密钥编码加 tenant- 前缀，避免与平台菜单 code 撞名。
@@ -807,7 +805,7 @@ func seedTenantApplications(ctx context.Context, db *gorm.DB, rep *Report, tenan
 		if count > 0 {
 			continue
 		}
-		ta := &model.TenantApplicationEntity{TenantID: tenant.ID, AppID: app.ID, Status: model.TenantApplicationStatusEnable, Config: []byte(`{}`), GrantedScope: []byte(`[]`)}
+		ta := &model.TenantApplicationEntity{TenantID: tenant.ID, AppID: app.ID, Status: model.TenantApplicationStatusEnable}
 		if err := db.WithContext(ctx).Create(ta).Error; err != nil {
 			return fmt.Errorf("seed tenant_application create fail: %w", err)
 		}
@@ -842,8 +840,6 @@ func seedAdminUser(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.
 			PasswordEncrypted: passwordHash,
 			PasswordMethod:    model.PasswordMethodBcrypt,
 			Name:              "系统管理员",
-			Profile:           []byte(`{}`),
-			CustomData:        []byte(`{}`),
 		}
 		if err := db.WithContext(ctx).Create(person).Error; err != nil {
 			return nil, fmt.Errorf("seed admin person create fail: %w", err)
@@ -860,20 +856,18 @@ func seedAdminUser(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.
 	if errors.Is(uErr, gorm.ErrRecordNotFound) {
 		now := time.Now()
 		user = &model.UserEntity{
-			TenantID:    tenant.ID,
-			PersonID:    person.ID,
-			Name:        "系统管理员",
-			Profile:     []byte(`{}`),
-			CustomData:  []byte(`{}`),
-			Source:      model.UserSourceBuiltin,
-			IsOwner:     true,
-			IsSuspended: false,
-			JoinedAt:    &now,
+			TenantID:  tenant.ID,
+			PersonID:  person.ID,
+			Name:      "系统管理员",
+			Source:    model.UserSourceBuiltin,
+			OwnerType: model.OwnerTypeOwner,
+			Status:    model.UserStatusActive,
+			JoinedAt:  &now,
 		}
 		if err := db.WithContext(ctx).Create(user).Error; err != nil {
 			return nil, fmt.Errorf("seed admin user create fail: %w", err)
 		}
-		glog.Infof(ctx, "[seed] admin user created, id:%s (default password: %s, must_change_password: false)", user.ID, credential.BootstrapAdminPassword)
+		glog.Infof(ctx, "[seed] admin user created, id:%s (default password: %s, password_status: %s)", user.ID, credential.BootstrapAdminPassword, model.PasswordStatusNormal)
 		rep.created(model.SeedEntityUser, user.ID)
 	}
 
@@ -946,12 +940,9 @@ func seedAdminUserRole(ctx context.Context, db *gorm.DB, rep *Report, tenant *mo
 	return nil
 }
 
-// seedOIDCClientGrantTypes 种子 OAuth 客户端授权类型：由 model.GrantType 常量序列化，
+// seedOIDCClientGrantTypes 种子 OAuth 客户端授权类型：引用 model.GrantType 常量，
 // 避免在种子数据里裸写 JSON 字面量导致取值漂移。
-var seedOIDCClientGrantTypes = func() []byte {
-	b, _ := json.Marshal([]model.GrantType{model.GrantTypeAuthorizationCode, model.GrantTypeRefreshToken})
-	return b
-}()
+var seedOIDCClientGrantTypes = model.GrantTypeList{model.GrantTypeAuthorizationCode, model.GrantTypeRefreshToken}
 
 // findApplicationClientByCode 按编码查客户端（code 即 OIDC client_id）；
 // 不存在返回 (nil, nil)，系统错误返回 (nil, err)。
@@ -976,8 +967,8 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 		legacyCode           string
 		name                 string
 		appID                string
-		redirectURIs         string
-		postLogoutRedirect   string
+		redirectURIs         model.RedirectURIList
+		postLogoutRedirect   model.PostLogoutRedirectURIList
 		backChannelLogoutURI string
 	}
 	defs := []clientDef{
@@ -986,8 +977,8 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 			legacyCode:           oauthClientPlatformAdminWebLegacy,
 			name:                 "平台管理后台",
 			appID:                adminApp.ID,
-			redirectURIs:         `["http://localhost:4001/auth/callback"]`,
-			postLogoutRedirect:   `["http://localhost:4001/login"]`,
+			redirectURIs:         model.RedirectURIList{"http://localhost:4001/auth/callback"},
+			postLogoutRedirect:   model.PostLogoutRedirectURIList{"http://localhost:4001/login"},
 			backChannelLogoutURI: "http://localhost:8100/oidc/bc-logout/platform",
 		},
 		{
@@ -995,8 +986,8 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 			legacyCode:           oauthClientTenantAdminWebLegacy,
 			name:                 "租户管理后台",
 			appID:                tenantAdminApp.ID,
-			redirectURIs:         `["http://localhost:4002/auth/callback"]`,
-			postLogoutRedirect:   `["http://localhost:4002/login"]`,
+			redirectURIs:         model.RedirectURIList{"http://localhost:4002/auth/callback"},
+			postLogoutRedirect:   model.PostLogoutRedirectURIList{"http://localhost:4002/login"},
 			backChannelLogoutURI: "http://localhost:8100/oidc/bc-logout/tenant",
 		},
 	}
@@ -1056,14 +1047,14 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 			AppID:                   def.appID,
 			Code:                    def.code,
 			Name:                    def.name,
-			RedirectURIs:            []byte(def.redirectURIs),
-			PostLogoutRedirectURIs:  []byte(def.postLogoutRedirect),
+			RedirectURIs:            def.redirectURIs,
+			PostLogoutRedirectURIs:  def.postLogoutRedirect,
 			BackChannelLogoutURI:    def.backChannelLogoutURI,
 			GrantTypes:              seedOIDCClientGrantTypes,
-			ResponseTypes:           []byte(`["code"]`),
+			ResponseTypes:           model.ResponseTypeList{model.ResponseTypeCode},
 			TokenEndpointAuthMethod: model.TokenEndpointAuthMethodNone,
-			RequirePKCE:             true,
-			DefaultScopes:           []byte(`["openid","profile","email"]`),
+			RequirePKCE:             model.ClientPKCEPolicyEnable,
+			DefaultScopes:           model.DefaultScopeList{model.ScopeOpenID, model.ScopeProfile, model.ScopeEmail},
 			Source:                  model.ApplicationClientSourceBuiltin,
 			Status:                  model.ApplicationClientStatusEnable,
 		}

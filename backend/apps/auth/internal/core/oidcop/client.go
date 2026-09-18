@@ -1,7 +1,6 @@
 package oidcop
 
 import (
-	"encoding/json"
 	"net/url"
 	"time"
 
@@ -32,19 +31,11 @@ func (c *OIDCClient) GetID() string {
 }
 
 func (c *OIDCClient) RedirectURIs() []string {
-	var uris []string
-	if err := json.Unmarshal(c.clientEntity.RedirectURIs, &uris); err != nil {
-		return nil
-	}
-	return uris
+	return c.clientEntity.RedirectURIs.Strings()
 }
 
 func (c *OIDCClient) PostLogoutRedirectURIs() []string {
-	var uris []string
-	if err := json.Unmarshal(c.clientEntity.PostLogoutRedirectURIs, &uris); err != nil {
-		return nil
-	}
-	return uris
+	return c.clientEntity.PostLogoutRedirectURIs.Strings()
 }
 
 func (c *OIDCClient) ApplicationType() op.ApplicationType {
@@ -67,18 +58,14 @@ func (c *OIDCClient) AuthMethod() oidc.AuthMethod {
 }
 
 func (c *OIDCClient) ResponseTypes() []oidc.ResponseType {
-	var rawTypes []string
-	if err := json.Unmarshal(c.clientEntity.ResponseTypes, &rawTypes); err != nil {
-		return nil
-	}
-	types := make([]oidc.ResponseType, 0, len(rawTypes))
-	for _, rt := range rawTypes {
+	types := make([]oidc.ResponseType, 0, len(c.clientEntity.ResponseTypes))
+	for _, rt := range c.clientEntity.ResponseTypes {
 		switch rt {
-		case "code":
+		case model.ResponseTypeCode:
 			types = append(types, oidc.ResponseTypeCode)
-		case "id_token":
+		case model.ResponseTypeIDToken:
 			types = append(types, oidc.ResponseTypeIDTokenOnly)
-		case "id_token token":
+		case model.ResponseTypeIDTokenToken:
 			types = append(types, oidc.ResponseTypeIDToken)
 		}
 	}
@@ -86,12 +73,8 @@ func (c *OIDCClient) ResponseTypes() []oidc.ResponseType {
 }
 
 func (c *OIDCClient) GrantTypes() []oidc.GrantType {
-	var rawTypes []model.GrantType
-	if err := json.Unmarshal(c.clientEntity.GrantTypes, &rawTypes); err != nil {
-		return nil
-	}
-	types := make([]oidc.GrantType, 0, len(rawTypes))
-	for _, gt := range rawTypes {
+	types := make([]oidc.GrantType, 0, len(c.clientEntity.GrantTypes))
+	for _, gt := range c.clientEntity.GrantTypes {
 		switch gt {
 		case model.GrantTypeAuthorizationCode:
 			types = append(types, oidc.GrantTypeCode)
@@ -137,17 +120,13 @@ func (c *OIDCClient) RestrictAdditionalAccessTokenScopes() func(scopes []string)
 }
 
 func (c *OIDCClient) IsScopeAllowed(scope string) bool {
-	var defaultScopes []string
-	if err := json.Unmarshal(c.clientEntity.DefaultScopes, &defaultScopes); err != nil {
-		return false
-	}
-	for _, s := range defaultScopes {
+	for _, s := range c.clientEntity.DefaultScopes {
 		if s == scope {
 			return true
 		}
 	}
 	switch scope {
-	case "openid", "profile", "email", "phone":
+	case model.ScopeOpenID, model.ScopeProfile, model.ScopeEmail, model.ScopePhone:
 		return true
 	}
 	return false

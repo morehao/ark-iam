@@ -24,7 +24,6 @@ import OAuthClientList from './pages/oauthClient'
 import OAuthClientDetail from './pages/oauthClient/Detail'
 import MenuList from './pages/menu'
 import DomainList from './pages/domain'
-import LogList from './pages/log'
 import { OAUTH_CLIENT_DETAIL_ROUTE } from './routes'
 
 // 图标映射：后端 menu.icon 存储的字符串 -> antd 图标组件
@@ -51,7 +50,6 @@ const COMPONENT_MAP: Record<string, React.ComponentType> = {
   '/oauth-client': OAuthClientList,
   '/menu': MenuList,
   '/domain': DomainList,
-  '/log': LogList,
   // 详情页（不进侧边栏菜单，由静态路由单独注册；path 取自 routes.ts 单一真相源）
   [OAUTH_CLIENT_DETAIL_ROUTE]: OAuthClientDetail,
 }

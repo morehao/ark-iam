@@ -29,8 +29,6 @@ func seedSubscribedApp(t *testing.T, db *gorm.DB, tenantID, appID, code, name st
 		TenantID:     tenantID,
 		AppID:        appID,
 		Status:       model.TenantApplicationStatusEnable,
-		Config:       []byte("{}"),
-		GrantedScope: []byte("[]"),
 	}).Error; err != nil {
 		t.Fatalf("seed tenant application: %v", err)
 	}

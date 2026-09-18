@@ -11,7 +11,6 @@ import (
 	"github.com/morehao/ark-iam/platformadmin/testutil"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/gerror"
-	"gorm.io/datatypes"
 )
 
 // newOAuthDeleteCtx 构造带租户与操作人上下文的 gin.Context。
@@ -28,13 +27,13 @@ func newTestClientEntity(name, clientID string, source model.ApplicationClientSo
 		TenantID:                "1",
 		Code:                    clientID,
 		Name:                    name,
-		RedirectURIs:            datatypes.JSON("[]"),
-		PostLogoutRedirectURIs:  datatypes.JSON("[]"),
-		GrantTypes:              datatypes.JSON("[]"),
-		ResponseTypes:           datatypes.JSON("[]"),
+		RedirectURIs:            model.RedirectURIList{},
+		PostLogoutRedirectURIs:  model.PostLogoutRedirectURIList{},
+		GrantTypes:              model.GrantTypeList{},
+		ResponseTypes:           model.ResponseTypeList{},
 		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodBasic,
-		AllowedOrigins:          datatypes.JSON("[]"),
-		DefaultScopes:           datatypes.JSON("[]"),
+		AllowedOrigins:          model.AllowedOriginList{},
+		DefaultScopes:           model.DefaultScopeList{},
 		Status:                  model.ApplicationClientStatusEnable,
 		Source:                  source,
 	}

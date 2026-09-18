@@ -25,7 +25,7 @@ const machineUsers: TenantMachineUserItem[] = [
     description: '',
     primaryDepartmentID: 'd1',
     primaryDepartmentName: '平台组',
-    isSuspended: false,
+    status: 'active',
   },
   {
     machineUserID: 'mu-2',
@@ -34,7 +34,7 @@ const machineUsers: TenantMachineUserItem[] = [
     description: '',
     primaryDepartmentID: 'd1',
     primaryDepartmentName: '平台组',
-    isSuspended: false,
+    status: 'active',
   },
 ]
 

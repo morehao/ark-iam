@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/datatypes"
 
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dao"
@@ -89,7 +88,6 @@ func TestApplicationRoleTemplateUpdateAndFanOut(t *testing.T) {
 	for _, tenantID := range []string{"t1", "t2"} {
 		if err := db.Create(&model.TenantApplicationEntity{
 			TenantID: tenantID, AppID: resp.AppID, Status: model.TenantApplicationStatusEnable,
-			Config: datatypes.JSON("{}"), GrantedScope: datatypes.JSON("[]"),
 		}).Error; err != nil {
 			t.Fatalf("seed subscription %s: %v", tenantID, err)
 		}

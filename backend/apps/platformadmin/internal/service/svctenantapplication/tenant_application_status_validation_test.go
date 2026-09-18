@@ -53,11 +53,9 @@ func TestTenantApplicationCreateRejectsIllegalStatus(t *testing.T) {
 func TestTenantApplicationUpdateRejectsIllegalStatus(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.TenantApplicationEntity{})
 	entity := &model.TenantApplicationEntity{
-		TenantID:     "t1",
-		AppID:        "app1",
-		Status:       model.TenantApplicationStatusEnable,
-		Config:       []byte("{}"),
-		GrantedScope: []byte("[]"),
+		TenantID: "t1",
+		AppID:    "app1",
+		Status:   model.TenantApplicationStatusEnable,
 	}
 	if err := db.Create(entity).Error; err != nil {
 		t.Fatalf("seed: %v", err)
