@@ -3,6 +3,8 @@
 > 本文指导**业务应用（RP）**如何接入 Ark IAM，实现：OIDC 登录（SSO）、令牌校验、单点登出（SLO）、机器凭证（API Key / client_credentials）四种能力。
 >
 > 前置阅读：[sso-oidc-concepts.md](sso-oidc-concepts.md)（协议概念）、[system-design.md](system-design.md) §6（接入流程概览）。
+>
+> 实战案例：[rustfs-integration-case.md](rustfs-integration-case.md) —— 接入一个**代码不可改、自带权限模型、只支持单向 SLO** 的存量第三方应用（RustFS）时的完整走查与踩坑记录。本文给通用步骤，该文给案例特有的判断与实测值。
 
 ---
 
