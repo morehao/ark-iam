@@ -5,12 +5,13 @@ import type { ApplicationItem } from '@ark-iam/types'
 
 const mockGetApplicationPageList = vi.fn()
 const mockCreateApplication = vi.fn()
+const mockUpdateApplication = vi.fn()
 vi.mock('@ark-iam/api', () => ({
   createApplication: (...args: unknown[]) => mockCreateApplication(...args),
   deleteApplication: vi.fn(),
   getApplicationDetail: vi.fn(),
   getApplicationPageList: (...args: unknown[]) => mockGetApplicationPageList(...args),
-  updateApplication: vi.fn(),
+  updateApplication: (...args: unknown[]) => mockUpdateApplication(...args),
 }))
 
 const ApplicationList = (await import('./index')).default
@@ -38,6 +39,7 @@ describe('应用列表', () => {
   beforeEach(() => {
     mockGetApplicationPageList.mockReset().mockResolvedValue({ list: applications, total: applications.length })
     mockCreateApplication.mockReset().mockResolvedValue({ appID: 'app-2', code: 'my_app' })
+    mockUpdateApplication.mockReset().mockResolvedValue(undefined)
   })
 
   it('同时展示创建时间与更新时间两列', async () => {
@@ -133,6 +135,91 @@ describe('编辑态应用编码的可写性', () => {
     const codeInput = await screen.findByPlaceholderText('唯一编码，如 iam_web')
     expect(codeInput).not.toBeDisabled()
     expect(codeInput).toHaveValue('customer_app')
+  })
+
+  /**
+   * 角色模板必须回显：编辑弹窗以列表行的值为初值，缺了它会把"未修改"提交成"清空"，
+   * 等于把该应用在各租户已物化的契约角色全部撤下（后端 application.role_template）。
+   */
+  it('编辑时回显该应用的角色模板', async () => {
+    mockGetApplicationPageList.mockResolvedValue({
+      list: [
+        {
+          ...applications[0],
+          appID: 'app-store',
+          code: 'customer_app',
+          roleTemplate: [
+            { code: 'storage_admin', name: '存储管理员' },
+            { code: 'readonly', name: '只读用户' },
+          ],
+        },
+      ],
+      total: 1,
+    })
+    render(<ApplicationList />)
+
+    fireEvent.click(await screen.findByText('编辑'))
+    await screen.findByPlaceholderText('唯一编码，如 iam_web')
+
+    // 两行模板项各自回显编码与名称（输入框的 value 不在 textContent 里，需按 placeholder 取）
+    await waitFor(() => expect(screen.getAllByPlaceholderText('编码，如 storage_admin')).toHaveLength(2))
+    const codes = screen.getAllByPlaceholderText('编码，如 storage_admin') as HTMLInputElement[]
+    const names = screen.getAllByPlaceholderText('名称，如 存储管理员') as HTMLInputElement[]
+    expect(codes.map((i) => i.value)).toEqual(['storage_admin', 'readonly'])
+    expect(names.map((i) => i.value)).toEqual(['存储管理员', '只读用户'])
+  })
+
+  /**
+   * 从模板移除编码 = 撤权：会在**各租户**删除该角色并级联删除成员/菜单授权，不可从控制台恢复。
+   * 必须二次确认才允许提交；取消则不发请求（后端同步逻辑见 pkg/core/tenant.SyncAppRoleTemplateToTenants）。
+   */
+  it('移除模板项时二次确认，取消则不提交', async () => {
+    mockGetApplicationPageList.mockResolvedValue({
+      list: [
+        {
+          ...applications[0],
+          appID: 'app-store',
+          code: 'customer_app',
+          roleTemplate: [
+            { code: 'storage_admin', name: '存储管理员' },
+            { code: 'readonly', name: '只读用户' },
+          ],
+        },
+      ],
+      total: 1,
+    })
+    render(<ApplicationList />)
+
+    fireEvent.click(await screen.findByText('编辑'))
+    await waitFor(() => expect(screen.getAllByPlaceholderText('编码，如 storage_admin')).toHaveLength(2))
+    // 移除第一行（storage_admin）后提交；按钮节点在确认框出现后仍复用，故先取引用
+    fireEvent.click(screen.getAllByText('移除')[0])
+    const submitBtn = document
+      .querySelector('.ant-modal')!
+      .querySelector('.ant-modal-footer .ant-btn-primary') as HTMLElement
+    const confirmBox = () => document.querySelector('.ant-modal-confirm') as HTMLElement
+    const confirmBtn = (selector: string) => confirmBox().querySelector(selector) as HTMLElement
+
+    fireEvent.click(submitBtn)
+    // 二次确认出现，且文案点明撤下的是哪个编码
+    await waitFor(() => expect(confirmBox()).toBeTruthy())
+    expect(confirmBox().textContent).toContain('storage_admin')
+    expect(mockUpdateApplication).not.toHaveBeenCalled()
+
+    // 取消 → 不提交
+    fireEvent.click(confirmBtn('.ant-btn:not(.ant-btn-primary)'))
+    await waitFor(() => expect(document.querySelector('.ant-modal-confirm')).toBeNull())
+    expect(mockUpdateApplication).not.toHaveBeenCalled()
+
+    // 再次提交并确认 → 提交的模板已不含被移除的编码
+    fireEvent.click(submitBtn)
+    await waitFor(() => expect(confirmBox()).toBeTruthy())
+    fireEvent.click(confirmBtn('.ant-btn-primary'))
+    await waitFor(() => expect(mockUpdateApplication).toHaveBeenCalledTimes(1))
+    expect(mockUpdateApplication.mock.calls[0][0]).toMatchObject({
+      appID: 'app-store',
+      roleTemplate: [{ code: 'readonly', name: '只读用户' }],
+    })
   })
 })
 

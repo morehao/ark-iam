@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import type { OAuthClientDetail as OAuthClientDetailType, OAuthClientItem } from '@ark-iam/types'
 import { OAUTH_CLIENT_DETAIL_ROUTE, OAUTH_CLIENT_LIST_PATH, oauthClientDetailPath } from '../../routes'
@@ -8,6 +8,7 @@ const mockGetOAuthClientPageList = vi.fn()
 const mockGetOAuthClientDetail = vi.fn()
 const mockListOAuthSecrets = vi.fn()
 const mockCreateOAuthClient = vi.fn()
+const mockUpdateOAuthClient = vi.fn()
 vi.mock('@ark-iam/api', () => ({
   createOAuthClient: (...args: unknown[]) => mockCreateOAuthClient(...args),
   createOAuthSecret: vi.fn(),
@@ -17,7 +18,7 @@ vi.mock('@ark-iam/api', () => ({
   getOAuthClientDetail: (...args: unknown[]) => mockGetOAuthClientDetail(...args),
   getOAuthClientPageList: (...args: unknown[]) => mockGetOAuthClientPageList(...args),
   listOAuthSecrets: (...args: unknown[]) => mockListOAuthSecrets(...args),
-  updateOAuthClient: vi.fn(),
+  updateOAuthClient: (...args: unknown[]) => mockUpdateOAuthClient(...args),
 }))
 
 const OAuthClientList = (await import('./index')).default
@@ -54,8 +55,8 @@ const detail: OAuthClientDetailType = {
   backChannelLogoutURI: 'http://localhost:8100/oidc/bc-logout/platform',
   responseTypes: ['code'],
   allowedOrigins: [],
-  requirePKCE: 1,
-  requireAuthTime: 0,
+  requirePKCE: true,
+  requireAuthTime: false,
   defaultScopes: ['openid', 'profile', 'email'],
   accessTokenTTL: 900,
   refreshTokenTTL: 2592000,
@@ -78,6 +79,7 @@ beforeEach(() => {
   mockGetOAuthClientDetail.mockReset().mockResolvedValue(detail)
   mockListOAuthSecrets.mockReset().mockResolvedValue({ total: 0, secrets: [] })
   mockCreateOAuthClient.mockReset().mockResolvedValue({ applicationClientID: 'c-2', code: 'iam_client' })
+  mockUpdateOAuthClient.mockReset().mockResolvedValue(undefined)
 })
 
 /**
@@ -242,5 +244,75 @@ describe('内置客户端不可删除', () => {
 
     expect(await screen.findByText('my_client')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '删除' })).not.toBeDisabled()
+  })
+})
+
+/**
+ * 协议参数此前在控制台完全无法维护（表单只有 所属应用/编码/名称/认证方式/状态）：
+ * 创建出来的客户端是空壳（redirect_uris、grant_types、response_types、default_scopes 全为 []），
+ * 授权请求被 OP 以 "The requested redirect_uri is missing in the client configuration" 拒绝；
+ * 而编辑接口是全量覆盖，界面回传不了的字段会被再次清空。
+ */
+describe('客户端协议参数（回调地址 / 授权类型 / Scopes / PKCE）', () => {
+  /** 列表行只有摘要字段，协议参数必须从详情接口回填 */
+  it('编辑态回显详情里的回调地址、后端登出地址与 PKCE', async () => {
+    renderApp(OAUTH_CLIENT_LIST_PATH)
+
+    fireEvent.click(await screen.findByText('编辑'))
+
+    expect(await screen.findByDisplayValue('http://localhost:4001/auth/callback')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('http://localhost:8100/oidc/bc-logout/platform')).toBeInTheDocument()
+    const modal = document.querySelector('.ant-modal') as HTMLElement
+    const switches = within(modal).getAllByRole('switch')
+    expect(switches[0]).toHaveAttribute('aria-checked', 'true') // 强制 PKCE
+    expect(switches[1]).toHaveAttribute('aria-checked', 'false') // 需要 auth_time
+  })
+
+  it('提交时把协议参数一并回传，避免全量覆盖把回调地址/Scopes/TTL 清空', async () => {
+    renderApp(OAUTH_CLIENT_LIST_PATH)
+
+    fireEvent.click(await screen.findByText('编辑'))
+    await screen.findByDisplayValue('http://localhost:4001/auth/callback')
+    const modal = document.querySelector('.ant-modal') as HTMLElement
+    fireEvent.click(modal.querySelector('.ant-modal-footer .ant-btn-primary') as HTMLElement)
+
+    await waitFor(() => expect(mockUpdateOAuthClient).toHaveBeenCalledTimes(1))
+    const payload = mockUpdateOAuthClient.mock.calls[0][0] as Record<string, unknown>
+    expect(payload.applicationClientID).toBe(clients[0].applicationClientID)
+    expect(payload.redirectURIs).toEqual(['http://localhost:4001/auth/callback'])
+    expect(payload.postLogoutRedirectURIs).toEqual(['http://localhost:4001/login'])
+    expect(payload.backChannelLogoutURI).toBe('http://localhost:8100/oidc/bc-logout/platform')
+    expect(payload.grantTypes).toEqual(['authorization_code', 'refresh_token'])
+    expect(payload.responseTypes).toEqual(['code'])
+    expect(payload.defaultScopes).toEqual(['openid', 'profile', 'email'])
+    expect(payload.requirePKCE).toBe(true)
+    expect(payload.accessTokenTTL).toBe(900)
+    expect(payload.refreshTokenTTL).toBe(2592000)
+  })
+
+  /** 新建时预填与后端列默认值同口径的缺省值，开箱不会产生空 grant_types/response_types/Scopes */
+  it('新建态预填授权类型/响应类型/Scopes 默认值', async () => {
+    renderApp(OAUTH_CLIENT_LIST_PATH)
+
+    fireEvent.click(await screen.findByRole('button', { name: /新建客户端/ }))
+    const modal = document.querySelector('.ant-modal') as HTMLElement
+
+    expect(await within(modal).findByTitle('authorization_code')).toBeInTheDocument()
+    expect(within(modal).getByTitle('code')).toBeInTheDocument()
+    expect(within(modal).getByTitle('openid')).toBeInTheDocument()
+    expect(within(modal).getByTitle('profile')).toBeInTheDocument()
+    expect(within(modal).getByTitle('email')).toBeInTheDocument()
+  })
+})
+
+/** 详情页的 requirePKCE/requireAuthTime 是 Go bool：曾按 === 1 判断，恒为假 → 永远显示"否" */
+describe('详情页 PKCE 展示', () => {
+  it('requirePKCE=true 显示"是"', async () => {
+    renderApp(oauthClientDetailPath(clients[0].applicationClientID))
+
+    const label = await screen.findByText('强制 PKCE')
+    // bordered 布局下标签是 th、内容是同级 td：按所在行（tr）定位，不能按单元格容器定位
+    const row = label.closest('tr') as HTMLElement
+    expect(within(row).getByText('是')).toBeInTheDocument()
   })
 })

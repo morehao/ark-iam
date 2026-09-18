@@ -1333,7 +1333,7 @@ const docTemplatetenantadmin = `{
                     },
                     {
                         "type": "string",
-                        "description": "关键词(名称 模糊)",
+                        "description": "关键词(名称/编码 模糊)",
                         "name": "keyword",
                         "in": "query"
                     },
@@ -3038,6 +3038,14 @@ const docTemplatetenantadmin = `{
                     "description": "所属应用名称",
                     "type": "string"
                 },
+                "code": {
+                    "description": "角色编码(跨系统授权契约值，即 OIDC groups 取值；由应用角色模板下发，自建角色为空串)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.RoleCode"
+                        }
+                    ]
+                },
                 "createdAt": {
                     "description": "创建时间",
                     "type": "integer"
@@ -3128,6 +3136,14 @@ const docTemplatetenantadmin = `{
                 "appName": {
                     "description": "所属应用名称",
                     "type": "string"
+                },
+                "code": {
+                    "description": "角色编码(跨系统授权契约值，即 OIDC groups 取值；由应用角色模板下发，自建角色为空串)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.RoleCode"
+                        }
+                    ]
                 },
                 "createdAt": {
                     "description": "创建时间",
@@ -3822,6 +3838,25 @@ const docTemplatetenantadmin = `{
                 "MenuVisibilityPublic",
                 "MenuVisibilityMember",
                 "MenuVisibilityAdmin"
+            ]
+        },
+        "model.RoleCode": {
+            "type": "string",
+            "enum": [
+                "platform_admin",
+                "tenant_admin"
+            ],
+            "x-enum-comments": {
+                "RoleCodePlatformAdmin": "内置「管理员」角色编码",
+                "RoleCodeTenantAdmin": "内置「租户管理员」角色编码"
+            },
+            "x-enum-descriptions": [
+                "内置「管理员」角色编码",
+                "内置「租户管理员」角色编码"
+            ],
+            "x-enum-varnames": [
+                "RoleCodePlatformAdmin",
+                "RoleCodeTenantAdmin"
             ]
         },
         "model.RoleSource": {

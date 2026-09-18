@@ -19,6 +19,9 @@ const (
 	RoleGetPageListError            = 100704
 	RoleNotExistError               = 100705
 	RoleDeleteBuiltinForbiddenError = 100706
+	// 100707 / 100708 / 100710 已随「租户可写角色编码」下线（契约值收归应用角色模板，见
+	// docs/design/system-design.md §5.4）：编号一律退役、不得复用。
+	RoleUpdateBuiltinForbiddenError = 100709 // 内置角色整体只读：编码由应用角色模板下发、名称同属应用方定义
 )
 
 const (
@@ -33,10 +36,14 @@ const (
 	// ApplicationBuiltInCodeImmutableError 内置应用的编码由平台版本定义：控制台菜单入口仍按该编码定位
 	// （svcpermission.MyTree 查 platform_admin、tenantadmin loadConsoleApps 留 tenant_admin），改名即自锁。
 	ApplicationBuiltInCodeImmutableError = 100749
-	ApplicationSecretCreateError         = 100736
-	ApplicationSecretGetListError        = 100737
-	ApplicationSecretDeleteError         = 100738
-	ApplicationSecretNotExistError       = 100739
+	// ApplicationRoleTemplateInvalidError 应用角色模板非法：条目数超限、code 形状非法或模板内重复、
+	// 名称为空或超长、或声明了产品锚点编码（锚点由开通链路按常量写入，模板不得占用同名 code）。
+	// 编码取 role/菜单段尾部下一个空位（100758/100759/100752 历史上已分配给其它错误，不得复用）。
+	ApplicationRoleTemplateInvalidError = 100765
+	ApplicationSecretCreateError        = 100736
+	ApplicationSecretGetListError       = 100737
+	ApplicationSecretDeleteError        = 100738
+	ApplicationSecretNotExistError      = 100739
 )
 
 // 租户应用订阅（tenant_application）
@@ -100,6 +107,7 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	RoleGetPageListError:                       "查看角色列表失败",
 	RoleNotExistError:                          "角色不存在",
 	RoleDeleteBuiltinForbiddenError:            "内置角色禁止删除",
+	RoleUpdateBuiltinForbiddenError:            "内置角色禁止编辑",
 	ApplicationCreateError:                     "创建应用失败",
 	ApplicationDeleteError:                     "删除应用失败",
 	ApplicationUpdateError:                     "修改应用失败",
@@ -117,6 +125,7 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	TenantApplicationBuiltInErr:                "内置应用的订阅由系统开通，不可删除（可改为「停用」）",
 	ApplicationBuiltInErr:                      "内置应用不可删除",
 	ApplicationBuiltInCodeImmutableError:       "内置应用的编码由平台版本定义，不可修改",
+	ApplicationRoleTemplateInvalidError:        "应用角色模板不合法（编码需小写字母开头且模板内唯一、名称非空且不超长、不得使用产品锚点编码）",
 	ApplicationSecretCreateError:               "创建应用密钥失败",
 	ApplicationSecretGetListError:              "查看应用密钥列表失败",
 	ApplicationSecretDeleteError:               "删除应用密钥失败",

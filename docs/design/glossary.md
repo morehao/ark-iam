@@ -72,7 +72,9 @@
 
 | 术语 | 英文 | 说明 |
 |---|---|---|
-| 角色 ✅ | Role | 权限载体（租户内、按应用 `app_id` 作用域）。**无类型字段、无业务编码**：以名称作为应用内可读标识（同一应用内名称唯一）；另以 `source`（builtin 内置 / custom 自定义）区分产生方式、以 `admin_type`（admin / normal）标记**系统管理能力**（内置角色的 `admin_type` 禁改） |
+| 角色 ✅ | Role | 权限载体（租户内、按应用 `app_id` 作用域）。两套标识刻意分离：`code`（**跨系统授权契约值**，即 OIDC `groups` 取值，见下「角色编码」）+ `name`（应用内可读标识，同一应用内唯一）；另以 `source`（builtin 内置 / custom 自定义）区分产生方式、以 `admin_type`（admin / normal）标记**系统管理能力**（内置角色的 `admin_type` 禁改） |
+| 角色编码 ✅ | Role Code | 下游按「`claim_prefix` + 编码」认自己的策略名，因此它是契约而非展示名。**只有两个来源**：产品锚点（`platform_admin`/`tenant_admin`）与**应用角色模板**（`application.role_template`，开通应用时物化到各租户）；**租户侧没有写入入口**——自建角色的编码恒为空串、不进入 `groups` 声明。下游策略是全局命名实体（一条策略全租户共用），若允许租户写编码，任何租户管理员都能造出一个撞上既有策略的编码从而自提权，详见 `application-integration-guide.md` §3.4 |
+| 应用角色模板 ✅ | Application Role Template | 应用对外的契约角色清单（`application.role_template` = `[{code,name}]`，≤64 项、编码模板内唯一且不得占用产品锚点）。它是**单一事实源**：开通应用时物化到租户（`source=builtin`、租户侧只读），更新时对已开通租户做差量同步——**移除即从各租户撤下该角色并级联删除其成员/菜单授权**（故平台控制台必须二次确认）。它取代了早先的「保留编码」层 |
 | 菜单 ✅ | Menu | 前端可访问的菜单/路由（树形，按应用 `app_id` 管理；`visibility` 分 public/member/admin 可见性门槛） |
 | 用户-角色 ✅ | User-Role | 用户与角色的多对多关联（表 `user_role`） |
 | 角色-菜单 ✅ | Role-Menu | 角色可访问菜单的授权（表 `role_menu`） |

@@ -1,12 +1,15 @@
 package svctenant
 
 import (
+	"encoding/json"
 	"testing"
 
+	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/tenantadmin/testutil"
 	"github.com/morehao/golib/dbaccess/gormdao"
+	"github.com/morehao/golib/gerror"
 	"gorm.io/gorm"
 )
 
@@ -32,12 +35,28 @@ func seedTestApp(t *testing.T, db *gorm.DB, tenantID, appID string) {
 	}
 }
 
+// seedTestRole 播种**空编码**的自建角色（新模型下租户自建角色的常态形态）。
 func seedTestRole(t *testing.T, db *gorm.DB, id, tenantID, appID, name string) {
 	t.Helper()
 	if err := db.Create(&model.RoleEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: id}},
 		TenantID:   tenantID,
 		AppID:      appID,
+		Name:       name,
+		CreatedBy:  "t",
+	}).Error; err != nil {
+		t.Fatalf("seed role: %v", err)
+	}
+}
+
+// seedTestRoleWithCode 播种带编码的角色（编码类断言专用；seedTestRole 保持"空编码存量行"形态）。
+func seedTestRoleWithCode(t *testing.T, db *gorm.DB, id, tenantID, appID, name string, roleCode model.RoleCode) {
+	t.Helper()
+	if err := db.Create(&model.RoleEntity{
+		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: id}},
+		TenantID:   tenantID,
+		AppID:      appID,
+		Code:       roleCode,
 		Name:       name,
 		CreatedBy:  "t",
 	}).Error; err != nil {
@@ -84,7 +103,7 @@ func TestRoleCreateRequiresApp(t *testing.T) {
 
 	ginCtx := newDeptGinCtx(t, "t1", "op")
 
-	// 非法应用
+	// 非法应用（非本租户订阅的应用）
 	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app-bad", Name: "管理员"}); err == nil {
 		t.Fatalf("expected invalid app error")
 	}
@@ -93,12 +112,171 @@ func TestRoleCreateRequiresApp(t *testing.T) {
 		t.Fatalf("create role: %v", err)
 	}
 	// 同应用名称唯一
-	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app1", Name: "管理员"}); err == nil {
-		t.Fatalf("expected duplicate name error")
+	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app1", Name: "管理员"}); gerror.GetCode(err) != int(code.RoleCreateError) {
+		t.Fatalf("expected duplicate name error, got %v", err)
 	}
-	// 其他租户同名不冲突
+	// 其他租户同名不冲突（名称唯一性在「租户 × 应用」维度）
 	if _, err := svc.Create(newDeptGinCtx(t, "t2", "op2"), &dtotenant.RoleCreateReq{AppID: "app2", Name: "管理员"}); err != nil {
 		t.Fatalf("cross-tenant same name should be allowed: %v", err)
+	}
+}
+
+// TestRoleCreateCannotInjectCode 租户侧在**结构上**没有写入角色编码的入口：请求体里即使带了 code，
+// 绑定层也没有字段接收它，落库的自建角色编码恒为空串。这是"契约值归应用方"的编译期 + 运行期双重保证
+// ——自建角色因此不可能与模板角色/产品锚点撞码，也不可能自造一个值去命中下游已有策略。
+func TestRoleCreateCannotInjectCode(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.RoleMenuEntity{},
+		&model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
+	svc := &roleSvc{}
+	seedTenantAdminOperator(t, db, "t1", "op")
+	seedTestApp(t, db, "t1", "app1")
+
+	ginCtx := newDeptGinCtx(t, "t1", "op")
+	// 直接喂 JSON：模拟前端/裸调 API 试图夹带契约值
+	var req dtotenant.RoleCreateReq
+	if err := json.Unmarshal([]byte(`{"appID":"app1","name":"管理员","code":"tenant_admin"}`), &req); err != nil {
+		t.Fatalf("bind req: %v", err)
+	}
+	resp, err := svc.Create(ginCtx, &req)
+	if err != nil {
+		t.Fatalf("create role: %v", err)
+	}
+	detail, err := svc.Detail(ginCtx, &dtotenant.RoleDetailReq{RoleID: resp.RoleID})
+	if err != nil {
+		t.Fatalf("detail: %v", err)
+	}
+	if detail.Code != "" {
+		t.Fatalf("自建角色编码必须为空串，实际 %q（租户不得写入契约值）", detail.Code)
+	}
+	if detail.Source != model.RoleSourceCustom {
+		t.Fatalf("source = %s, want custom", detail.Source)
+	}
+}
+
+// TestRoleUpdateBuiltinForbidden 内置角色整体只读：模板角色（应用角色模板物化）与产品锚点的编码/名称
+// 都由应用方定义，租户不得改名——权威判定必须在服务层（前端置灰只是 UX 兜底），
+// 且不得因为「字段原样回传」而放行整条更新。
+func TestRoleUpdateBuiltinForbidden(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.RoleMenuEntity{},
+		&model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
+	svc := &roleSvc{}
+	seedTenantAdminOperator(t, db, "t1", "op")
+	seedTestApp(t, db, "t1", "app1")
+	// 产品锚点角色
+	if err := db.Create(&model.RoleEntity{
+		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "rb"}},
+		TenantID:   "t1",
+		AppID:      "app1",
+		Code:       model.RoleCodeTenantAdmin,
+		Name:       "租户管理员",
+		Source:     model.RoleSourceBuiltin,
+		AdminType:  model.SysAdminTypeAdmin,
+		CreatedBy:  "t",
+	}).Error; err != nil {
+		t.Fatalf("seed builtin role: %v", err)
+	}
+	// 模板角色（由应用角色模板物化的普通内置角色）
+	if err := db.Create(&model.RoleEntity{
+		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "rt"}},
+		TenantID:   "t1",
+		AppID:      "app1",
+		Code:       "storage_admin",
+		Name:       "存储管理员",
+		Source:     model.RoleSourceBuiltin,
+		AdminType:  model.SysAdminTypeNormal,
+		CreatedBy:  "t",
+	}).Error; err != nil {
+		t.Fatalf("seed template role: %v", err)
+	}
+
+	ginCtx := newDeptGinCtx(t, "t1", "op")
+	// 改名与「原样回传」都必须拒绝：只读语义与内容是否变化无关
+	for _, req := range []*dtotenant.RoleUpdateReq{
+		{RoleID: "rb", Name: "改名试试"},
+		{RoleID: "rb", Name: "租户管理员"},
+		{RoleID: "rt", Name: "存储超管"},
+	} {
+		if err := svc.Update(ginCtx, req); gerror.GetCode(err) != int(code.RoleUpdateBuiltinForbiddenError) {
+			t.Fatalf("expected builtin-forbidden error for %+v, got %v", req, err)
+		}
+	}
+
+	detail, err := svc.Detail(ginCtx, &dtotenant.RoleDetailReq{RoleID: "rb"})
+	if err != nil {
+		t.Fatalf("detail: %v", err)
+	}
+	if detail.Code != model.RoleCodeTenantAdmin || detail.Name != "租户管理员" {
+		t.Fatalf("builtin role must stay untouched, got code=%q name=%q", detail.Code, detail.Name)
+	}
+}
+
+// TestRoleUpdateCustomRoleKeepsCode 自建角色的更新只作用于名称/描述：编码不在入参里，
+// 更新既不会写入也不会清掉存量行的编码（存量行可能带着历史编码）。
+func TestRoleUpdateCustomRoleKeepsCode(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.RoleMenuEntity{},
+		&model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
+	svc := &roleSvc{}
+	seedTenantAdminOperator(t, db, "t1", "op")
+	seedTestApp(t, db, "t1", "app1")
+	seedTestRoleWithCode(t, db, "r1", "t1", "app1", "管理员", "custom_admin")
+	seedTestRoleWithCode(t, db, "r2", "t1", "app1", "只读", "storage_readonly")
+
+	ginCtx := newDeptGinCtx(t, "t1", "op")
+
+	// 与他人重名拒绝
+	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "只读"}); gerror.GetCode(err) != int(code.RoleUpdateError) {
+		t.Fatalf("expected duplicate name error, got %v", err)
+	}
+	// 自身同名放行（唯一性校验排除自身）
+	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "管理员"}); err != nil {
+		t.Fatalf("update with unchanged name: %v", err)
+	}
+	// 改名生效，编码保持不变
+	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "存储管理员", Description: "负责存储"}); err != nil {
+		t.Fatalf("update name: %v", err)
+	}
+	detail, err := svc.Detail(ginCtx, &dtotenant.RoleDetailReq{RoleID: "r1"})
+	if err != nil {
+		t.Fatalf("detail: %v", err)
+	}
+	if detail.Name != "存储管理员" || detail.Description != "负责存储" {
+		t.Fatalf("name/description not updated, got %q/%q", detail.Name, detail.Description)
+	}
+	if detail.Code != "custom_admin" {
+		t.Fatalf("encode must stay untouched by update, got %q", detail.Code)
+	}
+}
+
+// TestRolePageListReturnsCode 列表回传编码（前端「编码」列直读），且关键词同时匹配名称与编码。
+func TestRolePageListReturnsCode(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.RoleMenuEntity{},
+		&model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
+	svc := &roleSvc{}
+	seedTestApp(t, db, "t1", "app1")
+	seedTestRoleWithCode(t, db, "r1", "t1", "app1", "平台管理员", "platform_admin")
+	seedTestRoleWithCode(t, db, "r2", "t1", "app1", "对象存储只读", "storage_readonly")
+
+	ginCtx := newDeptGinCtx(t, "t1", "op")
+
+	resp, err := svc.PageList(ginCtx, &dtotenant.RolePageListReq{Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("page list: %v", err)
+	}
+	codeMap := make(map[string]model.RoleCode, len(resp.List))
+	for _, item := range resp.List {
+		codeMap[item.RoleID] = item.Code
+	}
+	if codeMap["r1"] != "platform_admin" || codeMap["r2"] != "storage_readonly" {
+		t.Fatalf("expected codes returned in list, got %+v", resp.List)
+	}
+
+	// 关键词命中编码（名称里没有 "storage"）
+	hit, err := svc.PageList(ginCtx, &dtotenant.RolePageListReq{Page: 1, PageSize: 10, Keyword: "storage"})
+	if err != nil {
+		t.Fatalf("page list by keyword: %v", err)
+	}
+	if hit.Total != 1 || hit.List[0].RoleID != "r2" {
+		t.Fatalf("expected keyword to match code, got total=%d list=%+v", hit.Total, hit.List)
 	}
 }
 
