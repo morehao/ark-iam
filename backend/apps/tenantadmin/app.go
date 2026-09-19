@@ -1,7 +1,7 @@
 package tenantadmin
 
 import (
-	"crypto/rsa"
+	"context"
 
 	"github.com/gin-gonic/gin"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
@@ -20,9 +20,17 @@ import (
 
 const AppName = "tenantadmin"
 
-func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
+// Init 装配 tenantadmin 应用。
+//
+// injectedKeySource 为 OP 公钥来源：gateway 单体部署由 auth 注入进程内 key set
+// （零网络调用）；独立部署传 nil，此时按本应用配置自建（见 middleware.ResolveKeySource）。
+func Init(engine *gin.Engine, Conf *pkgconfig.Config, injectedKeySource middleware.KeySource) {
 	config.Conf = Conf
-	getOIDCPublicKey := middleware.LoadSigningPublicKey(Conf)
+	keySource, keyErr := middleware.ResolveKeySource(injectedKeySource, Conf)
+	if keyErr != nil {
+		// fail-closed：拿不到 OP 公钥就绝不放行任何 token（中间件会统一返回 401）。
+		glog.Errorf(context.Background(), "[%s.Init] oidc key source unavailable, err:%v", AppName, keyErr)
+	}
 	ssoStore := sso.NewSSOSessionStore()
 
 	oidcAuthOpts := []middleware.AuthOption{}
@@ -58,7 +66,7 @@ func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 	routerGroups := ginserver.NewRouterGroups(engine, "tenant", []ginserver.VersionGroup{{
 		Version: ginserver.ApiVersionV1,
 		Middlewares: []gin.HandlerFunc{
-			middleware.OIDCCompatibleAuth(getOIDCPublicKey, oidcAuthOpts...),
+			middleware.OIDCAuth(append([]middleware.AuthOption{middleware.WithOIDCKeySource(keySource)}, oidcAuthOpts...)...),
 		},
 	}})
 
@@ -67,12 +75,12 @@ func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 	}
 
 	router.RegisterRouter(routerGroups)
-	registerBackChannelLogout(engine, Conf, getOIDCPublicKey)
+	registerBackChannelLogout(engine, Conf, keySource)
 }
 
 // registerBackChannelLogout 挂载本应用的 back-channel logout 接收端。
 // 路径使用 app 专属子路径，避免 gateway 聚合部署时与其它应用路由冲突。
-func registerBackChannelLogout(engine *gin.Engine, Conf *pkgconfig.Config, getOIDCPublicKey func() *rsa.PublicKey) {
+func registerBackChannelLogout(engine *gin.Engine, Conf *pkgconfig.Config, keySource middleware.KeySource) {
 	if Conf == nil {
 		return
 	}
@@ -82,5 +90,5 @@ func registerBackChannelLogout(engine *gin.Engine, Conf *pkgconfig.Config, getOI
 	if basePath == "" {
 		basePath = "/bc-logout/tenant"
 	}
-	goidc.RegisterReceiverRoutes(group, basePath, getOIDCPublicKey, Conf.OIDC.Issuer, model.SeedBuiltinClientTenantAdminWeb, nil)
+	goidc.RegisterReceiverRoutes(group, basePath, keySource, Conf.OIDC.Issuer, model.SeedBuiltinClientTenantAdminWeb, nil)
 }

@@ -42,12 +42,13 @@ make list-apps
 # 构建单个应用（产物输出到 backend/output；有效 APP 见下表）
 make build APP=auth
 
-# 运行单个应用（auth / platformadmin / tenantadmin / gateway）
+# 运行单个应用（auth / platformadmin / tenantadmin / rpapi / gateway）
 make run APP=auth
 make run APP=platformadmin
 make run APP=tenantadmin
+make run APP=rpapi
 
-# 单体聚合运行（一个进程挂载三者，:8100）
+# 单体聚合运行（一个进程挂载四者，:8100）
 make run APP=gateway
 ```
 
@@ -56,6 +57,7 @@ make run APP=gateway
 | auth | 8081 | 认证 + OIDC Provider（`/oidc`） |
 | platformadmin | 8082 | 平台管理 |
 | tenantadmin | 8083 | 租户自服务 |
+| rpapi | 8084 | 面向应用的只读目录 API（`/v1/rp/directory/*`） |
 | gateway | 8100 | 聚合部署（推荐日常使用） |
 
 ### 2.2 前端
@@ -162,11 +164,11 @@ curl http://localhost:8100/oidc/healthz
 ## 3. 测试
 
 ```bash
-# 运行指定应用测试（推荐；gateway 只做聚合、没有测试用例，请用 auth/platformadmin/tenantadmin）
+# 运行指定应用测试（推荐；gateway 只做聚合、没有测试用例，请用 auth/platformadmin/tenantadmin/rpapi）
 make test APP=auth
 
 # 全量测试（go.work 在 backend/，且按路径逐个 use 模块）
-cd backend && go test ./apps/auth/... ./apps/gateway/... ./apps/platformadmin/... ./apps/tenantadmin/... ./pkg/...
+cd backend && go test ./apps/auth/... ./apps/gateway/... ./apps/platformadmin/... ./apps/rpapi/... ./apps/tenantadmin/... ./pkg/... ./sdk/...
 
 # 指定包 / 单个用例
 cd backend && go test ./pkg/core/user/ -run TestCreate_NewPersonWithDeptRelations -v
@@ -178,12 +180,12 @@ go tool cover -html=coverage.out
 
 # Lint / vet
 make lint
-cd backend && for m in apps/auth apps/gateway apps/platformadmin apps/tenantadmin pkg; do (cd $m && go vet ./...); done
+cd backend && for m in apps/auth apps/gateway apps/platformadmin apps/rpapi apps/tenantadmin pkg sdk; do (cd $m && go vet ./...); done
 ```
 
 > **为什么不能写 `go test ./...`**：`backend/go.work` 用 `use (./apps/auth … ./pkg)` 逐个列出模块，`backend/` 本身不是模块，因此 `cd backend && go test ./...` 会报 `directory prefix . does not contain modules listed in go.work`（`./apps/...` 也不行，`apps` 不是模块）。要么显式列出各模块目录，要么进入某个模块目录内跑 `./...`（`make lint` 就是用后者遍历模块）。
 
-**单元测试约定**：auth / platformadmin / tenantadmin 各自的 `testutil.SetupSQLite(t, entities...)` 注册内存 SQLite 为全局 iam 库，服务内 `dao.NewXxxDao()` 自动落测试库，直接断言真实 dao 行为（gateway 无 `testutil`，因为它只在 `app.go` 里挂载三个应用）。需要真实 PostgreSQL/Redis 的集成测试用 `pkg/testsetup`（`Initialize`/`Done`/`NewCtx`，读取 `apps/<app>/config/config.yaml`）。
+**单元测试约定**：auth / platformadmin / tenantadmin / rpapi 各自的 `testutil.SetupSQLite(t, entities...)` 注册内存 SQLite 为全局 iam 库，服务内 `dao.NewXxxDao()` 自动落测试库，直接断言真实 dao 行为（gateway 无 `testutil`，因为它只在 `app.go` 里挂载四个应用）。RP 侧能力另有一套不依赖 DB 的测试：`cd backend/sdk && go test ./...`（`make test-sdk`）。需要真实 PostgreSQL/Redis 的集成测试用 `pkg/testsetup`（`Initialize`/`Done`/`NewCtx`，读取 `apps/<app>/config/config.yaml`）。
 
 **e2e（Playwright，浏览器全流程）**：
 
@@ -237,12 +239,16 @@ flowchart TB
         subgraph TEN_CLUS["tenantadmin 集群"]
             T1["tenantadmin-1 :8083"]
         end
+        subgraph RP_CLUS["rpapi 集群"]
+            R1["rpapi-1 :8084"]
+        end
         REDIS_SHARED[("Redis（认证共享）<br/>SSO 会话/授权状态/SLO 队列")]
         PG[("PostgreSQL")]
     end
     LB --> AUTH_CLUS
     LB --> PLAT_CLUS
     LB --> TEN_CLUS
+    LB --> RP_CLUS
     AUTH_CLUS --> REDIS_SHARED
     PLAT_CLUS --> REDIS_SHARED
     TEN_CLUS --> REDIS_SHARED
@@ -253,8 +259,8 @@ flowchart TB
 
 | 部署形态 | 适用 | 说明 |
 |---|---|---|
-| **单体聚合**（gateway 单进程） | 小规模/开发 | 一个进程挂载三应用，端口 8100 |
-| **分体部署** | 中大规模 | auth / platformadmin / tenantadmin 独立进程独立扩缩容 |
+| **单体聚合**（gateway 单进程） | 小规模/开发 | 一个进程挂载四应用，端口 8100 |
+| **分体部署** | 中大规模 | auth / platformadmin / tenantadmin / rpapi 独立进程独立扩缩容 |
 | **auth 多副本** | 高可用 | 必须共享同一认证 Redis（会话/授权状态），PostgreSQL 主库；`/oidc` 无状态化依赖 Redis |
 
 **关键约束**：

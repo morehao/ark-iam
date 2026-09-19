@@ -14,6 +14,7 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/middleware"
 	"github.com/morehao/ark-iam/auth/internal/service/svcoidc"
 	"github.com/morehao/ark-iam/pkg/sso"
+	"github.com/morehao/ark-iam/sdk/rp"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -21,6 +22,9 @@ type OIDCCtr struct {
 	provider    *svcoidc.OIDCProvider
 	oidcAuthSvc svcoidc.OIDCAuthSvc
 	publicKey   *rsa.PublicKey
+	// keySource 是本 OP 全部已发布公钥的进程内来源（含过渡期旧 key）：
+	// auth 自身作为 RP 校验业务 token 时直接用它，零网络调用且自动跟随多 key 轮换。
+	keySource rp.KeySource
 }
 
 // NewOIDCCtr 自装配 OIDC OP：provider（签名/加密密钥、协议态 storage）、
@@ -47,7 +51,21 @@ func newOIDCCtr(provider *svcoidc.OIDCProvider) *OIDCCtr {
 	if pub, err := provider.PublicKey(); err == nil {
 		ctr.publicKey = pub
 	}
+	if provider != nil && provider.Storage != nil {
+		if keys := provider.Storage.PublishedKeys(); len(keys) > 0 {
+			ctr.keySource = rp.NewKeysFromSet(keys)
+		}
+	}
 	return ctr
+}
+
+// KeySource 返回本 OP 已发布公钥的进程内来源（供鉴权中间件按 kid 取键）。
+// 未装配成功（测试注入空 provider）时返回 nil，调用方应 fail-closed。
+func (ctr *OIDCCtr) KeySource() rp.KeySource {
+	if ctr == nil {
+		return nil
+	}
+	return ctr.keySource
 }
 
 // PublicKey 返回 OP 签名公钥，供业务路由鉴权中间件校验本 OP 签发的 token。

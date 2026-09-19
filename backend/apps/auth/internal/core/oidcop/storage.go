@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -81,15 +82,46 @@ type OIDCStorage struct {
 	persistentStore *PersistentStore
 	signingKey      *rsa.PrivateKey
 	signingKeyID    string
+	// publishedKeys 是经 /oidc/keys 发布的全部公钥（kid → 公钥），
+	// 含当前 active 与轮换过渡期内的旧 key；校验方按 kid 取键，因此多 key 对其透明。
+	publishedKeys map[string]*rsa.PublicKey
 }
 
-func NewOIDCStorage(protocolStore ProtocolStateStore, persistentStore *PersistentStore, signingKey *rsa.PrivateKey, keyID string) *OIDCStorage {
-	return &OIDCStorage{
+// NewOIDCStorage 构造 OP storage。
+//
+// signingKey/keyID 为**当前 active** 的签名密钥；publishedKeys 可选，为该 OP
+// 需要对外发布的全部公钥（active + 过渡期旧 key）。省略时退化为只发布 active
+// 公钥，即原有单 key 行为（零破坏迁移）。
+func NewOIDCStorage(protocolStore ProtocolStateStore, persistentStore *PersistentStore, signingKey *rsa.PrivateKey, keyID string, publishedKeys ...map[string]*rsa.PublicKey) *OIDCStorage {
+	storage := &OIDCStorage{
 		protocolStore:   protocolStore,
 		persistentStore: persistentStore,
 		signingKey:      signingKey,
 		signingKeyID:    keyID,
 	}
+	switch {
+	case len(publishedKeys) > 0 && len(publishedKeys[0]) > 0:
+		storage.publishedKeys = make(map[string]*rsa.PublicKey, len(publishedKeys[0]))
+		for kid, key := range publishedKeys[0] {
+			if kid == "" || key == nil {
+				continue
+			}
+			storage.publishedKeys[kid] = key
+		}
+	case signingKey != nil:
+		storage.publishedKeys = map[string]*rsa.PublicKey{keyID: &signingKey.PublicKey}
+	}
+	return storage
+}
+
+// PublishedKeys 返回本 OP 当前发布的全部公钥副本（供进程内 RP 直接构造 KeySource，
+// 避免单体部署下走网络回环取 JWKS）。
+func (s *OIDCStorage) PublishedKeys() map[string]*rsa.PublicKey {
+	out := make(map[string]*rsa.PublicKey, len(s.publishedKeys))
+	for kid, key := range s.publishedKeys {
+		out[kid] = key
+	}
+	return out
 }
 
 var _ op.Storage = (*OIDCStorage)(nil)
@@ -161,62 +193,69 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 			claims.TokenUsage = objauth.TokenUsageMachine
 			claims.TenantID = ccReq.ownerTenantID
 			claims.UserID = ccReq.ownerUserID
+			if ccReq.ownerActorID != "" {
+				claims.Actor = map[string]any{"sub": ccReq.ownerActorID}
+			}
 		}
 		return claims.OIDCPrivateClaims(), nil
 	}
-	// authorization_code：优先用认证流程确定的租户
+	// authorization_code：优先用认证流程确定的租户。
+	// 挂起租户以 access_denied 拒绝签发。
 	if authReq, ok := request.(*AuthRequest); ok {
-		if tid := authReq.GetTenantID(); tid != "" {
-			if pid, perr := ParseSubject(authReq.GetSubject()); perr == nil {
-				// 目标租户在协议流程中解析得出（非调用方当前租户）：显式声明「指定租户」作用域。
-				users, uerr := s.persistentStore.userDao().GetListByCond(dbclient.ExplicitTenantContext(ctx, tid), &dao.UserCond{PersonID: pid, TenantID: tid})
-				if uerr != nil {
-					// 查询失败不再静默降级：缺少 tenant_id 的 token 会破坏下游授权，直接报错
-					glog.Errorf(ctx, "[oidcop.GetPrivateClaimsFromRequest] user dao GetListByCond fail, err:%v", uerr)
-					return nil, uerr
-				}
-				if len(users) > 0 {
-					if tErr := s.tenantTokenGate(ctx, tid, oidc.ErrAccessDenied()); tErr != nil {
-						return nil, tErr
-					}
-					claims := objauth.TokenClaims{TenantID: tid}.OIDCPrivateClaims()
-					// sid：注入 SSO 会话标识，使 access token 携带 sid，
-					// 供 RP 匹配与会话粒度的 back-channel 登出（M4）。
-					if authReq.SessionID != "" {
-						claims["sid"] = authReq.SessionID
-					}
-					return claims, nil
-				}
-			}
+		if claims, err := s.personPrivateClaims(ctx, authReq.GetTenantID(), authReq.GetSubject(), authReq.SessionID, oidc.ErrAccessDenied()); claims != nil || err != nil {
+			return claims, err
 		}
 	}
-	// refresh token 轮换：保留存储的租户，避免重新落到 users[0]
+	// refresh token 轮换：保留存储的租户，避免重新落到 users[0]。
+	// 落在挂起租户以 invalid_grant 拒绝，促使 RP 丢弃该 refresh token。
 	if rr, ok := request.(*refreshTokenRequest); ok {
-		if tid := rr.GetTenantID(); tid != "" {
-			if pid, perr := ParseSubject(rr.GetSubject()); perr == nil {
-				// 目标租户在协议流程中解析得出（非调用方当前租户）：显式声明「指定租户」作用域。
-				users, uerr := s.persistentStore.userDao().GetListByCond(dbclient.ExplicitTenantContext(ctx, tid), &dao.UserCond{PersonID: pid, TenantID: tid})
-				if uerr != nil {
-					glog.Errorf(ctx, "[oidcop.GetPrivateClaimsFromRequest] user dao GetListByCond fail, err:%v", uerr)
-					return nil, uerr
-				}
-				if len(users) > 0 {
-					// 刷新轮换落在挂起租户：以 invalid_grant 拒绝，促使 RP 丢弃该 refresh token
-					// （挂起动作本身也会撤销存量 refresh token，此处是并发窗口内的兜底）。
-					if tErr := s.tenantTokenGate(ctx, tid, oidc.ErrInvalidGrant()); tErr != nil {
-						return nil, tErr
-					}
-					claims := objauth.TokenClaims{TenantID: tid}.OIDCPrivateClaims()
-					// sid：刷新轮换也携带会话标识，保证刷新后的 token 可关联同一中心会话。
-					if rr.GetSessionID() != "" {
-						claims["sid"] = rr.GetSessionID()
-					}
-					return claims, nil
-				}
-			}
+		if claims, err := s.personPrivateClaims(ctx, rr.GetTenantID(), rr.GetSubject(), rr.GetSessionID(), oidc.ErrInvalidGrant()); claims != nil || err != nil {
+			return claims, err
 		}
 	}
 	return s.GetPrivateClaimsFromScopes(ctx, request.GetSubject(), getClientIDFromRequest(request), restrictedScopes)
+}
+
+// personPrivateClaims 依据 (租户, 自然人) 定位 tenant_user 行并产出人令牌私有声明。
+//
+// 返回 (nil, nil) 表示"该请求没有可用的租户/自然人上下文"，由调用方决定回退路径。
+// 三项声明一次性给出，避免"同一个语义在三处各写一遍"：
+//   - tenant_id：目标租户（协议流程解析得出，非调用方当前租户，故显式声明作用域）；
+//   - user_id：**tenant_user.id**，下游审计操作者的唯一口径；
+//   - person_id：自然人 ID，便于下游在无库访问时识别主体；
+//   - sid：会话标识，供 RP 匹配会话粒度的 back-channel 登出（M4）。
+//
+// suspendedErr 是租户被挂起时的协议错误（授权码流 access_denied、刷新流 invalid_grant）。
+func (s *OIDCStorage) personPrivateClaims(ctx context.Context, tenantID, subject, sessionID string, suspendedErr *oidc.Error) (map[string]any, error) {
+	if tenantID == "" {
+		return nil, nil
+	}
+	personID, perr := ParseSubject(subject)
+	if perr != nil {
+		return nil, nil
+	}
+	users, uerr := s.persistentStore.userDao().GetListByCond(
+		dbclient.ExplicitTenantContext(ctx, tenantID),
+		&dao.UserCond{PersonID: personID, TenantID: tenantID},
+	)
+	if uerr != nil {
+		// 查询失败不再静默降级：缺少 tenant_id/user_id 的 token 会破坏下游授权与审计，直接报错
+		glog.Errorf(ctx, "[oidcop.personPrivateClaims] user dao GetListByCond fail, err:%v, tenantID:%s", uerr, tenantID)
+		return nil, uerr
+	}
+	if len(users) == 0 {
+		return nil, nil
+	}
+	if tErr := s.tenantTokenGate(ctx, tenantID, suspendedErr); tErr != nil {
+		return nil, tErr
+	}
+	claims := objauth.TokenClaims{
+		TenantID:      tenantID,
+		UserID:        users[0].ID,
+		PersonIDClaim: users[0].PersonID,
+		SessionID:     sessionID,
+	}.OIDCPrivateClaims()
+	return claims, nil
 }
 
 // tenantTokenGate 令牌签发前的租户准入门禁：租户状态非 active 时拒绝签发/轮换令牌。
@@ -373,7 +412,13 @@ func (s *OIDCStorage) ClientCredentialsTokenRequest(ctx context.Context, clientI
 		// 绝不把原始密钥写进 token claim；owner 上下文放私有 claim。
 		req.isApiKey = true
 		req.ownerTenantID = apiKey.TenantID
-		req.ownerUserID = apiKey.CreatedBy
+		// user_id 的口径统一为「机器主体」（归属用户本人或服务账号），
+		// 与 x-api-key 直连通道注入的 KeyUserID 一致；创建密钥的人走 act.sub，
+		// 否则同一把密钥两条通道的"操作者"不同，会直接污染下游审计口径。
+		req.ownerUserID = apiKey.OwnerUserID
+		if apiKey.CreatedBy != "" && apiKey.CreatedBy != apiKey.OwnerUserID {
+			req.ownerActorID = apiKey.CreatedBy
+		}
 		req.subject = apiKey.KeyPrefix
 		req.clientID = apiKey.KeyPrefix
 		req.audience = []string{resolveAudienceFromRequest(ctx, apiKey.KeyPrefix)}
@@ -389,6 +434,8 @@ type clientCredentialsTokenRequest struct {
 	isApiKey      bool
 	ownerTenantID string
 	ownerUserID   string
+	// ownerActorID 是代操作主体（act.sub）：API Key 创建人。仅当它与机器主体不同时下发。
+	ownerActorID string
 }
 
 func (r *clientCredentialsTokenRequest) GetSubject() string    { return r.subject }
@@ -492,7 +539,12 @@ func ParseSubject(subject string) (string, error) {
 	return rawID, nil
 }
 
+// SigningKey 只返回 **active** 的签名密钥：新签发的 token 一律用最新 key，
+// 这是"轮换后新 token 立即用新 key"的落点。
 func (s *OIDCStorage) SigningKey(ctx context.Context) (op.SigningKey, error) {
+	if s.signingKey == nil {
+		return nil, fmt.Errorf("oidc signing key not configured")
+	}
 	return &oidcSigningKey{
 		id:  s.signingKeyID,
 		alg: jose.RS256,
@@ -504,15 +556,29 @@ func (s *OIDCStorage) SignatureAlgorithms(ctx context.Context) ([]jose.Signature
 	return []jose.SignatureAlgorithm{jose.RS256}, nil
 }
 
+// KeySet 发布 **全部** 已配置公钥（active + 过渡期旧 key）。这是最小多 key
+// 轮换的支撑点：只要旧 key 仍在 KeySet 里，尚未过期的存量大 token 就仍能通过
+// /oidc/keys + kid 校验；摘除旧 key 即让对应 token 立即失效（紧急轮换）。
+// 输出按 kid 排序，保证 /oidc/keys 响应稳定（便于缓存与快照对比）。
 func (s *OIDCStorage) KeySet(ctx context.Context) ([]op.Key, error) {
-	return []op.Key{
-		&oidcKey{
-			id:  s.signingKeyID,
+	if len(s.publishedKeys) == 0 {
+		return nil, nil
+	}
+	kids := make([]string, 0, len(s.publishedKeys))
+	for kid := range s.publishedKeys {
+		kids = append(kids, kid)
+	}
+	sort.Strings(kids)
+	keys := make([]op.Key, 0, len(kids))
+	for _, kid := range kids {
+		keys = append(keys, &oidcKey{
+			id:  kid,
 			alg: jose.RS256,
 			use: "sig",
-			key: &s.signingKey.PublicKey,
-		},
-	}, nil
+			key: s.publishedKeys[kid],
+		})
+	}
+	return keys, nil
 }
 
 type oidcSigningKey struct {

@@ -1,0 +1,112 @@
+server:
+  name: rpapi
+  port: 8084
+  env: dev
+
+db:
+  auto_migrate: true
+  seed: true
+
+client:
+  httpbingo:
+    host: https://httpbingo.org
+    module: httpbingo
+    retry: 3
+    timeout: 5s
+
+log:
+  default:
+    service: rpapi
+    module: default
+    level: info
+    logger_type: zap
+    writers:
+      - type: console
+      - type: file
+        dir: ../../../log
+    enable_otel_trace: true
+    extra_keys:
+      - requestID
+  gorm:
+    service: rpapi
+    module: gorm
+    level: debug
+    logger_type: zap
+    writers:
+      - type: console
+      - type: file
+        dir: ../../../log
+    enable_otel_trace: true
+    extra_keys:
+      - requestID
+  redis:
+    service: rpapi
+    module: redis
+    level: debug
+    logger_type: zap
+    writers:
+      - type: console
+      - type: file
+        dir: ../../../log
+    enable_otel_trace: true
+    extra_keys:
+      - requestID
+
+trace:
+  enable: true
+  service_version: ""
+  sampler: traceidratio
+  trace_id_ratio: 1.0
+  otlp:
+    endpoint: "127.0.0.1:4317"
+    insecure: true
+    timeout: 10s
+
+db_configs:
+  - url: "postgres://postgres:123456@127.0.0.1:5432/iam?sslmode=disable&TimeZone=Asia/Shanghai"
+    service: iam
+
+redis_config:
+  service: iam
+  addr: 127.0.0.1:6379
+  password: ""
+  db: 0
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
+
+security:
+  login:
+    maxFailures: 5
+    windowSec: 300
+    lockSec: 900
+
+jwt:
+  signKey: "your-jwt-secret-key"
+
+oidc:
+  # rpapi 是独立进程：校验 M2M 令牌时**本地验签**（JWKS 预取 + kid 查表），不查库。
+  # issuer 指向 OP（auth）；jwksURL 留空时由 SDK 解析（标准 discovery 的 jwks_uri
+  # 优先，本仓 OP 即 {issuer}/keys），显式给出可省一次 discovery。
+  # 注意：本仓 OP（zitadel/oidc）**不发布** {issuer}/.well-known/jwks.json。
+  issuer: "http://localhost:8081/oidc"
+  jwksURL: "http://localhost:8081/oidc/keys"
+  # 目录 API 的 aud 白名单：只接受 aud 命中 rpapi 自身 client_id 的 M2M 令牌。
+  # 按应用声明（不硬编码在代码里），与 tenantadmin/platformadmin 收紧 aud 的做法一致。
+  audiences:
+    - "rpapi"
+  # 注意：rpapi **只消费** OP 的公钥（jwksURL），不签发任何令牌，
+  # 因此这里刻意没有 signingKeyID / signingPrivateKeyPath / signingPrivateKeyPEM——
+  # 目录 API 进程不该持有 OP 的签名私钥。
+  frontendLoginURL: "http://localhost:4000/login"
+  encryptionKey: "oidc-dev-encryption-key-32bytes"
+  encryptionKeyID: "dev-enc-key"
+  allowInsecure: true
+  authRequestTTL: 600
+  authCodeTTL: 300
+  spentCodeTTL: 86400
+  sessionTTL: 86400
+  # rpapi 与 auth 共享认证 Redis（单进程 gateway 部署下天然共享），
+  # 因此可以校验 SSO 会话活性；独立部署且不共享 Redis 时必须改为 false。
+  enableSSOSessionValidation: true
+  backChannelLogoutPath: ""

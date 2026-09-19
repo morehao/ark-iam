@@ -3,112 +3,48 @@
 // 当前内容为 OIDC Back-Channel Logout（OIDC Back-Channel Logout 1.0）的
 // RP 侧接收端：供各业务应用（RP）挂载 back-channel logout 接收端点，
 // 接收由 auth（OP）在用户登出后推送的 logout_token，并执行本地会话清除。
-// 与 auth/internal/core/oidcop（OP 侧领域层，含登出登记与 SLO 队列）对应，本包是"接收端"。
-// OP 侧领域层代码位于 auth 应用内部，待出现第二个 OP 消费者时再上提至本包。
+//
+// 校验逻辑的单一真源在 github.com/morehao/ark-iam/sdk/rp/logout（框架无关、
+// 基于 net/http）。本包只做"Gin 挂载 + 最近记录（调试/e2e 断言）"这两件事，
+// 不再自行实现 token 校验——避免 RP 侧出现第二套验签规则。
 package goidc
 
 import (
-	"crypto/rsa"
 	"errors"
-	"fmt"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
+
+	"github.com/morehao/ark-iam/sdk/contract"
+	"github.com/morehao/ark-iam/sdk/rp/logout"
 )
 
-const (
-	// BackChannelLogoutEventURI 是 logout_token 中 events 声明的标准事件 URI。
-	BackChannelLogoutEventURI = "http://schemas.openid.net/event/backchannel-logout"
+// 契约别名：调用方引用 goidc.Xxx 与 sdk 侧完全同一类型。
+const BackChannelLogoutEventURI = contract.BackChannelLogoutEventURI
+
+type (
+	// LogoutTokenClaims 是 logout_token 的标准声明（真源 sdk/contract）。
+	LogoutTokenClaims = contract.LogoutTokenClaims
+	// KeySource 是按 kid 取公钥的最小接口（与 rp.KeySource 同形）。
+	KeySource = logout.JWKS
+	// JTIStore 是 jti 去重实现接口。
+	JTIStore = logout.JTIStore
 )
-
-// LogoutTokenClaims 是 OIDC Back-Channel Logout logout_token 的标准声明。
-//
-// 除 JWT 注册声明外，logout_token 必须包含：
-//   - events: 包含 BackChannelLogoutEventURI 键
-//   - sid:    会话 ID（可选，取决于 OP 是否支持 session 粒度）
-//   - sub:    用户标识
-//   - aud:    客户端 ID（必须是接收方 RP）
-//   - jti:    唯一标识（防重放）
-type LogoutTokenClaims struct {
-	jwt.RegisteredClaims
-	SessionID string         `json:"sid,omitempty"`
-	Events    map[string]any `json:"events,omitempty"`
-}
-
-// HasBackChannelLogoutEvent 报告 logout_token 是否声明了 back-channel logout 事件。
-func (c *LogoutTokenClaims) HasBackChannelLogoutEvent() bool {
-	if c == nil || c.Events == nil {
-		return false
-	}
-	_, ok := c.Events[BackChannelLogoutEventURI]
-	return ok
-}
-
-// ParseLogoutToken 解析并校验 logout_token。
-//
-// 校验项（对齐 OIDC Back-Channel Logout 1.0 §2.1.2 RP 处理要求）：
-//   - 签名：RS256，使用 OP 公钥验签
-//   - iss：必须等于 OP issuer
-//   - aud：必须包含本 RP 的 client_id
-//   - exp：未过期
-//   - events：必须包含 backchannel-logout 事件
-//   - jti：必须存在（防重放基础；具体去重由调用方基于 jti 完成）
-func ParseLogoutToken(tokenStr string, publicKey *rsa.PublicKey, issuer, clientID string) (*LogoutTokenClaims, error) {
-	if publicKey == nil {
-		return nil, errors.New("oidc logout: public key not initialized")
-	}
-	if tokenStr == "" {
-		return nil, errors.New("oidc logout: empty logout_token")
-	}
-	claims := &LogoutTokenClaims{}
-	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("oidc logout: unexpected signing method: %v", token.Header["alg"])
-		}
-		return publicKey, nil
-	},
-		jwt.WithLeeway(0),
-		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()}),
-		jwt.WithExpirationRequired(),
-		jwt.WithIssuer(issuer),
-		jwt.WithAudience(clientID),
-	)
-	if err != nil {
-		return nil, err
-	}
-	if !token.Valid {
-		return nil, errors.New("oidc logout: invalid logout_token")
-	}
-	if !claims.HasBackChannelLogoutEvent() {
-		return nil, errors.New("oidc logout: missing backchannel-logout event")
-	}
-	if claims.ID == "" {
-		return nil, errors.New("oidc logout: missing jti")
-	}
-	if claims.Subject == "" {
-		return nil, errors.New("oidc logout: missing sub")
-	}
-	return claims, nil
-}
 
 // SessionRevoker 是收到合法 logout_token 后执行本地会话清除的回调。
-// 返回 error 时接收端按 500 处理（OP 会重试）；nil 表示已成功处理。
-type SessionRevoker func(ctx *gin.Context, claims *LogoutTokenClaims) error
+// 返回 error 时接收端按 500 处理（OP 会重投）；nil 表示已成功处理。
+type SessionRevoker = logout.SessionRevoker
 
-// BackChannelLogoutHandler 是 back-channel logout 接收端的 Gin 处理器。
-type BackChannelLogoutHandler struct {
-	GetPublicKey func() *rsa.PublicKey
-	Issuer       string
-	ClientID     string
-	OnLogout     SessionRevoker
+// MemoryJTIStore 是 JTIStore 的进程内实现。
+type MemoryJTIStore = logout.MemoryJTIStore
 
-	// 最近接收的 logout_token 记录（内存，供调试/可观测/e2e 断言）。
-	recentMu sync.Mutex
-	recent   []RecentLogoutToken
-}
+// NewMemoryJTIStore 构造内存 jti 表。
+func NewMemoryJTIStore() *MemoryJTIStore { return logout.NewMemoryJTIStore() }
+
+// HashJTI 返回 jti 的存储键（sha256 十六进制）。
+func HashJTI(jti string) string { return logout.HashJTI(jti) }
 
 // RecentLogoutToken 记录一次接收到的 logout_token 摘要。
 type RecentLogoutToken struct {
@@ -123,47 +59,95 @@ type RecentLogoutToken struct {
 
 const maxRecentTokens = 64
 
+// BackChannelLogoutHandler 是 back-channel logout 接收端的 Gin 处理器。
+type BackChannelLogoutHandler struct {
+	// Receiver 是 SDK 的 net/http 接收端（校验 + jti 去重的唯一实现）。
+	Receiver *logout.Receiver
+	// KeySource / Issuer / ClientID 保留导出字段以兼容既有调用方与测试。
+	KeySource KeySource
+	Issuer    string
+	ClientID  string
+	OnLogout  SessionRevoker
+
+	// 最近接收的 logout_token 记录（内存，供调试/可观测/e2e 断言）。
+	recentMu sync.Mutex
+	recent   []RecentLogoutToken
+}
+
 // NewBackChannelLogoutHandler 构造接收端处理器。
-func NewBackChannelLogoutHandler(getPublicKey func() *rsa.PublicKey, issuer, clientID string, onLogout SessionRevoker) *BackChannelLogoutHandler {
+//
+// keys/issuer/clientID 缺一不可：任一缺失时接收端对所有请求返回 400（fail-closed），
+// 绝不"因为配不出来"就放行。
+func NewBackChannelLogoutHandler(keys KeySource, issuer, clientID string, onLogout SessionRevoker) *BackChannelLogoutHandler {
 	return &BackChannelLogoutHandler{
-		GetPublicKey: getPublicKey,
-		Issuer:       issuer,
-		ClientID:     clientID,
-		OnLogout:     onLogout,
-		recent:       make([]RecentLogoutToken, 0, maxRecentTokens),
+		Receiver:  newSDKReceiver(keys, issuer, clientID, onLogout),
+		KeySource: keys,
+		Issuer:    issuer,
+		ClientID:  clientID,
+		OnLogout:  onLogout,
+		recent:    make([]RecentLogoutToken, 0, maxRecentTokens),
 	}
+}
+
+func newSDKReceiver(keys KeySource, issuer, clientID string, onLogout SessionRevoker) *logout.Receiver {
+	opts := []logout.Option{
+		logout.WithJTIStore(logout.NewMemoryJTIStore()),
+	}
+	if issuer != "" {
+		opts = append(opts, logout.WithIssuer(issuer))
+	}
+	if clientID != "" {
+		opts = append(opts, logout.WithClientID(clientID))
+	}
+	if keys != nil {
+		opts = append(opts, logout.WithKeySource(keys))
+	}
+	if onLogout != nil {
+		opts = append(opts, logout.WithSessionRevoker(onLogout))
+	}
+	return logout.NewReceiver(opts...)
+}
+
+// ParseLogoutToken 解析并校验 logout_token（委托 SDK，保留本包历史导出名）。
+//
+// 校验项：RS256 + kid 必填 + 拒绝头部 jwk/jku/x5u、iss、aud、exp(必填)、iat(必填)、
+// events(必含 backchannel-logout)、jti(必填)、nonce(必须不存在)、sub(必填)。
+func ParseLogoutToken(tokenStr string, keys KeySource, issuer, clientID string) (*LogoutTokenClaims, error) {
+	if keys == nil {
+		return nil, errors.New("oidc logout: key source not initialized")
+	}
+	return newSDKReceiver(keys, issuer, clientID, nil).Parse(tokenStr)
 }
 
 // Handler 返回 Gin HandlerFunc：POST back_channel_logout_uri?logout_token=...
 //
 // 处理语义（对齐 OIDC Back-Channel Logout 1.0 §2.2）：
-//   - 成功处理 → 200
-//   - token 无效（签名/声明校验失败）→ 400（OP 不重试无效 token，仅记日志）
-//   - 本地登出回调失败 → 500（OP 将按重试策略重发）
+//   - 成功处理 → 200（重复投递同样 200，幂等）
+//   - token 无效（签名/声明校验失败）→ 400（OP 不重试无效 token）
+//   - 本地登出回调失败 → 500（OP 将按重试策略重发；此时不记 jti，保证重投有效）
 func (h *BackChannelLogoutHandler) Handler() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		tokenStr := ctx.PostForm("logout_token")
-		claims, err := ParseLogoutToken(tokenStr, h.GetPublicKey(), h.Issuer, h.ClientID)
+		claims, parseErr := h.Receiver.Parse(tokenStr)
+		// 观测优先：先记录本次投递（含无效），再交给 SDK 执行副作用。
 		h.record(RecentLogoutToken{
 			JTI:      claimsJTI(claims),
 			Sub:      claimsSub(claims),
 			SID:      claimsSID(claims),
 			ClientID: h.ClientID,
 			Received: time.Now(),
-			Valid:    err == nil,
-			ParseErr: errString(err),
+			Valid:    parseErr == nil,
+			ParseErr: errString(parseErr),
 		})
-		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "invalid logout_token: " + err.Error()})
+
+		// 语义（校验 → 幂等去重 → 撤销 → 记 jti）只有 SDK 一份实现：
+		// 撤销失败返回 500 且不记 jti，保证 OP 重投能真正重试。
+		status, msg := h.Receiver.Handle(ctx, tokenStr)
+		if status == http.StatusOK {
+			ctx.Status(http.StatusOK)
 			return
 		}
-		if h.OnLogout != nil {
-			if lErr := h.OnLogout(ctx, claims); lErr != nil {
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "logout processing failed"})
-				return
-			}
-		}
-		ctx.Status(http.StatusOK)
+		ctx.AbortWithStatusJSON(status, gin.H{"code": status, "msg": msg})
 	}
 }
 
@@ -238,11 +222,11 @@ type Receiver struct {
 //
 // basePath 默认 "/oidc/bc-logout"；调用方传入 group 时请确保路径不会与其它应用冲突
 // （gateway 聚合部署时各 app 应使用独立 basePath，如 /oidc/bc-logout/platform）。
-func RegisterReceiverRoutes(group *gin.RouterGroup, basePath string, getPublicKey func() *rsa.PublicKey, issuer, clientID string, onLogout SessionRevoker) *BackChannelLogoutHandler {
+func RegisterReceiverRoutes(group *gin.RouterGroup, basePath string, keys KeySource, issuer, clientID string, onLogout SessionRevoker) *BackChannelLogoutHandler {
 	if basePath == "" {
 		basePath = "/oidc/bc-logout"
 	}
-	h := NewBackChannelLogoutHandler(getPublicKey, issuer, clientID, onLogout)
+	h := NewBackChannelLogoutHandler(keys, issuer, clientID, onLogout)
 	group.POST(basePath, h.Handler())
 	group.GET(basePath+"/recent", func(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{"recent": h.Recent()})

@@ -17,6 +17,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/sdk/rp"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,7 +52,35 @@ func newOIDCAuthTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
+// testKID 是测试 token 的 kid：SDK 校验器要求 kid 必填，且 KeySource 必须能按它取到公钥。
+const testKID = "test-kid"
+
+// testKeySource 构造按 kid 取键的进程内 KeySource（等价于生产里 rp.NewKeysFromSet）。
+func testKeySource(key *rsa.PublicKey) KeySource {
+	return rp.NewKeysFromSet(map[string]*rsa.PublicKey{testKID: key})
+}
+
+// testKeySourceWith 构造可容纳多把公钥的 KeySource（多 key 轮换用例）。
+func testKeySourceWith(keys map[string]*rsa.PublicKey) KeySource {
+	return rp.NewKeysFromSet(keys)
+}
+
+// signTestToken 用给定私钥签发带 kid 的 access token。
+func signTestToken(t *testing.T, key *rsa.PrivateKey, claims jwt.MapClaims) string {
+	t.Helper()
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = testKID
+	s, err := token.SignedString(key)
+	require.NoError(t, err)
+	return s
+}
+
 func makeOIDCToken(t *testing.T, key *rsa.PrivateKey, sub string, tokenUsage string) string {
+	t.Helper()
+	return makeOIDCTokenWithUser(t, key, sub, tokenUsage, "")
+}
+
+func makeOIDCTokenWithUser(t *testing.T, key *rsa.PrivateKey, sub, tokenUsage, userID string) string {
 	t.Helper()
 	claims := jwt.MapClaims{
 		"sub":       sub,
@@ -64,10 +93,10 @@ func makeOIDCToken(t *testing.T, key *rsa.PrivateKey, sub string, tokenUsage str
 	if tokenUsage != "" {
 		claims["token_usage"] = tokenUsage
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	s, err := token.SignedString(key)
-	require.NoError(t, err)
-	return s
+	if userID != "" {
+		claims["user_id"] = userID
+	}
+	return signTestToken(t, key, claims)
 }
 
 func setupRouter(t *testing.T, validate func(ctx *gin.Context, personID string, isMachineToken bool) bool) (*gin.Engine, *rsa.PrivateKey) {
@@ -76,7 +105,7 @@ func setupRouter(t *testing.T, validate func(ctx *gin.Context, personID string, 
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 	r := gin.New()
-	r.Use(OIDCCompatibleAuth(func() *rsa.PublicKey { return &key.PublicKey }, WithOIDCSSOValidation(validate)))
+	r.Use(OIDCAuth(WithOIDCKeySource(testKeySource(&key.PublicKey)), WithOIDCSSOValidation(validate)))
 	r.GET("/v1/test", func(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{
 			"personID": ginFromContext(ctx),
@@ -213,9 +242,9 @@ func TestAPIKeyParallelAuth(t *testing.T) {
 	}
 
 	owner := &model.UserEntity{
-		TenantID:   "1",
-		UserType:   model.UserTypeMachine,
-		Name:       "parallel-auth-service-account",
+		TenantID: "1",
+		UserType: model.UserTypeMachine,
+		Name:     "parallel-auth-service-account",
 	}
 	if err := dao.NewUserDao().Insert(context.Background(), owner); err != nil {
 		t.Fatalf("seed api key owner: %v", err)
@@ -271,11 +300,11 @@ func seedDefaultOIDCUser(t *testing.T) {
 	t.Helper()
 	now := time.Now()
 	user := &model.UserEntity{
-		TenantID:   "1",
-		PersonID:   "88",
-		Name:       "oidc-user",
-		JoinedAt:   &now,
-		Status:     model.UserStatusActive,
+		TenantID: "1",
+		PersonID: "88",
+		Name:     "oidc-user",
+		JoinedAt: &now,
+		Status:   model.UserStatusActive,
 	}
 	if err := dao.NewUserDao().Insert(context.Background(), user); err != nil {
 		t.Fatalf("seed oidc user: %v", err)
@@ -289,21 +318,18 @@ func TestRejectsTokenWithWrongIssuer(t *testing.T) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 	r := gin.New()
-	r.Use(OIDCCompatibleAuth(func() *rsa.PublicKey { return &key.PublicKey },
+	r.Use(OIDCAuth(WithOIDCKeySource(testKeySource(&key.PublicKey)),
 		WithOIDCIssuer("http://localhost:8099/oidc")))
 	r.GET("/v1/test", func(ctx *gin.Context) { ctx.Status(http.StatusOK) })
 
-	claims := jwt.MapClaims{
+	s := signTestToken(t, key, jwt.MapClaims{
 		"sub":       "person:88",
 		"tenant_id": "1",
 		"aud":       "test-client",
 		"iss":       "http://evil.example.com/oidc",
 		"exp":       time.Now().Add(time.Hour).Unix(),
 		"iat":       time.Now().Unix(),
-	}
-	tok := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	s, err := tok.SignedString(key)
-	require.NoError(t, err)
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
 	req.Header.Set(AuthHeaderKey, AuthBearer+s)
@@ -318,22 +344,19 @@ func TestRejectsTokenWithWrongAudience(t *testing.T) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 	r := gin.New()
-	r.Use(OIDCCompatibleAuth(func() *rsa.PublicKey { return &key.PublicKey },
+	r.Use(OIDCAuth(WithOIDCKeySource(testKeySource(&key.PublicKey)),
 		WithOIDCIssuer("http://localhost:8099/oidc"),
 		WithOIDCAudiences("platform_admin_web")))
 	r.GET("/v1/test", func(ctx *gin.Context) { ctx.Status(http.StatusOK) })
 
-	claims := jwt.MapClaims{
+	s := signTestToken(t, key, jwt.MapClaims{
 		"sub":       "person:88",
 		"tenant_id": "1",
 		"aud":       "tenant_admin_web", // 另一个 client 的 token
 		"iss":       "http://localhost:8099/oidc",
 		"exp":       time.Now().Add(time.Hour).Unix(),
 		"iat":       time.Now().Unix(),
-	}
-	tok := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	s, err := tok.SignedString(key)
-	require.NoError(t, err)
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
 	req.Header.Set(AuthHeaderKey, AuthBearer+s)
@@ -352,23 +375,20 @@ func TestAcceptsTokenWithMatchingIssuerAndAudience(t *testing.T) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 	r := gin.New()
-	r.Use(OIDCCompatibleAuth(func() *rsa.PublicKey { return &key.PublicKey },
+	r.Use(OIDCAuth(WithOIDCKeySource(testKeySource(&key.PublicKey)),
 		WithOIDCIssuer("http://localhost:8099/oidc"),
 		WithOIDCAudiences("platform_admin_web"),
 		WithOIDCSSOValidation(func(ctx *gin.Context, personID string, isMachineToken bool) bool { return true })))
 	r.GET("/v1/test", func(ctx *gin.Context) { ctx.Status(http.StatusOK) })
 
-	claims := jwt.MapClaims{
+	s := signTestToken(t, key, jwt.MapClaims{
 		"sub":       "person:88",
 		"tenant_id": "1",
 		"aud":       "platform_admin_web",
 		"iss":       "http://localhost:8099/oidc",
 		"exp":       time.Now().Add(time.Hour).Unix(),
 		"iat":       time.Now().Unix(),
-	}
-	tok := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	s, err := tok.SignedString(key)
-	require.NoError(t, err)
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
 	req.Header.Set(AuthHeaderKey, AuthBearer+s)
@@ -392,4 +412,122 @@ func TestOIDCPersonWithoutUserRejected(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+// TestOIDCUserIDFromTokenClaim 锁定「令牌携带 user_id 时不再查库」的行为：
+// claims.user_id 即下游审计操作者，且与 tenant_user 行主键一致。
+func TestOIDCUserIDFromTokenClaim(t *testing.T) {
+	// 建库但不 seed 任何 user：若中间件仍走反查会因"非租户成员"而 401。
+	_ = newOIDCAuthTestDB(t)
+	t.Cleanup(func() { dbclient.ClearDBForTest(dbclient.ServiceNameIam) })
+
+	r, key := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
+		return true
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
+	req.Header.Set(AuthHeaderKey, AuthBearer+makeOIDCTokenWithUser(t, key, "person:88", "", "tu-777"))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `"userID":"tu-777"`, "user_id 必须直接取令牌声明")
+	assert.Contains(t, w.Body.String(), `"personID":"88"`)
+}
+
+// TestOIDCMachineTokenCarriesUserID 机器凭证同样下发 user_id（机器主体），且不查库。
+func TestOIDCMachineTokenCarriesUserID(t *testing.T) {
+	_ = newOIDCAuthTestDB(t)
+	t.Cleanup(func() { dbclient.ClearDBForTest(dbclient.ServiceNameIam) })
+
+	r, key := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
+		return true
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
+	req.Header.Set(AuthHeaderKey, AuthBearer+makeOIDCTokenWithUser(t, key, "ak_1234567", "machine", "owner-9"))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `"userID":"owner-9"`)
+}
+
+// TestOIDCMultiKeyRotation 覆盖最小多 key 轮换：
+// active 换 key 后，旧 key 仍在 key set 里时存量 token 继续可用；
+// 摘除旧 key 后立即失效（紧急轮换语义）。
+func TestOIDCMultiKeyRotation(t *testing.T) {
+	_ = newOIDCAuthTestDB(t)
+	seedDefaultOIDCUser(t)
+	t.Cleanup(func() { dbclient.ClearDBForTest(dbclient.ServiceNameIam) })
+
+	oldKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	newKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	const oldKID = "kid-old"
+	const newKID = "kid-new"
+
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	engine.Use(OIDCAuth(
+		WithOIDCKeySource(testKeySourceWith(map[string]*rsa.PublicKey{
+			oldKID: &oldKey.PublicKey,
+			newKID: &newKey.PublicKey,
+		})),
+		WithOIDCIssuer("http://localhost:8099/oidc"),
+		WithOIDCAudiences("test-client"),
+	))
+	engine.GET("/v1/test", func(ctx *gin.Context) { ctx.Status(http.StatusOK) })
+
+	oldToken := signTokenWithKID(t, oldKey, oldKID)
+	newToken := signTokenWithKID(t, newKey, newKID)
+
+	for name, token := range map[string]string{"旧 key 存量 token": oldToken, "新 key token": newToken} {
+		req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
+		req.Header.Set(AuthHeaderKey, AuthBearer+token)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code, "%s 应在过渡期内继续可用", name)
+	}
+
+	// 摘除旧 key（模拟紧急轮换）：旧 token 立即 401，新 token 不受影响。
+	engine2 := gin.New()
+	engine2.Use(OIDCAuth(
+		WithOIDCKeySource(testKeySourceWith(map[string]*rsa.PublicKey{newKID: &newKey.PublicKey})),
+		WithOIDCIssuer("http://localhost:8099/oidc"),
+		WithOIDCAudiences("test-client"),
+	))
+	engine2.GET("/v1/test", func(ctx *gin.Context) { ctx.Status(http.StatusOK) })
+
+	reqOld := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
+	reqOld.Header.Set(AuthHeaderKey, AuthBearer+oldToken)
+	wOld := httptest.NewRecorder()
+	engine2.ServeHTTP(wOld, reqOld)
+	assert.Equal(t, http.StatusUnauthorized, wOld.Code, "摘除旧 key 后旧 token 必须立即失效")
+
+	reqNew := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
+	reqNew.Header.Set(AuthHeaderKey, AuthBearer+newToken)
+	wNew := httptest.NewRecorder()
+	engine2.ServeHTTP(wNew, reqNew)
+	assert.Equal(t, http.StatusOK, wNew.Code, "新 active key 签发的 token 不受影响")
+}
+
+func signTokenWithKID(t *testing.T, key *rsa.PrivateKey, kid string) string {
+	t.Helper()
+	claims := jwt.MapClaims{
+		"sub":       "person:88",
+		"tenant_id": "1",
+		"aud":       "test-client",
+		"iss":       "http://localhost:8099/oidc",
+		"exp":       time.Now().Add(time.Hour).Unix(),
+		"iat":       time.Now().Unix(),
+		"user_id":   "tu-88",
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = kid
+	s, err := token.SignedString(key)
+	require.NoError(t, err)
+	return s
 }

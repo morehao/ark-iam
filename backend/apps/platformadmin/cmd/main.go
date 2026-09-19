@@ -29,7 +29,8 @@ func main() {
 	// 仅在开启该开关时 gin 才把 Done/Err/Deadline/Value 转发到请求的 context。
 	engine.ContextWithFallback = true
 	engine.Use(gin.Recovery())
-	platformadmin.Init(engine, config.Conf)
+	// 独立部署没有同进程 OP：传 nil，由应用按自身配置解析 JWKS 端点。
+	platformadmin.Init(engine, config.Conf, nil)
 
 	if err := engine.Run(fmt.Sprintf(":%s", config.Conf.Server.Port)); err != nil {
 		glog.Errorf(context.Background(), "%s run fail, port:%s", platformadmin.AppName, config.Conf.Server.Port)
