@@ -7,12 +7,17 @@ import (
 	"github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/auth/internal/router"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
+	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/morehao/golib/biz/gserver/gindocs"
 )
 
 const AppName = "auth"
 
-func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
+// Init 装配 auth 应用，并返回本进程 OP 已发布公钥的进程内 KeySource。
+//
+// 返回值供 **gateway 单体部署**使用：同进程的 platformadmin/tenantadmin/rpapi
+// 直接复用它做本地验签（零网络调用、跟随多 key 轮换）；独立部署的调用方可忽略。
+func Init(engine *gin.Engine, Conf *pkgconfig.Config) pkgmiddleware.KeySource {
 	config.Conf = Conf
 
 	// H15：非 dev 环境强制安全配置，否则拒绝启动（fail-closed，与签名密钥策略对齐）
@@ -26,7 +31,7 @@ func Init(engine *gin.Engine, Conf *pkgconfig.Config) {
 
 	// 全部业务对象（OIDC provider、控制器、服务）由 router 层自装配，
 	// app 层只做基础设施装配（配置、docs、引擎）。
-	router.RegisterRouter(engine)
+	return router.RegisterRouter(engine)
 }
 
 // validateNonDevSecurityConfig 非 dev 环境强制：HTTPS 场景 cookieSecure=true、

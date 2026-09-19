@@ -1,6 +1,6 @@
 # API 参考（API Reference）
 
-> 本文给出 Ark IAM 的 API 总览：**OIDC 协议端点**（`/oidc/*`）、**认证端点**（`/v1/auth/*`）、**平台管理端点**（`/v1/platform/*`）、**租户自服务端点**（`/v1/tenant/*`），以及认证方式、通用响应信封、路由规范摘要。
+> 本文给出 Ark IAM 的 API 总览：**OIDC 协议端点**（`/oidc/*`）、**认证端点**（`/v1/auth/*`）、**平台管理端点**（`/v1/platform/*`）、**租户自服务端点**（`/v1/tenant/*`）、**应用目录端点**（`/v1/rp/directory/*`），以及认证方式、通用响应信封、路由规范摘要。
 >
 > 开发环境 Swagger（redoc）：`http://localhost:{port}/{appName}/redocs`（如 `http://localhost:8081/auth/redocs`）。
 
@@ -15,6 +15,7 @@
 5. [平台管理端点（/v1/platform/*）](#5-平台管理端点v1platform)
 6. [租户自服务端点（/v1/tenant/*）](#6-租户自服务端点v1tenant)
 7. [路由规范摘要](#7-路由规范摘要)
+8. [应用目录端点（/v1/rp/directory/*）](#8-应用目录端点v1rpdirectory)
 
 ---
 
@@ -27,6 +28,9 @@
 | auth | `auth` | 8081 | 8100 |
 | platformadmin | `platform` | 8082 | 8100 |
 | tenantadmin | `tenant` | 8083 | 8100 |
+| rpapi | `rp` | 8084 | 8100 |
+
+> `rpapi` 是面向**外部应用（RP）**的只读目录服务（`/v1/rp/directory/*`），独立进程 :8084；gateway 单体部署时按 `rp` 前缀挂到 :8100（见 §8）。
 
 ### 1.2 响应信封
 
@@ -44,7 +48,8 @@
 - `code=0` 表示成功；非 0 为业务错误码（`pkg/code` 统一维护）；
 - **业务错误仍以 HTTP 200 返回**（`gincontext.Fail/Abort`），调用方必须以 `code` 判定成败，不能依赖 HTTP 状态码；
 - `requestID` 为链路追踪 ID，便于按请求排查日志；
-- 仅鉴权中间件短路时返回 HTTP 401：`{"code": 401, "msg": "invalid token"}`。
+- 仅鉴权中间件短路时返回 HTTP 401：`{"code": 401, "msg": "invalid token"}`；
+- **例外：`/v1/rp/directory/*` 成功响应返回裸 DTO，不套本信封**（原因见 §8.3）。
 
 ### 1.3 路径参数命名
 
@@ -65,19 +70,35 @@
 ```mermaid
 flowchart LR
     REQ["业务请求"] --> AUTH{"鉴权通道"}
-    AUTH -->|"Authorization: Bearer access_token"| OIDC["OIDC Access Token<br/>（RS256，校验 iss/aud/租户/会话活性）"]
+    AUTH -->|"Authorization: Bearer access_token"| OIDC["OIDC Access Token<br/>（RS256，校验 iss/aud/会话活性；租户作用域由消费方判定）"]
     AUTH -->|"x-api-key: <64 位 hex 明文>"| AK["API Key<br/>（SHA-256 哈希/过期/吊销校验）"]
-    OIDC --> PASS["注入 personID / tenantID / userID"]
+    OIDC --> PASS["注入 personID / userID / tenantID（可缺）"]
     AK --> PASS
 ```
 
 | 通道 | 使用方 | 说明 |
 |---|---|---|
-| `Authorization: Bearer <access_token>` | 登录用户（前端） | OIDC JWT，`sub=person:<id>`，私有声明 `tenant_id`/`user_id`/`client_id`/`token_usage` |
+| `Authorization: Bearer <access_token>` | 登录用户（前端）/ M2M 应用 | OIDC JWT，`sub=person:<id>`，私有声明 `tenant_id`/`user_id`/`person_id`/`sid`/`client_id`/`token_usage`/`scope`/`act`（口径见 §2.1） |
 | `x-api-key: <64 位 hex 明文>` | 机器/服务 | 明文为 32 字节随机数的 64 位小写 hex，**无 `ak_` 之类前缀**；列表展示用 `keyPrefix`（前 7 位）。也可放进 `Authorization: Bearer`，与 `x-api-key` 二选一，任一通过即可 |
 
 免鉴权路径（跳过业务鉴权中间件）：`/v1/auth/connectors/callback`（Connector 回调）。**全部 `/oidc/*` 端点直接挂在 engine 上、不经业务鉴权**（鉴权中间件只作用于 `/v1/*`），由协议自身校验（token 端点校验 client 凭据，bc-logout 校验 `logout_token` JWT）。
 > 说明：`/v1/auth/register` 端点已下线，自助注册收口到 `/oidc/registerPerson` + `/oidc/createTenant`（见 §3.2）。
+
+### 2.1 Access Token 私有声明
+
+声明契约的**双端单一事实源**是 `backend/sdk/contract`（签发侧 OP 与校验侧 RP 共享同一份定义），字段口径如下：
+
+| 声明 | 含义 |
+|---|---|
+| `sub` | 人令牌为 `person:<personID>`；机器凭证令牌（`token_usage=machine`）的 `sub` 不是自然人 |
+| `user_id` | **审计操作者的唯一口径**。人令牌 = `tenant_user.id`（与 IAM 自身 `created_by`/`updated_by` 同口径）；API Key / client_credentials 机器令牌 = 机器主体（`api_key.owner_user_id`），创建者另在 `act.sub` |
+| `person_id` | 自然人 ID（与 `sub` 的 `person:` 前缀同源，便于下游无库访问识别主体） |
+| `sid` | SSO 中心会话标识，用于按会话作废与 back-channel 登出匹配 |
+| `tenant_id` | 租户作用域。**不是令牌有效性条件**：签发侧在「自然人 → 租户映射不唯一」时**不写**该 claim，验签照常通过、身份里的租户为空。需要租户的接口必须自行判定并返回 **403**，不得让 `dbclient.ErrTenantScopeMissing` 冒成 500 |
+| `client_id` | 令牌所属客户端 |
+| `token_usage` | `machine` 表示机器凭证（API Key / client_credentials）；缺省为自然人令牌 |
+| `scope` | 标准 OAuth scope（空格分隔，RFC 6749 §3.3）；目录 API 等 M2M 权限据此判定 |
+| `act` | 代操作声明，wire 形态 `{"act":{"sub":"<tenant_user.id>"}}`（机器凭证代表某人操作时承载原操作者） |
 
 ---
 
@@ -328,3 +349,91 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | 关联建模 | 从属资源用子资源（`/users/{userID}/identities`）；多对多用双端视角 + `PUT` 全量替换（`/users/{userID}/roles` ↔ `/roles/{roleID}/menus`） |
 | 层级限制 | 集合层级 ≤ 3（路径段 ≤ 6） |
 | 当前用户 | `/v1/auth/me`、`/v1/auth/me/tenants`、`/v1/auth/me/sessions` |
+
+---
+
+## 8. 应用目录端点（/v1/rp/directory/*）
+
+> 部署于 rpapi 应用（:8084）与 gateway（:8100）；服务标识段为 `rp`，完整前缀 `/v1/rp`。
+> 这是给**外部应用（RP）**用的只读目录接口（后台展示取姓名/部门/角色），**不提供任何写操作**。
+> 客户端实现见 `backend/sdk/rp/directory`（TTL 缓存 / ETag 304 / 批量 / single-flight），接入说明见 `backend/sdk/README.md` §4。
+
+### 8.1 鉴权与状态码契约
+
+鉴权链是 rpapi **自己的一条**，刻意不复用 auth 的宽松链（目录 API 的鉴权缺失会直接变成越权读）：
+
+1. `OIDCAuth`：校验 issuer；并在配置了 `oidc.audiences` 时把 `aud` 收紧到 **rpapi 自身的 client_id**（`rpapi/config/config.yaml` 声明 `audiences: ["rpapi"]`）；
+2. `RequireDirectoryRead`：要求令牌携带 scope `directory.read` **且** `tenant_id` 非空。
+
+**租户作用域一律来自令牌的 `tenant_id`，不接受任何请求参数指定租户**；中间件据此显式声明 ctx 租户作用域，后续实体查询由租户隔离插件按此注入。
+
+| 状态码 | 触发条件 | 响应体 |
+|---|---|---|
+| 200 | 正常 | 裸 DTO（见 §8.3） |
+| 304 | `If-None-Match` 命中当前 `ETag` | 空 |
+| 400 | 批量 `ids` 超过 100 | `{code,requestID,msg,data:null}` |
+| 401 | 无令牌 / 令牌不可用 / 会话已撤销 | `OIDCAuth` 短路返回 `{"code":401,"msg":"..."}`；`RequireDirectoryRead` 的兜底（未经过 `OIDCAuth`）返回 `{code,requestID,msg,data:null}` |
+| 403 | 缺 `directory.read`，或令牌无 `tenant_id` | `{code,requestID,msg,data:null}` |
+| 404 | 成员跨租户或不存在 | `{code,requestID,msg,data:null}` |
+| 503 | 目录数据不可用（系统错误统一归此档） | `{code,requestID,msg,data:null}` |
+
+> 与 §1.2 的常规业务接口不同：**目录 API 的错误路径以 HTTP 状态码承载语义**（不套"HTTP 200 + 非 0 code"），调用方按 HTTP 状态码分支即可。错误码属 `pkg/code` 的 `1060xx` 段（106003 不存在 / 106004 未认证 / 106005 无权 / 106006 入参非法 / 106007 目录不可用）。
+
+### 8.2 端点总览
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/v1/rp/directory/members/{userID}` | 单个成员摘要；跨租户与不存在都是 404 |
+| GET | `/v1/rp/directory/members?ids=a,b,c` | 批量成员摘要；`ids` 逗号分隔（去空白、去空项、去重、保序），**≤100**，超出显式 400 |
+| GET | `/v1/rp/directory/departments/tree` | 本租户部门树（**仅 `enable` 节点**） |
+| GET | `/v1/rp/directory/roles` | 本租户角色清单；**≤500**，超出置 `truncated:true` |
+
+### 8.3 响应形态：裸 DTO 与 ETag 协商
+
+**成功响应是裸 DTO，不是 `{code,requestID,msg,data}` 信封**。原因是服务端把 `ETag` 算作**序列化后响应体的 sha256**（`"` + `base64url(sha256(body)[:16])` + `"`，用稳定的 `gutil.ToJsonString` 序列化，保证"算哈希的字节"与"发出去的字节"严格同一份）；套信封会让 `requestID` 每次不同、ETag 永不命中，304 也就无从谈起。
+
+每个 200 响应都带：
+
+| 响应头 | 值 | 说明 |
+|---|---|---|
+| `ETag` | `"<base64url(sha256(body)[:16])>"` | 序列化后响应体的哈希 |
+| `Cache-Control` | `private, no-cache` | 带 `Authorization` 的响应显式声明不进共享缓存 |
+| `Vary` | `Authorization` | 按令牌维度区分缓存 |
+
+请求带 `If-None-Match` 且与当前 ETag 匹配（支持逗号分隔候选列表与 `W/` 弱前缀，`*` 恒命中）时返回 **304 + 空响应体**——省带宽与反序列化，**不省 DB 查询**（服务端要算哈希必先取数）。
+
+### 8.4 响应结构
+
+**`GET /directory/members/{userID}`** → `Member`：
+
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| `userID` | string | 租户成员主键（与令牌 `user_id` 同口径） |
+| `name` | string | 姓名 |
+| `avatar` | string | 头像 |
+| `status` | string | `active` / `suspended`。**仅服务展示**：绝不用它做放行/拒绝判定，挂起与否由令牌侧决定 |
+| `userType` | string | `member` / `machine` |
+| `departmentNames` | []string | 部门名列表（有序；无部门时为空数组，不是 `null`） |
+
+**`GET /directory/members?ids=...`** → `{list:[Member],missing:[id]}`：命中进 `list`，未命中进 `missing`，个别缺项不影响整体成功（200）。**跨租户 id 与不存在的 id 在 `missing` 中不可区分**（刻意防枚举），调用方不得据此推断某 id 是否存在于其它租户。
+
+**`GET /directory/departments/tree`** → `Department[]`：节点 `{id,parentID,name,children?}`，`children` 仅在非空时出现；父节点不可见的节点按根节点处理（不会静默丢掉整棵子树）。
+
+**`GET /directory/roles`** → `{list:[{code,name,appID}],truncated:bool}`：补齐 ID token `groups` 只含编码的缺口；按 `appID` → `code` 排序；列表超过 500 时截断并置 `truncated=true`。
+
+### 8.5 客户端接入
+
+外部应用用 `backend/sdk` 的目录客户端（缓存/批量/降级已内置，缓存 TTL 等旋钮见 `configuration-reference.md` §11）：
+
+```go
+client, err := directory.New(directory.Config{
+    BaseURL: "https://iam.example.com/v1/rp", // 不带尾斜杠
+    Tokens:  tc,                              // rp.TokenClient，scope 含 directory.read
+})
+member, err := client.Member(ctx, userID)
+members, err := client.Members(ctx, []string{id1, id2}) // ≤100
+tree, err := client.DepartmentTree(ctx)
+roles, err := client.Roles(ctx)                          // client.RolesTruncated() 查截断
+```
+
+> 按 `sdk/README.md`：目录客户端**不得**进入鉴权中间件或审计写入的关键路径；401/403/404 一律透传、绝不降级（仅连接失败/超时/5xx 可用 stale 缓存）。

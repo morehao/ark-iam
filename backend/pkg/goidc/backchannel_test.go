@@ -1,6 +1,7 @@
 package goidc
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
@@ -31,7 +32,34 @@ type testClaims struct {
 	Events    map[string]any `json:"events,omitempty"`
 }
 
-func buildTestLogoutToken(t *testing.T, privKey *rsa.PrivateKey, issuer, clientID, sid, sub string, withEvent bool) string {
+// testKeySource 返回"单 key"KeySource（kid 与 token 头一致），
+// 与本包生产接线（rp.NewKeysFromSet / JWKS）保持同一取键口径。
+func testKeySource(m map[string]*rsa.PublicKey) KeySource { return keyMapSource(m) }
+
+type keyMapSource map[string]*rsa.PublicKey
+
+func (m keyMapSource) PublicKey(_ context.Context, kid string) (*rsa.PublicKey, error) {
+	key, ok := m[kid]
+	if !ok {
+		return nil, errors.New("unknown kid: " + kid)
+	}
+	return key, nil
+}
+
+// newTestKeyAndSource 生成一把测试私钥，并返回可按 kid 取到其公钥的 KeySource。
+func newTestKeyAndSource(t *testing.T) (*rsa.PrivateKey, KeySource, string) {
+	t.Helper()
+	privKey := newTestKey(t)
+	kid := "test-kid"
+	return privKey, testKeySource(map[string]*rsa.PublicKey{kid: &privKey.PublicKey}), kid
+}
+
+func buildTestLogoutTokenWithKID(t *testing.T, privKey *rsa.PrivateKey, kid, issuer, clientID, sid, sub string, withEvent bool) string {
+	t.Helper()
+	return signLogoutToken(t, privKey, kid, issuer, clientID, sid, sub, withEvent)
+}
+
+func signLogoutToken(t *testing.T, privKey *rsa.PrivateKey, kid, issuer, clientID, sid, sub string, withEvent bool) string {
 	t.Helper()
 	events := map[string]any{}
 	if withEvent {
@@ -50,9 +78,15 @@ func buildTestLogoutToken(t *testing.T, privKey *rsa.PrivateKey, issuer, clientI
 		Events:    events,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = kid
 	tokenStr, err := token.SignedString(privKey)
 	require.NoError(t, err)
 	return tokenStr
+}
+
+func buildTestLogoutToken(t *testing.T, privKey *rsa.PrivateKey, issuer, clientID, sid, sub string, withEvent bool) string {
+	t.Helper()
+	return signLogoutToken(t, privKey, "", issuer, clientID, sid, sub, withEvent)
 }
 
 func newTestKey(t *testing.T) *rsa.PrivateKey {
@@ -63,10 +97,10 @@ func newTestKey(t *testing.T) *rsa.PrivateKey {
 }
 
 func TestParseLogoutToken_Valid(t *testing.T) {
-	privKey := newTestKey(t)
-	tokenStr := buildTestLogoutToken(t, privKey, testIssuer, testClient, testSID, testSubject, true)
+	privKey, source, kid := newTestKeyAndSource(t)
+	tokenStr := buildTestLogoutTokenWithKID(t, privKey, kid, testIssuer, testClient, testSID, testSubject, true)
 
-	claims, err := ParseLogoutToken(tokenStr, &privKey.PublicKey, testIssuer, testClient)
+	claims, err := ParseLogoutToken(tokenStr, source, testIssuer, testClient)
 	require.NoError(t, err)
 	assert.Equal(t, testSubject, claims.Subject)
 	assert.Equal(t, testSID, claims.SessionID)
@@ -75,45 +109,45 @@ func TestParseLogoutToken_Valid(t *testing.T) {
 }
 
 func TestParseLogoutToken_InvalidSignature(t *testing.T) {
-	privKey := newTestKey(t)
+	privKey, _, kid := newTestKeyAndSource(t)
 	otherPrivKey := newTestKey(t)
-	tokenStr := buildTestLogoutToken(t, privKey, testIssuer, testClient, testSID, testSubject, true)
+	tokenStr := buildTestLogoutTokenWithKID(t, privKey, kid, testIssuer, testClient, testSID, testSubject, true)
 
-	_, err := ParseLogoutToken(tokenStr, &otherPrivKey.PublicKey, testIssuer, testClient)
+	_, err := ParseLogoutToken(tokenStr, testKeySource(map[string]*rsa.PublicKey{kid: &otherPrivKey.PublicKey}), testIssuer, testClient)
 	require.Error(t, err)
 }
 
 func TestParseLogoutToken_WrongIssuer(t *testing.T) {
-	privKey := newTestKey(t)
-	tokenStr := buildTestLogoutToken(t, privKey, "http://evil.example/oidc", testClient, testSID, testSubject, true)
+	privKey, source, kid := newTestKeyAndSource(t)
+	tokenStr := buildTestLogoutTokenWithKID(t, privKey, kid, "http://evil.example/oidc", testClient, testSID, testSubject, true)
 
-	_, err := ParseLogoutToken(tokenStr, &privKey.PublicKey, testIssuer, testClient)
+	_, err := ParseLogoutToken(tokenStr, source, testIssuer, testClient)
 	require.Error(t, err)
 }
 
 func TestParseLogoutToken_WrongAudience(t *testing.T) {
-	privKey := newTestKey(t)
-	tokenStr := buildTestLogoutToken(t, privKey, testIssuer, "some-other-rp", testSID, testSubject, true)
+	privKey, source, kid := newTestKeyAndSource(t)
+	tokenStr := buildTestLogoutTokenWithKID(t, privKey, kid, testIssuer, "some-other-rp", testSID, testSubject, true)
 
-	_, err := ParseLogoutToken(tokenStr, &privKey.PublicKey, testIssuer, testClient)
+	_, err := ParseLogoutToken(tokenStr, source, testIssuer, testClient)
 	require.Error(t, err)
 }
 
 func TestParseLogoutToken_MissingEvent(t *testing.T) {
-	privKey := newTestKey(t)
-	tokenStr := buildTestLogoutToken(t, privKey, testIssuer, testClient, testSID, testSubject, false)
+	privKey, source, kid := newTestKeyAndSource(t)
+	tokenStr := buildTestLogoutTokenWithKID(t, privKey, kid, testIssuer, testClient, testSID, testSubject, false)
 
-	_, err := ParseLogoutToken(tokenStr, &privKey.PublicKey, testIssuer, testClient)
+	_, err := ParseLogoutToken(tokenStr, source, testIssuer, testClient)
 	require.Error(t, err)
 }
 
 func TestBackChannelLogoutHandler_ValidToken_200(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	privKey := newTestKey(t)
+	privKey, source, kid := newTestKeyAndSource(t)
 
 	var revoked []*LogoutTokenClaims
-	h := NewBackChannelLogoutHandler(func() *rsa.PublicKey { return &privKey.PublicKey }, testIssuer, testClient,
-		func(ctx *gin.Context, claims *LogoutTokenClaims) error {
+	h := NewBackChannelLogoutHandler(source, testIssuer, testClient,
+		func(ctx context.Context, claims *LogoutTokenClaims) error {
 			revoked = append(revoked, claims)
 			return nil
 		})
@@ -121,7 +155,7 @@ func TestBackChannelLogoutHandler_ValidToken_200(t *testing.T) {
 	engine := gin.New()
 	engine.POST("/bc-logout", h.Handler())
 
-	tokenStr := buildTestLogoutToken(t, privKey, testIssuer, testClient, testSID, testSubject, true)
+	tokenStr := buildTestLogoutTokenWithKID(t, privKey, kid, testIssuer, testClient, testSID, testSubject, true)
 	form := url.Values{}
 	form.Set("logout_token", tokenStr)
 	req := httptest.NewRequest(http.MethodPost, "/bc-logout", strings.NewReader(form.Encode()))
@@ -141,9 +175,9 @@ func TestBackChannelLogoutHandler_ValidToken_200(t *testing.T) {
 
 func TestBackChannelLogoutHandler_InvalidToken_400(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	privKey := newTestKey(t)
+	_, source, _ := newTestKeyAndSource(t)
 
-	h := NewBackChannelLogoutHandler(func() *rsa.PublicKey { return &privKey.PublicKey }, testIssuer, testClient, nil)
+	h := NewBackChannelLogoutHandler(source, testIssuer, testClient, nil)
 	engine := gin.New()
 	engine.POST("/bc-logout", h.Handler())
 
@@ -160,16 +194,16 @@ func TestBackChannelLogoutHandler_InvalidToken_400(t *testing.T) {
 
 func TestBackChannelLogoutHandler_RevokerError_500(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	privKey := newTestKey(t)
+	privKey, source, kid := newTestKeyAndSource(t)
 
-	h := NewBackChannelLogoutHandler(func() *rsa.PublicKey { return &privKey.PublicKey }, testIssuer, testClient,
-		func(ctx *gin.Context, claims *LogoutTokenClaims) error {
+	h := NewBackChannelLogoutHandler(source, testIssuer, testClient,
+		func(ctx context.Context, claims *LogoutTokenClaims) error {
 			return errors.New("revoker boom")
 		})
 	engine := gin.New()
 	engine.POST("/bc-logout", h.Handler())
 
-	tokenStr := buildTestLogoutToken(t, privKey, testIssuer, testClient, testSID, testSubject, true)
+	tokenStr := buildTestLogoutTokenWithKID(t, privKey, kid, testIssuer, testClient, testSID, testSubject, true)
 	form := url.Values{}
 	form.Set("logout_token", tokenStr)
 	req := httptest.NewRequest(http.MethodPost, "/bc-logout", strings.NewReader(form.Encode()))

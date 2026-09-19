@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"log/slog"
@@ -16,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	appconfig "github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
+	"github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"golang.org/x/text/language"
@@ -50,103 +52,155 @@ func isSupportedRSAPrivateKeyBlock(blockType string) bool {
 	return blockType == "RSA PRIVATE KEY" || blockType == "PRIVATE KEY"
 }
 
-func loadSigningKey() (*rsa.PrivateKey, string, error) {
+// LoadedSigningKeys 是一次加载结果：当前 active 私钥 + 需对外发布的全部公钥。
+type LoadedSigningKeys struct {
+	// ActiveKey / ActiveKeyID 为当前签发用密钥（恰好一个）。
+	ActiveKey   *rsa.PrivateKey
+	ActiveKeyID string
+	// Published 是需经 /oidc/keys 发布的全部公钥（kid → 公钥），含过渡期旧 key。
+	Published map[string]*rsa.PublicKey
+}
+
+// loadSigningKeys 加载**全部**配置的签名密钥（最小多 key）。
+//
+// 配置来源：`oidc.keys` 列表（kid + privateKeyPath/PEM + active）；未配置列表时
+// 回退到单 key 三元组（等价于只有一项且 active），保证零破坏迁移。
+//
+// 规则：
+//   - 列表内 kid 必须唯一且非空（空 kid 由公钥派生 thumbprint 补齐），
+//     否则"换 key 忘改 kid"会让校验方按 kid 取到错误公钥；
+//   - 恰好一个 active；0 个或多个都视为配置错误（fail-closed，不猜测）；
+//   - 非 dev 环境缺 key 一律 fail-closed，不自动生成（避免重启导致 token 全量失效）。
+func loadSigningKeys() (*LoadedSigningKeys, error) {
 	if appconfig.Conf == nil {
 		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-		return privateKey, "auto-key", err
+		if err != nil {
+			return nil, err
+		}
+		kid := DeriveKeyID(&privateKey.PublicKey)
+		return &LoadedSigningKeys{
+			ActiveKey:   privateKey,
+			ActiveKeyID: kid,
+			Published:   map[string]*rsa.PublicKey{kid: &privateKey.PublicKey},
+		}, nil
 	}
-	cfg := &appconfig.Conf.OIDC
+	return loadSigningKeysFromConfig(&appconfig.Conf.OIDC)
+}
 
-	if cfg.SigningPrivateKeyPath != "" {
-		pemData, err := os.ReadFile(cfg.SigningPrivateKeyPath)
+func loadSigningKeysFromConfig(cfg *config.OIDC) (*LoadedSigningKeys, error) {
+	configured := cfg.EffectiveSigningKeys()
+	if len(configured) == 0 {
+		if !isDevEnv() {
+			return nil, fmt.Errorf("oidc signing key not configured (set oidc.keys or signingPrivateKeyPath/signingPrivateKeyPEM)")
+		}
+		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			return nil, err
+		}
+		kid := DeriveKeyID(&privateKey.PublicKey)
+		return &LoadedSigningKeys{
+			ActiveKey:   privateKey,
+			ActiveKeyID: kid,
+			Published:   map[string]*rsa.PublicKey{kid: &privateKey.PublicKey},
+		}, nil
+	}
+	result := &LoadedSigningKeys{Published: make(map[string]*rsa.PublicKey, len(configured))}
+	for i := range configured {
+		item := configured[i]
+		privateKey, err := loadSingleSigningKey(cfg, &item, i)
+		if err != nil {
+			return nil, err
+		}
+		kid := item.Kid
+		if kid == "" {
+			kid = DeriveKeyID(&privateKey.PublicKey)
+		}
+		if _, dup := result.Published[kid]; dup {
+			return nil, fmt.Errorf("oidc.keys[%d]: duplicate kid %q (kid 必须唯一，否则验签方会取到错误公钥)", i, kid)
+		}
+		result.Published[kid] = &privateKey.PublicKey
+		if item.Active {
+			if result.ActiveKey != nil {
+				return nil, fmt.Errorf("oidc.keys: multiple active keys (kid %q and %q)", result.ActiveKeyID, kid)
+			}
+			result.ActiveKey = privateKey
+			result.ActiveKeyID = kid
+		}
+	}
+	if result.ActiveKey == nil {
+		return nil, fmt.Errorf("oidc.keys: no active signing key (exactly one entry must set active: true)")
+	}
+	return result, nil
+}
+
+// loadSingleSigningKey 解析单个 key 条目；keyIndex 仅用于报错定位。
+func loadSingleSigningKey(cfg *config.OIDC, item *config.SigningKeyConfig, keyIndex int) (*rsa.PrivateKey, error) {
+	switch {
+	case item.PrivateKeyPEM != "":
+		return parseRSAPrivateKeyPEM([]byte(item.PrivateKeyPEM), fmt.Sprintf("oidc.keys[%d].privateKeyPEM", keyIndex))
+	case item.PrivateKeyPath != "":
+		pemData, err := os.ReadFile(item.PrivateKeyPath)
 		if err != nil {
 			if !os.IsNotExist(err) {
-				return nil, "", err
+				return nil, err
 			}
 			// H4：非 dev 环境显式配置了路径但文件缺失时 fail-closed——
 			// 自动生成新密钥会静默更换 kid，导致所有已签发 token 失效且各 RP 公钥失同步。
 			if !isDevEnv() {
-				return nil, "", fmt.Errorf("signing private key file not found: %s (refusing to auto-generate in non-dev)", cfg.SigningPrivateKeyPath)
+				return nil, fmt.Errorf("signing private key file not found: %s (refusing to auto-generate in non-dev)", item.PrivateKeyPath)
 			}
-			privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-			if err != nil {
-				return nil, "", fmt.Errorf("failed to generate signing key: %w", err)
+			privateKey, genErr := rsa.GenerateKey(rand.Reader, 2048)
+			if genErr != nil {
+				return nil, fmt.Errorf("failed to generate signing key: %w", genErr)
 			}
-			der := x509.MarshalPKCS1PrivateKey(privateKey)
 			encoded := pem.EncodeToMemory(&pem.Block{
 				Type:  "RSA PRIVATE KEY",
-				Bytes: der,
+				Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
 			})
-			keyDir := filepath.Dir(cfg.SigningPrivateKeyPath)
-			if keyDir != "." {
-				if err := os.MkdirAll(keyDir, 0755); err != nil {
-					return nil, "", fmt.Errorf("failed to create key directory: %w", err)
+			if keyDir := filepath.Dir(item.PrivateKeyPath); keyDir != "." {
+				if mkErr := os.MkdirAll(keyDir, 0755); mkErr != nil {
+					return nil, fmt.Errorf("failed to create key directory: %w", mkErr)
 				}
 			}
-			if err := os.WriteFile(cfg.SigningPrivateKeyPath, encoded, 0600); err != nil {
-				return nil, "", fmt.Errorf("failed to write signing key: %w", err)
+			if wErr := os.WriteFile(item.PrivateKeyPath, encoded, 0600); wErr != nil {
+				return nil, fmt.Errorf("failed to write signing key: %w", wErr)
 			}
-			keyID := cfg.SigningKeyID
-			if keyID == "" {
-				keyID = "auto-key"
-			}
-			return privateKey, keyID, nil
+			return privateKey, nil
 		}
-		block, _ := pem.Decode(pemData)
-		if block == nil || !isSupportedRSAPrivateKeyBlock(block.Type) {
-			return nil, "", fmt.Errorf("invalid RSA private key PEM: %s", cfg.SigningPrivateKeyPath)
-		}
-		privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-		if err != nil {
-			privateKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-			if err != nil {
-				return nil, "", fmt.Errorf("failed to parse RSA private key: %w", err)
-			}
-		}
-		rsaKey, ok := privateKey.(*rsa.PrivateKey)
-		if !ok {
-			return nil, "", fmt.Errorf("key is not RSA: %T", privateKey)
-		}
-		keyID := cfg.SigningKeyID
-		if keyID == "" {
-			keyID = "config-key"
-		}
-		return rsaKey, keyID, nil
+		return parseRSAPrivateKeyPEM(pemData, item.PrivateKeyPath)
+	default:
+		return nil, fmt.Errorf("oidc.keys[%d]: neither privateKeyPath nor privateKeyPEM set", keyIndex)
 	}
+}
 
-	if cfg.SigningPrivateKeyPEM != "" {
-		block, _ := pem.Decode([]byte(cfg.SigningPrivateKeyPEM))
-		if block == nil || !isSupportedRSAPrivateKeyBlock(block.Type) {
-			return nil, "", fmt.Errorf("invalid RSA private key PEM in config")
-		}
-		privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-		if err != nil {
-			privateKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-			if err != nil {
-				return nil, "", fmt.Errorf("failed to parse RSA private key: %w", err)
-			}
-		}
-		rsaKey, ok := privateKey.(*rsa.PrivateKey)
-		if !ok {
-			return nil, "", fmt.Errorf("key is not RSA: %T", privateKey)
-		}
-		keyID := cfg.SigningKeyID
-		if keyID == "" {
-			keyID = "config-key"
-		}
-		return rsaKey, keyID, nil
+// parseRSAPrivateKeyPEM 宽容解析 RSA 私钥 PEM（PKCS#8 优先、PKCS#1 兜底）。
+func parseRSAPrivateKeyPEM(pemData []byte, source string) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode(pemData)
+	if block == nil || !isSupportedRSAPrivateKeyBlock(block.Type) {
+		return nil, fmt.Errorf("invalid RSA private key PEM: %s", source)
 	}
-
-	// H4：未配置任何签名密钥时，仅 dev 环境允许生成临时密钥；
-	// 非 dev 环境 fail-closed，避免重启后 token 全量失效与 RP 公钥失同步。
-	if !isDevEnv() {
-		return nil, "", fmt.Errorf("oidc signing key not configured (set signingPrivateKeyPath or signingPrivateKeyPEM)")
-	}
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
-		return nil, "", err
+		parsed, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse RSA private key: %w", err)
+		}
 	}
-	return privateKey, "auto-key", nil
+	rsaKey, ok := parsed.(*rsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("key is not RSA: %T", parsed)
+	}
+	return rsaKey, nil
+}
+
+// DeriveKeyID 由公钥派生稳定的 kid（RFC 7638 JWK thumbprint 风格，base64url(sha256(n || e))）。
+// 供"未显式配置 kid"时使用，避免换 key 忘改 kid。
+func DeriveKeyID(pub *rsa.PublicKey) string {
+	if pub == nil {
+		return ""
+	}
+	sum := sha256.Sum256(pub.N.Bytes())
+	return base64.RawURLEncoding.EncodeToString(sum[:16])
 }
 
 func loadEncryptionKey() ([32]byte, string, error) {
@@ -207,7 +261,7 @@ func resolveIssuer() string {
 // 协议态 storage 与 op.Provider。
 func SetupOIDCProvider() (*OIDCProvider, error) {
 	issuer := resolveIssuer()
-	privateKey, keyID, err := loadSigningKey()
+	keys, err := loadSigningKeys()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load OIDC signing key: %w", err)
 	}
@@ -215,7 +269,7 @@ func SetupOIDCProvider() (*OIDCProvider, error) {
 	storage := oidcop.NewOIDCStorage(
 		oidcop.NewRedisProtocolStateStore(protocolStateTTLOptions()...),
 		oidcop.NewPersistentStore(oidcop.WithIssuer(issuer)),
-		privateKey, keyID,
+		keys.ActiveKey, keys.ActiveKeyID, keys.Published,
 	)
 
 	encKey, encKeyID, err := loadEncryptionKey()

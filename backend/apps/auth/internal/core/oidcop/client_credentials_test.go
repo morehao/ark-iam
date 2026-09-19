@@ -13,6 +13,7 @@ import (
 
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objauth"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
@@ -114,6 +115,27 @@ func TestClientCredentialsStorage(t *testing.T) {
 	}
 	if req.GetSubject() != clientID {
 		t.Fatalf("expected subject %q, got %q", clientID, req.GetSubject())
+	}
+
+	// 契约钉子：普通 OIDC 客户端的 client_credentials **不产生机器令牌**。
+	//
+	// 它只有 client_id 一个身份 claim，没有 token_usage=machine，也没有 tenant_id——
+	// SDK 验签会按"既非自然人亦非机器"以 contract.ErrMissingClaim 拒绝。这是刻意的：
+	// 目录数据按租户隔离，而纯 client_credentials 没有任何租户归属（租户上下文只能来自
+	// API Key 的归属主体）。若哪天要让普通 client_credentials 也签发 machine 令牌，
+	// 本测试会先失败，提醒同步 rpapi 的租户来源与 sdk/README、接入文档。
+	claims, err := storage.GetPrivateClaimsFromRequest(ctx, req, nil)
+	if err != nil {
+		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
+	}
+	if claims[objauth.ClaimTokenUsage] != nil {
+		t.Fatalf("plain client_credentials must not claim token_usage, got %v", claims[objauth.ClaimTokenUsage])
+	}
+	if claims[objauth.ClaimTenantID] != nil {
+		t.Fatalf("plain client_credentials must not claim tenant_id, got %v", claims[objauth.ClaimTenantID])
+	}
+	if claims[objauth.ClaimClientID] != clientID {
+		t.Fatalf("expected client_id claim %q, got %v", clientID, claims[objauth.ClaimClientID])
 	}
 }
 

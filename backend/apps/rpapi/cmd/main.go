@@ -1,0 +1,39 @@
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/rpapi"
+	"github.com/morehao/ark-iam/rpapi/config"
+	"github.com/morehao/golib/glog"
+)
+
+func main() {
+	if err := serverInit(); err != nil {
+		panic(fmt.Sprintf("server init failed, error: %v", err))
+	}
+	if config.Conf.Server.Env == "prod" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+	defer shutdownTraceProvider()
+	defer func() {
+		if err := glog.Close(); err != nil {
+			fmt.Printf("failed to close logger: %v\n", err)
+		}
+	}()
+
+	engine := gin.New()
+	// 让 gin 上下文可当作 context.Context 传给任何下游（OIDC provider、glog、异步任务）：
+	// 仅在开启该开关时 gin 才把 Done/Err/Deadline/Value 转发到请求的 context。
+	engine.ContextWithFallback = true
+	engine.Use(gin.Recovery())
+	// 独立部署没有同进程 OP：传 nil，由应用按自身配置解析 JWKS 端点。
+	rpapi.Init(engine, config.Conf, nil)
+
+	if err := engine.Run(fmt.Sprintf(":%s", config.Conf.Server.Port)); err != nil {
+		glog.Errorf(context.Background(), "%s run fail, port:%s", rpapi.AppName, config.Conf.Server.Port)
+		panic(err)
+	}
+}

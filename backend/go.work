@@ -4,6 +4,8 @@ use (
 	./apps/auth
 	./apps/gateway
 	./apps/platformadmin
+	./apps/rpapi
 	./apps/tenantadmin
 	./pkg
+	./sdk
 )

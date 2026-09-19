@@ -103,4 +103,4 @@
 | 会话审计 ✅ | Session Audit | `session` 表只追加记录**会话创建（登录）**；该表无状态列，会话撤销时间由 `refresh_token.revoked_at` 承担 |
 | 登录日志 ✅ | Login Log | `user_login_log` 表，每次密码登录的 IP/UA/时间 |
 | 审计日志 ✅ | Audit Log | `audit_log` 表，业务操作审计（动作/目标/结果/详情） |
-| 网关聚合 ✅ | Gateway | gateway 应用（:8100）单进程挂载 auth/platformadmin/tenantadmin |
+| 网关聚合 ✅ | Gateway | gateway 应用（:8100）单进程挂载 auth/platformadmin/tenantadmin/rpapi |

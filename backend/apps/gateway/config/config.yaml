@@ -109,3 +109,11 @@ oidc:
   # gateway 聚合部署：platform/tenant 均在 gateway 进程内，共享同一认证 Redis，
   # 开启请求粒度 SSO 活性校验以实现"一处登出、处处登出"即时性。
   enableSSOSessionValidation: true
+  # aud 白名单是 **per-app** 的：gateway 聚合了 rpapi，必须为它声明与
+  # apps/rpapi/config/config.yaml 相同的白名单，否则 /v1/rp/directory/* 在
+  # gateway 下会跳过 aud 收紧（platformadmin/tenantadmin 的 aud 在代码里按内置 client 常量收紧）。
+  audiences:
+    - "rpapi"
+  # 说明：不需要（也不应）配置 jwksURL/issuer 供本进程内的内置应用自取公钥——
+  # gateway.Init 会把 auth 的 OP 已发布公钥作为进程内 KeySource 注入
+  # platformadmin/tenantadmin/rpapi，零网络调用。

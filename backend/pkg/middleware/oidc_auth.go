@@ -1,8 +1,11 @@
 package middleware
 
 import (
+	"context"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -11,11 +14,11 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dao"
-	"github.com/morehao/ark-iam/pkg/object/objauth"
+	"github.com/morehao/ark-iam/sdk/contract"
+	"github.com/morehao/ark-iam/sdk/rp"
 
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -33,6 +36,10 @@ const (
 // golib 的 gcontext 没有对应常量，因此在本包内定义并配套 ClientIDFromContext 读取。
 const ContextKeyClientID = "oidcClientID"
 
+// ContextKeyOIDCIdentity 是完整 rp.Identity（含 Scopes）在 gin 上下文里的键，
+// 供下游做策略判定（鉴权已完成，此处只回答"该身份是否有权做这件事"）。
+const ContextKeyOIDCIdentity = "oidcIdentity"
+
 // ClientIDFromContext 读取鉴权中间件注入的 client_id；未注入（如 skip path、
 // API Key 通道）时返回空字符串，调用方应对空值 fail-closed。
 func ClientIDFromContext(ctx *gin.Context) string {
@@ -42,6 +49,13 @@ func ClientIDFromContext(ctx *gin.Context) string {
 	return ctx.GetString(ContextKeyClientID)
 }
 
+// KeySource 是 OP 公钥来源的导出别名（真源 sdk/rp.KeySource）。
+type KeySource = rp.KeySource
+
+// TokenClaims 是 access token 私有 claim 的兼容别名（真源在 sdk/contract）。
+// 保留该导出名是为了不破坏既有调用方的类型断言。
+type TokenClaims = contract.TokenClaims
+
 type authConfig struct {
 	skipPaths       []string
 	validateOIDCSSO func(ctx *gin.Context, personID string, isMachineToken bool) bool
@@ -50,6 +64,11 @@ type authConfig struct {
 	// audiences 为本应用（RP）认可的 aud 集合，配置后强制校验 access token 的 aud，
 	// 防止同一 OP 下其它 client 的 token 串用本应用接口。
 	audiences []string
+	// keySource 提供按 kid 取公钥的能力（支持 OP 多 key 轮换）。
+	keySource rp.KeySource
+	// disableLegacyUserLookup 关闭"token 未携带 user_id 时反查 tenant_user"的兼容分支。
+	// 生产不应打开；仅用于验证严格模式。
+	disableLegacyUserLookup bool
 }
 
 type AuthOption func(*authConfig)
@@ -76,6 +95,17 @@ func WithOIDCAudiences(audiences ...string) AuthOption {
 	}
 }
 
+// WithOIDCKeySource 注入按 kid 取公钥的密钥来源（sdk/rp.KeySource）。
+// 这是支持 OP 多 key 轮换的正路：未知 kid 时 SDK 会限速刷新 JWKS，
+// 而不是像旧实现那样把公钥在启动时钉死（轮换后必然 401）。
+func WithOIDCKeySource(source rp.KeySource) AuthOption {
+	return func(c *authConfig) {
+		if source != nil {
+			c.keySource = source
+		}
+	}
+}
+
 // WithOIDCSSOValidation 注入 OIDC 访问令牌的 SSO 会话校验器。
 // 校验 OIDC 令牌有效后，如果该校验器返回 false（该自然人不再有有效的 SSO 会话，
 // 例如已在其他应用全局登出），则本次请求按未认证处理，返回 401。
@@ -87,11 +117,39 @@ func WithOIDCSSOValidation(validate func(ctx *gin.Context, personID string, isMa
 	}
 }
 
+// WithOIDCLegacyUserLookup 控制"person token 未携带 user_id 时反查 tenant_user"
+// 的兼容分支（默认开启）。保留它是为了让尚未升级的存量 token 在切换期仍可用；
+// 待 OP 全面下发 user_id 后可关闭。
+func WithOIDCLegacyUserLookup(enable bool) AuthOption {
+	return func(c *authConfig) {
+		c.disableLegacyUserLookup = !enable
+	}
+}
+
+// OIDCCompatibleAuth 构造 OIDC 鉴权中间件。
+//
+// getOIDCPublicKey 是历史签名（返回 OP 公钥）。它被包装为"单 key KeySource"，
+// 因此调用方无需改动即可获得 kid 匹配能力；但**无法感知轮换**——新部署请改用
+// WithOIDCKeySource / NewKeySourceFromConfig。
+//
+// Deprecated: 只保留给仓外既有调用方做零改动迁移。单 key 快照在 OP 轮换签名密钥后
+// 需要重启本进程才生效（例行轮换会中断）；新代码一律走 WithOIDCKeySource +
+// NewKeySourceFromConfig（JWKS 预取 + kid 查表 + 未知 kid 限速刷新）。本仓已无调用方。
 func OIDCCompatibleAuth(getOIDCPublicKey func() *rsa.PublicKey, opts ...AuthOption) gin.HandlerFunc {
+	if getOIDCPublicKey != nil {
+		opts = append([]AuthOption{WithOIDCKeySource(staticKeySource(getOIDCPublicKey))}, opts...)
+	}
+	return OIDCAuth(opts...)
+}
+
+// OIDCAuth 构造完全由 AuthOption 驱动的 OIDC 鉴权中间件。
+func OIDCAuth(opts ...AuthOption) gin.HandlerFunc {
 	cfg := &authConfig{}
 	for _, opt := range opts {
 		opt(cfg)
 	}
+
+	verifier, vErr := newVerifier(cfg)
 
 	return func(ctx *gin.Context) {
 		if isSkippedPath(ctx.Request.URL.Path, cfg.skipPaths) {
@@ -117,18 +175,21 @@ func OIDCCompatibleAuth(getOIDCPublicKey func() *rsa.PublicKey, opts ...AuthOpti
 			abortUnauthorized(ctx, "missing auth token")
 			return
 		}
+		if vErr != nil {
+			// 密钥来源不可用：fail-closed，绝不因为"配不出来"就放行。
+			glog.Errorf(ctx, "[oidcauth] verifier not ready, err:%v", vErr)
+			abortUnauthorized(ctx, "auth verifier unavailable")
+			return
+		}
 
-		oidcPublicKey := getOIDCPublicKey()
-		claims, err := validateOIDCAccessToken(tokenStr, oidcPublicKey, cfg.issuer, cfg.audiences)
+		identity, err := verifier.Verify(ctx, tokenStr)
 		if err == nil {
-			isMachine := claims.IsMachine()
-			personID := claims.PersonID()
-			if cfg.validateOIDCSSO != nil && !cfg.validateOIDCSSO(ctx, personID, isMachine) {
-				glog.Warnf(ctx, "[oidcauth] sso session revoked, personID:%s", personID)
+			if cfg.validateOIDCSSO != nil && !cfg.validateOIDCSSO(ctx, identity.PersonID, identity.IsMachine) {
+				glog.Warnf(ctx, "[oidcauth] sso session revoked, personID:%s", identity.PersonID)
 				abortUnauthorized(ctx, "session expired")
 				return
 			}
-			if err := setOIDCContext(ctx, claims, tokenStr); err != nil {
+			if err := setOIDCContext(ctx, identity, tokenStr, !cfg.disableLegacyUserLookup); err != nil {
 				abortUnauthorized(ctx, "invalid token")
 				return
 			}
@@ -141,115 +202,211 @@ func OIDCCompatibleAuth(getOIDCPublicKey func() *rsa.PublicKey, opts ...AuthOpti
 	}
 }
 
-// validateOIDCAccessToken 校验 OIDC access token 的签名与核心声明（H3）：
-//   - 算法必须为 RS256（拒绝 HS256 等对称算法混淆）；
-//   - 配置了 issuer 时，iss 必须精确匹配 OP issuer；
-//   - 配置了 audiences 时，aud 必须包含本应用 client_id（防跨 client 串用）。
-func validateOIDCAccessToken(tokenStr string, publicKey *rsa.PublicKey, issuer string, audiences []string) (*objauth.TokenClaims, error) {
-	if publicKey == nil {
-		return nil, errors.New("oidc public key not initialized")
+// newVerifier 依据选项构造 SDK 校验器（无 KeySource 时返回错误，中间件 fail-closed）。
+func newVerifier(cfg *authConfig) (*rp.Verifier, error) {
+	if cfg.keySource == nil {
+		return nil, errors.New("oidc key source not configured")
 	}
-	claims := &objauth.TokenClaims{}
-	parserOpts := []jwt.ParserOption{
-		jwt.WithLeeway(0),
-		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()}),
+	opts := []rp.VerifierOption{}
+	if cfg.issuer != "" {
+		opts = append(opts, rp.WithIssuer(cfg.issuer))
 	}
-	if issuer != "" {
-		parserOpts = append(parserOpts, jwt.WithIssuer(issuer))
+	if len(cfg.audiences) > 0 {
+		opts = append(opts, rp.WithAudiences(cfg.audiences...))
 	}
-	if len(audiences) > 0 {
-		parserOpts = append(parserOpts, jwt.WithAudience(audiences...))
-	}
-	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return publicKey, nil
-	}, parserOpts...)
-	if err != nil {
-		return nil, err
-	}
-	if !token.Valid {
-		return nil, errors.New("invalid oidc token")
-	}
-	// 人 token 必须携带 person sub 与 tenant_id；机器凭证必须携带可知的 token_usage。
-	// 既非 person 也非 machine 的 token（如仅 client_id 的 client_credentials）拒绝。
-	if claims.HasPerson() {
-		if claims.TenantID == "" {
-			return nil, errors.New("missing required oidc claim: tenant_id")
-		}
-		return claims, nil
-	}
-	if !claims.IsMachine() {
-		return nil, errors.New("missing required oidc claims")
-	}
-	return claims, nil
+	return rp.NewVerifier(cfg.keySource, opts...), nil
 }
 
-// LoadSigningPublicKey returns a closure yielding the RSA public key used to
-// verify OIDC access tokens issued by the auth app. It reads the signing key
-// from conf.OIDC.SigningPrivateKeyPath (file) or SigningPrivateKeyPEM.
+// staticKeySource 把"启动时钉死的一把公钥"包装为 KeySource：
+// 任意 kid 都返回该公钥（兼容旧签名，代价是无法感知轮换）。
+func staticKeySource(get func() *rsa.PublicKey) rp.KeySource {
+	return keySourceFunc(func(ctx context.Context, kid string) (*rsa.PublicKey, error) {
+		key := get()
+		if key == nil {
+			return nil, contract.ErrKeySourceUnavailable
+		}
+		return key, nil
+	})
+}
+
+// keySourceFunc 把函数适配为 rp.KeySource（SDK 不提供该适配器以保持接口最小）。
+type keySourceFunc func(ctx context.Context, kid string) (*rsa.PublicKey, error)
+
+func (f keySourceFunc) PublicKey(ctx context.Context, kid string) (*rsa.PublicKey, error) {
+	return f(ctx, kid)
+}
+
+// NewKeySourceFromConfig 依据配置构造 OP 公钥来源，供内置应用（RP）校验 access token。
+//
+// 取值优先级：
+//  1. OIDC.JWKSURL（显式端点）或由 issuer 解析出的 JWKS 端点——
+//     issuer 形态走「标准 discovery 的 jwks_uri → {issuer}/keys →
+//     {issuer}/.well-known/jwks.json」，是本仓 OP 与外部 OP 都适用的
+//     "可轮换"来源，支持未知 kid 限速刷新；生产多进程部署应走这条；
+//  2. 本地配置的签名密钥（signingPrivateKeyPath / signingPrivateKeyPEM / oidc.keys）
+//     ——导出全部公钥构造进程内 key set。**注意：这是启动时快照，OP 轮换后需要
+//     重启本进程**，因此它只作为"没有可用的 JWKS 端点时的兜底"，不是推荐路径。
+//
+// 两者都没有时返回 error（调用方应 fail-closed，不得退化为不校验）。
+func NewKeySourceFromConfig(conf *config.Config) (rp.KeySource, error) {
+	if conf != nil && strings.TrimSpace(conf.OIDC.JWKSURL) != "" {
+		return rp.NewKeys(context.Background(), strings.TrimSpace(conf.OIDC.JWKSURL))
+	}
+	if conf != nil && conf.OIDC.Issuer != "" {
+		// issuer 形如 {op}/oidc：JWKS 端点由 SDK 解析（discovery 优先，
+		// 本仓 OP 的 jwks_uri = {issuer}/keys），并同步预取（失败即 fail-fast，
+		// 不静默降级为不校验）。
+		return rp.NewKeys(context.Background(), conf.OIDC.Issuer)
+	}
+	if keys := localPublicKeys(conf); len(keys) > 0 {
+		glog.Warnf(context.Background(), "[middleware.NewKeySourceFromConfig] 使用本地签名密钥快照作为 JWKS 来源：OP 轮换签名密钥后本进程需重启才会生效；生产建议配置 oidc.jwksURL")
+		return rp.NewKeysFromSet(keys), nil
+	}
+	return nil, errors.New("oidc key source unavailable: set oidc.jwksURL, oidc.issuer, or local signing key")
+}
+
+// ResolveKeySource 返回本应用可用的 OP 公钥来源。
+//
+// injected 非空时直接使用：**gateway 单体部署**下 auth 的 OP 把自己的已发布公钥
+// 作为进程内 key set 注入同进程的其它应用（platformadmin/tenantadmin/rpapi），
+// 零网络调用、自动跟随多 key 轮换，也避免"进程启动期 HTTP 请求自己还没监听的
+// JWKS 端点"这种必然失败的自举。injected 为 nil 时按本应用配置自建
+// （见 NewKeySourceFromConfig），此时才可能发生网络预取。
+func ResolveKeySource(injected KeySource, conf *config.Config) (KeySource, error) {
+	if injected != nil {
+		return injected, nil
+	}
+	return NewKeySourceFromConfig(conf)
+}
+
+// localPublicKeys 从本地配置的签名密钥（单 key 或 keys 列表）导出全部公钥。
+func localPublicKeys(conf *config.Config) map[string]*rsa.PublicKey {
+	if conf == nil {
+		return nil
+	}
+	out := map[string]*rsa.PublicKey{}
+	for i, item := range conf.OIDC.EffectiveSigningKeys() {
+		var pemData []byte
+		switch {
+		case item.PrivateKeyPEM != "":
+			pemData = []byte(item.PrivateKeyPEM)
+		case item.PrivateKeyPath != "":
+			data, err := os.ReadFile(item.PrivateKeyPath)
+			if err != nil {
+				continue
+			}
+			pemData = data
+		default:
+			continue
+		}
+		key, err := parseRSAPrivateKeyPEM(pemData)
+		if err != nil {
+			glog.Warnf(context.Background(), "[middleware.localPublicKeys] parse signing key fail, index:%d, err:%v", i, err)
+			continue
+		}
+		kid := item.Kid
+		if kid == "" {
+			kid = conf.OIDC.SigningKeyID
+		}
+		if kid == "" {
+			// 与 auth 侧一致的 kid 派生（sha256(N)[:16] → base64url）：
+			// kid 必须与 OP 实际签发的 kid 完全一致，否则全部请求 401。
+			kid = deriveKeyID(&key.PublicKey)
+		}
+		out[kid] = &key.PublicKey
+	}
+	return out
+}
+
+// deriveKeyID 与 auth 侧 svcoidc.DeriveKeyID 保持同一算法（此处重复实现以避免
+// pkg → apps 的反向依赖）。改动其一必须同步另一处。
+func deriveKeyID(pub *rsa.PublicKey) string {
+	if pub == nil {
+		return ""
+	}
+	sum := sha256.Sum256(pub.N.Bytes())
+	return base64.RawURLEncoding.EncodeToString(sum[:16])
+}
+
+// LoadSigningPublicKey 保持历史签名：返回 OP 签名公钥的闭包。
+//
+// Deprecated: 过渡 API——它从**本地**配置的签名密钥导出公钥，属于"启动钉死一把公钥"，
+// 感知不到 OP 的密钥轮换。新代码请用 NewKeySourceFromConfig + WithOIDCKeySource。
 func LoadSigningPublicKey(conf *config.Config) func() *rsa.PublicKey {
 	var publicKey *rsa.PublicKey
-	if conf != nil && conf.OIDC.SigningPrivateKeyPath != "" {
-		if pemData, err := os.ReadFile(conf.OIDC.SigningPrivateKeyPath); err == nil {
-			if block, _ := pem.Decode(pemData); block != nil {
-				if pk, err := parsePrivateKey(block.Bytes); err == nil {
-					publicKey = &pk.PublicKey
-				}
-			}
-		}
-	} else if conf != nil && conf.OIDC.SigningPrivateKeyPEM != "" {
-		if block, _ := pem.Decode([]byte(conf.OIDC.SigningPrivateKeyPEM)); block != nil {
-			if pk, err := parsePrivateKey(block.Bytes); err == nil {
-				publicKey = &pk.PublicKey
-			}
+	if conf != nil {
+		for _, key := range localPublicKeys(conf) {
+			publicKey = key
+			break
 		}
 	}
 	return func() *rsa.PublicKey { return publicKey }
 }
 
-func parsePrivateKey(der []byte) (*rsa.PrivateKey, error) {
-	if pk, err := x509.ParsePKCS8PrivateKey(der); err == nil {
-		if rsaKey, ok := pk.(*rsa.PrivateKey); ok {
-			return rsaKey, nil
+// parseRSAPrivateKeyPEM 宽容解析 RSA 私钥 PEM（PKCS#8 优先、PKCS#1 兜底）。
+func parseRSAPrivateKeyPEM(pemData []byte) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode(pemData)
+	if block == nil {
+		return nil, errors.New("invalid RSA private key PEM")
+	}
+	if block.Type != "RSA PRIVATE KEY" && block.Type != "PRIVATE KEY" {
+		return nil, fmt.Errorf("unsupported PEM block type: %s", block.Type)
+	}
+	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		parsed, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse RSA private key: %w", err)
 		}
 	}
-	return x509.ParsePKCS1PrivateKey(der)
+	rsaKey, ok := parsed.(*rsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("key is not RSA: %T", parsed)
+	}
+	return rsaKey, nil
 }
 
-// setOIDCContext 把 OIDC claims 注入 gin 上下文：
-//   - person token：设置 personID + tenantID + authToken，并以 (tenantID, personID) 反查当前租户下的用户，
-//     将 userID 写入 KeyUserID。反查失败视为非法访问（该自然人非当前租户成员或无对应账户）。
-//   - 机器凭证（token_usage=machine）：仅注入 personID/tenantID/authToken，不反查用户
-//     （机器凭证不隶属某个租户成员，KeyUserID 由 API Key 通道负责注入）。
+// setOIDCContext 把校验通过的 identity 注入 gin 上下文：
+//   - person token：注入 personID + tenantID + authToken + userID + client_id；
+//   - 机器凭证（token_usage=machine）：同样注入 user_id（机器主体），不做租户成员反查。
 //
-// 两条通道都会注入 client_id（若 token 携带该声明），供应用级入口策略判定使用。
-func setOIDCContext(ctx *gin.Context, claims *objauth.TokenClaims, tokenStr string) error {
-	personID := claims.PersonID()
+// user_id 自「令牌增加 user_id 声明」起由 OP 直接下发，因此不再需要每次请求查库反查
+// tenant_user（既省一次查询，也消除了"缓存层一旦读不到就误判非成员"的降级风险）。
+// 对尚未携带 user_id 的存量 token，保留一段反查兼容（allowLegacyLookup）。
+func setOIDCContext(ctx *gin.Context, identity *rp.Identity, tokenStr string, allowLegacyLookup bool) error {
+	personID := identity.PersonID
 
 	ctx.Set(gcontext.KeyPersonID, personID)
 	// 租户作用域：类型化值写入请求上下文（协议层 / 异步任务同样可见），
 	// 同时投影 gin Keys 的 tenantID 供既有身份读取点使用。
 	// 必须写在下面的"租户内用户反查"之前，该查询依赖租户隔离。
-	gincontext.SetTenantScope(ctx, gcontext.CurrentScope(claims.TenantID))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope(identity.TenantID))
 	ctx.Set(gcontext.KeyAuthToken, tokenStr)
-	ctx.Set(ContextKeyClientID, claims.ClientID)
+	ctx.Set(ContextKeyClientID, identity.ClientID)
+	// 完整 identity（含 Scopes）留一份供下游做**策略**判定（如目录 API 要求
+	// directory.read）。鉴权（验签/租户）由本中间件完成，策略判定不属于它。
+	ctx.Set(ContextKeyOIDCIdentity, identity)
 
-	// 机器凭证不需要反查租户用户。
-	if claims.IsMachine() || personID == "" {
+	if identity.UserID != "" {
+		ctx.Set(gcontext.KeyUserID, identity.UserID)
 		return nil
 	}
+	// 机器凭证不隶属租户成员，不做反查。
+	if identity.IsMachine || personID == "" || !allowLegacyLookup {
+		return nil
+	}
+
+	// 兼容分支：token 未携带 user_id（存量 token 或旧 OP）。
 	userList, err := dao.NewUserDao().GetListByCond(ctx, &dao.UserCond{
-		TenantID: claims.TenantID,
+		TenantID: identity.TenantID,
 		PersonID: personID,
 	})
 	if err != nil {
-		glog.Errorf(ctx, "[oidcauth] resolve tenant user fail, err:%v, tenantID:%s, personID:%s", err, claims.TenantID, personID)
+		glog.Errorf(ctx, "[oidcauth] resolve tenant user fail, err:%v, tenantID:%s, personID:%s", err, identity.TenantID, personID)
 		return fmt.Errorf("resolve tenant user fail: %w", err)
 	}
 	if len(userList) == 0 {
-		glog.Warnf(ctx, "[oidcauth] person has no user in tenant, tenantID:%s, personID:%s", claims.TenantID, personID)
+		glog.Warnf(ctx, "[oidcauth] person has no user in tenant, tenantID:%s, personID:%s", identity.TenantID, personID)
 		return fmt.Errorf("person not a member of tenant")
 	}
 	ctx.Set(gcontext.KeyUserID, userList[0].ID)
@@ -263,6 +420,25 @@ func isSkippedPath(path string, skipPaths []string) bool {
 		}
 	}
 	return false
+}
+
+// OIDCIdentityFromContext 取出本中间件写入的完整 identity（未经过 OIDC 鉴权时返回 nil）。
+//
+// 用途是**策略**判定（scope/客户端维度），不是鉴权：鉴权已由 OIDCAuth 完成，
+// 因此调用方拿到 nil 时应按"策略不满足"处理，绝不回退成放行。
+func OIDCIdentityFromContext(ctx *gin.Context) *rp.Identity {
+	if ctx == nil {
+		return nil
+	}
+	value, ok := ctx.Get(ContextKeyOIDCIdentity)
+	if !ok {
+		return nil
+	}
+	identity, ok := value.(*rp.Identity)
+	if !ok {
+		return nil
+	}
+	return identity
 }
 
 func abortUnauthorized(ctx *gin.Context, msg string) {

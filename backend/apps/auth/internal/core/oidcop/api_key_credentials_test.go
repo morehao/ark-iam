@@ -91,11 +91,14 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 		Name:      "service-key",
 		KeyHash:   hash,
 		KeyPrefix: "ak_1234567",
-		CreatedBy: "7",
+		// 机器主体（服务账号）是 owner，创建密钥的人是另一个人（act.sub）：
+		// 两条通道的 user_id 必须同为机器主体，创建人只能出现在 act 里。
+		OwnerUserID: "7",
+		CreatedBy:   "9",
 	}).Error; err != nil {
 		t.Fatalf("create api key: %v", err)
 	}
-	// owner user：ID=7（对应 apiKey.CreatedBy），person_id=5
+	// owner user：ID=7（对应 apiKey.OwnerUserID，机器账号），person_id=5
 	now := time.Now()
 	ownerUser := &model.UserEntity{
 		TenantID: "1",
@@ -162,8 +165,17 @@ func TestClientCredentialsForApiKey(t *testing.T) {
 	if got := claims["tenant_id"]; got != "1" {
 		t.Fatalf("expected tenant_id claim 1, got %v", got)
 	}
+	// user_id 口径 = 机器主体（与 x-api-key 直连通道注入的 KeyUserID 一致）
 	if got := claims["user_id"]; got != "7" {
 		t.Fatalf("expected user_id claim 7, got %v", got)
+	}
+	// 创建密钥的人走 act.sub，不再污染 user_id
+	act, ok := claims["act"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected act claim map, got %v", claims["act"])
+	}
+	if got := act["sub"]; got != "9" {
+		t.Fatalf("expected act.sub 9, got %v", got)
 	}
 	if got := claims["client_id"]; got != "ak_1234567" {
 		t.Fatalf("expected client_id claim %q, got %v", "ak_1234567", got)

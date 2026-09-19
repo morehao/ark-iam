@@ -289,3 +289,42 @@ func TestGetPrivateClaimsFromAuthRequestOmitsSidWhenEmpty(t *testing.T) {
 		t.Fatalf("expected no sid claim when SessionID empty, got %v", claims["sid"])
 	}
 }
+
+// TestGetPrivateClaimsFromRequestIncludesUserID 覆盖「令牌新增 user_id 声明」：
+// 人令牌的 user_id 必须等于该 (tenant_id, person_id) 对应的 tenant_user.id，
+// 且与刷新令牌行上的 UserID 一致（下游据此写审计操作者列）。
+func TestGetPrivateClaimsFromRequestIncludesUserID(t *testing.T) {
+	ctx := context.Background()
+
+	users := []model.UserEntity{
+		{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "50"}}, TenantID: "1", PersonID: "88"},
+		{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "51"}}, TenantID: "7", PersonID: "88"},
+	}
+	storage, _ := newTenantClaimTestStore(t, users)
+
+	authReq := &AuthRequest{Subject: BuildSubject("88"), ClientID: "client-1", TenantID: "7", SessionID: "sid-1"}
+
+	claims, err := storage.GetPrivateClaimsFromRequest(ctx, authReq, []string{model.ScopeOpenID})
+	if err != nil {
+		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
+	}
+	if got := claims["user_id"]; got != "51" {
+		t.Fatalf("expected user_id claim 51 (tenant 7 的 tenant_user.id), got %v", got)
+	}
+	if got := claims["person_id"]; got != "88" {
+		t.Fatalf("expected person_id claim 88, got %v", got)
+	}
+	if got := claims["sid"]; got != "sid-1" {
+		t.Fatalf("expected sid claim sid-1, got %v", got)
+	}
+
+	// 刷新轮换必须保持同一 user_id（验收标准 4：刷新后不变）。
+	rr := &refreshTokenRequest{subject: BuildSubject("88"), tenantID: "7", sessionID: "sid-1"}
+	refreshClaims, err := storage.GetPrivateClaimsFromRequest(ctx, rr, []string{model.ScopeOpenID})
+	if err != nil {
+		t.Fatalf("GetPrivateClaimsFromRequest(refresh) failed: %v", err)
+	}
+	if got := refreshClaims["user_id"]; got != "51" {
+		t.Fatalf("refresh must keep user_id 51, got %v", got)
+	}
+}

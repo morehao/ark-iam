@@ -14,6 +14,8 @@ type DepartmentCond struct {
 	DeptPath string
 	Status   model.DeptNodeStatus
 	Name     string
+	// IDs 主键 IN 批量查询（目录摘要按 id 批量取部门名，避免 N+1）。
+	IDs []string
 }
 
 func (c *DepartmentCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -34,6 +36,9 @@ func (c *DepartmentCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.Name != "" {
 		db.Where(tableName+".name = ?", c.Name)
+	}
+	if len(c.IDs) > 0 {
+		db.Where(tableName+".id IN ?", c.IDs)
 	}
 }
 

@@ -2,11 +2,14 @@ package oidcop
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	jose "github.com/go-jose/go-jose/v4"
@@ -26,6 +29,166 @@ import (
 // errRefreshTokenReused 标记 refresh token 复用（已被并发轮换或撤销）。
 // 按 RFC 9706 §4.1 检测到复用时应撤销整个 token 家族。
 var errRefreshTokenReused = errors.New("refresh token reused")
+
+// refreshRotationGraceWindow 是刷新令牌轮换的并发宽限窗口。
+//
+// 背景：轮换成功后旧 refresh token 立刻被条件撤销，此后任何携带旧 token 的请求都会被
+// 判为「复用」，进而按 RFC 9706 §4.1 撤销整个 token 家族、把用户踢下线。但真实世界里
+// 「同一秒内两个请求」绝大多数不是攻击，而是客户端/网络重试（响应丢失后重发）、
+// 或用户同时开了两个标签页——此时家族撤销是明显的误伤，用户被迫重新登录。
+//
+// 语义：轮换成功后的 refreshRotationGraceWindow 内，携带**同一把**旧 token 的请求不再
+// 判为复用，而是**原样返回刚签发的那把新 refresh token**（幂等重放）。
+// 窗口外的复用、以及窗口内携带**另一把**已撤销 token 的请求，一律按复用处理
+// （家族撤销，fail-closed）。窗口取 10s：覆盖一次 TCP 重传 + 服务端超时重试，
+// 远小于任何人工重放的价值。
+const refreshRotationGraceWindow = 10 * time.Second
+
+// maxRefreshGraceEntries 是宽限缓存的条目上界（超过即先清理过期项，再淘汰最旧一条）。
+// 条目只在窗口内存活，正常并发量下远达不到该上界；设上界是为了防止
+// 「大量唯一旧 token 在窗口内并发」把进程内存打满。
+const maxRefreshGraceEntries = 4096
+
+// refreshGraceEntry 是一次轮换的可重放结果。
+type refreshGraceEntry struct {
+	newRefreshToken string
+	expiration      time.Time
+	rotatedAt       time.Time
+}
+
+// rotationResult 是宽限窗口内可重放的轮换产物。
+// 只含 refresh token：access token 每次都必须新签发（jti 唯一）。
+type rotationResult struct {
+	newRefreshToken string
+	expiration      time.Time
+}
+
+// rotationKey 把一把 refresh token 映射为宽限缓存键。
+//
+// 刻意**只**用 token 本身、不带 client_id：refresh token 是 256 位随机不透明串，
+// 全局唯一且行内已绑定 person/tenant/client，不存在跨客户端撞键；
+// 而 client_id 在「旧 token 已被撤销」这条路径上并不总能解析出来
+// （撤销行的 ApplicationClientID 可能为空或指向已删行），带进键里会让同一把 token
+// 在登记与查询两侧算出不同的键，宽限窗口直接失效。
+//
+// 用 sha256 派生而不是直接存明文 token：缓存只为单进程短期存在，
+// 但仍不应在内存里留明文长期凭证。
+func rotationKey(refreshToken string) string {
+	sum := sha256.Sum256([]byte(refreshToken))
+	return base64.RawURLEncoding.EncodeToString(sum[:16])
+}
+
+// withinRotationGrace 判断一次撤销是否仍处在并发宽限窗口内。
+func withinRotationGrace(revokedAt, now time.Time) bool {
+	return !revokedAt.IsZero() && now.Sub(revokedAt) <= refreshRotationGraceWindow
+}
+
+// lookupRotationGrace 命中宽限窗口时返回可重放的轮换结果。
+func (s *PersistentStore) lookupRotationGrace(key string) (refreshGraceEntry, bool) {
+	now := time.Now()
+	s.rotationMu.Lock()
+	defer s.rotationMu.Unlock()
+	entry, ok := s.rotationGrace[key]
+	if !ok {
+		return refreshGraceEntry{}, false
+	}
+	if now.Sub(entry.rotatedAt) > refreshRotationGraceWindow {
+		delete(s.rotationGrace, key)
+		return refreshGraceEntry{}, false
+	}
+	return entry, true
+}
+
+// rememberRotationGrace 登记一次轮换结果，并顺带清理过期项与淘汰最旧条目。
+func (s *PersistentStore) rememberRotationGrace(key string, entry refreshGraceEntry) {
+	now := time.Now()
+	s.rotationMu.Lock()
+	defer s.rotationMu.Unlock()
+	for k, v := range s.rotationGrace {
+		if now.Sub(v.rotatedAt) > refreshRotationGraceWindow {
+			delete(s.rotationGrace, k)
+		}
+	}
+	for len(s.rotationGrace) >= maxRefreshGraceEntries {
+		// 达到上界（窗口内出现远超预期的唯一旧 token 并发）：淘汰最旧的一条腾位置。
+		// 整体清空会连带丢掉刚写入的窗口，让同一把 token 的重试退化成复用误判；
+		// 淘汰最旧则最坏只影响最老的那次轮换。
+		oldestKey, oldestAt := "", now
+		for k, v := range s.rotationGrace {
+			if oldestKey == "" || v.rotatedAt.Before(oldestAt) {
+				oldestKey, oldestAt = k, v.rotatedAt
+			}
+		}
+		if oldestKey == "" {
+			break
+		}
+		delete(s.rotationGrace, oldestKey)
+	}
+	s.rotationGrace[key] = entry
+}
+
+// beginRotation 把当前请求登记为该旧 token 的首个轮换者。
+// 返回 (leader=true, nil) 表示由本请求执行真正的轮换；
+// 返回 (false, done) 表示已有在途轮换，done 会在其结束时关闭。
+func (s *PersistentStore) beginRotation(key string) (bool, chan struct{}) {
+	s.rotationMu.Lock()
+	defer s.rotationMu.Unlock()
+	if done, ok := s.rotationInflight[key]; ok {
+		return false, done
+	}
+	done := make(chan struct{})
+	s.rotationInflight[key] = done
+	return true, done
+}
+
+// endRotation 结束在途登记并唤醒等待者。
+func (s *PersistentStore) endRotation(key string, done chan struct{}) {
+	s.rotationMu.Lock()
+	delete(s.rotationInflight, key)
+	s.rotationMu.Unlock()
+	close(done)
+}
+
+// refreshWithGrace 在「轮换执行的起点」处理宽限窗口，返回 ok=true 表示本次请求已被
+// 宽限路径满足（调用方直接返回该结果）。
+//
+// 两条命中路径：
+//  1. 旧 token 已经轮换过且在窗口内 → 直接重放刚签发的结果（幂等）；
+//  2. 另一个请求正在用同一把旧 token 轮换 → 等它结束再读缓存（避免并发双轮换）。
+//
+// 返回 ok=false 时调用方照常执行轮换；此时若旧 token 已被撤销、且不在窗口内，
+// 既有的条件撤销判定会把它落到 errRefreshTokenReused（家族撤销）——严格语义不变。
+func (s *PersistentStore) refreshWithGrace(currentRefreshToken string) (rotationResult, bool) {
+	key := rotationKey(currentRefreshToken)
+
+	if entry, ok := s.lookupRotationGrace(key); ok {
+		// access token 的明文只在签发函数内组装，这里只能回放 refresh token；
+		// 调用方会据此重新签发 access token（jti 唯一），语义等价且更安全。
+		return rotationResult{newRefreshToken: entry.newRefreshToken, expiration: entry.expiration}, true
+	}
+
+	leader, done := s.beginRotation(key)
+	if leader {
+		// defer 保证无论成功/失败都唤醒等待者并清掉在途登记。
+		defer s.endRotation(key, done)
+		return rotationResult{}, false
+	}
+
+	// 只等「在途轮换结束」或「窗口到期」，不看请求 ctx：刷新是写操作，
+	// 客户端断开不代表轮换没发生，此时若提前返回会让调用方以为"没轮换过"而重试。
+	select {
+	case <-done:
+	case <-time.After(refreshRotationGraceWindow):
+		// 在途轮换迟迟不结束：不阻塞请求，退回常规路径自行处理（旧 token 已被撤销时
+		// 条件撤销会命中 0 行 → 仍按复用处理，fail-closed）。
+		return rotationResult{}, false
+	}
+
+	if entry, ok := s.lookupRotationGrace(key); ok {
+		return rotationResult{newRefreshToken: entry.newRefreshToken, expiration: entry.expiration}, true
+	}
+	return rotationResult{}, false
+}
 
 // persistentStoreOption 承载持久化存储的可注入配置。
 type persistentStoreOption struct {
@@ -55,6 +218,11 @@ type PersistentStore struct {
 	// db 返回用于事务的 DB 句柄（轮换原子性等）。默认全局 iam 库，
 	// 测试可注入独立 SQLite 连接。
 	db func(ctx context.Context) *gorm.DB
+
+	// rotationMu 保护下面的宽限缓存与在途登记表（见 refreshRotationGraceWindow）。
+	rotationMu       sync.Mutex
+	rotationGrace    map[string]refreshGraceEntry
+	rotationInflight map[string]chan struct{}
 }
 
 func NewPersistentStore(opts ...PersistentStoreOption) *PersistentStore {
@@ -74,6 +242,8 @@ func NewPersistentStore(opts ...PersistentStoreOption) *PersistentStore {
 		roleDao:                    dao.NewRoleDao,
 		issuer:                     cfg.issuer,
 		db:                         dbclient.IamDB,
+		rotationGrace:              make(map[string]refreshGraceEntry),
+		rotationInflight:           make(map[string]chan struct{}),
 	}
 }
 
@@ -497,6 +667,25 @@ func (s *PersistentStore) CreateAccessToken(ctx context.Context, request op.Toke
 func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, request op.TokenRequest, currentRefreshToken string) (accessTokenID string, newRefreshToken string, expiration time.Time, err error) {
 	// 先按自然人列出其全部租户成员关系（再在内存中按 selectedTenantID 选定）：显式声明跨全部租户。
 	ctx = dbclient.CrossTenantContext(ctx)
+
+	// consumedRefreshToken 是**本次刷新要消费掉的那把旧 token**（授权码流为空）。
+	// 单独留一份：函数后段还会用 currentRefreshToken 做条件撤销，
+	// 而宽限窗口的登记与查询都必须以被消费的那把为键。
+	consumedRefreshToken := currentRefreshToken
+
+	// P9：刷新轮换的并发宽限窗口。刻意不做类型断言——refresh 流的 request 是
+	// *refreshTokenRequest，不应假设它实现 op.AuthRequest；宽限窗口只依赖 token 本身。
+	if consumedRefreshToken != "" {
+		if result, ok := s.refreshWithGrace(consumedRefreshToken); ok {
+			// access token 每次都新签发（jti 必须唯一，绝不复用），
+			// 只有 refresh token 是幂等重放——这正是宽限窗口要解决的重复轮换问题。
+			replayAccessTokenID, idErr := randomTokenID("at")
+			if idErr != nil {
+				return "", "", time.Time{}, fmt.Errorf("generate access token id: %w", idErr)
+			}
+			return replayAccessTokenID, result.newRefreshToken, result.expiration, nil
+		}
+	}
 	accessTokenID, err = randomTokenID("at")
 	if err != nil {
 		return "", "", time.Time{}, fmt.Errorf("generate access token id: %w", err)
@@ -651,6 +840,17 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 		return "", "", time.Time{}, txErr
 	}
 
+	// P9：轮换成功后登记宽限窗口，键是**刚被消费掉的那把旧 token**，
+	// 使窗口内携带同一把旧 token 的并发/重试请求幂等拿到这把新 refresh token，
+	// 而不是被判为复用并撤销整个 token 家族。
+	if consumedRefreshToken != "" {
+		s.rememberRotationGrace(rotationKey(consumedRefreshToken), refreshGraceEntry{
+			newRefreshToken: refreshTokenValue,
+			expiration:      expiration,
+			rotatedAt:       now,
+		})
+	}
+
 	// 登出登记：有 SSO 会话 且 client 配置了 back_channel_logout_uri 时，登记该会话对该 client 的通知关系。
 	// 无 sid（服务账号/Client Credentials）或未配置背信道 URI 则跳过，对齐 OIDC Back-Channel 注册要求。
 	if sessionID != "" && backChannelLogoutURI != "" {
@@ -711,7 +911,10 @@ func (s *PersistentStore) TokenRequestByRefreshToken(ctx context.Context, refres
 	if err != nil || storedToken == nil || storedToken.ID == "" {
 		return nil, op.ErrInvalidRefreshToken
 	}
-	if storedToken.RevokedAt != nil {
+	// P9：刚被轮换撤销的 token 在宽限窗口内仍然"可读"——这里的放行不是授权，
+	// 只是把最终判定交给 CreateAccessAndRefreshTokens（那里才有幂等重放/复用检测）。
+	// 窗口外的撤销、以及已过期的 token 一律当场拒绝。
+	if storedToken.RevokedAt != nil && !withinRotationGrace(*storedToken.RevokedAt, time.Now()) {
 		return nil, op.ErrInvalidRefreshToken
 	}
 	if storedToken.ExpiredAt == nil || !storedToken.ExpiredAt.After(time.Now()) {

@@ -4,7 +4,7 @@
 
 ## 项目概述
 
-GoArk 是一个基于 Gin + GORM 的多应用后端项目，采用前后端分离架构。IAM 后端拆分为四个应用（`auth`/`platformadmin`/`tenantadmin`/`gateway`），共享公共层 `backend/pkg`，并以 `backend/go.work` 作为 Go workspace 管理 5 个模块（apps/auth、apps/gateway、apps/platformadmin、apps/tenantadmin、pkg）。
+GoArk 是一个基于 Gin + GORM 的多应用后端项目，采用前后端分离架构。IAM 后端拆分为五个应用（`auth`/`platformadmin`/`tenantadmin`/`rpapi`/`gateway`），共享公共层 `backend/pkg` 与面向 RP 的 `backend/sdk`，并以 `backend/go.work` 作为 Go workspace 管理 7 个模块（apps/auth、apps/gateway、apps/platformadmin、apps/rpapi、apps/tenantadmin、pkg、sdk）。
 
 ## 项目结构
 
@@ -15,7 +15,8 @@ ark-iam/
 │   │   ├── auth/          # 认证网关（登录/注册/token/OIDC），:8081
 │   │   ├── platformadmin/ # 平台管理，:8082
 │   │   ├── tenantadmin/   # 租户自服务，:8083
-│   │   └── gateway/       # 聚合应用（挂载上述三者，单体部署），:8100
+│   │   ├── rpapi/         # 面向应用的只读目录 API（/v1/rp/directory/*），:8084
+│   │   └── gateway/       # 聚合应用（挂载上述四者，单体部署），:8100
 │   ├── pkg/               # 公共层，5 模块之一（model/dao/object/core/credential/…）
 │   └── Makefile
 ├── frontend/             # React 前端项目
@@ -27,7 +28,7 @@ ark-iam/
 
 ## 构建与运行命令
 
-所有命令在项目根目录下执行。有效 `APP` 取值为 `auth | platformadmin | tenantadmin | gateway`：
+所有命令在项目根目录下执行。有效 `APP` 取值为 `auth | platformadmin | tenantadmin | rpapi | gateway`：
 
 ```bash
 # 列出所有可用应用
@@ -37,7 +38,7 @@ make list-apps
 make build APP=auth
 make build APP=gateway
 
-# 运行指定应用（开发调试；gateway 单进程聚合三者）
+# 运行指定应用（开发调试；gateway 单进程聚合四者）
 make run APP=auth
 make run APP=gateway
 
@@ -48,12 +49,12 @@ make deps
 make clean
 ```
 
-应用端口：auth 8081、platformadmin 8082、tenantadmin 8083、gateway 8100。
+应用端口：auth 8081、platformadmin 8082、tenantadmin 8083、rpapi 8084、gateway 8100。
 
 ## 测试命令
 
 ```bash
-# 运行指定应用的测试（推荐；gateway 只做聚合、无测试用例，请用 auth/platformadmin/tenantadmin）
+# 运行指定应用的测试（推荐；gateway 只做聚合、无测试用例，请用 auth/platformadmin/tenantadmin/rpapi）
 make test APP=auth
 
 # 注意：go.work 位于 backend/，go 命令须在 backend 目录下执行，且模块按路径逐个 use。
@@ -62,7 +63,7 @@ make test APP=auth
 cd backend
 
 # 运行所有模块的测试
-go test ./apps/auth/... ./apps/gateway/... ./apps/platformadmin/... ./apps/tenantadmin/... ./pkg/...
+go test ./apps/auth/... ./apps/gateway/... ./apps/platformadmin/... ./apps/rpapi/... ./apps/tenantadmin/... ./pkg/... ./sdk/...
 
 # 等价的模块内写法
 cd backend/apps/auth && go test ./...
@@ -91,7 +92,7 @@ make lint
 golangci-lint run ./... --disable-all -E golint,errcheck,staticcheck
 
 # go vet（同样按模块逐个执行）
-cd backend && for m in apps/auth apps/gateway apps/platformadmin apps/tenantadmin pkg; do (cd $m && go vet ./...); done
+cd backend && for m in apps/auth apps/gateway apps/platformadmin apps/rpapi apps/tenantadmin pkg sdk; do (cd $m && go vet ./...); done
 ```
 
 ## 代码规范
@@ -113,8 +114,10 @@ apps/
 │   └── dao/                 # 数据访问层
 ├── platformadmin/              # 平台管理（结构同 auth）
 ├── tenantadmin/                # 租户自服务（结构同 auth）
-├── gateway/                    # 聚合应用（挂载 auth/platformadmin/tenantadmin）
+├── rpapi/                      # 面向应用的只读目录 API（/v1/rp/directory/*，结构同 auth）
+├── gateway/                    # 聚合应用（挂载 auth/platformadmin/tenantadmin/rpapi）
 pkg/                          # 公共层（跨应用共享，见下方「公共层约定」）
+sdk/                          # RP 侧 OIDC SDK（独立 module：contract + rp，依赖白名单见 sdk/README.md）
 ```
 
 > **公共层约定（`pkg/`）**：与应用内层级一一对应，**共享即上提同名目录**——`internal/middleware` ↔ `pkg/middleware`、`internal/core/<域>` ↔ `pkg/core/<域>`、`dto/dto<域>` ↔ `object/obj<域>`；跨应用共享的 model/dao/object 直接平铺在 `pkg/model`、`pkg/dao`、`pkg/object`（**不再套业务域容器**：模块路径 `github.com/morehao/ark-iam/pkg` 已表达域名，套一层会重复且与 `pkg/goidc`、`pkg/seed` 等兄弟包边界矛盾）。
@@ -123,7 +126,7 @@ pkg/                          # 公共层（跨应用共享，见下方「公共
 >
 > **领域层容器约定**：应用内领域层统一放 `internal/core/<领域名>`（当前为 `oidcop`）。`core` 只承载绑定框架/协议的领域逻辑，禁止放置工具与辅助代码；`op` 为 OpenID Provider 术语（对应 RP 侧 `pkg/goidc`），非领域层通用后缀，其他领域层按领域名命名（如 `core/session`）。公共层同理：`pkg/core/<域>` 是平铺的领域层容器，**只放领域不变式，不放工具与辅助代码**（工具/基础能力直接放 `pkg/<name>`）。
 >
-> **OIDC 分层约定**：OP（Provider）侧领域层在 `apps/auth/internal/core/oidcop`（仅 auth 使用，绑定 auth 实体与 zitadel op 框架）；跨应用共享的 OIDC 能力（当前为 RP 侧 `pkg/goidc`）才放 `pkg`。若未来出现第二个 OP 消费者，将 `oidcop` 上提至 `pkg/goidc`。
+> **OIDC 分层约定**：OP（Provider）侧领域层在 `apps/auth/internal/core/oidcop`（仅 auth 使用，绑定 auth 实体与 zitadel op 框架）。**RP 侧 OIDC 能力的唯一事实源是独立 module `backend/sdk`**（`sdk/contract` claim 契约 + `sdk/rp` 验签/M2M/登出/目录客户端），它面向外部应用，依赖白名单只有标准库 + `jwt/v5`（`make sdk-check-deps` 强制），禁止引入 gin/gorm/redis/go-oidc/go-jose；`pkg/object/objauth`、`pkg/goidc` 只是指向 `sdk` 的**类型别名与 gin 薄壳**（零破坏迁移用），不得再新增 RP 侧实现。若未来出现第二个 OP 消费者，将 `oidcop` 上提。
 
 ### 命名规范
 
@@ -257,6 +260,7 @@ import (
 
     "github.com/morehao/ark-iam/platformadmin/internal/dto/dtouser"
     "github.com/morehao/ark-iam/pkg/code"
+    "github.com/morehao/ark-iam/sdk/rp"
     "github.com/morehao/golib/glog"
 )
 ```
@@ -390,7 +394,7 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 
 **三条硬规则（新增路由必须按序判定）**：
 
-- **R1 资源 CRUD → REST**：资源的增删改查/列表/详情/树，用「集合 + 方法 + ID」表达。路径格式 `/{版本}/{服务标识}/{资源}[/{id}[/{子资源}]]`（如 `/v1/platform/users/{userID}/identities`；`服务标识` 即应用标识段：auth → `/v1/auth`、platformadmin → `/v1/platform`、tenantadmin → `/v1/tenant`，各应用路径互不相同；资源名可跨应用复用，由服务标识段区分归属）
+- **R1 资源 CRUD → REST**：资源的增删改查/列表/详情/树，用「集合 + 方法 + ID」表达。路径格式 `/{版本}/{服务标识}/{资源}[/{id}[/{子资源}]]`（如 `/v1/platform/users/{userID}/identities`；`服务标识` 即应用标识段：auth → `/v1/auth`、platformadmin → `/v1/platform`、tenantadmin → `/v1/tenant`、rpapi → `/v1/rp`，各应用路径互不相同；资源名可跨应用复用，由服务标识段区分归属）
 - **R2 业务动作 → 动作子路径**：状态流转/触发副作用类操作用 `POST /资源/{id}/动作`（如 `POST /v1/tenant/api-keys/{apiKeyID}/revoke`）；认证/会话类动作挂 `/v1/auth` 动作式专用段（`joinTenant`/`logout`/`logoutAll`/`userinfo`；`register` 已下线，自助注册走 `/oidc/registerPerson` + `/oidc/createTenant`）
 - **R3 标准协议 → 专用前缀**：`/oidc/*`、back-channel logout、docs 不走业务路由规范，保持不动
 
@@ -416,7 +420,7 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 
 #### 路由注册
 
-各业务 app 通过 `ginserver.NewRouterGroups(engine, "<服务标识>", ...)` 注册应用前缀（auth: `"auth"`、platformadmin: `"platform"`、tenantadmin: `"tenant"`），然后在 `router/router.go` 中按版本 `MustGetGroup(ginserver.ApiVersionV1)` 注册各模块路由：
+各业务 app 通过 `ginserver.NewRouterGroups(engine, "<服务标识>", ...)` 注册应用前缀（auth: `"auth"`、platformadmin: `"platform"`、tenantadmin: `"tenant"`、rpapi: `"rp"`），然后在 `router/router.go` 中按版本 `MustGetGroup(ginserver.ApiVersionV1)` 注册各模块路由：
 
 ```go
 routerGroups := ginserver.NewRouterGroups(engine, "platform", []ginserver.VersionGroup{{
@@ -593,6 +597,7 @@ actionColumn<TenantItem>({
 - **API 文档**: swag (Swag Go)
 - **代码生成**: gocli
 - **数据库**: GORM with PostgreSQL（主库，启动时 AutoMigrate 自动建表 + 幂等种子数据），测试用 SQLite
+- **RP SDK**: `backend/sdk`（独立 module，依赖白名单；`make test-sdk` / `make sdk-check-deps`，用法见 `backend/sdk/README.md`）
 - **缓存**: Redis
 - **链路追踪**: OpenTelemetry
 - **日志**: golib/glog
