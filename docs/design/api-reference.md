@@ -137,7 +137,7 @@ flowchart LR
 | `/oidc/login/changePassword` | POST | **首次登录强制改密**（authRequestID + currentPassword + newPassword）：`/oidc/login` 对持临时密码的账号返回 `requiresPasswordChange=true` 且不完成授权，改密成功后需重新登录（会话已全局撤销） |
 | `/oidc/sso-login` | GET | SSO 免密续登（携带 `iam_sso_session` Cookie，`?authRequestID=`） |
 | `/oidc/logged-out` | GET | 登出落地页（清除 SSO Cookie 后跳前端登录页） |
-| `/bc-logout/platform`、`/bc-logout/tenant` | POST | **反向通道登出接收端**（RP 侧接收端，实现在 `pkg/goidc`）：仅 platformadmin 挂 `/oidc/bc-logout/platform`、tenantadmin 挂 `/oidc/bc-logout/tenant`，**auth 不挂载**；gateway 聚合时两者都在 `:8100` |
+| `/bc-logout/platform`、`/bc-logout/tenant` | POST | **反向通道登出接收端**（RP 侧接收端，实现在 `pkg/oidckit`）：仅 platformadmin 挂 `/oidc/bc-logout/platform`、tenantadmin 挂 `/oidc/bc-logout/tenant`，**auth 不挂载**；gateway 聚合时两者都在 `:8100` |
 | `/bc-logout/platform/recent`、`/bc-logout/tenant/recent` | GET | 最近接收记录（调试 / e2e 断言用） |
 
 ### 3.3 令牌端点示例

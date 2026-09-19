@@ -73,7 +73,7 @@ flowchart TB
             PLAT["platformadmin :8082<br/>平台管理"]
             TENANT["tenantadmin :8083<br/>租户自服务"]
         end
-        PKG["backend/pkg 公共层<br/>config / dbclient / middleware / code<br/>model·dao·object / core/&lt;域&gt; / credential<br/>goidc / sso / audit / seed / testsetup"]
+        PKG["backend/pkg 公共层<br/>config / dbclient / middleware / code<br/>model·dao·object / core/&lt;域&gt; / credential<br/>oidckit / identity / sso / audit / seed / testsetup"]
     end
 
     subgraph INFRA["基础设施"]
@@ -137,7 +137,7 @@ flowchart TB
 > `dao/`、`model/`、`object/` **不在应用内**：跨应用共享的实体 / 访问器 / 对象统一在 `pkg/dao`、`pkg/model`、`pkg/object`（模块路径已表达域名，不再套业务域容器）。
 
 - **领域层容器**：绑定框架/协议的领域逻辑放应用内 `internal/core/<域>`（当前仅 auth 的 `internal/core/oidcop`——OP 侧 `op.Storage` 适配 / 协议态 / 持久化 / 客户端适配）；可复用的领域不变式下沉 `pkg/core/<域>`（当前 `person`/`user`/`tenant`/`menu`/`application`），与 `internal/core/<域>` 对称。`core` 只承载领域逻辑，禁止放工具与辅助代码。
-- **基础能力**：凭证（口令强度 / 临时口令 / API Key·client secret·refresh token 的生成与摘要）统一在 `pkg/credential`（全系统只允许一份摘要实现）；OIDC 鉴权中间件在 `pkg/middleware/oidc_auth.go`；RP 侧 back-channel logout 接收端在 `pkg/goidc`；种子初始化在 `pkg/seed`；操作审计在 `pkg/audit`；
+- **基础能力**：凭证（口令强度 / 临时口令 / API Key·client secret·refresh token 的生成与摘要）统一在 `pkg/credential`（全系统只允许一份摘要实现）；请求级身份的读写契约在 `pkg/identity`（中间件写、业务/策略层读）；OIDC 鉴权中间件在 `pkg/middleware/oidc_auth.go`；RP 侧 OIDC 能力（公钥来源装配 + back-channel logout 接收端）在 `pkg/oidckit`；种子初始化在 `pkg/seed`；操作审计在 `pkg/audit`；
 - 服务层依赖接口 + 构造函数注入，控制器统一 `gincontext.Success/Fail` 返回 `{code, requestID, msg, data}` 信封；
 - 数据库访问基于 GORM，事务用 `dbclient.IamDB(ctx).Transaction(...)` 封装。
 
@@ -887,8 +887,8 @@ flowchart TB
 | 2. 创建应用 | 平台管理员创建应用并配置租户策略 | `POST /v1/platform/applications` |
 | 3. 创建客户端 | 一个应用可多个客户端（多端/多环境），**redirect_uri 必须精确白名单** | `POST /v1/platform/application-clients` |
 | 4. 前端接入 | Authorization Code + PKCE，`state`/`nonce` 由 SDK 处理 | `/oidc/*` 端点 |
-| 5. 后端校验 | `middleware.OIDCCompatibleAuth` 中间件：验签 + iss/aud + SSO 会话活性 | `pkg/middleware` |
-| 6. 单点登出 | 配置 `back_channel_logout_uri` 接收 logout_token（RP 侧接收端，本仓内置实现在 `pkg/goidc`，platformadmin/tenantadmin 分别挂载 `/oidc/bc-logout/platform`、`/oidc/bc-logout/tenant`） | `back_channel_logout_uri` |
+| 5. 后端校验 | `middleware.OIDCAuth` 中间件：验签 + iss/aud + SSO 会话活性（公钥来源由 `pkg/oidckit` 装配） | `pkg/middleware` |
+| 6. 单点登出 | 配置 `back_channel_logout_uri` 接收 logout_token（RP 侧接收端，本仓内置实现在 `pkg/oidckit`，platformadmin/tenantadmin 分别挂载 `/oidc/bc-logout/platform`、`/oidc/bc-logout/tenant`） | `back_channel_logout_uri` |
 | 7. 验收 | 跨应用免密、一处登出处处登出、审计可查 | - |
 
 ---

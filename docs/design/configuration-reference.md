@@ -218,7 +218,7 @@ oidc:
 | `cookieSameSite` | SSO Cookie SameSite：`lax`/`strict`/`none`（跨站 SSO 需 none + Secure） | lax |
 | `cookieDomain` | SSO Cookie Domain（跨子域共享时设置） | 空 |
 | `enableSSOSessionValidation` | 是否开启请求粒度 SSO 会话活性校验（需共享 Redis） | false |
-| `backChannelLogoutPath` | 本应用 back-channel logout 接收端基础路径（挂载在 `/oidc` 组下） | platformadmin 兜底 `/bc-logout/platform`、tenantadmin 兜底 `/bc-logout/tenant`；`pkg/goidc` 通用兜底 `/oidc/bc-logout`；auth / gateway 未配置 |
+| `backChannelLogoutPath` | 本应用 back-channel logout 接收端基础路径（挂载在 `/oidc` 组下） | platformadmin 兜底 `/bc-logout/platform`、tenantadmin 兜底 `/bc-logout/tenant`；`pkg/oidckit` 通用兜底 `/oidc/bc-logout`；auth / gateway 未配置 |
 
 ### 8.1 签名密钥（多 key、轮换与启动校验）
 
@@ -267,7 +267,7 @@ oidc:                                  # 与上面的 keys 列表等价
 | 非 dev 不自动生成 | 显式配了路径但文件缺失时，非 dev 同样拒绝启动（dev 才自动生成）——避免重启换 kid 使全部令牌失效、各 RP 公钥失同步 |
 | 加密密钥 | `encryptionKey` 非 dev 必须显式配置（缺省测试密钥是公开常量）；`encryptionKeyID` 缺省 `enc-key-1` |
 
-RP 侧取公钥的正路是 `middleware.ResolveKeySource(injected, conf)` / `NewKeySourceFromConfig(conf)`：gateway 单体部署下由 auth 注入**进程内 key set**（`OIDCStorage.PublishedKeys()` → `rp.NewKeysFromSet`，零网络调用、跟随多 key 轮换）；独立部署则优先 `oidc.jwksURL`（显式端点，原样使用），其次 `issuer`（SDK 解析端点并**同步预取**：标准 discovery 的 `jwks_uri` → `{issuer}/keys` → `{issuer}/.well-known/jwks.json`；**本仓 OP（zitadel/oidc）发布在 `{issuer}/keys`**，它不提供 `{issuer}/.well-known/jwks.json`），最后回退到本地配置签名密钥导出的快照（会告警：OP 轮换后需重启才生效，生产应配 `jwksURL`）；三者皆无则启动失败（fail-closed）。客户端**必须**在 JWT 头带 `kid`，并拒绝 `jwk`/`jku`/`x5u` 头（`middleware.LoadSigningPublicKey` 是旧的单公钥兼容入口，无法感知轮换）。
+RP 侧取公钥的正路是 `oidckit.ResolveKeySource(injected, conf)` / `oidckit.NewKeySourceFromConfig(conf)`（装配在 `pkg/oidckit/keys.go`）：gateway 单体部署下由 auth 注入**进程内 key set**（`OIDCStorage.PublishedKeys()` → `rp.NewKeysFromSet`，零网络调用、跟随多 key 轮换）；独立部署则优先 `oidc.jwksURL`（显式端点，原样使用），其次 `issuer`（SDK 解析端点并**同步预取**：标准 discovery 的 `jwks_uri` → `{issuer}/keys` → `{issuer}/.well-known/jwks.json`；**本仓 OP（zitadel/oidc）发布在 `{issuer}/keys`**，它不提供 `{issuer}/.well-known/jwks.json`），最后回退到本地配置签名密钥导出的快照（会告警：OP 轮换后需重启才生效，生产应配 `jwksURL`）；三者皆无则启动失败（fail-closed）。客户端**必须**在 JWT 头带 `kid`，并拒绝 `jwk`/`jku`/`x5u` 头。（历史上曾有「启动时钉死一把公钥」的兼容入口，已随本轮收敛删除；本地签名密钥快照只作无 JWKS 端点时的兜底。）
 
 ### 8.2 SSO Cookie 拓扑选择
 

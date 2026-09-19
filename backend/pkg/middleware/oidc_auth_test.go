@@ -56,12 +56,12 @@ func newOIDCAuthTestDB(t *testing.T) *gorm.DB {
 const testKID = "test-kid"
 
 // testKeySource 构造按 kid 取键的进程内 KeySource（等价于生产里 rp.NewKeysFromSet）。
-func testKeySource(key *rsa.PublicKey) KeySource {
+func testKeySource(key *rsa.PublicKey) rp.KeySource {
 	return rp.NewKeysFromSet(map[string]*rsa.PublicKey{testKID: key})
 }
 
 // testKeySourceWith 构造可容纳多把公钥的 KeySource（多 key 轮换用例）。
-func testKeySourceWith(keys map[string]*rsa.PublicKey) KeySource {
+func testKeySourceWith(keys map[string]*rsa.PublicKey) rp.KeySource {
 	return rp.NewKeysFromSet(keys)
 }
 

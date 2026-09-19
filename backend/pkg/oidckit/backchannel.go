@@ -1,13 +1,19 @@
-// Package goidc 提供跨应用共享的 OIDC 能力。
+// Package oidckit 封装本项目内置应用（gin 侧）所需的 OIDC 能力。
 //
-// 当前内容为 OIDC Back-Channel Logout（OIDC Back-Channel Logout 1.0）的
-// RP 侧接收端：供各业务应用（RP）挂载 back-channel logout 接收端点，
-// 接收由 auth（OP）在用户登出后推送的 logout_token，并执行本地会话清除。
+// 职责有二：
+//   - OP 公钥来源装配：把 oidc.* 配置解析为 sdk/rp 的验签 KeySource（见 keys.go）；
+//   - OIDC Back-Channel Logout（OIDC Back-Channel Logout 1.0）的 RP 侧接收端：
+//     供各业务应用（RP）挂载 back-channel logout 端点，接收由 auth（OP）在用户
+//     登出后推送的 logout_token，并执行本地会话清除。
 //
-// 校验逻辑的单一真源在 github.com/morehao/ark-iam/sdk/rp/logout（框架无关、
-// 基于 net/http）。本包只做"Gin 挂载 + 最近记录（调试/e2e 断言）"这两件事，
-// 不再自行实现 token 校验——避免 RP 侧出现第二套验签规则。
-package goidc
+// 边界：RP 侧 OIDC 能力的**唯一事实源**是独立 module `backend/sdk`
+// （sdk/contract 契约 + sdk/rp 验签/M2M/登出）。本包只做"配置解析 + Gin 挂载 +
+// 类型别名"三件事，不得在此新增第二套验签或协议实现（AGENTS.md §OIDC 分层约定）。
+//
+// back-channel logout 的校验逻辑单一真源在
+// github.com/morehao/ark-iam/sdk/rp/logout（框架无关、基于 net/http）；
+// 本包只做"Gin 挂载 + 最近记录（调试/e2e 断言）"，不再自行实现 token 校验。
+package oidckit
 
 import (
 	"errors"
@@ -21,14 +27,12 @@ import (
 	"github.com/morehao/ark-iam/sdk/rp/logout"
 )
 
-// 契约别名：调用方引用 goidc.Xxx 与 sdk 侧完全同一类型。
+// 契约别名：调用方引用 oidckit.Xxx 与 sdk 侧完全同一类型。
 const BackChannelLogoutEventURI = contract.BackChannelLogoutEventURI
 
 type (
 	// LogoutTokenClaims 是 logout_token 的标准声明（真源 sdk/contract）。
 	LogoutTokenClaims = contract.LogoutTokenClaims
-	// KeySource 是按 kid 取公钥的最小接口（与 rp.KeySource 同形）。
-	KeySource = logout.JWKS
 	// JTIStore 是 jti 去重实现接口。
 	JTIStore = logout.JTIStore
 )

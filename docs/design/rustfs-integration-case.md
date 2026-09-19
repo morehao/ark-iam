@@ -24,7 +24,7 @@
 
 ## 1. 为什么单独成文
 
-通用指南覆盖的是「**你写一个应用**，用 `react-oidc-context` 接前端、用 `pkg/goidc` 接反向通道登出」。
+通用指南覆盖的是「**你写一个应用**，用 `react-oidc-context` 接前端、用 `pkg/oidckit` 接反向通道登出」。
 RustFS 是另一类形态——**存量第三方应用**，三个特征让接入的难点整体位移：
 
 | 特征 | 后果 |
@@ -238,7 +238,7 @@ curl -X PUT http://localhost:8100/v1/platform/applications/{appID} \
 此时策略若还没备好，该应用**所有已授权用户**点登录都会拿到
 `InvalidRequest: OIDC policy mapping did not resolve to current policies`。
 
-> 这与"下游认不出的值就跳过"的直觉相反，也和本系统自有应用（`pkg/goidc` 侧）的
+> 这与"下游认不出的值就跳过"的直觉相反，也和本系统自有应用（`pkg/oidckit` 侧）的
 > fail-safe 行为相反。**排障第一动作**是解 ID token 看 `groups` 实际内容，
 > 再去下游核对同名策略是否存在——而不是先怀疑令牌或网络。
 

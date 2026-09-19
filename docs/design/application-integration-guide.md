@@ -329,7 +329,7 @@ func OIDCAuth(verifier *rp.Verifier) gin.HandlerFunc {
 }
 ```
 
-> **本仓内置应用**的参考实现是 `pkg/middleware/oidc_auth.go`（`NewKeySourceFromConfig` + `OIDCAuth`）：除本地验签外，它还做 SSO 会话活性校验、`x-api-key` 直连通道，并把 `Identity` 投影到 gin context（`gcontext.KeyPersonID` / `KeyUserID` / `KeyTenantID` / `KeyAuthToken`）供既有处理器读取，完整身份用 `OIDCIdentityFromContext` 取回。`middleware.OIDCCompatibleAuth` + `middleware.LoadSigningPublicKey` 是**过渡 API**（只在启动时钉死一把公钥、感知不到轮换），新代码请用 `WithOIDCKeySource` / `NewKeySourceFromConfig`，或直接按上面的 SDK 写法。
+> **本仓内置应用**的参考实现是 `pkg/middleware/oidc_auth.go`（公钥来源用 `oidckit.NewKeySourceFromConfig` 装配 + `middleware.OIDCAuth`）：除本地验签外，它还做 SSO 会话活性校验、`x-api-key` 直连通道，并把 `Identity` 投影到 gin context（`gcontext.KeyPersonID` / `KeyUserID` / `KeyTenantID` / `KeyAuthToken`）供既有处理器读取，完整身份用 `pkg/identity.OIDCIdentityFromContext` 取回（`client_id` 用 `pkg/identity.ClientIDFromContext`）。新代码请用 `middleware.WithOIDCKeySource` / `oidckit.NewKeySourceFromConfig`，或直接按上面的 SDK 写法。
 
 **`rp.Identity` 字段**（`verifier.Verify` 的返回值）：
 
@@ -533,7 +533,7 @@ OP 收到登出请求后：清除 `iam_sso_session` Cookie → 撤销该 person 
 
 ### 8.2 反向通道登出接收端
 
-反向通道登出的**唯一实现**在 SDK：`sdk/rp/logout`（`logout.Receiver.Handle`，框架无关、基于 `net/http`）；本仓 Gin 应用用 `pkg/goidc` 薄壳挂载（只做参数搬运与观测，**不再有第二套验签规则**）。外部应用自行实现 `POST <backChannelLogoutURI>` 即可：
+反向通道登出的**唯一实现**在 SDK：`sdk/rp/logout`（`logout.Receiver.Handle`，框架无关、基于 `net/http`）；本仓 Gin 应用用 `pkg/oidckit` 薄壳挂载（只做参数搬运与观测，**不再有第二套验签规则**）。外部应用自行实现 `POST <backChannelLogoutURI>` 即可：
 
 ```go
 receiver := logout.NewReceiver(
@@ -552,13 +552,13 @@ http.Handle("/oidc/bc-logout", receiver) // 正确状态码：200/400/500
 本仓 Gin 应用挂载方式：
 
 ```go
-import "github.com/morehao/ark-iam/pkg/goidc"
+import "github.com/morehao/ark-iam/pkg/oidckit"
 
 // 挂载接收端点（路径与客户端注册的 backChannelLogoutURI 一致）
 group := engine.Group("/oidc")
-basePath := Conf.OIDC.BackChannelLogoutPath // 本仓约定 /bc-logout/<app>（如 /bc-logout/platform）；pkg/goidc 通用兜底为 /oidc/bc-logout
-goidc.RegisterReceiverRoutes(group, basePath, keys, Conf.OIDC.Issuer, "<本应用 client_id>",
-    func(ctx *gin.Context, claims *goidc.LogoutTokenClaims) error {
+basePath := Conf.OIDC.BackChannelLogoutPath // 本仓约定 /bc-logout/<app>（如 /bc-logout/platform）；pkg/oidckit 通用兜底为 /oidc/bc-logout
+oidckit.RegisterReceiverRoutes(group, basePath, keys, Conf.OIDC.Issuer, "<本应用 client_id>",
+    func(ctx *gin.Context, claims *oidckit.LogoutTokenClaims) error {
         // 验签通过后作废本地会话：传 nil 只会验签、不会登出
         return localSessionStore.RevokeBySessionID(ctx.Request.Context(), claims.SessionID)
     })
@@ -652,4 +652,4 @@ flowchart LR
 不能。目录客户端**只在连接失败/超时/5xx** 且缓存未超过 `StaleOnError`（建议 ≤5 分钟）时返回过期副本；**401/403/404 一律透传、绝不降级**。`Member.Status` 也**不得**用于放行/拒绝——成员是否可登录由令牌侧决定。鉴权路径请只用本地验签的 `rp.Identity`，目录结果只服务展示。
 
 **Q10：OP 轮换签名密钥后，RP 需要重启或重新下发 JWKS 吗？**
-不需要。客户端按令牌头的 `kid` 定位公钥（`kid` 必填；`jwk`/`jku`/`x5u` 头一律拒绝），未知 `kid` 会限速触发一次 JWKS 刷新。例行轮换「追加 → 切 `active` → 等 ≥2×JWKS TTL → 摘除」零中断；紧急轮换删除旧 key 后立即生效。别再使用 `middleware.LoadSigningPublicKey` 这类「启动时钉死一把公钥」的过渡 API。
+不需要。客户端按令牌头的 `kid` 定位公钥（`kid` 必填；`jwk`/`jku`/`x5u` 头一律拒绝），未知 `kid` 会限速触发一次 JWKS 刷新。例行轮换「追加 → 切 `active` → 等 ≥2×JWKS TTL → 摘除」零中断；紧急轮换删除旧 key 后立即生效。（「启动时钉死一把公钥」的过渡 API 已删除，内置应用一律走 JWKS 或 gateway 注入的进程内 key set。）
