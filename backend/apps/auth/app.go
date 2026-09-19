@@ -7,7 +7,7 @@ import (
 	"github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/auth/internal/router"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
-	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
+	"github.com/morehao/ark-iam/pkg/oidckit"
 	"github.com/morehao/golib/biz/gserver/gindocs"
 )
 
@@ -17,7 +17,7 @@ const AppName = "auth"
 //
 // 返回值供 **gateway 单体部署**使用：同进程的 platformadmin/tenantadmin/rpapi
 // 直接复用它做本地验签（零网络调用、跟随多 key 轮换）；独立部署的调用方可忽略。
-func Init(engine *gin.Engine, Conf *pkgconfig.Config) pkgmiddleware.KeySource {
+func Init(engine *gin.Engine, Conf *pkgconfig.Config) oidckit.KeySource {
 	config.Conf = Conf
 
 	// H15：非 dev 环境强制安全配置，否则拒绝启动（fail-closed，与签名密钥策略对齐）

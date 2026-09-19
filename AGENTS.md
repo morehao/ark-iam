@@ -120,13 +120,13 @@ pkg/                          # 公共层（跨应用共享，见下方「公共
 sdk/                          # RP 侧 OIDC SDK（独立 module：contract + rp，依赖白名单见 sdk/README.md）
 ```
 
-> **公共层约定（`pkg/`）**：与应用内层级一一对应，**共享即上提同名目录**——`internal/middleware` ↔ `pkg/middleware`、`internal/core/<域>` ↔ `pkg/core/<域>`、`dto/dto<域>` ↔ `object/obj<域>`；跨应用共享的 model/dao/object 直接平铺在 `pkg/model`、`pkg/dao`、`pkg/object`（**不再套业务域容器**：模块路径 `github.com/morehao/ark-iam/pkg` 已表达域名，套一层会重复且与 `pkg/goidc`、`pkg/seed` 等兄弟包边界矛盾）。
+> **公共层约定（`pkg/`）**：与应用内层级一一对应，**共享即上提同名目录**——`internal/middleware` ↔ `pkg/middleware`、`internal/core/<域>` ↔ `pkg/core/<域>`、`dto/dto<域>` ↔ `object/obj<域>`；跨应用共享的 model/dao/object 直接平铺在 `pkg/model`、`pkg/dao`、`pkg/object`（**不再套业务域容器**：模块路径 `github.com/morehao/ark-iam/pkg` 已表达域名，套一层会重复且与 `pkg/oidckit`、`pkg/seed` 等兄弟包边界矛盾）。
 >
-> 公共层**禁止**复用应用侧 `svc` 前缀：`svc` 专指应用内服务层，编排不外提；共享层只承载领域不变式（跨表、在调用方事务内、返回实体/哨兵错误）与基础能力，可复用的领域不变式下沉 `pkg/core/<域>`，其余留在各应用。凭证（口令强度 / 临时口令 / API Key·OAuth client secret·refresh token 的生成与摘要）统一在 `pkg/credential`，**全系统只允许一份摘要实现**；OIDC 鉴权中间件在 `pkg/middleware/oidc_auth.go`，RP 侧 back-channel logout 接收端在 `pkg/goidc`。
+> 公共层**禁止**复用应用侧 `svc` 前缀：`svc` 专指应用内服务层，编排不外提；共享层只承载领域不变式（跨表、在调用方事务内、返回实体/哨兵错误）与基础能力，可复用的领域不变式下沉 `pkg/core/<域>`，其余留在各应用。凭证（口令强度 / 临时口令 / API Key·OAuth client secret·refresh token 的生成与摘要）统一在 `pkg/credential`，**全系统只允许一份摘要实现**；请求级身份的**读写契约**在 `pkg/identity`（写侧由鉴权中间件调用，读侧供业务/策略层取值——策略层因此**不依赖** `pkg/middleware`，它回答的是"该身份是否有权做这件事"）；OIDC 鉴权中间件在 `pkg/middleware/oidc_auth.go`，RP 侧 OIDC 能力（公钥来源装配 + back-channel logout 接收端）在 `pkg/oidckit`。
 >
-> **领域层容器约定**：应用内领域层统一放 `internal/core/<领域名>`（当前为 `oidcop`）。`core` 只承载绑定框架/协议的领域逻辑，禁止放置工具与辅助代码；`op` 为 OpenID Provider 术语（对应 RP 侧 `pkg/goidc`），非领域层通用后缀，其他领域层按领域名命名（如 `core/session`）。公共层同理：`pkg/core/<域>` 是平铺的领域层容器，**只放领域不变式，不放工具与辅助代码**（工具/基础能力直接放 `pkg/<name>`）。
+> **领域层容器约定**：应用内领域层统一放 `internal/core/<领域名>`（当前为 `oidcop`）。`core` 只承载绑定框架/协议的领域逻辑，禁止放置工具与辅助代码；`op` 为 OpenID Provider 术语（对应 RP 侧 `pkg/oidckit`），非领域层通用后缀，其他领域层按领域名命名（如 `core/session`）。公共层同理：`pkg/core/<域>` 是平铺的领域层容器，**只放领域不变式，不放工具与辅助代码**（工具/基础能力直接放 `pkg/<name>`）。
 >
-> **OIDC 分层约定**：OP（Provider）侧领域层在 `apps/auth/internal/core/oidcop`（仅 auth 使用，绑定 auth 实体与 zitadel op 框架）。**RP 侧 OIDC 能力的唯一事实源是独立 module `backend/sdk`**（`sdk/contract` claim 契约 + `sdk/rp` 验签/M2M/登出/目录客户端），它面向外部应用，依赖白名单只有标准库 + `jwt/v5`（`make sdk-check-deps` 强制），禁止引入 gin/gorm/redis/go-oidc/go-jose；`pkg/object/objauth`、`pkg/goidc` 只是指向 `sdk` 的**类型别名与 gin 薄壳**（零破坏迁移用），不得再新增 RP 侧实现。若未来出现第二个 OP 消费者，将 `oidcop` 上提。
+> **OIDC 分层约定**：OP（Provider）侧领域层在 `apps/auth/internal/core/oidcop`（仅 auth 使用，绑定 auth 实体与 zitadel op 框架）。**RP 侧 OIDC 能力的唯一事实源是独立 module `backend/sdk`**（`sdk/contract` claim 契约 + `sdk/rp` 验签/M2M/登出/目录客户端），它面向外部应用，依赖白名单只有标准库 + `jwt/v5`（`make sdk-check-deps` 强制），禁止引入 gin/gorm/redis/go-oidc/go-jose；`pkg/object/objauth`、`pkg/oidckit` 只是指向 `sdk` 的**类型别名与 gin 薄壳**（外加把 `oidc.*` 配置装配成 `sdk/rp.KeySource`，见 `pkg/oidckit/keys.go`），不得再新增 RP 侧实现。若未来出现第二个 OP 消费者，将 `oidcop` 上提。
 
 ### 命名规范
 

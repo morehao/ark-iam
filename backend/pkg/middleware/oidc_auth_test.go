@@ -56,12 +56,12 @@ func newOIDCAuthTestDB(t *testing.T) *gorm.DB {
 const testKID = "test-kid"
 
 // testKeySource 构造按 kid 取键的进程内 KeySource（等价于生产里 rp.NewKeysFromSet）。
-func testKeySource(key *rsa.PublicKey) KeySource {
+func testKeySource(key *rsa.PublicKey) rp.KeySource {
 	return rp.NewKeysFromSet(map[string]*rsa.PublicKey{testKID: key})
 }
 
 // testKeySourceWith 构造可容纳多把公钥的 KeySource（多 key 轮换用例）。
-func testKeySourceWith(keys map[string]*rsa.PublicKey) KeySource {
+func testKeySourceWith(keys map[string]*rsa.PublicKey) rp.KeySource {
 	return rp.NewKeysFromSet(keys)
 }
 
@@ -144,7 +144,7 @@ func TestRejectsInternalHS256Token(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
-	req.Header.Set(AuthHeaderKey, AuthBearer+makeInternalHS256Token(t, "person:88"))
+	req.Header.Set(authHeaderKey, authBearer+makeInternalHS256Token(t, "person:88"))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -163,7 +163,7 @@ func TestOIDCSSOValidationRejectsRevokedSession(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
-	req.Header.Set(AuthHeaderKey, AuthBearer+makeOIDCToken(t, key, "person:88", ""))
+	req.Header.Set(authHeaderKey, authBearer+makeOIDCToken(t, key, "person:88", ""))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -182,7 +182,7 @@ func TestOIDCSSOValidationAllowsActiveSession(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
-	req.Header.Set(AuthHeaderKey, AuthBearer+makeOIDCToken(t, key, "person:88", ""))
+	req.Header.Set(authHeaderKey, authBearer+makeOIDCToken(t, key, "person:88", ""))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -206,7 +206,7 @@ func TestOIDCSSOValidationMachineTokenBypassesRevokedSession(t *testing.T) {
 
 	// 机器令牌：即便自然人会话被撤销也应 200
 	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
-	req.Header.Set(AuthHeaderKey, AuthBearer+makeOIDCToken(t, key, "person:88", "machine"))
+	req.Header.Set(authHeaderKey, authBearer+makeOIDCToken(t, key, "person:88", "machine"))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -214,7 +214,7 @@ func TestOIDCSSOValidationMachineTokenBypassesRevokedSession(t *testing.T) {
 
 	// 非机器令牌：会话撤销应 401
 	req2 := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
-	req2.Header.Set(AuthHeaderKey, AuthBearer+makeOIDCToken(t, key, "person:88", ""))
+	req2.Header.Set(authHeaderKey, authBearer+makeOIDCToken(t, key, "person:88", ""))
 	w2 := httptest.NewRecorder()
 	r.ServeHTTP(w2, req2)
 	assert.Equal(t, http.StatusUnauthorized, w2.Code)
@@ -332,7 +332,7 @@ func TestRejectsTokenWithWrongIssuer(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
-	req.Header.Set(AuthHeaderKey, AuthBearer+s)
+	req.Header.Set(authHeaderKey, authBearer+s)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
@@ -359,7 +359,7 @@ func TestRejectsTokenWithWrongAudience(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
-	req.Header.Set(AuthHeaderKey, AuthBearer+s)
+	req.Header.Set(authHeaderKey, authBearer+s)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
@@ -391,7 +391,7 @@ func TestAcceptsTokenWithMatchingIssuerAndAudience(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
-	req.Header.Set(AuthHeaderKey, AuthBearer+s)
+	req.Header.Set(authHeaderKey, authBearer+s)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -408,7 +408,7 @@ func TestOIDCPersonWithoutUserRejected(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
-	req.Header.Set(AuthHeaderKey, AuthBearer+makeOIDCToken(t, key, "person:88", ""))
+	req.Header.Set(authHeaderKey, authBearer+makeOIDCToken(t, key, "person:88", ""))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
@@ -426,7 +426,7 @@ func TestOIDCUserIDFromTokenClaim(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
-	req.Header.Set(AuthHeaderKey, AuthBearer+makeOIDCTokenWithUser(t, key, "person:88", "", "tu-777"))
+	req.Header.Set(authHeaderKey, authBearer+makeOIDCTokenWithUser(t, key, "person:88", "", "tu-777"))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -445,7 +445,7 @@ func TestOIDCMachineTokenCarriesUserID(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
-	req.Header.Set(AuthHeaderKey, AuthBearer+makeOIDCTokenWithUser(t, key, "ak_1234567", "machine", "owner-9"))
+	req.Header.Set(authHeaderKey, authBearer+makeOIDCTokenWithUser(t, key, "ak_1234567", "machine", "owner-9"))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -486,7 +486,7 @@ func TestOIDCMultiKeyRotation(t *testing.T) {
 
 	for name, token := range map[string]string{"旧 key 存量 token": oldToken, "新 key token": newToken} {
 		req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
-		req.Header.Set(AuthHeaderKey, AuthBearer+token)
+		req.Header.Set(authHeaderKey, authBearer+token)
 		w := httptest.NewRecorder()
 		engine.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusOK, w.Code, "%s 应在过渡期内继续可用", name)
@@ -502,13 +502,13 @@ func TestOIDCMultiKeyRotation(t *testing.T) {
 	engine2.GET("/v1/test", func(ctx *gin.Context) { ctx.Status(http.StatusOK) })
 
 	reqOld := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
-	reqOld.Header.Set(AuthHeaderKey, AuthBearer+oldToken)
+	reqOld.Header.Set(authHeaderKey, authBearer+oldToken)
 	wOld := httptest.NewRecorder()
 	engine2.ServeHTTP(wOld, reqOld)
 	assert.Equal(t, http.StatusUnauthorized, wOld.Code, "摘除旧 key 后旧 token 必须立即失效")
 
 	reqNew := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
-	reqNew.Header.Set(AuthHeaderKey, AuthBearer+newToken)
+	reqNew.Header.Set(authHeaderKey, authBearer+newToken)
 	wNew := httptest.NewRecorder()
 	engine2.ServeHTTP(wNew, reqNew)
 	assert.Equal(t, http.StatusOK, wNew.Code, "新 active key 签发的 token 不受影响")

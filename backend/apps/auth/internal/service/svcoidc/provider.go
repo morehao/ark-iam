@@ -47,7 +47,7 @@ func isDevEnv() bool {
 // isSupportedRSAPrivateKeyBlock 判断 PEM 块是否为受支持的 RSA 私钥编码：
 // PKCS#1（"RSA PRIVATE KEY"）或 PKCS#8（"PRIVATE KEY"）。两者后续均由
 // ParsePKCS8PrivateKey 优先解析、ParsePKCS1PrivateKey 兜底，与 RP 侧
-// middleware.LoadSigningPublicKey 的宽容解析保持一致。
+// pkg/oidckit 的宽容解析保持一致。
 func isSupportedRSAPrivateKeyBlock(blockType string) bool {
 	return blockType == "RSA PRIVATE KEY" || blockType == "PRIVATE KEY"
 }

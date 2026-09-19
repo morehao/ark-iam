@@ -10,7 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
-	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
@@ -28,20 +28,20 @@ const DirectoryReadScope = "directory.read"
 //   - 404/503：由控制器按查询结果给出。
 func RequireDirectoryRead() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		identity := pkgmiddleware.OIDCIdentityFromContext(ctx)
-		if identity == nil {
+		ident := identity.OIDCIdentityFromContext(ctx)
+		if ident == nil {
 			// 未经过 OIDCAuth：绝不能放行，也不能当作"策略不满足"以外的语义。
 			abort(ctx, http.StatusUnauthorized, code.RpDirectoryUnauthorizedError, code.GetError(code.RpDirectoryUnauthorizedError).Msg)
 			return
 		}
-		if identity.TenantID == "" {
+		if ident.TenantID == "" {
 			abort(ctx, http.StatusForbidden, code.RpDirectoryForbiddenError, "令牌未携带租户作用域")
 			return
 		}
 		// 租户作用域必须来自**服务端派生的** tenant_id：显式声明一次，
 		// 后续 dao 查询按此隔离；不接受任何入参指定租户。
-		gincontext.SetTenantScope(ctx, gcontext.CurrentScope(identity.TenantID))
-		if !identity.HasScope(DirectoryReadScope) {
+		gincontext.SetTenantScope(ctx, gcontext.CurrentScope(ident.TenantID))
+		if !ident.HasScope(DirectoryReadScope) {
 			abort(ctx, http.StatusForbidden, code.RpDirectoryForbiddenError, "缺少 "+DirectoryReadScope+" 权限")
 			return
 		}

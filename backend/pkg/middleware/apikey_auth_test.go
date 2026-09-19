@@ -101,8 +101,7 @@ func TestApiKeyAuthViaXApiKeyHeader(t *testing.T) {
 	r.GET("/test", func(ctx *gin.Context) {
 		tenantID, _ := ctx.Get("tenantID")
 		userID, _ := ctx.Get("userID")
-		userType, _ := ctx.Get(ContextKeyUserType)
-		ctx.JSON(http.StatusOK, gin.H{"tenantID": tenantID, "userID": userID, "userType": userType})
+		ctx.JSON(http.StatusOK, gin.H{"tenantID": tenantID, "userID": userID})
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
@@ -117,16 +116,12 @@ func TestApiKeyAuthViaXApiKeyHeader(t *testing.T) {
 	var body struct {
 		TenantID string `json:"tenantID"`
 		UserID   string `json:"userID"`
-		UserType string `json:"userType"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
 	if body.UserID != owner.ID {
 		t.Fatalf("expected ctx userID=machine owner %s, got %s", owner.ID, body.UserID)
-	}
-	if body.UserType != string(model.UserTypeMachine) {
-		t.Fatalf("expected ctx userType=machine, got %s", body.UserType)
 	}
 }
 

@@ -16,7 +16,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/core/application"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/ark-iam/pkg/middleware"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objauth"
 	"github.com/morehao/ark-iam/pkg/sso"
@@ -206,7 +206,7 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 	// 解析不出应用（空 client_id / 客户端或应用不存在）一律 fail-closed。
 	// 机器凭证通道（API Key）不注入 person 身份，本函数在其之前就已按未认证拒绝。
 	// 该检查先于邀请解析：功能关闭时不向外暴露"邀请码是否存在"。
-	clientID := middleware.ClientIDFromContext(ctx)
+	clientID := identity.ClientIDFromContext(ctx)
 	appEntity, err := application.GetByClientID(ctx, clientID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.JoinTenant] resolve application by clientID fail, err:%v, clientID:%s", err, clientID)

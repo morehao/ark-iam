@@ -12,7 +12,7 @@ const (
 	oidcErrorLoginRequired = "login_required"
 )
 
-// SSOValidator 校验 SSO 会话标识是否仍然有效。命令者返回 nil 表示有效。
+// SSOValidator 校验 SSO 会话标识是否仍然有效。返回 nil 表示有效。
 type SSOValidator func(ctx *gin.Context, sessionID string) error
 
 // RedirectURIVerifier 校验 prompt=none 失败时要跳回的 redirect_uri 是否属于该 client。
@@ -24,9 +24,13 @@ type silentSSOConfig struct {
 	verifyRedirectURI RedirectURIVerifier
 }
 
+// SilentSSOOption 配置 SilentSSORequired。与 AuthOption 同形：只能由本包的
+// WithXxx 构造函数产出，调用方把它透传给 SilentSSORequired 即可。
+type SilentSSOOption func(*silentSSOConfig)
+
 // WithSessionValidator 注入 SSO 会话校验器。设置后，中间件会根据校验结果决定
 // 是否放行，而不再仅凭 cookie 是否存在判定 SSO 会话有效。
-func WithSessionValidator(v SSOValidator) func(*silentSSOConfig) {
+func WithSessionValidator(v SSOValidator) SilentSSOOption {
 	return func(c *silentSSOConfig) {
 		c.validate = v
 	}
@@ -34,13 +38,13 @@ func WithSessionValidator(v SSOValidator) func(*silentSSOConfig) {
 
 // WithRedirectURIVerifier 注入 redirect_uri 注册校验器。设置后，
 // prompt=none 静默登录失败的错误跳转只允许落到该 client 注册的回调地址。
-func WithRedirectURIVerifier(v RedirectURIVerifier) func(*silentSSOConfig) {
+func WithRedirectURIVerifier(v RedirectURIVerifier) SilentSSOOption {
 	return func(c *silentSSOConfig) {
 		c.verifyRedirectURI = v
 	}
 }
 
-func SilentSSORequired(ssoCookieName string, opts ...func(*silentSSOConfig)) gin.HandlerFunc {
+func SilentSSORequired(ssoCookieName string, opts ...SilentSSOOption) gin.HandlerFunc {
 	cfg := &silentSSOConfig{}
 	for _, opt := range opts {
 		opt(cfg)

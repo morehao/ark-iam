@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"math/big"
 	"os"
 	"path/filepath"
 	"testing"
@@ -134,6 +135,23 @@ func TestLoadSigningKeysLegacySingleKey(t *testing.T) {
 	}
 	if len(loaded.Published) != 1 || loaded.Published[kid] == nil {
 		t.Fatalf("expected exactly one published key %q, got %v", kid, loaded.Published)
+	}
+}
+
+// TestDeriveKeyID_CrossPackageGolden 锁定 kid 派生算法的跨包 golden。
+//
+// pkg/oidckit 为 RP 侧复用同一算法另存了一份实现（pkg 不能反向依赖 apps），
+// 两侧测试都断言这同一个字面量：pkg/oidckit/keys_test.go 的 TestDeriveKeyID_Golden
+// 与本用例。任一侧改了截断长度/编码方式，另一侧立刻失败——kid 与 OP 实际签发的
+// 不一致会导致全量请求 401，且症状只在运行时出现，必须靠测试兜住。
+func TestDeriveKeyID_CrossPackageGolden(t *testing.T) {
+	const modulusHex = "c3530e0d1a5d0b5f2e7c4a9b8d6f3c2e1a4b7d9f0c2e5a8b1d4f7c0e3a6b9d2c"
+	n, ok := new(big.Int).SetString(modulusHex, 16)
+	if !ok {
+		t.Fatalf("invalid modulus hex")
+	}
+	if got := DeriveKeyID(&rsa.PublicKey{N: n, E: 65537}); got != "DcYoXzsKCpT1wWLw_BYXaA" {
+		t.Fatalf("kid derivation drifted from pkg/oidckit golden: got %q, want %q", got, "DcYoXzsKCpT1wWLw_BYXaA")
 	}
 }
 

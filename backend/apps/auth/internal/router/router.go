@@ -5,6 +5,7 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/controller/ctroidc"
 	"github.com/morehao/ark-iam/auth/internal/middleware"
 	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
+	"github.com/morehao/ark-iam/pkg/oidckit"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
 
@@ -13,7 +14,7 @@ import (
 //
 // 返回本进程 OP 已发布公钥的进程内 KeySource：gateway 聚合部署时由它注入同进程的
 // 其它应用（见 gateway.Init），使内置应用无需网络预取自己的 JWKS、也无需挂载 OP 私钥。
-func RegisterRouter(engine *gin.Engine) pkgmiddleware.KeySource {
+func RegisterRouter(engine *gin.Engine) oidckit.KeySource {
 	oidcCtr := ctroidc.NewOIDCCtr()
 	registerRouter(engine, oidcCtr)
 	return oidcCtr.KeySource()

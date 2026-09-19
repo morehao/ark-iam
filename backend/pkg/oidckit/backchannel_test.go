@@ -1,4 +1,4 @@
-package goidc
+package oidckit
 
 import (
 	"context"

@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/config"
 	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
+	"github.com/morehao/ark-iam/pkg/oidckit"
 	"github.com/morehao/ark-iam/rpapi/internal/controller/ctrdirectory"
 	rpamiddleware "github.com/morehao/ark-iam/rpapi/internal/middleware"
 	"github.com/morehao/golib/biz/gserver/ginserver"
@@ -21,13 +22,13 @@ import (
 //
 // keySource 由调用方给出（app 层已按「注入优先、否则按配置自建」解析）：
 // 拿不到时中间件对每个请求 fail-closed 返回 401，绝不静默放行（不挂裸路由）。
-func RegisterRouter(engine *gin.Engine, conf *config.Config, keySource pkgmiddleware.KeySource) {
+func RegisterRouter(engine *gin.Engine, conf *config.Config, keySource oidckit.KeySource) {
 	registerRouter(engine, conf, keySource)
 }
 
 // registerRouter 装配路由的注入版入口：keySource 由调用方给出，
 // 使单测能用进程内 key set 走与生产完全一致的验签链（离线、无 JWKS 网络依赖）。
-func registerRouter(engine *gin.Engine, conf *config.Config, keySource pkgmiddleware.KeySource) {
+func registerRouter(engine *gin.Engine, conf *config.Config, keySource oidckit.KeySource) {
 	oidcOpts := []pkgmiddleware.AuthOption{pkgmiddleware.WithOIDCKeySource(keySource)}
 	if conf != nil {
 		if conf.OIDC.Issuer != "" {

@@ -155,7 +155,7 @@ receiver := logout.NewReceiver(
 http.Handle("/bc-logout", receiver) // 正确状态码：200/400/500
 ```
 
-`receiver.Handle(ctx, tokenStr)` 是唯一实现，gin 壳只做参数搬运（见 `backend/pkg/goidc`）。
+`receiver.Handle(ctx, tokenStr)` 是唯一实现，gin 壳只做参数搬运（见 `backend/pkg/oidckit`）。
 
 ## 6. 验证与自检
 

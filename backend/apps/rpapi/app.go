@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
-	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
+	"github.com/morehao/ark-iam/pkg/oidckit"
 	"github.com/morehao/ark-iam/rpapi/config"
 	"github.com/morehao/ark-iam/rpapi/internal/router"
 	"github.com/morehao/golib/biz/gserver/gindocs"
@@ -21,10 +21,10 @@ const AppName = "rpapi"
 // Init 装配 rpapi 应用。
 //
 // injectedKeySource 为 OP 公钥来源：gateway 单体部署由 auth 注入进程内 key set
-// （零网络调用）；独立部署传 nil，此时按本应用配置自建（见 pkgmiddleware.ResolveKeySource）。
-func Init(engine *gin.Engine, Conf *pkgconfig.Config, injectedKeySource pkgmiddleware.KeySource) {
+// （零网络调用）；独立部署传 nil，此时按本应用配置自建（见 oidckit.ResolveKeySource）。
+func Init(engine *gin.Engine, Conf *pkgconfig.Config, injectedKeySource oidckit.KeySource) {
 	config.Conf = Conf
-	keySource, keyErr := pkgmiddleware.ResolveKeySource(injectedKeySource, Conf)
+	keySource, keyErr := oidckit.ResolveKeySource(injectedKeySource, Conf)
 	if keyErr != nil {
 		// fail-closed：没有可用 KeySource 时目录路由照常挂载，但 OIDCAuth 会对每个
 		// 请求返回 401（x-api-key 通道除外，它是独立的凭证校验）。
