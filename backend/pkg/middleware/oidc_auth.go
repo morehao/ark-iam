@@ -11,7 +11,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/ark-iam/pkg/oidckit"
-	"github.com/morehao/ark-iam/sdk/contract"
 	"github.com/morehao/ark-iam/sdk/rp"
 
 	"github.com/morehao/golib/biz/gcontext"
@@ -20,13 +19,9 @@ import (
 )
 
 const (
-	AuthHeaderKey = "Authorization"
-	AuthBearer    = "Bearer "
+	authHeaderKey = "Authorization"
+	authBearer    = "Bearer "
 )
-
-// TokenClaims 是 access token 私有 claim 的兼容别名（真源在 sdk/contract）。
-// 保留该导出名是为了不破坏既有调用方的类型断言。
-type TokenClaims = contract.TokenClaims
 
 type authConfig struct {
 	skipPaths       []string
@@ -117,7 +112,7 @@ func OIDCAuth(opts ...AuthOption) gin.HandlerFunc {
 		// 机器凭证（API Key）不依赖浏览器 SSO 会话活性，见设计文档 §4.4。
 		// 仅以 x-api-key 头作为机器凭证通道，避免与 Authorization: Bearer 的 OIDC 通道冲突。
 		if ctx.GetHeader("x-api-key") != "" {
-			if AuthenticateApiKey(ctx) {
+			if authenticateApiKey(ctx) {
 				ctx.Next()
 				return
 			}
@@ -234,12 +229,12 @@ func abortUnauthorized(ctx *gin.Context, msg string) {
 }
 
 func extractToken(ctx *gin.Context) string {
-	auth := ctx.GetHeader(AuthHeaderKey)
+	auth := ctx.GetHeader(authHeaderKey)
 	if auth == "" {
 		return ""
 	}
-	if strings.HasPrefix(auth, AuthBearer) {
-		return strings.TrimPrefix(auth, AuthBearer)
+	if strings.HasPrefix(auth, authBearer) {
+		return strings.TrimPrefix(auth, authBearer)
 	}
 	return auth
 }

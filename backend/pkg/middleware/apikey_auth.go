@@ -16,10 +16,6 @@ import (
 	"github.com/morehao/golib/glog"
 )
 
-// ContextKeyUserType 上下文中的租户账号类型（member 真实用户 / machine 服务账号），
-// 由 API Key 鉴权按归属主体写入，供下游判断主体性质。
-const ContextKeyUserType = "iam_user_type"
-
 type ApiKeyAuthMiddleware interface {
 	Middleware() gin.HandlerFunc
 }
@@ -30,12 +26,21 @@ type apiKeyAuthMiddleware struct {
 	tenantDao *dao.TenantDao
 }
 
-func NewApiKeyAuthMiddleware() ApiKeyAuthMiddleware {
+// defaultApiKeyAuth 是包级默认实例，供 oidc_auth 的并行鉴权复用。
+// DAO 无请求态（DB handle 由 dbclient 在调用时解析），因此可安全跨请求复用，
+// 省掉每次回退鉴权都新建 3 个 DAO 的分配。
+var defaultApiKeyAuth = newDefaultApiKeyAuth()
+
+func newDefaultApiKeyAuth() *apiKeyAuthMiddleware {
 	return &apiKeyAuthMiddleware{
 		apiKeyDao: dao.NewApiKeyDao(),
 		userDao:   dao.NewUserDao(),
 		tenantDao: dao.NewTenantDao(),
 	}
+}
+
+func NewApiKeyAuthMiddleware() ApiKeyAuthMiddleware {
+	return newDefaultApiKeyAuth()
 }
 
 func newApiKeyAuthMiddlewareWithDao(apiKeyDao *dao.ApiKeyDao, userDao *dao.UserDao, tenantDao *dao.TenantDao) ApiKeyAuthMiddleware {
@@ -48,7 +53,7 @@ func newApiKeyAuthMiddlewareWithDao(apiKeyDao *dao.ApiKeyDao, userDao *dao.UserD
 
 func (m *apiKeyAuthMiddleware) Middleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		if ExtractApiKey(ctx) == "" {
+		if extractApiKey(ctx) == "" {
 			writeApiKeyUnauthorized(ctx, http.StatusUnauthorized, "missing or invalid API key")
 			return
 		}
@@ -60,12 +65,15 @@ func (m *apiKeyAuthMiddleware) Middleware() gin.HandlerFunc {
 }
 
 // Authenticate 校验当前请求携带的 API Key（支持 x-api-key 或 Authorization: Bearer），
-// 合法则注入租户/用户上下文并返回 true；非法或缺失时不写响应返回 false，交由调用方决定行为。
+// 合法则注入租户/用户上下文并返回 true。
+//
+// 返回 false 时**可能已经写入了 401/500 响应**（缺失凭证除外：那一种不写响应，
+// 由调用方决定如何处理）。因此调用方在 false 后必须直接 return，不得再写响应体。
 // 供 OIDC 并行鉴权（任一通过即放行）复用同一套校验逻辑。
 func (m *apiKeyAuthMiddleware) Authenticate(ctx *gin.Context) bool {
-	rawKey := ExtractApiKey(ctx)
+	rawKey := extractApiKey(ctx)
 	if rawKey == "" {
-		// 缺失 API Key：由调用方决定是否放行/拒绝，此处不写响应
+		// 缺失 API Key：属"本通道不适用"，不写响应，由调用方决定是否放行/拒绝
 		return false
 	}
 
@@ -150,24 +158,19 @@ func (m *apiKeyAuthMiddleware) Authenticate(ctx *gin.Context) bool {
 	// 写入租户作用域（类型化值 + gin Keys 投影），此后本请求的数据访问默认按该租户隔离。
 	gincontext.SetTenantScope(ctx, gcontext.CurrentScope(entity.TenantID))
 	ctx.Set(gcontext.KeyUserID, owner.ID)
-	ctx.Set(ContextKeyUserType, owner.UserType)
 
 	return true
 }
 
-// AuthenticateApiKey 便捷封装：基于默认 DAO 校验请求中的 API Key，合法则返回 true。
+// authenticateApiKey 便捷封装：基于默认 DAO 实例校验请求中的 API Key，合法则返回 true。
 // 供 oidcauth 等并行鉴权中间件在 OIDC token 校验失败时回退使用。
-func AuthenticateApiKey(ctx *gin.Context) bool {
-	return (&apiKeyAuthMiddleware{
-		apiKeyDao: dao.NewApiKeyDao(),
-		userDao:   dao.NewUserDao(),
-		tenantDao: dao.NewTenantDao(),
-	}).Authenticate(ctx)
+func authenticateApiKey(ctx *gin.Context) bool {
+	return defaultApiKeyAuth.Authenticate(ctx)
 }
 
-// ExtractApiKey 从 x-api-key 头或 Authorization: Bearer 头解析 API Key。
+// extractApiKey 从 x-api-key 头或 Authorization: Bearer 头解析 API Key。
 // 供 oidcauth 并行鉴权判断请求是否携带机器凭证。
-func ExtractApiKey(ctx *gin.Context) string {
+func extractApiKey(ctx *gin.Context) string {
 	if key := ctx.GetHeader("x-api-key"); key != "" {
 		return key
 	}
