@@ -142,6 +142,12 @@ oidc:
   `TestLoadSigningKeysMultiKey`：active 唯一性、kid 派生稳定性、重复/缺失/多个 active 均报错。
 - `backend/pkg/middleware/oidc_auth_test.go`
   `TestOIDCMultiKeyRotation`：多 key 并存时存量 token 可用；**摘除旧 key 后立即失效**。
+- `backend/pkg/oidckit/keys_test.go`（公钥来源装配，本轮由 `pkg/middleware` 迁入）
+  `TestDeriveKeyID_Golden`：`kid` 派生算法的固定黄金值；`TestLocalPublicKeys_KidPrecedence`：
+  显式 `kid` > 签名 key id > 派生值；`TestNewKeySourceFromConfig_UnreachableJWKSDoesNotFallBack`：
+  **JWKS 端点配了但不可用时必须报错，绝不静默回落到本地快照**（静默降级会把"轮换后全 401"
+  伪装成"能启动"）；`TestResolveKeySource_InjectedWinsWithoutNetwork`：网关注入时零网络调用。
+  其中 `kid` 黄金值与 `svcoidc` 侧同值断言，两处实现因此无法各自漂移。
 - `backend/sdk/rp/verifier_test.go`：unknown-kid 触发刷新（`TestKeys_UnknownKidTriggersRefresh`）、
   刷新限频 1/分钟（`TestKeys_RefreshRateLimited`）、拉取失败保留旧 key
   （`TestKeys_RefreshFailureKeepsOldKeys`）、陈旧密钥 fail-closed（`TestKeys_MaxKeyAgeFailClosed`）、
