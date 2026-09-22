@@ -92,6 +92,21 @@ oidc:
   # 配套的 RustFS 出站白名单见 docker-compose 的 RUSTFS_OUTBOUND_ALLOW_ORIGINS。
   issuer: "http://localhost:8100/oidc"
   frontendLoginURL: "http://localhost:4000/login"
+  # 内置控制台的部署地址（完整 URL，不做 origin 派生）：/install 页面回显"稍后从哪登录"，
+  # L1 引导把同样的值写进 application_client 回调白名单，因此"页面看到的"与"落库的"必然一致。
+  # 整段留空即取内置缺省值（本地开发端口 4001/4002，与历史硬编码值逐字节相同）。
+  # backChannelLogoutURI 留空：按 issuer + 标准路径派生（分体部署下控制台与 issuer 不同源时才需显式配置）。
+  consoles:
+    platformAdminWeb:
+      redirectURIs:
+        - "http://localhost:4001/auth/callback"
+      postLogoutRedirectURIs:
+        - "http://localhost:4001/login"
+    tenantAdminWeb:
+      redirectURIs:
+        - "http://localhost:4002/auth/callback"
+      postLogoutRedirectURIs:
+        - "http://localhost:4002/login"
   signingKeyID: "dev-oidc-key"
   signingPrivateKeyPath: "config/oidc-dev-key.pem"
   signingPrivateKeyPEM: ""
