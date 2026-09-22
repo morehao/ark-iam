@@ -44,8 +44,13 @@ test('全局登出后，SSO 会话失效且兄弟应用需重新认证', async (
 
   // 5. 清理兄弟应用本地 OIDC 用户（模拟该端本地会话已脱身），再访问 4002
   //    必须走完整 login-web，无法再静默 SSO —— 证明 SSO 会话已全局失效
-  await rp1.goto('http://localhost:4002/', { waitUntil: 'domcontentloaded', timeout: 20000 });
-  await rp1.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
+  // 这次导航要容忍 ERR_ABORTED：全局登出已生效，租户应用的 SPA 在装载过程中就会
+  // 通过 useSSOSessionProbe 发现会话死亡并发起**客户端跳转**（signinRedirect），
+  // 于是这次 goto 的导航被取消 —— 被取消本身正是"全局登出确实生效"的表现。
+  // 本次导航的目的只是"落到该应用 origin 上以便清理它的本地状态"，
+  // 真正的断言是后面那条"必须走完整 login-web"（waitForURL 到 4000/login）。
+  await rp1.goto('http://localhost:4002/', { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {});
+  await rp1.evaluate(() => { localStorage.clear(); sessionStorage.clear(); }).catch(() => {});
   await rp1.context().clearCookies();
   await rp1.goto('http://localhost:4002/', { waitUntil: 'domcontentloaded', timeout: 20000 });
   await rp1.waitForURL((url) => url.port === '4000' && url.pathname === '/login', { timeout: 30000 });
