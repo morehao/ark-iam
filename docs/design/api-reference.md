@@ -469,4 +469,4 @@ roles, err := client.Roles(ctx)                          // client.RolesTruncate
 | `adminEmail` / `adminPhone` | **至少填一个** |
 | `adminName` / `tenantName` / `issuer` | 可空，留空回落内置默认值（平台租户「平台运营中心」、issuer `http://localhost:8100/oidc` 等，见 `pkg/seed.definition.go`） |
 
-> 安装页（login-web 的 `/install`，开发端口 4000）把上述入参拆成 3 步（租户 / 管理员 / 内置数据确认），但**只有第 3 步发这一次写请求**——后端没有分步端点，因此不会出现"第一步成功、第二步失败"的半成品库。`BOOTSTRAP_TOKEN` 是**部署期一次性机密**，初始化完成后应从运行环境移除；`/install` 只应在受信网络内可达（部署时建议用 SSH 端口转发打开，见 `run-and-deploy.md` §2.4）。e2e 通过 `global-setup` 调这两个端点完成引导（令牌 `e2e-bootstrap-token`，管理员口令 `Admin123`，见 `e2e/README.md`）。
+> 安装页（login-web 的 `/install`，开发端口 4000）把上述入参拆成 3 步（租户 / 管理员 / 内置数据确认），但**只有第 3 步发这一次写请求**——后端没有分步端点，因此不会出现"第一步成功、第二步失败"的半成品库。`BOOTSTRAP_TOKEN` 是**部署期一次性机密**，初始化完成后应从运行环境移除；`/install` 只应在受信网络内可达（部署时建议用 SSH 端口转发打开，见 `run-and-deploy.md` §2.4）。e2e 通过 `global-setup` 调这两个端点完成引导（令牌 `e2e-bootstrap-token`，管理员口令 `Admin123`，见 `e2e/README.md`）；另有 `pnpm test:fresh` 在**全新库**上用浏览器真走一遍三步向导，并断言完成页回显了本次写入的 `seed.Report`（这是唯一一次内置数据写入，此后种子永久自锁，页面必须把它交代清楚——条数 + 可展开的 entity/key/action 明细）。
