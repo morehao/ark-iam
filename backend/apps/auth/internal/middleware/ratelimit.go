@@ -50,6 +50,15 @@ func PasswordChangeRateLimit() gin.HandlerFunc {
 	return NewLoginRateLimit("password:change:ip:")
 }
 
+// BootstrapRateLimit 初始化接口频率限流（按 IP）。
+//
+// 需要它的理由：/install/initialize 是**未认证写面**，且令牌是静态共享密钥——
+// 无限流时它可以被离线暴力猜测，也会成为一条无需鉴权的写入压力入口。
+// 这是与"初始化成功后永久 409 + 未配置 token 即不可用"并列的第三道闸门。
+func BootstrapRateLimit() gin.HandlerFunc {
+	return NewLoginRateLimit("install:initialize:ip:")
+}
+
 // NewLoginRateLimit 按指定 key 前缀构造登录/敏感操作的 IP 频率限流中间件。
 func NewLoginRateLimit(keyPrefix string) gin.HandlerFunc {
 	if dbclient.RedisCli == nil {
