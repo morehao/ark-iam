@@ -1,0 +1,275 @@
+/*
+ * /install 页面补充样式。
+ *
+ * 沿用 login-web 的既有做法：品牌区 / 卡片 / 输入框 / 主按钮等通用外观复用
+ * LoginPage.css 的类（.login-page/.login-brand/.login-main/.login-card/.form-group/.login-btn/
+ * .error-msg），本文件只承载向导特有部分——步骤条、字段提示、确认清单、控制台入口。
+ * 与 LoginPage.css 一致，login-web 不依赖 @ark-iam/ui，故此处允许字面色值
+ * （见 frontend/DESIGN.md Known Gaps #2）。
+ */
+
+/* 向导字段较多，卡片加宽并允许内部滚动，避免小屏下按钮被挤出视口 */
+.install-card {
+  width: 460px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+.install-form {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- 步骤条 ---------- */
+.install-steps {
+  list-style: none;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.install-step {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f5f6fa;
+  color: #8b93a7;
+}
+
+.install-step.is-active {
+  background: rgba(79, 110, 247, 0.1);
+  color: #4f6ef7;
+}
+
+.install-step.is-done {
+  color: #4f6ef7;
+}
+
+.install-step-index {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.install-step.is-active .install-step-index,
+.install-step.is-done .install-step-index {
+  background: #4f6ef7;
+  color: #fff;
+}
+
+.install-step-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.install-step-text strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.install-step-text em {
+  font-style: normal;
+  font-size: 11px;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.install-step-body {
+  min-height: 200px;
+}
+
+/* ---------- 字段级提示 ---------- */
+.field-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8b93a7;
+}
+
+.field-error {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #ff4d4f;
+}
+
+/* ---------- 第 ③ 步确认清单 ---------- */
+.install-summary {
+  background: #fafafa;
+  border: 1px solid #e6e9ef;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+
+.install-summary-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.install-summary ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.install-summary li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.install-summary li span {
+  color: #8b93a7;
+  flex-shrink: 0;
+}
+
+.install-summary li strong {
+  color: #1f2430;
+  font-weight: 500;
+  text-align: right;
+  word-break: break-all;
+}
+
+/* ---------- 操作区 ---------- */
+.install-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.install-actions .login-btn,
+.install-actions .ghost-btn {
+  flex: 1;
+  margin-top: 0;
+}
+
+.ghost-btn {
+  height: 46px;
+  border: 1px solid #d9d9d9;
+  border-radius: 10px;
+  background: #fff;
+  color: #333;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, border-color 0.2s;
+}
+
+.ghost-btn:hover {
+  border-color: #4f6ef7;
+  color: #4f6ef7;
+}
+
+.ghost-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---------- 阻塞 / 完成视图 ---------- */
+.install-state {
+  display: flex;
+  flex-direction: column;
+}
+
+.install-state-msg {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.install-summary-line {
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 16px;
+}
+
+.install-summary-line strong {
+  color: #1f2430;
+}
+
+.install-done-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(79, 110, 247, 0.12);
+  color: #4f6ef7;
+  font-size: 24px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+
+.install-link-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+/* ---------- 控制台入口 ---------- */
+.install-consoles {
+  margin-top: 24px;
+  border-top: 1px solid #e6e9ef;
+  padding-top: 18px;
+}
+
+.install-consoles-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.install-consoles ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.install-consoles a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border: 1px solid #e6e9ef;
+  border-radius: 10px;
+  text-decoration: none;
+  transition: border-color 0.2s;
+}
+
+.install-consoles a:hover {
+  border-color: #4f6ef7;
+}
+
+.install-consoles a strong {
+  font-size: 13px;
+  color: #4f6ef7;
+  font-weight: 600;
+}
+
+.install-consoles a span {
+  font-size: 12px;
+  color: #8b93a7;
+  word-break: break-all;
+}

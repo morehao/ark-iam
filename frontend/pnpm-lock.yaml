@@ -38,12 +38,18 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^4.3.0
         version: 4.3.3(vite@5.4.10(@types/node@25.9.2))
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1
       typescript:
         specifier: ^5.5.0
         version: 5.6.3
       vite:
         specifier: ^5.4.10
         version: 5.4.10(@types/node@25.9.2)
+      vitest:
+        specifier: ^2.1.4
+        version: 2.1.4(@types/node@25.9.2)(jsdom@25.0.1)
 
   apps/platform-admin-web:
     dependencies:

@@ -6,7 +6,7 @@ import { CONFIG } from '../config';
 // real-time-logout.spec.ts；本用例聚焦 cookie 层面的全局登出证据。
 test('全局登出后，SSO 会话失效且兄弟应用需重新认证', async ({ page, context }) => {
   const identifier = 'admin';
-  const password = 'admin123';
+  const password = CONFIG.password;
 
   // 1. 首次访问 3001（管理平台），应跳转 login-web（3000）并带 authRequestID
   await page.goto('http://localhost:3001/', { waitUntil: 'domcontentloaded', timeout: 20000 });

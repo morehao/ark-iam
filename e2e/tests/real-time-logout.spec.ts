@@ -13,7 +13,7 @@ import { CONFIG } from '../config';
 test.describe('实时统一登出', () => {
   test('Admin 登出后，持有 token 的 RP1 下一次请求即 401 并跳登录', async ({ page, context }) => {
     const identifier = 'admin';
-    const password = 'admin123';
+    const password = CONFIG.password;
 
     // 1. 登录 Admin（3001）
     await page.goto('http://localhost:3001/', { waitUntil: 'domcontentloaded', timeout: 20000 });
@@ -82,7 +82,7 @@ test.describe('实时统一登出', () => {
     request,
   }) => {
     const identifier = 'admin';
-    const password = 'admin123';
+    const password = CONFIG.password;
 
     // 1. 登录 Admin（3001），建立 SSO 会话并签发 token（触发 back-channel 登记）
     await page.goto('http://localhost:3001/', { waitUntil: 'domcontentloaded', timeout: 20000 });

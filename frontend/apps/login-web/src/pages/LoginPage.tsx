@@ -1,5 +1,13 @@
 import { useState, useEffect, type FormEvent } from 'react'
-import { oidcLogin, oidcSelectTenant, registerPerson, createTenant, getLoginConfig, oidcChangePassword } from '../api'
+import {
+  oidcLogin,
+  oidcSelectTenant,
+  registerPerson,
+  createTenant,
+  getLoginConfig,
+  oidcChangePassword,
+  installRedirectForError,
+} from '../api'
 import '../LoginPage.css'
 
 type Mode = 'login' | 'register' | 'createTenant' | 'changePassword'
@@ -32,6 +40,16 @@ export default function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [notice, setNotice] = useState('')
 
+  // 系统尚未初始化（107004）时业务端点整体不可用：把用户送回 /install，而不是停在登录表单反复失败。
+  const failWith = (err: unknown, fallback: string) => {
+    const redirect = installRedirectForError(err)
+    if (redirect) {
+      window.location.href = redirect
+      return
+    }
+    setError(err instanceof Error && err.message ? err.message : fallback)
+  }
+
   useEffect(() => {
     if (!authRequestID) {
       setError('缺少认证请求 ID，请从应用重新发起登录')
@@ -39,7 +57,12 @@ export default function LoginPage() {
     }
     getLoginConfig({ authRequestID })
       .then((resp) => setAllowRegister(resp.allowPersonCreateTenant))
-      .catch(() => setAllowRegister(false))
+      .catch((err) => {
+        setAllowRegister(false)
+        if (installRedirectForError(err)) {
+          window.location.href = '/install'
+        }
+      })
   }, [authRequestID])
 
   const handleSubmit = async (e: FormEvent) => {
@@ -85,7 +108,7 @@ export default function LoginPage() {
         setError('登录响应异常，请重试')
       }
     } catch (err: any) {
-      setError(err?.message || '登录失败，请重试')
+      failWith(err, '登录失败，请重试')
     } finally {
       setLoading(false)
     }
@@ -103,7 +126,7 @@ export default function LoginPage() {
         setError('选择租户响应异常，请重试')
       }
     } catch (err: any) {
-      setError(err?.message || '选择租户失败，请重试')
+      failWith(err, '选择租户失败，请重试')
     } finally {
       setLoading(false)
     }
@@ -162,7 +185,7 @@ export default function LoginPage() {
       }
       setError('当前应用未开放自助注册')
     } catch (err: any) {
-      setError(err?.message || '注册失败，请重试')
+      failWith(err, '注册失败，请重试')
     } finally {
       setLoading(false)
     }
@@ -202,7 +225,7 @@ export default function LoginPage() {
       setMode('login')
       setNotice('密码修改成功，请使用新密码登录')
     } catch (err: any) {
-      setError(err?.message || '修改密码失败，请重试')
+      failWith(err, '修改密码失败，请重试')
     } finally {
       setLoading(false)
     }
@@ -234,7 +257,7 @@ export default function LoginPage() {
         setError('创建租户响应异常，请重试')
       }
     } catch (err: any) {
-      setError(err?.message || '创建租户失败，请重试')
+      failWith(err, '创建租户失败，请重试')
     } finally {
       setLoading(false)
     }
