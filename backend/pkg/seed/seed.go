@@ -145,7 +145,7 @@ func bootstrapAll(ctx context.Context, db *gorm.DB, rep *Report, def Definition)
 		return err
 	}
 
-	// 4. 角色（admin 归属平台管理后台；tenant_admin 由第 10 步的权限开通统一创建）
+	// 4. 角色（admin 归属平台管理后台；tenant_admin 由第 9 步的权限开通统一创建）
 	adminRole, err := seedRoles(ctx, db, rep, tenant, adminApp)
 	if err != nil {
 		return err
@@ -157,12 +157,12 @@ func bootstrapAll(ctx context.Context, db *gorm.DB, rep *Report, def Definition)
 		return err
 	}
 
-	// 6. 角色-菜单关联（仅平台管理后台 admin 角色；tenant_admin 由第 10 步开通时授权）
+	// 6. 角色-菜单关联（仅平台管理后台 admin 角色；tenant_admin 由第 9 步开通时授权）
 	if err := seedRoleMenus(ctx, db, tenant, adminRole, menus); err != nil {
 		return err
 	}
 
-	// 7. 租户应用订阅（平台管理后台 platform_admin；租户管理后台 tenant_admin 由第 10 步开通时订阅）
+	// 7. 租户应用订阅（平台管理后台 platform_admin；租户管理后台 tenant_admin 由第 9 步开通时订阅）
 	if err := seedTenantApplications(ctx, db, rep, tenant, adminApp); err != nil {
 		return err
 	}
@@ -347,14 +347,15 @@ func seedRoles(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.Tena
 		rep.created(model.SeedEntityRole, entity.Name)
 		return entity, nil
 	}
-	// 幂等回填：存量内置角色的 admin_type 随种子定义更新
-	if entity.AdminType != adminType {
-		if uerr := db.Model(&model.RoleEntity{}).Where("id = ?", entity.ID).
-			Update("admin_type", adminType).Error; uerr != nil {
-			return nil, fmt.Errorf("seed admin role update fail: %w", uerr)
-		}
-		entity.AdminType = adminType
-	}
+	// 已有角色直接复用，**不做任何回写**——包括 admin_type。
+	//
+	// 这里曾经有一段"幂等回填：存量内置角色的 admin_type 随种子定义更新"，
+	// 属跨版本写入的残留，已删除，理由有两条：
+	//   1) 不可达：Bootstrap 只在库未初始化时执行且成功即永久自锁，
+	//      走到这个分支意味着库内已存在内置角色，那不是本函数该处理的场景；
+	//   2) 语义错误：`role.admin_type` 在字段权威矩阵里是 immutable，
+	//      控制台已拒改（见 svctenant 的角色更新校验），因此这里"收敛"不到任何运维改动，
+	//      只会让读者以为种子仍具备跨版本写入能力——而这次改造的全部意义就是取消它。
 	return entity, nil
 }
 
