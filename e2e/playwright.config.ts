@@ -9,7 +9,7 @@ export default defineConfig({
   globalSetup: './global-setup.ts',
   globalTeardown: './global-teardown.ts',
   use: {
-    baseURL: 'http://localhost:3002',
+    baseURL: 'http://localhost:4002',
     headless: true,
     browserName: 'chromium',
     ignoreHTTPSErrors: true,

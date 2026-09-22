@@ -1,8 +1,8 @@
 export const CONFIG = {
   issuer: 'http://localhost:8100/oidc',
-  rp1Url: 'http://localhost:3002/',
-  loginWebUrl: 'http://localhost:3000/login',
-  platformAdminUrl: 'http://localhost:3001/',
+  rp1Url: 'http://localhost:4002/',
+  loginWebUrl: 'http://localhost:4000/login',
+  platformAdminUrl: 'http://localhost:4001/',
   identifier: 'admin',
   // 管理员口令由初始化页面指定（首次引导时经 POST /install/initialize 写入）。
   // 必须满足服务端 credential.ValidateStrength：含大写字母、小写字母与数字。

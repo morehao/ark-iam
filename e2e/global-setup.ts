@@ -39,7 +39,7 @@ const SERVICES: ServiceDef[] = [
   },
   {
     name: 'login-web',
-    port: 3000,
+    port: 4000,
     cmd: 'pnpm',
     args: ['--filter', '@ark-iam/login-web', 'dev'],
     cwd: FRONTEND_ROOT,
@@ -47,7 +47,7 @@ const SERVICES: ServiceDef[] = [
   },
   {
     name: 'platform-admin-web',
-    port: 3001,
+    port: 4001,
     cmd: 'pnpm',
     args: ['--filter', '@ark-iam/platform-admin-web', 'dev'],
     cwd: FRONTEND_ROOT,
@@ -55,7 +55,7 @@ const SERVICES: ServiceDef[] = [
   },
   {
     name: 'tenant-admin-web',
-    port: 3002,
+    port: 4002,
     cmd: 'pnpm',
     args: ['--filter', '@ark-iam/tenant-admin-web', 'dev'],
     cwd: FRONTEND_ROOT,

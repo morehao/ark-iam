@@ -4,7 +4,7 @@ import { CONFIG } from '../config';
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function isLoginWebUrl(url: string): boolean {
-  return url.includes('localhost:3000') && url.includes('/login');
+  return url.includes('localhost:4000') && url.includes('/login');
 }
 
 function isAuthCallbackUrl(url: string): boolean {
@@ -12,11 +12,11 @@ function isAuthCallbackUrl(url: string): boolean {
 }
 
 function isRp1Url(url: string): boolean {
-  return url.includes('localhost:3002');
+  return url.includes('localhost:4002');
 }
 
 function isAdminUrl(url: string): boolean {
-  return url.includes('localhost:3001');
+  return url.includes('localhost:4001');
 }
 
 export async function fillLoginWebCredentials(page: Page): Promise<void> {

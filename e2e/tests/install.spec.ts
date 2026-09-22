@@ -62,10 +62,10 @@ test('系统已完成初始化：status 如实报告且引导入口自锁', asyn
 test('已初始化时 /install 页面展示"已完成"而不是可提交的表单', async ({ page }) => {
   // 只断言"页面上不存在可提交的初始化表单"这类**结构性**事实，
   // 不锁定具体文案（文案属前端可迭代内容，锁死会让每次改字都要改 e2e）。
-  await page.goto('http://localhost:3000/install', { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await page.goto('http://localhost:4000/install', { waitUntil: 'domcontentloaded', timeout: 20000 });
   // 初始化表单必然包含口令输入；已初始化页不应有它
   await expect(page.locator('input[type="password"]')).toHaveCount(0, { timeout: 15000 });
-  // 页面应给出控制台入口（至少一个指向 3001/3002 的链接）
-  const consoleLinks = page.locator('a[href*="3001"], a[href*="3002"]');
+  // 页面应给出控制台入口（至少一个指向 4001/4002 的链接）
+  const consoleLinks = page.locator('a[href*="4001"], a[href*="4002"]');
   await expect(consoleLinks.first()).toBeVisible({ timeout: 15000 });
 });

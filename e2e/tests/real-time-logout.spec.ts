@@ -15,21 +15,21 @@ test.describe('实时统一登出', () => {
     const identifier = 'admin';
     const password = CONFIG.password;
 
-    // 1. 登录 Admin（3001）
-    await page.goto('http://localhost:3001/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    // 1. 登录 Admin（4001）
+    await page.goto('http://localhost:4001/', { waitUntil: 'domcontentloaded', timeout: 20000 });
     await page.waitForURL(
-      (url) => url.port === '3000' && url.pathname === '/login' && url.searchParams.has('authRequestID'),
+      (url) => url.port === '4000' && url.pathname === '/login' && url.searchParams.has('authRequestID'),
       { timeout: 30000 },
     );
     await page.fill('#identifier', identifier);
     await page.fill('#password', password);
     await page.click('button[type="submit"]');
-    await page.waitForURL((url) => url.port === '3001' && !url.pathname.includes('/auth/callback'), { timeout: 30000 });
+    await page.waitForURL((url) => url.port === '4001' && !url.pathname.includes('/auth/callback'), { timeout: 30000 });
     await expect(page.getByText('仪表盘', { exact: true }).first()).toBeVisible({ timeout: 30000 });
 
-    // 2. 同 context 新开标签页访问 RP1（3002），应免密 SSO 登录
+    // 2. 同 context 新开标签页访问 RP1（4002），应免密 SSO 登录
     const rp1 = await context.newPage();
-    await rp1.goto('http://localhost:3002/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await rp1.goto('http://localhost:4002/', { waitUntil: 'domcontentloaded', timeout: 20000 });
     await expect(rp1.getByText('部门管理', { exact: true }).first()).toBeVisible({ timeout: 30000 });
 
     // 3. 确认 RP1 本地持有未过期的 access token（未清理任何状态）
@@ -61,7 +61,7 @@ test.describe('实时统一登出', () => {
     await page.locator('.ant-avatar').click();
     await page.waitForTimeout(500);
     await page.locator('.ant-dropdown-menu-item', { hasText: '退出登录' }).click();
-    await page.waitForURL((url) => url.port === '3000', { timeout: 20000 });
+    await page.waitForURL((url) => url.port === '4000', { timeout: 20000 });
     console.log('>>> Admin 全局登出完成');
 
     // 5. 兄弟应用 RP1 刷新页面：应触发 API 请求，被 401 拒绝后跳回登录页
@@ -69,7 +69,7 @@ test.describe('实时统一登出', () => {
     await rp1.reload({ waitUntil: 'domcontentloaded', timeout: 15000 });
     // 401 后 request.ts 跳转 '/' → signinRedirect → OP 无 SSO cookie → login-web
     await rp1.waitForURL(
-      (url) => (url.port === '3000' && url.pathname === '/login') || (url.port === '3002' && url.pathname === '/login'),
+      (url) => (url.port === '4000' && url.pathname === '/login') || (url.port === '4002' && url.pathname === '/login'),
       { timeout: 30000 },
     );
     console.log('>>> RP1 刷新后即时登出，跳回登录页');
@@ -84,16 +84,16 @@ test.describe('实时统一登出', () => {
     const identifier = 'admin';
     const password = CONFIG.password;
 
-    // 1. 登录 Admin（3001），建立 SSO 会话并签发 token（触发 back-channel 登记）
-    await page.goto('http://localhost:3001/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    // 1. 登录 Admin（4001），建立 SSO 会话并签发 token（触发 back-channel 登记）
+    await page.goto('http://localhost:4001/', { waitUntil: 'domcontentloaded', timeout: 20000 });
     await page.waitForURL(
-      (url) => url.port === '3000' && url.pathname === '/login' && url.searchParams.has('authRequestID'),
+      (url) => url.port === '4000' && url.pathname === '/login' && url.searchParams.has('authRequestID'),
       { timeout: 30000 },
     );
     await page.fill('#identifier', identifier);
     await page.fill('#password', password);
     await page.click('button[type="submit"]');
-    await page.waitForURL((url) => url.port === '3001' && !url.pathname.includes('/auth/callback'), { timeout: 30000 });
+    await page.waitForURL((url) => url.port === '4001' && !url.pathname.includes('/auth/callback'), { timeout: 30000 });
     await expect(page.getByText('仪表盘', { exact: true }).first()).toBeVisible({ timeout: 30000 });
 
     // 2. 清理接收端历史记录，确保断言的是本次登出产生的通知
@@ -103,7 +103,7 @@ test.describe('实时统一登出', () => {
     await page.locator('.ant-avatar').click();
     await page.waitForTimeout(500);
     await page.locator('.ant-dropdown-menu-item', { hasText: '退出登录' }).click();
-    await page.waitForURL((url) => url.port === '3000', { timeout: 20000 });
+    await page.waitForURL((url) => url.port === '4000', { timeout: 20000 });
     console.log('>>> Admin 全局登出完成');
 
     // 4. 等待 back-channel worker 消费队列并推送 logout_token 到已登记接收端
