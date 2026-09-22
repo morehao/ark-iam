@@ -462,10 +462,43 @@ export function CompletionScreen({ result, consoles }: { result: InstallInitiali
       <p className="install-summary-line">
         管理员账号：<strong>{result.adminUsername || '-'}</strong>
       </p>
+      <InstallReport result={result} />
       <a className="login-btn install-link-btn" href={resolveLoginURL(result.loginURL)}>
         前往登录
       </a>
       <ConsoleLinks consoles={consoles} />
+    </div>
+  )
+}
+
+/**
+ * 回显本次写入的 `seed.Report`（AC-2 要求"提交后展示 Report"）。
+ *
+ * 为什么必须给运维看这份清单：这是**唯一一次**内置数据写入，此后种子永久自锁。
+ * 页面不显示，就等于"系统背着你写了 26 行数据，而且以后再没有任何机制会告诉你写了什么"。
+ * 明细默认折叠（全展开会把完成页撑得很长，而这页还要给出控制台入口），
+ * 但**条数与明细入口始终可见**。
+ */
+function InstallReport({ result }: { result: InstallInitializeResp }) {
+  const changes = result.report?.changes ?? []
+  if (changes.length === 0) return null
+  return (
+    <div className="install-report">
+      <p className="install-summary-line">
+        内置数据：共写入 <strong>{changes.length}</strong> 项
+      </p>
+      <details>
+        <summary>查看写入明细</summary>
+        <ul>
+          {changes.map((change, index) => (
+            <li key={`${change.entity}:${change.key}:${index}`}>
+              <span className="install-report-entity">{change.entity}</span>
+              <strong>{change.key}</strong>
+              <em>{change.action}</em>
+            </li>
+          ))}
+        </ul>
+      </details>
     </div>
   )
 }

@@ -273,3 +273,58 @@
   color: #8b93a7;
   word-break: break-all;
 }
+
+/* 写入明细（seed.Report 回显）：默认折叠，条数与入口始终可见 */
+.install-report {
+  margin-top: 14px;
+  text-align: left;
+}
+
+.install-report details {
+  border: 1px solid #e6e9ef;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.install-report summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: #4f6ef7;
+  font-weight: 600;
+}
+
+.install-report ul {
+  list-style: none;
+  margin-top: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.install-report li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  border-bottom: 1px dashed #f0f2f5;
+}
+
+.install-report li:last-child {
+  border-bottom: none;
+}
+
+.install-report-entity {
+  color: #8a94a6;
+  min-width: 120px;
+}
+
+.install-report li strong {
+  color: #333;
+  font-weight: 600;
+}
+
+.install-report li em {
+  margin-left: auto;
+  font-style: normal;
+  color: #8a94a6;
+}

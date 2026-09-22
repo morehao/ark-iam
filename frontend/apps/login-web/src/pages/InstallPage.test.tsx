@@ -95,3 +95,39 @@ describe('AC-12：第③步回显的控制台地址来自服务端', () => {
     expect(html).toContain(`href="${result.loginURL}"`)
   })
 })
+
+// AC-2：提交成功后必须**展示 Report**（本次唯一一次内置数据写入的清单）。
+// 页面此前只显示管理员账号与控制台入口，`report.changes` 直接丢弃——
+// 那样运维看不到系统到底写了什么，而种子此后永久自锁、再没有任何机制会告知。
+describe('AC-2：完成页回显 seed.Report', () => {
+  const withChanges: InstallInitializeResp = {
+    ...result,
+    report: {
+      tenantId: 't-1',
+      changes: [
+        { entity: 'tenant', key: '平台运营中心', action: 'created' },
+        { entity: 'menu', key: '部门管理', action: 'created' },
+        { entity: 'application_client', key: 'tenant_admin_web', action: 'created' },
+      ],
+    },
+  }
+
+  it('显示写入条数与每一条明细（entity/key/action）', () => {
+    const html = render(withChanges)
+    expect(html).toContain('共写入')
+    expect(html).toContain('3')
+    expect(html).toContain('查看写入明细')
+    expect(html).toContain('平台运营中心')
+    expect(html).toContain('部门管理')
+    expect(html).toContain('tenant_admin_web')
+    expect(html).toContain('created')
+    // 明细默认折叠，但内容必须在 DOM 里（运维展开即见，不依赖二次请求）
+    expect(html).toContain('<details>')
+  })
+
+  it('Report 为空时不渲染该区块（而不是显示"共写入 0 项"）', () => {
+    const html = render({ ...withChanges, report: { tenantId: 't-1', changes: [] } })
+    expect(html).not.toContain('共写入')
+    expect(html).not.toContain('查看写入明细')
+  })
+})
