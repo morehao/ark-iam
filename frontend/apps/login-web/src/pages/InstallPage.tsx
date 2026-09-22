@@ -450,7 +450,10 @@ function BlockedScreen({
   )
 }
 
-function CompletionScreen({ result, consoles }: { result: InstallInitializeResp; consoles?: InstallConsoles }) {
+// CompletionScreen 导出仅为可测：AC-12 要求"回显的控制台地址 = 服务端配置值"，
+// 而这条链路的最后一跳（consoles -> <a href>）只有渲染出来才能断言。
+// 用 react-dom/server 的 renderToStaticMarkup，不引入 testing-library/jest-dom。
+export function CompletionScreen({ result, consoles }: { result: InstallInitializeResp; consoles?: InstallConsoles }) {
   return (
     <div className="install-state">
       <div className="install-done-badge">✓</div>
