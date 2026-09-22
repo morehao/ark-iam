@@ -275,7 +275,7 @@ func (svc *tenantSvc) Update(ctx *gin.Context, req *dtotenant.TenantUpdateReq) e
 		return code.GetError(code.TenantSuspendSelfForbiddenError)
 	}
 	// 平台自运营租户不可挂起：它是平台控制台自身所在租户，挂起会导致整栈失联且无恢复路径。
-	// 与种子的 status=reconcile 不变式同源（字段权威矩阵），此处拒写以消除双写者。
+	// 这是字段权威矩阵里 tenant.status=immutable 的控制台拒写点（L1 只在创建时写入 status）。
 	if tenantStatus == model.TenantStatusSuspended && tenantEntity.Code == model.SeedPlatformTenantCode {
 		glog.Errorf(ctx, "[svctenant.TenantUpdate] refuse to suspend platform tenant, tenantID:%s, req:%s", req.TenantID, gutil.ToJsonString(req))
 		return code.GetError(code.TenantPlatformSuspendForbiddenError)

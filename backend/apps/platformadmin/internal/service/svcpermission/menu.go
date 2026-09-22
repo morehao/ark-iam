@@ -99,8 +99,9 @@ func (svc *menuSvc) Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (
 		glog.Errorf(ctx, "[svcpermission.CreateMenu] 菜单编码不得为空, req:%s", gutil.ToJsonString(req))
 		return nil, code.GetError(code.MenuCreateError)
 	}
-	// 菜单可挂到任意应用（含内置应用）：控制台自建行 seed_key 恒为空，种子不会认领它；
-	// 内置菜单的删除则靠软删"墓碑"保证持久生效（见 pkg/seed.menuSeedKeyRemoved）。
+	// 菜单可挂到任意应用（含内置应用）：控制台自建行 seed_key 恒为空，L1 引导不会认领它；
+	// 内置菜单的删除也不需要"墓碑"保护——L1 已初始化即永久自锁（见 pkg/seed.Bootstrap），
+	// 不存在第二次写入，因此删除后不会被建回来。
 	// 因此"按需扩展/调整菜单"不再需要改代码发版。
 	ok, err := menuParentUsable(ctx, req.AppID, req.ParentID)
 	if err != nil {

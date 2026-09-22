@@ -348,7 +348,7 @@ e2e-test:
 # 菜单行归运维后 L1 只播种一次，升级带来的新菜单不会自动下发，必须照本清单手工录入。
 print-builtin-menus:
 	@echo "📋 正在生成内置菜单清单..."
-	@cd backend && go work sync && go run ./pkg/cmd/printbuiltinmenus
+	@cd backend && go run ./pkg/cmd/printbuiltinmenus
 
 # 列出所有可用的应用程序
 list-apps:

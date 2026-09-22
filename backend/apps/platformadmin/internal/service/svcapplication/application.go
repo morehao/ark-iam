@@ -171,9 +171,9 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.Applicat
 	}, nil
 }
 
-// 内置应用的写入约束：字段权威矩阵里 application 的 reconcile 字段只有 source（内置标记），
-// 而 source 不在 ApplicationUpdateReq 中（控制台无写入入口），故 Update 无需再做种子字段校验。
-// 名称/描述/启停/排序/logo/主页都归运维（create_only）：控制台改完重启不被种子回写。
+// 内置应用的写入约束：字段权威矩阵里 application 的 immutable 字段是 source（内置标记）与
+// code（编码），两者都不在 ApplicationUpdateReq 中（source 控制台无写入入口，code 由下方显式拒绝）。
+// 名称/描述/启停/排序/logo/主页都归运维（create_only）：控制台改完不被 L1 回写。
 // code（应用编码）自建应用可改，**内置应用拒改**：控制台菜单入口仍按该编码定位
 // （svcpermission.MyTree 按 platform_admin 查应用、tenantadmin loadConsoleApps 只保留 tenant_admin），
 // 改名会当场让对应控制台侧边栏失联且无法从界面恢复（真要换属版本级动作）。种子定位用 seed_key，与此无关。

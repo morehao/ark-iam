@@ -1,23 +1,29 @@
-// Package seed 提供 IAM 基础种子数据的幂等写入能力。
+// Package seed 提供 IAM 内置数据的一次性引导能力（L1 Bootstrap）。
 //
-// 替代历史 MySQL 方言建表/种子脚本（scripts/sql/*.sql 已废弃删除）：服务启动时
-// 基于唯一键（code / client_id / username 等）查重，不存在则创建；已存在时不盲目跳过——
-// 写哪些字段由 pkg/model.SeedFieldAuthorities（字段权威矩阵）决定，默认归运维
-// （create_only：种子只在创建时写），仅定位键与安全不变式由种子每次启动收敛（reconcile）。
-// 因此可安全重复执行，兼容全新数据库与已有数据的升级场景，且控制台改过的数据重启不被收回。
+// 唯一触发者是初始化页面（POST /install/initialize）；**启动期不做任何数据写入**，
+// 只执行 AutoMigrate 建表（见 pkg/model.AutoMigrateAll）。库是否已初始化由平台租户行
+// 判定（IsInitialized），已初始化后 Bootstrap 永久自锁，不再写任何数据。
+//
+// 本包因此只有一条写通道（Bootstrap）：按不可见的种子身份键 seed_key 认行、缺失则创建。
+// 内置行的**后续调整一律归运维**（各控制台页面）：本包不再做跨版本的字段收敛、改名或
+// 退役清理——那些机制（reconcileFields / seedMigrations / retiredMenus / 墓碑跳过）
+// 已随「内置数据交给运维」一并删除，详见 docs/design/system-design.md §4.5。
+// 新增版本菜单由 `make print-builtin-menus` 输出清单、运维在「菜单管理」页补录。
+//
+// 字段权威矩阵（pkg/model.SeedFieldAuthorities）保留为**声明 + 契约测试**：它说明哪些
+// 字段在 L1 创建时写入、之后控制台必须拒写，但执行体是各 service 的拒写点，不是本包。
+//
 // 自 string-id 改造起所有主键为字符串（UUID v7），实体间关联在写入时动态接线，
 // 不再依赖固定的数字主键。
 //
-// 业务约束：用户必须从属于某个部门（部门节点），种子管理员同样从属于
-// 租户的顶级部门（根部门节点，seedRootDepartment 创建），归属关系为
-// member 行政主部门。
+// 业务约束：用户必须从属于某个部门（部门节点），引导管理员同样从属于
+// 租户的顶级部门（根部门节点，seedRootDepartment 创建），归属关系为 primary 行政主部门。
 package seed
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/morehao/ark-iam/pkg/credential"
@@ -35,9 +41,8 @@ const (
 	// （pkg/core/tenant.GenerateCode：t_<12 位随机 hex>）一致——同前缀、后缀可读且固定。
 	// 自动生成编码的随机段只用小写 hex，"platform" 含非 hex 字符，故两者永不冲突。
 	tenantCodePlatform = model.SeedPlatformTenantCode
-	// tenantCodePlatformLegacy 历史种子编码（旧版本为 "platform"）。
-	// 启动时若命中该编码的平台租户，原地改名（保留主键，避免租户重建导致引用失联）。
-	tenantCodePlatformLegacy = "platform"
+	// changeActionCreated Report 里唯一的动作：L1 只创建，不更新、不改名。
+	changeActionCreated = "created"
 
 	// 平台租户名（defaultTenantName）在 definition.go：它是 L1 的输入（Definition.TenantName），
 	// 不再是包内常量；此处保留说明，避免读者按旧路径查找。
@@ -51,91 +56,17 @@ const (
 	appCodeAdmin       = "platform_admin"
 	appCodeTenantAdmin = "tenant_admin"
 
-	// appCodeAdminLegacy / appCodeTenantAdminLegacy 历史种子编码（旧版本为连字符形态）。
-	// 启动时若命中旧编码，原地改名（保留主键，避免改编码规则后重复建出第二个内置应用——
-	// 菜单、租户订阅、角色都挂在 app_id 上）。
-	appCodeAdminLegacy       = "platform-admin"
-	appCodeTenantAdminLegacy = "tenant-admin"
-
 	// 内置 OAuth 客户端编码（= OIDC client_id）取自 pkg/model 的种子身份常量：
 	// 网关侧用它做令牌 audience 校验，两处必须是同一个值。
 	oauthClientPlatformAdminWeb = model.SeedBuiltinClientPlatformAdminWeb
 	oauthClientTenantAdminWeb   = model.SeedBuiltinClientTenantAdminWeb
-	// oauthClientPlatformAdminWebLegacy / oauthClientTenantAdminWebLegacy 历史种子编码（连字符形态）。
-	// 启动时若命中旧编码，原地改名（保留主键，避免编码规则调整后重复建出第二个内置客户端——
-	// refresh_token、application_client_secret 等都以客户端 id 为外键）。
-	oauthClientPlatformAdminWebLegacy = "platform-admin-web"
-	oauthClientTenantAdminWebLegacy   = "tenant-admin-web"
 )
 
-// seedMigration 一次性改名条目：仅当字段当前值等于 from 时改写为 to（值匹配，不改运维自定义值）。
-type seedMigration struct {
-	entity string
-	field  string
-	from   string
-	to     string
-}
-
-// seedMigrations 历史改名清单（migrate_once 语义的唯一登记处）：
-// 只登记"跨版本必须自愈的核心标识/展示名"，编码类改名（platform→t_platform、
-// platform-admin→platform_admin）因改变后续查询键，仍在各自的 upsert 里先行处理。
-// 同一字段可累积多条（A→B、B→C），migrateString 会在一次启动内链式应用。
-var seedMigrations = []seedMigration{
-	{model.SeedEntityTenant, "name", "Default Tenant", defaultTenantName},
-	// 根部门与平台租户同名（派生），随租户名的历史改名同步一次
-	{model.SeedEntityDepartment, "name", "Default Tenant", defaultTenantName},
-}
-
-// migrateString 对单值应用 seedMigrations 的值匹配迁移，返回新值与是否发生迁移。
-// 链式条目（A→B、B→C）在一次调用内连续应用；无匹配即为空操作（幂等，可重复执行）。
-func migrateString(entity, field, current string) (string, bool) {
-	value, migrated := current, false
-	for round := 0; round <= len(seedMigrations); round++ {
-		matched := false
-		for _, migration := range seedMigrations {
-			if migration.entity == entity && migration.field == field && migration.from == value {
-				value, matched, migrated = migration.to, true, true
-				break
-			}
-		}
-		if !matched {
-			break
-		}
-	}
-	return value, migrated
-}
-
-// reconcileFields 按字段权威矩阵收敛实体字段：只写矩阵声明为 reconcile、且当前值不一致的字段。
-// 矩阵（pkg/model.SeedFieldAuthorities）是唯一真相源——新增收敛字段必须先声明，否则不会被写入。
-// 返回字段级 from→to 变更（供 Report 与启动日志），无变更时返回 nil。
-func reconcileFields(ctx context.Context, db *gorm.DB, entity, table, id string, current, desired map[string]any) (map[string]string, error) {
-	updateMap := make(map[string]any)
-	changes := make(map[string]string)
-	for field, want := range desired {
-		if !model.SeedOwnsField(entity, field) {
-			continue
-		}
-		if reflect.DeepEqual(current[field], want) {
-			continue
-		}
-		updateMap[field] = want
-		changes[field] = fmt.Sprintf("%v -> %v", current[field], want)
-	}
-	if len(updateMap) == 0 {
-		return nil, nil
-	}
-	if err := db.WithContext(ctx).Table(table).Where("id = ?", id).Updates(updateMap).Error; err != nil {
-		return nil, err
-	}
-	return changes, nil
-}
-
-// Change 一次种子变更：created（新建）/ updated（收敛）/ migrated（一次性改名）。
+// Change 一次 L1 写入：Action 恒为 created（L1 只创建，不更新、不改名）。
 type Change struct {
 	Entity string
 	Key    string
 	Action string
-	Fields map[string]string // 字段级 from→to（created 时为空）
 }
 
 // Report 本次种子执行的变更报告：仅用于启动日志核对（不落库），
@@ -148,44 +79,20 @@ type Report struct {
 }
 
 func (r *Report) created(entity, key string) {
-	r.Changes = append(r.Changes, Change{Entity: entity, Key: key, Action: "created"})
+	r.Changes = append(r.Changes, Change{Entity: entity, Key: key, Action: changeActionCreated})
 }
 
-func (r *Report) updated(entity, key string, fields map[string]string) {
-	if len(fields) == 0 {
-		return
-	}
-	r.Changes = append(r.Changes, Change{Entity: entity, Key: key, Action: "updated", Fields: fields})
-}
-
-func (r *Report) migrated(entity, key, field, from, to string) {
-	r.Changes = append(r.Changes, Change{
-		Entity: entity, Key: key, Action: "migrated",
-		Fields: map[string]string{field: from + " -> " + to},
-	})
-}
-
-// Summary 汇总各动作计数（启动日志一行）。
+// Summary 汇总变更计数（启动日志一行）。L1 只创建，故仅有 created 一项。
 func (r *Report) Summary() string {
-	counts := map[string]int{}
-	for _, change := range r.Changes {
-		counts[change.Action]++
-	}
-	return fmt.Sprintf("created=%d updated=%d migrated=%d", counts["created"], counts["updated"], counts["migrated"])
+	return fmt.Sprintf("created=%d", len(r.Changes))
 }
 
-// log 输出变更报告：汇总一行；改名条目单独 Warn 级输出，便于部署时核对"这次启动改了什么"。
+// log 输出变更报告：汇总一行，便于部署时核对"这次启动写了什么"。
 func (r *Report) log(ctx context.Context) {
 	if len(r.Changes) == 0 {
 		return
 	}
 	glog.Infof(ctx, "[seed] done, %s", r.Summary())
-	for _, change := range r.Changes {
-		if change.Action != "migrated" {
-			continue
-		}
-		glog.Warnf(ctx, "[seed] migrated %s(%s) fields:%v", change.Entity, change.Key, change.Fields)
-	}
 }
 
 // lockSeed 播种互斥：Postgres 取事务级 advisory lock（事务结束自动释放）。
@@ -277,12 +184,12 @@ func bootstrapAll(ctx context.Context, db *gorm.DB, rep *Report, def Definition)
 		return err
 	}
 
-	// 3. 应用（历史库的连字符编码由 getOrCreateApplication 原地改名）
-	adminApp, err := getOrCreateApplication(ctx, db, rep, appCodeAdmin, appCodeAdminLegacy, "平台管理后台", "平台管理后台应用", 0, model.AppSourceBuiltin)
+	// 3. 应用
+	adminApp, err := getOrCreateApplication(ctx, db, rep, appCodeAdmin, "平台管理后台", "平台管理后台应用", 0, model.AppSourceBuiltin)
 	if err != nil {
 		return err
 	}
-	tenantAdminApp, err := getOrCreateApplication(ctx, db, rep, appCodeTenantAdmin, appCodeTenantAdminLegacy, "租户管理后台", "租户管理后台应用", 1, model.AppSourceBuiltin)
+	tenantAdminApp, err := getOrCreateApplication(ctx, db, rep, appCodeTenantAdmin, "租户管理后台", "租户管理后台应用", 1, model.AppSourceBuiltin)
 	if err != nil {
 		return err
 	}
@@ -299,25 +206,17 @@ func bootstrapAll(ctx context.Context, db *gorm.DB, rep *Report, def Definition)
 		return err
 	}
 
-	// 6. 已下线菜单清理（菜单行 + role_menu 授权绑定）
-	if err := pruneRetiredMenus(ctx, db, map[string]*model.ApplicationEntity{
-		appCodeAdmin:       adminApp,
-		appCodeTenantAdmin: tenantAdminApp,
-	}); err != nil {
-		return err
-	}
-
-	// 7. 角色-菜单关联（仅平台管理后台 admin 角色；tenant_admin 由第 10 步开通时授权）
+	// 6. 角色-菜单关联（仅平台管理后台 admin 角色；tenant_admin 由第 10 步开通时授权）
 	if err := seedRoleMenus(ctx, db, tenant, adminRole, menus); err != nil {
 		return err
 	}
 
-	// 8. 租户应用订阅（平台管理后台 platform_admin；租户管理后台 tenant_admin 由第 10 步开通时订阅）
+	// 7. 租户应用订阅（平台管理后台 platform_admin；租户管理后台 tenant_admin 由第 10 步开通时订阅）
 	if err := seedTenantApplications(ctx, db, rep, tenant, adminApp); err != nil {
 		return err
 	}
 
-	// 9. 默认管理员（person + user + 顶级部门归属）
+	// 8. 默认管理员（person + user + 顶级部门归属）
 	adminUser, err := seedAdminUser(ctx, db, rep, tenant, rootDept, def)
 	if err != nil {
 		return err
@@ -326,7 +225,7 @@ func bootstrapAll(ctx context.Context, db *gorm.DB, rep *Report, def Definition)
 		return err
 	}
 
-	// 10. 平台租户的租户自服务权限开通：与"新建租户"共用同一实现
+	// 9. 平台租户的租户自服务权限开通：与"新建租户"共用同一实现
 	// （pkg/core/tenant.ProvisionTenantAdmin），保证内置角色/菜单授权/订阅只有一份定义。
 	if _, err := iamtenant.ProvisionTenantAdmin(ctx, db, &iamtenant.ProvisionTenantAdminReq{
 		TenantID:    tenant.ID,
@@ -335,7 +234,7 @@ func bootstrapAll(ctx context.Context, db *gorm.DB, rep *Report, def Definition)
 		return fmt.Errorf("seed provision tenant admin fail: %w", err)
 	}
 
-	// 11. OIDC 测试客户端（平台管理后台客户端挂 platform_admin，租户管理后台客户端挂 tenant_admin）
+	// 10. OIDC 测试客户端（平台管理后台客户端挂 platform_admin，租户管理后台客户端挂 tenant_admin）
 	if err := seedOIDCClients(ctx, db, rep, tenant, adminApp, tenantAdminApp, def); err != nil {
 		return err
 	}
@@ -363,51 +262,10 @@ func getOrCreateTenant(ctx context.Context, db *gorm.DB, rep *Report, def Defini
 	if err != nil {
 		return nil, err
 	}
-	if entity == nil {
-		// 历史库平台租户编码为 tenantCodePlatformLegacy（"platform"）：原地改名，
-		// 保留主键，避免改编码规则后重复建出第二个平台租户。仅迁移平台类型租户，
-		// 防止误改恰好同名的客户租户。
-		legacy, lErr := findTenantByCode(db, tenantCodePlatformLegacy)
-		if lErr != nil {
-			return nil, lErr
-		}
-		if legacy != nil && legacy.Type == model.TenantTypePlatform {
-			if uErr := db.Model(&model.TenantEntity{}).Where("id = ?", legacy.ID).
-				Update("code", tenantCodePlatform).Error; uErr != nil {
-				return nil, fmt.Errorf("seed tenant code migrate fail: %w", uErr)
-			}
-			legacy.Code = tenantCodePlatform
-			glog.Infof(ctx, "[seed] tenant code migrated (%s -> %s), id:%s",
-				tenantCodePlatformLegacy, tenantCodePlatform, legacy.ID)
-			entity = legacy
-		}
-	}
 	if entity != nil {
-		// 存量库自愈（字段权威矩阵见 pkg/model/seed_authority.go）：
-		//   - name 是 migrate_once：只在值仍是历史种子名（Default Tenant）时改名；
-		//     运维把平台租户改成自己公司名后，种子不再回写（这是"改名"而不是"收敛"）；
-		//   - status 是 reconcile：平台租户被挂起会导致整栈控制台失联，恒为 active；
-		//   - type/tag/db_user 是 create_only，种子不回填。
-		if name, migrated := migrateString(model.SeedEntityTenant, "name", entity.Name); migrated {
-			if uErr := db.Model(&model.TenantEntity{}).Where("id = ?", entity.ID).
-				Update("name", name).Error; uErr != nil {
-				return nil, fmt.Errorf("seed tenant name migrate fail: %w", uErr)
-			}
-			glog.Infof(ctx, "[seed] tenant name migrated (%s -> %s), id:%s", entity.Name, name, entity.ID)
-			rep.migrated(model.SeedEntityTenant, entity.Code, "name", entity.Name, name)
-			entity.Name = name
-		}
-		changes, uErr := reconcileFields(ctx, db, model.SeedEntityTenant, model.TableNameTenant, entity.ID,
-			map[string]any{"status": entity.Status},
-			map[string]any{"status": model.TenantStatusActive})
-		if uErr != nil {
-			return nil, fmt.Errorf("seed tenant reconcile fail: %w", uErr)
-		}
-		if len(changes) > 0 {
-			glog.Infof(ctx, "[seed] tenant reconciled, id:%s fields:%v", entity.ID, changes)
-			rep.updated(model.SeedEntityTenant, entity.Code, changes)
-			entity.Status = model.TenantStatusActive
-		}
+		// 已存在即返回：平台租户的 name/status/type/tag/db_user 全归运维（create_only 语义），
+		// 引导不回写任何字段。平台租户被挂起会导致整栈控制台失联，这条不变式改由控制台的
+		// 拒写点保证（平台租户不可挂起），不再靠"每次启动收敛 status"来兜底。
 		return entity, nil
 	}
 	entity = &model.TenantEntity{
@@ -427,21 +285,12 @@ func getOrCreateTenant(ctx context.Context, db *gorm.DB, rep *Report, def Defini
 }
 
 // seedRootDepartment 确保租户存在唯一顶级部门（根部门节点），并返回该节点。
-// 根部门名与租户同名是派生关系：只在值仍是历史种子名时随迁移同步一次（migrate_once），
-// 运维按自己组织架构改过部门名后不再被拉回。所有种子用户（含管理员）均从属于此顶级部门。
+// 根部门名与租户同名只是**创建时**的取值：运维按自己组织架构改过部门名后引导不回写
+// （create_only 语义）。所有种子用户（含管理员）均从属于此顶级部门。
 func seedRootDepartment(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, rep *Report) (*model.DepartmentEntity, error) {
 	dept := &model.DepartmentEntity{}
 	err := db.Where("tenant_id = ? AND parent_id = ?", tenant.ID, "").First(dept).Error
 	if err == nil {
-		if name, migrated := migrateString(model.SeedEntityDepartment, "name", dept.Name); migrated {
-			if uErr := db.WithContext(ctx).Model(&model.DepartmentEntity{}).Where("id = ?", dept.ID).
-				Update("name", name).Error; uErr != nil {
-				return nil, fmt.Errorf("seed root department rename fail: %w", uErr)
-			}
-			glog.Infof(ctx, "[seed] root department name migrated (%s -> %s), id:%s", dept.Name, name, dept.ID)
-			rep.migrated(model.SeedEntityDepartment, dept.ID, "name", dept.Name, name)
-			dept.Name = name
-		}
 		return dept, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -466,19 +315,6 @@ func seedRootDepartment(ctx context.Context, db *gorm.DB, tenant *model.TenantEn
 	return dept, nil
 }
 
-// findApplicationByCode 按编码查应用；不存在返回 (nil, nil)，系统错误返回 (nil, err)。
-func findApplicationByCode(db *gorm.DB, code string) (*model.ApplicationEntity, error) {
-	entity := &model.ApplicationEntity{}
-	err := db.Where("code = ?", code).First(entity).Error
-	if err == nil {
-		return entity, nil
-	}
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	return nil, fmt.Errorf("seed application query fail (code=%s): %w", code, err)
-}
-
 // findApplicationBySeedKey 按种子身份键查内置应用；不存在返回 (nil, nil)，系统错误返回 (nil, err)。
 func findApplicationBySeedKey(db *gorm.DB, seedKey string) (*model.ApplicationEntity, error) {
 	entity := &model.ApplicationEntity{}
@@ -492,77 +328,20 @@ func findApplicationBySeedKey(db *gorm.DB, seedKey string) (*model.ApplicationEn
 	return nil, fmt.Errorf("seed application query fail (seed_key=%s): %w", seedKey, err)
 }
 
-// getOrCreateApplication 幂等获取内置应用。
-// 认行顺序（与种子身份键配套，见 model.ApplicationEntity.SeedKey）：
-//  1. seed_key：内置应用的稳定身份——运营在控制台改过 code 后仍命中同一行；
-//  2. code：存量库首次升级时该行还没有 seed_key，按旧口径认领并回填；
-//  3. legacyCode：历史库的连字符编码，把 code 与 seed_key 一并原地迁移到新定义值。
+// getOrCreateApplication 幂等获取内置应用：按不可见的种子身份键 seed_key 认行，缺失则创建。
 //
-// 编码改名不影响任何以 app_id 关联的菜单/订阅/角色。
-func getOrCreateApplication(ctx context.Context, db *gorm.DB, rep *Report, code, legacyCode, name, desc string, sort int, source model.AppSource) (*model.ApplicationEntity, error) {
+// 只按 seed_key 认行，不做 (code) 兜底：本项目按全新项目维护 schema，不存在"还没有 seed_key
+// 的存量行"；保留旧口径兜底反而会让运维自建的同 code 应用被误认领成内置行（获得删除保护、
+// 接管菜单范围）。编码改名不影响任何以 app_id 关联的菜单/订阅/角色。
+func getOrCreateApplication(ctx context.Context, db *gorm.DB, rep *Report, code, name, desc string, sort int, source model.AppSource) (*model.ApplicationEntity, error) {
 	entity, err := findApplicationBySeedKey(db, code)
 	if err != nil {
 		return nil, err
 	}
-	if entity == nil {
-		entity, err = findApplicationByCode(db, code)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if legacyCode != "" {
-		legacy, lErr := findApplicationByCode(db, legacyCode)
-		if lErr != nil {
-			return nil, lErr
-		}
-		switch {
-		case legacy == nil:
-			// 正常路径：旧编码不存在（全新库或已迁移过）
-		case entity != nil:
-			// 新旧编码并存：无法判断哪一行才是内置应用。此时回填 source 会把用户自建应用
-			// 改写成内置（获得删除保护并接管菜单范围），故宁可中断启动，交人工确认后删除其一。
-			return nil, fmt.Errorf("seed application code conflict: %q 与 %q 同时存在，请人工确认哪一行是内置应用并删除另一行", code, legacyCode)
-		default:
-			// 历史库编码迁移（platform-admin -> platform_admin）：code 与 seed_key 同批迁移到定义值，
-			// 否则下次启动会因 seed_key 不匹配而退回按 code 认行，运营改名后就会重建应用。
-			if uErr := db.WithContext(ctx).Model(&model.ApplicationEntity{}).Where("id = ?", legacy.ID).
-				Updates(map[string]any{"code": code, "seed_key": code}).Error; uErr != nil {
-				return nil, fmt.Errorf("seed application code migrate fail (%s -> %s): %w", legacyCode, code, uErr)
-			}
-			legacy.Code = code
-			legacy.SeedKey = code
-			glog.Infof(ctx, "[seed] application code migrated (%s -> %s), id:%s", legacyCode, code, legacy.ID)
-			entity = legacy
-		}
-	}
-	if entity != nil && entity.SeedKey == "" {
-		// 一次性回填种子身份键：此后该行即使被改名也能被种子认出，不会重建
-		if uErr := db.WithContext(ctx).Model(&model.ApplicationEntity{}).Where("id = ?", entity.ID).
-			Update("seed_key", code).Error; uErr != nil {
-			return nil, fmt.Errorf("seed application %s seed_key backfill fail: %w", code, uErr)
-		}
-		glog.Infof(ctx, "[seed] application seed_key backfilled (code:%s), id:%s", code, entity.ID)
-		rep.migrated(model.SeedEntityApplication, code, "seed_key", "", code)
-		entity.SeedKey = code
-	}
 	if entity != nil {
-		// 幂等回填（按字段权威矩阵）：desired 覆盖种子定义的全部字段，真正写谁由矩阵决定。
-		// 当前只有 source（内置标记，安全不变式）是 reconcile，每次启动收敛；
-		// name/description/sort/status/logo_url/homepage_url 归运维（create_only）：
-		// 控制台改名/改描述后重启不回写，跨版本改名按需登记 seedMigrations。
-		changes, uErr := reconcileFields(ctx, db, model.SeedEntityApplication, model.TableNameApplication, entity.ID,
-			map[string]any{"source": entity.Source, "name": entity.Name, "description": entity.Description},
-			map[string]any{"source": source, "name": name, "description": desc})
-		if uErr != nil {
-			return nil, fmt.Errorf("seed application %s reconcile fail: %w", code, uErr)
-		}
-		if len(changes) > 0 {
-			glog.Infof(ctx, "[seed] application reconciled, code:%s fields:%v", code, changes)
-			rep.updated(model.SeedEntityApplication, code, changes)
-			// 只回写落在实体上的收敛字段：name/description 可能已被运维改过，
-			// 用种子定义覆盖内存态会让调用方拿到与库不一致的值。
-			entity.Source = source
-		}
+		// 已存在即返回：name/description/sort/status 全归运维（create_only 语义），引导不回写
+		// 任何字段——运营在控制台改过的名称与描述在重新初始化（不可能发生）或重建库后不会被收回。
+		// source（内置标记，安全不变式）由服务端的拒写点保证不可更改，不再靠种子收敛。
 		return entity, nil
 	}
 	entity = &model.ApplicationEntity{
@@ -642,51 +421,25 @@ func seedMenus(ctx context.Context, db *gorm.DB, rep *Report, adminApp, tenantAd
 	out := make(map[string]*model.MenuEntity, len(builtinMenuDefs))
 	for _, def := range builtinMenuDefs {
 		app := appByCode[def.appCode]
-		// 认行顺序（与种子身份键配套，见 model.MenuEntity.SeedKey）：
-		//  1) seed_key：内置菜单的稳定身份——运营在控制台改过 code/换了所属应用后仍命中同一行；
-		//  2) 墓碑：该 seed_key 存在软删行 → 该内置菜单已被控制台删除，跳过创建（不再复活）；
-		//  3) 兜底 (app_id, code)：存量库首次升级时该行还没有 seed_key，按旧口径认领并回填；
-		//  4) 都没有 → 新建（同时写入 seed_key 与定义值）。
-		// 菜单的展示与结构字段全部归运维（矩阵 create_only），故命中后不再收敛任何字段；
-		// 行的"存在性"在首次创建后同样归运维：控制台删除即持久删除，种子不再重建。
+		// 认行只看不可见的种子身份键 seed_key（见 model.MenuEntity.SeedKey）：运营在控制台改过
+		// code、或把菜单换挂到别的应用后仍命中同一行。
+		//
+		// 控制台删除内置菜单后不会被"建回来"：L1 已初始化即永久自锁（见 Bootstrap），
+		// 不存在第二次写入。这正是退役机制（retiredMenus）与墓碑跳过（menuSeedKeyRemoved）
+		// 可以删除的原因——它们要解决的是"种子反复执行会撤销运维改动"，而 L1 只执行一次。
+		//
+		// 菜单的展示与结构字段全部归运维（create_only），命中后不回写任何字段。
 		entity, err := findMenuBySeedKey(db, def.code)
 		if err != nil {
 			return nil, err
-		}
-		if entity == nil {
-			// 墓碑检查必须早于 (app_id, code) 兜底：否则运营删除内置菜单后自建一个同 code 的菜单，
-			// 会被兜底分支误认领并回填 seed_key，运营自建行当场被"变成"内置行。
-			removed, err := menuSeedKeyRemoved(db, def.code)
-			if err != nil {
-				return nil, err
-			}
-			if removed {
-				glog.Warnf(ctx, "[seed] menu %s 已由控制台删除(墓碑)，跳过创建", def.code)
-				continue
-			}
-			entity, err = findMenuByAppAndCode(db, app.ID, def.code)
-			if err != nil {
-				return nil, err
-			}
-		}
-		if entity != nil && entity.SeedKey == "" {
-			// 一次性回填种子身份键：此后该行即使被改名也能被种子认出，不会重建
-			if uErr := db.WithContext(ctx).Model(&model.MenuEntity{}).Where("id = ?", entity.ID).
-				Update("seed_key", def.code).Error; uErr != nil {
-				return nil, fmt.Errorf("seed menu %s seed_key backfill fail: %w", def.code, uErr)
-			}
-			glog.Infof(ctx, "[seed] menu seed_key backfilled (code:%s), id:%s", def.code, entity.ID)
-			rep.migrated(model.SeedEntityMenu, def.code, "seed_key", "", def.code)
-			entity.SeedKey = def.code
 		}
 		parentID := ""
 		if def.parentCode != "" {
 			parent, ok := out[def.parentCode]
 			if !ok || parent == nil {
-				// 父级已被删除（墓碑）或随之跳过：跳过该子菜单，而不是中断启动。
-				// 不把它改挂成根菜单——种子的层级定义不该被静默改写，重建层级由运维在控制台完成。
-				glog.Warnf(ctx, "[seed] menu %s 的父级 %s 不可用，跳过创建", def.code, def.parentCode)
-				continue
+				// builtinMenuDefs 保证父级先于子级出现；走到这里说明定义写错了，
+				// 属于编程错误而非数据问题，直接中断而不是静默跳过子菜单。
+				return nil, fmt.Errorf("seed menu %s 的父级 %s 未在其之前定义", def.code, def.parentCode)
 			}
 			parentID = parent.ID
 		}
@@ -710,6 +463,7 @@ func seedMenus(ctx context.Context, db *gorm.DB, rep *Report, adminApp, tenantAd
 			if err := db.WithContext(ctx).Create(entity).Error; err != nil {
 				return nil, fmt.Errorf("seed menu %s create fail: %w", def.code, err)
 			}
+			glog.Infof(ctx, "[seed] menu created, id:%s code:%s", entity.ID, def.code)
 			rep.created(model.SeedEntityMenu, def.code)
 		}
 		out[def.code] = entity
@@ -728,39 +482,6 @@ func findMenuBySeedKey(db *gorm.DB, seedKey string) (*model.MenuEntity, error) {
 		return nil, nil
 	}
 	return nil, fmt.Errorf("seed menu query fail (seed_key=%s): %w", seedKey, err)
-}
-
-// findMenuByAppAndCode 按 (app_id, code) 查菜单：仅用于存量库回填 seed_key（旧口径的认行方式）。
-func findMenuByAppAndCode(db *gorm.DB, appID, code string) (*model.MenuEntity, error) {
-	entity := &model.MenuEntity{}
-	err := db.Where("app_id = ? AND code = ?", appID, code).First(entity).Error
-	if err == nil {
-		return entity, nil
-	}
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	return nil, fmt.Errorf("seed menu query fail (app_id=%s, code=%s): %w", appID, code, err)
-}
-
-// menuSeedKeyRemoved 判断某内置菜单（按 seed_key）是否已被控制台删除。
-//
-// 控制台删除菜单是软删除，软删行仍带 seed_key，即"该内置菜单已被人为下线"的**墓碑**：
-// 种子据此跳过创建。否则删除操作会在下次启动被撤销——菜单行被重建、role_menu 授权分叉，
-// 控制台就永远无法真正删除一个内置菜单（功能扩展/调整只能靠改代码发版）。
-//
-// 注意：退役菜单（retiredMenus）走物理删除、不留墓碑——版本级下线与运维级删除是两种语义，
-// 前者允许未来重新上线同名菜单，后者是运维的确定选择。
-func menuSeedKeyRemoved(db *gorm.DB, seedKey string) (bool, error) {
-	entity := &model.MenuEntity{}
-	err := db.Unscoped().Where("seed_key = ?", seedKey).First(entity).Error
-	if err == nil {
-		return true, nil
-	}
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return false, nil
-	}
-	return false, fmt.Errorf("seed menu tombstone query fail (seed_key=%s): %w", seedKey, err)
 }
 
 // seedRoleMenus 只处理平台管理后台 admin 角色的菜单授权；
@@ -869,19 +590,8 @@ func seedAdminUser(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.
 		rep.created(model.SeedEntityUser, user.ID)
 	}
 
-	// 来源回填（矩阵 reconcile）：种子管理员是内置管理员，source 必须为 builtin，
-	// 平台侧"重置内置管理员密码"依赖该标记定位目标用户。
-	userChanges, uErr := reconcileFields(ctx, db, model.SeedEntityUser, model.TableNameUser, user.ID,
-		map[string]any{"source": user.Source},
-		map[string]any{"source": model.UserSourceBuiltin})
-	if uErr != nil {
-		return nil, fmt.Errorf("seed admin user reconcile fail: %w", uErr)
-	}
-	if len(userChanges) > 0 {
-		glog.Infof(ctx, "[seed] admin user reconciled, id:%s fields:%v", user.ID, userChanges)
-		rep.updated(model.SeedEntityUser, user.ID, userChanges)
-		user.Source = model.UserSourceBuiltin
-	}
+	// source=builtin 在创建时即写入（见上方 Create），不做启动期回填：它是账号归属的
+	// 安全不变式，由控制台的拒写点保证不可更改；平台侧"重置内置管理员密码"依赖该标记定位用户。
 
 	// 顶级部门归属（幂等，兼容已有库升级：admin 用户已存在但尚无部门归属的场景）
 	if err := seedAdminUserDepartment(ctx, db, rep, tenant, user, rootDept); err != nil {
@@ -956,9 +666,10 @@ func findApplicationClientByCode(db *gorm.DB, code string) (*model.ApplicationCl
 	return nil, fmt.Errorf("seed application_client query fail (code=%s): %w", code, err)
 }
 
-// seedOIDCClients 播种内置 OAuth 客户端（OIDC RP）。
+// seedOIDCClients 播种内置 OAuth 客户端（OIDC RP），按 code（= client_id）认行。
 // 归属应用按控制台一一对应：平台管理后台客户端 → platform_admin 应用，租户管理后台客户端 → tenant_admin 应用。
-// app_id 是种子收敛字段（矩阵声明 reconcile）：存量库把两者都挂到 platform_admin 的错误绑定由此自愈。
+// app_id 只在创建时写入（create_only）：控制台拒改内置客户端的 code，但归属应用的调整由控制台完成，
+// 引导不回写——否则运维的改动会在下次（不可能发生的）初始化时被收回。
 //
 // 回调地址来自 def.Consoles（完整 URL，不做 origin 派生）；bc-logout 已由 withDefaults 解析成最终值，
 // 因此这里落库的地址与初始化页面回显给运维的地址必然一致。
@@ -966,7 +677,6 @@ func findApplicationClientByCode(db *gorm.DB, code string) (*model.ApplicationCl
 func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.TenantEntity, adminApp, tenantAdminApp *model.ApplicationEntity, def Definition) error {
 	type builtinClientDef struct {
 		code                 string
-		legacyCode           string
 		name                 string
 		appID                string
 		redirectURIs         model.RedirectURIList
@@ -976,7 +686,6 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 	clientDefs := []builtinClientDef{
 		{
 			code:                 oauthClientPlatformAdminWeb,
-			legacyCode:           oauthClientPlatformAdminWebLegacy,
 			name:                 "平台管理后台",
 			appID:                adminApp.ID,
 			redirectURIs:         model.RedirectURIList(def.Consoles.PlatformAdminWeb.RedirectURIs),
@@ -985,7 +694,6 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 		},
 		{
 			code:                 oauthClientTenantAdminWeb,
-			legacyCode:           oauthClientTenantAdminWebLegacy,
 			name:                 "租户管理后台",
 			appID:                tenantAdminApp.ID,
 			redirectURIs:         model.RedirectURIList(def.Consoles.TenantAdminWeb.RedirectURIs),
@@ -1003,45 +711,9 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 		if err != nil {
 			return err
 		}
-		if cd.legacyCode != "" {
-			legacy, lErr := findApplicationClientByCode(db, cd.legacyCode)
-			if lErr != nil {
-				return lErr
-			}
-			switch {
-			case legacy == nil:
-				// 正常路径：旧编码不存在（全新库或已迁移过）
-			case entity != nil:
-				// 新旧编码并存：无法判断哪一行才是内置客户端。此时回填 source/app_id 会把用户自建客户端
-				// 改写成内置（获得删除保护并接管回调白名单），故宁可中断启动，交人工确认后删除其一。
-				return fmt.Errorf("seed oauth client code conflict: %q 与 %q 同时存在，请人工确认哪一行是内置客户端并删除另一行", cd.code, cd.legacyCode)
-			default:
-				// 历史库编码迁移（platform-admin-web -> platform_admin_web）：保留主键，
-				// 使 refresh_token / application_client_secret 等以 id 为外键的引用不失联。
-				if uErr := db.WithContext(ctx).Model(&model.ApplicationClientEntity{}).Where("id = ?", legacy.ID).
-					Update("code", cd.code).Error; uErr != nil {
-					return fmt.Errorf("seed oauth client code migrate fail (%s -> %s): %w", cd.legacyCode, cd.code, uErr)
-				}
-				glog.Infof(ctx, "[seed] oauth client code migrated (%s -> %s), id:%s", cd.legacyCode, cd.code, legacy.ID)
-				rep.migrated(model.SeedEntityApplicationClient, cd.code, "code", cd.legacyCode, cd.code)
-				legacy.Code = cd.code
-				entity = legacy
-			}
-		}
 		if entity != nil {
-			// 幂等回填（按字段权威矩阵）：desired 覆盖种子定义的全部字段，真正写谁由矩阵决定。
-			// 当前 source（内置标记）与 app_id（归属应用）是 reconcile；name 归运维（create_only）——
-			// 控制台改客户端名后重启不回写。回调地址/授权类型/令牌 TTL 等运行参数同为 create_only。
-			changes, uErr := reconcileFields(ctx, db, model.SeedEntityApplicationClient, model.TableNameApplicationClient, entity.ID,
-				map[string]any{"source": entity.Source, "name": entity.Name, "app_id": entity.AppID},
-				map[string]any{"source": model.ApplicationClientSourceBuiltin, "name": cd.name, "app_id": cd.appID})
-			if uErr != nil {
-				return fmt.Errorf("seed oauth client %s reconcile fail: %w", cd.code, uErr)
-			}
-			if len(changes) > 0 {
-				glog.Infof(ctx, "[seed] oauth client reconciled, code:%s fields:%v", cd.code, changes)
-				rep.updated(model.SeedEntityApplicationClient, cd.code, changes)
-			}
+			// 已存在即返回：name/回调地址/授权类型/令牌 TTL 等全部归运维（create_only 语义），
+			// 引导不回写任何字段；source/app_id 是安全不变式，由控制台拒写点保证。
 			continue
 		}
 		entity = &model.ApplicationClientEntity{

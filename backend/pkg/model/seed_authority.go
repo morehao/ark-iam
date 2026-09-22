@@ -1,42 +1,41 @@
 package model
 
-// 种子字段权威矩阵（single writer per field）——本文件是「内置种子数据的哪个字段归谁写」的
-// 唯一真相源，pkg/seed 按它决定收敛哪些字段，控制台服务按它拒写种子拥有的字段。
+// 种子字段权威矩阵（single writer per field）——本文件是「内置数据的哪个字段归谁写」的
+// 唯一真相源，控制台服务按它拒写不可变字段。
 //
-// 三条语义（与 docs/design/system-design.md §4.5 一致）：
+// 两条语义（与 docs/design/system-design.md §4.5 一致）：
 //
-//	reconcile   种子收敛：启动时必须与种子定义一致；写者唯一为种子，控制台对这些字段一律拒写
-//	            （否则会出现"运维改完、重启被收回"的双写者）。
-//	create_only 只播种：种子仅在行不存在时写入，此后永不回写；写者唯一为运维，控制台可改。
-//	migrate_once 一次性迁移：跨版本的标识改名，以「当前值 == 历史种子值」为条件触发；
-//	            迁移完成后自然失效，运维自定义值一律不动。迁移清单位于 pkg/seed。
+//	immutable   L1 创建时写入，此后**必须保持不变**：控制台对这类字段一律拒写
+//	            （否则会出现"运维改完、下次初始化被收回"的双写者，或鉴权被绕过）。
+//	create_only L1 只在行不存在时写入，此后永不回写；写者唯一为运维，控制台可改。
 //
-// reconcile 的准入判据（2026-09-12 收窄，见 docs/design/system-design.md §4.5）：
-// 只有「被控制台改写后会导致种子定位失效或鉴权被绕过」的字段才进 reconcile，共两类——
-//   - 定位键：pkg/seed 靠它查行（tenant/application/application_client 的 code、
-//     menu 的 app_id + code）。键一变，下次启动查不到该行 → 重复建一行，幂等性直接失效；
-//   - 安全不变式：source（内置标记）、admin_type、平台租户 status。
+// 为什么没有第三条：种子不再在启动期写入任何数据（L1 只在首次初始化执行一次，随后永久自锁），
+// 因此**不再需要**跨版本的字段收敛（原 reconcile）与一次性改名（原 migrate_once）——
+// 前者的执行体曾是 pkg/seed，后者的清单曾是 pkg/seed 的 seedMigrations，两者已删除。
+// 内置数据的后续调整一律由运维在控制台完成（新增版本菜单见 `make print-builtin-menus`）。
+//
+// immutable 的准入判据：只有「被控制台改写后会导致鉴权被绕过或控制台自我锁死」的字段才进
+// immutable，共两类——
+//   - 安全不变式：source（内置标记）、admin_type（系统管理能力）、平台租户 status（挂起即整栈失联）；
+//   - 身份编码：内置应用 code（各控制台菜单入口的定位值）、内置客户端 code（= client_id，
+//     同时是网关 audience 白名单与前端构建期默认值）——改名会当场锁死对应控制台且界面无法自救。
 // 不接受"产品身份/展示名"这类软理由：展示字段（应用名与描述、客户端名、菜单名/图标/排序/
-// 可见性/路径/组件/层级）的跨版本自愈收益≈0，代价却是整页不可编辑，一律归运维（create_only）；
-// 确需跨版本改名时按需登记 pkg/seed 的 seedMigrations（值匹配，运营改过就不动）。
+// 可见性/路径/组件/层级）一律归运维（create_only）；未声明的字段视为 create_only。
 //
 // 硬规则：
-//  1. 字段进入矩阵即表明其写者，未声明的字段视为 create_only（归运维），不得由种子回填；
-//  2. reconcile 字段必须满足上面的准入判据，且必须在控制台侧拒写——只在一侧声明等于把
-//     双写者的问题留到线上；
-//  3. 历史改名（如 Default Tenant → 平台运营中心）用 migrate_once 表达，禁止用 reconcile
-//     表达改名，否则运维的改名会在下次启动被无条件覆盖。
+//  1. 字段进入矩阵即表明其写者；未声明的字段视为 create_only（归运维），种子不回填；
+//  2. immutable 字段必须**在控制台侧有对应的拒写点**——只在一侧声明等于把双写者的问题留到线上；
+//     矩阵登记的是"存在控制台写入入口的字段"，没有入口的字段（如 seed_key）不登记。
+//  3. 展示类字段不接受"跨版本自动改名"的需求：确需改名由运维在控制台改，或按版本动作发版。
 
 // SeedFieldMode 字段的写者语义（见文件头注释）。
 type SeedFieldMode string
 
 const (
-	// SeedFieldReconcile 种子收敛：写者唯一为种子，控制台拒写。
-	SeedFieldReconcile SeedFieldMode = "reconcile"
-	// SeedFieldCreateOnly 只播种：写者唯一为运维，种子只在创建时写入。
+	// SeedFieldImmutable 不可变：L1 创建时写入，之后控制台拒写。
+	SeedFieldImmutable SeedFieldMode = "immutable"
+	// SeedFieldCreateOnly 只播种：L1 只在创建时写入，之后写者唯一为运维，控制台可改。
 	SeedFieldCreateOnly SeedFieldMode = "create_only"
-	// SeedFieldMigrateOnce 一次性迁移：仅当归前值命中历史种子值时才改写。
-	SeedFieldMigrateOnce SeedFieldMode = "migrate_once"
 )
 
 // 种子实体标识：矩阵行键，取业务领域名而非表名，避免与 TableName 常量耦合。
@@ -85,26 +84,25 @@ type SeedFieldAuthority struct {
 // SeedFieldAuthorities 字段权威矩阵。
 // 覆盖 pkg/seed 会写入或在控制台可编辑的字段；矩阵之外的字段视为 create_only。
 var SeedFieldAuthorities = []SeedFieldAuthority{
-	// 平台租户：code 与 name 只做一次性改名（旧库自愈），status 是安全性不变式（被挂起会整栈失联），
-	// type/tag/db_user 属部署数据，种子的值只是"创建时的初值"。
-	{SeedEntityTenant, "code", SeedFieldMigrateOnce},
-	{SeedEntityTenant, "name", SeedFieldMigrateOnce},
-	{SeedEntityTenant, "status", SeedFieldReconcile},
+	// 平台租户：status 是安全不变式（被挂起会整栈失联，故控制台拒写）；name 归运维
+	// （改成自己公司名后不被回写）；type/tag/db_user 属部署数据，种子的值只是"创建时的初值"。
+	{SeedEntityTenant, "code", SeedFieldCreateOnly},
+	{SeedEntityTenant, "name", SeedFieldCreateOnly},
+	{SeedEntityTenant, "status", SeedFieldImmutable},
 	{SeedEntityTenant, "type", SeedFieldCreateOnly},
 	{SeedEntityTenant, "tag", SeedFieldCreateOnly},
 	{SeedEntityTenant, "db_user", SeedFieldCreateOnly},
-	// 平台租户根部门：与租户同名，仅在租户名发生一次性改名时同步一次（派生，不是每次启动跟随）。
-	{SeedEntityDepartment, "name", SeedFieldMigrateOnce},
+	// 平台租户根部门：创建时取租户名；之后按组织架构改名归运维。
+	{SeedEntityDepartment, "name", SeedFieldCreateOnly},
 	{SeedEntityDepartment, "status", SeedFieldCreateOnly},
 	{SeedEntityDepartment, "sort", SeedFieldCreateOnly},
-	// 内置应用：source 是内置标记（安全不变式——平台侧"重置内置管理员口令"等能力依赖它定位内置对象），
-	// 归种子收敛且控制台无写入入口。seed_key 是种子身份键（不可见不可写）：种子按它认行，
-	// 因此 code 可归运维自由改名而不触发重建行。名称/描述属控制台展示身份（create_only）：种子的值
-	// 只是创建时的初值，控制台改名/改描述后重启不回写。启停/排序/logo/主页同理。
-	// code 另有一条 migrate_once：仅把历史连字符编码（platform-admin）值匹配改成下划线形态。
-	{SeedEntityApplication, "seed_key", SeedFieldCreateOnly},
-	{SeedEntityApplication, "code", SeedFieldMigrateOnce},
-	{SeedEntityApplication, "source", SeedFieldReconcile},
+	// 内置应用：source 是内置标记（安全不变式——平台侧"重置内置管理员口令"等能力依赖它定位内置对象）；
+	// code 是各控制台菜单入口的定位值（svcpermission.MyTree 按 platform_admin 查应用、
+	// tenantadmin loadConsoleApps 只保留 tenant_admin），从控制台改名会当场锁死对应控制台且界面无法自救，
+	// 故两者都 immutable。seed_key 是种子身份键（不可见不可写，无控制台入口，不登记）。
+	// 名称/描述属控制台展示身份（create_only）：种子的值只是创建时的初值，控制台改名/改描述后不回写。
+	{SeedEntityApplication, "code", SeedFieldImmutable},
+	{SeedEntityApplication, "source", SeedFieldImmutable},
 	{SeedEntityApplication, "name", SeedFieldCreateOnly},
 	{SeedEntityApplication, "description", SeedFieldCreateOnly},
 	{SeedEntityApplication, "status", SeedFieldCreateOnly},
@@ -113,14 +111,14 @@ var SeedFieldAuthorities = []SeedFieldAuthority{
 	{SeedEntityApplication, "homepage_url", SeedFieldCreateOnly},
 	// 应用角色模板：部署事实（该应用对外提供哪些跨系统契约值），归运维；种子只在创建时给初值，不回写。
 	{SeedEntityApplication, "role_template", SeedFieldCreateOnly},
-	// 内置应用的 OAuth 客户端：code 是种子定位键（migrate_once 处理历史编码改名），app_id 是归属应用
-	// ——平台管理后台客户端挂 platform_admin、租户管理后台客户端挂 tenant_admin，控制台不提供改归属的
-	// 入口，故归种子收敛（历史版本把两个客户端都挂在 platform_admin，靠这条声明自愈）。
-	// source 是内置标记（安全不变式）；name 属展示身份（create_only，归运维）；
-	// 回调地址/授权类型/TTL 等与环境相关，归运维。
-	{SeedEntityApplicationClient, "code", SeedFieldMigrateOnce},
-	{SeedEntityApplicationClient, "app_id", SeedFieldReconcile},
-	{SeedEntityApplicationClient, "source", SeedFieldReconcile},
+	// 内置应用的 OAuth 客户端：code（= client_id）同时是网关 aud 白名单、back-channel logout
+	// 客户端识别与前端构建期 VITE_OIDC_CLIENT_ID 默认值的取值来源，改名会当场把对应控制台锁死，
+	// 故 immutable；source 是内置标记（安全不变式），同 immutable。
+	// app_id 是归属应用（创建时按控制台一一对应写入，无控制台改归属入口，不登记）；
+	// name 属展示身份（create_only，归运维）；回调地址/授权类型/TTL 等与环境相关，归运维。
+	{SeedEntityApplicationClient, "code", SeedFieldImmutable},
+	{SeedEntityApplicationClient, "app_id", SeedFieldCreateOnly},
+	{SeedEntityApplicationClient, "source", SeedFieldImmutable},
 	{SeedEntityApplicationClient, "name", SeedFieldCreateOnly},
 	{SeedEntityApplicationClient, "redirect_uris", SeedFieldCreateOnly},
 	{SeedEntityApplicationClient, "post_logout_redirect_uris", SeedFieldCreateOnly},
@@ -129,11 +127,11 @@ var SeedFieldAuthorities = []SeedFieldAuthority{
 	{SeedEntityApplicationClient, "default_scopes", SeedFieldCreateOnly},
 	{SeedEntityApplicationClient, "access_token_ttl", SeedFieldCreateOnly},
 	{SeedEntityApplicationClient, "refresh_token_ttl", SeedFieldCreateOnly},
-	// 菜单：**全部业务字段归运维（create_only）**，包括 app_id 与 code——种子靠 seed_key（种子身份键，
-	// 不可见不可写）认行，不再靠 (app_id, code)，因此改编码/改归属都不会让种子重建行。
-	// 种子的职责收敛为三件：按 seed_key 认行、缺失时创建、下线走 retiredMenus。
-	// 代价（有意接受）：既有菜单行的跨版本结构变更不再自动生效，由运维在控制台完成。
-	{SeedEntityMenu, "seed_key", SeedFieldCreateOnly},
+	// 菜单：**全部业务字段归运维（create_only）**，包括 app_id 与 code——L1 靠 seed_key
+	// （种子身份键，不可见不可写）认行，因此控制台改编码/改归属都不会影响后续行为。
+	// L1 的职责收敛为两件：按 seed_key 认行、缺失时创建（下线与调整全在控制台完成）。
+	// 代价（有意接受）：既有菜单行的跨版本结构变更不再自动生效，由运维按 `make print-builtin-menus`
+	// 的清单在控制台完成。
 	{SeedEntityMenu, "app_id", SeedFieldCreateOnly},
 	{SeedEntityMenu, "code", SeedFieldCreateOnly},
 	{SeedEntityMenu, "parent_id", SeedFieldCreateOnly},
@@ -145,17 +143,17 @@ var SeedFieldAuthorities = []SeedFieldAuthority{
 	{SeedEntityMenu, "type", SeedFieldCreateOnly},
 	{SeedEntityMenu, "visibility", SeedFieldCreateOnly},
 	{SeedEntityMenu, "status", SeedFieldCreateOnly},
-	// 内置角色：admin_type 是系统管理能力的安全不变式（归种子）。名称/描述/编码归"定义方"而非种子回写：
+	// 内置角色：admin_type 是系统管理能力的安全不变式（控制台拒写）。名称/描述/编码归"定义方"而非种子回写：
 	// 编码是下游授权契约值（OIDC groups 取值），只有两个来源——产品锚点（种子定义，如 tenant_admin）
 	// 与应用角色模板（application.role_template，开通应用时物化到各租户）；租户控制台对角色整体只读、
 	// 没有写入入口，模板改名由 SyncAppRoleTemplateToTenants 同步（不是种子回写）。
-	{SeedEntityRole, "admin_type", SeedFieldReconcile},
+	{SeedEntityRole, "admin_type", SeedFieldImmutable},
 	{SeedEntityRole, "name", SeedFieldCreateOnly},
 	{SeedEntityRole, "description", SeedFieldCreateOnly},
 	{SeedEntityRole, "code", SeedFieldCreateOnly},
-	// 种子管理员：口令绝不覆盖（重置走专用接口），source 是内置标记（安全不变式）。
+	// 种子管理员：口令绝不覆盖（重置走专用接口），source 是内置标记（安全不变式，控制台拒写）。
 	{SeedEntityPerson, "password_encrypted", SeedFieldCreateOnly},
-	{SeedEntityUser, "source", SeedFieldReconcile},
+	{SeedEntityUser, "source", SeedFieldImmutable},
 	{SeedEntityUser, "owner_type", SeedFieldCreateOnly},
 }
 
@@ -176,17 +174,16 @@ func SeedFieldModeOf(entity, field string) SeedFieldMode {
 	return SeedFieldCreateOnly
 }
 
-// SeedOwnsField 报告字段是否为种子收敛字段（reconcile）：
-// 唯一写者 = 种子，控制台必须拒写。migrate_once 由迁移清单单独执行，不在此列。
-func SeedOwnsField(entity, field string) bool {
-	return SeedFieldModeOf(entity, field) == SeedFieldReconcile
+// SeedFieldImmutable 报告字段是否不可变：L1 创建时写入，之后控制台必须拒写。
+func SeedFieldIsImmutable(entity, field string) bool {
+	return SeedFieldModeOf(entity, field) == SeedFieldImmutable
 }
 
-// SeedReconcileFields 返回实体的种子收敛字段清单（pkg/seed 据此生成收敛更新集）。
-func SeedReconcileFields(entity string) []string {
+// SeedImmutableFields 返回实体的不可变字段清单（控制台据此实现/核对拒写点）。
+func SeedImmutableFields(entity string) []string {
 	fields := make([]string, 0, len(SeedFieldAuthorities))
 	for _, authority := range SeedFieldAuthorities {
-		if authority.Entity == entity && authority.Mode == SeedFieldReconcile {
+		if authority.Entity == entity && authority.Mode == SeedFieldImmutable {
 			fields = append(fields, authority.Field)
 		}
 	}

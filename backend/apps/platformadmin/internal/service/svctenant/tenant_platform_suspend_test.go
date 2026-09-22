@@ -62,7 +62,7 @@ func TestTenantUpdateRejectsPlatformTenantSuspend(t *testing.T) {
 		t.Fatalf("被拒的挂起不得落库, got %q", got.Status)
 	}
 
-	// 平台租户改名归运维（migrate_once 只处理历史种子值），必须放行
+	// 平台租户改名归运维（create_only：L1 只在创建时写入），必须放行
 	if err := svc.Update(ctx, &dtotenant.TenantUpdateReq{
 		TenantID: platformTenant.ID,
 		TenantBaseInfo: objtenant.TenantBaseInfo{
