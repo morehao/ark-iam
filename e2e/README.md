@@ -36,15 +36,16 @@
 | 服务 | 端口 | OAuth client_id | 说明 |
 |------|------|-----------------|------|
 | gateway | 8100 | - | IAM 后端（`/oidc`） |
-| login-web | 3000 | - | 登录页（凭证表单，非 OIDC Client） |
-| platform-admin-web | 3001 | `platform_admin_web` | 平台管理后台（Admin） |
-| tenant-admin-web | 3002 | `tenant_admin_web` | 租户管理后台（RP1） |
+| login-web | 4000 | - | 登录页（凭证表单，非 OIDC Client） |
+| platform-admin-web | 4001 | `platform_admin_web` | 平台管理后台（Admin） |
+| tenant-admin-web | 4002 | `tenant_admin_web` | 租户管理后台（RP1） |
 
 ## 前置条件
 
 - Node.js 18+
-- MySQL + Redis 已运行
-- 后端种子数据已导入（`admin` / `admin123` + OAuth 客户端 `platform_admin_web` / `tenant_admin_web`）
+- PostgreSQL + Redis 已运行
+- 后端**不再有启动期种子数据**：全新库必须先完成一次性初始化。`globalSetup` 会自动调 `GET /install/status` + `POST /install/initialize` 完成它，因此后端要**带初始化令牌启动**——环境变量 `BOOTSTRAP_TOKEN` 必须等于 `e2e/config.ts` 的 `bootstrapToken`（`e2e-bootstrap-token`），否则端点整体不可用（fail-closed，e2e 直接失败并给出提示）
+- 初始化写入的内置数据：管理员 `admin` / 口令 `Admin123`（`e2e/config.ts` 的 `password`，满足 8–128 位含大小写与数字）+ 内置 OAuth 客户端 `platform_admin_web` / `tenant_admin_web`。库**已初始化**时 `/install/initialize` 返回 409 且永久自锁，e2e 会跳过初始化直接跑；要重来只能删库重建（见 `docs/design/run-and-deploy.md` §2.3 / §2.4）
 - 后端需使用 `config.yaml` 启动（OIDC 端点前缀 `/oidc`）
 
 ## 安装
@@ -69,8 +70,9 @@ npm run test:debug
 ```
 
 测试自动管理服务生命周期：
-- `globalSetup` — 检查并启动所需服务（IAM 后端 :8100、platform-admin-web :3001、tenant-admin-web :3002、login-web :3000）
+- `globalSetup` — 检查并启动所需服务（IAM 后端 :8100、platform-admin-web :4001、tenant-admin-web :4002、login-web :4000）
 - `globalTeardown` — 测试结束后强制清理所有进程（无论成功/失败）
+- 首次初始化 — `globalSetup` 在服务就绪后调用 `GET /install/status`，未初始化则用 `BOOTSTRAP_TOKEN` 调 `POST /install/initialize`，随后再确认一次状态；已初始化直接跳过（端点自锁返回 409）
 
 ## 配置
 

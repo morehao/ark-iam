@@ -648,7 +648,7 @@ flowchart LR
 **实现补充（P4）**：`pkg` 侧已完成，`apps/*` 与前端同批收口。
 
 - 删除的列以「列即代码」的方式整体移除：model 字段、DTO、service 读写点、前端类型/列一并删，无兼容分支、无迁移 SQL（符合 §8.1 的删库重建约定）。
-- `log` 表下线同时登记退役菜单：`pkg/seed` 删除「审计日志」菜单定义并在 `retiredMenus` 登记 `log`，否则存量库会残留指向已删页面的死链菜单（且 `role_menu` 授权不清理）。种子菜单总数 15 → 14，相关计数断言同步修正。
+- `log` 表下线同时登记退役菜单：`pkg/seed` 删除「审计日志」菜单定义并在 `retiredMenus` 登记 `log`，否则存量库会残留指向已删页面的死链菜单（且 `role_menu` 授权不清理）。种子菜单总数 15 → 14，相关计数断言同步修正。**（后续变更注记，2026-09 播种改造）**：这条只对当时成立——`retiredMenus` 清单、`pruneRetiredMenus` 清理与菜单软删墓碑跳过机制已随「播种改为初始化页一次性引导」**整体删除**（启动期不再写任何数据、初始化引导只在全新库跑一次，不存在需要清理的存量库死链菜单；本项目按全新库维护，见 `run-and-deploy.md` §2.3 / §2.4）。本文其余结论不受影响。
 - `pkg/go.mod` 移除 `gorm.io/datatypes`（`go mod tidy` 连带移除 mysql driver 等间接依赖）；`pkg/model.BoolPtr` 随旧 `*bool` 策略字段一并删除（死代码）。
 - 「时间类型原生化」在本批由删除达成：`api_key.last_used_at`（唯一残留 `sql.NullTime`）随列下线，全仓 `sql.Null*` 归零；`user_identity.last_used_at` 本就是 `*time.Time`。
 - AC-1 达成：`pkg/model` 中 `datatypes.JSON` / `json.RawMessage` / `type:boolean` / `sql.Null` 全部为 0。

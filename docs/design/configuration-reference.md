@@ -1,8 +1,8 @@
 # 配置参考（Configuration Reference）
 
-> 本文说明 Ark IAM 各应用 `config.yaml` 的配置项。五个应用（auth / platformadmin / tenantadmin / rpapi / gateway）共享同一套 `pkg/config.Config` 结构，差异主要在 `server.name/port`、OIDC 相关项，以及**仅 auth 生效**的登录限流（`security.login.ratePerMinute` / `burst`）与 `server.trustedProxies`、**仅 platformadmin / tenantadmin 生效**的 `oidc.backChannelLogoutPath`。RP 侧（含外部应用）的 OIDC/目录能力另由 `backend/sdk` 提供，旋钮见 §11。
+> 本文说明 Ark IAM 各应用 `config.yaml` 的配置项。五个应用（auth / platformadmin / tenantadmin / rpapi / gateway）共享同一套 `pkg/config.Config` 结构，差异主要在 `server.name/port`、OIDC 相关项，以及**仅 auth 生效**的登录限流（`security.login.ratePerMinute` / `burst`）与 `server.trustedProxies`、**仅 platformadmin / tenantadmin 生效**的 `oidc.backChannelLogoutPath`、**仅 auth / gateway 配置**的 `oidc.consoles`。RP 侧（含外部应用）的 OIDC/目录能力另由 `backend/sdk` 提供，旋钮见 §11。
 >
-> 配置加载顺序：环境变量 `APP_CONFIG_PATH` 指定路径 → 相对**当前工作目录**的 `../config/config.yaml` → **可执行文件所在目录的上一级** `config/config.yaml`；三者皆无时仍按相对路径加载并启动失败（panic）。
+> 配置加载顺序：环境变量 `APP_CONFIG_PATH` 指定路径 → 相对**当前工作目录**的 `../config/config.yaml` → **可执行文件所在目录的上一级** `config/config.yaml`；三者皆无时仍按相对路径加载并启动失败（panic）。另有唯一一个非 YAML 配置项 `BOOTSTRAP_TOKEN`（首次初始化引导令牌），见 §1.1。
 
 ---
 
@@ -43,7 +43,8 @@ trace:
 
 db:
   auto_migrate: true   # 启动时基于 GORM AutoMigrate 自动建表/增量同步（幂等，只增不删）
-  seed: true           # 启动时幂等写入基础种子数据（seed_key 认行 + 字段权威矩阵）
+                       # 启动期不写任何数据；内置数据由安装页 POST /install/initialize 一次性引导
+                       # （历史配置项 db.seed 已删除，见 §5.1）
 
 db_configs:
   - url: "postgres://postgres:123456@127.0.0.1:5432/iam?sslmode=disable&TimeZone=Asia/Shanghai"
@@ -98,7 +99,24 @@ oidc:
   cookieSameSite: lax
   enableSSOSessionValidation: false
   backChannelLogoutPath: "/bc-logout/platform"
+  # 两个内置控制台的 OIDC 回调地址：**只在首次引导创建内置 OAuth 客户端时使用**
+  # （留空则用内置默认值 :4001 / :4002；详见 §8.4）
+  consoles:
+    platformAdminWeb:
+      redirectURIs: ["http://localhost:4001/auth/callback"]
+      postLogoutRedirectURIs: ["http://localhost:4001/login"]
+      # backChannelLogoutURI: ""   # 留空按 issuer 派生
+    tenantAdminWeb:
+      redirectURIs: ["http://localhost:4002/auth/callback"]
+      postLogoutRedirectURIs: ["http://localhost:4002/login"]
 ```
+
+### 1.1 环境变量
+
+| 变量 | 说明 |
+|---|---|
+| `APP_CONFIG_PATH` | 指定 `config.yaml` 路径，优先级最高（见文首加载顺序） |
+| `BOOTSTRAP_TOKEN` | **首次初始化引导的一次性令牌**（仅 auth / gateway 消费）：`POST /install/initialize` 必须携带匹配的请求头 `X-Bootstrap-Token`；**未设置时该端点整体不可用**——`GET /install/status` 回 `tokenRequired=false`，提交返回 HTTP 503（`107002`），这是 fail-closed。只在全新库引导阶段设置，完成初始化后应立即从运行环境移除；不要写进 `config.yaml` 或镜像（引导流程见 `run-and-deploy.md` §2.4） |
 
 ---
 
@@ -160,7 +178,8 @@ oidc:
 | 配置项 | 说明 |
 |---|---|
 | `auto_migrate` | 启动时基于 GORM AutoMigrate 自动创建/增量同步全部数据表（幂等）。**只新增缺失的表/列/索引，不删列、不改名**；但 GORM 会同步既有列的类型/默认值/非空约束。列 / 表下线一律删代码 + 删库重建（见 `system-design.md` §4.1） |
-| `seed` | 启动时幂等写入基础种子数据（平台租户、根部门、两个内置应用 platform_admin/tenant_admin、内置角色与菜单授权、租户应用订阅、管理员账号 admin/admin123、两个内置 OAuth 客户端 platform_admin_web/tenant_admin_web）。按**种子身份键 `seed_key`** 认行、字段按**权威矩阵**收敛（见 `system-design.md` §4.5），可安全重复执行 |
+
+> **没有"启动时播种"开关**：历史配置项 `db.seed` 已从 `DBConfig` 结构体删除（各应用 `config.yaml` 里的 `seed: true` 也一并移除）。启动期只做 `auto_migrate`、**不写任何数据**；内置数据（平台租户、根部门、两个内置应用 `platform_admin`/`tenant_admin`、内置角色与菜单、租户应用开通、内置管理员、两个内置 OAuth 客户端）由安装页 `POST /install/initialize` 在**单事务**内一次性写入，成功后端点永久自锁。因此不存在"打开开关补种子 / 关掉开关跳过种子"的配置，内置数据清单与首次引导流程见 `run-and-deploy.md` §2.4 与 `system-design.md` §4.5。
 
 > 多租户预留：`tenant.db_user` 字段支持按租户路由数据库用户（当前未启用分库）。
 
@@ -219,6 +238,7 @@ oidc:
 | `cookieDomain` | SSO Cookie Domain（跨子域共享时设置） | 空 |
 | `enableSSOSessionValidation` | 是否开启请求粒度 SSO 会话活性校验（需共享 Redis） | false |
 | `backChannelLogoutPath` | 本应用 back-channel logout 接收端基础路径（挂载在 `/oidc` 组下） | platformadmin 兜底 `/bc-logout/platform`、tenantadmin 兜底 `/bc-logout/tenant`；`pkg/oidckit` 通用兜底 `/oidc/bc-logout`；auth / gateway 未配置 |
+| `consoles` | **两个内置控制台的 OIDC 回调地址**（`platformAdminWeb`/`tenantAdminWeb`，各含 `redirectURIs`/`postLogoutRedirectURIs`/`backChannelLogoutURI`）；**只在首次引导创建内置 OAuth 客户端时使用**，之后改配置不回写。留空＝内置默认值（见 §8.4） | 空（回落 `:4001`/`:4002` 本地默认） |
 
 ### 8.1 签名密钥（多 key、轮换与启动校验）
 
@@ -299,6 +319,28 @@ oidc:
 > gateway 单体部署时由 auth 注入**进程内 key set**，不产生网络调用；此时 `jwksURL` 不生效也不需要配置。
 > **但 `audiences` 仍要配**：它是 per-app 的，gateway 配置里为 rpapi 声明 `["rpapi"]`，否则 `/v1/rp/directory/*` 在 gateway 下会跳过 aud 收紧。rpapi 独立部署时才走 `jwksURL`。
 
+### 8.4 consoles（内置控制台回调地址）
+
+`oidc.consoles` 声明两个内置控制台（`platform_admin_web` / `tenant_admin_web`）的 OIDC 回调地址，当前只有 `auth` 与 `gateway` 的 `config.yaml` 有这一节：
+
+```yaml
+oidc:
+  consoles:
+    platformAdminWeb:
+      redirectURIs: ["http://localhost:4001/auth/callback"]
+      postLogoutRedirectURIs: ["http://localhost:4001/login"]
+      backChannelLogoutURI: ""     # 留空按 issuer + model.SeedBackChannelLogoutPath* 派生
+    tenantAdminWeb:
+      redirectURIs: ["http://localhost:4002/auth/callback"]
+      postLogoutRedirectURIs: ["http://localhost:4002/login"]
+```
+
+- **地址一律写完整 URL**，不做 origin 派生——配置写什么就写什么；
+- **留空回落内置默认值**（本地开发端口 4001/4002 的那组），与改造前的硬编码值逐字节一致，因此本地开发无需配置；
+- 三个字段的判定分三种：字段缺失（`nil`）→ 回落默认；显式配置（含空数组）→ 原样保留；元素为空串 → 回落默认（避免写入无效回调地址）；
+- **只在首次引导创建内置 OAuth 客户端时使用**：`POST /install/initialize` 把它写进 `application_client.redirect_uris` 等列，之后改配置**不会回写**（这些列归运维，可在 OAuth 客户端页面改）。若部署形态变化（换域名/端口），要么在引导前配好，要么引导后在控制台改；
+- **分体部署要显式配 `backChannelLogoutURI`**：auth 与 platformadmin/tenantadmin 不同主机时，单靠 `issuer` 派生不出正确的接收端地址。
+
 ---
 
 ## 9. 其他（jwt / client / masterKey）
@@ -325,6 +367,8 @@ oidc:
 | `oidc.audiences` | 可留空（不校验 aud） | 建议按应用声明白名单 |
 | Swagger 文档 | 开启（`/auth/redocs` 等） | 关闭 |
 | Gin 模式 | debug | release（`env: prod`） |
+| `BOOTSTRAP_TOKEN`（环境变量） | 引导全新库时设置（随机长串即可） | **仅首次初始化期间设置**，完成引导后立即移除；未设置时 `/install/initialize` 不可用（`107002`） |
+| `oidc.consoles` | 可留空（回落 :4001/:4002 默认） | 配成正式控制台域名（只在引导时写入内置客户端，之后改配置不回写） |
 
 ---
 

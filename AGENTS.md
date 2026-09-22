@@ -135,8 +135,8 @@ sdk/                          # RP 侧 OIDC SDK（独立 module：contract + rp�
 - **结构体**: 导出使用大驼峰 `UserSvc`，非导出使用小驼峰 `userSvc`
 - **文件命名**: 小写下划线，如 `user_service.go`，测试文件 `*_test.go`
 - **数据库表**: 下划线命名，如 `department_user`
-- **编码规则（`code` 类字段）**: 两套规则**刻意不同**，不要混用——`application.code`（应用编码，`model.AppCodePattern`，`^[a-z][a-z0-9_]*$`）允许数字；`application_client.code`（= OIDC `client_id`，`model.ClientCodePattern`，`^[a-z][a-z_]*$`）**仅小写字母与下划线、不允许数字**，两者都禁连字符。客户端 `code` 是**创建时的必填入参**（`ApplicationClientCreateReq.Code`，服务端不再生成），且**前后端各校验一份**：前端表单 `pattern`（`platform-admin-web/src/pages/oauthClient` 的 `CLIENT_CODE_PATTERN`）+ 后端 service 入口（`model.IsValidClientCode` → `ApplicationClientCodeInvalidError`）。正则跨语言无法共享，**改一处必须同步另一处**并补两侧回归。内置 `client_id` 常量在 `pkg/model`（`SeedBuiltinClientPlatformAdminWeb` / `SeedBuiltinClientTenantAdminWeb`）：它同时是网关 aud 白名单、back-channel logout 客户端识别与前端 `VITE_OIDC_CLIENT_ID` 默认值的取值来源；存量库的连字符编码由 `pkg/seed` 的 legacy 改名分支原地迁移（保留主键）。
-- **`code` 的可改性由「谁按它认行」决定**（见 `docs/design/system-design.md` §4.5「种子数据与字段权威」）：**菜单 `code` 与归属应用、自建应用 `code`、用户自建客户端 `code` 全部可改**——种子按不可见的**种子身份键 `seed_key`**（`menu`/`application` 上的内部列，创建时写入后不变，控制台不可见不可写）认行，租户开通（`ProvisionTenantAdmin`）与退役菜单清理也按它定位；**内置应用 `code` 与内置客户端 `code`（= `client_id`）保持只读**——内置应用的编码仍是各自控制台菜单入口的定位值（`svcpermission.MyTree` 按 `platform_admin` 查应用、tenantadmin `loadConsoleApps` 只保留 `tenant_admin`），内置客户端编码同时是网关 aud 白名单与前端构建期默认值，两者从控制台改名都会当场把对应控制台锁死且界面无法自救（真要换属版本级动作）。新增按编码认行的代码前，先确认该编码是否属于上述"可改"集合。
+- **编码规则（`code` 类字段）**: 两套规则**刻意不同**，不要混用——`application.code`（应用编码，`model.AppCodePattern`，`^[a-z][a-z0-9_]*$`）允许数字；`application_client.code`（= OIDC `client_id`，`model.ClientCodePattern`，`^[a-z][a-z_]*$`）**仅小写字母与下划线、不允许数字**，两者都禁连字符。客户端 `code` 是**创建时的必填入参**（`ApplicationClientCreateReq.Code`，服务端不再生成），且**前后端各校验一份**：前端表单 `pattern`（`platform-admin-web/src/pages/oauthClient` 的 `CLIENT_CODE_PATTERN`）+ 后端 service 入口（`model.IsValidClientCode` → `ApplicationClientCodeInvalidError`）。正则跨语言无法共享，**改一处必须同步另一处**并补两侧回归。内置 `client_id` 常量在 `pkg/model`（`SeedBuiltinClientPlatformAdminWeb` / `SeedBuiltinClientTenantAdminWeb`）：它同时是网关 aud 白名单、back-channel logout 客户端识别与前端 `VITE_OIDC_CLIENT_ID` 默认值的取值来源。这两个编码在字段权威矩阵里是 `immutable`（`SeedFieldImmutable`）：L1 首次引导创建时按 `ClientCodePattern` 写入，此后控制台拒改（报 `100823`，见 `svcapplicationclient`）。**旧实现里「存量库的连字符编码由 `pkg/seed` legacy 改名分支原地迁移」的那条分支已随启动期播种一并删除**——本项目按全新库维护，不存在需要原地改名的存量行，老部署只能自行改回或删库重建。
+- **`code` 的可改性由「谁按它认行」决定**（见 `docs/design/system-design.md` §4.5「种子数据与字段权威」）：**菜单 `code` 与归属应用、自建应用 `code`、用户自建客户端 `code` 全部可改**——种子按不可见的**种子身份键 `seed_key`**（`menu`/`application` 上的内部列，创建时写入后不变，控制台不可见不可写）认行，租户开通（`ProvisionTenantAdmin`）也按它定位；**内置应用 `code` 与内置客户端 `code`（= `client_id`）保持只读**——内置应用的编码仍是各自控制台菜单入口的定位值（`svcpermission.MyTree` 按 `platform_admin` 查应用、tenantadmin `loadConsoleApps` 只保留 `tenant_admin`），内置客户端编码同时是网关 aud 白名单与前端构建期默认值，两者从控制台改名都会当场把对应控制台锁死且界面无法自救（真要换属版本级动作）。新增按编码认行的代码前，先确认该编码是否属于上述"可改"集合。
 
 ### 模块划分规范
 
@@ -362,8 +362,8 @@ if txErr != nil {
 2. **作用域只能显式声明**，禁止用"ctx 碰巧没有作用域"表达跨租户可见：
    - 当前租户：中间件调用一次 `gincontext.SetTenantScope(ctx, gcontext.CurrentScope(tenantID))`（写入请求上下文，并投影 gin Keys 供 `gincontext.Get*String` 读取）；
    - 指定它租户：`dbclient.ExplicitTenantContext(ctx, tenantID)`（写在具名 dao 方法内，调用方零判断）；
-   - 跨全部租户：`dbclient.CrossTenantContext(ctx)`（按全局唯一键反查、自然人级操作、启动期迁移/种子）；
-   - 非请求入口（seed、worker、后台任务）：显式 `gcontext.WithTenantScope(ctx, gcontext.AllScope()/CurrentScope(tenantID))`。
+   - 跨全部租户：`dbclient.CrossTenantContext(ctx)`（按全局唯一键反查、自然人级操作、首次初始化引导 `svcinstall`）；
+   - 非请求入口（初始化引导、worker、后台任务）：显式 `gcontext.WithTenantScope(ctx, gcontext.AllScope()/CurrentScope(tenantID))`。
 3. **新增不含 `tenant_id` 的全局表**必须同步登记到 `pkg/dbclient/gorm.go` 的 `tenantScopeSkipTables`，否则带租户上下文查询会报 `no such column`。
 4. **测试同样受约束**：`testutil.SetupSQLite` 挂载同一份插件，测试里对租户表的断言查询也必须带作用域（用被测服务同一个 gin ctx，或 `dbclient.CrossTenantContext(...)` 显式跨租户）。
 5. 灰度回退仅有 `dbclient.SetMissingTenantScopeMode(dbclient.MissingTenantScopeWarn)` 一个开关（只告警不拦截），**不得**作为长期方案。
@@ -492,16 +492,16 @@ func TestGeneratePassword(t *testing.T) {
 
 ### 数据库 Schema 变更约定（按新项目处理）
 
-本项目按**全新项目**维护 schema，**不写数据迁移脚本**：`AutoMigrate` 只新增缺失的表/列/索引，**不删不改**既有结构（`db.auto_migrate`），`pkg/seed` 亦只做幂等 upsert。因此**列/表下线（删字段、改名、类型或语义替换）一律按新项目处理**：
+本项目按**全新项目**维护 schema，**不写数据迁移脚本**：`AutoMigrate` 只新增缺失的表/列/索引，**不删不改**既有结构（`db.auto_migrate`）；**启动期不写任何数据**，`pkg/seed` 的写通道只剩一次性的 `Bootstrap`（由初始化页面 `POST /install/initialize` 触发，落库后永久自锁，见 `docs/design/system-design.md` §4.5）。因此**列/表下线（删字段、改名、类型或语义替换）一律按新项目处理**：
 
 - **下线即彻底删代码**：model 字段、DAO Cond、DTO/object、service、controller/router、前端类型与 `docs/design` 同步删除，并全仓 `grep` 确认零残留（参考 `tenant.is_suspended` → `tenant.status`、`system` 模块下线）。
-- **菜单下线额外两步**：从 `seedMenus` 删除定义后，必须在 `pkg/seed/retired_menu.go` 的 `retiredMenus` 登记（父目录与子菜单一并登记），否则存量库会残留指向已删除页面的死链菜单；判断依据是「base 版 `seedMenus` 与当前定义的差集」——`seedMenus` 只 upsert 不下线，而全新库测试永远测不出这类残留。退役清理是**物理删除**（不留墓碑）：版本级下线允许未来重新上线同名 `seed_key`。
-- **菜单的"行"归运维**（见 `docs/design/system-design.md` §4.5）：控制台可新增根菜单/子菜单、可删除任意菜单（含内置菜单）。删除是软删除，软删行仍带 `seed_key`，即"该菜单已被人为下线"的**墓碑**——`seedMenus` 命中墓碑即跳过创建（检查必须早于 `(app_id, code)` 兜底，否则会误认领运维自建的同 code 菜单）。因此不要假设"内置菜单行一定存在"，也不要从控制台删除后又指望种子把它建回来。
-- **禁止在代码里写兼容旧库的分支**：不加回填、不加 `DROP COLUMN`、不引入 `information_schema`/`Migrator()` 判定——这会污染 AutoMigrate「只增不删」的契约，且对新项目零收益。
-- **旧库残留列/表属预期**（不再是事实源、不被读写），处置方式是**开发/测试库删库重建**：重建后 AutoMigrate + Seed 产出的结构即目标结构（见 `docs/design/run-and-deploy.md` §2.3）。
+- **内置菜单的下线/调整全归运维**：`seedMenus` 只在 **L1 首次引导**写入一次，此后不再有任何内置数据写入。因此菜单下线只需删代码定义，**不存在"存量库残留死链菜单"这回事**——旧实现里的 `retiredMenus` 退役清单、`pruneRetiredMenus` 清理、菜单软删墓碑跳过（`menuSeedKeyRemoved`）等机制已全部删除。反过来，**版本升级新增的内置菜单也不会自动下发**：由 `make print-builtin-menus` 输出完整 15 字段清单，运维在「菜单管理」页照单补录（判断依据是「base 版 `builtinMenuDefs` 与当前定义的差集」——`seedMenus` 只创建不更新，全新库测试永远测不出这类差异）。
+- **菜单的"行"归运维**（见 `docs/design/system-design.md` §4.5）：控制台可新增根菜单/子菜单、可删除任意菜单（含内置菜单）。删除是软删除，软删行仍带 `seed_key`，等于"该菜单已被人为下线"。**L1 只在库未初始化时按 `seed_key` 认行创建**，因此不要假设"内置菜单行一定存在"；库已初始化后种子永久自锁，从控制台删除后不会有任何东西把它建回来。
+- **禁止在代码里写兼容旧库的分支**：不加回填、不加 `DROP COLUMN`、不引入 `information_schema`/`Migrator()` 判定——这会污染 AutoMigrate「只增不删」的契约，且对新项目零收益。旧实现里的 legacy 改名分支（菜单/应用/客户端编码的原地迁移）、字段收敛（`reconcileFields`）与一次性改名清单（`seedMigrations`）已随启动期播种一并删除。
+- **旧库残留列/表属预期**（不再是事实源、不被读写），处置方式是**开发/测试库删库重建**：重建后 AutoMigrate 建出目标结构、再由初始化页面写入内置数据（见 `docs/design/run-and-deploy.md` §2.3 删库重建、§2.4 首次初始化）。
 - **改名列 / 改类型的列不能靠 AutoMigrate 过渡**：AutoMigrate 不会转换既有列，旧列原样留着、新列取列默认值；即使手工 `ALTER COLUMN ... TYPE varchar USING bool::varchar`，`true`/`false` 也**不是合法枚举值**（读取端按 `active`/`suspended`、`enable`/`disable` 判定会全部落到默认分支）。因此布尔→枚举这类改造必须删库重建；确需保全数据时先导出、按新枚举口径人工映射再导入（`docs/design/run-and-deploy.md` §2.3）。
-- **种子写入遵循字段权威矩阵**（单一写者，见 `pkg/model/seed_authority.go` 与 `docs/design/system-design.md` §4.5）：每字段显式声明 `reconcile`（种子收敛，控制台必须拒写）/ `create_only`（只播种，归运维，种子不回写）/ `migrate_once`（值匹配一次性改名，登记在 `pkg/seed` 的 `seedMigrations`）；禁止绕过矩阵手写回填 `if`、禁止用 `reconcile` 表达改名（会覆盖运维改动），新增内置字段必须先声明语义再实现。
-- **`reconcile` 的准入判据**（2026-09-12 两轮收窄后的最终形态见 `docs/design/system-design.md` §4.5）：只保留**安全不变式**——`source`（内置标记）、`admin_type`、平台租户 `status`（被挂起整栈失联）。**种子认行不再经由任何控制台可写字段**：菜单/应用按不可见的 `seed_key` 认行，`application_client` 按 `code` 认行。因此展示、结构、编码类字段一律 `create_only` 归运维——种子不回写；其中**内置应用与内置客户端的 `code` 另由 service 拒改**（见上方「`code` 的可改性」）。种子在执行侧只按矩阵过滤（`reconcileFields`），**禁止**在 `pkg/seed` 里硬编码字段归属。
+- **内置数据的字段权威矩阵只有两条语义**（单一写者，见 `pkg/model/seed_authority.go` 与 `docs/design/system-design.md` §4.5）：`immutable`（`SeedFieldImmutable`，L1 创建时写入、此后**控制台必须拒写**）/ `create_only`（`SeedFieldCreateOnly`，只播种，归运维，种子不回写）。旧的 `reconcile`/`migrate_once` 两条已随跨版本写入一并删除——L1 只跑一次、之后永久自锁，**不存在"下次初始化被收回"的双写者**，因此不需要字段收敛与一次性改名。矩阵今天只承担**声明 + 控制台拒写依据**两个职责（执行体是各 service 的拒写点，不是 `pkg/seed`）：未声明的字段一律视为 `create_only`。
+- **`immutable` 的准入判据**（见 `docs/design/system-design.md` §4.5）：只有「被控制台改写后会导致鉴权被绕过或控制台自我锁死」的字段才准入，共两类——**安全不变式**（`source` 内置标记、`role.admin_type`、平台租户 `status`、`tenant_user.source`）与**身份编码**（内置应用 `code`、内置客户端 `code` = `client_id`）。展示、结构、编码类字段一律 `create_only` 归运维——种子不回写；`immutable` 字段必须在控制台有对应拒写点（如内置应用/客户端 `code` 报 `100749`/`100823`、平台租户 `status` 拒挂起），**禁止**在 `pkg/seed` 或 service 里硬编码字段归属而不登记矩阵。
 - **确需保全旧数据时**，把一次性 SQL 写进部署文档交执行方在升级前运行，而不是塞进启动流程。
 
 ### 代码生成
@@ -596,7 +596,7 @@ actionColumn<TenantItem>({
 - **依赖管理**: go mod
 - **API 文档**: swag (Swag Go)
 - **代码生成**: gocli
-- **数据库**: GORM with PostgreSQL（主库，启动时 AutoMigrate 自动建表 + 幂等种子数据），测试用 SQLite
+- **数据库**: GORM with PostgreSQL（主库，启动时 AutoMigrate 自动建表、**不写任何数据**；内置数据由初始化页面 `POST /install/initialize` 一次性引导），测试用 SQLite
 - **RP SDK**: `backend/sdk`（独立 module，依赖白名单；`make test-sdk` / `make sdk-check-deps`，用法见 `backend/sdk/README.md`）
 - **缓存**: Redis
 - **链路追踪**: OpenTelemetry

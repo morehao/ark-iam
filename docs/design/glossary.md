@@ -11,8 +11,8 @@
 | 自然人 ✅ | Person | 跨租户的**全局身份**。用户名/邮箱/手机号全局唯一（可空），密码、全局状态（挂起）在此维护。OIDC `sub` 为 `person:<id>` |
 | 租户成员 ✅ | User | 自然人（person）在某个**租户内**的成员记录（表 **`tenant_user`**——`user` 是 PostgreSQL 保留字，故物理表名加前缀；领域实体为 `UserEntity`）。租户内姓名/资料/角色、归属类型（`owner_type`：`owner` 拥有者 / `normal` 普通成员）、加入时间 |
 | 租户 | Tenant | 独立的客户边界（业务主体的隔离单元）。数据与权限按租户隔离；类型分 `customer`（客户租户）/`platform`（平台租户） |
-| 租户类型 | Tenant Type | **分类标识**：`customer` = 外部客户/合作方的独立租户；`platform` = 平台自运营租户（种子数据“平台运营中心”即平台租户）。当前仅用于分类展示，不参与数据隔离与权限判定（隔离一律按 `tenant_id`） |
-| 租户编码 | Tenant Code | 租户的业务编码，全局唯一、创建后不可修改。由服务端自动生成，规则 `t_<12 位随机小写 hex>`（如 `t_3f7a9c1d2e4b`），见 `pkg/core/tenant.GenerateCode`；平台租户（种子数据“平台运营中心”）为固定值 `t_platform`——同前缀、后缀固定可读，因自动生成的随机段只用小写 hex，两者不会冲突 |
+| 租户类型 | Tenant Type | **分类标识**：`customer` = 外部客户/合作方的独立租户；`platform` = 平台自运营租户（首次引导写入的平台租户「平台运营中心」即平台租户）。当前仅用于分类展示，不参与数据隔离与权限判定（隔离一律按 `tenant_id`） |
+| 租户编码 | Tenant Code | 租户的业务编码，全局唯一、创建后不可修改。由服务端自动生成，规则 `t_<12 位随机小写 hex>`（如 `t_3f7a9c1d2e4b`），见 `pkg/core/tenant.GenerateCode`；平台租户（首次引导写入的「平台运营中心」）为固定值 `t_platform`——同前缀、后缀固定可读，因自动生成的随机段只用小写 hex，两者不会冲突。平台的 `tenant.status` 还是字段权威矩阵里的 `immutable`（挂起整栈失联，控制台拒写） |
 | 租户拥有者 | Tenant Owner | 租户的拥有者成员（注册即成为首个拥有者），拥有租户管理权限 |
 | 外部身份 | User Identity | person 在外部身份源（Connector）中的身份映射（issuer + external_subject） |
 | 多租户 | Multi-tenant | 一个 person 可同时属于多个租户；登录时需选择租户（或由 `tenant` hint 指定） |
@@ -37,10 +37,10 @@
 | 客户端编码 ✅ | Client Code (`client_id`) | `application_client.code`，即 OIDC 的 `client_id`（控制台列表/详情与 API 字段同名，都叫「客户端编码」/`code`）：**创建时由调用方填写（必填）**；**用户自建客户端可改**，**内置客户端只读**（它是网关 aud 白名单与前端构建期默认值的取值来源，改名会当场把该控制台锁死且界面无法自救）。受 `model.ClientCodePattern` 约束——小写字母开头，**仅小写字母与下划线（不允许数字），禁连字符**；前端表单 `pattern` 与后端 service 各校验一份（口径见 [sso-oidc-concepts.md](sso-oidc-concepts.md) §3.2）。与 `application_client.id`（控制台内部主键，供密钥/令牌表外键引用）不是一回事 |
 | OAuth 客户端 ✅ | Application Client | 应用下的 OIDC 接入凭证：client_id、回调白名单、授权类型、令牌 TTL 等 |
 | 客户端密钥 ✅ | Client Secret | 机密客户端在令牌端点的认证凭证（库中只存哈希） |
-| 内置应用 | Built-in App | 平台随产品交付的控制台应用（`application.source=builtin`）：**平台管理后台**与**租户管理后台**两个种子应用，受删除保护（报 `100746`）、编码只读（报 `100749`），菜单只在各自所属的控制台呈现 |
-| 字段权威矩阵 ✅ | Seed Field Authority | 声明内置种子数据每个字段归谁写的唯一真相源（`pkg/model/seed_authority.go`）：`reconcile` 种子收敛且控制台拒写 / `create_only` 只播种、归运维 / `migrate_once` 值匹配一次性改名。种子与控制台共用同一份声明，避免"改了又被收回"的双写者。**reconcile 准入判据**：只保留安全不变式（`source`/`admin_type`/平台租户 `status`），展示、结构与编码字段一律归运维——种子认行由**种子身份键**承担，不再经由控制台可写字段。详见 [system-design.md](system-design.md) §4.5 |
-| 种子身份键 ✅ | Seed Identity Key (`seed_key`) | `menu` / `application` 上的内部列：内置行的**稳定标识**（= 种子定义时的 `code`），创建时写入后不再变化，**控制台不可见也不可写**（API 出参也不返回）。种子认行、租户开通（`ProvisionTenantAdmin`）与退役菜单清理都以它为依据，因此业务字段 `code`（乃至菜单归属应用）可以自由修改而不触发"查不到 → 重建一行"——**例外是内置应用与内置客户端的 `code`**：它们仍被控制台菜单入口 / 网关 aud 边界按值引用，由 service 拒改。控制台自建行恒为空串（部分唯一索引排除空值）。详见 [system-design.md](system-design.md) §4.5 |
-| 第一方应用 | First-party App | 平台自建但非内置的应用（`application.source=first_party`），可删除；当前种子不产生该来源，仅运维自建时出现 |
+| 内置应用 | Built-in App | 平台随产品交付的控制台应用（`application.source=builtin`）：**平台管理后台**与**租户管理后台**两个内置应用（由首次初始化引导写入），受删除保护（报 `100746`）、编码只读（报 `100749`），菜单只在各自所属的控制台呈现 |
+| 字段权威矩阵 ✅ | Seed Field Authority | 声明内置种子数据每个字段归谁写的唯一真相源（`pkg/model/seed_authority.go`）：`immutable` 首次引导写入后控制台拒写 / `create_only` 只播种、归运维。只有这两条语义——旧的 `reconcile`（种子收敛）与 `migrate_once`（值匹配一次性改名）已随"启动期播种"整体删除：初始化只在全新库执行一次、随后永久自锁，不存在"下次初始化被收回"的双写者。矩阵与各 service 的拒写点共用同一份声明（矩阵本身不写数据）。**immutable 准入判据**：只保留安全不变式（`source`/`admin_type`/平台租户 `status`/`tenant_user.source`）与身份编码（内置应用 `code`、内置客户端 `code`），展示、结构与其余编码字段一律归运维——首次引导由**种子身份键**认行，不再经由控制台可写字段。详见 [system-design.md](system-design.md) §4.5 |
+| 种子身份键 ✅ | Seed Identity Key (`seed_key`) | `menu` / `application` 上的内部列：内置行的**稳定标识**（= 首次引导定义时的 `code`），创建时写入后不再变化，**控制台不可见也不可写**（API 出参也不返回）。初始化引导（`pkg/seed.Bootstrap`）与租户开通（`ProvisionTenantAdmin`）都以它认行，因此业务字段 `code`（乃至菜单归属应用）可以自由修改而不触发"查不到 → 重建一行"——**例外是内置应用与内置客户端的 `code`**：它们仍被控制台菜单入口 / 网关 aud 边界按值引用，矩阵登记为 `immutable` 且由 service 拒改。控制台自建行恒为空串（部分唯一索引排除空值）。详见 [system-design.md](system-design.md) §4.5 |
+| 第一方应用 | First-party App | 平台自建但非内置的应用（`application.source=first_party`），可删除；当前首次引导不产生该来源，仅运维自建时出现 |
 | 第三方应用 | Third-party App | 外部接入应用（`application.source=third_party`）；控制台新建的应用恒为此类 |
 | 来源 | Source | 应用/客户端的归属与内置性（`source`：builtin/first_party/third_party）与角色的产生方式（`role.source`：builtin/custom） |
 | 回调地址 | Redirect URI | 授权码回传地址，**必须精确白名单匹配** |
@@ -104,3 +104,6 @@
 | 登录日志 ✅ | Login Log | `user_login_log` 表，每次密码登录的 IP/UA/时间 |
 | 审计日志 ✅ | Audit Log | `audit_log` 表，业务操作审计（动作/目标/结果/详情） |
 | 网关聚合 ✅ | Gateway | gateway 应用（:8100）单进程挂载 auth/platformadmin/tenantadmin/rpapi |
+| 初始化引导 ✅ | Bootstrap | 全新库第一次可用前的一次性写入：安装页 `POST /install/initialize` 触发 `pkg/seed.Bootstrap`，在单事务内写入平台租户 / 根部门 / 内置应用与 OAuth 客户端 / 菜单 / 角色 / 内置管理员；成功后端点**永久自锁**（再调报 `107000`），启动期不再写任何数据 |
+| 初始化令牌 ✅ | Bootstrap Token (`BOOTSTRAP_TOKEN`) | 引导写接口的唯一门禁：环境变量 + 请求头 `X-Bootstrap-Token`，未配置时端点整体不可用（HTTP 503 / `107002`）；属**部署期一次性机密**，初始化完成后即应移除 |
+| 未初始化守卫 ✅ | Bootstrap Guard | `pkg/middleware.BootstrapGuard`：库未初始化时把业务端点拦成 HTTP 409（`107004`），只放行 `/install` 与 `/oidc` 的健康检查 / 服务发现 / 登出端点；已初始化后常驻放行 |

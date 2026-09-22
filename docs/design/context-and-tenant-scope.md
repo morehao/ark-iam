@@ -41,7 +41,7 @@ controller → service → dao → 第三方（OIDC provider、glog、限流器�
 | 当前租户（默认） | `gincontext.SetTenantScope(ctx, gcontext.CurrentScope(tenantID))` | 认证中间件写一次：`pkg/middleware/oidc_auth.go`（OIDC claims）、`pkg/middleware/apikey_auth.go`（API Key 归属租户） |
 | 指定它租户 | `dbclient.ExplicitTenantContext(ctx, tenantID)` | 加入租户、平台侧运维他人租户、新建租户的根部门/成员/权限 |
 | 跨全部租户 | `dbclient.CrossTenantContext(ctx)` | 按全局唯一键（client_id、API Key 摘要、refresh token 摘要、行 ID）反查、自然人级全局登出 |
-| 非请求入口 | `gcontext.WithTenantScope(ctx, gcontext.AllScope()/CurrentScope(tenantID))` | 启动期 AutoMigrate + Seed、审计写入、后台 worker |
+| 非请求入口 | `gcontext.WithTenantScope(ctx, gcontext.AllScope()/CurrentScope(tenantID))` | 启动期 AutoMigrate（只建表、不写数据）、审计写入、后台 worker |
 
 ### 规则 3：新增全局表必须登记
 
@@ -189,7 +189,7 @@ flowchart LR
 |---|---|
 | 写入点 | `pkg/middleware/oidc_auth.go`、`pkg/middleware/apikey_auth.go`：各写一次 `CurrentScope`（API Key 路径同时用 `CrossTenantContext` 反查摘要、`ExplicitTenantContext` 反查归属） |
 | 数据层 | `pkg/dbclient/tenant_scope.go` 重写；`gorm.go` 新增 `UseTenantScopePlugin`，`RegisterDBForTest` 同配置挂载并 panic on error |
-| 非请求入口 | 4 × `cmd/init.go`（AllScope 供 AutoMigrate + Seed）、`pkg/audit`（AllScope 写入）、API Key 异步 `gincontext.AsyncContext` |
+| 非请求入口 | 4 × `cmd/init.go`（AllScope 只供 AutoMigrate，启动期不写数据）、`pkg/audit`（AllScope 写入）、API Key 异步 `gincontext.AsyncContext`；首次初始化引导 `svcinstall` 独立于启动流程，用 `dbclient.CrossTenantContext` 写入内置数据 |
 | 业务/协议层 | `svcauth`、`svcoidc`、`svcsession`、`svcperson`、`oidcop`（协议层 18 处）、`platformadmin`（`svctenant`、`svctenantapplication`）、`pkg/core/{tenant,application}`：逐点显式声明作用域 |
 | 引擎开关 | 4 × `cmd/main.go`：`engine.ContextWithFallback = true` |
 | 脚手架 | `pkg/testsetup/init.go`、各 app `testutil`：测试 gin 上下文与生产中间件同构（类型化作用域 + fallback） |
