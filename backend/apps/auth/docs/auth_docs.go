@@ -15,6 +15,82 @@ const docTemplateauth = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/install/initialize": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统初始化"
+                ],
+                "summary": "执行系统首次初始化",
+                "parameters": [
+                    {
+                        "description": "初始化参数",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoinstall.InstallationInitializeReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoinstall.InstallationInitializeResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/install/status": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统初始化"
+                ],
+                "summary": "查询初始化状态",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoinstall.InstallationStatusResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/oidc/login-config": {
             "post": {
                 "consumes": [
@@ -1599,6 +1675,130 @@ const docTemplateauth = `{
                     "type": "string"
                 },
                 "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "dtoinstall.InstallationChange": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "entity": {
+                    "type": "string"
+                },
+                "key": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtoinstall.InstallationConsoles": {
+            "type": "object",
+            "properties": {
+                "platformAdminWeb": {
+                    "description": "平台管理后台地址（登录页）",
+                    "type": "string"
+                },
+                "tenantAdminWeb": {
+                    "description": "租户管理后台地址（登录页）",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoinstall.InstallationInitializeReq": {
+            "type": "object",
+            "required": [
+                "adminPassword",
+                "adminUsername"
+            ],
+            "properties": {
+                "adminEmail": {
+                    "description": "AdminEmail 与 AdminPhone 至少填一项（同 UserContactRequiredError 的口径）。",
+                    "type": "string",
+                    "maxLength": 128
+                },
+                "adminName": {
+                    "description": "AdminName 管理员显示名（可选，留空取内置缺省）。",
+                    "type": "string",
+                    "maxLength": 128
+                },
+                "adminPassword": {
+                    "description": "AdminPassword 管理员口令（必填）：由运维自选，服务端按 credential.ValidateStrength 强校验。",
+                    "type": "string",
+                    "maxLength": 128
+                },
+                "adminPhone": {
+                    "type": "string",
+                    "maxLength": 32
+                },
+                "adminUsername": {
+                    "description": "AdminUsername 平台管理员用户名（必填，≤128）。",
+                    "type": "string",
+                    "maxLength": 128
+                },
+                "issuer": {
+                    "description": "Issuer 覆盖 OIDC issuer（可选，留空取本部署配置的 oidc.issuer）。\n存在的意义：内置客户端的回调/登出地址按 issuer 派生，反代拓扑下部署方需要显式指定。",
+                    "type": "string",
+                    "maxLength": 256
+                },
+                "tenantName": {
+                    "description": "TenantName 平台租户名称（可选，留空取内置缺省）。",
+                    "type": "string",
+                    "maxLength": 128
+                }
+            }
+        },
+        "dtoinstall.InstallationInitializeResp": {
+            "type": "object",
+            "properties": {
+                "adminUsername": {
+                    "type": "string"
+                },
+                "consoles": {
+                    "$ref": "#/definitions/dtoinstall.InstallationConsoles"
+                },
+                "loginURL": {
+                    "description": "LoginURL 由 oidc.frontendLoginURL 派生，便于页面直接给出下一步入口。",
+                    "type": "string"
+                },
+                "report": {
+                    "description": "Report 本次真实写入的明细（L1 只创建，故 action 恒为 created）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dtoinstall.InstallationReport"
+                        }
+                    ]
+                }
+            }
+        },
+        "dtoinstall.InstallationReport": {
+            "type": "object",
+            "properties": {
+                "changes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtoinstall.InstallationChange"
+                    }
+                },
+                "tenantId": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtoinstall.InstallationStatusResp": {
+            "type": "object",
+            "properties": {
+                "consoles": {
+                    "$ref": "#/definitions/dtoinstall.InstallationConsoles"
+                },
+                "initialized": {
+                    "type": "boolean"
+                },
+                "schemaReady": {
+                    "type": "boolean"
+                },
+                "tokenRequired": {
                     "type": "boolean"
                 }
             }
