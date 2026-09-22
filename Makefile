@@ -34,7 +34,7 @@ PORT              = 8099
 .PHONY: all build build-env clean run lint test swag codegen \
         docker-build docker-run check-image \
         list-apps deps tidy update-dep dev-all dev-frontend stop-frontend e2e e2e-sso e2e-test help \
-        test-sdk sdk-check-deps
+        test-sdk sdk-check-deps print-builtin-menus
 
 # ============================================================
 # 通用入口：清理、依赖、构建并运行
@@ -344,6 +344,12 @@ e2e-test:
 # 其他工具
 # ============================================================
 
+# 打印内置菜单的完整 15 字段清单（供版本升级时在「菜单管理」页补齐新菜单）。
+# 菜单行归运维后 L1 只播种一次，升级带来的新菜单不会自动下发，必须照本清单手工录入。
+print-builtin-menus:
+	@echo "📋 正在生成内置菜单清单..."
+	@cd backend && go work sync && go run ./pkg/cmd/printbuiltinmenus
+
 # 列出所有可用的应用程序
 list-apps:
 	@echo "📂 可用的应用程序:"
@@ -395,6 +401,9 @@ help:
 	@echo "  前端"
 	@echo "    make dev-frontend                      并行启动所有前端服务"
 	@echo "    make stop-frontend                     停止所有前端服务（本地测试）"
+	@echo ""
+	@echo "  种子数据 / 运维"
+	@echo "    make print-builtin-menus               打印内置菜单清单（版本升级补菜单用）"
 	@echo ""
 	@echo "  其他"
 	@echo "    make list-apps                         列出所有可用的应用程序"
