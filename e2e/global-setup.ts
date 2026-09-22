@@ -74,9 +74,15 @@ if (fs.existsSync(GATEWAY_BIN)) {
   };
 }
 
+// 探测主机列表：macOS 上 `localhost` 默认解析到 `::1`，而 vite dev server 绑的就是它。
+// checkPort 与 healthCheck **必须用同一份列表**——否则会出现
+// "TCP 连得上（探到 ::1）但健康检查失败（只探 127.0.0.1）"，
+// 于是把一个完全健康的已启动服务判成"占用但异常"并 SIGKILL 掉。
+const PROBE_HOSTS = ['127.0.0.1', '::1'];
+
 async function checkPort(port: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const hosts = ['127.0.0.1', '::1'];
+    const hosts = PROBE_HOSTS;
     let tried = 0;
     for (const host of hosts) {
       const socket = new net.Socket();
@@ -93,17 +99,30 @@ async function checkPort(port: number): Promise<boolean> {
 /**
  * 对已占用端口的服务做健康检查，确保它能正常响应。
  * 返回 true 表示服务健康可用，false 表示需要重启。
+ *
+ * 逐个尝试 PROBE_HOSTS（IPv4 与 IPv6 环回）：只探 127.0.0.1 会把绑在 ::1 上的
+ * 服务（macOS 上 vite dev server 就是）误判为不健康。
  */
-function healthCheck(port: number, healthPath: string, timeoutMs: number = 5000): Promise<boolean> {
+function healthCheckOnce(host: string, port: number, healthPath: string, timeoutMs: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const req = http.get(`http://127.0.0.1:${port}${healthPath}`, { timeout: timeoutMs }, (res) => {
+    // IPv6 字面量在 URL 里必须加方括号
+    const authority = host.includes(':') ? `[${host}]` : host;
+    const req = http.get(`http://${authority}:${port}${healthPath}`, { timeout: timeoutMs }, (res) => {
       // 2xx/3xx 认为健康
       const status = res.statusCode ?? 0;
+      res.resume();
       resolve(status >= 200 && status < 400);
     });
     req.on('error', () => resolve(false));
     req.on('timeout', () => { req.destroy(); resolve(false); });
   });
+}
+
+async function healthCheck(port: number, healthPath: string, timeoutMs: number = 5000): Promise<boolean> {
+  for (const host of PROBE_HOSTS) {
+    if (await healthCheckOnce(host, port, healthPath, timeoutMs)) return true;
+  }
+  return false;
 }
 
 /**
@@ -157,11 +176,11 @@ async function globalSetup() {
     }
   }
 
-  if (needStart.length === 0) {
-    console.log('  All services ready\n');
-    process.env.E2E_SERVICE_CHILDREN = JSON.stringify([]);
-    return;
-  }
+  // 注意：这里**不能**因为"服务都已在跑"就提前 return。
+  // 服务健康与"系统已初始化"是两件事——启动期播种已删除，初始化只会由下面的
+  // ensureInitialized() 触发。早期版本在 needStart 为空时直接 return，于是
+  // "先手动起好服务（或复用开发者的 dev server）再跑 e2e"这条最自然的路径上，
+  // 全新库永远不会被初始化，所有用例都撞 409/107004 失败。
 
   await Promise.all(
     needStart.map(
@@ -201,12 +220,16 @@ async function globalSetup() {
 
   console.log('  All services ready\n');
 
+  // 无论服务是本次启动的、还是复用到的，都必须确保系统已初始化。
   await ensureInitialized();
   await verifyInitialized();
 
   console.log('[globalSetup] complete\n');
 
   process.env.E2E_SERVICE_CHILDREN = JSON.stringify(children.map((c) => c.pid));
+  // 只登记本次真正启动的端口；复用到的（already running & healthy）不在其中，
+  // teardown 据此避免误杀开发者自己的服务。
+  process.env.E2E_STARTED_PORTS = JSON.stringify(needStart.map((s) => s.port));
 }
 
 /** 极简 JSON 请求（不引 playwright 的 request，globalSetup 运行在测试框架之外）。 */
