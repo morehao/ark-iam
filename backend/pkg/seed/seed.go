@@ -26,11 +26,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/morehao/ark-iam/pkg/credential"
 	"github.com/morehao/ark-iam/pkg/model"
 	// 别名：SeedIam 内以 tenant 命名的局部变量会遮蔽同名包
 	iamtenant "github.com/morehao/ark-iam/pkg/core/tenant"
-	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
 	"gorm.io/gorm"
 )
@@ -121,54 +119,7 @@ type seedMenu struct {
 	visibility model.MenuVisibility
 }
 
-// SeedIam 幂等写入 IAM 基础种子数据。任一环节失败即返回错误，由调用方决定是否阻断启动。
-//
-// Deprecated: 过渡期接口。启动期播种将被删除（启动期只做 AutoMigrate），首次引导的唯一入口是
-// Bootstrap（由 /install 页面触发）。保留它只是为了在引导入口交付前维持既有行为逐字节不变。
-func SeedIam(ctx context.Context, db *gorm.DB) error {
-	_, err := Run(ctx, db)
-	return err
-}
-
-// Run 在单事务内执行种子并返回本次变更报告：
-//   - 整体事务：任一环节失败即回滚，不留"半播"状态；重入时所有分支都以当前值为条件，天然幂等；
-//   - 进程间互斥：Postgres 取 advisory lock，串行化多进程并发播种（SQLite 等测试库跳过）。
-//
-// Deprecated: 过渡期接口，见 SeedIam。与 Bootstrap 的关键差别是**不做"已初始化即返回"判定**：
-// 存量库上仍会执行字段收敛与退役菜单清理，这正是过渡期"零行为变更"所必需的。
-func Run(ctx context.Context, db *gorm.DB) (Report, error) {
-	def, err := legacyDefinition()
-	if err != nil {
-		return Report{}, err
-	}
-	rep := Report{}
-	txErr := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := lockSeed(tx); err != nil {
-			return err
-		}
-		return bootstrapAll(ctx, tx, &rep, def)
-	})
-	if txErr != nil {
-		return rep, txErr
-	}
-	rep.log(ctx)
-	return rep, nil
-}
-
-// legacyDefinition 过渡期的启动播种定义：口令沿用 credential.BootstrapAdminPassword，
-// 其余全部走内置缺省值——保证启动期产物与改造前逐字节一致。
-// 随启动期播种一起删除（届时 credential 与 gcrypto 依赖也一并消失）。
-func legacyDefinition() (Definition, error) {
-	passwordHash, err := gcrypto.GeneratePasswordHash(credential.BootstrapAdminPassword)
-	if err != nil {
-		return Definition{}, fmt.Errorf("seed bootstrap password hash fail: %w", err)
-	}
-	def := defaultDefinition()
-	def.AdminPasswordHash = passwordHash
-	return def, nil
-}
-
-// bootstrapAll 顺序执行 L1 各类引导（在 Bootstrap/Run 的单个事务内）。步骤编号与依赖顺序一一对应。
+// bootstrapAll 顺序执行 L1 各类引导（在 Bootstrap 的单个事务内）。步骤编号与依赖顺序一一对应。
 func bootstrapAll(ctx context.Context, db *gorm.DB, rep *Report, def Definition) error {
 	// 1. 平台租户
 	tenant, err := getOrCreateTenant(ctx, db, rep, def)

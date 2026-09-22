@@ -101,8 +101,10 @@ func TestSeedExportedSurfaceIsPinned(t *testing.T) {
 		//   IsInitialized    只读：库是否已引导
 		//   SchemaReady      只读：表结构是否就绪
 		//   BuiltinMenus     只读：内置菜单清单（make print-builtin-menus）
-		//   Run / SeedIam    过渡期启动播种入口，P5（切断启动期播种）删除
-		"Bootstrap", "BuiltinMenus", "IsInitialized", "Run", "SchemaReady", "SeedIam",
+		//
+		// 注意列表里**没有** Run/SeedIam：启动期播种已切断（P5），
+		// 保留"随时可全量重播"的入口会重新打开"启动期写数据"的口子。
+		"Bootstrap", "BuiltinMenus", "IsInitialized", "SchemaReady",
 	}
 	sort.Strings(want)
 	if len(got) != len(want) {

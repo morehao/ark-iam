@@ -34,17 +34,14 @@ func setupDB(t *testing.T) *gorm.DB {
 
 // TestSeedIamSQLite 在内存 SQLite 上验证种子数据：首次写入 + 二次幂等，
 // 并断言管理员用户从属顶级部门（primary 行政主部门）。
-func TestSeedIamSQLite(t *testing.T) {
+func TestBootstrapSQLite(t *testing.T) {
 	db := setupDB(t)
 	ctx := context.Background()
 
-	// 第一次：种子写入
-	if err := seed.SeedIam(ctx, db); err != nil {
-		t.Fatalf("seed fail: %v", err)
-	}
-	// 第二次：幂等性验证（不应报错、不应重复插入）
-	if err := seed.SeedIam(ctx, db); err != nil {
-		t.Fatalf("seed (2nd) fail: %v", err)
+	// 首次引导写入全部内置数据（幂等性与"二次零写入"由
+	// TestBootstrap_SecondCallIsNoop 与 TestBootstrapAll_SecondRunCreatesNothing 覆盖）
+	if _, _, err := seed.Bootstrap(ctx, db, testDefinition(t)); err != nil {
+		t.Fatalf("bootstrap fail: %v", err)
 	}
 
 	assertCount := func(tbl string, want int64) {
@@ -184,8 +181,8 @@ func TestSeedIamSQLite(t *testing.T) {
 func TestSeedPlatformMenuStructure(t *testing.T) {
 	db := setupDB(t)
 	ctx := context.Background()
-	if err := seed.SeedIam(ctx, db); err != nil {
-		t.Fatalf("seed fail: %v", err)
+	if _, _, err := seed.Bootstrap(ctx, db, testDefinition(t)); err != nil {
+		t.Fatalf("bootstrap fail: %v", err)
 	}
 
 	var adminApp model.ApplicationEntity
@@ -322,75 +319,5 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 	}
 	if granted["system"] {
 		t.Error("admin role should not grant retired menu system")
-	}
-}
-
-// TestSeedIamKeepsOperatorMenuEdits 内置应用菜单的展示与结构字段归运维：在控制台改过之后
-// （名称/路径/组件/图标/排序/类型/可见性/父级），再次播种不得回写——菜单的全部业务字段都是
-// create_only（L1 只按 seed_key 认行、缺失时创建，不回写任何字段）。
-// 过渡期用 Run 验证（启动期播种仍存在）；P5 切断启动期播种后本用例改为断言"二次引导零写入"。
-func TestSeedIamKeepsOperatorMenuEdits(t *testing.T) {
-	db := setupDB(t)
-	ctx := context.Background()
-	if err := seed.SeedIam(ctx, db); err != nil {
-		t.Fatalf("seed fail: %v", err)
-	}
-
-	var adminApp model.ApplicationEntity
-	if err := db.Where("code = ?", "platform_admin").First(&adminApp).Error; err != nil {
-		t.Fatalf("query admin app: %v", err)
-	}
-	var editors []model.MenuEntity
-	if err := db.Where("app_id = ? AND parent_id != ?", adminApp.ID, "").Find(&editors).Error; err != nil {
-		t.Fatalf("query child menus: %v", err)
-	}
-	if len(editors) == 0 {
-		t.Fatal("没有可验证的内置子菜单")
-	}
-
-	// 控制台改动：整体重命名 + 改结构（含把菜单挂到根节点，验证父级不被回写）
-	custom := map[string]any{
-		"name":       "运维自定菜单名",
-		"path":       "/ops-custom",
-		"component":  "pages/opsCustom",
-		"icon":       "SettingOutlined",
-		"sort":       99,
-		"type":       model.MenuTypeMenu,
-		"visibility": model.MenuVisibilityPublic,
-		"parent_id":  "",
-		"status":     model.MenuStatusDisable,
-	}
-	edited := editors[0]
-	if err := db.Model(&model.MenuEntity{}).Where("id = ?", edited.ID).Updates(custom).Error; err != nil {
-		t.Fatalf("degrade menu: %v", err)
-	}
-
-	if err := seed.SeedIam(ctx, db); err != nil {
-		t.Fatalf("seed (2nd) fail: %v", err)
-	}
-	if err := seed.SeedIam(ctx, db); err != nil {
-		t.Fatalf("seed (3rd) fail: %v", err)
-	}
-
-	var got model.MenuEntity
-	if err := db.Where("id = ?", edited.ID).First(&got).Error; err != nil {
-		t.Fatalf("query menu: %v", err)
-	}
-	if got.Name != "运维自定菜单名" || got.Path != "/ops-custom" || got.Component != "pages/opsCustom" ||
-		got.Icon != "SettingOutlined" || got.Sort != 99 || got.ParentID != "" ||
-		got.Visibility != model.MenuVisibilityPublic || got.Status != model.MenuStatusDisable {
-		t.Errorf("内置菜单被种子回写: name=%q path=%q component=%q icon=%q sort=%d parent=%q visibility=%q status=%q",
-			got.Name, got.Path, got.Component, got.Icon, got.Sort, got.ParentID, got.Visibility, got.Status)
-	}
-	if got.Code != edited.Code {
-		t.Errorf("定位键 code 不得变化: %q -> %q", edited.Code, got.Code)
-	}
-	// 内置菜单自愈的边界：种子不再创建缺失行以外的动作，菜单总数保持不变（未因重命名重建）
-	var total int64
-	if err := db.Model(&model.MenuEntity{}).Where("app_id = ?", adminApp.ID).Count(&total).Error; err != nil {
-		t.Fatalf("count menus: %v", err)
-	}
-	if total != 10 {
-		t.Errorf("平台应用菜单数 = %d, want 10（改菜单不得触发种子重建行）", total)
 	}
 }

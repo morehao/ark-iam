@@ -197,9 +197,11 @@ type Server struct {
 // DBConfig 数据库启动行为配置。
 type DBConfig struct {
 	// AutoMigrate 是否在启动时基于 GORM AutoMigrate 自动创建/同步数据表（幂等）。
+	//
+	// 注意：**没有对应的 seed 开关**。启动期只建表、不写任何数据——内置数据由初始化页面
+	// （POST /install/initialize → pkg/seed.Bootstrap）一次性写入，且写入后永久自锁。
+	// 关闭 AutoMigrate 时表结构需由部署方自行准备，否则 /install/status 会报 schemaReady=false。
 	AutoMigrate bool `yaml:"auto_migrate"`
-	// Seed 是否在启动时幂等写入基础种子数据（租户/角色/权限/菜单/管理员/应用客户端）。
-	Seed bool `yaml:"seed"`
 }
 
 type Client struct {

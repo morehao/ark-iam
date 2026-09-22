@@ -33,6 +33,7 @@ func GetError(code int) gerror.Error {
 func init() {
 	// 业务错误码规范: 从 1001XX 开始
 	// 领域划分: tenant(1001XX-1004XX) user(1005XX-1008XX) permission(1006XX-1009XX) auth(1010XX-1011XX) audit
+	// install(1070XX-1070XX) 初始化引导入口（/install/*，唯一写入口，使用真实 HTTP 状态码）
 	registerError(gconstant.DBErrorMsgMap)
 	registerError(gconstant.SystemErrorMsgMap)
 	registerError(gconstant.AuthErrorMsgMap)
@@ -44,4 +45,5 @@ func init() {
 	registerError(connectorErrorMsgMap)
 	registerError(oidcErrorMsgMap)
 	registerError(rpErrorMsgMap)
+	registerError(installErrorMsgMap)
 }

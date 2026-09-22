@@ -38,13 +38,16 @@ func pgTestDSN(t *testing.T) string {
 	return dsn
 }
 
-// TestSeedIamAgainstPostgres 针对本地 PostgreSQL 验证 AutoMigrate + 种子数据的幂等性。
+// TestBootstrapAgainstPostgres 在真实 PostgreSQL 上验证 AutoMigrate 建表 + 首次引导的产物。
 //
-// 运行方式: go test -tags pg ./pkg/seed/ -run TestSeedIamAgainstPostgres -v
+// 为什么必须有这条：SQLite 与 PG 在列默认值、JSON 列、唯一索引（尤其部分唯一索引）、
+// advisory lock 上的行为不同，黄金基线只在 PG 上跑一遍才算真的成立。
+//
+// 运行方式: go test -tags pg ./pkg/seed/ -run TestBootstrapAgainstPostgres -v
 // 前置条件: 本地 127.0.0.1:5432 存在 postgres/<pwd> 且已创建测试库（默认 iam_seedtest）：
 //
 //	docker exec postgres18 psql -U postgres -c "CREATE DATABASE iam_seedtest;"
-func TestSeedIamAgainstPostgres(t *testing.T) {
+func TestBootstrapAgainstPostgres(t *testing.T) {
 	db, err := gorm.Open(postgres.Open(pgTestDSN(t)), &gorm.Config{Logger: logger.Default.LogMode(logger.Warn)})
 	if err != nil {
 		t.Fatalf("open postgres: %v", err)
@@ -67,20 +70,22 @@ func TestSeedIamAgainstPostgres(t *testing.T) {
 
 	cleanup()
 
-	// 第一次：AutoMigrate + Seed
+	// 第一次：AutoMigrate（只建表）+ 首次引导（唯一写通道）
 	if err := model.AutoMigrateAll(db); err != nil {
 		t.Fatalf("auto migrate fail: %v", err)
 	}
-	if err := seed.SeedIam(context.Background(), db); err != nil {
-		t.Fatalf("seed fail: %v", err)
+	if _, _, err := seed.Bootstrap(context.Background(), db, testDefinition(t)); err != nil {
+		t.Fatalf("bootstrap fail: %v", err)
 	}
 
-	// 第二次：幂等性验证（不应报错、不应重复插入）
+	// 第二次：AutoMigrate 仍然只建表（不写数据）；Bootstrap 自锁，零写入
 	if err := model.AutoMigrateAll(db); err != nil {
 		t.Fatalf("auto migrate (2nd) fail: %v", err)
 	}
-	if err := seed.SeedIam(context.Background(), db); err != nil {
-		t.Fatalf("seed (2nd) fail: %v", err)
+	if _, status, err := seed.Bootstrap(context.Background(), db, testDefinition(t)); err != nil {
+		t.Fatalf("bootstrap (2nd) fail: %v", err)
+	} else if status != seed.StatusAlreadyInitialized {
+		t.Fatalf("二次引导 status = %q, want %q", status, seed.StatusAlreadyInitialized)
 	}
 
 	assertCount := func(tbl string, want int64) {
