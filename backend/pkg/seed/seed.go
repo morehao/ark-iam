@@ -39,9 +39,8 @@ const (
 	// 启动时若命中该编码的平台租户，原地改名（保留主键，避免租户重建导致引用失联）。
 	tenantCodePlatformLegacy = "platform"
 
-	// tenantNamePlatform 平台租户名称（种子定义）：仅用于创建与一次性迁移目标值。
-	// 该字段在矩阵里是 migrate_once——运维把平台租户改成自己的公司名后，种子不再回写。
-	tenantNamePlatform = "平台运营中心"
+	// 平台租户名（defaultTenantName）在 definition.go：它是 L1 的输入（Definition.TenantName），
+	// 不再是包内常量；此处保留说明，避免读者按旧路径查找。
 
 	// seedAdvisoryLockKey 播种互斥键（Postgres 事务级 advisory lock）：分体部署时四个应用会同时
 	// 启动播种，用它把执行串行化，避免并发插入撞关联表唯一索引后中断启动。取值仅需全系统一致。
@@ -82,9 +81,9 @@ type seedMigration struct {
 // platform-admin→platform_admin）因改变后续查询键，仍在各自的 upsert 里先行处理。
 // 同一字段可累积多条（A→B、B→C），migrateString 会在一次启动内链式应用。
 var seedMigrations = []seedMigration{
-	{model.SeedEntityTenant, "name", "Default Tenant", tenantNamePlatform},
+	{model.SeedEntityTenant, "name", "Default Tenant", defaultTenantName},
 	// 根部门与平台租户同名（派生），随租户名的历史改名同步一次
-	{model.SeedEntityDepartment, "name", "Default Tenant", tenantNamePlatform},
+	{model.SeedEntityDepartment, "name", "Default Tenant", defaultTenantName},
 }
 
 // migrateString 对单值应用 seedMigrations 的值匹配迁移，返回新值与是否发生迁移。
@@ -142,7 +141,10 @@ type Change struct {
 // Report 本次种子执行的变更报告：仅用于启动日志核对（不落库），
 // 覆盖权威矩阵相关实体与平台自举产物（租户/部门/应用/菜单/客户端/角色/订阅/管理员）。
 type Report struct {
-	Changes []Change
+	// TenantID 平台租户 ID：L1 引导的审计与响应需要它定位本次操作的目标租户。
+	// 引导失败（未走到租户创建）时为空。
+	TenantID string
+	Changes  []Change
 }
 
 func (r *Report) created(entity, key string) {
@@ -213,6 +215,9 @@ type seedMenu struct {
 }
 
 // SeedIam 幂等写入 IAM 基础种子数据。任一环节失败即返回错误，由调用方决定是否阻断启动。
+//
+// Deprecated: 过渡期接口。启动期播种将被删除（启动期只做 AutoMigrate），首次引导的唯一入口是
+// Bootstrap（由 /install 页面触发）。保留它只是为了在引导入口交付前维持既有行为逐字节不变。
 func SeedIam(ctx context.Context, db *gorm.DB) error {
 	_, err := Run(ctx, db)
 	return err
@@ -221,13 +226,20 @@ func SeedIam(ctx context.Context, db *gorm.DB) error {
 // Run 在单事务内执行种子并返回本次变更报告：
 //   - 整体事务：任一环节失败即回滚，不留"半播"状态；重入时所有分支都以当前值为条件，天然幂等；
 //   - 进程间互斥：Postgres 取 advisory lock，串行化多进程并发播种（SQLite 等测试库跳过）。
+//
+// Deprecated: 过渡期接口，见 SeedIam。与 Bootstrap 的关键差别是**不做"已初始化即返回"判定**：
+// 存量库上仍会执行字段收敛与退役菜单清理，这正是过渡期"零行为变更"所必需的。
 func Run(ctx context.Context, db *gorm.DB) (Report, error) {
+	def, err := legacyDefinition()
+	if err != nil {
+		return Report{}, err
+	}
 	rep := Report{}
 	txErr := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := lockSeed(tx); err != nil {
 			return err
 		}
-		return seedAll(ctx, tx, &rep)
+		return bootstrapAll(ctx, tx, &rep, def)
 	})
 	if txErr != nil {
 		return rep, txErr
@@ -236,13 +248,28 @@ func Run(ctx context.Context, db *gorm.DB) (Report, error) {
 	return rep, nil
 }
 
-// seedAll 顺序执行各类种子（在 Run 的单个事务内）。步骤编号与依赖顺序一一对应。
-func seedAll(ctx context.Context, db *gorm.DB, rep *Report) error {
+// legacyDefinition 过渡期的启动播种定义：口令沿用 credential.BootstrapAdminPassword，
+// 其余全部走内置缺省值——保证启动期产物与改造前逐字节一致。
+// 随启动期播种一起删除（届时 credential 与 gcrypto 依赖也一并消失）。
+func legacyDefinition() (Definition, error) {
+	passwordHash, err := gcrypto.GeneratePasswordHash(credential.BootstrapAdminPassword)
+	if err != nil {
+		return Definition{}, fmt.Errorf("seed bootstrap password hash fail: %w", err)
+	}
+	def := defaultDefinition()
+	def.AdminPasswordHash = passwordHash
+	return def, nil
+}
+
+// bootstrapAll 顺序执行 L1 各类引导（在 Bootstrap/Run 的单个事务内）。步骤编号与依赖顺序一一对应。
+func bootstrapAll(ctx context.Context, db *gorm.DB, rep *Report, def Definition) error {
 	// 1. 平台租户
-	tenant, err := getOrCreateTenant(ctx, db, rep)
+	tenant, err := getOrCreateTenant(ctx, db, rep, def)
 	if err != nil {
 		return err
 	}
+	// 审计与响应据此定位本次引导的目标租户
+	rep.TenantID = tenant.ID
 
 	// 2. 租户同名顶级部门（用户归属的根部门，管理员也归属于此）
 	rootDept, err := seedRootDepartment(ctx, db, tenant, rep)
@@ -291,7 +318,7 @@ func seedAll(ctx context.Context, db *gorm.DB, rep *Report) error {
 	}
 
 	// 9. 默认管理员（person + user + 顶级部门归属）
-	adminUser, err := seedAdminUser(ctx, db, rep, tenant, rootDept)
+	adminUser, err := seedAdminUser(ctx, db, rep, tenant, rootDept, def)
 	if err != nil {
 		return err
 	}
@@ -309,7 +336,7 @@ func seedAll(ctx context.Context, db *gorm.DB, rep *Report) error {
 	}
 
 	// 11. OIDC 测试客户端（平台管理后台客户端挂 platform_admin，租户管理后台客户端挂 tenant_admin）
-	if err := seedOIDCClients(ctx, db, rep, tenant, adminApp, tenantAdminApp); err != nil {
+	if err := seedOIDCClients(ctx, db, rep, tenant, adminApp, tenantAdminApp, def); err != nil {
 		return err
 	}
 
@@ -331,7 +358,7 @@ func findTenantByCode(db *gorm.DB, code string) (*model.TenantEntity, error) {
 	return nil, fmt.Errorf("seed tenant query fail (code=%s): %w", code, err)
 }
 
-func getOrCreateTenant(ctx context.Context, db *gorm.DB, rep *Report) (*model.TenantEntity, error) {
+func getOrCreateTenant(ctx context.Context, db *gorm.DB, rep *Report, def Definition) (*model.TenantEntity, error) {
 	entity, err := findTenantByCode(db, tenantCodePlatform)
 	if err != nil {
 		return nil, err
@@ -385,7 +412,7 @@ func getOrCreateTenant(ctx context.Context, db *gorm.DB, rep *Report) (*model.Te
 	}
 	entity = &model.TenantEntity{
 		Code:   tenantCodePlatform,
-		Name:   tenantNamePlatform,
+		Name:   def.TenantName,
 		Type:   model.TenantTypePlatform,
 		DbUser: "default_user",
 		Status: model.TenantStatusActive,
@@ -817,34 +844,31 @@ func seedTenantApplications(ctx context.Context, db *gorm.DB, rep *Report, tenan
 // seedAdminUser 幂等写入默认管理员（person + user），并确保其从属于顶级部门 rootDept
 // （primary 行政主部门），满足"用户必须从属于某个部门"的业务约束。
 // rootDept 缺失时视为种子数据不完整，直接报错，避免产出无归属用户。
-func seedAdminUser(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.TenantEntity, rootDept *model.DepartmentEntity) (*model.UserEntity, error) {
+func seedAdminUser(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.TenantEntity, rootDept *model.DepartmentEntity, def Definition) (*model.UserEntity, error) {
 	if rootDept == nil || rootDept.ID == "" {
 		return nil, fmt.Errorf("seed admin user fail: root department not found")
 	}
-	passwordHash, err := gcrypto.GeneratePasswordHash(credential.BootstrapAdminPassword)
-	if err != nil {
-		return nil, fmt.Errorf("seed admin password hash fail: %w", err)
-	}
-
-	// person：以 username 为唯一键
+	// person：以 username 为唯一键。口令摘要由调用方提供（Bootstrap 的调用方是初始化接口，
+	// 过渡期的 Run 由 legacyDefinition 生成），本包不内置任何默认口令。
 	person := &model.PersonEntity{}
-	pErr := db.Where("username = ?", model.StrPtr("admin")).First(person).Error
+	pErr := db.Where("username = ?", model.StrPtr(def.AdminUsername)).First(person).Error
 	if pErr != nil && !errors.Is(pErr, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("seed admin person query fail: %w", pErr)
 	}
 	if errors.Is(pErr, gorm.ErrRecordNotFound) {
 		person = &model.PersonEntity{
-			Username:          model.StrPtr("admin"),
-			PrimaryEmail:      model.StrPtr("admin@example.com"),
-			PrimaryPhone:      model.StrPtr("13800000000"),
-			PasswordEncrypted: passwordHash,
+			Username:          model.StrPtr(def.AdminUsername),
+			PrimaryEmail:      model.StrPtr(def.AdminEmail),
+			PrimaryPhone:      model.StrPtr(def.AdminPhone),
+			PasswordEncrypted: def.AdminPasswordHash,
 			PasswordMethod:    model.PasswordMethodBcrypt,
-			Name:              "系统管理员",
+			PasswordStatus:    def.AdminPasswordStatus,
+			Name:              def.AdminName,
 		}
 		if err := db.WithContext(ctx).Create(person).Error; err != nil {
 			return nil, fmt.Errorf("seed admin person create fail: %w", err)
 		}
-		rep.created(model.SeedEntityPerson, "admin")
+		rep.created(model.SeedEntityPerson, def.AdminUsername)
 	}
 
 	// user：以 (tenant_id, person_id) 为唯一键
@@ -858,7 +882,7 @@ func seedAdminUser(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.
 		user = &model.UserEntity{
 			TenantID:  tenant.ID,
 			PersonID:  person.ID,
-			Name:      "系统管理员",
+			Name:      def.AdminName,
 			Source:    model.UserSourceBuiltin,
 			OwnerType: model.OwnerTypeOwner,
 			Status:    model.UserStatusActive,
@@ -867,7 +891,7 @@ func seedAdminUser(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.
 		if err := db.WithContext(ctx).Create(user).Error; err != nil {
 			return nil, fmt.Errorf("seed admin user create fail: %w", err)
 		}
-		glog.Infof(ctx, "[seed] admin user created, id:%s (default password: %s, password_status: %s)", user.ID, credential.BootstrapAdminPassword, model.PasswordStatusNormal)
+		glog.Infof(ctx, "[seed] admin user created, id:%s username:%s password_status:%s", user.ID, def.AdminUsername, def.AdminPasswordStatus)
 		rep.created(model.SeedEntityUser, user.ID)
 	}
 
@@ -961,8 +985,12 @@ func findApplicationClientByCode(db *gorm.DB, code string) (*model.ApplicationCl
 // seedOIDCClients 播种内置 OAuth 客户端（OIDC RP）。
 // 归属应用按控制台一一对应：平台管理后台客户端 → platform_admin 应用，租户管理后台客户端 → tenant_admin 应用。
 // app_id 是种子收敛字段（矩阵声明 reconcile）：存量库把两者都挂到 platform_admin 的错误绑定由此自愈。
-func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.TenantEntity, adminApp, tenantAdminApp *model.ApplicationEntity) error {
-	type clientDef struct {
+//
+// 回调地址来自 def.Consoles（完整 URL，不做 origin 派生）；bc-logout 已由 withDefaults 解析成最终值，
+// 因此这里落库的地址与初始化页面回显给运维的地址必然一致。
+// 切片非 nil 由 withDefaults 保证（nil → 内置缺省），满足 JSON 列"nil 入库前归一为空切片"的约束。
+func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.TenantEntity, adminApp, tenantAdminApp *model.ApplicationEntity, def Definition) error {
+	type builtinClientDef struct {
 		code                 string
 		legacyCode           string
 		name                 string
@@ -971,38 +999,38 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 		postLogoutRedirect   model.PostLogoutRedirectURIList
 		backChannelLogoutURI string
 	}
-	defs := []clientDef{
+	clientDefs := []builtinClientDef{
 		{
 			code:                 oauthClientPlatformAdminWeb,
 			legacyCode:           oauthClientPlatformAdminWebLegacy,
 			name:                 "平台管理后台",
 			appID:                adminApp.ID,
-			redirectURIs:         model.RedirectURIList{"http://localhost:4001/auth/callback"},
-			postLogoutRedirect:   model.PostLogoutRedirectURIList{"http://localhost:4001/login"},
-			backChannelLogoutURI: "http://localhost:8100/oidc/bc-logout/platform",
+			redirectURIs:         model.RedirectURIList(def.Consoles.PlatformAdminWeb.RedirectURIs),
+			postLogoutRedirect:   model.PostLogoutRedirectURIList(def.Consoles.PlatformAdminWeb.PostLogoutRedirectURIs),
+			backChannelLogoutURI: def.Consoles.PlatformAdminWeb.BackChannelLogoutURI,
 		},
 		{
 			code:                 oauthClientTenantAdminWeb,
 			legacyCode:           oauthClientTenantAdminWebLegacy,
 			name:                 "租户管理后台",
 			appID:                tenantAdminApp.ID,
-			redirectURIs:         model.RedirectURIList{"http://localhost:4002/auth/callback"},
-			postLogoutRedirect:   model.PostLogoutRedirectURIList{"http://localhost:4002/login"},
-			backChannelLogoutURI: "http://localhost:8100/oidc/bc-logout/tenant",
+			redirectURIs:         model.RedirectURIList(def.Consoles.TenantAdminWeb.RedirectURIs),
+			postLogoutRedirect:   model.PostLogoutRedirectURIList(def.Consoles.TenantAdminWeb.PostLogoutRedirectURIs),
+			backChannelLogoutURI: def.Consoles.TenantAdminWeb.BackChannelLogoutURI,
 		},
 	}
-	for _, def := range defs {
+	for _, cd := range clientDefs {
 		// 编码规则在种子入口先行校验：内置 client_id 同时是网关侧的 audience 白名单值，
 		// 写错一个字符就会让该控制台的令牌全部 401，宁可阻断启动也不要落库。
-		if !model.IsValidClientCode(def.code) {
-			return fmt.Errorf("seed oauth client 编码 %q 不符合规则 %s", def.code, model.ClientCodePattern)
+		if !model.IsValidClientCode(cd.code) {
+			return fmt.Errorf("seed oauth client 编码 %q 不符合规则 %s", cd.code, model.ClientCodePattern)
 		}
-		entity, err := findApplicationClientByCode(db, def.code)
+		entity, err := findApplicationClientByCode(db, cd.code)
 		if err != nil {
 			return err
 		}
-		if def.legacyCode != "" {
-			legacy, lErr := findApplicationClientByCode(db, def.legacyCode)
+		if cd.legacyCode != "" {
+			legacy, lErr := findApplicationClientByCode(db, cd.legacyCode)
 			if lErr != nil {
 				return lErr
 			}
@@ -1012,17 +1040,17 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 			case entity != nil:
 				// 新旧编码并存：无法判断哪一行才是内置客户端。此时回填 source/app_id 会把用户自建客户端
 				// 改写成内置（获得删除保护并接管回调白名单），故宁可中断启动，交人工确认后删除其一。
-				return fmt.Errorf("seed oauth client code conflict: %q 与 %q 同时存在，请人工确认哪一行是内置客户端并删除另一行", def.code, def.legacyCode)
+				return fmt.Errorf("seed oauth client code conflict: %q 与 %q 同时存在，请人工确认哪一行是内置客户端并删除另一行", cd.code, cd.legacyCode)
 			default:
 				// 历史库编码迁移（platform-admin-web -> platform_admin_web）：保留主键，
 				// 使 refresh_token / application_client_secret 等以 id 为外键的引用不失联。
 				if uErr := db.WithContext(ctx).Model(&model.ApplicationClientEntity{}).Where("id = ?", legacy.ID).
-					Update("code", def.code).Error; uErr != nil {
-					return fmt.Errorf("seed oauth client code migrate fail (%s -> %s): %w", def.legacyCode, def.code, uErr)
+					Update("code", cd.code).Error; uErr != nil {
+					return fmt.Errorf("seed oauth client code migrate fail (%s -> %s): %w", cd.legacyCode, cd.code, uErr)
 				}
-				glog.Infof(ctx, "[seed] oauth client code migrated (%s -> %s), id:%s", def.legacyCode, def.code, legacy.ID)
-				rep.migrated(model.SeedEntityApplicationClient, def.code, "code", def.legacyCode, def.code)
-				legacy.Code = def.code
+				glog.Infof(ctx, "[seed] oauth client code migrated (%s -> %s), id:%s", cd.legacyCode, cd.code, legacy.ID)
+				rep.migrated(model.SeedEntityApplicationClient, cd.code, "code", cd.legacyCode, cd.code)
+				legacy.Code = cd.code
 				entity = legacy
 			}
 		}
@@ -1032,24 +1060,24 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 			// 控制台改客户端名后重启不回写。回调地址/授权类型/令牌 TTL 等运行参数同为 create_only。
 			changes, uErr := reconcileFields(ctx, db, model.SeedEntityApplicationClient, model.TableNameApplicationClient, entity.ID,
 				map[string]any{"source": entity.Source, "name": entity.Name, "app_id": entity.AppID},
-				map[string]any{"source": model.ApplicationClientSourceBuiltin, "name": def.name, "app_id": def.appID})
+				map[string]any{"source": model.ApplicationClientSourceBuiltin, "name": cd.name, "app_id": cd.appID})
 			if uErr != nil {
-				return fmt.Errorf("seed oauth client %s reconcile fail: %w", def.code, uErr)
+				return fmt.Errorf("seed oauth client %s reconcile fail: %w", cd.code, uErr)
 			}
 			if len(changes) > 0 {
-				glog.Infof(ctx, "[seed] oauth client reconciled, code:%s fields:%v", def.code, changes)
-				rep.updated(model.SeedEntityApplicationClient, def.code, changes)
+				glog.Infof(ctx, "[seed] oauth client reconciled, code:%s fields:%v", cd.code, changes)
+				rep.updated(model.SeedEntityApplicationClient, cd.code, changes)
 			}
 			continue
 		}
 		entity = &model.ApplicationClientEntity{
 			TenantID:                tenant.ID,
-			AppID:                   def.appID,
-			Code:                    def.code,
-			Name:                    def.name,
-			RedirectURIs:            def.redirectURIs,
-			PostLogoutRedirectURIs:  def.postLogoutRedirect,
-			BackChannelLogoutURI:    def.backChannelLogoutURI,
+			AppID:                   cd.appID,
+			Code:                    cd.code,
+			Name:                    cd.name,
+			RedirectURIs:            cd.redirectURIs,
+			PostLogoutRedirectURIs:  cd.postLogoutRedirect,
+			BackChannelLogoutURI:    cd.backChannelLogoutURI,
 			GrantTypes:              seedOIDCClientGrantTypes,
 			ResponseTypes:           model.ResponseTypeList{model.ResponseTypeCode},
 			TokenEndpointAuthMethod: model.TokenEndpointAuthMethodNone,
@@ -1059,10 +1087,10 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 			Status:                  model.ApplicationClientStatusEnable,
 		}
 		if err := db.WithContext(ctx).Create(entity).Error; err != nil {
-			return fmt.Errorf("seed oauth client %s create fail: %w", def.code, err)
+			return fmt.Errorf("seed oauth client %s create fail: %w", cd.code, err)
 		}
-		glog.Infof(ctx, "[seed] oauth client created, code:%s", def.code)
-		rep.created(model.SeedEntityApplicationClient, def.code)
+		glog.Infof(ctx, "[seed] oauth client created, code:%s", cd.code)
+		rep.created(model.SeedEntityApplicationClient, cd.code)
 	}
 	return nil
 }

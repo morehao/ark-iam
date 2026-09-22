@@ -65,6 +65,16 @@ const (
 	SeedBuiltinClientTenantAdminWeb   = "tenant_admin_web"
 )
 
+// back-channel logout 接收端路径（相对 OIDC Issuer 的路径部分）。
+//
+// 三处必须一致，因此收口在这里：接收端注册（platformadmin/tenantadmin 的 app.go）、
+// L1 播种时写入 application_client.back_channel_logout_uri 的派生结果。
+// 只含路径不含主机：主机由 oidc.issuer 或 console 级覆盖决定（分体部署下两者可能不同）。
+const (
+	SeedBackChannelLogoutPathPlatform = "/bc-logout/platform"
+	SeedBackChannelLogoutPathTenant   = "/bc-logout/tenant"
+)
+
 // SeedFieldAuthority 单条字段权威声明。
 type SeedFieldAuthority struct {
 	Entity string
