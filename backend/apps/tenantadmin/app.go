@@ -86,9 +86,10 @@ func registerBackChannelLogout(engine *gin.Engine, Conf *pkgconfig.Config, keySo
 	}
 	group := engine.Group("/oidc")
 	group.Use(ginmiddleware.CORS())
+	// 默认路径取自 pkg/model 的常量，理由同 platformadmin（app_test.go 钉住了这条路径）。
 	basePath := Conf.OIDC.BackChannelLogoutPath
 	if basePath == "" {
-		basePath = "/bc-logout/tenant"
+		basePath = model.SeedBackChannelLogoutPathTenant
 	}
 	oidckit.RegisterReceiverRoutes(group, basePath, keySource, Conf.OIDC.Issuer, model.SeedBuiltinClientTenantAdminWeb, nil)
 }
