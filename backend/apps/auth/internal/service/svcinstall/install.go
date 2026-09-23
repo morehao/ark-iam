@@ -204,7 +204,12 @@ func validateInitializeReq(req *dtoinstall.InstallationInitializeReq) error {
 //
 // 单独提供而不是直接 gutil.ToJsonString(req)，是为了让"口令不入日志"这件事只有一处实现，
 // 且调用方无法"顺手"把整个 req 打进日志。
+//
+// 容忍 nil：令牌校验先于参数绑定，未通过准入的请求还没有 req 可记。
 func LogSafeReq(req *dtoinstall.InstallationInitializeReq) string {
+	if req == nil {
+		return "{}"
+	}
 	safe := *req
 	safe.AdminPassword = ""
 	return gutil.ToJsonString(&safe)

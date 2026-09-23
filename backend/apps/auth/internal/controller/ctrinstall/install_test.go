@@ -304,3 +304,73 @@ func TestStatusReportsSchemaNotReady(t *testing.T) {
 		t.Fatalf("空库 status 查询 status = %d, want 200(schemaReady=false) 或 503", rec.Code)
 	}
 }
+
+// postInitializeRaw 发送**原始请求体**：postInitialize 只能发合法 JSON，
+// 覆盖不到"参数不合法"这条路径。
+func postInitializeRaw(t *testing.T, engine *gin.Engine, token, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	httpReq := httptest.NewRequest(http.MethodPost, "/install/initialize", strings.NewReader(body))
+	httpReq.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		httpReq.Header.Set(svcinstall.HeaderBootstrapToken, token)
+	}
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, httpReq)
+	return rec
+}
+
+// 令牌校验必须**先于**参数绑定。
+//
+// 这是安全属性：绑定失败返回 400/107005、令牌失败返回 401/107001，
+// 若绑定在前，一个未持令牌的调用方就能靠"400 还是 401"判断自己的参数是否合法——
+// 参数校验变成无需准入即可使用的探测面。
+func TestInitializeChecksTokenBeforeBinding(t *testing.T) {
+	cases := []struct {
+		name  string
+		token string
+		body  string
+	}{
+		{"无令牌 + 非法 JSON → 401，不得是 400", "", `{"adminUsername":`},
+		{"无令牌 + 空对象 → 401，不得是 400", "", `{}`},
+		{"错令牌 + 非法 JSON → 401，不得是 400", "wrong", `{"adminUsername":`},
+		{"错令牌 + 空对象 → 401，不得是 400", "wrong", `{}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			engine, _ := newInstallEngine(t)
+			t.Setenv(svcinstall.EnvBootstrapToken, "s3cret")
+
+			rec := postInitializeRaw(t, engine, tc.token, tc.body)
+
+			if rec.Code != http.StatusUnauthorized {
+				t.Fatalf("status = %d, want 401（令牌必须先于绑定被校验）body=%s", rec.Code, rec.Body.String())
+			}
+			if got := codeOf(t, rec); got != 107001 {
+				t.Errorf("code = %d, want 107001", got)
+			}
+		})
+	}
+}
+
+// 换序不能把参数校验弄丢：通过准入之后，非法 JSON 仍必须是 400/107005。
+func TestInitializeBadJSONAfterTokenIsBadRequest(t *testing.T) {
+	engine, _ := newInstallEngine(t)
+	t.Setenv(svcinstall.EnvBootstrapToken, "s3cret")
+
+	rec := postInitializeRaw(t, engine, "s3cret", `{"adminUsername":`)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400, body=%s", rec.Code, rec.Body.String())
+	}
+	if got := codeOf(t, rec); got != 107005 {
+		t.Errorf("code = %d, want 107005", got)
+	}
+}
+
+// 令牌校验先于绑定，因此"未通过准入"这条路径会带着 nil req 调 svcinstall.LogSafeReq——
+// 它必须容忍 nil，否则准入失败会 panic 成 500，而不是预期的 401。
+func TestLogSafeReqToleratesNilForUnauthenticatedRequests(t *testing.T) {
+	if got := svcinstall.LogSafeReq(nil); got != "{}" {
+		t.Fatalf("LogSafeReq(nil) = %q, want %q", got, "{}")
+	}
+}

@@ -58,17 +58,24 @@ func (ctr *InstallCtr) Status(ctx *gin.Context) {
 // @Success 200 {object} gincontext.DtoRender{data=dtoinstall.InstallationInitializeResp}
 // @Router /install/initialize [post]
 func (ctr *InstallCtr) Initialize(ctx *gin.Context) {
+	// 令牌校验**先于任何参数处理**：它是"准入"而非业务规则。
+	//
+	// 这个顺序是安全属性，不是风格偏好：绑定失败会返回 400/107005，令牌失败返回 401/107001，
+	// 若把绑定放在前面，一个**未持有令牌**的调用方就能靠"400 还是 401"判断自己的请求参数
+	// 是否合法——把参数校验变成了无需准入即可使用的探测面。原先的注释已写明这条意图，
+	// 但代码把绑定放在了令牌之前，实现与契约相反。
+	if err := svcinstall.CheckBootstrapToken(ctx.GetHeader(svcinstall.HeaderBootstrapToken)); err != nil {
+		status, _ := svcinstall.HTTPStatusOf(err)
+		// 未通过准入的请求**不记录其参数**：此时 req 尚未绑定（也不该绑定），
+		// 日志只留状态码与错误类型。
+		ctr.fail(ctx, nil, status, err, err)
+		return
+	}
+
 	var req dtoinstall.InstallationInitializeReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		// 绑定失败的错误文案由 gin 生成，可能含请求体片段，因此只进日志、不进审计。
 		ctr.fail(ctx, &req, http.StatusBadRequest, code.GetError(code.InstallationBadRequestError), err)
-		return
-	}
-	// 令牌校验在控制器入口：它是"准入"而非业务规则，且必须在任何业务处理之前失败——
-	// 未持有令牌的调用方不该从错误信息里推断出参数是否合法。
-	if err := svcinstall.CheckBootstrapToken(ctx.GetHeader(svcinstall.HeaderBootstrapToken)); err != nil {
-		status, _ := svcinstall.HTTPStatusOf(err)
-		ctr.fail(ctx, &req, status, err, err)
 		return
 	}
 
