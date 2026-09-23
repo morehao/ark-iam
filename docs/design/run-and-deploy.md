@@ -162,7 +162,7 @@ flowchart LR
    make run APP=gateway
    ```
 
-   > `BOOTSTRAP_TOKEN` 只从**环境变量**读取。**未设置时 `/install/initialize` 整体不可用**：`GET /install/status` 回 `tokenRequired=false`，提交返回 HTTP 503（错误码 `107002`）。这是 fail-closed 设计——宁可"没人能初始化"，也不能让一个没有令牌保护的写接口在公网裸奔。
+   > 令牌有两个来源：**环境变量 `BOOTSTRAP_TOKEN`（优先）** 与配置项 `install.bootstrapToken`（回落，本地开发的 dev 配置里已有 `dev-bootstrap-token`）。**两个来源都为空时 `/install/initialize` 整体不可用**：`GET /install/status` 回 `tokenRequired=false`，提交返回 HTTP 503（错误码 `107002`）。这是 fail-closed 设计——宁可"没人能初始化"，也不能让一个没有令牌保护的写接口在公网裸奔。生产建议**只**用环境变量/Secret，把 `install.bootstrapToken` 留空：`config.yaml` 入库，长期令牌放在里面会随代码一起分发。
 
 3. **打开安装页**：先启动登录门户（`cd frontend && pnpm dev:login`，:4000），浏览器访问 `http://localhost:4000/install`；未初始化时访问 `http://localhost:4000/login` 也会被 `InstallGuard` 自动跳到这里。页面共三步，但**只有第三步发一次写请求**（`POST /install/initialize`，其余校验都在浏览器内完成）：
 
@@ -176,7 +176,7 @@ flowchart LR
 
 **安全约束（部署必读）**：
 
-- **`BOOTSTRAP_TOKEN` 是部署期一次性机密**：只在引导阶段设置，初始化完成后应立即从运行环境移除；它不该长期留在生产环境变量里。
+- **引导令牌是部署期一次性机密**：只在引导阶段设置，初始化完成后应立即从运行环境（若用了配置文件则连同 `install.bootstrapToken`）移除；它不该长期留在生产环境里。
 - **`/install` 只应在受信网络内可达**：它不需要登录态，唯一门禁就是这个令牌。若部署机在公网可达，推荐用 **SSH 端口转发**在本地打开，不要把安装页暴露到公网：
 
   ```bash
@@ -289,7 +289,7 @@ make docker-run APP=auth    PORT=8081
 - 通过环境变量 `APP_CONFIG_PATH` 挂载生产 `config.yaml`（含正式 issuer、密钥、`cookieSecure: true`）；
 - **默认镜像内嵌仓库里的 dev 签名私钥与 dev 加密口令**（Dockerfile 会 `COPY config/oidc-dev-key.pem`，`config.yaml` 内嵌 dev `encryptionKey`）：生产上线前必须替换为外部 Secret 挂载并覆盖这两项；
 - 签名私钥与加密密钥通过 Secret 挂载，不写入生产镜像；
-- **首次部署额外注入一次性 `BOOTSTRAP_TOKEN`**（建议用 Secret 而非明文 env），用它在 `/install` 完成初始化后立即移除；`/install` 不要经负载均衡暴露到公网，运维用 SSH 端口转发打开（见 §2.4）；
+- **首次部署额外注入一次性引导令牌**（`BOOTSTRAP_TOKEN`，建议用 Secret 而非明文 env/config），用它在 `/install` 完成初始化后立即移除；`/install` 不要经负载均衡暴露到公网，运维用 SSH 端口转发打开（见 §2.4）；
 - 数据库、Redis 使用托管实例，与容器网络隔离。
 
 ---
@@ -354,8 +354,8 @@ flowchart TB
 | 生产启动失败 | 检查签名/加密密钥是否显式配置（fail-closed）；`cookieSecure` 是否与 HTTPS 匹配 |
 | SSO 免密失效 | 检查 `iam_sso_session` Cookie 是否写入（Domain/SameSite/Secure）、Redis 会话是否存在 |
 | 跨站无法共享 SSO | 检查 `cookieSameSite: none` + `cookieSecure: true` |
-| e2e 失败 | 按 `e2e/README.md` 核对服务映射与首次初始化（e2e 由 `global-setup` 调 `/install/initialize`，需后端带 `BOOTSTRAP_TOKEN`） |
+| e2e 失败 | 按 `e2e/README.md` 核对服务映射与首次初始化（e2e 由 `global-setup` 调 `/install/initialize`，需后端带 `BOOTSTRAP_TOKEN`；配置文件里的 `install.bootstrapToken` 亦可作为回落） |
 | 业务接口一律 409 | 库还没初始化（错误码 `107004`）：按 §2.4 打开安装页完成引导 |
-| `/install/initialize` 返回 503 | 后端未设置 `BOOTSTRAP_TOKEN` 环境变量（错误码 `107002`），或未初始化探测超时 |
+| `/install/initialize` 返回 503 | 后端未配置引导令牌（环境变量 `BOOTSTRAP_TOKEN` 与配置项 `install.bootstrapToken` 都为空，错误码 `107002`），或未初始化探测超时 |
 | `/install/initialize` 返回 409 | 库已初始化且端点永久自锁（错误码 `107000`）；需要重来只能删库重建（§2.3） |
 | 令牌验签失败 | 对比 `/oidc/keys` 与 RP 配置公钥是否一致（kid/密钥内容） |

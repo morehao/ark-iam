@@ -105,5 +105,5 @@
 | 审计日志 ✅ | Audit Log | `audit_log` 表，业务操作审计（动作/目标/结果/详情） |
 | 网关聚合 ✅ | Gateway | gateway 应用（:8100）单进程挂载 auth/platformadmin/tenantadmin/rpapi |
 | 初始化引导 ✅ | Bootstrap | 全新库第一次可用前的一次性写入：安装页 `POST /install/initialize` 触发 `pkg/seed.Bootstrap`，在单事务内写入平台租户 / 根部门 / 内置应用与 OAuth 客户端 / 菜单 / 角色 / 内置管理员；成功后端点**永久自锁**（再调报 `107000`），启动期不再写任何数据 |
-| 初始化令牌 ✅ | Bootstrap Token (`BOOTSTRAP_TOKEN`) | 引导写接口的唯一门禁：环境变量 + 请求头 `X-Bootstrap-Token`，未配置时端点整体不可用（HTTP 503 / `107002`）；属**部署期一次性机密**，初始化完成后即应移除 |
+| 初始化令牌 ✅ | Bootstrap Token (`BOOTSTRAP_TOKEN`) | 引导写接口的唯一门禁：请求头 `X-Bootstrap-Token` 与部署侧配置的令牌比对。令牌有两个来源，**环境变量 `BOOTSTRAP_TOKEN` 优先、配置项 `install.bootstrapToken` 回落**（两者皆空时端点整体不可用，HTTP 503 / `107002`）；属**部署期一次性机密**，初始化完成后即应移除 |
 | 未初始化守卫 ✅ | Bootstrap Guard | `pkg/middleware.BootstrapGuard`：库未初始化时把业务端点拦成 HTTP 409（`107004`），只放行 `/install` 与 `/oidc` 的健康检查 / 服务发现 / 登出端点；已初始化后常驻放行 |

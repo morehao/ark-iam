@@ -62,6 +62,13 @@ trace:
     timeout: 10s
 
 
+# 首次初始化（引导）配置。
+# bootstrapToken 是 `POST /install/initialize` 的门禁令牌，等价于"创建平台管理员"的权限。
+# 环境变量 BOOTSTRAP_TOKEN 优先于本字段（生产建议只用环境变量/密钥管理，别入库）；
+# 这里是本地开发用的回落值，初始化完成后应从本文件与运行环境中一并移除。
+install:
+  bootstrapToken: "dev-bootstrap-token"
+
 db_configs:
   - url: "postgres://postgres:123456@127.0.0.1:5432/iam?sslmode=disable&TimeZone=Asia/Shanghai"
     service: iam

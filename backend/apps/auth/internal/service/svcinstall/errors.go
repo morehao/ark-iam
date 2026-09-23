@@ -63,7 +63,8 @@ func BusinessCodeOf(err error) int {
 // CheckBootstrapToken 校验请求头携带的引导令牌与部署配置是否一致。
 //
 // 返回 nil 表示通过。三类失败各自的语义（也决定了页面该提示什么）：
-//   - 服务端未配置 BOOTSTRAP_TOKEN：**整体不可用**（503）。刻意 fail-closed——
+//   - 服务端未配置引导令牌（环境变量 BOOTSTRAP_TOKEN 与配置 install.bootstrapToken
+//     都为空）：**整体不可用**（503）。刻意 fail-closed——
 //     若改成"未配置则跳过校验"，一个忘记配置 token 的部署就等于把
 //     "任何能访问 /install 的人都可以创建平台管理员"变成真实风险；
 //   - 请求未携带令牌：401；
@@ -76,7 +77,7 @@ func BusinessCodeOf(err error) int {
 // （令牌肉眼完全一致）。代价是"以空白开头/结尾的令牌"无法使用——可接受，
 // 且对称归一后不存在"只归一一边"导致的隐性不等。
 func CheckBootstrapToken(provided string) error {
-	expected := trimToken(envBootstrapToken())
+	expected := effectiveBootstrapToken()
 	if expected == "" {
 		return errTokenNotConfigured
 	}

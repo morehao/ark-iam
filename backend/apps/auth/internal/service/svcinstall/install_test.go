@@ -326,3 +326,57 @@ func errUnknownForTest() error { return errors.New("boom") }
 
 // contains 字符串包含（避免为测试引入额外依赖）。
 func contains(haystack, needle string) bool { return strings.Contains(haystack, needle) }
+
+// 引导令牌现在有两个来源：环境变量 BOOTSTRAP_TOKEN 与配置 install.bootstrapToken。
+// 这里把**优先级**钉死，因为它决定了生产能不能用环境变量覆盖掉入库的配置值。
+func TestBootstrapTokenSources(t *testing.T) {
+	cases := []struct {
+		name     string
+		env      string
+		cfg      string
+		provided string
+		wantErr  error
+	}{
+		{"仅配置：可用", "", "cfg-secret", "cfg-secret", nil},
+		{"仅配置：不匹配仍 401", "", "cfg-secret", "wrong", errTokenInvalid},
+		{"env 优先于配置", "env-secret", "cfg-secret", "env-secret", nil},
+		{"env 优先时配置值不再被接受", "env-secret", "cfg-secret", "cfg-secret", errTokenInvalid},
+		{"env 为纯空白 → 回落到配置，而不是被判成未配置", "   ", "cfg-secret", "cfg-secret", nil},
+		{"配置值带尾随换行 → 归一", "", "cfg-secret\n", "cfg-secret", nil},
+		{"两个来源都为空 → 未配置（fail-closed 503）", "", "", "anything", errTokenNotConfigured},
+		{"两个来源都是空白 → 未配置", "  ", "\t", "anything", errTokenNotConfigured},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(EnvBootstrapToken, tc.env)
+			prev := config.Conf
+			config.Conf = &pkgconfig.Config{}
+			config.Conf.Install.BootstrapToken = tc.cfg
+			t.Cleanup(func() { config.Conf = prev })
+
+			if err := CheckBootstrapToken(tc.provided); err != tc.wantErr {
+				t.Fatalf("err = %v, want %v", err, tc.wantErr)
+			}
+			if want := tc.wantErr != errTokenNotConfigured; tokenConfigured() != want {
+				t.Fatalf("tokenConfigured() = %v, want %v", tokenConfigured(), want)
+			}
+		})
+	}
+}
+
+// config.Conf 为 nil 时不得 panic（独立运行/未加载配置的单元测试路径）。
+func TestBootstrapTokenNilConfigIsSafe(t *testing.T) {
+	prev := config.Conf
+	config.Conf = nil
+	t.Cleanup(func() { config.Conf = prev })
+
+	t.Setenv(EnvBootstrapToken, "")
+	if err := CheckBootstrapToken("x"); err != errTokenNotConfigured {
+		t.Fatalf("Conf 为 nil 且 env 为空时应视为未配置, got %v", err)
+	}
+
+	t.Setenv(EnvBootstrapToken, "env-secret")
+	if err := CheckBootstrapToken("env-secret"); err != nil {
+		t.Fatalf("Conf 为 nil 不应影响环境变量来源, got %v", err)
+	}
+}

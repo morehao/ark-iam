@@ -25,7 +25,23 @@ type Config struct {
 	OIDC        OIDC                      `yaml:"oidc"`
 	Password    PasswordConfig            `yaml:"password"`
 	Security    SecurityConfig            `yaml:"security"`
+	Install     InstallConfig             `yaml:"install"`
 	MasterKey   string                    `yaml:"masterKey"`
+}
+
+// InstallConfig 首次初始化（引导）相关配置。
+type InstallConfig struct {
+	// BootstrapToken 是引导写接口（`POST /install/initialize`）的门禁令牌。
+	//
+	// **环境变量 `BOOTSTRAP_TOKEN` 优先**，本字段是它的配置文件回落：
+	// 本地开发省得每次 export，也让 `make dev-all` 这类"直接起进程"的场景能带上令牌。
+	//
+	// 生产仍建议只用环境变量或密钥管理：配置文件通常会被提交、复制、打进镜像层，
+	// 而这个令牌等价于"创建平台管理员"的权限（见 svcinstall.CheckBootstrapToken 的
+	// fail-closed 说明）。无论从哪来，初始化完成后都应移除。
+	//
+	// 首尾空白会在读取时归一（部署脚本注入的值常带尾随换行）。
+	BootstrapToken string `yaml:"bootstrapToken"`
 }
 
 type SecurityConfig struct {

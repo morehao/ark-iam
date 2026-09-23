@@ -83,7 +83,7 @@ flowchart LR
 | `Authorization: Bearer <access_token>` | 登录用户（前端）/ M2M 应用 | OIDC JWT，`sub=person:<id>`，私有声明 `tenant_id`/`user_id`/`person_id`/`sid`/`client_id`/`token_usage`/`scope`/`act`（口径见 §2.1） |
 | `x-api-key: <64 位 hex 明文>` | 机器/服务 | 明文为 32 字节随机数的 64 位小写 hex，**无 `ak_` 之类前缀**；列表展示用 `keyPrefix`（前 7 位）。也可放进 `Authorization: Bearer`，与 `x-api-key` 二选一，任一通过即可 |
 
-免鉴权路径（跳过业务鉴权中间件）：`/v1/auth/connectors/callback`（Connector 回调）。**全部 `/oidc/*` 端点直接挂在 engine 上、不经业务鉴权**（鉴权中间件只作用于 `/v1/*`），由协议自身校验（token 端点校验 client 凭据，bc-logout 校验 `logout_token` JWT）。**`/install/*` 同样不经业务鉴权**：`GET /install/status` 公开只读，`POST /install/initialize` 只认请求头 `X-Bootstrap-Token`（与环境变量 `BOOTSTRAP_TOKEN` 比对，见 §9）。
+免鉴权路径（跳过业务鉴权中间件）：`/v1/auth/connectors/callback`（Connector 回调）。**全部 `/oidc/*` 端点直接挂在 engine 上、不经业务鉴权**（鉴权中间件只作用于 `/v1/*`），由协议自身校验（token 端点校验 client 凭据，bc-logout 校验 `logout_token` JWT）。**`/install/*` 同样不经业务鉴权**：`GET /install/status` 公开只读，`POST /install/initialize` 只认请求头 `X-Bootstrap-Token`（与部署侧令牌比对：环境变量 `BOOTSTRAP_TOKEN` 优先、配置项 `install.bootstrapToken` 回落，见 §9）。
 > 说明：`/v1/auth/register` 端点已下线，自助注册收口到 `/oidc/registerPerson` + `/oidc/createTenant`（见 §3.2）。
 
 ### 2.1 Access Token 私有声明
@@ -455,10 +455,10 @@ roles, err := client.Roles(ctx)                          // client.RolesTruncate
 
 | 方法 | 路径 | 鉴权 | 说明 |
 |---|---|---|---|
-| GET | `/install/status` | **公开只读** | 返回 `{initialized, tokenRequired, schemaReady, consoles}`：`initialized` 以库内平台租户行为准（不是进程内缓存）；`tokenRequired` 表示服务端是否配置了 `BOOTSTRAP_TOKEN`；`schemaReady` 表示 `AutoMigrate` 是否已建出核心表（`seed.SchemaReady`）；`consoles` 回显内置控制台入口。未初始化时 login-web 的 `InstallGuard` 靠它决定是否把登录入口改道到 `/install` |
+| GET | `/install/status` | **公开只读** | 返回 `{initialized, tokenRequired, schemaReady, consoles}`：`initialized` 以库内平台租户行为准（不是进程内缓存）；`tokenRequired` 表示服务端是否配置了引导令牌（环境变量或配置项任一非空即 true）；`schemaReady` 表示 `AutoMigrate` 是否已建出核心表（`seed.SchemaReady`）；`consoles` 回显内置控制台入口。未初始化时 login-web 的 `InstallGuard` 靠它决定是否把登录入口改道到 `/install` |
 | POST | `/install/initialize` | 请求头 `X-Bootstrap-Token` | **全系统唯一的内置数据写入口**：在**单个事务**内写入平台租户、根部门、内置应用与 OAuth 客户端、内置菜单与角色、内置管理员（person + tenant_user + 部门关系 + 角色授权）以及租户应用开通，并返回 `{report, adminUsername, loginURL, consoles}`；挂 `middleware.BootstrapRateLimit()` 限流 |
 
-**状态码与错误码**：成功 200；已初始化 409（`107000`，永久自锁，重启/换副本都不解除）；令牌缺失或不匹配 401（`107001`）；服务端未配置 `BOOTSTRAP_TOKEN` 时端点整体不可用、返回 503（`107002`，**fail-closed**）；初始化失败 500（`107003`）；入参非法 400（`107005`）；口令强度不足 400（`107006`）。
+**状态码与错误码**：成功 200；已初始化 409（`107000`，永久自锁，重启/换副本都不解除）；令牌缺失或不匹配 401（`107001`）；服务端未配置引导令牌时端点整体不可用、返回 503（`107002`，**fail-closed**）；初始化失败 500（`107003`）；入参非法 400（`107005`）；口令强度不足 400（`107006`）。
 
 **令牌校验先于参数绑定**（顺序是契约，不是实现细节）：绑定失败返回 400/`107005`、令牌失败返回 401/`107001`，若绑定在前，一个**未持令牌**的调用方就能靠"400 还是 401"判断自己的请求参数是否合法——参数校验会成为无需准入即可使用的探测面。因此未通过准入的请求一律 401（即使请求体是非法 JSON），且其参数不进日志。
 

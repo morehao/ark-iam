@@ -2,7 +2,7 @@
 
 > 本文说明 Ark IAM 各应用 `config.yaml` 的配置项。五个应用（auth / platformadmin / tenantadmin / rpapi / gateway）共享同一套 `pkg/config.Config` 结构，差异主要在 `server.name/port`、OIDC 相关项，以及**仅 auth 生效**的登录限流（`security.login.ratePerMinute` / `burst`）与 `server.trustedProxies`、**仅 platformadmin / tenantadmin 生效**的 `oidc.backChannelLogoutPath`、**仅 auth / gateway 配置**的 `oidc.consoles`。RP 侧（含外部应用）的 OIDC/目录能力另由 `backend/sdk` 提供，旋钮见 §11。
 >
-> 配置加载顺序：环境变量 `APP_CONFIG_PATH` 指定路径 → 相对**当前工作目录**的 `../config/config.yaml` → **可执行文件所在目录的上一级** `config/config.yaml`；三者皆无时仍按相对路径加载并启动失败（panic）。另有唯一一个非 YAML 配置项 `BOOTSTRAP_TOKEN`（首次初始化引导令牌），见 §1.1。
+> 配置加载顺序：环境变量 `APP_CONFIG_PATH` 指定路径 → 相对**当前工作目录**的 `../config/config.yaml` → **可执行文件所在目录的上一级** `config/config.yaml`；三者皆无时仍按相对路径加载并启动失败（panic）。引导令牌有两个来源——环境变量 `BOOTSTRAP_TOKEN`（高优先级）与 YAML 的 `install.bootstrapToken`（回落），见 §1.1 / §1.2。
 
 ---
 
@@ -116,7 +116,22 @@ oidc:
 | 变量 | 说明 |
 |---|---|
 | `APP_CONFIG_PATH` | 指定 `config.yaml` 路径，优先级最高（见文首加载顺序） |
-| `BOOTSTRAP_TOKEN` | **首次初始化引导的一次性令牌**（仅 auth / gateway 消费）：`POST /install/initialize` 必须携带匹配的请求头 `X-Bootstrap-Token`；**未设置时该端点整体不可用**——`GET /install/status` 回 `tokenRequired=false`，提交返回 HTTP 503（`107002`），这是 fail-closed。只在全新库引导阶段设置，完成初始化后应立即从运行环境移除；不要写进 `config.yaml` 或镜像（引导流程见 `run-and-deploy.md` §2.4） |
+| `BOOTSTRAP_TOKEN` | **首次初始化引导的一次性令牌**（仅 auth / gateway 消费）：`POST /install/initialize` 必须携带匹配的请求头 `X-Bootstrap-Token`；两个来源都为空时该端点整体不可用——`GET /install/status` 回 `tokenRequired=false`，提交返回 HTTP 503（`107002`），这是 fail-closed。**优先级高于 `install.bootstrapToken`**，因此置空此变量会自动回落到配置文件；只在全新库引导阶段需要，完成初始化后应从运行环境移除（引导流程见 `run-and-deploy.md` §2.4） |
+
+### 1.2 install（首次初始化引导）
+
+| 配置项 | 说明 | 默认 |
+|---|---|---|
+| `install.bootstrapToken` | 引导令牌的**配置文件来源**，即 `BOOTSTRAP_TOKEN` 的回落值。取值时两侧都做首尾空白归一（`export T=$(cat file)` 带尾随换行也能用）；空白视同"此来源未提供"，继续回落，因此 `BOOTSTRAP_TOKEN=" "` 不会把配置里的有效令牌遮成"未配置" | 空（即只能靠环境变量） |
+
+典型写法（仅 auth / gateway 需要；本地开发可写死，生产**建议留空**只走环境变量）：
+
+```yaml
+install:
+  bootstrapToken: "dev-bootstrap-token"
+```
+
+令牌等价于"创建平台管理员"的权限，因此**环境变量优先**：生产用环境变量或密钥管理覆盖，不必先改文件——而 `config.yaml` 在本仓库是入库的（含库口令与 dev 私钥），把长期有效的令牌留在里面等于把它连同代码一起分发。无论来自哪个来源，初始化完成后都应移除。
 
 ---
 
@@ -367,7 +382,7 @@ oidc:
 | `oidc.audiences` | 可留空（不校验 aud） | 建议按应用声明白名单 |
 | Swagger 文档 | 开启（`/auth/redocs` 等） | 关闭 |
 | Gin 模式 | debug | release（`env: prod`） |
-| `BOOTSTRAP_TOKEN`（环境变量） | 引导全新库时设置（随机长串即可） | **仅首次初始化期间设置**，完成引导后立即移除；未设置时 `/install/initialize` 不可用（`107002`） |
+| 引导令牌（`BOOTSTRAP_TOKEN` 环境变量 / `install.bootstrapToken`） | 引导全新库时设置（随机长串即可，也可直接用 dev 配置里的 `dev-bootstrap-token`，无需 export） | **仅首次初始化期间设置**，完成引导后立即移除；两个来源都为空时 `/install/initialize` 不可用（`107002`）。生产建议**只**用环境变量/Secret，配置文件留空 |
 | `oidc.consoles` | 可留空（回落 :4001/:4002 默认） | 配成正式控制台域名（只在引导时写入内置客户端，之后改配置不回写） |
 
 ---
