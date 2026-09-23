@@ -21,6 +21,7 @@ const (
 	AuditActionApplicationClientCreateSecret AuditAction = "application_client.create_secret" // 创建 OAuth 客户端密钥
 	AuditActionApiKeyCreate                  AuditAction = "api_key.create"                   // 创建 API Key
 	AuditActionApiKeyRevoke                  AuditAction = "api_key.revoke"                   // 吊销 API Key
+	AuditActionInstallationInitialize        AuditAction = "installation.initialize"          // 系统首次初始化
 )
 
 // AuditResult 审计结果。
@@ -43,6 +44,7 @@ const (
 	AuditTargetTypeApplication       AuditTargetType = "application"        // 应用
 	AuditTargetTypeApplicationClient AuditTargetType = "application_client" // 应用客户端
 	AuditTargetTypeAPIKey            AuditTargetType = "api_key"            // API Key
+	AuditTargetTypeInstallation      AuditTargetType = "installation"       // 系统初始化（无租户/账号前的事件）
 )
 
 type AuditLogEntity struct {

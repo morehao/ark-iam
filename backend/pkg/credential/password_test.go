@@ -72,21 +72,3 @@ func TestGenerateTemporaryPassword_Unique(t *testing.T) {
 		t.Fatalf("expected %d unique passwords, got %d", rounds, len(seen))
 	}
 }
-
-// TestBootstrapAdminPassword_Stable 种子 bootstrap 口令是部署文档与 e2e 的稳定契约：
-// 值一旦变化必须同步 e2e/config.ts 与部署文档，因此在此锁定。
-func TestBootstrapAdminPassword_Stable(t *testing.T) {
-	if BootstrapAdminPassword != "admin123" {
-		t.Fatalf("bootstrap admin password changed to %q; update e2e/config.ts and deploy docs together", BootstrapAdminPassword)
-	}
-	// bootstrap 口令是唯一固定默认口令，绝不能由生成器产出（否则等于把它变成通用临时口令）。
-	for i := 0; i < 200; i++ {
-		generated, err := GenerateTemporaryPassword()
-		if err != nil {
-			t.Fatalf("GenerateTemporaryPassword fail: %v", err)
-		}
-		if generated == BootstrapAdminPassword {
-			t.Fatalf("temporary password equals bootstrap password")
-		}
-	}
-}

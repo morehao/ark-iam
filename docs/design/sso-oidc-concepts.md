@@ -123,7 +123,7 @@ RP 接入前必须在 OP 注册一个 **OAuth Client**，核心注册字段（�
 | `post_logout_redirect_uris` | 登出后跳转白名单 | - |
 | `back_channel_logout_uri` | 反向通道登出通知地址（SLO，即服务端登出通知） | - |
 | `require_pkce` | 是否强制 PKCE（`ClientPKCEPolicy`，`enable`/`disable`） | 默认 `disable`（协议侧始终支持 S256；判定必须写 `== enable`，`'disable'` 真值为 true） |
-| `default_scopes` | 默认授权 scope | 列默认 `["openid","profile"]`；两个内置客户端种子值为 `["openid","profile","email"]` |
+| `default_scopes` | 默认授权 scope | 列默认 `["openid","profile"]`；两个内置客户端由首次初始化引导写入 `["openid","profile","email"]` |
 | `access_token_ttl` / `refresh_token_ttl` | 令牌有效期（秒） | 900 / 2592000 |
 
 > **`client_id` 在库中的落位与命名**：本系统存在 `application_client.code` 列，它就是这里的 `client_id`（唯一索引），
@@ -134,7 +134,7 @@ RP 接入前必须在 OP 注册一个 **OAuth Client**，核心注册字段（�
 > 从控制台改名会当场把该控制台锁死且界面无法自救（见 [system-design.md](system-design.md) §4.5）。
 > 应用编码同理：**自建应用可改，内置应用只读**——控制台菜单入口仍按 `platform_admin` / `tenant_admin` 定位，
 > 改名会让对应控制台侧边栏失联（`100749`）。
-> 内置客户端由种子写入可读值（`platform_admin_web` / `tenant_admin_web`，
+> 内置客户端由首次初始化引导写入可读值（`platform_admin_web` / `tenant_admin_web`，
 > 常量在 `model.SeedBuiltinClientPlatformAdminWeb` / `model.SeedBuiltinClientTenantAdminWeb`）。
 > **两套「编码」规则刻意不同**：`application.code`（应用编码）受 `model.AppCodePattern` 约束
 > （`^[a-z][a-z0-9_]*$`，允许数字）；客户端编码受 `model.ClientCodePattern` 约束

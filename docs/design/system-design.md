@@ -137,7 +137,7 @@ flowchart TB
 > `dao/`、`model/`、`object/` **不在应用内**：跨应用共享的实体 / 访问器 / 对象统一在 `pkg/dao`、`pkg/model`、`pkg/object`（模块路径已表达域名，不再套业务域容器）。
 
 - **领域层容器**：绑定框架/协议的领域逻辑放应用内 `internal/core/<域>`（当前仅 auth 的 `internal/core/oidcop`——OP 侧 `op.Storage` 适配 / 协议态 / 持久化 / 客户端适配）；可复用的领域不变式下沉 `pkg/core/<域>`（当前 `person`/`user`/`tenant`/`menu`/`application`），与 `internal/core/<域>` 对称。`core` 只承载领域逻辑，禁止放工具与辅助代码。
-- **基础能力**：凭证（口令强度 / 临时口令 / API Key·client secret·refresh token 的生成与摘要）统一在 `pkg/credential`（全系统只允许一份摘要实现）；请求级身份的读写契约在 `pkg/identity`（中间件写、业务/策略层读）；OIDC 鉴权中间件在 `pkg/middleware/oidc_auth.go`；RP 侧 OIDC 能力（公钥来源装配 + back-channel logout 接收端）在 `pkg/oidckit`；种子初始化在 `pkg/seed`；操作审计在 `pkg/audit`；
+- **基础能力**：凭证（口令强度 / 临时口令 / API Key·client secret·refresh token 的生成与摘要）统一在 `pkg/credential`（全系统只允许一份摘要实现）；请求级身份的读写契约在 `pkg/identity`（中间件写、业务/策略层读）；OIDC 鉴权中间件在 `pkg/middleware/oidc_auth.go`；RP 侧 OIDC 能力（公钥来源装配 + back-channel logout 接收端）在 `pkg/oidckit`；内置数据的**一次性**初始化引导在 `pkg/seed.Bootstrap`（触发入口 `apps/auth` 的 `svcinstall`，见 §4.5）；操作审计在 `pkg/audit`；
 - 服务层依赖接口 + 构造函数注入，控制器统一 `gincontext.Success/Fail` 返回 `{code, requestID, msg, data}` 信封；
 - 数据库访问基于 GORM，事务用 `dbclient.IamDB(ctx).Transaction(...)` 封装。
 
@@ -149,12 +149,12 @@ flowchart TB
 
 | 应用 | 服务标识 | 独立端口 | 职责 | 主要领域 |
 |---|---|---|---|---|
-| **auth** | `auth` | 8081 | 认证网关：登录 / 注册 / 令牌 / OIDC Provider / SSO / SLO / Connector；自助注册与建租户收口在 `/oidc/registerPerson` + `/oidc/createTenant` | person、tenant_user（成员）、tenant_invite、refresh_token、session、connector、user_identity |
+| **auth** | `auth` | 8081 | 认证网关：登录 / 注册 / 令牌 / OIDC Provider / SSO / SLO / Connector / **系统初始化引导（`/install/*`，R3 专用前缀）**；自助注册与建租户收口在 `/oidc/registerPerson` + `/oidc/createTenant` | person、tenant_user（成员）、tenant_invite、refresh_token、session、connector、user_identity |
 | **platformadmin** | `platform` | 8082 | 平台管理：租户（建租户时自动创建内置管理员、可重置其口令）/ 菜单 / 应用 / OAuth 客户端 / 域名 / 租户应用 / 审计；**不提供 users / roles / api-keys 接口**（用户与角色管理全在租户端） | tenant、menu、application、application_client、domain、tenant_application、audit_log |
 | **tenantadmin** | `tenant` | 8083 | 租户自服务：部门架构 / 用户与角色 / 服务账号 / 加入邀请 / API 密钥 / 租户菜单 | department、department_user、tenant_user、tenant_invite、role、api_key |
 | **gateway** | 聚合 | 8100 | 单体聚合部署，挂载 auth + platformadmin + tenantadmin；部署为 gateway 时 OIDC issuer 同步切到 `http://localhost:8100/oidc` | 无独立业务 |
 
-> 各应用通过 `ginserver.NewRouterGroups(engine, "<服务标识>", ...)` 注册前缀，业务路由形如 `/v1/{auth|platform|tenant}/...`；OIDC 协议端点固定挂在 `/oidc/*`（R3 专用前缀，不走业务路由规范）。
+> 各应用通过 `ginserver.NewRouterGroups(engine, "<服务标识>", ...)` 注册前缀，业务路由形如 `/v1/{auth|platform|tenant}/...`；OIDC 协议端点固定挂在 `/oidc/*`，初始化引导固定挂在 `/install/*`——两者都是 **R3 专用前缀**（标准协议 / 自举入口），不走业务路由规范。未初始化时 `pkg/middleware.BootstrapGuard` 会把业务端点拦成 HTTP 409（错误码 `107004`），只放行 `/install` 与 `/oidc` 的健康/发现/登出端点。
 
 ### 3.2 前端应用
 
@@ -173,7 +173,7 @@ flowchart TB
 | 后端框架 | Gin + GORM + Go workspace（`backend/go.work`，5 个模块） |
 | OIDC Provider | [zitadel/oidc/v3](https://github.com/zitadel/oidc)（`op` 包） |
 | JWT | golang-jwt/jwt/v5（RP 校验）、go-jose（logout_token 签名） |
-| 数据库 | PostgreSQL（主库，`iam`，启动时 AutoMigrate 自动建表），测试用 SQLite 内存库 |
+| 数据库 | PostgreSQL（主库，`iam`，启动时 AutoMigrate 自动建表、**不写任何数据**；内置数据由安装页 `/install/initialize` 一次性引导），测试用 SQLite 内存库 |
 | 缓存/会话 | Redis（SSO 会话、授权状态、令牌元数据、SLO 队列） |
 | 日志 | golib/glog（zap 内核，全链路 requestID / traceID） |
 | 链路追踪 | OpenTelemetry（OTLP gRPC Collector） |
@@ -483,7 +483,7 @@ erDiagram
 | 表 | 说明 |
 |---|---|
 | `person` | **自然人**：全局唯一身份。username / primary_email / primary_phone 可空且全局唯一（NULL 不撞唯一索引）；密码 bcrypt 哈希；`password_status`（`PasswordStatus`：normal/must_change）标识"临时密码 / 被重置后必须先改密"（登录链路据此拦截）；`status`（`PersonStatus`：active/suspended）全局挂起。**无 profile / custom_data**（通用 JSON 兜底列已下线） |
-| `tenant_user` | **租户账号**（领域实体 `UserEntity`，物理表名 `tenant_user`：`user` 是 PG 保留字）：member=真实用户（person × tenant 成员记录，可登录/入部门）；machine=服务账号（`person_id` 恒空，不可登录/无自然人/不可任部门负责人，但**从属部门**：主部门 primary 必填 + 参与部门 secondary 可多条，仅作角色主体与 API Key 归属）；`source` 区分 builtin（随租户创建由系统生成：平台建租户的管理员 / 自助开通租户的 owner / 种子管理员）与 manual；`owner_type`（`OwnerType`：owner/normal）仅真实用户可持有；租户内资料仅 name/description/avatar（**无 profile / custom_data**） |
+| `tenant_user` | **租户账号**（领域实体 `UserEntity`，物理表名 `tenant_user`：`user` 是 PG 保留字）：member=真实用户（person × tenant 成员记录，可登录/入部门）；machine=服务账号（`person_id` 恒空，不可登录/无自然人/不可任部门负责人，但**从属部门**：主部门 primary 必填 + 参与部门 secondary 可多条，仅作角色主体与 API Key 归属）；`source` 区分 builtin（随租户创建由系统生成：平台建租户的管理员 / 自助开通租户的 owner / L1 首次引导写入的内置管理员）与 manual；`owner_type`（`OwnerType`：owner/normal）仅真实用户可持有；租户内资料仅 name/description/avatar（**无 profile / custom_data**） |
 | `user_identity` | 外部身份关联：person 在外部 IdP（Connector）的身份映射，`external_subject` 为外部主体标识 |
 | `user_login_log` | 登录日志：记录每次登录的时间/IP/UA/类型 |
 
@@ -491,7 +491,7 @@ erDiagram
 
 | 表 | 说明 |
 |---|---|
-| `tenant` | 租户：`type` 分 customer/platform（分类标识，不参与隔离判定）；`code` 全局唯一且由服务端自动生成（`t_<12 位随机 hex>`，平台租户种子固定为 `t_platform`，创建后不可改）；`status` 生命周期状态（active/suspended，取代早期 `is_suspended`） |
+| `tenant` | 租户：`type` 分 customer/platform（分类标识，不参与隔离判定）；`code` 全局唯一且由服务端自动生成（`t_<12 位随机 hex>`，L1 首次引导写入的平台租户固定为 `t_platform`，创建后不可改）；`status` 生命周期状态（active/suspended，取代早期 `is_suspended`，且是矩阵里的 `immutable`——平台租户被挂起会整栈失联，控制台拒写） |
 | `tenant_invite` | 加入邀请：通道 B 的凭据，`code` 邀请码 + `status`（pending/accepted/revoked）+ 可空 `expires_at` |
 | `tenant_application` | 租户-应用开通关系：`status` 开通状态（`config` / `granted_scope` 两个通用 JSON 兜底列已下线） |
 | `domain` | 租户域名：`verification_status`（`DomainVerificationStatus`：unverified/verified；旧 `is_verified` + `verified_at` 已下线），当前仅平台端录入与管理，登录链路尚未按域名识别租户 |
@@ -507,7 +507,7 @@ erDiagram
 
 | 表 | 说明 |
 |---|---|
-| `role` | 角色：租户内 + 按应用（`app_id`）作用域；`source` builtin/custom；`admin_type` admin/normal 是系统管理能力标签（**内置角色整体只读**：禁删、禁编辑——名称/描述/编码一律不可改）。`code` 是**跨系统授权契约值**（`^[a-z][a-z0-9_]*$`）：它是 OIDC ID token `groups` 声明的取值，下游系统按「前缀 + 编码」认自己的策略名（如对象存储 `claim_prefix=iam_` → 策略 `iam_platform_admin`）。**编码只有两个来源，租户侧没有任何写入入口**：① 产品锚点角色（`platform_admin`/`tenant_admin`，`source=builtin && admin_type=admin`，随种子/建租户产生）；② **应用角色模板**（`application.role_template`，开通应用时物化到该租户，`source=builtin && admin_type=normal`）。**租户自建角色（`source=custom`）的 `code` 恒为空串、不进入 `groups` 声明**——下游策略是全局命名实体（策略名 = `claim_prefix` + 编码，全租户共用一条、无映射表可回查），若允许租户写编码，任何租户管理员都能造出一个撞上既有策略的编码从而自提权；把契约值收归应用方定义后，「定义值的人」与「在下游供给策略的人」是同一主体，不再需要保留字护栏。**该声明只下发给「本角色所属应用的客户端」**（作用域键 = `application_client.app_id`，见 §5.4）：下游只认自己那个应用的编码，跨应用的角色不会进入其策略命名空间；反之若按租户全量下发，在无关应用里造一个同码角色即可命中下游策略（跨应用越权）。**无 `type`、无 `is_default`** |
+| `role` | 角色：租户内 + 按应用（`app_id`）作用域；`source` builtin/custom；`admin_type` admin/normal 是系统管理能力标签（**内置角色整体只读**：禁删、禁编辑——名称/描述/编码一律不可改）。`code` 是**跨系统授权契约值**（`^[a-z][a-z0-9_]*$`）：它是 OIDC ID token `groups` 声明的取值，下游系统按「前缀 + 编码」认自己的策略名（如对象存储 `claim_prefix=iam_` → 策略 `iam_platform_admin`）。**编码只有两个来源，租户侧没有任何写入入口**：① 产品锚点角色（`platform_admin`/`tenant_admin`，`source=builtin && admin_type=admin`，由 L1 首次引导或建租户产生）；② **应用角色模板**（`application.role_template`，开通应用时物化到该租户，`source=builtin && admin_type=normal`）。**租户自建角色（`source=custom`）的 `code` 恒为空串、不进入 `groups` 声明**——下游策略是全局命名实体（策略名 = `claim_prefix` + 编码，全租户共用一条、无映射表可回查），若允许租户写编码，任何租户管理员都能造出一个撞上既有策略的编码从而自提权；把契约值收归应用方定义后，「定义值的人」与「在下游供给策略的人」是同一主体，不再需要保留字护栏。**该声明只下发给「本角色所属应用的客户端」**（作用域键 = `application_client.app_id`，见 §5.4）：下游只认自己那个应用的编码，跨应用的角色不会进入其策略命名空间；反之若按租户全量下发，在无关应用里造一个同码角色即可命中下游策略（跨应用越权）。**无 `type`、无 `is_default`** |
 | `menu` | 菜单：按应用管理（`app_id`），支持树（`parent_id`）；`type` directory/menu/button；`visibility` public/member/admin 为可见性门槛；`seed_key` 为种子身份键（控制台不可见不可写）。**顺序由 `sort` 唯一决定**（升序，同值按 `code`，见 `pkg/dao.MenuOrderBySort`）：所有面向界面的菜单查询（两端侧边栏、角色授权树、菜单管理树/列表）都必须显式 ORDER BY，缺省顺序数据库不保证、控制台改排序会看不到效果。**无 `tenant_id`、无 `permission`** |
 | `user_role` | 用户-角色关联 |
 | `role_menu` | 角色-菜单关联（可访问菜单） |
@@ -549,27 +549,30 @@ erDiagram
 
 ### 4.5 种子数据与字段权威（single writer per field）
 
-`pkg/seed` 在每次启动时执行**幂等种子**：为内置租户 / 应用 / OAuth 客户端 / 菜单 / 角色 / 管理员补齐缺失的行，并输出本次的创建 / 收敛 / 迁移变更报告。多进程（分体部署四应用同启）由 Postgres 事务级 advisory lock 串行化。核心约定是**每个字段只有一个写者**——矩阵声明在 `pkg/model/seed_authority.go`（`SeedFieldAuthorities`），是"某字段归种子还是归运维"的唯一真相源。
+`pkg/seed` 的**唯一写通道是 `Bootstrap`**：它只在「库尚未初始化」时执行一次，由安装页 `POST /install/initialize`（`apps/auth` 的 `/install/*`，见 §3.1）触发，为内置租户 / 根部门 / 两个内置应用（`platform_admin`、`tenant_admin`）/ 对应 OAuth 客户端 / 菜单 / 角色 / 租户应用开通 / 内置管理员（person + tenant_user + 部门关系 + 角色）**一次性**写入初值，并把本次创建明细写进 `Report`（仅用于本次引导的日志核对、不落库；L1 只创建，`Action` 恒为 `created`）。**启动期不写任何数据**：`AutoMigrate`（`model.AutoMigrateAll`）只建表，`pkg/seed` 另两个公开函数 `IsInitialized` / `SchemaReady` 只读。初始化在**单个事务**内完成——页面上的三步只是 UI 分步，后端没有分步端点，否则"第一步成功、第二步失败"会留下一个没有管理员的租户且无恢复路径；多副本并发由 Postgres 事务级 advisory lock 串行化（`lockSeed`）。是否已初始化以**平台租户行**为准（`IsInitialized` 查 `model.SeedPlatformTenantCode` = `t_platform`），不依赖任何进程内缓存，因此重启、换副本都不会"忘记"；这也带来**永久自锁**：初始化成功后该端点再调一律 HTTP 409（`InstallationAlreadyInitializedError`），重启也不会解除。
 
-三种语义：
+> **为什么不再有"每次启动的幂等种子"**：启动期播种要求种子在每次启动都把内置行"收敛/补齐"到定义，这才需要字段收敛（原 `reconcile`）与跨版本原地改名（原 `migrate_once`）。改为一次性引导后这两类机制没有存在理由，已**整体删除**（执行体 `reconcileFields`、清单 `seedMigrations`、退役菜单清理 `retiredMenus`、软删墓碑跳过 `menuSeedKeyRemoved` 与所有 legacy 改名分支全部下线）；内置数据的后续调整一律由运维在各控制台完成。代价（有意接受）：既有菜单行的跨版本结构变更不再自动生效，新增内置菜单由运维按 `make print-builtin-menus` 的清单在「菜单管理」页补录。
+
+核心约定仍是**每个字段只有一个写者**——矩阵声明在 `pkg/model/seed_authority.go`（`SeedFieldAuthorities`），是"某字段归 L1 还是归运维"的唯一真相源；今天它只承担**声明 + 控制台拒写依据**两个职责（执行体是各 service 的拒写点，不是 `pkg/seed`）。
+
+两条语义（`SeedFieldMode` 只有这两个取值）：
 
 | 语义 | 写者 | 行为 |
 |---|---|---|
-| `reconcile`（种子收敛） | 种子 | 每次启动都收敛到种子定义；**控制台必须拒写**，否则出现"运维改完、重启被收回"的双写者 |
-| `create_only`（只播种） | 运维 | 仅在行不存在时写入初值，此后永不回写；控制台可自由修改 |
-| `migrate_once`（一次性迁移） | 种子 | 以「当前值 == 历史种子值」为条件的一次性改名，迁移完成后自然失效，运维自定义值一律不动 |
+| `immutable`（不可变，`SeedFieldImmutable`） | L1（仅创建时） | L1 创建时写入，此后**必须保持不变**：控制台对这类字段一律拒写。这里的原因**不是**"运维改完、下次初始化被收回"（L1 只跑一次、之后永久自锁，不存在下一次），而是这些字段本身就是身份 / 安全不变式——被改写会让鉴权边界失效（如 `source` 内置标记、平台租户 `status`）或让对应控制台自我锁死（如内置应用 / 客户端 `code`） |
+| `create_only`（只播种，`SeedFieldCreateOnly`） | 运维 | L1 只在行不存在时写入初值，此后永不回写；控制台可自由修改 |
 
-**`reconcile` 的准入判据**：只有"被控制台改写后会导致种子定位失效或鉴权被绕过"的字段才准入，即**安全不变式**——`tenant`/`application`/`application_client` 的 `source`（内置标记）、`role.admin_type`、平台租户 `status`、`tenant_user.source`，外加内置客户端的归属 `app_id`。展示 / 结构 / 编码类字段（应用名与描述、**应用角色模板 `role_template`**、客户端名、角色名/描述/编码、菜单的名/图标/排序/可见性/路径/组件/层级）一律 `create_only` 归运维；矩阵之外的字段视为 `create_only`。跨版本改名一律用 `migrate_once` 登记（`pkg/seed` 的迁移清单），**禁止用 `reconcile` 表达改名**。
+**`immutable` 的准入判据**：只有"被控制台改写后会导致鉴权被绕过或控制台自我锁死"的字段才准入，共两类——**安全不变式**：`tenant`/`application`/`application_client` 的 `source`（内置标记）、`role.admin_type`、平台租户 `status`（被挂起整栈失联）、`tenant_user.source`；**身份编码**：内置应用 `code`、内置客户端 `code`（= `client_id`）。展示 / 结构类字段（应用名与描述、**应用角色模板 `role_template`**、客户端名、角色名/描述/编码、菜单的名/图标/排序/可见性/路径/组件/层级）一律 `create_only` 归运维；矩阵之外的字段视为 `create_only`。**不接受"跨版本自动改名"的需求**：确需改名由运维在控制台改，或按版本级动作发版。判定谓词是 `model.SeedFieldIsImmutable(entity, field)`，实体不可变字段清单用 `model.SeedImmutableFields(entity)`；`immutable` 字段必须在控制台有对应拒写点（见下方"只读编码"）。
 
-**种子认行靠 `seed_key`，不靠业务编码**：`menu` 与 `application` 各有一个控制台**不可见不可写**的内部列 `seed_key`（创建时写入、此后不变），种子按它定位既有行。因此菜单的 `code` 与归属应用、自建应用 / 客户端的 `code` 都可以自由修改而不触发"重复建行"。`application_client` 仍按 `code`（= `client_id`）认行。
+**L1 认行靠 `seed_key`，不靠业务编码**：`menu` 与 `application` 各有一个控制台**不可见不可写**的内部列 `seed_key`（创建时写入、此后不变），L1 按它定位既有行（只按 `seed_key`，不做 `code` 兜底——保留兜底反而会让运维自建的同 code 行被误认领）。因此菜单的 `code` 与归属应用、自建应用 / 客户端的 `code` 都可以自由修改而不触发"重复建行"。`application_client` 仍按 `code`（= `client_id`）认行。
 
-**仍保持只读的编码**（不是矩阵规则，而是 service 层拒改）：
+**只读编码**（矩阵登记为 `immutable`，service 侧另有对应的拒写点）：
 
-- **内置应用的 `code`**：各控制台的菜单入口按它定位（platformadmin 的 `MyTree` 按 `platform_admin` 查应用，tenantadmin 的 `loadConsoleApps` 只保留 `tenant_admin`），改名会当场锁死对应控制台且界面无法自救；
-- **内置客户端的 `code`**（= `client_id`：`platform_admin_web` / `tenant_admin_web`）：同时是网关 aud 白名单、back-channel logout 的客户端识别与前端 `VITE_OIDC_CLIENT_ID` 默认值的取值来源。两者定义在 `pkg/model`（`SeedBuiltinClientPlatformAdminWeb` / `SeedBuiltinClientTenantAdminWeb`），更换属版本级动作；
-- **角色的 `code`**（`role.code`，跨系统授权契约值）：**租户侧在结构上没有写入入口**——`dtotenant.RoleCreateReq`/`RoleUpdateReq` 不含该字段，service 创建自建角色时恒写空串、更新只改名称/描述。取值只能由产品锚点（种子）与应用角色模板（`application.role_template`）产生，见 §5.4。
+- **内置应用的 `code`**：各控制台的菜单入口按它定位（platformadmin 的 `MyTree` 按 `platform_admin` 查应用，tenantadmin 的 `loadConsoleApps` 只保留 `tenant_admin`），改名会当场锁死对应控制台且界面无法自救；控制台改名报 `100749`（`ApplicationBuiltInCodeImmutableError`）；
+- **内置客户端的 `code`**（= `client_id`：`platform_admin_web` / `tenant_admin_web`）：同时是网关 aud 白名单、back-channel logout 的客户端识别与前端 `VITE_OIDC_CLIENT_ID` 默认值的取值来源。两者定义在 `pkg/model`（`SeedBuiltinClientPlatformAdminWeb` / `SeedBuiltinClientTenantAdminWeb`），更换属版本级动作；控制台改名报 `100823`（`ApplicationClientBuiltInCodeImmutableError`）；
+- **角色的 `code`**（`role.code`，跨系统授权契约值）：**租户侧在结构上没有写入入口**——`dtotenant.RoleCreateReq`/`RoleUpdateReq` 不含该字段，service 创建自建角色时恒写空串、更新只改名称/描述。取值只能由产品锚点（L1）与应用角色模板（`application.role_template`）产生，见 §5.4。
 
-**菜单的"行"归运维**：控制台可新增根菜单 / 子菜单，也可删除任意菜单（含内置菜单）。删除是**软删除**，软删行仍带 `seed_key`，等于"该菜单已被人为下线"的**墓碑**——`seedMenus` 命中墓碑即跳过创建（该检查必须早于 `(app_id, code)` 兜底，否则会误认领运维自建的同 code 菜单）。因此**不要假设内置菜单行一定存在**，也不要指望从控制台删除后种子会把它建回来。版本级下线另在 `pkg/seed/retired_menu.go` 的 `retiredMenus` 登记（父目录与子菜单一并登记），并**物理删除**、不留墓碑。
+**菜单的"行"归运维**：控制台可新增根菜单 / 子菜单，也可删除任意菜单（含内置菜单）。删除是**软删除**，软删行仍带 `seed_key`，等于"该菜单已被人为下线"；但 L1 **只在库未初始化时**按 `seed_key` 认行创建，之后永久自锁，因此**不要假设内置菜单行一定存在**，也不要指望从控制台删除后种子会把它建回来。版本级下线只删 `builtinMenuDefs` 中的定义即可——旧实现里的 `retiredMenus` 退役清理与墓碑跳过机制已删除；反之，新增内置菜单也不会自动下发，须由运维按 `make print-builtin-menus` 的清单在控制台补录。
 
 ---
 
@@ -936,7 +939,7 @@ flowchart TB
 |---|---|---|
 | `gincontext.SetTenantScope(ctx, gcontext.CurrentScope(tenantID))` | 当前租户（默认） | 认证中间件：`pkg/middleware/oidc_auth.go`（OIDC claims）、`pkg/middleware/apikey_auth.go`（API Key 归属租户）各写一次 |
 | `dbclient.ExplicitTenantContext(ctx, tenantID)` | 指定它租户（加入租户、平台侧操作他人租户、新建租户的根部门） | 具名 dao/领域方法内，调用方零判断 |
-| `dbclient.CrossTenantContext(ctx)` | 跨全部租户（按全局唯一键反查 client_id/邀请码/API Key 摘要、自然人级全局登出、启动期 AutoMigrate 与种子） | 调用点显式书写并注释理由 |
+| `dbclient.CrossTenantContext(ctx)` | 跨全部租户（按全局唯一键反查 client_id/邀请码/API Key 摘要、自然人级全局登出、首次初始化引导 `svcinstall`） | 调用点显式书写并注释理由 |
 
 **fail-closed**：ctx 未声明作用域时，插件拒绝执行 SQL 并返回 `dbclient.ErrTenantScopeMissing`（错误信息含表名与修复指引），**绝不静默放行成跨租户读**。灰度回退开关为 `dbclient.SetMissingTenantScopeMode(dbclient.MissingTenantScopeWarn)`（只告警不拦截）。
 

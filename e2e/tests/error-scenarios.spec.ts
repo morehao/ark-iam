@@ -16,7 +16,7 @@ test.describe('错误和边界场景', () => {
       await page.goto(CONFIG.rp1Url, { waitUntil: 'networkidle', timeout: 15000 });
     }
     await page.waitForURL(
-      (u) => u.toString().includes('localhost:3000') && u.searchParams.has('authRequestID'),
+      (u) => u.toString().includes('localhost:4000') && u.searchParams.has('authRequestID'),
       { timeout: 20000 }
     );
     await page.waitForSelector('#identifier', { timeout: 10000 });
@@ -26,7 +26,7 @@ test.describe('错误和边界场景', () => {
     // 检查 URL 仍停留在 login-web（说明登录失败未跳转），
     // 同时检查页面无"仪表盘"/"部门管理"（说明未成功回调到应用）
     await page.waitForTimeout(3000);
-    const stillOnLoginWeb = page.url().includes('localhost:3000');
+    const stillOnLoginWeb = page.url().includes('localhost:4000');
     const body = await page.evaluate(() => document.body.innerText);
     const notLoggedIn = !body.includes('仪表盘') && !body.includes('部门管理');
     expect(stillOnLoginWeb || notLoggedIn).toBe(true);
@@ -64,10 +64,10 @@ test.describe('错误和边界场景', () => {
     await pageB.goto(`${CONFIG.issuer}/logged-out`, { waitUntil: 'networkidle', timeout: 10000 });
     await pageB.goto(CONFIG.rp1Url, { waitUntil: 'networkidle', timeout: 15000 });
     const urlB = pageB.url();
-    if (urlB.includes('localhost:3000')) {
+    if (urlB.includes('localhost:4000')) {
       await fillLoginWebCredentials(pageB);
       await pageB.waitForURL(
-        (u) => u.toString().includes('localhost:3002') && !u.toString().includes('/auth/callback'),
+        (u) => u.toString().includes('localhost:4002') && !u.toString().includes('/auth/callback'),
         { timeout: 30000 }
       );
     }

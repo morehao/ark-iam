@@ -24,6 +24,7 @@ const (
 	ActionApplicationClientCreateSecret = model.AuditActionApplicationClientCreateSecret
 	ActionApiKeyCreate                  = model.AuditActionApiKeyCreate
 	ActionApiKeyRevoke                  = model.AuditActionApiKeyRevoke
+	ActionInstallationInitialize        = model.AuditActionInstallationInitialize
 )
 
 type AuditEntry struct {

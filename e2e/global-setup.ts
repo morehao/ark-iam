@@ -1,4 +1,5 @@
 import { spawn, execSync, type ChildProcess } from 'child_process';
+import { CONFIG } from './config';
 import * as http from 'http';
 import * as net from 'net';
 import * as path from 'path';
@@ -29,12 +30,16 @@ const SERVICES: ServiceDef[] = [
     cwd: path.join(ROOT, 'backend'),
     env: {
       APP_CONFIG_PATH: path.join(ROOT, 'backend', 'apps', 'gateway', 'config', 'config.yaml'),
+      // 初始化引导的一次性令牌。启动期播种已删除，因此**每次全新库跑 e2e 都必须有人**
+      // 调用 POST /install/initialize——本文件末尾的 ensureInitialized 就是那个调用方。
+      // 未配置该变量时 /install/initialize 整体不可用（fail-closed），e2e 会直接失败并给出提示。
+      BOOTSTRAP_TOKEN: CONFIG.bootstrapToken,
     },
     healthPath: '/oidc/healthz',
   },
   {
     name: 'login-web',
-    port: 3000,
+    port: 4000,
     cmd: 'pnpm',
     args: ['--filter', '@ark-iam/login-web', 'dev'],
     cwd: FRONTEND_ROOT,
@@ -42,7 +47,7 @@ const SERVICES: ServiceDef[] = [
   },
   {
     name: 'platform-admin-web',
-    port: 3001,
+    port: 4001,
     cmd: 'pnpm',
     args: ['--filter', '@ark-iam/platform-admin-web', 'dev'],
     cwd: FRONTEND_ROOT,
@@ -50,7 +55,7 @@ const SERVICES: ServiceDef[] = [
   },
   {
     name: 'tenant-admin-web',
-    port: 3002,
+    port: 4002,
     cmd: 'pnpm',
     args: ['--filter', '@ark-iam/tenant-admin-web', 'dev'],
     cwd: FRONTEND_ROOT,
@@ -69,9 +74,15 @@ if (fs.existsSync(GATEWAY_BIN)) {
   };
 }
 
+// 探测主机列表：macOS 上 `localhost` 默认解析到 `::1`，而 vite dev server 绑的就是它。
+// checkPort 与 healthCheck **必须用同一份列表**——否则会出现
+// "TCP 连得上（探到 ::1）但健康检查失败（只探 127.0.0.1）"，
+// 于是把一个完全健康的已启动服务判成"占用但异常"并 SIGKILL 掉。
+const PROBE_HOSTS = ['127.0.0.1', '::1'];
+
 async function checkPort(port: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const hosts = ['127.0.0.1', '::1'];
+    const hosts = PROBE_HOSTS;
     let tried = 0;
     for (const host of hosts) {
       const socket = new net.Socket();
@@ -88,17 +99,30 @@ async function checkPort(port: number): Promise<boolean> {
 /**
  * 对已占用端口的服务做健康检查，确保它能正常响应。
  * 返回 true 表示服务健康可用，false 表示需要重启。
+ *
+ * 逐个尝试 PROBE_HOSTS（IPv4 与 IPv6 环回）：只探 127.0.0.1 会把绑在 ::1 上的
+ * 服务（macOS 上 vite dev server 就是）误判为不健康。
  */
-function healthCheck(port: number, healthPath: string, timeoutMs: number = 5000): Promise<boolean> {
+function healthCheckOnce(host: string, port: number, healthPath: string, timeoutMs: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const req = http.get(`http://127.0.0.1:${port}${healthPath}`, { timeout: timeoutMs }, (res) => {
+    // IPv6 字面量在 URL 里必须加方括号
+    const authority = host.includes(':') ? `[${host}]` : host;
+    const req = http.get(`http://${authority}:${port}${healthPath}`, { timeout: timeoutMs }, (res) => {
       // 2xx/3xx 认为健康
       const status = res.statusCode ?? 0;
+      res.resume();
       resolve(status >= 200 && status < 400);
     });
     req.on('error', () => resolve(false));
     req.on('timeout', () => { req.destroy(); resolve(false); });
   });
+}
+
+async function healthCheck(port: number, healthPath: string, timeoutMs: number = 5000): Promise<boolean> {
+  for (const host of PROBE_HOSTS) {
+    if (await healthCheckOnce(host, port, healthPath, timeoutMs)) return true;
+  }
+  return false;
 }
 
 /**
@@ -152,11 +176,11 @@ async function globalSetup() {
     }
   }
 
-  if (needStart.length === 0) {
-    console.log('  All services ready\n');
-    process.env.E2E_SERVICE_CHILDREN = JSON.stringify([]);
-    return;
-  }
+  // 注意：这里**不能**因为"服务都已在跑"就提前 return。
+  // 服务健康与"系统已初始化"是两件事——启动期播种已删除，初始化只会由下面的
+  // ensureInitialized() 触发。早期版本在 needStart 为空时直接 return，于是
+  // "先手动起好服务（或复用开发者的 dev server）再跑 e2e"这条最自然的路径上，
+  // 全新库永远不会被初始化，所有用例都撞 409/107004 失败。
 
   await Promise.all(
     needStart.map(
@@ -195,9 +219,127 @@ async function globalSetup() {
   );
 
   console.log('  All services ready\n');
+
+  // 无论服务是本次启动的、还是复用到的，都必须确保系统已初始化。
+  await ensureInitialized();
+  await verifyInitialized();
+
   console.log('[globalSetup] complete\n');
 
   process.env.E2E_SERVICE_CHILDREN = JSON.stringify(children.map((c) => c.pid));
+  // 只登记本次真正启动的端口；复用到的（already running & healthy）不在其中，
+  // teardown 据此避免误杀开发者自己的服务。
+  process.env.E2E_STARTED_PORTS = JSON.stringify(needStart.map((s) => s.port));
+}
+
+/** 极简 JSON 请求（不引 playwright 的 request，globalSetup 运行在测试框架之外）。 */
+function jsonRequest(
+  method: string,
+  url: string,
+  body?: unknown,
+  headers: Record<string, string> = {}
+): Promise<{ status: number; body: any }> {
+  return new Promise((resolve, reject) => {
+    const payload = body === undefined ? undefined : JSON.stringify(body);
+    const req = http.request(
+      url,
+      {
+        method,
+        timeout: 30000,
+        headers: {
+          ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}),
+          ...headers,
+        },
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (c) => (data += c));
+        res.on('end', () => {
+          let parsed: any = null;
+          try {
+            parsed = data ? JSON.parse(data) : null;
+          } catch {
+            parsed = data;
+          }
+          resolve({ status: res.statusCode ?? 0, body: parsed });
+        });
+      }
+    );
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(new Error('request timeout')); });
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+/**
+ * 确保系统已完成首次初始化。
+ *
+ * 为什么必须由 e2e 自己做这件事：启动期播种已删除（这是本设计的核心），
+ * 后端起来只是一个**空库**——没有平台租户、没有管理员，登录页对谁都登不进去。
+ * 若这里不引导，后续所有用例都会以"登录失败"告终，而根因与本用例要验证的东西毫无关系。
+ *
+ * 走的是与初始化页面**完全相同**的接口（D8：不引入第二条播种路径）。
+ * 库已初始化时直接跳过：自锁是产品语义，e2e 不做"重置后再初始化"（那需要直接改库）。
+ */
+async function ensureInitialized(): Promise<void> {
+  const base = CONFIG.installBaseURL;
+  const status = await jsonRequest('GET', `${base}/install/status`);
+  if (status.status !== 200) {
+    throw new Error(
+      `[globalSetup] GET /install/status 返回 ${status.status}；后端可能未就绪或未建表（检查 db.auto_migrate）`
+    );
+  }
+  const data = status.body?.data ?? {};
+  if (data.tokenRequired === false) {
+    throw new Error(
+      '[globalSetup] 后端未配置 BOOTSTRAP_TOKEN，/install/initialize 不可用（fail-closed）。' +
+        ' e2e 在 SERVICES 的 IAM Backend env 中注入该变量；若后端已在运行，请先停掉再跑 e2e。'
+    );
+  }
+  if (data.initialized === true) {
+    console.log('  ✅ 系统已初始化，跳过首次引导');
+    return;
+  }
+  if (data.schemaReady === false) {
+    throw new Error('[globalSetup] 表结构未就绪（schemaReady=false）：确认 db.auto_migrate 为 true');
+  }
+
+  const res = await jsonRequest(
+    'POST',
+    `${base}/install/initialize`,
+    {
+      tenantName: 'E2E 平台运营中心',
+      adminUsername: CONFIG.identifier,
+      adminPassword: CONFIG.password,
+      adminEmail: 'admin@example.com',
+      adminName: '系统管理员',
+    },
+    { 'X-Bootstrap-Token': CONFIG.bootstrapToken }
+  );
+  if (res.status !== 200) {
+    throw new Error(
+      `[globalSetup] 首次引导失败（HTTP ${res.status}, code=${res.body?.code}）：${res.body?.msg ?? ''}`
+    );
+  }
+  const created = res.body?.data?.report?.changes?.length ?? 0;
+  console.log(`  ✅ 首次引导完成（创建 ${created} 条内置数据，管理员 ${CONFIG.identifier}）`);
+}
+
+/**
+ * 引导后自检：状态必须翻转为 initialized。
+ *
+ * 这条断言把"引导其实没生效"与"后续用例登录失败"区分开——
+ * 否则一个失败的初始化会表现成十几个互不相关的登录用例失败。
+ */
+async function verifyInitialized(): Promise<void> {
+  const started = Date.now();
+  while (Date.now() - started < 10000) {
+    const st = await jsonRequest('GET', `${CONFIG.installBaseURL}/install/status`);
+    if (st.body?.data?.initialized === true) return;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error('[globalSetup] 引导后 /install/status 仍报未初始化');
 }
 
 export default globalSetup;

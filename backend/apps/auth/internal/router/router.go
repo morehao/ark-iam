@@ -2,6 +2,7 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/auth/internal/controller/ctrinstall"
 	"github.com/morehao/ark-iam/auth/internal/controller/ctroidc"
 	"github.com/morehao/ark-iam/auth/internal/middleware"
 	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
@@ -39,4 +40,7 @@ func registerRouter(engine *gin.Engine, oidcCtr *ctroidc.OIDCCtr) {
 	userSessionRouter(routerGroups)
 	connectorRouter(routerGroups)
 	InitOIDC(engine, oidcCtr)
+	// /install 为自举专用前缀（R3 例外）：注册在所有业务路由之外，
+	// 且必须晚于 OIDC provider 装配（状态查询要读本部署的 issuer 与控制台地址）。
+	installRouter(engine, ctrinstall.NewInstallCtr())
 }

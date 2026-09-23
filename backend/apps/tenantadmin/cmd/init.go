@@ -7,7 +7,6 @@ import (
 
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/pkg/seed"
 	"github.com/morehao/ark-iam/tenantadmin"
 	"github.com/morehao/ark-iam/tenantadmin/config"
 	"github.com/morehao/golib/biz/gcontext"
@@ -51,16 +50,14 @@ func resourceInit() error {
 	}
 	// 启动期不隶属任何租户：显式声明「全部租户」作用域。
 	// fail-closed 下不允许用缺失作用域来获得跨租户可见性（会直接报错），
-	// 因此 AutoMigrate 与种子写入必须在此显式声明。
+	// 因此 AutoMigrate 必须在此显式声明。
+	//
+	// 启动期**只建表、不写数据**：内置数据由初始化页面触发的一次性引导写入
+	// （pkg/seed.Bootstrap，见 docs/design/system-design.md §4.5）。
 	bootstrapCtx := gcontext.WithTenantScope(context.Background(), gcontext.AllScope())
 	if config.Conf.DB.AutoMigrate {
 		if err := model.AutoMigrateAll(dbclient.IamDB(bootstrapCtx)); err != nil {
 			return fmt.Errorf("auto migrate failed: %w", err)
-		}
-	}
-	if config.Conf.DB.Seed {
-		if err := seed.SeedIam(bootstrapCtx, dbclient.IamDB(bootstrapCtx)); err != nil {
-			return fmt.Errorf("seed data failed: %w", err)
 		}
 	}
 

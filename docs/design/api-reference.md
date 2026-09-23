@@ -1,6 +1,6 @@
 # API 参考（API Reference）
 
-> 本文给出 Ark IAM 的 API 总览：**OIDC 协议端点**（`/oidc/*`）、**认证端点**（`/v1/auth/*`）、**平台管理端点**（`/v1/platform/*`）、**租户自服务端点**（`/v1/tenant/*`）、**应用目录端点**（`/v1/rp/directory/*`），以及认证方式、通用响应信封、路由规范摘要。
+> 本文给出 Ark IAM 的 API 总览：**初始化引导端点**（`/install/*`）、**OIDC 协议端点**（`/oidc/*`）、**认证端点**（`/v1/auth/*`）、**平台管理端点**（`/v1/platform/*`）、**租户自服务端点**（`/v1/tenant/*`）、**应用目录端点**（`/v1/rp/directory/*`），以及认证方式、通用响应信封、路由规范摘要。
 >
 > 开发环境 Swagger（redoc）：`http://localhost:{port}/{appName}/redocs`（如 `http://localhost:8081/auth/redocs`）。
 
@@ -16,6 +16,7 @@
 6. [租户自服务端点（/v1/tenant/*）](#6-租户自服务端点v1tenant)
 7. [路由规范摘要](#7-路由规范摘要)
 8. [应用目录端点（/v1/rp/directory/*）](#8-应用目录端点v1rpdirectory)
+9. [初始化引导端点（/install/*）](#9-初始化引导端点install)
 
 ---
 
@@ -49,6 +50,7 @@
 - **业务错误仍以 HTTP 200 返回**（`gincontext.Fail/Abort`），调用方必须以 `code` 判定成败，不能依赖 HTTP 状态码；
 - `requestID` 为链路追踪 ID，便于按请求排查日志；
 - 仅鉴权中间件短路时返回 HTTP 401：`{"code": 401, "msg": "invalid token"}`；
+- **例外：`/install/*` 的失败响应使用真实 HTTP 状态码**（`gincontext.FailWithStatus` 按 `InstallErrorHTTPStatus` 映射，如已初始化 409 / 令牌不匹配 401 / 未配置令牌 503），成功仍是标准信封；未初始化时业务端点还会被守卫短路成 HTTP 409（`107004`）。详见 §9；
 - **例外：`/v1/rp/directory/*` 成功响应返回裸 DTO，不套本信封**（原因见 §8.3）。
 
 ### 1.3 路径参数命名
@@ -81,7 +83,7 @@ flowchart LR
 | `Authorization: Bearer <access_token>` | 登录用户（前端）/ M2M 应用 | OIDC JWT，`sub=person:<id>`，私有声明 `tenant_id`/`user_id`/`person_id`/`sid`/`client_id`/`token_usage`/`scope`/`act`（口径见 §2.1） |
 | `x-api-key: <64 位 hex 明文>` | 机器/服务 | 明文为 32 字节随机数的 64 位小写 hex，**无 `ak_` 之类前缀**；列表展示用 `keyPrefix`（前 7 位）。也可放进 `Authorization: Bearer`，与 `x-api-key` 二选一，任一通过即可 |
 
-免鉴权路径（跳过业务鉴权中间件）：`/v1/auth/connectors/callback`（Connector 回调）。**全部 `/oidc/*` 端点直接挂在 engine 上、不经业务鉴权**（鉴权中间件只作用于 `/v1/*`），由协议自身校验（token 端点校验 client 凭据，bc-logout 校验 `logout_token` JWT）。
+免鉴权路径（跳过业务鉴权中间件）：`/v1/auth/connectors/callback`（Connector 回调）。**全部 `/oidc/*` 端点直接挂在 engine 上、不经业务鉴权**（鉴权中间件只作用于 `/v1/*`），由协议自身校验（token 端点校验 client 凭据，bc-logout 校验 `logout_token` JWT）。**`/install/*` 同样不经业务鉴权**：`GET /install/status` 公开只读，`POST /install/initialize` 只认请求头 `X-Bootstrap-Token`（与部署侧令牌比对：环境变量 `BOOTSTRAP_TOKEN` 优先、配置项 `install.bootstrapToken` 回落，见 §9）。
 > 说明：`/v1/auth/register` 端点已下线，自助注册收口到 `/oidc/registerPerson` + `/oidc/createTenant`（见 §3.2）。
 
 ### 2.1 Access Token 私有声明
@@ -107,6 +109,8 @@ flowchart LR
 > 部署于 auth 应用（:8081）与 gateway（:8100）。issuer 随部署形态切换：auth 独立部署为 `http://localhost:8081/oidc`，gateway 聚合部署为 `http://localhost:8100/oidc`。
 >
 > 下表路径均相对 `/oidc`（即 `/.well-known/openid-configuration` 的完整路径是 `/oidc/.well-known/openid-configuration`）。
+>
+> 同为 R3 专用前缀的 `/install/*`（系统首次引导）**不属于 OIDC 协议**，单独见 §9。
 
 ### 3.1 标准端点（zitadel/oidc 提供）
 
@@ -220,7 +224,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | GET | `/v1/platform/menus` | 菜单分页 |
 | GET | `/v1/platform/menus/my` | 当前用户可见菜单树（控制台侧边栏） |
 | GET | `/v1/platform/menus/tree` | 菜单树 |
-| GET/PUT/DELETE | `/v1/platform/menus/{menuID}` | 菜单详情/更新/删除（**删除级联整棵子树**并在同事务内解绑 `role_menu`；控制台可增删任意应用的菜单，含内置应用——删除留下软删"墓碑"，种子不再复活，见 `system-design.md` §4.5） |
+| GET/PUT/DELETE | `/v1/platform/menus/{menuID}` | 菜单详情/更新/删除（**删除级联整棵子树**并在同事务内解绑 `role_menu`；控制台可增删任意应用的菜单，含内置应用——删除是软删，等价于"人工下线"。首次引导只在库未初始化时按 `seed_key` 创建、之后永久自锁，因此删除后不会有任何东西把它建回来，见 `system-design.md` §4.5） |
 
 > 权限点 / 资源字典（`/v1/platform/scopes`、`/v1/platform/resources`）随资源级授权一并下线（见 `system-design.md` §4.3），平台端不提供接口。
 
@@ -230,17 +234,17 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 |---|---|---|
 | POST | `/v1/platform/tenants` | 创建租户（**必带 `admin`**：同事务建根部门 + 内置管理员 user + 租户管理员角色授权；响应 `adminInitialPassword` 为一次性临时密码） |
 | GET | `/v1/platform/tenants` | 租户分页 |
-| GET/PUT/DELETE | `/v1/platform/tenants/{tenantID}` | 租户详情/更新/删除（**平台自运营租户 `t_platform` 禁删**，删除报 `100212`：它是平台控制台自身所在租户，删除即整栈失联且无恢复路径；判定按种子编码而非 `type`——控制台可建 `type=platform` 的普通租户） |
+| GET/PUT/DELETE | `/v1/platform/tenants/{tenantID}` | 租户详情/更新/删除（**平台自运营租户 `t_platform` 禁删**，删除报 `100212`：它是平台控制台自身所在租户，删除即整栈失联且无恢复路径；判定按首次引导写入的固定编码 `t_platform`（`model.SeedPlatformTenantCode`）而非 `type`——控制台可建 `type=platform` 的普通租户） |
 | POST | `/v1/platform/tenants/{tenantID}/builtin-admin/reset-password` | 重置租户内置管理员密码（仅 `source=builtin`，即建租户时由平台创建的管理员；返回一次性临时密码并撤销其会话） |
 | POST | `/v1/platform/tenant-applications` | 开通租户-应用（**必带 `tenantID`** 指定归属租户；同租户同应用重复订阅报 `100747`，租户不存在报 `100205`，应用不存在报 `100735`） |
 | GET | `/v1/platform/tenant-applications` | 租户应用分页（`tenantID` 按归属租户筛选、留空＝全部租户；`status` 筛选状态；返回 `tenantName`/`appName`/`appSource` 便于回显与判定内置订阅） |
-| GET/PUT/DELETE | `/v1/platform/tenant-applications/{tenantAppID}` | 详情/更新/删除（平台侧跨租户运维：归属租户来自 `tenantID`/资源本身，不校验 ctx 租户，与 `/v1/platform/tenants` 同一信任模型；订阅不存在报 `100745`；**订阅的是内置应用（`appSource=builtin`）时禁删报 `100756`**——种子与 `ProvisionTenantAdmin` 系统开通的订阅删除后对应控制台会失去菜单，下线请改 `status=disable`） |
+| GET/PUT/DELETE | `/v1/platform/tenant-applications/{tenantAppID}` | 详情/更新/删除（平台侧跨租户运维：归属租户来自 `tenantID`/资源本身，不校验 ctx 租户，与 `/v1/platform/tenants` 同一信任模型；订阅不存在报 `100745`；**订阅的是内置应用（`appSource=builtin`）时禁删报 `100756`**——首次引导与 `ProvisionTenantAdmin` 系统开通的订阅删除后对应控制台会失去菜单，下线请改 `status=disable`） |
 
 > 租户编码 `code` 由服务端自动生成（规则 `t_<12 位随机 hex>`，如 `t_3f7a9c1d2e4b`，平台租户固定 `t_platform`），创建/更新入参无需传 `code`，创建后不可修改；列表支持 `GET /v1/platform/tenants?name=<关键词>&status=<active|suspended>`（`name` 按租户名模糊搜索，`status` 按状态精确筛选、留空不筛选、非法值报 `100209`），并返回 `createdAt`/`updatedAt`（秒级时间戳）。
 >
 > 租户状态 `status`（`active` 正常 / `suspended` 已挂起）：非法值/缺省归一为 `active`；`suspended` 会撤销该租户成员的 refresh token 与 SSO 会话，非 active 租户的成员无法登录、令牌不签发；`PUT /v1/platform/tenants/{tenantID}` 拒绝挂起操作者自己所在的租户（`100208`）；重置内置管理员密码失败报 `100210`。
 >
-> **建租户的管理员约定**（D2/D3/D6）：`admin` 必填且邮箱/手机至少一个（缺联系方式报 `100521`）；管理员在同事务内创建为 `tenant_user.source=builtin`、`owner_type=owner`，并绑定根部门与内置「租户管理员」角色（`source=builtin`、`admin_type=admin`，该角色随租户开通 `tenant-admin` 应用订阅；应用/菜单种子缺失会整体回滚并报 `100200`）。`adminInitialPassword` 只在**新建自然人**时非空——命中已存在自然人时沿用其原密码、不回显凭据（可改用重置内置管理员密码接口兜底）。该管理员首次登录强制改密：`/oidc/login` 返回 `requiresPasswordChange=true`，改完（`/oidc/login/changePassword`）须重新登录。详见 `system-design.md` §5.8。
+> **建租户的管理员约定**（D2/D3/D6）：`admin` 必填且邮箱/手机至少一个（缺联系方式报 `100521`）；管理员在同事务内创建为 `tenant_user.source=builtin`、`owner_type=owner`，并绑定根部门与内置「租户管理员」角色（`source=builtin`、`admin_type=admin`，该角色随租户开通 `tenant-admin` 应用订阅；应用/菜单缺失会整体回滚并报 `100200`）。`adminInitialPassword` 只在**新建自然人**时非空——命中已存在自然人时沿用其原密码、不回显凭据（可改用重置内置管理员密码接口兜底）。该管理员首次登录强制改密：`/oidc/login` 返回 `requiresPasswordChange=true`，改完（`/oidc/login/changePassword`）须重新登录。详见 `system-design.md` §5.8。
 
 ### 5.4 应用与客户端（OIDC 配置）
 
@@ -340,7 +344,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 1. **R1 资源 CRUD → REST**：`/{版本}/{服务标识}/{资源}[/{id}[/{子资源}]]`；
 2. **R2 业务动作 → 动作子路径**：`POST /资源/{id}/动作`（如 `/api-keys/{apiKeyID}/revoke`）；认证/会话类动作挂 `/v1/auth` 动作段（`joinTenant`/`logout`/`logoutAll`/`userinfo`；自助注册不在业务路由，收口在 `/oidc/registerPerson` + `/oidc/createTenant`）；
-3. **R3 标准协议 → 专用前缀**：`/oidc/*`、back-channel logout 不走业务路由规范。
+3. **R3 标准协议 → 专用前缀**：`/oidc/*`、back-channel logout、**初始化引导 `/install/*`**（自举入口，见 §9）不走业务路由规范。
 
 | 规范 | 说明 |
 |---|---|
@@ -437,3 +441,34 @@ roles, err := client.Roles(ctx)                          // client.RolesTruncate
 ```
 
 > 按 `sdk/README.md`：目录客户端**不得**进入鉴权中间件或审计写入的关键路径；401/403/404 一律透传、绝不降级（仅连接失败/超时/5xx 可用 stale 缓存）。
+
+---
+
+## 9. 初始化引导端点（/install/*）
+
+> **R3 专用前缀**：与 `/oidc/*` 一样是标准自举入口，不走业务路由规范（不是 REST 资源，也不挂在 `{服务标识}` 段下）；固定注册在 auth（:8081）与 gateway（:8100）上，实现在 `apps/auth` 的 `ctrinstall`/`svcinstall` 与 `pkg/seed.Bootstrap`。这三条硬规则见 §7。
+>
+> 这是**全新库的首次引导写入口**，与常规业务接口有两点关键差异：
+>
+> 1. **未初始化时业务端点整体不可用**：`pkg/middleware.BootstrapGuard` 把业务端点短路成 **HTTP 409 + 错误码 `107004`**，只放行 `/install` 与 `/oidc` 的健康检查 / 服务发现 / 登出端点（`BootstrapGuardAllowPrefixes`）。这是引导态的预期行为，不是服务故障。
+> 2. **失败响应使用真实 HTTP 状态码**（与 §1.2「HTTP 200 + 非 0 code」不同）：`gincontext.FailWithStatus` 按 `pkg/code.InstallErrorHTTPStatus` 映射——`107000`→409、`107001`→401、`107002`→503、`107003`→500、`107005`→400、`107006`→400。成功仍返回标准信封。
+
+| 方法 | 路径 | 鉴权 | 说明 |
+|---|---|---|---|
+| GET | `/install/status` | **公开只读** | 返回 `{initialized, tokenRequired, schemaReady, consoles}`：`initialized` 以库内平台租户行为准（不是进程内缓存）；`tokenRequired` 表示服务端是否配置了引导令牌（环境变量或配置项任一非空即 true）；`schemaReady` 表示 `AutoMigrate` 是否已建出核心表（`seed.SchemaReady`）；`consoles` 回显内置控制台入口。未初始化时 login-web 的 `InstallGuard` 靠它决定是否把登录入口改道到 `/install` |
+| POST | `/install/initialize` | 请求头 `X-Bootstrap-Token` | **全系统唯一的内置数据写入口**：在**单个事务**内写入平台租户、根部门、内置应用与 OAuth 客户端、内置菜单与角色、内置管理员（person + tenant_user + 部门关系 + 角色授权）以及租户应用开通，并返回 `{report, adminUsername, loginURL, consoles}`；挂 `middleware.BootstrapRateLimit()` 限流 |
+
+**状态码与错误码**：成功 200；已初始化 409（`107000`，永久自锁，重启/换副本都不解除）；令牌缺失或不匹配 401（`107001`）；服务端未配置引导令牌时端点整体不可用、返回 503（`107002`，**fail-closed**）；初始化失败 500（`107003`）；入参非法 400（`107005`）；口令强度不足 400（`107006`）。
+
+**令牌校验先于参数绑定**（顺序是契约，不是实现细节）：绑定失败返回 400/`107005`、令牌失败返回 401/`107001`，若绑定在前，一个**未持令牌**的调用方就能靠"400 还是 401"判断自己的请求参数是否合法——参数校验会成为无需准入即可使用的探测面。因此未通过准入的请求一律 401（即使请求体是非法 JSON），且其参数不进日志。
+
+**请求体 `InstallationInitializeReq`**：
+
+| 字段 | 约束 |
+|---|---|
+| `adminUsername` | 必填，长度 ≤128 |
+| `adminPassword` | 必填，**8–128 位且同时包含大写字母、小写字母与数字**（`credential.ValidateStrength`）；明文不落日志（`LogSafeReq` 已剥离），库中只存 bcrypt 摘要。后端**不预置任何默认口令**（历史常量 `credential.BootstrapAdminPassword` 已删除） |
+| `adminEmail` / `adminPhone` | **至少填一个** |
+| `adminName` / `tenantName` / `issuer` | 可空，留空回落内置默认值（平台租户「平台运营中心」、issuer `http://localhost:8100/oidc` 等，见 `pkg/seed.definition.go`） |
+
+> 安装页（login-web 的 `/install`，开发端口 4000）把上述入参拆成 3 步（租户 / 管理员 / 内置数据确认），但**只有第 3 步发这一次写请求**——后端没有分步端点，因此不会出现"第一步成功、第二步失败"的半成品库。`BOOTSTRAP_TOKEN` 是**部署期一次性机密**，初始化完成后应从运行环境移除；`/install` 只应在受信网络内可达（部署时建议用 SSH 端口转发打开，见 `run-and-deploy.md` §2.4）。e2e 通过 `global-setup` 调这两个端点完成引导（令牌 `e2e-bootstrap-token`，管理员口令 `Admin123`，见 `e2e/README.md`）；另有 `pnpm test:fresh` 在**全新库**上用浏览器真走一遍三步向导，并断言完成页回显了本次写入的 `seed.Report`（这是唯一一次内置数据写入，此后种子永久自锁，页面必须把它交代清楚——条数 + 可展开的 entity/key/action 明细）。

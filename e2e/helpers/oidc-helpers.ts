@@ -4,7 +4,7 @@ import { CONFIG } from '../config';
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function isLoginWebUrl(url: string): boolean {
-  return url.includes('localhost:3000') && url.includes('/login');
+  return url.includes('localhost:4000') && url.includes('/login');
 }
 
 function isAuthCallbackUrl(url: string): boolean {
@@ -12,11 +12,11 @@ function isAuthCallbackUrl(url: string): boolean {
 }
 
 function isRp1Url(url: string): boolean {
-  return url.includes('localhost:3002');
+  return url.includes('localhost:4002');
 }
 
 function isAdminUrl(url: string): boolean {
-  return url.includes('localhost:3001');
+  return url.includes('localhost:4001');
 }
 
 export async function fillLoginWebCredentials(page: Page): Promise<void> {
@@ -75,14 +75,23 @@ async function navigateToLoginWeb(page: Page, targetUrl: string): Promise<void> 
 export async function verifyRp1HomePage(page: Page): Promise<void> {
   // SPA 的 useSSOSessionProbe 会间歇触发 silent renew，导致 body 周期性清空，
   // 因此不能依赖一次性 innerText 断言，改用自动重试的 locator 等待稳定可见。
-  // RP1 现由 tenant-admin-web（:3002 / tenant_admin_web client）承担，其首页展示租户部门管理。
+  // RP1 现由 tenant-admin-web（:4002 / tenant_admin_web client）承担，其首页展示租户部门管理。
+  //
+  // 第二条断言原来是 `'租户管理'`——**这条永远不可能通过**：`exact: true` 要求文本节点
+  // 完全等于该串，而租户控制台的标题是 `Ark IAM`、副标题是 `租户管理后台`，
+  // 精确匹配 `租户管理` 谁都命中不了；并且 `租户管理` 其实是**平台管理后台**的菜单名，
+  // 不在租户应用的 4 个内置菜单（部门管理/用户管理/角色管理/API密钥）里。
+  // 意图是"确认确实进了租户控制台"，因此断言副标题。
   await expect(page.getByText('部门管理', { exact: true }).first()).toBeVisible({ timeout: 30000 });
-  await expect(page.getByText('租户管理', { exact: true }).first()).toBeVisible({ timeout: 30000 });
+  await expect(page.getByText('租户管理后台', { exact: true }).first()).toBeVisible({ timeout: 30000 });
 }
 
 export async function verifyAdminDashboard(page: Page): Promise<void> {
+  // 同理（见 verifyRp1HomePage 的说明）：`IAM 管理平台` 只存在于 index.html 的 <title>
+  // 与登录页标题里，登录后的布局文本是 `Ark IAM` + `平台管理后台`，
+  // 因此精确匹配 `IAM 管理平台` 在仪表盘上必然落空——断言副标题才是"确实进了平台控制台"。
   await expect(page.getByText('仪表盘', { exact: true }).first()).toBeVisible({ timeout: 30000 });
-  await expect(page.getByText('IAM 管理平台', { exact: true }).first()).toBeVisible({ timeout: 30000 });
+  await expect(page.getByText('平台管理后台', { exact: true }).first()).toBeVisible({ timeout: 30000 });
 }
 
 export async function rp1Login(page: Page): Promise<void> {

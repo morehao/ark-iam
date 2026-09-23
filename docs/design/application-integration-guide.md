@@ -48,7 +48,7 @@ flowchart TB
 | 问题 | 影响 |
 |---|---|
 | 应用有前端页面吗？ | 前端用授权码 + PKCE；无前端用 client_credentials |
-| 是自有应用还是第三方应用？ | 来源（`application.source`）：控制台创建恒为 `third_party`；`builtin`/`first_party` 仅由种子与运维产生 |
+| 是自有应用还是第三方应用？ | 来源（`application.source`）：控制台创建恒为 `third_party`；`builtin` 仅由首次初始化引导写入，`first_party` 仅由运维自建产生 |
 | 回调地址是什么？ | `redirect_uri` 必须**精确白名单**（HTTPS 生产必填） |
 | 需要免登录串访吗？ | 需要 → 确保与 IAM 同浏览器环境（SSO Cookie 生效） |
 | 需要服务端到服务端调用吗？ | 需要 → 额外申请 API Key 或 client_credentials |

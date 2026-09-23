@@ -6,7 +6,8 @@
   "scripts": {
     "test": "npx playwright test",
     "test:headed": "npx playwright test --headed",
-    "test:debug": "npx playwright test --debug"
+    "test:debug": "npx playwright test --debug",
+    "test:fresh": "npx playwright test --config playwright.fresh.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

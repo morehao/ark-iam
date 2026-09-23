@@ -54,16 +54,6 @@ func ValidateStrength(password string) error {
 	return nil
 }
 
-// BootstrapAdminPassword 种子平台管理员（bootstrap）的固定初始口令。
-//
-// 这是全系统**唯一**允许存在的固定默认口令，且只在种子阶段使用：
-//   - 平台租户由 pkg/seed 在启动时创建，其管理员的初始口令必须可被部署文档与
-//     e2e 用例稳定引用（e2e/config.ts 即以该口令登录），因此刻意保留固定值；
-//   - 其余一切"代建 / 重置"场景的初始口令都必须走 GenerateTemporaryPassword（每用户随机）。
-//
-// 不要把本常量用于任何业务链路；新增业务默认口令一律用 GenerateTemporaryPassword。
-const BootstrapAdminPassword = "admin123"
-
 // 临时密码字符集与长度：剔除易混淆字符（数字 0/1、字母 l/I/O），
 // 降低人工转录（运营复制转交）时的错录概率。
 const (

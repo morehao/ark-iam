@@ -8,21 +8,31 @@ import (
 	"github.com/morehao/ark-iam/pkg/seed"
 )
 
-// TestRunReportsChanges 变更报告（可观测性）：全新库首次播种必须报告各实体的 created；
-// 二次执行必须零 created（幂等），部署时据此核对"这次启动改了什么"。
-func TestRunReportsChanges(t *testing.T) {
+// TestBootstrapReportsChanges 变更报告（可观测性）：L1 首次引导必须报告各实体的 created；
+// 二次引导必须自锁并零写入（部署时据此核对"这次到底写了什么"）。
+//
+// 报告是初始化接口回给初始化页面的内容（见 install 服务），因此它必须如实反映本次真实写入——
+// L1 只创建，故 Change.Action 恒为 created，不存在 updated/migrated。
+func TestBootstrapReportsChanges(t *testing.T) {
 	db := setupDB(t)
 	ctx := context.Background()
 
-	rep, err := seed.Run(ctx, db)
+	rep, status, err := seed.Bootstrap(ctx, db, testDefinition(t))
 	if err != nil {
-		t.Fatalf("seed run fail: %v", err)
+		t.Fatalf("bootstrap fail: %v", err)
+	}
+	if status != seed.StatusCreated {
+		t.Fatalf("status = %q, want %q", status, seed.StatusCreated)
+	}
+	if rep.TenantID == "" {
+		t.Error("报告必须带上平台租户 ID（审计与响应据此定位目标租户）")
 	}
 	created := map[string]int{}
 	for _, change := range rep.Changes {
-		if change.Action == "created" {
-			created[change.Entity]++
+		if change.Action != "created" {
+			t.Errorf("L1 只创建，动作必须恒为 created，实际 %+v", change)
 		}
+		created[change.Entity]++
 	}
 	wantCreated := map[string]int{
 		model.SeedEntityTenant:            1,
@@ -46,114 +56,15 @@ func TestRunReportsChanges(t *testing.T) {
 		t.Error("报告汇总不得为空")
 	}
 
-	rep2, err := seed.Run(ctx, db)
+	rep2, status2, err := seed.Bootstrap(ctx, db, testDefinition(t))
 	if err != nil {
-		t.Fatalf("seed (2nd) run fail: %v", err)
+		t.Fatalf("bootstrap (2nd) fail: %v", err)
 	}
-	for _, change := range rep2.Changes {
-		if change.Action == "created" {
-			t.Errorf("二次执行不得再有 created: %+v", change)
-		}
-		if change.Action == "migrated" {
-			t.Errorf("二次执行不得再触发迁移: %+v", change)
-		}
+	if status2 != seed.StatusAlreadyInitialized {
+		t.Errorf("二次引导 status = %q, want %q", status2, seed.StatusAlreadyInitialized)
 	}
-}
-
-// TestSeedIamRespectsOperatorOwnedFields 单一写者语义（reconcile 收窄到定位键+安全不变式后）：
-//   - 归运维的字段（平台租户名、根部门名、应用名与描述、应用启停/排序、客户端名与回调地址）
-//     改过之后，种子不得回写；
-//   - 安全不变式（内置对象的 source、平台租户 status=active）仍被纠正。
-func TestSeedIamRespectsOperatorOwnedFields(t *testing.T) {
-	db := setupDB(t)
-	ctx := context.Background()
-	if err := seed.SeedIam(ctx, db); err != nil {
-		t.Fatalf("seed fail: %v", err)
-	}
-
-	var tenant model.TenantEntity
-	if err := db.Where("code = ?", model.SeedPlatformTenantCode).First(&tenant).Error; err != nil {
-		t.Fatalf("query tenant: %v", err)
-	}
-	// 运维改动：平台租户名（迁移只在历史种子值上触发，这里已是运维自定义值）
-	if err := db.Model(&model.TenantEntity{}).Where("id = ?", tenant.ID).
-		Updates(map[string]any{"name": "ACME 平台运营中心", "status": model.TenantStatusSuspended}).Error; err != nil {
-		t.Fatalf("degrade tenant: %v", err)
-	}
-	// 运维改动：根部门名按自己组织架构命名
-	if err := db.Model(&model.DepartmentEntity{}).Where("tenant_id = ? AND parent_id = ?", tenant.ID, "").
-		Update("name", "ACME 技术中心").Error; err != nil {
-		t.Fatalf("degrade department: %v", err)
-	}
-	// 运维改动：应用名/描述（控制台可改）+ 启停/排序；同时把 source 降级以验证安全不变式仍收敛
-	if err := db.Model(&model.ApplicationEntity{}).Where("code = ?", "platform_admin").
-		Updates(map[string]any{
-			"name": "ACME 控制台", "description": "ACME 自定描述",
-			"status": model.AppStatusDisable, "sort": 9,
-			"source": model.AppSourceThirdParty,
-		}).Error; err != nil {
-		t.Fatalf("degrade application: %v", err)
-	}
-	// 运维改动：客户端名（控制台可改）+ 回调地址（环境相关）；source 同样降级
-	customRedirect := "https://sso.example.com/auth/callback"
-	if err := db.Model(&model.ApplicationClientEntity{}).Where("code = ?", "platform_admin_web").
-		Updates(&model.ApplicationClientEntity{
-			Name:         "ACME SSO 客户端",
-			RedirectURIs: model.RedirectURIList{customRedirect},
-			Source:       model.ApplicationClientSourceThirdParty,
-		}).Error; err != nil {
-		t.Fatalf("degrade client: %v", err)
-	}
-
-	if err := seed.SeedIam(ctx, db); err != nil {
-		t.Fatalf("seed (2nd) fail: %v", err)
-	}
-
-	if err := db.Where("code = ?", model.SeedPlatformTenantCode).First(&tenant).Error; err != nil {
-		t.Fatalf("query tenant after reseed: %v", err)
-	}
-	if tenant.Name != "ACME 平台运营中心" {
-		t.Errorf("平台租户名 = %q, want 运维自定义值（migrate_once 不得覆盖运维改名）", tenant.Name)
-	}
-	if tenant.Status != model.TenantStatusActive {
-		t.Errorf("平台租户 status = %q, want %q（reconcile 安全不变式）", tenant.Status, model.TenantStatusActive)
-	}
-
-	var rootDept model.DepartmentEntity
-	if err := db.Where("tenant_id = ? AND parent_id = ?", tenant.ID, "").First(&rootDept).Error; err != nil {
-		t.Fatalf("query root department: %v", err)
-	}
-	if rootDept.Name != "ACME 技术中心" {
-		t.Errorf("根部门名 = %q, want 运维自定义值（派生字段只在历史种子值上同步一次）", rootDept.Name)
-	}
-
-	var adminApp model.ApplicationEntity
-	if err := db.Where("code = ?", "platform_admin").First(&adminApp).Error; err != nil {
-		t.Fatalf("query application: %v", err)
-	}
-	if adminApp.Name != "ACME 控制台" || adminApp.Description != "ACME 自定描述" {
-		t.Errorf("应用 (name, description) = (%q, %q), want 运维自定义值（create_only 字段种子不得回写）",
-			adminApp.Name, adminApp.Description)
-	}
-	if adminApp.Status != model.AppStatusDisable || adminApp.Sort != 9 {
-		t.Errorf("应用 status/sort = (%q, %d), want (disable, 9)：create_only 字段种子不得回写", adminApp.Status, adminApp.Sort)
-	}
-	if adminApp.Source != model.AppSourceBuiltin {
-		t.Errorf("应用 source = %q, want %q（安全不变式必须收敛）", adminApp.Source, model.AppSourceBuiltin)
-	}
-
-	var client model.ApplicationClientEntity
-	if err := db.Where("code = ?", "platform_admin_web").First(&client).Error; err != nil {
-		t.Fatalf("query application_client: %v", err)
-	}
-	if client.Name != "ACME SSO 客户端" {
-		t.Errorf("客户端名 = %q, want 运维自定义值（create_only 字段种子不得回写）", client.Name)
-	}
-	if len(client.RedirectURIs) != 1 || client.RedirectURIs[0] != customRedirect {
-		t.Errorf("客户端回调地址 = %v, want %s（create_only 字段种子不得回写）", client.RedirectURIs, customRedirect)
-	}
-	if client.Source != model.ApplicationClientSourceBuiltin {
-		t.Errorf("客户端 source = %q, want %q（安全不变式必须收敛）", client.Source, model.ApplicationClientSourceBuiltin)
+	if len(rep2.Changes) != 0 {
+		t.Errorf("二次引导必须零写入，实际 %+v", rep2.Changes)
 	}
 }
 

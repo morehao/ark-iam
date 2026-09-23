@@ -194,8 +194,9 @@ func (svc *oAuthClientSvc) Delete(ctx *gin.Context, req *dtoapplicationclient.Ap
 	return nil
 }
 
-// 内置客户端的写入约束：字段权威矩阵里 application_client 的 reconcile 字段只有 source 与
-// app_id（内置标记与归属应用），两者都不在 ApplicationClientUpdateReq 中，控制台无写入入口。
+// 内置客户端的写入约束：字段权威矩阵里 application_client 的 immutable 字段是 source 与
+// code（内置标记与 client_id），source 不在 ApplicationClientUpdateReq 中（控制台无写入入口），
+// code 由下方显式拒绝。app_id（归属应用）同样是 create_only，控制台无改归属入口。
 // code（= client_id）**可改，但内置客户端拒改**：它同时是网关 aud 白名单与前端构建期
 // client_id 的取值来源，从控制台改会当场把该控制台锁死且无法从界面恢复（见客户端编码方案文档）。
 // 名称/回调地址/授权类型/TTL 都归运维（create_only）。

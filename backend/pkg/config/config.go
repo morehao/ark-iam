@@ -25,7 +25,23 @@ type Config struct {
 	OIDC        OIDC                      `yaml:"oidc"`
 	Password    PasswordConfig            `yaml:"password"`
 	Security    SecurityConfig            `yaml:"security"`
+	Install     InstallConfig             `yaml:"install"`
 	MasterKey   string                    `yaml:"masterKey"`
+}
+
+// InstallConfig 首次初始化（引导）相关配置。
+type InstallConfig struct {
+	// BootstrapToken 是引导写接口（`POST /install/initialize`）的门禁令牌。
+	//
+	// **环境变量 `BOOTSTRAP_TOKEN` 优先**，本字段是它的配置文件回落：
+	// 本地开发省得每次 export，也让 `make dev-all` 这类"直接起进程"的场景能带上令牌。
+	//
+	// 生产仍建议只用环境变量或密钥管理：配置文件通常会被提交、复制、打进镜像层，
+	// 而这个令牌等价于"创建平台管理员"的权限（见 svcinstall.CheckBootstrapToken 的
+	// fail-closed 说明）。无论从哪来，初始化完成后都应移除。
+	//
+	// 首尾空白会在读取时归一（部署脚本注入的值常带尾随换行）。
+	BootstrapToken string `yaml:"bootstrapToken"`
 }
 
 type SecurityConfig struct {
@@ -60,10 +76,39 @@ type SigningKeyConfig struct {
 	Active bool `yaml:"active"`
 }
 
+// ConsoleDeployConfig 是单个内置控制台的部署地址（完整 URL，配置驱动，不做 origin 派生）。
+//
+// 为什么必须是完整地址而不是"控制台根地址 + 代码拼路径"：分体部署与反向代理下，
+// 控制台的对外地址与 issuer、与浏览器实际访问地址三者都可能不同源，任何按 origin 拼接的
+// 派生规则都会在某个拓扑下算错；而回调地址错一个字符就是该控制台整体登录不可用，
+// 且失败现象（回调被拒/跳错域名）比配置错误本身难定位得多。
+type ConsoleDeployConfig struct {
+	// RedirectURIs 是该控制台的 OAuth 授权码回调白名单（完整 URL，可多个）。
+	RedirectURIs []string `yaml:"redirectURIs"`
+	// PostLogoutRedirectURIs 是登出后允许跳回的地址白名单（完整 URL，可多个）。
+	PostLogoutRedirectURIs []string `yaml:"postLogoutRedirectURIs"`
+	// BackChannelLogoutURI 是 OP 主动回调该控制台的登出通知地址。留空时按
+	// issuer + 标准路径派生（见 pkg/model.SeedBackChannelLogoutPath*）——只有
+	// "控制台与 issuer 不同源"（反向代理把 /oidc 与业务前端分到不同域名）时才需要显式配置。
+	BackChannelLogoutURI string `yaml:"backChannelLogoutURI"`
+}
+
+// ConsolesDeployConfig 是两个内置控制台的部署地址。
+//
+// 用途：初始化页面（/install）与 L1 引导共用同一份地址——页面回显给运维"稍后从哪登录"，
+// 引导把同样的值写进 application_client 的回调白名单，因此"页面看到的"与"落库的"必然一致。
+// 留空时取内置缺省值（本地开发端口 4001/4002），与历史硬编码值逐字节相同。
+type ConsolesDeployConfig struct {
+	PlatformAdminWeb ConsoleDeployConfig `yaml:"platformAdminWeb"`
+	TenantAdminWeb   ConsoleDeployConfig `yaml:"tenantAdminWeb"`
+}
+
 type OIDC struct {
 	Issuer           string `yaml:"issuer"`
 	FrontendLoginURL string `yaml:"frontendLoginURL"`
-	CookieDomain     string `yaml:"cookieDomain"`
+	// Consoles 是内置控制台的部署地址（见 ConsolesDeployConfig）。
+	Consoles     ConsolesDeployConfig `yaml:"consoles"`
+	CookieDomain string               `yaml:"cookieDomain"`
 	// CookieSecure 控制 SSO 会话 cookie 的 Secure 标志。生产环境（HTTPS）必须为 true。
 	CookieSecure bool `yaml:"cookieSecure"`
 	// CookieSameSite 控制 SSO 会话 cookie 的 SameSite 属性，取值 lax/strict/none。
@@ -168,9 +213,11 @@ type Server struct {
 // DBConfig 数据库启动行为配置。
 type DBConfig struct {
 	// AutoMigrate 是否在启动时基于 GORM AutoMigrate 自动创建/同步数据表（幂等）。
+	//
+	// 注意：**没有对应的 seed 开关**。启动期只建表、不写任何数据——内置数据由初始化页面
+	// （POST /install/initialize → pkg/seed.Bootstrap）一次性写入，且写入后永久自锁。
+	// 关闭 AutoMigrate 时表结构需由部署方自行准备，否则 /install/status 会报 schemaReady=false。
 	AutoMigrate bool `yaml:"auto_migrate"`
-	// Seed 是否在启动时幂等写入基础种子数据（租户/角色/权限/菜单/管理员/应用客户端）。
-	Seed bool `yaml:"seed"`
 }
 
 type Client struct {

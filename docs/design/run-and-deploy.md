@@ -22,7 +22,7 @@
 | Go | 1.26+ | 后端（`backend/go.work` 与各 `go.mod` 均声明 1.26.1；Docker 构建镜像 `golang:1.26-alpine`） |
 | Node.js | 22+ | 前端 / e2e（pnpm 11 已不支持 Node 18/19/20/21） |
 | pnpm | 11+ | 前端 monorepo 依赖管理（`package.json` 的 `packageManager` 锁定 11.1.0） |
-| PostgreSQL | 13+ | 主库（库名 `iam`），启动时由 AutoMigrate 自动建表；13+ 才能用 `DROP DATABASE ... WITH (FORCE)` |
+| PostgreSQL | 13+ | 主库（库名 `iam`），启动时由 AutoMigrate 自动建表（**只建表、不写数据**）；13+ 才能用 `DROP DATABASE ... WITH (FORCE)` |
 | Redis | 5+ | SSO 会话 / 授权状态 / SLO 队列 |
 | OpenTelemetry Collector（可选） | - | 链路追踪（默认 `127.0.0.1:4317`） |
 
@@ -76,19 +76,22 @@ pnpm dev:tenant   # tenant-admin-web :4002
 ```mermaid
 flowchart LR
     PG["启动 PostgreSQL<br/>（创建 iam 库）"] --> REDIS["启动 Redis"]
-    REDIS --> BE["启动后端 gateway :8100<br/>（AutoMigrate 自动建表 + 幂等种子数据）"]
-    BE --> FE["启动前端三个应用"]
-    FE --> TEST["访问 platform-admin-web 验证登录"]
+    REDIS --> BE["启动后端 gateway :8100<br/>（AutoMigrate 自动建表，不写任何数据）"]
+    BE --> FE["启动前端三个应用<br/>（login-web :4000）"]
+    FE --> INSTALL["打开 login-web 的 /install<br/>填入 BOOTSTRAP_TOKEN 完成首次初始化"]
+    INSTALL --> TEST["访问 platform-admin-web :4001 验证登录"]
 ```
 
-种子数据：启动时由 `pkg/seed` 幂等写入（配置 `db.seed: true` 开启）。管理员 `admin / admin123`，OAuth 客户端 `platform_admin_web` / `tenant_admin_web`（存量库的连字符编码会在启动时原地改名，保留主键）。
+**数据准备只有两种来源**：schema 由启动时的 `AutoMigrate` 建出（只增不删），**内置数据由初始化页面一次性写入**——启动期不写任何数据，`pkg/seed` 的唯一写通道 `Bootstrap` 只有 `POST /install/initialize` 一个调用方（详见 §2.4）。因此**全新库的启动顺序必须是「先起后端（带 `BOOTSTRAP_TOKEN`）→ 再打开安装页完成引导」**；未初始化期间业务端点会被 `pkg/middleware.BootstrapGuard` 拦成 HTTP 409（错误码 `107004`），这是预期行为，不是服务故障。
+
+> **为什么把播种从启动期挪到安装页**：启动期播种必须"每次启动都把内置行收敛到代码定义"，于是应用既要建表又要当数据写者，运维在控制台改过的内置字段会在下次重启被悄悄收回（双写者），跨版本改名也只能靠启动分支打补丁。改成一次性引导后，写者唯一、时机明确（部署时由人确认），应用启动退化为纯只读。代价已经明确接受：内置数据的后续调整全部由运维在控制台完成，不再自动下发（见 §2.5）。
 
 > **Schema 变更（列/表下线）**：本项目按新项目处理，不维护数据迁移脚本（AutoMigrate 只增不删，见 `system-design.md` §4.1）。下线列/表后，开发/测试库需**删库重建**。本地 PostgreSQL 跑在 Docker 里（容器名以 `docker ps` 为准，下例为 `postgres18`）：
 >
 > ```bash
 > docker exec -i postgres18 psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS iam WITH (FORCE)"
 > docker exec -i postgres18 psql -U postgres -d postgres -c "CREATE DATABASE iam"
-> # 然后重启后端：AutoMigrate + Seed 重建全部表与种子数据
+> # 然后重启后端：AutoMigrate 重建全部表；再打开 /install 重新完成一次初始化
 > ```
 >
 > `WITH (FORCE)`（PG 13+）会断开仍连着该库的会话，因此后端不必先停。旧库中残留的列/表不再被读写，属预期。确需保全旧数据时，在升级前自行执行一次性 SQL 导出/回填。
@@ -110,7 +113,7 @@ flowchart LR
 >   ELSE 'first_party'
 > END);
 >
-> -- application_client：同规则（种子客户端 is_system=true → builtin）
+> -- application_client：同规则（is_system=true 的内置客户端 → builtin）
 > UPDATE application_client SET source = CASE
 >   WHEN is_system THEN 'builtin'
 >   WHEN type = 'third_party' THEN 'third_party'
@@ -123,16 +126,16 @@ flowchart LR
 > END);
 > ```
 >
-> `WHERE ... IS DISTINCT FROM ...` 让脚本**幂等**（重复执行 0 行受影响），可安全重跑。只有在升级**之后**才补做时，无条件安全的只有第一步（`is_system = true` → `builtin`，它决定删除保护与租户控制台菜单范围），其余行按新策略保持 `third_party` 即可；种子数据（`platform_admin` / `tenant_admin` 与两个内置 OAuth 客户端）由 `pkg/seed` 启动时自行回填为 `builtin`，无需人工介入（归属口径见 `system-design.md` §4.3）。
+> `WHERE ... IS DISTINCT FROM ...` 让脚本**幂等**（重复执行 0 行受影响），可安全重跑。只有在升级**之后**才补做时，无条件安全的只有第一步（`is_system = true` → `builtin`，它决定删除保护与租户控制台菜单范围），其余行按新策略保持 `third_party` 即可。**新代码不会再自动回填 `source`**：内置应用与两个内置 OAuth 客户端的 `source=builtin` 由 L1 首次引导在**创建时**写入，启动期不做任何回写；存量库必须靠上面的 SQL 自己改对，漏做不会被修复（归属口径见 `system-design.md` §4.3）。
 >
-> **存量库应用编码改为下划线连接（2026-09-12 改造）**：`application.code` 统一为下划线形态，两个内置应用 `platform-admin` → `platform_admin`、`tenant-admin` → `tenant_admin`。编码是应用的业务唯一键，改名即原地 `UPDATE`，菜单/租户订阅/角色都按 `app_id` 关联，无需一起改。**请在部署新代码之前执行**（否则种子会按新编码另建一套内置应用，旧应用仍占着旧唯一键，菜单与订阅会分裂到两套应用上）：
+> **存量库应用编码改为下划线连接（2026-09-12 改造；仅在需要保全旧库数据时执行）**：`application.code` 统一为下划线形态，两个内置应用 `platform-admin` → `platform_admin`、`tenant-admin` → `tenant_admin`。编码是应用的业务唯一键，改名即原地 `UPDATE`，菜单/租户应用/角色都按 `app_id` 关联，无需一起改。**请在部署新代码之前执行**——新代码里**没有任何**自动改名分支（旧实现的 legacy 原地改名已随启动期播种一并删除）：漏做时旧编码会原样留着，若之后删库重建，L1 首次引导会按新编码另建一套内置应用，菜单与租户应用将分裂到两套应用上。
 >
 > ```sql
 > UPDATE application SET code = 'platform_admin' WHERE code = 'platform-admin';
 > UPDATE application SET code = 'tenant_admin'   WHERE code = 'tenant-admin';
 > ```
 >
-> 漏做时 `pkg/seed` 也会在启动时把命中的旧编码原地改名（保留主键，幂等）；但若新旧编码**同时存在**，种子会报错中断启动要求人工确认，因此上述 SQL 是「先改名再上代码」的稳妥做法。本次只动 `application.code`，菜单编码与 OAuth `client_id` 不变。
+> 本次只动 `application.code`，菜单编码与 OAuth `client_id` 不变。
 >
 > 重建后若出现登录态异常（Redis 里仍有指向已消失用户的 SSO 会话），**按前缀**清理本项目的键即可，不要 `FLUSHDB`——本地 Redis 容器常与其它项目共用：
 >
@@ -146,9 +149,75 @@ flowchart LR
 > - 若浏览器仍持有重建前的 IAM 会话（Redis 未清理），授权请求会用**旧** `sub` 找 person，查不到时 userinfo 只返回 `sub`，RP 会报"缺少 email/preferred_username"之类的字段缺失错误——这正是上面按前缀清 `iam:oidc:*` 的原因；
 > - 处置：清 Redis 会话后用 IAM 账号重新登录一次，RP 侧重新建号或重新关联即可（本地开发无业务数据，重建绑定最省事）。
 
-### 2.4 验证 OIDC Provider
+### 2.4 首次初始化（安装页引导）
+
+全新库（或按 §2.3 重建后的库）在第一次可用之前必须完成一次初始化：schema 由后端启动时的 `AutoMigrate` 建好，内置数据（平台租户、根部门、两个内置应用与 OAuth 客户端、内置菜单与角色、内置管理员）则由安装页**一次性**写入。这一步必须由部署人员本人完成——不能用脚本绕过，也没有任何"镜像内置默认口令"可用。
+
+1. **准备数据库**：目标库为空；`AutoMigrate` 会在后端启动时自动建表，不需要手工建表，也不需要（也不应该）预置任何数据。
+2. **带一次性初始化令牌启动后端**：
+
+   ```bash
+   # 令牌是部署期的一次性机密，建议用长随机串；不要写进 config.yaml，也不要进镜像
+   export BOOTSTRAP_TOKEN="$(openssl rand -hex 32)"
+   make run APP=gateway
+   ```
+
+   > 令牌有两个来源：**环境变量 `BOOTSTRAP_TOKEN`（优先）** 与配置项 `install.bootstrapToken`（回落，本地开发的 dev 配置里已有 `dev-bootstrap-token`）。**两个来源都为空时 `/install/initialize` 整体不可用**：`GET /install/status` 回 `tokenRequired=false`，提交返回 HTTP 503（错误码 `107002`）。这是 fail-closed 设计——宁可"没人能初始化"，也不能让一个没有令牌保护的写接口在公网裸奔。生产建议**只**用环境变量/Secret，把 `install.bootstrapToken` 留空：`config.yaml` 入库，长期令牌放在里面会随代码一起分发。
+
+3. **打开安装页**：先启动登录门户（`cd frontend && pnpm dev:login`，:4000），浏览器访问 `http://localhost:4000/install`；未初始化时访问 `http://localhost:4000/login` 也会被 `InstallGuard` 自动跳到这里。页面共三步，但**只有第三步发一次写请求**（`POST /install/initialize`，其余校验都在浏览器内完成）：
+
+   1. **租户**：平台租户名称（默认「平台运营中心」，留空由后端取默认值）；
+   2. **管理员**：初始管理员用户名、密码、确认密码、姓名、邮箱 / 手机号（邮箱与手机号**至少填一个**）；
+   3. **内置数据确认**：核对将写入的内置数据，并粘贴 `BOOTSTRAP_TOKEN` 的值（作为请求头 `X-Bootstrap-Token` 发送，不写入浏览器存储）。
+
+   管理员口令**由运维在这里自己设定**：后端不预置任何默认口令（历史实现里的 `credential.BootstrapAdminPassword` = `admin123` 已删除），服务端按 `credential.ValidateStrength` 校验 **8–128 位且同时包含大写字母、小写字母与数字**，不满足当场拒绝（HTTP 400，错误码 `107006`）。内置控制台的 OIDC 回调地址来自配置 `oidc.consoles`（留空则用内置默认值，见 `configuration-reference.md`）。
+
+4. **确认提交**：后端在**单个事务**内写入全部内置数据，返回管理员用户名、登录地址与控制台入口；页面提示"内置数据已写入，后续启动不会再重复写入"。之后即可用刚设定的账号登录 platform-admin-web（:4001）/ tenant-admin-web（:4002）。
+
+**安全约束（部署必读）**：
+
+- **引导令牌是部署期一次性机密**：只在引导阶段设置，初始化完成后应立即从运行环境（若用了配置文件则连同 `install.bootstrapToken`）移除；它不该长期留在生产环境里。
+- **`/install` 只应在受信网络内可达**：它不需要登录态，唯一门禁就是这个令牌。若部署机在公网可达，推荐用 **SSH 端口转发**在本地打开，不要把安装页暴露到公网：
+
+  ```bash
+  # 在本地机器执行：把部署机的 login-web 与后端端口映射到本地，无需对外暴露 /install
+  ssh -N -L 4000:127.0.0.1:4000 -L 8100:127.0.0.1:8100 deploy@<host>
+  # 然后本地浏览器访问 http://localhost:4000/install
+  ```
+
+  完成初始化后关闭转发；不要在负载均衡 / 反向代理上长期暴露 `/install/*`。
+- **端点会永久自锁**：初始化成功后再次调用 `/install/initialize` 一律返回 HTTP 409（错误码 `107000`），重启、换副本都不会解除；`GET /install/status`（公开、只读）回 `initialized=true`，可给部署脚本或监控用来确认状态。
+- **未初始化期间业务端点不可用是预期行为**：`pkg/middleware.BootstrapGuard` 会把业务端点拦成 HTTP 409（错误码 `107004`），只放行 `/install` 与 `/oidc` 的健康检查 / 服务发现 / 登出端点。集成方在初始化前探测收到 409，属正常引导态，不是服务故障。
+
+### 2.5 版本升级时的菜单变更清单
+
+**菜单行归运维**：L1 首次初始化只写入一次内置菜单，之后菜单由「菜单管理」页维护（可新增根菜单/子菜单，可删除任意菜单）。因此**版本升级带来的新菜单不会被自动下发**，升级后需要人工补录。
 
 ```bash
+# 打印内置菜单的完整 15 字段清单（Markdown 表格）
+make print-builtin-menus
+```
+
+用法：
+
+1. 升级前先跑一次，留存本次输出的旧清单；
+2. 升级后再跑一次，`diff` 两份输出——**新增的行就是需要手工补录的菜单**；
+3. 在对应控制台的「菜单管理」页按清单录入：先建 `type=directory` 的父级，再建子菜单（`parentCode` 指向父级的 `code`）；
+4. 清单里后 5 列（`redirect` / `hidden` / `externalLink` / `keepAlive` / `status`）是**建表列默认值**，照填即与首次初始化产物一致；
+5. 新菜单若属于某个角色的默认可见范围，再去「角色管理」页补授权（目录菜单不需要授权）。
+
+> **不要复用已下线菜单的 `code`**：首次初始化引导按不可见的 `seed_key` 认行，而 `seed_key` 只在创建时写入、之后不变；且库一旦初始化，引导永久自锁，代码里改了 `code` 既不会改动已有行、也不会补建新行。升级新增菜单请用新的 `code`。
+>
+> **漏补菜单的后果是"导航里看不到"，不是"接口 403"**：菜单不参与 API 鉴权（权限由角色与字段权威决定）。因此漏补只影响可用性，不会造成越权，可以从容补录。
+>
+> 历史版本曾用「退役菜单清单（`retiredMenus`）」在启动时自动清理已下线的内置菜单。**该机制已删除**：菜单的下线与调整现在完全由运维在控制台完成（详见 `system-design.md` §4.5）。
+
+### 2.6 验证 OIDC Provider
+
+```bash
+# 初始化状态（公开只读；initialized=false 说明还没走 §2.4 的安装页）
+curl http://localhost:8100/install/status
+
 # 服务发现
 curl http://localhost:8100/oidc/.well-known/openid-configuration
 
@@ -193,7 +262,8 @@ cd backend && for m in apps/auth apps/gateway apps/platformadmin apps/rpapi apps
 cd e2e
 npm install
 npx playwright install chromium
-# 前置：PostgreSQL + Redis + 后端（gateway）+ 三个前端应用已启动（种子数据启动时自动写入）
+# 前置：PostgreSQL + Redis + 后端（gateway，带 BOOTSTRAP_TOKEN）+ 三个前端应用已启动，
+#       且已由 global-setup 通过 /install/initialize 完成首次初始化（见 e2e/README.md）
 npx playwright test
 ```
 
@@ -219,6 +289,7 @@ make docker-run APP=auth    PORT=8081
 - 通过环境变量 `APP_CONFIG_PATH` 挂载生产 `config.yaml`（含正式 issuer、密钥、`cookieSecure: true`）；
 - **默认镜像内嵌仓库里的 dev 签名私钥与 dev 加密口令**（Dockerfile 会 `COPY config/oidc-dev-key.pem`，`config.yaml` 内嵌 dev `encryptionKey`）：生产上线前必须替换为外部 Secret 挂载并覆盖这两项；
 - 签名私钥与加密密钥通过 Secret 挂载，不写入生产镜像；
+- **首次部署额外注入一次性引导令牌**（`BOOTSTRAP_TOKEN`，建议用 Secret 而非明文 env/config），用它在 `/install` 完成初始化后立即移除；`/install` 不要经负载均衡暴露到公网，运维用 SSH 端口转发打开（见 §2.4）；
 - 数据库、Redis 使用托管实例，与容器网络隔离。
 
 ---
@@ -267,7 +338,10 @@ flowchart TB
 
 - 启用了 `enableSSOSessionValidation` 的所有应用必须**共享同一认证 Redis**；
 - `issuer` 必须与最终访问入口一致（负载均衡后仍应是客户端可见的正式域名）；
-- 签名密钥在多副本间保持一致（同一文件/同一 PEM 配置），避免 kid 漂移。
+- 签名密钥在多副本间保持一致（同一文件/同一 PEM 配置），避免 kid 漂移；
+- **初始化只需在一个副本上做一次**：是否已初始化以库内平台租户行为准（`seed.IsInitialized`），`BootstrapGuard` 每次探测直接查库，没有进程内状态，因此初始化完成后所有副本在下一次探测即整体放行业务端点；`BOOTSTRAP_TOKEN` 只需在引导阶段为"接流量的那一侧"设置；
+- **多副本同时提交初始化是安全的**：`seed.Bootstrap` 用 Postgres 事务级 advisory lock 串行化，只有一个副本真正写入，其余得到 `already_initialized`（HTTP 409），不会写出两套内置数据；
+- **`oidc.consoles` 的回调地址必须与最终访问入口一致**：它在 L1 首次引导时写入内置 OAuth 客户端，之后改配置不会回写（`redirect_uris` 归运维、可在控制台改）；分体部署时 `backChannelLogoutURI` 要显式配置，否则只能按 `issuer` 派生。
 
 ---
 
@@ -280,5 +354,8 @@ flowchart TB
 | 生产启动失败 | 检查签名/加密密钥是否显式配置（fail-closed）；`cookieSecure` 是否与 HTTPS 匹配 |
 | SSO 免密失效 | 检查 `iam_sso_session` Cookie 是否写入（Domain/SameSite/Secure）、Redis 会话是否存在 |
 | 跨站无法共享 SSO | 检查 `cookieSameSite: none` + `cookieSecure: true` |
-| e2e 失败 | 按 `e2e/README.md` 核对服务映射与种子数据 |
+| e2e 失败 | 按 `e2e/README.md` 核对服务映射与首次初始化（e2e 由 `global-setup` 调 `/install/initialize`，需后端带 `BOOTSTRAP_TOKEN`；配置文件里的 `install.bootstrapToken` 亦可作为回落） |
+| 业务接口一律 409 | 库还没初始化（错误码 `107004`）：按 §2.4 打开安装页完成引导 |
+| `/install/initialize` 返回 503 | 后端未配置引导令牌（环境变量 `BOOTSTRAP_TOKEN` 与配置项 `install.bootstrapToken` 都为空，错误码 `107002`），或未初始化探测超时 |
+| `/install/initialize` 返回 409 | 库已初始化且端点永久自锁（错误码 `107000`）；需要重来只能删库重建（§2.3） |
 | 令牌验签失败 | 对比 `/oidc/keys` 与 RP 配置公钥是否一致（kid/密钥内容） |
