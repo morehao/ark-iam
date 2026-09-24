@@ -332,3 +332,81 @@ describe('详情页 PKCE 展示', () => {
     expect(within(authTimeRow).getByText('是')).toBeInTheDocument()
   })
 })
+
+/**
+ * 客户端类型不变式的控制台侧收口（后端 svcapplicationclient 同步拒写，报 100825）。
+ *
+ * 内置控制台是纯浏览器 SPA：必须保持 token_endpoint_auth_method=none + 强制 PKCE。
+ * RFC 6749 §10.1 禁止为 user-agent 类客户端签发/要求客户端凭据，RFC 10017 §6.3.3.1 要求
+ * 浏览器客户端登记为 public 且授权服务器不得对其要求客户端认证；而在工程上，改成机密客户端
+ * 会当场锁死该控制台——前端只传 client_id、不持密钥，token 端点要求认证 → 登录与静默续期
+ * 全部 invalid_client，修复入口又恰在被锁死的控制台内部。
+ */
+describe('内置客户端的认证方式与强制 PKCE 置灰', () => {
+  it('编辑内置客户端时「令牌端点认证方式」与「强制 PKCE」均不可改', async () => {
+    renderApp(OAUTH_CLIENT_LIST_PATH)
+
+    fireEvent.click(await screen.findByText('编辑'))
+    const modal = document.querySelector('.ant-modal') as HTMLElement
+
+    const authMethodLabel = await within(modal).findByText('令牌端点认证方式')
+    const authMethodItem = authMethodLabel.closest('.ant-form-item') as HTMLElement
+    expect(authMethodItem.querySelector('.ant-select-disabled')).not.toBeNull()
+
+    expect(within(modal).getAllByRole('switch')[0]).toBeDisabled() // 强制 PKCE
+  })
+
+  it('第三方客户端的认证方式保持可改（收口不得误伤自建客户端）', async () => {
+    const custom: OAuthClientItem = {
+      ...clients[0],
+      applicationClientID: 'c-custom',
+      code: 'my_client',
+      name: '自建客户端',
+      source: 'third_party',
+      tokenEndpointAuthMethod: 'client_secret_basic',
+    }
+    mockGetOAuthClientPageList.mockResolvedValue({ list: [custom], total: 1 })
+    mockGetOAuthClientDetail.mockResolvedValue({
+      ...detail,
+      applicationClientID: 'c-custom',
+      source: 'third_party',
+      tokenEndpointAuthMethod: 'client_secret_basic',
+    })
+
+    renderApp(OAUTH_CLIENT_LIST_PATH)
+
+    fireEvent.click(await screen.findByText('编辑'))
+    const modal = document.querySelector('.ant-modal') as HTMLElement
+
+    const authMethodLabel = await within(modal).findByText('令牌端点认证方式')
+    const authMethodItem = authMethodLabel.closest('.ant-form-item') as HTMLElement
+    expect(authMethodItem.querySelector('.ant-select-disabled')).toBeNull()
+    expect(within(modal).getAllByRole('switch')[0]).not.toBeDisabled()
+  })
+})
+
+/**
+ * 公共客户端（none）不签发也不使用客户端密钥（后端 CreateSecret 报 100826）：
+ * 这类客户端的代码会下发给每个用户，密钥无处安全保存，且令牌端点不会向其索取认证。
+ */
+describe('公共客户端不提供密钥入口', () => {
+  it('token_endpoint_auth_method=none 时不展示「新建密钥」并给出说明', async () => {
+    renderApp(oauthClientDetailPath(clients[0].applicationClientID)) // detail 即内置 public 客户端
+
+    expect(
+      await screen.findByText('公共客户端（token_endpoint_auth_method = none）不支持客户端密钥'),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /新建密钥/ })).not.toBeInTheDocument()
+  })
+
+  it('机密客户端仍可新建密钥', async () => {
+    mockGetOAuthClientDetail.mockResolvedValue({ ...detail, tokenEndpointAuthMethod: 'client_secret_basic' })
+
+    renderApp(oauthClientDetailPath(clients[0].applicationClientID))
+
+    expect(await screen.findByRole('button', { name: /新建密钥/ })).toBeInTheDocument()
+    expect(
+      screen.queryByText('公共客户端（token_endpoint_auth_method = none）不支持客户端密钥'),
+    ).not.toBeInTheDocument()
+  })
+})

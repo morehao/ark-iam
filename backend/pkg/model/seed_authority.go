@@ -15,10 +15,14 @@ package model
 // 内置数据的后续调整一律由运维在控制台完成（新增版本菜单见 `make print-builtin-menus`）。
 //
 // immutable 的准入判据：只有「被控制台改写后会导致鉴权被绕过或控制台自我锁死」的字段才进
-// immutable，共两类——
+// immutable，共三类——
 //   - 安全不变式：source（内置标记）、admin_type（系统管理能力）、平台租户 status（挂起即整栈失联）；
 //   - 身份编码：内置应用 code（各控制台菜单入口的定位值）、内置客户端 code（= client_id，
-//     同时是网关 audience 白名单与前端构建期默认值）——改名会当场锁死对应控制台且界面无法自救。
+//     同时是网关 audience 白名单与前端构建期默认值）——改名会当场锁死对应控制台且界面无法自救；
+//   - 客户端类型不变式：内置客户端的 token_endpoint_auth_method / require_pkce——它们必须保持
+//     public + 强制 PKCE（浏览器客户端不可持密钥：RFC 6749 §10.1 / RFC 10017 §6.3.3.1）；
+//     改成机密客户端会当场锁死控制台（前端不持密钥而 token 端点要求认证），关掉 PKCE 则去掉
+//     公共客户端唯一的补偿控制（防降级）。
 // 不接受"产品身份/展示名"这类软理由：展示字段（应用名与描述、客户端名、菜单名/图标/排序/
 // 可见性/路径/组件/层级）一律归运维（create_only）；未声明的字段视为 create_only。
 //
@@ -119,6 +123,16 @@ var SeedFieldAuthorities = []SeedFieldAuthority{
 	{SeedEntityApplicationClient, "code", SeedFieldImmutable},
 	{SeedEntityApplicationClient, "app_id", SeedFieldCreateOnly},
 	{SeedEntityApplicationClient, "source", SeedFieldImmutable},
+	// 认证方式与强制 PKCE 是浏览器公共客户端的安全不变式，同 immutable：
+	// 内置两个控制台客户端是纯浏览器 SPA，其代码与配置会下发给每个用户，因此**必须**登记为
+	// public（token_endpoint_auth_method=none）+ 强制 PKCE（require_pkce=enable）——
+	// RFC 6749 §10.1 禁止为 user-agent 类客户端签发/要求客户端凭据，RFC 10017 §6.3.3.1
+	// 要求浏览器客户端登记为 public 且授权服务器不得对其要求客户端认证；
+	// 同时改写它们会当场把对应控制台锁死（前端不持密钥、token 端点要求认证 → invalid_client），
+	// 且修复入口就在被锁死的控制台内部（与 code 同款自锁，无界面自救路径）。
+	// require_pkce 被关掉则去掉公共客户端唯一的补偿控制（防降级）。
+	{SeedEntityApplicationClient, "token_endpoint_auth_method", SeedFieldImmutable},
+	{SeedEntityApplicationClient, "require_pkce", SeedFieldImmutable},
 	{SeedEntityApplicationClient, "name", SeedFieldCreateOnly},
 	{SeedEntityApplicationClient, "redirect_uris", SeedFieldCreateOnly},
 	{SeedEntityApplicationClient, "post_logout_redirect_uris", SeedFieldCreateOnly},

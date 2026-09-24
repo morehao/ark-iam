@@ -23,7 +23,7 @@
 
 | 文档 | 职责 |
 |---|---|
-| [sso-oidc-concepts.md](sso-oidc-concepts.md) | **SSO 与 OIDC 概念、协议、流程说明**（建议先读）。回答：什么是 SSO、OIDC 为什么出现、核心概念（Client / Authorization Server / Token / Scope / Claims / 授权码+PKCE / 刷新令牌 / 单点登出）、协议端点与令牌生命周期 |
+| [sso-oidc-concepts.md](sso-oidc-concepts.md) | **SSO 与 OIDC 概念、协议、流程说明**（建议先读）。回答：什么是 SSO、OIDC 为什么出现、核心概念（Client / Authorization Server / Token / Scope / Claims / 授权码+PKCE / 刷新令牌 / 单点登出）、**客户端类型与凭据选择（§3.6：什么时候需要 `client_secret` 的集中判据）**、协议端点与令牌生命周期 |
 | [system-design.md](system-design.md) | **系统设计文档（核心主文档，单一事实源）**。背景与目标、总体架构、应用划分（auth / platformadmin / tenantadmin / rpapi / gateway）与内部分层、技术栈、数据库设计（ER 图 + 表说明 + Redis Key + **内置数据初始化引导与字段权威矩阵**）、核心业务流程（自助开通租户 / 登录 / SSO / 登出 / 授权 / 令牌签发 / Connector / **建租户与内置管理员**）、路由规范、安全设计、演进方向 |
 | [application-integration-guide.md](application-integration-guide.md) | **新应用接入指南**。从零把业务应用接入 IAM：前置准备、创建应用与 OAuth 客户端、RP 侧 OIDC 配置示例、SSO 单点登录体验、单点登出接入、API Key / client_credentials 机器凭证接入、验收清单 |
 | [rustfs-integration-case.md](rustfs-integration-case.md) | **存量第三方应用接入实战案例**。以 RustFS（自带 canned policy 权限模型、代码不可改、仅支持单向 SLO）为例，记录：契约设计（IAM 角色编码 ↔ 下游策略名）、**下游策略解析为 fail-closed 所推出的供给顺序硬约束**、登出方向不对称与三种 SLO 处置取舍（接受窗口 / 外部吊销 / 对方实现接收端）、逐条实测的验收结果、可复用的接入检查清单 |

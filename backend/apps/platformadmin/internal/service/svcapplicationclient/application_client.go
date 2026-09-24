@@ -89,6 +89,32 @@ func normalizeClientAuthTimeClaimPolicy(policy model.ClientAuthTimeClaimPolicy) 
 	return policy
 }
 
+// isValidTokenEndpointAuthMethod 校验令牌端点认证方式：空串表示「创建时取列默认 / 更新时不修改」，
+// 非空必须命中白名单常量。校验归 service（AGENTS.md 硬规则 3）：非法值不允许落库——
+// 未知取值会在 oidcop 侧落到 fail-closed 的 private_key_jwt 分支，使客户端静默不可用。
+func isValidTokenEndpointAuthMethod(method model.TokenEndpointAuthMethod) bool {
+	switch method {
+	case "",
+		model.TokenEndpointAuthMethodBasic,
+		model.TokenEndpointAuthMethodPost,
+		model.TokenEndpointAuthMethodNone:
+		return true
+	default:
+		return false
+	}
+}
+
+// isConfidentialAuthMethod 判断认证方式是否属于机密客户端（可在令牌端点用密钥认证）。
+// 公共客户端（none）无法保密凭据（RFC 6749 §2.1），故不得为其签发客户端密钥（RFC 6749 §10.1）。
+func isConfidentialAuthMethod(method model.TokenEndpointAuthMethod) bool {
+	switch method {
+	case model.TokenEndpointAuthMethodBasic, model.TokenEndpointAuthMethodPost:
+		return true
+	default:
+		return false
+	}
+}
+
 // emptyIfNil 把请求里缺省的 nil 切片落成空切片（沿用本服务原有的「nil 落空数组」口径）。
 // 不可把 nil 直接交给 serializer：GORM 对 NOT NULL 的 JSON 列会把 nil 序列化为空串，
 // 在 PostgreSQL 的 json 列上是非法 JSON（更新路径必须显式 Select，nil 字段会被写进去）。
@@ -134,6 +160,11 @@ func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.Ap
 	if !isValidClientAuthTimeClaimPolicy(req.RequireAuthTime) {
 		glog.Errorf(ctx, "[svcapplicationclient.Create] 非法 auth_time 策略, req:%s", gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationClientCreateError)
+	}
+	// 认证方式留空取列默认（client_secret_basic）；非空必须是白名单值。
+	if !isValidTokenEndpointAuthMethod(req.TokenEndpointAuthMethod) {
+		glog.Errorf(ctx, "[svcapplicationclient.Create] 非法令牌端点认证方式, req:%s", gutil.ToJsonString(req))
+		return nil, code.GetError(code.ApplicationClientAuthMethodInvalidError)
 	}
 	insertEntity := &model.ApplicationClientEntity{
 		TenantID:                gincontext.GetTenantIDString(ctx),
@@ -194,9 +225,10 @@ func (svc *oAuthClientSvc) Delete(ctx *gin.Context, req *dtoapplicationclient.Ap
 	return nil
 }
 
-// 内置客户端的写入约束：字段权威矩阵里 application_client 的 immutable 字段是 source 与
-// code（内置标记与 client_id），source 不在 ApplicationClientUpdateReq 中（控制台无写入入口），
-// code 由下方显式拒绝。app_id（归属应用）同样是 create_only，控制台无改归属入口。
+// 内置客户端的写入约束：字段权威矩阵里 application_client 的 immutable 字段是 source、code
+// （内置标记与 client_id）与 token_endpoint_auth_method / require_pkce（浏览器公共客户端的安全不变式）。
+// source 不在 ApplicationClientUpdateReq 中（控制台无写入入口），其余由下方显式拒绝。
+// app_id（归属应用）是 create_only，控制台无改归属入口。
 // code（= client_id）**可改，但内置客户端拒改**：它同时是网关 aud 白名单与前端构建期
 // client_id 的取值来源，从控制台改会当场把该控制台锁死且无法从界面恢复（见客户端编码方案文档）。
 // 名称/回调地址/授权类型/TTL 都归运维（create_only）。
@@ -213,6 +245,10 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.Ap
 		glog.Errorf(ctx, "[svcapplicationclient.Update] 非法 auth_time 策略, req:%s", gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationClientUpdateError)
 	}
+	if !isValidTokenEndpointAuthMethod(req.TokenEndpointAuthMethod) {
+		glog.Errorf(ctx, "[svcapplicationclient.Update] 非法令牌端点认证方式, req:%s", gutil.ToJsonString(req))
+		return code.GetError(code.ApplicationClientAuthMethodInvalidError)
+	}
 	entity, err := dao.NewApplicationClientDao().GetByID(ctx, req.ApplicationClientID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -222,25 +258,41 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.Ap
 		return code.GetError(code.ApplicationClientNotExistError)
 	}
 
+	// 内置客户端是浏览器公共客户端，认证方式与强制 PKCE 是安全不变式：
+	//   1. RFC 6749 §10.1 禁止为 user-agent 类客户端签发/要求客户端凭据，RFC 10017 §6.3.3.1
+	//      要求浏览器客户端登记为 public，故内置客户端必须保持 none + require_pkce=enable；
+	//   2. 两个控制台前端只传 client_id、不持密钥，改成 basic/post 后 token 端点要求认证而前端
+	//      无法提供 → 登录与静默续期全部 invalid_client，而修复入口恰在该控制台内部（自锁）。
+	// 留空表示「本次不修改」：空串不是合法枚举，若照直写入会把存量刷成空值 / disable（见下方列处理）。
+	if entity.Source.IsBuiltin() {
+		if req.TokenEndpointAuthMethod != "" && req.TokenEndpointAuthMethod != entity.TokenEndpointAuthMethod {
+			glog.Errorf(ctx, "[svcapplicationclient.Update] 拒绝修改内置客户端令牌端点认证方式, clientID:%s, req:%s",
+				req.ApplicationClientID, gutil.ToJsonString(req))
+			return code.GetError(code.ApplicationClientBuiltInAuthMethodImmutableError)
+		}
+		if req.RequirePKCE != "" && normalizeClientPKCEPolicy(req.RequirePKCE) != entity.RequirePKCE {
+			glog.Errorf(ctx, "[svcapplicationclient.Update] 拒绝修改内置客户端强制 PKCE 策略, clientID:%s, req:%s",
+				req.ApplicationClientID, gutil.ToJsonString(req))
+			return code.GetError(code.ApplicationClientBuiltInAuthMethodImmutableError)
+		}
+	}
+
 	userID := gincontext.GetUserIDString(ctx)
 	// 走 dao.UpdateFields（结构化 Updates）而非 UpdateMap：JSON 列必须经 GORM serializer 落库，
 	// 用 map 写会绕过 serializer 静默落脏值（设计文档 D6）。只填要改的字段，列名与 model 的 column tag 一致。
 	updateEntity := &model.ApplicationClientEntity{
-		Name:                    req.Name,
-		RedirectURIs:            model.RedirectURIList(emptyIfNil(req.RedirectURIs)),
-		PostLogoutRedirectURIs:  model.PostLogoutRedirectURIList(emptyIfNil(req.PostLogoutRedirectURIs)),
-		BackChannelLogoutURI:    req.BackChannelLogoutURI,
-		GrantTypes:              model.GrantTypeList(emptyIfNil(req.GrantTypes)),
-		ResponseTypes:           toResponseTypeList(req.ResponseTypes),
-		TokenEndpointAuthMethod: req.TokenEndpointAuthMethod,
-		AllowedOrigins:          model.AllowedOriginList(emptyIfNil(req.AllowedOrigins)),
-		// 两个策略在更新中是全量字段（原 bool 亦为全量写入）：空串归一为 disable，保持原「未提供 = false」行为
-		RequirePKCE:     normalizeClientPKCEPolicy(req.RequirePKCE),
-		RequireAuthTime: normalizeClientAuthTimeClaimPolicy(req.RequireAuthTime),
-		DefaultScopes:   model.DefaultScopeList(emptyIfNil(req.DefaultScopes)),
-		AccessTokenTTL:  req.AccessTokenTTL,
-		RefreshTokenTTL: req.RefreshTokenTTL,
-		UpdatedBy:       userID,
+		Name:                   req.Name,
+		RedirectURIs:           model.RedirectURIList(emptyIfNil(req.RedirectURIs)),
+		PostLogoutRedirectURIs: model.PostLogoutRedirectURIList(emptyIfNil(req.PostLogoutRedirectURIs)),
+		BackChannelLogoutURI:   req.BackChannelLogoutURI,
+		GrantTypes:             model.GrantTypeList(emptyIfNil(req.GrantTypes)),
+		ResponseTypes:          toResponseTypeList(req.ResponseTypes),
+		AllowedOrigins:         model.AllowedOriginList(emptyIfNil(req.AllowedOrigins)),
+		RequireAuthTime:        normalizeClientAuthTimeClaimPolicy(req.RequireAuthTime),
+		DefaultScopes:          model.DefaultScopeList(emptyIfNil(req.DefaultScopes)),
+		AccessTokenTTL:         req.AccessTokenTTL,
+		RefreshTokenTTL:        req.RefreshTokenTTL,
+		UpdatedBy:              userID,
 	}
 	fields := []string{
 		"name",
@@ -249,14 +301,25 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.Ap
 		"back_channel_logout_uri",
 		"grant_types",
 		"response_types",
-		"token_endpoint_auth_method",
 		"allowed_origins",
-		"require_pkce",
 		"require_auth_time",
 		"default_scopes",
 		"access_token_ttl",
 		"refresh_token_ttl",
 		"updated_by",
+	}
+	// 认证方式留空表示不修改：空串不是合法枚举，照直写入会让该客户端在 oidcop 侧落到 fail-closed
+	// 的 private_key_jwt 分支（client.go 的 default 分支）而静默不可用——列必须按「有值才写」处理。
+	if req.TokenEndpointAuthMethod != "" {
+		updateEntity.TokenEndpointAuthMethod = req.TokenEndpointAuthMethod
+		fields = append(fields, "token_endpoint_auth_method")
+	}
+	// require_pkce 对自建客户端沿用既有契约（空串归一为 disable，原「未提供 = false」行为，已被
+	// status_validation_test.go 钉住）；内置客户端则留空即保持——它的 PKCE 强制是安全不变式，
+	// 不能被一次省略该字段的 PUT 静默降级。
+	if !entity.Source.IsBuiltin() || req.RequirePKCE != "" {
+		updateEntity.RequirePKCE = normalizeClientPKCEPolicy(req.RequirePKCE)
+		fields = append(fields, "require_pkce")
 	}
 	// status 留空表示不修改：不写该列，避免把状态覆盖为空串
 	if req.Status != "" {
@@ -482,6 +545,15 @@ func (svc *oAuthClientSvc) CreateSecret(ctx *gin.Context, req *dtoapplicationcli
 	}
 	if !applicationClientVisibleToTenant(entity, gincontext.GetTenantIDString(ctx)) {
 		return nil, code.GetError(code.ApplicationClientNotExistError)
+	}
+	// 公共客户端（token_endpoint_auth_method=none）不得签发密钥：这类客户端的代码/配置会下发给
+	// 每个用户，密钥无处安全保存，等于公开（RFC 6749 §2.1）；RFC 6749 §10.1 明确禁止为 user-agent
+	// 类客户端签发客户端凭据；且令牌端点本就不会向这类客户端索取认证（client_credentials 通道对
+	// AuthMethodNone 显式拒绝），密钥建了也用不上。故按「机密客户端白名单」fail-closed 放行。
+	if !isConfidentialAuthMethod(entity.TokenEndpointAuthMethod) {
+		glog.Errorf(ctx, "[svcapplicationclient.CreateSecret] 公共客户端不支持密钥, clientID:%s, authMethod:%s, req:%s",
+			entity.Code, entity.TokenEndpointAuthMethod, gutil.ToJsonString(req))
+		return nil, code.GetError(code.ApplicationClientPublicClientSecretForbiddenError)
 	}
 
 	secretValue, err := credential.GenerateSecret(credential.ClientSecretBytes)

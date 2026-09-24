@@ -115,11 +115,11 @@ RP 接入前必须在 OP 注册一个 **OAuth Client**，核心注册字段（�
 | 字段 | 说明 | 本系统默认值 |
 |---|---|---|
 | `client_id` | 客户端唯一标识 | 如 `platform_admin_web` |
-| `client_secret` | 客户端密钥（仅机密客户端需要，库中只存哈希） | - |
+| `client_secret` | 客户端密钥（仅机密客户端需要，库中只存哈希；**要不要发见 §3.6** 的集中判据） | - |
 | `redirect_uris` | 授权码回调地址（**必须白名单精确匹配**） | 如 `http://localhost:4001/auth/callback` |
 | `grant_types` | 允许的授权类型 | `["authorization_code"]` |
 | `response_types` | 允许的响应类型 | `["code"]` |
-| `token_endpoint_auth_method` | 令牌端点客户端认证方式 | `client_secret_basic` / `client_secret_post` / `none` |
+| `token_endpoint_auth_method` | 令牌端点客户端认证方式（`none` = 公共客户端、无密钥、**必须**配强制 PKCE；判据见 §3.6） | `client_secret_basic` / `client_secret_post` / `none` |
 | `post_logout_redirect_uris` | 登出后跳转白名单 | - |
 | `back_channel_logout_uri` | 反向通道登出通知地址（SLO，即服务端登出通知） | - |
 | `require_pkce` | 是否强制 PKCE（`ClientPKCEPolicy`，`enable`/`disable`） | 默认 `disable`（协议侧始终支持 S256；判定必须写 `== enable`，`'disable'` 真值为 true） |
@@ -197,6 +197,106 @@ flowchart TB
 - **Scope** 是权限范围：`openid`（必须，声明启用 OIDC）、`profile`、`email`、`phone`、`offline_access`（允许发 Refresh Token）等。
 - **Claims** 是 ID Token / UserInfo 中的身份声明，按 scope 裁剪返回。
 - 本系统在 `application_client.default_scopes` 中配置客户端默认 scope。**资源级权限（`resource`/`scope`/`role_scope`）已从 IAM 移除**，IAM 只到「角色—菜单」粒度，业务细粒度鉴权由各业务应用自行实现。
+
+### 3.6 客户端类型与凭据选择：什么时候需要 `client_secret`
+
+> 本节是「某个接入方到底要不要密钥」的**集中判据**。其他文档只给结论或操作步骤
+> （[application-integration-guide.md](application-integration-guide.md) §3.2/§3.3、[api-reference.md](api-reference.md) §3.3），
+> 判据与规范依据以本节为准。
+
+**一句话判据**：看这个客户端**有没有一个"用户拿不到代码与配置"的运行位置**。
+有 → 机密客户端，发密钥；没有 → 公共客户端，**不发密钥**、改用 PKCE。
+
+```mermaid
+flowchart TB
+    Q["客户端代码 / 配置<br/>用户能拿到吗？"] -->|"不能<br/>（服务端进程）"| C["机密客户端 confidential<br/>token_endpoint_auth_method<br/>= client_secret_basic / client_secret_post"]
+    Q -->|"能<br/>（浏览器 / 移动端 App）"| P["公共客户端 public<br/>token_endpoint_auth_method = none<br/>+ 强制 PKCE + redirect_uri 精确白名单"]
+    C --> C2["发放 client_secret<br/>（库中只存哈希）"]
+    P --> P2["不发 client_secret<br/>（发了也无效，且违反规范）"]
+```
+
+#### 3.6.1 决策表
+
+| 接入形态 | 客户端类型 | `token_endpoint_auth_method` | 需要 `client_secret`？ | 靠什么保护 |
+|---|---|---|---|---|
+| 浏览器 SPA（本系统两个控制台） | public | `none` | **不需要**（且不得发） | PKCE（`require_pkce=enable`）+ redirect_uri 精确白名单 + 令牌短 TTL + refresh 轮换 |
+| 移动端 / 桌面 App | public | `none` | **不需要**（且不得发） | 同上 + 系统浏览器（RFC 8252） |
+| 后端服务换取机器令牌（M2M） | confidential | `client_secret_basic` | **必须** | 密钥 + 轮换；本系统**业务 API** 另用 API Key（见 §5.3） |
+| 后端服务代用户走授权码 | confidential | `client_secret_basic` | **必须** | 密钥 + PKCE（双保险） |
+| 浏览器 + 后端组件（BFF） | confidential（**只给后端组件**） | `client_secret_basic` | 后端组件持有，**浏览器侧不持有** | 令牌不落到浏览器（见 §3.6.4） |
+
+#### 3.6.2 为什么浏览器客户端不能持有密钥
+
+规范层面是**两处硬约束**，不是"建议"：
+
+1. **RFC 6749 §2.1** 把 public 定义为"无法保密自身凭据的客户端"，并明确点名 *a web browser-based application*；
+   **§10.1** 进一步规定授权服务器 **MUST NOT issue client passwords or other client credentials to native
+   application or user-agent-based application clients for the purpose of client authentication**——
+   即"给 SPA 发密钥"本身是规范禁止的行为。
+2. **RFC 10017**（OAuth 2.0 for Browser-Based Applications，BCP 212）**§6.3.3.1**：浏览器客户端是 public 客户端，
+   源码要下发给每个用户，*unfit to contain provisioned secrets*；授权服务器 **MUST NOT require client
+   authentication of browser-based** 客户端。配套的 **RFC 9700**（OAuth 2.0 安全 BCP）要求授权码流一律配 PKCE，
+   隐式流已不推荐。
+
+工程层面还有两条事实：
+
+- **保密在物理上不可能**：Vite/Webpack 会把 `VITE_*` 常量在构建期内联进 JS 产物，任何用户下载 bundle 即可读出；
+  密钥等于公开，并随 CDN/缓存扩散到所有用户。
+- **密钥在协议侧不产生保护**：RFC 6749 **§2.3** 允许授权服务器 MAY 给 public 客户端建认证方式，但
+  **MUST NOT rely on public client authentication for the purpose of identifying the client**——
+  即便配了密钥，它也不能作为身份证明，收益为零。
+
+> 换个角度：`client_id` 本身不是秘密（RFC 6749 §2.2），只做标识；公共客户端的安全性来自
+> **PKCE + 精确 redirect_uri + 短 TTL + refresh 轮换**，而不是"加一个别人也看得到的密钥"。
+
+#### 3.6.3 本系统落地
+
+- **两个内置控制台客户端**（`platform_admin_web` / `tenant_admin_web`）是浏览器 SPA，登记为 **public + PKCE**：
+  `token_endpoint_auth_method=none`、`require_pkce=enable`（首次引导写入，见 `backend/pkg/seed/seed.go`）。
+  换令牌与刷新只带 `client_id`（示例见 [api-reference.md](api-reference.md) §3.3）。
+- **自建的机密客户端**（如 RustFS 资源服务器）用 `client_secret_basic`，在控制台「客户端密钥」页创建：
+  明文**只返回一次**，库中只存哈希与 8 位前缀（`application_client_secret.value_hash` / `value_prefix`），
+  支持多把并存、可设过期、可吊销，校验用恒定时间比较。参见 [rustfs-integration-case.md](rustfs-integration-case.md) §5。
+- **公共客户端不得走 `client_credentials`**：该授权类型没有用户参与，唯一凭据就是密钥，公共客户端走它等于无认证。
+  本系统在 `oidcop` 显式拒绝（`AuthMethodNone` → `ErrInvalidClient`），并有回归测试覆盖。
+- **业务 API 的机器凭证一律用 API Key**，不要复用内置客户端的 `client_credentials`
+  （见 §5.3 与 [application-integration-guide.md](application-integration-guide.md) §6.2）。
+
+#### 3.6.4 需要更强保证时的正解：BFF，而不是给 SPA 加密钥
+
+若确实想要"令牌不落到浏览器""刷新令牌不被 XSS 窃取"这一档保护，正确做法是引入 **BFF（Backend for Frontend）**：
+由后端作为机密客户端持有密钥与令牌，浏览器只与后端维持 `HttpOnly` Cookie 会话（RFC 10017 §6.1）。
+**这不是改一个下拉框能达成的**——给 SPA 加密钥既拿不到这档保护，还会破坏登录（见下）。
+
+> ⚠️ **改内置客户端的认证方式是"自锁"操作**：两个控制台前端只传 `clientID`、不传 `clientSecret`。
+> 一旦把内置客户端改成 `client_secret_basic`，token 端点要求客户端认证而前端无法提供 → 登录与静默续期
+> 全部 `invalid_client`，**而修复入口恰在该控制台内部**。`require_pkce` 同理不能关：公共客户端不强制 PKCE，
+> 等于放弃唯一的替代保护。因此这两项对内置客户端应当是**只读**的——当前控制台尚未拦住（见 §3.6.5）。
+
+#### 3.6.5 本系统的执行现状
+
+| 不变式 | 落地 | 位置 |
+|---|---|---|
+| 内置客户端 `code`（= `client_id`）只读 | ✅ service 拒写（报 `100823`）+ 矩阵 `immutable` | `svcapplicationclient.Update` |
+| 内置客户端 `source` 只读 | ✅ 无控制台写入入口 + 矩阵 `immutable` | `pkg/model/seed_authority.go` |
+| 内置客户端 `token_endpoint_auth_method` 必须为 `none` | ✅ service 拒写（报 `100825`）+ 矩阵 `immutable`；种子测试断言 `none`；控制台下拉对内置客户端置灰 | `application_client.go` / `seed_authority.go` / `golden_manifest_test.go` / `oauthClient/index.tsx` |
+| 内置客户端 `require_pkce` 必须为 `enable` | ✅ 同上（拒写、矩阵、控制台开关置灰） | 同上 |
+| 公共客户端不得签发密钥 | ✅ `CreateSecret` 按机密客户端白名单 fail-closed（报 `100826`）；控制台对 `none` 客户端隐藏「新建密钥」入口并给出说明 | `application_client.go` / `oauthClient/Detail.tsx` |
+| `token_endpoint_auth_method` 留空语义 | ✅ 留空 = **保持存量**（原先该列被无条件全量写入，任何省略它的 PUT 都会把存量刷成空串，使客户端在 oidcop 侧落到 fail-closed 的 `private_key_jwt` 分支而静默不可用） | `application_client.go` |
+
+> **拒写点是"拒绝变更"，不是"纠正存量"**：若某个内置行已处于 `client_secret_basic`（历史误配），
+> 控制台**不会**自动改回，也**不会**因此拒绝改名字。按本项目的"全新库维护、不写迁移"口径，
+> 存量修正走删库重建（见 [run-and-deploy.md](run-and-deploy.md) §2.3）或直接改库，不在代码里留兼容分支。
+
+#### 3.6.6 常见误区
+
+| 误区 | 为什么错 |
+|---|---|
+| "给 SPA 配个密钥更安全" | 密钥随 bundle 公开，且规范禁止（RFC 6749 §10.1）；收益为零，代价是登录全站不可用 |
+| "两个控制台是自家应用，所以能当机密客户端" | **第一方 ≠ 机密**：判据是"代码是否下发给用户"，与归属无关（RFC 10017 §5 明确第一方同样适用） |
+| "密钥放环境变量 / 构建参数就不会泄露" | 前端环境变量在**构建期**被内联进静态产物，仍对用户可见 |
+| "用内置客户端的 `client_credentials` 调业务 API" | 该令牌既非人令牌也非机器令牌，业务中间件直接 401；应改用 API Key（§5.3） |
+| "public 客户端没有 secret，所以不安全" | 它由 PKCE + redirect_uri 白名单 + 短 TTL + refresh 轮换保护，正是 RFC 9700 / RFC 10017 的推荐形态 |
 
 ---
 

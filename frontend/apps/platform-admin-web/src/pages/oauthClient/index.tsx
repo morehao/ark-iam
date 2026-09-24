@@ -371,9 +371,15 @@ export default function OAuthClientList() {
           <Form.Item
             name="tokenEndpointAuthMethod"
             label="令牌端点认证方式"
+            tooltip={
+              builtinClient
+                ? '内置控制台是浏览器公共客户端，必须保持 none + 强制 PKCE：它的代码会下发给每个用户，无法保密客户端密钥（RFC 6749 §10.1 / RFC 10017 §6.3.3.1）；改成机密客户端会当场锁死该控制台'
+                : 'none = 公共客户端（浏览器 / 移动端，不发密钥，必须配强制 PKCE）；client_secret_basic / client_secret_post = 机密客户端（服务端，可签发密钥）'
+            }
             rules={[{ required: true, message: '请选择认证方式' }]}
           >
             <Select
+              disabled={builtinClient}
               options={[
                 { value: 'client_secret_basic', label: 'client_secret_basic' },
                 { value: 'client_secret_post', label: 'client_secret_post' },
@@ -436,9 +442,13 @@ export default function OAuthClientList() {
               name="requirePKCE"
               label="强制 PKCE"
               {...ENABLE_FLAG_FORM_PROPS}
-              tooltip="开启后授权请求必须携带 code_challenge；公开客户端（none）与使用 S256 PKCE 的接入方（如 RustFS 控制台）需要开启"
+              tooltip={
+                builtinClient
+                  ? '内置控制台必须保持开启：公共客户端没有密钥，PKCE 是唯一的授权码绑定手段，关掉等于放弃防降级'
+                  : '开启后授权请求必须携带 code_challenge；公开客户端（none）与使用 S256 PKCE 的接入方（如 RustFS 控制台）需要开启'
+              }
             >
-              <Switch />
+              <Switch disabled={builtinClient} />
             </Form.Item>
             <Form.Item
               name="requireAuthTime"

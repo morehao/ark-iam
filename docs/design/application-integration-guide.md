@@ -47,8 +47,9 @@ flowchart TB
 
 | 问题 | 影响 |
 |---|---|
+| **客户端代码会被下发给用户吗？** | 会（浏览器 SPA / 移动端）→ **public 客户端**：`tokenEndpointAuthMethod=none` + 强制 PKCE，**不发密钥**；不会（服务端进程）→ **confidential 客户端**：`client_secret_basic` + 密钥。判据见 [sso-oidc-concepts.md](sso-oidc-concepts.md) §3.6 |
 | 应用有前端页面吗？ | 前端用授权码 + PKCE；无前端用 client_credentials |
-| 是自有应用还是第三方应用？ | 来源（`application.source`）：控制台创建恒为 `third_party`；`builtin` 仅由首次初始化引导写入，`first_party` 仅由运维自建产生 |
+| 是自有应用还是第三方应用？ | 来源（`application.source`）：控制台创建恒为 `third_party`；`builtin` 仅由首次初始化引导写入，`first_party` 仅由运维自建产生（**第一方 ≠ 机密客户端**，判据只看代码是否下发） |
 | 回调地址是什么？ | `redirect_uri` 必须**精确白名单**（HTTPS 生产必填） |
 | 需要免登录串访吗？ | 需要 → 确保与 IAM 同浏览器环境（SSO Cookie 生效） |
 | 需要服务端到服务端调用吗？ | 需要 → 额外申请 API Key 或 client_credentials |
@@ -60,7 +61,7 @@ flowchart TB
 
 1. **IAM 环境可访问**：确定 issuer，例如开发环境 `http://localhost:8081/oidc`（生产为正式域名）。访问 `GET {issuer}/.well-known/openid-configuration` 应返回元数据。
 2. **账号**：一个可登录平台管理台（platform-admin-web）的账号，用于创建应用与客户端。
-3. **密钥可获取**：创建客户端后生成的 `client_secret`（只显示一次，库中只存哈希）。
+3. **密钥可获取（仅机密客户端）**：`client_secret` 只对**服务端**接入方有意义——创建后只显示一次，库中只存哈希。纯前端（SPA / 移动端）是 public 客户端，**不需要也不应持有密钥**，请跳过此项（判据见 [sso-oidc-concepts.md](sso-oidc-concepts.md) §3.6）。
 4. **共享 Redis（可选但推荐）**：需要"登出即失效"的请求粒度校验时，业务后端与 auth 共享同一认证 Redis。
 
 > 提示：平台管理台已提供可视化创建入口；下文同时给出 API 调用方式，便于脚本化/自动化。
@@ -123,12 +124,15 @@ curl -X POST http://localhost:8082/v1/platform/application-clients \
 |---|---|---|
 | `grantTypes` | `["authorization_code","refresh_token"]` | 前端应用标准组合 |
 | `responseTypes` | `["code"]` | 授权码模式 |
-| `tokenEndpointAuthMethod` | `client_secret_basic` | 机密客户端；纯前端可 `none` + 强制 PKCE |
-| `requirePKCE` | `true` | 生产建议强制 PKCE |
+| `tokenEndpointAuthMethod` | `client_secret_basic` | 机密客户端（服务端）；**纯前端 SPA / 移动端必须 `none` + `requirePKCE: true`，且不发密钥**——判据见 [sso-oidc-concepts.md](sso-oidc-concepts.md) §3.6 |
+| `requirePKCE` | `true` | 生产建议强制 PKCE；公共客户端（`none`）**必须**开启 |
 | `redirectURIs` | 精确到路径 | 白名单校验，**多一个字符都不匹配** |
 | `backChannelLogoutURI` | 指向自己的接收端点 | 用于 SLO（见 §8） |
 
-### 3.3 创建客户端密钥（可选，机密客户端）
+### 3.3 创建客户端密钥（**仅机密客户端**；public 客户端跳过本节）
+
+> 是否属于机密客户端见 [sso-oidc-concepts.md](sso-oidc-concepts.md) §3.6 的决策表：
+> 纯浏览器 / 移动端是 **public 客户端，不发也不需要密钥**（规范禁止，且密钥随 bundle 公开）。
 
 ```bash
 curl -X POST http://localhost:8082/v1/platform/application-clients/{applicationClientID}/secrets \

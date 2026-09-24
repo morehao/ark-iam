@@ -23,6 +23,10 @@ export default function OAuthClientDetail() {
   // 路由参数是控制台内部主键 applicationClientID（非 OIDC client_id/code）
   const applicationClientID = id ?? ""
 
+  // 公共客户端（token_endpoint_auth_method=none）：浏览器 / 移动端形态，不签发也不使用客户端密钥。
+  // 判定必须显式比较枚举值，不可用真值判断（'disable' 之类的非空字符串真值恒为 true）。
+  const isPublicClient = detail?.tokenEndpointAuthMethod === 'none'
+
   const fetchAll = useCallback(async () => {
     if (!id) return
     setLoading(true)
@@ -164,19 +168,31 @@ export default function OAuthClientDetail() {
       </Card>
 
       <Card title="密钥管理" style={{ borderRadius: 12, border: `1px solid ${tokens.border}` }} styles={{ body: { padding: 24 } }}>
-        <Space style={{ marginBottom: 16 }}>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => {
-              setCreatedSecret(null)
-              secretForm.resetFields()
-              setSecretModalOpen(true)
-            }}
-          >
-            新建密钥
-          </Button>
-        </Space>
+        {/* 公共客户端（token_endpoint_auth_method=none）是浏览器/移动端：代码与配置会下发给每个用户，
+            密钥无处安全保存，且令牌端点不会向其索取认证（RFC 6749 §10.1）——故不提供创建入口。 */}
+        {isPublicClient ? (
+          <Alert
+            type="info"
+            showIcon
+            message="公共客户端（token_endpoint_auth_method = none）不支持客户端密钥"
+            description="这类客户端的代码会下发给每个用户，无法保密密钥；它由 PKCE + 回调地址白名单保护。需要密钥请先将令牌端点认证方式改为 client_secret_basic / client_secret_post（机密客户端，限服务端接入）。"
+            style={{ marginBottom: 16 }}
+          />
+        ) : (
+          <Space style={{ marginBottom: 16 }}>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => {
+                setCreatedSecret(null)
+                secretForm.resetFields()
+                setSecretModalOpen(true)
+              }}
+            >
+              新建密钥
+            </Button>
+          </Space>
+        )}
         {createdSecret && (
           <Alert
             type="warning"
