@@ -20,7 +20,10 @@ func TestUpdateBuiltInClientAllowsName(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
 	builtin := &model.ApplicationClientEntity{
 		TenantID: "1", AppID: "app1", Code: model.SeedBuiltinClientPlatformAdminWeb, Name: "平台管理后台",
-		Source: model.ApplicationClientSourceBuiltin, Status: model.ApplicationClientStatusEnable,
+		Source:                  model.ApplicationClientSourceBuiltin,
+		Status:                  model.ApplicationClientStatusEnable,
+		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodNone,
+		RequirePKCE:             model.ClientPKCEPolicyEnable,
 	}
 	if err := db.Create(builtin).Error; err != nil {
 		t.Fatalf("seed client: %v", err)
@@ -54,6 +57,16 @@ func TestUpdateBuiltInClientAllowsName(t *testing.T) {
 	// source（安全不变式）不在 Update 请求里，控制台无法改写内置标记
 	if got.Source != model.ApplicationClientSourceBuiltin {
 		t.Fatalf("source 不得被控制台改写: %q", got.Source)
+	}
+	// 请求未提交认证方式 / PKCE 策略时**必须保持存量**，不得被写成空串或降级为 disable。
+	// 回归背景（原缺陷）：这两列曾在 fields 白名单里无条件全量写入，任何省略它们的 PUT 都会把
+	// token_endpoint_auth_method 刷成空串——空串在 oidcop 侧落到 fail-closed 的 private_key_jwt
+	// 分支，该控制台登录直接不可用；require_pkce 则被静默降级、丢掉公共客户端唯一的补偿控制。
+	if got.TokenEndpointAuthMethod != model.TokenEndpointAuthMethodNone {
+		t.Fatalf("内置客户端认证方式不得被改写: %q", got.TokenEndpointAuthMethod)
+	}
+	if got.RequirePKCE != model.ClientPKCEPolicyEnable {
+		t.Fatalf("内置客户端强制 PKCE 不得被降级: %q", got.RequirePKCE)
 	}
 }
 

@@ -146,7 +146,7 @@ flowchart LR
 
 ### 3.3 令牌端点示例
 
-内置客户端 `platform_admin_web` / `tenant_admin_web` 是 **public + PKCE**（`token_endpoint_auth_method=none`），不带 client secret，请求里用 `client_id` 标识：
+内置客户端 `platform_admin_web` / `tenant_admin_web` 是 **public + PKCE**（`token_endpoint_auth_method=none`），不带 client secret，请求里用 `client_id` 标识（为什么这类客户端不发密钥，见 [sso-oidc-concepts.md](sso-oidc-concepts.md) §3.6）：
 
 ```bash
 # 授权码换令牌（public client + PKCE）
@@ -255,8 +255,8 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | GET/PUT/DELETE | `/v1/platform/applications/{appID}` | 应用详情/更新/删除（内置应用 `source=builtin` 禁删报 `100746`：平台管理后台 / 租户管理后台由平台版本交付；其编码不可改报 `100749`：控制台菜单入口按它定位，改名即失去侧边栏。自建应用可改编码，非法值报 `100748`。`roleTemplate` 传 `null` 不修改、传 `[]` 清空、传值全量替换（全量语义见下）；形状非法报 `100765`） |
 | POST | `/v1/platform/application-clients` | 创建 OAuth 客户端 |
 | GET | `/v1/platform/application-clients` | 客户端分页 |
-| GET/PUT/DELETE | `/v1/platform/application-clients/{applicationClientID}` | 详情/更新/删除（内置客户端 `source=builtin` 禁删报 `100820`，其编码不可改报 `100823`：`client_id` 是网关 aud 白名单与前端构建期默认值的来源） |
-| GET/POST | `/v1/platform/application-clients/{applicationClientID}/secrets` | 密钥列表/创建 |
+| GET/PUT/DELETE | `/v1/platform/application-clients/{applicationClientID}` | 详情/更新/删除（内置客户端 `source=builtin` 禁删报 `100820`，其编码不可改报 `100823`：`client_id` 是网关 aud 白名单与前端构建期默认值的来源；其 `tokenEndpointAuthMethod` 与 `requirePKCE` 亦不可改报 `100825`：内置控制台是浏览器公共客户端，必须保持 `none` + 强制 PKCE，改动会当场锁死该控制台。`tokenEndpointAuthMethod` 非法值报 `100824`，**留空表示不修改**） |
+| GET/POST | `/v1/platform/application-clients/{applicationClientID}/secrets` | 密钥列表/创建（**公共客户端 `tokenEndpointAuthMethod=none` 不得创建密钥**，报 `100826`：其代码会下发给用户、无法保密凭据（[sso-oidc-concepts.md](sso-oidc-concepts.md) §3.6），且令牌端点不会向其索取认证） |
 | DELETE | `/v1/platform/application-clients/{applicationClientID}/secrets/{secretID}` | 删除密钥 |
 
 > **`roleTemplate` 的全量语义（撤权操作）**：模板是应用契约角色的**单一事实源**，更新即全量替换——

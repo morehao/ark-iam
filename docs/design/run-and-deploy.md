@@ -228,6 +228,80 @@ curl http://localhost:8100/oidc/keys
 curl http://localhost:8100/oidc/healthz
 ```
 
+### 2.7 升级前存量数据核查（按需，不是迁移）
+
+本项目的 schema 与写入约束**没有需要执行的迁移脚本**：AutoMigrate 只增不删、启动期不写数据（见 §2.4），
+本次收口也只新增**拒写点**（校验型改动）——它约束的是"新写入"，**不会自动纠正已落库的存量行**。
+因此升级前按下表核查一次即可，**只有查出违规行才需要修**。
+
+#### 2.7.1 内置 OAuth 客户端必须保持 public + 强制 PKCE
+
+`platform_admin_web` / `tenant_admin_web` 是浏览器 SPA，必须 `token_endpoint_auth_method='none'`
+且 `require_pkce='enable'`（RFC 6749 §10.1 / RFC 10017 §6.3.3.1，判据见
+[sso-oidc-concepts.md](sso-oidc-concepts.md) §3.6）。升级后控制台不再允许修改这两列（报 `100825`）。
+
+```sql
+-- 应返回 0 行；有结果即存量行违反不变式（已软删的行不算）
+SELECT id, tenant_id, code, name, token_endpoint_auth_method, require_pkce
+FROM application_client
+WHERE source = 'builtin' AND deleted_at IS NULL
+  AND (token_endpoint_auth_method <> 'none' OR require_pkce <> 'enable');
+```
+
+- 命中 `require_pkce = 'disable'`：**静默的安全降级**——登录不会坏，只是丢掉了公共客户端唯一的补偿控制。
+  历史成因：旧 `Update` 把该列无条件全量写入，任何省略 `requirePKCE` 的调用都会把它归一为 `disable`。
+- 命中 `token_endpoint_auth_method <> 'none'`：该控制台的登录与静默续期**已经是坏的**（前端只传 `client_id`、
+  不持密钥，而 token 端点要求认证 → `invalid_client`）。
+
+> **务必在发布新前端之前修**：新前端的认证方式下拉对内置客户端已置灰。若存量值是空串，表单的必填校验会
+> 阻止保存，运维将失去"在界面上改回 `none`"这条自救路径（改动前该下拉可编辑，所以能自救）。
+
+```sql
+-- 一次性修复：交给执行方在升级前运行（本项目不把这类 SQL 塞进启动流程，见 system-design.md §4.5）
+UPDATE application_client
+SET token_endpoint_auth_method = 'none', require_pkce = 'enable', updated_at = now()
+WHERE source = 'builtin' AND deleted_at IS NULL
+  AND (token_endpoint_auth_method <> 'none' OR require_pkce <> 'enable');
+```
+
+#### 2.7.2 认证方式不得为空串
+
+`token_endpoint_auth_method` 为空串不是合法枚举：读取端会落到 fail-closed 的 `private_key_jwt` 分支
+（`apps/auth/internal/core/oidcop/client.go` 的 `default`），该客户端在令牌端点随之不可用。
+空串只可能来自历史的全量写入缺陷（省略该字段的 PUT 会把它刷成空串）。
+
+```sql
+-- 应返回 0 行
+SELECT id, tenant_id, code, name, source, token_endpoint_auth_method
+FROM application_client
+WHERE token_endpoint_auth_method = '' AND deleted_at IS NULL;
+```
+
+修复要按客户端的**真实形态**取值：浏览器 / 移动端 → `none`（并同时 `require_pkce = 'enable'`，
+`none` 客户端不强制 PKCE 等于放弃唯一的补偿控制）；服务端 → `client_secret_basic` 或 `client_secret_post`。
+**不要一律刷成 `none`**——`none` 意味着该客户端在令牌端点免认证，对服务端接入是降级。
+
+#### 2.7.3 公共客户端名下残留的密钥（可选清理）
+
+升级前为 `none` 客户端签发过的密钥不会被自动清理，但**已无实际效力**：`none` 客户端在令牌端点从不出示
+凭据，`client_credentials` 通道也显式拒绝 `AuthMethodNone`（`oidcop/storage.go` 的 `ClientCredentials`），
+因此不构成泄露风险，不修也能正常跑。仅作卫生清理：
+
+```sql
+-- 列出残留密钥
+SELECT s.id, c.code, s.value_prefix, s.created_at
+FROM application_client_secret s
+JOIN application_client c ON c.id = s.application_client_id
+WHERE c.token_endpoint_auth_method = 'none'
+  AND s.revoked_at IS NULL AND s.deleted_at IS NULL AND c.deleted_at IS NULL;
+```
+
+处置：在客户端详情页逐条「删除密钥」，或 `UPDATE application_client_secret SET revoked_at = now() WHERE id = '...'`
+（保留审计痕迹优于物理删除）。
+
+> `application_client` 与 `application_client_secret` 都是软删除（`deleted_at`，来自 `gormdao.BaseEntity`），
+> 所以上面的核查 SQL 都显式带 `deleted_at IS NULL`，避免把已删行误算成违规。
+
 ---
 
 ## 3. 测试

@@ -74,7 +74,7 @@ func TestSeedImmutableFieldsPinned(t *testing.T) {
 	want := map[string][]string{
 		SeedEntityTenant:            {"status"},
 		SeedEntityApplication:       {"code", "source"},
-		SeedEntityApplicationClient: {"code", "source"},
+		SeedEntityApplicationClient: {"code", "require_pkce", "source", "token_endpoint_auth_method"},
 		SeedEntityRole:              {"admin_type"},
 		SeedEntityUser:              {"source"},
 	}

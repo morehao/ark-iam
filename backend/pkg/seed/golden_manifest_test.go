@@ -256,6 +256,12 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 		if client.RequirePKCE != model.ClientPKCEPolicyEnable {
 			t.Errorf("客户端 %s require_pkce = %q, want enable（PKCE 未强制意味着授权码可被重放）", want.code, client.RequirePKCE)
 		}
+		// 内置客户端是纯浏览器 SPA：必须登记为公共客户端（none），不得持有/要求客户端密钥
+		// （RFC 6749 §10.1、RFC 10017 §6.3.3.1）；登记成 basic/post 会让该控制台登录当场不可用。
+		if client.TokenEndpointAuthMethod != model.TokenEndpointAuthMethodNone {
+			t.Errorf("客户端 %s token_endpoint_auth_method = %q, want none（浏览器客户端不得登记为机密客户端）",
+				want.code, client.TokenEndpointAuthMethod)
+		}
 	}
 
 	// ---- 订阅：平台租户订阅两个应用 ----
