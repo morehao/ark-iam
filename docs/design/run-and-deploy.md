@@ -84,7 +84,7 @@ flowchart LR
 
 **数据准备只有两种来源**：schema 由启动时的 `AutoMigrate` 建出（只增不删），**内置数据由初始化页面一次性写入**——启动期不写任何数据，`pkg/seed` 的唯一写通道 `Bootstrap` 只有 `POST /install/initialize` 一个调用方（详见 §2.4）。因此**全新库的启动顺序必须是「先起后端（带 `BOOTSTRAP_TOKEN`）→ 再打开安装页完成引导」**；未初始化期间业务端点会被 `pkg/middleware.BootstrapGuard` 拦成 HTTP 409（错误码 `107004`），这是预期行为，不是服务故障。
 
-> **为什么把播种从启动期挪到安装页**：启动期播种必须"每次启动都把内置行收敛到代码定义"，于是应用既要建表又要当数据写者，运维在控制台改过的内置字段会在下次重启被悄悄收回（双写者），跨版本改名也只能靠启动分支打补丁。改成一次性引导后，写者唯一、时机明确（部署时由人确认），应用启动退化为纯只读。代价已经明确接受：内置数据的后续调整全部由运维在控制台完成，不再自动下发（见 §2.5）。
+> **为什么把播种从启动期挪到安装页**：启动期播种必须"每次启动都把内置行收敛到代码定义"，于是应用既要建表又要当数据写者，运维在控制台改过的内置字段会在下次重启被悄悄收回（双写者），跨版本改名也只能靠启动分支打补丁。改成一次性引导后，写者唯一、时机明确（部署时由人确认），应用启动退化为纯只读。代价已经明确接受：内置数据的后续调整全部由运维在控制台完成，不再自动下发（见 §2.6）。
 
 > **Schema 变更（列/表下线）**：本项目按新项目处理，不维护数据迁移脚本（AutoMigrate 只增不删，见 `system-design.md` §4.1）。下线列/表后，开发/测试库需**删库重建**。本地 PostgreSQL 跑在 Docker 里（容器名以 `docker ps` 为准，下例为 `postgres18`）：
 >
@@ -189,7 +189,94 @@ flowchart LR
 - **端点会永久自锁**：初始化成功后再次调用 `/install/initialize` 一律返回 HTTP 409（错误码 `107000`），重启、换副本都不会解除；`GET /install/status`（公开、只读）回 `initialized=true`，可给部署脚本或监控用来确认状态。
 - **未初始化期间业务端点不可用是预期行为**：`pkg/middleware.BootstrapGuard` 会把业务端点拦成 HTTP 409（错误码 `107004`），只放行 `/install` 与 `/oidc` 的健康检查 / 服务发现 / 登出端点。集成方在初始化前探测收到 409，属正常引导态，不是服务故障。
 
-### 2.5 版本升级时的菜单变更清单
+### 2.5 存量库升级
+
+**先分清两种口径**：本仓按**全新项目**维护，开发/测试库的标准路径是**删库重建 + `POST /install/initialize` 重新引导**（§2.3、§2.4）——代码侧没有任何数据迁移脚本，`user_application` 表与部分唯一索引由启动时的 `AutoMigrate` 自动补建，回填 SQL 也**不进启动流程**；而**已上线库若要保全数据**，则必须由运维在**开门禁前**手工执行本节的 5 条一次性 SQL（本批的一次性 SQL 只落在部署文档，本项目不把这类 SQL 塞进启动流程，见 `system-design.md` §4.5）。完整口径见设计文档 [2026-09-24-user-application-access-design.md](../../.dsh/docs/specs/2026-09-24-user-application-access-design.md#存量数据回填) 的「存量数据回填」小节。
+
+#### 2.5.1 代码侧无需迁移，行为由开关控制
+
+本批新增三层语义中的**准入层**：表 `user_application`（`tenant_id`、`user_id` 指向 `tenant_user.id`——含成员与服务账号、`app_id`、`status`（具名枚举 `enable`/`disable`，撤销 = 置 `disable` 保留行）、`source`（`manual`/`role`/`provision`）），以及部分唯一索引 `uk_user_application_active (tenant_id, user_id, app_id) WHERE deleted_at IS NULL`。**AutoMigrate 只新增缺失的表/列/索引**，因此升级代码本身不需要任何迁移动作。
+
+判定式收敛为单一实现 `backend/pkg/core/application` 的 `Usable` / `CheckUsable`：
+
+> 可用 ⟺ `application.status=enable` ∧ `tenant_application.status=enable` ∧ `user_application.status=enable`
+
+新增配置开关 **`oidc.enforceAppAccess`**（yaml `oidc.enforceAppAccess`，Go 字段 `pkg/config.Config.OIDC.EnforceAppAccess`，**默认 `false`**）：
+
+| 开关 | 行为 |
+|---|---|
+| `false`（默认） | 令牌签发与登录链路与升级前**完全等价**（AC-13）：`user_application` 照常写入，但读取点全部不生效 |
+| `true` | 登录期早拒（错误码 `110016`）；登录页租户列表按准入过滤；令牌签发兜底拒绝（授权码流 `access_denied`、刷新流 `invalid_grant`）；静默登录在本客户端所属应用下**无任何有准入的租户**时渲染无权限页（HTTP 403，不走"清 Cookie 回登录页"分支，避免登录死循环） |
+
+因此铺数据阶段**不必停服、也不必改代码**：部署新代码（`AutoMigrate` 建表）→ 保持开关关闭 → 执行回填 → 核查与盘点。
+
+#### 2.5.2 已上线库的一次性回填 SQL
+
+仅在**需要保全旧库数据**时执行；由运维在**开门禁前**依序运行（语句 3 / 4 / 5 是前置检查、对账与盘点，不改数据）：
+
+```sql
+-- 1) 现有角色绑定 → 准入（source=role）
+INSERT INTO user_application (id, tenant_id, user_id, app_id, status, source, created_at, updated_at)
+SELECT gen_random_uuid()::text, ur.tenant_id, ur.user_id, r.app_id, 'enable', 'role', now(), now()
+FROM user_role ur JOIN role r ON r.id = ur.role_id AND r.deleted_at IS NULL
+WHERE ur.deleted_at IS NULL AND r.app_id <> ''
+ON CONFLICT DO NOTHING;
+
+-- 2) 内置管理员：补齐"本租户全部订阅且启用的应用"，避免开门禁后无法自救（source=provision）
+INSERT INTO user_application (id, tenant_id, user_id, app_id, status, source, created_at, updated_at)
+SELECT gen_random_uuid()::text, ur.tenant_id, ur.user_id, ta.app_id, 'enable', 'provision', now(), now()
+FROM user_role ur
+JOIN role r  ON r.id = ur.role_id AND r.deleted_at IS NULL
+JOIN tenant_application ta ON ta.tenant_id = ur.tenant_id AND ta.status = 'enable' AND ta.deleted_at IS NULL
+JOIN application a ON a.id = ta.app_id AND a.status = 'enable' AND a.deleted_at IS NULL
+WHERE ur.deleted_at IS NULL AND r.source = 'builtin' AND r.admin_type = 'admin'
+ON CONFLICT DO NOTHING;
+
+-- 3) 开门禁前的前置检查：列出未绑定应用的客户端（将因 fail-closed 不可用）
+SELECT id, code, app_id FROM application_client WHERE app_id = '' AND deleted_at IS NULL;
+
+-- 4) 对账：应返回 0（存在角色但无准入的行数）
+SELECT count(*) FROM user_role ur
+JOIN role r ON r.id = ur.role_id AND r.deleted_at IS NULL
+LEFT JOIN user_application ua ON ua.tenant_id = ur.tenant_id AND ua.user_id = ur.user_id
+     AND ua.app_id = r.app_id AND ua.status = 'enable' AND ua.deleted_at IS NULL
+WHERE ur.deleted_at IS NULL AND r.app_id <> '' AND ua.id IS NULL;
+
+-- 5) 【P2 退出判据 / 升级告知清单】按判定式干跑：列出开门禁后将失去某应用访问的存量成员
+--    口径：租户 active、订阅 enable、应用 enable，但该成员没有 enable 的 grant。
+--    （租户/成员已停用者可忽略——他们本来也登不进。）
+SELECT u.tenant_id, u.id AS user_id, p.username, a.code AS app_code
+FROM tenant_user u
+JOIN tenant t  ON t.id = u.tenant_id AND t.status = 'active' AND t.deleted_at IS NULL
+JOIN person p  ON p.id = u.person_id AND p.deleted_at IS NULL
+JOIN tenant_application ta ON ta.tenant_id = u.tenant_id AND ta.status = 'enable' AND ta.deleted_at IS NULL
+JOIN application a ON a.id = ta.app_id AND a.status = 'enable' AND a.deleted_at IS NULL
+LEFT JOIN user_application ua ON ua.tenant_id = u.tenant_id AND ua.user_id = u.id
+     AND ua.app_id = ta.app_id AND ua.status = 'enable' AND ua.deleted_at IS NULL
+WHERE u.deleted_at IS NULL AND ua.id IS NULL
+ORDER BY u.tenant_id, a.code;
+```
+
+**执行顺序**：语句 1 → 2 → 3/4/5。语句 2 在语句 1 之后跑通常只补少量行甚至 0 行——语句 1 已把"有角色者"的准入补齐，只有当某管理员的**订阅应用**超出其角色覆盖范围时语句 2 才追加（两条都是 `ON CONFLICT DO NOTHING`，可重复执行）。**以语句 4 的对账结果为准**：返回 `0` 才算铺数据完成，不要以"插入行数"判断。
+
+两条说明：
+
+1. 回填行的 `id` 用 `gen_random_uuid()`（v4），与 Go 侧 UUIDv7 不一致；**仅影响按 ID 的排序倾向，无功能影响**。若要求一致，改由一次性 Go 脚本执行。
+2. **已决 ADR-2：不做"给全部成员批量开通"**。本需求的语义是"逐个授权、默认拒绝"，因此回填**只覆盖语句 1（有角色者）+ 语句 2（内置管理员）**，其余成员的准入由租户管理员在控制台按需分配。**这条决策的代价必须显式承担**：存量库开门禁后，原先靠"订阅即全员可用"获得访问的**无角色成员会失去访问**。处置方式是把语句 5 的清单作为**升级告知与运维工单来源**，而**不得**在代码里补默认开通（那会作废本次口径）。
+
+#### 2.5.3 三步发布判据
+
+| 阶段 | 内容 | 进入判据 | 退出判据 |
+|---|---|---|---|
+| **P1 铺数据（门禁关闭）** | 建表 + DAO + 判定 + 租户端接口与 UI + 角色授予自动补准入 + 运维执行回填 SQL 1–2 | 阶段代码全部合并；`oidc.enforceAppAccess=false` | 租户内每个用户的准入集合可见；语句 4 对账差异 = 0；管理员全部有内置控制台准入 |
+| **P2 观察** | 只读观察准入覆盖率；执行语句 5 形成"开门禁后将失去访问"台账并交付运维（升级告知 + 按需分配） | P1 退出判据满足 | 台账已交付并完成告知；剩余被拒者全部属于"已知悉的默认拒绝"，无一条是配置遗漏；观察期 ≥ 3 个工作日 |
+| **P3 开门禁** | `oidc.enforceAppAccess=true` 灰度到全量 | P2 退出判据满足 | 登录成功率不下降；"准入拒绝次数"持平预期、无异常尖峰 |
+
+#### 2.5.4 回滚
+
+把 `oidc.enforceAppAccess` 改回 `false` 并重启即回到升级前行为（表与数据保留，纯新增、无副作用）；彻底移除能力才需要删表（不可逆，需审批与备份）。
+
+### 2.6 版本升级时的菜单变更清单
 
 **菜单行归运维**：L1 首次初始化只写入一次内置菜单，之后菜单由「菜单管理」页维护（可新增根菜单/子菜单，可删除任意菜单）。因此**版本升级带来的新菜单不会被自动下发**，升级后需要人工补录。
 
@@ -212,7 +299,7 @@ make print-builtin-menus
 >
 > 历史版本曾用「退役菜单清单（`retiredMenus`）」在启动时自动清理已下线的内置菜单。**该机制已删除**：菜单的下线与调整现在完全由运维在控制台完成（详见 `system-design.md` §4.5）。
 
-### 2.6 验证 OIDC Provider
+### 2.7 验证 OIDC Provider
 
 ```bash
 # 初始化状态（公开只读；initialized=false 说明还没走 §2.4 的安装页）
@@ -228,13 +315,13 @@ curl http://localhost:8100/oidc/keys
 curl http://localhost:8100/oidc/healthz
 ```
 
-### 2.7 升级前存量数据核查（按需，不是迁移）
+### 2.8 升级前存量数据核查（按需，不是迁移）
 
 本项目的 schema 与写入约束**没有需要执行的迁移脚本**：AutoMigrate 只增不删、启动期不写数据（见 §2.4），
 本次收口也只新增**拒写点**（校验型改动）——它约束的是"新写入"，**不会自动纠正已落库的存量行**。
 因此升级前按下表核查一次即可，**只有查出违规行才需要修**。
 
-#### 2.7.1 内置 OAuth 客户端必须保持 public + 强制 PKCE
+#### 2.8.1 内置 OAuth 客户端必须保持 public + 强制 PKCE
 
 `platform_admin_web` / `tenant_admin_web` 是浏览器 SPA，必须 `token_endpoint_auth_method='none'`
 且 `require_pkce='enable'`（RFC 6749 §10.1 / RFC 10017 §6.3.3.1，判据见
@@ -264,7 +351,7 @@ WHERE source = 'builtin' AND deleted_at IS NULL
   AND (token_endpoint_auth_method <> 'none' OR require_pkce <> 'enable');
 ```
 
-#### 2.7.2 认证方式不得为空串
+#### 2.8.2 认证方式不得为空串
 
 `token_endpoint_auth_method` 为空串不是合法枚举：读取端会落到 fail-closed 的 `private_key_jwt` 分支
 （`apps/auth/internal/core/oidcop/client.go` 的 `default`），该客户端在令牌端点随之不可用。
@@ -281,7 +368,7 @@ WHERE token_endpoint_auth_method = '' AND deleted_at IS NULL;
 `none` 客户端不强制 PKCE 等于放弃唯一的补偿控制）；服务端 → `client_secret_basic` 或 `client_secret_post`。
 **不要一律刷成 `none`**——`none` 意味着该客户端在令牌端点免认证，对服务端接入是降级。
 
-#### 2.7.3 公共客户端名下残留的密钥（可选清理）
+#### 2.8.3 公共客户端名下残留的密钥（可选清理）
 
 升级前为 `none` 客户端签发过的密钥不会被自动清理，但**已无实际效力**：`none` 客户端在令牌端点从不出示
 凭据，`client_credentials` 通道也显式拒绝 `AuthMethodNone`（`oidcop/storage.go` 的 `ClientCredentials`），

@@ -31,6 +31,7 @@ func setupTenantCreateEnv(t *testing.T) *gorm.DB {
 		&model.RoleMenuEntity{},
 		&model.TenantApplicationEntity{},
 		&model.UserRoleEntity{},
+		&model.UserApplicationEntity{},
 	)
 	seedTenantAdminApp(t, db)
 	return db

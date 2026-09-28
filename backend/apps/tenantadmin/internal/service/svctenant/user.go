@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/core/application"
 	"github.com/morehao/ark-iam/pkg/core/person"
 	"github.com/morehao/ark-iam/pkg/core/tenant"
 	"github.com/morehao/ark-iam/pkg/core/user"
@@ -777,6 +778,21 @@ func (svc *userSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.UserRolesUpdate
 				CreatedBy: operator,
 			}
 			if err := dao.NewUserRoleDao().WithTx(tx).Insert(ctx, entity); err != nil {
+				return err
+			}
+		}
+		// 不变式 I1：授权 ⇒ 准入。本次确实授予了角色时，同事务补齐该应用的用户准入
+		// （source=role）。刻意只在 len(req.RoleIDs) > 0 时补：把某应用的角色清空属"撤销授权"，
+		// 撤销不反向撤销准入（单向级联），否则此处会凭空造出一条"已被清空角色却仍有准入"的记录。
+		// req.AppID 为空串（系统/未归属应用组）时 EnsureGrant 内部直接跳过。
+		if len(req.RoleIDs) > 0 {
+			if err := application.EnsureGrant(ctx, tx, application.GrantParams{
+				TenantID: tenantID,
+				UserID:   req.UserID,
+				AppID:    req.AppID,
+				Source:   model.UserApplicationSourceRole,
+				Operator: operator,
+			}); err != nil {
 				return err
 			}
 		}

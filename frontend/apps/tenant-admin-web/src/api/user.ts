@@ -11,6 +11,8 @@ import type {
   TenantUserResetPasswordResp,
   TenantUserRoleItem,
   TenantUserCreateResp,
+  TenantUserApplicationsListResp,
+  TenantApplicationUsersListResp,
   UserStatus,
 } from '@ark-iam/types'
 
@@ -45,6 +47,25 @@ export const getTenantUserRoles = (userID: string) => request.get<any, { list: T
 /** 按应用全量替换用户角色（appID 空串=系统/未归属应用组；仅替换该应用下授权，不影响其它应用） */
 export const updateTenantUserRoles = (userID: string, appID: string, roleIDs: string[]) =>
   request.put<any, string>(`/tenant/users/${userID}/roles`, { appID, roleIDs })
+
+/**
+ * 用户的应用准入清单：返回「本租户订阅应用 ∪ 该用户准入行」的全集，
+ * 每行带 subscribed/granted/roleCount，供抽屉呈现选中态与撤销确认文案。
+ */
+export const getTenantUserApplications = (userID: string) =>
+  request.get<any, TenantUserApplicationsListResp>(`/tenant/users/${userID}/applications`)
+
+/**
+ * 全量替换用户的应用准入（`appIDs` 即"最终应被准入的应用集合"）。
+ * 必须显式传 `appIDs`：缺字段会被服务端拒绝（防"漏传即清空"），传 `[]` 表示清空全部准入。
+ * 撤销某应用准入会在同一事务内级联撤销该应用下的角色绑定，故前端需按 roleCount 二次确认。
+ */
+export const updateTenantUserApplications = (userID: string, appIDs: string[]) =>
+  request.put<any, string>(`/tenant/users/${userID}/applications`, { appIDs })
+
+/** 某应用下被准入的成员列表（应用视角；撤销前的影响面核对） */
+export const getTenantApplicationUsers = (appID: string) =>
+  request.get<any, TenantApplicationUsersListResp>(`/tenant/applications/${appID}/users`)
 
 /** 用户已绑定的第三方身份 */
 export const getTenantUserIdentities = (userID: string) =>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Select, message } from 'antd'
 import { RemoteMultiSelect, tokens } from '@ark-iam/ui'
-import type { TenantAppItem, TenantUserRoleItem } from '@ark-iam/types'
+import type { TenantSubscribedApplicationItem, TenantUserRoleItem } from '@ark-iam/types'
 import { getMachineUserRoles, updateMachineUserRoles } from '../api/machineUser'
 import { getTenantApps } from '../api/menu'
 import { getTenantRolePageList } from '../api/role'
@@ -24,7 +24,7 @@ interface AppOption {
 }
 
 // 应用选项 = 租户订阅应用 ∪ 当前已持有角色所在应用 ∪ 系统角色组（存在空 appID 角色时）。
-function buildAppOptions(apps: TenantAppItem[], roles: TenantUserRoleItem[]): AppOption[] {
+function buildAppOptions(apps: TenantSubscribedApplicationItem[], roles: TenantUserRoleItem[]): AppOption[] {
   const byId = new Map<string, string>()
   for (const a of apps) {
     byId.set(a.appID, a.name)
@@ -45,14 +45,14 @@ function buildAppOptions(apps: TenantAppItem[], roles: TenantUserRoleItem[]): Ap
  * 再勾选该应用下的角色；保存（PUT）仅全量替换该应用的角色，不影响其它应用。
  */
 export default function RoleAssignEditor({ kind, subjectID, onSaved }: RoleAssignEditorProps) {
-  const [apps, setApps] = useState<TenantAppItem[]>([])
+  const [apps, setApps] = useState<TenantSubscribedApplicationItem[]>([])
   const [roles, setRoles] = useState<TenantUserRoleItem[]>([]) // 当前已分配（全应用）
   const [loading, setLoading] = useState(true)
   const [appID, setAppID] = useState<string>()
   const [checked, setChecked] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
-  const loadApps = useCallback(async (): Promise<TenantAppItem[]> => {
+  const loadApps = useCallback(async (): Promise<TenantSubscribedApplicationItem[]> => {
     const resp = await getTenantApps().catch(() => null)
     return resp?.list || []
   }, [])

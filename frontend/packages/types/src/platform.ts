@@ -275,6 +275,11 @@ export interface TenantApplicationItem {
    */
   appSource?: AppSource
   status: TenantApplicationStatus
+  /**
+   * 该租户下已准入（user_application.status=enable）本应用的成员数。
+   * 停用/删除订阅会让这些成员失去本应用访问，故用于确认文案回显「影响人数」。
+   */
+  grantedUserCount?: number
   createdAt?: number
   updatedAt?: number
 }

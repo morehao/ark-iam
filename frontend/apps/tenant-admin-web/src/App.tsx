@@ -139,12 +139,17 @@ function App() {
 }
 
 // EmptyAccess 菜单为空（后端未下发任何权限菜单）时的空态占位，避免重定向到 404 或白屏。
+// 菜单为空有两类成因，提示必须同时覆盖：
+//   1) 应用准入缺失（P4 起「准入」是进入应用的前提，无准入者连登录都会被拒，
+//      故走到这里通常不是这一类，但重新分配后仍可能出现）；
+//   2) 有准入但该应用下未授予任何功能菜单（无角色 / 角色无菜单）。
 function EmptyAccess() {
   return (
     <div style={{ padding: 80, textAlign: 'center', color: tokens.textPlaceholder }}>
       <div style={{ fontSize: 40 }}>🔒</div>
-      <p>暂无可用菜单</p>
-      <p style={{ fontSize: 13 }}>当前账号未被授予任何菜单权限，请联系租户管理员。</p>
+      <p>你尚未被授予本应用的任何功能权限</p>
+      <p style={{ fontSize: 13 }}>当前账号没有可见菜单：可能是未获得本应用的准入，或已准入但未被授予任何菜单权限。</p>
+      <p style={{ fontSize: 13 }}>请联系所在租户的管理员分配应用准入与角色。</p>
     </div>
   )
 }

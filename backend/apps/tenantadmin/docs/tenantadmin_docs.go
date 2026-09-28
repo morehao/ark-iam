@@ -180,7 +180,7 @@ const docTemplatetenantadmin = `{
                 }
             }
         },
-        "/v1/tenant/apps": {
+        "/v1/tenant/applications": {
             "get": {
                 "consumes": [
                     "application/json"
@@ -189,9 +189,9 @@ const docTemplatetenantadmin = `{
                     "application/json"
                 ],
                 "tags": [
-                    "租户菜单"
+                    "租户应用"
                 ],
-                "summary": "当前租户订阅的启用应用列表（角色归属应用选项，含系统内置应用）",
+                "summary": "当前租户订阅的启用应用列表（角色归属 / 应用准入的应用选项，含系统内置应用）",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -204,7 +204,50 @@ const docTemplatetenantadmin = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/dtotenant.TenantAppsResp"
+                                            "$ref": "#/definitions/dtotenant.TenantApplicationsResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/tenant/applications/{appID}/users": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "租户应用"
+                ],
+                "summary": "应用视角：被准入使用该应用的成员列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "应用ID",
+                        "name": "appID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.ApplicationUsersListResp"
                                         }
                                     }
                                 }
@@ -1866,6 +1909,99 @@ const docTemplatetenantadmin = `{
                 }
             }
         },
+        "/v1/tenant/users/{userID}/applications": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "成员的应用准入清单（含本租户已订阅但未准入的应用，供 UI 呈现全集与选中态）",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "用户ID",
+                        "name": "userID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.UserApplicationsListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "全量替换成员的应用准入集合（集合外应用同时级联撤销其角色绑定）",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "用户ID",
+                        "name": "userID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "准入应用ID全集([]=清空全部准入)",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.UserApplicationsUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/v1/tenant/users/{userID}/identities": {
             "get": {
                 "consumes": [
@@ -2306,6 +2442,75 @@ const docTemplatetenantadmin = `{
                 },
                 "total": {
                     "description": "数据总条数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.ApplicationUserItem": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "description": "租户内姓名/服务账号名称",
+                    "type": "string"
+                },
+                "primaryEmail": {
+                    "description": "主要邮箱(服务账号为空)",
+                    "type": "string"
+                },
+                "roleCount": {
+                    "description": "该成员在此应用下的角色数",
+                    "type": "integer"
+                },
+                "source": {
+                    "description": "准入来源(manual/role/provision)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserApplicationSource"
+                        }
+                    ]
+                },
+                "status": {
+                    "description": "成员状态(active正常/suspended挂起)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserStatus"
+                        }
+                    ]
+                },
+                "updatedAt": {
+                    "description": "准入行更新时间",
+                    "type": "integer"
+                },
+                "userID": {
+                    "description": "成员ID",
+                    "type": "string"
+                },
+                "userType": {
+                    "description": "账号类型(member真实用户/machine服务账号)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserType"
+                        }
+                    ]
+                },
+                "username": {
+                    "description": "全局用户名(服务账号为空)",
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.ApplicationUsersListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "被准入成员列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.ApplicationUserItem"
+                    }
+                },
+                "total": {
+                    "description": "总条数",
                     "type": "integer"
                 }
             }
@@ -3255,7 +3460,7 @@ const docTemplatetenantadmin = `{
                 }
             }
         },
-        "dtotenant.TenantAppItem": {
+        "dtotenant.TenantApplicationItem": {
             "type": "object",
             "properties": {
                 "appID": {
@@ -3272,14 +3477,98 @@ const docTemplatetenantadmin = `{
                 }
             }
         },
-        "dtotenant.TenantAppsResp": {
+        "dtotenant.TenantApplicationsResp": {
             "type": "object",
             "properties": {
                 "list": {
                     "description": "应用列表",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dtotenant.TenantAppItem"
+                        "$ref": "#/definitions/dtotenant.TenantApplicationItem"
+                    }
+                }
+            }
+        },
+        "dtotenant.UserApplicationItem": {
+            "type": "object",
+            "properties": {
+                "appID": {
+                    "description": "应用ID",
+                    "type": "string"
+                },
+                "appStatus": {
+                    "description": "应用启停状态(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppStatus"
+                        }
+                    ]
+                },
+                "code": {
+                    "description": "应用编码",
+                    "type": "string"
+                },
+                "granted": {
+                    "description": "该成员是否已准入且启用",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "应用名称",
+                    "type": "string"
+                },
+                "roleCount": {
+                    "description": "该成员在此应用下的角色数(撤销确认文案用)",
+                    "type": "integer"
+                },
+                "source": {
+                    "description": "准入来源(manual/role/provision；无准入行为空)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserApplicationSource"
+                        }
+                    ]
+                },
+                "status": {
+                    "description": "准入状态(enable/disable；无准入行为空)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.UserApplicationStatus"
+                        }
+                    ]
+                },
+                "subscribed": {
+                    "description": "本租户是否订阅且启用",
+                    "type": "boolean"
+                },
+                "updatedAt": {
+                    "description": "准入行更新时间(无准入行时取订阅行时间)",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtotenant.UserApplicationsListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "应用准入清单（含未准入的订阅应用，供 UI 呈现全集与选中态）",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtotenant.UserApplicationItem"
+                    }
+                }
+            }
+        },
+        "dtotenant.UserApplicationsUpdateReq": {
+            "type": "object",
+            "required": [
+                "appIDs"
+            ],
+            "properties": {
+                "appIDs": {
+                    "description": "准入应用ID全集（[]=清空全部准入）",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
                     }
                 }
             }
@@ -3776,6 +4065,25 @@ const docTemplatetenantadmin = `{
                 }
             }
         },
+        "model.AppStatus": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-comments": {
+                "AppStatusDisable": "停用",
+                "AppStatusEnable": "启用"
+            },
+            "x-enum-descriptions": [
+                "启用",
+                "停用"
+            ],
+            "x-enum-varnames": [
+                "AppStatusEnable",
+                "AppStatusDisable"
+            ]
+        },
         "model.DeptNodeStatus": {
             "type": "string",
             "enum": [
@@ -4005,6 +4313,48 @@ const docTemplatetenantadmin = `{
             "x-enum-varnames": [
                 "SysAdminTypeAdmin",
                 "SysAdminTypeNormal"
+            ]
+        },
+        "model.UserApplicationSource": {
+            "type": "string",
+            "enum": [
+                "manual",
+                "role",
+                "provision"
+            ],
+            "x-enum-comments": {
+                "UserApplicationSourceManual": "租户管理员手工分配",
+                "UserApplicationSourceProvision": "引导/建租户随内置管理员写入",
+                "UserApplicationSourceRole": "角色授予时自动补齐（授权⇒准入）"
+            },
+            "x-enum-descriptions": [
+                "租户管理员手工分配",
+                "角色授予时自动补齐（授权⇒准入）",
+                "引导/建租户随内置管理员写入"
+            ],
+            "x-enum-varnames": [
+                "UserApplicationSourceManual",
+                "UserApplicationSourceRole",
+                "UserApplicationSourceProvision"
+            ]
+        },
+        "model.UserApplicationStatus": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-comments": {
+                "UserApplicationStatusDisable": "已撤销",
+                "UserApplicationStatusEnable": "已准入"
+            },
+            "x-enum-descriptions": [
+                "已准入",
+                "已撤销"
+            ],
+            "x-enum-varnames": [
+                "UserApplicationStatusEnable",
+                "UserApplicationStatusDisable"
             ]
         },
         "model.UserIdentityDetail": {

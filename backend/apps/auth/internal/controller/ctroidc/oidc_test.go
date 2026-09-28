@@ -12,7 +12,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
+	"github.com/morehao/ark-iam/auth/internal/service/svcoidc"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
+	"github.com/morehao/ark-iam/pkg/sso"
 )
 
 type fakeOIDCAuthSvc struct {
@@ -332,5 +334,68 @@ func TestLoginConfigMissingAuthRequestID(t *testing.T) {
 	}
 	if body.Code == 0 {
 		t.Fatal("expected non-zero code for missing authRequestID")
+	}
+}
+
+// TestSSOLoginRendersNoAppAccessPage 无应用准入（AC-5）：
+// 静默登录因「本客户端应用下没有任何有准入的租户」被拒时，必须直接渲染无权限页（403），
+// **不得**清 cookie 跳回登录页——重新登录仍是同一结论，会形成登录死循环。
+func TestSSOLoginRendersNoAppAccessPage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLoginBySession: func(ctx *gin.Context, authRequestID string, sessionID string) (string, error) {
+		return "", svcoidc.ErrSilentLoginNoAppAccess
+	}}}
+	engine.GET("/oidc/sso", ctr.SSOLogin)
+
+	req := httptest.NewRequest(http.MethodGet, "/oidc/sso?authRequestID=ar-1", nil)
+	req.AddCookie(&http.Cookie{Name: sso.SessionCookieName, Value: "session-1"})
+	resp := httptest.NewRecorder()
+	engine.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 no-permission page, got %d body=%s", resp.Code, resp.Body.String())
+	}
+	if ct := resp.Header().Get("Content-Type"); !strings.Contains(ct, "text/html") {
+		t.Fatalf("expected html content type, got %q", ct)
+	}
+	if !strings.Contains(resp.Body.String(), "你暂无该应用的访问权限") {
+		t.Fatalf("expected no-permission copy, got %s", resp.Body.String())
+	}
+	if loc := resp.Header().Get("Location"); loc != "" {
+		t.Fatalf("must not redirect to login page (login loop), got Location=%q", loc)
+	}
+	if sc := resp.Header().Get("Set-Cookie"); strings.Contains(sc, sso.SessionCookieName) {
+		t.Fatalf("must keep SSO session cookie untouched, got Set-Cookie=%q", sc)
+	}
+}
+
+// TestSSOLoginRedirectsToLoginOnOtherSilentLoginFailures 对照用例：
+// 其它静默登录失败（prompt=login / max_age 超期 / 会话失效）仍走「清 cookie 回登录页」——
+// 那是正确处置（重新认证可能通过），不能被无权限页的分支吞掉。
+func TestSSOLoginRedirectsToLoginOnOtherSilentLoginFailures(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	config.Conf = &pkgconfig.Config{
+		OIDC: pkgconfig.OIDC{FrontendLoginURL: "http://localhost:4000/oidc/login"},
+	}
+	engine := gin.New()
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLoginBySession: func(ctx *gin.Context, authRequestID string, sessionID string) (string, error) {
+		return "", errors.New("silent login not allowed")
+	}}}
+	engine.GET("/oidc/sso", ctr.SSOLogin)
+
+	req := httptest.NewRequest(http.MethodGet, "/oidc/sso?authRequestID=ar-1", nil)
+	req.AddCookie(&http.Cookie{Name: sso.SessionCookieName, Value: "session-1"})
+	resp := httptest.NewRecorder()
+	engine.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusFound {
+		t.Fatalf("expected 302 back to login page, got %d", resp.Code)
+	}
+	if loc := resp.Header().Get("Location"); !strings.Contains(loc, "http://localhost:4000/oidc/login") {
+		t.Fatalf("expected redirect to login page, got %q", loc)
+	}
+	if sc := resp.Header().Get("Set-Cookie"); !strings.Contains(sc, sso.SessionCookieName) {
+		t.Fatalf("expected SSO session cookie to be cleared, got Set-Cookie=%q", sc)
 	}
 }

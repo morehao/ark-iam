@@ -237,7 +237,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | GET/PUT/DELETE | `/v1/platform/tenants/{tenantID}` | 租户详情/更新/删除（**平台自运营租户 `t_platform` 禁删**，删除报 `100212`：它是平台控制台自身所在租户，删除即整栈失联且无恢复路径；判定按首次引导写入的固定编码 `t_platform`（`model.SeedPlatformTenantCode`）而非 `type`——控制台可建 `type=platform` 的普通租户） |
 | POST | `/v1/platform/tenants/{tenantID}/builtin-admin/reset-password` | 重置租户内置管理员密码（仅 `source=builtin`，即建租户时由平台创建的管理员；返回一次性临时密码并撤销其会话） |
 | POST | `/v1/platform/tenant-applications` | 开通租户-应用（**必带 `tenantID`** 指定归属租户；同租户同应用重复订阅报 `100747`，租户不存在报 `100205`，应用不存在报 `100735`） |
-| GET | `/v1/platform/tenant-applications` | 租户应用分页（`tenantID` 按归属租户筛选、留空＝全部租户；`status` 筛选状态；返回 `tenantName`/`appName`/`appSource` 便于回显与判定内置订阅） |
+| GET | `/v1/platform/tenant-applications` | 租户应用分页（`tenantID` 按归属租户筛选、留空＝全部租户；`status` 筛选状态；返回 `tenantName`/`appName`/`appSource` 便于回显与判定内置订阅，以及 `grantedUserCount`（int64，该租户下已准入本应用且 `user_application.status=enable` 的成员数：订阅一旦停用/删除这些成员即失去访问，故作为「停用/删除订阅」确认文案回显影响人数）） |
 | GET/PUT/DELETE | `/v1/platform/tenant-applications/{tenantAppID}` | 详情/更新/删除（平台侧跨租户运维：归属租户来自 `tenantID`/资源本身，不校验 ctx 租户，与 `/v1/platform/tenants` 同一信任模型；订阅不存在报 `100745`；**订阅的是内置应用（`appSource=builtin`）时禁删报 `100756`**——首次引导与 `ProvisionTenantAdmin` 系统开通的订阅删除后对应控制台会失去菜单，下线请改 `status=disable`） |
 
 > 租户编码 `code` 由服务端自动生成（规则 `t_<12 位随机 hex>`，如 `t_3f7a9c1d2e4b`，平台租户固定 `t_platform`），创建/更新入参无需传 `code`，创建后不可修改；列表支持 `GET /v1/platform/tenants?name=<关键词>&status=<active|suspended>`（`name` 按租户名模糊搜索，`status` 按状态精确筛选、留空不筛选、非法值报 `100209`），并返回 `createdAt`/`updatedAt`（秒级时间戳）。
@@ -296,7 +296,9 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | PATCH | `/v1/tenant/users/{userID}` | 局部更新（姓名/头像/状态 + primaryDepartmentID 换主部门不可清空 + secondaryDepartmentIDs/leaderDepartmentIDs 全量替换，nil=不变） |
 | POST | `/v1/tenant/users/{userID}/reset-password` | 重置密码（无入参，仅 `user_type=member`）：服务端生成临时密码写入关联 person，响应 `initialPassword` 仅此一次返回，并撤销该成员全部会话 |
 | GET | `/v1/tenant/users/{userID}/roles` | 用户已分配角色（用户侧授权入口；服务账号走 `/machine-users`） |
-| PUT | `/v1/tenant/users/{userID}/roles` | 全量替换用户角色 |
+| PUT | `/v1/tenant/users/{userID}/roles` | 全量替换用户角色（写角色会在同事务**自动补**该应用下的准入，`source=role`；撤销角色**不**回撤准入） |
+| GET | `/v1/tenant/users/{userID}/applications` | 成员的应用准入清单（`list[]` 含 `appID`/`code`/`name`/`appStatus`/`subscribed`/`granted`/`status`/`source`/`roleCount`/`updatedAt`；是「本租户订阅行 ∪ 该成员准入行」的并集，含未准入的订阅应用供 UI 呈现全集与选中态；需系统管理能力；查询失败报 `100785`）；明细见本节末「应用准入（准入层）端点明细」 |
+| PUT | `/v1/tenant/users/{userID}/applications` | 全量替换成员的应用准入集合（`appIDs` 为必填指针语义，`[]`＝清空全部准入；集合外原本 `enable` 的准入置 `disable`，并在**同一事务**内级联软删该应用下的 `user_role`（不变式 I2）；未订阅报 `100786`、撤销最后一个内置管理员的准入被拒报 `100787`、其他失败报 `100784`；`data` 为字符串；需系统管理能力） |
 | GET | `/v1/tenant/users/{userID}/identities` | 用户已绑定的第三方身份列表（身份按 person 归属，借道"该 person 在本租户有 user"做可见性校验） |
 | POST | `/v1/tenant/users/{userID}/identities` | 绑定第三方身份 {issuer, identityID, detail?}（租户取自登录上下文，不传 tenantID；同 issuer+identityID 全局唯一） |
 | DELETE | `/v1/tenant/users/{userID}/identities/{identityID}` | 解绑第三方身份 |
@@ -316,7 +318,8 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | POST | `/v1/tenant/invites` | 生成租户加入邀请（返回邀请码，供通道 B 使用） |
 | GET | `/v1/tenant/invites` | 邀请分页 |
 | DELETE | `/v1/tenant/invites/{inviteID}` | 撤销邀请 |
-| GET | `/v1/tenant/apps` | 租户订阅的启用应用列表（角色归属/菜单授权的应用选项，含系统内置应用） |
+| GET | `/v1/tenant/applications` | 当前租户订阅且启用的应用列表（角色归属 / 菜单授权 / 应用准入的应用选项，含系统内置应用；响应 `dtotenant.TenantApplicationsResp`，`list[]` 每行 `appID`/`code`/`name`）。**原 `GET /v1/tenant/apps` 已删除、无兼容别名**（前后端同仓发布） |
+| GET | `/v1/tenant/applications/{appID}/users` | 应用视角：被准入使用该应用的成员列表（`list[]` + `total`，仅返回该应用下 `user_application.status=enable` 的准入行；含服务账号；需系统管理能力；`appID` 不存在报 `100735`）；明细见本节末「应用准入（准入层）端点明细」 |
 | POST | `/v1/tenant/roles` | 创建角色（**appID 必选**，角色从属于已订阅应用，名称应用内唯一；**请求体不含 `code`**——跨系统授权契约值只能由应用角色模板下发，自建角色编码恒为空串、不进入 OIDC `groups` 声明，见 `system-design.md` §5.4。重名报 `100700`） |
 | GET | `/v1/tenant/roles` | 角色分页（?appID=&keyword=&unassigned=，含成员数/菜单数/所属应用名/编码；`keyword` 同时模糊匹配名称与编码；`unassigned=true` 只查未归属应用的系统角色，供角色授权下拉按名称服务端搜索） |
 | GET | `/v1/tenant/roles/{roleID}` | 角色详情（含 `code`：模板角色/产品锚点非空，自建角色为空串） |
@@ -335,6 +338,45 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | PUT | `/v1/tenant/departments/{departmentID}/users/{userID}` | 更新成员关系（relationType） |
 | DELETE | `/v1/tenant/departments/{departmentID}/users/{userID}` | 移除成员关系 |
 | GET | `/v1/tenant/menus/tree` | 租户动态菜单树 |
+
+**应用准入（准入层）端点明细**：三层语义为 **订阅**（租户层 `tenant_application`：租户是否开通该应用）→ **准入**（`user_application`：用户是否被准入某应用，**唯一准入事实源**）→ **授权**（应用内角色 / 菜单 `user_role`/`role_menu`）。判定式「可用 ⟺ `application.status=enable` ∧ `tenant_application.status=enable` ∧ `user_application.status=enable`」的**唯一实现**在 `pkg/core/application` 的 `Usable`（表达式）/ `CheckUsable`（点查）。下列三个端点均需系统管理能力（与 `/v1/tenant/users/{userID}/roles` 同口径）；其中成员视角的 `{userID}` 仅支持真实用户（`user_type=machine` 走 `/machine-users`，报 `100841`）。
+
+**`GET /v1/tenant/users/{userID}/applications`**（无查询参数与请求体，`userID` 取自 path）→ `dtotenant.UserApplicationsListResp`，`list[]` 每行：
+
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| `appID` | string | 应用 ID |
+| `code` | string | 应用编码 |
+| `name` | string | 应用名称 |
+| `appStatus` | string | 应用自身启停状态（`enable`/`disable`） |
+| `subscribed` | bool | 本租户是否**订阅且启用**该应用（订阅上界） |
+| `granted` | bool | 该成员是否**已准入且启用**（准入门槛） |
+| `status` | string | 该成员的准入状态（`enable`/`disable`；**无准入行为空串**） |
+| `source` | string | 准入来源（`manual`/`role`/`provision`；**无准入行为空串**） |
+| `roleCount` | int64 | 该成员在此应用下的角色数（撤销二次确认文案用） |
+| `updatedAt` | int64 | 秒级时间戳；**无准入行时取订阅行时间** |
+
+清单是「本租户订阅行 ∪ 该成员准入行」的**并集**——含未准入的订阅应用，供 UI 呈现全集与选中态；仅有准入行而订阅已被停用/删除的应用同样如实返回。查询失败报 `100785`。
+
+**`PUT /v1/tenant/users/{userID}/applications`**：请求体 `dtotenant.UserApplicationsUpdateReq`，唯一字段 `appIDs`（`[]string`，**必填指针语义**：字段缺失或传 `null` 报参数错误，传 `[]` 是合法的「清空全部准入」）。语义为**全量替换**：集合内 upsert 为 `enable`（`source=manual`）；**集合外且原本 `enable` 的应用置 `status=disable`（保留行）**，并在**同一事务内级联软删该应用下的 `user_role`**（不变式 I2：单向级联，只删被撤销应用的角色绑定，其他应用与角色行本身不动）；目标集合中任一应用「不存在 / 已停用 / 本租户未订阅」时整体拒绝报 `100786`（订阅是准入的上界），且预检先于写库、失败零写入。响应 `data` 为字符串（成功文案）；更新失败（含事务与系统错误兜底）报 `100784`；命中防自锁报 `100787`。相关不变式：写角色在同事务**自动补准入**（I1，`source=role`）而撤销角色**不**回撤准入；取消订阅**不**级联删除准入行（I3，重新订阅即恢复）；门禁只作用于人类令牌（I4，`client_credentials`/API Key 通道豁免）。
+
+**`GET /v1/tenant/applications/{appID}/users`**（`appID` 取自 path）→ `dtotenant.ApplicationUsersListResp`（`list[]` + `total`，**无分页，`total` 即本次返回条数**）：应用视角的**被准入成员**列表，**仅返回该应用下 `user_application.status=enable` 的成员**（含服务账号；不要求订阅当前仍启用）。`list[]` 每行：
+
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| `userID` | string | 成员 ID（`tenant_user.id`） |
+| `userType` | string | `member`（真实用户）/ `machine`（服务账号） |
+| `name` | string | 租户内姓名 / 服务账号名称 |
+| `username` | string | 全局用户名（服务账号恒为空串） |
+| `primaryEmail` | string | 主要邮箱（服务账号恒为空串） |
+| `status` | string | 成员状态（`active`/`suspended`），仅展示用 |
+| `source` | string | 准入来源（`manual`/`role`/`provision`） |
+| `roleCount` | int64 | 该成员在此应用下的角色数 |
+| `updatedAt` | int64 | 准入行更新时间（秒级时间戳） |
+
+`appID` 不存在报 `100735`；查询失败报 `100785`。
+
+**准入相关错误码**（本文档无独立错误码表，按 `pkg/code` 的 `1007xx` 段内联给出）：`100784` 应用准入更新失败、`100785` 应用准入清单查询失败、`100786` 应用未订阅（不满足订阅上界）、`100787` 不可撤销最后一个内置管理员的准入（防自锁，不变式 I5）。
 
 ---
 

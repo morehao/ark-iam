@@ -92,7 +92,7 @@ func seedTestMenuTree(t *testing.T, db *gorm.DB, tenantID string) (rootID, child
 
 // TestRoleCreateRequiresApp 角色从属于租户订阅的应用：非法应用拒绝、应用内名称唯一、跨应用/租户同名允许。
 func TestRoleCreateRequiresApp(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
 	seedTenantAdminOperator(t, db, "t1", "op")
 	seedTestApp(t, db, "t1", "app1")
@@ -123,7 +123,7 @@ func TestRoleCreateRequiresApp(t *testing.T) {
 // 绑定层也没有字段接收它，落库的自建角色编码恒为空串。这是"契约值归应用方"的编译期 + 运行期双重保证
 // ——自建角色因此不可能与模板角色/产品锚点撞码，也不可能自造一个值去命中下游已有策略。
 func TestRoleCreateCannotInjectCode(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.RoleMenuEntity{},
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{}, &model.RoleMenuEntity{},
 		&model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
 	seedTenantAdminOperator(t, db, "t1", "op")
@@ -155,7 +155,7 @@ func TestRoleCreateCannotInjectCode(t *testing.T) {
 // 都由应用方定义，租户不得改名——权威判定必须在服务层（前端置灰只是 UX 兜底），
 // 且不得因为「字段原样回传」而放行整条更新。
 func TestRoleUpdateBuiltinForbidden(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.RoleMenuEntity{},
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{}, &model.RoleMenuEntity{},
 		&model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
 	seedTenantAdminOperator(t, db, "t1", "op")
@@ -211,7 +211,7 @@ func TestRoleUpdateBuiltinForbidden(t *testing.T) {
 // TestRoleUpdateCustomRoleKeepsCode 自建角色的更新只作用于名称/描述：编码不在入参里，
 // 更新既不会写入也不会清掉存量行的编码（存量行可能带着历史编码）。
 func TestRoleUpdateCustomRoleKeepsCode(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.RoleMenuEntity{},
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{}, &model.RoleMenuEntity{},
 		&model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
 	seedTenantAdminOperator(t, db, "t1", "op")
@@ -247,7 +247,7 @@ func TestRoleUpdateCustomRoleKeepsCode(t *testing.T) {
 
 // TestRolePageListReturnsCode 列表回传编码（前端「编码」列直读），且关键词同时匹配名称与编码。
 func TestRolePageListReturnsCode(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.RoleMenuEntity{},
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{}, &model.RoleMenuEntity{},
 		&model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
 	seedTestApp(t, db, "t1", "app1")
@@ -280,7 +280,7 @@ func TestRolePageListReturnsCode(t *testing.T) {
 
 // TestRolePageListWithCounts 分页列表带成员数/菜单数聚合。
 func TestRolePageListWithCounts(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.RoleMenuEntity{},
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{}, &model.RoleMenuEntity{},
 		&model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
 	seedTestApp(t, db, "t1", "app1")
@@ -328,7 +328,7 @@ func TestRolePageListWithCounts(t *testing.T) {
 // TestRolePageListUnassigned 未归属应用的系统角色（app_id 为空串）必须能由服务端过滤：
 // 前端「系统角色」下拉若靠"全量拉一页再客户端过滤"，租户角色超过一页时会漏掉未归属角色。
 func TestRolePageListUnassigned(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.RoleMenuEntity{},
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{}, &model.RoleMenuEntity{},
 		&model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
 	seedTestApp(t, db, "t1", "app1")
@@ -364,7 +364,7 @@ func TestRolePageListUnassigned(t *testing.T) {
 
 // TestRoleMenusUpdateAndGet 角色菜单授权：按角色所属应用菜单授权 + 回显 + 非法菜单拒绝。
 func TestRoleMenusUpdateAndGet(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.RoleMenuEntity{}, &model.MenuEntity{}, &model.UserRoleEntity{},
+	db := testutil.SetupSQLite(t, &model.RoleEntity{}, &model.RoleMenuEntity{}, &model.MenuEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{},
 		&model.ApplicationEntity{}, &model.TenantApplicationEntity{})
 	svc := &roleSvc{}
 	seedTenantAdminOperator(t, db, "t1", "op")

@@ -50,7 +50,7 @@ func seedTestUserWithPerson(t *testing.T, db *gorm.DB, userID, tenantID, personI
 // 仅姓名→创建仅含姓名的自然人；提供标识→新建 person（姓名即自然人姓名）；标识命中已有 person→关联复用；同租户重复→拒绝。
 // 用户必属部门：所有创建均携带 departmentIDs（t1→o1、t2→o2）。
 func TestUserCreateFindOrCreatePerson(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
 	svc := &userSvc{}
 
 	// 部门（用户必属部门）：t1 拥有 o1，t2 拥有 o2
@@ -172,7 +172,7 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 // TestUserCreateRequiresDepartment 业务约束：创建用户必须从属于至少一个部门
 // （departmentIDs 必传，缺失或为空一律拒绝；提供合法部门则正常创建）。
 func TestUserCreateRequiresDepartment(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
 	svc := &userSvc{}
 	ginCtx := newAdminCtx(t, db, "t1", "op")
 
@@ -219,7 +219,7 @@ func TestUserCreateRequiresDepartment(t *testing.T) {
 
 // TestUserCreateWithDepartments 创建用户时建立行政主部门(primary,至多1)与负责关系(leader,可多)。
 func TestUserCreateWithDepartments(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
 	svc := &userSvc{}
 
 	now := time.Now()
@@ -483,7 +483,7 @@ func TestUserDetailWithDepartmentsAndRoles(t *testing.T) {
 
 // TestUserUpdateRolesFullReplace 全量替换用户角色。
 func TestUserUpdateRolesFullReplace(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
 	svc := &userSvc{}
 	seedTestUserWithPerson(t, db, "u1", "t1", "", "张三")
 
@@ -537,7 +537,7 @@ func TestUserUpdateRolesFullReplace(t *testing.T) {
 // TestUserUpdateRolesScopedByApp 按应用粒度替换：仅替换目标应用下的角色，其它应用不受影响；
 // 清空仅清空该应用；跨应用/跨租户授予被拒。
 func TestUserUpdateRolesScopedByApp(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
 	svc := &userSvc{}
 	seedTestUserWithPerson(t, db, "u1", "t1", "", "张三")
 
@@ -624,7 +624,7 @@ func TestUserUpdateRolesScopedByApp(t *testing.T) {
 
 // TestUserCreateWithLeaderDepts 创建用户同时建立行政主部门(primary)、参与部门(secondary)与负责部门(leader)。
 func TestUserCreateWithLeaderDepts(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
 	svc := &userSvc{}
 
 	for _, deptID := range []string{"o1", "o2", "o3"} {
@@ -687,7 +687,7 @@ func TestUserCreateWithLeaderDepts(t *testing.T) {
 // TestUserUpdateDepartments 编辑用户时更新主/参与/负责部门：
 // primary 替换、secondary/leader 全量替换、leader 冲突拒绝。
 func TestUserUpdateDepartments(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
 	svc := &userSvc{}
 
 	for _, deptID := range []string{"o1", "o2", "o3"} {
@@ -776,7 +776,7 @@ func TestUserUpdateDepartments(t *testing.T) {
 // TestUserUpdateContact 编辑成员联系方式：更新 person 的邮箱/手机号/用户名，
 // 校验邮箱与手机号二选一、以及全局唯一性冲突。
 func TestUserUpdateContact(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
 	svc := &userSvc{}
 
 	if err := db.Create(&model.DepartmentEntity{
@@ -1056,5 +1056,71 @@ func TestUserResetPasswordRejectsMachineUser(t *testing.T) {
 	}
 	if stored.PasswordEncrypted != "machine-hash" {
 		t.Fatalf("machine user password must not be touched, got %q", stored.PasswordEncrypted)
+	}
+}
+
+// TestUserUpdateRolesGrantsAppAccess 不变式 I1/I2 的写路径一致性（用户侧）：
+//   - 授予某应用角色 → 同一事务内补齐该应用准入（source=role）；
+//   - 清空某应用角色属「撤销授权」，**不**反向撤销准入（单向级联，避免与 I1 形成回环）；
+//   - 从未授予过角色的应用被清空时，不得凭空产生准入行。
+func TestUserUpdateRolesGrantsAppAccess(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
+	svc := &userSvc{}
+	seedTestUserWithPerson(t, db, "u1", "t1", "", "张三")
+	for _, r := range []struct{ id, appID string }{{"ra", "app-a"}, {"rb", "app-b"}} {
+		if err := db.Create(&model.RoleEntity{
+			BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: r.id}},
+			TenantID:   "t1",
+			AppID:      r.appID,
+			Name:       r.id,
+		}).Error; err != nil {
+			t.Fatalf("seed role %s: %v", r.id, err)
+		}
+	}
+	ginCtx := newAdminCtx(t, db, "t1", "op")
+
+	grantOf := func(appID string) *model.UserApplicationEntity {
+		t.Helper()
+		entity := &model.UserApplicationEntity{}
+		err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ? AND app_id = ?", "t1", "u1", appID).First(entity).Error
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			t.Fatalf("query grant %s: %v", appID, err)
+		}
+		return entity
+	}
+
+	// 1) 授予 app-a 角色 → 同事务补准入（enable/role）
+	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-a", RoleIDs: []string{"ra"}}); err != nil {
+		t.Fatalf("grant app-a role: %v", err)
+	}
+	if g := grantOf("app-a"); g == nil || g.Status != model.UserApplicationStatusEnable || g.Source != model.UserApplicationSourceRole {
+		t.Fatalf("授权后应出现 enable/role 准入，got %+v", g)
+	}
+
+	// 2) 清空 app-a 角色 → 准入保留（撤销授权不反向撤准入）
+	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-a", RoleIDs: []string{}}); err != nil {
+		t.Fatalf("clear app-a roles: %v", err)
+	}
+	if g := grantOf("app-a"); g == nil || g.Status != model.UserApplicationStatusEnable {
+		t.Fatalf("清除角色不得反向撤销准入，got %+v", g)
+	}
+	var remainRoleIDs []string
+	if err := db.WithContext(ginCtx).Model(&model.UserRoleEntity{}).
+		Where("tenant_id = ? AND user_id = ?", "t1", "u1").Pluck("role_id", &remainRoleIDs).Error; err != nil {
+		t.Fatalf("query user_role: %v", err)
+	}
+	if len(remainRoleIDs) != 0 {
+		t.Fatalf("app-a 的角色绑定应被清空，got %v", remainRoleIDs)
+	}
+
+	// 3) 从未授权过角色的 app-b 被清空 → 不产生准入（撤销授权 ≠ 授权）
+	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-b", RoleIDs: nil}); err != nil {
+		t.Fatalf("clear app-b roles: %v", err)
+	}
+	if g := grantOf("app-b"); g != nil {
+		t.Fatalf("清空未授权应用不得凭空产生准入，got %+v", g)
 	}
 }

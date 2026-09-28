@@ -19,9 +19,9 @@ func seedTestOperator(t *testing.T, tenantID string, super bool) *model.UserEnti
 	t.Helper()
 	db := dbclient.IamDB(context.Background())
 	op := &model.UserEntity{
-		TenantID:   tenantID,
-		UserType:   model.UserTypeMember,
-		Name:       "operator",
+		TenantID: tenantID,
+		UserType: model.UserTypeMember,
+		Name:     "operator",
 	}
 	if err := db.Create(op).Error; err != nil {
 		t.Fatalf("seed operator: %v", err)
@@ -74,7 +74,7 @@ func seedTestDept(t *testing.T, tenantID, name string) *model.DepartmentEntity {
 // 创建(需 super+主部门) → 列表主部门 → 详情归属 → 改主部门/清参与 → 挂起 → 角色(禁授 super) →
 // 删除(有 key 拒绝;成功后级联清理角色与部门关系)。
 func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{},
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{},
 		&model.ApplicationEntity{}, &model.ApiKeyEntity{}, &model.PersonEntity{},
 		&model.DepartmentEntity{}, &model.DepartmentUserEntity{})
 	tenantID := "t1"
@@ -244,6 +244,16 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-tenant", RoleIDs: []string{devRole.ID}}); err != nil {
 		t.Fatalf("grant dev role: %v", err)
 	}
+	// 不变式 I1：服务账号与真实成员同口径——授予角色即同事务补齐该应用准入（enable/role）
+	machineGrant := &model.UserApplicationEntity{}
+	if err := db.WithContext(newTestTenantCtx(tenantID, adminOp.ID)).
+		Where("tenant_id = ? AND user_id = ? AND app_id = ?", tenantID, machineID, "app-tenant").
+		First(machineGrant).Error; err != nil {
+		t.Fatalf("machine app access missing after role assign: %v", err)
+	}
+	if machineGrant.Status != model.UserApplicationStatusEnable || machineGrant.Source != model.UserApplicationSourceRole {
+		t.Fatalf("machine app access expect enable/role, got %+v", machineGrant)
+	}
 	adminRole := &model.RoleEntity{
 		TenantID: tenantID, AppID: "app-tenant", Name: "租户管理员",
 		Source: model.RoleSourceBuiltin, AdminType: model.SysAdminTypeAdmin,
@@ -338,9 +348,9 @@ func TestServiceAccountCannotBeLeader(t *testing.T) {
 	adminOp := seedTestOperator(t, tenantID, true)
 	dept := seedTestDept(t, tenantID, "研发部")
 	machine := &model.UserEntity{
-		TenantID:   tenantID,
-		UserType:   model.UserTypeMachine,
-		Name:       "svc-pay",
+		TenantID: tenantID,
+		UserType: model.UserTypeMachine,
+		Name:     "svc-pay",
 	}
 	if err := dbclient.IamDB(context.Background()).Create(machine).Error; err != nil {
 		t.Fatalf("seed machine: %v", err)
@@ -371,5 +381,56 @@ func TestServiceAccountCannotBeLeader(t *testing.T) {
 		RelationType: model.DeptUserRelationLeader,
 	}); err != code.GetError(code.UserMemberOperationOnlyError) {
 		t.Fatalf("converge machine to leader: want member-operation-only, got %v", err)
+	}
+}
+
+// TestMachineUserUpdateRolesGrantsAppAccess 锁定 I1 在**服务账号**路径上同样成立（AC-6）：
+// 服务账号与真实成员共用 user_id=tenant_user.id 的口径，本次确实授予角色时必须同事务补出
+// enable/role 准入；清空角色属撤销授权，不反向撤准入（与 userSvc 的用例对称）。
+func TestMachineUserUpdateRolesGrantsAppAccess(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
+	tenantID := "t1"
+	adminOp := seedTestOperator(t, tenantID, true)
+	ginCtx := newTestTenantCtx(tenantID, adminOp.ID)
+
+	// 服务账号（user_type=machine，与成员同行同表）
+	machine := &model.UserEntity{TenantID: tenantID, UserType: model.UserTypeMachine, Name: "svc-pay"}
+	if err := db.Create(machine).Error; err != nil {
+		t.Fatalf("seed machine user: %v", err)
+	}
+	role := &model.RoleEntity{TenantID: tenantID, AppID: "app-a", Name: "自定义角色"}
+	if err := db.Create(role).Error; err != nil {
+		t.Fatalf("seed role: %v", err)
+	}
+
+	svc := NewMachineUserSvc()
+	if err := svc.UpdateRoles(ginCtx, &dtotenant.MachineUserRolesUpdateReq{
+		MachineUserID: machine.ID, AppID: "app-a", RoleIDs: []string{role.ID},
+	}); err != nil {
+		t.Fatalf("grant role to machine user: %v", err)
+	}
+
+	grant := &model.UserApplicationEntity{}
+	if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ? AND app_id = ?", tenantID, machine.ID, "app-a").
+		First(grant).Error; err != nil {
+		t.Fatalf("授权后应出现准入行: %v", err)
+	}
+	if grant.Status != model.UserApplicationStatusEnable || grant.Source != model.UserApplicationSourceRole {
+		t.Fatalf("服务账号准入应为 enable/role，got status:%s source:%s", grant.Status, grant.Source)
+	}
+
+	// 清空角色 → 准入保留（撤销授权不反向撤准入）
+	if err := svc.UpdateRoles(ginCtx, &dtotenant.MachineUserRolesUpdateReq{
+		MachineUserID: machine.ID, AppID: "app-a", RoleIDs: []string{},
+	}); err != nil {
+		t.Fatalf("clear machine user roles: %v", err)
+	}
+	kept := &model.UserApplicationEntity{}
+	if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ? AND app_id = ?", tenantID, machine.ID, "app-a").
+		First(kept).Error; err != nil {
+		t.Fatalf("清空角色后准入行应保留: %v", err)
+	}
+	if kept.Status != model.UserApplicationStatusEnable {
+		t.Fatalf("清空角色不应反向撤准入，got status:%s", kept.Status)
 	}
 }

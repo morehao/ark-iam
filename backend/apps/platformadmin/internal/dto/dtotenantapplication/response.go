@@ -25,8 +25,11 @@ type PageListItem struct {
 	AppName     string                        `json:"appName"`     // 应用名称
 	AppSource   model.AppSource               `json:"appSource"`   // 所属应用来源（builtin=内置应用，其订阅由系统开通、不可删除）
 	Status      model.TenantApplicationStatus `json:"status"`      // 状态
-	CreatedAt   int64                         `json:"createdAt"`   // 创建时间(unix 秒)
-	UpdatedAt   int64                         `json:"updatedAt"`   // 更新时间(unix 秒)
+	// GrantedUserCount 该租户下已准入（user_application.status=enable）该应用的成员数。
+	// 订阅停用/删除会让这些成员失去访问，故作为确认文案里的「影响人数」回显。
+	GrantedUserCount int64 `json:"grantedUserCount"` // 已准入成员数
+	CreatedAt        int64 `json:"createdAt"`        // 创建时间(unix 秒)
+	UpdatedAt        int64 `json:"updatedAt"`        // 更新时间(unix 秒)
 }
 
 type TenantApplicationPageListResp struct {

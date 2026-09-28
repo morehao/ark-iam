@@ -34,9 +34,9 @@ func newSeedDB(t *testing.T, apps []appSeedApp) *gorm.DB {
 		&model.PersonEntity{}, &model.TenantEntity{}, &model.UserEntity{}, &model.DepartmentEntity{},
 		&model.DepartmentUserEntity{},
 		&model.ApplicationClientEntity{}, &model.ApplicationEntity{},
-		// 建租户链路还会写入租户自服务的角色/授权/订阅（权限开通）
+		// 建租户链路还会写入租户自服务的角色/授权/订阅（权限开通）与管理员应用准入（不变式 I1）
 		&model.MenuEntity{}, &model.RoleEntity{}, &model.RoleMenuEntity{},
-		&model.TenantApplicationEntity{}, &model.UserRoleEntity{},
+		&model.TenantApplicationEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{},
 	)
 	// 权限开通依赖租户管理后台应用（真实环境由 pkg/seed 写入）
 	if err := db.Create(&model.ApplicationEntity{Code: tenant.ProvisionAppSeedKey, SeedKey: tenant.ProvisionAppSeedKey, Name: "租户管理后台", Status: model.AppStatusEnable}).Error; err != nil {

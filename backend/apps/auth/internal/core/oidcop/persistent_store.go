@@ -194,6 +194,9 @@ func (s *PersistentStore) refreshWithGrace(currentRefreshToken string) (rotation
 type persistentStoreOption struct {
 	// issuer 为 OP 的 issuer，构造 OIDCClient 时注入，用于生成 LoginURL。
 	issuer string
+	// enforceAppAccess 是否在令牌签发前校验「成员是否被准入该客户端所属应用」（不变式 I4）。
+	// 零值即关闭：未配置时保持历史行为，与配置项 oidc.enforceAppAccess 同步。
+	enforceAppAccess bool
 }
 
 // PersistentStoreOption 允许调用方为持久化存储注入配置。
@@ -204,7 +207,16 @@ func WithIssuer(issuer string) PersistentStoreOption {
 	return func(o *persistentStoreOption) { o.issuer = issuer }
 }
 
+// WithAppAccessEnforcement 开关「令牌签发兜底门禁」：开启后，人令牌（授权码流/刷新流）
+// 在租户状态校验之后追加应用准入校验（见 appAccessTokenGate）。
+// 只作用于人令牌——client_credentials / API Key 分支没有自然人主体，不进此门禁（I4）。
+func WithAppAccessEnforcement(enforce bool) PersistentStoreOption {
+	return func(o *persistentStoreOption) { o.enforceAppAccess = enforce }
+}
+
 type PersistentStore struct {
+	// enforceAppAccess 见 persistentStoreOption.enforceAppAccess。
+	enforceAppAccess           bool
 	applicationClientDao       func(opts ...dao.DaoOption) *dao.ApplicationClientDao
 	applicationClientSecretDao func(opts ...dao.DaoOption) *dao.ApplicationClientSecretDao
 	personDao                  func(opts ...dao.DaoOption) *dao.PersonDao
@@ -241,6 +253,7 @@ func NewPersistentStore(opts ...PersistentStoreOption) *PersistentStore {
 		userRoleDao:                dao.NewUserRoleDao,
 		roleDao:                    dao.NewRoleDao,
 		issuer:                     cfg.issuer,
+		enforceAppAccess:           cfg.enforceAppAccess,
 		db:                         dbclient.IamDB,
 		rotationGrace:              make(map[string]refreshGraceEntry),
 		rotationInflight:           make(map[string]chan struct{}),

@@ -12,6 +12,7 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
 
+	"github.com/morehao/ark-iam/pkg/core/application"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
@@ -200,37 +201,54 @@ func (s *OIDCStorage) GetPrivateClaimsFromRequest(ctx context.Context, request o
 		return claims.OIDCPrivateClaims(), nil
 	}
 	// authorization_code：优先用认证流程确定的租户。
-	// 挂起租户以 access_denied 拒绝签发。
+	// 挂起租户以 access_denied 拒绝签发；租户正常但成员未被准入该客户端所属应用同样拒绝。
 	if authReq, ok := request.(*AuthRequest); ok {
-		if claims, err := s.personPrivateClaims(ctx, authReq.GetTenantID(), authReq.GetSubject(), authReq.SessionID, oidc.ErrAccessDenied()); claims != nil || err != nil {
+		if claims, err := s.personPrivateClaims(ctx, personClaimsRequest{
+			tenantID: authReq.GetTenantID(), subject: authReq.GetSubject(), sessionID: authReq.SessionID,
+			clientID: authReq.GetClientID(),
+		}, oidc.ErrAccessDenied()); claims != nil || err != nil {
 			return claims, err
 		}
 	}
 	// refresh token 轮换：保留存储的租户，避免重新落到 users[0]。
-	// 落在挂起租户以 invalid_grant 拒绝，促使 RP 丢弃该 refresh token。
+	// 落在挂起租户以 invalid_grant 拒绝，促使 RP 丢弃该 refresh token；准入被撤销同样拒绝，
+	// 使「撤销准入」在下一个刷新周期内即时生效（不必等 token 自然过期）。
 	if rr, ok := request.(*refreshTokenRequest); ok {
-		if claims, err := s.personPrivateClaims(ctx, rr.GetTenantID(), rr.GetSubject(), rr.GetSessionID(), oidc.ErrInvalidGrant()); claims != nil || err != nil {
+		if claims, err := s.personPrivateClaims(ctx, personClaimsRequest{
+			tenantID: rr.GetTenantID(), subject: rr.GetSubject(), sessionID: rr.GetSessionID(),
+			clientID: rr.GetClientID(),
+		}, oidc.ErrInvalidGrant()); claims != nil || err != nil {
 			return claims, err
 		}
 	}
 	return s.GetPrivateClaimsFromScopes(ctx, request.GetSubject(), getClientIDFromRequest(request), restrictedScopes)
 }
 
-// personPrivateClaims 依据 (租户, 自然人) 定位 tenant_user 行并产出人令牌私有声明。
+// personClaimsRequest personPrivateClaims 的入参：一次令牌签发请求中与准入/声明相关的最小信息。
+// clientID 用于解析客户端所属应用（准入门禁的命名空间边界），刷新流与授权码流取值口径一致。
+type personClaimsRequest struct {
+	tenantID  string
+	subject   string
+	sessionID string
+	clientID  string
+}
+
+// personPrivateClaims 依据 (租户, 自然人, 客户端) 定位 tenant_user 行并产出人令牌私有声明。
 //
 // 返回 (nil, nil) 表示"该请求没有可用的租户/自然人上下文"，由调用方决定回退路径。
-// 三项声明一次性给出，避免"同一个语义在三处各写一遍"：
+// 四项声明一次性给出，避免"同一个语义在三处各写一遍"：
 //   - tenant_id：目标租户（协议流程解析得出，非调用方当前租户，故显式声明作用域）；
 //   - user_id：**tenant_user.id**，下游审计操作者的唯一口径；
 //   - person_id：自然人 ID，便于下游在无库访问时识别主体；
 //   - sid：会话标识，供 RP 匹配会话粒度的 back-channel 登出（M4）。
 //
-// suspendedErr 是租户被挂起时的协议错误（授权码流 access_denied、刷新流 invalid_grant）。
-func (s *OIDCStorage) personPrivateClaims(ctx context.Context, tenantID, subject, sessionID string, suspendedErr *oidc.Error) (map[string]any, error) {
+// denyErr 是租户被挂起或应用准入被拒时的协议错误（授权码流 access_denied、刷新流 invalid_grant）。
+func (s *OIDCStorage) personPrivateClaims(ctx context.Context, req personClaimsRequest, denyErr *oidc.Error) (map[string]any, error) {
+	tenantID := req.tenantID
 	if tenantID == "" {
 		return nil, nil
 	}
-	personID, perr := ParseSubject(subject)
+	personID, perr := ParseSubject(req.subject)
 	if perr != nil {
 		return nil, nil
 	}
@@ -246,14 +264,19 @@ func (s *OIDCStorage) personPrivateClaims(ctx context.Context, tenantID, subject
 	if len(users) == 0 {
 		return nil, nil
 	}
-	if tErr := s.tenantTokenGate(ctx, tenantID, suspendedErr); tErr != nil {
+	if tErr := s.tenantTokenGate(ctx, tenantID, denyErr); tErr != nil {
 		return nil, tErr
+	}
+	// 应用准入门禁（兜底）：租户正常但成员未被准入该客户端所属应用时拒绝签发。
+	// 放在租户门禁之后：租户级问题优先报租户错误，便于区分"租户挂了"与"没权限"。
+	if aErr := s.appAccessTokenGate(ctx, tenantID, users[0].ID, req.clientID, denyErr); aErr != nil {
+		return nil, aErr
 	}
 	claims := objauth.TokenClaims{
 		TenantID:      tenantID,
 		UserID:        users[0].ID,
 		PersonIDClaim: users[0].PersonID,
-		SessionID:     sessionID,
+		SessionID:     req.sessionID,
 	}.OIDCPrivateClaims()
 	return claims, nil
 }
@@ -278,6 +301,48 @@ func (s *OIDCStorage) tenantTokenGate(ctx context.Context, tenantID string, susp
 	if !tenantEntity.IsActive() {
 		glog.Warnf(ctx, "[oidcop.tenantTokenGate] reject token for inactive tenant, tenantID:%s", tenantID)
 		return suspendedErr.WithDescription("tenant is suspended")
+	}
+	return nil
+}
+
+// AppAccessEnforced 应用准入门禁是否开启。
+// 供 auth 登录期读路径（svcoidc）复用**同一个开关来源**：否则会出现
+// 「令牌签发看持久化存储的选项、登录期看全局配置」的双源漂移。
+func (s *OIDCStorage) AppAccessEnforced() bool {
+	return s.persistentStore.enforceAppAccess
+}
+
+// appAccessTokenGate 令牌签发前的应用准入门禁（不变式 I4：只作用于人令牌）。
+//
+// 判定式唯一实现在 pkg/core/application（订阅启用 ∧ 应用启用 ∧ 准入启用），本处只负责
+// 解析客户端所属应用并 fail-closed 地拒绝：
+//   - 开关关闭 → 直接放行，行为等价于门禁上线前（AC-13）；
+//   - client_id 为空 / 客户端不存在 / 客户端未绑定应用 → 拒绝（应用作用域不明即不许签发，
+//     与 appendRoleGroupClaims 的 fail-closed 同口径）；
+//   - 判定查询出错 → 如实上抛（系统错误不伪装成"无权限"）。
+//
+// denyErr 由调用方按授权类型给定（授权码流 access_denied、刷新流 invalid_grant）。
+func (s *OIDCStorage) appAccessTokenGate(ctx context.Context, tenantID, userID, clientID string, denyErr *oidc.Error) error {
+	if !s.persistentStore.enforceAppAccess {
+		return nil
+	}
+	appID, err := s.persistentStore.resolveClientAppID(ctx, clientID)
+	if err != nil {
+		glog.Errorf(ctx, "[oidcop.appAccessTokenGate] resolve client app fail, clientID:%s, tenantID:%s, err:%v", clientID, tenantID, err)
+		return err
+	}
+	if appID == "" {
+		glog.Warnf(ctx, "[oidcop.appAccessTokenGate] client has no bound application, reject token, clientID:%s, tenantID:%s", clientID, tenantID)
+		return denyErr.WithDescription("client is not bound to an application")
+	}
+	usable, err := application.CheckUsable(ctx, tenantID, userID, appID)
+	if err != nil {
+		glog.Errorf(ctx, "[oidcop.appAccessTokenGate] check app access fail, clientID:%s, tenantID:%s, userID:%s, appID:%s, err:%v", clientID, tenantID, userID, appID, err)
+		return err
+	}
+	if !usable {
+		glog.Warnf(ctx, "[oidcop.appAccessTokenGate] reject token for member without app access, clientID:%s, tenantID:%s, userID:%s, appID:%s", clientID, tenantID, userID, appID)
+		return denyErr.WithDescription("member is not granted access to the application")
 	}
 	return nil
 }

@@ -3,6 +3,7 @@ package ctroidc
 import (
 	"context"
 	"crypto/rsa"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -209,6 +210,30 @@ func setSSOSessionCookie(ctx *gin.Context, sessionID string) {
 	sso.SetSessionCookie(ctx, sso.SessionCookieName, sessionID, ttl, domain, secure, sameSite)
 }
 
+// noAppAccessHTML 无应用准入提示页（静默登录被拒时渲染，HTTP 403）。
+// 纯静态文案：不回显 client_id / authRequestID 等参数，避免反射型注入。
+const noAppAccessHTML = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>无访问权限</title>
+<style>
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+background:#f5f6f8;color:#1f2329;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif}
+.card{max-width:440px;padding:40px 36px;background:#fff;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.06);text-align:center}
+h1{margin:0 0 12px;font-size:20px}
+p{margin:0;font-size:14px;line-height:1.7;color:#646a73}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>你暂无该应用的访问权限</h1>
+<p>你所在的租户未向你授予此应用的准入权限，请联系所在租户的管理员分配后再试。</p>
+</div>
+</body>
+</html>`
+
 func (ctr *OIDCCtr) SSOLogin(ctx *gin.Context) {
 	authRequestID := ctx.Query("authRequestID")
 	if authRequestID == "" {
@@ -225,6 +250,13 @@ func (ctr *OIDCCtr) SSOLogin(ctx *gin.Context) {
 
 	continueURL, err := ctr.oidcAuthSvc.CompleteLoginBySession(ctx, authRequestID, sessionID)
 	if err != nil {
+		// 无应用准入（本次客户端应用下没有任何有准入的租户）：直接渲染提示页。
+		// 不能走下面「清 cookie 回登录页」的分支——重新登录仍会得到同一结论，会形成登录死循环（AC-5）。
+		if errors.Is(err, svcoidc.ErrSilentLoginNoAppAccess) {
+			ctx.Header("Content-Type", "text/html; charset=utf-8")
+			ctx.String(http.StatusForbidden, noAppAccessHTML)
+			return
+		}
 		domain := ""
 		secure := false
 		sameSite := sso.DefaultSameSite

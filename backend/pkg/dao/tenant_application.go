@@ -10,6 +10,7 @@ type TenantApplicationCond struct {
 	*gormdao.BaseCond
 	TenantID string
 	AppID    string
+	AppIDs   []string // 批量点查（准入替换的预检一次校验多个应用）
 	Status   model.TenantApplicationStatus
 }
 
@@ -22,6 +23,9 @@ func (c *TenantApplicationCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.AppID != "" {
 		db.Where(tableName+".app_id = ?", c.AppID)
+	}
+	if len(c.AppIDs) > 0 {
+		db.Where(tableName+".app_id IN ?", c.AppIDs)
 	}
 	if c.Status != "" {
 		db.Where(tableName+".status = ?", c.Status)

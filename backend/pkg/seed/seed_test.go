@@ -62,6 +62,7 @@ func TestBootstrapSQLite(t *testing.T) {
 	assertCount("tenant_user", 1)
 	assertCount("application_client", 2)
 	assertCount("user_role", 2)
+	assertCount("user_application", 2)
 	assertCount("role_menu", 14)
 	assertCount("tenant_application", 2)
 	assertCount("department", 1)
@@ -106,6 +107,27 @@ func TestBootstrapSQLite(t *testing.T) {
 	}
 	if tenantAdminRole.Code != model.RoleCodeTenantAdmin {
 		t.Fatalf("seed tenant_admin role code mismatch: %+v", tenantAdminRole)
+	}
+
+	// 不变式 I1：平台管理员对两个内置应用的准入必须齐备——platform_admin 由 seedAdminUserRole
+	// 直接写 user_role 时补，tenant_admin 由 ProvisionTenantAdmin 补。缺任一条，
+	// 门禁开启后平台将无人能登录、且界面无法自救。
+	var grants []model.UserApplicationEntity
+	if err := db.Find(&grants).Error; err != nil {
+		t.Fatalf("query user_application: %v", err)
+	}
+	grantByAppID := map[string]model.UserApplicationEntity{}
+	for _, g := range grants {
+		grantByAppID[g.AppID] = g
+	}
+	for _, appName := range []string{"平台管理后台", "租户管理后台"} {
+		g, ok := grantByAppID[appIDByName[appName]]
+		if !ok {
+			t.Fatalf("平台管理员缺少 %s 应用准入（grant 缺失即门禁开启后无法登录）", appName)
+		}
+		if g.Status != model.UserApplicationStatusEnable || g.Source != model.UserApplicationSourceProvision {
+			t.Fatalf("%s 应用准入 expect enable/provision, got %+v", appName, g)
+		}
 	}
 
 	// tenant_admin 预授权租户管理后台应用全部 4 个菜单

@@ -8,6 +8,7 @@ func RegisterRouter(groups *ginserver.RouterGroups) {
 	departmentRouter(groups)
 	roleRouter(groups)
 	tenantMenuRouter(groups)
+	applicationRouter(groups)
 	apiKeyRouter(groups)
 	inviteRouter(groups)
 }

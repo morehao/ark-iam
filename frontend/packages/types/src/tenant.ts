@@ -1,7 +1,7 @@
 // tenantadmin 领域类型（与 backend/apps/tenantadmin/internal/dto/dtotenant 对齐）
 
 import type { UserDepartmentItem } from './department'
-import type { MenuItem, SysAdminType } from './platform'
+import type { AppStatus, MenuItem, SysAdminType } from './platform'
 
 /**
  * 租户成员可用性（后端具名类型 model.UserStatus）：active-正常 / suspended-已挂起。
@@ -111,10 +111,65 @@ export interface TenantUserLoginLogItem {
 }
 
 // ---------- 租户订阅应用 ----------
-export interface TenantAppItem {
+/**
+ * 租户已订阅且启用的应用（角色归属 / 菜单授权 / 应用准入的应用候选）。
+ * 接口：`GET /v1/tenant/applications`（原 `/tenant/apps` 已下线）。
+ */
+export interface TenantSubscribedApplicationItem {
   appID: string
   code: string
   name: string
+}
+
+// ---------- 用户应用准入（准入层：用户 × 应用） ----------
+/** 准入状态（后端具名类型 model.UserApplicationStatus）：撤销用 disable，行保留以备审计 */
+export type UserApplicationStatus = 'enable' | 'disable'
+/** 准入来源（后端具名类型 model.UserApplicationSource）：manual-手工分配 / role-角色授予自动补 / provision-引导写入 */
+export type UserApplicationSource = 'manual' | 'role' | 'provision'
+
+/**
+ * 用户视角的单个应用准入行。清单是「本租户订阅行 ∪ 该成员准入行」的并集：
+ * `subscribed`（租户已订阅且启用）/ `granted`（该成员已准入且启用）是两道门槛，
+ * 二者为真且 `appStatus === 'enable'` 才真正可用（后端判定式 CanUseApp）。
+ */
+export interface TenantUserApplicationItem {
+  appID: string
+  code: string
+  name: string
+  appStatus: AppStatus
+  subscribed: boolean
+  granted: boolean
+  /** 无准入行时为空串 */
+  status: UserApplicationStatus | ''
+  /** 无准入行时为空串 */
+  source: UserApplicationSource | ''
+  /** 该成员在此应用下的角色数：撤销准入会级联撤销这些角色绑定，用于二次确认文案 */
+  roleCount: number
+  updatedAt: number
+}
+
+/** 用户应用准入清单（含未准入的订阅应用，供 UI 呈现全集与选中态） */
+export interface TenantUserApplicationsListResp {
+  list: TenantUserApplicationItem[]
+}
+
+/** 应用视角的被准入成员行（仅含已准入成员） */
+export interface TenantApplicationUserItem {
+  userID: string
+  /** 账号类型（后端具名类型 model.UserType）：member-真实用户 / machine-服务账号 */
+  userType: 'member' | 'machine'
+  name: string
+  username: string
+  primaryEmail: string
+  status: UserStatus
+  source: UserApplicationSource
+  roleCount: number
+  updatedAt: number
+}
+
+export interface TenantApplicationUsersListResp {
+  list: TenantApplicationUserItem[]
+  total: number
 }
 
 // ---------- 租户角色 ----------

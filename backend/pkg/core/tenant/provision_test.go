@@ -25,6 +25,7 @@ func newProvisionTestDB(t *testing.T) *gorm.DB {
 		&model.RoleMenuEntity{},
 		&model.TenantApplicationEntity{},
 		&model.UserRoleEntity{},
+		&model.UserApplicationEntity{},
 	))
 	t.Cleanup(func() {
 		if sqlDB, sqlErr := db.DB(); sqlErr == nil {
@@ -82,14 +83,22 @@ func TestProvisionTenantAdmin_CreatesSubscriptionRoleMenusAndGrant(t *testing.T)
 	require.Equal(t, ProvisionAdminType, role.AdminType)
 	require.True(t, role.IsBuiltinAdmin())
 
-	// 应用订阅 1 + 角色 1 + 授权 4 + 管理员绑定 1
+	// 应用订阅 1 + 角色 1 + 授权 4 + 管理员绑定 1 + 管理员应用准入 1（不变式 I1）
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.TenantApplicationEntity{}, "tenant_id = ? AND app_id = ?", "t1", app.ID))
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.RoleEntity{}, "tenant_id = ? AND app_id = ? AND source = ?", "t1", app.ID, model.RoleSourceBuiltin))
 	require.Equal(t, int64(len(ProvisionMenuSeedKeys)), countProvisionRows(t, db, &model.RoleMenuEntity{}, "tenant_id = ? AND role_id = ?", "t1", role.ID))
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.UserRoleEntity{}, "tenant_id = ? AND user_id = ? AND role_id = ?", "t1", "u1", role.ID))
 
+	// 管理员应用准入：开通链路给管理员授权即隐含准入（source=provision），
+	// 否则新建租户的管理员有角色却因缺 grant 进不去控制台（门禁默认拒绝且界面无法自救）。
+	grant := &model.UserApplicationEntity{}
+	require.NoError(t, db.Where("tenant_id = ? AND user_id = ? AND app_id = ?", "t1", "u1", app.ID).First(grant).Error)
+	require.Equal(t, model.UserApplicationStatusEnable, grant.Status)
+	require.Equal(t, model.UserApplicationSourceProvision, grant.Source)
+
 	// 租户隔离：不得污染其他租户
 	require.Equal(t, int64(0), countProvisionRows(t, db, &model.RoleEntity{}, "tenant_id = ?", "t2"))
+	require.Equal(t, int64(0), countProvisionRows(t, db, &model.UserApplicationEntity{}, "tenant_id = ?", "t2"))
 }
 
 func TestProvisionTenantAdmin_Idempotent(t *testing.T) {
@@ -103,12 +112,14 @@ func TestProvisionTenantAdmin_Idempotent(t *testing.T) {
 	second, err := ProvisionTenantAdmin(ctx, db, req)
 	require.NoError(t, err)
 
-	// 重复执行必须命中同一角色，且各表行数不变（四张表均无唯一索引，靠应用层查重）
+	// 重复执行必须命中同一角色，且各表行数不变（除 user_application 有部分唯一索引外，
+	// 其余表均无唯一索引，靠应用层查重）
 	require.Equal(t, first.ID, second.ID)
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.TenantApplicationEntity{}, "tenant_id = ? AND app_id = ?", "t1", app.ID))
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.RoleEntity{}, "tenant_id = ?", "t1"))
 	require.Equal(t, int64(len(ProvisionMenuSeedKeys)), countProvisionRows(t, db, &model.RoleMenuEntity{}, "tenant_id = ?", "t1"))
 	require.Equal(t, int64(1), countProvisionRows(t, db, &model.UserRoleEntity{}, "tenant_id = ?", "t1"))
+	require.Equal(t, int64(1), countProvisionRows(t, db, &model.UserApplicationEntity{}, "tenant_id = ? AND user_id = ?", "t1", "u1"))
 }
 
 // TestProvisionTenantAdmin_BackfillsAdminType 存量库内置角色被误置为普通类型时，

@@ -131,6 +131,13 @@ type OIDC struct {
 	// 用户的 SSO 中心会话活性（HasActiveSession）。开启后"一处登出、处处登出"
 	// 在请求粒度即时生效；要求业务应用与 auth 共享同一认证 Redis。
 	EnableSSOSessionValidation bool `yaml:"enableSSOSessionValidation"`
+	// EnforceAppAccess 控制是否启用「应用准入门禁」（user_application）：
+	// 登录期（CompleteLogin/SelectTenant/静默登录）与令牌签发兜底（personPrivateClaims）
+	// 都会按判定式 application.Usable 校验，失败 fail-closed。
+	// **默认 false**：本能力分三步上线（铺数据 → 观察 → 开门禁），关闭时 user_application
+	// 照常写入但读取点不生效，行为等价于现状（AC-13）；回滚只需改回 false（秒级）。
+	// 长期残留开关属技术债，仅作上线期临时手段。
+	EnforceAppAccess bool `yaml:"enforceAppAccess"`
 	// BackChannelLogoutPath 是本应用挂载 back-channel logout 接收端的基础路径
 	// （默认 /oidc/bc-logout）。
 	BackChannelLogoutPath string `yaml:"backChannelLogoutPath"`

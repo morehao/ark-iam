@@ -57,6 +57,46 @@ type UserRolesListResp struct {
 	List []UserRoleItem `json:"list"` // 角色列表
 }
 
+// ---------- 应用准入（用户子资源） ----------
+
+// UserApplicationItem 用户视角的单个应用准入行。
+// 清单是「本租户订阅行 ∪ 该成员准入行」的并集：`subscribed`/`granted` 分别表达两道门槛，
+// 二者同时为真才真正可用（应用自身停用同样不可用，由 `appStatus` 表达）。
+type UserApplicationItem struct {
+	AppID      string                      `json:"appID"`      // 应用ID
+	Code       string                      `json:"code"`       // 应用编码
+	Name       string                      `json:"name"`       // 应用名称
+	AppStatus  model.AppStatus             `json:"appStatus"`  // 应用启停状态(enable/disable)
+	Subscribed bool                        `json:"subscribed"` // 本租户是否订阅且启用
+	Granted    bool                        `json:"granted"`    // 该成员是否已准入且启用
+	Status     model.UserApplicationStatus `json:"status"`     // 准入状态(enable/disable；无准入行为空)
+	Source     model.UserApplicationSource `json:"source"`     // 准入来源(manual/role/provision；无准入行为空)
+	RoleCount  int64                       `json:"roleCount"`  // 该成员在此应用下的角色数(撤销确认文案用)
+	UpdatedAt  int64                       `json:"updatedAt"`  // 准入行更新时间(无准入行时取订阅行时间)
+}
+
+type UserApplicationsListResp struct {
+	List []UserApplicationItem `json:"list"` // 应用准入清单（含未准入的订阅应用，供 UI 呈现全集与选中态）
+}
+
+// ApplicationUserItem 应用视角的被准入成员行。
+type ApplicationUserItem struct {
+	UserID       string                      `json:"userID"`       // 成员ID
+	UserType     model.UserType              `json:"userType"`     // 账号类型(member真实用户/machine服务账号)
+	Name         string                      `json:"name"`         // 租户内姓名/服务账号名称
+	Username     string                      `json:"username"`     // 全局用户名(服务账号为空)
+	PrimaryEmail string                      `json:"primaryEmail"` // 主要邮箱(服务账号为空)
+	Status       model.UserStatus            `json:"status"`       // 成员状态(active正常/suspended挂起)
+	Source       model.UserApplicationSource `json:"source"`       // 准入来源(manual/role/provision)
+	RoleCount    int64                       `json:"roleCount"`    // 该成员在此应用下的角色数
+	UpdatedAt    int64                       `json:"updatedAt"`    // 准入行更新时间
+}
+
+type ApplicationUsersListResp struct {
+	List  []ApplicationUserItem `json:"list"`  // 被准入成员列表
+	Total int64                 `json:"total"` // 总条数
+}
+
 // ---------- 第三方身份（用户子资源） ----------
 
 type UserIdentityItem struct {

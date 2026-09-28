@@ -3674,6 +3674,10 @@ const docTemplateplatformadmin = `{
                     "description": "创建时间(unix 秒)",
                     "type": "integer"
                 },
+                "grantedUserCount": {
+                    "description": "GrantedUserCount 该租户下已准入（user_application.status=enable）该应用的成员数。\n订阅停用/删除会让这些成员失去访问，故作为确认文案里的「影响人数」回显。",
+                    "type": "integer"
+                },
                 "status": {
                     "description": "状态",
                     "allOf": [

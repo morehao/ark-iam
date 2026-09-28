@@ -54,7 +54,7 @@ func TestTenantAppsIncludeSubscribedBuiltInApp(t *testing.T) {
 	}
 
 	ginCtx := newDeptGinCtx(t, "t1", "op")
-	resp, err := NewTenantMenuSvc().Apps(ginCtx)
+	resp, err := NewApplicationAccessSvc().ListTenantApplications(ginCtx)
 	if err != nil {
 		t.Fatalf("apps: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestTenantAppsExcludeDisabledApplication(t *testing.T) {
 		t.Fatalf("disable application: %v", err)
 	}
 
-	resp, err := NewTenantMenuSvc().Apps(newDeptGinCtx(t, "t1", "op"))
+	resp, err := NewApplicationAccessSvc().ListTenantApplications(newDeptGinCtx(t, "t1", "op"))
 	if err != nil {
 		t.Fatalf("apps: %v", err)
 	}

@@ -17,6 +17,9 @@ func userRouter(groups *ginserver.RouterGroups) {
 	// 用户角色（用户侧授权入口）
 	v1RouterGroup.GET("/users/:userID/roles", userCtr.ListRoles)
 	v1RouterGroup.PUT("/users/:userID/roles", userCtr.UpdateRoles)
+	// 用户应用准入（准入层唯一写入口：无角色的应用同样在此授权）
+	v1RouterGroup.GET("/users/:userID/applications", userCtr.ListApplications)
+	v1RouterGroup.PUT("/users/:userID/applications", userCtr.UpdateApplications)
 	// 用户第三方身份（用户视角子资源）
 	v1RouterGroup.GET("/users/:userID/identities", userCtr.ListIdentities)
 	v1RouterGroup.POST("/users/:userID/identities", userCtr.CreateIdentity)

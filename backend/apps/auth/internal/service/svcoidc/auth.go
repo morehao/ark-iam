@@ -2,6 +2,7 @@ package svcoidc
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -30,6 +31,30 @@ type OIDCAuthSvc interface {
 // 由 SSOLogin 处理为清除 SSO cookie 并跳回登录页重新认证。
 var errSilentLoginNotAllowed = errors.New("silent login not allowed")
 
+// ErrSilentLoginNoAppAccess 标记静默登录被拒且原因是「本客户端所属应用下没有任何有准入的租户」。
+// 与 errSilentLoginNotAllowed 刻意分开：后者清 cookie 回登录页是正确处置（重新认证可能通过），
+// 而准入缺失重新登录仍是同一结论，若同样回登录页会形成登录死循环（AC-5）。
+// SSOLogin 用 errors.Is 识别本哨兵并直接渲染无权限提示页，不动 SSO 会话。
+var ErrSilentLoginNoAppAccess = errors.New("silent login: no tenant grants access to client app")
+
+// writeAppAccessDeniedAudit 记录一次「因应用准入被拒」的登录尝试（best-effort）。
+//
+// 为什么必须落审计而不只打日志：AC-4 要求"过滤后为空时有明确文案 + 审计"，且灰度 P3 的退出
+// 判据是"准入拒绝次数持平于预期"——该指标的唯一可查来源就是这张表（detail 里带
+// reason:no app access，可按动作 + 结果 + detail 聚合）。写库失败由 audit.WriteAudit 自行兜底，
+// 不影响拒绝结果本身。
+func writeAppAccessDeniedAudit(ctx *gin.Context, personID, clientID, tenantID string) {
+	audit.WriteAudit(ctx, audit.AuditEntry{
+		Action:     audit.ActionLogin,
+		TenantID:   tenantID,
+		Result:     model.AuditResultFailure,
+		TargetType: model.AuditTargetTypePerson,
+		TargetID:   personID,
+		ClientID:   clientID,
+		Detail:     fmt.Sprintf("personID:%s, clientID:%s, reason:no app access", personID, clientID),
+	})
+}
+
 // mapAuthRequestError 区分"授权票据不存在"与"存储故障"：
 // 前者返回 OIDCSessionNotFound（客户端可重试登录），后者返回 OIDCServerError（服务端问题）。
 func mapAuthRequestError(err error) error {
@@ -40,6 +65,16 @@ func mapAuthRequestError(err error) error {
 }
 
 // containsPrompt 判断 prompt 参数是否包含指定值。
+// findTenantOption 在租户选项集合中定位指定租户。
+func findTenantOption(tenants []objauth.TenantOption, tenantID string) (objauth.TenantOption, bool) {
+	for _, option := range tenants {
+		if option.TenantID == tenantID {
+			return option, true
+		}
+	}
+	return objauth.TenantOption{}, false
+}
+
 func containsPrompt(prompts []string, target string) bool {
 	for _, p := range prompts {
 		if p == target {
@@ -113,6 +148,21 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 			AllowPersonCreateTenant: allow,
 		}, nil
 	}
+	// 应用准入（P5-4/P5-5）：只把「本次登录客户端所属应用下已被准入」的租户呈现给用户，
+	// 避免选中一个必然失败的租户；一个都没有时当场早拒（不发 code、不建 SSO 会话）。
+	clientID := clientIDFromAuthRequest(authReq)
+	usableTenants, fErr := svc.filterTenantsByClientApp(ctx, clientID, tenants)
+	if fErr != nil {
+		glog.Errorf(ctx, "[oidcAuthSvc.CompleteLogin] filter tenants by app access fail, err:%v, clientID:%s", fErr, clientID)
+		return nil, code.GetError(code.OIDCServerError)
+	}
+	if svc.appAccessEnforced() && len(usableTenants) == 0 {
+		glog.Warnf(ctx, "[oidcAuthSvc.CompleteLogin] no tenant grants access to client app, clientID:%s, tenantCount:%d", clientID, len(tenants))
+		writeAppAccessDeniedAudit(ctx, personEntity.ID, clientID, "")
+		return nil, code.GetError(code.AuthAppAccessDeniedError)
+	}
+	tenants = usableTenants
+
 	authTime := time.Now()
 	subject := oidcop.BuildSubject(personEntity.ID)
 	// 优先尊重 ?tenant hint（如 SSO 会话过期后回退到密码登录时），但仅当 hint 是 person 的成员租户时才采用
@@ -141,6 +191,25 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	tenantID := resolvedTenant
 	if tenantID == "" {
 		tenantID = userEntity.TenantID
+	}
+	// 落地租户必须在本应用下有准入：单租户场景上面已过滤，hint 场景已收窄到可用集合，
+	// 但 userEntity.TenantID 可能指向可用集合之外的租户（多成员关系下取"当前成员行"），故再点查一次。
+	if svc.appAccessEnforced() {
+		option, ok := findTenantOption(usableTenants, tenantID)
+		if !ok {
+			glog.Warnf(ctx, "[oidcAuthSvc.CompleteLogin] resolved tenant has no app access, clientID:%s, tenantID:%s", clientID, tenantID)
+			writeAppAccessDeniedAudit(ctx, personEntity.ID, clientID, tenantID)
+			return nil, code.GetError(code.AuthAppAccessDeniedError)
+		}
+		usable, aErr := svc.canUseClientApp(ctx, clientID, option)
+		if aErr != nil {
+			glog.Errorf(ctx, "[oidcAuthSvc.CompleteLogin] check app access fail, err:%v, clientID:%s, tenantID:%s", aErr, clientID, tenantID)
+			return nil, code.GetError(code.OIDCServerError)
+		}
+		if !usable {
+			writeAppAccessDeniedAudit(ctx, personEntity.ID, clientID, tenantID)
+			return nil, code.GetError(code.AuthAppAccessDeniedError)
+		}
 	}
 	if err := svc.provider.Storage.CompleteAuthRequest(ctx, req.AuthRequestID, subject, authTime, []string{"pwd"}, "", tenantID, true); err != nil {
 		return nil, mapAuthRequestError(err)
@@ -208,6 +277,24 @@ func (svc *oidcAuthSvc) SelectTenant(ctx *gin.Context, authRequestID string, ten
 	if !ok {
 		return nil, code.GetError(code.TenantNotExistError)
 	}
+	// 应用准入（P5-4）：所选租户必须在本客户端所属应用下被准入，否则早拒（不发 code、不建 SSO 会话）。
+	// 每次选择都重新判定——租户选项可能是登录页较早渲染的旧列表。
+	if svc.appAccessEnforced() {
+		option, found := findTenantOption(tenants, tenantID)
+		if !found {
+			return nil, code.GetError(code.TenantNotExistError)
+		}
+		usable, aErr := svc.canUseClientApp(ctx, authReq.GetClientID(), option)
+		if aErr != nil {
+			glog.Errorf(ctx, "[oidcAuthSvc.SelectTenant] check app access fail, err:%v, clientID:%s, tenantID:%s", aErr, authReq.GetClientID(), tenantID)
+			return nil, code.GetError(code.OIDCServerError)
+		}
+		if !usable {
+			glog.Warnf(ctx, "[oidcAuthSvc.SelectTenant] tenant has no app access, clientID:%s, tenantID:%s", authReq.GetClientID(), tenantID)
+			writeAppAccessDeniedAudit(ctx, personID, authReq.GetClientID(), tenantID)
+			return nil, code.GetError(code.AuthAppAccessDeniedError)
+		}
+	}
 	if err := svc.provider.Storage.CompleteAuthRequest(reqCtx, authRequestID, authReq.GetSubject(), authReq.GetAuthTime(), authReq.GetAMR(), "", tenantID, true); err != nil {
 		return nil, mapAuthRequestError(err)
 	}
@@ -256,9 +343,22 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID s
 	tenantID := ""
 	tenants, tErr := svc.authSvc.TenantsForPerson(ctx, personID)
 	if tErr == nil {
+		clientID := clientIDFromAuthRequest(authReq)
+		// 应用准入（P5-6）：只在「本客户端所属应用下有准入」的租户里选，避免静默登录落到
+		// 一个必然被令牌门禁拒绝的租户；一个都没有时返回专用哨兵，由 SSOLogin 渲染无权限页。
+		usableTenants, fErr := svc.filterTenantsByClientApp(ctx, clientID, tenants)
+		if fErr != nil {
+			glog.Errorf(ctx, "[oidcAuthSvc.CompleteLoginBySession] filter tenants by app access fail, err:%v, clientID:%s", fErr, clientID)
+			return "", fErr
+		}
+		if svc.appAccessEnforced() && len(usableTenants) == 0 {
+			glog.Warnf(ctx, "[oidcAuthSvc.CompleteLoginBySession] no tenant grants access to client app, clientID:%s, personID:%s", clientID, personID)
+			writeAppAccessDeniedAudit(ctx, personID, clientID, "")
+			return "", ErrSilentLoginNoAppAccess
+		}
 		if ar, ok := authReq.(*oidcop.AuthRequest); ok {
 			if hint := ar.GetTenantID(); hint != "" {
-				for _, t := range tenants {
+				for _, t := range usableTenants {
 					if t.TenantID == hint {
 						tenantID = hint
 						break
@@ -267,8 +367,8 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID s
 			}
 		}
 		// membership safety: never issue a token for a tenant hinted but not owned by the user
-		if tenantID == "" && len(tenants) > 0 {
-			tenantID = tenants[0].TenantID
+		if tenantID == "" && len(usableTenants) > 0 {
+			tenantID = usableTenants[0].TenantID
 		}
 	}
 

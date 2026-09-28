@@ -17,7 +17,7 @@
 | 外部身份 | User Identity | person 在外部身份源（Connector）中的身份映射（issuer + external_subject） |
 | 多租户 | Multi-tenant | 一个 person 可同时属于多个租户；登录时需选择租户（或由 `tenant` hint 指定） |
 | 挂起 | Suspended | person/user 被停用，禁止登录（`person.status` / `tenant_user.status` = `suspended`；旧 `is_suspended` 布尔列已下线） |
-| 启停状态 | Enable Status | 全局统一的「启用/停用」词汇：`enable` 启用 / `disable` 停用。凡表达「这条记录还能不能参与业务」的字段一律用它——`application.status`、`application_client.status`、`tenant_application.status`、`department.status`、`connector.status`、`menu.status` 均属此类，禁止再出现 `active`/`inactive`/`enabled` 等同义异写。**布尔开关一律具名枚举化**：同名的 `...Flag` / `...Policy` 列（如 `menu.hidden`、`application_client.require_pkce`、`connector.allow_account_link`）同样是 `enable`/`disable` 的 `varchar(16)` 列 + 具名类型 + 常量，禁止用 Go `bool` 表达字典语义、禁止裸字面量 |
+| 启停状态 | Enable Status | 全局统一的「启用/停用」词汇：`enable` 启用 / `disable` 停用。凡表达「这条记录还能不能参与业务」的字段一律用它——`application.status`、`application_client.status`、`tenant_application.status`、`user_application.status`、`department.status`、`connector.status`、`menu.status` 均属此类，禁止再出现 `active`/`inactive`/`enabled` 等同义异写。**布尔开关一律具名枚举化**：同名的 `...Flag` / `...Policy` 列（如 `menu.hidden`、`application_client.require_pkce`、`connector.allow_account_link`）同样是 `enable`/`disable` 的 `varchar(16)` 列 + 具名类型 + 常量，禁止用 Go `bool` 表达字典语义、禁止裸字面量 |
 | 租户状态 | Tenant Status | 租户**生命周期**状态（`tenant.status`）：`active` 正常 / `suspended` 已挂起，属生命周期词汇而**不是**启停状态（`suspended` 有「禁止该租户成员登录与签发令牌」的独立语义，降级为 `disable` 会丢失语义）。仅 active 允许其成员登录、签发与轮换令牌；挂起会撤销该租户成员的 refresh token 与 SSO 会话；禁止挂起操作者自己所在的租户（不可逆自锁） |
 
 ## 二、部门与归属
@@ -72,12 +72,13 @@
 
 | 术语 | 英文 | 说明 |
 |---|---|---|
+| 准入 ✅ | Entitlement / App Access | **「某用户可否使用某应用」的唯一事实源**（表 `user_application`：`tenant_id`、`user_id`（引用 `tenant_user.id`，含成员与服务账号）、`app_id`、`status`、`source`；唯一性靠部分唯一索引 `uk_user_application_active (tenant_id, user_id, app_id) WHERE deleted_at IS NULL`，软删后可重授）。与**订阅**（租户层，表 `tenant_application`：租户是否开通该应用）与**授权**（应用内角色/菜单，表 `user_role`/`role_menu`：进入应用后能做什么）是三层不同语义。判定式 `可用 ⟺ application.status=enable ∧ tenant_application.status=enable ∧ user_application.status=enable`，唯一实现在 `backend/pkg/core/application/access.go` 的 `Usable`（表达式）/`CheckUsable`（点查）；`status` 是具名枚举 `model.UserApplicationStatus`（`enable`/`disable`，撤销＝置 `disable` 且**保留行**），`source` 是具名枚举 `model.UserApplicationSource`（`manual` 手工分配 / `role` 角色授予自动补齐 / `provision` 引导写入）。**与订阅的差别**：订阅是准入的**上界**——未订阅时准入必然无效（违反即拒绝写入，报 `100786`），但已写入的准入行**保留**，重新订阅即自动恢复（不变式 I3，取消订阅不级联删除准入行）。**与授权的差别**：授权不产生可用性，只有准入是门槛——写角色会在同事务**自动补准入**（不变式 I1，`source=role`），而撤销角色**不**回撤准入（单向）。常见误用：把「已订阅」当成「成员可用」、把「有角色」当成「能登录」 |
 | 角色 ✅ | Role | 权限载体（租户内、按应用 `app_id` 作用域）。两套标识刻意分离：`code`（**跨系统授权契约值**，即 OIDC `groups` 取值，见下「角色编码」）+ `name`（应用内可读标识，同一应用内唯一）；另以 `source`（builtin 内置 / custom 自定义）区分产生方式、以 `admin_type`（admin / normal）标记**系统管理能力**（内置角色的 `admin_type` 禁改） |
 | 角色编码 ✅ | Role Code | 下游按「`claim_prefix` + 编码」认自己的策略名，因此它是契约而非展示名。**只有两个来源**：产品锚点（`platform_admin`/`tenant_admin`）与**应用角色模板**（`application.role_template`，开通应用时物化到各租户）；**租户侧没有写入入口**——自建角色的编码恒为空串、不进入 `groups` 声明。下游策略是全局命名实体（一条策略全租户共用），若允许租户写编码，任何租户管理员都能造出一个撞上既有策略的编码从而自提权，详见 `application-integration-guide.md` §3.4 |
 | 应用角色模板 ✅ | Application Role Template | 应用对外的契约角色清单（`application.role_template` = `[{code,name}]`，≤64 项、编码模板内唯一且不得占用产品锚点）。它是**单一事实源**：开通应用时物化到租户（`source=builtin`、租户侧只读），更新时对已开通租户做差量同步——**移除即从各租户撤下该角色并级联删除其成员/菜单授权**（故平台控制台必须二次确认）。它取代了早先的「保留编码」层 |
 | 菜单 ✅ | Menu | 前端可访问的菜单/路由（树形，按应用 `app_id` 管理；`visibility` 分 public/member/admin 可见性门槛） |
-| 用户-角色 ✅ | User-Role | 用户与角色的多对多关联（表 `user_role`） |
-| 角色-菜单 ✅ | Role-Menu | 角色可访问菜单的授权（表 `role_menu`） |
+| 用户-角色 ✅ | User-Role | 用户与角色的多对多关联（表 `user_role`）；属**授权层**——授权不产生可用性：写角色会在同事务**自动补**该应用下的准入（`source=role`），撤销角色**不**回撤准入；某用户能否使用该应用只由「准入」判定（见上） |
+| 角色-菜单 ✅ | Role-Menu | 角色可访问菜单的授权（表 `role_menu`）；属**授权层**，是**准入之后**的应用内可见范围，不参与「能否登录/使用该应用」的判定（见上「准入」） |
 
 > 资源级权限（权限点 Scope / 资源 Resource / 角色-权限点 Role-Scope）**已从 IAM 移除**，相关表与接口不再存在；IAM 的授权粒度到「角色—菜单」，业务细粒度鉴权由各业务应用自行实现。
 
