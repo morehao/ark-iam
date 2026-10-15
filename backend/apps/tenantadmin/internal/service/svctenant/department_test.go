@@ -81,7 +81,7 @@ func newCustomAdminCtx(t *testing.T, db *gorm.DB, tenantID, userID string) *gin.
 }
 
 func TestDepartmentCreateRootAndChildPaths(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
 	ginCtx := newDeptGinCtx(t, "41", "1001")
 	seedTenantAdminOperator(t, db, "41", "1001")
 
@@ -124,7 +124,7 @@ func TestDepartmentCreateRootAndChildPaths(t *testing.T) {
 }
 
 func TestDepartmentMoveCascadesPathAndRejectsCycle(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
 	ginCtx := newDeptGinCtx(t, "41", "1001")
 	seedTenantAdminOperator(t, db, "41", "1001")
 
@@ -183,7 +183,7 @@ func TestDepartmentMoveCascadesPathAndRejectsCycle(t *testing.T) {
 }
 
 func TestDepartmentDeleteRejectsWithChildrenAndCascade(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
 	ginCtx := newDeptGinCtx(t, "41", "1001")
 	seedTenantAdminOperator(t, db, "41", "1001")
 
@@ -218,7 +218,7 @@ func TestDepartmentDeleteRejectsWithChildrenAndCascade(t *testing.T) {
 }
 
 func TestDepartmentUserMemberSingletonAndValidTypes(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
 	ginCtx := newDeptGinCtx(t, "41", "1001")
 	seedTenantAdminOperator(t, db, "41", "1001")
 	seedTestUser(t, db, "41", "u1", "用户一")
@@ -303,7 +303,7 @@ func TestDepartmentUserMemberSingletonAndValidTypes(t *testing.T) {
 }
 
 func TestDepartmentUserCrossTenantRejected(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
 	ginCtx := newDeptGinCtx(t, "41", "1001")
 	seedTenantAdminOperator(t, db, "41", "1001")
 	seedTestUser(t, db, "41", "u1", "用户一")
@@ -326,7 +326,7 @@ func TestDepartmentUserCrossTenantRejected(t *testing.T) {
 }
 
 func TestDepartmentChildrenPageAndHasChildren(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	db := testutil.SetupSQLite(t, &model.DepartmentEntity{}, &model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
 	ginCtx := newDeptGinCtx(t, "41", "1001")
 	seedTenantAdminOperator(t, db, "41", "1001")
 

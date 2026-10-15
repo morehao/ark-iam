@@ -14,7 +14,7 @@ import (
 // TestApiKeyServiceAccountOnly 验证 API 密钥已收敛为「仅服务账号」管理模型：
 // 创建/列表/吊销/删除均为系统管理操作；普通成员无任何密钥通道（个人密钥已下线）。
 func TestApiKeyServiceAccountOnly(t *testing.T) {
-	testutil.SetupSQLite(t, &model.ApiKeyEntity{}, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	testutil.SetupSQLite(t, &model.ApiKeyEntity{}, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
 	tenantID := "t1"
 	adminOp := seedTestOperator(t, tenantID, true)
 	memberOp := seedTestOperator(t, tenantID, false)
@@ -123,7 +123,7 @@ func TestApiKeyServiceAccountOnly(t *testing.T) {
 
 // TestApiKeyDeleteRequiresAdmin 验证密钥删除仅限系统管理能力（服务账号不可自登录，无"本人自管"通道）。
 func TestApiKeyDeleteRequiresAdmin(t *testing.T) {
-	testutil.SetupSQLite(t, &model.ApiKeyEntity{}, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+	testutil.SetupSQLite(t, &model.ApiKeyEntity{}, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})
 	tenantID := "t1"
 	adminOp := seedTestOperator(t, tenantID, true)
 	memberOp := seedTestOperator(t, tenantID, false)

@@ -28,6 +28,7 @@ import (
 
 	"github.com/morehao/ark-iam/pkg/model"
 	// 别名：SeedIam 内以 tenant 命名的局部变量会遮蔽同名包
+	iamapplication "github.com/morehao/ark-iam/pkg/core/application"
 	iamtenant "github.com/morehao/ark-iam/pkg/core/tenant"
 	"github.com/morehao/golib/glog"
 	"gorm.io/gorm"
@@ -581,6 +582,10 @@ func seedAdminUserDepartment(ctx context.Context, db *gorm.DB, rep *Report, tena
 
 // seedAdminUserRole 绑定平台管理后台 admin 角色；默认管理员的 tenant_admin 角色绑定
 // 由后续的权限开通（pkg/core/tenant.ProvisionTenantAdmin）统一写入。
+//
+// 本函数直接写 user_role（不走租户端角色接口），因此必须自己补应用准入（不变式 I1）：
+// 否则平台管理员虽有 platform_admin 角色却因缺 grant 进不去平台控制台，且门禁开启后
+// 无人能登录，界面无法自救。
 func seedAdminUserRole(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.TenantEntity, adminUser *model.UserEntity, adminRole *model.RoleEntity) error {
 	// 默认管理员持有平台管理后台 admin 角色
 	var count int64
@@ -589,14 +594,23 @@ func seedAdminUserRole(ctx context.Context, db *gorm.DB, rep *Report, tenant *mo
 		Count(&count).Error; err != nil {
 		return fmt.Errorf("seed user_role count fail: %w", err)
 	}
-	if count > 0 {
-		return nil
+	if count == 0 {
+		ur := &model.UserRoleEntity{TenantID: tenant.ID, UserID: adminUser.ID, RoleID: adminRole.ID}
+		if err := db.WithContext(ctx).Create(ur).Error; err != nil {
+			return fmt.Errorf("seed user_role create fail: %w", err)
+		}
+		rep.created(model.TableNameUserRole, ur.ID)
 	}
-	ur := &model.UserRoleEntity{TenantID: tenant.ID, UserID: adminUser.ID, RoleID: adminRole.ID}
-	if err := db.WithContext(ctx).Create(ur).Error; err != nil {
-		return fmt.Errorf("seed user_role create fail: %w", err)
+	// 准入按 (租户, 管理员, 归属应用) 幂等 upsert：角色绑定已存在时也要补，
+	// 保证"库里已有平台管理员的旧部署"在引导/升级路径上同样补齐（引导只跑一次，L1 之后不自锁重跑）。
+	if err := iamapplication.EnsureGrant(ctx, db, iamapplication.GrantParams{
+		TenantID: tenant.ID,
+		UserID:   adminUser.ID,
+		AppID:    adminRole.AppID,
+		Source:   model.UserApplicationSourceProvision,
+	}); err != nil {
+		return fmt.Errorf("seed admin app access fail: %w", err)
 	}
-	rep.created(model.TableNameUserRole, ur.ID)
 	return nil
 }
 

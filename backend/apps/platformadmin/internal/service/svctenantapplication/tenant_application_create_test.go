@@ -46,8 +46,10 @@ func seedAppEntity(t *testing.T, db *gorm.DB, appID, name string) {
 func setupTenantAppDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	// RoleEntity：订阅落行时会顺带把应用角色模板物化到该租户（本用例模板为空，只需 role 表存在）。
+	// UserApplicationEntity：列表回传「影响人数」（已准入成员数）需要聚合该表。
 	return testutil.SetupSQLite(t,
-		&model.TenantEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{}, &model.RoleEntity{})
+		&model.TenantEntity{}, &model.ApplicationEntity{}, &model.TenantApplicationEntity{}, &model.RoleEntity{},
+		&model.UserApplicationEntity{})
 }
 
 // TestCreateRejectsUnknownTenant 归属租户必须存在：订阅不能指向不存在的租户。

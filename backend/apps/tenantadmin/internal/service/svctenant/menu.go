@@ -16,7 +16,6 @@ import (
 // TenantMenuSvc 租户侧菜单服务
 type TenantMenuSvc interface {
 	Tree(ctx *gin.Context) (*dtotenant.MenuTreeResp, error)
-	Apps(ctx *gin.Context) (*dtotenant.TenantAppsResp, error)
 }
 
 type tenantMenuSvc struct{}
@@ -35,23 +34,6 @@ func (svc *tenantMenuSvc) Tree(ctx *gin.Context) (*dtotenant.MenuTreeResp, error
 	return &dtotenant.MenuTreeResp{
 		List: tree,
 	}, nil
-}
-
-// Apps 当前租户订阅的启用应用（角色归属/菜单授权的应用选项，含内置应用如平台管理后台）。
-func (svc *tenantMenuSvc) Apps(ctx *gin.Context) (*dtotenant.TenantAppsResp, error) {
-	appList, err := loadSubscribedApps(ctx)
-	if err != nil {
-		return nil, err
-	}
-	list := make([]dtotenant.TenantAppItem, 0, len(appList))
-	for _, app := range appList {
-		list = append(list, dtotenant.TenantAppItem{
-			AppID: app.ID,
-			Code:  app.Code,
-			Name:  app.Name,
-		})
-	}
-	return &dtotenant.TenantAppsResp{List: list}, nil
 }
 
 // loadSubscribedApps 当前租户订阅的启用应用（含内置应用，如平台管理后台）。

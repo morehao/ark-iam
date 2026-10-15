@@ -15,6 +15,8 @@ type UserCtr interface {
 	ResetPassword(ctx *gin.Context)
 	ListRoles(ctx *gin.Context)
 	UpdateRoles(ctx *gin.Context)
+	ListApplications(ctx *gin.Context)
+	UpdateApplications(ctx *gin.Context)
 	ListIdentities(ctx *gin.Context)
 	CreateIdentity(ctx *gin.Context)
 	DeleteIdentity(ctx *gin.Context)
@@ -24,6 +26,7 @@ type UserCtr interface {
 type userCtr struct {
 	userSvc         svctenant.UserSvc
 	userIdentitySvc svctenant.UserIdentitySvc
+	appAccessSvc    svctenant.ApplicationAccessSvc
 }
 
 var _ UserCtr = (*userCtr)(nil)
@@ -32,6 +35,7 @@ func NewUserCtr() UserCtr {
 	return &userCtr{
 		userSvc:         svctenant.NewUserSvc(),
 		userIdentitySvc: svctenant.NewUserIdentitySvc(),
+		appAccessSvc:    svctenant.NewApplicationAccessSvc(),
 	}
 }
 
@@ -186,6 +190,52 @@ func (ctr *userCtr) UpdateRoles(ctx *gin.Context) {
 		return
 	}
 	if err := ctr.userSvc.UpdateRoles(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, "更新成功")
+}
+
+// @Tags 用户
+// @Summary 成员的应用准入清单（含本租户已订阅但未准入的应用，供 UI 呈现全集与选中态）
+// @accept application/json
+// @Produce application/json
+// @Param userID path string true "用户ID"
+// @Success 200 {object} gincontext.DtoRender{data=dtotenant.UserApplicationsListResp}
+// @Router /v1/tenant/users/{userID}/applications [get]
+func (ctr *userCtr) ListApplications(ctx *gin.Context) {
+	var req dtotenant.UserApplicationsListReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.appAccessSvc.ListUserApplications(ctx, &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 用户
+// @Summary 全量替换成员的应用准入集合（集合外应用同时级联撤销其角色绑定）
+// @accept application/json
+// @Produce application/json
+// @Param userID path string true "用户ID"
+// @Param req body dtotenant.UserApplicationsUpdateReq true "准入应用ID全集([]=清空全部准入)"
+// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Router /v1/tenant/users/{userID}/applications [put]
+func (ctr *userCtr) UpdateApplications(ctx *gin.Context) {
+	var req dtotenant.UserApplicationsUpdateReq
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctr.appAccessSvc.UpdateUserApplications(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

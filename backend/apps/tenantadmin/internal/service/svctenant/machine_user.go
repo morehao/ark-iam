@@ -3,6 +3,7 @@ package svctenant
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/core/application"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
@@ -468,6 +469,19 @@ func (svc *machineUserSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.MachineU
 				CreatedBy: operator,
 			}
 			if err := dao.NewUserRoleDao().WithTx(tx).Insert(ctx, entity); err != nil {
+				return err
+			}
+		}
+		// 不变式 I1：授权 ⇒ 准入。服务账号与真实成员同一口径（user_id 都是 tenant_user.id），
+		// 本次确实授予了角色时同事务补齐该应用的准入；清空角色属撤销授权，不反向撤准入。
+		if len(req.RoleIDs) > 0 {
+			if err := application.EnsureGrant(ctx, tx, application.GrantParams{
+				TenantID: tenantID,
+				UserID:   req.MachineUserID,
+				AppID:    req.AppID,
+				Source:   model.UserApplicationSourceRole,
+				Operator: operator,
+			}); err != nil {
 				return err
 			}
 		}

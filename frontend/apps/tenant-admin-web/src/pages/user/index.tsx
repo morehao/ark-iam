@@ -45,6 +45,7 @@ import {
 } from '../../api/machineUser'
 import { getApiKeyPageList } from '../../api/apiKey'
 import { getDepartmentTree } from '../../api/department'
+import AppAccessEditor from '../../components/AppAccessEditor'
 import RoleAssignEditor from '../../components/RoleAssignEditor'
 import UserIdentityTab from '../../components/UserIdentityTab'
 import UserLoginLogTab from '../../components/UserLoginLogTab'
@@ -100,6 +101,9 @@ function UsersPane() {
 
   // 授权角色（列表行操作 Modal：按应用授权，逻辑收敛于共享组件 RoleAssignEditor）
   const [roleTarget, setRoleTarget] = useState<TenantUserItem | null>(null)
+
+  // 应用准入（列表行操作 Modal：准入层「用户 × 应用」，撤销会级联撤销该应用角色）
+  const [appAccessTarget, setAppAccessTarget] = useState<TenantUserItem | null>(null)
 
   // 一次性初始/临时密码（建成员或重置密码后展示，关闭即不可再查）
   const [initialPassword, setInitialPassword] = useState('')
@@ -292,6 +296,7 @@ function UsersPane() {
       actions: (r) => [
         { key: 'edit', label: '编辑', onClick: () => void openEdit(r) },
         { key: 'roles', label: '授权角色', onClick: () => setRoleTarget(r) },
+        { key: 'apps', label: '应用准入', onClick: () => setAppAccessTarget(r) },
         { key: 'resetPwd', label: '重置密码', confirm: '重置后系统生成新的临时密码并仅展示一次，该成员既有会话将失效。确认重置？', onClick: () => void resetPassword(r) },
         {
           key: 'toggle',
@@ -525,6 +530,26 @@ function UsersPane() {
       />
 
 
+
+      {/* 应用准入（列表行操作）：准入层「用户 × 应用」的唯一写入口 */}
+      <Modal
+        title={`应用准入 - ${appAccessTarget?.name || ''}`}
+        open={!!appAccessTarget}
+        onCancel={() => setAppAccessTarget(null)}
+        footer={null}
+        destroyOnClose
+        width={560}
+      >
+        {appAccessTarget && (
+          <AppAccessEditor
+            userID={appAccessTarget.userID}
+            userName={appAccessTarget.name}
+            onSaved={() => {
+              void fetchData()
+            }}
+          />
+        )}
+      </Modal>
 
       {/* 授权角色（列表行操作）：按应用授权，内容收敛于共享组件 */}
       <Modal

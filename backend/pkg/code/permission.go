@@ -101,6 +101,14 @@ const (
 	RoleApplicationNotExistError = 100783
 )
 
+const (
+	// 用户应用准入（租户端「成员 × 应用」准入集合，准入层的唯一写入口）
+	UserApplicationReplaceError            = 100784 // 全量替换用户应用准入失败
+	UserApplicationGetListError            = 100785 // 查看用户应用准入清单失败
+	UserApplicationNotSubscribedError      = 100786 // 目标应用未订阅或已停用，不可准入
+	UserApplicationLastAdminForbiddenError = 100787 // 撤销后租户将失去最后一个内置管理员（防自锁）
+)
+
 var permissionErrorMsgMap = gerror.CodeMsgMap{
 	MenuCreateError:                                   "创建菜单失败",
 	MenuDeleteError:                                   "删除菜单失败",
@@ -163,6 +171,10 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	RoleUserDeleteError:                               "删除角色用户关联失败",
 	RoleUserGetListError:                              "查看角色用户列表失败",
 	RoleUserNotExistError:                             "角色用户不存在",
+	UserApplicationReplaceError:                       "更新用户应用准入失败",
+	UserApplicationGetListError:                       "查看用户应用准入清单失败",
+	UserApplicationNotSubscribedError:                 "目标应用未订阅或已停用，不可准入",
+	UserApplicationLastAdminForbiddenError:            "撤销该准入会使租户失去最后一个内置管理员，已拒绝",
 	RoleApplicationCreateError:                        "创建角色应用关联失败",
 	RoleApplicationGetListError:                       "查看角色应用列表失败",
 	RoleApplicationDeleteError:                        "删除角色应用关联失败",

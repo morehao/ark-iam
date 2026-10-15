@@ -16,7 +16,7 @@ import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
 import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, NAME_COL_WIDTH, PageContainer, SourceTag, STATUS_COL_WIDTH, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
-import type { MenuItem, TenantAppItem, TenantRoleItem } from '@ark-iam/types'
+import type { MenuItem, TenantSubscribedApplicationItem, TenantRoleItem } from '@ark-iam/types'
 import {
   createTenantRole,
   deleteTenantRole,
@@ -76,7 +76,7 @@ export default function TenantRolePage() {
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
   const [appFilter, setAppFilter] = useState<string | undefined>()
-  const [apps, setApps] = useState<TenantAppItem[]>([])
+  const [apps, setApps] = useState<TenantSubscribedApplicationItem[]>([])
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<TenantRoleItem | null>(null)

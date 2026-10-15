@@ -229,6 +229,11 @@ func (svc *tenantApplicationSvc) PageList(ctx *gin.Context, req *dtotenantapplic
 		glog.Errorf(ctx, "[svctenantapplication.PageList] loadRefs fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantApplicationGetPageListError)
 	}
+	grantedCounts, err := loadGrantedUserCounts(crossCtx, list)
+	if err != nil {
+		glog.Errorf(ctx, "[svctenantapplication.PageList] loadGrantedUserCounts fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.TenantApplicationGetPageListError)
+	}
 	items := make([]dtotenantapplication.PageListItem, 0, len(list))
 	for _, v := range list {
 		items = append(items, dtotenantapplication.PageListItem{
@@ -239,8 +244,10 @@ func (svc *tenantApplicationSvc) PageList(ctx *gin.Context, req *dtotenantapplic
 			AppName:     appNames[v.AppID],
 			AppSource:   appSources[v.AppID],
 			Status:      v.Status,
-			CreatedAt:   v.CreatedAt.Unix(),
-			UpdatedAt:   v.UpdatedAt.Unix(),
+			// 影响人数：停用/删除订阅会让这些成员失去该应用访问（一次 GROUP BY 聚合，无 N+1）
+			GrantedUserCount: grantedCounts[grantedCountKey(v.TenantID, v.AppID)],
+			CreatedAt:        v.CreatedAt.Unix(),
+			UpdatedAt:        v.UpdatedAt.Unix(),
 		})
 	}
 	return &dtotenantapplication.TenantApplicationPageListResp{List: items, Total: total}, nil
@@ -295,4 +302,55 @@ func loadRefs(ctx context.Context, list model.TenantApplicationEntityList) (map[
 		}
 	}
 	return tenantNames, appNames, appSources, nil
+}
+
+// grantedCountKey 影响人数的聚合键（同一应用在不同租户下分别计数）。
+func grantedCountKey(tenantID, appID string) string {
+	return tenantID + "|" + appID
+}
+
+// loadGrantedUserCounts 批量统计「(租户, 应用) → 已准入成员数」（仅 enable 行）：
+// 一次 GROUP BY tenant_id, app_id 聚合。平台侧跨租户视角，作用域由调用方声明为全租户。
+func loadGrantedUserCounts(ctx context.Context, list model.TenantApplicationEntityList) (map[string]int64, error) {
+	counts := make(map[string]int64, len(list))
+	if len(list) == 0 {
+		return counts, nil
+	}
+	tenantIDs := make([]string, 0, len(list))
+	appIDs := make([]string, 0, len(list))
+	seenTenant := make(map[string]struct{}, len(list))
+	seenApp := make(map[string]struct{}, len(list))
+	for _, v := range list {
+		if v.TenantID != "" {
+			if _, ok := seenTenant[v.TenantID]; !ok {
+				seenTenant[v.TenantID] = struct{}{}
+				tenantIDs = append(tenantIDs, v.TenantID)
+			}
+		}
+		if v.AppID != "" {
+			if _, ok := seenApp[v.AppID]; !ok {
+				seenApp[v.AppID] = struct{}{}
+				appIDs = append(appIDs, v.AppID)
+			}
+		}
+	}
+	if len(tenantIDs) == 0 || len(appIDs) == 0 {
+		return counts, nil
+	}
+	type countRow struct {
+		TenantID string
+		AppID    string
+		Cnt      int64
+	}
+	var rows []countRow
+	if err := dbclient.IamDB(ctx).Model(&model.UserApplicationEntity{}).
+		Where("tenant_id IN ? AND app_id IN ? AND status = ?", tenantIDs, appIDs, model.UserApplicationStatusEnable).
+		Select("tenant_id, app_id, count(*) as cnt").Group("tenant_id, app_id").Scan(&rows).Error; err != nil {
+		glog.Errorf(ctx, "[svctenantapplication.loadGrantedUserCounts] count userApplication fail, err:%v", err)
+		return nil, err
+	}
+	for _, row := range rows {
+		counts[grantedCountKey(row.TenantID, row.AppID)] = row.Cnt
+	}
+	return counts, nil
 }

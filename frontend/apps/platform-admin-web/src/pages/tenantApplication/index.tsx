@@ -11,7 +11,7 @@ import {
   getTenantPageList,
   updateTenantApplication,
 } from '@ark-iam/api'
-import type { TenantApplicationItem } from '@ark-iam/types'
+import type { TenantApplicationItem, TenantApplicationStatus } from '@ark-iam/types'
 
 export default function TenantApplicationList() {
   const [data, setData] = useState<TenantApplicationItem[]>([])
@@ -78,9 +78,30 @@ export default function TenantApplicationList() {
     setModalOpen(true)
   }
 
+  // 停用订阅会让已准入成员立即失去该应用访问（订阅是准入的上界），
+  // 影响人数不为 0 时先二次确认，避免运维无意中造成"整批人失去应用"。
+  const confirmDisableImpact = (values: { status?: TenantApplicationStatus }): Promise<boolean> => {
+    const count = editing?.grantedUserCount || 0
+    if (!editing || values.status !== 'disable' || editing.status === 'disable' || count === 0) {
+      return Promise.resolve(true)
+    }
+    return new Promise<boolean>((resolve) => {
+      Modal.confirm({
+        title: '停用订阅将影响已准入成员',
+        content: subscriptionImpact(editing),
+        okText: '确认停用',
+        okButtonProps: { danger: true },
+        cancelText: '取消',
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      })
+    })
+  }
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
+      if (editing && !(await confirmDisableImpact(values))) return
       setSubmitLoading(true)
       if (editing) {
         const { tenantID: _tenantID, appID: _appID, ...rest } = values
@@ -97,6 +118,15 @@ export default function TenantApplicationList() {
     } finally {
       setSubmitLoading(false)
     }
+  }
+
+  // subscriptionImpact 停用/删除订阅的确认文案：回显受影响人数（已准入成员数）。
+  // 订阅是准入的上界：停用后这些成员立即失去该应用访问（准入行保留，重新订阅即恢复）。
+  const subscriptionImpact = (record: TenantApplicationItem): string => {
+    const count = record.grantedUserCount || 0
+    return count > 0
+      ? `该租户已有 ${count} 名成员被准入本应用，停用/删除后他们将立即失去本应用访问（准入行保留，重新订阅即恢复）。`
+      : '该租户当前没有成员被准入本应用。'
   }
 
   const handleDelete = async (record: TenantApplicationItem) => {
@@ -131,7 +161,7 @@ export default function TenantApplicationList() {
           // ProvisionTenantAdmin 系统开通，删除会让对应控制台失去菜单；置灰保留展示，下线请改用「停用」。
           // 后端 svctenantapplication.Delete 以 TenantApplicationBuiltInErr 兜底。
           disabled: r.appSource === 'builtin',
-          confirm: '确认删除该订阅？',
+          confirm: `确认删除该订阅？${subscriptionImpact(r)}`,
           onClick: () => void handleDelete(r),
         },
       ],

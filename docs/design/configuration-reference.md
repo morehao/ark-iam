@@ -252,6 +252,7 @@ install:
 | `cookieSameSite` | SSO Cookie SameSite：`lax`/`strict`/`none`（跨站 SSO 需 none + Secure） | lax |
 | `cookieDomain` | SSO Cookie Domain（跨子域共享时设置） | 空 |
 | `enableSSOSessionValidation` | 是否开启请求粒度 SSO 会话活性校验（需共享 Redis） | false |
+| `enforceAppAccess` | 是否开启**应用准入门禁**（`user_application`）：登录期（`CompleteLogin`/`SelectTenant`/静默登录）与令牌签发兜底（`personPrivateClaims`）按判定式 `application.Usable` 校验，失败 fail-closed（登录期报 `110016`；授权码流 `access_denied`、刷新流 `invalid_grant`；静默登录渲染无权限页）。**关闭时准入数据照常写入但读取点不生效**，行为等价于升级前。分三步灰度上线（铺数据 → 观察 → 开门禁），回滚只需改回 `false`；长期保留属技术债，见 [run-and-deploy.md](run-and-deploy.md) §2.5 | false |
 | `backChannelLogoutPath` | 本应用 back-channel logout 接收端基础路径（挂载在 `/oidc` 组下） | platformadmin 兜底 `/bc-logout/platform`、tenantadmin 兜底 `/bc-logout/tenant`；`pkg/oidckit` 通用兜底 `/oidc/bc-logout`；auth / gateway 未配置 |
 | `consoles` | **两个内置控制台的 OIDC 回调地址**（`platformAdminWeb`/`tenantAdminWeb`，各含 `redirectURIs`/`postLogoutRedirectURIs`/`backChannelLogoutURI`）；**只在首次引导创建内置 OAuth 客户端时使用**，之后改配置不回写。留空＝内置默认值（见 §8.4） | 空（回落 `:4001`/`:4002` 本地默认） |
 

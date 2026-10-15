@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/morehao/ark-iam/pkg/core/application"
 	"github.com/morehao/ark-iam/pkg/core/user"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
@@ -43,8 +44,9 @@ type ProvisionTenantAdminReq struct {
 
 // ProvisionTenantAdmin 在 tx 事务内为新租户开通租户自服务权限：
 // 应用订阅（tenant_application）+ 内置管理员角色（role）+ 角色菜单授权（role_menu）+
-// 管理员角色绑定（user_role）。全部步骤应用层查重后 upsert，可重复执行且不产生重复行
-// （这四张表均无唯一索引，故幂等只能由应用层保证）。
+// 管理员角色绑定（user_role）+ 管理员应用准入（user_application，不变式 I1）。全部步骤应用层
+// 查重后 upsert，可重复执行且不产生重复行（除 user_application 有部分唯一索引外，其余表均无唯一索引，
+// 幂等只能由应用层保证）。
 //
 // 必须在调用方的事务 tx 内执行（tx 为空返回错误）。
 // 应用/菜单属全局种子数据：应用缺失视为种子未就绪，直接返回错误让调用方回滚；
@@ -100,6 +102,18 @@ func ProvisionTenantAdmin(ctx context.Context, tx *gorm.DB, req *ProvisionTenant
 	if req.GrantUserID != "" {
 		if err := ensureUserRole(ctx, tx, req, role.ID); err != nil {
 			return nil, err
+		}
+		// 5.1 不变式 I1：授权 ⇒ 准入。开通链路给管理员授予内置角色即隐含准入，
+		// 同事务写入 source=provision 的 grant——否则新建租户的管理员拿到角色却进不去控制台
+		// （门禁默认拒绝），且界面无法自救。
+		if err := application.EnsureGrant(ctx, tx, application.GrantParams{
+			TenantID: req.TenantID,
+			UserID:   req.GrantUserID,
+			AppID:    app.ID,
+			Source:   model.UserApplicationSourceProvision,
+			Operator: req.CreatedBy,
+		}); err != nil {
+			return nil, fmt.Errorf("ensure admin app access fail: %w", err)
 		}
 	}
 	return role, nil

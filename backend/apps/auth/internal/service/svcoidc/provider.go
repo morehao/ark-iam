@@ -268,7 +268,11 @@ func SetupOIDCProvider() (*OIDCProvider, error) {
 
 	storage := oidcop.NewOIDCStorage(
 		oidcop.NewRedisProtocolStateStore(protocolStateTTLOptions()...),
-		oidcop.NewPersistentStore(oidcop.WithIssuer(issuer)),
+		oidcop.NewPersistentStore(
+			oidcop.WithIssuer(issuer),
+			// 应用准入门禁（默认关）：配置项 oidc.enforceAppAccess 三步上线的第三阶段才打开
+			oidcop.WithAppAccessEnforcement(appconfig.Conf != nil && appconfig.Conf.OIDC.EnforceAppAccess),
+		),
 		keys.ActiveKey, keys.ActiveKeyID, keys.Published,
 	)
 

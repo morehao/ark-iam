@@ -9,12 +9,15 @@ const (
 	AuthJoinNotAllowedError           = 110013
 	AuthTenantRegisterNotAllowedError = 110014
 	AuthJoinPolicyCheckError          = 110015
-	InviteGetDetailError              = 110030
-	InviteInvalidError                = 110031
-	InviteExpiredError                = 110032
-	InviteCreateError                 = 110033
-	InviteRevokeError                 = 110034
-	InviteGetPageListError            = 110035
+	// AuthAppAccessDeniedError 登录期应用准入被拒：所选租户下该成员未被授权使用本次登录的应用。
+	// 与令牌签发兜底门禁同源（判定式 application.Usable），只是把拒绝提前到登录期，便于前端提示。
+	AuthAppAccessDeniedError = 110016
+	InviteGetDetailError     = 110030
+	InviteInvalidError       = 110031
+	InviteExpiredError       = 110032
+	InviteCreateError        = 110033
+	InviteRevokeError        = 110034
+	InviteGetPageListError   = 110035
 )
 
 const (
@@ -57,6 +60,7 @@ var authErrorMsgMap = gerror.CodeMsgMap{
 	AuthJoinNotAllowedError:           "无权加入该租户",
 	AuthTenantRegisterNotAllowedError: "该应用未开放注册",
 	AuthJoinPolicyCheckError:          "加入租户策略校验失败",
+	AuthAppAccessDeniedError:          "你未被授权使用该应用，请联系所在租户的管理员分配",
 	InviteGetDetailError:              "获取邀请信息失败",
 	InviteInvalidError:                "邀请码无效",
 	InviteExpiredError:                "邀请码已过期",

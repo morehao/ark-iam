@@ -104,6 +104,7 @@ flowchart TB
 | **person + user 两级身份** | person 是跨租户全局身份（用户名/邮箱/手机号全局唯一），user 是租户内成员，天然支持"一人多租户" |
 | **JWT Access Token + 短 TTL** | 无状态校验、水平扩展友好；登出失效依赖 SSO 会话活性校验兜底 |
 | **Redis 为中心会话存储** | SSO 会话、授权码、令牌元数据、SLO 队列共享同一认证 Redis，支持 auth 多副本 |
+| **准入层独立于授权层（`user_application`）** | "能不能进这个应用"与"进去后能做什么"是两件事：租户内存在大量**没有角色概念**的接入应用，若以"有角色"当准入判据，这些应用永远无法只读地授予某个人。因此准入独立成表、成为可用性的唯一事实源，判定式收敛为一条：`application.enable ∧ tenant_application.enable ∧ user_application.enable`（`pkg/core/application`） |
 
 ### 2.3 应用内部分层
 
@@ -151,7 +152,7 @@ flowchart TB
 |---|---|---|---|---|
 | **auth** | `auth` | 8081 | 认证网关：登录 / 注册 / 令牌 / OIDC Provider / SSO / SLO / Connector / **系统初始化引导（`/install/*`，R3 专用前缀）**；自助注册与建租户收口在 `/oidc/registerPerson` + `/oidc/createTenant` | person、tenant_user（成员）、tenant_invite、refresh_token、session、connector、user_identity |
 | **platformadmin** | `platform` | 8082 | 平台管理：租户（建租户时自动创建内置管理员、可重置其口令）/ 菜单 / 应用 / OAuth 客户端 / 域名 / 租户应用 / 审计；**不提供 users / roles / api-keys 接口**（用户与角色管理全在租户端） | tenant、menu、application、application_client、domain、tenant_application、audit_log |
-| **tenantadmin** | `tenant` | 8083 | 租户自服务：部门架构 / 用户与角色 / 服务账号 / 加入邀请 / API 密钥 / 租户菜单 | department、department_user、tenant_user、tenant_invite、role、api_key |
+| **tenantadmin** | `tenant` | 8083 | 租户自服务：部门架构 / 用户与角色 / 服务账号 / 加入邀请 / API 密钥 / 租户菜单 / **应用准入（成员 × 应用）** | department、department_user、tenant_user、tenant_invite、role、api_key、user_application |
 | **gateway** | 聚合 | 8100 | 单体聚合部署，挂载 auth + platformadmin + tenantadmin；部署为 gateway 时 OIDC issuer 同步切到 `http://localhost:8100/oidc` | 无独立业务 |
 
 > 各应用通过 `ginserver.NewRouterGroups(engine, "<服务标识>", ...)` 注册前缀，业务路由形如 `/v1/{auth|platform|tenant}/...`；OIDC 协议端点固定挂在 `/oidc/*`，初始化引导固定挂在 `/install/*`——两者都是 **R3 专用前缀**（标准协议 / 自举入口），不走业务路由规范。未初始化时 `pkg/middleware.BootstrapGuard` 会把业务端点拦成 HTTP 409（错误码 `107004`），只放行 `/install` 与 `/oidc` 的健康/发现/登出端点。
@@ -198,7 +199,7 @@ flowchart TB
 
 ### 4.2 ER 图
 
-> 所有表主键统一为 `varchar(36)` UUID v7（`gormdao.BaseEntity.StringID`），下图不再逐表标注类型细节；`created_by/updated_by/deleted_by` 与 `created_at/updated_at/deleted_at` 为所有表共有的审计字段，图中省略。`tenant_user.user_id` 与 `department_user.user_id`、`user_role.user_id`、`api_key.owner_user_id` 指向的都是 `tenant_user`。
+> 所有表主键统一为 `varchar(36)` UUID v7（`gormdao.BaseEntity.StringID`），下图不再逐表标注类型细节；`created_by/updated_by/deleted_by` 与 `created_at/updated_at/deleted_at` 为所有表共有的审计字段，图中省略。`tenant_user.user_id` 与 `department_user.user_id`、`user_role.user_id`、`user_application.user_id`、`api_key.owner_user_id` 指向的都是 `tenant_user`（**准入的主体是租户账号，不是自然人**：同一自然人在两个租户里的准入互不相干）。
 
 ```mermaid
 erDiagram
@@ -207,6 +208,8 @@ erDiagram
     tenant ||--o{ tenant_invite : "1:N 加入邀请"
     tenant ||--o{ tenant_application : "1:N 开通"
     application ||--o{ tenant_application : "1:N"
+    tenant_user ||--o{ user_application : "1:N 准入"
+    application ||--o{ user_application : "1:N 准入"
     application ||--o{ application_client : "1:N"
     application_client ||--o{ application_client_secret : "1:N"
     tenant ||--o{ department : "1:N 部门树(parent_id 自引用)"
@@ -323,6 +326,14 @@ erDiagram
         string tenant_id FK
         string app_id FK
         string status "enable/disable"
+    }
+    user_application {
+        string id PK "UUID v7"
+        string tenant_id FK
+        string user_id FK "tenant_user.id（成员/服务账号）"
+        string app_id FK
+        string status "enable/disable（撤销=disable，行保留）"
+        string source "manual/role/provision"
     }
     department {
         string id PK "UUID v7"
@@ -493,7 +504,7 @@ erDiagram
 |---|---|
 | `tenant` | 租户：`type` 分 customer/platform（分类标识，不参与隔离判定）；`code` 全局唯一且由服务端自动生成（`t_<12 位随机 hex>`，L1 首次引导写入的平台租户固定为 `t_platform`，创建后不可改）；`status` 生命周期状态（active/suspended，取代早期 `is_suspended`，且是矩阵里的 `immutable`——平台租户被挂起会整栈失联，控制台拒写） |
 | `tenant_invite` | 加入邀请：通道 B 的凭据，`code` 邀请码 + `status`（pending/accepted/revoked）+ 可空 `expires_at` |
-| `tenant_application` | 租户-应用开通关系：`status` 开通状态（`config` / `granted_scope` 两个通用 JSON 兜底列已下线） |
+| `tenant_application` | **订阅层**：租户-应用开通关系，`status` 开通状态（`config` / `granted_scope` 两个通用 JSON 兜底列已下线）。订阅是**准入的上界**：订阅不满足时该应用下的准入必然无效，但准入行**不做级联删除**（重新订阅即恢复，见权限域 `user_application` 与 §5.4） |
 | `domain` | 租户域名：`verification_status`（`DomainVerificationStatus`：unverified/verified；旧 `is_verified` + `verified_at` 已下线），当前仅平台端录入与管理，登录链路尚未按域名识别租户 |
 
 #### 部门架构域
@@ -509,7 +520,8 @@ erDiagram
 |---|---|
 | `role` | 角色：租户内 + 按应用（`app_id`）作用域；`source` builtin/custom；`admin_type` admin/normal 是系统管理能力标签（**内置角色整体只读**：禁删、禁编辑——名称/描述/编码一律不可改）。`code` 是**跨系统授权契约值**（`^[a-z][a-z0-9_]*$`）：它是 OIDC ID token `groups` 声明的取值，下游系统按「前缀 + 编码」认自己的策略名（如对象存储 `claim_prefix=iam_` → 策略 `iam_platform_admin`）。**编码只有两个来源，租户侧没有任何写入入口**：① 产品锚点角色（`platform_admin`/`tenant_admin`，`source=builtin && admin_type=admin`，由 L1 首次引导或建租户产生）；② **应用角色模板**（`application.role_template`，开通应用时物化到该租户，`source=builtin && admin_type=normal`）。**租户自建角色（`source=custom`）的 `code` 恒为空串、不进入 `groups` 声明**——下游策略是全局命名实体（策略名 = `claim_prefix` + 编码，全租户共用一条、无映射表可回查），若允许租户写编码，任何租户管理员都能造出一个撞上既有策略的编码从而自提权；把契约值收归应用方定义后，「定义值的人」与「在下游供给策略的人」是同一主体，不再需要保留字护栏。**该声明只下发给「本角色所属应用的客户端」**（作用域键 = `application_client.app_id`，见 §5.4）：下游只认自己那个应用的编码，跨应用的角色不会进入其策略命名空间；反之若按租户全量下发，在无关应用里造一个同码角色即可命中下游策略（跨应用越权）。**无 `type`、无 `is_default`** |
 | `menu` | 菜单：按应用管理（`app_id`），支持树（`parent_id`）；`type` directory/menu/button；`visibility` public/member/admin 为可见性门槛；`seed_key` 为种子身份键（控制台不可见不可写）。**顺序由 `sort` 唯一决定**（升序，同值按 `code`，见 `pkg/dao.MenuOrderBySort`）：所有面向界面的菜单查询（两端侧边栏、角色授权树、菜单管理树/列表）都必须显式 ORDER BY，缺省顺序数据库不保证、控制台改排序会看不到效果。**无 `tenant_id`、无 `permission`** |
-| `user_role` | 用户-角色关联 |
+| `user_application` | **准入层**：用户-应用准入（`user_id` 指向 `tenant_user.id`，成员与服务账号同构），是「某用户可否使用某应用」的**唯一事实源**；`status`（`UserApplicationStatus`：enable/disable，撤销=置 disable、行保留以备审计）与 `source`（`UserApplicationSource`：manual 手工分配 / role 由角色授予自动补齐 / provision 引导写入）。唯一性靠**部分唯一索引** `uk_user_application_active (tenant_id, user_id, app_id) WHERE deleted_at IS NULL`（软删后可重授，与 `user_role` 同形）。判定式与不变式（角色授予自动补准入、撤销准入级联软删该应用 `user_role`、取消订阅不级联）见 `pkg/core/application` |
+| `user_role` | **授权层**：用户-角色关联（授权**不产生**可用性：有角色而无准入仍不可用；反之写角色会**自动补**准入，撤销角色**不**回撤准入） |
 | `role_menu` | 角色-菜单关联（可访问菜单） |
 
 > 业务权限点不由 IAM 承载：`scope` / `resource` / `role_scope` 三张表与 `system`（冗余配置）模块**已整体下线**，`AutoMigrate` 不再创建，代码全仓零残留。
@@ -549,7 +561,7 @@ erDiagram
 
 ### 4.5 种子数据与字段权威（single writer per field）
 
-`pkg/seed` 的**唯一写通道是 `Bootstrap`**：它只在「库尚未初始化」时执行一次，由安装页 `POST /install/initialize`（`apps/auth` 的 `/install/*`，见 §3.1）触发，为内置租户 / 根部门 / 两个内置应用（`platform_admin`、`tenant_admin`）/ 对应 OAuth 客户端 / 菜单 / 角色 / 租户应用开通 / 内置管理员（person + tenant_user + 部门关系 + 角色）**一次性**写入初值，并把本次创建明细写进 `Report`（仅用于本次引导的日志核对、不落库；L1 只创建，`Action` 恒为 `created`）。**启动期不写任何数据**：`AutoMigrate`（`model.AutoMigrateAll`）只建表，`pkg/seed` 另两个公开函数 `IsInitialized` / `SchemaReady` 只读。初始化在**单个事务**内完成——页面上的三步只是 UI 分步，后端没有分步端点，否则"第一步成功、第二步失败"会留下一个没有管理员的租户且无恢复路径；多副本并发由 Postgres 事务级 advisory lock 串行化（`lockSeed`）。是否已初始化以**平台租户行**为准（`IsInitialized` 查 `model.SeedPlatformTenantCode` = `t_platform`），不依赖任何进程内缓存，因此重启、换副本都不会"忘记"；这也带来**永久自锁**：初始化成功后该端点再调一律 HTTP 409（`InstallationAlreadyInitializedError`），重启也不会解除。
+`pkg/seed` 的**唯一写通道是 `Bootstrap`**：它只在「库尚未初始化」时执行一次，由安装页 `POST /install/initialize`（`apps/auth` 的 `/install/*`，见 §3.1）触发，为内置租户 / 根部门 / 两个内置应用（`platform_admin`、`tenant_admin`）/ 对应 OAuth 客户端 / 菜单 / 角色 / 租户应用开通 / 内置管理员（person + tenant_user + 部门关系 + 角色 + **该租户全部订阅应用的准入行**）**一次性**写入初值，并把本次创建明细写进 `Report`（仅用于本次引导的日志核对、不落库；L1 只创建，`Action` 恒为 `created`）。**启动期不写任何数据**：`AutoMigrate`（`model.AutoMigrateAll`）只建表，`pkg/seed` 另两个公开函数 `IsInitialized` / `SchemaReady` 只读。初始化在**单个事务**内完成——页面上的三步只是 UI 分步，后端没有分步端点，否则"第一步成功、第二步失败"会留下一个没有管理员的租户且无恢复路径；多副本并发由 Postgres 事务级 advisory lock 串行化（`lockSeed`）。是否已初始化以**平台租户行**为准（`IsInitialized` 查 `model.SeedPlatformTenantCode` = `t_platform`），不依赖任何进程内缓存，因此重启、换副本都不会"忘记"；这也带来**永久自锁**：初始化成功后该端点再调一律 HTTP 409（`InstallationAlreadyInitializedError`），重启也不会解除。
 
 > **为什么不再有"每次启动的幂等种子"**：启动期播种要求种子在每次启动都把内置行"收敛/补齐"到定义，这才需要字段收敛（原 `reconcile`）与跨版本原地改名（原 `migrate_once`）。改为一次性引导后这两类机制没有存在理由，已**整体删除**（执行体 `reconcileFields`、清单 `seedMigrations`、退役菜单清理 `retiredMenus`、软删墓碑跳过 `menuSeedKeyRemoved` 与所有 legacy 改名分支全部下线）；内置数据的后续调整一律由运维在各控制台完成。代价（有意接受）：既有菜单行的跨版本结构变更不再自动生效，新增内置菜单由运维按 `make print-builtin-menus` 的清单在「菜单管理」页补录。
 
@@ -634,6 +646,8 @@ sequenceDiagram
     A-->>U: { userID }
 ```
 
+**准入口径**：两条通道（`createTenant` 与 `joinTenant`）都**不自动分配应用准入**——准入是"逐个授权、默认拒绝"，新成员落地后由租户管理员在控制台分配（或在其被授予角色时由 I1 自动补齐）；唯一的例外是**内置管理员**：建租户时按该租户全部订阅应用写入 `source=provision` 的准入行，避免管理员开门禁后连自己的控制台都进不去（见 §5.8）。
+
 **要点**：落哪个租户由**邀请码**决定（租户侧授权）；`joinTenant` **禁止裸 `tenantID` 直入**——这是软隔离多租户模型下的必要门禁（对标 keycloak 落当前 realm / zitadel org scope）。加入者永远是普通成员：`owner_type=owner` 只在**自助开通租户或平台建租户**时产生，平台端不提供 owner 指派接口（`PUT /v1/platform/users/{userID}/owner` 已下线），该字段仅用于展示、不参与鉴权。
 
 通道 B 有**两道门禁**，按序判定（见 `backend/apps/auth/internal/service/svcauth/auth.go` 的 `JoinTenant`）：
@@ -680,6 +694,8 @@ sequenceDiagram
     end
 ```
 
+**应用准入校验（登录期早拒；灰度开关 `oidc.enforceAppAccess`）**：开关打开时，`POST /oidc/login`（`CompleteLogin`）与多租户用户的 `POST /oidc/login/selectTenant`（`SelectTenant`）在**完成授权请求之前**先按「`client_id` → 应用 → 判定式」校验该成员对本次客户端所属应用的准入（`svcoidc.canUseClientApp` → `application.CheckUsable`）：不满足即返回 `AuthAppAccessDeniedError`(110016)，**不建 SSO 会话、不发授权码、不落登录成功审计**，而是落一条**登录失败审计**（`action=login`、`result=failure`、`target_type=person`、`detail` 带 `reason:no app access` 与 `clientID`）——这既是 AC-4 要求的可追溯性，也是灰度 P3「准入拒绝次数」指标的**唯一查询来源**（按 `action`+`result`+`detail` 聚合），把拒绝挡在流程最早的对外可解释位置。多租户用户的**租户选项同样先按准入过滤**（`filterTenantsByClientApp`）：让用户只看到"选了就能进"的租户，而不是选完才被告知无权。解析不出应用（`client_id` 为空 / 客户端不存在 / 客户端未绑定应用）按 **fail-closed** 拒绝。开关**默认 false**（未配置即升级前行为），三步灰度发布与回滚见 [run-and-deploy.md](run-and-deploy.md)。
+
 **首次登录强制改密**：登录校验通过后若命中 `person.password_status = must_change`（临时口令，或口令刚被管理员重置），auth **不建立 SSO 会话、也不签发授权码**，而是返回需改密状态；login-web 随即引导调用 `POST /oidc/login/changePassword`（改密后必须重新登录）。已登录用户的自助改密走 `POST /v1/auth/me/changePassword`。
 
 ### 5.3 免密续登（SSO）
@@ -706,6 +722,8 @@ sequenceDiagram
         U->>OP: 重新凭证登录（回到 5.2）
     end
 ```
+
+**应用准入与静默登录的租户选择**：开关打开时，免密续登不再固定取「第一个租户」，而是取**本客户端所属应用下有准入的第一个租户**（`CompleteLoginBySession`，`authRequest.tenant_id` 提示值只在有准入的集合内生效）。若一个可用租户都没有，返回专用哨兵 `ErrSilentLoginNoAppAccess`，由 `SSOLogin` 直接渲染 403 无权限页——**刻意不复用**"重新认证"那条路径（清 cookie 跳登录页）：重新登录仍是同一结论，跳回去会形成登录死循环。
 
 ### 5.4 令牌签发与校验（RP 侧）
 
@@ -744,6 +762,16 @@ sequenceDiagram
 > 客户端未知（记录不存在）或角色读取失败按 **fail-closed** 返回错误拒绝该次签发——宁可登录失败，
 > 也不签发作用域不明或缺 `groups` 的令牌让下游把用户当「无策略」静默降权；客户端为空或未绑定应用时
 > 视为「无命名空间」而不产出声明（与「租户未定不猜租户」同构）。
+>
+> **签发期兜底门禁（`oidc.enforceAppAccess` 打开时）**：`personPrivateClaims` 在既有的 `tenantTokenGate`
+> 之后追加 `appAccessTokenGate`——授权码流被拒报 `access_denied`、刷新流报 `invalid_grant`，两者都发生在
+> 令牌落库/下发之前，因此**不存在"先发出去再撤销"的窗口**。它是登录期早拒的**兜底**而非重复：早拒依赖
+> 交互式登录路径，而刷新流、以及准入在签发前一刻被管理员撤销的并发场景只能靠这一层拦住。判定复用同一份
+> `pkg/core/application.CheckUsable` 与同一个「客户端 → 应用」解析（`resolveClientAppID`，显式跨租户作用域：
+> 该查询发生在租户作用域之外且按 `client_id` 全局唯一键反查）；`client_id` 为空、客户端不存在、客户端未绑定
+> 应用一律拒绝并记日志（含 `client_id`/`tenant_id`/`user_id`/`app_id`，供运维定位）。
+> **机器通道（`client_credentials` 与 API Key）不进这道门禁**：它们没有 person 身份、也不该被"人是否被准入"
+> 约束，其权限来自服务账号自身的角色与凭证管理（`token_usage=machine`，见 §5.6）。
 >
 > **契约值只由应用方定义（这是「前缀隔离不了同码」的根本解）**：下游按「`claim_prefix` + 编码」逐字拼
 > 策略名，前缀只隔离命名空间、隔离不了同码——而且策略在下游是**全局命名实体**（一条策略全租户共用，
@@ -805,6 +833,8 @@ sequenceDiagram
     API-->>SVC: 业务数据
 ```
 
+**不受应用准入门禁约束**：API Key（与 `client_credentials` 签发的令牌）走的是 `token_usage=machine` 通道，`oidc.enforceAppAccess` 对它们**不生效**——机器凭证没有 person 身份，其权限边界由服务账号自身的角色与密钥归属决定（`pkg/middleware` 的会话活性校验同样按 `token_usage` 跳过）。因此"撤销某人的应用准入"不会影响任何服务账号的调用。
+
 ### 5.7 Connector 外部身份源登录（OIDC/OAuth2 IdP）
 
 ```mermaid
@@ -852,7 +882,7 @@ sequenceDiagram
     PA->>DB: 2) 根部门节点
     PA->>DB: 3) tenant_user（person_id 关联/新建，source=builtin，owner_type=owner）
     PA->>DB: 4) person.password_status = must_change
-    PA->>DB: 5) 绑定内置管理员角色 + 根部门 primary 关系 + 应用订阅
+    PA->>DB: 5) 绑定内置管理员角色 + 根部门 primary 关系 + 应用订阅<br/>+ 各订阅应用的准入（source=provision）
     PA->>DB: 6) 按各订阅应用的 role_template 物化契约角色（source=builtin）
     PA-->>P: { tenantID, adminUserID, 临时口令明文（仅此一次展示） }
 ```
@@ -955,7 +985,8 @@ flowchart TB
 - **部门架构增强**：部门/部门与角色联动、批量导入导出；
 - **更多授权类型**：`urn:ietf:params:oauth:grant-type:token-exchange`、jwt-bearer（当前显式拒绝，避免虚假宣称）；
 - **MFA**：TOTP/短信二次认证（部门级 MFA 策略已移出部门表，后续按租户级配置承载——`system` 冗余配置模块已下线）；
-- **SCIM 供给**：租户→应用的用户供给协议；
+- **准入层后续增强**：① 服务账号（M2M）的准入是否纳入同一门禁（当前机器通道豁免，其权限来自服务账号角色与凭证）；② 准入的**到期时间 / 审批流**（当前只有 enable/disable 两态）；③ rpapi 目录接口按准入过滤（当前只做应用作用域）；④ 平台侧跨租户的批量准入运维（当前准入的写入口只在租户端，平台侧只回显影响人数）；
+- **SCIM 供给**：租户→应用的用户供给协议（准入层落地后它是天然的供给落点）；
 - **细粒度授权**：资源级（`resource`/`scope`）的 ABAC 策略引擎；
 - **auth 高可用**：共享认证 Redis 已支持多副本，后续补会话一致性看护与优雅降级；
 - **前端登录页自定义**：login-web 品牌化、多主题。

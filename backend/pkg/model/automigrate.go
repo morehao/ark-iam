@@ -20,6 +20,7 @@ func AllEntities() []any {
 		&ApplicationClientEntity{},
 		&ApplicationClientSecretEntity{},
 		&TenantApplicationEntity{},
+		&UserApplicationEntity{},
 		&RoleEntity{},
 		&MenuEntity{},
 		&RoleMenuEntity{},

@@ -60,6 +60,27 @@ type UserRolesUpdateReq struct {
 	RoleIDs []string `json:"roleIDs" binding:"required"`        // 角色ID列表(全量替换该应用下的授权)
 }
 
+// ---------- 应用准入（用户子资源） ----------
+// 准入回答"该成员能否使用某应用"，与角色（进入后能做什么）解耦：无角色应用同样在此授权。
+
+type UserApplicationsListReq struct {
+	UserID string `json:"-" uri:"userID" binding:"required"` // 用户ID（path）
+}
+
+// UserApplicationsUpdateReq 全量替换该成员的准入应用集合（PUT 集合语义）：
+// 集合内 enable、集合外 disable，并对集合外应用级联撤销其角色绑定（不变式 I2）。
+// AppIDs 用指针 + required：字段必须显式传入（杜绝漏传被当成"清空全部准入"），
+// 而传 `[]` 是合法的"清空全部准入"。
+type UserApplicationsUpdateReq struct {
+	UserID string    `json:"-" uri:"userID" binding:"required"` // 用户ID（path）
+	AppIDs *[]string `json:"appIDs" binding:"required"`         // 准入应用ID全集（[]=清空全部准入）
+}
+
+// ApplicationUsersListReq 应用视角：被准入的成员列表（谁能进这个应用）。
+type ApplicationUsersListReq struct {
+	AppID string `json:"-" uri:"appID" binding:"required"` // 应用ID（path）
+}
+
 // ---------- 第三方身份（用户子资源） ----------
 // 租户维度一律取自登录上下文，不接受请求体传入 tenantID，避免参数污染。
 

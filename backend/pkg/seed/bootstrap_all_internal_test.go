@@ -232,6 +232,7 @@ func allSeedTables() []string {
 		model.TableNameUser,
 		model.TableNameDepartmentUser,
 		model.TableNameUserRole,
+		model.TableNameUserApplication,
 		model.TableNameApplicationClient,
 	}
 }
