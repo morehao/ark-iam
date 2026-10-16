@@ -194,3 +194,59 @@ func TestHardenedColumnsUseNamedEnums(t *testing.T) {
 		}
 	}
 }
+
+// walkEntityColumns 遍历实体类型的全部列字段并回调 (列名, 字段类型, gorm tag)。
+// 内嵌结构体（如 gormdao.BaseEntity → StringID）会被递归展开——它们同样是 DB 列
+// （created_at/updated_at/deleted_at/id），只查顶层字段会漏判。
+// 列名取 gorm tag 的 column；缺失时回退 Go 字段名（口径与「表结构不存在某列」一致）。
+func walkEntityColumns(entityType reflect.Type, visit func(column string, fieldType reflect.Type, gormTag string)) {
+	if entityType.Kind() == reflect.Ptr {
+		entityType = entityType.Elem()
+	}
+	if entityType.Kind() != reflect.Struct {
+		return
+	}
+	for i := 0; i < entityType.NumField(); i++ {
+		field := entityType.Field(i)
+		gormTag := field.Tag.Get("gorm")
+		// 匿名内嵌结构体本身不是列，继续下钻；带 column tag 的匿名字段按普通列处理。
+		if field.Anonymous && gormTagValue(gormTag, "column") == "" {
+			walkEntityColumns(field.Type, visit)
+			continue
+		}
+		column := gormTagValue(gormTag, "column")
+		if column == "" {
+			column = field.Name
+		}
+		visit(column, field.Type, gormTag)
+	}
+}
+
+// TestNoBooleanDictionaryColumns 是「布尔语义一律枚举化」的全域否定断言（AGENTS.md
+// 「强类型字符串枚举」第 5 条）：任何实体、任何列的 Go 字段类型都不得是 bool，
+// gorm tag 也不得出现 type:boolean / tinyint(1)。
+//
+// 开关类语义（...Flag / ...Policy）必须写成 varchar(16) + 具名类型 + enable/disable 常量：
+// 真值判断会把 'disable'（非空字符串）当成启用，是历史 bool 列改造的根本动因。
+// 本测试遍历 AllEntities() 全量实体（含内嵌 BaseEntity），命中即失败并指出「表名.列名」。
+func TestNoBooleanDictionaryColumns(t *testing.T) {
+	for _, entity := range AllEntities() {
+		tableName := tableNameOf(entity)
+		walkEntityColumns(reflect.TypeOf(entity), func(column string, fieldType reflect.Type, gormTag string) {
+			key := tableName + "." + column
+			baseType := fieldType
+			if baseType.Kind() == reflect.Ptr {
+				baseType = baseType.Elem()
+			}
+			if baseType.Kind() == reflect.Bool {
+				t.Errorf("%s 是 Go bool 列；布尔语义必须枚举化为 varchar(16) + 具名类型 + enable/disable 常量", key)
+			}
+			if strings.Contains(gormTag, "type:boolean") {
+				t.Errorf("%s gorm tag 含 type:boolean，禁止布尔字典列，实际 tag: %s", key, gormTag)
+			}
+			if strings.Contains(gormTag, "tinyint(1)") {
+				t.Errorf("%s gorm tag 含 tinyint(1)，禁止布尔字典列，实际 tag: %s", key, gormTag)
+			}
+		})
+	}
+}

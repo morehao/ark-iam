@@ -206,6 +206,8 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 ## 5. 平台管理端点（/v1/platform/*）
 
 > 前缀 `platform`：`/v1/platform/...`。全部需 Bearer 令牌（平台管理员）。
+>
+> **控制台准入闸口（L1，P0-0）**：本节的 `/v1/platform/*` 业务端点在鉴权之后、进入业务之前统一判定应用准入，判据是三层全部 enable——`application.status` ∧ `tenant_application.status`（按令牌 `tenant_id`）∧ `user_application.status`（按令牌 `tenant_id` + `user_id`）。任一不满足返回 `110016`（`AuthAppAccessDeniedError`）；底层查询报错按系统错误上抛，不伪装成 `110016`。闸口在版本组中间件（`VersionGroup.Middlewares`）统一注入，位于 `OIDCAuth` 之后，同组新增路由自动被覆盖、无需逐条声明（见 `app.go`）。`/v1/tenant/*` 为同一口径（成员准入，见 §6）。
 
 ### 5.1 用户与身份
 
@@ -281,6 +283,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
+| GET | `/v1/platform/audit-logs` | 审计日志分页（只读）。**平台视角跨租户**：`tenantID` 留空＝不限租户，非空＝只看该租户（不存在"当前租户"隐式过滤）。过滤维度 `tenantID`/`actorPersonID`/`action`/`result`/`startTime`/`endTime`（秒级时间戳；`startTime` 留空默认**近 7 天**、`endTime` 留空不设上界）；`action`/`result` 非法值报 `108002`（不静默返回空集）；`pageSize` 上限 **100**（超出按 100 截断）、缺省 20，`page<=0` 归一为 1；固定 `ORDER BY created_at DESC, id DESC`。查询失败报 `108001`。索引 `(tenant_id, created_at)`/`(created_at)`/`(actor_person_id, created_at)` 由启动期 `AutoMigrateAll` 的 `performanceIndexes` 幂等建立（`created_at` 来自内嵌 `BaseEntity`，GORM 索引 tag 对它无效，故走 DDL） |
 
 ---
 

@@ -47,6 +47,12 @@ const (
 	AuditTargetTypeInstallation      AuditTargetType = "installation"       // 系统初始化（无租户/账号前的事件）
 )
 
+// AuditLogEntity 审计日志（追加型、只读查询，不设更新/删除入口）。
+//
+// 索引：三条查询索引（(tenant_id, created_at)、(created_at)、(actor_person_id, created_at)）
+// **不在本结构体上用 tag 声明**——目标列 created_at 来自内嵌的 gormdao.BaseEntity，
+// 而 GORM 不解析内嵌字段上的索引 tag（实测会静默退化成单列索引）。
+// 事实源见 automigrate.go 的 performanceIndexes（AutoMigrate 后显式执行、幂等）。
 type AuditLogEntity struct {
 	gormdao.BaseEntity
 	ActorPersonID string          `gorm:"column:actor_person_id;type:varchar(36);not null;default:'';comment:操作人person id"`

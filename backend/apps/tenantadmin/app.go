@@ -67,6 +67,11 @@ func Init(engine *gin.Engine, Conf *pkgconfig.Config, injectedKeySource oidckit.
 		Version: ginserver.ApiVersionV1,
 		Middlewares: []gin.HandlerFunc{
 			middleware.OIDCAuth(append([]middleware.AuthOption{middleware.WithOIDCKeySource(keySource)}, oidcAuthOpts...)...),
+			// L1 应用准入闸口（判定「该成员能不能用 tenant_admin 应用」：应用启用 ∧ 租户订阅启用 ∧ 用户准入启用）。
+			// 挂在版本组上、对组内全部路由生效，无需逐路由声明；它不回答"在本租户内能不能做管理"，
+			// 那是服务层的 L2（requireSystemAdmin），两层不得互相替代。顺序由 gin 保证：
+			// 同组的 OIDCAuth 先跑（验签 + 写租户作用域与成员身份），闸口只读这些已校验取值。
+			middleware.RequireAppAccess(),
 		},
 	}})
 
