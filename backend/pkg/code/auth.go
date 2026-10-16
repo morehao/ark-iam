@@ -9,8 +9,10 @@ const (
 	AuthJoinNotAllowedError           = 110013
 	AuthTenantRegisterNotAllowedError = 110014
 	AuthJoinPolicyCheckError          = 110015
-	// AuthAppAccessDeniedError 登录期应用准入被拒：所选租户下该成员未被授权使用本次登录的应用。
-	// 与令牌签发兜底门禁同源（判定式 application.Usable），只是把拒绝提前到登录期，便于前端提示。
+	// AuthAppAccessDeniedError 登录期或请求期应用准入被拒：该成员在当前租户下未被授权使用本应用。
+	// 判定式唯一实现在 application.Usable（应用启用 ∧ 租户订阅启用 ∧ 用户准入启用）：
+	// 登录期由登录链路把拒绝提前，请求期由 pkg/middleware.RequireAppAccess 对控制台整组拦截，
+	// 令牌签发期再兜底——三处同源，故文案与码值统一（码值 110016 已对接前端，不得变更）。
 	AuthAppAccessDeniedError = 110016
 	InviteGetDetailError     = 110030
 	InviteInvalidError       = 110031

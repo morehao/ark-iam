@@ -14,6 +14,9 @@ type LoginType string
 // 登录方式取值（禁止硬编码）。
 const (
 	LoginTypePassword LoginType = "password" // 账号密码登录
+	LoginTypeOIDC     LoginType = "oidc"     // OIDC/SSO 授权码登录
+	LoginTypeRefresh  LoginType = "refresh"  // 刷新令牌续期
+	LoginTypeMachine  LoginType = "machine"  // 机器凭证（API Key / client_credentials）
 )
 
 type UserLoginLogEntity struct {

@@ -222,6 +222,9 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 		TargetType: model.AuditTargetTypePerson,
 		TargetID:   personEntity.ID,
 	})
+	// 登录日志（T4）：授权票据已 done=true（即将签发授权码）才算成功，此处是「授权码登录」的落点。
+	// best-effort，写失败不影响登录（详见 recordOIDCLoginLog）。
+	recordOIDCLoginLog(ctx, tenantID, userEntity.ID, personEntity.ID)
 
 	allowPersonCreateTenant := false
 	if cid := clientIDFromAuthRequest(authReq); cid != "" {
@@ -325,6 +328,11 @@ func (svc *oidcAuthSvc) SelectTenant(ctx *gin.Context, authRequestID string, ten
 		TargetType: model.AuditTargetTypeTenant,
 		TargetID:   tenantID,
 	})
+	// 登录日志（T4）：多租户登录由 CompleteLogin(done=false) + 本方法共同完成，成功的落点在
+	// 这里（上一步校验过 tenantID 必在 tenants 内，故 UserID 必然可得）。
+	// CompleteLogin 在该分支刻意不写，避免同一次登录重复落账。
+	selected, _ := findTenantOption(tenants, tenantID)
+	recordOIDCLoginLog(ctx, tenantID, selected.UserID, personID)
 	return resp, nil
 }
 
@@ -341,6 +349,7 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID s
 	}
 
 	tenantID := ""
+	loginUserID := ""
 	tenants, tErr := svc.authSvc.TenantsForPerson(ctx, personID)
 	if tErr == nil {
 		clientID := clientIDFromAuthRequest(authReq)
@@ -361,6 +370,7 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID s
 				for _, t := range usableTenants {
 					if t.TenantID == hint {
 						tenantID = hint
+						loginUserID = t.UserID
 						break
 					}
 				}
@@ -369,6 +379,7 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID s
 		// membership safety: never issue a token for a tenant hinted but not owned by the user
 		if tenantID == "" && len(usableTenants) > 0 {
 			tenantID = usableTenants[0].TenantID
+			loginUserID = usableTenants[0].UserID
 		}
 	}
 
@@ -404,6 +415,10 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID s
 		TargetType: model.AuditTargetTypePerson,
 		TargetID:   personID,
 	})
+
+	// 登录日志（T4）：prompt=none 静默 SSO 是货真价实的登录成功（票据已 done=true），
+	// 且这条路径没有密码校验、上游不会写 password 行，故必须在此补记。
+	recordOIDCLoginLog(ctx, tenantID, loginUserID, personID)
 
 	if aErr := svc.provider.Storage.AssociateSession(reqCtx, authRequestID, sessionID); aErr != nil {
 		glog.Warnf(ctx, "[oidcAuthSvc.CompleteLoginBySession] associate session fail, err:%v, authRequestID:%s, sessionID:%s", aErr, authRequestID, sessionID)

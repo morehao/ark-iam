@@ -297,7 +297,7 @@ func TestAppAccessTokenGateKeepsTenantGatePriority(t *testing.T) {
 
 // TestResolveClientAppIDUsesExplicitCrossTenantScope 门禁取应用的口径：
 // client_id 全局唯一，解析必须显式声明「全租户」作用域（测试库挂着同一份 fail-closed 插件，
-// 漏声明会以 ErrTenantScopeMissing 失败）。
+// 漏声明会以 ErrTenantScopeMissing 失败）。解析实现已上提为 pkg/core/application.AppIDByClientID。
 func TestResolveClientAppIDUsesExplicitCrossTenantScope(t *testing.T) {
 	f := newAppAccessGateFixture(t, true)
 	appID, err := f.storage.persistentStore.resolveClientAppID(context.Background(), f.clientID)

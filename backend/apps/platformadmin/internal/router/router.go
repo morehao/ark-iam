@@ -9,4 +9,5 @@ func RegisterRouter(groups *ginserver.RouterGroups) {
 	applicationRouter(groups)
 	domainRouter(groups)
 	tenantApplicationRouter(groups)
+	auditLogRouter(groups)
 }

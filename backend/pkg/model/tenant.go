@@ -38,9 +38,16 @@ func NormalizeTenantStatus(status TenantStatus) TenantStatus {
 	}
 }
 
+// TenantEntity 租户。
+//
+// code 的唯一性口径与其余软删除表一致：**部分唯一索引**（WHERE deleted_at IS NULL），
+// 使「软删一个租户 → 用同一 code 再建」不会被历史行撞键。
+// GORM AutoMigrate 不支持部分索引，事实源是 automigrate.go 的 partialUniqueIndexes（幂等 DDL）。
+// 注意：本列原来的普通 `uniqueIndex` tag 已删除——AutoMigrate 只增不删，
+// 存量库上的旧唯一索引需要**删库重建**才会消失（见 AGENTS.md「Schema 变更约定」）。
 type TenantEntity struct {
 	gormdao.BaseEntity
-	Code      string       `gorm:"column:code;type:varchar(64);not null;default:'';uniqueIndex;comment:租户编码"`
+	Code      string       `gorm:"column:code;type:varchar(64);not null;default:'';comment:租户编码"`
 	CreatedBy string       `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id"`
 	DbUser    string       `gorm:"column:db_user;type:varchar(64);not null;default:'';comment:数据库用户"`
 	DeletedBy string       `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人id"`

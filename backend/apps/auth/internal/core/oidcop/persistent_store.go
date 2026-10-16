@@ -16,6 +16,7 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
 
+	"github.com/morehao/ark-iam/pkg/core/application"
 	"github.com/morehao/ark-iam/pkg/credential"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
@@ -478,25 +479,11 @@ func (s *PersistentStore) appendRoleGroupClaims(ctx context.Context, userinfo *o
 
 // resolveClientAppID 解析本次签发客户端所属的应用——即 groups 声明的命名空间。
 //
-// client_id 全局唯一（`application_client.code` 带全局唯一索引），且解析发生在「租户确定之前」，
-// 与 GetClientByClientID 同口径：显式声明跨全部租户读取。
-//
-// 返回空串表示「没有可用的命名空间」，此时不产出声明而不报错——与「租户未定不猜租户」同构：
-// clientID 为空（调用方拿不到客户端）或客户端未绑定应用，都属合法的「无作用域」。
-// 客户端记录不存在则是状态异常，返回 error 由调用方 fail-closed 拒绝签发。
+// 解析逻辑的唯一实现在 pkg/core/application.AppIDByClientIDWithDAO（与控制台请求期准入闸口
+// 共用同一份口径）；本方法只负责把本 store 装配的 application_client dao（可能绑定调用方事务）
+// 注入进去，不再自带第二份实现。
 func (s *PersistentStore) resolveClientAppID(ctx context.Context, clientID string) (string, error) {
-	if clientID == "" {
-		return "", nil
-	}
-	cctx := dbclient.CrossTenantContext(ctx)
-	client, err := s.applicationClientDao().GetByCond(cctx, &dao.ApplicationClientCond{Code: clientID})
-	if err != nil {
-		return "", err
-	}
-	if client == nil || client.ID == "" {
-		return "", fmt.Errorf("application client not found: %s", clientID)
-	}
-	return client.AppID, nil
+	return application.AppIDByClientIDWithDAO(ctx, clientID, s.applicationClientDao())
 }
 
 func (s *PersistentStore) SetUserinfoFromScopes(ctx context.Context, userinfo *oidc.UserInfo, userID, clientID string, scopes []string) error {
