@@ -8,7 +8,7 @@
 > 1. **接受破坏性调整**：按新项目做数据初始化——升级＝删库重建，**不写回填 SQL、不写兼容旧库的分支**。
 > 2. **不使用共享枚举类型**（不引入 `Toggle`）：每个「是否 X」列各自一个具名类型 + 一组常量，换取编译期字段身份。
 > 3. **禁止 `map[string]string` 这类"半显式"载体**：自由 JSON 一律落成显式结构体（外部数据走白名单收窄）。
-> 4. **状态类型不共用**：`person.status` 与 `tenant_user.status` 各自具名，即使取值集合相同。
+> 4. **状态类型不共用**：`person.status` 与 `user.status` 各自具名，即使取值集合相同。
 
 ---
 
@@ -73,7 +73,7 @@
 | `user_identity` | detail | `json.RawMessage` | 控制台身份列表展示 |
 | `tenant_application` | config / granted_scope | `datatypes.JSON` | **仅存取，无消费方** |
 | `api_key` | scope | `json.RawMessage` | **只写 `{}`，无读方**（glossary 自述"当前不参与鉴权"） |
-| `person` / `tenant_user` | profile / custom_data | `json.RawMessage` | **只写 `{}`，无读方** |
+| `person` / `"user"` | profile / custom_data | `json.RawMessage` | **只写 `{}`，无读方** |
 | `log` | payload | `json.RawMessage` | 读方存在（platformadmin `/logs`），**但全仓无任何写入方** |
 
 - **78 处**非测试代码直接操作上述列或为其写 `{}`/`[]` 占位值（口径：`json.Marshal|json.Unmarshal|datatypes.JSON|json.RawMessage` 命中 116 行，剔除 oidcop/sso 协议态 Redis 序列化 17 行与 model 字段声明 21 行；随 #68 合并后复算）。
@@ -85,7 +85,7 @@
 | 表 | 列 | 现类型 |
 |---|---|---|
 | `person` | is_suspended / must_change_password | `bool` |
-| `tenant_user` | is_suspended / is_owner | `bool` |
+| `"user"` | is_suspended / is_owner | `bool` |
 | `application` | allow_person_create_tenant / allow_join_by_invite | `*bool`（可空） |
 | `application_client` | require_pkce / require_auth_time | `bool` |
 | `connector` | allow_auto_create_user / allow_account_link / sync_profile / enable_token_storage | `bool` |
@@ -183,7 +183,7 @@ const (
     PersonStatusSuspended PersonStatus = "suspended"
 )
 
-// UserStatus 租户成员可用性（tenant_user.status）。
+// UserStatus 租户成员可用性（user.status）。
 // 与 PersonStatus **刻意分列**：两者是不同实体的生命周期，共用类型会让
 // 「把 person 的状态写进 user」编译通过——正是本次评审要求避免的。
 type UserStatus string
@@ -199,7 +199,7 @@ const (
     PasswordStatusMustChange PasswordStatus = "must_change"
 )
 
-// OwnerType 租户拥有者类型（tenant_user.owner_type），取值风格对齐 role.admin_type（admin/normal）。
+// OwnerType 租户拥有者类型（user.owner_type），取值风格对齐 role.admin_type（admin/normal）。
 type OwnerType string
 const (
     OwnerTypeOwner  OwnerType = "owner"
@@ -312,7 +312,7 @@ func (l ConnectorScopeList) Strings() []string        { return []string(l) }
 | 11 | refresh_token.amr | `AuthMethodList` | `+serializer:json` | **保持可空** |
 | 12 | user_identity.detail | `UserIdentityDetail` | `+serializer:json` | 见 §5.4、§6.4 |
 | 13 | application.role_template | `RoleTemplateItemList`（**已存在**，`pkg/model/role.go`） | `+serializer:json` | 随 #68 新增；删 `ApplicationEntity.RoleTemplateList()` 手工解析（见 §6.7） |
-| 14-21 | tenant_application.granted_scope / tenant_application.config / person.profile / person.custom_data / tenant_user.profile / tenant_user.custom_data / api_key.scope / log.payload | — | — | **删除**（无消费方；随 §12 决策） |
+| 14-21 | tenant_application.granted_scope / tenant_application.config / person.profile / person.custom_data / user.profile / user.custom_data / api_key.scope / log.payload | — | — | **删除**（无消费方；随 §12 决策） |
 
 ```go
 // ConnectorConfig 连接器配置：显式字段取代原 map[string]any + Raw/Extra 双逃生舱。
@@ -383,8 +383,8 @@ type UserIdentityDetail struct {
 |---|---|---|---|---|---|---|
 | 1 | person.is_suspended | bool | `Status` | `PersonStatus` | `status` | **改名**（新列默认 `active`） |
 | 2 | person.must_change_password | bool | `PasswordStatus` | `PasswordStatus` | `password_status` | **改名**（默认 `normal`） |
-| 3 | tenant_user.is_suspended | bool | `Status` | `UserStatus` | `status` | **改名** |
-| 4 | tenant_user.is_owner | bool | `OwnerType` | `OwnerType` | `owner_type` | **改名** + 同步 `seed_authority` 矩阵键 |
+| 3 | user.is_suspended | bool | `Status` | `UserStatus` | `status` | **改名** |
+| 4 | user.is_owner | bool | `OwnerType` | `OwnerType` | `owner_type` | **改名** + 同步 `seed_authority` 矩阵键 |
 | 5 | application.allow_person_create_tenant | *bool | `AllowPersonCreateTenant` | `AppPersonCreateTenantPolicy` | 不变 | 类型变更 + **去掉可空**（NULL≡false≡disable） |
 | 6 | application.allow_join_by_invite | *bool | `AllowJoinByInvite` | `AppJoinByInvitePolicy` | 不变 | 同上 |
 | 7 | application_client.require_pkce | bool | `RequirePKCE` | `ClientPKCEPolicy` | 不变 | ⚠️ 同名列类型变更（§8.1） |
@@ -675,7 +675,7 @@ flowchart LR
 | Q4 | `connector.config.scopes` 是否单独具名 | **具名** `ConnectorScopeList`，不复用外部列表类型 | §5.2 |
 | Q5 | `role_template` 坏 JSON 的读取语义（#68 合并后新增；原 `RoleTemplateList()` 是"解码失败返回 nil"） | **fail-loud**（§6.7-A）：删宽容解析，防线收敛到写入侧校验；不保留"静默撤空角色"的读侧兜底 | §5.3 第 13 行、§6.7、P1 |
 
-> 更早已随评审关闭：`Toggle` vs 每字段类型 → **每字段独立**（策略 2）；`map[string]string` vs 白名单 → **显式白名单结构体**（策略 3）；`person.status` 与 `tenant_user.status` 是否共用 → **不共用**（策略 4）；是否写回填 SQL → **不写，删库重建**（策略 1）。
+> 更早已随评审关闭：`Toggle` vs 每字段类型 → **每字段独立**（策略 2）；`map[string]string` vs 白名单 → **显式白名单结构体**（策略 3）；`person.status` 与 `user.status` 是否共用 → **不共用**（策略 4）；是否写回填 SQL → **不写，删库重建**（策略 1）。
 
 **至此无未决项**，可直接进入 P0。
 

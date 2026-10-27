@@ -160,7 +160,7 @@ func TestAppAccessTokenGateAuthorizationCodeFlow(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "access_denied")
 
-	// 准入启用：放行，且声明口径正确（tenant_id/user_id=tenant_user.id/person_id/sid）
+	// 准入启用：放行，且声明口径正确（tenant_id/user_id=user.id/person_id/sid）
 	f.setGrant(t, model.UserApplicationStatusEnable)
 	claims, err := f.storage.GetPrivateClaimsFromRequest(ctx, f.authRequest(), nil)
 	require.NoError(t, err)

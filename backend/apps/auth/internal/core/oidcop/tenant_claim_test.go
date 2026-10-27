@@ -291,7 +291,7 @@ func TestGetPrivateClaimsFromAuthRequestOmitsSidWhenEmpty(t *testing.T) {
 }
 
 // TestGetPrivateClaimsFromRequestIncludesUserID 覆盖「令牌新增 user_id 声明」：
-// 人令牌的 user_id 必须等于该 (tenant_id, person_id) 对应的 tenant_user.id，
+// 人令牌的 user_id 必须等于该 (tenant_id, person_id) 对应的 user.id，
 // 且与刷新令牌行上的 UserID 一致（下游据此写审计操作者列）。
 func TestGetPrivateClaimsFromRequestIncludesUserID(t *testing.T) {
 	ctx := context.Background()
@@ -309,7 +309,7 @@ func TestGetPrivateClaimsFromRequestIncludesUserID(t *testing.T) {
 		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
 	}
 	if got := claims["user_id"]; got != "51" {
-		t.Fatalf("expected user_id claim 51 (tenant 7 的 tenant_user.id), got %v", got)
+		t.Fatalf("expected user_id claim 51 (tenant 7 的 user.id), got %v", got)
 	}
 	if got := claims["person_id"]; got != "88" {
 		t.Fatalf("expected person_id claim 88, got %v", got)

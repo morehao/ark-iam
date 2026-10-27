@@ -385,7 +385,7 @@ func TestServiceAccountCannotBeLeader(t *testing.T) {
 }
 
 // TestMachineUserUpdateRolesGrantsAppAccess 锁定 I1 在**服务账号**路径上同样成立（AC-6）：
-// 服务账号与真实成员共用 user_id=tenant_user.id 的口径，本次确实授予角色时必须同事务补出
+// 服务账号与真实成员共用 user_id=user.id 的口径，本次确实授予角色时必须同事务补出
 // enable/role 准入；清空角色属撤销授权，不反向撤准入（与 userSvc 的用例对称）。
 func TestMachineUserUpdateRolesGrantsAppAccess(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserApplicationEntity{})

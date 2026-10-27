@@ -7,10 +7,17 @@ import (
 )
 
 // TableNameUser 租户内用户表的物理表名。
-// 领域实体保持 UserEntity（租户内用户，与 PersonEntity 自然人区分，贯穿 API/DTO/前端）；
-// 因 user 是 PostgreSQL 保留字（DAO 拼接 user.xxx 会语法错误），物理表名采用 tenant_user，
+// 领域实体保持 UserEntity（租户内用户，与 PersonEntity 自然人区分，贯穿 API/DTO/前端），
 // 由 UserEntity.TableName() 建立映射。
-const TableNameUser = "tenant_user"
+//
+// user 是 PostgreSQL 保留字，直接拼 "user.xxx" 会语法错误；这里传**逻辑表名**，
+// 由 golib gormdao（v1.33.0+）按方言引用标识符，PostgreSQL 生成 "user"."tenant_id"。
+// 因此本仓库不得在表名/列名上手工加引号。
+//
+// 历史：该表曾名 iam_user，后改为 tenant_user；2026-10-27 回归为 user，
+// 旧库由部署窗口内的一次性 `ALTER TABLE tenant_user RENAME TO "user"` 保数据（见
+// docs/design/run-and-deploy.md「升级到 user 表名」）。
+const TableNameUser = "user"
 
 // UserType 租户账号类型。
 type UserType string
@@ -40,7 +47,7 @@ func (s UserSource) IsBuiltin() bool {
 	return s == UserSourceBuiltin
 }
 
-// UserStatus 租户成员可用性（tenant_user.status）。
+// UserStatus 租户成员可用性（user.status）。
 // 与 PersonStatus 刻意分列：两者是不同实体的生命周期，共用类型会让
 // 「把 person 的状态写进 user」编译通过。
 type UserStatus string
@@ -51,7 +58,7 @@ const (
 	UserStatusSuspended UserStatus = "suspended"
 )
 
-// OwnerType 租户拥有者类型（tenant_user.owner_type），取值风格对齐 role.admin_type。
+// OwnerType 租户拥有者类型（user.owner_type），取值风格对齐 role.admin_type。
 type OwnerType string
 
 // 租户拥有者类型取值（禁止硬编码）。

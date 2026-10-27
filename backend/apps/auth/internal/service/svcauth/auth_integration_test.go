@@ -93,7 +93,7 @@ func TestLogout(t *testing.T) {
 }
 
 // TestDefaultRecordLoginLogUpdatesLastSignInAt 回归（2026-09-18）：登录成功必须把 last_sign_in_at
-// 落到 tenant_user。该表带 tenant_id，而 /oidc/login 链路没有租户中间件——不在方法内显式声明
+// 落到 `"user"`。该表带 tenant_id，而 /oidc/login 链路没有租户中间件——不在方法内显式声明
 // 作用域时，fail-closed 插件会拦下这次 UPDATE，但登录本身照常成功、只留一行 error 日志，
 // 因此必须断言"值真的写进去了"，而不是断言登录返回成功。
 func TestDefaultRecordLoginLogUpdatesLastSignInAt(t *testing.T) {
@@ -107,5 +107,5 @@ func TestDefaultRecordLoginLogUpdatesLastSignInAt(t *testing.T) {
 	user, err := dao.NewUserDao().GetByID(dbclient.CrossTenantContext(ctx), "1")
 	require.NoError(t, err)
 	require.NotNil(t, user)
-	assert.NotNil(t, user.LastSignInAt, "登录成功后 tenant_user.last_sign_in_at 必须落库")
+	assert.NotNil(t, user.LastSignInAt, "登录成功后 user.last_sign_in_at 必须落库")
 }

@@ -32,12 +32,12 @@ const (
 // 进入应用后能做什么由角色（user_role/role_menu）决定，两者互不替代。
 // 完整判定 = tenant_application.status=enable ∧ application.status=enable ∧ 本表 status=enable。
 //
-// UserID 指向 tenant_user.id（租户成员主键，真实用户与服务账号同一口径），不是 person.id：
+// UserID 指向 user.id（租户成员主键，真实用户与服务账号同一口径），不是 person.id：
 // 协议层只拿得到 person，须先解析出成员行再判定（同 user_role.user_id 口径）。
 type UserApplicationEntity struct {
 	gormdao.BaseEntity
 	TenantID  string                `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id;uniqueIndex:uk_user_application_active,where:deleted_at IS NULL" json:"tenantID"`
-	UserID    string                `gorm:"column:user_id;type:varchar(36);not null;default:'';comment:租户成员id(tenant_user.id);uniqueIndex:uk_user_application_active,where:deleted_at IS NULL;index:idx_user_application_app,priority:2" json:"userID"`
+	UserID    string                `gorm:"column:user_id;type:varchar(36);not null;default:'';comment:租户成员id(user.id);uniqueIndex:uk_user_application_active,where:deleted_at IS NULL;index:idx_user_application_app,priority:2" json:"userID"`
 	AppID     string                `gorm:"column:app_id;type:varchar(36);not null;default:'';comment:应用id;uniqueIndex:uk_user_application_active,where:deleted_at IS NULL;index:idx_user_application_app,priority:1" json:"appID"`
 	Status    UserApplicationStatus `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:准入状态(enable/disable)" json:"status"`
 	Source    UserApplicationSource `gorm:"column:source;type:varchar(32);not null;default:'manual';comment:准入来源(manual/role/provision)" json:"source"`

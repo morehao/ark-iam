@@ -9,14 +9,14 @@
 | 术语 | 英文 | 说明 |
 |---|---|---|
 | 自然人 ✅ | Person | 跨租户的**全局身份**。用户名/邮箱/手机号全局唯一（可空），密码、全局状态（挂起）在此维护。OIDC `sub` 为 `person:<id>` |
-| 租户成员 ✅ | User | 自然人（person）在某个**租户内**的成员记录（表 **`tenant_user`**——`user` 是 PostgreSQL 保留字，故物理表名加前缀；领域实体为 `UserEntity`）。租户内姓名/资料/角色、归属类型（`owner_type`：`owner` 拥有者 / `normal` 普通成员）、加入时间 |
+| 租户成员 ✅ | User | 自然人（person）在某个**租户内**的成员记录（表 **`"user"`**——`user` 是 PostgreSQL 保留字，物理表名需按方言引用，由 golib gormdao 负责；领域实体为 `UserEntity`）。租户内姓名/资料/角色、归属类型（`owner_type`：`owner` 拥有者 / `normal` 普通成员）、加入时间 |
 | 租户 | Tenant | 独立的客户边界（业务主体的隔离单元）。数据与权限按租户隔离；类型分 `customer`（客户租户）/`platform`（平台租户） |
 | 租户类型 | Tenant Type | **分类标识**：`customer` = 外部客户/合作方的独立租户；`platform` = 平台自运营租户（首次引导写入的平台租户「平台运营中心」即平台租户）。当前仅用于分类展示，不参与数据隔离与权限判定（隔离一律按 `tenant_id`） |
 | 租户编码 | Tenant Code | 租户的业务编码，全局唯一、创建后不可修改。由服务端自动生成，规则 `t_<12 位随机小写 hex>`（如 `t_3f7a9c1d2e4b`），见 `pkg/core/tenant.GenerateCode`；平台租户（首次引导写入的「平台运营中心」）为固定值 `t_platform`——同前缀、后缀固定可读，因自动生成的随机段只用小写 hex，两者不会冲突。平台的 `tenant.status` 还是字段权威矩阵里的 `immutable`（挂起整栈失联，控制台拒写） |
 | 租户拥有者 | Tenant Owner | 租户的拥有者成员（注册即成为首个拥有者），拥有租户管理权限 |
 | 外部身份 | User Identity | person 在外部身份源（Connector）中的身份映射（issuer + external_subject） |
 | 多租户 | Multi-tenant | 一个 person 可同时属于多个租户；登录时需选择租户（或由 `tenant` hint 指定） |
-| 挂起 | Suspended | person/user 被停用，禁止登录（`person.status` / `tenant_user.status` = `suspended`；旧 `is_suspended` 布尔列已下线） |
+| 挂起 | Suspended | person/user 被停用，禁止登录（`person.status` / `user.status` = `suspended`；旧 `is_suspended` 布尔列已下线） |
 | 启停状态 | Enable Status | 全局统一的「启用/停用」词汇：`enable` 启用 / `disable` 停用。凡表达「这条记录还能不能参与业务」的字段一律用它——`application.status`、`application_client.status`、`tenant_application.status`、`user_application.status`、`department.status`、`connector.status`、`menu.status` 均属此类，禁止再出现 `active`/`inactive`/`enabled` 等同义异写。**布尔开关一律具名枚举化**：同名的 `...Flag` / `...Policy` 列（如 `menu.hidden`、`application_client.require_pkce`、`connector.allow_account_link`）同样是 `enable`/`disable` 的 `varchar(16)` 列 + 具名类型 + 常量，禁止用 Go `bool` 表达字典语义、禁止裸字面量 |
 | 租户状态 | Tenant Status | 租户**生命周期**状态（`tenant.status`）：`active` 正常 / `suspended` 已挂起，属生命周期词汇而**不是**启停状态（`suspended` 有「禁止该租户成员登录与签发令牌」的独立语义，降级为 `disable` 会丢失语义）。仅 active 允许其成员登录、签发与轮换令牌；挂起会撤销该租户成员的 refresh token 与 SSO 会话；禁止挂起操作者自己所在的租户（不可逆自锁） |
 
@@ -38,7 +38,7 @@
 | OAuth 客户端 ✅ | Application Client | 应用下的 OIDC 接入凭证：client_id、回调白名单、授权类型、令牌 TTL 等 |
 | 客户端密钥 ✅ | Client Secret | 机密客户端在令牌端点的认证凭证（库中只存哈希） |
 | 内置应用 | Built-in App | 平台随产品交付的控制台应用（`application.source=builtin`）：**平台管理后台**与**租户管理后台**两个内置应用（由首次初始化引导写入），受删除保护（报 `100746`）、编码只读（报 `100749`），菜单只在各自所属的控制台呈现 |
-| 字段权威矩阵 ✅ | Seed Field Authority | 声明内置种子数据每个字段归谁写的唯一真相源（`pkg/model/seed_authority.go`）：`immutable` 首次引导写入后控制台拒写 / `create_only` 只播种、归运维。只有这两条语义——旧的 `reconcile`（种子收敛）与 `migrate_once`（值匹配一次性改名）已随"启动期播种"整体删除：初始化只在全新库执行一次、随后永久自锁，不存在"下次初始化被收回"的双写者。矩阵与各 service 的拒写点共用同一份声明（矩阵本身不写数据）。**immutable 准入判据**：只保留安全不变式（`source`/`admin_type`/平台租户 `status`/`tenant_user.source`）与身份编码（内置应用 `code`、内置客户端 `code`），展示、结构与其余编码字段一律归运维——首次引导由**种子身份键**认行，不再经由控制台可写字段。详见 [system-design.md](system-design.md) §4.5 |
+| 字段权威矩阵 ✅ | Seed Field Authority | 声明内置种子数据每个字段归谁写的唯一真相源（`pkg/model/seed_authority.go`）：`immutable` 首次引导写入后控制台拒写 / `create_only` 只播种、归运维。只有这两条语义——旧的 `reconcile`（种子收敛）与 `migrate_once`（值匹配一次性改名）已随"启动期播种"整体删除：初始化只在全新库执行一次、随后永久自锁，不存在"下次初始化被收回"的双写者。矩阵与各 service 的拒写点共用同一份声明（矩阵本身不写数据）。**immutable 准入判据**：只保留安全不变式（`source`/`admin_type`/平台租户 `status`/`user.source`）与身份编码（内置应用 `code`、内置客户端 `code`），展示、结构与其余编码字段一律归运维——首次引导由**种子身份键**认行，不再经由控制台可写字段。详见 [system-design.md](system-design.md) §4.5 |
 | 种子身份键 ✅ | Seed Identity Key (`seed_key`) | `menu` / `application` 上的内部列：内置行的**稳定标识**（= 首次引导定义时的 `code`），创建时写入后不再变化，**控制台不可见也不可写**（API 出参也不返回）。初始化引导（`pkg/seed.Bootstrap`）与租户开通（`ProvisionTenantAdmin`）都以它认行，因此业务字段 `code`（乃至菜单归属应用）可以自由修改而不触发"查不到 → 重建一行"——**例外是内置应用与内置客户端的 `code`**：它们仍被控制台菜单入口 / 网关 aud 边界按值引用，矩阵登记为 `immutable` 且由 service 拒改。控制台自建行恒为空串（部分唯一索引排除空值）。详见 [system-design.md](system-design.md) §4.5 |
 | 第一方应用 | First-party App | 平台自建但非内置的应用（`application.source=first_party`），可删除；当前首次引导不产生该来源，仅运维自建时出现 |
 | 第三方应用 | Third-party App | 外部接入应用（`application.source=third_party`）；控制台新建的应用恒为此类 |
@@ -72,7 +72,7 @@
 
 | 术语 | 英文 | 说明 |
 |---|---|---|
-| 准入 ✅ | Entitlement / App Access | **「某用户可否使用某应用」的唯一事实源**（表 `user_application`：`tenant_id`、`user_id`（引用 `tenant_user.id`，含成员与服务账号）、`app_id`、`status`、`source`；唯一性靠部分唯一索引 `uk_user_application_active (tenant_id, user_id, app_id) WHERE deleted_at IS NULL`，软删后可重授）。与**订阅**（租户层，表 `tenant_application`：租户是否开通该应用）与**授权**（应用内角色/菜单，表 `user_role`/`role_menu`：进入应用后能做什么）是三层不同语义。判定式 `可用 ⟺ application.status=enable ∧ tenant_application.status=enable ∧ user_application.status=enable`，唯一实现在 `backend/pkg/core/application/access.go` 的 `Usable`（表达式）/`CheckUsable`（点查）；`status` 是具名枚举 `model.UserApplicationStatus`（`enable`/`disable`，撤销＝置 `disable` 且**保留行**），`source` 是具名枚举 `model.UserApplicationSource`（`manual` 手工分配 / `role` 角色授予自动补齐 / `provision` 引导写入）。**与订阅的差别**：订阅是准入的**上界**——未订阅时准入必然无效（违反即拒绝写入，报 `100786`），但已写入的准入行**保留**，重新订阅即自动恢复（不变式 I3，取消订阅不级联删除准入行）。**与授权的差别**：授权不产生可用性，只有准入是门槛——写角色会在同事务**自动补准入**（不变式 I1，`source=role`），而撤销角色**不**回撤准入（单向）。常见误用：把「已订阅」当成「成员可用」、把「有角色」当成「能登录」 |
+| 准入 ✅ | Entitlement / App Access | **「某用户可否使用某应用」的唯一事实源**（表 `user_application`：`tenant_id`、`user_id`（引用 `user.id`，含成员与服务账号）、`app_id`、`status`、`source`；唯一性靠部分唯一索引 `uk_user_application_active (tenant_id, user_id, app_id) WHERE deleted_at IS NULL`，软删后可重授）。与**订阅**（租户层，表 `tenant_application`：租户是否开通该应用）与**授权**（应用内角色/菜单，表 `user_role`/`role_menu`：进入应用后能做什么）是三层不同语义。判定式 `可用 ⟺ application.status=enable ∧ tenant_application.status=enable ∧ user_application.status=enable`，唯一实现在 `backend/pkg/core/application/access.go` 的 `Usable`（表达式）/`CheckUsable`（点查）；`status` 是具名枚举 `model.UserApplicationStatus`（`enable`/`disable`，撤销＝置 `disable` 且**保留行**），`source` 是具名枚举 `model.UserApplicationSource`（`manual` 手工分配 / `role` 角色授予自动补齐 / `provision` 引导写入）。**与订阅的差别**：订阅是准入的**上界**——未订阅时准入必然无效（违反即拒绝写入，报 `100786`），但已写入的准入行**保留**，重新订阅即自动恢复（不变式 I3，取消订阅不级联删除准入行）。**与授权的差别**：授权不产生可用性，只有准入是门槛——写角色会在同事务**自动补准入**（不变式 I1，`source=role`），而撤销角色**不**回撤准入（单向）。常见误用：把「已订阅」当成「成员可用」、把「有角色」当成「能登录」 |
 | 角色 ✅ | Role | 权限载体（租户内、按应用 `app_id` 作用域）。两套标识刻意分离：`code`（**跨系统授权契约值**，即 OIDC `groups` 取值，见下「角色编码」）+ `name`（应用内可读标识，同一应用内唯一）；另以 `source`（builtin 内置 / custom 自定义）区分产生方式、以 `admin_type`（admin / normal）标记**系统管理能力**（内置角色的 `admin_type` 禁改） |
 | 角色编码 ✅ | Role Code | 下游按「`claim_prefix` + 编码」认自己的策略名，因此它是契约而非展示名。**只有两个来源**：产品锚点（`platform_admin`/`tenant_admin`）与**应用角色模板**（`application.role_template`，开通应用时物化到各租户）；**租户侧没有写入入口**——自建角色的编码恒为空串、不进入 `groups` 声明。下游策略是全局命名实体（一条策略全租户共用），若允许租户写编码，任何租户管理员都能造出一个撞上既有策略的编码从而自提权，详见 `application-integration-guide.md` §3.4 |
 | 应用角色模板 ✅ | Application Role Template | 应用对外的契约角色清单（`application.role_template` = `[{code,name}]`，≤64 项、编码模板内唯一且不得占用产品锚点）。它是**单一事实源**：开通应用时物化到租户（`source=builtin`、租户侧只读），更新时对已开通租户做差量同步——**移除即从各租户撤下该角色并级联删除其成员/菜单授权**（故平台控制台必须二次确认）。它取代了早先的「保留编码」层 |
@@ -91,7 +91,7 @@
 | 登录风控 | Login Guard | 失败次数窗口与锁定（默认 5 次/5 分钟/锁 15 分钟） |
 | API Key ✅ | API Key | 机器凭证（`x-api-key` 头或 `Authorization: Bearer` 携带，SHA-256 哈希存储、可过期/吊销；`scope` 列保留但**当前不参与鉴权**） |
 | 机器令牌 ✅ | Machine Token | 带 `token_usage=machine` 的令牌（**仅 API Key 签发**，含「API Key 当 client credential」路径），不依赖浏览器会话；普通 `client_credentials` 令牌不带该标记，也不能访问业务 API |
-| 通道 A ✅ | Channel A: Self-Serve Signup | 自助注册自然人并开通自己的租户（`POST /oidc/registerPerson` → `POST /oidc/createTenant`），注册人成为该租户**拥有者**（`tenant_user.owner_type=owner`）；门禁是应用级 `application.allow_person_create_tenant`（非全局开关） |
+| 通道 A ✅ | Channel A: Self-Serve Signup | 自助注册自然人并开通自己的租户（`POST /oidc/registerPerson` → `POST /oidc/createTenant`），注册人成为该租户**拥有者**（`user.owner_type=owner`）；门禁是应用级 `application.allow_person_create_tenant`（非全局开关） |
 | 通道 B ✅ | Channel B: Join by Invite | 已登录用户凭邀请码加入**已有**租户（`POST /v1/auth/joinTenant`），加入者恒为**普通成员**；门禁是应用级 `application.allow_join_by_invite` 加邀请单自身有效——详见 `system-design.md` §5.1 |
 | 入口策略 ✅ | Entry Policy | `application` 上按两条自助通道各一个的**具名枚举开关列**（`allow_person_create_tenant`：`AppPersonCreateTenantPolicy`、`allow_join_by_invite`：`AppJoinByInvitePolicy`，取值 `enable`/`disable`，列类型 `varchar(16)`；NULL ≡ `disable`）；判定时按调用方 `client_id` 解析应用后读取，解析不出应用一律拒绝（fail-closed） |
 

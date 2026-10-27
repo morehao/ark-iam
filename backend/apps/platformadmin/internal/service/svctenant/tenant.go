@@ -169,7 +169,7 @@ func (svc *tenantSvc) ResetAdminPassword(ctx *gin.Context, req *dtotenant.Tenant
 	}
 
 	// 目标租户来自请求参数（可能不是调用方所在的平台租户）：显式声明「指定租户」作用域，
-	// 否则 tenant_user 查询会被当前租户过滤成 0 行，"内置管理员不存在"变成静默误判。
+	// 否则 user 表查询会被当前租户过滤成 0 行，"内置管理员不存在"变成静默误判。
 	builtinAdmin, err := dao.NewUserDao().GetByCond(dbclient.ExplicitTenantContext(ctx, tenantEntity.ID), &dao.UserCond{
 		TenantID: tenantEntity.ID,
 		Source:   model.UserSourceBuiltin,

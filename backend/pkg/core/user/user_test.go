@@ -15,7 +15,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// newTestDB 内存 SQLite 承载 person/tenant_user/department_user 三张表。
+// newTestDB 内存 SQLite 承载 person/user/department_user 三张表。
 // 这里直接用 tx（WithTx 路径）调用领域能力，无需注册全局 iam 库。
 func newTestDB(t *testing.T) *gorm.DB {
 	t.Helper()

@@ -472,7 +472,7 @@ func (svc *machineUserSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.MachineU
 				return err
 			}
 		}
-		// 不变式 I1：授权 ⇒ 准入。服务账号与真实成员同一口径（user_id 都是 tenant_user.id），
+		// 不变式 I1：授权 ⇒ 准入。服务账号与真实成员同一口径（user_id 都是 user.id），
 		// 本次确实授予了角色时同事务补齐该应用的准入；清空角色属撤销授权，不反向撤准入。
 		if len(req.RoleIDs) > 0 {
 			if err := application.EnsureGrant(ctx, tx, application.GrantParams{

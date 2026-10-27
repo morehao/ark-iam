@@ -415,7 +415,7 @@ func TestOIDCPersonWithoutUserRejected(t *testing.T) {
 }
 
 // TestOIDCUserIDFromTokenClaim 锁定「令牌携带 user_id 时不再查库」的行为：
-// claims.user_id 即下游审计操作者，且与 tenant_user 行主键一致。
+// claims.user_id 即下游审计操作者，且与 "user" 行主键一致。
 func TestOIDCUserIDFromTokenClaim(t *testing.T) {
 	// 建库但不 seed 任何 user：若中间件仍走反查会因"非租户成员"而 401。
 	_ = newOIDCAuthTestDB(t)

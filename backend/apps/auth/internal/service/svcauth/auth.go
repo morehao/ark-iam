@@ -560,7 +560,7 @@ func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID string, success bo
 
 	if success {
 		userDao := newAuthUserStore()
-		// last_sign_in_at 落在 tenant_user（含 tenant_id 的租户表）：/oidc/login 链路没有租户中间件，
+		// last_sign_in_at 落在 `"user"`（含 tenant_id 的租户表）：/oidc/login 链路没有租户中间件，
 		// ctx 未声明作用域，fail-closed 插件会把这次 UPDATE 拦下（登录仍成功，只在日志里留 error，
 		// 因而极易漏掉）。故按本次登录的租户显式声明作用域，与 JoinTenant 的 joinCtx 同口径。
 		if err := userDao.UpdateMap(dbclient.ExplicitTenantContext(ctx, tenantID), userID, map[string]interface{}{

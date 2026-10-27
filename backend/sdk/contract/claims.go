@@ -27,7 +27,7 @@ const (
 	ClaimTokenUsage = "token_usage"
 	// ClaimTenantID 是租户 claim 名。
 	ClaimTenantID = "tenant_id"
-	// ClaimUserID 是用户 claim 名（值为 tenant_user.id，审计主键）。
+	// ClaimUserID 是用户 claim 名（值为 user.id，审计主键）。
 	ClaimUserID = "user_id"
 	// ClaimClientID 是 client id claim 名。
 	ClaimClientID = "client_id"
@@ -35,7 +35,7 @@ const (
 	ClaimSessionID = "sid"
 	// ClaimScope 是标准 OAuth scope 声明名（空格分隔）。
 	ClaimScope = "scope"
-	// ClaimActor 是代操作（actor）声明名，形如 act: {sub: <tenant_user.id>}。
+	// ClaimActor 是代操作（actor）声明名，形如 act: {sub: <user.id>}。
 	ClaimActor = "act"
 	// ClaimPersonID 是自然人标识 claim 名（扩展声明；access token 默认集的一部分）。
 	ClaimPersonID = "person_id"
@@ -71,9 +71,9 @@ type TokenClaims struct {
 	jwt.RegisteredClaims
 	TokenUsage TokenUsage `json:"token_usage,omitempty"`
 	TenantID   string     `json:"tenant_id,omitempty"`
-	// UserID 是 tenant_user.id（租户成员主键），审计口径与 IAM 自身
+	// UserID 是 user.id（租户成员主键），审计口径与 IAM 自身
 	// created_by/updated_by 一致。人令牌由签发侧按 (tenant_id, person_id) 填，
-	// 机器令牌为机器账号（tenant_user）主键。
+	// 机器令牌为机器账号（user）主键。
 	UserID   string `json:"user_id,omitempty"`
 	ClientID string `json:"client_id,omitempty"`
 	// SessionID 是中心会话标识（OIDC sid）：用于按会话作废与 back-channel 登出匹配。
@@ -85,7 +85,7 @@ type TokenClaims struct {
 	// 目录 API 等 M2M 权限判定据此进行。
 	Scope string `json:"scope,omitempty"`
 	// Actor 是代操作（actor）声明：机器凭证代表某人操作时承载原操作者，
-	// wire 形态为 {"act":{"sub":"<tenant_user.id>"}}。
+	// wire 形态为 {"act":{"sub":"<user.id>"}}。
 	Actor map[string]any `json:"act,omitempty"`
 }
 

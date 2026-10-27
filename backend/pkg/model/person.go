@@ -47,7 +47,7 @@ type PersonEntity struct {
 	PasswordMethod    PasswordMethod `gorm:"column:password_method;type:varchar(32);not null;default:'';comment:密码加密方式"`
 	// PasswordStatus 为 must_change 时，该自然人持临时密码（或密码刚被管理员重置），
 	// 登录链路会在认证通过后拦截并强制其先设置新密码，改密成功前不签发 code / 不建会话。
-	// 放在 person（而非 tenant_user）是因为密码是自然人全局凭据，同一个人在多个租户共享一套密码。
+	// 放在 person（而非 user 表）是因为密码是自然人全局凭据，同一个人在多个租户共享一套密码。
 	PasswordStatus PasswordStatus `gorm:"column:password_status;type:varchar(16);not null;default:'normal';comment:密码状态(normal正常/must_change需改密)"`
 	Name           string         `gorm:"column:name;type:varchar(128);not null;default:'';comment:姓名"`
 	Avatar         string         `gorm:"column:avatar;type:varchar(2048);not null;default:'';comment:头像URL"`

@@ -53,7 +53,7 @@ func newRoleClaimTestStore(t *testing.T) (*PersistentStore, *gorm.DB) {
 	return ps, db
 }
 
-// seedTenantMember 播种租户成员（tenant_user）：注意其主键与自然人 ID **不同**，
+// seedTenantMember 播种租户成员（user）：注意其主键与自然人 ID **不同**，
 // user_role.user_id 引用的是成员主键——同 ID 的夹具会让「按 personID 查 user_role」的错误实现也能通过。
 func seedTenantMember(t *testing.T, db *gorm.DB, id, tenantID, personID string) {
 	t.Helper()
@@ -65,7 +65,7 @@ func seedTenantMember(t *testing.T, db *gorm.DB, id, tenantID, personID string) 
 		Source:     model.UserSourceBuiltin,
 		Name:       "成员-" + id,
 	}).Error; err != nil {
-		t.Fatalf("seed tenant_user: %v", err)
+		t.Fatalf("seed user: %v", err)
 	}
 }
 
@@ -152,7 +152,7 @@ func TestAppendRoleGroupClaimsScopedByTenantProfileAndApp(t *testing.T) {
 	subject := BuildSubject("g1")
 
 	// 同一自然人在两个租户各有角色；t1 内还含空编码存量行与一条历史重复编码角色。
-	// 成员主键刻意与自然人 ID 不同：user_role.user_id 引用的是成员主键（tenant_user.id）。
+	// 成员主键刻意与自然人 ID 不同：user_role.user_id 引用的是成员主键（user.id）。
 	seedTenantMember(t, db, "u-t1-g1", "t1", "g1")
 	seedTenantMember(t, db, "u-t2-g1", "t2", "g1")
 	// t1 内两个应用各有角色：只有与请求客户端所属应用一致的那些才进声明。
@@ -240,7 +240,7 @@ func TestAppendRoleGroupClaimsScopedByTenantProfileAndApp(t *testing.T) {
 		t.Fatalf("expected no groups for tenant without roles, got %v", got)
 	}
 
-	// 非该租户成员（无 tenant_user 行）：不产出 groups，也不跨租户兜底
+	// 非该租户成员（无 "user" 行）：不产出 groups，也不跨租户兜底
 	seedUserRoleBinding(t, db, "ur7", "t4", "u-t4-g1", "role-t1-a")
 	userinfo = &oidc.UserInfo{}
 	if err := ps.appendRoleGroupClaims(ctx, userinfo, "t4", "store_console", subject, []string{oidc.ScopeOpenID, oidc.ScopeProfile}); err != nil {

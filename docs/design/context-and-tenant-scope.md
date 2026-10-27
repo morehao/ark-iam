@@ -121,7 +121,7 @@ flowchart LR
 
 | `ContextWithFallback` | `db.WithContext(ginCtx)` | `db.WithContext(ginCtx.Request.Context())` | `tenantScopeFrom(ginCtx)` | `ginCtx` 作为 `context.Context` |
 |---|---|---|---|---|
-| **true** | `… AND "tenant_user"."tenant_id" = ?` | **逐字节相同** | 命中 | `Done()` 非 nil；`cancel()` 后 `Err() == Canceled` |
+| **true** | `… AND "user"."tenant_id" = ?` | **逐字节相同** | 命中 | `Done()` 非 nil；`cancel()` 后 `Err() == Canceled` |
 | **false** | **无 tenant 条件（静默不过滤！）** | 仍带 tenant 条件 | miss | `Done() == nil`（不透传） |
 
 > 测量口径：request ctx 必须是**可取消**的（`req.WithContext(cancelCtx)`）；沿用 `http.NewRequest` 默认的 `context.Background()` 会让 `Done()` 恒为 nil，把"未透传"误判为"透传"。
@@ -204,7 +204,7 @@ flowchart LR
 |---|---|---|---|
 | 1 | `pkg/core/tenant.CreateWithRootDept` | 根部门 `UpdateMap(dept_path/dept_depth)`：协议层建租户（无作用域）⇒ fail-closed 500；平台侧建租户（平台租户作用域）⇒ **命中 0 行且不报错**，部门路径永久缺失 | 租户 ID 生成后 `ExplicitTenantContext(ctx, tenantEntity.ID)` |
 | 2 | `pkg/core/tenant.ProvisionTenantAdmin` | `tenant_application`/`role`/`role_menu`/`user_role` 查重与写入被调用方租户过滤 ⇒ 重复行或静默不生效 | 入口按 `req.TenantID` 显式声明 |
-| 3 | `pkg/core/tenant.CreateTenantWithBuiltinAdmin` | 内置管理员的 `tenant_user` 查重/写入被调用方租户过滤 | 派生 `newTenantCtx` 传给 `user.Create` |
+| 3 | `pkg/core/tenant.CreateTenantWithBuiltinAdmin` | 内置管理员的 `"user"` 查重/写入被调用方租户过滤 | 派生 `newTenantCtx` 传给 `user.Create` |
 | 4 | `platformadmin/svctenantapplication`（Create/Update/Delete/Detail/PageList/loadRefs） | 平台侧跨租户运维订阅：重复订阅检测**永远为空**（表无唯一索引 ⇒ 只能靠 UNIQUE 报错）；列表只看得到平台租户；改/删他租户订阅报"不存在" | 全部 DAO 调用 `CrossTenantContext`；`loadRefs` 改收 `context.Context` |
 | 5 | `platformadmin/svctenant.ResetAdminPassword` | 按目标租户查内置管理员被平台租户过滤 ⇒ 永远"内置管理员不存在" | `ExplicitTenantContext(ctx, tenantEntity.ID)` |
 | 6 | `pkg/core/tenant.RevokeMemberSessions` / `RevokePersonSessions` | 平台侧挂起他租户：成员列表被平台租户过滤（撤不掉会话）；自然人级全局登出被限成单租户 | 成员列表 `Explicit(tenantID)`；自然人级 `Cross` |

@@ -18,8 +18,8 @@ func newTenantScopeGinCtx(tenantID string) *gin.Context {
 
 // TestTenantScopedUserInvisibleAcrossTenants 租户隔离插件（fail-closed）：
 // ctx 声明的租户作用域与行归属不一致时，即使按主键直查也读不到该行
-// （tenant_user 含 tenant_id，插件自动注入 tenant_id 过滤）。
-// 原「日志详情拒绝跨租户实体」用例随 log 表下线删除，本用例以 tenant_user 承担同一不变式。
+// （user 表含 tenant_id，插件自动注入 tenant_id 过滤）。
+// 原「日志详情拒绝跨租户实体」用例随 log 表下线删除，本用例以 user 表承担同一不变式。
 func TestTenantScopedUserInvisibleAcrossTenants(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.UserEntity{})
 	ctx := newTenantScopeGinCtx("71")
@@ -34,6 +34,6 @@ func TestTenantScopedUserInvisibleAcrossTenants(t *testing.T) {
 		t.Fatalf("GetByID returned error: %v", err)
 	}
 	if got != nil && got.ID != "" {
-		t.Fatalf("跨租户 tenant_user 不得可见, got %+v", got)
+		t.Fatalf("跨租户 user 不得可见, got %+v", got)
 	}
 }

@@ -33,7 +33,7 @@ type authConfig struct {
 	audiences []string
 	// keySource 提供按 kid 取公钥的能力（支持 OP 多 key 轮换）。
 	keySource oidckit.KeySource
-	// disableLegacyUserLookup 关闭"token 未携带 user_id 时反查 tenant_user"的兼容分支。
+	// disableLegacyUserLookup 关闭"token 未携带 user_id 时反查 user 表"的兼容分支。
 	// 生产不应打开；仅用于验证严格模式。
 	disableLegacyUserLookup bool
 }
@@ -84,7 +84,7 @@ func WithOIDCSSOValidation(validate func(ctx *gin.Context, personID string, isMa
 	}
 }
 
-// WithOIDCLegacyUserLookup 控制"person token 未携带 user_id 时反查 tenant_user"
+// WithOIDCLegacyUserLookup 控制"person token 未携带 user_id 时反查 user 表"
 // 的兼容分支（默认开启）。保留它是为了让尚未升级的存量 token 在切换期仍可用；
 // 待 OP 全面下发 user_id 后可关闭。
 func WithOIDCLegacyUserLookup(enable bool) AuthOption {
@@ -173,7 +173,7 @@ func newVerifier(cfg *authConfig) (*rp.Verifier, error) {
 //   - 机器凭证（token_usage=machine）：同样注入 user_id（机器主体），不做租户成员反查。
 //
 // user_id 自「令牌增加 user_id 声明」起由 OP 直接下发，因此不再需要每次请求查库反查
-// tenant_user（既省一次查询，也消除了"缓存层一旦读不到就误判非成员"的降级风险）。
+// user 表（既省一次查询，也消除了"缓存层一旦读不到就误判非成员"的降级风险）。
 // 对尚未携带 user_id 的存量 token，保留一段反查兼容（allowLegacyLookup）。
 func setOIDCContext(ctx *gin.Context, ident *rp.Identity, tokenStr string, allowLegacyLookup bool) error {
 	personID := ident.PersonID

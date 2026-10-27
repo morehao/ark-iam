@@ -93,14 +93,14 @@ flowchart LR
 | 声明 | 含义 |
 |---|---|
 | `sub` | 人令牌为 `person:<personID>`；机器凭证令牌（`token_usage=machine`）的 `sub` 不是自然人 |
-| `user_id` | **审计操作者的唯一口径**。人令牌 = `tenant_user.id`（与 IAM 自身 `created_by`/`updated_by` 同口径）；API Key / client_credentials 机器令牌 = 机器主体（`api_key.owner_user_id`），创建者另在 `act.sub` |
+| `user_id` | **审计操作者的唯一口径**。人令牌 = `user.id`（与 IAM 自身 `created_by`/`updated_by` 同口径）；API Key / client_credentials 机器令牌 = 机器主体（`api_key.owner_user_id`），创建者另在 `act.sub` |
 | `person_id` | 自然人 ID（与 `sub` 的 `person:` 前缀同源，便于下游无库访问识别主体） |
 | `sid` | SSO 中心会话标识，用于按会话作废与 back-channel 登出匹配 |
 | `tenant_id` | 租户作用域。**不是令牌有效性条件**：签发侧在「自然人 → 租户映射不唯一」时**不写**该 claim，验签照常通过、身份里的租户为空。需要租户的接口必须自行判定并返回 **403**，不得让 `dbclient.ErrTenantScopeMissing` 冒成 500 |
 | `client_id` | 令牌所属客户端 |
 | `token_usage` | `machine` 表示机器凭证（API Key / client_credentials）；缺省为自然人令牌 |
 | `scope` | 标准 OAuth scope（空格分隔，RFC 6749 §3.3）；目录 API 等 M2M 权限据此判定 |
-| `act` | 代操作声明，wire 形态 `{"act":{"sub":"<tenant_user.id>"}}`（机器凭证代表某人操作时承载原操作者） |
+| `act` | 代操作声明，wire 形态 `{"act":{"sub":"<user.id>"}}`（机器凭证代表某人操作时承载原操作者） |
 
 ---
 
@@ -246,7 +246,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 >
 > 租户状态 `status`（`active` 正常 / `suspended` 已挂起）：非法值/缺省归一为 `active`；`suspended` 会撤销该租户成员的 refresh token 与 SSO 会话，非 active 租户的成员无法登录、令牌不签发；`PUT /v1/platform/tenants/{tenantID}` 拒绝挂起操作者自己所在的租户（`100208`）；重置内置管理员密码失败报 `100210`。
 >
-> **建租户的管理员约定**（D2/D3/D6）：`admin` 必填且邮箱/手机至少一个（缺联系方式报 `100521`）；管理员在同事务内创建为 `tenant_user.source=builtin`、`owner_type=owner`，并绑定根部门与内置「租户管理员」角色（`source=builtin`、`admin_type=admin`，该角色随租户开通 `tenant-admin` 应用订阅；应用/菜单缺失会整体回滚并报 `100200`）。`adminInitialPassword` 只在**新建自然人**时非空——命中已存在自然人时沿用其原密码、不回显凭据（可改用重置内置管理员密码接口兜底）。该管理员首次登录强制改密：`/oidc/login` 返回 `requiresPasswordChange=true`，改完（`/oidc/login/changePassword`）须重新登录。详见 `system-design.md` §5.8。
+> **建租户的管理员约定**（D2/D3/D6）：`admin` 必填且邮箱/手机至少一个（缺联系方式报 `100521`）；管理员在同事务内创建为 `user.source=builtin`、`owner_type=owner`，并绑定根部门与内置「租户管理员」角色（`source=builtin`、`admin_type=admin`，该角色随租户开通 `tenant-admin` 应用订阅；应用/菜单缺失会整体回滚并报 `100200`）。`adminInitialPassword` 只在**新建自然人**时非空——命中已存在自然人时沿用其原密码、不回显凭据（可改用重置内置管理员密码接口兜底）。该管理员首次登录强制改密：`/oidc/login` 返回 `requiresPasswordChange=true`，改完（`/oidc/login/changePassword`）须重新登录。详见 `system-design.md` §5.8。
 
 ### 5.4 应用与客户端（OIDC 配置）
 
@@ -367,7 +367,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 | 字段 | 类型 | 含义 |
 |---|---|---|
-| `userID` | string | 成员 ID（`tenant_user.id`） |
+| `userID` | string | 成员 ID（`user.id`） |
 | `userType` | string | `member`（真实用户）/ `machine`（服务账号） |
 | `name` | string | 租户内姓名 / 服务账号名称 |
 | `username` | string | 全局用户名（服务账号恒为空串） |
@@ -501,7 +501,7 @@ roles, err := client.Roles(ctx)                          // client.RolesTruncate
 | 方法 | 路径 | 鉴权 | 说明 |
 |---|---|---|---|
 | GET | `/install/status` | **公开只读** | 返回 `{initialized, tokenRequired, schemaReady, consoles}`：`initialized` 以库内平台租户行为准（不是进程内缓存）；`tokenRequired` 表示服务端是否配置了引导令牌（环境变量或配置项任一非空即 true）；`schemaReady` 表示 `AutoMigrate` 是否已建出核心表（`seed.SchemaReady`）；`consoles` 回显内置控制台入口。未初始化时 login-web 的 `InstallGuard` 靠它决定是否把登录入口改道到 `/install` |
-| POST | `/install/initialize` | 请求头 `X-Bootstrap-Token` | **全系统唯一的内置数据写入口**：在**单个事务**内写入平台租户、根部门、内置应用与 OAuth 客户端、内置菜单与角色、内置管理员（person + tenant_user + 部门关系 + 角色授权）以及租户应用开通，并返回 `{report, adminUsername, loginURL, consoles}`；挂 `middleware.BootstrapRateLimit()` 限流 |
+| POST | `/install/initialize` | 请求头 `X-Bootstrap-Token` | **全系统唯一的内置数据写入口**：在**单个事务**内写入平台租户、根部门、内置应用与 OAuth 客户端、内置菜单与角色、内置管理员（person + user + 部门关系 + 角色授权）以及租户应用开通，并返回 `{report, adminUsername, loginURL, consoles}`；挂 `middleware.BootstrapRateLimit()` 限流 |
 
 **状态码与错误码**：成功 200；已初始化 409（`107000`，永久自锁，重启/换副本都不解除）；令牌缺失或不匹配 401（`107001`）；服务端未配置引导令牌时端点整体不可用、返回 503（`107002`，**fail-closed**）；初始化失败 500（`107003`）；入参非法 400（`107005`）；口令强度不足 400（`107006`）。
 

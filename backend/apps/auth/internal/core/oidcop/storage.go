@@ -233,12 +233,12 @@ type personClaimsRequest struct {
 	clientID  string
 }
 
-// personPrivateClaims 依据 (租户, 自然人, 客户端) 定位 tenant_user 行并产出人令牌私有声明。
+// personPrivateClaims 依据 (租户, 自然人, 客户端) 定位 `"user"` 行并产出人令牌私有声明。
 //
 // 返回 (nil, nil) 表示"该请求没有可用的租户/自然人上下文"，由调用方决定回退路径。
 // 四项声明一次性给出，避免"同一个语义在三处各写一遍"：
 //   - tenant_id：目标租户（协议流程解析得出，非调用方当前租户，故显式声明作用域）；
-//   - user_id：**tenant_user.id**，下游审计操作者的唯一口径；
+//   - user_id：**user.id**，下游审计操作者的唯一口径；
 //   - person_id：自然人 ID，便于下游在无库访问时识别主体；
 //   - sid：会话标识，供 RP 匹配会话粒度的 back-channel 登出（M4）。
 //
