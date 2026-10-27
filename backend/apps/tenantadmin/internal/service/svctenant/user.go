@@ -1,9 +1,9 @@
 package svctenant
 
 import (
+	"context"
 	"errors"
 
-	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/core/application"
@@ -14,8 +14,8 @@ import (
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
@@ -27,14 +27,14 @@ import (
 const userLoginLogPageSize = 100
 
 type UserSvc interface {
-	PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (*dtotenant.UserPageListResp, error)
-	Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dtotenant.UserCreateResp, error)
-	Detail(ctx *gin.Context, req *dtotenant.UserDetailReq) (*dtotenant.UserDetailResp, error)
-	Update(ctx *gin.Context, req *dtotenant.UserUpdateReq) error
-	ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPasswordReq) (*dtotenant.UserResetPasswordResp, error)
-	ListRoles(ctx *gin.Context, req *dtotenant.UserRolesListReq) (*dtotenant.UserRolesListResp, error)
-	UpdateRoles(ctx *gin.Context, req *dtotenant.UserRolesUpdateReq) error
-	ListLoginLogs(ctx *gin.Context, req *dtotenant.UserLoginLogListReq) (*dtotenant.UserLoginLogListResp, error)
+	PageList(ctx context.Context, req *dtotenant.UserPageListReq) (*dtotenant.UserPageListResp, error)
+	Create(ctx context.Context, req *dtotenant.UserCreateReq) (*dtotenant.UserCreateResp, error)
+	Detail(ctx context.Context, req *dtotenant.UserDetailReq) (*dtotenant.UserDetailResp, error)
+	Update(ctx context.Context, req *dtotenant.UserUpdateReq) error
+	ResetPassword(ctx context.Context, req *dtotenant.UserResetPasswordReq) (*dtotenant.UserResetPasswordResp, error)
+	ListRoles(ctx context.Context, req *dtotenant.UserRolesListReq) (*dtotenant.UserRolesListResp, error)
+	UpdateRoles(ctx context.Context, req *dtotenant.UserRolesUpdateReq) error
+	ListLoginLogs(ctx context.Context, req *dtotenant.UserLoginLogListReq) (*dtotenant.UserLoginLogListResp, error)
 }
 
 type userSvc struct {
@@ -60,13 +60,13 @@ func isValidUserStatus(status model.UserStatus) bool {
 
 // PageList 返回当前租户内的用户目录（含自然人基础信息），支持关键词（姓名/用户名/邮箱/手机）与状态过滤；
 // 传 departmentID 时仅返回"恰在该部门"的用户（含 primary/secondary/leader 任一关系，不含子部门）。
-func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (*dtotenant.UserPageListResp, error) {
+func (svc *userSvc) PageList(ctx context.Context, req *dtotenant.UserPageListReq) (*dtotenant.UserPageListResp, error) {
 	// 状态过滤：空串=不过滤，非空必须命中白名单常量
 	if req.Status != "" && !isValidUserStatus(req.Status) {
 		glog.Errorf(ctx, "[svcuser.PageList] 非法用户状态, req:%s", gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserGetPageListError)
 	}
-	tenantID := gincontext.GetTenantIDString(ctx)
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	cond := &dao.UserCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
@@ -142,7 +142,7 @@ func (svc *userSvc) PageList(ctx *gin.Context, req *dtotenant.UserPageListReq) (
 }
 
 // loadPrimaryDepartmentNameMap 批量查询用户行政归属部门名称（member 唯一行）。
-func loadPrimaryDepartmentNameMap(ctx *gin.Context, tenantID string, userIDs []string) map[string]string {
+func loadPrimaryDepartmentNameMap(ctx context.Context, tenantID string, userIDs []string) map[string]string {
 	result := make(map[string]string, len(userIDs))
 	if len(userIDs) == 0 {
 		return result
@@ -186,7 +186,7 @@ func loadPrimaryDepartmentNameMap(ctx *gin.Context, tenantID string, userIDs []s
 }
 
 // loadUserRoleCountMap 批量统计用户角色数（GROUP BY user_id）。
-func loadUserRoleCountMap(ctx *gin.Context, tenantID string, userIDs []string) map[string]int64 {
+func loadUserRoleCountMap(ctx context.Context, tenantID string, userIDs []string) map[string]int64 {
 	result := make(map[string]int64, len(userIDs))
 	if len(userIDs) == 0 {
 		return result
@@ -218,13 +218,13 @@ func loadUserRoleCountMap(ctx *gin.Context, tenantID string, userIDs []string) m
 //   - 密码不由调用方提供，统一由 pkg/credential 生成临时密码，仅本次响应返回一次；
 //   - 仅新建自然人时置 password_status=must_change（复用既有自然人绝不改动其密码）；
 //   - person/user/部门关系同事务写入，共用 pkg/core/user.Create。
-func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dtotenant.UserCreateResp, error) {
+func (svc *userSvc) Create(ctx context.Context, req *dtotenant.UserCreateReq) (*dtotenant.UserCreateResp, error) {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
-	if err := requireSystemAdmin(ctx, code.UserCreateError); err != nil {
+	if err := requireSystemAdmin(ctx, req.Operator, code.UserCreateError); err != nil {
 		return nil, err
 	}
-	tenantID := gincontext.GetTenantIDString(ctx)
-	operatorID := gincontext.GetUserIDString(ctx)
+	tenantID := dbclient.TenantIDFromContext(ctx)
+	operatorID := req.Operator.UserID
 
 	// 状态入参白名单校验：空串=默认 active（由 pkg/core/user.Create 落默认值）
 	if req.Status != "" && !isValidUserStatus(req.Status) {
@@ -350,8 +350,8 @@ func (svc *userSvc) Create(ctx *gin.Context, req *dtotenant.UserCreateReq) (*dto
 }
 
 // Detail 用户详情：基础信息（含自然人）+ 部门归属 + 已分配角色。
-func (svc *userSvc) Detail(ctx *gin.Context, req *dtotenant.UserDetailReq) (*dtotenant.UserDetailResp, error) {
-	tenantID := gincontext.GetTenantIDString(ctx)
+func (svc *userSvc) Detail(ctx context.Context, req *dtotenant.UserDetailReq) (*dtotenant.UserDetailResp, error) {
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -404,12 +404,12 @@ func (svc *userSvc) Detail(ctx *gin.Context, req *dtotenant.UserDetailReq) (*dto
 }
 
 // Update 局部更新用户（PATCH）：姓名/头像/状态 + 主/参与/负责部门更新。
-func (svc *userSvc) Update(ctx *gin.Context, req *dtotenant.UserUpdateReq) error {
+func (svc *userSvc) Update(ctx context.Context, req *dtotenant.UserUpdateReq) error {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
-	if err := requireSystemAdmin(ctx, code.UserUpdateError); err != nil {
+	if err := requireSystemAdmin(ctx, req.Operator, code.UserUpdateError); err != nil {
 		return err
 	}
-	tenantID := gincontext.GetTenantIDString(ctx)
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	// 状态入参白名单校验：nil=不修改，非 nil 必须命中白名单常量
 	if req.Status != nil && !isValidUserStatus(*req.Status) {
 		glog.Errorf(ctx, "[svcuser.Update] 非法用户状态, req:%s", gutil.ToJsonString(req))
@@ -423,7 +423,7 @@ func (svc *userSvc) Update(ctx *gin.Context, req *dtotenant.UserUpdateReq) error
 	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != tenantID {
 		return code.GetError(code.UserNotExistError)
 	}
-	operatorID := gincontext.GetUserIDString(ctx)
+	operatorID := req.Operator.UserID
 
 	// 主部门不可清空：显式传 "" 拒绝。
 	if req.PrimaryDepartmentID != nil && *req.PrimaryDepartmentID == "" {
@@ -502,7 +502,7 @@ func (svc *userSvc) Update(ctx *gin.Context, req *dtotenant.UserUpdateReq) error
 			}
 		}
 		if curPerson != nil {
-			if err := updatePersonContact(ctx, tx, curPerson, req.Username, req.PrimaryEmail, req.PrimaryPhone); err != nil {
+			if err := updatePersonContact(ctx, req.Operator, tx, curPerson, req.Username, req.PrimaryEmail, req.PrimaryPhone); err != nil {
 				return err
 			}
 		}
@@ -544,7 +544,7 @@ func derefSlice(p *[]string) []string {
 
 // checkPersonContactUnique 校验变更后的用户名/邮箱/手机号不被其他 person 占用。
 // 仅对传入（非 nil）的字段做查重，排除当前 person 自身。
-func checkPersonContactUnique(ctx *gin.Context, selfPersonID string, username, email, phone *string) error {
+func checkPersonContactUnique(ctx context.Context, selfPersonID string, username, email, phone *string) error {
 	if username != nil && *username != "" {
 		if p, err := dao.NewPersonDao().GetByCond(ctx, &dao.PersonCond{Username: *username}); err != nil {
 			return err
@@ -570,9 +570,9 @@ func checkPersonContactUnique(ctx *gin.Context, selfPersonID string, username, e
 }
 
 // updatePersonContact 更新 person 的用户名/邮箱/手机号（空串视为清空）。须在事务内传入 tx。
-func updatePersonContact(ctx *gin.Context, tx *gorm.DB, person *model.PersonEntity, username, email, phone *string) error {
+func updatePersonContact(ctx context.Context, operator objidentity.Operator, tx *gorm.DB, person *model.PersonEntity, username, email, phone *string) error {
 	personDao := dao.NewPersonDao().WithTx(tx)
-	updateMap := map[string]any{"updated_by": gincontext.GetUserIDString(ctx)}
+	updateMap := map[string]any{"updated_by": operator.UserID}
 	if username != nil {
 		updateMap["username"] = strPtrOrNil(username)
 	}
@@ -600,9 +600,9 @@ func strPtrOrNil(p *string) *string {
 // 不接收新密码：由服务端生成临时密码并在响应中返回一次；置 password_status=must_change
 // 使新口令首次登录必须改密，并撤销该自然人既有 SSO 会话与 refresh token（改密即全局登出）。
 // 无自然人关联的用户（服务账号等）不可登录，也没有口令语义，直接拒绝。
-func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPasswordReq) (*dtotenant.UserResetPasswordResp, error) {
+func (svc *userSvc) ResetPassword(ctx context.Context, req *dtotenant.UserResetPasswordReq) (*dtotenant.UserResetPasswordResp, error) {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
-	if err := requireSystemAdmin(ctx, code.UserResetPasswordError); err != nil {
+	if err := requireSystemAdmin(ctx, req.Operator, code.UserResetPasswordError); err != nil {
 		return nil, err
 	}
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
@@ -610,7 +610,7 @@ func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPass
 		glog.Errorf(ctx, "[svcuser.ResetPassword] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.UserUpdateError)
 	}
-	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != gincontext.GetTenantIDString(ctx) {
+	if userEntity == nil || userEntity.ID == "" || userEntity.TenantID != dbclient.TenantIDFromContext(ctx) {
 		return nil, code.GetError(code.UserNotExistError)
 	}
 	// 服务账号（user_type=machine）不使用口令，归属其自身的密钥管理，不在此处重置
@@ -635,7 +635,7 @@ func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPass
 		"password_encrypted": hash,
 		"password_method":    model.PasswordMethodBcrypt,
 		"password_status":    model.PasswordStatusMustChange,
-		"updated_by":         gincontext.GetUserIDString(ctx),
+		"updated_by":         req.Operator.UserID,
 	}); err != nil {
 		glog.Errorf(ctx, "[svcuser.ResetPassword] person UpdateMap fail, err:%v", err)
 		return nil, code.GetError(code.UserResetPasswordError)
@@ -646,7 +646,7 @@ func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPass
 
 	audit.WriteAudit(ctx, audit.AuditEntry{
 		Action:     audit.ActionTenantAdminPasswordReset,
-		TenantID:   gincontext.GetTenantIDString(ctx),
+		TenantID:   dbclient.TenantIDFromContext(ctx),
 		Result:     model.AuditResultSuccess,
 		TargetType: model.AuditTargetTypeUser,
 		TargetID:   userEntity.ID,
@@ -661,8 +661,8 @@ func (svc *userSvc) ResetPassword(ctx *gin.Context, req *dtotenant.UserResetPass
 }
 
 // ListRoles 用户已分配角色列表。
-func (svc *userSvc) ListRoles(ctx *gin.Context, req *dtotenant.UserRolesListReq) (*dtotenant.UserRolesListResp, error) {
-	tenantID := gincontext.GetTenantIDString(ctx)
+func (svc *userSvc) ListRoles(ctx context.Context, req *dtotenant.UserRolesListReq) (*dtotenant.UserRolesListResp, error) {
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.ListRoles] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -687,12 +687,12 @@ func (svc *userSvc) ListRoles(ctx *gin.Context, req *dtotenant.UserRolesListReq)
 // (role.app_id == req.AppID) 下的角色关联，其它应用的角色不受影响；
 // req.AppID 为空串表示「系统/未归属应用组」。req.RoleIDs 必须全部属于当前租户
 // 且归属目标应用，否则拒绝（防跨应用混授）。
-func (svc *userSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.UserRolesUpdateReq) error {
+func (svc *userSvc) UpdateRoles(ctx context.Context, req *dtotenant.UserRolesUpdateReq) error {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
-	if err := requireSystemAdmin(ctx, code.UserRoleReplaceError); err != nil {
+	if err := requireSystemAdmin(ctx, req.Operator, code.UserRoleReplaceError); err != nil {
 		return err
 	}
-	tenantID := gincontext.GetTenantIDString(ctx)
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	userEntity, err := dao.NewUserDao().GetByID(ctx, req.UserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.UpdateRoles] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -758,7 +758,7 @@ func (svc *userSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.UserRolesUpdate
 		return code.GetError(code.UserRoleRemoveLastAdminForbiddenError)
 	}
 
-	operator := gincontext.GetUserIDString(ctx)
+	operator := req.Operator.UserID
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
 		// 仅删除目标应用下的旧关联，其它应用保持不变
 		for _, ur := range oldList {
@@ -806,7 +806,7 @@ func (svc *userSvc) UpdateRoles(ctx *gin.Context, req *dtotenant.UserRolesUpdate
 }
 
 // roleAppMapOf 收集一批 user_role 关联所指向角色的归属应用（缺失角色忽略，不入映射）。
-func (svc *userSvc) roleAppMapOf(ctx *gin.Context, tenantID string, urList []model.UserRoleEntity) (map[string]string, error) {
+func (svc *userSvc) roleAppMapOf(ctx context.Context, tenantID string, urList []model.UserRoleEntity) (map[string]string, error) {
 	result := make(map[string]string, len(urList))
 	if len(urList) == 0 {
 		return result, nil
@@ -832,7 +832,7 @@ func (svc *userSvc) roleAppMapOf(ctx *gin.Context, tenantID string, urList []mod
 // 返回 true 表示应拒绝该操作（防止平台系统管理能力永久锁死）。
 // 规则：目标用户当前持有 ≥1 个内置管理员角色（source=builtin 且 admin_type=admin），且替换后的
 // 有效集合不包含任何内置管理员角色，且当前租户内除目标用户外没有其他用户仍持有内置管理员角色 → 需保留，返回 true。
-func (svc *userSvc) hasOtherSystemAdminHolder(ctx *gin.Context, tenantID, targetUserID string, newEffectiveRoleIDs []string) (bool, error) {
+func (svc *userSvc) hasOtherSystemAdminHolder(ctx context.Context, tenantID, targetUserID string, newEffectiveRoleIDs []string) (bool, error) {
 	// 1. 目标用户当前角色
 	urList, err := dao.NewUserRoleDao().GetListByCond(ctx, &dao.UserRoleCond{TenantID: tenantID, UserID: targetUserID})
 	if err != nil {
@@ -888,7 +888,7 @@ func (svc *userSvc) hasOtherSystemAdminHolder(ctx *gin.Context, tenantID, target
 }
 
 // filterBuiltinSystemRoles 从 roleIDs 中筛出「内置 + 系统管理」的角色 ID（内置管理员：source=builtin && admin_type=admin）。
-func (svc *userSvc) filterBuiltinSystemRoles(ctx *gin.Context, tenantID string, roleIDs []string) ([]string, error) {
+func (svc *userSvc) filterBuiltinSystemRoles(ctx context.Context, tenantID string, roleIDs []string) ([]string, error) {
 	result := make([]string, 0)
 	if len(roleIDs) == 0 {
 		return result, nil
@@ -907,7 +907,7 @@ func (svc *userSvc) filterBuiltinSystemRoles(ctx *gin.Context, tenantID string, 
 }
 
 // listTenantBuiltinSystemRoles 返回当前租户内全部内置管理员角色 ID。
-func (svc *userSvc) listTenantBuiltinSystemRoles(ctx *gin.Context, tenantID string) ([]string, error) {
+func (svc *userSvc) listTenantBuiltinSystemRoles(ctx context.Context, tenantID string) ([]string, error) {
 	roles, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{
 		TenantID:  tenantID,
 		Source:    model.RoleSourceBuiltin,
@@ -924,7 +924,7 @@ func (svc *userSvc) listTenantBuiltinSystemRoles(ctx *gin.Context, tenantID stri
 }
 
 // listRoles 查询用户已分配角色（含角色基础信息）。
-func (svc *userSvc) listRoles(ctx *gin.Context, tenantID, userID string) ([]dtotenant.UserRoleItem, error) {
+func (svc *userSvc) listRoles(ctx context.Context, tenantID, userID string) ([]dtotenant.UserRoleItem, error) {
 	urList, err := dao.NewUserRoleDao().GetListByCond(ctx, &dao.UserRoleCond{TenantID: tenantID, UserID: userID})
 	if err != nil {
 		glog.Errorf(ctx, "[svcuser.listRoles] query user_role fail, err:%v", err)
@@ -968,7 +968,7 @@ func (svc *userSvc) listRoles(ctx *gin.Context, tenantID, userID string) ([]dtot
 }
 
 // loadUserPersonMaps 批量加载用户与其关联自然人（IN 查询，避免 N+1）。
-func (svc *userSvc) loadUserPersonMaps(ctx *gin.Context, userIDs []string) (map[string]*model.UserEntity, map[string]*model.PersonEntity) {
+func (svc *userSvc) loadUserPersonMaps(ctx context.Context, userIDs []string) (map[string]*model.UserEntity, map[string]*model.PersonEntity) {
 	userMap := make(map[string]*model.UserEntity)
 	personMap := make(map[string]*model.PersonEntity)
 	if len(userIDs) == 0 {
@@ -1001,14 +1001,14 @@ func (svc *userSvc) loadUserPersonMaps(ctx *gin.Context, userIDs []string) (map[
 
 // ListLoginLogs 返回租户内某用户的登录日志（只读）。
 // 先校验用户属于当前租户，再以「租户 + 用户」双重条件查询，避免跨租户读取。
-func (svc *userSvc) ListLoginLogs(ctx *gin.Context, req *dtotenant.UserLoginLogListReq) (*dtotenant.UserLoginLogListResp, error) {
+func (svc *userSvc) ListLoginLogs(ctx context.Context, req *dtotenant.UserLoginLogListReq) (*dtotenant.UserLoginLogListResp, error) {
 	if _, err := resolveTenantUser(ctx, req.UserID); err != nil {
 		return nil, err
 	}
 
 	entityList, total, err := dao.NewUserLoginLogDao().GetPageListByCond(ctx, &dao.UserLoginLogCond{
 		BaseCond: &gormdao.BaseCond{Page: 1, PageSize: userLoginLogPageSize},
-		TenantID: gincontext.GetTenantIDString(ctx),
+		TenantID: dbclient.TenantIDFromContext(ctx),
 		UserID:   req.UserID,
 	})
 	if err != nil {

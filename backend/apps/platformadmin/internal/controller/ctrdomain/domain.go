@@ -2,6 +2,7 @@ package ctrdomain
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtodomain"
 	"github.com/morehao/ark-iam/platformadmin/internal/service/svcdomain"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -36,11 +37,12 @@ func NewDomainCtr() DomainCtr {
 // @Router /v1/platform/domains [post]
 func (ctr *domainCtr) Create(ctx *gin.Context) {
 	var req dtodomain.DomainCreateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.domainSvc.Create(ctx, &req)
+	res, err := ctr.domainSvc.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -61,7 +63,7 @@ func (ctr *domainCtr) PageList(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.domainSvc.PageList(ctx, &req)
+	res, err := ctr.domainSvc.PageList(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -79,6 +81,7 @@ func (ctr *domainCtr) PageList(ctx *gin.Context) {
 // @Router /v1/platform/domains/{domainID} [put]
 func (ctr *domainCtr) Update(ctx *gin.Context) {
 	var req dtodomain.DomainUpdateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -87,7 +90,7 @@ func (ctr *domainCtr) Update(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.domainSvc.Update(ctx, &req); err != nil {
+	if err := ctr.domainSvc.Update(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -107,7 +110,7 @@ func (ctr *domainCtr) Detail(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.domainSvc.Detail(ctx, &req)
+	res, err := ctr.domainSvc.Detail(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -124,11 +127,12 @@ func (ctr *domainCtr) Detail(ctx *gin.Context) {
 // @Router /v1/platform/domains/{domainID} [delete]
 func (ctr *domainCtr) Delete(ctx *gin.Context) {
 	var req dtodomain.DomainDeleteReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.domainSvc.Delete(ctx, &req); err != nil {
+	if err := ctr.domainSvc.Delete(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

@@ -1,6 +1,7 @@
 package svcpermission
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"testing"
 
 	"github.com/morehao/ark-iam/pkg/code"
@@ -35,11 +36,13 @@ func TestMenuSwitchEnumValidation(t *testing.T) {
 	valid.Hidden = model.MenuHiddenFlagEnable
 	valid.ExternalLink = model.MenuExternalLinkFlagEnable
 	valid.KeepAlive = model.MenuKeepAliveFlagEnable
-	resp, err := svc.Create(ctx, &dtopermission.MenuCreateReq{MenuBaseInfo: valid})
+	resp, err := svc.Create(requestCtx(ctx), &dtopermission.MenuCreateReq{MenuBaseInfo: valid,
+		Operator: operatorOf(ctx),
+	})
 	if err != nil {
 		t.Fatalf("合法开关应允许创建: %v", err)
 	}
-	got, err := dao.NewMenuDao().GetByID(ctx, resp.MenuID)
+	got, err := dao.NewMenuDao().GetByID(dbclient.CrossTenantContext(ctx), resp.MenuID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -48,10 +51,12 @@ func TestMenuSwitchEnumValidation(t *testing.T) {
 	}
 
 	// 空串（未提供）归一为 disable：更新走 UpdateMap，不得把空字符串写进列
-	if err := svc.Update(ctx, &dtopermission.MenuUpdateReq{MenuID: resp.MenuID, MenuBaseInfo: base()}); err != nil {
+	if err := svc.Update(requestCtx(ctx), &dtopermission.MenuUpdateReq{MenuID: resp.MenuID, MenuBaseInfo: base(),
+		Operator: operatorOf(ctx),
+	}); err != nil {
 		t.Fatalf("空串开关应允许更新: %v", err)
 	}
-	got, err = dao.NewMenuDao().GetByID(ctx, resp.MenuID)
+	got, err = dao.NewMenuDao().GetByID(dbclient.CrossTenantContext(ctx), resp.MenuID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -62,27 +67,35 @@ func TestMenuSwitchEnumValidation(t *testing.T) {
 	// 非法值：创建路径
 	badHidden := base()
 	badHidden.Hidden = model.MenuHiddenFlag("yes")
-	if _, err := svc.Create(ctx, &dtopermission.MenuCreateReq{MenuBaseInfo: badHidden}); err == nil || gerror.GetCode(err) != int(code.MenuCreateError) {
+	if _, err := svc.Create(requestCtx(ctx), &dtopermission.MenuCreateReq{MenuBaseInfo: badHidden,
+		Operator: operatorOf(ctx),
+	}); err == nil || gerror.GetCode(err) != int(code.MenuCreateError) {
 		t.Fatalf("非法 hidden 应返回 MenuCreateError, got %v", err)
 	}
 	badExternal := base()
 	badExternal.ExternalLink = model.MenuExternalLinkFlag("true")
-	if _, err := svc.Create(ctx, &dtopermission.MenuCreateReq{MenuBaseInfo: badExternal}); err == nil || gerror.GetCode(err) != int(code.MenuCreateError) {
+	if _, err := svc.Create(requestCtx(ctx), &dtopermission.MenuCreateReq{MenuBaseInfo: badExternal,
+		Operator: operatorOf(ctx),
+	}); err == nil || gerror.GetCode(err) != int(code.MenuCreateError) {
 		t.Fatalf("非法 externalLink 应返回 MenuCreateError, got %v", err)
 	}
 	badKeepAlive := base()
 	badKeepAlive.KeepAlive = model.MenuKeepAliveFlag("1")
-	if _, err := svc.Create(ctx, &dtopermission.MenuCreateReq{MenuBaseInfo: badKeepAlive}); err == nil || gerror.GetCode(err) != int(code.MenuCreateError) {
+	if _, err := svc.Create(requestCtx(ctx), &dtopermission.MenuCreateReq{MenuBaseInfo: badKeepAlive,
+		Operator: operatorOf(ctx),
+	}); err == nil || gerror.GetCode(err) != int(code.MenuCreateError) {
 		t.Fatalf("非法 keepAlive 应返回 MenuCreateError, got %v", err)
 	}
 
 	// 非法值：更新路径，拒绝后不得改写
 	badUpdate := base()
 	badUpdate.Hidden = model.MenuHiddenFlag("on")
-	if err := svc.Update(ctx, &dtopermission.MenuUpdateReq{MenuID: resp.MenuID, MenuBaseInfo: badUpdate}); err == nil || gerror.GetCode(err) != int(code.MenuUpdateError) {
+	if err := svc.Update(requestCtx(ctx), &dtopermission.MenuUpdateReq{MenuID: resp.MenuID, MenuBaseInfo: badUpdate,
+		Operator: operatorOf(ctx),
+	}); err == nil || gerror.GetCode(err) != int(code.MenuUpdateError) {
 		t.Fatalf("非法 hidden 更新应返回 MenuUpdateError, got %v", err)
 	}
-	got, err = dao.NewMenuDao().GetByID(ctx, resp.MenuID)
+	got, err = dao.NewMenuDao().GetByID(dbclient.CrossTenantContext(ctx), resp.MenuID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}

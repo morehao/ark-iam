@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"reflect"
 	"testing"
 	"time"
@@ -31,7 +32,7 @@ func newRoleClaimTestStore(t *testing.T) (*PersistentStore, *gorm.DB) {
 	if err := db.AutoMigrate(&model.RoleEntity{}, &model.UserRoleEntity{}, &model.UserEntity{}, &model.PersonEntity{}, &model.ApplicationClientEntity{}); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
-	dbGetter := func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }
+	dbGetter := func(ctx context.Context) *gorm.DB { return db.WithContext(dbclient.CrossTenantContext(ctx)) }
 	ps := NewPersistentStore()
 	ps.personDao = func(opts ...dao.DaoOption) *dao.PersonDao {
 		return dao.NewPersonDao(dao.WithDBGetter(dbGetter))

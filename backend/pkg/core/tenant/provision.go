@@ -130,10 +130,10 @@ func ensureTenantApplication(ctx context.Context, tx *gorm.DB, req *ProvisionTen
 		return nil
 	}
 	entity := &model.TenantApplicationEntity{
-		TenantID:     req.TenantID,
-		AppID:        appID,
-		Status:       model.TenantApplicationStatusEnable,
-		CreatedBy:    req.CreatedBy,
+		TenantID:  req.TenantID,
+		AppID:     appID,
+		Status:    model.TenantApplicationStatusEnable,
+		CreatedBy: req.CreatedBy,
 	}
 	if err := appDao.Insert(ctx, entity); err != nil {
 		return fmt.Errorf("insert tenant_application fail: %w", err)

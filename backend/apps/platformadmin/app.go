@@ -47,7 +47,7 @@ func Init(engine *gin.Engine, Conf *pkgconfig.Config, injectedKeySource oidckit.
 		// 本应用的下一次请求即判 401，实现"一处登出、处处登出"的即时性。
 		// 前提：本应用与 auth 共享同一认证 Redis。
 		oidcAuthOpts = append(oidcAuthOpts,
-			middleware.WithOIDCSSOValidation(func(ctx *gin.Context, personID string, isMachineToken bool) bool {
+			middleware.WithOIDCSSOValidation(func(ctx context.Context, personID string, isMachineToken bool) bool {
 				if isMachineToken {
 					return true
 				}

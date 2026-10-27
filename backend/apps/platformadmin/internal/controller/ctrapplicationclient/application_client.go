@@ -2,6 +2,7 @@ package ctrapplicationclient
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtoapplicationclient"
 	"github.com/morehao/ark-iam/platformadmin/internal/service/svcapplicationclient"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -39,11 +40,12 @@ func NewApplicationClientCtr() ApplicationClientCtr {
 // @Router /v1/platform/application-clients [post]
 func (ctr *oAuthClientCtr) Create(ctx *gin.Context) {
 	var req dtoapplicationclient.ApplicationClientCreateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.svc.Create(ctx, &req)
+	res, err := ctr.svc.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -60,11 +62,12 @@ func (ctr *oAuthClientCtr) Create(ctx *gin.Context) {
 // @Router /v1/platform/application-clients/{applicationClientID} [delete]
 func (ctr *oAuthClientCtr) Delete(ctx *gin.Context) {
 	var req dtoapplicationclient.ApplicationClientDeleteReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.svc.Delete(ctx, &req); err != nil {
+	if err := ctr.svc.Delete(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -81,6 +84,7 @@ func (ctr *oAuthClientCtr) Delete(ctx *gin.Context) {
 // @Router /v1/platform/application-clients/{applicationClientID} [put]
 func (ctr *oAuthClientCtr) Update(ctx *gin.Context) {
 	var req dtoapplicationclient.ApplicationClientUpdateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -89,7 +93,7 @@ func (ctr *oAuthClientCtr) Update(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.svc.Update(ctx, &req); err != nil {
+	if err := ctr.svc.Update(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -109,7 +113,7 @@ func (ctr *oAuthClientCtr) Detail(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.svc.Detail(ctx, &req)
+	res, err := ctr.svc.Detail(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -130,7 +134,7 @@ func (ctr *oAuthClientCtr) PageList(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.svc.PageList(ctx, &req)
+	res, err := ctr.svc.PageList(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -151,7 +155,7 @@ func (ctr *oAuthClientCtr) ListSecrets(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.svc.ListSecrets(ctx, &req)
+	res, err := ctr.svc.ListSecrets(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -169,6 +173,7 @@ func (ctr *oAuthClientCtr) ListSecrets(ctx *gin.Context) {
 // @Router /v1/platform/application-clients/{applicationClientID}/secrets [post]
 func (ctr *oAuthClientCtr) CreateSecret(ctx *gin.Context) {
 	var req dtoapplicationclient.SecretCreateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -177,7 +182,7 @@ func (ctr *oAuthClientCtr) CreateSecret(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.svc.CreateSecret(ctx, &req)
+	res, err := ctr.svc.CreateSecret(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -195,11 +200,12 @@ func (ctr *oAuthClientCtr) CreateSecret(ctx *gin.Context) {
 // @Router /v1/platform/application-clients/{applicationClientID}/secrets/{secretID} [delete]
 func (ctr *oAuthClientCtr) DeleteSecret(ctx *gin.Context) {
 	var req dtoapplicationclient.SecretDeleteReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.svc.DeleteSecret(ctx, &req); err != nil {
+	if err := ctr.svc.DeleteSecret(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

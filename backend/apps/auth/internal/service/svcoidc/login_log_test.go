@@ -3,6 +3,7 @@ package svcoidc
 import (
 	"context"
 	"errors"
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
 	"testing"
 	"time"
 
@@ -50,7 +51,7 @@ func newOIDCLoginLogEnv(t *testing.T) (*OIDCProvider, *gin.Context) {
 func newOIDCLoginSuccessSvc(provider *OIDCProvider) *oidcAuthSvc {
 	return &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx context.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 			return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}}},
 				&model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "66"}}, TenantID: "1", PersonID: "88"},
 				[]objauth.TenantOption{{TenantID: "1", Name: "tenant-1", UserID: "66"}}, nil
@@ -73,7 +74,7 @@ func loadLoginLogs(t *testing.T) []model.UserLoginLogEntity {
 
 // swapOIDCLoginLogInserter 在用例内替换落库点，结束后恢复。
 // 同包用例串行执行（无 t.Parallel），无并发改写风险。
-func swapOIDCLoginLogInserter(t *testing.T, fn func(ctx *gin.Context, entity *model.UserLoginLogEntity) error) {
+func swapOIDCLoginLogInserter(t *testing.T, fn func(ctx context.Context, entity *model.UserLoginLogEntity) error) {
 	t.Helper()
 	original := insertOIDCLoginLog
 	insertOIDCLoginLog = fn
@@ -91,7 +92,8 @@ func TestCompleteLoginRecordsOIDCLoginLog(t *testing.T) {
 		AuthRequestID: authReq.GetID(),
 		Identifier:    "person@example.com",
 		Password:      "Password1",
-	})
+
+		Operator: operatorOf(ctx)})
 	require.NoError(t, err)
 	require.NotEmpty(t, res.ContinueURL, "登录成功必须继续签发授权码")
 
@@ -101,7 +103,7 @@ func TestCompleteLoginRecordsOIDCLoginLog(t *testing.T) {
 	require.Equal(t, "1", rows[0].TenantID)
 	require.Equal(t, "66", rows[0].UserID)
 	require.Equal(t, "88", rows[0].PersonID)
-	require.Equal(t, "oidc-login-test/1.0", rows[0].UserAgent)
+	require.Equal(t, operatorOf(ctx).UserAgent, rows[0].UserAgent)
 	require.False(t, rows[0].LoginTime.IsZero(), "登录时间必须落库")
 }
 
@@ -113,7 +115,7 @@ func TestCompleteLoginNoOIDCLoginLogBeforeTenantSelection(t *testing.T) {
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx context.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 			return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}}},
 				&model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "66"}}, TenantID: "1", PersonID: "88"},
 				[]objauth.TenantOption{
@@ -123,11 +125,12 @@ func TestCompleteLoginNoOIDCLoginLogBeforeTenantSelection(t *testing.T) {
 		}},
 	}
 
-	res, err := svc.CompleteLogin(ctx, &dtooidc.OIDCLoginReq{
+	res, err := svc.CompleteLogin(requestCtx(ctx), &dtooidc.OIDCLoginReq{
 		AuthRequestID: authReq.GetID(),
 		Identifier:    "person@example.com",
 		Password:      "Password1",
-	})
+
+		Operator: operatorOf(ctx)})
 	require.NoError(t, err)
 	require.True(t, res.RequiresTenantSelection)
 	require.Empty(t, res.ContinueURL)
@@ -144,7 +147,7 @@ func TestSelectTenantRecordsOIDCLoginLog(t *testing.T) {
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx context.Context, personID string) ([]objauth.TenantOption, error) {
 			return []objauth.TenantOption{
 				{TenantID: "3", Name: "tenant-3", UserID: "63"},
 				{TenantID: "7", Name: "tenant-7", UserID: "67"},
@@ -152,7 +155,7 @@ func TestSelectTenantRecordsOIDCLoginLog(t *testing.T) {
 		}},
 	}
 
-	res, err := svc.SelectTenant(ctx, authReq.GetID(), "7")
+	res, err := svc.SelectTenant(requestCtx(ctx), operatorOf(ctx), authReq.GetID(), "7")
 	require.NoError(t, err)
 	require.NotEmpty(t, res.ContinueURL)
 
@@ -172,13 +175,13 @@ func TestCompleteLoginBySessionRecordsOIDCLoginLog(t *testing.T) {
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx context.Context, personID string) ([]objauth.TenantOption, error) {
 			return []objauth.TenantOption{{TenantID: "7", Name: "tenant-7", UserID: "67"}}, nil
 		}},
 		ssoSessionStore: &fakeSSOSessionStore{validatedPersonID: "88"},
 	}
 
-	continueURL, err := svc.CompleteLoginBySession(ctx, authReq.GetID(), "session-x")
+	continueURL, err := svc.CompleteLoginBySession(requestCtx(ctx), operatorOf(ctx), authReq.GetID(), "session-x")
 	require.NoError(t, err)
 	require.Contains(t, continueURL, "id="+authReq.GetID())
 
@@ -194,7 +197,7 @@ func TestCompleteLoginBySessionRecordsOIDCLoginLog(t *testing.T) {
 // 日志写入失败绝不上抛、绝不阻断登录——授权票据照常完成、continueURL 照常返回。
 func TestCompleteLoginSucceedsWhenLoginLogWriteFails(t *testing.T) {
 	provider, ctx := newOIDCLoginLogEnv(t)
-	swapOIDCLoginLogInserter(t, func(ctx *gin.Context, entity *model.UserLoginLogEntity) error {
+	swapOIDCLoginLogInserter(t, func(ctx context.Context, entity *model.UserLoginLogEntity) error {
 		return errors.New("simulated insert failure")
 	})
 	authReq := newAuthReq(t, provider, "client-1")
@@ -203,7 +206,8 @@ func TestCompleteLoginSucceedsWhenLoginLogWriteFails(t *testing.T) {
 		AuthRequestID: authReq.GetID(),
 		Identifier:    "person@example.com",
 		Password:      "Password1",
-	})
+
+		Operator: operatorOf(ctx)})
 	require.NoError(t, err, "登录日志写失败不得影响登录结果")
 	require.NotEmpty(t, res.ContinueURL)
 	require.Empty(t, loadLoginLogs(t))
@@ -214,7 +218,7 @@ func TestCompleteLoginSucceedsWhenLoginLogWriteFails(t *testing.T) {
 // 登录主流程照常完成（panic 若逃逸，本用例会直接失败）。
 func TestCompleteLoginSucceedsWhenLoginLogWritePanics(t *testing.T) {
 	provider, ctx := newOIDCLoginLogEnv(t)
-	swapOIDCLoginLogInserter(t, func(ctx *gin.Context, entity *model.UserLoginLogEntity) error {
+	swapOIDCLoginLogInserter(t, func(ctx context.Context, entity *model.UserLoginLogEntity) error {
 		panic("simulated nil *gorm.DB panic")
 	})
 	authReq := newAuthReq(t, provider, "client-1")
@@ -223,7 +227,8 @@ func TestCompleteLoginSucceedsWhenLoginLogWritePanics(t *testing.T) {
 		AuthRequestID: authReq.GetID(),
 		Identifier:    "person@example.com",
 		Password:      "Password1",
-	})
+
+		Operator: operatorOf(ctx)})
 	require.NoError(t, err, "登录日志写入 panic 不得影响登录结果")
 	require.NotEmpty(t, res.ContinueURL)
 	require.Empty(t, loadLoginLogs(t))
@@ -246,7 +251,7 @@ func TestRecordOIDCLoginLogSurvivesUnavailableDB(t *testing.T) {
 	require.Nil(t, dbclient.IamDB(ctx), "本用例要求 DB 不可用")
 
 	require.NotPanics(t, func() {
-		recordOIDCLoginLog(ctx, "1", "66", "88")
+		recordOIDCLoginLog(requestCtx(ctx), operatorOf(ctx), "1", "66", "88")
 	})
 }
 
@@ -255,9 +260,9 @@ func TestRecordOIDCLoginLogSurvivesUnavailableDB(t *testing.T) {
 func TestRecordOIDCLoginLogToleratesMissingRequest(t *testing.T) {
 	ctx := &gin.Context{}
 	require.NotPanics(t, func() {
-		recordOIDCLoginLog(ctx, "1", "66", "88")
+		recordOIDCLoginLog(requestCtx(ctx), operatorOf(ctx), "1", "66", "88")
 	})
 	require.NotPanics(t, func() {
-		recordOIDCLoginLog(nil, "1", "66", "88")
+		recordOIDCLoginLog(nil, objidentity.Operator{}, "1", "66", "88")
 	})
 }

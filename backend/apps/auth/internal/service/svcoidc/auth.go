@@ -1,11 +1,11 @@
 package svcoidc
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/auth/internal/service/svcauth"
@@ -13,18 +13,19 @@ import (
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objauth"
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
 	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/glog"
 )
 
 type OIDCAuthSvc interface {
-	CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error)
-	SelectTenant(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error)
-	CompleteLoginBySession(ctx *gin.Context, authRequestID string, sessionID string) (string, error)
-	RegisterPerson(ctx *gin.Context, req *dtooidc.RegisterPersonReq) (*dtooidc.RegisterPersonResp, error)
-	CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenantReq) (*dtooidc.CreateTenantResp, error)
-	ChangePassword(ctx *gin.Context, req *dtooidc.OIDCChangePasswordReq) error
-	LoginConfig(ctx *gin.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error)
+	CompleteLogin(ctx context.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error)
+	SelectTenant(ctx context.Context, operator objidentity.Operator, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error)
+	CompleteLoginBySession(ctx context.Context, operator objidentity.Operator, authRequestID string, sessionID string) (string, error)
+	RegisterPerson(ctx context.Context, req *dtooidc.RegisterPersonReq) (*dtooidc.RegisterPersonResp, error)
+	CreateTenant(ctx context.Context, req *dtooidc.CreateTenantReq) (*dtooidc.CreateTenantResp, error)
+	ChangePassword(ctx context.Context, req *dtooidc.OIDCChangePasswordReq) error
+	LoginConfig(ctx context.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error)
 }
 
 // errSilentLoginNotAllowed 标记静默登录被拒（prompt=login / max_age 超期），
@@ -43,7 +44,7 @@ var ErrSilentLoginNoAppAccess = errors.New("silent login: no tenant grants acces
 // 判据是"准入拒绝次数持平于预期"——该指标的唯一可查来源就是这张表（detail 里带
 // reason:no app access，可按动作 + 结果 + detail 聚合）。写库失败由 audit.WriteAudit 自行兜底，
 // 不影响拒绝结果本身。
-func writeAppAccessDeniedAudit(ctx *gin.Context, personID, clientID, tenantID string) {
+func writeAppAccessDeniedAudit(ctx context.Context, personID, clientID, tenantID string) {
 	audit.WriteAudit(ctx, audit.AuditEntry{
 		Action:     audit.ActionLogin,
 		TenantID:   tenantID,
@@ -85,8 +86,8 @@ func containsPrompt(prompts []string, target string) bool {
 }
 
 type passwordAuthenticator interface {
-	AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error)
-	TenantsForPerson(ctx *gin.Context, personID string) ([]objauth.TenantOption, error)
+	AuthenticatePassword(ctx context.Context, operator objidentity.Operator, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error)
+	TenantsForPerson(ctx context.Context, personID string) ([]objauth.TenantOption, error)
 }
 
 type oidcAuthSvc struct {
@@ -103,12 +104,12 @@ func NewOIDCAuthSvc(provider *OIDCProvider) OIDCAuthSvc {
 	}
 }
 
-func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
+func (svc *oidcAuthSvc) CompleteLogin(ctx context.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
 	authReq, err := svc.provider.Storage.AuthRequestByID(ctx, req.AuthRequestID)
 	if err != nil {
 		return nil, mapAuthRequestError(err)
 	}
-	personEntity, userEntity, tenants, err := svc.authSvc.AuthenticatePassword(ctx, req.Identifier, req.Password)
+	personEntity, userEntity, tenants, err := svc.authSvc.AuthenticatePassword(ctx, req.Operator, req.Identifier, req.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -221,10 +222,11 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 		Result:     model.AuditResultSuccess,
 		TargetType: model.AuditTargetTypePerson,
 		TargetID:   personEntity.ID,
+		Operator:   req.Operator,
 	})
 	// 登录日志（T4）：授权票据已 done=true（即将签发授权码）才算成功，此处是「授权码登录」的落点。
 	// best-effort，写失败不影响登录（详见 recordOIDCLoginLog）。
-	recordOIDCLoginLog(ctx, tenantID, userEntity.ID, personEntity.ID)
+	recordOIDCLoginLog(ctx, req.Operator, tenantID, userEntity.ID, personEntity.ID)
 
 	allowPersonCreateTenant := false
 	if cid := clientIDFromAuthRequest(authReq); cid != "" {
@@ -253,7 +255,7 @@ func (svc *oidcAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginRe
 	return resp, nil
 }
 
-func (svc *oidcAuthSvc) SelectTenant(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error) {
+func (svc *oidcAuthSvc) SelectTenant(ctx context.Context, operator objidentity.Operator, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error) {
 	reqCtx := ctx
 	authReq, err := svc.provider.Storage.AuthRequestByID(reqCtx, authRequestID)
 	if err != nil {
@@ -327,16 +329,17 @@ func (svc *oidcAuthSvc) SelectTenant(ctx *gin.Context, authRequestID string, ten
 		Result:     model.AuditResultSuccess,
 		TargetType: model.AuditTargetTypeTenant,
 		TargetID:   tenantID,
+		Operator:   operator,
 	})
 	// 登录日志（T4）：多租户登录由 CompleteLogin(done=false) + 本方法共同完成，成功的落点在
 	// 这里（上一步校验过 tenantID 必在 tenants 内，故 UserID 必然可得）。
 	// CompleteLogin 在该分支刻意不写，避免同一次登录重复落账。
 	selected, _ := findTenantOption(tenants, tenantID)
-	recordOIDCLoginLog(ctx, tenantID, selected.UserID, personID)
+	recordOIDCLoginLog(ctx, operator, tenantID, selected.UserID, personID)
 	return resp, nil
 }
 
-func (svc *oidcAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID string, sessionID string) (string, error) {
+func (svc *oidcAuthSvc) CompleteLoginBySession(ctx context.Context, operator objidentity.Operator, authRequestID string, sessionID string) (string, error) {
 	reqCtx := ctx
 	personID, err := svc.ssoSessionStore.ValidateSession(reqCtx, sessionID)
 	if err != nil {
@@ -414,11 +417,12 @@ func (svc *oidcAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID s
 		Result:     model.AuditResultSuccess,
 		TargetType: model.AuditTargetTypePerson,
 		TargetID:   personID,
+		Operator:   operator,
 	})
 
 	// 登录日志（T4）：prompt=none 静默 SSO 是货真价实的登录成功（票据已 done=true），
 	// 且这条路径没有密码校验、上游不会写 password 行，故必须在此补记。
-	recordOIDCLoginLog(ctx, tenantID, loginUserID, personID)
+	recordOIDCLoginLog(ctx, operator, tenantID, loginUserID, personID)
 
 	if aErr := svc.provider.Storage.AssociateSession(reqCtx, authRequestID, sessionID); aErr != nil {
 		glog.Warnf(ctx, "[oidcAuthSvc.CompleteLoginBySession] associate session fail, err:%v, authRequestID:%s, sessionID:%s", aErr, authRequestID, sessionID)

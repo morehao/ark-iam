@@ -2,8 +2,10 @@ package ctroidc
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,55 +20,55 @@ import (
 )
 
 type fakeOIDCAuthSvc struct {
-	completeLogin          func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error)
-	selectTenant           func(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error)
-	completeLoginBySession func(ctx *gin.Context, authRequestID string, sessionID string) (string, error)
-	registerPerson         func(ctx *gin.Context, req *dtooidc.RegisterPersonReq) (*dtooidc.RegisterPersonResp, error)
-	createTenant           func(ctx *gin.Context, req *dtooidc.CreateTenantReq) (*dtooidc.CreateTenantResp, error)
-	changePassword         func(ctx *gin.Context, req *dtooidc.OIDCChangePasswordReq) error
-	loginConfig            func(ctx *gin.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error)
+	completeLogin          func(ctx context.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error)
+	selectTenant           func(ctx context.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error)
+	completeLoginBySession func(ctx context.Context, authRequestID string, sessionID string) (string, error)
+	registerPerson         func(ctx context.Context, req *dtooidc.RegisterPersonReq) (*dtooidc.RegisterPersonResp, error)
+	createTenant           func(ctx context.Context, req *dtooidc.CreateTenantReq) (*dtooidc.CreateTenantResp, error)
+	changePassword         func(ctx context.Context, req *dtooidc.OIDCChangePasswordReq) error
+	loginConfig            func(ctx context.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error)
 }
 
-func (f *fakeOIDCAuthSvc) CompleteLogin(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
+func (f *fakeOIDCAuthSvc) CompleteLogin(ctx context.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
 	return f.completeLogin(ctx, req)
 }
 
-func (f *fakeOIDCAuthSvc) SelectTenant(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error) {
+func (f *fakeOIDCAuthSvc) SelectTenant(ctx context.Context, operator objidentity.Operator, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error) {
 	if f.selectTenant != nil {
 		return f.selectTenant(ctx, authRequestID, tenantID)
 	}
 	return nil, errors.New("selectTenant not implemented in fake")
 }
 
-func (f *fakeOIDCAuthSvc) CompleteLoginBySession(ctx *gin.Context, authRequestID string, sessionID string) (string, error) {
+func (f *fakeOIDCAuthSvc) CompleteLoginBySession(ctx context.Context, operator objidentity.Operator, authRequestID string, sessionID string) (string, error) {
 	if f.completeLoginBySession != nil {
 		return f.completeLoginBySession(ctx, authRequestID, sessionID)
 	}
 	return "", nil
 }
 
-func (f *fakeOIDCAuthSvc) RegisterPerson(ctx *gin.Context, req *dtooidc.RegisterPersonReq) (*dtooidc.RegisterPersonResp, error) {
+func (f *fakeOIDCAuthSvc) RegisterPerson(ctx context.Context, req *dtooidc.RegisterPersonReq) (*dtooidc.RegisterPersonResp, error) {
 	if f.registerPerson != nil {
 		return f.registerPerson(ctx, req)
 	}
 	return nil, errors.New("registerPerson not implemented in fake")
 }
 
-func (f *fakeOIDCAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenantReq) (*dtooidc.CreateTenantResp, error) {
+func (f *fakeOIDCAuthSvc) CreateTenant(ctx context.Context, req *dtooidc.CreateTenantReq) (*dtooidc.CreateTenantResp, error) {
 	if f.createTenant != nil {
 		return f.createTenant(ctx, req)
 	}
 	return nil, errors.New("createTenant not implemented in fake")
 }
 
-func (f *fakeOIDCAuthSvc) ChangePassword(ctx *gin.Context, req *dtooidc.OIDCChangePasswordReq) error {
+func (f *fakeOIDCAuthSvc) ChangePassword(ctx context.Context, req *dtooidc.OIDCChangePasswordReq) error {
 	if f.changePassword != nil {
 		return f.changePassword(ctx, req)
 	}
 	return errors.New("changePassword not implemented in fake")
 }
 
-func (f *fakeOIDCAuthSvc) LoginConfig(ctx *gin.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error) {
+func (f *fakeOIDCAuthSvc) LoginConfig(ctx context.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error) {
 	if f.loginConfig != nil {
 		return f.loginConfig(ctx, authRequestID)
 	}
@@ -76,7 +78,7 @@ func (f *fakeOIDCAuthSvc) LoginConfig(ctx *gin.Context, authRequestID string) (*
 func TestLoginReturnsContinueURLOnSuccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
-	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx context.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
 		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1"}, nil
 	}}}
 	engine.POST("/oidc/login", ctr.Login)
@@ -106,7 +108,7 @@ func TestLoginReturnsContinueURLOnSuccess(t *testing.T) {
 func TestLoginReturnsErrorOnServiceFailure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
-	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx context.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
 		return nil, errors.New("login failed")
 	}}}
 	engine.POST("/oidc/login", ctr.Login)
@@ -130,7 +132,7 @@ func TestLoginReturnsErrorOnServiceFailure(t *testing.T) {
 func TestSelectTenantReturnsContinueURLOnSuccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
-	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{selectTenant: func(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error) {
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{selectTenant: func(ctx context.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error) {
 		if authRequestID != "ar-1" || tenantID != "7" {
 			t.Fatalf("unexpected args authRequestID=%q tenantID=%s", authRequestID, tenantID)
 		}
@@ -168,7 +170,7 @@ func TestSelectTenantSetsSSOCookie(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	config.Conf = &pkgconfig.Config{}
 	engine := gin.New()
-	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{selectTenant: func(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error) {
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{selectTenant: func(ctx context.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error) {
 		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1", TenantID: "7", SessionID: "session-1"}, nil
 	}}}
 	engine.POST("/oidc/login/selectTenant", ctr.SelectTenant)
@@ -187,7 +189,7 @@ func TestSelectTenantSetsSSOCookie(t *testing.T) {
 func TestSelectTenantReturnsErrorOnInvalidTenant(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
-	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{selectTenant: func(ctx *gin.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error) {
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{selectTenant: func(ctx context.Context, authRequestID string, tenantID string) (*dtooidc.OIDCLoginResp, error) {
 		return nil, errors.New("tenant not allowed")
 	}}}
 	engine.POST("/oidc/login/selectTenant", ctr.SelectTenant)
@@ -212,7 +214,7 @@ func TestLoginSetsSSOCookieWithoutDomainByDefault(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	config.Conf = &pkgconfig.Config{}
 	engine := gin.New()
-	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx context.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
 		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1", SessionID: "session-1"}, nil
 	}}}
 	engine.POST("/oidc/login", ctr.Login)
@@ -235,7 +237,7 @@ func TestLoginSetsSSOCookieWithConfiguredDomain(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	config.Conf = &pkgconfig.Config{OIDC: pkgconfig.OIDC{CookieDomain: "example.com"}}
 	engine := gin.New()
-	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx context.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
 		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1", SessionID: "session-1"}, nil
 	}}}
 	engine.POST("/login", ctr.Login)
@@ -257,7 +259,7 @@ func TestLoginSetsSSOCookieWhenConfigIsNil(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	config.Conf = nil
 	engine := gin.New()
-	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx *gin.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLogin: func(ctx context.Context, req *dtooidc.OIDCLoginReq) (*dtooidc.OIDCLoginResp, error) {
 		return &dtooidc.OIDCLoginResp{ContinueURL: "http://localhost:8099/oidc/authorize/callback?id=ar-1", SessionID: "session-1"}, nil
 	}}}
 	engine.POST("/login", ctr.Login)
@@ -284,7 +286,7 @@ func TestLoginSetsSSOCookieWhenConfigIsNil(t *testing.T) {
 func TestLoginConfigReturnsAllowPersonCreateTenant(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
-	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{loginConfig: func(ctx *gin.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error) {
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{loginConfig: func(ctx context.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error) {
 		return &dtooidc.OIDCLoginConfigResp{AllowPersonCreateTenant: true}, nil
 	}}}
 	engine.POST("/oidc/login-config", ctr.LoginConfig)
@@ -343,7 +345,7 @@ func TestLoginConfigMissingAuthRequestID(t *testing.T) {
 func TestSSOLoginRendersNoAppAccessPage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
-	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLoginBySession: func(ctx *gin.Context, authRequestID string, sessionID string) (string, error) {
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLoginBySession: func(ctx context.Context, authRequestID string, sessionID string) (string, error) {
 		return "", svcoidc.ErrSilentLoginNoAppAccess
 	}}}
 	engine.GET("/oidc/sso", ctr.SSOLogin)
@@ -379,7 +381,7 @@ func TestSSOLoginRedirectsToLoginOnOtherSilentLoginFailures(t *testing.T) {
 		OIDC: pkgconfig.OIDC{FrontendLoginURL: "http://localhost:4000/oidc/login"},
 	}
 	engine := gin.New()
-	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLoginBySession: func(ctx *gin.Context, authRequestID string, sessionID string) (string, error) {
+	ctr := &OIDCCtr{oidcAuthSvc: &fakeOIDCAuthSvc{completeLoginBySession: func(ctx context.Context, authRequestID string, sessionID string) (string, error) {
 		return "", errors.New("silent login not allowed")
 	}}}
 	engine.GET("/oidc/sso", ctr.SSOLogin)

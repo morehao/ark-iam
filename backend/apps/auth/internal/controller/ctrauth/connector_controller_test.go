@@ -1,6 +1,7 @@
 package ctrauth
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -31,51 +32,51 @@ type stubConnectorSvc struct {
 	callbackErr  error
 }
 
-func (s *stubConnectorSvc) Create(ctx *gin.Context, req *dtoauth.ConnectorCreateReq) (*dtoauth.ConnectorCreateResp, error) {
+func (s *stubConnectorSvc) Create(ctx context.Context, req *dtoauth.ConnectorCreateReq) (*dtoauth.ConnectorCreateResp, error) {
 	panic("unexpected call")
 }
 
-func (s *stubConnectorSvc) Delete(ctx *gin.Context, req *dtoauth.ConnectorDeleteReq) error {
+func (s *stubConnectorSvc) Delete(ctx context.Context, req *dtoauth.ConnectorDeleteReq) error {
 	panic("unexpected call")
 }
 
-func (s *stubConnectorSvc) Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateReq) error {
+func (s *stubConnectorSvc) Update(ctx context.Context, req *dtoauth.ConnectorUpdateReq) error {
 	panic("unexpected call")
 }
 
-func (s *stubConnectorSvc) Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailReq) (*dtoauth.ConnectorDetailResp, error) {
+func (s *stubConnectorSvc) Detail(ctx context.Context, req *dtoauth.ConnectorDetailReq) (*dtoauth.ConnectorDetailResp, error) {
 	panic("unexpected call")
 }
 
-func (s *stubConnectorSvc) PageList(ctx *gin.Context, req *dtoauth.ConnectorPageListReq) (*dtoauth.ConnectorPageListResp, error) {
+func (s *stubConnectorSvc) PageList(ctx context.Context, req *dtoauth.ConnectorPageListReq) (*dtoauth.ConnectorPageListResp, error) {
 	panic("unexpected call")
 }
 
-func (s *stubConnectorSvc) GetFactoryList(ctx *gin.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error) {
+func (s *stubConnectorSvc) GetFactoryList(ctx context.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error) {
 	s.getFactoryListReq = req
 	return s.getFactoryListResp, s.getFactoryListErr
 }
 
-func (s *stubConnectorSvc) ListFactories(ctx *gin.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error) {
+func (s *stubConnectorSvc) ListFactories(ctx context.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error) {
 	panic("unexpected call")
 }
 
-func (s *stubConnectorSvc) TestConnector(ctx *gin.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.ConnectorTestResp, error) {
+func (s *stubConnectorSvc) TestConnector(ctx context.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.ConnectorTestResp, error) {
 	s.testConnectorReq = req
 	return s.testConnectorResp, s.testConnectorErr
 }
 
-func (s *stubConnectorSvc) Authorize(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID string) (*dtoconnector.ConnectorAuthorizeResp, error) {
+func (s *stubConnectorSvc) Authorize(ctx context.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID string) (*dtoconnector.ConnectorAuthorizeResp, error) {
 	s.authorizeReq = req
 	s.authorizeConnectorID = connectorID
 	return s.authorizeResp, s.authorizeErr
 }
 
-func (s *stubConnectorSvc) GetAuthorizationURL(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq) (*dtoconnector.ConnectorAuthorizeResp, error) {
+func (s *stubConnectorSvc) GetAuthorizationURL(ctx context.Context, req *dtoconnector.ConnectorAuthorizeReq) (*dtoconnector.ConnectorAuthorizeResp, error) {
 	panic("unexpected call")
 }
 
-func (s *stubConnectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorCallbackReq) (*dtoauth.LoginResp, error) {
+func (s *stubConnectorSvc) Callback(ctx context.Context, req *dtoconnector.ConnectorCallbackReq) (*dtoauth.LoginResp, error) {
 	s.callbackReq = req
 	return s.callbackResp, s.callbackErr
 }

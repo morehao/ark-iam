@@ -65,7 +65,7 @@ func TestUserIdentityCreateBindsPersonOfUser(t *testing.T) {
 	db := setupUserSubResourceTestDB(t)
 	svc := NewUserIdentitySvc()
 
-	resp, err := svc.Create(newTestTenantCtx("t1", "op1"), &dtotenant.UserIdentityCreateReq{
+	resp, err := svc.Create(requestCtx(newTestTenantCtx("t1", "op1")), &dtotenant.UserIdentityCreateReq{
 		UserID:     "user1",
 		Issuer:     "https://accounts.example.com",
 		IdentityID: "sub-1",
@@ -86,7 +86,7 @@ func TestUserIdentityCreateBindsPersonOfUser(t *testing.T) {
 		t.Fatalf("unexpected identity fields: %+v", got)
 	}
 
-	list, err := svc.ListByUser(newTestTenantCtx("t1", "op1"), &dtotenant.UserIdentityListReq{UserID: "user1"})
+	list, err := svc.ListByUser(requestCtx(newTestTenantCtx("t1", "op1")), &dtotenant.UserIdentityListReq{UserID: "user1"})
 	if err != nil {
 		t.Fatalf("list identity: %v", err)
 	}
@@ -107,15 +107,18 @@ func TestUserIdentityRejectsCrossTenantUser(t *testing.T) {
 
 	ctx := newTestTenantCtx("t1", "op1")
 
-	if _, err := svc.ListByUser(ctx, &dtotenant.UserIdentityListReq{UserID: "user2"}); err != code.GetError(code.UserNotExistError) {
+	if _, err := svc.ListByUser(requestCtx(ctx), &dtotenant.UserIdentityListReq{UserID: "user2"}); err != code.GetError(code.UserNotExistError) {
 		t.Fatalf("cross-tenant list: want user not exist, got %v", err)
 	}
-	if _, err := svc.Create(ctx, &dtotenant.UserIdentityCreateReq{
+	if _, err := svc.Create(requestCtx(ctx), &dtotenant.UserIdentityCreateReq{
 		UserID: "user2", Issuer: "https://accounts.example.com", IdentityID: "sub-3",
-	}); err != code.GetError(code.UserNotExistError) {
+
+		Operator: operatorOf(ctx)}); err != code.GetError(code.UserNotExistError) {
 		t.Fatalf("cross-tenant create: want user not exist, got %v", err)
 	}
-	if err := svc.Delete(ctx, &dtotenant.UserIdentityDeleteReq{UserID: "user2", UserIdentityID: "id-other"}); err != code.GetError(code.UserNotExistError) {
+	if err := svc.Delete(requestCtx(ctx), &dtotenant.UserIdentityDeleteReq{UserID: "user2", UserIdentityID: "id-other",
+		Operator: operatorOf(ctx),
+	}); err != code.GetError(code.UserNotExistError) {
 		t.Fatalf("cross-tenant delete: want user not exist, got %v", err)
 	}
 
@@ -136,7 +139,7 @@ func TestUserIdentityDeleteRejectsMismatchedUser(t *testing.T) {
 	seedTestIdentity(t, db, "id-1", "p1", "https://accounts.example.com", "sub-1")
 
 	// user1 的身份，用同租户 user3 的路径解绑 → 拒绝
-	if err := svc.Delete(newTestTenantCtx("t1", "op1"), &dtotenant.UserIdentityDeleteReq{
+	if err := svc.Delete(requestCtx(newTestTenantCtx("t1", "op1")), &dtotenant.UserIdentityDeleteReq{
 		UserID: "user3", UserIdentityID: "id-1",
 	}); err != code.GetError(code.UserIdentityNotExistError) {
 		t.Fatalf("mismatched user delete: want identity not exist, got %v", err)
@@ -157,13 +160,13 @@ func TestUserIdentityDeleteInTenant(t *testing.T) {
 	svc := NewUserIdentitySvc()
 	seedTestIdentity(t, db, "id-1", "p1", "https://accounts.example.com", "sub-1")
 
-	if err := svc.Delete(newTestTenantCtx("t1", "op1"), &dtotenant.UserIdentityDeleteReq{
+	if err := svc.Delete(requestCtx(newTestTenantCtx("t1", "op1")), &dtotenant.UserIdentityDeleteReq{
 		UserID: "user1", UserIdentityID: "id-1",
 	}); err != nil {
 		t.Fatalf("delete identity: %v", err)
 	}
 
-	list, err := svc.ListByUser(newTestTenantCtx("t1", "op1"), &dtotenant.UserIdentityListReq{UserID: "user1"})
+	list, err := svc.ListByUser(requestCtx(newTestTenantCtx("t1", "op1")), &dtotenant.UserIdentityListReq{UserID: "user1"})
 	if err != nil {
 		t.Fatalf("list after delete: %v", err)
 	}
@@ -171,7 +174,7 @@ func TestUserIdentityDeleteInTenant(t *testing.T) {
 		t.Fatalf("expected identity removed, got %+v", list)
 	}
 
-	if err := svc.Delete(newTestTenantCtx("t1", "op1"), &dtotenant.UserIdentityDeleteReq{
+	if err := svc.Delete(requestCtx(newTestTenantCtx("t1", "op1")), &dtotenant.UserIdentityDeleteReq{
 		UserID: "user1", UserIdentityID: "id-1",
 	}); err != code.GetError(code.UserIdentityNotExistError) {
 		t.Fatalf("delete missing identity: want not exist, got %v", err)
@@ -189,7 +192,7 @@ func TestUserLoginLogsScopeToTenantAndUser(t *testing.T) {
 	seedTestLoginLog(t, db, "p1", "t1", "user1", now)
 	seedTestLoginLog(t, db, "p2", "t2", "user2", now)
 
-	resp, err := svc.ListLoginLogs(newTestTenantCtx("t1", "op1"), &dtotenant.UserLoginLogListReq{UserID: "user1"})
+	resp, err := svc.ListLoginLogs(requestCtx(newTestTenantCtx("t1", "op1")), &dtotenant.UserLoginLogListReq{UserID: "user1"})
 	if err != nil {
 		t.Fatalf("list login logs: %v", err)
 	}
@@ -202,7 +205,7 @@ func TestUserLoginLogsScopeToTenantAndUser(t *testing.T) {
 		}
 	}
 
-	if _, err := svc.ListLoginLogs(newTestTenantCtx("t1", "op1"), &dtotenant.UserLoginLogListReq{UserID: "user2"}); err != code.GetError(code.UserNotExistError) {
+	if _, err := svc.ListLoginLogs(requestCtx(newTestTenantCtx("t1", "op1")), &dtotenant.UserLoginLogListReq{UserID: "user2"}); err != code.GetError(code.UserNotExistError) {
 		t.Fatalf("cross-tenant list login logs: want user not exist, got %v", err)
 	}
 }

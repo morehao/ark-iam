@@ -1,6 +1,7 @@
 package svctenant
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"regexp"
 	"testing"
 
@@ -95,7 +96,7 @@ func TestTenantPageListReturnsTimeFields(t *testing.T) {
 	}
 
 	svc := &tenantSvc{}
-	resp, err := svc.PageList(newTenantScopeGinCtx(""), &dtotenant.TenantPageListReq{})
+	resp, err := svc.PageList(requestCtx(newTenantScopeGinCtx("")), &dtotenant.TenantPageListReq{})
 	if err != nil {
 		t.Fatalf("PageList failed: %v", err)
 	}
@@ -127,7 +128,7 @@ func TestTenantPageListNameKeyword(t *testing.T) {
 	}
 
 	svc := &tenantSvc{}
-	resp, err := svc.PageList(newTenantScopeGinCtx(""), &dtotenant.TenantPageListReq{Name: "cme"})
+	resp, err := svc.PageList(requestCtx(newTenantScopeGinCtx("")), &dtotenant.TenantPageListReq{Name: "cme"})
 	if err != nil {
 		t.Fatalf("PageList failed: %v", err)
 	}
@@ -144,7 +145,7 @@ func TestTenantCreateGeneratesCode(t *testing.T) {
 	req := newTenantCreateReq("Acme Corp", "admin@acme.com")
 	req.Code = "manual-code-should-be-ignored"
 
-	resp, err := svc.Create(newTenantScopeGinCtx(""), req)
+	resp, err := svc.Create(requestCtx(newTenantScopeGinCtx("")), req)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -177,7 +178,7 @@ func TestTenantCreateNormalizesStatus(t *testing.T) {
 	req := newTenantCreateReq("Acme Corp", "admin@acme.com")
 	req.Status = model.TenantStatus("bogus")
 
-	resp, err := svc.Create(newTenantScopeGinCtx(""), req)
+	resp, err := svc.Create(requestCtx(newTenantScopeGinCtx("")), req)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -200,7 +201,7 @@ func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
 	ctx := newTenantScopeGinCtx("")
 
 	svc := &tenantSvc{}
-	resp, err := svc.Create(ctx, newTenantCreateReq("Acme Corp", "admin@acme.com"))
+	resp, err := svc.Create(requestCtx(ctx), newTenantCreateReq("Acme Corp", "admin@acme.com"))
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -215,7 +216,7 @@ func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
 	}
 
 	// 管理员用户：builtin 来源、owner、member 类型
-	adminUser, err := dao.NewUserDao().GetByID(ctx, resp.AdminUserID)
+	adminUser, err := dao.NewUserDao().GetByID(dbclient.CrossTenantContext(ctx), resp.AdminUserID)
 	if err != nil || adminUser == nil {
 		t.Fatalf("load admin user fail, err:%v, user:%+v", err, adminUser)
 	}
@@ -230,7 +231,7 @@ func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
 	}
 
 	// 密码哈希与返回的临时密码一致，且带强制改密标记
-	person, err := dao.NewPersonDao().GetByID(ctx, adminUser.PersonID)
+	person, err := dao.NewPersonDao().GetByID(dbclient.CrossTenantContext(ctx), adminUser.PersonID)
 	if err != nil || person == nil {
 		t.Fatalf("load admin person fail, err:%v, person:%+v", err, person)
 	}
@@ -242,21 +243,21 @@ func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
 	}
 
 	// 归属租户根部门（primary）
-	rootDept, err := dao.NewDepartmentDao().GetByCond(ctx, &dao.DepartmentCond{TenantID: resp.TenantID})
+	rootDept, err := dao.NewDepartmentDao().GetByCond(dbclient.CrossTenantContext(ctx), &dao.DepartmentCond{TenantID: resp.TenantID})
 	if err != nil || rootDept == nil {
 		t.Fatalf("load root dept fail, err:%v, dept:%+v", err, rootDept)
 	}
-	if got := countEntities(t, db.WithContext(ctx), &model.DepartmentUserEntity{},
+	if got := countEntities(t, db.WithContext(dbclient.CrossTenantContext(ctx)), &model.DepartmentUserEntity{},
 		"tenant_id = ? AND user_id = ? AND department_id = ? AND relation_type = ?",
 		resp.TenantID, resp.AdminUserID, rootDept.ID, model.DeptUserRelationPrimary); got != 1 {
 		t.Errorf("primary dept relation count = %d, want 1", got)
 	}
 
 	// 权限开通：应用订阅 1 + 内置角色 1 + 菜单授权 4 + 管理员角色绑定 1
-	if got := countEntities(t, db.WithContext(ctx), &model.TenantApplicationEntity{}, "tenant_id = ?", resp.TenantID); got != 1 {
+	if got := countEntities(t, db.WithContext(dbclient.CrossTenantContext(ctx)), &model.TenantApplicationEntity{}, "tenant_id = ?", resp.TenantID); got != 1 {
 		t.Errorf("tenant_application count = %d, want 1", got)
 	}
-	role, err := dao.NewRoleDao().GetByCond(ctx, &dao.RoleCond{
+	role, err := dao.NewRoleDao().GetByCond(dbclient.CrossTenantContext(ctx), &dao.RoleCond{
 		TenantID:  resp.TenantID,
 		Source:    model.RoleSourceBuiltin,
 		AdminType: model.SysAdminTypeAdmin,
@@ -267,10 +268,10 @@ func TestTenantCreateProvisionsBuiltinAdmin(t *testing.T) {
 	if !role.IsBuiltinAdmin() {
 		t.Errorf("role should be builtin super admin, got source=%q adminType=%q", role.Source, role.AdminType)
 	}
-	if got := countEntities(t, db.WithContext(ctx), &model.RoleMenuEntity{}, "tenant_id = ? AND role_id = ?", resp.TenantID, role.ID); got != int64(len(tenant.ProvisionMenuSeedKeys)) {
+	if got := countEntities(t, db.WithContext(dbclient.CrossTenantContext(ctx)), &model.RoleMenuEntity{}, "tenant_id = ? AND role_id = ?", resp.TenantID, role.ID); got != int64(len(tenant.ProvisionMenuSeedKeys)) {
 		t.Errorf("role_menu count = %d, want %d", got, len(tenant.ProvisionMenuSeedKeys))
 	}
-	if got := countEntities(t, db.WithContext(ctx), &model.UserRoleEntity{}, "tenant_id = ? AND user_id = ? AND role_id = ?", resp.TenantID, resp.AdminUserID, role.ID); got != 1 {
+	if got := countEntities(t, db.WithContext(dbclient.CrossTenantContext(ctx)), &model.UserRoleEntity{}, "tenant_id = ? AND user_id = ? AND role_id = ?", resp.TenantID, resp.AdminUserID, role.ID); got != 1 {
 		t.Errorf("user_role count = %d, want 1", got)
 	}
 }
@@ -283,7 +284,7 @@ func TestTenantCreateRejectsAdminWithoutContact(t *testing.T) {
 	svc := &tenantSvc{}
 	req := newTenantCreateReq("Acme Corp", "")
 	req.Admin.PrimaryPhone = ""
-	_, err := svc.Create(newTenantScopeGinCtx(""), req)
+	_, err := svc.Create(requestCtx(newTenantScopeGinCtx("")), req)
 	if err == nil || err.Error() != code.GetError(code.UserContactRequiredError).Error() {
 		t.Fatalf("Create err = %v, want %v", err, code.GetError(code.UserContactRequiredError))
 	}
@@ -306,7 +307,7 @@ func TestTenantCreateReusesExistingPersonWithoutPassword(t *testing.T) {
 	}
 
 	svc := &tenantSvc{}
-	resp, err := svc.Create(ctx, newTenantCreateReq("Acme Corp", "admin@acme.com"))
+	resp, err := svc.Create(requestCtx(ctx), newTenantCreateReq("Acme Corp", "admin@acme.com"))
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -314,14 +315,14 @@ func TestTenantCreateReusesExistingPersonWithoutPassword(t *testing.T) {
 		t.Errorf("adminInitialPassword = %q, want empty when reusing an existing person", resp.AdminInitialPassword)
 	}
 
-	adminUser, err := dao.NewUserDao().GetByID(ctx, resp.AdminUserID)
+	adminUser, err := dao.NewUserDao().GetByID(dbclient.CrossTenantContext(ctx), resp.AdminUserID)
 	if err != nil || adminUser == nil {
 		t.Fatalf("load admin user fail, err:%v", err)
 	}
 	if adminUser.PersonID != existing.ID {
 		t.Errorf("admin personID = %q, want existing %q", adminUser.PersonID, existing.ID)
 	}
-	person, err := dao.NewPersonDao().GetByID(ctx, existing.ID)
+	person, err := dao.NewPersonDao().GetByID(dbclient.CrossTenantContext(ctx), existing.ID)
 	if err != nil || person == nil {
 		t.Fatalf("load person fail, err:%v", err)
 	}
@@ -340,12 +341,14 @@ func TestResetAdminPasswordReissuesTemporaryPassword(t *testing.T) {
 	ctx := newTenantScopeGinCtx("")
 
 	svc := &tenantSvc{}
-	created, err := svc.Create(ctx, newTenantCreateReq("Acme Corp", "admin@acme.com"))
+	created, err := svc.Create(requestCtx(ctx), newTenantCreateReq("Acme Corp", "admin@acme.com"))
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	reset, err := svc.ResetAdminPassword(ctx, &dtotenant.TenantAdminResetPasswordReq{TenantID: created.TenantID})
+	reset, err := svc.ResetAdminPassword(requestCtx(ctx), &dtotenant.TenantAdminResetPasswordReq{TenantID: created.TenantID,
+		Operator: operatorOf(ctx),
+	})
 	if err != nil {
 		t.Fatalf("ResetAdminPassword failed: %v", err)
 	}
@@ -362,11 +365,11 @@ func TestResetAdminPasswordReissuesTemporaryPassword(t *testing.T) {
 		t.Errorf("reset password %q fails strength: %v", reset.InitialPassword, err)
 	}
 
-	adminUser, err := dao.NewUserDao().GetByID(ctx, created.AdminUserID)
+	adminUser, err := dao.NewUserDao().GetByID(dbclient.CrossTenantContext(ctx), created.AdminUserID)
 	if err != nil || adminUser == nil {
 		t.Fatalf("load admin user fail, err:%v", err)
 	}
-	person, err := dao.NewPersonDao().GetByID(ctx, adminUser.PersonID)
+	person, err := dao.NewPersonDao().GetByID(dbclient.CrossTenantContext(ctx), adminUser.PersonID)
 	if err != nil || person == nil {
 		t.Fatalf("load admin person fail, err:%v", err)
 	}
@@ -388,7 +391,7 @@ func TestResetAdminPasswordNeverTargetsManualMember(t *testing.T) {
 	ctx := newTenantScopeGinCtx("")
 
 	svc := &tenantSvc{}
-	created, err := svc.Create(ctx, newTenantCreateReq("Acme Corp", "admin@acme.com"))
+	created, err := svc.Create(requestCtx(ctx), newTenantCreateReq("Acme Corp", "admin@acme.com"))
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -412,15 +415,17 @@ func TestResetAdminPasswordNeverTargetsManualMember(t *testing.T) {
 	}
 
 	// 删除内置管理员后，租户只剩 manual 成员 → 必须拒绝，且不得改动 manual 成员
-	if err := db.WithContext(ctx).Where("tenant_id = ? AND source = ?", created.TenantID, model.UserSourceBuiltin).
+	if err := db.WithContext(dbclient.CrossTenantContext(ctx)).Where("tenant_id = ? AND source = ?", created.TenantID, model.UserSourceBuiltin).
 		Delete(&model.UserEntity{}).Error; err != nil {
 		t.Fatalf("delete builtin admin: %v", err)
 	}
-	_, err = svc.ResetAdminPassword(ctx, &dtotenant.TenantAdminResetPasswordReq{TenantID: created.TenantID})
+	_, err = svc.ResetAdminPassword(requestCtx(ctx), &dtotenant.TenantAdminResetPasswordReq{TenantID: created.TenantID,
+		Operator: operatorOf(ctx),
+	})
 	if err == nil || err.Error() != code.GetError(code.UserNotExistError).Error() {
 		t.Fatalf("ResetAdminPassword err = %v, want %v", err, code.GetError(code.UserNotExistError))
 	}
-	storedManual, err := dao.NewPersonDao().GetByID(ctx, manualPerson.ID)
+	storedManual, err := dao.NewPersonDao().GetByID(dbclient.CrossTenantContext(ctx), manualPerson.ID)
 	if err != nil || storedManual == nil {
 		t.Fatalf("load manual person fail, err:%v", err)
 	}
@@ -434,7 +439,7 @@ func TestResetAdminPasswordTenantNotFound(t *testing.T) {
 	setupTenantCreateEnv(t)
 
 	svc := &tenantSvc{}
-	_, err := svc.ResetAdminPassword(newTenantScopeGinCtx(""), &dtotenant.TenantAdminResetPasswordReq{TenantID: "not-exist"})
+	_, err := svc.ResetAdminPassword(requestCtx(newTenantScopeGinCtx("")), &dtotenant.TenantAdminResetPasswordReq{TenantID: "not-exist", Operator: operatorOf(newTenantScopeGinCtx(""))})
 	if err == nil || err.Error() != code.GetError(code.TenantNotExistError).Error() {
 		t.Fatalf("ResetAdminPassword err = %v, want %v", err, code.GetError(code.TenantNotExistError))
 	}
@@ -446,7 +451,7 @@ func TestTenantUpdateSuspendsAndListsStatus(t *testing.T) {
 	setupTenantCreateEnv(t)
 
 	svc := &tenantSvc{}
-	created, err := svc.Create(newTenantScopeGinCtx(""), newTenantCreateReq("Acme Corp", "admin@acme.com"))
+	created, err := svc.Create(requestCtx(newTenantScopeGinCtx("")), newTenantCreateReq("Acme Corp", "admin@acme.com"))
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -456,7 +461,7 @@ func TestTenantUpdateSuspendsAndListsStatus(t *testing.T) {
 	updateReq.Type = model.TenantTypeCustomer
 	updateReq.Status = model.TenantStatusSuspended
 	// 操作者所在租户是另一个租户，允许挂起
-	if err := svc.Update(newTenantScopeGinCtx("other-tenant"), updateReq); err != nil {
+	if err := svc.Update(requestCtx(newTenantScopeGinCtx("other-tenant")), updateReq); err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
 
@@ -468,7 +473,7 @@ func TestTenantUpdateSuspendsAndListsStatus(t *testing.T) {
 		t.Fatalf("stored status = %+v, want %q", stored, model.TenantStatusSuspended)
 	}
 
-	listResp, err := svc.PageList(newTenantScopeGinCtx(""), &dtotenant.TenantPageListReq{})
+	listResp, err := svc.PageList(requestCtx(newTenantScopeGinCtx("")), &dtotenant.TenantPageListReq{})
 	if err != nil {
 		t.Fatalf("PageList failed: %v", err)
 	}
@@ -492,7 +497,7 @@ func TestTenantUpdateRefusesSuspendOwnTenant(t *testing.T) {
 	setupTenantCreateEnv(t)
 
 	svc := &tenantSvc{}
-	created, err := svc.Create(newTenantScopeGinCtx(""), newTenantCreateReq("Acme Corp", "admin@acme.com"))
+	created, err := svc.Create(requestCtx(newTenantScopeGinCtx("")), newTenantCreateReq("Acme Corp", "admin@acme.com"))
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -501,7 +506,7 @@ func TestTenantUpdateRefusesSuspendOwnTenant(t *testing.T) {
 	updateReq.Name = "Acme Corp"
 	updateReq.Type = model.TenantTypeCustomer
 	updateReq.Status = model.TenantStatusSuspended
-	err = svc.Update(newTenantScopeGinCtx(created.TenantID), updateReq)
+	err = svc.Update(requestCtx(newTenantScopeGinCtx(created.TenantID)), updateReq)
 	if err == nil || err.Error() != code.GetError(code.TenantSuspendSelfForbiddenError).Error() {
 		t.Fatalf("Update err = %v, want %v", err, code.GetError(code.TenantSuspendSelfForbiddenError))
 	}
@@ -529,7 +534,7 @@ func TestTenantPageListStatusFilter(t *testing.T) {
 	}
 
 	svc := &tenantSvc{}
-	all, err := svc.PageList(newTenantScopeGinCtx(""), &dtotenant.TenantPageListReq{})
+	all, err := svc.PageList(requestCtx(newTenantScopeGinCtx("")), &dtotenant.TenantPageListReq{})
 	if err != nil {
 		t.Fatalf("PageList(no filter) failed: %v", err)
 	}
@@ -537,7 +542,7 @@ func TestTenantPageListStatusFilter(t *testing.T) {
 		t.Fatalf("PageList(no filter) len = %d, want 2", len(all.List))
 	}
 
-	suspended, err := svc.PageList(newTenantScopeGinCtx(""), &dtotenant.TenantPageListReq{Status: model.TenantStatusSuspended})
+	suspended, err := svc.PageList(requestCtx(newTenantScopeGinCtx("")), &dtotenant.TenantPageListReq{Status: model.TenantStatusSuspended})
 	if err != nil {
 		t.Fatalf("PageList(suspended) failed: %v", err)
 	}
@@ -548,7 +553,7 @@ func TestTenantPageListStatusFilter(t *testing.T) {
 		t.Errorf("filtered status = %q, want %q", suspended.List[0].Status, model.TenantStatusSuspended)
 	}
 
-	active, err := svc.PageList(newTenantScopeGinCtx(""), &dtotenant.TenantPageListReq{Status: model.TenantStatusActive})
+	active, err := svc.PageList(requestCtx(newTenantScopeGinCtx("")), &dtotenant.TenantPageListReq{Status: model.TenantStatusActive})
 	if err != nil {
 		t.Fatalf("PageList(active) failed: %v", err)
 	}
@@ -563,7 +568,7 @@ func TestTenantPageListRejectsInvalidStatus(t *testing.T) {
 	testutil.SetupSQLite(t, &model.TenantEntity{})
 
 	svc := &tenantSvc{}
-	_, err := svc.PageList(newTenantScopeGinCtx(""), &dtotenant.TenantPageListReq{Status: model.TenantStatus("bogus")})
+	_, err := svc.PageList(requestCtx(newTenantScopeGinCtx("")), &dtotenant.TenantPageListReq{Status: model.TenantStatus("bogus")})
 	if err == nil || err.Error() != code.GetError(code.TenantPageListStatusInvalidError).Error() {
 		t.Fatalf("PageList err = %v, want %v", err, code.GetError(code.TenantPageListStatusInvalidError))
 	}

@@ -36,7 +36,7 @@ func NewInstallCtr() *InstallCtr {
 // @Success 200 {object} gincontext.DtoRender{data=dtoinstall.InstallationStatusResp}
 // @Router /install/status [get]
 func (ctr *InstallCtr) Status(ctx *gin.Context) {
-	res, err := ctr.installSvc.Status(ctx)
+	res, err := ctr.installSvc.Status(ctx.Request.Context())
 	if err != nil {
 		// 状态查询失败只能是系统错误（表未建/DB 不可用）：用 503 表达"暂时给不出状态"，
 		// 而不是 200 + 业务码——前端与探针需要据此区分"没初始化"与"服务不可用"。
@@ -79,7 +79,7 @@ func (ctr *InstallCtr) Initialize(ctx *gin.Context) {
 		return
 	}
 
-	res, err := ctr.installSvc.Initialize(ctx, &req)
+	res, err := ctr.installSvc.Initialize(ctx.Request.Context(), &req)
 	if err != nil {
 		status, _ := svcinstall.HTTPStatusOf(err)
 		ctr.fail(ctx, &req, status, err, err)

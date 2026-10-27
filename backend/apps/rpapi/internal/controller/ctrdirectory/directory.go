@@ -50,7 +50,7 @@ func NewDirectoryCtr() DirectoryCtr {
 // @Router /v1/rp/directory/members/{userID} [get]
 func (ctr *directoryCtr) Member(ctx *gin.Context) {
 	userID := ctx.Param("userID")
-	member, err := ctr.directorySvc.Member(ctx, userID)
+	member, err := ctr.directorySvc.Member(ctx.Request.Context(), userID)
 	if err != nil {
 		glog.Errorf(ctx, "[ctrdirectory.Member] svc fail, err:%v, userID:%s", err, userID)
 		fail(ctx, code.RpDirectoryMembersError)
@@ -77,7 +77,7 @@ func (ctr *directoryCtr) Members(ctx *gin.Context) {
 		fail(ctx, code.RpDirectoryBadRequestError)
 		return
 	}
-	resp, err := ctr.directorySvc.Members(ctx, ids)
+	resp, err := ctr.directorySvc.Members(ctx.Request.Context(), ids)
 	if err != nil {
 		glog.Errorf(ctx, "[ctrdirectory.Members] svc fail, err:%v, count:%d", err, len(ids))
 		fail(ctx, code.RpDirectoryMembersError)
@@ -92,7 +92,7 @@ func (ctr *directoryCtr) Members(ctx *gin.Context) {
 // @Success 200 {object} gincontext.DtoRender{data=[]dtordirectory.Department}
 // @Router /v1/rp/directory/departments/tree [get]
 func (ctr *directoryCtr) DepartmentTree(ctx *gin.Context) {
-	tree, err := ctr.directorySvc.DepartmentTree(ctx)
+	tree, err := ctr.directorySvc.DepartmentTree(ctx.Request.Context())
 	if err != nil {
 		glog.Errorf(ctx, "[ctrdirectory.DepartmentTree] svc fail, err:%v", err)
 		fail(ctx, code.RpDirectoryDepartmentError)
@@ -107,7 +107,7 @@ func (ctr *directoryCtr) DepartmentTree(ctx *gin.Context) {
 // @Success 200 {object} gincontext.DtoRender{data=dtordirectory.RoleListResp}
 // @Router /v1/rp/directory/roles [get]
 func (ctr *directoryCtr) Roles(ctx *gin.Context) {
-	resp, err := ctr.directorySvc.Roles(ctx)
+	resp, err := ctr.directorySvc.Roles(ctx.Request.Context())
 	if err != nil {
 		glog.Errorf(ctx, "[ctrdirectory.Roles] svc fail, err:%v", err)
 		fail(ctx, code.RpDirectoryRolesError)

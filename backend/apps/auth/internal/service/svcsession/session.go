@@ -1,13 +1,13 @@
 package svcsession
 
 import (
+	"context"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dao"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 )
@@ -17,9 +17,9 @@ import (
 // 对应一个登录会话），而非 SSO 中心会话（Redis + session 审计表）。
 
 type SessionSvc interface {
-	List(ctx *gin.Context, req *dtouser.SessionListReq) (*dtouser.SessionListResp, error)
-	Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq) error
-	RevokeAll(ctx *gin.Context, req *dtouser.SessionRevokeAllReq) error
+	List(ctx context.Context, req *dtouser.SessionListReq) (*dtouser.SessionListResp, error)
+	Revoke(ctx context.Context, req *dtouser.SessionRevokeReq) error
+	RevokeAll(ctx context.Context, req *dtouser.SessionRevokeAllReq) error
 }
 
 type sessionSvc struct{}
@@ -30,10 +30,10 @@ func NewSessionSvc() SessionSvc {
 	return &sessionSvc{}
 }
 
-func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq) (*dtouser.SessionListResp, error) {
+func (svc *sessionSvc) List(ctx context.Context, req *dtouser.SessionListReq) (*dtouser.SessionListResp, error) {
 	refreshTokenDao := dao.NewRefreshTokenDao()
-	personID := gincontext.GetPersonIDString(ctx)
-	tenantID := gincontext.GetTenantIDString(ctx)
+	personID := req.Operator.PersonID
+	tenantID := dbclient.TenantIDFromContext(ctx)
 
 	page := req.Page
 	if page < 1 {
@@ -92,10 +92,10 @@ func (svc *sessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq) (*dto
 	}, nil
 }
 
-func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq) error {
+func (svc *sessionSvc) Revoke(ctx context.Context, req *dtouser.SessionRevokeReq) error {
 	// 单条条件 UPDATE（id + person + tenant 归属），RowsAffected==0 即无权或不存在，
 	// 替代"全量拉取 + 内存比对"的旧实现，消除归属校验与撤销之间的竞态。
-	hit, err := dao.NewRefreshTokenDao().RevokeByID(ctx, req.SessionID, gincontext.GetPersonIDString(ctx), gincontext.GetTenantIDString(ctx))
+	hit, err := dao.NewRefreshTokenDao().RevokeByID(ctx, req.SessionID, req.Operator.PersonID, dbclient.TenantIDFromContext(ctx))
 	if err != nil {
 		glog.Errorf(ctx, "[sessionSvc.Revoke] revoke fail, err:%v", err)
 		return code.GetError(code.SessionRevokeError)
@@ -106,10 +106,10 @@ func (svc *sessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq) e
 	return nil
 }
 
-func (svc *sessionSvc) RevokeAll(ctx *gin.Context, _ *dtouser.SessionRevokeAllReq) error {
+func (svc *sessionSvc) RevokeAll(ctx context.Context, req *dtouser.SessionRevokeAllReq) error {
 	if err := dao.NewRefreshTokenDao().RevokeByCond(ctx, &dao.RefreshTokenCond{
-		PersonID: gincontext.GetPersonIDString(ctx),
-		TenantID: gincontext.GetTenantIDString(ctx),
+		PersonID: req.Operator.PersonID,
+		TenantID: dbclient.TenantIDFromContext(ctx),
 	}); err != nil {
 		glog.Errorf(ctx, "[sessionSvc.RevokeAll] revoke all fail, err:%v", err)
 		return code.GetError(code.SessionRevokeError)

@@ -2,6 +2,8 @@ package svcinstall
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -27,6 +29,9 @@ func setupSvc(t *testing.T) (*gin.Context, *gorm.DB) {
 	config.Conf.OIDC.FrontendLoginURL = "http://localhost:4000/login"
 	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(nil)
+	if ctx.Request == nil {
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	// 刻意**不**给 ctx 声明租户作用域：真实请求路径上也不会有人替 /install 声明。
 	// 引导自身的跨租户声明必须由 service 自己做（否则 fail-closed 会直接拒绝），
 	// 这条用例因此同时是"service 不依赖调用方设置作用域"的回归。
@@ -50,7 +55,7 @@ func TestStatus_BeforeAndAfterInitialize(t *testing.T) {
 	svc := NewInstallSvc()
 
 	t.Setenv(EnvBootstrapToken, "s3cret-token")
-	before, err := svc.Status(ctx)
+	before, err := svc.Status(requestCtx(ctx))
 	if err != nil {
 		t.Fatalf("status fail: %v", err)
 	}
@@ -64,11 +69,11 @@ func TestStatus_BeforeAndAfterInitialize(t *testing.T) {
 		t.Error("已配置 BOOTSTRAP_TOKEN，tokenRequired 必须为 true")
 	}
 
-	if _, err := svc.Initialize(ctx, validReq()); err != nil {
+	if _, err := svc.Initialize(requestCtx(ctx), validReq()); err != nil {
 		t.Fatalf("initialize fail: %v", err)
 	}
 
-	after, err := svc.Status(ctx)
+	after, err := svc.Status(requestCtx(ctx))
 	if err != nil {
 		t.Fatalf("status (after) fail: %v", err)
 	}
@@ -82,7 +87,7 @@ func TestStatus_BeforeAndAfterInitialize(t *testing.T) {
 func TestStatus_TokenNotConfigured(t *testing.T) {
 	ctx, _ := setupSvc(t)
 	t.Setenv(EnvBootstrapToken, "")
-	st, err := NewInstallSvc().Status(ctx)
+	st, err := NewInstallSvc().Status(requestCtx(ctx))
 	if err != nil {
 		t.Fatalf("status fail: %v", err)
 	}
@@ -97,7 +102,7 @@ func TestInitialize_UsesRequestInputs(t *testing.T) {
 	ctx, db := setupSvc(t)
 	t.Setenv(EnvBootstrapToken, "s3cret-token")
 
-	res, err := NewInstallSvc().Initialize(ctx, validReq())
+	res, err := NewInstallSvc().Initialize(requestCtx(ctx), validReq())
 	if err != nil {
 		t.Fatalf("initialize fail: %v", err)
 	}
@@ -158,7 +163,7 @@ func TestInitialize_RejectsInvalidInput(t *testing.T) {
 			t.Setenv(EnvBootstrapToken, "s3cret-token")
 			req := validReq()
 			tc.mutate(req)
-			if _, err := NewInstallSvc().Initialize(ctx, req); err != tc.wantErr {
+			if _, err := NewInstallSvc().Initialize(requestCtx(ctx), req); err != tc.wantErr {
 				t.Fatalf("err = %v, want %v", err, tc.wantErr)
 			}
 		})
@@ -172,7 +177,7 @@ func TestInitialize_RejectsWeakPasswordBeforeWriting(t *testing.T) {
 	t.Setenv(EnvBootstrapToken, "s3cret-token")
 	req := validReq()
 	req.AdminPassword = "weak"
-	if _, err := NewInstallSvc().Initialize(ctx, req); err == nil {
+	if _, err := NewInstallSvc().Initialize(requestCtx(ctx), req); err == nil {
 		t.Fatal("弱口令必须被拒")
 	}
 	var tenants int64
@@ -190,7 +195,7 @@ func TestInitialize_SecondCallIsAlreadyInitialized(t *testing.T) {
 	ctx, db := setupSvc(t)
 	t.Setenv(EnvBootstrapToken, "s3cret-token")
 	svc := NewInstallSvc()
-	if _, err := svc.Initialize(ctx, validReq()); err != nil {
+	if _, err := svc.Initialize(requestCtx(ctx), validReq()); err != nil {
 		t.Fatalf("initialize fail: %v", err)
 	}
 	var before int64
@@ -200,7 +205,8 @@ func TestInitialize_SecondCallIsAlreadyInitialized(t *testing.T) {
 
 	req := validReq()
 	req.AdminUsername = "attacker"
-	if _, err := svc.Initialize(ctx, req); err != errAlreadyInitialized {
+	_ = operatorOf(ctx) // 安装入口不带业务操作人（见 Initialize 的签名说明）
+	if _, err := svc.Initialize(requestCtx(ctx), req); err != errAlreadyInitialized {
 		t.Fatalf("二次初始化 err = %v, want %v", err, errAlreadyInitialized)
 	}
 	var after int64

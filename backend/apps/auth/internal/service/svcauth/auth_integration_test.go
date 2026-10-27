@@ -1,6 +1,7 @@
 package svcauth
 
 import (
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"testing"
 	"time"
 
@@ -57,7 +58,7 @@ func TestMyTenants(t *testing.T) {
 	ctx.Set(gcontext.KeyPersonID, "1")
 
 	svc := NewAuthSvc()
-	resp, err := svc.MyTenants(ctx, &dtoauth.MyTenantsReq{})
+	resp, err := svc.MyTenants(requestCtx(ctx), &dtoauth.MyTenantsReq{Operator: operatorOf(ctx)})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	require.Len(t, resp.List, 1)
@@ -70,10 +71,12 @@ func TestUserinfo(t *testing.T) {
 
 	ctx.Set(gcontext.KeyUserID, "1")
 	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
 	ctx.Set(gcontext.KeyPersonID, "1")
 
 	svc := NewAuthSvc()
-	resp, err := svc.Userinfo(ctx, &dtoauth.UserinfoReq{})
+	resp, err := svc.Userinfo(requestCtx(ctx), &dtoauth.UserinfoReq{Operator: operatorOf(ctx)})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Equal(t, "1", resp.PersonInfo.PersonID)
@@ -88,7 +91,7 @@ func TestLogout(t *testing.T) {
 	ctx.Set(gcontext.KeyPersonID, "1")
 
 	svc := NewAuthSvc()
-	err := svc.Logout(ctx, &dtoauth.LogoutReq{})
+	err := svc.Logout(requestCtx(ctx), &dtoauth.LogoutReq{Operator: operatorOf(ctx)})
 	require.NoError(t, err)
 }
 
@@ -102,7 +105,7 @@ func TestDefaultRecordLoginLogUpdatesLastSignInAt(t *testing.T) {
 	// 刻意不声明租户作用域：与 /oidc/login 链路的 ctx 一致
 	ctx := testsetup.NewCtx()
 
-	defaultRecordLoginLog(ctx, "1", "1", true)
+	defaultRecordLoginLog(requestCtx(ctx), operatorOf(ctx), "1", "1", true)
 
 	user, err := dao.NewUserDao().GetByID(dbclient.CrossTenantContext(ctx), "1")
 	require.NoError(t, err)

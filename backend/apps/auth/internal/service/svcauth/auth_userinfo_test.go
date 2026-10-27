@@ -2,6 +2,9 @@ package svcauth
 
 import (
 	"context"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -13,9 +16,14 @@ import (
 
 func TestUserinfoReturnsPersonAndTenantUser(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyUserID, "21")
 	ginCtx.Set(gcontext.KeyTenantID, "11")
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("11"))
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("11"))
 	ginCtx.Set(gcontext.KeyPersonID, "101")
 
 	restoreUserStore := swapUserStoreFactory(func() authUserStore {
@@ -49,7 +57,7 @@ func TestUserinfoReturnsPersonAndTenantUser(t *testing.T) {
 	defer restorePersonStore()
 
 	svc := &authSvc{}
-	resp, err := svc.Userinfo(ginCtx, &dtoauth.UserinfoReq{})
+	resp, err := svc.Userinfo(requestCtx(ginCtx), &dtoauth.UserinfoReq{Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("Userinfo returned error: %v", err)
 	}
@@ -63,9 +71,14 @@ func TestUserinfoReturnsPersonAndTenantUser(t *testing.T) {
 
 func TestUserinfoReturnsPersonFromContextWhenPersonMissing(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyUserID, "21")
 	ginCtx.Set(gcontext.KeyTenantID, "11")
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("11"))
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("11"))
 	ginCtx.Set(gcontext.KeyPersonID, "99")
 
 	restoreUserStore := swapUserStoreFactory(func() authUserStore {
@@ -96,7 +109,7 @@ func TestUserinfoReturnsPersonFromContextWhenPersonMissing(t *testing.T) {
 	defer restorePersonStore()
 
 	svc := &authSvc{}
-	resp, err := svc.Userinfo(ginCtx, &dtoauth.UserinfoReq{})
+	resp, err := svc.Userinfo(requestCtx(ginCtx), &dtoauth.UserinfoReq{Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("Userinfo returned error: %v", err)
 	}

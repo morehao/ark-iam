@@ -25,10 +25,10 @@ func seedSubscribedApp(t *testing.T, db *gorm.DB, tenantID, appID, code, name st
 		t.Fatalf("seed app: %v", err)
 	}
 	if err := db.Create(&model.TenantApplicationEntity{
-		BaseEntity:   gormdao.BaseEntity{StringID: gormdao.StringID{ID: "ta-" + appID}},
-		TenantID:     tenantID,
-		AppID:        appID,
-		Status:       model.TenantApplicationStatusEnable,
+		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "ta-" + appID}},
+		TenantID:   tenantID,
+		AppID:      appID,
+		Status:     model.TenantApplicationStatusEnable,
 	}).Error; err != nil {
 		t.Fatalf("seed tenant application: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestTenantAppsIncludeSubscribedBuiltInApp(t *testing.T) {
 	}
 
 	ginCtx := newDeptGinCtx(t, "t1", "op")
-	resp, err := NewApplicationAccessSvc().ListTenantApplications(ginCtx)
+	resp, err := NewApplicationAccessSvc().ListTenantApplications(requestCtx(ginCtx))
 	if err != nil {
 		t.Fatalf("apps: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestTenantAppsIncludeSubscribedBuiltInApp(t *testing.T) {
 	}
 
 	// 订阅的内置应用可作为角色归属（自建角色不写编码，编码只能来自应用角色模板）
-	if _, err := NewRoleSvc().Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app-admin", Name: "后台管理员"}); err != nil {
+	if _, err := NewRoleSvc().Create(requestCtx(ginCtx), &dtotenant.RoleCreateReq{AppID: "app-admin", Name: "后台管理员", Operator: operatorOf(ginCtx)}); err != nil {
 		t.Fatalf("create role on subscribed built-in app: %v", err)
 	}
 }
@@ -141,7 +141,7 @@ func TestConsoleMenuScopeExcludesBuiltInApp(t *testing.T) {
 	}
 
 	ginCtx := newDeptGinCtx(t, "t1", "op")
-	tree, err := buildMyMenuTree(ginCtx)
+	tree, err := buildMyMenuTree(requestCtx(ginCtx), operatorOf(ginCtx))
 	if err != nil {
 		t.Fatalf("build my menu tree: %v", err)
 	}
@@ -172,7 +172,7 @@ func TestTenantSidebarFollowsMenuSort(t *testing.T) {
 		}
 	}
 
-	tree, err := buildMyMenuTree(newDeptGinCtx(t, "t1", "op"))
+	tree, err := buildMyMenuTree(requestCtx(newDeptGinCtx(t, "t1", "op")), operatorOf(newDeptGinCtx(t, "t1", "op")))
 	if err != nil {
 		t.Fatalf("build my menu tree: %v", err)
 	}

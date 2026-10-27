@@ -176,11 +176,11 @@ func TestUsableExpression(t *testing.T) {
 	enabledGrant := &model.UserApplicationEntity{Status: model.UserApplicationStatusEnable}
 
 	cases := []struct {
-		name              string
-		app               *model.ApplicationEntity
-		sub               *model.TenantApplicationEntity
-		grant             *model.UserApplicationEntity
-		want              bool
+		name  string
+		app   *model.ApplicationEntity
+		sub   *model.TenantApplicationEntity
+		grant *model.UserApplicationEntity
+		want  bool
 	}{
 		{name: "三者齐备", app: enabledApp, sub: enabledSub, grant: enabledGrant, want: true},
 		{name: "缺应用", app: nil, sub: enabledSub, grant: enabledGrant, want: false},

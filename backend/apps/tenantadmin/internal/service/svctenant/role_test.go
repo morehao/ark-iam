@@ -24,10 +24,10 @@ func seedTestApp(t *testing.T, db *gorm.DB, tenantID, appID string) {
 		t.Fatalf("seed app: %v", err)
 	}
 	if err := db.Create(&model.TenantApplicationEntity{
-		BaseEntity:   gormdao.BaseEntity{StringID: gormdao.StringID{ID: "ta-" + appID}},
-		TenantID:     tenantID,
-		AppID:        appID,
-		Status:       "enable",
+		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "ta-" + appID}},
+		TenantID:   tenantID,
+		AppID:      appID,
+		Status:     "enable",
 	}).Error; err != nil {
 		t.Fatalf("seed tenant application: %v", err)
 	}
@@ -102,19 +102,25 @@ func TestRoleCreateRequiresApp(t *testing.T) {
 	ginCtx := newDeptGinCtx(t, "t1", "op")
 
 	// 非法应用（非本租户订阅的应用）
-	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app-bad", Name: "管理员"}); err == nil {
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.RoleCreateReq{AppID: "app-bad", Name: "管理员",
+		Operator: operatorOf(ginCtx),
+	}); err == nil {
 		t.Fatalf("expected invalid app error")
 	}
 	// 创建成功
-	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app1", Name: "管理员"}); err != nil {
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.RoleCreateReq{AppID: "app1", Name: "管理员",
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("create role: %v", err)
 	}
 	// 同应用名称唯一
-	if _, err := svc.Create(ginCtx, &dtotenant.RoleCreateReq{AppID: "app1", Name: "管理员"}); gerror.GetCode(err) != int(code.RoleCreateError) {
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.RoleCreateReq{AppID: "app1", Name: "管理员",
+		Operator: operatorOf(ginCtx),
+	}); gerror.GetCode(err) != int(code.RoleCreateError) {
 		t.Fatalf("expected duplicate name error, got %v", err)
 	}
 	// 其他租户同名不冲突（名称唯一性在「租户 × 应用」维度）
-	if _, err := svc.Create(newDeptGinCtx(t, "t2", "op2"), &dtotenant.RoleCreateReq{AppID: "app2", Name: "管理员"}); err != nil {
+	if _, err := svc.Create(requestCtx(newDeptGinCtx(t, "t2", "op2")), &dtotenant.RoleCreateReq{AppID: "app2", Name: "管理员", Operator: operatorOf(newDeptGinCtx(t, "t2", "op2"))}); err != nil {
 		t.Fatalf("cross-tenant same name should be allowed: %v", err)
 	}
 }
@@ -135,11 +141,12 @@ func TestRoleCreateCannotInjectCode(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"appID":"app1","name":"管理员","code":"tenant_admin"}`), &req); err != nil {
 		t.Fatalf("bind req: %v", err)
 	}
-	resp, err := svc.Create(ginCtx, &req)
+	req.Operator = operatorOf(ginCtx)
+	resp, err := svc.Create(requestCtx(ginCtx), &req)
 	if err != nil {
 		t.Fatalf("create role: %v", err)
 	}
-	detail, err := svc.Detail(ginCtx, &dtotenant.RoleDetailReq{RoleID: resp.RoleID})
+	detail, err := svc.Detail(requestCtx(ginCtx), &dtotenant.RoleDetailReq{RoleID: resp.RoleID})
 	if err != nil {
 		t.Fatalf("detail: %v", err)
 	}
@@ -194,12 +201,14 @@ func TestRoleUpdateBuiltinForbidden(t *testing.T) {
 		{RoleID: "rb", Name: "租户管理员"},
 		{RoleID: "rt", Name: "存储超管"},
 	} {
-		if err := svc.Update(ginCtx, req); gerror.GetCode(err) != int(code.RoleUpdateBuiltinForbiddenError) {
+		req.Operator = operatorOf(ginCtx)
+		req.Operator = operatorOf(ginCtx)
+		if err := svc.Update(requestCtx(ginCtx), req); gerror.GetCode(err) != int(code.RoleUpdateBuiltinForbiddenError) {
 			t.Fatalf("expected builtin-forbidden error for %+v, got %v", req, err)
 		}
 	}
 
-	detail, err := svc.Detail(ginCtx, &dtotenant.RoleDetailReq{RoleID: "rb"})
+	detail, err := svc.Detail(requestCtx(ginCtx), &dtotenant.RoleDetailReq{RoleID: "rb"})
 	if err != nil {
 		t.Fatalf("detail: %v", err)
 	}
@@ -222,18 +231,24 @@ func TestRoleUpdateCustomRoleKeepsCode(t *testing.T) {
 	ginCtx := newDeptGinCtx(t, "t1", "op")
 
 	// 与他人重名拒绝
-	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "只读"}); gerror.GetCode(err) != int(code.RoleUpdateError) {
+	if err := svc.Update(requestCtx(ginCtx), &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "只读",
+		Operator: operatorOf(ginCtx),
+	}); gerror.GetCode(err) != int(code.RoleUpdateError) {
 		t.Fatalf("expected duplicate name error, got %v", err)
 	}
 	// 自身同名放行（唯一性校验排除自身）
-	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "管理员"}); err != nil {
+	if err := svc.Update(requestCtx(ginCtx), &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "管理员",
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("update with unchanged name: %v", err)
 	}
 	// 改名生效，编码保持不变
-	if err := svc.Update(ginCtx, &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "存储管理员", Description: "负责存储"}); err != nil {
+	if err := svc.Update(requestCtx(ginCtx), &dtotenant.RoleUpdateReq{RoleID: "r1", Name: "存储管理员", Description: "负责存储",
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("update name: %v", err)
 	}
-	detail, err := svc.Detail(ginCtx, &dtotenant.RoleDetailReq{RoleID: "r1"})
+	detail, err := svc.Detail(requestCtx(ginCtx), &dtotenant.RoleDetailReq{RoleID: "r1"})
 	if err != nil {
 		t.Fatalf("detail: %v", err)
 	}
@@ -256,7 +271,7 @@ func TestRolePageListReturnsCode(t *testing.T) {
 
 	ginCtx := newDeptGinCtx(t, "t1", "op")
 
-	resp, err := svc.PageList(ginCtx, &dtotenant.RolePageListReq{Page: 1, PageSize: 10})
+	resp, err := svc.PageList(requestCtx(ginCtx), &dtotenant.RolePageListReq{Page: 1, PageSize: 10})
 	if err != nil {
 		t.Fatalf("page list: %v", err)
 	}
@@ -269,7 +284,7 @@ func TestRolePageListReturnsCode(t *testing.T) {
 	}
 
 	// 关键词命中编码（名称里没有 "storage"）
-	hit, err := svc.PageList(ginCtx, &dtotenant.RolePageListReq{Page: 1, PageSize: 10, Keyword: "storage"})
+	hit, err := svc.PageList(requestCtx(ginCtx), &dtotenant.RolePageListReq{Page: 1, PageSize: 10, Keyword: "storage"})
 	if err != nil {
 		t.Fatalf("page list by keyword: %v", err)
 	}
@@ -305,7 +320,7 @@ func TestRolePageListWithCounts(t *testing.T) {
 		t.Fatalf("seed role_menu: %v", err)
 	}
 
-	resp, err := svc.PageList(newDeptGinCtx(t, "t1", "op"), &dtotenant.RolePageListReq{Page: 1, PageSize: 10})
+	resp, err := svc.PageList(requestCtx(newDeptGinCtx(t, "t1", "op")), &dtotenant.RolePageListReq{Page: 1, PageSize: 10})
 	if err != nil {
 		t.Fatalf("page list: %v", err)
 	}
@@ -335,7 +350,7 @@ func TestRolePageListUnassigned(t *testing.T) {
 	seedTestRole(t, db, "r1", "t1", "app1", "应用管理员")
 	seedTestRole(t, db, "r2", "t1", "", "系统管理员")
 
-	resp, err := svc.PageList(newDeptGinCtx(t, "t1", "op"), &dtotenant.RolePageListReq{Page: 1, PageSize: 10, Unassigned: true})
+	resp, err := svc.PageList(requestCtx(newDeptGinCtx(t, "t1", "op")), &dtotenant.RolePageListReq{Page: 1, PageSize: 10, Unassigned: true})
 	if err != nil {
 		t.Fatalf("page list unassigned: %v", err)
 	}
@@ -344,7 +359,7 @@ func TestRolePageListUnassigned(t *testing.T) {
 	}
 
 	// 不传 unassigned 时不过滤（空串 appID 语义是"不过滤"）
-	all, err := svc.PageList(newDeptGinCtx(t, "t1", "op"), &dtotenant.RolePageListReq{Page: 1, PageSize: 10})
+	all, err := svc.PageList(requestCtx(newDeptGinCtx(t, "t1", "op")), &dtotenant.RolePageListReq{Page: 1, PageSize: 10})
 	if err != nil {
 		t.Fatalf("page list all: %v", err)
 	}
@@ -353,7 +368,7 @@ func TestRolePageListUnassigned(t *testing.T) {
 	}
 
 	// 与关键词组合：未归属 + 名称模糊命中
-	hit, err := svc.PageList(newDeptGinCtx(t, "t1", "op"), &dtotenant.RolePageListReq{Page: 1, PageSize: 10, Unassigned: true, Keyword: "系统"})
+	hit, err := svc.PageList(requestCtx(newDeptGinCtx(t, "t1", "op")), &dtotenant.RolePageListReq{Page: 1, PageSize: 10, Unassigned: true, Keyword: "系统"})
 	if err != nil {
 		t.Fatalf("page list unassigned+keyword: %v", err)
 	}
@@ -374,17 +389,21 @@ func TestRoleMenusUpdateAndGet(t *testing.T) {
 	ginCtx := newDeptGinCtx(t, "t1", "op")
 
 	// 非法菜单（不在角色所属应用菜单集合内）
-	if err := svc.UpdateMenus(ginCtx, &dtotenant.RoleMenusUpdateReq{RoleID: "r1", MenuIDs: []string{"m-bad"}}); err == nil {
+	if err := svc.UpdateMenus(requestCtx(ginCtx), &dtotenant.RoleMenusUpdateReq{RoleID: "r1", MenuIDs: []string{"m-bad"},
+		Operator: operatorOf(ginCtx),
+	}); err == nil {
 		t.Fatalf("expected invalid menu error")
 	}
 
 	// 全量替换
-	if err := svc.UpdateMenus(ginCtx, &dtotenant.RoleMenusUpdateReq{RoleID: "r1", MenuIDs: []string{rootID, childID}}); err != nil {
+	if err := svc.UpdateMenus(requestCtx(ginCtx), &dtotenant.RoleMenusUpdateReq{RoleID: "r1", MenuIDs: []string{rootID, childID},
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("update menus: %v", err)
 	}
 
 	// 回显
-	resp, err := svc.GetMenus(ginCtx, &dtotenant.RoleDetailReq{RoleID: "r1"})
+	resp, err := svc.GetMenus(requestCtx(ginCtx), &dtotenant.RoleDetailReq{RoleID: "r1"})
 	if err != nil {
 		t.Fatalf("get menus: %v", err)
 	}
@@ -396,10 +415,12 @@ func TestRoleMenusUpdateAndGet(t *testing.T) {
 	}
 
 	// 全量替换为空（撤销全部授权）
-	if err := svc.UpdateMenus(ginCtx, &dtotenant.RoleMenusUpdateReq{RoleID: "r1", MenuIDs: []string{}}); err != nil {
+	if err := svc.UpdateMenus(requestCtx(ginCtx), &dtotenant.RoleMenusUpdateReq{RoleID: "r1", MenuIDs: []string{},
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("clear menus: %v", err)
 	}
-	resp, err = svc.GetMenus(ginCtx, &dtotenant.RoleDetailReq{RoleID: "r1"})
+	resp, err = svc.GetMenus(requestCtx(ginCtx), &dtotenant.RoleDetailReq{RoleID: "r1"})
 	if err != nil {
 		t.Fatalf("get menus: %v", err)
 	}

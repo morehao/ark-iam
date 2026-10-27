@@ -1,9 +1,9 @@
 package svctenant
 
 import (
+	"context"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/core/person"
@@ -15,7 +15,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objtenant"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenant"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gcrypto"
@@ -25,12 +24,12 @@ import (
 )
 
 type TenantSvc interface {
-	Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (*dtotenant.TenantCreateResp, error)
-	ResetAdminPassword(ctx *gin.Context, req *dtotenant.TenantAdminResetPasswordReq) (*dtotenant.TenantAdminResetPasswordResp, error)
-	Delete(ctx *gin.Context, req *dtotenant.TenantDeleteReq) error
-	Update(ctx *gin.Context, req *dtotenant.TenantUpdateReq) error
-	Detail(ctx *gin.Context, req *dtotenant.TenantDetailReq) (*dtotenant.TenantDetailResp, error)
-	PageList(ctx *gin.Context, req *dtotenant.TenantPageListReq) (*dtotenant.TenantPageListResp, error)
+	Create(ctx context.Context, req *dtotenant.TenantCreateReq) (*dtotenant.TenantCreateResp, error)
+	ResetAdminPassword(ctx context.Context, req *dtotenant.TenantAdminResetPasswordReq) (*dtotenant.TenantAdminResetPasswordResp, error)
+	Delete(ctx context.Context, req *dtotenant.TenantDeleteReq) error
+	Update(ctx context.Context, req *dtotenant.TenantUpdateReq) error
+	Detail(ctx context.Context, req *dtotenant.TenantDetailReq) (*dtotenant.TenantDetailResp, error)
+	PageList(ctx context.Context, req *dtotenant.TenantPageListReq) (*dtotenant.TenantPageListResp, error)
 }
 
 type tenantSvc struct {
@@ -50,7 +49,7 @@ func NewTenantSvc() TenantSvc {
 // （应用订阅 / 内置角色 / 菜单授权 / 角色绑定）。管理员初始密码为系统生成的临时密码，
 // 仅在响应中返回一次，且该管理员首次登录必须改密（见
 // docs/design/system-design.md §5.8）。
-func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (*dtotenant.TenantCreateResp, error) {
+func (svc *tenantSvc) Create(ctx context.Context, req *dtotenant.TenantCreateReq) (*dtotenant.TenantCreateResp, error) {
 	admin := req.Admin
 	if admin == nil {
 		return nil, code.GetError(code.UserContactRequiredError)
@@ -77,7 +76,7 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 		return nil, code.GetError(code.PasswordHashError)
 	}
 
-	userID := gincontext.GetUserIDString(ctx)
+	userID := req.Operator.UserID
 	tenantType := req.Type
 	if tenantType != model.TenantTypeCustomer && tenantType != model.TenantTypePlatform {
 		tenantType = model.TenantTypeCustomer
@@ -158,7 +157,7 @@ func (svc *tenantSvc) Create(ctx *gin.Context, req *dtotenant.TenantCreateReq) (
 //
 // 生成新临时密码 → 置 password_status=must_change → 撤销该自然人既有会话 → 写审计；
 // 明文只在响应中返回一次，不落库、不写日志。
-func (svc *tenantSvc) ResetAdminPassword(ctx *gin.Context, req *dtotenant.TenantAdminResetPasswordReq) (*dtotenant.TenantAdminResetPasswordResp, error) {
+func (svc *tenantSvc) ResetAdminPassword(ctx context.Context, req *dtotenant.TenantAdminResetPasswordReq) (*dtotenant.TenantAdminResetPasswordResp, error) {
 	tenantEntity, err := dao.NewTenantDao().GetByID(ctx, req.TenantID)
 	if err != nil {
 		glog.Errorf(ctx, "[svctenant.ResetAdminPassword] dao GetByID tenant fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -193,7 +192,7 @@ func (svc *tenantSvc) ResetAdminPassword(ctx *gin.Context, req *dtotenant.Tenant
 		glog.Errorf(ctx, "[svctenant.ResetAdminPassword] GeneratePasswordHash fail, err:%v", err)
 		return nil, code.GetError(code.PasswordHashError)
 	}
-	operatorID := gincontext.GetUserIDString(ctx)
+	operatorID := req.Operator.UserID
 	if err := dao.NewPersonDao().UpdateMap(ctx, builtinAdmin.PersonID, map[string]any{
 		"password_encrypted": passwordHash,
 		"password_method":    model.PasswordMethodBcrypt,
@@ -228,7 +227,7 @@ func (svc *tenantSvc) ResetAdminPassword(ctx *gin.Context, req *dtotenant.Tenant
 // 平台自运营租户（种子租户 t_platform）禁删：它是平台控制台自身所在租户，删除即整栈失联，
 // 且产品内没有恢复路径（只能改库）。判定依据与 Update 的「不可挂起」同源——平台租户编码是
 // 种子身份（model.SeedPlatformTenantCode），与租户改名无关。
-func (svc *tenantSvc) Delete(ctx *gin.Context, req *dtotenant.TenantDeleteReq) error {
+func (svc *tenantSvc) Delete(ctx context.Context, req *dtotenant.TenantDeleteReq) error {
 	tenantEntity, err := dao.NewTenantDao().GetByID(ctx, req.TenantID)
 	if err != nil {
 		glog.Errorf(ctx, "[svctenant.TenantDelete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -242,7 +241,7 @@ func (svc *tenantSvc) Delete(ctx *gin.Context, req *dtotenant.TenantDeleteReq) e
 		return code.GetError(code.TenantBuiltInDeleteForbiddenError)
 	}
 
-	userID := gincontext.GetUserIDString(ctx)
+	userID := req.Operator.UserID
 
 	if err := dao.NewTenantDao().Delete(ctx, req.TenantID, userID); err != nil {
 		glog.Errorf(ctx, "[svctenant.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -252,7 +251,7 @@ func (svc *tenantSvc) Delete(ctx *gin.Context, req *dtotenant.TenantDeleteReq) e
 }
 
 // Update 更新租户管理
-func (svc *tenantSvc) Update(ctx *gin.Context, req *dtotenant.TenantUpdateReq) error {
+func (svc *tenantSvc) Update(ctx context.Context, req *dtotenant.TenantUpdateReq) error {
 	tenantEntity, err := dao.NewTenantDao().GetByID(ctx, req.TenantID)
 	if err != nil {
 		glog.Errorf(ctx, "[svctenant.TenantUpdate] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -262,7 +261,7 @@ func (svc *tenantSvc) Update(ctx *gin.Context, req *dtotenant.TenantUpdateReq) e
 		return code.GetError(code.TenantNotExistError)
 	}
 
-	userID := gincontext.GetUserIDString(ctx)
+	userID := req.Operator.UserID
 	tenantType := req.Type
 	if tenantType != model.TenantTypeCustomer && tenantType != model.TenantTypePlatform {
 		tenantType = model.TenantTypeCustomer
@@ -270,7 +269,7 @@ func (svc *tenantSvc) Update(ctx *gin.Context, req *dtotenant.TenantUpdateReq) e
 	tenantStatus := model.NormalizeTenantStatus(req.Status)
 	// 禁止挂起操作者自己所在的租户：挂起后该租户整体无法登录、本控制台随之失联，
 	// 且产品内没有恢复路径（只能改库），属于不可逆自锁。
-	if tenantStatus == model.TenantStatusSuspended && req.TenantID == gincontext.GetTenantIDString(ctx) {
+	if tenantStatus == model.TenantStatusSuspended && req.TenantID == dbclient.TenantIDFromContext(ctx) {
 		glog.Errorf(ctx, "[svctenant.TenantUpdate] refuse to suspend own tenant, tenantID:%s, req:%s", req.TenantID, gutil.ToJsonString(req))
 		return code.GetError(code.TenantSuspendSelfForbiddenError)
 	}
@@ -304,7 +303,7 @@ func (svc *tenantSvc) Update(ctx *gin.Context, req *dtotenant.TenantUpdateReq) e
 }
 
 // Detail 根据id获取租户管理
-func (svc *tenantSvc) Detail(ctx *gin.Context, req *dtotenant.TenantDetailReq) (*dtotenant.TenantDetailResp, error) {
+func (svc *tenantSvc) Detail(ctx context.Context, req *dtotenant.TenantDetailReq) (*dtotenant.TenantDetailResp, error) {
 	tenantEntity, err := dao.NewTenantDao().GetByID(ctx, req.TenantID)
 	if err != nil {
 		glog.Errorf(ctx, "[svctenant.TenantDetail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -334,7 +333,7 @@ func (svc *tenantSvc) Detail(ctx *gin.Context, req *dtotenant.TenantDetailReq) (
 // PageList 分页获取租户管理列表。
 // 列表需同时回传创建时间与更新时间（前端两列都展示），故两个时间字段均需赋值。
 // 状态筛选走白名单校验：非法值直接报错，避免静默返回"看起来正常"的错误集合。
-func (svc *tenantSvc) PageList(ctx *gin.Context, req *dtotenant.TenantPageListReq) (*dtotenant.TenantPageListResp, error) {
+func (svc *tenantSvc) PageList(ctx context.Context, req *dtotenant.TenantPageListReq) (*dtotenant.TenantPageListResp, error) {
 	switch req.Status {
 	case "", model.TenantStatusActive, model.TenantStatusSuspended:
 	default:

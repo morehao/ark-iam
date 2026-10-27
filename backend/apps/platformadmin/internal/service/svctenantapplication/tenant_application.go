@@ -3,7 +3,6 @@ package svctenantapplication
 import (
 	"context"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
 	"github.com/morehao/ark-iam/pkg/code"
@@ -12,18 +11,17 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenantapplication"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
 
 type TenantApplicationSvc interface {
-	Create(ctx *gin.Context, req *dtotenantapplication.TenantApplicationCreateReq) (*dtotenantapplication.TenantApplicationCreateResp, error)
-	Delete(ctx *gin.Context, req *dtotenantapplication.TenantApplicationDeleteReq) error
-	Update(ctx *gin.Context, req *dtotenantapplication.TenantApplicationUpdateReq) error
-	Detail(ctx *gin.Context, req *dtotenantapplication.TenantApplicationDetailReq) (*dtotenantapplication.TenantApplicationDetailResp, error)
-	PageList(ctx *gin.Context, req *dtotenantapplication.TenantApplicationPageListReq) (*dtotenantapplication.TenantApplicationPageListResp, error)
+	Create(ctx context.Context, req *dtotenantapplication.TenantApplicationCreateReq) (*dtotenantapplication.TenantApplicationCreateResp, error)
+	Delete(ctx context.Context, req *dtotenantapplication.TenantApplicationDeleteReq) error
+	Update(ctx context.Context, req *dtotenantapplication.TenantApplicationUpdateReq) error
+	Detail(ctx context.Context, req *dtotenantapplication.TenantApplicationDetailReq) (*dtotenantapplication.TenantApplicationDetailResp, error)
+	PageList(ctx context.Context, req *dtotenantapplication.TenantApplicationPageListReq) (*dtotenantapplication.TenantApplicationPageListResp, error)
 }
 
 type tenantApplicationSvc struct{}
@@ -48,7 +46,7 @@ func isValidTenantApplicationStatus(status model.TenantApplicationStatus) bool {
 // 平台侧跨租户运维：订阅的归属租户来自请求参数（而非调用者 token 里的租户），
 // 读改删同样不校验 ctx 租户归属——与 /v1/platform/tenants/{tenantID} 同一信任模型
 // （能拿到 platform_admin_web 令牌即可运维任意租户）。
-func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplication.TenantApplicationCreateReq) (*dtotenantapplication.TenantApplicationCreateResp, error) {
+func (svc *tenantApplicationSvc) Create(ctx context.Context, req *dtotenantapplication.TenantApplicationCreateReq) (*dtotenantapplication.TenantApplicationCreateResp, error) {
 	if !isValidTenantApplicationStatus(req.Status) {
 		glog.Errorf(ctx, "[svctenantapplication.Create] 非法订阅状态, req:%s", gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantApplicationCreateError)
@@ -92,7 +90,7 @@ func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplicat
 		TenantID:  req.TenantID,
 		AppID:     req.AppID,
 		Status:    req.Status,
-		CreatedBy: gincontext.GetUserIDString(ctx),
+		CreatedBy: req.Operator.UserID,
 	}
 	if entity.Status == "" {
 		entity.Status = model.TenantApplicationStatusEnable
@@ -107,7 +105,7 @@ func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplicat
 		return tenant.SyncAppRoleTemplate(crossCtx, tx, &tenant.SyncAppRoleTemplateReq{
 			TenantID:  req.TenantID,
 			AppID:     req.AppID,
-			CreatedBy: gincontext.GetUserIDString(ctx),
+			CreatedBy: req.Operator.UserID,
 		})
 	})
 	if txErr != nil {
@@ -123,7 +121,7 @@ func (svc *tenantApplicationSvc) Create(ctx *gin.Context, req *dtotenantapplicat
 // 写入 tenant_admin 订阅——它们由系统开通，删除会让对应控制台当场失去菜单（平台侧整栈失联、
 // 租户侧无法自救）。判定口径取「订阅的应用 source=builtin」，与 svcapplication.Delete 的
 // 内置应用禁删同源；需要下线时改 status=disable（Update 不受限）。
-func (svc *tenantApplicationSvc) Delete(ctx *gin.Context, req *dtotenantapplication.TenantApplicationDeleteReq) error {
+func (svc *tenantApplicationSvc) Delete(ctx context.Context, req *dtotenantapplication.TenantApplicationDeleteReq) error {
 	// 平台侧跨租户运维：订阅归属租户来自请求参数，调用方 ctx 携带的是平台租户，
 	// 因此这里必须显式声明「全租户」作用域——跨租户可见性不能来自「ctx 恰好没有作用域」。
 	crossCtx := dbclient.CrossTenantContext(ctx)
@@ -144,14 +142,14 @@ func (svc *tenantApplicationSvc) Delete(ctx *gin.Context, req *dtotenantapplicat
 	if app != nil && app.Source.IsBuiltin() {
 		return code.GetError(code.TenantApplicationBuiltInErr)
 	}
-	if err := dao.NewTenantApplicationDao().Delete(crossCtx, req.TenantAppID, gincontext.GetUserIDString(ctx)); err != nil {
+	if err := dao.NewTenantApplicationDao().Delete(crossCtx, req.TenantAppID, req.Operator.UserID); err != nil {
 		glog.Errorf(ctx, "[svctenantapplication.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.TenantApplicationDeleteError)
 	}
 	return nil
 }
 
-func (svc *tenantApplicationSvc) Update(ctx *gin.Context, req *dtotenantapplication.TenantApplicationUpdateReq) error {
+func (svc *tenantApplicationSvc) Update(ctx context.Context, req *dtotenantapplication.TenantApplicationUpdateReq) error {
 	if !isValidTenantApplicationStatus(req.Status) {
 		glog.Errorf(ctx, "[svctenantapplication.Update] 非法订阅状态, req:%s", gutil.ToJsonString(req))
 		return code.GetError(code.TenantApplicationUpdateError)
@@ -168,7 +166,7 @@ func (svc *tenantApplicationSvc) Update(ctx *gin.Context, req *dtotenantapplicat
 		return code.GetError(code.TenantApplicationNotExistError)
 	}
 	updateMap := map[string]any{
-		"updated_by": gincontext.GetUserIDString(ctx),
+		"updated_by": req.Operator.UserID,
 	}
 	// status 留空表示不修改：不写该列，避免把状态覆盖为空串
 	if req.Status != "" {
@@ -181,7 +179,7 @@ func (svc *tenantApplicationSvc) Update(ctx *gin.Context, req *dtotenantapplicat
 	return nil
 }
 
-func (svc *tenantApplicationSvc) Detail(ctx *gin.Context, req *dtotenantapplication.TenantApplicationDetailReq) (*dtotenantapplication.TenantApplicationDetailResp, error) {
+func (svc *tenantApplicationSvc) Detail(ctx context.Context, req *dtotenantapplication.TenantApplicationDetailReq) (*dtotenantapplication.TenantApplicationDetailResp, error) {
 	// 平台侧跨租户运维：订阅归属租户来自请求参数，调用方 ctx 携带的是平台租户，
 	// 因此这里必须显式声明「全租户」作用域——跨租户可见性不能来自「ctx 恰好没有作用域」。
 	crossCtx := dbclient.CrossTenantContext(ctx)
@@ -199,18 +197,18 @@ func (svc *tenantApplicationSvc) Detail(ctx *gin.Context, req *dtotenantapplicat
 		return nil, code.GetError(code.TenantApplicationGetDetailError)
 	}
 	return &dtotenantapplication.TenantApplicationDetailResp{
-		TenantAppID:  entity.ID,
-		TenantID:     entity.TenantID,
-		TenantName:   tenantNames[entity.TenantID],
-		AppID:        entity.AppID,
-		AppName:      appNames[entity.AppID],
-		AppSource:    appSources[entity.AppID],
-		Status:       entity.Status,
-		CreatedAt:    entity.CreatedAt.Unix(),
+		TenantAppID: entity.ID,
+		TenantID:    entity.TenantID,
+		TenantName:  tenantNames[entity.TenantID],
+		AppID:       entity.AppID,
+		AppName:     appNames[entity.AppID],
+		AppSource:   appSources[entity.AppID],
+		Status:      entity.Status,
+		CreatedAt:   entity.CreatedAt.Unix(),
 	}, nil
 }
 
-func (svc *tenantApplicationSvc) PageList(ctx *gin.Context, req *dtotenantapplication.TenantApplicationPageListReq) (*dtotenantapplication.TenantApplicationPageListResp, error) {
+func (svc *tenantApplicationSvc) PageList(ctx context.Context, req *dtotenantapplication.TenantApplicationPageListReq) (*dtotenantapplication.TenantApplicationPageListResp, error) {
 	// 平台侧跨租户运维：订阅归属租户来自请求参数，调用方 ctx 携带的是平台租户，
 	// 因此这里必须显式声明「全租户」作用域——跨租户可见性不能来自「ctx 恰好没有作用域」。
 	crossCtx := dbclient.CrossTenantContext(ctx)

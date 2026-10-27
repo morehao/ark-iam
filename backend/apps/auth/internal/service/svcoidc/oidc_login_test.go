@@ -3,7 +3,9 @@ package svcoidc
 import (
 	"context"
 	"fmt"
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -22,15 +24,15 @@ import (
 )
 
 type fakePasswordAuthenticator struct {
-	authenticate     func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error)
-	tenantsForPerson func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error)
+	authenticate     func(ctx context.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error)
+	tenantsForPerson func(ctx context.Context, personID string) ([]objauth.TenantOption, error)
 }
 
-func (f *fakePasswordAuthenticator) AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+func (f *fakePasswordAuthenticator) AuthenticatePassword(ctx context.Context, operator objidentity.Operator, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 	return f.authenticate(ctx, identifier, password)
 }
 
-func (f *fakePasswordAuthenticator) TenantsForPerson(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+func (f *fakePasswordAuthenticator) TenantsForPerson(ctx context.Context, personID string) ([]objauth.TenantOption, error) {
 	if f.tenantsForPerson != nil {
 		return f.tenantsForPerson(ctx, personID)
 	}
@@ -99,7 +101,7 @@ func TestCompleteLoginBySessionHonorsAuthRequestTenantHint(t *testing.T) {
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx context.Context, personID string) ([]objauth.TenantOption, error) {
 			if personID != "88" {
 				t.Fatalf("expected personID 88, got %s", personID)
 			}
@@ -108,7 +110,7 @@ func TestCompleteLoginBySessionHonorsAuthRequestTenantHint(t *testing.T) {
 		ssoSessionStore: &fakeSSOSessionStore{validatedPersonID: "88"},
 	}
 
-	res, err := svc.CompleteLoginBySession(testsetup.NewCtx(), request.GetID(), "session-x")
+	res, err := svc.CompleteLoginBySession(requestCtx(testsetup.NewCtx()), operatorOf(testsetup.NewCtx()), request.GetID(), "session-x")
 	if err != nil {
 		t.Fatalf("CompleteLoginBySession failed: %v", err)
 	}
@@ -166,13 +168,13 @@ func TestCompleteLoginBySessionFallsBackWhenHintNotInPersonsTenants(t *testing.T
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx context.Context, personID string) ([]objauth.TenantOption, error) {
 			return []objauth.TenantOption{{TenantID: "3", Name: "tenant-3"}}, nil
 		}},
 		ssoSessionStore: &fakeSSOSessionStore{validatedPersonID: "88"},
 	}
 
-	if _, err := svc.CompleteLoginBySession(testsetup.NewCtx(), request.GetID(), "session-x"); err != nil {
+	if _, err := svc.CompleteLoginBySession(requestCtx(testsetup.NewCtx()), operatorOf(testsetup.NewCtx()), request.GetID(), "session-x"); err != nil {
 		t.Fatalf("CompleteLoginBySession failed: %v", err)
 	}
 	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())
@@ -226,13 +228,13 @@ func TestCompleteLoginBySessionRejectsHintOnTenantLookupError(t *testing.T) {
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx context.Context, personID string) ([]objauth.TenantOption, error) {
 			return nil, assert.AnError
 		}},
 		ssoSessionStore: &fakeSSOSessionStore{validatedPersonID: "88"},
 	}
 
-	if _, err := svc.CompleteLoginBySession(testsetup.NewCtx(), request.GetID(), "session-x"); err != nil {
+	if _, err := svc.CompleteLoginBySession(requestCtx(testsetup.NewCtx()), operatorOf(testsetup.NewCtx()), request.GetID(), "session-x"); err != nil {
 		t.Fatalf("CompleteLoginBySession failed: %v", err)
 	}
 	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())
@@ -281,7 +283,7 @@ func TestCompleteLoginReturnsContinueURLAndCompletesRequest(t *testing.T) {
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx context.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 			if identifier != "person@example.com" || password != "Password1" {
 				t.Fatalf("unexpected credentials identifier=%q password=%q", identifier, password)
 			}
@@ -290,12 +292,19 @@ func TestCompleteLoginReturnsContinueURLAndCompletesRequest(t *testing.T) {
 	}
 
 	ginCtx, _ := gin.CreateTestContext(nil)
+
+	if ginCtx.Request == nil {
+
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login", nil)
-	res, err := svc.CompleteLogin(ginCtx, &dtooidc.OIDCLoginReq{
+	res, err := svc.CompleteLogin(requestCtx(ginCtx), &dtooidc.OIDCLoginReq{
 		AuthRequestID: request.GetID(),
 		Identifier:    "person@example.com",
 		Password:      "Password1",
-	})
+
+		Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("CompleteLogin failed: %v", err)
 	}
@@ -357,7 +366,7 @@ func TestCompleteLoginZeroTenantVerifiedPersonBindsDoneFalseAndReturnsCreateTena
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx context.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 			// 零租户已验密 person：无 user、无 tenants
 			return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}}}, nil, nil, nil
 		}},
@@ -365,12 +374,19 @@ func TestCompleteLoginZeroTenantVerifiedPersonBindsDoneFalseAndReturnsCreateTena
 	}
 
 	ginCtx, _ := gin.CreateTestContext(nil)
+
+	if ginCtx.Request == nil {
+
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login", nil)
-	res, err := svc.CompleteLogin(ginCtx, &dtooidc.OIDCLoginReq{
+	res, err := svc.CompleteLogin(requestCtx(ginCtx), &dtooidc.OIDCLoginReq{
 		AuthRequestID: request.GetID(),
 		Identifier:    "zero@example.com",
 		Password:      "Password1",
-	})
+
+		Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("CompleteLogin failed: %v", err)
 	}
@@ -431,19 +447,26 @@ func TestCompleteLoginZeroTenantAppDisallowFalse(t *testing.T) {
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx context.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 			return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}}}, nil, nil, nil
 		}},
 		ssoSessionStore: &fakeSSOSessionStore{},
 	}
 
 	ginCtx, _ := gin.CreateTestContext(nil)
+
+	if ginCtx.Request == nil {
+
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login", nil)
-	res, err := svc.CompleteLogin(ginCtx, &dtooidc.OIDCLoginReq{
+	res, err := svc.CompleteLogin(requestCtx(ginCtx), &dtooidc.OIDCLoginReq{
 		AuthRequestID: request.GetID(),
 		Identifier:    "zero@example.com",
 		Password:      "Password1",
-	})
+
+		Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("CompleteLogin failed: %v", err)
 	}
@@ -485,18 +508,25 @@ func TestCompleteLoginMultiTenantRequiresSelection(t *testing.T) {
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx context.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 			return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}}}, &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "66"}}, TenantID: "3", PersonID: "88"}, []objauth.TenantOption{{TenantID: "3", Name: "tenant-3"}, {TenantID: "7", Name: "tenant-7"}}, nil
 		}},
 	}
 
 	ginCtx, _ := gin.CreateTestContext(nil)
+
+	if ginCtx.Request == nil {
+
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login", nil)
-	res, err := svc.CompleteLogin(ginCtx, &dtooidc.OIDCLoginReq{
+	res, err := svc.CompleteLogin(requestCtx(ginCtx), &dtooidc.OIDCLoginReq{
 		AuthRequestID: request.GetID(),
 		Identifier:    "person@example.com",
 		Password:      "Password1",
-	})
+
+		Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("CompleteLogin failed: %v", err)
 	}
@@ -559,19 +589,26 @@ func TestCompleteLoginHonorsTenantHint(t *testing.T) {
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx context.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 			return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}}}, &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "66"}}, TenantID: "3", PersonID: "88"}, []objauth.TenantOption{{TenantID: "3", Name: "tenant-3"}, {TenantID: "7", Name: "tenant-7"}}, nil
 		}},
 		ssoSessionStore: &fakeSSOSessionStore{},
 	}
 
 	ginCtx, _ := gin.CreateTestContext(nil)
+
+	if ginCtx.Request == nil {
+
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login", nil)
-	res, err := svc.CompleteLogin(ginCtx, &dtooidc.OIDCLoginReq{
+	res, err := svc.CompleteLogin(requestCtx(ginCtx), &dtooidc.OIDCLoginReq{
 		AuthRequestID: request.GetID(),
 		Identifier:    "person@example.com",
 		Password:      "Password1",
-	})
+
+		Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("CompleteLogin failed: %v", err)
 	}
@@ -635,19 +672,26 @@ func TestCompleteLoginIgnoresForgedTenantHint(t *testing.T) {
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx context.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 			return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}}}, &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "66"}}, TenantID: "3", PersonID: "88"}, []objauth.TenantOption{{TenantID: "3", Name: "tenant-3"}}, nil
 		}},
 		ssoSessionStore: &fakeSSOSessionStore{},
 	}
 
 	ginCtx, _ := gin.CreateTestContext(nil)
+
+	if ginCtx.Request == nil {
+
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login", nil)
-	res, err := svc.CompleteLogin(ginCtx, &dtooidc.OIDCLoginReq{
+	res, err := svc.CompleteLogin(requestCtx(ginCtx), &dtooidc.OIDCLoginReq{
 		AuthRequestID: request.GetID(),
 		Identifier:    "person@example.com",
 		Password:      "Password1",
-	})
+
+		Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("CompleteLogin failed: %v", err)
 	}
@@ -705,7 +749,7 @@ func TestSelectTenantWritesTenantAndReturnsContinueURL(t *testing.T) {
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx context.Context, personID string) ([]objauth.TenantOption, error) {
 			if personID != "88" {
 				t.Fatalf("expected personID 88, got %s", personID)
 			}
@@ -713,7 +757,7 @@ func TestSelectTenantWritesTenantAndReturnsContinueURL(t *testing.T) {
 		}},
 	}
 
-	res, err := svc.SelectTenant(testsetup.NewCtx(), request.GetID(), "7")
+	res, err := svc.SelectTenant(requestCtx(testsetup.NewCtx()), operatorOf(testsetup.NewCtx()), request.GetID(), "7")
 	if err != nil {
 		t.Fatalf("SelectTenant failed: %v", err)
 	}
@@ -777,12 +821,12 @@ func TestSelectTenantRejectsTenantNotBelongingToPerson(t *testing.T) {
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx context.Context, personID string) ([]objauth.TenantOption, error) {
 			return []objauth.TenantOption{{TenantID: "3", Name: "tenant-3"}}, nil
 		}},
 	}
 
-	if _, err := svc.SelectTenant(testsetup.NewCtx(), request.GetID(), "7"); err == nil {
+	if _, err := svc.SelectTenant(requestCtx(testsetup.NewCtx()), operatorOf(testsetup.NewCtx()), request.GetID(), "7"); err == nil {
 		t.Fatal("expected error when selecting a tenant not belonging to the person")
 	}
 	updated, err := provider.Storage.AuthRequestByID(t.Context(), request.GetID())
@@ -825,7 +869,7 @@ func TestSelectTenantRejectsAlreadyDoneRequest(t *testing.T) {
 	callCount := 0
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx context.Context, personID string) ([]objauth.TenantOption, error) {
 			callCount++
 			return []objauth.TenantOption{{TenantID: "3", Name: "tenant-3"}, {TenantID: "7", Name: "tenant-7"}}, nil
 		}},
@@ -837,7 +881,7 @@ func TestSelectTenantRejectsAlreadyDoneRequest(t *testing.T) {
 		t.Fatalf("CompleteAuthRequest(done=true) failed: %v", err)
 	}
 
-	if _, err := svc.SelectTenant(testsetup.NewCtx(), request.GetID(), "3"); err == nil {
+	if _, err := svc.SelectTenant(requestCtx(testsetup.NewCtx()), operatorOf(testsetup.NewCtx()), request.GetID(), "3"); err == nil {
 		t.Fatalf("expected SelectTenant to reject an already-done request")
 	}
 	if callCount != 0 {

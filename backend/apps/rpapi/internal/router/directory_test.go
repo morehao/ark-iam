@@ -1,8 +1,11 @@
 package router
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -14,10 +17,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/morehao/ark-iam/pkg/config"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/rpapi/internal/dto/dtordirectory"
 	"github.com/morehao/ark-iam/rpapi/testutil"
 	"github.com/morehao/ark-iam/sdk/rp"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -106,12 +111,21 @@ type directoryFixture struct {
 
 func seedDirectory(t *testing.T) directoryFixture {
 	t.Helper()
-	db := testutil.SetupSQLite(t,
+	return seedDirectoryWith(t)
+}
+
+// seedDirectoryWith 同 seedDirectory，可追加额外实体（如 api_key），
+// 保证只建一次库——重复调用 testutil.SetupSQLite 会重建内存库、抹掉已播种数据。
+func seedDirectoryWith(t *testing.T, extra ...any) directoryFixture {
+	t.Helper()
+	entities := []any{
 		&model.UserEntity{},
 		&model.DepartmentEntity{},
 		&model.DepartmentUserEntity{},
 		&model.RoleEntity{},
-	)
+	}
+	entities = append(entities, extra...)
+	db := testutil.SetupSQLite(t, entities...)
 	users := []model.UserEntity{
 		{PersonID: "p-1", TenantID: testTenantID, UserType: model.UserTypeMember, Name: "张三", Status: model.UserStatusActive},
 		{TenantID: testTenantID, UserType: model.UserTypeMachine, Name: "服务账号", Status: model.UserStatusSuspended},
@@ -250,4 +264,60 @@ func TestDirectoryETagAndTreeAndRoles(t *testing.T) {
 	assert.Contains(t, w.Body.String(), `"code":"admin"`)
 	assert.Contains(t, w.Body.String(), `"name":"管理员"`)
 	assert.Contains(t, w.Body.String(), `"truncated":false`)
+}
+
+// TestDirectoryAPIKeyChannelPasses 回归：API Key 是**独立的机器凭证通道**（设计文档 §4.4）。
+//
+// OIDCAuth 校验 API Key 后只写入租户作用域与 user_id，**不会**写入 OIDC identity
+// （identity.OIDCIdentityFromContext == nil）。修复前 RequireDirectoryRead 直接按
+// "ident == nil → 401" 判定，把合法的 API Key 请求全部误杀成 401。
+//
+// 本用例钉住：合法的 API Key 走目录接口必须 200 且只看得到本租户数据。
+func TestDirectoryAPIKeyChannelPasses(t *testing.T) {
+	// api_key 通道还会读 tenant（校验租户可用性），一并建表。
+	fx := seedDirectoryWith(t, &model.ApiKeyEntity{}, &model.TenantEntity{})
+	db := dbclient.IamDB(context.Background())
+
+	// 租户本身必须存在且 active（API Key 通道会校验租户可用性）。
+	require.NoError(t, db.Create(&model.TenantEntity{
+		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: testTenantID}},
+		Code:       "tenant-one",
+		Name:       "租户一",
+		Status:     model.TenantStatusActive,
+	}).Error)
+
+	rawKey := "ak_live_raw_secret_for_test"
+	sum := sha256.Sum256([]byte(rawKey))
+	require.NoError(t, db.Create(&model.ApiKeyEntity{
+		TenantID:    testTenantID,
+		OwnerUserID: fx.memberID, // 归属主体必须可用（fixture 里的服务账号是 suspended）
+		Name:        "rp-directory-key",
+		KeyHash:     hex.EncodeToString(sum[:]),
+		KeyPrefix:   "ak_live",
+	}).Error)
+
+	_, keySource := newKey(t)
+	engine := newTestEngine(t, keySource)
+
+	w := get(t, engine, "/v1/rp/directory/members/"+fx.memberID, "", map[string]string{"x-api-key": rawKey})
+	require.Equal(t, http.StatusOK, w.Code, "合法 API Key 必须被目录接口接受, body=%s", w.Body.String())
+	var single dtordirectory.Member
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &single))
+	assert.Equal(t, fx.memberID, single.UserID)
+
+	// 租户隔离不因通道变化而失效：别租户成员不可见（404/不存在，与"不存在 id"不可区分）
+	wForeign := get(t, engine, "/v1/rp/directory/members/"+fx.foreignID, "", map[string]string{"x-api-key": rawKey})
+	assert.NotEqual(t, http.StatusOK, wForeign.Code, "别租户成员不得经 API Key 通道读到")
+}
+
+// TestDirectoryAPIKeyChannelRejectsUnknownKey 反例：无效 API Key 仍为 401（不得因放行分支而裸奔）。
+func TestDirectoryAPIKeyChannelRejectsUnknownKey(t *testing.T) {
+	// 需要 api_key / tenant 表才能走到"找不到密钥"分支（缺表会冒成 500）。
+	fx := seedDirectoryWith(t, &model.ApiKeyEntity{}, &model.TenantEntity{})
+	_, keySource := newKey(t)
+	engine := newTestEngine(t, keySource)
+
+	w := get(t, engine, "/v1/rp/directory/members", "", map[string]string{"x-api-key": "ak_unknown"})
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	assert.NotContains(t, w.Body.String(), fx.memberID)
 }

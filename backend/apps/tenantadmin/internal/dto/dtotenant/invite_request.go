@@ -2,6 +2,7 @@ package dtotenant
 
 import (
 	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
 	"github.com/morehao/golib/biz/gobject"
 )
 
@@ -9,6 +10,8 @@ import (
 type InviteCreateReq struct {
 	// ExpireHours 有效期小时数（0 表示不过期）
 	ExpireHours int `json:"expireHours"`
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type InviteCreateResp struct {
@@ -18,6 +21,8 @@ type InviteCreateResp struct {
 
 type InviteRevokeReq struct {
 	InviteID string `json:"-" uri:"inviteID" binding:"required"` // 邀请ID
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type InvitePageListReq struct {

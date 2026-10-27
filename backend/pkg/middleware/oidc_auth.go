@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -25,7 +26,7 @@ const (
 
 type authConfig struct {
 	skipPaths       []string
-	validateOIDCSSO func(ctx *gin.Context, personID string, isMachineToken bool) bool
+	validateOIDCSSO func(ctx context.Context, personID string, isMachineToken bool) bool
 	// issuer 为 OP 的 issuer，配置后强制校验 access token 的 iss（H3）。
 	issuer string
 	// audiences 为本应用（RP）认可的 aud 集合，配置后强制校验 access token 的 aud，
@@ -78,7 +79,7 @@ func WithOIDCKeySource(source oidckit.KeySource) AuthOption {
 // 例如已在其他应用全局登出），则本次请求按未认证处理，返回 401。
 // isMachineToken 标识该令牌是否为机器凭证（client_credentials/API Key）签发，
 // 机器凭证不依赖浏览器 SSO 会话活性，校验器可据此直接放行。
-func WithOIDCSSOValidation(validate func(ctx *gin.Context, personID string, isMachineToken bool) bool) AuthOption {
+func WithOIDCSSOValidation(validate func(ctx context.Context, personID string, isMachineToken bool) bool) AuthOption {
 	return func(c *authConfig) {
 		c.validateOIDCSSO = validate
 	}
@@ -135,7 +136,7 @@ func OIDCAuth(opts ...AuthOption) gin.HandlerFunc {
 
 		ident, err := verifier.Verify(ctx, tokenStr)
 		if err == nil {
-			if cfg.validateOIDCSSO != nil && !cfg.validateOIDCSSO(ctx, ident.PersonID, ident.IsMachine) {
+			if cfg.validateOIDCSSO != nil && !cfg.validateOIDCSSO(ctx.Request.Context(), ident.PersonID, ident.IsMachine) {
 				glog.Warnf(ctx, "[oidcauth] sso session revoked, personID:%s", ident.PersonID)
 				abortUnauthorized(ctx, "session expired")
 				return

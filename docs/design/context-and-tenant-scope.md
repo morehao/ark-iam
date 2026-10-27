@@ -1,6 +1,6 @@
 # 上下文传递与租户作用域（约定 + 实施记录）
 
-> **状态：已落地（2026-09-16）**。本文是「ctx 怎么传、租户隔离怎么生效、跨租户查询怎么写」的唯一权威文档；结论同步维护在 `AGENTS.md`「上下文传递与租户作用域（must）」与 `system-design.md` §7.1。
+> **状态：已落地（2026-09-16）**；**2026-10-27 边界调整**（见下方「规则 1 的历史」）。本文是「ctx 怎么传、租户隔离怎么生效、跨租户查询怎么写」的唯一权威文档；结论同步维护在 `AGENTS.md`「上下文传递与租户作用域（must）」与 `system-design.md` §7.1。
 > **外部契约不变**：不改 HTTP 接口、不改表结构、不改前端。唯一的对外行为变化是——缺少租户作用域的 query/update/delete 从**静默返回全量**变为**明确报错**（`dbclient.ErrTenantScopeMissing`）。
 > 本文合并了原「治理技术方案（待实施）」与 2026-09-16 的评审稿（`context-and-tenant-scope-review-20260916.md`，已并入本文后删除）；评审中对原方案的修订、被否掉的设计与依据一并保留在第 3 节。
 
@@ -22,14 +22,35 @@
 
 含 `tenant_id` 列的表，其 SELECT/UPDATE/DELETE 由租户隔离插件（`pkg/dbclient/tenant_scope.go`）自动注入 `tenant_id = ?`；**ctx 未声明作用域时 fail-closed 报错**（`dbclient.ErrTenantScopeMissing`），绝不静默放行成跨租户读。
 
-### 规则 1：ctx 一路直传 `*gin.Context`
+### 规则 1：controller 是唯一转换点，内层只收 `context.Context`（2026-10-27 调整）
 
-controller → service → dao → 第三方（OIDC provider、glog、限流器）都传同一个 gin ctx。4 个 `cmd/main.go` 已开 `engine.ContextWithFallback = true`，gin 上下文本身即合法 `context.Context`（`Value/Done/Err/Deadline` 转发到请求的 context）。
+> **规则 1 的历史**：2026-09-16 的原始约定是「ctx 一路直传 `*gin.Context`、引擎开 `ContextWithFallback`、禁止 `ctx.Request.Context()`」，目的是让租户作用域随 ctx 直达 dao。2026-10-27 随 golib v1.33.0 升级做了**边界调整**（依据 `biz/gcontext/README.md`「身份不经过 context」）：
+>
+> | 项 | 原约定（≤ 2026-09） | 现约定（2026-10-27 起） |
+> |---|---|---|
+> | 载体 | gin ctx 一路直传 | **controller 用 `ctx.Request.Context()` 转换一次**，内层（service/dao/core/audit）只收纯 `context.Context` |
+> | 引擎开关 | 5 个 `cmd/main.go` 开 `ContextWithFallback` | **不再开启**（生产 0 处） |
+> | 身份来源 | service 内 `gincontext.GetUserIDString(ctx)` 等直读 gin Keys | **走 DTO**：controller 用 `identity.OperatorFromGin(ctx)` 填 `req.Operator`，service 只读 DTO |
+> | 租户 ID | service 内 `gincontext.GetTenantIDString(ctx)` | `dbclient.TenantIDFromContext(ctx)`（读类型化作用域，随 ctx 传递） |
+> | 内层依赖 | 允许 | service/dao/core/audit **禁止** `*gin.Context`、禁止 import `gincontext` 与 `pkg/identity`（design guard 强制） |
+>
+> 调整的收益：service 不再依赖 gin、单测不需要造引擎；身份成为**显式业务输入**，异步路径不会静默丢身份（`AsyncContext` 明确不带走 gin Keys 里的身份，入队时须把 operator 放进任务载荷）。
+
+身份与租户的**分工是固定的两条线**：
+
+| 数据 | 来源 | 进入 service 的方式 |
+|---|---|---|
+| 操作人 userID / personID | access token → gin Keys | DTO 的 `Operator.UserID/PersonID`（或显式 `operator objidentity.Operator` 参数） |
+| clientIP / userAgent | gin ctx | DTO 的 `Operator.ClientIP/UserAgent`（登录日志、审计需要） |
+| OIDC client_id | `pkg/identity`（gin Keys 写侧） | DTO 字段（目前只有 `JoinTenantReq.ClientID` 需要） |
+| 当前租户 ID | 中间件写入的**类型化租户作用域** | `dbclient.TenantIDFromContext(ctx)`；**不要**塞进每个 DTO |
+| requestID / trace | gin Keys / 请求上下文 | 横切值，service 不读；日志从 ctx 取 |
 
 | 场景 | 写法 |
 |---|---|
-| 业务代码任意位置 | `ctx`（gin 上下文直传），**禁止** `ctx.Request.Context()` |
-| 异步/后台续跑 | `gincontext.AsyncContext(ctx)`（保留取值与作用域、去掉取消，且不持有会被 gin 复用的上下文） |
+| controller 调 service | `req.Operator = identity.OperatorFromGin(ctx)`，然后 `svc.X(ctx.Request.Context(), &req)` |
+| service / dao / core / audit | 只出现 `context.Context`；身份读 `req.Operator`，租户读 `dbclient.TenantIDFromContext(ctx)` |
+| 异步/后台续跑 | `gincontext.AsyncContext(ctx)` 带走取值与作用域，**不带走身份**——operator 必须进任务载荷 |
 | 必须跨 `http.Handler` 边界搬运值（zitadel `op.Provider` 只能看到 `*http.Request`） | `gincontext.WithRequestValue(ctx, key, value)`（全仓唯一的请求上下文写入口） |
 
 ### 规则 2：作用域只能显式声明
@@ -49,7 +70,19 @@ controller → service → dao → 第三方（OIDC provider、glog、限流器�
 
 ### 规则 4：测试同样受约束
 
-`testutil.SetupSQLite` → `dbclient.RegisterDBForTest` 挂载**与生产同一份**插件，测试里对租户表的断言查询也必须带作用域：优先复用被测服务同一个 gin ctx；确需跨租户时显式 `dbclient.CrossTenantContext(...)` 并写一行理由。**禁止**用 `SetMissingTenantScopeMode(Warn)`、禁止跳过/弱化断言来"修绿"。
+`testutil.SetupSQLite` → `dbclient.RegisterDBForTest` 挂载**与生产同一份**插件，测试里对租户表的断言查询也必须带作用域：优先复用被测服务同一个**请求 ctx**；确需跨租户时显式 `dbclient.CrossTenantContext(...)` 并写一行理由。**禁止**用 `SetMissingTenantScopeMode(Warn)`、禁止跳过/弱化断言来"修绿"。
+
+边界调整后的测试写法：
+
+```go
+ginCtx := newTestCtx("t1", "op")                  // 写入租户作用域 + userID，并挂上 Request
+req := &dtotenant.XxxCreateReq{ /* ... */ }
+req.Operator = operatorOf(ginCtx)                 // 等价于 controller 的 identity.OperatorFromGin
+svc.Create(requestCtx(ginCtx), req)               // requestCtx = ginCtx.Request.Context()
+```
+
+各 service 测试包都有同名助手（`requestCtx` / `operatorOf`）。service 单测也可以完全绕开 gin：
+`ctx, op := testutil.NewRequestCtx("t1", "op")`。
 
 ### 规则 5：灰度回退只有一个开关
 
@@ -195,6 +228,27 @@ flowchart LR
 | 脚手架 | `pkg/testsetup/init.go`、各 app `testutil`：测试 gin 上下文与生产中间件同构（类型化作用域 + fallback） |
 | 守卫测试 | `pkg/dbclient/design_guard_test.go`（两条红线）、`pkg/dbclient/tenant_scope_enforcement_test.go`（G2/fail-closed/三类语义/投影兜底/AsyncContext）、`apps/auth/internal/core/oidcop/protocol_scope_test.go`（协议层声明不退化） |
 | 文档 | 本文、`system-design.md` §7.1、`AGENTS.md`「上下文传递与租户作用域（must）」 |
+
+### 5.1.1 2026-10-27 边界调整的改动清单（golib v1.33.0 升级随行）
+
+| 层 | 变更 |
+|---|---|
+| 公共契约 | 新增 `pkg/object/objidentity/operator.go`（`Operator{UserID,PersonID,ClientIP,UserAgent}`，字段全 `json:"-"`，纯数据不 import gin）；新增 `pkg/identity/operator.go` 的 `OperatorFromGin(c *gin.Context) objidentity.Operator`（**唯一**身份搬运点）；`pkg/dbclient.TenantIDFromContext(ctx)` 成为 service 读当前租户的唯一入口 |
+| 审计 | `pkg/audit.AuditEntry` 增 `Operator objidentity.Operator`；`WriteAudit(ctx context.Context, e)` 不再读 gin 上下文，`ActorPersonID/ActorUserID/CreatedBy/IP/UserAgent` 全部取自 `e.Operator`（`IP`/`UserAgent` 显式字段可覆盖，供非 HTTP 入口） |
+| service | 43 个文件、约 150 个方法：`*gin.Context` → `context.Context`；`gincontext.GetUserIDString/GetPersonIDString/GetClientIP` → `req.Operator.*`（无 DTO 的方法加显式 `operator objidentity.Operator` 参数）；`gincontext.GetTenantIDString` → `dbclient.TenantIDFromContext(ctx)`；`identity.ClientIDFromContext` → `JoinTenantReq.ClientID` |
+| DTO | 需要操作人的请求加 `Operator objidentity.Operator`（值嵌入）；`JoinTenantReq` 另加 `ClientID`（`json:"-"`） |
+| controller | 约 30 个文件：绑定后 `req.Operator = identity.OperatorFromGin(ctx)`，调用改 `ctx.Request.Context()`；只读 DTO 不加 Operator |
+| middleware | `pkg/middleware/oidc_auth.go` 的 `WithOIDCSSOValidation`、`pkg/middleware/silent_oidc.go` 的 `RedirectURIVerifier` 回调参数改 `context.Context`；5 个 `cmd/main.go` **去掉** `engine.ContextWithFallback` |
+| 引擎/夹具 | `pkg/testsetup/init.go`、各 app `testutil`：不再开 fallback，新增 `RequestCtx`/`Operator`（或 `requestCtx`/`operatorOf`）助手；测试调 service 传纯 ctx + 设置 `req.Operator` |
+| 守卫 | `pkg/dbclient/design_guard_test.go` 重写为三条红线：`TestServiceLayerHasNoGinDependency`（内层零 `*gin.Context`/`gincontext`）、`TestRequestContextOnlyAtControllerBoundary`（`.Request.Context()` 只在 controller/middleware）、`TestBusinessLayerDoesNotImportGinIdentity`（业务层不 import `pkg/identity`） |
+| 顺带修复 | `apps/rpapi/internal/middleware/directory.go`：API Key 通道被 `RequireDirectoryRead` 误判 401 的缺陷（见 §5.2.1） |
+| 文档 | 本文规则 1/规则 4、`AGENTS.md`「上下文传递与租户作用域（must）」、`system-design.md` §7.1 |
+
+### 5.2.1 本次改造中修复的真实缺陷（rpapi API Key 通道）
+
+`RequireDirectoryRead` 原来的判定是「`identity.OIDCIdentityFromContext(ctx) == nil` → 401」。但 **API Key 是独立的机器凭证通道**：`OIDCAuth` 校验通过后只写入租户作用域与 `user_id`，**不写 OIDC identity**。于是合法的 API Key 请求在 HEAD 上一律被误判 401，与设计文档 §4.4「API Key 是独立通道」不符。
+
+修法：按通道区分——`x-api-key` 非空且租户作用域已派生（`gincontext.GetTenantIDString(ctx) != ""`）时放行，其余仍 401。判定依据是**服务端已派生的事实**，不接受请求头自证范围（`x-api-key` 只有在 `OIDCAuth` 里真正校验通过才可能走到这里）。回归用例：`apps/rpapi/internal/router/directory_test.go` 的 `TestDirectoryAPIKeyChannelPasses` / `TestDirectoryAPIKeyChannelRejectsUnknownKey`（后者钉住"放行分支不得让无效 Key 裸奔"）。
 
 ### 5.2 本次 fail-closed 暴露并修复的真实缺陷
 

@@ -1,6 +1,9 @@
 package svcauth
 
 import (
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -13,7 +16,12 @@ import (
 
 func TestConnectorDetailRejectsCrossTenantEntity(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Set(gcontext.KeyTenantID, "71")
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("71"))
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("71"))
 
 	db := testutil.SetupSQLite(t, &model.ConnectorEntity{})
 	if err := db.Create(&model.ConnectorEntity{
@@ -28,7 +36,7 @@ func TestConnectorDetailRejectsCrossTenantEntity(t *testing.T) {
 	}
 
 	svc := &connectorSvc{}
-	_, err := svc.Detail(ginCtx, &dtoauth.ConnectorDetailReq{ConnectorID: "10"})
+	_, err := svc.Detail(requestCtx(ginCtx), &dtoauth.ConnectorDetailReq{ConnectorID: "10"})
 	if err == nil {
 		t.Fatalf("expected cross-tenant connector detail to fail")
 	}
@@ -36,7 +44,12 @@ func TestConnectorDetailRejectsCrossTenantEntity(t *testing.T) {
 
 func TestConnectorPageListUsesContextTenant(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Set(gcontext.KeyTenantID, "72")
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("72"))
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("72"))
 
 	db := testutil.SetupSQLite(t, &model.ConnectorEntity{})
 	if err := db.Create(&model.ConnectorEntity{
@@ -60,7 +73,7 @@ func TestConnectorPageListUsesContextTenant(t *testing.T) {
 
 	svc := &connectorSvc{}
 	// 请求里的 TenantID 为 99，但服务必须以上下文租户 72 为准
-	resp, err := svc.PageList(ginCtx, &dtoauth.ConnectorPageListReq{TenantID: "99"})
+	resp, err := svc.PageList(requestCtx(ginCtx), &dtoauth.ConnectorPageListReq{TenantID: "99"})
 	if err != nil {
 		t.Fatalf("PageList returned error: %v", err)
 	}

@@ -2,6 +2,7 @@ package ctrtenant
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/tenantadmin/internal/service/svctenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -38,11 +39,12 @@ func NewRoleCtr() RoleCtr {
 // @Router /v1/tenant/roles [post]
 func (ctr *roleCtr) Create(ctx *gin.Context) {
 	var req dtotenant.RoleCreateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.roleSvc.Create(ctx, &req)
+	res, err := ctr.roleSvc.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -63,7 +65,7 @@ func (ctr *roleCtr) PageList(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.roleSvc.PageList(ctx, &req)
+	res, err := ctr.roleSvc.PageList(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -84,7 +86,7 @@ func (ctr *roleCtr) Detail(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.roleSvc.Detail(ctx, &req)
+	res, err := ctr.roleSvc.Detail(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -102,6 +104,7 @@ func (ctr *roleCtr) Detail(ctx *gin.Context) {
 // @Router /v1/tenant/roles/{roleID} [put]
 func (ctr *roleCtr) Update(ctx *gin.Context) {
 	var req dtotenant.RoleUpdateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -110,7 +113,7 @@ func (ctr *roleCtr) Update(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.roleSvc.Update(ctx, &req); err != nil {
+	if err := ctr.roleSvc.Update(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -126,11 +129,12 @@ func (ctr *roleCtr) Update(ctx *gin.Context) {
 // @Router /v1/tenant/roles/{roleID} [delete]
 func (ctr *roleCtr) Delete(ctx *gin.Context) {
 	var req dtotenant.RoleDeleteReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.roleSvc.Delete(ctx, &req); err != nil {
+	if err := ctr.roleSvc.Delete(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -150,7 +154,7 @@ func (ctr *roleCtr) GetMenus(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.roleSvc.GetMenus(ctx, &req)
+	res, err := ctr.roleSvc.GetMenus(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -168,6 +172,7 @@ func (ctr *roleCtr) GetMenus(ctx *gin.Context) {
 // @Router /v1/tenant/roles/{roleID}/menus [put]
 func (ctr *roleCtr) UpdateMenus(ctx *gin.Context) {
 	var req dtotenant.RoleMenusUpdateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -176,7 +181,7 @@ func (ctr *roleCtr) UpdateMenus(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.roleSvc.UpdateMenus(ctx, &req); err != nil {
+	if err := ctr.roleSvc.UpdateMenus(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

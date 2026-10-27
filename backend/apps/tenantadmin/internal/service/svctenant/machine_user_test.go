@@ -2,6 +2,9 @@ package svctenant
 
 import (
 	"context"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -46,9 +49,13 @@ func seedTestOperator(t *testing.T, tenantID string, super bool) *model.UserEnti
 	return op
 }
 
+// newTestTenantCtx 构造测试用 gin 上下文：写入租户作用域与 userID 投影，形同生产鉴权中间件。
+// 挂上真实 Request，service 内的 ctx.Request.Context() 才能透传作用域（生产链路必有）。
 func newTestTenantCtx(tenantID, userID string) *gin.Context {
-	ctx := &gin.Context{}
+	ctx, _ := gin.CreateTestContext(nil)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 	ctx.Set(gcontext.KeyTenantID, tenantID)
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope(tenantID))
 	ctx.Set(gcontext.KeyUserID, userID)
 	return ctx
 }
@@ -87,7 +94,7 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 	svc := NewMachineUserSvc()
 
 	// 非 super 创建被拒
-	_, err := svc.Create(newTestTenantCtx(tenantID, memberOp.ID), &dtotenant.MachineUserCreateReq{
+	_, err := svc.Create(requestCtx(newTestTenantCtx(tenantID, memberOp.ID)), &dtotenant.MachineUserCreateReq{
 		Name:                "forbidden",
 		PrimaryDepartmentID: rd.ID,
 	})
@@ -95,19 +102,21 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 		t.Fatalf("member create: want system admin required, got %v", err)
 	}
 	// 缺主部门被拒（主部门为单值入参，"多主部门"在类型层面已不可表达）
-	if _, err := svc.Create(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserCreateReq{Name: "no-dept"}); err != code.GetError(code.MachineUserDepartmentRequiredError) {
+	if _, err := svc.Create(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserCreateReq{Name: "no-dept", Operator: operatorOf(newTestTenantCtx(tenantID, adminOp.ID))}); err != code.GetError(code.MachineUserDepartmentRequiredError) {
 		t.Fatalf("create without primary dept: want dept required, got %v", err)
 	}
 	// 跨租户部门被拒
-	if _, err := svc.Create(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserCreateReq{
+	if _, err := svc.Create(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserCreateReq{
 		Name: "cross", PrimaryDepartmentID: "dept-other-tenant",
+		Operator: operatorOf(newTestTenantCtx(tenantID, adminOp.ID)),
 	}); err != code.GetError(code.DepartmentNotExistError) {
 		t.Fatalf("create with foreign dept: want not exist, got %v", err)
 	}
 
 	// super 创建：主部门 rd + 参与 op
-	created, err := svc.Create(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserCreateReq{
+	created, err := svc.Create(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserCreateReq{
 		Name: "svc-pay", Description: "支付回调", PrimaryDepartmentID: rd.ID, SecondaryDepartmentIDs: []string{op.ID},
+		Operator: operatorOf(newTestTenantCtx(tenantID, adminOp.ID)),
 	})
 	if err != nil {
 		t.Fatalf("create machine user: %v", err)
@@ -128,7 +137,7 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 	}
 
 	// 列表：主部门名称回填
-	page, err := svc.PageList(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserPageListReq{Name: "svc-pay"})
+	page, err := svc.PageList(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserPageListReq{Name: "svc-pay"})
 	if err != nil {
 		t.Fatalf("page list: %v", err)
 	}
@@ -141,26 +150,26 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 		t.Fatalf("createdAt/updatedAt not returned: %+v", item)
 	}
 	// 状态枚举筛选：空串=不过滤；命中白名单按状态过滤；非法枚举被拒
-	page, err = svc.PageList(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserPageListReq{Status: model.UserStatusActive})
+	page, err = svc.PageList(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserPageListReq{Status: model.UserStatusActive})
 	if err != nil {
 		t.Fatalf("page list active: %v", err)
 	}
 	if page.Total != 1 || page.List[0].Status != model.UserStatusActive {
 		t.Fatalf("active filter mismatch: %+v", page)
 	}
-	page, err = svc.PageList(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserPageListReq{Status: model.UserStatusSuspended})
+	page, err = svc.PageList(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserPageListReq{Status: model.UserStatusSuspended})
 	if err != nil {
 		t.Fatalf("page list suspended: %v", err)
 	}
 	if page.Total != 0 {
 		t.Fatalf("suspended filter should be empty, got %d", page.Total)
 	}
-	if _, err := svc.PageList(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserPageListReq{Status: model.UserStatus("bogus")}); err != code.GetError(code.MachineUserGetPageListError) {
+	if _, err := svc.PageList(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserPageListReq{Status: model.UserStatus("bogus")}); err != code.GetError(code.MachineUserGetPageListError) {
 		t.Fatalf("page list with invalid status: want %v, got %v", code.GetError(code.MachineUserGetPageListError), err)
 	}
 
 	// 详情：部门归属 + 角色
-	detail, err := svc.Detail(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserDetailReq{MachineUserID: machineID})
+	detail, err := svc.Detail(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserDetailReq{MachineUserID: machineID})
 	if err != nil {
 		t.Fatalf("detail: %v", err)
 	}
@@ -182,9 +191,10 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 
 	// 更新：改主部门→fin、参与部门全量替换为 [op, fin]
 	newSecondary := []string{op.ID, fin.ID}
-	if err := svc.Update(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserUpdateReq{
+	if err := svc.Update(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserUpdateReq{
 		MachineUserID: machineID, Name: "svc-pay-v2", Description: "支付回调V2",
 		PrimaryDepartmentID: &fin.ID, SecondaryDepartmentIDs: &newSecondary,
+		Operator: operatorOf(newTestTenantCtx(tenantID, adminOp.ID)),
 	}); err != nil {
 		t.Fatalf("update dept: %v", err)
 	}
@@ -201,13 +211,14 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 	}
 
 	// 主部门不可清空
-	if err := svc.Update(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserUpdateReq{
+	if err := svc.Update(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserUpdateReq{
 		MachineUserID: machineID, Name: "svc-pay-v2", PrimaryDepartmentID: strPtr(""),
+		Operator: operatorOf(newTestTenantCtx(tenantID, adminOp.ID)),
 	}); err != code.GetError(code.MachineUserDepartmentRequiredError) {
 		t.Fatalf("clear primary: want dept required, got %v", err)
 	}
 	// 挂起
-	if err := svc.UpdateStatus(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserStatusReq{MachineUserID: machineID, Status: model.UserStatusSuspended}); err != nil {
+	if err := svc.UpdateStatus(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserStatusReq{MachineUserID: machineID, Status: model.UserStatusSuspended, Operator: operatorOf(newTestTenantCtx(tenantID, adminOp.ID))}); err != nil {
 		t.Fatalf("suspend: %v", err)
 	}
 	reloaded, err := dao.NewUserDao().GetByID(newTestTenantCtx(tenantID, adminOp.ID), machineID)
@@ -219,10 +230,10 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 	}
 
 	// 非法枚举值被拒（service 入口白名单校验），且不落库
-	if err := svc.UpdateStatus(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserStatusReq{MachineUserID: machineID, Status: model.UserStatus("bogus")}); err != code.GetError(code.MachineUserStatusUpdateError) {
+	if err := svc.UpdateStatus(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserStatusReq{MachineUserID: machineID, Status: model.UserStatus("bogus"), Operator: operatorOf(newTestTenantCtx(tenantID, adminOp.ID))}); err != code.GetError(code.MachineUserStatusUpdateError) {
 		t.Fatalf("invalid status: want %v, got %v", code.GetError(code.MachineUserStatusUpdateError), err)
 	}
-	if err := svc.UpdateStatus(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserStatusReq{MachineUserID: machineID}); err != code.GetError(code.MachineUserStatusUpdateError) {
+	if err := svc.UpdateStatus(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserStatusReq{MachineUserID: machineID, Operator: operatorOf(newTestTenantCtx(tenantID, adminOp.ID))}); err != code.GetError(code.MachineUserStatusUpdateError) {
 		t.Fatalf("empty status: want %v, got %v", code.GetError(code.MachineUserStatusUpdateError), err)
 	}
 	reloaded, err = dao.NewUserDao().GetByID(newTestTenantCtx(tenantID, adminOp.ID), machineID)
@@ -241,7 +252,7 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 	if err := db.Create(devRole).Error; err != nil {
 		t.Fatalf("seed dev role: %v", err)
 	}
-	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-tenant", RoleIDs: []string{devRole.ID}}); err != nil {
+	if err := svc.UpdateRoles(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-tenant", RoleIDs: []string{devRole.ID}, Operator: operatorOf(newTestTenantCtx(tenantID, adminOp.ID))}); err != nil {
 		t.Fatalf("grant dev role: %v", err)
 	}
 	// 不变式 I1：服务账号与真实成员同口径——授予角色即同事务补齐该应用准入（enable/role）
@@ -261,7 +272,7 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 	if err := db.Create(adminRole).Error; err != nil {
 		t.Fatalf("seed super role 2: %v", err)
 	}
-	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-tenant", RoleIDs: []string{adminRole.ID}}); err != code.GetError(code.UserAdminRoleAssignForbidden) {
+	if err := svc.UpdateRoles(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-tenant", RoleIDs: []string{adminRole.ID}, Operator: operatorOf(newTestTenantCtx(tenantID, adminOp.ID))}); err != code.GetError(code.UserAdminRoleAssignForbidden) {
 		t.Fatalf("grant super role to machine: want forbidden, got %v", err)
 	}
 
@@ -273,7 +284,7 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 	if err := db.Create(opsRole).Error; err != nil {
 		t.Fatalf("seed ops role: %v", err)
 	}
-	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-other", RoleIDs: []string{opsRole.ID}}); err != nil {
+	if err := svc.UpdateRoles(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-other", RoleIDs: []string{opsRole.ID}, Operator: operatorOf(newTestTenantCtx(tenantID, adminOp.ID))}); err != nil {
 		t.Fatalf("grant ops role: %v", err)
 	}
 	var machRoleIDs []string
@@ -291,7 +302,7 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 	if len(machRoleIDs) != 2 || !hasRole(machRoleIDs, devRole.ID) || !hasRole(machRoleIDs, opsRole.ID) {
 		t.Fatalf("expected dev+ops roles kept per-app, got %+v", machRoleIDs)
 	}
-	if err := svc.UpdateRoles(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-tenant", RoleIDs: []string{opsRole.ID}}); err != code.GetError(code.RoleNotExistError) {
+	if err := svc.UpdateRoles(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserRolesUpdateReq{MachineUserID: machineID, AppID: "app-tenant", RoleIDs: []string{opsRole.ID}, Operator: operatorOf(newTestTenantCtx(tenantID, adminOp.ID))}); err != code.GetError(code.RoleNotExistError) {
 		t.Fatalf("cross-app role grant: want RoleNotExist, got %v", err)
 	}
 
@@ -303,14 +314,14 @@ func TestMachineUserDeptLifecycleAndGuards(t *testing.T) {
 	if err := db.Create(key).Error; err != nil {
 		t.Fatalf("seed machine key: %v", err)
 	}
-	if err := svc.Delete(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserDeleteReq{MachineUserID: machineID}); err != code.GetError(code.MachineUserDeleteHasKeysError) {
+	if err := svc.Delete(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserDeleteReq{MachineUserID: machineID, Operator: operatorOf(newTestTenantCtx(tenantID, adminOp.ID))}); err != code.GetError(code.MachineUserDeleteHasKeysError) {
 		t.Fatalf("delete with keys: want has-keys forbidden, got %v", err)
 	}
 	// 清掉 key 后删除成功：用户软删 + 角色/部门关系级联清理
 	if err := dao.NewApiKeyDao().Delete(newTestTenantCtx(tenantID, adminOp.ID), key.ID, adminOp.ID); err != nil {
 		t.Fatalf("delete key: %v", err)
 	}
-	if err := svc.Delete(newTestTenantCtx(tenantID, adminOp.ID), &dtotenant.MachineUserDeleteReq{MachineUserID: machineID}); err != nil {
+	if err := svc.Delete(requestCtx(newTestTenantCtx(tenantID, adminOp.ID)), &dtotenant.MachineUserDeleteReq{MachineUserID: machineID, Operator: operatorOf(newTestTenantCtx(tenantID, adminOp.ID))}); err != nil {
 		t.Fatalf("delete machine user: %v", err)
 	}
 	gone, err := dao.NewUserDao().GetByID(newTestTenantCtx(tenantID, adminOp.ID), machineID)
@@ -359,27 +370,30 @@ func TestServiceAccountCannotBeLeader(t *testing.T) {
 	svc := NewDepartmentUserSvc()
 	ctx := newTestTenantCtx(tenantID, adminOp.ID)
 	// leader：拒绝
-	if _, err := svc.Create(ctx, &dtotenant.DepartmentUserCreateReq{
+	if _, err := svc.Create(requestCtx(ctx), &dtotenant.DepartmentUserCreateReq{
 		DepartmentID: dept.ID,
 		UserID:       machine.ID,
 		RelationType: model.DeptUserRelationLeader,
-	}); err != code.GetError(code.UserMemberOperationOnlyError) {
+
+		Operator: operatorOf(ctx)}); err != code.GetError(code.UserMemberOperationOnlyError) {
 		t.Fatalf("machine as leader: want member-operation-only, got %v", err)
 	}
 	// secondary：允许
-	if _, err := svc.Create(ctx, &dtotenant.DepartmentUserCreateReq{
+	if _, err := svc.Create(requestCtx(ctx), &dtotenant.DepartmentUserCreateReq{
 		DepartmentID: dept.ID,
 		UserID:       machine.ID,
 		RelationType: model.DeptUserRelationSecondary,
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("machine as secondary member: %v", err)
 	}
 	// 已挂 primary 关系的服务账号收敛为 leader 同样拒绝
-	if err := svc.Update(ctx, &dtotenant.DepartmentUserUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtotenant.DepartmentUserUpdateReq{
 		DepartmentID: dept.ID,
 		UserID:       machine.ID,
 		RelationType: model.DeptUserRelationLeader,
-	}); err != code.GetError(code.UserMemberOperationOnlyError) {
+
+		Operator: operatorOf(ctx)}); err != code.GetError(code.UserMemberOperationOnlyError) {
 		t.Fatalf("converge machine to leader: want member-operation-only, got %v", err)
 	}
 }
@@ -404,14 +418,15 @@ func TestMachineUserUpdateRolesGrantsAppAccess(t *testing.T) {
 	}
 
 	svc := NewMachineUserSvc()
-	if err := svc.UpdateRoles(ginCtx, &dtotenant.MachineUserRolesUpdateReq{
+	if err := svc.UpdateRoles(requestCtx(ginCtx), &dtotenant.MachineUserRolesUpdateReq{
 		MachineUserID: machine.ID, AppID: "app-a", RoleIDs: []string{role.ID},
-	}); err != nil {
+
+		Operator: operatorOf(ginCtx)}); err != nil {
 		t.Fatalf("grant role to machine user: %v", err)
 	}
 
 	grant := &model.UserApplicationEntity{}
-	if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ? AND app_id = ?", tenantID, machine.ID, "app-a").
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).Where("tenant_id = ? AND user_id = ? AND app_id = ?", tenantID, machine.ID, "app-a").
 		First(grant).Error; err != nil {
 		t.Fatalf("授权后应出现准入行: %v", err)
 	}
@@ -420,13 +435,14 @@ func TestMachineUserUpdateRolesGrantsAppAccess(t *testing.T) {
 	}
 
 	// 清空角色 → 准入保留（撤销授权不反向撤准入）
-	if err := svc.UpdateRoles(ginCtx, &dtotenant.MachineUserRolesUpdateReq{
+	if err := svc.UpdateRoles(requestCtx(ginCtx), &dtotenant.MachineUserRolesUpdateReq{
 		MachineUserID: machine.ID, AppID: "app-a", RoleIDs: []string{},
-	}); err != nil {
+
+		Operator: operatorOf(ginCtx)}); err != nil {
 		t.Fatalf("clear machine user roles: %v", err)
 	}
 	kept := &model.UserApplicationEntity{}
-	if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ? AND app_id = ?", tenantID, machine.ID, "app-a").
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).Where("tenant_id = ? AND user_id = ? AND app_id = ?", tenantID, machine.ID, "app-a").
 		First(kept).Error; err != nil {
 		t.Fatalf("清空角色后准入行应保留: %v", err)
 	}

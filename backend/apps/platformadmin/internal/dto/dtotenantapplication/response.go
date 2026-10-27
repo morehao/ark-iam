@@ -7,14 +7,14 @@ type TenantApplicationCreateResp struct {
 }
 
 type TenantApplicationDetailResp struct {
-	TenantAppID  string                        `json:"tenantAppID"`  // 租户应用订阅ID
-	TenantID     string                        `json:"tenantID"`     // 租户ID
-	TenantName   string                        `json:"tenantName"`   // 租户名称
-	AppID        string                        `json:"appID"`        // 应用ID
-	AppName      string                        `json:"appName"`      // 应用名称
-	AppSource    model.AppSource               `json:"appSource"`    // 所属应用来源（builtin=内置应用，其订阅由系统开通、不可删除）
-	Status       model.TenantApplicationStatus `json:"status"`       // 状态
-	CreatedAt    int64                         `json:"createdAt"`    // 创建时间(unix 秒)
+	TenantAppID string                        `json:"tenantAppID"` // 租户应用订阅ID
+	TenantID    string                        `json:"tenantID"`    // 租户ID
+	TenantName  string                        `json:"tenantName"`  // 租户名称
+	AppID       string                        `json:"appID"`       // 应用ID
+	AppName     string                        `json:"appName"`     // 应用名称
+	AppSource   model.AppSource               `json:"appSource"`   // 所属应用来源（builtin=内置应用，其订阅由系统开通、不可删除）
+	Status      model.TenantApplicationStatus `json:"status"`      // 状态
+	CreatedAt   int64                         `json:"createdAt"`   // 创建时间(unix 秒)
 }
 
 type PageListItem struct {

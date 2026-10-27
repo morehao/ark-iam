@@ -1,19 +1,19 @@
 package svcoidc
 
 import (
+	"context"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
 	"github.com/morehao/golib/glog"
 )
 
 // insertOIDCLoginLog 是登录日志的落库点，抽成包级函数变量仅为单测注入"写库失败/DB 不可用"
 // （与 svcauth.authLoginRecorder 同构的测试 seam，不引入 repository 接口）：
 // 服务层直连 dao.NewUserLoginLogDao()，生产路径不依赖任何中间层。
-var insertOIDCLoginLog = func(ctx *gin.Context, entity *model.UserLoginLogEntity) error {
+var insertOIDCLoginLog = func(ctx context.Context, entity *model.UserLoginLogEntity) error {
 	return dao.NewUserLoginLogDao().Insert(ctx, entity)
 }
 
@@ -30,7 +30,7 @@ var insertOIDCLoginLog = func(ctx *gin.Context, entity *model.UserLoginLogEntity
 //
 // 调用时机：只在授权票据已 done=true（将继续签发授权码）之后调用，被拒/待选租户/待改密
 // 等未完成路径一律不写，避免把失败尝试记成成功登录。
-func recordOIDCLoginLog(ctx *gin.Context, tenantID, userID, personID string) {
+func recordOIDCLoginLog(ctx context.Context, operator objidentity.Operator, tenantID, userID, personID string) {
 	if ctx == nil {
 		return
 	}
@@ -46,8 +46,8 @@ func recordOIDCLoginLog(ctx *gin.Context, tenantID, userID, personID string) {
 		TenantID:  tenantID,
 		UserID:    userID,
 		LoginType: model.LoginTypeOIDC,
-		LoginIP:   gincontext.GetClientIP(ctx),
-		UserAgent: ctx.GetHeader("User-Agent"),
+		LoginIP:   operator.ClientIP,
+		UserAgent: operator.UserAgent,
 		LoginTime: time.Now(),
 		// 与既有写入点（svcauth.defaultRecordLoginLog）同口径：OIDC 登录由自然人本人发起，
 		// 此时请求上下文尚未注入鉴权身份（没有 userID 可作 created_by），故留空。

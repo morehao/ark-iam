@@ -1,6 +1,7 @@
 package svcpermission
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"testing"
 
 	"github.com/morehao/ark-iam/pkg/code"
@@ -39,17 +40,18 @@ func TestUpdateBuiltInAppMenuAllowsAllFields(t *testing.T) {
 	ctx := newGinCtx("1", "0")
 
 	// 一次性改掉全部字段，含编码与所属应用
-	if err := svc.Update(ctx, &dtopermission.MenuUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtopermission.MenuUpdateReq{
 		MenuID: menu.ID,
 		MenuBaseInfo: objpermission.MenuBaseInfo{
 			AppID: otherApp.ID, Name: "运维自定菜单名", Code: "workbench", Path: "/ops-custom",
 			Icon: "SettingOutlined", Sort: 7, Type: model.MenuTypeMenu,
 			Visibility: model.MenuVisibilityPublic, Component: "pages/opsCustom", Status: model.MenuStatusDisable,
 		},
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("内置应用菜单字段应全部可改: %v", err)
 	}
-	got, err := dao.NewMenuDao().GetByID(ctx, menu.ID)
+	got, err := dao.NewMenuDao().GetByID(dbclient.CrossTenantContext(ctx), menu.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -64,13 +66,14 @@ func TestUpdateBuiltInAppMenuAllowsAllFields(t *testing.T) {
 	}
 
 	// 编码为空必须拒绝（应用内唯一由唯一索引兜底）
-	if err := svc.Update(ctx, &dtopermission.MenuUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtopermission.MenuUpdateReq{
 		MenuID: menu.ID,
 		MenuBaseInfo: objpermission.MenuBaseInfo{
 			AppID: otherApp.ID, Name: "运维自定菜单名", Code: "", Path: "/ops-custom",
 			Type: model.MenuTypeMenu, Visibility: model.MenuVisibilityPublic, Status: model.MenuStatusEnable,
 		},
-	}); err == nil || gerror.GetCode(err) != int(code.MenuUpdateError) {
+
+		Operator: operatorOf(ctx)}); err == nil || gerror.GetCode(err) != int(code.MenuUpdateError) {
 		t.Fatalf("空编码必须被拒绝, got %v", err)
 	}
 }
@@ -89,16 +92,17 @@ func TestCreateAndDeleteBuiltinAppMenuAllowed(t *testing.T) {
 	ctx := newGinCtx("1", "0")
 
 	// 1) 内置应用新增根菜单
-	rootResp, err := svc.Create(ctx, &dtopermission.MenuCreateReq{
+	rootResp, err := svc.Create(requestCtx(ctx), &dtopermission.MenuCreateReq{
 		MenuBaseInfo: objpermission.MenuBaseInfo{
 			AppID: builtin.ID, Name: "运维新增", Code: "ops-menu",
 			Type: model.MenuTypeDirectory, Visibility: model.MenuVisibilityAdmin, Status: model.MenuStatusEnable,
 		},
-	})
+
+		Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("内置应用新增根菜单应放行: %v", err)
 	}
-	root, err := dao.NewMenuDao().GetByID(ctx, rootResp.MenuID)
+	root, err := dao.NewMenuDao().GetByID(dbclient.CrossTenantContext(ctx), rootResp.MenuID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -107,18 +111,21 @@ func TestCreateAndDeleteBuiltinAppMenuAllowed(t *testing.T) {
 	}
 
 	// 2) 新增子菜单挂在根菜单下
-	childResp, err := svc.Create(ctx, &dtopermission.MenuCreateReq{
+	childResp, err := svc.Create(requestCtx(ctx), &dtopermission.MenuCreateReq{
 		MenuBaseInfo: objpermission.MenuBaseInfo{
 			AppID: builtin.ID, ParentID: rootResp.MenuID, Name: "运维子页", Code: "ops-page",
 			Type: model.MenuTypeMenu, Visibility: model.MenuVisibilityAdmin, Status: model.MenuStatusEnable,
 		},
-	})
+
+		Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("内置应用新增子菜单应放行: %v", err)
 	}
 
 	// 3) 删除根菜单：子菜单一并级联删除（否则会留下看不见也删不掉的孤儿行）
-	if err := svc.Delete(ctx, &dtopermission.MenuDeleteReq{MenuID: rootResp.MenuID}); err != nil {
+	if err := svc.Delete(requestCtx(ctx), &dtopermission.MenuDeleteReq{MenuID: rootResp.MenuID,
+		Operator: operatorOf(ctx),
+	}); err != nil {
 		t.Fatalf("内置应用删除菜单应放行: %v", err)
 	}
 	for _, menuID := range []string{rootResp.MenuID, childResp.MenuID} {
@@ -143,7 +150,9 @@ func TestCreateAndDeleteBuiltinAppMenuAllowed(t *testing.T) {
 	if err := db.Create(binding).Error; err != nil {
 		t.Fatalf("seed role_menu: %v", err)
 	}
-	if err := svc.Delete(ctx, &dtopermission.MenuDeleteReq{MenuID: seedMenu.ID}); err != nil {
+	if err := svc.Delete(requestCtx(ctx), &dtopermission.MenuDeleteReq{MenuID: seedMenu.ID,
+		Operator: operatorOf(ctx),
+	}); err != nil {
 		t.Fatalf("删除内置菜单应放行: %v", err)
 	}
 	var active int64
@@ -163,7 +172,7 @@ func TestCreateAndDeleteBuiltinAppMenuAllowed(t *testing.T) {
 		t.Fatalf("内置菜单删除应留下软删墓碑, count=%d", tombstone)
 	}
 	var linkCount int64
-	if err := db.WithContext(ctx).Model(&model.RoleMenuEntity{}).Where("menu_id = ?", seedMenu.ID).Count(&linkCount).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ctx)).Model(&model.RoleMenuEntity{}).Where("menu_id = ?", seedMenu.ID).Count(&linkCount).Error; err != nil {
 		t.Fatalf("count role_menu: %v", err)
 	}
 	if linkCount != 0 {
@@ -186,41 +195,45 @@ func TestMenuParentValidation(t *testing.T) {
 	svc := NewMenuSvc()
 	ctx := newGinCtx("1", "0")
 
-	root, err := svc.Create(ctx, &dtopermission.MenuCreateReq{
+	root, err := svc.Create(requestCtx(ctx), &dtopermission.MenuCreateReq{
 		MenuBaseInfo: objpermission.MenuBaseInfo{
 			AppID: appA.ID, Name: "根", Code: "root",
 			Type: model.MenuTypeDirectory, Visibility: model.MenuVisibilityAdmin, Status: model.MenuStatusEnable,
 		},
-	})
+
+		Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("create root: %v", err)
 	}
 
 	// 父级不存在
-	if _, err := svc.Create(ctx, &dtopermission.MenuCreateReq{
+	if _, err := svc.Create(requestCtx(ctx), &dtopermission.MenuCreateReq{
 		MenuBaseInfo: objpermission.MenuBaseInfo{
 			AppID: appA.ID, ParentID: "not-exist", Name: "x", Code: "x",
 			Type: model.MenuTypeMenu, Visibility: model.MenuVisibilityAdmin, Status: model.MenuStatusEnable,
 		},
-	}); err == nil {
+
+		Operator: operatorOf(ctx)}); err == nil {
 		t.Fatal("父级不存在必须被拒绝")
 	}
 	// 父级属于别的应用
-	if _, err := svc.Create(ctx, &dtopermission.MenuCreateReq{
+	if _, err := svc.Create(requestCtx(ctx), &dtopermission.MenuCreateReq{
 		MenuBaseInfo: objpermission.MenuBaseInfo{
 			AppID: appB.ID, ParentID: root.MenuID, Name: "y", Code: "y",
 			Type: model.MenuTypeMenu, Visibility: model.MenuVisibilityAdmin, Status: model.MenuStatusEnable,
 		},
-	}); err == nil {
+
+		Operator: operatorOf(ctx)}); err == nil {
 		t.Fatal("父级跨应用必须被拒绝")
 	}
 
-	child, err := svc.Create(ctx, &dtopermission.MenuCreateReq{
+	child, err := svc.Create(requestCtx(ctx), &dtopermission.MenuCreateReq{
 		MenuBaseInfo: objpermission.MenuBaseInfo{
 			AppID: appA.ID, ParentID: root.MenuID, Name: "子", Code: "child",
 			Type: model.MenuTypeMenu, Visibility: model.MenuVisibilityAdmin, Status: model.MenuStatusEnable,
 		},
-	})
+
+		Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("create child: %v", err)
 	}
@@ -235,11 +248,11 @@ func TestMenuParentValidation(t *testing.T) {
 		}
 	}
 	// 挂到自己的子孙下 → 成环
-	if err := svc.Update(ctx, updateReq(child.MenuID)); err == nil {
+	if err := svc.Update(requestCtx(ctx), updateReq(child.MenuID)); err == nil {
 		t.Fatal("把菜单挂到自己的子孙下必须被拒绝")
 	}
 	// 挂到自己下
-	if err := svc.Update(ctx, updateReq(root.MenuID)); err == nil {
+	if err := svc.Update(requestCtx(ctx), updateReq(root.MenuID)); err == nil {
 		t.Fatal("把菜单挂到自己下必须被拒绝")
 	}
 }

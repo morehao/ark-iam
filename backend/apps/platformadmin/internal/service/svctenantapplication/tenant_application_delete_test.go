@@ -1,6 +1,7 @@
 package svctenantapplication
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"testing"
 
 	"gorm.io/gorm"
@@ -51,7 +52,7 @@ func TestDeleteBuiltInApplicationSubscriptionForbidden(t *testing.T) {
 	sub := seedTenantAppEntity(t, db, "t1", "app-builtin")
 
 	ctx := newCreateCtx()
-	err := NewTenantApplicationSvc().Delete(ctx, &dtotenantapplication.TenantApplicationDeleteReq{TenantAppID: sub.ID})
+	err := NewTenantApplicationSvc().Delete(requestCtx(ctx), &dtotenantapplication.TenantApplicationDeleteReq{TenantAppID: sub.ID, Operator: operatorOf(ctx)})
 	if err == nil {
 		t.Fatal("内置应用的订阅必须拒绝删除")
 	}
@@ -60,7 +61,7 @@ func TestDeleteBuiltInApplicationSubscriptionForbidden(t *testing.T) {
 	}
 
 	// 被拒的删除不得落库（订阅仍可查到）
-	got, err := dao.NewTenantApplicationDao().GetByID(ctx, sub.ID)
+	got, err := dao.NewTenantApplicationDao().GetByID(dbclient.CrossTenantContext(ctx), sub.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -77,11 +78,11 @@ func TestDeleteThirdPartyApplicationSubscription(t *testing.T) {
 	sub := seedTenantAppEntity(t, db, "t1", "app-third")
 
 	ctx := newCreateCtx()
-	if err := NewTenantApplicationSvc().Delete(ctx, &dtotenantapplication.TenantApplicationDeleteReq{TenantAppID: sub.ID}); err != nil {
+	if err := NewTenantApplicationSvc().Delete(requestCtx(ctx), &dtotenantapplication.TenantApplicationDeleteReq{TenantAppID: sub.ID, Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("Delete returned error: %v", err)
 	}
 
-	got, err := dao.NewTenantApplicationDao().GetByID(ctx, sub.ID)
+	got, err := dao.NewTenantApplicationDao().GetByID(dbclient.CrossTenantContext(ctx), sub.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -91,7 +92,7 @@ func TestDeleteThirdPartyApplicationSubscription(t *testing.T) {
 
 	// 断言软删行用被测服务同一个租户作用域（订阅归属 t1，非跨租户查询）
 	var deleted model.TenantApplicationEntity
-	if err := db.WithContext(ctx).Unscoped().Where("id = ?", sub.ID).First(&deleted).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ctx)).Unscoped().Where("id = ?", sub.ID).First(&deleted).Error; err != nil {
 		t.Fatalf("query deleted row: %v", err)
 	}
 	if deleted.DeletedBy != "u1" {

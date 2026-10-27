@@ -180,7 +180,7 @@ func TestFilterTenantsByClientApp(t *testing.T) {
 	}
 
 	svc := &oidcAuthSvc{provider: env.provider}
-	filtered, err := svc.filterTenantsByClientApp(env.ctx, clientCode, tenants)
+	filtered, err := svc.filterTenantsByClientApp(requestCtx(env.ctx), clientCode, tenants)
 	require.NoError(t, err)
 	require.Len(t, filtered, 1)
 	require.Equal(t, withGrant.tenantID, filtered[0].TenantID)
@@ -203,11 +203,12 @@ func TestCompleteLoginRejectsTenantWithoutAppAccess(t *testing.T) {
 	authReq := newAuthReq(t, env.provider, clientCode)
 	svc := newAppAccessLoginSvc(env, seed)
 
-	_, err := svc.CompleteLogin(env.ctx, &dtooidc.OIDCLoginReq{
+	_, err := svc.CompleteLogin(requestCtx(env.ctx), &dtooidc.OIDCLoginReq{
 		AuthRequestID: authReq.GetID(),
 		Identifier:    "member",
 		Password:      "secret",
-	})
+
+		Operator: operatorOf(env.ctx)})
 	require.Error(t, err)
 	require.Equal(t, code.GetError(code.AuthAppAccessDeniedError).Error(), err.Error())
 
@@ -249,11 +250,12 @@ func TestCompleteLoginAllowsMemberWithAppAccess(t *testing.T) {
 	authReq := newAuthReq(t, env.provider, clientCode)
 	svc := newAppAccessLoginSvc(env, seed)
 
-	res, err := svc.CompleteLogin(env.ctx, &dtooidc.OIDCLoginReq{
+	res, err := svc.CompleteLogin(requestCtx(env.ctx), &dtooidc.OIDCLoginReq{
 		AuthRequestID: authReq.GetID(),
 		Identifier:    "member",
 		Password:      "secret",
-	})
+
+		Operator: operatorOf(env.ctx)})
 	require.NoError(t, err)
 	require.Equal(t, seed.tenantID, res.TenantID)
 	require.NotEmpty(t, res.ContinueURL)
@@ -277,7 +279,7 @@ func TestSilentLoginPicksTenantWithAppAccess(t *testing.T) {
 		{TenantID: withGrant.tenantID, Name: "granted", UserID: withGrant.memberID},
 	})
 
-	continueURL, err := svc.CompleteLoginBySession(env.ctx, authReq.GetID(), "session-appaccess")
+	continueURL, err := svc.CompleteLoginBySession(requestCtx(env.ctx), operatorOf(env.ctx), authReq.GetID(), "session-appaccess")
 	require.NoError(t, err)
 	require.NotEmpty(t, continueURL)
 
@@ -304,7 +306,7 @@ func TestSilentLoginWithoutAnyAppAccessIsRejected(t *testing.T) {
 		{TenantID: second.tenantID, Name: "revoked", UserID: second.memberID},
 	})
 
-	_, err := svc.CompleteLoginBySession(env.ctx, authReq.GetID(), "session-appaccess")
+	_, err := svc.CompleteLoginBySession(requestCtx(env.ctx), operatorOf(env.ctx), authReq.GetID(), "session-appaccess")
 	require.Error(t, err)
 	require.ErrorIs(t, err, ErrSilentLoginNoAppAccess)
 	// 必须是**另一个**哨兵：混用 errSilentLoginNotAllowed 会让 SSOLogin 清 cookie 回登录页（死循环）
@@ -335,7 +337,7 @@ func TestSelectTenantRejectsTenantWithoutAppAccess(t *testing.T) {
 		{TenantID: seed.tenantID, Name: "no-grant", UserID: seed.memberID},
 	})
 
-	_, err := svc.SelectTenant(env.ctx, authReq.GetID(), seed.tenantID)
+	_, err := svc.SelectTenant(requestCtx(env.ctx), operatorOf(env.ctx), authReq.GetID(), seed.tenantID)
 	require.Error(t, err)
 	require.Equal(t, code.GetError(code.AuthAppAccessDeniedError).Error(), err.Error())
 
@@ -346,7 +348,7 @@ func TestSelectTenantRejectsTenantWithoutAppAccess(t *testing.T) {
 func newAppAccessLoginSvc(env *appAccessGateEnv, seed appAccessSeed) *oidcAuthSvc {
 	return &oidcAuthSvc{
 		provider: env.provider,
-		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx context.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 			return &model.PersonEntity{
 					BaseEntity:     gormdao.BaseEntity{StringID: gormdao.StringID{ID: seed.personID}},
 					PasswordStatus: model.PasswordStatusNormal,
@@ -367,7 +369,7 @@ func newAppAccessLoginSvc(env *appAccessGateEnv, seed appAccessSeed) *oidcAuthSv
 func newAppAccessSilentLoginSvc(env *appAccessGateEnv, personID string, tenants []objauth.TenantOption) *oidcAuthSvc {
 	return &oidcAuthSvc{
 		provider: env.provider,
-		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx *gin.Context, got string) ([]objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{tenantsForPerson: func(ctx context.Context, got string) ([]objauth.TenantOption, error) {
 			if got != personID {
 				return nil, fmt.Errorf("unexpected personID %s, want %s", got, personID)
 			}

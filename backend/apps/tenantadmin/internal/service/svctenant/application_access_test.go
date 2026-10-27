@@ -189,7 +189,7 @@ func TestListUserApplicationsView(t *testing.T) {
 	f.bindRole("ur-2", "t1", "u1", "r-on-2")
 	f.bindRole("ur-3", "t1", "u1", "r-un")
 
-	resp, err := NewApplicationAccessSvc().ListUserApplications(f.ctx, &dtotenant.UserApplicationsListReq{UserID: "u1"})
+	resp, err := NewApplicationAccessSvc().ListUserApplications(requestCtx(f.ctx), &dtotenant.UserApplicationsListReq{UserID: "u1", Operator: operatorOf(f.ctx)})
 	if err != nil {
 		t.Fatalf("ListUserApplications: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestUpdateUserApplicationsReplaceAndCascade(t *testing.T) {
 
 	// 首次提交：{app-a, app-b}
 	appIDs := []string{"app-a", "app-b"}
-	if err := svc.UpdateUserApplications(f.ctx, &dtotenant.UserApplicationsUpdateReq{UserID: "u1", AppIDs: &appIDs}); err != nil {
+	if err := svc.UpdateUserApplications(requestCtx(f.ctx), &dtotenant.UserApplicationsUpdateReq{UserID: "u1", AppIDs: &appIDs, Operator: operatorOf(f.ctx)}); err != nil {
 		t.Fatalf("replace to {a,b}: %v", err)
 	}
 	for _, appID := range []string{"app-a", "app-b"} {
@@ -257,7 +257,7 @@ func TestUpdateUserApplicationsReplaceAndCascade(t *testing.T) {
 	}
 	// 二次提交：仅 {app-a} → app-b 准入置 disable 且其角色绑定被级联撤销
 	kept := []string{"app-a"}
-	if err := svc.UpdateUserApplications(f.ctx, &dtotenant.UserApplicationsUpdateReq{UserID: "u1", AppIDs: &kept}); err != nil {
+	if err := svc.UpdateUserApplications(requestCtx(f.ctx), &dtotenant.UserApplicationsUpdateReq{UserID: "u1", AppIDs: &kept, Operator: operatorOf(f.ctx)}); err != nil {
 		t.Fatalf("replace to {a}: %v", err)
 	}
 	if g := f.grantOf("u1", "app-b"); g == nil || g.Status != model.UserApplicationStatusDisable {
@@ -271,7 +271,7 @@ func TestUpdateUserApplicationsReplaceAndCascade(t *testing.T) {
 	}
 
 	// 幂等：重复提交同一集合结果一致
-	if err := svc.UpdateUserApplications(f.ctx, &dtotenant.UserApplicationsUpdateReq{UserID: "u1", AppIDs: &kept}); err != nil {
+	if err := svc.UpdateUserApplications(requestCtx(f.ctx), &dtotenant.UserApplicationsUpdateReq{UserID: "u1", AppIDs: &kept, Operator: operatorOf(f.ctx)}); err != nil {
 		t.Fatalf("repeat replace: %v", err)
 	}
 	if g := f.grantOf("u1", "app-a"); g == nil || g.Status != model.UserApplicationStatusEnable {
@@ -280,7 +280,7 @@ func TestUpdateUserApplicationsReplaceAndCascade(t *testing.T) {
 
 	// 清空：{}（appIDs=[]）撤销全部准入
 	empty := []string{}
-	if err := svc.UpdateUserApplications(f.ctx, &dtotenant.UserApplicationsUpdateReq{UserID: "u1", AppIDs: &empty}); err != nil {
+	if err := svc.UpdateUserApplications(requestCtx(f.ctx), &dtotenant.UserApplicationsUpdateReq{UserID: "u1", AppIDs: &empty, Operator: operatorOf(f.ctx)}); err != nil {
 		t.Fatalf("clear all: %v", err)
 	}
 	if g := f.grantOf("u1", "app-a"); g == nil || g.Status != model.UserApplicationStatusDisable {
@@ -308,7 +308,7 @@ func TestUpdateUserApplicationsRejectsUnsubscribed(t *testing.T) {
 
 	for _, appID := range []string{"app-un", "app-off", "app-missing"} {
 		appIDs := []string{"app-a", appID}
-		err := svc.UpdateUserApplications(f.ctx, &dtotenant.UserApplicationsUpdateReq{UserID: "u1", AppIDs: &appIDs})
+		err := svc.UpdateUserApplications(requestCtx(f.ctx), &dtotenant.UserApplicationsUpdateReq{UserID: "u1", AppIDs: &appIDs, Operator: operatorOf(f.ctx)})
 		if got := iamCodeOf(err); got != code.UserApplicationNotSubscribedError {
 			t.Fatalf("准入 %s: want 100786, got %v", appID, err)
 		}
@@ -337,17 +337,19 @@ func TestUpdateUserApplicationsGuards(t *testing.T) {
 
 	// 非系统管理员（不带任何管理员角色）
 	plainCtx := newDeptGinCtx(t, "t1", "plain")
-	err := svc.UpdateUserApplications(plainCtx, &dtotenant.UserApplicationsUpdateReq{UserID: "u1", AppIDs: &appIDs})
+	err := svc.UpdateUserApplications(plainCtx, &dtotenant.UserApplicationsUpdateReq{UserID: "u1", AppIDs: &appIDs,
+		Operator: operatorOf(plainCtx),
+	})
 	if err != code.GetError(code.UserSystemAdminRequiredError) {
 		t.Fatalf("非管理员: want UserSystemAdminRequired, got %v", err)
 	}
 	// 跨租户成员：不得跨租户准入
-	err = svc.UpdateUserApplications(f.ctx, &dtotenant.UserApplicationsUpdateReq{UserID: "u2", AppIDs: &appIDs})
+	err = svc.UpdateUserApplications(requestCtx(f.ctx), &dtotenant.UserApplicationsUpdateReq{UserID: "u2", AppIDs: &appIDs, Operator: operatorOf(f.ctx)})
 	if err != code.GetError(code.UserNotExistError) {
 		t.Fatalf("跨租户成员: want UserNotExist, got %v", err)
 	}
 	// 不存在的成员
-	err = svc.UpdateUserApplications(f.ctx, &dtotenant.UserApplicationsUpdateReq{UserID: "ghost", AppIDs: &appIDs})
+	err = svc.UpdateUserApplications(requestCtx(f.ctx), &dtotenant.UserApplicationsUpdateReq{UserID: "ghost", AppIDs: &appIDs, Operator: operatorOf(f.ctx)})
 	if err != code.GetError(code.UserNotExistError) {
 		t.Fatalf("不存在成员: want UserNotExist, got %v", err)
 	}
@@ -357,7 +359,7 @@ func TestUpdateUserApplicationsGuards(t *testing.T) {
 		Update("user_type", model.UserTypeMachine).Error; err != nil {
 		t.Fatalf("mark machine: %v", err)
 	}
-	err = svc.UpdateUserApplications(f.ctx, &dtotenant.UserApplicationsUpdateReq{UserID: "m1", AppIDs: &appIDs})
+	err = svc.UpdateUserApplications(requestCtx(f.ctx), &dtotenant.UserApplicationsUpdateReq{UserID: "m1", AppIDs: &appIDs, Operator: operatorOf(f.ctx)})
 	if err != code.GetError(code.UserMemberOperationOnlyError) {
 		t.Fatalf("服务账号: want UserMemberOperationOnly, got %v", err)
 	}
@@ -380,7 +382,7 @@ func TestUpdateUserApplicationsLastAdminForbidden(t *testing.T) {
 	svc := NewApplicationAccessSvc()
 
 	empty := []string{}
-	err := svc.UpdateUserApplications(f.ctx, &dtotenant.UserApplicationsUpdateReq{UserID: "u1", AppIDs: &empty})
+	err := svc.UpdateUserApplications(requestCtx(f.ctx), &dtotenant.UserApplicationsUpdateReq{UserID: "u1", AppIDs: &empty, Operator: operatorOf(f.ctx)})
 	if got := iamCodeOf(err); got != code.UserApplicationLastAdminForbiddenError {
 		t.Fatalf("撤销最后一个内置管理员准入: want 100787, got %v", err)
 	}
@@ -394,7 +396,7 @@ func TestUpdateUserApplicationsLastAdminForbidden(t *testing.T) {
 	// 存在第二个内置管理员持有者时放行（保护只针对"最后一个"）
 	f.user("u2", "t1", "第二管理员")
 	seedUserRoleLink(t, f.db, "ur-admin-2", "t1", "u2", "role-admin")
-	if err := svc.UpdateUserApplications(f.ctx, &dtotenant.UserApplicationsUpdateReq{UserID: "u1", AppIDs: &empty}); err != nil {
+	if err := svc.UpdateUserApplications(requestCtx(f.ctx), &dtotenant.UserApplicationsUpdateReq{UserID: "u1", AppIDs: &empty, Operator: operatorOf(f.ctx)}); err != nil {
 		t.Fatalf("存在其他内置管理员时应放行: %v", err)
 	}
 	if g := f.grantOf("u1", "app-admin"); g == nil || g.Status != model.UserApplicationStatusDisable {
@@ -417,7 +419,7 @@ func TestListApplicationUsers(t *testing.T) {
 	f.bindRole("ur-1", "t1", "u1", "r-a")
 	svc := NewApplicationAccessSvc()
 
-	resp, err := svc.ListApplicationUsers(f.ctx, &dtotenant.ApplicationUsersListReq{AppID: "app-a"})
+	resp, err := svc.ListApplicationUsers(requestCtx(f.ctx), &dtotenant.ApplicationUsersListReq{AppID: "app-a", Operator: operatorOf(f.ctx)})
 	if err != nil {
 		t.Fatalf("ListApplicationUsers: %v", err)
 	}
@@ -446,7 +448,7 @@ func TestListApplicationUsers(t *testing.T) {
 	// 无准入的应用：空列表而非报错
 	f.app("app-b", "应用B", model.AppStatusEnable)
 	f.subscribe("t1", "app-b", model.TenantApplicationStatusEnable)
-	empty, err := svc.ListApplicationUsers(f.ctx, &dtotenant.ApplicationUsersListReq{AppID: "app-b"})
+	empty, err := svc.ListApplicationUsers(requestCtx(f.ctx), &dtotenant.ApplicationUsersListReq{AppID: "app-b", Operator: operatorOf(f.ctx)})
 	if err != nil {
 		t.Fatalf("empty app list: %v", err)
 	}
@@ -455,7 +457,7 @@ func TestListApplicationUsers(t *testing.T) {
 	}
 
 	// 不存在的应用：明确报"应用不存在"
-	_, err = svc.ListApplicationUsers(f.ctx, &dtotenant.ApplicationUsersListReq{AppID: "ghost"})
+	_, err = svc.ListApplicationUsers(requestCtx(f.ctx), &dtotenant.ApplicationUsersListReq{AppID: "ghost", Operator: operatorOf(f.ctx)})
 	if err != code.GetError(code.ApplicationNotExistError) {
 		t.Fatalf("不存在应用: want ApplicationNotExist, got %v", err)
 	}
@@ -477,7 +479,7 @@ func TestListApplicationUsersTenantIsolation(t *testing.T) {
 		t.Fatalf("seed cross-tenant grant: %v", err)
 	}
 
-	resp, err := NewApplicationAccessSvc().ListApplicationUsers(f.ctx, &dtotenant.ApplicationUsersListReq{AppID: "app-a"})
+	resp, err := NewApplicationAccessSvc().ListApplicationUsers(requestCtx(f.ctx), &dtotenant.ApplicationUsersListReq{AppID: "app-a", Operator: operatorOf(f.ctx)})
 	if err != nil {
 		t.Fatalf("ListApplicationUsers: %v", err)
 	}

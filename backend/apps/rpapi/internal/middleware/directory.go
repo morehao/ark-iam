@@ -30,6 +30,16 @@ func RequireDirectoryRead() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ident := identity.OIDCIdentityFromContext(ctx)
 		if ident == nil {
+			// API Key 是独立的机器凭证通道（设计文档 §4.4）：OIDCAuth 校验通过后**不会**写入
+			// OIDC identity，只写入租户作用域与 user_id。此前的实现直接按 ident==nil 判 401，
+			// 把合法 API Key 请求全部误杀——这里按通道区分，而不是"没 identity 就当未认证"。
+			//
+			// 判定依据是服务端已派生的事实（租户作用域非空 + user_id 存在），不接受请求头自证范围：
+			// x-api-key 只有在 OIDCAuth 里被真正校验通过才会走到这里（否则上游已 401 终止）。
+			if ctx.GetHeader("x-api-key") != "" && gincontext.GetTenantIDString(ctx) != "" {
+				ctx.Next()
+				return
+			}
 			// 未经过 OIDCAuth：绝不能放行，也不能当作"策略不满足"以外的语义。
 			abort(ctx, http.StatusUnauthorized, code.RpDirectoryUnauthorizedError, code.GetError(code.RpDirectoryUnauthorizedError).Msg)
 			return

@@ -1,9 +1,9 @@
 package svcauth
 
 import (
+	"context"
 	"net/url"
 
-	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/model"
 )
@@ -41,9 +41,9 @@ func resolveConnectorRedirectURI(input *ConnectorAuthorizeInput) string {
 type ConnectorDriver interface {
 	DriverType() model.ConnectorProtocol
 	ValidateConfig(config ConnectorConfig) error
-	BuildAuthorizationURL(ctx *gin.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error)
-	ExchangeCallback(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error)
-	TestConnection(ctx *gin.Context, input *ConnectorTestInput) (*ConnectorTestOutput, error)
+	BuildAuthorizationURL(ctx context.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error)
+	ExchangeCallback(ctx context.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error)
+	TestConnection(ctx context.Context, input *ConnectorTestInput) (*ConnectorTestOutput, error)
 }
 
 type connectorDriverRegistry struct {
@@ -129,7 +129,7 @@ func (d *stubConnectorDriver) ValidateConfig(config ConnectorConfig) error {
 	}
 }
 
-func (d *stubConnectorDriver) BuildAuthorizationURL(ctx *gin.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error) {
+func (d *stubConnectorDriver) BuildAuthorizationURL(ctx context.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error) {
 	_ = ctx
 	params := url.Values{}
 	params.Set("redirect_uri", resolveConnectorRedirectURI(input))
@@ -140,11 +140,11 @@ func (d *stubConnectorDriver) BuildAuthorizationURL(ctx *gin.Context, input *Con
 	}, nil
 }
 
-func (d *stubConnectorDriver) ExchangeCallback(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
+func (d *stubConnectorDriver) ExchangeCallback(ctx context.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
 	return &ConnectorCallbackOutput{}, nil
 }
 
-func (d *stubConnectorDriver) TestConnection(ctx *gin.Context, input *ConnectorTestInput) (*ConnectorTestOutput, error) {
+func (d *stubConnectorDriver) TestConnection(ctx context.Context, input *ConnectorTestInput) (*ConnectorTestOutput, error) {
 	return &ConnectorTestOutput{
 		Success: true,
 		Message: "连接成功",

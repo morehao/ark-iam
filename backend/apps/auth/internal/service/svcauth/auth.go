@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/auth/internal/service/svcloginguard"
 	"github.com/morehao/ark-iam/pkg/audit"
@@ -16,11 +15,10 @@ import (
 	"github.com/morehao/ark-iam/pkg/core/application"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objauth"
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
 	"github.com/morehao/ark-iam/pkg/sso"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gconstant"
 	"github.com/morehao/golib/gcrypto"
@@ -72,18 +70,18 @@ var newAuthRefreshTokenStore = func() authRefreshTokenStore {
 	return dao.NewRefreshTokenDao()
 }
 
-var authLoginRecorder = func(ctx *gin.Context, tenantID, userID string, success bool) {
-	defaultRecordLoginLog(ctx, tenantID, userID, success)
+var authLoginRecorder = func(ctx context.Context, operator objidentity.Operator, tenantID, userID string, success bool) {
+	defaultRecordLoginLog(ctx, operator, tenantID, userID, success)
 }
 
 type AuthSvc interface {
-	AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error)
-	TenantsForPerson(ctx *gin.Context, personID string) ([]objauth.TenantOption, error)
-	MyTenants(ctx *gin.Context, req *dtoauth.MyTenantsReq) (*dtoauth.MyTenantsResp, error)
-	JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*dtoauth.JoinTenantResp, error)
-	Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error
-	LogoutAll(ctx *gin.Context, req *dtoauth.LogoutAllReq) error
-	Userinfo(ctx *gin.Context, req *dtoauth.UserinfoReq) (*dtoauth.UserinfoResp, error)
+	AuthenticatePassword(ctx context.Context, operator objidentity.Operator, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error)
+	TenantsForPerson(ctx context.Context, personID string) ([]objauth.TenantOption, error)
+	MyTenants(ctx context.Context, req *dtoauth.MyTenantsReq) (*dtoauth.MyTenantsResp, error)
+	JoinTenant(ctx context.Context, req *dtoauth.JoinTenantReq) (*dtoauth.JoinTenantResp, error)
+	Logout(ctx context.Context, req *dtoauth.LogoutReq) error
+	LogoutAll(ctx context.Context, req *dtoauth.LogoutAllReq) error
+	Userinfo(ctx context.Context, req *dtoauth.UserinfoReq) (*dtoauth.UserinfoResp, error)
 }
 
 type authSvc struct {
@@ -95,29 +93,29 @@ func NewAuthSvc() AuthSvc {
 	return &authSvc{}
 }
 
-func (svc *authSvc) AuthenticatePassword(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+func (svc *authSvc) AuthenticatePassword(ctx context.Context, operator objidentity.Operator, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 	personDao := newAuthPersonStore()
-	personEntity, userEntity, tenants, err := svc.resolvePersonLogin(ctx, personDao, identifier)
+	personEntity, userEntity, tenants, err := svc.resolvePersonLogin(ctx, operator, personDao, identifier)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	// 零租户 person：person 存在但无任何租户成员（userEntity==nil 且 tenants 为空）。
 	// 仍必须强制密码校验（与普通账号同错，防枚举），通过后才放行到"建自己租户"。
 	if personEntity != nil && userEntity == nil && len(tenants) == 0 {
-		personEntity, _, aErr := svc.authenticateResolvedPerson(ctx, personEntity, nil, password)
+		personEntity, _, aErr := svc.authenticateResolvedPerson(ctx, operator, personEntity, nil, password)
 		if aErr != nil {
 			return nil, nil, nil, aErr
 		}
 		return personEntity, nil, nil, nil
 	}
-	personEntity, userEntity, err = svc.authenticateResolvedPerson(ctx, personEntity, userEntity, password)
+	personEntity, userEntity, err = svc.authenticateResolvedPerson(ctx, operator, personEntity, userEntity, password)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	return personEntity, userEntity, tenants, nil
 }
 
-func (svc *authSvc) TenantsForPerson(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+func (svc *authSvc) TenantsForPerson(ctx context.Context, personID string) ([]objauth.TenantOption, error) {
 	_, tenants, err := svc.listPersonTenants(ctx, personID)
 	if err != nil {
 		return nil, err
@@ -125,8 +123,8 @@ func (svc *authSvc) TenantsForPerson(ctx *gin.Context, personID string) ([]objau
 	return tenants, nil
 }
 
-func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *model.PersonEntity, userEntity *model.UserEntity, password string) (*model.PersonEntity, *model.UserEntity, error) {
-	ip := gincontext.GetClientIP(ctx)
+func (svc *authSvc) authenticateResolvedPerson(ctx context.Context, operator objidentity.Operator, personEntity *model.PersonEntity, userEntity *model.UserEntity, password string) (*model.PersonEntity, *model.UserEntity, error) {
+	ip := operator.ClientIP
 	// 零租户 person（userEntity==nil）：无 tenant/user id，登录审计记 person 级空 id。
 	tenantID, userID := "", ""
 	if userEntity != nil {
@@ -138,6 +136,7 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 			Result:     model.AuditResultFailure,
 			TargetType: model.AuditTargetTypePerson,
 			Detail:     fmt.Sprintf("personID:%s, reason:login locked", personEntity.ID),
+			Operator:   operator,
 		})
 		return nil, nil, code.GetError(code.LoginLockedError)
 	}
@@ -148,6 +147,7 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 			Result:     model.AuditResultFailure,
 			TargetType: model.AuditTargetTypePerson,
 			Detail:     fmt.Sprintf("personID:%s, reason:suspended", personEntity.ID),
+			Operator:   operator,
 		})
 		return nil, nil, code.GetError(code.UserSuspendedError)
 	}
@@ -158,12 +158,13 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 			Result:     model.AuditResultFailure,
 			TargetType: model.AuditTargetTypePerson,
 			Detail:     fmt.Sprintf("personID:%s, reason:password not set", personEntity.ID),
+			Operator:   operator,
 		})
 		return nil, nil, code.GetError(code.PasswordNotSetError)
 	}
 
 	if err := gcrypto.ComparePasswordHash(personEntity.PasswordEncrypted, password); err != nil {
-		authLoginRecorder(ctx, tenantID, userID, false)
+		authLoginRecorder(ctx, operator, tenantID, userID, false)
 		svcloginguard.RecordFailure(ctx, ip, personEntity.ID)
 		glog.Errorf(ctx, "[svcauth.authenticateResolvedPerson] password mismatch, personID:%s", personEntity.ID)
 		// H8：密码错误与用户不存在统一错误码，避免用户名枚举
@@ -171,12 +172,12 @@ func (svc *authSvc) authenticateResolvedPerson(ctx *gin.Context, personEntity *m
 	}
 
 	svcloginguard.RecordSuccess(ctx, ip, personEntity.ID)
-	authLoginRecorder(ctx, tenantID, userID, true)
+	authLoginRecorder(ctx, operator, tenantID, userID, true)
 	return personEntity, userEntity, nil
 }
 
-func (svc *authSvc) MyTenants(ctx *gin.Context, req *dtoauth.MyTenantsReq) (*dtoauth.MyTenantsResp, error) {
-	personID := gincontext.GetPersonIDString(ctx)
+func (svc *authSvc) MyTenants(ctx context.Context, req *dtoauth.MyTenantsReq) (*dtoauth.MyTenantsResp, error) {
+	personID := req.Operator.PersonID
 	if personID == "" {
 		return nil, code.GetError(gconstant.UnauthorizedErr)
 	}
@@ -189,10 +190,10 @@ func (svc *authSvc) MyTenants(ctx *gin.Context, req *dtoauth.MyTenantsReq) (*dto
 	return &dtoauth.MyTenantsResp{List: tenants}, nil
 }
 
-func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*dtoauth.JoinTenantResp, error) {
+func (svc *authSvc) JoinTenant(ctx context.Context, req *dtoauth.JoinTenantReq) (*dtoauth.JoinTenantResp, error) {
 	// 通道 B：凭邀请加入已有租户（非 owner）。
 	// 落哪个租户由邀请码决定（租户侧授权，禁止裸 tenantID 直入）。
-	personID := gincontext.GetPersonIDString(ctx)
+	personID := req.Operator.PersonID
 	if personID == "" {
 		return nil, code.GetError(gconstant.UnauthorizedErr)
 	}
@@ -206,7 +207,7 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 	// 解析不出应用（空 client_id / 客户端或应用不存在）一律 fail-closed。
 	// 机器凭证通道（API Key）不注入 person 身份，本函数在其之前就已按未认证拒绝。
 	// 该检查先于邀请解析：功能关闭时不向外暴露"邀请码是否存在"。
-	clientID := identity.ClientIDFromContext(ctx)
+	clientID := req.ClientID
 	appEntity, err := application.GetByClientID(ctx, clientID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.JoinTenant] resolve application by clientID fail, err:%v, clientID:%s", err, clientID)
@@ -278,8 +279,8 @@ func (svc *authSvc) JoinTenant(ctx *gin.Context, req *dtoauth.JoinTenantReq) (*d
 	}, nil
 }
 
-func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
-	personID := gincontext.GetPersonIDString(ctx)
+func (svc *authSvc) Logout(ctx context.Context, req *dtoauth.LogoutReq) error {
+	personID := req.Operator.PersonID
 	// 全局登出语义：撤销该 person 的全部 refresh token + SSO 会话，实现"一处登出、处处登出"。
 	// access token 依赖其短 TTL 失效（见设计文档 §2.5），此处不维护 HS256 黑名单。
 	if personID != "" {
@@ -289,6 +290,7 @@ func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
 			Result:     model.AuditResultSuccess,
 			TargetType: model.AuditTargetTypePerson,
 			TargetID:   personID,
+			Operator:   req.Operator,
 		})
 		// person 级全局登出：跨该自然人的全部租户撤销，显式声明「全租户」作用域。
 		personCtx := dbclient.CrossTenantContext(ctx)
@@ -308,23 +310,24 @@ func (svc *authSvc) Logout(ctx *gin.Context, req *dtoauth.LogoutReq) error {
 // 任务入队（在撤销 SSO 会话前调用，此时会话索引仍可用），使其它已登录应用（含第三方 RP）
 // 即时收到 logout_token。入队失败仅告警，不影响登出主流程；任务由 oidcop 的 logoutWorker 异步消费。
 // 具体登记遍历复用 sso.EnqueueLogoutsByPersonID（租户挂起等场景走同一实现，避免两处逻辑漂移）。
-func (svc *authSvc) enqueueBackChannelLogouts(ctx *gin.Context, personID string) {
+func (svc *authSvc) enqueueBackChannelLogouts(ctx context.Context, personID string) {
 	if _, err := sso.EnqueueLogoutsByPersonID(dbclient.CrossTenantContext(ctx), personID); err != nil {
 		glog.Warnf(ctx, "[svcauth.Logout] enqueue back-channel logouts fail, personID:%s, err:%v", personID, err)
 	}
 }
 
-func (svc *authSvc) LogoutAll(ctx *gin.Context, req *dtoauth.LogoutAllReq) error {
-	// LogoutAll 与 Logout 语义一致（person 级全局登出）
-	return svc.Logout(ctx, &dtoauth.LogoutReq{})
+func (svc *authSvc) LogoutAll(ctx context.Context, req *dtoauth.LogoutAllReq) error {
+	// LogoutAll 与 Logout 语义一致（person 级全局登出）。
+	// Operator 必须透传：Logout 从 DTO 取 personID，丢掉它会让登出静默变成 no-op。
+	return svc.Logout(ctx, &dtoauth.LogoutReq{Operator: req.Operator})
 }
 
-func (svc *authSvc) Userinfo(ctx *gin.Context, req *dtoauth.UserinfoReq) (*dtoauth.UserinfoResp, error) {
+func (svc *authSvc) Userinfo(ctx context.Context, req *dtoauth.UserinfoReq) (*dtoauth.UserinfoResp, error) {
 	userDao := newAuthUserStore()
 
-	userID := gincontext.GetUserIDString(ctx)
-	personID := gincontext.GetPersonIDString(ctx)
-	tenantID := gincontext.GetTenantIDString(ctx)
+	userID := req.Operator.UserID
+	personID := req.Operator.PersonID
+	tenantID := dbclient.TenantIDFromContext(ctx)
 
 	var userEntity *model.UserEntity
 	var err error
@@ -382,7 +385,7 @@ func (svc *authSvc) Userinfo(ctx *gin.Context, req *dtoauth.UserinfoReq) (*dtoau
 	}, nil
 }
 
-func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonStore, identifier string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+func (svc *authSvc) resolvePersonLogin(ctx context.Context, operator objidentity.Operator, personDao authPersonStore, identifier string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 	identifier = strings.TrimSpace(identifier)
 	if identifier == "" {
 		return nil, nil, nil, code.GetError(code.AuthIdentifierRequiredError)
@@ -404,6 +407,7 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 			Result:     model.AuditResultFailure,
 			TargetType: model.AuditTargetTypePerson,
 			Detail:     fmt.Sprintf("identifier:%s, reason:user lookup error", identifier),
+			Operator:   operator,
 		})
 		glog.Errorf(ctx, "[svcauth.resolvePersonLogin] person dao GetByCond fail, err:%v", err)
 		return nil, nil, nil, code.GetError(code.UserGetDetailError)
@@ -411,12 +415,13 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 	if personEntity == nil || personEntity.ID == "" {
 		// H8：未知标识同样计入 IP 维度失败（防口令喷洒绕过 IP 锁）；
 		// 审计 detail 不写"user not found"，避免用户名枚举。
-		svcloginguard.RecordFailure(ctx, gincontext.GetClientIP(ctx), "")
+		svcloginguard.RecordFailure(ctx, operator.ClientIP, "")
 		audit.WriteAudit(ctx, audit.AuditEntry{
 			Action:     audit.ActionLogin,
 			Result:     model.AuditResultFailure,
 			TargetType: model.AuditTargetTypePerson,
 			Detail:     fmt.Sprintf("identifier-hash:%s, reason:auth failed", hashIdentifier(identifier)),
+			Operator:   operator,
 		})
 		return nil, nil, nil, code.GetError(code.AuthLoginFailedError)
 	}
@@ -436,13 +441,14 @@ func (svc *authSvc) resolvePersonLogin(ctx *gin.Context, personDao authPersonSto
 			Result:     model.AuditResultFailure,
 			TargetType: model.AuditTargetTypePerson,
 			Detail:     fmt.Sprintf("userID:%s, reason:suspended", userEntity.ID),
+			Operator:   operator,
 		})
 		return nil, nil, nil, code.GetError(code.UserSuspendedError)
 	}
 	return personEntity, userEntity, tenants, nil
 }
 
-func (svc *authSvc) listPersonTenants(ctx *gin.Context, personID string) (*model.UserEntity, []objauth.TenantOption, error) {
+func (svc *authSvc) listPersonTenants(ctx context.Context, personID string) (*model.UserEntity, []objauth.TenantOption, error) {
 	userDao := newAuthUserStore()
 	tenantDao := newAuthTenantStore()
 	// 一次取全部租户成员，按加入时间排序：第一条即"默认租户"（确定性），
@@ -540,9 +546,9 @@ func hashIdentifier(identifier string) string {
 	return hex.EncodeToString(sum[:8])
 }
 
-func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID string, success bool) {
-	loginIP := gincontext.GetClientIP(ctx)
-	userAgent := ctx.GetHeader("User-Agent")
+func defaultRecordLoginLog(ctx context.Context, operator objidentity.Operator, tenantID, userID string, success bool) {
+	loginIP := operator.ClientIP
+	userAgent := operator.UserAgent
 
 	loginLogEntity := &model.UserLoginLogEntity{
 		TenantID:  tenantID,
@@ -581,5 +587,6 @@ func defaultRecordLoginLog(ctx *gin.Context, tenantID, userID string, success bo
 		TargetType: model.AuditTargetTypePerson,
 		TargetID:   userID,
 		Detail:     fmt.Sprintf("userID:%s", userID),
+		Operator:   operator,
 	})
 }

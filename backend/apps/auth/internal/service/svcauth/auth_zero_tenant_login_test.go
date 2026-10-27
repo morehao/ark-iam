@@ -1,6 +1,8 @@
 package svcauth
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +18,9 @@ import (
 func zeroTenantLoginCtx(t *testing.T) *gin.Context {
 	t.Helper()
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 	return ginCtx
 }
@@ -46,7 +51,7 @@ func seedZeroTenantPerson(t *testing.T, identifier, password string) {
 func TestAuthenticatePasswordZeroTenantPersonCorrectPassword(t *testing.T) {
 	seedZeroTenantPerson(t, "zero@example.com", "Password1")
 
-	person, user, tenants, err := NewAuthSvc().AuthenticatePassword(zeroTenantLoginCtx(t), "zero@example.com", "Password1")
+	person, user, tenants, err := NewAuthSvc().AuthenticatePassword(requestCtx(zeroTenantLoginCtx(t)), operatorOf(zeroTenantLoginCtx(t)), "zero@example.com", "Password1")
 	if err != nil {
 		t.Fatalf("AuthenticatePassword returned error: %v", err)
 	}
@@ -64,7 +69,7 @@ func TestAuthenticatePasswordZeroTenantPersonCorrectPassword(t *testing.T) {
 func TestAuthenticatePasswordZeroTenantPersonWrongPassword(t *testing.T) {
 	seedZeroTenantPerson(t, "zero@example.com", "Password1")
 
-	person, user, tenants, err := NewAuthSvc().AuthenticatePassword(zeroTenantLoginCtx(t), "zero@example.com", "wrong-password")
+	person, user, tenants, err := NewAuthSvc().AuthenticatePassword(requestCtx(zeroTenantLoginCtx(t)), operatorOf(zeroTenantLoginCtx(t)), "zero@example.com", "wrong-password")
 	assertCode(t, err, code.AuthLoginFailedError)
 	if person != nil || user != nil || len(tenants) != 0 {
 		t.Fatalf("expected all nil/empty on wrong password, got person:%#v user:%#v tenants:%#v", person, user, tenants)
@@ -74,7 +79,7 @@ func TestAuthenticatePasswordZeroTenantPersonWrongPassword(t *testing.T) {
 func TestAuthenticatePasswordPersonNotExist(t *testing.T) {
 	testutil.SetupSQLite(t, &model.PersonEntity{}, &model.UserEntity{}, &model.TenantEntity{})
 
-	person, user, tenants, err := NewAuthSvc().AuthenticatePassword(zeroTenantLoginCtx(t), "ghost@example.com", "whatever")
+	person, user, tenants, err := NewAuthSvc().AuthenticatePassword(requestCtx(zeroTenantLoginCtx(t)), operatorOf(zeroTenantLoginCtx(t)), "ghost@example.com", "whatever")
 	assertCode(t, err, code.AuthLoginFailedError)
 	if person != nil || user != nil || len(tenants) != 0 {
 		t.Fatalf("expected all nil/empty when person not found, got person:%#v user:%#v tenants:%#v", person, user, tenants)
@@ -113,7 +118,7 @@ func TestAuthenticatePasswordZeroTenantPersonVariableIdentifierForms(t *testing.
 			}).Error; err != nil {
 				t.Fatalf("seed person: %v", err)
 			}
-			person, user, tenants, err := NewAuthSvc().AuthenticatePassword(zeroTenantLoginCtx(t), tc.identifier, "Password1")
+			person, user, tenants, err := NewAuthSvc().AuthenticatePassword(requestCtx(zeroTenantLoginCtx(t)), operatorOf(zeroTenantLoginCtx(t)), tc.identifier, "Password1")
 			if err != nil {
 				t.Fatalf("AuthenticatePassword returned error: %v", err)
 			}
@@ -159,7 +164,7 @@ func TestAuthenticatePasswordPersonWithTenantPreservesOriginalBehavior(t *testin
 		t.Fatalf("seed user: %v", err)
 	}
 
-	person, user, tenants, err := NewAuthSvc().AuthenticatePassword(zeroTenantLoginCtx(t), "member@example.com", "Password1")
+	person, user, tenants, err := NewAuthSvc().AuthenticatePassword(requestCtx(zeroTenantLoginCtx(t)), operatorOf(zeroTenantLoginCtx(t)), "member@example.com", "Password1")
 	if err != nil {
 		t.Fatalf("AuthenticatePassword returned error: %v", err)
 	}

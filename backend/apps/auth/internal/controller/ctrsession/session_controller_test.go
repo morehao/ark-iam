@@ -1,6 +1,7 @@
 package ctrsession
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,16 +14,16 @@ type stubSessionSvc struct {
 	revokeReq *dtouser.SessionRevokeReq
 }
 
-func (s *stubSessionSvc) List(ctx *gin.Context, req *dtouser.SessionListReq) (*dtouser.SessionListResp, error) {
+func (s *stubSessionSvc) List(ctx context.Context, req *dtouser.SessionListReq) (*dtouser.SessionListResp, error) {
 	panic("unexpected call")
 }
 
-func (s *stubSessionSvc) Revoke(ctx *gin.Context, req *dtouser.SessionRevokeReq) error {
+func (s *stubSessionSvc) Revoke(ctx context.Context, req *dtouser.SessionRevokeReq) error {
 	s.revokeReq = req
 	return nil
 }
 
-func (s *stubSessionSvc) RevokeAll(ctx *gin.Context, req *dtouser.SessionRevokeAllReq) error {
+func (s *stubSessionSvc) RevokeAll(ctx context.Context, req *dtouser.SessionRevokeAllReq) error {
 	panic("unexpected call")
 }
 

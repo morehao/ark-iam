@@ -1,7 +1,9 @@
 package svcoidc
 
 import (
+	"context"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -52,18 +54,25 @@ func TestFullOIDCCodeFlow(t *testing.T) {
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx context.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 			return &model.PersonEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}}}, &model.UserEntity{BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "66"}}, TenantID: "1", PersonID: "88"}, nil, nil
 		}},
 	}
 
 	ginCtx, _ := gin.CreateTestContext(nil)
+
+	if ginCtx.Request == nil {
+
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login", nil)
-	res, err := svc.CompleteLogin(ginCtx, &dtooidc.OIDCLoginReq{
+	res, err := svc.CompleteLogin(requestCtx(ginCtx), &dtooidc.OIDCLoginReq{
 		AuthRequestID: authReq.GetID(),
 		Identifier:    "person@example.com",
 		Password:      "Password1",
-	})
+
+		Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("CompleteLogin failed: %v", err)
 	}

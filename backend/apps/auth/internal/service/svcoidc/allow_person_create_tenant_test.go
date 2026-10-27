@@ -2,6 +2,8 @@ package svcoidc
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -98,7 +100,13 @@ func TestResolveAllowPersonCreateTenant(t *testing.T) {
 			svc := &oidcAuthSvc{}
 
 			ginCtx, _ := gin.CreateTestContext(nil)
-			got := svc.resolveAllowPersonCreateTenant(ginCtx, c.clientID, c.tenantCount)
+
+			if ginCtx.Request == nil {
+
+				ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+			}
+			got := svc.resolveAllowPersonCreateTenant(requestCtx(ginCtx), c.clientID, c.tenantCount)
 			if got != c.want {
 				t.Fatalf("expected %v, got %v", c.want, got)
 			}
@@ -136,7 +144,10 @@ func TestAppAllowsPersonCreateTenant(t *testing.T) {
 			}
 			svc := &oidcAuthSvc{}
 			ginCtx, _ := gin.CreateTestContext(nil)
-			if got := svc.appAllowsPersonCreateTenant(ginCtx, "cid-x"); got != c.want {
+			if ginCtx.Request == nil {
+				ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+			}
+			if got := svc.appAllowsPersonCreateTenant(requestCtx(ginCtx), "cid-x"); got != c.want {
 				t.Fatalf("expected %v, got %v", c.want, got)
 			}
 		})

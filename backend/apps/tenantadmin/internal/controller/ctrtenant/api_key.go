@@ -2,6 +2,7 @@ package ctrtenant
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/tenantadmin/internal/service/svctenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -35,11 +36,12 @@ func NewApiKeyCtr() ApiKeyCtr {
 // @Router /v1/tenant/api-keys [post]
 func (ctr *apiKeyCtr) Create(ctx *gin.Context) {
 	var req dtotenant.ApiKeyCreateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.apiKeySvc.Create(ctx, &req)
+	res, err := ctr.apiKeySvc.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -56,11 +58,12 @@ func (ctr *apiKeyCtr) Create(ctx *gin.Context) {
 // @Router /v1/tenant/api-keys [get]
 func (ctr *apiKeyCtr) PageList(ctx *gin.Context) {
 	var req dtotenant.ApiKeyPageListReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.apiKeySvc.PageList(ctx, &req)
+	res, err := ctr.apiKeySvc.PageList(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -77,11 +80,12 @@ func (ctr *apiKeyCtr) PageList(ctx *gin.Context) {
 // @Router /v1/tenant/api-keys/{apiKeyID}/revoke [post]
 func (ctr *apiKeyCtr) Revoke(ctx *gin.Context) {
 	var req dtotenant.ApiKeyRevokeReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindUri(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.apiKeySvc.Revoke(ctx, &req); err != nil {
+	if err := ctr.apiKeySvc.Revoke(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -97,11 +101,12 @@ func (ctr *apiKeyCtr) Revoke(ctx *gin.Context) {
 // @Router /v1/tenant/api-keys/{apiKeyID} [delete]
 func (ctr *apiKeyCtr) Delete(ctx *gin.Context) {
 	var req dtotenant.ApiKeyDeleteReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindUri(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.apiKeySvc.Delete(ctx, &req); err != nil {
+	if err := ctr.apiKeySvc.Delete(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

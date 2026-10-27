@@ -1,15 +1,14 @@
 package svctenant
 
 import (
+	"context"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
@@ -17,10 +16,10 @@ import (
 )
 
 type DepartmentUserSvc interface {
-	Create(ctx *gin.Context, req *dtotenant.DepartmentUserCreateReq) (*dtotenant.DepartmentUserCreateResp, error)
-	Update(ctx *gin.Context, req *dtotenant.DepartmentUserUpdateReq) error
-	Delete(ctx *gin.Context, req *dtotenant.DepartmentUserDeleteReq) error
-	PageList(ctx *gin.Context, req *dtotenant.DepartmentUserPageListReq) (*dtotenant.DepartmentUserPageListResp, error)
+	Create(ctx context.Context, req *dtotenant.DepartmentUserCreateReq) (*dtotenant.DepartmentUserCreateResp, error)
+	Update(ctx context.Context, req *dtotenant.DepartmentUserUpdateReq) error
+	Delete(ctx context.Context, req *dtotenant.DepartmentUserDeleteReq) error
+	PageList(ctx context.Context, req *dtotenant.DepartmentUserPageListReq) (*dtotenant.DepartmentUserPageListResp, error)
 }
 
 type departmentUserSvc struct {
@@ -32,12 +31,12 @@ func NewDepartmentUserSvc() DepartmentUserSvc {
 	return &departmentUserSvc{}
 }
 
-func (svc *departmentUserSvc) Create(ctx *gin.Context, req *dtotenant.DepartmentUserCreateReq) (*dtotenant.DepartmentUserCreateResp, error) {
+func (svc *departmentUserSvc) Create(ctx context.Context, req *dtotenant.DepartmentUserCreateReq) (*dtotenant.DepartmentUserCreateResp, error) {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
-	if err := requireSystemAdmin(ctx, code.DepartmentUserCreateError); err != nil {
+	if err := requireSystemAdmin(ctx, req.Operator, code.DepartmentUserCreateError); err != nil {
 		return nil, err
 	}
-	tenantID := gincontext.GetTenantIDString(ctx)
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	relationType := req.RelationType
 	if relationType == "" {
 		relationType = model.DeptUserRelationPrimary
@@ -67,7 +66,7 @@ func (svc *departmentUserSvc) Create(ctx *gin.Context, req *dtotenant.Department
 		return nil, code.GetError(code.UserMemberOperationOnlyError)
 	}
 
-	userID := gincontext.GetUserIDString(ctx)
+	userID := req.Operator.UserID
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
 		deptUserDao := dao.NewDepartmentUserDao().WithTx(tx)
 		if relationType == model.DeptUserRelationPrimary {
@@ -124,12 +123,12 @@ func (svc *departmentUserSvc) Create(ctx *gin.Context, req *dtotenant.Department
 	return &dtotenant.DepartmentUserCreateResp{}, nil
 }
 
-func (svc *departmentUserSvc) Update(ctx *gin.Context, req *dtotenant.DepartmentUserUpdateReq) error {
+func (svc *departmentUserSvc) Update(ctx context.Context, req *dtotenant.DepartmentUserUpdateReq) error {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
-	if err := requireSystemAdmin(ctx, code.DepartmentUserUpdateError); err != nil {
+	if err := requireSystemAdmin(ctx, req.Operator, code.DepartmentUserUpdateError); err != nil {
 		return err
 	}
-	tenantID := gincontext.GetTenantIDString(ctx)
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	relationType := req.RelationType
 	if relationType == "" {
 		relationType = model.DeptUserRelationPrimary
@@ -162,7 +161,7 @@ func (svc *departmentUserSvc) Update(ctx *gin.Context, req *dtotenant.Department
 		}
 	}
 
-	userID := gincontext.GetUserIDString(ctx)
+	userID := req.Operator.UserID
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
 		if relationType == model.DeptUserRelationLeader {
 			// 一个部门至多一个负责人：目标关系为 leader 且该部门已有其他 leader 时拒绝。
@@ -230,7 +229,7 @@ func isValidRelationType(relationType model.DeptUserRelationType) bool {
 
 // ensureDeptLeaderUnique 保证一个部门至多一个负责人：查询该部门的 leader 关系，
 // 若存在除 exceptUserID 之外的用户则返回负责人冲突错误。须在事务内传入 tx。
-func ensureDeptLeaderUnique(ctx *gin.Context, tx *gorm.DB, tenantID, deptID, exceptUserID string) error {
+func ensureDeptLeaderUnique(ctx context.Context, tx *gorm.DB, tenantID, deptID, exceptUserID string) error {
 	leaderList, err := dao.NewDepartmentUserDao().WithTx(tx).GetListByCond(ctx, &dao.DepartmentUserCond{
 		TenantID:     tenantID,
 		DepartmentID: deptID,
@@ -250,7 +249,7 @@ func ensureDeptLeaderUnique(ctx *gin.Context, tx *gorm.DB, tenantID, deptID, exc
 
 // replaceDeptRelationList 全量替换用户某种部门关系集合：删除旧关系并插入 deptIDs 对应新关系。
 // 供 user.Create/Update 的部门维度局部/整体更新复用（须在事务内传入 tx）。
-func replaceDeptRelationList(ctx *gin.Context, tx *gorm.DB, tenantID, userID string, deptIDs []string, relationType model.DeptUserRelationType, operatorID string) error {
+func replaceDeptRelationList(ctx context.Context, tx *gorm.DB, tenantID, userID string, deptIDs []string, relationType model.DeptUserRelationType, operatorID string) error {
 	deptUserDao := dao.NewDepartmentUserDao().WithTx(tx)
 	oldList, err := deptUserDao.GetListByCond(ctx, &dao.DepartmentUserCond{
 		TenantID:     tenantID,
@@ -287,7 +286,7 @@ func replaceDeptRelationList(ctx *gin.Context, tx *gorm.DB, tenantID, userID str
 }
 
 // ensureSinglePrimary 保证 primary（行政主部门）每用户至多 1 行：除 exceptID 外不保留其他 primary 行。须在事务内传入 tx。
-func ensureSinglePrimary(ctx *gin.Context, tx *gorm.DB, tenantID, userID, exceptID, operatorID string) error {
+func ensureSinglePrimary(ctx context.Context, tx *gorm.DB, tenantID, userID, exceptID, operatorID string) error {
 	deptUserDao := dao.NewDepartmentUserDao().WithTx(tx)
 	oldList, err := deptUserDao.GetListByCond(ctx, &dao.DepartmentUserCond{
 		TenantID:     tenantID,
@@ -307,12 +306,12 @@ func ensureSinglePrimary(ctx *gin.Context, tx *gorm.DB, tenantID, userID, except
 	return nil
 }
 
-func (svc *departmentUserSvc) Delete(ctx *gin.Context, req *dtotenant.DepartmentUserDeleteReq) error {
+func (svc *departmentUserSvc) Delete(ctx context.Context, req *dtotenant.DepartmentUserDeleteReq) error {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
-	if err := requireSystemAdmin(ctx, code.DepartmentUserDeleteError); err != nil {
+	if err := requireSystemAdmin(ctx, req.Operator, code.DepartmentUserDeleteError); err != nil {
 		return err
 	}
-	tenantID := gincontext.GetTenantIDString(ctx)
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	relationList, err := dao.NewDepartmentUserDao().GetListByCond(ctx, &dao.DepartmentUserCond{
 		TenantID:     tenantID,
 		DepartmentID: req.DepartmentID,
@@ -326,7 +325,7 @@ func (svc *departmentUserSvc) Delete(ctx *gin.Context, req *dtotenant.Department
 		return code.GetError(code.DepartmentUserNotExistError)
 	}
 
-	userID := gincontext.GetUserIDString(ctx)
+	userID := req.Operator.UserID
 	for _, r := range relationList {
 		if err := dao.NewDepartmentUserDao().Delete(ctx, r.ID, userID); err != nil {
 			glog.Errorf(ctx, "[svcdepartmentuser.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -336,8 +335,8 @@ func (svc *departmentUserSvc) Delete(ctx *gin.Context, req *dtotenant.Department
 	return nil
 }
 
-func (svc *departmentUserSvc) PageList(ctx *gin.Context, req *dtotenant.DepartmentUserPageListReq) (*dtotenant.DepartmentUserPageListResp, error) {
-	tenantID := gincontext.GetTenantIDString(ctx)
+func (svc *departmentUserSvc) PageList(ctx context.Context, req *dtotenant.DepartmentUserPageListReq) (*dtotenant.DepartmentUserPageListResp, error) {
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	cond := &dao.DepartmentUserCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
@@ -404,7 +403,7 @@ func matchMemberKeyword(item dtotenant.DepartmentUserPageListItem, keyword strin
 }
 
 // loadUserDepartments 查询用户部门归属（含各节点名称），供用户归属接口与用户详情复用。
-func loadUserDepartments(ctx *gin.Context, tenantID, userID string) ([]dtotenant.UserDepartmentItem, error) {
+func loadUserDepartments(ctx context.Context, tenantID, userID string) ([]dtotenant.UserDepartmentItem, error) {
 	relationList, err := dao.NewDepartmentUserDao().GetListByCond(ctx, &dao.DepartmentUserCond{
 		TenantID: tenantID,
 		UserID:   userID,

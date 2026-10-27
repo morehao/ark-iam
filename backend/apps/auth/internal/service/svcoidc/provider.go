@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	appconfig "github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/morehao/ark-iam/pkg/config"
@@ -362,12 +361,12 @@ func (p *OIDCProvider) BuildAuthCallbackURL(ctx context.Context, authRequestID s
 // RedirectURIVerifier 返回基于 provider 客户端注册的回调地址校验器，
 // 供静默登录中间件在 prompt=none 失败跳回 redirect_uri 前校验其确为该 client 注册的回调地址（L1）。
 // provider 或其存储不可用（如单元测试中的空 provider）时返回 nil，跳过校验保持兼容。
-func (p *OIDCProvider) RedirectURIVerifier() func(ctx *gin.Context, clientID, redirectURI string) bool {
+func (p *OIDCProvider) RedirectURIVerifier() func(ctx context.Context, clientID, redirectURI string) bool {
 	if p == nil || p.Storage == nil {
 		return nil
 	}
 	storage := p.Storage
-	return func(ctx *gin.Context, clientID, redirectURI string) bool {
+	return func(ctx context.Context, clientID, redirectURI string) bool {
 		if clientID == "" || redirectURI == "" {
 			return false
 		}

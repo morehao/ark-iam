@@ -36,25 +36,27 @@ func TestApplicationRoleTemplateValidation(t *testing.T) {
 		"条目数超上限": tooMany,
 	}
 	for name, items := range cases {
-		_, err := svc.Create(ctx, &dtoapplication.ApplicationCreateReq{
+		_, err := svc.Create(requestCtx(ctx), &dtoapplication.ApplicationCreateReq{
 			Code:         "app_bad",
 			Name:         "非法模板",
 			RoleTemplate: items,
-		})
+
+			Operator: operatorOf(ctx)})
 		if gerror.GetCode(err) != int(code.ApplicationRoleTemplateInvalidError) {
 			t.Fatalf("%s: err = %v, want code %d", name, err, code.ApplicationRoleTemplateInvalidError)
 		}
 	}
 
 	// 合法模板：名称自动去空白后落库
-	resp, err := svc.Create(ctx, &dtoapplication.ApplicationCreateReq{
+	resp, err := svc.Create(requestCtx(ctx), &dtoapplication.ApplicationCreateReq{
 		Code: "app_ok",
 		Name: "对象存储",
 		RoleTemplate: []model.RoleTemplateItem{
 			{Code: "storage_admin", Name: " 存储管理员 "},
 			{Code: "readonly", Name: "只读用户"},
 		},
-	})
+
+		Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -76,11 +78,12 @@ func TestApplicationRoleTemplateUpdateAndFanOut(t *testing.T) {
 	ctx := newApplicationCtx()
 	svc := NewApplicationSvc()
 
-	resp, err := svc.Create(ctx, &dtoapplication.ApplicationCreateReq{
+	resp, err := svc.Create(requestCtx(ctx), &dtoapplication.ApplicationCreateReq{
 		Code:         "app_store",
 		Name:         "对象存储",
 		RoleTemplate: []model.RoleTemplateItem{{Code: "storage_admin", Name: "存储管理员"}},
-	})
+
+		Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -94,7 +97,9 @@ func TestApplicationRoleTemplateUpdateAndFanOut(t *testing.T) {
 	}
 
 	// null 表示不修改：不传该字段时既不清空也不追加，且不应触发物化
-	if err := svc.Update(ctx, &dtoapplication.ApplicationUpdateReq{AppID: resp.AppID, Name: "对象存储"}); err != nil {
+	if err := svc.Update(requestCtx(ctx), &dtoapplication.ApplicationUpdateReq{AppID: resp.AppID, Name: "对象存储",
+		Operator: operatorOf(ctx),
+	}); err != nil {
 		t.Fatalf("Update without roleTemplate failed: %v", err)
 	}
 	if got := detailRoleTemplate(t, svc, ctx, resp.AppID); len(got) != 1 {
@@ -105,14 +110,15 @@ func TestApplicationRoleTemplateUpdateAndFanOut(t *testing.T) {
 	}
 
 	// 传值即全量替换：模板落库 + 物化到两个已订阅租户
-	if err := svc.Update(ctx, &dtoapplication.ApplicationUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtoapplication.ApplicationUpdateReq{
 		AppID: resp.AppID,
 		Name:  "对象存储",
 		RoleTemplate: []model.RoleTemplateItem{
 			{Code: "storage_admin", Name: "存储管理员"},
 			{Code: "readonly", Name: "只读用户"},
 		},
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("Update with roleTemplate failed: %v", err)
 	}
 	if got := detailRoleTemplate(t, svc, ctx, resp.AppID); len(got) != 2 {
@@ -131,11 +137,12 @@ func TestApplicationRoleTemplateUpdateAndFanOut(t *testing.T) {
 	}
 
 	// 模板移除 readonly：两个租户下的该角色被撤下（连带清理用户/菜单授权）
-	if err := svc.Update(ctx, &dtoapplication.ApplicationUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtoapplication.ApplicationUpdateReq{
 		AppID:        resp.AppID,
 		Name:         "对象存储",
 		RoleTemplate: []model.RoleTemplateItem{{Code: "storage_admin", Name: "存储管理员"}},
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("Update removing template item failed: %v", err)
 	}
 	for _, tenantID := range []string{"t1", "t2"} {
@@ -146,11 +153,12 @@ func TestApplicationRoleTemplateUpdateAndFanOut(t *testing.T) {
 	}
 
 	// [] 表示清空：模板清空后租户侧的模板角色全部撤下
-	if err := svc.Update(ctx, &dtoapplication.ApplicationUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtoapplication.ApplicationUpdateReq{
 		AppID:        resp.AppID,
 		Name:         "对象存储",
 		RoleTemplate: []model.RoleTemplateItem{},
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("Update with empty roleTemplate failed: %v", err)
 	}
 	if got := detailRoleTemplate(t, svc, ctx, resp.AppID); len(got) != 0 {
@@ -164,7 +172,7 @@ func TestApplicationRoleTemplateUpdateAndFanOut(t *testing.T) {
 // detailRoleTemplate 读取应用详情里的角色模板（断言用）。
 func detailRoleTemplate(t *testing.T, svc ApplicationSvc, ctx *gin.Context, appID string) []model.RoleTemplateItem {
 	t.Helper()
-	detail, err := svc.Detail(ctx, &dtoapplication.ApplicationDetailReq{AppID: appID})
+	detail, err := svc.Detail(requestCtx(ctx), &dtoapplication.ApplicationDetailReq{AppID: appID})
 	if err != nil {
 		t.Fatalf("Detail(%s) failed: %v", appID, err)
 	}

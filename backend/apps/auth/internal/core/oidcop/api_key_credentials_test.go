@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"testing"
 	"time"
 
@@ -30,7 +31,7 @@ func TestLookupApiKeyByRawKey(t *testing.T) {
 
 	store := NewPersistentStore()
 	store.apiKeyDao = func(opts ...dao.DaoOption) *dao.ApiKeyDao {
-		return dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
+		return dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(dbclient.CrossTenantContext(ctx)) }))
 	}
 
 	sum := sha256.Sum256([]byte("rawkey"))

@@ -8,7 +8,7 @@
 package menu
 
 import (
-	"github.com/gin-gonic/gin"
+	"context"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objpermission"
@@ -19,7 +19,7 @@ import (
 // BuildAppMenuTree 构建指定应用的启用菜单树（角色菜单授权 / 侧边栏可见树共用）。
 // 展示顺序取 dao.MenuOrderBySort：同一父级下按控制台维护的「排序」升序——
 // 侧边栏与角色授权树的顺序必须是「排序」字段的唯一函数，否则控制台里改排序看不到任何效果。
-func BuildAppMenuTree(ctx *gin.Context, appID string) ([]objpermission.MenuItemNode, error) {
+func BuildAppMenuTree(ctx context.Context, appID string) ([]objpermission.MenuItemNode, error) {
 	menuEntityList, _, err := dao.NewMenuDao().GetPageListByCond(ctx, &dao.MenuCond{
 		BaseCond: &gormdao.BaseCond{OrderField: dao.MenuOrderBySort},
 		AppID:    appID,
@@ -73,7 +73,7 @@ func BuildAppMenuTree(ctx *gin.Context, appID string) ([]objpermission.MenuItemN
 //   - 内置管理员豁免：持有内置管理员角色（source=builtin && admin_type=admin）→ 全量菜单（含 visibility=admin，免授权）；
 //   - 普通用户：按该用户授权菜单集合（role_menu 并集）过滤 + visibility 门槛（public/member）二次过滤；
 //     父子收敛：父未达标/未授权时若存在可见子项则保留父壳，保证层级连贯。
-func BuildMyMenuTree(ctx *gin.Context, tenantID, userID string, appIDs []string) ([]objpermission.MenuItemNode, error) {
+func BuildMyMenuTree(ctx context.Context, tenantID, userID string, appIDs []string) ([]objpermission.MenuItemNode, error) {
 	var full []objpermission.MenuItemNode
 	for _, appID := range appIDs {
 		appTree, err := BuildAppMenuTree(ctx, appID)
@@ -98,7 +98,7 @@ func BuildMyMenuTree(ctx *gin.Context, tenantID, userID string, appIDs []string)
 }
 
 // UserHoldsBuiltinAdmin 判断用户（租户内）是否持有内置管理员角色（source=builtin && admin_type=admin）。
-func UserHoldsBuiltinAdmin(ctx *gin.Context, tenantID, userID string) (bool, error) {
+func UserHoldsBuiltinAdmin(ctx context.Context, tenantID, userID string) (bool, error) {
 	if tenantID == "" || userID == "" {
 		return false, nil
 	}
@@ -129,7 +129,7 @@ func UserHoldsBuiltinAdmin(ctx *gin.Context, tenantID, userID string) (bool, err
 }
 
 // UserAuthorizedMenuIDs 返回用户在租户内经 role_menu 授权得到的菜单 ID 集合（跨角色去重）。
-func UserAuthorizedMenuIDs(ctx *gin.Context, tenantID, userID string) (map[string]bool, error) {
+func UserAuthorizedMenuIDs(ctx context.Context, tenantID, userID string) (map[string]bool, error) {
 	result := make(map[string]bool)
 	if tenantID == "" || userID == "" {
 		return result, nil
@@ -159,7 +159,7 @@ func UserAuthorizedMenuIDs(ctx *gin.Context, tenantID, userID string) (map[strin
 
 // ResolveUserAdminType 推导用户的系统管理类型：聚合其全部角色，
 // 任一角色为管理员类型（admin）即视为管理员类型，否则为普通类型（normal）。
-func ResolveUserAdminType(ctx *gin.Context, tenantID, userID string) (model.SysAdminType, error) {
+func ResolveUserAdminType(ctx context.Context, tenantID, userID string) (model.SysAdminType, error) {
 	if tenantID == "" || userID == "" {
 		return model.SysAdminTypeNormal, nil
 	}

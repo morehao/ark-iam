@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"net/http"
 	"net/url"
 
@@ -85,11 +86,12 @@ func (ctr *OIDCCtr) Provider() *svcoidc.OIDCProvider {
 
 func (ctr *OIDCCtr) Login(ctx *gin.Context) {
 	var req dtooidc.OIDCLoginReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.oidcAuthSvc.CompleteLogin(ctx, &req)
+	res, err := ctr.oidcAuthSvc.CompleteLogin(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -106,7 +108,7 @@ func (ctr *OIDCCtr) SelectTenant(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.oidcAuthSvc.SelectTenant(ctx, req.AuthRequestID, req.TenantID)
+	res, err := ctr.oidcAuthSvc.SelectTenant(ctx.Request.Context(), identity.OperatorFromGin(ctx), req.AuthRequestID, req.TenantID)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -131,7 +133,7 @@ func (ctr *OIDCCtr) ChangePassword(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.oidcAuthSvc.ChangePassword(ctx, &req); err != nil {
+	if err := ctr.oidcAuthSvc.ChangePassword(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -144,7 +146,7 @@ func (ctr *OIDCCtr) RegisterPerson(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.oidcAuthSvc.RegisterPerson(ctx, &req)
+	res, err := ctr.oidcAuthSvc.RegisterPerson(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -158,7 +160,7 @@ func (ctr *OIDCCtr) CreateTenant(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.oidcAuthSvc.CreateTenant(ctx, &req)
+	res, err := ctr.oidcAuthSvc.CreateTenant(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -180,7 +182,7 @@ func (ctr *OIDCCtr) LoginConfig(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.oidcAuthSvc.LoginConfig(ctx, req.AuthRequestID)
+	res, err := ctr.oidcAuthSvc.LoginConfig(ctx.Request.Context(), req.AuthRequestID)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -248,7 +250,7 @@ func (ctr *OIDCCtr) SSOLogin(ctx *gin.Context) {
 		return
 	}
 
-	continueURL, err := ctr.oidcAuthSvc.CompleteLoginBySession(ctx, authRequestID, sessionID)
+	continueURL, err := ctr.oidcAuthSvc.CompleteLoginBySession(ctx.Request.Context(), identity.OperatorFromGin(ctx), authRequestID, sessionID)
 	if err != nil {
 		// 无应用准入（本次客户端应用下没有任何有准入的租户）：直接渲染提示页。
 		// 不能走下面「清 cookie 回登录页」的分支——重新登录仍会得到同一结论，会形成登录死循环（AC-5）。

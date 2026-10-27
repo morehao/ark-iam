@@ -1,11 +1,11 @@
 package svcperson
 
 import (
-	"github.com/gin-gonic/gin"
+	"context"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoperson"
 )
 
 type PersonProfileSvc interface {
-	Detail(ctx *gin.Context, req *dtoperson.PersonDetailReq) (*dtoperson.PersonDetailResp, error)
-	UpdatePassword(ctx *gin.Context, req *dtoperson.PersonUpdatePasswordReq) error
+	Detail(ctx context.Context, req *dtoperson.PersonDetailReq) (*dtoperson.PersonDetailResp, error)
+	UpdatePassword(ctx context.Context, req *dtoperson.PersonUpdatePasswordReq) error
 }

@@ -3,7 +3,6 @@ package svcoidc
 import (
 	"context"
 
-	"github.com/gin-gonic/gin"
 	"github.com/zitadel/oidc/v3/pkg/op"
 
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
@@ -35,7 +34,7 @@ func (svc *oidcAuthSvc) appAccessEnforced() bool {
 // pkg/core/application 的同一份判定式（订阅启用 ∧ 应用启用 ∧ 准入启用）。
 // fail-closed：client_id 为空、客户端未绑定应用、应用行缺失一律 false；
 // 查询失败如实上抛（系统错误不伪装成"无权限"）。
-func (svc *oidcAuthSvc) canUseClientApp(ctx *gin.Context, clientID string, option objauth.TenantOption) (bool, error) {
+func (svc *oidcAuthSvc) canUseClientApp(ctx context.Context, clientID string, option objauth.TenantOption) (bool, error) {
 	if !svc.appAccessEnforced() {
 		return true, nil
 	}
@@ -59,7 +58,7 @@ func (svc *oidcAuthSvc) canUseClientApp(ctx *gin.Context, clientID string, optio
 
 // filterTenantsByClientApp 只保留「该成员在本客户端所属应用下已被准入」的租户选项，
 // 使用户不会在多租户选择里选中一个必然失败的租户。开关关闭时原样返回（不查库）。
-func (svc *oidcAuthSvc) filterTenantsByClientApp(ctx *gin.Context, clientID string, tenants []objauth.TenantOption) ([]objauth.TenantOption, error) {
+func (svc *oidcAuthSvc) filterTenantsByClientApp(ctx context.Context, clientID string, tenants []objauth.TenantOption) ([]objauth.TenantOption, error) {
 	if !svc.appAccessEnforced() {
 		return tenants, nil
 	}
@@ -80,7 +79,7 @@ func (svc *oidcAuthSvc) filterTenantsByClientApp(ctx *gin.Context, clientID stri
 // 供 RegisterPerson/CreateTenant 作为"注册入口是否开放"的门禁。
 // client_id → 应用的解析与应用策略读取统一在 pkg/core/application，
 // 与通道 B 的 AllowJoinByInvite 共用同一份实现（禁止各写一套）。
-func (svc *oidcAuthSvc) appAllowsPersonCreateTenant(ctx *gin.Context, clientID string) bool {
+func (svc *oidcAuthSvc) appAllowsPersonCreateTenant(ctx context.Context, clientID string) bool {
 	appEntity, err := application.GetByClientID(ctx, clientID)
 	if err != nil {
 		return false
@@ -90,7 +89,7 @@ func (svc *oidcAuthSvc) appAllowsPersonCreateTenant(ctx *gin.Context, clientID s
 
 // resolveAllowPersonCreateTenant reports whether the app backing the oauth client
 // allows a zero-tenant person to self-create a tenant. Person with >=1 tenant => false.
-func (svc *oidcAuthSvc) resolveAllowPersonCreateTenant(ctx *gin.Context, clientID string, tenantCount int) bool {
+func (svc *oidcAuthSvc) resolveAllowPersonCreateTenant(ctx context.Context, clientID string, tenantCount int) bool {
 	if clientID == "" || tenantCount > 0 {
 		return false
 	}

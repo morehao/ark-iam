@@ -1,6 +1,10 @@
 package svctenant
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -16,7 +20,12 @@ import (
 // newTenantDeleteCtx 构造租户删除的请求上下文（删除链路不取 ctx.Request，仅需操作人/租户上下文）。
 func newTenantDeleteCtx() *gin.Context {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Set(gcontext.KeyTenantID, "other-tenant")
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("other-tenant"))
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("other-tenant"))
 	ginCtx.Set(gcontext.KeyUserID, "0")
 	return ginCtx
 }
@@ -36,7 +45,9 @@ func TestTenantDeleteRejectsPlatformTenant(t *testing.T) {
 
 	ctx := newTenantDeleteCtx()
 	svc := NewTenantSvc()
-	err := svc.Delete(ctx, &dtotenant.TenantDeleteReq{TenantID: platformTenant.ID})
+	err := svc.Delete(requestCtx(ctx), &dtotenant.TenantDeleteReq{TenantID: platformTenant.ID,
+		Operator: operatorOf(ctx),
+	})
 	if err == nil {
 		t.Fatal("删除平台租户必须被拒绝")
 	}
@@ -44,7 +55,7 @@ func TestTenantDeleteRejectsPlatformTenant(t *testing.T) {
 		t.Fatalf("期望 TenantBuiltInDeleteForbiddenError, got %v", err)
 	}
 
-	got, err := dao.NewTenantDao().GetByID(ctx, platformTenant.ID)
+	got, err := dao.NewTenantDao().GetByID(dbclient.CrossTenantContext(ctx), platformTenant.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -66,11 +77,13 @@ func TestTenantDeleteAllowsCustomerTenant(t *testing.T) {
 
 	ctx := newTenantDeleteCtx()
 	svc := NewTenantSvc()
-	if err := svc.Delete(ctx, &dtotenant.TenantDeleteReq{TenantID: customer.ID}); err != nil {
+	if err := svc.Delete(requestCtx(ctx), &dtotenant.TenantDeleteReq{TenantID: customer.ID,
+		Operator: operatorOf(ctx),
+	}); err != nil {
 		t.Fatalf("Delete returned error: %v", err)
 	}
 
-	got, err := dao.NewTenantDao().GetByID(ctx, customer.ID)
+	got, err := dao.NewTenantDao().GetByID(dbclient.CrossTenantContext(ctx), customer.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}

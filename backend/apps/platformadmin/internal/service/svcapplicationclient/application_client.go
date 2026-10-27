@@ -1,32 +1,31 @@
 package svcapplicationclient
 
 import (
+	"context"
 	"time"
-
-	"github.com/gin-gonic/gin"
 
 	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/credential"
 	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtoapplicationclient"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
 
 type ApplicationClientSvc interface {
-	Create(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientCreateReq) (*dtoapplicationclient.ApplicationClientCreateResp, error)
-	Delete(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientDeleteReq) error
-	Update(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientUpdateReq) error
-	Detail(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientDetailReq) (*dtoapplicationclient.ApplicationClientDetailResp, error)
-	PageList(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientPageListReq) (*dtoapplicationclient.ApplicationClientPageListResp, error)
-	GetByClientID(ctx *gin.Context, clientID string) (*dtoapplicationclient.ApplicationClientDetailResp, error)
-	ListSecrets(ctx *gin.Context, req *dtoapplicationclient.SecretListReq) (*dtoapplicationclient.SecretListResp, error)
-	CreateSecret(ctx *gin.Context, req *dtoapplicationclient.SecretCreateReq) (*dtoapplicationclient.SecretCreateResp, error)
-	DeleteSecret(ctx *gin.Context, req *dtoapplicationclient.SecretDeleteReq) error
+	Create(ctx context.Context, req *dtoapplicationclient.ApplicationClientCreateReq) (*dtoapplicationclient.ApplicationClientCreateResp, error)
+	Delete(ctx context.Context, req *dtoapplicationclient.ApplicationClientDeleteReq) error
+	Update(ctx context.Context, req *dtoapplicationclient.ApplicationClientUpdateReq) error
+	Detail(ctx context.Context, req *dtoapplicationclient.ApplicationClientDetailReq) (*dtoapplicationclient.ApplicationClientDetailResp, error)
+	PageList(ctx context.Context, req *dtoapplicationclient.ApplicationClientPageListReq) (*dtoapplicationclient.ApplicationClientPageListResp, error)
+	GetByClientID(ctx context.Context, clientID string) (*dtoapplicationclient.ApplicationClientDetailResp, error)
+	ListSecrets(ctx context.Context, req *dtoapplicationclient.SecretListReq) (*dtoapplicationclient.SecretListResp, error)
+	CreateSecret(ctx context.Context, req *dtoapplicationclient.SecretCreateReq) (*dtoapplicationclient.SecretCreateResp, error)
+	DeleteSecret(ctx context.Context, req *dtoapplicationclient.SecretDeleteReq) error
 }
 
 type oAuthClientSvc struct{}
@@ -144,7 +143,7 @@ func responseTypeStrings(list model.ResponseTypeList) []string {
 	return values
 }
 
-func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientCreateReq) (*dtoapplicationclient.ApplicationClientCreateResp, error) {
+func (svc *oAuthClientSvc) Create(ctx context.Context, req *dtoapplicationclient.ApplicationClientCreateReq) (*dtoapplicationclient.ApplicationClientCreateResp, error) {
 	// 编码规则校验（校验归 service，与 svcapplication.Create 同款）：客户端编码即 OIDC client_id，
 	// 同时是网关侧 audience 白名单值；非法值（连字符/数字/大写/空）必须在此拦截，
 	// 而不是落库后再靠人工纠正——写错一个字符会让该客户端签发的令牌全部 401。
@@ -167,7 +166,7 @@ func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.Ap
 		return nil, code.GetError(code.ApplicationClientAuthMethodInvalidError)
 	}
 	insertEntity := &model.ApplicationClientEntity{
-		TenantID:                gincontext.GetTenantIDString(ctx),
+		TenantID:                dbclient.TenantIDFromContext(ctx),
 		AppID:                   req.AppID,
 		Code:                    req.Code,
 		Name:                    req.Name,
@@ -184,7 +183,7 @@ func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.Ap
 		AccessTokenTTL:          req.AccessTokenTTL,
 		RefreshTokenTTL:         req.RefreshTokenTTL,
 		Source:                  model.ApplicationClientSourceThirdParty, // 控制台创建的客户端恒为第三方接入
-		CreatedBy:               gincontext.GetUserIDString(ctx),
+		CreatedBy:               req.Operator.UserID,
 	}
 
 	if err := dao.NewApplicationClientDao().Insert(ctx, insertEntity); err != nil {
@@ -204,20 +203,20 @@ func (svc *oAuthClientSvc) Create(ctx *gin.Context, req *dtoapplicationclient.Ap
 	}, nil
 }
 
-func (svc *oAuthClientSvc) Delete(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientDeleteReq) error {
+func (svc *oAuthClientSvc) Delete(ctx context.Context, req *dtoapplicationclient.ApplicationClientDeleteReq) error {
 	entity, err := dao.NewApplicationClientDao().GetByID(ctx, req.ApplicationClientID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationClientDeleteError)
 	}
-	if !applicationClientVisibleToTenant(entity, gincontext.GetTenantIDString(ctx)) {
+	if !applicationClientVisibleToTenant(entity, dbclient.TenantIDFromContext(ctx)) {
 		return code.GetError(code.ApplicationClientNotExistError)
 	}
 	if entity.Source.IsBuiltin() {
 		return code.GetError(code.ApplicationClientBuiltInErr)
 	}
 
-	userID := gincontext.GetUserIDString(ctx)
+	userID := req.Operator.UserID
 	if err := dao.NewApplicationClientDao().Delete(ctx, req.ApplicationClientID, userID); err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationClientDeleteError)
@@ -232,7 +231,7 @@ func (svc *oAuthClientSvc) Delete(ctx *gin.Context, req *dtoapplicationclient.Ap
 // code（= client_id）**可改，但内置客户端拒改**：它同时是网关 aud 白名单与前端构建期
 // client_id 的取值来源，从控制台改会当场把该控制台锁死且无法从界面恢复（见客户端编码方案文档）。
 // 名称/回调地址/授权类型/TTL 都归运维（create_only）。
-func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientUpdateReq) error {
+func (svc *oAuthClientSvc) Update(ctx context.Context, req *dtoapplicationclient.ApplicationClientUpdateReq) error {
 	if !isValidApplicationClientStatus(req.Status) {
 		glog.Errorf(ctx, "[svcapplicationclient.Update] 非法客户端状态, req:%s", gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationClientUpdateError)
@@ -254,7 +253,7 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.Ap
 		glog.Errorf(ctx, "[svcapplicationclient.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationClientUpdateError)
 	}
-	if !applicationClientVisibleToTenant(entity, gincontext.GetTenantIDString(ctx)) {
+	if !applicationClientVisibleToTenant(entity, dbclient.TenantIDFromContext(ctx)) {
 		return code.GetError(code.ApplicationClientNotExistError)
 	}
 
@@ -277,7 +276,7 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.Ap
 		}
 	}
 
-	userID := gincontext.GetUserIDString(ctx)
+	userID := req.Operator.UserID
 	// 走 dao.UpdateFields（结构化 Updates）而非 UpdateMap：JSON 列必须经 GORM serializer 落库，
 	// 用 map 写会绕过 serializer 静默落脏值（设计文档 D6）。只填要改的字段，列名与 model 的 column tag 一致。
 	updateEntity := &model.ApplicationClientEntity{
@@ -347,13 +346,13 @@ func (svc *oAuthClientSvc) Update(ctx *gin.Context, req *dtoapplicationclient.Ap
 	return nil
 }
 
-func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientDetailReq) (*dtoapplicationclient.ApplicationClientDetailResp, error) {
+func (svc *oAuthClientSvc) Detail(ctx context.Context, req *dtoapplicationclient.ApplicationClientDetailReq) (*dtoapplicationclient.ApplicationClientDetailResp, error) {
 	entity, err := dao.NewApplicationClientDao().GetByID(ctx, req.ApplicationClientID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationClientGetDetailError)
 	}
-	if !applicationClientVisibleToTenant(entity, gincontext.GetTenantIDString(ctx)) {
+	if !applicationClientVisibleToTenant(entity, dbclient.TenantIDFromContext(ctx)) {
 		return nil, code.GetError(code.ApplicationClientNotExistError)
 	}
 
@@ -366,7 +365,7 @@ func (svc *oAuthClientSvc) Detail(ctx *gin.Context, req *dtoapplicationclient.Ap
 }
 
 // buildDetailResp 由实体组装详情出参：读取 JSON 列（具名切片）+ 回填所属应用名称。
-func buildDetailResp(ctx *gin.Context, entity *model.ApplicationClientEntity) (*dtoapplicationclient.ApplicationClientDetailResp, error) {
+func buildDetailResp(ctx context.Context, entity *model.ApplicationClientEntity) (*dtoapplicationclient.ApplicationClientDetailResp, error) {
 	appNames, err := loadAppNames(ctx, model.ApplicationClientEntityList{*entity})
 	if err != nil {
 		return nil, err
@@ -401,7 +400,7 @@ func buildDetailResp(ctx *gin.Context, entity *model.ApplicationClientEntity) (*
 	}, nil
 }
 
-func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.ApplicationClientPageListReq) (*dtoapplicationclient.ApplicationClientPageListResp, error) {
+func (svc *oAuthClientSvc) PageList(ctx context.Context, req *dtoapplicationclient.ApplicationClientPageListReq) (*dtoapplicationclient.ApplicationClientPageListResp, error) {
 	// 非法来源过滤值直接拒绝，避免 DAO 落成「查不到任何数据」的空结果而看不出原因
 	if req.Source != "" {
 		switch req.Source {
@@ -416,7 +415,7 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID: gincontext.GetTenantIDString(ctx),
+		TenantID: dbclient.TenantIDFromContext(ctx),
 		Name:     req.Name,
 		Source:   req.Source,
 		Status:   req.Status,
@@ -454,7 +453,7 @@ func (svc *oAuthClientSvc) PageList(ctx *gin.Context, req *dtoapplicationclient.
 	}, nil
 }
 
-func (svc *oAuthClientSvc) GetByClientID(ctx *gin.Context, clientID string) (*dtoapplicationclient.ApplicationClientDetailResp, error) {
+func (svc *oAuthClientSvc) GetByClientID(ctx context.Context, clientID string) (*dtoapplicationclient.ApplicationClientDetailResp, error) {
 	entity, err := dao.NewApplicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{
 		Code: clientID,
 	})
@@ -475,7 +474,7 @@ func (svc *oAuthClientSvc) GetByClientID(ctx *gin.Context, clientID string) (*dt
 
 // loadAppNames 批量回填所属应用名称（列表/详情一次查询，避免前端按行再查或 N+1）。
 // 名称缺失不报错：调用方以空名返回，前端退化为展示应用 ID。
-func loadAppNames(ctx *gin.Context, list model.ApplicationClientEntityList) (map[string]string, error) {
+func loadAppNames(ctx context.Context, list model.ApplicationClientEntityList) (map[string]string, error) {
 	appIDs := make([]string, 0, len(list))
 	seen := make(map[string]struct{}, len(list))
 	for _, v := range list {
@@ -502,7 +501,7 @@ func loadAppNames(ctx *gin.Context, list model.ApplicationClientEntityList) (map
 	return appNames, nil
 }
 
-func (svc *oAuthClientSvc) ListSecrets(ctx *gin.Context, req *dtoapplicationclient.SecretListReq) (*dtoapplicationclient.SecretListResp, error) {
+func (svc *oAuthClientSvc) ListSecrets(ctx context.Context, req *dtoapplicationclient.SecretListReq) (*dtoapplicationclient.SecretListResp, error) {
 	secretDao := dao.NewApplicationClientSecretDao()
 
 	list, total, err := secretDao.GetPageListByCond(ctx, &dao.ApplicationClientSecretCond{
@@ -537,13 +536,13 @@ func (svc *oAuthClientSvc) ListSecrets(ctx *gin.Context, req *dtoapplicationclie
 	}, nil
 }
 
-func (svc *oAuthClientSvc) CreateSecret(ctx *gin.Context, req *dtoapplicationclient.SecretCreateReq) (*dtoapplicationclient.SecretCreateResp, error) {
+func (svc *oAuthClientSvc) CreateSecret(ctx context.Context, req *dtoapplicationclient.SecretCreateReq) (*dtoapplicationclient.SecretCreateResp, error) {
 	entity, err := dao.NewApplicationClientDao().GetByID(ctx, req.ApplicationClientID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.CreateSecret] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationClientSecretCreateError)
 	}
-	if !applicationClientVisibleToTenant(entity, gincontext.GetTenantIDString(ctx)) {
+	if !applicationClientVisibleToTenant(entity, dbclient.TenantIDFromContext(ctx)) {
 		return nil, code.GetError(code.ApplicationClientNotExistError)
 	}
 	// 公共客户端（token_endpoint_auth_method=none）不得签发密钥：这类客户端的代码/配置会下发给
@@ -576,7 +575,7 @@ func (svc *oAuthClientSvc) CreateSecret(ctx *gin.Context, req *dtoapplicationcli
 		ValueHash:           valueHash,
 		ValuePrefix:         valuePrefix,
 		ExpiredAt:           expiresAt,
-		CreatedBy:           gincontext.GetUserIDString(ctx),
+		CreatedBy:           req.Operator.UserID,
 	}
 
 	if err := dao.NewApplicationClientSecretDao().Insert(ctx, secretEntity); err != nil {
@@ -600,7 +599,7 @@ func (svc *oAuthClientSvc) CreateSecret(ctx *gin.Context, req *dtoapplicationcli
 	}, nil
 }
 
-func (svc *oAuthClientSvc) DeleteSecret(ctx *gin.Context, req *dtoapplicationclient.SecretDeleteReq) error {
+func (svc *oAuthClientSvc) DeleteSecret(ctx context.Context, req *dtoapplicationclient.SecretDeleteReq) error {
 	secretEntity, err := dao.NewApplicationClientSecretDao().GetByID(ctx, req.SecretID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.DeleteSecret] get secret fail, err:%v", err)
@@ -611,11 +610,11 @@ func (svc *oAuthClientSvc) DeleteSecret(ctx *gin.Context, req *dtoapplicationcli
 	}
 
 	entity, err := dao.NewApplicationClientDao().GetByID(ctx, secretEntity.ApplicationClientID)
-	if err != nil || !applicationClientVisibleToTenant(entity, gincontext.GetTenantIDString(ctx)) {
+	if err != nil || !applicationClientVisibleToTenant(entity, dbclient.TenantIDFromContext(ctx)) {
 		return code.GetError(code.ApplicationClientSecretNotExistError)
 	}
 
-	if err := dao.NewApplicationClientSecretDao().Delete(ctx, req.SecretID, gincontext.GetUserIDString(ctx)); err != nil {
+	if err := dao.NewApplicationClientSecretDao().Delete(ctx, req.SecretID, req.Operator.UserID); err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.DeleteSecret] delete fail, err:%v", err)
 		return code.GetError(code.ApplicationClientSecretDeleteError)
 	}

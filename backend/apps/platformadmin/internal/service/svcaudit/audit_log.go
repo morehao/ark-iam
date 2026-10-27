@@ -1,9 +1,9 @@
 package svcaudit
 
 import (
+	"context"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
@@ -27,7 +27,7 @@ const (
 const auditLogOrderBy = "created_at DESC, id DESC"
 
 type AuditLogSvc interface {
-	PageList(ctx *gin.Context, req *dtoaudit.AuditLogPageListReq) (*dtoaudit.AuditLogPageListResp, error)
+	PageList(ctx context.Context, req *dtoaudit.AuditLogPageListReq) (*dtoaudit.AuditLogPageListResp, error)
 }
 
 type auditLogSvc struct {
@@ -76,7 +76,7 @@ func isValidAuditResult(result model.AuditResult) bool {
 // 而平台审计查询的语义本就是跨租户，因此显式声明 dbclient.CrossTenantContext——
 // 不用"ctx 碰巧没有作用域"表达跨租户（那样在 fail-closed 下会直接报错）。
 // 过滤到具体租户时仍是"显式跨租户作用域 + tenant_id 条件"，二者不是同一件事。
-func (svc *auditLogSvc) PageList(ctx *gin.Context, req *dtoaudit.AuditLogPageListReq) (*dtoaudit.AuditLogPageListResp, error) {
+func (svc *auditLogSvc) PageList(ctx context.Context, req *dtoaudit.AuditLogPageListReq) (*dtoaudit.AuditLogPageListResp, error) {
 	if req.Action != "" && !isValidAuditAction(req.Action) {
 		glog.Errorf(ctx, "[svcaudit.PageList] 非法审计动作, req:%s", gutil.ToJsonString(req))
 		return nil, code.GetError(code.AuditLogPageListParamInvalidError)

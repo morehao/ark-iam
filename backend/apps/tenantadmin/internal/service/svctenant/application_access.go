@@ -4,14 +4,12 @@ import (
 	"context"
 	"errors"
 
-	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
 	iamapplication "github.com/morehao/ark-iam/pkg/core/application"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 	"gorm.io/gorm"
@@ -23,10 +21,10 @@ import (
 // 因此**无角色的接入应用同样在这里授权**。判定式与写入不变式（I1/I2/I5）的唯一实现
 // 在 pkg/core/application；本层只做鉴权、越权校验与 DTO 装配，不复制任何判定逻辑。
 type ApplicationAccessSvc interface {
-	ListTenantApplications(ctx *gin.Context) (*dtotenant.TenantApplicationsResp, error)
-	ListUserApplications(ctx *gin.Context, req *dtotenant.UserApplicationsListReq) (*dtotenant.UserApplicationsListResp, error)
-	UpdateUserApplications(ctx *gin.Context, req *dtotenant.UserApplicationsUpdateReq) error
-	ListApplicationUsers(ctx *gin.Context, req *dtotenant.ApplicationUsersListReq) (*dtotenant.ApplicationUsersListResp, error)
+	ListTenantApplications(ctx context.Context) (*dtotenant.TenantApplicationsResp, error)
+	ListUserApplications(ctx context.Context, req *dtotenant.UserApplicationsListReq) (*dtotenant.UserApplicationsListResp, error)
+	UpdateUserApplications(ctx context.Context, req *dtotenant.UserApplicationsUpdateReq) error
+	ListApplicationUsers(ctx context.Context, req *dtotenant.ApplicationUsersListReq) (*dtotenant.ApplicationUsersListResp, error)
 }
 
 type applicationAccessSvc struct{}
@@ -39,7 +37,7 @@ func NewApplicationAccessSvc() ApplicationAccessSvc {
 
 // ListTenantApplications 本租户订阅且启用的应用（应用准入编辑器与角色归属的应用选项全集）。
 // 过滤口径复用菜单域的 loadSubscribedApps：订阅启用 ∧ 应用启用。
-func (svc *applicationAccessSvc) ListTenantApplications(ctx *gin.Context) (*dtotenant.TenantApplicationsResp, error) {
+func (svc *applicationAccessSvc) ListTenantApplications(ctx context.Context) (*dtotenant.TenantApplicationsResp, error) {
 	appList, err := loadSubscribedApps(ctx)
 	if err != nil {
 		return nil, err
@@ -58,11 +56,11 @@ func (svc *applicationAccessSvc) ListTenantApplications(ctx *gin.Context) (*dtot
 // ListUserApplications 该成员的准入应用清单（含未准入的订阅应用，供 UI 呈现全集与选中态）。
 // 每行回传 roleCount，由前端拼"撤销后同时失去该应用下 N 个角色"的二次确认文案
 // ——不做服务端 dry-run，避免出现第二份判定实现。
-func (svc *applicationAccessSvc) ListUserApplications(ctx *gin.Context, req *dtotenant.UserApplicationsListReq) (*dtotenant.UserApplicationsListResp, error) {
-	if err := requireSystemAdmin(ctx, code.UserApplicationGetListError); err != nil {
+func (svc *applicationAccessSvc) ListUserApplications(ctx context.Context, req *dtotenant.UserApplicationsListReq) (*dtotenant.UserApplicationsListResp, error) {
+	if err := requireSystemAdmin(ctx, req.Operator, code.UserApplicationGetListError); err != nil {
 		return nil, err
 	}
-	tenantID := gincontext.GetTenantIDString(ctx)
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	if _, err := svc.loadMember(ctx, tenantID, req.UserID, code.UserApplicationGetListError); err != nil {
 		return nil, err
 	}
@@ -103,11 +101,11 @@ func (svc *applicationAccessSvc) ListUserApplications(ctx *gin.Context, req *dto
 // UpdateUserApplications 全量替换该成员的准入集合（PUT 集合语义）。
 // 集合内 enable、集合外 disable，并对集合外应用级联撤销其角色绑定（I2）；
 // 命中防自锁（I5，会移除最后一个内置管理员的控制台准入）时整体拒绝。
-func (svc *applicationAccessSvc) UpdateUserApplications(ctx *gin.Context, req *dtotenant.UserApplicationsUpdateReq) error {
-	if err := requireSystemAdmin(ctx, code.UserApplicationReplaceError); err != nil {
+func (svc *applicationAccessSvc) UpdateUserApplications(ctx context.Context, req *dtotenant.UserApplicationsUpdateReq) error {
+	if err := requireSystemAdmin(ctx, req.Operator, code.UserApplicationReplaceError); err != nil {
 		return err
 	}
-	tenantID := gincontext.GetTenantIDString(ctx)
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	if _, err := svc.loadMember(ctx, tenantID, req.UserID, code.UserApplicationReplaceError); err != nil {
 		return err
 	}
@@ -116,7 +114,7 @@ func (svc *applicationAccessSvc) UpdateUserApplications(ctx *gin.Context, req *d
 	if req.AppIDs != nil {
 		appIDs = *req.AppIDs
 	}
-	operator := gincontext.GetUserIDString(ctx)
+	operator := req.Operator.UserID
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
 		return iamapplication.Replace(ctx, tx, iamapplication.ReplaceParams{
 			TenantID: tenantID,
@@ -145,11 +143,11 @@ func (svc *applicationAccessSvc) UpdateUserApplications(ctx *gin.Context, req *d
 }
 
 // ListApplicationUsers 应用视角：被准入的成员列表（谁能进这个应用）。
-func (svc *applicationAccessSvc) ListApplicationUsers(ctx *gin.Context, req *dtotenant.ApplicationUsersListReq) (*dtotenant.ApplicationUsersListResp, error) {
-	if err := requireSystemAdmin(ctx, code.UserApplicationGetListError); err != nil {
+func (svc *applicationAccessSvc) ListApplicationUsers(ctx context.Context, req *dtotenant.ApplicationUsersListReq) (*dtotenant.ApplicationUsersListResp, error) {
+	if err := requireSystemAdmin(ctx, req.Operator, code.UserApplicationGetListError); err != nil {
 		return nil, err
 	}
-	tenantID := gincontext.GetTenantIDString(ctx)
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	appEntity, err := dao.NewApplicationDao().GetByID(ctx, req.AppID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcappaccess.ListApplicationUsers] dao application GetByID fail, err:%v, appID:%s", err, req.AppID)
@@ -213,7 +211,7 @@ func (svc *applicationAccessSvc) ListApplicationUsers(ctx *gin.Context, req *dto
 
 // loadMember 加载当前租户内的成员行（不存在/跨租户返回"用户不存在"）。
 // 服务账号走 /machine-users 入口管理，本入口与角色接口同口径拒绝。
-func (svc *applicationAccessSvc) loadMember(ctx *gin.Context, tenantID, userID string, opErr int) (*model.UserEntity, error) {
+func (svc *applicationAccessSvc) loadMember(ctx context.Context, tenantID, userID string, opErr int) (*model.UserEntity, error) {
 	userEntity, err := dao.NewUserDao().GetByID(ctx, userID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcappaccess.loadMember] dao user GetByID fail, err:%v, userID:%s", err, userID)
@@ -235,7 +233,7 @@ type personBrief struct {
 }
 
 // personBriefOf 批量回填成员的自然人摘要（一次查询，避免列表页 N+1）。
-func (svc *applicationAccessSvc) personBriefOf(ctx *gin.Context, users []model.UserEntity) (map[string]personBrief, error) {
+func (svc *applicationAccessSvc) personBriefOf(ctx context.Context, users []model.UserEntity) (map[string]personBrief, error) {
 	result := make(map[string]personBrief, len(users))
 	personIDs := make([]string, 0, len(users))
 	for i := range users {
@@ -268,7 +266,7 @@ func (svc *applicationAccessSvc) personBriefOf(ctx *gin.Context, users []model.U
 }
 
 // roleCountByAppOf 汇总某成员在各应用下的角色数（应用 → 计数）。两次查询，无 N+1。
-func roleCountByAppOf(ctx *gin.Context, tenantID, userID string) (map[string]int64, error) {
+func roleCountByAppOf(ctx context.Context, tenantID, userID string) (map[string]int64, error) {
 	userRoles, err := dao.NewUserRoleDao().GetListByCond(ctx, &dao.UserRoleCond{TenantID: tenantID, UserID: userID})
 	if err != nil {
 		glog.Errorf(ctx, "[svcappaccess.roleCountByAppOf] dao userRole GetListByCond fail, err:%v, userID:%s", err, userID)
@@ -303,7 +301,7 @@ func roleCountByAppOf(ctx *gin.Context, tenantID, userID string) (map[string]int
 
 // roleCountByUserOf 汇总某应用下各成员的角色数（成员 → 计数）。
 // 一次 GROUP BY user_id 聚合（同 svctenant.loadUserRoleCountMap 的既有口径），行数随成员数封顶，无 N+1。
-func roleCountByUserOf(ctx *gin.Context, tenantID, appID string, userIDs []string) (map[string]int64, error) {
+func roleCountByUserOf(ctx context.Context, tenantID, appID string, userIDs []string) (map[string]int64, error) {
 	counts := make(map[string]int64, len(userIDs))
 	if len(userIDs) == 0 {
 		return counts, nil

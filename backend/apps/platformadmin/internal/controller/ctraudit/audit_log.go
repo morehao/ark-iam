@@ -37,7 +37,7 @@ func (ctr *auditLogCtr) PageList(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.auditLogSvc.PageList(ctx, &req)
+	res, err := ctr.auditLogSvc.PageList(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

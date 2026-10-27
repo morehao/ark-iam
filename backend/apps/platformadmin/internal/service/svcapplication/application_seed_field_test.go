@@ -1,6 +1,7 @@
 package svcapplication
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"testing"
 
 	"github.com/morehao/ark-iam/pkg/code"
@@ -33,16 +34,17 @@ func TestUpdateBuiltInApplicationAllowsDisplayFields(t *testing.T) {
 	ctx := newDeleteCtx("0")
 
 	// 内置应用改名/改描述/改启停排序：全部放行
-	if err := svc.Update(ctx, &dtoapplication.ApplicationUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtoapplication.ApplicationUpdateReq{
 		AppID:       builtin.ID,
 		Name:        "运维自定名",
 		Description: "运维自定描述",
 		Status:      model.AppStatusDisable,
 		Sort:        9,
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("内置应用的展示字段应可改: %v", err)
 	}
-	got, err := dao.NewApplicationDao().GetByID(ctx, builtin.ID)
+	got, err := dao.NewApplicationDao().GetByID(dbclient.CrossTenantContext(ctx), builtin.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -62,9 +64,10 @@ func TestUpdateBuiltInApplicationAllowsDisplayFields(t *testing.T) {
 	if err := db.Create(thirdParty).Error; err != nil {
 		t.Fatalf("seed third party application: %v", err)
 	}
-	if err := svc.Update(ctx, &dtoapplication.ApplicationUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtoapplication.ApplicationUpdateReq{
 		AppID: thirdParty.ID, Name: "客户应用改名", Description: "新描述", Status: model.AppStatusEnable,
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("第三方应用改名应放行: %v", err)
 	}
 }
@@ -85,13 +88,14 @@ func TestUpdateBuiltInApplicationRejectsCodeRename(t *testing.T) {
 	svc := NewApplicationSvc()
 	ctx := newDeleteCtx("0")
 
-	err := svc.Update(ctx, &dtoapplication.ApplicationUpdateReq{
+	err := svc.Update(requestCtx(ctx), &dtoapplication.ApplicationUpdateReq{
 		AppID: builtin.ID, Code: "platform_console", Name: builtin.Name, Status: builtin.Status,
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil || gerror.GetCode(err) != int(code.ApplicationBuiltInCodeImmutableError) {
 		t.Fatalf("内置应用改编码必须被拒绝, got %v", err)
 	}
-	got, err := dao.NewApplicationDao().GetByID(ctx, builtin.ID)
+	got, err := dao.NewApplicationDao().GetByID(dbclient.CrossTenantContext(ctx), builtin.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -100,9 +104,10 @@ func TestUpdateBuiltInApplicationRejectsCodeRename(t *testing.T) {
 	}
 
 	// 回传未变化的编码不受影响（幂等友好），其它字段照常可改
-	if err := svc.Update(ctx, &dtoapplication.ApplicationUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtoapplication.ApplicationUpdateReq{
 		AppID: builtin.ID, Code: "platform_admin", Name: "运维自定名", Status: builtin.Status,
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("编码未变化时其余字段应可改: %v", err)
 	}
 }
@@ -121,12 +126,13 @@ func TestUpdateApplicationAllowsCodeRename(t *testing.T) {
 	svc := NewApplicationSvc()
 	ctx := newDeleteCtx("0")
 
-	if err := svc.Update(ctx, &dtoapplication.ApplicationUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtoapplication.ApplicationUpdateReq{
 		AppID: thirdParty.ID, Code: "customer_console", Name: thirdParty.Name, Status: thirdParty.Status,
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("自建应用改编码应放行: %v", err)
 	}
-	got, err := dao.NewApplicationDao().GetByID(ctx, thirdParty.ID)
+	got, err := dao.NewApplicationDao().GetByID(dbclient.CrossTenantContext(ctx), thirdParty.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -147,9 +153,10 @@ func TestUpdateApplicationRejectsInvalidCode(t *testing.T) {
 	ctx := newDeleteCtx("0")
 
 	for _, badCode := range []string{"my-app", "My_App", "1app", "app.web", "app web"} {
-		err := svc.Update(ctx, &dtoapplication.ApplicationUpdateReq{
+		err := svc.Update(requestCtx(ctx), &dtoapplication.ApplicationUpdateReq{
 			AppID: app.ID, Code: badCode, Name: app.Name, Status: app.Status,
-		})
+
+			Operator: operatorOf(ctx)})
 		if err == nil {
 			t.Fatalf("非法编码 %q 必须被拒绝", badCode)
 		}
@@ -157,7 +164,7 @@ func TestUpdateApplicationRejectsInvalidCode(t *testing.T) {
 			t.Fatalf("编码 %q 期望 ApplicationCodeInvalidError, got %v", badCode, err)
 		}
 	}
-	got, err := dao.NewApplicationDao().GetByID(ctx, app.ID)
+	got, err := dao.NewApplicationDao().GetByID(dbclient.CrossTenantContext(ctx), app.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}

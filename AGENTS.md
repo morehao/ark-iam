@@ -271,7 +271,9 @@ import (
 
 ```go
 type UserSvc interface {
-    Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtouser.UserCreateResp, error)
+    // service 只收 context.Context：身份在 req.Operator 里（controller 填），
+    // 租户作用域随 ctx 传递。
+    Create(ctx context.Context, req *dtouser.UserCreateReq) (*dtouser.UserCreateResp, error)
 }
 
 type userSvc struct {
@@ -358,14 +360,19 @@ if txErr != nil {
 
 含 `tenant_id` 列的表，其 SELECT/UPDATE/DELETE 由租户隔离插件（`pkg/dbclient/tenant_scope.go`）自动注入 `tenant_id = ?`；**ctx 未声明作用域时 fail-closed 报错**（`dbclient.ErrTenantScopeMissing`），绝不静默放行成跨租户读。
 
-1. **ctx 一路直传 `*gin.Context`**：controller → service → dao → 第三方（OIDC provider、glog、限流器）都传同一个 gin ctx（引擎已开 `ContextWithFallback`，gin 上下文本身即合法 `context.Context`）。**禁止 `ctx.Request.Context()`**（全仓白名单为空）；异步/后台续跑用 `gincontext.AsyncContext(ctx)`（保留取值与作用域、去掉取消，且不持有会被复用的 gin 上下文）。
+1. **controller 是唯一转换点，内层只收 `context.Context`**（2026-10-27 边界调整，见 `docs/design/context-and-tenant-scope.md`）：
+   - **controller / middleware** 用 `ctx.Request.Context()` 做**唯一一次**载体转换，此后 service → dao → 第三方（OIDC provider、glog、限流器）一律收纯 `context.Context`；生产引擎**不再开启** `engine.ContextWithFallback`。
+   - **身份（谁在操作）走 DTO，不走 ctx**：controller 调 `identity.OperatorFromGin(ctx)` 填进请求 DTO 的 `Operator objidentity.Operator` 字段（该字段 `json:"-"`，客户端不可伪造；值嵌入、非指针），service 只读 `req.Operator`。没有 DTO 的方法用显式 `operator objidentity.Operator` 参数。依据 golib v1.33.0 `biz/gcontext/README.md`「身份不经过 context」。
+   - **service / dao / core / audit 禁止 import `gincontext`、`pkg/identity`，禁止出现 `*gin.Context`**（由 `pkg/dbclient/design_guard_test.go` 的可执行守卫强制）。
+   - **租户作用域**随 ctx 传递：service 用 `dbclient.TenantIDFromContext(ctx)` 读当前租户，**不要**把 tenantID 塞进每个 DTO。
+   - 异步/后台续跑用 `gincontext.AsyncContext(ctx)`：它保留取值与作用域，**但不带走 gin Keys 里的身份**——入队时须把 operator 放进任务载荷。
 2. **作用域只能显式声明**，禁止用"ctx 碰巧没有作用域"表达跨租户可见：
    - 当前租户：中间件调用一次 `gincontext.SetTenantScope(ctx, gcontext.CurrentScope(tenantID))`（写入请求上下文，并投影 gin Keys 供 `gincontext.Get*String` 读取）；
    - 指定它租户：`dbclient.ExplicitTenantContext(ctx, tenantID)`（写在具名 dao 方法内，调用方零判断）；
    - 跨全部租户：`dbclient.CrossTenantContext(ctx)`（按全局唯一键反查、自然人级操作、首次初始化引导 `svcinstall`）；
    - 非请求入口（初始化引导、worker、后台任务）：显式 `gcontext.WithTenantScope(ctx, gcontext.AllScope()/CurrentScope(tenantID))`。
 3. **新增不含 `tenant_id` 的全局表**必须同步登记到 `pkg/dbclient/gorm.go` 的 `tenantScopeSkipTables`，否则带租户上下文查询会报 `no such column`。
-4. **测试同样受约束**：`testutil.SetupSQLite` 挂载同一份插件，测试里对租户表的断言查询也必须带作用域（用被测服务同一个 gin ctx，或 `dbclient.CrossTenantContext(...)` 显式跨租户）。
+4. **测试同样受约束**：`testutil.SetupSQLite` 挂载同一份插件，测试里对租户表的断言查询也必须带作用域（用被测服务同一个请求 ctx，或 `dbclient.CrossTenantContext(...)` 显式跨租户）。测试调 service 时传 `requestCtx(ginCtx)`（= `ginCtx.Request.Context()`，各 service 测试包有同名助手）并设置 `req.Operator`；service 单测优先直接用 `dbclient.CurrentTenantContext(context.Background(), tenantID)`，不必造 gin 引擎。
 5. 灰度回退仅有 `dbclient.SetMissingTenantScopeMode(dbclient.MissingTenantScopeWarn)` 一个开关（只告警不拦截），**不得**作为长期方案。
 
 ### Controller 返回模式
@@ -379,7 +386,9 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
         gincontext.Fail(ctx, err)
         return
     }
-    res, err := ctr.userSvc.Create(ctx, &req)
+    // 身份填进 DTO（客户端不可伪造），再把纯 ctx 交给 service。
+    req.Operator = identity.OperatorFromGin(ctx)
+    res, err := ctr.userSvc.Create(ctx.Request.Context(), &req)
     if err != nil {
         gincontext.Fail(ctx, err)
         return

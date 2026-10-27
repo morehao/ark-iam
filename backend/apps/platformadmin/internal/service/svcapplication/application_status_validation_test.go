@@ -1,6 +1,10 @@
 package svcapplication
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -44,22 +48,31 @@ func TestApplicationUpdateRejectsIllegalStatus(t *testing.T) {
 	}
 
 	ctx, _ := gin.CreateTestContext(nil)
+
+	if ctx.Request == nil {
+
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
 	ctx.Set(gcontext.KeyUserID, "0")
 	svc := NewApplicationSvc()
 
-	err := svc.Update(ctx, &dtoapplication.ApplicationUpdateReq{
+	err := svc.Update(requestCtx(ctx), &dtoapplication.ApplicationUpdateReq{
 		AppID:  entity.ID,
 		Name:   "应用1",
 		Status: "enabled",
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil {
 		t.Fatal("非法 status 应被拒绝")
 	}
 	if gerror.GetCode(err) != int(code.ApplicationUpdateError) {
 		t.Fatalf("期望 ApplicationUpdateError, got %v", err)
 	}
-	got, err := dao.NewApplicationDao().GetByID(ctx, entity.ID)
+	got, err := dao.NewApplicationDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -83,14 +96,24 @@ func TestApplicationUpdateStatusEmptyMeansKeep(t *testing.T) {
 	}
 
 	ctx, _ := gin.CreateTestContext(nil)
+
+	if ctx.Request == nil {
+
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
 	ctx.Set(gcontext.KeyUserID, "0")
 	svc := NewApplicationSvc()
 
-	if err := svc.Update(ctx, &dtoapplication.ApplicationUpdateReq{AppID: entity.ID, Name: "应用2改名"}); err != nil {
+	if err := svc.Update(requestCtx(ctx), &dtoapplication.ApplicationUpdateReq{AppID: entity.ID, Name: "应用2改名",
+		Operator: operatorOf(ctx),
+	}); err != nil {
 		t.Fatalf("status 留空应允许: %v", err)
 	}
-	got, err := dao.NewApplicationDao().GetByID(ctx, entity.ID)
+	got, err := dao.NewApplicationDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -102,12 +125,13 @@ func TestApplicationUpdateStatusEmptyMeansKeep(t *testing.T) {
 	}
 
 	// 合法值仍可正常流转
-	if err := svc.Update(ctx, &dtoapplication.ApplicationUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtoapplication.ApplicationUpdateReq{
 		AppID: entity.ID, Name: "应用2改名", Status: model.AppStatusDisable,
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("合法 status 应允许: %v", err)
 	}
-	got, err = dao.NewApplicationDao().GetByID(ctx, entity.ID)
+	got, err = dao.NewApplicationDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -159,23 +183,25 @@ func TestApplicationUpdateRejectsIllegalPolicy(t *testing.T) {
 	ctx := newApplicationCtx()
 	svc := NewApplicationSvc()
 
-	err := svc.Update(ctx, &dtoapplication.ApplicationUpdateReq{
+	err := svc.Update(requestCtx(ctx), &dtoapplication.ApplicationUpdateReq{
 		AppID:                   entity.ID,
 		Name:                    "策略应用",
 		AllowPersonCreateTenant: "true",
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil || gerror.GetCode(err) != int(code.ApplicationUpdateError) {
 		t.Fatalf("非法个人建租户策略应返回 ApplicationUpdateError, got %v", err)
 	}
-	err = svc.Update(ctx, &dtoapplication.ApplicationUpdateReq{
+	err = svc.Update(requestCtx(ctx), &dtoapplication.ApplicationUpdateReq{
 		AppID:             entity.ID,
 		Name:              "策略应用",
 		AllowJoinByInvite: "yes",
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil || gerror.GetCode(err) != int(code.ApplicationUpdateError) {
 		t.Fatalf("非法邀请加入策略应返回 ApplicationUpdateError, got %v", err)
 	}
-	got, err := dao.NewApplicationDao().GetByID(ctx, entity.ID)
+	got, err := dao.NewApplicationDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -185,10 +211,12 @@ func TestApplicationUpdateRejectsIllegalPolicy(t *testing.T) {
 	}
 
 	// 空串表示不修改；合法值可正常流转
-	if err := svc.Update(ctx, &dtoapplication.ApplicationUpdateReq{AppID: entity.ID, Name: "策略应用改名"}); err != nil {
+	if err := svc.Update(requestCtx(ctx), &dtoapplication.ApplicationUpdateReq{AppID: entity.ID, Name: "策略应用改名",
+		Operator: operatorOf(ctx),
+	}); err != nil {
 		t.Fatalf("策略留空应允许: %v", err)
 	}
-	got, err = dao.NewApplicationDao().GetByID(ctx, entity.ID)
+	got, err = dao.NewApplicationDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -196,15 +224,16 @@ func TestApplicationUpdateRejectsIllegalPolicy(t *testing.T) {
 		got.AllowJoinByInvite != model.AppJoinByInvitePolicyDisable {
 		t.Fatalf("留空不应覆盖策略: %+v", got)
 	}
-	if err := svc.Update(ctx, &dtoapplication.ApplicationUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtoapplication.ApplicationUpdateReq{
 		AppID:                   entity.ID,
 		Name:                    "策略应用改名",
 		AllowPersonCreateTenant: model.AppPersonCreateTenantPolicyDisable,
 		AllowJoinByInvite:       model.AppJoinByInvitePolicyEnable,
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("合法策略应允许: %v", err)
 	}
-	got, err = dao.NewApplicationDao().GetByID(ctx, entity.ID)
+	got, err = dao.NewApplicationDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -220,11 +249,11 @@ func TestApplicationCreatePolicyDefaultsToDisable(t *testing.T) {
 	testutil.SetupSQLite(t, &model.ApplicationEntity{})
 
 	ctx := newApplicationCtx()
-	resp, err := NewApplicationSvc().Create(ctx, &dtoapplication.ApplicationCreateReq{Code: "app_default", Name: "缺省策略应用"})
+	resp, err := NewApplicationSvc().Create(requestCtx(ctx), &dtoapplication.ApplicationCreateReq{Code: "app_default", Name: "缺省策略应用", Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	got, err := dao.NewApplicationDao().GetByID(ctx, resp.AppID)
+	got, err := dao.NewApplicationDao().GetByID(dbclient.CrossTenantContext(ctx), resp.AppID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -239,11 +268,12 @@ func TestApplicationCreateRejectsIllegalPolicy(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ApplicationEntity{})
 
 	ctx := newApplicationCtx()
-	_, err := NewApplicationSvc().Create(ctx, &dtoapplication.ApplicationCreateReq{
+	_, err := NewApplicationSvc().Create(requestCtx(ctx), &dtoapplication.ApplicationCreateReq{
 		Code:                    "app_bad_policy",
 		Name:                    "非法策略应用",
 		AllowPersonCreateTenant: "true",
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil || gerror.GetCode(err) != int(code.ApplicationCreateError) {
 		t.Fatalf("非法策略应返回 ApplicationCreateError, got %v", err)
 	}

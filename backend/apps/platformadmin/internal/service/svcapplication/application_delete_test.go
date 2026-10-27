@@ -1,6 +1,10 @@
 package svcapplication
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -16,7 +20,12 @@ import (
 // newDeleteCtx 构造带租户与操作人上下文的 gin.Context。
 func newDeleteCtx(userID string) *gin.Context {
 	ctx, _ := gin.CreateTestContext(nil)
+	if ctx.Request == nil {
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
 	ctx.Set(gcontext.KeyUserID, userID)
 	return ctx
 }
@@ -35,7 +44,7 @@ func TestDeleteBuiltInApplication(t *testing.T) {
 	}
 
 	svc := NewApplicationSvc()
-	err := svc.Delete(newDeleteCtx("0"), &dtoapplication.ApplicationDeleteReq{AppID: entity.ID})
+	err := svc.Delete(requestCtx(newDeleteCtx("0")), &dtoapplication.ApplicationDeleteReq{AppID: entity.ID, Operator: operatorOf(newDeleteCtx("0"))})
 	if err == nil {
 		t.Fatal("expected error for built-in application")
 	}
@@ -61,7 +70,9 @@ func TestDeleteFirstPartyApplication(t *testing.T) {
 
 	ctx := newDeleteCtx("7")
 	svc := NewApplicationSvc()
-	if err := svc.Delete(ctx, &dtoapplication.ApplicationDeleteReq{AppID: entity.ID}); err != nil {
+	if err := svc.Delete(requestCtx(ctx), &dtoapplication.ApplicationDeleteReq{AppID: entity.ID,
+		Operator: operatorOf(ctx),
+	}); err != nil {
 		t.Fatalf("Delete returned error: %v", err)
 	}
 }
@@ -81,12 +92,14 @@ func TestDeleteThirdPartyApplication(t *testing.T) {
 
 	ctx := newDeleteCtx("7")
 	svc := NewApplicationSvc()
-	if err := svc.Delete(ctx, &dtoapplication.ApplicationDeleteReq{AppID: entity.ID}); err != nil {
+	if err := svc.Delete(requestCtx(ctx), &dtoapplication.ApplicationDeleteReq{AppID: entity.ID,
+		Operator: operatorOf(ctx),
+	}); err != nil {
 		t.Fatalf("Delete returned error: %v", err)
 	}
 
 	// 真实 dao 断言：软删除后按 ID 查不到
-	got, err := dao.NewApplicationDao().GetByID(ctx, entity.ID)
+	got, err := dao.NewApplicationDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}

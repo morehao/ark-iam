@@ -1,6 +1,9 @@
 package svcpermission
 
 import (
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -13,7 +16,11 @@ import (
 
 func newGinCtx(tenantID, userID string) *gin.Context {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Set(gcontext.KeyTenantID, tenantID)
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope(tenantID))
 	ginCtx.Set(gcontext.KeyUserID, userID)
 	return ginCtx
 }
@@ -29,7 +36,7 @@ func TestMenuDetailRejectsCrossTenantEntity(t *testing.T) {
 
 	// 菜单无租户维度，跨租户实体 detail 不拒绝
 	svc := &menuSvc{}
-	_, err := svc.Detail(ctx, &dtopermission.MenuDetailReq{MenuID: menu.ID})
+	_, err := svc.Detail(requestCtx(ctx), &dtopermission.MenuDetailReq{MenuID: menu.ID})
 	if err != nil {
 		t.Fatalf("unexpected error for menu detail: %v", err)
 	}
@@ -47,7 +54,7 @@ func TestMenuPageListUsesAppID(t *testing.T) {
 	}
 
 	svc := &menuSvc{}
-	resp, err := svc.PageList(ctx, &dtopermission.MenuPageListReq{AppID: "10"})
+	resp, err := svc.PageList(requestCtx(ctx), &dtopermission.MenuPageListReq{AppID: "10"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,7 +82,7 @@ func TestMenuTreeUsesAppID(t *testing.T) {
 	}
 
 	svc := &menuSvc{}
-	resp, err := svc.Tree(ctx, &dtopermission.MenuTreeReq{AppID: "10"})
+	resp, err := svc.Tree(requestCtx(ctx), &dtopermission.MenuTreeReq{AppID: "10"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -92,7 +99,7 @@ func TestMenuCreatePersistsVisibilityAndStatusAndType(t *testing.T) {
 	ctx := newGinCtx("20", "0")
 
 	svc := &menuSvc{}
-	resp, err := svc.Create(ctx, &dtopermission.MenuCreateReq{
+	resp, err := svc.Create(requestCtx(ctx), &dtopermission.MenuCreateReq{
 		MenuBaseInfo: objpermission.MenuBaseInfo{
 			AppID:      "10",
 			Name:       "工作台",
@@ -101,7 +108,8 @@ func TestMenuCreatePersistsVisibilityAndStatusAndType(t *testing.T) {
 			Visibility: model.MenuVisibilityMember,
 			Status:     model.MenuStatusEnable,
 		},
-	})
+
+		Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -126,7 +134,7 @@ func TestMenuCreateRejectsInvalidEnums(t *testing.T) {
 	ctx := newGinCtx("21", "0")
 
 	svc := &menuSvc{}
-	_, err := svc.Create(ctx, &dtopermission.MenuCreateReq{
+	_, err := svc.Create(requestCtx(ctx), &dtopermission.MenuCreateReq{
 		MenuBaseInfo: objpermission.MenuBaseInfo{
 			AppID:      "10",
 			Name:       "x",
@@ -135,7 +143,8 @@ func TestMenuCreateRejectsInvalidEnums(t *testing.T) {
 			Visibility: model.MenuVisibility("illegal"),
 			Status:     model.MenuStatusEnable,
 		},
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil {
 		t.Fatalf("expected invalid visibility to be rejected")
 	}
@@ -165,7 +174,7 @@ func TestMenuUpdatePersistsVisibility(t *testing.T) {
 	}
 
 	svc := &menuSvc{}
-	err := svc.Update(ctx, &dtopermission.MenuUpdateReq{
+	err := svc.Update(requestCtx(ctx), &dtopermission.MenuUpdateReq{
 		MenuID: menu.ID,
 		MenuBaseInfo: objpermission.MenuBaseInfo{
 			AppID:      "10",
@@ -175,7 +184,8 @@ func TestMenuUpdatePersistsVisibility(t *testing.T) {
 			Visibility: model.MenuVisibilityAdmin,
 			Status:     model.MenuStatusEnable,
 		},
-	})
+
+		Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}

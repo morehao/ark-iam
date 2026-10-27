@@ -2,17 +2,22 @@ package dtopermission
 
 import (
 	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
 	"github.com/morehao/ark-iam/pkg/object/objpermission"
 	"github.com/morehao/golib/biz/gobject"
 )
 
 type MenuCreateReq struct {
 	objpermission.MenuBaseInfo
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type MenuUpdateReq struct {
 	MenuID string `json:"-" uri:"menuID" binding:"required"` // 菜单ID
 	objpermission.MenuBaseInfo
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type MenuDetailReq struct {
@@ -32,8 +37,17 @@ type MenuPageListReq struct {
 
 type MenuDeleteReq struct {
 	MenuID string `json:"-" uri:"menuID" binding:"required"` // 菜单ID
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type MenuTreeReq struct {
 	AppID string `json:"appID" form:"appID" binding:"required"` // 应用ID（菜单树按应用维度查询）
+}
+
+// MenuMyTreeReq 平台菜单树请求（无业务参数，仅携带操作人：
+// 可见菜单取决于该用户持有的角色与管理员身份）。
+type MenuMyTreeReq struct {
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }

@@ -1,6 +1,10 @@
 package svcapplication
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -13,7 +17,12 @@ import (
 
 func newApplicationCtx() *gin.Context {
 	ctx, _ := gin.CreateTestContext(nil)
+	if ctx.Request == nil {
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
 	ctx.Set(gcontext.KeyUserID, "1")
 	return ctx
 }
@@ -70,7 +79,7 @@ func TestApplicationPageListFiltersBySource(t *testing.T) {
 		{model.AppSourceFirstParty, "ops-app"},
 		{model.AppSourceThirdParty, "blog"},
 	} {
-		resp, err := svc.PageList(newApplicationCtx(), &dtoapplication.ApplicationPageListReq{Source: tc.source})
+		resp, err := svc.PageList(requestCtx(newApplicationCtx()), &dtoapplication.ApplicationPageListReq{Source: tc.source})
 		if err != nil {
 			t.Fatalf("PageList(%s) failed: %v", tc.source, err)
 		}
@@ -99,15 +108,16 @@ func TestCreateApplicationForcesThirdParty(t *testing.T) {
 	testutil.SetupSQLite(t, &model.ApplicationEntity{})
 
 	ctx := newApplicationCtx()
-	resp, err := NewApplicationSvc().Create(ctx, &dtoapplication.ApplicationCreateReq{
+	resp, err := NewApplicationSvc().Create(requestCtx(ctx), &dtoapplication.ApplicationCreateReq{
 		Code: "demo",
 		Name: "演示应用",
-	})
+
+		Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	entity, err := dao.NewApplicationDao().GetByID(ctx, resp.AppID)
+	entity, err := dao.NewApplicationDao().GetByID(dbclient.CrossTenantContext(ctx), resp.AppID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}

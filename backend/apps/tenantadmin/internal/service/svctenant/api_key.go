@@ -1,16 +1,17 @@
 package svctenant
 
 import (
+	"context"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/credential"
 	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
@@ -20,10 +21,10 @@ import (
 // 密钥一律归属服务账号（开发者模式，面向服务端集成）；创建/列表/吊销/删除为系统管理操作
 // （服务账号不可登录，不存在"本人自管"通道）。鉴权时按归属服务账号注入身份上下文。
 type ApiKeySvc interface {
-	Create(ctx *gin.Context, req *dtotenant.ApiKeyCreateReq) (*dtotenant.ApiKeyCreateResp, error)
-	PageList(ctx *gin.Context, req *dtotenant.ApiKeyPageListReq) (*dtotenant.ApiKeyPageListResp, error)
-	Revoke(ctx *gin.Context, req *dtotenant.ApiKeyRevokeReq) error
-	Delete(ctx *gin.Context, req *dtotenant.ApiKeyDeleteReq) error
+	Create(ctx context.Context, req *dtotenant.ApiKeyCreateReq) (*dtotenant.ApiKeyCreateResp, error)
+	PageList(ctx context.Context, req *dtotenant.ApiKeyPageListReq) (*dtotenant.ApiKeyPageListResp, error)
+	Revoke(ctx context.Context, req *dtotenant.ApiKeyRevokeReq) error
+	Delete(ctx context.Context, req *dtotenant.ApiKeyDeleteReq) error
 }
 
 type apiKeySvc struct{}
@@ -36,12 +37,12 @@ func NewApiKeySvc() ApiKeySvc {
 
 // requireSystemAdmin 校验当前操作者具备系统管理能力，opErr 用于系统错误的兜底返回。
 // 统一走共享门槛 svctenant.requireSystemAdmin。
-func (svc *apiKeySvc) requireSystemAdmin(ctx *gin.Context, opErr int) error {
-	return requireSystemAdmin(ctx, opErr)
+func (svc *apiKeySvc) requireSystemAdmin(ctx context.Context, operator objidentity.Operator, opErr int) error {
+	return requireSystemAdmin(ctx, operator, opErr)
 }
 
 // loadOwnerServiceAccount 加载指定租户内作为密钥归属的服务账号（不存在/跨租户/非服务账号均按不存在处理）。
-func (svc *apiKeySvc) loadOwnerServiceAccount(ctx *gin.Context, tenantID, machineUserID string) (*model.UserEntity, error) {
+func (svc *apiKeySvc) loadOwnerServiceAccount(ctx context.Context, tenantID, machineUserID string) (*model.UserEntity, error) {
 	entity, err := dao.NewUserDao().GetByID(ctx, machineUserID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapikey.loadOwnerServiceAccount] dao GetByID fail, err:%v, id:%s", err, machineUserID)
@@ -53,12 +54,12 @@ func (svc *apiKeySvc) loadOwnerServiceAccount(ctx *gin.Context, tenantID, machin
 	return entity, nil
 }
 
-func (svc *apiKeySvc) Create(ctx *gin.Context, req *dtotenant.ApiKeyCreateReq) (*dtotenant.ApiKeyCreateResp, error) {
-	if err := svc.requireSystemAdmin(ctx, code.ApiKeyCreateError); err != nil {
+func (svc *apiKeySvc) Create(ctx context.Context, req *dtotenant.ApiKeyCreateReq) (*dtotenant.ApiKeyCreateResp, error) {
+	if err := svc.requireSystemAdmin(ctx, req.Operator, code.ApiKeyCreateError); err != nil {
 		return nil, err
 	}
-	tenantID := gincontext.GetTenantIDString(ctx)
-	operatorID := gincontext.GetUserIDString(ctx)
+	tenantID := dbclient.TenantIDFromContext(ctx)
+	operatorID := req.Operator.UserID
 
 	// 密钥归属服务账号（DTO 已校验 machineUserID 必填）
 	owner, err := svc.loadOwnerServiceAccount(ctx, tenantID, req.MachineUserID)
@@ -109,11 +110,11 @@ func (svc *apiKeySvc) Create(ctx *gin.Context, req *dtotenant.ApiKeyCreateReq) (
 
 // PageList 服务账号密钥分页（管理视角，需系统管理能力）：
 // machineUserID 为空 = 租户全部密钥；指定 = 该服务账号名下密钥。
-func (svc *apiKeySvc) PageList(ctx *gin.Context, req *dtotenant.ApiKeyPageListReq) (*dtotenant.ApiKeyPageListResp, error) {
-	if err := svc.requireSystemAdmin(ctx, code.ApiKeyGetPageListError); err != nil {
+func (svc *apiKeySvc) PageList(ctx context.Context, req *dtotenant.ApiKeyPageListReq) (*dtotenant.ApiKeyPageListResp, error) {
+	if err := svc.requireSystemAdmin(ctx, req.Operator, code.ApiKeyGetPageListError); err != nil {
 		return nil, err
 	}
-	tenantID := gincontext.GetTenantIDString(ctx)
+	tenantID := dbclient.TenantIDFromContext(ctx)
 
 	cond := &dao.ApiKeyCond{
 		BaseCond: &gormdao.BaseCond{
@@ -164,13 +165,13 @@ func (svc *apiKeySvc) PageList(ctx *gin.Context, req *dtotenant.ApiKeyPageListRe
 	return &dtotenant.ApiKeyPageListResp{List: respList, Total: total}, nil
 }
 
-func (svc *apiKeySvc) Revoke(ctx *gin.Context, req *dtotenant.ApiKeyRevokeReq) error {
-	tenantID := gincontext.GetTenantIDString(ctx)
+func (svc *apiKeySvc) Revoke(ctx context.Context, req *dtotenant.ApiKeyRevokeReq) error {
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	key, err := svc.loadKey(ctx, tenantID, req.ApiKeyID)
 	if err != nil {
 		return err
 	}
-	if err := svc.requireSystemAdmin(ctx, code.ApiKeyRevokeError); err != nil {
+	if err := svc.requireSystemAdmin(ctx, req.Operator, code.ApiKeyRevokeError); err != nil {
 		return err
 	}
 	if err := dao.NewApiKeyDao().UpdateMap(ctx, key.ID, map[string]any{"revoked_at": time.Now()}); err != nil {
@@ -187,23 +188,23 @@ func (svc *apiKeySvc) Revoke(ctx *gin.Context, req *dtotenant.ApiKeyRevokeReq) e
 	return nil
 }
 
-func (svc *apiKeySvc) Delete(ctx *gin.Context, req *dtotenant.ApiKeyDeleteReq) error {
-	tenantID := gincontext.GetTenantIDString(ctx)
+func (svc *apiKeySvc) Delete(ctx context.Context, req *dtotenant.ApiKeyDeleteReq) error {
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	key, err := svc.loadKey(ctx, tenantID, req.ApiKeyID)
 	if err != nil {
 		return err
 	}
-	if err := svc.requireSystemAdmin(ctx, code.ApiKeyDeleteError); err != nil {
+	if err := svc.requireSystemAdmin(ctx, req.Operator, code.ApiKeyDeleteError); err != nil {
 		return err
 	}
-	if err := dao.NewApiKeyDao().Delete(ctx, key.ID, gincontext.GetUserIDString(ctx)); err != nil {
+	if err := dao.NewApiKeyDao().Delete(ctx, key.ID, req.Operator.UserID); err != nil {
 		glog.Errorf(ctx, "[svcapikey.Delete] dao Delete fail, err:%v, id:%s", err, key.ID)
 		return code.GetError(code.ApiKeyDeleteError)
 	}
 	return nil
 }
 
-func (svc *apiKeySvc) loadKey(ctx *gin.Context, tenantID, keyID string) (*model.ApiKeyEntity, error) {
+func (svc *apiKeySvc) loadKey(ctx context.Context, tenantID, keyID string) (*model.ApiKeyEntity, error) {
 	entity, err := dao.NewApiKeyDao().GetByID(ctx, keyID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapikey.loadKey] dao GetByID fail, err:%v, id:%s", err, keyID)
@@ -216,7 +217,7 @@ func (svc *apiKeySvc) loadKey(ctx *gin.Context, tenantID, keyID string) (*model.
 }
 
 // loadUserMap 汇总某批密钥中的归属服务账号与创建人，批量加载租户内用户。
-func (svc *apiKeySvc) loadUserMap(ctx *gin.Context, tenantID string, list model.ApiKeyEntityList) (map[string]*model.UserEntity, error) {
+func (svc *apiKeySvc) loadUserMap(ctx context.Context, tenantID string, list model.ApiKeyEntityList) (map[string]*model.UserEntity, error) {
 	idSet := make(map[string]struct{})
 	for _, v := range list {
 		if v.OwnerUserID != "" {

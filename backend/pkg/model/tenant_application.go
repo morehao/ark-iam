@@ -18,12 +18,12 @@ const (
 
 type TenantApplicationEntity struct {
 	gormdao.BaseEntity
-	TenantID     string                  `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id;uniqueIndex:uk_tenant_application_active,where:deleted_at IS NULL" json:"tenantID"`
-	AppID        string                  `gorm:"column:app_id;type:varchar(36);not null;default:'';comment:应用id;uniqueIndex:uk_tenant_application_active,where:deleted_at IS NULL" json:"appID"`
-	Status       TenantApplicationStatus `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态" json:"status"`
-	CreatedBy    string                  `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id" json:"createdBy"`
-	UpdatedBy    string                  `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id" json:"updatedBy"`
-	DeletedBy    string                  `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人id" json:"deletedBy"`
+	TenantID  string                  `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id;uniqueIndex:uk_tenant_application_active,where:deleted_at IS NULL" json:"tenantID"`
+	AppID     string                  `gorm:"column:app_id;type:varchar(36);not null;default:'';comment:应用id;uniqueIndex:uk_tenant_application_active,where:deleted_at IS NULL" json:"appID"`
+	Status    TenantApplicationStatus `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态" json:"status"`
+	CreatedBy string                  `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id" json:"createdBy"`
+	UpdatedBy string                  `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id" json:"updatedBy"`
+	DeletedBy string                  `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人id" json:"deletedBy"`
 }
 
 func (TenantApplicationEntity) TableName() string { return TableNameTenantApplication }

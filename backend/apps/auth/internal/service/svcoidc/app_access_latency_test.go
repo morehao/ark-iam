@@ -46,7 +46,7 @@ func TestAppAccessGateLatencyMeasurement(t *testing.T) {
 
 	// 开门禁：client_id → 应用 → CheckUsable（user_application/application/tenant_application 三个点查）
 	onDurations := measure(t, iterations, func() {
-		allowed, err := svc.canUseClientApp(env.ctx, clientCode, option)
+		allowed, err := svc.canUseClientApp(requestCtx(env.ctx), clientCode, option)
 		require.NoError(t, err)
 		require.True(t, allowed)
 	})

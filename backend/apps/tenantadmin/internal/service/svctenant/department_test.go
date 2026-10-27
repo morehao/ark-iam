@@ -1,6 +1,9 @@
 package svctenant
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -10,14 +13,22 @@ import (
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/tenantadmin/testutil"
 	"github.com/morehao/golib/biz/gcontext"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )
 
+// newDeptGinCtx 构造测试用 gin 上下文：写入租户作用域（类型化，随 Request.Context 透传）
+// 与 userID 投影，形同生产鉴权中间件。service 现在只收 context.Context，
+// 调用方用 requestCtx(ginCtx) 取纯 ctx、用 operatorOf(ginCtx) 填 DTO 的 Operator。
 func newDeptGinCtx(t *testing.T, tenantID, userID string) *gin.Context {
 	t.Helper()
 	ginCtx, _ := gin.CreateTestContext(nil)
-	ginCtx.Set(gcontext.KeyTenantID, tenantID)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
+	ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope(tenantID))
 	ginCtx.Set(gcontext.KeyUserID, userID)
 	return ginCtx
 }
@@ -86,29 +97,31 @@ func TestDepartmentCreateRootAndChildPaths(t *testing.T) {
 	seedTenantAdminOperator(t, db, "41", "1001")
 
 	svc := &departmentSvc{}
-	root, err := svc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
+	root, err := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentCreateReq{
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "总公司", Status: model.DeptNodeStatusEnable},
-	})
+
+		Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("create root: %v", err)
 	}
 	var rootEntity model.DepartmentEntity
-	if err := db.WithContext(ginCtx).First(&rootEntity, "id = ?", root.DepartmentID).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).First(&rootEntity, "id = ?", root.DepartmentID).Error; err != nil {
 		t.Fatalf("query root: %v", err)
 	}
 	if rootEntity.DeptPath != "/"+root.DepartmentID || rootEntity.DeptDepth != 1 {
 		t.Fatalf("unexpected root path: %s depth=%d", rootEntity.DeptPath, rootEntity.DeptDepth)
 	}
 
-	child, err := svc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
+	child, err := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentCreateReq{
 		ParentID:           root.DepartmentID,
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "研发部"},
-	})
+
+		Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("create child: %v", err)
 	}
 	var childEntity model.DepartmentEntity
-	if err := db.WithContext(ginCtx).First(&childEntity, "id = ?", child.DepartmentID).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).First(&childEntity, "id = ?", child.DepartmentID).Error; err != nil {
 		t.Fatalf("query child: %v", err)
 	}
 	if childEntity.DeptPath != "/"+root.DepartmentID+"/"+child.DepartmentID || childEntity.DeptDepth != 2 {
@@ -116,9 +129,10 @@ func TestDepartmentCreateRootAndChildPaths(t *testing.T) {
 	}
 
 	// 根节点唯一：再创建根应失败
-	if _, err := svc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentCreateReq{
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "重复根"},
-	}); err == nil {
+
+		Operator: operatorOf(ginCtx)}); err == nil {
 		t.Fatalf("expected duplicate root create to fail")
 	}
 }
@@ -129,31 +143,35 @@ func TestDepartmentMoveCascadesPathAndRejectsCycle(t *testing.T) {
 	seedTenantAdminOperator(t, db, "41", "1001")
 
 	svc := &departmentSvc{}
-	root, _ := svc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
+	root, _ := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentCreateReq{
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "A"},
-	})
-	b, _ := svc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
+
+		Operator: operatorOf(ginCtx)})
+	b, _ := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentCreateReq{
 		ParentID:           root.DepartmentID,
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "B"},
-	})
-	c, _ := svc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
+
+		Operator: operatorOf(ginCtx)})
+	c, _ := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentCreateReq{
 		ParentID:           b.DepartmentID,
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "C"},
-	})
+
+		Operator: operatorOf(ginCtx)})
 
 	// 移动 C 到 A 下：C 的 path 应从 A/B/C 变为 A/C
-	if err := svc.Update(ginCtx, &dtotenant.DepartmentUpdateReq{
+	if err := svc.Update(requestCtx(ginCtx), &dtotenant.DepartmentUpdateReq{
 		DepartmentID: c.DepartmentID,
 		ParentID:     root.DepartmentID,
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{
 			Name:   "C",
 			Status: model.DeptNodeStatusEnable,
 		},
-	}); err != nil {
+
+		Operator: operatorOf(ginCtx)}); err != nil {
 		t.Fatalf("move C under A: %v", err)
 	}
 	var cEntity model.DepartmentEntity
-	if err := db.WithContext(ginCtx).First(&cEntity, "id = ?", c.DepartmentID).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).First(&cEntity, "id = ?", c.DepartmentID).Error; err != nil {
 		t.Fatalf("query C: %v", err)
 	}
 	if cEntity.DeptPath != "/"+root.DepartmentID+"/"+c.DepartmentID || cEntity.DeptDepth != 2 {
@@ -161,20 +179,21 @@ func TestDepartmentMoveCascadesPathAndRejectsCycle(t *testing.T) {
 	}
 
 	// 环路：把 A 移到 C 下（C 是 A 的子孙）应拒绝
-	err := svc.Update(ginCtx, &dtotenant.DepartmentUpdateReq{
+	err := svc.Update(requestCtx(ginCtx), &dtotenant.DepartmentUpdateReq{
 		DepartmentID: root.DepartmentID,
 		ParentID:     c.DepartmentID,
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{
 			Name:   "A",
 			Status: model.DeptNodeStatusEnable,
 		},
-	})
+
+		Operator: operatorOf(ginCtx)})
 	if err == nil {
 		t.Fatalf("expected cycle move to fail")
 	}
 	// 环路移动失败后 A 的路径不应被破坏
 	var aEntity model.DepartmentEntity
-	if err := db.WithContext(ginCtx).First(&aEntity, "id = ?", root.DepartmentID).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).First(&aEntity, "id = ?", root.DepartmentID).Error; err != nil {
 		t.Fatalf("query A: %v", err)
 	}
 	if aEntity.DeptPath != "/"+root.DepartmentID {
@@ -188,31 +207,37 @@ func TestDepartmentDeleteRejectsWithChildrenAndCascade(t *testing.T) {
 	seedTenantAdminOperator(t, db, "41", "1001")
 
 	svc := &departmentSvc{}
-	root, _ := svc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
+	root, _ := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentCreateReq{
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "A"},
-	})
-	child, _ := svc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
+
+		Operator: operatorOf(ginCtx)})
+	child, _ := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentCreateReq{
 		ParentID:           root.DepartmentID,
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "B"},
-	})
+
+		Operator: operatorOf(ginCtx)})
 
 	// 有子节点默认拒绝
-	if err := svc.Delete(ginCtx, &dtotenant.DepartmentDeleteReq{DepartmentID: root.DepartmentID}); err == nil {
+	if err := svc.Delete(requestCtx(ginCtx), &dtotenant.DepartmentDeleteReq{DepartmentID: root.DepartmentID,
+		Operator: operatorOf(ginCtx),
+	}); err == nil {
 		t.Fatalf("expected delete with children to fail")
 	}
 	// cascade 删除成功且子树软删
-	if err := svc.Delete(ginCtx, &dtotenant.DepartmentDeleteReq{DepartmentID: root.DepartmentID, Cascade: true}); err != nil {
+	if err := svc.Delete(requestCtx(ginCtx), &dtotenant.DepartmentDeleteReq{DepartmentID: root.DepartmentID, Cascade: true,
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("cascade delete: %v", err)
 	}
 	var count int64
-	if err := db.WithContext(ginCtx).Model(&model.DepartmentEntity{}).Unscoped().Count(&count).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).Model(&model.DepartmentEntity{}).Unscoped().Count(&count).Error; err != nil {
 		t.Fatalf("count depts: %v", err)
 	}
 	if count != 2 {
 		t.Fatalf("expected 2 soft-deleted rows, got %d", count)
 	}
 	var childEntity model.DepartmentEntity
-	if err := db.WithContext(ginCtx).First(&childEntity, "id = ?", child.DepartmentID).Error; err == nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).First(&childEntity, "id = ?", child.DepartmentID).Error; err == nil {
 		t.Fatalf("expected child soft-deleted")
 	}
 }
@@ -225,33 +250,37 @@ func TestDepartmentUserMemberSingletonAndValidTypes(t *testing.T) {
 	seedTestUser(t, db, "41", "u2", "用户二")
 
 	deptSvc := &departmentSvc{}
-	root, _ := deptSvc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
+	root, _ := deptSvc.Create(requestCtx(ginCtx), &dtotenant.DepartmentCreateReq{
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "A"},
-	})
-	other, _ := deptSvc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
+
+		Operator: operatorOf(ginCtx)})
+	other, _ := deptSvc.Create(requestCtx(ginCtx), &dtotenant.DepartmentCreateReq{
 		ParentID:           root.DepartmentID,
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "A1"},
-	})
+
+		Operator: operatorOf(ginCtx)})
 
 	svc := &departmentUserSvc{}
 	// u1 行政归属 A
-	if _, err := svc.Create(ginCtx, &dtotenant.DepartmentUserCreateReq{
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentUserCreateReq{
 		DepartmentID: root.DepartmentID,
 		UserID:       "u1",
 		RelationType: model.DeptUserRelationPrimary,
-	}); err != nil {
+
+		Operator: operatorOf(ginCtx)}); err != nil {
 		t.Fatalf("add member u1: %v", err)
 	}
 	// u1 再行政主部门 A1 → 应覆盖为 A1（primary 每用户至多 1 行）
-	if _, err := svc.Create(ginCtx, &dtotenant.DepartmentUserCreateReq{
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentUserCreateReq{
 		DepartmentID: other.DepartmentID,
 		UserID:       "u1",
 		RelationType: model.DeptUserRelationPrimary,
-	}); err != nil {
+
+		Operator: operatorOf(ginCtx)}); err != nil {
 		t.Fatalf("reassign primary u1 to A1: %v", err)
 	}
 	var primaryCount int64
-	if err := db.WithContext(ginCtx).Model(&model.DepartmentUserEntity{}).
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).Model(&model.DepartmentUserEntity{}).
 		Where("user_id = ? AND relation_type = ?", "u1", model.DeptUserRelationPrimary).
 		Count(&primaryCount).Error; err != nil {
 		t.Fatalf("count primary: %v", err)
@@ -261,43 +290,48 @@ func TestDepartmentUserMemberSingletonAndValidTypes(t *testing.T) {
 	}
 
 	// 非法关系类型拒绝
-	if _, err := svc.Create(ginCtx, &dtotenant.DepartmentUserCreateReq{
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentUserCreateReq{
 		DepartmentID: root.DepartmentID,
 		UserID:       "u2",
 		RelationType: "admin",
-	}); err == nil {
+
+		Operator: operatorOf(ginCtx)}); err == nil {
 		t.Fatalf("expected invalid relation type to fail")
 	}
 	// secondary 正常建立（u2 参与 A）
-	if _, err := svc.Create(ginCtx, &dtotenant.DepartmentUserCreateReq{
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentUserCreateReq{
 		DepartmentID: root.DepartmentID,
 		UserID:       "u2",
 		RelationType: model.DeptUserRelationSecondary,
-	}); err != nil {
+
+		Operator: operatorOf(ginCtx)}); err != nil {
 		t.Fatalf("add secondary u2: %v", err)
 	}
 	// leader 不要求同时是成员：u2 负责 A1
-	if _, err := svc.Create(ginCtx, &dtotenant.DepartmentUserCreateReq{
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentUserCreateReq{
 		DepartmentID: other.DepartmentID,
 		UserID:       "u2",
 		RelationType: model.DeptUserRelationLeader,
-	}); err != nil {
+
+		Operator: operatorOf(ginCtx)}); err != nil {
 		t.Fatalf("add leader u2: %v", err)
 	}
 	// 一个部门至多一个负责人：u2 已是 A1 的负责人，u1 再设 A1 负责人应冲突拒绝
-	if _, err := svc.Create(ginCtx, &dtotenant.DepartmentUserCreateReq{
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentUserCreateReq{
 		DepartmentID: other.DepartmentID,
 		UserID:       "u1",
 		RelationType: model.DeptUserRelationLeader,
-	}); err == nil {
+
+		Operator: operatorOf(ginCtx)}); err == nil {
 		t.Fatalf("expected leader conflict to be rejected")
 	}
 	// 同一用户重复设为同一部门负责人：幂等成功
-	if _, err := svc.Create(ginCtx, &dtotenant.DepartmentUserCreateReq{
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentUserCreateReq{
 		DepartmentID: other.DepartmentID,
 		UserID:       "u2",
 		RelationType: model.DeptUserRelationLeader,
-	}); err != nil {
+
+		Operator: operatorOf(ginCtx)}); err != nil {
 		t.Fatalf("re-set same leader should succeed: %v", err)
 	}
 }
@@ -309,9 +343,10 @@ func TestDepartmentUserCrossTenantRejected(t *testing.T) {
 	seedTestUser(t, db, "41", "u1", "用户一")
 
 	deptSvc := &departmentSvc{}
-	root, _ := deptSvc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
+	root, _ := deptSvc.Create(requestCtx(ginCtx), &dtotenant.DepartmentCreateReq{
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "A"},
-	})
+
+		Operator: operatorOf(ginCtx)})
 
 	// 切换到其他租户：部门不可见 → 添加关系失败
 	otherCtx := newDeptGinCtx(t, "99", "2001")
@@ -320,7 +355,8 @@ func TestDepartmentUserCrossTenantRejected(t *testing.T) {
 		DepartmentID: root.DepartmentID,
 		UserID:       "u1",
 		RelationType: model.DeptUserRelationPrimary,
-	}); err == nil {
+
+		Operator: operatorOf(otherCtx)}); err == nil {
 		t.Fatalf("expected cross-tenant relation create to fail")
 	}
 }
@@ -331,36 +367,39 @@ func TestDepartmentChildrenPageAndHasChildren(t *testing.T) {
 	seedTenantAdminOperator(t, db, "41", "1001")
 
 	svc := &departmentSvc{}
-	root, err := svc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
+	root, err := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentCreateReq{
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "总公司", Status: model.DeptNodeStatusEnable},
-	})
+
+		Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("create root: %v", err)
 	}
-	a, _ := svc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
+	a, _ := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentCreateReq{
 		ParentID:           root.DepartmentID,
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "A", Status: model.DeptNodeStatusEnable},
-	})
-	if _, err := svc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
+
+		Operator: operatorOf(ginCtx)})
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentCreateReq{
 		ParentID:           root.DepartmentID,
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "B", Status: model.DeptNodeStatusDisable},
-	}); err != nil {
+
+		Operator: operatorOf(ginCtx)}); err != nil {
 		t.Fatalf("create B: %v", err)
 	}
 	// A 下挂一个深层子级，验证 hasChildren
-	if _, err := svc.Create(ginCtx, &dtotenant.DepartmentCreateReq{
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.DepartmentCreateReq{
 		ParentID:           a.DepartmentID,
 		DepartmentBaseInfo: objtenant.DepartmentBaseInfo{Name: "A1", Status: model.DeptNodeStatusEnable},
-	}); err != nil {
+
+		Operator: operatorOf(ginCtx)}); err != nil {
 		t.Fatalf("create A1: %v", err)
 	}
 
 	// 直属子级：应只有 A、B 两项
-	resp, err := svc.Children(ginCtx, &dtotenant.DepartmentChildrenReq{
+	resp, err := svc.Children(requestCtx(ginCtx), &dtotenant.DepartmentChildrenReq{
 		DepartmentID: root.DepartmentID,
 		Page:         1,
-		PageSize:     10,
-	})
+		PageSize:     10})
 	if err != nil {
 		t.Fatalf("children: %v", err)
 	}
@@ -386,12 +425,11 @@ func TestDepartmentChildrenPageAndHasChildren(t *testing.T) {
 	}
 
 	// 状态筛选：只返回启用的 A
-	resp, err = svc.Children(ginCtx, &dtotenant.DepartmentChildrenReq{
+	resp, err = svc.Children(requestCtx(ginCtx), &dtotenant.DepartmentChildrenReq{
 		DepartmentID: root.DepartmentID,
 		Status:       model.DeptNodeStatusEnable,
 		Page:         1,
-		PageSize:     10,
-	})
+		PageSize:     10})
 	if err != nil {
 		t.Fatalf("children status filter: %v", err)
 	}
@@ -400,11 +438,10 @@ func TestDepartmentChildrenPageAndHasChildren(t *testing.T) {
 	}
 
 	// 分页：pageSize=1 时 total 仍为 2
-	resp, err = svc.Children(ginCtx, &dtotenant.DepartmentChildrenReq{
+	resp, err = svc.Children(requestCtx(ginCtx), &dtotenant.DepartmentChildrenReq{
 		DepartmentID: root.DepartmentID,
 		Page:         1,
-		PageSize:     1,
-	})
+		PageSize:     1})
 	if err != nil {
 		t.Fatalf("children paging: %v", err)
 	}

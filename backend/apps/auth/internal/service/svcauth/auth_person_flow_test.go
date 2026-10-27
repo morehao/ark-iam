@@ -2,6 +2,8 @@ package svcauth
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -77,6 +79,9 @@ func (f *fakeAuthTenantStore) GetListByCond(ctx context.Context, cond gormdao.Co
 
 func TestMyTenantsReturnsCurrentPersonTenantList(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
@@ -111,7 +116,7 @@ func TestMyTenantsReturnsCurrentPersonTenantList(t *testing.T) {
 	defer restoreTenantStore()
 
 	svc := &authSvc{}
-	resp, err := svc.MyTenants(ginCtx, &dtoauth.MyTenantsReq{})
+	resp, err := svc.MyTenants(requestCtx(ginCtx), &dtoauth.MyTenantsReq{Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("MyTenants returned error: %v", err)
 	}
@@ -130,6 +135,9 @@ func TestMyTenantsReturnsCurrentPersonTenantList(t *testing.T) {
 // 成员关系全部指向挂起租户时明确拒绝（100207），不与"零租户可自助建租户"路径混同。
 func TestMyTenantsRejectsWhenAllTenantsSuspended(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
@@ -155,7 +163,7 @@ func TestMyTenantsRejectsWhenAllTenantsSuspended(t *testing.T) {
 	defer restoreTenantStore()
 
 	svc := &authSvc{}
-	_, err := svc.MyTenants(ginCtx, &dtoauth.MyTenantsReq{})
+	_, err := svc.MyTenants(requestCtx(ginCtx), &dtoauth.MyTenantsReq{Operator: operatorOf(ginCtx)})
 	assertCode(t, err, code.TenantSuspendedError)
 }
 
@@ -163,6 +171,9 @@ func TestMyTenantsRejectsWhenAllTenantsSuspended(t *testing.T) {
 // 必须报数据类错误而不是"该租户已被挂起"（否则掩盖真实根因）。
 func TestMyTenantsReportsMissingTenantRowsAsDataError(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
@@ -187,12 +198,15 @@ func TestMyTenantsReportsMissingTenantRowsAsDataError(t *testing.T) {
 	defer restoreTenantStore()
 
 	svc := &authSvc{}
-	_, err := svc.MyTenants(ginCtx, &dtoauth.MyTenantsReq{})
+	_, err := svc.MyTenants(requestCtx(ginCtx), &dtoauth.MyTenantsReq{Operator: operatorOf(ginCtx)})
 	assertCode(t, err, code.UserGetDetailError)
 }
 
 func TestJoinTenantRejectsMissingInviteCode(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
@@ -200,7 +214,10 @@ func TestJoinTenantRejectsMissingInviteCode(t *testing.T) {
 	identity.SetClientID(ginCtx, seedJoinByInviteApp(t, db, true))
 
 	svc := &authSvc{}
-	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: ""})
+	_, err := svc.JoinTenant(requestCtx(ginCtx), &dtoauth.JoinTenantReq{InviteCode: "",
+		Operator: operatorOf(ginCtx),
+		ClientID: identity.ClientIDFromContext(ginCtx),
+	})
 	assertCode(t, err, code.AuthJoinNotAllowedError)
 	if cerr := db.Exec("SELECT 1 FROM tenant_invite").Error; cerr != nil {
 		t.Fatalf("expected invite table migrated: %v", cerr)
@@ -209,6 +226,9 @@ func TestJoinTenantRejectsMissingInviteCode(t *testing.T) {
 
 func TestJoinTenantRejectsInvalidInvite(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
@@ -217,12 +237,18 @@ func TestJoinTenantRejectsInvalidInvite(t *testing.T) {
 	seedInvite(t, db, "invite-abc", "22", model.InviteStatusPending, nil)
 
 	svc := &authSvc{}
-	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: "no-such-code"})
+	_, err := svc.JoinTenant(requestCtx(ginCtx), &dtoauth.JoinTenantReq{InviteCode: "no-such-code",
+		Operator: operatorOf(ginCtx),
+		ClientID: identity.ClientIDFromContext(ginCtx),
+	})
 	assertCode(t, err, code.InviteInvalidError)
 }
 
 func TestJoinTenantRejectsRevokedInvite(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
@@ -231,7 +257,10 @@ func TestJoinTenantRejectsRevokedInvite(t *testing.T) {
 	seedInvite(t, db, "invite-abc", "22", model.InviteStatusRevoked, nil)
 
 	svc := &authSvc{}
-	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: "invite-abc"})
+	_, err := svc.JoinTenant(requestCtx(ginCtx), &dtoauth.JoinTenantReq{InviteCode: "invite-abc",
+		Operator: operatorOf(ginCtx),
+		ClientID: identity.ClientIDFromContext(ginCtx),
+	})
 	assertCode(t, err, code.InviteInvalidError)
 }
 
@@ -239,6 +268,9 @@ func TestJoinTenantRejectsRevokedInvite(t *testing.T) {
 // 库里没有 "expired" 这个状态值，能否加入只取决于 expires_at 是否已过。
 func TestJoinTenantRejectsExpiredInvite(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
@@ -248,7 +280,10 @@ func TestJoinTenantRejectsExpiredInvite(t *testing.T) {
 	seedInvite(t, db, "invite-abc", "22", model.InviteStatusPending, &past)
 
 	svc := &authSvc{}
-	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: "invite-abc"})
+	_, err := svc.JoinTenant(requestCtx(ginCtx), &dtoauth.JoinTenantReq{InviteCode: "invite-abc",
+		Operator: operatorOf(ginCtx),
+		ClientID: identity.ClientIDFromContext(ginCtx),
+	})
 	assertCode(t, err, code.InviteExpiredError)
 }
 
@@ -256,6 +291,9 @@ func TestJoinTenantRejectsExpiredInvite(t *testing.T) {
 // 防止把过期比较写反（ExpiresAt 在未来却被判过期）。
 func TestJoinTenantAcceptsInviteNotYetExpired(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
@@ -265,7 +303,10 @@ func TestJoinTenantAcceptsInviteNotYetExpired(t *testing.T) {
 	seedInvite(t, db, "invite-abc", "22", model.InviteStatusPending, &future)
 
 	svc := &authSvc{}
-	resp, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: "invite-abc"})
+	resp, err := svc.JoinTenant(requestCtx(ginCtx), &dtoauth.JoinTenantReq{InviteCode: "invite-abc",
+		Operator: operatorOf(ginCtx),
+		ClientID: identity.ClientIDFromContext(ginCtx),
+	})
 	if err != nil {
 		t.Fatalf("未过期邀请应可加入, got err: %v", err)
 	}
@@ -276,6 +317,9 @@ func TestJoinTenantAcceptsInviteNotYetExpired(t *testing.T) {
 
 func TestJoinTenantRejectsAlreadyJoinedTenant(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
@@ -295,12 +339,18 @@ func TestJoinTenantRejectsAlreadyJoinedTenant(t *testing.T) {
 	}
 
 	svc := &authSvc{}
-	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: "invite-abc"})
+	_, err := svc.JoinTenant(requestCtx(ginCtx), &dtoauth.JoinTenantReq{InviteCode: "invite-abc",
+		Operator: operatorOf(ginCtx),
+		ClientID: identity.ClientIDFromContext(ginCtx),
+	})
 	assertCode(t, err, code.AlreadyJoinedError)
 }
 
 func TestJoinTenantCreatesNonOwnerUser(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
@@ -309,7 +359,10 @@ func TestJoinTenantCreatesNonOwnerUser(t *testing.T) {
 	seedInvite(t, db, "invite-abc", "22", model.InviteStatusPending, nil)
 
 	svc := &authSvc{}
-	resp, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: "invite-abc"})
+	resp, err := svc.JoinTenant(requestCtx(ginCtx), &dtoauth.JoinTenantReq{InviteCode: "invite-abc",
+		Operator: operatorOf(ginCtx),
+		ClientID: identity.ClientIDFromContext(ginCtx),
+	})
 	if err != nil {
 		t.Fatalf("JoinTenant returned error: %v", err)
 	}
@@ -383,6 +436,9 @@ func seedJoinByInviteApp(t *testing.T, db *gorm.DB, allow bool) string {
 // 且门禁先于邀请解析——被拒时不得消费邀请。
 func TestJoinTenantRejectsWhenAppDisallowsInvite(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "88")
 
@@ -392,7 +448,10 @@ func TestJoinTenantRejectsWhenAppDisallowsInvite(t *testing.T) {
 	identity.SetClientID(ginCtx, seedJoinByInviteApp(t, db, false))
 
 	svc := &authSvc{}
-	_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: "invite-abc"})
+	_, err := svc.JoinTenant(requestCtx(ginCtx), &dtoauth.JoinTenantReq{InviteCode: "invite-abc",
+		Operator: operatorOf(ginCtx),
+		ClientID: identity.ClientIDFromContext(ginCtx),
+	})
 	assertCode(t, err, code.AuthJoinNotAllowedError)
 
 	// 邀请码全局唯一，按 code 反查需显式声明跨租户作用域
@@ -414,6 +473,9 @@ func TestJoinTenantRejectsWhenClientUnresolvable(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			ginCtx, _ := gin.CreateTestContext(nil)
+			if ginCtx.Request == nil {
+				ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+			}
 			ginCtx.Request = httptestRequest(t)
 			ginCtx.Set(gcontext.KeyPersonID, "88")
 			identity.SetClientID(ginCtx, c.clientID)
@@ -423,7 +485,9 @@ func TestJoinTenantRejectsWhenClientUnresolvable(t *testing.T) {
 			seedInvite(t, db, "invite-abc", "22", model.InviteStatusPending, nil)
 
 			svc := &authSvc{}
-			_, err := svc.JoinTenant(ginCtx, &dtoauth.JoinTenantReq{InviteCode: "invite-abc"})
+			_, err := svc.JoinTenant(requestCtx(ginCtx), &dtoauth.JoinTenantReq{InviteCode: "invite-abc",
+				Operator: operatorOf(ginCtx),
+			})
 			assertCode(t, err, code.AuthJoinNotAllowedError)
 		})
 	}

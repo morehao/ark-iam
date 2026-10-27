@@ -1,6 +1,10 @@
 package svcauth
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -35,16 +39,25 @@ func TestConnectorCreateRejectsIllegalStatus(t *testing.T) {
 	testutil.SetupSQLite(t, &model.ConnectorEntity{})
 
 	ctx, _ := gin.CreateTestContext(nil)
+
+	if ctx.Request == nil {
+
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
 	ctx.Set(gcontext.KeyUserID, "0")
 	svc := NewConnectorSvc()
 
-	_, err := svc.Create(ctx, &dtoauth.ConnectorCreateReq{
+	_, err := svc.Create(requestCtx(ctx), &dtoauth.ConnectorCreateReq{
 		ConnectorBaseInfo: objauth.ConnectorBaseInfo{
 			Name:   "连接器1",
 			Status: "enabled", // 阶段 2 前的历史取值，已不在白名单内
 		},
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil {
 		t.Fatal("非法 status 应被拒绝")
 	}
@@ -59,11 +72,19 @@ func TestConnectorCreateWithoutStatusDefaultsEnable(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ConnectorEntity{})
 
 	ctx, _ := gin.CreateTestContext(nil)
+
+	if ctx.Request == nil {
+
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
 	ctx.Set(gcontext.KeyUserID, "0")
 	svc := NewConnectorSvc()
 
-	resp, err := svc.Create(ctx, &dtoauth.ConnectorCreateReq{
+	resp, err := svc.Create(requestCtx(ctx), &dtoauth.ConnectorCreateReq{
 		ConnectorBaseInfo: objauth.ConnectorBaseInfo{
 			Name:         "连接器1",
 			Protocol:     "oauth2",
@@ -71,14 +92,15 @@ func TestConnectorCreateWithoutStatusDefaultsEnable(t *testing.T) {
 			ClaimMapping: model.ConnectorClaimMapping{Email: "email"},
 			DomainPolicy: model.ConnectorDomainPolicy{AllowedDomains: model.DomainList{"example.com"}},
 		},
-	})
+
+		Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("未指定 status 应允许创建: %v", err)
 	}
 
 	var entity model.ConnectorEntity
 	// 断言使用与 svc.Create 同一个租户上下文，避免绕过租户隔离插件
-	if err := db.WithContext(ctx).Where("id = ?", resp.ConnectorID).First(&entity).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ctx)).Where("id = ?", resp.ConnectorID).First(&entity).Error; err != nil {
 		t.Fatalf("查询连接器失败: %v", err)
 	}
 	if entity.Status != model.ConnectorStatusEnable {
@@ -104,21 +126,30 @@ func TestConnectorUpdateRejectsIllegalStatus(t *testing.T) {
 	}
 
 	ctx, _ := gin.CreateTestContext(nil)
+
+	if ctx.Request == nil {
+
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
 	ctx.Set(gcontext.KeyUserID, "0")
 	svc := NewConnectorSvc()
 
-	err := svc.Update(ctx, &dtoauth.ConnectorUpdateReq{
+	err := svc.Update(requestCtx(ctx), &dtoauth.ConnectorUpdateReq{
 		ConnectorID:       entity.ID,
 		ConnectorBaseInfo: objauth.ConnectorBaseInfo{Name: "连接器1", Status: "enabled"},
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil {
 		t.Fatal("非法 status 应被拒绝")
 	}
 	if gerror.GetCode(err) != int(code.ConnectorUpdateError) {
 		t.Fatalf("期望 ConnectorUpdateError, got %v", err)
 	}
-	got, err := dao.NewConnectorDao().GetByID(ctx, entity.ID)
+	got, err := dao.NewConnectorDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -145,17 +176,26 @@ func TestConnectorUpdateStatusDisable(t *testing.T) {
 	}
 
 	ctx, _ := gin.CreateTestContext(nil)
+
+	if ctx.Request == nil {
+
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
 	ctx.Set(gcontext.KeyUserID, "0")
 	svc := NewConnectorSvc()
 
-	if err := svc.Update(ctx, &dtoauth.ConnectorUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtoauth.ConnectorUpdateReq{
 		ConnectorID:       entity.ID,
 		ConnectorBaseInfo: objauth.ConnectorBaseInfo{Name: "连接器1", Status: model.ConnectorStatusDisable},
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("合法 status disable 应允许: %v", err)
 	}
-	got, err := dao.NewConnectorDao().GetByID(ctx, entity.ID)
+	got, err := dao.NewConnectorDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -197,11 +237,19 @@ func TestConnectorCreateRejectsIllegalSwitch(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ConnectorEntity{})
 
 	ctx, _ := gin.CreateTestContext(nil)
+
+	if ctx.Request == nil {
+
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
 	ctx.Set(gcontext.KeyUserID, "0")
 	svc := NewConnectorSvc()
 
-	_, err := svc.Create(ctx, &dtoauth.ConnectorCreateReq{
+	_, err := svc.Create(requestCtx(ctx), &dtoauth.ConnectorCreateReq{
 		ConnectorBaseInfo: objauth.ConnectorBaseInfo{
 			Name:                "连接器1",
 			Protocol:            "oauth2",
@@ -209,7 +257,8 @@ func TestConnectorCreateRejectsIllegalSwitch(t *testing.T) {
 			Status:              model.ConnectorStatusEnable,
 			AllowAutoCreateUser: "true", // 阶段 3 前的布尔字面量，已不在枚举白名单内
 		},
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil {
 		t.Fatal("非法开关值应被拒绝")
 	}
@@ -217,7 +266,7 @@ func TestConnectorCreateRejectsIllegalSwitch(t *testing.T) {
 		t.Fatalf("期望 ConnectorCreateError, got %v", err)
 	}
 	var count int64
-	if err := db.WithContext(ctx).Model(&model.ConnectorEntity{}).Count(&count).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ctx)).Model(&model.ConnectorEntity{}).Count(&count).Error; err != nil {
 		t.Fatalf("count: %v", err)
 	}
 	if count != 0 {
@@ -231,23 +280,32 @@ func TestConnectorCreateWithoutSwitchesDefaultsDisable(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ConnectorEntity{})
 
 	ctx, _ := gin.CreateTestContext(nil)
+
+	if ctx.Request == nil {
+
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
 	ctx.Set(gcontext.KeyUserID, "0")
 	svc := NewConnectorSvc()
 
-	resp, err := svc.Create(ctx, &dtoauth.ConnectorCreateReq{
+	resp, err := svc.Create(requestCtx(ctx), &dtoauth.ConnectorCreateReq{
 		ConnectorBaseInfo: objauth.ConnectorBaseInfo{
 			Name:     "连接器1",
 			Protocol: "oauth2",
 			Provider: "github",
 		},
-	})
+
+		Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("未提交开关字段应允许创建: %v", err)
 	}
 
 	var entity model.ConnectorEntity
-	if err := db.WithContext(ctx).Where("id = ?", resp.ConnectorID).First(&entity).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ctx)).Where("id = ?", resp.ConnectorID).First(&entity).Error; err != nil {
 		t.Fatalf("查询连接器失败: %v", err)
 	}
 	if entity.AllowAutoCreateUser != model.ConnectorAutoCreateUserFlagDisable ||
@@ -281,25 +339,34 @@ func TestConnectorUpdateRejectsIllegalSwitch(t *testing.T) {
 	}
 
 	ctx, _ := gin.CreateTestContext(nil)
+
+	if ctx.Request == nil {
+
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
 	ctx.Set(gcontext.KeyUserID, "0")
 	svc := NewConnectorSvc()
 
-	err := svc.Update(ctx, &dtoauth.ConnectorUpdateReq{
+	err := svc.Update(requestCtx(ctx), &dtoauth.ConnectorUpdateReq{
 		ConnectorID: entity.ID,
 		ConnectorBaseInfo: objauth.ConnectorBaseInfo{
 			Name:             "连接器1",
 			SyncProfile:      "yes", // 非法枚举值
 			AllowAccountLink: model.ConnectorAccountLinkFlagDisable,
 		},
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil {
 		t.Fatal("非法开关值应被拒绝")
 	}
 	if gerror.GetCode(err) != int(code.ConnectorUpdateError) {
 		t.Fatalf("期望 ConnectorUpdateError, got %v", err)
 	}
-	got, err := dao.NewConnectorDao().GetByID(ctx, entity.ID)
+	got, err := dao.NewConnectorDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}

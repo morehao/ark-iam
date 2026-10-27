@@ -6,15 +6,14 @@ import (
 	"encoding/base64"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoconnector"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objauth"
 	"github.com/morehao/ark-iam/pkg/sso"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
@@ -72,17 +71,17 @@ func normalizeConnectorSwitches(info *objauth.ConnectorBaseInfo) bool {
 }
 
 type ConnectorSvc interface {
-	Create(ctx *gin.Context, req *dtoauth.ConnectorCreateReq) (*dtoauth.ConnectorCreateResp, error)
-	Delete(ctx *gin.Context, req *dtoauth.ConnectorDeleteReq) error
-	Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateReq) error
-	Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailReq) (*dtoauth.ConnectorDetailResp, error)
-	PageList(ctx *gin.Context, req *dtoauth.ConnectorPageListReq) (*dtoauth.ConnectorPageListResp, error)
-	GetFactoryList(ctx *gin.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error)
-	ListFactories(ctx *gin.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error)
-	TestConnector(ctx *gin.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.ConnectorTestResp, error)
-	Authorize(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID string) (*dtoconnector.ConnectorAuthorizeResp, error)
-	GetAuthorizationURL(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq) (*dtoconnector.ConnectorAuthorizeResp, error)
-	Callback(ctx *gin.Context, req *dtoconnector.ConnectorCallbackReq) (*dtoauth.LoginResp, error)
+	Create(ctx context.Context, req *dtoauth.ConnectorCreateReq) (*dtoauth.ConnectorCreateResp, error)
+	Delete(ctx context.Context, req *dtoauth.ConnectorDeleteReq) error
+	Update(ctx context.Context, req *dtoauth.ConnectorUpdateReq) error
+	Detail(ctx context.Context, req *dtoauth.ConnectorDetailReq) (*dtoauth.ConnectorDetailResp, error)
+	PageList(ctx context.Context, req *dtoauth.ConnectorPageListReq) (*dtoauth.ConnectorPageListResp, error)
+	GetFactoryList(ctx context.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error)
+	ListFactories(ctx context.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error)
+	TestConnector(ctx context.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.ConnectorTestResp, error)
+	Authorize(ctx context.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID string) (*dtoconnector.ConnectorAuthorizeResp, error)
+	GetAuthorizationURL(ctx context.Context, req *dtoconnector.ConnectorAuthorizeReq) (*dtoconnector.ConnectorAuthorizeResp, error)
+	Callback(ctx context.Context, req *dtoconnector.ConnectorCallbackReq) (*dtoauth.LoginResp, error)
 }
 
 type connectorRuntimeRepository interface {
@@ -100,15 +99,15 @@ type connectorSvc struct {
 	identityResolver connectorIdentityResolver
 	authSvc          tenantProvider
 	ssoSessionStore  sso.SSOSessionStore
-	tokenGenerator   func(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error)
-	loginRecorder    func(ctx *gin.Context, tenantID, userID string, success bool)
+	tokenGenerator   func(ctx context.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error)
+	loginRecorder    func(ctx context.Context, tenantID, userID string, success bool)
 	stateGenerator   func() (string, error)
 	nowFunc          func() time.Time
 }
 
 // tenantProvider 抽象"查询自然人租户列表"能力，由 svcauth.AuthSvc 实现。
 type tenantProvider interface {
-	TenantsForPerson(ctx *gin.Context, personID string) ([]objauth.TenantOption, error)
+	TenantsForPerson(ctx context.Context, personID string) ([]objauth.TenantOption, error)
 }
 
 var _ ConnectorSvc = (*connectorSvc)(nil)
@@ -237,7 +236,7 @@ func buildConnectorUpdateEntity(req *dtoauth.ConnectorUpdateReq, updatedBy strin
 	return entity, fields
 }
 
-func (svc *connectorSvc) Create(ctx *gin.Context, req *dtoauth.ConnectorCreateReq) (*dtoauth.ConnectorCreateResp, error) {
+func (svc *connectorSvc) Create(ctx context.Context, req *dtoauth.ConnectorCreateReq) (*dtoauth.ConnectorCreateResp, error) {
 	if !isValidConnectorStatus(req.Status) {
 		glog.Errorf(ctx, "[svcauth.CreateConnector] 非法连接器状态, req:%s", gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorCreateError)
@@ -246,7 +245,7 @@ func (svc *connectorSvc) Create(ctx *gin.Context, req *dtoauth.ConnectorCreateRe
 		glog.Errorf(ctx, "[svcauth.CreateConnector] 非法连接器开关, req:%s", gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorCreateError)
 	}
-	insertEntity := buildConnectorInsertEntity(req, gincontext.GetTenantIDString(ctx), gincontext.GetUserIDString(ctx))
+	insertEntity := buildConnectorInsertEntity(req, dbclient.TenantIDFromContext(ctx), req.Operator.UserID)
 	if err := dao.NewConnectorDao().Insert(ctx, insertEntity); err != nil {
 		glog.Errorf(ctx, "[svcauth.CreateConnector] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorCreateError)
@@ -256,17 +255,17 @@ func (svc *connectorSvc) Create(ctx *gin.Context, req *dtoauth.ConnectorCreateRe
 	}, nil
 }
 
-func (svc *connectorSvc) Delete(ctx *gin.Context, req *dtoauth.ConnectorDeleteReq) error {
+func (svc *connectorSvc) Delete(ctx context.Context, req *dtoauth.ConnectorDeleteReq) error {
 	connectorEntity, err := dao.NewConnectorDao().GetByID(ctx, req.ConnectorID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.DeleteConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorDeleteError)
 	}
-	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantIDString(ctx)) {
+	if !connectorVisibleToTenant(connectorEntity, dbclient.TenantIDFromContext(ctx)) {
 		return code.GetError(code.ConnectorNotExistError)
 	}
 
-	userID := gincontext.GetUserIDString(ctx)
+	userID := req.Operator.UserID
 	if err := dao.NewConnectorDao().Delete(ctx, req.ConnectorID, userID); err != nil {
 		glog.Errorf(ctx, "[svcauth.DeleteConnector] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorDeleteError)
@@ -274,7 +273,7 @@ func (svc *connectorSvc) Delete(ctx *gin.Context, req *dtoauth.ConnectorDeleteRe
 	return nil
 }
 
-func (svc *connectorSvc) Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateReq) error {
+func (svc *connectorSvc) Update(ctx context.Context, req *dtoauth.ConnectorUpdateReq) error {
 	if !isValidConnectorStatus(req.Status) {
 		glog.Errorf(ctx, "[svcauth.UpdateConnector] 非法连接器状态, req:%s", gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorUpdateError)
@@ -288,11 +287,11 @@ func (svc *connectorSvc) Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateRe
 		glog.Errorf(ctx, "[svcauth.UpdateConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorUpdateError)
 	}
-	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantIDString(ctx)) {
+	if !connectorVisibleToTenant(connectorEntity, dbclient.TenantIDFromContext(ctx)) {
 		return code.GetError(code.ConnectorNotExistError)
 	}
 
-	updateEntity, fields := buildConnectorUpdateEntity(req, gincontext.GetUserIDString(ctx))
+	updateEntity, fields := buildConnectorUpdateEntity(req, req.Operator.UserID)
 	if err := dao.UpdateFields(ctx, dao.NewConnectorDao().Dao, req.ConnectorID, updateEntity, fields...); err != nil {
 		glog.Errorf(ctx, "[svcauth.UpdateConnector] dao UpdateFields fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ConnectorUpdateError)
@@ -300,13 +299,13 @@ func (svc *connectorSvc) Update(ctx *gin.Context, req *dtoauth.ConnectorUpdateRe
 	return nil
 }
 
-func (svc *connectorSvc) Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailReq) (*dtoauth.ConnectorDetailResp, error) {
+func (svc *connectorSvc) Detail(ctx context.Context, req *dtoauth.ConnectorDetailReq) (*dtoauth.ConnectorDetailResp, error) {
 	connectorEntity, err := dao.NewConnectorDao().GetByID(ctx, req.ConnectorID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.DetailConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
-	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantIDString(ctx)) {
+	if !connectorVisibleToTenant(connectorEntity, dbclient.TenantIDFromContext(ctx)) {
 		return nil, code.GetError(code.ConnectorNotExistError)
 	}
 
@@ -336,14 +335,14 @@ func (svc *connectorSvc) Detail(ctx *gin.Context, req *dtoauth.ConnectorDetailRe
 	return resp, nil
 }
 
-func (svc *connectorSvc) PageList(ctx *gin.Context, req *dtoauth.ConnectorPageListReq) (*dtoauth.ConnectorPageListResp, error) {
+func (svc *connectorSvc) PageList(ctx context.Context, req *dtoauth.ConnectorPageListReq) (*dtoauth.ConnectorPageListResp, error) {
 	connectorRepo := dao.NewConnectorDao()
 	cond := &dao.ConnectorCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
 			PageSize: req.PageSize,
 		},
-		TenantID:    gincontext.GetTenantIDString(ctx),
+		TenantID:    dbclient.TenantIDFromContext(ctx),
 		Protocol:    req.Protocol,
 		Provider:    req.Provider,
 		Status:      req.Status,
@@ -388,24 +387,24 @@ func (svc *connectorSvc) PageList(ctx *gin.Context, req *dtoauth.ConnectorPageLi
 	}, nil
 }
 
-func (svc *connectorSvc) GetFactoryList(ctx *gin.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error) {
+func (svc *connectorSvc) GetFactoryList(ctx context.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error) {
 	return &dtoconnector.ConnectorFactoryListResp{
 		List: selectConnectorFactories(req, defaultConnectorFactories()),
 	}, nil
 }
 
-func (svc *connectorSvc) ListFactories(ctx *gin.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error) {
+func (svc *connectorSvc) ListFactories(ctx context.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error) {
 	return svc.GetFactoryList(ctx, req)
 }
 
-func (svc *connectorSvc) TestConnector(ctx *gin.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.ConnectorTestResp, error) {
+func (svc *connectorSvc) TestConnector(ctx context.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.ConnectorTestResp, error) {
 	connectorEntity, err := dao.NewConnectorDao().GetByID(ctx, req.ConnectorID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.TestConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
 	// H11：与其他 CRUD 一致，测试连接器必须校验租户归属（防跨租户触发外部网络请求）
-	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantIDString(ctx)) {
+	if !connectorVisibleToTenant(connectorEntity, dbclient.TenantIDFromContext(ctx)) {
 		return nil, code.GetError(code.ConnectorNotExistError)
 	}
 	driver, config, err := selectDriverForConnector(svc.getDriverRegistry(), connectorEntity)
@@ -422,13 +421,13 @@ func (svc *connectorSvc) TestConnector(ctx *gin.Context, req *dtoconnector.Conne
 	}, nil
 }
 
-func (svc *connectorSvc) Authorize(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID string) (*dtoconnector.ConnectorAuthorizeResp, error) {
+func (svc *connectorSvc) Authorize(ctx context.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID string) (*dtoconnector.ConnectorAuthorizeResp, error) {
 	connectorEntity, err := svc.getConnectorRepo().GetByID(runtimeContext(ctx), connectorID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.Authorize] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
-	if !connectorVisibleToTenant(connectorEntity, gincontext.GetTenantIDString(ctx)) || connectorEntity.Status != model.ConnectorStatusEnable {
+	if !connectorVisibleToTenant(connectorEntity, dbclient.TenantIDFromContext(ctx)) || connectorEntity.Status != model.ConnectorStatusEnable {
 		return nil, code.GetError(code.ConnectorNotExistError)
 	}
 	// H12：redirect_uri 必须与本连接器配置的回调地址同源且为 https，
@@ -474,11 +473,11 @@ func (svc *connectorSvc) Authorize(ctx *gin.Context, req *dtoconnector.Connector
 	}, nil
 }
 
-func (svc *connectorSvc) GetAuthorizationURL(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq) (*dtoconnector.ConnectorAuthorizeResp, error) {
+func (svc *connectorSvc) GetAuthorizationURL(ctx context.Context, req *dtoconnector.ConnectorAuthorizeReq) (*dtoconnector.ConnectorAuthorizeResp, error) {
 	return svc.Authorize(ctx, req, req.ConnectorID)
 }
 
-func (svc *connectorSvc) Callback(ctx *gin.Context, req *dtoconnector.ConnectorCallbackReq) (*dtoauth.LoginResp, error) {
+func (svc *connectorSvc) Callback(ctx context.Context, req *dtoconnector.ConnectorCallbackReq) (*dtoauth.LoginResp, error) {
 	// 先原子消费 state（GetDel）：一次性使用，杜绝重放窗口；
 	// 消费失败（已使用/过期/伪造）直接拒绝，不再继续 exchange。
 	storedState, err := svc.getStateStore().Consume(runtimeContext(ctx), req.State)
@@ -558,8 +557,10 @@ func defaultConnectorStateGenerator() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
-func runtimeContext(ctx *gin.Context) context.Context {
-	if ctx != nil && ctx.Request != nil {
+// runtimeContext 保证下游拿到非 nil 的 context（context.Context 是接口，nil 会被
+// glog / gorm 解引用 panic）。改造后 service 只收纯 ctx，不再有 gin 的 Request 判空。
+func runtimeContext(ctx context.Context) context.Context {
+	if ctx != nil {
 		return ctx
 	}
 	return context.Background()

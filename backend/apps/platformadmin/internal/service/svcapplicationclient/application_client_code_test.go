@@ -1,6 +1,7 @@
 package svcapplicationclient
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"testing"
 
 	"github.com/morehao/ark-iam/pkg/code"
@@ -30,9 +31,10 @@ func TestCreateRejectsInvalidClientCode(t *testing.T) {
 		"",
 	}
 	for _, badCode := range invalidCodes {
-		_, err := svc.Create(ctx, &dtoapplicationclient.ApplicationClientCreateReq{
+		_, err := svc.Create(requestCtx(ctx), &dtoapplicationclient.ApplicationClientCreateReq{
 			AppID: "app1", Code: badCode, Name: "非法编码客户端",
-		})
+
+			Operator: operatorOf(ctx)})
 		if err == nil {
 			t.Fatalf("Create(code=%q) 必须被拒绝", badCode)
 		}
@@ -43,7 +45,7 @@ func TestCreateRejectsInvalidClientCode(t *testing.T) {
 	}
 
 	var count int64
-	if err := db.WithContext(ctx).Model(&model.ApplicationClientEntity{}).Count(&count).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ctx)).Model(&model.ApplicationClientEntity{}).Count(&count).Error; err != nil {
 		t.Fatalf("count application_client: %v", err)
 	}
 	if count != 0 {
@@ -57,9 +59,10 @@ func TestCreateAcceptsClientCodeAsClientID(t *testing.T) {
 	testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
 	ctx := newOAuthDeleteCtx("1", "0")
 
-	resp, err := NewApplicationClientSvc().Create(ctx, &dtoapplicationclient.ApplicationClientCreateReq{
+	resp, err := NewApplicationClientSvc().Create(requestCtx(ctx), &dtoapplicationclient.ApplicationClientCreateReq{
 		AppID: "app1", Code: "iam_client", Name: "接入客户端",
-	})
+
+		Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("合法编码应放行: %v", err)
 	}
@@ -67,7 +70,7 @@ func TestCreateAcceptsClientCodeAsClientID(t *testing.T) {
 		t.Fatalf("resp code = %q, want iam_client", resp.Code)
 	}
 
-	got, err := dao.NewApplicationClientDao().GetByID(ctx, resp.ApplicationClientID)
+	got, err := dao.NewApplicationClientDao().GetByID(dbclient.CrossTenantContext(ctx), resp.ApplicationClientID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -89,21 +92,23 @@ func TestUpdateClientAllowsCodeRenameForThirdParty(t *testing.T) {
 	ctx := newOAuthDeleteCtx("1", "0")
 	svc := NewApplicationClientSvc()
 
-	created, err := svc.Create(ctx, &dtoapplicationclient.ApplicationClientCreateReq{
+	created, err := svc.Create(requestCtx(ctx), &dtoapplicationclient.ApplicationClientCreateReq{
 		AppID: "app1", Code: "iam_client", Name: "接入客户端",
-	})
+
+		Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	if err := svc.Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID: created.ApplicationClientID,
 		Code:                "iam_client_web",
 		Name:                "接入客户端",
 		Status:              model.ApplicationClientStatusEnable,
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("自建客户端改编码应放行: %v", err)
 	}
-	got, err := dao.NewApplicationClientDao().GetByID(ctx, created.ApplicationClientID)
+	got, err := dao.NewApplicationClientDao().GetByID(dbclient.CrossTenantContext(ctx), created.ApplicationClientID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -112,22 +117,24 @@ func TestUpdateClientAllowsCodeRenameForThirdParty(t *testing.T) {
 	}
 
 	// 改回原编码（回传未变化的编码同样放行）
-	if err := svc.Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID: created.ApplicationClientID,
 		Code:                "iam_client_web",
 		Name:                "接入客户端",
 		Status:              model.ApplicationClientStatusEnable,
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("编码未变化应放行: %v", err)
 	}
 
 	// 非法编码被拒
-	err = svc.Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	err = svc.Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID: created.ApplicationClientID,
 		Code:                "iam-client-v3",
 		Name:                "接入客户端",
 		Status:              model.ApplicationClientStatusEnable,
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil || gerror.GetCode(err) != int(code.ApplicationClientCodeInvalidError) {
 		t.Fatalf("非法编码必须被拒绝, got %v", err)
 	}
@@ -148,16 +155,17 @@ func TestUpdateBuiltInClientRejectsCodeRename(t *testing.T) {
 		t.Fatalf("seed builtin client: %v", err)
 	}
 
-	err := svc.Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	err := svc.Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID: builtin.ID,
 		Code:                "platform_console_web",
 		Name:                builtin.Name,
 		Status:              model.ApplicationClientStatusEnable,
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil || gerror.GetCode(err) != int(code.ApplicationClientBuiltInCodeImmutableError) {
 		t.Fatalf("内置客户端改编码必须被拒绝, got %v", err)
 	}
-	got, err := dao.NewApplicationClientDao().GetByID(ctx, builtin.ID)
+	got, err := dao.NewApplicationClientDao().GetByID(dbclient.CrossTenantContext(ctx), builtin.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -166,12 +174,13 @@ func TestUpdateBuiltInClientRejectsCodeRename(t *testing.T) {
 	}
 
 	// 回传未变化的编码不受影响（幂等友好），其它字段照常可改
-	if err := svc.Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID: builtin.ID,
 		Code:                model.SeedBuiltinClientPlatformAdminWeb,
 		Name:                "运维自定名",
 		Status:              model.ApplicationClientStatusEnable,
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("编码未变化时其余字段应可改: %v", err)
 	}
 }

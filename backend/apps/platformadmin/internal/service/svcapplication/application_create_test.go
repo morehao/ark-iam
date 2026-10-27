@@ -1,6 +1,7 @@
 package svcapplication
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"testing"
 
 	"github.com/morehao/ark-iam/pkg/code"
@@ -19,7 +20,7 @@ func TestApplicationCreateRejectsInvalidCode(t *testing.T) {
 
 	svc := NewApplicationSvc()
 	for _, badCode := range []string{"my-app", "My_App", "1app", "app.web", "app web", "_app", ""} {
-		_, err := svc.Create(newApplicationCtx(), &dtoapplication.ApplicationCreateReq{Code: badCode, Name: "非法编码应用"})
+		_, err := svc.Create(requestCtx(newApplicationCtx()), &dtoapplication.ApplicationCreateReq{Code: badCode, Name: "非法编码应用", Operator: operatorOf(newApplicationCtx())})
 		if err == nil {
 			t.Fatalf("Create(%q) expected error", badCode)
 		}
@@ -35,7 +36,7 @@ func TestApplicationCreateAcceptsUnderscoreCode(t *testing.T) {
 	testutil.SetupSQLite(t, &model.ApplicationEntity{})
 
 	ctx := newApplicationCtx()
-	resp, err := NewApplicationSvc().Create(ctx, &dtoapplication.ApplicationCreateReq{Code: "my_app_2", Name: "合法应用"})
+	resp, err := NewApplicationSvc().Create(requestCtx(ctx), &dtoapplication.ApplicationCreateReq{Code: "my_app_2", Name: "合法应用", Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -43,7 +44,7 @@ func TestApplicationCreateAcceptsUnderscoreCode(t *testing.T) {
 		t.Fatalf("resp code = %q, want my_app_2", resp.Code)
 	}
 
-	got, err := dao.NewApplicationDao().GetByID(ctx, resp.AppID)
+	got, err := dao.NewApplicationDao().GetByID(dbclient.CrossTenantContext(ctx), resp.AppID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}

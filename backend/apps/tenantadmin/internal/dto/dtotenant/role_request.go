@@ -1,5 +1,7 @@
 package dtotenant
 
+import "github.com/morehao/ark-iam/pkg/object/objidentity"
+
 // RoleCreateReq 创建租户自建角色。
 // **不含角色编码**：编码是跨系统授权契约值（OIDC groups 取值、下游策略名），策略在下游是全局
 // 命名实体、全租户共用一条，故只能由应用方在应用角色模板里定义一次（见 docs/design/system-design.md §5.4）。
@@ -8,12 +10,16 @@ type RoleCreateReq struct {
 	AppID       string `json:"appID" binding:"required"` // 所属应用ID（租户订阅的启用应用，含系统内置应用）
 	Name        string `json:"name" binding:"required"`  // 角色名称(应用内唯一)
 	Description string `json:"description"`              // 角色描述
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type RoleUpdateReq struct {
 	RoleID      string `json:"-" uri:"roleID" binding:"required"` // 角色ID
 	Name        string `json:"name" binding:"required"`           // 角色名称(应用内唯一)
 	Description string `json:"description"`                       // 角色描述
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type RoleDetailReq struct {
@@ -32,9 +38,13 @@ type RolePageListReq struct {
 
 type RoleDeleteReq struct {
 	RoleID string `json:"-" uri:"roleID" binding:"required"` // 角色ID
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type RoleMenusUpdateReq struct {
 	RoleID  string   `json:"-" uri:"roleID" binding:"required"` // 角色ID
 	MenuIDs []string `json:"menuIDs" binding:"required"`        // 菜单ID列表(全量替换)
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }

@@ -2,6 +2,7 @@ package ctrtenant
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/tenantadmin/internal/service/svctenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -52,7 +53,7 @@ func (ctr *userCtr) PageList(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.userSvc.PageList(ctx, &req)
+	res, err := ctr.userSvc.PageList(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -69,11 +70,12 @@ func (ctr *userCtr) PageList(ctx *gin.Context) {
 // @Router /v1/tenant/users [post]
 func (ctr *userCtr) Create(ctx *gin.Context) {
 	var req dtotenant.UserCreateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.userSvc.Create(ctx, &req)
+	res, err := ctr.userSvc.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -94,7 +96,7 @@ func (ctr *userCtr) Detail(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.userSvc.Detail(ctx, &req)
+	res, err := ctr.userSvc.Detail(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -112,6 +114,7 @@ func (ctr *userCtr) Detail(ctx *gin.Context) {
 // @Router /v1/tenant/users/{userID} [patch]
 func (ctr *userCtr) Update(ctx *gin.Context) {
 	var req dtotenant.UserUpdateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -120,7 +123,7 @@ func (ctr *userCtr) Update(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.userSvc.Update(ctx, &req); err != nil {
+	if err := ctr.userSvc.Update(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -138,11 +141,12 @@ func (ctr *userCtr) Update(ctx *gin.Context) {
 // @Router /v1/tenant/users/{userID}/reset-password [post]
 func (ctr *userCtr) ResetPassword(ctx *gin.Context) {
 	var req dtotenant.UserResetPasswordReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.userSvc.ResetPassword(ctx, &req)
+	res, err := ctr.userSvc.ResetPassword(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -163,7 +167,7 @@ func (ctr *userCtr) ListRoles(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.userSvc.ListRoles(ctx, &req)
+	res, err := ctr.userSvc.ListRoles(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -181,6 +185,7 @@ func (ctr *userCtr) ListRoles(ctx *gin.Context) {
 // @Router /v1/tenant/users/{userID}/roles [put]
 func (ctr *userCtr) UpdateRoles(ctx *gin.Context) {
 	var req dtotenant.UserRolesUpdateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -189,7 +194,7 @@ func (ctr *userCtr) UpdateRoles(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.userSvc.UpdateRoles(ctx, &req); err != nil {
+	if err := ctr.userSvc.UpdateRoles(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -205,11 +210,12 @@ func (ctr *userCtr) UpdateRoles(ctx *gin.Context) {
 // @Router /v1/tenant/users/{userID}/applications [get]
 func (ctr *userCtr) ListApplications(ctx *gin.Context) {
 	var req dtotenant.UserApplicationsListReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.appAccessSvc.ListUserApplications(ctx, &req)
+	res, err := ctr.appAccessSvc.ListUserApplications(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -227,6 +233,7 @@ func (ctr *userCtr) ListApplications(ctx *gin.Context) {
 // @Router /v1/tenant/users/{userID}/applications [put]
 func (ctr *userCtr) UpdateApplications(ctx *gin.Context) {
 	var req dtotenant.UserApplicationsUpdateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -235,7 +242,7 @@ func (ctr *userCtr) UpdateApplications(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.appAccessSvc.UpdateUserApplications(ctx, &req); err != nil {
+	if err := ctr.appAccessSvc.UpdateUserApplications(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -255,7 +262,7 @@ func (ctr *userCtr) ListIdentities(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.userIdentitySvc.ListByUser(ctx, &req)
+	res, err := ctr.userIdentitySvc.ListByUser(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -273,6 +280,7 @@ func (ctr *userCtr) ListIdentities(ctx *gin.Context) {
 // @Router /v1/tenant/users/{userID}/identities [post]
 func (ctr *userCtr) CreateIdentity(ctx *gin.Context) {
 	var req dtotenant.UserIdentityCreateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -281,7 +289,7 @@ func (ctr *userCtr) CreateIdentity(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.userIdentitySvc.Create(ctx, &req)
+	res, err := ctr.userIdentitySvc.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -299,11 +307,12 @@ func (ctr *userCtr) CreateIdentity(ctx *gin.Context) {
 // @Router /v1/tenant/users/{userID}/identities/{identityID} [delete]
 func (ctr *userCtr) DeleteIdentity(ctx *gin.Context) {
 	var req dtotenant.UserIdentityDeleteReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.userIdentitySvc.Delete(ctx, &req); err != nil {
+	if err := ctr.userIdentitySvc.Delete(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -323,7 +332,7 @@ func (ctr *userCtr) ListLoginLogs(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.userSvc.ListLoginLogs(ctx, &req)
+	res, err := ctr.userSvc.ListLoginLogs(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

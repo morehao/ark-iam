@@ -974,7 +974,15 @@ flowchart TB
 
 **fail-closed**：ctx 未声明作用域时，插件拒绝执行 SQL 并返回 `dbclient.ErrTenantScopeMissing`（错误信息含表名与修复指引），**绝不静默放行成跨租户读**。灰度回退开关为 `dbclient.SetMissingTenantScopeMode(dbclient.MissingTenantScopeWarn)`（只告警不拦截）。
 
-**两层载体**：规范存储是**请求上下文**里的类型化作用域（跨 `http.Handler` 的协议层、异步任务同样可见，OIDC provider 的 `op.Storage` 因此零改造）；同一 helper 同时把当前租户投影到 gin Keys，使 `gincontext.Get*String` 的 135 处读取点与历史写法继续可用。两者语义等价、类型化优先——因此即使某个引擎漏开 `ContextWithFallback`，隔离也不会静默失效。
+**两层载体**：规范存储是**请求上下文**里的类型化作用域（跨 `http.Handler` 的协议层、异步任务同样可见，OIDC provider 的 `op.Storage` 因此零改造）；同一 helper 把当前租户投影到 gin Keys 供 controller/middleware 读取。
+
+**2026-10-27 边界调整（取代"gin ctx 直传"的旧结论）**：context 只承载横切值（取消/超时、trace、租户作用域、requestID），**身份是业务输入、走 DTO**：
+
+- **controller 是唯一转换点**：`ctx.Request.Context()` 转换一次，此后 service → dao → 第三方一律收纯 `context.Context`；生产引擎**不再开启** `engine.ContextWithFallback`（5 个 `cmd/main.go` 已移除）。
+- **身份走 DTO**：controller 用 `identity.OperatorFromGin(ctx)` 填 `req.Operator`（`objidentity.Operator`，字段全 `json:"-"`），service 只读 DTO；没有 DTO 的方法用显式 `operator` 参数。依据 golib v1.33.0 `biz/gcontext/README.md`「身份不经过 context」。
+- **租户 ID**：service 用 `dbclient.TenantIDFromContext(ctx)` 读当前作用域，不塞进每个 DTO；数据隔离仍由插件按同一份作用域注入，不依赖该返回值。
+- **内层零 gin**：service/dao/core/audit 禁止 `*gin.Context`、禁止 import `gincontext` 与 `pkg/identity`（`pkg/dbclient/design_guard_test.go` 三条红线强制）。
+- 依据与改动清单见 [context-and-tenant-scope.md](context-and-tenant-scope.md) 规则 1 与 §5.1.1。
 
 **验收测试**：`pkg/dbclient/tenant_scope_enforcement_test.go` 覆盖「gin ctx 与 `ctx.Request.Context()` 解析逐字节一致（G2）」「未声明作用域 fail-closed」「All/Explicit/Current 三类语义」「开关关闭时投影仍生效」「AsyncContext 带走作用域且不继承取消」。
 
