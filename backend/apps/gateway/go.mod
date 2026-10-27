@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/gin-gonic/gin v1.12.0
-	github.com/morehao/golib v1.32.17
+	github.com/morehao/golib v1.33.0
 )
 
 require (
