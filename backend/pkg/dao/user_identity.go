@@ -8,6 +8,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type UserIdentityCond struct {
@@ -23,20 +24,21 @@ func (c *UserIdentityCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
+	col := condCols(tableName)
 	if c.PersonID != "" {
-		*db = *db.Where(tableName+".person_id = ?", c.PersonID)
+		db.Where(clause.Eq{Column: col("person_id"), Value: c.PersonID})
 	}
 	if c.ConnectorID != "" {
-		*db = *db.Where(tableName+".connector_id = ?", c.ConnectorID)
+		db.Where(clause.Eq{Column: col("connector_id"), Value: c.ConnectorID})
 	}
 	if c.Provider != "" {
-		*db = *db.Where(tableName+".provider = ?", c.Provider)
+		db.Where(clause.Eq{Column: col("provider"), Value: c.Provider})
 	}
 	if c.Issuer != "" {
-		*db = *db.Where(tableName+".issuer = ?", c.Issuer)
+		db.Where(clause.Eq{Column: col("issuer"), Value: c.Issuer})
 	}
 	if c.ExternalSubject != "" {
-		*db = *db.Where(tableName+".external_subject = ?", c.ExternalSubject)
+		db.Where(clause.Eq{Column: col("external_subject"), Value: c.ExternalSubject})
 	}
 }
 

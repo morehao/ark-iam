@@ -4,6 +4,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type RoleMenuCond struct {
@@ -18,17 +19,18 @@ func (c *RoleMenuCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
+	col := condCols(tableName)
 	if c.TenantID != "" {
-		db.Where(tableName+".tenant_id = ?", c.TenantID)
+		db.Where(clause.Eq{Column: col("tenant_id"), Value: c.TenantID})
 	}
 	if c.RoleID != "" {
-		db.Where(tableName+".role_id = ?", c.RoleID)
+		db.Where(clause.Eq{Column: col("role_id"), Value: c.RoleID})
 	}
 	if len(c.RoleIDs) > 0 {
-		db.Where(tableName+".role_id IN ?", c.RoleIDs)
+		db.Where(clause.IN{Column: col("role_id"), Values: toAnySlice(c.RoleIDs)})
 	}
 	if c.MenuID != "" {
-		db.Where(tableName+".menu_id = ?", c.MenuID)
+		db.Where(clause.Eq{Column: col("menu_id"), Value: c.MenuID})
 	}
 }
 

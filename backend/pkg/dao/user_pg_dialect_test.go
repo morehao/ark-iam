@@ -93,12 +93,14 @@ func TestUserCondRendersQuotedUserTableOnPostgres(t *testing.T) {
 	t.Logf("PG dry-run SQL: %s", sql)
 
 	// 契约（golib gormdao/cond.go）：Cond.BuildCondition 收到的 tableName 已是当前方言下的
-	// 引用形式（PostgreSQL `"user"`），调用方用它拼前缀即 `"user".col = ?`，不得再手动引用。
-	// 列名（tenant_id/status）不是保留字，PG 允许裸列名，因此正确形态是 `"user".tenant_id`。
+	// 引用形式（PostgreSQL `"user"`）。本仓 Cond 一律用 clause 结构化拼装条件
+	// （clause.Eq{Column: clause.Column{Table: tableName, Name: "status"}}），表名与列名都交给
+	// GORM 按方言引用，因此正确形态是 `"user"."tenant_id"`（表名、列名均带引号）——
+	// 这比旧的「只引用表名、列名裸写」更强：列名是保留字（order/desc 等）时同样安全。
 	wants := []string{
 		`FROM "user"`,
-		`"user".tenant_id`,
-		`"user".status`,
+		`"user"."tenant_id"`,
+		`"user"."status"`,
 		`"user"."deleted_at"`,
 	}
 	for _, want := range wants {
@@ -206,3 +208,33 @@ type nonExecResult struct{}
 
 func (nonExecResult) LastInsertId() (int64, error) { return 0, nil }
 func (nonExecResult) RowsAffected() (int64, error) { return 0, nil }
+
+// TestUserCondKeywordRendersClauseStyleOnPostgres 钉住 clause 结构化拼装的复合条件：
+// 关键字 OR（姓名 LIKE / 关联 person 子查询 LIKE）在 PG 方言下必须产出按方言引用的标识符，
+// 且不得出现反引号或未引用的保留字表名前缀。
+func TestUserCondKeywordRendersClauseStyleOnPostgres(t *testing.T) {
+	db, sqls := newCaptureDB(t)
+	userDao := NewUserDao(WithDBGetter(func(context.Context) *gorm.DB { return db }))
+
+	cond := &UserCond{TenantID: "tenant-1", Keyword: "alice"}
+	if _, err := userDao.GetListByCond(context.Background(), cond); err != nil {
+		t.Fatalf("GetListByCond (dry-run) fail: %v", err)
+	}
+	if len(*sqls) == 0 {
+		t.Fatal("未捕获到 DryRun SQL")
+	}
+	sql := (*sqls)[len(*sqls)-1]
+	t.Logf("PG dry-run SQL: %s", sql)
+
+	for _, want := range []string{
+		`"user"."name" LIKE '%alice%'`,
+		`"user"."person_id" IN (SELECT id FROM "person"`,
+	} {
+		if !strings.Contains(sql, want) {
+			t.Errorf("SQL 缺少 %q\n实际: %s", want, sql)
+		}
+	}
+	if strings.Contains(sql, "`") {
+		t.Errorf("SQL 出现反引号（PG 不支持）\n实际: %s", sql)
+	}
+}

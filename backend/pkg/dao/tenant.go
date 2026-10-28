@@ -4,6 +4,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type TenantCond struct {
@@ -23,32 +24,33 @@ func (c *TenantCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
+	col := condCols(tableName)
 	if len(c.IDs) > 0 {
-		db.Where(tableName+".id IN ?", c.IDs)
+		db.Where(clause.IN{Column: col("id"), Values: toAnySlice(c.IDs)})
 	}
 	if c.CreatedBy != "" {
-		db.Where(tableName+".created_by = ?", c.CreatedBy)
+		db.Where(clause.Eq{Column: col("created_by"), Value: c.CreatedBy})
 	}
 	if c.DbUser != "" {
-		db.Where(tableName+".db_user = ?", c.DbUser)
+		db.Where(clause.Eq{Column: col("db_user"), Value: c.DbUser})
 	}
 	if c.DeletedBy != "" {
-		db.Where(tableName+".deleted_by = ?", c.DeletedBy)
+		db.Where(clause.Eq{Column: col("deleted_by"), Value: c.DeletedBy})
 	}
 	if c.Status != "" {
-		db.Where(tableName+".status = ?", c.Status)
+		db.Where(clause.Eq{Column: col("status"), Value: c.Status})
 	}
 	if c.Keyword != "" {
-		db.Where(tableName+".name LIKE ?", "%"+c.Keyword+"%")
+		db.Where(clause.Like{Column: col("name"), Value: "%" + c.Keyword + "%"})
 	}
 	if c.Name != "" {
-		db.Where(tableName+".name = ?", c.Name)
+		db.Where(clause.Eq{Column: col("name"), Value: c.Name})
 	}
 	if c.Tag != "" {
-		db.Where(tableName+".tag = ?", c.Tag)
+		db.Where(clause.Eq{Column: col("tag"), Value: c.Tag})
 	}
 	if c.UpdatedBy != "" {
-		db.Where(tableName+".updated_by = ?", c.UpdatedBy)
+		db.Where(clause.Eq{Column: col("updated_by"), Value: c.UpdatedBy})
 	}
 }
 

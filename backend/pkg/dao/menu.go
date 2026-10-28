@@ -4,6 +4,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // MenuOrderBySort 菜单的规范排序字段：先按控制台可维护的「排序」(sort) 升序，
@@ -29,29 +30,30 @@ func (c *MenuCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
+	col := condCols(tableName)
 	if c.AppID != "" {
-		db.Where(tableName+".app_id = ?", c.AppID)
+		db.Where(clause.Eq{Column: col("app_id"), Value: c.AppID})
 	}
 	if c.ParentID != "" {
-		db.Where(tableName+".parent_id = ?", c.ParentID)
+		db.Where(clause.Eq{Column: col("parent_id"), Value: c.ParentID})
 	}
 	if c.Name != "" {
-		db.Where(tableName+".name = ?", c.Name)
+		db.Where(clause.Eq{Column: col("name"), Value: c.Name})
 	}
 	if c.Code != "" {
-		db.Where(tableName+".code = ?", c.Code)
+		db.Where(clause.Eq{Column: col("code"), Value: c.Code})
 	}
 	if c.SeedKey != "" {
-		db.Where(tableName+".seed_key = ?", c.SeedKey)
+		db.Where(clause.Eq{Column: col("seed_key"), Value: c.SeedKey})
 	}
 	if c.Type != "" {
-		db.Where(tableName+".type = ?", c.Type)
+		db.Where(clause.Eq{Column: col("type"), Value: c.Type})
 	}
 	if c.Visibility != "" {
-		db.Where(tableName+".visibility = ?", c.Visibility)
+		db.Where(clause.Eq{Column: col("visibility"), Value: c.Visibility})
 	}
 	if c.Status != "" {
-		db.Where(tableName+".status = ?", c.Status)
+		db.Where(clause.Eq{Column: col("status"), Value: c.Status})
 	}
 }
 

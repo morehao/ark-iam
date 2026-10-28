@@ -4,6 +4,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type RoleCond struct {
@@ -23,34 +24,34 @@ func (c *RoleCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
+	col := condCols(tableName)
 	if c.TenantID != "" {
-		db.Where(tableName+".tenant_id = ?", c.TenantID)
+		db.Where(clause.Eq{Column: col("tenant_id"), Value: c.TenantID})
 	}
 	if c.AppID != "" {
-		db.Where(tableName+".app_id = ?", c.AppID)
+		db.Where(clause.Eq{Column: col("app_id"), Value: c.AppID})
 	}
 	// app_id 为空串是"未归属应用"（系统角色）的存储值，而 AppID 空值语义是"不过滤"，故用独立开关表达
 	if c.Unassigned {
-		db.Where(tableName + ".app_id = ''")
+		db.Where(clause.Eq{Column: col("app_id"), Value: ""})
 	}
 	if len(c.IDs) > 0 {
-		db.Where(tableName+".id IN ?", c.IDs)
+		db.Where(clause.IN{Column: col("id"), Values: toAnySlice(c.IDs)})
 	}
 	if c.Keyword != "" {
-		k := "%" + c.Keyword + "%"
-		db.Where(tableName+".name LIKE ? OR "+tableName+".code LIKE ?", k, k)
+		db.Where(buildOrLike(col, c.Keyword, "name", "code"))
 	}
 	if c.Name != "" {
-		db.Where(tableName+".name = ?", c.Name)
+		db.Where(clause.Eq{Column: col("name"), Value: c.Name})
 	}
 	if c.Code != "" {
-		db.Where(tableName+".code = ?", c.Code)
+		db.Where(clause.Eq{Column: col("code"), Value: c.Code})
 	}
 	if c.Source != "" {
-		db.Where(tableName+".source = ?", c.Source)
+		db.Where(clause.Eq{Column: col("source"), Value: c.Source})
 	}
 	if c.AdminType != "" {
-		db.Where(tableName+".admin_type = ?", c.AdminType)
+		db.Where(clause.Eq{Column: col("admin_type"), Value: c.AdminType})
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type AuditLogCond struct {
@@ -18,17 +19,18 @@ func (c *AuditLogCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
+	col := condCols(tableName)
 	if c.PersonID != "" {
-		db.Where(tableName+".actor_person_id = ?", c.PersonID)
+		db.Where(clause.Eq{Column: col("actor_person_id"), Value: c.PersonID})
 	}
 	if c.TenantID != "" {
-		db.Where(tableName+".tenant_id = ?", c.TenantID)
+		db.Where(clause.Eq{Column: col("tenant_id"), Value: c.TenantID})
 	}
 	if c.Action != "" {
-		db.Where(tableName+".action = ?", c.Action)
+		db.Where(clause.Eq{Column: col("action"), Value: c.Action})
 	}
 	if c.Result != "" {
-		db.Where(tableName+".result = ?", c.Result)
+		db.Where(clause.Eq{Column: col("result"), Value: c.Result})
 	}
 }
 

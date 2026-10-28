@@ -4,6 +4,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // UserApplicationCond 用户应用准入查询条件。
@@ -22,23 +23,24 @@ func (c *UserApplicationCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
+	col := condCols(tableName)
 	if c.TenantID != "" {
-		db.Where(tableName+".tenant_id = ?", c.TenantID)
+		db.Where(clause.Eq{Column: col("tenant_id"), Value: c.TenantID})
 	}
 	if c.UserID != "" {
-		db.Where(tableName+".user_id = ?", c.UserID)
+		db.Where(clause.Eq{Column: col("user_id"), Value: c.UserID})
 	}
 	if c.AppID != "" {
-		db.Where(tableName+".app_id = ?", c.AppID)
+		db.Where(clause.Eq{Column: col("app_id"), Value: c.AppID})
 	}
 	if c.Status != "" {
-		db.Where(tableName+".status = ?", c.Status)
+		db.Where(clause.Eq{Column: col("status"), Value: c.Status})
 	}
 	if len(c.UserIDs) > 0 {
-		db.Where(tableName+".user_id IN ?", c.UserIDs)
+		db.Where(clause.IN{Column: col("user_id"), Values: toAnySlice(c.UserIDs)})
 	}
 	if len(c.AppIDs) > 0 {
-		db.Where(tableName+".app_id IN ?", c.AppIDs)
+		db.Where(clause.IN{Column: col("app_id"), Values: toAnySlice(c.AppIDs)})
 	}
 }
 
