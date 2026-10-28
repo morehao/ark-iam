@@ -4,6 +4,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type DepartmentUserCond struct {
@@ -19,20 +20,21 @@ func (c *DepartmentUserCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
+	col := condCols(tableName)
 	if c.TenantID != "" {
-		db.Where(tableName+".tenant_id = ?", c.TenantID)
+		db.Where(clause.Eq{Column: col("tenant_id"), Value: c.TenantID})
 	}
 	if c.DepartmentID != "" {
-		db.Where(tableName+".department_id = ?", c.DepartmentID)
+		db.Where(clause.Eq{Column: col("department_id"), Value: c.DepartmentID})
 	}
 	if c.UserID != "" {
-		db.Where(tableName+".user_id = ?", c.UserID)
+		db.Where(clause.Eq{Column: col("user_id"), Value: c.UserID})
 	}
 	if len(c.UserIDs) > 0 {
-		db.Where(tableName+".user_id IN ?", c.UserIDs)
+		db.Where(clause.IN{Column: col("user_id"), Values: toAnySlice(c.UserIDs)})
 	}
 	if c.RelationType != "" {
-		db.Where(tableName+".relation_type = ?", c.RelationType)
+		db.Where(clause.Eq{Column: col("relation_type"), Value: c.RelationType})
 	}
 }
 

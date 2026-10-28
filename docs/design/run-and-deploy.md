@@ -195,7 +195,7 @@ flowchart LR
 
 #### 2.5.1 代码侧无需迁移，行为由开关控制
 
-本批新增三层语义中的**准入层**：表 `user_application`（`tenant_id`、`user_id` 指向 `tenant_user.id`——含成员与服务账号、`app_id`、`status`（具名枚举 `enable`/`disable`，撤销 = 置 `disable` 保留行）、`source`（`manual`/`role`/`provision`）），以及部分唯一索引 `uk_user_application_active (tenant_id, user_id, app_id) WHERE deleted_at IS NULL`。**AutoMigrate 只新增缺失的表/列/索引**，因此升级代码本身不需要任何迁移动作。
+本批新增三层语义中的**准入层**：表 `user_application`（`tenant_id`、`user_id` 指向 `user.id`——含成员与服务账号、`app_id`、`status`（具名枚举 `enable`/`disable`，撤销 = 置 `disable` 保留行）、`source`（`manual`/`role`/`provision`）），以及部分唯一索引 `uk_user_application_active (tenant_id, user_id, app_id) WHERE deleted_at IS NULL`。**AutoMigrate 只新增缺失的表/列/索引**，因此升级代码本身不需要任何迁移动作。
 
 判定式收敛为单一实现 `backend/pkg/core/application` 的 `Usable` / `CheckUsable`：
 
@@ -246,7 +246,7 @@ WHERE ur.deleted_at IS NULL AND r.app_id <> '' AND ua.id IS NULL;
 --    口径：租户 active、订阅 enable、应用 enable，但该成员没有 enable 的 grant。
 --    （租户/成员已停用者可忽略——他们本来也登不进。）
 SELECT u.tenant_id, u.id AS user_id, p.username, a.code AS app_code
-FROM tenant_user u
+FROM "user" u
 JOIN tenant t  ON t.id = u.tenant_id AND t.status = 'active' AND t.deleted_at IS NULL
 JOIN person p  ON p.id = u.person_id AND p.deleted_at IS NULL
 JOIN tenant_application ta ON ta.tenant_id = u.tenant_id AND ta.status = 'enable' AND ta.deleted_at IS NULL
@@ -275,6 +275,52 @@ ORDER BY u.tenant_id, a.code;
 #### 2.5.4 回滚
 
 把 `oidc.enforceAppAccess` 改回 `false` 并重启即回到升级前行为（表与数据保留，纯新增、无副作用）；彻底移除能力才需要删表（不可逆，需审批与备份）。
+
+#### 2.5.5 升级到 `user` 表名（v1.33 批次，必须手工执行）
+
+租户成员表的物理表名由 `tenant_user` 回归为 **`user`**（`backend/pkg/model/user.go` 的 `model.TableNameUser`）。`user` 是 PostgreSQL 保留字，SQL 里必须**按方言引用**（写成 `"user"`）；引用由 golib `gormdao` v1.33.0+ 负责，应用代码不再手工加引号。
+
+**为什么必须手工执行**：`AutoMigrate` 只新增缺失的表，**不会给已有表改名**。若先起新版，它会新建一张空的 `"user"`，旧数据全部留在 `tenant_user` 里，表现为"所有用户消失、登录不进"。
+
+**执行顺序（不可颠倒）**：
+
+```sql
+-- 0) 备份（按现场备份方案执行，至少包含 tenant_user 全表）
+--    例：pg_dump -Fc -t tenant_user <db> > backup_before_user_rename.dump
+
+-- 1) 停旧版（关闭 auth/platformadmin/tenantadmin/rpapi/gateway 全部进程，
+--    确认没有任何旧版实例在连接该库）
+
+-- 2) 记下旧表行数，作为升级后的核对基线
+SELECT count(*) FROM tenant_user;
+
+-- 3) 改名（表名必须加双引号；不加引号会语法错误）
+ALTER TABLE tenant_user RENAME TO "user";
+
+-- 4) 核对：行数与第 2 步一致
+SELECT count(*) FROM "user";
+```
+
+```bash
+# 5) 起新版（golib ≥ v1.33.0），确认健康检查与登录可用
+```
+
+**要点**：
+
+- **必须整批一起升级**：所有应用共用同一张表，任一实例仍跑旧代码（读 `tenant_user`）都会在改名后查不到表。单体 `gateway` 与拆分部署的四个应用要同一批替换。
+- 该表**没有外键**、`UserEntity` 上**没有索引 tag**；改名后主键与既有索引（`tenant_user_pkey` 等）继续附着在 `"user"` 上，名称保留旧前缀，**不影响读写**，无需重建。
+- 改名后**不要**再手工在任何地方写 `tenant_user`。仓库内 `git grep tenant_user` 仅剩历史说明与本次改名指引。
+- 外部报表/BI 若直接读 `tenant_user`，升级后会查询失败，需同步改为 `SELECT ... FROM "user"`——这是本次变更对外部系统的**唯一影响面**（HTTP API 与 JWT claim 均不变）。
+
+**回滚（先停新版，顺序与升级相反）**：
+
+```sql
+ALTER TABLE "user" RENAME TO tenant_user;
+```
+
+回滚后必须**同时把应用回退到旧版本**（读 `tenant_user` 的代码），否则同样出现"新代码找不到 `"user"` 表"。若改名后已有新数据写入，优先从第 0 步的备份恢复，再评估回滚。
+
+**开发/测试环境**不必执行上述 SQL：直接删库重建（§2.3）后由 `AutoMigrate` 建出 `"user"`，再走 §2.4 首次初始化即可。
 
 ### 2.6 版本升级时的菜单变更清单
 

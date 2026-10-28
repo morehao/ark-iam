@@ -198,7 +198,7 @@ const (
 2. **全链路用常量**：赋值、传参、比较一律引用常量，如 `model.DeptUserRelationPrimary`，**禁止** `string(model.DeptUserRelationX)` 强转、**禁止**显式类型转换换别的枚举类型、**禁止**裸字面量 `"primary"`/`"admin"` 出现在非定义处。
 3. **非法值校验归 service**：请求来自前端（JSON/form 绑定原始类型），service 入口用 `switch` + 常量白名单判合法，非法返回对应功能级错误码；合法值命中常量直接使用。
 4. **JSON/DB 向下兼容**：具名类型的底层是 `string`，JSON 序列化仍是普通字符串、gorm 存 varchar，前端和数据库均无感知；DTO 包允许 import `pkg/model`（单向下游，无环）。
-5. **布尔语义一律枚举化，禁止 Go `bool` 承载字典语义**：表达开/关的列（`...Flag` / `...Policy`，如 `menu.hidden`、`application.allow_join_by_invite`、`application_client.require_pkce`、`connector.allow_account_link`）一律 `varchar(16)` + 具名类型 + `enable`/`disable` 常量，**禁止** `bool`、`0/1`、`type:boolean`；**真值判断是错误写法**——比较必须写 `== XxxEnable`（`'disable'` 是非空字符串、真值恒为 true，`if x` 会把停用当启用，前端同理）。历史布尔列的改名与去 `is_`/`is_verified` 前缀一并按此收敛（如 `person.is_suspended` → `person.status`、`tenant_user.is_owner` → `owner_type`、`domain.is_verified` → `verification_status`）。
+5. **布尔语义一律枚举化，禁止 Go `bool` 承载字典语义**：表达开/关的列（`...Flag` / `...Policy`，如 `menu.hidden`、`application.allow_join_by_invite`、`application_client.require_pkce`、`connector.allow_account_link`）一律 `varchar(16)` + 具名类型 + `enable`/`disable` 常量，**禁止** `bool`、`0/1`、`type:boolean`；**真值判断是错误写法**——比较必须写 `== XxxEnable`（`'disable'` 是非空字符串、真值恒为 true，`if x` 会把停用当启用，前端同理）。历史布尔列的改名与去 `is_`/`is_verified` 前缀一并按此收敛（如 `person.is_suspended` → `person.status`、`user.is_owner` → `owner_type`、`domain.is_verified` → `verification_status`）。
 6. **JSON 列必须显式化**：列一律 `type:json` + `serializer:json` 且用**具名载具类型**（如 `RoleTemplateItemList`、`ConnectorConfig`、`RedirectURIList`），**禁止** `datatypes.JSON`、`json.RawMessage`、`[]byte`、`map[string]any`、`any` 承载；写路径只允许 `Create(entity)` 与 `pkg/dao.UpdateFields`（`Select(fields).Updates(entity)`），**禁止** `UpdateMap`、`Update("col", v)`、`UpdateColumn` 写 JSON 列——它们绕过 serializer，会静默写入 `map[...]`/`[123 34 ...]` 脏值且不报错；nil 切片入库前归一为空切片`[]T{}`。
 
 #### 数据表常量（model 层）
@@ -271,7 +271,9 @@ import (
 
 ```go
 type UserSvc interface {
-    Create(ctx *gin.Context, req *dtouser.UserCreateReq) (*dtouser.UserCreateResp, error)
+    // service 只收 context.Context：身份在 req.Operator 里（controller 填），
+    // 租户作用域随 ctx 传递。
+    Create(ctx context.Context, req *dtouser.UserCreateReq) (*dtouser.UserCreateResp, error)
 }
 
 type userSvc struct {
@@ -358,14 +360,19 @@ if txErr != nil {
 
 含 `tenant_id` 列的表，其 SELECT/UPDATE/DELETE 由租户隔离插件（`pkg/dbclient/tenant_scope.go`）自动注入 `tenant_id = ?`；**ctx 未声明作用域时 fail-closed 报错**（`dbclient.ErrTenantScopeMissing`），绝不静默放行成跨租户读。
 
-1. **ctx 一路直传 `*gin.Context`**：controller → service → dao → 第三方（OIDC provider、glog、限流器）都传同一个 gin ctx（引擎已开 `ContextWithFallback`，gin 上下文本身即合法 `context.Context`）。**禁止 `ctx.Request.Context()`**（全仓白名单为空）；异步/后台续跑用 `gincontext.AsyncContext(ctx)`（保留取值与作用域、去掉取消，且不持有会被复用的 gin 上下文）。
+1. **controller 是唯一转换点，内层只收 `context.Context`**（2026-10-27 边界调整，见 `docs/design/context-and-tenant-scope.md`）：
+   - **controller / middleware** 用 `ctx.Request.Context()` 做**唯一一次**载体转换，此后 service → dao → 第三方（OIDC provider、glog、限流器）一律收纯 `context.Context`；生产引擎**不再开启** `engine.ContextWithFallback`。
+   - **身份（谁在操作）走 DTO，不走 ctx**：controller 调 `identity.OperatorFromGin(ctx)` 填进请求 DTO 的 `Operator objidentity.Operator` 字段（该字段 `json:"-"`，客户端不可伪造；值嵌入、非指针），service 只读 `req.Operator`。没有 DTO 的方法用显式 `operator objidentity.Operator` 参数。依据 golib v1.33.0 `biz/gcontext/README.md`「身份不经过 context」。
+   - **service / dao / core / audit 禁止 import `gincontext`、`pkg/identity`，禁止出现 `*gin.Context`**（由 `pkg/dbclient/design_guard_test.go` 的可执行守卫强制）。
+   - **租户作用域**随 ctx 传递：service 用 `dbclient.TenantIDFromContext(ctx)` 读当前租户，**不要**把 tenantID 塞进每个 DTO。
+   - 异步/后台续跑用 `gincontext.AsyncContext(ctx)`：它保留取值与作用域，**但不带走 gin Keys 里的身份**——入队时须把 operator 放进任务载荷。
 2. **作用域只能显式声明**，禁止用"ctx 碰巧没有作用域"表达跨租户可见：
    - 当前租户：中间件调用一次 `gincontext.SetTenantScope(ctx, gcontext.CurrentScope(tenantID))`（写入请求上下文，并投影 gin Keys 供 `gincontext.Get*String` 读取）；
    - 指定它租户：`dbclient.ExplicitTenantContext(ctx, tenantID)`（写在具名 dao 方法内，调用方零判断）；
    - 跨全部租户：`dbclient.CrossTenantContext(ctx)`（按全局唯一键反查、自然人级操作、首次初始化引导 `svcinstall`）；
    - 非请求入口（初始化引导、worker、后台任务）：显式 `gcontext.WithTenantScope(ctx, gcontext.AllScope()/CurrentScope(tenantID))`。
 3. **新增不含 `tenant_id` 的全局表**必须同步登记到 `pkg/dbclient/gorm.go` 的 `tenantScopeSkipTables`，否则带租户上下文查询会报 `no such column`。
-4. **测试同样受约束**：`testutil.SetupSQLite` 挂载同一份插件，测试里对租户表的断言查询也必须带作用域（用被测服务同一个 gin ctx，或 `dbclient.CrossTenantContext(...)` 显式跨租户）。
+4. **测试同样受约束**：`testutil.SetupSQLite` 挂载同一份插件，测试里对租户表的断言查询也必须带作用域（用被测服务同一个请求 ctx，或 `dbclient.CrossTenantContext(...)` 显式跨租户）。测试调 service 时传 `requestCtx(ginCtx)`（= `ginCtx.Request.Context()`，各 service 测试包有同名助手）并设置 `req.Operator`；service 单测优先直接用 `dbclient.CurrentTenantContext(context.Background(), tenantID)`，不必造 gin 引擎。
 5. 灰度回退仅有 `dbclient.SetMissingTenantScopeMode(dbclient.MissingTenantScopeWarn)` 一个开关（只告警不拦截），**不得**作为长期方案。
 
 ### Controller 返回模式
@@ -379,7 +386,9 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
         gincontext.Fail(ctx, err)
         return
     }
-    res, err := ctr.userSvc.Create(ctx, &req)
+    // 身份填进 DTO（客户端不可伪造），再把纯 ctx 交给 service。
+    req.Operator = identity.OperatorFromGin(ctx)
+    res, err := ctr.userSvc.Create(ctx.Request.Context(), &req)
     if err != nil {
         gincontext.Fail(ctx, err)
         return
@@ -501,7 +510,7 @@ func TestGeneratePassword(t *testing.T) {
 - **旧库残留列/表属预期**（不再是事实源、不被读写），处置方式是**开发/测试库删库重建**：重建后 AutoMigrate 建出目标结构、再由初始化页面写入内置数据（见 `docs/design/run-and-deploy.md` §2.3 删库重建、§2.4 首次初始化）。
 - **改名列 / 改类型的列不能靠 AutoMigrate 过渡**：AutoMigrate 不会转换既有列，旧列原样留着、新列取列默认值；即使手工 `ALTER COLUMN ... TYPE varchar USING bool::varchar`，`true`/`false` 也**不是合法枚举值**（读取端按 `active`/`suspended`、`enable`/`disable` 判定会全部落到默认分支）。因此布尔→枚举这类改造必须删库重建；确需保全数据时先导出、按新枚举口径人工映射再导入（`docs/design/run-and-deploy.md` §2.3）。
 - **内置数据的字段权威矩阵只有两条语义**（单一写者，见 `pkg/model/seed_authority.go` 与 `docs/design/system-design.md` §4.5）：`immutable`（`SeedFieldImmutable`，L1 创建时写入、此后**控制台必须拒写**）/ `create_only`（`SeedFieldCreateOnly`，只播种，归运维，种子不回写）。旧的 `reconcile`/`migrate_once` 两条已随跨版本写入一并删除——L1 只跑一次、之后永久自锁，**不存在"下次初始化被收回"的双写者**，因此不需要字段收敛与一次性改名。矩阵今天只承担**声明 + 控制台拒写依据**两个职责（执行体是各 service 的拒写点，不是 `pkg/seed`）：未声明的字段一律视为 `create_only`。
-- **`immutable` 的准入判据**（见 `docs/design/system-design.md` §4.5）：只有「被控制台改写后会导致鉴权被绕过或控制台自我锁死」的字段才准入，共两类——**安全不变式**（`source` 内置标记、`role.admin_type`、平台租户 `status`、`tenant_user.source`）与**身份编码**（内置应用 `code`、内置客户端 `code` = `client_id`）。展示、结构、编码类字段一律 `create_only` 归运维——种子不回写；`immutable` 字段必须在控制台有对应拒写点（如内置应用/客户端 `code` 报 `100749`/`100823`、平台租户 `status` 拒挂起），**禁止**在 `pkg/seed` 或 service 里硬编码字段归属而不登记矩阵。
+- **`immutable` 的准入判据**（见 `docs/design/system-design.md` §4.5）：只有「被控制台改写后会导致鉴权被绕过或控制台自我锁死」的字段才准入，共两类——**安全不变式**（`source` 内置标记、`role.admin_type`、平台租户 `status`、`user.source`）与**身份编码**（内置应用 `code`、内置客户端 `code` = `client_id`）。展示、结构、编码类字段一律 `create_only` 归运维——种子不回写；`immutable` 字段必须在控制台有对应拒写点（如内置应用/客户端 `code` 报 `100749`/`100823`、平台租户 `status` 拒挂起），**禁止**在 `pkg/seed` 或 service 里硬编码字段归属而不登记矩阵。
 - **确需保全旧数据时**，把一次性 SQL 写进部署文档交执行方在升级前运行，而不是塞进启动流程。
 
 ### 代码生成

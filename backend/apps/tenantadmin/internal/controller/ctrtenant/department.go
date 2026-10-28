@@ -2,6 +2,7 @@ package ctrtenant
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/tenantadmin/internal/service/svctenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -37,11 +38,12 @@ func NewDepartmentCtr() DepartmentCtr {
 // @Router /v1/tenant/departments [post]
 func (ctr *departmentCtr) Create(ctx *gin.Context) {
 	var req dtotenant.DepartmentCreateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.departmentSvc.Create(ctx, &req)
+	res, err := ctr.departmentSvc.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -62,7 +64,7 @@ func (ctr *departmentCtr) Tree(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.departmentSvc.Tree(ctx, &req)
+	res, err := ctr.departmentSvc.Tree(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -88,7 +90,7 @@ func (ctr *departmentCtr) Children(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.departmentSvc.Children(ctx, &req)
+	res, err := ctr.departmentSvc.Children(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -106,6 +108,7 @@ func (ctr *departmentCtr) Children(ctx *gin.Context) {
 // @Router /v1/tenant/departments/{departmentID} [put]
 func (ctr *departmentCtr) Update(ctx *gin.Context) {
 	var req dtotenant.DepartmentUpdateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -114,7 +117,7 @@ func (ctr *departmentCtr) Update(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.departmentSvc.Update(ctx, &req); err != nil {
+	if err := ctr.departmentSvc.Update(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -131,6 +134,7 @@ func (ctr *departmentCtr) Update(ctx *gin.Context) {
 // @Router /v1/tenant/departments/{departmentID} [patch]
 func (ctr *departmentCtr) UpdateStatus(ctx *gin.Context) {
 	var req dtotenant.DepartmentStatusReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -139,7 +143,7 @@ func (ctr *departmentCtr) UpdateStatus(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.departmentSvc.UpdateStatus(ctx, &req); err != nil {
+	if err := ctr.departmentSvc.UpdateStatus(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -156,6 +160,7 @@ func (ctr *departmentCtr) UpdateStatus(ctx *gin.Context) {
 // @Router /v1/tenant/departments/{departmentID} [delete]
 func (ctr *departmentCtr) Delete(ctx *gin.Context) {
 	var req dtotenant.DepartmentDeleteReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -164,7 +169,7 @@ func (ctr *departmentCtr) Delete(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.departmentSvc.Delete(ctx, &req); err != nil {
+	if err := ctr.departmentSvc.Delete(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

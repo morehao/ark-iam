@@ -13,7 +13,7 @@
 package application
 
 import (
-	"github.com/gin-gonic/gin"
+	"context"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
@@ -24,7 +24,7 @@ import (
 //
 // clientID 为空、客户端不存在或应用不存在时返回 (nil, nil)——「解析不出应用」是可预期
 // 的业务边界，由调用方决定如何处理（各门禁一律 fail-closed）；仅返回数据库/IO 等系统错误。
-func GetByClientID(ctx *gin.Context, clientID string) (*model.ApplicationEntity, error) {
+func GetByClientID(ctx context.Context, clientID string) (*model.ApplicationEntity, error) {
 	if clientID == "" {
 		return nil, nil
 	}

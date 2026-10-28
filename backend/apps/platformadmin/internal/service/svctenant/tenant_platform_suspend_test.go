@@ -1,6 +1,8 @@
 package svctenant
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -22,6 +24,8 @@ func newTenantUpdateCtx() *gin.Context {
 	ginCtx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	ginCtx.Request = httptest.NewRequest(http.MethodPut, "/v1/platform/tenants/x", nil)
 	ginCtx.Set(gcontext.KeyTenantID, "other-tenant")
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("other-tenant"))
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("other-tenant"))
 	ginCtx.Set(gcontext.KeyUserID, "0")
 	return ginCtx
 }
@@ -42,19 +46,20 @@ func TestTenantUpdateRejectsPlatformTenantSuspend(t *testing.T) {
 	svc := NewTenantSvc()
 	ctx := newTenantUpdateCtx()
 
-	err := svc.Update(ctx, &dtotenant.TenantUpdateReq{
+	err := svc.Update(requestCtx(ctx), &dtotenant.TenantUpdateReq{
 		TenantID: platformTenant.ID,
 		TenantBaseInfo: objtenant.TenantBaseInfo{
 			Name: "平台运营中心", Type: model.TenantTypePlatform, Status: model.TenantStatusSuspended,
 		},
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil {
 		t.Fatal("挂起平台租户必须被拒绝")
 	}
 	if gerror.GetCode(err) != int(code.TenantPlatformSuspendForbiddenError) {
 		t.Fatalf("期望 TenantPlatformSuspendForbiddenError, got %v", err)
 	}
-	got, err := dao.NewTenantDao().GetByID(ctx, platformTenant.ID)
+	got, err := dao.NewTenantDao().GetByID(dbclient.CrossTenantContext(ctx), platformTenant.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -63,15 +68,16 @@ func TestTenantUpdateRejectsPlatformTenantSuspend(t *testing.T) {
 	}
 
 	// 平台租户改名归运维（create_only：L1 只在创建时写入），必须放行
-	if err := svc.Update(ctx, &dtotenant.TenantUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtotenant.TenantUpdateReq{
 		TenantID: platformTenant.ID,
 		TenantBaseInfo: objtenant.TenantBaseInfo{
 			Name: "ACME 平台运营中心", Type: model.TenantTypePlatform, Status: model.TenantStatusActive,
 		},
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("平台租户改名应放行: %v", err)
 	}
-	got, err = dao.NewTenantDao().GetByID(ctx, platformTenant.ID)
+	got, err = dao.NewTenantDao().GetByID(dbclient.CrossTenantContext(ctx), platformTenant.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -84,12 +90,13 @@ func TestTenantUpdateRejectsPlatformTenantSuspend(t *testing.T) {
 	if err := db.Create(customer).Error; err != nil {
 		t.Fatalf("seed customer tenant: %v", err)
 	}
-	if err := svc.Update(ctx, &dtotenant.TenantUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtotenant.TenantUpdateReq{
 		TenantID: customer.ID,
 		TenantBaseInfo: objtenant.TenantBaseInfo{
 			Name: "客户租户", Type: model.TenantTypeCustomer, Status: model.TenantStatusSuspended,
 		},
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("客户租户挂起应放行: %v", err)
 	}
 }

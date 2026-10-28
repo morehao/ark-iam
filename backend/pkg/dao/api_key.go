@@ -6,6 +6,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type ApiKeyCond struct {
@@ -21,23 +22,24 @@ func (c *ApiKeyCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
+	col := condCols(tableName)
 	if c.TenantID != "" {
-		db.Where(tableName+".tenant_id = ?", c.TenantID)
+		db.Where(clause.Eq{Column: col("tenant_id"), Value: c.TenantID})
 	}
 	if c.OwnerUserID != "" {
-		db.Where(tableName+".owner_user_id = ?", c.OwnerUserID)
+		db.Where(clause.Eq{Column: col("owner_user_id"), Value: c.OwnerUserID})
 	}
 	if c.Name != "" {
-		db.Where(tableName+".name LIKE ?", "%"+c.Name+"%")
+		db.Where(clause.Like{Column: col("name"), Value: "%" + c.Name + "%"})
 	}
 	if c.KeyHash != "" {
-		db.Where(tableName+".key_hash = ?", c.KeyHash)
+		db.Where(clause.Eq{Column: col("key_hash"), Value: c.KeyHash})
 	}
 	if c.RevokedAt != nil {
 		if c.RevokedAt.IsZero() {
-			db.Where(tableName + ".revoked_at IS NULL")
+			db.Where(clause.Eq{Column: col("revoked_at"), Value: nil})
 		} else {
-			db.Where(tableName+".revoked_at = ?", c.RevokedAt)
+			db.Where(clause.Eq{Column: col("revoked_at"), Value: c.RevokedAt})
 		}
 	}
 }

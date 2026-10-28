@@ -54,7 +54,7 @@ func TestMenuTreeFollowsSort(t *testing.T) {
 	seedSortMenu(t, db, app.ID, "", "tie-a", "并列A", 6)
 
 	ctx := newGinCtx("1", "0")
-	resp, err := NewMenuSvc().Tree(ctx, &dtopermission.MenuTreeReq{AppID: app.ID})
+	resp, err := NewMenuSvc().Tree(requestCtx(ctx), &dtopermission.MenuTreeReq{AppID: app.ID})
 	if err != nil {
 		t.Fatalf("menu tree: %v", err)
 	}
@@ -101,7 +101,7 @@ func TestMenuPageListFollowsSort(t *testing.T) {
 	seedSortMenu(t, db, app.ID, "", "tenant-role", "角色管理", 3)
 
 	ctx := newGinCtx("1", "0")
-	resp, err := NewMenuSvc().PageList(ctx, &dtopermission.MenuPageListReq{
+	resp, err := NewMenuSvc().PageList(requestCtx(ctx), &dtopermission.MenuPageListReq{
 		PageQuery: gobject.PageQuery{Page: 1, PageSize: 2},
 		AppID:     app.ID,
 	})
@@ -116,7 +116,7 @@ func TestMenuPageListFollowsSort(t *testing.T) {
 	}
 
 	// 第二页接着排，翻页不重复：缺 ORDER BY 时同一行可能出现在两页里
-	page2, err := NewMenuSvc().PageList(ctx, &dtopermission.MenuPageListReq{
+	page2, err := NewMenuSvc().PageList(requestCtx(ctx), &dtopermission.MenuPageListReq{
 		PageQuery: gobject.PageQuery{Page: 2, PageSize: 2},
 		AppID:     app.ID,
 	})

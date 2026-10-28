@@ -1,7 +1,7 @@
 package svcoidc
 
 import (
-	"github.com/gin-gonic/gin"
+	"context"
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
 	"github.com/morehao/ark-iam/pkg/code"
@@ -23,7 +23,7 @@ import (
 // 避免参数污染）→ 校验当前（临时）密码 → 强度与同值校验 → 更新口令、清除强制改密标记 →
 // 撤销既有 SSO 会话与 refresh token。改密后不续跑登录流程——租户选择与应用策略需要在
 // 重新登录时按最新状态重新判定，前端回到登录页用新密码重新登录。
-func (svc *oidcAuthSvc) ChangePassword(ctx *gin.Context, req *dtooidc.OIDCChangePasswordReq) error {
+func (svc *oidcAuthSvc) ChangePassword(ctx context.Context, req *dtooidc.OIDCChangePasswordReq) error {
 	reqCtx := ctx
 	authReq, err := svc.provider.Storage.AuthRequestByID(reqCtx, req.AuthRequestID)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type TenantApplicationCond struct {
@@ -18,17 +19,18 @@ func (c *TenantApplicationCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
+	col := condCols(tableName)
 	if c.TenantID != "" {
-		db.Where(tableName+".tenant_id = ?", c.TenantID)
+		db.Where(clause.Eq{Column: col("tenant_id"), Value: c.TenantID})
 	}
 	if c.AppID != "" {
-		db.Where(tableName+".app_id = ?", c.AppID)
+		db.Where(clause.Eq{Column: col("app_id"), Value: c.AppID})
 	}
 	if len(c.AppIDs) > 0 {
-		db.Where(tableName+".app_id IN ?", c.AppIDs)
+		db.Where(clause.IN{Column: col("app_id"), Values: toAnySlice(c.AppIDs)})
 	}
 	if c.Status != "" {
-		db.Where(tableName+".status = ?", c.Status)
+		db.Where(clause.Eq{Column: col("status"), Value: c.Status})
 	}
 }
 

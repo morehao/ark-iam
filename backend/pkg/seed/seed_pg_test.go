@@ -59,7 +59,7 @@ func TestBootstrapAgainstPostgres(t *testing.T) {
 			"user_role", "role_menu", "tenant_application",
 			"application_client_secret", "application_client", "menu",
 			"role", "user_identity", "user_login_log",
-			"department_user", "department", "tenant_user", "person",
+			"department_user", "department", `"user"`, "person",
 			"refresh_token", "session", "audit_log", "api_key", "connector",
 			"domain", "system", "log", "application", "tenant",
 		}
@@ -104,7 +104,7 @@ func TestBootstrapAgainstPostgres(t *testing.T) {
 	assertCount("role", 2)
 	assertCount("menu", 14)
 	assertCount("person", 1)
-	assertCount("tenant_user", 1)
+	assertCount(`"user"`, 1)
 	assertCount("application_client", 2)
 	assertCount("user_role", 2)
 	assertCount("role_menu", 14)
@@ -159,8 +159,8 @@ func TestBootstrapAgainstPostgres(t *testing.T) {
 	for _, col := range []struct{ table, column string }{
 		{"person", "status"},
 		{"person", "password_status"},
-		{"tenant_user", "status"},
-		{"tenant_user", "owner_type"},
+		{"user", "status"},
+		{"user", "owner_type"},
 		{"domain", "verification_status"},
 		{"application", "allow_person_create_tenant"},
 		{"application", "allow_join_by_invite"},
@@ -210,10 +210,10 @@ func TestBootstrapAgainstPostgres(t *testing.T) {
 		{"person", "custom_data"},
 		{"person", "must_change_password"},
 		{"person", "is_suspended"},
-		{"tenant_user", "profile"},
-		{"tenant_user", "custom_data"},
-		{"tenant_user", "is_owner"},
-		{"tenant_user", "is_suspended"},
+		{"user", "profile"},
+		{"user", "custom_data"},
+		{"user", "is_owner"},
+		{"user", "is_suspended"},
 		{"api_key", "scope"},
 		{"api_key", "last_used_at"},
 		{"user_identity", "last_used_at"},
@@ -249,8 +249,8 @@ func TestBootstrapAgainstPostgres(t *testing.T) {
 	}{
 		{"person", "status", allowedValues(string(model.PersonStatusActive), string(model.PersonStatusSuspended))},
 		{"person", "password_status", allowedValues(string(model.PasswordStatusNormal), string(model.PasswordStatusMustChange))},
-		{"tenant_user", "status", allowedValues(string(model.UserStatusActive), string(model.UserStatusSuspended))},
-		{"tenant_user", "owner_type", allowedValues(string(model.OwnerTypeOwner), string(model.OwnerTypeNormal))},
+		{"user", "status", allowedValues(string(model.UserStatusActive), string(model.UserStatusSuspended))},
+		{"user", "owner_type", allowedValues(string(model.OwnerTypeOwner), string(model.OwnerTypeNormal))},
 		{"domain", "verification_status", allowedValues(string(model.DomainVerificationUnverified), string(model.DomainVerificationVerified))},
 		{"application", "allow_person_create_tenant", allowedValues(string(model.AppPersonCreateTenantPolicyEnable), string(model.AppPersonCreateTenantPolicyDisable))},
 		{"application", "allow_join_by_invite", allowedValues(string(model.AppJoinByInvitePolicyEnable), string(model.AppJoinByInvitePolicyDisable))},

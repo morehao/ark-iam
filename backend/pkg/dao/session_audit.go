@@ -4,6 +4,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type SessionAuditCond struct {
@@ -16,11 +17,12 @@ func (c *SessionAuditCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
+	col := condCols(tableName)
 	if c.PersonID != "" {
-		db.Where(tableName+".person_id = ?", c.PersonID)
+		db.Where(clause.Eq{Column: col("person_id"), Value: c.PersonID})
 	}
 	if c.SessionID != "" {
-		db.Where(tableName+".session_id = ?", c.SessionID)
+		db.Where(clause.Eq{Column: col("session_id"), Value: c.SessionID})
 	}
 }
 

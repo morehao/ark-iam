@@ -4,6 +4,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type ApplicationClientSecretCond struct {
@@ -16,11 +17,12 @@ func (c *ApplicationClientSecretCond) BuildCondition(db *gorm.DB, tableName stri
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
+	col := condCols(tableName)
 	if c.ApplicationClientID != "" {
-		db.Where(tableName+".application_client_id = ?", c.ApplicationClientID)
+		db.Where(clause.Eq{Column: col("application_client_id"), Value: c.ApplicationClientID})
 	}
 	if c.Name != "" {
-		db.Where(tableName+".name = ?", c.Name)
+		db.Where(clause.Eq{Column: col("name"), Value: c.Name})
 	}
 }
 

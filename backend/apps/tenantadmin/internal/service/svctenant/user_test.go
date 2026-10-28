@@ -2,6 +2,7 @@ package svctenant
 
 import (
 	"errors"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"testing"
 	"time"
 
@@ -69,12 +70,14 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 
 	// 无 personID 且无登录标识：以姓名创建自然人并关联（person 始终存在）
 	ginCtx := newAdminCtx(t, db, "t1", "op")
-	resp, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "仅姓名用户", PrimaryEmail: "nameonly@x.com", PrimaryDepartmentID: "o1"})
+	resp, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "仅姓名用户", PrimaryEmail: "nameonly@x.com", PrimaryDepartmentID: "o1",
+		Operator: operatorOf(ginCtx),
+	})
 	if err != nil {
 		t.Fatalf("create user with name-only person: %v", err)
 	}
 	var nameOnly model.UserEntity
-	if err := db.WithContext(ginCtx).First(&nameOnly, "id = ?", resp.UserID).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).First(&nameOnly, "id = ?", resp.UserID).Error; err != nil {
 		t.Fatalf("query name-only user: %v", err)
 	}
 	if nameOnly.PersonID == "" {
@@ -89,7 +92,9 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 	}
 
 	// 提供 email：新建 person（姓名=req.Name，bcrypt 哈希），临时密码仅创建响应返回一次
-	respB, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "Bob", PrimaryEmail: "bob@x.com", PrimaryDepartmentID: "o1"})
+	respB, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "Bob", PrimaryEmail: "bob@x.com", PrimaryDepartmentID: "o1",
+		Operator: operatorOf(ginCtx),
+	})
 	if err != nil {
 		t.Fatalf("create user with new person: %v", err)
 	}
@@ -97,7 +102,7 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 		t.Fatalf("expected initial temporary password for newly created person")
 	}
 	var bob model.UserEntity
-	if err := db.WithContext(ginCtx).First(&bob, "id = ?", respB.UserID).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).First(&bob, "id = ?", respB.UserID).Error; err != nil {
 		t.Fatalf("query bob: %v", err)
 	}
 	if bob.PersonID == "" {
@@ -119,7 +124,9 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 
 	// 另一租户提供相同 email：find-or-create 命中已有 person 并关联（复用同一自然人）
 	ginCtxT2 := newAdminCtx(t, db, "t2", "op2")
-	respC, err := svc.Create(ginCtxT2, &dtotenant.UserCreateReq{Name: "Bob2", PrimaryEmail: "bob@x.com", PrimaryDepartmentID: "o2"})
+	respC, err := svc.Create(requestCtx(ginCtxT2), &dtotenant.UserCreateReq{Name: "Bob2", PrimaryEmail: "bob@x.com", PrimaryDepartmentID: "o2",
+		Operator: operatorOf(ginCtxT2),
+	})
 	if err != nil {
 		t.Fatalf("create user linking existing person: %v", err)
 	}
@@ -135,18 +142,24 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 	}
 
 	// 同租户重复加入：拒绝
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "Bob3", PrimaryEmail: "bob@x.com", PrimaryDepartmentID: "o1"}); err == nil {
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "Bob3", PrimaryEmail: "bob@x.com", PrimaryDepartmentID: "o1",
+		Operator: operatorOf(ginCtx),
+	}); err == nil {
 		t.Fatalf("expected duplicate-in-tenant error")
 	}
 
 	// 指定 personID 直接关联；同一 person 在本租户已有 user 时拒绝
 	personID := bob.PersonID
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "Bob4", PersonID: personID, PrimaryEmail: "bob4@x.com", PrimaryDepartmentID: "o1"}); err == nil {
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "Bob4", PersonID: personID, PrimaryEmail: "bob4@x.com", PrimaryDepartmentID: "o1",
+		Operator: operatorOf(ginCtx),
+	}); err == nil {
 		t.Fatalf("expected error when linking person already in tenant")
 	}
 
 	// 仅有手机号（无邮箱）：同样创建自然人并返回临时密码
-	respPwd, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "NoID", PrimaryPhone: "13000000001", PrimaryDepartmentID: "o1"})
+	respPwd, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "NoID", PrimaryPhone: "13000000001", PrimaryDepartmentID: "o1",
+		Operator: operatorOf(ginCtx),
+	})
 	if err != nil {
 		t.Fatalf("create user with phone only: %v", err)
 	}
@@ -154,7 +167,7 @@ func TestUserCreateFindOrCreatePerson(t *testing.T) {
 		t.Fatalf("expected initial temporary password for newly created person")
 	}
 	var noID model.UserEntity
-	if err := db.WithContext(ginCtx).First(&noID, "id = ?", respPwd.UserID).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).First(&noID, "id = ?", respPwd.UserID).Error; err != nil {
 		t.Fatalf("query no-id user: %v", err)
 	}
 	var noIDPerson model.PersonEntity
@@ -192,27 +205,36 @@ func TestUserCreateRequiresDepartment(t *testing.T) {
 		"missing": {Name: "张三"},
 		"empty":   {Name: "李四", PrimaryDepartmentID: ""},
 	} {
-		if _, err := svc.Create(ginCtx, req); !errors.Is(err, requiredErr) {
+		req.Operator = operatorOf(ginCtx)
+		if _, err := svc.Create(requestCtx(ginCtx), req); !errors.Is(err, requiredErr) {
 			t.Fatalf("case %s: expected UserDepartmentRequiredError, got %v", name, err)
 		}
 	}
 
 	// 邮箱、手机号二选一：都为空拒绝
 	contactErr := code.GetError(code.UserContactRequiredError)
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "无联系方式", PrimaryDepartmentID: "o1"}); !errors.Is(err, contactErr) {
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "无联系方式", PrimaryDepartmentID: "o1",
+		Operator: operatorOf(ginCtx),
+	}); !errors.Is(err, contactErr) {
 		t.Fatalf("expected UserContactRequiredError, got %v", err)
 	}
 	// 仅手机号可创建
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "仅手机", PrimaryPhone: "15011112222", PrimaryDepartmentID: "o1"}); err != nil {
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "仅手机", PrimaryPhone: "15011112222", PrimaryDepartmentID: "o1",
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("create with phone only should succeed: %v", err)
 	}
 	// 仅邮箱可创建
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "仅邮箱", PrimaryEmail: "only@x.com", PrimaryDepartmentID: "o1"}); err != nil {
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "仅邮箱", PrimaryEmail: "only@x.com", PrimaryDepartmentID: "o1",
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("create with email only should succeed: %v", err)
 	}
 
 	// 提供合法部门：正常创建
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "王五", PrimaryEmail: "ww@x.com", PrimaryDepartmentID: "o1"}); err != nil {
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "王五", PrimaryEmail: "ww@x.com", PrimaryDepartmentID: "o1",
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("create user with valid dept: %v", err)
 	}
 }
@@ -239,12 +261,14 @@ func TestUserCreateWithDepartments(t *testing.T) {
 
 	ginCtx := newAdminCtx(t, db, "t1", "op")
 	// 创建用户：primary=o1（单个行政主部门）+ leader=o2
-	resp, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", PrimaryDepartmentID: "o1", LeaderDepartmentIDs: []string{"o2"}})
+	resp, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", PrimaryDepartmentID: "o1", LeaderDepartmentIDs: []string{"o2"},
+		Operator: operatorOf(ginCtx),
+	})
 	if err != nil {
 		t.Fatalf("create user with depts: %v", err)
 	}
 	var relations []model.DepartmentUserEntity
-	if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ?", "t1", resp.UserID).Find(&relations).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).Where("tenant_id = ? AND user_id = ?", "t1", resp.UserID).Find(&relations).Error; err != nil {
 		t.Fatalf("query relations: %v", err)
 	}
 	if len(relations) != 2 {
@@ -259,12 +283,16 @@ func TestUserCreateWithDepartments(t *testing.T) {
 	}
 
 	// 主部门为单值入参：多主部门在类型层面已不可表达，改验"空主部门被拒"（防绕过 DTO 校验）
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "李四", PrimaryEmail: "lis@x.com"}); !errors.Is(err, code.GetError(code.UserDepartmentRequiredError)) {
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "李四", PrimaryEmail: "lis@x.com",
+		Operator: operatorOf(ginCtx),
+	}); !errors.Is(err, code.GetError(code.UserDepartmentRequiredError)) {
 		t.Fatalf("expected primary department required, got %v", err)
 	}
 
 	// 非法部门（非本租户）拒绝
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "王五", PrimaryPhone: "15000000002", PrimaryDepartmentID: "o-other"}); err == nil {
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "王五", PrimaryPhone: "15000000002", PrimaryDepartmentID: "o-other",
+		Operator: operatorOf(ginCtx),
+	}); err == nil {
 		t.Fatalf("expected invalid dept error")
 	}
 }
@@ -284,7 +312,7 @@ func TestUserPageListKeyword(t *testing.T) {
 	ginCtx := newDeptGinCtx(t, "t1", "op")
 
 	// 按 person username 命中
-	resp, err := svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Keyword: "zhangsan"})
+	resp, err := svc.PageList(requestCtx(ginCtx), &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Keyword: "zhangsan"})
 	if err != nil {
 		t.Fatalf("page list: %v", err)
 	}
@@ -297,7 +325,7 @@ func TestUserPageListKeyword(t *testing.T) {
 	}
 
 	// 按租户内姓名命中
-	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Keyword: "李四"})
+	resp, err = svc.PageList(requestCtx(ginCtx), &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Keyword: "李四"})
 	if err != nil {
 		t.Fatalf("page list: %v", err)
 	}
@@ -306,7 +334,7 @@ func TestUserPageListKeyword(t *testing.T) {
 	}
 
 	// 按 person email 命中
-	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Keyword: "wang@x"})
+	resp, err = svc.PageList(requestCtx(ginCtx), &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Keyword: "wang@x"})
 	if err != nil {
 		t.Fatalf("page list: %v", err)
 	}
@@ -315,7 +343,7 @@ func TestUserPageListKeyword(t *testing.T) {
 	}
 
 	// 空关键词返回全部
-	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10})
+	resp, err = svc.PageList(requestCtx(ginCtx), &dtotenant.UserPageListReq{Page: 1, PageSize: 10})
 	if err != nil {
 		t.Fatalf("page list: %v", err)
 	}
@@ -345,15 +373,16 @@ func TestUserStatusEnumContract(t *testing.T) {
 	statusPtr := func(status model.UserStatus) *model.UserStatus { return &status }
 
 	// 创建：合法枚举落库
-	created, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{
+	created, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{
 		Name: "张三", PrimaryEmail: "zs@x.com", PrimaryDepartmentID: "o1",
 		Status: model.UserStatusSuspended,
-	})
+
+		Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("create suspended user: %v", err)
 	}
 	var createdEntity model.UserEntity
-	if err := db.WithContext(ginCtx).First(&createdEntity, "id = ?", created.UserID).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).First(&createdEntity, "id = ?", created.UserID).Error; err != nil {
 		t.Fatalf("query created user: %v", err)
 	}
 	if createdEntity.Status != model.UserStatusSuspended {
@@ -361,29 +390,30 @@ func TestUserStatusEnumContract(t *testing.T) {
 	}
 
 	// 创建：非法枚举被拒
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{
 		Name: "李四", PrimaryEmail: "ls@x.com", PrimaryDepartmentID: "o1",
 		Status: model.UserStatus("bogus"),
-	}); !errors.Is(err, code.GetError(code.UserCreateError)) {
+
+		Operator: operatorOf(ginCtx)}); !errors.Is(err, code.GetError(code.UserCreateError)) {
 		t.Fatalf("create with invalid status: want %v, got %v", code.GetError(code.UserCreateError), err)
 	}
 
 	// 筛选：命中枚举按状态过滤，空串不过滤
-	resp, err := svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Status: model.UserStatusSuspended})
+	resp, err := svc.PageList(requestCtx(ginCtx), &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Status: model.UserStatusSuspended})
 	if err != nil {
 		t.Fatalf("page list suspended: %v", err)
 	}
 	if resp.Total != 1 || len(resp.List) != 1 || resp.List[0].Status != model.UserStatusSuspended {
 		t.Fatalf("suspended filter mismatch: %+v", resp)
 	}
-	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Status: model.UserStatusActive})
+	resp, err = svc.PageList(requestCtx(ginCtx), &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Status: model.UserStatusActive})
 	if err != nil {
 		t.Fatalf("page list active: %v", err)
 	}
 	if resp.Total != 0 {
 		t.Fatalf("active filter should be empty, got %d", resp.Total)
 	}
-	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10})
+	resp, err = svc.PageList(requestCtx(ginCtx), &dtotenant.UserPageListReq{Page: 1, PageSize: 10})
 	if err != nil {
 		t.Fatalf("page list without status: %v", err)
 	}
@@ -392,16 +422,18 @@ func TestUserStatusEnumContract(t *testing.T) {
 	}
 
 	// 筛选：非法枚举被拒
-	if _, err := svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Status: model.UserStatus("bogus")}); !errors.Is(err, code.GetError(code.UserGetPageListError)) {
+	if _, err := svc.PageList(requestCtx(ginCtx), &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Status: model.UserStatus("bogus")}); !errors.Is(err, code.GetError(code.UserGetPageListError)) {
 		t.Fatalf("page list with invalid status: want %v, got %v", code.GetError(code.UserGetPageListError), err)
 	}
 
 	// 更新：非法枚举被拒且不落库
-	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: created.UserID, Status: statusPtr(model.UserStatus("bogus"))}); !errors.Is(err, code.GetError(code.UserUpdateError)) {
+	if err := svc.Update(requestCtx(ginCtx), &dtotenant.UserUpdateReq{UserID: created.UserID, Status: statusPtr(model.UserStatus("bogus")),
+		Operator: operatorOf(ginCtx),
+	}); !errors.Is(err, code.GetError(code.UserUpdateError)) {
 		t.Fatalf("update with invalid status: want %v, got %v", code.GetError(code.UserUpdateError), err)
 	}
 	var afterInvalid model.UserEntity
-	if err := db.WithContext(ginCtx).First(&afterInvalid, "id = ?", created.UserID).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).First(&afterInvalid, "id = ?", created.UserID).Error; err != nil {
 		t.Fatalf("reload after invalid update: %v", err)
 	}
 	if afterInvalid.Status != model.UserStatusSuspended {
@@ -409,10 +441,12 @@ func TestUserStatusEnumContract(t *testing.T) {
 	}
 
 	// 更新：合法枚举生效
-	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: created.UserID, Status: statusPtr(model.UserStatusActive)}); err != nil {
+	if err := svc.Update(requestCtx(ginCtx), &dtotenant.UserUpdateReq{UserID: created.UserID, Status: statusPtr(model.UserStatusActive),
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("activate user: %v", err)
 	}
-	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Status: model.UserStatusActive})
+	resp, err = svc.PageList(requestCtx(ginCtx), &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Status: model.UserStatusActive})
 	if err != nil {
 		t.Fatalf("page list active after update: %v", err)
 	}
@@ -468,7 +502,7 @@ func TestUserDetailWithDepartmentsAndRoles(t *testing.T) {
 	}
 
 	ginCtx := newAdminCtx(t, db, "t1", "op")
-	resp, err := svc.Detail(ginCtx, &dtotenant.UserDetailReq{UserID: "u1"})
+	resp, err := svc.Detail(requestCtx(ginCtx), &dtotenant.UserDetailReq{UserID: "u1"})
 	if err != nil {
 		t.Fatalf("detail: %v", err)
 	}
@@ -506,11 +540,13 @@ func TestUserUpdateRolesFullReplace(t *testing.T) {
 	}
 
 	ginCtx := newAdminCtx(t, db, "t1", "op")
-	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", RoleIDs: []string{"r1", "r2"}}); err != nil {
+	if err := svc.UpdateRoles(requestCtx(ginCtx), &dtotenant.UserRolesUpdateReq{UserID: "u1", RoleIDs: []string{"r1", "r2"},
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("update roles: %v", err)
 	}
 	var urList []model.UserRoleEntity
-	if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&urList).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&urList).Error; err != nil {
 		t.Fatalf("query user_role: %v", err)
 	}
 	if len(urList) != 2 {
@@ -518,10 +554,12 @@ func TestUserUpdateRolesFullReplace(t *testing.T) {
 	}
 
 	// 全量替换为单个
-	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", RoleIDs: []string{"r2"}}); err != nil {
+	if err := svc.UpdateRoles(requestCtx(ginCtx), &dtotenant.UserRolesUpdateReq{UserID: "u1", RoleIDs: []string{"r2"},
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("update roles: %v", err)
 	}
-	if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&urList).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&urList).Error; err != nil {
 		t.Fatalf("query user_role: %v", err)
 	}
 	if len(urList) != 1 || urList[0].RoleID != "r2" {
@@ -529,7 +567,9 @@ func TestUserUpdateRolesFullReplace(t *testing.T) {
 	}
 
 	// 跨租户角色应拒绝
-	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", RoleIDs: []string{"r-other"}}); err == nil {
+	if err := svc.UpdateRoles(requestCtx(ginCtx), &dtotenant.UserRolesUpdateReq{UserID: "u1", RoleIDs: []string{"r-other"},
+		Operator: operatorOf(ginCtx),
+	}); err == nil {
 		t.Fatalf("expected cross-tenant role error")
 	}
 }
@@ -576,7 +616,7 @@ func TestUserUpdateRolesScopedByApp(t *testing.T) {
 
 	queryRoleIDs := func() []string {
 		var urList []model.UserRoleEntity
-		if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&urList).Error; err != nil {
+		if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&urList).Error; err != nil {
 			t.Fatalf("query user_role: %v", err)
 		}
 		ids := make([]string, 0, len(urList))
@@ -595,7 +635,9 @@ func TestUserUpdateRolesScopedByApp(t *testing.T) {
 	}
 
 	// 仅替换 app-a：ra1 被移除、ra2 加入，app-b 的 rb1 必须保留
-	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-a", RoleIDs: []string{"ra2"}}); err != nil {
+	if err := svc.UpdateRoles(requestCtx(ginCtx), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-a", RoleIDs: []string{"ra2"},
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("replace app-a roles: %v", err)
 	}
 	ids := queryRoleIDs()
@@ -604,7 +646,9 @@ func TestUserUpdateRolesScopedByApp(t *testing.T) {
 	}
 
 	// 清空 app-b：仅移除 rb1，app-a 的 ra2 保留
-	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-b", RoleIDs: []string{}}); err != nil {
+	if err := svc.UpdateRoles(requestCtx(ginCtx), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-b", RoleIDs: []string{},
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("clear app-b roles: %v", err)
 	}
 	ids = queryRoleIDs()
@@ -613,11 +657,15 @@ func TestUserUpdateRolesScopedByApp(t *testing.T) {
 	}
 
 	// 跨应用授予：app-a 下塞 app-b 的角色 → 拒绝
-	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-a", RoleIDs: []string{"rb1"}}); err != code.GetError(code.RoleNotExistError) {
+	if err := svc.UpdateRoles(requestCtx(ginCtx), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-a", RoleIDs: []string{"rb1"},
+		Operator: operatorOf(ginCtx),
+	}); err != code.GetError(code.RoleNotExistError) {
 		t.Fatalf("cross-app role grant: want RoleNotExist, got %v", err)
 	}
 	// 跨租户角色（即使 AppID 相同）→ 拒绝
-	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-c", RoleIDs: []string{"rc1"}}); err != code.GetError(code.RoleNotExistError) {
+	if err := svc.UpdateRoles(requestCtx(ginCtx), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-c", RoleIDs: []string{"rc1"},
+		Operator: operatorOf(ginCtx),
+	}); err != code.GetError(code.RoleNotExistError) {
 		t.Fatalf("cross-tenant role grant: want RoleNotExist, got %v", err)
 	}
 }
@@ -641,18 +689,19 @@ func TestUserCreateWithLeaderDepts(t *testing.T) {
 	}
 
 	ginCtx := newAdminCtx(t, db, "t1", "op")
-	resp, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{
+	resp, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{
 		Name:                   "张三",
 		PrimaryEmail:           "zs2@x.com",
 		PrimaryDepartmentID:    "o1",
 		SecondaryDepartmentIDs: []string{"o2"},
 		LeaderDepartmentIDs:    []string{"o3"},
-	})
+
+		Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("create user with leader depts: %v", err)
 	}
 	var relations []model.DepartmentUserEntity
-	if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ?", "t1", resp.UserID).Find(&relations).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).Where("tenant_id = ? AND user_id = ?", "t1", resp.UserID).Find(&relations).Error; err != nil {
 		t.Fatalf("query relations: %v", err)
 	}
 	if len(relations) != 3 {
@@ -674,12 +723,16 @@ func TestUserCreateWithLeaderDepts(t *testing.T) {
 	}
 
 	// 一个部门至多一个负责人：新用户再负责 o3 应拒绝
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "李四", PrimaryPhone: "15000000003", PrimaryDepartmentID: "o1", LeaderDepartmentIDs: []string{"o3"}}); err == nil {
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "李四", PrimaryPhone: "15000000003", PrimaryDepartmentID: "o1", LeaderDepartmentIDs: []string{"o3"},
+		Operator: operatorOf(ginCtx),
+	}); err == nil {
 		t.Fatalf("expected leader conflict to be rejected")
 	}
 
 	// 负责部门非法（非本租户）拒绝
-	if _, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "王五", PrimaryEmail: "ww5@x.com", PrimaryDepartmentID: "o1", LeaderDepartmentIDs: []string{"o-other"}}); err == nil {
+	if _, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "王五", PrimaryEmail: "ww5@x.com", PrimaryDepartmentID: "o1", LeaderDepartmentIDs: []string{"o-other"},
+		Operator: operatorOf(ginCtx),
+	}); err == nil {
 		t.Fatalf("expected invalid leader dept error")
 	}
 }
@@ -704,20 +757,21 @@ func TestUserUpdateDepartments(t *testing.T) {
 	}
 
 	ginCtx := newAdminCtx(t, db, "t1", "op")
-	u1, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{
+	u1, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{
 		Name:                   "张三",
 		PrimaryEmail:           "u1@x.com",
 		PrimaryDepartmentID:    "o1",
 		SecondaryDepartmentIDs: []string{"o2"},
 		LeaderDepartmentIDs:    []string{"o3"},
-	})
+
+		Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("create u1: %v", err)
 	}
 
 	countByType := func(userID string) map[model.DeptUserRelationType]string {
 		var rows []model.DepartmentUserEntity
-		if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ?", "t1", userID).Find(&rows).Error; err != nil {
+		if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).Where("tenant_id = ? AND user_id = ?", "t1", userID).Find(&rows).Error; err != nil {
 			t.Fatalf("query relations: %v", err)
 		}
 		m := map[model.DeptUserRelationType]string{}
@@ -729,7 +783,9 @@ func TestUserUpdateDepartments(t *testing.T) {
 
 	// 替换主部门 o1 -> o2
 	prim := "o2"
-	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: u1.UserID, PrimaryDepartmentID: &prim}); err != nil {
+	if err := svc.Update(requestCtx(ginCtx), &dtotenant.UserUpdateReq{UserID: u1.UserID, PrimaryDepartmentID: &prim,
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("update primary: %v", err)
 	}
 	m := countByType(u1.UserID)
@@ -739,11 +795,13 @@ func TestUserUpdateDepartments(t *testing.T) {
 
 	// 全量替换参与部门 o2 -> [o3, o1]
 	sec := []string{"o3", "o1"}
-	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: u1.UserID, SecondaryDepartmentIDs: &sec}); err != nil {
+	if err := svc.Update(requestCtx(ginCtx), &dtotenant.UserUpdateReq{UserID: u1.UserID, SecondaryDepartmentIDs: &sec,
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("update secondary: %v", err)
 	}
 	var secCount int64
-	if err := db.WithContext(ginCtx).Model(&model.DepartmentUserEntity{}).
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).Model(&model.DepartmentUserEntity{}).
 		Where("tenant_id = ? AND user_id = ? AND relation_type = ?", "t1", u1.UserID, model.DeptUserRelationSecondary).
 		Count(&secCount).Error; err != nil {
 		t.Fatalf("count secondary: %v", err)
@@ -754,7 +812,9 @@ func TestUserUpdateDepartments(t *testing.T) {
 
 	// 全量替换负责部门 o3 -> [o1]
 	lead := []string{"o1"}
-	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: u1.UserID, LeaderDepartmentIDs: &lead}); err != nil {
+	if err := svc.Update(requestCtx(ginCtx), &dtotenant.UserUpdateReq{UserID: u1.UserID, LeaderDepartmentIDs: &lead,
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("update leader: %v", err)
 	}
 	m = countByType(u1.UserID)
@@ -763,12 +823,16 @@ func TestUserUpdateDepartments(t *testing.T) {
 	}
 
 	// leader 冲突：另建用户 u2 负责 o1（已被 u1 负责）应拒绝
-	u2, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "李四", PrimaryPhone: "15000000004", PrimaryDepartmentID: "o1"})
+	u2, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "李四", PrimaryPhone: "15000000004", PrimaryDepartmentID: "o1",
+		Operator: operatorOf(ginCtx),
+	})
 	if err != nil {
 		t.Fatalf("create u2: %v", err)
 	}
 	conflictLead := []string{"o1"}
-	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: u2.UserID, LeaderDepartmentIDs: &conflictLead}); err == nil {
+	if err := svc.Update(requestCtx(ginCtx), &dtotenant.UserUpdateReq{UserID: u2.UserID, LeaderDepartmentIDs: &conflictLead,
+		Operator: operatorOf(ginCtx),
+	}); err == nil {
 		t.Fatalf("expected leader conflict rejected")
 	}
 }
@@ -791,14 +855,16 @@ func TestUserUpdateContact(t *testing.T) {
 	}
 
 	ginCtx := newAdminCtx(t, db, "t1", "op")
-	u1, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", PrimaryDepartmentID: "o1"})
+	u1, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", PrimaryDepartmentID: "o1",
+		Operator: operatorOf(ginCtx),
+	})
 	if err != nil {
 		t.Fatalf("create u1: %v", err)
 	}
 
 	loadPerson := func() *model.PersonEntity {
 		var user model.UserEntity
-		if err := db.WithContext(ginCtx).First(&user, "id = ?", u1.UserID).Error; err != nil {
+		if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).First(&user, "id = ?", u1.UserID).Error; err != nil {
 			t.Fatalf("query user: %v", err)
 		}
 		var p model.PersonEntity
@@ -810,7 +876,9 @@ func TestUserUpdateContact(t *testing.T) {
 
 	// 更新手机号（原来只有邮箱）：编辑后邮箱+手机都非空
 	phone := "15000000001"
-	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: u1.UserID, PrimaryPhone: &phone}); err != nil {
+	if err := svc.Update(requestCtx(ginCtx), &dtotenant.UserUpdateReq{UserID: u1.UserID, PrimaryPhone: &phone,
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("update phone: %v", err)
 	}
 	p := loadPerson()
@@ -820,7 +888,9 @@ func TestUserUpdateContact(t *testing.T) {
 
 	// 清空邮箱只留手机号（编辑双方联系方式且至少一个非空）：email 清空成功
 	empty := ""
-	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: u1.UserID, PrimaryEmail: &empty}); err != nil {
+	if err := svc.Update(requestCtx(ginCtx), &dtotenant.UserUpdateReq{UserID: u1.UserID, PrimaryEmail: &empty,
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("clear email with phone kept: %v", err)
 	}
 	p = loadPerson()
@@ -829,24 +899,32 @@ func TestUserUpdateContact(t *testing.T) {
 	}
 
 	// 邮箱、手机都清空：二选一拒绝
-	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: u1.UserID, PrimaryEmail: &empty, PrimaryPhone: &empty}); err == nil {
+	if err := svc.Update(requestCtx(ginCtx), &dtotenant.UserUpdateReq{UserID: u1.UserID, PrimaryEmail: &empty, PrimaryPhone: &empty,
+		Operator: operatorOf(ginCtx),
+	}); err == nil {
 		t.Fatalf("expected contact required error when both cleared")
 	}
 
 	// 唯一性：另建用户占 u1 的手机号，编辑 u1 撞库应拒绝
-	u2, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "李四", PrimaryPhone: "15000000002", PrimaryDepartmentID: "o1"})
+	u2, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "李四", PrimaryPhone: "15000000002", PrimaryDepartmentID: "o1",
+		Operator: operatorOf(ginCtx),
+	})
 	if err != nil {
 		t.Fatalf("create u2: %v", err)
 	}
 	_ = u2
 	conflict := "15000000002"
-	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: u1.UserID, PrimaryPhone: &conflict}); err == nil {
+	if err := svc.Update(requestCtx(ginCtx), &dtotenant.UserUpdateReq{UserID: u1.UserID, PrimaryPhone: &conflict,
+		Operator: operatorOf(ginCtx),
+	}); err == nil {
 		t.Fatalf("expected phone conflict error")
 	}
 
 	// 更新用户名
 	uname := "zs_new"
-	if err := svc.Update(ginCtx, &dtotenant.UserUpdateReq{UserID: u1.UserID, Username: &uname}); err != nil {
+	if err := svc.Update(requestCtx(ginCtx), &dtotenant.UserUpdateReq{UserID: u1.UserID, Username: &uname,
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("update username: %v", err)
 	}
 	p = loadPerson()
@@ -904,7 +982,7 @@ func TestUserPageListDepartmentFilter(t *testing.T) {
 	ginCtx := newDeptGinCtx(t, "t1", "op")
 
 	// 全量（不含其他租户）：主部门名仅聚合 primary 关系
-	resp, err := svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10})
+	resp, err := svc.PageList(requestCtx(ginCtx), &dtotenant.UserPageListReq{Page: 1, PageSize: 10})
 	if err != nil {
 		t.Fatalf("user page list: %v", err)
 	}
@@ -931,7 +1009,7 @@ func TestUserPageListDepartmentFilter(t *testing.T) {
 	}
 
 	// 按部门过滤：o1 命中 u1；o2 命中 u2（leader 也算该部门用户）
-	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, DepartmentID: "o1"})
+	resp, err = svc.PageList(requestCtx(ginCtx), &dtotenant.UserPageListReq{Page: 1, PageSize: 10, DepartmentID: "o1"})
 	if err != nil {
 		t.Fatalf("user page list by dept: %v", err)
 	}
@@ -939,7 +1017,7 @@ func TestUserPageListDepartmentFilter(t *testing.T) {
 		t.Fatalf("expected only u1 for o1, got %+v", resp.List)
 	}
 
-	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, DepartmentID: "o2"})
+	resp, err = svc.PageList(requestCtx(ginCtx), &dtotenant.UserPageListReq{Page: 1, PageSize: 10, DepartmentID: "o2"})
 	if err != nil {
 		t.Fatalf("user page list by dept: %v", err)
 	}
@@ -948,7 +1026,7 @@ func TestUserPageListDepartmentFilter(t *testing.T) {
 	}
 
 	// 关键词命中租户内姓名
-	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Keyword: "张三"})
+	resp, err = svc.PageList(requestCtx(ginCtx), &dtotenant.UserPageListReq{Page: 1, PageSize: 10, Keyword: "张三"})
 	if err != nil {
 		t.Fatalf("user page list by keyword: %v", err)
 	}
@@ -957,7 +1035,7 @@ func TestUserPageListDepartmentFilter(t *testing.T) {
 	}
 
 	// 无匹配部门返回空
-	resp, err = svc.PageList(ginCtx, &dtotenant.UserPageListReq{Page: 1, PageSize: 10, DepartmentID: "o-none"})
+	resp, err = svc.PageList(requestCtx(ginCtx), &dtotenant.UserPageListReq{Page: 1, PageSize: 10, DepartmentID: "o-none"})
 	if err != nil {
 		t.Fatalf("user page list by missing dept: %v", err)
 	}
@@ -981,12 +1059,14 @@ func TestUserResetPasswordIssuesTemporaryPassword(t *testing.T) {
 	}
 	ginCtx := newAdminCtx(t, db, "t1", "op1")
 
-	created, err := svc.Create(ginCtx, &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", PrimaryDepartmentID: "o1"})
+	created, err := svc.Create(requestCtx(ginCtx), &dtotenant.UserCreateReq{Name: "张三", PrimaryEmail: "zs@x.com", PrimaryDepartmentID: "o1",
+		Operator: operatorOf(ginCtx),
+	})
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 	var createdUser model.UserEntity
-	if err := db.WithContext(ginCtx).First(&createdUser, "id = ?", created.UserID).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).First(&createdUser, "id = ?", created.UserID).Error; err != nil {
 		t.Fatalf("query user: %v", err)
 	}
 	var createdPerson model.PersonEntity
@@ -995,7 +1075,9 @@ func TestUserResetPasswordIssuesTemporaryPassword(t *testing.T) {
 	}
 	oldHash := createdPerson.PasswordEncrypted
 
-	reset, err := svc.ResetPassword(ginCtx, &dtotenant.UserResetPasswordReq{UserID: created.UserID})
+	reset, err := svc.ResetPassword(requestCtx(ginCtx), &dtotenant.UserResetPasswordReq{UserID: created.UserID,
+		Operator: operatorOf(ginCtx),
+	})
 	if err != nil {
 		t.Fatalf("reset password: %v", err)
 	}
@@ -1041,12 +1123,14 @@ func TestUserResetPasswordRejectsMachineUser(t *testing.T) {
 		t.Fatalf("seed machine person password: %v", err)
 	}
 	seedTestUserWithPerson(t, db, "um1", "t1", machinePerson.ID, "服务账号")
-	if err := db.WithContext(ginCtx).Model(&model.UserEntity{}).Where("id = ?", "um1").
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).Model(&model.UserEntity{}).Where("id = ?", "um1").
 		Update("user_type", model.UserTypeMachine).Error; err != nil {
 		t.Fatalf("mark machine user: %v", err)
 	}
 
-	_, err := svc.ResetPassword(ginCtx, &dtotenant.UserResetPasswordReq{UserID: "um1"})
+	_, err := svc.ResetPassword(requestCtx(ginCtx), &dtotenant.UserResetPasswordReq{UserID: "um1",
+		Operator: operatorOf(ginCtx),
+	})
 	if err == nil || err.Error() != code.GetError(code.UserNotExistError).Error() {
 		t.Fatalf("ResetPassword err = %v, want %v", err, code.GetError(code.UserNotExistError))
 	}
@@ -1082,7 +1166,7 @@ func TestUserUpdateRolesGrantsAppAccess(t *testing.T) {
 	grantOf := func(appID string) *model.UserApplicationEntity {
 		t.Helper()
 		entity := &model.UserApplicationEntity{}
-		err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ? AND app_id = ?", "t1", "u1", appID).First(entity).Error
+		err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).Where("tenant_id = ? AND user_id = ? AND app_id = ?", "t1", "u1", appID).First(entity).Error
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil
@@ -1093,7 +1177,9 @@ func TestUserUpdateRolesGrantsAppAccess(t *testing.T) {
 	}
 
 	// 1) 授予 app-a 角色 → 同事务补准入（enable/role）
-	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-a", RoleIDs: []string{"ra"}}); err != nil {
+	if err := svc.UpdateRoles(requestCtx(ginCtx), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-a", RoleIDs: []string{"ra"},
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("grant app-a role: %v", err)
 	}
 	if g := grantOf("app-a"); g == nil || g.Status != model.UserApplicationStatusEnable || g.Source != model.UserApplicationSourceRole {
@@ -1101,14 +1187,16 @@ func TestUserUpdateRolesGrantsAppAccess(t *testing.T) {
 	}
 
 	// 2) 清空 app-a 角色 → 准入保留（撤销授权不反向撤准入）
-	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-a", RoleIDs: []string{}}); err != nil {
+	if err := svc.UpdateRoles(requestCtx(ginCtx), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-a", RoleIDs: []string{},
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("clear app-a roles: %v", err)
 	}
 	if g := grantOf("app-a"); g == nil || g.Status != model.UserApplicationStatusEnable {
 		t.Fatalf("清除角色不得反向撤销准入，got %+v", g)
 	}
 	var remainRoleIDs []string
-	if err := db.WithContext(ginCtx).Model(&model.UserRoleEntity{}).
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).Model(&model.UserRoleEntity{}).
 		Where("tenant_id = ? AND user_id = ?", "t1", "u1").Pluck("role_id", &remainRoleIDs).Error; err != nil {
 		t.Fatalf("query user_role: %v", err)
 	}
@@ -1117,7 +1205,9 @@ func TestUserUpdateRolesGrantsAppAccess(t *testing.T) {
 	}
 
 	// 3) 从未授权过角色的 app-b 被清空 → 不产生准入（撤销授权 ≠ 授权）
-	if err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-b", RoleIDs: nil}); err != nil {
+	if err := svc.UpdateRoles(requestCtx(ginCtx), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app-b", RoleIDs: nil,
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("clear app-b roles: %v", err)
 	}
 	if g := grantOf("app-b"); g != nil {

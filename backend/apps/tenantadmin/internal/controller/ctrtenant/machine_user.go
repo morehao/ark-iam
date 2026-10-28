@@ -2,6 +2,7 @@ package ctrtenant
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/tenantadmin/internal/service/svctenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -43,7 +44,7 @@ func (ctr *machineUserCtr) PageList(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.machineUserSvc.PageList(ctx, &req)
+	res, err := ctr.machineUserSvc.PageList(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -60,11 +61,12 @@ func (ctr *machineUserCtr) PageList(ctx *gin.Context) {
 // @Router /v1/tenant/machine-users [post]
 func (ctr *machineUserCtr) Create(ctx *gin.Context) {
 	var req dtotenant.MachineUserCreateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.machineUserSvc.Create(ctx, &req)
+	res, err := ctr.machineUserSvc.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -81,11 +83,12 @@ func (ctr *machineUserCtr) Create(ctx *gin.Context) {
 // @Router /v1/tenant/machine-users/{machineUserID} [put]
 func (ctr *machineUserCtr) Update(ctx *gin.Context) {
 	var req dtotenant.MachineUserUpdateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.machineUserSvc.Update(ctx, &req); err != nil {
+	if err := ctr.machineUserSvc.Update(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -101,11 +104,12 @@ func (ctr *machineUserCtr) Update(ctx *gin.Context) {
 // @Router /v1/tenant/machine-users/{machineUserID} [patch]
 func (ctr *machineUserCtr) UpdateStatus(ctx *gin.Context) {
 	var req dtotenant.MachineUserStatusReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.machineUserSvc.UpdateStatus(ctx, &req); err != nil {
+	if err := ctr.machineUserSvc.UpdateStatus(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -121,11 +125,12 @@ func (ctr *machineUserCtr) UpdateStatus(ctx *gin.Context) {
 // @Router /v1/tenant/machine-users/{machineUserID} [delete]
 func (ctr *machineUserCtr) Delete(ctx *gin.Context) {
 	var req dtotenant.MachineUserDeleteReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindUri(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.machineUserSvc.Delete(ctx, &req); err != nil {
+	if err := ctr.machineUserSvc.Delete(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -145,7 +150,7 @@ func (ctr *machineUserCtr) Detail(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.machineUserSvc.Detail(ctx, &req)
+	res, err := ctr.machineUserSvc.Detail(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -166,7 +171,7 @@ func (ctr *machineUserCtr) ListRoles(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.machineUserSvc.ListRoles(ctx, &req)
+	res, err := ctr.machineUserSvc.ListRoles(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -184,6 +189,7 @@ func (ctr *machineUserCtr) ListRoles(ctx *gin.Context) {
 // @Router /v1/tenant/machine-users/{machineUserID}/roles [put]
 func (ctr *machineUserCtr) UpdateRoles(ctx *gin.Context) {
 	var req dtotenant.MachineUserRolesUpdateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindUri(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -192,7 +198,7 @@ func (ctr *machineUserCtr) UpdateRoles(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.machineUserSvc.UpdateRoles(ctx, &req); err != nil {
+	if err := ctr.machineUserSvc.UpdateRoles(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

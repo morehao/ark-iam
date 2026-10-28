@@ -2,6 +2,9 @@ package svcdomain
 
 import (
 	"fmt"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -42,7 +45,11 @@ func newTestDB(t *testing.T) *gorm.DB {
 
 func newGinCtx(tenantID, userID string) *gin.Context {
 	ctx, _ := gin.CreateTestContext(nil)
+	if ctx.Request == nil {
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ctx.Set(gcontext.KeyTenantID, tenantID)
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope(tenantID))
 	ctx.Set(gcontext.KeyUserID, userID)
 	return ctx
 }
@@ -52,7 +59,9 @@ func TestDomainSvc_Create_Success(t *testing.T) {
 	ctx := newGinCtx("10", "100")
 
 	svc := NewDomainSvc()
-	resp, err := svc.Create(ctx, &dtodomain.DomainCreateReq{Domain: "example.com"})
+	resp, err := svc.Create(requestCtx(ctx), &dtodomain.DomainCreateReq{Domain: "example.com",
+		Operator: operatorOf(ctx),
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -60,7 +69,7 @@ func TestDomainSvc_Create_Success(t *testing.T) {
 		t.Fatalf("expected non-zero id")
 	}
 
-	entity, err := dao.NewDomainDao().GetByID(ctx, resp.ID)
+	entity, err := dao.NewDomainDao().GetByID(dbclient.CrossTenantContext(ctx), resp.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -90,7 +99,9 @@ func TestDomainSvc_Create_DomainAlreadyExists(t *testing.T) {
 	}
 
 	svc := NewDomainSvc()
-	resp, err := svc.Create(ctx, &dtodomain.DomainCreateReq{Domain: "example.com"})
+	resp, err := svc.Create(requestCtx(ctx), &dtodomain.DomainCreateReq{Domain: "example.com",
+		Operator: operatorOf(ctx),
+	})
 	if err == nil {
 		t.Fatalf("expected error for duplicate domain, got resp=%+v", resp)
 	}
@@ -104,7 +115,9 @@ func TestDomainSvc_Create_EmptyDomain(t *testing.T) {
 	ctx := newGinCtx("10", "100")
 
 	svc := NewDomainSvc()
-	resp, err := svc.Create(ctx, &dtodomain.DomainCreateReq{Domain: ""})
+	resp, err := svc.Create(requestCtx(ctx), &dtodomain.DomainCreateReq{Domain: "",
+		Operator: operatorOf(ctx),
+	})
 	if err == nil {
 		t.Fatalf("expected error for empty domain, got resp=%+v", resp)
 	}
@@ -126,7 +139,7 @@ func TestDomainSvc_PageList(t *testing.T) {
 	}
 
 	svc := NewDomainSvc()
-	resp, err := svc.PageList(ctx, &dtodomain.DomainPageListReq{Domain: "alpha"})
+	resp, err := svc.PageList(requestCtx(ctx), &dtodomain.DomainPageListReq{Domain: "alpha"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -152,12 +165,14 @@ func TestDomainSvc_Delete_Success(t *testing.T) {
 	}
 
 	svc := NewDomainSvc()
-	if err := svc.Delete(ctx, &dtodomain.DomainDeleteReq{DomainID: entity.ID}); err != nil {
+	if err := svc.Delete(requestCtx(ctx), &dtodomain.DomainDeleteReq{DomainID: entity.ID,
+		Operator: operatorOf(ctx),
+	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// 软删除后 GetByID 应查不到
-	got, err := dao.NewDomainDao().GetByID(ctx, entity.ID)
+	got, err := dao.NewDomainDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -171,7 +186,9 @@ func TestDomainSvc_Delete_NotExist(t *testing.T) {
 	ctx := newGinCtx("10", "100")
 
 	svc := NewDomainSvc()
-	err := svc.Delete(ctx, &dtodomain.DomainDeleteReq{DomainID: "999"})
+	err := svc.Delete(requestCtx(ctx), &dtodomain.DomainDeleteReq{DomainID: "999",
+		Operator: operatorOf(ctx),
+	})
 	if err == nil {
 		t.Fatalf("expected error for non-existent domain")
 	}
@@ -188,13 +205,14 @@ func TestDomainSvc_Update_VerificationStatus(t *testing.T) {
 	}
 
 	svc := NewDomainSvc()
-	if err := svc.Update(ctx, &dtodomain.DomainUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtodomain.DomainUpdateReq{
 		DomainID:           entity.ID,
 		VerificationStatus: model.DomainVerificationVerified,
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("合法验证状态应被接受: %v", err)
 	}
-	got, err := dao.NewDomainDao().GetByID(ctx, entity.ID)
+	got, err := dao.NewDomainDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -203,14 +221,15 @@ func TestDomainSvc_Update_VerificationStatus(t *testing.T) {
 	}
 
 	// 非法值必须返回既有功能级错误码，且不得落库
-	err = svc.Update(ctx, &dtodomain.DomainUpdateReq{
+	err = svc.Update(requestCtx(ctx), &dtodomain.DomainUpdateReq{
 		DomainID:           entity.ID,
 		VerificationStatus: model.DomainVerificationStatus("yes"),
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil || gerror.GetCode(err) != int(code.DomainUpdateError) {
 		t.Fatalf("非法验证状态应返回 DomainUpdateError, got %v", err)
 	}
-	got, err = dao.NewDomainDao().GetByID(ctx, entity.ID)
+	got, err = dao.NewDomainDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}

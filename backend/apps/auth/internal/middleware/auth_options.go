@@ -1,7 +1,8 @@
 package middleware
 
 import (
-	"github.com/gin-gonic/gin"
+	"context"
+
 	"github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
@@ -28,7 +29,7 @@ func OIDCBusinessAuthOptions() []pkgmiddleware.AuthOption {
 			// 其 skip path 一并移除，避免留下指向不存在端点的死配置。
 			"/v1/auth/connectors/callback",
 		),
-		pkgmiddleware.WithOIDCSSOValidation(func(ctx *gin.Context, personID string, isMachineToken bool) bool {
+		pkgmiddleware.WithOIDCSSOValidation(func(ctx context.Context, personID string, isMachineToken bool) bool {
 			// 机器凭证（client_credentials/API Key）不依赖浏览器 SSO 会话活性，直接放行
 			if isMachineToken {
 				return true

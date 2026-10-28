@@ -417,12 +417,12 @@ func (s *PersistentStore) appendRoleGroupClaims(ctx context.Context, userinfo *o
 	if appID == "" {
 		return nil
 	}
-	// user_role.user_id 是**租户成员**（tenant_user）主键，不是自然人 ID：协议层只拿得到
+	// user_role.user_id 是**租户成员**（user）主键，不是自然人 ID：协议层只拿得到
 	// subject(person:<id>)，必须先按 (person_id, tenant_id) 解析出成员行。少这一步会恒查不到角色，
 	// 并「静默产出空 groups」——下游按 groups 认策略名且是 fail-closed，会直接拒绝登录（端到端已实测）。
 	members, err := s.userDao().GetListByCond(tctx, &dao.UserCond{PersonID: pid, TenantID: tenantID})
 	if err != nil {
-		glog.Errorf(ctx, "[PersistentStore.appendRoleGroupClaims] query tenant_user fail, tenantID:%s, err:%v", tenantID, err)
+		glog.Errorf(ctx, "[PersistentStore.appendRoleGroupClaims] query user fail, tenantID:%s, err:%v", tenantID, err)
 		return err
 	}
 	if len(members) == 0 {

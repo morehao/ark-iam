@@ -8,6 +8,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type DomainCond struct {
@@ -20,11 +21,12 @@ func (c *DomainCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
+	col := condCols(tableName)
 	if c.TenantID != "" {
-		db.Where(tableName+".tenant_id = ?", c.TenantID)
+		db.Where(clause.Eq{Column: col("tenant_id"), Value: c.TenantID})
 	}
 	if c.Domain != "" {
-		db.Where(tableName+".domain LIKE ?", "%"+c.Domain+"%")
+		db.Where(clause.Like{Column: col("domain"), Value: "%" + c.Domain + "%"})
 	}
 }
 

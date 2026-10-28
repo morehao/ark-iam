@@ -340,7 +340,7 @@ func OIDCAuth(verifier *rp.Verifier) gin.HandlerFunc {
 | 字段 | 含义 |
 |---|---|
 | `PersonID` | 自然人 ID（人令牌的 `sub=person:<id>` 或 `person_id` 声明；机器令牌为空） |
-| `UserID` | **租户成员主键 `tenant_user.id`**（人令牌）/ 机器主体（机器令牌）。写审计 `created_by`/`updated_by` 的唯一口径 |
+| `UserID` | **租户成员主键 `user.id`**（人令牌）/ 机器主体（机器令牌）。写审计 `created_by`/`updated_by` 的唯一口径 |
 | `TenantID` | 租户作用域，**一律来自令牌**，不接受入参指定 |
 | `ClientID` | 令牌的 `client_id` |
 | `IsMachine` | 是否机器凭证（`token_usage=machine`） |
@@ -354,12 +354,12 @@ func OIDCAuth(verifier *rp.Verifier) gin.HandlerFunc {
 |---|---|---|---|
 | `sub` | `person:<person_id>` | `<key_prefix>`（或 client_id） | 用 `contract.ParsePersonSubject` 解析 |
 | `person_id` | ✅ | — | 自然人 ID 的显式声明 |
-| `user_id` | ✅ = `tenant_user.id` | ✅ = 机器主体（`api_key.owner_user_id`） | 审计操作者列取值 |
+| `user_id` | ✅ = `user.id` | ✅ = 机器主体（`api_key.owner_user_id`） | 审计操作者列取值 |
 | `tenant_id` | 映射唯一时 ✅ | ✅（API Key 归属租户） | 租户作用域 |
 | `sid` | 有中心会话时 ✅ | — | 会话标识 |
 | `token_usage` | — | `machine` | 机器凭证标记 |
 | `scope` | ✅ | ✅ | 空格分隔（目录 API 据此判定） |
-| `act` | — | 创建人 ≠ 机器主体时 `{"sub":"<tenant_user.id>"}` | 代操作主体 |
+| `act` | — | 创建人 ≠ 机器主体时 `{"sub":"<user.id>"}` | 代操作主体 |
 
 > **`tenant_id` 不是令牌有效性条件**：签发侧在「自然人 → 租户映射不唯一」时**不写**该 claim，验签照常通过、`Identity.TenantID` 为空。因此**需要租户的接口必须自行判定并返回 403**，绝不依赖 `dbclient.ErrTenantScopeMissing` 冒成 500（目录 API 就是这么做的，见 §7.3）。
 
@@ -641,7 +641,7 @@ flowchart LR
 可以：不开启 `EnableSSOSessionValidation`，仅做 JWT 验签 + iss/aud 校验；登出即时性退化为"access_token 过期后失效"。
 
 **Q5：token 里能拿到什么身份信息？**
-标准声明：`sub`（人登录为 `person:<id>`）、`client_id`、`scope`、`iss`/`aud`/`exp` 等。私有声明：**人登录令牌**含 `tenant_id`、`user_id`（= `tenant_user.id`，审计口径）、`person_id`，有中心会话时另含 `sid`；**机器令牌**含 `token_usage=machine` 与 `user_id`（机器主体），API Key 代操作时另含 `act.sub`（创建人）。以上全部映射到 SDK 的 `rp.Identity`（§5），校验后直接读字段即可。`/oidc/userinfo` 按 scope 返回 `name`/`preferred_username`/`email`/`phone`（**不含头像**）。
+标准声明：`sub`（人登录为 `person:<id>`）、`client_id`、`scope`、`iss`/`aud`/`exp` 等。私有声明：**人登录令牌**含 `tenant_id`、`user_id`（= `user.id`，审计口径）、`person_id`，有中心会话时另含 `sid`；**机器令牌**含 `token_usage=machine` 与 `user_id`（机器主体），API Key 代操作时另含 `act.sub`（创建人）。以上全部映射到 SDK 的 `rp.Identity`（§5），校验后直接读字段即可。`/oidc/userinfo` 按 scope 返回 `name`/`preferred_username`/`email`/`phone`（**不含头像**）。
 
 **Q6：前端如何获取用户资料？**
 `GET /v1/auth/userinfo`（`Authorization: Bearer <access_token>`）返回 `personInfo` + `userInfo`（租户内信息）。⚠️ **`/v1/auth/*` 是 OP 自身的业务 API（服务登录前端），不是 RP 的长期契约**——字段与状态码随登录前端演进；RP 的实体类查询请一律用 `/v1/rp/directory/*`（§7）。

@@ -4,6 +4,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type PersonCond struct {
@@ -20,23 +21,24 @@ func (c *PersonCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
+	col := condCols(tableName)
 	if len(c.IDs) > 0 {
-		db.Where(tableName+".id IN ?", c.IDs)
+		db.Where(clause.IN{Column: col("id"), Values: toAnySlice(c.IDs)})
 	}
 	if c.Username != "" {
-		db.Where(tableName+".username = ?", c.Username)
+		db.Where(clause.Eq{Column: col("username"), Value: c.Username})
 	}
 	if c.PrimaryEmail != "" {
-		db.Where(tableName+".primary_email = ?", c.PrimaryEmail)
+		db.Where(clause.Eq{Column: col("primary_email"), Value: c.PrimaryEmail})
 	}
 	if c.PrimaryPhone != "" {
-		db.Where(tableName+".primary_phone = ?", c.PrimaryPhone)
+		db.Where(clause.Eq{Column: col("primary_phone"), Value: c.PrimaryPhone})
 	}
 	if c.Name != "" {
-		db.Where(tableName+".name = ?", c.Name)
+		db.Where(clause.Eq{Column: col("name"), Value: c.Name})
 	}
 	if c.Status != "" {
-		db.Where(tableName+".status = ?", c.Status)
+		db.Where(clause.Eq{Column: col("status"), Value: c.Status})
 	}
 }
 

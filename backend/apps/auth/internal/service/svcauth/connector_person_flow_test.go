@@ -3,6 +3,8 @@ package svcauth
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -46,6 +48,9 @@ func (f *fakeConnectorSSOSessionStore) HasActiveSession(ctx context.Context, per
 
 func TestConnectorCallbackReturnsPersonTokenWhenPersonHasMultipleTenants(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 
 	stateStore := NewInMemoryConnectorStateStore()
@@ -99,7 +104,7 @@ func TestConnectorCallbackReturnsPersonTokenWhenPersonHasMultipleTenants(t *test
 	svc := &connectorSvc{
 		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{
 			driverType: connectorDriverTypeOAuth2,
-			exchangeCallbackFunc: func(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
+			exchangeCallbackFunc: func(ctx context.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
 				return &ConnectorCallbackOutput{Identity: StandardIdentity{Issuer: "https://issuer.example.com", Subject: "sub-1", Email: "alice@example.com"}}, nil
 			},
 		}),
@@ -115,10 +120,10 @@ func TestConnectorCallbackReturnsPersonTokenWhenPersonHasMultipleTenants(t *test
 			},
 		},
 		ssoSessionStore: &fakeConnectorSSOSessionStore{},
-		loginRecorder:   func(ctx *gin.Context, tenantID, userID string, success bool) {},
+		loginRecorder:   func(ctx context.Context, tenantID, userID string, success bool) {},
 	}
 
-	resp, err := svc.Callback(ginCtx, &dtoconnector.ConnectorCallbackReq{ConnectorID: "11", Code: "authorization-code", State: "callback-state-multi-tenant"})
+	resp, err := svc.Callback(requestCtx(ginCtx), &dtoconnector.ConnectorCallbackReq{ConnectorID: "11", Code: "authorization-code", State: "callback-state-multi-tenant"})
 	if err != nil {
 		t.Fatalf("Callback returned error: %v", err)
 	}
@@ -135,6 +140,9 @@ func TestConnectorCallbackReturnsPersonTokenWhenPersonHasMultipleTenants(t *test
 
 func TestConnectorCallbackUsesIdentityResolverPath(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 
 	stateStore := NewInMemoryConnectorStateStore()
@@ -189,17 +197,17 @@ func TestConnectorCallbackUsesIdentityResolverPath(t *testing.T) {
 	defer restoreTenantStore()
 
 	svc := &connectorSvc{
-		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{driverType: connectorDriverTypeOAuth2, exchangeCallbackFunc: func(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
+		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{driverType: connectorDriverTypeOAuth2, exchangeCallbackFunc: func(ctx context.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
 			return &ConnectorCallbackOutput{Identity: StandardIdentity{Issuer: "https://issuer.example.com", Subject: "sub-resolver", Email: "resolver@example.com", DisplayName: "Resolver User"}}, nil
 		}}),
 		connectorRepo:    &fakeConnectorRuntimeRepository{getByIDFunc: func(ctx context.Context, id string) (*model.ConnectorEntity, error) { return conn, nil }},
 		stateStore:       stateStore,
 		identityResolver: mapper,
 		ssoSessionStore:  &fakeConnectorSSOSessionStore{},
-		loginRecorder:    func(ctx *gin.Context, tenantID, userID string, success bool) {},
+		loginRecorder:    func(ctx context.Context, tenantID, userID string, success bool) {},
 	}
 
-	resp, err := svc.Callback(ginCtx, &dtoconnector.ConnectorCallbackReq{ConnectorID: "19", Code: "authorization-code", State: "callback-state-resolver-path"})
+	resp, err := svc.Callback(requestCtx(ginCtx), &dtoconnector.ConnectorCallbackReq{ConnectorID: "19", Code: "authorization-code", State: "callback-state-resolver-path"})
 	if err != nil {
 		t.Fatalf("Callback returned error: %v", err)
 	}

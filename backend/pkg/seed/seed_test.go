@@ -59,7 +59,7 @@ func TestBootstrapSQLite(t *testing.T) {
 	assertCount("role", 2)
 	assertCount("menu", 14)
 	assertCount("person", 1)
-	assertCount("tenant_user", 1)
+	assertCount("user", 1)
 	assertCount("application_client", 2)
 	assertCount("user_role", 2)
 	assertCount("user_application", 2)

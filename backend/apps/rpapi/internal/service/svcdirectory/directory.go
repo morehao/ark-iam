@@ -8,10 +8,10 @@
 package svcdirectory
 
 import (
+	"context"
 	"sort"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/rpapi/internal/dto/dtordirectory"
@@ -20,13 +20,13 @@ import (
 // DirectorySvc 是只读目录服务接口。
 type DirectorySvc interface {
 	// Members 批量取成员摘要（命中进 List，未命中进 Missing，缺项不影响整体成功）。
-	Members(ctx *gin.Context, ids []string) (*dtordirectory.MemberListResp, error)
+	Members(ctx context.Context, ids []string) (*dtordirectory.MemberListResp, error)
 	// Member 取单个成员摘要；不存在/跨租户返回 gerror 的 NotExist 语义由调用方判定。
-	Member(ctx *gin.Context, userID string) (*dtordirectory.Member, error)
+	Member(ctx context.Context, userID string) (*dtordirectory.Member, error)
 	// DepartmentTree 取本租户部门树（仅 enable 节点）。
-	DepartmentTree(ctx *gin.Context) ([]*dtordirectory.Department, error)
+	DepartmentTree(ctx context.Context) ([]*dtordirectory.Department, error)
 	// Roles 取本租户角色清单（≤MaxRoleListSize，超出置 truncated）。
-	Roles(ctx *gin.Context) (*dtordirectory.RoleListResp, error)
+	Roles(ctx context.Context) (*dtordirectory.RoleListResp, error)
 }
 
 type directorySvc struct{}
@@ -38,7 +38,7 @@ func NewDirectorySvc() DirectorySvc {
 	return &directorySvc{}
 }
 
-func (s *directorySvc) Members(ctx *gin.Context, ids []string) (*dtordirectory.MemberListResp, error) {
+func (s *directorySvc) Members(ctx context.Context, ids []string) (*dtordirectory.MemberListResp, error) {
 	resp := &dtordirectory.MemberListResp{List: []dtordirectory.Member{}, Missing: []string{}}
 	unique := normalizeIDs(ids)
 	if len(unique) == 0 {
@@ -68,7 +68,7 @@ func (s *directorySvc) Members(ctx *gin.Context, ids []string) (*dtordirectory.M
 	return resp, nil
 }
 
-func (s *directorySvc) Member(ctx *gin.Context, userID string) (*dtordirectory.Member, error) {
+func (s *directorySvc) Member(ctx context.Context, userID string) (*dtordirectory.Member, error) {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
 		return nil, nil
@@ -88,7 +88,7 @@ func (s *directorySvc) Member(ctx *gin.Context, userID string) (*dtordirectory.M
 	return &member, nil
 }
 
-func (s *directorySvc) DepartmentTree(ctx *gin.Context) ([]*dtordirectory.Department, error) {
+func (s *directorySvc) DepartmentTree(ctx context.Context) ([]*dtordirectory.Department, error) {
 	departments, err := dao.NewDepartmentDao().GetListByCond(ctx, &dao.DepartmentCond{
 		Status: model.DeptNodeStatusEnable,
 	})
@@ -98,7 +98,7 @@ func (s *directorySvc) DepartmentTree(ctx *gin.Context) ([]*dtordirectory.Depart
 	return buildDepartmentTree(departments), nil
 }
 
-func (s *directorySvc) Roles(ctx *gin.Context) (*dtordirectory.RoleListResp, error) {
+func (s *directorySvc) Roles(ctx context.Context) (*dtordirectory.RoleListResp, error) {
 	// 角色清单是无上界响应：多取一条即可判断是否被截断，避免 COUNT 查询。
 	roles, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{})
 	if err != nil {
@@ -142,7 +142,7 @@ func toMember(user model.UserEntity, departmentNames []string) dtordirectory.Mem
 
 // departmentNamesByUser 批量取"用户 → 部门名列表"（避免 N+1）。
 // 仅返回名称，不返回状态：目录只服务展示。
-func departmentNamesByUser(ctx *gin.Context, userIDs []string) (map[string][]string, error) {
+func departmentNamesByUser(ctx context.Context, userIDs []string) (map[string][]string, error) {
 	if len(userIDs) == 0 {
 		return map[string][]string{}, nil
 	}

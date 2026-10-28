@@ -1,13 +1,12 @@
 package svctenant
 
 import (
-	"github.com/gin-gonic/gin"
+	"context"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
@@ -19,13 +18,13 @@ func roleVisibleToTenant(entity *model.RoleEntity, tenantID string) bool {
 }
 
 type RoleSvc interface {
-	Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dtotenant.RoleCreateResp, error)
-	Delete(ctx *gin.Context, req *dtotenant.RoleDeleteReq) error
-	Update(ctx *gin.Context, req *dtotenant.RoleUpdateReq) error
-	Detail(ctx *gin.Context, req *dtotenant.RoleDetailReq) (*dtotenant.RoleDetailResp, error)
-	PageList(ctx *gin.Context, req *dtotenant.RolePageListReq) (*dtotenant.RolePageListResp, error)
-	GetMenus(ctx *gin.Context, req *dtotenant.RoleDetailReq) (*dtotenant.RoleMenuTreeResp, error)
-	UpdateMenus(ctx *gin.Context, req *dtotenant.RoleMenusUpdateReq) error
+	Create(ctx context.Context, req *dtotenant.RoleCreateReq) (*dtotenant.RoleCreateResp, error)
+	Delete(ctx context.Context, req *dtotenant.RoleDeleteReq) error
+	Update(ctx context.Context, req *dtotenant.RoleUpdateReq) error
+	Detail(ctx context.Context, req *dtotenant.RoleDetailReq) (*dtotenant.RoleDetailResp, error)
+	PageList(ctx context.Context, req *dtotenant.RolePageListReq) (*dtotenant.RolePageListResp, error)
+	GetMenus(ctx context.Context, req *dtotenant.RoleDetailReq) (*dtotenant.RoleMenuTreeResp, error)
+	UpdateMenus(ctx context.Context, req *dtotenant.RoleMenusUpdateReq) error
 }
 
 type roleSvc struct{}
@@ -43,12 +42,12 @@ func NewRoleSvc() RoleSvc {
 // （application.role_template）里定义一次并物化到各租户（见 pkg/core/tenant.SyncAppRoleTemplate）。
 // 自建角色只承载本系统内的菜单权限，code 恒为空串，因此**结构上不可能**与模板角色/产品锚点撞码，
 // 也不可能自造一个值去命中下游已有策略（这是"契约值归应用方"的落点）。
-func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dtotenant.RoleCreateResp, error) {
+func (svc *roleSvc) Create(ctx context.Context, req *dtotenant.RoleCreateReq) (*dtotenant.RoleCreateResp, error) {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
-	if err := requireSystemAdmin(ctx, code.RoleCreateError); err != nil {
+	if err := requireSystemAdmin(ctx, req.Operator, code.RoleCreateError); err != nil {
 		return nil, err
 	}
-	tenantID := gincontext.GetTenantIDString(ctx)
+	tenantID := dbclient.TenantIDFromContext(ctx)
 
 	// 角色从属于租户订阅的应用：校验 appID（订阅且启用的应用均可选，含系统内置应用）
 	appList, err := loadSubscribedApps(ctx)
@@ -84,7 +83,7 @@ func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dto
 		Description: req.Description,
 		Source:      model.RoleSourceCustom,
 		AdminType:   model.SysAdminTypeNormal,
-		CreatedBy:   gincontext.GetUserIDString(ctx),
+		CreatedBy:   req.Operator.UserID,
 	}
 	if err := dao.NewRoleDao().Insert(ctx, insertEntity); err != nil {
 		glog.Errorf(ctx, "[svcrole.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -94,12 +93,12 @@ func (svc *roleSvc) Create(ctx *gin.Context, req *dtotenant.RoleCreateReq) (*dto
 }
 
 // Delete 删除角色：级联清理 user_role / role_menu 关联（事务）。
-func (svc *roleSvc) Delete(ctx *gin.Context, req *dtotenant.RoleDeleteReq) error {
+func (svc *roleSvc) Delete(ctx context.Context, req *dtotenant.RoleDeleteReq) error {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
-	if err := requireSystemAdmin(ctx, code.RoleDeleteError); err != nil {
+	if err := requireSystemAdmin(ctx, req.Operator, code.RoleDeleteError); err != nil {
 		return err
 	}
-	tenantID := gincontext.GetTenantIDString(ctx)
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcrole.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -113,7 +112,7 @@ func (svc *roleSvc) Delete(ctx *gin.Context, req *dtotenant.RoleDeleteReq) error
 		return code.GetError(code.RoleDeleteBuiltinForbiddenError)
 	}
 
-	userID := gincontext.GetUserIDString(ctx)
+	userID := req.Operator.UserID
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := dao.NewRoleDao().WithTx(tx).Delete(ctx, req.RoleID, userID); err != nil {
 			return err
@@ -148,12 +147,12 @@ func (svc *roleSvc) Delete(ctx *gin.Context, req *dtotenant.RoleDeleteReq) error
 }
 
 // Update 全量更新角色。
-func (svc *roleSvc) Update(ctx *gin.Context, req *dtotenant.RoleUpdateReq) error {
+func (svc *roleSvc) Update(ctx context.Context, req *dtotenant.RoleUpdateReq) error {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
-	if err := requireSystemAdmin(ctx, code.RoleUpdateError); err != nil {
+	if err := requireSystemAdmin(ctx, req.Operator, code.RoleUpdateError); err != nil {
 		return err
 	}
-	tenantID := gincontext.GetTenantIDString(ctx)
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcrole.Update] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -185,7 +184,7 @@ func (svc *roleSvc) Update(ctx *gin.Context, req *dtotenant.RoleUpdateReq) error
 	updateMap := map[string]any{
 		"name":        req.Name,
 		"description": req.Description,
-		"updated_by":  gincontext.GetUserIDString(ctx),
+		"updated_by":  req.Operator.UserID,
 	}
 	if err := dao.NewRoleDao().UpdateMap(ctx, req.RoleID, updateMap); err != nil {
 		glog.Errorf(ctx, "[svcrole.Update] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -195,8 +194,8 @@ func (svc *roleSvc) Update(ctx *gin.Context, req *dtotenant.RoleUpdateReq) error
 }
 
 // Detail 角色详情（含成员数 / 授权菜单数）。
-func (svc *roleSvc) Detail(ctx *gin.Context, req *dtotenant.RoleDetailReq) (*dtotenant.RoleDetailResp, error) {
-	tenantID := gincontext.GetTenantIDString(ctx)
+func (svc *roleSvc) Detail(ctx context.Context, req *dtotenant.RoleDetailReq) (*dtotenant.RoleDetailResp, error) {
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcrole.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -230,8 +229,8 @@ func (svc *roleSvc) Detail(ctx *gin.Context, req *dtotenant.RoleDetailReq) (*dto
 }
 
 // PageList 角色分页列表（含成员数 / 授权菜单数聚合，可按应用过滤）。
-func (svc *roleSvc) PageList(ctx *gin.Context, req *dtotenant.RolePageListReq) (*dtotenant.RolePageListResp, error) {
-	tenantID := gincontext.GetTenantIDString(ctx)
+func (svc *roleSvc) PageList(ctx context.Context, req *dtotenant.RolePageListReq) (*dtotenant.RolePageListResp, error) {
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	cond := &dao.RoleCond{
 		BaseCond: &gormdao.BaseCond{
 			Page:     req.Page,
@@ -282,8 +281,8 @@ func (svc *roleSvc) PageList(ctx *gin.Context, req *dtotenant.RolePageListReq) (
 }
 
 // GetMenus 角色菜单授权回显：角色所属应用的菜单树 + 已授权菜单ID（无应用归属的种子角色回退全控制台菜单）。
-func (svc *roleSvc) GetMenus(ctx *gin.Context, req *dtotenant.RoleDetailReq) (*dtotenant.RoleMenuTreeResp, error) {
-	tenantID := gincontext.GetTenantIDString(ctx)
+func (svc *roleSvc) GetMenus(ctx context.Context, req *dtotenant.RoleDetailReq) (*dtotenant.RoleMenuTreeResp, error) {
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcrole.GetMenus] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -311,7 +310,7 @@ func (svc *roleSvc) GetMenus(ctx *gin.Context, req *dtotenant.RoleDetailReq) (*d
 }
 
 // roleMenuFullTree 角色所属应用（或全控制台）的完整菜单树（含 visibility=admin，不剔除）。
-func (svc *roleSvc) roleMenuFullTree(ctx *gin.Context, roleEntity *model.RoleEntity) ([]dtotenant.MenuTreeItem, error) {
+func (svc *roleSvc) roleMenuFullTree(ctx context.Context, roleEntity *model.RoleEntity) ([]dtotenant.MenuTreeItem, error) {
 	if roleEntity.AppID != "" {
 		return buildAppMenuTree(ctx, roleEntity.AppID)
 	}
@@ -321,7 +320,7 @@ func (svc *roleSvc) roleMenuFullTree(ctx *gin.Context, roleEntity *model.RoleEnt
 // roleMenuTree 角色可授权的菜单树。
 // 有应用归属则取该应用菜单，否则回退全租户控制台菜单（种子角色）。
 // 非内置管理员角色剔除 visibility=admin 的菜单（授权约束），内置管理员角色可见全部。
-func (svc *roleSvc) roleMenuTree(ctx *gin.Context, roleEntity *model.RoleEntity) ([]dtotenant.MenuTreeItem, error) {
+func (svc *roleSvc) roleMenuTree(ctx context.Context, roleEntity *model.RoleEntity) ([]dtotenant.MenuTreeItem, error) {
 	var tree []dtotenant.MenuTreeItem
 	var err error
 	if roleEntity.AppID != "" {
@@ -377,12 +376,12 @@ func containAdminVisibilityMenus(tree []dtotenant.MenuTreeItem) bool {
 }
 
 // UpdateMenus 全量替换角色菜单授权（PUT 集合语义）。
-func (svc *roleSvc) UpdateMenus(ctx *gin.Context, req *dtotenant.RoleMenusUpdateReq) error {
+func (svc *roleSvc) UpdateMenus(ctx context.Context, req *dtotenant.RoleMenusUpdateReq) error {
 	// 系统管理操作：控制台管理层专用，直接调 API 的普通成员拒绝
-	if err := requireSystemAdmin(ctx, code.RoleUpdateError); err != nil {
+	if err := requireSystemAdmin(ctx, req.Operator, code.RoleUpdateError); err != nil {
 		return err
 	}
-	tenantID := gincontext.GetTenantIDString(ctx)
+	tenantID := dbclient.TenantIDFromContext(ctx)
 	roleEntity, err := dao.NewRoleDao().GetByID(ctx, req.RoleID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcrole.UpdateMenus] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -415,7 +414,7 @@ func (svc *roleSvc) UpdateMenus(ctx *gin.Context, req *dtotenant.RoleMenusUpdate
 		}
 	}
 
-	userID := gincontext.GetUserIDString(ctx)
+	userID := req.Operator.UserID
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
 		// 删除旧关联
 		oldList, err := dao.NewRoleMenuDao().GetListByCond(ctx, &dao.RoleMenuCond{TenantID: tenantID, RoleID: req.RoleID})
@@ -449,7 +448,7 @@ func (svc *roleSvc) UpdateMenus(ctx *gin.Context, req *dtotenant.RoleMenusUpdate
 }
 
 // roleRelationCounts 批量统计角色成员数与授权菜单数（GROUP BY，避免 N+1）。
-func (svc *roleSvc) roleRelationCounts(ctx *gin.Context, tenantID string, roleIDs []string) (map[string]int64, map[string]int64, error) {
+func (svc *roleSvc) roleRelationCounts(ctx context.Context, tenantID string, roleIDs []string) (map[string]int64, map[string]int64, error) {
 	memberCount := make(map[string]int64, len(roleIDs))
 	menuCount := make(map[string]int64, len(roleIDs))
 	for _, id := range roleIDs {
@@ -506,7 +505,7 @@ func collectMenuIDs(tree []dtotenant.MenuTreeItem) map[string]bool {
 }
 
 // tenantAppNameMap 租户订阅应用 ID -> 名称 映射（含系统内置应用，与角色可选应用集合口径一致）。
-func tenantAppNameMap(ctx *gin.Context) (map[string]string, error) {
+func tenantAppNameMap(ctx context.Context) (map[string]string, error) {
 	appList, err := loadSubscribedApps(ctx)
 	if err != nil {
 		return nil, err

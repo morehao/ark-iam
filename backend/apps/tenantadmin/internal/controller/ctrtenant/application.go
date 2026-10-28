@@ -2,6 +2,7 @@ package ctrtenant
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/tenantadmin/internal/service/svctenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -32,7 +33,7 @@ func NewApplicationCtr() ApplicationCtr {
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.TenantApplicationsResp}
 // @Router /v1/tenant/applications [get]
 func (ctr *applicationCtr) List(ctx *gin.Context) {
-	res, err := ctr.appAccessSvc.ListTenantApplications(ctx)
+	res, err := ctr.appAccessSvc.ListTenantApplications(ctx.Request.Context())
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -49,11 +50,12 @@ func (ctr *applicationCtr) List(ctx *gin.Context) {
 // @Router /v1/tenant/applications/{appID}/users [get]
 func (ctr *applicationCtr) ListUsers(ctx *gin.Context) {
 	var req dtotenant.ApplicationUsersListReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.appAccessSvc.ListApplicationUsers(ctx, &req)
+	res, err := ctr.appAccessSvc.ListApplicationUsers(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

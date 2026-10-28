@@ -1,7 +1,9 @@
 package svcoidc
 
 import (
+	"context"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -66,6 +68,9 @@ func seedTempPasswordPerson(t *testing.T, db *gorm.DB, tempPassword string) *mod
 func newOIDCGinCtx(t *testing.T, path string) *gin.Context {
 	t.Helper()
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	req, err := http.NewRequest(http.MethodPost, path, nil)
 	if err != nil {
 		t.Fatalf("new request: %v", err)
@@ -92,7 +97,7 @@ func TestCompleteLoginTempPasswordRequiresChange(t *testing.T) {
 
 	svc := &oidcAuthSvc{
 		provider: provider,
-		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx *gin.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+		authSvc: &fakePasswordAuthenticator{authenticate: func(ctx context.Context, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
 			return &model.PersonEntity{
 					BaseEntity:     gormdao.BaseEntity{StringID: gormdao.StringID{ID: "88"}},
 					PasswordStatus: model.PasswordStatusMustChange,
@@ -103,7 +108,7 @@ func TestCompleteLoginTempPasswordRequiresChange(t *testing.T) {
 		}},
 	}
 
-	res, err := svc.CompleteLogin(newOIDCGinCtx(t, "/oidc/login"), &dtooidc.OIDCLoginReq{
+	res, err := svc.CompleteLogin(requestCtx(newOIDCGinCtx(t, "/oidc/login")), &dtooidc.OIDCLoginReq{
 		AuthRequestID: authReq.GetID(),
 		Identifier:    "temp@example.com",
 		Password:      "Temp1234",
@@ -149,7 +154,7 @@ func TestChangePasswordRotatesAndClearsFlag(t *testing.T) {
 	}
 
 	svc := &oidcAuthSvc{provider: provider}
-	err := svc.ChangePassword(newOIDCGinCtx(t, "/oidc/login/changePassword"), &dtooidc.OIDCChangePasswordReq{
+	err := svc.ChangePassword(requestCtx(newOIDCGinCtx(t, "/oidc/login/changePassword")), &dtooidc.OIDCChangePasswordReq{
 		AuthRequestID:   authReq.GetID(),
 		CurrentPassword: "Temp1234",
 		NewPassword:     "Fresh1234",
@@ -208,7 +213,7 @@ func TestChangePasswordRejections(t *testing.T) {
 			}
 
 			svc := &oidcAuthSvc{provider: provider}
-			err := svc.ChangePassword(newOIDCGinCtx(t, "/oidc/login/changePassword"), &dtooidc.OIDCChangePasswordReq{
+			err := svc.ChangePassword(requestCtx(newOIDCGinCtx(t, "/oidc/login/changePassword")), &dtooidc.OIDCChangePasswordReq{
 				AuthRequestID:   authReq.GetID(),
 				CurrentPassword: tc.currentPassword,
 				NewPassword:     tc.newPassword,
@@ -236,7 +241,7 @@ func TestChangePasswordRejectsUnknownAuthRequest(t *testing.T) {
 	provider, _ := newChangePasswordEnv(t)
 
 	svc := &oidcAuthSvc{provider: provider}
-	err := svc.ChangePassword(newOIDCGinCtx(t, "/oidc/login/changePassword"), &dtooidc.OIDCChangePasswordReq{
+	err := svc.ChangePassword(requestCtx(newOIDCGinCtx(t, "/oidc/login/changePassword")), &dtooidc.OIDCChangePasswordReq{
 		AuthRequestID:   "not-exist",
 		CurrentPassword: "Temp1234",
 		NewPassword:     "Fresh1234",

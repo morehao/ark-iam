@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"testing"
 	"time"
 
@@ -31,21 +32,21 @@ func newProtocolConformanceStore(t *testing.T, migrate ...any) (*PersistentStore
 	}
 	ps := NewPersistentStore()
 	ps.personDao = func(opts ...dao.DaoOption) *dao.PersonDao {
-		return dao.NewPersonDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
+		return dao.NewPersonDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(dbclient.CrossTenantContext(ctx)) }))
 	}
 	ps.userDao = func(opts ...dao.DaoOption) *dao.UserDao {
-		return dao.NewUserDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
+		return dao.NewUserDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(dbclient.CrossTenantContext(ctx)) }))
 	}
 	ps.refreshTokenDao = func(opts ...dao.DaoOption) *dao.RefreshTokenDao {
-		return dao.NewRefreshTokenDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
+		return dao.NewRefreshTokenDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(dbclient.CrossTenantContext(ctx)) }))
 	}
 	ps.applicationClientDao = func(opts ...dao.DaoOption) *dao.ApplicationClientDao {
-		return dao.NewApplicationClientDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
+		return dao.NewApplicationClientDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(dbclient.CrossTenantContext(ctx)) }))
 	}
 	ps.applicationClientSecretDao = func(opts ...dao.DaoOption) *dao.ApplicationClientSecretDao {
-		return dao.NewApplicationClientSecretDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
+		return dao.NewApplicationClientSecretDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(dbclient.CrossTenantContext(ctx)) }))
 	}
-	ps.db = func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }
+	ps.db = func(ctx context.Context) *gorm.DB { return db.WithContext(dbclient.CrossTenantContext(ctx)) }
 	return ps, db
 }
 

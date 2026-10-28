@@ -4,6 +4,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type UserCond struct {
@@ -26,43 +27,53 @@ func (c *UserCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.BaseCond != nil {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
+	col := condCols(tableName)
 	if c.TenantID != "" {
-		db.Where(tableName+".tenant_id = ?", c.TenantID)
+		db.Where(clause.Eq{Column: col("tenant_id"), Value: c.TenantID})
 	}
 	if c.PersonID != "" {
-		db.Where(tableName+".person_id = ?", c.PersonID)
+		db.Where(clause.Eq{Column: col("person_id"), Value: c.PersonID})
 	}
 	if c.UserType != "" {
-		db.Where(tableName+".user_type = ?", c.UserType)
+		db.Where(clause.Eq{Column: col("user_type"), Value: c.UserType})
 	}
 	if c.Source != "" {
-		db.Where(tableName+".source = ?", c.Source)
+		db.Where(clause.Eq{Column: col("source"), Value: c.Source})
 	}
 	if len(c.IDs) > 0 {
-		db.Where(tableName+".id IN ?", c.IDs)
+		db.Where(clause.IN{Column: col("id"), Values: toAnySlice(c.IDs)})
 	}
 	if c.Username != "" {
-		db.Where(tableName+".username = ?", c.Username)
+		db.Where(clause.Eq{Column: col("username"), Value: c.Username})
 	}
 	if c.PrimaryEmail != "" {
-		db.Where(tableName+".primary_email = ?", c.PrimaryEmail)
+		db.Where(clause.Eq{Column: col("primary_email"), Value: c.PrimaryEmail})
 	}
 	if c.PrimaryPhone != "" {
-		db.Where(tableName+".primary_phone = ?", c.PrimaryPhone)
+		db.Where(clause.Eq{Column: col("primary_phone"), Value: c.PrimaryPhone})
 	}
 	if c.Name != "" {
-		db.Where(tableName+".name = ?", c.Name)
+		db.Where(clause.Eq{Column: col("name"), Value: c.Name})
 	}
 	if c.Status != "" {
-		db.Where(tableName+".status = ?", c.Status)
+		db.Where(clause.Eq{Column: col("status"), Value: c.Status})
 	}
 	if c.OwnerType != "" {
-		db.Where(tableName+".owner_type = ?", c.OwnerType)
+		db.Where(clause.Eq{Column: col("owner_type"), Value: c.OwnerType})
 	}
 	if c.Keyword != "" {
 		k := "%" + c.Keyword + "%"
-		db.Where(tableName+".name LIKE ? OR "+tableName+".person_id IN (SELECT id FROM "+model.TableNamePerson+" WHERE username LIKE ? OR primary_email LIKE ? OR primary_phone LIKE ?)",
-			k, k, k, k)
+		// 姓名 LIKE，或关联 person 的 username/email/phone LIKE。
+		// 子查询在 OR 分支里用 clause.Expr 表达；表名/列名经 quoteCol 按方言引用。
+		db.Where(clause.Or(
+			clause.Like{Column: col("name"), Value: k},
+			clause.Expr{
+				SQL: quoteCol(db, tableName, "person_id") +
+					" IN (SELECT id FROM " + quoteIdent(db, model.TableNamePerson) +
+					" WHERE username LIKE ? OR primary_email LIKE ? OR primary_phone LIKE ?)",
+				Vars: []interface{}{k, k, k},
+			},
+		))
 	}
 }
 

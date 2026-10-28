@@ -3,6 +3,7 @@ package dtooidc
 import (
 	"bytes"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -10,6 +11,9 @@ import (
 
 func TestOIDCLoginReqBindingRequiresAllFields(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	body := []byte(`{"identifier":"person@example.com","password":"Password1"}`)
 	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	if err != nil {

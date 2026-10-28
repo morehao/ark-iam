@@ -1,6 +1,9 @@
 package svctenantapplication
 
 import (
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -41,10 +44,18 @@ func TestTenantApplicationPageListReturnsTimeFields(t *testing.T) {
 	}
 
 	ctx, _ := gin.CreateTestContext(nil)
+
+	if ctx.Request == nil {
+
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ctx.Set(gcontext.KeyTenantID, "t1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("t1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("t1"))
 	ctx.Set(gcontext.KeyUserID, "1")
 
-	resp, err := NewTenantApplicationSvc().PageList(ctx, &dtotenantapplication.TenantApplicationPageListReq{})
+	resp, err := NewTenantApplicationSvc().PageList(requestCtx(ctx), &dtotenantapplication.TenantApplicationPageListReq{})
 	if err != nil {
 		t.Fatalf("PageList failed: %v", err)
 	}

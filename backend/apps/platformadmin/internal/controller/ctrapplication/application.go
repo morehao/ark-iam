@@ -2,6 +2,7 @@ package ctrapplication
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtoapplication"
 	"github.com/morehao/ark-iam/platformadmin/internal/service/svcapplication"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -34,11 +35,12 @@ func NewApplicationCtr() ApplicationCtr {
 // @Router /v1/platform/applications [post]
 func (ctr *applicationCtr) Create(ctx *gin.Context) {
 	var req dtoapplication.ApplicationCreateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.svc.Create(ctx, &req)
+	res, err := ctr.svc.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -56,6 +58,7 @@ func (ctr *applicationCtr) Create(ctx *gin.Context) {
 // @Router /v1/platform/applications/{appID} [put]
 func (ctr *applicationCtr) Update(ctx *gin.Context) {
 	var req dtoapplication.ApplicationUpdateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -64,7 +67,7 @@ func (ctr *applicationCtr) Update(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.svc.Update(ctx, &req); err != nil {
+	if err := ctr.svc.Update(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -80,11 +83,12 @@ func (ctr *applicationCtr) Update(ctx *gin.Context) {
 // @Router /v1/platform/applications/{appID} [delete]
 func (ctr *applicationCtr) Delete(ctx *gin.Context) {
 	var req dtoapplication.ApplicationDeleteReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.svc.Delete(ctx, &req); err != nil {
+	if err := ctr.svc.Delete(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -104,7 +108,7 @@ func (ctr *applicationCtr) Detail(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.svc.Detail(ctx, &req)
+	res, err := ctr.svc.Detail(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -125,7 +129,7 @@ func (ctr *applicationCtr) PageList(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.svc.PageList(ctx, &req)
+	res, err := ctr.svc.PageList(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

@@ -2,6 +2,7 @@ package ctrtenant
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/tenantadmin/internal/service/svctenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -34,11 +35,12 @@ func NewInviteCtr() InviteCtr {
 // @Router /v1/tenant/invites [post]
 func (ctr *inviteCtr) Create(ctx *gin.Context) {
 	var req dtotenant.InviteCreateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.inviteSvc.Create(ctx, &req)
+	res, err := ctr.inviteSvc.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -55,11 +57,12 @@ func (ctr *inviteCtr) Create(ctx *gin.Context) {
 // @Router /v1/tenant/invites/{inviteID} [delete]
 func (ctr *inviteCtr) Revoke(ctx *gin.Context) {
 	var req dtotenant.InviteRevokeReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.inviteSvc.Revoke(ctx, &req); err != nil {
+	if err := ctr.inviteSvc.Revoke(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -79,7 +82,7 @@ func (ctr *inviteCtr) PageList(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.inviteSvc.PageList(ctx, &req)
+	res, err := ctr.inviteSvc.PageList(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

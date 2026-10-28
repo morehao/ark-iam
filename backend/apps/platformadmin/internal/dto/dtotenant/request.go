@@ -2,6 +2,7 @@ package dtotenant
 
 import (
 	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
 	"github.com/morehao/ark-iam/pkg/object/objtenant"
 	"github.com/morehao/golib/biz/gobject"
 )
@@ -9,6 +10,8 @@ import (
 type TenantCreateReq struct {
 	objtenant.TenantBaseInfo
 	Admin *TenantAdminCreateReq `json:"admin" binding:"required"` // 租户管理员(必填：每个租户都必须有管理员)
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 // TenantAdminCreateReq 建租户时一并创建的租户管理员。
@@ -24,11 +27,15 @@ type TenantAdminCreateReq struct {
 // TenantAdminResetPasswordReq 重置租户内置管理员(builtin)密码；tenantID 只来自 path。
 type TenantAdminResetPasswordReq struct {
 	TenantID string `json:"-" uri:"tenantID" binding:"required"` // 租户ID
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type TenantUpdateReq struct {
 	TenantID string `json:"-" uri:"tenantID" binding:"required"` // 租户ID
 	objtenant.TenantBaseInfo
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type TenantDetailReq struct {
@@ -44,4 +51,6 @@ type TenantPageListReq struct {
 
 type TenantDeleteReq struct {
 	TenantID string `json:"-" uri:"tenantID" binding:"required"` // 租户ID
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }

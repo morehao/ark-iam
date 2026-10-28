@@ -5,6 +5,7 @@ import (
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoconnector"
 	"github.com/morehao/ark-iam/auth/internal/service/svcauth"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -41,11 +42,12 @@ func NewConnectorCtr() ConnectorCtr {
 // @Router /v1/auth/connectors [post]
 func (ctr *connectorCtr) Create(ctx *gin.Context) {
 	var req dtoauth.ConnectorCreateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.connectorSvc.Create(ctx, &req)
+	res, err := ctr.connectorSvc.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -62,11 +64,12 @@ func (ctr *connectorCtr) Create(ctx *gin.Context) {
 // @Router /v1/auth/connectors/{connectorID} [delete]
 func (ctr *connectorCtr) Delete(ctx *gin.Context) {
 	var req dtoauth.ConnectorDeleteReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.connectorSvc.Delete(ctx, &req); err != nil {
+	if err := ctr.connectorSvc.Delete(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -83,6 +86,7 @@ func (ctr *connectorCtr) Delete(ctx *gin.Context) {
 // @Router /v1/auth/connectors/{connectorID} [put]
 func (ctr *connectorCtr) Update(ctx *gin.Context) {
 	var req dtoauth.ConnectorUpdateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -91,7 +95,7 @@ func (ctr *connectorCtr) Update(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.connectorSvc.Update(ctx, &req); err != nil {
+	if err := ctr.connectorSvc.Update(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -111,7 +115,7 @@ func (ctr *connectorCtr) Detail(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.connectorSvc.Detail(ctx, &req)
+	res, err := ctr.connectorSvc.Detail(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -132,7 +136,7 @@ func (ctr *connectorCtr) PageList(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.connectorSvc.PageList(ctx, &req)
+	res, err := ctr.connectorSvc.PageList(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -153,7 +157,7 @@ func (ctr *connectorCtr) GetFactoryList(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.connectorSvc.GetFactoryList(ctx, &req)
+	res, err := ctr.connectorSvc.GetFactoryList(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -174,7 +178,7 @@ func (ctr *connectorCtr) TestConnector(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.connectorSvc.TestConnector(ctx, &req)
+	res, err := ctr.connectorSvc.TestConnector(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -215,7 +219,7 @@ func (ctr *connectorCtr) Authorize(ctx *gin.Context) {
 		LoginHint:    bodyReq.LoginHint,
 		ResponseMode: bodyReq.ResponseMode,
 	}
-	res, err := ctr.connectorSvc.Authorize(ctx, &req, req.ConnectorID)
+	res, err := ctr.connectorSvc.Authorize(ctx.Request.Context(), &req, req.ConnectorID)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -242,7 +246,7 @@ func (ctr *connectorCtr) Callback(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.connectorSvc.Callback(ctx, &dtoconnector.ConnectorCallbackReq{
+	res, err := ctr.connectorSvc.Callback(ctx.Request.Context(), &dtoconnector.ConnectorCallbackReq{
 		ConnectorID: req.ConnectorID,
 		Code:        req.Code,
 		State:       req.State,

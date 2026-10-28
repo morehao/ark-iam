@@ -2,6 +2,8 @@ package ctrtenant
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/identity"
+	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/tenantadmin/internal/service/svctenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
@@ -29,7 +31,8 @@ func NewTenantMenuCtr() TenantMenuCtr {
 // @Success 200 {object} gincontext.DtoRender{data=dtotenant.MenuTreeResp}
 // @Router /v1/tenant/menus/tree [get]
 func (ctr *tenantMenuCtr) Tree(ctx *gin.Context) {
-	res, err := ctr.tenantMenuSvc.Tree(ctx)
+	req := dtotenant.MenuTreeReq{Operator: identity.OperatorFromGin(ctx)}
+	res, err := ctr.tenantMenuSvc.Tree(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

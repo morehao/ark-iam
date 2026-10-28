@@ -20,9 +20,9 @@ func templateJSON(t *testing.T, items ...model.RoleTemplateItem) model.RoleTempl
 func seedSubscribedTenant(t *testing.T, db *gorm.DB, tenantID, appID string) {
 	t.Helper()
 	require.NoError(t, db.WithContext(context.Background()).Create(&model.TenantApplicationEntity{
-		TenantID:     tenantID,
-		AppID:        appID,
-		Status:       model.TenantApplicationStatusEnable,
+		TenantID: tenantID,
+		AppID:    appID,
+		Status:   model.TenantApplicationStatusEnable,
 	}).Error)
 }
 

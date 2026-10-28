@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
 
 	"github.com/morehao/ark-iam/pkg/code"
@@ -65,7 +64,7 @@ func (d *OIDCDriver) ValidateConfig(config ConnectorConfig) error {
 	return validateOIDCConnectorConfig(config)
 }
 
-func (d *OIDCDriver) BuildAuthorizationURL(ctx *gin.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error) {
+func (d *OIDCDriver) BuildAuthorizationURL(ctx context.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error) {
 	if input == nil {
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
@@ -111,7 +110,7 @@ func (d *OIDCDriver) BuildAuthorizationURL(ctx *gin.Context, input *ConnectorAut
 	}, nil
 }
 
-func (d *OIDCDriver) ExchangeCallback(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
+func (d *OIDCDriver) ExchangeCallback(ctx context.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
 	if input == nil {
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
@@ -176,7 +175,7 @@ func (d *OIDCDriver) ExchangeCallback(ctx *gin.Context, input *ConnectorCallback
 	}, nil
 }
 
-func (d *OIDCDriver) TestConnection(ctx *gin.Context, input *ConnectorTestInput) (*ConnectorTestOutput, error) {
+func (d *OIDCDriver) TestConnection(ctx context.Context, input *ConnectorTestInput) (*ConnectorTestOutput, error) {
 	_ = ctx
 	_ = input
 	return &ConnectorTestOutput{

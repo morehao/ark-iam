@@ -1,6 +1,7 @@
 package svcapplicationclient
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"testing"
 
 	"github.com/morehao/ark-iam/pkg/code"
@@ -32,17 +33,18 @@ func TestUpdateBuiltInClientRejectsAuthMethodChange(t *testing.T) {
 	}
 
 	ctx := newOAuthDeleteCtx("1", "0")
-	err := NewApplicationClientSvc().Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	err := NewApplicationClientSvc().Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID:     builtin.ID,
 		Name:                    "平台管理后台",
 		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodBasic,
 		RequirePKCE:             model.ClientPKCEPolicyEnable,
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil || gerror.GetCode(err) != int(code.ApplicationClientBuiltInAuthMethodImmutableError) {
 		t.Fatalf("内置客户端改认证方式应返回 ApplicationClientBuiltInAuthMethodImmutableError, got %v", err)
 	}
 
-	got, err := dao.NewApplicationClientDao().GetByID(ctx, builtin.ID)
+	got, err := dao.NewApplicationClientDao().GetByID(dbclient.CrossTenantContext(ctx), builtin.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -64,17 +66,18 @@ func TestUpdateBuiltInClientRejectsPKCEDowngrade(t *testing.T) {
 	}
 
 	ctx := newOAuthDeleteCtx("1", "0")
-	err := NewApplicationClientSvc().Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	err := NewApplicationClientSvc().Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID:     builtin.ID,
 		Name:                    "平台管理后台",
 		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodNone,
 		RequirePKCE:             model.ClientPKCEPolicyDisable,
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil || gerror.GetCode(err) != int(code.ApplicationClientBuiltInAuthMethodImmutableError) {
 		t.Fatalf("内置客户端关掉强制 PKCE 应返回 ApplicationClientBuiltInAuthMethodImmutableError, got %v", err)
 	}
 
-	got, err := dao.NewApplicationClientDao().GetByID(ctx, builtin.ID)
+	got, err := dao.NewApplicationClientDao().GetByID(dbclient.CrossTenantContext(ctx), builtin.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -96,16 +99,17 @@ func TestUpdateThirdPartyClientCanSwitchAuthMethod(t *testing.T) {
 	}
 
 	ctx := newOAuthDeleteCtx("1", "0")
-	if err := NewApplicationClientSvc().Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	if err := NewApplicationClientSvc().Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID:     thirdParty.ID,
 		Name:                    "第三方 BFF",
 		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodBasic,
 		RequirePKCE:             model.ClientPKCEPolicyDisable,
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("自建客户端应可切换认证方式: %v", err)
 	}
 
-	got, err := dao.NewApplicationClientDao().GetByID(ctx, thirdParty.ID)
+	got, err := dao.NewApplicationClientDao().GetByID(dbclient.CrossTenantContext(ctx), thirdParty.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -130,14 +134,15 @@ func TestUpdateAuthMethodEmptyKeepsExisting(t *testing.T) {
 
 	ctx := newOAuthDeleteCtx("1", "0")
 	// 只改名字，完全不提交认证方式
-	if err := NewApplicationClientSvc().Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	if err := NewApplicationClientSvc().Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID: thirdParty.ID,
 		Name:                "服务端应用改名",
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("改名应允许: %v", err)
 	}
 
-	got, err := dao.NewApplicationClientDao().GetByID(ctx, thirdParty.ID)
+	got, err := dao.NewApplicationClientDao().GetByID(dbclient.CrossTenantContext(ctx), thirdParty.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -157,11 +162,12 @@ func TestUpdateRejectsIllegalAuthMethod(t *testing.T) {
 	}
 
 	ctx := newOAuthDeleteCtx("1", "0")
-	err := NewApplicationClientSvc().Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	err := NewApplicationClientSvc().Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID:     thirdParty.ID,
 		Name:                    "服务端应用",
 		TokenEndpointAuthMethod: model.TokenEndpointAuthMethod("private_key_jwt"),
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil || gerror.GetCode(err) != int(code.ApplicationClientAuthMethodInvalidError) {
 		t.Fatalf("非法认证方式应返回 ApplicationClientAuthMethodInvalidError, got %v", err)
 	}
@@ -172,10 +178,11 @@ func TestCreateRejectsIllegalAuthMethod(t *testing.T) {
 	testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
 
 	ctx := newOAuthDeleteCtx("1", "0")
-	_, err := NewApplicationClientSvc().Create(ctx, &dtoapplicationclient.ApplicationClientCreateReq{
+	_, err := NewApplicationClientSvc().Create(requestCtx(ctx), &dtoapplicationclient.ApplicationClientCreateReq{
 		AppID: "app1", Code: "client_illegal_method", Name: "非法认证方式客户端",
 		TokenEndpointAuthMethod: model.TokenEndpointAuthMethod("client_secret_jwt"),
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil || gerror.GetCode(err) != int(code.ApplicationClientAuthMethodInvalidError) {
 		t.Fatalf("创建非法认证方式应返回 ApplicationClientAuthMethodInvalidError, got %v", err)
 	}
@@ -195,14 +202,15 @@ func TestCreateSecretRejectedForPublicClient(t *testing.T) {
 	}
 
 	ctx := newOAuthDeleteCtx("1", "0")
-	_, err := NewApplicationClientSvc().CreateSecret(ctx, &dtoapplicationclient.SecretCreateReq{
+	_, err := NewApplicationClientSvc().CreateSecret(requestCtx(ctx), &dtoapplicationclient.SecretCreateReq{
 		ApplicationClientID: public.ID, Name: "prod-key",
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil || gerror.GetCode(err) != int(code.ApplicationClientPublicClientSecretForbiddenError) {
 		t.Fatalf("公共客户端建密钥应返回 ApplicationClientPublicClientSecretForbiddenError, got %v", err)
 	}
 
-	secrets, err := dao.NewApplicationClientSecretDao().GetListByCond(ctx, &dao.ApplicationClientSecretCond{ApplicationClientID: public.ID})
+	secrets, err := dao.NewApplicationClientSecretDao().GetListByCond(dbclient.CrossTenantContext(ctx), &dao.ApplicationClientSecretCond{ApplicationClientID: public.ID})
 	if err != nil {
 		t.Fatalf("GetListByCond: %v", err)
 	}
@@ -222,9 +230,10 @@ func TestCreateSecretAllowedForConfidentialClient(t *testing.T) {
 	}
 
 	ctx := newOAuthDeleteCtx("1", "0")
-	resp, err := NewApplicationClientSvc().CreateSecret(ctx, &dtoapplicationclient.SecretCreateReq{
+	resp, err := NewApplicationClientSvc().CreateSecret(requestCtx(ctx), &dtoapplicationclient.SecretCreateReq{
 		ApplicationClientID: confidential.ID, Name: "prod-key",
-	})
+
+		Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("机密客户端建密钥应放行: %v", err)
 	}

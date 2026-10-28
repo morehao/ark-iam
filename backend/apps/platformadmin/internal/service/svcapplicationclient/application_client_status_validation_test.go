@@ -1,6 +1,10 @@
 package svcapplicationclient
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -43,22 +47,31 @@ func TestApplicationClientUpdateRejectsIllegalStatus(t *testing.T) {
 	}
 
 	ctx, _ := gin.CreateTestContext(nil)
+
+	if ctx.Request == nil {
+
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
 	ctx.Set(gcontext.KeyUserID, "0")
 	svc := NewApplicationClientSvc()
 
-	err := svc.Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	err := svc.Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID: entity.ID,
 		Name:                "客户端1",
 		Status:              "enabled",
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil {
 		t.Fatal("非法 status 应被拒绝")
 	}
 	if gerror.GetCode(err) != int(code.ApplicationClientUpdateError) {
 		t.Fatalf("期望 ApplicationClientUpdateError, got %v", err)
 	}
-	got, err := dao.NewApplicationClientDao().GetByID(ctx, entity.ID)
+	got, err := dao.NewApplicationClientDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -83,16 +96,25 @@ func TestApplicationClientUpdateStatusEmptyMeansKeep(t *testing.T) {
 	}
 
 	ctx, _ := gin.CreateTestContext(nil)
+
+	if ctx.Request == nil {
+
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
 	ctx.Set(gcontext.KeyUserID, "0")
 	svc := NewApplicationClientSvc()
 
-	if err := svc.Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID: entity.ID, Name: "客户端2改名",
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("status 留空应允许: %v", err)
 	}
-	got, err := dao.NewApplicationClientDao().GetByID(ctx, entity.ID)
+	got, err := dao.NewApplicationClientDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -150,23 +172,25 @@ func TestApplicationClientUpdateRejectsIllegalPolicy(t *testing.T) {
 	ctx := newOAuthDeleteCtx("1", "0")
 	svc := NewApplicationClientSvc()
 
-	err := svc.Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	err := svc.Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID: entity.ID,
 		Name:                "策略客户端",
 		RequirePKCE:         "true",
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil || gerror.GetCode(err) != int(code.ApplicationClientUpdateError) {
 		t.Fatalf("非法 PKCE 策略应返回 ApplicationClientUpdateError, got %v", err)
 	}
-	err = svc.Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	err = svc.Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID: entity.ID,
 		Name:                "策略客户端",
 		RequireAuthTime:     "yes",
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil || gerror.GetCode(err) != int(code.ApplicationClientUpdateError) {
 		t.Fatalf("非法 auth_time 策略应返回 ApplicationClientUpdateError, got %v", err)
 	}
-	got, err := dao.NewApplicationClientDao().GetByID(ctx, entity.ID)
+	got, err := dao.NewApplicationClientDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -175,13 +199,14 @@ func TestApplicationClientUpdateRejectsIllegalPolicy(t *testing.T) {
 	}
 
 	// 空串表示未提供 → 归一 disable
-	if err := svc.Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID: entity.ID,
 		Name:                "策略客户端改名",
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("策略留空应允许: %v", err)
 	}
-	got, err = dao.NewApplicationClientDao().GetByID(ctx, entity.ID)
+	got, err = dao.NewApplicationClientDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -190,15 +215,16 @@ func TestApplicationClientUpdateRejectsIllegalPolicy(t *testing.T) {
 	}
 
 	// 合法值可正常流转
-	if err := svc.Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID: entity.ID,
 		Name:                "策略客户端改名",
 		RequirePKCE:         model.ClientPKCEPolicyEnable,
 		RequireAuthTime:     model.ClientAuthTimeClaimPolicyDisable,
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("合法策略应允许: %v", err)
 	}
-	got, err = dao.NewApplicationClientDao().GetByID(ctx, entity.ID)
+	got, err = dao.NewApplicationClientDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -212,13 +238,14 @@ func TestApplicationClientCreatePolicyDefaultsToDisable(t *testing.T) {
 	testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
 
 	ctx := newOAuthDeleteCtx("1", "0")
-	resp, err := NewApplicationClientSvc().Create(ctx, &dtoapplicationclient.ApplicationClientCreateReq{
+	resp, err := NewApplicationClientSvc().Create(requestCtx(ctx), &dtoapplicationclient.ApplicationClientCreateReq{
 		AppID: "app1", Code: "client_default", Name: "缺省策略客户端",
-	})
+
+		Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	got, err := dao.NewApplicationClientDao().GetByID(ctx, resp.ApplicationClientID)
+	got, err := dao.NewApplicationClientDao().GetByID(dbclient.CrossTenantContext(ctx), resp.ApplicationClientID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}

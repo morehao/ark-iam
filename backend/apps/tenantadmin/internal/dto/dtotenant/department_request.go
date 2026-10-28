@@ -2,6 +2,7 @@ package dtotenant
 
 import (
 	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
 	"github.com/morehao/ark-iam/pkg/object/objtenant"
 )
 
@@ -10,22 +11,30 @@ import (
 type DepartmentCreateReq struct {
 	ParentID string `json:"parentID" form:"parentID"` // 父节点ID,空为根节点
 	objtenant.DepartmentBaseInfo
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type DepartmentUpdateReq struct {
 	DepartmentID string `json:"-" uri:"departmentID" binding:"required"` // 部门ID
 	ParentID     string `json:"parentID" form:"parentID"`                // 父节点ID,空为根节点(改此字段=移动节点)
 	objtenant.DepartmentBaseInfo
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type DepartmentStatusReq struct {
 	DepartmentID string               `json:"-" uri:"departmentID" binding:"required"` // 部门ID
 	Status       model.DeptNodeStatus `json:"status" binding:"required"`               // 状态: enable-启用 disable-停用
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type DepartmentDeleteReq struct {
 	DepartmentID string `json:"-" uri:"departmentID" binding:"required"` // 部门ID
 	Cascade      bool   `json:"cascade" form:"cascade"`                  // 是否级联删除子树与成员(默认拒绝)
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type DepartmentTreeReq struct {
@@ -48,17 +57,23 @@ type DepartmentUserCreateReq struct {
 	DepartmentID string                     `json:"-" uri:"departmentID" binding:"required"` // 部门ID
 	UserID       string                     `json:"userID" binding:"required"`               // 用户ID
 	RelationType model.DeptUserRelationType `json:"relationType"`                            // 关系类型: primary-行政主部门(每用户至多1) secondary-跨部门参与 leader-负责
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type DepartmentUserUpdateReq struct {
 	DepartmentID string                     `json:"-" uri:"departmentID" binding:"required"` // 部门ID
 	UserID       string                     `json:"-" uri:"userID" binding:"required"`       // 用户ID
 	RelationType model.DeptUserRelationType `json:"relationType"`                            // 关系类型
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type DepartmentUserDeleteReq struct {
 	DepartmentID string `json:"-" uri:"departmentID" binding:"required"` // 部门ID
 	UserID       string `json:"-" uri:"userID" binding:"required"`       // 用户ID
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type DepartmentUserPageListReq struct {

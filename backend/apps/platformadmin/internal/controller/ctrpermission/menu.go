@@ -2,6 +2,7 @@ package ctrpermission
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtopermission"
 	"github.com/morehao/ark-iam/platformadmin/internal/service/svcpermission"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -38,11 +39,12 @@ func NewMenuCtr() MenuCtr {
 // @Router /v1/platform/menus [post]
 func (ctr *menuCtr) Create(ctx *gin.Context) {
 	var req dtopermission.MenuCreateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.menuSvc.Create(ctx, &req)
+	res, err := ctr.menuSvc.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -59,11 +61,12 @@ func (ctr *menuCtr) Create(ctx *gin.Context) {
 // @Router /v1/platform/menus/{menuID} [delete]
 func (ctr *menuCtr) Delete(ctx *gin.Context) {
 	var req dtopermission.MenuDeleteReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.menuSvc.Delete(ctx, &req); err != nil {
+	if err := ctr.menuSvc.Delete(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -80,6 +83,7 @@ func (ctr *menuCtr) Delete(ctx *gin.Context) {
 // @Router /v1/platform/menus/{menuID} [put]
 func (ctr *menuCtr) Update(ctx *gin.Context) {
 	var req dtopermission.MenuUpdateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -88,7 +92,7 @@ func (ctr *menuCtr) Update(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.menuSvc.Update(ctx, &req); err != nil {
+	if err := ctr.menuSvc.Update(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -108,7 +112,7 @@ func (ctr *menuCtr) Detail(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.menuSvc.Detail(ctx, &req)
+	res, err := ctr.menuSvc.Detail(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -129,7 +133,7 @@ func (ctr *menuCtr) PageList(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.menuSvc.PageList(ctx, &req)
+	res, err := ctr.menuSvc.PageList(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -150,7 +154,7 @@ func (ctr *menuCtr) Tree(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.menuSvc.Tree(ctx, &req)
+	res, err := ctr.menuSvc.Tree(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -165,7 +169,8 @@ func (ctr *menuCtr) Tree(ctx *gin.Context) {
 // @Success 200 {object} gincontext.DtoRender{data=dtopermission.MenuMyTreeResp}
 // @Router /v1/platform/menus/my [get]
 func (ctr *menuCtr) MyTree(ctx *gin.Context) {
-	res, err := ctr.menuSvc.MyTree(ctx)
+	req := dtopermission.MenuMyTreeReq{Operator: identity.OperatorFromGin(ctx)}
+	res, err := ctr.menuSvc.MyTree(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

@@ -1,6 +1,9 @@
 package dtoapplicationclient
 
-import "github.com/morehao/ark-iam/pkg/model"
+import (
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
+)
 
 // ApplicationClientCreateReq 创建 OAuth 客户端。
 // 来源（source）不由控制台决定：控制台创建的客户端恒为 model.ApplicationClientSourceThirdParty，
@@ -25,6 +28,8 @@ type ApplicationClientCreateReq struct {
 	DefaultScopes           []string                        `json:"defaultScopes"`           // 默认权限范围
 	AccessTokenTTL          int64                           `json:"accessTokenTTL"`          // 访问令牌有效期(秒)
 	RefreshTokenTTL         int64                           `json:"refreshTokenTTL"`         // 刷新令牌有效期(秒)
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 // ApplicationClientUpdateReq 修改 OAuth 客户端。source 不可改。
@@ -49,10 +54,14 @@ type ApplicationClientUpdateReq struct {
 	DefaultScopes           []string                        `json:"defaultScopes"`           // 默认权限范围
 	AccessTokenTTL          int64                           `json:"accessTokenTTL"`          // 访问令牌有效期(秒)
 	RefreshTokenTTL         int64                           `json:"refreshTokenTTL"`         // 刷新令牌有效期(秒)
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type ApplicationClientDeleteReq struct {
 	ApplicationClientID string `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type ApplicationClientDetailReq struct {
@@ -75,9 +84,13 @@ type SecretCreateReq struct {
 	ApplicationClientID string `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
 	Name                string `json:"name" binding:"required"`                        // 密钥名称
 	ExpiredAt           int64  `json:"expiresAt"`                                      // 过期时间(unix 秒)
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type SecretDeleteReq struct {
 	ApplicationClientID string `json:"-" uri:"applicationClientID" binding:"required"` // OAuth客户端ID
 	SecretID            string `json:"-" uri:"secretID" binding:"required"`            // 密钥ID
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }

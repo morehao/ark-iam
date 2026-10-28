@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
@@ -111,9 +114,9 @@ func (f *fakeConnectorStateStore) Consume(ctx context.Context, state string) (*C
 type fakeConnectorDriver struct {
 	driverType                model.ConnectorProtocol
 	validateConfigFunc        func(config ConnectorConfig) error
-	buildAuthorizationURLFunc func(ctx *gin.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error)
-	exchangeCallbackFunc      func(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error)
-	testConnectionFunc        func(ctx *gin.Context, input *ConnectorTestInput) (*ConnectorTestOutput, error)
+	buildAuthorizationURLFunc func(ctx context.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error)
+	exchangeCallbackFunc      func(ctx context.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error)
+	testConnectionFunc        func(ctx context.Context, input *ConnectorTestInput) (*ConnectorTestOutput, error)
 }
 
 func (f *fakeConnectorDriver) DriverType() model.ConnectorProtocol {
@@ -127,21 +130,21 @@ func (f *fakeConnectorDriver) ValidateConfig(config ConnectorConfig) error {
 	return f.validateConfigFunc(config)
 }
 
-func (f *fakeConnectorDriver) BuildAuthorizationURL(ctx *gin.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error) {
+func (f *fakeConnectorDriver) BuildAuthorizationURL(ctx context.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error) {
 	if f.buildAuthorizationURLFunc == nil {
 		return nil, nil
 	}
 	return f.buildAuthorizationURLFunc(ctx, input)
 }
 
-func (f *fakeConnectorDriver) ExchangeCallback(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
+func (f *fakeConnectorDriver) ExchangeCallback(ctx context.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
 	if f.exchangeCallbackFunc == nil {
 		return nil, nil
 	}
 	return f.exchangeCallbackFunc(ctx, input)
 }
 
-func (f *fakeConnectorDriver) TestConnection(ctx *gin.Context, input *ConnectorTestInput) (*ConnectorTestOutput, error) {
+func (f *fakeConnectorDriver) TestConnection(ctx context.Context, input *ConnectorTestInput) (*ConnectorTestOutput, error) {
 	if f.testConnectionFunc == nil {
 		return &ConnectorTestOutput{}, nil
 	}
@@ -455,7 +458,7 @@ func TestIdentityMapperAutoCreateRollsBackPersonWhenBindIdentityFails(t *testing
 	ctx := newConnectorRuntimeContext(t)
 	db := newConnectorIdentityMapperTestDB(t)
 	mapper := newIdentityMapper(nil, nil, WithIdentityMapperDBProvider(func(ctx context.Context) *gorm.DB {
-		return db.WithContext(ctx)
+		return db.WithContext(dbclient.CrossTenantContext(ctx))
 	}))
 	if err := db.Callback().Create().Before("gorm:create").Register("test_fail_user_identity_create", func(tx *gorm.DB) {
 		if tx.Statement != nil && tx.Statement.Schema != nil && tx.Statement.Schema.Table == model.TableNameUserIdentity {
@@ -506,7 +509,7 @@ func TestIdentityMapperAutoCreatePersistsPersonAndIdentityWithinTransaction(t *t
 	}()
 
 	mapper := newIdentityMapper(nil, nil, WithIdentityMapperDBProvider(func(ctx context.Context) *gorm.DB {
-		return db.WithContext(ctx)
+		return db.WithContext(dbclient.CrossTenantContext(ctx))
 	}))
 
 	person, err := mapper.Resolve(ctx, identityResolveInput{
@@ -643,7 +646,7 @@ func TestIdentityMapperRepairsOrphanBindingInsteadOfReinserting(t *testing.T) {
 func TestConnectorServiceGetFactoryListReturnsTemplates(t *testing.T) {
 	svc := &connectorSvc{}
 	runtimeSvc, ok := any(svc).(interface {
-		GetFactoryList(ctx *gin.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error)
+		GetFactoryList(ctx context.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error)
 	})
 	if !ok {
 		t.Fatal("connector service should expose GetFactoryList")
@@ -675,7 +678,7 @@ func TestConnectorServiceAuthorizeStoresStateAndReturnsAuthorizationURL(t *testi
 	svc := &connectorSvc{
 		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{
 			driverType: connectorDriverTypeOAuth2,
-			buildAuthorizationURLFunc: func(ctx *gin.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error) {
+			buildAuthorizationURLFunc: func(ctx context.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error) {
 				authorizeInput = input
 				return &ConnectorAuthorizeOutput{
 					AuthorizationURL: "https://github.com/login/oauth/authorize?state=generated-state",
@@ -706,7 +709,7 @@ func TestConnectorServiceAuthorizeStoresStateAndReturnsAuthorizationURL(t *testi
 		},
 	}
 	runtimeSvc, ok := any(svc).(interface {
-		Authorize(ctx *gin.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID string) (*dtoconnector.ConnectorAuthorizeResp, error)
+		Authorize(ctx context.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID string) (*dtoconnector.ConnectorAuthorizeResp, error)
 	})
 	if !ok {
 		t.Fatal("connector service should expose Authorize")
@@ -714,10 +717,15 @@ func TestConnectorServiceAuthorizeStoresStateAndReturnsAuthorizationURL(t *testi
 
 	// Authorize 现在要求非 nil gin 上下文（取租户归属）且 redirect_uri 与配置同源（H11/H12）
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyTenantID, "22")
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("22"))
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("22"))
 
-	resp, err := runtimeSvc.Authorize(ginCtx, &dtoconnector.ConnectorAuthorizeReq{
+	resp, err := runtimeSvc.Authorize(requestCtx(ginCtx), &dtoconnector.ConnectorAuthorizeReq{
 		RedirectURI:  "https://iam.example.com/callback",
 		LoginHint:    "user@example.com",
 		ResponseMode: "query",
@@ -782,7 +790,7 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 	svc := &connectorSvc{
 		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{
 			driverType: connectorDriverTypeOAuth2,
-			exchangeCallbackFunc: func(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
+			exchangeCallbackFunc: func(ctx context.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
 				callbackInput = input
 				return &ConnectorCallbackOutput{
 					Identity: StandardIdentity{Subject: "subject-1"},
@@ -805,10 +813,10 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 				return &resolvedConnectorPerson{Person: person}, nil
 			},
 		},
-		tokenGenerator: func(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error) {
+		tokenGenerator: func(ctx context.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error) {
 			return &objauth.TokenInfo{AccessToken: "issued-access", RefreshToken: "issued-refresh", TokenType: "Bearer"}, nil
 		},
-		loginRecorder:   func(ctx *gin.Context, tenantID, userID string, success bool) {},
+		loginRecorder:   func(ctx context.Context, tenantID, userID string, success bool) {},
 		ssoSessionStore: &fakeConnectorSSOSessionStore{},
 	}
 	restoreUserStore := swapUserStoreFactory(func() authUserStore {
@@ -829,7 +837,7 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 	})
 	defer restoreTenantStore()
 	runtimeSvc, ok := any(svc).(interface {
-		Callback(ctx *gin.Context, req *dtoconnector.ConnectorCallbackReq) (*dtoauth.LoginResp, error)
+		Callback(ctx context.Context, req *dtoconnector.ConnectorCallbackReq) (*dtoauth.LoginResp, error)
 	})
 	if !ok {
 		t.Fatal("connector service should expose Callback")
@@ -837,9 +845,12 @@ func TestConnectorServiceCallbackConsumesStateAndInvokesDriver(t *testing.T) {
 
 	// Callback 需要非 nil gin 上下文（租户查询走 gincontext）
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 
-	resp, err := runtimeSvc.Callback(ginCtx, &dtoconnector.ConnectorCallbackReq{
+	resp, err := runtimeSvc.Callback(requestCtx(ginCtx), &dtoconnector.ConnectorCallbackReq{
 		ConnectorID: "101",
 		Code:        "authorization-code",
 		State:       "callback-state",
@@ -895,7 +906,7 @@ func TestConnectorServiceCallbackAllowsMissingConnectorID(t *testing.T) {
 	svc := &connectorSvc{
 		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{
 			driverType: connectorDriverTypeOAuth2,
-			exchangeCallbackFunc: func(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
+			exchangeCallbackFunc: func(ctx context.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
 				callbackInput = input
 				return &ConnectorCallbackOutput{
 					Identity: StandardIdentity{Subject: "subject-1"},
@@ -918,10 +929,10 @@ func TestConnectorServiceCallbackAllowsMissingConnectorID(t *testing.T) {
 				return &resolvedConnectorPerson{Person: person}, nil
 			},
 		},
-		tokenGenerator: func(ctx *gin.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error) {
+		tokenGenerator: func(ctx context.Context, userEntity *model.UserEntity) (*objauth.TokenInfo, error) {
 			return &objauth.TokenInfo{AccessToken: "issued-access", RefreshToken: "issued-refresh", TokenType: "Bearer"}, nil
 		},
-		loginRecorder:   func(ctx *gin.Context, tenantID, userID string, success bool) {},
+		loginRecorder:   func(ctx context.Context, tenantID, userID string, success bool) {},
 		ssoSessionStore: &fakeConnectorSSOSessionStore{},
 	}
 	restoreUserStore := swapUserStoreFactory(func() authUserStore {
@@ -1004,7 +1015,7 @@ func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 	svc := &connectorSvc{
 		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{
 			driverType: connectorDriverTypeOAuth2,
-			exchangeCallbackFunc: func(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
+			exchangeCallbackFunc: func(ctx context.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
 				return &ConnectorCallbackOutput{
 					Identity:     StandardIdentity{Issuer: "https://issuer.example.com", Subject: "subject-1", Email: "connector@example.com"},
 					AccessToken:  "provider-access-token",
@@ -1024,7 +1035,7 @@ func TestConnectorCallbackReturnsPersonScopedAuthPayload(t *testing.T) {
 			},
 		},
 		tokenGenerator:  nil,
-		loginRecorder:   func(ctx *gin.Context, tenantID, userID string, success bool) {},
+		loginRecorder:   func(ctx context.Context, tenantID, userID string, success bool) {},
 		ssoSessionStore: &fakeConnectorSSOSessionStore{},
 	}
 	restorePersonStore := swapPersonStoreFactory(func() authPersonStore {
@@ -1101,7 +1112,7 @@ func TestConnectorCallbackInvokesIdentityResolverTokenGeneratorAndLoginRecorder(
 	svc := &connectorSvc{
 		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{
 			driverType: connectorDriverTypeOAuth2,
-			exchangeCallbackFunc: func(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
+			exchangeCallbackFunc: func(ctx context.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
 				return &ConnectorCallbackOutput{
 					Identity: StandardIdentity{
 						Issuer:      "https://issuer.example.com",
@@ -1124,7 +1135,7 @@ func TestConnectorCallbackInvokesIdentityResolverTokenGeneratorAndLoginRecorder(
 				return &resolvedConnectorPerson{Person: resolvedPerson}, nil
 			},
 		},
-		loginRecorder:   func(ctx *gin.Context, tenantID, userID string, success bool) {},
+		loginRecorder:   func(ctx context.Context, tenantID, userID string, success bool) {},
 		ssoSessionStore: &fakeConnectorSSOSessionStore{},
 	}
 	restoreUserStore := swapUserStoreFactory(func() authUserStore {
@@ -1194,7 +1205,7 @@ func TestConnectorServiceCallbackRetainsStateWhenDriverExchangeFails(t *testing.
 	svc := &connectorSvc{
 		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{
 			driverType: connectorDriverTypeOAuth2,
-			exchangeCallbackFunc: func(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
+			exchangeCallbackFunc: func(ctx context.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
 				return nil, expectedErr
 			},
 		}),
@@ -1248,6 +1259,9 @@ func sanitizeConnectorTestName(name string) string {
 func testGinCtx(t *testing.T) *gin.Context {
 	t.Helper()
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 	return ginCtx
 }

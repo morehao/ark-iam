@@ -67,7 +67,7 @@ func TestPageListPlatformViewSeesAllTenants(t *testing.T) {
 	)
 
 	ctx := testutil.NewGinCtx(auditTenantA, "operator")
-	resp, err := svc.PageList(ctx, &dtoaudit.AuditLogPageListReq{})
+	resp, err := svc.PageList(requestCtx(ctx), &dtoaudit.AuditLogPageListReq{})
 	require.NoError(t, err)
 
 	require.Len(t, resp.List, 2, "平台视角必须跨租户可见")
@@ -90,7 +90,7 @@ func TestPageListTenantFilterHidesOtherTenants(t *testing.T) {
 	)
 
 	ctx := testutil.NewGinCtx(auditTenantA, "operator")
-	resp, err := svc.PageList(ctx, &dtoaudit.AuditLogPageListReq{TenantID: auditTenantB})
+	resp, err := svc.PageList(requestCtx(ctx), &dtoaudit.AuditLogPageListReq{TenantID: auditTenantB})
 	require.NoError(t, err)
 
 	require.Len(t, resp.List, 1)
@@ -113,7 +113,7 @@ func TestPageListActorAndTimeRangeFilter(t *testing.T) {
 	)
 
 	ctx := testutil.NewGinCtx(auditTenantA, "operator")
-	resp, err := svc.PageList(ctx, &dtoaudit.AuditLogPageListReq{
+	resp, err := svc.PageList(requestCtx(ctx), &dtoaudit.AuditLogPageListReq{
 		ActorPersonID: "person-x",
 		StartTime:     now.Add(-4 * time.Hour).Unix(),
 		EndTime:       now.Add(-time.Hour).Unix(),
@@ -135,7 +135,7 @@ func TestPageListActionAndResultFilter(t *testing.T) {
 	)
 
 	ctx := testutil.NewGinCtx(auditTenantA, "operator")
-	resp, err := svc.PageList(ctx, &dtoaudit.AuditLogPageListReq{
+	resp, err := svc.PageList(requestCtx(ctx), &dtoaudit.AuditLogPageListReq{
 		Action: model.AuditActionApiKeyCreate,
 		Result: model.AuditResultSuccess,
 	})
@@ -158,7 +158,7 @@ func TestPageListPaginatesAndCapsPageSize(t *testing.T) {
 	seedAudit(t, db, rows...)
 
 	ctx := testutil.NewGinCtx(auditTenantA, "operator")
-	resp, err := svc.PageList(ctx, &dtoaudit.AuditLogPageListReq{
+	resp, err := svc.PageList(requestCtx(ctx), &dtoaudit.AuditLogPageListReq{
 		PageQuery: gobject.PageQuery{Page: 1, PageSize: 1000},
 	})
 	require.NoError(t, err)
@@ -166,7 +166,7 @@ func TestPageListPaginatesAndCapsPageSize(t *testing.T) {
 	assert.EqualValues(t, 120, resp.Total, "total 是过滤后的全量条数，不受单页上限影响")
 
 	// 第二页：起点正确（row-099 之后继续）。
-	resp2, err := svc.PageList(ctx, &dtoaudit.AuditLogPageListReq{
+	resp2, err := svc.PageList(requestCtx(ctx), &dtoaudit.AuditLogPageListReq{
 		PageQuery: gobject.PageQuery{Page: 2, PageSize: 100},
 	})
 	require.NoError(t, err)
@@ -174,7 +174,7 @@ func TestPageListPaginatesAndCapsPageSize(t *testing.T) {
 	assert.Equal(t, "row-119", resp2.List[19].AuditLogID, "按时间倒序时最后一条是最旧的行")
 
 	// 不传分页参数时用默认值，且绝不出现"不分页返回全部"（page/pageSize 非正数时 dao 会返回全部）。
-	resp3, err := svc.PageList(ctx, &dtoaudit.AuditLogPageListReq{})
+	resp3, err := svc.PageList(requestCtx(ctx), &dtoaudit.AuditLogPageListReq{})
 	require.NoError(t, err)
 	assert.Len(t, resp3.List, auditLogDefaultPageSize)
 }
@@ -189,13 +189,13 @@ func TestPageListDefaultsToRecentWindow(t *testing.T) {
 	)
 
 	ctx := testutil.NewGinCtx(auditTenantA, "operator")
-	resp, err := svc.PageList(ctx, &dtoaudit.AuditLogPageListReq{})
+	resp, err := svc.PageList(requestCtx(ctx), &dtoaudit.AuditLogPageListReq{})
 	require.NoError(t, err)
 	require.Len(t, resp.List, 1, "默认时间窗为近 7 天")
 	assert.Equal(t, "recent", resp.List[0].AuditLogID)
 
 	// 显式给出更早的窗口：历史数据可查。
-	resp2, err := svc.PageList(ctx, &dtoaudit.AuditLogPageListReq{
+	resp2, err := svc.PageList(requestCtx(ctx), &dtoaudit.AuditLogPageListReq{
 		StartTime: now.Add(-60 * 24 * time.Hour).Unix(),
 	})
 	require.NoError(t, err)
@@ -208,9 +208,9 @@ func TestPageListRejectsInvalidEnums(t *testing.T) {
 	seedAudit(t, db, auditRow("a1", auditTenantA, "person-a", model.AuditActionLogin, model.AuditResultSuccess, time.Now()))
 
 	ctx := testutil.NewGinCtx(auditTenantA, "operator")
-	_, err := svc.PageList(ctx, &dtoaudit.AuditLogPageListReq{Action: model.AuditAction("drop table")})
+	_, err := svc.PageList(requestCtx(ctx), &dtoaudit.AuditLogPageListReq{Action: model.AuditAction("drop table")})
 	assert.Equal(t, code.GetError(code.AuditLogPageListParamInvalidError), err)
 
-	_, err = svc.PageList(ctx, &dtoaudit.AuditLogPageListReq{Result: model.AuditResult("maybe")})
+	_, err = svc.PageList(requestCtx(ctx), &dtoaudit.AuditLogPageListReq{Result: model.AuditResult("maybe")})
 	assert.Equal(t, code.GetError(code.AuditLogPageListParamInvalidError), err)
 }

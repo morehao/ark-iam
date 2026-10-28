@@ -2,6 +2,7 @@ package ctrtenant
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/ark-iam/tenantadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/tenantadmin/internal/service/svctenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -36,6 +37,7 @@ func NewDepartmentUserCtr() DepartmentUserCtr {
 // @Router /v1/tenant/departments/{departmentID}/users [post]
 func (ctr *departmentUserCtr) Create(ctx *gin.Context) {
 	var req dtotenant.DepartmentUserCreateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -44,7 +46,7 @@ func (ctr *departmentUserCtr) Create(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.departmentUserSvc.Create(ctx, &req)
+	res, err := ctr.departmentUserSvc.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -63,6 +65,7 @@ func (ctr *departmentUserCtr) Create(ctx *gin.Context) {
 // @Router /v1/tenant/departments/{departmentID}/users/{userID} [put]
 func (ctr *departmentUserCtr) Update(ctx *gin.Context) {
 	var req dtotenant.DepartmentUserUpdateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -71,7 +74,7 @@ func (ctr *departmentUserCtr) Update(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.departmentUserSvc.Update(ctx, &req); err != nil {
+	if err := ctr.departmentUserSvc.Update(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -88,11 +91,12 @@ func (ctr *departmentUserCtr) Update(ctx *gin.Context) {
 // @Router /v1/tenant/departments/{departmentID}/users/{userID} [delete]
 func (ctr *departmentUserCtr) Delete(ctx *gin.Context) {
 	var req dtotenant.DepartmentUserDeleteReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.departmentUserSvc.Delete(ctx, &req); err != nil {
+	if err := ctr.departmentUserSvc.Delete(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -117,7 +121,7 @@ func (ctr *departmentUserCtr) PageList(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.departmentUserSvc.PageList(ctx, &req)
+	res, err := ctr.departmentUserSvc.PageList(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

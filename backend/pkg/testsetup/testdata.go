@@ -60,12 +60,12 @@ func PrepareTestUser(ctx context.Context, tenantID, personID string, name string
 		ownerType = model.OwnerTypeOwner
 	}
 	entity := &model.UserEntity{
-		TenantID:   tenantID,
-		PersonID:   personID,
-		Name:       name,
-		OwnerType:  ownerType,
-		Status:     model.UserStatusActive,
-		JoinedAt:   &now,
+		TenantID:  tenantID,
+		PersonID:  personID,
+		Name:      name,
+		OwnerType: ownerType,
+		Status:    model.UserStatusActive,
+		JoinedAt:  &now,
 	}
 	if err := db.Create(entity).Error; err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
@@ -76,10 +76,11 @@ func PrepareTestUser(ctx context.Context, tenantID, personID string, name string
 func CleanupTestData(ctx context.Context, ids TestDataIDs) error {
 	db := dbclient.IamDB(ctx)
 
-	// 使用 model 表名常量，避免与当前 schema（user/person/tenant，无 iam_ 前缀）漂移。
+	// 使用 model 实体而非手写表名：`user` 是 PostgreSQL 保留字，手拼
+	// "DELETE FROM "+表名 会生成 `DELETE FROM user` 并语法错误；交给 GORM 按方言引用。
 	if len(ids.UserIDs) > 0 {
 		for _, id := range ids.UserIDs {
-			db.Exec("DELETE FROM "+model.TableNameUser+" WHERE id = ?", id)
+			db.Unscoped().Where("id = ?", id).Delete(&model.UserEntity{})
 		}
 	}
 	if len(ids.PersonIDs) > 0 {

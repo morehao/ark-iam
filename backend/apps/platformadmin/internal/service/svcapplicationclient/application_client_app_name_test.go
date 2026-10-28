@@ -1,6 +1,9 @@
 package svcapplicationclient
 
 import (
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -40,11 +43,19 @@ func TestApplicationClientPageListReturnsAppName(t *testing.T) {
 	}
 
 	ctx, _ := gin.CreateTestContext(nil)
+
+	if ctx.Request == nil {
+
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
 	ctx.Set(gcontext.KeyUserID, "u1")
 	svc := NewApplicationClientSvc()
 
-	resp, err := svc.PageList(ctx, &dtoapplicationclient.ApplicationClientPageListReq{Page: 1, PageSize: 10})
+	resp, err := svc.PageList(requestCtx(ctx), &dtoapplicationclient.ApplicationClientPageListReq{Page: 1, PageSize: 10})
 	if err != nil {
 		t.Fatalf("PageList: %v", err)
 	}
@@ -58,7 +69,7 @@ func TestApplicationClientPageListReturnsAppName(t *testing.T) {
 		t.Fatalf("appName = %q, want %q", resp.List[0].AppName, "应用一")
 	}
 
-	detail, err := svc.Detail(ctx, &dtoapplicationclient.ApplicationClientDetailReq{ApplicationClientID: client.ID})
+	detail, err := svc.Detail(requestCtx(ctx), &dtoapplicationclient.ApplicationClientDetailReq{ApplicationClientID: client.ID})
 	if err != nil {
 		t.Fatalf("Detail: %v", err)
 	}
@@ -82,9 +93,17 @@ func TestApplicationClientAppNameEmptyWhenAppMissing(t *testing.T) {
 	}
 
 	ctx, _ := gin.CreateTestContext(nil)
-	ctx.Set(gcontext.KeyTenantID, "1")
 
-	resp, err := NewApplicationClientSvc().PageList(ctx, &dtoapplicationclient.ApplicationClientPageListReq{Page: 1, PageSize: 10})
+	if ctx.Request == nil {
+
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
+	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+
+	resp, err := NewApplicationClientSvc().PageList(requestCtx(ctx), &dtoapplicationclient.ApplicationClientPageListReq{Page: 1, PageSize: 10})
 	if err != nil {
 		t.Fatalf("PageList: %v", err)
 	}

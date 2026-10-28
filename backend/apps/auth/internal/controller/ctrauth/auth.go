@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoauth"
 	"github.com/morehao/ark-iam/auth/internal/service/svcauth"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -35,11 +36,12 @@ func NewAuthCtr() AuthCtr {
 // @Router /v1/auth/me/tenants [get]
 func (ctr *authCtr) MyTenants(ctx *gin.Context) {
 	var req dtoauth.MyTenantsReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.authSvc.MyTenants(ctx, &req)
+	res, err := ctr.authSvc.MyTenants(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -56,11 +58,12 @@ func (ctr *authCtr) MyTenants(ctx *gin.Context) {
 // @Router /v1/auth/joinTenant [post]
 func (ctr *authCtr) JoinTenant(ctx *gin.Context) {
 	var req dtoauth.JoinTenantReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.authSvc.JoinTenant(ctx, &req)
+	res, err := ctr.authSvc.JoinTenant(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -76,11 +79,12 @@ func (ctr *authCtr) JoinTenant(ctx *gin.Context) {
 // @Router /v1/auth/logout [post]
 func (ctr *authCtr) Logout(ctx *gin.Context) {
 	var req dtoauth.LogoutReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.authSvc.Logout(ctx, &req); err != nil {
+	if err := ctr.authSvc.Logout(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -91,11 +95,12 @@ func (ctr *authCtr) Logout(ctx *gin.Context) {
 // 会话撤销已由 svcauth.Logout 内部完成，此处不再重复调用 SSO 撤销。
 func (ctr *authCtr) LogoutAll(ctx *gin.Context) {
 	var req dtoauth.LogoutAllReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.authSvc.LogoutAll(ctx, &req); err != nil {
+	if err := ctr.authSvc.LogoutAll(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -111,7 +116,8 @@ func (ctr *authCtr) LogoutAll(ctx *gin.Context) {
 // @Router /v1/auth/userinfo [get]
 func (ctr *authCtr) Userinfo(ctx *gin.Context) {
 	var req dtoauth.UserinfoReq
-	res, err := ctr.authSvc.Userinfo(ctx, &req)
+	req.Operator = identity.OperatorFromGin(ctx)
+	res, err := ctr.authSvc.Userinfo(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

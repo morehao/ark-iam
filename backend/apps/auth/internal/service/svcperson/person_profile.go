@@ -1,7 +1,7 @@
 package svcperson
 
 import (
-	"github.com/gin-gonic/gin"
+	"context"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoperson"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/credential"
@@ -9,7 +9,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/sso"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
 )
@@ -22,8 +21,8 @@ func NewPersonProfileSvc() PersonProfileSvc {
 	return &personProfileSvc{}
 }
 
-func (svc *personProfileSvc) Detail(ctx *gin.Context, req *dtoperson.PersonDetailReq) (*dtoperson.PersonDetailResp, error) {
-	personID := gincontext.GetPersonIDString(ctx)
+func (svc *personProfileSvc) Detail(ctx context.Context, req *dtoperson.PersonDetailReq) (*dtoperson.PersonDetailResp, error) {
+	personID := req.Operator.PersonID
 	if personID == "" {
 		return nil, code.GetError(code.UserNotExistError)
 	}
@@ -49,8 +48,8 @@ func (svc *personProfileSvc) Detail(ctx *gin.Context, req *dtoperson.PersonDetai
 	}, nil
 }
 
-func (svc *personProfileSvc) UpdatePassword(ctx *gin.Context, req *dtoperson.PersonUpdatePasswordReq) error {
-	personID := gincontext.GetPersonIDString(ctx)
+func (svc *personProfileSvc) UpdatePassword(ctx context.Context, req *dtoperson.PersonUpdatePasswordReq) error {
+	personID := req.Operator.PersonID
 	if personID == "" {
 		return code.GetError(code.UserNotExistError)
 	}

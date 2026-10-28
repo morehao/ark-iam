@@ -1,7 +1,9 @@
 package svcoidc
 
 import (
+	"context"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -78,7 +80,7 @@ func newAuthReq(t *testing.T, provider *OIDCProvider, clientID string) op.AuthRe
 	return req
 }
 
-func registerSvc(provider *OIDCProvider, db *gorm.DB, tenants func(*gin.Context, string) ([]objauth.TenantOption, error)) *oidcAuthSvc {
+func registerSvc(provider *OIDCProvider, db *gorm.DB, tenants func(context.Context, string) ([]objauth.TenantOption, error)) *oidcAuthSvc {
 	return &oidcAuthSvc{
 		provider: provider,
 		authSvc:  &fakePasswordAuthenticator{tenantsForPerson: tenants},
@@ -98,8 +100,11 @@ func TestRegisterPersonDisallowedWhenAppPolicyFalse(t *testing.T) {
 
 	svc := registerSvc(provider, db, nil)
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/registerPerson", nil)
-	if _, err := svc.RegisterPerson(ginCtx, &dtooidc.RegisterPersonReq{AuthRequestID: authReq.GetID(), Username: "alice", Password: "Password123"}); err == nil {
+	if _, err := svc.RegisterPerson(requestCtx(ginCtx), &dtooidc.RegisterPersonReq{AuthRequestID: authReq.GetID(), Username: "alice", Password: "Password123"}); err == nil {
 		t.Fatal("expected register to fail when app disallows")
 	}
 }
@@ -115,12 +120,15 @@ func TestRegisterPersonCreatesAndBindsPerson(t *testing.T) {
 	db := newSeedDB(t, []appSeedApp{{clientCode: "cid-1", allow: model.AppPersonCreateTenantPolicyEnable}})
 	authReq := newAuthReq(t, provider, "cid-1")
 
-	svc := registerSvc(provider, db, func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+	svc := registerSvc(provider, db, func(ctx context.Context, personID string) ([]objauth.TenantOption, error) {
 		return nil, nil // 零租户
 	})
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/registerPerson", nil)
-	resp, err := svc.RegisterPerson(ginCtx, &dtooidc.RegisterPersonReq{AuthRequestID: authReq.GetID(), Username: "alice", Password: "Password123", Name: "Alice"})
+	resp, err := svc.RegisterPerson(requestCtx(ginCtx), &dtooidc.RegisterPersonReq{AuthRequestID: authReq.GetID(), Username: "alice", Password: "Password123", Name: "Alice"})
 	if err != nil {
 		t.Fatalf("RegisterPerson: %v", err)
 	}
@@ -165,12 +173,15 @@ func TestRegisterPersonExistingPersonRequiresPasswordLogin(t *testing.T) {
 	}
 	authReq := newAuthReq(t, provider, "cid-1")
 
-	svc := registerSvc(provider, db, func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+	svc := registerSvc(provider, db, func(ctx context.Context, personID string) ([]objauth.TenantOption, error) {
 		return nil, nil
 	})
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/registerPerson", nil)
-	resp, err := svc.RegisterPerson(ginCtx, &dtooidc.RegisterPersonReq{AuthRequestID: authReq.GetID(), Username: "alice", Password: "NewPass123"})
+	resp, err := svc.RegisterPerson(requestCtx(ginCtx), &dtooidc.RegisterPersonReq{AuthRequestID: authReq.GetID(), Username: "alice", Password: "NewPass123"})
 	if err != nil {
 		t.Fatalf("RegisterPerson: %v", err)
 	}
@@ -217,12 +228,15 @@ func TestCreateTenantSucceedsForZeroTenantPerson(t *testing.T) {
 		t.Fatalf("bind person: %v", err)
 	}
 
-	svc := registerSvc(provider, db, func(ctx *gin.Context, personID string) ([]objauth.TenantOption, error) {
+	svc := registerSvc(provider, db, func(ctx context.Context, personID string) ([]objauth.TenantOption, error) {
 		return nil, nil // 零租户
 	})
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/createTenant", nil)
-	res, err := svc.CreateTenant(ginCtx, &dtooidc.CreateTenantReq{AuthRequestID: authReq.GetID(), TenantName: "Acme", TenantCode: "acme"})
+	res, err := svc.CreateTenant(requestCtx(ginCtx), &dtooidc.CreateTenantReq{AuthRequestID: authReq.GetID(), TenantName: "Acme", TenantCode: "acme"})
 	if err != nil {
 		t.Fatalf("CreateTenant failed: %v", err)
 	}
@@ -287,8 +301,11 @@ func TestLoginConfig(t *testing.T) {
 		authReq := newAuthReq(t, provider, "cfg-1")
 		svc := registerSvc(provider, db, nil)
 		ginCtx, _ := gin.CreateTestContext(nil)
+		if ginCtx.Request == nil {
+			ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+		}
 		ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login-config", nil)
-		res, err := svc.LoginConfig(ginCtx, authReq.GetID())
+		res, err := svc.LoginConfig(requestCtx(ginCtx), authReq.GetID())
 		if err != nil {
 			t.Fatalf("LoginConfig: %v", err)
 		}
@@ -303,8 +320,11 @@ func TestLoginConfig(t *testing.T) {
 		authReq := newAuthReq(t, provider, "cfg-2")
 		svc := registerSvc(provider, db, nil)
 		ginCtx, _ := gin.CreateTestContext(nil)
+		if ginCtx.Request == nil {
+			ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+		}
 		ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login-config", nil)
-		res, err := svc.LoginConfig(ginCtx, authReq.GetID())
+		res, err := svc.LoginConfig(requestCtx(ginCtx), authReq.GetID())
 		if err != nil {
 			t.Fatalf("LoginConfig: %v", err)
 		}
@@ -318,8 +338,11 @@ func TestLoginConfig(t *testing.T) {
 		db := newSeedDB(t, nil)
 		svc := registerSvc(provider, db, nil)
 		ginCtx, _ := gin.CreateTestContext(nil)
+		if ginCtx.Request == nil {
+			ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+		}
 		ginCtx.Request, _ = http.NewRequest(http.MethodPost, "/oidc/login-config", nil)
-		if _, err := svc.LoginConfig(ginCtx, "missing-id"); err == nil {
+		if _, err := svc.LoginConfig(requestCtx(ginCtx), "missing-id"); err == nil {
 			t.Fatal("expected error for invalid authRequestID")
 		}
 	})

@@ -18,7 +18,7 @@ import (
 // 字段口径（见设计文档「分层与接入点」）：
 //   - PersonID：sub=person:<id> 解析出的自然人 ID；机器令牌为空
 //   - TenantID：claim tenant_id，租户作用域与审计隔离键
-//   - UserID：claim user_id = tenant_user.id，**审计主键**（与 IAM 自身 created_by 口径一致）
+//   - UserID：claim user_id = user.id，**审计主键**（与 IAM 自身 created_by 口径一致）
 //   - ClientID：aud 命中的本应用 client_id
 //   - IsMachine：token_usage=machine
 //   - SessionID：sid，用于按会话作废与 back-channel 登出匹配

@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtouser"
 	"github.com/morehao/ark-iam/auth/internal/service/svcsession"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -34,12 +35,13 @@ func NewSessionCtr() SessionCtr {
 // @Router /v1/auth/me/sessions [get]
 func (ctr *sessionCtr) List(ctx *gin.Context) {
 	var req dtouser.SessionListReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
 
-	res, err := ctr.sessionSvc.List(ctx, &req)
+	res, err := ctr.sessionSvc.List(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -56,12 +58,13 @@ func (ctr *sessionCtr) List(ctx *gin.Context) {
 // @Router /v1/auth/me/sessions/{sessionID} [delete]
 func (ctr *sessionCtr) Revoke(ctx *gin.Context) {
 	var req dtouser.SessionRevokeReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
 
-	if err := ctr.sessionSvc.Revoke(ctx, &req); err != nil {
+	if err := ctr.sessionSvc.Revoke(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -76,7 +79,8 @@ func (ctr *sessionCtr) Revoke(ctx *gin.Context) {
 // @Router /v1/auth/me/sessions [delete]
 func (ctr *sessionCtr) RevokeAll(ctx *gin.Context) {
 	var req dtouser.SessionRevokeAllReq
-	if err := ctr.sessionSvc.RevokeAll(ctx, &req); err != nil {
+	req.Operator = identity.OperatorFromGin(ctx)
+	if err := ctr.sessionSvc.RevokeAll(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}

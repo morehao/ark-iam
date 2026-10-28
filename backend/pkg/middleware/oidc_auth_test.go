@@ -99,7 +99,7 @@ func makeOIDCTokenWithUser(t *testing.T, key *rsa.PrivateKey, sub, tokenUsage, u
 	return signTestToken(t, key, claims)
 }
 
-func setupRouter(t *testing.T, validate func(ctx *gin.Context, personID string, isMachineToken bool) bool) (*gin.Engine, *rsa.PrivateKey) {
+func setupRouter(t *testing.T, validate func(ctx context.Context, personID string, isMachineToken bool) bool) (*gin.Engine, *rsa.PrivateKey) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -139,7 +139,7 @@ func makeInternalHS256Token(t *testing.T, sub string) string {
 }
 
 func TestRejectsInternalHS256Token(t *testing.T) {
-	r, _ := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
+	r, _ := setupRouter(t, func(ctx context.Context, personID string, isMachineToken bool) bool {
 		return true // 会话有效，但 RS256 验签失败应直接 401
 	})
 
@@ -158,7 +158,7 @@ func ginFromContext(ctx *gin.Context) string {
 }
 
 func TestOIDCSSOValidationRejectsRevokedSession(t *testing.T) {
-	r, key := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
+	r, key := setupRouter(t, func(ctx context.Context, personID string, isMachineToken bool) bool {
 		return false // 会话已撤销
 	})
 
@@ -177,7 +177,7 @@ func TestOIDCSSOValidationAllowsActiveSession(t *testing.T) {
 	seedDefaultOIDCUser(t)
 	t.Cleanup(func() { dbclient.ClearDBForTest(dbclient.ServiceNameIam) })
 
-	r, key := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
+	r, key := setupRouter(t, func(ctx context.Context, personID string, isMachineToken bool) bool {
 		return true // 会话有效
 	})
 
@@ -200,7 +200,7 @@ func TestOIDCSSOValidationMachineTokenBypassesRevokedSession(t *testing.T) {
 	_ = newOIDCAuthTestDB(t)
 	t.Cleanup(func() { dbclient.ClearDBForTest(dbclient.ServiceNameIam) })
 
-	r, key := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
+	r, key := setupRouter(t, func(ctx context.Context, personID string, isMachineToken bool) bool {
 		return isMachineToken // 非机器令牌返回 false（会话撤销），机器令牌放行
 	})
 
@@ -268,7 +268,7 @@ func TestAPIKeyParallelAuth(t *testing.T) {
 		_ = dbclient.IamDB(context.Background()).Where("id = ?", seed.ID).Delete(&model.ApiKeyEntity{}).Error
 	})
 
-	r, _ := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
+	r, _ := setupRouter(t, func(ctx context.Context, personID string, isMachineToken bool) bool {
 		return true
 	})
 
@@ -378,7 +378,7 @@ func TestAcceptsTokenWithMatchingIssuerAndAudience(t *testing.T) {
 	r.Use(OIDCAuth(WithOIDCKeySource(testKeySource(&key.PublicKey)),
 		WithOIDCIssuer("http://localhost:8099/oidc"),
 		WithOIDCAudiences("platform_admin_web"),
-		WithOIDCSSOValidation(func(ctx *gin.Context, personID string, isMachineToken bool) bool { return true })))
+		WithOIDCSSOValidation(func(ctx context.Context, personID string, isMachineToken bool) bool { return true })))
 	r.GET("/v1/test", func(ctx *gin.Context) { ctx.Status(http.StatusOK) })
 
 	s := signTestToken(t, key, jwt.MapClaims{
@@ -403,7 +403,7 @@ func TestOIDCPersonWithoutUserRejected(t *testing.T) {
 	_ = newOIDCAuthTestDB(t)
 	t.Cleanup(func() { dbclient.ClearDBForTest(dbclient.ServiceNameIam) })
 
-	r, key := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
+	r, key := setupRouter(t, func(ctx context.Context, personID string, isMachineToken bool) bool {
 		return true
 	})
 
@@ -415,13 +415,13 @@ func TestOIDCPersonWithoutUserRejected(t *testing.T) {
 }
 
 // TestOIDCUserIDFromTokenClaim 锁定「令牌携带 user_id 时不再查库」的行为：
-// claims.user_id 即下游审计操作者，且与 tenant_user 行主键一致。
+// claims.user_id 即下游审计操作者，且与 "user" 行主键一致。
 func TestOIDCUserIDFromTokenClaim(t *testing.T) {
 	// 建库但不 seed 任何 user：若中间件仍走反查会因"非租户成员"而 401。
 	_ = newOIDCAuthTestDB(t)
 	t.Cleanup(func() { dbclient.ClearDBForTest(dbclient.ServiceNameIam) })
 
-	r, key := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
+	r, key := setupRouter(t, func(ctx context.Context, personID string, isMachineToken bool) bool {
 		return true
 	})
 
@@ -440,7 +440,7 @@ func TestOIDCMachineTokenCarriesUserID(t *testing.T) {
 	_ = newOIDCAuthTestDB(t)
 	t.Cleanup(func() { dbclient.ClearDBForTest(dbclient.ServiceNameIam) })
 
-	r, key := setupRouter(t, func(ctx *gin.Context, personID string, isMachineToken bool) bool {
+	r, key := setupRouter(t, func(ctx context.Context, personID string, isMachineToken bool) bool {
 		return true
 	})
 

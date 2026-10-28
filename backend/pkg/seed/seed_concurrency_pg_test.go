@@ -49,7 +49,7 @@ func TestBootstrapConcurrentOnlyOneWins(t *testing.T) {
 			"user_role", "role_menu", "tenant_application",
 			"application_client_secret", "application_client", "menu",
 			"role", "user_identity", "user_login_log",
-			"department_user", "department", "tenant_user", "person",
+			"department_user", "department", `"user"`, "person",
 			"refresh_token", "session", "audit_log", "api_key", "connector",
 			"domain", "system", "log", "application", "tenant",
 		} {
@@ -160,7 +160,7 @@ func TestBootstrapConcurrentOnlyOneWins(t *testing.T) {
 	assertCount("role", 2)
 	assertCount("menu", 14)
 	assertCount("person", 1)
-	assertCount("tenant_user", 1)
+	assertCount(`"user"`, 1)
 	assertCount("application_client", 2)
 	assertCount("user_role", 2)
 	assertCount("role_menu", 14)

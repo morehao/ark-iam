@@ -1,4 +1,4 @@
-// Package user 承载租户内用户（tenant_user）聚合的跨表写能力：
+// Package user 承载租户内用户（user）聚合的跨表写能力：
 // person 解析/find-or-create + 用户主体 + 部门归属（primary/leader/secondary）的原子写入。
 //
 // 供 platformadmin（建租户时创建内置管理员）与 tenantadmin（控制台建成员）共用同一实现，

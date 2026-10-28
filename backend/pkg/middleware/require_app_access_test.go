@@ -48,7 +48,7 @@ func newAppAccessProbe(t *testing.T, withSchema bool) *appAccessProbe {
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	require.NoError(t, err)
 	if withSchema {
-		// 三元组 + 客户端解析所需的四张表；不建 tenant_user（CheckUsable 不认识它）。
+		// 三元组 + 客户端解析所需的四张表；不建 user（CheckUsable 不认识它）。
 		require.NoError(t, db.AutoMigrate(
 			&model.ApplicationEntity{},
 			&model.TenantApplicationEntity{},

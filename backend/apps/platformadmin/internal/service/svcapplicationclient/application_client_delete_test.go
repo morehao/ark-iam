@@ -1,6 +1,10 @@
 package svcapplicationclient
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -16,7 +20,11 @@ import (
 // newOAuthDeleteCtx 构造带租户与操作人上下文的 gin.Context。
 func newOAuthDeleteCtx(tenantID, userID string) *gin.Context {
 	ctx, _ := gin.CreateTestContext(nil)
+	if ctx.Request == nil {
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ctx.Set(gcontext.KeyTenantID, tenantID)
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope(tenantID))
 	ctx.Set(gcontext.KeyUserID, userID)
 	return ctx
 }
@@ -48,7 +56,7 @@ func TestDeleteBuiltInApplicationClient(t *testing.T) {
 	}
 
 	svc := NewApplicationClientSvc()
-	err := svc.Delete(newOAuthDeleteCtx("1", "0"), &dtoapplicationclient.ApplicationClientDeleteReq{ApplicationClientID: entity.ID})
+	err := svc.Delete(requestCtx(newOAuthDeleteCtx("1", "0")), &dtoapplicationclient.ApplicationClientDeleteReq{ApplicationClientID: entity.ID, Operator: operatorOf(newOAuthDeleteCtx("1", "0"))})
 	if err == nil {
 		t.Fatal("expected error for built-in oauth client")
 	}
@@ -67,12 +75,14 @@ func TestDeleteNonBuiltInApplicationClient(t *testing.T) {
 
 	ctx := newOAuthDeleteCtx("1", "7")
 	svc := NewApplicationClientSvc()
-	if err := svc.Delete(ctx, &dtoapplicationclient.ApplicationClientDeleteReq{ApplicationClientID: entity.ID}); err != nil {
+	if err := svc.Delete(requestCtx(ctx), &dtoapplicationclient.ApplicationClientDeleteReq{ApplicationClientID: entity.ID,
+		Operator: operatorOf(ctx),
+	}); err != nil {
 		t.Fatalf("Delete returned error: %v", err)
 	}
 
 	// 真实 dao 断言：软删除后按 ID 查不到
-	got, err := dao.NewApplicationClientDao().GetByID(ctx, entity.ID)
+	got, err := dao.NewApplicationClientDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -82,7 +92,7 @@ func TestDeleteNonBuiltInApplicationClient(t *testing.T) {
 
 	// 删除人应写入 7（对应原 stub 断言 deletedBy == 7）
 	var deleted model.ApplicationClientEntity
-	if err := db.WithContext(ctx).Unscoped().Where("id = ?", entity.ID).First(&deleted).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ctx)).Unscoped().Where("id = ?", entity.ID).First(&deleted).Error; err != nil {
 		t.Fatalf("query deleted row: %v", err)
 	}
 	if deleted.DeletedBy != "7" {

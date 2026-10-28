@@ -427,9 +427,9 @@ func seedTestOwnerUser(t *testing.T, userDao *dao.UserDao, tenantID string, mach
 		name = "Test Service Account"
 	}
 	entity := &model.UserEntity{
-		TenantID:   tenantID,
-		UserType:   userType,
-		Name:       name,
+		TenantID: tenantID,
+		UserType: userType,
+		Name:     name,
 	}
 	if err := userDao.Insert(context.Background(), entity); err != nil {
 		t.Fatalf("insert test owner user: %v", err)

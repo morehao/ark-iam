@@ -13,8 +13,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 
-	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/code"
+	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/platformadmin/testutil"

@@ -1,11 +1,10 @@
 package svcoidc
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"time"
-
-	"github.com/gin-gonic/gin"
 
 	"github.com/morehao/ark-iam/auth/internal/core/oidcop"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtooidc"
@@ -30,7 +29,7 @@ import (
 // person find-or-create（不存在建、存在复用，绝不覆盖既有密码）；随后前端按需
 // 进入 selectTenant（有租户）或 createTenant（零租户且应用允许）。
 // 本方法仅绑定 person 到 authRequest（done=false），不发 code，认证收尾交 selectTenant。
-func (svc *oidcAuthSvc) RegisterPerson(ctx *gin.Context, req *dtooidc.RegisterPersonReq) (*dtooidc.RegisterPersonResp, error) {
+func (svc *oidcAuthSvc) RegisterPerson(ctx context.Context, req *dtooidc.RegisterPersonReq) (*dtooidc.RegisterPersonResp, error) {
 	if err := credential.ValidateStrength(req.Password); err != nil {
 		return nil, code.GetError(code.PasswordValidationError)
 	}
@@ -116,7 +115,7 @@ func (svc *oidcAuthSvc) RegisterPerson(ctx *gin.Context, req *dtooidc.RegisterPe
 }
 
 // svcResolvePersonConflict 并发唯一冲突时回查哪个标识已存在，返回对应错误码。
-func svcResolvePersonConflict(ctx *gin.Context, req *dtooidc.RegisterPersonReq) error {
+func svcResolvePersonConflict(ctx context.Context, req *dtooidc.RegisterPersonReq) error {
 	personDao := dao.NewPersonDao()
 	if req.Username != "" {
 		if p, qErr := personDao.GetByCond(ctx, &dao.PersonCond{Username: req.Username}); qErr == nil && p != nil && p.ID != "" {
@@ -140,7 +139,7 @@ func svcResolvePersonConflict(ctx *gin.Context, req *dtooidc.RegisterPersonReq) 
 // 仅建 person+tenant+owner 成员；认证收尾（complete + 发 code + SSO 会话）由前端调 selectTenant 完成。
 // I1：createTenant 无幂等、不置 done，同一 authRequest 可被重复调用批量建多个租户，但这是
 // 新建 person 的自建动作（C1 修复后仅新建 person 可达此），非跨用户/冒用风险，判定可接受。
-func (svc *oidcAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenantReq) (*dtooidc.CreateTenantResp, error) {
+func (svc *oidcAuthSvc) CreateTenant(ctx context.Context, req *dtooidc.CreateTenantReq) (*dtooidc.CreateTenantResp, error) {
 	authReq, err := svc.provider.Storage.AuthRequestByID(ctx, req.AuthRequestID)
 	if err != nil {
 		return nil, mapAuthRequestError(err)
@@ -220,7 +219,7 @@ func (svc *oidcAuthSvc) CreateTenant(ctx *gin.Context, req *dtooidc.CreateTenant
 // LoginConfig 登录页前置查询应用策略（当前含是否允许自助注册/创建租户）。
 // 供登录页在渲染前决定是否展示"注册账号"入口；仅读 OIDC 协议态与应用策略，
 // 不改变任何状态。判定链与 RegisterPerson/CreateTenant 同源，保证 UI 判断与门禁一致。
-func (svc *oidcAuthSvc) LoginConfig(ctx *gin.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error) {
+func (svc *oidcAuthSvc) LoginConfig(ctx context.Context, authRequestID string) (*dtooidc.OIDCLoginConfigResp, error) {
 	authReq, err := svc.provider.Storage.AuthRequestByID(ctx, authRequestID)
 	if err != nil {
 		return nil, mapAuthRequestError(err)

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -131,7 +132,7 @@ func TestSilentSSORequired_NoState_OmitsStateParam(t *testing.T) {
 	}
 }
 
-func allowAllRedirectURIVerifier(ctx *gin.Context, clientID, redirectURI string) bool {
+func allowAllRedirectURIVerifier(ctx context.Context, clientID, redirectURI string) bool {
 	return true
 }
 
@@ -203,7 +204,7 @@ func TestSilentSSORequired_RejectsUnregisteredRedirectURI(t *testing.T) {
 	r := gin.New()
 	var nextCalled bool
 	// L1：redirect_uri 不在 client 注册列表时拒绝跳转（防开放重定向）
-	r.Use(SilentSSORequired("iam_sso_session", WithRedirectURIVerifier(func(ctx *gin.Context, clientID, redirectURI string) bool {
+	r.Use(SilentSSORequired("iam_sso_session", WithRedirectURIVerifier(func(ctx context.Context, clientID, redirectURI string) bool {
 		return redirectURI == "https://rp.example.com/callback"
 	})))
 	r.GET("/authorize", func(ctx *gin.Context) {

@@ -1,17 +1,27 @@
 package dtouser
 
-import "github.com/morehao/golib/biz/gobject"
+import (
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
+	"github.com/morehao/golib/biz/gobject"
+)
 
 type SessionListReq struct {
 	gobject.PageQuery
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type SessionRevokeReq struct {
 	SessionID string `json:"-" uri:"sessionID" binding:"required"`
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
-// SessionRevokeAllReq 撤销所有会话（无请求参数，仅占位以统一 svc 入参约定）
-type SessionRevokeAllReq struct{}
+// SessionRevokeAllReq 撤销所有会话（无业务请求参数，仅携带操作人）。
+type SessionRevokeAllReq struct {
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
+}
 
 type SessionResp struct {
 	ID         string `json:"id"`

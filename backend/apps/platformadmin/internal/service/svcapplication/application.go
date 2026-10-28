@@ -1,9 +1,9 @@
 package svcapplication
 
 import (
+	"context"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
 	"github.com/morehao/ark-iam/pkg/audit"
@@ -13,18 +13,17 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtoapplication"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
 
 type ApplicationSvc interface {
-	Create(ctx *gin.Context, req *dtoapplication.ApplicationCreateReq) (*dtoapplication.ApplicationCreateResp, error)
-	Update(ctx *gin.Context, req *dtoapplication.ApplicationUpdateReq) error
-	Delete(ctx *gin.Context, req *dtoapplication.ApplicationDeleteReq) error
-	Detail(ctx *gin.Context, req *dtoapplication.ApplicationDetailReq) (*dtoapplication.ApplicationDetailResp, error)
-	PageList(ctx *gin.Context, req *dtoapplication.ApplicationPageListReq) (*dtoapplication.ApplicationPageListResp, error)
+	Create(ctx context.Context, req *dtoapplication.ApplicationCreateReq) (*dtoapplication.ApplicationCreateResp, error)
+	Update(ctx context.Context, req *dtoapplication.ApplicationUpdateReq) error
+	Delete(ctx context.Context, req *dtoapplication.ApplicationDeleteReq) error
+	Detail(ctx context.Context, req *dtoapplication.ApplicationDetailReq) (*dtoapplication.ApplicationDetailResp, error)
+	PageList(ctx context.Context, req *dtoapplication.ApplicationPageListReq) (*dtoapplication.ApplicationPageListResp, error)
 }
 
 type applicationSvc struct{}
@@ -120,7 +119,7 @@ func buildRoleTemplate(items []model.RoleTemplateItem) (model.RoleTemplateItemLi
 	return normalized, true
 }
 
-func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.ApplicationCreateReq) (*dtoapplication.ApplicationCreateResp, error) {
+func (svc *applicationSvc) Create(ctx context.Context, req *dtoapplication.ApplicationCreateReq) (*dtoapplication.ApplicationCreateResp, error) {
 	// 编码规则（model.AppCodePattern）：小写字母开头，仅含小写字母/数字/下划线。
 	// 非法编码（如连字符）在此拦截，避免落库后再靠人工纠正。
 	if !model.IsValidAppCode(req.Code) {
@@ -152,7 +151,7 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.Applicat
 		AllowJoinByInvite:       normalizeJoinByInvitePolicy(req.AllowJoinByInvite),
 		RoleTemplate:            roleTemplate,
 		Sort:                    req.Sort,
-		CreatedBy:               gincontext.GetUserIDString(ctx),
+		CreatedBy:               req.Operator.UserID,
 	}
 	if err := dao.NewApplicationDao().Insert(ctx, entity); err != nil {
 		glog.Errorf(ctx, "[svcapplication.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -177,7 +176,7 @@ func (svc *applicationSvc) Create(ctx *gin.Context, req *dtoapplication.Applicat
 // code（应用编码）自建应用可改，**内置应用拒改**：控制台菜单入口仍按该编码定位
 // （svcpermission.MyTree 按 platform_admin 查应用、tenantadmin loadConsoleApps 只保留 tenant_admin），
 // 改名会当场让对应控制台侧边栏失联且无法从界面恢复（真要换属版本级动作）。种子定位用 seed_key，与此无关。
-func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.ApplicationUpdateReq) error {
+func (svc *applicationSvc) Update(ctx context.Context, req *dtoapplication.ApplicationUpdateReq) error {
 	if !isValidAppStatus(req.Status) {
 		glog.Errorf(ctx, "[svcapplication.Update] 非法应用状态, req:%s", gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationUpdateError)
@@ -206,7 +205,7 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.Applicat
 		LogoURL:     req.LogoURL,
 		HomepageURL: req.HomepageURL,
 		Sort:        req.Sort,
-		UpdatedBy:   gincontext.GetUserIDString(ctx),
+		UpdatedBy:   req.Operator.UserID,
 	}
 	fields := []string{"name", "description", "logo_url", "homepage_url", "sort", "updated_by"}
 	// status 留空表示不修改：不写该列，避免把状态覆盖为空串
@@ -261,7 +260,7 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.Applicat
 		}
 		return tenant.SyncAppRoleTemplateToTenants(ctx, tx, &tenant.SyncAppRoleTemplateToTenantsReq{
 			AppID:     req.AppID,
-			CreatedBy: gincontext.GetUserIDString(ctx),
+			CreatedBy: req.Operator.UserID,
 		})
 	})
 	if txErr != nil {
@@ -271,7 +270,7 @@ func (svc *applicationSvc) Update(ctx *gin.Context, req *dtoapplication.Applicat
 	return nil
 }
 
-func (svc *applicationSvc) Delete(ctx *gin.Context, req *dtoapplication.ApplicationDeleteReq) error {
+func (svc *applicationSvc) Delete(ctx context.Context, req *dtoapplication.ApplicationDeleteReq) error {
 	entity, err := dao.NewApplicationDao().GetByID(ctx, req.AppID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplication.Delete] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -280,7 +279,7 @@ func (svc *applicationSvc) Delete(ctx *gin.Context, req *dtoapplication.Applicat
 	if entity != nil && entity.Source.IsBuiltin() {
 		return code.GetError(code.ApplicationBuiltInErr)
 	}
-	userID := gincontext.GetUserIDString(ctx)
+	userID := req.Operator.UserID
 	if err := dao.NewApplicationDao().Delete(ctx, req.AppID, userID); err != nil {
 		glog.Errorf(ctx, "[svcapplication.Delete] dao Delete fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.ApplicationDeleteError)
@@ -288,7 +287,7 @@ func (svc *applicationSvc) Delete(ctx *gin.Context, req *dtoapplication.Applicat
 	return nil
 }
 
-func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.ApplicationDetailReq) (*dtoapplication.ApplicationDetailResp, error) {
+func (svc *applicationSvc) Detail(ctx context.Context, req *dtoapplication.ApplicationDetailReq) (*dtoapplication.ApplicationDetailResp, error) {
 	entity, err := dao.NewApplicationDao().GetByID(ctx, req.AppID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplication.Detail] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -314,7 +313,7 @@ func (svc *applicationSvc) Detail(ctx *gin.Context, req *dtoapplication.Applicat
 	}, nil
 }
 
-func (svc *applicationSvc) PageList(ctx *gin.Context, req *dtoapplication.ApplicationPageListReq) (*dtoapplication.ApplicationPageListResp, error) {
+func (svc *applicationSvc) PageList(ctx context.Context, req *dtoapplication.ApplicationPageListReq) (*dtoapplication.ApplicationPageListResp, error) {
 	// 非法来源过滤值直接拒绝，避免 DAO 落成「查不到任何数据」的空结果而看不出原因
 	if req.Source != "" {
 		switch req.Source {

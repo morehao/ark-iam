@@ -28,10 +28,14 @@ func main() {
 	}()
 
 	engine := gin.New()
-	// 让 gin 上下文可当作 context.Context 传给任何下游（OIDC provider、glog、异步任务）：
-	// 仅在开启该开关时 gin 才把 Done/Err/Deadline/Value 转发到请求的 context。
-	engine.ContextWithFallback = true
+	// 刻意**不开启** engine.ContextWithFallback：service/dao 只收 context.Context，
+	// controller 用 ctx.Request.Context() 做唯一一次转换（见
+	// docs/design/context-and-tenant-scope.md「边界调整」）。因此池化的 *gin.Context
+	// 不再被当作 context.Context 传下游，避免"传 gin ctx 还是纯 ctx 结果不同"的分支。
 	engine.Use(gin.Recovery())
+	// 把 requestID 等横切字段搬进请求上下文：service/dao 只拿纯 ctx（边界调整后
+	// controller 传 ctx.Request.Context()），日志 extra_keys 才取得到 requestID。
+	engine.Use(middleware.WithRequestFields())
 
 	// 未初始化守卫（见 pkg/middleware 的 bootstrap_guard.go）：空库启动的进程没有任何账号，
 	// 业务端点若照常放行只会返回一片 401/500，且无法区分"没初始化"与"服务坏了"。

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -94,6 +95,9 @@ func (f *fakeAuthUserStore) UpdateMap(ctx context.Context, id string, updates ma
 
 func TestLogoutAllRevokesAllRefreshTokensForPerson(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	ginCtx.Request = httptestRequest(t)
 	ginCtx.Set(gcontext.KeyPersonID, "42")
 	ginCtx.Request.Header.Set("Authorization", "")
@@ -110,7 +114,7 @@ func TestLogoutAllRevokesAllRefreshTokensForPerson(t *testing.T) {
 	defer restoreRefreshTokenStore()
 
 	svc := &authSvc{}
-	err := svc.LogoutAll(ginCtx, &dtoauth.LogoutAllReq{})
+	err := svc.LogoutAll(requestCtx(ginCtx), &dtoauth.LogoutAllReq{Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("LogoutAll returned error: %v", err)
 	}

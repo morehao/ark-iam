@@ -2,6 +2,7 @@ package dtotenant
 
 import (
 	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
 )
 
 // 服务账号（租户内机器主体，user_type=machine）请求 DTO。
@@ -18,6 +19,8 @@ type MachineUserCreateReq struct {
 	Description            string   `json:"description"`                            // 描述
 	PrimaryDepartmentID    string   `json:"primaryDepartmentID" binding:"required"` // 主部门ID(primary,单值,必传:服务账号必须从属部门)
 	SecondaryDepartmentIDs []string `json:"secondaryDepartmentIDs"`                 // 参与部门ID列表(secondary,可多条,可选)
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type MachineUserUpdateReq struct {
@@ -26,11 +29,15 @@ type MachineUserUpdateReq struct {
 	Description            string    `json:"description"`                              // 描述
 	PrimaryDepartmentID    *string   `json:"primaryDepartmentID"`                      // 主部门(primary,nil=不变;非nil=替换主部门,不可清空)
 	SecondaryDepartmentIDs *[]string `json:"secondaryDepartmentIDs"`                   // 参与部门(secondary,nil=不变;[]=清空;含值=全量替换)
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type MachineUserStatusReq struct {
 	MachineUserID string           `json:"-" uri:"machineUserID" binding:"required"` // 服务账号ID
 	Status        model.UserStatus `json:"status"`                                   // 状态(active正常/suspended挂起)
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type MachineUserDetailReq struct {
@@ -39,6 +46,8 @@ type MachineUserDetailReq struct {
 
 type MachineUserDeleteReq struct {
 	MachineUserID string `json:"-" uri:"machineUserID" binding:"required"` // 服务账号ID
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type MachineUserRolesListReq struct {
@@ -49,4 +58,6 @@ type MachineUserRolesUpdateReq struct {
 	MachineUserID string   `json:"-" uri:"machineUserID" binding:"required"` // 服务账号ID
 	AppID         string   `json:"appID"`                                    // 目标应用ID(按应用授权；空串=系统/未归属应用组)
 	RoleIDs       []string `json:"roleIDs" binding:"required"`               // 角色ID列表(全量替换该应用下的授权)
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }

@@ -116,7 +116,7 @@ func TestLogoutEnqueuesBackChannelLogoutForPerson(t *testing.T) {
 	ginCtx.Set(gcontext.KeyPersonID, personID)
 
 	svc := NewAuthSvc()
-	require.NoError(t, svc.Logout(ginCtx, &dtoauth.LogoutReq{}))
+	require.NoError(t, svc.Logout(requestCtx(ginCtx), &dtoauth.LogoutReq{Operator: operatorOf(ginCtx)}))
 
 	// Logout 使该 person 的登记被入队；轮询等待写入稳定
 	var job *sso.LogoutJob
@@ -145,7 +145,7 @@ func TestLogoutEnqueuesNothingWithoutRegistrations(t *testing.T) {
 	ginCtx.Set(gcontext.KeyPersonID, personID)
 
 	svc := NewAuthSvc()
-	require.NoError(t, svc.LogoutAll(ginCtx, &dtoauth.LogoutAllReq{}))
+	require.NoError(t, svc.LogoutAll(requestCtx(ginCtx), &dtoauth.LogoutAllReq{Operator: operatorOf(ginCtx)}))
 
 	// 无登记的 person 登出后，不应出现其专属任务
 	require.Nil(t, findLogoutJob(listLogoutJobs(t), personID, "", ""), "Logout with no registrations should not enqueue jobs")

@@ -1,6 +1,10 @@
 package svctenantapplication
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -32,15 +36,24 @@ func TestTenantApplicationCreateRejectsIllegalStatus(t *testing.T) {
 	testutil.SetupSQLite(t, &model.TenantApplicationEntity{})
 
 	ctx, _ := gin.CreateTestContext(nil)
+
+	if ctx.Request == nil {
+
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
 	ctx.Set(gcontext.KeyUserID, "0")
 	svc := NewTenantApplicationSvc()
 
-	_, err := svc.Create(ctx, &dtotenantapplication.TenantApplicationCreateReq{
+	_, err := svc.Create(requestCtx(ctx), &dtotenantapplication.TenantApplicationCreateReq{
 		TenantID: "t1",
 		AppID:    "app1",
 		Status:   "enabled",
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil {
 		t.Fatal("非法 status 应被拒绝")
 	}
@@ -65,17 +78,18 @@ func TestTenantApplicationUpdateRejectsIllegalStatus(t *testing.T) {
 	ctx := testutil.NewGinCtx("t1", "0")
 	svc := NewTenantApplicationSvc()
 
-	err := svc.Update(ctx, &dtotenantapplication.TenantApplicationUpdateReq{
+	err := svc.Update(requestCtx(ctx), &dtotenantapplication.TenantApplicationUpdateReq{
 		TenantAppID: entity.ID,
 		Status:      "enabled",
-	})
+
+		Operator: operatorOf(ctx)})
 	if err == nil {
 		t.Fatal("非法 status 应被拒绝")
 	}
 	if gerror.GetCode(err) != int(code.TenantApplicationUpdateError) {
 		t.Fatalf("期望 TenantApplicationUpdateError, got %v", err)
 	}
-	got, err := dao.NewTenantApplicationDao().GetByID(ctx, entity.ID)
+	got, err := dao.NewTenantApplicationDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}

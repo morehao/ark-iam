@@ -1,10 +1,9 @@
 package svcinstall
 
 import (
+	"context"
 	"net/url"
 	"strings"
-
-	"github.com/gin-gonic/gin"
 
 	"github.com/morehao/ark-iam/auth/config"
 	"github.com/morehao/ark-iam/auth/internal/dto/dtoinstall"
@@ -32,9 +31,9 @@ const (
 // 边界：本服务**不做**口令校验与令牌校验（前者在 service 入参校验，后者在 controller 入口）。
 type InstallSvc interface {
 	// Status 返回部署期的三个状态位与控制台入口（公开、只读）。
-	Status(ctx *gin.Context) (*dtoinstall.InstallationStatusResp, error)
+	Status(ctx context.Context) (*dtoinstall.InstallationStatusResp, error)
 	// Initialize 执行首次初始化（唯一写入口）。
-	Initialize(ctx *gin.Context, req *dtoinstall.InstallationInitializeReq) (*dtoinstall.InstallationInitializeResp, error)
+	Initialize(ctx context.Context, req *dtoinstall.InstallationInitializeReq) (*dtoinstall.InstallationInitializeResp, error)
 }
 
 type installSvc struct{}
@@ -46,7 +45,7 @@ func NewInstallSvc() InstallSvc {
 }
 
 // Status 汇总部署期状态。三个状态位相互独立，页面可据此给出不同的可执行提示。
-func (svc *installSvc) Status(ctx *gin.Context) (*dtoinstall.InstallationStatusResp, error) {
+func (svc *installSvc) Status(ctx context.Context) (*dtoinstall.InstallationStatusResp, error) {
 	// 初始化天然是跨租户操作（此刻库里还没有任何租户）。fail-closed 下不允许用
 	// "ctx 碰巧没有作用域"表达跨租户，因此这里**显式**声明全部租户作用域。
 	scopeCtx := dbclient.CrossTenantContext(ctx)
@@ -73,7 +72,7 @@ func (svc *installSvc) Status(ctx *gin.Context) (*dtoinstall.InstallationStatusR
 //
 // 关键点：**单次事务**。页面上的三步是 UI 分步，后端只有这一个写入口——
 // 分步提交会让"第一步成功、第二步失败"留下一个没有管理员的租户，且没有任何恢复路径。
-func (svc *installSvc) Initialize(ctx *gin.Context, req *dtoinstall.InstallationInitializeReq) (*dtoinstall.InstallationInitializeResp, error) {
+func (svc *installSvc) Initialize(ctx context.Context, req *dtoinstall.InstallationInitializeReq) (*dtoinstall.InstallationInitializeResp, error) {
 	def, err := buildDefinition(req)
 	if err != nil {
 		return nil, err

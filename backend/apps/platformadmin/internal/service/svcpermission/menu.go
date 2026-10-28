@@ -1,7 +1,7 @@
 package svcpermission
 
 import (
-	"github.com/gin-gonic/gin"
+	"context"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/core/menu"
 	"github.com/morehao/ark-iam/pkg/dao"
@@ -9,7 +9,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objpermission"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtopermission"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
@@ -73,13 +72,13 @@ func normalizeMenuSwitches(req *objpermission.MenuBaseInfo) {
 }
 
 type MenuSvc interface {
-	Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (*dtopermission.MenuCreateResp, error)
-	Delete(ctx *gin.Context, req *dtopermission.MenuDeleteReq) error
-	Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) error
-	Detail(ctx *gin.Context, req *dtopermission.MenuDetailReq) (*dtopermission.MenuDetailResp, error)
-	PageList(ctx *gin.Context, req *dtopermission.MenuPageListReq) (*dtopermission.MenuPageListResp, error)
-	Tree(ctx *gin.Context, req *dtopermission.MenuTreeReq) (*dtopermission.MenuTreeResp, error)
-	MyTree(ctx *gin.Context) (*dtopermission.MenuMyTreeResp, error)
+	Create(ctx context.Context, req *dtopermission.MenuCreateReq) (*dtopermission.MenuCreateResp, error)
+	Delete(ctx context.Context, req *dtopermission.MenuDeleteReq) error
+	Update(ctx context.Context, req *dtopermission.MenuUpdateReq) error
+	Detail(ctx context.Context, req *dtopermission.MenuDetailReq) (*dtopermission.MenuDetailResp, error)
+	PageList(ctx context.Context, req *dtopermission.MenuPageListReq) (*dtopermission.MenuPageListResp, error)
+	Tree(ctx context.Context, req *dtopermission.MenuTreeReq) (*dtopermission.MenuTreeResp, error)
+	MyTree(ctx context.Context, req *dtopermission.MenuMyTreeReq) (*dtopermission.MenuMyTreeResp, error)
 }
 
 type menuSvc struct{}
@@ -90,7 +89,7 @@ func NewMenuSvc() MenuSvc {
 	return &menuSvc{}
 }
 
-func (svc *menuSvc) Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (*dtopermission.MenuCreateResp, error) {
+func (svc *menuSvc) Create(ctx context.Context, req *dtopermission.MenuCreateReq) (*dtopermission.MenuCreateResp, error) {
 	if !validateMenuEnums(&req.MenuBaseInfo) {
 		return nil, code.GetError(code.MenuCreateError)
 	}
@@ -127,7 +126,7 @@ func (svc *menuSvc) Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (
 		ExternalLink: req.ExternalLink,
 		KeepAlive:    req.KeepAlive,
 		Status:       req.Status,
-		CreatedBy:    gincontext.GetUserIDString(ctx),
+		CreatedBy:    req.Operator.UserID,
 	}
 
 	if err := dao.NewMenuDao().Insert(ctx, insertEntity); err != nil {
@@ -139,7 +138,7 @@ func (svc *menuSvc) Create(ctx *gin.Context, req *dtopermission.MenuCreateReq) (
 	}, nil
 }
 
-func (svc *menuSvc) Delete(ctx *gin.Context, req *dtopermission.MenuDeleteReq) error {
+func (svc *menuSvc) Delete(ctx context.Context, req *dtopermission.MenuDeleteReq) error {
 	menuEntity, err := dao.NewMenuDao().GetByID(ctx, req.MenuID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.DeleteMenu] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -156,7 +155,7 @@ func (svc *menuSvc) Delete(ctx *gin.Context, req *dtopermission.MenuDeleteReq) e
 		return code.GetError(code.MenuDeleteError)
 	}
 
-	userID := gincontext.GetUserIDString(ctx)
+	userID := req.Operator.UserID
 	txErr := dbclient.IamDB(ctx).Transaction(func(tx *gorm.DB) error {
 		for _, menuID := range subtreeIDs {
 			// 先解绑角色授权，否则 role_menu 会留下指向已删除菜单的悬空绑定
@@ -184,7 +183,7 @@ func (svc *menuSvc) Delete(ctx *gin.Context, req *dtopermission.MenuDeleteReq) e
 
 // menuParentUsable 校验上级菜单：空串表示根菜单（合法）；否则父级必须存在且与本菜单同属一个应用。
 // 不校验会让子菜单挂到不存在或别的应用的父级下——它不会出现在任何应用菜单树里，成为看不见的孤儿行。
-func menuParentUsable(ctx *gin.Context, appID, parentID string) (bool, error) {
+func menuParentUsable(ctx context.Context, appID, parentID string) (bool, error) {
 	if parentID == "" {
 		return true, nil
 	}
@@ -200,7 +199,7 @@ func menuParentUsable(ctx *gin.Context, appID, parentID string) (bool, error) {
 
 // collectMenuSubtreeIDs 返回 rootID 及其全部子孙菜单 ID（限定同一应用）。
 // 菜单树规模有限（单应用几十行），一次取回后内存遍历，避免逐层查询。
-func collectMenuSubtreeIDs(ctx *gin.Context, appID, rootID string) ([]string, error) {
+func collectMenuSubtreeIDs(ctx context.Context, appID, rootID string) ([]string, error) {
 	list, err := dao.NewMenuDao().GetListByCond(ctx, &dao.MenuCond{AppID: appID})
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.collectMenuSubtreeIDs] dao GetListByCond fail, err:%v, appID:%s", err, appID)
@@ -221,7 +220,7 @@ func collectMenuSubtreeIDs(ctx *gin.Context, appID, rootID string) ([]string, er
 	return ids, nil
 }
 
-func (svc *menuSvc) Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) error {
+func (svc *menuSvc) Update(ctx context.Context, req *dtopermission.MenuUpdateReq) error {
 	menuEntity, err := dao.NewMenuDao().GetByID(ctx, req.MenuID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.UpdateMenu] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -263,7 +262,7 @@ func (svc *menuSvc) Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) e
 		}
 	}
 
-	userID := gincontext.GetUserIDString(ctx)
+	userID := req.Operator.UserID
 	updateMap := map[string]any{
 		"app_id":        req.AppID,
 		"parent_id":     req.ParentID,
@@ -289,7 +288,7 @@ func (svc *menuSvc) Update(ctx *gin.Context, req *dtopermission.MenuUpdateReq) e
 	return nil
 }
 
-func (svc *menuSvc) Detail(ctx *gin.Context, req *dtopermission.MenuDetailReq) (*dtopermission.MenuDetailResp, error) {
+func (svc *menuSvc) Detail(ctx context.Context, req *dtopermission.MenuDetailReq) (*dtopermission.MenuDetailResp, error) {
 	menuEntity, err := dao.NewMenuDao().GetByID(ctx, req.MenuID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcpermission.DetailMenu] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -326,7 +325,7 @@ func (svc *menuSvc) Detail(ctx *gin.Context, req *dtopermission.MenuDetailReq) (
 	return resp, nil
 }
 
-func (svc *menuSvc) PageList(ctx *gin.Context, req *dtopermission.MenuPageListReq) (*dtopermission.MenuPageListResp, error) {
+func (svc *menuSvc) PageList(ctx context.Context, req *dtopermission.MenuPageListReq) (*dtopermission.MenuPageListResp, error) {
 	menuRepo := dao.NewMenuDao()
 	cond := &dao.MenuCond{
 		BaseCond: &gormdao.BaseCond{
@@ -381,7 +380,7 @@ func (svc *menuSvc) PageList(ctx *gin.Context, req *dtopermission.MenuPageListRe
 	}, nil
 }
 
-func (svc *menuSvc) Tree(ctx *gin.Context, req *dtopermission.MenuTreeReq) (*dtopermission.MenuTreeResp, error) {
+func (svc *menuSvc) Tree(ctx context.Context, req *dtopermission.MenuTreeReq) (*dtopermission.MenuTreeResp, error) {
 	menuRepo := dao.NewMenuDao()
 	// 菜单管理页展示顺序与两端侧边栏同源（dao.MenuOrderBySort）：控制台里改「排序」后，
 	// 这里与侧边栏必须同时按新顺序呈现，否则运维无法确认排序是否生效。
@@ -442,9 +441,9 @@ const platformAdminAppCode = "platform_admin"
 // MyTree 返回当前用户可见的平台菜单树（侧边栏动态菜单）。
 // 平台菜单固定归属平台管理后台应用（platform_admin），按用户的角色授权（管理员角色全量 + role_menu 授权 + visibility）过滤，
 // 与租户控制台菜单逻辑保持一致，复用公共层 menu。
-func (svc *menuSvc) MyTree(ctx *gin.Context) (*dtopermission.MenuMyTreeResp, error) {
-	tenantID := gincontext.GetTenantIDString(ctx)
-	userID := gincontext.GetUserIDString(ctx)
+func (svc *menuSvc) MyTree(ctx context.Context, req *dtopermission.MenuMyTreeReq) (*dtopermission.MenuMyTreeResp, error) {
+	tenantID := dbclient.TenantIDFromContext(ctx)
+	userID := req.Operator.UserID
 
 	appList, _, err := dao.NewApplicationDao().GetPageListByCond(ctx, &dao.ApplicationCond{
 		BaseCond: &gormdao.BaseCond{Page: 1, PageSize: 1},

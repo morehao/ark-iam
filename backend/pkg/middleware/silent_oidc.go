@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 
@@ -17,7 +18,7 @@ type SSOValidator func(ctx *gin.Context, sessionID string) error
 
 // RedirectURIVerifier 校验 prompt=none 失败时要跳回的 redirect_uri 是否属于该 client。
 // 返回 false 时中间件拒绝跳转（返回 400），防止开放重定向（L1）。
-type RedirectURIVerifier func(ctx *gin.Context, clientID, redirectURI string) bool
+type RedirectURIVerifier func(ctx context.Context, clientID, redirectURI string) bool
 
 type silentSSOConfig struct {
 	validate          SSOValidator
@@ -74,7 +75,7 @@ func SilentSSORequired(ssoCookieName string, opts ...SilentSSOOption) gin.Handle
 		}
 		// L1：错误跳转只允许到该 client 注册的回调地址（防开放重定向）；
 		// 未注入校验器（如仅测试场景）或校验失败时一律拒绝跳转。
-		if cfg.verifyRedirectURI == nil || !cfg.verifyRedirectURI(ctx, ctx.Query("client_id"), redirectURI) {
+		if cfg.verifyRedirectURI == nil || !cfg.verifyRedirectURI(ctx.Request.Context(), ctx.Query("client_id"), redirectURI) {
 			ctx.AbortWithStatus(http.StatusBadRequest)
 			return
 		}

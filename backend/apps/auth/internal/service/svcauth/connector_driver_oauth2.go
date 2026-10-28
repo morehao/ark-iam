@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
 
 	"github.com/morehao/ark-iam/pkg/code"
@@ -44,7 +43,7 @@ func (d *OAuth2Driver) ValidateConfig(config ConnectorConfig) error {
 	return validateOAuth2ConnectorConfig(config)
 }
 
-func (d *OAuth2Driver) BuildAuthorizationURL(ctx *gin.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error) {
+func (d *OAuth2Driver) BuildAuthorizationURL(ctx context.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error) {
 	_ = ctx
 	if input == nil {
 		return nil, code.GetError(code.ConnectorGetDetailError)
@@ -86,7 +85,7 @@ func (d *OAuth2Driver) BuildAuthorizationURL(ctx *gin.Context, input *ConnectorA
 	}, nil
 }
 
-func (d *OAuth2Driver) ExchangeCallback(ctx *gin.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
+func (d *OAuth2Driver) ExchangeCallback(ctx context.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
 	if input == nil {
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
@@ -133,7 +132,7 @@ func (d *OAuth2Driver) ExchangeCallback(ctx *gin.Context, input *ConnectorCallba
 	}, nil
 }
 
-func (d *OAuth2Driver) TestConnection(ctx *gin.Context, input *ConnectorTestInput) (*ConnectorTestOutput, error) {
+func (d *OAuth2Driver) TestConnection(ctx context.Context, input *ConnectorTestInput) (*ConnectorTestOutput, error) {
 	_ = ctx
 	_ = input
 	return &ConnectorTestOutput{

@@ -1,6 +1,10 @@
 package svcapplicationclient
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -30,20 +34,29 @@ func TestUpdateBuiltInClientAllowsName(t *testing.T) {
 	}
 
 	ctx, _ := gin.CreateTestContext(nil)
+
+	if ctx.Request == nil {
+
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	}
 	ctx.Set(gcontext.KeyTenantID, "1")
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope("1"))
 	ctx.Set(gcontext.KeyUserID, "0")
 	svc := NewApplicationClientSvc()
 
 	// 改名 + 改回调地址：一并放行
-	if err := svc.Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	if err := svc.Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID: builtin.ID,
 		Name:                "运维自定名",
 		Status:              model.ApplicationClientStatusEnable,
 		RedirectURIs:        []string{"https://sso.example.com/auth/callback"},
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("内置客户端展示字段应可改: %v", err)
 	}
-	got, err := dao.NewApplicationClientDao().GetByID(ctx, builtin.ID)
+	got, err := dao.NewApplicationClientDao().GetByID(dbclient.CrossTenantContext(ctx), builtin.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -82,14 +95,15 @@ func TestUpdateClientKeepsJSONColumnsValidWhenOmitted(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
-	if err := NewApplicationClientSvc().Update(ctx, &dtoapplicationclient.ApplicationClientUpdateReq{
+	if err := NewApplicationClientSvc().Update(requestCtx(ctx), &dtoapplicationclient.ApplicationClientUpdateReq{
 		ApplicationClientID: client.ID,
 		Name:                "客户端1改名",
-	}); err != nil {
+
+		Operator: operatorOf(ctx)}); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
-	got, err := dao.NewApplicationClientDao().GetByID(ctx, client.ID)
+	got, err := dao.NewApplicationClientDao().GetByID(dbclient.CrossTenantContext(ctx), client.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
@@ -101,7 +115,7 @@ func TestUpdateClientKeepsJSONColumnsValidWhenOmitted(t *testing.T) {
 	var raw struct {
 		RedirectURIs string `gorm:"column:redirect_uris"`
 	}
-	if err := db.WithContext(ctx).Raw("select redirect_uris from application_client where id = ?", client.ID).Scan(&raw).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ctx)).Raw("select redirect_uris from application_client where id = ?", client.ID).Scan(&raw).Error; err != nil {
 		t.Fatalf("raw query: %v", err)
 	}
 	if raw.RedirectURIs != "[]" {

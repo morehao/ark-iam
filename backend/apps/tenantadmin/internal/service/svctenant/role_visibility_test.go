@@ -1,6 +1,7 @@
 package svctenant
 
 import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"testing"
 
 	"github.com/morehao/ark-iam/pkg/code"
@@ -35,7 +36,8 @@ func TestDeleteRejectsBuiltinRole(t *testing.T) {
 	seedTestApp(t, db, "t1", "app1")
 	seedBuiltinRole(t, db, "r1", "t1", "app1")
 
-	err := svc.Delete(newAdminCtx(t, db, "t1", "op"), &dtotenant.RoleDeleteReq{RoleID: "r1"})
+	opCtx := newAdminCtx(t, db, "t1", "op")
+	err := svc.Delete(requestCtx(opCtx), &dtotenant.RoleDeleteReq{RoleID: "r1", Operator: operatorOf(opCtx)})
 	if err == nil {
 		t.Fatalf("expected builtin delete forbidden error")
 	}
@@ -67,7 +69,7 @@ func TestHasSystemAdminCapability(t *testing.T) {
 		t.Fatalf("seed user_role: %v", err)
 	}
 
-	has, err := HasSystemAdminCapability(newDeptGinCtx(t, "t1", "u1"))
+	has, err := HasSystemAdminCapability(requestCtx(newDeptGinCtx(t, "t1", "u1")), operatorOf(newDeptGinCtx(t, "t1", "u1")))
 	if err != nil {
 		t.Fatalf("hasadmin: %v", err)
 	}
@@ -90,7 +92,7 @@ func TestHasSystemAdminCapability(t *testing.T) {
 	}).Error; err != nil {
 		t.Fatalf("seed user_role u2: %v", err)
 	}
-	has, err = HasSystemAdminCapability(newDeptGinCtx(t, "t1", "u2"))
+	has, err = HasSystemAdminCapability(requestCtx(newDeptGinCtx(t, "t1", "u2")), operatorOf(newDeptGinCtx(t, "t1", "u2")))
 	if err != nil {
 		t.Fatalf("hasadmin u2: %v", err)
 	}
@@ -180,7 +182,8 @@ func TestUpdateRolesRejectRemovingLastAdmin(t *testing.T) {
 	seedUserRoleLink(t, db, "ur1", "t1", "u1", "r-admin")
 
 	// u1 是唯一持有内置管理员角色的人，尝试按应用(app1)移除 → 拒绝
-	err := svc.UpdateRoles(newCustomAdminCtx(t, db, "t1", "op"), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app1", RoleIDs: []string{}})
+	opCtx := newCustomAdminCtx(t, db, "t1", "op")
+	err := svc.UpdateRoles(requestCtx(opCtx), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app1", RoleIDs: []string{}, Operator: operatorOf(opCtx)})
 	if err == nil {
 		t.Fatalf("expected last-admin removal forbidden")
 	}
@@ -201,7 +204,8 @@ func TestUpdateRolesAllowWhenKeepSystemRole(t *testing.T) {
 	seedUserRoleLink(t, db, "ur1", "t1", "u1", "r-admin")
 
 	// 新列表仍保留一个内置管理员角色 → 允许（权限不丢失）
-	err := svc.UpdateRoles(newCustomAdminCtx(t, db, "t1", "op"), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app1", RoleIDs: []string{"r-sys2"}})
+	opCtx := newCustomAdminCtx(t, db, "t1", "op")
+	err := svc.UpdateRoles(requestCtx(opCtx), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app1", RoleIDs: []string{"r-sys2"}, Operator: operatorOf(opCtx)})
 	if err != nil {
 		t.Fatalf("update to another system role should be allowed: %v", err)
 	}
@@ -220,7 +224,8 @@ func TestUpdateRolesAllowWhenOtherAdminExists(t *testing.T) {
 	seedUserRoleLink(t, db, "ur2", "t1", "u2", "r-admin")
 
 	// u2 仍持有内置管理员角色 → u1 可释放，不锁死
-	err := svc.UpdateRoles(newCustomAdminCtx(t, db, "t1", "op"), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app1", RoleIDs: []string{}})
+	opCtx := newCustomAdminCtx(t, db, "t1", "op")
+	err := svc.UpdateRoles(requestCtx(opCtx), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app1", RoleIDs: []string{}, Operator: operatorOf(opCtx)})
 	if err != nil {
 		t.Fatalf("release when another admin remains should be allowed: %v", err)
 	}
@@ -242,13 +247,15 @@ func TestUpdateRolesKeepAdminHeldInOtherApp(t *testing.T) {
 
 	// 仅替换 app1 为空：app2 的管理员角色仍在有效集合内 → 不应触发「最后一个管理员」保护
 	ginCtx := newCustomAdminCtx(t, db, "t1", "op")
-	err := svc.UpdateRoles(ginCtx, &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app1", RoleIDs: []string{}})
+	err := svc.UpdateRoles(requestCtx(ginCtx), &dtotenant.UserRolesUpdateReq{UserID: "u1", AppID: "app1", RoleIDs: []string{},
+		Operator: operatorOf(ginCtx),
+	})
 	if err != nil {
 		t.Fatalf("removing roles of app1 while holding system role in app2 should be allowed: %v", err)
 	}
 	// app2 关联应保留
 	var remain []model.UserRoleEntity
-	if err := db.WithContext(ginCtx).Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&remain).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ginCtx)).Where("tenant_id = ? AND user_id = ?", "t1", "u1").Find(&remain).Error; err != nil {
 		t.Fatalf("re-query user_role: %v", err)
 	}
 	if len(remain) != 1 || remain[0].RoleID != "r-sys2" {
@@ -287,7 +294,9 @@ func TestUpdateMenusRejectsAdminVisibilityForNormalRole(t *testing.T) {
 	ginCtx := newDeptGinCtx(t, "t1", "op")
 
 	// 普通角色授权 admin 可见性菜单 → 拒绝
-	if err := svc.UpdateMenus(ginCtx, &dtotenant.RoleMenusUpdateReq{RoleID: "r1", MenuIDs: []string{"m-admin"}}); err == nil {
+	if err := svc.UpdateMenus(requestCtx(ginCtx), &dtotenant.RoleMenusUpdateReq{RoleID: "r1", MenuIDs: []string{"m-admin"},
+		Operator: operatorOf(ginCtx),
+	}); err == nil {
 		t.Fatalf("expected admin-visibility rejection for normal role")
 	} else if err != code.GetError(code.RoleMenuAdminVisibilityForbiddenError) {
 		t.Fatalf("expected RoleMenuAdminVisibilityForbiddenError, got %v", err)
@@ -305,7 +314,9 @@ func TestUpdateMenusAllowsAdminVisibilityForBuiltinAdmin(t *testing.T) {
 	seedAdminVisibilityMenu(t, db, "m-admin", "app1")
 
 	ginCtx := newDeptGinCtx(t, "t1", "op")
-	if err := svc.UpdateMenus(ginCtx, &dtotenant.RoleMenusUpdateReq{RoleID: "r-admin", MenuIDs: []string{"m-admin"}}); err != nil {
+	if err := svc.UpdateMenus(requestCtx(ginCtx), &dtotenant.RoleMenusUpdateReq{RoleID: "r-admin", MenuIDs: []string{"m-admin"},
+		Operator: operatorOf(ginCtx),
+	}); err != nil {
 		t.Fatalf("builtin admin should be allowed to grant admin menu: %v", err)
 	}
 }
@@ -322,7 +333,7 @@ func TestRoleMenuTreeHidesAdminForNormalRole(t *testing.T) {
 
 	// 普通角色
 	seedTestRole(t, db, "r1", "t1", "app1", "成员")
-	tree, err := svc.roleMenuTree(ginCtx, &model.RoleEntity{AppID: "app1"})
+	tree, err := svc.roleMenuTree(requestCtx(ginCtx), &model.RoleEntity{AppID: "app1"})
 	if err != nil {
 		t.Fatalf("roleMenuTree normal: %v", err)
 	}
@@ -331,11 +342,10 @@ func TestRoleMenuTreeHidesAdminForNormalRole(t *testing.T) {
 	}
 
 	// 内置管理员
-	tree, err = svc.roleMenuTree(ginCtx, &model.RoleEntity{
+	tree, err = svc.roleMenuTree(requestCtx(ginCtx), &model.RoleEntity{
 		AppID:     "app1",
 		Source:    model.RoleSourceBuiltin,
-		AdminType: model.SysAdminTypeAdmin,
-	})
+		AdminType: model.SysAdminTypeAdmin})
 	if err != nil {
 		t.Fatalf("roleMenuTree admin: %v", err)
 	}
@@ -386,7 +396,7 @@ func TestUserHoldsBuiltinAdmin(t *testing.T) {
 	seedTestRole(t, db, "r-member", "t1", "app1", "成员")
 	seedUserRoleLink(t, db, "ur-member", "t1", "u-member", "r-member")
 
-	admin, err := userHoldsBuiltinAdmin(newDeptGinCtx(t, "t1", "u-admin"))
+	admin, err := userHoldsBuiltinAdmin(requestCtx(newDeptGinCtx(t, "t1", "u-admin")), operatorOf(newDeptGinCtx(t, "t1", "u-admin")))
 	if err != nil {
 		t.Fatalf("holds admin: %v", err)
 	}
@@ -394,7 +404,7 @@ func TestUserHoldsBuiltinAdmin(t *testing.T) {
 		t.Fatalf("user with builtin super role should hold builtin admin")
 	}
 
-	mem, err := userHoldsBuiltinAdmin(newDeptGinCtx(t, "t1", "u-member"))
+	mem, err := userHoldsBuiltinAdmin(requestCtx(newDeptGinCtx(t, "t1", "u-member")), operatorOf(newDeptGinCtx(t, "t1", "u-member")))
 	if err != nil {
 		t.Fatalf("holds member: %v", err)
 	}

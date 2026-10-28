@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"testing"
 	"time"
 
@@ -78,7 +79,7 @@ func TestClientCredentialsStorage(t *testing.T) {
 		)}
 	}
 	persistentStore.apiKeyDao = func(opts ...dao.DaoOption) *dao.ApiKeyDao {
-		return dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
+		return dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(dbclient.CrossTenantContext(ctx)) }))
 	}
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -196,7 +197,7 @@ func TestClientCredentialsRejectsPublicClient(t *testing.T) {
 		)}
 	}
 	persistentStore.apiKeyDao = func(opts ...dao.DaoOption) *dao.ApiKeyDao {
-		return dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
+		return dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(dbclient.CrossTenantContext(ctx)) }))
 	}
 
 	storage := NewOIDCStorage(nil, persistentStore, nil, "test-key")

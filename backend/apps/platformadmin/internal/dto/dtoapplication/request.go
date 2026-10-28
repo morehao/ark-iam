@@ -1,6 +1,9 @@
 package dtoapplication
 
-import "github.com/morehao/ark-iam/pkg/model"
+import (
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
+)
 
 // ApplicationCreateReq 创建应用。
 // 来源（source）不由控制台决定：控制台创建的应用恒为 model.AppSourceThirdParty，
@@ -18,6 +21,8 @@ type ApplicationCreateReq struct {
 	// 下游按「claim_prefix + code」认策略名（策略在下游是全局命名实体、全租户共用一条），
 	// 故契约值由应用方在此定义一次，租户只能授权、不能定义；开通应用时物化到各租户。
 	RoleTemplate []model.RoleTemplateItem `json:"roleTemplate"`
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 // ApplicationUpdateReq 修改应用。source 不可改（内置应用不可被改写为第三方）。
@@ -39,6 +44,8 @@ type ApplicationUpdateReq struct {
 	// RoleTemplate 应用角色模板：传 null 表示不修改，传 [] 表示清空，传值即全量替换。
 	// 全量替换会**撤下**已不在模板中的模板角色（连带清理其用户/菜单授权），界面需二次确认。
 	RoleTemplate []model.RoleTemplateItem `json:"roleTemplate"`
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type ApplicationDetailReq struct {
@@ -47,6 +54,8 @@ type ApplicationDetailReq struct {
 
 type ApplicationDeleteReq struct {
 	AppID string `json:"-" uri:"appID" binding:"required"` // 应用ID
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type ApplicationPageListReq struct {

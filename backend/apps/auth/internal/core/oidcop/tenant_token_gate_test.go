@@ -3,6 +3,7 @@ package oidcop
 import (
 	"context"
 	"fmt"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"strings"
 	"testing"
 	"time"
@@ -28,9 +29,9 @@ func newTenantTokenGateTestStorage(t *testing.T) (*OIDCStorage, *gorm.DB) {
 	}
 	persistentStore := NewPersistentStore()
 	persistentStore.tenantDao = func(opts ...dao.DaoOption) *dao.TenantDao {
-		return dao.NewTenantDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }))
+		return dao.NewTenantDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(dbclient.CrossTenantContext(ctx)) }))
 	}
-	persistentStore.db = func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }
+	persistentStore.db = func(ctx context.Context) *gorm.DB { return db.WithContext(dbclient.CrossTenantContext(ctx)) }
 	return &OIDCStorage{persistentStore: persistentStore}, db
 }
 

@@ -2,6 +2,7 @@ package svcsession
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -15,6 +16,9 @@ import (
 
 func TestSessionListReturnsPersonAwareTenantSessions(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
 	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 	ginCtx.Request = req
 	ginCtx.Set(gcontext.KeyPersonID, "101")
@@ -52,7 +56,7 @@ func TestSessionListReturnsPersonAwareTenantSessions(t *testing.T) {
 	}
 
 	svc := &sessionSvc{}
-	resp, err := svc.List(ginCtx, &dtouser.SessionListReq{})
+	resp, err := svc.List(requestCtx(ginCtx), &dtouser.SessionListReq{Operator: operatorOf(ginCtx)})
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
 	}

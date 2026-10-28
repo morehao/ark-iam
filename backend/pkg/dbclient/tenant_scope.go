@@ -74,7 +74,7 @@ func handleMissingTenantScope(db *gorm.DB, tableName string) error {
 			"[dbclient.tenantScope] 缺少租户作用域，已按历史行为放行（无租户过滤）, table:%s", tableName)
 		return nil
 	}
-	return fmt.Errorf("%w: table=%s; 中间件需用 gincontext.SetTenantScope 写入作用域，"+
+	return fmt.Errorf("%w: table=%s; 请求入口（鉴权中间件）需把作用域写入请求上下文，"+
 		"跨租户访问需在 dao 层用 gcontext.WithTenantScope(ctx, gcontext.AllScope()/ExplicitScope(tenantID)) 显式声明",
 		ErrTenantScopeMissing, tableName)
 }
@@ -107,4 +107,22 @@ func ExplicitTenantContext(ctx context.Context, tenantID string) context.Context
 // 需要显式声明归属租户的场景。
 func CurrentTenantContext(ctx context.Context, tenantID string) context.Context {
 	return gcontext.WithTenantScope(ctx, gcontext.CurrentScope(tenantID))
+}
+
+// TenantIDFromContext 返回当前租户作用域的 TenantID；AllScope / 未声明作用域时返回空串。
+//
+// 这是 service 层读"当前租户"的唯一入口：service 收纯 context.Context，
+// 租户作用域随 ctx 传递（由鉴权中间件在入站边界写入），
+// 因此不再需要 gin 上下文，也**不要**把 tenantID 塞进每个 DTO。
+//
+// 注意区分两种语义：
+//   - 本函数回答"当前请求作用域是哪个租户"，用于业务归属判断（如拼 tenant_id 字段）；
+//   - 数据隔离由租户插件按同一份作用域自动注入，不依赖本函数返回值。
+//
+// 返回空串时调用方按既有业务规则处理（通常是 fail-closed）。
+func TenantIDFromContext(ctx context.Context) string {
+	if scope, ok := gcontext.TenantScopeFrom(ctx); ok {
+		return scope.TenantID
+	}
+	return ""
 }

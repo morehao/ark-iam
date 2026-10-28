@@ -90,10 +90,12 @@ func TestCreateRejectsDuplicateSubscription(t *testing.T) {
 	ctx := newCreateCtx()
 	svc := NewTenantApplicationSvc()
 	req := &dtotenantapplication.TenantApplicationCreateReq{TenantID: "t2", AppID: "app-1"}
-	if _, err := svc.Create(ctx, req); err != nil {
+	req.Operator = operatorOf(ctx)
+	if _, err := svc.Create(requestCtx(ctx), req); err != nil {
 		t.Fatalf("first create failed: %v", err)
 	}
-	if _, err := svc.Create(ctx, req); err != code.GetError(code.TenantApplicationExistError) {
+	req.Operator = operatorOf(ctx)
+	if _, err := svc.Create(requestCtx(ctx), req); err != code.GetError(code.TenantApplicationExistError) {
 		t.Fatalf("expected TenantApplicationExistError, got %v", err)
 	}
 }
@@ -109,13 +111,15 @@ func TestCreateTargetsRequestTenantAndPageListFilters(t *testing.T) {
 	ctx := newCreateCtx()
 	svc := NewTenantApplicationSvc()
 	for _, tenantID := range []string{"t2", "t3"} {
-		if _, err := svc.Create(ctx, &dtotenantapplication.TenantApplicationCreateReq{TenantID: tenantID, AppID: "app-1"}); err != nil {
+		if _, err := svc.Create(requestCtx(ctx), &dtotenantapplication.TenantApplicationCreateReq{TenantID: tenantID, AppID: "app-1",
+			Operator: operatorOf(ctx),
+		}); err != nil {
 			t.Fatalf("create for %s failed: %v", tenantID, err)
 		}
 	}
 
 	// 不传 tenantID：跨租户全量视角（平台侧）
-	all, err := svc.PageList(ctx, &dtotenantapplication.TenantApplicationPageListReq{})
+	all, err := svc.PageList(requestCtx(ctx), &dtotenantapplication.TenantApplicationPageListReq{})
 	if err != nil {
 		t.Fatalf("page list all: %v", err)
 	}
@@ -124,7 +128,7 @@ func TestCreateTargetsRequestTenantAndPageListFilters(t *testing.T) {
 	}
 
 	// 传 tenantID：只返回该租户的订阅，并带出名称
-	one, err := svc.PageList(ctx, &dtotenantapplication.TenantApplicationPageListReq{TenantID: "t2"})
+	one, err := svc.PageList(requestCtx(ctx), &dtotenantapplication.TenantApplicationPageListReq{TenantID: "t2"})
 	if err != nil {
 		t.Fatalf("page list t2: %v", err)
 	}
@@ -148,14 +152,20 @@ func TestDeleteOtherTenantSubscription(t *testing.T) {
 
 	ctx := newCreateCtx()
 	svc := NewTenantApplicationSvc()
-	created, err := svc.Create(ctx, &dtotenantapplication.TenantApplicationCreateReq{TenantID: "t2", AppID: "app-1"})
+	created, err := svc.Create(requestCtx(ctx), &dtotenantapplication.TenantApplicationCreateReq{TenantID: "t2", AppID: "app-1",
+		Operator: operatorOf(ctx),
+	})
 	if err != nil {
 		t.Fatalf("create failed: %v", err)
 	}
-	if err := svc.Delete(ctx, &dtotenantapplication.TenantApplicationDeleteReq{TenantAppID: created.TenantAppID}); err != nil {
+	if err := svc.Delete(requestCtx(ctx), &dtotenantapplication.TenantApplicationDeleteReq{TenantAppID: created.TenantAppID,
+		Operator: operatorOf(ctx),
+	}); err != nil {
 		t.Fatalf("delete other tenant subscription failed: %v", err)
 	}
-	if err := svc.Delete(ctx, &dtotenantapplication.TenantApplicationDeleteReq{TenantAppID: created.TenantAppID}); err != code.GetError(code.TenantApplicationNotExistError) {
+	if err := svc.Delete(requestCtx(ctx), &dtotenantapplication.TenantApplicationDeleteReq{TenantAppID: created.TenantAppID,
+		Operator: operatorOf(ctx),
+	}); err != code.GetError(code.TenantApplicationNotExistError) {
 		t.Fatalf("expected TenantApplicationNotExistError on second delete, got %v", err)
 	}
 }

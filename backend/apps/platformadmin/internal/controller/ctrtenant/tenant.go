@@ -2,6 +2,7 @@ package ctrtenant
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/ark-iam/platformadmin/internal/dto/dtotenant"
 	"github.com/morehao/ark-iam/platformadmin/internal/service/svctenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -37,11 +38,12 @@ func NewTenantCtr() TenantCtr {
 // @Router /v1/platform/tenants [post]
 func (ctr *tenantCtr) Create(ctx *gin.Context) {
 	var req dtotenant.TenantCreateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.tenantSvc.Create(ctx, &req)
+	res, err := ctr.tenantSvc.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -60,11 +62,12 @@ func (ctr *tenantCtr) Create(ctx *gin.Context) {
 // @Router /v1/platform/tenants/{tenantID}/builtin-admin/reset-password [post]
 func (ctr *tenantCtr) ResetAdminPassword(ctx *gin.Context) {
 	var req dtotenant.TenantAdminResetPasswordReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.tenantSvc.ResetAdminPassword(ctx, &req)
+	res, err := ctr.tenantSvc.ResetAdminPassword(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -81,11 +84,12 @@ func (ctr *tenantCtr) ResetAdminPassword(ctx *gin.Context) {
 // @Router /v1/platform/tenants/{tenantID} [delete]
 func (ctr *tenantCtr) Delete(ctx *gin.Context) {
 	var req dtotenant.TenantDeleteReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.tenantSvc.Delete(ctx, &req); err != nil {
+	if err := ctr.tenantSvc.Delete(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -102,6 +106,7 @@ func (ctr *tenantCtr) Delete(ctx *gin.Context) {
 // @Router /v1/platform/tenants/{tenantID} [put]
 func (ctr *tenantCtr) Update(ctx *gin.Context) {
 	var req dtotenant.TenantUpdateReq
+	req.Operator = identity.OperatorFromGin(ctx)
 	if err := gincontext.BindPathParams(ctx, &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -110,7 +115,7 @@ func (ctr *tenantCtr) Update(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	if err := ctr.tenantSvc.Update(ctx, &req); err != nil {
+	if err := ctr.tenantSvc.Update(ctx.Request.Context(), &req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -130,7 +135,7 @@ func (ctr *tenantCtr) Detail(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.tenantSvc.Detail(ctx, &req)
+	res, err := ctr.tenantSvc.Detail(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return
@@ -151,7 +156,7 @@ func (ctr *tenantCtr) PageList(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	res, err := ctr.tenantSvc.PageList(ctx, &req)
+	res, err := ctr.tenantSvc.PageList(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

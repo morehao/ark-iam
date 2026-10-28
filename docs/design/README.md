@@ -41,7 +41,7 @@
 
 - **Ark IAM** 是一个多租户、多应用的统一身份认证服务，对外提供 **OIDC Provider**（基于 [zitadel/oidc](https://github.com/zitadel/oidc)）能力，业务应用作为 **RP（Relying Party）** 通过标准 OIDC 协议接入，实现 **一次登录、处处通行（SSO）** 与 **一处登出、处处登出（SLO）**。
 - 后端由 4 个应用组成：`auth`（认证网关 / OIDC Provider，:8081）、`platformadmin`（平台管理，:8082）、`tenantadmin`（租户自服务，:8083）、`gateway`（单体聚合部署，:8100），共享 `backend/pkg` 公共层，Go workspace（`backend/go.work`）管理 5 个模块。
-- 身份模型为 **自然人（person）+ 租户成员（user，表 `tenant_user`）**：person 是跨租户的全局身份，user 是 person 在某个租户内的成员记录，一个人可同时属于多个租户。
+- 身份模型为 **自然人（person）+ 租户成员（user，表 `"user"`）**：person 是跨租户的全局身份，user 是 person 在某个租户内的成员记录，一个人可同时属于多个租户。
 - 授权模型到「**角色—菜单**」粒度（角色按租户 + 应用作用域，`user_role` / `role_menu` 两张关联表）；资源级权限不在 IAM 承载。
 - 前端为 React 18 + Vite + Ant Design 5 的 pnpm monorepo（`frontend/`），包含登录门户（login-web :4000）、平台管理台（platform-admin-web :4001）、租户管理台（tenant-admin-web :4002）。
 
