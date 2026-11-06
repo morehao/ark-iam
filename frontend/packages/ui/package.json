@@ -1,28 +1,53 @@
 {
   "name": "@ark-iam/ui",
-  "private": true,
   "version": "1.0.0",
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "description": "GoArk IAM 共享 UI 组件、设计令牌与列表页列工厂",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "vite build --config vite.config.lib.ts && tsc -p tsconfig.build.json",
+    "pack:dist": "pnpm build && pnpm pack",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@ant-design/icons": "^5.4.0",
+    "antd": "^5.22.0",
+    "react": "^18.3.1",
+    "react-router-dom": "^7.15.0"
   },
   "dependencies": {
-    "@ant-design/icons": "^5.4.0",
     "@ark-iam/api": "workspace:*",
     "@ark-iam/auth": "workspace:*",
     "@ark-iam/types": "workspace:*",
-    "antd": "^5.22.0",
     "dayjs": "^1.11.13",
-    "react": "^18.3.1",
-    "react-oidc-context": "^3.3.1",
-    "react-router-dom": "^7.15.0"
+    "react-oidc-context": "^3.3.1"
   },
   "devDependencies": {
+    "@ant-design/icons": "^5.4.0",
     "@ark-iam/tsconfig": "workspace:*",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.1",
+    "antd": "^5.22.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.15.0",
     "typescript": "^5.6.0",
     "vite": "^5.4.10",
     "vitest": "^2.1.4"

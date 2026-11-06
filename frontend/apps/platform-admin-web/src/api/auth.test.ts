@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 
-vi.mock('@ark-iam/api', () => ({
+vi.mock('@morehao/ark-iam-react/api', () => ({
   getUserinfo: vi.fn(() =>
     Promise.resolve({
       personInfo: { personID: "1", name: 'Test', avatar: '' },

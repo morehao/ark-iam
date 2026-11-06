@@ -1,4 +1,4 @@
-import { request } from '@ark-iam/api'
+import { request } from '@morehao/ark-iam-react/api'
 import type {
   PageListResp,
   TenantMachineUserCreateReq,
@@ -7,7 +7,7 @@ import type {
   TenantMachineUserUpdateReq,
   TenantUserRoleItem,
   UserStatus,
-} from '@ark-iam/types'
+} from '@morehao/ark-iam-react/types'
 
 /** 服务账号分页列表（租户内机器主体，user_type=machine；name=名称模糊，status=状态过滤（空串=不过滤）；条目含主部门 primaryDepartmentID/primaryDepartmentName） */
 export const getMachineUserPageList = (params?: {

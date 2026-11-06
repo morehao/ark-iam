@@ -22,8 +22,8 @@ vi.mock('react-oidc-context', () => ({
   hasAuthParams: vi.fn(() => false),
 }))
 
-vi.mock('@ark-iam/ui', async () => {
-  const actual = await vi.importActual<typeof import('@ark-iam/ui')>('@ark-iam/ui')
+vi.mock('@morehao/ark-iam-react/ui', async () => {
+  const actual = await vi.importActual<typeof import('@morehao/ark-iam-react/ui')>('@morehao/ark-iam-react/ui')
   return {
     ...actual,
     MainLayout: () => <div>Main Layout</div>,

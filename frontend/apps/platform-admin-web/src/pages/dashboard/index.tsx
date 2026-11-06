@@ -5,8 +5,8 @@ import {
   FileSearchOutlined,
   GlobalOutlined,
 } from '@ant-design/icons'
-import { PageContainer, tokens } from '@ark-iam/ui'
-import { getApplicationPageList, getTenantPageList } from '@ark-iam/api'
+import { PageContainer, tokens } from '@morehao/ark-iam-react/ui'
+import { getApplicationPageList, getTenantPageList } from '@morehao/ark-iam-react/api'
 
 interface Stat {
   title: string

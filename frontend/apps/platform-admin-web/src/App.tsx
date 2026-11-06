@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { useAuthGuard, FullPageSpinner } from '@ark-iam/auth'
-import { MainLayout, LoginPage, tokens } from '@ark-iam/ui'
-import type { MainMenuItems } from '@ark-iam/ui'
+import { useAuthGuard, FullPageSpinner } from '@morehao/ark-iam-react/auth'
+import { MainLayout, LoginPage, tokens } from '@morehao/ark-iam-react/ui'
+import type { MainMenuItems } from '@morehao/ark-iam-react/ui'
 import {
   ApartmentOutlined,
   AppstoreOutlined,
@@ -14,8 +14,8 @@ import {
   SettingOutlined,
   ShoppingOutlined,
 } from '@ant-design/icons'
-import type { MenuItem } from '@ark-iam/types'
-import { getMyMenuTree } from '@ark-iam/api'
+import type { MenuItem } from '@morehao/ark-iam-react/types'
+import { getMyMenuTree } from '@morehao/ark-iam-react/api'
 import Dashboard from './pages/dashboard'
 import ApplicationList from './pages/application'
 import TenantList from './pages/tenant'

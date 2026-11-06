@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { TenantRoleItem } from '@ark-iam/types'
+import type { TenantRoleItem } from '@morehao/ark-iam-react/types'
 import { ROLE_CODE_PATTERN } from './index'
 
 const mockGetTenantRolePageList = vi.fn()

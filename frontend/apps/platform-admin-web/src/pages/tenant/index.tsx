@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Divider, Form, Input, message, Modal, Select, Space, Switch, Table, Tooltip } from 'antd'
 import { PlusOutlined, QuestionCircleOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, CODE_COL_WIDTH, idColumn, InitialPasswordModal, NAME_COL_WIDTH, PageContainer, STATUS_COL_WIDTH, SuspendedTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, TypeTag } from '@ark-iam/ui'
-import { createTenant, deleteTenant, getTenantPageList, resetTenantAdminPassword, updateTenant } from '@ark-iam/api'
-import type { TenantItem, TenantStatus } from '@ark-iam/types'
+import { actionColumn, CODE_COL_WIDTH, idColumn, InitialPasswordModal, NAME_COL_WIDTH, PageContainer, STATUS_COL_WIDTH, SuspendedTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, TypeTag } from '@morehao/ark-iam-react/ui'
+import { createTenant, deleteTenant, getTenantPageList, resetTenantAdminPassword, updateTenant } from '@morehao/ark-iam-react/api'
+import type { TenantItem, TenantStatus } from '@morehao/ark-iam-react/types'
 
 // 租户状态筛选项（后端 model.TenantStatus：active-正常 / suspended-已挂起）。
 // 「全部」由 allowClear 的空值表达，无需单独一项。

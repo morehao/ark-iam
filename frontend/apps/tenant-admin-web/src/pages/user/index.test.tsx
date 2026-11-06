@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { TenantApiKeyItem, TenantMachineUserDetail, TenantMachineUserItem } from '@ark-iam/types'
+import type { TenantApiKeyItem, TenantMachineUserDetail, TenantMachineUserItem } from '@morehao/ark-iam-react/types'
 
 const mockGetTenantUserPageList = vi.fn()
 const mockGetMachineUserPageList = vi.fn()

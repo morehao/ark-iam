@@ -1,12 +1,30 @@
 {
   "name": "@ark-iam/types",
-  "private": true,
   "version": "1.0.0",
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "description": "GoArk IAM 共享类型与业务码常量",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "vite build --config vite.config.lib.ts && tsc -p tsconfig.build.json",
+    "pack:dist": "pnpm build && pnpm pack",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "devDependencies": {
     "@ark-iam/tsconfig": "workspace:*",

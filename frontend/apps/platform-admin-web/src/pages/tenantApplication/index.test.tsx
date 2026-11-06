@@ -6,7 +6,7 @@ const mockGetTenantPageList = vi.fn()
 const mockGetApplicationPageList = vi.fn()
 const mockCreateTenantApplication = vi.fn()
 
-vi.mock('@ark-iam/api', () => ({
+vi.mock('@morehao/ark-iam-react/api', () => ({
   createTenantApplication: (...args: unknown[]) => mockCreateTenantApplication(...args),
   deleteTenantApplication: vi.fn(),
   getApplicationPageList: (...args: unknown[]) => mockGetApplicationPageList(...args),

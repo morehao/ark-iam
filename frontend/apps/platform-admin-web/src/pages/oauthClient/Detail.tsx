@@ -3,9 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Alert, Button, Card, DatePicker, Descriptions, Form, Input, Modal, Space, Spin, Table, message } from 'antd'
 import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { createOAuthSecret, deleteOAuthSecret, getOAuthClientDetail, listOAuthSecrets } from '@ark-iam/api'
-import type { OAuthClientDetail as OAuthClientDetailType, OAuthSecretCreateResp, OAuthSecretItem } from '@ark-iam/types'
-import { actionColumn, CODE_COL_WIDTH, fmtTime, IDCell, idColumn, NAME_COL_WIDTH, SourceTag, EnableTag, tableScrollX, textColumn, timeColumn, tokens } from '@ark-iam/ui'
+import { createOAuthSecret, deleteOAuthSecret, getOAuthClientDetail, listOAuthSecrets } from '@morehao/ark-iam-react/api'
+import type { OAuthClientDetail as OAuthClientDetailType, OAuthSecretCreateResp, OAuthSecretItem } from '@morehao/ark-iam-react/types'
+import { actionColumn, CODE_COL_WIDTH, fmtTime, IDCell, idColumn, NAME_COL_WIDTH, SourceTag, EnableTag, tableScrollX, textColumn, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
 import { OAUTH_CLIENT_LIST_PATH } from '../../routes'
 
 export default function OAuthClientDetail() {

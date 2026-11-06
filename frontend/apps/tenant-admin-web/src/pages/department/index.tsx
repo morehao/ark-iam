@@ -17,8 +17,8 @@ import {
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
-import { actionColumn, NAME_COL_WIDTH, nameColumn, PageContainer, STATUS_COL_WIDTH, EnableTag, tableScrollX, timeColumn, tokens } from '@ark-iam/ui'
-import type { DepartmentChildItem, DepartmentItem, DeptNodeStatus } from '@ark-iam/types'
+import { actionColumn, NAME_COL_WIDTH, nameColumn, PageContainer, STATUS_COL_WIDTH, EnableTag, tableScrollX, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
+import type { DepartmentChildItem, DepartmentItem, DeptNodeStatus } from '@morehao/ark-iam-react/types'
 import {
   createDepartment,
   deleteDepartment,

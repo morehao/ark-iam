@@ -18,7 +18,7 @@ import {
   textColumn,
   timeColumn,
   tokens,
-} from '@ark-iam/ui'
+} from '@morehao/ark-iam-react/ui'
 import {
   createOAuthClient,
   deleteOAuthClient,
@@ -26,8 +26,8 @@ import {
   getOAuthClientDetail,
   getOAuthClientPageList,
   updateOAuthClient,
-} from '@ark-iam/api'
-import type { ClientAuthTimeClaimPolicy, ClientPKCEPolicy, GrantType, OAuthClientItem, TokenEndpointAuthMethod } from '@ark-iam/types'
+} from '@morehao/ark-iam-react/api'
+import type { ClientAuthTimeClaimPolicy, ClientPKCEPolicy, GrantType, OAuthClientItem, TokenEndpointAuthMethod } from '@morehao/ark-iam-react/types'
 import { useNavigate } from 'react-router-dom'
 import { oauthClientDetailPath } from '../../routes'
 

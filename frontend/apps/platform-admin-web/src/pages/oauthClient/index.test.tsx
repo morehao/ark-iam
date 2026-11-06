@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import type { OAuthClientDetail as OAuthClientDetailType, OAuthClientItem } from '@ark-iam/types'
+import type { OAuthClientDetail as OAuthClientDetailType, OAuthClientItem } from '@morehao/ark-iam-react/types'
 import { OAUTH_CLIENT_DETAIL_ROUTE, OAUTH_CLIENT_LIST_PATH, oauthClientDetailPath } from '../../routes'
 
 const mockGetOAuthClientPageList = vi.fn()
@@ -9,7 +9,7 @@ const mockGetOAuthClientDetail = vi.fn()
 const mockListOAuthSecrets = vi.fn()
 const mockCreateOAuthClient = vi.fn()
 const mockUpdateOAuthClient = vi.fn()
-vi.mock('@ark-iam/api', () => ({
+vi.mock('@morehao/ark-iam-react/api', () => ({
   createOAuthClient: (...args: unknown[]) => mockCreateOAuthClient(...args),
   createOAuthSecret: vi.fn(),
   deleteOAuthClient: vi.fn(),

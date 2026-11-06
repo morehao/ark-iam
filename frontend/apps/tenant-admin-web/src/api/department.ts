@@ -1,4 +1,4 @@
-import { request } from '@ark-iam/api'
+import { request } from '@morehao/ark-iam-react/api'
 import type {
   DepartmentChildrenResp,
   DepartmentItem,
@@ -6,7 +6,7 @@ import type {
   DepartmentUserItem,
   DeptNodeStatus,
   PageListResp,
-} from '@ark-iam/types'
+} from '@morehao/ark-iam-react/types'
 
 // ---------- 部门树 ----------
 export const getDepartmentTree = (params?: { name?: string; status?: DeptNodeStatus }) =>

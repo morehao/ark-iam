@@ -1,4 +1,4 @@
-import { request } from '@ark-iam/api'
+import { request } from '@morehao/ark-iam-react/api'
 import type {
   PageListResp,
   TenantUserCreateReq,
@@ -14,7 +14,7 @@ import type {
   TenantUserApplicationsListResp,
   TenantApplicationUsersListResp,
   UserStatus,
-} from '@ark-iam/types'
+} from '@morehao/ark-iam-react/types'
 
 /** 获取当前租户内的用户目录（分页，关键词=姓名/用户名/邮箱/手机；status=状态过滤，空串=不过滤；departmentID=仅筛选恰在该部门的用户） */
 export const getTenantUserPageList = (params?: {

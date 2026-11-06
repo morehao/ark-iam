@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { TenantRoleItem, TenantUserRoleItem } from '@ark-iam/types'
+import type { TenantRoleItem, TenantUserRoleItem } from '@morehao/ark-iam-react/types'
 
 const mockGetMachineUserRoles = vi.fn()
 const mockUpdateMachineUserRoles = vi.fn()
