@@ -34,7 +34,7 @@ PORT              = 8099
 .PHONY: all build build-env clean run lint test swag codegen \
         docker-build docker-run check-image \
         list-apps deps tidy update-dep dev-all dev-frontend stop-frontend e2e e2e-sso e2e-test help \
-        test-sdk sdk-check-deps print-builtin-menus
+        test-sdk sdk-check-deps print-builtin-menus iam-build test-iam
 
 # ============================================================
 # 通用入口：清理、依赖、构建并运行
@@ -117,6 +117,17 @@ test-sdk:
 # SDK 依赖白名单断言：contract/rp 只允许标准库 + jwt/v5（禁止 gorm/gin/redis）
 sdk-check-deps:
 	@cd backend && bash sdk/scripts/check-deps.sh
+
+# 可嵌入 IAM 库（backend/iam）构建
+iam-build:
+	@echo "🔨 构建可嵌入 IAM 库（backend/iam）..."
+	@cd backend && go build ./iam/...
+
+# 可嵌入 IAM 库（backend/iam）测试
+test-iam:
+	@echo "🧪 正在运行可嵌入 IAM 库测试..."
+	@cd backend && go test ./iam/... -count=1
+
 
 # ============================================================
 # 一键开发（后端 + 前端）

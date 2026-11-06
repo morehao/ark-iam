@@ -1,0 +1,43 @@
+package dtopermission
+
+import (
+	"github.com/morehao/ark-iam/pkg/object/objpermission"
+	"github.com/morehao/golib/biz/gobject"
+)
+
+type MenuCreateResp struct {
+	MenuID string `json:"menuID"` // 菜单ID
+}
+
+type MenuDetailResp struct {
+	MenuID string `json:"menuID"` // 菜单ID
+	objpermission.MenuBaseInfo
+	gobject.OperatorBaseInfo
+}
+
+type MenuPageListItem struct {
+	MenuID string `json:"menuID"` // 菜单ID
+	objpermission.MenuBaseInfo
+	gobject.OperatorBaseInfo
+}
+
+type MenuPageListResp struct {
+	List  []MenuPageListItem `json:"list"`  // 数据列表
+	Total int64              `json:"total"` // 数据总条数
+}
+
+type MenuTreeItem struct {
+	MenuID string `json:"menuID"` // 菜单ID
+	objpermission.MenuBaseInfo
+	gobject.OperatorBaseInfo
+	Children []MenuTreeItem `json:"children"` // 子菜单
+}
+
+type MenuTreeResp struct {
+	List []MenuTreeItem `json:"list"` // 菜单树
+}
+
+// MenuMyTreeResp 当前用户可见的平台菜单树（侧边栏动态菜单用，基于公共层节点）。
+type MenuMyTreeResp struct {
+	List []objpermission.MenuItemNode `json:"list"` // 当前用户可见菜单树
+}

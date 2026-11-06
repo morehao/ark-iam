@@ -2,23 +2,72 @@ package gateway
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/auth"
+	"github.com/morehao/ark-iam/iam"
 	"github.com/morehao/ark-iam/pkg/config"
-	"github.com/morehao/ark-iam/platformadmin"
 	"github.com/morehao/ark-iam/rpapi"
-	"github.com/morehao/ark-iam/tenantadmin"
 )
 
 const AppName = "gateway"
 
+// Init 装配 gateway 聚合应用。R4 起 platformadmin/tenantadmin/auth 三域改由
+// 可嵌入 IAM 库（iam.New + Mount）统一装配；rpapi 仍是独立的只读目录 API，单独挂载。
+//
+// 行为与重构前等价：同一套路由布局、同一套鉴权中间件（OIDCAuth + RequireAppAccess）、
+// 同一套 back-channel logout 接收端。
 func Init(engine *gin.Engine, Conf *config.Config) {
-	// auth 先装配 OP，并返回本进程已发布公钥的进程内 KeySource（含过渡期旧 key）。
-	// gateway 聚合部署下，同进程的其余应用直接复用它做本地验签：
-	//   - 零网络调用：不去 HTTP 请求自己的 JWKS 端点（进程启动期服务尚未监听，
-	//     "自取公钥"必然失败）；
-	//   - 自动跟随多 key 轮换，无需挂载 OP 私钥、无需重启。
-	keySource := auth.Init(engine, Conf)
-	platformadmin.Init(engine, Conf, keySource)
-	tenantadmin.Init(engine, Conf, keySource)
-	rpapi.Init(engine, Conf, keySource)
+	app, err := iam.New(iam.Config{
+		Raw: Conf,
+		Env: envOf(Conf),
+		DB: iam.DBConfig{
+			DSN:     dsnFromConf(Conf),
+			Service: "iam",
+		},
+		Redis: redisFromConf(Conf),
+		// Domains=nil → 全量（形态 1：gateway 独立部署挂全部域）。
+	})
+	if err != nil {
+		panic("[gateway.Init] iam.New fail: " + err.Error())
+	}
+	if err := app.Mount(engine.Group("")); err != nil {
+		panic("[gateway.Init] iam.Mount fail: " + err.Error())
+	}
+
+	// rpapi 不在 iam 核心库内（独立只读目录 API），仍单独挂载。复用 iam 装配的 auth 域
+	// 已产出的进程内 KeySource（app.KeySource()），使 rpapi 本地验签、零网络调用，
+	// 与重构前 gateway 注入 auth keySource 的行为一致。
+	rpapi.Init(engine, Conf, app.KeySource())
+}
+
+func envOf(c *config.Config) string {
+	if c == nil {
+		return "dev"
+	}
+	return c.Server.Env
+}
+
+func dsnFromConf(c *config.Config) string {
+	if c == nil {
+		return ""
+	}
+	for _, dbc := range c.DBConfigs {
+		if dbc.Service == "iam" || dbc.Service == "" {
+			return dbc.URL
+		}
+	}
+	if len(c.DBConfigs) > 0 {
+		return c.DBConfigs[0].URL
+	}
+	return ""
+}
+
+func redisFromConf(c *config.Config) *iam.RedisConfig {
+	if c == nil || c.RedisConfig.Addr == "" {
+		return nil
+	}
+	return &iam.RedisConfig{
+		Service:  c.RedisConfig.Service,
+		Addr:     c.RedisConfig.Addr,
+		Password: c.RedisConfig.Password,
+		DB:       c.RedisConfig.DB,
+	}
 }
