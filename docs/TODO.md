@@ -10,15 +10,19 @@
 
 ## 目录
 
-1. [P0 前端组件发布为 npm 包（**已选定方案**）](#1-p0-前端组件发布为-npm-包已选定方案)
-2. [P1 前端门面包 `@ark-iam/react`](#2-p1-前端门面包-ark-iamreact)
+1. [P0 前端组件发布为 npm 包（**已完成**）](#1-p0-前端组件发布为-npm-包已完成---2026-11-06)
+2. [P1 前端门面包 `@morehao/ark-iam-react`](#2-p1-前端门面包-ark-iamreact)
 3. [P2 管理台前端的内嵌/挂载](#3-p2-管理台前端的内嵌挂载)
 4. [P3 后端相关待办](#4-p3-后端相关待办)
 5. [已完成的记录](#5-已完成的记录)
 
 ---
 
-## 1. P0 前端组件发布为 npm 包（**已选定方案**）
+## 1. P0 前端组件发布为 npm 包（**已完成 — 2026-11-06**）
+
+> **状态：已落地（最终采用「单门面包」形态）。** 对外**只发布一个包** `@morehao/ark-iam-react`：它把内部 `@ark-iam/{types,api,auth,ui}` 的代码与类型**打进自身 dist**，以 ESM 子路径 `@morehao/ark-iam-react/{types,api,auth,ui}` 按需暴露，根入口 `@morehao/ark-iam-react` 一把梭。T1~T9 全绿：库构建（ESM + `.d.ts`，含类型自包含 bundle）、入口 `exports` 指向 `dist`、`publishConfig.access=public`、peer/dev 依赖分类、脚本化版本/发布通道（仅门面包）、接入文档、仓外空项目冒烟（tarball 离线 → 外部 vite+react 项目 `actionColumn` 表格渲染 + `createAuthProvider` 登录跳转 PKCE 成功；独立 facade 消费测试：根入口 + 四子路径 runtime/tsc 均过）均通过。
+> 运行期配置优先级：**props > `/config.json` > `VITE_*` > 相对默认值**（`/config.json` 由后端 `iam/app_frontend.go` 从 `Config.Raw` 与请求 Host 派生，含 CORS）；仓内 dev 走 `src`（`frontend/vite.alias.ts` 的 `arkIamAlias`），发布走 `dist`。
+> 发布目标：**公共 npm**，包名 `@morehao/ark-iam-react`，scope `@morehao`（免费 public org）。内部四包不对外发布。以下为原始方案留档。
 
 ### 1.1 目标
 
@@ -80,14 +84,14 @@ import { createApiClient } from '@ark-iam/api'
 
 ---
 
-## 2. P1 前端门面包 `@ark-iam/react`
+## 2. P1 前端门面包 `@morehao/ark-iam-react`
 
 ### 2.1 目标
 
 做到「前端一行接入」：
 
 ```tsx
-import { IamProvider, IamRoutes } from '@ark-iam/react'
+import { IamProvider, IamRoutes } from '@morehao/ark-iam-react'
 
 <IamProvider config={{ issuer, clientId, apiBase }}>
   <IamRoutes basePath="/iam" />
@@ -150,3 +154,5 @@ import { IamProvider, IamRoutes } from '@ark-iam/react'
 | `iam.Config.Redis` 未打通 | 已修：`initRedis` 建连接后同步注册全局 `dbclient.RedisCli`；`Service` 缺省 `iam` | `pkg/dbclient/redis.go`、`iam/app_db.go`、`iam/redis_bridge_test.go` |
 | e2e 全流程（真实 PG + Redis） | 8 项全通（建表/install/前端/OIDC discovery/授权码全流程/token 访问/负向 401/落库核对） | `.dsh/docs/notes/2026-11-06-iam-e2e-report.md`（本地，未入库） |
 | 可嵌入 IAM 库落地 | R0~R6 完成，`go test ./iam/...` 25 包全绿 | `backend/iam/`、`backend/iam/README.md` |
+| P0 前端组件发布为 npm 包 | 已完成（T1~T9，单门面包 `@morehao/ark-iam-react`）：内部四包代码+类型打进 dist，ESM 子路径 `/types /api /auth /ui` 按需引入，对外只发布一个包；peer/dev 分类、脚本发布通道、接入文档、仓外冒烟（actionColumn 表格 + AuthProvider PKCE 登录跳转）+ facade 独立消费（runtime+tsc）均通过。运行期配置优先级 props > `/config.json` > `VITE_*` > 默认 | 见 `docs/design/application-integration-guide.md` §12、`frontend/packages/react/`、`frontend/vite.alias.ts`、`frontend/scripts/release-packages.mjs` |
+| 门面包公共 npm 首发 | `@morehao/ark-iam-react@0.1.0` 已发布到公共 npm（scope `@morehao` = 账号用户级 scope，未建 org），`dist-tags.latest=0.1.0`，外部 `pnpm add @morehao/ark-iam-react` 可用。发布口径：起始版本用 `0.1.0`；曾误发 `1.0.0`/`0.0.0-stage` 已 unpublish 清理。发布前需 `npm login` 并把 registry 指到 `https://registry.npmjs.org`（本机默认是 npmmirror 镜像，不可发布） | 公共 npm registry `@morehao/ark-iam-react`；`frontend/packages/react/package.json` |

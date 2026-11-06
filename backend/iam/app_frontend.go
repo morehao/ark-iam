@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/frontend"
+	"github.com/morehao/ark-iam/pkg/model"
 )
 
 // MountFrontend 托管内嵌登录/初始化页，并注册 /config.json 运行时配置端点。
@@ -15,17 +16,32 @@ import (
 // 工作（相对路径天然正确，无需构建期 base）。应在 Mount 之后调用。
 func (a *App) MountFrontend(engine *gin.Engine, basePath string) error {
 	engine.GET(joinPath(basePath, "/config.json"), func(c *gin.Context) {
-		conf := a.cfg.Raw
-		issuer := ""
-		if conf != nil {
-			issuer = conf.OIDC.Issuer
+		// /config.json 是前端运行时配置来源（B3）：前端启动先拉本端点覆盖构建期默认值。
+		// 它可能被「业务应用（独立 origin）」跨源读取，故放行 CORS（该端点只含公开配置，
+		// 不含任何密钥，回显请求 Origin 即可）。
+		if origin := c.GetHeader("Origin"); origin != "" {
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Vary", "Origin")
 		}
+
+		// issuer：优先取 Raw 配置的绝对值（多源部署时即 OP 的公网地址）；未配置时按请求
+		// Host 派生为绝对地址（{scheme}://{host}/oidc），避免下发空串导致前端无法完成 OIDC。
+		issuer := ""
+		if a.cfg.Raw != nil {
+			issuer = a.cfg.Raw.OIDC.Issuer
+		}
+		if issuer == "" {
+			issuer = requestBaseURL(c) + "/oidc"
+		}
+
 		c.JSON(http.StatusOK, gin.H{
 			"issuer":       issuer,
 			"apiBase":      "/v1",
 			"oidcBase":     "/oidc",
 			"callbackPath": "/auth/callback",
-			"clientId":     "",
+			// clientId：本控制台 SPA 的 OIDC client_id（平台管理台内置客户端编码）。
+			// 派生自 pkg/model 常量，与种子/网关 aud 白名单同源，杜绝空串。
+			"clientId": model.SeedBuiltinClientPlatformAdminWeb,
 		})
 	})
 
@@ -57,6 +73,20 @@ func (a *App) MountFrontend(engine *gin.Engine, basePath string) error {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
 	})
 	return nil
+}
+
+// requestBaseURL 按请求派生 {scheme}://{host}，用于 issuer 缺省时生成绝对地址。
+// 反向代理后面（TLS 终止于代理）时优先采用 X-Forwarded-Proto。
+func requestBaseURL(c *gin.Context) string {
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	switch p := c.GetHeader("X-Forwarded-Proto"); p {
+	case "https", "http":
+		scheme = p
+	}
+	return scheme + "://" + c.Request.Host
 }
 
 func isAPIPath(p string) bool {
