@@ -1,0 +1,59 @@
+name: check
+
+# PR / main 上的机械校验：与发版链路同一套构建命令，把「只有发版才暴露」的错误前移。
+# 本仓无 `npm run check` 聚合脚本（pnpm monorepo），门禁在下面按 pnpm 命令逐条串起：
+#   发布脚本语法 → lock 一致性 → 类型检查 → 门面包构建 → 单测。
+# 产物（各包 dist/）不入库，由这里的构建现场产出；与 release.yml 的 build 步骤一致。
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+defaults:
+  run:
+    # 前端工作区在 frontend/ 子目录。
+    working-directory: frontend
+
+jobs:
+  check:
+    name: Pre-publish checks
+    # 镜像显式钉版本：校验结果不该随 latest 漂移。
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          # CI 主支持线；v7 下 22 的日志是干净的。
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: 安装依赖（--frozen-lockfile：lock 必须与 package.json 同步提交）
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: 发布脚本语法
+        run: bash -n scripts/ci-publish.sh
+
+      # 类型检查（packages + apps 全量 tsc --noEmit，见 frontend package.json scripts.typecheck）
+      - name: 类型检查
+        run: pnpm run typecheck
+
+      # 真正构建门面包（与 release 同一套：先内部四包、再 @morehao/ark-iam-react）
+      - name: 构建门面包
+        run: pnpm run build:pkgs
+
+      # 单测（当前 frontend 仅 platform-admin-web 有 vitest 配置，test/test:web 均指向它）
+      - name: 单测
+        run: pnpm run test:web
