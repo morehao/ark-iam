@@ -1,6 +1,6 @@
 # 配置参考（Configuration Reference）
 
-> 本文说明 Ark IAM 各应用 `config.yaml` 的配置项。五个应用（auth / platformadmin / tenantadmin / rpapi / gateway）共享同一套 `pkg/config.Config` 结构，差异主要在 `server.name/port`、OIDC 相关项，以及**仅 auth 生效**的登录限流（`security.login.ratePerMinute` / `burst`）与 `server.trustedProxies`、**仅 platformadmin / tenantadmin 生效**的 `oidc.backChannelLogoutPath`、**仅 auth / gateway 配置**的 `oidc.consoles`。RP 侧（含外部应用）的 OIDC/目录能力另由 `backend/sdk` 提供，旋钮见 §11。
+> 本文说明 Ark IAM 各应用 `config.yaml` 的配置项。五个应用（auth / platformadmin / tenantadmin / rpapi / gateway）共享同一套 `pkg/config.Config` 结构，差异主要在 `server.name/port`、OIDC 相关项，以及**仅 auth 生效**的登录限流（`security.login.ratePerMinute` / `burst`）与 `server.trustedProxies`、**仅 platformadmin / tenantadmin 生效**的 `oidc.backChannelLogoutPath`、**仅 auth / gateway 配置**的 `oidc.consoles`。RP 侧（含外部应用）的 OIDC/目录能力另由 `backend/sdk` 提供，旋钮见 §11；「内嵌到业务单体」形态改用 `backend/iam` 的 `iam.Config`（精简字段 + 可选透传完整 `pkgconfig.Config`），见 §12。
 >
 > 配置加载顺序：环境变量 `APP_CONFIG_PATH` 指定路径 → 相对**当前工作目录**的 `../config/config.yaml` → **可执行文件所在目录的上一级** `config/config.yaml`；三者皆无时仍按相对路径加载并启动失败（panic）。引导令牌有两个来源——环境变量 `BOOTSTRAP_TOKEN`（高优先级）与 YAML 的 `install.bootstrapToken`（回落），见 §1.1 / §1.2。
 
@@ -19,6 +19,7 @@
 9. [其他（jwt / client / masterKey）](#9-其他jwt--client--masterkey)
 10. [环境差异要点](#10-环境差异要点)
 11. [RP SDK 客户端配置（sdk/rp）](#11-rp-sdk-客户端配置sdkrp)
+12. [可嵌入 IAM 库配置（iam.Config）](#12-可嵌入-iam-库配置iamconfig)
 
 ---
 
@@ -428,3 +429,34 @@ oidc:
 | `Metrics` | 可选计数器（缓存命中 / stale / 未命中 / 不可用；额外实现 `NotModifiedMetrics` 可收 304 计数） | nil |
 
 客户端侧批量上限 `directory.MaxBatchIDs = 100`（与服务端一致，超出本地即报 `ErrTooManyIDs`，不静默截断）；目录读取要求的 scope 是 `directory.ScopeRead = "directory.read"`。缓存无命中且目录不可用时返回 `ErrUnavailable`；`Member.Status` **不得**用于放行/拒绝判定（只服务展示）。
+
+---
+
+## 12. 可嵌入 IAM 库配置（`iam.Config`）
+
+「形态 2：把 IAM 内嵌进业务单体」不使用各应用 `config.yaml`，而是在代码里构造 `iam.Config`（详见 [`backend/iam/README.md`](../../backend/iam/README.md)）：
+
+```go
+app, err := iam.New(iam.Config{
+    Env:     "dev",                                    // dev / prod；prod 触发非 dev 安全校验
+    DB:      iam.DBConfig{DSN: "postgres://...", Service: "iam"},
+    Redis:   &iam.RedisConfig{Addr: "127.0.0.1:6379"}, // 可空；配置后桥接为全局 Redis
+    Domains: iam.DefaultConsoleDomains,                // 空=全量；最小集见 §11.3 of 接入指南
+    Raw:     nil,                                     // 可选：透传完整 pkgconfig.Config（OP 需要）
+    SameDatabase: true,                               // IAM 表与业务表同库 → 启用撞名检测
+    AllowExistingTables: []string{},                  // 撞名白名单（可选）
+})
+```
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `Env` | 否 | `dev`/`prod`。非 dev 强制 OIDC 签名密钥 + `encryptionKey` + `cookieSecure=true`、`allowInsecure=false`，缺失即 fail-closed |
+| `DB.DSN` | **是** | 数据库连接串（postgres/sqlite） |
+| `DB.Service` | 否 | 连接服务名，缺省 `iam` |
+| `Redis` | 否 | 为空则不连 Redis（OP 协议态/SSO 校验相关能力不可用）；配置后同步注册为全局 `dbclient.RedisCli` |
+| `Domains` | 否 | 选择挂载的业务域；空 = 全量 |
+| `Raw` | 否 | 完整 `pkgconfig.Config`；auth 的 OP（issuer/签名密钥/cookie/控制台回调）依赖它，不传则按精简字段合成 dev 最小配置 |
+| `SameDatabase` | 否 | `true` 时 `RunMigrations` 先做同库撞名检测 |
+| `AllowExistingTables` | 否 | 撞名检测白名单 |
+
+> 配置加载顺序的差异：`iam` 由**调用方代码**构造配置，不读 `APP_CONFIG_PATH` / `config.yaml`；若需要沿用 `config.yaml`，请自行读取后填入 `Config.Raw`（`apps/gateway` 即如此：直接把 `config.Conf` 作为 `Raw` 传入）。

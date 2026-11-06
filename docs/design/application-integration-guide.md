@@ -22,10 +22,27 @@
 8. [单点登出（SLO）接入](#8-单点登出slo接入)
 9. [验收清单](#9-验收清单)
 10. [常见问题（FAQ）](#10-常见问题faq)
+11. [形态 2：把 IAM 内嵌进业务单体应用](#11-形态-2把-iam-内嵌进业务单体应用)
 
 ---
 
 ## 1. 接入总览
+
+### 1.1 两种接入形态
+
+业务应用接入 IAM 有两种形态，**共用同一份实现与令牌契约**，按部署诉求选择：
+
+| 维度 | 形态 1：IAM 单独部署（本文 §2~§10） | 形态 2：把 IAM 内嵌进业务单体（§11） |
+|---|---|---|
+| 部署单元 | IAM 独立进程（`gateway` 或分体 apps）+ 业务应用，两套 | **只有业务应用一个进程**，IAM 打包进去 |
+| 账号数据 | IAM 自己的库 | 业务自己的库（同库、表名不改，可启用撞名检测） |
+| 前端 | IAM 托管（login-web / 管理台） | 登录页 `embed` 进业务二进制（管理台可外置） |
+| 谁签令牌 | IAM 的 OP | 内嵌的 OP（业务进程内） |
+| 业务如何鉴权 | `backend/sdk` 跨域本地验签 | 进程内同一套 `sdk` 验签（或直接读内嵌身份） |
+| 适合 | 多项目**共享一套账号**、要统一身份 | 单项目想**零运维自带**账号体系（不单独部署 IAM） |
+| 取舍 | 需单独运维 IAM（集中升级、私钥单点） | 私钥散落在业务进程、DDL 由各进程跑、无法多实例共享一套账号 |
+
+> 形态 1 对应 `backend/sdk`（RP 侧验签 SDK）；形态 2 对应 `backend/iam`（可嵌入 IAM 库，见 [`backend/iam/README.md`](../../backend/iam/README.md)）。本文 §2~§10 讲形态 1 的完整步骤，§11 讲形态 2。
 
 ```mermaid
 flowchart TB
@@ -657,3 +674,82 @@ flowchart LR
 
 **Q10：OP 轮换签名密钥后，RP 需要重启或重新下发 JWKS 吗？**
 不需要。客户端按令牌头的 `kid` 定位公钥（`kid` 必填；`jwk`/`jku`/`x5u` 头一律拒绝），未知 `kid` 会限速触发一次 JWKS 刷新。例行轮换「追加 → 切 `active` → 等 ≥2×JWKS TTL → 摘除」零中断；紧急轮换删除旧 key 后立即生效。（「启动时钉死一把公钥」的过渡 API 已删除，内置应用一律走 JWKS 或 gateway 注入的进程内 key set。）
+
+---
+
+## 11. 形态 2：把 IAM 内嵌进业务单体应用
+
+> 适用场景：业务应用希望**不单独部署 IAM 前后端**，由自己的 Go 进程一并提供登录、会话、人员、部门、角色、菜单能力。
+> 实现细节与完整 API 见 [`backend/iam/README.md`](../../backend/iam/README.md)；本节只讲接入要点。
+
+### 11.1 最小接入
+
+```go
+import (
+    "context"
+
+    "github.com/gin-gonic/gin"
+    "github.com/morehao/ark-iam/iam"
+    _ "github.com/morehao/golib/dbaccess/dbgorm/driver/sqlite" // 或 postgres
+    _ "github.com/morehao/golib/glog/driver/zap"
+)
+
+func main() {
+    app, err := iam.New(iam.Config{
+        Env:          "dev",
+        DB:           iam.DBConfig{DSN: "postgres://user:pass@host:5432/mydb?sslmode=disable"},
+        Redis:        &iam.RedisConfig{Addr: "127.0.0.1:6379"}, // 可空
+        Domains:      iam.DefaultConsoleDomains,                // 部门/人员/角色/菜单最小集
+        SameDatabase: true,                                     // IAM 表与业务表同库 → 启用撞名检测
+    })
+    if err != nil { panic(err) }
+    defer app.Close()
+
+    if err := app.RunMigrations(context.Background()); err != nil { panic(err) }
+
+    engine := gin.New()
+    if err := app.Mount(engine.Group("")); err != nil { panic(err) }     // /v1/* + /oidc + /install
+    if err := app.MountFrontend(engine, "/"); err != nil { panic(err) } // 内嵌登录/初始化页
+    engine.Run(":8080")
+}
+```
+
+启动后：访问 `/install` 完成一次性初始化（建平台管理员）→ `/login` 登录。**空库不能直接登录**，必须先走 `/install`（`BootstrapGuard` 会把业务端点拦成 409 并引导到该页）。
+
+### 11.2 对外契约
+
+| 方法 | 作用 |
+|---|---|
+| `iam.New(Config) (*App, error)` | 实例化；校验 DSN、域依赖闭合、非 dev 安全配置 |
+| `App.RunMigrations(ctx)` | 建表（AutoMigrate 只增不删；`SameDatabase=true` 时含撞名检测） |
+| `App.Mount(rg *gin.RouterGroup)` | 按 `Domains` 挂 `/v1/{platform,tenant,auth}` + `/oidc` + `/install`，并套鉴权中间件 |
+| `App.MountFrontend(engine, basePath)` | 托管内嵌登录页 + `/config.json` 运行时配置 |
+| `App.DBGetter()` / `App.KeySource()` / `App.Redis()` | 供宿主复用连接 / OP 公钥 / Redis 客户端 |
+| `App.Close()` | 释放 DB / Redis |
+
+挂载在宿主指定前缀下时（如 `engine.Group("/iam")`），所有端点会变成 `/iam/v1/*`、`/iam/oidc/*`、`/iam/install`。
+
+### 11.3 Domains 裁剪
+
+- `Domains` 为空 = **全量**（等同形态 1 的全部控制台能力）。
+- `iam.DefaultConsoleDomains` = 最小集：`core-auth` + `install` + `person` + `user` + `department` + `role` + `menu`。
+- 可选企业级域：`tenant` / `application` / `oauth-client` / `connector` / `domain` / `audit` / `api-key` / `machine-user` / `invite` / `tenant-app` / `self-service`。
+- 域依赖：`role` 依赖 `menu`，缺则 `New` 返回 `ErrDomainDependency`。
+- ⚠️ 未选 `application` 域时，`/v1/platform/applications` 等应用管理端点**不会挂载**（404 属预期），需要时显式加 `DomainApplication`。
+
+### 11.4 配置要点与坑
+
+| 项 | 说明 |
+|---|---|
+| `Config.Redis` | 只需配这一处：`iam` 会把实例 Redis 桥接为全局，OP 协议态存储与 SSO 校验共用同一份（无需额外设置全局） |
+| `Config.Raw` | 完整 `pkgconfig.Config`（auth 的 OP 需要 issuer / 签名密钥 / cookie / 控制台回调等完整配置）；不传则按精简字段合成 dev 最小配置 |
+| **非 dev 私钥** | `Env != dev` 时必须显式配置 OIDC 签名密钥 + `encryptionKey` + `cookieSecure=true`、`allowInsecure=false`，否则 `New` fail-closed；dev 下自动内存生成（不落盘） |
+| **同库撞名** | `SameDatabase=true` 时，若目标库已存在同名但缺 `id`/`created_at` 的表 → `ErrTableConflict` fail-fast；确属自有表可用 `Config.AllowExistingTables` 白名单放行 |
+| **业务表隔离** | 业务自己的表**不要**用 IAM 的连接查询（会被租户隔离插件注入 `tenant_id`），用业务自己的 gorm 连接 |
+| 前端 | 只内嵌 login-web；平台/租户管理台暂未内嵌（需按宿主 `base` 重新构建，属二期 npm 门面包范畴） |
+
+### 11.5 与形态 1 的关系
+
+- 令牌契约完全一致（同一 `sdk/contract`），业务侧验签代码两种形态通用。
+- 同一应用可从形态 2 演进到形态 1：内嵌库的 IAM 表结构由同一份 `pkg/model` 定义，SQL 级导出导入即可迁移到独立 IAM 库；不承诺自动双向同步。
+- 若将来需要「多个项目共享一套账号」，应回到形态 1（集中部署），因为形态 2 的私钥与 DDL 由各业务进程各自持有。
