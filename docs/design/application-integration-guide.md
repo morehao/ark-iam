@@ -23,6 +23,7 @@
 9. [验收清单](#9-验收清单)
 10. [常见问题（FAQ）](#10-常见问题faq)
 11. [形态 2：把 IAM 内嵌进业务单体应用](#11-形态-2把-iam-内嵌进业务单体应用)
+12. [前端组件接入（@ark-iam/ui · auth · api · types）](#12-前端组件接入ark-iamui--auth--api--types)
 
 ---
 
@@ -753,3 +754,275 @@ func main() {
 - 令牌契约完全一致（同一 `sdk/contract`），业务侧验签代码两种形态通用。
 - 同一应用可从形态 2 演进到形态 1：内嵌库的 IAM 表结构由同一份 `pkg/model` 定义，SQL 级导出导入即可迁移到独立 IAM 库；不承诺自动双向同步。
 - 若将来需要「多个项目共享一套账号」，应回到形态 1（集中部署），因为形态 2 的私钥与 DDL 由各业务进程各自持有。
+
+---
+
+## 12. 前端组件接入（@morehao/ark-iam-react 门面包）
+
+> 本节面向**外部业务前端**（React + antd 5），讲如何把本仓的前端能力当第三方库引入，快速获得统一的**登录跳转（OIDC PKCE）+ 请求封装（401 自动跳登录）+ 列表页操作列（actionColumn）+ 设计令牌（themeConfig）**。
+>
+> 对外只发布**一个**包 `@morehao/ark-iam-react`（聚合了内部 `@ark-iam/{types,api,auth,ui}`，代码与类型均已打进其 `dist`，消费者无需再装内部包）。它以 **ESM 子路径**暴露各层：`@morehao/ark-iam-react/types`、`/api`、`/auth`、`/ui`，可按需引入以减小打包体积；根入口 `@morehao/ark-iam-react` 一把梭 re-export 全部（含 antd 依赖）。
+>
+> 它区别于 §4「手工手写 oidcConfig」：§4 演示的是不依赖本仓包的通用接法；本节演示的是**复用 `@morehao/ark-iam-react` 门面包**的接法——两者都能完成 OIDC 登录，后者更省心、且视觉/交互与本仓控制台一致。
+>
+> 事实源：`frontend/packages/react/src`（聚合壳）与 `frontend/packages/{auth,api,ui,types}/src`（实现）。本节所有签名与默认值均以这些源码为准。
+
+### 12.1 安装
+
+```bash
+pnpm add @morehao/ark-iam-react
+# antd / react / react-dom / react-router-dom 作为 peer 由宿主提供（见 §12.7）：
+pnpm add antd@^5.22.0 react@^18.3.1 react-dom@^18.3.1 react-router-dom@^7.15.0
+```
+
+对外**只装一个包** `@morehao/ark-iam-react`。它按 ESM 子路径暴露四层能力，可按需引入（减小打包体积）：
+
+| 子路径 | 作用 | 关键导出 |
+|---|---|---|
+| `@morehao/ark-iam-react/types` | 纯类型与错误码枚举（DTO、`BizCode`），**零重依赖** | `BizCode`、各类 `*Req` / `*Resp` 类型 |
+| `@morehao/ark-iam-react/api` | 业务 API 客户端（axios 实例 + 拦截器） | `createApiClient`、默认 `request`、`setUserProvider`、`setSessionExpiredHandler` |
+| `@morehao/ark-iam-react/auth` | OIDC 登录（PKCE）+ 租户切换 / 登出钩子 | `createAuthProvider`、`fetchRuntimeConfig`、`useTenantSwitching`、`useLogout`、`useAuthGuard` |
+| `@morehao/ark-iam-react/ui` | 设计令牌 + 列表页列工厂 + 骨架组件（重依赖） | `themeConfig`、`tokens`、`actionColumn`、`tableScrollX`、`AppShell`、`MainLayout` 等 |
+| `@morehao/ark-iam-react`（根） | 上面四层全部 re-export（一把梭） | 全部 |
+
+> 建议：**追求体积时用子路径**（如只 `import { BizCode } from '@morehao/ark-iam-react/types'` 不会拉入 antd）；仅图省事时才从根入口全量引入。
+>
+> 与 Go「一个 module 多 package 按需计入二进制」的差异：npm 单包靠 ESM 子路径 + tree-shaking 只能减小**打进 bundle 的 JS**，`node_modules` 安装体积与 peer 约束仍是整包粒度——这是 npm 与 Go 的根本差异，门面包已用子路径把「按需」做到最接近。
+
+### 12.2 全局主题：`ConfigProvider theme={themeConfig}`
+
+`@morehao/ark-iam-react/ui` 的唯一设计令牌事实源是 `themeConfig`（源自 `src/theme.ts` 的 `tokens`）。在应用根节点用 antd 的 `ConfigProvider` 套上它，即可让宿主项目的 antd 组件沿用本仓「冷白工程台」视觉：
+
+```tsx
+import { ConfigProvider } from 'antd'
+import zhCN from 'antd/locale/zh_CN'
+import { themeConfig } from '@morehao/ark-iam-react/ui'
+
+<ConfigProvider locale={zhCN} theme={themeConfig}>
+  <App />
+</ConfigProvider>
+```
+
+> 也可直接用 `@morehao/ark-iam-react/ui` 的 `AppShell`（内部已包好 `ConfigProvider` + `themeConfig` + `antd App` 上下文，并注入全局等宽数字等结构性微修正）。若宿主已有自己的 `ConfigProvider`，仅引入 `themeConfig` 复用主题即可。
+>
+> `themeConfig` 是发布后的对外契约，改动按 semver 处理（见 `frontend/DESIGN.md` §10 令牌清单）。
+
+### 12.3 登录：`createAuthProvider(opts)`
+
+`createAuthProvider` 是一个**工厂**：它接收配置对象，**返回一个 `AuthProvider` 组件**（不是直接导出一个裸 `AuthProvider`）。把返回的组件包在应用外层即可获得 OIDC（授权码 + PKCE）登录能力。
+
+```ts
+import { createAuthProvider } from '@morehao/ark-iam-react/auth'
+
+const AuthProvider = createAuthProvider({
+  clientID: 'my_app_web',        // 控制台应用的 application_client.code（= OIDC client_id）
+  // issuer: 'https://iam.example.com/oidc', // 显式指定 OP；不传则按下方优先级解析
+})
+
+// <AuthProvider><App /></AuthProvider>
+```
+
+**参数（`CreateAuthProviderOptions`，全部可选）**：
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| `clientID` | `string` | OIDC `client_id`（= 控制台 `application_client.code`）。未传时依次回退 `/config.json.clientId` → `VITE_OIDC_CLIENT_ID` → `''` |
+| `clientSecret` | `string` | 仅机密客户端需要；纯前端 SPA 是 public 客户端，**不要传** |
+| `issuer` | `string` | OP 地址（如 `https://iam.example.com/oidc`）。未传时 `/config.json.issuer` → `VITE_OIDC_ISSUER` → `'/oidc'` |
+| `redirectPath` | `string` | 授权回调路径（拼在 `window.location.origin` 后）。未传时 `/config.json.callbackPath` → `'/auth/callback'` |
+| `postLogoutRedirectPath` | `string` | 登出后回跳路径。未传时 `'/login'` |
+| `getExtraQueryParams` | `() => Record<string, string\|number\|boolean>` | 追加自定义授权请求参数 |
+| `useRuntimeConfig` | `boolean` | 是否启动先拉 `/config.json`，**默认 `true`**。无 IAM 托管 / 无该端点时置 `false` |
+| `runtimeConfigBase` | `string` | `config.json` 拉取基址，默认 `import.meta.env.BASE_URL` |
+
+**配置优先级（务必理解，`props > /config.json > VITE_* > 相对默认值`）**：
+
+| 字段 | props | `/config.json` | `VITE_*` | 默认值 |
+|---|---|---|---|---|
+| issuer | `opts.issuer` | `issuer` | `VITE_OIDC_ISSUER` | `'/oidc'` |
+| clientId | `opts.clientID` | `clientId` | `VITE_OIDC_CLIENT_ID` | `''` |
+| redirectPath | `opts.redirectPath` | `callbackPath` | — | `'/auth/callback'` |
+| postLogoutRedirectPath | `opts.postLogoutRedirectPath` | — | — | `'/login'` |
+
+> **`/config.json` 运行时配置**：当 `useRuntimeConfig` 为 `true`（默认），`AuthProvider` 挂载时会先 `fetch` 一次 `{base}config.json`，**拉取完成前先渲染 `null`**（避免用未就绪配置发起错误授权），完成后再按上表优先级构造 OIDC 配置。该端点由后端 `iam.MountFrontend` 注册（见 §11.2），结构为：
+
+```json
+{
+  "issuer": "https://iam.example.com/oidc",
+  "apiBase": "/v1",
+  "oidcBase": "/oidc",
+  "callbackPath": "/auth/callback",
+  "clientId": "platform_admin_web"
+}
+```
+
+> 服务端行为：`issuer` 缺省时按请求 Host 派生为 `{scheme}://{host}/oidc`；`clientId` 为平台管理台内置 `client_id`；该端点带 CORS 头，供**独立 origin 的业务应用跨源读取**。因此**多数外部接入方无需设置任何 `VITE_*`**，只要提供 `clientID`，或让后端 `/config.json` 下发即可。
+>
+> **`VITE_*` 仅作仓内默认**：`VITE_OIDC_ISSUER` / `VITE_OIDC_CLIENT_ID` 是构建期常量，仅为本仓自托管构建提供便捷覆盖；外部项目不应依赖它们（既不方便也不安全），优先用 props 或运行时 `/config.json`。
+
+**独立的运行时配置读取**：若只需单独取配置（不经 `AuthProvider`），可导出 `fetchRuntimeConfig(base?)`：
+
+```ts
+import { fetchRuntimeConfig } from '@morehao/ark-iam-react/auth'
+
+const cfg = await fetchRuntimeConfig() // 失败 resolve null，绝不 reject
+// cfg: { issuer?, apiBase?, oidcBase?, callbackPath?, clientId? } | null
+```
+
+### 12.4 请求：`createApiClient({ baseURL, timeout, headers })`
+
+`createApiClient` 返回一个**已装配拦截器**的 axios 实例（`AxiosInstance`），拦截逻辑与仓内默认单例完全一致：请求自动带 `Authorization: Bearer <access_token>`；业务码非成功时按 `BizCode` 提示；**401 / 令牌失效自动清本地 user 并跳登录页**；`config.silent = true` 可抑制提示。
+
+```ts
+import { createApiClient } from '@morehao/ark-iam-react/api'
+
+export const api = createApiClient({
+  baseURL: 'https://iam.example.com/v1', // 默认 '/v1'；外部应用通常指向 IAM 的绝对地址
+  timeout: 30000,                        // 默认 30000 ms
+  headers: { 'X-Client': 'my-app' },     // 追加到每个请求的静态头
+})
+
+// 用法：拦截器已把响应体解包为 data.data
+const userinfo = await api.get('/auth/userinfo')
+// POST
+await api.post('/some/resource', { name: 'x' })
+```
+
+**`CreateApiClientOptions`（全部可选）**：
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `baseURL` | `string` | `'/v1'` | 业务 API 基址（含版本段） |
+| `timeout` | `number` | `30000` | 超时（毫秒） |
+| `headers` | `Record<string, string>` | — | 追加的静态请求头 |
+
+> 包内还导出一个默认单例 `request = createApiClient()`（`baseURL: '/v1'`），供与 IAM 同源、API 挂在 `/v1` 下的仓内应用直接使用。外部应用建议自建实例并显式传 `baseURL`。
+>
+> **令牌注入是自动的**：`request` / `createApiClient` 共享同一份 `userProvider`。使用 `useAuthGuard()`（见 §12.5）后，每次请求都会自动带当前登录用户的 `access_token`，无需手工拼 `Authorization` 头。
+
+### 12.5 最小页面示例（`actionColumn` 表格 + 登录跳转）
+
+下面是一个可运行的最小示例：登录态守卫 → `createApiClient` 拉数据 → `actionColumn` 渲染操作列表格。`actionColumn`/`tableScrollX`/`themeConfig` 均来自 `@morehao/ark-iam-react/ui`。
+
+```tsx
+// main.tsx
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { ConfigProvider } from 'antd'
+import zhCN from 'antd/locale/zh_CN'
+import { themeConfig } from '@morehao/ark-iam-react/ui'
+import { createAuthProvider } from '@morehao/ark-iam-react/auth'
+import App from './App'
+
+// 工厂返回 AuthProvider 组件；显式传 clientID。若后端有 /config.json 可省略 issuer/useRuntimeConfig。
+const AuthProvider = createAuthProvider({ clientID: 'my_app_web' })
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <ConfigProvider locale={zhCN} theme={themeConfig}>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </ConfigProvider>
+  </React.StrictMode>,
+)
+```
+
+```tsx
+// App.tsx
+import { useEffect, useState } from 'react'
+import { Table } from 'antd'
+import { useAuth } from 'react-oidc-context'
+import { useAuthGuard } from '@morehao/ark-iam-react/auth'
+import { createApiClient } from '@morehao/ark-iam-react/api'
+import { actionColumn, textColumn, nameColumn, tableScrollX } from '@morehao/ark-iam-react/ui'
+
+const api = createApiClient({ baseURL: 'https://iam.example.com/v1' })
+
+interface TenantItem {
+  id: string
+  name: string
+  code: string
+}
+
+export default function App() {
+  const auth = useAuthGuard() // 注册令牌注入、SSO 探测、401 处理
+  const [rows, setRows] = useState<TenantItem[]>([])
+  const [loading, setLoading] = useState(false)
+
+  // 未登录 → 触发 OIDC 登录跳转（/oidc/authorize）
+  useEffect(() => {
+    if (!auth.isLoading && !auth.isAuthenticated) auth.signinRedirect()
+  }, [auth.isLoading, auth.isAuthenticated])
+
+  useEffect(() => {
+    if (!auth.isAuthenticated) return
+    setLoading(true)
+    api.get<TenantItem[]>('/tenants')
+      .then(setRows)
+      .finally(() => setLoading(false))
+  }, [auth.isAuthenticated])
+
+  if (auth.isLoading || !auth.isAuthenticated) return null
+
+  const columns = [
+    nameColumn<TenantItem>({ title: '名称', dataIndex: 'name', onClick: (r) => console.log('detail', r) }),
+    textColumn<TenantItem>({ title: '编码', dataIndex: 'code', monospace: true }),
+    actionColumn<TenantItem>({
+      max: 2,
+      actions: (r) => [
+        { key: 'edit', label: '编辑', onClick: () => console.log('edit', r) },
+        { key: 'delete', label: '删除', danger: true, confirm: '确认删除？', onClick: () => console.log('del', r) },
+      ],
+    }),
+  ]
+
+  return (
+    <Table
+      rowKey="id"
+      loading={loading}
+      dataSource={rows}
+      columns={columns}
+      tableLayout="fixed"
+      scroll={tableScrollX(columns)} // 列宽求和得出的 scroll.x，禁止手写固定值
+    />
+  )
+}
+```
+
+要点：
+
+- **登录跳转**：`useAuthGuard()` 内部已注册 `setUserProvider`（令牌注入）与 `setSessionExpiredHandler`（401 时清 user）；未认证时调用 `auth.signinRedirect()` 即跳转 `/oidc/authorize`（授权码 + PKCE）。回调页（默认 `/auth/callback`）由 `AuthProvider` 内部的 `react-oidc-context` 处理。
+- **操作列 `actionColumn`**：默认最多横排 3 个、超过即收「更多」下拉、永远 `fixed: 'right'`；支持 `danger`（危险红）、`confirm`（二次确认）、`hidden`（运行时隐藏）。**列宽由 `actionColumnWidth(max)` 自动给出，页面禁止手写 `width/title/key/fixed`**（规范见 `frontend/DESIGN.md` §7.3 R1）。
+- **列宽/横滚**：所有列用 `@morehao/ark-iam-react/ui` 的列工厂（`idColumn`/`nameColumn`/`textColumn`/`timeColumn`/`actionColumn`），`Table` 写 `tableLayout="fixed"` + `scroll={tableScrollX(columns)}`（规范见 §7.3）。
+
+### 12.6 样式与类型说明
+
+- **样式**：四个包**不含独立 CSS 文件**。视觉由 antd 组件 + `themeConfig`（token）表达，`AppShell` 内联了少量结构性微修正。因此接入方只需 `ConfigProvider theme={themeConfig}`（或直接使用 `AppShell`），**无需额外引入任何 `.css`**。
+- **类型**：包以 TypeScript 源码/声明对外，DTO 与枚举集中在 `@morehao/ark-iam-react/types`（如 `BizCode`：`Success=0`、`Unauthorized`、`TokenInvalid`、`TokenExpired`、`PermissionDenied`…）。业务请求/响应类型直接 `import type { ... } from '@morehao/ark-iam-react/types'`。
+- **配置类型**：`CreateAuthProviderOptions`（from `@morehao/ark-iam-react/auth`）、`CreateApiClientOptions`（from `@morehao/ark-iam-react/api`）、`RuntimeConfig`（from `@morehao/ark-iam-react/auth`）、`RowAction` / `ActionColumnConfig` 等（from `@morehao/ark-iam-react/ui`）均为具名导出，宿主可获得完整补全。
+
+### 12.7 peerDependencies 版本口径
+
+`@morehao/ark-iam-react` 的 `ui`/`auth` 层深度依赖 antd 5 的 `ConfigProvider` / `theme` / `Table`，且设计令牌是代码事实源。为避免消费者装出**两份 antd**（主题错乱、Context 断裂），React 生态依赖应声明为 **`peerDependencies`**（宿主提供）而非随包打包：
+
+| 依赖 | 建议 peer 版本 | 说明 |
+|---|---|---|
+| `antd` | `^5.22.0` | 收紧到 5.22+，与 `themeConfig` 使用的 token 对齐；**不要**跨大版本（antd 6 主题契约不同） |
+| `@ant-design/icons` | `^5.4.0` | 与 antd 5 配套 |
+| `react` | `^18.3.1` | React 18 |
+| `react-dom` | `^18.3.1` | 与 react 同版本 |
+| `react-router-dom` | `^7.15.0` | `AuthProvider` 内部用 `BrowserRouter`；宿主若已有路由需同版本 |
+| `oidc-client-ts` / `react-oidc-context` | 由 `@morehao/ark-iam-react` 依赖带入 | 一般不必由宿主重复声明 |
+
+> 口径原则：**UI 框架层（react / react-dom / antd / @ant-design/icons / react-router-dom）走 peer**，由宿主统一版本；**纯逻辑/工具依赖（axios 等）由包自身 dependencies 带入**。这样宿主升级 antd 时不会与本仓包冲突，也避免重复打包。门面包 `@morehao/ark-iam-react` 已完成发布门面改造（2026-11-06）：`main`/`module`/`types`/`exports`（含 `./types ./api ./auth ./ui` 子路径）指向 `dist`、`files: ["dist"]`、`publishConfig.access=public`；UI 框架层依赖在 `@morehao/ark-iam-react` 上声明为 **peerDependencies**（其中 antd/@ant-design/icons/react-router-dom 标 `peerDependenciesMeta.optional`，只引 `/types` 的消费者不强制安装它们）。内部四包作为 `@morehao/ark-iam-react` 的 **devDependencies（`workspace:*`）** 参与构建、**不对外发布**。
+
+### 12.8 包构建、仓内 dev 与发布通道
+
+- **构建（门面包）**：`@morehao/ark-iam-react` 的 `pnpm build` = `vite build --config vite.config.lib.ts && tsc -p tsconfig.build.json && node scripts/bundle-dts.mjs`。
+  - 多入口 ESM：`dist/{index,types,api,auth,ui}.js`。
+  - **代码打进 dist**：内部 `@ark-iam/{types,api,auth,ui}` 的源码被 rollup **打包进** `@morehao/ark-iam-react` 的 dist（不 external），只有第三方依赖（react/antd/axios/oidc-client-ts/react-oidc-context/react-router-dom 等）external——这样才能做到「对外只一个包」，消费者无需再装内部四包。
+  - **类型打进 dist**：`bundle-dts.mjs` 把内部四包的 `.d.ts` 复制到 `dist/_types/<pkg>/` 并改写其 `@ark-iam/*` 引用为相对路径，各入口 `d.ts` re-export `./_types/<pkg>/index`，消费者拿到自包含类型（不依赖内部包声明）。
+  - 依赖解析注意：`_types/api/*.d.ts` 里 `import ... from 'axios'` 等外部模块需能从 `packages/react` 的 node_modules 解析到（真实 `pnpm install` 会依据 `@morehao/ark-iam-react` 的 dependencies/peer 建立链接；仓内手动联调时可临时软链）。
+- **仓内 dev 走 src**：各 app 的 `vite.config.ts` 引入 `frontend/vite.alias.ts` 的 `arkIamAlias`，把 `@morehao/ark-iam-react/{types,api,auth,ui}`（及内部 `@ark-iam/*`）alias 到对应包 `src`，开发期无需 build；发布/外部消费走 `dist`。这是「双轨」的唯一约定——不要让仓内 app 直接消费 dist，否则改包就要频繁 build。
+- **版本与发布（脚本化，非 changesets）**：`frontend/scripts/release-packages.mjs` 仅针对门面包 `@morehao/ark-iam-react` 提供 `version <x.y.z>`（改版本）/ `pack`（build + `pnpm pack` 产 tarball）/ `publish [--registry <url>]`；内部四包不单独发布。私有 registry / GitHub Packages 的 `@morehao:registry` 与 token 配置见 `frontend/.npmrc` 注释模板。发布 scope 为 **`@morehao`**（公共 npm 免费 org）。
