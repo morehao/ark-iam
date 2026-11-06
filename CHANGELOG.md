@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.1.2] - 2026-11-06
+
+### Fixes
+
+- **release**: 门面包补 repository 字段并 bump 0.1.2（修复 provenance 校验） (#80)
+
+**Full Changelog**: https://github.com/morehao/ark-iam/compare/v0.1.1...v0.1.2
+
 ## [v0.1.1] - 2026-11-06
 
 ### Features
