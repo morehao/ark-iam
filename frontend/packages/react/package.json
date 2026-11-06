@@ -1,9 +1,18 @@
 {
   "name": "@morehao/ark-iam-react",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "description": "GoArk IAM 前端门面包：聚合 @ark-iam/{types,api,auth,ui} 的单一入口（含 ESM 子路径导出，可按需引入）",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/morehao/ark-iam.git",
+    "directory": "frontend/packages/react"
+  },
+  "homepage": "https://github.com/morehao/ark-iam/tree/main/frontend/packages/react",
+  "bugs": {
+    "url": "https://github.com/morehao/ark-iam/issues"
+  },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
