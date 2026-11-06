@@ -41,8 +41,12 @@ func (a *App) initRedis() error {
 	if a.cfg.Redis == nil || a.cfg.Redis.Addr == "" {
 		return nil
 	}
+	service := a.cfg.Redis.Service
+	if service == "" {
+		service = defaultDBService // "iam"
+	}
 	cfg := dbredis.RedisConfig{
-		Service:  a.cfg.Redis.Service,
+		Service:  service,
 		Addr:     a.cfg.Redis.Addr,
 		Password: a.cfg.Redis.Password,
 		DB:       a.cfg.Redis.DB,
@@ -52,6 +56,9 @@ func (a *App) initRedis() error {
 		return fmt.Errorf("iam: init redis failed: %w", err)
 	}
 	a.redis = client
+	// 同步注册为全局 RedisCli：OP 协议态存储、SSO 会话校验等共享代码读的是全局，
+	// 使嵌入方只需配置 Config.Redis 一处即可。
+	dbclient.SetRedis(client)
 	return nil
 }
 
