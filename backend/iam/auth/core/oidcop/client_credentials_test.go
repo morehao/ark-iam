@@ -1,0 +1,321 @@
+package oidcop
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"testing"
+	"time"
+
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objauth"
+	"github.com/morehao/golib/dbaccess/gormdao"
+	"github.com/zitadel/oidc/v3/pkg/oidc"
+	"github.com/zitadel/oidc/v3/pkg/op"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+)
+
+func TestClientCredentialsStorage(t *testing.T) {
+	ctx := context.Background()
+
+	dsn := fmt.Sprintf("file:cc_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.ApplicationClientEntity{}, &model.ApplicationClientSecretEntity{}); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+
+	clientID := "machine-client"
+	secret := "s3cr3t"
+	secretHash := sha256.Sum256([]byte(secret))
+
+	clientEntity := &model.ApplicationClientEntity{
+		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
+		TenantID:                "1",
+		Code:                    clientID,
+		Name:                    "Machine Client",
+		RedirectURIs:            model.RedirectURIList{},
+		PostLogoutRedirectURIs:  model.PostLogoutRedirectURIList{},
+		GrantTypes:              model.GrantTypeList{model.GrantTypeClientCredentials},
+		ResponseTypes:           model.ResponseTypeList{},
+		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodBasic,
+		AllowedOrigins:          model.AllowedOriginList{},
+		DefaultScopes:           model.DefaultScopeList{model.ScopeOpenID},
+		Status:                  model.ApplicationClientStatusEnable,
+		Source:                  model.ApplicationClientSourceFirstParty,
+	}
+	if err := db.Create(clientEntity).Error; err != nil {
+		t.Fatalf("insert application_client: %v", err)
+	}
+
+	secretEntity := &model.ApplicationClientSecretEntity{
+		BaseEntity:          gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
+		ApplicationClientID: clientEntity.ID,
+		Name:                "default",
+		ValueHash:           hex.EncodeToString(secretHash[:]),
+		ValuePrefix:         "s*",
+	}
+	if err := db.Create(secretEntity).Error; err != nil {
+		t.Fatalf("insert application_client_secret: %v", err)
+	}
+
+	persistentStore := NewPersistentStore()
+	persistentStore.applicationClientDao = func(opts ...dao.DaoOption) *dao.ApplicationClientDao {
+		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
+	}
+	persistentStore.applicationClientSecretDao = func(opts ...dao.DaoOption) *dao.ApplicationClientSecretDao {
+		return &dao.ApplicationClientSecretDao{Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList, string](
+			model.TableNameApplicationClientSecret, "ApplicationClientSecretDao",
+			func(c context.Context) *gorm.DB { return db.WithContext(c) },
+		)}
+	}
+	persistentStore.apiKeyDao = func(opts ...dao.DaoOption) *dao.ApiKeyDao {
+		return dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(dbclient.CrossTenantContext(ctx)) }))
+	}
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate rsa key: %v", err)
+	}
+	storage := NewOIDCStorage(nil, persistentStore, privateKey, "test-key")
+
+	ccStorage, ok := (interface{})(storage).(op.ClientCredentialsStorage)
+	if !ok {
+		t.Fatal("expected OIDCStorage to implement op.ClientCredentialsStorage")
+	}
+
+	client, err := ccStorage.ClientCredentials(ctx, clientID, secret)
+	if err != nil {
+		t.Fatalf("ClientCredentials with correct secret failed: %v", err)
+	}
+	if client.GetID() != clientID {
+		t.Fatalf("expected client id %q, got %q", clientID, client.GetID())
+	}
+
+	_, err = ccStorage.ClientCredentials(ctx, clientID, "wrong-secret")
+	if err == nil {
+		t.Fatal("expected ClientCredentials with wrong secret to fail")
+	}
+	var oidcErr *oidc.Error
+	if !errors.As(err, &oidcErr) || oidcErr.ErrorType != oidc.ErrInvalidClient().ErrorType {
+		t.Fatalf("expected oidc.ErrInvalidClient on wrong secret, got %v", err)
+	}
+
+	req, err := ccStorage.ClientCredentialsTokenRequest(ctx, clientID, []string{oidc.ScopeOpenID})
+	if err != nil {
+		t.Fatalf("ClientCredentialsTokenRequest failed: %v", err)
+	}
+	if req.GetSubject() != clientID {
+		t.Fatalf("expected subject %q, got %q", clientID, req.GetSubject())
+	}
+
+	// 契约钉子：普通 OIDC 客户端的 client_credentials **不产生机器令牌**。
+	//
+	// 它只有 client_id 一个身份 claim，没有 token_usage=machine，也没有 tenant_id——
+	// SDK 验签会按"既非自然人亦非机器"以 contract.ErrMissingClaim 拒绝。这是刻意的：
+	// 目录数据按租户隔离，而纯 client_credentials 没有任何租户归属（租户上下文只能来自
+	// API Key 的归属主体）。若哪天要让普通 client_credentials 也签发 machine 令牌，
+	// 本测试会先失败，提醒同步 rpapi 的租户来源与 sdk/README、接入文档。
+	claims, err := storage.GetPrivateClaimsFromRequest(ctx, req, nil)
+	if err != nil {
+		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
+	}
+	if claims[objauth.ClaimTokenUsage] != nil {
+		t.Fatalf("plain client_credentials must not claim token_usage, got %v", claims[objauth.ClaimTokenUsage])
+	}
+	if claims[objauth.ClaimTenantID] != nil {
+		t.Fatalf("plain client_credentials must not claim tenant_id, got %v", claims[objauth.ClaimTenantID])
+	}
+	if claims[objauth.ClaimClientID] != clientID {
+		t.Fatalf("expected client_id claim %q, got %v", clientID, claims[objauth.ClaimClientID])
+	}
+}
+
+func TestClientCredentialsRejectsPublicClient(t *testing.T) {
+	ctx := context.Background()
+
+	dsn := fmt.Sprintf("file:cc_public_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.ApplicationClientEntity{}, &model.ApplicationClientSecretEntity{}); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+
+	clientID := "public-client"
+	secret := "s3cr3t"
+	secretHash := sha256.Sum256([]byte(secret))
+
+	publicClient := &model.ApplicationClientEntity{
+		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
+		TenantID:                "1",
+		Code:                    clientID,
+		Name:                    "Public Client",
+		RedirectURIs:            model.RedirectURIList{},
+		PostLogoutRedirectURIs:  model.PostLogoutRedirectURIList{},
+		GrantTypes:              model.GrantTypeList{model.GrantTypeClientCredentials},
+		ResponseTypes:           model.ResponseTypeList{},
+		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodNone,
+		AllowedOrigins:          model.AllowedOriginList{},
+		DefaultScopes:           model.DefaultScopeList{model.ScopeOpenID},
+		Status:                  model.ApplicationClientStatusEnable,
+		Source:                  model.ApplicationClientSourceFirstParty,
+	}
+	if err := db.Create(publicClient).Error; err != nil {
+		t.Fatalf("insert application_client: %v", err)
+	}
+
+	secretEntity := &model.ApplicationClientSecretEntity{
+		BaseEntity:          gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
+		ApplicationClientID: publicClient.ID,
+		Name:                "default",
+		ValueHash:           hex.EncodeToString(secretHash[:]),
+		ValuePrefix:         "s*",
+	}
+	if err := db.Create(secretEntity).Error; err != nil {
+		t.Fatalf("insert application_client_secret: %v", err)
+	}
+
+	persistentStore := NewPersistentStore()
+	persistentStore.applicationClientDao = func(opts ...dao.DaoOption) *dao.ApplicationClientDao {
+		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
+	}
+	persistentStore.applicationClientSecretDao = func(opts ...dao.DaoOption) *dao.ApplicationClientSecretDao {
+		return &dao.ApplicationClientSecretDao{Dao: gormdao.NewDao[model.ApplicationClientSecretEntity, model.ApplicationClientSecretEntityList, string](
+			model.TableNameApplicationClientSecret, "ApplicationClientSecretDao",
+			func(c context.Context) *gorm.DB { return db.WithContext(c) },
+		)}
+	}
+	persistentStore.apiKeyDao = func(opts ...dao.DaoOption) *dao.ApiKeyDao {
+		return dao.NewApiKeyDao(dao.WithDBGetter(func(ctx context.Context) *gorm.DB { return db.WithContext(dbclient.CrossTenantContext(ctx)) }))
+	}
+
+	storage := NewOIDCStorage(nil, persistentStore, nil, "test-key")
+
+	ccStorage, ok := (interface{})(storage).(op.ClientCredentialsStorage)
+	if !ok {
+		t.Fatal("expected OIDCStorage to implement op.ClientCredentialsStorage")
+	}
+
+	if client, err := ccStorage.ClientCredentials(ctx, clientID, secret); err == nil {
+		t.Fatalf("expected public client (%s) with auth method none to be rejected, got client %q", clientID, client.GetID())
+	}
+}
+
+func TestCreateAccessTokenForClientCredentials(t *testing.T) {
+	ctx := context.Background()
+
+	clientID := "cc-client-ttl"
+	accessTokenTTL := int64(7200)
+	db := newClientCredentialsTestDB(t, clientID, accessTokenTTL)
+
+	persistentStore := NewPersistentStore()
+	persistentStore.applicationClientDao = func(opts ...dao.DaoOption) *dao.ApplicationClientDao {
+		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
+	}
+
+	now := time.Now()
+	accessTokenID, expiration, err := persistentStore.CreateAccessToken(ctx, &clientCredentialsTokenRequest{
+		subject:  clientID,
+		audience: []string{"urn:ark:iam:platform-admin"},
+		clientID: clientID,
+		scopes:   []string{model.ScopeOpenID},
+	})
+	if err != nil {
+		t.Fatalf("CreateAccessToken failed: %v", err)
+	}
+	if accessTokenID == "" {
+		t.Fatal("expected non-empty access token id")
+	}
+	if !expiration.After(now) {
+		t.Fatalf("expected expiration in the future, got %v", expiration)
+	}
+	ttlSeconds := int64(expiration.Sub(now).Seconds())
+	if ttlSeconds != accessTokenTTL {
+		t.Fatalf("expected access token ttl to match client's %d, got %d", accessTokenTTL, ttlSeconds)
+	}
+}
+
+func TestGetPrivateClaimsFromRequestForClientCredentials(t *testing.T) {
+	ctx := context.Background()
+
+	clientID := "cc-client-private"
+	db := newClientCredentialsTestDB(t, clientID, 3600)
+
+	persistentStore := NewPersistentStore()
+	persistentStore.applicationClientDao = func(opts ...dao.DaoOption) *dao.ApplicationClientDao {
+		return dao.NewApplicationClientDao(dao.WithDBGetter(func(c context.Context) *gorm.DB { return db.WithContext(c) }))
+	}
+
+	storage := NewOIDCStorage(nil, persistentStore, nil, "test-key")
+
+	req := &clientCredentialsTokenRequest{
+		subject:  clientID,
+		clientID: clientID,
+		audience: []string{"urn:ark:iam:platform-admin"},
+		scopes:   []string{"urn:ark:iam:platform-admin"},
+	}
+	claims, err := storage.GetPrivateClaimsFromRequest(ctx, req, []string{"urn:ark:iam:platform-admin"})
+	if err != nil {
+		t.Fatalf("GetPrivateClaimsFromRequest failed: %v", err)
+	}
+	if got := claims["client_id"]; got != clientID {
+		t.Fatalf("expected client_id claim %q, got %v", clientID, got)
+	}
+}
+
+func TestResolveAudienceFromRequest(t *testing.T) {
+	// RFC 8707：resource 参数优先
+	resourceCtx := context.WithValue(context.Background(), ResourceHintKey, "https://api.example.com")
+	if got := resolveAudienceFromRequest(resourceCtx, "client-1"); got != "https://api.example.com" {
+		t.Fatalf("expected resource audience, got %q", got)
+	}
+	// 无 resource：回退到 client 标识（不再把自定义 scope 当 audience）
+	if got := resolveAudienceFromRequest(context.Background(), "client-1"); got != "client-1" {
+		t.Fatalf("expected default client audience, got %q", got)
+	}
+}
+
+func newClientCredentialsTestDB(t *testing.T, clientID string, accessTokenTTL int64) *gorm.DB {
+	t.Helper()
+
+	dsn := fmt.Sprintf("file:ccttl_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.ApplicationClientEntity{}, &model.ApplicationClientSecretEntity{}); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+
+	clientEntity := &model.ApplicationClientEntity{
+		BaseEntity:              gormdao.BaseEntity{StringID: gormdao.StringID{ID: "1"}},
+		TenantID:                "1",
+		Code:                    clientID,
+		Name:                    "TTL Client",
+		RedirectURIs:            model.RedirectURIList{},
+		PostLogoutRedirectURIs:  model.PostLogoutRedirectURIList{},
+		GrantTypes:              model.GrantTypeList{model.GrantTypeClientCredentials},
+		ResponseTypes:           model.ResponseTypeList{},
+		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodBasic,
+		AllowedOrigins:          model.AllowedOriginList{},
+		DefaultScopes:           model.DefaultScopeList{model.ScopeOpenID},
+		AccessTokenTTL:          accessTokenTTL,
+		Status:                  model.ApplicationClientStatusEnable,
+		Source:                  model.ApplicationClientSourceFirstParty,
+	}
+	if err := db.Create(clientEntity).Error; err != nil {
+		t.Fatalf("insert application_client: %v", err)
+	}
+	return db
+}

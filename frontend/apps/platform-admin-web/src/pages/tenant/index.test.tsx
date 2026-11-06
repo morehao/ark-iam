@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { App as AntdApp } from 'antd'
-import { EnableTag, SuspendedTag, fmtTime } from '@ark-iam/ui'
-import type { TenantItem } from '@ark-iam/types'
+import { EnableTag, SuspendedTag, fmtTime } from '@morehao/ark-iam-react/ui'
+import type { TenantItem } from '@morehao/ark-iam-react/types'
 
 const mockGetTenantPageList = vi.fn()
 const mockCreateTenant = vi.fn()
 const mockResetTenantAdminPassword = vi.fn()
-vi.mock('@ark-iam/api', () => ({
+vi.mock('@morehao/ark-iam-react/api', () => ({
   createTenant: (...args: unknown[]) => mockCreateTenant(...args),
   deleteTenant: vi.fn(),
   getTenantPageList: (...args: unknown[]) => mockGetTenantPageList(...args),

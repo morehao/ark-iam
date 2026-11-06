@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { RemoteMultiSelect, RemoteSelect } from '@ark-iam/ui'
-import type { RemoteSelectOption } from '@ark-iam/ui'
+import { RemoteMultiSelect, RemoteSelect } from '@morehao/ark-iam-react/ui'
+import type { RemoteSelectOption } from '@morehao/ark-iam-react/ui'
 
 /**
  * RemoteSelect 回归要点（解决「下拉只取前 N 条 → 数据量上百后选不到目标」）：

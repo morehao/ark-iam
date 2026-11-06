@@ -3,6 +3,8 @@
 > 本文给出 Ark IAM 的 API 总览：**初始化引导端点**（`/install/*`）、**OIDC 协议端点**（`/oidc/*`）、**认证端点**（`/v1/auth/*`）、**平台管理端点**（`/v1/platform/*`）、**租户自服务端点**（`/v1/tenant/*`）、**应用目录端点**（`/v1/rp/directory/*`），以及认证方式、通用响应信封、路由规范摘要。
 >
 > 开发环境 Swagger（redoc）：`http://localhost:{port}/{appName}/redocs`（如 `http://localhost:8081/auth/redocs`）。
+>
+> **内嵌形态（形态 2）**：用 `backend/iam` 把 IAM 内嵌进业务单体时，下列所有前缀会挂在宿主 `App.Mount(rg)` 传入的路由组下——例如 `engine.Group("/iam")` 时端点变为 `/iam/v1/platform/*`、`/iam/oidc/*`、`/iam/install`。路由与鉴权语义不变，见 [application-integration-guide.md](application-integration-guide.md) §11。
 
 ---
 

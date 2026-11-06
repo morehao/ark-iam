@@ -26,9 +26,9 @@ import {
   ThunderboltOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons'
-import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, PageContainer, RemoteSelect, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
-import { createMenu, deleteMenu, getApplicationDetail, getApplicationPageList, getMenuTree, updateMenu } from '@ark-iam/api'
-import type { ApplicationItem, MenuExternalLinkFlag, MenuHiddenFlag, MenuItem, MenuKeepAliveFlag, MenuStatus, MenuType, MenuVisibility } from '@ark-iam/types'
+import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, PageContainer, RemoteSelect, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
+import { createMenu, deleteMenu, getApplicationDetail, getApplicationPageList, getMenuTree, updateMenu } from '@morehao/ark-iam-react/api'
+import type { ApplicationItem, MenuExternalLinkFlag, MenuHiddenFlag, MenuItem, MenuKeepAliveFlag, MenuStatus, MenuType, MenuVisibility } from '@morehao/ark-iam-react/types'
 
 interface MenuFormValues {
   parentID: string

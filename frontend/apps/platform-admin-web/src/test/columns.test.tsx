@@ -15,7 +15,7 @@ import {
   tableScrollX,
   textColumn,
   timeColumn,
-} from '@ark-iam/ui'
+} from '@morehao/ark-iam-react/ui'
 
 /**
  * 列表列宽 / 操作列回归测试。

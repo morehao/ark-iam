@@ -17,7 +17,7 @@ import {
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, fmtTime, InitialPasswordModal, NAME_COL_WIDTH, NameLink, nameColumn, PageContainer, STATUS_COL_WIDTH, SuspendedTag, tableScrollX, textColumn, TEXT_COL_WIDTH, timeColumn, tokens } from '@ark-iam/ui'
+import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, fmtTime, InitialPasswordModal, NAME_COL_WIDTH, NameLink, nameColumn, PageContainer, STATUS_COL_WIDTH, SuspendedTag, tableScrollX, textColumn, TEXT_COL_WIDTH, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
 import type {
   DepartmentItem,
   TenantApiKeyItem,
@@ -27,7 +27,7 @@ import type {
   TenantUserDetail,
   TenantUserItem,
   UserStatus,
-} from '@ark-iam/types'
+} from '@morehao/ark-iam-react/types'
 import {
   createTenantUser,
   getTenantUserDetail,

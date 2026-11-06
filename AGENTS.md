@@ -4,7 +4,7 @@
 
 ## 项目概述
 
-GoArk 是一个基于 Gin + GORM 的多应用后端项目，采用前后端分离架构。IAM 后端拆分为五个应用（`auth`/`platformadmin`/`tenantadmin`/`rpapi`/`gateway`），共享公共层 `backend/pkg` 与面向 RP 的 `backend/sdk`，并以 `backend/go.work` 作为 Go workspace 管理 7 个模块（apps/auth、apps/gateway、apps/platformadmin、apps/rpapi、apps/tenantadmin、pkg、sdk）。
+GoArk 是一个基于 Gin + GORM 的多应用后端项目，采用前后端分离架构。IAM 后端拆分为五个应用（`auth`/`platformadmin`/`tenantadmin`/`rpapi`/`gateway`），共享公共层 `backend/pkg`、面向 RP 的 `backend/sdk` 与**可嵌入 IAM 库 `backend/iam`**，并以 `backend/go.work` 作为 Go workspace 管理 8 个模块（apps/auth、apps/gateway、apps/platformadmin、apps/rpapi、apps/tenantadmin、pkg、sdk、iam），另含示例模块 `examples/embedded-iam-demo`。`backend/iam` 把 auth/platformadmin/tenantadmin 三域封装为可实例化、可按域裁剪的库，支持「内嵌业务单体」形态（`iam.New + Mount + MountFrontend`），`apps/gateway` 是它的「全量使用者」。
 
 ## 项目结构
 
@@ -17,7 +17,10 @@ ark-iam/
 │   │   ├── tenantadmin/   # 租户自服务，:8083
 │   │   ├── rpapi/         # 面向应用的只读目录 API（/v1/rp/directory/*），:8084
 │   │   └── gateway/       # 聚合应用（挂载上述四者，单体部署），:8100
-│   ├── pkg/               # 公共层，5 模块之一（model/dao/object/core/credential/…）
+│   ├── pkg/               # 公共层（model/dao/object/core/credential/…）
+│   ├── sdk/               # RP 侧 OIDC SDK（验签/M2M/登出/目录）
+│   ├── iam/               # 可嵌入 IAM 库（New/Mount/MountFrontend，支持内嵌业务单体）
+│   ├── examples/          # 示例（embedded-iam-demo：内嵌形态最小可运行工程）
 │   └── Makefile
 ├── frontend/             # React 前端项目
 ├── docs/                  # 文档目录
@@ -63,7 +66,7 @@ make test APP=auth
 cd backend
 
 # 运行所有模块的测试
-go test ./apps/auth/... ./apps/gateway/... ./apps/platformadmin/... ./apps/rpapi/... ./apps/tenantadmin/... ./pkg/... ./sdk/...
+go test ./apps/auth/... ./apps/gateway/... ./apps/platformadmin/... ./apps/rpapi/... ./apps/tenantadmin/... ./pkg/... ./sdk/... ./iam/...
 
 # 等价的模块内写法
 cd backend/apps/auth && go test ./...
@@ -92,7 +95,7 @@ make lint
 golangci-lint run ./... --disable-all -E golint,errcheck,staticcheck
 
 # go vet（同样按模块逐个执行）
-cd backend && for m in apps/auth apps/gateway apps/platformadmin apps/rpapi apps/tenantadmin pkg sdk; do (cd $m && go vet ./...); done
+cd backend && for m in apps/auth apps/gateway apps/platformadmin apps/rpapi apps/tenantadmin pkg sdk iam; do (cd $m && go vet ./...); done
 ```
 
 ## 代码规范
@@ -607,6 +610,7 @@ actionColumn<TenantItem>({
 - **代码生成**: gocli
 - **数据库**: GORM with PostgreSQL（主库，启动时 AutoMigrate 自动建表、**不写任何数据**；内置数据由初始化页面 `POST /install/initialize` 一次性引导），测试用 SQLite
 - **RP SDK**: `backend/sdk`（独立 module，依赖白名单；`make test-sdk` / `make sdk-check-deps`，用法见 `backend/sdk/README.md`）
+- **可嵌入 IAM 库**: `backend/iam`（`iam.New + Mount + MountFrontend`，支持内嵌业务单体；`make iam-build` / `make test-iam`，用法见 `backend/iam/README.md`，示例 `backend/examples/embedded-iam-demo`）
 - **缓存**: Redis
 - **链路追踪**: OpenTelemetry
 - **日志**: golib/glog

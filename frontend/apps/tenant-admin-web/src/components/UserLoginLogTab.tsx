@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Space, Table } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { CODE_COL_WIDTH, idColumn, tableScrollX, textColumn, TEXT_COL_WIDTH, timeColumn, tokens } from '@ark-iam/ui'
-import type { TenantUserLoginLogItem } from '@ark-iam/types'
+import { CODE_COL_WIDTH, idColumn, tableScrollX, textColumn, TEXT_COL_WIDTH, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
+import type { TenantUserLoginLogItem } from '@morehao/ark-iam-react/types'
 import { getTenantUserLoginLogs } from '../api/user'
 
 export interface UserLoginLogTabProps {

@@ -1,1 +1,1 @@
-export { getUserinfo, getMyTenants, logoutAPI, logoutAllAPI } from '@ark-iam/api'
+export { getUserinfo, getMyTenants, logoutAPI, logoutAllAPI } from '@morehao/ark-iam-react/api'

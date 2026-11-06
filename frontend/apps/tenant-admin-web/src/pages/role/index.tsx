@@ -15,8 +15,8 @@ import {
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
-import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, NAME_COL_WIDTH, PageContainer, SourceTag, STATUS_COL_WIDTH, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
-import type { MenuItem, TenantSubscribedApplicationItem, TenantRoleItem } from '@ark-iam/types'
+import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, NAME_COL_WIDTH, PageContainer, SourceTag, STATUS_COL_WIDTH, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
+import type { MenuItem, TenantSubscribedApplicationItem, TenantRoleItem } from '@morehao/ark-iam-react/types'
 import {
   createTenantRole,
   deleteTenantRole,

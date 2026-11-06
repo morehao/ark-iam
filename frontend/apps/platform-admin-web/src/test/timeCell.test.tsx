@@ -7,7 +7,7 @@ import {
   TIME_COL_WIDTH_RELATIVE,
   TimeCell,
   timeColumn,
-} from '@ark-iam/ui'
+} from '@morehao/ark-iam-react/ui'
 
 /**
  * 时间列回归测试（2026-09 列表页时间折行问题）。

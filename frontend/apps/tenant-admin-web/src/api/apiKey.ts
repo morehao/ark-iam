@@ -1,5 +1,5 @@
-import { request } from '@ark-iam/api'
-import type { PageListResp, TenantApiKeyCreateReq, TenantApiKeyCreateResp, TenantApiKeyItem } from '@ark-iam/types'
+import { request } from '@morehao/ark-iam-react/api'
+import type { PageListResp, TenantApiKeyCreateReq, TenantApiKeyCreateResp, TenantApiKeyItem } from '@morehao/ark-iam-react/types'
 
 /**
  * API 密钥分页列表（租户端，需系统管理能力 super）。

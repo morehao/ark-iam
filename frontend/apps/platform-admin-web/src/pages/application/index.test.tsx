@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { fmtTime } from '@ark-iam/ui'
-import type { ApplicationItem } from '@ark-iam/types'
+import { fmtTime } from '@morehao/ark-iam-react/ui'
+import type { ApplicationItem } from '@morehao/ark-iam-react/types'
 
 const mockGetApplicationPageList = vi.fn()
 const mockCreateApplication = vi.fn()
 const mockUpdateApplication = vi.fn()
-vi.mock('@ark-iam/api', () => ({
+vi.mock('@morehao/ark-iam-react/api', () => ({
   createApplication: (...args: unknown[]) => mockCreateApplication(...args),
   deleteApplication: vi.fn(),
   getApplicationDetail: vi.fn(),

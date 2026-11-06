@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, message, Modal, Select, Space, Table } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, idColumn, NAME_COL_WIDTH, PageContainer, RemoteSelect, SourceTag, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn } from '@ark-iam/ui'
+import { actionColumn, idColumn, NAME_COL_WIDTH, PageContainer, RemoteSelect, SourceTag, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn } from '@morehao/ark-iam-react/ui'
 import {
   createTenantApplication,
   deleteTenantApplication,
@@ -10,8 +10,8 @@ import {
   getTenantApplicationPageList,
   getTenantPageList,
   updateTenantApplication,
-} from '@ark-iam/api'
-import type { TenantApplicationItem, TenantApplicationStatus } from '@ark-iam/types'
+} from '@morehao/ark-iam-react/api'
+import type { TenantApplicationItem, TenantApplicationStatus } from '@morehao/ark-iam-react/types'
 
 export default function TenantApplicationList() {
   const [data, setData] = useState<TenantApplicationItem[]>([])

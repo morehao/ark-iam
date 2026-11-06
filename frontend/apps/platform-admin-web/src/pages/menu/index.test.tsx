@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import type { ApplicationItem } from '@ark-iam/types'
+import type { ApplicationItem } from '@morehao/ark-iam-react/types'
 
 const mockGetApplicationPageList = vi.fn()
 const mockGetApplicationDetail = vi.fn()
@@ -8,7 +8,7 @@ const mockGetMenuTree = vi.fn()
 const mockCreateMenu = vi.fn()
 const mockUpdateMenu = vi.fn()
 
-vi.mock('@ark-iam/api', () => ({
+vi.mock('@morehao/ark-iam-react/api', () => ({
   createMenu: (...args: unknown[]) => mockCreateMenu(...args),
   deleteMenu: vi.fn(),
   getApplicationDetail: (...args: unknown[]) => mockGetApplicationDetail(...args),

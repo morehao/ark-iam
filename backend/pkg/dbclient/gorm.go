@@ -91,6 +91,31 @@ func UseTenantScopePlugin(db *gorm.DB) error {
 	return db.Use(plugin)
 }
 
+// NewStore 实例化一个携带租户隔离插件的数据库连接，供「可嵌入 IAM 库」（backend/iam）
+// 以实例方式持有，而不依赖包级全局 dbMap。与 InitMultiDB 复用同一份租户插件配置，
+// 保证内嵌与独立部署的隔离语义一致。
+//
+// 返回的 *gorm.DB 已挂 UseTenantScopePlugin；调用方负责在退出时关闭底层连接。
+func NewStore(cfg dbgorm.Config) (*gorm.DB, error) {
+	db, err := dbgorm.New(&cfg)
+	if err != nil {
+		return nil, fmt.Errorf("dbclient: new store failed: %w", err)
+	}
+	if err := UseTenantScopePlugin(db); err != nil {
+		return nil, fmt.Errorf("dbclient: register tenant plugin failed: %w", err)
+	}
+	return db, nil
+}
+
+// SetIamDB 将给定连接注册为全局 iam 库（生产用）。可嵌入 IAM 库（backend/iam）在实例化时
+// 调用它，使仍通过全局 dbclient.IamDB 取连接的共享代码（pkg/sso、pkg/core 默认路径等）
+// 与实例使用同一份连接。一进程一 IAM 实例语义下这是安全且必要的桥接。
+func SetIamDB(db *gorm.DB) {
+	dbMutex.Lock()
+	defer dbMutex.Unlock()
+	dbMap[dbNameIam] = db
+}
+
 // RegisterDBForTest injects a gorm DB for a service name (test-only usage).
 // 测试库与生产库挂载同一份租户隔离配置：未声明租户作用域的查询会 fail-closed，
 // 因此测试必须像生产一样显式声明作用域（gin 上下文写租户或 gcontext.WithTenantScope）。

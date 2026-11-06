@@ -57,3 +57,8 @@ __debug_bin*
 
 # go 本地缓存（误入仓库防护）
 **/.tmp/
+
+.dsh/
+
+# 示例工程编译产物
+backend/examples/*/embedded-iam-demo

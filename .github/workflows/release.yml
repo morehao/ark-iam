@@ -1,0 +1,127 @@
+# 自动发布（Trusted Publishing / OIDC，tag 触发）：
+#   推送 vX.Y.Z 标签时，从 tag 读版本，经 OIDC 把 @morehao/ark-iam-react 发布到 npmjs。
+#   认证走 OIDC，**不需要 NPM_TOKEN**（job 提 id-token: write，npm CLI 自动换取短时令牌）。
+#
+#   本仓是 pnpm monorepo（frontend/ 为工作区），与单包仓不同：
+#     - pnpm/action-setup 先装 pnpm（读 frontend/package.json packageManager），setup-node 再挂 pnpm cache；
+#     - 只 build + publish `@morehao/ark-iam-react` 一个门面包，内部四包 @ark-iam/{types,api,auth,ui}
+#       作为 workspace devDeps 参与构建、**不对外发布**；
+#     - 必须用 `pnpm publish`（devDeps 里的 workspace:* 协议需由 pnpm rewrite，npm publish 不认）。
+#
+#   npm 侧一次性前置（已建包，0.1.0 为手工发布）：
+#     npm trust github @morehao/ark-iam-react \
+#       --repo morehao/ark-iam --file release.yml --allow-publish
+#     - Workflow 必须等于 release.yml（本文件 name 也必须是 release.yml，OIDC 的 workflow claim
+#       要与 npm 侧精确匹配）；
+#     - Allowed actions 必须允许 `npm publish`（2026-09-03 后新建的默认只允许 stage publish，
+#       会导致 OIDC 直接发布被拒为 permission denied）。
+#
+# 版本约定：发布版本 = 去掉 tag 前缀 v，且必须等于 frontend/packages/react/package.json.version（脚本会校验）。
+#   bump 版本(`npm run version:pkgs` 或手改) → 提交 → 打注记 tag → push tag。
+# npm 上同版本已存在则跳过（幂等）。
+#
+# GitHub Release：npm 发布**成功后**，用注记 tag 的正文建 Release（正文由
+# scripts/release-notes.mjs 从注记原样投影，不重新生成、不改写；已存在则跳过）。
+# `gh release create` 必须留在这个文件里 —— git-kit 的 /git-release 预检靠 grep
+# .github/workflows 判定 EFFECT_RELEASE=workflow，判定为 workflow 后它只校验、不重复建。
+name: release.yml
+on:
+  push:
+    tags:
+      - 'v*'
+  # 手动补发：tag 指向的提交不可改，workflow 本身修好后靠这里重跑同一版本（不新建 tag）。
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布的 tag（如 v0.1.1）'
+        required: true
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+defaults:
+  run:
+    # 前端工作区在 frontend/ 子目录；脚本与 pnpm 命令都在其中执行。
+    working-directory: frontend
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write   # OIDC 可信发布
+      contents: write   # 建 GitHub Release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # push: 用触发的 tag ref；dispatch: 用输入的 tag（同一个 ref 都能 checkout）
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      # pnpm 必须先于 setup-node 就位，setup-node 的 cache: pnpm 才能工作。
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest
+
+      # OIDC 自检：只打布尔值，不打印 token。缺 id-token 权限时 npm 会静默跳过 OIDC，
+      # 最终只报一句误导性的 ENEEDAUTH —— 先把「环境到底有没有」变成可读事实。
+      - name: OIDC 环境自检
+        run: |
+          echo "GITHUB_ACTIONS=${GITHUB_ACTIONS:-unset}"
+          if [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] && [ -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+            echo "id-token env: present"
+          else
+            echo "id-token env: MISSING（检查 job 的 permissions.id-token: write 与仓库策略）"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        # --frozen-lockfile：lock 与 package.json 必须同步提交，否则直接失败（前置不变量）。
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      # 内部四包必须先 build（bundle-dts 从 ../{types,api,auth,ui}/dist 取 d.ts），再 build 门面包。
+      # build:pkgs 已固定 types→api→auth→ui→react 顺序；CI 干净 checkout 无任何 dist。
+      - name: Build publishable package
+        run: pnpm run build:pkgs
+
+      # 版本校验 + 幂等跳过 + pnpm publish 都在脚本里；registry 显式指向公共 npmjs。
+      - name: Publish to npm via OIDC
+        run: bash ./scripts/ci-publish.sh
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          # verbose 才看得到 oidc 的具体失败原因（npm 对 OIDC 失败一律静默、最后只报 ENEEDAUTH）
+          NPM_CONFIG_LOGLEVEL: verbose
+
+      # 只在 npm 发布成功后运行（前面失败即中断）。正文来自注记 tag，已存在即跳过，
+      # 因此本步骤可在任意时刻重跑（publish 幂等跳过 + 这里补建缺失的 Release）。
+      - name: Create GitHub Release from tag annotation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release ${TAG} 已存在；跳过（幂等）"
+            exit 0
+          fi
+          # checkout 对 tag 事件会把本地 ref 重指成轻量 tag，注记对象随之丢失：显式回拉一次。
+          git fetch --force --no-recurse-submodules origin "+refs/tags/${TAG}:refs/tags/${TAG}"
+          notes="$(mktemp)"
+          node scripts/release-notes.mjs "$TAG" > "$notes"
+          args=(--repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --notes-file "$notes")
+          if [[ "$TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+- ]]; then
+            args+=(--prerelease)
+          fi
+          gh release create "$TAG" "${args[@]}"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --json tagName,url,body --jq '{tag:.tagName,url:.url,body_len:(.body|length)}'

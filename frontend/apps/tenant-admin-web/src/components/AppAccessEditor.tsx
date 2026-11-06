@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Checkbox, Modal, Tag, message } from 'antd'
-import { tokens } from '@ark-iam/ui'
-import type { TenantUserApplicationItem } from '@ark-iam/types'
+import { tokens } from '@morehao/ark-iam-react/ui'
+import type { TenantUserApplicationItem } from '@morehao/ark-iam-react/types'
 import { getTenantUserApplications, updateTenantUserApplications } from '../api/user'
 
 export interface AppAccessEditorProps {

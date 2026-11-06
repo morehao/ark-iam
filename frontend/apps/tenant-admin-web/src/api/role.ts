@@ -1,11 +1,11 @@
-import { request } from '@ark-iam/api'
+import { request } from '@morehao/ark-iam-react/api'
 import type {
   PageListResp,
   TenantRoleCreateReq,
   TenantRoleItem,
   TenantRoleMenuResp,
   TenantRoleUpdateReq,
-} from '@ark-iam/types'
+} from '@morehao/ark-iam-react/types'
 
 /** 租户角色分页列表（`unassigned=true` 只查未归属应用的系统角色） */
 export const getTenantRolePageList = (params?: {

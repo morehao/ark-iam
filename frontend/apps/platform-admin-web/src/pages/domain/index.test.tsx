@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { VerifiedTag } from '@ark-iam/ui'
-import type { DomainItem } from '@ark-iam/types'
+import { VerifiedTag } from '@morehao/ark-iam-react/ui'
+import type { DomainItem } from '@morehao/ark-iam-react/types'
 
 const mockGetDomainPageList = vi.fn()
 const mockGetDomainDetail = vi.fn()
 const mockUpdateDomain = vi.fn()
 
-vi.mock('@ark-iam/api', () => ({
+vi.mock('@morehao/ark-iam-react/api', () => ({
   createDomain: vi.fn(),
   deleteDomain: vi.fn(),
   getDomainDetail: (...args: unknown[]) => mockGetDomainDetail(...args),

@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Space, Table, message } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, idColumn, NAME_COL_WIDTH, tableScrollX, textColumn, TEXT_COL_WIDTH, timeColumn, tokens } from '@ark-iam/ui'
-import type { TenantUserIdentityItem } from '@ark-iam/types'
+import { actionColumn, idColumn, NAME_COL_WIDTH, tableScrollX, textColumn, TEXT_COL_WIDTH, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
+import type { TenantUserIdentityItem } from '@morehao/ark-iam-react/types'
 import { createTenantUserIdentity, deleteTenantUserIdentity, getTenantUserIdentities } from '../api/user'
 
 export interface UserIdentityTabProps {
