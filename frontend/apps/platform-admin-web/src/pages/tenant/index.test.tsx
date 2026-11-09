@@ -90,7 +90,7 @@ describe('租户列表', () => {
     expect(mockGetTenantPageList).toHaveBeenCalledWith(expect.objectContaining({ page: 1, status: undefined }))
 
     // 页面上还有分页器的下拉，这里按占位文案定位状态筛选下拉
-    const statusSelector = screen.getByText('全部状态').closest('.ant-select-selector')
+    const statusSelector = screen.getByText('全部状态').closest('.ant-select-content')
     fireEvent.mouseDown(statusSelector as HTMLElement)
     fireEvent.click(await screen.findByTitle('挂起'))
 

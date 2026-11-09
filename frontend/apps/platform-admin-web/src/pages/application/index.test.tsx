@@ -208,10 +208,18 @@ describe('编辑态应用编码的可写性', () => {
 
     // 取消 → 不提交
     fireEvent.click(confirmBtn('.ant-btn:not(.ant-btn-primary)'))
-    await waitFor(() => expect(document.querySelector('.ant-modal-confirm')).toBeNull())
+    // antd6 + jsdom：静态 Modal.confirm 关闭时会进入 leave 动画（ant-zoom-leave），但 jsdom 不触发
+    // transitionend，元素不会真正从 DOM 移除。这里断言已进入 leave 态（等价于"取消关闭"语义），
+    // 不再依赖元素被卸载。
+    await waitFor(() => expect(document.querySelector('.ant-modal-confirm')).toHaveClass('ant-zoom-leave'))
     expect(mockUpdateApplication).not.toHaveBeenCalled()
 
     // 再次提交并确认 → 提交的模板已不含被移除的编码
+    // antd6 + jsdom 下上一步"取消"的 Modal.confirm 因 leave 动画未移除，会残留并抢占后续查询；
+    // 这里手动清理已进入 leave 态的旧 confirm（真实浏览器会自行移除），再触发第二次提交。
+    document.querySelectorAll('.ant-modal-root .ant-modal-confirm.ant-zoom-leave').forEach((el) => {
+      el.closest('.ant-modal-root')?.remove()
+    })
     fireEvent.click(submitBtn)
     await waitFor(() => expect(confirmBox()).toBeTruthy())
     fireEvent.click(confirmBtn('.ant-btn-primary'))

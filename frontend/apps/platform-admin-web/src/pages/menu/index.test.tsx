@@ -68,7 +68,7 @@ describe('菜单页应用切换器', () => {
     await waitFor(() => expect(mockGetMenuTree).toHaveBeenCalledWith('app-1'))
 
     // 输入关键字 → 必须带 name 请求服务端（而非在前 100 条里本地过滤）
-    fireEvent.mouseDown(document.querySelector('.ant-select-selector') as HTMLElement)
+    fireEvent.mouseDown(document.querySelector('.ant-select-content') as HTMLElement)
     fireEvent.change(document.querySelector('[role="combobox"]') as HTMLElement, { target: { value: '订单' } })
     await waitFor(() =>
       expect(mockGetApplicationPageList).toHaveBeenCalledWith(expect.objectContaining({ name: '订单' })),

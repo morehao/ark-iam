@@ -73,7 +73,7 @@ const builtinRole: TenantRoleItem = {
 /** 展开弹窗内的「所属应用」下拉并选中一项（antd Select 在 jsdom 下需 mouseDown 才渲染选项）。 */
 async function selectApp(label: string) {
   const modal = document.querySelector('.ant-modal') as HTMLElement
-  fireEvent.mouseDown(modal.querySelector('.ant-select-selector') as HTMLElement)
+  fireEvent.mouseDown(modal.querySelector('.ant-select-content') as HTMLElement)
   fireEvent.click(await screen.findByTitle(label))
 }
 

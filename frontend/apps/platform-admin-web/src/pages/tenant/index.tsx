@@ -293,7 +293,7 @@ export default function TenantList() {
           </Form.Item>
           {!editing && (
             <>
-              <Divider orientation="left" plain>
+              <Divider titlePlacement="left" plain>
                 租户管理员
               </Divider>
               <Form.Item
