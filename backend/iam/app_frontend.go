@@ -25,19 +25,24 @@ func (a *App) MountFrontend(engine *gin.Engine, basePath string) error {
 		}
 
 		// issuer：优先取 Raw 配置的绝对值（多源部署时即 OP 的公网地址）；未配置时按请求
-		// Host 派生为绝对地址（{scheme}://{host}/oidc），避免下发空串导致前端无法完成 OIDC。
+		// Host 派生为绝对地址（{scheme}://{host}{basePath}/oidc），避免下发空串导致前端无法完成 OIDC。
 		issuer := ""
 		if a.cfg.Raw != nil {
 			issuer = a.cfg.Raw.OIDC.Issuer
 		}
 		if issuer == "" {
-			issuer = requestBaseURL(c) + "/oidc"
+			issuer = requestBaseURL(c) + joinPath(basePath, "/oidc")
 		}
 
+		// 各端点的**挂载前缀感知**基址：内嵌非空前缀（如 /iam）时下发生 /iam/v1、/iam/oidc、
+		// /iam/install 等，让登录页 SPA 的 axios/路由自适应；根挂载时退化为 /v1、/oidc、/install。
+		// loginPath 为登录页在本挂载下的路径（前端整页跳转用）。
 		c.JSON(http.StatusOK, gin.H{
 			"issuer":       issuer,
-			"apiBase":      "/v1",
-			"oidcBase":     "/oidc",
+			"apiBase":      joinPath(basePath, "/v1"),
+			"oidcBase":     joinPath(basePath, "/oidc"),
+			"installBase":  joinPath(basePath, "/install"),
+			"loginPath":    joinPath(basePath, "/login"),
 			"callbackPath": "/auth/callback",
 			// clientId：本控制台 SPA 的 OIDC client_id（平台管理台内置客户端编码）。
 			// 派生自 pkg/model 常量，与种子/网关 aud 白名单同源，杜绝空串。

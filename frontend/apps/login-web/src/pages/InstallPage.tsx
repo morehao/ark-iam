@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { INSTALL_PENDING_REDIRECT, getInstallStatus, initializeInstall } from '../api'
+import { appPath } from '../config'
 import { resolveInstallError, statusUnavailableMessage } from '../install/errors'
 import { INSTALL_MESSAGES } from '../install/messages'
 import {
@@ -153,7 +154,7 @@ export default function InstallPage() {
         return
       }
       if (behavior.redirectToInstall) {
-        window.location.href = INSTALL_PENDING_REDIRECT
+        window.location.href = appPath(INSTALL_PENDING_REDIRECT)
         return
       }
       if (behavior.disableSubmit) {
