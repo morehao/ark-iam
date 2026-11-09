@@ -552,7 +552,7 @@ export default function MenuList() {
             <span style={{ color: tokens.textSecondary, fontSize: 12 }}>（以列表页选中的应用为准，不可修改）</span>
           </div>
 
-          <Divider orientation="left" plain style={{ margin: '16px 0 8px', fontSize: 13 }}>
+          <Divider titlePlacement="left" plain style={{ margin: '16px 0 8px', fontSize: 13 }}>
             基本信息
           </Divider>
           <Form.Item name="parentID" label="上级菜单">
@@ -603,7 +603,7 @@ export default function MenuList() {
             </Form.Item>
           </div>
 
-          <Divider orientation="left" plain style={{ margin: '16px 0 8px', fontSize: 13 }}>
+          <Divider titlePlacement="left" plain style={{ margin: '16px 0 8px', fontSize: 13 }}>
             路由配置
           </Divider>
           <div style={{ display: 'flex', gap: 16 }}>
@@ -623,7 +623,7 @@ export default function MenuList() {
             </Form.Item>
           </div>
 
-          <Divider orientation="left" plain style={{ margin: '16px 0 8px', fontSize: 13 }}>
+          <Divider titlePlacement="left" plain style={{ margin: '16px 0 8px', fontSize: 13 }}>
             权限与展示
           </Divider>
           <Form.Item name="visibility" label="可见性门槛" tooltip="所有人可见（无门槛）/ 任意租户成员可见（登录即可）/ 仅管理员角色可见">

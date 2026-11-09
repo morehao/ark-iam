@@ -75,7 +75,7 @@ describe('按应用授权编辑器', () => {
     expect(await screen.findByText('租户管理员')).toBeInTheDocument()
 
     // 角色多选框（第 2 个下拉）输入关键字 → 带 keyword + 当前 appID 请求服务端
-    fireEvent.mouseDown(document.querySelectorAll('.ant-select-selector')[1] as HTMLElement)
+    fireEvent.mouseDown(document.querySelectorAll('.ant-select-content')[1] as HTMLElement)
     fireEvent.change(document.querySelectorAll('[role="combobox"]')[1] as HTMLElement, {
       target: { value: '运维' },
     })

@@ -45,13 +45,13 @@ export function InitialPasswordModal({ password, title, description, onClose }: 
           我已保存
         </Button>
       }
-      destroyOnClose
+      destroyOnHidden
       width={560}
     >
       <Alert
         type="warning"
         showIcon
-        message="请立即保存，关闭后不再显示"
+        title="请立即保存，关闭后不再显示"
         description={
           <Space direction="vertical" size={12} style={{ width: '100%' }}>
             {description && <div style={{ color: tokens.textSecondary }}>{description}</div>}

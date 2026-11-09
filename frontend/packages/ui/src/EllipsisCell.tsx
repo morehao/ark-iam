@@ -25,7 +25,7 @@ export function EllipsisCell({ value, limit, monospace = false, placeholder = '-
       title={text}
       mouseEnterDelay={0.3}
       mouseLeaveDelay={0.6}
-      styles={{ body: { userSelect: 'text' } }}
+      styles={{ container: { userSelect: 'text' } }}
     >
       <span
         style={{

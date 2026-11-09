@@ -43,11 +43,11 @@ describe('租户应用订阅', () => {
     })
 
     const modal = document.querySelector('.ant-modal') as HTMLElement
-    const selects = modal.querySelectorAll('.ant-select-selector')
+    const selects = modal.querySelectorAll('.ant-select-content')
     // 弹窗内下拉顺序：租户 → 应用 → 状态
     fireEvent.mouseDown(selects[0])
     fireEvent.click(await screen.findByText('租户二'))
-    fireEvent.mouseDown(modal.querySelectorAll('.ant-select-selector')[1])
+    fireEvent.mouseDown(modal.querySelectorAll('.ant-select-content')[1])
     fireEvent.click(await screen.findByText('平台管理后台'))
     fireEvent.click(modal.querySelector('.ant-modal-footer .ant-btn-primary') as HTMLElement)
 
@@ -68,7 +68,7 @@ describe('租户应用订阅', () => {
 
     await waitFor(() => expect(mockGetTenantPageList).toHaveBeenCalled())
 
-    const filterSelector = document.querySelectorAll('.ant-select-selector')[0]
+    const filterSelector = document.querySelectorAll('.ant-select-content')[0]
     fireEvent.mouseDown(filterSelector as HTMLElement)
     fireEvent.change(document.querySelectorAll('[role="combobox"]')[0], { target: { value: '租' } })
 

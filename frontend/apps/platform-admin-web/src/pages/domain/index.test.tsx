@@ -62,7 +62,7 @@ describe('域名页验证状态枚举', () => {
     // 打开弹窗内的验证状态 Select（页面上还有分页 sizeChanger 的 Select，必须限定在弹窗内），
     // 选「未验证」（当前回显为 verified，故该选项只存在于下拉里）
     const modal = document.querySelector('.ant-modal') as HTMLElement
-    fireEvent.mouseDown(modal.querySelector('.ant-select-selector') as HTMLElement)
+    fireEvent.mouseDown(modal.querySelector('.ant-select-content') as HTMLElement)
     fireEvent.click(await screen.findByTitle('未验证'))
 
     fireEvent.click(modal.querySelector('.ant-modal-footer .ant-btn-primary') as HTMLElement)

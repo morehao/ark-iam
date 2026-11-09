@@ -23,7 +23,7 @@ export function IDCell({ value, prefix = 8, suffix = 4 }: IDCellProps) {
       title={text}
       mouseEnterDelay={0.3}
       mouseLeaveDelay={0.6}
-      styles={{ body: { userSelect: 'text' } }}
+      styles={{ container: { userSelect: 'text' } }}
     >
       <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12 }}>{short}</span>
     </Tooltip>

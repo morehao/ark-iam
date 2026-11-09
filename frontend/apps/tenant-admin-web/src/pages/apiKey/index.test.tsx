@@ -55,7 +55,7 @@ describe('API 密钥页服务账号下拉', () => {
 
     await waitFor(() => expect(mockGetMachineUserPageList).toHaveBeenCalled())
 
-    fireEvent.mouseDown(document.querySelector('.ant-select-selector') as HTMLElement)
+    fireEvent.mouseDown(document.querySelector('.ant-select-content') as HTMLElement)
     fireEvent.change(document.querySelector('[role="combobox"]') as HTMLElement, { target: { value: '监控' } })
 
     await waitFor(() =>
