@@ -10,6 +10,16 @@
 
 > 两行、两条命令即可接入。两个包互不依赖，可单独使用，也可同时使用（前端登录 + 后端验签）。
 
+### 后端三个可 `go get` 的 Go 模块（均在仓库根级，同一 v0.3.0 版本线）
+
+| 模块 | 用途 | 安装 |
+|---|---|---|
+| `github.com/morehao/ark-iam/sdk` | **RP 侧 SDK**：本地验签 / M2M / introspect / revoke / userinfo / 登出 / 目录（业务应用最常用） | `go get github.com/morehao/ark-iam/sdk@v0.3.0` |
+| `github.com/morehao/ark-iam/iam` | **可嵌入 IAM 库**：「形态 2 内嵌业务单体」，把 IAM 与宿主同进程部署 | `go get github.com/morehao/ark-iam/iam@v0.3.0` |
+| `github.com/morehao/ark-iam/pkg` | **公共层**（config/dbclient/middleware/model/dao/... ），一般随 iam 传递引入，无需直接依赖 | `go get github.com/morehao/ark-iam/pkg@v0.3.0` |
+
+> 三者版本统一 `v0.3.0`；`iam` 依赖 `pkg` + `sdk`，`pkg` 依赖 `sdk`，均以真实版本号解析（发布后消费方无需 replace）。
+
 ---
 
 ## 后端：Go SDK（本地验签，框架无关）
@@ -95,8 +105,8 @@ const AuthProvider = createAuthProvider({ clientID: 'my_app_web' })
 
 ## 版本线
 
-- **Go SDK**：子模块 tag `sdk/vX.Y.Z`（Go 多模块标准，`go get .../sdk@vX.Y.Z` 依赖该前缀对齐目录 `sdk/`）。
-  当前 `sdk/v0.3.0`。与仓库级 tag（如 `v0.2.1`）并存、互不影响。
+- **Go 模块**（sdk / iam / pkg）：各自子模块 tag（`sdk/vX.Y.Z`、`iam/vX.Y.Z`、`pkg/vX.Y.Z`，Go 多模块标准，`go get .../<mod>@vX.Y.Z` 依赖前缀对齐目录）。
+  当前统一 `v0.3.0`。与仓库级 tag（如 `v0.2.1`）并存、互不影响。
 - **前端包**：`@morehao/ark-iam-react@X.Y.Z`（npm registry），当前 `0.2.0`。
 
 两套版本线独立演进、独立发布，不要求同号。

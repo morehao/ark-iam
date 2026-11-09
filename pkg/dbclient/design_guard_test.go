@@ -30,10 +30,20 @@ import (
 //   - pkg/oidckit：OIDC 回调适配；
 //   - pkg/middleware：鉴权/策略中间件（gin 中间件就是它的产物）；
 //   - pkg/testsetup、各 app 的 testutil：测试夹具。
-const repoRootRelPath = "../../.."
+const repoRootRelPath = "../.."
 
 // guardedGoDirs 是允许出现业务代码的目录（相对于仓库根）。
-var guardedGoDirs = []string{"backend/pkg", "backend/apps"}
+var guardedGoDirs = []string{"pkg", "backend/apps"}
+
+// resolveGuardedDir 把"逻辑目录"（相对旧 backend/ 布局）映射到搬迁后的真实路径：
+//   - pkg/...            -> <root>/pkg/...            （pkg 已搬到仓库根级）
+//   - apps/... 或其它     -> <root>/backend/apps/...    （apps 仍在 backend/ 下）
+func resolveGuardedDir(root, dir string) string {
+	if dir == "pkg" || strings.HasPrefix(dir, "pkg/") {
+		return filepath.Join(root, filepath.FromSlash(dir))
+	}
+	return filepath.Join(root, "backend", filepath.FromSlash(dir))
+}
 
 // skippedDirNames 不参与扫描（历史副本、依赖、工具产物）。
 var skippedDirNames = map[string]bool{
@@ -94,7 +104,7 @@ func TestServiceLayerHasNoGinDependency(t *testing.T) {
 
 	var violations []string
 	for _, dir := range innerLayerDirs {
-		abs := filepath.Join(root, "backend", dir)
+		abs := resolveGuardedDir(root, dir)
 		if _, err := os.Stat(abs); err != nil {
 			continue // 目录可能尚未创建（如空域），跳过
 		}
@@ -129,23 +139,27 @@ func TestRequestContextOnlyAtControllerBoundary(t *testing.T) {
 	require.DirExists(t, root, "仓库根目录必须存在（守卫依赖 backend/ 布局）")
 
 	var violations []string
-	walkGoFiles(t, filepath.Join(root, "backend"), func(path string, lines []string) {
-		if strings.HasSuffix(path, "_test.go") {
-			return
-		}
-		slashPath := filepath.ToSlash(path)
-		if isInboundBoundary(slashPath) {
-			return
-		}
-		for i, line := range lines {
-			if !isCodeLine(line) {
-				continue
+	scan := func(dir string) {
+		walkGoFiles(t, dir, func(path string, lines []string) {
+			if strings.HasSuffix(path, "_test.go") {
+				return
 			}
-			if strings.Contains(line, ".Request.Context(") {
-				violations = append(violations, formatViolation(root, path, i+1, line))
+			slashPath := filepath.ToSlash(path)
+			if isInboundBoundary(slashPath) {
+				return
 			}
-		}
-	})
+			for i, line := range lines {
+				if !isCodeLine(line) {
+					continue
+				}
+				if strings.Contains(line, ".Request.Context(") {
+					violations = append(violations, formatViolation(root, path, i+1, line))
+				}
+			}
+		})
+	}
+	scan(filepath.Join(root, "pkg"))
+	scan(filepath.Join(root, "backend"))
 	require.Empty(t, violations,
 		"`.Request.Context()` 只允许出现在 controller / middleware 目录："+
 			"那里是 gin 载体与标准 context.Context 的唯一转换点")
@@ -161,7 +175,7 @@ func TestBusinessLayerDoesNotImportGinIdentity(t *testing.T) {
 
 	var violations []string
 	for _, dir := range innerLayerDirs {
-		abs := filepath.Join(root, "backend", dir)
+		abs := resolveGuardedDir(root, dir)
 		if _, err := os.Stat(abs); err != nil {
 			continue
 		}
@@ -187,7 +201,7 @@ func TestTenantScopeLayerDoesNotDependOnGin(t *testing.T) {
 	require.DirExists(t, root, "仓库根目录必须存在（守卫依赖 backend/ 布局）")
 
 	var violations []string
-	walkGoFiles(t, filepath.Join(root, "backend/pkg/dbclient"), func(path string, lines []string) {
+	walkGoFiles(t, filepath.Join(root, "pkg/dbclient"), func(path string, lines []string) {
 		if strings.HasSuffix(path, "_test.go") {
 			return
 		}
@@ -212,12 +226,19 @@ func isInboundBoundary(slashPath string) bool {
 			return true
 		}
 	}
-	idx := strings.LastIndex(slashPath, "/backend/")
-	if idx >= 0 {
-		rel := slashPath[idx+len("/backend/"):]
+	for _, marker := range []string{"/backend/", "/pkg/"} {
+		idx := strings.LastIndex(slashPath, marker)
+		if idx < 0 {
+			continue
+		}
+		rel := slashPath[idx+len(marker):]
+		// pkg 从 backend/ 搬到根级后，ginAdapterPkgs 里 pkg/... 前缀需补回以便统一匹配。
+		candidates := []string{rel, "pkg/" + rel}
 		for _, adapter := range ginAdapterPkgs {
-			if strings.HasPrefix(rel, adapter) || strings.Contains(rel, adapter) {
-				return true
+			for _, cand := range candidates {
+				if strings.HasPrefix(cand, adapter) || strings.Contains(cand, adapter) {
+					return true
+				}
 			}
 		}
 	}

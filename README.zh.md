@@ -4,7 +4,7 @@
 
 `ark-iam` 是一个前后端分离的全栈项目，后端基于 [Gin](https://github.com/gin-gonic/gin)，提供分层、可维护、可扩展的服务结构，支持多个应用模块。
 
-IAM 后端拆分为 `backend/apps/` 下的四个应用（auth、platformadmin、tenantadmin、gateway），共享公共层 `backend/pkg`，以 Go workspace（`backend/go.work`）管理。
+IAM 后端拆分为 `backend/apps/` 下的五个应用（auth、platformadmin、tenantadmin、gateway、rpapi）。可复用的公共层放在**仓库根级**作为独立 Go 模块——`pkg/`（公共包）、`iam/`（可嵌入 IAM 库）、`sdk/`（RP 侧 SDK）——统一由根 `go.work` 管理，并可各自通过 `go get` 引依赖使用。
 
 ---
 

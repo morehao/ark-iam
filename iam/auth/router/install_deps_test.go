@@ -50,7 +50,7 @@ func TestInstallRoutesRegistered(t *testing.T) {
 // "谁触发了这次写入"这个信息就不可信了。
 // 正确的分工是：pkg/seed 只写业务数据并返回变更报告，审计由调用方（ctrinstall）按报告写。
 func TestSeedPackageHasNoAuditDependency(t *testing.T) {
-	seedDir := filepath.Join(repoRootForDeps(t), "backend", "pkg", "seed")
+	seedDir := filepath.Join(repoRootForDeps(t), "pkg", "seed")
 	forbidden := map[string]string{
 		"github.com/morehao/ark-iam/pkg/audit":  "pkg/seed 不得 import pkg/audit（审计由调用方按 Report 写）",
 		"github.com/morehao/ark-iam/pkg/config": "pkg/seed 不得 import pkg/config（配置由调用方翻译成 Definition）",

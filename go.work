@@ -7,7 +7,7 @@ use (
 	./backend/apps/rpapi
 	./backend/apps/tenantadmin
 	./backend/examples/embedded-iam-demo
-	./backend/iam
-	./backend/pkg
+	./iam
+	./pkg
 	./sdk
 )
