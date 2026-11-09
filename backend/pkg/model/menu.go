@@ -4,7 +4,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameMenu = "menu"
+const TableNameMenu = "iam_menu"
 
 // MenuVisibility 菜单可见性门槛（单调：等级越高可见范围越窄）。
 type MenuVisibility string

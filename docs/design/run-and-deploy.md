@@ -331,6 +331,59 @@ ALTER TABLE "user" RENAME TO tenant_user;
 
 **开发/测试环境**不必执行上述 SQL：直接删库重建（§2.3）后由 `AutoMigrate` 建出 `"user"`，再走 §2.4 首次初始化即可。
 
+#### 2.5.6 全部 IAM 表统一加 `iam_` 前缀（内嵌业务单体场景）
+
+为支持把 IAM **内嵌到业务单体、与宿主自有同名表（`user`/`role`/`tenant` 等）共库共存**，全部 23 张 IAM 物理表统一加 `iam_` 前缀（如 `user` → `iam_user`、`tenant` → `iam_tenant`）。唯一事实源是 `backend/pkg/model/*.go` 的 `TableNameXxx` 常量（结构体名、字段、JSON tag、枚举/业务 code 均不变）。
+
+**为什么必须手工执行**：`AutoMigrate` 只新增缺失的表、**不会给已有表改名**。若先起新版，它会新建一批空的 `iam_*` 表，旧数据全部留在无前缀旧表里，表现为"用户/租户全部消失"。
+
+**执行顺序（不可颠倒）**：
+
+```sql
+-- 0) 备份（pg_dump -Fc <db> > backup.dump）
+
+-- 1) 停全部 IAM 进程（auth/platformadmin/tenantadmin/rpapi/gateway 或内嵌宿主进程）
+
+-- 2) 逐表改名（"user" 是保留字，必须加双引号；其余表名可不加）
+ALTER TABLE tenant            RENAME TO iam_tenant;
+ALTER TABLE person            RENAME TO iam_person;
+ALTER TABLE "user"            RENAME TO iam_user;
+ALTER TABLE user_identity     RENAME TO iam_user_identity;
+ALTER TABLE user_role         RENAME TO iam_user_role;
+ALTER TABLE user_login_log    RENAME TO iam_user_login_log;
+ALTER TABLE department        RENAME TO iam_department;
+ALTER TABLE department_user   RENAME TO iam_department_user;
+ALTER TABLE application       RENAME TO iam_application;
+ALTER TABLE application_client         RENAME TO iam_application_client;
+ALTER TABLE application_client_secret  RENAME TO iam_application_client_secret;
+ALTER TABLE tenant_application RENAME TO iam_tenant_application;
+ALTER TABLE user_application   RENAME TO iam_user_application;
+ALTER TABLE role              RENAME TO iam_role;
+ALTER TABLE menu              RENAME TO iam_menu;
+ALTER TABLE role_menu         RENAME TO iam_role_menu;
+ALTER TABLE connector         RENAME TO iam_connector;
+ALTER TABLE domain            RENAME TO iam_domain;
+ALTER TABLE api_key           RENAME TO iam_api_key;
+ALTER TABLE refresh_token     RENAME TO iam_refresh_token;
+ALTER TABLE session           RENAME TO iam_session;
+ALTER TABLE audit_log         RENAME TO iam_audit_log;
+ALTER TABLE tenant_invite     RENAME TO iam_tenant_invite;
+
+-- 3) 核对：各表行数与升级前一致
+```
+
+```bash
+# 4) 起新版，确认健康检查、登录、初始化均正常
+```
+
+**要点**：
+
+- **整批一起升级**：所有应用共用同一套表，任一实例仍跑旧代码都会查不到表。
+- 加前缀后 `iam_user` **不再是 PostgreSQL 保留字**，§2.5.5 里的引号处理仍正确但不再是必需。
+- **撞名检测（`SameDatabase`/`ErrTableConflict`）**：加前缀后与宿主 `user/role/tenant` 天然不冲突，该检测基本退化为兜底防御，可保留。
+- **索引名**跨库仍可能撞名（同库内嵌时宿主也建 `idx_tenant_code` 等），如需彻底隔离可另给索引名加 `iam_` 前缀（非本次强制项）。
+- **开发/测试环境**不必手工执行：直接删库重建（§2.3）后由 `AutoMigrate` 建出 `iam_*` 表，再走 §2.4 首次初始化即可。
+
 ### 2.6 版本升级时的菜单变更清单
 
 **菜单行归运维**：L1 首次初始化只写入一次内置菜单，之后菜单由「菜单管理」页维护（可新增根菜单/子菜单，可删除任意菜单）。因此**版本升级带来的新菜单不会被自动下发**，升级后需要人工补录。

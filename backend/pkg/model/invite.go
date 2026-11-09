@@ -6,7 +6,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameInvite = "tenant_invite"
+const TableNameInvite = "iam_tenant_invite"
 
 // InviteStatus 邀请单状态。
 // 「已过期」不是存储态：由 expires_at 在读取时派生——若写成存储态，会引入

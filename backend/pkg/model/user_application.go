@@ -4,7 +4,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameUserApplication = "user_application"
+const TableNameUserApplication = "iam_user_application"
 
 // UserApplicationStatus 用户应用准入的启停状态（启停语义统一使用 enable/disable）。
 // 撤销准入用 disable 表达（保留来源与审计痕迹），软删只用于实体下线。

@@ -4,7 +4,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameUserIdentity = "user_identity"
+const TableNameUserIdentity = "iam_user_identity"
 
 // EmailVerificationState 第三方身份回传的邮箱验证态（user_identity.detail.emailVerified）。
 type EmailVerificationState string

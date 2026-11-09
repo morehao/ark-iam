@@ -6,7 +6,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameApplication = "application"
+const TableNameApplication = "iam_application"
 
 // AppCodePattern 应用编码规则：以小写字母开头，仅含小写字母、数字与下划线（如 platform_admin）。
 // 种子内置应用（platform_admin / tenant_admin）与控制台新建应用共用同一口径，禁止连字符。

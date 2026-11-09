@@ -4,7 +4,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameTenant = "tenant"
+const TableNameTenant = "iam_tenant"
 
 type TenantType string
 

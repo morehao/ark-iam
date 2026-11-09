@@ -6,7 +6,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameSession = "session"
+const TableNameSession = "iam_session"
 
 // SessionAuditEntity 登录会话审计记录：只追加、不可变。
 //

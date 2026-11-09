@@ -133,7 +133,7 @@ func TestUpdateFieldsSerializesJSONColumn(t *testing.T) {
 	}
 
 	var raw string
-	if err := db.Raw("SELECT role_template FROM application WHERE id = ?", entity.ID).Scan(&raw).Error; err != nil {
+	if err := db.Raw(fmt.Sprintf("SELECT role_template FROM %s WHERE id = ?", model.TableNameApplication), entity.ID).Scan(&raw).Error; err != nil {
 		t.Fatalf("read raw role_template: %v", err)
 	}
 	var decoded model.RoleTemplateItemList

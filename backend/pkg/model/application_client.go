@@ -6,7 +6,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameApplicationClient = "application_client"
+const TableNameApplicationClient = "iam_application_client"
 
 // ApplicationClientSource 应用客户端来源。取值与语义同 AppSource（见 application.go），
 // 独立具名类型以避免跨实体混用常量。

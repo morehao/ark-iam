@@ -69,8 +69,8 @@ func (r *sqlRecorder) Printf(format string, args ...interface{}) {
 // TestUserCondRendersQuotedUserTableOnPostgres 钉住 `user` 保留字表名在 PG 方言下的渲染：
 // Cond 条件与软删除过滤都必须产出 "user"."col"（表名带引号），且不得出现双重引号或反引号。
 func TestUserCondRendersQuotedUserTableOnPostgres(t *testing.T) {
-	if model.TableNameUser != "user" {
-		t.Fatalf("TableNameUser = %q, want %q", model.TableNameUser, "user")
+	if model.TableNameUser != "iam_user" {
+		t.Fatalf("TableNameUser = %q, want %q", model.TableNameUser, "iam_user")
 	}
 
 	db, sqls := newCaptureDB(t)
@@ -98,10 +98,10 @@ func TestUserCondRendersQuotedUserTableOnPostgres(t *testing.T) {
 	// GORM 按方言引用，因此正确形态是 `"user"."tenant_id"`（表名、列名均带引号）——
 	// 这比旧的「只引用表名、列名裸写」更强：列名是保留字（order/desc 等）时同样安全。
 	wants := []string{
-		`FROM "user"`,
-		`"user"."tenant_id"`,
-		`"user"."status"`,
-		`"user"."deleted_at"`,
+		`FROM "iam_user"`,
+		`"iam_user"."tenant_id"`,
+		`"iam_user"."status"`,
+		`"iam_user"."deleted_at"`,
 	}
 	for _, want := range wants {
 		if !strings.Contains(sql, want) {
@@ -111,13 +111,13 @@ func TestUserCondRendersQuotedUserTableOnPostgres(t *testing.T) {
 
 	// 反向断言：不得出现双重引号、反引号（PG 不支持），
 	// 也不得出现**未引用**的保留字表名前缀 user.（这正是 tenant_user 改名前的做法）。
-	for _, bad := range []string{"`", `""user""`, `"user""`} {
+	for _, bad := range []string{"`", `""iam_user""`, `"iam_user""`} {
 		if strings.Contains(sql, bad) {
 			t.Errorf("SQL 出现非法引用 %q（双重引号/反引号）\n实际: %s", bad, sql)
 		}
 	}
-	if strings.Contains(sql, "user.tenant_id") && !strings.Contains(sql, `"user".tenant_id`) {
-		t.Errorf("SQL 使用了未引用的保留字表名 user.tenant_id\n实际: %s", sql)
+	if strings.Contains(sql, "iam_user.tenant_id") && !strings.Contains(sql, `"iam_user".tenant_id`) {
+		t.Errorf("SQL 使用了未引用的表名 iam_user.tenant_id\n实际: %s", sql)
 	}
 }
 
@@ -134,8 +134,8 @@ func TestUserDaoParamQueryRendersQuotedUserTableOnPostgres(t *testing.T) {
 	}
 	sql := (*sqls)[len(*sqls)-1]
 	t.Logf("PG dry-run SQL: %s", sql)
-	if !strings.Contains(sql, `FROM "user"`) {
-		t.Errorf("GetByID 缺少 FROM \"user\"\n实际: %s", sql)
+	if !strings.Contains(sql, `FROM "iam_user"`) {
+		t.Errorf("GetByID 缺少 FROM \"iam_user\"\n实际: %s", sql)
 	}
 	if strings.Contains(sql, "`") {
 		t.Errorf("GetByID SQL 出现反引号（PG 不支持）\n实际: %s", sql)
@@ -159,8 +159,8 @@ func TestUserEntityPhysicalDeleteRendersQuotedUserTableOnPostgres(t *testing.T) 
 
 	sql := rec.lastSQL()
 	t.Logf("PG SQL: %s", sql)
-	if !strings.Contains(sql, `DELETE FROM "user"`) {
-		t.Errorf("物理删除缺少 DELETE FROM \"user\"\n实际: %s", sql)
+	if !strings.Contains(sql, `DELETE FROM "iam_user"`) {
+		t.Errorf("物理删除缺少 DELETE FROM \"iam_user\"\n实际: %s", sql)
 	}
 	if strings.Contains(sql, "`") {
 		t.Errorf("物理删除 SQL 出现反引号（PG 不支持）\n实际: %s", sql)
@@ -227,8 +227,8 @@ func TestUserCondKeywordRendersClauseStyleOnPostgres(t *testing.T) {
 	t.Logf("PG dry-run SQL: %s", sql)
 
 	for _, want := range []string{
-		`"user"."name" LIKE '%alice%'`,
-		`"user"."person_id" IN (SELECT id FROM "person"`,
+		`"iam_user"."name" LIKE '%alice%'`,
+		`"iam_user"."person_id" IN (SELECT id FROM "iam_person"`,
 	} {
 		if !strings.Contains(sql, want) {
 			t.Errorf("SQL 缺少 %q\n实际: %s", want, sql)

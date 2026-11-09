@@ -6,7 +6,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameRefreshToken = "refresh_token"
+const TableNameRefreshToken = "iam_refresh_token"
 
 type RefreshTokenEntity struct {
 	gormdao.BaseEntity

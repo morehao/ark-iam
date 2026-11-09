@@ -4,6 +4,7 @@ package seed_test
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"os"
 	"strings"
@@ -56,12 +57,12 @@ func TestBootstrapAgainstPostgres(t *testing.T) {
 	// 清理旧数据（顺序：先删关联表，再删主表）
 	cleanup := func() {
 		tables := []string{
-			"user_role", "role_menu", "tenant_application",
-			"application_client_secret", "application_client", "menu",
-			"role", "user_identity", "user_login_log",
-			"department_user", "department", `"user"`, "person",
-			"refresh_token", "session", "audit_log", "api_key", "connector",
-			"domain", "system", "log", "application", "tenant",
+			model.TableNameUserRole, model.TableNameRoleMenu, model.TableNameTenantApplication,
+			model.TableNameApplicationClientSecret, model.TableNameApplicationClient, model.TableNameMenu,
+			model.TableNameRole, model.TableNameUserIdentity, model.TableNameUserLoginLog,
+			model.TableNameDepartmentUser, model.TableNameDepartment, model.TableNameUser, model.TableNamePerson,
+			model.TableNameRefreshToken, model.TableNameSession, model.TableNameAuditLog, model.TableNameApiKey, model.TableNameConnector,
+			model.TableNameDomain, "system", "log", model.TableNameApplication, model.TableNameTenant,
 		}
 		for _, tbl := range tables {
 			_ = db.Exec("DROP TABLE IF EXISTS " + tbl).Error
@@ -99,18 +100,18 @@ func TestBootstrapAgainstPostgres(t *testing.T) {
 			t.Errorf("table %s: want %d rows, got %d", tbl, want, n)
 		}
 	}
-	assertCount("tenant", 1)
-	assertCount("application", 2)
-	assertCount("role", 2)
-	assertCount("menu", 14)
-	assertCount("person", 1)
-	assertCount(`"user"`, 1)
-	assertCount("application_client", 2)
-	assertCount("user_role", 2)
-	assertCount("role_menu", 14)
-	assertCount("tenant_application", 2)
-	assertCount("department", 1)
-	assertCount("department_user", 1)
+	assertCount(model.TableNameTenant, 1)
+	assertCount(model.TableNameApplication, 2)
+	assertCount(model.TableNameRole, 2)
+	assertCount(model.TableNameMenu, 14)
+	assertCount(model.TableNamePerson, 1)
+	assertCount(model.TableNameUser, 1)
+	assertCount(model.TableNameApplicationClient, 2)
+	assertCount(model.TableNameUserRole, 2)
+	assertCount(model.TableNameRoleMenu, 14)
+	assertCount(model.TableNameTenantApplication, 2)
+	assertCount(model.TableNameDepartment, 1)
+	assertCount(model.TableNameDepartmentUser, 1)
 
 	// 验证管理员用户归属
 	var u model.UserEntity
@@ -157,22 +158,22 @@ func TestBootstrapAgainstPostgres(t *testing.T) {
 
 	// 16 个布尔语义列：抽查各表代表列，必须是 varchar(16)（具名枚举列统一宽度）
 	for _, col := range []struct{ table, column string }{
-		{"person", "status"},
-		{"person", "password_status"},
-		{"user", "status"},
-		{"user", "owner_type"},
-		{"domain", "verification_status"},
-		{"application", "allow_person_create_tenant"},
-		{"application", "allow_join_by_invite"},
-		{"application_client", "require_pkce"},
-		{"application_client", "require_auth_time"},
-		{"menu", "hidden"},
-		{"menu", "external_link"},
-		{"menu", "keep_alive"},
-		{"connector", "allow_auto_create_user"},
-		{"connector", "allow_account_link"},
-		{"connector", "sync_profile"},
-		{"connector", "enable_token_storage"},
+		{model.TableNamePerson, "status"},
+		{model.TableNamePerson, "password_status"},
+		{model.TableNameUser, "status"},
+		{model.TableNameUser, "owner_type"},
+		{model.TableNameDomain, "verification_status"},
+		{model.TableNameApplication, "allow_person_create_tenant"},
+		{model.TableNameApplication, "allow_join_by_invite"},
+		{model.TableNameApplicationClient, "require_pkce"},
+		{model.TableNameApplicationClient, "require_auth_time"},
+		{model.TableNameMenu, "hidden"},
+		{model.TableNameMenu, "external_link"},
+		{model.TableNameMenu, "keep_alive"},
+		{model.TableNameConnector, "allow_auto_create_user"},
+		{model.TableNameConnector, "allow_account_link"},
+		{model.TableNameConnector, "sync_profile"},
+		{model.TableNameConnector, "enable_token_storage"},
 	} {
 		row, ok := columnOf(col.table, col.column)
 		if !ok {
@@ -186,11 +187,11 @@ func TestBootstrapAgainstPostgres(t *testing.T) {
 
 	// JSON 列：必须是 jsonb（serializer:json + 具名载具类型），抽查覆盖 3 类载具
 	for _, col := range []struct{ table, column string }{
-		{"application", "role_template"},
-		{"application_client", "redirect_uris"},
-		{"connector", "config"},
-		{"refresh_token", "scopes"},
-		{"user_identity", "detail"},
+		{model.TableNameApplication, "role_template"},
+		{model.TableNameApplicationClient, "redirect_uris"},
+		{model.TableNameConnector, "config"},
+		{model.TableNameRefreshToken, "scopes"},
+		{model.TableNameUserIdentity, "detail"},
 	} {
 		row, ok := columnOf(col.table, col.column)
 		if !ok {
@@ -204,21 +205,21 @@ func TestBootstrapAgainstPostgres(t *testing.T) {
 
 	// 已下线列必须不存在（AutoMigrate 只增不删：全新库更不该有）
 	for _, col := range []struct{ table, column string }{
-		{"tenant_application", "config"},
-		{"tenant_application", "granted_scope"},
-		{"person", "profile"},
-		{"person", "custom_data"},
-		{"person", "must_change_password"},
-		{"person", "is_suspended"},
-		{"user", "profile"},
-		{"user", "custom_data"},
-		{"user", "is_owner"},
-		{"user", "is_suspended"},
-		{"api_key", "scope"},
-		{"api_key", "last_used_at"},
-		{"user_identity", "last_used_at"},
-		{"domain", "is_verified"},
-		{"domain", "verified_at"},
+		{model.TableNameTenantApplication, "config"},
+		{model.TableNameTenantApplication, "granted_scope"},
+		{model.TableNamePerson, "profile"},
+		{model.TableNamePerson, "custom_data"},
+		{model.TableNamePerson, "must_change_password"},
+		{model.TableNamePerson, "is_suspended"},
+		{model.TableNameUser, "profile"},
+		{model.TableNameUser, "custom_data"},
+		{model.TableNameUser, "is_owner"},
+		{model.TableNameUser, "is_suspended"},
+		{model.TableNameApiKey, "scope"},
+		{model.TableNameApiKey, "last_used_at"},
+		{model.TableNameUserIdentity, "last_used_at"},
+		{model.TableNameDomain, "is_verified"},
+		{model.TableNameDomain, "verified_at"},
 	} {
 		if row, ok := columnOf(col.table, col.column); ok {
 			t.Errorf("已下线列 %s.%s 仍存在（type=%s）", col.table, col.column, row.DataType)
@@ -247,22 +248,22 @@ func TestBootstrapAgainstPostgres(t *testing.T) {
 		column  string
 		allowed []string
 	}{
-		{"person", "status", allowedValues(string(model.PersonStatusActive), string(model.PersonStatusSuspended))},
-		{"person", "password_status", allowedValues(string(model.PasswordStatusNormal), string(model.PasswordStatusMustChange))},
-		{"user", "status", allowedValues(string(model.UserStatusActive), string(model.UserStatusSuspended))},
-		{"user", "owner_type", allowedValues(string(model.OwnerTypeOwner), string(model.OwnerTypeNormal))},
-		{"domain", "verification_status", allowedValues(string(model.DomainVerificationUnverified), string(model.DomainVerificationVerified))},
-		{"application", "allow_person_create_tenant", allowedValues(string(model.AppPersonCreateTenantPolicyEnable), string(model.AppPersonCreateTenantPolicyDisable))},
-		{"application", "allow_join_by_invite", allowedValues(string(model.AppJoinByInvitePolicyEnable), string(model.AppJoinByInvitePolicyDisable))},
-		{"application_client", "require_pkce", allowedValues(string(model.ClientPKCEPolicyEnable), string(model.ClientPKCEPolicyDisable))},
-		{"application_client", "require_auth_time", allowedValues(string(model.ClientAuthTimeClaimPolicyEnable), string(model.ClientAuthTimeClaimPolicyDisable))},
-		{"menu", "hidden", allowedValues(string(model.MenuHiddenFlagEnable), string(model.MenuHiddenFlagDisable))},
-		{"menu", "external_link", allowedValues(string(model.MenuExternalLinkFlagEnable), string(model.MenuExternalLinkFlagDisable))},
-		{"menu", "keep_alive", allowedValues(string(model.MenuKeepAliveFlagEnable), string(model.MenuKeepAliveFlagDisable))},
-		{"connector", "allow_auto_create_user", allowedValues(string(model.ConnectorAutoCreateUserFlagEnable), string(model.ConnectorAutoCreateUserFlagDisable))},
-		{"connector", "allow_account_link", allowedValues(string(model.ConnectorAccountLinkFlagEnable), string(model.ConnectorAccountLinkFlagDisable))},
-		{"connector", "sync_profile", allowedValues(string(model.ConnectorSyncProfileFlagEnable), string(model.ConnectorSyncProfileFlagDisable))},
-		{"connector", "enable_token_storage", allowedValues(string(model.ConnectorTokenStorageFlagEnable), string(model.ConnectorTokenStorageFlagDisable))},
+		{model.TableNamePerson, "status", allowedValues(string(model.PersonStatusActive), string(model.PersonStatusSuspended))},
+		{model.TableNamePerson, "password_status", allowedValues(string(model.PasswordStatusNormal), string(model.PasswordStatusMustChange))},
+		{model.TableNameUser, "status", allowedValues(string(model.UserStatusActive), string(model.UserStatusSuspended))},
+		{model.TableNameUser, "owner_type", allowedValues(string(model.OwnerTypeOwner), string(model.OwnerTypeNormal))},
+		{model.TableNameDomain, "verification_status", allowedValues(string(model.DomainVerificationUnverified), string(model.DomainVerificationVerified))},
+		{model.TableNameApplication, "allow_person_create_tenant", allowedValues(string(model.AppPersonCreateTenantPolicyEnable), string(model.AppPersonCreateTenantPolicyDisable))},
+		{model.TableNameApplication, "allow_join_by_invite", allowedValues(string(model.AppJoinByInvitePolicyEnable), string(model.AppJoinByInvitePolicyDisable))},
+		{model.TableNameApplicationClient, "require_pkce", allowedValues(string(model.ClientPKCEPolicyEnable), string(model.ClientPKCEPolicyDisable))},
+		{model.TableNameApplicationClient, "require_auth_time", allowedValues(string(model.ClientAuthTimeClaimPolicyEnable), string(model.ClientAuthTimeClaimPolicyDisable))},
+		{model.TableNameMenu, "hidden", allowedValues(string(model.MenuHiddenFlagEnable), string(model.MenuHiddenFlagDisable))},
+		{model.TableNameMenu, "external_link", allowedValues(string(model.MenuExternalLinkFlagEnable), string(model.MenuExternalLinkFlagDisable))},
+		{model.TableNameMenu, "keep_alive", allowedValues(string(model.MenuKeepAliveFlagEnable), string(model.MenuKeepAliveFlagDisable))},
+		{model.TableNameConnector, "allow_auto_create_user", allowedValues(string(model.ConnectorAutoCreateUserFlagEnable), string(model.ConnectorAutoCreateUserFlagDisable))},
+		{model.TableNameConnector, "allow_account_link", allowedValues(string(model.ConnectorAccountLinkFlagEnable), string(model.ConnectorAccountLinkFlagDisable))},
+		{model.TableNameConnector, "sync_profile", allowedValues(string(model.ConnectorSyncProfileFlagEnable), string(model.ConnectorSyncProfileFlagDisable))},
+		{model.TableNameConnector, "enable_token_storage", allowedValues(string(model.ConnectorTokenStorageFlagEnable), string(model.ConnectorTokenStorageFlagDisable))},
 	} {
 		var illegal int64
 		if err := db.Table(col.table).
@@ -280,7 +281,7 @@ func TestBootstrapAgainstPostgres(t *testing.T) {
 	// 但 PKCE 未强制意味着授权码可被截获重放，故显式钉住种子必须写 enable。
 	for _, code := range []string{model.SeedBuiltinClientPlatformAdminWeb, model.SeedBuiltinClientTenantAdminWeb} {
 		var policy string
-		if err := db.Raw(`SELECT require_pkce FROM application_client WHERE code = ?`, code).Scan(&policy).Error; err != nil {
+		if err := db.Raw(fmt.Sprintf(`SELECT require_pkce FROM %s WHERE code = ?`, model.TableNameApplicationClient), code).Scan(&policy).Error; err != nil {
 			t.Fatalf("query require_pkce of %s: %v", code, err)
 		}
 		if policy != string(model.ClientPKCEPolicyEnable) {

@@ -4,7 +4,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameTenantApplication = "tenant_application"
+const TableNameTenantApplication = "iam_tenant_application"
 
 // TenantApplicationStatus 租户应用订阅启停状态（启停语义统一使用 enable/disable）。
 // 取值与 AppStatus 相同但语义不同：AppStatus 描述应用自身，本类型描述「租户是否订阅该应用」。

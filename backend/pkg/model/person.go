@@ -6,7 +6,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNamePerson = "person"
+const TableNamePerson = "iam_person"
 
 // PasswordMethod 密码加密方式（字典值，落 person.password_method）。
 type PasswordMethod string

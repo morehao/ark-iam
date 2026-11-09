@@ -6,7 +6,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameRole = "role"
+const TableNameRole = "iam_role"
 
 // RoleSource 角色来源。
 type RoleSource string

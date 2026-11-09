@@ -48,9 +48,9 @@ func TestTableConflict(t *testing.T) {
 	}
 	defer app.Close()
 
-	// 预置一张名为 user、但缺 id/created_at 的「三方业务表」。
+	// 预置一张名为 iam_user、但缺 id/created_at 的「三方业务表」（与 IAM 表同名，触发撞名）。
 	db := app.DBGetter()(context.Background())
-	if err := db.Exec("CREATE TABLE user (external_id TEXT PRIMARY KEY, nickname TEXT)").Error; err != nil {
+	if err := db.Exec("CREATE TABLE iam_user (external_id TEXT PRIMARY KEY, nickname TEXT)").Error; err != nil {
 		t.Fatalf("create conflicting table: %v", err)
 	}
 
@@ -59,8 +59,8 @@ func TestTableConflict(t *testing.T) {
 	if !errors.As(err, &conflict) {
 		t.Fatalf("RunMigrations: want ErrTableConflict, got %v", err)
 	}
-	if conflict.Table != "user" {
-		t.Fatalf("conflict table: want user, got %q", conflict.Table)
+	if conflict.Table != "iam_user" {
+		t.Fatalf("conflict table: want iam_user, got %q", conflict.Table)
 	}
 }
 
@@ -71,14 +71,14 @@ func TestTableConflictAllowlist(t *testing.T) {
 		DB:                  DBConfig{DSN: "sqlite://:memory:"},
 		Domains:             []Domain{DomainMenu},
 		SameDatabase:        true,
-		AllowExistingTables: []string{"user"},
+		AllowExistingTables: []string{"iam_user"},
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
 	defer app.Close()
 	db := app.DBGetter()(context.Background())
-	if err := db.Exec("CREATE TABLE user (external_id TEXT PRIMARY KEY)").Error; err != nil {
+	if err := db.Exec("CREATE TABLE iam_user (external_id TEXT PRIMARY KEY)").Error; err != nil {
 		t.Fatalf("create table: %v", err)
 	}
 	// 白名单放行：不应返回 ErrTableConflict（后续 AutoMigrate 可能因列冲突另报错，但非撞名错误）。

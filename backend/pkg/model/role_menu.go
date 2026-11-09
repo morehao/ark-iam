@@ -4,7 +4,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameRoleMenu = "role_menu"
+const TableNameRoleMenu = "iam_role_menu"
 
 type RoleMenuEntity struct {
 	gormdao.BaseEntity

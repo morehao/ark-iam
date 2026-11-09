@@ -4,7 +4,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameUserRole = "user_role"
+const TableNameUserRole = "iam_user_role"
 
 type UserRoleEntity struct {
 	gormdao.BaseEntity
