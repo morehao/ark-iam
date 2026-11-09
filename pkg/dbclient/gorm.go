@@ -93,7 +93,7 @@ func UseTenantScopePlugin(db *gorm.DB) error {
 	return db.Use(plugin)
 }
 
-// NewStore 实例化一个携带租户隔离插件的数据库连接，供「可嵌入 IAM 库」（backend/iam）
+// NewStore 实例化一个携带租户隔离插件的数据库连接，供「可嵌入 IAM 库」（iam/）
 // 以实例方式持有，而不依赖包级全局 dbMap。与 InitMultiDB 复用同一份租户插件配置，
 // 保证内嵌与独立部署的隔离语义一致。
 //
@@ -109,7 +109,7 @@ func NewStore(cfg dbgorm.Config) (*gorm.DB, error) {
 	return db, nil
 }
 
-// SetIamDB 将给定连接注册为全局 iam 库（生产用）。可嵌入 IAM 库（backend/iam）在实例化时
+// SetIamDB 将给定连接注册为全局 iam 库（生产用）。可嵌入 IAM 库（iam/）在实例化时
 // 调用它，使仍通过全局 dbclient.IamDB 取连接的共享代码（pkg/sso、pkg/core 默认路径等）
 // 与实例使用同一份连接。一进程一 IAM 实例语义下这是安全且必要的桥接。
 func SetIamDB(db *gorm.DB) {

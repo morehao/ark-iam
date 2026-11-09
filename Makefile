@@ -68,7 +68,6 @@ build:
 	$(call validate_app)
 	@echo "🔨 正在构建应用程序 $(APP)..."
 	@mkdir -p $(BUILD_DIR)
-	@cd backend && go work sync && cd ..
 	@cd backend && go build -ldflags="-X 'main.BuildVersion=$(VERSION)'" -o $(BUILD_DIR)/$(BINARY) $(MAIN_DIR)
 	@echo "✅ 构建完成: $(BUILD_DIR)/$(BINARY)"
 
@@ -77,7 +76,6 @@ build-env:
 	$(call validate_app)
 	@echo "🔨 正在为 [$(GO_ENV)] 构建 $(APP)..."
 	@mkdir -p $(BUILD_DIR)
-	@cd backend && go work sync && cd ..
 	@cd backend && $(GO_ENV) go build -ldflags="-X 'main.BuildVersion=$(VERSION)'" -o $(BUILD_DIR)/$(BINARY) $(MAIN_DIR)
 	@echo "✅ 构建完成: $(BUILD_DIR)/$(BINARY)"
 
@@ -99,14 +97,12 @@ clean:
 run:
 	$(call validate_app)
 	@echo "🚀 正在运行应用程序 $(APP)..."
-	@cd backend && go work sync && cd ..
 	@cd backend/apps/$(APP)/cmd && go run .
 
 # 运行单元测试
 test:
 	$(call validate_app)
 	@echo "🧪 正在运行测试..."
-	@cd backend && go work sync && cd ..
 	@cd backend && go test ./apps/$(APP)/... -v
 
 # 运行 SDK（backend/sdk）全部测试：契约 + RP 核心 + 客户端
@@ -118,15 +114,15 @@ test-sdk:
 sdk-check-deps:
 	@bash sdk/scripts/check-deps.sh
 
-# 可嵌入 IAM 库（backend/iam）构建
+# 可嵌入 IAM 库（iam/）构建
 iam-build:
-	@echo "🔨 构建可嵌入 IAM 库（backend/iam）..."
-	@cd backend && go build ./iam/...
+	@echo "🔨 构建可嵌入 IAM 库（iam/）..."
+	@go build ./iam/...
 
-# 可嵌入 IAM 库（backend/iam）测试
+# 可嵌入 IAM 库（iam/）测试
 test-iam:
 	@echo "🧪 正在运行可嵌入 IAM 库测试..."
-	@cd backend && go test ./iam/... -count=1
+	@go test ./iam/... -count=1
 
 
 # ============================================================
@@ -145,7 +141,6 @@ dev-all:
 	@echo "   后端: gateway → http://localhost:8100（聚合 auth/platformadmin/tenantadmin/rpapi）"
 	@echo "   前端: login-web(:4000) / platform-admin-web(:4001) / tenant-admin-web(:4002)"
 	@echo "   前置: PostgreSQL 与 Redis 需已启动；Ctrl+C 一并停止全部服务"
-	@cd backend && go work sync && cd ..
 	@echo "🔨 正在构建后端 gateway..."
 	@cd backend/apps/gateway/cmd && go build -o /tmp/ark-iam-gateway-dev .
 	@be_pid=""; \
@@ -191,7 +186,6 @@ dev-all:
 # 同步 workspace 并更新所有子模块依赖
 deps:
 	@echo "📦 正在下载依赖项..."
-	@cd backend && go work sync && cd ..
 	@find ./backend -name "go.mod" -not -path "*/vendor/*" | while read modfile; do \
 		dir=$$(dirname $$modfile); \
 		echo "  => $$dir"; \
@@ -206,7 +200,6 @@ tidy:
 		echo "==> Tidy in $$dir"; \
 		(cd $$dir && go mod tidy); \
 	done
-	@cd backend && go work sync && cd ..
 	@echo "✅ go mod tidy 完成"
 
 # 升级指定依赖包（仅在引用该包的模块中执行）
@@ -359,7 +352,7 @@ e2e-test:
 # 菜单行归运维后 L1 只播种一次，升级带来的新菜单不会自动下发，必须照本清单手工录入。
 print-builtin-menus:
 	@echo "📋 正在生成内置菜单清单..."
-	@cd backend && go run ./pkg/cmd/printbuiltinmenus
+	@go run ./pkg/cmd/printbuiltinmenus
 
 # 列出所有可用的应用程序
 list-apps:

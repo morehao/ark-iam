@@ -176,8 +176,8 @@ func TestRemovedMechanismsLeaveNoResidue(t *testing.T) {
 	}
 
 	// 退役清单文件本身也必须不存在
-	if _, statErr := os.Stat(filepath.Join(root, "backend/pkg/seed/retired_menu.go")); statErr == nil {
-		t.Error("backend/pkg/seed/retired_menu.go 仍存在：菜单下线不再需要版本级清单")
+	if _, statErr := os.Stat(filepath.Join(root, "pkg/seed/retired_menu.go")); statErr == nil {
+		t.Error("pkg/seed/retired_menu.go 仍存在：菜单下线不再需要版本级清单")
 	}
 }
 
@@ -226,10 +226,10 @@ func exportedSurface(t *testing.T) []string {
 	return names
 }
 
-// repoRoot 返回仓库根目录（测试的工作目录是 backend/pkg/seed）。
+// repoRoot 返回仓库根目录（测试的工作目录是 pkg/seed）。
 func repoRoot(t *testing.T) string {
 	t.Helper()
-	root, err := filepath.Abs("../../..")
+	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatalf("resolve repo root: %v", err)
 	}

@@ -4,7 +4,7 @@
 
 `ark-iam` is a full-stack project with Go backend and React frontend. The backend is based on [Gin](https://github.com/gin-gonic/gin), providing a layered, maintainable, and scalable service structure with multiple app modules.
 
-The IAM backend is split into four apps under `backend/apps/` (auth, platformadmin, tenantadmin, gateway) sharing a common `backend/pkg` layer, managed as a Go workspace (`backend/go.work`).
+The IAM backend is split into five apps under `backend/apps/` (auth, platformadmin, tenantadmin, gateway, rpapi). The reusable layers live at the repository root as standalone Go modules — `pkg/` (common packages), `iam/` (embeddable IAM library) and `sdk/` (RP-side SDK) — all managed by the root `go.work` and individually consumable via `go get`.
 
 ---
 
@@ -26,15 +26,17 @@ The IAM backend is split into four apps under `backend/apps/` (auth, platformadm
 
 ```
 ark-iam/
-├── backend/               # Go backend (project-layout based, go.work multi-module)
+├── go.work                # Root Go workspace (covers pkg/ iam/ sdk/ + backend/apps/*)
+├── pkg/                   # Common packages module (github.com/morehao/ark-iam/pkg) — go get-able
+├── iam/                   # Embeddable IAM library module (github.com/morehao/ark-iam/iam) — go get-able
+├── sdk/                   # RP-side SDK module (github.com/morehao/ark-iam/sdk) — go get-able
+├── backend/               # Go backend apps (project-layout based)
 │   ├── apps/
 │   │   ├── auth/          # Authentication gateway (login/register/token/OIDC), :8081
 │   │   ├── platformadmin/ # Platform management (user/role/menu/tenant), :8082
 │   │   ├── tenantadmin/   # Tenant self-service (department/user/role), :8083
 │   │   └── gateway/       # Aggregate app mounting all three, :8100
-│   ├── pkg/               # Common packages (shared across apps)
-│   ├── scripts/           # Scripts
-│   └── Makefile
+│   └── examples/          # In-repo examples (embedded-iam-demo)
 ├── frontend/              # React frontend (Vite + React)
 ├── docs/                 # Documentation
 ├── Makefile              # Root Makefile

@@ -53,7 +53,8 @@ func findConfigPath(appName string) string {
 	pkgDir := filepath.Dir(filename)
 	projectRoot := filepath.Dir(filepath.Dir(pkgDir))
 
-	return filepath.Join(projectRoot, "apps", appName, "config", "config.yaml")
+	// pkg 已搬到仓库根级，apps 仍在 backend/ 下：projectRoot 为仓库根，配置在 backend/apps/<app>/config。
+	return filepath.Join(projectRoot, "backend", "apps", appName, "config", "config.yaml")
 }
 
 func (i *baseAppInitializer) Init() error {
