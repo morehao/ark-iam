@@ -1,4 +1,5 @@
-import axios from 'axios'
+import axios, { type InternalAxiosRequestConfig } from 'axios'
+import { getRuntimeConfig } from './config'
 import type {
   ApiResponse,
   OIDCLoginReq,
@@ -66,19 +67,35 @@ function normalizeAxiosError(error: unknown): unknown {
   return error
 }
 
-/** login-web 的 OIDC 凭证调用（baseURL /oidc，走 Vite 代理到 gateway）。 */
-export const oidcApi = axios.create({
-  baseURL: '/oidc',
-  timeout: 10000,
-})
+/**
+ * 在请求前注入运行时 baseURL（内嵌形态前缀自适应）。
+ *
+ * 构建期无法确定挂载前缀（`/` 或 `/iam` 等），故 axios 实例创建时不写死 baseURL，
+ * 每次请求从 `getRuntimeConfig()` 取后端下发的带前缀 base（oidcBase / installBase）。
+ * 若运行时配置尚未落定，回退到实例自身的 baseURL（旧根行为）。
+ */
+function applyDynamicBase(getBase: () => string) {
+  return (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
+    const base = getBase()
+    if (base) config.baseURL = base
+    return config
+  }
+}
+
+/** login-web 的 OIDC 凭证调用（baseURL 由 config.json 的 oidcBase 运行时下发）。 */
+export const oidcApi = axios.create({ timeout: 10000 })
+// baseURL 运行时注入：优先 config.json 的 oidcBase，回退根 /oidc。
+oidcApi.interceptors.request.use(
+  applyDynamicBase(() => getRuntimeConfig()?.oidcBase || '/oidc'),
+)
 // 守卫返回真实 409（见 normalizeAxiosError 注释），必须归一后才能识别 code=107004
 oidcApi.interceptors.response.use((resp) => resp, (error) => Promise.reject(normalizeAxiosError(error)))
 
-/** /install 调用（baseURL /install，同一代理机制；公开只读 status + 唯一写端点 initialize）。 */
-export const installApi = axios.create({
-  baseURL: '/install',
-  timeout: 15000,
-})
+/** /install 调用（baseURL 由 config.json 的 installBase 运行时下发；公开只读 status + 唯一写端点 initialize）。 */
+export const installApi = axios.create({ timeout: 15000 })
+installApi.interceptors.request.use(
+  applyDynamicBase(() => getRuntimeConfig()?.installBase || '/install'),
+)
 
 // 后端统一响应信封：业务失败也返回 HTTP 200，需按 code 判断
 export async function oidcLogin(data: OIDCLoginReq): Promise<OIDCLoginResp> {

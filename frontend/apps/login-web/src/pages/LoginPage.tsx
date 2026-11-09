@@ -8,6 +8,7 @@ import {
   oidcChangePassword,
   installRedirectForError,
 } from '../api'
+import { appPath } from '../config'
 import '../LoginPage.css'
 
 type Mode = 'login' | 'register' | 'createTenant' | 'changePassword'
@@ -44,7 +45,7 @@ export default function LoginPage() {
   const failWith = (err: unknown, fallback: string) => {
     const redirect = installRedirectForError(err)
     if (redirect) {
-      window.location.href = redirect
+      window.location.href = appPath(redirect)
       return
     }
     setError(err instanceof Error && err.message ? err.message : fallback)
@@ -60,7 +61,7 @@ export default function LoginPage() {
       .catch((err) => {
         setAllowRegister(false)
         if (installRedirectForError(err)) {
-          window.location.href = '/install'
+          window.location.href = appPath('/install')
         }
       })
   }, [authRequestID])

@@ -113,3 +113,43 @@ func TestConfigJSON_CORSHeader(t *testing.T) {
 		t.Errorf("Access-Control-Allow-Origin = %q, want http://app.example.com", got)
 	}
 }
+
+// TestConfigJSON_PrefixedBases 验证非空前缀挂载（内嵌形态，如 /iam）下 /config.json 下发的
+// 各端点 base 均带前缀——登录页 SPA 据此自适应，避免打到根 /oidc、/install 而 404。
+func TestConfigJSON_PrefixedBases(t *testing.T) {
+	raw := &pkconfig.Config{OIDC: pkconfig.OIDC{Issuer: "http://localhost:8099/iam/oidc"}}
+	e := mountFrontendOnly(t, raw, "/iam")
+	out := getConfigJSON(t, e, "http://localhost:8099/iam/config.json")
+
+	cases := map[string]string{
+		"apiBase":     "/iam/v1",
+		"oidcBase":    "/iam/oidc",
+		"installBase": "/iam/install",
+		"loginPath":   "/iam/login",
+	}
+	for k, want := range cases {
+		if got := out[k]; got != want {
+			t.Errorf("%s = %v, want %s", k, got, want)
+		}
+	}
+	if out["callbackPath"] != "/auth/callback" {
+		t.Errorf("callbackPath = %v", out["callbackPath"])
+	}
+}
+
+// TestConfigJSON_RootBases 验证根挂载（"" 前缀）时 base 仍为无前缀形态（向后兼容网关/独立部署）。
+func TestConfigJSON_RootBases(t *testing.T) {
+	e := mountFrontendOnly(t, nil, "")
+	out := getConfigJSON(t, e, "http://x/config.json")
+	for k, want := range map[string]string{
+		"apiBase": "/v1", "oidcBase": "/oidc", "installBase": "/install", "loginPath": "/login",
+	} {
+		if got := out[k]; got != want {
+			t.Errorf("%s = %v, want %s", k, got, want)
+		}
+	}
+	// 根挂载 issuer 由 host 派生，不应带多余前缀段。
+	if got := out["issuer"]; got != "http://x/oidc" {
+		t.Errorf("issuer = %v, want http://x/oidc", got)
+	}
+}

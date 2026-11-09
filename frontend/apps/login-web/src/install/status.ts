@@ -1,3 +1,4 @@
+import { appPath } from '../config'
 import { INSTALL_MESSAGES } from './messages'
 import type { InstallConsoles, InstallStatus } from './types'
 
@@ -49,6 +50,16 @@ export function consoleEntries(consoles?: InstallConsoles): InstallConsoleEntry[
 /** 成功后的登录入口：优先后端回显的 loginURL，缺失时回退到本页登录路由。 */
 export const FALLBACK_LOGIN_URL = '/login'
 
+/**
+ * 解析安装成功后的登录入口。
+ *
+ * - 后端回显的 loginURL 若是**绝对地址**（含 scheme，如 http://host/iam/login）原样使用；
+ * - 若是**逻辑路径**（如 /login）或缺失（回退 /login），按当前挂载 basePath 前缀化
+ *   （`/iam/login`），与运行时的内嵌前缀保持一致。
+ */
 export function resolveLoginURL(loginURL?: string): string {
-  return (loginURL ?? '').trim() || FALLBACK_LOGIN_URL
+  const v = (loginURL ?? '').trim()
+  if (!v) return appPath(FALLBACK_LOGIN_URL)
+  if (/^https?:\/\//.test(v)) return v
+  return appPath(v)
 }
