@@ -1,0 +1,13 @@
+go 1.26.1
+
+use (
+	./backend/apps/auth
+	./backend/apps/gateway
+	./backend/apps/platformadmin
+	./backend/apps/rpapi
+	./backend/apps/tenantadmin
+	./backend/examples/embedded-iam-demo
+	./backend/iam
+	./backend/pkg
+	./sdk
+)

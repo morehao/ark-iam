@@ -112,11 +112,11 @@ test:
 # 运行 SDK（backend/sdk）全部测试：契约 + RP 核心 + 客户端
 test-sdk:
 	@echo "🧪 正在运行 RP SDK 测试..."
-	@cd backend/sdk && go test ./... -count=1
+	@cd sdk && go test ./... -count=1
 
 # SDK 依赖白名单断言：contract/rp 只允许标准库 + jwt/v5（禁止 gorm/gin/redis）
 sdk-check-deps:
-	@cd backend && bash sdk/scripts/check-deps.sh
+	@bash sdk/scripts/check-deps.sh
 
 # 可嵌入 IAM 库（backend/iam）构建
 iam-build:

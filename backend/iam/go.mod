@@ -13,5 +13,5 @@ require (
 
 replace (
 	github.com/morehao/ark-iam/pkg => ../pkg
-	github.com/morehao/ark-iam/sdk => ../sdk
+	github.com/morehao/ark-iam/sdk => ../../sdk
 )
