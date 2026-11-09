@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.1.3] - 2026-11-09
+
+### Features
+
+- IAM 表名与索引名统一加 iam_ 前缀以支持内嵌业务单体 (#83)
+
+### Fixes
+
+- **iam**: /config.json 运行时配置补齐 CORS/issuer/clientId + 文档 (#82)
+
+**Full Changelog**: https://github.com/morehao/ark-iam/compare/v0.1.2...v0.1.3
+
 ## [v0.1.2] - 2026-11-06
 
 ### Fixes
