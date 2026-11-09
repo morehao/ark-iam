@@ -4,13 +4,13 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameRoleMenu = "role_menu"
+const TableNameRoleMenu = "iam_role_menu"
 
 type RoleMenuEntity struct {
 	gormdao.BaseEntity
-	TenantID  string `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id;uniqueIndex:uk_role_menu_active,where:deleted_at IS NULL" json:"tenantID"`
-	RoleID    string `gorm:"column:role_id;type:varchar(36);not null;default:'';comment:角色ID;uniqueIndex:uk_role_menu_active,where:deleted_at IS NULL" json:"roleID"`
-	MenuID    string `gorm:"column:menu_id;type:varchar(36);not null;default:'';comment:菜单ID;uniqueIndex:uk_role_menu_active,where:deleted_at IS NULL" json:"menuID"`
+	TenantID  string `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id;uniqueIndex:iam_uk_role_menu_active,where:deleted_at IS NULL" json:"tenantID"`
+	RoleID    string `gorm:"column:role_id;type:varchar(36);not null;default:'';comment:角色ID;uniqueIndex:iam_uk_role_menu_active,where:deleted_at IS NULL" json:"roleID"`
+	MenuID    string `gorm:"column:menu_id;type:varchar(36);not null;default:'';comment:菜单ID;uniqueIndex:iam_uk_role_menu_active,where:deleted_at IS NULL" json:"menuID"`
 	CreatedBy string `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id" json:"createdBy"`
 	UpdatedBy string `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id" json:"updatedBy"`
 	DeletedBy string `gorm:"column:deleted_by;type:varchar(36);not null;default:'';comment:删除人id" json:"deletedBy"`

@@ -46,7 +46,7 @@ func TestBootstrap_DeletedBuiltinMenuStaysDeleted(t *testing.T) {
 		t.Fatalf("soft delete menu: %v", err)
 	}
 	beforeCounts := map[string]int64{}
-	for _, table := range []string{model.TableNameMenu, model.TableNameRoleMenu, "tenant", "application", "application_client"} {
+	for _, table := range []string{model.TableNameMenu, model.TableNameRoleMenu, model.TableNameTenant, model.TableNameApplication, model.TableNameApplicationClient} {
 		beforeCounts[table] = countRows(t, db, table)
 	}
 

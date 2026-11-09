@@ -115,7 +115,7 @@ func TestUpdateClientKeepsJSONColumnsValidWhenOmitted(t *testing.T) {
 	var raw struct {
 		RedirectURIs string `gorm:"column:redirect_uris"`
 	}
-	if err := db.WithContext(dbclient.CrossTenantContext(ctx)).Raw("select redirect_uris from application_client where id = ?", client.ID).Scan(&raw).Error; err != nil {
+	if err := db.WithContext(dbclient.CrossTenantContext(ctx)).Raw("select redirect_uris from "+model.TableNameApplicationClient+" where id = ?", client.ID).Scan(&raw).Error; err != nil {
 		t.Fatalf("raw query: %v", err)
 	}
 	if raw.RedirectURIs != "[]" {

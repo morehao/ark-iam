@@ -6,7 +6,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameApplicationClientSecret = "application_client_secret"
+const TableNameApplicationClientSecret = "iam_application_client_secret"
 
 type ApplicationClientSecretEntity struct {
 	gormdao.BaseEntity

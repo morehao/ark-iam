@@ -4,7 +4,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameAuditLog = "audit_log"
+const TableNameAuditLog = "iam_audit_log"
 
 // AuditAction 审计动作标识（字典值，落 audit_log.action）。
 type AuditAction string

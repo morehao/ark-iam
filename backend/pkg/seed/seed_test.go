@@ -54,19 +54,19 @@ func TestBootstrapSQLite(t *testing.T) {
 			t.Fatalf("table %s: want %d rows, got %d", tbl, want, n)
 		}
 	}
-	assertCount("tenant", 1)
-	assertCount("application", 2)
-	assertCount("role", 2)
-	assertCount("menu", 14)
-	assertCount("person", 1)
-	assertCount("user", 1)
-	assertCount("application_client", 2)
-	assertCount("user_role", 2)
-	assertCount("user_application", 2)
-	assertCount("role_menu", 14)
-	assertCount("tenant_application", 2)
-	assertCount("department", 1)
-	assertCount("department_user", 1)
+	assertCount(model.TableNameTenant, 1)
+	assertCount(model.TableNameApplication, 2)
+	assertCount(model.TableNameRole, 2)
+	assertCount(model.TableNameMenu, 14)
+	assertCount(model.TableNamePerson, 1)
+	assertCount(model.TableNameUser, 1)
+	assertCount(model.TableNameApplicationClient, 2)
+	assertCount(model.TableNameUserRole, 2)
+	assertCount(model.TableNameUserApplication, 2)
+	assertCount(model.TableNameRoleMenu, 14)
+	assertCount(model.TableNameTenantApplication, 2)
+	assertCount(model.TableNameDepartment, 1)
+	assertCount(model.TableNameDepartmentUser, 1)
 
 	// 内置角色：admin 属平台管理后台、tenant_admin 属租户管理后台（source=builtin、admin_type=admin）。
 	// 角色无业务编码，按所属应用定位（每种内置角色在其应用内唯一）。

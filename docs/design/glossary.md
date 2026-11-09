@@ -9,7 +9,7 @@
 | 术语 | 英文 | 说明 |
 |---|---|---|
 | 自然人 ✅ | Person | 跨租户的**全局身份**。用户名/邮箱/手机号全局唯一（可空），密码、全局状态（挂起）在此维护。OIDC `sub` 为 `person:<id>` |
-| 租户成员 ✅ | User | 自然人（person）在某个**租户内**的成员记录（表 **`"user"`**——`user` 是 PostgreSQL 保留字，物理表名需按方言引用，由 golib gormdao 负责；领域实体为 `UserEntity`）。租户内姓名/资料/角色、归属类型（`owner_type`：`owner` 拥有者 / `normal` 普通成员）、加入时间 |
+| 租户成员 ✅ | User | 自然人（person）在某个**租户内**的成员记录（表 `iam_user`——全部 IAM 物理表统一带 `iam_` 前缀以便内嵌到业务单体；领域实体为 `UserEntity`）。租户内姓名/资料/角色、归属类型（`owner_type`：`owner` 拥有者 / `normal` 普通成员）、加入时间 |
 | 租户 | Tenant | 独立的客户边界（业务主体的隔离单元）。数据与权限按租户隔离；类型分 `customer`（客户租户）/`platform`（平台租户） |
 | 租户类型 | Tenant Type | **分类标识**：`customer` = 外部客户/合作方的独立租户；`platform` = 平台自运营租户（首次引导写入的平台租户「平台运营中心」即平台租户）。当前仅用于分类展示，不参与数据隔离与权限判定（隔离一律按 `tenant_id`） |
 | 租户编码 | Tenant Code | 租户的业务编码，全局唯一、创建后不可修改。由服务端自动生成，规则 `t_<12 位随机小写 hex>`（如 `t_3f7a9c1d2e4b`），见 `pkg/core/tenant.GenerateCode`；平台租户（首次引导写入的「平台运营中心」）为固定值 `t_platform`——同前缀、后缀固定可读，因自动生成的随机段只用小写 hex，两者不会冲突。平台的 `tenant.status` 还是字段权威矩阵里的 `immutable`（挂起整栈失联，控制台拒写） |

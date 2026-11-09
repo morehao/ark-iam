@@ -67,7 +67,7 @@ machine-user / invite / tenant-app / self-service。
 - **完整配置**：`Config.Raw *pkgconfig.Config` —— auth 的 OP（issuer/签名密钥/cookie/控制台回调）需要完整配置。
 - **私钥**：dev 自动生成；**非 dev 必须显式配置签名密钥 + encryptionKey + cookieSecure=true**，否则 `New` fail-closed。
 - **同库撞名**：`SameDatabase=true` 时，若目标库已存在同名但缺 `id`/`created_at` 的表 → `ErrTableConflict` fail-fast；
-  可用 `Config.AllowExistingTables` 白名单放行。
+  可用 `Config.AllowExistingTables` 白名单放行。（注：全部 IAM 表已统一带 `iam_` 前缀，与宿主 `user`/`role`/`tenant` 天然不冲突，该检测退化为兜底防御。）
 - 三方业务表**不要**用 IAM 的连接查（会被租户插件注入 `tenant_id`），用三方自己的 gorm 连接。
 
 ## 形态 1：单独部署 + sdk 接入

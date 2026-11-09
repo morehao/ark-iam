@@ -4,7 +4,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameTenantApplication = "tenant_application"
+const TableNameTenantApplication = "iam_tenant_application"
 
 // TenantApplicationStatus 租户应用订阅启停状态（启停语义统一使用 enable/disable）。
 // 取值与 AppStatus 相同但语义不同：AppStatus 描述应用自身，本类型描述「租户是否订阅该应用」。
@@ -18,8 +18,8 @@ const (
 
 type TenantApplicationEntity struct {
 	gormdao.BaseEntity
-	TenantID  string                  `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id;uniqueIndex:uk_tenant_application_active,where:deleted_at IS NULL" json:"tenantID"`
-	AppID     string                  `gorm:"column:app_id;type:varchar(36);not null;default:'';comment:应用id;uniqueIndex:uk_tenant_application_active,where:deleted_at IS NULL" json:"appID"`
+	TenantID  string                  `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id;uniqueIndex:iam_uk_tenant_application_active,where:deleted_at IS NULL" json:"tenantID"`
+	AppID     string                  `gorm:"column:app_id;type:varchar(36);not null;default:'';comment:应用id;uniqueIndex:iam_uk_tenant_application_active,where:deleted_at IS NULL" json:"appID"`
 	Status    TenantApplicationStatus `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态" json:"status"`
 	CreatedBy string                  `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id" json:"createdBy"`
 	UpdatedBy string                  `gorm:"column:updated_by;type:varchar(36);not null;default:'';comment:更新人id" json:"updatedBy"`

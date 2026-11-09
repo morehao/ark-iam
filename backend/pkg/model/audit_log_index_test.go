@@ -43,10 +43,10 @@ func newIndexProbeDB(t *testing.T) *gorm.DB {
 // TestAuditLogPerformanceIndexesCreated 三条审计查询索引确实被建出（P0 T6.2）。
 func TestAuditLogPerformanceIndexesCreated(t *testing.T) {
 	db := newIndexProbeDB(t)
-	for _, name := range []string{"idx_audit_tenant_created", "idx_audit_created", "idx_audit_actor_created"} {
+	for _, name := range []string{"iam_idx_audit_tenant_created", "iam_idx_audit_created", "iam_idx_audit_actor_created"} {
 		var count int64
 		require.NoError(t, db.Raw(
-			"select count(*) from sqlite_master where type='index' and tbl_name='audit_log' and name=?", name).Scan(&count).Error)
+			"select count(*) from sqlite_master where type='index' and tbl_name='iam_audit_log' and name=?", name).Scan(&count).Error)
 		assert.EqualValues(t, 1, count, "索引 %s 未创建", name)
 	}
 }
@@ -66,18 +66,18 @@ func TestAuditLogQueryPlanUsesIndex(t *testing.T) {
 	}{
 		{
 			name:      "租户视角（tenant_id + 时间窗，审计列表默认形态）",
-			query:     "select * from audit_log where tenant_id='tenant-01' and created_at >= '2026-01-01' and created_at <= '2027-01-01' order by created_at desc, id desc limit 20",
-			wantIndex: "idx_audit_tenant_created",
+			query:     "select * from iam_audit_log where tenant_id='tenant-01' and created_at >= '2026-01-01' and created_at <= '2027-01-01' order by created_at desc, id desc limit 20",
+			wantIndex: "iam_idx_audit_tenant_created",
 		},
 		{
 			name:      "全平台视角（仅时间窗）",
-			query:     "select * from audit_log where created_at >= '2026-01-01' and created_at <= '2027-01-01' order by created_at desc, id desc limit 20",
-			wantIndex: "idx_audit_created",
+			query:     "select * from iam_audit_log where created_at >= '2026-01-01' and created_at <= '2027-01-01' order by created_at desc, id desc limit 20",
+			wantIndex: "iam_idx_audit_created",
 		},
 		{
 			name:      "操作人视角（actor_person_id + 时间窗）",
-			query:     "select * from audit_log where actor_person_id='person-01' and created_at >= '2026-01-01' and created_at <= '2027-01-01' order by created_at desc, id desc limit 20",
-			wantIndex: "idx_audit_actor_created",
+			query:     "select * from iam_audit_log where actor_person_id='person-01' and created_at >= '2026-01-01' and created_at <= '2027-01-01' order by created_at desc, id desc limit 20",
+			wantIndex: "iam_idx_audit_actor_created",
 		},
 	}
 
@@ -99,7 +99,7 @@ func TestAuditLogQueryPlanUsesIndex(t *testing.T) {
 			t.Logf("查询计划：%s", plan)
 
 			assert.Contains(t, plan, c.wantIndex, "必须命中预期索引")
-			assert.NotContains(t, plan, "SCAN audit_log", "不得退化为全表扫描")
+			assert.NotContains(t, plan, "SCAN iam_audit_log", "不得退化为全表扫描")
 		})
 	}
 }

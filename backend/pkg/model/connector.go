@@ -4,7 +4,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameConnector = "connector"
+const TableNameConnector = "iam_connector"
 
 // ConnectorStatus 连接器启停状态。
 // 取值属全局启停语义，与其它领域统一为 enable/disable

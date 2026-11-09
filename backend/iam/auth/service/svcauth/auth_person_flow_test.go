@@ -219,7 +219,7 @@ func TestJoinTenantRejectsMissingInviteCode(t *testing.T) {
 		ClientID: identity.ClientIDFromContext(ginCtx),
 	})
 	assertCode(t, err, code.AuthJoinNotAllowedError)
-	if cerr := db.Exec("SELECT 1 FROM tenant_invite").Error; cerr != nil {
+	if cerr := db.Exec("SELECT 1 FROM " + model.TableNameInvite).Error; cerr != nil {
 		t.Fatalf("expected invite table migrated: %v", cerr)
 	}
 }

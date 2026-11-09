@@ -6,7 +6,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameUserLoginLog = "user_login_log"
+const TableNameUserLoginLog = "iam_user_login_log"
 
 // LoginType 登录方式（字典值，落 user_login_log.login_type）。
 type LoginType string

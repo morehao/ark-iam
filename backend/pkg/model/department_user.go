@@ -4,7 +4,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameDepartmentUser = "department_user"
+const TableNameDepartmentUser = "iam_department_user"
 
 // DeptUserRelationType 用户↔部门节点关系类型（强类型字符串枚举）。
 // 枚举值互斥纯净：primary（行政主部门）与 secondary（跨部门协作参与）、leader（负责人）是不同的关系种类；

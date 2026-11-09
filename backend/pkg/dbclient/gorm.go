@@ -9,6 +9,8 @@ import (
 	_ "github.com/morehao/golib/dbaccess/dbgorm/driver/postgres"
 	"github.com/morehao/golib/glog"
 	"gorm.io/gorm"
+
+	"github.com/morehao/ark-iam/pkg/model"
 )
 
 var (
@@ -30,12 +32,12 @@ const (
 // （平台端表现为 [100734] 查看应用列表失败等列表类错误）。
 // 判断标准：表结构不存在 tenant_id 列（见 pkg/model 各实体定义）。
 var tenantScopeSkipTables = []string{
-	"person",
-	"tenant",
-	"application",
-	"menu",
-	"user_identity",
-	"application_client_secret",
+	model.TableNamePerson,
+	model.TableNameTenant,
+	model.TableNameApplication,
+	model.TableNameMenu,
+	model.TableNameUserIdentity,
+	model.TableNameApplicationClientSecret,
 }
 
 func InitMultiDB(configs []dbgorm.Config, logConfig *glog.LogConfig) error {

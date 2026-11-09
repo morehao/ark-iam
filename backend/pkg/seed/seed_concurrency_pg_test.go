@@ -46,12 +46,12 @@ func TestBootstrapConcurrentOnlyOneWins(t *testing.T) {
 
 	dropAll := func() {
 		for _, tbl := range []string{
-			"user_role", "role_menu", "tenant_application",
-			"application_client_secret", "application_client", "menu",
-			"role", "user_identity", "user_login_log",
-			"department_user", "department", `"user"`, "person",
-			"refresh_token", "session", "audit_log", "api_key", "connector",
-			"domain", "system", "log", "application", "tenant",
+			model.TableNameUserRole, model.TableNameRoleMenu, model.TableNameTenantApplication,
+			model.TableNameApplicationClientSecret, model.TableNameApplicationClient, model.TableNameMenu,
+			model.TableNameRole, model.TableNameUserIdentity, model.TableNameUserLoginLog,
+			model.TableNameDepartmentUser, model.TableNameDepartment, model.TableNameUser, model.TableNamePerson,
+			model.TableNameRefreshToken, model.TableNameSession, model.TableNameAuditLog, model.TableNameApiKey, model.TableNameConnector,
+			model.TableNameDomain, "system", "log", model.TableNameApplication, model.TableNameTenant,
 		} {
 			_ = db.Exec("DROP TABLE IF EXISTS " + tbl).Error
 		}
@@ -155,18 +155,18 @@ func TestBootstrapConcurrentOnlyOneWins(t *testing.T) {
 			t.Errorf("table %s: want %d rows, got %d", tbl, want, n)
 		}
 	}
-	assertCount("tenant", 1)
-	assertCount("application", 2)
-	assertCount("role", 2)
-	assertCount("menu", 14)
-	assertCount("person", 1)
-	assertCount(`"user"`, 1)
-	assertCount("application_client", 2)
-	assertCount("user_role", 2)
-	assertCount("role_menu", 14)
-	assertCount("tenant_application", 2)
-	assertCount("department", 1)
-	assertCount("department_user", 1)
+	assertCount(model.TableNameTenant, 1)
+	assertCount(model.TableNameApplication, 2)
+	assertCount(model.TableNameRole, 2)
+	assertCount(model.TableNameMenu, 14)
+	assertCount(model.TableNamePerson, 1)
+	assertCount(model.TableNameUser, 1)
+	assertCount(model.TableNameApplicationClient, 2)
+	assertCount(model.TableNameUserRole, 2)
+	assertCount(model.TableNameRoleMenu, 14)
+	assertCount(model.TableNameTenantApplication, 2)
+	assertCount(model.TableNameDepartment, 1)
+	assertCount(model.TableNameDepartmentUser, 1)
 
 	var tenant model.TenantEntity
 	if err := db.Where("code = ?", model.SeedPlatformTenantCode).First(&tenant).Error; err != nil {

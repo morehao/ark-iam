@@ -59,20 +59,20 @@ func TestUserApplicationIndexDDL(t *testing.T) {
 		t.Fatalf("iterate index rows: %v", err)
 	}
 
-	uk, ok := indexSQL["uk_user_application_active"]
+	uk, ok := indexSQL["iam_uk_user_application_active"]
 	if !ok {
-		t.Fatalf("缺少唯一索引 uk_user_application_active，实际索引: %v", indexSQL)
+		t.Fatalf("缺少唯一索引 iam_uk_user_application_active，实际索引: %v", indexSQL)
 	}
 	if !strings.Contains(uk, "deleted_at IS NULL") {
-		t.Fatalf("uk_user_application_active 必须是部分索引（WHERE deleted_at IS NULL），实际 DDL: %s", uk)
+		t.Fatalf("iam_uk_user_application_active 必须是部分索引（WHERE deleted_at IS NULL），实际 DDL: %s", uk)
 	}
 	for _, col := range []string{"tenant_id", "user_id", "app_id"} {
 		if !strings.Contains(uk, col) {
-			t.Fatalf("uk_user_application_active 缺少列 %s，实际 DDL: %s", col, uk)
+			t.Fatalf("iam_uk_user_application_active 缺少列 %s，实际 DDL: %s", col, uk)
 		}
 	}
-	if _, ok := indexSQL["idx_user_application_app"]; !ok {
-		t.Fatalf("缺少二级索引 idx_user_application_app，实际索引: %v", indexSQL)
+	if _, ok := indexSQL["iam_idx_user_application_app"]; !ok {
+		t.Fatalf("缺少二级索引 iam_idx_user_application_app，实际索引: %v", indexSQL)
 	}
 }
 

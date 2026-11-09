@@ -4,7 +4,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameDomain = "domain"
+const TableNameDomain = "iam_domain"
 
 // DomainVerificationStatus 域名验证状态（domain.verification_status）。
 // 预留 pending/failed：接入真实验证流程时只加常量，不改列类型、不破坏 API。

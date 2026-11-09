@@ -6,7 +6,7 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-const TableNameApiKey = "api_key"
+const TableNameApiKey = "iam_api_key"
 
 type ApiKeyEntity struct {
 	gormdao.BaseEntity

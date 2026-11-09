@@ -17,7 +17,7 @@ import (
 // 历史：该表曾名 iam_user，后改为 tenant_user；2026-10-27 回归为 user，
 // 旧库由部署窗口内的一次性 `ALTER TABLE tenant_user RENAME TO "user"` 保数据（见
 // docs/design/run-and-deploy.md「升级到 user 表名」）。
-const TableNameUser = "user"
+const TableNameUser = "iam_user"
 
 // UserType 租户账号类型。
 type UserType string
