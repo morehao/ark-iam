@@ -72,7 +72,7 @@ type ApplicationEntity struct {
 	// SeedKey 种子身份键：内置应用的稳定标识（= 种子定义时的 code），创建时写入后不再变化，
 	// 控制台不可见也不可写。种子查行与租户开通（ProvisionTenantAdmin 定位 tenant_admin 应用）
 	// 都以它为依据；控制台自建应用恒为空串（空串不进部分唯一索引）。
-	SeedKey                 string                      `gorm:"column:seed_key;type:varchar(64);not null;default:'';comment:种子身份键(内置应用稳定标识,控制台不可见);uniqueIndex:uk_application_seed_key_active,where:deleted_at IS NULL AND seed_key <> ''" json:"-"`
+	SeedKey                 string                      `gorm:"column:seed_key;type:varchar(64);not null;default:'';comment:种子身份键(内置应用稳定标识,控制台不可见);uniqueIndex:iam_uk_application_seed_key_active,where:deleted_at IS NULL AND seed_key <> ''" json:"-"`
 	AllowPersonCreateTenant AppPersonCreateTenantPolicy `gorm:"column:allow_person_create_tenant;type:varchar(16);not null;default:'disable';comment:个人是否可自助创建租户(enable/disable)" json:"allowPersonCreateTenant"`
 	AllowJoinByInvite       AppJoinByInvitePolicy       `gorm:"column:allow_join_by_invite;type:varchar(16);not null;default:'disable';comment:是否允许通过邀请加入租户(enable/disable)" json:"allowJoinByInvite"`
 	// RoleTemplate 应用角色模板：本应用对外提供的跨系统授权契约值清单（code + 展示名）。

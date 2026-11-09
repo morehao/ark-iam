@@ -43,7 +43,7 @@ func newIndexProbeDB(t *testing.T) *gorm.DB {
 // TestAuditLogPerformanceIndexesCreated 三条审计查询索引确实被建出（P0 T6.2）。
 func TestAuditLogPerformanceIndexesCreated(t *testing.T) {
 	db := newIndexProbeDB(t)
-	for _, name := range []string{"idx_audit_tenant_created", "idx_audit_created", "idx_audit_actor_created"} {
+	for _, name := range []string{"iam_idx_audit_tenant_created", "iam_idx_audit_created", "iam_idx_audit_actor_created"} {
 		var count int64
 		require.NoError(t, db.Raw(
 			"select count(*) from sqlite_master where type='index' and tbl_name='iam_audit_log' and name=?", name).Scan(&count).Error)
@@ -67,17 +67,17 @@ func TestAuditLogQueryPlanUsesIndex(t *testing.T) {
 		{
 			name:      "租户视角（tenant_id + 时间窗，审计列表默认形态）",
 			query:     "select * from iam_audit_log where tenant_id='tenant-01' and created_at >= '2026-01-01' and created_at <= '2027-01-01' order by created_at desc, id desc limit 20",
-			wantIndex: "idx_audit_tenant_created",
+			wantIndex: "iam_idx_audit_tenant_created",
 		},
 		{
 			name:      "全平台视角（仅时间窗）",
 			query:     "select * from iam_audit_log where created_at >= '2026-01-01' and created_at <= '2027-01-01' order by created_at desc, id desc limit 20",
-			wantIndex: "idx_audit_created",
+			wantIndex: "iam_idx_audit_created",
 		},
 		{
 			name:      "操作人视角（actor_person_id + 时间窗）",
 			query:     "select * from iam_audit_log where actor_person_id='person-01' and created_at >= '2026-01-01' and created_at <= '2027-01-01' order by created_at desc, id desc limit 20",
-			wantIndex: "idx_audit_actor_created",
+			wantIndex: "iam_idx_audit_actor_created",
 		},
 	}
 

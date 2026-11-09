@@ -61,9 +61,9 @@ func AutoMigrateAll(db *gorm.DB) error {
 // 索引口径见方案 §6.6：审计列表总是「按租户/操作人 + 时间倒序翻页」，
 // 三条索引分别服务「租户视角」「全平台视角」「操作人视角」。
 var performanceIndexes = []string{
-	fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_audit_tenant_created ON %s (tenant_id, created_at)`, TableNameAuditLog),
-	fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_audit_created ON %s (created_at)`, TableNameAuditLog),
-	fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_audit_actor_created ON %s (actor_person_id, created_at)`, TableNameAuditLog),
+	fmt.Sprintf(`CREATE INDEX IF NOT EXISTS iam_idx_audit_tenant_created ON %s (tenant_id, created_at)`, TableNameAuditLog),
+	fmt.Sprintf(`CREATE INDEX IF NOT EXISTS iam_idx_audit_created ON %s (created_at)`, TableNameAuditLog),
+	fmt.Sprintf(`CREATE INDEX IF NOT EXISTS iam_idx_audit_actor_created ON %s (actor_person_id, created_at)`, TableNameAuditLog),
 }
 
 // EnsurePerformanceIndexes 创建普通性能索引（幂等；PostgreSQL 与 SQLite 均支持该语法）。
@@ -82,15 +82,15 @@ func EnsurePerformanceIndexes(db *gorm.DB) error {
 // PostgreSQL 与 SQLite（3.8+）均支持该语法。
 var partialUniqueIndexes = []string{
 	// 租户编码：软删后 code 应可复用（P0-2c，与其余 12 处口径对齐）。
-	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_code ON %s (code) WHERE deleted_at IS NULL`, TableNameTenant),
-	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_person_username ON %s (username) WHERE deleted_at IS NULL`, TableNamePerson),
-	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_person_primary_email ON %s (primary_email) WHERE deleted_at IS NULL`, TableNamePerson),
-	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_person_primary_phone ON %s (primary_phone) WHERE deleted_at IS NULL`, TableNamePerson),
-	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_identity_issuer_subject ON %s (issuer, external_subject) WHERE deleted_at IS NULL`, TableNameUserIdentity),
-	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_invite_code ON %s (code) WHERE deleted_at IS NULL`, TableNameInvite),
+	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS iam_idx_tenant_code ON %s (code) WHERE deleted_at IS NULL`, TableNameTenant),
+	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS iam_idx_person_username ON %s (username) WHERE deleted_at IS NULL`, TableNamePerson),
+	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS iam_idx_person_primary_email ON %s (primary_email) WHERE deleted_at IS NULL`, TableNamePerson),
+	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS iam_idx_person_primary_phone ON %s (primary_phone) WHERE deleted_at IS NULL`, TableNamePerson),
+	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS iam_idx_user_identity_issuer_subject ON %s (issuer, external_subject) WHERE deleted_at IS NULL`, TableNameUserIdentity),
+	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS iam_idx_invite_code ON %s (code) WHERE deleted_at IS NULL`, TableNameInvite),
 	// 部门关系唯一性：同一 (租户, 部门, 用户, 关系类型) 只允许一行未删除记录。
 	// 关系类型互斥（primary 每用户至多 1 行 / leader 每部门至多 1 人）除服务层校验外，此处提供 DB 级兜底。
-	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS uk_dept_user ON %s (tenant_id, department_id, user_id, relation_type) WHERE deleted_at IS NULL`, TableNameDepartmentUser),
+	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS iam_uk_dept_user ON %s (tenant_id, department_id, user_id, relation_type) WHERE deleted_at IS NULL`, TableNameDepartmentUser),
 }
 
 // EnsurePartialUniqueIndexes 创建/校验软删除表的部分唯一索引（幂等）。

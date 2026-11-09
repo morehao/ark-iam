@@ -36,9 +36,9 @@ const (
 // 协议层只拿得到 person，须先解析出成员行再判定（同 user_role.user_id 口径）。
 type UserApplicationEntity struct {
 	gormdao.BaseEntity
-	TenantID  string                `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id;uniqueIndex:uk_user_application_active,where:deleted_at IS NULL" json:"tenantID"`
-	UserID    string                `gorm:"column:user_id;type:varchar(36);not null;default:'';comment:租户成员id(user.id);uniqueIndex:uk_user_application_active,where:deleted_at IS NULL;index:idx_user_application_app,priority:2" json:"userID"`
-	AppID     string                `gorm:"column:app_id;type:varchar(36);not null;default:'';comment:应用id;uniqueIndex:uk_user_application_active,where:deleted_at IS NULL;index:idx_user_application_app,priority:1" json:"appID"`
+	TenantID  string                `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id;uniqueIndex:iam_uk_user_application_active,where:deleted_at IS NULL" json:"tenantID"`
+	UserID    string                `gorm:"column:user_id;type:varchar(36);not null;default:'';comment:租户成员id(user.id);uniqueIndex:iam_uk_user_application_active,where:deleted_at IS NULL;index:iam_idx_user_application_app,priority:2" json:"userID"`
+	AppID     string                `gorm:"column:app_id;type:varchar(36);not null;default:'';comment:应用id;uniqueIndex:iam_uk_user_application_active,where:deleted_at IS NULL;index:iam_idx_user_application_app,priority:1" json:"appID"`
 	Status    UserApplicationStatus `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:准入状态(enable/disable)" json:"status"`
 	Source    UserApplicationSource `gorm:"column:source;type:varchar(32);not null;default:'manual';comment:准入来源(manual/role/provision)" json:"source"`
 	CreatedBy string                `gorm:"column:created_by;type:varchar(36);not null;default:'';comment:创建人id" json:"createdBy"`

@@ -369,8 +369,34 @@ ALTER TABLE session           RENAME TO iam_session;
 ALTER TABLE audit_log         RENAME TO iam_audit_log;
 ALTER TABLE tenant_invite     RENAME TO iam_tenant_invite;
 
--- 3) 核对：各表行数与升级前一致
+-- 3) 索引名加 iam_ 前缀（显式声明的 20 个业务索引；deleted_at 等自动索引随表名自动变为 idx_iam_*）
+--    说明：AutoMigrate 只会新建缺失索引、不会给已有索引改名，故旧索引名会残留，
+--    必须手工 ALTER INDEX 改名（否则新代码会再建一套 iam_ 索引，形成重复索引）。
+ALTER INDEX IF EXISTS idx_department_parent             RENAME TO iam_idx_department_parent;
+ALTER INDEX IF EXISTS idx_department_path               RENAME TO iam_idx_department_path;
+ALTER INDEX IF EXISTS idx_user_application_app          RENAME TO iam_idx_user_application_app;
+ALTER INDEX IF EXISTS idx_tenant_code                   RENAME TO iam_idx_tenant_code;
+ALTER INDEX IF EXISTS idx_person_username               RENAME TO iam_idx_person_username;
+ALTER INDEX IF EXISTS idx_person_primary_email          RENAME TO iam_idx_person_primary_email;
+ALTER INDEX IF EXISTS idx_person_primary_phone          RENAME TO iam_idx_person_primary_phone;
+ALTER INDEX IF EXISTS idx_user_identity_issuer_subject  RENAME TO iam_idx_user_identity_issuer_subject;
+ALTER INDEX IF EXISTS idx_invite_code                   RENAME TO iam_idx_invite_code;
+ALTER INDEX IF EXISTS idx_audit_tenant_created          RENAME TO iam_idx_audit_tenant_created;
+ALTER INDEX IF EXISTS idx_audit_created                 RENAME TO iam_idx_audit_created;
+ALTER INDEX IF EXISTS idx_audit_actor_created           RENAME TO iam_idx_audit_actor_created;
+ALTER INDEX IF EXISTS uk_application_seed_key_active    RENAME TO iam_uk_application_seed_key_active;
+ALTER INDEX IF EXISTS uk_menu_app_code_active           RENAME TO iam_uk_menu_app_code_active;
+ALTER INDEX IF EXISTS uk_menu_seed_key_active           RENAME TO iam_uk_menu_seed_key_active;
+ALTER INDEX IF EXISTS uk_role_menu_active               RENAME TO iam_uk_role_menu_active;
+ALTER INDEX IF EXISTS uk_tenant_application_active      RENAME TO iam_uk_tenant_application_active;
+ALTER INDEX IF EXISTS uk_user_application_active        RENAME TO iam_uk_user_application_active;
+ALTER INDEX IF EXISTS uk_user_role_active               RENAME TO iam_uk_user_role_active;
+ALTER INDEX IF EXISTS uk_dept_user                      RENAME TO iam_uk_dept_user;
+
+-- 4) 核对：各表行数与升级前一致
 ```
+
+> 更简单的等价做法：先 `DROP` 掉 `iam_*` 表上的全部非主键索引，再起新版由 `AutoMigrate` 按当前代码重建（会得到干净的一套 `iam_idx_*` / `iam_uk_*` + 自动 `idx_iam_*_deleted_at`，无重复索引、无旧名残留）。
 
 ```bash
 # 4) 起新版，确认健康检查、登录、初始化均正常
@@ -381,7 +407,7 @@ ALTER TABLE tenant_invite     RENAME TO iam_tenant_invite;
 - **整批一起升级**：所有应用共用同一套表，任一实例仍跑旧代码都会查不到表。
 - 加前缀后 `iam_user` **不再是 PostgreSQL 保留字**，§2.5.5 里的引号处理仍正确但不再是必需。
 - **撞名检测（`SameDatabase`/`ErrTableConflict`）**：加前缀后与宿主 `user/role/tenant` 天然不冲突，该检测基本退化为兜底防御，可保留。
-- **索引名**跨库仍可能撞名（同库内嵌时宿主也建 `idx_tenant_code` 等），如需彻底隔离可另给索引名加 `iam_` 前缀（非本次强制项）。
+- **索引名**：显式声明的业务索引（`idx_*`/`uk_*`）已统一加 `iam_` 前缀（`iam_idx_*`/`iam_uk_*`）；`deleted_at`、`code`、`session_id` 等由框架（`BaseEntity` tag / gorm 列索引）自动生成的索引名随表名自然变为 `idx_iam_*`。同库内嵌时索引名不再与宿主冲突。
 - **开发/测试环境**不必手工执行：直接删库重建（§2.3）后由 `AutoMigrate` 建出 `iam_*` 表，再走 §2.4 首次初始化即可。
 
 ### 2.6 版本升级时的菜单变更清单
