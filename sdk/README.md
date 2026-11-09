@@ -26,11 +26,18 @@ sdk/
 
 ## 安装
 
-本仓 `go.work` 已包含 `./sdk`。外部应用按需引入：
+本仓根级 `go.work` 已包含 `./sdk`（模块目录 `sdk/`，与模块名 `github.com/morehao/ark-iam/sdk` 对齐，可被外部 `go get`）。
+外部应用按需引入：
+
+```bash
+go get github.com/morehao/ark-iam/sdk@v0.3.0
+```
 
 ```
-require github.com/morehao/ark-iam/sdk v0.0.0
+require github.com/morehao/ark-iam/sdk v0.3.0
 ```
+
+样例见 [`../examples/rp-gin/`](../examples/rp-gin/)（独立模块，不用 replace）。
 
 ## 1. 本地验签（唯一鉴权路径）
 
