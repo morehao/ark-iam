@@ -1,14 +1,15 @@
 package ctroidc
 
 import (
-	"github.com/morehao/golib/dbaccess/gormdao"
 	"context"
 	"crypto/rsa"
 	"errors"
 	"fmt"
 	"github.com/morehao/ark-iam/pkg/identity"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/iam/auth/config"
@@ -282,17 +283,57 @@ func (ctr *OIDCCtr) SSOLogin(ctx *gin.Context) {
 // 透传前先把 gin 上下文中暂存的 OIDC hint 搬运到 request context——
 // 这是值跨过 gin → http.Handler 边界的唯一通道（见 middleware.CarryOIDCHints）。
 // provider 未初始化（如单元测试中的空 provider）时返回 200 占位处理器保持兼容。
+//
+// 前缀剥离：provider（zitadel op）以自身路由根为基准（/keys、/authorize、
+// /.well-known/openid-configuration 等），因此需要剥离请求路径中到 "/oidc" 为止的前缀。
+// 内嵌场景下 IAM 可能挂在任意前缀下（如 /iam），此时真实路径是 /iam/oidc/keys，
+// 不能再用硬编码的 "/oidc" 剥离（否则 provider 收到 /iam/oidc/keys → 404）。
+// 这里按请求路径动态定位 "/oidc" 段并剥离其之前（含）的部分，兼容空前缀（/oidc）
+// 与任意前缀（/iam/oidc、/x/y/oidc）。
 func (ctr *OIDCCtr) ProviderHandler() gin.HandlerFunc {
 	if ctr.provider != nil && ctr.provider.Provider != nil {
-		handler := http.StripPrefix("/oidc", ctr.provider.Provider)
+		provider := ctr.provider.Provider
 		return func(ctx *gin.Context) {
 			middleware.CarryOIDCHints(ctx)
-			handler.ServeHTTP(ctx.Writer, ctx.Request)
+			stripOIDCPrefix(provider).ServeHTTP(ctx.Writer, ctx.Request)
 		}
 	}
 	return func(ctx *gin.Context) {
 		ctx.Status(http.StatusOK)
 	}
+}
+
+// stripOIDCPrefix 依据请求路径中 "/oidc" 段的位置返回剥离了挂载前缀的处理器。
+//
+// 例：/oidc/keys → /keys；/iam/oidc/authorize → /authorize；
+// /iam/oidc/.well-known/openid-configuration → /.well-known/openid-configuration。
+// 若路径中不含 "/oidc"（异常情况），回退为不剥离，交由 provider 自行处理。
+func stripOIDCPrefix(provider http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		prefix := oidcStripPrefix(r.URL.Path)
+		if prefix != "" {
+			http.StripPrefix(prefix, provider).ServeHTTP(w, r)
+			return
+		}
+		provider.ServeHTTP(w, r)
+	})
+}
+
+// oidcStripPrefix 从请求路径中解析出到 "/oidc" 为止（含）的前缀。
+//
+// 返回空前缀表示未命中（调用方据此不剥离）。取最后一次出现的 "/oidc" 边界，
+// 以兼容挂载前缀本身可能包含相似片段的情况。
+func oidcStripPrefix(path string) string {
+	idx := strings.LastIndex(path, "/oidc")
+	if idx < 0 {
+		return ""
+	}
+	end := idx + len("/oidc")
+	// 仅当 "/oidc" 后紧跟 "/" 或已到结尾时才算作协议段边界，避免误伤 "/oidcxx"。
+	if end != len(path) && path[end] != '/' {
+		return ""
+	}
+	return path[:end]
 }
 
 // EndSession 处理 RP-Initiated Logout（/oidc/end_session）：
