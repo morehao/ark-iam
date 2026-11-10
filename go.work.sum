@@ -261,6 +261,7 @@ github.com/meguminnnnnnnnn/go-openai v0.1.2/go.mod h1:qs96ysDmxhE4BZoU45I43zcyfn
 github.com/microcosm-cc/bluemonday v1.0.26 h1:xbqSvqzQMeEHCqMi64VAs4d8uy6Mequs3rQ0k/Khz58=
 github.com/microcosm-cc/bluemonday v1.0.26/go.mod h1:JyzOCs9gkyQyjs+6h10UEVSe02CGwkhd72Xdqh78TWs=
 github.com/microsoft/go-mssqldb v1.7.2/go.mod h1:kOvZKUdrhhFQmxLZqbwUV0rHkNkZpthMITIb2Ko1IoA=
+github.com/morehao/ark-iam/pkg v0.3.0/go.mod h1:tcQi+8n0Zn/zqHDjE0XKn2cL283V275JRPQl5mCzqy4=
 github.com/morehao/golib v1.32.1 h1:/lGBIifs66hkoNE+1TUukjUY345FGGRAiwxhP3pYQTo=
 github.com/morehao/golib v1.32.1/go.mod h1:ir03Dfy0ARhZfmTP/P4WOGFS7C7rvXcF/8i7ib66XrI=
 github.com/morehao/golib v1.32.3/go.mod h1:ir03Dfy0ARhZfmTP/P4WOGFS7C7rvXcF/8i7ib66XrI=
