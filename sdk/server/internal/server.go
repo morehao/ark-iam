@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/backend/apps/auth"
+	dirpkg "github.com/morehao/ark-iam/sdk/server/internal/directory"
 	"github.com/morehao/ark-iam/contract"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/middleware"
@@ -125,6 +126,23 @@ func (a *App) Mount(rg *gin.RouterGroup) error {
 		}
 		tenantadmin.Mount(tenantGroup, a.dbGetter, a.tenantKeys(keep))
 	}
+	return nil
+}
+
+// MountDirectory 挂载面向应用的只读目录 API（/v1/rp/directory/*，原 rpapi 并入）。
+//
+// 需在 Mount 之后调用（复用 Mount 解析出的 KeySource）。engine 必须是根引擎（目录按
+// 服务标识段 "rp" 生成 /v1/rp/* 前缀，等价于重构前 gateway 的 rpapi.Init(engine,...)）。
+func (a *App) MountDirectory(engine *gin.Engine) error {
+	keep := make(map[Domain]bool)
+	for _, d := range resolveDomains(a.cfg.Domains) {
+		keep[d] = true
+	}
+	if !a.anyDomain(keep, []Domain{DomainDirectory}) {
+		return nil
+	}
+	conf := a.rawConfig()
+	dirpkg.Mount(engine, conf, a.keySource)
 	return nil
 }
 

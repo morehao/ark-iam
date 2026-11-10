@@ -5,7 +5,7 @@
 //   - 跨租户与不存在在响应上不可区分（防枚举）；
 //   - 绝不把 Member.Status 用于放行/拒绝判定（挂起与否由令牌侧决定）；
 //   - 实体查询复用 pkg/dao，租户隔离由插件按 ctx 作用域注入，缺失即 fail-closed。
-package svcdirectory
+package directory
 
 import (
 	"context"
@@ -14,19 +14,19 @@ import (
 
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/rpapi/internal/dto/dtordirectory"
+	"github.com/morehao/ark-iam/contract/directory"
 )
 
 // DirectorySvc 是只读目录服务接口。
 type DirectorySvc interface {
 	// Members 批量取成员摘要（命中进 List，未命中进 Missing，缺项不影响整体成功）。
-	Members(ctx context.Context, ids []string) (*dtordirectory.MemberListResp, error)
+	Members(ctx context.Context, ids []string) (*directory.MemberListResp, error)
 	// Member 取单个成员摘要；不存在/跨租户返回 gerror 的 NotExist 语义由调用方判定。
-	Member(ctx context.Context, userID string) (*dtordirectory.Member, error)
+	Member(ctx context.Context, userID string) (*directory.Member, error)
 	// DepartmentTree 取本租户部门树（仅 enable 节点）。
-	DepartmentTree(ctx context.Context) ([]*dtordirectory.Department, error)
+	DepartmentTree(ctx context.Context) ([]*directory.Department, error)
 	// Roles 取本租户角色清单（≤MaxRoleListSize，超出置 truncated）。
-	Roles(ctx context.Context) (*dtordirectory.RoleListResp, error)
+	Roles(ctx context.Context) (*directory.RoleListResp, error)
 }
 
 type directorySvc struct{}
@@ -38,8 +38,8 @@ func NewDirectorySvc() DirectorySvc {
 	return &directorySvc{}
 }
 
-func (s *directorySvc) Members(ctx context.Context, ids []string) (*dtordirectory.MemberListResp, error) {
-	resp := &dtordirectory.MemberListResp{List: []dtordirectory.Member{}, Missing: []string{}}
+func (s *directorySvc) Members(ctx context.Context, ids []string) (*directory.MemberListResp, error) {
+	resp := &directory.MemberListResp{List: []directory.Member{}, Missing: []string{}}
 	unique := normalizeIDs(ids)
 	if len(unique) == 0 {
 		return resp, nil
@@ -68,7 +68,7 @@ func (s *directorySvc) Members(ctx context.Context, ids []string) (*dtordirector
 	return resp, nil
 }
 
-func (s *directorySvc) Member(ctx context.Context, userID string) (*dtordirectory.Member, error) {
+func (s *directorySvc) Member(ctx context.Context, userID string) (*directory.Member, error) {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
 		return nil, nil
@@ -88,7 +88,7 @@ func (s *directorySvc) Member(ctx context.Context, userID string) (*dtordirector
 	return &member, nil
 }
 
-func (s *directorySvc) DepartmentTree(ctx context.Context) ([]*dtordirectory.Department, error) {
+func (s *directorySvc) DepartmentTree(ctx context.Context) ([]*directory.Department, error) {
 	departments, err := dao.NewDepartmentDao().GetListByCond(ctx, &dao.DepartmentCond{
 		Status: model.DeptNodeStatusEnable,
 	})
@@ -98,13 +98,13 @@ func (s *directorySvc) DepartmentTree(ctx context.Context) ([]*dtordirectory.Dep
 	return buildDepartmentTree(departments), nil
 }
 
-func (s *directorySvc) Roles(ctx context.Context) (*dtordirectory.RoleListResp, error) {
+func (s *directorySvc) Roles(ctx context.Context) (*directory.RoleListResp, error) {
 	// 角色清单是无上界响应：多取一条即可判断是否被截断，避免 COUNT 查询。
 	roles, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{})
 	if err != nil {
 		return nil, err
 	}
-	resp := &dtordirectory.RoleListResp{List: []dtordirectory.Role{}}
+	resp := &directory.RoleListResp{List: []directory.Role{}}
 	sort.Slice(roles, func(i, j int) bool {
 		if roles[i].AppID != roles[j].AppID {
 			return roles[i].AppID < roles[j].AppID
@@ -112,11 +112,11 @@ func (s *directorySvc) Roles(ctx context.Context) (*dtordirectory.RoleListResp, 
 		return roles[i].Code < roles[j].Code
 	})
 	for i := range roles {
-		if i >= dtordirectory.MaxRoleListSize {
+		if i >= directory.MaxRoleListSize {
 			resp.Truncated = true
 			break
 		}
-		resp.List = append(resp.List, dtordirectory.Role{
+		resp.List = append(resp.List, directory.Role{
 			Code:  string(roles[i].Code),
 			Name:  roles[i].Name,
 			AppID: roles[i].AppID,
@@ -126,11 +126,11 @@ func (s *directorySvc) Roles(ctx context.Context) (*dtordirectory.RoleListResp, 
 }
 
 // toMember 把实体转成对外只读摘要。
-func toMember(user model.UserEntity, departmentNames []string) dtordirectory.Member {
+func toMember(user model.UserEntity, departmentNames []string) directory.Member {
 	if departmentNames == nil {
 		departmentNames = []string{}
 	}
-	return dtordirectory.Member{
+	return directory.Member{
 		UserID:          user.ID,
 		Name:            user.Name,
 		Avatar:          user.Avatar,
@@ -186,16 +186,16 @@ func departmentNamesByUser(ctx context.Context, userIDs []string) (map[string][]
 
 // buildDepartmentTree 由扁平列表构建树；父节点缺失（不可见/已删）的节点按根节点处理，
 // 保证"存在子节点却整棵子树消失"这种静默丢数据不会发生。
-func buildDepartmentTree(departments model.DepartmentEntityList) []*dtordirectory.Department {
-	nodes := make(map[string]*dtordirectory.Department, len(departments))
+func buildDepartmentTree(departments model.DepartmentEntityList) []*directory.Department {
+	nodes := make(map[string]*directory.Department, len(departments))
 	for i := range departments {
-		nodes[departments[i].ID] = &dtordirectory.Department{
+		nodes[departments[i].ID] = &directory.Department{
 			ID:       departments[i].ID,
 			ParentID: departments[i].ParentID,
 			Name:     departments[i].Name,
 		}
 	}
-	roots := make([]*dtordirectory.Department, 0, len(departments))
+	roots := make([]*directory.Department, 0, len(departments))
 	order := make([]string, 0, len(departments))
 	for i := range departments {
 		order = append(order, departments[i].ID)

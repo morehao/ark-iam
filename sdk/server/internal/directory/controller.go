@@ -5,7 +5,7 @@
 //     会让已删成员在客户端长期滞留，staleness 变成无界）；
 //   - If-None-Match 命中 → 304（省带宽与序列化，**不省 DB 查询**）；
 //   - Cache-Control: private, no-cache + Vary: Authorization（显式声明不进共享缓存）。
-package ctrdirectory
+package directory
 
 import (
 	"crypto/sha256"
@@ -16,9 +16,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/rpapi/internal/dto/dtordirectory"
-	"github.com/morehao/ark-iam/rpapi/internal/service/svcdirectory"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"github.com/morehao/ark-iam/contract/directory"
+		"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )
@@ -32,21 +31,21 @@ type DirectoryCtr interface {
 }
 
 type directoryCtr struct {
-	directorySvc svcdirectory.DirectorySvc
+	directorySvc DirectorySvc
 }
 
 var _ DirectoryCtr = (*directoryCtr)(nil)
 
 // NewDirectoryCtr 构造只读目录控制器。
 func NewDirectoryCtr() DirectoryCtr {
-	return &directoryCtr{directorySvc: svcdirectory.NewDirectorySvc()}
+	return &directoryCtr{directorySvc: NewDirectorySvc()}
 }
 
 // @Tags 目录（RP）
 // @Summary 成员摘要
 // @Produce application/json
 // @Param userID path string true "成员用户ID"
-// @Success 200 {object} gincontext.DtoRender{data=dtordirectory.Member}
+// @Success 200 {object} gincontext.DtoRender{data=directory.Member}
 // @Router /v1/rp/directory/members/{userID} [get]
 func (ctr *directoryCtr) Member(ctx *gin.Context) {
 	userID := ctx.Param("userID")
@@ -68,11 +67,11 @@ func (ctr *directoryCtr) Member(ctx *gin.Context) {
 // @Summary 批量成员摘要
 // @Produce application/json
 // @Param ids query string true "逗号分隔的成员用户ID，最多 100 个"
-// @Success 200 {object} gincontext.DtoRender{data=dtordirectory.MemberListResp}
+// @Success 200 {object} gincontext.DtoRender{data=directory.MemberListResp}
 // @Router /v1/rp/directory/members [get]
 func (ctr *directoryCtr) Members(ctx *gin.Context) {
 	ids := parseIDs(ctx.Query("ids"))
-	if len(ids) > dtordirectory.MaxBatchMemberIDs {
+	if len(ids) > directory.MaxBatchMemberIDs {
 		// 显式拒绝，不静默截断（否则调用方会以为"没返回就是不存在"）。
 		fail(ctx, code.RpDirectoryBadRequestError)
 		return
@@ -89,7 +88,7 @@ func (ctr *directoryCtr) Members(ctx *gin.Context) {
 // @Tags 目录（RP）
 // @Summary 部门树
 // @Produce application/json
-// @Success 200 {object} gincontext.DtoRender{data=[]dtordirectory.Department}
+// @Success 200 {object} gincontext.DtoRender{data=[]directory.Department}
 // @Router /v1/rp/directory/departments/tree [get]
 func (ctr *directoryCtr) DepartmentTree(ctx *gin.Context) {
 	tree, err := ctr.directorySvc.DepartmentTree(ctx.Request.Context())
@@ -104,7 +103,7 @@ func (ctr *directoryCtr) DepartmentTree(ctx *gin.Context) {
 // @Tags 目录（RP）
 // @Summary 角色清单
 // @Produce application/json
-// @Success 200 {object} gincontext.DtoRender{data=dtordirectory.RoleListResp}
+// @Success 200 {object} gincontext.DtoRender{data=directory.RoleListResp}
 // @Router /v1/rp/directory/roles [get]
 func (ctr *directoryCtr) Roles(ctx *gin.Context) {
 	resp, err := ctr.directorySvc.Roles(ctx.Request.Context())

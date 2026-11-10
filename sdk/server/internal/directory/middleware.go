@@ -3,7 +3,7 @@
 // 与 auth 的 OIDC 中间件链**刻意分开**：这里只做 /v1/rp/* 的策略判定
 // （aud 在 OIDCAuth 的 options 里收紧 + `directory.read` + tenant_id 前置校验），
 // 避免"误复用 auth 的宽松链"导致目录越权（设计文档风险表已登记该风险）。
-package middleware
+package directory
 
 import (
 	"net/http"

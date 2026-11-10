@@ -1,4 +1,4 @@
-package router
+package directory
 
 import (
 	"context"
@@ -16,15 +16,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	contractdir "github.com/morehao/ark-iam/contract/directory"
 	"github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/rpapi/internal/dto/dtordirectory"
-	"github.com/morehao/ark-iam/rpapi/testutil"
 	"github.com/morehao/ark-iam/sdk/rp"
+	dbgormsqlite "github.com/morehao/golib/dbaccess/dbgorm/driver/sqlite"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 const (
@@ -34,13 +35,34 @@ const (
 	testKID      = "rpapi-test-kid"
 )
 
-// newTestEngine 构造只挂 rpapi 目录路由的引擎，KeySource 用进程内 key set，
+// setupSQLite 打开独立内存 SQLite 并注册为全局 iam 库（等价原 rpapi testutil.SetupSQLite），
+// 使用 golib 的 sqlite 方言（ncruces），与 sdk/server/internal 其它测试一致。
+func setupSQLite(t *testing.T, entities ...any) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(dbgormsqlite.Open("sqlite://:memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(entities...); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+	dbclient.RegisterDBForTest(dbclient.ServiceNameIam, db)
+	t.Cleanup(func() {
+		dbclient.ClearDBForTest(dbclient.ServiceNameIam)
+		if sqlDB, _ := db.DB(); sqlDB != nil {
+			_ = sqlDB.Close()
+		}
+	})
+	return db
+}
+
+// newTestEngine 构造只挂目录路由的引擎，KeySource 用进程内 key set，
 // 从而走与生产完全一致的验签链（本地验签），但不依赖 JWKS 网络。
 func newTestEngine(t *testing.T, keySource rp.KeySource) *gin.Engine {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
-	registerRouter(engine, &config.Config{OIDC: config.OIDC{Issuer: testIssuer, Audiences: []string{testAudience}}}, keySource)
+	Mount(engine, &config.Config{OIDC: config.OIDC{Issuer: testIssuer, Audiences: []string{testAudience}}}, keySource)
 	return engine
 }
 
@@ -50,7 +72,7 @@ func newTestEngine(t *testing.T, keySource rp.KeySource) *gin.Engine {
 func TestDirectoryFailsClosedWithoutKeySource(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
-	registerRouter(engine, &config.Config{OIDC: config.OIDC{Issuer: testIssuer}}, nil)
+	Mount(engine, &config.Config{OIDC: config.OIDC{Issuer: testIssuer}}, nil)
 
 	for _, token := range []string{"", "not-a-jwt"} {
 		w := get(t, engine, "/v1/rp/directory/members", token, nil)
@@ -125,7 +147,7 @@ func seedDirectoryWith(t *testing.T, extra ...any) directoryFixture {
 		&model.RoleEntity{},
 	}
 	entities = append(entities, extra...)
-	db := testutil.SetupSQLite(t, entities...)
+	db := setupSQLite(t, entities...)
 	users := []model.UserEntity{
 		{PersonID: "p-1", TenantID: testTenantID, UserType: model.UserTypeMember, Name: "张三", Status: model.UserStatusActive},
 		{TenantID: testTenantID, UserType: model.UserTypeMachine, Name: "服务账号", Status: model.UserStatusSuspended},
@@ -191,7 +213,7 @@ func TestDirectoryMembersTenantScoped(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	// 目录 API 直接回裸 DTO（不是本仓业务接口的 {code,msg,data} 信封）：
 	// 这样 ETag 哈希才与调用方实际拿到的字节一一对应。
-	var single dtordirectory.Member
+	var single contractdir.Member
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &single))
 	assert.Equal(t, fx.memberID, single.UserID)
 	assert.Equal(t, "张三", single.Name)
@@ -208,7 +230,7 @@ func TestDirectoryMembersTenantScoped(t *testing.T) {
 	path := "/v1/rp/directory/members?ids=" + fx.memberID + "," + fx.machineID + "," + fx.foreignID + ",does-not-exist"
 	w = get(t, engine, path, token, nil)
 	require.Equal(t, http.StatusOK, w.Code)
-	var batch dtordirectory.MemberListResp
+	var batch contractdir.MemberListResp
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &batch))
 	require.Len(t, batch.List, 2)
 	assert.ElementsMatch(t, []string{fx.foreignID, "does-not-exist"}, batch.Missing,
@@ -301,7 +323,7 @@ func TestDirectoryAPIKeyChannelPasses(t *testing.T) {
 
 	w := get(t, engine, "/v1/rp/directory/members/"+fx.memberID, "", map[string]string{"x-api-key": rawKey})
 	require.Equal(t, http.StatusOK, w.Code, "合法 API Key 必须被目录接口接受, body=%s", w.Body.String())
-	var single dtordirectory.Member
+	var single contractdir.Member
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &single))
 	assert.Equal(t, fx.memberID, single.UserID)
 
