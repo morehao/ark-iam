@@ -11,7 +11,7 @@
 // 类型别名"三件事，不得在此新增第二套验签或协议实现（AGENTS.md §OIDC 分层约定）。
 //
 // back-channel logout 的校验逻辑单一真源在
-// github.com/morehao/ark-iam/sdk/rp/logout（框架无关、基于 net/http）；
+// github.com/morehao/ark-iam/contract/logout（框架无关、基于 net/http）；
 // 本包只做"Gin 挂载 + 最近记录（调试/e2e 断言）"，不再自行实现 token 校验。
 package oidckit
 
@@ -24,7 +24,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/morehao/ark-iam/contract"
-	"github.com/morehao/ark-iam/sdk/rp/logout"
+	"github.com/morehao/ark-iam/contract/logout"
 )
 
 // 契约别名：调用方引用 oidckit.Xxx 与 sdk 侧完全同一类型。

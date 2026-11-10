@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	"github.com/morehao/ark-iam/contract"
 	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"net/http"
@@ -70,6 +71,20 @@ func (ctr *OIDCCtr) KeySource() rp.KeySource {
 		return nil
 	}
 	return ctr.keySource
+}
+
+// Verifier 构造 access token 校验器（contract.Verifier 接口，sdk/rp 实现），供 pkg 中间件
+// 通过 middleware.WithVerifier 注入（pkg 不再 import sdk 自行构造，解 pkg → sdk 环）。
+// issuer 用于收紧 iss 校验（本 OP 签发的 token）。
+func (ctr *OIDCCtr) Verifier(issuer string) contract.Verifier {
+	if ctr == nil || ctr.keySource == nil {
+		return nil
+	}
+	opts := []rp.VerifierOption{}
+	if issuer != "" {
+		opts = append(opts, rp.WithIssuer(issuer))
+	}
+	return rp.NewVerifier(ctr.keySource, opts...)
 }
 
 // PublicKey 返回 OP 签名公钥，供业务路由鉴权中间件校验本 OP 签发的 token。

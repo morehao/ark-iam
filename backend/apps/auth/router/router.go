@@ -2,6 +2,7 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
+	authconfig "github.com/morehao/ark-iam/backend/apps/auth/config"
 	authmiddleware "github.com/morehao/ark-iam/backend/apps/auth/middleware"
 	"github.com/morehao/ark-iam/backend/apps/auth/controller/ctroidc"
 	"github.com/morehao/ark-iam/backend/apps/auth/controller/ctrinstall"
@@ -38,6 +39,7 @@ func Register(authRG *gin.RouterGroup, protocolEngine *gin.RouterGroup, db gormd
 	// （原 iam 版把该职责留在调用方易漏挂；统一收敛到域库 Register 内）。
 	authOpts := append([]pkgmiddleware.AuthOption{
 		pkgmiddleware.WithOIDCKeySource(oidcCtr.KeySource()),
+		pkgmiddleware.WithVerifier(oidcCtr.Verifier(authIssuer())),
 	}, authmiddleware.OIDCBusinessAuthOptions()...)
 	authRG.Use(pkgmiddleware.OIDCAuth(authOpts...))
 	registerRouter(authRG, protocolEngine, db, oidcCtr, opts)
@@ -57,4 +59,12 @@ func registerRouter(authRG *gin.RouterGroup, protocolEngine *gin.RouterGroup, db
 	if opts.Install {
 		installRouter(protocolEngine, ctrinstall.NewInstallCtr(db))
 	}
+}
+
+// authIssuer 返回本 OP 的 issuer（供构造 access token 校验器收紧 iss；未配置时为空）。
+func authIssuer() string {
+	if authconfig.Conf != nil {
+		return authconfig.Conf.OIDC.Issuer
+	}
+	return ""
 }

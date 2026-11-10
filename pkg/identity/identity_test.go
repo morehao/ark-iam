@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/morehao/ark-iam/sdk/rp"
+	"github.com/morehao/ark-iam/contract"
 )
 
 // newTestCtx 构造可写的 gin 测试上下文（gin 的 CreateTestContext 不自动带 Request）。
@@ -53,7 +53,7 @@ func TestOIDCIdentityFromContext(t *testing.T) {
 		t.Fatalf("unwritten identity = %v, want nil", got)
 	}
 
-	ident := &rp.Identity{PersonID: "person:1", TenantID: "t-1", ClientID: "app_web", UserID: "u-1"}
+	ident := &contract.Identity{PersonID: "person:1", TenantID: "t-1", ClientID: "app_web", UserID: "u-1"}
 	SetOIDCIdentity(ctx, ident)
 
 	got := OIDCIdentityFromContext(ctx)
@@ -70,7 +70,7 @@ func TestOIDCIdentityFromContext(t *testing.T) {
 
 func TestOIDCIdentityFromContext_WrongTypeIsNil(t *testing.T) {
 	ctx := newTestCtx()
-	// 键被写入非 *rp.Identity 值（例如测试或中间件误用）时必须返回 nil，绝不 panic。
+	// 键被写入非 *contract.Identity 值（例如测试或中间件误用）时必须返回 nil，绝不 panic。
 	ctx.Set(contextKeyOIDCIdentity, "not-an-identity")
 
 	if got := OIDCIdentityFromContext(ctx); got != nil {
@@ -79,7 +79,7 @@ func TestOIDCIdentityFromContext_WrongTypeIsNil(t *testing.T) {
 }
 
 func TestOIDCIdentityFromContext_NilCtx(t *testing.T) {
-	SetOIDCIdentity(nil, &rp.Identity{PersonID: "person:1"})
+	SetOIDCIdentity(nil, &contract.Identity{PersonID: "person:1"})
 	if got := OIDCIdentityFromContext(nil); got != nil {
 		t.Fatalf("nil ctx identity = %v, want nil", got)
 	}
