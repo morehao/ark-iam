@@ -15,7 +15,7 @@
 | 前端开发对接 | 登录页 / 管理台调用哪些接口、OIDC 端点契约 | [api-reference.md](api-reference.md) |
 | 后端开发 | 路由规范、接口清单、权限模型、首次初始化引导与字段权威 | [api-reference.md](api-reference.md) → [system-design.md](system-design.md) §4.5 |
 | 接入 SDK（RP 侧） | Go 应用如何使用 IAM 的 RP SDK（验签 / M2M / 目录 / 登出） | [backend/sdk/README.md](../../backend/sdk/README.md) |
-| 把 IAM 内嵌进自己的单体应用 | 不单独部署 IAM 前后端，用 `iam.New + Mount + MountFrontend` 自带账号体系（含 Domains 裁剪、同库撞名、私钥策略） | [backend/iam/README.md](../../backend/iam/README.md) + [application-integration-guide.md](application-integration-guide.md) |
+| 把 IAM 内嵌进自己的单体应用 | 不单独部署 IAM 进程，用 `sdk/server` 的 `server.New + App.Mount` 自带账号体系（含 Domains 裁剪、同库撞名、私钥策略） | [application-integration-guide.md](application-integration-guide.md) §11 |
 | 后端开发（改数据访问/中间件） | ctx 怎么传、租户隔离怎么生效、跨租户查询怎么写 | [context-and-tenant-scope.md](context-and-tenant-scope.md) |
 | 部署运维 | 配置项含义、构建运行、**首次初始化（安装页引导）**、Docker、签名密钥轮换 | [configuration-reference.md](configuration-reference.md) + [run-and-deploy.md](run-and-deploy.md) + [signing-key-rotation-runbook.md](signing-key-rotation-runbook.md) |
 | 快速查词 | 术语、缩写、角色定义 | [glossary.md](glossary.md) |
@@ -44,8 +44,8 @@
 ## 核心概念速览
 
 - **Ark IAM** 是一个多租户、多应用的统一身份认证服务，对外提供 **OIDC Provider**（基于 [zitadel/oidc](https://github.com/zitadel/oidc)）能力，业务应用作为 **RP（Relying Party）** 通过标准 OIDC 协议接入，实现 **一次登录、处处通行（SSO）** 与 **一处登出、处处登出（SLO）**。
-- 后端由 5 个应用组成：`auth`（认证网关 / OIDC Provider，:8081）、`platformadmin`（平台管理，:8082）、`tenantadmin`（租户自服务，:8083）、`rpapi`（面向应用的只读目录 API，:8084）、`gateway`（单体聚合部署，:8100），共享 `backend/pkg` 公共层；另有 **`backend/iam` 可嵌入 IAM 库**（把 auth/platformadmin/tenantadmin 三域封装为可实例化、可按域组合、可裁剪的库，供「内嵌到业务单体」的形态使用）。Go workspace（`backend/go.work`）管理 **8 个模块**（`apps/auth`、`apps/gateway`、`apps/platformadmin`、`apps/rpapi`、`apps/tenantadmin`、`pkg`、`sdk`、`iam`），另含示例模块 `examples/embedded-iam-demo`。
-- **两种接入形态**：形态 1 单独部署 IAM（`gateway`/分体），业务应用通过 `backend/sdk` 验签接入；形态 2 用 `backend/iam` 把 IAM **内嵌**进业务自己的 Go 进程（不单独部署 IAM 前后端），见 [application-integration-guide.md](application-integration-guide.md) 与 [`backend/iam/README.md`](../../backend/iam/README.md)。
+- 后端由 5 个应用组成：`auth`（认证网关 / OIDC Provider，:8081）、`platformadmin`（平台管理，:8082）、`tenantadmin`（租户自服务，:8083）、`rpapi`（面向应用的只读目录 API，:8084）、`gateway`（单体聚合部署，:8100），共享 `backend/pkg` 公共层；各域实现物理归 `apps/*`（可 import 的库包，各带 `cmd/` 进程入口），其上另有 `backend/sdk/server` 薄门面 / 编排层（供「内嵌到业务单体」的形态使用）。Go workspace（`backend/go.work`）管理 **7 个模块**（`apps/auth`、`apps/gateway`、`apps/platformadmin`、`apps/rpapi`、`apps/tenantadmin`、`pkg`、`sdk`）。
+- **两种接入形态**：形态 1 单独部署 IAM（`gateway`/分体），业务应用通过 `backend/sdk` 验签接入；形态 2 用 `backend/sdk/server` 把 IAM **内嵌**进业务自己的 Go 进程（不单独部署 IAM 进程，前端由 npm 包 `@morehao/ark-iam-react` 提供），见 [application-integration-guide.md](application-integration-guide.md) §11。
 - 身份模型为 **自然人（person）+ 租户成员（user，表 `"user"`）**：person 是跨租户的全局身份，user 是 person 在某个租户内的成员记录，一个人可同时属于多个租户。
 - 授权模型到「**角色—菜单**」粒度（角色按租户 + 应用作用域，`user_role` / `role_menu` 两张关联表）；资源级权限不在 IAM 承载。
 - 前端为 React 18 + Vite + Ant Design 5 的 pnpm monorepo（`frontend/`），包含登录门户（login-web :4000）、平台管理台（platform-admin-web :4001）、租户管理台（tenant-admin-web :4002）。

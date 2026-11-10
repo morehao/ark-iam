@@ -50,13 +50,6 @@ make run APP=rpapi
 
 # 单体聚合运行（一个进程挂载四者，:8100）
 make run APP=gateway
-
-# 可嵌入 IAM 库（backend/iam）构建 / 测试
-make iam-build
-make test-iam
-
-# 内嵌形态最小示例（一个进程 = IAM + 业务，:8099；先访问 /install 初始化）
-cd backend/examples/embedded-iam-demo && go run .
 ```
 
 | 应用 | 端口 | 说明 |
@@ -67,7 +60,7 @@ cd backend/examples/embedded-iam-demo && go run .
 | rpapi | 8084 | 面向应用的只读目录 API（`/v1/rp/directory/*`） |
 | gateway | 8100 | 聚合部署（推荐日常使用） |
 
-> 另有 **`backend/iam` 可嵌入 IAM 库**（非独立应用）：把 auth/platformadmin/tenantadmin 三域封装为可实例化、可按域裁剪的库，供业务应用内嵌使用（与业务同进程部署，不单独起 IAM 进程）。最小示例见 `backend/examples/embedded-iam-demo`，接入说明见 [application-integration-guide.md](application-integration-guide.md) §11。
+> **两层可复用能力**：`apps/{auth,platformadmin,tenantadmin,rpapi}` 是**可 import 的域库包**（各带 `cmd/` 进程入口，保留分体部署；`apps/gateway` 是纯 `cmd/main` 聚合器）；`backend/sdk/server` 是在其上的一层**薄门面 / 编排层**（`package server`，提供 `server.New` / `App.Mount` / `App.RunMigrations` / `App.MountConfig` 等），供业务应用把 IAM 内嵌进自己的 Go 进程（与业务同进程部署，不单独起 IAM 进程）。依赖方向为：进程入口 → `sdk/server` → `apps/*` 各域库 → `pkg`（`apps` 不 import `sdk`，唯一例外 `apps/rpapi → sdk/rp` 验签）。接入说明见 [application-integration-guide.md](application-integration-guide.md) §11。
 
 ### 2.2 前端
 
@@ -532,11 +525,7 @@ WHERE c.token_endpoint_auth_method = 'none'
 make test APP=auth
 
 # 全量测试（go.work 在 backend/，且按路径逐个 use 模块）
-cd backend && go test ./apps/auth/... ./apps/gateway/... ./apps/platformadmin/... ./apps/rpapi/... ./apps/tenantadmin/... ./pkg/... ./sdk/... ./iam/...
-
-# 可嵌入 IAM 库（backend/iam）
-make iam-build   # 构建
-make test-iam    # 测试
+cd backend && go test ./apps/auth/... ./apps/gateway/... ./apps/platformadmin/... ./apps/rpapi/... ./apps/tenantadmin/... ./pkg/... ./sdk/...
 
 # 指定包 / 单个用例
 cd backend && go test ./pkg/core/user/ -run TestCreate_NewPersonWithDeptRelations -v
@@ -548,12 +537,12 @@ go tool cover -html=coverage.out
 
 # Lint / vet
 make lint
-cd backend && for m in apps/auth apps/gateway apps/platformadmin apps/rpapi apps/tenantadmin pkg sdk iam; do (cd $m && go vet ./...); done
+cd backend && for m in apps/auth apps/gateway apps/platformadmin apps/rpapi apps/tenantadmin pkg sdk; do (cd $m && go vet ./...); done
 ```
 
 > **为什么不能写 `go test ./...`**：`backend/go.work` 用 `use (./apps/auth … ./pkg)` 逐个列出模块，`backend/` 本身不是模块，因此 `cd backend && go test ./...` 会报 `directory prefix . does not contain modules listed in go.work`（`./apps/...` 也不行，`apps` 不是模块）。要么显式列出各模块目录，要么进入某个模块目录内跑 `./...`（`make lint` 就是用后者遍历模块）。
 
-**单元测试约定**：auth / platformadmin / tenantadmin / rpapi 各自的 `testutil.SetupSQLite(t, entities...)` 注册内存 SQLite 为全局 iam 库，服务内 `dao.NewXxxDao()` 自动落测试库，直接断言真实 dao 行为（gateway 无 `testutil`，因为它只在 `app.go` 里挂载四个应用）。RP 侧能力另有一套不依赖 DB 的测试：`cd backend/sdk && go test ./...`（`make test-sdk`）。可嵌入 IAM 库的测试在 `iam/` 下：`cd backend && go test ./iam/...`（`make test-iam`），含端到端用例 `iam/e2e_test.go`（sqlite 建表→引导→登录）与静态守卫 `design_guard_test.go`。需要真实 PostgreSQL/Redis 的集成测试用 `pkg/testsetup`（`Initialize`/`Done`/`NewCtx`，读取 `apps/<app>/config/config.yaml`）。
+**单元测试约定**：auth / platformadmin / tenantadmin / rpapi 各自的 `testutil.SetupSQLite(t, entities...)` 注册内存 SQLite 为全局 iam 库，服务内 `dao.NewXxxDao()` 自动落测试库，直接断言真实 dao 行为（gateway 无 `testutil`，因为它只在 `app.go` 里挂载四个应用）。RP 侧能力另有一套不依赖 DB 的测试：`cd backend/sdk && go test ./...`（`make test-sdk`）。需要真实 PostgreSQL/Redis 的集成测试用 `pkg/testsetup`（`Initialize`/`Done`/`NewCtx`，读取 `apps/<app>/config/config.yaml`）。
 
 **e2e（Playwright，浏览器全流程）**：
 
@@ -632,7 +621,7 @@ flowchart TB
 | **单体聚合**（gateway 单进程） | 小规模/开发 | 一个进程挂载四应用，端口 8100 |
 | **分体部署** | 中大规模 | auth / platformadmin / tenantadmin / rpapi 独立进程独立扩缩容 |
 | **auth 多副本** | 高可用 | 必须共享同一认证 Redis（会话/授权状态），PostgreSQL 主库；`/oidc` 无状态化依赖 Redis |
-| **形态 2：内嵌业务单体** | 单项目零运维自带账号体系 | IAM 随业务二进制同进程部署，**不单独起 IAM 进程/前端**；`iam.New + Mount + MountFrontend`（见 `backend/iam/README.md`） |
+| **形态 2：内嵌业务单体** | 单项目零运维自带账号体系 | IAM 随业务二进制同进程部署，**不单独起 IAM 进程**；Go 侧用 `sdk/server`（`server.New + App.Mount`）把各域库内嵌进业务进程，配置项另见 [configuration-reference.md](configuration-reference.md) §12 |
 
 **关键约束**：
 

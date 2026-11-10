@@ -1,6 +1,6 @@
 # 配置参考（Configuration Reference）
 
-> 本文说明 Ark IAM 各应用 `config.yaml` 的配置项。五个应用（auth / platformadmin / tenantadmin / rpapi / gateway）共享同一套 `pkg/config.Config` 结构，差异主要在 `server.name/port`、OIDC 相关项，以及**仅 auth 生效**的登录限流（`security.login.ratePerMinute` / `burst`）与 `server.trustedProxies`、**仅 platformadmin / tenantadmin 生效**的 `oidc.backChannelLogoutPath`、**仅 auth / gateway 配置**的 `oidc.consoles`。RP 侧（含外部应用）的 OIDC/目录能力另由 `backend/sdk` 提供，旋钮见 §11；「内嵌到业务单体」形态改用 `backend/iam` 的 `iam.Config`（精简字段 + 可选透传完整 `pkgconfig.Config`），见 §12。
+> 本文说明 Ark IAM 各应用 `config.yaml` 的配置项。五个应用（auth / platformadmin / tenantadmin / rpapi / gateway）共享同一套 `pkg/config.Config` 结构，差异主要在 `server.name/port`、OIDC 相关项，以及**仅 auth 生效**的登录限流（`security.login.ratePerMinute` / `burst`）与 `server.trustedProxies`、**仅 platformadmin / tenantadmin 生效**的 `oidc.backChannelLogoutPath`、**仅 auth / gateway 配置**的 `oidc.consoles`。RP 侧（含外部应用）的 OIDC/目录能力另由 `backend/sdk` 提供，旋钮见 §11；「内嵌到业务单体」形态改用 `backend/sdk/server` 的 `server.Config`（精简字段 + 可选透传完整 `pkgconfig.Config`），见 §12。
 >
 > 配置加载顺序：环境变量 `APP_CONFIG_PATH` 指定路径 → 相对**当前工作目录**的 `../config/config.yaml` → **可执行文件所在目录的上一级** `config/config.yaml`；三者皆无时仍按相对路径加载并启动失败（panic）。引导令牌有两个来源——环境变量 `BOOTSTRAP_TOKEN`（高优先级）与 YAML 的 `install.bootstrapToken`（回落），见 §1.1 / §1.2。
 
@@ -19,7 +19,7 @@
 9. [其他（jwt / client / masterKey）](#9-其他jwt--client--masterkey)
 10. [环境差异要点](#10-环境差异要点)
 11. [RP SDK 客户端配置（sdk/rp）](#11-rp-sdk-客户端配置sdkrp)
-12. [可嵌入 IAM 库配置（iam.Config）](#12-可嵌入-iam-库配置iamconfig)
+12. [内嵌业务单体配置（server.Config）](#12-内嵌业务单体配置serverconfig)
 
 ---
 
@@ -432,19 +432,22 @@ oidc:
 
 ---
 
-## 12. 可嵌入 IAM 库配置（`iam.Config`）
+## 12. 内嵌业务单体配置（`server.Config`）
 
-「形态 2：把 IAM 内嵌进业务单体」不使用各应用 `config.yaml`，而是在代码里构造 `iam.Config`（详见 [`backend/iam/README.md`](../../backend/iam/README.md)）：
+「形态 2：把 IAM 内嵌进业务单体」不使用各应用 `config.yaml`，而是在代码里构造 `sdk/server` 的 `server.Config`（import `github.com/morehao/ark-iam/sdk/server`，接入要点见 [application-integration-guide.md](application-integration-guide.md) §11）：
 
 ```go
-app, err := iam.New(iam.Config{
-    Env:     "dev",                                    // dev / prod；prod 触发非 dev 安全校验
-    DB:      iam.DBConfig{DSN: "postgres://...", Service: "iam"},
-    Redis:   &iam.RedisConfig{Addr: "127.0.0.1:6379"}, // 可空；配置后桥接为全局 Redis
-    Domains: iam.DefaultConsoleDomains,                // 空=全量；最小集见 §11.3 of 接入指南
-    Raw:     nil,                                     // 可选：透传完整 pkgconfig.Config（OP 需要）
-    SameDatabase: true,                               // IAM 表与业务表同库 → 启用撞名检测
-    AllowExistingTables: []string{},                  // 撞名白名单（可选）
+app, err := server.New(server.Config{
+    Env:     "dev",                                       // dev / prod；prod 触发非 dev 安全校验
+    DB:      server.DBConfig{DSN: "postgres://...", Service: "iam"},
+    Redis:   &server.RedisConfig{Addr: "127.0.0.1:6379"}, // 可空；配置后桥接为全局 Redis
+    Domains: server.DefaultConsoleDomains,                // 空=全量；最小集见接入指南 §11.3
+    Raw:     nil,                                         // 可选：透传完整 pkgconfig.Config（OP 需要）
+    SameDatabase: true,                                   // IAM 表与业务表同库 → 启用撞名检测
+    AllowExistingTables: []string{},                      // 撞名白名单（可选）
+    JWKSURL:  "",                                         // 分体部署：远程 JWKS 地址（跨进程验签）
+    Issuer:   "",                                         // 分体部署：OP issuer
+    KeySource: nil,                                       // 可选：自定义公钥来源
 })
 ```
 
@@ -458,5 +461,7 @@ app, err := iam.New(iam.Config{
 | `Raw` | 否 | 完整 `pkgconfig.Config`；auth 的 OP（issuer/签名密钥/cookie/控制台回调）依赖它，不传则按精简字段合成 dev 最小配置 |
 | `SameDatabase` | 否 | `true` 时 `RunMigrations` 先做同库撞名检测 |
 | `AllowExistingTables` | 否 | 撞名检测白名单 |
+| `JWKSURL` / `Issuer` | 否 | 分体部署时独立进程远程拉 JWKS 验签所需的 JWKS 地址 / issuer |
+| `KeySource` | 否 | 可选：自定义 OP 公钥来源 |
 
-> 配置加载顺序的差异：`iam` 由**调用方代码**构造配置，不读 `APP_CONFIG_PATH` / `config.yaml`；若需要沿用 `config.yaml`，请自行读取后填入 `Config.Raw`（`apps/gateway` 即如此：直接把 `config.Conf` 作为 `Raw` 传入）。
+> 配置加载顺序的差异：`sdk/server` 由**调用方代码**构造配置，不读 `APP_CONFIG_PATH` / `config.yaml`；若需要沿用 `config.yaml`，请自行读取后填入 `Config.Raw`（`apps/gateway` 即如此：直接把 `config.Conf` 作为 `Raw` 传入）。
