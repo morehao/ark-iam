@@ -12,8 +12,8 @@ import (
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/tenantadmin/dto/dtotenant"
-	"github.com/morehao/ark-iam/tenantadmin/testutil"
+	"github.com/morehao/ark-iam/backend/apps/tenantadmin/dto/dtotenant"
+	"github.com/morehao/ark-iam/backend/apps/tenantadmin/testutil"
 	"github.com/morehao/golib/biz/gcontext"
 )
 

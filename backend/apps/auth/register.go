@@ -9,7 +9,7 @@ package auth
 
 import (
 	"github.com/gin-gonic/gin"
-	authrouter "github.com/morehao/ark-iam/auth/router"
+	authrouter "github.com/morehao/ark-iam/backend/apps/auth/router"
 	"github.com/morehao/ark-iam/pkg/oidckit"
 	"github.com/morehao/golib/dbaccess/gormdao"
 )

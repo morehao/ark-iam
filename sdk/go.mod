@@ -80,17 +80,17 @@ require (
 )
 
 require (
-	github.com/morehao/ark-iam/auth v0.4.0
+	github.com/morehao/ark-iam/backend/apps/auth v0.4.0
+	github.com/morehao/ark-iam/backend/apps/platformadmin v0.4.0
+	github.com/morehao/ark-iam/backend/apps/tenantadmin v0.4.0
 	github.com/morehao/ark-iam/pkg v0.3.0
-	github.com/morehao/ark-iam/platformadmin v0.4.0
-	github.com/morehao/ark-iam/tenantadmin v0.4.0
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 )
 
-replace github.com/morehao/ark-iam/auth => ../backend/apps/auth
-
-replace github.com/morehao/ark-iam/platformadmin => ../backend/apps/platformadmin
-
-replace github.com/morehao/ark-iam/tenantadmin => ../backend/apps/tenantadmin
-
 replace github.com/morehao/ark-iam/pkg => ../pkg
+
+replace github.com/morehao/ark-iam/backend/apps/auth => ../backend/apps/auth
+
+replace github.com/morehao/ark-iam/backend/apps/platformadmin => ../backend/apps/platformadmin
+
+replace github.com/morehao/ark-iam/backend/apps/tenantadmin => ../backend/apps/tenantadmin

@@ -8,8 +8,8 @@ import (
 
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/platformadmin/dto/dtotenantapplication"
-	"github.com/morehao/ark-iam/platformadmin/testutil"
+	"github.com/morehao/ark-iam/backend/apps/platformadmin/dto/dtotenantapplication"
+	"github.com/morehao/ark-iam/backend/apps/platformadmin/testutil"
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 

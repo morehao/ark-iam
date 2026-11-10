@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/platformadmin/dto/dtopermission"
-	"github.com/morehao/ark-iam/platformadmin/testutil"
+	"github.com/morehao/ark-iam/backend/apps/platformadmin/dto/dtopermission"
+	"github.com/morehao/ark-iam/backend/apps/platformadmin/testutil"
 	"github.com/morehao/golib/biz/gobject"
 	"gorm.io/gorm"
 )

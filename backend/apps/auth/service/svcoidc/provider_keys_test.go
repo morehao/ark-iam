@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	appconfig "github.com/morehao/ark-iam/auth/config"
+	appconfig "github.com/morehao/ark-iam/backend/apps/auth/config"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 )
 

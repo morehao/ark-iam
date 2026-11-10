@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/auth/config"
-	"github.com/morehao/ark-iam/auth/controller/ctroidc"
-	"github.com/morehao/ark-iam/auth/router"
+	"github.com/morehao/ark-iam/backend/apps/auth/config"
+	"github.com/morehao/ark-iam/backend/apps/auth/controller/ctroidc"
+	"github.com/morehao/ark-iam/backend/apps/auth/router"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 )

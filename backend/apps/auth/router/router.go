@@ -2,8 +2,8 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/auth/controller/ctroidc"
-	"github.com/morehao/ark-iam/auth/controller/ctrinstall"
+	"github.com/morehao/ark-iam/backend/apps/auth/controller/ctroidc"
+	"github.com/morehao/ark-iam/backend/apps/auth/controller/ctrinstall"
 	"github.com/morehao/ark-iam/pkg/oidckit"
 	"github.com/morehao/golib/dbaccess/gormdao"
 )

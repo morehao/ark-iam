@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/morehao/ark-iam/auth/config"
+	"github.com/morehao/ark-iam/backend/apps/auth/config"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/redis/go-redis/v9"

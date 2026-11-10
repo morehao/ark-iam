@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/morehao/ark-iam/auth/core/oidcop"
-	"github.com/morehao/ark-iam/auth/dto/dtooidc"
-	"github.com/morehao/ark-iam/auth/service/svcauth"
+	"github.com/morehao/ark-iam/backend/apps/auth/core/oidcop"
+	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtooidc"
+	"github.com/morehao/ark-iam/backend/apps/auth/service/svcauth"
 	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/model"

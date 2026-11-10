@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/platformadmin/testutil"
+	"github.com/morehao/ark-iam/backend/apps/platformadmin/testutil"
 )
 
 // newTenantScopeGinCtx 构造带租户作用域的测试 gin.Context；tenantID 为空表示平台侧

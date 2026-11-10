@@ -7,8 +7,8 @@ import (
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objpermission"
-	"github.com/morehao/ark-iam/tenantadmin/dto/dtotenant"
-	"github.com/morehao/ark-iam/tenantadmin/testutil"
+	"github.com/morehao/ark-iam/backend/apps/tenantadmin/dto/dtotenant"
+	"github.com/morehao/ark-iam/backend/apps/tenantadmin/testutil"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )

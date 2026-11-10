@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/auth/dto/dtouser"
+	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtouser"
 )
 
 type stubSessionSvc struct {

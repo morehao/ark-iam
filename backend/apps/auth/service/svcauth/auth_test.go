@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/auth/dto/dtoauth"
+	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoauth"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/biz/gcontext"

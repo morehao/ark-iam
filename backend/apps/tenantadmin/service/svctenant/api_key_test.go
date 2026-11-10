@@ -7,8 +7,8 @@ import (
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/tenantadmin/dto/dtotenant"
-	"github.com/morehao/ark-iam/tenantadmin/testutil"
+	"github.com/morehao/ark-iam/backend/apps/tenantadmin/dto/dtotenant"
+	"github.com/morehao/ark-iam/backend/apps/tenantadmin/testutil"
 )
 
 // TestApiKeyServiceAccountOnly 验证 API 密钥已收敛为「仅服务账号」管理模型：

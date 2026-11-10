@@ -3,8 +3,8 @@ package ctrsession
 import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/auth/dto/dtouser"
-	"github.com/morehao/ark-iam/auth/service/svcsession"
+	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtouser"
+	"github.com/morehao/ark-iam/backend/apps/auth/service/svcsession"
 	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )

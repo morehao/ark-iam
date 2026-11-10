@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/morehao/ark-iam/auth/config"
-	"github.com/morehao/ark-iam/auth/dto/dtoinstall"
+	"github.com/morehao/ark-iam/backend/apps/auth/config"
+	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoinstall"
 	"github.com/morehao/ark-iam/pkg/credential"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/seed"
