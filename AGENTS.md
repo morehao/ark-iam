@@ -4,7 +4,9 @@
 
 ## 项目概述
 
-GoArk 是一个基于 Gin + GORM 的多应用后端项目，采用前后端分离架构。IAM 后端拆分为五个应用（`auth`/`platformadmin`/`tenantadmin`/`rpapi`/`gateway`），共享公共层 `backend/pkg`、面向 RP 的 `backend/sdk` 与**可嵌入 IAM 库 `backend/iam`**，并以 `backend/go.work` 作为 Go workspace 管理 8 个模块（apps/auth、apps/gateway、apps/platformadmin、apps/rpapi、apps/tenantadmin、pkg、sdk、iam），另含示例模块 `examples/embedded-iam-demo`。`backend/iam` 把 auth/platformadmin/tenantadmin 三域封装为可实例化、可按域裁剪的库，支持「内嵌业务单体」形态（`iam.New + Mount + MountFrontend`），`apps/gateway` 是它的「全量使用者」。
+GoArk 是一个基于 Gin + GORM 的多应用后端项目，采用前后端分离架构。IAM 后端拆分为四个应用（`auth`/`platformadmin`/`tenantadmin`/`gateway`；原 `rpapi` 的只读目录 API 已并入 `sdk/server` 的 `DomainDirectory` 域），共享公共层 `pkg`、对外 SDK `sdk`、最底层契约 module `contract`，并以仓库根 `go.work` 作为 Go workspace 管理 7 个模块（contract、pkg、sdk、apps/auth、apps/gateway、apps/platformadmin、apps/tenantadmin）。`sdk/server` 把 auth/platformadmin/tenantadmin 三域 + 目录域封装为可实例化、可按域裁剪的门面，支持「内嵌业务单体」形态（`sdk/server.New + Mount + MountConfig + RunMigrations`），`apps/gateway` 是它的「全量使用者」。
+
+> **模块依赖方向（单向 DAG，无环）**：`contract`（仅 stdlib + jwt，无 ark-iam 依赖）← `pkg` ← `sdk`；`apps/*` → `contract`、`pkg`。`pkg` **不得**依赖 `sdk`（验签经 `contract.Verifier`/`contract.KeySource` 接口由 `sdk/server/internal` 注入）；`sdk/server/internal` 是唯一 import `apps/*`+`pkg` 的地方。守卫：`make sdk-check-deps`（依赖白名单）+ `make sdk-check-graph`（module 依赖方向）。
 
 ## 项目结构
 
@@ -15,12 +17,11 @@ ark-iam/
 │   │   ├── auth/          # 认证网关（登录/注册/token/OIDC），:8081
 │   │   ├── platformadmin/ # 平台管理，:8082
 │   │   ├── tenantadmin/   # 租户自服务，:8083
-│   │   ├── rpapi/         # 面向应用的只读目录 API（/v1/rp/directory/*），:8084
-│   │   └── gateway/       # 聚合应用（挂载上述四者，单体部署），:8100
-│   ├── pkg/               # 公共层（model/dao/object/core/credential/…）
-│   ├── sdk/               # RP 侧 OIDC SDK（验签/M2M/登出/目录）
-│   ├── iam/               # 可嵌入 IAM 库（New/Mount/MountFrontend，支持内嵌业务单体）
-│   ├── examples/          # 示例（embedded-iam-demo：内嵌形态最小可运行工程）
+│   │   └── gateway/       # 聚合应用（挂载 auth/platformadmin/tenantadmin + 目录域，单体部署），:8100
+│   ├── pkg/               # 公共层（model/dao/object/core/credential/…，仅依赖 contract）
+│   ├── sdk/               # 对外 SDK + 门面（rp 验签/M2M/登出/目录客户端 + server 门面 + DomainDirectory）
+│   ├── contract/          # 最底层契约 module（仅 stdlib + jwt）
+│   ├── examples/          # 示例（内嵌形态最小可运行工程）
 │   └── Makefile
 ├── frontend/             # React 前端项目
 ├── docs/                  # 文档目录
@@ -117,10 +118,10 @@ apps/
 │   └── dao/                 # 数据访问层
 ├── platformadmin/              # 平台管理（结构同 auth）
 ├── tenantadmin/                # 租户自服务（结构同 auth）
-├── rpapi/                      # 面向应用的只读目录 API（/v1/rp/directory/*，结构同 auth）
-├── gateway/                    # 聚合应用（挂载 auth/platformadmin/tenantadmin/rpapi）
+├── gateway/                    # 聚合应用（挂载 auth/platformadmin/tenantadmin + 目录域）
 pkg/                          # 公共层（跨应用共享，见下方「公共层约定」）
-sdk/                          # RP 侧 OIDC SDK（独立 module：contract + rp，依赖白名单见 sdk/README.md）
+sdk/                          # 对外 SDK（独立 module：rp + server；依赖白名单见 sdk/README.md）
+contract/                     # 最底层契约 module（仅 stdlib + jwt）
 ```
 
 > **公共层约定（`pkg/`）**：与应用内层级一一对应，**共享即上提同名目录**——`internal/middleware` ↔ `pkg/middleware`、`internal/core/<域>` ↔ `pkg/core/<域>`、`dto/dto<域>` ↔ `object/obj<域>`；跨应用共享的 model/dao/object 直接平铺在 `pkg/model`、`pkg/dao`、`pkg/object`（**不再套业务域容器**：模块路径 `github.com/morehao/ark-iam/pkg` 已表达域名，套一层会重复且与 `pkg/oidckit`、`pkg/seed` 等兄弟包边界矛盾）。
@@ -129,7 +130,7 @@ sdk/                          # RP 侧 OIDC SDK（独立 module：contract + rp�
 >
 > **领域层容器约定**：应用内领域层统一放 `internal/core/<领域名>`（当前为 `oidcop`）。`core` 只承载绑定框架/协议的领域逻辑，禁止放置工具与辅助代码；`op` 为 OpenID Provider 术语（对应 RP 侧 `pkg/oidckit`），非领域层通用后缀，其他领域层按领域名命名（如 `core/session`）。公共层同理：`pkg/core/<域>` 是平铺的领域层容器，**只放领域不变式，不放工具与辅助代码**（工具/基础能力直接放 `pkg/<name>`）。
 >
-> **OIDC 分层约定**：OP（Provider）侧领域层在 `apps/auth/internal/core/oidcop`（仅 auth 使用，绑定 auth 实体与 zitadel op 框架）。**RP 侧 OIDC 能力的唯一事实源是独立 module `backend/sdk`**（`sdk/contract` claim 契约 + `sdk/rp` 验签/M2M/登出/目录客户端），它面向外部应用，依赖白名单只有标准库 + `jwt/v5`（`make sdk-check-deps` 强制），禁止引入 gin/gorm/redis/go-oidc/go-jose；`pkg/object/objauth`、`pkg/oidckit` 只是指向 `sdk` 的**类型别名与 gin 薄壳**（外加把 `oidc.*` 配置装配成 `sdk/rp.KeySource`，见 `pkg/oidckit/keys.go`），不得再新增 RP 侧实现。若未来出现第二个 OP 消费者，将 `oidcop` 上提。
+> **OIDC 分层约定**：OP（Provider）侧领域层在 `apps/auth/internal/core/oidcop`（仅 auth 使用，绑定 auth 实体与 zitadel op 框架）。**RP 侧 OIDC 能力的唯一事实源是 `contract`（最底层契约 module：claim/Identity/logout/目录 DTO/验签接口）+ `sdk`（`sdk/rp` 验签/M2M/登出/目录客户端）**，它面向外部应用，依赖白名单只有标准库 + `jwt/v5`（`make sdk-check-deps` 强制），禁止引入 gin/gorm/redis/go-oidc/go-jose；`pkg/object/objauth`、`pkg/oidckit` 只是指向 `sdk` 的**类型别名与 gin 薄壳**（外加把 `oidc.*` 配置装配成 `contract.KeySource`，见 `pkg/oidckit/keys.go`，具体实现由 `sdk/server/internal` 注入），不得再新增 RP 侧实现。若未来出现第二个 OP 消费者，将 `oidcop` 上提。
 
 ### 命名规范
 
@@ -609,8 +610,9 @@ actionColumn<TenantItem>({
 - **API 文档**: swag (Swag Go)
 - **代码生成**: gocli
 - **数据库**: GORM with PostgreSQL（主库，启动时 AutoMigrate 自动建表、**不写任何数据**；内置数据由初始化页面 `POST /install/initialize` 一次性引导），测试用 SQLite
-- **RP SDK**: `backend/sdk`（独立 module，依赖白名单；`make test-sdk` / `make sdk-check-deps`，用法见 `backend/sdk/README.md`）
-- **可嵌入 IAM 库**: `backend/iam`（`iam.New + Mount + MountFrontend`，支持内嵌业务单体；`make iam-build` / `make test-iam`，用法见 `backend/iam/README.md`，示例 `backend/examples/embedded-iam-demo`）
+- **RP SDK**: `sdk`（独立 module，依赖白名单；`make test-sdk` / `make sdk-check-deps` / `make sdk-check-graph`，用法见 `sdk/README.md`）
+- **可嵌入 IAM 门面**: `sdk/server`（`New + Mount + MountConfig + RunMigrations`，支持内嵌业务单体；示例 `examples/`）
+- **契约 module**: `contract`（最底层独立 module，仅 stdlib + jwt，仅数据契约与验签接口）
 - **缓存**: Redis
 - **链路追踪**: OpenTelemetry
 - **日志**: golib/glog
