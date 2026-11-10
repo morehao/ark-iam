@@ -1,7 +1,7 @@
 # 签名密钥轮换运行手册（Signing Key Rotation Runbook）
 
 适用范围：OP（`apps/auth`）的 ID token / access token / logout token 签名密钥。
-相关实现：`backend/apps/auth/internal/service/svcoidc/provider.go`、`backend/pkg/config/config.go` 的 `OIDC.Keys`、`backend/sdk/rp/keys.go`（RP 侧 key set 消费）。
+相关实现：`backend/apps/auth/internal/service/svcoidc/provider.go`、`pkg/config/config.go` 的 `OIDC.Keys`、`sdk/rp/keys.go`（RP 侧 key set 消费）。
 
 ## 0. 结论速览
 
@@ -51,7 +51,7 @@ oidc:
 
 ## 2. RP 侧取键时序（决定轮换时延）
 
-`backend/sdk/rp/keys.go` 的策略：
+`sdk/rp/keys.go` 的策略：
 
 | 参数 | 默认值 | 作用 |
 |---|---|---|
@@ -140,15 +140,15 @@ oidc:
 
 - `backend/apps/auth/internal/service/svcoidc/provider_keys_test.go`
   `TestLoadSigningKeysMultiKey`：active 唯一性、kid 派生稳定性、重复/缺失/多个 active 均报错。
-- `backend/pkg/middleware/oidc_auth_test.go`
+- `pkg/middleware/oidc_auth_test.go`
   `TestOIDCMultiKeyRotation`：多 key 并存时存量 token 可用；**摘除旧 key 后立即失效**。
-- `backend/pkg/oidckit/keys_test.go`（公钥来源装配，本轮由 `pkg/middleware` 迁入）
+- `pkg/oidckit/keys_test.go`（公钥来源装配，本轮由 `pkg/middleware` 迁入）
   `TestDeriveKeyID_Golden`：`kid` 派生算法的固定黄金值；`TestLocalPublicKeys_KidPrecedence`：
   显式 `kid` > 签名 key id > 派生值；`TestNewKeySourceFromConfig_UnreachableJWKSDoesNotFallBack`：
   **JWKS 端点配了但不可用时必须报错，绝不静默回落到本地快照**（静默降级会把"轮换后全 401"
   伪装成"能启动"）；`TestResolveKeySource_InjectedWinsWithoutNetwork`：网关注入时零网络调用。
   其中 `kid` 黄金值与 `svcoidc` 侧同值断言，两处实现因此无法各自漂移。
-- `backend/sdk/rp/verifier_test.go`：unknown-kid 触发刷新（`TestKeys_UnknownKidTriggersRefresh`）、
+- `sdk/rp/verifier_test.go`：unknown-kid 触发刷新（`TestKeys_UnknownKidTriggersRefresh`）、
   刷新限频 1/分钟（`TestKeys_RefreshRateLimited`）、拉取失败保留旧 key
   （`TestKeys_RefreshFailureKeepsOldKeys`）、陈旧密钥 fail-closed（`TestKeys_MaxKeyAgeFailClosed`）、
   多 key key set 基准（`BenchmarkVerify_Keyset`）。

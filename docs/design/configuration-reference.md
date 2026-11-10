@@ -1,6 +1,6 @@
 # 配置参考（Configuration Reference）
 
-> 本文说明 Ark IAM 各应用 `config.yaml` 的配置项。五个应用（auth / platformadmin / tenantadmin / rpapi / gateway）共享同一套 `pkg/config.Config` 结构，差异主要在 `server.name/port`、OIDC 相关项，以及**仅 auth 生效**的登录限流（`security.login.ratePerMinute` / `burst`）与 `server.trustedProxies`、**仅 platformadmin / tenantadmin 生效**的 `oidc.backChannelLogoutPath`、**仅 auth / gateway 配置**的 `oidc.consoles`。RP 侧（含外部应用）的 OIDC/目录能力另由 `backend/sdk` 提供，旋钮见 §11；「内嵌到业务单体」形态改用 `backend/sdk/server` 的 `server.Config`（精简字段 + 可选透传完整 `pkgconfig.Config`），见 §12。
+> 本文说明 Ark IAM 各应用 `config.yaml` 的配置项。四个应用（auth / platformadmin / tenantadmin / gateway）共享同一套 `pkg/config.Config` 结构，差异主要在 `server.name/port`、OIDC 相关项，以及**仅 auth 生效**的登录限流（`security.login.ratePerMinute` / `burst`）与 `server.trustedProxies`、**仅 platformadmin / tenantadmin 生效**的 `oidc.backChannelLogoutPath`、**仅 auth / gateway 配置**的 `oidc.consoles`。RP 侧（含外部应用）的 OIDC/目录能力另由 `sdk` 提供，旋钮见 §11；「内嵌到业务单体」形态改用 `sdk/server` 的 `server.Config`（精简字段 + 可选透传完整 `pkgconfig.Config`），见 §12。
 >
 > 配置加载顺序：环境变量 `APP_CONFIG_PATH` 指定路径 → 相对**当前工作目录**的 `../config/config.yaml` → **可执行文件所在目录的上一级** `config/config.yaml`；三者皆无时仍按相对路径加载并启动失败（panic）。引导令牌有两个来源——环境变量 `BOOTSTRAP_TOKEN`（高优先级）与 YAML 的 `install.bootstrapToken`（回落），见 §1.1 / §1.2。
 
@@ -27,7 +27,7 @@
 
 ```yaml
 server:
-  name: auth            # 服务名（auth/platformadmin/tenantadmin/rpapi/gateway）
+  name: auth            # 服务名（auth/platformadmin/tenantadmin/gateway）
   port: 8081
   env: dev              # dev / prod 等
   trustedProxies: []    # 可信反向代理 CIDR（仅 auth 生效；留空 = 不信任任何代理）
@@ -76,7 +76,7 @@ oidc:
   jwksURL: ""
   # audiences 是本应用接受的 aud 白名单；留空＝不校验 aud
   # 注意 aud 是 per-app 的：gateway 聚合了某个应用，就要在 gateway 配置里为它
-  # 声明同样的白名单（如 rpapi → ["rpapi"]）
+  # 声明同样的白名单（目录域 aud）：gateway 配置里声明 ["rpapi"]
   audiences: []
   # 多签名密钥（配置后优先于下方 legacy 单 key 三元组）
   keys:
@@ -141,7 +141,7 @@ install:
 | 配置项 | 说明 | 默认 |
 |---|---|---|
 | `name` | 服务名，用于日志/追踪标识 | auth 等 |
-| `port` | HTTP 监听端口（auth 8081 / platformadmin 8082 / tenantadmin 8083 / rpapi 8084 / gateway 8100） | - |
+| `port` | HTTP 监听端口（auth 8081 / platformadmin 8082 / tenantadmin 8083 / gateway 8100） | - |
 | `env` | 环境标识：`dev`/`prod`。`dev` 启用 Swagger 文档、允许临时密钥、允许 insecure OIDC | 空 |
 | `trustedProxies` | 可信反向代理 CIDR 列表（如 `["10.0.0.0/8"]`）。配置后 gin 仅从这些代理透传的 `X-Forwarded-For` 取客户端 IP；**未配置则不信任任何代理**，直接使用 `RemoteAddr`，防止伪造 `X-Forwarded-For` 绕过按 IP 的限流与登录锁定。**仅 auth 应用读取并生效**，gateway 聚合部署下该项不生效 | 空 |
 
@@ -241,7 +241,7 @@ install:
 | `signingPrivateKeyPEM` | 签名私钥 PEM 内联（**legacy 单 key**，与 path 二选一，PEM 优先） | - |
 | `keys` | **签名密钥列表（多 key）**：每项 `kid`（可省）/`privateKeyPath`/`privateKeyPEM`/`active`；配置后**优先于**上面三个单 key 字段 | 空（回退单 key 三元组） |
 | `jwksURL` | RP 侧（含内置应用）获取 OP 公钥的**显式端点**（末段为 `keys`/`jwks` 或以 `.json` 结尾）；留空时按 `issuer` 解析：标准 discovery 的 `jwks_uri` → `{issuer}/keys` → `{issuer}/.well-known/jwks.json`（**本仓 OP 发布在 `{issuer}/keys`**）；gateway 单体部署下注入进程内 key set，完全无网络调用 | 空 |
-| `audiences` | 本应用接受的 `aud` 白名单；留空＝**不校验 aud**（auth 的 `/v1/auth/*` 即是）；`rpapi` 声明 `["rpapi"]`。**per-app**：gateway 聚合部署时须在 gateway 配置里同样声明 | 空 |
+| `audiences` | 本应用接受的 `aud` 白名单；留空＝**不校验 aud**（auth 的 `/v1/auth/*` 即是）；目录域声明 `["rpapi"]`（aud 值沿用原 rpapi）。**per-app**：gateway 聚合部署时须在 gateway 配置里同样声明 | 空 |
 | `encryptionKey` | 授权码加密密钥（非 dev 必须显式配置，fail-closed） | - |
 | `encryptionKeyID` | 加密密钥 kid | enc-key-1 |
 | `allowInsecure` | 允许非 HTTPS（dev 才应开启） | false |
@@ -317,24 +317,24 @@ flowchart TB
     DEPLOY -->|"跨子域"| DOMAIN["cookieDomain=.example.com<br/>+ Secure"]
 ```
 
-### 8.3 aud 白名单与 JWKS 地址（以 rpapi 为例）
+### 8.3 aud 白名单与 JWKS 地址（以目录域为例）
 
 `oidc.audiences` 是 **per-app** 的 `aud` 白名单（按应用声明，不硬编码 client_id）：留空表示**不校验 aud**（`auth` 的 `/v1/auth/*` 就是这种情形——它服务多个内置控制台客户端）；一旦声明，access token 的 `aud` 必须命中其中之一，否则按无效令牌拒绝。
 
-`rpapi`（独立进程，校验 M2M 令牌时**本地验签、不查库**）的 `oidc` 配置即范例：
+`gateway` 上挂载的目录域（`DomainDirectory`，校验 M2M 令牌时**本地验签、不查库**）的 `oidc` 配置即范例：
 
 ```yaml
 oidc:
   issuer: "http://localhost:8081/oidc"          # 指向 OP（auth）
   jwksURL: "http://localhost:8081/oidc/keys"    # 显式端点可省一次 discovery；留空则由 SDK 解析
   audiences:
-    - "rpapi"                                   # 只接受 aud 命中 rpapi 自身 client_id 的 M2M 令牌
+    - "rpapi"                                   # 只接受 aud 命中目录应用 client_id 的 M2M 令牌（aud 值沿用原 rpapi）
   enableSSOSessionValidation: true
   backChannelLogoutPath: ""
 ```
 
 > gateway 单体部署时由 auth 注入**进程内 key set**，不产生网络调用；此时 `jwksURL` 不生效也不需要配置。
-> **但 `audiences` 仍要配**：它是 per-app 的，gateway 配置里为 rpapi 声明 `["rpapi"]`，否则 `/v1/rp/directory/*` 在 gateway 下会跳过 aud 收紧。rpapi 独立部署时才走 `jwksURL`。
+> **但 `audiences` 仍要配**：它是 per-app 的，gateway 配置里为目录域声明 `["rpapi"]`，否则 `/v1/rp/directory/*` 在 gateway 下会跳过 aud 收紧。目录域挂在 gateway 内部时由 auth 注入进程内 key set，不需要 `jwksURL`。
 
 ### 8.4 consoles（内置控制台回调地址）
 
@@ -391,7 +391,7 @@ oidc:
 
 ## 11. RP SDK 客户端配置（`sdk/rp`）
 
-外部应用（RP）经独立 module `backend/sdk` 接入（安装与用法见 `backend/sdk/README.md`，依赖白名单由 `make sdk-check-deps` 强制）。以下旋钮是**程序化参数**（Go option / `Config` 字段），**不在 `config.yaml`**；本仓内置应用把同一批能力经 `pkg/middleware` 暴露给 `oidc.*` 配置（§8）。
+外部应用（RP）经独立 module `sdk` 接入（安装与用法见 [sdk/README.md](../../sdk/README.md)，依赖白名单由 `make sdk-check-deps` 强制；契约在 `contract` 独立 module）。以下旋钮是**程序化参数**（Go option / `Config` 字段），**不在 `config.yaml`**；本仓内置应用把同一批能力经 `pkg/middleware` 暴露给 `oidc.*` 配置（§8）。
 
 ### 11.1 验签（`rp.NewKeys` / `rp.NewVerifier`）
 
@@ -417,7 +417,7 @@ oidc:
 
 | 字段 | 说明 | 默认 |
 |---|---|---|
-| `BaseURL` | 目录 API 根地址（如 `http://iam:8084/v1/rp`，不带尾斜杠） | 必填 |
+| `BaseURL` | 目录 API 根地址（如 `http://iam:8100/v1/rp`，不带尾斜杠；目录域随 gateway 提供） | 必填 |
 | `Tokens` | M2M 令牌来源（`rp.TokenClient`，距 `exp` 60s 自动换新） | 必填 |
 | `HTTPClient` | 自定义 HTTP 客户端 | connect 1s / 总超时 3s |
 | `MemberTTL` | 成员缓存 TTL | 60s |

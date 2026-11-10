@@ -1,6 +1,6 @@
 # ark-iam/sdk —— RP 侧 OIDC 能力 SDK
 
-面向**外部应用（RP）**的 OIDC 接入 SDK，也是本仓内置应用（`auth`/`platformadmin`/`tenantadmin`/`rpapi`）
+面向**外部应用（RP）**的 OIDC 接入 SDK，也是本仓内置应用（`auth`/`platformadmin`/`tenantadmin`，以及 `sdk/server` 的 `DomainDirectory` 目录域）
 使用的同一份实现（dogfooding：内置应用能用的能力，外部应用同样可用）。
 
 - **框架无关**：只依赖 Go 标准库与 `github.com/golang-jwt/jwt/v5`（测试另加 `testify`）。
@@ -11,11 +11,13 @@
 - **fail-closed**：任何无法建立密钥集/校验器的情况都必须落到 401，不允许静默放行。
 
 ```
+contract/         # 独立 module（github.com/morehao/ark-iam/contract）：claim 契约（双端单一事实源）、
+                  #   Identity、错误分类、back-channel logout 事件常量、KeySource/Verifier 接口、目录 DTO
 sdk/
-├── contract/     # claim 契约（双端单一事实源）、错误分类、back-channel logout 事件常量
-├── server/       # 门面/编排层：New(Domains)/Mount/MountConfig，委托 apps/* 各域实现库
-│                 #   （process entry → sdk/server → apps/{auth,platformadmin,tenantadmin} → pkg）
-└── rp/           # RP 侧能力
+├── server/       # 门面/编排层：New(Domains)/Mount/MountConfig/RunMigrations，委托 apps/* 各域实现库
+│   └── internal/ #   唯一 import apps/* + pkg 的地方（装配 + 注入 verifier）；public 只用 contract 类型
+│                 #   （process entry → sdk/server → sdk/server/internal → apps/{auth,platformadmin,tenantadmin} → pkg → contract）
+└── rp/           # RP 侧能力（实现 contract.Verifier / contract.KeySource）
     ├── keys.go       # KeySource：JWKS 预取 / kid 查表 / 限频刷新 / 磁盘兜底
     ├── verifier.go   # 本地验签 → Identity（person/machine、租户、scope、代操作主体）
     ├── client_credentials.go  # M2M 令牌自动续期（距 exp 60s 换新）
@@ -103,7 +105,7 @@ func OIDCAuth(verifier *rp.Verifier) gin.HandlerFunc {
 }
 ```
 
-本仓内置应用的参考实现见 `backend/pkg/middleware/oidc_auth.go`（含 aud/issuer 收紧、
+本仓内置应用的参考实现见 `pkg/middleware/oidc_auth.go`（含 aud/issuer 收紧、
 SSO 会话活性校验、`user_id` 回填等本仓特有逻辑）。
 
 ## 3. 机器凭证（M2M）
@@ -131,7 +133,7 @@ client, err := directory.New(directory.Config{
 > 以 `contract.ErrMissingClaim` 拒绝（HTTP 401）。原因是目录数据按租户隔离，而纯
 > `client_credentials` 没有任何租户归属（租户上下文只能来自 API Key 的归属主体）。
 > 因此外部应用取目录数据请统一走上面这段 `NewTokenClient`（内部即 API Key 换 token），
-> 并在客户端上授好 `directory.read` scope 与 rpapi 的 `aud`。
+> 并在客户端上授好 `directory.read` scope 与目录应用的 `aud`（gateway 配置 `oidc.audiences` 沿用 `rpapi`）。
 
 ## 4. 只读目录（推荐：后台展示取姓名/部门）
 
@@ -164,12 +166,12 @@ receiver := logout.NewReceiver(
 http.Handle("/bc-logout", receiver) // 正确状态码：200/400/500
 ```
 
-`receiver.Handle(ctx, tokenStr)` 是唯一实现，gin 壳只做参数搬运（见 `backend/pkg/oidckit`）。
+`receiver.Handle(ctx, tokenStr)` 是唯一实现，gin 壳只做参数搬运（见 `pkg/oidckit`）。
 
 ## 6. 验证与自检
 
 ```bash
-make test-sdk          # cd backend/sdk && go test ./...
+make test-sdk          # cd contract && go test ./...（契约）+ cd sdk && go test ./...（RP 核心）
 make sdk-check-deps    # 依赖白名单（拒绝 gorm/redis/gin/go-oidc/go-jose）
 ```
 

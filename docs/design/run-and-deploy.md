@@ -19,7 +19,7 @@
 
 | 依赖 | 版本 | 用途 |
 |---|---|---|
-| Go | 1.26+ | 后端（`backend/go.work` 与各 `go.mod` 均声明 1.26.1；Docker 构建镜像 `golang:1.26-alpine`） |
+| Go | 1.26+ | 后端（根 `go.work` 与各 `go.mod` 均声明 1.26.1；Docker 构建镜像 `golang:1.26-alpine`） |
 | Node.js | 22+ | 前端 / e2e（pnpm 11 已不支持 Node 18/19/20/21） |
 | pnpm | 11+ | 前端 monorepo 依赖管理（`package.json` 的 `packageManager` 锁定 11.1.0） |
 | PostgreSQL | 13+ | 主库（库名 `iam`），启动时由 AutoMigrate 自动建表（**只建表、不写数据**）；13+ 才能用 `DROP DATABASE ... WITH (FORCE)` |
@@ -42,13 +42,12 @@ make list-apps
 # 构建单个应用（产物输出到 backend/output；有效 APP 见下表）
 make build APP=auth
 
-# 运行单个应用（auth / platformadmin / tenantadmin / rpapi / gateway）
+# 运行单个应用（auth / platformadmin / tenantadmin / gateway）
 make run APP=auth
 make run APP=platformadmin
 make run APP=tenantadmin
-make run APP=rpapi
 
-# 单体聚合运行（一个进程挂载四者，:8100）
+# 单体聚合运行（一个进程挂载 auth/platformadmin/tenantadmin + 目录域，:8100）
 make run APP=gateway
 ```
 
@@ -57,10 +56,9 @@ make run APP=gateway
 | auth | 8081 | 认证 + OIDC Provider（`/oidc`） |
 | platformadmin | 8082 | 平台管理 |
 | tenantadmin | 8083 | 租户自服务 |
-| rpapi | 8084 | 面向应用的只读目录 API（`/v1/rp/directory/*`） |
-| gateway | 8100 | 聚合部署（推荐日常使用） |
+| gateway | 8100 | 聚合部署（推荐日常使用）；同时挂载只读目录域 `/v1/rp/directory/*`（原 rpapi 已并入，无独立 8084 端口） |
 
-> **两层可复用能力**：`apps/{auth,platformadmin,tenantadmin,rpapi}` 是**可 import 的域库包**（各带 `cmd/` 进程入口，保留分体部署；`apps/gateway` 是纯 `cmd/main` 聚合器）；`backend/sdk/server` 是在其上的一层**薄门面 / 编排层**（`package server`，提供 `server.New` / `App.Mount` / `App.RunMigrations` / `App.MountConfig` 等），供业务应用把 IAM 内嵌进自己的 Go 进程（与业务同进程部署，不单独起 IAM 进程）。依赖方向为：进程入口 → `sdk/server` → `apps/*` 各域库 → `pkg`（`apps` 不 import `sdk`，唯一例外 `apps/rpapi → sdk/rp` 验签）。接入说明见 [application-integration-guide.md](application-integration-guide.md) §11。
+> **两层可复用能力**：`apps/{auth,platformadmin,tenantadmin}` 是**可 import 的域库包**（各带 `cmd/` 进程入口，保留分体部署；`apps/gateway` 是纯 `cmd/main` 聚合器）；`sdk/server` 是在其上的一层**薄门面 / 编排层**（`package server`，提供 `server.New` / `App.Mount` / `App.RunMigrations` / `App.MountConfig` / `App.MountDirectory` 等，装配实现下沉 `sdk/server/internal`），供业务应用把 IAM 内嵌进自己的 Go 进程（与业务同进程部署，不单独起 IAM 进程）。依赖方向（严格单向 DAG）：进程入口 → `sdk/server` → `sdk/server/internal` → `apps/*` 各域库 → `pkg` → `contract`；`pkg`、`apps/*`、`sdk/rp` 均只依赖 `contract`（`pkg` 的验签经 `contract.Verifier`/`contract.KeySource` 接口注入），**无 `pkg → sdk` / `apps → sdk` 反向依赖**，由 `make sdk-check-graph` 强制。接入说明见 [application-integration-guide.md](application-integration-guide.md) §11。
 
 ### 2.2 前端
 
@@ -199,7 +197,7 @@ flowchart LR
 
 本批新增三层语义中的**准入层**：表 `user_application`（`tenant_id`、`user_id` 指向 `user.id`——含成员与服务账号、`app_id`、`status`（具名枚举 `enable`/`disable`，撤销 = 置 `disable` 保留行）、`source`（`manual`/`role`/`provision`）），以及部分唯一索引 `uk_user_application_active (tenant_id, user_id, app_id) WHERE deleted_at IS NULL`。**AutoMigrate 只新增缺失的表/列/索引**，因此升级代码本身不需要任何迁移动作。
 
-判定式收敛为单一实现 `backend/pkg/core/application` 的 `Usable` / `CheckUsable`：
+判定式收敛为单一实现 `pkg/core/application` 的 `Usable` / `CheckUsable`：
 
 > 可用 ⟺ `application.status=enable` ∧ `tenant_application.status=enable` ∧ `user_application.status=enable`
 
@@ -280,7 +278,7 @@ ORDER BY u.tenant_id, a.code;
 
 #### 2.5.5 升级到 `user` 表名（v1.33 批次，必须手工执行）
 
-租户成员表的物理表名由 `tenant_user` 回归为 **`user`**（`backend/pkg/model/user.go` 的 `model.TableNameUser`）。`user` 是 PostgreSQL 保留字，SQL 里必须**按方言引用**（写成 `"user"`）；引用由 golib `gormdao` v1.33.0+ 负责，应用代码不再手工加引号。
+租户成员表的物理表名由 `tenant_user` 回归为 **`user`**（`pkg/model/user.go` 的 `model.TableNameUser`）。`user` 是 PostgreSQL 保留字，SQL 里必须**按方言引用**（写成 `"user"`）；引用由 golib `gormdao` v1.33.0+ 负责，应用代码不再手工加引号。
 
 **为什么必须手工执行**：`AutoMigrate` 只新增缺失的表，**不会给已有表改名**。若先起新版，它会新建一张空的 `"user"`，旧数据全部留在 `tenant_user` 里，表现为"所有用户消失、登录不进"。
 
@@ -290,7 +288,7 @@ ORDER BY u.tenant_id, a.code;
 -- 0) 备份（按现场备份方案执行，至少包含 tenant_user 全表）
 --    例：pg_dump -Fc -t tenant_user <db> > backup_before_user_rename.dump
 
--- 1) 停旧版（关闭 auth/platformadmin/tenantadmin/rpapi/gateway 全部进程，
+-- 1) 停旧版（关闭 auth/platformadmin/tenantadmin/gateway 全部进程，
 --    确认没有任何旧版实例在连接该库）
 
 -- 2) 记下旧表行数，作为升级后的核对基线
@@ -326,7 +324,7 @@ ALTER TABLE "user" RENAME TO tenant_user;
 
 #### 2.5.6 全部 IAM 表统一加 `iam_` 前缀（内嵌业务单体场景）
 
-为支持把 IAM **内嵌到业务单体、与宿主自有同名表（`user`/`role`/`tenant` 等）共库共存**，全部 23 张 IAM 物理表统一加 `iam_` 前缀（如 `user` → `iam_user`、`tenant` → `iam_tenant`）。唯一事实源是 `backend/pkg/model/*.go` 的 `TableNameXxx` 常量（结构体名、字段、JSON tag、枚举/业务 code 均不变）。
+为支持把 IAM **内嵌到业务单体、与宿主自有同名表（`user`/`role`/`tenant` 等）共库共存**，全部 23 张 IAM 物理表统一加 `iam_` 前缀（如 `user` → `iam_user`、`tenant` → `iam_tenant`）。唯一事实源是 `pkg/model/*.go` 的 `TableNameXxx` 常量（结构体名、字段、JSON tag、枚举/业务 code 均不变）。
 
 **为什么必须手工执行**：`AutoMigrate` 只新增缺失的表、**不会给已有表改名**。若先起新版，它会新建一批空的 `iam_*` 表，旧数据全部留在无前缀旧表里，表现为"用户/租户全部消失"。
 
@@ -335,7 +333,7 @@ ALTER TABLE "user" RENAME TO tenant_user;
 ```sql
 -- 0) 备份（pg_dump -Fc <db> > backup.dump）
 
--- 1) 停全部 IAM 进程（auth/platformadmin/tenantadmin/rpapi/gateway 或内嵌宿主进程）
+-- 1) 停全部 IAM 进程（auth/platformadmin/tenantadmin/gateway 或内嵌宿主进程）
 
 -- 2) 逐表改名（"user" 是保留字，必须加双引号；其余表名可不加）
 ALTER TABLE tenant            RENAME TO iam_tenant;
@@ -521,11 +519,11 @@ WHERE c.token_endpoint_auth_method = 'none'
 ## 3. 测试
 
 ```bash
-# 运行指定应用测试（推荐；gateway 只做聚合、没有测试用例，请用 auth/platformadmin/tenantadmin/rpapi）
+# 运行指定应用测试（推荐；gateway 只做聚合、没有测试用例，请用 auth/platformadmin/tenantadmin）
 make test APP=auth
 
 # 全量测试（go.work 在 backend/，且按路径逐个 use 模块）
-cd backend && go test ./apps/auth/... ./apps/gateway/... ./apps/platformadmin/... ./apps/rpapi/... ./apps/tenantadmin/... ./pkg/... ./sdk/...
+go test ./backend/apps/auth/... ./backend/apps/gateway/... ./backend/apps/platformadmin/... ./backend/apps/tenantadmin/... ./pkg/... ./sdk/... ./contract/...
 
 # 指定包 / 单个用例
 cd backend && go test ./pkg/core/user/ -run TestCreate_NewPersonWithDeptRelations -v
@@ -537,12 +535,12 @@ go tool cover -html=coverage.out
 
 # Lint / vet
 make lint
-cd backend && for m in apps/auth apps/gateway apps/platformadmin apps/rpapi apps/tenantadmin pkg sdk; do (cd $m && go vet ./...); done
+for m in backend/apps/auth backend/apps/gateway backend/apps/platformadmin backend/apps/tenantadmin pkg sdk contract; do (cd $m && go vet ./...); done
 ```
 
-> **为什么不能写 `go test ./...`**：`backend/go.work` 用 `use (./apps/auth … ./pkg)` 逐个列出模块，`backend/` 本身不是模块，因此 `cd backend && go test ./...` 会报 `directory prefix . does not contain modules listed in go.work`（`./apps/...` 也不行，`apps` 不是模块）。要么显式列出各模块目录，要么进入某个模块目录内跑 `./...`（`make lint` 就是用后者遍历模块）。
+> **为什么不能写 `go test ./...`**：根 `go.work` 用 `use (./contract ./pkg ./sdk ./backend/apps/auth …)` 逐个列出模块，仓库根本身不是模块，因此 `go test ./...` 会报 `directory prefix . does not contain modules listed in go.work`（`./apps/...` 也不行，`apps` 不是模块）。要么显式列出各模块目录（`./contract/... ./pkg/... ./sdk/... ./backend/apps/<app>/...`），要么进入某个模块目录内跑 `./...`（`make lint` 就是用后者遍历模块）。
 
-**单元测试约定**：auth / platformadmin / tenantadmin / rpapi 各自的 `testutil.SetupSQLite(t, entities...)` 注册内存 SQLite 为全局 iam 库，服务内 `dao.NewXxxDao()` 自动落测试库，直接断言真实 dao 行为（gateway 无 `testutil`，因为它只在 `app.go` 里挂载四个应用）。RP 侧能力另有一套不依赖 DB 的测试：`cd backend/sdk && go test ./...`（`make test-sdk`）。需要真实 PostgreSQL/Redis 的集成测试用 `pkg/testsetup`（`Initialize`/`Done`/`NewCtx`，读取 `apps/<app>/config/config.yaml`）。
+**单元测试约定**：auth / platformadmin / tenantadmin 各自的 `testutil.SetupSQLite(t, entities...)` 注册内存 SQLite 为全局 iam 库，服务内 `dao.NewXxxDao()` 自动落测试库，直接断言真实 dao 行为（gateway 无 `testutil`，因为它只在 `app.go` 里挂载各应用域；原 rpapi 目录域测试随并入 `sdk/server/internal/directory`）。RP 侧能力另有一套不依赖 DB 的测试：`cd sdk && go test ./...`（`make test-sdk`，另含 `cd contract && go test ./...` 契约测试与 `make test-sdk-server`）。需要真实 PostgreSQL/Redis 的集成测试用 `pkg/testsetup`（`Initialize`/`Done`/`NewCtx`，读取 `apps/<app>/config/config.yaml`）。
 
 **e2e（Playwright，浏览器全流程）**：
 
@@ -598,16 +596,12 @@ flowchart TB
         subgraph TEN_CLUS["tenantadmin 集群"]
             T1["tenantadmin-1 :8083"]
         end
-        subgraph RP_CLUS["rpapi 集群"]
-            R1["rpapi-1 :8084"]
-        end
         REDIS_SHARED[("Redis（认证共享）<br/>SSO 会话/授权状态/SLO 队列")]
         PG[("PostgreSQL")]
     end
     LB --> AUTH_CLUS
     LB --> PLAT_CLUS
     LB --> TEN_CLUS
-    LB --> RP_CLUS
     AUTH_CLUS --> REDIS_SHARED
     PLAT_CLUS --> REDIS_SHARED
     TEN_CLUS --> REDIS_SHARED
@@ -618,8 +612,8 @@ flowchart TB
 
 | 部署形态 | 适用 | 说明 |
 |---|---|---|
-| **单体聚合**（gateway 单进程） | 小规模/开发 | 一个进程挂载四应用，端口 8100 |
-| **分体部署** | 中大规模 | auth / platformadmin / tenantadmin / rpapi 独立进程独立扩缩容 |
+| **单体聚合**（gateway 单进程） | 小规模/开发 | 一个进程挂载 auth/platformadmin/tenantadmin + 目录域，端口 8100 |
+| **分体部署** | 中大规模 | auth / platformadmin / tenantadmin 独立进程独立扩缩容（只读目录 API 随 gateway 提供，不再有独立 rpapi 进程） |
 | **auth 多副本** | 高可用 | 必须共享同一认证 Redis（会话/授权状态），PostgreSQL 主库；`/oidc` 无状态化依赖 Redis |
 | **形态 2：内嵌业务单体** | 单项目零运维自带账号体系 | IAM 随业务二进制同进程部署，**不单独起 IAM 进程**；Go 侧用 `sdk/server`（`server.New + App.Mount`）把各域库内嵌进业务进程，配置项另见 [configuration-reference.md](configuration-reference.md) §12 |
 

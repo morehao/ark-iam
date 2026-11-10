@@ -72,10 +72,11 @@ flowchart TB
             AUTH["auth :8081<br/>认证网关 + OIDC Provider"]
             PLAT["platformadmin :8082<br/>平台管理"]
             TENANT["tenantadmin :8083<br/>租户自服务"]
-            RPAPI["rpapi :8084<br/>只读目录 API"]
+            DIR["DomainDirectory 目录域<br/>（原 rpapi，/v1/rp/directory/*）"]
         end
-        SDKSERVER["backend/sdk/server 薄门面<br/>server.New + App.Mount<br/>形态 2：内嵌业务单体"]
-        PKG["backend/pkg 公共层<br/>config / dbclient / middleware / code<br/>model·dao·object / core/&lt;域&gt; / credential<br/>oidckit / identity / sso / audit / seed / testsetup"]
+        SDKSERVER["sdk/server 薄门面<br/>server.New + App.Mount<br/>形态 2：内嵌业务单体（internal 装配）"]
+        CONTRACT["contract 契约 module<br/>claims / Identity / Verifier·KeySource 接口 / 目录 DTO<br/>（仅 stdlib + jwt）"]
+        PKG["pkg 公共层<br/>config / dbclient / middleware / code<br/>model·dao·object / core/&lt;域&gt; / credential<br/>oidckit / identity / sso / audit / seed / testsetup"]
     end
 
     subgraph INFRA["基础设施"]
@@ -91,11 +92,17 @@ flowchart TB
     AUTH --> PKG
     PLAT --> PKG
     TENANT --> PKG
-    RPAPI --> PKG
-    SDKSERVER -.编排复用三域库.-> AUTH
-    SDKSERVER -.编排复用三域库.-> PLAT
-    SDKSERVER -.编排复用三域库.-> TENANT
+    DIR --> PKG
+    AUTH --> CONTRACT
+    PLAT --> CONTRACT
+    TENANT --> CONTRACT
+    PKG --> CONTRACT
+    SDKSERVER -.编排复用各域库.-> AUTH
+    SDKSERVER -.编排复用各域库.-> PLAT
+    SDKSERVER -.编排复用各域库.-> TENANT
+    SDKSERVER -.编排 DomainDirectory.-> DIR
     SDKSERVER --> PKG
+    SDKSERVER --> CONTRACT
     PKG --> PG
     PKG --> REDIS
     PKG --> OTLP
@@ -107,7 +114,7 @@ flowchart TB
 |---|---|
 | **OIDC 标准协议** | 生态成熟、客户端 SDK 丰富、安全机制经实践检验（见 [sso-oidc-concepts.md](sso-oidc-concepts.md)） |
 | **OP（auth）与业务 API（RP）分层** | OP 持有中心会话（Redis），RP 无状态校验令牌，实现请求粒度的"登出即失效" |
-| **五应用 + 共享 pkg + sdk/server 门面** | 认证 / 平台管理 / 租户自服务 / 只读目录 API 按职责拆分；`gateway` 单体聚合便于单进程部署，也支持分体部署；各域实现物理归 `apps/*`（可 import 的库包），`sdk/server` 作为其上的薄门面 / 编排层，支持「内嵌业务单体」形态 |
+| **四应用 + 共享 pkg + contract + sdk/server 门面** | 认证 / 平台管理 / 租户自服务按职责拆分；`gateway` 单体聚合便于单进程部署，也支持分体部署；原只读目录应用 `rpapi` 下线、并入 `sdk/server` 的 `DomainDirectory` 域。各域实现物理归 `apps/*`（可 import 的库包），`sdk/server` 作为其上的薄门面 / 编排层（装配下沉 `sdk/server/internal`），支持「内嵌业务单体」形态；`contract` 为最底层零框架数据契约 module |
 | **person + user 两级身份** | person 是跨租户全局身份（用户名/邮箱/手机号全局唯一），user 是租户内成员，天然支持"一人多租户" |
 | **JWT Access Token + 短 TTL** | 无状态校验、水平扩展友好；登出失效依赖 SSO 会话活性校验兜底 |
 | **Redis 为中心会话存储** | SSO 会话、授权码、令牌元数据、SLO 队列共享同一认证 Redis，支持 auth 多副本 |
@@ -126,7 +133,7 @@ flowchart TB
         CORE["core/&lt;域&gt; 领域层容器<br/>（仅绑定框架/协议的领域逻辑）"]
         DTO["dto/dtoxxx 请求/响应对象"]
     end
-    subgraph SHARED["共享层 backend/pkg"]
+    subgraph SHARED["共享层 pkg"]
         D["pkg/dao 数据访问层"]
         M["pkg/model 数据模型"]
         O["pkg/object 领域对象"]
@@ -160,20 +167,22 @@ flowchart TB
 | **auth** | `auth` | 8081 | 认证网关：登录 / 注册 / 令牌 / OIDC Provider / SSO / SLO / Connector / **系统初始化引导（`/install/*`，R3 专用前缀）**；自助注册与建租户收口在 `/oidc/registerPerson` + `/oidc/createTenant` | person、user（成员）、tenant_invite、refresh_token、session、connector、user_identity |
 | **platformadmin** | `platform` | 8082 | 平台管理：租户（建租户时自动创建内置管理员、可重置其口令）/ 菜单 / 应用 / OAuth 客户端 / 域名 / 租户应用 / 审计；**不提供 users / roles / api-keys 接口**（用户与角色管理全在租户端） | tenant、menu、application、application_client、domain、tenant_application、audit_log |
 | **tenantadmin** | `tenant` | 8083 | 租户自服务：部门架构 / 用户与角色 / 服务账号 / 加入邀请 / API 密钥 / 租户菜单 / **应用准入（成员 × 应用）** | department、department_user、user、tenant_invite、role、api_key、user_application |
-| **gateway** | 聚合 | 8100 | 单体聚合部署，挂载 auth + platformadmin + tenantadmin；部署为 gateway 时 OIDC issuer 同步切到 `http://localhost:8100/oidc` | 无独立业务 |
+| **gateway** | 聚合 | 8100 | 单体聚合部署，挂载 auth + platformadmin + tenantadmin + 目录域（`DomainDirectory`）；部署为 gateway 时 OIDC issuer 同步切到 `http://localhost:8100/oidc` | 无独立业务 |
+
+> 只读目录 API（`/v1/rp/directory/*`，服务标识段 `rp`）原为独立应用 `rpapi`（:8084），现已并入 `sdk/server` 的 `DomainDirectory` 域：`gateway` 全量挂载（`Domains=nil`）时经 `app.MountDirectory` 挂到 `/v1/rp`；不再有独立 `rpapi` 进程。
 
 > 各应用通过 `ginserver.NewRouterGroups(engine, "<服务标识>", ...)` 注册前缀，业务路由形如 `/v1/{auth|platform|tenant}/...`；OIDC 协议端点固定挂在 `/oidc/*`，初始化引导固定挂在 `/install/*`——两者都是 **R3 专用前缀**（标准协议 / 自举入口），不走业务路由规范。未初始化时 `pkg/middleware.BootstrapGuard` 会把业务端点拦成 HTTP 409（错误码 `107004`），只放行 `/install` 与 `/oidc` 的健康/发现/登出端点。
 
 ### 3.1.1 sdk/server 门面与 apps 各域库
 
-域实现物理归 `apps`：`apps/{auth,platformadmin,tenantadmin,rpapi}` 是**可 import 的库包**（各带 `cmd/` 进程入口，保留分体部署），`apps/gateway` 是纯 `cmd/main` 聚合器。`sdk/server`（`github.com/morehao/ark-iam/sdk/server`，`package server`）是在其上的**薄门面 / 编排层**，把各域库装配为可实例化、可按域组合的对象，用于「把账号体系内嵌进业务单体」的形态 2；两种形态共用同一份域实现：
+域实现物理归 `apps`：`apps/{auth,platformadmin,tenantadmin}` 是**可 import 的库包**（各带 `cmd/` 进程入口，保留分体部署），`apps/gateway` 是纯 `cmd/main` 聚合器。`sdk/server`（`github.com/morehao/ark-iam/sdk/server`，`package server`）是在其上的**薄门面 / 编排层**，把各域库装配为可实例化、可按域组合的对象，用于「把账号体系内嵌进业务单体」的形态 2；两种形态共用同一份域实现。公开 API（`sdk/server` 顶层文件）只暴露 `contract` 类型与框架无关类型，装配实现（`import apps/* + pkg`）全部下沉 `sdk/server/internal`：
 
 | 使用者 | 形态 | 装配方式 |
 |---|---|---|
-| `apps/gateway` | 形态 1 单独部署（全量域 + 外置前端） | `server.New(全量 Domains) + App.Mount`；`rpapi` 仍单独挂载并复用 `App.KeySource()` |
+| `apps/gateway` | 形态 1 单独部署（全量域 + 外置前端） | `server.New(全量 Domains) + App.Mount + App.MountDirectory`；目录域（原 rpapi）复用 `App.KeySource()` 本地验签 |
 | 三方业务单体 | 形态 2 内嵌业务单体（最小域集） | `server.New(最小 Domains) + App.Mount`，与业务同进程部署 |
 
-> 依赖方向倒置：进程入口 → `sdk/server` → `apps/*` 各域库 → `pkg`。`sdk` 调用 `apps`，`apps` 不 import `sdk`（唯一例外 `apps/rpapi → sdk/rp` 验签），无环。
+> 依赖方向（严格单向 DAG）：进程入口 → `sdk/server` → `sdk/server/internal` → `apps/*` 各域库 → `pkg` → `contract`。`sdk/rp`、`apps/*`、`pkg` 均只依赖 `contract`（`pkg` 的验签经 `contract.Verifier`/`contract.KeySource` 接口，由 `sdk/rp` 实现、`sdk/server/internal` 注入），**不存在 `pkg → sdk` / `apps → sdk` 反向依赖**，无环。模块依赖方向由 `make sdk-check-graph`（`sdk/scripts/check-module-graph.sh`）强制。
 
 对外契约：
 
@@ -203,7 +212,7 @@ app.MountConfig(engine, "/")    // 挂 /config.json 运行时配置端点（仅�
 
 | 层 | 技术 |
 |---|---|
-| 后端框架 | Gin + GORM + Go workspace（`backend/go.work`，8 个模块：5 个应用 + `pkg` + `sdk` + `iam`） |
+| 后端框架 | Gin + GORM + Go workspace（根 `go.work`，7 个模块：4 个应用 `apps/{auth,platformadmin,tenantadmin,gateway}` + `pkg` + `sdk` + `contract`；原 `iam` 模块已删除、`apps/rpapi` 已并入 `sdk/server` 的 `DomainDirectory`） |
 | OIDC Provider | [zitadel/oidc/v3](https://github.com/zitadel/oidc)（`op` 包） |
 | JWT | golang-jwt/jwt/v5（RP 校验）、go-jose（logout_token 签名） |
 | 数据库 | PostgreSQL（主库，`iam`，启动时 AutoMigrate 自动建表、**不写任何数据**；内置数据由安装页 `/install/initialize` 一次性引导），测试用 SQLite 内存库 |
@@ -1025,7 +1034,7 @@ flowchart TB
 - **部门架构增强**：部门/部门与角色联动、批量导入导出；
 - **更多授权类型**：`urn:ietf:params:oauth:grant-type:token-exchange`、jwt-bearer（当前显式拒绝，避免虚假宣称）；
 - **MFA**：TOTP/短信二次认证（部门级 MFA 策略已移出部门表，后续按租户级配置承载——`system` 冗余配置模块已下线）；
-- **准入层后续增强**：① 服务账号（M2M）的准入是否纳入同一门禁（当前机器通道豁免，其权限来自服务账号角色与凭证）；② 准入的**到期时间 / 审批流**（当前只有 enable/disable 两态）；③ rpapi 目录接口按准入过滤（当前只做应用作用域）；④ 平台侧跨租户的批量准入运维（当前准入的写入口只在租户端，平台侧只回显影响人数）；
+- **准入层后续增强**：① 服务账号（M2M）的准入是否纳入同一门禁（当前机器通道豁免，其权限来自服务账号角色与凭证）；② 准入的**到期时间 / 审批流**（当前只有 enable/disable 两态）；③ 目录接口（`/v1/rp/directory/*`）按准入过滤（当前只做应用作用域）；④ 平台侧跨租户的批量准入运维（当前准入的写入口只在租户端，平台侧只回显影响人数）；
 - **SCIM 供给**：租户→应用的用户供给协议（准入层落地后它是天然的供给落点）；
 - **细粒度授权**：资源级（`resource`/`scope`）的 ABAC 策略引擎；
 - **auth 高可用**：共享认证 Redis 已支持多副本，后续补会话一致性看护与优雅降级；
