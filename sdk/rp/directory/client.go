@@ -20,6 +20,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/morehao/ark-iam/contract/directory"
 )
 
 // 目录 API 的状态码语义（固定四类，见设计文档「接口契约与错误语义」）。
@@ -42,30 +44,16 @@ const MaxBatchIDs = 100
 // ScopeRead 是目录 API 要求的标准 scope。
 const ScopeRead = "directory.read"
 
-// Member 是成员摘要。
-type Member struct {
-	UserID          string   `json:"userID"`
-	Name            string   `json:"name"`
-	Avatar          string   `json:"avatar"`
-	Status          string   `json:"status"`
-	UserType        string   `json:"userType"`
-	DepartmentNames []string `json:"departmentNames"`
-}
-
-// Department 是部门节点。
-type Department struct {
-	ID       string       `json:"id"`
-	Name     string       `json:"name"`
-	ParentID string       `json:"parentID"`
-	Children []Department `json:"children,omitempty"`
-}
-
-// Role 是角色清单项。
-type Role struct {
-	Code  string `json:"code"`
-	Name  string `json:"name"`
-	AppID string `json:"appID"`
-}
+// 目录 DTO 的真源已下沉至 contract/directory（与服务端共享同一份定义）。
+// 这里用类型别名保持本包对外 API 完全不变（Member/Department/Role 仍是同一类型）。
+type (
+	// Member 是成员摘要。
+	Member = directory.Member
+	// Department 是部门节点。
+	Department = directory.Department
+	// Role 是角色清单项。
+	Role = directory.Role
+)
 
 // TokenProvider 提供 M2M access token（实现见 rp.TokenClient）。
 type TokenProvider interface {

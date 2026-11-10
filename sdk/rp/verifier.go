@@ -10,7 +10,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/morehao/ark-iam/sdk/contract"
+	"github.com/morehao/ark-iam/contract"
 )
 
 // Identity 是校验通过的令牌身份（框架无关）。

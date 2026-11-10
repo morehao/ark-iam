@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/morehao/ark-iam/sdk/contract"
+	"github.com/morehao/ark-iam/contract"
 )
 
 // Logger 是 SDK 的最小日志接口（避免引入任何日志框架依赖）。

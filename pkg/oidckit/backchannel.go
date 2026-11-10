@@ -23,7 +23,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/morehao/ark-iam/sdk/contract"
+	"github.com/morehao/ark-iam/contract"
 	"github.com/morehao/ark-iam/sdk/rp/logout"
 )
 

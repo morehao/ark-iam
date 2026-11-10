@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/morehao/ark-iam/sdk/contract"
+	"github.com/morehao/ark-iam/contract"
 )
 
 const (
