@@ -4,7 +4,9 @@
 
 `ark-iam` is a full-stack project with Go backend and React frontend. The backend is based on [Gin](https://github.com/gin-gonic/gin), providing a layered, maintainable, and scalable service structure with multiple app modules.
 
-The IAM backend is split into five apps under `backend/apps/` (auth, platformadmin, tenantadmin, gateway, rpapi). The reusable layers live at the repository root as standalone Go modules — `pkg/` (common packages), `iam/` (embeddable IAM library) and `sdk/` (RP-side SDK) — all managed by the root `go.work` and individually consumable via `go get`.
+The IAM backend is split into five apps under `backend/apps/` (auth, platformadmin, tenantadmin, gateway, rpapi). `auth`/`platformadmin`/`tenantadmin`/`rpapi` are importable **library packages** (each with a `cmd/` process entry for standalone deployment); `gateway` is a **pure `cmd/main`** aggregator that is never imported. The reusable layers live at the repository root as standalone Go modules — `pkg/` (common packages), `sdk/` (RP-side SDK plus the `sdk/server` facade that orchestrates the domain libraries) — all managed by the root `go.work` and individually consumable via `go get`.
+
+> **Layered inversion**: process entry → `sdk/server` (thin facade) → `apps/*` domain libraries → `pkg`. `sdk` calls `apps`; `apps` never imports `sdk` (the only allowed exception is `apps/rpapi → sdk/rp` for signature verification). The former standalone `iam/` module has been removed; its domain implementations now live in `apps/`, and Go-side frontend embedding (`MountFrontend`) is gone — the login/admin frontend is served from the npm package `@morehao/ark-iam-react`.
 
 ---
 
@@ -26,17 +28,18 @@ The IAM backend is split into five apps under `backend/apps/` (auth, platformadm
 
 ```
 ark-iam/
-├── go.work                # Root Go workspace (covers pkg/ iam/ sdk/ + backend/apps/*)
+├── go.work                # Root Go workspace (covers pkg/ sdk/ + backend/apps/*)
 ├── pkg/                   # Common packages module (github.com/morehao/ark-iam/pkg) — go get-able
-├── iam/                   # Embeddable IAM library module (github.com/morehao/ark-iam/iam) — go get-able
 ├── sdk/                   # RP-side SDK module (github.com/morehao/ark-iam/sdk) — go get-able
+│   ├── rp/ contract/      # RP client: verify / M2M / introspect / revoke / userinfo / logout / directory
+│   └── server/            # Thin facade: New(Domains)/Mount/MountConfig, delegates to apps/* domain libs
 ├── backend/               # Go backend apps (project-layout based)
 │   ├── apps/
-│   │   ├── auth/          # Authentication gateway (login/register/token/OIDC), :8081
-│   │   ├── platformadmin/ # Platform management (user/role/menu/tenant), :8082
-│   │   ├── tenantadmin/   # Tenant self-service (department/user/role), :8083
-│   │   └── gateway/       # Aggregate app mounting all three, :8100
-│   └── examples/          # In-repo examples (embedded-iam-demo)
+│   │   ├── auth/          # Auth domain library + cmd (login/session/OIDC), :8081
+│   │   ├── platformadmin/ # Platform domain library + cmd (user/role/menu/tenant), :8082
+│   │   ├── tenantadmin/   # Tenant domain library + cmd (department/user/role), :8083
+│   │   ├── rpapi/         # Read-only directory API library + cmd (uses sdk/rp), :8084
+│   │   └── gateway/       # Pure cmd aggregator: server.New(Domains=nil) + rpapi, :8100
 ├── frontend/              # React frontend (Vite + React)
 ├── docs/                 # Documentation
 ├── Makefile              # Root Makefile

@@ -34,7 +34,7 @@ PORT              = 8099
 .PHONY: all build build-env clean run lint test swag codegen \
         docker-build docker-run check-image \
         list-apps deps tidy update-dep dev-all dev-frontend stop-frontend e2e e2e-sso e2e-test help \
-        test-sdk sdk-check-deps print-builtin-menus iam-build test-iam
+        test-sdk test-sdk-server sdk-check-deps print-builtin-menus sdk-server-build
 
 # ============================================================
 # 通用入口：清理、依赖、构建并运行
@@ -105,24 +105,24 @@ test:
 	@echo "🧪 正在运行测试..."
 	@cd backend && go test ./apps/$(APP)/... -v
 
-# 运行 SDK（backend/sdk）全部测试：契约 + RP 核心 + 客户端
+# 运行 SDK（sdk/）全部测试：契约 + RP 核心 + 客户端 + server 门面
 test-sdk:
 	@echo "🧪 正在运行 RP SDK 测试..."
 	@cd sdk && go test ./... -count=1
+
+# sdk/server 门面（编排层）测试：domains/db/migrate/mount/config/e2e/guard
+test-sdk-server:
+	@echo "🧪 正在运行 sdk/server 门面测试..."
+	@cd sdk && go test ./server/... -count=1
 
 # SDK 依赖白名单断言：contract/rp 只允许标准库 + jwt/v5（禁止 gorm/gin/redis）
 sdk-check-deps:
 	@bash sdk/scripts/check-deps.sh
 
-# 可嵌入 IAM 库（iam/）构建
-iam-build:
-	@echo "🔨 构建可嵌入 IAM 库（iam/）..."
-	@go build ./iam/...
-
-# 可嵌入 IAM 库（iam/）测试
-test-iam:
-	@echo "🧪 正在运行可嵌入 IAM 库测试..."
-	@go test ./iam/... -count=1
+# sdk/server 门面（委托 apps 各域库）构建
+sdk-server-build:
+	@echo "🔨 构建 sdk/server 门面..."
+	@go build ./sdk/server/...
 
 
 # ============================================================
