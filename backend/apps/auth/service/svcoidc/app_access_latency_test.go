@@ -21,7 +21,7 @@ import (
 //
 // 默认跳过（性能用例不进常规回归，避免 CI 机器负载导致的假失败）：运行方式
 //
-//	IAM_AC11_MEASURE=1 go test ./apps/auth/internal/service/svcoidc/ -run TestAppAccessGateLatency -v
+//	IAM_AC11_MEASURE=1 go test ./apps/auth/service/svcoidc/ -run TestAppAccessGateLatency -v
 func TestAppAccessGateLatencyMeasurement(t *testing.T) {
 	if os.Getenv("IAM_AC11_MEASURE") != "1" {
 		t.Skip("需要 IAM_AC11_MEASURE=1（真实 Postgres 上的性能测量，默认不跑）")
