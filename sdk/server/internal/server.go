@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"crypto/rsa"
 	"errors"
 	"fmt"
 
@@ -10,6 +11,7 @@ import (
 	authconfig "github.com/morehao/ark-iam/backend/apps/auth/config"
 	authrouter "github.com/morehao/ark-iam/backend/apps/auth/router"
 	svcdb "github.com/morehao/ark-iam/backend/apps/auth/service/svcdb"
+	"github.com/morehao/ark-iam/contract"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/middleware"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
@@ -17,6 +19,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/oidckit"
 	"github.com/morehao/ark-iam/backend/apps/platformadmin"
 	"github.com/morehao/ark-iam/backend/apps/tenantadmin"
+	"github.com/morehao/ark-iam/sdk/rp"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/redis/go-redis/v9"
@@ -217,7 +220,12 @@ func (a *App) resolveRemoteKeySource() (oidckit.KeySource, error) {
 	if a.cfg.Issuer != "" && conf.OIDC.Issuer == "" {
 		conf.OIDC.Issuer = a.cfg.Issuer
 	}
-	return oidckit.NewKeySourceFromConfig(conf)
+	// 注入 sdk/rp 的具体 KeySource 构造器（pkg/oidckit 自身不 import sdk，解环）。
+	return oidckit.NewKeySourceFromConfig(
+		conf,
+		func(ctx context.Context, url string) (contract.KeySource, error) { return rp.NewKeys(ctx, url) },
+		func(keys map[string]*rsa.PublicKey) contract.KeySource { return rp.NewKeysFromSet(keys) },
+	)
 }
 
 // DBGetter 返回实例持有的数据访问器。

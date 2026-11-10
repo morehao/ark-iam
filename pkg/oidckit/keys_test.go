@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"errors"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
@@ -19,8 +20,28 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/morehao/ark-iam/pkg/config"
-	"github.com/morehao/ark-iam/sdk/rp"
 )
+
+// fakeKeys 是 contract.KeySource 的测试实现（仅内存公钥集合，零网络），
+// 用来替代 sdk/rp.NewKeysFromSet，使 pkg 测试不 import sdk。
+type fakeKeys struct{ m map[string]*rsa.PublicKey }
+
+func newFakeKeys(m map[string]*rsa.PublicKey) fakeKeys { return fakeKeys{m: m} }
+
+func (f fakeKeys) PublicKey(_ context.Context, kid string) (*rsa.PublicKey, error) {
+	if k, ok := f.m[kid]; ok {
+		return k, nil
+	}
+	return nil, errors.New("fakeKeys: unknown kid")
+}
+
+// fakeFromSet / fakeFromURL 是注入给 NewKeySourceFromConfig 的契约内构造器。
+func fakeFromSet(m map[string]*rsa.PublicKey) KeySource { return newFakeKeys(m) }
+
+func fakeFromURL(_ context.Context, _ string) (KeySource, error) {
+	return nil, errors.New("fakeKeys: no network in tests")
+}
+
 
 // goldenModulusHex 是用于 kid 派生的固定模数。deriveKeyID 只用到 N，
 // 因此无需真实私钥即可锁定算法口径。
@@ -232,72 +253,61 @@ func TestLocalPublicKeys_NilConf(t *testing.T) {
 func TestNewKeySourceFromConfig_UnavailableFailsClosed(t *testing.T) {
 	// 没有任何可用来源时必须报错，绝不能返回一个"能构造但取不到键"的空来源，
 	// 否则调用方会把 fail-closed 变成静默不校验。
-	_, err := NewKeySourceFromConfig(nil)
+	_, err := NewKeySourceFromConfig(nil, fakeFromURL, fakeFromSet)
 	assert.Error(t, err)
 
-	_, err = NewKeySourceFromConfig(&config.Config{})
+	_, err = NewKeySourceFromConfig(&config.Config{}, fakeFromURL, fakeFromSet)
 	assert.Error(t, err)
 }
 
 func TestNewKeySourceFromConfig_JWKSURLTakesPriority(t *testing.T) {
-	jwksKey, localKey := generateRSAKey(t), generateRSAKey(t)
-	srv := newJWKSServer(t, "jwks-kid", &jwksKey.PublicKey)
-
+	// 配置了 JWKSURL 时必须走 URL 构造器（不落到本地快照分支）。
+	var urlCalled, setCalled bool
+	fromURL := func(_ context.Context, url string) (KeySource, error) {
+		urlCalled = true
+		assert.Equal(t, "https://op.example.com/keys", url)
+		return newFakeKeys(map[string]*rsa.PublicKey{"jwks-kid": goldenPublicKey()}), nil
+	}
+	fromSet := func(m map[string]*rsa.PublicKey) KeySource { setCalled = true; return newFakeKeys(m) }
 	conf := &config.Config{OIDC: config.OIDC{
-		JWKSURL: srv.URL + "/keys",
-		// issuer 与本地快照同时存在：都必须让位给 JWKSURL。
+		JWKSURL:              "https://op.example.com/keys",
 		Issuer:               "http://127.0.0.1:1/oidc",
-		SigningPrivateKeyPEM: privateKeyPEM(t, localKey, false),
+		SigningPrivateKeyPEM: privateKeyPEM(t, generateRSAKey(t), false),
 	}}
-
-	ks, err := NewKeySourceFromConfig(conf)
+	ks, err := NewKeySourceFromConfig(conf, fromURL, fromSet)
 	require.NoError(t, err)
-
-	pub, err := ks.PublicKey(context.Background(), "jwks-kid")
-	require.NoError(t, err, "应能从 JWKS 端点取到公钥")
-	assert.Equal(t, jwksKey.PublicKey.N, pub.N)
-
-	// 本地快照的 kid 不应存在于来源中：证明没有落到本地兜底分支。
-	_, err = ks.PublicKey(context.Background(), deriveKeyID(&localKey.PublicKey))
-	assert.Error(t, err, "配置了 JWKSURL 时不应混入本地签名密钥")
+	assert.True(t, urlCalled, "JWKSURL 应走 URL 构造器")
+	assert.False(t, setCalled, "配置了 JWKSURL 时不应落到本地快照分支")
+	_, err = ks.PublicKey(context.Background(), "jwks-kid")
+	require.NoError(t, err)
 }
 
 func TestNewKeySourceFromConfig_UnreachableJWKSDoesNotFallBack(t *testing.T) {
-	// 关键不变式：JWKS 端点配了但不可用时报错，**不得**静默降级到本地快照。
-	// 静默降级会让"JWKS 配错/挂了"表现为"能启动但轮换后全 401"，极难排查。
+	// JWKS 端点配了但构造失败时必须报错，**不得**静默降级到本地快照。
 	localKey := generateRSAKey(t)
-	srv := newFailingJWKSServer(t)
-
+	fromURL := func(_ context.Context, _ string) (KeySource, error) { return nil, errors.New("jwks unreachable") }
+	fromSet := func(m map[string]*rsa.PublicKey) KeySource { return newFakeKeys(m) }
 	conf := &config.Config{OIDC: config.OIDC{
-		JWKSURL:              srv.URL + "/keys",
+		JWKSURL:              "https://op.example.com/keys",
 		SigningPrivateKeyPEM: privateKeyPEM(t, localKey, false),
 	}}
-
-	_, err := NewKeySourceFromConfig(conf)
-	assert.Error(t, err, "JWKS 拉取失败必须 fail-fast")
+	_, err := NewKeySourceFromConfig(conf, fromURL, fromSet)
+	assert.Error(t, err, "JWKS 构造失败必须 fail-fast，不降级到本地快照")
 }
 
-func TestNewKeySourceFromConfig_IssuerResolvesJWKS(t *testing.T) {
-	key := generateRSAKey(t)
-	jwks := newJWKSServer(t, "issuer-kid", &key.PublicKey)
-
-	// 本仓 OP 把 JWKS 发布在 {issuer}/keys，SDK 对 issuer 形态会按
-	// discovery → {issuer}/keys → {issuer}/.well-known/jwks.json 逐个尝试。
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/oidc/keys" {
-			http.Redirect(w, r, jwks.URL+"/keys", http.StatusTemporaryRedirect)
-			return
-		}
-		http.NotFound(w, r)
-	}))
-	t.Cleanup(srv.Close)
-
-	ks, err := NewKeySourceFromConfig(&config.Config{OIDC: config.OIDC{Issuer: srv.URL + "/oidc"}})
+func TestNewKeySourceFromConfig_IssuerUsesURLBuilder(t *testing.T) {
+	// issuer 形态同样走 URL 构造器（具体 discovery/JWKS 解析在 sdk/rp 实现里，见其测试）。
+	var gotURL string
+	fromURL := func(_ context.Context, url string) (KeySource, error) {
+		gotURL = url
+		return newFakeKeys(map[string]*rsa.PublicKey{"issuer-kid": goldenPublicKey()}), nil
+	}
+	fromSet := func(m map[string]*rsa.PublicKey) KeySource { return newFakeKeys(m) }
+	ks, err := NewKeySourceFromConfig(&config.Config{OIDC: config.OIDC{Issuer: "https://op.example.com/oidc"}}, fromURL, fromSet)
 	require.NoError(t, err)
-
-	pub, err := ks.PublicKey(context.Background(), "issuer-kid")
+	assert.Equal(t, "https://op.example.com/oidc", gotURL)
+	_, err = ks.PublicKey(context.Background(), "issuer-kid")
 	require.NoError(t, err)
-	assert.Equal(t, key.PublicKey.N, pub.N)
 }
 
 func TestNewKeySourceFromConfig_LocalSnapshot(t *testing.T) {
@@ -307,7 +317,7 @@ func TestNewKeySourceFromConfig_LocalSnapshot(t *testing.T) {
 		SigningPrivateKeyPEM: privateKeyPEM(t, key, false),
 	}}
 
-	ks, err := NewKeySourceFromConfig(conf)
+	ks, err := NewKeySourceFromConfig(conf, fakeFromURL, fakeFromSet)
 	require.NoError(t, err)
 
 	pub, err := ks.PublicKey(context.Background(), "snapshot-kid")
@@ -315,19 +325,12 @@ func TestNewKeySourceFromConfig_LocalSnapshot(t *testing.T) {
 	assert.Equal(t, key.PublicKey.N, pub.N)
 }
 
-// TestKeySourceIsSDKAlias 编译期锁定「单别名」这一决策：把 oidckit.KeySource 直接
-// 交给只接受 SDK 类型的构造器，无需任何转换。
-//
-// 若有人把 KeySource 改成"方法集相同的另一个独立接口"，本用例立刻编译失败——
-// 而那正是 back-channel logout 接收端与 access token 验签**无法共用同一个公钥来源**
-// 的信号（D3 的回退条件）。
-func TestKeySourceIsSDKAlias(t *testing.T) {
-	var ks KeySource = rp.NewKeysFromSet(map[string]*rsa.PublicKey{"k": goldenPublicKey()})
+// TestKeySourceIsContractAlias 编译期锁定「KeySource == contract.KeySource 单别名」：
+// 同一个来源可同时用于 back-channel logout 接收端解析（无需任何转换）。
+func TestKeySourceIsContractAlias(t *testing.T) {
+	var ks KeySource = newFakeKeys(map[string]*rsa.PublicKey{"k": goldenPublicKey()})
 
-	// 1) access token 验签路径：SDK 校验器直接吃这个来源。
-	_ = rp.NewVerifier(ks)
-
-	// 2) logout_token 解析路径：同一个来源直接传给 back-channel logout 入口。
+	// logout_token 解析路径：同一个来源直接传给 back-channel logout 入口。
 	// token 本身是垃圾串，必然解析失败；这里验证的是**类型同一**（能编译）。
 	_, err := ParseLogoutToken("not-a-jwt", ks, "https://op.example.com", "client-1")
 	require.Error(t, err)
@@ -337,12 +340,12 @@ func TestKeySourceIsSDKAlias(t *testing.T) {
 
 func TestResolveKeySource_InjectedWinsWithoutNetwork(t *testing.T) {
 	key := generateRSAKey(t)
-	injected := rp.NewKeysFromSet(map[string]*rsa.PublicKey{"injected-kid": &key.PublicKey})
+	injected := newFakeKeys(map[string]*rsa.PublicKey{"injected-kid": &key.PublicKey})
 
 	// conf 里的 JWKSURL 指向必然连不通的地址：一旦走到"按配置自建"就会失败/发网络请求。
 	conf := &config.Config{OIDC: config.OIDC{JWKSURL: "http://127.0.0.1:1/keys"}}
 
-	got, err := ResolveKeySource(injected, conf)
+	got, err := ResolveKeySource(injected, conf, fakeFromURL, fakeFromSet)
 	require.NoError(t, err)
 	assert.Equal(t, KeySource(injected), got, "注入的 KeySource 必须原样返回")
 
@@ -353,12 +356,12 @@ func TestResolveKeySource_InjectedWinsWithoutNetwork(t *testing.T) {
 
 func TestResolveKeySource_NilInjectedFallsBackToConfig(t *testing.T) {
 	// 未注入（独立部署）时按配置自建；配置不可用时同样 fail-closed。
-	_, err := ResolveKeySource(nil, &config.Config{})
+	_, err := ResolveKeySource(nil, &config.Config{}, fakeFromURL, fakeFromSet)
 	assert.Error(t, err)
 
 	key := generateRSAKey(t)
 	conf := &config.Config{OIDC: config.OIDC{SigningKeyID: "solo", SigningPrivateKeyPEM: privateKeyPEM(t, key, false)}}
-	got, err := ResolveKeySource(nil, conf)
+	got, err := ResolveKeySource(nil, conf, fakeFromURL, fakeFromSet)
 	require.NoError(t, err)
 	_, err = got.PublicKey(context.Background(), "solo")
 	assert.NoError(t, err)

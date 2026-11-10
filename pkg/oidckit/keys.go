@@ -12,17 +12,26 @@ import (
 	"os"
 	"strings"
 
+	"github.com/morehao/ark-iam/contract"
 	"github.com/morehao/ark-iam/pkg/config"
-	"github.com/morehao/ark-iam/sdk/rp"
 
 	"github.com/morehao/golib/glog"
 )
 
-// KeySource 是按 kid 取公钥的最小接口（真源 sdk/rp.KeySource）。
+// KeySource 是按 kid 取公钥的最小接口别名（真源 contract.KeySource）。
 //
 // 全仓只保留这一个别名：back-channel logout 接收端与 OIDC 鉴权中间件都用它，
-// 避免出现两个方法集相同却各自命名的重复别名。
-type KeySource = rp.KeySource
+// 避免出现两个方法集相同却各自命名的重复别名。pkg 只依赖 contract（不 import sdk）。
+type KeySource = contract.KeySource
+
+// KeysFromURLFunc 由**调用方注入**的 JWKS 端点构造器（顶层实现见 sdk/rp.NewKeys）。
+//
+// pkg 不 import sdk（解 pkg → sdk 环，F1）；具体 JWKS 拉取实现通过本函数签名注入，
+// 既保持 pkg 对 sdk 零依赖，又不引入任何全局注册表 / init 自注册（符合 R4）。
+type KeysFromURLFunc func(ctx context.Context, jwksURL string) (contract.KeySource, error)
+
+// KeysFromSetFunc 由**调用方注入**的进程内公钥集合构造器（顶层见 sdk/rp.NewKeysFromSet）。
+type KeysFromSetFunc func(keys map[string]*rsa.PublicKey) contract.KeySource
 
 // NewKeySourceFromConfig 依据配置构造 OP 公钥来源，供内置应用（RP）校验 access token。
 //
@@ -36,19 +45,30 @@ type KeySource = rp.KeySource
 //     重启本进程**，因此它只作为"没有可用的 JWKS 端点时的兜底"，不是推荐路径。
 //
 // 两者都没有时返回 error（调用方应 fail-closed，不得退化为不校验）。
-func NewKeySourceFromConfig(conf *config.Config) (KeySource, error) {
+//
+// fromURL / fromSet 是具体 KeySource 实现的注入点（sdk/rp 提供）；pkg 自身不构造。
+func NewKeySourceFromConfig(conf *config.Config, fromURL KeysFromURLFunc, fromSet KeysFromSetFunc) (KeySource, error) {
 	if conf != nil && strings.TrimSpace(conf.OIDC.JWKSURL) != "" {
-		return rp.NewKeys(context.Background(), strings.TrimSpace(conf.OIDC.JWKSURL))
+		if fromURL == nil {
+			return nil, errors.New("oidc key source unavailable: JWKS URL configured but no URL builder injected")
+		}
+		return fromURL(context.Background(), strings.TrimSpace(conf.OIDC.JWKSURL))
 	}
 	if conf != nil && conf.OIDC.Issuer != "" {
 		// issuer 形如 {op}/oidc：JWKS 端点由 SDK 解析（discovery 优先，
 		// 本仓 OP 的 jwks_uri = {issuer}/keys），并同步预取（失败即 fail-fast，
 		// 不静默降级为不校验）。
-		return rp.NewKeys(context.Background(), conf.OIDC.Issuer)
+		if fromURL == nil {
+			return nil, errors.New("oidc key source unavailable: issuer configured but no URL builder injected")
+		}
+		return fromURL(context.Background(), conf.OIDC.Issuer)
 	}
 	if keys := localPublicKeys(conf); len(keys) > 0 {
+		if fromSet == nil {
+			return nil, errors.New("oidc key source unavailable: local keys configured but no set builder injected")
+		}
 		glog.Warnf(context.Background(), "[oidckit.NewKeySourceFromConfig] 使用本地签名密钥快照作为 JWKS 来源：OP 轮换签名密钥后本进程需重启才会生效；生产建议配置 oidc.jwksURL")
-		return rp.NewKeysFromSet(keys), nil
+		return fromSet(keys), nil
 	}
 	return nil, errors.New("oidc key source unavailable: set oidc.jwksURL, oidc.issuer, or local signing key")
 }
@@ -60,11 +80,11 @@ func NewKeySourceFromConfig(conf *config.Config) (KeySource, error) {
 // 零网络调用、自动跟随多 key 轮换，也避免"进程启动期 HTTP 请求自己还没监听的
 // JWKS 端点"这种必然失败的自举。injected 为 nil 时按本应用配置自建
 // （见 NewKeySourceFromConfig），此时才可能发生网络预取。
-func ResolveKeySource(injected KeySource, conf *config.Config) (KeySource, error) {
+func ResolveKeySource(injected KeySource, conf *config.Config, fromURL KeysFromURLFunc, fromSet KeysFromSetFunc) (KeySource, error) {
 	if injected != nil {
 		return injected, nil
 	}
-	return NewKeySourceFromConfig(conf)
+	return NewKeySourceFromConfig(conf, fromURL, fromSet)
 }
 
 // localPublicKeys 从本地配置的签名密钥（单 key 或 keys 列表）导出全部公钥。

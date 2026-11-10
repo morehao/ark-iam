@@ -9,10 +9,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/morehao/ark-iam/contract"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/ark-iam/pkg/oidckit"
-	"github.com/morehao/ark-iam/sdk/rp"
 
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
@@ -34,6 +34,11 @@ type authConfig struct {
 	audiences []string
 	// keySource 提供按 kid 取公钥的能力（支持 OP 多 key 轮换）。
 	keySource oidckit.KeySource
+	// verifier 是 access token 校验器（contract.Verifier 接口，由装配层注入 sdk/rp 实现）。
+	// pkg 只依赖 contract 接口，具体实现由 sdk/server/internal / 调用方注入，斩断 pkg → sdk 边。
+	verifier contract.Verifier
+	// verifierBuilder 是按 keySource+issuer+audiences 构造 verifier 的注入点（见 WithVerifierBuilder）。
+	verifierBuilder VerifierBuilder
 	// disableLegacyUserLookup 关闭"token 未携带 user_id 时反查 user 表"的兼容分支。
 	// 生产不应打开；仅用于验证严格模式。
 	disableLegacyUserLookup bool
@@ -63,13 +68,43 @@ func WithOIDCAudiences(audiences ...string) AuthOption {
 	}
 }
 
-// WithOIDCKeySource 注入按 kid 取公钥的密钥来源（真源 sdk/rp.KeySource，装配见 pkg/oidckit）。
-// 这是支持 OP 多 key 轮换的正路：未知 kid 时 SDK 会限速刷新 JWKS，
-// 而不是把公钥在启动时钉死（轮换后必然 401）。
+// WithOIDCKeySource 注入按 kid 取公钥的密钥来源（真源 contract.KeySource）。
+//
+// 注意：自 pkg 解环后，中间件**不再**自行用 keySource 构造验签器（那需要 import sdk/rp）。
+// 真正执行验签的 contract.Verifier 由装配层通过 WithVerifier 注入；本选项保留以兼容
+// 既有调用方（仍会记录 keySource 供契约断言/诊断），但不再触发构造。
 func WithOIDCKeySource(source oidckit.KeySource) AuthOption {
 	return func(c *authConfig) {
 		if source != nil {
 			c.keySource = source
+		}
+	}
+}
+
+// WithVerifier 注入 access token 校验器（真源 contract.Verifier，实现见 sdk/rp）。
+//
+// 解环关键（F1）：pkg 只依赖 contract 接口，具体 sdk/rp 实现由装配层
+// （sdk/server/internal 的 newVerifier，或 apps 装配入口）注入。优先级高于 builder/keySource。
+func WithVerifier(verifier contract.Verifier) AuthOption {
+	return func(c *authConfig) {
+		if verifier != nil {
+			c.verifier = verifier
+		}
+	}
+}
+
+// VerifierBuilder 由装配层注入的验签器构造器：吃 keySource + issuer + audiences，
+// 返回具体 contract.Verifier（实现见 sdk/rp）。pkg 只持有该函数签名，不 import sdk，
+// 既解 pkg → sdk 环，又能让中间件按 WithOIDCIssuer/WithOIDCAudiences 收紧校验（行为不变）。
+type VerifierBuilder func(keySource contract.KeySource, issuer string, audiences []string) contract.Verifier
+
+// WithVerifierBuilder 注入验签器构造器（与 WithOIDCKeySource / WithOIDCIssuer /
+// WithOIDCAudiences 组合使用：中间件用 keySource+issuer+audiences 构造 verifier）。
+// 若已用 WithVerifier 注入具体实现，则本 builder 不生效（显式实现优先）。
+func WithVerifierBuilder(builder VerifierBuilder) AuthOption {
+	return func(c *authConfig) {
+		if builder != nil {
+			c.verifierBuilder = builder
 		}
 	}
 }
@@ -154,19 +189,24 @@ func OIDCAuth(opts ...AuthOption) gin.HandlerFunc {
 	}
 }
 
-// newVerifier 依据选项构造 SDK 校验器（无 KeySource 时返回错误，中间件 fail-closed）。
-func newVerifier(cfg *authConfig) (*rp.Verifier, error) {
-	if cfg.keySource == nil {
-		return nil, errors.New("oidc key source not configured")
+// newVerifier 返回验签器：优先使用注入的 contract.Verifier（WithVerifier）；
+// 未注入时报错（中间件 fail-closed）。
+//
+// pkg 不再 import sdk/rp 自行构造（解 pkg → sdk 环）；具体实现由装配层注入。
+// 若调用方只注入了 keySource 而未注入 verifier，这里明确报错，避免"静默不校验"。
+func newVerifier(cfg *authConfig) (contract.Verifier, error) {
+	if cfg.verifier != nil {
+		return cfg.verifier, nil
 	}
-	opts := []rp.VerifierOption{}
-	if cfg.issuer != "" {
-		opts = append(opts, rp.WithIssuer(cfg.issuer))
+	if cfg.verifierBuilder != nil && cfg.keySource != nil {
+		if v := cfg.verifierBuilder(cfg.keySource, cfg.issuer, cfg.audiences); v != nil {
+			return v, nil
+		}
 	}
-	if len(cfg.audiences) > 0 {
-		opts = append(opts, rp.WithAudiences(cfg.audiences...))
+	if cfg.keySource != nil {
+		return nil, errors.New("oidc verifier not injected: use middleware.WithVerifier or WithVerifierBuilder (pkg no longer constructs sdk/rp verifier)")
 	}
-	return rp.NewVerifier(cfg.keySource, opts...), nil
+	return nil, errors.New("oidc key source not configured")
 }
 
 // setOIDCContext 把校验通过的 identity 注入 gin 上下文：
@@ -176,7 +216,7 @@ func newVerifier(cfg *authConfig) (*rp.Verifier, error) {
 // user_id 自「令牌增加 user_id 声明」起由 OP 直接下发，因此不再需要每次请求查库反查
 // user 表（既省一次查询，也消除了"缓存层一旦读不到就误判非成员"的降级风险）。
 // 对尚未携带 user_id 的存量 token，保留一段反查兼容（allowLegacyLookup）。
-func setOIDCContext(ctx *gin.Context, ident *rp.Identity, tokenStr string, allowLegacyLookup bool) error {
+func setOIDCContext(ctx *gin.Context, ident *contract.Identity, tokenStr string, allowLegacyLookup bool) error {
 	personID := ident.PersonID
 
 	ctx.Set(gcontext.KeyPersonID, personID)

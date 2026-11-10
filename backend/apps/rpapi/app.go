@@ -6,12 +6,15 @@ package rpapi
 
 import (
 	"context"
+	"crypto/rsa"
 
 	"github.com/gin-gonic/gin"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/oidckit"
+	"github.com/morehao/ark-iam/contract"
 	"github.com/morehao/ark-iam/rpapi/config"
 	"github.com/morehao/ark-iam/rpapi/internal/router"
+	"github.com/morehao/ark-iam/sdk/rp"
 	"github.com/morehao/golib/biz/gserver/gindocs"
 	"github.com/morehao/golib/glog"
 )
@@ -24,7 +27,12 @@ const AppName = "rpapi"
 // （零网络调用）；独立部署传 nil，此时按本应用配置自建（见 oidckit.ResolveKeySource）。
 func Init(engine *gin.Engine, Conf *pkgconfig.Config, injectedKeySource oidckit.KeySource) {
 	config.Conf = Conf
-	keySource, keyErr := oidckit.ResolveKeySource(injectedKeySource, Conf)
+	keySource, keyErr := oidckit.ResolveKeySource(
+		injectedKeySource,
+		Conf,
+		func(ctx context.Context, url string) (contract.KeySource, error) { return rp.NewKeys(ctx, url) },
+		func(keys map[string]*rsa.PublicKey) contract.KeySource { return rp.NewKeysFromSet(keys) },
+	)
 	if keyErr != nil {
 		// fail-closed：没有可用 KeySource 时目录路由照常挂载，但 OIDCAuth 会对每个
 		// 请求返回 401（x-api-key 通道除外，它是独立的凭证校验）。

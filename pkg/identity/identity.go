@@ -13,7 +13,7 @@ package identity
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/morehao/ark-iam/sdk/rp"
+	"github.com/morehao/ark-iam/contract"
 )
 
 // 上下文键保持历史字面量不变（值即契约，改动会让按原始字符串读取的调用点静默失配）。
@@ -38,7 +38,7 @@ func SetClientID(ctx *gin.Context, clientID string) {
 }
 
 // SetOIDCIdentity 写入校验通过的完整身份（由鉴权中间件调用）。
-func SetOIDCIdentity(ctx *gin.Context, ident *rp.Identity) {
+func SetOIDCIdentity(ctx *gin.Context, ident *contract.Identity) {
 	if ctx == nil {
 		return
 	}
@@ -58,7 +58,7 @@ func ClientIDFromContext(ctx *gin.Context) string {
 //
 // 用途是**策略**判定（scope/客户端维度），不是鉴权：鉴权已由 OIDC 中间件完成，
 // 因此调用方拿到 nil 时应按"策略不满足"处理，绝不回退成放行。
-func OIDCIdentityFromContext(ctx *gin.Context) *rp.Identity {
+func OIDCIdentityFromContext(ctx *gin.Context) *contract.Identity {
 	if ctx == nil {
 		return nil
 	}
@@ -66,7 +66,7 @@ func OIDCIdentityFromContext(ctx *gin.Context) *rp.Identity {
 	if !ok {
 		return nil
 	}
-	ident, ok := value.(*rp.Identity)
+	ident, ok := value.(*contract.Identity)
 	if !ok {
 		return nil
 	}

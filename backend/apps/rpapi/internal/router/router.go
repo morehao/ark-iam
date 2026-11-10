@@ -10,6 +10,7 @@ import (
 	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/morehao/ark-iam/pkg/oidckit"
 	"github.com/morehao/ark-iam/rpapi/internal/controller/ctrdirectory"
+	"github.com/morehao/ark-iam/sdk/rp"
 	rpamiddleware "github.com/morehao/ark-iam/rpapi/internal/middleware"
 	"github.com/morehao/golib/biz/gserver/ginserver"
 )
@@ -33,6 +34,18 @@ func registerRouter(engine *gin.Engine, conf *config.Config, keySource oidckit.K
 	if conf != nil {
 		if conf.OIDC.Issuer != "" {
 			oidcOpts = append(oidcOpts, pkgmiddleware.WithOIDCIssuer(conf.OIDC.Issuer))
+		}
+		// 解环接线：在本装配层 new 出 sdk/rp 的 Verifier 实现并注入 pkg 中间件
+		// （pkg 只认 contract.Verifier 接口，不再 import sdk）。
+		if keySource != nil {
+			vopts := []rp.VerifierOption{}
+			if conf.OIDC.Issuer != "" {
+				vopts = append(vopts, rp.WithIssuer(conf.OIDC.Issuer))
+			}
+			if len(conf.OIDC.Audiences) > 0 {
+				vopts = append(vopts, rp.WithAudiences(conf.OIDC.Audiences...))
+			}
+			oidcOpts = append(oidcOpts, pkgmiddleware.WithVerifier(rp.NewVerifier(keySource, vopts...)))
 		}
 		// aud 收紧：只接受 aud 指向本应用（rpapi）自身的 M2M 令牌——
 		// 与 tenantadmin/platformadmin 收紧到内置控制台客户端同理。

@@ -17,9 +17,19 @@ import (
 //
 // 与现网三 app 的中间件装配逐段等价，配置来源为完整 pkgconfig.Config。
 func (a *App) authMiddlewareForGroup(conf *pkgconfig.Config, audience string) []gin.HandlerFunc {
-	opts := []middleware.AuthOption{middleware.WithOIDCKeySource(a.keySource)}
-	if conf != nil && conf.OIDC.Issuer != "" {
-		opts = append(opts, middleware.WithOIDCIssuer(conf.OIDC.Issuer))
+	issuer := ""
+	if conf != nil {
+		issuer = conf.OIDC.Issuer
+	}
+	// 解环接线：在本装配层 new 出 sdk/rp 的 Verifier 实现并注入 pkg 中间件
+	// （pkg 只认 contract.Verifier 接口，不再 import sdk）。
+	verifier := newVerifier(a.keySource, issuer, []string{audience})
+	opts := []middleware.AuthOption{
+		middleware.WithOIDCKeySource(a.keySource),
+		middleware.WithVerifier(verifier),
+	}
+	if issuer != "" {
+		opts = append(opts, middleware.WithOIDCIssuer(issuer))
 	}
 	opts = append(opts, middleware.WithOIDCAudiences(audience))
 	if conf != nil && conf.OIDC.EnableSSOSessionValidation {
