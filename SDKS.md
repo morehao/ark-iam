@@ -5,20 +5,19 @@
 
 | 集成物 | 语言/生态 | 安装 | 版本线 |
 |---|---|---|---|
-| **Go SDK** `github.com/morehao/ark-iam/sdk` | Go | `go get github.com/morehao/ark-iam/sdk@v0.3.0` | 子模块 tag `sdk/vX.Y.Z` |
+| **Go SDK** `github.com/morehao/ark-iam/sdk` | Go | `go get github.com/morehao/ark-iam/sdk@v0.4.0` | 子模块 tag `sdk/vX.Y.Z` |
 | **前端门面包** `@morehao/ark-iam-react` | React / npm | `pnpm add @morehao/ark-iam-react@^0.2.0` | npm 版本 `X.Y.Z` |
 
 > 两行、两条命令即可接入。两个包互不依赖，可单独使用，也可同时使用（前端登录 + 后端验签）。
 
-### 后端三个可 `go get` 的 Go 模块（均在仓库根级，同一 v0.3.0 版本线）
+### 后端两个可 `go get` 的 Go 模块（均在仓库根级）
 
 | 模块 | 用途 | 安装 |
 |---|---|---|
-| `github.com/morehao/ark-iam/sdk` | **RP 侧 SDK**：本地验签 / M2M / introspect / revoke / userinfo / 登出 / 目录（业务应用最常用） | `go get github.com/morehao/ark-iam/sdk@v0.3.0` |
-| `github.com/morehao/ark-iam/iam` | **可嵌入 IAM 库**：「形态 2 内嵌业务单体」，把 IAM 与宿主同进程部署 | `go get github.com/morehao/ark-iam/iam@v0.3.0` |
-| `github.com/morehao/ark-iam/pkg` | **公共层**（config/dbclient/middleware/model/dao/... ），一般随 iam 传递引入，无需直接依赖 | `go get github.com/morehao/ark-iam/pkg@v0.3.0` |
+| `github.com/morehao/ark-iam/sdk` | **RP 侧 SDK**（`sdk/rp` + `sdk/contract`）：本地验签 / M2M / introspect / revoke / userinfo / 登出 / 目录；另含 **`sdk/server` 门面**：`New(Domains)/Mount/MountConfig`，委托 `apps/*` 各域实现库（业务应用最常用） | `go get github.com/morehao/ark-iam/sdk@v0.4.0` |
+| `github.com/morehao/ark-iam/pkg` | **公共层**（config/dbclient/middleware/model/dao/... ），随 `sdk/server`（经 `apps/*`）传递引入，一般无需直接依赖 | `go get github.com/morehao/ark-iam/pkg@v0.4.0` |
 
-> 三者版本统一 `v0.3.0`；`iam` 依赖 `pkg` + `sdk`，`pkg` 依赖 `sdk`，均以真实版本号解析（发布后消费方无需 replace）。
+> **分层倒置**：`sdk/server` → `apps/*`（auth/platformadmin/tenantadmin 各域实现库）→ `pkg`。原独立 `iam` 模块已删除（其域实现并入 `apps/`，Go 侧不再托管前端静态资源）。`sdk/rp`、`sdk/contract` 保持**框架无关**（只依赖标准库 + `jwt/v5`，由 `sdk/scripts/check-deps.sh` 强制）；`sdk/server` 是编排层，可引入 gin/gorm/redis。
 
 ---
 
@@ -27,11 +26,11 @@
 ### 安装
 
 ```bash
-go get github.com/morehao/ark-iam/sdk@v0.3.0
+go get github.com/morehao/ark-iam/sdk@v0.4.0
 ```
 
 ```go
-require github.com/morehao/ark-iam/sdk v0.3.0
+require github.com/morehao/ark-iam/sdk v0.4.0
 ```
 
 SDK 完全**框架无关**，只依赖 Go 标准库 + `github.com/golang-jwt/jwt/v5`（测试另加 `testify`）。
@@ -63,7 +62,7 @@ identity, err := v.Verify(ctx, rawToken) // 失败一律 401
 
 ### 样例
 
-- [`examples/rp-gin/`](./examples/rp-gin/) —— 独立模块，`require github.com/morehao/ark-iam/sdk v0.3.0`（**不用 replace**），
+- [`examples/rp-gin/`](./examples/rp-gin/) —— 独立模块，`require github.com/morehao/ark-iam/sdk v0.4.0`（**不用 replace**），
   用 `rp.NewVerifier` 写 Gin 鉴权中间件的开箱照抄样例。
 
 ---
@@ -105,8 +104,8 @@ const AuthProvider = createAuthProvider({ clientID: 'my_app_web' })
 
 ## 版本线
 
-- **Go 模块**（sdk / iam / pkg）：各自子模块 tag（`sdk/vX.Y.Z`、`iam/vX.Y.Z`、`pkg/vX.Y.Z`，Go 多模块标准，`go get .../<mod>@vX.Y.Z` 依赖前缀对齐目录）。
-  当前统一 `v0.3.0`。与仓库级 tag（如 `v0.2.1`）并存、互不影响。
+- **Go 模块**（sdk / pkg）：各自子模块 tag（`sdk/vX.Y.Z`、`pkg/vX.Y.Z`，Go 多模块标准，`go get .../<mod>@vX.Y.Z` 依赖前缀对齐目录）。
+  当前 `sdk` 为 `v0.4.0`（分层倒置大改：新增 `sdk/server` 门面、废弃原 `iam` 模块）。与仓库级 tag（如 `v0.2.1`）并存、互不影响。
 - **前端包**：`@morehao/ark-iam-react@X.Y.Z`（npm registry），当前 `0.2.0`。
 
 两套版本线独立演进、独立发布，不要求同号。
@@ -115,5 +114,8 @@ const AuthProvider = createAuthProvider({ clientID: 'my_app_web' })
 
 ## 参考样例（非 SDK 依赖路径）
 
-- [`backend/examples/embedded-iam-demo`](./backend/examples/embedded-iam-demo) —— **内嵌 OP**（把 IAM 服务端嵌入宿主进程）的完整示例，
-  供需要「自建 IAM 服务端」的场景参考；与上面的「引 SDK 依赖接入已有 IAM」是两条不同路径。
+- [`examples/rp-gin/`](./examples/rp-gin/) —— 独立模块，`require github.com/morehao/ark-iam/sdk v0.4.0`（**不用 replace**），
+  演示「引 SDK 依赖接入已有 IAM」的 RP 侧验签接入。
+
+> 原「内嵌 OP」示例 `backend/examples/embedded-iam-demo` 已随分层倒置重构删除：服务端域实现归 `apps/*`，
+> 前端改由 npm 包 `@morehao/ark-iam-react` 提供，Go 侧不再托管任何前端静态资源。

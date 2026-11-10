@@ -13,6 +13,8 @@
 ```
 sdk/
 ├── contract/     # claim 契约（双端单一事实源）、错误分类、back-channel logout 事件常量
+├── server/       # 门面/编排层：New(Domains)/Mount/MountConfig，委托 apps/* 各域实现库
+│                 #   （process entry → sdk/server → apps/{auth,platformadmin,tenantadmin} → pkg）
 └── rp/           # RP 侧能力
     ├── keys.go       # KeySource：JWKS 预取 / kid 查表 / 限频刷新 / 磁盘兜底
     ├── verifier.go   # 本地验签 → Identity（person/machine、租户、scope、代操作主体）
@@ -30,11 +32,11 @@ sdk/
 外部应用按需引入：
 
 ```bash
-go get github.com/morehao/ark-iam/sdk@v0.3.0
+go get github.com/morehao/ark-iam/sdk@v0.4.0
 ```
 
 ```
-require github.com/morehao/ark-iam/sdk v0.3.0
+require github.com/morehao/ark-iam/sdk v0.4.0
 ```
 
 样例见 [`../examples/rp-gin/`](../examples/rp-gin/)（独立模块，不用 replace）。

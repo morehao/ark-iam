@@ -4,7 +4,7 @@
 >
 > 开发环境 Swagger（redoc）：`http://localhost:{port}/{appName}/redocs`（如 `http://localhost:8081/auth/redocs`）。
 >
-> **内嵌形态（形态 2）**：用 `backend/iam` 把 IAM 内嵌进业务单体时，下列所有前缀会挂在宿主 `App.Mount(rg)` 传入的路由组下——例如 `engine.Group("/iam")` 时端点变为 `/iam/v1/platform/*`、`/iam/oidc/*`、`/iam/install`。路由与鉴权语义不变，见 [application-integration-guide.md](application-integration-guide.md) §11。
+> **内嵌形态（形态 2）**：用 `backend/sdk/server` 把 IAM 内嵌进业务单体时，下列所有前缀会挂在宿主 `App.Mount(rg)` 传入的路由组下——例如 `engine.Group("/iam")` 时端点变为 `/iam/v1/platform/*`、`/iam/oidc/*`、`/iam/install`。路由与鉴权语义不变，见 [application-integration-guide.md](application-integration-guide.md) §11。
 
 ---
 

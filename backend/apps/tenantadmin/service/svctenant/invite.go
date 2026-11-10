@@ -1,0 +1,122 @@
+package svctenant
+
+import (
+	"context"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/tenantadmin/dto/dtotenant"
+	"github.com/morehao/golib/dbaccess/gormdao"
+	"github.com/morehao/golib/glog"
+	"github.com/morehao/golib/gutil"
+)
+
+// InviteSvc 租户邀请管理：租户 owner/管理员生成加入邀请，凭证持有者凭邀请码自助加入租户（通道 B）。
+type InviteSvc interface {
+	Create(ctx context.Context, req *dtotenant.InviteCreateReq) (*dtotenant.InviteCreateResp, error)
+	Revoke(ctx context.Context, req *dtotenant.InviteRevokeReq) error
+	PageList(ctx context.Context, req *dtotenant.InvitePageListReq) (*dtotenant.InvitePageListResp, error)
+}
+
+type inviteSvc struct {
+	db gormdao.DBGetter
+}
+
+var _ InviteSvc = (*inviteSvc)(nil)
+
+func NewInviteSvc(db gormdao.DBGetter) InviteSvc {
+	if db == nil {
+		db = dbclient.IamDB
+	}
+	return &inviteSvc{db: db}
+}
+
+// Create 生成一条租户加入邀请（一次性邀请码，可选有效期）。
+func (svc *inviteSvc) Create(ctx context.Context, req *dtotenant.InviteCreateReq) (*dtotenant.InviteCreateResp, error) {
+	tenantID := dbclient.TenantIDFromContext(ctx)
+	operatorID := req.Operator.UserID
+
+	var expiresAt *time.Time
+	if req.ExpireHours > 0 {
+		t := time.Now().Add(time.Duration(req.ExpireHours) * time.Hour)
+		expiresAt = &t
+	}
+
+	entity := &model.InviteEntity{
+		TenantID:  tenantID,
+		Code:      "invite-" + uuid.NewString(),
+		Status:    model.InviteStatusPending,
+		ExpiresAt: expiresAt,
+		CreatedBy: operatorID,
+	}
+	if err := dao.NewInviteDao(dao.WithDBGetter(svc.db)).Insert(ctx, entity); err != nil {
+		glog.Errorf(ctx, "[svcinvite.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.InviteCreateError)
+	}
+	return &dtotenant.InviteCreateResp{
+		InviteID: entity.ID,
+		Code:     entity.Code,
+	}, nil
+}
+
+// Revoke 撤销一条邀请（置为 revoked 状态）。
+func (svc *inviteSvc) Revoke(ctx context.Context, req *dtotenant.InviteRevokeReq) error {
+	tenantID := dbclient.TenantIDFromContext(ctx)
+	entity, err := dao.NewInviteDao(dao.WithDBGetter(svc.db)).GetByID(ctx, req.InviteID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcinvite.Revoke] dao GetByID fail, err:%v, inviteID:%s", err, req.InviteID)
+		return code.GetError(code.InviteRevokeError)
+	}
+	if entity == nil || entity.ID == "" || entity.TenantID != tenantID {
+		return code.GetError(code.InviteInvalidError)
+	}
+	if err := dao.NewInviteDao(dao.WithDBGetter(svc.db)).UpdateMap(ctx, req.InviteID, map[string]any{
+		"status":     model.InviteStatusRevoked,
+		"updated_by": req.Operator.UserID,
+	}); err != nil {
+		glog.Errorf(ctx, "[svcinvite.Revoke] dao UpdateMap fail, err:%v, inviteID:%s", err, req.InviteID)
+		return code.GetError(code.InviteRevokeError)
+	}
+	return nil
+}
+
+// PageList 邀请列表（租户内）。
+func (svc *inviteSvc) PageList(ctx context.Context, req *dtotenant.InvitePageListReq) (*dtotenant.InvitePageListResp, error) {
+	tenantID := dbclient.TenantIDFromContext(ctx)
+	cond := &dao.InviteCond{
+		BaseCond: &gormdao.BaseCond{
+			Page:     req.Page,
+			PageSize: req.PageSize,
+		},
+		TenantID: tenantID,
+		Status:   req.Status,
+	}
+	list, total, err := dao.NewInviteDao(dao.WithDBGetter(svc.db)).GetPageListByCond(ctx, cond)
+	if err != nil {
+		glog.Errorf(ctx, "[svcinvite.PageList] dao GetPageListByCond fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.InviteGetPageListError)
+	}
+	items := make([]dtotenant.InvitePageListItem, 0, len(list))
+	for _, v := range list {
+		var exp *int64
+		if v.ExpiresAt != nil {
+			e := v.ExpiresAt.Unix()
+			exp = &e
+		}
+		items = append(items, dtotenant.InvitePageListItem{
+			InviteID:  v.ID,
+			Code:      v.Code,
+			Status:    v.Status,
+			ExpiresAt: exp,
+			CreatedAt: v.CreatedAt.Unix(),
+		})
+	}
+	return &dtotenant.InvitePageListResp{
+		List:  items,
+		Total: total,
+	}, nil
+}

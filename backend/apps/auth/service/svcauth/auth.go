@@ -1,0 +1,603 @@
+package svcauth
+
+import (
+	svcdb "github.com/morehao/ark-iam/auth/service/svcdb"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/morehao/ark-iam/auth/dto/dtoauth"
+	"github.com/morehao/ark-iam/auth/service/svcloginguard"
+	"github.com/morehao/ark-iam/pkg/audit"
+	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/core/application"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objauth"
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
+	"github.com/morehao/ark-iam/pkg/sso"
+	"github.com/morehao/golib/dbaccess/gormdao"
+	"github.com/morehao/golib/gconstant"
+	"github.com/morehao/golib/gcrypto"
+	"github.com/morehao/golib/gerror"
+	"github.com/morehao/golib/glog"
+	"gorm.io/gorm"
+)
+
+type authUserStore interface {
+	GetByID(ctx context.Context, id string) (*model.UserEntity, error)
+	GetByCond(ctx context.Context, cond gormdao.Cond) (*model.UserEntity, error)
+	GetListByCond(ctx context.Context, cond gormdao.Cond) (model.UserEntityList, error)
+	Insert(ctx context.Context, entity *model.UserEntity) error
+	UpdateMap(ctx context.Context, id string, updateMap map[string]any) error
+}
+
+type authPersonStore interface {
+	GetByID(ctx context.Context, id string) (*model.PersonEntity, error)
+	GetByCond(ctx context.Context, cond gormdao.Cond) (*model.PersonEntity, error)
+	Insert(ctx context.Context, entity *model.PersonEntity) error
+}
+
+type authTenantStore interface {
+	GetByID(ctx context.Context, id string) (*model.TenantEntity, error)
+	GetPageListByCond(ctx context.Context, cond gormdao.Cond) (model.TenantEntityList, int64, error)
+	GetListByCond(ctx context.Context, cond gormdao.Cond) (model.TenantEntityList, error)
+}
+
+type authRefreshTokenStore interface {
+	GetByCond(ctx context.Context, cond gormdao.Cond) (*model.RefreshTokenEntity, error)
+	Insert(ctx context.Context, entity *model.RefreshTokenEntity) error
+	Delete(ctx context.Context, id, userID string) error
+	RevokeByPersonID(ctx context.Context, personID string) error
+}
+
+// defaultDB 由 iam.App 注入（一进程一 IAM 实例），供包级测试 seam 使用。
+
+
+// SetDefaultDB 由 iam.App 设置默认 DBGetter。
+
+
+var newAuthUserStore = func() authUserStore {
+	return dao.NewUserDao(dao.WithDBGetter(svcdb.DB))
+}
+
+var newAuthPersonStore = func() authPersonStore {
+	return dao.NewPersonDao(dao.WithDBGetter(svcdb.DB))
+}
+
+var newAuthTenantStore = func() authTenantStore {
+	return dao.NewTenantDao(dao.WithDBGetter(svcdb.DB))
+}
+
+var newAuthRefreshTokenStore = func() authRefreshTokenStore {
+	return dao.NewRefreshTokenDao(dao.WithDBGetter(svcdb.DB))
+}
+
+var authLoginRecorder = func(ctx context.Context, operator objidentity.Operator, tenantID, userID string, success bool) {
+	defaultRecordLoginLog(svcdb.DB, ctx, operator, tenantID, userID, success)
+}
+
+type AuthSvc interface {
+	AuthenticatePassword(ctx context.Context, operator objidentity.Operator, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error)
+	TenantsForPerson(ctx context.Context, personID string) ([]objauth.TenantOption, error)
+	MyTenants(ctx context.Context, req *dtoauth.MyTenantsReq) (*dtoauth.MyTenantsResp, error)
+	JoinTenant(ctx context.Context, req *dtoauth.JoinTenantReq) (*dtoauth.JoinTenantResp, error)
+	Logout(ctx context.Context, req *dtoauth.LogoutReq) error
+	LogoutAll(ctx context.Context, req *dtoauth.LogoutAllReq) error
+	Userinfo(ctx context.Context, req *dtoauth.UserinfoReq) (*dtoauth.UserinfoResp, error)
+}
+
+type authSvc struct {
+	db gormdao.DBGetter
+}
+
+var _ AuthSvc = (*authSvc)(nil)
+
+func NewAuthSvc(db gormdao.DBGetter) AuthSvc {
+	if db == nil {
+		db = dbclient.IamDB
+	}
+	return &authSvc{db: db}
+}
+
+func (svc *authSvc) AuthenticatePassword(ctx context.Context, operator objidentity.Operator, identifier, password string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+	personDao := newAuthPersonStore()
+	personEntity, userEntity, tenants, err := svc.resolvePersonLogin(ctx, operator, personDao, identifier)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	// 零租户 person：person 存在但无任何租户成员（userEntity==nil 且 tenants 为空）。
+	// 仍必须强制密码校验（与普通账号同错，防枚举），通过后才放行到"建自己租户"。
+	if personEntity != nil && userEntity == nil && len(tenants) == 0 {
+		personEntity, _, aErr := svc.authenticateResolvedPerson(ctx, operator, personEntity, nil, password)
+		if aErr != nil {
+			return nil, nil, nil, aErr
+		}
+		return personEntity, nil, nil, nil
+	}
+	personEntity, userEntity, err = svc.authenticateResolvedPerson(ctx, operator, personEntity, userEntity, password)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return personEntity, userEntity, tenants, nil
+}
+
+func (svc *authSvc) TenantsForPerson(ctx context.Context, personID string) ([]objauth.TenantOption, error) {
+	_, tenants, err := svc.listPersonTenants(ctx, personID)
+	if err != nil {
+		return nil, err
+	}
+	return tenants, nil
+}
+
+func (svc *authSvc) authenticateResolvedPerson(ctx context.Context, operator objidentity.Operator, personEntity *model.PersonEntity, userEntity *model.UserEntity, password string) (*model.PersonEntity, *model.UserEntity, error) {
+	ip := operator.ClientIP
+	// 零租户 person（userEntity==nil）：无 tenant/user id，登录审计记 person 级空 id。
+	tenantID, userID := "", ""
+	if userEntity != nil {
+		tenantID, userID = userEntity.TenantID, userEntity.ID
+	}
+	if svcloginguard.Check(ctx, ip, personEntity.ID) {
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
+			Result:     model.AuditResultFailure,
+			TargetType: model.AuditTargetTypePerson,
+			Detail:     fmt.Sprintf("personID:%s, reason:login locked", personEntity.ID),
+			Operator:   operator,
+		})
+		return nil, nil, code.GetError(code.LoginLockedError)
+	}
+
+	if personEntity.Status == model.PersonStatusSuspended {
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
+			Result:     model.AuditResultFailure,
+			TargetType: model.AuditTargetTypePerson,
+			Detail:     fmt.Sprintf("personID:%s, reason:suspended", personEntity.ID),
+			Operator:   operator,
+		})
+		return nil, nil, code.GetError(code.UserSuspendedError)
+	}
+
+	if personEntity.PasswordEncrypted == "" {
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
+			Result:     model.AuditResultFailure,
+			TargetType: model.AuditTargetTypePerson,
+			Detail:     fmt.Sprintf("personID:%s, reason:password not set", personEntity.ID),
+			Operator:   operator,
+		})
+		return nil, nil, code.GetError(code.PasswordNotSetError)
+	}
+
+	if err := gcrypto.ComparePasswordHash(personEntity.PasswordEncrypted, password); err != nil {
+		authLoginRecorder(ctx, operator, tenantID, userID, false)
+		svcloginguard.RecordFailure(ctx, ip, personEntity.ID)
+		glog.Errorf(ctx, "[svcauth.authenticateResolvedPerson] password mismatch, personID:%s", personEntity.ID)
+		// H8：密码错误与用户不存在统一错误码，避免用户名枚举
+		return nil, nil, code.GetError(code.AuthLoginFailedError)
+	}
+
+	svcloginguard.RecordSuccess(ctx, ip, personEntity.ID)
+	authLoginRecorder(ctx, operator, tenantID, userID, true)
+	return personEntity, userEntity, nil
+}
+
+func (svc *authSvc) MyTenants(ctx context.Context, req *dtoauth.MyTenantsReq) (*dtoauth.MyTenantsResp, error) {
+	personID := req.Operator.PersonID
+	if personID == "" {
+		return nil, code.GetError(gconstant.UnauthorizedErr)
+	}
+
+	_, tenants, err := svc.listPersonTenants(ctx, personID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dtoauth.MyTenantsResp{List: tenants}, nil
+}
+
+func (svc *authSvc) JoinTenant(ctx context.Context, req *dtoauth.JoinTenantReq) (*dtoauth.JoinTenantResp, error) {
+	// 通道 B：凭邀请加入已有租户（非 owner）。
+	// 落哪个租户由邀请码决定（租户侧授权，禁止裸 tenantID 直入）。
+	personID := req.Operator.PersonID
+	if personID == "" {
+		return nil, code.GetError(gconstant.UnauthorizedErr)
+	}
+	if req.InviteCode == "" {
+		return nil, code.GetError(code.AuthJoinNotAllowedError)
+	}
+
+	// 0. 应用级门禁（通道 B）：该应用是否允许其用户凭邀请加入已有租户。
+	// 与通道 A 的 allow_person_create_tenant 对称——都按调用方 access token 的 client_id
+	// 解析出应用、再读该应用的开关（pkg/core/application，两端共用同一份实现）。
+	// 解析不出应用（空 client_id / 客户端或应用不存在）一律 fail-closed。
+	// 机器凭证通道（API Key）不注入 person 身份，本函数在其之前就已按未认证拒绝。
+	// 该检查先于邀请解析：功能关闭时不向外暴露"邀请码是否存在"。
+	clientID := req.ClientID
+	appEntity, err := application.GetByClientID(ctx, clientID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcauth.JoinTenant] resolve application by clientID fail, err:%v, clientID:%s", err, clientID)
+		return nil, code.GetError(code.AuthJoinPolicyCheckError)
+	}
+	if !application.AllowsJoinByInvite(appEntity) {
+		glog.Warnf(ctx, "[svcauth.JoinTenant] app does not allow join by invite, clientID:%s, personID:%s", clientID, personID)
+		return nil, code.GetError(code.AuthJoinNotAllowedError)
+	}
+
+	// 1. 解析邀请：邀请码全局唯一，解析阶段尚不知归属租户，必须显式声明「全租户」作用域。
+	inviteEntity, err := dao.NewInviteDao(dao.WithDBGetter(svc.db)).GetByCond(dbclient.CrossTenantContext(ctx), &dao.InviteCond{Code: req.InviteCode})
+	if err != nil {
+		glog.Errorf(ctx, "[svcauth.JoinTenant] invite dao GetByCond fail, err:%v, code:%s", err, req.InviteCode)
+		return nil, code.GetError(code.InviteGetDetailError)
+	}
+	if inviteEntity == nil || inviteEntity.ID == "" || inviteEntity.Status != model.InviteStatusPending {
+		return nil, code.GetError(code.InviteInvalidError)
+	}
+	if inviteEntity.ExpiresAt != nil && time.Now().After(*inviteEntity.ExpiresAt) {
+		return nil, code.GetError(code.InviteExpiredError)
+	}
+	tenantID := inviteEntity.TenantID
+	// 邀请归属租户已确定：后续成员读写一律用「指定租户」作用域（与调用方当前租户无关）。
+	joinCtx := dbclient.ExplicitTenantContext(ctx, tenantID)
+
+	userDao := newAuthUserStore()
+	existingUser, err := userDao.GetByCond(joinCtx, &dao.UserCond{PersonID: personID, TenantID: tenantID})
+	if err != nil {
+		glog.Errorf(ctx, "[svcauth.JoinTenant] user dao GetByCond fail, err:%v", err)
+		return nil, code.GetError(code.UserGetDetailError)
+	}
+	if existingUser != nil && existingUser.ID != "" {
+		return nil, code.GetError(code.AlreadyJoinedError)
+	}
+
+	// 2. 建成员 user（非 owner）+ 标记邀请已用
+	var userID string
+	txErr := svc.db(joinCtx).Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		userEntity := &model.UserEntity{
+			TenantID:  tenantID,
+			PersonID:  personID,
+			Name:      "",
+			OwnerType: model.OwnerTypeNormal,
+			JoinedAt:  &now,
+			CreatedBy: personID,
+		}
+		if uErr := dao.NewUserDao(dao.WithDBGetter(svcdb.DB)).WithTx(tx).Insert(joinCtx, userEntity); uErr != nil {
+			return uErr
+		}
+		userID = userEntity.ID
+		// 标记邀请已使用
+		if uErr := dao.NewInviteDao(dao.WithDBGetter(svc.db)).WithTx(tx).UpdateMap(joinCtx, inviteEntity.ID, map[string]any{
+			"status":     model.InviteStatusAccepted,
+			"updated_by": personID,
+		}); uErr != nil {
+			return uErr
+		}
+		return nil
+	})
+	if txErr != nil {
+		glog.Errorf(ctx, "[svcauth.JoinTenant] transaction fail, err:%v, code:%s", txErr, req.InviteCode)
+		return nil, code.GetError(code.UserCreateError)
+	}
+
+	return &dtoauth.JoinTenantResp{
+		UserID: userID,
+	}, nil
+}
+
+func (svc *authSvc) Logout(ctx context.Context, req *dtoauth.LogoutReq) error {
+	personID := req.Operator.PersonID
+	// 全局登出语义：撤销该 person 的全部 refresh token + SSO 会话，实现"一处登出、处处登出"。
+	// access token 依赖其短 TTL 失效（见设计文档 §2.5），此处不维护 HS256 黑名单。
+	if personID != "" {
+		// H13：登出动作记录审计
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogout,
+			Result:     model.AuditResultSuccess,
+			TargetType: model.AuditTargetTypePerson,
+			TargetID:   personID,
+			Operator:   req.Operator,
+		})
+		// person 级全局登出：跨该自然人的全部租户撤销，显式声明「全租户」作用域。
+		personCtx := dbclient.CrossTenantContext(ctx)
+		if err := newAuthRefreshTokenStore().RevokeByPersonID(personCtx, personID); err != nil {
+			glog.Errorf(ctx, "[svcauth.Logout] RevokeByPersonID fail, personID:%s, err:%v", personID, err)
+		}
+		// 先入队 back-channel 通知（ListByPersonID 依赖 sso_user_sessions 索引），再撤销 SSO 会话。
+		svc.enqueueBackChannelLogouts(ctx, personID)
+		if err := sso.RevokeSSOSessionsByPersonID(personCtx, personID); err != nil {
+			glog.Errorf(ctx, "[svcauth.Logout] RevokeSSOSessionsByPersonID fail, personID:%s, err:%v", personID, err)
+		}
+	}
+	return nil
+}
+
+// enqueueBackChannelLogouts 将该 person 已登记的全部 client 的 back-channel logout
+// 任务入队（在撤销 SSO 会话前调用，此时会话索引仍可用），使其它已登录应用（含第三方 RP）
+// 即时收到 logout_token。入队失败仅告警，不影响登出主流程；任务由 oidcop 的 logoutWorker 异步消费。
+// 具体登记遍历复用 sso.EnqueueLogoutsByPersonID（租户挂起等场景走同一实现，避免两处逻辑漂移）。
+func (svc *authSvc) enqueueBackChannelLogouts(ctx context.Context, personID string) {
+	if _, err := sso.EnqueueLogoutsByPersonID(dbclient.CrossTenantContext(ctx), personID); err != nil {
+		glog.Warnf(ctx, "[svcauth.Logout] enqueue back-channel logouts fail, personID:%s, err:%v", personID, err)
+	}
+}
+
+func (svc *authSvc) LogoutAll(ctx context.Context, req *dtoauth.LogoutAllReq) error {
+	// LogoutAll 与 Logout 语义一致（person 级全局登出）。
+	// Operator 必须透传：Logout 从 DTO 取 personID，丢掉它会让登出静默变成 no-op。
+	return svc.Logout(ctx, &dtoauth.LogoutReq{Operator: req.Operator})
+}
+
+func (svc *authSvc) Userinfo(ctx context.Context, req *dtoauth.UserinfoReq) (*dtoauth.UserinfoResp, error) {
+	userDao := newAuthUserStore()
+
+	userID := req.Operator.UserID
+	personID := req.Operator.PersonID
+	tenantID := dbclient.TenantIDFromContext(ctx)
+
+	var userEntity *model.UserEntity
+	var err error
+
+	if userID != "" {
+		userEntity, err = userDao.GetByID(ctx, userID)
+	} else if personID != "" && tenantID != "" {
+		userEntity, err = userDao.GetByCond(ctx, &dao.UserCond{PersonID: personID, TenantID: tenantID})
+	} else {
+		return nil, code.GetError(gconstant.UnauthorizedErr)
+	}
+
+	if err != nil {
+		glog.Errorf(ctx, "[svcauth.Userinfo] dao query fail, err:%v, userID:%s, personID:%s, tenantID:%s", err, userID, personID, tenantID)
+		return nil, code.GetError(code.UserGetDetailError)
+	}
+	if userEntity == nil || userEntity.ID == "" {
+		return nil, code.GetError(code.UserNotExistError)
+	}
+
+	if personID == "" {
+		personID = userEntity.PersonID
+	}
+
+	personInfo := objauth.PersonInfo{}
+	if personID != "" {
+		personDao := newAuthPersonStore()
+		personEntity, personErr := personDao.GetByID(ctx, personID)
+		if personErr != nil {
+			// 不再静默吞错：DB 故障时如实报错，避免返回残缺 personInfo 误导调用方
+			glog.Errorf(ctx, "[svcauth.Userinfo] person dao GetByID fail, err:%v, personID:%s", personErr, personID)
+			return nil, code.GetError(code.UserGetDetailError)
+		}
+		if personEntity != nil && personEntity.ID != "" {
+			personInfo = objauth.PersonInfo{
+				PersonID: personEntity.ID,
+				Name:     personEntity.Name,
+				Avatar:   personEntity.Avatar,
+			}
+		} else {
+			personInfo = objauth.PersonInfo{
+				PersonID: personID,
+			}
+		}
+	}
+
+	return &dtoauth.UserinfoResp{
+		PersonInfo: personInfo,
+		UserInfo: objauth.TenantUserInfo{
+			UserID:    userEntity.ID,
+			TenantID:  userEntity.TenantID,
+			Name:      userEntity.Name,
+			OwnerType: userEntity.OwnerType,
+		},
+	}, nil
+}
+
+func (svc *authSvc) resolvePersonLogin(ctx context.Context, operator objidentity.Operator, personDao authPersonStore, identifier string) (*model.PersonEntity, *model.UserEntity, []objauth.TenantOption, error) {
+	identifier = strings.TrimSpace(identifier)
+	if identifier == "" {
+		return nil, nil, nil, code.GetError(code.AuthIdentifierRequiredError)
+	}
+
+	personCond := &dao.PersonCond{}
+	if strings.Contains(identifier, "@") {
+		personCond.PrimaryEmail = identifier
+	} else if len(identifier) >= 11 && strings.HasPrefix(identifier, "1") {
+		personCond.PrimaryPhone = identifier
+	} else {
+		personCond.Username = identifier
+	}
+
+	personEntity, err := personDao.GetByCond(ctx, personCond)
+	if err != nil {
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
+			Result:     model.AuditResultFailure,
+			TargetType: model.AuditTargetTypePerson,
+			Detail:     fmt.Sprintf("identifier:%s, reason:user lookup error", identifier),
+			Operator:   operator,
+		})
+		glog.Errorf(ctx, "[svcauth.resolvePersonLogin] person dao GetByCond fail, err:%v", err)
+		return nil, nil, nil, code.GetError(code.UserGetDetailError)
+	}
+	if personEntity == nil || personEntity.ID == "" {
+		// H8：未知标识同样计入 IP 维度失败（防口令喷洒绕过 IP 锁）；
+		// 审计 detail 不写"user not found"，避免用户名枚举。
+		svcloginguard.RecordFailure(ctx, operator.ClientIP, "")
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
+			Result:     model.AuditResultFailure,
+			TargetType: model.AuditTargetTypePerson,
+			Detail:     fmt.Sprintf("identifier-hash:%s, reason:auth failed", hashIdentifier(identifier)),
+			Operator:   operator,
+		})
+		return nil, nil, nil, code.GetError(code.AuthLoginFailedError)
+	}
+
+	userEntity, tenants, err := svc.listPersonTenants(ctx, personEntity.ID)
+	if err != nil {
+		// 零租户 person（无任何租户成员）：放行到密码验证，合法与否由密码决定。
+		// 用错误码（而非字符串）区分"零租户"与"系统错误"：只有 UserNotExistError 表示零租户。
+		if gerror.IsCode(err, code.UserNotExistError) {
+			return personEntity, nil, nil, nil
+		}
+		return nil, nil, nil, err
+	}
+	if userEntity.Status == model.UserStatusSuspended {
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
+			Result:     model.AuditResultFailure,
+			TargetType: model.AuditTargetTypePerson,
+			Detail:     fmt.Sprintf("userID:%s, reason:suspended", userEntity.ID),
+			Operator:   operator,
+		})
+		return nil, nil, nil, code.GetError(code.UserSuspendedError)
+	}
+	return personEntity, userEntity, tenants, nil
+}
+
+func (svc *authSvc) listPersonTenants(ctx context.Context, personID string) (*model.UserEntity, []objauth.TenantOption, error) {
+	userDao := newAuthUserStore()
+	tenantDao := newAuthTenantStore()
+	// 一次取全部租户成员，按加入时间排序：第一条即"默认租户"（确定性），
+	// 消除原先 GetByCond 无 ORDER BY 时默认租户随机的问题。
+	// 按自然人列出其全部租户成员关系：这是"跨租户"读取（此时尚未确定当前租户），
+	// 必须显式声明「全租户」作用域。
+	joinedUsers, err := userDao.GetListByCond(dbclient.CrossTenantContext(ctx), &dao.UserCond{
+		BaseCond: &gormdao.BaseCond{OrderField: "joined_at, id"},
+		PersonID: personID,
+	})
+	if err != nil {
+		glog.Errorf(ctx, "[svcauth.listPersonTenants] user dao GetListByCond fail, err:%v", err)
+		return nil, nil, code.GetError(code.UserGetDetailError)
+	}
+	if len(joinedUsers) == 0 {
+		return nil, nil, code.GetError(code.UserNotExistError)
+	}
+	// 批量查询租户（消除 N+1）
+	tenantIDs := make([]string, 0, len(joinedUsers))
+	for _, u := range joinedUsers {
+		if u.TenantID != "" {
+			tenantIDs = append(tenantIDs, u.TenantID)
+		}
+	}
+	tenantMap := map[string]*model.TenantEntity{}
+	if len(tenantIDs) > 0 {
+		tenants, qErr := tenantDao.GetListByCond(ctx, &dao.TenantCond{
+			BaseCond: &gormdao.BaseCond{IDs: toAnySlice(tenantIDs)},
+		})
+		if qErr != nil {
+			glog.Errorf(ctx, "[svcauth.listPersonTenants] tenant dao GetListByCond fail, err:%v", qErr)
+			return nil, nil, code.GetError(code.UserGetDetailError)
+		}
+		for i := range tenants {
+			tenantMap[tenants[i].ID] = &tenants[i]
+		}
+	}
+	options := make([]objauth.TenantOption, 0, len(joinedUsers))
+	var defaultUser *model.UserEntity
+	missingTenantCount := 0
+	for i := range joinedUsers {
+		joinedUser := joinedUsers[i]
+		tenantEntity := tenantMap[joinedUser.TenantID]
+		if tenantEntity == nil {
+			// 成员关系存在但租户行查不到：属数据不一致，与"租户被挂起"是两回事，
+			// 分开计数，避免被下面的挂起分支掩盖真实根因。
+			missingTenantCount++
+			continue
+		}
+		// 挂起租户：既不出现在租户选择列表（避免选中后又被令牌环节拒绝），
+		// 也不能作为默认租户进入。
+		if !tenantEntity.IsActive() {
+			continue
+		}
+		if defaultUser == nil {
+			defaultUser = &joinedUsers[i]
+		}
+		options = append(options, objauth.TenantOption{TenantID: tenantEntity.ID, Name: tenantEntity.Name, Tag: tenantEntity.Tag, UserID: joinedUser.ID, OwnerType: joinedUser.OwnerType})
+	}
+	if missingTenantCount > 0 {
+		glog.Errorf(ctx, "[svcauth.listPersonTenants] tenant row missing for user memberships, personID:%s, missing:%d, joined:%d, tenantIDs:%v",
+			personID, missingTenantCount, len(joinedUsers), tenantIDs)
+	}
+	if defaultUser == nil {
+		// 全部成员关系都指向不存在的租户行：数据不一致，如实报系统级错误，
+		// 不能报"已挂起"（会误导排查方向）。
+		if missingTenantCount == len(joinedUsers) {
+			return nil, nil, code.GetError(code.UserGetDetailError)
+		}
+		// 租户确实存在但全部被挂起：明确拒绝，不与"零租户可自助建租户"路径混同。
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionLogin,
+			Result:     model.AuditResultFailure,
+			TargetType: model.AuditTargetTypePerson,
+			Detail:     fmt.Sprintf("personID:%s, reason:all tenants suspended", personID),
+		})
+		return nil, nil, code.GetError(code.TenantSuspendedError)
+	}
+	return defaultUser, options, nil
+}
+
+// toAnySlice 把 []string 转为 []any（供 gormdao.BaseCond.IDs 使用）。
+func toAnySlice(ids []string) []any {
+	out := make([]any, len(ids))
+	for i, id := range ids {
+		out[i] = id
+	}
+	return out
+}
+
+// hashIdentifier 对登录标识做摘要（前 16 位 hex），
+// 供审计/日志记录失败来源而不泄露明文用户名/邮箱。
+func hashIdentifier(identifier string) string {
+	sum := sha256.Sum256([]byte(identifier))
+	return hex.EncodeToString(sum[:8])
+}
+
+func defaultRecordLoginLog(db gormdao.DBGetter, ctx context.Context, operator objidentity.Operator, tenantID, userID string, success bool) {
+	loginIP := operator.ClientIP
+	userAgent := operator.UserAgent
+
+	loginLogEntity := &model.UserLoginLogEntity{
+		TenantID:  tenantID,
+		UserID:    userID,
+		LoginType: model.LoginTypePassword,
+		LoginIP:   loginIP,
+		UserAgent: userAgent,
+		LoginTime: time.Now(),
+		CreatedBy: "",
+	}
+
+	if err := dao.NewUserLoginLogDao(dao.WithDBGetter(db)).Insert(ctx, loginLogEntity); err != nil {
+		glog.Errorf(ctx, "[svcauth.defaultRecordLoginLog] insert login log fail, err:%v", err)
+	}
+
+	if success {
+		userDao := newAuthUserStore()
+		// last_sign_in_at 落在 `"user"`（含 tenant_id 的租户表）：/oidc/login 链路没有租户中间件，
+		// ctx 未声明作用域，fail-closed 插件会把这次 UPDATE 拦下（登录仍成功，只在日志里留 error，
+		// 因而极易漏掉）。故按本次登录的租户显式声明作用域，与 JoinTenant 的 joinCtx 同口径。
+		if err := userDao.UpdateMap(dbclient.ExplicitTenantContext(ctx, tenantID), userID, map[string]interface{}{
+			"last_sign_in_at": time.Now(),
+		}); err != nil {
+			glog.Errorf(ctx, "[svcauth.defaultRecordLoginLog] update last_sign_in_at fail, err:%v", err)
+		}
+	}
+
+	result := model.AuditResultFailure
+	if success {
+		result = model.AuditResultSuccess
+	}
+	audit.WriteAudit(ctx, audit.AuditEntry{
+		Action:     audit.ActionLogin,
+		TenantID:   tenantID,
+		Result:     result,
+		TargetType: model.AuditTargetTypePerson,
+		TargetID:   userID,
+		Detail:     fmt.Sprintf("userID:%s", userID),
+		Operator:   operator,
+	})
+}

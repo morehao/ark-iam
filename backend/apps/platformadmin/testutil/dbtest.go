@@ -1,11 +1,13 @@
 package testutil
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -32,4 +34,26 @@ func SetupSQLite(t *testing.T, entities ...any) *gorm.DB {
 		}
 	})
 	return db
+}
+
+// SetupGetter 打开独立的内存 SQLite 并返回一个 DBGetter，供「注入式 service」直接构造，
+// 不触碰全局 iam 库注册（可嵌入 IAM 库的 service 均通过 DBGetter 注入）。
+// entities 为需要 AutoMigrate 的 model 结构体。
+func SetupGetter(t *testing.T, entities ...any) gormdao.DBGetter {
+	t.Helper()
+	dsn := fmt.Sprintf("file:testg_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(entities...); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+	t.Cleanup(func() {
+		sqlDB, _ := db.DB()
+		if sqlDB != nil {
+			_ = sqlDB.Close()
+		}
+	})
+	return func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }
 }

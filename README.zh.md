@@ -4,7 +4,9 @@
 
 `ark-iam` 是一个前后端分离的全栈项目，后端基于 [Gin](https://github.com/gin-gonic/gin)，提供分层、可维护、可扩展的服务结构，支持多个应用模块。
 
-IAM 后端拆分为 `backend/apps/` 下的五个应用（auth、platformadmin、tenantadmin、gateway、rpapi）。可复用的公共层放在**仓库根级**作为独立 Go 模块——`pkg/`（公共包）、`iam/`（可嵌入 IAM 库）、`sdk/`（RP 侧 SDK）——统一由根 `go.work` 管理，并可各自通过 `go get` 引依赖使用。
+IAM 后端拆分为 `backend/apps/` 下的五个应用（auth、platformadmin、tenantadmin、gateway、rpapi）。其中 auth/platformadmin/tenantadmin/rpapi 是**可 import 的库包**（各带 `cmd/` 进程入口，保留分体部署）；gateway 是**纯 `cmd/main`** 聚合器（绝不被 import）。可复用的公共层放在**仓库根级**作为独立 Go 模块——`pkg/`（公共包）、`sdk/`（RP 侧 SDK + `sdk/server` 门面，委托 apps 各域库）——统一由根 `go.work` 管理，并可各自通过 `go get` 引依赖使用。
+
+> **分层倒置**：进程入口 → `sdk/server`（薄门面）→ `apps/*` 各域库 → `pkg`。`sdk` 调用 `apps`，`apps` 不 import `sdk`（唯一例外：`apps/rpapi → sdk/rp` 验签）。原独立 `iam/` 模块已删除，域实现全部并入 `apps/`；Go 侧不再托管前端静态资源（`MountFrontend` 已删），登录/管理台前端由 npm 包 `@morehao/ark-iam-react` 提供。
 
 ---
 
@@ -26,15 +28,18 @@ IAM 后端拆分为 `backend/apps/` 下的五个应用（auth、platformadmin、
 
 ```
 ark-iam/
+├── go.work                # 根 Go workspace（pkg/ sdk/ + backend/apps/*）
+├── pkg/                   # 公共包模块（github.com/morehao/ark-iam/pkg）— 可 go get
+├── sdk/                   # RP 侧 SDK 模块（github.com/morehao/ark-iam/sdk）— 可 go get
+│   ├── rp/ contract/      # RP 客户端：验签 / M2M / introspect / revoke / userinfo / 登出 / 目录
+│   └── server/            # 薄门面：New(Domains)/Mount/MountConfig，委托 apps/* 各域库
 ├── backend/               # Go 后端 (基于 project-layout, go.work 多模块)
 │   ├── apps/
-│   │   ├── auth/          # 认证网关（登录/注册/token/OIDC）, :8081
-│   │   ├── platformadmin/ # 平台管理（user/role/menu/tenant）, :8082
-│   │   ├── tenantadmin/   # 租户自服务（department/user/role）, :8083
-│   │   └── gateway/       # 聚合应用，挂载上述三个, :8100
-│   ├── pkg/               # 公共包（多应用共享）
-│   ├── scripts/           # 脚本
-│   └── Makefile
+│   │   ├── auth/          # 认证域库 + cmd（登录/会话/OIDC）, :8081
+│   │   ├── platformadmin/ # 平台域库 + cmd（user/role/menu/tenant）, :8082
+│   │   ├── tenantadmin/   # 租户域库 + cmd（department/user/role）, :8083
+│   │   ├── rpapi/         # 只读目录 API 库 + cmd（用 sdk/rp）, :8084
+│   │   └── gateway/       # 纯 cmd 聚合器：server.New(Domains=nil) + rpapi, :8100
 ├── frontend/              # React 前端 (Vite + React)
 ├── docs/                  # 文档目录
 ├── Makefile               # 根目录 Makefile
