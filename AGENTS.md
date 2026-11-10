@@ -32,7 +32,7 @@ ark-iam/
 
 ## 构建与运行命令
 
-所有命令在项目根目录下执行。有效 `APP` 取值为 `auth | platformadmin | tenantadmin | rpapi | gateway`：
+所有命令在项目根目录下执行。有效 `APP` 取值为 `auth | platformadmin | tenantadmin | gateway`（原 `rpapi` 已并入 `sdk/server` 的 `DomainDirectory` 域，不再有独立 app）：
 
 ```bash
 # 列出所有可用应用
@@ -53,21 +53,20 @@ make deps
 make clean
 ```
 
-应用端口：auth 8081、platformadmin 8082、tenantadmin 8083、rpapi 8084、gateway 8100。
+应用端口：auth 8081、platformadmin 8082、tenantadmin 8083、gateway 8100（目录域 `/v1/rp/directory/*` 随 gateway 挂载，无独立端口）。
 
 ## 测试命令
 
 ```bash
-# 运行指定应用的测试（推荐；gateway 只做聚合、无测试用例，请用 auth/platformadmin/tenantadmin/rpapi）
+# 运行指定应用的测试（推荐；gateway 只做聚合、无测试用例，请用 auth/platformadmin/tenantadmin）
 make test APP=auth
 
-# 注意：go.work 位于 backend/，go 命令须在 backend 目录下执行，且模块按路径逐个 use。
-# `cd backend && go test ./...` 会报 "directory prefix . does not contain modules listed in go.work"，
+# 注意：根 go.work 逐个 use 各模块目录（contract、pkg、sdk、backend/apps/*）。
+# `go test ./...` 从根跑会报 "directory prefix . does not contain modules listed in go.work"，
 # 必须显式列出各模块目录（或在模块目录内跑 ./...）。
-cd backend
 
-# 运行所有模块的测试
-go test ./apps/auth/... ./apps/gateway/... ./apps/platformadmin/... ./apps/rpapi/... ./apps/tenantadmin/... ./pkg/... ./sdk/... ./iam/...
+# 运行所有模块的测试（apps 各域 + 共享层 + sdk + contract）
+go test ./backend/apps/auth/... ./backend/apps/gateway/... ./backend/apps/platformadmin/... ./backend/apps/tenantadmin/... ./pkg/... ./sdk/... ./contract/...
 
 # 等价的模块内写法
 cd backend/apps/auth && go test ./...
@@ -96,7 +95,7 @@ make lint
 golangci-lint run ./... --disable-all -E golint,errcheck,staticcheck
 
 # go vet（同样按模块逐个执行）
-cd backend && for m in apps/auth apps/gateway apps/platformadmin apps/rpapi apps/tenantadmin pkg sdk iam; do (cd $m && go vet ./...); done
+for m in backend/apps/auth backend/apps/gateway backend/apps/platformadmin backend/apps/tenantadmin pkg sdk contract; do (cd $m && go vet ./...); done
 ```
 
 ## 代码规范
@@ -407,7 +406,7 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 
 **三条硬规则（新增路由必须按序判定）**：
 
-- **R1 资源 CRUD → REST**：资源的增删改查/列表/详情/树，用「集合 + 方法 + ID」表达。路径格式 `/{版本}/{服务标识}/{资源}[/{id}[/{子资源}]]`（如 `/v1/platform/users/{userID}/identities`；`服务标识` 即应用标识段：auth → `/v1/auth`、platformadmin → `/v1/platform`、tenantadmin → `/v1/tenant`、rpapi → `/v1/rp`，各应用路径互不相同；资源名可跨应用复用，由服务标识段区分归属）
+- **R1 资源 CRUD → REST**：资源的增删改查/列表/详情/树，用「集合 + 方法 + ID」表达。路径格式 `/{版本}/{服务标识}/{资源}[/{id}[/{子资源}]]`（如 `/v1/platform/users/{userID}/identities`；`服务标识` 即应用标识段：auth → `/v1/auth`、platformadmin → `/v1/platform`、tenantadmin → `/v1/tenant`、目录域（原 rpapi，现随 sdk/server 的 DomainDirectory）→ `/v1/rp`，各服务标识路径互不相同；资源名可跨应用复用，由服务标识段区分归属）
 - **R2 业务动作 → 动作子路径**：状态流转/触发副作用类操作用 `POST /资源/{id}/动作`（如 `POST /v1/tenant/api-keys/{apiKeyID}/revoke`）；认证/会话类动作挂 `/v1/auth` 动作式专用段（`joinTenant`/`logout`/`logoutAll`/`userinfo`；`register` 已下线，自助注册走 `/oidc/registerPerson` + `/oidc/createTenant`）
 - **R3 标准协议 → 专用前缀**：`/oidc/*`、back-channel logout、docs 不走业务路由规范，保持不动
 
@@ -433,7 +432,7 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 
 #### 路由注册
 
-各业务 app 通过 `ginserver.NewRouterGroups(engine, "<服务标识>", ...)` 注册应用前缀（auth: `"auth"`、platformadmin: `"platform"`、tenantadmin: `"tenant"`、rpapi: `"rp"`），然后在 `router/router.go` 中按版本 `MustGetGroup(ginserver.ApiVersionV1)` 注册各模块路由：
+各业务 app 通过 `ginserver.NewRouterGroups(engine, "<服务标识>", ...)` 注册应用前缀（auth: `"auth"`、platformadmin: `"platform"`、tenantadmin: `"tenant"`、目录域（原 rpapi）: `"rp"`），然后在 `router/router.go` 中按版本 `MustGetGroup(ginserver.ApiVersionV1)` 注册各模块路由：
 
 ```go
 routerGroups := ginserver.NewRouterGroups(engine, "platform", []ginserver.VersionGroup{{

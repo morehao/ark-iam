@@ -2,9 +2,9 @@
 
 > 本文指导**业务应用（RP）**如何接入 Ark IAM，实现：OIDC 登录（SSO）、令牌校验、单点登出（SLO）、机器凭证（API Key / client_credentials）、只读目录查询五种能力。
 >
-> 前置阅读：[sso-oidc-concepts.md](sso-oidc-concepts.md)（协议概念）、[system-design.md](system-design.md) §6（接入流程概览）、[`backend/sdk/README.md`](../../backend/sdk/README.md)（RP 侧 OIDC SDK，本文的参考实现）。
+> 前置阅读：[sso-oidc-concepts.md](sso-oidc-concepts.md)（协议概念）、[system-design.md](system-design.md) §6（接入流程概览）、[`sdk/README.md`](../../sdk/README.md)（RP 侧 OIDC SDK，本文的参考实现）。
 >
-> RP 侧 OIDC 能力的**唯一事实源**是独立 module `backend/sdk`（`sdk/contract` 契约 + `sdk/rp` 验签/M2M/登出/目录客户端）；它框架无关，只依赖标准库与 `jwt/v5`，本仓内置应用与外部应用用的是同一份实现。
+> RP 侧 OIDC 能力的**唯一事实源**是独立 module `sdk`（其中契约部分独立为最底层 module `contract`，即 claim/Identity/验签接口/目录 DTO；`sdk/rp` 提供验签/M2M/登出/目录客户端并实现 `contract` 的接口）。`contract` 与 `sdk/rp` 框架无关，只依赖标准库与 `jwt/v5`，本仓内置应用与外部应用用的是同一份实现。
 >
 > 实战案例：[rustfs-integration-case.md](rustfs-integration-case.md) —— 接入一个**代码不可改、自带权限模型、只支持单向 SLO** 的存量第三方应用（RustFS）时的完整走查与踩坑记录。本文给通用步骤，该文给案例特有的判断与实测值。
 
@@ -39,11 +39,11 @@
 | 账号数据 | IAM 自己的库 | 业务自己的库（同库、表名不改，可启用撞名检测） |
 | 前端 | IAM 托管（login-web / 管理台） | 登录页 `embed` 进业务二进制（管理台可外置） |
 | 谁签令牌 | IAM 的 OP | 内嵌的 OP（业务进程内） |
-| 业务如何鉴权 | `backend/sdk` 跨域本地验签 | 进程内同一套 `sdk` 验签（或直接读内嵌身份） |
+| 业务如何鉴权 | `sdk` 跨域本地验签 | 进程内同一套 `sdk` 验签（或直接读内嵌身份） |
 | 适合 | 多项目**共享一套账号**、要统一身份 | 单项目想**零运维自带**账号体系（不单独部署 IAM） |
 | 取舍 | 需单独运维 IAM（集中升级、私钥单点） | 私钥散落在业务进程、DDL 由各进程跑、无法多实例共享一套账号 |
 
-> 形态 1 对应 `backend/sdk`（RP 侧验签 SDK）；形态 2 对应 `backend/sdk/server`（`package server`，在各域库之上的薄门面 / 编排层）。本文 §2~§10 讲形态 1 的完整步骤，§11 讲形态 2。
+> 形态 1 对应 `sdk`（RP 侧验签 SDK，`sdk/rp`）；形态 2 对应 `sdk/server`（`package server`，在各域库之上的薄门面 / 编排层）。本文 §2~§10 讲形态 1 的完整步骤，§11 讲形态 2。
 
 ```mermaid
 flowchart TB
@@ -273,7 +273,7 @@ sequenceDiagram
 
 ## 5. 后端接入：令牌校验中间件
 
-令牌校验在本应用内**本地完成**：启动时预取一次 OP 的 JWKS，之后请求路径只按令牌头的 `kid` 查内存公钥、**绝不访问 OP**。参考实现是 RP 侧 SDK [`backend/sdk`](../../backend/sdk/README.md)（`sdk/rp`），框架无关；gin 绑定由消费方自己写约 20 行。校验流程：
+令牌校验在本应用内**本地完成**：启动时预取一次 OP 的 JWKS，之后请求路径只按令牌头的 `kid` 查内存公钥、**绝不访问 OP**。参考实现是 RP 侧 SDK [`sdk`](../../sdk/README.md)（`sdk/rp`），框架无关；gin 绑定由消费方自己写约 20 行。校验流程：
 
 ```mermaid
 flowchart TB
@@ -307,7 +307,7 @@ import (
 
     "github.com/gin-gonic/gin"
 
-    "github.com/morehao/ark-iam/sdk/contract"
+    "github.com/morehao/ark-iam/contract"
     "github.com/morehao/ark-iam/sdk/rp"
 )
 
@@ -366,7 +366,7 @@ func OIDCAuth(verifier *rp.Verifier) gin.HandlerFunc {
 | `Scopes` | 标准 `scope` 声明（空格分隔），`HasScope("...")` |
 | `ActorID` | 代操作主体（`act.sub`），机器凭证代表某人操作时承载原操作者 |
 
-**access token 私有 claim**（契约单一事实源：`sdk/contract`）：
+**access token 私有 claim**（契约单一事实源：`contract` 独立 module）：
 
 | claim | 人令牌 | 机器令牌 | 说明 |
 |---|---|---|---|
@@ -464,13 +464,13 @@ curl -u "$API_KEY:$API_KEY" -X POST http://localhost:8081/oidc/oauth/token \
 
 ## 7. 只读目录 API 接入（M2M）
 
-需要展示成员姓名/头像/部门/角色等**实体信息**时，走只读目录 API。它由独立应用 `apps/rpapi` 提供（端口 **8084**，`gateway` 聚合部署时经网关访问），与业务 API 的鉴权模型不同：只接受 **M2M 机器令牌**，租户作用域**只来自令牌的 `tenant_id`**，不接受任何请求参数指定租户。
+需要展示成员姓名/头像/部门/角色等**实体信息**时，走只读目录 API。它由 `sdk/server` 的 `DomainDirectory` 域提供（原 `rpapi` 应用并入，`gateway` 单体部署时经网关 :8100 访问；不再有独立 :8084 进程），与业务 API 的鉴权模型不同：只接受 **M2M 机器令牌**，租户作用域**只来自令牌的 `tenant_id`**，不接受任何请求参数指定租户。
 
 > ⚠️ **`/v1/auth/*` 不是 RP 契约**：它是 OP 自身的业务 API（服务登录前端），不是给 RP 的正式接口。实体类查询请一律用 `/v1/rp/directory/*`。
 
 ### 7.1 取令牌与建客户端
 
-前提：令牌 `aud` 命中 **rpapi 自己的 client_id**，且携带 `directory.read`。取令牌用 API Key 换 token（§6.2），再交给目录客户端自动续期：
+前提：令牌 `aud` 命中**目录应用自身的 client_id**（`gateway` 配置里 `oidc.audiences` 沿用 `rpapi` 取值），且携带 `directory.read`。取令牌用 API Key 换 token（§6.2），再交给目录客户端自动续期：
 
 ```go
 tc, err := rp.NewTokenClient(rp.ClientCredentialsConfig{
@@ -478,14 +478,14 @@ tc, err := rp.NewTokenClient(rp.ClientCredentialsConfig{
     ClientID:     "<原始 API Key>",   // 形式：client_id == client_secret == rawKey
     ClientSecret: "<同一原始 API Key>",
     Scopes:       []string{directory.ScopeRead}, // "directory.read"
-    Resource:     "<rpapi 的 client_id>",        // RFC 8707：aud 必须命中 rpapi
+    Resource:     "<目录应用的 client_id>",      // RFC 8707：aud 必须命中目录应用（gateway 的 oidc.audiences）
 }, nil)
 if err != nil {
     log.Fatalf("init token client: %v", err)
 }
 
 client, err := directory.New(directory.Config{
-    BaseURL:      "http://localhost:8084/v1/rp",
+    BaseURL:      "http://localhost:8100/v1/rp",  // gateway 单体部署（原 rpapi :8084 已并入目录域）
     Tokens:       tc,              // 距 exp 60s 自动换新
     StaleOnError: 5 * time.Minute, // 仅连接失败/超时/5xx 时降级；建议上限 5 分钟
 })
@@ -633,7 +633,7 @@ flowchart LR
 | 6 | 机器凭证 | 服务间调用带 `x-api-key` 成功；吊销后立即 401 |
 | 7 | 审计 | 平台管理台可见本应用相关登录/操作审计 |
 | 8 | 生产安全 | issuer 为正式域名、HTTPS、`cookieSecure: true`、密钥非默认 |
-| 9 | 目录 API 鉴权 | 用 `aud`=rpapi client_id + `directory.read` 的机器令牌调 `GET /v1/rp/directory/members/{userID}` → 200 |
+| 9 | 目录 API 鉴权 | 用 `aud`=目录应用 client_id（gateway `oidc.audiences` 沿用 `rpapi`）+ `directory.read` 的机器令牌调 `GET /v1/rp/directory/members/{userID}` → 200 |
 | 10 | 目录 scope/租户缺失 | 去掉 `directory.read`、或用无 `tenant_id` 的令牌 → **403**（不是 500） |
 | 11 | 目录防枚举 | 查其它租户用户与查不存在用户都返回 404，响应不可区分 |
 | 12 | 目录批量与缓存 | >100 个 id → 400；重复请求命中 TTL/ETag → SDK 不再发请求或收到 304 |
@@ -681,7 +681,7 @@ flowchart LR
 ## 11. 形态 2：把 IAM 内嵌进业务单体应用
 
 > 适用场景：业务应用希望**不单独部署 IAM 进程**，由自己的 Go 进程一并提供登录、会话、人员、部门、角色、菜单能力。前端（登录页 / 管理台）直接复用 npm 包 `@morehao/ark-iam-react`，Go 侧不托管静态。
-> 该形态由 `backend/sdk/server`（`package server`）提供，它把 `apps/{auth,platformadmin,tenantadmin,rpapi}` 各域库编排装配起来；本节只讲接入要点。
+> 该形态由 `sdk/server`（`package server`）提供，它把 `apps/{auth,platformadmin,tenantadmin}` 各域库与 `sdk/server/internal/directory` 目录域编排装配起来；本节只讲接入要点。
 
 ### 11.1 最小接入
 
@@ -752,7 +752,7 @@ func main() {
 
 ### 11.5 与形态 1 的关系
 
-- 令牌契约完全一致（同一 `sdk/contract`），业务侧验签代码两种形态通用。
+- 令牌契约完全一致（同一 `contract` 独立 module），业务侧验签代码两种形态通用。
 - 同一应用可从形态 2 演进到形态 1：内嵌库的 IAM 表结构由同一份 `pkg/model` 定义，SQL 级导出导入即可迁移到独立 IAM 库；不承诺自动双向同步。
 - 若将来需要「多个项目共享一套账号」，应回到形态 1（集中部署），因为形态 2 的私钥与 DDL 由各业务进程各自持有。
 

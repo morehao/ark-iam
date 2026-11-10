@@ -4,7 +4,7 @@
 >
 > 开发环境 Swagger（redoc）：`http://localhost:{port}/{appName}/redocs`（如 `http://localhost:8081/auth/redocs`）。
 >
-> **内嵌形态（形态 2）**：用 `backend/sdk/server` 把 IAM 内嵌进业务单体时，下列所有前缀会挂在宿主 `App.Mount(rg)` 传入的路由组下——例如 `engine.Group("/iam")` 时端点变为 `/iam/v1/platform/*`、`/iam/oidc/*`、`/iam/install`。路由与鉴权语义不变，见 [application-integration-guide.md](application-integration-guide.md) §11。
+> **内嵌形态（形态 2）**：用 `sdk/server` 把 IAM 内嵌进业务单体时，下列所有前缀会挂在宿主 `App.Mount(rg)` 传入的路由组下——例如 `engine.Group("/iam")` 时端点变为 `/iam/v1/platform/*`、`/iam/oidc/*`、`/iam/install`。路由与鉴权语义不变，见 [application-integration-guide.md](application-integration-guide.md) §11。
 
 ---
 
@@ -31,9 +31,9 @@
 | auth | `auth` | 8081 | 8100 |
 | platformadmin | `platform` | 8082 | 8100 |
 | tenantadmin | `tenant` | 8083 | 8100 |
-| rpapi | `rp` | 8084 | 8100 |
+| 目录域（`sdk/server` 的 `DomainDirectory`，原 rpapi） | `rp` | —（不在独立进程暴露） | 8100 |
 
-> `rpapi` 是面向**外部应用（RP）**的只读目录服务（`/v1/rp/directory/*`），独立进程 :8084；gateway 单体部署时按 `rp` 前缀挂到 :8100（见 §8）。
+> 只读目录 API（`/v1/rp/directory/*`）原为独立应用 `rpapi`（:8084），现已并入 `sdk/server` 的 `DomainDirectory` 域；`gateway` 单体部署时经 `app.MountDirectory` 按 `rp` 前缀挂到 :8100（见 §8），不再有独立 `rpapi` 进程。
 
 ### 1.2 响应信封
 
@@ -90,7 +90,7 @@ flowchart LR
 
 ### 2.1 Access Token 私有声明
 
-声明契约的**双端单一事实源**是 `backend/sdk/contract`（签发侧 OP 与校验侧 RP 共享同一份定义），字段口径如下：
+声明契约的**双端单一事实源**是 `contract` 独立 module（`github.com/morehao/ark-iam/contract`，签发侧 OP 与校验侧 RP 共享同一份定义），字段口径如下：
 
 | 声明 | 含义 |
 |---|---|
@@ -405,15 +405,15 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 ## 8. 应用目录端点（/v1/rp/directory/*）
 
-> 部署于 rpapi 应用（:8084）与 gateway（:8100）；服务标识段为 `rp`，完整前缀 `/v1/rp`。
+> 由 `sdk/server` 的 `DomainDirectory` 域提供（原 `rpapi` 应用并入），`gateway`（:8100）全量挂载时经 `app.MountDirectory` 按 `rp` 前缀挂出；服务标识段为 `rp`，完整前缀 `/v1/rp`。
 > 这是给**外部应用（RP）**用的只读目录接口（后台展示取姓名/部门/角色），**不提供任何写操作**。
-> 客户端实现见 `backend/sdk/rp/directory`（TTL 缓存 / ETag 304 / 批量 / single-flight），接入说明见 `backend/sdk/README.md` §4。
+> 客户端实现见 `sdk/rp/directory`（TTL 缓存 / ETag 304 / 批量 / single-flight），接入说明见 [sdk/README.md](../../sdk/README.md) §4。
 
 ### 8.1 鉴权与状态码契约
 
-鉴权链是 rpapi **自己的一条**，刻意不复用 auth 的宽松链（目录 API 的鉴权缺失会直接变成越权读）：
+鉴权链是目录域**自己的一条**，刻意不复用 auth 的宽松链（目录 API 的鉴权缺失会直接变成越权读）：
 
-1. `OIDCAuth`：校验 issuer；并在配置了 `oidc.audiences` 时把 `aud` 收紧到 **rpapi 自身的 client_id**（`rpapi/config/config.yaml` 声明 `audiences: ["rpapi"]`）；
+1. `OIDCAuth`：校验 issuer；并在配置了 `oidc.audiences` 时把 `aud` 收紧到 **目录应用自身的 client_id**（`gateway` 的 `config.yaml` 中 `oidc.audiences: ["rpapi"]`，沿用原 `rpapi` 的 aud 值以保持外部应用取令牌口径不变）；
 2. `RequireDirectoryRead`：要求令牌携带 scope `directory.read` **且** `tenant_id` 非空。
 
 **租户作用域一律来自令牌的 `tenant_id`，不接受任何请求参数指定租户**；中间件据此显式声明 ctx 租户作用域，后续实体查询由租户隔离插件按此注入。
@@ -474,7 +474,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 ### 8.5 客户端接入
 
-外部应用用 `backend/sdk` 的目录客户端（缓存/批量/降级已内置，缓存 TTL 等旋钮见 `configuration-reference.md` §11）：
+外部应用用 `sdk/rp/directory` 目录客户端（缓存/批量/降级已内置，缓存 TTL 等旋钮见 `configuration-reference.md` §11）：
 
 ```go
 client, err := directory.New(directory.Config{

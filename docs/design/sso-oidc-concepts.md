@@ -252,7 +252,7 @@ flowchart TB
 #### 3.6.3 本系统落地
 
 - **两个内置控制台客户端**（`platform_admin_web` / `tenant_admin_web`）是浏览器 SPA，登记为 **public + PKCE**：
-  `token_endpoint_auth_method=none`、`require_pkce=enable`（首次引导写入，见 `backend/pkg/seed/seed.go`）。
+  `token_endpoint_auth_method=none`、`require_pkce=enable`（首次引导写入，见 `pkg/seed/seed.go`）。
   换令牌与刷新只带 `client_id`（示例见 [api-reference.md](api-reference.md) §3.3）。
 - **自建的机密客户端**（如 RustFS 资源服务器）用 `client_secret_basic`，在控制台「客户端密钥」页创建：
   明文**只返回一次**，库中只存哈希与 8 位前缀（`application_client_secret.value_hash` / `value_prefix`），

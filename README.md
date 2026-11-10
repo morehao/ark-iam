@@ -4,9 +4,9 @@
 
 `ark-iam` is a full-stack project with Go backend and React frontend. The backend is based on [Gin](https://github.com/gin-gonic/gin), providing a layered, maintainable, and scalable service structure with multiple app modules.
 
-The IAM backend is split into five apps under `backend/apps/` (auth, platformadmin, tenantadmin, gateway, rpapi). `auth`/`platformadmin`/`tenantadmin`/`rpapi` are importable **library packages** (each with a `cmd/` process entry for standalone deployment); `gateway` is a **pure `cmd/main`** aggregator that is never imported. The reusable layers live at the repository root as standalone Go modules — `pkg/` (common packages), `sdk/` (RP-side SDK plus the `sdk/server` facade that orchestrates the domain libraries) — all managed by the root `go.work` and individually consumable via `go get`.
+The IAM backend is split into four apps under `backend/apps/` (auth, platformadmin, tenantadmin, gateway). `auth`/`platformadmin`/`tenantadmin` are importable **library packages** (each with a `cmd/` process entry for standalone deployment); `gateway` is a **pure `cmd/main`** aggregator that is never imported. The former read-only directory app `rpapi` has been retired — its capability now lives in the `sdk/server` `DomainDirectory` domain (still served at `/v1/rp/directory/*`). The reusable layers live at the repository root as standalone Go modules — `contract/` (the framework-free data-contract module), `pkg/` (common packages), `sdk/` (RP-side SDK plus the `sdk/server` facade that orchestrates the domain libraries) — all managed by the root `go.work` and individually consumable via `go get`.
 
-> **Layered inversion**: process entry → `sdk/server` (thin facade) → `apps/*` domain libraries → `pkg`. `sdk` calls `apps`; `apps` never imports `sdk` (the only allowed exception is `apps/rpapi → sdk/rp` for signature verification). The former standalone `iam/` module has been removed; its domain implementations now live in `apps/`, and Go-side frontend embedding (`MountFrontend`) is gone — the login/admin frontend is served from the npm package `@morehao/ark-iam-react`.
+> **Layered inversion (single-direction DAG)**: process entry → `sdk/server` → `sdk/server/internal` → `apps/*` domain libraries → `pkg` → `contract`. `sdk/rp` and `apps/*` depend only on `contract`; `pkg` depends only on `contract` (its verification path goes through the `contract.Verifier`/`contract.KeySource` interfaces, implemented by `sdk/rp` and injected by `sdk/server/internal`) — so there is no `pkg → sdk` and no `apps → sdk` edge. The former standalone `iam/` module has been removed; its domain implementations now live in `apps/`, and Go-side frontend embedding (`MountFrontend`) is gone — the login/admin frontend is served from the npm package `@morehao/ark-iam-react`.
 
 ---
 
@@ -28,18 +28,19 @@ The IAM backend is split into five apps under `backend/apps/` (auth, platformadm
 
 ```
 ark-iam/
-├── go.work                # Root Go workspace (covers pkg/ sdk/ + backend/apps/*)
-├── pkg/                   # Common packages module (github.com/morehao/ark-iam/pkg) — go get-able
-├── sdk/                   # RP-side SDK module (github.com/morehao/ark-iam/sdk) — go get-able
-│   ├── rp/ contract/      # RP client: verify / M2M / introspect / revoke / userinfo / logout / directory
-│   └── server/            # Thin facade: New(Domains)/Mount/MountConfig, delegates to apps/* domain libs
+├── go.work                # Root Go workspace (covers contract/ pkg/ sdk/ + backend/apps/*)
+├── contract/              # Framework-free data-contract module (github.com/morehao/ark-iam/contract): claims / Identity / KeySource+Verifier interfaces / directory DTOs
+├── pkg/                   # Common packages module (github.com/morehao/ark-iam/pkg) — depends only on contract
+├── sdk/                   # RP-side SDK module (github.com/morehao/ark-iam/sdk) — the single go get target
+│   ├── rp/                # RP client: verify / M2M / introspect / revoke / userinfo / logout / directory (implements contract.Verifier/KeySource)
+│   └── server/            # Thin facade: New(Domains)/Mount/MountConfig/RunMigrations; public API uses contract types only
+│       └── internal/      # The only place that imports apps/* + pkg; wires the verifier, DB/Redis, migrations
 ├── backend/               # Go backend apps (project-layout based)
 │   ├── apps/
 │   │   ├── auth/          # Auth domain library + cmd (login/session/OIDC), :8081
 │   │   ├── platformadmin/ # Platform domain library + cmd (user/role/menu/tenant), :8082
 │   │   ├── tenantadmin/   # Tenant domain library + cmd (department/user/role), :8083
-│   │   ├── rpapi/         # Read-only directory API library + cmd (uses sdk/rp), :8084
-│   │   └── gateway/       # Pure cmd aggregator: server.New(Domains=nil) + rpapi, :8100
+│   │   └── gateway/       # Pure cmd aggregator: server.New(Domains=nil) + MountDirectory, :8100
 ├── frontend/              # React frontend (Vite + React)
 ├── docs/                 # Documentation
 ├── Makefile              # Root Makefile
