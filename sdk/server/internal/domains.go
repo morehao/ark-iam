@@ -8,7 +8,7 @@
 //   - 依赖方向（分层倒置）：进程入口 → sdk/server → apps 各域库 → pkg。
 //     sdk 调用 apps；apps 不 import sdk（唯一例外：apps/rpapi → sdk/rp 叶子依赖）。
 //   - 提供 New(Domains)/Mount/RunMigrations/MountConfig/KeySource/DBGetter/Redis/Close。
-package server
+package internal
 
 // Domain 是 IAM 业务域的枚举。使用者通过 Config.Domains 选择挂哪些域，
 // 从而实现「可嵌入 + 可组合」：既支持形态 1 的全量挂载，也支持形态 2 的最小集。

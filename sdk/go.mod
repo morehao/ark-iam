@@ -50,6 +50,10 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/muhlemmer/gu v0.3.1 // indirect
 	github.com/muhlemmer/httpforwarded v0.1.0 // indirect
+	github.com/ncruces/go-sqlite3 v0.34.0 // indirect
+	github.com/ncruces/go-sqlite3-wasm/v2 v2.1.35300 // indirect
+	github.com/ncruces/go-sqlite3/gormlite v0.34.0 // indirect
+	github.com/ncruces/julianday v1.0.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.3.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.59.0 // indirect
@@ -66,6 +70,8 @@ require (
 	go.opentelemetry.io/otel/metric v1.46.0 // indirect
 	go.opentelemetry.io/otel/trace v1.46.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
+	go.uber.org/zap v1.27.1 // indirect
 	golang.org/x/arch v0.25.0 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
@@ -75,6 +81,7 @@ require (
 	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/postgres v1.6.0 // indirect
 )
@@ -83,6 +90,7 @@ require (
 	github.com/morehao/ark-iam/backend/apps/auth v0.4.1
 	github.com/morehao/ark-iam/backend/apps/platformadmin v0.4.1
 	github.com/morehao/ark-iam/backend/apps/tenantadmin v0.4.1
+	github.com/morehao/ark-iam/contract v0.0.0
 	github.com/morehao/ark-iam/pkg v0.3.0
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 )
@@ -94,3 +102,5 @@ replace github.com/morehao/ark-iam/backend/apps/auth => ../backend/apps/auth
 replace github.com/morehao/ark-iam/backend/apps/platformadmin => ../backend/apps/platformadmin
 
 replace github.com/morehao/ark-iam/backend/apps/tenantadmin => ../backend/apps/tenantadmin
+
+replace github.com/morehao/ark-iam/contract => ../contract

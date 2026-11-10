@@ -1,4 +1,4 @@
-package server
+package internal
 
 import (
 	"os"
@@ -18,9 +18,9 @@ import (
 func TestNoGlobalDBInInjectedServices(t *testing.T) {
 	noArgDao := regexp.MustCompile(`dao\.New[A-Za-z]+Dao\(\)`)
 	roots := []string{
-		filepath.Join("..", "..", "backend", "apps", "auth", "service"),
-		filepath.Join("..", "..", "backend", "apps", "platformadmin", "service"),
-		filepath.Join("..", "..", "backend", "apps", "tenantadmin", "service"),
+		filepath.Join("..", "..", "..", "backend", "apps", "auth", "service"),
+		filepath.Join("..", "..", "..", "backend", "apps", "platformadmin", "service"),
+		filepath.Join("..", "..", "..", "backend", "apps", "tenantadmin", "service"),
 	}
 
 	var offenders []string

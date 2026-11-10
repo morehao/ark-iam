@@ -184,6 +184,9 @@ type Keys struct {
 
 var _ KeySource = (*Keys)(nil)
 
+// *Keys 实现 contract.KeySource（pkg 侧依赖的验签接口，用于注入中��件）。
+var _ contract.KeySource = (*Keys)(nil)
+
 // NewKeys 构造密钥来源。
 //
 //	jwksURL：既可传 JWKS 端点完整地址（如 https://op.example.com/oidc/keys 或

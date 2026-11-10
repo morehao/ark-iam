@@ -1,4 +1,4 @@
-package server
+package internal
 
 import (
 	pkconfig "github.com/morehao/ark-iam/pkg/config"
@@ -69,7 +69,11 @@ type RedisConfig struct {
 //   - Env 取 conf.Server.Env。
 //
 // domains 为选定的域集合（空=全量）；jwksURL/issuer 用于独立部署的远程验签（同进程可都空）。
-func FromPkgConfig(conf *pkconfig.Config, domains []Domain, jwksURL, issuer string) Config {
+//
+// 参数 conf 用 any 接收（由 sdk/server 顶层门面转发，保持顶层不 import pkg）；
+// 这里断言回 *pkgconfig.Config，nil/其它类型按 nil 处理。
+func FromPkgConfig(confAny any, domains []Domain, jwksURL, issuer string) Config {
+	conf, _ := confAny.(*pkconfig.Config)
 	cfg := Config{
 		Raw:     conf,
 		Domains: domains,
