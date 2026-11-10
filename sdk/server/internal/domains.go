@@ -40,6 +40,9 @@ const (
 	DomainInvite      Domain = "invite"
 	DomainTenantApp   Domain = "tenant-app"
 	DomainSelfService Domain = "self-service" // 自助注册/加入租户
+
+	// DomainDirectory 是面向应用的只读目录 API 域（/v1/rp/directory/*，原 rpapi 并入）。
+	DomainDirectory Domain = "directory"
 )
 
 // DefaultConsoleDomains 是「部门/人员/角色/菜单」简易用户体系的最小集（形态 2 推荐）。
@@ -61,6 +64,7 @@ var allDomains = []Domain{
 	DomainTenant, DomainApplication, DomainOAuthClient, DomainConnector,
 	DomainDomain, DomainAudit, DomainAPIKey, DomainMachineUser,
 	DomainInvite, DomainTenantApp, DomainSelfService,
+	DomainDirectory,
 }
 
 // resolveDomains 归一化使用者传入的域集合：空 → 全量；否则返回去重后的副本。

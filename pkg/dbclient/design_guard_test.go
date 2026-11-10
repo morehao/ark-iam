@@ -63,7 +63,6 @@ var ginAdapterPkgs = []string{
 	"pkg/middleware/",
 	"pkg/testsetup/",
 	"apps/auth/internal/middleware/",
-	"apps/rpapi/internal/middleware/",
 	"/testutil/",
 }
 
@@ -73,15 +72,12 @@ var innerLayerDirs = []string{
 	"apps/auth/internal/service",
 	"apps/platformadmin/internal/service",
 	"apps/tenantadmin/internal/service",
-	"apps/rpapi/internal/service",
 	"apps/auth/internal/core",
 	"apps/platformadmin/internal/core",
 	"apps/tenantadmin/internal/core",
-	"apps/rpapi/internal/core",
 	"apps/auth/internal/dao",
 	"apps/platformadmin/internal/dao",
 	"apps/tenantadmin/internal/dao",
-	"apps/rpapi/internal/dao",
 	"pkg/audit",
 	"pkg/core",
 	"pkg/dao",

@@ -9,7 +9,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/morehao/ark-iam/pkg/seed"
-	"github.com/morehao/ark-iam/rpapi"
 	"github.com/morehao/ark-iam/sdk/server"
 	"github.com/morehao/golib/glog"
 )
@@ -53,7 +52,7 @@ func main() {
 	guardPrefixes := middleware.BootstrapGuardAllowPrefixes
 	if config.Conf.Server.Env == "dev" {
 		// dev 的 swagger/redoc 由 gindocs 挂在 /<appName>/...，不属于业务路由。
-		guardPrefixes = append(append([]string{}, guardPrefixes...), "/auth", "/platformadmin", "/tenantadmin", "/rpapi")
+		guardPrefixes = append(append([]string{}, guardPrefixes...), "/auth", "/platformadmin", "/tenantadmin")
 	}
 	engine.Use(middleware.BootstrapGuard(func(ctx context.Context) (bool, error) {
 		return seed.IsInitialized(ctx, dbclient.IamDB(ctx))
@@ -66,10 +65,11 @@ func main() {
 		panic(fmt.Sprintf("[%s] MountConfig fail: %v", appName, err))
 	}
 
-	// rpapi 不在 sdk/server 门面内（独立只读目录 API，用 sdk/rp 验签），单独挂载。
-	// 复用 auth 域已产出的进程内 KeySource（app.KeySource()），rpapi 本地验签、零网络调用，
-	// 与重构前 gateway 注入 auth keySource 的行为一致。
-	rpapi.Init(engine, config.Conf, app.KeySource())
+	// 只读目录 API（原 rpapi）已并入 sdk/server 的 DomainDirectory；全量挂载（Domains=nil）
+	// 已含该域。此处显式挂目录路由，复用 Mount 解析出的进程内 KeySource（本地验签、零网络）。
+	if err := app.MountDirectory(engine); err != nil {
+		panic(fmt.Sprintf("[%s] MountDirectory fail: %v", appName, err))
+	}
 
 	if err := engine.Run(fmt.Sprintf(":%s", config.Conf.Server.Port)); err != nil {
 		glog.Errorf(context.Background(), "%s run fail, port:%s", appName, config.Conf.Server.Port)
