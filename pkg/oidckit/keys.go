@@ -137,6 +137,32 @@ func deriveKeyID(pub *rsa.PublicKey) string {
 	return base64.RawURLEncoding.EncodeToString(sum[:16])
 }
 
+// setKeySource 是基于进程内公钥集合（kid → 公钥）的 KeySource 纯实现。
+//
+// 用于 OP 自身（apps/auth）把「已发布公钥快照」作为验签来源：零网络、自动跟随多 key
+// （集合里含过渡期旧 key）。纯 map 查表，无框架依赖——替代原 rp.NewKeysFromSet 的
+// 这一分支，使 apps 不再需要 import sdk/rp 构造 KeySource。
+type setKeySource struct {
+	keys map[string]*rsa.PublicKey
+}
+
+// NewKeysFromSet 用已知公钥集合构造进程内 KeySource（零网络调用，纯 map 查表）。
+func NewKeysFromSet(keys map[string]*rsa.PublicKey) contract.KeySource {
+	cp := make(map[string]*rsa.PublicKey, len(keys))
+	for k, v := range keys {
+		cp[k] = v
+	}
+	return setKeySource{keys: cp}
+}
+
+// PublicKey 实现 contract.KeySource：按 kid 返回公钥，未命中报 ErrUnknownKid。
+func (s setKeySource) PublicKey(_ context.Context, kid string) (*rsa.PublicKey, error) {
+	if k, ok := s.keys[kid]; ok && k != nil {
+		return k, nil
+	}
+	return nil, fmt.Errorf("%w: %s", contract.ErrUnknownKid, kid)
+}
+
 // parseRSAPrivateKeyPEM 宽容解析 RSA 私钥 PEM（PKCS#8 优先、PKCS#1 兜底）。
 func parseRSAPrivateKeyPEM(pemData []byte) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode(pemData)

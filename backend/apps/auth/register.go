@@ -13,8 +13,8 @@ import (
 	authconfig "github.com/morehao/ark-iam/backend/apps/auth/config"
 	authrouter "github.com/morehao/ark-iam/backend/apps/auth/router"
 	svcdb "github.com/morehao/ark-iam/backend/apps/auth/service/svcdb"
+	"github.com/morehao/ark-iam/contract"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
-	"github.com/morehao/ark-iam/pkg/oidckit"
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
@@ -24,28 +24,33 @@ const AppName = "auth"
 // Options 控制 auth 域挂载哪些部分（转承 auth/router.Options）。
 type Options = authrouter.Options
 
+// VerifierBuilder 由装配层注入的验签器构造器（真源 auth/router.VerifierBuilder）。
+// apps 不 import sdk，具体 sdk/rp 实现由 sdk/server/internal 注入。
+type VerifierBuilder = authrouter.VerifierBuilder
+
 // Mount 装配 auth 域全部路由（稳定装配面）：内部完成运行时配置注入（config.Set）、
 // 数据访问器注入（svcdb.Set）与路由注册，返回本进程 OP 的进程内 KeySource
 // （contract.KeySource，供 platform/tenant 域鉴权中间件验签注入）。
 //
 // sdk/server/internal 只需依赖本包顶层，不再直接 import apps/auth/{config,router,service/svcdb}。
 //
-//	authRG    —— 业务路由组，通常为 /v1/auth
-//	engine    —— /oidc、/install 等协议端点直接挂在其根
-//	db        —— 数据访问器
-//	conf      —— 完整运行时配置（可为 nil，仅测试）
-//	opts      —— 选择挂载哪些 auth 子域
-func Mount(authRG *gin.RouterGroup, engine *gin.RouterGroup, db gormdao.DBGetter, conf *pkgconfig.Config, opts Options) oidckit.KeySource {
+//	authRG        —— 业务路由组，通常为 /v1/auth
+//	engine        —— /oidc、/install 等协议端点直接挂在其根
+//	db            —— 数据访问器
+//	conf          —— 完整运行时配置（可为 nil，仅测试）
+//	opts          —— 选择挂载哪些 auth 子域
+//	buildVerifier —— 由装配层注入的验签器构造器（用 sdk/rp 实现）
+func Mount(authRG *gin.RouterGroup, engine *gin.RouterGroup, db gormdao.DBGetter, conf *pkgconfig.Config, opts Options, buildVerifier VerifierBuilder) contract.KeySource {
 	authconfig.Set(conf)
 	svcdb.Set(db)
-	return authrouter.Register(authRG, engine, db, opts)
+	return authrouter.Register(authRG, engine, db, opts, buildVerifier)
 }
 
 // Register 保留历史入口（等价 Mount，但不注入配置/svcdb；调用方需自行先 Set）。
 //
 // Deprecated: 请改用 Mount（稳定装配面，内部收敛配置/数据库注入）。
-func Register(authRG *gin.RouterGroup, protocolEngine *gin.RouterGroup, db gormdao.DBGetter, opts Options) oidckit.KeySource {
-	return authrouter.Register(authRG, protocolEngine, db, opts)
+func Register(authRG *gin.RouterGroup, protocolEngine *gin.RouterGroup, db gormdao.DBGetter, opts Options, buildVerifier VerifierBuilder) contract.KeySource {
+	return authrouter.Register(authRG, protocolEngine, db, opts, buildVerifier)
 }
 
 // Issuer 返回当前注入配置的 OP issuer（供上层构造验签器收紧 iss；未配置返回空）。

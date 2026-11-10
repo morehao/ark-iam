@@ -18,8 +18,8 @@ import (
 	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtooidc"
 	"github.com/morehao/ark-iam/backend/apps/auth/middleware"
 	"github.com/morehao/ark-iam/backend/apps/auth/service/svcoidc"
+	"github.com/morehao/ark-iam/pkg/oidckit"
 	"github.com/morehao/ark-iam/pkg/sso"
-	"github.com/morehao/ark-iam/sdk/rp"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 
@@ -29,7 +29,7 @@ type OIDCCtr struct {
 	publicKey   *rsa.PublicKey
 	// keySource 是本 OP 全部已发布公钥的进程内来源（含过渡期旧 key）：
 	// auth 自身作为 RP 校验业务 token 时直接用它，零网络调用且自动跟随多 key 轮换。
-	keySource rp.KeySource
+	keySource contract.KeySource
 }
 
 // NewOIDCCtr 自装配 OIDC OP：provider（签名/加密密钥、协议态 storage）、
@@ -58,7 +58,7 @@ func newOIDCCtr(db gormdao.DBGetter, provider *svcoidc.OIDCProvider) *OIDCCtr {
 	}
 	if provider != nil && provider.Storage != nil {
 		if keys := provider.Storage.PublishedKeys(); len(keys) > 0 {
-			ctr.keySource = rp.NewKeysFromSet(keys)
+			ctr.keySource = oidckit.NewKeysFromSet(keys)
 		}
 	}
 	return ctr
@@ -66,25 +66,14 @@ func newOIDCCtr(db gormdao.DBGetter, provider *svcoidc.OIDCProvider) *OIDCCtr {
 
 // KeySource 返回本 OP 已发布公钥的进程内来源（供鉴权中间件按 kid 取键）。
 // 未装配成功（测试注入空 provider）时返回 nil，调用方应 fail-closed。
-func (ctr *OIDCCtr) KeySource() rp.KeySource {
+//
+// 返回 contract.KeySource（纯数据接口）；具体验签器（contract.Verifier）由装配层
+// （sdk/server/internal）用 sdk/rp 实现构造并注入，本包不 import sdk。
+func (ctr *OIDCCtr) KeySource() contract.KeySource {
 	if ctr == nil {
 		return nil
 	}
 	return ctr.keySource
-}
-
-// Verifier 构造 access token 校验器（contract.Verifier 接口，sdk/rp 实现），供 pkg 中间件
-// 通过 middleware.WithVerifier 注入（pkg 不再 import sdk 自行构造，解 pkg → sdk 环）。
-// issuer 用于收紧 iss 校验（本 OP 签发的 token）。
-func (ctr *OIDCCtr) Verifier(issuer string) contract.Verifier {
-	if ctr == nil || ctr.keySource == nil {
-		return nil
-	}
-	opts := []rp.VerifierOption{}
-	if issuer != "" {
-		opts = append(opts, rp.WithIssuer(issuer))
-	}
-	return rp.NewVerifier(ctr.keySource, opts...)
 }
 
 // PublicKey 返回 OP 签名公钥，供业务路由鉴权中间件校验本 OP 签发的 token。

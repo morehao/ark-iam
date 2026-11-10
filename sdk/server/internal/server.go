@@ -158,8 +158,22 @@ func (a *App) mountAuth(authRG *gin.RouterGroup, engine *gin.RouterGroup, keep m
 	if !opts.CoreAuth && !opts.Install {
 		return nil // 未选任何 auth 子域
 	}
-	a.keySource = auth.Mount(authRG, engine, a.dbGetter, cfg, opts)
+	a.keySource = auth.Mount(authRG, engine, a.dbGetter, cfg, opts, authVerifierBuilder)
 	return nil
+}
+
+// authVerifierBuilder 是注入 apps/auth 的验签器构造器：在本装配层（internal，唯一 import
+// sdk/rp 之处）用 sdk/rp 构造 contract.Verifier，供 auth 业务路由中间件注入——apps 因此
+// 不必 import sdk（消除 apps → sdk 依赖边）。
+func authVerifierBuilder(ks contract.KeySource, issuer string) contract.Verifier {
+	if ks == nil {
+		return nil
+	}
+	vopts := []rp.VerifierOption{}
+	if issuer != "" {
+		vopts = append(vopts, rp.WithIssuer(issuer))
+	}
+	return rp.NewVerifier(ks, vopts...)
 }
 
 // platformKeys 把 keep 中的 platform 域映射为注册 key 列表；为空时返回 nil（=全量）。
