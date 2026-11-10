@@ -1,0 +1,101 @@
+package svcapplicationclient
+
+import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/platformadmin/dto/dtoapplicationclient"
+	"github.com/morehao/ark-iam/platformadmin/testutil"
+	"github.com/morehao/golib/biz/gcontext"
+	"github.com/morehao/golib/gerror"
+)
+
+// newOAuthDeleteCtx 构造带租户与操作人上下文的 gin.Context。
+func newOAuthDeleteCtx(tenantID, userID string) *gin.Context {
+	ctx, _ := gin.CreateTestContext(nil)
+	if ctx.Request == nil {
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
+	ctx.Set(gcontext.KeyTenantID, tenantID)
+	gincontext.SetTenantScope(ctx, gcontext.CurrentScope(tenantID))
+	ctx.Set(gcontext.KeyUserID, userID)
+	return ctx
+}
+
+// newTestClientEntity 构造一条完整的应用客户端记录（source 按需传入，其余取常规默认值）。
+func newTestClientEntity(name, clientID string, source model.ApplicationClientSource) *model.ApplicationClientEntity {
+	return &model.ApplicationClientEntity{
+		TenantID:                "1",
+		Code:                    clientID,
+		Name:                    name,
+		RedirectURIs:            model.RedirectURIList{},
+		PostLogoutRedirectURIs:  model.PostLogoutRedirectURIList{},
+		GrantTypes:              model.GrantTypeList{},
+		ResponseTypes:           model.ResponseTypeList{},
+		TokenEndpointAuthMethod: model.TokenEndpointAuthMethodBasic,
+		AllowedOrigins:          model.AllowedOriginList{},
+		DefaultScopes:           model.DefaultScopeList{},
+		Status:                  model.ApplicationClientStatusEnable,
+		Source:                  source,
+	}
+}
+
+func TestDeleteBuiltInApplicationClient(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{}, &model.ApplicationClientSecretEntity{})
+
+	entity := newTestClientEntity("System Client", "x", model.ApplicationClientSourceBuiltin)
+	if err := db.Create(entity).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	svc := NewApplicationClientSvc(nil)
+	err := svc.Delete(requestCtx(newOAuthDeleteCtx("1", "0")), &dtoapplicationclient.ApplicationClientDeleteReq{ApplicationClientID: entity.ID, Operator: operatorOf(newOAuthDeleteCtx("1", "0"))})
+	if err == nil {
+		t.Fatal("expected error for built-in oauth client")
+	}
+	if gerror.GetCode(err) != int(code.ApplicationClientBuiltInErr) {
+		t.Fatalf("expected ApplicationClientBuiltInErr, got %v", err)
+	}
+}
+
+func TestDeleteNonBuiltInApplicationClient(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{}, &model.ApplicationClientSecretEntity{})
+
+	entity := newTestClientEntity("Blog Client", "y", model.ApplicationClientSourceThirdParty)
+	if err := db.Create(entity).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	ctx := newOAuthDeleteCtx("1", "7")
+	svc := NewApplicationClientSvc(nil)
+	if err := svc.Delete(requestCtx(ctx), &dtoapplicationclient.ApplicationClientDeleteReq{ApplicationClientID: entity.ID,
+		Operator: operatorOf(ctx),
+	}); err != nil {
+		t.Fatalf("Delete returned error: %v", err)
+	}
+
+	// 真实 dao 断言：软删除后按 ID 查不到
+	got, err := dao.NewApplicationClientDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if got != nil && got.ID != "" {
+		t.Fatalf("expected client soft-deleted, got %+v", got)
+	}
+
+	// 删除人应写入 7（对应原 stub 断言 deletedBy == 7）
+	var deleted model.ApplicationClientEntity
+	if err := db.WithContext(dbclient.CrossTenantContext(ctx)).Unscoped().Where("id = ?", entity.ID).First(&deleted).Error; err != nil {
+		t.Fatalf("query deleted row: %v", err)
+	}
+	if deleted.DeletedBy != "7" {
+		t.Fatalf("expected deletedBy 7, got %s", deleted.DeletedBy)
+	}
+}
