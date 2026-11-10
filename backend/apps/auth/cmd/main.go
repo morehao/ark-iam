@@ -10,6 +10,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/morehao/ark-iam/pkg/seed"
+	"github.com/morehao/ark-iam/sdk/server"
 	"github.com/morehao/golib/glog"
 )
 
@@ -26,6 +27,19 @@ func main() {
 			fmt.Printf("failed to close logger: %v\n", err)
 		}
 	}()
+
+	// 分层倒置：进程入口经 sdk/server 门面装配 auth 域库。
+	// auth 进程用独立域集（业务登录 + 安装引导 + connector + 自助），并产出进程内 KeySource。
+	app, err := server.New(server.FromPkgConfig(config.Conf, authDomains(), "", ""))
+	if err != nil {
+		panic(fmt.Sprintf("[%s] sdk/server.New fail: %v", auth.AppName, err))
+	}
+	defer app.Close()
+	if config.Conf.DB.AutoMigrate {
+		if err := app.RunMigrations(context.Background()); err != nil {
+			panic(fmt.Sprintf("[%s] RunMigrations fail: %v", auth.AppName, err))
+		}
+	}
 
 	engine := gin.New()
 	// 刻意**不开启** engine.ContextWithFallback：service/dao 只收 context.Context，
@@ -65,10 +79,26 @@ func main() {
 			panic(err)
 		}
 	}
-	auth.Init(engine, config.Conf)
+
+	if err := app.Mount(engine.Group("")); err != nil {
+		panic(fmt.Sprintf("[%s] Mount fail: %v", auth.AppName, err))
+	}
+	if err := app.MountConfig(engine, ""); err != nil {
+		panic(fmt.Sprintf("[%s] MountConfig fail: %v", auth.AppName, err))
+	}
 
 	if err := engine.Run(fmt.Sprintf(":%s", config.Conf.Server.Port)); err != nil {
 		glog.Errorf(context.Background(), "%s run fail, port:%s", auth.AppName, config.Conf.Server.Port)
 		panic(err)
+	}
+}
+
+// authDomains 返回 auth 独立进程的域集：登录/会话、安装引导、connector、自助。
+func authDomains() []server.Domain {
+	return []server.Domain{
+		server.DomainCoreAuth,
+		server.DomainInstall,
+		server.DomainConnector,
+		server.DomainSelfService,
 	}
 }

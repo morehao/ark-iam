@@ -61,3 +61,43 @@ type RedisConfig struct {
 	// DB 逻辑库序号；0 为默认。
 	DB int
 }
+
+// FromPkgConfig 从完整 pkgconfig.Config 派生门面 Config（进程入口便捷构造用）：
+//   - Raw 直接引用 conf（auth 域深度依赖完整配置）；
+//   - DB.DSN 取 conf.DBConfigs 中 service=="iam"/空 的第一条（否则取第一条）；
+//   - Redis 取 conf.RedisConfig（addr 空则不启用）；
+//   - Env 取 conf.Server.Env。
+//
+// domains 为选定的域集合（空=全量）；jwksURL/issuer 用于独立部署的远程验签（同进程可都空）。
+func FromPkgConfig(conf *pkconfig.Config, domains []Domain, jwksURL, issuer string) Config {
+	cfg := Config{
+		Raw:     conf,
+		Domains: domains,
+		JWKSURL: jwksURL,
+		Issuer:  issuer,
+	}
+	if conf == nil {
+		return cfg
+	}
+	cfg.Env = conf.Server.Env
+	// DB：优先 service==iam，否则第一条。
+	for _, dbc := range conf.DBConfigs {
+		if dbc.Service == "iam" || dbc.Service == "" {
+			cfg.DB = DBConfig{DSN: dbc.URL, Service: "iam"}
+			break
+		}
+	}
+	if cfg.DB.DSN == "" && len(conf.DBConfigs) > 0 {
+		cfg.DB = DBConfig{DSN: conf.DBConfigs[0].URL, Service: "iam"}
+	}
+	// Redis：addr 非空才启用。
+	if conf.RedisConfig.Addr != "" {
+		cfg.Redis = &RedisConfig{
+			Service:  "iam",
+			Addr:     conf.RedisConfig.Addr,
+			Password: conf.RedisConfig.Password,
+			DB:       conf.RedisConfig.DB,
+		}
+	}
+	return cfg
+}

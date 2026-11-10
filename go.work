@@ -6,8 +6,6 @@ use (
 	./backend/apps/platformadmin
 	./backend/apps/rpapi
 	./backend/apps/tenantadmin
-	./backend/examples/embedded-iam-demo
-	./iam
 	./pkg
 	./sdk
 )
