@@ -14,10 +14,11 @@
 
 | 模块 | 用途 | 安装 |
 |---|---|---|
-| `github.com/morehao/ark-iam/sdk` | **RP 侧 SDK**（`sdk/rp` + `sdk/contract`）：本地验签 / M2M / introspect / revoke / userinfo / 登出 / 目录；另含 **`sdk/server` 门面**：`New(Domains)/Mount/MountConfig`，委托 `apps/*` 各域实现库（业务应用最常用） | `go get github.com/morehao/ark-iam/sdk@v0.4.0` |
+| `github.com/morehao/ark-iam/sdk` | **RP 侧 SDK**（`sdk/rp` + 独立契约 module `contract`）：本地验签 / M2M / introspect / revoke / userinfo / 登出 / 目录；另含 **`sdk/server` 门面**：`New(Domains)/Mount/MountConfig`，委托 `apps/*` 各域实现库（业务应用最常用） | `go get github.com/morehao/ark-iam/sdk@v0.4.0` |
+| `github.com/morehao/ark-iam/contract` | **契约 module**（最底层，仅 stdlib + jwt）：claim/Identity/logout/目录 DTO/验签接口；由 `sdk` 传递引入，无需直接 get | （传递依赖，无需直接 get） |
 | `github.com/morehao/ark-iam/pkg` | **公共层**（config/dbclient/middleware/model/dao/... ），随 `sdk/server`（经 `apps/*`）传递引入，一般无需直接依赖 | `go get github.com/morehao/ark-iam/pkg@v0.4.0` |
 
-> **分层倒置**：`sdk/server` → `apps/*`（auth/platformadmin/tenantadmin 各域实现库）→ `pkg`。原独立 `iam` 模块已删除（其域实现并入 `apps/`，Go 侧不再托管前端静态资源）。`sdk/rp`、`sdk/contract` 保持**框架无关**（只依赖标准库 + `jwt/v5`，由 `sdk/scripts/check-deps.sh` 强制）；`sdk/server` 是编排层，可引入 gin/gorm/redis。
+> **分层倒置**：`sdk/server` → `apps/*`（auth/platformadmin/tenantadmin 各域实现库）→ `pkg`。原独立 `iam` 模块已删除（其域实现并入 `apps/`，Go 侧不再托管前端静态资源）。`sdk/rp` 与独立 module `contract` 保持**框架无关**（只依赖标准库 + `jwt/v5`，由 `sdk/scripts/check-deps.sh` 强制）；`sdk/server` 是编排层，可引入 gin/gorm/redis。
 
 ---
 
@@ -48,7 +49,7 @@ SDK 完全**框架无关**，只依赖 Go 标准库 + `github.com/golang-jwt/jwt
 | userinfo | `sdk/rp/userinfo` | 展示用途（勿放鉴权/审计关键路径） |
 | 单点登出 | `sdk/rp/logout` | back-channel logout 接收端（jti 去重 + 会话撤销） |
 | 只读目录 | `sdk/rp/directory` | TTL 缓存 / ETag 304 / 批量 / single-flight |
-| claim 契约 | `sdk/contract` | 双端单一事实源、错误分类 |
+| claim 契约 | `contract`（独立 module） | 双端单一事实源、错误分类 |
 
 ### 最小用法（本地验签）
 

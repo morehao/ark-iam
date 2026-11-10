@@ -34,7 +34,7 @@ PORT              = 8099
 .PHONY: all build build-env clean run lint test swag codegen \
         docker-build docker-run check-image \
         list-apps deps tidy update-dep dev-all dev-frontend stop-frontend e2e e2e-sso e2e-test help \
-        test-sdk test-sdk-server sdk-check-deps print-builtin-menus sdk-server-build
+        test-sdk test-sdk-server sdk-check-deps sdk-check-graph print-builtin-menus sdk-server-build
 
 # ============================================================
 # 通用入口：清理、依赖、构建并运行
@@ -107,6 +107,8 @@ test:
 
 # 运行 SDK（sdk/）全部测试：契约 + RP 核心 + 客户端 + server 门面
 test-sdk:
+	@echo "🧪 正在运行 contract 契约测试..."
+	@cd contract && GOWORK=off go test ./... -count=1
 	@echo "🧪 正在运行 RP SDK 测试..."
 	@cd sdk && go test ./... -count=1
 
@@ -119,6 +121,10 @@ test-sdk-server:
 sdk-check-deps:
 	@bash sdk/scripts/check-deps.sh
 
+# module 依赖方向守卫：无 pkg → sdk / contract 反向依赖，pkg 可独立单建
+sdk-check-graph:
+	@bash sdk/scripts/check-module-graph.sh
+
 # sdk/server 门面（委托 apps 各域库）构建
 sdk-server-build:
 	@echo "🔨 构建 sdk/server 门面..."
@@ -130,7 +136,7 @@ sdk-server-build:
 # ============================================================
 
 # 同时启动后端与前端全部开发服务（Ctrl+C 或前端退出时后端一并停止）：
-#   - 后端 gateway：单进程聚合 auth / platformadmin / tenantadmin / rpapi，监听 :8100
+#   - 后端 gateway：单进程聚合 auth / platformadmin / tenantadmin + 目录域（原 rpapi 并入 sdk/server），监听 :8100
 #   - 前端三应用：login-web(:4000) / platform-admin-web(:4001) / tenant-admin-web(:4002)，/v1、/oidc 代理到 gateway
 # 前置依赖：PostgreSQL 与 Redis 需已启动（详见 docs/design/run-and-deploy.md）
 # 用法：make dev-all
@@ -138,7 +144,7 @@ sdk-server-build:
 #       可确保退出时端口被正确释放（go run 的包装进程被 kill 后子服务会残留占用端口）。
 dev-all:
 	@echo "🚀 正在启动全部开发服务（后端 gateway + 前端三应用）..."
-	@echo "   后端: gateway → http://localhost:8100（聚合 auth/platformadmin/tenantadmin/rpapi）"
+	@echo "   后端: gateway → http://localhost:8100（聚合 auth/platformadmin/tenantadmin + 目录域）"
 	@echo "   前端: login-web(:4000) / platform-admin-web(:4001) / tenant-admin-web(:4002)"
 	@echo "   前置: PostgreSQL 与 Redis 需已启动；Ctrl+C 一并停止全部服务"
 	@echo "🔨 正在构建后端 gateway..."

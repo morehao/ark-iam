@@ -46,7 +46,7 @@ require github.com/morehao/ark-iam/sdk v0.4.0
 ```go
 import (
     "github.com/morehao/ark-iam/sdk/rp"
-    "github.com/morehao/ark-iam/sdk/contract"
+    "github.com/morehao/ark-iam/contract"
 )
 
 // 传 issuer：SDK 用标准 discovery 解析 jwks_uri（也可直接给显式端点，如
