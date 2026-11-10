@@ -8,9 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/backend/apps/auth"
-	authconfig "github.com/morehao/ark-iam/backend/apps/auth/config"
-	authrouter "github.com/morehao/ark-iam/backend/apps/auth/router"
-	svcdb "github.com/morehao/ark-iam/backend/apps/auth/service/svcdb"
 	"github.com/morehao/ark-iam/contract"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/middleware"
@@ -134,10 +131,7 @@ func (a *App) Mount(rg *gin.RouterGroup) error {
 // mountAuth 装配 auth 域：注入配置与 DB，注册业务路由与协议端点，返回 OP 进程内 KeySource。
 func (a *App) mountAuth(authRG *gin.RouterGroup, engine *gin.RouterGroup, keep map[Domain]bool) error {
 	cfg := a.rawConfig()
-	authconfig.Set(cfg)
-	svcdb.Set(a.dbGetter)
-
-	opts := authrouter.Options{
+	opts := auth.Options{
 		CoreAuth:    keep[DomainCoreAuth],
 		Install:     keep[DomainInstall],
 		Connector:   keep[DomainConnector],
@@ -146,7 +140,7 @@ func (a *App) mountAuth(authRG *gin.RouterGroup, engine *gin.RouterGroup, keep m
 	if !opts.CoreAuth && !opts.Install {
 		return nil // 未选任何 auth 子域
 	}
-	a.keySource = auth.Register(authRG, engine, a.dbGetter, opts)
+	a.keySource = auth.Mount(authRG, engine, a.dbGetter, cfg, opts)
 	return nil
 }
 
