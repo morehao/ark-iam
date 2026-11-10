@@ -3,7 +3,7 @@ package svcperson
 import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"context"
-	"github.com/morehao/ark-iam/auth/dto/dtoperson"
+	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoperson"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/credential"
 	"github.com/morehao/ark-iam/pkg/dao"

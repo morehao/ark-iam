@@ -10,7 +10,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/platformadmin/dto/dtotenantapplication"
+	"github.com/morehao/ark-iam/backend/apps/platformadmin/dto/dtotenantapplication"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"

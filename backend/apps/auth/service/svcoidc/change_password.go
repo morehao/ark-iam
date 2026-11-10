@@ -2,8 +2,8 @@ package svcoidc
 
 import (
 	"context"
-	"github.com/morehao/ark-iam/auth/core/oidcop"
-	"github.com/morehao/ark-iam/auth/dto/dtooidc"
+	"github.com/morehao/ark-iam/backend/apps/auth/core/oidcop"
+	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtooidc"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/core/tenant"
 	"github.com/morehao/ark-iam/pkg/credential"

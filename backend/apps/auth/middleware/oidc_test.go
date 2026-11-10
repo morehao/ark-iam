@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/auth/core/oidcop"
+	"github.com/morehao/ark-iam/backend/apps/auth/core/oidcop"
 	"github.com/stretchr/testify/assert"
 )
 

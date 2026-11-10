@@ -1,4 +1,4 @@
-module github.com/morehao/ark-iam/auth
+module github.com/morehao/ark-iam/backend/apps/auth
 
 go 1.26.1
 

@@ -1,8 +1,8 @@
 package router
 
 import (
-	"github.com/morehao/ark-iam/auth/controller/ctrperson"
-	"github.com/morehao/ark-iam/auth/middleware"
+	"github.com/morehao/ark-iam/backend/apps/auth/controller/ctrperson"
+	"github.com/morehao/ark-iam/backend/apps/auth/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/golib/dbaccess/gormdao"
 )

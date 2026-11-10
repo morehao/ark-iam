@@ -15,8 +15,8 @@ import (
 	"path/filepath"
 	"time"
 
-	appconfig "github.com/morehao/ark-iam/auth/config"
-	"github.com/morehao/ark-iam/auth/core/oidcop"
+	appconfig "github.com/morehao/ark-iam/backend/apps/auth/config"
+	"github.com/morehao/ark-iam/backend/apps/auth/core/oidcop"
 	"github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/zitadel/oidc/v3/pkg/op"

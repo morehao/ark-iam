@@ -3,8 +3,8 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/morehao/ark-iam/auth/controller/ctrinstall"
-	"github.com/morehao/ark-iam/auth/middleware"
+	"github.com/morehao/ark-iam/backend/apps/auth/controller/ctrinstall"
+	"github.com/morehao/ark-iam/backend/apps/auth/middleware"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
 )
 

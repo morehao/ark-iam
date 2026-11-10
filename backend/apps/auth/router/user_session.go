@@ -1,7 +1,7 @@
 package router
 
 import (
-	"github.com/morehao/ark-iam/auth/controller/ctrsession"
+	"github.com/morehao/ark-iam/backend/apps/auth/controller/ctrsession"
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/golib/dbaccess/gormdao"
 )

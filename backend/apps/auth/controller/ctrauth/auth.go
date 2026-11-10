@@ -3,8 +3,8 @@ package ctrauth
 import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/auth/dto/dtoauth"
-	"github.com/morehao/ark-iam/auth/service/svcauth"
+	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoauth"
+	"github.com/morehao/ark-iam/backend/apps/auth/service/svcauth"
 	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )

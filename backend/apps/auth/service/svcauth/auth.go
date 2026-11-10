@@ -1,7 +1,7 @@
 package svcauth
 
 import (
-	svcdb "github.com/morehao/ark-iam/auth/service/svcdb"
+	svcdb "github.com/morehao/ark-iam/backend/apps/auth/service/svcdb"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/morehao/ark-iam/auth/dto/dtoauth"
-	"github.com/morehao/ark-iam/auth/service/svcloginguard"
+	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoauth"
+	"github.com/morehao/ark-iam/backend/apps/auth/service/svcloginguard"
 	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/core/application"

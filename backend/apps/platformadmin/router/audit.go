@@ -1,7 +1,7 @@
 package router
 
 import (
-	"github.com/morehao/ark-iam/platformadmin/controller/ctraudit"
+	"github.com/morehao/ark-iam/backend/apps/platformadmin/controller/ctraudit"
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/golib/dbaccess/gormdao"
 )

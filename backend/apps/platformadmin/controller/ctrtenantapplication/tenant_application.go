@@ -4,8 +4,8 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/pkg/identity"
-	"github.com/morehao/ark-iam/platformadmin/dto/dtotenantapplication"
-	"github.com/morehao/ark-iam/platformadmin/service/svctenantapplication"
+	"github.com/morehao/ark-iam/backend/apps/platformadmin/dto/dtotenantapplication"
+	"github.com/morehao/ark-iam/backend/apps/platformadmin/service/svctenantapplication"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 )
 

@@ -2,7 +2,7 @@ package svcperson
 
 import (
 	"context"
-	"github.com/morehao/ark-iam/auth/dto/dtoperson"
+	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoperson"
 )
 
 type PersonProfileSvc interface {

@@ -10,7 +10,7 @@ package platformadmin
 
 import (
 	"github.com/gin-gonic/gin"
-	platrouter "github.com/morehao/ark-iam/platformadmin/router"
+	platrouter "github.com/morehao/ark-iam/backend/apps/platformadmin/router"
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 

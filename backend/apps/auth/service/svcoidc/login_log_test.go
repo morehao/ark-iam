@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	appconfig "github.com/morehao/ark-iam/auth/config"
-	"github.com/morehao/ark-iam/auth/dto/dtooidc"
-	"github.com/morehao/ark-iam/auth/testutil"
+	appconfig "github.com/morehao/ark-iam/backend/apps/auth/config"
+	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtooidc"
+	"github.com/morehao/ark-iam/backend/apps/auth/testutil"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"

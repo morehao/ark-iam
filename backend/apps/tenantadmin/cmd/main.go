@@ -9,8 +9,8 @@ import (
 	"github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/morehao/ark-iam/pkg/seed"
 	"github.com/morehao/ark-iam/sdk/server"
-	"github.com/morehao/ark-iam/tenantadmin"
-	"github.com/morehao/ark-iam/tenantadmin/config"
+	"github.com/morehao/ark-iam/backend/apps/tenantadmin"
+	"github.com/morehao/ark-iam/backend/apps/tenantadmin/config"
 	"github.com/morehao/golib/glog"
 )
 

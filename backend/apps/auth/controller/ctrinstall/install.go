@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/morehao/ark-iam/auth/dto/dtoinstall"
-	"github.com/morehao/ark-iam/auth/service/svcinstall"
+	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoinstall"
+	"github.com/morehao/ark-iam/backend/apps/auth/service/svcinstall"
 	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/model"

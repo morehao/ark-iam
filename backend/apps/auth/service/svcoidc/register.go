@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/morehao/ark-iam/auth/core/oidcop"
-	"github.com/morehao/ark-iam/auth/dto/dtooidc"
+	"github.com/morehao/ark-iam/backend/apps/auth/core/oidcop"
+	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtooidc"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/core/person"
 	"github.com/morehao/ark-iam/pkg/core/tenant"

@@ -12,8 +12,8 @@ import (
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objtenant"
-	"github.com/morehao/ark-iam/platformadmin/dto/dtotenant"
-	"github.com/morehao/ark-iam/platformadmin/testutil"
+	"github.com/morehao/ark-iam/backend/apps/platformadmin/dto/dtotenant"
+	"github.com/morehao/ark-iam/backend/apps/platformadmin/testutil"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/gerror"
 )

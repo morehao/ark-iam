@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/auth/dto/dtoauth"
-	"github.com/morehao/ark-iam/auth/dto/dtoconnector"
+	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoauth"
+	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoconnector"
 )
 
 type stubConnectorSvc struct {

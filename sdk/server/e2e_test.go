@@ -6,11 +6,11 @@ import (
 
 	_ "github.com/morehao/golib/dbaccess/dbgorm/driver/sqlite"
 
-	authconfig "github.com/morehao/ark-iam/auth/config"
-	"github.com/morehao/ark-iam/auth/dto/dtoinstall"
-	"github.com/morehao/ark-iam/auth/service/svcauth"
-	"github.com/morehao/ark-iam/auth/service/svcdb"
-	"github.com/morehao/ark-iam/auth/service/svcinstall"
+	authconfig "github.com/morehao/ark-iam/backend/apps/auth/config"
+	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoinstall"
+	"github.com/morehao/ark-iam/backend/apps/auth/service/svcauth"
+	"github.com/morehao/ark-iam/backend/apps/auth/service/svcdb"
+	"github.com/morehao/ark-iam/backend/apps/auth/service/svcinstall"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objidentity"
