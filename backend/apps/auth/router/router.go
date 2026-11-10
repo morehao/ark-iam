@@ -2,8 +2,10 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
+	authmiddleware "github.com/morehao/ark-iam/backend/apps/auth/middleware"
 	"github.com/morehao/ark-iam/backend/apps/auth/controller/ctroidc"
 	"github.com/morehao/ark-iam/backend/apps/auth/controller/ctrinstall"
+	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/morehao/ark-iam/pkg/oidckit"
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
@@ -30,6 +32,14 @@ type Options struct {
 // 注意：调用前必须已通过 iam/auth/config.Set 注入配置；OP provider 由 NewOIDCCtr 自装配。
 func Register(authRG *gin.RouterGroup, protocolEngine *gin.RouterGroup, db gormdao.DBGetter, opts Options) oidckit.KeySource {
 	oidcCtr := ctroidc.NewOIDCCtr(db)
+	// 业务路由组 /v1/auth/* 必须经过 OIDC 鉴权中间件（验签 + 身份注入 + iss/SSO 会话校验），
+	// 否则 /me、/me/sessions 等取不到 Operator，会误报「用户不存在」。
+	// 这里在注册业务路由前对该组挂中间件，使其在 gateway 聚合部署与 auth 独立部署下行为一致
+	// （原 iam 版把该职责留在调用方易漏挂；统一收敛到域库 Register 内）。
+	authOpts := append([]pkgmiddleware.AuthOption{
+		pkgmiddleware.WithOIDCKeySource(oidcCtr.KeySource()),
+	}, authmiddleware.OIDCBusinessAuthOptions()...)
+	authRG.Use(pkgmiddleware.OIDCAuth(authOpts...))
 	registerRouter(authRG, protocolEngine, db, oidcCtr, opts)
 	return oidcCtr.KeySource()
 }
