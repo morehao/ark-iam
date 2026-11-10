@@ -6,6 +6,7 @@ use (
 	./backend/apps/platformadmin
 	./backend/apps/rpapi
 	./backend/apps/tenantadmin
+	./contract
 	./pkg
 	./sdk
 )

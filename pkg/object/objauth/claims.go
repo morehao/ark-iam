@@ -1,13 +1,13 @@
 package objauth
 
 import (
-	"github.com/morehao/ark-iam/sdk/contract"
+	"github.com/morehao/ark-iam/contract"
 )
 
 // 本文件是 SDK 契约在 IAM 内部的**类型别名门面**：签发侧（oidcop）与内置应用
 // 的鉴权中间件都通过这里引用同一份定义，避免内外部两处独立演化。
 //
-// 契约本体在 github.com/morehao/ark-iam/sdk/contract（对外可复用的唯一真源）。
+// 契约本体在 github.com/morehao/ark-iam/contract（对外可复用的唯一真源）。
 // 使用别名而非重新定义，保证 `objauth.TokenClaims` 与 `contract.TokenClaims`
 // 完全同一类型（可互相赋值、可跨包传递）。
 

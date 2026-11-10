@@ -23,7 +23,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/morehao/ark-iam/sdk/contract"
+	"github.com/morehao/ark-iam/contract"
 )
 
 // JWKS 是接收端所需的最小密钥来源（与 rp.KeySource 同形，避免包间循环依赖）。
