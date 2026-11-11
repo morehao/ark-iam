@@ -56,6 +56,11 @@ jobs:
       - name: 类型检查
         run: pnpm run typecheck
 
-      # 单测（当前 frontend 仅 platform-admin-web 有 vitest 配置，test/test:web 均指向它）
+      # 单测：三个有 vitest 配置的目标。
+      #   @ark-iam/login       —— 抽出的账密页 + runtime config/auth/install 逻辑（含组件测试）；
+      #   @ark-iam/login-web   —— OP 壳的 install 向导纯逻辑；
+      #   test:web             —— platform-admin-web 控制台（沿用既有入口）。
+      # 选择逐条串（而非 test:all）：test:all 会随未来任何包新增 test 脚本而自动纳入，语义漂移且
+      # 可能出现「本不该在 CI 跑的重依赖用例」；逐条显式列出与现状（仅列已配 vitest 的目标）一致、可预期。
       - name: 单测
-        run: pnpm run test:web
+        run: pnpm --filter @ark-iam/login test && pnpm --filter @ark-iam/login-web test && pnpm run test:web

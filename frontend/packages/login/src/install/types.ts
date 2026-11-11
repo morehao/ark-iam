@@ -1,8 +1,8 @@
 /**
  * /install/* 接口契约（由 auth 应用提供，前缀 /install）。
  *
- * login-web 不依赖 @ark-iam/types（刻意保持零 @ark-iam/* 依赖），
- * 故与 src/types.ts 的既有做法一致：按后端同名同形在本包内定义一份。
+ * 本包不依赖 `@ark-iam/types`（保持自足），故与 src/types.ts 的既有做法一致：
+ * 按后端同名同形在本包内定义一份。
  * 后端事实源：apps/auth/internal/controller/ctrinstall + pkg/code/install.go。
  */
 

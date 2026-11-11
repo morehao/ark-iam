@@ -10,8 +10,8 @@ import {
   isInstallPendingError,
   oidcApi,
   oidcLogin,
-} from './api'
-import type { InstallInitializeReq, InstallStatus } from './install/types'
+} from '../api'
+import type { InstallInitializeReq, InstallStatus } from '../install/types'
 
 /** 用自定义 adapter 直接产出响应，避免真实网络请求。 */
 function respondWith(body: unknown, status = 200) {

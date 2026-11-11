@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthGuard, FullPageSpinner } from '@morehao/ark-iam-react/auth'
-import { MainLayout, LoginPage, tokens } from '@morehao/ark-iam-react/ui'
+import { MainLayout, SsoLoginPage, tokens } from '@morehao/ark-iam-react/ui'
 import type { MainMenuItems } from '@morehao/ark-iam-react/ui'
 import {
   ApartmentOutlined,
@@ -152,7 +152,7 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage title="IAM 管理平台" subtitle="平台管理后台" />} />
+      <Route path="/login" element={<SsoLoginPage title="IAM 管理平台" subtitle="平台管理后台" />} />
       <Route path="/auth/callback" element={<FullPageSpinner />} />
       <Route path="/" element={<MainLayout title="Ark IAM" subtitle="平台管理后台" menuItems={sidebarMenu} />}>
         {defaultPath ? (

@@ -1,0 +1,4 @@
+{
+  "extends": "@ark-iam/tsconfig/app.json",
+  "include": ["src"]
+}

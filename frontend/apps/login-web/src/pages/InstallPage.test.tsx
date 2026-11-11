@@ -3,7 +3,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import { CompletionScreen } from './InstallPage'
-import type { InstallInitializeResp } from '../install/types'
+import type { InstallInitializeResp } from '@ark-iam/login'
 
 // AC-12：第③步提交后回显的控制台地址必须**等于服务端下发的配置值**。
 //

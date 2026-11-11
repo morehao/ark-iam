@@ -10,7 +10,7 @@ import {
   isSubmitEnabled,
   type WizardStep,
 } from './wizard'
-import { createEmptyInstallForm, type InstallForm } from './types'
+import { createEmptyInstallForm, type InstallForm } from '@ark-iam/login'
 
 function validForm(overrides: Partial<InstallForm> = {}): InstallForm {
   return {

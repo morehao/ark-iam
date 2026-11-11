@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
-import LoginPage from './pages/LoginPage'
+import { LoginPage } from '@ark-iam/login'
 import InstallPage from './pages/InstallPage'
 import { InstallGuard } from './install/InstallGuard'
 

@@ -1,7 +1,7 @@
 /**
  * 运行时基址解析（内嵌形态自适应挂载前缀）。
  *
- * 背景：login-web 既可能被**根路径挂载**（gateway / 独立 auth：`/oidc`、`/install` 在 origin 根），
+ * 背景：账密登录页既可能被**根路径挂载**（gateway / 独立 auth：`/oidc`、`/install` 在 origin 根），
  * 也可能被**非空前缀内嵌**（如 `/iam`：`/iam/oidc`、`/iam/install`）。页面路由也随前缀走
  * （`{base}/login`、`{base}/install`）。因此不能在构建期把 base 写死（`vite base` 只能定一个值，
  * 无法同 dist 多前缀复用），改为**运行时**：页面先探测自身 basePath，拉取 `{basePath}/config.json`
@@ -52,6 +52,10 @@ function normalizeBase(base: string, fallback: string): string {
 
 let current: RuntimeConfig | null = null
 let appBase = ''
+/** 是否已由宿主显式指定 basePath（指定后 loadRuntimeConfig 不再自动探测覆盖）。 */
+let appBaseExplicit = false
+/** 进行中/已完成的初始化 Promise，用于幂等缓存（并发调用共享同一次加载）。 */
+let loading: Promise<RuntimeConfig> | null = null
 
 /** 读取已解析的运行时配置（未初始化前为 null）。 */
 export function getRuntimeConfig(): RuntimeConfig | null {
@@ -79,7 +83,7 @@ export function appPath(path: string): string {
  * 由后续 API 调用暴露真实错误。
  */
 export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
-  appBase = detectBasePath(window.location.pathname)
+  if (!appBaseExplicit) appBase = detectBasePath(window.location.pathname)
   const fallback: RuntimeConfig = {
     issuer: window.location.origin + '/oidc',
     apiBase: '/v1',
@@ -110,4 +114,43 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
     current = fallback
   }
   return current
+}
+
+/**
+ * 显式设置挂载 basePath（覆盖自动探测）。用于宿主传入 `basePath` prop 时；
+ * 必须在 `ensureRuntimeConfig` / `loadRuntimeConfig` 之前调用。传空串表示根挂载。
+ */
+export function setAppBase(basePath: string): void {
+  appBase = basePath
+  appBaseExplicit = true
+}
+
+/**
+ * 幂等加载运行时配置（内部缓存）。
+ *
+ * 与 `loadRuntimeConfig()` 的区别：本函数允许多次调用、并发调用，但只会真正发起**一次**
+ * 加载——首次调用创建 Promise 并缓存，后续调用（含并发）复用同一 Promise；已加载完成则
+ * 直接返回缓存的配置。这样 `LoginPage` 挂载时即可调用 `ensureRuntimeConfig()` 自加载，
+ * 无需宿主先手动 bootstrap（宿主也可以预先调用，二者共享同一份结果）。
+ */
+export function ensureRuntimeConfig(): Promise<RuntimeConfig> {
+  if (current) return Promise.resolve(current)
+  if (!loading) {
+    loading = loadRuntimeConfig().finally(() => {
+      // 加载完成后清空进行中标记：current 已落定（失败也会落为 fallback），后续直接命中缓存。
+      loading = null
+    })
+  }
+  return loading
+}
+
+/**
+ * 重置运行时配置缓存（仅供测试使用；生产代码不应调用）。
+ * @internal
+ */
+export function __resetRuntimeConfigForTests(): void {
+  current = null
+  appBase = ''
+  appBaseExplicit = false
+  loading = null
 }

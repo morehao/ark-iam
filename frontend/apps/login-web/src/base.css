@@ -1,0 +1,17 @@
+/*
+ * login-web 全局基础样式。
+ *
+ * 只放页面级 reset 与 body 字体等"全站生效"的规则——这部分原先随旧 LoginPage.css 一并加载；
+ * 账密页迁入 @ark-iam/login（antd 内联样式、无独立 CSS）后，login-web 仍需要这些全局规则，
+ * 故单独落到 base.css 并由 main.tsx 引入，保证 InstallPage 视觉不回退。
+ *
+ * 组件级布局类（.login-page / .login-brand / .login-card / .form-group / .login-btn 等）
+ * 已随 InstallPage 的复用需要迁入 InstallPage.css（见该文件头注释）。
+ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  min-height: 100vh;
+}
