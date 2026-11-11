@@ -1,4 +1,4 @@
-import type { InstallField, InstallFieldErrors, InstallForm } from './types'
+import type { InstallField, InstallFieldErrors, InstallForm } from '@ark-iam/login'
 
 /**
  * 向导客户端校验。

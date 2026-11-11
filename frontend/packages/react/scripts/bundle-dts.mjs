@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PKG_ROOT = resolve(__dirname, '..')
 const DEST_BASE = resolve(PKG_ROOT, 'dist/_types')
-const INTERNAL = ['types', 'api', 'auth', 'ui']
+const INTERNAL = ['types', 'api', 'auth', 'ui', 'login']
 
 function walk(dir) {
   const out = []
@@ -54,11 +54,12 @@ for (const pkg of INTERNAL) {
 
 // 3. 重写门面包入口 d.ts
 const ENTRY_MAP = {
-  'index.d.ts': ['types', 'api', 'auth', 'ui'],
+  'index.d.ts': ['types', 'api', 'auth', 'ui', 'login'],
   'types.d.ts': ['types'],
   'api.d.ts': ['api'],
   'auth.d.ts': ['auth'],
   'ui.d.ts': ['ui'],
+  'login.d.ts': ['login'],
 }
 for (const [entryFile, pkgs] of Object.entries(ENTRY_MAP)) {
   const abs = resolve(PKG_ROOT, 'dist', entryFile)

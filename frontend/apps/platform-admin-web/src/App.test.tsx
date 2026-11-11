@@ -27,7 +27,7 @@ vi.mock('@morehao/ark-iam-react/ui', async () => {
   return {
     ...actual,
     MainLayout: () => <div>Main Layout</div>,
-    LoginPage: () => <div>Login Page</div>,
+    SsoLoginPage: () => <div>Login Page</div>,
   }
 })
 

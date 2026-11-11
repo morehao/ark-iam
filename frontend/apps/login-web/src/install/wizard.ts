@@ -1,4 +1,4 @@
-import type { InstallForm, InstallInitializeReq } from './types'
+import type { InstallForm, InstallInitializeReq } from '@ark-iam/login'
 import { validateAdminStep, validateBootstrapStep, type StepValidation } from './validation'
 
 /**

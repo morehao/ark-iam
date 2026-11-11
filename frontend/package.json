@@ -10,7 +10,7 @@
     "dev:tenant": "pnpm --filter @ark-iam/tenant-admin-web dev",
     "dev:all": "pnpm run --parallel --filter @ark-iam/login-web --filter @ark-iam/platform-admin-web --filter @ark-iam/tenant-admin-web dev",
     "build": "pnpm -r --filter './packages/*' --filter './apps/*' build",
-    "build:pkgs": "pnpm --filter @ark-iam/types build && pnpm --filter @ark-iam/api build && pnpm --filter @ark-iam/auth build && pnpm --filter @ark-iam/ui build && pnpm --filter @morehao/ark-iam-react build",
+    "build:pkgs": "pnpm --filter @ark-iam/types build && pnpm --filter @ark-iam/api build && pnpm --filter @ark-iam/auth build && pnpm --filter @ark-iam/ui build && pnpm --filter @ark-iam/login build && pnpm --filter @morehao/ark-iam-react build",
     "pack:pkgs": "node scripts/release-packages.mjs pack",
     "publish:pkgs": "node scripts/release-packages.mjs publish",
     "version:pkgs": "node scripts/release-packages.mjs version",

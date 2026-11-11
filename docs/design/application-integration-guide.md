@@ -762,7 +762,7 @@ func main() {
 
 > 本节面向**外部业务前端**（React + antd 5），讲如何把本仓的前端能力当第三方库引入，快速获得统一的**登录跳转（OIDC PKCE）+ 请求封装（401 自动跳登录）+ 列表页操作列（actionColumn）+ 设计令牌（themeConfig）**。
 >
-> 对外只发布**一个**包 `@morehao/ark-iam-react`（聚合了内部 `@ark-iam/{types,api,auth,ui}`，代码与类型均已打进其 `dist`，消费者无需再装内部包）。它以 **ESM 子路径**暴露各层：`@morehao/ark-iam-react/types`、`/api`、`/auth`、`/ui`，可按需引入以减小打包体积；根入口 `@morehao/ark-iam-react` 一把梭 re-export 全部（含 antd 依赖）。
+> 对外只发布**一个**包 `@morehao/ark-iam-react`（聚合了内部 `@ark-iam/{types,api,auth,ui,login}`，代码与类型均已打进其 `dist`，消费者无需再装内部包）。它以 **ESM 子路径**暴露各层：`@morehao/ark-iam-react/types`、`/api`、`/auth`、`/ui`、`/login`，可按需引入以减小打包体积；根入口 `@morehao/ark-iam-react` 一把梭 re-export 全部（含 antd 依赖）。
 >
 > 它区别于 §4「手工手写 oidcConfig」：§4 演示的是不依赖本仓包的通用接法；本节演示的是**复用 `@morehao/ark-iam-react` 门面包**的接法——两者都能完成 OIDC 登录，后者更省心、且视觉/交互与本仓控制台一致。
 >
@@ -784,7 +784,8 @@ pnpm add antd@^5.22.0 react@^18.3.1 react-dom@^18.3.1 react-router-dom@^7.15.0
 | `@morehao/ark-iam-react/api` | 业务 API 客户端（axios 实例 + 拦截器） | `createApiClient`、默认 `request`、`setUserProvider`、`setSessionExpiredHandler` |
 | `@morehao/ark-iam-react/auth` | OIDC 登录（PKCE）+ 租户切换 / 登出钩子 | `createAuthProvider`、`fetchRuntimeConfig`、`useTenantSwitching`、`useLogout`、`useAuthGuard` |
 | `@morehao/ark-iam-react/ui` | 设计令牌 + 列表页列工厂 + 骨架组件（重依赖） | `themeConfig`、`tokens`、`actionColumn`、`tableScrollX`、`AppShell`、`MainLayout` 等 |
-| `@morehao/ark-iam-react`（根） | 上面四层全部 re-export（一把梭） | 全部 |
+| `@morehao/ark-iam-react/login` | OP 账密登录页（凭证表单 + 多租户选择 + 自助注册/建租户/改密）+ runtime config / 认证 API / install 错误映射 | `LoginPage`、`ensureRuntimeConfig`、`oidcLogin`、`getInstallStatus`、`resolveInstallError` 等 |
+| `@morehao/ark-iam-react`（根） | 上面各层全部 re-export（一把梭） | 全部 |
 
 > 建议：**追求体积时用子路径**（如只 `import { BizCode } from '@morehao/ark-iam-react/types'` 不会拉入 antd）；仅图省事时才从根入口全量引入。
 >
@@ -999,7 +1000,7 @@ export default function App() {
 
 ### 12.6 样式与类型说明
 
-- **样式**：四个包**不含独立 CSS 文件**。视觉由 antd 组件 + `themeConfig`（token）表达，`AppShell` 内联了少量结构性微修正。因此接入方只需 `ConfigProvider theme={themeConfig}`（或直接使用 `AppShell`），**无需额外引入任何 `.css`**。
+- **样式**：所有包**不含独立 CSS 文件**（含 `./login` 账密页——它用 antd 组件 + 内联 `brand`/`tokens` 表达视觉，与 SSO 入口页同构）。视觉由 antd 组件 + `themeConfig`（token）表达，`AppShell` 内联了少量结构性微修正。因此接入方只需 `ConfigProvider theme={themeConfig}`（或直接使用 `AppShell`），**无需额外引入任何 `.css`**；`./login` 的 `LoginPage` 亦是如此，只需保证外层有 `ConfigProvider`。
 - **类型**：包以 TypeScript 源码/声明对外，DTO 与枚举集中在 `@morehao/ark-iam-react/types`（如 `BizCode`：`Success=0`、`Unauthorized`、`TokenInvalid`、`TokenExpired`、`PermissionDenied`…）。业务请求/响应类型直接 `import type { ... } from '@morehao/ark-iam-react/types'`。
 - **配置类型**：`CreateAuthProviderOptions`（from `@morehao/ark-iam-react/auth`）、`CreateApiClientOptions`（from `@morehao/ark-iam-react/api`）、`RuntimeConfig`（from `@morehao/ark-iam-react/auth`）、`RowAction` / `ActionColumnConfig` 等（from `@morehao/ark-iam-react/ui`）均为具名导出，宿主可获得完整补全。
 
@@ -1022,8 +1023,61 @@ export default function App() {
 
 - **构建（门面包）**：`@morehao/ark-iam-react` 的 `pnpm build` = `vite build --config vite.config.lib.ts && tsc -p tsconfig.build.json && node scripts/bundle-dts.mjs`。
   - 多入口 ESM：`dist/{index,types,api,auth,ui}.js`。
-  - **代码打进 dist**：内部 `@ark-iam/{types,api,auth,ui}` 的源码被 rollup **打包进** `@morehao/ark-iam-react` 的 dist（不 external），只有第三方依赖（react/antd/axios/oidc-client-ts/react-oidc-context/react-router-dom 等）external——这样才能做到「对外只一个包」，消费者无需再装内部四包。
-  - **类型打进 dist**：`bundle-dts.mjs` 把内部四包的 `.d.ts` 复制到 `dist/_types/<pkg>/` 并改写其 `@ark-iam/*` 引用为相对路径，各入口 `d.ts` re-export `./_types/<pkg>/index`，消费者拿到自包含类型（不依赖内部包声明）。
+  - **代码打进 dist**：内部 `@ark-iam/{types,api,auth,ui,login}` 的源码被 rollup **打包进** `@morehao/ark-iam-react` 的 dist（不 external），只有第三方依赖（react/antd/axios/oidc-client-ts/react-oidc-context/react-router-dom 等）external——这样才能做到「对外只一个包」，消费者无需再装内部四包。
+  - **类型打进 dist**：`bundle-dts.mjs` 把内部各包的 `.d.ts` 复制到 `dist/_types/<pkg>/` 并改写其 `@ark-iam/*` 引用为相对路径，各入口 `d.ts` re-export `./_types/<pkg>/index`，消费者拿到自包含类型（不依赖内部包声明）。
   - 依赖解析注意：`_types/api/*.d.ts` 里 `import ... from 'axios'` 等外部模块需能从 `packages/react` 的 node_modules 解析到（真实 `pnpm install` 会依据 `@morehao/ark-iam-react` 的 dependencies/peer 建立链接；仓内手动联调时可临时软链）。
 - **仓内 dev 走 src**：各 app 的 `vite.config.ts` 引入 `frontend/vite.alias.ts` 的 `arkIamAlias`，把 `@morehao/ark-iam-react/{types,api,auth,ui}`（及内部 `@ark-iam/*`）alias 到对应包 `src`，开发期无需 build；发布/外部消费走 `dist`。这是「双轨」的唯一约定——不要让仓内 app 直接消费 dist，否则改包就要频繁 build。
-- **版本与发布（脚本化，非 changesets）**：`frontend/scripts/release-packages.mjs` 仅针对门面包 `@morehao/ark-iam-react` 提供 `version <x.y.z>`（改版本）/ `pack`（build + `pnpm pack` 产 tarball）/ `publish [--registry <url>]`；内部四包不单独发布。私有 registry / GitHub Packages 的 `@morehao:registry` 与 token 配置见 `frontend/.npmrc` 注释模板。发布 scope 为 **`@morehao`**（公共 npm 免费 org）。
+- **版本与发布（脚本化，非 changesets）**：`frontend/scripts/release-packages.mjs` 仅针对门面包 `@morehao/ark-iam-react` 提供 `version <x.y.z>`（改版本）/ `pack`（build + `pnpm pack` 产 tarball）/ `publish [--registry <url>]`；内部四包（含 `@ark-iam/login`）不单独发布。私有 registry / GitHub Packages 的 `@morehao:registry` 与 token 配置见 `frontend/.npmrc` 注释模板。发布 scope 为 **`@morehao`**（公共 npm 免费 org）。
+
+### 12.9 宿主内嵌 OP 时挂账密页（`@morehao/ark-iam-react/login`）
+
+> 适用场景：业务应用**自己就是 OP（ark-iam）的宿主**、需要在其 SPA 里直接渲染 ark-iam 的**账密认证页**（`iam.mode: op` 下 OIDC 把浏览器送到 `{origin}/iam/login?authRequestID=…` 的那一跳）。这是「登录本身」的页面，区别于 §12.3 的 `createAuthProvider`（RP 侧「去登录」的 SSO 入口）。若你的应用只是 OIDC Client（RP），**不应**使用本节，用 §12.3 即可。
+
+`LoginPage` 是**自足组件**：不依赖路由、不依赖 `AuthProvider`/任何 Provider 上下文，挂载时会自行加载运行时配置（`ensureRuntimeConfig()`）。宿主只需负责**路由**与**外层 `ConfigProvider`**。
+
+```tsx
+// 1) 路由：把 /iam/login 映射到 LoginPage（不要套 AuthProvider/AuthGuard）
+import { Route, Routes } from 'react-router-dom'
+import { LoginPage } from '@morehao/ark-iam-react/login'
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/iam/login" element={<LoginPage />} />
+      {/* 其余业务路由 */}
+    </Routes>
+  )
+}
+```
+
+```tsx
+// 2) 外层必须有 ConfigProvider（antd 主题 / locale），否则 antd 组件拿不到主题令牌。
+import { ConfigProvider } from 'antd'
+import zhCN from 'antd/locale/zh_CN'
+import { themeConfig } from '@morehao/ark-iam-react/ui'
+
+createRoot(el).render(
+  <ConfigProvider locale={zhCN} theme={themeConfig}>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </ConfigProvider>,
+)
+```
+
+**Props（全部可选）**：
+
+| Prop | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `title` | `string` | 「统一身份认证」 | 品牌区主标题 |
+| `subtitle` | `string` | 「统一身份认证平台」 | 品牌区副标题 |
+| `basePath` | `string` | 从 `window.location.pathname` 推断（`/iam/login` → `/iam`） | IAM 挂载前缀；用于 `107004` 跳 `{basePath}/install`、请求 `{basePath}/oidc/*`、`{basePath}/install/*` |
+| `onLoggedIn` | `(continueURL: string) => void` | `window.location.assign(continueURL)` | 登录成功后拿到 `continueURL` 的回调；默认整页跳回业务应用 |
+
+**关于 `basePath`**：组件默认按当前路径推断挂载前缀，`/iam/login` 会推出 `/iam`，多数情况无需显式传；若宿主把登录页挂在非常规前缀（或做反向代理改写了路径），请显式传 `basePath`（如 `basePath="/iam"`，根挂载传 `basePath=""`）。它必须与后端下发 `config.json` 的前缀一致。
+
+**依赖要求**：`./login` 子路径把 antd / `@ant-design/icons` / react / react-dom 作为 **peer**（由宿主提供，见 §12.7）；`axios` 由包自带，无需宿主显式声明。宿主**不要**把登录页包进 `AuthProvider`——账密页直接向 OP 的 `{basePath}/oidc/login` 提交凭证，不参与授权码流程。
+
+**行为覆盖**：`LoginPage` 覆盖 `login` / `register` / `createTenant` / `changePassword` 四个 mode，行为与 ark-iam 自带的 login-web 完全一致（单一实现），宿主无需重复实现这些分支。
+
+

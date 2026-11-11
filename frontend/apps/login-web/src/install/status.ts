@@ -1,6 +1,6 @@
-import { appPath } from '../config'
+import { appPath } from '@ark-iam/login'
+import type { InstallConsoles, InstallStatus } from '@ark-iam/login'
 import { INSTALL_MESSAGES } from './messages'
-import type { InstallConsoles, InstallStatus } from './types'
 
 /**
  * GET /install/status 的结果 -> 页面该渲染哪个视图。

@@ -7,7 +7,7 @@ import {
   resolveLoginURL,
   shouldRedirectToInstall,
 } from './status'
-import type { InstallStatus } from './types'
+import type { InstallStatus } from '@ark-iam/login'
 
 function status(overrides: Partial<InstallStatus> = {}): InstallStatus {
   return {

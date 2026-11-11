@@ -1,14 +1,15 @@
+// SsoLoginPage —— 控制台 SSO 入口页：展示品牌区并提供「IAM 账号登录」跳转（OIDC signinRedirect）。
 import { Button, Typography } from 'antd'
 import { ArrowRightOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import { useAuth } from 'react-oidc-context'
 import { brand } from './theme'
 
-interface Props {
+export interface SsoLoginPageProps {
   title: string
   subtitle?: string
 }
 
-export function LoginPage({ title, subtitle }: Props) {
+export function SsoLoginPage({ title, subtitle }: SsoLoginPageProps) {
   const auth = useAuth()
 
   return (

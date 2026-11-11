@@ -1,7 +1,22 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { INSTALL_PENDING_REDIRECT, getInstallStatus, initializeInstall } from '../api'
-import { appPath } from '../config'
-import { resolveInstallError, statusUnavailableMessage } from '../install/errors'
+import {
+  INSTALL_PENDING_REDIRECT,
+  getInstallStatus,
+  initializeInstall,
+  appPath,
+  resolveInstallError,
+  statusUnavailableMessage,
+  DEFAULT_TENANT_NAME,
+  createEmptyInstallForm,
+} from '@ark-iam/login'
+import type {
+  InstallConsoles,
+  InstallField,
+  InstallFieldErrors,
+  InstallForm,
+  InstallInitializeResp,
+  InstallStatus,
+} from '@ark-iam/login'
 import { INSTALL_MESSAGES } from '../install/messages'
 import {
   INSTALL_VIEW_TEXT,
@@ -22,16 +37,6 @@ import {
   type WizardStep,
 } from '../install/wizard'
 import { PASSWORD_STRENGTH_HINT, validateAdminStep, validateBootstrapStep } from '../install/validation'
-import { DEFAULT_TENANT_NAME, createEmptyInstallForm } from '../install/types'
-import type {
-  InstallConsoles,
-  InstallField,
-  InstallFieldErrors,
-  InstallForm,
-  InstallInitializeResp,
-  InstallStatus,
-} from '../install/types'
-import '../LoginPage.css'
 import '../InstallPage.css'
 
 /**

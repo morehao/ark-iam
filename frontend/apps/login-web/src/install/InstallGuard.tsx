@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
-import { getInstallStatus } from '../api'
-import '../LoginPage.css'
+import { getInstallStatus } from '@ark-iam/login'
+import '../InstallPage.css'
 
 /**
  * 登录入口守卫：GET /install/status 显示 initialized=false 时把用户送到 /install，

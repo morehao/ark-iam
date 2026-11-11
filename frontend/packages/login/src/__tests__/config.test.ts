@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectBasePath, appPath } from './config'
+import { detectBasePath, appPath } from '../config'
 
 // 说明：detectBasePath/appPath 是纯函数，覆盖"根挂载"与"非空前缀内嵌"两类，锁住终局方案的
 // 前缀自适应行为。appPath 依赖模块级 appBase（由 loadRuntimeConfig 设置），此处通过直接

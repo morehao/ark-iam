@@ -41,6 +41,7 @@ export default {
         api: resolve(process.cwd(), 'src/api.ts'),
         auth: resolve(process.cwd(), 'src/auth.ts'),
         ui: resolve(process.cwd(), 'src/ui.ts'),
+        login: resolve(process.cwd(), 'src/login.ts'),
       },
       formats: ['es'] as const,
       fileName: (_fmt: string, entryName: string) => `${entryName}.js`,

@@ -1,8 +1,9 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { getAppBase, loadRuntimeConfig } from '@ark-iam/login'
 import App from './App'
-import { getAppBase, loadRuntimeConfig } from './config'
+import './base.css'
 
 // login-web 是 IAM OP 的登录 UI（凭证表单 + 多租户选择），不是 OIDC Client/RP：
 // 凭证直接提交到 OP 内部端点 {base}/oidc/login，不参与授权码流程，无 client_id / redirect_uri。

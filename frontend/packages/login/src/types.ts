@@ -1,4 +1,11 @@
 /**
+ * 登录协议层的对外类型（与后端 dtooidc 同名同形）。
+ *
+ * 本包为自足模块，不依赖 `@ark-iam/types`，故在此按后端同名同形定义一份，
+ * 供 api.ts / LoginPage / 宿主消费方引用。
+ */
+
+/**
  * 租户拥有者类型（后端具名类型 model.OwnerType）：owner-拥有者 / normal-普通成员。
  * login-web 不依赖 @ark-iam/types，故在此按后端同名同形定义一份。
  */
