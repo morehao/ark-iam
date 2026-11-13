@@ -6,7 +6,7 @@ import { NameLink } from './NameLink'
 import { RowActions, type RowAction } from './RowActions'
 
 /**
- * 列表列宽标准（px）与列工厂（规范见 frontend/DESIGN.md §7.3）。
+ * 列表列宽标准（px）与列工厂（规范见 DESIGN.md §7.3）。
  *
  * 背景：历史 bug 是各页手写列宽 + 手写 `scroll.x`，列宽普遍偏大（ID 150、编码 180…）
  * 叠加后总宽轻松超过内容区，导致「一进列表就有横向滚动条、操作列要横滑很久才看得到」。

@@ -77,7 +77,7 @@ const columns = [
 <Table tableLayout="fixed" scroll={{ x: tableScrollX(columns) }} columns={columns} dataSource={rows} rowKey="id" />
 ```
 
-完整接入说明见 `docs/design/application-integration-guide.md` §12「前端组件接入」；视觉规范见仓库根 `frontend/DESIGN.md`。
+完整接入说明见 `docs/design/application-integration-guide.md` §12「前端组件接入」；视觉规范见仓库根 `DESIGN.md`。
 
 ## peerDependencies 口径
 

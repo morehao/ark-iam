@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { resolve } from 'node:path'
 
 // 仓内 app 走源码：把 @ark-iam/login 直接指向包 src，开发期无需先 build 包（与
-// platform-admin-web 经 frontend/vite.alias.ts 走 src 的双轨约定一致）。发布/外部消费走 dist。
+// platform-admin-web 经 vite.alias.ts 走 src 的双轨约定一致）。发布/外部消费走 dist。
 const loginSrc = resolve(__dirname, '../../packages/login/src/index.ts')
 
 export default defineConfig({

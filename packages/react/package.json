@@ -7,9 +7,9 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/morehao/ark-iam.git",
-    "directory": "frontend/packages/react"
+    "directory": "packages/react"
   },
-  "homepage": "https://github.com/morehao/ark-iam/tree/main/frontend/packages/react",
+  "homepage": "https://github.com/morehao/ark-iam/tree/main/packages/react",
   "bugs": {
     "url": "https://github.com/morehao/ark-iam/issues"
   },

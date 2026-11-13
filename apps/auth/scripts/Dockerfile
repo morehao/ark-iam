@@ -4,7 +4,7 @@ ENV GOPROXY=https://goproxy.cn,direct
 
 WORKDIR /build
 
-# 复制整个 backend workspace（含 go.work、apps/*、pkg/*），供 go.work 解析共享模块
+# 复制整个仓库根 workspace（含 go.work、apps/*、pkg/*、sdk/*、contract），供 go.work 解析共享模块
 COPY . .
 
 # 同步 workspace 并下载依赖

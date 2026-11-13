@@ -5,8 +5,9 @@ import * as net from 'net';
 import * as path from 'path';
 
 const ROOT = path.resolve(__dirname, '..');
-const BACKEND_ROOT = path.join(ROOT, 'backend');
-const FRONTEND_ROOT = path.join(ROOT, 'frontend');
+// 去壳后后端（go.work + apps/*）与前端（pnpm workspace + apps/*-web）都以仓库根为根目录。
+const BACKEND_ROOT = ROOT;
+const FRONTEND_ROOT = ROOT;
 
 interface ServiceDef {
   name: string;
@@ -23,13 +24,13 @@ const SERVICES: ServiceDef[] = [
   {
     name: 'IAM Backend',
     port: 8100,
-    // 优先使用预编译二进制（backend/.tmp/gateway-bin），避免 go run 首次编译
+    // 优先使用预编译二进制（.tmp/gateway-bin），避免 go run 首次编译
     // 缓慢导致健康检查超时；无二进制时回退 go run。
     cmd: 'go',
     args: ['run', './apps/gateway/cmd'],
-    cwd: path.join(ROOT, 'backend'),
+    cwd: BACKEND_ROOT,
     env: {
-      APP_CONFIG_PATH: path.join(ROOT, 'backend', 'apps', 'gateway', 'config', 'config.yaml'),
+      APP_CONFIG_PATH: path.join(ROOT, 'apps', 'gateway', 'config', 'config.yaml'),
       // 初始化引导的一次性令牌。启动期播种已删除，因此**每次全新库跑 e2e 都必须有人**
       // 调用 POST /install/initialize——本文件末尾的 ensureInitialized 就是那个调用方。
       // 未配置该变量时 /install/initialize 整体不可用（fail-closed），e2e 会直接失败并给出提示。
@@ -63,7 +64,7 @@ const SERVICES: ServiceDef[] = [
   },
 ];
 
-// 若预编译 gateway 二进制存在，则替换 backend 服务定义，避免 go run 编译慢导致超时。
+// 若预编译 gateway 二进制存在，则替换后端服务定义，避免 go run 编译慢导致超时。
 const GATEWAY_BIN = path.join(BACKEND_ROOT, '.tmp', 'gateway-bin');
 const fs = require('fs') as typeof import('fs');
 if (fs.existsSync(GATEWAY_BIN)) {

@@ -13,8 +13,8 @@ concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 defaults:
   run:
-    # 前端工作区在 frontend/ 子目录。
-    working-directory: frontend
+    # 前端（pnpm monorepo）工作区已在仓库根目录。
+    working-directory: .
 
 jobs:
   check:
@@ -30,7 +30,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          package_json_file: frontend/package.json
+          package_json_file: package.json
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -38,7 +38,7 @@ jobs:
           # CI 主支持线；v7 下 22 的日志是干净的。
           node-version: '22'
           cache: 'pnpm'
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: 安装依赖（--frozen-lockfile：lock 必须与 package.json 同步提交）
         run: pnpm install --frozen-lockfile --ignore-scripts
@@ -52,7 +52,7 @@ jobs:
       - name: 构建门面包
         run: pnpm run build:pkgs
 
-      # 类型检查（packages + apps 全量 tsc --noEmit，见 frontend package.json scripts.typecheck）
+      # 类型检查（packages + apps 全量 tsc --noEmit，见根 package.json scripts.typecheck）
       - name: 类型检查
         run: pnpm run typecheck
 

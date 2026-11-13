@@ -1,7 +1,7 @@
 import { Tag } from 'antd'
 
 /**
- * 状态标签规范（详见 frontend/DESIGN.md「Components → 状态 Tag」）
+ * 状态标签规范（详见 DESIGN.md「Components → 状态 Tag」）
  *
  * 两类字典严格区分：
  * - 语义状态（enable/disable/挂起/验证）→ 语义色 success/default/error/warning；

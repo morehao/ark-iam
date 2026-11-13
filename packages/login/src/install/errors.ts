@@ -3,7 +3,7 @@ import { INSTALL_MESSAGES } from './messages'
 /**
  * /install 领域错误码与"页面该做什么"的映射。
  *
- * 事实源：backend/pkg/code/install.go（107xxx 段）。要点：与其它领域不同，
+ * 事实源：pkg/code/install.go（107xxx 段）。要点：与其它领域不同，
  * 这些端点返回**真实 HTTP 状态码**（409/401/503/500/400），因此解码必须同时
  * 覆盖两种形态——
  *   1. axios 因非 2xx 抛错，业务码在 error.response.data（正常路径）；

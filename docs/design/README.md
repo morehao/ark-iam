@@ -48,7 +48,7 @@
 - **两种接入形态**：形态 1 单独部署 IAM（`gateway`/分体），业务应用通过 `sdk` 验签接入；形态 2 用 `sdk/server` 把 IAM **内嵌**进业务自己的 Go 进程（不单独部署 IAM 进程，前端由 npm 包 `@morehao/ark-iam-react` 提供），见 [application-integration-guide.md](application-integration-guide.md) §11。
 - 身份模型为 **自然人（person）+ 租户成员（user，表 `"user"`）**：person 是跨租户的全局身份，user 是 person 在某个租户内的成员记录，一个人可同时属于多个租户。
 - 授权模型到「**角色—菜单**」粒度（角色按租户 + 应用作用域，`user_role` / `role_menu` 两张关联表）；资源级权限不在 IAM 承载。
-- 前端为 React 18 + Vite + Ant Design 5 的 pnpm monorepo（`frontend/`），包含登录门户（login-web :4000）、平台管理台（platform-admin-web :4001）、租户管理台（tenant-admin-web :4002）。
+- 前端为 React 18 + Vite + Ant Design 5 的 pnpm monorepo（仓库根 `packages/` + `apps/*-web`），包含登录门户（login-web :4000）、平台管理台（platform-admin-web :4001）、租户管理台（tenant-admin-web :4002）。
 
 ## 目录约定
 

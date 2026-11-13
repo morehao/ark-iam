@@ -6,7 +6,7 @@ import type { ThemeConfig } from 'antd'
  * 设计方向：「冷白工程台」收敛（受 Stripe / Vercel 工程控制台启发，见 DESIGN.md 参照锚点）。
  * 靛蓝只出现在主按钮 / 链接 / 选中态 / 品牌区；页面表面一律中性灰阶，
  * 卡片以 hairline 边框分层（无阴影）；文字为三级 hex 灰阶。
- * 命名与 frontend/DESIGN.md 的 colors 段一一对应，改动需两处同步。
+ * 命名与 DESIGN.md 的 colors 段一一对应，改动需两处同步。
  */
 export const tokens = {
   // 品牌 Brand：靛蓝 → 紫，仅用于主按钮 / 链接 / 选中态 / 登录与 Logo 品牌区

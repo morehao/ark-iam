@@ -2,8 +2,8 @@
 #   推送 vX.Y.Z 标签时，从 tag 读版本，经 OIDC 把 @morehao/ark-iam-react 发布到 npmjs。
 #   认证走 OIDC，**不需要 NPM_TOKEN**（job 提 id-token: write，npm CLI 自动换取短时令牌）。
 #
-#   本仓是 pnpm monorepo（frontend/ 为工作区），与单包仓不同：
-#     - pnpm/action-setup 先装 pnpm（读 frontend/package.json packageManager），setup-node 再挂 pnpm cache；
+#   本仓是 pnpm monorepo（前端 workspace 在仓库根），与单包仓不同：
+#     - pnpm/action-setup 先装 pnpm（读根 package.json packageManager），setup-node 再挂 pnpm cache；
 #     - 只 build + publish `@morehao/ark-iam-react` 一个门面包，内部四包 @ark-iam/{types,api,auth,ui}
 #       作为 workspace devDeps 参与构建、**不对外发布**；
 #     - 必须用 `pnpm publish`（devDeps 里的 workspace:* 协议需由 pnpm rewrite，npm publish 不认）。
@@ -16,7 +16,7 @@
 #     - Allowed actions 必须允许 `npm publish`（2026-09-03 后新建的默认只允许 stage publish，
 #       会导致 OIDC 直接发布被拒为 permission denied）。
 #
-# 版本约定：发布版本 = 去掉 tag 前缀 v，且必须等于 frontend/packages/react/package.json.version（脚本会校验）。
+# 版本约定：发布版本 = 去掉 tag 前缀 v，且必须等于 packages/react/package.json.version（脚本会校验）。
 #   bump 版本(`npm run version:pkgs` 或手改) → 提交 → 打注记 tag → push tag。
 # npm 上同版本已存在则跳过（幂等）。
 #
@@ -40,8 +40,8 @@ concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 defaults:
   run:
-    # 前端工作区在 frontend/ 子目录；脚本与 pnpm 命令都在其中执行。
-    working-directory: frontend
+    # 前端 workspace 已在仓库根目录；脚本与 pnpm 命令都在其中执行。
+    working-directory: .
 
 jobs:
   publish:
@@ -62,14 +62,14 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          package_json_file: frontend/package.json
+          package_json_file: package.json
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'pnpm'
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Upgrade npm for trusted publishing
         run: npm install -g npm@latest

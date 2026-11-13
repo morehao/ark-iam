@@ -12,21 +12,27 @@ GoArk 是一个基于 Gin + GORM 的多应用后端项目，采用前后端分�
 
 ```
 ark-iam/
-├── backend/               # Go 后端项目（go.work 多模块）
-│   ├── apps/
-│   │   ├── auth/          # 认证网关（登录/注册/token/OIDC），:8081
-│   │   ├── platformadmin/ # 平台管理，:8082
-│   │   ├── tenantadmin/   # 租户自服务，:8083
-│   │   └── gateway/       # 聚合应用（挂载 auth/platformadmin/tenantadmin + 目录域，单体部署），:8100
-│   ├── pkg/               # 公共层（model/dao/object/core/credential/…，仅依赖 contract）
-│   ├── sdk/               # 对外 SDK + 门面（rp 验签/M2M/登出/目录客户端 + server 门面 + DomainDirectory）
-│   ├── contract/          # 最底层契约 module（仅 stdlib + jwt）
-│   ├── examples/          # 示例（内嵌形态最小可运行工程）
-│   └── Makefile
-├── frontend/             # React 前端项目
+├── apps/                  # 全部应用（Go 后端 + React 前端，去壳后平铺）
+│   ├── auth/              # 认证网关（登录/注册/token/OIDC），:8081，Go module
+│   ├── platformadmin/     # 平台管理，:8082，Go module
+│   ├── tenantadmin/       # 租户自服务，:8083，Go module
+│   ├── gateway/           # 聚合应用（挂载 auth/platformadmin/tenantadmin + 目录域，单体部署），:8100，Go module
+│   ├── login-web/         # 登录门户前端（:4000）
+│   ├── platform-admin-web/# 平台管理台前端（:4001）
+│   └── tenant-admin-web/  # 租户管理台前端（:4002）
+├── packages/              # 前端共享包（pnpm workspace：types/api/auth/ui 等）
+├── pkg/                   # Go 公共层（model/dao/object/core/credential/…，仅依赖 contract）
+├── sdk/                   # 对外 SDK + 门面（rp 验签/M2M/登出/目录客户端 + server 门面 + DomainDirectory）
+├── contract/              # 最底层契约 module（仅 stdlib + jwt）
+├── examples/              # 示例（内嵌形态最小可运行工程）
+├── e2e/                   # 端到端测试
 ├── docs/                  # 文档目录
-├── Makefile              # 根目录 Makefile
-├── AGENTS.md             # 开发规范
+├── config/                # 配置目录
+├── go.work                # Go workspace（use 各 Go module：contract/pkg/sdk/apps/*）
+├── package.json           # 前端 workspace 根 package（pnpm）
+├── pnpm-workspace.yaml    # pnpm workspace 配置
+├── Makefile               # 根目录 Makefile
+├── AGENTS.md              # 开发规范
 └── README.md
 ```
 
@@ -61,27 +67,27 @@ make clean
 # 运行指定应用的测试（推荐；gateway 只做聚合、无测试用例，请用 auth/platformadmin/tenantadmin）
 make test APP=auth
 
-# 注意：根 go.work 逐个 use 各模块目录（contract、pkg、sdk、backend/apps/*）。
+# 注意：根 go.work 逐个 use 各模块目录（contract、pkg、sdk、apps/*）。
 # `go test ./...` 从根跑会报 "directory prefix . does not contain modules listed in go.work"，
 # 必须显式列出各模块目录（或在模块目录内跑 ./...）。
 
 # 运行所有模块的测试（apps 各域 + 共享层 + sdk + contract）
-go test ./backend/apps/auth/... ./backend/apps/gateway/... ./backend/apps/platformadmin/... ./backend/apps/tenantadmin/... ./pkg/... ./sdk/... ./contract/...
+go test ./apps/auth/... ./apps/gateway/... ./apps/platformadmin/... ./apps/tenantadmin/... ./pkg/... ./sdk/... ./contract/...
 
 # 等价的模块内写法
-cd backend/apps/auth && go test ./...
+cd apps/auth && go test ./...
 
 # 运行单个测试函数（共享层领域能力）
-cd backend && go test ./pkg/core/user/ -run TestCreate_NewPersonWithDeptRelations -v
+cd pkg && go test ./core/user/ -run TestCreate_NewPersonWithDeptRelations -v
 
 # 运行单个测试函数（凭证摘要契约）
-cd backend && go test ./pkg/credential/ -run TestHashSecret_Golden -v
+cd pkg && go test ./credential/ -run TestHashSecret_Golden -v
 
 # 运行特定包测试
-cd backend && go test ./apps/auth/internal/router/... -v
+cd apps/auth && go test ./internal/router/... -v
 
 # 生成测试覆盖率报告
-cd backend && go test ./apps/platformadmin/internal/... -coverprofile=coverage.out
+cd apps/platformadmin && go test ./internal/... -coverprofile=coverage.out
 go tool cover -html=coverage.out
 ```
 
@@ -95,7 +101,7 @@ make lint
 golangci-lint run ./... --disable-all -E golint,errcheck,staticcheck
 
 # go vet（同样按模块逐个执行）
-for m in backend/apps/auth backend/apps/gateway backend/apps/platformadmin backend/apps/tenantadmin pkg sdk contract; do (cd $m && go vet ./...); done
+for m in apps/auth apps/gateway apps/platformadmin apps/tenantadmin pkg sdk contract; do (cd $m && go vet ./...); done
 ```
 
 ## 代码规范
@@ -561,11 +567,11 @@ make docker-run APP=auth
 
 ## 前端规范
 
-前端工作区为 pnpm monorepo（`frontend/`）：`packages/{types,api,auth,ui}` 为共享包，`apps/{login-web,platform-admin-web,tenant-admin-web}` 为业务应用。统一视觉语言与设计令牌见 `frontend/DESIGN.md`（代码事实源为 `frontend/packages/ui/src/theme.ts` 的 `tokens`），业务页面一律复用 `@ark-iam/ui` 共享组件，禁止硬编码色值与自造样式。
+前端为 pnpm monorepo（根目录）：`packages/{types,api,auth,ui}` 为共享包，`apps/{login-web,platform-admin-web,tenant-admin-web}` 为业务应用。统一视觉语言与设计令牌见根目录 `DESIGN.md`（代码事实源为 `packages/ui/src/theme.ts` 的 `tokens`），业务页面一律复用 `@ark-iam/ui` 共享组件，禁止硬编码色值与自造样式。
 
 ### 列表页操作列规范（操作列收敛 + 名称即详情入口）
 
-所有列表页（Table）的操作列遵守以下硬规则。规范细节同步维护在 `frontend/DESIGN.md` §7.3，实现统一收敛到 `@ark-iam/ui` 的 `actionColumn`（内部 `RowActions`）与 `nameColumn`（内部 `NameLink`）。
+所有列表页（Table）的操作列遵守以下硬规则。规范细节同步维护在 `DESIGN.md` §7.3，实现统一收敛到 `@ark-iam/ui` 的 `actionColumn`（内部 `RowActions`）与 `nameColumn`（内部 `NameLink`）。
 
 **R1 操作列一律用 `actionColumn` 声明：最多横排 3 个操作，超过即纵向展开为「更多」下拉，且始终 `fixed: 'right'`。**
 
@@ -601,7 +607,7 @@ actionColumn<TenantItem>({
 
 ### 列表页列宽与横向滚动规范（列宽收敛 + 操作列常驻）
 
-这是「列建得太宽 → 一进列表就有横向滚动条 → 操作列要横滑很久才看到」的根因治理，规范细节见 `frontend/DESIGN.md` §7.3。
+这是「列建得太宽 → 一进列表就有横向滚动条 → 操作列要横滑很久才看到」的根因治理，规范细节见 `DESIGN.md` §7.3。
 
 - **列宽优先取共享常量或列工厂**：`ID_COL_WIDTH`(130) / `NAME_COL_WIDTH`(180) / `CODE_COL_WIDTH`(150) / `TAG_COL_WIDTH`(110) / `STATUS_COL_WIDTH`(100) / `COUNT_COL_WIDTH`(90) / `TEXT_COL_WIDTH`(200) / `LONG_TEXT_COL_WIDTH`(320)，或直接用 `idColumn` / `nameColumn` / `textColumn` / `timeColumn` / `actionColumn` 工厂。常量不合适时可在调用处传显式 `width`（`scroll.x` 由 `tableScrollX` 求和，不会漂移），但**同类列在各页必须同宽**，禁止同一字段一处 150、一处 180，也禁止与内容无关的整百凑数宽度。
 - **所有列都必须有显式列宽**：`tableLayout="fixed"` 下没有宽度的列会被压扁，因此即使是自由文本列也要给 `TEXT_COL_WIDTH` / `LONG_TEXT_COL_WIDTH`。
@@ -611,7 +617,7 @@ actionColumn<TenantItem>({
 
 ### 列表页时间列规范（创建时间 + 更新时间）
 
-所有列表页（Table）的时间列遵守以下硬规则，规范细节同步维护在 `frontend/DESIGN.md` §7.3。
+所有列表页（Table）的时间列遵守以下硬规则，规范细节同步维护在 `DESIGN.md` §7.3。
 
 **R3 一律展示「创建时间」，可编辑业务主体同时展示「更新时间」。**
 

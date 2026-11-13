@@ -21,7 +21,7 @@
 ## 1. P0 前端组件发布为 npm 包（**已完成 — 2026-11-06**）
 
 > **状态：已落地（最终采用「单门面包」形态）。** 对外**只发布一个包** `@morehao/ark-iam-react`：它把内部 `@ark-iam/{types,api,auth,ui}` 的代码与类型**打进自身 dist**，以 ESM 子路径 `@morehao/ark-iam-react/{types,api,auth,ui}` 按需暴露，根入口 `@morehao/ark-iam-react` 一把梭。T1~T9 全绿：库构建（ESM + `.d.ts`，含类型自包含 bundle）、入口 `exports` 指向 `dist`、`publishConfig.access=public`、peer/dev 依赖分类、脚本化版本/发布通道（仅门面包）、接入文档、仓外空项目冒烟（tarball 离线 → 外部 vite+react 项目 `actionColumn` 表格渲染 + `createAuthProvider` 登录跳转 PKCE 成功；独立 facade 消费测试：根入口 + 四子路径 runtime/tsc 均过）均通过。
-> 运行期配置优先级：**props > `/config.json` > `VITE_*` > 相对默认值**（`/config.json` 由后端 `iam/app_frontend.go` 从 `Config.Raw` 与请求 Host 派生，含 CORS）；仓内 dev 走 `src`（`frontend/vite.alias.ts` 的 `arkIamAlias`），发布走 `dist`。
+> 运行期配置优先级：**props > `/config.json` > `VITE_*` > 相对默认值**（`/config.json` 由后端 `iam/app_frontend.go` 从 `Config.Raw` 与请求 Host 派生，含 CORS）；仓内 dev 走 `src`（`vite.alias.ts` 的 `arkIamAlias`），发布走 `dist`。
 > 发布目标：**公共 npm**，包名 `@morehao/ark-iam-react`，scope `@morehao`（免费 public org）。内部四包不对外发布。以下为原始方案留档。
 
 ### 1.1 目标
@@ -55,22 +55,22 @@ import { createApiClient } from '@ark-iam/api'
 
 | # | 阻塞点 | 现状 | 要改成 |
 |---|---|---|---|
-| B1 | API baseURL 硬编码 | `frontend/packages/api/src/request.ts`：`axios.create({ baseURL: '/v1' })` + 模块级单例 | 导出 `createApiClient({ baseURL, timeout, headers })`；保留一个默认实例供仓内使用 |
-| B2 | OIDC issuer 构建期注入 | `frontend/packages/auth/src/config.ts`：`import.meta.env.VITE_OIDC_ISSUER \|\| '/oidc'` | 改为运行时参数：`AuthProvider` 接收 `issuer / clientId / redirectPath / postLogoutRedirectPath`，`VITE_*` 仅作仓内默认值 |
+| B1 | API baseURL 硬编码 | `packages/api/src/request.ts`：`axios.create({ baseURL: '/v1' })` + 模块级单例 | 导出 `createApiClient({ baseURL, timeout, headers })`；保留一个默认实例供仓内使用 |
+| B2 | OIDC issuer 构建期注入 | `packages/auth/src/config.ts`：`import.meta.env.VITE_OIDC_ISSUER \|\| '/oidc'` | 改为运行时参数：`AuthProvider` 接收 `issuer / clientId / redirectPath / postLogoutRedirectPath`，`VITE_*` 仅作仓内默认值 |
 | B3 | `/config.json` 端点无人消费（**已随 2026-11 分层倒置重构解决**：端点改由 `sdk/server.App.MountConfig` 提供，前端 `@morehao/ark-iam-react` 已消费） | `iam/app_frontend.go` 注册了该端点（旧实现，文件已随 `backend/iam` 删除），前端**未读取**（当前是预留/死代码） | 二选一：<br>(a) 前端启动时先拉 `{base}/config.json` 覆盖默认值（推荐，配合 B2）；<br>(b) 若确认不做运行时配置，则从 `MountFrontend` 删除该端点，避免误导 |
 
 ### 1.4 任务清单
 
 | # | 任务 | 要改的文件 | 验收标准 |
 |---|---|---|---|
-| T1 | 为 4 个包加库构建 | `frontend/packages/{ui,auth,api,types}/package.json` + 新增 `vite.config.lib.ts`（或 `tsup.config.ts`） | `pnpm --filter './packages/*' build` 产出 `dist/`（ESM + `.d.ts`）；`dist/index.js` 可被 node 解析 |
+| T1 | 为 4 个包加库构建 | `packages/{ui,auth,api,types}/package.json` + 新增 `vite.config.lib.ts`（或 `tsup.config.ts`） | `pnpm --filter './packages/*' build` 产出 `dist/`（ESM + `.d.ts`）；`dist/index.js` 可被 node 解析 |
 | T2 | 包入口指向产物 | 同上 | `main`/`module`/`types` 指向 `dist`；`exports` 映射 `dist`；`files: ["dist"]` |
 | T3 | 去 private + publishConfig | 同上 | `private` 删除或改 `false`；`publishConfig` 指定 registry 与 `access` |
 | T4 | 依赖分类：peer vs dep | 4 个包的 `package.json` | `react`、`react-dom`、`antd`、`@ant-design/icons`、`react-router-dom`（ui/auth 用到的）进 `peerDependencies` + `devDependencies`；避免重复打包 |
 | T5 | `types` 包只产声明 | `packages/types` | 产出 `.d.ts`（无 JS 或仅空 ESM），消费者类型可用 |
 | T6 | 样式/静态资源随包分发 | `packages/ui`（如有 css） | 若存在 CSS，需在 `exports` 暴露样式入口（`./styles.css`），并在 README 说明需手动引入 |
 | T7 | 版本与发布通道 | 仓库根（新增 `changesets` 或脚本） | 能独立给 4 个包打版本；发布到私有 registry / GitHub Packages 成功 |
-| T8 | 消费者接入文档 | `docs/design/application-integration-guide.md` 新增「前端组件接入」一节；`frontend/packages/ui/README.md`（新建） | 文档给出：安装、`ConfigProvider theme={themeConfig}`、`AuthProvider` 参数、`createApiClient` 用法、最小页面示例 |
+| T8 | 消费者接入文档 | `docs/design/application-integration-guide.md` 新增「前端组件接入」一节；`packages/ui/README.md`（新建） | 文档给出：安装、`ConfigProvider theme={themeConfig}`、`AuthProvider` 参数、`createApiClient` 用法、最小页面示例 |
 | T9 | 冒烟：仓外项目验证 | 新建一个临时仓外 demo（不提交） | 在空目录 `pnpm add` 后，能渲染一个用 `actionColumn` 的表格，且 `AuthProvider` 能完成登录跳转 |
 
 ### 1.5 工作量与风险
@@ -78,7 +78,7 @@ import { createApiClient } from '@ark-iam/api'
 - 估量：**T1~T9 约 3~5 人日**（含发布通道搭建与仓外冒烟）。
 - 风险：
   - **antd 版本耦合**：`ui` 深度依赖 antd 5 的 `ConfigProvider`/`theme`，peer 版本区间过宽会让消费者主题错乱；建议 peer 收紧为 `^5.22`。
-  - **设计令牌是代码事实源**（`frontend/packages/ui/src/theme.ts`），发布后即成为对外契约，改动需按 semver。
+  - **设计令牌是代码事实源**（`packages/ui/src/theme.ts`），发布后即成为对外契约，改动需按 semver。
   - **i18n / 文案**：组件内中文文案硬编码，若未来要国际化，需在发布前先抽出。
   - **构建产物与仓内 dev 的双轨**：`workspace:*` 下是否走 `dist` 还是 `src` 需明确（建议 `publishConfig` + `exports` 条件导出，dev 走 src、发布走 dist），否则开发期要频繁 build。
 
@@ -154,5 +154,5 @@ import { IamProvider, IamRoutes } from '@morehao/ark-iam-react'
 | `iam.Config.Redis` 未打通（**随 2026-11 分层倒置重构迁移为 `server.Config.Redis`**） | 已修：`initRedis` 建连接后同步注册全局 `dbclient.RedisCli`；`Service` 缺省 `iam` | `pkg/dbclient/redis.go`、`iam/app_db.go`、`iam/redis_bridge_test.go`（旧实现，随 `backend/iam` 删除） |
 | e2e 全流程（真实 PG + Redis） | 8 项全通（建表/install/前端/OIDC discovery/授权码全流程/token 访问/负向 401/落库核对） | `.dsh/docs/notes/2026-11-06-iam-e2e-report.md`（本地，未入库） |
 | 可嵌入 IAM 库落地（**已被 2026-11 分层倒置重构取代**：`backend/iam` 独立模块彻底删除，能力迁到 `sdk/server` 门面 + `apps/*` 各域库；`go test ./iam/...` 已不适用） | R0~R6 完成，`go test ./iam/...` 25 包全绿 | 历史落点 `backend/iam/`、`backend/iam/README.md`（均已删除） |
-| P0 前端组件发布为 npm 包 | 已完成（T1~T9，单门面包 `@morehao/ark-iam-react`）：内部四包代码+类型打进 dist，ESM 子路径 `/types /api /auth /ui` 按需引入，对外只发布一个包；peer/dev 分类、脚本发布通道、接入文档、仓外冒烟（actionColumn 表格 + AuthProvider PKCE 登录跳转）+ facade 独立消费（runtime+tsc）均通过。运行期配置优先级 props > `/config.json` > `VITE_*` > 默认 | 见 `docs/design/application-integration-guide.md` §12、`frontend/packages/react/`、`frontend/vite.alias.ts`、`frontend/scripts/release-packages.mjs` |
-| 门面包公共 npm 首发 | `@morehao/ark-iam-react@0.1.0` 已发布到公共 npm（scope `@morehao` = 账号用户级 scope，未建 org），`dist-tags.latest=0.1.0`，外部 `pnpm add @morehao/ark-iam-react` 可用。发布口径：起始版本用 `0.1.0`；曾误发 `1.0.0`/`0.0.0-stage` 已 unpublish 清理。发布前需 `npm login` 并把 registry 指到 `https://registry.npmjs.org`（本机默认是 npmmirror 镜像，不可发布） | 公共 npm registry `@morehao/ark-iam-react`；`frontend/packages/react/package.json` |
+| P0 前端组件发布为 npm 包 | 已完成（T1~T9，单门面包 `@morehao/ark-iam-react`）：内部四包代码+类型打进 dist，ESM 子路径 `/types /api /auth /ui` 按需引入，对外只发布一个包；peer/dev 分类、脚本发布通道、接入文档、仓外冒烟（actionColumn 表格 + AuthProvider PKCE 登录跳转）+ facade 独立消费（runtime+tsc）均通过。运行期配置优先级 props > `/config.json` > `VITE_*` > 默认 | 见 `docs/design/application-integration-guide.md` §12、`packages/react/`、`vite.alias.ts`、`scripts/release-packages.mjs` |
+| 门面包公共 npm 首发 | `@morehao/ark-iam-react@0.1.0` 已发布到公共 npm（scope `@morehao` = 账号用户级 scope，未建 org），`dist-tags.latest=0.1.0`，外部 `pnpm add @morehao/ark-iam-react` 可用。发布口径：起始版本用 `0.1.0`；曾误发 `1.0.0`/`0.0.0-stage` 已 unpublish 清理。发布前需 `npm login` 并把 registry 指到 `https://registry.npmjs.org`（本机默认是 npmmirror 镜像，不可发布） | 公共 npm registry `@morehao/ark-iam-react`；`packages/react/package.json` |

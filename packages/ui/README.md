@@ -8,9 +8,9 @@ Ark IAM 前端共享组件与设计令牌库（React + antd 5）。
 2. **列表页列工厂**：`actionColumn` / `nameColumn` / `textColumn` / `idColumn` / `timeColumn` / `tableScrollX` 及列宽常量 —— 收敛各页列宽、操作列与横向滚动。
 3. **骨架与通用组件**：`AppShell` / `MainLayout` / `PageContainer` / `LoginPage` / `TenantSwitcher` / `ProfileCenter` / `RemoteSelect` / `RemoteMultiSelect` / 状态 Tag 等。
 
-> 设计规范细节见仓库根 `frontend/DESIGN.md`；接入完整说明见 `docs/design/application-integration-guide.md` §12「前端组件接入」。
+> 设计规范细节见仓库根 `DESIGN.md`；接入完整说明见 `docs/design/application-integration-guide.md` §12「前端组件接入」。
 
-> 说明：`@ark-iam/ui` 是**内部包**，不单独对外发布。外部业务项目请安装门面包 `@morehao/ark-iam-react`，从 `@morehao/ark-iam-react/ui` 引入本包的组件与令牌。见 `frontend/packages/react/README.md`。
+> 说明：`@ark-iam/ui` 是**内部包**，不单独对外发布。外部业务项目请安装门面包 `@morehao/ark-iam-react`，从 `@morehao/ark-iam-react/ui` 引入本包的组件与令牌。见 `packages/react/README.md`。
 
 ## 安装（门面包）
 
@@ -111,7 +111,7 @@ const columns = [
 - 所有列都有显式列宽，优先取列工厂/常量；同类列在各页必须同宽。
 - 视觉只用 `tokens` / `themeConfig`，禁止硬编码色值或自造样式。
 
-规范出处：`frontend/DESIGN.md` §7.3；接入说明：`docs/design/application-integration-guide.md` §12。
+规范出处：`DESIGN.md` §7.3；接入说明：`docs/design/application-integration-guide.md` §12。
 
 ## peerDependencies 口径
 

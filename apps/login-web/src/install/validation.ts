@@ -5,7 +5,7 @@ import type { InstallField, InstallFieldErrors, InstallForm } from '@ark-iam/log
  *
  * 规则与后端逐条对齐（不引入后端没有的限制，也不漏掉后端会拒的明显输入）：
  *   - 用户名：必填、≤128 字符（后端 max 128）
- *   - 密码：8~128 字符，且同时含大写、小写、数字（backend/pkg/credential.ValidateStrength）
+ *   - 密码：8~128 字符，且同时含大写、小写、数字（pkg/credential.ValidateStrength）
  *   - 确认密码：必须一致
  *   - 邮箱 / 手机号：至少填一个（后端 107005 的典型触发条件）
  * 客户端校验只为即时反馈，后端 400（107005/107006）仍按字段回填。

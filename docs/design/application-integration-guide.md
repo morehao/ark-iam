@@ -766,7 +766,7 @@ func main() {
 >
 > 它区别于 §4「手工手写 oidcConfig」：§4 演示的是不依赖本仓包的通用接法；本节演示的是**复用 `@morehao/ark-iam-react` 门面包**的接法——两者都能完成 OIDC 登录，后者更省心、且视觉/交互与本仓控制台一致。
 >
-> 事实源：`frontend/packages/react/src`（聚合壳）与 `frontend/packages/{auth,api,ui,types}/src`（实现）。本节所有签名与默认值均以这些源码为准。
+> 事实源：`packages/react/src`（聚合壳）与 `packages/{auth,api,ui,types}/src`（实现）。本节所有签名与默认值均以这些源码为准。
 
 ### 12.1 安装
 
@@ -807,7 +807,7 @@ import { themeConfig } from '@morehao/ark-iam-react/ui'
 
 > 也可直接用 `@morehao/ark-iam-react/ui` 的 `AppShell`（内部已包好 `ConfigProvider` + `themeConfig` + `antd App` 上下文，并注入全局等宽数字等结构性微修正）。若宿主已有自己的 `ConfigProvider`，仅引入 `themeConfig` 复用主题即可。
 >
-> `themeConfig` 是发布后的对外契约，改动按 semver 处理（见 `frontend/DESIGN.md` §10 令牌清单）。
+> `themeConfig` 是发布后的对外契约，改动按 semver 处理（见 `DESIGN.md` §10 令牌清单）。
 
 ### 12.3 登录：`createAuthProvider(opts)`
 
@@ -995,7 +995,7 @@ export default function App() {
 要点：
 
 - **登录跳转**：`useAuthGuard()` 内部已注册 `setUserProvider`（令牌注入）与 `setSessionExpiredHandler`（401 时清 user）；未认证时调用 `auth.signinRedirect()` 即跳转 `/oidc/authorize`（授权码 + PKCE）。回调页（默认 `/auth/callback`）由 `AuthProvider` 内部的 `react-oidc-context` 处理。
-- **操作列 `actionColumn`**：默认最多横排 3 个、超过即收「更多」下拉、永远 `fixed: 'right'`；支持 `danger`（危险红）、`confirm`（二次确认）、`hidden`（运行时隐藏）。**列宽由 `actionColumnWidth(max)` 自动给出，页面禁止手写 `width/title/key/fixed`**（规范见 `frontend/DESIGN.md` §7.3 R1）。
+- **操作列 `actionColumn`**：默认最多横排 3 个、超过即收「更多」下拉、永远 `fixed: 'right'`；支持 `danger`（危险红）、`confirm`（二次确认）、`hidden`（运行时隐藏）。**列宽由 `actionColumnWidth(max)` 自动给出，页面禁止手写 `width/title/key/fixed`**（规范见 `DESIGN.md` §7.3 R1）。
 - **列宽/横滚**：所有列用 `@morehao/ark-iam-react/ui` 的列工厂（`idColumn`/`nameColumn`/`textColumn`/`timeColumn`/`actionColumn`），`Table` 写 `tableLayout="fixed"` + `scroll={tableScrollX(columns)}`（规范见 §7.3）。
 
 ### 12.6 样式与类型说明
@@ -1026,8 +1026,8 @@ export default function App() {
   - **代码打进 dist**：内部 `@ark-iam/{types,api,auth,ui,login}` 的源码被 rollup **打包进** `@morehao/ark-iam-react` 的 dist（不 external），只有第三方依赖（react/antd/axios/oidc-client-ts/react-oidc-context/react-router-dom 等）external——这样才能做到「对外只一个包」，消费者无需再装内部四包。
   - **类型打进 dist**：`bundle-dts.mjs` 把内部各包的 `.d.ts` 复制到 `dist/_types/<pkg>/` 并改写其 `@ark-iam/*` 引用为相对路径，各入口 `d.ts` re-export `./_types/<pkg>/index`，消费者拿到自包含类型（不依赖内部包声明）。
   - 依赖解析注意：`_types/api/*.d.ts` 里 `import ... from 'axios'` 等外部模块需能从 `packages/react` 的 node_modules 解析到（真实 `pnpm install` 会依据 `@morehao/ark-iam-react` 的 dependencies/peer 建立链接；仓内手动联调时可临时软链）。
-- **仓内 dev 走 src**：各 app 的 `vite.config.ts` 引入 `frontend/vite.alias.ts` 的 `arkIamAlias`，把 `@morehao/ark-iam-react/{types,api,auth,ui}`（及内部 `@ark-iam/*`）alias 到对应包 `src`，开发期无需 build；发布/外部消费走 `dist`。这是「双轨」的唯一约定——不要让仓内 app 直接消费 dist，否则改包就要频繁 build。
-- **版本与发布（脚本化，非 changesets）**：`frontend/scripts/release-packages.mjs` 仅针对门面包 `@morehao/ark-iam-react` 提供 `version <x.y.z>`（改版本）/ `pack`（build + `pnpm pack` 产 tarball）/ `publish [--registry <url>]`；内部四包（含 `@ark-iam/login`）不单独发布。私有 registry / GitHub Packages 的 `@morehao:registry` 与 token 配置见 `frontend/.npmrc` 注释模板。发布 scope 为 **`@morehao`**（公共 npm 免费 org）。
+- **仓内 dev 走 src**：各 app 的 `vite.config.ts` 引入 `vite.alias.ts` 的 `arkIamAlias`，把 `@morehao/ark-iam-react/{types,api,auth,ui}`（及内部 `@ark-iam/*`）alias 到对应包 `src`，开发期无需 build；发布/外部消费走 `dist`。这是「双轨」的唯一约定——不要让仓内 app 直接消费 dist，否则改包就要频繁 build。
+- **版本与发布（脚本化，非 changesets）**：`scripts/release-packages.mjs` 仅针对门面包 `@morehao/ark-iam-react` 提供 `version <x.y.z>`（改版本）/ `pack`（build + `pnpm pack` 产 tarball）/ `publish [--registry <url>]`；内部四包（含 `@ark-iam/login`）不单独发布。私有 registry / GitHub Packages 的 `@morehao:registry` 与 token 配置见 `.npmrc` 注释模板。发布 scope 为 **`@morehao`**（公共 npm 免费 org）。
 
 ### 12.9 宿主内嵌 OP 时挂账密页（`@morehao/ark-iam-react/login`）
 

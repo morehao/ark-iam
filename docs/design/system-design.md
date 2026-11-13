@@ -206,7 +206,7 @@ app.MountConfig(engine, "/")    // 挂 /config.json 运行时配置端点（仅�
 | platform-admin-web | 4001 | 平台管理后台（OIDC Client，client_id `platform_admin_web`，public + PKCE） |
 | tenant-admin-web | 4002 | 租户管理后台（OIDC Client，client_id `tenant_admin_web`，public + PKCE） |
 
-前端为 pnpm monorepo：`packages/{types,api,auth,ui}` 为共享包（`@ark-iam/ui` 提供设计令牌与共享组件，令牌事实源是 `frontend/packages/ui/src/theme.ts` 的 `tokens`），业务页面一律复用共享组件、禁止硬编码色值；视觉规范见 `frontend/DESIGN.md`。
+前端为 pnpm monorepo：`packages/{types,api,auth,ui}` 为共享包（`@ark-iam/ui` 提供设计令牌与共享组件，令牌事实源是 `packages/ui/src/theme.ts` 的 `tokens`），业务页面一律复用共享组件、禁止硬编码色值；视觉规范见根目录 `DESIGN.md`。
 
 ### 3.3 技术栈
 
@@ -691,7 +691,7 @@ sequenceDiagram
 
 **要点**：落哪个租户由**邀请码**决定（租户侧授权）；`joinTenant` **禁止裸 `tenantID` 直入**——这是软隔离多租户模型下的必要门禁（对标 keycloak 落当前 realm / zitadel org scope）。加入者永远是普通成员：`owner_type=owner` 只在**自助开通租户或平台建租户**时产生，平台端不提供 owner 指派接口（`PUT /v1/platform/users/{userID}/owner` 已下线），该字段仅用于展示、不参与鉴权。
 
-通道 B 有**两道门禁**，按序判定（见 `backend/apps/auth/internal/service/svcauth/auth.go` 的 `JoinTenant`）：
+通道 B 有**两道门禁**，按序判定（见 `apps/auth/internal/service/svcauth/auth.go` 的 `JoinTenant`）：
 
 1. **应用级策略** `application.allow_join_by_invite`：与通道 A 的 `allow_person_create_tenant` 完全对称——按调用方 access token 的 `client_id` 解析出应用，再读该应用的开关（`pkg/core/application.GetByClientID` + `AllowsJoinByInvite`，两条通道共用同一份实现）。
    - **fail-closed**：解析不出应用（`client_id` 为空、客户端或应用不存在）一律拒绝；字段为 NULL（未配置）同样视为不允许。（机器凭证通道不注入 person 身份，`JoinTenant` 在其之前即按未认证拒绝，因此走不到本门禁。）

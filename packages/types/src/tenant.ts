@@ -1,4 +1,4 @@
-// tenantadmin 领域类型（与 backend/apps/tenantadmin/internal/dto/dtotenant 对齐）
+// tenantadmin 领域类型（与 apps/tenantadmin/internal/dto/dtotenant 对齐）
 
 import type { UserDepartmentItem } from './department'
 import type { AppStatus, MenuItem, SysAdminType } from './platform'

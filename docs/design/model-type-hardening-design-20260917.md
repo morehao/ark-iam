@@ -1,7 +1,7 @@
 # 模型层类型强化方案：JSON 列显式化 · bool → 具名枚举 · 原生时间类型
 
 > 状态：**待实施**（标准档 · 结构重构 + 下线废弃 双场景）
-> 范围：`backend/pkg`（model / dao / object / core / seed / testsetup）+ `auth` / `platformadmin` / `tenantadmin` 三个应用 + `frontend` 受影响页面 + `docs/design`
+> 范围：`pkg`（model / dao / object / core / seed / testsetup）+ `apps/{auth,platformadmin,tenantadmin}` 三个应用 + `apps/*-web` 受影响页面 + `docs/design`
 > 本文只给方案，不动代码。所有 GORM 行为结论均已在本仓实测（见 §4；实测脚本已删除，未留改动）
 >
 > **评审已定策略（2026-09-17）**
@@ -58,7 +58,7 @@
 
 ## 3. 现状勘察（量化）
 
-计数口径统一为：`grep -rn` 于 `backend/`，非测试文件（除特别注明）。**基线：`58d95f9`（#68 合并后，2026-09-18 复核）**；本文档首版按 `4dae721` 盘点，本次已把 #68 新增的 `application.role_template` 与前端改动计入。
+计数口径统一为：`grep -rn` 于仓库根 `pkg/`+`apps/`，非测试文件（除特别注明）。**基线：`58d95f9`（#68 合并后，2026-09-18 复核）**；本文档首版按 `4dae721` 盘点，本次已把 #68 新增的 `application.role_template` 与前端改动计入。
 
 ### 3.1 JSON 列：21 个字段 / 10 张表
 
@@ -517,7 +517,7 @@ type UserIdentityDetail struct {
 | `apps/tenantadmin` | 8 | `svctenant/api_key`（删 `scope`、`last_used_at` 出参）、`user`/`machine_user`/`department_user`（`is_suspended→status`）、`user_identity`（detail 结构化）、DTO |
 | `go.mod` | 1 | `pkg` 删除 `gorm.io/datatypes` direct 依赖；swagger 产物重跑 |
 
-### 7.2 前端（`frontend/`）
+### 7.2 前端（`packages/` + `apps/*-web`）
 
 | 文件 | 改动 |
 |---|---|
@@ -590,15 +590,15 @@ type UserIdentityDetail struct {
 
 | ID | 标准 | 验证方式 |
 |---|---|---|
-| AC-1 | `pkg/model` 中不再有 `datatypes.JSON` / `json.RawMessage` / `type:boolean` / `sql.Null` | `grep -rn "datatypes\.JSON\|json\.RawMessage\|type:boolean\|sql\.Null" backend/pkg/model` → 0 行 |
-| AC-2 | 全仓不再有 `datatypes.JSON` / `json.RawMessage` / `sql.NullTime` | `grep -rn` 于 `backend/`（`*_test.go` 之外）→ 0 行；`pkg/go.mod` 无 `gorm.io/datatypes` |
+| AC-1 | `pkg/model` 中不再有 `datatypes.JSON` / `json.RawMessage` / `type:boolean` / `sql.Null` | `grep -rn "datatypes\.JSON\|json\.RawMessage\|type:boolean\|sql\.Null" pkg/model` → 0 行 |
+| AC-2 | 全仓不再有 `datatypes.JSON` / `json.RawMessage` / `sql.NullTime` | `grep -rn` 于仓库根 `pkg/`+`apps/`（`*_test.go` 之外）→ 0 行；`pkg/go.mod` 无 `gorm.io/datatypes` |
 | AC-3 | 6 处 `UpdateMap` 不再携带 JSON 值 | 逐一核对，JSON 列一律走 `UpdateFields`（含 `svcapplication/application.go` 的 `role_template`） |
 | AC-4 | 全部模块测试通过 | `cd backend && go test ./apps/auth/... ./apps/gateway/... ./apps/platformadmin/... ./apps/tenantadmin/... ./pkg/...` |
 | AC-5 | 全量 `AutoMigrate + Seed` 在**空库**上成功 | `testutil.SetupSQLite` 全实体 + `Seed`，断言无错误且目标表/列齐备 |
 | AC-6 | **PG 上**空库 `AutoMigrate + Seed` + 核心协议回归全绿 | 一次性 PG 集成验证（docker 起 PG，跑完即弃），验证 `serializer:json` 与 `UpdateFields` 在 pgx 下的行为 |
 | AC-7 | 前端测试与类型检查全绿，D1/D2 用例转绿；`oauthClient` 的 PKCE 展示/提交断言已随 P3 改为枚举口径 | `pnpm -C frontend test` + 各 app `tsc --noEmit` |
 | AC-8 | swagger 产物仅含预期字段差异 | `make swag APP=auth\|platformadmin\|tenantadmin` 后 `git diff --stat` 审查 |
-| AC-9 | 仓库内**不存在**回填 SQL / 兼容旧库分支；`run-and-deploy.md` §2.3 已补本批脏值说明 | `grep -rn "information_schema\|Migrator()\|DROP COLUMN\|USING " backend/`（Go 代码）→ 0 行；`run-and-deploy.md` 评审 |
+| AC-9 | 仓库内**不存在**回填 SQL / 兼容旧库分支；`run-and-deploy.md` §2.3 已补本批脏值说明 | `grep -rn "information_schema\|Migrator()\|DROP COLUMN\|USING " pkg/ apps/`（Go 代码）→ 0 行；`run-and-deploy.md` 评审 |
 | AC-10 | 枚举类型独占性测试通过（同类型不被两列引用） | §8.3 第 3 项反射测试 |
 | AC-11 | 新增枚举/载具类型均符合 §10 规则 | 代码评审 |
 

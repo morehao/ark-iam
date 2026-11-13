@@ -118,5 +118,5 @@ const AuthProvider = createAuthProvider({ clientID: 'my_app_web' })
 - [`examples/rp-gin/`](./examples/rp-gin/) —— 独立模块，`require github.com/morehao/ark-iam/sdk v0.4.0`（**不用 replace**），
   演示「引 SDK 依赖接入已有 IAM」的 RP 侧验签接入。
 
-> 原「内嵌 OP」示例 `backend/examples/embedded-iam-demo` 已随分层倒置重构删除：服务端域实现归 `apps/*`，
+> 原「内嵌 OP」示例 `examples/embedded-iam-demo` 已随分层倒置重构删除：服务端域实现归 `apps/*`，
 > 前端改由 npm 包 `@morehao/ark-iam-react` 提供，Go 侧不再托管任何前端静态资源。

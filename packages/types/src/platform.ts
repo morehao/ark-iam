@@ -1,4 +1,4 @@
-// platformadmin 领域类型（与 backend/apps/platformadmin/internal/dto 对齐）
+// platformadmin 领域类型（与 apps/platformadmin/internal/dto 对齐）
 
 // 系统管理类型：admin=管理员角色（具备系统管理能力），normal=普通角色（不具备）。
 export type SysAdminType = 'admin' | 'normal'

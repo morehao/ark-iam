@@ -88,7 +88,7 @@ func TestSeedPackageHasNoAuditDependency(t *testing.T) {
 // "谁触发了这次操作"退化成不可信（例如未来加一个 CLI 引导入口，它会带着 HTTP 的
 // actor 信息写审计，或者干脆写不出来）。
 func TestInstallServiceDoesNotWriteAudit(t *testing.T) {
-	svcDir := filepath.Join(repoRootForDeps(t), "backend", "apps", "auth", "service", "svcinstall")
+	svcDir := filepath.Join(repoRootForDeps(t), "apps", "auth", "service", "svcinstall")
 	entries, err := os.ReadDir(svcDir)
 	if err != nil {
 		t.Fatalf("read %s: %v", svcDir, err)

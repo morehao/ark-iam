@@ -10,7 +10,7 @@ import { tokens } from './theme'
  * 下实测 146.06px（macOS / Chrome / 系统字体栈，为常见平台里较宽的一种）；
  * antd v5 单元格水平内边距为 `token.padding` × 2 = 32px，故单行显示至少需要 178.06px，
  * 取 180 留余量。低于该值的列宽会让时间恰好在唯一的空格处折行成「日期 / 时间」两行
- * （规范见 frontend/DESIGN.md §7.3）。
+ * （规范见 DESIGN.md §7.3）。
  */
 export const TIME_COL_WIDTH = 180
 

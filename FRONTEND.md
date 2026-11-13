@@ -18,17 +18,17 @@ IAM 管理平台前端，基于 React 18 + Vite + Ant Design 5.x 的 pnpm monore
 ## 项目结构
 
 ```
-frontend/
-├── packages/
-│   ├── tsconfig/          # 共享 TS 配置
-│   ├── types/             # 领域类型（auth / department / platform）
-│   ├── api/               # Axios 实例 + 全量领域 API 资源
-│   ├── auth/              # OIDC Provider、租户切换、登出、鉴权守卫
-│   └── ui/                # 设计系统：主题、MainLayout、LoginPage、PageContainer 等
-└── apps/
-    ├── login-web/         # 登录页（:4000）— OP 登录 UI：凭证登录 / 多租户选择（非 OIDC Client）
-    ├── platform-admin-web/# 平台管理后台（:4001）— 用户/角色/菜单/部门/应用/OAuth客户端/租户/API Key/域名/审计日志
-    └── tenant-admin-web/  # 租户管理后台（:4002）— 部门/部门角色/部门用户/部门角色用户
+<repo root>/
+├── packages/                # 共享包（pnpm workspace）
+│   ├── tsconfig/            # 共享 TS 配置
+│   ├── types/               # 领域类型（auth / department / platform）
+│   ├── api/                 # Axios 实例 + 全量领域 API 资源
+│   ├── auth/                # OIDC Provider、租户切换、登出、鉴权守卫
+│   └── ui/                  # 设计系统：主题、MainLayout、LoginPage、PageContainer 等
+└── apps/                    # 前端应用与后端应用平铺在同一 apps/ 下
+    ├── login-web/           # 登录页（:4000）— OP 登录 UI：凭证登录 / 多租户选择（非 OIDC Client）
+    ├── platform-admin-web/  # 平台管理后台（:4001）— 用户/角色/菜单/部门/应用/OAuth客户端/租户/API Key/域名/审计日志
+    └── tenant-admin-web/    # 租户管理后台（:4002）— 部门/部门角色/部门用户/部门角色用户
 ```
 
 依赖方向：`ui → auth → api → types`，业务 app 消费共享包。
