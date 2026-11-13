@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Select, Space, Table, message } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, CODE_COL_WIDTH, idColumn, PageContainer, STATUS_COL_WIDTH, tableScrollX, textColumn, timeColumn, VerifiedTag } from '@morehao/ark-iam-react/ui'
+import { actionColumn, CODE_COL_WIDTH, idColumn, PageContainer, StatCard, StatRow, STATUS_COL_WIDTH, tableScrollX, textColumn, timeColumn, VerifiedTag } from '@morehao/ark-iam-react/ui'
 import { createDomain, deleteDomain, getDomainDetail, getDomainPageList, updateDomain } from '@morehao/ark-iam-react/api'
 import type { DomainItem, DomainVerificationStatus } from '@morehao/ark-iam-react/types'
 
@@ -120,8 +120,13 @@ export default function DomainList() {
           </Button>
         </Space>
       }
-    >
-      <div style={{ marginBottom: 16 }}>
+      summary={
+        <StatRow>
+          <StatCard label="域名总数" value={total} hint="当前筛选下返回总数" />
+          <StatCard label="本页数量" value={data.length} hint={`第 ${page} 页 · 每页 ${pageSize} 条`} />
+        </StatRow>
+      }
+      toolbar={
         <Input.Search
           allowClear
           placeholder="按域名搜索"
@@ -129,7 +134,8 @@ export default function DomainList() {
           style={{ width: 240 }}
           onSearch={(v) => { setKeyword(v); setPage(1) }}
         />
-      </div>
+      }
+    >
       <Table<DomainItem>
         rowKey="id"
         columns={columns}

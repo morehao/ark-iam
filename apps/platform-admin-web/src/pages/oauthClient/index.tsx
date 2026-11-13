@@ -11,6 +11,8 @@ import {
   PageContainer,
   RemoteSelect,
   SourceTag,
+  StatCard,
+  StatRow,
   STATUS_COL_WIDTH,
   EnableTag,
   tableScrollX,
@@ -290,8 +292,13 @@ export default function OAuthClientList() {
           </Button>
         </Space>
       }
-    >
-      <div style={{ marginBottom: 16 }}>
+      summary={
+        <StatRow>
+          <StatCard label="客户端总数" value={total} hint="当前筛选下返回总数" />
+          <StatCard label="本页数量" value={data.length} hint={`第 ${page} 页 · 每页 ${pageSize} 条`} />
+        </StatRow>
+      }
+      toolbar={
         <Input.Search
           allowClear
           placeholder="按名称搜索"
@@ -299,7 +306,8 @@ export default function OAuthClientList() {
           style={{ width: 240 }}
           onSearch={(v) => { setKeyword(v); setPage(1) }}
         />
-      </div>
+      }
+    >
       <Table<OAuthClientItem>
         rowKey="applicationClientID"
         columns={columns}

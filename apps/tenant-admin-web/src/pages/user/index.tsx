@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import {
   Avatar,
   Button,
@@ -17,7 +17,7 @@ import {
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, fmtTime, InitialPasswordModal, NAME_COL_WIDTH, NameLink, nameColumn, PageContainer, STATUS_COL_WIDTH, SuspendedTag, tableScrollX, textColumn, TEXT_COL_WIDTH, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
+import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, fmtTime, InitialPasswordModal, NAME_COL_WIDTH, NameLink, nameColumn, PageContainer, StatCard, StatRow, STATUS_COL_WIDTH, SuspendedTag, tableScrollX, textColumn, TEXT_COL_WIDTH, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
 import type {
   DepartmentItem,
   TenantApiKeyItem,
@@ -70,7 +70,31 @@ const SUSPENDED_FLAG_FORM_PROPS = {
 }
 
 // ==================== Tab：用户（真实用户，保持原逻辑不变） ====================
-function UsersPane() {
+// 数据与筛选状态集中在 Provider（见下方 ServiceAccountsProvider 同款思路），
+// 让 summary（指标条）/ toolbar（搜索筛选）在 PageContainer 中读同一份列表数据，不改接口/筛选。
+interface UsersState {
+  data: TenantUserItem[]
+  loading: boolean
+  page: number
+  setPage: (v: number) => void
+  pageSize: number
+  setPageSize: (v: number) => void
+  total: number
+  keyword: string
+  setKeyword: (v: string) => void
+  status: UserStatus | undefined
+  setStatus: (v: UserStatus | undefined) => void
+  departmentID: string | undefined
+  setDepartmentID: (v: string | undefined) => void
+  deptTree: DepartmentItem[]
+  fetchData: () => Promise<void>
+  /** 顶部「新建用户」按钮触发的自增信号 */
+  createSignal: number
+  /** 顶部「新建用户」按钮点击：递增信号唤起 pane 内创建弹窗 */
+  triggerCreate: () => void
+}
+
+function UsersProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<TenantUserItem[]>([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -79,34 +103,8 @@ function UsersPane() {
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState<UserStatus | undefined>()
   const [departmentID, setDepartmentID] = useState<string>()
-
-  // 创建 / 编辑
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editing, setEditing] = useState<TenantUserItem | null>(null)
-  const [form] = Form.useForm()
-  const [submitLoading, setSubmitLoading] = useState(false)
-  // 编辑前的部门关系快照：仅在部门关系变化时才随 PATCH 提交，避免无谓地重置 joined_at
-  const [deptBefore, setDeptBefore] = useState<{ primaryDepartmentID?: string; secondaryDepartmentIDs: string[]; leaderDepartmentIDs: string[] }>({
-    secondaryDepartmentIDs: [],
-    leaderDepartmentIDs: [],
-  })
-
-  // 详情 Drawer
-  const [detailOpen, setDetailOpen] = useState(false)
-  const [detail, setDetail] = useState<TenantUserDetail | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
-
-  // 部门树（创建/编辑表单部门下拉）
   const [deptTree, setDeptTree] = useState<DepartmentItem[]>([])
-
-  // 授权角色（列表行操作 Modal：按应用授权，逻辑收敛于共享组件 RoleAssignEditor）
-  const [roleTarget, setRoleTarget] = useState<TenantUserItem | null>(null)
-
-  // 应用准入（列表行操作 Modal：准入层「用户 × 应用」，撤销会级联撤销该应用角色）
-  const [appAccessTarget, setAppAccessTarget] = useState<TenantUserItem | null>(null)
-
-  // 一次性初始/临时密码（建成员或重置密码后展示，关闭即不可再查）
-  const [initialPassword, setInitialPassword] = useState('')
+  const [createSignal, setCreateSignal] = useState(0)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -131,16 +129,79 @@ function UsersPane() {
     void fetchData()
   }, [fetchData])
 
-  // 部门树（创建/编辑表单部门下拉共用）
+  // 部门树（创建/编辑表单部门下拉）
   useEffect(() => {
     getDepartmentTree().then((resp) => setDeptTree(resp?.list || [])).catch(() => {})
   }, [])
+
+  const state: UsersState = {
+    data,
+    loading,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    total,
+    keyword,
+    setKeyword,
+    status,
+    setStatus,
+    departmentID,
+    setDepartmentID,
+    deptTree,
+    fetchData,
+    createSignal,
+    triggerCreate: () => setCreateSignal((n) => n + 1),
+  }
+  return <UsersStateContext.Provider value={state}>{children}</UsersStateContext.Provider>
+}
+
+const UsersStateContext = createContext<UsersState | null>(null)
+function useUsersState(): UsersState {
+  const ctx = useContext(UsersStateContext)
+  if (!ctx) throw new Error('useUsersState must be used within UsersProvider')
+  return ctx
+}
+
+function UsersPane() {
+  const { data, loading, page, setPage, pageSize, setPageSize, total, deptTree, fetchData, createSignal } = useUsersState()
+
+  // 创建 / 编辑
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<TenantUserItem | null>(null)
+  const [form] = Form.useForm()
+  const [submitLoading, setSubmitLoading] = useState(false)
+  // 编辑前的部门关系快照：仅在部门关系变化时才随 PATCH 提交，避免无谓地重置 joined_at
+  const [deptBefore, setDeptBefore] = useState<{ primaryDepartmentID?: string; secondaryDepartmentIDs: string[]; leaderDepartmentIDs: string[] }>({
+    secondaryDepartmentIDs: [],
+    leaderDepartmentIDs: [],
+  })
+
+  // 详情 Drawer
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detail, setDetail] = useState<TenantUserDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+
+  // 授权角色（列表行操作 Modal：按应用授权，逻辑收敛于共享组件 RoleAssignEditor）
+  const [roleTarget, setRoleTarget] = useState<TenantUserItem | null>(null)
+
+  // 应用准入（列表行操作 Modal：准入层「用户 × 应用」，撤销会级联撤销该应用角色）
+  const [appAccessTarget, setAppAccessTarget] = useState<TenantUserItem | null>(null)
+
+  // 一次性初始/临时密码（建成员或重置密码后展示，关闭即不可再查）
+  const [initialPassword, setInitialPassword] = useState('')
 
   const openCreate = () => {
     setEditing(null)
     form.resetFields()
     setModalOpen(true)
   }
+
+  // 顶部「新建用户」按钮（在 PageContainer extra）通过 createSignal 唤起本 pane 的创建弹窗
+  useEffect(() => {
+    if (createSignal > 0) openCreate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createSignal])
 
   // 编辑：先取详情回填（部门关系在编辑弹窗中一并维护：主/参与/负责部门）
   const openEdit = async (record: TenantUserItem) => {
@@ -311,55 +372,6 @@ function UsersPane() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-        <Space wrap>
-          <TreeSelect
-            allowClear
-            treeData={toTreeSelect(deptTree)}
-            treeDefaultExpandAll
-            placeholder="按部门筛选（恰在该部门）"
-            style={{ width: 220 }}
-            value={departmentID}
-            onChange={(v) => {
-              setDepartmentID(v)
-              setPage(1)
-            }}
-          />
-          <Select
-            allowClear
-            placeholder="状态"
-            style={{ width: 110 }}
-            value={status}
-            onChange={(v: UserStatus | undefined) => {
-              setStatus(v)
-              setPage(1)
-            }}
-            options={[
-              { label: '正常', value: 'active' },
-              { label: '挂起', value: 'suspended' },
-            ]}
-          />
-          <Input.Search
-            allowClear
-            placeholder="姓名/用户名/邮箱/手机"
-            prefix={<SearchOutlined />}
-            style={{ width: 260 }}
-            onSearch={(v) => {
-              setKeyword(v)
-              setPage(1)
-            }}
-          />
-        </Space>
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
-            刷新
-          </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            新建用户
-          </Button>
-        </Space>
-      </div>
-
       <Table<TenantUserItem>
         rowKey="userID"
         columns={columns}
@@ -576,7 +588,36 @@ function UsersPane() {
 }
 
 // ==================== Tab：服务账号（机器主体，user_type=machine） ====================
-function ServiceAccountsPane() {
+// 数据与筛选状态集中在 Provider：summary（指标条）/ toolbar（搜索筛选）在 PageContainer 中
+// 也能读到同一份列表数据，不新增接口请求、不改筛选逻辑。渲染用 render-prop 下传状态，
+// 让 pane 内部仍然引用同一批变量名，减少改动面。
+interface ServiceAccountsState {
+  data: TenantMachineUserItem[]
+  loading: boolean
+  page: number
+  setPage: (v: number) => void
+  pageSize: number
+  setPageSize: (v: number) => void
+  total: number
+  keyword: string
+  setKeyword: (v: string) => void
+  status: UserStatus | undefined
+  setStatus: (v: UserStatus | undefined) => void
+  fetchData: () => Promise<void>
+  /** 顶部「新建服务账号」按钮触发的自增信号，pane 监听后打开创建弹窗 */
+  createSignal: number
+  /** 顶部「新建服务账号」按钮点击：递增信号唤起 pane 内创建弹窗 */
+  triggerCreate: () => void
+}
+
+const ServiceAccountsStateContext = createContext<ServiceAccountsState | null>(null)
+function useServiceAccountsState(): ServiceAccountsState {
+  const ctx = useContext(ServiceAccountsStateContext)
+  if (!ctx) throw new Error('useServiceAccountsState must be used within ServiceAccountsProvider')
+  return ctx
+}
+
+function ServiceAccountsProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<TenantMachineUserItem[]>([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -584,6 +625,51 @@ function ServiceAccountsPane() {
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState<UserStatus | undefined>()
+  const [createSignal, setCreateSignal] = useState(0)
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const resp = await getMachineUserPageList({
+        page,
+        pageSize,
+        name: keyword || undefined,
+        status,
+      })
+      setData(resp?.list || [])
+      setTotal(resp?.total || 0)
+    } catch {
+      /* 拦截器已提示 */
+    } finally {
+      setLoading(false)
+    }
+  }, [page, pageSize, keyword, status])
+
+  useEffect(() => {
+    void fetchData()
+  }, [fetchData])
+
+  const state: ServiceAccountsState = {
+    data,
+    loading,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    total,
+    keyword,
+    setKeyword,
+    status,
+    setStatus,
+    fetchData,
+    createSignal,
+    triggerCreate: () => setCreateSignal((n) => n + 1),
+  }
+  return <ServiceAccountsStateContext.Provider value={state}>{children}</ServiceAccountsStateContext.Provider>
+}
+
+function ServiceAccountsPane() {
+  const { data, loading, page, setPage, pageSize, setPageSize, total, fetchData, createSignal } = useServiceAccountsState()
 
   // 创建 / 编辑
   const [modalOpen, setModalOpen] = useState(false)
@@ -608,28 +694,6 @@ function ServiceAccountsPane() {
   const [machineKeysTotal, setMachineKeysTotal] = useState(0)
   const [machineKeysLoading, setMachineKeysLoading] = useState(false)
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const resp = await getMachineUserPageList({
-        page,
-        pageSize,
-        name: keyword || undefined,
-        status,
-      })
-      setData(resp?.list || [])
-      setTotal(resp?.total || 0)
-    } catch {
-      /* 拦截器已提示 */
-    } finally {
-      setLoading(false)
-    }
-  }, [page, pageSize, keyword, status])
-
-  useEffect(() => {
-    void fetchData()
-  }, [fetchData])
-
   // 部门树（创建/编辑表单部门下拉共用）
   useEffect(() => {
     getDepartmentTree().then((resp) => setDeptTree(resp?.list || [])).catch(() => {})
@@ -640,6 +704,12 @@ function ServiceAccountsPane() {
     form.resetFields()
     setModalOpen(true)
   }
+
+  // 顶部「新建服务账号」按钮（在 PageContainer extra）通过 createSignal 唤起本 pane 的创建弹窗
+  useEffect(() => {
+    if (createSignal > 0) openCreate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createSignal])
 
   // 编辑：先取详情回填（主/参与部门在编辑弹窗中一并维护）
   const openEdit = async (record: TenantMachineUserItem) => {
@@ -782,43 +852,6 @@ function ServiceAccountsPane() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-        <Space wrap>
-          <Input.Search
-            allowClear
-            placeholder="按名称搜索"
-            prefix={<SearchOutlined />}
-            style={{ width: 260 }}
-            onSearch={(v) => {
-              setKeyword(v)
-              setPage(1)
-            }}
-          />
-          <Select
-            allowClear
-            placeholder="状态"
-            style={{ width: 110 }}
-            value={status}
-            onChange={(v: UserStatus | undefined) => {
-              setStatus(v)
-              setPage(1)
-            }}
-            options={[
-              { label: '启用', value: 'active' },
-              { label: '挂起', value: 'suspended' },
-            ]}
-          />
-        </Space>
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
-            刷新
-          </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            新建服务账号
-          </Button>
-        </Space>
-      </div>
-
       <Table<TenantMachineUserItem>
         rowKey="machineUserID"
         columns={columns}
@@ -959,17 +992,186 @@ function MachineDetailInfo({ detail }: { detail: TenantMachineUserDetail }) {
 }
 
 // ==================== 页面容器：用户 / 服务账号 双 Tab ====================
-export default function TenantUserPage() {
+// 每个 Tab 一个 Provider；PageContainer 放在 Provider 内部渲染，使 summary（指标条）/ toolbar
+// （Tab + 搜索筛选）/ extra（刷新 + 新建）都能读到该 Tab 的列表数据，与列表同源、不新增接口请求。
+// Tab 切换用受控 activeKey，只渲染当前 Tab 的 Provider。
+const TABS = [
+  { key: 'user', label: '用户' },
+  { key: 'machine', label: '服务账号' },
+] as const
+
+function UsersToolbar() {
+  const { departmentID, setDepartmentID, status, setStatus, setKeyword, setPage, deptTree } = useUsersState()
   return (
-    <PageContainer title="用户管理" description="租户内的主体管理：真实用户（部门归属、角色分配与账号状态）与服务账号（机器主体，须从属主部门）">
-      <Tabs
-        defaultActiveKey="user"
-        items={[
-          { key: 'user', label: '用户', children: <UsersPane /> },
-          { key: 'machine', label: '服务账号', children: <ServiceAccountsPane /> },
+    <Space wrap>
+      <TreeSelect
+        allowClear
+        treeData={toTreeSelect(deptTree)}
+        treeDefaultExpandAll
+        placeholder="按部门筛选（恰在该部门）"
+        style={{ width: 220 }}
+        value={departmentID}
+        onChange={(v) => {
+          setDepartmentID(v)
+          setPage(1)
+        }}
+      />
+      <Select
+        allowClear
+        placeholder="状态"
+        style={{ width: 110 }}
+        value={status}
+        onChange={(v: UserStatus | undefined) => {
+          setStatus(v)
+          setPage(1)
+        }}
+        options={[
+          { label: '正常', value: 'active' },
+          { label: '挂起', value: 'suspended' },
         ]}
       />
-    </PageContainer>
+      <Input.Search
+        allowClear
+        placeholder="姓名/用户名/邮箱/手机"
+        prefix={<SearchOutlined />}
+        style={{ width: 260 }}
+        onSearch={(v) => {
+          setKeyword(v)
+          setPage(1)
+        }}
+      />
+    </Space>
+  )
+}
+
+function UsersSummary() {
+  const { total, data, page, pageSize, status, departmentID, keyword } = useUsersState()
+  const filters = [departmentID ? '指定部门' : '', status ? (status === 'active' ? '正常' : '挂起') : '', keyword ? `关键词：${keyword}` : ''].filter(Boolean)
+  return (
+    <StatRow>
+      <StatCard label="用户总数" value={total} hint="当前筛选下返回总数" />
+      <StatCard label="本页数量" value={data.length} hint={`第 ${page} 页 · 每页 ${pageSize} 条`} />
+      <StatCard label="当前筛选" value={filters.length ? '已设置筛选' : '全部'} hint={filters.join(' · ') || '未设置筛选条件'} />
+    </StatRow>
+  )
+}
+
+function UsersExtra() {
+  const { triggerCreate, fetchData } = useUsersState()
+  return (
+    <Space>
+      <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
+        刷新
+      </Button>
+      <Button type="primary" icon={<PlusOutlined />} onClick={triggerCreate}>
+        新建用户
+      </Button>
+    </Space>
+  )
+}
+
+function ServiceAccountsToolbar() {
+  const { setKeyword, status, setStatus, setPage } = useServiceAccountsState()
+  return (
+    <Space wrap>
+      <Input.Search
+        allowClear
+        placeholder="按名称搜索"
+        prefix={<SearchOutlined />}
+        style={{ width: 260 }}
+        onSearch={(v) => {
+          setKeyword(v)
+          setPage(1)
+        }}
+      />
+      <Select
+        allowClear
+        placeholder="状态"
+        style={{ width: 110 }}
+        value={status}
+        onChange={(v: UserStatus | undefined) => {
+          setStatus(v)
+          setPage(1)
+        }}
+        options={[
+          { label: '启用', value: 'active' },
+          { label: '挂起', value: 'suspended' },
+        ]}
+      />
+    </Space>
+  )
+}
+
+function ServiceAccountsSummary() {
+  const { total, data, page, pageSize, status, keyword } = useServiceAccountsState()
+  const filters = [status ? (status === 'active' ? '启用' : '挂起') : '', keyword ? `关键词：${keyword}` : ''].filter(Boolean)
+  return (
+    <StatRow>
+      <StatCard label="服务账号总数" value={total} hint="当前筛选下返回总数" />
+      <StatCard label="本页数量" value={data.length} hint={`第 ${page} 页 · 每页 ${pageSize} 条`} />
+      <StatCard label="当前筛选" value={filters.length ? '已设置筛选' : '全部'} hint={filters.join(' · ') || '未设置筛选条件'} />
+    </StatRow>
+  )
+}
+
+function ServiceAccountsExtra() {
+  const { triggerCreate, fetchData } = useServiceAccountsState()
+  return (
+    <Space>
+      <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
+        刷新
+      </Button>
+      <Button type="primary" icon={<PlusOutlined />} onClick={triggerCreate}>
+        新建服务账号
+      </Button>
+    </Space>
+  )
+}
+
+/** 在 Provider 内部渲染列表主体（读取同一份 context 状态）。 */
+function UsersPaneContainer() {
+  return <UsersPane />
+}
+
+function ServiceAccountsPaneContainer() {
+  return <ServiceAccountsPane />
+}
+
+export default function TenantUserPage() {
+  const [activeTab, setActiveTab] = useState<'user' | 'machine'>('user')
+  const tabsNode = (
+    <Tabs
+      activeKey={activeTab}
+      onChange={(k) => setActiveTab(k as 'user' | 'machine')}
+      items={TABS.map((t) => ({ key: t.key, label: t.label }))}
+    />
+  )
+  return activeTab === 'user' ? (
+    <UsersProvider>
+      <PageContainer
+        title="用户管理"
+        description="租户内的主体管理：真实用户（部门归属、角色分配与账号状态）与服务账号（机器主体，须从属主部门）"
+        summary={<UsersSummary />}
+        toolbar={tabsNode}
+        extra={<UsersExtra />}
+      >
+        <UsersToolbar />
+        <UsersPaneContainer />
+      </PageContainer>
+    </UsersProvider>
+  ) : (
+    <ServiceAccountsProvider>
+      <PageContainer
+        title="用户管理"
+        description="租户内的主体管理：真实用户（部门归属、角色分配与账号状态）与服务账号（机器主体，须从属主部门）"
+        summary={<ServiceAccountsSummary />}
+        toolbar={tabsNode}
+        extra={<ServiceAccountsExtra />}
+      >
+        <ServiceAccountsToolbar />
+        <ServiceAccountsPaneContainer />
+      </PageContainer>
+    </ServiceAccountsProvider>
   )
 }
 

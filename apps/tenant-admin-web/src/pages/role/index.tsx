@@ -15,7 +15,7 @@ import {
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
-import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, NAME_COL_WIDTH, PageContainer, SourceTag, STATUS_COL_WIDTH, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
+import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, NAME_COL_WIDTH, PageContainer, SourceTag, StatCard, StatRow, STATUS_COL_WIDTH, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
 import type { MenuItem, TenantSubscribedApplicationItem, TenantRoleItem } from '@morehao/ark-iam-react/types'
 import {
   createTenantRole,
@@ -252,31 +252,43 @@ export default function TenantRolePage() {
           </Button>
         </Space>
       }
+      summary={
+        <StatRow>
+          <StatCard label="角色总数" value={total} hint="当前筛选下返回总数" />
+          <StatCard label="本页数量" value={data.length} hint={`第 ${page} 页 · 每页 ${pageSize} 条`} />
+          <StatCard
+            label="当前筛选"
+            value={appFilter ? apps.find((a) => a.appID === appFilter)?.name || '已选应用' : '全部应用'}
+            hint={keyword ? `关键词：${keyword}` : '未设置搜索关键词'}
+          />
+        </StatRow>
+      }
+      toolbar={
+        <Space wrap>
+          <Select
+            allowClear
+            placeholder="所属应用"
+            style={{ width: 180 }}
+            value={appFilter}
+            onChange={(v) => {
+              setAppFilter(v)
+              setPage(1)
+            }}
+            options={apps.map((a) => ({ label: a.name, value: a.appID }))}
+          />
+          <Input.Search
+            allowClear
+            placeholder="按角色名称搜索"
+            prefix={<SearchOutlined />}
+            style={{ width: 260 }}
+            onSearch={(v) => {
+              setKeyword(v)
+              setPage(1)
+            }}
+          />
+        </Space>
+      }
     >
-      <Space style={{ marginBottom: 16 }} wrap>
-        <Select
-          allowClear
-          placeholder="所属应用"
-          style={{ width: 180 }}
-          value={appFilter}
-          onChange={(v) => {
-            setAppFilter(v)
-            setPage(1)
-          }}
-          options={apps.map((a) => ({ label: a.name, value: a.appID }))}
-        />
-        <Input.Search
-          allowClear
-          placeholder="按角色名称搜索"
-          prefix={<SearchOutlined />}
-          style={{ width: 260 }}
-          onSearch={(v) => {
-            setKeyword(v)
-            setPage(1)
-          }}
-        />
-      </Space>
-
       <Table<TenantRoleItem>
         rowKey="roleID"
         columns={columns}

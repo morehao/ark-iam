@@ -3,46 +3,65 @@ import type { ThemeConfig } from 'antd'
 /**
  * Ark IAM 全局设计令牌（唯一事实源）
  *
- * 设计方向：「冷白工程台」收敛（受 Stripe / Vercel 工程控制台启发，见 DESIGN.md 参照锚点）。
- * 靛蓝只出现在主按钮 / 链接 / 选中态 / 品牌区；页面表面一律中性灰阶，
- * 卡片以 hairline 边框分层（无阴影）；文字为三级 hex 灰阶。
- * 命名与 DESIGN.md 的 colors 段一一对应，改动需两处同步。
+ * 设计方向：Ant Design 原生（对齐同级仓库 ark-go-starter）。蓝色主色 #1677ff、
+ * 浅色 Sider（白底）+ 浅色 Layout、6px 控件圆角 / 8px 卡片圆角；页面表面中性灰阶、
+ * 卡片 hairline 边框分层、无默认阴影（阴影仅留给 Modal / Dropdown 等浮层）。
+ *
+ * 视觉规范全文见根目录 DESIGN.md（唯一设计事实源，遵循 Google DESIGN.md 官方格式规范，
+ * 可用 `npx @google/design.md lint DESIGN.md` 校验）。
+ * 本文件 tokens 与 DESIGN.md front-matter 的令牌一一对应，改动需两处同步。
  */
 export const tokens = {
-  // 品牌 Brand：靛蓝 → 紫，仅用于主按钮 / 链接 / 选中态 / 登录与 Logo 品牌区
-  primary: '#4f6ef7',
-  primaryHover: '#6b86ff',
-  primaryActive: '#3a55d6',
-  gradient: 'linear-gradient(135deg, #4f6ef7 0%, #7a5af8 55%, #a855f7 100%)',
-  gradientSoft: 'linear-gradient(135deg, #eef2ff 0%, #f5f0ff 100%)',
-  purple: '#7a5af8', // 品牌紫：分类图标/点缀强调（极少量）
-  selectedBg: 'rgba(79, 110, 247, 0.14)', // 深色导航选中项柔和底（非整块亮色）
+  // 品牌 Brand：蓝色，仅用于主按钮 / 链接 / 选中态 / 分页当前页 / 聚焦环
+  primary: '#1677ff',
+  primaryHover: '#4096ff',
+  primaryActive: '#0958d9',
+  // 主色「承载白字」的无障碍变体（#1677ff 白字仅 4.10:1，此处 5.57:1 满足 WCAG AA）
+  primaryStrong: '#0b63d6',
+  primarySoft: '#e6f4ff', // 选中 Tag / 批量操作提示条 / 菜单选中项浅蓝底
+  primarySoftBorder: '#91caff', // 上者描边
+  gradient: 'linear-gradient(135deg, #1677ff 0%, #4096ff 55%, #69b1ff 100%)',
+  gradientSoft: 'linear-gradient(135deg, #e6f4ff 0%, #f0f8ff 100%)',
+  purple: '#69b1ff', // 分类点缀强调（AntD 蓝系延续）
+  selectedBg: '#e6f4ff', // 浅色导航选中项浅蓝底
 
-  // 表面 Surface（中性灰阶，禁用靛蓝淡底 tint）
-  bg: '#f6f7f9', // 页面布局底色（冷白）
+  // 表面 Surface（中性灰阶）
+  bg: '#f5f5f5', // 页面布局底色
   cardBg: '#ffffff',
-  sidebarBg: '#0f172a',
+  sidebarBg: '#ffffff', // 浅色 Sider
+  sidebarSubBg: '#fafafa', // 侧栏次级/折叠底
   headerBg: '#ffffff',
-  tableHeaderBg: '#f7f8fa',
-  rowHoverBg: '#f3f4f6',
-  softFill: '#f1f3f5', // 中性填充底（统计卡图标底、应用固定条等）
-  codeBg: '#fafafa', // 代码/内容块底色
+  tableHeaderBg: '#fafafa',
+  rowHoverBg: '#fafafa',
+  softFill: '#f5f5f5', // 中性填充底（菜单 hover 等）
+  codeBg: '#fafafa',
 
-  // 边框 Border（冷调 hairline，卡片分层的主语言）
-  border: '#e6e9ef',
-  borderStrong: '#d3d8e0', // 更强的分割线（Header 内分割线等）
+  // 边框 Border
+  border: '#f0f0f0', // 卡片 / 分隔线
+  borderStrong: '#d9d9d9', // 控件描边（输入框 / 按钮 / 分页器）
 
-  // 文字 Text（三级 hex 灰阶）
-  text: '#1f2430',
-  textSecondary: '#64748d', // 借鉴 Stripe ink-mute
-  textPlaceholder: '#94a3b8', // 空态/占位辅助文字
+  // 文字 Text（antd 透明度体系；保留三级 key + 新增 tertiary）
+  text: 'rgba(0,0,0,0.88)',
+  textSecondary: 'rgba(0,0,0,0.65)',
+  textTertiary: 'rgba(0,0,0,0.45)',
+  textPlaceholder: 'rgba(0,0,0,0.25)',
 
   // 语义色 Semantic（与 antd colorSuccess/Warning/Error 对齐，仅状态 Tag/告警使用）
-  success: '#22c55e',
-  warning: '#f59e0b',
-  error: '#ef4444',
+  success: '#52c41a',
+  warning: '#faad14',
+  error: '#ff4d4f',
   warningBg: '#fffbe6', // 轻量告警底色
   warningBorder: '#ffe58f', // 轻量告警描边
+
+  // 圆角 Radius（对齐 DESIGN.md rounded 段：sm 4 / md 6 / lg 8）
+  radiusSm: 4, // Tag / 小徽标
+  radiusMd: 6, // 控件（按钮 / 输入 / 分页器 / 菜单项）
+  radiusLg: 8, // 卡片 / 内容卡 / Statistic 卡 / Dropdown / Modal
+
+  // 字号 Font size（对齐 DESIGN.md typography 段：body 14 / small 13 / tag 12）
+  fontSizeBody: 14,
+  fontSizeSmall: 13,
+  fontSizeTag: 12,
 }
 
 /** 历史兼容：品牌相关令牌（主色/渐变/背景/文字）。新代码请引用 tokens。 */
@@ -67,28 +86,35 @@ export const themeConfig: ThemeConfig = {
     colorWarning: tokens.warning,
     colorError: tokens.error,
     colorBgLayout: tokens.bg,
-    colorBorderSecondary: tokens.border, // hairline 统一为冷调
-    borderRadius: 8,
-    borderRadiusLG: 12,
+    colorBgContainer: tokens.cardBg,
+    colorBorderSecondary: tokens.border,
+    colorBorder: tokens.borderStrong,
+    borderRadius: tokens.radiusMd,
+    borderRadiusLG: tokens.radiusLg,
     colorText: tokens.text,
     colorTextSecondary: tokens.textSecondary,
+    colorTextTertiary: tokens.textTertiary,
+    colorTextQuaternary: tokens.textPlaceholder,
+    controlHeight: 32,
     fontFamily:
       "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif",
-    boxShadowSecondary: '0 6px 24px rgba(15, 23, 42, 0.08)', // 仅浮层/Modal 使用
+    fontSize: tokens.fontSizeBody,
+    boxShadowSecondary:
+      '0 6px 16px rgba(0,0,0,0.08), 0 3px 6px -4px rgba(0,0,0,0.12), 0 9px 28px 8px rgba(0,0,0,0.05)', // 仅浮层/Modal 使用
   },
   components: {
     Layout: {
       headerBg: tokens.headerBg,
-      headerHeight: 56,
+      headerHeight: 64,
       siderBg: tokens.sidebarBg,
       bodyBg: tokens.bg,
     },
     Menu: {
       darkItemBg: tokens.sidebarBg,
-      darkItemSelectedBg: tokens.selectedBg,
-      darkItemSelectedColor: '#ffffff',
-      darkItemHoverBg: 'rgba(255,255,255,0.08)',
-      itemBorderRadius: 8,
+      darkItemSelectedBg: tokens.primarySoft,
+      darkItemSelectedColor: tokens.primaryActive,
+      darkItemHoverBg: tokens.softFill,
+      itemBorderRadius: tokens.radiusMd,
       itemHeight: 42,
     },
     Card: {
@@ -100,7 +126,7 @@ export const themeConfig: ThemeConfig = {
       rowHoverBg: tokens.rowHoverBg,
     },
     Modal: {
-      borderRadiusLG: 14,
+      borderRadiusLG: tokens.radiusLg,
     },
   },
 }

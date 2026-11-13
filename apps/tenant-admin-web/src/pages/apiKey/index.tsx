@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Alert, Button, DatePicker, Form, Input, Modal, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { CopyOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
-import { actionColumn, CODE_COL_WIDTH, EllipsisCell, NAME_COL_WIDTH, PageContainer, RemoteSelect, STATUS_COL_WIDTH, tableScrollX, textColumn, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
+import { actionColumn, CODE_COL_WIDTH, EllipsisCell, NAME_COL_WIDTH, PageContainer, RemoteSelect, StatCard, StatRow, STATUS_COL_WIDTH, tableScrollX, textColumn, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
 import type { TenantApiKeyCreateResp, TenantApiKeyItem } from '@morehao/ark-iam-react/types'
 import { createApiKey, deleteApiKey, getApiKeyPageList, revokeApiKey } from '../../api/apiKey'
 import { getMachineUserPageList } from '../../api/machineUser'
@@ -74,21 +74,48 @@ function CreatedKeyModal({
   )
 }
 
-/** API 密钥管理（单一视图）：密钥一律归属服务账号，供服务端集成；列表/创建/吊销/删除均需系统管理能力。 */
-function ApiKeysPane() {
+/**
+ * 列表数据与筛选状态集中在 Provider 中，使 summary（指标条）与 toolbar（搜索筛选）
+ * 都在 PageContainer 里、脱离 pane 内部 JSX 也能读到同一份数据——不改变任何筛选/接口逻辑。
+ */
+interface ApiKeysState {
+  data: TenantApiKeyItem[]
+  total: number
+  page: number
+  pageSize: number
+  keyword: string
+  machineUserID?: string
+  setKeyword: (v: string) => void
+  setMachineUserID: (v?: string) => void
+  setPage: (v: number) => void
+  setPageSize: (v: number) => void
+  fetchData: () => Promise<void>
+  machineLabelCache: Map<string, string>
+  fetchMachineOptions: (search: string) => Promise<{ value: string; label: string }[]>
+  loading: boolean
+  /** 顶部「新建 API 密钥」按钮触发的自增信号 */
+  createSignal: number
+  triggerCreate: () => void
+}
+
+const ApiKeysContext = createContext<ApiKeysState | null>(null)
+
+function useApiKeysState(): ApiKeysState {
+  const ctx = useContext(ApiKeysContext)
+  if (!ctx) throw new Error('useApiKeysState must be used within ApiKeysProvider')
+  return ctx
+}
+
+function ApiKeysProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<TenantApiKeyItem[]>([])
-  const [loading, setLoading] = useState(false)
+  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
   // 归属服务账号筛选：空=租户全部密钥
   const [machineUserID, setMachineUserID] = useState<string>()
-
-  const [modalOpen, setModalOpen] = useState(false)
-  const [form] = Form.useForm<ApiKeyFormValues>()
-  const [submitLoading, setSubmitLoading] = useState(false)
-  const [created, setCreated] = useState<TenantApiKeyCreateResp | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [createSignal, setCreateSignal] = useState(0)
 
   // 服务账号可增长：下拉走服务端搜索（远程搜索组件），两个下拉共享「值 → 名称」缓存
   // （筛选区选过的账号，创建弹窗里直接显示名称而不是 ID）。
@@ -120,12 +147,97 @@ function ApiKeysPane() {
     void fetchData()
   }, [fetchData])
 
+  const value: ApiKeysState = {
+    data,
+    total,
+    page,
+    pageSize,
+    keyword,
+    machineUserID,
+    setKeyword,
+    setMachineUserID,
+    setPage,
+    setPageSize,
+    fetchData,
+    machineLabelCache: machineLabelCacheRef.current,
+    fetchMachineOptions,
+    loading,
+    createSignal,
+    triggerCreate: () => setCreateSignal((n) => n + 1),
+  }
+
+  return <ApiKeysContext.Provider value={value}>{children}</ApiKeysContext.Provider>
+}
+
+/** 内容卡顶部工具条：搜索/筛选（内容与交互保持不变）。 */
+function ApiKeysToolbar() {
+  const { machineUserID, setMachineUserID, setKeyword, setPage, machineLabelCache, fetchMachineOptions } = useApiKeysState()
+  return (
+    <Space wrap>
+      <RemoteSelect
+        allowClear
+        width={300}
+        placeholder="归属服务账号（不选=租户全部，可输入名称搜索）"
+        value={machineUserID}
+        onChange={(v) => {
+          setMachineUserID(v)
+          setPage(1)
+        }}
+        fetchOptions={fetchMachineOptions}
+        labelCache={machineLabelCache}
+      />
+      <Input.Search
+        allowClear
+        placeholder="按密钥名称搜索"
+        prefix={<SearchOutlined />}
+        style={{ width: 240 }}
+        onSearch={(v) => {
+          setKeyword(v)
+          setPage(1)
+        }}
+      />
+    </Space>
+  )
+}
+
+/** 指标条：总数 / 本页数量 / 当前筛选（取已有变量，不新增接口请求）。 */
+function ApiKeysSummary() {
+  const { total, data, page, pageSize, machineUserID, keyword } = useApiKeysState()
+  return (
+    <StatRow>
+      <StatCard label="密钥总数" value={total} hint="当前筛选下返回总数" />
+      <StatCard label="本页数量" value={data.length} hint={`第 ${page} 页 · 每页 ${pageSize} 条`} />
+      <StatCard
+        label="当前筛选"
+        value={machineUserID ? '指定服务账号' : '全部服务账号'}
+        hint={keyword ? `关键词：${keyword}` : '未设置搜索关键词'}
+      />
+    </StatRow>
+  )
+}
+
+/** API 密钥管理（单一视图）：密钥一律归属服务账号，供服务端集成；列表/创建/吊销/删除均需系统管理能力。 */
+function ApiKeysPane() {
+  const { data, total, page, pageSize, machineUserID, setPage, setPageSize, fetchData, machineLabelCache, fetchMachineOptions, loading, createSignal } =
+    useApiKeysState()
+
+  const [modalOpen, setModalOpen] = useState(false)
+  const [form] = Form.useForm<ApiKeyFormValues>()
+  const [submitLoading, setSubmitLoading] = useState(false)
+  const [created, setCreated] = useState<TenantApiKeyCreateResp | null>(null)
+
   const openCreate = () => {
     form.resetFields()
     // 便捷：默认带入当前筛选的服务账号，仍可改选
     form.setFieldsValue({ machineUserID: machineUserID || undefined })
     setModalOpen(true)
   }
+
+  // 顶部「新建 API 密钥」按钮（在 PageContainer extra）通过 createSignal 唤起创建弹窗
+  useEffect(() => {
+    if (createSignal > 0) openCreate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createSignal])
 
   const handleSubmit = async () => {
     try {
@@ -206,42 +318,6 @@ function ApiKeysPane() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-        <Space wrap>
-          <RemoteSelect
-            allowClear
-            width={300}
-            placeholder="归属服务账号（不选=租户全部，可输入名称搜索）"
-            value={machineUserID}
-            onChange={(v) => {
-              setMachineUserID(v)
-              setPage(1)
-              setData([])
-            }}
-            fetchOptions={fetchMachineOptions}
-            labelCache={machineLabelCacheRef.current}
-          />
-          <Input.Search
-            allowClear
-            placeholder="按密钥名称搜索"
-            prefix={<SearchOutlined />}
-            style={{ width: 240 }}
-            onSearch={(v) => {
-              setKeyword(v)
-              setPage(1)
-            }}
-          />
-        </Space>
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
-            刷新
-          </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            新建 API 密钥
-          </Button>
-        </Space>
-      </div>
-
       <Table<TenantApiKeyItem>
         rowKey="keyID"
         columns={columns}
@@ -279,7 +355,7 @@ function ApiKeysPane() {
             <RemoteSelect
               placeholder="选择该密钥归属的服务账号（输入名称搜索）"
               fetchOptions={fetchMachineOptions}
-              labelCache={machineLabelCacheRef.current}
+              labelCache={machineLabelCache}
             />
           </Form.Item>
           <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
@@ -296,16 +372,39 @@ function ApiKeysPane() {
   )
 }
 
+/** 右上角操作：刷新 + 新建 API 密钥。 */
+function ApiKeysExtra() {
+  const { fetchData, triggerCreate } = useApiKeysState()
+  return (
+    <Space>
+      <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
+        刷新
+      </Button>
+      <Button type="primary" icon={<PlusOutlined />} onClick={triggerCreate}>
+        新建 API 密钥
+      </Button>
+    </Space>
+  )
+}
+
 export default function ApiKeyPage() {
   return (
-    <PageContainer title="API 密钥" description="服务端集成凭证：密钥归属服务账号，创建与管理需系统管理能力">
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-        message="密钥一律归属于服务账号（机器主体），供开发者/服务端集成调用平台 API；可设置有效期，使用前可在到期前吊销。本页密钥的查看、创建、吊销与删除均需系统管理能力。"
-      />
-      <ApiKeysPane />
-    </PageContainer>
+    <ApiKeysProvider>
+      <PageContainer
+        title="API 密钥"
+        description="服务端集成凭证：密钥归属服务账号，创建与管理需系统管理能力"
+        summary={<ApiKeysSummary />}
+        toolbar={<ApiKeysToolbar />}
+        extra={<ApiKeysExtra />}
+      >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="密钥一律归属于服务账号（机器主体），供开发者/服务端集成调用平台 API；可设置有效期，使用前可在到期前吊销。本页密钥的查看、创建、吊销与删除均需系统管理能力。"
+        />
+        <ApiKeysPane />
+      </PageContainer>
+    </ApiKeysProvider>
   )
 }

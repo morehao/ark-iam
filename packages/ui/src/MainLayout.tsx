@@ -75,8 +75,14 @@ export function MainLayout({ title, subtitle, menuItems, hasTenantSwitch = true 
         collapsible
         collapsed={collapsed}
         width={232}
-        theme="dark"
-        style={{ position: 'sticky', top: 0, height: '100vh' }}
+        theme="light"
+        style={{
+          position: 'sticky',
+          top: 0,
+          height: '100vh',
+          background: tokens.sidebarBg,
+          borderRight: `1px solid ${tokens.border}`,
+        }}
       >
         <div
           style={{
@@ -85,21 +91,22 @@ export function MainLayout({ title, subtitle, menuItems, hasTenantSwitch = true 
             alignItems: 'center',
             justifyContent: 'center',
             gap: 10,
-            background: brand.gradient,
-            color: '#fff',
+            background: tokens.cardBg,
+            color: tokens.text,
             overflow: 'hidden',
+            borderBottom: `1px solid ${tokens.border}`,
           }}
         >
-          <SafetyCertificateOutlined style={{ fontSize: collapsed ? 20 : 24 }} />
+          <SafetyCertificateOutlined style={{ fontSize: collapsed ? 20 : 24, color: tokens.primary }} />
           {!collapsed && (
             <div style={{ lineHeight: 1.1 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: 0.5 }}>{title}</div>
-              {subtitle && <div style={{ fontSize: 11, opacity: 0.8 }}>{subtitle}</div>}
+              <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: 0.5, color: tokens.text }}>{title}</div>
+              {subtitle && <div style={{ fontSize: 11, color: tokens.textSecondary }}>{subtitle}</div>}
             </div>
           )}
         </div>
         <Menu
-          theme="dark"
+          theme="light"
           mode="inline"
           selectedKeys={[selectedKey]}
           defaultOpenKeys={[selectedKey]}
@@ -107,14 +114,14 @@ export function MainLayout({ title, subtitle, menuItems, hasTenantSwitch = true 
           onClick={({ key }) => {
             if (key !== location.pathname) navigate(key)
           }}
-          style={{ padding: '8px 10px', borderInlineEnd: 'none' }}
+          style={{ padding: '8px 10px', borderInlineEnd: 'none', background: tokens.sidebarBg }}
         />
       </Sider>
       <Layout>
         <Header
           style={{
             padding: '0 20px',
-            background: '#fff',
+            background: tokens.headerBg,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
