@@ -1,6 +1,6 @@
 {
   "name": "@morehao/ark-iam-react",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "description": "GoArk IAM 前端门面包：聚合 @ark-iam/{types,api,auth,ui} 的单一入口（含 ESM 子路径导出，可按需引入）",
   "license": "MIT",
