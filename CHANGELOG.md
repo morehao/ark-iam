@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.2] - 2026-11-14
+
+### Features
+
+- **ui**: 前端视觉对齐 ark-go-starter（Ant Design 原生） (#108)
+
+**Full Changelog**: https://github.com/morehao/ark-iam/compare/v0.3.1...v0.3.2
+
 ## [v0.1.3] - 2026-11-09
 
 ### Features
