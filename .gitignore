@@ -11,13 +11,12 @@
 
 # 日志
 **/log/
-!frontend/**/src/pages/log/
+!apps/**/src/pages/log/
 **/output/
 
 # 前端
-frontend/dist/
-frontend/apps/*/dist/
-frontend/packages/*/dist/
+apps/*/dist/
+packages/*/dist/
 **/node_modules/
 .pnpm-store
 .pnpm-debug.log*
@@ -44,7 +43,7 @@ e2e/.env.local
 *.test
 *.exe
 *.out
-backend/.tmp/
+.tmp/
 **/.gocache
 __debug_bin*
 
@@ -61,4 +60,4 @@ __debug_bin*
 .dsh/
 
 # 示例工程编译产物
-backend/examples/*/embedded-iam-demo
+examples/*/embedded-iam-demo

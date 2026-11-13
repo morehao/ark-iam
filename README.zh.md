@@ -4,7 +4,7 @@
 
 `ark-iam` 是一个前后端分离的全栈项目，后端基于 [Gin](https://github.com/gin-gonic/gin)，提供分层、可维护、可扩展的服务结构，支持多个应用模块。
 
-IAM 后端拆分为 `backend/apps/` 下的四个应用（auth、platformadmin、tenantadmin、gateway）。其中 auth/platformadmin/tenantadmin 是**可 import 的库包**（各带 `cmd/` 进程入口，保留分体部署）；gateway 是**纯 `cmd/main`** 聚合器（绝不被 import）。原只读目录应用 `rpapi` 已下线——其能力并入 `sdk/server` 的 `DomainDirectory` 域（路由仍在 `/v1/rp/directory/*`）。可复用的能力放在**仓库根级**作为独立 Go 模块——`contract/`（框架无关的数据契约模块）、`pkg/`（公共包）、`sdk/`（RP 侧 SDK + `sdk/server` 门面，委托 apps 各域库）——统一由根 `go.work` 管理，并可各自通过 `go get` 引依赖使用。
+IAM 后端拆分为 `apps/` 下的四个应用（auth、platformadmin、tenantadmin、gateway）。其中 auth/platformadmin/tenantadmin 是**可 import 的库包**（各带 `cmd/` 进程入口，保留分体部署）；gateway 是**纯 `cmd/main`** 聚合器（绝不被 import）。原只读目录应用 `rpapi` 已下线——其能力并入 `sdk/server` 的 `DomainDirectory` 域（路由仍在 `/v1/rp/directory/*`）。可复用的能力放在**仓库根级**作为独立 Go 模块——`contract/`（框架无关的数据契约模块）、`pkg/`（公共包）、`sdk/`（RP 侧 SDK + `sdk/server` 门面，委托 apps 各域库）——统一由根 `go.work` 管理，并可各自通过 `go get` 引依赖使用。
 
 > **分层倒置（单向 DAG）**：进程入口 → `sdk/server` → `sdk/server/internal` → `apps/*` 各域库 → `pkg` → `contract`。`sdk/rp` 与 `apps/*` 只依赖 `contract`；`pkg` 只依赖 `contract`（验签经 `contract.Verifier`/`contract.KeySource` 接口，由 `sdk/rp` 实现、`sdk/server/internal` 注入）——因此不存在 `pkg → sdk`、也不存在 `apps → sdk` 依赖边。原独立 `iam/` 模块已删除，域实现全部并入 `apps/`；Go 侧不再托管前端静态资源（`MountFrontend` 已删），登录/管理台前端由 npm 包 `@morehao/ark-iam-react` 提供。
 
@@ -28,21 +28,28 @@ IAM 后端拆分为 `backend/apps/` 下的四个应用（auth、platformadmin、
 
 ```
 ark-iam/
-├── go.work                # 根 Go workspace（contract/ pkg/ sdk/ + backend/apps/*）
+├── apps/                  # 全部应用（Go 后端 + React 前端），去壳后平铺到仓库根
+│   ├── auth/              # 认证域库 + cmd（登录/会话/OIDC）, :8081
+│   ├── platformadmin/     # 平台域库 + cmd（user/role/menu/tenant）, :8082
+│   ├── tenantadmin/       # 租户域库 + cmd（department/user/role）, :8083
+│   ├── gateway/           # 纯 cmd 聚合器：server.New(Domains=nil) + MountDirectory, :8100
+│   ├── login-web/         # 登录门户前端, :4000
+│   ├── platform-admin-web/# 平台管理台前端, :4001
+│   └── tenant-admin-web/  # 租户管理台前端, :4002
+├── packages/              # 前端共享包（pnpm workspace：types/api/auth/ui）
+├── go.work                # 根 Go workspace（contract/ pkg/ sdk/ + apps/*）
 ├── contract/              # 框架无关的数据契约模块（github.com/morehao/ark-iam/contract）：claims / Identity / KeySource+Verifier 接口 / 目录 DTO
 ├── pkg/                   # 公共包模块（github.com/morehao/ark-iam/pkg）— 仅依赖 contract
 ├── sdk/                   # RP 侧 SDK 模块（github.com/morehao/ark-iam/sdk）— 唯一 go get 目标
 │   ├── rp/                # RP 客户端：验签 / M2M / introspect / revoke / userinfo / 登出 / 目录（实现 contract.Verifier/KeySource）
 │   └── server/            # 薄门面：New(Domains)/Mount/MountConfig/RunMigrations；公开 API 只用 contract 类型
 │       └── internal/      # 唯一 import apps/* + pkg 的地方；装配验签器、DB/Redis、迁移
-├── backend/               # Go 后端 (基于 project-layout, go.work 多模块)
-│   ├── apps/
-│   │   ├── auth/          # 认证域库 + cmd（登录/会话/OIDC）, :8081
-│   │   ├── platformadmin/ # 平台域库 + cmd（user/role/menu/tenant）, :8082
-│   │   ├── tenantadmin/   # 租户域库 + cmd（department/user/role）, :8083
-│   │   └── gateway/       # 纯 cmd 聚合器：server.New(Domains=nil) + MountDirectory, :8100
-├── frontend/              # React 前端 (Vite + React)
+├── examples/              # 最小内嵌 IAM 示例工程
+├── e2e/                   # 端到端测试
 ├── docs/                  # 文档目录
+├── config/                # 配置目录
+├── package.json           # 前端 workspace 根 package（pnpm）
+├── pnpm-workspace.yaml    # pnpm workspace 配置
 ├── Makefile               # 根目录 Makefile
 ├── AGENTS.md              # AI 代理开发规范
 └── README.md
@@ -62,7 +69,7 @@ ark-iam/
 go install github.com/morehao/gocli@latest
 ```
 
-确保应用目录下存在 `code_gen.yaml` 配置文件，例如 `backend/apps/auth/config/code_gen.yaml`。
+确保应用目录下存在 `code_gen.yaml` 配置文件，例如 `apps/auth/config/code_gen.yaml`。
 
 运行代码生成命令：
 

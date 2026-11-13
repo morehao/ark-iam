@@ -39,7 +39,7 @@ make deps
 # 列出可用应用
 make list-apps
 
-# 构建单个应用（产物输出到 backend/output；有效 APP 见下表）
+# 构建单个应用（产物输出到 output；有效 APP 见下表）
 make build APP=auth
 
 # 运行单个应用（auth / platformadmin / tenantadmin / gateway）
@@ -63,7 +63,6 @@ make run APP=gateway
 ### 2.2 前端
 
 ```bash
-cd frontend
 pnpm install
 
 pnpm dev          # platform-admin-web :4001
@@ -164,7 +163,7 @@ flowchart LR
 
    > 令牌有两个来源：**环境变量 `BOOTSTRAP_TOKEN`（优先）** 与配置项 `install.bootstrapToken`（回落，本地开发的 dev 配置里已有 `dev-bootstrap-token`）。**两个来源都为空时 `/install/initialize` 整体不可用**：`GET /install/status` 回 `tokenRequired=false`，提交返回 HTTP 503（错误码 `107002`）。这是 fail-closed 设计——宁可"没人能初始化"，也不能让一个没有令牌保护的写接口在公网裸奔。生产建议**只**用环境变量/Secret，把 `install.bootstrapToken` 留空：`config.yaml` 入库，长期令牌放在里面会随代码一起分发。
 
-3. **打开安装页**：先启动登录门户（`cd frontend && pnpm dev:login`，:4000），浏览器访问 `http://localhost:4000/install`；未初始化时访问 `http://localhost:4000/login` 也会被 `InstallGuard` 自动跳到这里。页面共三步，但**只有第三步发一次写请求**（`POST /install/initialize`，其余校验都在浏览器内完成）：
+3. **打开安装页**：先启动登录门户（`pnpm dev:login`，:4000，在仓库根执行），浏览器访问 `http://localhost:4000/install`；未初始化时访问 `http://localhost:4000/login` 也会被 `InstallGuard` 自动跳到这里。页面共三步，但**只有第三步发一次写请求**（`POST /install/initialize`，其余校验都在浏览器内完成）：
 
    1. **租户**：平台租户名称（默认「平台运营中心」，留空由后端取默认值）；
    2. **管理员**：初始管理员用户名、密码、确认密码、姓名、邮箱 / 手机号（邮箱与手机号**至少填一个**）；
@@ -522,23 +521,23 @@ WHERE c.token_endpoint_auth_method = 'none'
 # 运行指定应用测试（推荐；gateway 只做聚合、没有测试用例，请用 auth/platformadmin/tenantadmin）
 make test APP=auth
 
-# 全量测试（go.work 在 backend/，且按路径逐个 use 模块）
-go test ./backend/apps/auth/... ./backend/apps/gateway/... ./backend/apps/platformadmin/... ./backend/apps/tenantadmin/... ./pkg/... ./sdk/... ./contract/...
+# 全量测试（go.work 在仓库根，且按路径逐个 use 模块）
+go test ./apps/auth/... ./apps/gateway/... ./apps/platformadmin/... ./apps/tenantadmin/... ./pkg/... ./sdk/... ./contract/...
 
 # 指定包 / 单个用例
-cd backend && go test ./pkg/core/user/ -run TestCreate_NewPersonWithDeptRelations -v
-cd backend && go test ./pkg/credential/ -run TestHashSecret_Golden -v
+cd pkg && go test ./core/user/ -run TestCreate_NewPersonWithDeptRelations -v
+cd pkg && go test ./credential/ -run TestHashSecret_Golden -v
 
 # 覆盖率
-cd backend && go test ./apps/platformadmin/internal/... -coverprofile=coverage.out
+cd apps/platformadmin && go test ./internal/... -coverprofile=coverage.out
 go tool cover -html=coverage.out
 
 # Lint / vet
 make lint
-for m in backend/apps/auth backend/apps/gateway backend/apps/platformadmin backend/apps/tenantadmin pkg sdk contract; do (cd $m && go vet ./...); done
+for m in apps/auth apps/gateway apps/platformadmin apps/tenantadmin pkg sdk contract; do (cd $m && go vet ./...); done
 ```
 
-> **为什么不能写 `go test ./...`**：根 `go.work` 用 `use (./contract ./pkg ./sdk ./backend/apps/auth …)` 逐个列出模块，仓库根本身不是模块，因此 `go test ./...` 会报 `directory prefix . does not contain modules listed in go.work`（`./apps/...` 也不行，`apps` 不是模块）。要么显式列出各模块目录（`./contract/... ./pkg/... ./sdk/... ./backend/apps/<app>/...`），要么进入某个模块目录内跑 `./...`（`make lint` 就是用后者遍历模块）。
+> **为什么不能写 `go test ./...`**：根 `go.work` 用 `use (./contract ./pkg ./sdk ./apps/auth …)` 逐个列出模块，仓库根本身不是模块，因此 `go test ./...` 会报 `directory prefix . does not contain modules listed in go.work`（`./apps/...` 也不行，`apps` 不是模块）。要么显式列出各模块目录（`./contract/... ./pkg/... ./sdk/... ./apps/<app>/...`），要么进入某个模块目录内跑 `./...`（`make lint` 就是用后者遍历模块）。
 
 **单元测试约定**：auth / platformadmin / tenantadmin 各自的 `testutil.SetupSQLite(t, entities...)` 注册内存 SQLite 为全局 iam 库，服务内 `dao.NewXxxDao()` 自动落测试库，直接断言真实 dao 行为（gateway 无 `testutil`，因为它只在 `app.go` 里挂载各应用域；原 rpapi 目录域测试随并入 `sdk/server/internal/directory`）。RP 侧能力另有一套不依赖 DB 的测试：`cd sdk && go test ./...`（`make test-sdk`，另含 `cd contract && go test ./...` 契约测试与 `make test-sdk-server`）。需要真实 PostgreSQL/Redis 的集成测试用 `pkg/testsetup`（`Initialize`/`Done`/`NewCtx`，读取 `apps/<app>/config/config.yaml`）。
 
@@ -568,7 +567,7 @@ make docker-run APP=gateway PORT=8100
 make docker-run APP=auth    PORT=8081
 ```
 
-镜像构成：Dockerfile 位于 `backend/apps/<app>/scripts/Dockerfile`，构建上下文为 `backend/`；构建阶段 `golang:1.26-alpine`、运行阶段 `alpine:3.22`；容器名即 `$(APP)`（同名容器会先被删除）；`EXPOSE` 对应各应用端口。
+镜像构成：Dockerfile 位于 `apps/<app>/scripts/Dockerfile`，构建上下文为仓库根 `./`；构建阶段 `golang:1.26-alpine`、运行阶段 `alpine:3.22`；容器名即 `$(APP)`（同名容器会先被删除）；`EXPOSE` 对应各应用端口。
 
 生产容器注意：
 

@@ -1,0 +1,69 @@
+package svcauth
+
+import (
+	"github.com/morehao/ark-iam/apps/auth/dto/dtoconnector"
+	"github.com/morehao/ark-iam/pkg/model"
+)
+
+// defaultConnectorFactoriesOnce 只构建一次工厂列表（只读共享），避免每次请求重建。
+var defaultConnectorFactoriesOnce = func() []dtoconnector.ConnectorFactoryResp {
+	return []dtoconnector.ConnectorFactoryResp{
+		{
+			FactoryID:     "oidc-google",
+			Protocol:      connectorDriverTypeOIDC,
+			Provider:      connectorProviderGoogle,
+			DisplayName:   "Google",
+			IsStandard:    true,
+			DefaultScopes: []string{model.ScopeOpenID, model.ScopeProfile, model.ScopeEmail},
+			Capabilities:  []model.ConnectorCapability{connectorCapabilityAuthorize, connectorCapabilityCallback, connectorCapabilityClaimMapping, connectorCapabilityDomainPolicy},
+			ConfigSchema: map[string]any{
+				"type":     "object",
+				"required": []string{"issuer", "clientId", "clientSecret", "redirectUri"},
+			},
+		},
+		{
+			FactoryID:     "oauth2-github",
+			Protocol:      connectorDriverTypeOAuth2,
+			Provider:      connectorProviderGithub,
+			DisplayName:   "GitHub",
+			IsStandard:    true,
+			DefaultScopes: []string{"read:user", "user:email"},
+			Capabilities:  []model.ConnectorCapability{connectorCapabilityAuthorize, connectorCapabilityCallback, connectorCapabilityProfileSync},
+			ConfigSchema: map[string]any{
+				"type":     "object",
+				"required": []string{"authUrl", "tokenUrl", "userInfoUrl", "clientId", "clientSecret", "redirectUri"},
+			},
+		},
+		{
+			FactoryID:     "oidc-microsoft-entra",
+			Protocol:      connectorDriverTypeOIDC,
+			Provider:      connectorProviderMicrosoft,
+			DisplayName:   "Microsoft Entra ID",
+			IsStandard:    true,
+			DefaultScopes: []string{model.ScopeOpenID, model.ScopeProfile, model.ScopeEmail},
+			Capabilities:  []model.ConnectorCapability{connectorCapabilityAuthorize, connectorCapabilityCallback, connectorCapabilityClaimMapping, connectorCapabilityDomainPolicy},
+			ConfigSchema: map[string]any{
+				"type":     "object",
+				"required": []string{"issuer", "clientId", "clientSecret", "redirectUri", "tenant"},
+			},
+		},
+	}
+}()
+
+func defaultConnectorFactories() []dtoconnector.ConnectorFactoryResp {
+	return defaultConnectorFactoriesOnce
+}
+
+func selectConnectorFactories(req *dtoconnector.ConnectorFactoryListReq, factories []dtoconnector.ConnectorFactoryResp) []dtoconnector.ConnectorFactoryResp {
+	filtered := make([]dtoconnector.ConnectorFactoryResp, 0, len(factories))
+	for _, factory := range factories {
+		if req != nil && req.Protocol != "" && factory.Protocol != req.Protocol {
+			continue
+		}
+		if req != nil && req.Provider != "" && factory.Provider != req.Provider {
+			continue
+		}
+		filtered = append(filtered, factory)
+	}
+	return filtered
+}

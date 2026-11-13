@@ -33,16 +33,13 @@ import (
 const repoRootRelPath = "../.."
 
 // guardedGoDirs 是允许出现业务代码的目录（相对于仓库根）。
-var guardedGoDirs = []string{"pkg", "backend/apps"}
+var guardedGoDirs = []string{"pkg", "apps"}
 
-// resolveGuardedDir 把"逻辑目录"（相对旧 backend/ 布局）映射到搬迁后的真实路径：
-//   - pkg/...            -> <root>/pkg/...            （pkg 已搬到仓库根级）
-//   - apps/... 或其它     -> <root>/backend/apps/...    （apps 仍在 backend/ 下）
+// resolveGuardedDir 把"逻辑目录"映射到仓库根下的真实路径（pkg 与 apps 均在根级）：
+//   - pkg/...   -> <root>/pkg/...
+//   - apps/...  -> <root>/apps/...
 func resolveGuardedDir(root, dir string) string {
-	if dir == "pkg" || strings.HasPrefix(dir, "pkg/") {
-		return filepath.Join(root, filepath.FromSlash(dir))
-	}
-	return filepath.Join(root, "backend", filepath.FromSlash(dir))
+	return filepath.Join(root, filepath.FromSlash(dir))
 }
 
 // skippedDirNames 不参与扫描（历史副本、依赖、工具产物）。
@@ -55,7 +52,7 @@ var inboundBoundaryPathSegments = []string{
 	"/controller/", "/middleware/",
 }
 
-// ginAdapterPkgs 是本身即 gin 边界实现/夹具的包（相对 backend/ 的路径前缀）。
+// ginAdapterPkgs 是本身即 gin 边界实现/夹具的包（相对仓库根的路径前缀）。
 var ginAdapterPkgs = []string{
 	"pkg/identity/",
 	"pkg/sso/",
@@ -66,7 +63,7 @@ var ginAdapterPkgs = []string{
 	"/testutil/",
 }
 
-// innerLayerDirs 是被要求"零 gin"的内层目录（相对 backend/）。
+// innerLayerDirs 是被要求"零 gin"的内层目录（相对仓库根）。
 // 这些目录下的生产代码只收 context.Context。
 var innerLayerDirs = []string{
 	"apps/auth/internal/service",
@@ -96,7 +93,7 @@ var innerLayerDirs = []string{
 // 内层若还持有 gin 上下文，说明改造漏点，且"传 gin ctx 还是纯 ctx 结果不同"的分支会重新长出。
 func TestServiceLayerHasNoGinDependency(t *testing.T) {
 	root := filepath.Join(repoRootRelPath)
-	require.DirExists(t, root, "仓库根目录必须存在（守卫依赖 backend/ 布局）")
+	require.DirExists(t, root, "仓库根目录必须存在")
 
 	var violations []string
 	for _, dir := range innerLayerDirs {
@@ -132,7 +129,7 @@ func TestServiceLayerHasNoGinDependency(t *testing.T) {
 // 因此租户作用域/取消/trace 的传递与 gin 引擎开关无关。
 func TestRequestContextOnlyAtControllerBoundary(t *testing.T) {
 	root := filepath.Join(repoRootRelPath)
-	require.DirExists(t, root, "仓库根目录必须存在（守卫依赖 backend/ 布局）")
+	require.DirExists(t, root, "仓库根目录必须存在")
 
 	var violations []string
 	scan := func(dir string) {
@@ -155,7 +152,7 @@ func TestRequestContextOnlyAtControllerBoundary(t *testing.T) {
 		})
 	}
 	scan(filepath.Join(root, "pkg"))
-	scan(filepath.Join(root, "backend"))
+	scan(filepath.Join(root, "apps"))
 	require.Empty(t, violations,
 		"`.Request.Context()` 只允许出现在 controller / middleware 目录："+
 			"那里是 gin 载体与标准 context.Context 的唯一转换点")
@@ -167,7 +164,7 @@ func TestRequestContextOnlyAtControllerBoundary(t *testing.T) {
 // 重新从上下文"捞"身份，异步路径（AsyncContext 不带走 gin Keys 身份）也会静默丢身份。
 func TestBusinessLayerDoesNotImportGinIdentity(t *testing.T) {
 	root := filepath.Join(repoRootRelPath)
-	require.DirExists(t, root, "仓库根目录必须存在（守卫依赖 backend/ 布局）")
+	require.DirExists(t, root, "仓库根目录必须存在")
 
 	var violations []string
 	for _, dir := range innerLayerDirs {
@@ -194,7 +191,7 @@ func TestBusinessLayerDoesNotImportGinIdentity(t *testing.T) {
 // TestTenantScopeLayerDoesNotDependOnGin 守护租户隔离层与 gin 解耦（无载体断言）。
 func TestTenantScopeLayerDoesNotDependOnGin(t *testing.T) {
 	root := filepath.Join(repoRootRelPath)
-	require.DirExists(t, root, "仓库根目录必须存在（守卫依赖 backend/ 布局）")
+	require.DirExists(t, root, "仓库根目录必须存在")
 
 	var violations []string
 	walkGoFiles(t, filepath.Join(root, "pkg/dbclient"), func(path string, lines []string) {
@@ -222,14 +219,15 @@ func isInboundBoundary(slashPath string) bool {
 			return true
 		}
 	}
-	for _, marker := range []string{"/backend/", "/pkg/"} {
+	for _, marker := range []string{"/apps/", "/pkg/"} {
 		idx := strings.LastIndex(slashPath, marker)
 		if idx < 0 {
 			continue
 		}
+		// rel 从 marker 之后开始；补回 "<seg>/" 前缀以便与 ginAdapterPkgs（相对仓库根）统一匹配。
+		seg := strings.Trim(marker, "/")
 		rel := slashPath[idx+len(marker):]
-		// pkg 从 backend/ 搬到根级后，ginAdapterPkgs 里 pkg/... 前缀需补回以便统一匹配。
-		candidates := []string{rel, "pkg/" + rel}
+		candidates := []string{seg + "/" + rel}
 		for _, adapter := range ginAdapterPkgs {
 			for _, cand := range candidates {
 				if strings.HasPrefix(cand, adapter) || strings.Contains(cand, adapter) {

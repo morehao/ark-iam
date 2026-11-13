@@ -87,9 +87,6 @@ require (
 )
 
 require (
-	github.com/morehao/ark-iam/backend/apps/auth v0.5.0
-	github.com/morehao/ark-iam/backend/apps/platformadmin v0.4.2
-	github.com/morehao/ark-iam/backend/apps/tenantadmin v0.4.2
 	github.com/morehao/ark-iam/contract v0.1.0
 	github.com/morehao/ark-iam/pkg v0.4.0
 	go.yaml.in/yaml/v3 v3.0.5 // indirect

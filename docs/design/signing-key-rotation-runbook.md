@@ -1,7 +1,7 @@
 # 签名密钥轮换运行手册（Signing Key Rotation Runbook）
 
 适用范围：OP（`apps/auth`）的 ID token / access token / logout token 签名密钥。
-相关实现：`backend/apps/auth/internal/service/svcoidc/provider.go`、`pkg/config/config.go` 的 `OIDC.Keys`、`sdk/rp/keys.go`（RP 侧 key set 消费）。
+相关实现：`apps/auth/internal/service/svcoidc/provider.go`、`pkg/config/config.go` 的 `OIDC.Keys`、`sdk/rp/keys.go`（RP 侧 key set 消费）。
 
 ## 0. 结论速览
 
@@ -138,7 +138,7 @@ oidc:
 
 ## 7. 相关测试（回归锚点）
 
-- `backend/apps/auth/internal/service/svcoidc/provider_keys_test.go`
+- `apps/auth/internal/service/svcoidc/provider_keys_test.go`
   `TestLoadSigningKeysMultiKey`：active 唯一性、kid 派生稳定性、重复/缺失/多个 active 均报错。
 - `pkg/middleware/oidc_auth_test.go`
   `TestOIDCMultiKeyRotation`：多 key 并存时存量 token 可用；**摘除旧 key 后立即失效**。

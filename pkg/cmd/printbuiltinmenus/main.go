@@ -6,7 +6,7 @@
 //
 // 用法：
 //
-//	cd backend && go run ./pkg/cmd/printbuiltinmenus
+//	go run ./pkg/cmd/printbuiltinmenus
 //	make print-builtin-menus
 package main
 

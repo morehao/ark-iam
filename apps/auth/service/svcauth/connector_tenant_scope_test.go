@@ -1,0 +1,87 @@
+package svcauth
+
+import (
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/apps/auth/dto/dtoauth"
+	"github.com/morehao/ark-iam/apps/auth/testutil"
+	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/golib/biz/gcontext"
+	"github.com/morehao/golib/dbaccess/gormdao"
+)
+
+func TestConnectorDetailRejectsCrossTenantEntity(t *testing.T) {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
+	ginCtx.Set(gcontext.KeyTenantID, "71")
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("71"))
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("71"))
+
+	db := testutil.SetupSQLite(t, &model.ConnectorEntity{})
+	if err := db.Create(&model.ConnectorEntity{
+		BaseEntity:   gormdao.BaseEntity{StringID: gormdao.StringID{ID: "10"}},
+		TenantID:     "99",
+		Name:         "cross",
+		Config:       model.ConnectorConfig{},
+		ClaimMapping: model.ConnectorClaimMapping{},
+		DomainPolicy: model.ConnectorDomainPolicy{},
+	}).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	svc := &connectorSvc{db: dbclient.IamDB}
+	_, err := svc.Detail(requestCtx(ginCtx), &dtoauth.ConnectorDetailReq{ConnectorID: "10"})
+	if err == nil {
+		t.Fatalf("expected cross-tenant connector detail to fail")
+	}
+}
+
+func TestConnectorPageListUsesContextTenant(t *testing.T) {
+	ginCtx, _ := gin.CreateTestContext(nil)
+	if ginCtx.Request == nil {
+		ginCtx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	}
+	ginCtx.Set(gcontext.KeyTenantID, "72")
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("72"))
+	gincontext.SetTenantScope(ginCtx, gcontext.CurrentScope("72"))
+
+	db := testutil.SetupSQLite(t, &model.ConnectorEntity{})
+	if err := db.Create(&model.ConnectorEntity{
+		TenantID:     "72",
+		Name:         "tenant-72",
+		Config:       model.ConnectorConfig{},
+		ClaimMapping: model.ConnectorClaimMapping{},
+		DomainPolicy: model.ConnectorDomainPolicy{},
+	}).Error; err != nil {
+		t.Fatalf("seed tenant 72: %v", err)
+	}
+	if err := db.Create(&model.ConnectorEntity{
+		TenantID:     "99",
+		Name:         "tenant-99",
+		Config:       model.ConnectorConfig{},
+		ClaimMapping: model.ConnectorClaimMapping{},
+		DomainPolicy: model.ConnectorDomainPolicy{},
+	}).Error; err != nil {
+		t.Fatalf("seed tenant 99: %v", err)
+	}
+
+	svc := &connectorSvc{db: dbclient.IamDB}
+	// 请求里的 TenantID 为 99，但服务必须以上下文租户 72 为准
+	resp, err := svc.PageList(requestCtx(ginCtx), &dtoauth.ConnectorPageListReq{TenantID: "99"})
+	if err != nil {
+		t.Fatalf("PageList returned error: %v", err)
+	}
+	if resp.Total != 1 {
+		t.Fatalf("expected total 1 (context tenant), got %d", resp.Total)
+	}
+	if len(resp.List) != 1 || resp.List[0].Name != "tenant-72" {
+		t.Fatalf("expected tenant 72 connector from context, got %+v", resp.List)
+	}
+}

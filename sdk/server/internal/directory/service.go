@@ -12,9 +12,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/morehao/ark-iam/contract/directory"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/contract/directory"
 )
 
 // DirectorySvc 是只读目录服务接口。

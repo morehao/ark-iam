@@ -192,7 +192,7 @@ flowchart LR
 
 | 编号 | 验收项 | 阈值 | 结果与证据 |
 |---|---|---|---|
-| G1/A1 | 非测试代码 `.Request.Context()` | 白名单 ≤2 条 | **0 处**；`pkg/dbclient/design_guard_test.go::TestNoRequestContextInProductionCode`（扫描 `backend/{pkg,apps}` 非测试 `.go`），注入探针可复现失败 |
+| G1/A1 | 非测试代码 `.Request.Context()` | 白名单 ≤2 条 | **0 处**；`pkg/dbclient/design_guard_test.go::TestNoRequestContextInProductionCode`（扫描根 `{pkg,apps}` 非测试 `.go`），注入探针可复现失败 |
 | G2 | 两种 ctx 解析一致、底层无载体断言 | 断言数 0；SQL 相同 | `TestTenantScopeGinCtxEqualsRequestContext`：同请求下两种载体生成的 SQL 与 Vars **逐字节相同**；`TestTenantScopeLayerDoesNotDependOnGin`：`pkg/dbclient` 不 import gin、零载体断言 |
 | G3 | 作用域可枚举 | 跨租户点全部显式 | 27 处 `CrossTenantContext` + 12 处 `ExplicitTenantContext`，全部带理由注释；协议层策略写在文件头 |
 | G4/A3/A4 | 隔离进入测试 | 双租户用例 ≥3 | 测试库挂载生产同款插件；`TestProtocolStoreDeclaresTenantScope` 以零作用域纯 ctx 覆盖协议层三类查询；各 app 双租户用例随迁移补齐（20 个测试文件） |
@@ -281,7 +281,7 @@ flowchart LR
 
 ## 6. 遗留与后续
 
-1. **依赖已切换为发布版（已完成）**：golib 本次新增 `biz/gcontext`、`biz/gcontext/gincontext`，并修改 `dbaccess/gormplugin`（`Resolver`/`MissingScope`），已提交并发布为 **v1.32.17**。ark-iam 侧同步完成：5 个模块 `go.mod` 的 `github.com/morehao/golib` 提升到 `v1.32.17`（`apps/gateway` 补上原本缺失的显式 require）、对应 `go.sum` 更新、**`backend/go.work` 中的本地 `use ../../golib` 已移除**（`go.work` 与 `go.work.sum` 回到与提交基线逐字节一致）。已实测依赖解析来源为模块缓存 `github.com/morehao/golib@v1.32.17`，即不再需要同级 golib 检出。
+1. **依赖已切换为发布版（已完成）**：golib 本次新增 `biz/gcontext`、`biz/gcontext/gincontext`，并修改 `dbaccess/gormplugin`（`Resolver`/`MissingScope`），已提交并发布为 **v1.32.17**。ark-iam 侧同步完成：5 个模块 `go.mod` 的 `github.com/morehao/golib` 提升到 `v1.32.17`（`apps/gateway` 补上原本缺失的显式 require）、对应 `go.sum` 更新、**根 `go.work` 中的本地 `use ../../golib` 已移除**（`go.work` 与 `go.work.sum` 回到与提交基线逐字节一致）。已实测依赖解析来源为模块缓存 `github.com/morehao/golib@v1.32.17`，即不再需要同级 golib 检出。
 2. **灰度开关的生命周期**：`SetMissingTenantScopeMode(MissingTenantScopeWarn)` 只用于上线窗口的紧急回退；观察到 `dbclient.tenantScope` 告警为零后应确认默认 fail-closed，并把它从"可选开关"降级为"仅测试可用"。
 3. **协议层的测试覆盖**：`oidcop` 既有测试大多自建未挂插件的 sqlite，本次已补一条挂插件的正向回归；后续新增协议层 DAO 访问时应在该测试里补断言，而不是依赖人工 review。
 4. **第二道防线（RLS）**：见 §5.3，属另期立项。
@@ -313,4 +313,4 @@ flowchart LR
 | 接入规则（must） | `AGENTS.md`「上下文传递与租户作用域（must）」 |
 | 安全设计定位 | `docs/design/system-design.md` §7.1 |
 | 红线守卫与机制测试 | `pkg/dbclient/design_guard_test.go`、`tenant_scope_enforcement_test.go` |
-| 协议层声明回归 | `backend/apps/auth/internal/core/oidcop/protocol_scope_test.go` |
+| 协议层声明回归 | `apps/auth/internal/core/oidcop/protocol_scope_test.go` |

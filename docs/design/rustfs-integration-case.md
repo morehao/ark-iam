@@ -136,7 +136,7 @@ flowchart LR
 >
 > 裁剪的动因值得记住：下游**无从分辨编码来源**，若按租户把所有应用的编码一起下发，
 > 在任意无关应用里造一个同码角色即可命中你的策略（跨应用越权）。
-> 实现见 `backend/apps/auth/internal/core/oidcop/persistent_store.go:183`（`ClaimGroups` 的注释，含越权动因）
+> 实现见 `apps/auth/internal/core/oidcop/persistent_store.go:183`（`ClaimGroups` 的注释，含越权动因）
 > 与 `:217-218`（`appendRoleGroupClaims`：客户端/应用解析出错或角色读取失败时 fail-closed 拒绝签发；
 > 而 `appID` 解析为空的处理是"不产出声明"，两者不同）。
 
@@ -204,7 +204,7 @@ curl -X PUT http://localhost:8100/v1/platform/applications/{appID} \
 | `responseTypes` | `["code"]` | |
 | `tokenEndpointAuthMethod` | `client_secret_basic` | 与 5.1 的决策一致 |
 | `requirePKCE` | `disable` | 下游自行发 `code_challenge`；此处不强制 |
-| `defaultScopes` | `["openid", "profile", "email"]` | **必须含 `profile`**：无 `profile` 时 `appendRoleGroupClaims` 直接返回、根本不产出 `groups`（`backend/apps/auth/internal/core/oidcop/persistent_store.go:218`）。漏配的表现是"登录成功但下游报策略未解析" |
+| `defaultScopes` | `["openid", "profile", "email"]` | **必须含 `profile`**：无 `profile` 时 `appendRoleGroupClaims` 直接返回、根本不产出 `groups`（`apps/auth/internal/core/oidcop/persistent_store.go:218`）。漏配的表现是"登录成功但下游报策略未解析" |
 
 创建密钥后，明文只显示一次，落到下游的密钥载体（本案例为 `.env`，已 gitignore），
 部署文件里用 `${VAR:?}` **fail-fast**，避免"忘了填"表现为"登录按钮点不动"。

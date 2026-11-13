@@ -5,10 +5,10 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"errors"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -41,7 +41,6 @@ func fakeFromSet(m map[string]*rsa.PublicKey) KeySource { return newFakeKeys(m) 
 func fakeFromURL(_ context.Context, _ string) (KeySource, error) {
 	return nil, errors.New("fakeKeys: no network in tests")
 }
-
 
 // goldenModulusHex 是用于 kid 派生的固定模数。deriveKeyID 只用到 N，
 // 因此无需真实私钥即可锁定算法口径。

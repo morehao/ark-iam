@@ -4,7 +4,7 @@
 OIDC 登录（PKCE）与租户能力。**不搬目录**：npm 包身份由 `package.json` 的 `name` + registry 决定，
 与仓库目录无关，消费者 `pnpm add` 即可。
 
-> 包源在 ark-iam 仓库 `frontend/packages/react`，发布名 `@morehao/ark-iam-react`，当前 `0.2.0`。
+> 包源在 ark-iam 仓库 `packages/react`，发布名 `@morehao/ark-iam-react`，当前 `0.2.0`。
 
 ## 1. 安装
 
