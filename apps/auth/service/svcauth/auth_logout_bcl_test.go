@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoauth"
-	"github.com/morehao/ark-iam/backend/apps/auth/testutil"
+	"github.com/morehao/ark-iam/apps/auth/dto/dtoauth"
+	"github.com/morehao/ark-iam/apps/auth/testutil"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/sso"

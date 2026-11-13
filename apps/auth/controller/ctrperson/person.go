@@ -1,12 +1,12 @@
 package ctrperson
 
 import (
-	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoperson"
-	"github.com/morehao/ark-iam/backend/apps/auth/service/svcperson"
+	"github.com/morehao/ark-iam/apps/auth/dto/dtoperson"
+	"github.com/morehao/ark-iam/apps/auth/service/svcperson"
 	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
 type PersonCtr interface {

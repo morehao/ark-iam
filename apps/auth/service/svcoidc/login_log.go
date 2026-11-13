@@ -1,8 +1,8 @@
 package svcoidc
 
 import (
-	svcdb "github.com/morehao/ark-iam/backend/apps/auth/service/svcdb"
 	"context"
+	svcdb "github.com/morehao/ark-iam/apps/auth/service/svcdb"
 	"time"
 
 	"github.com/morehao/ark-iam/pkg/dao"

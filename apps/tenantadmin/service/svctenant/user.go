@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/morehao/ark-iam/apps/tenantadmin/dto/dtotenant"
 	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/core/application"
@@ -15,7 +16,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objidentity"
-	"github.com/morehao/ark-iam/backend/apps/tenantadmin/dto/dtotenant"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"

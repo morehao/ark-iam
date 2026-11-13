@@ -1,11 +1,11 @@
 package ctraudit
 
 import (
-	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/backend/apps/platformadmin/dto/dtoaudit"
-	"github.com/morehao/ark-iam/backend/apps/platformadmin/service/svcaudit"
+	"github.com/morehao/ark-iam/apps/platformadmin/dto/dtoaudit"
+	"github.com/morehao/ark-iam/apps/platformadmin/service/svcaudit"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
 type AuditLogCtr interface {

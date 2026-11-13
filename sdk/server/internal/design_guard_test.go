@@ -14,13 +14,13 @@ import (
 // DAO 必须经 dao.WithDBGetter(<recv>.db) 注入。
 //
 // 允许的例外：service 构造函数里 `if db == nil { db = dbclient.IamDB }` 的兜底，以及注释。
-// 本测试从 sdk/server 运行，向上两级定位到仓库根的 backend/apps。
+// 本测试从 sdk/server 运行，向上三级定位到仓库根的 apps。
 func TestNoGlobalDBInInjectedServices(t *testing.T) {
 	noArgDao := regexp.MustCompile(`dao\.New[A-Za-z]+Dao\(\)`)
 	roots := []string{
-		filepath.Join("..", "..", "..", "backend", "apps", "auth", "service"),
-		filepath.Join("..", "..", "..", "backend", "apps", "platformadmin", "service"),
-		filepath.Join("..", "..", "..", "backend", "apps", "tenantadmin", "service"),
+		filepath.Join("..", "..", "..", "apps", "auth", "service"),
+		filepath.Join("..", "..", "..", "apps", "platformadmin", "service"),
+		filepath.Join("..", "..", "..", "apps", "tenantadmin", "service"),
 	}
 
 	var offenders []string

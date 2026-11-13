@@ -1,4 +1,4 @@
-module github.com/morehao/ark-iam/backend/apps/platformadmin
+module github.com/morehao/ark-iam/apps/platformadmin
 
 go 1.26.1
 

@@ -1,16 +1,16 @@
 package svcauth
 
 import (
-	svcdb "github.com/morehao/ark-iam/backend/apps/auth/service/svcdb"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	svcdb "github.com/morehao/ark-iam/apps/auth/service/svcdb"
 	"strings"
 	"time"
 
-	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoauth"
-	"github.com/morehao/ark-iam/backend/apps/auth/service/svcloginguard"
+	"github.com/morehao/ark-iam/apps/auth/dto/dtoauth"
+	"github.com/morehao/ark-iam/apps/auth/service/svcloginguard"
 	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/core/application"
@@ -57,9 +57,7 @@ type authRefreshTokenStore interface {
 
 // defaultDB 由 iam.App 注入（一进程一 IAM 实例），供包级测试 seam 使用。
 
-
 // SetDefaultDB 由 iam.App 设置默认 DBGetter。
-
 
 var newAuthUserStore = func() authUserStore {
 	return dao.NewUserDao(dao.WithDBGetter(svcdb.DB))

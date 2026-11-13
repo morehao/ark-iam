@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/morehao/ark-iam/backend/apps/auth/config"
+	"github.com/morehao/ark-iam/apps/auth/config"
 )
 
 // envBootstrapToken 读取引导令牌。

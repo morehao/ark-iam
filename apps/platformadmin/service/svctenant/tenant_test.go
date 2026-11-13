@@ -5,13 +5,13 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/morehao/ark-iam/apps/platformadmin/dto/dtotenant"
+	"github.com/morehao/ark-iam/apps/platformadmin/testutil"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/core/tenant"
 	"github.com/morehao/ark-iam/pkg/credential"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/backend/apps/platformadmin/dto/dtotenant"
-	"github.com/morehao/ark-iam/backend/apps/platformadmin/testutil"
 	"github.com/morehao/golib/gcrypto"
 	"gorm.io/gorm"
 )

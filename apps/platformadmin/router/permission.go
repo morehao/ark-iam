@@ -1,9 +1,9 @@
 package router
 
 import (
-	"github.com/morehao/ark-iam/backend/apps/platformadmin/controller/ctrapplicationclient"
-	"github.com/morehao/ark-iam/backend/apps/platformadmin/controller/ctrpermission"
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/apps/platformadmin/controller/ctrapplicationclient"
+	"github.com/morehao/ark-iam/apps/platformadmin/controller/ctrpermission"
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 

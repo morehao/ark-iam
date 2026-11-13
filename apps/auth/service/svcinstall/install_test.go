@@ -10,9 +10,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
-	"github.com/morehao/ark-iam/backend/apps/auth/config"
-	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoinstall"
-	"github.com/morehao/ark-iam/backend/apps/auth/testutil"
+	"github.com/morehao/ark-iam/apps/auth/config"
+	"github.com/morehao/ark-iam/apps/auth/dto/dtoinstall"
+	"github.com/morehao/ark-iam/apps/auth/testutil"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/model"
 )

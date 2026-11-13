@@ -5,11 +5,11 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/apps/platformadmin"
+	"github.com/morehao/ark-iam/apps/platformadmin/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/morehao/ark-iam/pkg/seed"
-	"github.com/morehao/ark-iam/backend/apps/platformadmin"
-	"github.com/morehao/ark-iam/backend/apps/platformadmin/config"
 	"github.com/morehao/ark-iam/sdk/server"
 	"github.com/morehao/golib/glog"
 )

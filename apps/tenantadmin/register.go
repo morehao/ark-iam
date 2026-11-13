@@ -10,7 +10,7 @@ package tenantadmin
 
 import (
 	"github.com/gin-gonic/gin"
-	tenantrouter "github.com/morehao/ark-iam/backend/apps/tenantadmin/router"
+	tenantrouter "github.com/morehao/ark-iam/apps/tenantadmin/router"
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 

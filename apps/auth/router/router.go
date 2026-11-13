@@ -2,10 +2,10 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
-	authconfig "github.com/morehao/ark-iam/backend/apps/auth/config"
-	authmiddleware "github.com/morehao/ark-iam/backend/apps/auth/middleware"
-	"github.com/morehao/ark-iam/backend/apps/auth/controller/ctroidc"
-	"github.com/morehao/ark-iam/backend/apps/auth/controller/ctrinstall"
+	authconfig "github.com/morehao/ark-iam/apps/auth/config"
+	"github.com/morehao/ark-iam/apps/auth/controller/ctrinstall"
+	"github.com/morehao/ark-iam/apps/auth/controller/ctroidc"
+	authmiddleware "github.com/morehao/ark-iam/apps/auth/middleware"
 	"github.com/morehao/ark-iam/contract"
 	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/morehao/golib/dbaccess/gormdao"

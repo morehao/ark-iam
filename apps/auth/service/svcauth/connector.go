@@ -6,8 +6,8 @@ import (
 	"encoding/base64"
 	"time"
 
-	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoauth"
-	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoconnector"
+	"github.com/morehao/ark-iam/apps/auth/dto/dtoauth"
+	"github.com/morehao/ark-iam/apps/auth/dto/dtoconnector"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
@@ -93,7 +93,7 @@ type connectorIdentityResolver interface {
 }
 
 type connectorSvc struct {
-	db gormdao.DBGetter
+	db               gormdao.DBGetter
 	driverRegistry   *connectorDriverRegistry
 	connectorRepo    connectorRuntimeRepository
 	stateStore       ConnectorStateStore
@@ -118,7 +118,7 @@ func NewConnectorSvc(db gormdao.DBGetter) ConnectorSvc {
 		db = dbclient.IamDB
 	}
 	return &connectorSvc{
-		db: db,
+		db:             db,
 		driverRegistry: defaultConnectorDriverRegistry(),
 		authSvc:        NewAuthSvc(db),
 	}

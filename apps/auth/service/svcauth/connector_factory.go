@@ -1,7 +1,7 @@
 package svcauth
 
 import (
-	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoconnector"
+	"github.com/morehao/ark-iam/apps/auth/dto/dtoconnector"
 	"github.com/morehao/ark-iam/pkg/model"
 )
 

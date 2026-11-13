@@ -12,9 +12,9 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/backend/apps/auth/config"
-	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtooidc"
-	"github.com/morehao/ark-iam/backend/apps/auth/service/svcoidc"
+	"github.com/morehao/ark-iam/apps/auth/config"
+	"github.com/morehao/ark-iam/apps/auth/dto/dtooidc"
+	"github.com/morehao/ark-iam/apps/auth/service/svcoidc"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/sso"
 )

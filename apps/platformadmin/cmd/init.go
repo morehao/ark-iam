@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/morehao/ark-iam/backend/apps/platformadmin"
-	"github.com/morehao/ark-iam/backend/apps/platformadmin/config"
+	"github.com/morehao/ark-iam/apps/platformadmin"
+	"github.com/morehao/ark-iam/apps/platformadmin/config"
 	"github.com/morehao/golib/glog"
 	_ "github.com/morehao/golib/glog/driver/zap"
 	"github.com/morehao/golib/gtrace/otel"

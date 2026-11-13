@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/backend/apps/auth/controller/ctroidc"
+	"github.com/morehao/ark-iam/apps/auth/controller/ctroidc"
 	"gorm.io/gorm"
 )
 

@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoauth"
-	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoconnector"
+	"github.com/morehao/ark-iam/apps/auth/dto/dtoauth"
+	"github.com/morehao/ark-iam/apps/auth/dto/dtoconnector"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objauth"

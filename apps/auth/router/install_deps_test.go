@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/backend/apps/auth/controller/ctrinstall"
+	"github.com/morehao/ark-iam/apps/auth/controller/ctrinstall"
 )
 
 // TestInstallRoutesRegistered /install 是自举入口（R3 例外）：状态查询公开可读，

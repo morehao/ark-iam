@@ -79,8 +79,8 @@ func TestOIDCConsolesAbsentIsZeroValue(t *testing.T) {
 // 因此在这里直接把真实文件解析一遍——它能在 CI 里拦住"改配置改坏了"。
 func TestShippedConfigsParseConsoles(t *testing.T) {
 	for _, path := range []string{
-		"../../backend/apps/auth/config/config.yaml",
-		"../../backend/apps/gateway/config/config.yaml",
+		"../../apps/auth/config/config.yaml",
+		"../../apps/gateway/config/config.yaml",
 	} {
 		data, err := os.ReadFile(path)
 		if err != nil {

@@ -1,4 +1,4 @@
-module github.com/morehao/ark-iam/gateway
+module github.com/morehao/ark-iam/apps/gateway
 
 go 1.26.1
 

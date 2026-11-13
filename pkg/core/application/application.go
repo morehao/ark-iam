@@ -13,11 +13,11 @@
 package application
 
 import (
-	"github.com/morehao/golib/dbaccess/gormdao"
 	"context"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 )
 

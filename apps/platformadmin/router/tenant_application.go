@@ -1,8 +1,8 @@
 package router
 
 import (
-	"github.com/morehao/ark-iam/backend/apps/platformadmin/controller/ctrtenantapplication"
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/apps/platformadmin/controller/ctrtenantapplication"
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 

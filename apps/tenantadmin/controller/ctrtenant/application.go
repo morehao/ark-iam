@@ -1,12 +1,12 @@
 package ctrtenant
 
 import (
-	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/apps/tenantadmin/dto/dtotenant"
+	"github.com/morehao/ark-iam/apps/tenantadmin/service/svctenant"
 	"github.com/morehao/ark-iam/pkg/identity"
-	"github.com/morehao/ark-iam/backend/apps/tenantadmin/dto/dtotenant"
-	"github.com/morehao/ark-iam/backend/apps/tenantadmin/service/svctenant"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
 // ApplicationCtr 租户应用视角接口：订阅应用清单 + 应用准入视角（谁能进这个应用）。

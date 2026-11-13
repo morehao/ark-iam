@@ -1,14 +1,14 @@
 package ctrinstall
 
 import (
-	"github.com/morehao/golib/dbaccess/gormdao"
 	"fmt"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoinstall"
-	"github.com/morehao/ark-iam/backend/apps/auth/service/svcinstall"
+	"github.com/morehao/ark-iam/apps/auth/dto/dtoinstall"
+	"github.com/morehao/ark-iam/apps/auth/service/svcinstall"
 	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/model"

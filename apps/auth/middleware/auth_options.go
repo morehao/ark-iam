@@ -3,7 +3,7 @@ package middleware
 import (
 	"context"
 
-	"github.com/morehao/ark-iam/backend/apps/auth/config"
+	"github.com/morehao/ark-iam/apps/auth/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/morehao/ark-iam/pkg/sso"

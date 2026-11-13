@@ -1,13 +1,13 @@
 package svcauth
 
 import (
-	svcdb "github.com/morehao/ark-iam/backend/apps/auth/service/svcdb"
+	svcdb "github.com/morehao/ark-iam/apps/auth/service/svcdb"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"testing"
 	"time"
 
-	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoauth"
-	"github.com/morehao/ark-iam/backend/apps/auth/testutil"
+	"github.com/morehao/ark-iam/apps/auth/dto/dtoauth"
+	"github.com/morehao/ark-iam/apps/auth/testutil"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"

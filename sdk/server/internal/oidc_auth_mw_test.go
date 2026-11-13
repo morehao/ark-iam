@@ -12,17 +12,17 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	mw "github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/morehao/ark-iam/contract"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/ark-iam/contract"
+	mw "github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/sdk/rp"
 	"github.com/morehao/golib/biz/gcontext"
+	dbgormsqlite "github.com/morehao/golib/dbaccess/dbgorm/driver/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	dbgormsqlite "github.com/morehao/golib/dbaccess/dbgorm/driver/sqlite"
 	"gorm.io/gorm"
 )
 

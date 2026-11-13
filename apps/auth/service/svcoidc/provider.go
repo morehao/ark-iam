@@ -1,7 +1,6 @@
 package svcoidc
 
 import (
-	"gorm.io/gorm"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -10,13 +9,14 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
+	"gorm.io/gorm"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
 
-	appconfig "github.com/morehao/ark-iam/backend/apps/auth/config"
-	"github.com/morehao/ark-iam/backend/apps/auth/core/oidcop"
+	appconfig "github.com/morehao/ark-iam/apps/auth/config"
+	"github.com/morehao/ark-iam/apps/auth/core/oidcop"
 	"github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/zitadel/oidc/v3/pkg/op"

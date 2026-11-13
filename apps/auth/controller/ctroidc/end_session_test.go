@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	appconfig "github.com/morehao/ark-iam/backend/apps/auth/config"
-	"github.com/morehao/ark-iam/backend/apps/auth/service/svcoidc"
+	appconfig "github.com/morehao/ark-iam/apps/auth/config"
+	"github.com/morehao/ark-iam/apps/auth/service/svcoidc"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 )
 

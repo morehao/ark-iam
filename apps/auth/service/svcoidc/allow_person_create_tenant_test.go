@@ -1,14 +1,14 @@
 package svcoidc
 
 import (
-	"github.com/morehao/ark-iam/pkg/dbclient"
 	"fmt"
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/backend/apps/auth/testutil"
+	"github.com/morehao/ark-iam/apps/auth/testutil"
 	"github.com/morehao/ark-iam/pkg/model"
 )
 

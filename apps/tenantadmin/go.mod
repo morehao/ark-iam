@@ -1,4 +1,4 @@
-module github.com/morehao/ark-iam/backend/apps/tenantadmin
+module github.com/morehao/ark-iam/apps/tenantadmin
 
 go 1.26.1
 

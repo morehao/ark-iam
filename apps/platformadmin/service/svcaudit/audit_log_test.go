@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/apps/platformadmin/dto/dtoaudit"
+	"github.com/morehao/ark-iam/apps/platformadmin/testutil"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/backend/apps/platformadmin/dto/dtoaudit"
-	"github.com/morehao/ark-iam/backend/apps/platformadmin/testutil"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/stretchr/testify/assert"

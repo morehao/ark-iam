@@ -2,8 +2,8 @@ package middleware
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/backend/apps/auth/core/oidcop"
-	"github.com/morehao/ark-iam/backend/apps/auth/service/svcoidc"
+	"github.com/morehao/ark-iam/apps/auth/core/oidcop"
+	"github.com/morehao/ark-iam/apps/auth/service/svcoidc"
 	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/biz/gcontext/gincontext"

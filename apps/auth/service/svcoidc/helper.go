@@ -5,7 +5,7 @@ import (
 
 	"github.com/zitadel/oidc/v3/pkg/op"
 
-	"github.com/morehao/ark-iam/backend/apps/auth/core/oidcop"
+	"github.com/morehao/ark-iam/apps/auth/core/oidcop"
 	"github.com/morehao/ark-iam/pkg/core/application"
 	"github.com/morehao/ark-iam/pkg/object/objauth"
 	"github.com/morehao/ark-iam/pkg/sso"

@@ -12,10 +12,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"   # sdk/scripts -> repo root
 cd "$REPO_ROOT"
 
-FORBIDDEN='gorm\.io|github\.com/gin-gonic|github\.com/redis|go-elasticsearch|github\.com/morehao/ark-iam/pkg|github\.com/morehao/ark-iam/backend'
+FORBIDDEN='gorm\.io|github\.com/gin-gonic|github\.com/redis|go-elasticsearch|github\.com/morehao/ark-iam/pkg|github\.com/morehao/ark-iam/apps'
 
 # 1) contract module：仅允许标准库 + jwt/v5（不得依赖任何 ark-iam 其它 module 或框架）。
-contract_extra=$(cd contract && GOWORK=off go list -deps ./... 2>/dev/null | grep -E 'github\.com/morehao/ark-iam/(pkg|sdk|backend|contract/[a-z])|github\.com/gin-gonic|gorm\.io|github\.com/redis|go-elasticsearch' | grep -v '^github\.com/morehao/ark-iam/contract' || true)
+contract_extra=$(cd contract && GOWORK=off go list -deps ./... 2>/dev/null | grep -E 'github\.com/morehao/ark-iam/(pkg|sdk|apps|contract/[a-z])|github\.com/gin-gonic|gorm\.io|github\.com/redis|go-elasticsearch' | grep -v '^github\.com/morehao/ark-iam/contract' || true)
 if [ -n "$contract_extra" ]; then
   echo "❌ contract 依赖断言失败：contract 仅允许标准库 + jwt/v5"
   echo "$contract_extra"

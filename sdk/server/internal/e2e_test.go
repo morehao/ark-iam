@@ -6,15 +6,15 @@ import (
 
 	_ "github.com/morehao/golib/dbaccess/dbgorm/driver/sqlite"
 
-	authconfig "github.com/morehao/ark-iam/backend/apps/auth/config"
-	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtoinstall"
-	"github.com/morehao/ark-iam/backend/apps/auth/service/svcauth"
-	"github.com/morehao/ark-iam/backend/apps/auth/service/svcdb"
-	"github.com/morehao/ark-iam/backend/apps/auth/service/svcinstall"
+	authconfig "github.com/morehao/ark-iam/apps/auth/config"
+	"github.com/morehao/ark-iam/apps/auth/dto/dtoinstall"
+	"github.com/morehao/ark-iam/apps/auth/service/svcauth"
+	"github.com/morehao/ark-iam/apps/auth/service/svcdb"
+	"github.com/morehao/ark-iam/apps/auth/service/svcinstall"
+	pkconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objidentity"
-	pkconfig "github.com/morehao/ark-iam/pkg/config"
 )
 
 // TestEndToEndBootstrapAndLogin 端到端：New → RunMigrations（真实建表）→ install.Initialize

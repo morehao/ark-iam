@@ -6,10 +6,10 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/morehao/ark-iam/apps/platformadmin/dto/dtotenantapplication"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/backend/apps/platformadmin/dto/dtotenantapplication"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gerror"
 )

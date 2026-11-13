@@ -1,14 +1,14 @@
 package svcoidc
 
 import (
-	"github.com/morehao/golib/dbaccess/gormdao"
 	"context"
 	"errors"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"strings"
 	"time"
 
-	"github.com/morehao/ark-iam/backend/apps/auth/core/oidcop"
-	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtooidc"
+	"github.com/morehao/ark-iam/apps/auth/core/oidcop"
+	"github.com/morehao/ark-iam/apps/auth/dto/dtooidc"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/core/person"
 	"github.com/morehao/ark-iam/pkg/core/tenant"

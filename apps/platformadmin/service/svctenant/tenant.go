@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/morehao/ark-iam/apps/platformadmin/dto/dtotenant"
 	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/core/person"
@@ -14,7 +15,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objtenant"
-	"github.com/morehao/ark-iam/backend/apps/platformadmin/dto/dtotenant"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gcrypto"
@@ -34,7 +34,6 @@ type TenantSvc interface {
 
 type tenantSvc struct {
 	db gormdao.DBGetter
-
 }
 
 var _ TenantSvc = (*tenantSvc)(nil)

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/morehao/ark-iam/backend/apps/auth/config"
+	"github.com/morehao/ark-iam/apps/auth/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 )
 

@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/morehao/ark-iam/apps/tenantadmin/dto/dtotenant"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/backend/apps/tenantadmin/dto/dtotenant"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"

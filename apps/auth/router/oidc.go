@@ -2,8 +2,8 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/backend/apps/auth/controller/ctroidc"
-	"github.com/morehao/ark-iam/backend/apps/auth/middleware"
+	"github.com/morehao/ark-iam/apps/auth/controller/ctroidc"
+	"github.com/morehao/ark-iam/apps/auth/middleware"
 	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
 	"github.com/zitadel/oidc/v3/pkg/oidc"

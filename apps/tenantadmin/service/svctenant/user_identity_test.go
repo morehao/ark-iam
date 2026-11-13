@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/morehao/ark-iam/apps/tenantadmin/dto/dtotenant"
+	"github.com/morehao/ark-iam/apps/tenantadmin/testutil"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/backend/apps/tenantadmin/dto/dtotenant"
-	"github.com/morehao/ark-iam/backend/apps/tenantadmin/testutil"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
 )

@@ -13,11 +13,11 @@ type DomainFunc func(rg *gin.RouterGroup, db gormdao.DBGetter)
 // 域常量见 iam.Domain：DomainMenu / DomainTenant / DomainApplication /
 // DomainOAuthClient / DomainDomain / DomainAudit / DomainTenantApp。
 var Registry = map[string]DomainFunc{
-	"menu":           menuRouter,
-	"tenant":         tenantRouter,
-	"application":    applicationRouter,
-	"oauth-client":   applicationClientRouter,
-	"domain":         domainRouter,
-	"tenant-app":     tenantApplicationRouter,
-	"audit":          auditLogRouter,
+	"menu":         menuRouter,
+	"tenant":       tenantRouter,
+	"application":  applicationRouter,
+	"oauth-client": applicationClientRouter,
+	"domain":       domainRouter,
+	"tenant-app":   tenantApplicationRouter,
+	"audit":        auditLogRouter,
 }

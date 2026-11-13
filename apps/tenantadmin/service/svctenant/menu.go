@@ -2,6 +2,7 @@ package svctenant
 
 import (
 	"context"
+	"github.com/morehao/ark-iam/apps/tenantadmin/dto/dtotenant"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/core/menu"
 	"github.com/morehao/ark-iam/pkg/dao"
@@ -9,7 +10,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objidentity"
 	"github.com/morehao/ark-iam/pkg/object/objpermission"
-	"github.com/morehao/ark-iam/backend/apps/tenantadmin/dto/dtotenant"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 )

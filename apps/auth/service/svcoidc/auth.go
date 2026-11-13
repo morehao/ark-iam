@@ -1,15 +1,15 @@
 package svcoidc
 
 import (
-	"github.com/morehao/golib/dbaccess/gormdao"
 	"context"
 	"errors"
 	"fmt"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"time"
 
-	"github.com/morehao/ark-iam/backend/apps/auth/core/oidcop"
-	"github.com/morehao/ark-iam/backend/apps/auth/dto/dtooidc"
-	"github.com/morehao/ark-iam/backend/apps/auth/service/svcauth"
+	"github.com/morehao/ark-iam/apps/auth/core/oidcop"
+	"github.com/morehao/ark-iam/apps/auth/dto/dtooidc"
+	"github.com/morehao/ark-iam/apps/auth/service/svcauth"
 	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/model"
@@ -92,7 +92,7 @@ type passwordAuthenticator interface {
 }
 
 type oidcAuthSvc struct {
-	db gormdao.DBGetter
+	db              gormdao.DBGetter
 	provider        *OIDCProvider
 	authSvc         passwordAuthenticator
 	ssoSessionStore sso.SSOSessionStore

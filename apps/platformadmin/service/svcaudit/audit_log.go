@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/morehao/ark-iam/apps/platformadmin/dto/dtoaudit"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/backend/apps/platformadmin/dto/dtoaudit"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
@@ -32,7 +32,6 @@ type AuditLogSvc interface {
 
 type auditLogSvc struct {
 	db gormdao.DBGetter
-
 }
 
 var _ AuditLogSvc = (*auditLogSvc)(nil)

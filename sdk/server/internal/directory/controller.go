@@ -15,9 +15,9 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/contract/directory"
-		"github.com/morehao/golib/biz/gcontext/gincontext"
+	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 )

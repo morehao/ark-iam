@@ -10,9 +10,9 @@ package auth
 
 import (
 	"github.com/gin-gonic/gin"
-	authconfig "github.com/morehao/ark-iam/backend/apps/auth/config"
-	authrouter "github.com/morehao/ark-iam/backend/apps/auth/router"
-	svcdb "github.com/morehao/ark-iam/backend/apps/auth/service/svcdb"
+	authconfig "github.com/morehao/ark-iam/apps/auth/config"
+	authrouter "github.com/morehao/ark-iam/apps/auth/router"
+	svcdb "github.com/morehao/ark-iam/apps/auth/service/svcdb"
 	"github.com/morehao/ark-iam/contract"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/golib/dbaccess/gormdao"

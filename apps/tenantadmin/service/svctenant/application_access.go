@@ -1,16 +1,16 @@
 package svctenant
 
 import (
-	"github.com/morehao/golib/dbaccess/gormdao"
 	"context"
 	"errors"
+	"github.com/morehao/golib/dbaccess/gormdao"
 
+	"github.com/morehao/ark-iam/apps/tenantadmin/dto/dtotenant"
 	"github.com/morehao/ark-iam/pkg/code"
 	iamapplication "github.com/morehao/ark-iam/pkg/core/application"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/backend/apps/tenantadmin/dto/dtotenant"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 	"gorm.io/gorm"

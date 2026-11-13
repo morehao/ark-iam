@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/apps/tenantadmin/dto/dtotenant"
+	"github.com/morehao/ark-iam/apps/tenantadmin/testutil"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objtenant"
-	"github.com/morehao/ark-iam/backend/apps/tenantadmin/dto/dtotenant"
-	"github.com/morehao/ark-iam/backend/apps/tenantadmin/testutil"
 	"github.com/morehao/golib/biz/gcontext"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"

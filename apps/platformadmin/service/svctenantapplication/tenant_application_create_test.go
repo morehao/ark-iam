@@ -6,10 +6,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
+	"github.com/morehao/ark-iam/apps/platformadmin/dto/dtotenantapplication"
+	"github.com/morehao/ark-iam/apps/platformadmin/testutil"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/backend/apps/platformadmin/dto/dtotenantapplication"
-	"github.com/morehao/ark-iam/backend/apps/platformadmin/testutil"
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 

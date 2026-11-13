@@ -256,20 +256,24 @@ func NewPersistentStore(opts ...PersistentStoreOption) *PersistentStore {
 		daoOpts = append(daoOpts, dao.WithDBGetter(cfg.db))
 	}
 	return &PersistentStore{
-		applicationClientDao:       func(o ...dao.DaoOption) *dao.ApplicationClientDao { return dao.NewApplicationClientDao(append(daoOpts, o...)...) },
-		applicationClientSecretDao: func(o ...dao.DaoOption) *dao.ApplicationClientSecretDao { return dao.NewApplicationClientSecretDao(append(daoOpts, o...)...) },
-		personDao:                  func(o ...dao.DaoOption) *dao.PersonDao { return dao.NewPersonDao(append(daoOpts, o...)...) },
-		tenantDao:                  func(o ...dao.DaoOption) *dao.TenantDao { return dao.NewTenantDao(append(daoOpts, o...)...) },
-		userDao:                    func(o ...dao.DaoOption) *dao.UserDao { return dao.NewUserDao(append(daoOpts, o...)...) },
-		refreshTokenDao:            func(o ...dao.DaoOption) *dao.RefreshTokenDao { return dao.NewRefreshTokenDao(append(daoOpts, o...)...) },
-		apiKeyDao:                  func(o ...dao.DaoOption) *dao.ApiKeyDao { return dao.NewApiKeyDao(append(daoOpts, o...)...) },
-		userRoleDao:                func(o ...dao.DaoOption) *dao.UserRoleDao { return dao.NewUserRoleDao(append(daoOpts, o...)...) },
-		roleDao:                    func(o ...dao.DaoOption) *dao.RoleDao { return dao.NewRoleDao(append(daoOpts, o...)...) },
-		issuer:                     cfg.issuer,
-		enforceAppAccess:           cfg.enforceAppAccess,
-		db:                         dbOrDefault(cfg.db),
-		rotationGrace:              make(map[string]refreshGraceEntry),
-		rotationInflight:           make(map[string]chan struct{}),
+		applicationClientDao: func(o ...dao.DaoOption) *dao.ApplicationClientDao {
+			return dao.NewApplicationClientDao(append(daoOpts, o...)...)
+		},
+		applicationClientSecretDao: func(o ...dao.DaoOption) *dao.ApplicationClientSecretDao {
+			return dao.NewApplicationClientSecretDao(append(daoOpts, o...)...)
+		},
+		personDao:        func(o ...dao.DaoOption) *dao.PersonDao { return dao.NewPersonDao(append(daoOpts, o...)...) },
+		tenantDao:        func(o ...dao.DaoOption) *dao.TenantDao { return dao.NewTenantDao(append(daoOpts, o...)...) },
+		userDao:          func(o ...dao.DaoOption) *dao.UserDao { return dao.NewUserDao(append(daoOpts, o...)...) },
+		refreshTokenDao:  func(o ...dao.DaoOption) *dao.RefreshTokenDao { return dao.NewRefreshTokenDao(append(daoOpts, o...)...) },
+		apiKeyDao:        func(o ...dao.DaoOption) *dao.ApiKeyDao { return dao.NewApiKeyDao(append(daoOpts, o...)...) },
+		userRoleDao:      func(o ...dao.DaoOption) *dao.UserRoleDao { return dao.NewUserRoleDao(append(daoOpts, o...)...) },
+		roleDao:          func(o ...dao.DaoOption) *dao.RoleDao { return dao.NewRoleDao(append(daoOpts, o...)...) },
+		issuer:           cfg.issuer,
+		enforceAppAccess: cfg.enforceAppAccess,
+		db:               dbOrDefault(cfg.db),
+		rotationGrace:    make(map[string]refreshGraceEntry),
+		rotationInflight: make(map[string]chan struct{}),
 	}
 }
 

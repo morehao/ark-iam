@@ -8,12 +8,12 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/morehao/ark-iam/apps/tenantadmin/dto/dtotenant"
+	"github.com/morehao/ark-iam/apps/tenantadmin/testutil"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/backend/apps/tenantadmin/dto/dtotenant"
-	"github.com/morehao/ark-iam/backend/apps/tenantadmin/testutil"
 	"github.com/morehao/golib/biz/gcontext"
 )
 
