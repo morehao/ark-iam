@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, message, Modal, Select, Space, Table } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, idColumn, NAME_COL_WIDTH, PageContainer, RemoteSelect, SourceTag, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn } from '@morehao/ark-iam-react/ui'
+import { actionColumn, idColumn, NAME_COL_WIDTH, PageContainer, RemoteSelect, SourceTag, StatCard, StatRow, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn } from '@morehao/ark-iam-react/ui'
 import {
   createTenantApplication,
   deleteTenantApplication,
@@ -182,34 +182,43 @@ export default function TenantApplicationList() {
           </Button>
         </Space>
       }
+      summary={
+        <StatRow>
+          <StatCard label="订阅总数" value={total} hint="当前筛选下返回总数" />
+          <StatCard label="本页数量" value={data.length} hint={`第 ${page} 页 · 每页 ${pageSize} 条`} />
+          <StatCard label="当前筛选" value={statusFilter ?? '全部'} hint={statusFilter ? '' : '未设置状态筛选'} />
+        </StatRow>
+      }
+      toolbar={
+        <Space wrap>
+          <RemoteSelect
+            allowClear
+            width={220}
+            placeholder="租户筛选（输入名称搜索）"
+            value={tenantFilter}
+            onChange={(v) => {
+              setTenantFilter(v)
+              setPage(1)
+            }}
+            fetchOptions={fetchTenantOptions}
+          />
+          <Select
+            allowClear
+            placeholder="状态筛选"
+            style={{ width: 140 }}
+            value={statusFilter}
+            onChange={(v) => {
+              setStatusFilter(v)
+              setPage(1)
+            }}
+            options={[
+              { value: 'enable', label: '启用' },
+              { value: 'disable', label: '停用' },
+            ]}
+          />
+        </Space>
+      }
     >
-      <div style={{ marginBottom: 16, display: 'flex', gap: 12 }}>
-        <RemoteSelect
-          allowClear
-          width={220}
-          placeholder="租户筛选（输入名称搜索）"
-          value={tenantFilter}
-          onChange={(v) => {
-            setTenantFilter(v)
-            setPage(1)
-          }}
-          fetchOptions={fetchTenantOptions}
-        />
-        <Select
-          allowClear
-          placeholder="状态筛选"
-          style={{ width: 140 }}
-          value={statusFilter}
-          onChange={(v) => {
-            setStatusFilter(v)
-            setPage(1)
-          }}
-          options={[
-            { value: 'enable', label: '启用' },
-            { value: 'disable', label: '停用' },
-          ]}
-        />
-      </div>
       <Table<TenantApplicationItem>
         rowKey="tenantAppID"
         columns={columns}

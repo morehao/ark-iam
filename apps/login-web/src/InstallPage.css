@@ -22,7 +22,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #4f6ef7 0%, #7a5af8 55%, #a855f7 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #4096ff 55%, #69b1ff 100%);
   color: #fff;
   overflow: hidden;
   padding: 48px;
@@ -117,8 +117,8 @@
 }
 
 .form-group input:focus {
-  border-color: #4f6ef7;
-  box-shadow: 0 0 0 3px rgba(79, 110, 247, 0.12);
+  border-color: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22,119,255,0.12);
 }
 
 .login-btn {
@@ -126,13 +126,13 @@
   height: 46px;
   border: none;
   border-radius: 10px;
-  background: linear-gradient(135deg, #4f6ef7 0%, #7a5af8 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
   color: #fff;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.2s, transform 0.1s;
-  box-shadow: 0 8px 20px rgba(79, 110, 247, 0.35);
+  box-shadow: 0 8px 20px rgba(22,119,255,0.35);
   margin-top: 8px;
 }
 
@@ -188,12 +188,12 @@
 }
 
 .install-step.is-active {
-  background: rgba(79, 110, 247, 0.1);
-  color: #4f6ef7;
+  background: rgba(22,119,255,0.1);
+  color: #1677ff;
 }
 
 .install-step.is-done {
-  color: #4f6ef7;
+  color: #1677ff;
 }
 
 .install-step-index {
@@ -212,7 +212,7 @@
 
 .install-step.is-active .install-step-index,
 .install-step.is-done .install-step-index {
-  background: #4f6ef7;
+  background: #1677ff;
   color: #fff;
 }
 
@@ -256,7 +256,7 @@
 /* ---------- 第 ③ 步确认清单 ---------- */
 .install-summary {
   background: #fafafa;
-  border: 1px solid #e6e9ef;
+  border: 1px solid #f0f0f0;
   border-radius: 10px;
   padding: 14px 16px;
   margin-bottom: 18px;
@@ -321,8 +321,8 @@
 }
 
 .ghost-btn:hover {
-  border-color: #4f6ef7;
-  color: #4f6ef7;
+  border-color: #1677ff;
+  color: #1677ff;
 }
 
 .ghost-btn:disabled {
@@ -357,8 +357,8 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: rgba(79, 110, 247, 0.12);
-  color: #4f6ef7;
+  background: rgba(22,119,255,0.12);
+  color: #1677ff;
   font-size: 24px;
   font-weight: 700;
   display: flex;
@@ -377,7 +377,7 @@
 /* ---------- 控制台入口 ---------- */
 .install-consoles {
   margin-top: 24px;
-  border-top: 1px solid #e6e9ef;
+  border-top: 1px solid #f0f0f0;
   padding-top: 18px;
 }
 
@@ -400,19 +400,19 @@
   flex-direction: column;
   gap: 2px;
   padding: 10px 14px;
-  border: 1px solid #e6e9ef;
+  border: 1px solid #f0f0f0;
   border-radius: 10px;
   text-decoration: none;
   transition: border-color 0.2s;
 }
 
 .install-consoles a:hover {
-  border-color: #4f6ef7;
+  border-color: #1677ff;
 }
 
 .install-consoles a strong {
   font-size: 13px;
-  color: #4f6ef7;
+  color: #1677ff;
   font-weight: 600;
 }
 
@@ -429,7 +429,7 @@
 }
 
 .install-report details {
-  border: 1px solid #e6e9ef;
+  border: 1px solid #f0f0f0;
   border-radius: 10px;
   padding: 10px 14px;
 }
@@ -437,7 +437,7 @@
 .install-report summary {
   cursor: pointer;
   font-size: 13px;
-  color: #4f6ef7;
+  color: #1677ff;
   font-weight: 600;
 }
 

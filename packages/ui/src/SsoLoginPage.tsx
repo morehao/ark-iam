@@ -124,7 +124,7 @@ export function SsoLoginPage({ title, subtitle }: SsoLoginPageProps) {
             block
             loading={auth.isLoading}
             onClick={() => void auth.signinRedirect()}
-            style={{ height: 46, borderRadius: 10, fontWeight: 600, background: brand.gradient, border: 'none', boxShadow: '0 8px 20px rgba(79,110,247,0.35)' }}
+            style={{ height: 46, borderRadius: 10, fontWeight: 600, background: brand.gradient, border: 'none', boxShadow: '0 8px 20px rgba(22,119,255,0.35)' }}
           >
             IAM 账号登录 <ArrowRightOutlined />
           </Button>

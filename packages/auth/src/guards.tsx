@@ -1,9 +1,9 @@
 import { Spin } from 'antd'
 
 // 注：auth 包处于 ui 下层（ui → auth 依赖方向），无法引用 @ark-iam/ui tokens，
-// 这里的中性色与 DESIGN.md「冷白工程台」灰阶保持一致，改动需手动同步。
-const LOADING_BG = '#f6f7f9'
-const LOADING_TEXT = '#94a3b8'
+// 这里的中性色与 DESIGN.md「Ant Design 原生」灰阶保持一致（画布 #f5f5f5 / 占位色 rgba(0,0,0,0.45)），改动需手动同步。
+const LOADING_BG = '#f5f5f5'
+const LOADING_TEXT = 'rgba(0,0,0,0.45)'
 
 export function FullPageSpinner() {
   return (

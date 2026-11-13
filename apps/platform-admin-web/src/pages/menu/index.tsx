@@ -26,7 +26,7 @@ import {
   ThunderboltOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons'
-import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, PageContainer, RemoteSelect, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
+import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, PageContainer, RemoteSelect, StatCard, StatRow, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
 import { createMenu, deleteMenu, getApplicationDetail, getApplicationPageList, getMenuTree, updateMenu } from '@morehao/ark-iam-react/api'
 import type { ApplicationItem, MenuExternalLinkFlag, MenuHiddenFlag, MenuItem, MenuKeepAliveFlag, MenuStatus, MenuType, MenuVisibility } from '@morehao/ark-iam-react/types'
 
@@ -422,94 +422,52 @@ export default function MenuList() {
           </Button>
         </Space>
       }
+      summary={
+        <StatRow>
+          <StatCard label="菜单总数" value={stats.total} hint={selectedApp ? `所属应用：${selectedApp.code}` : '请先选择所属应用'} />
+          <StatCard label="目录 / 菜单" value={`${stats.directory} / ${stats.menu}`} hint="按类型统计" />
+          <StatCard label="按钮数量" value={stats.button} hint={`停用 ${stats.disabled} 项`} danger={stats.disabled > 0} />
+        </StatRow>
+      }
+      toolbar={
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <Space size={12}>
+            <span className="menu-app-label">所属应用</span>
+            <RemoteSelect
+              placeholder="选择应用（输入名称搜索）"
+              width={300}
+              value={selectedAppId}
+              onChange={handleAppChange}
+              fetchOptions={fetchAppOptions}
+              initialLabel={selectedApp ? `${selectedApp.name}（${selectedApp.code}）` : undefined}
+            />
+            {selectedApp && <Tag color="blue">{selectedApp.code}</Tag>}
+          </Space>
+          <Space>
+            <Input
+              allowClear
+              prefix={<SearchOutlined style={{ color: tokens.textSecondary }} />}
+              placeholder="按名称 / 编码 / 路径过滤"
+              style={{ width: 280 }}
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+            />
+            <Button size="small" onClick={() => setExpandedKeys(collectKeys(menuTree))}>
+              展开全部
+            </Button>
+            <Button size="small" onClick={() => setExpandedKeys([])}>
+              收起全部
+            </Button>
+          </Space>
+        </div>
+      }
     >
       <style>{`
-        .menu-app-bar {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          flex-wrap: wrap;
-          gap: 12px;
-        }
         .menu-app-label {
           color: ${tokens.textSecondary};
           font-size: 13px;
         }
-        .menu-app-stats {
-          font-size: 13px;
-          color: ${tokens.textSecondary};
-        }
-        .menu-app-stats b {
-          color: ${tokens.text};
-          font-size: 16px;
-          margin-left: 4px;
-        }
-        .menu-app-fixed {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 14px;
-          border-radius: 8px;
-          background: ${tokens.softFill};
-          border: 1px solid ${tokens.border};
-          font-size: 13px;
-        }
       `}</style>
-
-      {/* 应用切换器 + 菜单概览 */}
-      <div className="menu-app-bar">
-        <Space size={12}>
-          <span className="menu-app-label">所属应用</span>
-          <RemoteSelect
-            placeholder="选择应用（输入名称搜索）"
-            width={300}
-            value={selectedAppId}
-            onChange={handleAppChange}
-            fetchOptions={fetchAppOptions}
-            initialLabel={selectedApp ? `${selectedApp.name}（${selectedApp.code}）` : undefined}
-          />
-          {selectedApp && <Tag color="blue">{selectedApp.code}</Tag>}
-        </Space>
-        <Space size={20} className="menu-app-stats">
-          <span>
-            菜单总数 <b>{stats.total}</b>
-          </span>
-          <span>
-            目录 <b>{stats.directory}</b>
-          </span>
-          <span>
-            菜单 <b>{stats.menu}</b>
-          </span>
-          <span>
-            按钮 <b>{stats.button}</b>
-          </span>
-          <span>
-            停用 <b>{stats.disabled}</b>
-          </span>
-        </Space>
-      </div>
-
-      <Divider style={{ margin: '12px 0 16px' }} />
-
-      {/* 搜索与展开控制 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <Input
-          allowClear
-          prefix={<SearchOutlined style={{ color: tokens.textSecondary }} />}
-          placeholder="按名称 / 编码 / 路径过滤"
-          style={{ width: 280 }}
-          value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
-        />
-        <Space>
-          <Button size="small" onClick={() => setExpandedKeys(collectKeys(menuTree))}>
-            展开全部
-          </Button>
-          <Button size="small" onClick={() => setExpandedKeys([])}>
-            收起全部
-          </Button>
-        </Space>
-      </div>
 
       <Spin spinning={treeLoading}>
         {!selectedAppId ? (

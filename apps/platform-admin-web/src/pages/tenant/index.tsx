@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Divider, Form, Input, message, Modal, Select, Space, Switch, Table, Tooltip } from 'antd'
 import { PlusOutlined, QuestionCircleOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, CODE_COL_WIDTH, idColumn, InitialPasswordModal, NAME_COL_WIDTH, PageContainer, STATUS_COL_WIDTH, SuspendedTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, TypeTag } from '@morehao/ark-iam-react/ui'
+import { actionColumn, CODE_COL_WIDTH, idColumn, InitialPasswordModal, NAME_COL_WIDTH, PageContainer, StatCard, StatRow, STATUS_COL_WIDTH, SuspendedTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, TypeTag } from '@morehao/ark-iam-react/ui'
 import { createTenant, deleteTenant, getTenantPageList, resetTenantAdminPassword, updateTenant } from '@morehao/ark-iam-react/api'
 import type { TenantItem, TenantStatus } from '@morehao/ark-iam-react/types'
 
@@ -219,30 +219,39 @@ export default function TenantList() {
           </Button>
         </Space>
       }
+      summary={
+        <StatRow>
+          <StatCard label="租户总数" value={total} hint="当前筛选下返回总数" />
+          <StatCard label="本页数量" value={data.length} hint={`第 ${page} 页 · 每页 ${pageSize} 条`} />
+          <StatCard label="当前筛选" value={status ?? '全部'} hint={status ? '' : '未设置状态筛选'} />
+        </StatRow>
+      }
+      toolbar={
+        <Space wrap>
+          <Input.Search
+            allowClear
+            placeholder="按租户名搜索"
+            prefix={<SearchOutlined />}
+            style={{ width: 240 }}
+            onSearch={(v) => {
+              setKeyword(v)
+              setPage(1)
+            }}
+          />
+          <Select
+            allowClear
+            placeholder="全部状态"
+            style={{ width: 140 }}
+            value={status}
+            onChange={(v: TenantStatus | undefined) => {
+              setStatus(v)
+              setPage(1)
+            }}
+            options={TENANT_STATUS_OPTIONS}
+          />
+        </Space>
+      }
     >
-      <Space style={{ marginBottom: 16 }} wrap>
-        <Input.Search
-          allowClear
-          placeholder="按租户名搜索"
-          prefix={<SearchOutlined />}
-          style={{ width: 240 }}
-          onSearch={(v) => {
-            setKeyword(v)
-            setPage(1)
-          }}
-        />
-        <Select
-          allowClear
-          placeholder="全部状态"
-          style={{ width: 140 }}
-          value={status}
-          onChange={(v: TenantStatus | undefined) => {
-            setStatus(v)
-            setPage(1)
-          }}
-          options={TENANT_STATUS_OPTIONS}
-        />
-      </Space>
       <Table<TenantItem>
         rowKey="tenantID"
         columns={columns}

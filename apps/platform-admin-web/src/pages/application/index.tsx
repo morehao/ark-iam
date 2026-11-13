@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Descriptions, Drawer, Form, Input, InputNumber, message, Modal, Select, Space, Switch, Table } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, CODE_COL_WIDTH, fmtTime, IDCell, idColumn, nameColumn, PageContainer, SourceTag, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
+import { actionColumn, CODE_COL_WIDTH, fmtTime, IDCell, idColumn, nameColumn, PageContainer, SourceTag, StatCard, StatRow, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
 import { createApplication, deleteApplication, getApplicationDetail, getApplicationPageList, updateApplication } from '@morehao/ark-iam-react/api'
 import type { ApplicationItem, ApplicationRoleTemplateItem } from '@morehao/ark-iam-react/types'
 
@@ -208,8 +208,13 @@ export default function ApplicationList() {
           </Button>
         </Space>
       }
-    >
-      <div style={{ marginBottom: 16 }}>
+      summary={
+        <StatRow>
+          <StatCard label="应用总数" value={total} hint="当前筛选下返回总数" />
+          <StatCard label="本页数量" value={data.length} hint={`第 ${page} 页 · 每页 ${pageSize} 条`} />
+        </StatRow>
+      }
+      toolbar={
         <Input.Search
           allowClear
           placeholder="按应用名搜索"
@@ -220,7 +225,8 @@ export default function ApplicationList() {
             setPage(1)
           }}
         />
-      </div>
+      }
+    >
       <Table<ApplicationItem>
         rowKey="appID"
         columns={columns}

@@ -17,7 +17,7 @@ import {
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
-import { actionColumn, NAME_COL_WIDTH, nameColumn, PageContainer, STATUS_COL_WIDTH, EnableTag, tableScrollX, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
+import { actionColumn, NAME_COL_WIDTH, nameColumn, PageContainer, StatCard, StatRow, STATUS_COL_WIDTH, EnableTag, tableScrollX, timeColumn } from '@morehao/ark-iam-react/ui'
 import type { DepartmentChildItem, DepartmentItem, DeptNodeStatus } from '@morehao/ark-iam-react/types'
 import {
   createDepartment,
@@ -274,7 +274,66 @@ export default function DepartmentPage() {
   ]
 
   return (
-    <PageContainer title="部门管理" description="部门树维护：部门层级与部门节点管理">
+    <PageContainer
+      title="部门管理"
+      description="部门树维护：部门层级与部门节点管理"
+      extra={
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreateNode(selectedID || defaultRootID || undefined)}>
+          新增部门
+        </Button>
+      }
+      summary={
+        <StatRow>
+          <StatCard label="下级部门总数" value={childrenTotal} hint="当前选中部门下返回总数" />
+          <StatCard label="本页数量" value={childrenList.length} hint={`第 ${page} 页 · 每页 ${pageSize} 条`} />
+          <StatCard
+            label="当前筛选"
+            value={query.name || query.status ? '已设置筛选' : '全部'}
+            hint={[query.name ? `名称：${query.name}` : '', query.status ? `状态：${query.status === 'enable' ? '启用' : '停用'}` : ''].filter(Boolean).join(' · ') || '未设置筛选条件'}
+          />
+        </StatRow>
+      }
+      toolbar={
+        <Form
+          form={filterForm}
+          layout="inline"
+          style={{ rowGap: 12 }}
+          onFinish={(v: { name?: string; status?: DeptNodeStatus }) => {
+            setQuery({ name: v.name, status: v.status })
+          }}
+        >
+          <Form.Item name="name" label="部门名称">
+            <Input placeholder="请输入部门名称" allowClear style={{ width: 200 }} />
+          </Form.Item>
+          <Form.Item name="status" label="状态">
+            <Select
+              allowClear
+              placeholder="请选择状态"
+              style={{ width: 160 }}
+              options={[
+                { label: '启用', value: 'enable' },
+                { label: '停用', value: 'disable' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item style={{ marginLeft: 'auto', marginRight: 0 }}>
+            <Space>
+              <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
+                查询
+              </Button>
+              <Button
+                onClick={() => {
+                  filterForm.resetFields()
+                  setQuery({})
+                }}
+              >
+                重置
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      }
+    >
       <style>{`
         #dept-tree-card .ant-tree-treenode {
           padding-inline: 0;
@@ -305,52 +364,6 @@ export default function DepartmentPage() {
         </Card>
 
         <Card style={{ flex: 1, borderRadius: 12 }} styles={{ body: { padding: '16px 24px 24px' } }}>
-          {/* 查询筛选栏 */}
-          <Form
-            form={filterForm}
-            layout="inline"
-            style={{ marginBottom: 16, rowGap: 12 }}
-            onFinish={(v: { name?: string; status?: DeptNodeStatus }) => {
-              setQuery({ name: v.name, status: v.status })
-            }}
-          >
-            <Form.Item name="name" label="部门名称">
-              <Input placeholder="请输入部门名称" allowClear style={{ width: 200 }} />
-            </Form.Item>
-            <Form.Item name="status" label="状态">
-              <Select
-                allowClear
-                placeholder="请选择状态"
-                style={{ width: 160 }}
-                options={[
-                  { label: '启用', value: 'enable' },
-                  { label: '停用', value: 'disable' },
-                ]}
-              />
-            </Form.Item>
-            <Form.Item style={{ marginLeft: 'auto', marginRight: 0 }}>
-              <Space>
-                <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
-                  查询
-                </Button>
-                <Button
-                  onClick={() => {
-                    filterForm.resetFields()
-                    setQuery({})
-                  }}
-                >
-                  重置
-                </Button>
-              </Space>
-            </Form.Item>
-          </Form>
-          <div style={{ borderBottom: `1px solid ${tokens.border}`, marginBottom: 16 }} />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreateNode(selectedID || defaultRootID || undefined)}>
-              新增部门
-            </Button>
-          </div>
-          <div style={{ borderBottom: `1px solid ${tokens.border}`, marginBottom: 16 }} />
           <Table<DepartmentChildItem>
             rowKey={(r) => r.departmentID}
             size="middle"

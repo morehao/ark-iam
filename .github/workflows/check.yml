@@ -35,8 +35,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          # CI 主支持线；v7 下 22 的日志是干净的。
-          node-version: '22'
+          # CI 主支持线；与 ark-go-starter 对齐（engines.node >=26、.nvmrc 26.13.0）。
+          node-version: '26'
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
 

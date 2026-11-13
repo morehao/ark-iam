@@ -4,11 +4,11 @@ Ark IAM 前端共享组件与设计令牌库（React + antd 5）。
 
 提供三类能力：
 
-1. **设计令牌**：`themeConfig` / `tokens` / `brand` —— 全站视觉唯一事实源（「冷白工程台」），配合 antd `ConfigProvider` 使用。
+1. **设计令牌**：`themeConfig` / `tokens` / `brand` —— 全站视觉唯一事实源（Ant Design 原生：浅色侧栏 + AntD 蓝主色 `#1677ff`，6px 控件圆角 / 8px 卡片圆角），配合 antd `ConfigProvider` 使用。
 2. **列表页列工厂**：`actionColumn` / `nameColumn` / `textColumn` / `idColumn` / `timeColumn` / `tableScrollX` 及列宽常量 —— 收敛各页列宽、操作列与横向滚动。
 3. **骨架与通用组件**：`AppShell` / `MainLayout` / `PageContainer` / `LoginPage` / `TenantSwitcher` / `ProfileCenter` / `RemoteSelect` / `RemoteMultiSelect` / 状态 Tag 等。
 
-> 设计规范细节见仓库根 `DESIGN.md`；接入完整说明见 `docs/design/application-integration-guide.md` §12「前端组件接入」。
+> 设计规范细节见仓库根 `DESIGN.md`（视觉规范唯一事实源，可用 `npx @google/design.md lint DESIGN.md` 校验格式）；接入完整说明见 `docs/design/application-integration-guide.md` §12「前端组件接入」。
 
 > 说明：`@ark-iam/ui` 是**内部包**，不单独对外发布。外部业务项目请安装门面包 `@morehao/ark-iam-react`，从 `@morehao/ark-iam-react/ui` 引入本包的组件与令牌。见 `packages/react/README.md`。
 

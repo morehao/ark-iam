@@ -62,7 +62,7 @@ function readAuthRequestID(): string | null {
   return new URLSearchParams(window.location.search).get('authRequestID')
 }
 
-/** 品牌区（左侧紫色渐变）。移动端（<900px）由父组件判定后不渲染。 */
+/** 品牌区（左侧蓝系渐变）。移动端（<900px）由父组件判定后不渲染。 */
 function BrandPanel({ title, subtitle }: { title: string; subtitle: string }) {
   const features = ['单点登录 SSO', '多租户隔离', '细粒度授权']
   return (
@@ -455,7 +455,7 @@ export function LoginPage({ title, subtitle, basePath, onLoggedIn }: LoginPagePr
     fontWeight: 600,
     background: brand.gradient,
     border: 'none',
-    boxShadow: '0 8px 20px rgba(79,110,247,0.35)',
+    boxShadow: '0 8px 20px rgba(22,119,255,0.35)',
   } as const
 
   const titleText =
@@ -667,7 +667,7 @@ function TenantSelection({
         disabled={!selected}
         loading={loading}
         onClick={() => selected && onSelect(selected)}
-        style={{ height: 46, borderRadius: 10, fontWeight: 600, background: brand.gradient, border: 'none', boxShadow: '0 8px 20px rgba(79,110,247,0.35)', marginTop: 4 }}
+        style={{ height: 46, borderRadius: 10, fontWeight: 600, background: brand.gradient, border: 'none', boxShadow: '0 8px 20px rgba(22,119,255,0.35)', marginTop: 4 }}
       >
         进入
       </Button>
