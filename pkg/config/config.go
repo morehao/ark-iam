@@ -27,6 +27,45 @@ type Config struct {
 	Security    SecurityConfig            `yaml:"security"`
 	Install     InstallConfig             `yaml:"install"`
 	MasterKey   string                    `yaml:"masterKey"`
+	Notify      NotifyConfig              `yaml:"notify"`
+}
+
+// NotifyConfig 是临时凭据投递（邮件/短信）配置（对应 pkg/notify.Config）。
+//
+// 三层开关语义见执行计划 2026-11-14-notify-delivery-channel-plan.md §1.2bis：
+//   - enabled 总闸（出厂 false，仅首启灰度验证；验证通道可用后应置 true 成为目标默认）；
+//   - mail.enabled / sms.enabled 渠道开关；
+//   - requireDelivery 失败语义（true=报错 / false=回退回显）。
+//
+// 敏感字段（password/accessKeySecret）**优先从环境变量读**（NOTIFY_MAIL_PASSWORD 等），
+// 配置仅作回落；生产建议用密钥管理。
+type NotifyConfig struct {
+	Enabled         bool           `yaml:"enabled"`
+	RequireDelivery bool           `yaml:"requireDelivery"`
+	Mail            NotifyMailConf `yaml:"mail"`
+	SMS             NotifySMSConf  `yaml:"sms"`
+}
+
+// NotifyMailConf 是 SMTP 邮件渠道配置。
+type NotifyMailConf struct {
+	Enabled  bool   `yaml:"enabled"`
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+	From     string `yaml:"from"`
+	TLS      bool   `yaml:"tls"`
+}
+
+// NotifySMSConf 是短信渠道配置（本期单供应商，可插拔）。
+type NotifySMSConf struct {
+	Enabled         bool   `yaml:"enabled"`
+	Provider        string `yaml:"provider"` // tencent | 空=不启用
+	AccessKeyID     string `yaml:"accessKeyID"`
+	AccessKeySecret string `yaml:"accessKeySecret"`
+	SignName        string `yaml:"signName"`
+	TemplateCode    string `yaml:"templateCode"`
+	Region          string `yaml:"region"`
 }
 
 // InstallConfig 首次初始化（引导）相关配置。

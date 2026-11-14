@@ -14,6 +14,7 @@ const (
 	UserResetPasswordError      = 100517 // 重置密码失败
 	UserContactRequiredError    = 100521 // 邮箱或手机号至少填写一个
 	UserOwnerUpdateError        = 100522 // 指派/取消租户拥有者失败
+	NotifyDeliverError          = 100523 // 账号已创建但凭据投递失败，请用重置密码接口重试
 )
 
 const (
@@ -80,6 +81,7 @@ var userErrorMsgMap = gerror.CodeMsgMap{
 	UserResetPasswordError:                "重置密码失败",
 	UserContactRequiredError:              "邮箱或手机号至少填写一个",
 	UserOwnerUpdateError:                  "设置租户拥有者失败",
+	NotifyDeliverError:                    "账号已创建，但凭据投递失败，请稍后用「重置密码」重试",
 	UserIdentityCreateError:               "创建用户身份失败",
 	UserIdentityDeleteError:               "删除用户身份失败",
 	UserIdentityUpdateError:               "修改用户身份失败",

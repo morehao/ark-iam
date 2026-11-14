@@ -15,11 +15,13 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/notify"
 	"github.com/morehao/ark-iam/pkg/oidckit"
 	"github.com/morehao/ark-iam/sdk/rp"
 	dirpkg "github.com/morehao/ark-iam/sdk/server/internal/directory"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
 	"github.com/morehao/golib/dbaccess/gormdao"
+	"github.com/morehao/golib/glog"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -68,7 +70,33 @@ func New(cfg Config) (*App, error) {
 	if err := app.initRedis(); err != nil {
 		return nil, err
 	}
+	if err := app.initNotify(); err != nil {
+		return nil, err
+	}
 	return app, nil
+}
+
+// initNotify 按配置装配临时凭据投递通道（pkg/notify），并注册为进程级默认。
+//
+// 配置来自完整 pkgconfig.Config 的 notify 段（cfg.Raw）。未提供 Raw 或总闸关闭时，
+// 装配一个「关闭态」Notifier（Send 恒 ErrNoChannel，业务侧回退现状）。总闸开但无渠道时
+// FromConfig 报 ErrChannelLessConfig：dev 降级为关闭态并告警，prod fail-closed 拒绝启动。
+func (a *App) initNotify() error {
+	var ncfg notify.Config
+	if a.cfg.Raw != nil {
+		ncfg = notifyConfigFrom(a.cfg.Raw.Notify)
+	}
+	n, err := notify.FromConfig(ncfg)
+	if err != nil {
+		if errors.Is(err, notify.ErrChannelLessConfig) && a.cfg.Env != "prod" {
+			glog.Warnf(context.Background(), "[sdk/server.initNotify] notify.enabled=true but no channel enabled; degrade to disabled (dev)")
+			notify.SetDefault(notify.Disabled())
+			return nil
+		}
+		return fmt.Errorf("sdk/server: init notify failed: %w", err)
+	}
+	notify.SetDefault(n)
+	return nil
 }
 
 // Mount 把选中的业务域挂到给定子路由组（不污染宿主根路由）。

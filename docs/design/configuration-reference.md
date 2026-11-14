@@ -370,6 +370,31 @@ oidc:
 | `es_configs` | Elasticsearch 配置位（`[]dbes.ESConfig`）；应用侧未配置、未消费，仅 `pkg/testsetup` 构造测试配置时读取 |
 | `masterKey` | 预留主密钥（加密敏感配置用） |
 
+### 9.1 notify（临时凭据投递通道）
+
+一次性临时口令（建租户 / 建成员 / 重置密码）可通过邮件 / 短信直接投递给账号本人，管理员不再经手明文（见 [system-design.md §5.8](system-design.md) 与 `pkg/notify`）。三层开关：
+
+| 配置项 | 默认 | 说明 |
+|---|---|---|
+| `notify.enabled` | `false` | **总闸**。`false` = 保持现状（响应回显一次明文、零外部调用）。出厂默认关闭仅用于首启灰度验证（通道可达性 / 模板审批未验证前不误投）；验证通道可用后应置 `true` 成为**目标默认**。 |
+| `notify.requireDelivery` | `true` | **失败语义**（仅总闸开时有效）。`true` = 投递失败返回 `NotifyDeliverError`（账号已建、需「重置密码」重试）；`false` = 回退为响应回显明文、`delivered=false`（仅通道故障时的降级）。 |
+| `notify.mail.enabled` | `false` | 邮件渠道开关（总闸开时生效）。 |
+| `notify.mail.host` / `port` / `from` | — | SMTP 服务器与发件人（`From` 形如 `IAM <no-reply@example.com>`）。 |
+| `notify.mail.username` / `password` | — | SMTP 认证。**`password` 生产用环境变量 `NOTIFY_MAIL_PASSWORD`**，配置仅作回落。 |
+| `notify.mail.tls` | `true` | 是否用 SMTPS/STARTTLS。 |
+| `notify.sms.enabled` | `false` | 短信渠道开关。 |
+| `notify.sms.provider` | `""` | 供应商标识（本期实现 `tencent`；空=不启用）。适配器可插拔，见 `pkg/notify/sms.go` 的 `smsFactories`，新增供应商只需实现 `Sender` 并注册工厂。 |
+| `notify.sms.accessKeyID` / `accessKeySecret` | — | 供应商凭证。**`accessKeySecret` 生产用环境变量 `NOTIFY_SMS_ACCESS_KEY_SECRET`**。 |
+| `notify.sms.signName` / `templateCode` / `region` | — | 短信签名 / 模板 / 地域（腾讯云默认 `ap-guangzhou`）。 |
+
+**渠道选择规则**：优先 `person.primary_email`（走邮件），其次 `person.primary_phone`（走短信）；两者皆空或对应渠道未开 → 不可投递，按 `requireDelivery` 分支处理。收件地址只取自然人自带联系方式，绝不从请求参数取（防乱投 / SSRF）。
+
+**配置校验**：`notify.enabled=true` 但 `mail`/`sms` 全关 → 配置错误：`prod` 拒绝启动、`dev` 降级为关闭态并告警（避免「以为开了但什么都没发」的静默漏配）。
+
+## 9.2 环境变化与临时口令交付
+
+`notify.enabled=true` 后，业务响应中的 `initialPassword` / `adminInitialPassword` 在投递成功时为空，新增 `delivered` 布尔表达投递结果；前端据此展示「已发送至账号邮箱/短信」或「自动发送失败，请线下转交」。回滚只需把 `notify.enabled` 置回 `false`（无需改代码）。
+
 ---
 
 ## 10. 环境差异要点

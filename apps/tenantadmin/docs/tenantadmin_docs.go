@@ -3635,8 +3635,12 @@ const docTemplatetenantadmin = `{
         "dtotenant.UserCreateResp": {
             "type": "object",
             "properties": {
+                "delivered": {
+                    "description": "Delivered 表示临时密码是否已通过邮件/短信投递给账号本人。",
+                    "type": "boolean"
+                },
                 "initialPassword": {
-                    "description": "InitialPassword 成员的初始临时密码，仅在此响应中返回一次，不落库、不可再查；\n若邮箱/手机命中已存在自然人（其密码不被改动），该字段为空串。\n待办：邮件/短信通道接入后本字段下线，见 pkg/credential 的 TODO(delivery)。",
+                    "description": "初始临时密码(通道未启用/投递失败回退时才有值)",
                     "type": "string"
                 },
                 "userID": {
@@ -3933,8 +3937,12 @@ const docTemplatetenantadmin = `{
         "dtotenant.UserResetPasswordResp": {
             "type": "object",
             "properties": {
+                "delivered": {
+                    "description": "Delivered 表示临时密码是否已通过邮件/短信投递给账号本人。",
+                    "type": "boolean"
+                },
                 "initialPassword": {
-                    "description": "InitialPassword 新临时密码，仅在此响应中返回一次，不落库、不可再查。",
+                    "description": "新临时密码(通道未启用/投递失败回退时才有值)",
                     "type": "string"
                 },
                 "userID": {
