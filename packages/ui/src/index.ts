@@ -34,7 +34,10 @@ export type {
   ActionColumnConfig,
 } from './columns'
 export { RowActions } from './RowActions'
-export type { RowAction, RowActionsProps } from './RowActions'
+export type { RowAction, RowActionsProps, RowActionsVariant } from './RowActions'
+export { MENU_ICONS, MENU_ICON_LABELS, menuIcon, menuIconOptions } from './menuIcons'
+export { StatusSwitch } from './StatusSwitch'
+export type { StatusSwitchProps } from './StatusSwitch'
 export { NameLink } from './NameLink'
 export type { NameLinkProps } from './NameLink'
 export { RemoteSelect, RemoteMultiSelect } from './RemoteSelect'
