@@ -1,0 +1,190 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Button, Select, message } from 'antd'
+import { RemoteMultiSelect, tokens } from '@ark-iam/ui'
+import type { TenantSubscribedApplicationItem, TenantUserRoleItem } from '@ark-iam/types'
+import { getMachineUserRoles, updateMachineUserRoles } from '@ark-iam/api'
+import { getTenantApps } from '@ark-iam/api'
+import { getTenantRolePageList } from '@ark-iam/api'
+import { getTenantUserRoles, updateTenantUserRoles } from '@ark-iam/api'
+
+/** 系统/未归属应用组（role.app_id 为空串） */
+const SYS_APP_ID = ''
+const SYS_APP_NAME = '系统角色'
+
+export interface RoleAssignEditorProps {
+  kind: 'user' | 'machine'
+  subjectID: string
+  /** 保存成功后回调（父级刷新列表/摘要等） */
+  onSaved?: () => void
+}
+
+interface AppOption {
+  appID: string
+  appName: string
+}
+
+// 应用选项 = 租户订阅应用 ∪ 当前已持有角色所在应用 ∪ 系统角色组（存在空 appID 角色时）。
+function buildAppOptions(apps: TenantSubscribedApplicationItem[], roles: TenantUserRoleItem[]): AppOption[] {
+  const byId = new Map<string, string>()
+  for (const a of apps) {
+    byId.set(a.appID, a.name)
+  }
+  for (const r of roles) {
+    const key = r.appID || SYS_APP_ID
+    const name = r.appName || (r.appID === SYS_APP_ID ? SYS_APP_NAME : '')
+    if (!byId.has(key)) {
+      byId.set(key, name || `未归属应用（${key}）`)
+    }
+  }
+  return Array.from(byId, ([appID, appName]) => ({ appID, appName }))
+}
+
+/**
+ * 按应用授权编辑器（用户 / 服务账号共用）：
+ * 角色从属于应用（role.app_id），故授权以「主体 × 应用」为粒度 —— 先选目标应用，
+ * 再勾选该应用下的角色；保存（PUT）仅全量替换该应用的角色，不影响其它应用。
+ */
+export default function RoleAssignEditor({ kind, subjectID, onSaved }: RoleAssignEditorProps) {
+  const [apps, setApps] = useState<TenantSubscribedApplicationItem[]>([])
+  const [roles, setRoles] = useState<TenantUserRoleItem[]>([]) // 当前已分配（全应用）
+  const [loading, setLoading] = useState(true)
+  const [appID, setAppID] = useState<string>()
+  const [checked, setChecked] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
+
+  const loadApps = useCallback(async (): Promise<TenantSubscribedApplicationItem[]> => {
+    const resp = await getTenantApps().catch(() => null)
+    return resp?.list || []
+  }, [])
+
+  const loadRoles = useCallback(async (): Promise<TenantUserRoleItem[]> => {
+    const resp = kind === 'user' ? await getTenantUserRoles(subjectID) : await getMachineUserRoles(subjectID)
+    return resp?.list || []
+  }, [kind, subjectID])
+
+  useEffect(() => {
+    let alive = true
+    setLoading(true)
+    Promise.all([loadApps(), loadRoles()])
+      .then(([appList, roleList]) => {
+        if (!alive) return
+        setApps(appList)
+        setRoles(roleList)
+        // 默认选中：优先「当前持有角色的应用」，否则第一个订阅应用
+        const counts = new Map<string, number>()
+        roleList.forEach((r) => counts.set(r.appID || SYS_APP_ID, (counts.get(r.appID || SYS_APP_ID) || 0) + 1))
+        const ordered = buildAppOptions(appList, roleList)
+        setAppID(ordered.find((o) => (counts.get(o.appID) || 0) > 0)?.appID ?? ordered[0]?.appID)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (alive) setLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [loadApps, loadRoles])
+
+  const appOptions = useMemo(() => buildAppOptions(apps, roles), [apps, roles])
+
+  // 角色候选集走服务端搜索（角色可增长，不能只取前 100 条在前端过滤）：按目标应用过滤；
+  // 「系统角色」组是 app_id 为空串的未归属角色，而空串 appID 在查询里语义是"不过滤"，故用 unassigned 开关。
+  const fetchRoleOptions = useCallback(
+    async (keyword: string) => {
+      if (appID === undefined) return []
+      const params =
+        appID === SYS_APP_ID
+          ? { page: 1, pageSize: 50, unassigned: true, keyword: keyword || undefined }
+          : { appID, page: 1, pageSize: 50, keyword: keyword || undefined }
+      const resp = await getTenantRolePageList(params)
+      return (resp?.list || []).map((r) => ({ value: r.roleID, label: r.name }))
+    },
+    [appID],
+  )
+
+  // 切换目标应用时重置勾选：默认勾上该主体已持有的该应用角色
+  useEffect(() => {
+    setChecked(appID === undefined ? [] : roles.filter((r) => r.appID === appID).map((r) => r.roleID))
+  }, [appID, roles])
+
+  // 已持有角色的名称：多选框据此回显已选项（已选项可能不在当前搜索结果里）
+  const checkedLabels = useMemo(() => {
+    const map: Record<string, string> = {}
+    roles.forEach((r) => {
+      if (r.roleID && r.name) map[r.roleID] = r.name
+    })
+    return map
+  }, [roles])
+
+  const save = async () => {
+    if (appID === undefined) {
+      message.warning('请先选择目标应用')
+      return
+    }
+    setSaving(true)
+    try {
+      if (kind === 'user') {
+        await updateTenantUserRoles(subjectID, appID, checked)
+      } else {
+        await updateMachineUserRoles(subjectID, appID, checked)
+      }
+      message.success('角色已更新')
+      setRoles(await loadRoles())
+      onSaved?.()
+    } catch {
+      /* 拦截器已提示 */
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return <div style={{ color: tokens.textPlaceholder, textAlign: 'center', padding: 24 }}>加载中...</div>
+  }
+
+  const currentAppRoles = appID === undefined ? [] : roles.filter((r) => r.appID === appID)
+  const currentAppLabel = appOptions.find((o) => o.appID === appID)?.appName || appID || SYS_APP_NAME
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div>
+        <div style={{ color: tokens.textPlaceholder, fontSize: 12, marginBottom: 4 }}>目标应用（角色从属于应用，按应用逐个授权）</div>
+        <Select
+          placeholder="选择目标应用"
+          style={{ width: '100%' }}
+          value={appID}
+          onChange={setAppID}
+          options={appOptions.map((o) => {
+            const count = roles.filter((r) => r.appID === o.appID).length
+            return { value: o.appID, label: `${o.appName}${count > 0 ? `（已分配 ${count}）` : ''}` }
+          })}
+        />
+      </div>
+      {appID !== undefined ? (
+        <>
+          <div>
+            <div style={{ color: tokens.textPlaceholder, fontSize: 12, marginBottom: 4 }}>角色（保存后全量替换「{currentAppLabel}」的授权）</div>
+            <RemoteMultiSelect
+              allowClear
+              placeholder="选择角色（输入名称搜索）"
+              style={{ width: '100%' }}
+              value={checked}
+              onChange={(v) => setChecked(v ?? [])}
+              fetchOptions={fetchRoleOptions}
+              initialLabels={checkedLabels}
+            />
+          </div>
+          <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>
+            {kind === 'machine' && '仅可授予普通角色，管理员角色不可授予服务账号；'}
+            当前「{currentAppLabel}」已分配：{currentAppRoles.map((r) => r.name).join('、') || '无'}。保存仅替换该应用，不影响其它应用。
+          </div>
+          <Button type="primary" loading={saving} onClick={() => void save()} style={{ alignSelf: 'flex-start' }}>
+            保存角色
+          </Button>
+        </>
+      ) : (
+        <div style={{ color: tokens.textPlaceholder, fontSize: 12 }}>暂无可用应用，请确认租户已订阅应用。</div>
+      )}
+    </div>
+  )
+}

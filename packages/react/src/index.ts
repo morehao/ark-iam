@@ -78,3 +78,8 @@ export type {
   InstallField,
   InstallFieldErrors,
 } from '@ark-iam/login'
+
+// 页面级门面包（IamProvider / IamRoutes / IamConsoleApp）：管理台页面 + 路由渲染 + 认证主题外壳。
+// 需要更细的子路径也可从 `@morehao/ark-iam-react/console` 引入。
+export { IamProvider, IamRoutes, IamConsoleApp } from '@ark-iam/console'
+export type { IamConsoleConfig, ConsoleRouteDef } from '@ark-iam/console'

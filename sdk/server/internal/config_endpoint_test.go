@@ -128,3 +128,60 @@ func TestConfigJSON_RootBases(t *testing.T) {
 		t.Errorf("issuer = %v, want http://x/oidc", got)
 	}
 }
+
+// TestConfigJSON_EnabledDomains 验证 G4：/config.json 下发 enabledDomains 域白名单。
+// 空 Domains 归一为全量域（与 Mount 的解析口径一致）。
+func TestConfigJSON_EnabledDomains(t *testing.T) {
+	// 空 Domains：全量域集合（非空，且含 core-auth / application）。
+	e := mountConfigOnly(t, nil, "")
+	out := getConfigJSON(t, e, "http://x/config.json")
+	raw, ok := out["enabledDomains"]
+	if !ok {
+		t.Fatalf("enabledDomains missing from /config.json: %v", out)
+	}
+	list, ok := raw.([]any)
+	if !ok {
+		t.Fatalf("enabledDomains is not an array: %T", raw)
+	}
+	if len(list) == 0 {
+		t.Errorf("enabledDomains must not be empty for full-domain instance")
+	}
+	has := func(d string) bool {
+		for _, v := range list {
+			if v == d {
+				return true
+			}
+		}
+		return false
+	}
+	if !has(string(DomainCoreAuth)) {
+		t.Errorf("enabledDomains missing %q: %v", DomainCoreAuth, list)
+	}
+	if !has(string(DomainApplication)) {
+		t.Errorf("enabledDomains missing %q: %v", DomainApplication, list)
+	}
+}
+
+// TestConfigJSON_EnabledDomainsSubset 验证显式选定域时只下发所选域的集合。
+func TestConfigJSON_EnabledDomainsSubset(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	app := &App{cfg: Config{Domains: []Domain{DomainCoreAuth, DomainUser, DomainRole, DomainMenu}}}
+	e := gin.New()
+	if err := app.MountConfig(e, ""); err != nil {
+		t.Fatalf("MountConfig: %v", err)
+	}
+	out := getConfigJSON(t, e, "http://x/config.json")
+	list, ok := out["enabledDomains"].([]any)
+	if !ok {
+		t.Fatalf("enabledDomains is not an array: %T", out["enabledDomains"])
+	}
+	if len(list) != 4 {
+		t.Errorf("enabledDomains length = %d, want 4: %v", len(list), list)
+	}
+	for _, v := range list {
+		s := v.(string)
+		if s == string(DomainApplication) || s == string(DomainTenant) {
+			t.Errorf("enabledDomains must not contain unselected domain %q: %v", s, list)
+		}
+	}
+}
