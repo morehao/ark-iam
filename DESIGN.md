@@ -413,6 +413,7 @@ Ark IAM 是**企业级 IAM 管理后台**（登录门户 + 平台管理后台 + 
 - **AppShell**：`ConfigProvider`（zhCN + `themeConfig`）在每个 app 的 main.tsx 包裹；根容器开启 `font-variant-numeric: tabular-nums`。
 - **antd 结构级微修正**统一收口在 `AppShell` 的内联 `<style>`（针对 antd 内部 DOM / portal 下拉等无法用 token 表达的修正）；**禁止各 app 新增 css 文件、禁止在页面散落全局 `<style>`**。
 - **租户切换器 `TenantSwitcher`**：`border-strong` 边 + `surface-table-header` 中性底 + 主色图标。
+- **菜单图标（`menuIcons` 唯一注册表）**：侧边栏菜单 icon 走**唯一注册表** `packages/ui/src/menuIcons.tsx`，禁止各 app 再硬编码 `ICON_MAP`。后端 `menu.icon` 存的是**注册表 key**（不是 React 组件名）；渲染一律 `menuIcon(key)`（未识别 key 回落兜底图标 `AppstoreOutlined`，不抛错不空白）。**一 key 一图标、语义唯一**——不同功能菜单禁止共用同一图标（如租户管理与自定义域名都曾用 `global`）。菜单管理页 icon 表单项用 `Select`（`options={menuIconOptions()}`，带图标预览+中文名），不再用自由文本 `Input`。注册表同时导出 `MENU_ICONS` / `MENU_ICON_LABELS` / `menuIconOptions()` 供表单与遍历。
 
 ### 7.2 状态 Tag 字典（唯一规范）
 
@@ -427,6 +428,13 @@ Ark IAM 是**企业级 IAM 管理后台**（登录门户 + 平台管理后台 + 
 | API Key 有效 | 内联语义色 | 有效（`success`）；已吊销（`error`） |
 
 **分类标识（非状态，用固定分类色，不用语义组件）**：租户类型用 `TypeTag`（platform→geekblue、customer→cyan）；应用/客户端来源与角色来源共用 `SourceTag`（builtin→gold「内置」、first_party→blue「第一方」、third_party→orange「第三方」、custom→blue「自定义」）；页面私有分类（public/private、菜单类型、超管等）允许内联但遵循「分类色」规则，禁止三态以上随意取色。
+
+**可切换状态用 `StatusSwitch`（不是 Tag）**：当「停用/启用、挂起/恢复」是**列表状态列上可随手切换**的操作时（用户、服务账号、部门等），状态列改用 `StatusSwitch` 内联开关，**同时从操作列移除对应的 toggle 按钮**（同一状态不留两个入口）。约束：
+
+- **双向二次确认**：正向（恢复/启用）与负向（挂起/停用）**都要 `Modal.confirm`**，负向文案必须说明影响（如撤销会话 / 子部门连带 / API Key 中断），负向确定按钮 `danger`。
+- **受控 + 失败回滚**：`checked` 由行状态派生，只有调用方请求成功后刷新行数据才翻转；组件不自己发请求，失败时开关自动回退。
+- **一次性不可逆动作（删除、吊销）不用 Switch**，保持按钮 + 确认——Switch 会让用户误以为可再拨回。
+- 纯展示、无切换入口的状态仍用语义 Tag（上表）。
 
 ### 7.3 列表页模板（List 骨架）
 
@@ -443,7 +451,7 @@ PageContainer(title, description, extra = 刷新 + 主操作[type=primary])
   │    ├─ 编码/key/域名列 → textColumn({ monospace: true })
   │    ├─ 状态列 → §7.2 语义组件（列宽 STATUS_COL_WIDTH）
   │    ├─ 时间列 → timeColumn()（TIME_COL_WIDTH=180 + TimeCell 强制单行）
-  │    └─ 操作列 → actionColumn()（最右，fixed:'right'，RowActions：≤max 横排；>max 收「更多」纵向下拉）
+  │    └─ 操作列 → actionColumn()（最右，fixed:'right'，RowActions：≤max 横排；>max 收「更多」纵向下拉；variant 默认 'icon'=图标+文字）
   └─ 新建/编辑 Modal（layout=vertical + confirmLoading）
      详情 Drawer（Descriptions bordered size=small）
 ```
@@ -453,12 +461,14 @@ PageContainer(title, description, extra = 刷新 + 主操作[type=primary])
 - **所有列都必须有显式列宽，优先取共享常量 / 工厂**：`ID_COL_WIDTH`(130) / `NAME_COL_WIDTH`(180) / `CODE_COL_WIDTH`(150) / `TAG_COL_WIDTH`(110) / `STATUS_COL_WIDTH`(100) / `COUNT_COL_WIDTH`(90) / `TEXT_COL_WIDTH`(200) / `LONG_TEXT_COL_WIDTH`(320)，时间列用 `timeColumn`。常量不合适时可传显式 `width`，但**同类列在各页必须同宽**，禁止与内容无关的整百「凑数宽度」。
 - **Table 一律 `tableLayout="fixed"`**：auto 布局下长文本会撑开列，`EllipsisCell` / `TimeCell` 的省略号与 nowrap 会失效。
 - **`scroll.x` 由列宽求和得出**：写 `scroll={tableScrollX(columns)}`，**禁止手写 `scroll={{ x: 1490 }}`**（手写值随列增删漂移，且写大了会强制出现横滚条；总宽小于容器时按 `min-width: 100%` 铺满）。
-- **操作列必须 `fixed: 'right'`**：一律用 `actionColumn()` 声明，横滚时钉在右侧可见；列宽由 `actionColumnWidth(max)` 计算，禁止手写 120/200/240。
+- **操作列必须 `fixed: 'right'`**：一律用 `actionColumn()` 声明，横滚时钉在右侧可见；列宽由 `actionColumnWidth(max, variant)` 计算（icon/iconOnly 档自动为图标留位），禁止手写 120/200/240。
 - **文本列一律走 `textColumn()`**（内部 `EllipsisCell`）；等宽语义（编码 / key / 域名 / IP）传 `monospace: true`。
 
 **操作列与详情入口硬规则**
 
-- **操作列最多横排 3 个操作**：≤max（默认 3）时全部横排（`Button type="link" size="small"`，危险操作 `danger`）；超过时保留前 `max-1` 个高频操作横排，其余收进「更多」下拉（纵向）。与 Ant Design Table 官方「操作」示例的 `Delete + More actions` 一致。
+- **操作列按钮图标化，`variant` 默认 `icon`（图标 + 文字）**：`RowActions` 支持 `variant: 'text' | 'icon' | 'iconOnly'`，列表页统一 `actionColumn({ actions, max: 3, variant: 'icon' })`。`icon`=图标在左+文字（扫视更快，默认）；`text`=纯文字（历史形态，向后兼容）；`iconOnly`=纯图标 + Tooltip（最紧凑，保留能力不默认启用）。**危险操作 `danger` 显红**。
+- **`RowAction` 必须补语义 `icon`**：编辑=`EditOutlined`、删除=`DeleteOutlined`、吊销=`LockOutlined`、停用/挂起=`PauseCircleOutlined`、启用/恢复=`PlayCircleOutlined`、重置=`RollbackOutlined`、新增子级=`SubnodeOutlined`、授权角色=`SafetyCertificateOutlined`、应用准入=`AppstoreOutlined`。
+- **操作列最多横排 3 个操作**：≤max（默认 3）时全部横排；超过时保留前 `max-1` 个高频操作横排，其余收进「更多」下拉（纵向）。与 Ant Design Table 官方「操作」示例的 `Delete + More actions` 一致。
 - 一律用共享 `actionColumn()`（内部 `RowActions`）声明式配置，**禁止页面内手写 `Space + Button/Popconfirm` 拼装，也禁止给操作列另写 `title/key/width/fixed`**；`actions` 数组顺序即优先级。运行时隐藏用 `RowAction.hidden`。
 - `RowAction.confirm` 声明二次确认：横排操作走 `Popconfirm`，下拉菜单项走 `Modal.confirm`。
 - **详情入口是名称，不是操作按钮**：列表不设「详情」操作，名称一律用 `nameColumn()`（内部 `NameLink`）渲染为主色可点击链接（hover 下划线 + 手型光标；过长省略号截断并悬浮展示全称，编码/日志键传 `monospace`）。删除「详情」后操作列为空的表，直接移除操作列。
@@ -489,9 +499,10 @@ PageContainer(title, description, extra = 刷新 + 主操作[type=primary])
 ### Do
 - 改设计值：先改 `packages/ui/src/theme.ts` 的 `tokens`，再同步本文件 front matter（两处一致）。
 - 页面/组件引用颜色一律用 `tokens.*`（`import { tokens } from '@morehao/ark-iam-react/ui'`）或 antd `theme.useToken()`；新代码优先 `tokens.*`。
-- 状态用语义 Tag 组件（`EnableTag` / `SuspendedTag` / `VerifiedTag` / `TypeTag` / `SourceTag`）；ID 用 `IDCell`；时间列用 `timeColumn()` / `TimeCell`（列宽取 `TIME_COL_WIDTH`），详情/描述区文本可用 `fmtTime`。
+- 状态用语义 Tag 组件（`EnableTag` / `SuspendedTag` / `VerifiedTag` / `TypeTag` / `SourceTag`）；**可切换的状态列用 `StatusSwitch`（双向确认、失败回滚），并从操作列移除对应 toggle**；ID 用 `IDCell`；时间列用 `timeColumn()` / `TimeCell`（列宽取 `TIME_COL_WIDTH`），详情/描述区文本可用 `fmtTime`。
 - 列宽只取共享常量 / 工厂（`idColumn` / `nameColumn` / `textColumn` / `timeColumn` / `actionColumn` 与 `*_COL_WIDTH`）；Table 一律 `tableLayout="fixed"` + `scroll={tableScrollX(columns)}`。
-- 操作列用 `actionColumn()`（自动 `fixed: 'right'`）；名称列用 `nameColumn()` 作为详情入口，不再设「详情」按钮。
+- 操作列用 `actionColumn()`（自动 `fixed: 'right'`）且 `variant` 默认 `icon`（图标 + 文字），每个 `RowAction` 补语义 `icon`；名称列用 `nameColumn()` 作为详情入口，不再设「详情」按钮。
+- 侧边栏菜单图标用 `menuIcon(key)`（唯一注册表 `menuIcons`），不硬编码 `ICON_MAP`、不用自由文本填 icon。
 - 主色仅用于主操作/链接/选中/焦点；页面表面保持中性灰阶 + 白卡。
 - 卡片无阴影（仅浮层/Modal 有阴影）；列表页骨架照 §7.3 模板。
 - 左右分栏用原生 flex（§4）；antd 结构级微修正统一放 `AppShell` 内联 `<style>`（§7.1）。
@@ -504,6 +515,8 @@ PageContainer(title, description, extra = 刷新 + 主操作[type=primary])
 - 禁止在页面表面使用蓝色淡底 tint（表头/行 hover/卡片一律中性）。
 - 禁止绕过 `TimeCell` 直接给时间列写 `render: (v) => fmtTime(v)` 并自定列宽；禁止把 `fmtTime` 输出再乘 1000（`fmtTime` 已自动识别秒/毫秒）。
 - 禁止页面自写操作列（`Space + Button/Popconfirm`）；禁止为列表新增独立「详情」按钮（详情走名称点击）。
+- 禁止操作列退回纯文字 link 而不给图标（应 `variant:'icon'` 且 `RowAction.icon` 有值）；禁止用 `Tag` 承载「可随手切换」的状态（该用 `StatusSwitch`）；禁止把「删除/吊销」等一次性不可逆动作做成开关。
+- 禁止各 app 硬编码菜单图标 `ICON_MAP` 或在 icon 表单项用自由文本；必须走 `menuIcon` 注册表与 `menuIconOptions()`。
 - 禁止手写列宽数字（`width: 150/180/240`）与 `scroll={{ x: 1490 }}`；禁止给操作列写裸 `RowActions`（必须走 `actionColumn()`）；禁止省略 `tableLayout="fixed"`。
 - 不要在依赖方向下层（如 auth/login-web 无法 import `@ark-iam/ui` 时）复制渐变/色值而不加注释说明原因。
 - 不要新增 css 文件承载后台样式（登录页除外）；antd 结构级微修正统一放 `AppShell` 内联 `<style>`。
