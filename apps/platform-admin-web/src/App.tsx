@@ -146,6 +146,12 @@ function App() {
   const defaultPath = useMemo(() => firstRoutablePath(effectiveTree), [effectiveTree])
 
   if (auth.isLoading || auth.activeNavigator) return <FullPageSpinner />
+  // 回调/登录失败：必须给出可见的错误与恢复入口，绝不无限转圈。
+  // react-oidc-context 在 signinCallback / silent renew 失败时会置 auth.error；
+  // 此时 isAuthenticated 为 false，若没有这一分支就会永远停在 /auth/callback 的 spinner 上。
+  if (auth.error) {
+    return <AuthErrorView error={auth.error} onRetry={() => void retryLogin(auth)} />
+  }
   if (!auth.isAuthenticated && location.pathname !== '/auth/callback') return null
   // 登录页不依赖动态菜单，无需等待菜单加载。
   if (location.pathname !== '/login' && !menuLoaded) return <FullPageSpinner />
@@ -165,6 +171,91 @@ function App() {
         <Route path={OAUTH_CLIENT_DETAIL_ROUTE} element={<OAuthClientDetail />} />
       </Route>
     </Routes>
+  )
+}
+
+// clearOidcStorage 彻底清掉 oidc-client-ts 在本地留下的全部痕迹。
+//
+// 为什么不能只 removeUser()：oidc-client-ts 除了 `oidc.user:*`，还会把授权流程的
+// state/nonce/回调参数存在带 `oidc.` 前缀的键里（本次实现落在 localStorage 的
+// `oidc.<hash>`，用户令牌在 sessionStorage 的 `oidc.user:*`）。若只删 user 不清这些
+// 残留 state，则跳回 `/` 后 oidc-client-ts 会读到残留 state 再次判定「这是回调」，
+// 带上已失效的旧 code 触发 signinCallback → user not found → 又回到错误页，形成死循环。
+// 因此重试时把两个 storage 里所有 `oidc.` 前缀的键清干净，确保是一次干净的重登。
+function clearOidcStorage() {
+  for (const store of [window.sessionStorage, window.localStorage]) {
+    const keys: string[] = []
+    for (let i = 0; i < store.length; i++) {
+      const k = store.key(i)
+      if (k && k.startsWith('oidc.')) keys.push(k)
+    }
+    keys.forEach((k) => store.removeItem(k))
+  }
+}
+
+// retryLogin 重新发起一次登录：先彻底清掉本地残留（失效的 user/state/code），
+// 再整页跳回根路径由 signinRedirect 重新走 authorize。
+// 用整页跳转而非 router navigate，确保 URL 上残留的 ?code=&state= 被丢弃。
+async function retryLogin(auth: ReturnType<typeof useAuthGuard>) {
+  try {
+    await auth.removeUser()
+  } catch {
+    // 本地清理失败不阻断重试
+  }
+  clearOidcStorage()
+  window.location.assign('/')
+}
+
+// AuthErrorView 是认证失败（OIDC 回调 / 静默续期出错）时的兜底页。
+// 核心目的：绝不让失败表现为「无限加载的 spinner」——必须给出可见原因与「重新登录」入口。
+function AuthErrorView({
+  error,
+  onRetry,
+}: {
+  error: { message?: string; name?: string } 
+  onRetry: () => void
+}) {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+        padding: 24,
+        textAlign: 'center',
+        color: tokens.textPlaceholder,
+      }}
+    >
+      <div style={{ fontSize: 40 }}>⚠️</div>
+      <div style={{ fontSize: 16, color: tokens.text }}>登录失败</div>
+      <div style={{ fontSize: 13, maxWidth: 520 }}>
+        认证过程未能完成，可能是登录链接已过期或本次登录信息已失效，请重新登录。
+      </div>
+      {error?.message ? (
+        <div style={{ fontSize: 12, color: tokens.textPlaceholder, maxWidth: 520, wordBreak: 'break-all' }}>
+          {error.message}
+        </div>
+      ) : null}
+      <button
+        type="button"
+        onClick={onRetry}
+        style={{
+          marginTop: 8,
+          padding: '6px 20px',
+          fontSize: 14,
+          color: '#fff',
+          background: tokens.primary,
+          border: 'none',
+          borderRadius: 6,
+          cursor: 'pointer',
+        }}
+      >
+        重新登录
+      </button>
+    </div>
   )
 }
 
