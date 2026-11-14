@@ -925,17 +925,25 @@ sequenceDiagram
     PA->>DB: 4) person.password_status = must_change
     PA->>DB: 5) 绑定内置管理员角色 + 根部门 primary 关系 + 应用订阅<br/>+ 各订阅应用的准入（source=provision）
     PA->>DB: 6) 按各订阅应用的 role_template 物化契约角色（source=builtin）
-    PA-->>P: { tenantID, adminUserID, 临时口令明文（仅此一次展示） }
+    PA->>DB: commit
+    Note over PA: commit 成功后（事务外）按配置投递临时口令
+    PA->>PA: notify.DeliverTempPassword(email/phone, 临时口令)<br/>（notify.enabled 决定是否走通道）
+    PA-->>P: { tenantID, adminUserID, delivered }
 ```
 
 **要点**：
 
 - **每个租户都必须有管理员**：建租户的管理员入参为必填，避免出现无人可登录的租户。
 - **应用订阅即契约角色物化**：`tenant_application` 落行时（建租户内的订阅、以及平台侧单独开通应用）在同一事务里按该应用的 `role_template` 在租户内 upsert 对应角色（`source=builtin && admin_type=normal`，`description` 标注来源）；租户侧对这些角色只读。模板更新走 `SyncAppRoleTemplateToTenants` 对各已开通租户做差量同步（新增/改名/移除撤权），详见 §5.4。
-- **口令不由创建人手填**：服务端用 `pkg/credential.GenerateTemporaryPassword` 生成每用户随机临时口令，全系统口令强度规则一致；**明文只在创建响应中回显一次**，库里只存 bcrypt 哈希。
+- **口令不由创建人手填**：服务端用 `pkg/credential.GenerateTemporaryPassword` 生成每用户随机临时口令，全系统口令强度规则一致；库里只存 bcrypt 哈希。
+- **临时口令的交付（投递通道）**：临时口令生成后，在**事务提交之后**（投递是外部 IO，绝不放进 DB 事务）由 `pkg/notify` 投递给账号本人（优先其 `primary_email`，其次 `primary_phone`；见配置参考 `notify` 段）：
+  - `notify.enabled=true` 且投递成功 → 响应 `initialPassword/adminInitialPassword` 为空、`delivered=true`，**管理员不经手明文**（目标默认形态）；
+  - `notify.enabled=true` 但投递失败 → `requireDelivery=true` 返回 `NotifyDeliverError`（账号已建、需「重置密码」重发）；`requireDelivery=false` 回退为响应回显明文、`delivered=false`（仅通道故障时的降级）；
+  - `notify.enabled=false`（出厂灰度默认）→ 保持现状：响应回显一次明文、`delivered=false`。
+  WHO 可见明文的收敛口径见 `pkg/credential` 的 `TODO(delivery)`；投递失败入审计（`delivery=fail`），日志/审计绝不含明文。
 - **内置标记 `source=builtin`**：该成员由系统随租户创建生成（区别于控制台手工创建的 `manual`），仅作为后端语义，不在租户控制台展示为可编辑字段。
 - **首次登录强制改密**：`person.password_status=must_change`，改密前不建会话、不发令牌（见 §5.2）。
-- **口令丢失的兜底**：平台侧提供 `POST /v1/platform/tenants/{tenantID}/builtin-admin/reset-password`，重置后同样回显一次性临时口令并重新置 `password_status=must_change`。该接口**仅允许作用于 `source=builtin` 的内置管理员**，不得触碰租户手工创建的成员。
+- **口令丢失的兜底**：平台侧提供 `POST /v1/platform/tenants/{tenantID}/builtin-admin/reset-password`，重置后按同一投递规则交付新一次性临时口令（投递成功不回显、失败按 `requireDelivery` 分支）并重新置 `password_status=must_change`。该接口**仅允许作用于 `source=builtin` 的内置管理员**，不得触碰租户手工创建的成员。
 
 ---
 

@@ -245,12 +245,15 @@ export interface TenantCreateResp {
   tenantID: string
   adminUserID: string
   adminInitialPassword: string
+  /** 临时密码是否已通过邮件/短信投递（true 时 adminInitialPassword 为空）。 */
+  delivered: boolean
 }
 
 /** 重置租户内置管理员密码响应：新临时密码仅此一次返回，该管理员下次登录必须改密。 */
 export interface TenantAdminResetPasswordResp {
   userID: string
   initialPassword: string
+  delivered: boolean
 }
 
 export interface TenantUpdateReq {

@@ -138,3 +138,27 @@ oidc:
   # 说明：不需要（也不应）配置 jwksURL/issuer 供本进程内的内置应用自取公钥——
   # gateway.Init 会把 auth 的 OP 已发布公钥作为进程内 KeySource 注入
   # platformadmin/tenantadmin/rpapi，零网络调用。
+
+# 临时凭据投递（邮件/短信）通道。出厂默认关闭：false = 保持现状（响应回显明文、零外部调用）。
+# 运维验证通道可用后应置 enabled=true 并把 requireDelivery 按安全口径设为 true（目标默认），
+# 此后响应不再回显明文。敏感字段优先从环境变量读（NOTIFY_MAIL_PASSWORD /
+# NOTIFY_SMS_ACCESS_KEY_SECRET），配置仅作回落。见 docs/design/configuration-reference.md。
+notify:
+  enabled: false
+  requireDelivery: true
+  mail:
+    enabled: false
+    host: smtp.example.com
+    port: 587
+    username: ""
+    password: ""        # 生产用 NOTIFY_MAIL_PASSWORD 环境变量，勿提交明文
+    from: "IAM <no-reply@example.com>"
+    tls: true
+  sms:
+    enabled: false
+    provider: ""        # tencent | 空=不启用（可插拔，见 pkg/notify/sms.go）
+    accessKeyID: ""
+    accessKeySecret: "" # 生产用 NOTIFY_SMS_ACCESS_KEY_SECRET 环境变量
+    signName: ""
+    templateCode: ""
+    region: ap-guangzhou

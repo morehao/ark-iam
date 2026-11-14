@@ -28,15 +28,19 @@ type UserCreateResp struct {
 	UserID string `json:"userID"` // 用户ID
 	// InitialPassword 成员的初始临时密码，仅在此响应中返回一次，不落库、不可再查；
 	// 若邮箱/手机命中已存在自然人（其密码不被改动），该字段为空串。
-	// 待办：邮件/短信通道接入后本字段下线，见 pkg/credential 的 TODO(delivery)。
-	InitialPassword string `json:"initialPassword"` // 初始临时密码(仅此一次返回)
+	// 通道启用且投递成功时本字段为空、由 delivered 表达结果；回显仅通道未启用/投递失败降级时才有值。
+	InitialPassword string `json:"initialPassword"` // 初始临时密码(通道未启用/投递失败回退时才有值)
+	// Delivered 表示临时密码是否已通过邮件/短信投递给账号本人。
+	Delivered bool `json:"delivered"`
 }
 
 // UserResetPasswordResp 重置成员密码的响应。
 type UserResetPasswordResp struct {
 	UserID string `json:"userID"` // 用户ID
 	// InitialPassword 新临时密码，仅在此响应中返回一次，不落库、不可再查。
-	InitialPassword string `json:"initialPassword"` // 新临时密码(仅此一次返回)
+	InitialPassword string `json:"initialPassword"` // 新临时密码(通道未启用/投递失败回退时才有值)
+	// Delivered 表示临时密码是否已通过邮件/短信投递给账号本人。
+	Delivered bool `json:"delivered"`
 }
 
 type UserDetailResp struct {

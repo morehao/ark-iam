@@ -106,8 +106,15 @@ export default function TenantList() {
         })
         setModalOpen(false)
         void fetchData()
-        if (created.adminInitialPassword) {
-          // 管理员初始临时密码仅此一次返回；该管理员首次登录必须改密
+        if (created.delivered) {
+          // 通道启用且投递成功：管理员不经手明文，仅提示已发送。
+          message.success('创建成功')
+          Modal.success({
+            title: '租户已创建',
+            content: '管理员初始密码已通过邮件/短信发送至账号本人，首次登录必须修改密码。若对方未收到，可在租户列表执行「重置管理员密码」重发。',
+          })
+        } else if (created.adminInitialPassword) {
+          // 通道未启用或投递失败回退：明文仅此一次返回；该管理员首次登录必须改密
           message.success('创建成功')
           setInitialPassword(created.adminInitialPassword)
         } else {
@@ -131,7 +138,15 @@ export default function TenantList() {
   const handleResetAdminPassword = async (record: TenantItem) => {
     try {
       const resp = await resetTenantAdminPassword(record.tenantID)
-      setInitialPassword(resp.initialPassword)
+      if (resp.delivered) {
+        Modal.success({
+          title: '重置成功',
+          content: '新密码已通过邮件/短信发送至管理员本人，下次登录必须修改密码。',
+        })
+      } else {
+        // 通道未启用或投递失败回退：明文仅此一次展示
+        setInitialPassword(resp.initialPassword)
+      }
     } catch {
       /* 拦截器已提示 */
     }
