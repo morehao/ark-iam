@@ -147,6 +147,71 @@ flowchart LR
 
 ## 5. 接入步骤
 
+### 5.0 完整操作序列（从平台到 Gitea，本次实测走通的路径）
+
+先给一张**端到端操作总图**，把「谁在哪一侧、做什么、哪一步是人工、哪一步由系统自动完成」一次讲清；后续 §5.1–§5.6 是每一步的细节。本次接入即按此序列实测跑通。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor PA as 平台管理员
+    actor TA as 租户管理员
+    participant IAM as Ark IAM 控制台
+    participant SYS as Ark IAM 后端(自动)
+    participant G as Gitea(容器)
+
+    Note over PA,G: ① 平台侧：定义契约 + 建客户端（人工）
+    PA->>IAM: 建应用 gitea，填 roleTemplate(gitea_admin/gitea_restricted)
+    PA->>IAM: 建 OAuth 客户端 gitea_console(redirect/post_logout/grant/scopes...)
+    PA->>IAM: 生成客户端密钥(明文只显示一次)
+
+    Note over SYS: ② 开通租户：模板自动物化（系统自动）
+    PA->>IAM: 开通应用 gitea 到租户 t_platform
+    IAM->>SYS: SyncAppRoleTemplate → iam_role 两条(source=builtin)
+    SYS-->>IAM: tenant_application(enable) + 角色行就绪
+
+    Note over TA,G: ③ 租户侧：把角色绑给人（人工决策）
+    TA->>IAM: 用户管理→授权角色→勾 gitea_admin→保存
+    IAM->>SYS: user_role 写入 + application.EnsureGrant(source=role) 准入自动补
+
+    Note over PA,G: ④ Gitea 侧部署（人工/运维）
+    PA->>G: docker compose up -d（host 网络/已初始化数据目录）
+    PA->>G: 已初始化则 update-oauth 对齐 secret + 改 .env
+
+    Note over PA,G: ⑤ 端到端登录
+    PA->>G: 浏览器 /user/oauth2/ark-iam
+    G-->>PA: 307 → IAM authorize
+    IAM-->>PA: 授权码回调（groups=gitea_admin，按应用裁剪）
+    PA->>G: 首次落 /user/link_account →「注册帐号」完成一次（非即时 JIT）
+    G-->>PA: 登录成功，is_admin=1，此后免密直进
+
+    Note over PA,G: ⑥ 登出
+    PA->>G: 退出登录
+    G->>IAM: end_session?post_logout_redirect_uri=http://localhost:3009/
+    IAM-->>G: 302 回 Gitea（不报 invalid_request）；无反向通道 SLO
+```
+
+**分步对照表**（★ = 必须人工决策；其余为系统幂等自动完成）：
+
+| # | 步骤 | 侧 | 人工/自动 | 产物（本次实测） |
+|---|---|---|---|---|
+| 1 | 建应用 + 声明 `roleTemplate` | 平台控制台 | ★ 人工一次 | `application.role_template`（契约值定义） |
+| 2 | 建 OAuth 客户端 `gitea_console` | 平台控制台 | ★ 人工 | `application_client`（code/redirect/post_logout/...） |
+| 3 | 生成客户端密钥 | 平台控制台 | ★ 人工（明文只显示一次） | `application_client_secret`（库中仅哈希） |
+| 4 | 开通应用给租户 | 平台控制台 | ★ 人工（一次） | 触发下行自动物化 |
+| 5 | **模板物化角色** | 系统 | 自动 | `iam_role`：`gitea_admin`/`gitea_restricted`，`source=builtin` |
+| 6 | **授权成员**（角色→人） | 租户控制台 | ★ 人工决策 | `user_role`：`系统管理员→gitea_admin` |
+| 7 | **授权⇒准入级联** | 系统 | 自动（不变式 I1） | `user_application`：`gitea, source=role, enable` |
+| 8 | Gitea 部署 + 登录源/secret 对齐 | Gitea 侧 | 人工/运维 | 容器 Up、`login_source.cfg` secret 与 IAM 一致 |
+| 9 | 端到端 SSO 登录 | 浏览器 | 人工（首登点一次注册） | 登录为 `admin`，`is_admin=1` |
+| 10 | 登出 | 浏览器 | 人工 | 302 回 Gitea，无 `invalid_request` |
+
+> **最容易误解的两点（务必区分）**：
+> - **角色是"模板声明一次、自动物化到每个租户"，不是"手动逐个建角色"**（步骤 5）。租户自建角色 `code` 恒为空、不进 `groups`。
+> - **"谁拥有哪个角色"必须人工授权**（步骤 6），系统**不会**自动把 `gitea_admin` 绑给任何人；但授权生效时会**自动补齐应用准入**（步骤 7，授权⇒准入，单向）。默认管理员在**引导期**会自动拿到 `platform_admin`、开通租户时自动拿到租户管理员角色——那是"内置管理员"场景，与业务角色授权不同。
+
+---
+
 ### 5.1 定契约：编码 ↔ 组名
 
 | 决策 | 取值 | 为什么 | 代价 |
@@ -219,9 +284,19 @@ curl -X PUT http://localhost:8100/v1/platform/applications/{appID} \
 
 ### 5.5 开通租户并授权成员
 
-1. 把应用 `gitea` 开通到租户 `t_platform` —— 角色模板此时物化为该租户内的角色。
-2. 在租户控制台把 `gitea_admin` / `gitea_restricted` 授权给相应成员。
+1. 把应用 `gitea` 开通到租户 `t_platform` —— 角色模板此时**自动物化**为该租户内的角色
+   （`pkg/core/tenant.SyncAppRoleTemplate`：模板里的每个 code 落一行 `iam_role`，`source=builtin`、`admin_type=normal`）。
+   这是"角色定义"，**只声明一次、自动铺到每个租户**，不是每租户手工建角色。
+2. 在租户控制台「用户管理 → 授权角色」把 `gitea_admin` / `gitea_restricted` **授权给相应成员**
+   （`PUT /v1/tenant/users/{userID}/roles` → `svctenant.UpdateRoles`）。**这一步是人工的业务授权决策，系统不会自动把业务角色绑给任何人。**
+   - 授权生效时系统**自动补齐应用准入**（`user_application, source=role`）——"授权 ⇒ 准入"，单向（撤销角色不反向撤销准入）。
 3. **不授权则 `groups` 为空** → 该用户登录 Gitea 是普通用户（非管理员/非受限，fail-safe）。
+
+> **绑定关系三档（避免混淆）**：
+> - **默认管理员 → `platform_admin`**：引导期自动（`pkg/seed.seedAdminUserRole`）；
+> - **开通租户 → 租户管理员角色**：开通事务自动（`pkg/core/tenant.ensureUserRole`）；
+> - **业务角色（`gitea_admin` 等）→ 具体成员**：**必须人工授权**（本节第 2 步）。
+> 只有业务角色需要人决定"谁拥有"；前两者是"内置管理员"场景的自动绑定。
 
 ### 5.6 验收
 
