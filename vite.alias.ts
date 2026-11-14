@@ -13,10 +13,12 @@ export const arkIamAlias = [
   { find: /^@morehao\/ark-iam-react\/api$/, replacement: resolve(PKG, 'api/src/index.ts') },
   { find: /^@morehao\/ark-iam-react\/auth$/, replacement: resolve(PKG, 'auth/src/index.ts') },
   { find: /^@morehao\/ark-iam-react\/ui$/, replacement: resolve(PKG, 'ui/src/index.ts') },
+  { find: /^@morehao\/ark-iam-react\/console$/, replacement: resolve(PKG, 'console/src/index.ts') },
   { find: /^@morehao\/ark-iam-react$/, replacement: resolve(PKG, 'react/src/index.ts') },
-  // 内部包自身引用（api/auth/ui 内部 import @ark-iam/{types,api,auth,ui}）
+  // 内部包自身引用（api/auth/ui 内部 import @ark-iam/{types,api,auth,ui,console}）
   { find: /^@ark-iam\/types$/, replacement: resolve(PKG, 'types/src/index.ts') },
   { find: /^@ark-iam\/api$/, replacement: resolve(PKG, 'api/src/index.ts') },
   { find: /^@ark-iam\/auth$/, replacement: resolve(PKG, 'auth/src/index.ts') },
   { find: /^@ark-iam\/ui$/, replacement: resolve(PKG, 'ui/src/index.ts') },
+  { find: /^@ark-iam\/console$/, replacement: resolve(PKG, 'console/src/index.ts') },
 ]

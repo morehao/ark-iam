@@ -34,7 +34,8 @@ PORT              = 8099
 .PHONY: all build build-env clean run lint test swag codegen \
         docker-build docker-run check-image \
         list-apps deps tidy update-dep dev-all dev-frontend stop-frontend e2e e2e-sso e2e-test help \
-        test-sdk test-sdk-server sdk-check-deps sdk-check-graph print-builtin-menus sdk-server-build
+        test-sdk test-sdk-server sdk-check-deps sdk-check-graph print-builtin-menus sdk-server-build \
+        frontend-check-deps
 
 # ============================================================
 # 通用入口：清理、依赖、构建并运行
@@ -124,6 +125,10 @@ sdk-check-deps:
 # module 依赖方向守卫：无 pkg → sdk / contract 反向依赖，pkg 可独立单建
 sdk-check-graph:
 	@bash sdk/scripts/check-module-graph.sh
+
+# 前端依赖方向守卫：packages/{ui,api,auth,types} 不得依赖 @ark-iam/console（保持 DAG）
+frontend-check-deps:
+	@bash scripts/check-frontend-deps.sh
 
 # sdk/server 门面（委托 apps 各域库）构建
 sdk-server-build:

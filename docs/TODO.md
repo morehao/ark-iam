@@ -11,10 +11,9 @@
 ## 目录
 
 1. [P0 前端组件发布为 npm 包（**已完成**）](#1-p0-前端组件发布为-npm-包已完成---2026-11-06)
-2. [P1 前端门面包 `@morehao/ark-iam-react`](#2-p1-前端门面包-ark-iamreact)
-3. [P2 管理台前端的内嵌/挂载](#3-p2-管理台前端的内嵌挂载)
-4. [P3 后端相关待办](#4-p3-后端相关待办)
-5. [已完成的记录](#5-已完成的记录)
+2. [P2 管理台前端的内嵌/挂载](#2-p2-管理台前端的内嵌挂载)
+3. [P3 后端相关待办](#3-p3-后端相关待办)
+4. [已完成的记录](#4-已完成的记录)
 
 ---
 
@@ -84,47 +83,15 @@ import { createApiClient } from '@ark-iam/api'
 
 ---
 
-## 2. P1 前端门面包 `@morehao/ark-iam-react`
+## 2. P2 管理台前端的内嵌/挂载
 
-### 2.1 目标
-
-做到「前端一行接入」：
-
-```tsx
-import { IamProvider, IamRoutes } from '@morehao/ark-iam-react'
-
-<IamProvider config={{ issuer, clientId, apiBase }}>
-  <IamRoutes basePath="/iam" />
-</IamProvider>
-```
-
-### 2.2 为什么单列为一项
-
-它**不能**由 P0 的 4 个包直接组合出来——管理台页面目前是 **app 内页面**（`apps/*/src/pages/**`），不是可挂载路由组件。要做门面包必须先把页面拆成受控组件（`IamRoutes` 依赖的是一张路由表，而不是三个独立 Vite 应用）。
-
-### 2.3 任务清单
-
-| # | 任务 | 说明 |
-|---|---|---|
-| G1 | 抽取页面为可挂载组件 | 把 `apps/platform-admin-web` / `tenant-admin-web` 的 `pages/**` 迁到 `packages/react/src/pages/**`，去掉对 app 级 store/路由的直接依赖，改为 props/context |
-| G2 | 路由表与菜单对齐 | `IamRoutes` 暴露的路径需与后端菜单 `code`/`path` 对齐（否则侧边栏点了 404） |
-| G3 | 依赖 P0 完成 | 门面包依赖 `@ark-iam/{ui,auth,api,types}` 已可发布 |
-| G4 | 与后端 `Domains` 联动 | 后端按域裁剪（如未选 `DomainApplication`）时，前端菜单/路由也要能隐藏对应入口——需一个 `enabledDomains` 配置从 `/config.json` 下发（与 B3 合并解决） |
-
-- 估量：**G1~G4 约 5~8 人日**（页面拆分是主要成本）。
-- 依赖：P0 完成。
-
----
-
-## 3. P2 管理台前端的内嵌/挂载
-
-### 3.1 现状
+### 2.1 现状
 
 `iam.MountFrontend`（**已随 2026-11 分层倒置重构删除**，Go 侧零 embed / 零静态托管，前端改由 npm 包 `@morehao/ark-iam-react` 提供）目前**只内嵌 login-web 的 `dist`**；两个管理台没有内嵌能力。
 
 原因（已核实）：`platform-admin-web` / `tenant-admin-web` 的 `dist/index.html` 使用**绝对路径** `/assets/...`，挂在子路径（如 `/iam/`）会 404，必须按 `base` 重新构建。
 
-### 3.2 两条路
+### 2.2 两条路
 
 | 路线 | 做法 | 代价 |
 |---|---|---|
@@ -135,7 +102,7 @@ import { IamProvider, IamRoutes } from '@morehao/ark-iam-react'
 
 ---
 
-## 4. P3 后端相关待办
+## 3. P3 后端相关待办
 
 | # | 项 | 说明 | 优先级 |
 |---|---|---|---|
@@ -147,7 +114,7 @@ import { IamProvider, IamRoutes } from '@morehao/ark-iam-react'
 
 ---
 
-## 5. 已完成的记录
+## 4. 已完成的记录
 
 | 项 | 结论 | 落点 |
 |---|---|---|
@@ -156,3 +123,4 @@ import { IamProvider, IamRoutes } from '@morehao/ark-iam-react'
 | 可嵌入 IAM 库落地（**已被 2026-11 分层倒置重构取代**：`backend/iam` 独立模块彻底删除，能力迁到 `sdk/server` 门面 + `apps/*` 各域库；`go test ./iam/...` 已不适用） | R0~R6 完成，`go test ./iam/...` 25 包全绿 | 历史落点 `backend/iam/`、`backend/iam/README.md`（均已删除） |
 | P0 前端组件发布为 npm 包 | 已完成（T1~T9，单门面包 `@morehao/ark-iam-react`）：内部四包代码+类型打进 dist，ESM 子路径 `/types /api /auth /ui` 按需引入，对外只发布一个包；peer/dev 分类、脚本发布通道、接入文档、仓外冒烟（actionColumn 表格 + AuthProvider PKCE 登录跳转）+ facade 独立消费（runtime+tsc）均通过。运行期配置优先级 props > `/config.json` > `VITE_*` > 默认 | 见 `docs/design/application-integration-guide.md` §12、`packages/react/`、`vite.alias.ts`、`scripts/release-packages.mjs` |
 | 门面包公共 npm 首发 | `@morehao/ark-iam-react@0.1.0` 已发布到公共 npm（scope `@morehao` = 账号用户级 scope，未建 org），`dist-tags.latest=0.1.0`，外部 `pnpm add @morehao/ark-iam-react` 可用。发布口径：起始版本用 `0.1.0`；曾误发 `1.0.0`/`0.0.0-stage` 已 unpublish 清理。发布前需 `npm login` 并把 registry 指到 `https://registry.npmjs.org`（本机默认是 npmmirror 镜像，不可发布） | 公共 npm registry `@morehao/ark-iam-react`；`packages/react/package.json` |
+| P1 页面级门面包（`IamRoutes` / `IamProvider`，**已完成 — 2026-11-14**） | 新增内部包 `packages/console`（页面 + `IamProvider`/`IamRoutes`/`IamConsoleApp`）；两管理台 app 降为 `<IamConsoleApp variant=…>` 薄壳；门面包新增 `@morehao/ark-iam-react/console` 子路径（根入口 re-export）；后端 `/config.json` 新增 `enabledDomains` 域白名单（G4）+ 前端按域裁剪；新增依赖方向守卫 `make frontend-check-deps`。Router 归属终局：Provider/Routes 不内置 Router，`IamConsoleApp` 自托管（D4） | 见 `docs/design/application-integration-guide.md` §12.10、`packages/console/`、`packages/api/src/resources/tenant.ts`、`sdk/server/internal/config_endpoint.go`、`scripts/check-frontend-deps.sh` |
