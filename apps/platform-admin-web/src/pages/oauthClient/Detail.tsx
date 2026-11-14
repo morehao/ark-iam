@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Alert, Button, Card, DatePicker, Descriptions, Form, Input, Modal, Space, Spin, Table, message } from 'antd'
-import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { createOAuthSecret, deleteOAuthSecret, getOAuthClientDetail, listOAuthSecrets } from '@morehao/ark-iam-react/api'
 import type { OAuthClientDetail as OAuthClientDetailType, OAuthSecretCreateResp, OAuthSecretItem } from '@morehao/ark-iam-react/types'
@@ -97,11 +97,13 @@ export default function OAuthClientDetail() {
     timeColumn<OAuthSecretItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     actionColumn<OAuthSecretItem>({
       max: 1,
+      variant: 'icon',
       actions: (r) => [
         {
           key: 'delete',
           label: '删除',
           danger: true,
+          icon: <DeleteOutlined />,
           confirm: '确认删除该密钥？',
           onClick: () => void handleDeleteSecret(r.id),
         },

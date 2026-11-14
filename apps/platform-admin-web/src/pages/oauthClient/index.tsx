@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Table, Button, Space, Input, InputNumber, Modal, Form, Select, Switch, message } from 'antd'
-import { MinusCircleOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import {
   actionColumn,
@@ -262,12 +262,14 @@ export default function OAuthClientList() {
     timeColumn<OAuthClientItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     actionColumn<OAuthClientItem>({
       max: 2,
+      variant: 'icon',
       actions: (r) => [
-        { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
+        { key: 'edit', label: '编辑', icon: <EditOutlined />, onClick: () => handleEdit(r) },
         {
           key: 'delete',
           label: '删除',
           danger: true,
+          icon: <DeleteOutlined />,
           // 内置客户端（source=builtin，网关 aud 白名单与前端构建期 client_id 的来源）禁删：置灰保留展示；
           // 后端 svcapplicationclient.Delete 以 ApplicationClientBuiltInErr 兜底。
           disabled: r.source === 'builtin',

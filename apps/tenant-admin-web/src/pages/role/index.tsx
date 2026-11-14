@@ -12,7 +12,7 @@ import {
   Tree,
   message,
 } from 'antd'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, SafetyCertificateOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
 import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, NAME_COL_WIDTH, PageContainer, SourceTag, StatCard, StatRow, STATUS_COL_WIDTH, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
@@ -218,17 +218,19 @@ export default function TenantRolePage() {
     timeColumn<TenantRoleItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     actionColumn<TenantRoleItem>({
       max: 3,
+      variant: 'icon',
       actions: (r) => {
         const isBuiltin = r.source === 'builtin'
         return [
-          { key: 'menu', label: '菜单权限', onClick: () => void openMenuAuth(r) },
+          { key: 'menu', label: '菜单权限', icon: <SafetyCertificateOutlined />, onClick: () => void openMenuAuth(r) },
           // 内置角色整体只读：编码是下游策略供给锚点（改名即改授权语义），后端同样拒改（100709）；
           // 菜单授权走独立接口，不受影响
-          { key: 'edit', label: '编辑', disabled: isBuiltin, onClick: () => openEdit(r) },
+          { key: 'edit', label: '编辑', icon: <EditOutlined />, disabled: isBuiltin, onClick: () => openEdit(r) },
           {
             key: 'delete',
             label: '删除',
             danger: true,
+            icon: <DeleteOutlined />,
             disabled: isBuiltin,
             confirm: '确认删除该角色？（级联清理成员/菜单关联）',
             onClick: () => void handleDelete(r),

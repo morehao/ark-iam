@@ -627,6 +627,16 @@ actionColumn<TenantItem>({
 - 时间列一律用 `timeColumn<T>({ title, dataIndex })`（列宽由 `TIME_COL_WIDTH` / `TIME_COL_WIDTH_RELATIVE` 给，禁止手写 150/160/170 造成折行）；两列位置统一在状态列之后、操作列之前（`scroll.x` 由 `tableScrollX(columns)` 自动跟随，无需手改）。
 - 可空时间（`过期时间`/`最后使用`/`验证时间`）用 `placeholder` 表达空值语义，次要时间用 `relative: true`；`创建时间`/`更新时间` 一律绝对时间。
 
+### 原型（Prototype）约定：静态 HTML 交付，不起常驻服务
+
+改版/新设计先出原型评审，原型**不进入产品代码**，也不该依赖常驻 dev server。约定如下：
+
+- **原型产物 = 静态 HTML**：评审通过后，原型以可离线打开的静态页面形态沉淀，放在 `.dsh/tmp/`（整体被 `.gitignore` 忽略，不入库；见全局指令「过程性 HTML / SVG 产物」）。**评审结束后停掉临时 dev server**，不在后台常驻 `vite dev`。
+- **构建方式**：原型在 `.dsh/tmp/<topic>/` 下用 vite 独立工程（复用 `apps/*/node_modules` 做软链即可，无需装依赖），`vite build --base=./` 产出 `dist/`。产物拷到 `.dsh/tmp/proto-dist/` 等固定目录。
+- **打开方式**：`file://` 直接双击打开即可（原型页用 query 参数切形态，不用依赖服务端路由）；因浏览器对 `file://` 的 ES module CORS 限制，若产物是分包 `assets/*.js`，改用 `vite preview` 或本地静态服务器查看，或在 vite 里内联成单文件。**不要为此长期起后台服务**。
+- **不承诺可交互常驻**：原型只用于评审对照（形态、配色、交互示意），不是可交付产品；需要在线演示时临时起服务、看完即停。
+- 原型落点与结论写进 `.dsh/docs/specs/<YYYY-MM-DD>-<topic>-design.md`（见全局「过程性文档」），代码落地另出执行计划到 `.dsh/docs/plans/`。
+
 ## 常用工具
 
 - **依赖管理**: go mod

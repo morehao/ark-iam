@@ -201,13 +201,13 @@ describe('内置角色只读', () => {
     expect(await screen.findByText('tenant_admin')).toBeInTheDocument()
     expect(screen.getByText('storage_readonly')).toBeInTheDocument()
     // 两个内置角色的编辑/删除都置灰（模板角色的编码与名称由应用方定义，租户不得改写）
-    expect(screen.getAllByRole('button', { name: '编辑' })).toHaveLength(2)
-    for (const btn of screen.getAllByRole('button', { name: '编辑' })) {
+    expect(screen.getAllByRole('button', { name: /编辑/ })).toHaveLength(2)
+    for (const btn of screen.getAllByRole('button', { name: /编辑/ })) {
       expect(btn).toBeDisabled()
     }
-    for (const btn of screen.getAllByRole('button', { name: '删除' })) {
+    for (const btn of screen.getAllByRole('button', { name: /删除/ })) {
       expect(btn).toBeDisabled()
     }
-    expect(screen.getAllByRole('button', { name: '菜单权限' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: /菜单权限/ })).toHaveLength(2)
   })
 })

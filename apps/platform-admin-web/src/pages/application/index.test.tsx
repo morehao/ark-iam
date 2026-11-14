@@ -245,7 +245,7 @@ describe('内置应用不可删除', () => {
     render(<ApplicationList />)
 
     expect(await screen.findByText('平台管理后台')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '删除' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /删除/ })).toBeDisabled()
   })
 
   it('第三方应用行的「删除」可点', async () => {
@@ -253,6 +253,6 @@ describe('内置应用不可删除', () => {
     render(<ApplicationList />)
 
     expect(await screen.findByText('平台管理后台')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '删除' })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: /删除/ })).not.toBeDisabled()
   })
 })

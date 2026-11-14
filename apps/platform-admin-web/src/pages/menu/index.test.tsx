@@ -142,7 +142,9 @@ describe('内置应用的菜单支持增删', () => {
     await waitFor(() => expect(nameInput).not.toBeDisabled())
     expect(screen.getByPlaceholderText('唯一编码，如 user:list')).not.toBeDisabled()
     expect(screen.getByPlaceholderText('如 /user/list')).not.toBeDisabled()
-    expect(screen.getByPlaceholderText('如 UserOutlined')).not.toBeDisabled()
+    // 图标字段已由 Input 改为 Select（图标下拉）：编辑态可见可交互的 combobox
+    const iconSelect = screen.getAllByRole('combobox').find((el) => !(el as HTMLInputElement).disabled)
+    expect(iconSelect).toBeTruthy()
     // 不再出现「内置应用不可新增/删除」的提示
     expect(screen.queryByText(/不可新增\/删除/)).not.toBeInTheDocument()
   })

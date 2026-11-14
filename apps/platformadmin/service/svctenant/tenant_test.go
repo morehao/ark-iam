@@ -33,6 +33,9 @@ func setupTenantCreateEnv(t *testing.T) *gorm.DB {
 		&model.TenantApplicationEntity{},
 		&model.UserRoleEntity{},
 		&model.UserApplicationEntity{},
+		// 重置内置管理员密码会撤销其 refresh token（改密即全局登出），
+		// 因此需要该表才能断言"旧凭证立即失效"。
+		&model.RefreshTokenEntity{},
 	)
 	seedTenantAdminApp(t, db)
 	return db
@@ -381,6 +384,51 @@ func TestResetAdminPasswordReissuesTemporaryPassword(t *testing.T) {
 	}
 	if person.PasswordStatus != model.PasswordStatusMustChange {
 		t.Errorf("reset must set passwordStatus = %q, got %q", model.PasswordStatusMustChange, person.PasswordStatus)
+	}
+}
+
+// TestResetAdminPasswordRevokesExistingSessions 重置内置管理员密码必须"改密即全局登出"：
+// 该自然人重置前持有的 refresh token 应立即被撤销（revoked_at 置位），否则旧口令泄露的
+// 影响面不会随改密收敛（见 pkg/core/tenant.RevokePersonSessions 的契约）。
+func TestResetAdminPasswordRevokesExistingSessions(t *testing.T) {
+	db := setupTenantCreateEnv(t)
+	ctx := newTenantScopeGinCtx("")
+
+	svc := &tenantSvc{db: dbclient.IamDB}
+	created, err := svc.Create(requestCtx(ctx), newTenantCreateReq("Acme Corp", "admin@acme.com"))
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	adminUser, err := dao.NewUserDao().GetByID(dbclient.CrossTenantContext(ctx), created.AdminUserID)
+	if err != nil || adminUser == nil {
+		t.Fatalf("load admin user fail, err:%v", err)
+	}
+
+	// 模拟管理员重置前已登录：预置一条未撤销的 refresh token。
+	liveToken := &model.RefreshTokenEntity{
+		PersonID: adminUser.PersonID,
+		TenantID: created.TenantID,
+		UserID:   created.AdminUserID,
+		Token:    "existing-refresh-token-hash",
+	}
+	if err := db.Create(liveToken).Error; err != nil {
+		t.Fatalf("seed refresh token: %v", err)
+	}
+
+	if _, err := svc.ResetAdminPassword(requestCtx(ctx), &dtotenant.TenantAdminResetPasswordReq{
+		TenantID: created.TenantID,
+		Operator: operatorOf(ctx),
+	}); err != nil {
+		t.Fatalf("ResetAdminPassword failed: %v", err)
+	}
+
+	stored := &model.RefreshTokenEntity{}
+	if err := db.WithContext(dbclient.CrossTenantContext(ctx)).Where("id = ?", liveToken.ID).First(stored).Error; err != nil {
+		t.Fatalf("load refresh token fail, err:%v", err)
+	}
+	if stored.RevokedAt == nil {
+		t.Error("reset must revoke the admin's existing refresh tokens, but revoked_at is still NULL")
 	}
 }
 

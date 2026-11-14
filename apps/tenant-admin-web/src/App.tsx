@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthGuard, FullPageSpinner } from '@morehao/ark-iam-react/auth'
-import { MainLayout, SsoLoginPage, tokens } from '@morehao/ark-iam-react/ui'
+import { MainLayout, SsoLoginPage, tokens, menuIcon } from '@morehao/ark-iam-react/ui'
 import type { MainMenuItems } from '@morehao/ark-iam-react/ui'
-import { ApartmentOutlined, KeyOutlined, SafetyCertificateOutlined, UserOutlined } from '@ant-design/icons'
 import type { MenuItem } from '@morehao/ark-iam-react/types'
 import { getMyMenuTree } from './api/menu'
 import DepartmentList from './pages/department'
@@ -11,24 +10,12 @@ import TenantUserList from './pages/user'
 import TenantRoleList from './pages/role'
 import TenantApiKeyList from './pages/apiKey'
 
-// 图标映射：后端 menu.icon 存储的字符串 -> antd 图标组件
-const ICON_MAP: Record<string, React.ReactNode> = {
-  apartment: <ApartmentOutlined />,
-  user: <UserOutlined />,
-  role: <SafetyCertificateOutlined />,
-  key: <KeyOutlined />,
-}
-
 // 组件白名单：只有 path 命中才会渲染路由与侧边栏菜单，避免点击进入 404
 const COMPONENT_MAP: Record<string, React.ComponentType> = {
   '/department': DepartmentList,
   '/user': TenantUserList,
   '/role': TenantRoleList,
   '/api-key': TenantApiKeyList,
-}
-
-function iconOf(icon?: string): React.ReactNode {
-  return (icon && ICON_MAP[icon]) || <ApartmentOutlined />
 }
 
 // 将后端菜单树转换为 MainLayout 侧边栏菜单；叶子菜单需命中组件白名单，目录仅保留有可渲染子项的
@@ -39,9 +26,9 @@ function buildMenuItems(list: MenuItem[]): MainMenuItems[] {
     .forEach((m) => {
       const children = m.children?.length ? buildMenuItems(m.children) : undefined
       if (children && children.length > 0) {
-        result.push({ key: m.path || `/${m.code}`, label: m.name, icon: iconOf(m.icon), children })
+        result.push({ key: m.path || `/${m.code}`, label: m.name, icon: menuIcon(m.icon), children })
       } else if (COMPONENT_MAP[m.path]) {
-        result.push({ key: m.path || `/${m.code}`, label: m.name, icon: iconOf(m.icon) })
+        result.push({ key: m.path || `/${m.code}`, label: m.name, icon: menuIcon(m.icon) })
       }
     })
   return result

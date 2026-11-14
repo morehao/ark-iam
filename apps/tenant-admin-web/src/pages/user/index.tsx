@@ -15,9 +15,9 @@ import {
   TreeSelect,
   message,
 } from 'antd'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, RollbackOutlined, SafetyCertificateOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, fmtTime, InitialPasswordModal, NAME_COL_WIDTH, NameLink, nameColumn, PageContainer, StatCard, StatRow, STATUS_COL_WIDTH, SuspendedTag, tableScrollX, textColumn, TEXT_COL_WIDTH, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
+import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, fmtTime, InitialPasswordModal, NAME_COL_WIDTH, NameLink, nameColumn, PageContainer, StatCard, StatRow, STATUS_COL_WIDTH, StatusSwitch, SuspendedTag, tableScrollX, textColumn, TEXT_COL_WIDTH, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
 import type {
   DepartmentItem,
   TenantApiKeyItem,
@@ -293,10 +293,11 @@ function UsersPane() {
     }
   }
 
+  // 供 StatusSwitch 使用：await 接口成功后再刷新；失败向上抛（StatusSwitch 捕获后不翻转 checked）。
+  // 成功提示由 StatusSwitch 统一给出，此处不再重复 message.success。
   const toggleSuspended = async (record: TenantUserItem, next: UserStatus) => {
     await updateTenantUser({ userID: record.userID, status: next })
-    message.success(next === 'suspended' ? '已挂起' : '已恢复')
-    void fetchData()
+    await fetchData()
   }
 
   const openDetail = async (record: TenantUserItem) => {
@@ -348,24 +349,31 @@ function UsersPane() {
       dataIndex: 'status',
       key: 'status',
       width: STATUS_COL_WIDTH,
-      render: (v: UserStatus) => <SuspendedTag value={v} />,
+      render: (v: UserStatus, r) => (
+        <StatusSwitch
+          checked={v === 'active'}
+          checkedChildren="正常"
+          unCheckedChildren="挂起"
+          confirmTitle={v === 'active' ? '挂起该用户？' : '恢复该用户？'}
+          confirmContent={
+            v === 'active'
+              ? '挂起后该用户无法登录，已签发的会话会立即失效。'
+              : '恢复后该用户可重新登录。'
+          }
+          onConfirmChange={(next) => toggleSuspended(r, next ? 'active' : 'suspended')}
+        />
+      ),
     },
     timeColumn<TenantUserItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<TenantUserItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     actionColumn<TenantUserItem>({
       max: 3,
+      variant: 'icon',
       actions: (r) => [
-        { key: 'edit', label: '编辑', onClick: () => void openEdit(r) },
-        { key: 'roles', label: '授权角色', onClick: () => setRoleTarget(r) },
-        { key: 'apps', label: '应用准入', onClick: () => setAppAccessTarget(r) },
-        { key: 'resetPwd', label: '重置密码', confirm: '重置后系统生成新的临时密码并仅展示一次，该成员既有会话将失效。确认重置？', onClick: () => void resetPassword(r) },
-        {
-          key: 'toggle',
-          label: r.status === 'suspended' ? '恢复' : '挂起',
-          danger: r.status !== 'suspended',
-          confirm: r.status === 'suspended' ? '确认恢复该用户？' : '确认挂起该用户？',
-          onClick: () => void toggleSuspended(r, r.status === 'suspended' ? 'active' : 'suspended'),
-        },
+        { key: 'edit', label: '编辑', icon: <EditOutlined />, onClick: () => void openEdit(r) },
+        { key: 'roles', label: '授权角色', icon: <SafetyCertificateOutlined />, onClick: () => setRoleTarget(r) },
+        { key: 'apps', label: '应用准入', icon: <AppstoreOutlined />, onClick: () => setAppAccessTarget(r) },
+        { key: 'resetPwd', label: '重置密码', icon: <RollbackOutlined />, confirm: '重置后系统生成新的临时密码并仅展示一次，该成员既有会话将失效。确认重置？', onClick: () => void resetPassword(r) },
       ],
     }),
   ]
@@ -766,10 +774,11 @@ function ServiceAccountsPane() {
     }
   }
 
+  // 供 StatusSwitch 使用：await 接口成功后刷新；失败向上抛（StatusSwitch 捕获后不翻转 checked）。
+  // 成功提示由 StatusSwitch 统一给出，此处不再重复 message.success。
   const toggleSuspended = async (record: TenantMachineUserItem, next: UserStatus) => {
     await updateMachineUserStatus(record.machineUserID, next)
-    message.success(next === 'suspended' ? '已挂起' : '已启用')
-    void fetchData()
+    await fetchData()
   }
 
   const handleDelete = async (record: TenantMachineUserItem) => {
@@ -815,25 +824,33 @@ function ServiceAccountsPane() {
       dataIndex: 'status',
       key: 'status',
       width: STATUS_COL_WIDTH,
-      render: (v: UserStatus) => <SuspendedTag value={v} />,
+      render: (v: UserStatus, r) => (
+        <StatusSwitch
+          checked={v === 'active'}
+          checkedChildren="启用"
+          unCheckedChildren="挂起"
+          confirmTitle={v === 'active' ? '挂起该服务账号？' : '启用该服务账号？'}
+          confirmContent={
+            v === 'active'
+              ? '挂起后该服务账号的 API 密钥将无法调用，相关集成会立即中断。'
+              : '启用后该服务账号的 API 密钥可恢复调用。'
+          }
+          onConfirmChange={(next) => toggleSuspended(r, next ? 'active' : 'suspended')}
+        />
+      ),
     },
     timeColumn<TenantMachineUserItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<TenantMachineUserItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     actionColumn<TenantMachineUserItem>({
       max: 3,
+      variant: 'icon',
       actions: (r) => [
-        { key: 'edit', label: '编辑', onClick: () => void openEdit(r) },
-        {
-          key: 'toggle',
-          label: r.status === 'suspended' ? '启用' : '挂起',
-          danger: r.status !== 'suspended',
-          confirm: r.status === 'suspended' ? '确认恢复该服务账号？' : '确认挂起该服务账号？',
-          onClick: () => void toggleSuspended(r, r.status === 'suspended' ? 'active' : 'suspended'),
-        },
+        { key: 'edit', label: '编辑', icon: <EditOutlined />, onClick: () => void openEdit(r) },
         {
           key: 'delete',
           label: '删除',
           danger: true,
+          icon: <DeleteOutlined />,
           confirm: '确认删除该服务账号？删除前须先删除其全部 API 密钥。',
           onClick: () => void handleDelete(r),
         },

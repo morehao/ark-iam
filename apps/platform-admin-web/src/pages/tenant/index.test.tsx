@@ -260,7 +260,7 @@ describe('平台租户不可删除', () => {
     expect(await screen.findByText('平台运营中心')).toBeInTheDocument()
     // 3 个操作（编辑/重置管理员密码/删除）→ 删除收在「更多」下拉中，菜单项置灰
     fireEvent.click(screen.getByRole('button', { name: /更多/ }))
-    const deleteItem = await screen.findByRole('menuitem', { name: '删除' })
+    const deleteItem = await screen.findByRole('menuitem', { name: /删除/ })
     expect(deleteItem).toHaveClass('ant-dropdown-menu-item-disabled')
   })
 
@@ -276,7 +276,7 @@ describe('平台租户不可删除', () => {
     expect(await screen.findByText('Globex')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /更多/ }))
-    const deleteItem = await screen.findByRole('menuitem', { name: '删除' })
+    const deleteItem = await screen.findByRole('menuitem', { name: /删除/ })
     expect(deleteItem).not.toHaveClass('ant-dropdown-menu-item-disabled')
   })
 })

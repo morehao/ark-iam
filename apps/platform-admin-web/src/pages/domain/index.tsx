@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Select, Space, Table, message } from 'antd'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { actionColumn, CODE_COL_WIDTH, idColumn, PageContainer, StatCard, StatRow, STATUS_COL_WIDTH, tableScrollX, textColumn, timeColumn, VerifiedTag } from '@morehao/ark-iam-react/ui'
 import { createDomain, deleteDomain, getDomainDetail, getDomainPageList, updateDomain } from '@morehao/ark-iam-react/api'
@@ -99,9 +99,10 @@ export default function DomainList() {
     timeColumn<DomainItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     actionColumn<DomainItem>({
       max: 2,
+      variant: 'icon',
       actions: (r) => [
-        { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
-        { key: 'delete', label: '删除', danger: true, confirm: '确认删除该域名？', onClick: () => void handleDelete(r) },
+        { key: 'edit', label: '编辑', icon: <EditOutlined />, onClick: () => handleEdit(r) },
+        { key: 'delete', label: '删除', danger: true, icon: <DeleteOutlined />, confirm: '确认删除该域名？', onClick: () => void handleDelete(r) },
       ],
     }),
   ]

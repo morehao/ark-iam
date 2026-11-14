@@ -1,19 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthGuard, FullPageSpinner } from '@morehao/ark-iam-react/auth'
-import { MainLayout, SsoLoginPage, tokens } from '@morehao/ark-iam-react/ui'
+import { MainLayout, SsoLoginPage, tokens, menuIcon } from '@morehao/ark-iam-react/ui'
 import type { MainMenuItems } from '@morehao/ark-iam-react/ui'
-import {
-  ApartmentOutlined,
-  AppstoreOutlined,
-  DashboardOutlined,
-  FileSearchOutlined,
-  GlobalOutlined,
-  KeyOutlined,
-  MenuOutlined,
-  SettingOutlined,
-  ShoppingOutlined,
-} from '@ant-design/icons'
 import type { MenuItem } from '@morehao/ark-iam-react/types'
 import { getMyMenuTree } from '@morehao/ark-iam-react/api'
 import Dashboard from './pages/dashboard'
@@ -25,19 +14,6 @@ import OAuthClientDetail from './pages/oauthClient/Detail'
 import MenuList from './pages/menu'
 import DomainList from './pages/domain'
 import { OAUTH_CLIENT_DETAIL_ROUTE } from './routes'
-
-// 图标映射：后端 menu.icon 存储的字符串 -> antd 图标组件
-const ICON_MAP: Record<string, React.ReactNode> = {
-  dashboard: <DashboardOutlined />,
-  apartment: <ApartmentOutlined />,
-  app: <AppstoreOutlined />,
-  menu: <MenuOutlined />,
-  global: <GlobalOutlined />,
-  shopping: <ShoppingOutlined />,
-  key: <KeyOutlined />,
-  setting: <SettingOutlined />,
-  file: <FileSearchOutlined />,
-}
 
 // 组件白名单：只有 path 命中才会渲染路由与侧边栏菜单，避免点击进入 404。
 // 关键：path 必须与后端动态菜单的 path 一致（均为绝对路径）。
@@ -54,10 +30,6 @@ const COMPONENT_MAP: Record<string, React.ComponentType> = {
   [OAUTH_CLIENT_DETAIL_ROUTE]: OAuthClientDetail,
 }
 
-function iconOf(icon?: string): React.ReactNode {
-  return (icon && ICON_MAP[icon]) || <AppstoreOutlined />
-}
-
 // 将后端菜单树转换为 MainLayout 侧边栏菜单；叶子菜单需命中组件白名单，目录仅保留有可渲染子项的
 function buildMenuItems(list: MenuItem[]): MainMenuItems[] {
   const result: MainMenuItems[] = []
@@ -66,9 +38,9 @@ function buildMenuItems(list: MenuItem[]): MainMenuItems[] {
     .forEach((m) => {
       const children = m.children?.length ? buildMenuItems(m.children) : undefined
       if (children && children.length > 0) {
-        result.push({ key: m.path || `/${m.code}`, label: m.name, icon: iconOf(m.icon), children })
+        result.push({ key: m.path || `/${m.code}`, label: m.name, icon: menuIcon(m.icon), children })
       } else if (COMPONENT_MAP[m.path]) {
-        result.push({ key: m.path || `/${m.code}`, label: m.name, icon: iconOf(m.icon) })
+        result.push({ key: m.path || `/${m.code}`, label: m.name, icon: menuIcon(m.icon) })
       }
     })
   return result

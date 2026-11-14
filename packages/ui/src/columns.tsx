@@ -3,7 +3,7 @@ import type { ColumnType } from 'antd/es/table'
 import { EllipsisCell } from './EllipsisCell'
 import { IDCell } from './IDCell'
 import { NameLink } from './NameLink'
-import { RowActions, type RowAction } from './RowActions'
+import { RowActions, type RowAction, type RowActionsVariant } from './RowActions'
 
 /**
  * 列表列宽标准（px）与列工厂（规范见 DESIGN.md §7.3）。
@@ -36,6 +36,10 @@ export const LONG_TEXT_COL_WIDTH = 320
 const CELL_PADDING = 32
 /** 操作列横排按钮宽度预算：约 3 个汉字（42px）+ link 按钮左右内边距（14px）。 */
 const ACTION_BUTTON_BUDGET = 56
+/** `icon` 档在文字预算上额外留给图标的宽度（图标 16px 取整）。 */
+const ACTION_ICON_EXTRA = 16
+/** `iconOnly` 档单项预算：仅图标（16）+ text 按钮左右内边距。 */
+const ACTION_ICON_ONLY_BUDGET = 28
 /** `RowActions` 横排 `Space` 间隔。 */
 const ACTION_GAP = 4
 
@@ -147,6 +151,8 @@ export interface ActionColumnConfig<T> {
   actions: (record: T) => RowAction[]
   /** 横排上限，超过则收起为「更多」下拉；默认 3 */
   max?: number
+  /** 呈现样式：text（纯文字，默认）/ icon（图标+文字）/ iconOnly（纯图标） */
+  variant?: RowActionsVariant
   /** 覆盖自动计算的列宽 */
   width?: number
 }
@@ -156,27 +162,42 @@ export interface ActionColumnConfig<T> {
  * - 统一 `RowActions` 渲染（≤ max 横排，> max 收「更多」）；
  * - **永远 `fixed: 'right'`**：即使表格出现横向滚动，操作列也钉在右侧可见，
  *   不会再出现「横向滑动很久才看到操作」；
- * - 列宽由 `actionColumnWidth(max)` 统一给出，页面禁止再手写 120/200/240。
+ * - 列宽由 `actionColumnWidth(max, variant)` 统一给出，页面禁止再手写 120/200/240。
  */
-export function actionColumn<T>({ actions, max = 3, width }: ActionColumnConfig<T>): ColumnType<T> {
+export function actionColumn<T>({
+  actions,
+  max = 3,
+  variant = 'text',
+  width,
+}: ActionColumnConfig<T>): ColumnType<T> {
   return {
     title: '操作',
     key: 'action',
     fixed: 'right',
-    width: width ?? actionColumnWidth(max),
-    render: (_, record) => <RowActions actions={actions(record)} max={max} />,
+    width: width ?? actionColumnWidth(max, variant),
+    render: (_, record) => <RowActions actions={actions(record)} max={max} variant={variant} />,
   }
 }
 
 /**
- * 操作列宽度估算（px）：`单元格内边距 32 + 横排数 × 56 + 间距 4`，向上取整到 10。
+ * 操作列宽度估算（px）：`单元格内边距 32 + 横排数 × 单项预算 + 间距 4`，向上取整到 10。
  *
- * 56 = 约 3 个汉字（42px）+ link 按钮左右内边距（14px）。**横排按钮文案应保持简短
- * （≤ 4 个汉字）**；文案更长时请降低 `max` 把它收进「更多」下拉，或显式传入 `width`。
+ * 单项预算分档：
+ * - `text`：56 = 约 3 个汉字（42px）+ link 按钮左右内边距（14px）；
+ * - `icon`：+16（图标宽），即 72；
+ * - `iconOnly`：仅图标，约 28（图标 16 + text 按钮内边距）。
+ * **横排按钮文案应保持简短（≤ 4 个汉字）**；文案更长时请降低 `max` 把它收进「更多」
+ * 下拉，或显式传入 `width`。
  */
-export function actionColumnWidth(max: number): number {
+export function actionColumnWidth(max: number, variant: RowActionsVariant = 'text'): number {
   const inline = Math.max(1, max)
-  const raw = CELL_PADDING + inline * ACTION_BUTTON_BUDGET + (inline - 1) * ACTION_GAP
+  const budget =
+    variant === 'iconOnly'
+      ? ACTION_ICON_ONLY_BUDGET
+      : variant === 'icon'
+        ? ACTION_BUTTON_BUDGET + ACTION_ICON_EXTRA
+        : ACTION_BUTTON_BUDGET
+  const raw = CELL_PADDING + inline * budget + (inline - 1) * ACTION_GAP
   return Math.ceil(raw / 10) * 10
 }
 
