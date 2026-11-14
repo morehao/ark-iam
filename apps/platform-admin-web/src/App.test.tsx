@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 let mockIsAuthenticated = false
 let mockIsLoading = false
 let mockActiveNavigator: string | undefined = undefined
+let mockError: { name?: string; message?: string } | undefined = undefined
 const mockSigninRedirect = vi.fn()
 const mockSigninSilent = vi.fn(() => Promise.resolve(null))
 
@@ -13,6 +14,7 @@ vi.mock('react-oidc-context', () => ({
     isAuthenticated: mockIsAuthenticated,
     isLoading: mockIsLoading,
     activeNavigator: mockActiveNavigator,
+    error: mockError,
     signinRedirect: mockSigninRedirect,
     signinSilent: mockSigninSilent,
     removeUser: vi.fn(),
@@ -39,6 +41,7 @@ describe('App', () => {
     mockIsAuthenticated = false
     mockIsLoading = false
     mockActiveNavigator = undefined
+    mockError = undefined
     mockSigninRedirect.mockClear()
     mockSigninSilent.mockClear()
   })
@@ -98,6 +101,32 @@ describe('App', () => {
       expect(document.querySelector('.ant-spin')).toBeInTheDocument()
     })
     expect(mockSigninRedirect).not.toHaveBeenCalled()
+  })
+
+  it('renders visible error (not an infinite spinner) when callback fails on /auth/callback', async () => {
+    mockError = { name: 'signinCallback', message: 'No matching state found in storage' }
+    const { getByText, container } = render(
+      <MemoryRouter initialEntries={['/auth/callback']}>
+        <App />
+      </MemoryRouter>
+    )
+    // 关键回归：失败必须可见且有恢复入口，不能停在 spinner。
+    await waitFor(() => expect(getByText('登录失败')).toBeInTheDocument())
+    expect(getByText('重新登录')).toBeInTheDocument()
+    expect(container.querySelector('.ant-spin')).not.toBeInTheDocument()
+    // 失败态不应再自动拉起 signinRedirect（避免与错误页打架/死循环）。
+    expect(mockSigninRedirect).not.toHaveBeenCalled()
+  })
+
+  it('renders error view when auth error occurs on a non-callback route', async () => {
+    mockError = { name: 'renewSilent', message: 'renew failed' }
+    const { getByText, container } = render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>
+    )
+    await waitFor(() => expect(getByText('登录失败')).toBeInTheDocument())
+    expect(container.querySelector('.ant-spin')).not.toBeInTheDocument()
   })
 
   it('renders main layout when authenticated', async () => {
