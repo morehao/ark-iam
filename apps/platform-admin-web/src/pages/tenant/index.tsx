@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Divider, Form, Input, message, Modal, Select, Space, Switch, Table, Tooltip } from 'antd'
-import { PlusOutlined, QuestionCircleOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, PlusOutlined, QuestionCircleOutlined, ReloadOutlined, RollbackOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { actionColumn, CODE_COL_WIDTH, idColumn, InitialPasswordModal, NAME_COL_WIDTH, PageContainer, StatCard, StatRow, STATUS_COL_WIDTH, SuspendedTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, TypeTag } from '@morehao/ark-iam-react/ui'
 import { createTenant, deleteTenant, getTenantPageList, resetTenantAdminPassword, updateTenant } from '@morehao/ark-iam-react/api'
@@ -179,11 +179,13 @@ export default function TenantList() {
     // 操作列因此收窄到 150 且 fixed: 'right'，任何窗口下都无需横滑即可操作。
     actionColumn<TenantItem>({
       max: 2,
+      variant: 'icon',
       actions: (r) => [
-        { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
+        { key: 'edit', label: '编辑', icon: <EditOutlined />, onClick: () => handleEdit(r) },
         {
           key: 'resetAdminPassword',
           label: '重置管理员密码',
+          icon: <RollbackOutlined />,
           confirm: '将重置该租户内置管理员的密码：新临时密码仅展示一次，其既有会话立即失效。确认重置？',
           onClick: () => void handleResetAdminPassword(r),
         },
@@ -191,6 +193,7 @@ export default function TenantList() {
           key: 'delete',
           label: '删除',
           danger: true,
+          icon: <DeleteOutlined />,
           // 平台自运营租户（种子租户 t_platform）禁删：删除即整栈控制台失联且无恢复路径；
           // 置灰保留展示，后端 svctenant.Delete 以 TenantBuiltInDeleteForbiddenError 兜底。
           disabled: r.code === PLATFORM_TENANT_CODE,

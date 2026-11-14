@@ -231,7 +231,7 @@ describe('内置客户端不可删除', () => {
     renderApp(OAUTH_CLIENT_LIST_PATH)
 
     expect(await screen.findByText(clientCode)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '删除' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /删除/ })).toBeDisabled()
   })
 
   it('第三方客户端行的「删除」可点', async () => {
@@ -243,7 +243,7 @@ describe('内置客户端不可删除', () => {
     renderApp(OAUTH_CLIENT_LIST_PATH)
 
     expect(await screen.findByText('my_client')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '删除' })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: /删除/ })).not.toBeDisabled()
   })
 })
 

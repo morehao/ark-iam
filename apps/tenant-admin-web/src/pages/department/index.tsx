@@ -14,10 +14,10 @@ import {
   TreeSelect,
   message,
 } from 'antd'
-import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { DataNode } from 'antd/es/tree'
-import { actionColumn, NAME_COL_WIDTH, nameColumn, PageContainer, StatCard, StatRow, STATUS_COL_WIDTH, EnableTag, tableScrollX, timeColumn } from '@morehao/ark-iam-react/ui'
+import { actionColumn, NAME_COL_WIDTH, nameColumn, PageContainer, StatCard, StatRow, STATUS_COL_WIDTH, StatusSwitch, tableScrollX, timeColumn } from '@morehao/ark-iam-react/ui'
 import type { DepartmentChildItem, DepartmentItem, DeptNodeStatus } from '@morehao/ark-iam-react/types'
 import {
   createDepartment,
@@ -212,12 +212,13 @@ export default function DepartmentPage() {
     }
   }
 
+  // 供 StatusSwitch 使用：await 接口成功后刷新；失败向上抛（StatusSwitch 捕获后不翻转 checked）。
+  // 成功提示由 StatusSwitch 统一给出，此处不再重复 message.success。
   const toggleStatus = async (node: { departmentID: string; status: DeptNodeStatus }) => {
     const next = node.status === 'enable' ? 'disable' : 'enable'
     await updateDepartmentStatus(node.departmentID, next)
-    message.success('状态已更新')
-    void loadTree()
-    void loadChildren(page)
+    await loadTree()
+    await loadChildren(page)
   }
 
   // 编辑时可选的父部门：排除当前节点及其子孙，避免环路
@@ -249,23 +250,33 @@ export default function DepartmentPage() {
       dataIndex: 'status',
       key: 'status',
       width: STATUS_COL_WIDTH,
-      render: (v: string) => <EnableTag value={v} />,
+      render: (v: string, r) => (
+        <StatusSwitch
+          checked={v === 'enable'}
+          checkedChildren="启用"
+          unCheckedChildren="停用"
+          confirmTitle={v === 'enable' ? '停用该部门？' : '启用该部门？'}
+          confirmContent={
+            v === 'enable'
+              ? '停用后该部门及其子部门不可用，相关成员将无法归属到该部门。'
+              : '启用后该部门及其子部门恢复可用。'
+          }
+          onConfirmChange={() => toggleStatus(r)}
+        />
+      ),
     },
     timeColumn<DepartmentChildItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<DepartmentChildItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     actionColumn<DepartmentChildItem>({
       max: 3,
+      variant: 'icon',
       actions: (r) => [
-        { key: 'edit', label: '编辑', onClick: () => openEditNode(r) },
-        {
-          key: 'toggle',
-          label: r.status === 'enable' ? '停用' : '启用',
-          onClick: () => void toggleStatus(r),
-        },
+        { key: 'edit', label: '编辑', icon: <EditOutlined />, onClick: () => openEditNode(r) },
         {
           key: 'delete',
           label: '删除',
           danger: true,
+          icon: <DeleteOutlined />,
           confirm: '确认删除该部门及其子部门？',
           onClick: () => void removeNode(r.departmentID),
         },

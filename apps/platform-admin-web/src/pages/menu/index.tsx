@@ -19,14 +19,17 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import {
   AppstoreOutlined,
+  DeleteOutlined,
+  EditOutlined,
   FolderOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
+  SubnodeOutlined,
   ThunderboltOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons'
-import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, PageContainer, RemoteSelect, StatCard, StatRow, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
+import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, MENU_ICONS, menuIconOptions, PageContainer, RemoteSelect, StatCard, StatRow, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
 import { createMenu, deleteMenu, getApplicationDetail, getApplicationPageList, getMenuTree, updateMenu } from '@morehao/ark-iam-react/api'
 import type { ApplicationItem, MenuExternalLinkFlag, MenuHiddenFlag, MenuItem, MenuKeepAliveFlag, MenuStatus, MenuType, MenuVisibility } from '@morehao/ark-iam-react/types'
 
@@ -387,13 +390,15 @@ export default function MenuList() {
     timeColumn<MenuItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     actionColumn<MenuItem>({
       max: 3,
+      variant: 'icon',
       actions: (m) => [
-        { key: 'createChild', label: '新增子级', onClick: () => handleCreateChild(m) },
-        { key: 'edit', label: '编辑', onClick: () => handleEdit(m) },
+        { key: 'createChild', label: '新增子级', icon: <SubnodeOutlined />, onClick: () => handleCreateChild(m) },
+        { key: 'edit', label: '编辑', icon: <EditOutlined />, onClick: () => handleEdit(m) },
         {
           key: 'delete',
           label: '删除',
           danger: true,
+          icon: <DeleteOutlined />,
           confirm: `确认删除「${m.name}」？其子菜单将一并删除`,
           onClick: () => void handleDelete(m),
         },
@@ -577,7 +582,19 @@ export default function MenuList() {
               <Input placeholder="选填" />
             </Form.Item>
             <Form.Item name="icon" label="图标" style={{ flex: 1 }}>
-              <Input placeholder="如 UserOutlined" />
+              <Select
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                options={menuIconOptions()}
+                placeholder="选择图标"
+                optionRender={(opt) => (
+                  <Space size={8}>
+                    <span>{MENU_ICONS[opt.value as string]}</span>
+                    <span>{opt.label}</span>
+                  </Space>
+                )}
+              />
             </Form.Item>
           </div>
 

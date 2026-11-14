@@ -105,7 +105,7 @@ describe('内置应用的订阅不可删除', () => {
     render(<TenantApplicationList />)
 
     expect(await screen.findByText('平台管理后台')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '删除' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /删除/ })).toBeDisabled()
   })
 
   it('订阅第三方应用的行「删除」可点', async () => {
@@ -114,6 +114,6 @@ describe('内置应用的订阅不可删除', () => {
     render(<TenantApplicationList />)
 
     expect(await screen.findByText('平台管理后台')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '删除' })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: /删除/ })).not.toBeDisabled()
   })
 })

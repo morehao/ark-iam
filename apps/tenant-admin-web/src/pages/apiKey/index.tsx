@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Alert, Button, DatePicker, Form, Input, Modal, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { CopyOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { CopyOutlined, DeleteOutlined, LockOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { actionColumn, CODE_COL_WIDTH, EllipsisCell, NAME_COL_WIDTH, PageContainer, RemoteSelect, StatCard, StatRow, STATUS_COL_WIDTH, tableScrollX, textColumn, timeColumn, tokens } from '@morehao/ark-iam-react/ui'
 import type { TenantApiKeyCreateResp, TenantApiKeyItem } from '@morehao/ark-iam-react/types'
 import { createApiKey, deleteApiKey, getApiKeyPageList, revokeApiKey } from '../../api/apiKey'
@@ -296,11 +296,13 @@ function ApiKeysPane() {
     timeColumn<TenantApiKeyItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     actionColumn<TenantApiKeyItem>({
       max: 2,
+      variant: 'icon',
       actions: (r) => [
         {
           key: 'revoke',
           label: '吊销',
           danger: true,
+          icon: <LockOutlined />,
           hidden: !!r.revokedAt,
           confirm: '确认吊销该密钥？吊销后立即失效',
           onClick: () => void handleRevoke(r),
@@ -309,6 +311,7 @@ function ApiKeysPane() {
           key: 'delete',
           label: '删除',
           danger: true,
+          icon: <DeleteOutlined />,
           confirm: '确认删除该密钥？',
           onClick: () => void handleDelete(r),
         },

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, message, Modal, Select, Space, Table } from 'antd'
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { actionColumn, idColumn, NAME_COL_WIDTH, PageContainer, RemoteSelect, SourceTag, StatCard, StatRow, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn } from '@morehao/ark-iam-react/ui'
 import {
@@ -151,12 +151,14 @@ export default function TenantApplicationList() {
     timeColumn<TenantApplicationItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     actionColumn<TenantApplicationItem>({
       max: 2,
+      variant: 'icon',
       actions: (r) => [
-        { key: 'edit', label: '编辑', onClick: () => handleEdit(r) },
+        { key: 'edit', label: '编辑', icon: <EditOutlined />, onClick: () => handleEdit(r) },
         {
           key: 'delete',
           label: '删除',
           danger: true,
+          icon: <DeleteOutlined />,
           // 订阅的是内置应用（source=builtin，平台管理后台/租户管理后台）即禁删：它由种子或
           // ProvisionTenantAdmin 系统开通，删除会让对应控制台失去菜单；置灰保留展示，下线请改用「停用」。
           // 后端 svctenantapplication.Delete 以 TenantApplicationBuiltInErr 兜底。
