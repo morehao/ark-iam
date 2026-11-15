@@ -10,7 +10,7 @@ require (
 	github.com/morehao/ark-iam/contract v0.1.0
 	github.com/morehao/ark-iam/pkg v0.4.2
 	github.com/morehao/ark-iam/sdk v0.6.0
-	github.com/morehao/golib v1.36.3
+	github.com/morehao/golib v1.37.0
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/stretchr/testify v1.12.1
 	github.com/swaggo/swag v1.16.6
