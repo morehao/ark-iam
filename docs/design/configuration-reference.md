@@ -384,8 +384,10 @@ oidc:
 | `notify.mail.tls` | `true` | 是否用 SMTPS/STARTTLS。 |
 | `notify.sms.enabled` | `false` | 短信渠道开关。 |
 | `notify.sms.provider` | `""` | 供应商标识（本期实现 `tencent`；空=不启用）。适配器可插拔，见 `pkg/notify/sms.go` 的 `smsFactories`，新增供应商只需实现 `Sender` 并注册工厂。 |
-| `notify.sms.accessKeyID` / `accessKeySecret` | — | 供应商凭证。**`accessKeySecret` 生产用环境变量 `NOTIFY_SMS_ACCESS_KEY_SECRET`**。 |
-| `notify.sms.signName` / `templateCode` / `region` | — | 短信签名 / 模板 / 地域（腾讯云默认 `ap-guangzhou`）。 |
+| `notify.sms.accessKeyID` / `accessKeySecret` | — | 供应商凭证（腾讯云 SecretID / SecretKey）。**`accessKeySecret` 生产用环境变量 `NOTIFY_SMS_ACCESS_KEY_SECRET`**。 |
+| `notify.sms.signName` / `sdkAppId` / `templateCode` / `region` | — | 短信签名 / 应用 SDKAppID（官方 SDK 必填，形如 `1400000000`）/ 模板 ID / 地域（腾讯云默认 `ap-guangzhou`）。 |
+
+> 发送实现：邮件渠道经 golib `gnotify/email`（底层 `wneessen/go-mail`），短信渠道经 golib `gnotify/sms/tencent`（腾讯云官方 Go SDK）。`pkg/notify` 只保留业务编排（渠道选择 / `requireDelivery` 回退 / `delivered` 与审计），发送细节由 gnotify 承载。
 
 **渠道选择规则**：优先 `person.primary_email`（走邮件），其次 `person.primary_phone`（走短信）；两者皆空或对应渠道未开 → 不可投递，按 `requireDelivery` 分支处理。收件地址只取自然人自带联系方式，绝不从请求参数取（防乱投 / SSRF）。
 

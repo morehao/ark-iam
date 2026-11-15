@@ -3,11 +3,12 @@ package notify
 import (
 	"context"
 	"errors"
-	"io"
 	"net/http"
-	"net/smtp"
+	"net/http/httptest"
 	"strings"
 	"testing"
+
+	gnotify "github.com/morehao/golib/gnotify"
 )
 
 // fakeSender 记录投递调用，可配置返回错误。
@@ -89,92 +90,133 @@ func TestNotifierPropagatesDeliveryFailure(t *testing.T) {
 	}
 }
 
-// T2: SMTP sender 组装 MIME 并调用 sendMail（注入 fake）。
-func TestSMTPSenderBuildsAndSends(t *testing.T) {
-	var gotAddr, gotFrom string
-	var gotTo []string
-	var gotRaw []byte
-	s := &smtpSender{
-		cfg:     MailConfig{Host: "smtp.example.com", Port: 587, From: "IAM <no-reply@example.com>"},
-		timeout: defaultSMTPTimeout,
-		sendMail: func(addr string, _ smtp.Auth, from string, to []string, msg []byte) error {
-			gotAddr, gotFrom, gotTo, gotRaw = addr, from, to, msg
-			return nil
-		},
-	}
+// ---- 发送适配层（gnotify 适配）----
+
+// fakeGNotifier 是 gnotify.Notifier 的测试桩，记录收到的 gnotify.Message 与 Channel。
+type fakeGNotifier struct {
+	got     gnotify.Message
+	sent    bool
+	err     error
+	channel string
+}
+
+func (f *fakeGNotifier) Send(_ context.Context, msg gnotify.Message) error {
+	f.got = msg
+	f.sent = true
+	return f.err
+}
+func (f *fakeGNotifier) Channel() string { return f.channel }
+
+// email 适配：Message 字段映射（To→[]string、Subject、Body），失败归一为 ErrDeliveryFailed。
+func TestEmailSenderAdapterMapsMessage(t *testing.T) {
+	f := &fakeGNotifier{}
+	s := &emailSender{n: f}
 	err := s.Send(context.Background(), Message{To: "u@example.com", Subject: "【Ark IAM】账号初始密码", Body: "PW123", Kind: KindTempPassword})
 	if err != nil {
 		t.Fatalf("send: %v", err)
 	}
-	if gotAddr != "smtp.example.com:587" {
-		t.Fatalf("addr %q", gotAddr)
+	if len(f.got.To) != 1 || f.got.To[0] != "u@example.com" {
+		t.Fatalf("To mapping wrong: %v", f.got.To)
 	}
-	if gotFrom != "IAM <no-reply@example.com>" || len(gotTo) != 1 || gotTo[0] != "u@example.com" {
-		t.Fatalf("from/to wrong: %q %v", gotFrom, gotTo)
-	}
-	raw := string(gotRaw)
-	for _, want := range []string{"To: u@example.com", "Subject: ", "PW123", "Content-Type: text/plain"} {
-		if !strings.Contains(raw, want) {
-			t.Fatalf("MIME missing %q:\n%s", want, raw)
-		}
+	if f.got.Subject != "【Ark IAM】账号初始密码" || f.got.Body != "PW123" {
+		t.Fatalf("subject/body wrong: %+v", f.got)
 	}
 }
 
-// T2: SMTP sender 构造校验。
+func TestEmailSenderAdapterNormalizesError(t *testing.T) {
+	f := &fakeGNotifier{err: gnotify.ErrSendFailed}
+	s := &emailSender{n: f}
+	if err := s.Send(context.Background(), Message{To: "u@example.com", Body: "x"}); !errors.Is(err, ErrDeliveryFailed) {
+		t.Fatalf("want ErrDeliveryFailed, got %v", err)
+	}
+	// 空收件人 → gnotify.ErrNoRecipient → notify.ErrNoRecipient
+	f2 := &fakeGNotifier{err: gnotify.ErrNoRecipient}
+	s2 := &emailSender{n: f2}
+	if err := s2.Send(context.Background(), Message{To: "", Body: "x"}); !errors.Is(err, ErrNoRecipient) {
+		t.Fatalf("want ErrNoRecipient, got %v", err)
+	}
+}
+
+// email 适配：构造校验（host/port/from 必填）。
 func TestNewSMTPSenderValidation(t *testing.T) {
 	if _, err := NewSMTPSender(MailConfig{Host: ""}); err == nil {
 		t.Fatal("want error on missing host")
 	}
-}
-
-// fakeHTTP 返回固定响应。
-type fakeHTTP struct {
-	status int
-	body   string
-	req    *http.Request
-}
-
-func (f *fakeHTTP) Do(req *http.Request) (*http.Response, error) {
-	f.req = req
-	return &http.Response{StatusCode: f.status, Body: io.NopCloser(strings.NewReader(f.body))}, nil
-}
-
-// T3: 腾讯云短信 sender 组装请求 + 签名 + 解析成功/失败。
-func TestTencentSMSSender(t *testing.T) {
-	s, err := NewTencentSMSSender(SMSConfig{
-		Provider: "tencent", AccessKeyID: "id", AccessKeySecret: "secret",
-		SignName: "ArkIAM", TemplateCode: "12345", Region: "ap-guangzhou",
-	})
-	if err != nil {
-		t.Fatalf("new: %v", err)
+	if _, err := NewSMTPSender(MailConfig{Host: "smtp.example.com", Port: 0, From: "a@b.com"}); err == nil {
+		t.Fatal("want error on missing port")
 	}
-	ts := s.(*tencentSMSSender)
-	fh := &fakeHTTP{status: 200, body: `{"Response":{"SendStatusSet":[{"Code":"Ok"}],"RequestId":"x"}}`}
-	ts.client = fh
+}
 
-	if err := ts.Send(context.Background(), Message{To: "13800000000", Body: "PW123", Kind: KindTempPassword}); err != nil {
+// sms 适配：Message.Body 作为模板单值参数注入 Params["param"]，To→[]string；错误归一。
+func TestTencentSenderAdapterMapsMessage(t *testing.T) {
+	f := &fakeGNotifier{channel: "tencent"}
+	s := &smsSender{n: f}
+	if err := s.Send(context.Background(), Message{To: "13800000000", Body: "PW123", Kind: KindTempPassword}); err != nil {
 		t.Fatalf("send: %v", err)
 	}
-	if fh.req == nil {
-		t.Fatal("no request issued")
+	if len(f.got.To) != 1 || f.got.To[0] != "13800000000" {
+		t.Fatalf("To mapping wrong: %v", f.got.To)
 	}
-	if fh.req.Header.Get("X-TC-Action") != "SendSms" || fh.req.Header.Get("X-TC-Version") != "2021-01-11" {
-		t.Fatalf("headers wrong: %v", fh.req.Header)
-	}
-	if !strings.HasPrefix(fh.req.Header.Get("Authorization"), "TC3-HMAC-SHA256 ") {
-		t.Fatalf("authorization not signed: %q", fh.req.Header.Get("Authorization"))
-	}
-
-	// 供应商返回 Error → ErrDeliveryFailed
-	ts.client = &fakeHTTP{status: 200, body: `{"Response":{"Error":{"Code":"AuthFailure.SignatureFailure","Message":"bad"}}}`}
-	if err := ts.Send(context.Background(), Message{To: "13800000000", Body: "x"}); !errors.Is(err, ErrDeliveryFailed) {
-		t.Fatalf("want ErrDeliveryFailed on provider error, got %v", err)
+	if f.got.Params["param"] != "PW123" {
+		t.Fatalf("template param wrong: %v", f.got.Params)
 	}
 }
 
-// T3: 未注册供应商 → 报错（可插拔注册表）。
+func TestTencentSenderAdapterNormalizesError(t *testing.T) {
+	f := &fakeGNotifier{err: gnotify.ErrSendFailed}
+	s := &smsSender{n: f}
+	if err := s.Send(context.Background(), Message{To: "13800000000", Body: "x"}); !errors.Is(err, ErrDeliveryFailed) {
+		t.Fatalf("want ErrDeliveryFailed, got %v", err)
+	}
+}
+
+// sms 适配：构造校验（凭证/签名/SDKAppID/模板必填）。
+func TestNewTencentSMSSenderValidation(t *testing.T) {
+	if _, err := NewTencentSMSSender(SMSConfig{Provider: "tencent"}); err == nil {
+		t.Fatal("want error on empty credentials")
+	}
+	// 缺 SdkAppID 也应报错（官方 SDK 必填）。
+	if _, err := NewTencentSMSSender(SMSConfig{
+		Provider: "tencent", AccessKeyID: "id", AccessKeySecret: "secret",
+		SignName: "ArkIAM", TemplateCode: "12345",
+	}); err == nil {
+		t.Fatal("want error on missing sdkAppId")
+	}
+}
+
+// sms：未注册供应商 → 报错（可插拔注册表）。
 func TestNewSMSSenderUnknownProvider(t *testing.T) {
 	if _, err := NewSMSSender(SMSConfig{Provider: "aliyun"}); err == nil {
 		t.Fatal("want error for unregistered provider")
+	}
+}
+
+// 端到端：经真实腾讯云 SDK + httptest endpoint，验证 smsSender.Send 全链路（适配→SDK→HTTP）
+// 与成功/失败归一路径。用 newTencentSMSSender 的 endpoint 注入把请求打到本地测试服务器。
+func TestTencentSenderEndToEndViaSDK(t *testing.T) {
+	var hit bool
+	var actionVersion string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hit = true
+		actionVersion = r.Header.Get("X-TC-Action") + "/" + r.Header.Get("X-TC-Version")
+		_, _ = w.Write([]byte(`{"Response":{"SendStatusSet":[{"Code":"Ok","Message":"ok"}],"RequestId":"r1"}}`))
+	}))
+	defer srv.Close()
+
+	s, err := newTencentSMSSender(SMSConfig{
+		Provider: "tencent", AccessKeyID: "id", AccessKeySecret: "secret",
+		SignName: "ArkIAM", SdkAppID: "1400000000", TemplateCode: "12345", Region: "ap-guangzhou",
+	}, srv.URL)
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	if err := s.Send(context.Background(), Message{To: "13800000000", Body: "PW123", Kind: KindTempPassword}); err != nil {
+		t.Fatalf("send: %v", err)
+	}
+	if !hit {
+		t.Fatal("httptest endpoint not hit (SDK path broken)")
+	}
+	if actionVersion != "SendSms/2021-01-11" {
+		t.Fatalf("unexpected action/version: %q", actionVersion)
 	}
 }

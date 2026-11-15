@@ -32,6 +32,7 @@ func notifyConfigFrom(c pkgconfig.NotifyConfig) notify.Config {
 			AccessKeyID:     c.SMS.AccessKeyID,
 			AccessKeySecret: smsSecret,
 			SignName:        c.SMS.SignName,
+			SdkAppID:        c.SMS.SdkAppID,
 			TemplateCode:    c.SMS.TemplateCode,
 			Region:          c.SMS.Region,
 		},

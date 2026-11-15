@@ -32,14 +32,18 @@ type MailConfig struct {
 }
 
 // SMSConfig 是短信渠道配置。本期单供应商（可插拔，通过 Provider 选适配器）。
+// 发送能力由 golib gnotify/sms/*（腾讯云官方 SDK）承载，本结构是面向业务的配置视图。
 type SMSConfig struct {
 	Enabled  bool
 	Provider string // 供应商标识；本期实现 "tencent"。空=不启用。
 	// 供应商相关凭证与签名/模板。
-	AccessKeyID     string
-	AccessKeySecret string
+	AccessKeyID     string // 腾讯云 SecretID
+	AccessKeySecret string // 腾讯云 SecretKey（建议走环境变量）
 	SignName        string
-	TemplateCode    string
+	// SdkAppID 是腾讯云短信应用 SDKAppID（如 1400000000），官方 SDK 必填。
+	SdkAppID string
+	// TemplateCode 是短信模板 ID（腾讯云 TemplateID）。
+	TemplateCode string
 	// Region 供应商地域（腾讯云用），如 ap-guangzhou。
 	Region string
 }
@@ -50,7 +54,7 @@ type SMSConfig struct {
 //   - Enabled=false：返回一个「关闭态」Notifier（Send 恒返回 ErrNoChannel），不报错；
 //   - Enabled=true 且 mail/sms 全关：返回 ErrNoChannelChannellessConfig（进程入口据环境决定拒绝启动/降级告警）。
 //
-// mail/sms 的具体 Sender 构造见 smtp.go / sms.go（各自 FromMailConfig / FromSMSConfig）。
+// mail/sms 的具体 Sender 构造见 smtp.go（gnotify/email 适配）/ sms.go（gnotify/sms/tencent 适配）。
 // 本函数会调用它们；任一构造失败即返回错误（fail-closed，避免「以为开了但发不出」）。
 func FromConfig(cfg Config) (*Notifier, error) {
 	if !cfg.Enabled {

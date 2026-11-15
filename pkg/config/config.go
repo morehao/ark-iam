@@ -64,8 +64,10 @@ type NotifySMSConf struct {
 	AccessKeyID     string `yaml:"accessKeyID"`
 	AccessKeySecret string `yaml:"accessKeySecret"`
 	SignName        string `yaml:"signName"`
-	TemplateCode    string `yaml:"templateCode"`
-	Region          string `yaml:"region"`
+	// SdkAppID 腾讯云短信应用 SDKAppID（官方 SDK 必填）。
+	SdkAppID     string `yaml:"sdkAppId"`
+	TemplateCode string `yaml:"templateCode"`
+	Region       string `yaml:"region"`
 }
 
 // InstallConfig 首次初始化（引导）相关配置。

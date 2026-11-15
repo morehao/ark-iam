@@ -936,7 +936,7 @@ sequenceDiagram
 - **每个租户都必须有管理员**：建租户的管理员入参为必填，避免出现无人可登录的租户。
 - **应用订阅即契约角色物化**：`tenant_application` 落行时（建租户内的订阅、以及平台侧单独开通应用）在同一事务里按该应用的 `role_template` 在租户内 upsert 对应角色（`source=builtin && admin_type=normal`，`description` 标注来源）；租户侧对这些角色只读。模板更新走 `SyncAppRoleTemplateToTenants` 对各已开通租户做差量同步（新增/改名/移除撤权），详见 §5.4。
 - **口令不由创建人手填**：服务端用 `pkg/credential.GenerateTemporaryPassword` 生成每用户随机临时口令，全系统口令强度规则一致；库里只存 bcrypt 哈希。
-- **临时口令的交付（投递通道）**：临时口令生成后，在**事务提交之后**（投递是外部 IO，绝不放进 DB 事务）由 `pkg/notify` 投递给账号本人（优先其 `primary_email`，其次 `primary_phone`；见配置参考 `notify` 段）：
+- **临时口令的交付（投递通道）**：临时口令生成后，在**事务提交之后**（投递是外部 IO，绝不放进 DB 事务）由 `pkg/notify` 投递给账号本人（优先其 `primary_email`，其次 `primary_phone`；见配置参考 `notify` 段）。发送实现委托 golib `gnotify`（邮件 `gnotify/email` + 腾讯云官方 SDK `gnotify/sms/tencent`），`pkg/notify` 只保留业务编排（渠道选择 / 失败回退 / `delivered` 与审计）：
   - `notify.enabled=true` 且投递成功 → 响应 `initialPassword/adminInitialPassword` 为空、`delivered=true`，**管理员不经手明文**（目标默认形态）；
   - `notify.enabled=true` 但投递失败 → `requireDelivery=true` 返回 `NotifyDeliverError`（账号已建、需「重置密码」重发）；`requireDelivery=false` 回退为响应回显明文、`delivered=false`（仅通道故障时的降级）；
   - `notify.enabled=false`（出厂灰度默认）→ 保持现状：响应回显一次明文、`delivered=false`。
