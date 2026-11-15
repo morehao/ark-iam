@@ -189,6 +189,13 @@ type OIDC struct {
 	// 留空表示不校验 aud（如 auth 的 /v1/auth/*：它服务的是多个内置控制台客户端）。
 	// 注意是 per-app 的：gateway 聚合某应用时，gateway 配置也须为该应用声明同样的白名单。
 	Audiences []string `yaml:"audiences"`
+	// CORSAllowOrigins 是 /oidc/* 协议端点允许的跨域来源白名单（完整 origin，如
+	// "https://login.example.com"）。/oidc/* 需读写 SSO 会话 cookie（iam_sso_session），
+	// golib v1.36.2 起 CORS 默认不再下发 Access-Control-Allow-Credentials，故这里显式
+	// 开启凭证并回显白名单内 Origin；**跨站部署**（cookieSameSite=none）必须配置，
+	// 否则浏览器不会携带该 cookie。留空时按「动态回显请求 Origin」处理：兼容同站部署，
+	// 同时不破坏跨站场景（等价于允许任意来源带凭证，适合内网/单租户；公网多租户建议显式配置）。
+	CORSAllowOrigins []string `yaml:"corsAllowOrigins"`
 }
 
 // EffectiveSigningKeys 返回生效的签名密钥列表：

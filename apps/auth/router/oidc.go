@@ -2,12 +2,28 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
+	authconfig "github.com/morehao/ark-iam/apps/auth/config"
 	"github.com/morehao/ark-iam/apps/auth/controller/ctroidc"
 	"github.com/morehao/ark-iam/apps/auth/middleware"
 	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 )
+
+// oidcCORS 返回 /oidc/* 协议端点的 CORS 中间件。
+//
+// /oidc/* 会读写 SSO 会话 cookie（iam_sso_session），跨站拓扑（cookieSameSite=none）
+// 下浏览器必须跨源携带该 cookie。golib v1.36.2 起 CORS 默认不再下发
+// Access-Control-Allow-Credentials（修掉了旧默认 Allow-Origin:* + Credentials:true 的
+// 非法组合），因此这里显式开启凭证：配置了白名单则回显白名单内 Origin，否则动态回显
+// 请求 Origin（allowCredentials 分支下不会再用通配 *）。
+func oidcCORS() gin.HandlerFunc {
+	opts := []ginmiddleware.CorsOption{ginmiddleware.WithAllowCredentials(true)}
+	if authconfig.Conf != nil && len(authconfig.Conf.OIDC.CORSAllowOrigins) > 0 {
+		opts = append(opts, ginmiddleware.WithAddAllowOrigins(authconfig.Conf.OIDC.CORSAllowOrigins...))
+	}
+	return ginmiddleware.CORS(opts...)
+}
 
 // InitOIDC 注册全部 /oidc 协议路由。provider 的装配（签名密钥、logout worker 等）
 // 由 ctroidc.NewOIDCCtr 自装配（router.RegisterRouter 内调用），这里只做路由注册。
@@ -17,7 +33,7 @@ func InitOIDC(engine *gin.RouterGroup, ctr *ctroidc.OIDCCtr) {
 	oidcHandler := ctr.ProviderHandler()
 
 	oidcGroup := engine.Group("/oidc")
-	oidcGroup.Use(ginmiddleware.CORS())
+	oidcGroup.Use(oidcCORS())
 	// 登录端点按 IP 频率限流（防暴力破解/CC，golib ratelimit；Redis 不可用时 fail-open）
 	oidcGroup.POST("/login", middleware.LoginRateLimit(), ctr.Login)
 	oidcGroup.POST("/login/selectTenant", ctr.SelectTenant)
