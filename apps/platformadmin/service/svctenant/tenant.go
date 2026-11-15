@@ -14,6 +14,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/notify"
 	"github.com/morehao/ark-iam/pkg/object/objtenant"
 	"github.com/morehao/golib/biz/gobject"
 	"github.com/morehao/golib/dbaccess/gormdao"
@@ -34,6 +35,8 @@ type TenantSvc interface {
 
 type tenantSvc struct {
 	db gormdao.DBGetter
+	// notifier 是临时凭据投递通道（构造时默认取进程级 notify.Default()）。
+	notifier *notify.Notifier
 }
 
 var _ TenantSvc = (*tenantSvc)(nil)
@@ -42,7 +45,7 @@ func NewTenantSvc(db gormdao.DBGetter) TenantSvc {
 	if db == nil {
 		db = dbclient.IamDB
 	}
-	return &tenantSvc{db: db}
+	return &tenantSvc{db: db, notifier: notify.Default()}
 }
 
 // Create 创建租户管理。
@@ -144,10 +147,28 @@ func (svc *tenantSvc) Create(ctx context.Context, req *dtotenant.TenantCreateReq
 	// 命中已有自然人时不回显初始密码：其密码未被改动（见 person.FindOrCreate 约定），
 	// 此时若仍需交付凭据，由运营调用 ResetAdminPassword 重新生成。
 	if adminPersonIsNew {
-		// TODO(delivery): 临时密码目前只能在本响应中回显一次（系统尚无邮件/短信通道）；
-		// 接入通道后改为下发给账号本人，本响应不再返回明文。
-		// 见 docs/design/system-design.md §5.8。
-		resp.AdminInitialPassword = tempPassword
+		// 事务已提交：投递临时密码给管理员本人；通道未启用/失败回退时回显（见 §5.8）。
+		outcome, derr := svc.notifier.DeliverTempPassword(ctx, notify.Recipient{
+			Email: admin.PrimaryEmail,
+			Phone: admin.PrimaryPhone,
+		}, tempPassword)
+		if derr != nil {
+			glog.Errorf(ctx, "[svctenant.TenantCreate] deliver admin temp password fail, err:%v, tenantID:%s", derr, tenantID)
+			audit.WriteAudit(ctx, audit.AuditEntry{
+				Action:     audit.ActionTenantAdminPasswordReset,
+				TenantID:   tenantID,
+				Result:     model.AuditResultFailure,
+				TargetType: model.AuditTargetTypeUser,
+				TargetID:   adminUserID,
+				Detail:     "delivery=fail",
+			})
+			return nil, code.GetError(code.NotifyDeliverError)
+		}
+		if outcome.Delivered {
+			resp.Delivered = true
+		} else {
+			resp.AdminInitialPassword = outcome.EchoPassword
+		}
 	}
 	return resp, nil
 }
@@ -217,13 +238,41 @@ func (svc *tenantSvc) ResetAdminPassword(ctx context.Context, req *dtotenant.Ten
 		TargetType: model.AuditTargetTypeUser,
 		TargetID:   builtinAdmin.ID,
 	})
-	// TODO(delivery): 临时密码目前只能在本响应中回显一次（系统尚无邮件/短信通道）；
-	// 接入通道后改为下发给账号本人，本响应不再返回明文。
-	// 见 docs/design/system-design.md §5.8。
-	return &dtotenant.TenantAdminResetPasswordResp{
-		UserID:          builtinAdmin.ID,
-		InitialPassword: tempPassword,
-	}, nil
+	resp := &dtotenant.TenantAdminResetPasswordResp{UserID: builtinAdmin.ID}
+	// 事务已提交：投递临时密码给内置管理员本人；通道未启用/失败回退时回显（见 §5.8）。
+	person, perr := dao.NewPersonDao(dao.WithDBGetter(svc.db)).GetByID(ctx, builtinAdmin.PersonID)
+	if perr != nil {
+		glog.Errorf(ctx, "[svctenant.ResetAdminPassword] dao GetByID person fail, err:%v, personID:%s", perr, builtinAdmin.PersonID)
+		return nil, code.GetError(code.TenantAdminResetPasswordError)
+	}
+	to := notify.Recipient{}
+	if person != nil {
+		if person.PrimaryEmail != nil {
+			to.Email = *person.PrimaryEmail
+		}
+		if person.PrimaryPhone != nil {
+			to.Phone = *person.PrimaryPhone
+		}
+	}
+	outcome, derr := svc.notifier.DeliverTempPassword(ctx, to, tempPassword)
+	if derr != nil {
+		glog.Errorf(ctx, "[svctenant.ResetAdminPassword] deliver temp password fail, err:%v, userID:%s", derr, builtinAdmin.ID)
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionTenantAdminPasswordReset,
+			TenantID:   tenantEntity.ID,
+			Result:     model.AuditResultFailure,
+			TargetType: model.AuditTargetTypeUser,
+			TargetID:   builtinAdmin.ID,
+			Detail:     "delivery=fail",
+		})
+		return nil, code.GetError(code.NotifyDeliverError)
+	}
+	if outcome.Delivered {
+		resp.Delivered = true
+	} else {
+		resp.InitialPassword = outcome.EchoPassword
+	}
+	return resp, nil
 }
 
 // Delete 删除租户。

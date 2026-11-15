@@ -272,8 +272,15 @@ function UsersPane() {
         })
         setModalOpen(false)
         void fetchData()
-        if (created.initialPassword) {
-          // 初始临时密码仅在创建响应返回一次；该成员首次登录必须改密
+        if (created.delivered) {
+          // 通道启用且投递成功：管理员不经手明文，仅提示已发送。
+          message.success('创建成功')
+          Modal.success({
+            title: '成员已创建',
+            content: '初始密码已通过邮件/短信发送至成员本人，首次登录必须修改密码。若对方未收到，可对该成员执行「重置密码」重发。',
+          })
+        } else if (created.initialPassword) {
+          // 通道未启用或投递失败回退：初始临时密码仅在创建响应返回一次；该成员首次登录必须改密
           message.success('创建成功')
           setInitialPassword(created.initialPassword)
         } else {
@@ -318,7 +325,15 @@ function UsersPane() {
   const resetPassword = async (record: TenantUserItem) => {
     try {
       const resp = await resetTenantUserPassword(record.userID)
-      setInitialPassword(resp.initialPassword)
+      if (resp.delivered) {
+        Modal.success({
+          title: '重置成功',
+          content: '新密码已通过邮件/短信发送至成员本人，下次登录必须修改密码。',
+        })
+      } else {
+        // 通道未启用或投递失败回退：明文仅此一次展示
+        setInitialPassword(resp.initialPassword)
+      }
     } catch {
       /* 拦截器已提示 */
     }

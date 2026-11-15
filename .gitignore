@@ -61,3 +61,4 @@ __debug_bin*
 
 # 示例工程编译产物
 examples/*/embedded-iam-demo
+examples/*/rp-gin

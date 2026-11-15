@@ -53,12 +53,15 @@ export interface TenantUserCreateReq {
 export interface TenantUserCreateResp {
   userID: string
   initialPassword: string
+  /** 临时密码是否已通过邮件/短信投递（true 时 initialPassword 为空）。 */
+  delivered: boolean
 }
 
 /** 重置成员密码响应：新临时密码仅此一次返回，成员下次登录必须改密。 */
 export interface TenantUserResetPasswordResp {
   userID: string
   initialPassword: string
+  delivered: boolean
 }
 
 // TenantUserDepartmentUpdate 编辑成员时的信息更新（PATCH 局部更新；字段省略=不改变）。

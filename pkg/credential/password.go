@@ -74,10 +74,10 @@ const (
 // 调用方职责：bcrypt 哈希后落库；明文只允许放入创建/重置响应（或交由消息通道下发），
 // 禁止写入 glog / 审计日志 / 其他任何落盘；也不得回写为"可再查询"的明文。
 //
-// TODO(delivery): 接入邮件/短信通道后，临时密码改为由通道下发给账号本人，
-// 创建/重置响应不再回显明文。这是本文件所有"一次性回显"约定的收敛点：
-// 全仓 grep TODO(delivery) 可定位到每个待改造的回显位置。
-// 见 docs/design/system-design.md §5.8。
+// 交付：临时密码的投递由 pkg/notify 承载（建租户/建成员/重置密码三条链路在事务提交后
+// 调用 notify.DeliverTempPassword 下发给账号本人）；回显仅在「通道未启用」或「投递失败且
+// requireDelivery=false」时作为降级。全仓 grep TODO(delivery) 可定位到每个回显点，
+// 其注释已收敛为「通道启用时为空、由 delivered 表达结果」。见 docs/design/system-design.md §5.8。
 func GenerateTemporaryPassword() (string, error) {
 	allChars := lowerChars + upperChars + digitChars
 

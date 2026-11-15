@@ -3409,8 +3409,12 @@ const docTemplateplatformadmin = `{
         "dtotenant.TenantAdminResetPasswordResp": {
             "type": "object",
             "properties": {
+                "delivered": {
+                    "description": "Delivered 表示临时密码是否已通过邮件/短信投递给账号本人。",
+                    "type": "boolean"
+                },
                 "initialPassword": {
-                    "description": "InitialPassword 新临时密码，仅在此响应中返回一次，不落库、不可再查。\n待办：邮件/短信通道接入后本字段下线，见 pkg/credential 的 TODO(delivery)。",
+                    "description": "新临时密码(通道未启用/投递失败回退时才有值)",
                     "type": "string"
                 },
                 "userID": {
@@ -3471,12 +3475,16 @@ const docTemplateplatformadmin = `{
             "type": "object",
             "properties": {
                 "adminInitialPassword": {
-                    "description": "AdminInitialPassword 租户管理员的初始临时密码，仅在此响应中返回一次，不落库、不可再查；\n若管理员的邮箱/手机命中已存在自然人（其密码不被改动），该字段为空串。\n待办：邮件/短信通道接入后本字段下线，见 pkg/credential 的 TODO(delivery)。",
+                    "description": "初始临时密码(通道未启用/投递失败回退时才有值)",
                     "type": "string"
                 },
                 "adminUserID": {
                     "description": "租户管理员用户ID",
                     "type": "string"
+                },
+                "delivered": {
+                    "description": "Delivered 表示临时密码是否已通过邮件/短信投递给账号本人。",
+                    "type": "boolean"
                 },
                 "tenantID": {
                     "description": "租户ID",

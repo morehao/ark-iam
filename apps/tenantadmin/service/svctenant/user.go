@@ -15,6 +15,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/notify"
 	"github.com/morehao/ark-iam/pkg/object/objidentity"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gcrypto"
@@ -39,6 +40,8 @@ type UserSvc interface {
 
 type userSvc struct {
 	db gormdao.DBGetter
+	// notifier 是临时凭据投递通道（构造时默认取进程级 notify.Default()，测试可用 WithNotifier 覆盖）。
+	notifier *notify.Notifier
 }
 
 var _ UserSvc = (*userSvc)(nil)
@@ -47,7 +50,7 @@ func NewUserSvc(db gormdao.DBGetter) UserSvc {
 	if db == nil {
 		db = dbclient.IamDB
 	}
-	return &userSvc{db: db}
+	return &userSvc{db: db, notifier: notify.Default()}
 }
 
 // isValidUserStatus 白名单校验用户状态取值：仅接受已定义的枚举常量。
@@ -345,10 +348,37 @@ func (svc *userSvc) Create(ctx context.Context, req *dtotenant.UserCreateReq) (*
 
 	resp := &dtotenant.UserCreateResp{UserID: createdUserID}
 	if personCreated {
-		resp.InitialPassword = tempPassword
+		// 事务已提交：临时密码通过 notify 投递给账号本人；通道未启用时回退回显（现状）。
+		outcome, derr := svc.notifier.DeliverTempPassword(ctx, notify.Recipient{
+			Email: req.PrimaryEmail,
+			Phone: req.PrimaryPhone,
+		}, tempPassword)
+		if derr != nil {
+			glog.Errorf(ctx, "[svcuser.Create] deliver temp password fail, err:%v, userID:%s", derr, createdUserID)
+			audit.WriteAudit(ctx, audit.AuditEntry{
+				Action:     audit.ActionTenantAdminPasswordReset,
+				TenantID:   tenantID,
+				Result:     model.AuditResultFailure,
+				TargetType: model.AuditTargetTypeUser,
+				TargetID:   createdUserID,
+				Detail:     "delivery=fail",
+			})
+			return nil, code.GetError(code.NotifyDeliverError)
+		}
+		if outcome.Delivered {
+			resp.Delivered = true
+			audit.WriteAudit(ctx, audit.AuditEntry{
+				Action:     audit.ActionTenantAdminPasswordReset,
+				TenantID:   tenantID,
+				Result:     model.AuditResultSuccess,
+				TargetType: model.AuditTargetTypeUser,
+				TargetID:   createdUserID,
+				Detail:     "delivery=ok",
+			})
+		} else {
+			resp.InitialPassword = outcome.EchoPassword
+		}
 	}
-	// TODO(delivery): 临时密码目前只能在本响应中回显一次（系统尚无邮件/短信通道）；
-	// 接入通道后改为下发给账号本人，本响应不再返回明文。
 	// 见 docs/design/system-design.md §5.8。
 	return resp, nil
 }
@@ -655,13 +685,49 @@ func (svc *userSvc) ResetPassword(ctx context.Context, req *dtotenant.UserResetP
 		TargetType: model.AuditTargetTypeUser,
 		TargetID:   userEntity.ID,
 	})
-	// TODO(delivery): 临时密码目前只能在本响应中回显一次（系统尚无邮件/短信通道）；
-	// 接入通道后改为下发给账号本人，本响应不再返回明文。
-	// 见 docs/design/system-design.md §5.8。
-	return &dtotenant.UserResetPasswordResp{
-		UserID:          userEntity.ID,
-		InitialPassword: tempPassword,
-	}, nil
+	resp := &dtotenant.UserResetPasswordResp{UserID: userEntity.ID}
+	// 事务已提交：投递临时密码给账号本人；通道未启用/失败回退时回显（见 §5.8）。
+	person, perr := dao.NewPersonDao(dao.WithDBGetter(svc.db)).GetByID(ctx, userEntity.PersonID)
+	if perr != nil {
+		glog.Errorf(ctx, "[svcuser.ResetPassword] dao GetByID person fail, err:%v, personID:%s", perr, userEntity.PersonID)
+		return nil, code.GetError(code.UserResetPasswordError)
+	}
+	to := notify.Recipient{}
+	if person != nil {
+		if person.PrimaryEmail != nil {
+			to.Email = *person.PrimaryEmail
+		}
+		if person.PrimaryPhone != nil {
+			to.Phone = *person.PrimaryPhone
+		}
+	}
+	outcome, derr := svc.notifier.DeliverTempPassword(ctx, to, tempPassword)
+	if derr != nil {
+		glog.Errorf(ctx, "[svcuser.ResetPassword] deliver temp password fail, err:%v, userID:%s", derr, userEntity.ID)
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionTenantAdminPasswordReset,
+			TenantID:   dbclient.TenantIDFromContext(ctx),
+			Result:     model.AuditResultFailure,
+			TargetType: model.AuditTargetTypeUser,
+			TargetID:   userEntity.ID,
+			Detail:     "delivery=fail",
+		})
+		return nil, code.GetError(code.NotifyDeliverError)
+	}
+	if outcome.Delivered {
+		resp.Delivered = true
+		audit.WriteAudit(ctx, audit.AuditEntry{
+			Action:     audit.ActionTenantAdminPasswordReset,
+			TenantID:   dbclient.TenantIDFromContext(ctx),
+			Result:     model.AuditResultSuccess,
+			TargetType: model.AuditTargetTypeUser,
+			TargetID:   userEntity.ID,
+			Detail:     "delivery=ok",
+		})
+	} else {
+		resp.InitialPassword = outcome.EchoPassword
+	}
+	return resp, nil
 }
 
 // ListRoles 用户已分配角色列表。
