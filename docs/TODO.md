@@ -143,7 +143,6 @@ import { IamProvider, IamRoutes } from '@morehao/ark-iam-react'
 | S2 | IAM 实例的全局收敛（**已随 2026-11 分层倒置重构解决**：`backend/iam` 已删除，域实现归 `apps/*` 库包，`sdk/server` 负责编排装配） | 当前 `backend/iam` 仍有包级全局：`iam/auth/config.Conf`、`iam/auth/service/svcdb.DB`、`dbclient.SetIamDB/SetRedis` 桥接。**「一进程一 IAM 实例」语义下安全**，但若未来要「一进程多实例」需彻底实例化 | P3（暂不做） |
 | S3 | service 构造的 nil 兜底 | 各 `NewXxxSvc` 保留 `if db == nil { db = dbclient.IamDB }`（兼容旧测试）。可在测试全部改为 `testutil.SetupGetter` 后移除 | P3 |
 | S4 | `iam` 域依赖表补全（**已随 2026-11 分层倒置重构迁移**：`domainDeps` 现位于 `sdk/server`） | `domainDeps` 目前只有 `role → menu`；若前端/页面联动发现更多隐式依赖需补 | P2 |
-| S5 | 撞名检测的 PG 实测 | `ErrTableConflict` 有 sqlite 用例；需在真实 PostgreSQL 下补一条集成验证 | P2 |
 
 ---
 
