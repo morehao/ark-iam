@@ -7,7 +7,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/morehao/ark-iam/pkg v0.4.2
 	github.com/morehao/ark-iam/sdk v0.6.0
-	github.com/morehao/golib v1.36.3
+	github.com/morehao/golib v1.37.0
 	github.com/swaggo/swag v1.16.6
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.1
