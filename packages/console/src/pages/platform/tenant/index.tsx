@@ -139,8 +139,12 @@ export default function TenantList() {
     try {
       const resp = await resetTenantAdminPassword(record.tenantID)
       if (resp.delivered) {
-        Modal.success({ title: '重置成功', content: '新密码已通过邮件/短信发送至管理员本人，下次登录必须修改密码。' })
+        Modal.success({
+          title: '重置成功',
+          content: '新密码已通过邮件/短信发送至管理员本人，下次登录必须修改密码。',
+        })
       } else {
+        // 通道未启用或投递失败回退：明文仅此一次展示
         setInitialPassword(resp.initialPassword)
       }
     } catch {

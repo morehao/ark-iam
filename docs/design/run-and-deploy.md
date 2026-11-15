@@ -397,6 +397,13 @@ ALTER INDEX IF EXISTS uk_dept_user                      RENAME TO iam_uk_dept_us
 - **整批一起升级**：所有应用共用同一套表，任一实例仍跑旧代码都会查不到表。
 - 加前缀后 `iam_user` **不再是 PostgreSQL 保留字**，§2.5.5 里的引号处理仍正确但不再是必需。
 - **撞名检测（`SameDatabase`/`ErrTableConflict`）**：加前缀后与宿主 `user/role/tenant` 天然不冲突，该检测基本退化为兜底防御，可保留。
+- **撞名检测的 PostgreSQL 实测（S5）**：`sdk/server/internal/migrate_pg_test.go`（`//go:build pg`）在真实 PG 上覆盖三条用例——冲突表 fail-fast 抛 `ErrTableConflict` / 正常 IAM 表二次迁移不误报 / `AllowExistingTables` 白名单放行。复用的是既有 `IAM_PG_TEST_DSN` + `-tags pg` 约定（DSN 缺省 `iam_migratetest`，库名必须含 `test` 才会执行破坏性 DROP）。运行方式：
+  ```bash
+  docker exec postgres18 psql -U postgres -c "CREATE DATABASE iam_migratetest;"
+  IAM_PG_TEST_DSN='postgres://postgres:<pwd>@127.0.0.1:5432/iam_migratetest?sslmode=disable' \
+    go test -tags pg ./sdk/server/internal/ -run 'TableConflict.*Postgres' -v
+  ```
+  PG 实测未暴露方言差异（`Migrator().ColumnTypes` / `HasTable` 对裸表名行为一致），`migrate.go` 判定逻辑无需改动；默认 `go test ./...`（无 `pg` tag）不受影响。
 - **索引名**：显式声明的业务索引（`idx_*`/`uk_*`）已统一加 `iam_` 前缀（`iam_idx_*`/`iam_uk_*`）；`deleted_at`、`code`、`session_id` 等由框架（`BaseEntity` tag / gorm 列索引）自动生成的索引名随表名自然变为 `idx_iam_*`。同库内嵌时索引名不再与宿主冲突。
 - **开发/测试环境**不必手工执行：直接删库重建（§2.3）后由 `AutoMigrate` 建出 `iam_*` 表，再走 §2.4 首次初始化即可。
 

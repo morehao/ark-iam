@@ -27,6 +27,47 @@ type Config struct {
 	Security    SecurityConfig            `yaml:"security"`
 	Install     InstallConfig             `yaml:"install"`
 	MasterKey   string                    `yaml:"masterKey"`
+	Notify      NotifyConfig              `yaml:"notify"`
+}
+
+// NotifyConfig 是临时凭据投递（邮件/短信）配置（对应 pkg/notify.Config）。
+//
+// 三层开关语义见执行计划 2026-11-14-notify-delivery-channel-plan.md §1.2bis：
+//   - enabled 总闸（出厂 false，仅首启灰度验证；验证通道可用后应置 true 成为目标默认）；
+//   - mail.enabled / sms.enabled 渠道开关；
+//   - requireDelivery 失败语义（true=报错 / false=回退回显）。
+//
+// 敏感字段（password/accessKeySecret）**优先从环境变量读**（NOTIFY_MAIL_PASSWORD 等），
+// 配置仅作回落；生产建议用密钥管理。
+type NotifyConfig struct {
+	Enabled         bool           `yaml:"enabled"`
+	RequireDelivery bool           `yaml:"requireDelivery"`
+	Mail            NotifyMailConf `yaml:"mail"`
+	SMS             NotifySMSConf  `yaml:"sms"`
+}
+
+// NotifyMailConf 是 SMTP 邮件渠道配置。
+type NotifyMailConf struct {
+	Enabled  bool   `yaml:"enabled"`
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+	From     string `yaml:"from"`
+	TLS      bool   `yaml:"tls"`
+}
+
+// NotifySMSConf 是短信渠道配置（本期单供应商，可插拔）。
+type NotifySMSConf struct {
+	Enabled         bool   `yaml:"enabled"`
+	Provider        string `yaml:"provider"` // tencent | 空=不启用
+	AccessKeyID     string `yaml:"accessKeyID"`
+	AccessKeySecret string `yaml:"accessKeySecret"`
+	SignName        string `yaml:"signName"`
+	// SdkAppID 腾讯云短信应用 SDKAppID（官方 SDK 必填）。
+	SdkAppID     string `yaml:"sdkAppId"`
+	TemplateCode string `yaml:"templateCode"`
+	Region       string `yaml:"region"`
 }
 
 // InstallConfig 首次初始化（引导）相关配置。
@@ -150,6 +191,13 @@ type OIDC struct {
 	// 留空表示不校验 aud（如 auth 的 /v1/auth/*：它服务的是多个内置控制台客户端）。
 	// 注意是 per-app 的：gateway 聚合某应用时，gateway 配置也须为该应用声明同样的白名单。
 	Audiences []string `yaml:"audiences"`
+	// CORSAllowOrigins 是 /oidc/* 协议端点允许的跨域来源白名单（完整 origin，如
+	// "https://login.example.com"）。/oidc/* 需读写 SSO 会话 cookie（iam_sso_session），
+	// golib v1.36.2 起 CORS 默认不再下发 Access-Control-Allow-Credentials，故这里显式
+	// 开启凭证并回显白名单内 Origin；**跨站部署**（cookieSameSite=none）必须配置，
+	// 否则浏览器不会携带该 cookie。留空时按「动态回显请求 Origin」处理：兼容同站部署，
+	// 同时不破坏跨站场景（等价于允许任意来源带凭证，适合内网/单租户；公网多租户建议显式配置）。
+	CORSAllowOrigins []string `yaml:"corsAllowOrigins"`
 }
 
 // EffectiveSigningKeys 返回生效的签名密钥列表：
