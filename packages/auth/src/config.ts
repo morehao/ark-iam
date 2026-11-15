@@ -33,6 +33,8 @@ export interface RuntimeConfig {
   oidcBase?: string
   callbackPath?: string
   clientId?: string
+  /** 已挂载的业务域白名单（G4）：后端按实际挂载的域下发，供前端裁剪菜单/路由入口。 */
+  enabledDomains?: string[]
 }
 
 /**

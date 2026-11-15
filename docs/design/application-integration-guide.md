@@ -785,6 +785,7 @@ pnpm add antd@^5.22.0 react@^18.3.1 react-dom@^18.3.1 react-router-dom@^7.15.0
 | `@morehao/ark-iam-react/auth` | OIDC 登录（PKCE）+ 租户切换 / 登出钩子 | `createAuthProvider`、`fetchRuntimeConfig`、`useTenantSwitching`、`useLogout`、`useAuthGuard` |
 | `@morehao/ark-iam-react/ui` | 设计令牌 + 列表页列工厂 + 骨架组件（重依赖） | `themeConfig`、`tokens`、`actionColumn`、`tableScrollX`、`AppShell`、`MainLayout` 等 |
 | `@morehao/ark-iam-react/login` | OP 账密登录页（凭证表单 + 多租户选择 + 自助注册/建租户/改密）+ runtime config / 认证 API / install 错误映射 | `LoginPage`、`ensureRuntimeConfig`、`oidcLogin`、`getInstallStatus`、`resolveInstallError` 等 |
+| `@morehao/ark-iam-react/console` | 页面级门面（整站管理台：IamProvider / IamRoutes / IamConsoleApp + 平台/租户页面，见 §12.10） | `IamProvider`、`IamRoutes`、`IamConsoleApp`、`OAUTH_CLIENT_DETAIL_ROUTE` |
 | `@morehao/ark-iam-react`（根） | 上面各层全部 re-export（一把梭） | 全部 |
 
 > 建议：**追求体积时用子路径**（如只 `import { BizCode } from '@morehao/ark-iam-react/types'` 不会拉入 antd）；仅图省事时才从根入口全量引入。
@@ -1081,3 +1082,62 @@ createRoot(el).render(
 **行为覆盖**：`LoginPage` 覆盖 `login` / `register` / `createTenant` / `changePassword` 四个 mode，行为与 ark-iam 自带的 login-web 完全一致（单一实现），宿主无需重复实现这些分支。
 
 
+
+### 12.10 页面级接入（`IamRoutes`，一行挂载整个管理台）
+
+> 适用场景：宿主希望**直接复用 ark-iam 的整套管理台页面**（登录 → 侧栏动态菜单 → 各业务页/详情页），而不是自己搭 `MainLayout`、自己维护「菜单树 → 路由」映射。这是「1 行接入页面级能力」，比 §12.3（只给认证 + 请求封装）、§12.9（只给账密页）更上层。
+>
+> 子路径：`@morehao/ark-iam-react/console`（根入口也 re-export 了 `IamProvider` / `IamRoutes` / `IamConsoleApp`）。
+> 事实源：`packages/console/src/console.tsx`（`IamProvider` / `IamRoutes` / `IamConsoleApp` 与纯函数 `buildMenuItems` / `collectRoutes` / `firstRoutablePath` / `filterByDomains`）。
+
+**三个导出与职责**：
+
+| 导出 | 职责 | 是否自带 Router |
+|---|---|---|
+| `IamProvider` | 认证外壳（`createAuthProvider`）+ 主题（`AppShell`）。只做「认证 + 主题」，不拥有 Router。 | **否**（要求外层已有 Router） |
+| `IamRoutes` | 「菜单树 → 侧栏 + 路由」渲染，行为与 ark-iam 自带控制台等价（含登录失败兜底、空态、spinner）。 | **否**（要求外层已有 Router） |
+| `IamConsoleApp` | 自托管入口：`BrowserRouter + IamProvider + IamRoutes` 一把装好。 | 是（内部含 `BrowserRouter`） |
+
+**Router 归属（重要）**：库不拥有 Router。宿主已有 Router 时用 `IamProvider` + `IamRoutes`；**无** Router 的裸站才用 `IamConsoleApp`。**不要**把 `IamConsoleApp` 挂在已有 `BrowserRouter` 里（会「Router 套 Router」报错）。
+
+```tsx
+// 形态 A（推荐）：宿主已自建 Router —— 门面包不拥有 Router
+import { BrowserRouter } from 'react-router-dom'
+import { IamProvider, IamRoutes } from '@morehao/ark-iam-react/console'
+
+createRoot(el).render(
+  <BrowserRouter>
+    <IamProvider config={{ clientId: 'my_console_web' }}>
+      <IamRoutes config={{ variant: 'platform', basePath: '/iam' }} />
+    </IamProvider>
+  </BrowserRouter>,
+)
+```
+
+```tsx
+// 形态 B：宿主无 Router（裸站 / 独立部署）—— 用自托管入口
+import { IamConsoleApp } from '@morehao/ark-iam-react/console'
+
+createRoot(el).render(<IamConsoleApp config={{ variant: 'tenant' }} />)
+```
+
+> 仓内两个管理台（`apps/platform-admin-web`、`apps/tenant-admin-web`）就是形态 B 的薄壳：`App.tsx` 直接 `<IamConsoleApp config={{ variant: 'platform' | 'tenant' }} />`。
+
+**`IamConsoleConfig` 字段**：
+
+| 字段 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `clientId` | `string` | `/config.json.clientId` | OIDC client_id（= 控制台应用的 `application_client.code`） |
+| `issuer` | `string` | `/config.json.issuer` → `VITE_OIDC_ISSUER` → `/oidc` | OP 地址 |
+| `apiBase` | `string` | `/config.json.apiBase` → `/v1` | 业务 API 基址 |
+| `enabledDomains` | `string[]` | `/config.json.enabledDomains`（缺省视为全量） | 域白名单（G4）：过滤 COMPONENT_MAP，未挂载域的入口（侧栏 + 路由）不渲染 |
+| `basePath` | `string` | `/` | 挂载基路径（子路径部署传 `/iam`） |
+| `variant` | `'platform' \| 'tenant'` | `'platform'` | 控制台形态：决定 `COMPONENT_MAP`、侧栏标题、登录页副标题 |
+
+**G4 域裁剪（`enabledDomains`）**：后端 `/config.json` 按实例实际挂载的域下发 `enabledDomains`（如仅挂载 `core-auth/install/user/role/department/menu` 的形态 2 实例不会下发 `application/oauth-client/tenant/...`）。`IamRoutes` 用该白名单过滤 `COMPONENT_MAP`：未在名单内、且声明了 `domain` 的页面，其侧栏入口与路由都不渲染（直接访问其 path 落空态）。宿主也可用 `config.enabledDomains` 显式覆盖。**props 覆盖 runtime**：`config.enabledDomains` 一旦给出（含空数组）即视为宿主拍板，不再回退 `/config.json`。
+
+**可选 `routes` 覆盖 / 收窄页面集**：`IamRoutes` 还接受可选的 `routes: ConsoleRouteDef[]`，用于替换默认 `COMPONENT_MAP`（`ConsoleRouteDef = { path: string; Component: React.ComponentType; domain?: string }`）。默认全量（按 `variant` 决定），传 `routes` 即以此为准，再叠加 `enabledDomains` 裁剪。
+
+**依赖要求**：`./console` 子路径把 `react / react-dom / antd / @ant-design/icons / react-router-dom` 作为 **peer**（由宿主提供，见 §12.7）；`@ark-iam/{ui,api,auth,types}` 已随门面包打进 dist。宿主记得在入口挂 `ConfigProvider`（或直接用 `AppShell`）——`IamConsoleApp` / `IamProvider` 已内置 `AppShell`（含主题），无需重复包裹。
+
+**子路径部署注意**：若 `basePath='/iam'`，Vite 构建需设 `base:'/iam/'`，否则 `/config.json` 拉取与静态资源路径可能 404——这与 §12 顶部「仓内 dev 走 src」的双轨约定一致。

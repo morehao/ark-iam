@@ -35,6 +35,13 @@ func (a *App) MountConfig(engine *gin.Engine, basePath string) error {
 			issuer = requestBaseURL(c) + joinPath(basePath, "/oidc")
 		}
 
+		// enabledDomains：本实例实际挂载的业务域集合（G4）。用于前端控制台按域裁剪菜单/路由入口
+		// （未挂载的域不下发，前端据此隐藏对应入口）。空 Domains 归一为全量（与 Mount 的解析口径一致）。
+		enabledDomains := make([]string, 0, len(allDomains))
+		for _, d := range resolveDomains(a.cfg.Domains) {
+			enabledDomains = append(enabledDomains, string(d))
+		}
+
 		c.JSON(http.StatusOK, gin.H{
 			"issuer":       issuer,
 			"apiBase":      joinPath(basePath, "/v1"),
@@ -44,6 +51,8 @@ func (a *App) MountConfig(engine *gin.Engine, basePath string) error {
 			"callbackPath": "/auth/callback",
 			// clientId：本控制台 SPA 的 OIDC client_id（平台管理台内置客户端编码）。
 			"clientId": model.SeedBuiltinClientPlatformAdminWeb,
+			// enabledDomains：已挂载域白名单（G4）；缺省/全量时前端视为全部域可用。
+			"enabledDomains": enabledDomains,
 		})
 	})
 	return nil

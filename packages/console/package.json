@@ -1,0 +1,59 @@
+{
+  "name": "@ark-iam/console",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "GoArk IAM 页面级控制台内部包：IamProvider / IamRoutes / IamConsoleApp + 管理台页面（平台/租户两形态）",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "vite build --config vite.config.lib.ts && tsc -p tsconfig.build.json",
+    "pack:dist": "pnpm build && pnpm pack",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@ant-design/icons": "^6.3.4",
+    "antd": "^6.7.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.15.0"
+  },
+  "dependencies": {
+    "@ark-iam/api": "workspace:*",
+    "@ark-iam/auth": "workspace:*",
+    "@ark-iam/types": "workspace:*",
+    "@ark-iam/ui": "workspace:*",
+    "axios": "^1.7.0"
+  },
+  "devDependencies": {
+    "@ant-design/icons": "^6.3.4",
+    "@ark-iam/tsconfig": "workspace:*",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@vitejs/plugin-react": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "antd": "^6.7.0",
+    "jsdom": "^31.0.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-oidc-context": "^3.3.1",
+    "react-router-dom": "^7.15.0",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.4"
+  }
+}
