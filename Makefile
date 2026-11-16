@@ -33,7 +33,7 @@ PORT              = 8099
 # ============================================================
 .PHONY: all build build-env clean run lint test swag codegen \
         docker-build docker-run check-image \
-        list-apps deps tidy update-dep dev-all dev-frontend stop-frontend e2e e2e-sso e2e-test help \
+        list-apps deps tidy update-dep dev-all dev-free-ports dev-frontend stop-frontend e2e e2e-sso e2e-test help \
         test-sdk test-sdk-server sdk-check-deps sdk-check-graph print-builtin-menus sdk-server-build \
         frontend-check-deps
 
@@ -145,13 +145,23 @@ sdk-server-build:
 #   - 前端三应用：login-web(:4000) / platform-admin-web(:4001) / tenant-admin-web(:4002)，/v1、/oidc 代理到 gateway
 # 前置依赖：PostgreSQL 与 Redis 需已启动（详见 docs/design/run-and-deploy.md）
 # 用法：make dev-all
-# 说明：先 go build 生成二进制再 exec 后台运行——直接 kill 该 PID 即为真实服务进程，
-#       可确保退出时端口被正确释放（go run 的包装进程被 kill 后子服务会残留占用端口）。
+# 说明：
+#   1. 启动前先释放开发端口（结束上次残留的 gateway / vite 进程），避免
+#      "listen tcp :8100: bind: address already in use" 报错与 vite 静默顺延端口；
+#      只想看占用情况不结束进程：NO_KILL=1 make dev-free-ports
+#   2. 先 go build 生成二进制再 exec 后台运行——直接 kill 该 PID 即为真实服务进程，
+#      可确保退出时端口被正确释放（go run 的包装进程被 kill 后子服务会残留占用端口）。
+DEV_BACKEND_PORT   = 8100
+DEV_FRONTEND_PORTS = 4000 4001 4002
+DEV_PORTS          = $(DEV_BACKEND_PORT) $(DEV_FRONTEND_PORTS)
+
 dev-all:
 	@echo "🚀 正在启动全部开发服务（后端 gateway + 前端三应用）..."
-	@echo "   后端: gateway → http://localhost:8100（聚合 auth/platformadmin/tenantadmin + 目录域）"
+	@echo "   后端: gateway → http://localhost:$(DEV_BACKEND_PORT)（聚合 auth/platformadmin/tenantadmin + 目录域）"
 	@echo "   前端: login-web(:4000) / platform-admin-web(:4001) / tenant-admin-web(:4002)"
 	@echo "   前置: PostgreSQL 与 Redis 需已启动；Ctrl+C 一并停止全部服务"
+	@echo "🧹 正在释放开发端口（$(DEV_PORTS)）..."
+	@bash scripts/free-ports.sh $(DEV_PORTS) || { echo "❌ 端口释放失败，请手动处理占用进程后重试"; exit 1; }
 	@echo "🔨 正在构建后端 gateway..."
 	@cd apps/gateway/cmd && go build -o /tmp/ark-iam-gateway-dev .
 	@be_pid=""; \
@@ -163,14 +173,14 @@ dev-all:
 			wait "$$be_pid" 2>/dev/null; \
 		fi; \
 	}; \
-	trap cleanup EXIT INT TERM; \
-	echo "🚀 启动后端 gateway（:8100）..."; \
+	trap cleanup EXIT INT TERM HUP; \
+	echo "🚀 启动后端 gateway（:$(DEV_BACKEND_PORT)）..."; \
 	( cd apps/gateway/cmd && exec /tmp/ark-iam-gateway-dev ) & \
 	be_pid=$$!; \
 	ready=""; \
 	i=0; \
 	while [ -z "$$ready" ] && [ "$$i" -lt 60 ]; do \
-		if curl -fsS http://localhost:8100/oidc/healthz >/dev/null 2>&1; then \
+		if curl -fsS http://localhost:$(DEV_BACKEND_PORT)/oidc/healthz >/dev/null 2>&1; then \
 			ready=1; \
 		elif ! kill -0 "$$be_pid" 2>/dev/null; then \
 			break; \
@@ -183,12 +193,19 @@ dev-all:
 		echo "❌ 后端 gateway 启动失败或 60s 内未就绪，请检查 PostgreSQL/Redis 是否已启动及上方后端日志"; \
 		exit 1; \
 	fi; \
-	echo "✅ 后端 gateway 已就绪（http://localhost:8100）"; \
+	echo "✅ 后端 gateway 已就绪（http://localhost:$(DEV_BACKEND_PORT)）"; \
 	echo "🚀 启动前端服务（pnpm run dev:all）..."; \
 	pnpm run dev:all; \
 	status=$$?; \
 	echo "前端服务已退出（exit=$$status），正在停止后端..."; \
 	exit $$status
+
+# 释放开发端口：结束仍占用 gateway（:8100）与前端（:4000-:4002）的残留进程。
+# dev-all / dev-frontend 启动前会自动调用；也可单独执行排查端口占用。
+# 用法：make dev-free-ports
+#       NO_KILL=1 make dev-free-ports   # 只列出占用进程，不结束
+dev-free-ports:
+	@bash scripts/free-ports.sh $(DEV_PORTS)
 
 # ============================================================
 # 依赖管理
@@ -321,15 +338,16 @@ check-image:
 # 前端开发
 # ============================================================
 
-# 并行启动所有前端服务（开发调试用）
+# 并行启动所有前端服务（开发调试用）；启动前释放 :4000-:4002 上的残留 vite
 dev-frontend:
 	@echo "🚀 正在并行启动所有前端服务..."
+	@bash scripts/free-ports.sh $(DEV_FRONTEND_PORTS) || { echo "❌ 前端端口释放失败，请手动处理占用进程后重试"; exit 1; }
 	@pnpm run dev:all
 
-# 停止所有前端服务（本地测试用）
+# 停止所有前端服务（按端口结束 vite，避免 pkill 模式匹配漏杀）
 stop-frontend:
 	@echo "🛑 正在停止前端服务..."
-	@pkill -f "vite.*ark-iam" 2>/dev/null && echo "✅ 已停止" || echo "⚠️  没有运行中的前端服务"
+	@bash scripts/free-ports.sh $(DEV_FRONTEND_PORTS)
 
 # 运行 E2E 测试（需先安装依赖：cd e2e && npm install && npx playwright install chromium）
 .PHONY: e2e
@@ -391,7 +409,8 @@ help:
 	@echo "    make run       APP=<名称>              go run 直接启动（开发调试）"
 	@echo "    make clean                             清理构建产物"
 	@echo "    make all       APP=<名称>              clean → deps → build → run"
-	@echo "    make dev-all                            一键启动后端 gateway + 全部前端服务（Ctrl+C 停止）"
+	@echo "    make dev-all                            一键启动后端 gateway + 全部前端服务（启动前自动释放端口，Ctrl+C 停止）"
+	@echo "    make dev-free-ports                     释放开发端口（:8100/:4000-:4002 上的残留进程；NO_KILL=1 只探测）"
 	@echo ""
 	@echo "  测试 & 检查"
 	@echo "    make test      APP=<名称>              运行单元测试"

@@ -25,7 +25,7 @@ var builtinMenuDefs = []seedMenu{
 	{appCode: appCodeAdmin, parentCode: "grp-app", name: "OAuth客户端", code: "oauth-client", path: "/oauth-client", icon: "oauth", sort: 2, component: "/oauthClient/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 	{appCode: appCodeAdmin, name: "平台管理", code: "grp-platform", icon: "setting", sort: 4, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
 	{appCode: appCodeAdmin, parentCode: "grp-platform", name: "菜单管理", code: "menu", path: "/menu", icon: "menu", sort: 1, component: "/menu/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
-	{appCode: appCodeAdmin, parentCode: "grp-platform", name: "系统设置", code: "setting", path: "/setting", icon: "setting", sort: 2, component: "/setting/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+	{appCode: appCodeAdmin, parentCode: "grp-platform", name: "系统设置", code: "setting", path: "/settings", icon: "setting", sort: 2, component: "/setting/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 	// 租户管理后台一级菜单：控制台定位为「租户管理层专用」（部门/用户/角色/密钥均属管理操作，
 	// 全部 visibility=admin 硬隔离；普通成员不面向该控制台，仅内置管理员角色可见与授权）。
 	// 用户/角色/密钥编码加 tenant- 前缀，避免与平台菜单 code 撞名。

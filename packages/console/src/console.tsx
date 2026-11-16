@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { BrowserRouter, Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthGuard, FullPageSpinner, createAuthProvider, fetchRuntimeConfig } from '@ark-iam/auth'
 import { MainLayout, SsoLoginPage, tokens, menuIcon, AppShell } from '@ark-iam/ui'
 import type { MainMenuItems } from '@ark-iam/ui'
@@ -60,7 +60,7 @@ const PLATFORM_COMPONENT_MAP: Record<string, { Component: React.ComponentType; d
   '/oauth-client': { Component: OAuthClientList, domain: 'oauth-client' },
   '/menu': { Component: MenuList, domain: 'menu' },
   '/domain': { Component: DomainList, domain: 'domain' },
-  '/setting': { Component: SettingPage, domain: 'setting' },
+  '/settings': { Component: SettingPage, domain: 'setting' },
   // 详情页（不进侧边栏菜单，由静态路由单独注册；path 取自 routes.ts 单一真相源）
   [OAUTH_CLIENT_DETAIL_ROUTE]: { Component: OAuthClientDetail, domain: 'oauth-client' },
 }
@@ -338,16 +338,15 @@ export function IamRoutes({ config, routes }: { config?: IamConsoleConfig; route
 /**
  * IamConsoleApp：自托管入口（无路由栈的宿主 / 仓内两个 app 直接用）。
  *
- * 内部自带 `BrowserRouter` + `IamProvider` + `IamRoutes` 一把装好。
- * ★宿主若已有 Router（推荐形态），请改用 `IamProvider` + `IamRoutes`，否则会「Router 套 Router」报错。
+ * Router 由 `IamProvider` 内部的 `createAuthProvider`（AuthProvider 自带 BrowserRouter）提供，
+ * 这里**不再额外包 BrowserRouter**，否则会「Router 套 Router」直接崩掉整棵 React 树（白屏）。
+ * 宿主若已有 Router，请改用 `IamProvider` + `IamRoutes`。
  */
 export function IamConsoleApp({ config }: { config?: IamConsoleConfig }) {
   return (
-    <BrowserRouter>
-      <IamProvider config={config}>
-        <IamRoutes config={config} />
-      </IamProvider>
-    </BrowserRouter>
+    <IamProvider config={config}>
+      <IamRoutes config={config} />
+    </IamProvider>
   )
 }
 
