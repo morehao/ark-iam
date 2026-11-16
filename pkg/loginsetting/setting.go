@@ -123,14 +123,15 @@ func Save(ctx context.Context, db gormdao.DBGetter, c Config) error {
 func saveTo(ctx context.Context, s *gsetting.Setting, c Config) error {
 	admin := gsetting.GetAdmin()
 	entries := []struct {
-		key string
-		val int
+		key  string
+		val  int
+		desc string
 	}{
-		{KeyMaxFailures, c.MaxFailures},
-		{KeyWindowSec, c.WindowSec},
-		{KeyLockSec, c.LockSec},
-		{KeyRatePerMinute, c.RatePerMinute},
-		{KeyBurst, c.Burst},
+		{KeyMaxFailures, c.MaxFailures, "失败次数阈值：窗口内连续失败达到该次数即锁定"},
+		{KeyWindowSec, c.WindowSec, "失败计数窗口（秒）"},
+		{KeyLockSec, c.LockSec, "锁定时长（秒）"},
+		{KeyRatePerMinute, c.RatePerMinute, "登录限流：每分钟允许的最大请求数（按 IP）"},
+		{KeyBurst, c.Burst, "登录限流：突发容量（令牌桶最大容量）"},
 	}
 	for _, e := range entries {
 		// gsetting 不接受空值；用 WithDefaults 后各项均 >0，正常不会为 0。
@@ -138,10 +139,11 @@ func saveTo(ctx context.Context, s *gsetting.Setting, c Config) error {
 			continue
 		}
 		if err := admin.Create(ctx, &gsetting.CreateReq{
-			Group:     SettingGroup,
-			Key:       e.key,
-			ValueType: string(gsetting.ValueTypeInt),
-			Value:     fmt.Sprintf("%d", e.val),
+			Group:       SettingGroup,
+			Key:         e.key,
+			ValueType:   string(gsetting.ValueTypeInt),
+			Value:       fmt.Sprintf("%d", e.val),
+			Description: e.desc,
 		}); err != nil {
 			return fmt.Errorf("loginsetting: save %s: %w", e.key, err)
 		}

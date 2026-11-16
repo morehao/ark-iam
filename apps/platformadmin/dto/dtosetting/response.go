@@ -24,3 +24,17 @@ type SettingPageListResp struct {
 	List  []*SettingItem `json:"list"`
 	Total int64          `json:"total"`
 }
+
+// SettingGroupMeta 是配置分组元数据（供前端渲染分组下拉与说明）。
+// 单一事实源在 svcsetting.settingGroups：新增一类运行时配置只改那一处，前端零改动。
+//
+// 分组以 Description（中文说明）对外展示，不额外维护硬编码的 Title——避免中英/标题与说明两套文案漂移。
+type SettingGroupMeta struct {
+	Group       string `json:"group"`       // 分组标识，如 notify
+	Description string `json:"description"` // 分组说明（下拉/筛选项展示用）
+}
+
+// SettingGroupListResp 分组元数据列表响应。
+type SettingGroupListResp struct {
+	List []*SettingGroupMeta `json:"list"`
+}

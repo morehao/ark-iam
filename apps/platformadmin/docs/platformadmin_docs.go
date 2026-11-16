@@ -1619,6 +1619,40 @@ const docTemplateplatformadmin = `{
                 }
             }
         },
+        "/v1/platform/settings/groups": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统设置"
+                ],
+                "summary": "配置分组元数据（分组名/说明/新增下拉）",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtosetting.SettingGroupListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/v1/platform/settings/{settingID}": {
             "get": {
                 "consumes": [
@@ -4082,6 +4116,30 @@ const docTemplateplatformadmin = `{
                 },
                 "valueType": {
                     "description": "值类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtosetting.SettingGroupListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtosetting.SettingGroupMeta"
+                    }
+                }
+            }
+        },
+        "dtosetting.SettingGroupMeta": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "分组说明（下拉/筛选项展示用）",
+                    "type": "string"
+                },
+                "group": {
+                    "description": "分组标识，如 notify",
                     "type": "string"
                 }
             }

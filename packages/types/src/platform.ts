@@ -446,3 +446,9 @@ export interface SettingUpdateReq {
   status?: SettingStatus
   description?: string
 }
+
+/** 配置分组元数据（供渲染分组下拉与说明；单一事实源在后端 svcsetting） */
+export interface SettingGroupMeta {
+  group: string
+  description?: string
+}

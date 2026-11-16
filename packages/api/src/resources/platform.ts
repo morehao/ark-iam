@@ -18,9 +18,11 @@ import type {
   OAuthSecretItem,
   PageListResp,
   SettingCreateReq,
+  SettingGroupMeta,
   SettingItem,
   SettingStatus,
   SettingUpdateReq,
+  SettingValueType,
   TenantApplicationCreateReq,
   TenantApplicationItem,
   TenantApplicationUpdateReq,
@@ -118,8 +120,15 @@ export const updateDomain = (data: { id: string; domain?: string; verificationSt
 export const deleteDomain = (id: string) => request.delete<any, string>(`/platform/domains/${id}`)
 
 // ==================== 系统设置（运行时配置中心） ====================
-export const getSettingPageList = (data: { group?: string; key?: string; page?: number; pageSize?: number }) =>
-  request.get<any, PageListResp<SettingItem>>('/platform/settings', { params: data })
+export const getSettingGroups = () => request.get<any, { list: SettingGroupMeta[] }>('/platform/settings/groups')
+export const getSettingPageList = (data: {
+  group?: string
+  key?: string
+  valueType?: SettingValueType
+  status?: SettingStatus
+  page?: number
+  pageSize?: number
+}) => request.get<any, PageListResp<SettingItem>>('/platform/settings', { params: data })
 export const getSettingDetail = (id: string) => request.get<any, SettingItem>(`/platform/settings/${id}`)
 export const createSetting = (data: SettingCreateReq) => request.post<any, string>('/platform/settings', data)
 export const updateSetting = (id: string, data: SettingUpdateReq) => request.put<any, string>(`/platform/settings/${id}`, data)

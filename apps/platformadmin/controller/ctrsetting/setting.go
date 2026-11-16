@@ -17,6 +17,7 @@ type SettingCtr interface {
 	Delete(ctx *gin.Context)
 	Detail(ctx *gin.Context)
 	PageList(ctx *gin.Context)
+	Groups(ctx *gin.Context)
 }
 
 type settingCtr struct {
@@ -65,6 +66,21 @@ func (ctr *settingCtr) PageList(ctx *gin.Context) {
 		return
 	}
 	res, err := ctr.settingSvc.PageList(ctx.Request.Context(), &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 系统设置
+// @Summary 配置分组元数据（分组名/说明/新增下拉）
+// @accept application/json
+// @Produce application/json
+// @Success 200 {object} gincontext.DtoRender{data=dtosetting.SettingGroupListResp}
+// @Router /v1/platform/settings/groups [get]
+func (ctr *settingCtr) Groups(ctx *gin.Context) {
+	res, err := ctr.settingSvc.Groups(ctx.Request.Context())
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

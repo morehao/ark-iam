@@ -223,6 +223,7 @@ func saveTo(ctx context.Context, s *gsetting.Setting, cfg Config) error {
 		valueType gsetting.ValueType
 		value     string
 		encrypted bool
+		desc      string
 	}
 	b := func(v bool) string {
 		if v {
@@ -231,25 +232,25 @@ func saveTo(ctx context.Context, s *gsetting.Setting, cfg Config) error {
 		return "false"
 	}
 	entries := []entry{
-		{SettingKeyEnabled, gsetting.ValueTypeBool, b(cfg.Enabled), false},
-		{SettingKeyRequireDelivery, gsetting.ValueTypeBool, b(cfg.RequireDelivery), false},
+		{SettingKeyEnabled, gsetting.ValueTypeBool, b(cfg.Enabled), false, "总闸：关闭=不发任何通知（回退为响应回显一次明文）；开启=按渠道投递"},
+		{SettingKeyRequireDelivery, gsetting.ValueTypeBool, b(cfg.RequireDelivery), false, "投递失败语义：开启=投递失败报错（需重置重试）；关闭=回退为回显明文"},
 
-		{SettingKeyMailEnabled, gsetting.ValueTypeBool, b(cfg.Mail.Enabled), false},
-		{SettingKeyMailHost, gsetting.ValueTypeString, cfg.Mail.Host, false},
-		{SettingKeyMailPort, gsetting.ValueTypeInt, fmt.Sprintf("%d", cfg.Mail.Port), false},
-		{SettingKeyMailUsername, gsetting.ValueTypeString, cfg.Mail.Username, false},
-		{SettingKeyMailPassword, gsetting.ValueTypeString, cfg.Mail.Password, true},
-		{SettingKeyMailFrom, gsetting.ValueTypeString, cfg.Mail.From, false},
-		{SettingKeyMailTLS, gsetting.ValueTypeBool, b(cfg.Mail.TLS), false},
+		{SettingKeyMailEnabled, gsetting.ValueTypeBool, b(cfg.Mail.Enabled), false, "邮件渠道开关（总闸开时生效）"},
+		{SettingKeyMailHost, gsetting.ValueTypeString, cfg.Mail.Host, false, "SMTP 服务器地址"},
+		{SettingKeyMailPort, gsetting.ValueTypeInt, fmt.Sprintf("%d", cfg.Mail.Port), false, "SMTP 服务器端口（如 587）"},
+		{SettingKeyMailUsername, gsetting.ValueTypeString, cfg.Mail.Username, false, "SMTP 认证用户名"},
+		{SettingKeyMailPassword, gsetting.ValueTypeString, cfg.Mail.Password, true, "SMTP 认证密码（加密存储；可用环境变量 NOTIFY_MAIL_PASSWORD 覆盖）"},
+		{SettingKeyMailFrom, gsetting.ValueTypeString, cfg.Mail.From, false, "发件人，形如 IAM <no-reply@example.com>"},
+		{SettingKeyMailTLS, gsetting.ValueTypeBool, b(cfg.Mail.TLS), false, "是否使用 SMTPS/STARTTLS"},
 
-		{SettingKeySMSEnabled, gsetting.ValueTypeBool, b(cfg.SMS.Enabled), false},
-		{SettingKeySMSProvider, gsetting.ValueTypeString, cfg.SMS.Provider, false},
-		{SettingKeySMSAccessKeyID, gsetting.ValueTypeString, cfg.SMS.AccessKeyID, false},
-		{SettingKeySMSAccessKeySecret, gsetting.ValueTypeString, cfg.SMS.AccessKeySecret, true},
-		{SettingKeySMSSignName, gsetting.ValueTypeString, cfg.SMS.SignName, false},
-		{SettingKeySMSSdkAppID, gsetting.ValueTypeString, cfg.SMS.SdkAppID, false},
-		{SettingKeySMSTemplateCode, gsetting.ValueTypeString, cfg.SMS.TemplateCode, false},
-		{SettingKeySMSRegion, gsetting.ValueTypeString, cfg.SMS.Region, false},
+		{SettingKeySMSEnabled, gsetting.ValueTypeBool, b(cfg.SMS.Enabled), false, "短信渠道开关（总闸开时生效）"},
+		{SettingKeySMSProvider, gsetting.ValueTypeString, cfg.SMS.Provider, false, "短信供应商标识（tencent；空=不启用）"},
+		{SettingKeySMSAccessKeyID, gsetting.ValueTypeString, cfg.SMS.AccessKeyID, false, "短信供应商 AccessKeyID（腾讯云 SecretID）"},
+		{SettingKeySMSAccessKeySecret, gsetting.ValueTypeString, cfg.SMS.AccessKeySecret, true, "短信供应商 AccessKeySecret（腾讯云 SecretKey，加密存储；可用环境变量 NOTIFY_SMS_ACCESS_KEY_SECRET 覆盖）"},
+		{SettingKeySMSSignName, gsetting.ValueTypeString, cfg.SMS.SignName, false, "短信签名"},
+		{SettingKeySMSSdkAppID, gsetting.ValueTypeString, cfg.SMS.SdkAppID, false, "短信应用 SDKAppID（腾讯云必填，如 1400000000）"},
+		{SettingKeySMSTemplateCode, gsetting.ValueTypeString, cfg.SMS.TemplateCode, false, "短信模板 ID"},
+		{SettingKeySMSRegion, gsetting.ValueTypeString, cfg.SMS.Region, false, "短信供应商地域（腾讯云默认 ap-guangzhou）"},
 	}
 	for _, e := range entries {
 		// gsetting 不接受空值（errValueEmpty）；空字段跳过不写，读取端按零值处理即可。
@@ -258,11 +259,12 @@ func saveTo(ctx context.Context, s *gsetting.Setting, cfg Config) error {
 		}
 		// Create 对同 (group,key) 走 upsert；Encrypted=true 时 gsetting 内部加密落库。
 		if err := admin.Create(ctx, &gsetting.CreateReq{
-			Group:     SettingGroup,
-			Key:       e.key,
-			ValueType: string(e.valueType),
-			Value:     e.value,
-			Encrypted: e.encrypted,
+			Group:       SettingGroup,
+			Key:         e.key,
+			ValueType:   string(e.valueType),
+			Value:       e.value,
+			Encrypted:   e.encrypted,
+			Description: e.desc,
 		}); err != nil {
 			return fmt.Errorf("notify: save %s: %w", e.key, err)
 		}
