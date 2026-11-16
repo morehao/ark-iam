@@ -47,4 +47,5 @@ func init() {
 	registerError(rpErrorMsgMap)
 	registerError(installErrorMsgMap)
 	registerError(auditErrorMsgMap)
+	registerError(settingErrorMsgMap)
 }

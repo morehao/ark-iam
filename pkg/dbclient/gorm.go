@@ -40,6 +40,18 @@ var tenantScopeSkipTables = []string{
 	model.TableNameApplicationClientSecret,
 }
 
+// componentSkipTables 是「外部组件自建、非 pkg/model 实体」的全局表（无 tenant_id）。
+//
+// 这些表由第三方组件维护（AutoMigrate 也由组件负责），不在 model.AllEntities() 里，
+// 因此与 tenantScopeSkipTables 分开登记；插件运行时二者合并生效，注册守卫测试对它们放行。
+// 登记前确认：该表确实无 tenant_id 列、且确为组件自有表。
+var componentSkipTables = []string{
+	TableNameCoreSetting, // golib gsetting 运行时配置中心表
+}
+
+// TableNameCoreSetting 是 golib gsetting 的配置表名（组件自有，见 gsetting/model.go）。
+const TableNameCoreSetting = "core_setting"
+
 func InitMultiDB(configs []dbgorm.Config, logConfig *glog.LogConfig) error {
 	if len(configs) == 0 {
 		return fmt.Errorf("mysql config is empty")
@@ -86,11 +98,19 @@ func UseTenantScopePlugin(db *gorm.DB) error {
 	if db == nil {
 		return fmt.Errorf("dbclient: db is nil")
 	}
-	plugin, err := newTenantScopePlugin(tenantScopeSkipTables)
+	plugin, err := newTenantScopePlugin(skipTables())
 	if err != nil {
 		return fmt.Errorf("new tenant scope plugin failed: %w", err)
 	}
 	return db.Use(plugin)
+}
+
+// skipTables 返回租户插件应跳过的全部表：model 实体全局表 + 外部组件全局表。
+func skipTables() []string {
+	out := make([]string, 0, len(tenantScopeSkipTables)+len(componentSkipTables))
+	out = append(out, tenantScopeSkipTables...)
+	out = append(out, componentSkipTables...)
+	return out
 }
 
 // NewStore 实例化一个携带租户隔离插件的数据库连接，供「可嵌入 IAM 库」（iam/）

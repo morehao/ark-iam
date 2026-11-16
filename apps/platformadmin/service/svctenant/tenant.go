@@ -35,8 +35,6 @@ type TenantSvc interface {
 
 type tenantSvc struct {
 	db gormdao.DBGetter
-	// notifier 是临时凭据投递通道（构造时默认取进程级 notify.Default()）。
-	notifier *notify.Notifier
 }
 
 var _ TenantSvc = (*tenantSvc)(nil)
@@ -45,7 +43,7 @@ func NewTenantSvc(db gormdao.DBGetter) TenantSvc {
 	if db == nil {
 		db = dbclient.IamDB
 	}
-	return &tenantSvc{db: db, notifier: notify.Default()}
+	return &tenantSvc{db: db}
 }
 
 // Create 创建租户管理。
@@ -148,7 +146,7 @@ func (svc *tenantSvc) Create(ctx context.Context, req *dtotenant.TenantCreateReq
 	// 此时若仍需交付凭据，由运营调用 ResetAdminPassword 重新生成。
 	if adminPersonIsNew {
 		// 事务已提交：投递临时密码给管理员本人；通道未启用/失败回退时回显（见 §5.8）。
-		outcome, derr := svc.notifier.DeliverTempPassword(ctx, notify.Recipient{
+		outcome, derr := notify.DeliverTempPasswordViaSetting(ctx, svc.db, notify.Recipient{
 			Email: admin.PrimaryEmail,
 			Phone: admin.PrimaryPhone,
 		}, tempPassword)
@@ -254,7 +252,7 @@ func (svc *tenantSvc) ResetAdminPassword(ctx context.Context, req *dtotenant.Ten
 			to.Phone = *person.PrimaryPhone
 		}
 	}
-	outcome, derr := svc.notifier.DeliverTempPassword(ctx, to, tempPassword)
+	outcome, derr := notify.DeliverTempPasswordViaSetting(ctx, svc.db, to, tempPassword)
 	if derr != nil {
 		glog.Errorf(ctx, "[svctenant.ResetAdminPassword] deliver temp password fail, err:%v, userID:%s", derr, builtinAdmin.ID)
 		audit.WriteAudit(ctx, audit.AuditEntry{

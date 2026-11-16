@@ -716,6 +716,160 @@ const docTemplateplatformadmin = `{
                 }
             }
         },
+        "/v1/platform/audit-logs": {
+            "get": {
+                "description": "平台视角只读查询（跨租户）；tenantID 为空时不限租户，startTime 为空时默认近 7 天，pageSize 上限 100。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "审计日志"
+                ],
+                "summary": "分页查询审计日志",
+                "parameters": [
+                    {
+                        "enum": [
+                            "login",
+                            "logout",
+                            "tenant.switch",
+                            "tenant.create",
+                            "tenant.admin_password_reset",
+                            "application.create",
+                            "application_client.create",
+                            "application_client.create_secret",
+                            "api_key.create",
+                            "api_key.revoke",
+                            "installation.initialize"
+                        ],
+                        "type": "string",
+                        "x-enum-comments": {
+                            "AuditActionApiKeyCreate": "创建 API Key",
+                            "AuditActionApiKeyRevoke": "吊销 API Key",
+                            "AuditActionApplicationClientCreate": "创建 OAuth 客户端",
+                            "AuditActionApplicationClientCreateSecret": "创建 OAuth 客户端密钥",
+                            "AuditActionApplicationCreate": "创建应用",
+                            "AuditActionInstallationInitialize": "系统首次初始化",
+                            "AuditActionLogin": "登录",
+                            "AuditActionLogout": "登出",
+                            "AuditActionTenantAdminPasswordReset": "重置租户管理员密码",
+                            "AuditActionTenantCreate": "创建租户",
+                            "AuditActionTenantSwitch": "切换租户"
+                        },
+                        "x-enum-descriptions": [
+                            "登录",
+                            "登出",
+                            "切换租户",
+                            "创建租户",
+                            "重置租户管理员密码",
+                            "创建应用",
+                            "创建 OAuth 客户端",
+                            "创建 OAuth 客户端密钥",
+                            "创建 API Key",
+                            "吊销 API Key",
+                            "系统首次初始化"
+                        ],
+                        "x-enum-varnames": [
+                            "AuditActionLogin",
+                            "AuditActionLogout",
+                            "AuditActionTenantSwitch",
+                            "AuditActionTenantCreate",
+                            "AuditActionTenantAdminPasswordReset",
+                            "AuditActionApplicationCreate",
+                            "AuditActionApplicationClientCreate",
+                            "AuditActionApplicationClientCreateSecret",
+                            "AuditActionApiKeyCreate",
+                            "AuditActionApiKeyRevoke",
+                            "AuditActionInstallationInitialize"
+                        ],
+                        "description": "Action 动作标识（空=不限）；取值白名单见 model.AuditAction*。",
+                        "name": "action",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "ActorPersonID 操作人自然人ID（空=不限操作人）。",
+                        "name": "actorPersonID",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "EndTime 结束时间（Unix 秒，含）；不传表示不设上界。",
+                        "name": "endTime",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1000,
+                        "type": "integer",
+                        "description": "每页数据条数",
+                        "name": "pageSize",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "success",
+                            "failure"
+                        ],
+                        "type": "string",
+                        "x-enum-comments": {
+                            "AuditResultFailure": "失败",
+                            "AuditResultSuccess": "成功"
+                        },
+                        "x-enum-descriptions": [
+                            "成功",
+                            "失败"
+                        ],
+                        "x-enum-varnames": [
+                            "AuditResultSuccess",
+                            "AuditResultFailure"
+                        ],
+                        "description": "Result 结果（空=不限）；取值白名单见 model.AuditResult*。",
+                        "name": "result",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "StartTime 起始时间（Unix 秒，含）；不传时默认为近 7 天，防止无界扫描全表。",
+                        "name": "startTime",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "TenantID 租户ID（空=不限租户，平台视角可见全部租户的审计）。",
+                        "name": "tenantID",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoaudit.AuditLogPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/v1/platform/domains": {
             "get": {
                 "consumes": [
@@ -1349,6 +1503,308 @@ const docTemplateplatformadmin = `{
                 }
             }
         },
+        "/v1/platform/settings": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统设置"
+                ],
+                "summary": "配置项列表分页",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "分组（白名单内，缺省不限白名单内全部分组）",
+                        "name": "group",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "键名（模糊）",
+                        "name": "key",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 1000,
+                        "type": "integer",
+                        "description": "每页数据条数",
+                        "name": "pageSize",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "状态",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "值类型",
+                        "name": "valueType",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtosetting.SettingPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统设置"
+                ],
+                "summary": "创建配置项",
+                "parameters": [
+                    {
+                        "description": "创建配置项",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtosetting.SettingCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/platform/settings/{settingID}": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统设置"
+                ],
+                "summary": "配置项详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "settingID",
+                        "name": "settingID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtosetting.SettingDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统设置"
+                ],
+                "summary": "修改配置项",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "settingID",
+                        "name": "settingID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "修改配置项",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtosetting.SettingUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统设置"
+                ],
+                "summary": "删除配置项",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "settingID",
+                        "name": "settingID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/platform/settings/{settingID}/status": {
+            "patch": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统设置"
+                ],
+                "summary": "启停配置项",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "settingID",
+                        "name": "settingID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "状态",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtosetting.SettingUpdateStatusReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/v1/platform/tenant-applications": {
             "get": {
                 "consumes": [
@@ -1945,6 +2401,14 @@ const docTemplateplatformadmin = `{
                     "description": "应用名称",
                     "type": "string"
                 },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
                 "roleTemplate": {
                     "description": "RoleTemplate 应用角色模板：本应用对外提供的跨系统授权契约值（code + 展示名）。\n下游按「claim_prefix + code」认策略名（策略在下游是全局命名实体、全租户共用一条），\n故契约值由应用方在此定义一次，租户只能授权、不能定义；开通应用时物化到各租户。",
                     "type": "array",
@@ -2102,6 +2566,14 @@ const docTemplateplatformadmin = `{
                     "description": "应用名称",
                     "type": "string"
                 },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
                 "roleTemplate": {
                     "description": "RoleTemplate 应用角色模板：传 null 表示不修改，传 [] 表示清空，传值即全量替换。\n全量替换会**撤下**已不在模板中的模板角色（连带清理其用户/菜单授权），界面需二次确认。",
                     "type": "array",
@@ -2243,6 +2715,14 @@ const docTemplateplatformadmin = `{
                 "name": {
                     "description": "客户端名称",
                     "type": "string"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
                 },
                 "postLogoutRedirectURIs": {
                     "description": "登出回调地址",
@@ -2491,6 +2971,14 @@ const docTemplateplatformadmin = `{
                     "description": "客户端名称",
                     "type": "string"
                 },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
                 "postLogoutRedirectURIs": {
                     "description": "登出回调地址",
                     "type": "array",
@@ -2627,6 +3115,14 @@ const docTemplateplatformadmin = `{
                 "name": {
                     "description": "密钥名称",
                     "type": "string"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
                 }
             }
         },
@@ -2696,6 +3192,91 @@ const docTemplateplatformadmin = `{
                 }
             }
         },
+        "dtoaudit.AuditLogPageListItem": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "description": "动作标识",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AuditAction"
+                        }
+                    ]
+                },
+                "actorPersonID": {
+                    "description": "操作人自然人ID",
+                    "type": "string"
+                },
+                "actorUserID": {
+                    "description": "操作人租户成员ID",
+                    "type": "string"
+                },
+                "auditLogID": {
+                    "description": "审计日志ID",
+                    "type": "string"
+                },
+                "clientID": {
+                    "description": "客户端ID（OIDC client_id）",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "发生时间(unix 秒)",
+                    "type": "integer"
+                },
+                "detail": {
+                    "description": "详情",
+                    "type": "string"
+                },
+                "ip": {
+                    "description": "客户端IP",
+                    "type": "string"
+                },
+                "result": {
+                    "description": "结果 success/failure",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AuditResult"
+                        }
+                    ]
+                },
+                "targetID": {
+                    "description": "目标ID",
+                    "type": "string"
+                },
+                "targetType": {
+                    "description": "目标类型",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AuditTargetType"
+                        }
+                    ]
+                },
+                "tenantID": {
+                    "description": "租户ID",
+                    "type": "string"
+                },
+                "userAgent": {
+                    "description": "用户代理",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoaudit.AuditLogPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "数据列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtoaudit.AuditLogPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "数据总条数",
+                    "type": "integer"
+                }
+            }
+        },
         "dtodomain.DomainCreateReq": {
             "type": "object",
             "required": [
@@ -2705,6 +3286,14 @@ const docTemplateplatformadmin = `{
                 "domain": {
                     "description": "域名",
                     "type": "string"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
                 }
             }
         },
@@ -2796,6 +3385,14 @@ const docTemplateplatformadmin = `{
                     "description": "域名",
                     "type": "string"
                 },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
                 "verificationStatus": {
                     "description": "VerificationStatus 验证状态: unverified-未验证, verified-已验证；留空表示不修改。",
                     "allOf": [
@@ -2855,6 +3452,14 @@ const docTemplateplatformadmin = `{
                 "name": {
                     "description": "菜单名称",
                     "type": "string"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
                 },
                 "parentID": {
                     "description": "父菜单ID",
@@ -3340,6 +3945,14 @@ const docTemplateplatformadmin = `{
                     "description": "菜单名称",
                     "type": "string"
                 },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
                 "parentID": {
                     "description": "父菜单ID",
                     "type": "string"
@@ -3382,6 +3995,205 @@ const docTemplateplatformadmin = `{
                 }
             }
         },
+        "dtosetting.SettingCreateReq": {
+            "type": "object",
+            "required": [
+                "group",
+                "key",
+                "value"
+            ],
+            "properties": {
+                "description": {
+                    "description": "描述",
+                    "type": "string"
+                },
+                "encrypted": {
+                    "description": "是否加密落库",
+                    "type": "boolean"
+                },
+                "group": {
+                    "description": "配置分组（白名单内）",
+                    "type": "string"
+                },
+                "key": {
+                    "description": "键名（同组内唯一）",
+                    "type": "string"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
+                "status": {
+                    "description": "enabled/disabled，默认 enabled",
+                    "type": "string"
+                },
+                "value": {
+                    "description": "值（明文；敏感项置 encrypted=true 加密落库）",
+                    "type": "string"
+                },
+                "valueType": {
+                    "description": "json/toml/yaml/string/int/bool/float，默认 string",
+                    "type": "string"
+                }
+            }
+        },
+        "dtosetting.SettingDetailResp": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "创建时间（unix 秒）",
+                    "type": "integer"
+                },
+                "description": {
+                    "description": "描述",
+                    "type": "string"
+                },
+                "encryptionMode": {
+                    "description": "plain/encrypted",
+                    "type": "string"
+                },
+                "group": {
+                    "description": "配置分组",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "配置项ID",
+                    "type": "string"
+                },
+                "key": {
+                    "description": "键名",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "enabled/disabled",
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "description": "更新时间（unix 秒）",
+                    "type": "integer"
+                },
+                "value": {
+                    "description": "值（敏感项为掩码）",
+                    "type": "string"
+                },
+                "valueType": {
+                    "description": "值类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtosetting.SettingItem": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "创建时间（unix 秒）",
+                    "type": "integer"
+                },
+                "description": {
+                    "description": "描述",
+                    "type": "string"
+                },
+                "encryptionMode": {
+                    "description": "plain/encrypted",
+                    "type": "string"
+                },
+                "group": {
+                    "description": "配置分组",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "配置项ID",
+                    "type": "string"
+                },
+                "key": {
+                    "description": "键名",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "enabled/disabled",
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "description": "更新时间（unix 秒）",
+                    "type": "integer"
+                },
+                "value": {
+                    "description": "值（敏感项为掩码）",
+                    "type": "string"
+                },
+                "valueType": {
+                    "description": "值类型",
+                    "type": "string"
+                }
+            }
+        },
+        "dtosetting.SettingPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtosetting.SettingItem"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dtosetting.SettingUpdateReq": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "描述",
+                    "type": "string"
+                },
+                "encrypted": {
+                    "description": "配合 value：是否加密落库",
+                    "type": "boolean"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
+                "status": {
+                    "description": "enabled/disabled",
+                    "type": "string"
+                },
+                "value": {
+                    "description": "新值；等于掩码表示不改",
+                    "type": "string"
+                }
+            }
+        },
+        "dtosetting.SettingUpdateStatusReq": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
+                "status": {
+                    "description": "enabled/disabled",
+                    "type": "string"
+                }
+            }
+        },
         "dtotenant.TenantAdminCreateReq": {
             "type": "object",
             "required": [
@@ -3414,7 +4226,7 @@ const docTemplateplatformadmin = `{
                     "type": "boolean"
                 },
                 "initialPassword": {
-                    "description": "新临时密码(通道未启用/投递失败回退时才有值)",
+                    "description": "InitialPassword 新临时密码，仅在此响应中返回一次，不落库、不可再查。\n通道启用且投递成功时本字段为空、由 delivered 表达结果；回显仅通道未启用/投递失败降级时才有值。",
                     "type": "string"
                 },
                 "userID": {
@@ -3449,6 +4261,14 @@ const docTemplateplatformadmin = `{
                     "description": "租户名称",
                     "type": "string"
                 },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
                 "status": {
                     "description": "Status 租户状态：active-正常 / suspended-已挂起（见 model.TenantStatus）。\n仅 active 允许该租户成员登录与签发令牌。",
                     "allOf": [
@@ -3475,7 +4295,7 @@ const docTemplateplatformadmin = `{
             "type": "object",
             "properties": {
                 "adminInitialPassword": {
-                    "description": "初始临时密码(通道未启用/投递失败回退时才有值)",
+                    "description": "AdminInitialPassword 租户管理员的初始临时密码，仅在此响应中返回一次，不落库、不可再查；\n若管理员的邮箱/手机命中已存在自然人（其密码不被改动），该字段为空串。\n通道启用且投递成功时本字段为空、由 delivered 表达结果；回显仅通道未启用/投递失败降级时才有值。",
                     "type": "string"
                 },
                 "adminUserID": {
@@ -3483,7 +4303,7 @@ const docTemplateplatformadmin = `{
                     "type": "string"
                 },
                 "delivered": {
-                    "description": "Delivered 表示临时密码是否已通过邮件/短信投递给账号本人。",
+                    "description": "Delivered 表示临时密码是否已通过邮件/短信投递给账号本人。true=已投递(明文不回显)；\nfalse=未投递(通道未启用或投递失败回退)。见 docs/design/system-design.md §5.8。",
                     "type": "boolean"
                 },
                 "tenantID": {
@@ -3637,6 +4457,14 @@ const docTemplateplatformadmin = `{
                     "description": "租户名称",
                     "type": "string"
                 },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
                 "status": {
                     "description": "Status 租户状态：active-正常 / suspended-已挂起（见 model.TenantStatus）。\n仅 active 允许该租户成员登录与签发令牌。",
                     "allOf": [
@@ -3722,6 +4550,14 @@ const docTemplateplatformadmin = `{
                 "appID": {
                     "description": "应用ID",
                     "type": "string"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
                 },
                 "status": {
                     "description": "状态: enable-启用, disable-停用",
@@ -3810,6 +4646,14 @@ const docTemplateplatformadmin = `{
         "dtotenantapplication.TenantApplicationUpdateReq": {
             "type": "object",
             "properties": {
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
                 "status": {
                     "description": "状态",
                     "allOf": [
@@ -3939,6 +4783,119 @@ const docTemplateplatformadmin = `{
             "x-enum-varnames": [
                 "ApplicationClientStatusEnable",
                 "ApplicationClientStatusDisable"
+            ]
+        },
+        "model.AuditAction": {
+            "type": "string",
+            "enum": [
+                "login",
+                "logout",
+                "tenant.switch",
+                "tenant.create",
+                "tenant.admin_password_reset",
+                "application.create",
+                "application_client.create",
+                "application_client.create_secret",
+                "api_key.create",
+                "api_key.revoke",
+                "installation.initialize"
+            ],
+            "x-enum-comments": {
+                "AuditActionApiKeyCreate": "创建 API Key",
+                "AuditActionApiKeyRevoke": "吊销 API Key",
+                "AuditActionApplicationClientCreate": "创建 OAuth 客户端",
+                "AuditActionApplicationClientCreateSecret": "创建 OAuth 客户端密钥",
+                "AuditActionApplicationCreate": "创建应用",
+                "AuditActionInstallationInitialize": "系统首次初始化",
+                "AuditActionLogin": "登录",
+                "AuditActionLogout": "登出",
+                "AuditActionTenantAdminPasswordReset": "重置租户管理员密码",
+                "AuditActionTenantCreate": "创建租户",
+                "AuditActionTenantSwitch": "切换租户"
+            },
+            "x-enum-descriptions": [
+                "登录",
+                "登出",
+                "切换租户",
+                "创建租户",
+                "重置租户管理员密码",
+                "创建应用",
+                "创建 OAuth 客户端",
+                "创建 OAuth 客户端密钥",
+                "创建 API Key",
+                "吊销 API Key",
+                "系统首次初始化"
+            ],
+            "x-enum-varnames": [
+                "AuditActionLogin",
+                "AuditActionLogout",
+                "AuditActionTenantSwitch",
+                "AuditActionTenantCreate",
+                "AuditActionTenantAdminPasswordReset",
+                "AuditActionApplicationCreate",
+                "AuditActionApplicationClientCreate",
+                "AuditActionApplicationClientCreateSecret",
+                "AuditActionApiKeyCreate",
+                "AuditActionApiKeyRevoke",
+                "AuditActionInstallationInitialize"
+            ]
+        },
+        "model.AuditResult": {
+            "type": "string",
+            "enum": [
+                "success",
+                "failure"
+            ],
+            "x-enum-comments": {
+                "AuditResultFailure": "失败",
+                "AuditResultSuccess": "成功"
+            },
+            "x-enum-descriptions": [
+                "成功",
+                "失败"
+            ],
+            "x-enum-varnames": [
+                "AuditResultSuccess",
+                "AuditResultFailure"
+            ]
+        },
+        "model.AuditTargetType": {
+            "type": "string",
+            "enum": [
+                "person",
+                "user",
+                "tenant",
+                "application",
+                "application_client",
+                "api_key",
+                "installation"
+            ],
+            "x-enum-comments": {
+                "AuditTargetTypeAPIKey": "API Key",
+                "AuditTargetTypeApplication": "应用",
+                "AuditTargetTypeApplicationClient": "应用客户端",
+                "AuditTargetTypeInstallation": "系统初始化（无租户/账号前的事件）",
+                "AuditTargetTypePerson": "自然人",
+                "AuditTargetTypeTenant": "租户",
+                "AuditTargetTypeUser": "租户成员"
+            },
+            "x-enum-descriptions": [
+                "自然人",
+                "租户成员",
+                "租户",
+                "应用",
+                "应用客户端",
+                "API Key",
+                "系统初始化（无租户/账号前的事件）"
+            ],
+            "x-enum-varnames": [
+                "AuditTargetTypePerson",
+                "AuditTargetTypeUser",
+                "AuditTargetTypeTenant",
+                "AuditTargetTypeApplication",
+                "AuditTargetTypeApplicationClient",
+                "AuditTargetTypeAPIKey",
+                "AuditTargetTypeInstallation"
             ]
         },
         "model.ClientAuthTimeClaimPolicy": {
@@ -4176,6 +5133,9 @@ const docTemplateplatformadmin = `{
                 "TokenEndpointAuthMethodPost",
                 "TokenEndpointAuthMethodNone"
             ]
+        },
+        "objidentity.Operator": {
+            "type": "object"
         },
         "objpermission.MenuItemNode": {
             "type": "object",

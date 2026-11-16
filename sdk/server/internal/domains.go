@@ -40,6 +40,7 @@ const (
 	DomainInvite      Domain = "invite"
 	DomainTenantApp   Domain = "tenant-app"
 	DomainSelfService Domain = "self-service" // 自助注册/加入租户
+	DomainSetting     Domain = "setting"      // 运行时配置中心管理面（/v1/platform/settings）
 
 	// DomainDirectory 是面向应用的只读目录 API 域（/v1/rp/directory/*，原 rpapi 并入）。
 	DomainDirectory Domain = "directory"
@@ -64,6 +65,7 @@ var allDomains = []Domain{
 	DomainTenant, DomainApplication, DomainOAuthClient, DomainConnector,
 	DomainDomain, DomainAudit, DomainAPIKey, DomainMachineUser,
 	DomainInvite, DomainTenantApp, DomainSelfService,
+	DomainSetting,
 	DomainDirectory,
 }
 
