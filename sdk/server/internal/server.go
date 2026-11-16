@@ -23,6 +23,7 @@ import (
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
+	"github.com/morehao/golib/gcache"
 	"github.com/morehao/golib/gsetting"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -44,6 +45,8 @@ type App struct {
 	// setting 是运行时配置中心（golib gsetting，单进程共享一份），
 	// 承载 notify / security.login 等分组；页面与业务消费者共用同一实例。
 	setting *gsetting.Setting
+	// settingCache 是 gsetting 读路径缓存（redis / memory），Close 时释放其连接。
+	settingCache gcache.Cache
 	// keySource 是 OP 公钥来源，供 platform/tenant 域鉴权中间件验签。
 	// 同进程（含 auth 域）由 auth 产出；独立进程由 cfg.KeySource/JWKSURL 远程解析。
 	keySource oidckit.KeySource
