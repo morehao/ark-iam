@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// 设计 §3.3「数据清单」的可执行形态：L1 一次引导后，12 张表 / 43 行的逐项内容。
+// 设计 §3.3「数据清单」的可执行形态：L1 一次引导后，12 张表 / 45 行的逐项内容。
 //
 // 这是整个改造的黄金用例——P1（参数化）、P3（删机制）、P4（回调地址配置化）都不得让它变红，
 // 它同时也是"字段权威矩阵 immut/ create_only 归属"的实测依据。
@@ -24,7 +24,7 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 		t.Fatalf("status = %q, want %q", status, seed.StatusCreated)
 	}
 
-	// ---- 行数：12 张表，合计 43 行 ----
+	// ---- 行数：12 张表，合计 44 行 ----
 	wantCounts := []struct {
 		table string
 		want  int64
@@ -33,8 +33,8 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 		{model.TableNameDepartment, 1},
 		{model.TableNameApplication, 2},
 		{model.TableNameRole, 2},
-		{model.TableNameMenu, 14},
-		{model.TableNameRoleMenu, 14},
+		{model.TableNameMenu, 15},
+		{model.TableNameRoleMenu, 15},
 		{model.TableNameTenantApplication, 2},
 		{model.TableNamePerson, 1},
 		{model.TableNameUser, 1},
@@ -50,8 +50,8 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 		}
 		total += got
 	}
-	if total != 43 {
-		t.Errorf("12 张表合计 = %d 行, want 43", total)
+	if total != 45 {
+		t.Errorf("12 张表合计 = %d 行, want 45", total)
 	}
 
 	// ---- 租户与根部门 ----
@@ -116,8 +116,8 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 		t.Errorf("租户角色 admin_type/source = %q/%q", tenantRole.AdminType, tenantRole.Source)
 	}
 
-	// ---- 菜单：14 个 seed_key，父级关系与类型/可见性 ----
-	// 列顺序即「平台管理后台（3 目录 + 7 页）→ 租户管理后台（4 页）」。
+	// ---- 菜单：15 个 seed_key，父级关系与类型/可见性 ----
+	// 列顺序即「平台管理后台（3 目录 + 8 页）→ 租户管理后台（4 页）」。
 	wantMenus := []struct {
 		seedKey    string
 		appCode    string
@@ -135,6 +135,7 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 		{"oauth-client", "platform_admin", "grp-app", model.MenuTypeMenu, model.MenuVisibilityAdmin},
 		{"grp-platform", "platform_admin", "", model.MenuTypeDirectory, model.MenuVisibilityAdmin},
 		{"menu", "platform_admin", "grp-platform", model.MenuTypeMenu, model.MenuVisibilityAdmin},
+		{"setting", "platform_admin", "grp-platform", model.MenuTypeMenu, model.MenuVisibilityAdmin},
 		{"department", "tenant_admin", "", model.MenuTypeMenu, model.MenuVisibilityAdmin},
 		{"tenant-user", "tenant_admin", "", model.MenuTypeMenu, model.MenuVisibilityAdmin},
 		{"tenant-role", "tenant_admin", "", model.MenuTypeMenu, model.MenuVisibilityAdmin},
@@ -201,11 +202,11 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 		}
 	}
 
-	// ---- role_menu：平台 admin 角色 10 条 + 租户 admin 角色 4 条 = 14 ----
+	// ---- role_menu：平台 admin 角色 11 条 + 租户 admin 角色 4 条 = 15 ----
 	// 目录菜单从不授权；平台角色的 10 条含 3 个 tenant_admin 应用菜单（department/tenant-user/tenant-role），
 	// 这是现状（便于平台侧改后无需重新授权），改造中不得"顺手纠正"。
 	wantPlatformRoleMenus := []string{
-		"dashboard", "menu", "tenant", "application", "tenant-application",
+		"dashboard", "menu", "setting", "tenant", "application", "tenant-application",
 		"oauth-client", "domain", "department", "tenant-user", "tenant-role",
 	}
 	assertRoleMenuSeedKeys(t, db, tenant.ID, platformRole.ID, menusBySeedKey, wantPlatformRoleMenus)

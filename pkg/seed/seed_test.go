@@ -57,13 +57,13 @@ func TestBootstrapSQLite(t *testing.T) {
 	assertCount(model.TableNameTenant, 1)
 	assertCount(model.TableNameApplication, 2)
 	assertCount(model.TableNameRole, 2)
-	assertCount(model.TableNameMenu, 14)
+	assertCount(model.TableNameMenu, 15)
 	assertCount(model.TableNamePerson, 1)
 	assertCount(model.TableNameUser, 1)
 	assertCount(model.TableNameApplicationClient, 2)
 	assertCount(model.TableNameUserRole, 2)
 	assertCount(model.TableNameUserApplication, 2)
-	assertCount(model.TableNameRoleMenu, 14)
+	assertCount(model.TableNameRoleMenu, 15)
 	assertCount(model.TableNameTenantApplication, 2)
 	assertCount(model.TableNameDepartment, 1)
 	assertCount(model.TableNameDepartmentUser, 1)
@@ -231,6 +231,7 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 		{code: "oauth-client", name: "OAuth客户端", parentCode: "grp-app", sort: 2},
 		{code: "grp-platform", name: "平台管理", sort: 4, dir: true},
 		{code: "menu", name: "菜单管理", parentCode: "grp-platform", sort: 1},
+		{code: "setting", name: "系统设置", parentCode: "grp-platform", sort: 2},
 	}
 
 	var menus []model.MenuEntity
@@ -314,8 +315,8 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 	if err := db.Where("role_id = ?", adminRole.ID).Find(&adminMenuLinks).Error; err != nil {
 		t.Fatalf("query admin role_menu: %v", err)
 	}
-	if len(adminMenuLinks) != 10 {
-		t.Fatalf("admin role_menu count: want 10, got %d", len(adminMenuLinks))
+	if len(adminMenuLinks) != 11 {
+		t.Fatalf("admin role_menu count: want 11, got %d", len(adminMenuLinks))
 	}
 	// 授权集合涉及平台应用与租户管理后台两个应用的菜单，用全量映射解析
 	var allMenus []model.MenuEntity

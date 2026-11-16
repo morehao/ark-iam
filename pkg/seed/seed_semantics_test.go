@@ -38,7 +38,7 @@ func TestBootstrapReportsChanges(t *testing.T) {
 		model.SeedEntityTenant:            1,
 		model.SeedEntityDepartment:        1,
 		model.SeedEntityApplication:       2,
-		model.SeedEntityMenu:              14,
+		model.SeedEntityMenu:              15,
 		model.SeedEntityApplicationClient: 2,
 		model.SeedEntityRole:              1,
 		model.SeedEntityPerson:            1,
