@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Drawer, Form, Input, InputNumber, Select, Space, Switch, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import {
   actionColumn,
   CODE_COL_WIDTH,
@@ -278,9 +278,10 @@ export default function SettingListPage() {
     timeColumn<SettingItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
     actionColumn<SettingItem>({
       max: 3,
+      variant: 'icon',
       actions: (r) => [
-        { key: 'edit', label: '编辑', onClick: () => openEdit(r) },
-        { key: 'delete', label: '删除', danger: true, confirm: '确认删除该配置项？', onClick: () => void handleDelete(r) },
+        { key: 'edit', label: '编辑', icon: <EditOutlined />, onClick: () => openEdit(r) },
+        { key: 'delete', label: '删除', icon: <DeleteOutlined />, danger: true, confirm: '确认删除该配置项？', onClick: () => void handleDelete(r) },
       ],
     }),
   ]

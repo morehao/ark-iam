@@ -576,7 +576,8 @@ make docker-run APP=auth
 
 **R1 操作列一律用 `actionColumn` 声明：最多横排 3 个操作，超过即纵向展开为「更多」下拉，且始终 `fixed: 'right'`。**
 
-- 操作数 ≤ `max`（默认 3）：全部以 `Button type="link" size="small"` 横排；危险操作加 `danger`。
+- 操作数 ≤ `max`（默认 3）：全部横排；危险操作加 `danger`。
+- **`variant` 必须显式传 `'icon'`（图标 + 文字），且每个 `RowAction` 必须补语义 `icon`**：项目既定风格是「图标在左 + 文字」（`EditOutlined` 编辑 / `DeleteOutlined` 删除 / `LockOutlined` 吊销 / `RollbackOutlined` 重置 …），**禁止退回纯文字 link（`variant` 缺省为 `'text'`，那是不合规的历史形态）**。硬规则细节见 `DESIGN.md` §7.3「操作列按钮图标化」。写 `actionColumn` 时缺 `variant:'icon'` 或 `RowAction` 缺 `icon`，会被判为不规范（曾出现设置页只写 `Button type=link` 裸「编辑 删除」的违规）。
 - 操作数 > `max`：保留前 `max-1` 个高频操作横排，其余收进「更多」下拉（菜单项纵向排列），避免操作列被撑宽、行内按钮挤成一团。这是后台表格的主流做法，与 Ant Design Table 官方「操作」示例的 `Delete + More actions` 形态一致。
 - **操作列永远 `fixed: 'right'`**：由 `actionColumn` 统一保证，横向滚动时钉在右侧，杜绝「操作列要横滑很久才看得到」。
 - **列宽由 `actionColumnWidth(max)` 自动给出**，页面**禁止**手写 `width: 120/200/240`；横排按钮文案保持简短（≤4 个汉字），文案更长时降低 `max` 让它落入「更多」下拉，或显式传 `width`。
