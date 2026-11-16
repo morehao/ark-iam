@@ -10,7 +10,7 @@ require (
 	github.com/morehao/ark-iam/apps/tenantadmin v0.1.0
 	github.com/morehao/ark-iam/contract v0.1.0
 	github.com/morehao/ark-iam/pkg v0.4.2
-	github.com/morehao/golib v1.38.2
+	github.com/morehao/golib v1.38.3
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/stretchr/testify v1.12.1
 	gorm.io/gorm v1.31.1

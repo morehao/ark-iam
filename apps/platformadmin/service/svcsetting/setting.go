@@ -107,7 +107,7 @@ func (svc *settingSvc) Update(ctx context.Context, req *dtosetting.SettingUpdate
 	if info == nil {
 		return code.GetError(code.SettingNotExistError)
 	}
-	if !allowedGroup(info.GroupName) {
+	if !allowedGroup(info.Group) {
 		return code.GetError(code.SettingGroupNotAllowedError)
 	}
 
@@ -137,7 +137,7 @@ func (svc *settingSvc) UpdateStatus(ctx context.Context, req *dtosetting.Setting
 	if info == nil {
 		return code.GetError(code.SettingNotExistError)
 	}
-	if !allowedGroup(info.GroupName) {
+	if !allowedGroup(info.Group) {
 		return code.GetError(code.SettingGroupNotAllowedError)
 	}
 	if err := admin.UpdateStatus(ctx, req.SettingID, gsetting.Status(req.Status)); err != nil {
@@ -161,7 +161,7 @@ func (svc *settingSvc) Delete(ctx context.Context, req *dtosetting.SettingDelete
 	if info == nil {
 		return code.GetError(code.SettingNotExistError)
 	}
-	if !allowedGroup(info.GroupName) {
+	if !allowedGroup(info.Group) {
 		return code.GetError(code.SettingGroupNotAllowedError)
 	}
 	if err := admin.Delete(ctx, req.SettingID); err != nil {
@@ -181,7 +181,7 @@ func (svc *settingSvc) Detail(ctx context.Context, req *dtosetting.SettingDetail
 	if info == nil {
 		return nil, code.GetError(code.SettingNotExistError)
 	}
-	if !allowedGroup(info.GroupName) {
+	if !allowedGroup(info.Group) {
 		return nil, code.GetError(code.SettingGroupNotAllowedError)
 	}
 	item := toItem(info)
@@ -274,7 +274,7 @@ func (svc *settingSvc) PageList(ctx context.Context, req *dtosetting.SettingPage
 		groupOrder[g] = i
 	}
 	sort.SliceStable(merged, func(i, j int) bool {
-		gi, gj := groupOrder[merged[i].GroupName], groupOrder[merged[j].GroupName]
+		gi, gj := groupOrder[merged[i].Group], groupOrder[merged[j].Group]
 		if gi != gj {
 			return gi < gj
 		}
@@ -307,7 +307,7 @@ func toItem(info *gsetting.SettingInfo) *dtosetting.SettingItem {
 	}
 	return &dtosetting.SettingItem{
 		ID:             info.ID,
-		Group:          info.GroupName,
+		Group:          info.Group,
 		Key:            info.Key,
 		ValueType:      string(info.ValueType),
 		Value:          value,
