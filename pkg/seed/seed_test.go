@@ -231,7 +231,7 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 		{code: "oauth-client", name: "OAuth客户端", parentCode: "grp-app", sort: 2},
 		{code: "grp-platform", name: "平台管理", sort: 4, dir: true},
 		{code: "menu", name: "菜单管理", parentCode: "grp-platform", sort: 1},
-		{code: "setting", name: "系统设置", parentCode: "grp-platform", sort: 2},
+		{code: "setting", name: "配置中心", parentCode: "grp-platform", sort: 2},
 	}
 
 	var menus []model.MenuEntity

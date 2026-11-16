@@ -306,7 +306,7 @@ export default function SettingListPage() {
 
   return (
     <PageContainer
-      title="系统设置"
+      title="配置中心"
       description="运行时配置中心 · 保存后即时生效，无需重启服务"
       extra={
         <Space>
