@@ -20,4 +20,5 @@ var Registry = map[string]DomainFunc{
 	"domain":       domainRouter,
 	"tenant-app":   tenantApplicationRouter,
 	"audit":        auditLogRouter,
+	"setting":      settingRouter,
 }

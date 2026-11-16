@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/morehao/ark-iam/apps/auth/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/loginsetting"
+	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
 const (
@@ -16,20 +17,14 @@ const (
 	keyLockPerson = "iam:login_lock:person:%s"
 )
 
-func cfg() (maxFailures, windowSec, lockSec int) {
-	maxFailures, windowSec, lockSec = 5, 300, 900
-	if config.Conf != nil {
-		if config.Conf.Security.Login.MaxFailures > 0 {
-			maxFailures = config.Conf.Security.Login.MaxFailures
-		}
-		if config.Conf.Security.Login.WindowSec > 0 {
-			windowSec = config.Conf.Security.Login.WindowSec
-		}
-		if config.Conf.Security.Login.LockSec > 0 {
-			lockSec = config.Conf.Security.Login.LockSec
-		}
+// cfg 现读登录安全配置（gsetting 分组 security.login），读失败按默认值回退。
+// 见设计 §5.6a：每次写失败计数时现读，天然「保存即生效」。
+func cfg(ctx context.Context, db gormdao.DBGetter) (maxFailures, windowSec, lockSec int) {
+	if db == nil {
+		db = dbclient.IamDB
 	}
-	return
+	c := loginsetting.Load(ctx, db)
+	return c.MaxFailures, c.WindowSec, c.LockSec
 }
 
 // Check 是否被锁定，true=锁定。Redis 不可用时 fail-open 返回 false。
@@ -53,11 +48,11 @@ func Check(ctx context.Context, ip string, personID string) bool {
 }
 
 // RecordFailure 记录失败次数，达到阈值则锁定 IP，并对 person 记录触发锁定的 IP。
-func RecordFailure(ctx context.Context, ip string, personID string) {
+func RecordFailure(ctx context.Context, db gormdao.DBGetter, ip string, personID string) {
 	if dbclient.RedisCli == nil {
 		return
 	}
-	maxFailures, windowSec, lockSec := cfg()
+	maxFailures, windowSec, lockSec := cfg(ctx, db)
 	w := windowSeconds(windowSec)
 	cli := dbclient.RedisCli
 	lock := lockDuration(lockSec)

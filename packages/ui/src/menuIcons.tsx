@@ -14,6 +14,7 @@ import {
   ProjectOutlined,
   SafetyCertificateOutlined,
   SettingOutlined,
+  SlidersOutlined,
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons'
@@ -45,6 +46,7 @@ const PLATFORM_ICONS: Record<string, ReactNode> = {
   menu: <ProfileOutlined />, // 菜单管理（清单/字典）
   dashboard: <DashboardOutlined />, // 工作台
   setting: <SettingOutlined />, // 平台管理（目录）
+  config: <SlidersOutlined />, // 配置中心（运行时参数调节，与「平台管理」目录图标区分）
   audit: <AuditOutlined />, // 审计日志
 
   // —— 旧 key 兼容（P3 前的存量库 / 灰度期）——
@@ -104,6 +106,7 @@ export const MENU_ICON_LABELS: Record<string, string> = {
   menu: '菜单',
   dashboard: '工作台',
   setting: '设置',
+  config: '配置中心',
   audit: '审计',
   department: '部门',
   user: '用户',

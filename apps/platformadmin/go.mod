@@ -6,7 +6,7 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/morehao/ark-iam/pkg v0.4.2
 	github.com/morehao/ark-iam/sdk v0.6.0
-	github.com/morehao/golib v1.37.0
+	github.com/morehao/golib v1.38.3
 	github.com/stretchr/testify v1.12.1
 	github.com/swaggo/swag v1.16.6
 	gorm.io/driver/sqlite v1.6.0
@@ -14,6 +14,7 @@ require (
 )
 
 require (
+	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.10.0 // indirect
 	github.com/bytedance/gopkg v0.1.4 // indirect
@@ -98,7 +99,7 @@ require (
 	golang.org/x/arch v0.25.0 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect

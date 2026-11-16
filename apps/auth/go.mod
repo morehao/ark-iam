@@ -10,7 +10,7 @@ require (
 	github.com/morehao/ark-iam/contract v0.1.0
 	github.com/morehao/ark-iam/pkg v0.4.2
 	github.com/morehao/ark-iam/sdk v0.6.0
-	github.com/morehao/golib v1.37.0
+	github.com/morehao/golib v1.38.3
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/stretchr/testify v1.12.1
 	github.com/swaggo/swag v1.16.6
@@ -102,7 +102,7 @@ require (
 	golang.org/x/arch v0.25.0 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/time v0.15.0 // indirect

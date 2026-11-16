@@ -13,6 +13,7 @@ import (
 	"github.com/morehao/ark-iam/contract"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/loginsetting"
 	"github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/notify"
@@ -22,6 +23,8 @@ import (
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
+	"github.com/morehao/golib/gcache"
+	"github.com/morehao/golib/gsetting"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -39,6 +42,11 @@ type App struct {
 	storeRaw *gorm.DB
 	dbGetter gormdao.DBGetter
 	redis    *redis.Client
+	// setting 是运行时配置中心（golib gsetting，单进程共享一份），
+	// 承载 notify / security.login 等分组；页面与业务消费者共用同一实例。
+	setting *gsetting.Setting
+	// settingCache 是 gsetting 读路径缓存（redis / memory），Close 时释放其连接。
+	settingCache gcache.Cache
 	// keySource 是 OP 公钥来源，供 platform/tenant 域鉴权中间件验签。
 	// 同进程（含 auth 域）由 auth 产出；独立进程由 cfg.KeySource/JWKSURL 远程解析。
 	keySource oidckit.KeySource
@@ -70,33 +78,65 @@ func New(cfg Config) (*App, error) {
 	if err := app.initRedis(); err != nil {
 		return nil, err
 	}
-	if err := app.initNotify(); err != nil {
+	if err := app.initSetting(); err != nil {
+		return nil, err
+	}
+	if err := app.seedRuntimeSettings(); err != nil {
 		return nil, err
 	}
 	return app, nil
 }
 
-// initNotify 按配置装配临时凭据投递通道（pkg/notify），并注册为进程级默认。
+// seedRuntimeSettings 首启播种运行时配置分组（notify / security.login）。
 //
-// 配置来自完整 pkgconfig.Config 的 notify 段（cfg.Raw）。未提供 Raw 或总闸关闭时，
-// 装配一个「关闭态」Notifier（Send 恒 ErrNoChannel，业务侧回退现状）。总闸开但无渠道时
-// FromConfig 报 ErrChannelLessConfig：dev 降级为关闭态并告警，prod fail-closed 拒绝启动。
-func (a *App) initNotify() error {
-	var ncfg notify.Config
-	if a.cfg.Raw != nil {
-		ncfg = notifyConfigFrom(a.cfg.Raw.Notify)
+// 语义（见设计 §2.4 / §5.4）：分组为空时用 yaml 对应段播种一次，之后以 DB 为唯一来源，
+// 运行时不再读 yaml。yaml 只是「首启初始值载体」。幂等：分组非空即跳过。
+//
+// 不再装配任何进程级 Notifier 单例（gsetting 是唯一事实源）。
+func (a *App) seedRuntimeSettings() error {
+	if a.cfg.Raw == nil {
+		return nil
 	}
-	n, err := notify.FromConfig(ncfg)
-	if err != nil {
-		if errors.Is(err, notify.ErrChannelLessConfig) && a.cfg.Env != "prod" {
-			glog.Warnf(context.Background(), "[sdk/server.initNotify] notify.enabled=true but no channel enabled; degrade to disabled (dev)")
-			notify.SetDefault(notify.Disabled())
-			return nil
+	ctx := context.Background()
+
+	// notify 分组。
+	if empty, err := isNotifySettingEmpty(ctx, a.dbGetter); err != nil {
+		glog.Warnf(ctx, "[sdk/server.seedRuntimeSettings] check notify empty fail, err:%v", err)
+	} else if empty {
+		cfg := notifyConfigFrom(a.cfg.Raw.Notify)
+		if err := notify.SaveConfig(ctx, a.dbGetter, cfg); err != nil {
+			return fmt.Errorf("sdk/server: seed notify settings failed: %w", err)
 		}
-		return fmt.Errorf("sdk/server: init notify failed: %w", err)
 	}
-	notify.SetDefault(n)
+
+	// security.login 分组。
+	if empty, err := loginsetting.IsEmpty(ctx, a.dbGetter); err != nil {
+		glog.Warnf(ctx, "[sdk/server.seedRuntimeSettings] check login empty fail, err:%v", err)
+	} else if empty {
+		l := a.cfg.Raw.Security.Login
+		cfg := loginsetting.Config{
+			MaxFailures:   l.MaxFailures,
+			WindowSec:     l.WindowSec,
+			LockSec:       l.LockSec,
+			RatePerMinute: l.RatePerMinute,
+			Burst:         l.Burst,
+		}.WithDefaults()
+		if err := loginsetting.Save(ctx, a.dbGetter, cfg); err != nil {
+			return fmt.Errorf("sdk/server: seed login settings failed: %w", err)
+		}
+	}
 	return nil
+}
+
+// isNotifySettingEmpty 判断 notify 分组是否为空（用于首启播种判据）。
+func isNotifySettingEmpty(ctx context.Context, db gormdao.DBGetter) (bool, error) {
+	cfg, err := notify.LoadConfig(ctx, db)
+	if err != nil {
+		return false, err
+	}
+	// 采用「enabled 且无任何渠道字段」不应视为已播种；这里用更稳妥的判据：
+	// 当且仅当整段都是零值（未配置过任何字段）时视为空。
+	return cfg == (notify.Config{}), nil
 }
 
 // Mount 把选中的业务域挂到给定子路由组（不污染宿主根路由）。
@@ -136,7 +176,7 @@ func (a *App) Mount(rg *gin.RouterGroup) error {
 	conf := a.rawConfig()
 
 	// platform 域：鉴权中间件（OIDCAuth + RequireAppAccess）+ back-channel logout。
-	if a.anyDomain(keep, []Domain{DomainMenu, DomainTenant, DomainApplication, DomainOAuthClient, DomainDomain, DomainTenantApp, DomainAudit}) {
+	if a.anyDomain(keep, []Domain{DomainMenu, DomainTenant, DomainApplication, DomainOAuthClient, DomainDomain, DomainTenantApp, DomainAudit, DomainSetting}) {
 		platformGroup := v1.Group("/platform")
 		if a.keySource != nil {
 			platformGroup.Use(a.authMiddlewareForGroup(conf, model.SeedBuiltinClientPlatformAdminWeb)...)
@@ -214,6 +254,7 @@ func (a *App) platformKeys(keep map[Domain]bool) []string {
 		DomainDomain:      "domain",
 		DomainTenantApp:   "tenant-app",
 		DomainAudit:       "audit",
+		DomainSetting:     "setting",
 	}
 	return keysOf(keep, domainKey)
 }

@@ -366,11 +366,12 @@ oidc:
 |---|---|
 | `jwt.signKey` | 预留的 JWT 密钥（当前令牌体系以 OIDC RS256 为主，此项保留兼容） |
 | `client.httpbingo` | 示例 HTTP 客户端配置（`host` / `retry` / `timeout`，对应 golib `ghttp.Client`；**无 `module` 字段**——YAML 为非严格解析，写了会被静默忽略；当前代码未消费） |
-| `password.prefix` | 口令前缀配置位（`pkg/config.PasswordConfig`）；当前全仓无消费者，属死配置 |
 | `es_configs` | Elasticsearch 配置位（`[]dbes.ESConfig`）；应用侧未配置、未消费，仅 `pkg/testsetup` 构造测试配置时读取 |
 | `masterKey` | 预留主密钥（加密敏感配置用） |
 
 ### 9.1 notify（临时凭据投递通道）
+
+> **配置来源（2026-11 起）**：notify 已迁至「运行时配置中心」——由平台管理台「系统设置」页面维护，落库 `core_setting`（分组 `notify`），**保存即生效、无需重启**。下方 `notify.*` 现为 **yaml 首启播种的初始值**：数据库分组为空时由启动流程写入一次，之后**运行时只读数据库、不再读 yaml**（见 §9.3）。
 
 一次性临时口令（建租户 / 建成员 / 重置密码）可通过邮件 / 短信直接投递给账号本人，管理员不再经手明文（见 [system-design.md §5.8](system-design.md) 与 `pkg/notify`）。三层开关：
 
@@ -396,6 +397,29 @@ oidc:
 ## 9.2 环境变化与临时口令交付
 
 `notify.enabled=true` 后，业务响应中的 `initialPassword` / `adminInitialPassword` 在投递成功时为空，新增 `delivered` 布尔表达投递结果；前端据此展示「已发送至账号邮箱/短信」或「自动发送失败，请线下转交」。回滚只需把 `notify.enabled` 置回 `false`（无需改代码）。
+
+---
+
+## 9.3 运行时配置中心（系统设置页面）
+
+「系统设置」页面（平台管理台 `/v1/platform/settings`）统一维护**运行时可按参数**，落库 golib `gsetting` 单表 `core_setting`，**保存即生效、无需重启**（限流为下一请求内）。
+
+**分组与字段**：
+
+| 分组 | 字段 | 说明 |
+|---|---|---|
+| `notify` | `enabled/requireDelivery/mail.*/sms.*` | 见 §9.1；`mail.password`、`sms.accessKeySecret` 加密落库、页面掩码 |
+| `security.login` | `maxFailures/windowSec/lockSec/ratePerMinute/burst` | 登录失败锁定阈值 + 登录限流参数；默认 5/300/900/30/10 |
+
+**存储与加密**：
+- 复用 golib `gsetting`（AES-256-GCM）。加密密钥来自环境变量 **`GOLIB_AES_KEY`**（生产**必须显式配置**，禁止用 golib 内置默认 key，否则密文等同明文）。
+- 敏感项以 `encryption_mode=encrypted` 落库，页面读取返回掩码 `******`，提交掩码表示「不修改」。
+
+**配置来源与优先级**：`环境变量（NOTIFY_MAIL_PASSWORD / NOTIFY_SMS_ACCESS_KEY_SECRET）> 数据库(gsetting) > yaml 首启播种值`。yaml 仅作「首启初始值」；数据库分组为空时播种一次，之后运行时只读数据库。
+
+**准入判据**（哪些配置适合上页面）：运行时可读、改完即生效、不涉及连接重建、非密钥。连接/启动期配置（`db`/`redis_config`/`es_configs`/`server`/`log`/`trace`）与密钥（`masterKey`/`oidc` 签名密钥/`bootstrapToken`/`GOLIB_AES_KEY`）**留在配置文件/密钥管理**，不上页面。
+
+**扩展方式**：新增一类运行时配置 → 在对应 `pkg/<域>` 提供 `LoadXxxConfig/SaveXxxConfig` + 在 `svcsetting.AllowedGroups` 登记分组名 + 前端加一个分组表单。通用层（存储/加密/路由/掩码）零改动。
 
 ---
 

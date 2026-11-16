@@ -7,7 +7,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/morehao/ark-iam/pkg v0.4.2
 	github.com/morehao/ark-iam/sdk v0.6.0
-	github.com/morehao/golib v1.37.0
+	github.com/morehao/golib v1.38.3
 	github.com/swaggo/swag v1.16.6
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.1
@@ -97,7 +97,7 @@ require (
 	golang.org/x/arch v0.25.0 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect

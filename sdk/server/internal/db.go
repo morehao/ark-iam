@@ -77,5 +77,10 @@ func (a *App) Close() error {
 			firstErr = cerr
 		}
 	}
+	if a.settingCache != nil {
+		if cerr := a.settingCache.Close(); cerr != nil && firstErr == nil {
+			firstErr = cerr
+		}
+	}
 	return firstErr
 }

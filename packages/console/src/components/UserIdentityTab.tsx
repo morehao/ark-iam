@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Space, Table, message } from 'antd'
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
+import { DisconnectOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { actionColumn, idColumn, NAME_COL_WIDTH, tableScrollX, textColumn, TEXT_COL_WIDTH, timeColumn, tokens } from '@ark-iam/ui'
 import type { TenantUserIdentityItem } from '@ark-iam/types'
@@ -75,10 +75,12 @@ export default function UserIdentityTab({ userID }: UserIdentityTabProps) {
     timeColumn<TenantUserIdentityItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     actionColumn<TenantUserIdentityItem>({
       max: 1,
+      variant: 'icon',
       actions: (r) => [
         {
           key: 'unbind',
           label: '解绑',
+          icon: <DisconnectOutlined />,
           danger: true,
           confirm: '确认解绑该身份？',
           onClick: () => void unbind(r.userIdentityID),

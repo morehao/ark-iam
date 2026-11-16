@@ -40,8 +40,6 @@ type UserSvc interface {
 
 type userSvc struct {
 	db gormdao.DBGetter
-	// notifier 是临时凭据投递通道（构造时默认取进程级 notify.Default()，测试可用 WithNotifier 覆盖）。
-	notifier *notify.Notifier
 }
 
 var _ UserSvc = (*userSvc)(nil)
@@ -50,7 +48,7 @@ func NewUserSvc(db gormdao.DBGetter) UserSvc {
 	if db == nil {
 		db = dbclient.IamDB
 	}
-	return &userSvc{db: db, notifier: notify.Default()}
+	return &userSvc{db: db}
 }
 
 // isValidUserStatus 白名单校验用户状态取值：仅接受已定义的枚举常量。
@@ -349,7 +347,7 @@ func (svc *userSvc) Create(ctx context.Context, req *dtotenant.UserCreateReq) (*
 	resp := &dtotenant.UserCreateResp{UserID: createdUserID}
 	if personCreated {
 		// 事务已提交：临时密码通过 notify 投递给账号本人；通道未启用时回退回显（现状）。
-		outcome, derr := svc.notifier.DeliverTempPassword(ctx, notify.Recipient{
+		outcome, derr := notify.DeliverTempPasswordViaSetting(ctx, svc.db, notify.Recipient{
 			Email: req.PrimaryEmail,
 			Phone: req.PrimaryPhone,
 		}, tempPassword)
@@ -701,7 +699,7 @@ func (svc *userSvc) ResetPassword(ctx context.Context, req *dtotenant.UserResetP
 			to.Phone = *person.PrimaryPhone
 		}
 	}
-	outcome, derr := svc.notifier.DeliverTempPassword(ctx, to, tempPassword)
+	outcome, derr := notify.DeliverTempPasswordViaSetting(ctx, svc.db, to, tempPassword)
 	if derr != nil {
 		glog.Errorf(ctx, "[svcuser.ResetPassword] deliver temp password fail, err:%v, userID:%s", derr, userEntity.ID)
 		audit.WriteAudit(ctx, audit.AuditEntry{

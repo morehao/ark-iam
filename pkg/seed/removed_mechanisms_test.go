@@ -30,8 +30,8 @@ func TestBootstrap_DeletedBuiltinMenuStaysDeleted(t *testing.T) {
 	if _, _, err := seed.Bootstrap(ctx, db, testDefinition(t)); err != nil {
 		t.Fatalf("bootstrap: %v", err)
 	}
-	if got := countRows(t, db, model.TableNameMenu); got != 14 {
-		t.Fatalf("首次引导后菜单数 = %d, want 14", got)
+	if got := countRows(t, db, model.TableNameMenu); got != 15 {
+		t.Fatalf("首次引导后菜单数 = %d, want 15", got)
 	}
 
 	// 模拟控制台删除「菜单管理」：先解除授权绑定，再软删菜单行（与控制台同一路径）。
@@ -72,14 +72,14 @@ func TestBootstrap_DeletedBuiltinMenuStaysDeleted(t *testing.T) {
 	if err := db.Model(&model.MenuEntity{}).Count(&activeMenus).Error; err != nil {
 		t.Fatalf("count active menus: %v", err)
 	}
-	if activeMenus != 13 {
-		t.Errorf("活跃菜单数 = %d, want 13（被删除的菜单不得复活）", activeMenus)
+	if activeMenus != 14 {
+		t.Errorf("活跃菜单数 = %d, want 14（被删除的菜单不得复活）", activeMenus)
 	}
 	if err := db.Unscoped().Model(&model.MenuEntity{}).Count(&allMenus).Error; err != nil {
 		t.Fatalf("count all menus: %v", err)
 	}
-	if allMenus != 14 {
-		t.Errorf("全量菜单行数 = %d, want 14（既不复活也不重复建行）", allMenus)
+	if allMenus != 15 {
+		t.Errorf("全量菜单行数 = %d, want 15（既不复活也不重复建行）", allMenus)
 	}
 }
 

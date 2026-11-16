@@ -80,6 +80,10 @@ export function createAuthProvider(opts: CreateAuthProviderOptions = {}) {
       client_id: clientId,
       ...(opts.clientSecret ? { client_secret: opts.clientSecret } : {}),
       redirect_uri: window.location.origin + redirectPath,
+      // silent_redirect_uri：启用 iframe `prompt=none` 静默登录/续期。silent renew 失败时
+      // （refresh token 轮换失配等）前端据此外用仍有效的 SSO 会话无声换回新 token，避免把用户
+      // 踢回登录页。oidc-client-ts 的 iframe 响应带 request_type=si:s，与交互式回调不冲突。
+      silent_redirect_uri: window.location.origin + redirectPath,
       post_logout_redirect_uri: window.location.origin + postLogoutRedirectPath,
       scope: defaultScope,
       automaticSilentRenew: true,

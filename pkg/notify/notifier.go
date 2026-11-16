@@ -67,21 +67,11 @@ func (n *Notifier) SendTempPassword(ctx context.Context, to Recipient, password 
 	return ErrNoRecipient
 }
 
-// —— 进程级默认 Notifier ——
+// —— 已移除进程级单例 ——
 //
-// 一进程一 IAM 实例语义下，投递通道是进程级依赖（与 db/redis 同）。服务构造时默认取
-// notify.Default()；需要单测替换时用 NewXxxSvc 的 WithNotifier 选项覆盖（见 svc 包）。
-var defaultNotifier *Notifier
-
-// SetDefault 设置进程级默认 Notifier（由 sdk/server 在启动时按配置装配后调用）。
-func SetDefault(n *Notifier) { defaultNotifier = n }
-
-// Default 返回进程级默认 Notifier（未设置时返回 nil，业务层按「通道未启用」处理）。
-func Default() *Notifier { return defaultNotifier }
-
-// Disabled 返回一个显式「关闭态」Notifier（SendTempPassword 恒 ErrNoChannel）。
-// 用于未配置/降级场景，等价于「通道不可用」。
-func Disabled() *Notifier { return &Notifier{enabled: false} }
+// 旧实现用 notify.SetDefault/Default 在进程启动时装配一个全局 Notifier。现改为「投递时
+// 现读 gsetting 现构造」（见 pkg/notify/setting.go 的 DeliverTempPasswordViaSetting），
+// gsetting 是唯一运行时事实源，不再保留任何进程级单例（见设计 §2.4）。
 
 // DeliveryOutcome 是「投递临时密码」的业务结果，供 service 直接映射到响应。
 type DeliveryOutcome struct {

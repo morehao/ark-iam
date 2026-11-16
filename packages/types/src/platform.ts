@@ -402,3 +402,53 @@ export interface ConnectorFactoryItem {
   capabilities: ConnectorCapability[]
   configSchema?: unknown
 }
+
+// ==================== 系统设置（运行时配置中心） ====================
+
+/** 配置项值类型 */
+export type SettingValueType = 'json' | 'toml' | 'yaml' | 'string' | 'int' | 'bool' | 'float'
+
+/** 配置项状态 */
+export type SettingStatus = 'enabled' | 'disabled'
+
+/** 配置项加密模式 */
+export type SettingEncryptionMode = 'plain' | 'encrypted'
+
+/** 配置项（敏感项 value 为掩码 "******"） */
+export interface SettingItem {
+  id: string
+  group: string
+  key: string
+  valueType: SettingValueType
+  value: string
+  encryptionMode: SettingEncryptionMode
+  description?: string
+  status: SettingStatus
+  createdAt: number
+  updatedAt: number
+}
+
+/** 创建配置项请求 */
+export interface SettingCreateReq {
+  group: string
+  key: string
+  valueType?: SettingValueType
+  value: string
+  encrypted?: boolean
+  status?: SettingStatus
+  description?: string
+}
+
+/** 更新配置项请求（value 传掩码表示不改） */
+export interface SettingUpdateReq {
+  value?: string
+  encrypted?: boolean
+  status?: SettingStatus
+  description?: string
+}
+
+/** 配置分组元数据（供渲染分组下拉与说明；单一事实源在后端 svcsetting） */
+export interface SettingGroupMeta {
+  group: string
+  description?: string
+}

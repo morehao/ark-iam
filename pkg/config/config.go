@@ -23,7 +23,6 @@ type Config struct {
 	Client      Client                    `yaml:"client"`
 	JWT         JWT                       `yaml:"jwt"`
 	OIDC        OIDC                      `yaml:"oidc"`
-	Password    PasswordConfig            `yaml:"password"`
 	Security    SecurityConfig            `yaml:"security"`
 	Install     InstallConfig             `yaml:"install"`
 	MasterKey   string                    `yaml:"masterKey"`
@@ -244,10 +243,6 @@ func (o OIDC) CookieSameSiteMode() http.SameSite {
 	default:
 		return http.SameSiteLaxMode
 	}
-}
-
-type PasswordConfig struct {
-	Prefix string `yaml:"prefix"`
 }
 
 type JWT struct {

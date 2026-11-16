@@ -174,7 +174,7 @@ func (svc *authSvc) authenticateResolvedPerson(ctx context.Context, operator obj
 
 	if err := gcrypto.ComparePasswordHash(personEntity.PasswordEncrypted, password); err != nil {
 		authLoginRecorder(ctx, operator, tenantID, userID, false)
-		svcloginguard.RecordFailure(ctx, ip, personEntity.ID)
+		svcloginguard.RecordFailure(ctx, svc.db, ip, personEntity.ID)
 		glog.Errorf(ctx, "[svcauth.authenticateResolvedPerson] password mismatch, personID:%s", personEntity.ID)
 		// H8：密码错误与用户不存在统一错误码，避免用户名枚举
 		return nil, nil, code.GetError(code.AuthLoginFailedError)
@@ -424,7 +424,7 @@ func (svc *authSvc) resolvePersonLogin(ctx context.Context, operator objidentity
 	if personEntity == nil || personEntity.ID == "" {
 		// H8：未知标识同样计入 IP 维度失败（防口令喷洒绕过 IP 锁）；
 		// 审计 detail 不写"user not found"，避免用户名枚举。
-		svcloginguard.RecordFailure(ctx, operator.ClientIP, "")
+		svcloginguard.RecordFailure(ctx, svc.db, operator.ClientIP, "")
 		audit.WriteAudit(ctx, audit.AuditEntry{
 			Action:     audit.ActionLogin,
 			Result:     model.AuditResultFailure,

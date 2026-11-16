@@ -70,6 +70,8 @@ pnpm dev:login    # login-web :4000
 pnpm dev:tenant   # tenant-admin-web :4002
 ```
 
+> **一键启动（推荐）**：`make dev-all` 同时拉起后端 gateway 与三个前端（Ctrl+C 一并停止）。启动前会自动释放 `:8100` / `:4000`–`:4002` 上的残留进程——上次 `make dev-all` 被强制结束（关终端、`kill -9`、终端崩溃）后 gateway 仍可能占着 :8100，再次启动会因 `bind: address already in use` panic；vite 也会静默顺延端口导致回调和代理对不上。只想排查端口占用可执行 `make dev-free-ports`（加 `NO_KILL=1` 只列出进程、不结束）。
+
 ### 2.3 启动顺序与数据准备
 
 ```mermaid
