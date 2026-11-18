@@ -9,7 +9,7 @@ import (
 
 type ConnectorCond struct {
 	*gormdao.BaseCond
-	TenantID    string
+	DefaultTenantID string
 	Protocol    model.ConnectorProtocol
 	Provider    model.ConnectorProvider
 	Status      model.ConnectorStatus
@@ -22,8 +22,8 @@ func (c *ConnectorCond) BuildCondition(db *gorm.DB, tableName string) {
 		c.BaseCond.BuildCondition(db, tableName)
 	}
 	col := condCols(tableName)
-	if c.TenantID != "" {
-		db.Where(clause.Eq{Column: col("tenant_id"), Value: c.TenantID})
+	if c.DefaultTenantID != "" {
+		db.Where(clause.Eq{Column: col("default_tenant_id"), Value: c.DefaultTenantID})
 	}
 	if c.Protocol != "" {
 		db.Where(clause.Eq{Column: col("protocol"), Value: c.Protocol})

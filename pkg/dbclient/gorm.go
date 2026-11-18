@@ -38,6 +38,9 @@ var tenantScopeSkipTables = []string{
 	model.TableNameMenu,
 	model.TableNameUserIdentity,
 	model.TableNameApplicationClientSecret,
+	// 连接器是平台级全局对象，无 tenant_id 列（仅 default_tenant_id 语义列），
+	// 跨租户运维走 CrossTenantContext；登记为全局表避免注入 tenant_id 过滤。
+	model.TableNameConnector,
 }
 
 // componentSkipTables 是「外部组件自建、非 pkg/model 实体」的全局表（无 tenant_id）。

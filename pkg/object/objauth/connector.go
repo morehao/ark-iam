@@ -3,7 +3,7 @@ package objauth
 import "github.com/morehao/ark-iam/pkg/model"
 
 type ConnectorBaseInfo struct {
-	TenantID            string                            `json:"tenantID" form:"tenantID"`                       // 租户ID
+	DefaultTenantID     string                            `json:"defaultTenantID" form:"defaultTenantID"`         // 默认落租户ID（自动创建用户默认归属租户）
 	Name                string                            `json:"name" form:"name"`                               // 连接器名称
 	DisplayName         string                            `json:"displayName" form:"displayName"`                 // 显示名称
 	Protocol            model.ConnectorProtocol           `json:"protocol" form:"protocol"`                       // 协议类型

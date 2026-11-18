@@ -88,7 +88,7 @@ const (
 
 type ConnectorEntity struct {
 	gormdao.BaseEntity
-	TenantID            string                      `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id"`
+	DefaultTenantID     string                      `gorm:"column:default_tenant_id;type:varchar(36);not null;default:'';comment:自动创建用户默认落租户(空=不自动开户或由策略决定)"`
 	Name                string                      `gorm:"column:name;type:varchar(128);not null;default:'';comment:连接器名称"`
 	DisplayName         string                      `gorm:"column:display_name;type:varchar(128);not null;default:'';comment:显示名称"`
 	Protocol            ConnectorProtocol           `gorm:"column:protocol;type:varchar(64);not null;default:'';comment:协议类型"`
