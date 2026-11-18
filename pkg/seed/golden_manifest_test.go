@@ -33,8 +33,8 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 		{model.TableNameDepartment, 1},
 		{model.TableNameApplication, 2},
 		{model.TableNameRole, 2},
-		{model.TableNameMenu, 15},
-		{model.TableNameRoleMenu, 15},
+		{model.TableNameMenu, 16},
+		{model.TableNameRoleMenu, 16},
 		{model.TableNameTenantApplication, 2},
 		{model.TableNamePerson, 1},
 		{model.TableNameUser, 1},
@@ -50,8 +50,8 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 		}
 		total += got
 	}
-	if total != 45 {
-		t.Errorf("12 张表合计 = %d 行, want 45", total)
+	if total != 47 {
+		t.Errorf("12 张表合计 = %d 行, want 47", total)
 	}
 
 	// ---- 租户与根部门 ----
@@ -116,8 +116,8 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 		t.Errorf("租户角色 admin_type/source = %q/%q", tenantRole.AdminType, tenantRole.Source)
 	}
 
-	// ---- 菜单：15 个 seed_key，父级关系与类型/可见性 ----
-	// 列顺序即「平台管理后台（3 目录 + 8 页）→ 租户管理后台（4 页）」。
+	// ---- 菜单：16 个 seed_key，父级关系与类型/可见性 ----
+	// 列顺序即「平台管理后台（3 目录 + 9 页）→ 租户管理后台（4 页）」。
 	wantMenus := []struct {
 		seedKey    string
 		appCode    string
@@ -136,6 +136,7 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 		{"grp-platform", "platform_admin", "", model.MenuTypeDirectory, model.MenuVisibilityAdmin},
 		{"menu", "platform_admin", "grp-platform", model.MenuTypeMenu, model.MenuVisibilityAdmin},
 		{"setting", "platform_admin", "grp-platform", model.MenuTypeMenu, model.MenuVisibilityAdmin},
+		{"connector", "platform_admin", "grp-platform", model.MenuTypeMenu, model.MenuVisibilityAdmin},
 		{"department", "tenant_admin", "", model.MenuTypeMenu, model.MenuVisibilityAdmin},
 		{"tenant-user", "tenant_admin", "", model.MenuTypeMenu, model.MenuVisibilityAdmin},
 		{"tenant-role", "tenant_admin", "", model.MenuTypeMenu, model.MenuVisibilityAdmin},
@@ -202,11 +203,11 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 		}
 	}
 
-	// ---- role_menu：平台 admin 角色 11 条 + 租户 admin 角色 4 条 = 15 ----
+	// ---- role_menu：平台 admin 角色 12 条 + 租户 admin 角色 4 条 = 16 ----
 	// 目录菜单从不授权；平台角色的 10 条含 3 个 tenant_admin 应用菜单（department/tenant-user/tenant-role），
 	// 这是现状（便于平台侧改后无需重新授权），改造中不得"顺手纠正"。
 	wantPlatformRoleMenus := []string{
-		"dashboard", "menu", "setting", "tenant", "application", "tenant-application",
+		"dashboard", "menu", "setting", "connector", "tenant", "application", "tenant-application",
 		"oauth-client", "domain", "department", "tenant-user", "tenant-role",
 	}
 	assertRoleMenuSeedKeys(t, db, tenant.ID, platformRole.ID, menusBySeedKey, wantPlatformRoleMenus)

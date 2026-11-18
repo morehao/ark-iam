@@ -38,8 +38,8 @@ func TestRender_CoversAllFifteenFields(t *testing.T) {
 // TestRender_IncludesEveryBuiltinMenuCode 每个内置菜单的 code 都必须出现在清单里。
 func TestRender_IncludesEveryBuiltinMenuCode(t *testing.T) {
 	menus := seed.BuiltinMenus()
-	if len(menus) != 15 {
-		t.Fatalf("内置菜单数 = %d, want 15", len(menus))
+	if len(menus) != 16 {
+		t.Fatalf("内置菜单数 = %d, want 16", len(menus))
 	}
 	got := renderString(t, menus)
 	for _, m := range menus {
@@ -98,14 +98,14 @@ func tableRows(t *testing.T, out string) [][2]string {
 // 且整体顺序必须是确定的一份清单。
 func TestRender_OrderIsParentBeforeChild(t *testing.T) {
 	rows := tableRows(t, renderString(t, seed.BuiltinMenus()))
-	if len(rows) != 15 {
-		t.Fatalf("解析到 %d 个数据行, want 15", len(rows))
+	if len(rows) != 16 {
+		t.Fatalf("解析到 %d 个数据行, want 16", len(rows))
 	}
 	// 顶级按 sort（工作台 → 租户中心 → 应用中心 → 平台管理），随后是子菜单（按其父级 sort）
 	wantOrder := []string{
 		"dashboard", "grp-tenant", "grp-app", "grp-platform",
 		"tenant", "tenant-application", "domain",
-		"application", "oauth-client", "menu", "setting",
+		"application", "oauth-client", "menu", "setting", "connector",
 		"department", "tenant-user", "tenant-role", "tenant-api-key",
 	}
 	for i, want := range wantOrder {

@@ -11,8 +11,8 @@ import (
 // TestBuiltinMenus_UniqueAndComplete 清单本身的结构约束。
 func TestBuiltinMenus_UniqueAndComplete(t *testing.T) {
 	menus := seed.BuiltinMenus()
-	if len(menus) != 15 {
-		t.Fatalf("BuiltinMenus() 长度 = %d, want 15", len(menus))
+	if len(menus) != 16 {
+		t.Fatalf("BuiltinMenus() 长度 = %d, want 16", len(menus))
 	}
 	seen := map[string]bool{}
 	for _, m := range menus {
