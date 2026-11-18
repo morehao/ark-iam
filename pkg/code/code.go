@@ -42,7 +42,7 @@ func init() {
 	registerError(permissionErrorMsgMap)
 	registerError(authErrorMsgMap)
 	registerError(userAuthErrorMsgMap)
-	registerError(connectorErrorMsgMap)
+
 	registerError(oidcErrorMsgMap)
 	registerError(rpErrorMsgMap)
 	registerError(installErrorMsgMap)
