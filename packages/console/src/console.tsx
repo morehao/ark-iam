@@ -16,6 +16,7 @@ import OAuthClientDetail from './pages/platform/oauthClient/Detail'
 import MenuList from './pages/platform/menu'
 import DomainList from './pages/platform/domain'
 import SettingPage from './pages/platform/setting'
+import ConnectorList from './pages/platform/connector'
 
 import DepartmentList from './pages/tenant/department'
 import TenantUserList from './pages/tenant/user'
@@ -61,6 +62,7 @@ const PLATFORM_COMPONENT_MAP: Record<string, { Component: React.ComponentType; d
   '/menu': { Component: MenuList, domain: 'menu' },
   '/domain': { Component: DomainList, domain: 'domain' },
   '/settings': { Component: SettingPage, domain: 'setting' },
+  '/connector': { Component: ConnectorList, domain: 'connector' },
   // 详情页（不进侧边栏菜单，由静态路由单独注册；path 取自 routes.ts 单一真相源）
   [OAUTH_CLIENT_DETAIL_ROUTE]: { Component: OAuthClientDetail, domain: 'oauth-client' },
 }

@@ -357,7 +357,7 @@ export interface DomainItem {
   updatedAt: number
 }
 
-// ---------- Connector（auth） ----------
+// ---------- Connector（platform 全局对象） ----------
 /** 连接器协议（后端具名类型 model.ConnectorProtocol）。 */
 export type ConnectorProtocol = 'oidc' | 'oauth2'
 /** 连接器身份提供商（后端具名类型 model.ConnectorProvider）。 */
@@ -374,9 +374,54 @@ export type ConnectorAccountLinkFlag = 'enable' | 'disable'
 export type ConnectorSyncProfileFlag = 'enable' | 'disable'
 export type ConnectorTokenStorageFlag = 'enable' | 'disable'
 
+/**
+ * 连接器协议配置（后端 model.ConnectorConfig，落 connector.config，JSON 列）。
+ * OIDC 用 issuer（+ microsoft 额外 tenant）；OAuth2 用 authUrl/tokenUrl/userInfoUrl。
+ * protocol/provider 由所选工厂带入，一般不由用户手填。
+ * 注意：这里的 `tenant` 是**协议级**配置（部分 IdP 如 Microsoft 的租户标识），
+ * 与连接器的 `defaultTenantID`（自动创建用户默认落租户）语义完全不同，勿混淆。
+ */
+export interface ConnectorConfig {
+  protocol?: ConnectorProtocol
+  provider?: ConnectorProvider
+  issuer?: string
+  authUrl?: string
+  tokenUrl?: string
+  userInfoUrl?: string
+  clientID?: string
+  clientSecret?: string
+  redirectUri?: string
+  scopes?: string[]
+  tenant?: string
+}
+
+/** 声明映射（后端 model.ConnectorClaimMapping，落 connector.claim_mapping，JSON 列）。 */
+export interface ConnectorClaimMapping {
+  subject?: string
+  email?: string
+  username?: string
+  displayName?: string
+  avatarUrl?: string
+}
+
+/** 域策略（后端 model.ConnectorDomainPolicy，落 connector.domain_policy，JSON 列）。 */
+export interface ConnectorDomainPolicy {
+  allowedDomains?: string[]
+  blockedDomains?: string[]
+}
+
+/** 连接器工厂 metadata 的 configSchema（当前后端只下发 required 列表）。 */
+export interface ConnectorConfigSchema {
+  type?: string
+  required?: string[]
+}
+
 export interface ConnectorItem {
   connectorID: string
-  tenantID: string
+  /** 自动创建用户默认落租户（后端 connector.default_tenant_id）。 */
+  defaultTenantID: string
+  /** 默认落租户名称（列表/详情展示用，后端回填）。 */
+  defaultTenantName?: string
   name: string
   displayName: string
   protocol: ConnectorProtocol
@@ -386,11 +431,35 @@ export interface ConnectorItem {
   allowAccountLink: ConnectorAccountLinkFlag
   syncProfile: ConnectorSyncProfileFlag
   enableTokenStorage: ConnectorTokenStorageFlag
-  config?: unknown
-  claimMapping?: unknown
-  domainPolicy?: unknown
+  config?: ConnectorConfig
+  claimMapping?: ConnectorClaimMapping
+  domainPolicy?: ConnectorDomainPolicy
   createdAt?: number
+  updatedAt?: number
 }
+
+/**
+ * 创建/更新连接器请求体（后端 dtoauth.ConnectorCreateReq / ConnectorUpdateReq）。
+ * `defaultTenantID`（自动创建用户默认落租户）仅在 allowAutoCreateUser=enable 时必填。
+ */
+export interface ConnectorCreateReq {
+  name: string
+  displayName: string
+  protocol: ConnectorProtocol
+  provider: ConnectorProvider
+  status?: ConnectorStatus
+  defaultTenantID?: string
+  allowAutoCreateUser?: ConnectorAutoCreateUserFlag
+  allowAccountLink?: ConnectorAccountLinkFlag
+  syncProfile?: ConnectorSyncProfileFlag
+  enableTokenStorage?: ConnectorTokenStorageFlag
+  config?: ConnectorConfig
+  claimMapping?: ConnectorClaimMapping
+  domainPolicy?: ConnectorDomainPolicy
+}
+
+/** 更新请求与创建同构；status 传空串表示「不修改状态」。 */
+export type ConnectorUpdateReq = ConnectorCreateReq
 
 export interface ConnectorFactoryItem {
   factoryID: string
@@ -400,7 +469,7 @@ export interface ConnectorFactoryItem {
   isStandard: boolean
   defaultScopes: string[]
   capabilities: ConnectorCapability[]
-  configSchema?: unknown
+  configSchema?: ConnectorConfigSchema
 }
 
 // ==================== 系统设置（运行时配置中心） ====================

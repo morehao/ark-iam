@@ -5,6 +5,10 @@ import type {
   ApplicationCreateReq,
   ApplicationItem,
   ApplicationUpdateReq,
+  ConnectorCreateReq,
+  ConnectorFactoryItem,
+  ConnectorItem,
+  ConnectorUpdateReq,
   DomainItem,
   DomainVerificationStatus,
   MenuItem,
@@ -135,3 +139,31 @@ export const updateSetting = (id: string, data: SettingUpdateReq) => request.put
 export const updateSettingStatus = (id: string, status: SettingStatus) =>
   request.patch<any, string>(`/platform/settings/${id}/status`, { status })
 export const deleteSetting = (id: string) => request.delete<any, string>(`/platform/settings/${id}`)
+
+// ==================== 身份连接器（平台级全局对象） ====================
+/** 连接器分页列表筛选参数（defaultTenantID=按默认落租户过滤） */
+export interface ConnectorPageListParams {
+  page?: number
+  pageSize?: number
+  defaultTenantID?: string
+  protocol?: string
+  provider?: string
+  status?: string
+  name?: string
+  displayName?: string
+}
+
+export const createConnector = (req: ConnectorCreateReq) =>
+  request.post<any, { connectorID: string }>('/platform/connectors', req)
+export const getConnectorPageList = (params?: ConnectorPageListParams) =>
+  request.get<any, { list: ConnectorItem[]; total: number }>('/platform/connectors', { params })
+export const getConnectorDetail = (connectorID: string) =>
+  request.get<any, ConnectorItem>(`/platform/connectors/${connectorID}`)
+export const updateConnector = (connectorID: string, req: ConnectorUpdateReq) =>
+  request.put<any, void>(`/platform/connectors/${connectorID}`, req)
+export const deleteConnector = (connectorID: string) =>
+  request.delete<any, void>(`/platform/connectors/${connectorID}`)
+export const getConnectorFactories = (params?: { protocol?: string; provider?: string }) =>
+  request.get<any, { list: ConnectorFactoryItem[] }>('/platform/connector-factories', { params })
+export const testConnector = (connectorID: string) =>
+  request.post<any, { success: boolean; message: string }>(`/platform/connectors/${connectorID}/test`)
