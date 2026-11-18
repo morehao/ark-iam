@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/apps/auth/dto/dtoconnector"
+	"github.com/morehao/ark-iam/pkg/core/connector"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/sso"
@@ -66,8 +67,9 @@ func TestConnectorCallbackReturnsPersonTokenWhenPersonHasMultipleTenants(t *test
 	}
 
 	conn := &model.ConnectorEntity{
-		Protocol:            connectorDriverTypeOAuth2,
-		Provider:            connectorProviderGithub,
+		DefaultTenantID:     "11",
+		Protocol:            connector.DriverTypeOAuth2,
+		Provider:            connector.ProviderGithub,
 		Status:              model.ConnectorStatusEnable,
 		AllowAutoCreateUser: model.ConnectorAutoCreateUserFlagEnable,
 		Config:              model.ConnectorConfig{AuthURL: "https://github.com/login/oauth/authorize", TokenURL: "https://github.com/login/oauth/access_token", UserInfoURL: "https://api.github.com/user", ClientID: "client-id", ClientSecret: "client-secret", RedirectURI: "https://iam.example.com/callback"},
@@ -102,10 +104,10 @@ func TestConnectorCallbackReturnsPersonTokenWhenPersonHasMultipleTenants(t *test
 	defer restoreTenantStore()
 
 	svc := &connectorSvc{
-		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{
-			driverType: connectorDriverTypeOAuth2,
-			exchangeCallbackFunc: func(ctx context.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
-				return &ConnectorCallbackOutput{Identity: StandardIdentity{Issuer: "https://issuer.example.com", Subject: "sub-1", Email: "alice@example.com"}}, nil
+		driverRegistry: connector.NewDriverRegistry(&fakeConnectorDriver{
+			driverType: connector.DriverTypeOAuth2,
+			exchangeCallbackFunc: func(ctx context.Context, input *connector.CallbackInput) (*connector.CallbackOutput, error) {
+				return &connector.CallbackOutput{Identity: StandardIdentity{Issuer: "https://issuer.example.com", Subject: "sub-1", Email: "alice@example.com"}}, nil
 			},
 		}),
 		connectorRepo: &fakeConnectorRuntimeRepository{
@@ -120,7 +122,6 @@ func TestConnectorCallbackReturnsPersonTokenWhenPersonHasMultipleTenants(t *test
 			},
 		},
 		ssoSessionStore: &fakeConnectorSSOSessionStore{},
-		loginRecorder:   func(ctx context.Context, tenantID, userID string, success bool) {},
 	}
 
 	resp, err := svc.Callback(requestCtx(ginCtx), &dtoconnector.ConnectorCallbackReq{ConnectorID: "11", Code: "authorization-code", State: "callback-state-multi-tenant"})
@@ -151,9 +152,9 @@ func TestConnectorCallbackUsesIdentityResolverPath(t *testing.T) {
 		t.Fatalf("stateStore.Save returned error: %v", err)
 	}
 
-	conn := &model.ConnectorEntity{Protocol: connectorDriverTypeOAuth2, Provider: connectorProviderGithub, Status: model.ConnectorStatusEnable, AllowAutoCreateUser: model.ConnectorAutoCreateUserFlagEnable, Config: model.ConnectorConfig{AuthURL: "https://github.com/login/oauth/authorize", TokenURL: "https://github.com/login/oauth/access_token", UserInfoURL: "https://api.github.com/user", ClientID: "client-id", ClientSecret: "client-secret", RedirectURI: "https://iam.example.com/callback"}}
+	conn := &model.ConnectorEntity{Protocol: connector.DriverTypeOAuth2, Provider: connector.ProviderGithub, Status: model.ConnectorStatusEnable, AllowAutoCreateUser: model.ConnectorAutoCreateUserFlagEnable, Config: model.ConnectorConfig{AuthURL: "https://github.com/login/oauth/authorize", TokenURL: "https://github.com/login/oauth/access_token", UserInfoURL: "https://api.github.com/user", ClientID: "client-id", ClientSecret: "client-secret", RedirectURI: "https://iam.example.com/callback"}}
 	conn.ID = "19"
-	conn.TenantID = "19"
+	conn.DefaultTenantID = "19"
 
 	var insertedIdentity *model.UserIdentityEntity
 	var insertedUser *model.UserEntity
@@ -197,14 +198,13 @@ func TestConnectorCallbackUsesIdentityResolverPath(t *testing.T) {
 	defer restoreTenantStore()
 
 	svc := &connectorSvc{
-		driverRegistry: newConnectorDriverRegistry(&fakeConnectorDriver{driverType: connectorDriverTypeOAuth2, exchangeCallbackFunc: func(ctx context.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
-			return &ConnectorCallbackOutput{Identity: StandardIdentity{Issuer: "https://issuer.example.com", Subject: "sub-resolver", Email: "resolver@example.com", DisplayName: "Resolver User"}}, nil
+		driverRegistry: connector.NewDriverRegistry(&fakeConnectorDriver{driverType: connector.DriverTypeOAuth2, exchangeCallbackFunc: func(ctx context.Context, input *connector.CallbackInput) (*connector.CallbackOutput, error) {
+			return &connector.CallbackOutput{Identity: StandardIdentity{Issuer: "https://issuer.example.com", Subject: "sub-resolver", Email: "resolver@example.com", DisplayName: "Resolver User"}}, nil
 		}}),
 		connectorRepo:    &fakeConnectorRuntimeRepository{getByIDFunc: func(ctx context.Context, id string) (*model.ConnectorEntity, error) { return conn, nil }},
 		stateStore:       stateStore,
 		identityResolver: mapper,
 		ssoSessionStore:  &fakeConnectorSSOSessionStore{},
-		loginRecorder:    func(ctx context.Context, tenantID, userID string, success bool) {},
 	}
 
 	resp, err := svc.Callback(requestCtx(ginCtx), &dtoconnector.ConnectorCallbackReq{ConnectorID: "19", Code: "authorization-code", State: "callback-state-resolver-path"})

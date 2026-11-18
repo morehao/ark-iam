@@ -14,14 +14,6 @@ import (
 )
 
 type stubConnectorSvc struct {
-	getFactoryListReq  *dtoconnector.ConnectorFactoryListReq
-	getFactoryListResp *dtoconnector.ConnectorFactoryListResp
-	getFactoryListErr  error
-
-	testConnectorReq  *dtoconnector.ConnectorIDReq
-	testConnectorResp *dtoconnector.ConnectorTestResp
-	testConnectorErr  error
-
 	authorizeReq         *dtoconnector.ConnectorAuthorizeReq
 	authorizeConnectorID string
 	authorizeResp        *dtoconnector.ConnectorAuthorizeResp
@@ -32,79 +24,15 @@ type stubConnectorSvc struct {
 	callbackErr  error
 }
 
-func (s *stubConnectorSvc) Create(ctx context.Context, req *dtoauth.ConnectorCreateReq) (*dtoauth.ConnectorCreateResp, error) {
-	panic("unexpected call")
-}
-
-func (s *stubConnectorSvc) Delete(ctx context.Context, req *dtoauth.ConnectorDeleteReq) error {
-	panic("unexpected call")
-}
-
-func (s *stubConnectorSvc) Update(ctx context.Context, req *dtoauth.ConnectorUpdateReq) error {
-	panic("unexpected call")
-}
-
-func (s *stubConnectorSvc) Detail(ctx context.Context, req *dtoauth.ConnectorDetailReq) (*dtoauth.ConnectorDetailResp, error) {
-	panic("unexpected call")
-}
-
-func (s *stubConnectorSvc) PageList(ctx context.Context, req *dtoauth.ConnectorPageListReq) (*dtoauth.ConnectorPageListResp, error) {
-	panic("unexpected call")
-}
-
-func (s *stubConnectorSvc) GetFactoryList(ctx context.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error) {
-	s.getFactoryListReq = req
-	return s.getFactoryListResp, s.getFactoryListErr
-}
-
-func (s *stubConnectorSvc) ListFactories(ctx context.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error) {
-	panic("unexpected call")
-}
-
-func (s *stubConnectorSvc) TestConnector(ctx context.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.ConnectorTestResp, error) {
-	s.testConnectorReq = req
-	return s.testConnectorResp, s.testConnectorErr
-}
-
 func (s *stubConnectorSvc) Authorize(ctx context.Context, req *dtoconnector.ConnectorAuthorizeReq, connectorID string) (*dtoconnector.ConnectorAuthorizeResp, error) {
 	s.authorizeReq = req
 	s.authorizeConnectorID = connectorID
 	return s.authorizeResp, s.authorizeErr
 }
 
-func (s *stubConnectorSvc) GetAuthorizationURL(ctx context.Context, req *dtoconnector.ConnectorAuthorizeReq) (*dtoconnector.ConnectorAuthorizeResp, error) {
-	panic("unexpected call")
-}
-
 func (s *stubConnectorSvc) Callback(ctx context.Context, req *dtoconnector.ConnectorCallbackReq) (*dtoauth.LoginResp, error) {
 	s.callbackReq = req
 	return s.callbackResp, s.callbackErr
-}
-
-func TestConnectorControllerGetFactoryList(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	svc := &stubConnectorSvc{
-		getFactoryListResp: &dtoconnector.ConnectorFactoryListResp{List: []dtoconnector.ConnectorFactoryResp{{FactoryID: "oidc-google"}}},
-	}
-	ctr := &connectorCtr{connectorSvc: svc}
-
-	recorder := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(recorder)
-	req := httptest.NewRequest(http.MethodGet, "/v1/auth/connector-factories?protocol=oidc&provider=google", nil)
-	ctx.Request = req
-
-	ctr.GetFactoryList(ctx)
-
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", recorder.Code)
-	}
-	if svc.getFactoryListReq == nil {
-		t.Fatal("expected GetFactoryList to receive request")
-	}
-	if svc.getFactoryListReq.Protocol != "oidc" || svc.getFactoryListReq.Provider != "google" {
-		t.Fatalf("expected query params to bind into request, got %+v", *svc.getFactoryListReq)
-	}
-	assertJSONContainsData(t, recorder.Body.Bytes(), "oidc-google")
 }
 
 func TestConnectorControllerAuthorize(t *testing.T) {
@@ -139,33 +67,6 @@ func TestConnectorControllerAuthorize(t *testing.T) {
 		t.Fatalf("expected JSON body to bind into authorize request, got %+v", *svc.authorizeReq)
 	}
 	assertJSONContainsData(t, recorder.Body.Bytes(), "https://idp.example.com/auth")
-}
-
-func TestConnectorControllerTestConnector(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	svc := &stubConnectorSvc{
-		testConnectorResp: &dtoconnector.ConnectorTestResp{Success: true, Message: "ok"},
-	}
-	ctr := &connectorCtr{connectorSvc: svc}
-
-	recorder := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(recorder)
-	req := httptest.NewRequest(http.MethodPost, "/v1/auth/connector/9/test", nil)
-	ctx.Request = req
-	ctx.Params = gin.Params{{Key: "connectorID", Value: "9"}}
-
-	ctr.TestConnector(ctx)
-
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", recorder.Code)
-	}
-	if svc.testConnectorReq == nil {
-		t.Fatal("expected TestConnector to receive request")
-	}
-	if svc.testConnectorReq.ConnectorID != "9" {
-		t.Fatalf("expected URI binding to populate connectorID=9, got %s", svc.testConnectorReq.ConnectorID)
-	}
-	assertJSONContainsData(t, recorder.Body.Bytes(), "ok")
 }
 
 func TestConnectorControllerCallback(t *testing.T) {

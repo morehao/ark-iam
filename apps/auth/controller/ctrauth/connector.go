@@ -2,22 +2,15 @@ package ctrauth
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/morehao/ark-iam/apps/auth/dto/dtoauth"
 	"github.com/morehao/ark-iam/apps/auth/dto/dtoconnector"
 	"github.com/morehao/ark-iam/apps/auth/service/svcauth"
-	"github.com/morehao/ark-iam/pkg/identity"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
+// ConnectorCtr 连接器「运行时」控制器：仅暴露登录链路（authorize / callback）。
+// 管理面（CRUD/工厂/测试）已迁至 platformadmin/ctrconnector，路由前缀 /v1/platform。
 type ConnectorCtr interface {
-	Create(ctx *gin.Context)
-	Delete(ctx *gin.Context)
-	Update(ctx *gin.Context)
-	Detail(ctx *gin.Context)
-	PageList(ctx *gin.Context)
-	GetFactoryList(ctx *gin.Context)
-	TestConnector(ctx *gin.Context)
 	Authorize(ctx *gin.Context)
 	Callback(ctx *gin.Context)
 }
@@ -32,159 +25,6 @@ func NewConnectorCtr(db gormdao.DBGetter) ConnectorCtr {
 	return &connectorCtr{
 		connectorSvc: svcauth.NewConnectorSvc(db),
 	}
-}
-
-// @Tags 连接器
-// @Summary 创建连接器
-// @accept application/json
-// @Produce application/json
-// @Param req body dtoauth.ConnectorCreateReq true "创建连接器"
-// @Success 200 {object} gincontext.DtoRender{data=dtoauth.ConnectorCreateResp}
-// @Router /v1/auth/connectors [post]
-func (ctr *connectorCtr) Create(ctx *gin.Context) {
-	var req dtoauth.ConnectorCreateReq
-	req.Operator = identity.OperatorFromGin(ctx)
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.connectorSvc.Create(ctx.Request.Context(), &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-// @Tags 连接器
-// @Summary 删除连接器
-// @accept application/json
-// @Produce application/json
-// @Param connectorID path string true "连接器ID"
-// @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/auth/connectors/{connectorID} [delete]
-func (ctr *connectorCtr) Delete(ctx *gin.Context) {
-	var req dtoauth.ConnectorDeleteReq
-	req.Operator = identity.OperatorFromGin(ctx)
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctr.connectorSvc.Delete(ctx.Request.Context(), &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, "删除成功")
-}
-
-// @Tags 连接器
-// @Summary 修改连接器
-// @accept application/json
-// @Produce application/json
-// @Param connectorID path string true "连接器ID"
-// @Param req body dtoauth.ConnectorUpdateReq true "修改连接器"
-// @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/auth/connectors/{connectorID} [put]
-func (ctr *connectorCtr) Update(ctx *gin.Context) {
-	var req dtoauth.ConnectorUpdateReq
-	req.Operator = identity.OperatorFromGin(ctx)
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctr.connectorSvc.Update(ctx.Request.Context(), &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, "修改成功")
-}
-
-// @Tags 连接器
-// @Summary 连接器详情
-// @accept application/json
-// @Produce application/json
-// @Param connectorID path string true "连接器ID"
-// @Success 200 {object} gincontext.DtoRender{data=dtoauth.ConnectorDetailResp}
-// @Router /v1/auth/connectors/{connectorID} [get]
-func (ctr *connectorCtr) Detail(ctx *gin.Context) {
-	var req dtoauth.ConnectorDetailReq
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.connectorSvc.Detail(ctx.Request.Context(), &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-// @Tags 连接器
-// @Summary 连接器列表分页
-// @accept application/json
-// @Produce application/json
-// @Param req query dtoauth.ConnectorPageListReq true "连接器列表分页"
-// @Success 200 {object} gincontext.DtoRender{data=dtoauth.ConnectorPageListResp}
-// @Router /v1/auth/connectors [get]
-func (ctr *connectorCtr) PageList(ctx *gin.Context) {
-	var req dtoauth.ConnectorPageListReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.connectorSvc.PageList(ctx.Request.Context(), &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-// @Tags 连接器
-// @Summary 连接器工厂列表
-// @accept application/json
-// @Produce application/json
-// @Param req query dtoconnector.ConnectorFactoryListReq false "连接器工厂列表"
-// @Success 200 {object} gincontext.DtoRender{data=dtoconnector.ConnectorFactoryListResp}
-// @Router /v1/auth/connector-factories [get]
-func (ctr *connectorCtr) GetFactoryList(ctx *gin.Context) {
-	var req dtoconnector.ConnectorFactoryListReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.connectorSvc.GetFactoryList(ctx.Request.Context(), &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-// @Tags 连接器
-// @Summary 测试连接器
-// @accept application/json
-// @Produce application/json
-// @Param connectorID path string true "连接器ID"
-// @Success 200 {object} gincontext.DtoRender{data=dtoconnector.ConnectorTestResp}
-// @Router /v1/auth/connectors/{connectorID}/test [post]
-func (ctr *connectorCtr) TestConnector(ctx *gin.Context) {
-	var req dtoconnector.ConnectorIDReq
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.connectorSvc.TestConnector(ctx.Request.Context(), &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
 }
 
 // @Tags 连接器

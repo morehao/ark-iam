@@ -17,15 +17,10 @@ func authRouter(rg *gin.RouterGroup, db gormdao.DBGetter) {
 	rg.GET("/userinfo", authCtr.Userinfo)
 }
 
+// connectorRouter 连接器「运行时」路由（登录链路）。
+// 管理面（CRUD/工厂/测试）归平台运营端 /v1/platform/connectors*（platformadmin）。
 func connectorRouter(rg *gin.RouterGroup, db gormdao.DBGetter) {
 	connectorCtr := ctrauth.NewConnectorCtr(db)
-	rg.POST("/connectors", connectorCtr.Create)
-	rg.GET("/connectors", connectorCtr.PageList)
-	rg.GET("/connector-factories", connectorCtr.GetFactoryList)
-	rg.GET("/connectors/:connectorID", connectorCtr.Detail)
-	rg.PUT("/connectors/:connectorID", connectorCtr.Update)
-	rg.DELETE("/connectors/:connectorID", connectorCtr.Delete)
-	rg.POST("/connectors/:connectorID/test", connectorCtr.TestConnector)
 	rg.POST("/connectors/:connectorID/authorize", connectorCtr.Authorize)
 	rg.GET("/connectors/callback", connectorCtr.Callback)
 }
