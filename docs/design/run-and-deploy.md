@@ -409,6 +409,27 @@ ALTER INDEX IF EXISTS uk_dept_user                      RENAME TO iam_uk_dept_us
 - **索引名**：显式声明的业务索引（`idx_*`/`uk_*`）已统一加 `iam_` 前缀（`iam_idx_*`/`iam_uk_*`）；`deleted_at`、`code`、`session_id` 等由框架（`BaseEntity` tag / gorm 列索引）自动生成的索引名随表名自然变为 `idx_iam_*`。同库内嵌时索引名不再与宿主冲突。
 - **开发/测试环境**不必手工执行：直接删库重建（§2.3）后由 `AutoMigrate` 建出 `iam_*` 表，再走 §2.4 首次初始化即可。
 
+#### 2.5.7 golib v1.39.0：`core_setting.group_name` → `group`（存量库必须手工改名）
+
+golib v1.39.0 把 gsetting 配置表 `core_setting` 的分组列由 `group_name` 改名为 `group`，Go 侧字段 `SettingEntity.GroupName` / `SettingInfo.GroupName` 一并改为 `Group`，唯一索引 `uk_group_key` 的列变为 `(group, key)`（v1.39.0 起又叠加 `app_id` 前导列，见下）。**`Migrate` 走 `AutoMigrate`，GORM 不会重命名列**：直接升级只会新增 `group`（`DEFAULT 'default'`），旧数据原样留在 `group_name`，于是**非 `default` 分组的配置会被静默读成 `default`**——本项目的两个分组 `notify`、`security.login` 都不是 `default`，存量库不执行下面的改名会**读不到这两组配置**（通知渠道 / 登录安全参数全部回落到默认值）。
+
+**请在部署新版代码之前执行一次改名**（承上文口径：一次性 SQL 只落在部署文档，不进启动流程）：
+
+```sql
+-- PostgreSQL
+ALTER TABLE core_setting RENAME COLUMN group_name TO "group";
+
+-- MySQL 8.0+
+ALTER TABLE core_setting RENAME COLUMN group_name TO `group`;
+-- MySQL 5.7（RENAME COLUMN 不可用）
+ALTER TABLE core_setting CHANGE COLUMN group_name `group` varchar(64) NOT NULL DEFAULT 'default'
+  COMMENT '配置分组，用于业务隔离，如 notify、security.login，默认 default';
+```
+
+**关于 `app_id` 维度（本仓不启用，保持空 app）**：v1.39.0 的 `core_setting` 新增 `app_id` 列，唯一键变为 `uk_app_group_key (app_id, group, key)`，且 `AppID` 由 `gormdao` 的 Create 回调从 ctx 作用域（`gormplugin.WithApp`）自动注入、读路径叠 `app_id` 条件。这都是**调用方 opt-in**：只有 `gsetting.New(db, gsetting.WithAppScope())` 才会为 `core_setting` 注册 app 隔离插件。**本仓的 `gsetting.New` 调用均未传 `WithAppScope()`，因此 `app_id` 恒为 `''`、读写不注入 `app_id` 条件，唯一键退化为 `(group, key)`，与 v1.38.3 行为等价**——本仓是单一 IAM 业务线，无需按 app 隔离。AutoMigrate 会为存量表补建 `app_id` 列（取列默认 `''`），无需手工处理。
+
+> **开发/测试环境**不必执行上述 SQL：直接删库重建（§2.3）后由 `AutoMigrate` 建出 `group` 列、再走 §2.4 首次初始化即可。`group` 是三种方言的保留字，但库内读写 SQL 全部经 `gormdao` 的 `clause.Column` 按方言加引号，本仓调用点（`pkg/notify`、`pkg/loginsetting`、`apps/platformadmin/service/svcsetting`）均走 `gsetting` 的 `SettingCond`/`AdminAPI`，不手写裸 `group` 片段，故无需在调用侧加引号。
+
 ### 2.6 版本升级时的菜单变更清单
 
 **菜单行归运维**：L1 首次初始化只写入一次内置菜单，之后菜单由「菜单管理」页维护（可新增根菜单/子菜单，可删除任意菜单）。因此**版本升级带来的新菜单不会被自动下发**，升级后需要人工补录。
