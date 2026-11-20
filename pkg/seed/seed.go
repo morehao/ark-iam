@@ -442,7 +442,7 @@ func findMenuBySeedKey(db *gorm.DB, seedKey string) (*model.MenuEntity, error) {
 func seedRoleMenus(ctx context.Context, db *gorm.DB, tenant *model.TenantEntity, adminRole *model.RoleEntity, menus map[string]*model.MenuEntity) error {
 	menuCodes := []string{
 		"dashboard", "menu", "setting", "tenant", "application",
-		"tenant-application", "oauth-client", "domain", "log",
+		"tenant-application", "oauth-client", "domain", "log", "connector",
 		"department", "tenant-user", "tenant-role",
 	}
 	for _, menuCode := range menuCodes {

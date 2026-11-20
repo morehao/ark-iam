@@ -429,6 +429,19 @@ make print-builtin-menus
 > **不要复用已下线菜单的 `code`**：首次初始化引导按不可见的 `seed_key` 认行，而 `seed_key` 只在创建时写入、之后不变；且库一旦初始化，引导永久自锁，代码里改了 `code` 既不会改动已有行、也不会补建新行。升级新增菜单请用新的 `code`。
 >
 > **漏补菜单的后果是"导航里看不到"，不是"接口 403"**：菜单不参与 API 鉴权（权限由角色与字段权威决定）。因此漏补只影响可用性，不会造成越权，可以从容补录。
+
+#### 连接器归属迁移（身份连接器迁platform端，2026-11-18）
+
+连接器由「租户端管理」改为**平台级全局对象**，本批涉及两处存量处置（开发/测试库**首选删库重建**，见 §2.3；下表为已上线库或无法重建时的口径）：
+
+1. **`iam_connector` 列改名需重建**：`connector.tenant_id` → `connector.default_tenant_id`（AutoMigrate 只增不删，旧列会原样残留、新列取默认值，不能靠迁移过渡）。开发/测试库直接删库重建；需保全数据的，导出后按新口径人工映射再导入。
+2. **菜单变化**：
+   - 新增平台菜单 `{appCode:platform_admin, parentCode:grp-platform, name:身份连接器, code:connector, path:/connector, icon:connector, sort:3, component:/connector/index, type:menu, visibility:admin}`，并**授予平台 admin 角色**（否则平台侧栏不显示）。
+   - 若旧库曾有租户端 `tenant-connector` 菜单（挂 tenant_admin），在「菜单管理」页删除（软删即可，前端已无对应页面）。
+   - 以 `make print-builtin-menus` 的 `diff` 结果为准补录/下线，步骤与授权同本节上文（§2.6）。
+
+> 本机 docker 若为**按现行种子全新初始化**的库（删库重建 + `/install/initialize` 之后），已天然是目标形态（单条 `connector` 菜单、`default_tenant_id` 列、platform admin 已授权），无需额外调整。
+
 >
 > 历史版本曾用「退役菜单清单（`retiredMenus`）」在启动时自动清理已下线的内置菜单。**该机制已删除**：菜单的下线与调整现在完全由运维在控制台完成（详见 `system-design.md` §4.5）。
 

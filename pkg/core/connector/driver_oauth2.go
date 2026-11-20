@@ -1,4 +1,4 @@
-package svcauth
+package connector
 
 import (
 	"context"
@@ -16,34 +16,34 @@ import (
 	"github.com/morehao/golib/glog"
 )
 
-type oauth2IdentityNormalizer func(config ConnectorConfig, claims map[string]any) (StandardIdentity, error)
+type oauth2IdentityNormalizer func(config Config, claims map[string]any) (StandardIdentity, error)
 
 type OAuth2Driver struct {
 	normalizers     map[model.ConnectorProvider]oauth2IdentityNormalizer
 	tokenExchanger  func(ctx context.Context, config oauth2.Config, code string, codeVerifier string) (*oauth2.Token, error)
-	userInfoFetcher func(ctx context.Context, token *oauth2.Token, config ConnectorConfig) (map[string]any, error)
+	userInfoFetcher func(ctx context.Context, token *oauth2.Token, config Config) (map[string]any, error)
 }
 
-var _ ConnectorDriver = (*OAuth2Driver)(nil)
+var _ Driver = (*OAuth2Driver)(nil)
 
-func NewOAuth2Driver() ConnectorDriver {
+func NewOAuth2Driver() Driver {
 	return &OAuth2Driver{
 		normalizers: map[model.ConnectorProvider]oauth2IdentityNormalizer{
-			connectorProviderGithub: normalizeGitHubIdentity,
-			connectorProviderWechat: normalizeOAuth2IdentityPassthrough,
+			ProviderGithub: normalizeGitHubIdentity,
+			ProviderWechat: normalizeOAuth2IdentityPassthrough,
 		},
 	}
 }
 
 func (d *OAuth2Driver) DriverType() model.ConnectorProtocol {
-	return connectorDriverTypeOAuth2
+	return DriverTypeOAuth2
 }
 
-func (d *OAuth2Driver) ValidateConfig(config ConnectorConfig) error {
-	return validateOAuth2ConnectorConfig(config)
+func (d *OAuth2Driver) ValidateConfig(config Config) error {
+	return validateOAuth2Config(config)
 }
 
-func (d *OAuth2Driver) BuildAuthorizationURL(ctx context.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error) {
+func (d *OAuth2Driver) BuildAuthorizationURL(ctx context.Context, input *AuthorizeInput) (*AuthorizeOutput, error) {
 	_ = ctx
 	if input == nil {
 		return nil, code.GetError(code.ConnectorGetDetailError)
@@ -52,7 +52,7 @@ func (d *OAuth2Driver) BuildAuthorizationURL(ctx context.Context, input *Connect
 		return nil, err
 	}
 	// H10：出站目标（authURL/tokenURL）做 SSRF 防护
-	if err := validateOutboundURL(input.Config.AuthURL); err != nil {
+	if err := ValidateOutboundURL(input.Config.AuthURL); err != nil {
 		glog.Warnf(ctx, "[OAuth2Driver.BuildAuthorizationURL] invalid auth url, err:%v", err)
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
@@ -60,7 +60,7 @@ func (d *OAuth2Driver) BuildAuthorizationURL(ctx context.Context, input *Connect
 	oauthConfig := oauth2.Config{
 		ClientID:     input.Config.ClientID,
 		ClientSecret: input.Config.ClientSecret,
-		RedirectURL:  resolveConnectorRedirectURI(input),
+		RedirectURL:  resolveAuthorizeRedirectURI(input),
 		Scopes:       input.Config.Scopes,
 		Endpoint: oauth2.Endpoint{
 			AuthURL:  input.Config.AuthURL,
@@ -69,23 +69,23 @@ func (d *OAuth2Driver) BuildAuthorizationURL(ctx context.Context, input *Connect
 	}
 
 	// H10：OAuth2 授权码模式启用 PKCE（S256），防授权码截获兑换
-	verifier, err := generatePKCEVerifier()
+	verifier, err := GeneratePKCEVerifier()
 	if err != nil {
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
 	authURL := oauthConfig.AuthCodeURL(input.State,
-		oauth2.SetAuthURLParam("code_challenge", pkceChallengeS256(verifier)),
+		oauth2.SetAuthURLParam("code_challenge", PKCEChallengeS256(verifier)),
 		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
 	)
 
-	return &ConnectorAuthorizeOutput{
+	return &AuthorizeOutput{
 		AuthorizationURL: authURL,
 		Nonce:            "",
 		CodeVerifier:     verifier,
 	}, nil
 }
 
-func (d *OAuth2Driver) ExchangeCallback(ctx context.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
+func (d *OAuth2Driver) ExchangeCallback(ctx context.Context, input *CallbackInput) (*CallbackOutput, error) {
 	if input == nil {
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
@@ -93,12 +93,12 @@ func (d *OAuth2Driver) ExchangeCallback(ctx context.Context, input *ConnectorCal
 		return nil, err
 	}
 	// H10：token/userinfo 出站目标做 SSRF 防护
-	if err := validateOutboundURL(input.Config.TokenURL); err != nil {
+	if err := ValidateOutboundURL(input.Config.TokenURL); err != nil {
 		glog.Warnf(ctx, "[OAuth2Driver.ExchangeCallback] invalid token url, err:%v", err)
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
 	if input.Config.UserInfoURL != "" {
-		if err := validateOutboundURL(input.Config.UserInfoURL); err != nil {
+		if err := ValidateOutboundURL(input.Config.UserInfoURL); err != nil {
 			glog.Warnf(ctx, "[OAuth2Driver.ExchangeCallback] invalid userinfo url, err:%v", err)
 			return nil, code.GetError(code.ConnectorGetDetailError)
 		}
@@ -106,7 +106,7 @@ func (d *OAuth2Driver) ExchangeCallback(ctx context.Context, input *ConnectorCal
 	oauthConfig := oauth2.Config{
 		ClientID:     input.Config.ClientID,
 		ClientSecret: input.Config.ClientSecret,
-		RedirectURL:  resolveConnectorCallbackRedirectURI(input),
+		RedirectURL:  resolveCallbackRedirectURI(input),
 		Scopes:       input.Config.Scopes,
 		Endpoint: oauth2.Endpoint{
 			AuthURL:  input.Config.AuthURL,
@@ -125,23 +125,23 @@ func (d *OAuth2Driver) ExchangeCallback(ctx context.Context, input *ConnectorCal
 	if err != nil {
 		return nil, err
 	}
-	return &ConnectorCallbackOutput{
+	return &CallbackOutput{
 		Identity:     identity,
 		AccessToken:  token.AccessToken,
 		RefreshToken: token.RefreshToken,
 	}, nil
 }
 
-func (d *OAuth2Driver) TestConnection(ctx context.Context, input *ConnectorTestInput) (*ConnectorTestOutput, error) {
+func (d *OAuth2Driver) TestConnection(ctx context.Context, input *TestInput) (*TestOutput, error) {
 	_ = ctx
 	_ = input
-	return &ConnectorTestOutput{
+	return &TestOutput{
 		Success: true,
 		Message: "连接成功",
 	}, nil
 }
 
-func (d *OAuth2Driver) normalizeIdentity(config ConnectorConfig, claims map[string]any) (StandardIdentity, error) {
+func (d *OAuth2Driver) normalizeIdentity(config Config, claims map[string]any) (StandardIdentity, error) {
 	if claims == nil {
 		claims = map[string]any{}
 	}
@@ -159,21 +159,21 @@ func (d *OAuth2Driver) getNormalizers() map[model.ConnectorProvider]oauth2Identi
 	return NewOAuth2Driver().(*OAuth2Driver).normalizers
 }
 
-func (d *OAuth2Driver) exchangeToken(ctx context.Context, config oauth2.Config, code string, codeVerifier string) (*oauth2.Token, error) {
+func (d *OAuth2Driver) exchangeToken(ctx context.Context, config oauth2.Config, codeValue string, codeVerifier string) (*oauth2.Token, error) {
 	if d.tokenExchanger != nil {
-		return d.tokenExchanger(ctx, config, code, codeVerifier)
+		return d.tokenExchanger(ctx, config, codeValue, codeVerifier)
 	}
 	authOpts := []oauth2.AuthCodeOption{}
 	if codeVerifier != "" {
 		authOpts = append(authOpts, oauth2.SetAuthURLParam("code_verifier", codeVerifier))
 	}
-	return config.Exchange(ctx, code, authOpts...)
+	return config.Exchange(ctx, codeValue, authOpts...)
 }
 
 // connectorHTTPClient 出站 HTTP 客户端：带超时，防 IdP 不响应导致请求挂起。
 var connectorHTTPClient = &http.Client{Timeout: 10 * time.Second}
 
-func (d *OAuth2Driver) fetchUserInfo(ctx context.Context, token *oauth2.Token, config ConnectorConfig) (map[string]any, error) {
+func (d *OAuth2Driver) fetchUserInfo(ctx context.Context, token *oauth2.Token, config Config) (map[string]any, error) {
 	if d.userInfoFetcher != nil {
 		return d.userInfoFetcher(ctx, token, config)
 	}
@@ -195,7 +195,7 @@ func (d *OAuth2Driver) fetchUserInfo(ctx context.Context, token *oauth2.Token, c
 	return claims, nil
 }
 
-func normalizeGitHubIdentity(config ConnectorConfig, claims map[string]any) (StandardIdentity, error) {
+func normalizeGitHubIdentity(config Config, claims map[string]any) (StandardIdentity, error) {
 	subject, err := oauth2ClaimString(claims, "id")
 	if err != nil {
 		return StandardIdentity{}, err
@@ -210,7 +210,7 @@ func normalizeGitHubIdentity(config ConnectorConfig, claims map[string]any) (Sta
 	}, nil
 }
 
-func normalizeOAuth2IdentityPassthrough(config ConnectorConfig, claims map[string]any) (StandardIdentity, error) {
+func normalizeOAuth2IdentityPassthrough(config Config, claims map[string]any) (StandardIdentity, error) {
 	return StandardIdentity{
 		Issuer: string(config.Provider),
 		Claims: claims,

@@ -10,6 +10,7 @@ import {
   DashboardOutlined,
   GlobalOutlined,
   KeyOutlined,
+  LinkOutlined,
   ProfileOutlined,
   ProjectOutlined,
   SafetyCertificateOutlined,
@@ -45,6 +46,7 @@ const PLATFORM_ICONS: Record<string, ReactNode> = {
   oauth: <ApiOutlined />, // OAuth 客户端（接入接口）
   menu: <ProfileOutlined />, // 菜单管理（清单/字典）
   dashboard: <DashboardOutlined />, // 工作台
+  connector: <LinkOutlined />, // 身份连接器（外部身份接入/关联）
   setting: <SettingOutlined />, // 平台管理（目录）
   config: <SlidersOutlined />, // 配置中心（运行时参数调节，与「平台管理」目录图标区分）
   audit: <AuditOutlined />, // 审计日志
@@ -105,6 +107,7 @@ export const MENU_ICON_LABELS: Record<string, string> = {
   oauth: 'OAuth 客户端',
   menu: '菜单',
   dashboard: '工作台',
+  connector: '身份连接器',
   setting: '设置',
   config: '配置中心',
   audit: '审计',

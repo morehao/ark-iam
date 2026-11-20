@@ -1,4 +1,4 @@
-package svcauth
+package connector
 
 import (
 	"context"
@@ -87,9 +87,9 @@ func (u fakeOIDCUserInfo) Claims(target any) error {
 func TestOIDCDriverValidateConfigRequiresIssuer(t *testing.T) {
 	driver := &OIDCDriver{}
 
-	err := driver.ValidateConfig(ConnectorConfig{
-		Protocol:     connectorDriverTypeOIDC,
-		Provider:     connectorProviderGoogle,
+	err := driver.ValidateConfig(Config{
+		Protocol:     DriverTypeOIDC,
+		Provider:     ProviderGoogle,
 		ClientID:     "client-id",
 		ClientSecret: "client-secret",
 		RedirectURI:  "https://console.example.com/callback",
@@ -100,9 +100,9 @@ func TestOIDCDriverValidateConfigRequiresIssuer(t *testing.T) {
 }
 
 func TestOIDCDriverValidateConfigMatchesSharedValidator(t *testing.T) {
-	config := ConnectorConfig{
-		Protocol:     connectorDriverTypeOIDC,
-		Provider:     connectorProviderMicrosoft,
+	config := Config{
+		Protocol:     DriverTypeOIDC,
+		Provider:     ProviderMicrosoft,
 		Issuer:       "https://issuer.example.com",
 		ClientID:     "client-id",
 		ClientSecret: "client-secret",
@@ -114,7 +114,7 @@ func TestOIDCDriverValidateConfigMatchesSharedValidator(t *testing.T) {
 	if err := driver.ValidateConfig(config); err != nil {
 		t.Fatalf("OIDCDriver ValidateConfig returned error: %v", err)
 	}
-	if err := validateOIDCConnectorConfig(config); err != nil {
+	if err := validateOIDCConfig(config); err != nil {
 		t.Fatalf("shared OIDC validator returned error: %v", err)
 	}
 }
@@ -132,10 +132,10 @@ func TestOIDCDriverBuildAuthorizationURLIncludesNonce(t *testing.T) {
 		},
 	}
 
-	resp, err := driver.BuildAuthorizationURL(nil, &ConnectorAuthorizeInput{
-		Config: ConnectorConfig{
-			Protocol:     connectorDriverTypeOIDC,
-			Provider:     connectorProviderGoogle,
+	resp, err := driver.BuildAuthorizationURL(nil, &AuthorizeInput{
+		Config: Config{
+			Protocol:     DriverTypeOIDC,
+			Provider:     ProviderGoogle,
 			Issuer:       "https://issuer.example.com",
 			ClientID:     "client-id",
 			ClientSecret: "client-secret",
@@ -175,10 +175,10 @@ func TestOIDCDriverBuildAuthorizationURLUsesRequestRedirectURI(t *testing.T) {
 		},
 	}
 
-	resp, err := driver.BuildAuthorizationURL(nil, &ConnectorAuthorizeInput{
-		Config: ConnectorConfig{
-			Protocol:     connectorDriverTypeOIDC,
-			Provider:     connectorProviderGoogle,
+	resp, err := driver.BuildAuthorizationURL(nil, &AuthorizeInput{
+		Config: Config{
+			Protocol:     DriverTypeOIDC,
+			Provider:     ProviderGoogle,
 			Issuer:       "https://issuer.example.com",
 			ClientID:     "client-id",
 			ClientSecret: "client-secret",
@@ -200,8 +200,8 @@ func TestOIDCDriverBuildAuthorizationURLUsesRequestRedirectURI(t *testing.T) {
 	}
 }
 
-func TestDefaultConnectorDriverRegistryUsesRealOIDCDriver(t *testing.T) {
-	driver, ok := defaultConnectorDriverRegistry().Get(connectorDriverTypeOIDC)
+func TestDefaultDriverRegistryUsesRealOIDCDriver(t *testing.T) {
+	driver, ok := DefaultDriverRegistry().Get(DriverTypeOIDC)
 	if !ok {
 		t.Fatalf("expected oidc driver in registry")
 	}
@@ -238,10 +238,10 @@ func TestOIDCDriverExchangeCallbackReturnsStandardIdentity(t *testing.T) {
 		},
 	}
 
-	resp, err := driver.ExchangeCallback(nil, &ConnectorCallbackInput{
-		Config: ConnectorConfig{
-			Protocol:     connectorDriverTypeOIDC,
-			Provider:     connectorProviderGoogle,
+	resp, err := driver.ExchangeCallback(nil, &CallbackInput{
+		Config: Config{
+			Protocol:     DriverTypeOIDC,
+			Provider:     ProviderGoogle,
 			Issuer:       "https://issuer.example.com",
 			ClientID:     "oidc-client-id",
 			ClientSecret: "oidc-client-secret",

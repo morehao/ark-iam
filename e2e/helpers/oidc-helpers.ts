@@ -20,9 +20,15 @@ function isAdminUrl(url: string): boolean {
 }
 
 export async function fillLoginWebCredentials(page: Page): Promise<void> {
-  await page.waitForSelector('#identifier', { timeout: 10000 });
-  await page.fill('#identifier', CONFIG.identifier);
-  await page.fill('#password', CONFIG.password);
+  // login-web 的凭证表单位于 @ark-iam/login 的 LoginPage，输入框**没有 id**，
+  // 只有 placeholder（「请输入用户名」/「请输入密码」）。用 placeholder 定位更稳健，
+  // 兼容 antd Input / Input.Password 渲染结构。
+  const identifier = page.getByPlaceholder('请输入用户名');
+  await identifier.waitFor({ state: 'visible', timeout: 15000 });
+  await identifier.fill(CONFIG.identifier);
+  const password = page.getByPlaceholder('请输入密码');
+  await password.waitFor({ state: 'visible', timeout: 15000 });
+  await password.fill(CONFIG.password);
   await page.click('button[type="submit"]');
 }
 

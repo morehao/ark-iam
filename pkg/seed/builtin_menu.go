@@ -26,6 +26,8 @@ var builtinMenuDefs = []seedMenu{
 	{appCode: appCodeAdmin, name: "平台管理", code: "grp-platform", icon: "setting", sort: 4, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
 	{appCode: appCodeAdmin, parentCode: "grp-platform", name: "菜单管理", code: "menu", path: "/menu", icon: "menu", sort: 1, component: "/menu/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 	{appCode: appCodeAdmin, parentCode: "grp-platform", name: "配置中心", code: "setting", path: "/settings", icon: "config", sort: 2, component: "/setting/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+	// 身份连接器：平台级全局对象（平台信任哪些外部 IdP），供平台运营端统一管理。
+	{appCode: appCodeAdmin, parentCode: "grp-platform", name: "身份连接器", code: "connector", path: "/connector", icon: "connector", sort: 3, component: "/connector/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 	// 租户管理后台一级菜单：控制台定位为「租户管理层专用」（部门/用户/角色/密钥均属管理操作，
 	// 全部 visibility=admin 硬隔离；普通成员不面向该控制台，仅内置管理员角色可见与授权）。
 	// 用户/角色/密钥编码加 tenant- 前缀，避免与平台菜单 code 撞名。

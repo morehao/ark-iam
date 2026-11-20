@@ -176,7 +176,7 @@ func (a *App) Mount(rg *gin.RouterGroup) error {
 	conf := a.rawConfig()
 
 	// platform 域：鉴权中间件（OIDCAuth + RequireAppAccess）+ back-channel logout。
-	if a.anyDomain(keep, []Domain{DomainMenu, DomainTenant, DomainApplication, DomainOAuthClient, DomainDomain, DomainTenantApp, DomainAudit, DomainSetting}) {
+	if a.anyDomain(keep, []Domain{DomainMenu, DomainTenant, DomainApplication, DomainOAuthClient, DomainConnector, DomainDomain, DomainTenantApp, DomainAudit, DomainSetting}) {
 		platformGroup := v1.Group("/platform")
 		if a.keySource != nil {
 			platformGroup.Use(a.authMiddlewareForGroup(conf, model.SeedBuiltinClientPlatformAdminWeb)...)
@@ -251,6 +251,7 @@ func (a *App) platformKeys(keep map[Domain]bool) []string {
 		DomainTenant:      "tenant",
 		DomainApplication: "application",
 		DomainOAuthClient: "oauth-client",
+		DomainConnector:   "connector",
 		DomainDomain:      "domain",
 		DomainTenantApp:   "tenant-app",
 		DomainAudit:       "audit",

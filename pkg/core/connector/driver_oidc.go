@@ -1,4 +1,4 @@
-package svcauth
+package connector
 
 import (
 	"context"
@@ -47,9 +47,9 @@ type coreOIDCProvider struct {
 	provider *oidc.Provider
 }
 
-var _ ConnectorDriver = (*OIDCDriver)(nil)
+var _ Driver = (*OIDCDriver)(nil)
 
-func NewOIDCDriver() ConnectorDriver {
+func NewOIDCDriver() Driver {
 	return &OIDCDriver{
 		providerFactory: defaultOIDCProviderFactory,
 		nonceGenerator:  defaultOIDCNonceGenerator,
@@ -57,14 +57,14 @@ func NewOIDCDriver() ConnectorDriver {
 }
 
 func (d *OIDCDriver) DriverType() model.ConnectorProtocol {
-	return connectorDriverTypeOIDC
+	return DriverTypeOIDC
 }
 
-func (d *OIDCDriver) ValidateConfig(config ConnectorConfig) error {
-	return validateOIDCConnectorConfig(config)
+func (d *OIDCDriver) ValidateConfig(config Config) error {
+	return validateOIDCConfig(config)
 }
 
-func (d *OIDCDriver) BuildAuthorizationURL(ctx context.Context, input *ConnectorAuthorizeInput) (*ConnectorAuthorizeOutput, error) {
+func (d *OIDCDriver) BuildAuthorizationURL(ctx context.Context, input *AuthorizeInput) (*AuthorizeOutput, error) {
 	if input == nil {
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
@@ -72,7 +72,7 @@ func (d *OIDCDriver) BuildAuthorizationURL(ctx context.Context, input *Connector
 		return nil, err
 	}
 	// H10：discovery issuer 出站目标做 SSRF 防护
-	if err := validateOutboundURL(input.Config.Issuer); err != nil {
+	if err := ValidateOutboundURL(input.Config.Issuer); err != nil {
 		glog.Warnf(ctx, "[OIDCDriver.BuildAuthorizationURL] invalid issuer, err:%v", err)
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
@@ -86,7 +86,7 @@ func (d *OIDCDriver) BuildAuthorizationURL(ctx context.Context, input *Connector
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
 	// H10：授权码模式启用 PKCE（S256）
-	verifier, err := generatePKCEVerifier()
+	verifier, err := GeneratePKCEVerifier()
 	if err != nil {
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
@@ -94,23 +94,23 @@ func (d *OIDCDriver) BuildAuthorizationURL(ctx context.Context, input *Connector
 	oauthConfig := oauth2.Config{
 		ClientID:     input.Config.ClientID,
 		ClientSecret: input.Config.ClientSecret,
-		RedirectURL:  resolveConnectorRedirectURI(input),
+		RedirectURL:  resolveAuthorizeRedirectURI(input),
 		Scopes:       input.Config.Scopes.Strings(),
 		Endpoint:     provider.Endpoint(),
 	}
 	authURL := oauthConfig.AuthCodeURL(input.State,
 		oidc.Nonce(nonce),
-		oauth2.SetAuthURLParam("code_challenge", pkceChallengeS256(verifier)),
+		oauth2.SetAuthURLParam("code_challenge", PKCEChallengeS256(verifier)),
 		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
 	)
-	return &ConnectorAuthorizeOutput{
+	return &AuthorizeOutput{
 		AuthorizationURL: authURL,
 		Nonce:            nonce,
 		CodeVerifier:     verifier,
 	}, nil
 }
 
-func (d *OIDCDriver) ExchangeCallback(ctx context.Context, input *ConnectorCallbackInput) (*ConnectorCallbackOutput, error) {
+func (d *OIDCDriver) ExchangeCallback(ctx context.Context, input *CallbackInput) (*CallbackOutput, error) {
 	if input == nil {
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
@@ -118,7 +118,7 @@ func (d *OIDCDriver) ExchangeCallback(ctx context.Context, input *ConnectorCallb
 		return nil, err
 	}
 	// H10：discovery issuer 出站目标做 SSRF 防护
-	if err := validateOutboundURL(input.Config.Issuer); err != nil {
+	if err := ValidateOutboundURL(input.Config.Issuer); err != nil {
 		glog.Warnf(ctx, "[OIDCDriver.ExchangeCallback] invalid issuer, err:%v", err)
 		return nil, code.GetError(code.ConnectorGetDetailError)
 	}
@@ -129,7 +129,7 @@ func (d *OIDCDriver) ExchangeCallback(ctx context.Context, input *ConnectorCallb
 	oauthConfig := oauth2.Config{
 		ClientID:     input.Config.ClientID,
 		ClientSecret: input.Config.ClientSecret,
-		RedirectURL:  resolveConnectorCallbackRedirectURI(input),
+		RedirectURL:  resolveCallbackRedirectURI(input),
 		Scopes:       input.Config.Scopes.Strings(),
 		Endpoint:     provider.Endpoint(),
 	}
@@ -168,17 +168,17 @@ func (d *OIDCDriver) ExchangeCallback(ctx context.Context, input *ConnectorCallb
 	if err != nil {
 		return nil, err
 	}
-	return &ConnectorCallbackOutput{
+	return &CallbackOutput{
 		Identity:     identity,
 		AccessToken:  token.AccessToken,
 		RefreshToken: token.RefreshToken,
 	}, nil
 }
 
-func (d *OIDCDriver) TestConnection(ctx context.Context, input *ConnectorTestInput) (*ConnectorTestOutput, error) {
+func (d *OIDCDriver) TestConnection(ctx context.Context, input *TestInput) (*TestOutput, error) {
 	_ = ctx
 	_ = input
-	return &ConnectorTestOutput{
+	return &TestOutput{
 		Success: true,
 		Message: "连接成功",
 	}, nil
@@ -198,15 +198,15 @@ func (d *OIDCDriver) getNonce() (string, error) {
 	return defaultOIDCNonceGenerator()
 }
 
-func (d *OIDCDriver) exchangeToken(ctx context.Context, config oauth2.Config, code string, codeVerifier string) (*oauth2.Token, error) {
+func (d *OIDCDriver) exchangeToken(ctx context.Context, config oauth2.Config, codeValue string, codeVerifier string) (*oauth2.Token, error) {
 	if d.tokenExchanger != nil {
-		return d.tokenExchanger(ctx, config, code, codeVerifier)
+		return d.tokenExchanger(ctx, config, codeValue, codeVerifier)
 	}
 	authOpts := []oauth2.AuthCodeOption{}
 	if codeVerifier != "" {
 		authOpts = append(authOpts, oauth2.SetAuthURLParam("code_verifier", codeVerifier))
 	}
-	return config.Exchange(ctx, code, authOpts...)
+	return config.Exchange(ctx, codeValue, authOpts...)
 }
 
 func (d *OIDCDriver) getVerifier(provider oidcProvider, config *oidc.Config) OIDCVerifier {
@@ -262,21 +262,10 @@ type coreOIDCVerifiedToken struct {
 	token *oidc.IDToken
 }
 
-func (t coreOIDCVerifiedToken) Claims(target any) error {
-	return t.token.Claims(target)
-}
-
-func (t coreOIDCVerifiedToken) Nonce() string {
-	return t.token.Nonce
-}
-
-func (t coreOIDCVerifiedToken) Subject() string {
-	return t.token.Subject
-}
-
-func (t coreOIDCVerifiedToken) Issuer() string {
-	return t.token.Issuer
-}
+func (t coreOIDCVerifiedToken) Claims(target any) error { return t.token.Claims(target) }
+func (t coreOIDCVerifiedToken) Nonce() string          { return t.token.Nonce }
+func (t coreOIDCVerifiedToken) Subject() string        { return t.token.Subject }
+func (t coreOIDCVerifiedToken) Issuer() string         { return t.token.Issuer }
 
 func buildOIDCStandardIdentity(token OIDCVerifiedToken, claims map[string]any) (StandardIdentity, error) {
 	if token == nil || token.Subject() == "" || token.Issuer() == "" {
@@ -303,22 +292,8 @@ func oidcClaimBool(claims map[string]any, key string) bool {
 	if !ok {
 		return false
 	}
-	switch v := value.(type) {
-	case bool:
-		return v
-	default:
-		return false
-	}
-}
-
-func resolveConnectorCallbackRedirectURI(input *ConnectorCallbackInput) string {
-	if input == nil {
-		return ""
-	}
-	if input.RedirectURI != "" {
-		return input.RedirectURI
-	}
-	return input.Config.RedirectURI
+	v, ok := value.(bool)
+	return ok && v
 }
 
 var _ OIDCVerifiedToken = (*coreOIDCVerifiedToken)(nil)

@@ -189,17 +189,13 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | POST | `/v1/auth/logoutAll` | 全端登出（同 logout） |
 | GET | `/v1/auth/userinfo` | 当前用户信息（personInfo + userInfo） |
 
-### 4.3 Connector（外部身份源）
+### 4.3 Connector（外部身份源，运行时）
+
+> 连接器是**平台级全局对象**：管理面（CRUD/工厂/测试）归平台管理端 `/v1/platform/connectors*`（见 §5.6），
+> auth 域**只保留登录运行时链路**（授权跳转、回调换取身份并签发会话）。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/v1/auth/connectors` | 创建连接器 |
-| GET | `/v1/auth/connectors` | 连接器分页列表 |
-| GET | `/v1/auth/connector-factories` | 连接器工厂列表（支持的协议/提供商） |
-| GET | `/v1/auth/connectors/{connectorID}` | 连接器详情 |
-| PUT | `/v1/auth/connectors/{connectorID}` | 更新连接器 |
-| DELETE | `/v1/auth/connectors/{connectorID}` | 删除连接器 |
-| POST | `/v1/auth/connectors/{connectorID}/test` | 测试连接器 |
 | POST | `/v1/auth/connectors/{connectorID}/authorize` | 发起连接器授权 |
 | GET | `/v1/auth/connectors/callback` | 连接器回调（免鉴权） |
 
@@ -281,7 +277,23 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | GET | `/v1/platform/domains` | 域名分页 |
 | GET/PUT/DELETE | `/v1/platform/domains/{domainID}` | 域名详情/更新/删除 |
 
-### 5.6 日志（审计）
+### 5.6 身份连接器（平台级全局对象）
+
+> 连接器=「平台信任哪些外部 IdP」的全局配置，与 OAuth 客户端同层，由平台运营端统一管理，**跨租户**（服务端 `dbclient.CrossTenantContext`）。一次认证可进入多租户；`defaultTenantID` 仅表示「自动创建用户默认落租户」，非归属边界。运行时 authorize/callback 仍在 auth（见 §4.3）。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/v1/platform/connectors` | 创建连接器（`defaultTenantID` 可选；`allowAutoCreateUser=enable` 时必填且须为存在租户） |
+| GET | `/v1/platform/connectors` | 连接器分页列表（返回 `defaultTenantID`/`defaultTenantName`/`createdAt`/`updatedAt`；按 `defaultTenantID`/`protocol`/`provider`/`status`/`name`/`displayName` 过滤） |
+| GET | `/v1/platform/connector-factories` | 连接器工厂列表（支持的协议/提供商） |
+| GET | `/v1/platform/connectors/{connectorID}` | 连接器详情（config.clientSecret 脱敏） |
+| PUT | `/v1/platform/connectors/{connectorID}` | 更新连接器（`defaultTenantID` 可改，不影响已建用户；secret 回传掩码/空串表示保留原值） |
+| DELETE | `/v1/platform/connectors/{connectorID}` | 删除连接器 |
+| POST | `/v1/platform/connectors/{connectorID}/test` | 测试连接器连通性 |
+
+错误码：`100920` 创建失败 / `100921` 删除失败 / `100922` 修改失败 / `100923` 查看详情失败 / `100924` 查看列表失败 / `100925` 连接器不存在 / `100926` 请指定有效的默认落租户。
+
+### 5.7 日志（审计）
 
 | 方法 | 路径 | 说明 |
 |---|---|---|

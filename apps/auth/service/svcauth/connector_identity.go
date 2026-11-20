@@ -13,7 +13,7 @@ import (
 
 type ConnectorRuntime struct {
 	ID                  string
-	TenantID            string
+	DefaultTenantID     string
 	AllowAutoCreateUser bool
 }
 
@@ -236,7 +236,7 @@ func (m *identityMapper) Resolve(ctx context.Context, input identityResolveInput
 		// 否则后续登录流程（Callback → listPersonTenants）查不到成员而失败。
 		now := time.Now()
 		user := &model.UserEntity{
-			TenantID:  input.Connector.TenantID,
+			TenantID:  input.Connector.DefaultTenantID,
 			PersonID:  person.ID,
 			Name:      person.Name,
 			JoinedAt:  &now,

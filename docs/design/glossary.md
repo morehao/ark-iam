@@ -87,7 +87,8 @@
 | 术语 | 英文 | 说明 |
 |---|---|---|
 | 密码登录 | Password Login | 用户名/邮箱/手机号 + 密码（bcrypt） |
-| 连接器 | Connector | 外部身份源接入配置（OIDC/OAuth2 驱动；内置工厂当前提供 Google、GitHub、Microsoft Entra ID） |
+| 连接器 | Connector | **平台级全局对象**：外部身份源接入配置（OIDC/OAuth2 驱动；内置工厂当前提供 Google、GitHub、Microsoft Entra ID）。与 OAuth 客户端同层，由平台运营端统一管理（`/v1/platform/connectors*`，跨租户）；运行时授权/回调在 auth。一次认证可进入多租户，故连接器不归属单个租户 |
+| 默认落租户 | Default Tenant | `connector.default_tenant_id`（实体 `DefaultTenantID`）：**自动创建用户时用户默认落在的租户**（准入门），非管理归属边界。仅当 `allow_auto_create_user=enable` 时有意义且必填；为空却开启自动开户则拒绝。仅作 autocreate 落租户决策点，其余为回显 |
 | 登录风控 | Login Guard | 失败次数窗口与锁定（默认 5 次/5 分钟/锁 15 分钟） |
 | API Key ✅ | API Key | 机器凭证（`x-api-key` 头或 `Authorization: Bearer` 携带，SHA-256 哈希存储、可过期/吊销；`scope` 列保留但**当前不参与鉴权**） |
 | 机器令牌 ✅ | Machine Token | 带 `token_usage=machine` 的令牌（**仅 API Key 签发**，含「API Key 当 client credential」路径），不依赖浏览器会话；普通 `client_credentials` 令牌不带该标记，也不能访问业务 API |

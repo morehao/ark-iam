@@ -1,4 +1,4 @@
-package svcauth
+package connector
 
 import (
 	"context"
@@ -9,19 +9,19 @@ import (
 )
 
 type oauth2IdentityNormalizerDriver interface {
-	normalizeIdentity(config ConnectorConfig, claims map[string]any) (StandardIdentity, error)
+	normalizeIdentity(config Config, claims map[string]any) (StandardIdentity, error)
 }
 
 func TestOAuth2DriverBuildAuthorizationURL(t *testing.T) {
-	driver, ok := defaultConnectorDriverRegistry().Get(connectorDriverTypeOAuth2)
+	driver, ok := DefaultDriverRegistry().Get(DriverTypeOAuth2)
 	if !ok {
 		t.Fatalf("expected oauth2 driver in registry")
 	}
 
-	resp, err := driver.BuildAuthorizationURL(nil, &ConnectorAuthorizeInput{
-		Config: ConnectorConfig{
-			Protocol:     connectorDriverTypeOAuth2,
-			Provider:     connectorProviderGithub,
+	resp, err := driver.BuildAuthorizationURL(nil, &AuthorizeInput{
+		Config: Config{
+			Protocol:     DriverTypeOAuth2,
+			Provider:     ProviderGithub,
 			AuthURL:      "https://github.com/login/oauth/authorize",
 			TokenURL:     "https://github.com/login/oauth/access_token",
 			UserInfoURL:  "https://api.github.com/user",
@@ -64,15 +64,15 @@ func TestOAuth2DriverBuildAuthorizationURL(t *testing.T) {
 }
 
 func TestOAuth2DriverUsesRequestRedirectURI(t *testing.T) {
-	driver, ok := defaultConnectorDriverRegistry().Get(connectorDriverTypeOAuth2)
+	driver, ok := DefaultDriverRegistry().Get(DriverTypeOAuth2)
 	if !ok {
 		t.Fatalf("expected oauth2 driver in registry")
 	}
 
-	resp, err := driver.BuildAuthorizationURL(nil, &ConnectorAuthorizeInput{
-		Config: ConnectorConfig{
-			Protocol:     connectorDriverTypeOAuth2,
-			Provider:     connectorProviderGithub,
+	resp, err := driver.BuildAuthorizationURL(nil, &AuthorizeInput{
+		Config: Config{
+			Protocol:     DriverTypeOAuth2,
+			Provider:     ProviderGithub,
 			AuthURL:      "https://github.com/login/oauth/authorize",
 			TokenURL:     "https://github.com/login/oauth/access_token",
 			UserInfoURL:  "https://api.github.com/user",
@@ -97,7 +97,7 @@ func TestOAuth2DriverUsesRequestRedirectURI(t *testing.T) {
 }
 
 func TestOAuth2DriverNormalizeGitHubIdentity(t *testing.T) {
-	driver, ok := defaultConnectorDriverRegistry().Get(connectorDriverTypeOAuth2)
+	driver, ok := DefaultDriverRegistry().Get(DriverTypeOAuth2)
 	if !ok {
 		t.Fatalf("expected oauth2 driver in registry")
 	}
@@ -107,9 +107,9 @@ func TestOAuth2DriverNormalizeGitHubIdentity(t *testing.T) {
 		t.Fatalf("expected oauth2 driver to expose normalizeIdentity hook, got %T", driver)
 	}
 
-	identity, err := normalizer.normalizeIdentity(ConnectorConfig{
-		Protocol: connectorDriverTypeOAuth2,
-		Provider: connectorProviderGithub,
+	identity, err := normalizer.normalizeIdentity(Config{
+		Protocol: DriverTypeOAuth2,
+		Provider: ProviderGithub,
 	}, map[string]any{
 		"id":         float64(12345),
 		"login":      "octocat",
@@ -137,8 +137,8 @@ func TestOAuth2DriverNormalizeGitHubIdentity(t *testing.T) {
 	}
 }
 
-func TestDefaultConnectorDriverRegistryUsesRealOAuth2Driver(t *testing.T) {
-	driver, ok := defaultConnectorDriverRegistry().Get(connectorDriverTypeOAuth2)
+func TestDefaultDriverRegistryUsesRealOAuth2Driver(t *testing.T) {
+	driver, ok := DefaultDriverRegistry().Get(DriverTypeOAuth2)
 	if !ok {
 		t.Fatalf("expected oauth2 driver in registry")
 	}
@@ -159,7 +159,7 @@ func TestOAuth2DriverExchangeCallbackReturnsNormalizedIdentity(t *testing.T) {
 			}
 			return &oauth2.Token{AccessToken: "provider-access", RefreshToken: "provider-refresh"}, nil
 		},
-		userInfoFetcher: func(ctx context.Context, token *oauth2.Token, config ConnectorConfig) (map[string]any, error) {
+		userInfoFetcher: func(ctx context.Context, token *oauth2.Token, config Config) (map[string]any, error) {
 			if token.AccessToken != "provider-access" {
 				t.Fatalf("expected provider access token, got %q", token.AccessToken)
 			}
@@ -172,10 +172,10 @@ func TestOAuth2DriverExchangeCallbackReturnsNormalizedIdentity(t *testing.T) {
 		},
 	}
 
-	resp, err := driver.ExchangeCallback(nil, &ConnectorCallbackInput{
-		Config: ConnectorConfig{
-			Protocol:     connectorDriverTypeOAuth2,
-			Provider:     connectorProviderGithub,
+	resp, err := driver.ExchangeCallback(nil, &CallbackInput{
+		Config: Config{
+			Protocol:     DriverTypeOAuth2,
+			Provider:     ProviderGithub,
 			AuthURL:      "https://github.com/login/oauth/authorize",
 			TokenURL:     "https://github.com/login/oauth/access_token",
 			UserInfoURL:  "https://api.github.com/user",
