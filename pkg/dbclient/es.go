@@ -3,7 +3,7 @@ package dbclient
 import (
 	"fmt"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	elasticsearch "github.com/elastic/go-elasticsearch/v9"
 	"github.com/morehao/golib/dbaccess/dbes"
 	"github.com/morehao/golib/glog"
 )
