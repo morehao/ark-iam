@@ -74,12 +74,3 @@ type CallbackOutput struct {
 	AccessToken  string
 	RefreshToken string
 }
-
-type TestInput struct {
-	Config Config
-}
-
-type TestOutput struct {
-	Success bool
-	Message string
-}

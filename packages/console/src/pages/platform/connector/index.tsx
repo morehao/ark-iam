@@ -7,7 +7,6 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
-  ThunderboltOutlined,
 } from '@ant-design/icons'
 import {
   actionColumn,
@@ -27,7 +26,6 @@ import type { ConnectorItem, TenantItem } from '@ark-iam/types'
 import { PROVIDER_COLOR, PROVIDER_LABEL } from './constants'
 import ConnectorWizard from './ConnectorWizard'
 import ConnectorDetail from './ConnectorDetail'
-import ConnectorTestModal from './ConnectorTestModal'
 
 type StatusFilter = 'all' | 'enable' | 'disable'
 
@@ -55,8 +53,6 @@ export default function ConnectorList() {
   const [detailOpen, setDetailOpen] = useState(false)
   const [detail, setDetail] = useState<ConnectorItem | null>(null)
 
-  const [testOpen, setTestOpen] = useState(false)
-  const [testing, setTesting] = useState<ConnectorItem | null>(null)
 
   // 平台租户列表（供「默认落租户」筛选下拉）
   useEffect(() => {
@@ -102,10 +98,6 @@ export default function ConnectorList() {
   const handleOpenDetail = (r: ConnectorItem) => {
     setDetail(r)
     setDetailOpen(true)
-  }
-  const handleTest = (r: ConnectorItem) => {
-    setTesting(r)
-    setTestOpen(true)
   }
   const handleDelete = async (r: ConnectorItem) => {
     try {
@@ -161,7 +153,6 @@ export default function ConnectorList() {
       variant: 'icon',
       actions: (r) => [
         { key: 'edit', label: '编辑', icon: <EditOutlined />, onClick: () => handleEdit(r) },
-        { key: 'test', label: '测试', icon: <ThunderboltOutlined />, onClick: () => handleTest(r) },
         {
           key: 'delete',
           label: '删除',
@@ -275,13 +266,8 @@ export default function ConnectorList() {
         connector={detail}
         onClose={() => setDetailOpen(false)}
         onEdit={handleEdit}
-        onTest={(c) => {
-          setDetailOpen(false)
-          handleTest(c)
-        }}
       />
 
-      <ConnectorTestModal open={testOpen} connector={testing} onClose={() => setTestOpen(false)} />
     </PageContainer>
   )
 }

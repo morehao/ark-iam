@@ -75,10 +75,3 @@ type ConnectorFactoryListReq struct {
 	Protocol model.ConnectorProtocol `json:"protocol" form:"protocol"` // 协议类型
 	Provider model.ConnectorProvider `json:"provider" form:"provider"` // 提供商
 }
-
-// ConnectorIDReq 仅含连接器ID的动作入参（如测试连接）。
-type ConnectorIDReq struct {
-	ConnectorID string `json:"-" uri:"connectorID" binding:"required"` // 连接器ID（path 唯一来源）
-	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
-	Operator objidentity.Operator
-}

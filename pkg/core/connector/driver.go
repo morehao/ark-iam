@@ -54,7 +54,6 @@ type Driver interface {
 	ValidateConfig(config Config) error
 	BuildAuthorizationURL(ctx context.Context, input *AuthorizeInput) (*AuthorizeOutput, error)
 	ExchangeCallback(ctx context.Context, input *CallbackInput) (*CallbackOutput, error)
-	TestConnection(ctx context.Context, input *TestInput) (*TestOutput, error)
 }
 
 // DriverRegistry 按协议类型注册/选择驱动。
@@ -151,6 +150,3 @@ func (d *stubDriver) ExchangeCallback(ctx context.Context, input *CallbackInput)
 	return &CallbackOutput{}, nil
 }
 
-func (d *stubDriver) TestConnection(ctx context.Context, input *TestInput) (*TestOutput, error) {
-	return &TestOutput{Success: true, Message: "连接成功"}, nil
-}

@@ -132,14 +132,6 @@ func (d *OAuth2Driver) ExchangeCallback(ctx context.Context, input *CallbackInpu
 	}, nil
 }
 
-func (d *OAuth2Driver) TestConnection(ctx context.Context, input *TestInput) (*TestOutput, error) {
-	_ = ctx
-	_ = input
-	return &TestOutput{
-		Success: true,
-		Message: "连接成功",
-	}, nil
-}
 
 func (d *OAuth2Driver) normalizeIdentity(config Config, claims map[string]any) (StandardIdentity, error) {
 	if claims == nil {

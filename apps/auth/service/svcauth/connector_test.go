@@ -116,7 +116,6 @@ type fakeConnectorDriver struct {
 	validateConfigFunc        func(config connector.Config) error
 	buildAuthorizationURLFunc func(ctx context.Context, input *connector.AuthorizeInput) (*connector.AuthorizeOutput, error)
 	exchangeCallbackFunc      func(ctx context.Context, input *connector.CallbackInput) (*connector.CallbackOutput, error)
-	testConnectionFunc        func(ctx context.Context, input *connector.TestInput) (*connector.TestOutput, error)
 }
 
 func (f *fakeConnectorDriver) DriverType() model.ConnectorProtocol {
@@ -144,12 +143,6 @@ func (f *fakeConnectorDriver) ExchangeCallback(ctx context.Context, input *conne
 	return f.exchangeCallbackFunc(ctx, input)
 }
 
-func (f *fakeConnectorDriver) TestConnection(ctx context.Context, input *connector.TestInput) (*connector.TestOutput, error) {
-	if f.testConnectionFunc == nil {
-		return &connector.TestOutput{}, nil
-	}
-	return f.testConnectionFunc(ctx, input)
-}
 
 func (f *fakeConnectorUserIdentityRepository) GetByIssuerAndExternalSubject(ctx context.Context, issuer, externalSubject string) (*model.UserIdentityEntity, error) {
 	if f.getByIssuerAndExternalSubjectFunc == nil {

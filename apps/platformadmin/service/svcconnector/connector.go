@@ -25,7 +25,6 @@ type ConnectorSvc interface {
 	Detail(ctx context.Context, req *dtoconnector.ConnectorDetailReq) (*dtoconnector.ConnectorDetailResp, error)
 	PageList(ctx context.Context, req *dtoconnector.ConnectorPageListReq) (*dtoconnector.ConnectorPageListResp, error)
 	ListFactories(ctx context.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error)
-	TestConnector(ctx context.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.ConnectorTestResp, error)
 }
 
 type connectorSvc struct {
@@ -307,29 +306,6 @@ func (svc *connectorSvc) ListFactories(ctx context.Context, req *dtoconnector.Co
 	return &dtoconnector.ConnectorFactoryListResp{List: items}, nil
 }
 
-// TestConnector 对连接器做连通性测试（选择驱动后调用 TestConnection）。
-func (svc *connectorSvc) TestConnector(ctx context.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.ConnectorTestResp, error) {
-	crossCtx := dbclient.CrossTenantContext(ctx)
-	entity, err := svc.connectorDao().GetByID(crossCtx, req.ConnectorID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcconnector.TestConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.ConnectorGetDetailError)
-	}
-	if entity == nil || entity.ID == "" {
-		return nil, code.GetError(code.ConnectorNotExistError)
-	}
-	driver, config, err := connector.SelectDriverForConnector(connector.DefaultDriverRegistry(), entity)
-	if err != nil {
-		glog.Errorf(ctx, "[svcconnector.TestConnector] select driver fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.ConnectorGetDetailError)
-	}
-	out, err := driver.TestConnection(ctx, &connector.TestInput{Config: config})
-	if err != nil {
-		glog.Errorf(ctx, "[svcconnector.TestConnector] driver TestConnection fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.ConnectorGetDetailError)
-	}
-	return &dtoconnector.ConnectorTestResp{Success: out.Success, Message: out.Message}, nil
-}
 
 // toBaseInfo 把实体转为前端展示的 ConnectorBaseInfo：config 脱敏（clientSecret 不回传明文）。
 func toBaseInfo(entity model.ConnectorEntity) objauth.ConnectorBaseInfo {

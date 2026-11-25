@@ -16,5 +16,4 @@ func connectorRouter(rg *gin.RouterGroup, db gormdao.DBGetter) {
 	rg.GET("/connectors/:connectorID", ctr.Detail)
 	rg.PUT("/connectors/:connectorID", ctr.Update)
 	rg.DELETE("/connectors/:connectorID", ctr.Delete)
-	rg.POST("/connectors/:connectorID/test", ctr.TestConnector)
 }

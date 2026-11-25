@@ -51,9 +51,3 @@ type ConnectorFactoryResp struct {
 type ConnectorFactoryListResp struct {
 	List []ConnectorFactoryResp `json:"list"` // 工厂列表
 }
-
-// ConnectorTestResp 连接器连通性测试响应。
-type ConnectorTestResp struct {
-	Success bool   `json:"success"` // 是否连通
-	Message string `json:"message"` // 结果说明
-}
