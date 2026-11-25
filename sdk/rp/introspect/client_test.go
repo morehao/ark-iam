@@ -42,7 +42,8 @@ func TestIntrospect_ActiveAndInactive(t *testing.T) {
 	assert.Equal(t, int64(1999999999), got.ExpiresAt)
 
 	got, err = client.Introspect(context.Background(), "revoked")
-	require.NoError(t, err)
+	require.ErrorIs(t, err, ErrInactive)
+	require.NotNil(t, got)
 	assert.False(t, got.Active)
 }
 

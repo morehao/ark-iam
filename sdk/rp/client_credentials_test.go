@@ -100,3 +100,26 @@ func TestTokenClient_EmptyAccessToken(t *testing.T) {
 	_, err = client.Token(context.Background())
 	assert.Contains(t, err.Error(), "no access_token")
 }
+
+// TestTokenClient_BasicAuthSpecialChars 回归 P1-4：
+// 客户端密钥含 URL 保留字符（+/=% 空格）时，必须按 RFC 7617 原样放入 Basic 头，
+// 不得二次 URL 转义（否则 OP 侧再 Unescape 一次即失配导致 invalid_client）。
+func TestTokenClient_BasicAuthSpecialChars(t *testing.T) {
+	const wantID = "svc+client"
+	const wantSecret = "p@ss+word/with=special%chars &more"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		require.True(t, ok)
+		assert.Equal(t, wantID, user)
+		assert.Equal(t, wantSecret, pass)
+		_, _ = fmt.Fprint(w, `{"access_token":"tok","token_type":"Bearer","expires_in":3600}`)
+	}))
+	defer srv.Close()
+
+	client, err := NewTokenClient(ClientCredentialsConfig{
+		TokenURL: srv.URL, ClientID: wantID, ClientSecret: wantSecret,
+	}, nil)
+	require.NoError(t, err)
+	_, err = client.Token(context.Background())
+	require.NoError(t, err)
+}
