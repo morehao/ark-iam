@@ -367,10 +367,9 @@ export type ConnectorCapability = 'authorize' | 'callback' | 'claim_mapping' | '
 
 /**
  * 连接器开关（后端具名类型，取值 enable/disable；语义等价旧 bool：true=enable / false=disable）：
- * ConnectorAutoCreateUserFlag / ConnectorAccountLinkFlag / ConnectorSyncProfileFlag / ConnectorTokenStorageFlag。
+ * ConnectorAutoCreateUserFlag / ConnectorSyncProfileFlag / ConnectorTokenStorageFlag。
  */
 export type ConnectorAutoCreateUserFlag = 'enable' | 'disable'
-export type ConnectorAccountLinkFlag = 'enable' | 'disable'
 export type ConnectorSyncProfileFlag = 'enable' | 'disable'
 export type ConnectorTokenStorageFlag = 'enable' | 'disable'
 
@@ -428,7 +427,6 @@ export interface ConnectorItem {
   provider: ConnectorProvider
   status: ConnectorStatus
   allowAutoCreateUser: ConnectorAutoCreateUserFlag
-  allowAccountLink: ConnectorAccountLinkFlag
   syncProfile: ConnectorSyncProfileFlag
   enableTokenStorage: ConnectorTokenStorageFlag
   config?: ConnectorConfig
@@ -450,7 +448,6 @@ export interface ConnectorCreateReq {
   status?: ConnectorStatus
   defaultTenantID?: string
   allowAutoCreateUser?: ConnectorAutoCreateUserFlag
-  allowAccountLink?: ConnectorAccountLinkFlag
   syncProfile?: ConnectorSyncProfileFlag
   enableTokenStorage?: ConnectorTokenStorageFlag
   config?: ConnectorConfig

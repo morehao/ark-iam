@@ -35,7 +35,6 @@ const connectors: ConnectorItem[] = [
     provider: 'google',
     status: 'enable',
     allowAutoCreateUser: 'enable',
-    allowAccountLink: 'enable',
     syncProfile: 'enable',
     enableTokenStorage: 'disable',
     config: { protocol: 'oidc', provider: 'google', issuer: 'https://accounts.google.com' },

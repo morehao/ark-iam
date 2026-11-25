@@ -152,9 +152,6 @@ export default function ConnectorDetail({ open, connector, onClose, onEdit, onTe
         <Descriptions.Item label="自动创建用户">
           <FlagRow value={detail.allowAutoCreateUser} />
         </Descriptions.Item>
-        <Descriptions.Item label="账号关联">
-          <FlagRow value={detail.allowAccountLink} />
-        </Descriptions.Item>
         <Descriptions.Item label="资料同步">
           <FlagRow value={detail.syncProfile} />
         </Descriptions.Item>

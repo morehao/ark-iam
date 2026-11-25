@@ -59,15 +59,6 @@ const (
 	ConnectorAutoCreateUserFlagDisable ConnectorAutoCreateUserFlag = "disable"
 )
 
-// ConnectorAccountLinkFlag connector.allow_account_link。
-type ConnectorAccountLinkFlag string
-
-// 账号关联开关取值（禁止硬编码）。
-const (
-	ConnectorAccountLinkFlagEnable  ConnectorAccountLinkFlag = "enable"
-	ConnectorAccountLinkFlagDisable ConnectorAccountLinkFlag = "disable"
-)
-
 // ConnectorSyncProfileFlag connector.sync_profile。
 type ConnectorSyncProfileFlag string
 
@@ -95,7 +86,6 @@ type ConnectorEntity struct {
 	Provider            ConnectorProvider           `gorm:"column:provider;type:varchar(128);not null;default:'';comment:提供商"`
 	Status              ConnectorStatus             `gorm:"column:status;type:varchar(32);not null;default:'enable';comment:状态(enable启用/disable停用)"`
 	AllowAutoCreateUser ConnectorAutoCreateUserFlag `gorm:"column:allow_auto_create_user;type:varchar(16);not null;default:'disable';comment:是否允许自动创建用户(enable/disable)"`
-	AllowAccountLink    ConnectorAccountLinkFlag    `gorm:"column:allow_account_link;type:varchar(16);not null;default:'disable';comment:是否允许账号关联(enable/disable)"`
 	SyncProfile         ConnectorSyncProfileFlag    `gorm:"column:sync_profile;type:varchar(16);not null;default:'disable';comment:是否同步资料(enable/disable)"`
 	EnableTokenStorage  ConnectorTokenStorageFlag   `gorm:"column:enable_token_storage;type:varchar(16);not null;default:'disable';comment:是否启用令牌存储(enable/disable)"`
 	Config              ConnectorConfig             `gorm:"column:config;type:json;serializer:json;not null;default:'{}';comment:连接器配置"`

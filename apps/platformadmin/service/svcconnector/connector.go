@@ -64,7 +64,6 @@ func (svc *connectorSvc) Create(ctx context.Context, req *dtoconnector.Connector
 		Provider:            req.Provider,
 		Status:              req.Status,
 		AllowAutoCreateUser: req.AllowAutoCreateUser,
-		AllowAccountLink:    req.AllowAccountLink,
 		SyncProfile:         req.SyncProfile,
 		EnableTokenStorage:  req.EnableTokenStorage,
 		Config:              req.Config,
@@ -112,7 +111,6 @@ func (svc *connectorSvc) Create(ctx context.Context, req *dtoconnector.Connector
 		Provider:            baseInfo.Provider,
 		Status:              baseInfo.Status,
 		AllowAutoCreateUser: baseInfo.AllowAutoCreateUser,
-		AllowAccountLink:    baseInfo.AllowAccountLink,
 		SyncProfile:         baseInfo.SyncProfile,
 		EnableTokenStorage:  baseInfo.EnableTokenStorage,
 		Config:              baseInfo.Config,
@@ -163,7 +161,6 @@ func (svc *connectorSvc) Update(ctx context.Context, req *dtoconnector.Connector
 		Provider:            req.Provider,
 		Status:              req.Status,
 		AllowAutoCreateUser: req.AllowAutoCreateUser,
-		AllowAccountLink:    req.AllowAccountLink,
 		SyncProfile:         req.SyncProfile,
 		EnableTokenStorage:  req.EnableTokenStorage,
 		Config:              req.Config,
@@ -214,7 +211,6 @@ func (svc *connectorSvc) Update(ctx context.Context, req *dtoconnector.Connector
 		Provider:            baseInfo.Provider,
 		Status:              status,
 		AllowAutoCreateUser: baseInfo.AllowAutoCreateUser,
-		AllowAccountLink:    baseInfo.AllowAccountLink,
 		SyncProfile:         baseInfo.SyncProfile,
 		EnableTokenStorage:  baseInfo.EnableTokenStorage,
 		Config:              connector.PreserveSecret(baseInfo.Config, existing.Config),
@@ -224,7 +220,7 @@ func (svc *connectorSvc) Update(ctx context.Context, req *dtoconnector.Connector
 	}
 	fields := []string{
 		"default_tenant_id", "name", "display_name", "protocol", "provider", "status",
-		"allow_auto_create_user", "allow_account_link", "sync_profile", "enable_token_storage",
+		"allow_auto_create_user", "sync_profile", "enable_token_storage",
 		"config", "claim_mapping", "domain_policy", "updated_by",
 	}
 	if err := dao.UpdateFields(crossCtx, svc.connectorDao().Dao, req.ConnectorID, entity, fields...); err != nil {
@@ -345,7 +341,6 @@ func toBaseInfo(entity model.ConnectorEntity) objauth.ConnectorBaseInfo {
 		Provider:            entity.Provider,
 		Status:              entity.Status,
 		AllowAutoCreateUser: entity.AllowAutoCreateUser,
-		AllowAccountLink:    entity.AllowAccountLink,
 		SyncProfile:         entity.SyncProfile,
 		EnableTokenStorage:  entity.EnableTokenStorage,
 		Config:              connector.SanitizeConfig(entity.Config),
