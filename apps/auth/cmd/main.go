@@ -6,11 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/apps/auth"
+	app "github.com/morehao/ark-iam/apps/auth/app"
 	"github.com/morehao/ark-iam/apps/auth/config"
-	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/ark-iam/pkg/middleware"
-	"github.com/morehao/ark-iam/pkg/seed"
-	"github.com/morehao/ark-iam/sdk/server"
 	"github.com/morehao/golib/glog"
 )
 
@@ -28,77 +25,27 @@ func main() {
 		}
 	}()
 
-	// 分层倒置：进程入口经 sdk/server 门面装配 auth 域库。
-	// auth 进程用独立域集（业务登录 + 安装引导 + connector + 自助），并产出进程内 KeySource。
-	app, err := server.New(server.FromPkgConfig(config.Conf, authDomains(), "", ""))
-	if err != nil {
-		panic(fmt.Sprintf("[%s] sdk/server.New fail: %v", auth.AppName, err))
-	}
-	defer app.Close()
-	if config.Conf.DB.AutoMigrate {
-		if err := app.RunMigrations(context.Background()); err != nil {
-			panic(fmt.Sprintf("[%s] RunMigrations fail: %v", auth.AppName, err))
-		}
-	}
-
 	engine := gin.New()
-	// 刻意**不开启** engine.ContextWithFallback：service/dao 只收 context.Context，
-	// controller 用 ctx.Request.Context() 做唯一一次转换（见
-	// docs/design/context-and-tenant-scope.md「边界调整」）。因此池化的 *gin.Context
-	// 不再被当作 context.Context 传下游，避免"传 gin ctx 还是纯 ctx 结果不同"的分支。
-	engine.Use(gin.Recovery())
-	// 把 requestID 等横切字段搬进请求上下文：service/dao 只拿纯 ctx（边界调整后
-	// controller 传 ctx.Request.Context()），日志 extra_keys 才取得到 requestID。
-	engine.Use(middleware.WithRequestFields())
-
-	// 未初始化守卫（见 pkg/middleware 的 bootstrap_guard.go）：空库启动的进程没有任何账号，
-	// 业务端点若照常放行只会返回一片 401/500，且无法区分"没初始化"与"服务坏了"。
-	// 守卫把这个状态变成明确的 409 + 安装引导错误码，并把 /install 与健康/发现端点放行，
-	// 让访问者被引导到初始化页面。已初始化后闩锁生效，此后零额外查询。
-	guardPrefixes := middleware.BootstrapGuardAllowPrefixes
-	if config.Conf.Server.Env == "dev" {
-		// dev 的 swagger/redoc 由 gindocs 挂在 /<appName>/...，不属于业务路由；
-		// 放行以免"想查接口文档却被告知先初始化"。
-		guardPrefixes = append(append([]string{}, guardPrefixes...), "/auth")
-	}
-	engine.Use(middleware.BootstrapGuard(func(ctx context.Context) (bool, error) {
-		return seed.IsInitialized(ctx, dbclient.IamDB(ctx))
-	}, guardPrefixes...))
-	// H1：默认不信任任何代理（直接用 RemoteAddr），避免客户端伪造
-	// X-Forwarded-For 绕过按 IP 维度的登录限流/锁定；部署在反向代理后时
-	// 在配置 server.trustedProxies 中显式声明可信代理 CIDR。
-	if len(config.Conf.Server.TrustedProxies) > 0 {
-		if err := engine.SetTrustedProxies(config.Conf.Server.TrustedProxies); err != nil {
-			glog.Errorf(context.Background(), "%s set trusted proxies fail, err:%v", auth.AppName, err)
-			panic(err)
-		}
-	} else {
-		// nil = 不信任任何代理，客户端 IP 直取 RemoteAddr（Gin 对空列表不返回错误，此处仍与上一分支统一处理）
-		if err := engine.SetTrustedProxies(nil); err != nil {
-			glog.Errorf(context.Background(), "%s set trusted proxies fail, err:%v", auth.AppName, err)
-			panic(err)
-		}
+	// H1：默认不信任任何代理（直取 RemoteAddr），避免客户端伪造 X-Forwarded-For 绕过按 IP 的限流/锁定；
+	// 部署在反向代理后时在 server.trustedProxies 显式声明可信代理 CIDR（空 = 不信任任何代理）。
+	if err := engine.SetTrustedProxies(config.Conf.Server.TrustedProxies); err != nil {
+		glog.Errorf(context.Background(), "%s set trusted proxies fail, err:%v", auth.AppName, err)
+		panic(err)
 	}
 
-	if err := app.Mount(engine.Group("")); err != nil {
-		panic(fmt.Sprintf("[%s] Mount fail: %v", auth.AppName, err))
+	// 分层倒置：进程入口经 apps/auth 根包装配（内部 pkg/appassembly + 域库），cmd 极薄。
+	closer, err := app.Routers(engine)
+	if err != nil {
+		panic(fmt.Sprintf("[%s] Routers fail: %v", auth.AppName, err))
 	}
-	if err := app.MountConfig(engine, ""); err != nil {
-		panic(fmt.Sprintf("[%s] MountConfig fail: %v", auth.AppName, err))
-	}
+	defer func() {
+		if cerr := closer.Close(); cerr != nil {
+			glog.Errorf(context.Background(), "[%s] closer.Close fail, err:%v", auth.AppName, cerr)
+		}
+	}()
 
 	if err := engine.Run(fmt.Sprintf(":%s", config.Conf.Server.Port)); err != nil {
 		glog.Errorf(context.Background(), "%s run fail, port:%s", auth.AppName, config.Conf.Server.Port)
 		panic(err)
-	}
-}
-
-// authDomains 返回 auth 独立进程的域集：登录/会话、安装引导、connector、自助。
-func authDomains() []server.Domain {
-	return []server.Domain{
-		server.DomainCoreAuth,
-		server.DomainInstall,
-		server.DomainConnector,
-		server.DomainSelfService,
 	}
 }

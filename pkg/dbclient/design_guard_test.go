@@ -213,7 +213,14 @@ func TestTenantScopeLayerDoesNotDependOnGin(t *testing.T) {
 }
 
 // isInboundBoundary 判断该文件是否属于入站适配体（controller/middleware 目录）或 gin 夹具包。
+//
+// 例外：文件名本身为 controller.go 的也视为入站适配体——某些域把 controller 直接平铺在
+// 域目录下（如 pkg/appassembly/directory/controller.go），其职责仍是入站载体转换点，与
+// "是否位于名为 controller 的目录"无关。
 func isInboundBoundary(slashPath string) bool {
+	if strings.HasSuffix(slashPath, "/controller.go") {
+		return true
+	}
 	for _, seg := range inboundBoundaryPathSegments {
 		if strings.Contains(slashPath, seg) {
 			return true

@@ -10,15 +10,28 @@
 
 > 两行、两条命令即可接入。两个包互不依赖，可单独使用，也可同时使用（前端登录 + 后端验签）。
 
-### 后端两个可 `go get` 的 Go 模块（均在仓库根级）
+### 职责边界表（对外集成面 vs 内部实现）
+
+| 层次 | 归属 | 职责 | 是否对外发布 |
+|---|---|---|---|
+| **验签引擎** `sdk/rp` | `github.com/morehao/ark-iam/sdk`（Go SDK） | 框架无关的本地验签：JWT → `contract.Identity`；另含 M2M / introspect / revoke / userinfo / 登出 / 只读目录 | **是**（RP 侧接入的核心） |
+| **gin 中间件 / 框架胶水** | **消费方自写** | 取 Bearer → `rp.Verifier.Verify` → `rp.WithIdentity` 注入 request ctx → 401；约 20 行，参考 [`examples/rp-gin`](./examples/rp-gin/) | 否（不放进 `sdk`，保持框架无关） |
+| **服务端装配** | ark-iam 内部 `pkg/appassembly` | DB/Redis/setting 初始化、域依赖闭合、路由编排（`Mount` 等） | **否**（由原 `sdk/server` 内部化而来，不再作为对外 SDK 发布） |
+
+> 一句话：ark-iam **只对外发验签引擎 `sdk/rp`**；gin 中间件由消费方自写；
+> 服务端装配是 ark-iam 自身进程的实现细节（内部 `pkg/appassembly`），**不再有 `sdk/server` 这个对外门面**。
+
+### 后端可 `go get` 的 Go 模块（均在仓库根级）
 
 | 模块 | 用途 | 安装 |
 |---|---|---|
-| `github.com/morehao/ark-iam/sdk` | **RP 侧 SDK**（`sdk/rp` + 独立契约 module `contract`）：本地验签 / M2M / introspect / revoke / userinfo / 登出 / 目录；另含 **`sdk/server` 门面**：`New(Domains)/Mount/MountConfig`，委托 `apps/*` 各域实现库（业务应用最常用） | `go get github.com/morehao/ark-iam/sdk@v0.4.0` |
+| `github.com/morehao/ark-iam/sdk` | **RP 侧 SDK**（`sdk/rp` + 独立契约 module `contract`）：本地验签 / M2M / introspect / revoke / userinfo / 登出 / 目录。**只保留 `rp`**；服务端装配已内部化到 `pkg/appassembly`，不在本模块对外 | `go get github.com/morehao/ark-iam/sdk@v0.4.0` |
 | `github.com/morehao/ark-iam/contract` | **契约 module**（最底层，仅 stdlib + jwt）：claim/Identity/logout/目录 DTO/验签接口；由 `sdk` 传递引入，无需直接 get | （传递依赖，无需直接 get） |
-| `github.com/morehao/ark-iam/pkg` | **公共层**（config/dbclient/middleware/model/dao/... ），随 `sdk/server`（经 `apps/*`）传递引入，一般无需直接依赖 | `go get github.com/morehao/ark-iam/pkg@v0.4.0` |
+| `github.com/morehao/ark-iam/pkg` | **公共层**（config/dbclient/middleware/model/dao/... + 内部装配 `appassembly`）；ark-iam 自身各 app 使用，外部 RP 一般无需直接依赖 | `go get github.com/morehao/ark-iam/pkg@v0.4.0` |
 
-> **分层倒置**：`sdk/server` → `apps/*`（auth/platformadmin/tenantadmin 各域实现库）→ `pkg`。原独立 `iam` 模块已删除（其域实现并入 `apps/`，Go 侧不再托管前端静态资源）。`sdk/rp` 与独立 module `contract` 保持**框架无关**（只依赖标准库 + `jwt/v5`，由 `sdk/scripts/check-deps.sh` 强制）；`sdk/server` 是编排层，可引入 gin/gorm/redis。
+> **分层倒置**：进程入口 → `pkg/appassembly`（内部装配，原 `sdk/server/internal`）→ `apps/*`（auth/platformadmin/tenantadmin 各域实现库）→ `pkg` → `contract`。
+> `sdk/rp` 与独立 module `contract` 保持**框架无关**（只依赖标准库 + `jwt/v5`，由 `sdk/scripts/check-deps.sh` 强制）；
+> `pkg/appassembly` 是内部装配层，可引入 gin/gorm/redis，但**不对外发布为 SDK**。
 
 ---
 
@@ -106,7 +119,7 @@ const AuthProvider = createAuthProvider({ clientID: 'my_app_web' })
 ## 版本线
 
 - **Go 模块**（sdk / pkg）：各自子模块 tag（`sdk/vX.Y.Z`、`pkg/vX.Y.Z`，Go 多模块标准，`go get .../<mod>@vX.Y.Z` 依赖前缀对齐目录）。
-  当前 `sdk` 为 `v0.4.0`（分层倒置大改：新增 `sdk/server` 门面、废弃原 `iam` 模块）。与仓库级 tag（如 `v0.2.1`）并存、互不影响。
+  当前 `sdk` 为 `v0.4.0`。其中 `sdk` 只保留 `rp`；服务端装配已内部化到 `pkg/appassembly`，**不再有 `sdk/server` 对外门面**。与仓库级 tag（如 `v0.2.1`）并存、互不影响。
 - **前端包**：`@morehao/ark-iam-react@X.Y.Z`（npm registry），当前 `0.2.0`。
 
 两套版本线独立演进、独立发布，不要求同号。
@@ -115,8 +128,9 @@ const AuthProvider = createAuthProvider({ clientID: 'my_app_web' })
 
 ## 参考样例（非 SDK 依赖路径）
 
-- [`examples/rp-gin/`](./examples/rp-gin/) —— 独立模块，`require github.com/morehao/ark-iam/sdk v0.4.0`（**不用 replace**），
-  演示「引 SDK 依赖接入已有 IAM」的 RP 侧验签接入。
+- [`examples/rp-gin/`](./examples/rp-gin/) —— **正式 RP 范本**。独立模块，`require github.com/morehao/ark-iam/sdk v0.4.0`（**不用 replace**），
+  演示「引 SDK 依赖接入已有 IAM」的完整 RP 侧接入：`rp.NewVerifier` 本地验签 + 消费方自写 20 行 gin 中间件 +
+  `rp.WithIdentity`/`IdentityFrom` 标准身份通道，并示范「令牌身份 → 本地业务身份」映射由消费方自加。
 
-> 原「内嵌 OP」示例 `examples/embedded-iam-demo` 已随分层倒置重构删除：服务端域实现归 `apps/*`，
+> 原「内嵌 OP」示例 `examples/embedded-iam-demo` 已删除：服务端装配内部化到 `pkg/appassembly`，不再对外发布；
 > 前端改由 npm 包 `@morehao/ark-iam-react` 提供，Go 侧不再托管任何前端静态资源。

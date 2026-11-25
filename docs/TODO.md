@@ -56,7 +56,7 @@ import { createApiClient } from '@ark-iam/api'
 |---|---|---|---|
 | B1 | API baseURL 硬编码 | `packages/api/src/request.ts`：`axios.create({ baseURL: '/v1' })` + 模块级单例 | 导出 `createApiClient({ baseURL, timeout, headers })`；保留一个默认实例供仓内使用 |
 | B2 | OIDC issuer 构建期注入 | `packages/auth/src/config.ts`：`import.meta.env.VITE_OIDC_ISSUER \|\| '/oidc'` | 改为运行时参数：`AuthProvider` 接收 `issuer / clientId / redirectPath / postLogoutRedirectPath`，`VITE_*` 仅作仓内默认值 |
-| B3 | `/config.json` 端点无人消费（**已随 2026-11 分层倒置重构解决**：端点改由 `sdk/server.App.MountConfig` 提供，前端 `@morehao/ark-iam-react` 已消费） | `iam/app_frontend.go` 注册了该端点（旧实现，文件已随 `backend/iam` 删除），前端**未读取**（当前是预留/死代码） | 二选一：<br>(a) 前端启动时先拉 `{base}/config.json` 覆盖默认值（推荐，配合 B2）；<br>(b) 若确认不做运行时配置，则从 `MountFrontend` 删除该端点，避免误导 |
+| B3 | `/config.json` 端点无人消费（**已随 2026-11 分层倒置重构解决**：端点改由 `pkg/appassembly.App.MountConfig` 提供，前端 `@morehao/ark-iam-react` 已消费） | `iam/app_frontend.go` 注册了该端点（旧实现，文件已随 `backend/iam` 删除），前端**未读取**（当前是预留/死代码） | 二选一：<br>(a) 前端启动时先拉 `{base}/config.json` 覆盖默认值（推荐，配合 B2）；<br>(b) 若确认不做运行时配置，则从 `MountFrontend` 删除该端点，避免误导 |
 
 ### 1.4 任务清单
 
@@ -107,9 +107,9 @@ import { createApiClient } from '@ark-iam/api'
 | # | 项 | 说明 | 优先级 |
 |---|---|---|---|
 | S1 | `/config.json` 端点处置 | 见 B3：要么被前端消费，要么删除 | P0（与 P0 绑定） |
-| S2 | IAM 实例的全局收敛（**已随 2026-11 分层倒置重构解决**：`backend/iam` 已删除，域实现归 `apps/*` 库包，`sdk/server` 负责编排装配） | 当前 `backend/iam` 仍有包级全局：`iam/auth/config.Conf`、`iam/auth/service/svcdb.DB`、`dbclient.SetIamDB/SetRedis` 桥接。**「一进程一 IAM 实例」语义下安全**，但若未来要「一进程多实例」需彻底实例化 | P3（暂不做） |
+| S2 | IAM 实例的全局收敛（**已随 2026-11 分层倒置重构解决**：`backend/iam` 已删除，域实现归 `apps/*` 库包，`pkg/appassembly` 负责编排装配） | 当前 `backend/iam` 仍有包级全局：`iam/auth/config.Conf`、`iam/auth/service/svcdb.DB`、`dbclient.SetIamDB/SetRedis` 桥接。**「一进程一 IAM 实例」语义下安全**，但若未来要「一进程多实例」需彻底实例化 | P3（暂不做） |
 | S3 | service 构造的 nil 兜底 | 各 `NewXxxSvc` 保留 `if db == nil { db = dbclient.IamDB }`（兼容旧测试）。可在测试全部改为 `testutil.SetupGetter` 后移除 | P3 |
-| S4 | `iam` 域依赖表补全（**已随 2026-11 分层倒置重构迁移**：`domainDeps` 现位于 `sdk/server`） | `domainDeps` 目前只有 `role → menu`；若前端/页面联动发现更多隐式依赖需补 | P2 |
+| S4 | `iam` 域依赖表补全（**已随 2026-11 分层倒置重构迁移**：`domainDeps` 现位于 `pkg/appassembly`） | `domainDeps` 目前只有 `role → menu`；若前端/页面联动发现更多隐式依赖需补 | P2 |
 
 ---
 
@@ -117,9 +117,9 @@ import { createApiClient } from '@ark-iam/api'
 
 | 项 | 结论 | 落点 |
 |---|---|---|
-| `iam.Config.Redis` 未打通（**随 2026-11 分层倒置重构迁移为 `server.Config.Redis`**） | 已修：`initRedis` 建连接后同步注册全局 `dbclient.RedisCli`；`Service` 缺省 `iam` | `pkg/dbclient/redis.go`、`iam/app_db.go`、`iam/redis_bridge_test.go`（旧实现，随 `backend/iam` 删除） |
+| `iam.Config.Redis` 未打通（**随 2026-11 分层倒置重构迁移为 `appassembly.Config.Redis`**） | 已修：`initRedis` 建连接后同步注册全局 `dbclient.RedisCli`；`Service` 缺省 `iam` | `pkg/dbclient/redis.go`、`iam/app_db.go`、`iam/redis_bridge_test.go`（旧实现，随 `backend/iam` 删除） |
 | e2e 全流程（真实 PG + Redis） | 8 项全通（建表/install/前端/OIDC discovery/授权码全流程/token 访问/负向 401/落库核对） | `.dsh/docs/notes/2026-11-06-iam-e2e-report.md`（本地，未入库） |
-| 可嵌入 IAM 库落地（**已被 2026-11 分层倒置重构取代**：`backend/iam` 独立模块彻底删除，能力迁到 `sdk/server` 门面 + `apps/*` 各域库；`go test ./iam/...` 已不适用） | R0~R6 完成，`go test ./iam/...` 25 包全绿 | 历史落点 `backend/iam/`、`backend/iam/README.md`（均已删除） |
+| 可嵌入 IAM 库落地（**已被 2026-11 分层倒置重构取代**：`backend/iam` 独立模块彻底删除，能力迁到 `pkg/appassembly` 内部装配层 + `apps/*` 各域库；`go test ./iam/...` 已不适用） | R0~R6 完成，`go test ./iam/...` 25 包全绿 | 历史落点 `backend/iam/`、`backend/iam/README.md`（均已删除） |
 | P0 前端组件发布为 npm 包 | 已完成（T1~T9，单门面包 `@morehao/ark-iam-react`）：内部四包代码+类型打进 dist，ESM 子路径 `/types /api /auth /ui` 按需引入，对外只发布一个包；peer/dev 分类、脚本发布通道、接入文档、仓外冒烟（actionColumn 表格 + AuthProvider PKCE 登录跳转）+ facade 独立消费（runtime+tsc）均通过。运行期配置优先级 props > `/config.json` > `VITE_*` > 默认 | 见 `docs/design/application-integration-guide.md` §12、`packages/react/`、`vite.alias.ts`、`scripts/release-packages.mjs` |
 | 门面包公共 npm 首发 | `@morehao/ark-iam-react@0.1.0` 已发布到公共 npm（scope `@morehao` = 账号用户级 scope，未建 org），`dist-tags.latest=0.1.0`，外部 `pnpm add @morehao/ark-iam-react` 可用。发布口径：起始版本用 `0.1.0`；曾误发 `1.0.0`/`0.0.0-stage` 已 unpublish 清理。发布前需 `npm login` 并把 registry 指到 `https://registry.npmjs.org`（本机默认是 npmmirror 镜像，不可发布） | 公共 npm registry `@morehao/ark-iam-react`；`packages/react/package.json` |
-| P1 页面级门面包（`IamRoutes` / `IamProvider`，**已完成 — 2026-11-14**） | 新增内部包 `packages/console`（页面 + `IamProvider`/`IamRoutes`/`IamConsoleApp`）；两管理台 app 降为 `<IamConsoleApp variant=…>` 薄壳；门面包新增 `@morehao/ark-iam-react/console` 子路径（根入口 re-export）；后端 `/config.json` 新增 `enabledDomains` 域白名单（G4）+ 前端按域裁剪；新增依赖方向守卫 `make frontend-check-deps`。Router 归属终局：Provider/Routes 不内置 Router，`IamConsoleApp` 自托管（D4） | 见 `docs/design/application-integration-guide.md` §12.10、`packages/console/`、`packages/api/src/resources/tenant.ts`、`sdk/server/internal/config_endpoint.go`、`scripts/check-frontend-deps.sh` |
+| P1 页面级门面包（`IamRoutes` / `IamProvider`，**已完成 — 2026-11-14**） | 新增内部包 `packages/console`（页面 + `IamProvider`/`IamRoutes`/`IamConsoleApp`）；两管理台 app 降为 `<IamConsoleApp variant=…>` 薄壳；门面包新增 `@morehao/ark-iam-react/console` 子路径（根入口 re-export）；后端 `/config.json` 新增 `enabledDomains` 域白名单（G4）+ 前端按域裁剪；新增依赖方向守卫 `make frontend-check-deps`。Router 归属终局：Provider/Routes 不内置 Router，`IamConsoleApp` 自托管（D4） | 见 `docs/design/application-integration-guide.md` §12.10、`packages/console/`、`packages/api/src/resources/tenant.ts`、`pkg/appassembly/config_endpoint.go`、`scripts/check-frontend-deps.sh` |

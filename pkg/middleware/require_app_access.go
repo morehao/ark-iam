@@ -1,3 +1,8 @@
+// 内置服务端专用：本文件的 RequireAppAccess 是 ark-iam 控制台请求期应用准入闸口，
+// 依赖本仓 dao/identity/application 等内部包，仅用于内置服务端装配。
+//
+// 外部 RP 请用框架无关的 sdk/rp 做本地验签 + 自写中间件（见 examples/rp-gin）；
+// 不要把本包当 RP 中间件引入。
 package middleware
 
 import (

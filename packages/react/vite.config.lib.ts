@@ -43,6 +43,7 @@ export default {
         ui: resolve(process.cwd(), 'src/ui.ts'),
         login: resolve(process.cwd(), 'src/login.ts'),
         console: resolve(process.cwd(), 'src/console.ts'),
+        install: resolve(process.cwd(), 'src/install.ts'),
       },
       formats: ['es'] as const,
       fileName: (_fmt: string, entryName: string) => `${entryName}.js`,

@@ -9,7 +9,7 @@ import {
   validateBootstrapStep,
   validateTenantStep,
 } from './validation'
-import { createEmptyInstallForm, type InstallForm } from '@ark-iam/login'
+import { createEmptyInstallForm, type InstallForm } from '@ark-iam/install'
 
 function form(overrides: Partial<InstallForm> = {}): InstallForm {
   return { ...createEmptyInstallForm(), ...overrides }

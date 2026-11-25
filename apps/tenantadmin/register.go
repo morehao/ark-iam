@@ -1,10 +1,10 @@
-// Package tenantadmin 是 tenantadmin 域的实现库（可被 sdk/server import）。
+// Package tenantadmin 是 tenantadmin 域的实现库（可被 pkg/appassembly import）。
 //
 // 由原 iam/tenantadmin 的 DI 重构版迁入：controller/service/dto/router 全部扁平平铺
-// 在本包之下（不再有 internal/）。对外通过 Mount 装配入口暴露：调用方（sdk/server）
+// 在本包之下（不再有 internal/）。对外通过 Mount 装配入口暴露：调用方（pkg/appassembly）
 // 持有 Domain→注册 key 的映射，把选中的 key 列表传进来，本库据此注册对应业务域。
 //
-// 依赖方向（分层倒置）：sdk/server → apps/tenantadmin（本库）→ pkg。
+// 依赖方向（分层倒置）：pkg/appassembly → apps/tenantadmin（本库）→ pkg。
 // 本库**不得** import sdk。
 package tenantadmin
 

@@ -1,6 +1,6 @@
 # 配置参考（Configuration Reference）
 
-> 本文说明 Ark IAM 各应用 `config.yaml` 的配置项。四个应用（auth / platformadmin / tenantadmin / gateway）共享同一套 `pkg/config.Config` 结构，差异主要在 `server.name/port`、OIDC 相关项，以及**仅 auth 生效**的登录限流（`security.login.ratePerMinute` / `burst`）与 `server.trustedProxies`、**仅 platformadmin / tenantadmin 生效**的 `oidc.backChannelLogoutPath`、**仅 auth / gateway 配置**的 `oidc.consoles`。RP 侧（含外部应用）的 OIDC/目录能力另由 `sdk` 提供，旋钮见 §11；「内嵌到业务单体」形态改用 `sdk/server` 的 `server.Config`（精简字段 + 可选透传完整 `pkgconfig.Config`），见 §12。
+> 本文说明 Ark IAM 各应用 `config.yaml` 的配置项。四个应用（auth / platformadmin / tenantadmin / gateway）共享同一套 `pkg/config.Config` 结构，差异主要在 `server.name/port`、OIDC 相关项，以及**仅 auth 生效**的登录限流（`security.login.ratePerMinute` / `burst`）与 `server.trustedProxies`、**仅 platformadmin / tenantadmin 生效**的 `oidc.backChannelLogoutPath`、**仅 auth / gateway 配置**的 `oidc.consoles`。RP 侧（含外部应用）的 OIDC/目录能力另由 `sdk` 提供，旋钮见 §11；「装配进单个进程」的形态改用内部 `pkg/appassembly` 的 `appassembly.Config`（精简字段 + 可选透传完整 `pkgconfig.Config`，仅限 ark-iam 自身 app），见 §12。
 >
 > 配置加载顺序：环境变量 `APP_CONFIG_PATH` 指定路径 → 相对**当前工作目录**的 `../config/config.yaml` → **可执行文件所在目录的上一级** `config/config.yaml`；三者皆无时仍按相对路径加载并启动失败（panic）。引导令牌有两个来源——环境变量 `BOOTSTRAP_TOKEN`（高优先级）与 YAML 的 `install.bootstrapToken`（回落），见 §1.1 / §1.2。
 
@@ -19,7 +19,7 @@
 9. [其他（jwt / client / masterKey）](#9-其他jwt--client--masterkey)
 10. [环境差异要点](#10-环境差异要点)
 11. [RP SDK 客户端配置（sdk/rp）](#11-rp-sdk-客户端配置sdkrp)
-12. [内嵌业务单体配置（server.Config）](#12-内嵌业务单体配置serverconfig)
+12. [内部装配配置（appassembly.Config）](#12-内部装配配置appassemblyconfig)
 
 ---
 
@@ -483,16 +483,18 @@ oidc:
 
 ---
 
-## 12. 内嵌业务单体配置（`server.Config`）
+## 12. 内部装配配置（`appassembly.Config`）
 
-「形态 2：把 IAM 内嵌进业务单体」不使用各应用 `config.yaml`，而是在代码里构造 `sdk/server` 的 `server.Config`（import `github.com/morehao/ark-iam/sdk/server`，接入要点见 [application-integration-guide.md](application-integration-guide.md) §11）：
+> 本节的「多 app 装配」能力**只服务 ark-iam 自身**（`apps/gateway` 等 4 个 app 的内部装配），由内部包 `pkg/appassembly` 提供，**不对外发布为 SDK**。外部业务应用请走形态 1（`sdk/rp` 本地验签 + 自写中间件）。
+
+「形态 2：把 IAM 装配进单个进程」不使用各应用 `config.yaml`，而是在代码里构造 `pkg/appassembly` 的 `appassembly.Config`（import `internal` 包 `github.com/morehao/ark-iam/pkg/appassembly`，接入要点见 [application-integration-guide.md](application-integration-guide.md) §11）：
 
 ```go
-app, err := server.New(server.Config{
+app, err := appassembly.New(appassembly.Config{
     Env:     "dev",                                       // dev / prod；prod 触发非 dev 安全校验
-    DB:      server.DBConfig{DSN: "postgres://...", Service: "iam"},
-    Redis:   &server.RedisConfig{Addr: "127.0.0.1:6379"}, // 可空；配置后桥接为全局 Redis
-    Domains: server.DefaultConsoleDomains,                // 空=全量；最小集见接入指南 §11.3
+    DB:      appassembly.DBConfig{DSN: "postgres://...", Service: "iam"},
+    Redis:   &appassembly.RedisConfig{Addr: "127.0.0.1:6379"}, // 可空；配置后桥接为全局 Redis
+    Domains: appassembly.DefaultConsoleDomains,                // 空=全量；最小集见接入指南 §11.3
     Raw:     nil,                                         // 可选：透传完整 pkgconfig.Config（OP 需要）
     SameDatabase: true,                                   // IAM 表与业务表同库 → 启用撞名检测
     AllowExistingTables: []string{},                      // 撞名白名单（可选）
@@ -515,4 +517,4 @@ app, err := server.New(server.Config{
 | `JWKSURL` / `Issuer` | 否 | 分体部署时独立进程远程拉 JWKS 验签所需的 JWKS 地址 / issuer |
 | `KeySource` | 否 | 可选：自定义 OP 公钥来源 |
 
-> 配置加载顺序的差异：`sdk/server` 由**调用方代码**构造配置，不读 `APP_CONFIG_PATH` / `config.yaml`；若需要沿用 `config.yaml`，请自行读取后填入 `Config.Raw`（`apps/gateway` 即如此：直接把 `config.Conf` 作为 `Raw` 传入）。
+> 配置加载顺序的差异：`pkg/appassembly` 由**调用方代码**构造配置，不读 `APP_CONFIG_PATH` / `config.yaml`；若需要沿用 `config.yaml`，请自行读取后填入 `Config.Raw`（`apps/gateway` 即如此：直接把 `config.Conf` 作为 `Raw` 传入）。

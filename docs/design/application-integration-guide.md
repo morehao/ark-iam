@@ -43,7 +43,7 @@
 | 适合 | 多项目**共享一套账号**、要统一身份 | 单项目想**零运维自带**账号体系（不单独部署 IAM） |
 | 取舍 | 需单独运维 IAM（集中升级、私钥单点） | 私钥散落在业务进程、DDL 由各进程跑、无法多实例共享一套账号 |
 
-> 形态 1 对应 `sdk`（RP 侧验签 SDK，`sdk/rp`）；形态 2 对应 `sdk/server`（`package server`，在各域库之上的薄门面 / 编排层）。本文 §2~§10 讲形态 1 的完整步骤，§11 讲形态 2。
+> 形态 1 对应 `sdk`（RP 侧验签 SDK，`sdk/rp`，唯一对外发布形态）；形态 2 对应内部 `pkg/appassembly`（`package appassembly`，在各域库之上的内部装配层，**不对外发布**，仅限 ark-iam 自身 app）。本文 §2~§10 讲形态 1 的完整步骤，§11 讲形态 2（内部装配，供理解 ark-iam 自身部署）。
 
 ```mermaid
 flowchart TB
@@ -464,7 +464,7 @@ curl -u "$API_KEY:$API_KEY" -X POST http://localhost:8081/oidc/oauth/token \
 
 ## 7. 只读目录 API 接入（M2M）
 
-需要展示成员姓名/头像/部门/角色等**实体信息**时，走只读目录 API。它由 `sdk/server` 的 `DomainDirectory` 域提供（原 `rpapi` 应用并入，`gateway` 单体部署时经网关 :8100 访问；不再有独立 :8084 进程），与业务 API 的鉴权模型不同：只接受 **M2M 机器令牌**，租户作用域**只来自令牌的 `tenant_id`**，不接受任何请求参数指定租户。
+需要展示成员姓名/头像/部门/角色等**实体信息**时，走只读目录 API。它由 `pkg/appassembly` 的 `DomainDirectory` 域提供（原 `rpapi` 应用并入，`gateway` 单体部署时经网关 :8100 访问；不再有独立 :8084 进程），与业务 API 的鉴权模型不同：只接受 **M2M 机器令牌**，租户作用域**只来自令牌的 `tenant_id`**，不接受任何请求参数指定租户。
 
 > ⚠️ **`/v1/auth/*` 不是 RP 契约**：它是 OP 自身的业务 API（服务登录前端），不是给 RP 的正式接口。实体类查询请一律用 `/v1/rp/directory/*`。
 
@@ -678,30 +678,32 @@ flowchart LR
 
 ---
 
-## 11. 形态 2：把 IAM 内嵌进业务单体应用
+## 11. 形态 2：把 IAM 装配进单个进程
 
-> 适用场景：业务应用希望**不单独部署 IAM 进程**，由自己的 Go 进程一并提供登录、会话、人员、部门、角色、菜单能力。前端（登录页 / 管理台）直接复用 npm 包 `@morehao/ark-iam-react`，Go 侧不托管静态。
-> 该形态由 `sdk/server`（`package server`）提供，它把 `apps/{auth,platformadmin,tenantadmin}` 各域库与 `sdk/server/internal/directory` 目录域编排装配起来；本节只讲接入要点。
+> ⚠️ **本形态仅限 ark-iam 自身**（`apps/gateway` 等 4 个 app 的内部多 app 装配）。原 `sdk/server` 门面已内部化为 `pkg/appassembly`，**不再对外发布、外部业务应用无法 `go get` 内嵌**。外部应用接入请一律走形态 1（`sdk/rp` 本地验签 + 自写中间件，见 `examples/rp-gin`）。
 
-### 11.1 最小接入
+> 适用场景（ark-iam 内部）：单个进程一并提供登录、会话、人员、部门、角色、菜单能力，无需分体起多个 IAM 进程。前端（登录页 / 管理台）复用 npm 包 `@morehao/ark-iam-react`，Go 侧不托管静态。
+> 该形态由内部包 `pkg/appassembly`（`package appassembly`）提供，它把 `apps/{auth,platformadmin,tenantadmin}` 各域库与 `pkg/appassembly/directory` 目录域编排装配起来；本节只讲装配要点。
+
+### 11.1 最小装配
 
 ```go
 import (
     "context"
 
     "github.com/gin-gonic/gin"
-    "github.com/morehao/ark-iam/sdk/server"
+    "github.com/morehao/ark-iam/pkg/appassembly"
     _ "github.com/morehao/golib/dbaccess/dbgorm/driver/sqlite" // 或 postgres
     _ "github.com/morehao/golib/glog/driver/zap"
 )
 
 func main() {
-    app, err := server.New(server.Config{
+    app, err := appassembly.New(appassembly.Config{
         Env:          "dev",
-        DB:           server.DBConfig{DSN: "postgres://user:pass@host:5432/mydb?sslmode=disable"},
-        Redis:        &server.RedisConfig{Addr: "127.0.0.1:6379"}, // 可空
-        Domains:      server.DefaultConsoleDomains,                // 部门/人员/角色/菜单最小集
-        SameDatabase: true,                                        // IAM 表与业务表同库 → 启用撞名检测
+        DB:           appassembly.DBConfig{DSN: "postgres://user:pass@host:5432/mydb?sslmode=disable"},
+        Redis:        &appassembly.RedisConfig{Addr: "127.0.0.1:6379"}, // 可空
+        Domains:      appassembly.DefaultConsoleDomains,                // 部门/人员/角色/菜单最小集
+        SameDatabase: true,                                            // IAM 表与业务表同库 → 启用撞名检测
     })
     if err != nil { panic(err) }
     defer app.Close()
@@ -721,7 +723,7 @@ func main() {
 
 | 方法 | 作用 |
 |---|---|
-| `server.New(Config) (*App, error)` | 实例化；校验 DSN、域依赖闭合、非 dev 安全配置 |
+| `appassembly.New(Config) (*App, error)` | 实例化；校验 DSN、域依赖闭合、非 dev 安全配置 |
 | `App.RunMigrations(ctx)` | 建表（AutoMigrate 只增不删；`SameDatabase=true` 时含撞名检测） |
 | `App.Mount(rg *gin.RouterGroup)` | 按 `Domains` 挂 `/v1/{platform,tenant,auth}` + `/oidc` + `/install`，并套鉴权中间件 |
 | `App.MountConfig(engine, basePath)` | 挂 `/config.json` 运行期配置端点（仅出配置，不托管静态前端） |
@@ -734,18 +736,18 @@ func main() {
 ### 11.3 Domains 裁剪
 
 - `Domains` 为空 = **全量**（等同形态 1 的全部控制台能力）。
-- `server.DefaultConsoleDomains` = 最小集：`core-auth` + `install` + `person` + `user` + `department` + `role` + `menu`。
+- `appassembly.DefaultConsoleDomains` = 最小集：`core-auth` + `install` + `person` + `user` + `department` + `role` + `menu`。
 - 可选企业级域：`tenant` / `application` / `oauth-client` / `connector` / `domain` / `audit` / `api-key` / `machine-user` / `invite` / `tenant-app` / `self-service`。
-- 域依赖：`role` 依赖 `menu`，缺则 `server.New` 返回 `ErrDomainDependency`。
+- 域依赖：`role` 依赖 `menu`，缺则 `appassembly.New` 返回 `ErrDomainDependency`。
 - ⚠️ 未选 `application` 域时，`/v1/platform/applications` 等应用管理端点**不会挂载**（404 属预期），需要时显式加 `DomainApplication`。
 
 ### 11.4 配置要点与坑
 
 | 项 | 说明 |
 |---|---|
-| `Config.Redis` | 只需配这一处：`sdk/server` 会把实例 Redis 桥接为全局，OP 协议态存储与 SSO 校验共用同一份（无需额外设置全局） |
+| `Config.Redis` | 只需配这一处：`pkg/appassembly` 会把实例 Redis 桥接为全局，OP 协议态存储与 SSO 校验共用同一份（无需额外设置全局） |
 | `Config.Raw` | 完整 `pkgconfig.Config`（auth 的 OP 需要 issuer / 签名密钥 / cookie / 控制台回调等完整配置）；不传则按精简字段合成 dev 最小配置 |
-| **非 dev 私钥** | `Env != dev` 时必须显式配置 OIDC 签名密钥 + `encryptionKey` + `cookieSecure=true`、`allowInsecure=false`，否则 `server.New` fail-closed；dev 下自动内存生成（不落盘） |
+| **非 dev 私钥** | `Env != dev` 时必须显式配置 OIDC 签名密钥 + `encryptionKey` + `cookieSecure=true`、`allowInsecure=false`，否则 `appassembly.New` fail-closed；dev 下自动内存生成（不落盘） |
 | **同库撞名** | `SameDatabase=true` 时，若目标库已存在同名但缺 `id`/`created_at` 的表 → `ErrTableConflict` fail-fast；确属自有表可用 `Config.AllowExistingTables` 白名单放行 |
 | **业务表隔离** | 业务自己的表**不要**用 IAM 的连接查询（会被租户隔离插件注入 `tenant_id`），用业务自己的 gorm 连接 |
 | 前端 | Go 侧不托管任何静态；登录 / 管理台统一由 npm 包 `@morehao/ark-iam-react` 在宿主前端渲染，运行时配置由 `App.MountConfig` 的 `/config.json` 下发 |

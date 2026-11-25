@@ -18,7 +18,7 @@ const appName = "gateway"
 var traceProvider *otel.Provider
 
 // serverInit 只做「与 DB/Redis 无关」的进程前置初始化：日志 + 链路追踪。
-// DB/Redis/建表统一交给 sdk/server.New + RunMigrations（分层倒置后由门面编排）。
+// DB/Redis/建表统一交给 pkg/appassembly.New + RunMigrations（分层倒置后由门面编排）。
 func serverInit() error {
 	config.InitConf()
 	if err := preInit(); err != nil {

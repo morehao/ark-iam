@@ -1,5 +1,5 @@
 import { appPath } from '@ark-iam/login'
-import type { InstallConsoles, InstallStatus } from '@ark-iam/login'
+import type { InstallConsoles, InstallStatus } from '@ark-iam/install'
 import { INSTALL_MESSAGES } from './messages'
 
 /**

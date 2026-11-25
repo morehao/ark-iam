@@ -1,3 +1,12 @@
+// Package middleware 内置服务端专用鉴权中间件。
+//
+// 本包内的 OIDC / API Key / 应用准入等中间件仅服务于 ark-iam 内置服务端
+// （apps/auth、platformadmin、tenantadmin、gateway 的进程装配），绑定了本仓的
+// dao/identity/oidckit/credential + gorm/redis，且把身份按本仓口径写入 gcontext。
+//
+// 外部 RP（资源服务器）**不要**把本包当 RP 中间件引入——那会为一个约 20 行的中间件
+// 背上整套 IAM 服务端依赖。外部 RP 请用框架无关的 sdk/rp 做本地验签，自己写 20 行
+// gin 中间件，参考 examples/rp-gin（rp.NewVerifier → rp.WithIdentity 注入 → Next）。
 package middleware
 
 import (

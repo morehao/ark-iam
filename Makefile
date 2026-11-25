@@ -106,17 +106,17 @@ test:
 	@echo "🧪 正在运行测试..."
 	@go test ./apps/$(APP)/... -v
 
-# 运行 SDK（sdk/）全部测试：契约 + RP 核心 + 客户端 + server 门面
+# 运行 SDK（sdk/）全部测试：契约 + RP 核心 + 客户端（server 装配已内部化到 pkg/appassembly）
 test-sdk:
 	@echo "🧪 正在运行 contract 契约测试..."
 	@cd contract && GOWORK=off go test ./... -count=1
 	@echo "🧪 正在运行 RP SDK 测试..."
 	@cd sdk && go test ./... -count=1
 
-# sdk/server 门面（编排层）测试：domains/db/migrate/mount/config/e2e/guard
+# 装配内核（pkg/appassembly，原 sdk/server）测试：domains/db/migrate/mount/config/e2e/guard
 test-sdk-server:
-	@echo "🧪 正在运行 sdk/server 门面测试..."
-	@cd sdk && go test ./server/... -count=1
+	@echo "🧪 正在运行 pkg/appassembly 装配内核测试..."
+	@go test ./pkg/appassembly/... -count=1
 
 # SDK 依赖白名单断言：contract/rp 只允许标准库 + jwt/v5（禁止 gorm/gin/redis）
 sdk-check-deps:
@@ -130,10 +130,10 @@ sdk-check-graph:
 frontend-check-deps:
 	@bash scripts/check-frontend-deps.sh
 
-# sdk/server 门面（委托 apps 各域库）构建
+# 装配内核（pkg/appassembly，原 sdk/server，委托 apps 各域库）构建
 sdk-server-build:
-	@echo "🔨 构建 sdk/server 门面..."
-	@go build ./sdk/server/...
+	@echo "🔨 构建 pkg/appassembly 装配内核..."
+	@go build ./pkg/appassembly/...
 
 
 # ============================================================

@@ -241,14 +241,14 @@ flowchart LR
 | middleware | `pkg/middleware/oidc_auth.go` 的 `WithOIDCSSOValidation`、`pkg/middleware/silent_oidc.go` 的 `RedirectURIVerifier` 回调参数改 `context.Context`；5 个 `cmd/main.go` **去掉** `engine.ContextWithFallback` |
 | 引擎/夹具 | `pkg/testsetup/init.go`、各 app `testutil`：不再开 fallback，新增 `RequestCtx`/`Operator`（或 `requestCtx`/`operatorOf`）助手；测试调 service 传纯 ctx + 设置 `req.Operator` |
 | 守卫 | `pkg/dbclient/design_guard_test.go` 重写为三条红线：`TestServiceLayerHasNoGinDependency`（内层零 `*gin.Context`/`gincontext`）、`TestRequestContextOnlyAtControllerBoundary`（`.Request.Context()` 只在 controller/middleware）、`TestBusinessLayerDoesNotImportGinIdentity`（业务层不 import `pkg/identity`） |
-| 顺带修复 | 目录域 `middleware.go`（当时在 `apps/rpapi`，现随并入 `sdk/server/internal/directory`）：API Key 通道被 `RequireDirectoryRead` 误判 401 的缺陷（见 §5.2.1） |
+| 顺带修复 | 目录域 `middleware.go`（当时在 `apps/rpapi`，现随并入 `pkg/appassembly/directory`）：API Key 通道被 `RequireDirectoryRead` 误判 401 的缺陷（见 §5.2.1） |
 | 文档 | 本文规则 1/规则 4、`AGENTS.md`「上下文传递与租户作用域（must）」、`system-design.md` §7.1 |
 
 ### 5.2.1 本次改造中修复的真实缺陷（rpapi API Key 通道）
 
 `RequireDirectoryRead` 原来的判定是「`identity.OIDCIdentityFromContext(ctx) == nil` → 401」。但 **API Key 是独立的机器凭证通道**：`OIDCAuth` 校验通过后只写入租户作用域与 `user_id`，**不写 OIDC identity**。于是合法的 API Key 请求在 HEAD 上一律被误判 401，与设计文档 §4.4「API Key 是独立通道」不符。
 
-修法：按通道区分——`x-api-key` 非空且租户作用域已派生（`gincontext.GetTenantIDString(ctx) != ""`）时放行，其余仍 401。判定依据是**服务端已派生的事实**，不接受请求头自证范围（`x-api-key` 只有在 `OIDCAuth` 里真正校验通过才可能走到这里）。回归用例：`sdk/server/internal/directory/directory_test.go`（原 `apps/rpapi/internal/router/directory_test.go`）的 `TestDirectoryAPIKeyChannelPasses` / `TestDirectoryAPIKeyChannelRejectsUnknownKey`（后者钉住"放行分支不得让无效 Key 裸奔"）。
+修法：按通道区分——`x-api-key` 非空且租户作用域已派生（`gincontext.GetTenantIDString(ctx) != ""`）时放行，其余仍 401。判定依据是**服务端已派生的事实**，不接受请求头自证范围（`x-api-key` 只有在 `OIDCAuth` 里真正校验通过才可能走到这里）。回归用例：`pkg/appassembly/directory/directory_test.go`（原 `apps/rpapi/internal/router/directory_test.go`）的 `TestDirectoryAPIKeyChannelPasses` / `TestDirectoryAPIKeyChannelRejectsUnknownKey`（后者钉住"放行分支不得让无效 Key 裸奔"）。
 
 ### 5.2 本次 fail-closed 暴露并修复的真实缺陷
 

@@ -58,7 +58,7 @@ make run APP=gateway
 | tenantadmin | 8083 | 租户自服务 |
 | gateway | 8100 | 聚合部署（推荐日常使用）；同时挂载只读目录域 `/v1/rp/directory/*`（原 rpapi 已并入，无独立 8084 端口） |
 
-> **两层可复用能力**：`apps/{auth,platformadmin,tenantadmin}` 是**可 import 的域库包**（各带 `cmd/` 进程入口，保留分体部署；`apps/gateway` 是纯 `cmd/main` 聚合器）；`sdk/server` 是在其上的一层**薄门面 / 编排层**（`package server`，提供 `server.New` / `App.Mount` / `App.RunMigrations` / `App.MountConfig` / `App.MountDirectory` 等，装配实现下沉 `sdk/server/internal`），供业务应用把 IAM 内嵌进自己的 Go 进程（与业务同进程部署，不单独起 IAM 进程）。依赖方向（严格单向 DAG）：进程入口 → `sdk/server` → `sdk/server/internal` → `apps/*` 各域库 → `pkg` → `contract`；`pkg`、`apps/*`、`sdk/rp` 均只依赖 `contract`（`pkg` 的验签经 `contract.Verifier`/`contract.KeySource` 接口注入），**无 `pkg → sdk` / `apps → sdk` 反向依赖**，由 `make sdk-check-graph` 强制。接入说明见 [application-integration-guide.md](application-integration-guide.md) §11。
+> **两层可复用能力**：`apps/{auth,platformadmin,tenantadmin}` 是**可 import 的域库包**（各带 `cmd/` 进程入口，保留分体部署；`apps/gateway` 是纯 `cmd/main` 聚合器）；内部包 `pkg/appassembly` 是在其上的一层**内部装配层**（`package appassembly`，提供 `appassembly.New` / `App.Mount` / `App.RunMigrations` / `App.MountConfig` / `App.MountDirectory` 等，装配实现即为该包自身；**原 `sdk/server` 门面已内部化到这里，不再对外发布**），仅供 ark-iam 自身各 app 把域库装配进同一进程（不单独起多进程）。**外部业务应用不再能内嵌该装配层**，请走形态 1（`sdk/rp` 本地验签 + 自写中间件）。依赖方向（严格单向 DAG）：进程入口 → `pkg/appassembly` → `apps/*` 各域库 → `pkg` → `contract`；`pkg`、`apps/*`、`sdk/rp` 均只依赖 `contract`（`pkg` 的验签经 `contract.Verifier`/`contract.KeySource` 接口注入），**无 `pkg → sdk` / `apps → sdk` 反向依赖**，由 `make sdk-check-graph` 强制。接入说明见 [application-integration-guide.md](application-integration-guide.md) §11。
 
 ### 2.2 前端
 
@@ -399,11 +399,11 @@ ALTER INDEX IF EXISTS uk_dept_user                      RENAME TO iam_uk_dept_us
 - **整批一起升级**：所有应用共用同一套表，任一实例仍跑旧代码都会查不到表。
 - 加前缀后 `iam_user` **不再是 PostgreSQL 保留字**，§2.5.5 里的引号处理仍正确但不再是必需。
 - **撞名检测（`SameDatabase`/`ErrTableConflict`）**：加前缀后与宿主 `user/role/tenant` 天然不冲突，该检测基本退化为兜底防御，可保留。
-- **撞名检测的 PostgreSQL 实测（S5）**：`sdk/server/internal/migrate_pg_test.go`（`//go:build pg`）在真实 PG 上覆盖三条用例——冲突表 fail-fast 抛 `ErrTableConflict` / 正常 IAM 表二次迁移不误报 / `AllowExistingTables` 白名单放行。复用的是既有 `IAM_PG_TEST_DSN` + `-tags pg` 约定（DSN 缺省 `iam_migratetest`，库名必须含 `test` 才会执行破坏性 DROP）。运行方式：
+- **撞名检测的 PostgreSQL 实测（S5）**：`pkg/appassembly/migrate_pg_test.go`（`//go:build pg`）在真实 PG 上覆盖三条用例——冲突表 fail-fast 抛 `ErrTableConflict` / 正常 IAM 表二次迁移不误报 / `AllowExistingTables` 白名单放行。复用的是既有 `IAM_PG_TEST_DSN` + `-tags pg` 约定（DSN 缺省 `iam_migratetest`，库名必须含 `test` 才会执行破坏性 DROP）。运行方式：
   ```bash
   docker exec postgres18 psql -U postgres -c "CREATE DATABASE iam_migratetest;"
   IAM_PG_TEST_DSN='postgres://postgres:<pwd>@127.0.0.1:5432/iam_migratetest?sslmode=disable' \
-    go test -tags pg ./sdk/server/internal/ -run 'TableConflict.*Postgres' -v
+    go test -tags pg ./pkg/appassembly/ -run 'TableConflict.*Postgres' -v
   ```
   PG 实测未暴露方言差异（`Migrator().ColumnTypes` / `HasTable` 对裸表名行为一致），`migrate.go` 判定逻辑无需改动；默认 `go test ./...`（无 `pg` tag）不受影响。
 - **索引名**：显式声明的业务索引（`idx_*`/`uk_*`）已统一加 `iam_` 前缀（`iam_idx_*`/`iam_uk_*`）；`deleted_at`、`code`、`session_id` 等由框架（`BaseEntity` tag / gorm 列索引）自动生成的索引名随表名自然变为 `idx_iam_*`。同库内嵌时索引名不再与宿主冲突。
@@ -582,7 +582,7 @@ for m in apps/auth apps/gateway apps/platformadmin apps/tenantadmin pkg sdk cont
 
 > **为什么不能写 `go test ./...`**：根 `go.work` 用 `use (./contract ./pkg ./sdk ./apps/auth …)` 逐个列出模块，仓库根本身不是模块，因此 `go test ./...` 会报 `directory prefix . does not contain modules listed in go.work`（`./apps/...` 也不行，`apps` 不是模块）。要么显式列出各模块目录（`./contract/... ./pkg/... ./sdk/... ./apps/<app>/...`），要么进入某个模块目录内跑 `./...`（`make lint` 就是用后者遍历模块）。
 
-**单元测试约定**：auth / platformadmin / tenantadmin 各自的 `testutil.SetupSQLite(t, entities...)` 注册内存 SQLite 为全局 iam 库，服务内 `dao.NewXxxDao()` 自动落测试库，直接断言真实 dao 行为（gateway 无 `testutil`，因为它只在 `app.go` 里挂载各应用域；原 rpapi 目录域测试随并入 `sdk/server/internal/directory`）。RP 侧能力另有一套不依赖 DB 的测试：`cd sdk && go test ./...`（`make test-sdk`，另含 `cd contract && go test ./...` 契约测试与 `make test-sdk-server`）。需要真实 PostgreSQL/Redis 的集成测试用 `pkg/testsetup`（`Initialize`/`Done`/`NewCtx`，读取 `apps/<app>/config/config.yaml`）。
+**单元测试约定**：auth / platformadmin / tenantadmin 各自的 `testutil.SetupSQLite(t, entities...)` 注册内存 SQLite 为全局 iam 库，服务内 `dao.NewXxxDao()` 自动落测试库，直接断言真实 dao 行为（gateway 无 `testutil`，因为它只在 `app.go` 里挂载各应用域；原 rpapi 目录域测试随并入 `pkg/appassembly/directory`）。RP 侧能力另有一套不依赖 DB 的测试：`cd sdk && go test ./...`（`make test-sdk`，另含 `cd contract && go test ./...` 契约测试与 `make test-sdk-server`，后者目标名保留但实际跑 `./pkg/appassembly/...` 装配内核测试）。需要真实 PostgreSQL/Redis 的集成测试用 `pkg/testsetup`（`Initialize`/`Done`/`NewCtx`，读取 `apps/<app>/config/config.yaml`）。
 
 **e2e（Playwright，浏览器全流程）**：
 
@@ -657,7 +657,7 @@ flowchart TB
 | **单体聚合**（gateway 单进程） | 小规模/开发 | 一个进程挂载 auth/platformadmin/tenantadmin + 目录域，端口 8100 |
 | **分体部署** | 中大规模 | auth / platformadmin / tenantadmin 独立进程独立扩缩容（只读目录 API 随 gateway 提供，不再有独立 rpapi 进程） |
 | **auth 多副本** | 高可用 | 必须共享同一认证 Redis（会话/授权状态），PostgreSQL 主库；`/oidc` 无状态化依赖 Redis |
-| **形态 2：内嵌业务单体** | 单项目零运维自带账号体系 | IAM 随业务二进制同进程部署，**不单独起 IAM 进程**；Go 侧用 `sdk/server`（`server.New + App.Mount`）把各域库内嵌进业务进程，配置项另见 [configuration-reference.md](configuration-reference.md) §12 |
+| **形态 2：内部多 app 装配（ark-iam 自身）** | 单进程合一部署（仅 ark-iam 自身） | ark-iam 各域随同进程装配，**不单独起多进程**；Go 侧用内部 `pkg/appassembly`（`appassembly.New + App.Mount`）把各域库装配进同一进程（**不对外发布**，外部应用请走形态 1），配置项另见 [configuration-reference.md](configuration-reference.md) §12 |
 
 **关键约束**：
 

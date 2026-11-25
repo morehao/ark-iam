@@ -4,9 +4,9 @@
 
 `ark-iam` is a full-stack project with Go backend and React frontend. The backend is based on [Gin](https://github.com/gin-gonic/gin), providing a layered, maintainable, and scalable service structure with multiple app modules.
 
-The IAM backend is split into four apps under `apps/` (auth, platformadmin, tenantadmin, gateway). `auth`/`platformadmin`/`tenantadmin` are importable **library packages** (each with a `cmd/` process entry for standalone deployment); `gateway` is a **pure `cmd/main`** aggregator that is never imported. The former read-only directory app `rpapi` has been retired — its capability now lives in the `sdk/server` `DomainDirectory` domain (still served at `/v1/rp/directory/*`). The reusable layers live at the repository root as standalone Go modules — `contract/` (the framework-free data-contract module), `pkg/` (common packages), `sdk/` (RP-side SDK plus the `sdk/server` facade that orchestrates the domain libraries) — all managed by the root `go.work` and individually consumable via `go get`.
+The IAM backend is split into four apps under `apps/` (auth, platformadmin, tenantadmin, gateway). `auth`/`platformadmin`/`tenantadmin` are importable **library packages** (each with a `cmd/` process entry for standalone deployment); `gateway` is a **pure `cmd/main`** aggregator that is never imported. The former read-only directory app `rpapi` has been retired — its capability now lives in the internal `pkg/appassembly` `DomainDirectory` domain (still served at `/v1/rp/directory/*`). The reusable layers live at the repository root as standalone Go modules — `contract/` (the framework-free data-contract module), `pkg/` (common packages, including the internal `pkg/appassembly` server assembly), `sdk/` (the RP-side SDK, only `rp`) — all managed by the root `go.work` and individually consumable via `go get`. **`sdk/rp` is the only published integration surface for RPs**; the server assembly (`pkg/appassembly`, formerly the `sdk/server` facade) is internal and no longer shipped as a public SDK.
 
-> **Layered inversion (single-direction DAG)**: process entry → `sdk/server` → `sdk/server/internal` → `apps/*` domain libraries → `pkg` → `contract`. `sdk/rp` and `apps/*` depend only on `contract`; `pkg` depends only on `contract` (its verification path goes through the `contract.Verifier`/`contract.KeySource` interfaces, implemented by `sdk/rp` and injected by `sdk/server/internal`) — so there is no `pkg → sdk` and no `apps → sdk` edge. The former standalone `iam/` module has been removed; its domain implementations now live in `apps/`, and Go-side frontend embedding (`MountFrontend`) is gone — the login/admin frontend is served from the npm package `@morehao/ark-iam-react`.
+> **Layered inversion (single-direction DAG)**: process entry → `pkg/appassembly` (internal assembly, formerly `sdk/server/internal`) → `apps/*` domain libraries → `pkg` → `contract`. `sdk/rp` and `apps/*` depend only on `contract`; `pkg` depends only on `contract` (its verification path goes through the `contract.Verifier`/`contract.KeySource` interfaces, implemented by `sdk/rp` and injected by `pkg/appassembly`) — so there is no `pkg → sdk` and no `apps → sdk` edge. The former standalone `iam/` module has been removed; its domain implementations now live in `apps/`, and Go-side frontend embedding (`MountFrontend`) is gone — the login/admin frontend is served from the npm package `@morehao/ark-iam-react`.
 
 ---
 
@@ -32,7 +32,7 @@ ark-iam/
 │   ├── auth/              # Auth domain library + cmd (login/session/OIDC), :8081
 │   ├── platformadmin/     # Platform domain library + cmd (user/role/menu/tenant), :8082
 │   ├── tenantadmin/       # Tenant domain library + cmd (department/user/role), :8083
-│   ├── gateway/           # Pure cmd aggregator: server.New(Domains=nil) + MountDirectory, :8100
+│   ├── gateway/           # Pure cmd aggregator: appassembly.New(Domains=nil) + MountDirectory, :8100
 │   ├── login-web/         # Login portal frontend, :4000
 │   ├── platform-admin-web/# Platform admin console frontend, :4001
 │   └── tenant-admin-web/  # Tenant admin console frontend, :4002

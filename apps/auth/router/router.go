@@ -13,7 +13,7 @@ import (
 
 // VerifierBuilder 由装配层注入的验签器构造器：吃 keySource + issuer，返回具体
 // contract.Verifier（实现见 sdk/rp）。apps 只持有函数签名、不 import sdk，
-// 具体 sdk/rp 实现由 sdk/server/internal（组合根）注入，从而消除 apps → sdk 依赖边。
+// 具体 sdk/rp 实现由 pkg/appassembly（组合根）注入，从而消除 apps → sdk 依赖边。
 type VerifierBuilder func(keySource contract.KeySource, issuer string) contract.Verifier
 
 // Options 控制 auth 域挂载哪些部分。
