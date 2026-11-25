@@ -4,7 +4,7 @@
 >
 > 开发环境 Swagger（redoc）：`http://localhost:{port}/{appName}/redocs`（如 `http://localhost:8081/auth/redocs`）。
 >
-> **内嵌形态（形态 2）**：用 `sdk/server` 把 IAM 内嵌进业务单体时，下列所有前缀会挂在宿主 `App.Mount(rg)` 传入的路由组下——例如 `engine.Group("/iam")` 时端点变为 `/iam/v1/platform/*`、`/iam/oidc/*`、`/iam/install`。路由与鉴权语义不变，见 [application-integration-guide.md](application-integration-guide.md) §11。
+> **多 app 装配形态（形态 2，内部）**：ark-iam 自身用内部 `pkg/appassembly`（原 `sdk/server` 门面内部化而来，不对外发布）把各域装配进同一进程时，下列所有前缀会挂在 `App.Mount(rg)` 传入的路由组下——例如 `engine.Group("/iam")` 时端点变为 `/iam/v1/platform/*`、`/iam/oidc/*`、`/iam/install`。路由与鉴权语义不变，见 [application-integration-guide.md](application-integration-guide.md) §11。
 
 ---
 
@@ -31,9 +31,9 @@
 | auth | `auth` | 8081 | 8100 |
 | platformadmin | `platform` | 8082 | 8100 |
 | tenantadmin | `tenant` | 8083 | 8100 |
-| 目录域（`sdk/server` 的 `DomainDirectory`，原 rpapi） | `rp` | —（不在独立进程暴露） | 8100 |
+| 目录域（`pkg/appassembly` 的 `DomainDirectory`，原 rpapi） | `rp` | —（不在独立进程暴露） | 8100 |
 
-> 只读目录 API（`/v1/rp/directory/*`）原为独立应用 `rpapi`（:8084），现已并入 `sdk/server` 的 `DomainDirectory` 域；`gateway` 单体部署时经 `app.MountDirectory` 按 `rp` 前缀挂到 :8100（见 §8），不再有独立 `rpapi` 进程。
+> 只读目录 API（`/v1/rp/directory/*`）原为独立应用 `rpapi`（:8084），现已并入 `pkg/appassembly` 的 `DomainDirectory` 域；`gateway` 单体部署时经 `app.MountDirectory` 按 `rp` 前缀挂到 :8100（见 §8），不再有独立 `rpapi` 进程。
 
 ### 1.2 响应信封
 
@@ -417,7 +417,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 ## 8. 应用目录端点（/v1/rp/directory/*）
 
-> 由 `sdk/server` 的 `DomainDirectory` 域提供（原 `rpapi` 应用并入），`gateway`（:8100）全量挂载时经 `app.MountDirectory` 按 `rp` 前缀挂出；服务标识段为 `rp`，完整前缀 `/v1/rp`。
+> 由 `pkg/appassembly` 的 `DomainDirectory` 域提供（原 `rpapi` 应用并入），`gateway`（:8100）全量挂载时经 `app.MountDirectory` 按 `rp` 前缀挂出；服务标识段为 `rp`，完整前缀 `/v1/rp`。
 > 这是给**外部应用（RP）**用的只读目录接口（后台展示取姓名/部门/角色），**不提供任何写操作**。
 > 客户端实现见 `sdk/rp/directory`（TTL 缓存 / ETag 304 / 批量 / single-flight），接入说明见 [sdk/README.md](../../sdk/README.md) §4。
 

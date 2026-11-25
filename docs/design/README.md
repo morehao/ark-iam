@@ -15,7 +15,7 @@
 | 前端开发对接 | 登录页 / 管理台调用哪些接口、OIDC 端点契约 | [api-reference.md](api-reference.md) |
 | 后端开发 | 路由规范、接口清单、权限模型、首次初始化引导与字段权威 | [api-reference.md](api-reference.md) → [system-design.md](system-design.md) §4.5 |
 | 接入 SDK（RP 侧） | Go 应用如何使用 IAM 的 RP SDK（验签 / M2M / 目录 / 登出） | [sdk/README.md](../../sdk/README.md) |
-| 把 IAM 内嵌进自己的单体应用 | 不单独部署 IAM 进程，用 `sdk/server` 的 `server.New + App.Mount` 自带账号体系（含 Domains 裁剪、同库撞名、私钥策略） | [application-integration-guide.md](application-integration-guide.md) §11 |
+| 了解 ark-iam 自身的多 app 装配（形态 2，内部，不对外） | IAM 各域如何在同一进程内装配（原 `sdk/server` 门面已内部化为 `pkg/appassembly`，仅限 ark-iam 自身 app；外部应用请走形态 1 sdk/rp） | [application-integration-guide.md](application-integration-guide.md) §11 |
 | 后端开发（改数据访问/中间件） | ctx 怎么传、租户隔离怎么生效、跨租户查询怎么写 | [context-and-tenant-scope.md](context-and-tenant-scope.md) |
 | 部署运维 | 配置项含义、构建运行、**首次初始化（安装页引导）**、Docker、签名密钥轮换 | [configuration-reference.md](configuration-reference.md) + [run-and-deploy.md](run-and-deploy.md) + [signing-key-rotation-runbook.md](signing-key-rotation-runbook.md) |
 | 快速查词 | 术语、缩写、角色定义 | [glossary.md](glossary.md) |
@@ -26,7 +26,7 @@
 | 文档 | 职责 |
 |---|---|
 | [sso-oidc-concepts.md](sso-oidc-concepts.md) | **SSO 与 OIDC 概念、协议、流程说明**（建议先读）。回答：什么是 SSO、OIDC 为什么出现、核心概念（Client / Authorization Server / Token / Scope / Claims / 授权码+PKCE / 刷新令牌 / 单点登出）、**客户端类型与凭据选择（§3.6：什么时候需要 `client_secret` 的集中判据）**、协议端点与令牌生命周期 |
-| [system-design.md](system-design.md) | **系统设计文档（核心主文档，单一事实源）**。背景与目标、总体架构、应用划分（auth / platformadmin / tenantadmin / gateway，原 rpapi 目录能力并入 sdk/server 的 DomainDirectory）与内部分层、技术栈、数据库设计（ER 图 + 表说明 + Redis Key + **内置数据初始化引导与字段权威矩阵**）、核心业务流程（自助开通租户 / 登录 / SSO / 登出 / 授权 / 令牌签发 / Connector / **建租户与内置管理员**）、路由规范、安全设计、演进方向 |
+| [system-design.md](system-design.md) | **系统设计文档（核心主文档，单一事实源）**。背景与目标、总体架构、应用划分（auth / platformadmin / tenantadmin / gateway，原 rpapi 目录能力并入 pkg/appassembly 的 DomainDirectory）与内部分层、技术栈、数据库设计（ER 图 + 表说明 + Redis Key + **内置数据初始化引导与字段权威矩阵**）、核心业务流程（自助开通租户 / 登录 / SSO / 登出 / 授权 / 令牌签发 / Connector / **建租户与内置管理员**）、路由规范、安全设计、演进方向 |
 | [application-integration-guide.md](application-integration-guide.md) | **新应用接入指南**。从零把业务应用接入 IAM：前置准备、创建应用与 OAuth 客户端、RP 侧 OIDC 配置示例、SSO 单点登录体验、单点登出接入、API Key / client_credentials 机器凭证接入、验收清单；**并列给出两种接入形态：形态 1 独立部署 + SDK 验签、形态 2 内嵌 IAM 到业务单体** |
 | [rustfs-integration-case.md](rustfs-integration-case.md) | **存量第三方应用接入实战案例**。以 RustFS（自带 canned policy 权限模型、代码不可改、仅支持单向 SLO）为例，记录：契约设计（IAM 角色编码 ↔ 下游策略名）、**下游策略解析为 fail-closed 所推出的供给顺序硬约束**、登出方向不对称与三种 SLO 处置取舍（接受窗口 / 外部吊销 / 对方实现接收端）、逐条实测的验收结果、可复用的接入检查清单 |
 | [api-reference.md](api-reference.md) | **API 参考**。五类端点总览（OIDC 协议端点 / auth 认证端点 / platform 平台管理端点 / tenant 租户自服务端点 / rp 面向应用的只读目录端点）、认证与鉴权方式、通用响应信封、路由规范摘要 |
@@ -39,13 +39,13 @@
 
 > **待办项另记**：尚未实施但方向已定的事项统一记在 [`docs/TODO.md`](../TODO.md)（含前端组件发布 npm 包的方案与前置解耦清单），落地后收敛回本目录对应文档。
 
-> **过程性设计稿（spec / plan）不入库**：本仓库用本地 SDD 工作流产出的方案与计划文档统一放在 `docs/superpowers/`（已 gitignore）。已落地的改造不再在 `docs/design/` 留过程文档——结论一律收敛进上表的长期维护文档：字段权威矩阵与种子身份键见 `system-design.md` §4.5、租户开通与内置管理员见 §5.8、共享层分层见 §2.3、schema 变更策略见 §4.1、运行与升级见 `run-and-deploy.md`。
+> **过程性设计稿（spec / plan）不入库**：已落地的改造不在 `docs/design/` 留过程文档——结论一律收敛进上表的长期维护文档：字段权威矩阵与种子身份键见 `system-design.md` §4.5、租户开通与内置管理员见 §5.8、共享层分层见 §2.3、schema 变更策略见 §4.1、运行与升级见 `run-and-deploy.md`。
 
 ## 核心概念速览
 
 - **Ark IAM** 是一个多租户、多应用的统一身份认证服务，对外提供 **OIDC Provider**（基于 [zitadel/oidc](https://github.com/zitadel/oidc)）能力，业务应用作为 **RP（Relying Party）** 通过标准 OIDC 协议接入，实现 **一次登录、处处通行（SSO）** 与 **一处登出、处处登出（SLO）**。
-- 后端由 4 个应用组成：`auth`（认证网关 / OIDC Provider，:8081）、`platformadmin`（平台管理，:8082）、`tenantadmin`（租户自服务，:8083）、`gateway`（单体聚合部署，:8100），共享 `pkg` 公共层；各域实现物理归 `apps/*`（可 import 的库包，各带 `cmd/` 进程入口）。原只读目录应用 `rpapi` 已下线，目录能力并入 `sdk/server` 的 `DomainDirectory` 域（路由仍在 `/v1/rp/directory/*`）。其上另有 `sdk/server` 薄门面 / 编排层（供「内嵌到业务单体」的形态使用）。Go workspace（根 `go.work`）管理 **7 个模块**（`contract`、`pkg`、`sdk`、`apps/auth`、`apps/gateway`、`apps/platformadmin`、`apps/tenantadmin`）。
-- **两种接入形态**：形态 1 单独部署 IAM（`gateway`/分体），业务应用通过 `sdk` 验签接入；形态 2 用 `sdk/server` 把 IAM **内嵌**进业务自己的 Go 进程（不单独部署 IAM 进程，前端由 npm 包 `@morehao/ark-iam-react` 提供），见 [application-integration-guide.md](application-integration-guide.md) §11。
+- 后端由 4 个应用组成：`auth`（认证网关 / OIDC Provider，:8081）、`platformadmin`（平台管理，:8082）、`tenantadmin`（租户自服务，:8083）、`gateway`（单体聚合部署，:8100），共享 `pkg` 公共层；各域实现物理归 `apps/*`（可 import 的库包，各带 `cmd/` 进程入口）。原只读目录应用 `rpapi` 已下线，目录能力并入 `pkg/appassembly` 的 `DomainDirectory` 域（路由仍在 `/v1/rp/directory/*`）。其上另有内部装配层 `pkg/appassembly`（原 `sdk/server` 门面内部化而来，供 ark-iam 自身的「多 app 装配」形态使用，**不对外发布**）。Go workspace（根 `go.work`）管理 **7 个模块**（`contract`、`pkg`、`sdk`、`apps/auth`、`apps/gateway`、`apps/platformadmin`、`apps/tenantadmin`）。
+- **两种接入形态**：形态 1 单独部署 IAM（`gateway`/分体），业务应用通过 `sdk`（`sdk/rp`）验签接入（对外唯一发布形态）；形态 2 用内部 `pkg/appassembly` 把 IAM 各域**装配**进同一进程（原 `sdk/server` 门面内部化而来，**不对外发布，仅限 ark-iam 自身 app**；前端由 npm 包 `@morehao/ark-iam-react` 提供），见 [application-integration-guide.md](application-integration-guide.md) §11。
 - 身份模型为 **自然人（person）+ 租户成员（user，表 `"user"`）**：person 是跨租户的全局身份，user 是 person 在某个租户内的成员记录，一个人可同时属于多个租户。
 - 授权模型到「**角色—菜单**」粒度（角色按租户 + 应用作用域，`user_role` / `role_menu` 两张关联表）；资源级权限不在 IAM 承载。
 - 前端为 React 18 + Vite + Ant Design 5 的 pnpm monorepo（仓库根 `packages/` + `apps/*-web`），包含登录门户（login-web :4000）、平台管理台（platform-admin-web :4001）、租户管理台（tenant-admin-web :4002）。

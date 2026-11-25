@@ -4,9 +4,9 @@
 
 `ark-iam` 是一个前后端分离的全栈项目，后端基于 [Gin](https://github.com/gin-gonic/gin)，提供分层、可维护、可扩展的服务结构，支持多个应用模块。
 
-IAM 后端拆分为 `apps/` 下的四个应用（auth、platformadmin、tenantadmin、gateway）。其中 auth/platformadmin/tenantadmin 是**可 import 的库包**（各带 `cmd/` 进程入口，保留分体部署）；gateway 是**纯 `cmd/main`** 聚合器（绝不被 import）。原只读目录应用 `rpapi` 已下线——其能力并入 `sdk/server` 的 `DomainDirectory` 域（路由仍在 `/v1/rp/directory/*`）。可复用的能力放在**仓库根级**作为独立 Go 模块——`contract/`（框架无关的数据契约模块）、`pkg/`（公共包）、`sdk/`（RP 侧 SDK + `sdk/server` 门面，委托 apps 各域库）——统一由根 `go.work` 管理，并可各自通过 `go get` 引依赖使用。
+IAM 后端拆分为 `apps/` 下的四个应用（auth、platformadmin、tenantadmin、gateway）。其中 auth/platformadmin/tenantadmin 是**可 import 的库包**（各带 `cmd/` 进程入口，保留分体部署）；gateway 是**纯 `cmd/main`** 聚合器（绝不被 import）。原只读目录应用 `rpapi` 已下线——其能力并入内部装配层 `pkg/appassembly` 的 `DomainDirectory` 域（路由仍在 `/v1/rp/directory/*`）。可复用的能力放在**仓库根级**作为独立 Go 模块——`contract/`（框架无关的数据契约模块）、`pkg/`（公共包，含内部装配 `pkg/appassembly`）、`sdk/`（RP 侧 SDK，仅保留 `rp`）——统一由根 `go.work` 管理，并可各自通过 `go get` 引依赖使用。**`sdk/rp` 是唯一对外发布的 RP 集成面**；服务端装配（`pkg/appassembly`，原 `sdk/server` 门面）为内部实现，不再作为对外 SDK 发布。
 
-> **分层倒置（单向 DAG）**：进程入口 → `sdk/server` → `sdk/server/internal` → `apps/*` 各域库 → `pkg` → `contract`。`sdk/rp` 与 `apps/*` 只依赖 `contract`；`pkg` 只依赖 `contract`（验签经 `contract.Verifier`/`contract.KeySource` 接口，由 `sdk/rp` 实现、`sdk/server/internal` 注入）——因此不存在 `pkg → sdk`、也不存在 `apps → sdk` 依赖边。原独立 `iam/` 模块已删除，域实现全部并入 `apps/`；Go 侧不再托管前端静态资源（`MountFrontend` 已删），登录/管理台前端由 npm 包 `@morehao/ark-iam-react` 提供。
+> **分层倒置（单向 DAG）**：进程入口 → `pkg/appassembly`（内部装配，原 `sdk/server/internal`）→ `apps/*` 各域库 → `pkg` → `contract`。`sdk/rp` 与 `apps/*` 只依赖 `contract`；`pkg` 只依赖 `contract`（验签经 `contract.Verifier`/`contract.KeySource` 接口，由 `sdk/rp` 实现、`pkg/appassembly` 注入）——因此不存在 `pkg → sdk`、也不存在 `apps → sdk` 依赖边。原独立 `iam/` 模块已删除，域实现全部并入 `apps/`；Go 侧不再托管前端静态资源（`MountFrontend` 已删），登录/管理台前端由 npm 包 `@morehao/ark-iam-react` 提供。
 
 ---
 
@@ -32,7 +32,7 @@ ark-iam/
 │   ├── auth/              # 认证域库 + cmd（登录/会话/OIDC）, :8081
 │   ├── platformadmin/     # 平台域库 + cmd（user/role/menu/tenant）, :8082
 │   ├── tenantadmin/       # 租户域库 + cmd（department/user/role）, :8083
-│   ├── gateway/           # 纯 cmd 聚合器：server.New(Domains=nil) + MountDirectory, :8100
+│   ├── gateway/           # 纯 cmd 聚合器：appassembly.New(Domains=nil) + MountDirectory, :8100
 │   ├── login-web/         # 登录门户前端, :4000
 │   ├── platform-admin-web/# 平台管理台前端, :4001
 │   └── tenant-admin-web/  # 租户管理台前端, :4002

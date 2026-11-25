@@ -4,9 +4,9 @@
 
 ## 项目概述
 
-GoArk 是一个基于 Gin + GORM 的多应用后端项目，采用前后端分离架构。IAM 后端拆分为四个应用（`auth`/`platformadmin`/`tenantadmin`/`gateway`；原 `rpapi` 的只读目录 API 已并入 `sdk/server` 的 `DomainDirectory` 域），共享公共层 `pkg`、对外 SDK `sdk`、最底层契约 module `contract`，并以仓库根 `go.work` 作为 Go workspace 管理 7 个模块（contract、pkg、sdk、apps/auth、apps/gateway、apps/platformadmin、apps/tenantadmin）。`sdk/server` 把 auth/platformadmin/tenantadmin 三域 + 目录域封装为可实例化、可按域裁剪的门面，支持「内嵌业务单体」形态（`sdk/server.New + Mount + MountConfig + RunMigrations`），`apps/gateway` 是它的「全量使用者」。
+GoArk 是一个基于 Gin + GORM 的多应用后端项目，采用前后端分离架构。IAM 后端拆分为四个应用（`auth`/`platformadmin`/`tenantadmin`/`gateway`；原 `rpapi` 的只读目录 API 已并入内部 `pkg/appassembly` 的 `DomainDirectory` 域），共享公共层 `pkg`、对外 SDK `sdk`（仅 `rp`）、最底层契约 module `contract`，并以仓库根 `go.work` 作为 Go workspace 管理 7 个模块（contract、pkg、sdk、apps/auth、apps/gateway、apps/platformadmin、apps/tenantadmin）。内部包 `pkg/appassembly` 把 auth/platformadmin/tenantadmin 三域 + 目录域封装为可实例化、可按域裁剪的**内部装配层**（原 `sdk/server` 门面内部化而来，**不对外发布**，仅供 ark-iam 自身「多 app 装配」形态使用，`appassembly.New + Mount + MountConfig + RunMigrations`），`apps/gateway` 是它的「全量使用者」。
 
-> **模块依赖方向（单向 DAG，无环）**：`contract`（仅 stdlib + jwt，无 ark-iam 依赖）← `pkg` ← `sdk`；`apps/*` → `contract`、`pkg`。`pkg` **不得**依赖 `sdk`（验签经 `contract.Verifier`/`contract.KeySource` 接口由 `sdk/server/internal` 注入）；`sdk/server/internal` 是唯一 import `apps/*`+`pkg` 的地方。守卫：`make sdk-check-deps`（依赖白名单）+ `make sdk-check-graph`（module 依赖方向）。
+> **模块依赖方向（单向 DAG，无环）**：`contract`（仅 stdlib + jwt，无 ark-iam 依赖）← `pkg` ← `sdk`；`apps/*` → `contract`、`pkg`。`pkg` **不得**依赖 `sdk`（验签经 `contract.Verifier`/`contract.KeySource` 接口由 `pkg/appassembly` 注入）；`pkg/appassembly` 是唯一 import `apps/*`+`pkg` 的地方。守卫：`make sdk-check-deps`（依赖白名单）+ `make sdk-check-graph`（module 依赖方向）。
 
 ## 项目结构
 
@@ -38,7 +38,7 @@ ark-iam/
 
 ## 构建与运行命令
 
-所有命令在项目根目录下执行。有效 `APP` 取值为 `auth | platformadmin | tenantadmin | gateway`（原 `rpapi` 已并入 `sdk/server` 的 `DomainDirectory` 域，不再有独立 app）：
+所有命令在项目根目录下执行。有效 `APP` 取值为 `auth | platformadmin | tenantadmin | gateway`（原 `rpapi` 已并入 `pkg/appassembly` 的 `DomainDirectory` 域，不再有独立 app）：
 
 ```bash
 # 列出所有可用应用
@@ -154,7 +154,7 @@ contract/                     # 最底层契约 module（仅 stdlib + jwt）
 >
 > **领域层容器约定**：应用内领域层统一放 `internal/core/<领域名>`（当前为 `oidcop`）。`core` 只承载绑定框架/协议的领域逻辑，禁止放置工具与辅助代码；`op` 为 OpenID Provider 术语（对应 RP 侧 `pkg/oidckit`），非领域层通用后缀，其他领域层按领域名命名（如 `core/session`）。公共层同理：`pkg/core/<域>` 是平铺的领域层容器，**只放领域不变式，不放工具与辅助代码**（工具/基础能力直接放 `pkg/<name>`）。
 >
-> **OIDC 分层约定**：OP（Provider）侧领域层在 `apps/auth/internal/core/oidcop`（仅 auth 使用，绑定 auth 实体与 zitadel op 框架）。**RP 侧 OIDC 能力的唯一事实源是 `contract`（最底层契约 module：claim/Identity/logout/目录 DTO/验签接口）+ `sdk`（`sdk/rp` 验签/M2M/登出/目录客户端）**，它面向外部应用，依赖白名单只有标准库 + `jwt/v5`（`make sdk-check-deps` 强制），禁止引入 gin/gorm/redis/go-oidc/go-jose；`pkg/object/objauth`、`pkg/oidckit` 只是指向 `sdk` 的**类型别名与 gin 薄壳**（外加把 `oidc.*` 配置装配成 `contract.KeySource`，见 `pkg/oidckit/keys.go`，具体实现由 `sdk/server/internal` 注入），不得再新增 RP 侧实现。若未来出现第二个 OP 消费者，将 `oidcop` 上提。
+> **OIDC 分层约定**：OP（Provider）侧领域层在 `apps/auth/internal/core/oidcop`（仅 auth 使用，绑定 auth 实体与 zitadel op 框架）。**RP 侧 OIDC 能力的唯一事实源是 `contract`（最底层契约 module：claim/Identity/logout/目录 DTO/验签接口）+ `sdk`（`sdk/rp` 验签/M2M/登出/目录客户端）**，它面向外部应用，依赖白名单只有标准库 + `jwt/v5`（`make sdk-check-deps` 强制），禁止引入 gin/gorm/redis/go-oidc/go-jose；`pkg/object/objauth`、`pkg/oidckit` 只是指向 `sdk` 的**类型别名与 gin 薄壳**（外加把 `oidc.*` 配置装配成 `contract.KeySource`，见 `pkg/oidckit/keys.go`，具体实现由 `pkg/appassembly` 注入），不得再新增 RP 侧实现。若未来出现第二个 OP 消费者，将 `oidcop` 上提。
 
 ### 命名规范
 
@@ -431,7 +431,7 @@ func (ctr *userCtr) Create(ctx *gin.Context) {
 
 **三条硬规则（新增路由必须按序判定）**：
 
-- **R1 资源 CRUD → REST**：资源的增删改查/列表/详情/树，用「集合 + 方法 + ID」表达。路径格式 `/{版本}/{服务标识}/{资源}[/{id}[/{子资源}]]`（如 `/v1/platform/users/{userID}/identities`；`服务标识` 即应用标识段：auth → `/v1/auth`、platformadmin → `/v1/platform`、tenantadmin → `/v1/tenant`、目录域（原 rpapi，现随 sdk/server 的 DomainDirectory）→ `/v1/rp`，各服务标识路径互不相同；资源名可跨应用复用，由服务标识段区分归属）
+- **R1 资源 CRUD → REST**：资源的增删改查/列表/详情/树，用「集合 + 方法 + ID」表达。路径格式 `/{版本}/{服务标识}/{资源}[/{id}[/{子资源}]]`（如 `/v1/platform/users/{userID}/identities`；`服务标识` 即应用标识段：auth → `/v1/auth`、platformadmin → `/v1/platform`、tenantadmin → `/v1/tenant`、目录域（原 rpapi，现随 pkg/appassembly 的 DomainDirectory）→ `/v1/rp`，各服务标识路径互不相同；资源名可跨应用复用，由服务标识段区分归属）
 - **R2 业务动作 → 动作子路径**：状态流转/触发副作用类操作用 `POST /资源/{id}/动作`（如 `POST /v1/tenant/api-keys/{apiKeyID}/revoke`）；认证/会话类动作挂 `/v1/auth` 动作式专用段（`joinTenant`/`logout`/`logoutAll`/`userinfo`；`register` 已下线，自助注册走 `/oidc/registerPerson` + `/oidc/createTenant`）
 - **R3 标准协议 → 专用前缀**：`/oidc/*`、back-channel logout、docs 不走业务路由规范，保持不动
 
@@ -646,7 +646,7 @@ actionColumn<TenantItem>({
 - **代码生成**: gocli
 - **数据库**: GORM with PostgreSQL（主库，启动时 AutoMigrate 自动建表、**不写任何数据**；内置数据由初始化页面 `POST /install/initialize` 一次性引导），测试用 SQLite
 - **RP SDK**: `sdk`（独立 module，依赖白名单；`make test-sdk` / `make sdk-check-deps` / `make sdk-check-graph`，用法见 `sdk/README.md`）
-- **可嵌入 IAM 门面**: `sdk/server`（`New + Mount + MountConfig + RunMigrations`，支持内嵌业务单体；示例 `examples/`）
+- **内部装配层（不对外）**: `pkg/appassembly`（`appassembly.New + Mount + MountConfig + RunMigrations`，为 ark-iam 自身多 app 装配服务；原 `sdk/server` 门面内部化而来，外部应用请走 `sdk/rp`，示例见 `examples/rp-gin`）
 - **契约 module**: `contract`（最底层独立 module，仅 stdlib + jwt，仅数据契约与验签接口）
 - **缓存**: Redis
 - **链路追踪**: OpenTelemetry

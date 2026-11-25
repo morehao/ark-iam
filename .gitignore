@@ -6,7 +6,6 @@
 .history
 .opencode/*
 .dsh
-.superpowers/
 .worktrees/
 
 # 日志
@@ -26,9 +25,6 @@ packages/*/dist/
 *.key
 *.cert
 certs/
-
-# 设计文档（docs/superpowers 是本地 SDD 工作产物：spec/plan 一律不入库）
-docs/superpowers/
 
 # Playwright E2E 产物
 e2e/test-results/

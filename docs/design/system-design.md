@@ -74,7 +74,7 @@ flowchart TB
             TENANT["tenantadmin :8083<br/>租户自服务"]
             DIR["DomainDirectory 目录域<br/>（原 rpapi，/v1/rp/directory/*）"]
         end
-        SDKSERVER["sdk/server 薄门面<br/>server.New + App.Mount<br/>形态 2：内嵌业务单体（internal 装配）"]
+        SDKSERVER["pkg/appassembly 内部装配层<br/>appassembly.New + App.Mount<br/>形态 2：多 app 装配（ark-iam 自身，不对外）"]
         CONTRACT["contract 契约 module<br/>claims / Identity / Verifier·KeySource 接口 / 目录 DTO<br/>（仅 stdlib + jwt）"]
         PKG["pkg 公共层<br/>config / dbclient / middleware / code<br/>model·dao·object / core/&lt;域&gt; / credential<br/>oidckit / identity / sso / audit / seed / testsetup"]
     end
@@ -114,7 +114,7 @@ flowchart TB
 |---|---|
 | **OIDC 标准协议** | 生态成熟、客户端 SDK 丰富、安全机制经实践检验（见 [sso-oidc-concepts.md](sso-oidc-concepts.md)） |
 | **OP（auth）与业务 API（RP）分层** | OP 持有中心会话（Redis），RP 无状态校验令牌，实现请求粒度的"登出即失效" |
-| **四应用 + 共享 pkg + contract + sdk/server 门面** | 认证 / 平台管理 / 租户自服务按职责拆分；`gateway` 单体聚合便于单进程部署，也支持分体部署；原只读目录应用 `rpapi` 下线、并入 `sdk/server` 的 `DomainDirectory` 域。各域实现物理归 `apps/*`（可 import 的库包），`sdk/server` 作为其上的薄门面 / 编排层（装配下沉 `sdk/server/internal`），支持「内嵌业务单体」形态；`contract` 为最底层零框架数据契约 module |
+| **四应用 + 共享 pkg + contract + pkg/appassembly 内部装配层** | 认证 / 平台管理 / 租户自服务按职责拆分；`gateway` 单体聚合便于单进程部署，也支持分体部署；原只读目录应用 `rpapi` 下线、并入 `pkg/appassembly` 的 `DomainDirectory` 域。各域实现物理归 `apps/*`（可 import 的库包），`pkg/appassembly` 作为其上的内部装配层（装配实现即该包，原本的 `sdk/server` 门面已内部化到此处，**不再对外发布**），支持 ark-iam 自身的「多 app 装配」形态；`contract` 为最底层零框架数据契约 module |
 | **person + user 两级身份** | person 是跨租户全局身份（用户名/邮箱/手机号全局唯一），user 是租户内成员，天然支持"一人多租户" |
 | **JWT Access Token + 短 TTL** | 无状态校验、水平扩展友好；登出失效依赖 SSO 会话活性校验兜底 |
 | **Redis 为中心会话存储** | SSO 会话、授权码、令牌元数据、SLO 队列共享同一认证 Redis，支持 auth 多副本 |
@@ -169,32 +169,32 @@ flowchart TB
 | **tenantadmin** | `tenant` | 8083 | 租户自服务：部门架构 / 用户与角色 / 服务账号 / 加入邀请 / API 密钥 / 租户菜单 / **应用准入（成员 × 应用）** | department、department_user、user、tenant_invite、role、api_key、user_application |
 | **gateway** | 聚合 | 8100 | 单体聚合部署，挂载 auth + platformadmin + tenantadmin + 目录域（`DomainDirectory`）；部署为 gateway 时 OIDC issuer 同步切到 `http://localhost:8100/oidc` | 无独立业务 |
 
-> 只读目录 API（`/v1/rp/directory/*`，服务标识段 `rp`）原为独立应用 `rpapi`（:8084），现已并入 `sdk/server` 的 `DomainDirectory` 域：`gateway` 全量挂载（`Domains=nil`）时经 `app.MountDirectory` 挂到 `/v1/rp`；不再有独立 `rpapi` 进程。
+> 只读目录 API（`/v1/rp/directory/*`，服务标识段 `rp`）原为独立应用 `rpapi`（:8084），现已并入 `pkg/appassembly` 的 `DomainDirectory` 域：`gateway` 全量挂载（`Domains=nil`）时经 `app.MountDirectory` 挂到 `/v1/rp`；不再有独立 `rpapi` 进程。
 
 > 各应用通过 `ginserver.NewRouterGroups(engine, "<服务标识>", ...)` 注册前缀，业务路由形如 `/v1/{auth|platform|tenant}/...`；OIDC 协议端点固定挂在 `/oidc/*`，初始化引导固定挂在 `/install/*`——两者都是 **R3 专用前缀**（标准协议 / 自举入口），不走业务路由规范。未初始化时 `pkg/middleware.BootstrapGuard` 会把业务端点拦成 HTTP 409（错误码 `107004`），只放行 `/install` 与 `/oidc` 的健康/发现/登出端点。
 
-### 3.1.1 sdk/server 门面与 apps 各域库
+### 3.1.1 pkg/appassembly 内部装配层与 apps 各域库
 
-域实现物理归 `apps`：`apps/{auth,platformadmin,tenantadmin}` 是**可 import 的库包**（各带 `cmd/` 进程入口，保留分体部署），`apps/gateway` 是纯 `cmd/main` 聚合器。`sdk/server`（`github.com/morehao/ark-iam/sdk/server`，`package server`）是在其上的**薄门面 / 编排层**，把各域库装配为可实例化、可按域组合的对象，用于「把账号体系内嵌进业务单体」的形态 2；两种形态共用同一份域实现。公开 API（`sdk/server` 顶层文件）只暴露 `contract` 类型与框架无关类型，装配实现（`import apps/* + pkg`）全部下沉 `sdk/server/internal`：
+域实现物理归 `apps`：`apps/{auth,platformadmin,tenantadmin}` 是**可 import 的库包**（各带 `cmd/` 进程入口，保留分体部署），`apps/gateway` 是纯 `cmd/main` 聚合器。内部包 `pkg/appassembly`（`github.com/morehao/ark-iam/pkg/appassembly`，`package appassembly`）是在其上的**内部装配层**，把各域库装配为可实例化、可按域组合的对象，用于 ark-iam 自身的「多 app 装配」形态 2；两种形态共用同一份域实现。**原 `sdk/server` 门面已内部化到此包，不再对外发布，外部业务应用无法 `go get` 内嵌**（外部接入走形态 1 `sdk/rp`）。装配实现（`import apps/* + pkg`）即在本包内（原 `sdk/server/internal`）：
 
 | 使用者 | 形态 | 装配方式 |
 |---|---|---|
-| `apps/gateway` | 形态 1 单独部署（全量域 + 外置前端） | `server.New(全量 Domains) + App.Mount + App.MountDirectory`；目录域（原 rpapi）复用 `App.KeySource()` 本地验签 |
-| 三方业务单体 | 形态 2 内嵌业务单体（最小域集） | `server.New(最小 Domains) + App.Mount`，与业务同进程部署 |
+| `apps/gateway` | 形态 1 单独部署（全量域 + 外置前端） | `appassembly.New(全量 Domains) + App.Mount + App.MountDirectory`；目录域（原 rpapi）复用 `App.KeySource()` 本地验签 |
+| ark-iam 自身 app（内部，不对外） | 形态 2 多 app 装配（最小域集） | `appassembly.New(最小 Domains) + App.Mount`，单进程装配 |
 
-> 依赖方向（严格单向 DAG）：进程入口 → `sdk/server` → `sdk/server/internal` → `apps/*` 各域库 → `pkg` → `contract`。`sdk/rp`、`apps/*`、`pkg` 均只依赖 `contract`（`pkg` 的验签经 `contract.Verifier`/`contract.KeySource` 接口，由 `sdk/rp` 实现、`sdk/server/internal` 注入），**不存在 `pkg → sdk` / `apps → sdk` 反向依赖**，无环。模块依赖方向由 `make sdk-check-graph`（`sdk/scripts/check-module-graph.sh`）强制。
+> 依赖方向（严格单向 DAG）：进程入口 → `pkg/appassembly` → `apps/*` 各域库 → `pkg` → `contract`。`sdk/rp`、`apps/*`、`pkg` 均只依赖 `contract`（`pkg` 的验签经 `contract.Verifier`/`contract.KeySource` 接口，由 `sdk/rp` 实现、`pkg/appassembly` 注入），**不存在 `pkg → sdk` / `apps → sdk` 反向依赖**，无环。模块依赖方向由 `make sdk-check-graph`（`sdk/scripts/check-module-graph.sh`）强制。
 
-对外契约：
+对外契约（内部包，仅 ark-iam 自身 app 使用）：
 
 ```go
-app, _ := server.New(server.Config{Domains, Env, DB, Redis, Raw, SameDatabase, AllowExistingTables, JWKSURL, Issuer, KeySource})
+app, _ := appassembly.New(appassembly.Config{Domains, Env, DB, Redis, Raw, SameDatabase, AllowExistingTables, JWKSURL, Issuer, KeySource})
 app.RunMigrations(ctx)          // AutoMigrate（SameDatabase=true 时含同库撞名检测）
 app.Mount(engine.Group("/iam")) // 挂 /v1/{platform,tenant,auth} + /oidc + /install，套鉴权中间件
 app.MountConfig(engine, "/")    // 挂 /config.json 运行时配置端点（仅出运行期配置，Go 侧不托管静态前端）
 ```
 
-- `server.Config{Domains []Domain, Env, DB, Redis, SameDatabase, AllowExistingTables, Raw *pkgconfig.Config, JWKSURL, Issuer, KeySource}`。
-- `Domain` 枚举与 `DefaultConsoleDomains` 定义在 `sdk/server`。
+- `appassembly.Config{Domains []Domain, Env, DB, Redis, SameDatabase, AllowExistingTables, Raw *pkgconfig.Config, JWKSURL, Issuer, KeySource}`。
+- `Domain` 枚举与 `DefaultConsoleDomains` 定义在 `pkg/appassembly`。
 - **Go 侧零 embed / 零静态托管**：登录 / 管理台前端由 npm 包 `@morehao/ark-iam-react` 提供，Go 侧不再内嵌 `dist`、不再有 `MountFrontend`。
 - **分体部署**：独立 platformadmin / tenantadmin 进程用 `Config` 的 `JWKSURL` / `Issuer` **远程拉 JWKS 验签**，无需进程内共享私钥。
 
@@ -212,7 +212,7 @@ app.MountConfig(engine, "/")    // 挂 /config.json 运行时配置端点（仅�
 
 | 层 | 技术 |
 |---|---|
-| 后端框架 | Gin + GORM + Go workspace（根 `go.work`，7 个模块：4 个应用 `apps/{auth,platformadmin,tenantadmin,gateway}` + `pkg` + `sdk` + `contract`；原 `iam` 模块已删除、`apps/rpapi` 已并入 `sdk/server` 的 `DomainDirectory`） |
+| 后端框架 | Gin + GORM + Go workspace（根 `go.work`，7 个模块：4 个应用 `apps/{auth,platformadmin,tenantadmin,gateway}` + `pkg` + `sdk` + `contract`；原 `iam` 模块已删除、`apps/rpapi` 已并入 `pkg/appassembly` 的 `DomainDirectory`） |
 | OIDC Provider | [zitadel/oidc/v3](https://github.com/zitadel/oidc)（`op` 包） |
 | JWT | golang-jwt/jwt/v5（RP 校验）、go-jose（logout_token 签名） |
 | 数据库 | PostgreSQL（主库，`iam`，启动时 AutoMigrate 自动建表、**不写任何数据**；内置数据由安装页 `/install/initialize` 一次性引导），测试用 SQLite 内存库 |
