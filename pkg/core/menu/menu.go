@@ -34,13 +34,22 @@ func BuildAppMenuTree(ctx context.Context, appID string) ([]objpermission.MenuIt
 		menus = append(menus, &menuEntityList[i])
 	}
 
+	// 先按 parent_id 建一次索引（保留 dao 的排序顺序），再递归组装，整体 O(n)。
+	// 旧实现对每个节点全量扫描查找子节点，是 O(n²)，控制台每次加载侧边栏 × 应用数会放大。
+	childrenByParent := make(map[string][]*model.MenuEntity, len(menus))
+	for _, menu := range menus {
+		childrenByParent[menu.ParentID] = append(childrenByParent[menu.ParentID], menu)
+	}
+
 	var buildTree func(parentID string) []objpermission.MenuItemNode
 	buildTree = func(parentID string) []objpermission.MenuItemNode {
-		var items []objpermission.MenuItemNode
-		for _, menu := range menus {
-			if menu.ParentID != parentID {
-				continue
-			}
+		children := childrenByParent[parentID]
+		if len(children) == 0 {
+			// 与旧实现保持一致：无子节点返回空切片（非 nil），避免 JSON 序列化为 null。
+			return []objpermission.MenuItemNode{}
+		}
+		items := make([]objpermission.MenuItemNode, 0, len(children))
+		for _, menu := range children {
 			item := objpermission.MenuItemNode{
 				MenuID: menu.ID,
 				MenuBaseInfo: objpermission.MenuBaseInfo{
