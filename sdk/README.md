@@ -1,7 +1,18 @@
 # ark-iam/sdk —— RP 侧 OIDC 能力 SDK
 
-面向**外部应用（RP）**的 OIDC 接入 SDK，也是本仓内置应用（`auth`/`platformadmin`/`tenantadmin`，以及 `sdk/server` 的 `DomainDirectory` 目录域）
-使用的同一份实现（dogfooding：内置应用能用的能力，外部应用同样可用）。
+面向**外部应用（RP）**的 OIDC 接入 SDK，也是本仓内置应用（`auth`/`platformadmin`/`tenantadmin`，
+以及其内部装配使用同一份 `rp` 实现）使用的同一份实现（dogfooding：内置应用能用的能力，外部应用同样可用）。
+
+## 职责边界（对外发什么 / 不发什么）
+
+| 层次 | 归属 | 职责 | 是否对外发布 |
+|---|---|---|---|
+| **验签引擎** `sdk/rp` | 本 SDK | 本地验签：JWT → `contract.Identity`；另含 M2M / introspect / revoke / userinfo / 登出 / 目录 | **是** |
+| **gin 中间件 / 框架胶水** | **消费方自写** | 取 Bearer → `Verifier.Verify` → `rp.WithIdentity` 注入 → 401；约 20 行，见下文「Gin 接入」 | 否（不放进 `sdk`，保持框架无关） |
+| **服务端装配** | ark-iam 内部 `pkg/appassembly` | DB/Redis/setting 初始化、域依赖闭合、路由编排 | **否**（原 `sdk/server` 内部化而来，不再对外） |
+
+> 一句话：`sdk` **只对外发验签引擎 `rp`**；gin 中间件由消费方自写；
+> 服务端装配（原 `sdk/server`）已内部化到 `pkg/appassembly`，不再是本 SDK 的对外能力。
 
 - **框架无关**：只依赖 Go 标准库与 `github.com/golang-jwt/jwt/v5`（测试另加 `testify`）。
   没有 gin/gorm/redis/go-oidc/go-jose 依赖，由 `scripts/check-deps.sh` 强制校验（`make sdk-check-deps`）。
@@ -14,10 +25,7 @@
 contract/         # 独立 module（github.com/morehao/ark-iam/contract）：claim 契约（双端单一事实源）、
                   #   Identity、错误分类、back-channel logout 事件常量、KeySource/Verifier 接口、目录 DTO
 sdk/
-├── server/       # 门面/编排层：New(Domains)/Mount/MountConfig/RunMigrations，委托 apps/* 各域实现库
-│   └── internal/ #   唯一 import apps/* + pkg 的地方（装配 + 注入 verifier）；public 只用 contract 类型
-│                 #   （process entry → sdk/server → sdk/server/internal → apps/{auth,platformadmin,tenantadmin} → pkg → contract）
-└── rp/           # RP 侧能力（实现 contract.Verifier / contract.KeySource）
+└── rp/           # RP 侧能力（实现 contract.Verifier / contract.KeySource），本模块唯一对外能力
     ├── keys.go       # KeySource：JWKS 预取 / kid 查表 / 限频刷新 / 磁盘兜底
     ├── verifier.go   # 本地验签 → Identity（person/machine、租户、scope、代操作主体）
     ├── client_credentials.go  # M2M 令牌自动续期（距 exp 60s 换新）
@@ -105,8 +113,11 @@ func OIDCAuth(verifier *rp.Verifier) gin.HandlerFunc {
 }
 ```
 
-本仓内置应用的参考实现见 `pkg/middleware/oidc_auth.go`（含 aud/issuer 收紧、
-SSO 会话活性校验、`user_id` 回填等本仓特有逻辑）。
+完整可运行范本见 [`../examples/rp-gin/`](../examples/rp-gin/)（正式 RP 范本，含身份注入 + 业务映射示范）。
+
+> ⚠️ `pkg/middleware/oidc_auth.go` 是 ark-iam **内置服务端专用**中间件（绑定本仓
+> dao/identity/oidckit + gorm/redis，并把身份按本仓口径写入 gcontext），**不要**把它当 RP
+> 中间件引入。外部 RP 请按上文自写 20 行中间件；「令牌身份 → 本地业务身份」的映射也由消费方自加。
 
 ## 3. 机器凭证（M2M）
 

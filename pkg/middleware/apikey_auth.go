@@ -1,3 +1,8 @@
+// 内置服务端专用：本文件的 API Key 鉴权中间件绑定本仓 credential/dao/model/dbclient
+// （gorm + redis），仅供 ark-iam 内置服务端装配使用。
+//
+// 外部 RP 请用框架无关的 sdk/rp 做本地验签 + 自写中间件（见 examples/rp-gin）；
+// 不要把本包当 RP 中间件引入。
 package middleware
 
 import (

@@ -1,11 +1,11 @@
-// Package auth 是 auth 域的实现库（可被 sdk/server import）。
+// Package auth 是 auth 域的实现库（可被 pkg/appassembly import）。
 //
 // 它由原 iam/auth 的 DI 重构版迁入：域内 controller/service/core/dto/router/middleware
 // 全部扁平平铺在本包之下（不再有 internal/），对外通过 Mount（稳定装配面）暴露。
 //
-// 依赖方向（分层倒置）：sdk/server/internal（门面）→ apps/auth（本库）→ pkg → contract。
+// 依赖方向（分层倒置）：pkg/appassembly（门面）→ apps/auth（本库）→ pkg → contract。
 // 本库**不得** import sdk；对 pkg 只依赖稳定面（本包内部再收敛 router/config/svcdb，
-// 使 sdk/server/internal 只依赖 apps/auth 顶层包）。
+// 使 pkg/appassembly 只依赖 apps/auth 顶层包）。
 package auth
 
 import (
@@ -25,14 +25,14 @@ const AppName = "auth"
 type Options = authrouter.Options
 
 // VerifierBuilder 由装配层注入的验签器构造器（真源 auth/router.VerifierBuilder）。
-// apps 不 import sdk，具体 sdk/rp 实现由 sdk/server/internal 注入。
+// apps 不 import sdk，具体 sdk/rp 实现由 pkg/appassembly 注入。
 type VerifierBuilder = authrouter.VerifierBuilder
 
 // Mount 装配 auth 域全部路由（稳定装配面）：内部完成运行时配置注入（config.Set）、
 // 数据访问器注入（svcdb.Set）与路由注册，返回本进程 OP 的进程内 KeySource
 // （contract.KeySource，供 platform/tenant 域鉴权中间件验签注入）。
 //
-// sdk/server/internal 只需依赖本包顶层，不再直接 import apps/auth/{config,router,service/svcdb}。
+// pkg/appassembly 只需依赖本包顶层，不再直接 import apps/auth/{config,router,service/svcdb}。
 //
 //	authRG        —— 业务路由组，通常为 /v1/auth
 //	engine        —— /oidc、/install 等协议端点直接挂在其根

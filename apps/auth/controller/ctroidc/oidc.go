@@ -68,7 +68,7 @@ func newOIDCCtr(db gormdao.DBGetter, provider *svcoidc.OIDCProvider) *OIDCCtr {
 // 未装配成功（测试注入空 provider）时返回 nil，调用方应 fail-closed。
 //
 // 返回 contract.KeySource（纯数据接口）；具体验签器（contract.Verifier）由装配层
-// （sdk/server/internal）用 sdk/rp 实现构造并注入，本包不 import sdk。
+// （pkg/appassembly）用 sdk/rp 实现构造并注入，本包不 import sdk。
 func (ctr *OIDCCtr) KeySource() contract.KeySource {
 	if ctr == nil {
 		return nil

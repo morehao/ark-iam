@@ -61,7 +61,7 @@ var _ SettingSvc = (*settingSvc)(nil)
 
 // NewSettingSvc 构造配置项服务。
 //
-// 说明：AdminAPI 用 gsetting.GetAdmin()（进程级单例，由 sdk/server 的 gsetting.New 初始化）。
+// 说明：AdminAPI 用 gsetting.GetAdmin()（进程级单例，由 pkg/appassembly 的 gsetting.New 初始化）。
 // 一进程一实例下与业务消费者共用同一 store；仅页面侧调用 GetAdmin，业务侧只用 Get*（见 R2）。
 func NewSettingSvc() SettingSvc {
 	return &settingSvc{}
