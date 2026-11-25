@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -45,6 +46,10 @@ var errRefreshTokenReused = errors.New("refresh token reused")
 // 远小于任何人工重放的价值。
 const refreshRotationGraceWindow = 10 * time.Second
 
+// rotationGraceRedisKeyPrefix 是共享（跨副本）宽限缓存键前缀：有 Redis 时宽限窗口落在这里，
+// 让落到不同副本的重试也能幂等重放；无 Redis 时退回进程内 map。
+const rotationGraceRedisKeyPrefix = "iam:oidc:rt_grace:"
+
 // maxRefreshGraceEntries 是宽限缓存的条目上界（超过即先清理过期项，再淘汰最旧一条）。
 // 条目只在窗口内存活，正常并发量下远达不到该上界；设上界是为了防止
 // 「大量唯一旧 token 在窗口内并发」把进程内存打满。
@@ -55,6 +60,21 @@ type refreshGraceEntry struct {
 	newRefreshToken string
 	expiration      time.Time
 	rotatedAt       time.Time
+}
+
+// refreshGraceWire 是 refreshGraceEntry 落 Redis 的线上形态（字段必须导出才能 JSON 序列化）。
+type refreshGraceWire struct {
+	NewRefreshToken string    `json:"newRefreshToken"`
+	Expiration      time.Time `json:"expiration"`
+	RotatedAt       time.Time `json:"rotatedAt"`
+}
+
+func (e refreshGraceEntry) toWire() refreshGraceWire {
+	return refreshGraceWire{NewRefreshToken: e.newRefreshToken, Expiration: e.expiration, RotatedAt: e.rotatedAt}
+}
+
+func (w refreshGraceWire) toEntry() refreshGraceEntry {
+	return refreshGraceEntry{newRefreshToken: w.NewRefreshToken, expiration: w.Expiration, rotatedAt: w.RotatedAt}
 }
 
 // rotationResult 是宽限窗口内可重放的轮换产物。
@@ -85,7 +105,26 @@ func withinRotationGrace(revokedAt, now time.Time) bool {
 }
 
 // lookupRotationGrace 命中宽限窗口时返回可重放的轮换结果。
+//
+// 多副本部署（auth 集群）下必须共享：同一把旧 refresh token 的重试可能落到不同副本，
+// 若只看进程内缓存，B 副本读不到 A 副本的轮换结果，会把它当成复用并撤销整个 token 家族
+// （用户被误踢下线）。因此优先查 Redis（共享、带 TTL）；Redis 未命中（或不可用）时再查
+// 进程内缓存——两条路径并存：进程内是单副本快路径，Redis 是跨副本正确性保证。
 func (s *PersistentStore) lookupRotationGrace(key string) (refreshGraceEntry, bool) {
+	if cli := dbclient.RedisCli; cli != nil {
+		data, err := cli.Get(context.Background(), rotationGraceRedisKey(key)).Bytes()
+		if err == nil {
+			var wire refreshGraceWire
+			if uErr := json.Unmarshal(data, &wire); uErr == nil {
+				entry := wire.toEntry()
+				if time.Since(entry.rotatedAt) <= refreshRotationGraceWindow {
+					return entry, true
+				}
+			}
+			return refreshGraceEntry{}, false
+		}
+		// Redis 未命中/出错：继续查进程内缓存（同副本自愈；跨副本仍以 Redis 为准）。
+	}
 	now := time.Now()
 	s.rotationMu.Lock()
 	defer s.rotationMu.Unlock()
@@ -100,8 +139,16 @@ func (s *PersistentStore) lookupRotationGrace(key string) (refreshGraceEntry, bo
 	return entry, true
 }
 
-// rememberRotationGrace 登记一次轮换结果，并顺带清理过期项与淘汰最旧条目。
+// rememberRotationGrace 登记一次轮换结果。
+//
+// 同时写两处：Redis（共享，跨副本重放的正确性来源，TTL=宽限窗口+余量）与进程内 map
+// （单副本快路径，有界防内存打满）。Redis 不可用时只写进程内 map，退化为单副本语义。
 func (s *PersistentStore) rememberRotationGrace(key string, entry refreshGraceEntry) {
+	if cli := dbclient.RedisCli; cli != nil {
+		if data, err := json.Marshal(entry.toWire()); err == nil {
+			cli.Set(context.Background(), rotationGraceRedisKey(key), data, refreshRotationGraceWindow+time.Second)
+		}
+	}
 	now := time.Now()
 	s.rotationMu.Lock()
 	defer s.rotationMu.Unlock()
@@ -126,6 +173,11 @@ func (s *PersistentStore) rememberRotationGrace(key string, entry refreshGraceEn
 		delete(s.rotationGrace, oldestKey)
 	}
 	s.rotationGrace[key] = entry
+}
+
+// rotationGraceRedisKey 是共享宽限缓存的 key（key 已是 sha256 派生，不含明文 token）。
+func rotationGraceRedisKey(rotationKey string) string {
+	return rotationGraceRedisKeyPrefix + rotationKey
 }
 
 // beginRotation 把当前请求登记为该旧 token 的首个轮换者。
