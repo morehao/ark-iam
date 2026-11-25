@@ -22,6 +22,8 @@ func setupUserSubResourceTestDB(t *testing.T) *gorm.DB {
 		&model.PersonEntity{},
 		&model.UserIdentityEntity{},
 		&model.UserLoginLogEntity{},
+		&model.RoleEntity{},
+		&model.UserRoleEntity{},
 	)
 	seedTestPerson(t, db, "p1", "u1", "u1@example.com")
 	seedTestPerson(t, db, "p2", "u2", "u2@example.com")
@@ -29,7 +31,36 @@ func setupUserSubResourceTestDB(t *testing.T) *gorm.DB {
 	seedTestUserWithPerson(t, db, "user1", "t1", "p1", "张三")
 	seedTestUserWithPerson(t, db, "user2", "t2", "p2", "李四")
 	seedTestUserWithPerson(t, db, "user3", "t1", "p3", "王五")
+	// 身份绑定/解绑是管理写操作（Create/Delete 走 requireSystemAdmin）：给测试操作者 op1
+	// 播种一个「自定义管理员」角色，使其具备系统管理能力但不算内置系统角色持有者。
+	seedTestAdminOperator(t, db, "t1", "op1")
 	return db
+}
+
+// seedTestAdminOperator 为操作用户绑定管理员角色（自定义来源），使其通过 requireSystemAdmin。
+func seedTestAdminOperator(t *testing.T, db *gorm.DB, tenantID, userID string) {
+	t.Helper()
+	roleID := "test-admin-role-" + tenantID + "-" + userID
+	if err := db.Create(&model.RoleEntity{
+		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: roleID}},
+		TenantID:   tenantID,
+		AppID:      "app-admin",
+		Name:       "测试管理员角色",
+		Source:     model.RoleSourceCustom,
+		AdminType:  model.SysAdminTypeAdmin,
+		CreatedBy:  "seed",
+	}).Error; err != nil {
+		t.Fatalf("seed admin role: %v", err)
+	}
+	if err := db.Create(&model.UserRoleEntity{
+		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "test-ur-" + roleID}},
+		TenantID:   tenantID,
+		UserID:     userID,
+		RoleID:     roleID,
+		CreatedBy:  "seed",
+	}).Error; err != nil {
+		t.Fatalf("seed user_role: %v", err)
+	}
 }
 
 func seedTestIdentity(t *testing.T, db *gorm.DB, id, personID, issuer, subject string) {
@@ -66,11 +97,13 @@ func TestUserIdentityCreateBindsPersonOfUser(t *testing.T) {
 	db := setupUserSubResourceTestDB(t)
 	svc := NewUserIdentitySvc(nil)
 
-	resp, err := svc.Create(requestCtx(newTestTenantCtx("t1", "op1")), &dtotenant.UserIdentityCreateReq{
+	opCtx := newTestTenantCtx("t1", "op1")
+	resp, err := svc.Create(requestCtx(opCtx), &dtotenant.UserIdentityCreateReq{
 		UserID:     "user1",
 		Issuer:     "https://accounts.example.com",
 		IdentityID: "sub-1",
 		Detail:     model.UserIdentityDetail{Email: "u1@example.com"},
+		Operator:   operatorOf(opCtx),
 	})
 	if err != nil {
 		t.Fatalf("create identity: %v", err)
@@ -140,8 +173,10 @@ func TestUserIdentityDeleteRejectsMismatchedUser(t *testing.T) {
 	seedTestIdentity(t, db, "id-1", "p1", "https://accounts.example.com", "sub-1")
 
 	// user1 的身份，用同租户 user3 的路径解绑 → 拒绝
-	if err := svc.Delete(requestCtx(newTestTenantCtx("t1", "op1")), &dtotenant.UserIdentityDeleteReq{
+	opCtx := newTestTenantCtx("t1", "op1")
+	if err := svc.Delete(requestCtx(opCtx), &dtotenant.UserIdentityDeleteReq{
 		UserID: "user3", UserIdentityID: "id-1",
+		Operator: operatorOf(opCtx),
 	}); err != code.GetError(code.UserIdentityNotExistError) {
 		t.Fatalf("mismatched user delete: want identity not exist, got %v", err)
 	}
@@ -161,8 +196,10 @@ func TestUserIdentityDeleteInTenant(t *testing.T) {
 	svc := NewUserIdentitySvc(nil)
 	seedTestIdentity(t, db, "id-1", "p1", "https://accounts.example.com", "sub-1")
 
-	if err := svc.Delete(requestCtx(newTestTenantCtx("t1", "op1")), &dtotenant.UserIdentityDeleteReq{
+	opCtx := newTestTenantCtx("t1", "op1")
+	if err := svc.Delete(requestCtx(opCtx), &dtotenant.UserIdentityDeleteReq{
 		UserID: "user1", UserIdentityID: "id-1",
+		Operator: operatorOf(opCtx),
 	}); err != nil {
 		t.Fatalf("delete identity: %v", err)
 	}
@@ -175,8 +212,9 @@ func TestUserIdentityDeleteInTenant(t *testing.T) {
 		t.Fatalf("expected identity removed, got %+v", list)
 	}
 
-	if err := svc.Delete(requestCtx(newTestTenantCtx("t1", "op1")), &dtotenant.UserIdentityDeleteReq{
+	if err := svc.Delete(requestCtx(opCtx), &dtotenant.UserIdentityDeleteReq{
 		UserID: "user1", UserIdentityID: "id-1",
+		Operator: operatorOf(opCtx),
 	}); err != code.GetError(code.UserIdentityNotExistError) {
 		t.Fatalf("delete missing identity: want not exist, got %v", err)
 	}
@@ -208,5 +246,40 @@ func TestUserLoginLogsScopeToTenantAndUser(t *testing.T) {
 
 	if _, err := svc.ListLoginLogs(requestCtx(newTestTenantCtx("t1", "op1")), &dtotenant.UserLoginLogListReq{UserID: "user2"}); err != code.GetError(code.UserNotExistError) {
 		t.Fatalf("cross-tenant list login logs: want user not exist, got %v", err)
+	}
+}
+
+// TestUserIdentityWriteRequiresSystemAdmin 校验身份绑定/解绑是管理写操作：
+// 不具备系统管理能力(admin_type=normal)的普通成员调用必须被拒（UserSystemAdminRequiredError），
+// 否则可把外部身份绑到他人账号实施接管。回归 P0-1。
+func TestUserIdentityWriteRequiresSystemAdmin(t *testing.T) {
+	db := setupUserSubResourceTestDB(t)
+	svc := NewUserIdentitySvc(nil)
+	seedTestIdentity(t, db, "id-1", "p1", "https://accounts.example.com", "sub-1")
+
+	// op-normal 是 t1 内无管理员角色的普通成员。
+	normalCtx := newTestTenantCtx("t1", "op-normal")
+
+	if _, err := svc.Create(requestCtx(normalCtx), &dtotenant.UserIdentityCreateReq{
+		UserID: "user1", Issuer: "https://evil.example.com", IdentityID: "attacker-sub",
+		Operator: operatorOf(normalCtx),
+	}); err != code.GetError(code.UserSystemAdminRequiredError) {
+		t.Fatalf("non-admin create: want UserSystemAdminRequiredError, got %v", err)
+	}
+
+	if err := svc.Delete(requestCtx(normalCtx), &dtotenant.UserIdentityDeleteReq{
+		UserID: "user1", UserIdentityID: "id-1",
+		Operator: operatorOf(normalCtx),
+	}); err != code.GetError(code.UserSystemAdminRequiredError) {
+		t.Fatalf("non-admin delete: want UserSystemAdminRequiredError, got %v", err)
+	}
+
+	// 确认非管理员的两步操作都未落库改动：原身份仍在。
+	var count int64
+	if err := db.Model(&model.UserIdentityEntity{}).Where("id = ?", "id-1").Count(&count).Error; err != nil {
+		t.Fatalf("count identity: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("non-admin write must not touch identity, count=%d", count)
 	}
 }
