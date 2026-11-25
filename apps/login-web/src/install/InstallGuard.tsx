@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
-import { getInstallStatus } from '@ark-iam/login'
+import { getInstallStatus } from '@ark-iam/install'
 import '../InstallPage.css'
 
 /**

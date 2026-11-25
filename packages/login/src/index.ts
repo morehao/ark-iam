@@ -1,12 +1,16 @@
-// @ark-iam/login 包入口：导出 OP 账密登录页 + 运行时配置 / 认证 API / install 辅助 + 类型。
+// @ark-iam/login 包入口：OP 账密登录页 + 运行时配置 / 认证 API + 类型。
+//
+// install 初始化协议已拆到独立包 `@ark-iam/install`（账密页不再承载 /install 协议）；
+// 消费方需要初始化向导能力（InstallStatus / getInstallStatus / initializeInstall / 错误映射）时
+// 从 `@ark-iam/install` 引入。
 //
 // 消费方（门面包 `@morehao/ark-iam-react/login`、login-web）从这里导入：
 //   - 组件：LoginPage（4 mode 账密页）
 //   - runtime config：ensureRuntimeConfig / loadRuntimeConfig / setAppBase / getRuntimeConfig /
 //     getAppBase / appPath / detectBasePath / RuntimeConfig
 //   - 认证 API：oidcLogin / oidcSelectTenant / oidcChangePassword / registerPerson / createTenant /
-//     getLoginConfig / install 相关（getInstallStatus / initializeInstall / installRedirectForError …）
-//   - 类型：LoginPageProps / OIDCLoginResp / TenantSelectionItem / Install* 等
+//     getLoginConfig / ApiError / 107004 守卫（isInstallPendingError / installRedirectForError）
+//   - 类型：LoginPageProps / OIDCLoginResp / TenantSelectionItem …
 
 export { LoginPage, default as LoginPageDefault } from './LoginPage'
 export type { LoginPageProps } from './LoginPage'
@@ -28,15 +32,12 @@ export {
   isInstallPendingError,
   installRedirectForError,
   oidcApi,
-  installApi,
   oidcLogin,
   oidcSelectTenant,
   oidcChangePassword,
   registerPerson,
   createTenant,
   getLoginConfig,
-  getInstallStatus,
-  initializeInstall,
 } from './api'
 
 export type {
@@ -54,31 +55,3 @@ export type {
   OIDCLoginConfigReq,
   OIDCLoginConfigResp,
 } from './types'
-
-export {
-  INSTALL_ERROR_CODE,
-  describeInstallError,
-  codeFromHTTPStatus,
-  decodeErrorEnvelope,
-  resolveInstallError,
-  statusUnavailableMessage,
-  unwrapEnvelope,
-} from './install/errors'
-export type {
-  InstallErrorField,
-  InstallErrorBehavior,
-  UnwrapResult,
-} from './install/errors'
-export { INSTALL_MESSAGES } from './install/messages'
-export { DEFAULT_TENANT_NAME, createEmptyInstallForm } from './install/types'
-export type {
-  InstallConsoles,
-  InstallStatus,
-  InstallInitializeReq,
-  InstallInitializeResp,
-  InstallChangeItem,
-  InstallReport,
-  InstallForm,
-  InstallField,
-  InstallFieldErrors,
-} from './install/types'

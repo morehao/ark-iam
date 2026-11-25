@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.4",
+    "@ark-iam/install": "workspace:*",
     "@ark-iam/login": "workspace:*",
     "antd": "^6.7.0",
     "react": "^19.3.1",

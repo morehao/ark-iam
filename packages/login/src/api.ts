@@ -13,9 +13,6 @@ import type {
   OIDCLoginConfigResp,
   OIDCChangePasswordReq,
 } from './types'
-import { INSTALL_ERROR_CODE, describeInstallError, resolveInstallError, unwrapEnvelope } from './install/errors'
-import type { InstallInitializeReq, InstallInitializeResp, InstallStatus } from './install/types'
-
 /**
  * 携带后端业务码的 API 错误。
  *
@@ -33,12 +30,20 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * 107004：业务接口在系统未初始化时的守卫错误码（后端 pkg/code/install.go 的 pending 段）。
+ *
+ * 账密登录侧仅需识别这一个码来把用户送回 /install，故在此本地定义，避免 login 反向依赖
+ * @ark-iam/install（install → login 单向）。install 域的完整错误码表见 @ark-iam/install。
+ */
+const INSTALL_PENDING_CODE = 107004
+
 /** 107004：业务接口在系统未初始化时的守卫错误 -> 必须把用户送回 /install。 */
 export const INSTALL_PENDING_REDIRECT = '/install'
 
 /** 是否命中"系统尚未初始化"守卫错误。 */
 export function isInstallPendingError(err: unknown): boolean {
-  return err instanceof ApiError && err.code === INSTALL_ERROR_CODE.pending
+  return err instanceof ApiError && err.code === INSTALL_PENDING_CODE
 }
 
 /** 需要跳转 /install 时返回目标路径，否则返回 null（便于调用点与测试复用同一判定）。 */
@@ -90,12 +95,6 @@ oidcApi.interceptors.request.use(
 )
 // 守卫返回真实 409（见 normalizeAxiosError 注释），必须归一后才能识别 code=107004
 oidcApi.interceptors.response.use((resp) => resp, (error) => Promise.reject(normalizeAxiosError(error)))
-
-/** /install 调用（baseURL 由 config.json 的 installBase 运行时下发；公开只读 status + 唯一写端点 initialize）。 */
-export const installApi = axios.create({ timeout: 15000 })
-installApi.interceptors.request.use(
-  applyDynamicBase(() => getRuntimeConfig()?.installBase || '/install'),
-)
 
 // 后端统一响应信封：业务失败也返回 HTTP 200，需按 code 判断
 export async function oidcLogin(data: OIDCLoginReq): Promise<OIDCLoginResp> {
@@ -150,46 +149,4 @@ export async function getLoginConfig(data: OIDCLoginConfigReq): Promise<OIDCLogi
     throw new ApiError(body.code, body.msg || '获取登录配置失败，请重试')
   }
   return body.data
-}
-
-/**
- * GET /install/status（公开只读）。响应可能是 {code,msg,data} 信封，也可能是裸对象，
- * unwrapEnvelope 两种都兼容。
- */
-export async function getInstallStatus(): Promise<InstallStatus> {
-  const resp = await installApi.get<unknown>('/status')
-  const unwrapped = unwrapEnvelope<InstallStatus>(resp.data)
-  if (!unwrapped.ok) {
-    const behavior = describeInstallError(unwrapped.code, unwrapped.message)
-    throw new ApiError(behavior.code, behavior.message)
-  }
-  return unwrapped.data
-}
-
-/**
- * POST /install/initialize —— 唯一写端点，bootstrap token 经 X-Bootstrap-Token 头传递。
- * 错误按真实 HTTP 状态码返回，resolveInstallError 同时覆盖 HTTP 错误与恒 200 信封两种形态。
- */
-export async function initializeInstall(
-  data: InstallInitializeReq,
-  bootstrapToken: string,
-): Promise<InstallInitializeResp> {
-  let resp
-  try {
-    resp = await installApi.post<unknown>('/initialize', data, {
-      // 与后端 svcinstall.trimToken 对称归一：部署脚本注入/页面粘贴的令牌常带尾随换行或空格，
-      // 不归一会被判成 401「令牌不正确」，而肉眼完全看不出差异。
-      headers: { 'X-Bootstrap-Token': bootstrapToken.trim() },
-    })
-  } catch (err) {
-    if (err instanceof ApiError) throw err
-    const behavior = resolveInstallError(err)
-    throw new ApiError(behavior.code, behavior.message)
-  }
-  const unwrapped = unwrapEnvelope<InstallInitializeResp>(resp.data)
-  if (!unwrapped.ok) {
-    const behavior = describeInstallError(unwrapped.code, unwrapped.message)
-    throw new ApiError(behavior.code, behavior.message)
-  }
-  return unwrapped.data
 }

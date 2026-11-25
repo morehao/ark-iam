@@ -3,12 +3,12 @@ import {
   INSTALL_PENDING_REDIRECT,
   getInstallStatus,
   initializeInstall,
-  appPath,
   resolveInstallError,
   statusUnavailableMessage,
   DEFAULT_TENANT_NAME,
   createEmptyInstallForm,
-} from '@ark-iam/login'
+} from '@ark-iam/install'
+import { appPath } from '@ark-iam/login'
 import type {
   InstallConsoles,
   InstallField,
@@ -16,7 +16,7 @@ import type {
   InstallForm,
   InstallInitializeResp,
   InstallStatus,
-} from '@ark-iam/login'
+} from '@ark-iam/install'
 import { INSTALL_MESSAGES } from '../install/messages'
 import {
   INSTALL_VIEW_TEXT,

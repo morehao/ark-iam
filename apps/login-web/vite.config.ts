@@ -4,12 +4,17 @@ import { resolve } from 'node:path'
 
 // 仓内 app 走源码：把 @ark-iam/login 直接指向包 src，开发期无需先 build 包（与
 // platform-admin-web 经 vite.alias.ts 走 src 的双轨约定一致）。发布/外部消费走 dist。
+// @ark-iam/install（从 login 拆出的 /install 协议包）同样指向源码。
 const loginSrc = resolve(__dirname, '../../packages/login/src/index.ts')
+const installSrc = resolve(__dirname, '../../packages/install/src/index.ts')
 
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    alias: [{ find: /^@ark-iam\/login$/, replacement: loginSrc }],
+    alias: [
+      { find: /^@ark-iam\/login$/, replacement: loginSrc },
+      { find: /^@ark-iam\/install$/, replacement: installSrc },
+    ],
   },
   server: {
     port: 4000,
