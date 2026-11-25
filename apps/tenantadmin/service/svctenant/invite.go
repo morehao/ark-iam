@@ -37,6 +37,11 @@ func NewInviteSvc(db gormdao.DBGetter) InviteSvc {
 
 // Create 生成一条租户加入邀请（一次性邀请码，可选有效期）。
 func (svc *inviteSvc) Create(ctx context.Context, req *dtotenant.InviteCreateReq) (*dtotenant.InviteCreateResp, error) {
+	// 邀请生成是管理写操作：邀请码可让陌生人自助加入租户，必须要求系统管理能力，
+	// 否则普通成员即可把任意外部人员拉进租户，绕开管理员管控的成员准入模型。
+	if err := requireSystemAdmin(ctx, req.Operator, code.InviteCreateError); err != nil {
+		return nil, err
+	}
 	tenantID := dbclient.TenantIDFromContext(ctx)
 	operatorID := req.Operator.UserID
 
@@ -65,6 +70,9 @@ func (svc *inviteSvc) Create(ctx context.Context, req *dtotenant.InviteCreateReq
 
 // Revoke 撤销一条邀请（置为 revoked 状态）。
 func (svc *inviteSvc) Revoke(ctx context.Context, req *dtotenant.InviteRevokeReq) error {
+	if err := requireSystemAdmin(ctx, req.Operator, code.InviteRevokeError); err != nil {
+		return err
+	}
 	tenantID := dbclient.TenantIDFromContext(ctx)
 	entity, err := dao.NewInviteDao(dao.WithDBGetter(svc.db)).GetByID(ctx, req.InviteID)
 	if err != nil {
@@ -86,6 +94,10 @@ func (svc *inviteSvc) Revoke(ctx context.Context, req *dtotenant.InviteRevokeReq
 
 // PageList 邀请列表（租户内）。
 func (svc *inviteSvc) PageList(ctx context.Context, req *dtotenant.InvitePageListReq) (*dtotenant.InvitePageListResp, error) {
+	// 列表回传邀请码明文，属管理视图，同样要求管理能力（避免普通成员拿到有效邀请码）。
+	if err := requireSystemAdmin(ctx, req.Operator, code.InviteGetPageListError); err != nil {
+		return nil, err
+	}
 	tenantID := dbclient.TenantIDFromContext(ctx)
 	cond := &dao.InviteCond{
 		BaseCond: &gormdao.BaseCond{

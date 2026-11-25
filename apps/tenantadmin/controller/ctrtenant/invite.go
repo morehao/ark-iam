@@ -83,6 +83,7 @@ func (ctr *inviteCtr) PageList(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
+	req.Operator = identity.OperatorFromGin(ctx)
 	res, err := ctr.inviteSvc.PageList(ctx.Request.Context(), &req)
 	if err != nil {
 		gincontext.Fail(ctx, err)

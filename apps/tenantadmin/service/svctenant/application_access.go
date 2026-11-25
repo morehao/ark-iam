@@ -130,7 +130,7 @@ func (svc *applicationAccessSvc) UpdateUserApplications(ctx context.Context, req
 			// 防自锁（I5）：复用租户端「最后一个内置管理员」保护——Replace 传入撤销后
 			// 保留的角色集合，由本层判断该集合是否仍含内置管理员角色。
 			CheckLastAdmin: func(_ context.Context, keptRoleIDs []string) (bool, error) {
-				return (&userSvc{}).hasOtherSystemAdminHolder(ctx, tenantID, req.UserID, keptRoleIDs)
+				return (&userSvc{db: svc.db}).hasOtherSystemAdminHolder(ctx, tenantID, req.UserID, keptRoleIDs)
 			},
 		})
 	})

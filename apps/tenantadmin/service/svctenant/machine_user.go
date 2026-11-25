@@ -381,7 +381,7 @@ func (svc *machineUserSvc) Detail(ctx context.Context, req *dtotenant.MachineUse
 		glog.Errorf(ctx, "[svcmachine.Detail] load departments fail, err:%v, id:%s", err, req.MachineUserID)
 		return nil, code.GetError(code.MachineUserGetDetailError)
 	}
-	roles, err := (&userSvc{}).listRoles(ctx, tenantID, req.MachineUserID)
+	roles, err := (&userSvc{db: svc.db}).listRoles(ctx, tenantID, req.MachineUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -404,7 +404,7 @@ func (svc *machineUserSvc) ListRoles(ctx context.Context, req *dtotenant.Machine
 	if _, err := svc.loadMachineUser(ctx, tenantID, req.MachineUserID); err != nil {
 		return nil, err
 	}
-	roles, err := (&userSvc{}).listRoles(ctx, tenantID, req.MachineUserID)
+	roles, err := (&userSvc{db: svc.db}).listRoles(ctx, tenantID, req.MachineUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -430,7 +430,7 @@ func (svc *machineUserSvc) UpdateRoles(ctx context.Context, req *dtotenant.Machi
 		glog.Errorf(ctx, "[svcmachine.UpdateRoles] dao GetListByCond old user_role fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return code.GetError(code.MachineUserRoleReplaceError)
 	}
-	oldRoleAppMap, err := (&userSvc{}).roleAppMapOf(ctx, tenantID, oldList)
+	oldRoleAppMap, err := (&userSvc{db: svc.db}).roleAppMapOf(ctx, tenantID, oldList)
 	if err != nil {
 		return err
 	}
