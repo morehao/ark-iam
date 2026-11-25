@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, Descriptions, Drawer, Space, Tag } from 'antd'
-import { EditOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { EditOutlined } from '@ant-design/icons'
 import { fmtTime, IDCell } from '@ark-iam/ui'
 import { getConnectorDetail } from '@ark-iam/api'
 import type { ConnectorItem } from '@ark-iam/types'
@@ -10,7 +10,6 @@ interface Props {
   connector: ConnectorItem | null
   onClose: () => void
   onEdit: (c: ConnectorItem) => void
-  onTest: (c: ConnectorItem) => void
 }
 
 function FlagRow({ value }: { value: string }) {
@@ -23,7 +22,7 @@ function FlagRow({ value }: { value: string }) {
   )
 }
 
-export default function ConnectorDetail({ open, connector, onClose, onEdit, onTest }: Props) {
+export default function ConnectorDetail({ open, connector, onClose, onEdit }: Props) {
   const [detail, setDetail] = useState<ConnectorItem | null>(connector)
 
   useEffect(() => {
@@ -48,9 +47,6 @@ export default function ConnectorDetail({ open, connector, onClose, onEdit, onTe
       onClose={onClose}
       extra={
         <Space>
-          <Button icon={<ThunderboltOutlined />} onClick={() => onTest(detail)}>
-            测试连通性
-          </Button>
           <Button type="primary" icon={<EditOutlined />} onClick={() => onEdit(detail)}>
             编辑
           </Button>
@@ -151,9 +147,6 @@ export default function ConnectorDetail({ open, connector, onClose, onEdit, onTe
         </Descriptions.Item>
         <Descriptions.Item label="自动创建用户">
           <FlagRow value={detail.allowAutoCreateUser} />
-        </Descriptions.Item>
-        <Descriptions.Item label="账号关联">
-          <FlagRow value={detail.allowAccountLink} />
         </Descriptions.Item>
         <Descriptions.Item label="资料同步">
           <FlagRow value={detail.syncProfile} />

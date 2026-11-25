@@ -101,7 +101,9 @@ func (c *TokenClient) fetch(ctx context.Context) (string, time.Duration, error) 
 		return "", 0, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.SetBasicAuth(url.QueryEscape(c.cfg.ClientID), url.QueryEscape(c.cfg.ClientSecret))
+	// 与 introspect / revoke 客户端一致：传原始凭证。SetBasicAuth 内部按 RFC 7617 处理编码，
+	// 若在此再 QueryEscape 会被 OP 侧再 Unescape 一次，含 + / = % 或空格的密钥即被双重转义而失配。
+	req.SetBasicAuth(c.cfg.ClientID, c.cfg.ClientSecret)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", 0, err

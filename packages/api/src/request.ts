@@ -56,20 +56,25 @@ function attachInterceptors(instance: AxiosInstance) {
 
       const isLogoutRequest = response.config.url?.includes('/auth/logout')
 
-      if (code === BizCode.TokenExpired || code === BizCode.TokenInvalid || code === BizCode.Unauthorized) {
+      // 会话失效只认后端实际下发的 code：鉴权中间件失败返回 HTTP 401 + {code:401}
+      // （见 pkg/middleware/oidc_auth.go，envelope 里 code 为 401）。历史 BizCode 110000-110004
+      // 后端从不发出，属死码；业务错误（如应用准入 110016）走下方通用分支提示即可，不跳登录。
+      if (code === 401) {
         if (isLogoutRequest) return Promise.reject(new Error(msg || 'session expired'))
         handleSessionExpired()
         return Promise.reject(new Error(msg || '未认证'))
-      }
-      if (code === BizCode.Forbidden || code === BizCode.PermissionDenied) {
-        if (!response.config.silent) message.warning('暂无权限访问')
-        return Promise.reject(new Error(msg || '暂无权限'))
       }
       if (!response.config.silent) message.error(msg || '请求失败')
       return Promise.reject(new Error(msg || '请求失败'))
     },
     async (error: AxiosError) => {
       if (error.response?.status === 401) {
+        // 登出请求本身可能 401（会话已撤销）：此时不得再触发 handleSessionExpired 的
+        // removeUser + 跳转，否则会打断 useLogout 的 signoutRedirect 流程。交回调用方处理。
+        const isLogoutRequest = error.config?.url?.includes('/auth/logout')
+        if (isLogoutRequest || error.config?.silent) {
+          return Promise.reject(error)
+        }
         handleSessionExpired()
         return Promise.reject(error)
       }

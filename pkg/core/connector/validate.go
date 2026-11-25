@@ -29,15 +29,12 @@ func normalizeSwitch[T ~string](value T, enable T, disable T) (T, bool) {
 	}
 }
 
-// NormalizeSwitches 就地校验并归一化连接器的 4 个开关列
-// （allow_auto_create_user / allow_account_link / sync_profile / enable_token_storage），
+// NormalizeSwitches 就地校验并归一化连接器的 3 个开关列
+// （allow_auto_create_user / sync_profile / enable_token_storage），
 // 任一非法值即整体返回 false，由调用方返回该操作既有的功能级错误码。
 func NormalizeSwitches(info *objauth.ConnectorBaseInfo) bool {
 	var ok bool
 	if info.AllowAutoCreateUser, ok = normalizeSwitch(info.AllowAutoCreateUser, model.ConnectorAutoCreateUserFlagEnable, model.ConnectorAutoCreateUserFlagDisable); !ok {
-		return false
-	}
-	if info.AllowAccountLink, ok = normalizeSwitch(info.AllowAccountLink, model.ConnectorAccountLinkFlagEnable, model.ConnectorAccountLinkFlagDisable); !ok {
 		return false
 	}
 	if info.SyncProfile, ok = normalizeSwitch(info.SyncProfile, model.ConnectorSyncProfileFlagEnable, model.ConnectorSyncProfileFlagDisable); !ok {

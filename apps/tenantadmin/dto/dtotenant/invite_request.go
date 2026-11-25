@@ -28,6 +28,8 @@ type InviteRevokeReq struct {
 type InvitePageListReq struct {
 	gobject.PageQuery
 	Status model.InviteStatus `json:"status" form:"status"` // 状态过滤
+	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
 }
 
 type InvitePageListItem struct {

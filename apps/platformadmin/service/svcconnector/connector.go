@@ -25,7 +25,6 @@ type ConnectorSvc interface {
 	Detail(ctx context.Context, req *dtoconnector.ConnectorDetailReq) (*dtoconnector.ConnectorDetailResp, error)
 	PageList(ctx context.Context, req *dtoconnector.ConnectorPageListReq) (*dtoconnector.ConnectorPageListResp, error)
 	ListFactories(ctx context.Context, req *dtoconnector.ConnectorFactoryListReq) (*dtoconnector.ConnectorFactoryListResp, error)
-	TestConnector(ctx context.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.ConnectorTestResp, error)
 }
 
 type connectorSvc struct {
@@ -64,7 +63,6 @@ func (svc *connectorSvc) Create(ctx context.Context, req *dtoconnector.Connector
 		Provider:            req.Provider,
 		Status:              req.Status,
 		AllowAutoCreateUser: req.AllowAutoCreateUser,
-		AllowAccountLink:    req.AllowAccountLink,
 		SyncProfile:         req.SyncProfile,
 		EnableTokenStorage:  req.EnableTokenStorage,
 		Config:              req.Config,
@@ -112,7 +110,6 @@ func (svc *connectorSvc) Create(ctx context.Context, req *dtoconnector.Connector
 		Provider:            baseInfo.Provider,
 		Status:              baseInfo.Status,
 		AllowAutoCreateUser: baseInfo.AllowAutoCreateUser,
-		AllowAccountLink:    baseInfo.AllowAccountLink,
 		SyncProfile:         baseInfo.SyncProfile,
 		EnableTokenStorage:  baseInfo.EnableTokenStorage,
 		Config:              baseInfo.Config,
@@ -163,7 +160,6 @@ func (svc *connectorSvc) Update(ctx context.Context, req *dtoconnector.Connector
 		Provider:            req.Provider,
 		Status:              req.Status,
 		AllowAutoCreateUser: req.AllowAutoCreateUser,
-		AllowAccountLink:    req.AllowAccountLink,
 		SyncProfile:         req.SyncProfile,
 		EnableTokenStorage:  req.EnableTokenStorage,
 		Config:              req.Config,
@@ -214,7 +210,6 @@ func (svc *connectorSvc) Update(ctx context.Context, req *dtoconnector.Connector
 		Provider:            baseInfo.Provider,
 		Status:              status,
 		AllowAutoCreateUser: baseInfo.AllowAutoCreateUser,
-		AllowAccountLink:    baseInfo.AllowAccountLink,
 		SyncProfile:         baseInfo.SyncProfile,
 		EnableTokenStorage:  baseInfo.EnableTokenStorage,
 		Config:              connector.PreserveSecret(baseInfo.Config, existing.Config),
@@ -224,7 +219,7 @@ func (svc *connectorSvc) Update(ctx context.Context, req *dtoconnector.Connector
 	}
 	fields := []string{
 		"default_tenant_id", "name", "display_name", "protocol", "provider", "status",
-		"allow_auto_create_user", "allow_account_link", "sync_profile", "enable_token_storage",
+		"allow_auto_create_user", "sync_profile", "enable_token_storage",
 		"config", "claim_mapping", "domain_policy", "updated_by",
 	}
 	if err := dao.UpdateFields(crossCtx, svc.connectorDao().Dao, req.ConnectorID, entity, fields...); err != nil {
@@ -311,29 +306,6 @@ func (svc *connectorSvc) ListFactories(ctx context.Context, req *dtoconnector.Co
 	return &dtoconnector.ConnectorFactoryListResp{List: items}, nil
 }
 
-// TestConnector 对连接器做连通性测试（选择驱动后调用 TestConnection）。
-func (svc *connectorSvc) TestConnector(ctx context.Context, req *dtoconnector.ConnectorIDReq) (*dtoconnector.ConnectorTestResp, error) {
-	crossCtx := dbclient.CrossTenantContext(ctx)
-	entity, err := svc.connectorDao().GetByID(crossCtx, req.ConnectorID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcconnector.TestConnector] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.ConnectorGetDetailError)
-	}
-	if entity == nil || entity.ID == "" {
-		return nil, code.GetError(code.ConnectorNotExistError)
-	}
-	driver, config, err := connector.SelectDriverForConnector(connector.DefaultDriverRegistry(), entity)
-	if err != nil {
-		glog.Errorf(ctx, "[svcconnector.TestConnector] select driver fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.ConnectorGetDetailError)
-	}
-	out, err := driver.TestConnection(ctx, &connector.TestInput{Config: config})
-	if err != nil {
-		glog.Errorf(ctx, "[svcconnector.TestConnector] driver TestConnection fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.ConnectorGetDetailError)
-	}
-	return &dtoconnector.ConnectorTestResp{Success: out.Success, Message: out.Message}, nil
-}
 
 // toBaseInfo 把实体转为前端展示的 ConnectorBaseInfo：config 脱敏（clientSecret 不回传明文）。
 func toBaseInfo(entity model.ConnectorEntity) objauth.ConnectorBaseInfo {
@@ -345,7 +317,6 @@ func toBaseInfo(entity model.ConnectorEntity) objauth.ConnectorBaseInfo {
 		Provider:            entity.Provider,
 		Status:              entity.Status,
 		AllowAutoCreateUser: entity.AllowAutoCreateUser,
-		AllowAccountLink:    entity.AllowAccountLink,
 		SyncProfile:         entity.SyncProfile,
 		EnableTokenStorage:  entity.EnableTokenStorage,
 		Config:              connector.SanitizeConfig(entity.Config),

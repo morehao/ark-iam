@@ -507,6 +507,16 @@ func loadAppNames(db gormdao.DBGetter, ctx context.Context, list model.Applicati
 }
 
 func (svc *oAuthClientSvc) ListSecrets(ctx context.Context, req *dtoapplicationclient.SecretListReq) (*dtoapplicationclient.SecretListResp, error) {
+	// 归属校验：与 Detail/Update/DeleteSecret 同口径，非本租户可见的客户端不返回其密钥元数据。
+	clientEntity, err := dao.NewApplicationClientDao(dao.WithDBGetter(svc.db)).GetByID(ctx, req.ApplicationClientID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcapplicationclient.ListSecrets] get client fail, err:%v, clientID:%s", err, req.ApplicationClientID)
+		return nil, code.GetError(code.ApplicationClientSecretGetListError)
+	}
+	if !applicationClientVisibleToTenant(clientEntity, dbclient.TenantIDFromContext(ctx)) {
+		return nil, code.GetError(code.ApplicationClientNotExistError)
+	}
+
 	secretDao := dao.NewApplicationClientSecretDao(dao.WithDBGetter(svc.db))
 
 	list, total, err := secretDao.GetPageListByCond(ctx, &dao.ApplicationClientSecretCond{
@@ -615,7 +625,12 @@ func (svc *oAuthClientSvc) DeleteSecret(ctx context.Context, req *dtoapplication
 	}
 
 	entity, err := dao.NewApplicationClientDao(dao.WithDBGetter(svc.db)).GetByID(ctx, secretEntity.ApplicationClientID)
-	if err != nil || !applicationClientVisibleToTenant(entity, dbclient.TenantIDFromContext(ctx)) {
+	if err != nil {
+		// 系统错误与业务边界分离：DB 故障如实上报，不伪装成"密钥不存在"。
+		glog.Errorf(ctx, "[svcapplicationclient.DeleteSecret] get client fail, err:%v, clientID:%s", err, secretEntity.ApplicationClientID)
+		return code.GetError(code.ApplicationClientSecretDeleteError)
+	}
+	if !applicationClientVisibleToTenant(entity, dbclient.TenantIDFromContext(ctx)) {
 		return code.GetError(code.ApplicationClientSecretNotExistError)
 	}
 

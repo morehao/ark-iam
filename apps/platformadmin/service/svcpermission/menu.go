@@ -162,14 +162,18 @@ func (svc *menuSvc) Delete(ctx context.Context, req *dtopermission.MenuDeleteReq
 
 	userID := req.Operator.UserID
 	txErr := svc.db(ctx).Transaction(func(tx *gorm.DB) error {
+		// menu 是全局表（无 tenant_id），但 role_menu 是租户级表：某菜单被角色授权时，
+		// 授权行散落在各业务租户。删菜单必须跨全部租户清理绑定，否则会留下指向已删菜单的
+		// 悬空授权（平台租户之外的绑定既看不见也清不掉）。故 role_menu 的读写显式走全租户作用域。
+		crossCtx := dbclient.CrossTenantContext(ctx)
 		for _, menuID := range subtreeIDs {
 			// 先解绑角色授权，否则 role_menu 会留下指向已删除菜单的悬空绑定
-			bindings, err := dao.NewRoleMenuDao(dao.WithDBGetter(svc.db)).WithTx(tx).GetListByCond(ctx, &dao.RoleMenuCond{MenuID: menuID})
+			bindings, err := dao.NewRoleMenuDao(dao.WithDBGetter(svc.db)).WithTx(tx).GetListByCond(crossCtx, &dao.RoleMenuCond{MenuID: menuID})
 			if err != nil {
 				return err
 			}
 			for _, binding := range bindings {
-				if err := dao.NewRoleMenuDao(dao.WithDBGetter(svc.db)).WithTx(tx).Delete(ctx, binding.ID, userID); err != nil {
+				if err := dao.NewRoleMenuDao(dao.WithDBGetter(svc.db)).WithTx(tx).Delete(crossCtx, binding.ID, userID); err != nil {
 					return err
 				}
 			}

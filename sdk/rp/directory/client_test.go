@@ -414,3 +414,28 @@ func TestETagNotModifiedReusesLocalCopy(t *testing.T) {
 	assert.Equal(t, int32(1), atomic.LoadInt32(&secondHadTag), "第二次请求必须带 If-None-Match")
 	assert.Equal(t, int32(1), atomic.LoadInt32(&m.notModified), "304 必须计入 NotModified 指标")
 }
+
+// TestMembers_401RetriesWithFreshToken 回归 P1-8：
+// 首个请求 401（令牌刚轮换）时，作废缓存令牌并用新令牌重试一次，而不是直接失败。
+func TestMembers_401RetriesWithFreshToken(t *testing.T) {
+	var requests int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&requests, 1)
+		if n == 1 {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_, _ = w.Write([]byte(`{"list":[{"userID":"u-1","name":"n","status":"active"}]}`))
+	}))
+	defer srv.Close()
+
+	tokens := &stubTokens{token: "t"}
+	c, err := New(Config{BaseURL: srv.URL, Tokens: tokens, Retry: 1})
+	require.NoError(t, err)
+
+	got, err := c.Members(context.Background(), []string{"u-1"})
+	require.NoError(t, err, "401 后应以新令牌重试成功")
+	assert.Len(t, got, 1)
+	assert.Equal(t, int32(2), atomic.LoadInt32(&requests), "应发生一次（且仅一次）重试")
+	assert.Equal(t, int32(1), atomic.LoadInt32(&tokens.invalidAt), "重试前应作废缓存令牌")
+}

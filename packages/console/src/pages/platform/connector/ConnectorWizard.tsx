@@ -57,7 +57,6 @@ interface ConnectorFormValues {
   allowedDomains?: string[]
   blockedDomains?: string[]
   allowAutoCreateUser?: string
-  allowAccountLink?: string
   syncProfile?: string
   enableTokenStorage?: string
 }
@@ -95,7 +94,6 @@ function buildPayload(factory: ConnectorFactoryItem, v: ConnectorFormValues): Co
     // 默认落租户：仅在自动创建用户=enable 时提交，否则置空。
     defaultTenantID: v.allowAutoCreateUser === 'enable' ? v.defaultTenantID : undefined,
     allowAutoCreateUser: (v.allowAutoCreateUser || 'disable') as ConnectorCreateReq['allowAutoCreateUser'],
-    allowAccountLink: (v.allowAccountLink || 'disable') as ConnectorCreateReq['allowAccountLink'],
     syncProfile: (v.syncProfile || 'disable') as ConnectorCreateReq['syncProfile'],
     enableTokenStorage: (v.enableTokenStorage || 'disable') as ConnectorCreateReq['enableTokenStorage'],
     config,
@@ -164,7 +162,6 @@ export default function ConnectorWizard({ open, editing, onClose, onSaved }: Pro
         allowedDomains: editing.domainPolicy?.allowedDomains,
         blockedDomains: editing.domainPolicy?.blockedDomains,
         allowAutoCreateUser: editing.allowAutoCreateUser,
-        allowAccountLink: editing.allowAccountLink,
         syncProfile: editing.syncProfile,
         enableTokenStorage: editing.enableTokenStorage,
       })
@@ -176,7 +173,6 @@ export default function ConnectorWizard({ open, editing, onClose, onSaved }: Pro
       form.setFieldsValue({
         status: 'enable',
         allowAutoCreateUser: 'disable',
-        allowAccountLink: 'disable',
         syncProfile: 'disable',
         enableTokenStorage: 'disable',
       })
@@ -508,14 +504,6 @@ export default function ConnectorWizard({ open, editing, onClose, onSaved }: Pro
                 </Form.Item>
               </Col>
               <Col span={12}>
-                <Form.Item
-                  name="allowAccountLink"
-                  label="账号关联"
-                  {...FLAG_PROPS}
-                  tooltip="外部身份是否可与平台已有账号关联绑定"
-                >
-                  <Switch checkedChildren="允许" unCheckedChildren="禁止" />
-                </Form.Item>
               </Col>
               <Col span={12}>
                 <Form.Item name="syncProfile" label="资料同步" {...FLAG_PROPS} tooltip="登录时同步外部资料到平台用户">

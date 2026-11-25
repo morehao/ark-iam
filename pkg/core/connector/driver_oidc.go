@@ -175,14 +175,6 @@ func (d *OIDCDriver) ExchangeCallback(ctx context.Context, input *CallbackInput)
 	}, nil
 }
 
-func (d *OIDCDriver) TestConnection(ctx context.Context, input *TestInput) (*TestOutput, error) {
-	_ = ctx
-	_ = input
-	return &TestOutput{
-		Success: true,
-		Message: "连接成功",
-	}, nil
-}
 
 func (d *OIDCDriver) getProvider(ctx context.Context, issuer string) (oidcProvider, error) {
 	if d.providerFactory != nil {

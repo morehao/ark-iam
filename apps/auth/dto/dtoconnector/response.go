@@ -17,11 +17,6 @@ type ConnectorFactoryListResp struct {
 	List []ConnectorFactoryResp `json:"list"`
 }
 
-type ConnectorTestResp struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
 type ConnectorAuthorizeResp struct {
 	AuthorizationURL string `json:"authorizationUrl"`
 }

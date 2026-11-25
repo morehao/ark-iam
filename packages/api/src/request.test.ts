@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AxiosResponse } from 'axios'
-import { BizCode } from '@ark-iam/types'
 
 const mockMessageError = vi.fn()
 const mockMessageWarning = vi.fn()
@@ -56,11 +55,29 @@ describe('request 全局错误提示的 silent 开关', () => {
     setSessionExpiredHandler(sessionExpired)
 
     try {
-      respondWith({ code: BizCode.Unauthorized, msg: '未认证' })
+      // 后端鉴权中间件失败的真实形态：envelope code=401（不是历史 BizCode 110000）
+      respondWith({ code: 401, msg: '未认证' })
 
       await expect(request.get('/platform/applications/stale-id', { silent: true })).rejects.toThrow('未认证')
       expect(sessionExpired).toHaveBeenCalledTimes(1)
       expect(mockMessageError).not.toHaveBeenCalled()
+    } finally {
+      globals.window = originalWindow
+    }
+  })
+
+  it('登出请求遇到 401 不触发会话处置（不打断 signoutRedirect）', async () => {
+    const globals = globalThis as { window?: unknown }
+    const originalWindow = globals.window
+    globals.window = { location: { href: '' } }
+    const sessionExpired = vi.fn()
+    setSessionExpiredHandler(sessionExpired)
+
+    try {
+      respondWith({ code: 401, msg: 'session expired' })
+
+      await expect(request.post('/auth/logout', {})).rejects.toThrow()
+      expect(sessionExpired).not.toHaveBeenCalled()
     } finally {
       globals.window = originalWindow
     }

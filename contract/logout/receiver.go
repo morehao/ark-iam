@@ -220,7 +220,7 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // ServeHTTP 与各框架适配器（如 Gin）都走这里，保证"校验 → 幂等去重 → 撤销 →
 // 记录 jti"的顺序只有一份实现：撤销失败返回 500 且**不记 jti**，让 OP 的重投有效。
 func (r *Receiver) Handle(ctx context.Context, tokenStr string) (int, string) {
-	claims, err := r.Parse(tokenStr)
+	claims, err := r.ParseContext(ctx, tokenStr)
 	if err != nil {
 		return http.StatusBadRequest, "invalid logout_token: " + err.Error()
 	}
@@ -268,6 +268,15 @@ func (r *Receiver) Seen(ctx context.Context, jti string) bool {
 //   - nonce：必须不存在
 //   - sub：必填（本仓 OP 始终下发；sid-only 属放宽项，见设计文档开放问题）
 func (r *Receiver) Parse(tokenStr string) (*contract.LogoutTokenClaims, error) {
+	return r.ParseContext(context.Background(), tokenStr)
+}
+
+// ParseContext 同 Parse，但把请求 ctx 透传给公钥来源（keys.PublicKey），使按 kid 触发
+// 的 JWKS 远端刷新受请求的超时/取消约束，避免 OP JWKS 端点慢时登出处理无限阻塞。
+func (r *Receiver) ParseContext(ctx context.Context, tokenStr string) (*contract.LogoutTokenClaims, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if r == nil || r.cfg.keys == nil {
 		return nil, errors.New("oidc logout: key source not configured")
 	}
@@ -288,7 +297,7 @@ func (r *Receiver) Parse(tokenStr string) (*contract.LogoutTokenClaims, error) {
 		if strings.TrimSpace(kid) == "" {
 			return nil, contract.ErrMissingKid
 		}
-		return r.cfg.keys.PublicKey(context.Background(), kid)
+		return r.cfg.keys.PublicKey(ctx, kid)
 	},
 		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()}),
 		jwt.WithLeeway(r.cfg.leeway),

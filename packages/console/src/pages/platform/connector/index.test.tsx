@@ -8,7 +8,6 @@ const mockGetConnectorFactories = vi.fn()
 const mockCreateConnector = vi.fn()
 const mockUpdateConnector = vi.fn()
 const mockGetConnectorDetail = vi.fn()
-const mockTestConnector = vi.fn()
 const mockGetTenantPageList = vi.fn()
 
 vi.mock('@ark-iam/api', () => ({
@@ -18,7 +17,6 @@ vi.mock('@ark-iam/api', () => ({
   createConnector: (...args: unknown[]) => mockCreateConnector(...args),
   updateConnector: (...args: unknown[]) => mockUpdateConnector(...args),
   getConnectorDetail: (...args: unknown[]) => mockGetConnectorDetail(...args),
-  testConnector: (...args: unknown[]) => mockTestConnector(...args),
   getTenantPageList: (...args: unknown[]) => mockGetTenantPageList(...args),
 }))
 
@@ -35,7 +33,6 @@ const connectors: ConnectorItem[] = [
     provider: 'google',
     status: 'enable',
     allowAutoCreateUser: 'enable',
-    allowAccountLink: 'enable',
     syncProfile: 'enable',
     enableTokenStorage: 'disable',
     config: { protocol: 'oidc', provider: 'google', issuer: 'https://accounts.google.com' },
@@ -81,7 +78,6 @@ describe('身份连接器列表页（平台）', () => {
     mockCreateConnector.mockReset().mockResolvedValue({ connectorID: 'cn-new' })
     mockUpdateConnector.mockReset().mockResolvedValue(undefined)
     mockGetConnectorDetail.mockReset().mockResolvedValue(connectors[0])
-    mockTestConnector.mockReset().mockResolvedValue({ success: true, message: '' })
     mockGetTenantPageList.mockReset().mockResolvedValue({ list: tenants, total: 1 })
   })
 

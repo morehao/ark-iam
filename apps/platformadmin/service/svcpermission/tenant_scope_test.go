@@ -13,6 +13,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objpermission"
 	"github.com/morehao/golib/biz/gcontext"
+	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
 func newGinCtx(tenantID, userID string) *gin.Context {
@@ -197,5 +198,44 @@ func TestMenuUpdatePersistsVisibility(t *testing.T) {
 	}
 	if got.Visibility != model.MenuVisibilityAdmin {
 		t.Fatalf("expected visibility admin after update, got %q", got.Visibility)
+	}
+}
+
+// TestMenuDeletePurgesRoleMenuAcrossTenants 回归 P0-3：
+// menu 是全局表、role_menu 是租户级表。删除一个已被多租户角色授权的全局菜单时，
+// 必须在**全部租户**范围内清除 role_menu 绑定，否则其它业务租户会残留指向已删菜单的悬空授权。
+func TestMenuDeletePurgesRoleMenuAcrossTenants(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.MenuEntity{}, &model.RoleMenuEntity{})
+	platformTenant, businessTenant := "21", "99"
+	ctx := newGinCtx(platformTenant, "0")
+	svc := NewMenuSvc(dbclient.IamDB)
+
+	menu := &model.MenuEntity{AppID: "10", Name: "shared-menu", ParentID: ""}
+	if err := db.Create(menu).Error; err != nil {
+		t.Fatalf("seed menu: %v", err)
+	}
+	// 两个租户都给该菜单绑定了角色授权。
+	for _, tid := range []string{platformTenant, businessTenant} {
+		if err := db.Create(&model.RoleMenuEntity{
+			BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "rm-" + tid}},
+			TenantID:   tid, RoleID: "role-" + tid, MenuID: menu.ID,
+		}).Error; err != nil {
+			t.Fatalf("seed role_menu %s: %v", tid, err)
+		}
+	}
+
+	if err := svc.Delete(requestCtx(ctx), &dtopermission.MenuDeleteReq{MenuID: menu.ID}); err != nil {
+		t.Fatalf("delete menu: %v", err)
+	}
+
+	// 两个租户的绑定都应被清除（软删，deleted_at 非空）——按主键直接查原始行校验。
+	// 校验查询跨全部租户，需显式全租户作用域。
+	var alive int64
+	if err := db.WithContext(dbclient.CrossTenantContext(requestCtx(ctx))).Model(&model.RoleMenuEntity{}).
+		Where("menu_id = ? AND deleted_at IS NULL", menu.ID).Count(&alive).Error; err != nil {
+		t.Fatalf("count role_menu: %v", err)
+	}
+	if alive != 0 {
+		t.Fatalf("menu delete must purge role_menu bindings in ALL tenants, %d still alive", alive)
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/oidckit"
 	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
+	"github.com/morehao/golib/glog"
 )
 
 // authMiddlewareForGroup 构造某个内置控制台应用（platform/tenant）版本组的鉴权中间件：
@@ -35,23 +36,33 @@ func (a *App) authMiddlewareForGroup(conf *pkgconfig.Config, audience string) []
 	if conf != nil && conf.OIDC.EnableSSOSessionValidation {
 		ssoStore := sso.NewSSOSessionStore()
 		opts = append(opts, middleware.WithOIDCSSOValidation(func(ctx context.Context, personID string, isMachineToken bool) bool {
-			if isMachineToken {
-				return true
-			}
-			if dbclient.RedisCli == nil {
-				return true
-			}
-			active, err := ssoStore.HasActiveSession(ctx, personID)
-			if err != nil {
-				return true
-			}
-			return active
+			return validateSSOSession(ctx, ssoStore, personID, isMachineToken)
 		}))
 	}
 	return []gin.HandlerFunc{
 		middleware.OIDCAuth(opts...),
 		middleware.RequireAppAccess(),
 	}
+}
+
+// validateSSOSession 决定一次已验签请求是否仍有有效的 SSO 中心会话（按请求生效的撤销点）。
+//
+//   - 机器凭证：不依赖浏览器会话，直接放行；
+//   - 未配置认证 Redis（dbclient.RedisCli == nil）：无法校验，放行（由 access token 短 TTL 兜底）；
+//   - Redis 已配置但查询出错：fail-closed（返回 false）——否则已撤销的会话会继续用满令牌 TTL。
+func validateSSOSession(ctx context.Context, store sso.SSOSessionStore, personID string, isMachineToken bool) bool {
+	if isMachineToken {
+		return true
+	}
+	if dbclient.RedisCli == nil {
+		return true
+	}
+	active, err := store.HasActiveSession(ctx, personID)
+	if err != nil {
+		glog.Warnf(ctx, "[sdk/server] sso session validate fail, fail-closed, personID:%s, err:%v", personID, err)
+		return false
+	}
+	return active
 }
 
 // registerBackChannelLogout 挂载 back-channel logout 接收端（/oidc/bc-logout/{platform|tenant}）。

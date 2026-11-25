@@ -165,5 +165,3 @@ export const deleteConnector = (connectorID: string) =>
   request.delete<any, void>(`/platform/connectors/${connectorID}`)
 export const getConnectorFactories = (params?: { protocol?: string; provider?: string }) =>
   request.get<any, { list: ConnectorFactoryItem[] }>('/platform/connector-factories', { params })
-export const testConnector = (connectorID: string) =>
-  request.post<any, { success: boolean; message: string }>(`/platform/connectors/${connectorID}/test`)

@@ -27,6 +27,10 @@ type Config struct {
 	HTTPClient *http.Client
 }
 
+// ErrInactive 表示令牌无效/已撤销（OP 返回 active=false）。作为非 nil error 返回，
+// 使只判断 err==nil 的调用方也不会把已撤销的令牌误当成可用（避免 fail-open）。
+var ErrInactive = errors.New("introspect: token is not active")
+
 // Response 是 RFC 7662 的 introspection 响应（只解析常用字段）。
 type Response struct {
 	Active    bool   `json:"active"`
@@ -105,6 +109,11 @@ func (c *Client) Introspect(ctx context.Context, token string) (*Response, error
 		if v, ok := raw[key]; ok {
 			out.Claims[key] = v
 		}
+	}
+	// active=false（无效/已撤销）：同时返回响应与 ErrInactive，强制调用方显式处理，
+	// 避免「只判 err==nil 就放行」把已撤销令牌当成可用。调用方仍可读取 out 的字段。
+	if !out.Active {
+		return out, ErrInactive
 	}
 	return out, nil
 }

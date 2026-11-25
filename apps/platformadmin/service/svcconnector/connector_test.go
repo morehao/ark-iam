@@ -254,23 +254,3 @@ func TestListFactories(t *testing.T) {
 	}
 }
 
-// TestTestConnector 连通性测试走驱动 TestConnection（stub OIDC/oauth2 均返回成功）。
-func TestTestConnector(t *testing.T) {
-	ctx := setupConnectorDB(t)
-	svc := NewConnectorSvc(nil)
-
-	resp, err := svc.Create(ctx, createReq(""))
-	if err != nil {
-		t.Fatalf("Create: %v", err)
-	}
-	res, err := svc.TestConnector(ctx, &dtoconnector.ConnectorIDReq{ConnectorID: resp.ConnectorID})
-	if err != nil {
-		t.Fatalf("TestConnector: %v", err)
-	}
-	if !res.Success {
-		t.Fatalf("expected success test result, got %+v", res)
-	}
-	if _, err := svc.TestConnector(ctx, &dtoconnector.ConnectorIDReq{ConnectorID: "missing"}); err != code.GetError(code.ConnectorNotExistError) {
-		t.Fatalf("expected ConnectorNotExistError, got %v", err)
-	}
-}

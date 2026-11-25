@@ -70,6 +70,12 @@ func (svc *userIdentitySvc) ListByUser(ctx context.Context, req *dtotenant.UserI
 }
 
 func (svc *userIdentitySvc) Create(ctx context.Context, req *dtotenant.UserIdentityCreateReq) (*dtotenant.UserIdentityCreateResp, error) {
+	// 身份绑定是管理写操作：绑定外部身份等同于授予该外部账号以本用户登录的能力，
+	// 必须与同目录其它管理写操作（用户/角色/部门/密钥）一样要求系统管理能力，
+	// 否则普通成员可把攻击者控制的外部身份绑到他人（含管理员）账号上实施接管。
+	if err := requireSystemAdmin(ctx, req.Operator, code.UserIdentityCreateError); err != nil {
+		return nil, err
+	}
 	userEntity, err := resolveTenantUser(svc.db, ctx, req.UserID)
 	if err != nil {
 		return nil, err
@@ -95,6 +101,10 @@ func (svc *userIdentitySvc) Create(ctx context.Context, req *dtotenant.UserIdent
 }
 
 func (svc *userIdentitySvc) Delete(ctx context.Context, req *dtotenant.UserIdentityDeleteReq) error {
+	// 解绑同样是管理写操作：可拒绝他人合法登录（DoS）或清除接管痕迹，须要求系统管理能力。
+	if err := requireSystemAdmin(ctx, req.Operator, code.UserIdentityDeleteError); err != nil {
+		return err
+	}
 	// 先校验 path 上的用户在不在本租户，再要求身份确实归属该用户的自然人：
 	// 两道校验合起来才能保证「租户内、且与该用户匹配」，不允许拿本租户其他用户的身份ID解绑。
 	userEntity, err := resolveTenantUser(svc.db, ctx, req.UserID)

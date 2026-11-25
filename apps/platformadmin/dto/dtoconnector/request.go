@@ -16,7 +16,6 @@ type ConnectorCreateReq struct {
 	Provider            model.ConnectorProvider           `json:"provider"`                              // 提供商
 	Status              model.ConnectorStatus             `json:"status"`                                // 状态: enable-启用, disable-停用
 	AllowAutoCreateUser model.ConnectorAutoCreateUserFlag `json:"allowAutoCreateUser"`                   // 是否允许自动创建用户(enable/disable)
-	AllowAccountLink    model.ConnectorAccountLinkFlag    `json:"allowAccountLink"`                      // 是否允许账号关联(enable/disable)
 	SyncProfile         model.ConnectorSyncProfileFlag    `json:"syncProfile"`                           // 是否同步资料(enable/disable)
 	EnableTokenStorage  model.ConnectorTokenStorageFlag   `json:"enableTokenStorage"`                    // 是否启用令牌存储(enable/disable)
 	Config              model.ConnectorConfig             `json:"config"`                                // 连接器配置
@@ -36,7 +35,6 @@ type ConnectorUpdateReq struct {
 	Provider            model.ConnectorProvider           `json:"provider"`                              // 提供商
 	Status              model.ConnectorStatus             `json:"status"`                                // 状态
 	AllowAutoCreateUser model.ConnectorAutoCreateUserFlag `json:"allowAutoCreateUser"`                   // 是否允许自动创建用户(enable/disable)
-	AllowAccountLink    model.ConnectorAccountLinkFlag    `json:"allowAccountLink"`                      // 是否允许账号关联(enable/disable)
 	SyncProfile         model.ConnectorSyncProfileFlag    `json:"syncProfile"`                           // 是否同步资料(enable/disable)
 	EnableTokenStorage  model.ConnectorTokenStorageFlag   `json:"enableTokenStorage"`                    // 是否启用令牌存储(enable/disable)
 	Config              model.ConnectorConfig             `json:"config"`                                // 连接器配置
@@ -76,11 +74,4 @@ type ConnectorPageListReq struct {
 type ConnectorFactoryListReq struct {
 	Protocol model.ConnectorProtocol `json:"protocol" form:"protocol"` // 协议类型
 	Provider model.ConnectorProvider `json:"provider" form:"provider"` // 提供商
-}
-
-// ConnectorIDReq 仅含连接器ID的动作入参（如测试连接）。
-type ConnectorIDReq struct {
-	ConnectorID string `json:"-" uri:"connectorID" binding:"required"` // 连接器ID（path 唯一来源）
-	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
-	Operator objidentity.Operator
 }

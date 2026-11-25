@@ -18,7 +18,6 @@ type ConnectorCtr interface {
 	Detail(ctx *gin.Context)
 	PageList(ctx *gin.Context)
 	GetFactoryList(ctx *gin.Context)
-	TestConnector(ctx *gin.Context)
 }
 
 type connectorCtr struct {
@@ -165,24 +164,3 @@ func (ctr *connectorCtr) GetFactoryList(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
-// @Tags 连接器
-// @Summary 测试连接器连通性
-// @accept application/json
-// @Produce application/json
-// @Param connectorID path string true "connectorID"
-// @Success 200 {object} gincontext.DtoRender{data=dtoconnector.ConnectorTestResp}
-// @Router /v1/platform/connectors/{connectorID}/test [post]
-func (ctr *connectorCtr) TestConnector(ctx *gin.Context) {
-	var req dtoconnector.ConnectorIDReq
-	req.Operator = identity.OperatorFromGin(ctx)
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.svc.TestConnector(ctx.Request.Context(), &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}

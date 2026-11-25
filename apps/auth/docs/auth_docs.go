@@ -694,49 +694,6 @@ const docTemplateauth = `{
                 }
             }
         },
-        "/v1/auth/connectors/{connectorID}/test": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "连接器"
-                ],
-                "summary": "测试连接器",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "连接器ID",
-                        "name": "connectorID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtoconnector.ConnectorTestResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/v1/auth/joinTenant": {
             "post": {
                 "consumes": [
@@ -1092,14 +1049,6 @@ const docTemplateauth = `{
         "dtoauth.ConnectorCreateReq": {
             "type": "object",
             "properties": {
-                "allowAccountLink": {
-                    "description": "是否允许账号关联(enable/disable)",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.ConnectorAccountLinkFlag"
-                        }
-                    ]
-                },
                 "allowAutoCreateUser": {
                     "description": "是否允许自动创建用户(enable/disable)",
                     "allOf": [
@@ -1198,14 +1147,6 @@ const docTemplateauth = `{
         "dtoauth.ConnectorDetailResp": {
             "type": "object",
             "properties": {
-                "allowAccountLink": {
-                    "description": "是否允许账号关联(enable/disable)",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.ConnectorAccountLinkFlag"
-                        }
-                    ]
-                },
                 "allowAutoCreateUser": {
                     "description": "是否允许自动创建用户(enable/disable)",
                     "allOf": [
@@ -1315,14 +1256,6 @@ const docTemplateauth = `{
         "dtoauth.ConnectorPageListItem": {
             "type": "object",
             "properties": {
-                "allowAccountLink": {
-                    "description": "是否允许账号关联(enable/disable)",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.ConnectorAccountLinkFlag"
-                        }
-                    ]
-                },
                 "allowAutoCreateUser": {
                     "description": "是否允许自动创建用户(enable/disable)",
                     "allOf": [
@@ -1448,14 +1381,6 @@ const docTemplateauth = `{
         "dtoauth.ConnectorUpdateReq": {
             "type": "object",
             "properties": {
-                "allowAccountLink": {
-                    "description": "是否允许账号关联(enable/disable)",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.ConnectorAccountLinkFlag"
-                        }
-                    ]
-                },
                 "allowAutoCreateUser": {
                     "description": "是否允许自动创建用户(enable/disable)",
                     "allOf": [
@@ -1665,17 +1590,6 @@ const docTemplateauth = `{
                 },
                 "provider": {
                     "$ref": "#/definitions/model.ConnectorProvider"
-                }
-            }
-        },
-        "dtoconnector.ConnectorTestResp": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string"
-                },
-                "success": {
-                    "type": "boolean"
                 }
             }
         },
@@ -1951,17 +1865,6 @@ const docTemplateauth = `{
                     "type": "string"
                 }
             }
-        },
-        "model.ConnectorAccountLinkFlag": {
-            "type": "string",
-            "enum": [
-                "enable",
-                "disable"
-            ],
-            "x-enum-varnames": [
-                "ConnectorAccountLinkFlagEnable",
-                "ConnectorAccountLinkFlagDisable"
-            ]
         },
         "model.ConnectorAutoCreateUserFlag": {
             "type": "string",

@@ -558,7 +558,13 @@ func (c *Client) getJSON(ctx context.Context, path string, out any, etag string)
 			// 服务端确认内容未变：不反序列化，调用方复用本地副本。
 			return pickETag(respETag, etag), true, nil
 		case status == http.StatusUnauthorized:
+			// 令牌可能刚被 OP 轮换/旋转：作废缓存令牌后重试一次（用新令牌）。仅当仍有重试
+			// 次数时 continue；耗尽（含 Retry=0，attempts=1）才如实返回 ErrUnauthorized。
 			c.invalidateTokenOnce()
+			if attempt < attempts-1 {
+				lastErr = ErrUnauthorized
+				continue
+			}
 			return "", false, ErrUnauthorized
 		case status == http.StatusForbidden:
 			return "", false, ErrForbidden

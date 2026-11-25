@@ -171,7 +171,6 @@ func TestBootstrapAgainstPostgres(t *testing.T) {
 		{model.TableNameMenu, "external_link"},
 		{model.TableNameMenu, "keep_alive"},
 		{model.TableNameConnector, "allow_auto_create_user"},
-		{model.TableNameConnector, "allow_account_link"},
 		{model.TableNameConnector, "sync_profile"},
 		{model.TableNameConnector, "enable_token_storage"},
 	} {
@@ -261,7 +260,6 @@ func TestBootstrapAgainstPostgres(t *testing.T) {
 		{model.TableNameMenu, "external_link", allowedValues(string(model.MenuExternalLinkFlagEnable), string(model.MenuExternalLinkFlagDisable))},
 		{model.TableNameMenu, "keep_alive", allowedValues(string(model.MenuKeepAliveFlagEnable), string(model.MenuKeepAliveFlagDisable))},
 		{model.TableNameConnector, "allow_auto_create_user", allowedValues(string(model.ConnectorAutoCreateUserFlagEnable), string(model.ConnectorAutoCreateUserFlagDisable))},
-		{model.TableNameConnector, "allow_account_link", allowedValues(string(model.ConnectorAccountLinkFlagEnable), string(model.ConnectorAccountLinkFlagDisable))},
 		{model.TableNameConnector, "sync_profile", allowedValues(string(model.ConnectorSyncProfileFlagEnable), string(model.ConnectorSyncProfileFlagDisable))},
 		{model.TableNameConnector, "enable_token_storage", allowedValues(string(model.ConnectorTokenStorageFlagEnable), string(model.ConnectorTokenStorageFlagDisable))},
 	} {

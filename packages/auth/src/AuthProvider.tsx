@@ -18,7 +18,6 @@ export interface CreateAuthProviderOptions {
    * 未传时优先用 /config.json 的 clientId，再退回 import.meta.env.VITE_OIDC_CLIENT_ID。
    */
   clientID?: string
-  clientSecret?: string
   /**
    * OIDC issuer（OP 地址）。未传时优先级：/config.json.issuer > VITE_OIDC_ISSUER > '/oidc'。
    * 多源部署时可显式传 OP 的绝对地址（如 https://iam.example.com/oidc）。
@@ -78,7 +77,6 @@ export function createAuthProvider(opts: CreateAuthProviderOptions = {}) {
     const oidcConfig = {
       authority: issuer,
       client_id: clientId,
-      ...(opts.clientSecret ? { client_secret: opts.clientSecret } : {}),
       redirect_uri: window.location.origin + redirectPath,
       // silent_redirect_uri：启用 iframe `prompt=none` 静默登录/续期。silent renew 失败时
       // （refresh token 轮换失配等）前端据此外用仍有效的 SSO 会话无声换回新 token，避免把用户
