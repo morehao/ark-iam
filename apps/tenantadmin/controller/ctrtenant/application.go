@@ -9,9 +9,10 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
-// ApplicationCtr 租户应用视角接口：订阅应用清单 + 应用准入视角（谁能进这个应用）。
+// ApplicationCtr 租户应用视角接口：订阅应用清单 + 归属应用清单 + 应用准入视角（谁能进这个应用）。
 type ApplicationCtr interface {
 	List(ctx *gin.Context)
+	OwnedList(ctx *gin.Context)
 	ListUsers(ctx *gin.Context)
 }
 
@@ -35,6 +36,21 @@ func NewApplicationCtr(db gormdao.DBGetter) ApplicationCtr {
 // @Router /v1/tenant/applications [get]
 func (ctr *applicationCtr) List(ctx *gin.Context) {
 	res, err := ctr.appAccessSvc.ListTenantApplications(ctx.Request.Context())
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 租户应用
+// @Summary 归属当前租户的应用列表（菜单管理应用选择器：只能维护归属自己的应用菜单）
+// @accept application/json
+// @Produce application/json
+// @Success 200 {object} gincontext.DtoRender{data=dtotenant.TenantApplicationsResp}
+// @Router /v1/tenant/applications/owned [get]
+func (ctr *applicationCtr) OwnedList(ctx *gin.Context) {
+	res, err := ctr.appAccessSvc.ListOwnedApplications(ctx.Request.Context(), identity.OperatorFromGin(ctx))
 	if err != nil {
 		gincontext.Fail(ctx, err)
 		return

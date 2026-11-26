@@ -190,3 +190,42 @@ func TestAppMenuDeletePurgesRoleMenuAcrossTenants(t *testing.T) {
 		t.Fatalf("删菜单后跨租户 role_menu 应清空，实际剩 %d 条", len(list))
 	}
 }
+
+// TestAppMenuPlatformTenantAdminCanManageBuiltinApp：平台租户(t_platform)管理员可在 tenant
+// 上下文维护归属 t_platform 的内置应用(platform_admin)菜单——证明内置菜单不再依赖平台写路由。
+func TestAppMenuPlatformTenantAdminCanManageBuiltinApp(t *testing.T) {
+	db := setupAppMenuDB(t)
+	// 内置应用归属平台租户
+	seedOwnedApp(t, db, "t_platform", "app-platform-admin", "platform_admin")
+	ginCtx := newAdminCtx(t, db, "t_platform", "plat-op")
+	svc := NewAppMenuSvc(nil)
+
+	resp, err := svc.Create(requestCtx(ginCtx), dtotenantCreateReq("app-platform-admin", "dashboard", "工作台", ginCtx))
+	if err != nil {
+		t.Fatalf("平台租户管理员维护内置应用菜单失败: %v", err)
+	}
+	if resp.MenuID == "" {
+		t.Fatalf("MenuID 为空")
+	}
+	// 另一个普通租户不能维护该内置应用
+	otherCtx := newAdminCtx(t, db, "t-other", "other-op")
+	if _, err := svc.Create(requestCtx(otherCtx), dtotenantCreateReq("app-platform-admin", "x", "x", otherCtx)); err == nil {
+		t.Fatalf("其它租户维护内置应用菜单应被拒")
+	}
+}
+
+// TestListOwnedApplicationsOnlyReturnsOwned：归属应用列表只返回 owner_tenant_id==当前租户的应用。
+func TestListOwnedApplicationsOnlyReturnsOwned(t *testing.T) {
+	db := setupAppMenuDB(t)
+	seedOwnedApp(t, db, "t1", "app-t1", "app-t1")
+	seedOwnedApp(t, db, "t2", "app-t2", "app-t2") // 别人的应用
+	ginCtx := newAdminCtx(t, db, "t1", "op-t1")
+
+	resp, err := NewApplicationAccessSvc(nil).ListOwnedApplications(requestCtx(ginCtx), operatorOf(ginCtx))
+	if err != nil {
+		t.Fatalf("ListOwnedApplications 失败: %v", err)
+	}
+	if len(resp.List) != 1 || resp.List[0].AppID != "app-t1" {
+		t.Fatalf("归属应用列表应只含 app-t1，实际 %+v", resp.List)
+	}
+}

@@ -48,7 +48,9 @@ const (
 )
 
 // DefaultConsoleDomains 是「部门/人员/角色/菜单」简易用户体系的最小集（形态 2 推荐）。
-// 含登录/会话 + 安装引导 + 人员 + 用户 + 部门 + 角色 + 菜单。
+// 含登录/会话 + 安装引导 + 人员 + 用户 + 部门 + 角色 + 菜单 + 应用。
+// menu 域依赖 application 域（租户侧菜单写需校验应用归属），经 role→menu→application
+// 依赖闭包，最小集必须携带 application 域，否则 validateDomainDeps 拒绝启动。
 var DefaultConsoleDomains = []Domain{
 	DomainCoreAuth,
 	DomainInstall,
@@ -57,6 +59,7 @@ var DefaultConsoleDomains = []Domain{
 	DomainDepartment,
 	DomainRole,
 	DomainMenu,
+	DomainApplication,
 }
 
 // allDomains 是全部域的集合（形态 1 / gateway 全量挂载用）。
@@ -105,6 +108,8 @@ func (e *ErrDomainDependency) Error() string {
 var domainDeps = map[Domain][]Domain{
 	// 部门/人员/角色在 tenantadmin，菜单写/读树在 platform+tenant 的 menu 域；保留 role→menu。
 	DomainRole: {DomainMenu},
+	// 租户侧菜单写需校验应用归属，menu 域依赖 application 域（连带 role→menu→application）。
+	DomainMenu: {DomainApplication},
 }
 
 // validateDomainDeps 校验域依赖闭合。

@@ -37,7 +37,7 @@ func dumpRoutes(routes gin.RoutesInfo) []string {
 func TestMountPlatformDomains(t *testing.T) {
 	app, err := New(Config{
 		DB:      DBConfig{DSN: "sqlite://:memory:"},
-		Domains: []Domain{DomainMenu},
+		Domains: []Domain{DomainMenu, DomainApplication},
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)

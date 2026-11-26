@@ -165,7 +165,8 @@ func TestConfigJSON_EnabledDomains(t *testing.T) {
 // TestConfigJSON_EnabledDomainsSubset 验证显式选定域时只下发所选域的集合。
 func TestConfigJSON_EnabledDomainsSubset(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	app := &App{cfg: Config{Domains: []Domain{DomainCoreAuth, DomainUser, DomainRole, DomainMenu}}}
+	// 依赖闭包：menu 依赖 application（role→menu→application），故选中集须携带 application。
+	app := &App{cfg: Config{Domains: []Domain{DomainCoreAuth, DomainUser, DomainRole, DomainMenu, DomainApplication}}}
 	e := gin.New()
 	if err := app.MountConfig(e, ""); err != nil {
 		t.Fatalf("MountConfig: %v", err)
@@ -175,12 +176,12 @@ func TestConfigJSON_EnabledDomainsSubset(t *testing.T) {
 	if !ok {
 		t.Fatalf("enabledDomains is not an array: %T", out["enabledDomains"])
 	}
-	if len(list) != 4 {
-		t.Errorf("enabledDomains length = %d, want 4: %v", len(list), list)
+	if len(list) != 5 {
+		t.Errorf("enabledDomains length = %d, want 5: %v", len(list), list)
 	}
 	for _, v := range list {
 		s := v.(string)
-		if s == string(DomainApplication) || s == string(DomainTenant) {
+		if s == string(DomainTenant) {
 			t.Errorf("enabledDomains must not contain unselected domain %q: %v", s, list)
 		}
 	}

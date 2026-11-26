@@ -214,6 +214,40 @@ const docTemplatetenantadmin = `{
                 }
             }
         },
+        "/v1/tenant/applications/owned": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "租户应用"
+                ],
+                "summary": "归属当前租户的应用列表（菜单管理应用选择器：只能维护归属自己的应用菜单）",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.TenantApplicationsResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/v1/tenant/applications/{appID}/menus": {
             "post": {
                 "consumes": [

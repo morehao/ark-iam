@@ -13,7 +13,7 @@ func TestTableConflict(t *testing.T) {
 	app, err := New(Config{
 		Env:          "dev",
 		DB:           DBConfig{DSN: "sqlite://:memory:"},
-		Domains:      []Domain{DomainMenu},
+		Domains:      []Domain{DomainMenu, DomainApplication},
 		SameDatabase: true,
 	})
 	if err != nil {
@@ -42,7 +42,7 @@ func TestTableConflictAllowlist(t *testing.T) {
 	app, err := New(Config{
 		Env:                 "dev",
 		DB:                  DBConfig{DSN: "sqlite://:memory:"},
-		Domains:             []Domain{DomainMenu},
+		Domains:             []Domain{DomainMenu, DomainApplication},
 		SameDatabase:        true,
 		AllowExistingTables: []string{"iam_user"},
 	})

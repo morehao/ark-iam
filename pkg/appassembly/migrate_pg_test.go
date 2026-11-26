@@ -41,7 +41,7 @@ func newPGApp(t *testing.T, dsn string, allow []string) *App {
 	app, err := New(Config{
 		Env:                 "test",
 		DB:                  DBConfig{DSN: dsn},
-		Domains:             []Domain{DomainMenu},
+		Domains:             []Domain{DomainMenu, DomainApplication},
 		SameDatabase:        true,
 		AllowExistingTables: allow,
 	})

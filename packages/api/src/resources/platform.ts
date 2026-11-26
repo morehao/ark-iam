@@ -11,7 +11,6 @@ import type {
   ConnectorUpdateReq,
   DomainItem,
   DomainVerificationStatus,
-  MenuItem,
   MenuMyTreeResp,
   MenuTreeResp,
   OAuthClientCreateReq,
@@ -103,14 +102,11 @@ export const deleteTenantApplication = (tenantAppID: string) =>
   request.delete<any, string>(`/platform/tenant-applications/${tenantAppID}`)
 
 // ==================== 菜单 ====================
+// 菜单写接口已下放到租户侧（/tenant/applications/{appID}/menus，见 resources/tenant.ts）：
+// createMenu/updateMenu/deleteMenu 已迁出并改为 createAppMenu/updateAppMenu/deleteAppMenu。
+// 平台侧仅保留只读：侧栏菜单树与平台审计菜单树。
 export const getMenuTree = (appID: string) => request.get<any, MenuTreeResp>('/platform/menus/tree', { params: { appID } })
 export const getMyMenuTree = () => request.get<any, MenuMyTreeResp>('/platform/menus/my')
-export const createMenu = (data: Partial<MenuItem>) => request.post<any, { menuID: string }>('/platform/menus', data)
-export const updateMenu = (data: Partial<MenuItem>) => {
-  const { menuID, ...body } = data
-  return request.put<any, string>(`/platform/menus/${menuID}`, body)
-}
-export const deleteMenu = (menuID: string) => request.delete<any, string>(`/platform/menus/${menuID}`)
 
 // ==================== 域名 ====================
 export const getDomainPageList = (data: { page: number; pageSize: number; domain?: string }) =>
