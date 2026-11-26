@@ -105,8 +105,8 @@ func TestRender_OrderIsParentBeforeChild(t *testing.T) {
 	wantOrder := []string{
 		"dashboard", "grp-tenant", "grp-app", "grp-platform",
 		"tenant", "tenant-application", "domain",
-		"application", "oauth-client", "menu", "setting", "connector",
-		"department", "tenant-user", "tenant-role", "tenant-api-key",
+		"application", "oauth-client", "setting", "connector",
+		"department", "tenant-user", "tenant-role", "tenant-api-key", "tenant-menu",
 	}
 	for i, want := range wantOrder {
 		if rows[i][0] != want {
