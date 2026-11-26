@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	pkconfig "github.com/morehao/ark-iam/pkg/config"
+	"github.com/morehao/ark-iam/pkg/model"
 )
 
 // mountConfigOnly 构造一个仅挂载 MountConfig 的最小 App，避免拉起 DB/auth 域。
@@ -184,5 +185,45 @@ func TestConfigJSON_EnabledDomainsSubset(t *testing.T) {
 		if s == string(DomainTenant) {
 			t.Errorf("enabledDomains must not contain unselected domain %q: %v", s, list)
 		}
+	}
+}
+
+// TestConfigJSON_ClientIdByConsoleOrigin 验证 /config.json 按请求来源 Referer/Origin 返回对应控制台 client_id。
+func TestConfigJSON_ClientIdByConsoleOrigin(t *testing.T) {
+	raw := &pkconfig.Config{OIDC: pkconfig.OIDC{Issuer: "http://localhost:8100/oidc"}}
+	raw.OIDC.Consoles.PlatformAdminWeb.RedirectURIs = []string{"http://localhost:4001/auth/callback"}
+	raw.OIDC.Consoles.TenantAdminWeb.RedirectURIs = []string{"http://localhost:4002/auth/callback"}
+	e := mountConfigOnly(t, raw, "")
+
+	get := func(hdr map[string]string) string {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "http://localhost:8100/config.json", nil)
+		for k, v := range hdr {
+			req.Header.Set(k, v)
+		}
+		e.ServeHTTP(w, req)
+		var out map[string]any
+		if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		cid, _ := out["clientId"].(string)
+		return cid
+	}
+
+	// 租户控制台（Referer 指向 4002）→ tenant_admin_web
+	if got := get(map[string]string{"Referer": "http://localhost:4002/menu"}); got != model.SeedBuiltinClientTenantAdminWeb {
+		t.Errorf("租户控制台 clientId = %q, want %q", got, model.SeedBuiltinClientTenantAdminWeb)
+	}
+	// 平台控制台（Referer 指向 4001）→ platform_admin_web
+	if got := get(map[string]string{"Referer": "http://localhost:4001/dashboard"}); got != model.SeedBuiltinClientPlatformAdminWeb {
+		t.Errorf("平台控制台 clientId = %q, want %q", got, model.SeedBuiltinClientPlatformAdminWeb)
+	}
+	// Origin 优先级同样生效
+	if got := get(map[string]string{"Origin": "http://localhost:4002"}); got != model.SeedBuiltinClientTenantAdminWeb {
+		t.Errorf("Origin 租户 clientId = %q, want %q", got, model.SeedBuiltinClientTenantAdminWeb)
+	}
+	// 无来源 → 回退 platform_admin_web
+	if got := get(nil); got != model.SeedBuiltinClientPlatformAdminWeb {
+		t.Errorf("无来源 clientId = %q, want 回退 %q", got, model.SeedBuiltinClientPlatformAdminWeb)
 	}
 }

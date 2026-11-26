@@ -17,6 +17,7 @@ func TestUserApplicationErrorCodesRegistered(t *testing.T) {
 		UserApplicationNotSubscribedError:      "目标应用未订阅或已停用，不可准入",
 		UserApplicationLastAdminForbiddenError: "撤销该准入会使租户失去最后一个内置管理员，已拒绝",
 		AuthAppAccessDeniedError:               "你未被授权使用该应用，请联系所在租户的管理员分配",
+		MenuAppNotOwnedError:                   "无权维护该应用的菜单（应用不归属当前租户或不存在）",
 	}
 	for c, msg := range wantMsg {
 		registered, ok := errorMap[c]

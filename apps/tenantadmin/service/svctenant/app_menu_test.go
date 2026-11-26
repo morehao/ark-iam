@@ -8,6 +8,8 @@ import (
 	"github.com/morehao/ark-iam/apps/tenantadmin/dto/dtotenant"
 	"github.com/morehao/ark-iam/apps/tenantadmin/testutil"
 	"github.com/morehao/ark-iam/pkg/dao"
+	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/golib/gerror"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
@@ -227,5 +229,27 @@ func TestListOwnedApplicationsOnlyReturnsOwned(t *testing.T) {
 	}
 	if len(resp.List) != 1 || resp.List[0].AppID != "app-t1" {
 		t.Fatalf("归属应用列表应只含 app-t1，实际 %+v", resp.List)
+	}
+}
+
+// TestAppMenuCreateRejectsNonexistentAppWithBizCode：不存在的应用建菜单返回 100606（业务码非 0），
+// 而非"看起来成功"。防回归：新错误码必须在 pkg/code 注册文案，否则 GetError 返回 code 0。
+func TestAppMenuCreateRejectsNonexistentAppWithBizCode(t *testing.T) {
+	db := setupAppMenuDB(t)
+	ctx := newAdminCtx(t, db, "t1", "op1")
+	svc := NewAppMenuSvc(nil)
+	_, err := svc.Create(requestCtx(ctx), dtotenantCreateReq("nonexistent-app-xyz", "c1", "n1", ctx))
+	if err == nil {
+		t.Fatalf("不存在应用建菜单应报错")
+	}
+	ge, ok := err.(gerror.Error)
+	if !ok {
+		t.Fatalf("err 应为 gerror.Error，实际 %T", err)
+	}
+	if ge.GetCode() != code.MenuAppNotOwnedError {
+		t.Fatalf("错误码 = %d, want %d（100606 必须已注册文案，否则 GetError 返回 0）", ge.GetCode(), code.MenuAppNotOwnedError)
+	}
+	if ge.GetCode() == 0 {
+		t.Fatalf("错误码不得为 0（新码未注册文案会导致越权请求看起来成功）")
 	}
 }

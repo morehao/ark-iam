@@ -24,8 +24,8 @@ test('全局登出后，SSO 会话失效且兄弟应用需重新认证', async (
   // 1. 首次访问 4001（管理平台），应跳转 login-web（4000）并带 authRequestID
   await page.goto('http://localhost:4001/', { waitUntil: 'domcontentloaded', timeout: 20000 });
   await page.waitForURL((url) => url.port === '4000' && url.pathname === '/login' && url.searchParams.has('authRequestID'), { timeout: 30000 });
-  await page.fill('#identifier', identifier);
-  await page.fill('#password', password);
+  await page.getByPlaceholder('请输入用户名').fill(identifier);
+  await page.getByPlaceholder('请输入密码').fill(password);
   await page.click('button[type="submit"]');
   // 回到管理平台仪表盘
   await page.waitForURL((url) => url.port === '4001' && !url.pathname.includes('/auth/callback'), { timeout: 30000 });

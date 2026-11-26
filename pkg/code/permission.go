@@ -122,6 +122,7 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	MenuGetDetailError:                                "查看菜单详情失败",
 	MenuGetPageListError:                              "查看菜单列表失败",
 	MenuNotExistError:                                 "菜单不存在",
+	MenuAppNotOwnedError:                              "无权维护该应用的菜单（应用不归属当前租户或不存在）",
 	RoleCreateError:                                   "创建角色失败",
 	RoleDeleteError:                                   "删除角色失败",
 	RoleUpdateError:                                   "修改角色失败",

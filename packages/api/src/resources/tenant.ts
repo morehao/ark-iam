@@ -239,6 +239,13 @@ export const getTenantMenuTree = () => request.get<any, MenuTreeResp>('/tenant/m
  */
 export const getTenantApps = () => request.get<any, { list: TenantSubscribedApplicationItem[] }>('/tenant/applications')
 
+/**
+ * 归属当前租户的应用列表（owner_tenant_id==当前租户），供「菜单管理」页的应用选择器：
+ * 只有归属租户能维护该应用菜单，故菜单页只列这一口径。
+ * 与 getTenantApps（订阅口径，供角色/准入）刻意区分。
+ */
+export const getOwnedApps = () => request.get<any, { list: TenantSubscribedApplicationItem[] }>('/tenant/applications/owned')
+
 // ---------- 应用菜单维护（租户侧，归属当前租户的应用） ----------
 // 菜单写接口已从平台侧（/platform/menus）下放到租户侧应用子资源：
 //   POST   /v1/tenant/applications/{appID}/menus

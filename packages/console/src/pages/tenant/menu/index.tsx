@@ -30,7 +30,7 @@ import {
   UnorderedListOutlined,
 } from '@ant-design/icons'
 import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, MENU_ICONS, menuIconOptions, PageContainer, RemoteSelect, StatCard, StatRow, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
-import { createAppMenu, deleteAppMenu, getAppMenuTree, getTenantApps, updateAppMenu } from '@ark-iam/api'
+import { createAppMenu, deleteAppMenu, getAppMenuTree, getOwnedApps, updateAppMenu } from '@ark-iam/api'
 import type { MenuExternalLinkFlag, MenuHiddenFlag, MenuItem, MenuKeepAliveFlag, MenuStatus, MenuType, MenuVisibility } from '@ark-iam/types'
 
 interface MenuFormValues {
@@ -111,7 +111,7 @@ function filterMenuTree(list: MenuItem[], keyword: string): MenuItem[] {
 }
 
 /**
- * 应用选择器选项（租户侧）：来自租户应用列表接口（getTenantApps），只列本租户可维护的应用。
+ * 应用选择器选项（租户侧）：来自归属应用接口（getOwnedApps，owner_tenant_id==当前租户），只列本租户可维护的应用。
  *
  * 注：「归属当前租户的应用」口径需后端补齐 loadOwnedApps（owner_tenant_id==当前租户）；
  * 当前 GET /v1/tenant/applications 返回的是「订阅且启用」口径，前端先沿用，待后端切换后
@@ -141,10 +141,10 @@ export default function MenuList() {
   const [form] = Form.useForm<MenuFormValues>()
   const [submitLoading, setSubmitLoading] = useState(false)
 
-  // 应用切换器选项：租户侧应用清单来自 getTenantApps（一次拉全量，租户应用量级有限）。
+  // 应用切换器选项：租户侧应用清单来自 getOwnedApps（归属当前租户，一次拉全量）。
   // 关键字过滤在前端本地做（租户应用通常只有几个~几十个）。
   const fetchAppOptions = useCallback(async (keyword: string) => {
-    const resp = await getTenantApps()
+    const resp = await getOwnedApps()
     const list: MenuAppOption[] = (resp?.list || []).map((a) => ({ appID: a.appID, code: a.code, name: a.name }))
     list.forEach((a) => appCacheRef.current.set(a.appID, a))
     const kw = keyword.trim().toLowerCase()
@@ -170,7 +170,7 @@ export default function MenuList() {
   useEffect(() => {
     void (async () => {
       try {
-        const resp = await getTenantApps()
+        const resp = await getOwnedApps()
         const list: MenuAppOption[] = (resp?.list || []).map((a) => ({ appID: a.appID, code: a.code, name: a.name }))
         list.forEach((a) => appCacheRef.current.set(a.appID, a))
         const saved = localStorage.getItem(STORAGE_KEY) || ''

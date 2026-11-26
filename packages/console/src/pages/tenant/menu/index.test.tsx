@@ -11,7 +11,7 @@ vi.mock('@ark-iam/api', () => ({
   createAppMenu: (...args: unknown[]) => mockCreateAppMenu(...args),
   deleteAppMenu: vi.fn(),
   getAppMenuTree: (...args: unknown[]) => mockGetAppMenuTree(...args),
-  getTenantApps: (...args: unknown[]) => mockGetTenantApps(...args),
+  getOwnedApps: (...args: unknown[]) => mockGetTenantApps(...args),
   updateAppMenu: (...args: unknown[]) => mockUpdateAppMenu(...args),
 }))
 
@@ -23,7 +23,7 @@ const apps: TenantSubscribedApplicationItem[] = [
 ]
 
 /**
- * 菜单页数据来源迁移到租户侧（v2）：应用选择器来自租户应用清单接口（getTenantApps），
+ * 菜单页数据来源迁移到租户侧（v2）：应用选择器来自归属应用接口（getOwnedApps），
  * 菜单树来自 /tenant/applications/{appID}/menus/tree（getAppMenuTree）；切换应用后按新 appID 重新加载。
  */
 describe('菜单页应用切换器', () => {

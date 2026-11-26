@@ -21,8 +21,8 @@ test.describe('实时统一登出', () => {
       (url) => url.port === '4000' && url.pathname === '/login' && url.searchParams.has('authRequestID'),
       { timeout: 30000 },
     );
-    await page.fill('#identifier', identifier);
-    await page.fill('#password', password);
+    await page.getByPlaceholder('请输入用户名').fill(identifier);
+    await page.getByPlaceholder('请输入密码').fill(password);
     await page.click('button[type="submit"]');
     await page.waitForURL((url) => url.port === '4001' && !url.pathname.includes('/auth/callback'), { timeout: 30000 });
     await expect(page.getByText('仪表盘', { exact: true }).first()).toBeVisible({ timeout: 30000 });
@@ -66,12 +66,16 @@ test.describe('实时统一登出', () => {
 
     // 5. 兄弟应用 RP1 刷新页面：应触发 API 请求，被 401 拒绝后跳回登录页
     //    （服务端 SSO 活性校验：SSO 会话已撤销 → 即使 access token 未过期也 401）
-    await rp1.reload({ waitUntil: 'domcontentloaded', timeout: 15000 });
-    // 401 后 request.ts 跳转 '/' → signinRedirect → OP 无 SSO cookie → login-web
-    await rp1.waitForURL(
-      (url) => (url.port === '4000' && url.pathname === '/login') || (url.port === '4002' && url.pathname === '/login'),
-      { timeout: 30000 },
-    );
+    // 注：reload 触发 401 → request.ts 立即 signinRedirect 导航，可能打断 reload/waitForURL
+    // 的导航（Playwright 报 net::ERR_ABORTED / frame detached）。这属预期竞态，故 reload 容错，
+    // 并用轮询式 toHaveURL 断言「最终落到登录页」（抗导航抖动），而不是一次性 waitForURL。
+    await rp1.reload({ waitUntil: 'commit', timeout: 15000 }).catch(() => {});
+    await expect
+      .poll(
+        () => rp1.url(),
+        { timeout: 30000, message: 'RP1 刷新后应落到登录页' },
+      )
+      .toMatch(/:4000\/login|:4002\/login/);
     console.log('>>> RP1 刷新后即时登出，跳回登录页');
 
     await rp1.close();
@@ -90,8 +94,8 @@ test.describe('实时统一登出', () => {
       (url) => url.port === '4000' && url.pathname === '/login' && url.searchParams.has('authRequestID'),
       { timeout: 30000 },
     );
-    await page.fill('#identifier', identifier);
-    await page.fill('#password', password);
+    await page.getByPlaceholder('请输入用户名').fill(identifier);
+    await page.getByPlaceholder('请输入密码').fill(password);
     await page.click('button[type="submit"]');
     await page.waitForURL((url) => url.port === '4001' && !url.pathname.includes('/auth/callback'), { timeout: 30000 });
     await expect(page.getByText('仪表盘', { exact: true }).first()).toBeVisible({ timeout: 30000 });
