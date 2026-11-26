@@ -136,12 +136,12 @@ func bootstrapAll(ctx context.Context, db *gorm.DB, rep *Report, def Definition)
 		return err
 	}
 
-	// 3. 应用
-	adminApp, err := getOrCreateApplication(ctx, db, rep, appCodeAdmin, "平台管理后台", "平台管理后台应用", 0, model.AppSourceBuiltin)
+	// 3. 应用（内置应用归属平台租户：owner_type=tenant，owner_tenant_id=平台租户 ID）
+	adminApp, err := getOrCreateApplication(ctx, db, rep, appCodeAdmin, "平台管理后台", "平台管理后台应用", 0, model.AppSourceBuiltin, tenant.ID)
 	if err != nil {
 		return err
 	}
-	tenantAdminApp, err := getOrCreateApplication(ctx, db, rep, appCodeTenantAdmin, "租户管理后台", "租户管理后台应用", 1, model.AppSourceBuiltin)
+	tenantAdminApp, err := getOrCreateApplication(ctx, db, rep, appCodeTenantAdmin, "租户管理后台", "租户管理后台应用", 1, model.AppSourceBuiltin, tenant.ID)
 	if err != nil {
 		return err
 	}
@@ -285,7 +285,7 @@ func findApplicationBySeedKey(db *gorm.DB, seedKey string) (*model.ApplicationEn
 // 只按 seed_key 认行，不做 (code) 兜底：本项目按全新项目维护 schema，不存在"还没有 seed_key
 // 的存量行"；保留旧口径兜底反而会让运维自建的同 code 应用被误认领成内置行（获得删除保护、
 // 接管菜单范围）。编码改名不影响任何以 app_id 关联的菜单/订阅/角色。
-func getOrCreateApplication(ctx context.Context, db *gorm.DB, rep *Report, code, name, desc string, sort int, source model.AppSource) (*model.ApplicationEntity, error) {
+func getOrCreateApplication(ctx context.Context, db *gorm.DB, rep *Report, code, name, desc string, sort int, source model.AppSource, ownerTenantID string) (*model.ApplicationEntity, error) {
 	entity, err := findApplicationBySeedKey(db, code)
 	if err != nil {
 		return nil, err
@@ -296,14 +296,17 @@ func getOrCreateApplication(ctx context.Context, db *gorm.DB, rep *Report, code,
 		// source（内置标记，安全不变式）由服务端的拒写点保证不可更改，不再靠种子收敛。
 		return entity, nil
 	}
+	// 内置应用归属平台租户：owner_type=tenant、owner_tenant_id=平台租户 ID（immutable，一次写对）。
 	entity = &model.ApplicationEntity{
-		Code:        code,
-		SeedKey:     code,
-		Name:        name,
-		Description: desc,
-		Source:      source,
-		Status:      model.AppStatusEnable,
-		Sort:        sort,
+		Code:          code,
+		SeedKey:       code,
+		Name:          name,
+		Description:   desc,
+		Source:        source,
+		OwnerType:     model.AppOwnerTypeTenant,
+		OwnerTenantID: ownerTenantID,
+		Status:        model.AppStatusEnable,
+		Sort:          sort,
 	}
 	if err := db.WithContext(ctx).Create(entity).Error; err != nil {
 		return nil, fmt.Errorf("seed application %s create fail: %w", code, err)

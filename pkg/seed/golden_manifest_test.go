@@ -96,6 +96,16 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 	if apps["platform_admin"].Sort != 0 || apps["tenant_admin"].Sort != 1 {
 		t.Errorf("应用 sort = %d/%d, want 0/1", apps["platform_admin"].Sort, apps["tenant_admin"].Sort)
 	}
+	// 内置应用归属平台租户：owner_type=tenant、owner_tenant_id=平台租户 ID。
+	for _, code := range []string{"platform_admin", "tenant_admin"} {
+		app := apps[code]
+		if app.OwnerType != model.AppOwnerTypeTenant {
+			t.Errorf("内置应用 %s owner_type = %q, want tenant", code, app.OwnerType)
+		}
+		if app.OwnerTenantID == "" {
+			t.Errorf("内置应用 %s owner_tenant_id 为空，want 平台租户 ID", code)
+		}
+	}
 
 	// ---- 角色：平台 admin 角色 code/admin_type/source 固定 ----
 	var platformRole model.RoleEntity
