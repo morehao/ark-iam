@@ -40,7 +40,10 @@ const (
 	// 名称为空或超长、或声明了产品锚点编码（锚点由开通链路按常量写入，模板不得占用同名 code）。
 	// 编码取 role/菜单段尾部下一个空位（100758/100759/100752 历史上已分配给其它错误，不得复用）。
 	ApplicationRoleTemplateInvalidError = 100765
-	ApplicationSecretCreateError        = 100736
+	// ApplicationOwnerInvalidError 应用归属非法：owner_type 取值不在白名单、或 owner_type=tenant 时
+	// owner_tenant_id 为空、或该归属租户不存在。归属是写菜单权（§5）的唯一依据，非法一律拒绝。
+	ApplicationOwnerInvalidError = 100766
+	ApplicationSecretCreateError = 100736
 	ApplicationSecretGetListError       = 100737
 	ApplicationSecretDeleteError        = 100738
 	ApplicationSecretNotExistError      = 100739
@@ -142,6 +145,7 @@ var permissionErrorMsgMap = gerror.CodeMsgMap{
 	ApplicationBuiltInErr:                             "内置应用不可删除",
 	ApplicationBuiltInCodeImmutableError:              "内置应用的编码由平台版本定义，不可修改",
 	ApplicationRoleTemplateInvalidError:               "应用角色模板不合法（编码需小写字母开头且模板内唯一、名称非空且不超长、不得使用产品锚点编码）",
+	ApplicationOwnerInvalidError:                      "应用归属非法（ownerType 只能为 platform/tenant；ownerType=tenant 时须指定存在且非空的 ownerTenantID）",
 	ApplicationSecretCreateError:                      "创建应用密钥失败",
 	ApplicationSecretGetListError:                     "查看应用密钥列表失败",
 	ApplicationSecretDeleteError:                      "删除应用密钥失败",

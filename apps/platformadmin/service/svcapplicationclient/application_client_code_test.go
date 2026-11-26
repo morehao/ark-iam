@@ -17,7 +17,7 @@ import (
 // 白名单值，写错一个字符会让该客户端签发的令牌全部 401，必须在落库前拦下。
 // 与 svcapplication 的应用编码校验同款（校验归 service，返回领域错误码）。
 func TestCreateRejectsInvalidClientCode(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
 	ctx := newOAuthDeleteCtx("1", "0")
 	svc := NewApplicationClientSvc(nil)
 
@@ -56,7 +56,7 @@ func TestCreateRejectsInvalidClientCode(t *testing.T) {
 // TestCreateAcceptsClientCodeAsClientID 合法编码（小写字母 + 下划线）落库为 client_id，
 // 且取自入参——控制台不再由服务端随机生成编码。
 func TestCreateAcceptsClientCodeAsClientID(t *testing.T) {
-	testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
+	testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
 	ctx := newOAuthDeleteCtx("1", "0")
 
 	resp, err := NewApplicationClientSvc(nil).Create(requestCtx(ctx), &dtoapplicationclient.ApplicationClientCreateReq{
@@ -88,7 +88,7 @@ func TestCreateAcceptsClientCodeAsClientID(t *testing.T) {
 // TestUpdateClientAllowsCodeRenameForThirdParty 用户自建客户端的编码可改（种子不管它们）：
 // 改名后该 RP 需同步自己的 client_id 配置、旧令牌按新 aud 失效——这是 OIDC 固有语义。
 func TestUpdateClientAllowsCodeRenameForThirdParty(t *testing.T) {
-	testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
+	testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
 	ctx := newOAuthDeleteCtx("1", "0")
 	svc := NewApplicationClientSvc(nil)
 
@@ -143,7 +143,7 @@ func TestUpdateClientAllowsCodeRenameForThirdParty(t *testing.T) {
 // TestUpdateBuiltInClientRejectsCodeRename 内置控制台客户端的编码（= client_id）保持只读：
 // 它同时是网关 aud 白名单与前端构建期默认值，从控制台改名会当场把该控制台锁死且界面无法自救。
 func TestUpdateBuiltInClientRejectsCodeRename(t *testing.T) {
-	testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
+	testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
 	ctx := newOAuthDeleteCtx("1", "0")
 	svc := NewApplicationClientSvc(nil)
 

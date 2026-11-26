@@ -21,11 +21,19 @@ type ApplicationCreateReq struct {
 	// 下游按「claim_prefix + code」认策略名（策略在下游是全局命名实体、全租户共用一条），
 	// 故契约值由应用方在此定义一次，租户只能授权、不能定义；开通应用时物化到各租户。
 	RoleTemplate []model.RoleTemplateItem `json:"roleTemplate"`
+	// OwnerType 应用归属类型：platform / tenant（留空按 platform）。控制台创建的应用恒为
+	// third_party，且归属固定写 owner_type=tenant（见 service.Create），本字段不影响该固定语义。
+	OwnerType model.AppOwnerType `json:"ownerType"`
+	// OwnerTenantID 归属租户 id：owner_type=tenant 时必填（service 强校验非空 + 该租户必须存在）。
+	OwnerTenantID string `json:"ownerTenantID"`
 	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
 	Operator objidentity.Operator
 }
 
 // ApplicationUpdateReq 修改应用。source 不可改（内置应用不可被改写为第三方）。
+//
+// 归属（ownerType/ownerTenantID）属 immutable：字段权威矩阵登记为 SeedFieldImmutable，
+// **本结构刻意不含 owner 字段**（结构上不可改，强于 service 拒写）。换归属=删旧建新。
 type ApplicationUpdateReq struct {
 	AppID string `json:"-" uri:"appID" binding:"required"` // 应用ID
 	// Code 应用编码：自建应用可改（留空表示不修改），规则同创建（model.AppCodePattern，小写字母开头、

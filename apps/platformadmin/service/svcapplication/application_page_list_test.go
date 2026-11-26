@@ -105,12 +105,14 @@ func TestApplicationPageListRejectsIllegalSource(t *testing.T) {
 // TestCreateApplicationForcesThirdParty 控制台创建的应用恒为 third_party：
 // source 不由入参决定（DTO 已移除该字段），builtin / first_party 只能由种子与运维产生。
 func TestCreateApplicationForcesThirdParty(t *testing.T) {
-	testutil.SetupSQLite(t, &model.ApplicationEntity{})
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.TenantEntity{})
+	seedOwnerTenant(t, db, "t_owner")
 
 	ctx := newApplicationCtx()
 	resp, err := NewApplicationSvc(nil).Create(requestCtx(ctx), &dtoapplication.ApplicationCreateReq{
-		Code: "demo",
-		Name: "演示应用",
+		Code:          "demo",
+		Name:          "演示应用",
+		OwnerTenantID: "t_owner",
 
 		Operator: operatorOf(ctx)})
 	if err != nil {

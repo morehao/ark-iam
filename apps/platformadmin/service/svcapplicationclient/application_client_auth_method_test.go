@@ -23,7 +23,7 @@ import (
 // 前端只传 client_id、不持密钥，改成 basic/post 后 token 端点要求认证而前端无法提供，
 // 该控制台登录与静默续期会全部 invalid_client，且修复入口就在被锁死的控制台内部。
 func TestUpdateBuiltInClientRejectsAuthMethodChange(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
 	builtin := newTestClientEntity("平台管理后台", model.SeedBuiltinClientPlatformAdminWeb, model.ApplicationClientSourceBuiltin)
 	builtin.AppID = "app1"
 	builtin.TokenEndpointAuthMethod = model.TokenEndpointAuthMethodNone
@@ -56,7 +56,7 @@ func TestUpdateBuiltInClientRejectsAuthMethodChange(t *testing.T) {
 // TestUpdateBuiltInClientRejectsPKCEDowngrade 内置客户端的强制 PKCE 不得被关掉：
 // 公共客户端没有密钥，PKCE 是唯一的授权码绑定手段，关掉等于放弃防降级。
 func TestUpdateBuiltInClientRejectsPKCEDowngrade(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
 	builtin := newTestClientEntity("平台管理后台", model.SeedBuiltinClientPlatformAdminWeb, model.ApplicationClientSourceBuiltin)
 	builtin.AppID = "app1"
 	builtin.TokenEndpointAuthMethod = model.TokenEndpointAuthMethodNone
@@ -89,7 +89,7 @@ func TestUpdateBuiltInClientRejectsPKCEDowngrade(t *testing.T) {
 // TestUpdateThirdPartyClientCanSwitchAuthMethod 自建客户端不在内置不变式范围内：
 // 从公共客户端迁到机密客户端（如改为 BFF）必须允许。
 func TestUpdateThirdPartyClientCanSwitchAuthMethod(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
 	thirdParty := newTestClientEntity("第三方 SPA", "third_party_web", model.ApplicationClientSourceThirdParty)
 	thirdParty.AppID = "app1"
 	thirdParty.TokenEndpointAuthMethod = model.TokenEndpointAuthMethodNone
@@ -124,7 +124,7 @@ func TestUpdateThirdPartyClientCanSwitchAuthMethod(t *testing.T) {
 // 刷成空串——空串不是合法枚举，在 oidcop 侧落到 fail-closed 的 private_key_jwt 分支
 // （client.go 的 default 分支），客户端随后无法用任何方式在令牌端点认证。
 func TestUpdateAuthMethodEmptyKeepsExisting(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
 	thirdParty := newTestClientEntity("服务端应用", "server_side_app", model.ApplicationClientSourceThirdParty)
 	thirdParty.AppID = "app1"
 	thirdParty.TokenEndpointAuthMethod = model.TokenEndpointAuthMethodBasic
@@ -154,7 +154,7 @@ func TestUpdateAuthMethodEmptyKeepsExisting(t *testing.T) {
 // TestUpdateRejectsIllegalAuthMethod 认证方式只允许白名单三值；未知取值会落到
 // private_key_jwt 分支，必须在 service 入口 fail-closed。
 func TestUpdateRejectsIllegalAuthMethod(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
 	thirdParty := newTestClientEntity("服务端应用", "server_side_app", model.ApplicationClientSourceThirdParty)
 	thirdParty.AppID = "app1"
 	if err := db.Create(thirdParty).Error; err != nil {
@@ -175,7 +175,7 @@ func TestUpdateRejectsIllegalAuthMethod(t *testing.T) {
 
 // TestCreateRejectsIllegalAuthMethod 创建路径同样按白名单校验（留空取列默认）。
 func TestCreateRejectsIllegalAuthMethod(t *testing.T) {
-	testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
+	testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
 
 	ctx := newOAuthDeleteCtx("1", "0")
 	_, err := NewApplicationClientSvc(nil).Create(requestCtx(ctx), &dtoapplicationclient.ApplicationClientCreateReq{
@@ -192,7 +192,7 @@ func TestCreateRejectsIllegalAuthMethod(t *testing.T) {
 // 这类客户端的代码会下发给每个用户，密钥无处安全保存（RFC 6749 §2.1），
 // 且令牌端点本就不会向其索取认证——签名等于制造一把用不上的凭据。
 func TestCreateSecretRejectedForPublicClient(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{}, &model.ApplicationClientSecretEntity{})
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.ApplicationClientEntity{}, &model.ApplicationClientSecretEntity{})
 	public := newTestClientEntity("第三方 SPA", "public_spa", model.ApplicationClientSourceThirdParty)
 	public.AppID = "app1"
 	public.TokenEndpointAuthMethod = model.TokenEndpointAuthMethodNone
@@ -221,7 +221,7 @@ func TestCreateSecretRejectedForPublicClient(t *testing.T) {
 
 // TestCreateSecretAllowedForConfidentialClient 机密客户端仍可正常签发密钥（收口不得误伤）。
 func TestCreateSecretAllowedForConfidentialClient(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{}, &model.ApplicationClientSecretEntity{})
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.ApplicationClientEntity{}, &model.ApplicationClientSecretEntity{})
 	confidential := newTestClientEntity("资源服务器", "resource_server", model.ApplicationClientSourceThirdParty)
 	confidential.AppID = "app1"
 	confidential.TokenEndpointAuthMethod = model.TokenEndpointAuthMethodBasic

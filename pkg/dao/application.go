@@ -9,12 +9,14 @@ import (
 
 type ApplicationCond struct {
 	*gormdao.BaseCond
-	IDs     []string
-	Name    string
-	Source  model.AppSource
-	Status  model.AppStatus
-	Code    string
-	SeedKey string // 种子身份键：内置应用的稳定标识（定位内置应用请用它，而不是可被改名的 Code）
+	IDs           []string
+	Name          string
+	Source        model.AppSource
+	Status        model.AppStatus
+	Code          string
+	SeedKey       string            // 种子身份键：内置应用的稳定标识（定位内置应用请用它，而不是可被改名的 Code）
+	OwnerType     model.AppOwnerType // 归属类型过滤（platform/tenant）
+	OwnerTenantID string            // 归属租户 id 过滤（owner_type=tenant 时按此定位"我的应用"）
 }
 
 func (c *ApplicationCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -39,6 +41,12 @@ func (c *ApplicationCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.SeedKey != "" {
 		db.Where(clause.Eq{Column: col("seed_key"), Value: c.SeedKey})
+	}
+	if c.OwnerType != "" {
+		db.Where(clause.Eq{Column: col("owner_type"), Value: c.OwnerType})
+	}
+	if c.OwnerTenantID != "" {
+		db.Where(clause.Eq{Column: col("owner_tenant_id"), Value: c.OwnerTenantID})
 	}
 }
 

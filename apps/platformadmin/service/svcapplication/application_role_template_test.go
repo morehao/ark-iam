@@ -18,7 +18,8 @@ import (
 // TestApplicationRoleTemplateValidation 应用角色模板是契约值的唯一写入入口，形状必须在这里守住：
 // 编码形状、模板内重码、名称空/超长、产品锚点编码、条目数超限一律拒（ApplicationRoleTemplateInvalidError）。
 func TestApplicationRoleTemplateValidation(t *testing.T) {
-	testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.RoleEntity{}, &model.TenantApplicationEntity{})
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.RoleEntity{}, &model.TenantApplicationEntity{}, &model.TenantEntity{})
+	seedOwnerTenant(t, db, "t_owner")
 
 	ctx := newApplicationCtx()
 	svc := NewApplicationSvc(nil)
@@ -49,8 +50,9 @@ func TestApplicationRoleTemplateValidation(t *testing.T) {
 
 	// 合法模板：名称自动去空白后落库
 	resp, err := svc.Create(requestCtx(ctx), &dtoapplication.ApplicationCreateReq{
-		Code: "app_ok",
-		Name: "对象存储",
+		Code:          "app_ok",
+		Name:          "对象存储",
+		OwnerTenantID: "t_owner",
 		RoleTemplate: []model.RoleTemplateItem{
 			{Code: "storage_admin", Name: " 存储管理员 "},
 			{Code: "readonly", Name: "只读用户"},
@@ -72,15 +74,17 @@ func TestApplicationRoleTemplateValidation(t *testing.T) {
 func TestApplicationRoleTemplateUpdateAndFanOut(t *testing.T) {
 	db := testutil.SetupSQLite(t,
 		&model.ApplicationEntity{}, &model.RoleEntity{}, &model.TenantApplicationEntity{},
-		&model.UserRoleEntity{}, &model.RoleMenuEntity{},
+		&model.UserRoleEntity{}, &model.RoleMenuEntity{}, &model.TenantEntity{},
 	)
+	seedOwnerTenant(t, db, "t_owner")
 
 	ctx := newApplicationCtx()
 	svc := NewApplicationSvc(nil)
 
 	resp, err := svc.Create(requestCtx(ctx), &dtoapplication.ApplicationCreateReq{
-		Code:         "app_store",
-		Name:         "对象存储",
+		Code:          "app_store",
+		Name:          "对象存储",
+		OwnerTenantID: "t_owner",
 		RoleTemplate: []model.RoleTemplateItem{{Code: "storage_admin", Name: "存储管理员"}},
 
 		Operator: operatorOf(ctx)})

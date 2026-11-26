@@ -246,10 +246,11 @@ func TestApplicationUpdateRejectsIllegalPolicy(t *testing.T) {
 // TestApplicationCreatePolicyDefaultsToDisable 创建未提供策略时按列默认 disable 落库
 // （原 *bool 缺省同样等价于关闭）。
 func TestApplicationCreatePolicyDefaultsToDisable(t *testing.T) {
-	testutil.SetupSQLite(t, &model.ApplicationEntity{})
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.TenantEntity{})
+	seedOwnerTenant(t, db, "t_owner")
 
 	ctx := newApplicationCtx()
-	resp, err := NewApplicationSvc(nil).Create(requestCtx(ctx), &dtoapplication.ApplicationCreateReq{Code: "app_default", Name: "缺省策略应用", Operator: operatorOf(ctx)})
+	resp, err := NewApplicationSvc(nil).Create(requestCtx(ctx), &dtoapplication.ApplicationCreateReq{Code: "app_default", Name: "缺省策略应用", OwnerTenantID: "t_owner", Operator: operatorOf(ctx)})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -265,13 +266,15 @@ func TestApplicationCreatePolicyDefaultsToDisable(t *testing.T) {
 
 // TestApplicationCreateRejectsIllegalPolicy 创建路径同样拦截非法策略且不落库。
 func TestApplicationCreateRejectsIllegalPolicy(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.ApplicationEntity{})
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.TenantEntity{})
+	seedOwnerTenant(t, db, "t_owner")
 
 	ctx := newApplicationCtx()
 	_, err := NewApplicationSvc(nil).Create(requestCtx(ctx), &dtoapplication.ApplicationCreateReq{
 		Code:                    "app_bad_policy",
 		Name:                    "非法策略应用",
 		AllowPersonCreateTenant: "true",
+		OwnerTenantID:           "t_owner",
 
 		Operator: operatorOf(ctx)})
 	if err == nil || gerror.GetCode(err) != int(code.ApplicationCreateError) {

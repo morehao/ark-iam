@@ -2,6 +2,8 @@ package svcpermission
 
 import (
 	"context"
+	"errors"
+
 	"github.com/morehao/ark-iam/apps/platformadmin/dto/dtopermission"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/core/menu"
@@ -18,57 +20,6 @@ import (
 
 func menuVisible(entity *model.MenuEntity) bool {
 	return entity != nil && entity.ID != ""
-}
-
-// validateMenuEnums 校验菜单字典枚举合法值：Type/Status/Visibility 必须命中白名单常量；
-// Hidden/ExternalLink/KeepAlive 三个开关允许空串（＝调用方未提供，按 disable 归一）。
-func validateMenuEnums(req *objpermission.MenuBaseInfo) bool {
-	switch req.Type {
-	case model.MenuTypeDirectory, model.MenuTypeMenu, model.MenuTypeButton:
-	default:
-		return false
-	}
-	switch req.Status {
-	case model.MenuStatusEnable, model.MenuStatusDisable:
-	default:
-		return false
-	}
-	switch req.Visibility {
-	case model.MenuVisibilityPublic, model.MenuVisibilityMember, model.MenuVisibilityAdmin:
-	default:
-		return false
-	}
-	switch req.Hidden {
-	case "", model.MenuHiddenFlagEnable, model.MenuHiddenFlagDisable:
-	default:
-		return false
-	}
-	switch req.ExternalLink {
-	case "", model.MenuExternalLinkFlagEnable, model.MenuExternalLinkFlagDisable:
-	default:
-		return false
-	}
-	switch req.KeepAlive {
-	case "", model.MenuKeepAliveFlagEnable, model.MenuKeepAliveFlagDisable:
-	default:
-		return false
-	}
-	return true
-}
-
-// normalizeMenuSwitches 把未提供的开关（空串）归一为 disable：列默认值即 disable，
-// 而更新走 UpdateMap（map 不经过 GORM 的默认值省略），空串直写会落成脏枚举值；
-// 归一后语义与原 bool 字段的 false（未勾选）完全一致。
-func normalizeMenuSwitches(req *objpermission.MenuBaseInfo) {
-	if req.Hidden == "" {
-		req.Hidden = model.MenuHiddenFlagDisable
-	}
-	if req.ExternalLink == "" {
-		req.ExternalLink = model.MenuExternalLinkFlagDisable
-	}
-	if req.KeepAlive == "" {
-		req.KeepAlive = model.MenuKeepAliveFlagDisable
-	}
 }
 
 type MenuSvc interface {
@@ -95,10 +46,10 @@ func NewMenuSvc(db gormdao.DBGetter) MenuSvc {
 }
 
 func (svc *menuSvc) Create(ctx context.Context, req *dtopermission.MenuCreateReq) (*dtopermission.MenuCreateResp, error) {
-	if !validateMenuEnums(&req.MenuBaseInfo) {
+	if !menu.ValidateMenuEnums(&req.MenuBaseInfo) {
 		return nil, code.GetError(code.MenuCreateError)
 	}
-	normalizeMenuSwitches(&req.MenuBaseInfo)
+	menu.NormalizeMenuSwitches(&req.MenuBaseInfo)
 	if req.Code == "" {
 		glog.Errorf(ctx, "[svcpermission.CreateMenu] 菜单编码不得为空, req:%s", gutil.ToJsonString(req))
 		return nil, code.GetError(code.MenuCreateError)
@@ -192,41 +143,21 @@ func (svc *menuSvc) Delete(ctx context.Context, req *dtopermission.MenuDeleteReq
 
 // menuParentUsable 校验上级菜单：空串表示根菜单（合法）；否则父级必须存在且与本菜单同属一个应用。
 // 不校验会让子菜单挂到不存在或别的应用的父级下——它不会出现在任何应用菜单树里，成为看不见的孤儿行。
+// 返回 true 表示可用，false 表示业务性不可用；系统错误（DAO 失败）原样返回给调用方另判。
 func menuParentUsable(db gormdao.DBGetter, ctx context.Context, appID, parentID string) (bool, error) {
-	if parentID == "" {
-		return true, nil
+	_, err := menu.MenuParentUsable(db, ctx, appID, parentID)
+	if errors.Is(err, menu.ErrParentUnusable) {
+		return false, nil
 	}
-	parent, err := dao.NewMenuDao(dao.WithDBGetter(db)).GetByID(ctx, parentID)
 	if err != nil {
 		return false, err
-	}
-	if parent == nil || parent.ID == "" || parent.AppID != appID {
-		return false, nil
 	}
 	return true, nil
 }
 
 // collectMenuSubtreeIDs 返回 rootID 及其全部子孙菜单 ID（限定同一应用）。
-// 菜单树规模有限（单应用几十行），一次取回后内存遍历，避免逐层查询。
 func collectMenuSubtreeIDs(db gormdao.DBGetter, ctx context.Context, appID, rootID string) ([]string, error) {
-	list, err := dao.NewMenuDao(dao.WithDBGetter(db)).GetListByCond(ctx, &dao.MenuCond{AppID: appID})
-	if err != nil {
-		glog.Errorf(ctx, "[svcpermission.collectMenuSubtreeIDs] dao GetListByCond fail, err:%v, appID:%s", err, appID)
-		return nil, err
-	}
-	childrenByParent := make(map[string][]string, len(list))
-	for _, item := range list {
-		childrenByParent[item.ParentID] = append(childrenByParent[item.ParentID], item.ID)
-	}
-	ids := make([]string, 0, 8)
-	queue := []string{rootID}
-	for len(queue) > 0 {
-		id := queue[0]
-		queue = queue[1:]
-		ids = append(ids, id)
-		queue = append(queue, childrenByParent[id]...)
-	}
-	return ids, nil
+	return menu.CollectSubtreeIDs(db, ctx, appID, rootID)
 }
 
 func (svc *menuSvc) Update(ctx context.Context, req *dtopermission.MenuUpdateReq) error {
@@ -238,10 +169,10 @@ func (svc *menuSvc) Update(ctx context.Context, req *dtopermission.MenuUpdateReq
 	if !menuVisible(menuEntity) {
 		return code.GetError(code.MenuNotExistError)
 	}
-	if !validateMenuEnums(&req.MenuBaseInfo) {
+	if !menu.ValidateMenuEnums(&req.MenuBaseInfo) {
 		return code.GetError(code.MenuUpdateError)
 	}
-	normalizeMenuSwitches(&req.MenuBaseInfo)
+	menu.NormalizeMenuSwitches(&req.MenuBaseInfo)
 	// 菜单编码可改（含内置菜单）：种子按 seed_key 认行，改 code/app_id 都不会导致重建行。
 	// 仅要求非空——应用内唯一由唯一索引 uk_menu_app_code_active 兜底（撞重返回本领域更新错误码）。
 	if req.Code == "" {

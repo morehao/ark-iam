@@ -9,12 +9,19 @@ package menu
 
 import (
 	"context"
+	"errors"
+
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objpermission"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 )
+
+// ErrParentUnusable 是菜单父级「业务性不可用」的哨兵错误：父菜单不存在（nil/空 ID）
+// 或不属于当前应用（parent.AppID != appID）。调用方据此与不可预期的系统错误分离——
+// 系统错误（DAO 失败）由各函数原样返回并已记日志，业务性不可用返回本哨兵。
+var ErrParentUnusable = errors.New("menu parent unusable")
 
 // BuildAppMenuTree 构建指定应用的启用菜单树（角色菜单授权 / 侧边栏可见树共用）。
 // 展示顺序取 dao.MenuOrderBySort：同一父级下按控制台维护的「排序」升序——
@@ -234,4 +241,98 @@ func PruneMenuTreeByAuthed(items []objpermission.MenuItemNode, authed map[string
 		}
 	}
 	return result
+}
+
+// ValidateMenuEnums 校验菜单字典枚举合法值：Type/Status/Visibility 必须命中白名单常量；
+// Hidden/ExternalLink/KeepAlive 三个开关允许空串（＝调用方未提供，交由 NormalizeMenuSwitches 归一为 disable）。
+func ValidateMenuEnums(req *objpermission.MenuBaseInfo) bool {
+	switch req.Type {
+	case model.MenuTypeDirectory, model.MenuTypeMenu, model.MenuTypeButton:
+	default:
+		return false
+	}
+	switch req.Status {
+	case model.MenuStatusEnable, model.MenuStatusDisable:
+	default:
+		return false
+	}
+	switch req.Visibility {
+	case model.MenuVisibilityPublic, model.MenuVisibilityMember, model.MenuVisibilityAdmin:
+	default:
+		return false
+	}
+	switch req.Hidden {
+	case "", model.MenuHiddenFlagEnable, model.MenuHiddenFlagDisable:
+	default:
+		return false
+	}
+	switch req.ExternalLink {
+	case "", model.MenuExternalLinkFlagEnable, model.MenuExternalLinkFlagDisable:
+	default:
+		return false
+	}
+	switch req.KeepAlive {
+	case "", model.MenuKeepAliveFlagEnable, model.MenuKeepAliveFlagDisable:
+	default:
+		return false
+	}
+	return true
+}
+
+// NormalizeMenuSwitches 把未提供的开关（空串）归一为 disable：列默认值即 disable，
+// 而更新走 map（不经过 GORM 的默认值省略），空串直写会落成脏枚举值；
+// 归一后语义与原 bool 字段的 false（未勾选）完全一致。
+func NormalizeMenuSwitches(req *objpermission.MenuBaseInfo) {
+	if req.Hidden == "" {
+		req.Hidden = model.MenuHiddenFlagDisable
+	}
+	if req.ExternalLink == "" {
+		req.ExternalLink = model.MenuExternalLinkFlagDisable
+	}
+	if req.KeepAlive == "" {
+		req.KeepAlive = model.MenuKeepAliveFlagDisable
+	}
+}
+
+// MenuParentUsable 校验上级菜单并返回父菜单实体：空串 parentID 表示根菜单（合法，返回 (nil, nil)）；
+// 否则父级必须存在且与本菜单同属一个应用。返回 ErrParentUnusable 表示业务性不可用
+// （父不存在/不属于该应用），系统错误（DAO 失败）原样返回。区分两者是既有 bool 返回值掩盖的瑕疵：
+// 调用方据此可分别返回「不存在」与「操作失败」两类错误码。
+// 不校验会让子菜单挂到不存在或别的应用的父级下——它不会出现在任何应用菜单树里，成为看不见的孤儿行。
+func MenuParentUsable(db gormdao.DBGetter, ctx context.Context, appID, parentID string) (*model.MenuEntity, error) {
+	if parentID == "" {
+		return nil, nil
+	}
+	parent, err := dao.NewMenuDao(dao.WithDBGetter(db)).GetByID(ctx, parentID)
+	if err != nil {
+		glog.Errorf(ctx, "[menu.MenuParentUsable] dao GetByID fail, err:%v, parentID:%s", err, parentID)
+		return nil, err
+	}
+	if parent == nil || parent.ID == "" || parent.AppID != appID {
+		return nil, ErrParentUnusable
+	}
+	return parent, nil
+}
+
+// CollectSubtreeIDs 返回 rootID 及其全部子孙菜单 ID（限定同一应用）。
+// 菜单树规模有限（单应用几十行），一次取回后内存遍历，避免逐层查询。
+func CollectSubtreeIDs(db gormdao.DBGetter, ctx context.Context, appID, rootID string) ([]string, error) {
+	list, err := dao.NewMenuDao(dao.WithDBGetter(db)).GetListByCond(ctx, &dao.MenuCond{AppID: appID})
+	if err != nil {
+		glog.Errorf(ctx, "[menu.CollectSubtreeIDs] dao GetListByCond fail, err:%v, appID:%s", err, appID)
+		return nil, err
+	}
+	childrenByParent := make(map[string][]string, len(list))
+	for _, item := range list {
+		childrenByParent[item.ParentID] = append(childrenByParent[item.ParentID], item.ID)
+	}
+	ids := make([]string, 0, 8)
+	queue := []string{rootID}
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		ids = append(ids, id)
+		queue = append(queue, childrenByParent[id]...)
+	}
+	return ids, nil
 }
