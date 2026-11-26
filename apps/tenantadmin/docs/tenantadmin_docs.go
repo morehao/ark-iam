@@ -214,6 +214,232 @@ const docTemplatetenantadmin = `{
                 }
             }
         },
+        "/v1/tenant/applications/{appID}/menus": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "租户菜单"
+                ],
+                "summary": "创建应用菜单",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "应用ID",
+                        "name": "appID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "创建应用菜单",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.AppMenuCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.AppMenuCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/tenant/applications/{appID}/menus/tree": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "租户菜单"
+                ],
+                "summary": "应用菜单树（管理视图）",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "应用ID",
+                        "name": "appID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.MenuTreeResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/tenant/applications/{appID}/menus/{menuID}": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "租户菜单"
+                ],
+                "summary": "应用菜单详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "应用ID",
+                        "name": "appID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "菜单ID",
+                        "name": "menuID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtotenant.MenuTreeItem"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "租户菜单"
+                ],
+                "summary": "更新应用菜单",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "应用ID",
+                        "name": "appID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "菜单ID",
+                        "name": "menuID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "更新应用菜单",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtotenant.AppMenuUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gincontext.DtoRender"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "租户菜单"
+                ],
+                "summary": "删除应用菜单",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "应用ID",
+                        "name": "appID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "菜单ID",
+                        "name": "menuID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/gincontext.DtoRender"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/tenant/applications/{appID}/users": {
             "get": {
                 "consumes": [
@@ -2345,6 +2571,14 @@ const docTemplatetenantadmin = `{
                 "name": {
                     "description": "密钥名称",
                     "type": "string"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
                 }
             }
         },
@@ -2443,6 +2677,190 @@ const docTemplatetenantadmin = `{
                 "total": {
                     "description": "数据总条数",
                     "type": "integer"
+                }
+            }
+        },
+        "dtotenant.AppMenuCreateReq": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "菜单编码",
+                    "type": "string"
+                },
+                "component": {
+                    "description": "组件路径",
+                    "type": "string"
+                },
+                "externalLink": {
+                    "description": "是否外链(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuExternalLinkFlag"
+                        }
+                    ]
+                },
+                "hidden": {
+                    "description": "是否隐藏(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuHiddenFlag"
+                        }
+                    ]
+                },
+                "icon": {
+                    "description": "菜单图标",
+                    "type": "string"
+                },
+                "keepAlive": {
+                    "description": "是否缓存(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuKeepAliveFlag"
+                        }
+                    ]
+                },
+                "name": {
+                    "description": "菜单名称",
+                    "type": "string"
+                },
+                "operator": {
+                    "$ref": "#/definitions/objidentity.Operator"
+                },
+                "parentID": {
+                    "description": "父菜单ID",
+                    "type": "string"
+                },
+                "path": {
+                    "description": "菜单路径",
+                    "type": "string"
+                },
+                "redirect": {
+                    "description": "重定向路径",
+                    "type": "string"
+                },
+                "sort": {
+                    "description": "排序",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "状态",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuStatus"
+                        }
+                    ]
+                },
+                "type": {
+                    "description": "菜单类型",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuType"
+                        }
+                    ]
+                },
+                "visibility": {
+                    "description": "可见性门槛(public/member/admin)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuVisibility"
+                        }
+                    ]
+                }
+            }
+        },
+        "dtotenant.AppMenuCreateResp": {
+            "type": "object",
+            "properties": {
+                "menuID": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtotenant.AppMenuUpdateReq": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "菜单编码",
+                    "type": "string"
+                },
+                "component": {
+                    "description": "组件路径",
+                    "type": "string"
+                },
+                "externalLink": {
+                    "description": "是否外链(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuExternalLinkFlag"
+                        }
+                    ]
+                },
+                "hidden": {
+                    "description": "是否隐藏(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuHiddenFlag"
+                        }
+                    ]
+                },
+                "icon": {
+                    "description": "菜单图标",
+                    "type": "string"
+                },
+                "keepAlive": {
+                    "description": "是否缓存(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuKeepAliveFlag"
+                        }
+                    ]
+                },
+                "name": {
+                    "description": "菜单名称",
+                    "type": "string"
+                },
+                "operator": {
+                    "$ref": "#/definitions/objidentity.Operator"
+                },
+                "parentID": {
+                    "description": "父菜单ID",
+                    "type": "string"
+                },
+                "path": {
+                    "description": "菜单路径",
+                    "type": "string"
+                },
+                "redirect": {
+                    "description": "重定向路径",
+                    "type": "string"
+                },
+                "sort": {
+                    "description": "排序",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "状态",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuStatus"
+                        }
+                    ]
+                },
+                "type": {
+                    "description": "菜单类型",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuType"
+                        }
+                    ]
+                },
+                "visibility": {
+                    "description": "可见性门槛(public/member/admin)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.MenuVisibility"
+                        }
+                    ]
                 }
             }
         },
@@ -2589,6 +3007,14 @@ const docTemplatetenantadmin = `{
                     "description": "部门名称",
                     "type": "string"
                 },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
                 "parentID": {
                     "description": "父节点ID,空为根节点",
                     "type": "string"
@@ -2622,6 +3048,14 @@ const docTemplatetenantadmin = `{
                 "status"
             ],
             "properties": {
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
                 "status": {
                     "description": "状态: enable-启用 disable-停用",
                     "allOf": [
@@ -2705,6 +3139,14 @@ const docTemplatetenantadmin = `{
                     "description": "部门名称",
                     "type": "string"
                 },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
                 "parentID": {
                     "description": "父节点ID,空为根节点(改此字段=移动节点)",
                     "type": "string"
@@ -2729,6 +3171,14 @@ const docTemplatetenantadmin = `{
                 "userID"
             ],
             "properties": {
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
                 "relationType": {
                     "description": "关系类型: primary-行政主部门(每用户至多1) secondary-跨部门参与 leader-负责",
                     "allOf": [
@@ -2826,6 +3276,14 @@ const docTemplatetenantadmin = `{
         "dtotenant.DepartmentUserUpdateReq": {
             "type": "object",
             "properties": {
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
                 "relationType": {
                     "description": "关系类型",
                     "allOf": [
@@ -2842,6 +3300,14 @@ const docTemplatetenantadmin = `{
                 "expireHours": {
                     "description": "ExpireHours 有效期小时数（0 表示不过期）",
                     "type": "integer"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
                 }
             }
         },
@@ -2917,6 +3383,14 @@ const docTemplatetenantadmin = `{
                 "name": {
                     "description": "服务账号名称",
                     "type": "string"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
                 },
                 "primaryDepartmentID": {
                     "description": "主部门ID(primary,单值,必传:服务账号必须从属部门)",
@@ -3070,6 +3544,14 @@ const docTemplatetenantadmin = `{
                     "description": "目标应用ID(按应用授权；空串=系统/未归属应用组)",
                     "type": "string"
                 },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
                 "roleIDs": {
                     "description": "角色ID列表(全量替换该应用下的授权)",
                     "type": "array",
@@ -3082,6 +3564,14 @@ const docTemplatetenantadmin = `{
         "dtotenant.MachineUserStatusReq": {
             "type": "object",
             "properties": {
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
                 "status": {
                     "description": "状态(active正常/suspended挂起)",
                     "allOf": [
@@ -3105,6 +3595,14 @@ const docTemplatetenantadmin = `{
                 "name": {
                     "description": "服务账号名称",
                     "type": "string"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
                 },
                 "primaryDepartmentID": {
                     "description": "主部门(primary,nil=不变;非nil=替换主部门,不可清空)",
@@ -3252,6 +3750,14 @@ const docTemplatetenantadmin = `{
                 "name": {
                     "description": "角色名称(应用内唯一)",
                     "type": "string"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
                 }
             }
         },
@@ -3360,6 +3866,14 @@ const docTemplatetenantadmin = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
                 }
             }
         },
@@ -3457,6 +3971,14 @@ const docTemplatetenantadmin = `{
                 "name": {
                     "description": "角色名称(应用内唯一)",
                     "type": "string"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
                 }
             }
         },
@@ -3570,6 +4092,14 @@ const docTemplatetenantadmin = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
                 }
             }
         },
@@ -3594,6 +4124,14 @@ const docTemplatetenantadmin = `{
                 "name": {
                     "description": "姓名(新建 person 时的自然人姓名)",
                     "type": "string"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
                 },
                 "personID": {
                     "description": "已有自然人ID(可选,优先关联)",
@@ -3640,7 +4178,7 @@ const docTemplatetenantadmin = `{
                     "type": "boolean"
                 },
                 "initialPassword": {
-                    "description": "初始临时密码(通道未启用/投递失败回退时才有值)",
+                    "description": "InitialPassword 成员的初始临时密码，仅在此响应中返回一次，不落库、不可再查；\n若邮箱/手机命中已存在自然人（其密码不被改动），该字段为空串。\n通道启用且投递成功时本字段为空、由 delivered 表达结果；回显仅通道未启用/投递失败降级时才有值。",
                     "type": "string"
                 },
                 "userID": {
@@ -3763,6 +4301,14 @@ const docTemplatetenantadmin = `{
                 "issuer": {
                     "description": "身份提供商",
                     "type": "string"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
                 }
             }
         },
@@ -3942,7 +4488,7 @@ const docTemplatetenantadmin = `{
                     "type": "boolean"
                 },
                 "initialPassword": {
-                    "description": "新临时密码(通道未启用/投递失败回退时才有值)",
+                    "description": "InitialPassword 新临时密码，仅在此响应中返回一次，不落库、不可再查。",
                     "type": "string"
                 },
                 "userID": {
@@ -3998,6 +4544,14 @@ const docTemplatetenantadmin = `{
                     "description": "目标应用ID(按应用授权；空串=系统/未归属应用组)",
                     "type": "string"
                 },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
                 "roleIDs": {
                     "description": "角色ID列表(全量替换该应用下的授权)",
                     "type": "array",
@@ -4024,6 +4578,14 @@ const docTemplatetenantadmin = `{
                 "name": {
                     "description": "姓名",
                     "type": "string"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
                 },
                 "primaryDepartmentID": {
                     "description": "主部门(primary,nil=不变;非nil=替换主部门,不可清空)",
@@ -4429,6 +4991,9 @@ const docTemplatetenantadmin = `{
                 "UserTypeMember",
                 "UserTypeMachine"
             ]
+        },
+        "objidentity.Operator": {
+            "type": "object"
         }
     }
 }`

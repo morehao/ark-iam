@@ -33,7 +33,7 @@ const (
 
 // ProvisionMenuSeedKeys 内置租户管理员默认授权的**菜单种子身份键**（tenant_admin 应用下的叶子菜单，见 model.MenuEntity.SeedKey）。
 // 用身份键而非菜单编码：运营在控制台改过菜单 code 之后，新开通的租户仍能授权到同一批菜单。
-var ProvisionMenuSeedKeys = []string{"department", "tenant-user", "tenant-role", "tenant-api-key"}
+var ProvisionMenuSeedKeys = []string{"department", "tenant-user", "tenant-role", "tenant-api-key", "tenant-menu"}
 
 // ProvisionTenantAdminReq 构造 ProvisionTenantAdmin 入参。
 type ProvisionTenantAdminReq struct {

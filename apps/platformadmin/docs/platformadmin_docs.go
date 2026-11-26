@@ -870,6 +870,411 @@ const docTemplateplatformadmin = `{
                 }
             }
         },
+        "/v1/platform/connector-factories": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "连接器"
+                ],
+                "summary": "查看连接器工厂列表",
+                "parameters": [
+                    {
+                        "enum": [
+                            "oidc",
+                            "oauth2"
+                        ],
+                        "type": "string",
+                        "x-enum-comments": {
+                            "ConnectorProtocolOAuth2": "OAuth2 协议",
+                            "ConnectorProtocolOIDC": "OIDC 协议"
+                        },
+                        "x-enum-descriptions": [
+                            "OIDC 协议",
+                            "OAuth2 协议"
+                        ],
+                        "x-enum-varnames": [
+                            "ConnectorProtocolOIDC",
+                            "ConnectorProtocolOAuth2"
+                        ],
+                        "description": "协议类型",
+                        "name": "protocol",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "google",
+                            "github",
+                            "microsoft",
+                            "wechat"
+                        ],
+                        "type": "string",
+                        "x-enum-comments": {
+                            "ConnectorProviderGithub": "GitHub",
+                            "ConnectorProviderGoogle": "Google",
+                            "ConnectorProviderMicrosoft": "Microsoft Entra ID",
+                            "ConnectorProviderWechat": "微信"
+                        },
+                        "x-enum-descriptions": [
+                            "Google",
+                            "GitHub",
+                            "Microsoft Entra ID",
+                            "微信"
+                        ],
+                        "x-enum-varnames": [
+                            "ConnectorProviderGoogle",
+                            "ConnectorProviderGithub",
+                            "ConnectorProviderMicrosoft",
+                            "ConnectorProviderWechat"
+                        ],
+                        "description": "提供商",
+                        "name": "provider",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/github_com_morehao_ark-iam_apps_platformadmin_dto_dtoconnector.ConnectorFactoryListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/platform/connectors": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "连接器"
+                ],
+                "summary": "查看连接器列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "默认落租户ID（筛选）",
+                        "name": "defaultTenantID",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "显示名称",
+                        "name": "displayName",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "名称",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页条数",
+                        "name": "pageSize",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "oidc",
+                            "oauth2"
+                        ],
+                        "type": "string",
+                        "x-enum-comments": {
+                            "ConnectorProtocolOAuth2": "OAuth2 协议",
+                            "ConnectorProtocolOIDC": "OIDC 协议"
+                        },
+                        "x-enum-descriptions": [
+                            "OIDC 协议",
+                            "OAuth2 协议"
+                        ],
+                        "x-enum-varnames": [
+                            "ConnectorProtocolOIDC",
+                            "ConnectorProtocolOAuth2"
+                        ],
+                        "description": "协议类型",
+                        "name": "protocol",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "google",
+                            "github",
+                            "microsoft",
+                            "wechat"
+                        ],
+                        "type": "string",
+                        "x-enum-comments": {
+                            "ConnectorProviderGithub": "GitHub",
+                            "ConnectorProviderGoogle": "Google",
+                            "ConnectorProviderMicrosoft": "Microsoft Entra ID",
+                            "ConnectorProviderWechat": "微信"
+                        },
+                        "x-enum-descriptions": [
+                            "Google",
+                            "GitHub",
+                            "Microsoft Entra ID",
+                            "微信"
+                        ],
+                        "x-enum-varnames": [
+                            "ConnectorProviderGoogle",
+                            "ConnectorProviderGithub",
+                            "ConnectorProviderMicrosoft",
+                            "ConnectorProviderWechat"
+                        ],
+                        "description": "提供商",
+                        "name": "provider",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "enable",
+                            "disable"
+                        ],
+                        "type": "string",
+                        "x-enum-comments": {
+                            "ConnectorStatusDisable": "停用：保留配置但不参与授权",
+                            "ConnectorStatusEnable": "启用：可用，参与授权与回调"
+                        },
+                        "x-enum-descriptions": [
+                            "启用：可用，参与授权与回调",
+                            "停用：保留配置但不参与授权"
+                        ],
+                        "x-enum-varnames": [
+                            "ConnectorStatusEnable",
+                            "ConnectorStatusDisable"
+                        ],
+                        "description": "状态",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoconnector.ConnectorPageListResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "连接器"
+                ],
+                "summary": "创建连接器",
+                "parameters": [
+                    {
+                        "description": "创建连接器",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoconnector.ConnectorCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoconnector.ConnectorCreateResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/platform/connectors/{connectorID}": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "连接器"
+                ],
+                "summary": "查看连接器详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "connectorID",
+                        "name": "connectorID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dtoconnector.ConnectorDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "连接器"
+                ],
+                "summary": "修改连接器",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "connectorID",
+                        "name": "connectorID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "修改连接器",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtoconnector.ConnectorUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "连接器"
+                ],
+                "summary": "删除连接器",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "connectorID",
+                        "name": "connectorID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/gincontext.DtoRender"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/v1/platform/domains": {
             "get": {
                 "consumes": [
@@ -1247,49 +1652,6 @@ const docTemplateplatformadmin = `{
                         }
                     }
                 }
-            },
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "菜单管理"
-                ],
-                "summary": "创建菜单管理",
-                "parameters": [
-                    {
-                        "description": "创建菜单管理",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtopermission.MenuCreateReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dtopermission.MenuCreateResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
             }
         },
         "/v1/platform/menus/my": {
@@ -1403,97 +1765,6 @@ const docTemplateplatformadmin = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/dtopermission.MenuDetailResp"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "put": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "菜单管理"
-                ],
-                "summary": "修改菜单管理",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "menuID",
-                        "name": "menuID",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "修改菜单管理",
-                        "name": "req",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dtopermission.MenuUpdateReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "菜单管理"
-                ],
-                "summary": "删除菜单管理",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "menuID",
-                        "name": "menuID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/gincontext.DtoRender"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
                                         }
                                     }
                                 }
@@ -2443,6 +2714,18 @@ const docTemplateplatformadmin = `{
                         }
                     ]
                 },
+                "ownerTenantID": {
+                    "description": "OwnerTenantID 归属租户 id：owner_type=tenant 时必填（service 强校验非空 + 该租户必须存在）。",
+                    "type": "string"
+                },
+                "ownerType": {
+                    "description": "OwnerType 应用归属类型：platform / tenant（留空按 platform）。控制台创建的应用恒为\nthird_party，且归属固定写 owner_type=tenant（见 service.Create），本字段不影响该固定语义。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AppOwnerType"
+                        }
+                    ]
+                },
                 "roleTemplate": {
                     "description": "RoleTemplate 应用角色模板：本应用对外提供的跨系统授权契约值（code + 展示名）。\n下游按「claim_prefix + code」认策略名（策略在下游是全局命名实体、全租户共用一条），\n故契约值由应用方在此定义一次，租户只能授权、不能定义；开通应用时物化到各租户。",
                     "type": "array",
@@ -3311,6 +3594,451 @@ const docTemplateplatformadmin = `{
                 }
             }
         },
+        "dtoconnector.ConnectorCreateReq": {
+            "type": "object",
+            "properties": {
+                "allowAutoCreateUser": {
+                    "description": "是否允许自动创建用户(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorAutoCreateUserFlag"
+                        }
+                    ]
+                },
+                "claimMapping": {
+                    "description": "声明映射",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorClaimMapping"
+                        }
+                    ]
+                },
+                "config": {
+                    "description": "连接器配置",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorConfig"
+                        }
+                    ]
+                },
+                "defaultTenantID": {
+                    "description": "自动创建用户默认落租户ID",
+                    "type": "string"
+                },
+                "displayName": {
+                    "description": "显示名称",
+                    "type": "string"
+                },
+                "domainPolicy": {
+                    "description": "域策略",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorDomainPolicy"
+                        }
+                    ]
+                },
+                "enableTokenStorage": {
+                    "description": "是否启用令牌存储(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorTokenStorageFlag"
+                        }
+                    ]
+                },
+                "name": {
+                    "description": "连接器名称",
+                    "type": "string"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
+                "protocol": {
+                    "description": "协议类型",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProtocol"
+                        }
+                    ]
+                },
+                "provider": {
+                    "description": "提供商",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProvider"
+                        }
+                    ]
+                },
+                "status": {
+                    "description": "状态: enable-启用, disable-停用",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorStatus"
+                        }
+                    ]
+                },
+                "syncProfile": {
+                    "description": "是否同步资料(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorSyncProfileFlag"
+                        }
+                    ]
+                }
+            }
+        },
+        "dtoconnector.ConnectorCreateResp": {
+            "type": "object",
+            "properties": {
+                "connectorID": {
+                    "description": "连接器ID",
+                    "type": "string"
+                }
+            }
+        },
+        "dtoconnector.ConnectorDetailResp": {
+            "type": "object",
+            "properties": {
+                "allowAutoCreateUser": {
+                    "description": "是否允许自动创建用户(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorAutoCreateUserFlag"
+                        }
+                    ]
+                },
+                "claimMapping": {
+                    "description": "声明映射",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorClaimMapping"
+                        }
+                    ]
+                },
+                "config": {
+                    "description": "连接器配置",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorConfig"
+                        }
+                    ]
+                },
+                "connectorID": {
+                    "description": "连接器ID",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "defaultTenantID": {
+                    "description": "默认落租户ID（自动创建用户默认归属租户）",
+                    "type": "string"
+                },
+                "defaultTenantName": {
+                    "description": "默认落租户名称（回显用，缺失为空串）",
+                    "type": "string"
+                },
+                "displayName": {
+                    "description": "显示名称",
+                    "type": "string"
+                },
+                "domainPolicy": {
+                    "description": "域策略",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorDomainPolicy"
+                        }
+                    ]
+                },
+                "enableTokenStorage": {
+                    "description": "是否启用令牌存储(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorTokenStorageFlag"
+                        }
+                    ]
+                },
+                "name": {
+                    "description": "连接器名称",
+                    "type": "string"
+                },
+                "protocol": {
+                    "description": "协议类型",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProtocol"
+                        }
+                    ]
+                },
+                "provider": {
+                    "description": "提供商",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProvider"
+                        }
+                    ]
+                },
+                "status": {
+                    "description": "状态",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorStatus"
+                        }
+                    ]
+                },
+                "syncProfile": {
+                    "description": "是否同步资料(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorSyncProfileFlag"
+                        }
+                    ]
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoconnector.ConnectorPageListItem": {
+            "type": "object",
+            "properties": {
+                "allowAutoCreateUser": {
+                    "description": "是否允许自动创建用户(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorAutoCreateUserFlag"
+                        }
+                    ]
+                },
+                "claimMapping": {
+                    "description": "声明映射",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorClaimMapping"
+                        }
+                    ]
+                },
+                "config": {
+                    "description": "连接器配置",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorConfig"
+                        }
+                    ]
+                },
+                "connectorID": {
+                    "description": "连接器ID",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "description": "创建时间",
+                    "type": "integer"
+                },
+                "createdBy": {
+                    "description": "创建人id",
+                    "type": "integer"
+                },
+                "defaultTenantID": {
+                    "description": "默认落租户ID（自动创建用户默认归属租户）",
+                    "type": "string"
+                },
+                "defaultTenantName": {
+                    "description": "默认落租户名称（回显用，缺失为空串）",
+                    "type": "string"
+                },
+                "displayName": {
+                    "description": "显示名称",
+                    "type": "string"
+                },
+                "domainPolicy": {
+                    "description": "域策略",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorDomainPolicy"
+                        }
+                    ]
+                },
+                "enableTokenStorage": {
+                    "description": "是否启用令牌存储(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorTokenStorageFlag"
+                        }
+                    ]
+                },
+                "name": {
+                    "description": "连接器名称",
+                    "type": "string"
+                },
+                "protocol": {
+                    "description": "协议类型",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProtocol"
+                        }
+                    ]
+                },
+                "provider": {
+                    "description": "提供商",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProvider"
+                        }
+                    ]
+                },
+                "status": {
+                    "description": "状态",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorStatus"
+                        }
+                    ]
+                },
+                "syncProfile": {
+                    "description": "是否同步资料(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorSyncProfileFlag"
+                        }
+                    ]
+                },
+                "updatedAt": {
+                    "description": "更新时间",
+                    "type": "integer"
+                },
+                "updatedBy": {
+                    "description": "更新人id",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoconnector.ConnectorPageListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "列表数据",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtoconnector.ConnectorPageListItem"
+                    }
+                },
+                "total": {
+                    "description": "总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "dtoconnector.ConnectorUpdateReq": {
+            "type": "object",
+            "properties": {
+                "allowAutoCreateUser": {
+                    "description": "是否允许自动创建用户(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorAutoCreateUserFlag"
+                        }
+                    ]
+                },
+                "claimMapping": {
+                    "description": "声明映射",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorClaimMapping"
+                        }
+                    ]
+                },
+                "config": {
+                    "description": "连接器配置",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorConfig"
+                        }
+                    ]
+                },
+                "defaultTenantID": {
+                    "description": "自动创建用户默认落租户ID",
+                    "type": "string"
+                },
+                "displayName": {
+                    "description": "显示名称",
+                    "type": "string"
+                },
+                "domainPolicy": {
+                    "description": "域策略",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorDomainPolicy"
+                        }
+                    ]
+                },
+                "enableTokenStorage": {
+                    "description": "是否启用令牌存储(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorTokenStorageFlag"
+                        }
+                    ]
+                },
+                "name": {
+                    "description": "连接器名称",
+                    "type": "string"
+                },
+                "operator": {
+                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/objidentity.Operator"
+                        }
+                    ]
+                },
+                "protocol": {
+                    "description": "协议类型",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProtocol"
+                        }
+                    ]
+                },
+                "provider": {
+                    "description": "提供商",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProvider"
+                        }
+                    ]
+                },
+                "status": {
+                    "description": "状态",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorStatus"
+                        }
+                    ]
+                },
+                "syncProfile": {
+                    "description": "是否同步资料(enable/disable)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorSyncProfileFlag"
+                        }
+                    ]
+                }
+            }
+        },
         "dtodomain.DomainCreateReq": {
             "type": "object",
             "required": [
@@ -3434,115 +4162,6 @@ const docTemplateplatformadmin = `{
                             "$ref": "#/definitions/model.DomainVerificationStatus"
                         }
                     ]
-                }
-            }
-        },
-        "dtopermission.MenuCreateReq": {
-            "type": "object",
-            "required": [
-                "appID"
-            ],
-            "properties": {
-                "appID": {
-                    "description": "应用ID（菜单必须归属某个应用）",
-                    "type": "string"
-                },
-                "code": {
-                    "description": "菜单编码",
-                    "type": "string"
-                },
-                "component": {
-                    "description": "组件路径",
-                    "type": "string"
-                },
-                "externalLink": {
-                    "description": "是否外链(enable/disable)",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.MenuExternalLinkFlag"
-                        }
-                    ]
-                },
-                "hidden": {
-                    "description": "是否隐藏(enable/disable)",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.MenuHiddenFlag"
-                        }
-                    ]
-                },
-                "icon": {
-                    "description": "菜单图标",
-                    "type": "string"
-                },
-                "keepAlive": {
-                    "description": "是否缓存(enable/disable)",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.MenuKeepAliveFlag"
-                        }
-                    ]
-                },
-                "name": {
-                    "description": "菜单名称",
-                    "type": "string"
-                },
-                "operator": {
-                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/objidentity.Operator"
-                        }
-                    ]
-                },
-                "parentID": {
-                    "description": "父菜单ID",
-                    "type": "string"
-                },
-                "path": {
-                    "description": "菜单路径",
-                    "type": "string"
-                },
-                "redirect": {
-                    "description": "重定向路径",
-                    "type": "string"
-                },
-                "sort": {
-                    "description": "排序",
-                    "type": "integer"
-                },
-                "status": {
-                    "description": "状态",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.MenuStatus"
-                        }
-                    ]
-                },
-                "type": {
-                    "description": "菜单类型",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.MenuType"
-                        }
-                    ]
-                },
-                "visibility": {
-                    "description": "可见性门槛(public/member/admin)",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.MenuVisibility"
-                        }
-                    ]
-                }
-            }
-        },
-        "dtopermission.MenuCreateResp": {
-            "type": "object",
-            "properties": {
-                "menuID": {
-                    "description": "菜单ID",
-                    "type": "string"
                 }
             }
         },
@@ -3926,106 +4545,6 @@ const docTemplateplatformadmin = `{
                     "items": {
                         "$ref": "#/definitions/dtopermission.MenuTreeItem"
                     }
-                }
-            }
-        },
-        "dtopermission.MenuUpdateReq": {
-            "type": "object",
-            "required": [
-                "appID"
-            ],
-            "properties": {
-                "appID": {
-                    "description": "应用ID（菜单必须归属某个应用）",
-                    "type": "string"
-                },
-                "code": {
-                    "description": "菜单编码",
-                    "type": "string"
-                },
-                "component": {
-                    "description": "组件路径",
-                    "type": "string"
-                },
-                "externalLink": {
-                    "description": "是否外链(enable/disable)",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.MenuExternalLinkFlag"
-                        }
-                    ]
-                },
-                "hidden": {
-                    "description": "是否隐藏(enable/disable)",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.MenuHiddenFlag"
-                        }
-                    ]
-                },
-                "icon": {
-                    "description": "菜单图标",
-                    "type": "string"
-                },
-                "keepAlive": {
-                    "description": "是否缓存(enable/disable)",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.MenuKeepAliveFlag"
-                        }
-                    ]
-                },
-                "name": {
-                    "description": "菜单名称",
-                    "type": "string"
-                },
-                "operator": {
-                    "description": "Operator 由 controller 从鉴权结果填入（json:\"-\"，客户端不可伪造）。",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/objidentity.Operator"
-                        }
-                    ]
-                },
-                "parentID": {
-                    "description": "父菜单ID",
-                    "type": "string"
-                },
-                "path": {
-                    "description": "菜单路径",
-                    "type": "string"
-                },
-                "redirect": {
-                    "description": "重定向路径",
-                    "type": "string"
-                },
-                "sort": {
-                    "description": "排序",
-                    "type": "integer"
-                },
-                "status": {
-                    "description": "状态",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.MenuStatus"
-                        }
-                    ]
-                },
-                "type": {
-                    "description": "菜单类型",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.MenuType"
-                        }
-                    ]
-                },
-                "visibility": {
-                    "description": "可见性门槛(public/member/admin)",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.MenuVisibility"
-                        }
-                    ]
                 }
             }
         },
@@ -4737,6 +5256,70 @@ const docTemplateplatformadmin = `{
                 }
             }
         },
+        "github_com_morehao_ark-iam_apps_platformadmin_dto_dtoconnector.ConnectorFactoryListResp": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "description": "工厂列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_morehao_ark-iam_apps_platformadmin_dto_dtoconnector.ConnectorFactoryResp"
+                    }
+                }
+            }
+        },
+        "github_com_morehao_ark-iam_apps_platformadmin_dto_dtoconnector.ConnectorFactoryResp": {
+            "type": "object",
+            "properties": {
+                "capabilities": {
+                    "description": "能力标识",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.ConnectorCapability"
+                    }
+                },
+                "configSchema": {
+                    "description": "配置 schema（前端按 ConnectorConfigSchema {required?:string[]} 解析）",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "defaultScopes": {
+                    "description": "默认 scope",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "displayName": {
+                    "description": "显示名称",
+                    "type": "string"
+                },
+                "factoryID": {
+                    "description": "工厂标识",
+                    "type": "string"
+                },
+                "isStandard": {
+                    "description": "是否标准连接器",
+                    "type": "boolean"
+                },
+                "protocol": {
+                    "description": "协议类型",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProtocol"
+                        }
+                    ]
+                },
+                "provider": {
+                    "description": "提供商",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectorProvider"
+                        }
+                    ]
+                }
+            }
+        },
         "model.AppJoinByInvitePolicy": {
             "type": "string",
             "enum": [
@@ -4746,6 +5329,17 @@ const docTemplateplatformadmin = `{
             "x-enum-varnames": [
                 "AppJoinByInvitePolicyEnable",
                 "AppJoinByInvitePolicyDisable"
+            ]
+        },
+        "model.AppOwnerType": {
+            "type": "string",
+            "enum": [
+                "platform",
+                "tenant"
+            ],
+            "x-enum-varnames": [
+                "AppOwnerTypePlatform",
+                "AppOwnerTypeTenant"
             ]
         },
         "model.AppPersonCreateTenantPolicy": {
@@ -4976,6 +5570,213 @@ const docTemplateplatformadmin = `{
             "x-enum-varnames": [
                 "ClientPKCEPolicyEnable",
                 "ClientPKCEPolicyDisable"
+            ]
+        },
+        "model.ConnectorAutoCreateUserFlag": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-varnames": [
+                "ConnectorAutoCreateUserFlagEnable",
+                "ConnectorAutoCreateUserFlagDisable"
+            ]
+        },
+        "model.ConnectorCapability": {
+            "type": "string",
+            "enum": [
+                "authorize",
+                "callback",
+                "claim_mapping",
+                "domain_policy",
+                "profile_sync"
+            ],
+            "x-enum-comments": {
+                "ConnectorCapabilityAuthorize": "发起授权",
+                "ConnectorCapabilityCallback": "处理回调",
+                "ConnectorCapabilityClaimMapping": "声明映射",
+                "ConnectorCapabilityDomainPolicy": "域策略",
+                "ConnectorCapabilityProfileSync": "资料同步"
+            },
+            "x-enum-descriptions": [
+                "发起授权",
+                "处理回调",
+                "声明映射",
+                "域策略",
+                "资料同步"
+            ],
+            "x-enum-varnames": [
+                "ConnectorCapabilityAuthorize",
+                "ConnectorCapabilityCallback",
+                "ConnectorCapabilityClaimMapping",
+                "ConnectorCapabilityDomainPolicy",
+                "ConnectorCapabilityProfileSync"
+            ]
+        },
+        "model.ConnectorClaimMapping": {
+            "type": "object",
+            "properties": {
+                "avatarUrl": {
+                    "type": "string"
+                },
+                "displayName": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "subject": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.ConnectorConfig": {
+            "type": "object",
+            "properties": {
+                "authUrl": {
+                    "type": "string"
+                },
+                "clientID": {
+                    "type": "string"
+                },
+                "clientSecret": {
+                    "type": "string"
+                },
+                "issuer": {
+                    "type": "string"
+                },
+                "protocol": {
+                    "$ref": "#/definitions/model.ConnectorProtocol"
+                },
+                "provider": {
+                    "$ref": "#/definitions/model.ConnectorProvider"
+                },
+                "redirectUri": {
+                    "type": "string"
+                },
+                "scopes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "tenant": {
+                    "type": "string"
+                },
+                "tokenUrl": {
+                    "type": "string"
+                },
+                "userInfoUrl": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.ConnectorDomainPolicy": {
+            "type": "object",
+            "properties": {
+                "allowedDomains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "blockedDomains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "model.ConnectorProtocol": {
+            "type": "string",
+            "enum": [
+                "oidc",
+                "oauth2"
+            ],
+            "x-enum-comments": {
+                "ConnectorProtocolOAuth2": "OAuth2 协议",
+                "ConnectorProtocolOIDC": "OIDC 协议"
+            },
+            "x-enum-descriptions": [
+                "OIDC 协议",
+                "OAuth2 协议"
+            ],
+            "x-enum-varnames": [
+                "ConnectorProtocolOIDC",
+                "ConnectorProtocolOAuth2"
+            ]
+        },
+        "model.ConnectorProvider": {
+            "type": "string",
+            "enum": [
+                "google",
+                "github",
+                "microsoft",
+                "wechat"
+            ],
+            "x-enum-comments": {
+                "ConnectorProviderGithub": "GitHub",
+                "ConnectorProviderGoogle": "Google",
+                "ConnectorProviderMicrosoft": "Microsoft Entra ID",
+                "ConnectorProviderWechat": "微信"
+            },
+            "x-enum-descriptions": [
+                "Google",
+                "GitHub",
+                "Microsoft Entra ID",
+                "微信"
+            ],
+            "x-enum-varnames": [
+                "ConnectorProviderGoogle",
+                "ConnectorProviderGithub",
+                "ConnectorProviderMicrosoft",
+                "ConnectorProviderWechat"
+            ]
+        },
+        "model.ConnectorStatus": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-comments": {
+                "ConnectorStatusDisable": "停用：保留配置但不参与授权",
+                "ConnectorStatusEnable": "启用：可用，参与授权与回调"
+            },
+            "x-enum-descriptions": [
+                "启用：可用，参与授权与回调",
+                "停用：保留配置但不参与授权"
+            ],
+            "x-enum-varnames": [
+                "ConnectorStatusEnable",
+                "ConnectorStatusDisable"
+            ]
+        },
+        "model.ConnectorSyncProfileFlag": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-varnames": [
+                "ConnectorSyncProfileFlagEnable",
+                "ConnectorSyncProfileFlagDisable"
+            ]
+        },
+        "model.ConnectorTokenStorageFlag": {
+            "type": "string",
+            "enum": [
+                "enable",
+                "disable"
+            ],
+            "x-enum-varnames": [
+                "ConnectorTokenStorageFlagEnable",
+                "ConnectorTokenStorageFlagDisable"
             ]
         },
         "model.DomainVerificationStatus": {

@@ -2,7 +2,6 @@ package svcpermission
 
 import (
 	"context"
-	"errors"
 
 	"github.com/morehao/ark-iam/apps/platformadmin/dto/dtopermission"
 	"github.com/morehao/ark-iam/pkg/code"
@@ -15,7 +14,6 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
-	"gorm.io/gorm"
 )
 
 func menuVisible(entity *model.MenuEntity) bool {
@@ -23,9 +21,6 @@ func menuVisible(entity *model.MenuEntity) bool {
 }
 
 type MenuSvc interface {
-	Create(ctx context.Context, req *dtopermission.MenuCreateReq) (*dtopermission.MenuCreateResp, error)
-	Delete(ctx context.Context, req *dtopermission.MenuDeleteReq) error
-	Update(ctx context.Context, req *dtopermission.MenuUpdateReq) error
 	Detail(ctx context.Context, req *dtopermission.MenuDetailReq) (*dtopermission.MenuDetailResp, error)
 	PageList(ctx context.Context, req *dtopermission.MenuPageListReq) (*dtopermission.MenuPageListResp, error)
 	Tree(ctx context.Context, req *dtopermission.MenuTreeReq) (*dtopermission.MenuTreeResp, error)
@@ -43,189 +38,6 @@ func NewMenuSvc(db gormdao.DBGetter) MenuSvc {
 		db = dbclient.IamDB
 	}
 	return &menuSvc{db: db}
-}
-
-func (svc *menuSvc) Create(ctx context.Context, req *dtopermission.MenuCreateReq) (*dtopermission.MenuCreateResp, error) {
-	if !menu.ValidateMenuEnums(&req.MenuBaseInfo) {
-		return nil, code.GetError(code.MenuCreateError)
-	}
-	menu.NormalizeMenuSwitches(&req.MenuBaseInfo)
-	if req.Code == "" {
-		glog.Errorf(ctx, "[svcpermission.CreateMenu] 菜单编码不得为空, req:%s", gutil.ToJsonString(req))
-		return nil, code.GetError(code.MenuCreateError)
-	}
-	// 菜单可挂到任意应用（含内置应用）：控制台自建行 seed_key 恒为空，L1 引导不会认领它；
-	// 内置菜单的删除也不需要"墓碑"保护——L1 已初始化即永久自锁（见 pkg/seed.Bootstrap），
-	// 不存在第二次写入，因此删除后不会被建回来。
-	// 因此"按需扩展/调整菜单"不再需要改代码发版。
-	ok, err := menuParentUsable(svc.db, ctx, req.AppID, req.ParentID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcpermission.CreateMenu] 校验上级菜单失败, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.MenuCreateError)
-	}
-	if !ok {
-		return nil, code.GetError(code.MenuCreateError)
-	}
-	insertEntity := &model.MenuEntity{
-		AppID:        req.AppID,
-		ParentID:     req.ParentID,
-		Name:         req.Name,
-		Code:         req.Code,
-		Path:         req.Path,
-		Icon:         req.Icon,
-		Sort:         req.Sort,
-		Type:         req.Type,
-		Visibility:   req.Visibility,
-		Component:    req.Component,
-		Redirect:     req.Redirect,
-		Hidden:       req.Hidden,
-		ExternalLink: req.ExternalLink,
-		KeepAlive:    req.KeepAlive,
-		Status:       req.Status,
-		CreatedBy:    req.Operator.UserID,
-	}
-
-	if err := dao.NewMenuDao(dao.WithDBGetter(svc.db)).Insert(ctx, insertEntity); err != nil {
-		glog.Errorf(ctx, "[svcpermission.CreateMenu] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return nil, code.GetError(code.MenuCreateError)
-	}
-	return &dtopermission.MenuCreateResp{
-		MenuID: insertEntity.ID,
-	}, nil
-}
-
-func (svc *menuSvc) Delete(ctx context.Context, req *dtopermission.MenuDeleteReq) error {
-	menuEntity, err := dao.NewMenuDao(dao.WithDBGetter(svc.db)).GetByID(ctx, req.MenuID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcpermission.DeleteMenu] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.MenuDeleteError)
-	}
-	if !menuVisible(menuEntity) {
-		return code.GetError(code.MenuNotExistError)
-	}
-	// 级联删除整棵子树：子菜单一旦失去父级就再也进不了应用菜单树（树从 parent_id="" 构建），
-	// 只会变成看不见又删不掉的孤儿行，因此删除父级必须连同子孙一起下线。
-	subtreeIDs, err := collectMenuSubtreeIDs(svc.db, ctx, menuEntity.AppID, menuEntity.ID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcpermission.DeleteMenu] 收集子树失败, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.MenuDeleteError)
-	}
-
-	userID := req.Operator.UserID
-	txErr := svc.db(ctx).Transaction(func(tx *gorm.DB) error {
-		// menu 是全局表（无 tenant_id），但 role_menu 是租户级表：某菜单被角色授权时，
-		// 授权行散落在各业务租户。删菜单必须跨全部租户清理绑定，否则会留下指向已删菜单的
-		// 悬空授权（平台租户之外的绑定既看不见也清不掉）。故 role_menu 的读写显式走全租户作用域。
-		crossCtx := dbclient.CrossTenantContext(ctx)
-		for _, menuID := range subtreeIDs {
-			// 先解绑角色授权，否则 role_menu 会留下指向已删除菜单的悬空绑定
-			bindings, err := dao.NewRoleMenuDao(dao.WithDBGetter(svc.db)).WithTx(tx).GetListByCond(crossCtx, &dao.RoleMenuCond{MenuID: menuID})
-			if err != nil {
-				return err
-			}
-			for _, binding := range bindings {
-				if err := dao.NewRoleMenuDao(dao.WithDBGetter(svc.db)).WithTx(tx).Delete(crossCtx, binding.ID, userID); err != nil {
-					return err
-				}
-			}
-			if err := dao.NewMenuDao(dao.WithDBGetter(svc.db)).WithTx(tx).Delete(ctx, menuID, userID); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if txErr != nil {
-		glog.Errorf(ctx, "[svcpermission.DeleteMenu] transaction fail, err:%v, req:%s", txErr, gutil.ToJsonString(req))
-		return code.GetError(code.MenuDeleteError)
-	}
-	return nil
-}
-
-// menuParentUsable 校验上级菜单：空串表示根菜单（合法）；否则父级必须存在且与本菜单同属一个应用。
-// 不校验会让子菜单挂到不存在或别的应用的父级下——它不会出现在任何应用菜单树里，成为看不见的孤儿行。
-// 返回 true 表示可用，false 表示业务性不可用；系统错误（DAO 失败）原样返回给调用方另判。
-func menuParentUsable(db gormdao.DBGetter, ctx context.Context, appID, parentID string) (bool, error) {
-	_, err := menu.MenuParentUsable(db, ctx, appID, parentID)
-	if errors.Is(err, menu.ErrParentUnusable) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-// collectMenuSubtreeIDs 返回 rootID 及其全部子孙菜单 ID（限定同一应用）。
-func collectMenuSubtreeIDs(db gormdao.DBGetter, ctx context.Context, appID, rootID string) ([]string, error) {
-	return menu.CollectSubtreeIDs(db, ctx, appID, rootID)
-}
-
-func (svc *menuSvc) Update(ctx context.Context, req *dtopermission.MenuUpdateReq) error {
-	menuEntity, err := dao.NewMenuDao(dao.WithDBGetter(svc.db)).GetByID(ctx, req.MenuID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcpermission.UpdateMenu] dao GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.MenuUpdateError)
-	}
-	if !menuVisible(menuEntity) {
-		return code.GetError(code.MenuNotExistError)
-	}
-	if !menu.ValidateMenuEnums(&req.MenuBaseInfo) {
-		return code.GetError(code.MenuUpdateError)
-	}
-	menu.NormalizeMenuSwitches(&req.MenuBaseInfo)
-	// 菜单编码可改（含内置菜单）：种子按 seed_key 认行，改 code/app_id 都不会导致重建行。
-	// 仅要求非空——应用内唯一由唯一索引 uk_menu_app_code_active 兜底（撞重返回本领域更新错误码）。
-	if req.Code == "" {
-		glog.Errorf(ctx, "[svcpermission.UpdateMenu] 菜单编码不得为空, req:%s", gutil.ToJsonString(req))
-		return code.GetError(code.MenuUpdateError)
-	}
-	// 上级菜单校验：父级必须存在且与目标应用一致（否则子菜单进不了任何应用菜单树），
-	// 且不得是自身或其子孙——成环后整棵子树都从菜单树里消失，等于自删。
-	ok, err := menuParentUsable(svc.db, ctx, req.AppID, req.ParentID)
-	if err != nil {
-		glog.Errorf(ctx, "[svcpermission.UpdateMenu] 校验上级菜单失败, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.MenuUpdateError)
-	}
-	if !ok || req.ParentID == req.MenuID {
-		return code.GetError(code.MenuUpdateError)
-	}
-	if req.ParentID != "" {
-		subtreeIDs, err := collectMenuSubtreeIDs(svc.db, ctx, menuEntity.AppID, req.MenuID)
-		if err != nil {
-			glog.Errorf(ctx, "[svcpermission.UpdateMenu] 校验菜单环失败, err:%v, req:%s", err, gutil.ToJsonString(req))
-			return code.GetError(code.MenuUpdateError)
-		}
-		for _, id := range subtreeIDs {
-			if id == req.ParentID {
-				return code.GetError(code.MenuUpdateError)
-			}
-		}
-	}
-
-	userID := req.Operator.UserID
-	updateMap := map[string]any{
-		"app_id":        req.AppID,
-		"parent_id":     req.ParentID,
-		"name":          req.Name,
-		"code":          req.Code,
-		"path":          req.Path,
-		"icon":          req.Icon,
-		"sort":          req.Sort,
-		"type":          req.Type,
-		"visibility":    req.Visibility,
-		"component":     req.Component,
-		"redirect":      req.Redirect,
-		"hidden":        req.Hidden,
-		"external_link": req.ExternalLink,
-		"keep_alive":    req.KeepAlive,
-		"status":        req.Status,
-		"updated_by":    userID,
-	}
-	if err := dao.NewMenuDao(dao.WithDBGetter(svc.db)).UpdateMap(ctx, req.MenuID, updateMap); err != nil {
-		glog.Errorf(ctx, "[svcpermission.UpdateMenu] dao UpdateMap fail, err:%v, req:%s", err, gutil.ToJsonString(req))
-		return code.GetError(code.MenuUpdateError)
-	}
-	return nil
 }
 
 func (svc *menuSvc) Detail(ctx context.Context, req *dtopermission.MenuDetailReq) (*dtopermission.MenuDetailResp, error) {
