@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+
+- **menu**: 菜单维护权下放到**应用归属租户**。新增 `application.owner_type`/`owner_tenant_id`（归属唯一租户，immutable；内置应用归属平台租户 `t_platform`）；租户侧新增应用菜单维护接口 `POST/GET/PUT/DELETE /v1/tenant/applications/{appID}/menus`（仅归属租户系统管理员可写，非归属报 `100606`）；新增 `GET /v1/tenant/applications/owned`（归属当前租户应用列表）。前端菜单管理页由平台控制台迁到租户控制台；平台管理员维护内置应用菜单改在租户控制台进行。
+
+### Breaking Changes
+
+- **menu**: **删除平台端菜单写接口** `POST /v1/platform/menus`、`PUT/DELETE /v1/platform/menus/{menuID}`（无兼容别名），平台端仅保留只读 `GET /v1/platform/menus*`。菜单写统一走租户侧 `applications/{appID}/menus`。
+- **application**: 创建应用入参新增 `ownerTenantID`（第三方应用必填，指定归属租户）；`owner_type`/`owner_tenant_id` 创建后不可改（`ApplicationUpdateReq` 不含该字段）。内置应用改为归属平台租户、`owner_type=tenant`。
+- **appassembly**: 域依赖新增 `menu` → `application`；最小集 `DefaultConsoleDomains` 随之携带 `application` 域（外部嵌入如使用该常量，实例将额外挂载 application 域）。
+
+
 ## [0.3.2] - 2026-11-14
 
 ### Features

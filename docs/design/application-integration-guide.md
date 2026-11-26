@@ -98,11 +98,14 @@ curl -X POST http://localhost:8082/v1/platform/applications \
     "code": "my_app",
     "name": "我的业务应用",
     "homepageUrl": "https://my-app.example.com",
-    "logoUrl": "https://my-app.example.com/logo.png"
+    "logoUrl": "https://my-app.example.com/logo.png",
+    "ownerTenantID": "<归属租户ID>"
   }'
 ```
 
 > `code` 即应用编码：**下划线连接**，以小写字母开头，仅含小写字母、数字与下划线（如 `my_app`、`platform_admin`；`AppCodePattern`），连字符/大写会被服务端拒绝。创建入参**不含 `status`**：控制台创建的应用来源固定为 `third_party`、状态固定 `enable`，之后用 `PUT /v1/platform/applications/{appID}` 改状态。
+>
+> **应用归属（`ownerTenantID`）**：应用归属**唯一租户**（`owner_type=tenant`），该租户才拥有该应用的**菜单维护权**。`ownerTenantID` 必填且须为已存在租户；归属创建后 **immutable**（不可改，改归属=删旧建新）。归属租户的系统管理员在**租户控制台**「菜单管理」页（`/v1/tenant/applications/{appID}/menus`）维护该应用菜单；其他租户订阅使用该应用时菜单只读。若该应用**不需要菜单**（如纯 SSO 接入的 gitea 类应用），建应用后不建任何菜单即可，无需额外配置。
 
 ### 3.2 创建 OAuth 客户端（Application Client）
 

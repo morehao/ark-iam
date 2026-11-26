@@ -214,17 +214,18 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 ### 5.2 角色与权限
 
-> **平台端不提供角色接口**：角色按租户归属，CRUD 与授权（成员/菜单）全部在 `/v1/tenant/roles/*`（见 §6）。
+> 平台端不提供角色接口：角色按租户归属，CRUD 与授权（成员/菜单）全部在 `/v1/tenant/roles/*`（见 §6）。
 > 原 `GET /v1/platform/roles/{roleID}/users` 缺少租户校验、返回跨租户成员，已随平台角色路由一并删除。
-> 平台端保留平台级权限字典**菜单**：
+> **平台端菜单接口只读**（菜单写已下放到归属租户，见 §6 `/v1/tenant/applications/{appID}/menus`）。平台管理员维护内置应用菜单时，以「平台租户（`t_platform`）管理员」身份登录租户控制台操作：
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/v1/platform/menus` | 创建菜单 |
-| GET | `/v1/platform/menus` | 菜单分页 |
-| GET | `/v1/platform/menus/my` | 当前用户可见菜单树（控制台侧边栏） |
-| GET | `/v1/platform/menus/tree` | 菜单树 |
-| GET/PUT/DELETE | `/v1/platform/menus/{menuID}` | 菜单详情/更新/删除（**删除级联整棵子树**并在同事务内解绑 `role_menu`；控制台可增删任意应用的菜单，含内置应用——删除是软删，等价于"人工下线"。首次引导只在库未初始化时按 `seed_key` 创建、之后永久自锁，因此删除后不会有任何东西把它建回来，见 `system-design.md` §4.5） |
+| GET | `/v1/platform/menus` | 菜单分页（只读审计） |
+| GET | `/v1/platform/menus/my` | 当前用户可见菜单树（平台控制台侧边栏） |
+| GET | `/v1/platform/menus/tree` | 菜单树（只读审计） |
+| GET | `/v1/platform/menus/{menuID}` | 菜单详情（只读） |
+
+> **菜单写已从平台端移除**（`POST /v1/platform/menus`、`PUT/DELETE /v1/platform/menus/{menuID}` 已删除，无兼容别名）。菜单归属由 `application.owner_type`+`owner_tenant_id` 决定：只有应用归属租户能维护其菜单，见 §6 与 `system-design.md` §4.5。
 
 > 权限点 / 资源字典（`/v1/platform/scopes`、`/v1/platform/resources`）随资源级授权一并下线（见 `system-design.md` §4.3），平台端不提供接口。
 
@@ -336,6 +337,10 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 | GET | `/v1/tenant/invites` | 邀请分页 |
 | DELETE | `/v1/tenant/invites/{inviteID}` | 撤销邀请 |
 | GET | `/v1/tenant/applications` | 当前租户订阅且启用的应用列表（角色归属 / 菜单授权 / 应用准入的应用选项，含系统内置应用；响应 `dtotenant.TenantApplicationsResp`，`list[]` 每行 `appID`/`code`/`name`）。**原 `GET /v1/tenant/apps` 已删除、无兼容别名**（前后端同仓发布） |
+| GET | `/v1/tenant/applications/owned` | 归属当前租户的应用列表（`owner_type=tenant` ∧ `owner_tenant_id=当前租户`，即"我拥有的应用"）——供菜单管理页的应用选择器；需系统管理能力。与上面的 `/applications`（订阅口径，供准入/角色）刻意区分 |
+| POST | `/v1/tenant/applications/{appID}/menus` | 创建归属应用菜单（`appID` 仅来自路径，body 不含；**仅应用归属租户的系统管理员**可写，非归属报 `100606`；`app_id` 落库取归属校验得到的权威值） |
+| GET | `/v1/tenant/applications/{appID}/menus/tree` | 归属应用菜单树（管理视图，非归属报 `100606`） |
+| GET/PUT/DELETE | `/v1/tenant/applications/{appID}/menus/{menuID}` | 菜单详情/更新/删除（**更新禁改 `app_id`**；**删除级联整棵子树**并在同事务内用 `CrossTenantContext` 级联解绑全租户 `role_menu`；`menuID` 必须属于 `appID`，跨应用报 `100605`；非归属报 `100606`） |
 | GET | `/v1/tenant/applications/{appID}/users` | 应用视角：被准入使用该应用的成员列表（`list[]` + `total`，仅返回该应用下 `user_application.status=enable` 的准入行；含服务账号；需系统管理能力；`appID` 不存在报 `100735`）；明细见本节末「应用准入（准入层）端点明细」 |
 | POST | `/v1/tenant/roles` | 创建角色（**appID 必选**，角色从属于已订阅应用，名称应用内唯一；**请求体不含 `code`**——跨系统授权契约值只能由应用角色模板下发，自建角色编码恒为空串、不进入 OIDC `groups` 声明，见 `system-design.md` §5.4。重名报 `100700`） |
 | GET | `/v1/tenant/roles` | 角色分页（?appID=&keyword=&unassigned=，含成员数/菜单数/所属应用名/编码；`keyword` 同时模糊匹配名称与编码；`unassigned=true` 只查未归属应用的系统角色，供角色授权下拉按名称服务端搜索） |
