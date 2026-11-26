@@ -9,7 +9,6 @@ import (
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/core/application"
 	"github.com/morehao/ark-iam/pkg/core/person"
-	"github.com/morehao/ark-iam/pkg/core/tenant"
 	"github.com/morehao/ark-iam/pkg/core/user"
 	"github.com/morehao/ark-iam/pkg/credential"
 	"github.com/morehao/ark-iam/pkg/dao"
@@ -663,18 +662,10 @@ func (svc *userSvc) ResetPassword(ctx context.Context, req *dtotenant.UserResetP
 		glog.Errorf(ctx, "[svcuser.ResetPassword] GeneratePasswordHash fail, err:%v", err)
 		return nil, code.GetError(code.PasswordHashError)
 	}
-	if err := dao.NewPersonDao(dao.WithDBGetter(svc.db)).UpdateMap(ctx, userEntity.PersonID, map[string]any{
-		"password_encrypted": hash,
-		"password_method":    model.PasswordMethodBcrypt,
-		"password_status":    model.PasswordStatusMustChange,
-		"updated_by":         req.Operator.UserID,
-	}); err != nil {
-		glog.Errorf(ctx, "[svcuser.ResetPassword] person UpdateMap fail, err:%v", err)
+	if err := person.UpdatePassword(ctx, svc.db, userEntity.PersonID, hash, model.PasswordStatusMustChange, req.Operator.UserID, ""); err != nil {
+		glog.Errorf(ctx, "[svcuser.ResetPassword] update password and revoke sessions fail, err:%v", err)
 		return nil, code.GetError(code.UserResetPasswordError)
 	}
-
-	// 改密即全局登出：旧 SSO 会话与 refresh token 立即失效
-	tenant.RevokePersonSessions(ctx, userEntity.PersonID)
 
 	audit.WriteAudit(ctx, audit.AuditEntry{
 		Action:     audit.ActionTenantAdminPasswordReset,

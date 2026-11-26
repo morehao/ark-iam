@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	svcdb "github.com/morehao/ark-iam/apps/auth/service/svcdb"
 	"strings"
@@ -199,6 +200,8 @@ func (svc *authSvc) MyTenants(ctx context.Context, req *dtoauth.MyTenantsReq) (*
 	return &dtoauth.MyTenantsResp{List: tenants}, nil
 }
 
+var errInviteUnavailable = errors.New("invite is no longer available")
+
 func (svc *authSvc) JoinTenant(ctx context.Context, req *dtoauth.JoinTenantReq) (*dtoauth.JoinTenantResp, error) {
 	// 通道 B：凭邀请加入已有租户（非 owner）。
 	// 落哪个租户由邀请码决定（租户侧授权，禁止裸 tenantID 直入）。
@@ -257,6 +260,13 @@ func (svc *authSvc) JoinTenant(ctx context.Context, req *dtoauth.JoinTenantReq) 
 	var userID string
 	txErr := svc.db(joinCtx).Transaction(func(tx *gorm.DB) error {
 		now := time.Now()
+		accepted, err := dao.NewInviteDao(dao.WithDBGetter(svc.db)).AcceptPending(joinCtx, tx, inviteEntity.ID, personID, now)
+		if err != nil {
+			return err
+		}
+		if !accepted {
+			return errInviteUnavailable
+		}
 		userEntity := &model.UserEntity{
 			TenantID:  tenantID,
 			PersonID:  personID,
@@ -269,15 +279,12 @@ func (svc *authSvc) JoinTenant(ctx context.Context, req *dtoauth.JoinTenantReq) 
 			return uErr
 		}
 		userID = userEntity.ID
-		// 标记邀请已使用
-		if uErr := dao.NewInviteDao(dao.WithDBGetter(svc.db)).WithTx(tx).UpdateMap(joinCtx, inviteEntity.ID, map[string]any{
-			"status":     model.InviteStatusAccepted,
-			"updated_by": personID,
-		}); uErr != nil {
-			return uErr
-		}
+
 		return nil
 	})
+	if errors.Is(txErr, errInviteUnavailable) {
+		return nil, code.GetError(code.InviteInvalidError)
+	}
 	if txErr != nil {
 		glog.Errorf(ctx, "[svcauth.JoinTenant] transaction fail, err:%v, code:%s", txErr, req.InviteCode)
 		return nil, code.GetError(code.UserCreateError)

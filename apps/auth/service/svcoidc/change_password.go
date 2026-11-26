@@ -5,7 +5,7 @@ import (
 	"github.com/morehao/ark-iam/apps/auth/core/oidcop"
 	"github.com/morehao/ark-iam/apps/auth/dto/dtooidc"
 	"github.com/morehao/ark-iam/pkg/code"
-	"github.com/morehao/ark-iam/pkg/core/tenant"
+	"github.com/morehao/ark-iam/pkg/core/person"
 	"github.com/morehao/ark-iam/pkg/credential"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/model"
@@ -68,17 +68,10 @@ func (svc *oidcAuthSvc) ChangePassword(ctx context.Context, req *dtooidc.OIDCCha
 		glog.Errorf(ctx, "[oidcAuthSvc.ChangePassword] GeneratePasswordHash fail, err:%v", err)
 		return code.GetError(code.PasswordHashError)
 	}
-	if err := personDao.UpdateMap(reqCtx, personID, map[string]any{
-		"password_encrypted": newHash,
-		"password_method":    model.PasswordMethodBcrypt,
-		"password_status":    model.PasswordStatusNormal,
-		"updated_by":         personID,
-	}); err != nil {
-		glog.Errorf(ctx, "[oidcAuthSvc.ChangePassword] dao UpdateMap fail, err:%v, personID:%s", err, personID)
+	if err := person.UpdatePassword(reqCtx, svc.db, personID, newHash, model.PasswordStatusNormal, personID, personEntity.PasswordEncrypted); err != nil {
+		glog.Errorf(ctx, "[oidcAuthSvc.ChangePassword] update password and revoke sessions fail, err:%v, personID:%s", err, personID)
 		return code.GetError(code.UserUpdateError)
 	}
 
-	// 改密即全局登出：临时密码登录过程中可能已建立的会话在改密后立即失效
-	tenant.RevokePersonSessions(reqCtx, personID)
 	return nil
 }

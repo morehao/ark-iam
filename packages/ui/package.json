@@ -21,7 +21,7 @@
     "build": "vite build --config vite.config.lib.ts && tsc -p tsconfig.build.json",
     "pack:dist": "pnpm build && pnpm pack",
     "clean": "rm -rf dist",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "publishConfig": {
     "access": "public"

@@ -389,7 +389,7 @@ func TestResetAdminPasswordReissuesTemporaryPassword(t *testing.T) {
 
 // TestResetAdminPasswordRevokesExistingSessions 重置内置管理员密码必须"改密即全局登出"：
 // 该自然人重置前持有的 refresh token 应立即被撤销（revoked_at 置位），否则旧口令泄露的
-// 影响面不会随改密收敛（见 pkg/core/tenant.RevokePersonSessions 的契约）。
+// 影响面不会随改密收敛（见 pkg/core/person.UpdatePassword 的契约）。
 func TestResetAdminPasswordRevokesExistingSessions(t *testing.T) {
 	db := setupTenantCreateEnv(t)
 	ctx := newTenantScopeGinCtx("")
@@ -619,5 +619,39 @@ func TestTenantPageListRejectsInvalidStatus(t *testing.T) {
 	_, err := svc.PageList(requestCtx(newTenantScopeGinCtx("")), &dtotenant.TenantPageListReq{Status: model.TenantStatus("bogus")})
 	if err == nil || err.Error() != code.GetError(code.TenantPageListStatusInvalidError).Error() {
 		t.Fatalf("PageList err = %v, want %v", err, code.GetError(code.TenantPageListStatusInvalidError))
+	}
+}
+
+func TestResetAdminPasswordRollsBackWhenRefreshRevocationFails(t *testing.T) {
+	db := setupTenantCreateEnv(t)
+	ctx := newTenantScopeGinCtx("")
+	svc := &tenantSvc{db: dbclient.IamDB}
+	created, err := svc.Create(requestCtx(ctx), newTenantCreateReq("Acme Corp", "admin@acme.com"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	crossCtx := dbclient.CrossTenantContext(requestCtx(ctx))
+	user, err := dao.NewUserDao().GetByID(crossCtx, created.AdminUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := dao.NewPersonDao().GetByID(crossCtx, user.PersonID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Migrator().DropTable(&model.RefreshTokenEntity{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.ResetAdminPassword(requestCtx(ctx), &dtotenant.TenantAdminResetPasswordReq{
+		TenantID: created.TenantID, Operator: operatorOf(ctx),
+	}); err == nil {
+		t.Fatal("reset succeeded even though refresh token revocation failed")
+	}
+	after, err := dao.NewPersonDao().GetByID(crossCtx, user.PersonID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.PasswordEncrypted != before.PasswordEncrypted {
+		t.Fatal("password changed despite revocation failure")
 	}
 }

@@ -99,18 +99,12 @@ func (s *directorySvc) DepartmentTree(ctx context.Context) ([]*directory.Departm
 }
 
 func (s *directorySvc) Roles(ctx context.Context) (*directory.RoleListResp, error) {
-	// 角色清单是无上界响应：多取一条即可判断是否被截断，避免 COUNT 查询。
-	roles, err := dao.NewRoleDao().GetListByCond(ctx, &dao.RoleCond{})
+	// 多取一条即可判断是否被截断，避免 COUNT 查询。
+	roles, err := dao.NewRoleDao().ListDirectoryRoles(ctx, directory.MaxRoleListSize+1)
 	if err != nil {
 		return nil, err
 	}
 	resp := &directory.RoleListResp{List: []directory.Role{}}
-	sort.Slice(roles, func(i, j int) bool {
-		if roles[i].AppID != roles[j].AppID {
-			return roles[i].AppID < roles[j].AppID
-		}
-		return roles[i].Code < roles[j].Code
-	})
 	for i := range roles {
 		if i >= directory.MaxRoleListSize {
 			resp.Truncated = true

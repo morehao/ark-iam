@@ -7,13 +7,14 @@ package sso
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/golib/glog"
 )
 
 const (
@@ -53,8 +54,7 @@ func EnqueueLogout(ctx context.Context, job LogoutJob) error {
 // 必须在撤销 SSO 会话之前调用：登记查询 ListByPersonID 依赖 sso_user_sessions 索引，
 // 会话一旦撤销索引即被清除，通知就再也发不出去（这是「先入队、再撤销」顺序的根因）。
 //
-// 登记查询失败返回 error 交调用方判断（属系统错误）；单条入队失败只记日志并继续，
-// 尽力而为，绝不阻断登出/挂起等主流程。
+// 查询和批量入队的错误均返回调用方。
 func EnqueueLogoutsByPersonID(ctx context.Context, personID string) (int, error) {
 	return enqueueLogoutsByPersonID(ctx, ssoLogoutQueueKey, personID)
 }
@@ -69,25 +69,29 @@ func enqueueLogoutsByPersonID(ctx context.Context, queueKey string, personID str
 	if err != nil {
 		return 0, fmt.Errorf("list logout registrations: %w", err)
 	}
-	enqueued := 0
+	if len(regs) == 0 {
+		return 0, nil
+	}
+	payloads := make([]any, 0, len(regs))
+	now := time.Now()
 	for _, reg := range regs {
-		if err := enqueueLogout(ctx, queueKey, LogoutJob{
+		payloads = append(payloads, (LogoutJob{
 			SessionID:            reg.SessionID,
 			PersonID:             personID,
 			OIDCSessionID:        reg.OIDCSessionID,
 			ClientID:             reg.ClientID,
 			UserID:               reg.UserID,
 			BackChannelLogoutURI: reg.BackChannelLogoutURI,
-		}); err != nil {
-			glog.Warnf(ctx, "[sso.EnqueueLogoutsByPersonID] enqueue back-channel logout fail, personID:%s, clientID:%s, err:%v", personID, reg.ClientID, err)
-			continue
-		}
-		enqueued++
+			CreatedAt:            now,
+		}).encode())
 	}
-	return enqueued, nil
+	if err := dbclient.RedisCli.LPush(ctx, queueKey, payloads...).Err(); err != nil {
+		return 0, fmt.Errorf("enqueue logout registrations: %w", err)
+	}
+	return len(regs), nil
 }
 
-// enqueueLogout 与 DequeueLogout 类似，但允许指定队列键，
+// enqueueLogout 允许指定队列键，
 // 供测试使用独立队列避免与运行中的 worker 共享消费。
 func enqueueLogout(ctx context.Context, queueKey string, job LogoutJob) error {
 	if dbclient.RedisCli == nil {
@@ -99,28 +103,61 @@ func enqueueLogout(ctx context.Context, queueKey string, job LogoutJob) error {
 	return dbclient.RedisCli.LPush(ctx, queueKey, job.encode()).Err()
 }
 
-// DequeueLogout 阻塞地从队列取出（BRPOP）一条登出任务；无任务时返回 ok=false。
-func DequeueLogout(ctx context.Context, timeout time.Duration) (LogoutJob, bool, error) {
-	return dequeueLogout(ctx, ssoLogoutQueueKey, timeout)
+// Atomically recover one timed-out delivery or claim the oldest queued job.
+var claimLogoutScript = redis.NewScript(`
+local now = redis.call('TIME')
+local ms = tonumber(now[1]) * 1000 + math.floor(tonumber(now[2]) / 1000)
+local expired = redis.call('ZRANGEBYSCORE', KEYS[2], '-inf', ms, 'LIMIT', 0, 1)
+local payload
+if expired[1] then
+    redis.call('ZREM', KEYS[2], expired[1])
+    payload = string.sub(expired[1], string.find(expired[1], ':', 1, true) + 1)
+else
+    payload = redis.call('RPOP', KEYS[1])
+end
+if not payload then return false end
+local delivery = ARGV[1] .. ':' .. payload
+redis.call('ZADD', KEYS[2], ms + tonumber(ARGV[2]), delivery)
+return delivery
+`)
+
+const logoutDeliveryLease = time.Minute
+
+// LogoutDelivery identifies a single claim. An expired claimant cannot acknowledge a newer claim.
+type LogoutDelivery struct {
+	LogoutJob
+	queueKey string
+	receipt  string
 }
 
-// dequeueLogout 与 DequeueLogout 类似，但允许指定队列键。
-func dequeueLogout(ctx context.Context, queueKey string, timeout time.Duration) (LogoutJob, bool, error) {
+func ClaimLogout(ctx context.Context) (*LogoutDelivery, error) {
+	return claimLogout(ctx, ssoLogoutQueueKey, logoutDeliveryLease)
+}
+
+func claimLogout(ctx context.Context, queueKey string, lease time.Duration) (*LogoutDelivery, error) {
 	if dbclient.RedisCli == nil {
-		return LogoutJob{}, false, fmt.Errorf("redis client not available")
+		return nil, fmt.Errorf("redis client not available")
 	}
-	vals, err := dbclient.RedisCli.BRPop(ctx, timeout, queueKey).Result()
-	if err == redis.Nil || len(vals) < 2 {
-		return LogoutJob{}, false, nil
+	id, err := generateSessionID()
+	if err != nil {
+		return nil, err
+	}
+	receipt, err := claimLogoutScript.Run(ctx, dbclient.RedisCli, []string{queueKey, queueKey + ":pending"}, id, lease.Milliseconds()).Text()
+	if err == redis.Nil {
+		return nil, nil
 	}
 	if err != nil {
-		return LogoutJob{}, false, err
+		return nil, err
 	}
-	var job LogoutJob
-	if err := json.Unmarshal([]byte(vals[1]), &job); err != nil {
-		return LogoutJob{}, false, fmt.Errorf("unmarshal logout job: %w", err)
+	delivery := &LogoutDelivery{queueKey: queueKey, receipt: receipt}
+	if err := json.Unmarshal([]byte(strings.TrimPrefix(receipt, id+":")), &delivery.LogoutJob); err != nil {
+		return nil, errors.Join(fmt.Errorf("unmarshal logout job: %w", err), delivery.Ack(ctx))
 	}
-	return job, true, nil
+	return delivery, nil
+}
+
+func (d *LogoutDelivery) Ack(ctx context.Context) error {
+	return dbclient.RedisCli.ZRem(ctx, d.queueKey+":pending", d.receipt).Err()
 }
 
 // LogoutRegistration 记录一次会话在其某个 client 上签发过令牌，登出时应向该 client 发 back-channel 通知。

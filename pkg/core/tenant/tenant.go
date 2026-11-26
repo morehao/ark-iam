@@ -46,11 +46,7 @@ func RevokeMemberSessions(ctx context.Context, tenantID string) error {
 // RevokePersonSessions 撤销某自然人的全部会话凭证（refresh token + SSO 会话），
 // 并向其已登录的各应用（含第三方 RP）投递 back-channel logout 通知。
 //
-// 用于"改密/重置密码后必须立即全局登出"的场景（自助改密、管理员重置成员密码、
-// 平台侧重置内置管理员密码、首次登录强制改密）：旧会话与 refresh token 必须在改密
-// 成功的同时失效，否则旧口令泄露的影响面不会随改密收敛。
-//
-// 幂等、失败不阻断：单个环节失败只记日志——密码哈希本身已经更新，调用方主流程不应因此失败。
+// 租户挂起时尽力撤销，租户准入门禁独立生效。
 func RevokePersonSessions(ctx context.Context, personID string) {
 	if personID == "" {
 		return

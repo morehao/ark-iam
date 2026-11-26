@@ -506,3 +506,26 @@ func seedInvite(t *testing.T, db *gorm.DB, code, tenantID string, status model.I
 		t.Fatalf("seed invite: %v", err)
 	}
 }
+
+func TestAcceptPendingInviteRejectsSecondClaim(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.InviteEntity{})
+	ctx := dbclient.CurrentTenantContext(t.Context(), "22")
+	invite := &model.InviteEntity{TenantID: "22", Code: "one-use", Status: model.InviteStatusPending}
+	if err := dao.NewInviteDao().Insert(ctx, invite); err != nil {
+		t.Fatal(err)
+	}
+	for i, personID := range []string{"person-one", "person-two"} {
+		if err := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			accepted, err := dao.NewInviteDao().AcceptPending(ctx, tx, invite.ID, personID, time.Now())
+			if err != nil {
+				return err
+			}
+			if accepted != (i == 0) {
+				t.Errorf("claim %d accepted = %v", i, accepted)
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}

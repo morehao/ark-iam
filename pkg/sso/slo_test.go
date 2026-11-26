@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/testsetup"
 	"github.com/stretchr/testify/require"
 )
@@ -78,9 +79,20 @@ func TestLogoutQueueEnqueueDequeue(t *testing.T) {
 	}
 	require.NoError(t, enqueueLogout(ctx, queueKey, job))
 
-	got, ok, err := dequeueLogout(ctx, queueKey, 5*time.Second)
+	first, err := claimLogout(ctx, queueKey, time.Millisecond)
 	require.NoError(t, err)
-	require.True(t, ok)
+	require.NotNil(t, first)
+	var got *LogoutDelivery
+	require.Eventually(t, func() bool {
+		got, err = claimLogout(ctx, queueKey, time.Minute)
+		return err != nil || got != nil
+	}, time.Second, 5*time.Millisecond)
+	require.NoError(t, err)
+	require.NotEqual(t, first.receipt, got.receipt)
+	require.NoError(t, first.Ack(ctx))
+	require.EqualValues(t, 1, dbclient.RedisCli.ZCard(ctx, queueKey+":pending").Val())
+	require.NoError(t, got.Ack(ctx))
+	require.EqualValues(t, 0, dbclient.RedisCli.ZCard(ctx, queueKey+":pending").Val())
 	require.Equal(t, "client-a", got.ClientID)
 	require.Equal(t, "person:42", got.UserID)
 	require.Equal(t, "sid-1", got.SessionID)
@@ -132,12 +144,13 @@ func TestEnqueueLogoutsByPersonID(t *testing.T) {
 
 	got := make(map[string]LogoutJob)
 	for i := 0; i < 2; i++ {
-		job, ok, err := dequeueLogout(ctx, queueKey, 5*time.Second)
+		job, err := claimLogout(ctx, queueKey, time.Minute)
 		require.NoError(t, err)
-		require.True(t, ok)
+		require.NotNil(t, job)
+		require.NoError(t, job.Ack(ctx))
 		require.Equal(t, personID, job.PersonID)
 		require.False(t, job.CreatedAt.IsZero(), "任务必须带入队时间戳")
-		got[job.ClientID] = job
+		got[job.ClientID] = job.LogoutJob
 	}
 	require.Equal(t, "at-one", got["client-one"].OIDCSessionID)
 	require.Equal(t, "https://one.example.com/bc", got["client-one"].BackChannelLogoutURI)

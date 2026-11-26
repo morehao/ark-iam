@@ -13,8 +13,9 @@ import (
 
 // fakeSSOStore 是 SSOSessionStore 的最小桩：只实现 HasActiveSession，其余 panic（本测试用不到）。
 type fakeSSOStore struct {
-	active bool
-	err    error
+	personID string
+	active   bool
+	err      error
 }
 
 func (f *fakeSSOStore) HasActiveSession(context.Context, string) (bool, error) {
@@ -24,7 +25,7 @@ func (f *fakeSSOStore) CreateSession(context.Context, string, []string) (string,
 	panic("unused") //nolint
 }
 func (f *fakeSSOStore) ValidateSession(context.Context, string) (string, error) {
-	panic("unused") //nolint
+	return f.personID, f.err
 }
 func (f *fakeSSOStore) SessionAMR(context.Context, string) []string { panic("unused") } //nolint
 func (f *fakeSSOStore) SessionAuthTime(context.Context, string) time.Time {
@@ -48,7 +49,7 @@ func TestValidateSSOSession_FailClosedOnError(t *testing.T) {
 	withRedisClient(t, redis.NewClient(&redis.Options{Addr: "127.0.0.1:1"}))
 
 	store := &fakeSSOStore{err: errors.New("redis down")}
-	if got := validateSSOSession(context.Background(), store, "person:1", false); got {
+	if got := validateSSOSession(context.Background(), store, "person:1", "", false); got {
 		t.Fatal("SSO validation must fail-closed (false) when Redis errors")
 	}
 }
@@ -57,7 +58,7 @@ func TestValidateSSOSession_FailClosedOnError(t *testing.T) {
 func TestValidateSSOSession_NoRedisAllows(t *testing.T) {
 	withRedisClient(t, nil)
 	store := &fakeSSOStore{active: false}
-	if got := validateSSOSession(context.Background(), store, "person:1", false); !got {
+	if got := validateSSOSession(context.Background(), store, "person:1", "", false); !got {
 		t.Fatal("no Redis configured must allow (rely on access token TTL)")
 	}
 }
@@ -66,7 +67,7 @@ func TestValidateSSOSession_NoRedisAllows(t *testing.T) {
 func TestValidateSSOSession_MachineTokenBypasses(t *testing.T) {
 	withRedisClient(t, redis.NewClient(&redis.Options{Addr: "127.0.0.1:1"}))
 	store := &fakeSSOStore{err: errors.New("redis down")}
-	if got := validateSSOSession(context.Background(), store, "svc", true); !got {
+	if got := validateSSOSession(context.Background(), store, "svc", "", true); !got {
 		t.Fatal("machine token must bypass SSO session validation")
 	}
 }
@@ -74,10 +75,23 @@ func TestValidateSSOSession_MachineTokenBypasses(t *testing.T) {
 // TestValidateSSOSession_ActiveAndRevoked 正常路径：会话有效放行、无效拒绝。
 func TestValidateSSOSession_ActiveAndRevoked(t *testing.T) {
 	withRedisClient(t, redis.NewClient(&redis.Options{Addr: "127.0.0.1:1"}))
-	if got := validateSSOSession(context.Background(), &fakeSSOStore{active: true}, "p", false); !got {
+	if got := validateSSOSession(context.Background(), &fakeSSOStore{active: true}, "p", "", false); !got {
 		t.Fatal("active session must pass")
 	}
-	if got := validateSSOSession(context.Background(), &fakeSSOStore{active: false}, "p", false); got {
+	if got := validateSSOSession(context.Background(), &fakeSSOStore{active: false}, "p", "", false); got {
 		t.Fatal("revoked session must be rejected")
+	}
+}
+
+func TestValidateSSOSessionUsesTokenSession(t *testing.T) {
+	withRedisClient(t, redis.NewClient(&redis.Options{Addr: "127.0.0.1:1"}))
+	store := &fakeSSOStore{active: true, err: errors.New("old session revoked")}
+	if validateSSOSession(t.Context(), store, "person-one", "old-sid", false) {
+		t.Fatal("another active session must not reactivate the revoked token session")
+	}
+	store.err = nil
+	store.personID = "person-one"
+	if !validateSSOSession(t.Context(), store, "person-one", "new-sid", false) {
+		t.Fatal("the current session should pass")
 	}
 }
