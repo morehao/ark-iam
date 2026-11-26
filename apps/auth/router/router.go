@@ -18,6 +18,9 @@ type VerifierBuilder func(keySource contract.KeySource, issuer string) contract.
 
 // Options 控制 auth 域挂载哪些部分。
 type Options struct {
+	// OnLogoutWorkerStarted hands worker shutdown to the process owner.
+	OnLogoutWorkerStarted func(stop func())
+
 	// CoreAuth 挂业务路由（me/logout/sessions/userinfo 等）+ /oidc 协议。默认 true。
 	CoreAuth bool
 	// Install 挂 /install 初始化引导。默认 true（空库自举必需）。
@@ -38,7 +41,14 @@ type Options struct {
 //
 // 注意：调用前必须已通过 iam/auth/config.Set 注入配置；OP provider 由 NewOIDCCtr 自装配。
 func Register(authRG *gin.RouterGroup, protocolEngine *gin.RouterGroup, db gormdao.DBGetter, opts Options, buildVerifier VerifierBuilder) contract.KeySource {
-	oidcCtr := ctroidc.NewOIDCCtr(db)
+	if !opts.CoreAuth {
+		registerRouter(authRG, protocolEngine, db, nil, opts)
+		return nil
+	}
+	oidcCtr, stop := ctroidc.NewOIDCCtr(db)
+	if opts.OnLogoutWorkerStarted != nil {
+		opts.OnLogoutWorkerStarted(stop)
+	}
 	ks := oidcCtr.KeySource()
 	// 业务路由组 /v1/auth/* 必须经过 OIDC 鉴权中间件（验签 + 身份注入 + iss/SSO 会话校验），
 	// 否则 /me、/me/sessions 等取不到 Operator，会误报「用户不存在」。

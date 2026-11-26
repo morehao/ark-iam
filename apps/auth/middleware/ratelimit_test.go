@@ -14,11 +14,12 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/loginsetting"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
+	"github.com/morehao/golib/gsetting"
 	"github.com/redis/go-redis/v9"
 )
 
 func TestLoginRateLimitWithoutRedisFailsOpen(t *testing.T) {
-	testutil.SetupSQLite(t)
+	testutil.SetupSQLite(t, gsetting.SchemaModels()...)
 	gin.SetMode(gin.TestMode)
 	dbclient.RedisCli = nil // 无 Redis -> fail-open
 
@@ -37,7 +38,7 @@ func TestLoginRateLimitWithoutRedisFailsOpen(t *testing.T) {
 }
 
 func TestRateParamsFromSetting(t *testing.T) {
-	testutil.SetupSQLite(t)
+	testutil.SetupSQLite(t, gsetting.SchemaModels()...)
 	ctx := context.Background()
 	// 未配置：默认 rate=30 burst=10
 	if rate, burst, _ := currentRateParams(); rate != 30 || burst != 10 {
@@ -61,7 +62,7 @@ func TestLoginRateLimitBlocksExcessWithRedis(t *testing.T) {
 	}
 	defer mr.Close()
 
-	testutil.SetupSQLite(t)
+	testutil.SetupSQLite(t, gsetting.SchemaModels()...)
 	oldCli := dbclient.RedisCli
 	dbclient.RedisCli = redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	defer func() { dbclient.RedisCli = oldCli }()

@@ -2,7 +2,6 @@ package svcinstall
 
 import (
 	"context"
-	"github.com/morehao/golib/dbaccess/gormdao"
 	"net/url"
 	"strings"
 
@@ -10,9 +9,12 @@ import (
 	"github.com/morehao/ark-iam/apps/auth/dto/dtoinstall"
 	"github.com/morehao/ark-iam/pkg/credential"
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/loginsetting"
 	"github.com/morehao/ark-iam/pkg/seed"
+	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gcrypto"
 	"github.com/morehao/golib/glog"
+	"github.com/morehao/golib/gsetting"
 	"github.com/morehao/golib/gutil"
 )
 
@@ -69,7 +71,7 @@ func (svc *installSvc) Status(ctx context.Context) (*dtoinstall.InstallationStat
 	return &dtoinstall.InstallationStatusResp{
 		Initialized:   initialized,
 		TokenRequired: tokenConfigured(),
-		SchemaReady:   schemaReady,
+		SchemaReady:   schemaReady && db.Migrator().HasTable(&gsetting.SettingEntity{}),
 		Consoles:      consolesFromConfigForStatus(),
 	}, nil
 }
@@ -137,6 +139,19 @@ func buildDefinition(req *dtoinstall.InstallationInitializeReq) (seed.Definition
 	// 配置了 oidc.issuer 时以配置为准——它才是本部署真实对外发布的 issuer。
 	if def.Issuer == "" {
 		def.Issuer = config.Conf.OIDC.Issuer
+	}
+	if config.Conf != nil {
+		l := config.Conf.Security.Login
+		def.RuntimeSettings = &seed.RuntimeSettings{
+			Notify: notifyConfigFrom(config.Conf.Notify),
+			Login: loginsetting.Config{
+				MaxFailures:   l.MaxFailures,
+				WindowSec:     l.WindowSec,
+				LockSec:       l.LockSec,
+				RatePerMinute: l.RatePerMinute,
+				Burst:         l.Burst,
+			}.WithDefaults(),
+		}
 	}
 	return def, nil
 }

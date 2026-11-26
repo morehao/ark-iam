@@ -14,7 +14,10 @@ import (
 	"github.com/morehao/ark-iam/apps/auth/dto/dtoinstall"
 	"github.com/morehao/ark-iam/apps/auth/testutil"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
+	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/loginsetting"
 	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/golib/gsetting"
 )
 
 // setupSvc 打开内存 SQLite（全部 IAM 表）+ 全局 iam 库注册，并注入一份可预测的配置。
@@ -23,7 +26,7 @@ import (
 // 被测服务走的是全局 iam 库，断言走原始句柄，两者是同一个内存库。
 func setupSvc(t *testing.T) (*gin.Context, *gorm.DB) {
 	t.Helper()
-	db := testutil.SetupSQLite(t, model.AllEntities()...)
+	db := testutil.SetupSQLite(t, append(model.AllEntities(), gsetting.SchemaModels()...)...)
 	config.Conf = &pkgconfig.Config{}
 	config.Conf.OIDC.Issuer = "http://localhost:8081/oidc"
 	config.Conf.OIDC.FrontendLoginURL = "http://localhost:4000/login"
@@ -384,5 +387,26 @@ func TestBootstrapTokenNilConfigIsSafe(t *testing.T) {
 	t.Setenv(EnvBootstrapToken, "env-secret")
 	if err := CheckBootstrapToken("env-secret"); err != nil {
 		t.Fatalf("Conf 为 nil 不应影响环境变量来源, got %v", err)
+	}
+}
+
+func TestInitializeRollsBackWhenSettingsCannotBeWritten(t *testing.T) {
+	ctx, db := setupSvc(t)
+	if err := db.Migrator().DropTable(&gsetting.SettingEntity{}); err != nil {
+		t.Fatal(err)
+	}
+	svc := NewInstallSvc(nil)
+	if _, err := svc.Initialize(requestCtx(ctx), validReq()); err == nil {
+		t.Fatal("installation succeeded without the settings table")
+	}
+	if err := gsetting.Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	config.Conf.Security.Login.MaxFailures = 12
+	if _, err := svc.Initialize(requestCtx(ctx), validReq()); err != nil {
+		t.Fatalf("installation could not be retried: %v", err)
+	}
+	if got := loginsetting.Load(requestCtx(ctx), dbclient.IamDB).MaxFailures; got != 12 {
+		t.Fatalf("initial max failures = %d, want 12", got)
 	}
 }

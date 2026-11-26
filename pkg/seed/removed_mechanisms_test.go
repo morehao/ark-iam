@@ -92,8 +92,8 @@ func TestSeedExportedSurfaceIsPinned(t *testing.T) {
 
 	// 唯一的写通道 + 只读查询 + 只读清单
 	want := []string{
-		// 类型
-		"BuiltinMenu", "Change", "ConsoleRedirects", "ConsolesConfig", "Definition", "Report", "Status",
+		// 类型（RuntimeSettings 仅携带 Bootstrap 的首次安装输入）
+		"BuiltinMenu", "Change", "ConsoleRedirects", "ConsolesConfig", "Definition", "Report", "RuntimeSettings", "Status",
 		// 常量
 		"ErrAdminPasswordHashRequired", "StatusAlreadyInitialized", "StatusCreated",
 		// 函数

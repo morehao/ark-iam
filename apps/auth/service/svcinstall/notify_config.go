@@ -1,4 +1,4 @@
-package appassembly
+package svcinstall
 
 import (
 	"os"

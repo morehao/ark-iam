@@ -47,6 +47,8 @@ const (
 //
 // 零值安全：除 AdminPasswordHash 外的字段留空即回落内置缺省值（见 withDefaults）。
 type Definition struct {
+	RuntimeSettings *RuntimeSettings
+
 	// TenantName 平台租户名称；根部门名与之同名。
 	TenantName string
 	// AdminUsername 内置管理员登录名（person.username）。
@@ -201,7 +203,13 @@ func Bootstrap(ctx context.Context, db *gorm.DB, def Definition) (Report, Status
 			status = StatusAlreadyInitialized
 			return nil
 		}
-		return bootstrapAll(ctx, tx, &rep, def)
+		if err := bootstrapAll(ctx, tx, &rep, def); err != nil {
+			return err
+		}
+		if def.RuntimeSettings != nil {
+			return def.RuntimeSettings.seed(ctx, tx)
+		}
+		return nil
 	})
 	if txErr != nil {
 		// 状态置空：调用方据此区分"已初始化"与"执行失败"，不会把失败误报成幂等命中。

@@ -3,6 +3,7 @@ package appassembly
 import (
 	"context"
 	"errors"
+	"github.com/morehao/golib/gsetting"
 	"testing"
 
 	_ "github.com/morehao/golib/dbaccess/dbgorm/driver/sqlite"
@@ -59,5 +60,24 @@ func TestTableConflictAllowlist(t *testing.T) {
 	var conflict *ErrTableConflict
 	if errors.As(err, &conflict) {
 		t.Fatalf("allowlisted table should not conflict, got %v", err)
+	}
+}
+
+func TestSettingSchemaRequiresExplicitMigration(t *testing.T) {
+	app, err := New(Config{DB: DBConfig{DSN: "sqlite://:memory:"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	ctx := context.Background()
+	db := app.DBGetter()(ctx)
+	if db.Migrator().HasTable(&gsetting.SettingEntity{}) {
+		t.Fatal("New created the runtime configuration table")
+	}
+	if err := app.RunMigrations(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if !db.Migrator().HasTable(&gsetting.SettingEntity{}) {
+		t.Fatal("RunMigrations did not create the runtime configuration table")
 	}
 }

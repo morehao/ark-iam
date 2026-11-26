@@ -35,15 +35,16 @@ type OIDCCtr struct {
 // NewOIDCCtr 自装配 OIDC OP：provider（签名/加密密钥、协议态 storage）、
 // back-channel logout 发送器、OIDC 鉴权服务与签名公钥缓存。
 // 装配失败（如非 dev 环境密钥缺失）直接 panic，与旧 app 装配层行为一致。
-func NewOIDCCtr(db gormdao.DBGetter) *OIDCCtr {
+func NewOIDCCtr(db gormdao.DBGetter) (*OIDCCtr, func()) {
 	provider, err := svcoidc.SetupOIDCProviderWithDB(db)
 	if err != nil {
 		panic(fmt.Sprintf("[ctroidc.NewOIDCCtr] SetupOIDCProvider fail, err:%v", err))
 	}
-	if err := provider.StartLogoutWorker(context.Background()); err != nil {
+	stop, err := provider.StartLogoutWorker(context.Background())
+	if err != nil {
 		panic(fmt.Sprintf("[ctroidc.NewOIDCCtr] StartLogoutWorker fail, err:%v", err))
 	}
-	return newOIDCCtr(db, provider)
+	return newOIDCCtr(db, provider), stop
 }
 
 // NewOIDCCtrWithProvider 测试专用：注入轻量/空 provider，跳过真实装配（密钥、worker）。

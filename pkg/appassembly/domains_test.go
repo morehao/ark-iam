@@ -43,9 +43,11 @@ func TestDomainDependency(t *testing.T) {
 		t.Fatalf("New(role+menu): want ErrDomainDependency (menu requires application), got %v", err)
 	}
 	// role + menu + application 应通过（依赖闭包闭合）。
-	if _, err := New(Config{DB: DBConfig{DSN: "sqlite://:memory:"}, Domains: []Domain{DomainRole, DomainMenu, DomainApplication}}); err != nil {
+	app, err := New(Config{DB: DBConfig{DSN: "sqlite://:memory:"}, Domains: []Domain{DomainRole, DomainMenu, DomainApplication}})
+	if err != nil {
 		t.Fatalf("New(role+menu+application): unexpected %v", err)
 	}
+	t.Cleanup(func() { _ = app.Close() })
 }
 
 // TestNonDevSecurityValidation 校验 prod 缺安全配置被拒绝。

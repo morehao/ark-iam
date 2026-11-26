@@ -371,7 +371,7 @@ oidc:
 
 ### 9.1 notify（临时凭据投递通道）
 
-> **配置来源（2026-11 起）**：notify 已迁至「运行时配置中心」——由平台管理台「系统设置」页面维护，落库 `core_setting`（分组 `notify`），**保存即生效、无需重启**。下方 `notify.*` 现为 **yaml 首启播种的初始值**：数据库分组为空时由启动流程写入一次，之后**运行时只读数据库、不再读 yaml**（见 §9.3）。
+> **配置来源（2026-11 起）**：notify 已迁至「运行时配置中心」——由平台管理台「系统设置」页面维护，落库 `core_setting`（分组 `notify`），**保存即生效、无需重启**。下方 `notify.*` 现为 **yaml 首启播种的初始值**：数据库分组为空时由安装接口在引导事务内写入一次，之后**运行时只读数据库、不再读 yaml**（见 §9.3）。
 
 一次性临时口令（建租户 / 建成员 / 重置密码）可通过邮件 / 短信直接投递给账号本人，管理员不再经手明文（见 [system-design.md §5.8](system-design.md) 与 `pkg/notify`）。三层开关：
 
@@ -415,7 +415,7 @@ oidc:
 - 复用 golib `gsetting`（AES-256-GCM）。加密密钥来自环境变量 **`GOLIB_AES_KEY`**（生产**必须显式配置**，禁止用 golib 内置默认 key，否则密文等同明文）。
 - 敏感项以 `encryption_mode=encrypted` 落库，页面读取返回掩码 `******`，提交掩码表示「不修改」。
 
-**配置来源与优先级**：`环境变量（NOTIFY_MAIL_PASSWORD / NOTIFY_SMS_ACCESS_KEY_SECRET）> 数据库(gsetting) > yaml 首启播种值`。yaml 仅作「首启初始值」；数据库分组为空时播种一次，之后运行时只读数据库。
+**配置来源与优先级**：`环境变量（NOTIFY_MAIL_PASSWORD / NOTIFY_SMS_ACCESS_KEY_SECRET）> 数据库(gsetting) > yaml 首启播种值`。yaml 仅作「首启初始值」；首次安装时由引导事务写入空分组，之后运行时只读数据库。
 
 **准入判据**（哪些配置适合上页面）：运行时可读、改完即生效、不涉及连接重建、非密钥。连接/启动期配置（`db`/`redis_config`/`es_configs`/`server`/`log`/`trace`）与密钥（`masterKey`/`oidc` 签名密钥/`bootstrapToken`/`GOLIB_AES_KEY`）**留在配置文件/密钥管理**，不上页面。
 

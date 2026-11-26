@@ -9,6 +9,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/loginsetting"
 	"github.com/morehao/golib/dbaccess/gormdao"
+	"github.com/morehao/golib/gsetting"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
@@ -17,7 +18,7 @@ import (
 // setupGuardDB 建内存库并返回 DBGetter（loginsetting 读它）。
 func setupGuardDB(t *testing.T) gormdao.DBGetter {
 	t.Helper()
-	db := testutil.SetupSQLite(t)
+	db := testutil.SetupSQLite(t, gsetting.SchemaModels()...)
 	return func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }
 }
 

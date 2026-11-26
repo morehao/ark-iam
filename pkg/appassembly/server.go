@@ -1,9 +1,10 @@
 package appassembly
 
 import (
-	"context"
 	"errors"
 	"fmt"
+	"sync"
+	"sync/atomic"
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/apps/auth"
@@ -13,16 +14,11 @@ import (
 	dirpkg "github.com/morehao/ark-iam/pkg/appassembly/directory"
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
-	"github.com/morehao/ark-iam/pkg/loginsetting"
-	"github.com/morehao/ark-iam/pkg/middleware"
 	"github.com/morehao/ark-iam/pkg/model"
-	"github.com/morehao/ark-iam/pkg/notify"
 	"github.com/morehao/ark-iam/pkg/oidckit"
-	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
+	"github.com/morehao/ark-iam/pkg/runtimesetting"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gcache"
-	"github.com/morehao/golib/glog"
-	"github.com/morehao/golib/gsetting"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -30,19 +26,29 @@ import (
 // ErrDBDSNRequired 表示 Config.DB.DSN 缺失。
 var ErrDBDSNRequired = errors.New("pkg/appassembly: config.DB.DSN is required")
 
+// ErrAppAlreadyRunning 表示进程已持有一个 IAM 实例。
+var ErrAppAlreadyRunning = errors.New("pkg/appassembly: an IAM application is already active in this process")
+
+var appActive atomic.Bool
+
 // App 是 pkg/appassembly 门面实例：持有 DB / Redis / 配置，按 Domains 编排 apps 各域库。
 //
 // 分层倒置下 App 不再持有业务实现（那些在 apps/* 库里），只做：
 // 建连、KeySource 解析（同进程 auth 产出 / 独立进程远程 JWKS）、按域转发 Mount。
 type App struct {
-	cfg Config
+	ownsProcess      bool
+	stopLogoutWorker func()
+	closeKeys        func()
+	closeOnce        sync.Once
+	closeErr         error
+	cfg              Config
 
 	storeRaw *gorm.DB
 	dbGetter gormdao.DBGetter
 	redis    *redis.Client
 	// setting 是运行时配置中心（golib gsetting，单进程共享一份），
 	// 承载 notify / security.login 等分组；页面与业务消费者共用同一实例。
-	setting *gsetting.Setting
+	setting *runtimesetting.Store
 	// settingCache 是 gsetting 读路径缓存（redis / memory），Close 时释放其连接。
 	settingCache gcache.Cache
 	// keySource 是 OP 公钥来源，供 platform/tenant 域鉴权中间件验签。
@@ -58,6 +64,11 @@ func New(cfg Config) (*App, error) {
 	if cfg.DB.DSN == "" {
 		return nil, ErrDBDSNRequired
 	}
+	switch cfg.Process {
+	case ProcessAll, ProcessAuth, ProcessPlatform, ProcessTenant:
+	default:
+		return nil, fmt.Errorf("pkg/appassembly: unknown process %q", cfg.Process)
+	}
 	// 域依赖校验（选定的域必须依赖闭合）。
 	if err := validateDomainDeps(resolveDomains(cfg.Domains)); err != nil {
 		return nil, err
@@ -69,7 +80,16 @@ func New(cfg Config) (*App, error) {
 		}
 	}
 
-	app := &App{cfg: cfg}
+	if !appActive.CompareAndSwap(false, true) {
+		return nil, ErrAppAlreadyRunning
+	}
+	app := &App{cfg: cfg, ownsProcess: true}
+	ready := false
+	defer func() {
+		if !ready {
+			_ = app.Close()
+		}
+	}()
 	if err := app.initDB(); err != nil {
 		return nil, err
 	}
@@ -79,62 +99,11 @@ func New(cfg Config) (*App, error) {
 	if err := app.initSetting(); err != nil {
 		return nil, err
 	}
-	if err := app.seedRuntimeSettings(); err != nil {
-		return nil, err
-	}
+	dbclient.SetIamDB(app.storeRaw)
+	dbclient.SetRedis(app.redis)
+	runtimesetting.SetProcessStore(app.setting)
+	ready = true
 	return app, nil
-}
-
-// seedRuntimeSettings 首启播种运行时配置分组（notify / security.login）。
-//
-// 语义（见设计 §2.4 / §5.4）：分组为空时用 yaml 对应段播种一次，之后以 DB 为唯一来源，
-// 运行时不再读 yaml。yaml 只是「首启初始值载体」。幂等：分组非空即跳过。
-//
-// 不再装配任何进程级 Notifier 单例（gsetting 是唯一事实源）。
-func (a *App) seedRuntimeSettings() error {
-	if a.cfg.Raw == nil {
-		return nil
-	}
-	ctx := context.Background()
-
-	// notify 分组。
-	if empty, err := isNotifySettingEmpty(ctx, a.dbGetter); err != nil {
-		glog.Warnf(ctx, "[pkg/appassembly.seedRuntimeSettings] check notify empty fail, err:%v", err)
-	} else if empty {
-		cfg := notifyConfigFrom(a.cfg.Raw.Notify)
-		if err := notify.SaveConfig(ctx, a.dbGetter, cfg); err != nil {
-			return fmt.Errorf("pkg/appassembly: seed notify settings failed: %w", err)
-		}
-	}
-
-	// security.login 分组。
-	if empty, err := loginsetting.IsEmpty(ctx, a.dbGetter); err != nil {
-		glog.Warnf(ctx, "[pkg/appassembly.seedRuntimeSettings] check login empty fail, err:%v", err)
-	} else if empty {
-		l := a.cfg.Raw.Security.Login
-		cfg := loginsetting.Config{
-			MaxFailures:   l.MaxFailures,
-			WindowSec:     l.WindowSec,
-			LockSec:       l.LockSec,
-			RatePerMinute: l.RatePerMinute,
-			Burst:         l.Burst,
-		}.WithDefaults()
-		if err := loginsetting.Save(ctx, a.dbGetter, cfg); err != nil {
-			return fmt.Errorf("pkg/appassembly: seed login settings failed: %w", err)
-		}
-	}
-	return nil
-}
-
-// isNotifySettingEmpty 判断 notify 分组是否为空（用于首启播种判据）。
-func isNotifySettingEmpty(ctx context.Context, db gormdao.DBGetter) (bool, error) {
-	cfg, err := notify.LoadConfig(ctx, db)
-	if err != nil {
-		return false, err
-	}
-	// 采用「enabled 且无任何渠道字段」不应视为已播种；这里用更稳妥的判据：
-	// 当且仅当整段都是零值（未配置过任何字段）时视为空。
-	return cfg == (notify.Config{}), nil
 }
 
 // Mount 把选中的业务域挂到给定子路由组（不污染宿主根路由）。
@@ -153,44 +122,52 @@ func (a *App) Mount(rg *gin.RouterGroup) error {
 	}
 	v1 := rg.Group("/v1")
 
-	// auth 域先装配：业务路由 /v1/auth，协议端点 /oidc、/install（均在本 rg 前缀下），
-	// 并产生 OP 的进程内 KeySource，供 platform/tenant 域鉴权中间件复用。
-	authGroup := v1.Group("/auth")
-	if err := a.mountAuth(authGroup, rg, keep); err != nil {
-		return err
+	mountAuth := a.cfg.Process == ProcessAll || a.cfg.Process == ProcessAuth
+	var platformKeys, tenantKeys []string
+	if a.cfg.Process == ProcessAll || a.cfg.Process == ProcessPlatform {
+		platformKeys = platformKeysFor(keep)
+	}
+	if a.cfg.Process == ProcessAll || a.cfg.Process == ProcessTenant {
+		tenantKeys = tenantKeysFor(keep)
+	}
+	protected := (mountAuth && keep[DomainCoreAuth]) || len(platformKeys) > 0 ||
+		len(tenantKeys) > 0 || (a.cfg.Process == ProcessAll && keep[DomainDirectory])
+	if protected && a.cfg.VerifierBuilder == nil {
+		return errors.New("pkg/appassembly: protected routes require an OIDC verifier builder")
 	}
 
-	// auth 未装配时，从 Config 解析 KeySource（独立部署的 platform/tenant 进程远程 JWKS）。
-	if a.keySource == nil {
+	// OP 先提供进程内公钥来源，分体管理进程才解析远程 JWKS。
+	if mountAuth {
+		a.mountAuth(v1.Group("/auth"), rg, keep)
+	}
+	if protected && a.keySource == nil {
 		ks, err := a.resolveRemoteKeySource()
 		if err != nil {
-			// fail-closed：拿不到 OP 公钥就绝不放行任何 token（中间件统一 401）。
-			a.keySource = nil
-		} else {
-			a.keySource = ks
+			return fmt.Errorf("pkg/appassembly: resolve OIDC key source: %w", err)
 		}
+		a.keySource = ks
+		if a.cfg.KeySource == nil {
+			if closer, ok := ks.(interface{ Close() }); ok {
+				a.closeKeys = closer.Close
+			}
+		}
+	}
+	if protected && a.keySource == nil {
+		return errors.New("pkg/appassembly: protected routes require an OIDC key source")
 	}
 
 	conf := a.rawConfig()
-
-	// platform 域：鉴权中间件（OIDCAuth + RequireAppAccess）+ back-channel logout。
-	if a.anyDomain(keep, []Domain{DomainMenu, DomainTenant, DomainApplication, DomainOAuthClient, DomainConnector, DomainDomain, DomainTenantApp, DomainAudit, DomainSetting}) {
+	if len(platformKeys) > 0 {
 		platformGroup := v1.Group("/platform")
-		if a.keySource != nil {
-			platformGroup.Use(a.authMiddlewareForGroup(conf, model.SeedBuiltinClientPlatformAdminWeb)...)
-			a.registerBackChannelLogout(rg, conf, model.SeedBackChannelLogoutPathPlatform, model.SeedBuiltinClientPlatformAdminWeb)
-		}
-		platformadmin.Mount(platformGroup, a.dbGetter, a.platformKeys(keep))
+		platformGroup.Use(a.authMiddlewareForGroup(conf, model.SeedBuiltinClientPlatformAdminWeb)...)
+		a.registerBackChannelLogout(rg, conf, model.SeedBackChannelLogoutPathPlatform, model.SeedBuiltinClientPlatformAdminWeb)
+		platformadmin.Mount(platformGroup, a.dbGetter, platformKeys)
 	}
-
-	// tenant 域：鉴权中间件 + back-channel logout。
-	if a.anyDomain(keep, []Domain{DomainUser, DomainDepartment, DomainRole, DomainMachineUser, DomainInvite, DomainAPIKey}) {
+	if len(tenantKeys) > 0 {
 		tenantGroup := v1.Group("/tenant")
-		if a.keySource != nil {
-			tenantGroup.Use(a.authMiddlewareForGroup(conf, model.SeedBuiltinClientTenantAdminWeb)...)
-			a.registerBackChannelLogout(rg, conf, model.SeedBackChannelLogoutPathTenant, model.SeedBuiltinClientTenantAdminWeb)
-		}
-		tenantadmin.Mount(tenantGroup, a.dbGetter, a.tenantKeys(keep))
+		tenantGroup.Use(a.authMiddlewareForGroup(conf, model.SeedBuiltinClientTenantAdminWeb)...)
+		a.registerBackChannelLogout(rg, conf, model.SeedBackChannelLogoutPathTenant, model.SeedBuiltinClientTenantAdminWeb)
+		tenantadmin.Mount(tenantGroup, a.dbGetter, tenantKeys)
 	}
 	return nil
 }
@@ -204,8 +181,11 @@ func (a *App) MountDirectory(engine *gin.Engine) error {
 	for _, d := range resolveDomains(a.cfg.Domains) {
 		keep[d] = true
 	}
-	if !a.anyDomain(keep, []Domain{DomainDirectory}) {
+	if a.cfg.Process != ProcessAll || !keep[DomainDirectory] {
 		return nil
+	}
+	if a.keySource == nil || a.cfg.VerifierBuilder == nil {
+		return errors.New("pkg/appassembly: mount directory requires OIDC key source and verifier builder")
 	}
 	conf := a.rawConfig()
 	dirpkg.Mount(engine, conf, a.keySource, a.cfg.VerifierBuilder)
@@ -213,19 +193,19 @@ func (a *App) MountDirectory(engine *gin.Engine) error {
 }
 
 // mountAuth 装配 auth 域：注入配置与 DB，注册业务路由与协议端点，返回 OP 进程内 KeySource。
-func (a *App) mountAuth(authRG *gin.RouterGroup, engine *gin.RouterGroup, keep map[Domain]bool) error {
+func (a *App) mountAuth(authRG *gin.RouterGroup, engine *gin.RouterGroup, keep map[Domain]bool) {
 	cfg := a.rawConfig()
 	opts := auth.Options{
-		CoreAuth:    keep[DomainCoreAuth],
-		Install:     keep[DomainInstall],
-		Connector:   keep[DomainConnector],
-		SelfService: keep[DomainSelfService],
+		OnLogoutWorkerStarted: func(stop func()) { a.stopLogoutWorker = stop },
+		CoreAuth:              keep[DomainCoreAuth],
+		Install:               keep[DomainInstall],
+		Connector:             keep[DomainConnector],
+		SelfService:           keep[DomainSelfService],
 	}
 	if !opts.CoreAuth && !opts.Install {
-		return nil // 未选任何 auth 子域
+		return // 未选任何 auth 子域
 	}
 	a.keySource = auth.Mount(authRG, engine, a.dbGetter, cfg, opts, a.authVerifierBuilder)
-	return nil
 }
 
 // authVerifierBuilder 是注入 apps/auth 的验签器构造器：在本装配层用 Config.VerifierBuilder
@@ -235,8 +215,8 @@ func (a *App) authVerifierBuilder(ks contract.KeySource, issuer string) contract
 	return a.newVerifier(ks, issuer, nil)
 }
 
-// platformKeys 把 keep 中的 platform 域映射为注册 key 列表；为空时返回 nil（=全量）。
-func (a *App) platformKeys(keep map[Domain]bool) []string {
+// platformKeysFor 返回选中的平台管理端路由注册项。
+func platformKeysFor(keep map[Domain]bool) []string {
 	domainKey := map[Domain]string{
 		DomainMenu:        "menu",
 		DomainTenant:      "tenant",
@@ -251,8 +231,8 @@ func (a *App) platformKeys(keep map[Domain]bool) []string {
 	return keysOf(keep, domainKey)
 }
 
-// tenantKeys 把 keep 中的 tenant 域映射为注册 key 列表；为空时返回 nil（=全量）。
-func (a *App) tenantKeys(keep map[Domain]bool) []string {
+// tenantKeysFor 返回选中的租户管理端路由注册项。
+func tenantKeysFor(keep map[Domain]bool) []string {
 	domainKey := map[Domain]string{
 		DomainUser:        "user",
 		DomainDepartment:  "department",
@@ -266,7 +246,7 @@ func (a *App) tenantKeys(keep map[Domain]bool) []string {
 	return keysOf(keep, domainKey)
 }
 
-// keysOf 返回 keep 中命中的 key 列表；空则返回 nil（调用方 Mount 视为全量）。
+// keysOf 返回 keep 中命中的 key 列表。
 func keysOf(keep map[Domain]bool, domainKey map[Domain]string) []string {
 	out := make([]string, 0, len(domainKey))
 	for d, key := range domainKey {
@@ -274,20 +254,7 @@ func keysOf(keep map[Domain]bool, domainKey map[Domain]string) []string {
 			out = append(out, key)
 		}
 	}
-	if len(out) == 0 {
-		return nil
-	}
 	return out
-}
-
-// anyDomain 报告 keep 中是否包含 want 任一域。
-func (a *App) anyDomain(keep map[Domain]bool, want []Domain) bool {
-	for _, d := range want {
-		if keep[d] {
-			return true
-		}
-	}
-	return false
 }
 
 // resolveRemoteKeySource 解析独立部署（非 auth 进程）的远程 JWKS 来源。
@@ -300,6 +267,8 @@ func (a *App) resolveRemoteKeySource() (oidckit.KeySource, error) {
 	if conf == nil {
 		conf = &pkgconfig.Config{}
 	}
+	local := *conf
+	conf = &local
 	// 用 Config 上的 JwksURL/Issuer 覆盖（支持不提供完整 Raw 的独立进程）。
 	if a.cfg.JWKSURL != "" {
 		conf.OIDC.JWKSURL = a.cfg.JWKSURL
@@ -343,11 +312,6 @@ func (a *App) synthPkgConfig() *pkgconfig.Config {
 	}
 	c := &pkgconfig.Config{}
 	c.Server.Env = env
+	c.OIDC.Issuer = a.cfg.Issuer
 	return c
 }
-
-var _ = middleware.OIDCAuth
-var _ = ginmiddleware.CORS
-var _ = context.Background
-var _ = fmt.Sprintf
-var _ = dbclient.IamDB

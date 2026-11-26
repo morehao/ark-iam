@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/runtimesetting"
 	"github.com/morehao/golib/dbaccess/dbgorm"
 	"github.com/morehao/golib/dbaccess/dbredis"
 	"gorm.io/gorm"
@@ -27,9 +28,6 @@ func (a *App) initDB() error {
 		return fmt.Errorf("pkg/appassembly: init db failed: %w", err)
 	}
 	a.storeRaw = db
-	// 将实例连接同时注册为全局 iam 库：一进程一实例下，仍通过 dbclient.IamDB 取连接的
-	// 共享代码（pkg/sso 会话审计、pkg/core 默认路径等）与本实例共用同一份连接。
-	dbclient.SetIamDB(db)
 	a.dbGetter = func(ctx context.Context) *gorm.DB {
 		return db.WithContext(ctx)
 	}
@@ -56,14 +54,33 @@ func (a *App) initRedis() error {
 		return fmt.Errorf("pkg/appassembly: init redis failed: %w", err)
 	}
 	a.redis = client
-	// 同步注册为全局 RedisCli：OP 协议态存储、SSO 会话校验等共享代码读的是全局，
-	// 使嵌入方只需配置 Config.Redis 一处即可。
-	dbclient.SetRedis(client)
 	return nil
 }
 
 // Close 释放实例持有的连接资源（DB 底层连接、Redis）。
 func (a *App) Close() error {
+	a.closeOnce.Do(func() {
+		if !a.ownsProcess {
+			return
+		}
+		if a.stopLogoutWorker != nil {
+			a.stopLogoutWorker()
+		}
+		if a.closeKeys != nil {
+			a.closeKeys()
+		}
+		if a.setting != nil {
+			runtimesetting.SetProcessStore(nil)
+			dbclient.SetIamDB(nil)
+			dbclient.SetRedis(nil)
+		}
+		a.closeErr = a.closeResources()
+		appActive.Store(false)
+	})
+	return a.closeErr
+}
+
+func (a *App) closeResources() error {
 	var firstErr error
 	if a.storeRaw != nil {
 		if sqlDB, err := a.storeRaw.DB(); err == nil {
