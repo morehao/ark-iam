@@ -9,6 +9,9 @@ const (
 	MenuGetDetailError   = 100603
 	MenuGetPageListError = 100604
 	MenuNotExistError    = 100605
+	// MenuAppNotOwnedError 目标应用不属于当前租户（或不存在/未订阅），归属校验失败。
+	// 语义等同"不存在"，不回显其它租户应用存在性。
+	MenuAppNotOwnedError = 100606
 )
 
 const (
