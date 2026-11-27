@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/morehao/ark-iam/pkg/runtimesetting"
 	"github.com/morehao/golib/gcache"
 	_ "github.com/morehao/golib/gcache/driver/memory" // 兜底 driver（无 Redis 时）
 	_ "github.com/morehao/golib/gcache/driver/redis"  // 生产 driver
@@ -25,7 +26,7 @@ const settingCacheTTL = time.Minute
 // 自然过期），无 Redis（dev）退化 memory driver。缓存的是 DB 原值（加密项为密文），不落明文。
 // 写路径（Create/Update/Delete）由 gsetting 自动按 (group,key) 失效，无需业务处理。
 //
-// 默认自动建表 core_setting（幂等 AutoMigrate）。
+// core_setting 由 RunMigrations 统一建表。
 func (a *App) initSetting() error {
 	if a.storeRaw == nil {
 		return fmt.Errorf("pkg/appassembly: init setting failed: db not initialized")
@@ -41,11 +42,11 @@ func (a *App) initSetting() error {
 	if cache != nil {
 		opts = append(opts, gsetting.WithCache(cache, settingCacheTTL))
 	}
-	s, err := gsetting.New(a.storeRaw, opts...)
+	store, err := runtimesetting.New(a.storeRaw, opts...)
 	if err != nil {
 		return fmt.Errorf("pkg/appassembly: init setting failed: %w", err)
 	}
-	a.setting = s
+	a.setting = store
 	return nil
 }
 
@@ -76,5 +77,8 @@ func (a *App) buildSettingCache() (gcache.Cache, error) {
 
 // Setting 返回实例持有的运行时配置中心句柄；未初始化时为 nil。
 func (a *App) Setting() *gsetting.Setting {
-	return a.setting
+	if a.setting == nil {
+		return nil
+	}
+	return a.setting.Setting
 }

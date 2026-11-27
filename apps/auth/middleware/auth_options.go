@@ -29,7 +29,7 @@ func OIDCBusinessAuthOptions() []pkgmiddleware.AuthOption {
 			// 其 skip path 一并移除，避免留下指向不存在端点的死配置。
 			"/v1/auth/connectors/callback",
 		),
-		pkgmiddleware.WithOIDCSSOValidation(func(ctx context.Context, personID string, isMachineToken bool) bool {
+		pkgmiddleware.WithOIDCSSOValidation(func(ctx context.Context, personID, sessionID string, isMachineToken bool) bool {
 			// 机器凭证（client_credentials/API Key）不依赖浏览器 SSO 会话活性，直接放行
 			if isMachineToken {
 				return true
@@ -38,10 +38,10 @@ func OIDCBusinessAuthOptions() []pkgmiddleware.AuthOption {
 			if dbclient.RedisCli == nil {
 				return true
 			}
-			active, err := ssoStore.HasActiveSession(ctx, personID)
+			active, err := sso.ValidateTokenSession(ctx, ssoStore, personID, sessionID)
 			if err != nil {
-				glog.Warnf(ctx, "[middleware.OIDCBusinessAuthOptions] HasActiveSession fail, personID:%s, err:%v", personID, err)
-				return true
+				glog.Warnf(ctx, "[middleware.OIDCBusinessAuthOptions] validate token session fail, personID:%s, err:%v", personID, err)
+				return false
 			}
 			return active
 		}),

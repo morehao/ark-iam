@@ -19,8 +19,20 @@ type KeysFromURLFunc = oidckit.KeysFromURLFunc
 // KeysFromSetFunc 见 KeysFromURLFunc。
 type KeysFromSetFunc = oidckit.KeysFromSetFunc
 
+// Process 限定当前进程负责挂载的路由组。
+type Process string
+
+const (
+	ProcessAll      Process = ""
+	ProcessAuth     Process = "auth"
+	ProcessPlatform Process = "platformadmin"
+	ProcessTenant   Process = "tenantadmin"
+)
+
 // Config 是嵌入方提供的配置（比 pkgconfig.Config 精简，缺省安全）。
 type Config struct {
+	Process Process
+
 	// Domains 选择挂载的业务域；空 = 全量（形态 1 / gateway 用）。
 	Domains []Domain
 

@@ -112,7 +112,7 @@ func TestBootstrapAll_KeepsOperatorEdits(t *testing.T) {
 		t.Fatalf("rename application: %v", err)
 	}
 	var rootMenu model.MenuEntity
-	if err := db.Where("seed_key = ?", "menu").First(&rootMenu).Error; err != nil {
+	if err := db.Where("seed_key = ?", "setting").First(&rootMenu).Error; err != nil {
 		t.Fatalf("query menu: %v", err)
 	}
 	if err := db.Model(&model.MenuEntity{}).Where("id = ?", rootMenu.ID).
@@ -166,11 +166,11 @@ func TestBootstrapAll_KeepsOperatorEdits(t *testing.T) {
 	}
 	// 按 seed_key 命中同一行：改 code 后既没新建，也没把新值拉回
 	var menus []model.MenuEntity
-	if err := db.Where("seed_key = ?", "menu").Find(&menus).Error; err != nil {
+	if err := db.Where("seed_key = ?", "setting").Find(&menus).Error; err != nil {
 		t.Fatalf("query menu by seed_key: %v", err)
 	}
 	if len(menus) != 1 {
-		t.Fatalf("seed_key=menu 命中 %d 行, want 1（改 code 不得新建行）", len(menus))
+		t.Fatalf("seed_key=setting 命中 %d 行, want 1（改 code 不得新建行）", len(menus))
 	}
 	if menus[0].ID != rootMenu.ID {
 		t.Errorf("命中的菜单 id = %s, want %s（必须是同一行）", menus[0].ID, rootMenu.ID)
@@ -200,7 +200,7 @@ func TestBootstrapAll_CreatesMissingRowsOnly(t *testing.T) {
 	run()
 
 	// 删掉两个菜单（模拟运维误删/手工清表）
-	if err := db.Where("seed_key IN ?", []string{"menu", "oauth-client"}).Delete(&model.MenuEntity{}).Error; err != nil {
+	if err := db.Where("seed_key IN ?", []string{"setting", "oauth-client"}).Delete(&model.MenuEntity{}).Error; err != nil {
 		t.Fatalf("delete menus: %v", err)
 	}
 	before := countTable(t, db, model.TableNameMenu)

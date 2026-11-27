@@ -117,6 +117,21 @@ export default function Dashboard() {
             ))}
           </Row>
         </Card>
+
+        <Card
+          style={{ marginTop: 20, borderRadius: 14, border: `1px solid ${tokens.border}` }}
+          styles={{ body: { padding: '24px 28px' } }}
+        >
+          <Typography.Title level={5} style={{ marginTop: 0 }}>
+            菜单维护
+          </Typography.Title>
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+            菜单维护能力已下放到租户控制台。请前往租户控制台，在「菜单管理」中维护应用菜单树与权限标识。
+          </Typography.Paragraph>
+          <Typography.Link href="/tenant" target="_blank" rel="noopener noreferrer">
+            前往租户控制台维护菜单
+          </Typography.Link>
+        </Card>
       </Spin>
     </PageContainer>
   )

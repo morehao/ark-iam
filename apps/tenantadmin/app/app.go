@@ -41,6 +41,7 @@ func Routers(engine *gin.Engine) (io.Closer, error) {
 	}, guardPrefixes...))
 
 	cfg := appassembly.FromPkgConfig(taconfig.Conf, tenantDomains(), "", taconfig.Conf.OIDC.Issuer)
+	cfg.Process = appassembly.ProcessTenant
 	cfg.VerifierBuilder = verifierBuilder
 	cfg.KeysFromURL = keysFromURL
 	cfg.KeysFromSet = keysFromSet

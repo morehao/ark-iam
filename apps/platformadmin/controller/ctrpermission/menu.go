@@ -10,9 +10,6 @@ import (
 )
 
 type MenuCtr interface {
-	Create(ctx *gin.Context)
-	Delete(ctx *gin.Context)
-	Update(ctx *gin.Context)
 	Detail(ctx *gin.Context)
 	PageList(ctx *gin.Context)
 	Tree(ctx *gin.Context)
@@ -29,75 +26,6 @@ func NewMenuCtr(db gormdao.DBGetter) MenuCtr {
 	return &menuCtr{
 		menuSvc: svcpermission.NewMenuSvc(db),
 	}
-}
-
-// @Tags 菜单管理
-// @Summary 创建菜单管理
-// @accept application/json
-// @Produce application/json
-// @Param req body dtopermission.MenuCreateReq true "创建菜单管理"
-// @Success 200 {object} gincontext.DtoRender{data=dtopermission.MenuCreateResp}
-// @Router /v1/platform/menus [post]
-func (ctr *menuCtr) Create(ctx *gin.Context) {
-	var req dtopermission.MenuCreateReq
-	req.Operator = identity.OperatorFromGin(ctx)
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	res, err := ctr.menuSvc.Create(ctx.Request.Context(), &req)
-	if err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, res)
-}
-
-// @Tags 菜单管理
-// @Summary 删除菜单管理
-// @accept application/json
-// @Produce application/json
-// @Param menuID path int true "menuID"
-// @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/menus/{menuID} [delete]
-func (ctr *menuCtr) Delete(ctx *gin.Context) {
-	var req dtopermission.MenuDeleteReq
-	req.Operator = identity.OperatorFromGin(ctx)
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctr.menuSvc.Delete(ctx.Request.Context(), &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, "删除成功")
-}
-
-// @Tags 菜单管理
-// @Summary 修改菜单管理
-// @accept application/json
-// @Produce application/json
-// @Param menuID path int true "menuID"
-// @Param req body dtopermission.MenuUpdateReq true "修改菜单管理"
-// @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/menus/{menuID} [put]
-func (ctr *menuCtr) Update(ctx *gin.Context) {
-	var req dtopermission.MenuUpdateReq
-	req.Operator = identity.OperatorFromGin(ctx)
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctr.menuSvc.Update(ctx.Request.Context(), &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, "修改成功")
 }
 
 // @Tags 菜单管理

@@ -1048,7 +1048,7 @@ func TestUserPageListDepartmentFilter(t *testing.T) {
 // 服务端生成新临时密码并仅返回一次、落库哈希与之匹配、强制下次登录改密、旧密码立即失效。
 func TestUserResetPasswordIssuesTemporaryPassword(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{},
-		&model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+		&model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.RefreshTokenEntity{})
 	svc := &userSvc{db: dbclient.IamDB}
 
 	if err := db.Create(&model.DepartmentEntity{

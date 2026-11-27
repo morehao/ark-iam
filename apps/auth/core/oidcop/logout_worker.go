@@ -46,51 +46,58 @@ func NewLogoutWorker(privKey *rsa.PrivateKey, keyID string, issuer string) *logo
 	}
 }
 
-// Run 起一个常驻消费者，阻塞地从队列取任务并发送，直至 ctx 取消。
+// Run 起一个常驻消费者，从队列领取任务并发送，直至 ctx 取消。
 // Redis 故障时退避重试，避免忙循环打爆 Redis。
 func (w *logoutWorker) Run(ctx context.Context) {
-	for {
-		job, ok, err := sso.DequeueLogout(ctx, 2*time.Second)
+	for ctx.Err() == nil {
+		delivery, err := sso.ClaimLogout(ctx)
 		if err != nil {
-			if ctx.Err() != nil {
-				return
-			}
-			glog.Warnf(ctx, "[logoutWorker.Run] dequeue logout fail, err:%v", err)
-			select {
-			case <-time.After(time.Second):
-			case <-ctx.Done():
+			glog.Warnf(ctx, "[logoutWorker.Run] claim logout fail, err:%v", err)
+		}
+		if delivery == nil {
+			if !waitForLogoutRetry(ctx, time.Second) {
 				return
 			}
 			continue
 		}
-		if !ok {
-			if ctx.Err() != nil {
-				return
+		if w.handleJob(ctx, delivery.LogoutJob) {
+			if err := delivery.Ack(ctx); err != nil {
+				glog.Warnf(ctx, "[logoutWorker.Run] acknowledge logout fail, err:%v", err)
 			}
-			continue
 		}
-		w.handleJob(ctx, job)
 	}
 }
 
-func (w *logoutWorker) handleJob(ctx context.Context, job sso.LogoutJob) {
-	if w.expired(job) {
-		return
+func waitForLogoutRetry(ctx context.Context, delay time.Duration) bool {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return true
+	case <-ctx.Done():
+		return false
 	}
-	for attempt := 1; attempt <= logoutMaxAttempts; attempt++ {
+}
+
+// handleJob returns whether the delivery has reached a terminal state.
+func (w *logoutWorker) handleJob(ctx context.Context, job sso.LogoutJob) bool {
+	if w.expired(job) {
+		return true
+	}
+	for attempt := 1; attempt <= logoutMaxAttempts && ctx.Err() == nil; attempt++ {
 		err := w.send(ctx, job)
 		if err == nil {
-			// 通知成功，删除登记以幂等
 			if job.SessionID != "" {
-				_ = sso.NewSLOStore().Delete(context.Background(), job.SessionID, job.OIDCSessionID)
+				_ = sso.NewSLOStore().Delete(ctx, job.SessionID, job.OIDCSessionID)
 			}
-			return
+			return true
 		}
 		glog.Warnf(ctx, "[logoutWorker.handleJob] send logout fail, attempt:%d/%d, clientID:%s, err:%v", attempt, logoutMaxAttempts, job.ClientID, err)
-		if attempt < logoutMaxAttempts {
-			time.Sleep(logoutBackoffStep * time.Duration(attempt))
+		if attempt < logoutMaxAttempts && !waitForLogoutRetry(ctx, logoutBackoffStep*time.Duration(attempt)) {
+			break
 		}
 	}
+	return false
 }
 
 // expired 丢弃超过 TTL 的过期任务（对齐 Zitadel MaxTtl，避免积压陈旧通知）。

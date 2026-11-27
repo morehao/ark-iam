@@ -2,8 +2,10 @@ package appassembly
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
+	pkconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/model"
 )
 
@@ -49,13 +51,67 @@ func (a *App) MountConfig(engine *gin.Engine, basePath string) error {
 			"installBase":  joinPath(basePath, "/install"),
 			"loginPath":    joinPath(basePath, "/login"),
 			"callbackPath": "/auth/callback",
-			// clientId：本控制台 SPA 的 OIDC client_id（平台管理台内置客户端编码）。
-			"clientId": model.SeedBuiltinClientPlatformAdminWeb,
+			// clientId：本控制台 SPA 的 OIDC client_id。两个内置控制台（平台/租户）是不同应用、
+			// 各有独立 client_id 与回调白名单；单进程聚合部署时 /config.json 只有一份端点，
+			// 故按请求来源 Referer/Origin 的 host 命中哪个控制台的 console 地址，返回对应 client_id。
+			// 无匹配（内嵌单控制台 / 外部业务应用读取）回退平台管理台 client_id（历史行为）。
+			"clientId":       resolveConsoleClientID(c, a.cfg.Raw),
 			// enabledDomains：已挂载域白名单（G4）；缺省/全量时前端视为全部域可用。
 			"enabledDomains": enabledDomains,
 		})
 	})
 	return nil
+}
+
+// resolveConsoleClientID 按请求来源判定该返回哪个内置控制台的 OIDC client_id。
+//
+// 单进程聚合（gateway）下 /config.json 是唯一端点，但平台控制台（:4001，client=platform_admin_web）
+// 与租户控制台（:4002，client=tenant_admin_web）是两个独立 SPA、各有独立 client_id 与回调白名单。
+// 若恒返回 platform_admin_web，租户控制台会拿着平台 client 发起授权、回调地址不在白名单 → 登录失败。
+//
+// 判定：取 Referer（页面同源拉取时浏览器默认携带）或 Origin 的 scheme://host，与配置里两个控制台
+// 回调白名单的 host 比对，命中租户控制台 → tenant_admin_web，命中平台控制台 → platform_admin_web；
+// 都不命中（内嵌单控制台同源、外部业务应用跨源读取）回退 platform_admin_web（与历史一致）。
+func resolveConsoleClientID(c *gin.Context, conf *pkconfig.Config) string {
+	if conf != nil {
+		src := requestSourceOrigin(c)
+		if src != "" {
+			if consoleOriginMatches(src, conf.OIDC.Consoles.TenantAdminWeb.RedirectURIs) {
+				return model.SeedBuiltinClientTenantAdminWeb
+			}
+			if consoleOriginMatches(src, conf.OIDC.Consoles.PlatformAdminWeb.RedirectURIs) {
+				return model.SeedBuiltinClientPlatformAdminWeb
+			}
+		}
+	}
+	return model.SeedBuiltinClientPlatformAdminWeb
+}
+
+// requestSourceOrigin 从 Referer 或 Origin 头解析出 scheme://host（去掉路径）。
+func requestSourceOrigin(c *gin.Context) string {
+	candidate := c.GetHeader("Origin")
+	if candidate == "" {
+		candidate = c.GetHeader("Referer")
+	}
+	if candidate == "" {
+		return ""
+	}
+	if u, err := url.Parse(candidate); err == nil && u.Scheme != "" && u.Host != "" {
+		return u.Scheme + "://" + u.Host
+	}
+	return ""
+}
+
+// consoleOriginMatches 判断 src（scheme://host）是否命中任一 console 回调 URL 的 scheme://host。
+func consoleOriginMatches(src string, redirectURIs []string) bool {
+	for _, ru := range redirectURIs {
+		if u, err := url.Parse(ru); err == nil && u.Scheme != "" && u.Host != "" {
+			if u.Scheme+"://"+u.Host == src {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // requestBaseURL 按请求派生 {scheme}://{host}，用于 issuer 缺省时生成绝对地址。

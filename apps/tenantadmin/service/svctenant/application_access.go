@@ -11,6 +11,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/object/objidentity"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
 	"gorm.io/gorm"
@@ -23,6 +24,7 @@ import (
 // 在 pkg/core/application；本层只做鉴权、越权校验与 DTO 装配，不复制任何判定逻辑。
 type ApplicationAccessSvc interface {
 	ListTenantApplications(ctx context.Context) (*dtotenant.TenantApplicationsResp, error)
+	ListOwnedApplications(ctx context.Context, operator objidentity.Operator) (*dtotenant.TenantApplicationsResp, error)
 	ListUserApplications(ctx context.Context, req *dtotenant.UserApplicationsListReq) (*dtotenant.UserApplicationsListResp, error)
 	UpdateUserApplications(ctx context.Context, req *dtotenant.UserApplicationsUpdateReq) error
 	ListApplicationUsers(ctx context.Context, req *dtotenant.ApplicationUsersListReq) (*dtotenant.ApplicationUsersListResp, error)
@@ -47,6 +49,34 @@ func (svc *applicationAccessSvc) ListTenantApplications(ctx context.Context) (*d
 	appList, err := loadSubscribedApps(svc.db, ctx)
 	if err != nil {
 		return nil, err
+	}
+	list := make([]dtotenant.TenantApplicationItem, 0, len(appList))
+	for _, app := range appList {
+		list = append(list, dtotenant.TenantApplicationItem{
+			AppID: app.ID,
+			Code:  app.Code,
+			Name:  app.Name,
+		})
+	}
+	return &dtotenant.TenantApplicationsResp{List: list}, nil
+}
+
+// ListOwnedApplications 归属当前租户的应用（owner_type=tenant 且 owner_tenant_id==当前租户），
+// 供租户侧「菜单管理」的应用选择器使用（只能维护归属自己的应用菜单）。
+// 与 ListTenantApplications（订阅口径，供准入/角色用）刻意区分：这是"我拥有的应用"。
+func (svc *applicationAccessSvc) ListOwnedApplications(ctx context.Context, operator objidentity.Operator) (*dtotenant.TenantApplicationsResp, error) {
+	if err := requireSystemAdmin(ctx, operator, code.MenuGetPageListError); err != nil {
+		return nil, err
+	}
+	tenantID, err := iamapplication.AssertCurrentTenantScope(ctx)
+	if err != nil {
+		glog.Errorf(ctx, "[svcappaccess.ListOwnedApplications] 无具体租户作用域, err:%v", err)
+		return nil, code.GetError(code.MenuGetPageListError)
+	}
+	appList, err := iamapplication.ListOwnedApps(ctx, tenantID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcappaccess.ListOwnedApplications] ListOwnedApps fail, err:%v, tenantID:%s", err, tenantID)
+		return nil, code.GetError(code.MenuGetPageListError)
 	}
 	list := make([]dtotenant.TenantApplicationItem, 0, len(appList))
 	for _, app := range appList {

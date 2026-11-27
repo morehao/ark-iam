@@ -30,6 +30,7 @@ import type {
   TenantUserItem,
   TenantUserLoginLogItem,
   TenantUserResetPasswordResp,
+  MenuItem,
   TenantUserRoleItem,
   UserStatus,
 } from '@ark-iam/types'
@@ -228,5 +229,45 @@ export const updateMachineUserRoles = (machineUserID: string, appID: string, rol
 /** 获取当前租户的菜单树（租户自服务控制台侧边栏动态菜单） */
 export const getTenantMenuTree = () => request.get<any, MenuTreeResp>('/tenant/menus/tree')
 
-/** 获取当前租户订阅的应用列表（角色归属 / 菜单授权 / 应用准入的应用选项） */
+/**
+ * 获取当前租户的应用列表（角色归属 / 菜单授权 / 应用准入的应用选项）。
+ *
+ * 注：当前后端 GET /v1/tenant/applications 返回的是「本租户订阅且启用的应用」口径
+ * （loadSubscribedApps），并非「归属当前租户（owner_tenant_id==当前租户）的应用」。
+ * 菜单维护页的应用选择器按后端规划后续应切到 loadOwnedApps / 归属口径接口；
+ * 前端先沿用本接口，待后端补齐「归属应用列表」后替换（见 S6 备注）。
+ */
 export const getTenantApps = () => request.get<any, { list: TenantSubscribedApplicationItem[] }>('/tenant/applications')
+
+/**
+ * 归属当前租户的应用列表（owner_tenant_id==当前租户），供「菜单管理」页的应用选择器：
+ * 只有归属租户能维护该应用菜单，故菜单页只列这一口径。
+ * 与 getTenantApps（订阅口径，供角色/准入）刻意区分。
+ */
+export const getOwnedApps = () => request.get<any, { list: TenantSubscribedApplicationItem[] }>('/tenant/applications/owned')
+
+// ---------- 应用菜单维护（租户侧，归属当前租户的应用） ----------
+// 菜单写接口已从平台侧（/platform/menus）下放到租户侧应用子资源：
+//   POST   /v1/tenant/applications/{appID}/menus
+//   PUT    /v1/tenant/applications/{appID}/menus/{menuID}
+//   DELETE /v1/tenant/applications/{appID}/menus/{menuID}
+//   GET    /v1/tenant/applications/{appID}/menus/tree
+/** 获取指定应用（归属当前租户）的菜单树（管理视图） */
+export const getAppMenuTree = (appID: string) =>
+  request.get<any, MenuTreeResp>(`/tenant/applications/${appID}/menus/tree`)
+
+/** 在指定应用下创建菜单 */
+export const createAppMenu = (data: Partial<MenuItem> & { appID: string }) => {
+  const { appID, ...body } = data
+  return request.post<any, { menuID: string }>(`/tenant/applications/${appID}/menus`, body)
+}
+
+/** 更新指定应用下的菜单（appID 只来自路径，不可改归属） */
+export const updateAppMenu = (data: Partial<MenuItem> & { appID: string; menuID: string }) => {
+  const { appID, menuID, ...body } = data
+  return request.put<any, string>(`/tenant/applications/${appID}/menus/${menuID}`, body)
+}
+
+/** 删除指定应用下的菜单 */
+export const deleteAppMenu = (appID: string, menuID: string) =>
+  request.delete<any, string>(`/tenant/applications/${appID}/menus/${menuID}`)

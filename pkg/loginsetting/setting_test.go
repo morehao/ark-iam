@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/morehao/golib/dbaccess/gormdao"
+	"github.com/morehao/golib/gsetting"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -14,6 +15,9 @@ func setupDB(t *testing.T) gormdao.DBGetter {
 	db, err := gorm.Open(sqlite.Open("file:loginsetting_"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := gsetting.Migrate(db); err != nil {
+		t.Fatal(err)
 	}
 	return func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }
 }
@@ -37,19 +41,5 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	got := Load(ctx, db)
 	if got != want {
 		t.Fatalf("roundtrip mismatch: got=%+v want=%+v", got, want)
-	}
-}
-
-func TestIsEmpty(t *testing.T) {
-	db := setupDB(t)
-	ctx := context.Background()
-	if empty, _ := IsEmpty(ctx, db); !empty {
-		t.Fatal("expected empty before save")
-	}
-	if err := Save(ctx, db, Config{MaxFailures: 3, WindowSec: 300, LockSec: 900, RatePerMinute: 30, Burst: 10}); err != nil {
-		t.Fatalf("save: %v", err)
-	}
-	if empty, _ := IsEmpty(ctx, db); empty {
-		t.Fatal("expected non-empty after save")
 	}
 }

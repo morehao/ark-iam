@@ -16,7 +16,7 @@ import (
 // service 层验证「未启用 → 回显」这一确定性映射。
 func TestUserResetPasswordNotifyDisabledKeepsEcho(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.UserEntity{}, &model.PersonEntity{}, &model.DepartmentEntity{},
-		&model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{})
+		&model.DepartmentUserEntity{}, &model.RoleEntity{}, &model.UserRoleEntity{}, &model.RefreshTokenEntity{})
 	if err := db.Create(&model.DepartmentEntity{
 		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: "o1"}},
 		TenantID:   "t1", DeptPath: "/o1", DeptDepth: 1, Name: "部门o1", Status: model.DeptNodeStatusEnable,

@@ -124,6 +124,40 @@ func buildRoleTemplate(items []model.RoleTemplateItem) (model.RoleTemplateItemLi
 	return normalized, true
 }
 
+// resolveCreateOwner 解析并校验创建应用时的归属，返回 (ownerType, ownerTenantID, ok)。
+//
+// 语义（设计文档 §4.4、§5）：
+//   - 控制台创建的应用恒为 third_party，归属固定 owner_type=tenant，OwnerTenantID 由入参给出；
+//   - 入参 owner_type 只允许白名单 platform/tenant（空值按默认 platform）；
+//   - owner_type=tenant ⇒ owner_tenant_id 必须非空；
+//   - owner_tenant_id 非空时校验该租户存在（err!=nil 与「不存在」分离，见调用方）。
+//
+// ok=false 表示入参非法（owner 取值非法 / tenant 但租户 id 为空）；租户存在性由调用方用返回的 id 再查。
+func resolveCreateOwner(source model.AppSource, req *dtoapplication.ApplicationCreateReq) (model.AppOwnerType, string, bool) {
+	ownerType := req.OwnerType
+	switch ownerType {
+	case "":
+		ownerType = model.AppOwnerTypePlatform
+	case model.AppOwnerTypePlatform, model.AppOwnerTypeTenant:
+		// 合法白名单取值
+	default:
+		return "", "", false
+	}
+	// 控制台创建的应用恒为第三方接入，归属固定为某租户（由入参给出 tenant id）。
+	if source == model.AppSourceThirdParty {
+		ownerType = model.AppOwnerTypeTenant
+	}
+	ownerTenantID := req.OwnerTenantID
+	if ownerType == model.AppOwnerTypeTenant && ownerTenantID == "" {
+		return "", "", false
+	}
+	// owner_type=platform 时不得残留 tenant id（避免归属语义自相矛盾）。
+	if ownerType == model.AppOwnerTypePlatform {
+		ownerTenantID = ""
+	}
+	return ownerType, ownerTenantID, true
+}
+
 func (svc *applicationSvc) Create(ctx context.Context, req *dtoapplication.ApplicationCreateReq) (*dtoapplication.ApplicationCreateResp, error) {
 	// 编码规则（model.AppCodePattern）：小写字母开头，仅含小写字母/数字/下划线。
 	// 非法编码（如连字符）在此拦截，避免落库后再靠人工纠正。
@@ -145,6 +179,25 @@ func (svc *applicationSvc) Create(ctx context.Context, req *dtoapplication.Appli
 		glog.Errorf(ctx, "[svcapplication.Create] 非法邀请加入策略, req:%s", gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationCreateError)
 	}
+	// 归属（owner_type/owner_tenant_id）是写菜单权的唯一依据（§5）：非法取值或 tenant 缺租户 id 直接拒绝。
+	ownerType, ownerTenantID, ok := resolveCreateOwner(model.AppSourceThirdParty, req)
+	if !ok {
+		glog.Errorf(ctx, "[svcapplication.Create] 非法应用归属, req:%s", gutil.ToJsonString(req))
+		return nil, code.GetError(code.ApplicationOwnerInvalidError)
+	}
+	// 归属租户必须真实存在。iam_application / iam_tenant 均为全局表，租户插件不注入 tenant_id，
+	// 故显式用 CrossTenantContext 按主键反查（不能依赖「ctx 恰好没有作用域」）。
+	if ownerTenantID != "" {
+		ownerTenant, err := dao.NewTenantDao(dao.WithDBGetter(svc.db)).GetByID(dbclient.CrossTenantContext(ctx), ownerTenantID)
+		if err != nil {
+			glog.Errorf(ctx, "[svcapplication.Create] dao tenant GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
+			return nil, code.GetError(code.ApplicationCreateError)
+		}
+		if ownerTenant == nil || ownerTenant.ID == "" {
+			glog.Errorf(ctx, "[svcapplication.Create] 归属租户不存在, ownerTenantID:%s, req:%s", ownerTenantID, gutil.ToJsonString(req))
+			return nil, code.GetError(code.ApplicationOwnerInvalidError)
+		}
+	}
 	entity := &model.ApplicationEntity{
 		Code:                    req.Code,
 		Name:                    req.Name,
@@ -152,6 +205,8 @@ func (svc *applicationSvc) Create(ctx context.Context, req *dtoapplication.Appli
 		LogoURL:                 req.LogoURL,
 		HomepageURL:             req.HomepageURL,
 		Source:                  model.AppSourceThirdParty, // 控制台创建的应用恒为第三方接入，builtin/first_party 仅由种子与运维产生
+		OwnerType:               ownerType,
+		OwnerTenantID:           ownerTenantID,
 		AllowPersonCreateTenant: normalizePersonCreateTenantPolicy(req.AllowPersonCreateTenant),
 		AllowJoinByInvite:       normalizeJoinByInvitePolicy(req.AllowJoinByInvite),
 		RoleTemplate:            roleTemplate,

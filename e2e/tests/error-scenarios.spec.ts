@@ -19,9 +19,9 @@ test.describe('错误和边界场景', () => {
       (u) => u.toString().includes('localhost:4000') && u.searchParams.has('authRequestID'),
       { timeout: 20000 }
     );
-    await page.waitForSelector('#identifier', { timeout: 10000 });
-    await page.fill('#identifier', 'wrong-user');
-    await page.fill('#password', 'wrong-pass');
+    await page.getByPlaceholder('请输入用户名').waitFor({ timeout: 10000 });
+    await page.getByPlaceholder('请输入用户名').fill('wrong-user');
+    await page.getByPlaceholder('请输入密码').fill('wrong-pass');
     await page.click('button[type="submit"]');
     // 检查 URL 仍停留在 login-web（说明登录失败未跳转），
     // 同时检查页面无"仪表盘"/"部门管理"（说明未成功回调到应用）

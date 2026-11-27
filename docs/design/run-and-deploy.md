@@ -87,6 +87,8 @@ flowchart LR
 
 > **为什么把播种从启动期挪到安装页**：启动期播种必须"每次启动都把内置行收敛到代码定义"，于是应用既要建表又要当数据写者，运维在控制台改过的内置字段会在下次重启被悄悄收回（双写者），跨版本改名也只能靠启动分支打补丁。改成一次性引导后，写者唯一、时机明确（部署时由人确认），应用启动退化为纯只读。代价已经明确接受：内置数据的后续调整全部由运维在控制台完成，不再自动下发（见 §2.6）。
 
+运行时配置表 `core_setting` 由同一个显式迁移入口创建。关闭 `db.auto_migrate` 时，请在启动服务前完成建表。首次安装由 `POST /install/initialize` 在同一事务中写入尚无配置的 `notify` 和 `security.login` 分组。
+
 > **Schema 变更（列/表下线）**：本项目按新项目处理，不维护数据迁移脚本（AutoMigrate 只增不删，见 `system-design.md` §4.1）。下线列/表后，开发/测试库需**删库重建**。本地 PostgreSQL 跑在 Docker 里（容器名以 `docker ps` 为准，下例为 `postgres18`）：
 >
 > ```bash
@@ -666,6 +668,8 @@ flowchart TB
 - 签名密钥在多副本间保持一致（同一文件/同一 PEM 配置），避免 kid 漂移；
 - **初始化只需在一个副本上做一次**：是否已初始化以库内平台租户行为准（`seed.IsInitialized`），`BootstrapGuard` 每次探测直接查库，没有进程内状态，因此初始化完成后所有副本在下一次探测即整体放行业务端点；`BOOTSTRAP_TOKEN` 只需在引导阶段为"接流量的那一侧"设置；
 - **多副本同时提交初始化是安全的**：`seed.Bootstrap` 用 Postgres 事务级 advisory lock 串行化，只有一个副本真正写入，其余得到 `already_initialized`（HTTP 409），不会写出两套内置数据；
+- **分体部署先启动 auth**：平台和租户管理进程在启动时解析并预取 OP 公钥。请等 auth 的 discovery/JWKS 端点可达后再启动管理进程。
+
 - **`oidc.consoles` 的回调地址必须与最终访问入口一致**：它在 L1 首次引导时写入内置 OAuth 客户端，之后改配置不会回写（`redirect_uris` 归运维、可在控制台改）；分体部署时 `backChannelLogoutURI` 要显式配置，否则只能按 `issuer` 派生。
 
 ---

@@ -13,7 +13,6 @@ import TenantList from './pages/platform/tenant'
 import TenantApplicationList from './pages/platform/tenantApplication'
 import OAuthClientList from './pages/platform/oauthClient'
 import OAuthClientDetail from './pages/platform/oauthClient/Detail'
-import MenuList from './pages/platform/menu'
 import DomainList from './pages/platform/domain'
 import SettingPage from './pages/platform/setting'
 import ConnectorList from './pages/platform/connector'
@@ -22,6 +21,7 @@ import DepartmentList from './pages/tenant/department'
 import TenantUserList from './pages/tenant/user'
 import TenantRoleList from './pages/tenant/role'
 import TenantApiKeyList from './pages/tenant/apiKey'
+import TenantMenuList from './pages/tenant/menu'
 
 /**
  * 页面级门面包对外配置（宿主一字接入的最小画像）。
@@ -59,7 +59,6 @@ const PLATFORM_COMPONENT_MAP: Record<string, { Component: React.ComponentType; d
   '/tenant': { Component: TenantList, domain: 'tenant' },
   '/tenant-application': { Component: TenantApplicationList, domain: 'tenant-app' },
   '/oauth-client': { Component: OAuthClientList, domain: 'oauth-client' },
-  '/menu': { Component: MenuList, domain: 'menu' },
   '/domain': { Component: DomainList, domain: 'domain' },
   '/settings': { Component: SettingPage, domain: 'setting' },
   '/connector': { Component: ConnectorList, domain: 'connector' },
@@ -73,6 +72,8 @@ const TENANT_COMPONENT_MAP: Record<string, { Component: React.ComponentType; dom
   '/user': { Component: TenantUserList, domain: 'user' },
   '/role': { Component: TenantRoleList, domain: 'role' },
   '/api-key': { Component: TenantApiKeyList, domain: 'api-key' },
+  // 菜单维护（租户能力，v2 下从平台侧下放）：path 与后端种子 tenant-menu 的 path=/menu 一致。
+  '/menu': { Component: TenantMenuList, domain: 'menu' },
 }
 
 /** 平台端 / 租户端的形态级差异（标题、登录页副标题、菜单拉取、组件白名单）。 */

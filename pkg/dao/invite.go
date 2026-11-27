@@ -1,6 +1,9 @@
 package dao
 
 import (
+	"context"
+	"time"
+
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
@@ -45,4 +48,13 @@ func NewInviteDao(opts ...DaoOption) *InviteDao {
 			resolveDBGetter(opts...),
 		),
 	}
+}
+
+// AcceptPending consumes an unexpired invitation inside the membership transaction.
+func (d *InviteDao) AcceptPending(ctx context.Context, tx *gorm.DB, id, personID string, now time.Time) (bool, error) {
+	result := d.WithTx(tx).DB(ctx).Model(&model.InviteEntity{}).
+		Where("id = ? AND status = ? AND deleted_at IS NULL", id, model.InviteStatusPending).
+		Where("(expires_at IS NULL OR expires_at > ?)", now).
+		Updates(map[string]any{"status": model.InviteStatusAccepted, "updated_by": personID})
+	return result.RowsAffected == 1, result.Error
 }

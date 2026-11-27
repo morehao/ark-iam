@@ -41,6 +41,7 @@ func Routers(engine *gin.Engine) (io.Closer, error) {
 	}, guardPrefixes...))
 
 	cfg := appassembly.FromPkgConfig(padconfig.Conf, platformDomains(), "", padconfig.Conf.OIDC.Issuer)
+	cfg.Process = appassembly.ProcessPlatform
 	cfg.VerifierBuilder = verifierBuilder
 	cfg.KeysFromURL = keysFromURL
 	cfg.KeysFromSet = keysFromSet
@@ -67,13 +68,15 @@ func Routers(engine *gin.Engine) (io.Closer, error) {
 }
 
 // platformDomains 返回 platformadmin 独立进程的域集（menu/tenant/application/oauth-client/
-// domain/tenant-app/audit）。
+// connector/domain/tenant-app/audit/setting）。
 func platformDomains() []appassembly.Domain {
 	return []appassembly.Domain{
 		appassembly.DomainMenu,
 		appassembly.DomainTenant,
 		appassembly.DomainApplication,
 		appassembly.DomainOAuthClient,
+		appassembly.DomainConnector,
+		appassembly.DomainSetting,
 		appassembly.DomainDomain,
 		appassembly.DomainTenantApp,
 		appassembly.DomainAudit,

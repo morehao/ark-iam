@@ -7,6 +7,7 @@ import (
 
 	"github.com/morehao/ark-iam/apps/platformadmin/dto/dtosetting"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/runtimesetting"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gsetting"
@@ -61,7 +62,7 @@ var _ SettingSvc = (*settingSvc)(nil)
 
 // NewSettingSvc 构造配置项服务。
 //
-// 说明：AdminAPI 用 gsetting.GetAdmin()（进程级单例，由 pkg/appassembly 的 gsetting.New 初始化）。
+// 说明：AdminAPI 用 processAdmin()（进程级单例，由 pkg/appassembly 的 gsetting.New 初始化）。
 // 一进程一实例下与业务消费者共用同一 store；仅页面侧调用 GetAdmin，业务侧只用 Get*（见 R2）。
 func NewSettingSvc() SettingSvc {
 	return &settingSvc{}
@@ -81,7 +82,7 @@ func (svc *settingSvc) Create(ctx context.Context, req *dtosetting.SettingCreate
 	if !allowedGroup(req.Group) {
 		return code.GetError(code.SettingGroupNotAllowedError)
 	}
-	admin := gsetting.GetAdmin()
+	admin := processAdmin()
 	if err := admin.Create(ctx, &gsetting.CreateReq{
 		Group:       req.Group,
 		Key:         req.Key,
@@ -98,7 +99,7 @@ func (svc *settingSvc) Create(ctx context.Context, req *dtosetting.SettingCreate
 }
 
 func (svc *settingSvc) Update(ctx context.Context, req *dtosetting.SettingUpdateReq) error {
-	admin := gsetting.GetAdmin()
+	admin := processAdmin()
 	info, err := admin.GetByID(ctx, req.SettingID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcsetting.Update] GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -128,7 +129,7 @@ func (svc *settingSvc) Update(ctx context.Context, req *dtosetting.SettingUpdate
 }
 
 func (svc *settingSvc) UpdateStatus(ctx context.Context, req *dtosetting.SettingUpdateStatusReq) error {
-	admin := gsetting.GetAdmin()
+	admin := processAdmin()
 	info, err := admin.GetByID(ctx, req.SettingID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcsetting.UpdateStatus] GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -152,7 +153,7 @@ func (svc *settingSvc) UpdateStatus(ctx context.Context, req *dtosetting.Setting
 }
 
 func (svc *settingSvc) Delete(ctx context.Context, req *dtosetting.SettingDeleteReq) error {
-	admin := gsetting.GetAdmin()
+	admin := processAdmin()
 	info, err := admin.GetByID(ctx, req.SettingID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcsetting.Delete] GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -172,7 +173,7 @@ func (svc *settingSvc) Delete(ctx context.Context, req *dtosetting.SettingDelete
 }
 
 func (svc *settingSvc) Detail(ctx context.Context, req *dtosetting.SettingDetailReq) (*dtosetting.SettingDetailResp, error) {
-	admin := gsetting.GetAdmin()
+	admin := processAdmin()
 	info, err := admin.GetByID(ctx, req.SettingID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcsetting.Detail] GetByID fail, err:%v, req:%s", err, gutil.ToJsonString(req))
@@ -225,7 +226,7 @@ func (svc *settingSvc) PageList(ctx context.Context, req *dtosetting.SettingPage
 		pageSize = 10
 	}
 
-	admin := gsetting.GetAdmin()
+	admin := processAdmin()
 
 	// 单组：走 gsetting 原生分页，组内分页正确。
 	if len(groups) == 1 {
@@ -317,4 +318,11 @@ func toItem(info *gsetting.SettingInfo) *dtosetting.SettingItem {
 		CreatedAt:      info.CreatedAt,
 		UpdatedAt:      info.UpdatedAt,
 	}
+}
+
+func processAdmin() *gsetting.AdminAPI {
+	if store := runtimesetting.ProcessStore(); store != nil {
+		return store.Admin
+	}
+	return nil
 }

@@ -23,6 +23,7 @@ func hardenedSingleColumnTypes() []reflect.Type {
 		reflect.TypeOf(EmailVerificationState("")),
 		reflect.TypeOf(AppPersonCreateTenantPolicy("")),
 		reflect.TypeOf(AppJoinByInvitePolicy("")),
+		reflect.TypeOf(AppOwnerType("")),
 		reflect.TypeOf(ClientPKCEPolicy("")),
 		reflect.TypeOf(ClientAuthTimeClaimPolicy("")),
 		reflect.TypeOf(ConnectorAutoCreateUserFlag("")),

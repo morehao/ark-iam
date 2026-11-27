@@ -1,6 +1,10 @@
 package dao
 
 import (
+	"context"
+	"fmt"
+	"time"
+
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
@@ -68,4 +72,50 @@ func NewMenuDao(opts ...DaoOption) *MenuDao {
 			resolveDBGetter(opts...),
 		),
 	}
+}
+
+// MenuScopedCond 带 app 约束的菜单查询（租户侧安全写路径用）：
+// menu 是全局表（无 tenant_id），租户侧写必须显式带 app_id 兜底，确保只作用于"已确认归属
+// 当前租户"的应用菜单。authorizedAppID 必须来自 pkg/core/application.LoadOwnedApp 的 app.ID，
+// 严禁直接取请求体里的 appID。
+type MenuScopedCond struct {
+	*gormdao.BaseCond
+	AppID  string // 必填：已授权的应用 ID
+	MenuID string // 单条定位（更新/删除）
+}
+
+func (c *MenuScopedCond) BuildCondition(db *gorm.DB, tableName string) {
+	if c.BaseCond != nil {
+		c.BaseCond.BuildCondition(db, tableName)
+	}
+	col := condCols(tableName)
+	if c.AppID != "" {
+		db.Where(clause.Eq{Column: col("app_id"), Value: c.AppID})
+	}
+	if c.MenuID != "" {
+		db.Where(clause.Eq{Column: col("id"), Value: c.MenuID})
+	}
+}
+
+// UpdateMapScoped 在 app_id 约束下按主键更新（WHERE id=? AND app_id=?）。
+// app_id 仍写回时也只允许等于 authorizedAppID（调用方应传入不含 app_id 变更的 map）。
+func (d *MenuDao) UpdateMapScoped(ctx context.Context, menuID, authorizedAppID string, updateMap map[string]any) error {
+	db := d.DB(ctx).Model(&model.MenuEntity{}).Table(d.TableName)
+	if err := db.Where("id = ? AND app_id = ?", menuID, authorizedAppID).Updates(updateMap).Error; err != nil {
+		return fmt.Errorf("[MenuDao] UpdateMapScoped fail menuID=%s appID=%s: %w", menuID, authorizedAppID, err)
+	}
+	return nil
+}
+
+// DeleteScoped 在 app_id 约束下软删除单条菜单（WHERE id=? AND app_id=?）。
+func (d *MenuDao) DeleteScoped(ctx context.Context, menuID, authorizedAppID, deletedBy string) error {
+	db := d.DB(ctx).Model(&model.MenuEntity{}).Table(d.TableName)
+	updatedField := map[string]any{
+		"deleted_at": time.Now(),
+		"deleted_by": deletedBy,
+	}
+	if err := db.Where("id = ? AND app_id = ?", menuID, authorizedAppID).Updates(updatedField).Error; err != nil {
+		return fmt.Errorf("[MenuDao] DeleteScoped fail menuID=%s appID=%s: %w", menuID, authorizedAppID, err)
+	}
+	return nil
 }

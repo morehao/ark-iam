@@ -53,7 +53,7 @@ func NewRefreshTokenDao(opts ...DaoOption) *RefreshTokenDao {
 
 func (d *RefreshTokenDao) RevokeByPersonID(ctx context.Context, personID string) error {
 	now := time.Now()
-	return dbclient.IamDB(ctx).Model(&model.RefreshTokenEntity{}).
+	return d.DB(ctx).Model(&model.RefreshTokenEntity{}).
 		Where("person_id = ?", personID).
 		Where("revoked_at IS NULL").
 		Update("revoked_at", &now).Error

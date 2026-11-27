@@ -4,32 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sync"
 
+	"github.com/morehao/ark-iam/pkg/runtimesetting"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gsetting"
 )
 
-// instanceCache 缓存「每个 *gorm.DB 对应一个 gsetting 实例」，避免每次投递都重新 Migrate。
-// gsetting.New 会隐式 AutoMigrate，重复调用虽幂等但有开销；这里按 db 指针去重。
-var (
-	instanceMu    sync.Mutex
-	instanceCache = map[any]*gsetting.Setting{}
-)
-
-func settingFor(db gormdao.DBGetter) (*gsetting.Setting, error) {
-	raw := db(context.Background())
-	instanceMu.Lock()
-	defer instanceMu.Unlock()
-	if s, ok := instanceCache[raw]; ok {
-		return s, nil
-	}
-	s, err := gsetting.New(raw)
-	if err != nil {
-		return nil, err
-	}
-	instanceCache[raw] = s
-	return s, nil
+func settingFor(db gormdao.DBGetter) (*runtimesetting.Store, error) {
+	return runtimesetting.ForDB(db(context.Background()))
 }
 
 // envOverride 读环境变量覆盖值，未设置为空串。
@@ -81,7 +63,7 @@ func LoadConfig(ctx context.Context, db gormdao.DBGetter) (Config, error) {
 }
 
 // loadFrom 用已初始化的 gsetting 实例读取并拼装（供测试与上层共享实例复用）。
-func loadFrom(ctx context.Context, s *gsetting.Setting) (Config, error) {
+func loadFrom(ctx context.Context, s *runtimesetting.Store) (Config, error) {
 	var cfg Config
 
 	// 顶层开关。
@@ -120,7 +102,7 @@ func loadFrom(ctx context.Context, s *gsetting.Setting) (Config, error) {
 	return cfg, nil
 }
 
-func loadMail(ctx context.Context, s *gsetting.Setting) (MailConfig, error) {
+func loadMail(ctx context.Context, s *runtimesetting.Store) (MailConfig, error) {
 	var m MailConfig
 	var err error
 	if m.Enabled, err = getBoolSafe(ctx, s, SettingKeyMailEnabled); err != nil {
@@ -147,7 +129,7 @@ func loadMail(ctx context.Context, s *gsetting.Setting) (MailConfig, error) {
 	return m, nil
 }
 
-func loadSMS(ctx context.Context, s *gsetting.Setting) (SMSConfig, error) {
+func loadSMS(ctx context.Context, s *runtimesetting.Store) (SMSConfig, error) {
 	var c SMSConfig
 	var err error
 	if c.Enabled, err = getBoolSafe(ctx, s, SettingKeySMSEnabled); err != nil {
@@ -178,8 +160,8 @@ func loadSMS(ctx context.Context, s *gsetting.Setting) (SMSConfig, error) {
 }
 
 // getStrSafe 读取字符串键；键不存在/解密失败一律视为空串（不视为错误）。
-func getStrSafe(ctx context.Context, s *gsetting.Setting, key string) (string, error) {
-	v, err := s.GetString(ctx, SettingGroup, key)
+func getStrSafe(ctx context.Context, s *runtimesetting.Store, key string) (string, error) {
+	v, err := s.Setting.GetString(ctx, SettingGroup, key)
 	if err != nil {
 		// gsetting 的 Get 在「行不存在」时返回零值实体、不报错；报错基本是 db 故障。
 		return "", err
@@ -187,8 +169,8 @@ func getStrSafe(ctx context.Context, s *gsetting.Setting, key string) (string, e
 	return v, nil
 }
 
-func getBoolSafe(ctx context.Context, s *gsetting.Setting, key string) (bool, error) {
-	v, err := s.GetBool(ctx, SettingGroup, key)
+func getBoolSafe(ctx context.Context, s *runtimesetting.Store, key string) (bool, error) {
+	v, err := s.Setting.GetBool(ctx, SettingGroup, key)
 	if err != nil {
 		// 行不存在时 gsetting 返回空串 -> ParseBool 报错；按 false 处理（安全默认）。
 		return false, nil
@@ -196,8 +178,8 @@ func getBoolSafe(ctx context.Context, s *gsetting.Setting, key string) (bool, er
 	return v, nil
 }
 
-func getIntSafe(ctx context.Context, s *gsetting.Setting, key string) (int, error) {
-	v, err := s.GetInt64(ctx, SettingGroup, key)
+func getIntSafe(ctx context.Context, s *runtimesetting.Store, key string) (int, error) {
+	v, err := s.Setting.GetInt64(ctx, SettingGroup, key)
 	if err != nil {
 		// 行不存在返回空串 -> ParseInt 报错；按 0 处理。
 		return 0, nil
@@ -216,8 +198,8 @@ func SaveConfig(ctx context.Context, db gormdao.DBGetter, cfg Config) error {
 	return saveTo(ctx, s, cfg)
 }
 
-func saveTo(ctx context.Context, s *gsetting.Setting, cfg Config) error {
-	admin := gsetting.GetAdmin()
+func saveTo(ctx context.Context, s *runtimesetting.Store, cfg Config) error {
+	admin := s.Admin
 	type entry struct {
 		key       string
 		valueType gsetting.ValueType

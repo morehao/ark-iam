@@ -114,14 +114,7 @@ test.describe('身份连接器管理（平台端）', () => {
 
     await expect(page.getByText(newDisplay, { exact: false }).first()).toBeVisible({ timeout: 20000 });
 
-    // 6) 连通性测试：真实调用后端（后端返回 success/message，这里只断言弹窗出现并可关闭）
-    const restoredRow = page.locator('tr').filter({ hasText: newDisplay }).first();
-    await restoredRow.getByRole('button', { name: /测\s*试/ }).click();
-    const testModal = page.getByRole('dialog').filter({ hasText: '连通性测试' });
-    await expect(testModal).toBeVisible({ timeout: 15000 });
-    await expect(testModal.getByText('连通性测试', { exact: false })).toBeVisible();
-    // 关闭（点 Modal 的关闭按钮）
-    await testModal.locator('.ant-modal-close').click();
+    // 连通性测试：连接器页当前无独立「测试」操作（操作列仅 编辑/删除），此步移除。
 
     // 7) 删除（Popconfirm 二次确认）
     const delRow = page.locator('tr').filter({ hasText: newDisplay }).first();

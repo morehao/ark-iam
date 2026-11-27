@@ -19,6 +19,7 @@ import (
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/biz/gcontext"
+	"github.com/morehao/golib/gsetting"
 )
 
 // 这些用例锁的是**对外 HTTP 契约**：状态码 + 业务码。
@@ -30,7 +31,7 @@ import (
 // newInstallEngine 装配只含 /install 路由的引擎（不引 OIDC provider，避免依赖 Redis/密钥）。
 func newInstallEngine(t *testing.T) (*gin.Engine, *gorm.DB) {
 	t.Helper()
-	db := testutil.SetupSQLite(t, model.AllEntities()...)
+	db := testutil.SetupSQLite(t, append(model.AllEntities(), gsetting.SchemaModels()...)...)
 	config.Conf = &pkgconfig.Config{}
 	config.Conf.OIDC.Issuer = "http://localhost:8081/oidc"
 	config.Conf.OIDC.FrontendLoginURL = "http://localhost:4000/login"

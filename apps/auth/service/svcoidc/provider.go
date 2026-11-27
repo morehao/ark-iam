@@ -342,14 +342,22 @@ func (p *OIDCProvider) SigningKey(ctx context.Context) (*rsa.PrivateKey, string,
 }
 
 // StartLogoutWorker 启动 back-channel logout 发送器（异步消费登出队列，发送 logout_token）。
-func (p *OIDCProvider) StartLogoutWorker(ctx context.Context) error {
+func (p *OIDCProvider) StartLogoutWorker(ctx context.Context) (func(), error) {
 	privKey, keyID, err := p.SigningKey(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	worker := oidcop.NewLogoutWorker(privKey, keyID, p.issuer)
-	go worker.Run(ctx)
-	return nil
+	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		worker.Run(ctx)
+	}()
+	return func() {
+		cancel()
+		<-done
+	}, nil
 }
 
 // PublicKey 返回 OP 签名公钥，供业务路由鉴权中间件校验本 OP 签发的 token。

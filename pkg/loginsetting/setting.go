@@ -8,8 +8,8 @@ package loginsetting
 import (
 	"context"
 	"fmt"
-	"sync"
 
+	"github.com/morehao/ark-iam/pkg/runtimesetting"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gsetting"
 )
@@ -64,25 +64,8 @@ func (c Config) WithDefaults() Config {
 	return c
 }
 
-// instanceCache 按 *gorm.DB 缓存 gsetting 实例，避免重复 Migrate。
-var (
-	instanceMu    sync.Mutex
-	instanceCache = map[any]*gsetting.Setting{}
-)
-
-func settingFor(db gormdao.DBGetter) (*gsetting.Setting, error) {
-	raw := db(context.Background())
-	instanceMu.Lock()
-	defer instanceMu.Unlock()
-	if s, ok := instanceCache[raw]; ok {
-		return s, nil
-	}
-	s, err := gsetting.New(raw)
-	if err != nil {
-		return nil, err
-	}
-	instanceCache[raw] = s
-	return s, nil
+func settingFor(db gormdao.DBGetter) (*runtimesetting.Store, error) {
+	return runtimesetting.ForDB(db(context.Background()))
 }
 
 // Load 读取 security.login 分组；字段缺失/读取错误按默认值填充（不返回错误，安全回退）。
@@ -94,9 +77,9 @@ func Load(ctx context.Context, db gormdao.DBGetter) Config {
 	return loadFrom(ctx, s).WithDefaults()
 }
 
-func loadFrom(ctx context.Context, s *gsetting.Setting) Config {
+func loadFrom(ctx context.Context, s *runtimesetting.Store) Config {
 	read := func(key string) int {
-		v, err := s.GetInt64(ctx, SettingGroup, key)
+		v, err := s.Setting.GetInt64(ctx, SettingGroup, key)
 		if err != nil {
 			return 0 // 行不存在/解析失败 -> 0（WithDefaults 会补默认）
 		}
@@ -120,8 +103,8 @@ func Save(ctx context.Context, db gormdao.DBGetter, c Config) error {
 	return saveTo(ctx, s, c)
 }
 
-func saveTo(ctx context.Context, s *gsetting.Setting, c Config) error {
-	admin := gsetting.GetAdmin()
+func saveTo(ctx context.Context, s *runtimesetting.Store, c Config) error {
+	admin := s.Admin
 	entries := []struct {
 		key  string
 		val  int
@@ -149,19 +132,4 @@ func saveTo(ctx context.Context, s *gsetting.Setting, c Config) error {
 		}
 	}
 	return nil
-}
-
-// IsEmpty 判断分组是否无任何行（用于首启播种判据）。
-func IsEmpty(ctx context.Context, db gormdao.DBGetter) (bool, error) {
-	s, err := settingFor(db)
-	if err != nil {
-		return false, err
-	}
-	v, err := s.GetInt64(ctx, SettingGroup, KeyMaxFailures)
-	if err != nil {
-		// 取不到（行不存在）视为空分组。
-		return true, nil
-	}
-	_ = v
-	return false, nil
 }

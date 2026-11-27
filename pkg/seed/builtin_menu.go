@@ -24,7 +24,6 @@ var builtinMenuDefs = []seedMenu{
 	{appCode: appCodeAdmin, parentCode: "grp-app", name: "应用管理", code: "application", path: "/application", icon: "application", sort: 1, component: "/application/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 	{appCode: appCodeAdmin, parentCode: "grp-app", name: "OAuth客户端", code: "oauth-client", path: "/oauth-client", icon: "oauth", sort: 2, component: "/oauthClient/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 	{appCode: appCodeAdmin, name: "平台管理", code: "grp-platform", icon: "setting", sort: 4, menuType: model.MenuTypeDirectory, visibility: model.MenuVisibilityAdmin},
-	{appCode: appCodeAdmin, parentCode: "grp-platform", name: "菜单管理", code: "menu", path: "/menu", icon: "menu", sort: 1, component: "/menu/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 	{appCode: appCodeAdmin, parentCode: "grp-platform", name: "配置中心", code: "setting", path: "/settings", icon: "config", sort: 2, component: "/setting/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 	// 身份连接器：平台级全局对象（平台信任哪些外部 IdP），供平台运营端统一管理。
 	{appCode: appCodeAdmin, parentCode: "grp-platform", name: "身份连接器", code: "connector", path: "/connector", icon: "connector", sort: 3, component: "/connector/index", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
@@ -35,6 +34,8 @@ var builtinMenuDefs = []seedMenu{
 	{appCode: appCodeTenantAdmin, name: "用户管理", code: "tenant-user", path: "/user", icon: "user", sort: 2, component: "pages/user", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 	{appCode: appCodeTenantAdmin, name: "角色管理", code: "tenant-role", path: "/role", icon: "role", sort: 3, component: "pages/role", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 	{appCode: appCodeTenantAdmin, name: "API密钥", code: "tenant-api-key", path: "/api-key", icon: "apikey", sort: 4, component: "pages/apiKey", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
+	// 菜单管理：租户/平台管理员在此维护「归属自己的应用」的菜单（写能力已下放到归属租户）。
+	{appCode: appCodeTenantAdmin, name: "菜单管理", code: "tenant-menu", path: "/menu", icon: "menu", sort: 5, component: "pages/menu", menuType: model.MenuTypeMenu, visibility: model.MenuVisibilityAdmin},
 }
 
 // BuiltinMenu 内置菜单的**完整字段清单**，与 objpermission.MenuBaseInfo 的 15 个字段一一对应。

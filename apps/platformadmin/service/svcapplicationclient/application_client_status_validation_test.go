@@ -33,7 +33,7 @@ func TestIsValidApplicationClientStatus(t *testing.T) {
 
 // TestApplicationClientUpdateRejectsIllegalStatus 校验白名单已接入 service 入口。
 func TestApplicationClientUpdateRejectsIllegalStatus(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
 	entity := &model.ApplicationClientEntity{
 		TenantID: "1",
 		AppID:    "app1",
@@ -82,7 +82,7 @@ func TestApplicationClientUpdateRejectsIllegalStatus(t *testing.T) {
 
 // TestApplicationClientUpdateStatusEmptyMeansKeep 留空表示「不修改」，不得把状态覆盖为空串。
 func TestApplicationClientUpdateStatusEmptyMeansKeep(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
 	entity := &model.ApplicationClientEntity{
 		TenantID: "1",
 		AppID:    "app1",
@@ -154,7 +154,7 @@ func TestIsValidApplicationClientPolicies(t *testing.T) {
 // TestApplicationClientUpdateRejectsIllegalPolicy 非法 PKCE/auth_time 策略返回功能级错误码且不落库；
 // 空串表示未提供，归一为 disable（原 bool 字段在更新中同样按 false 全量写入）。
 func TestApplicationClientUpdateRejectsIllegalPolicy(t *testing.T) {
-	db := testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
 	entity := &model.ApplicationClientEntity{
 		TenantID:        "1",
 		AppID:           "app1",
@@ -235,7 +235,7 @@ func TestApplicationClientUpdateRejectsIllegalPolicy(t *testing.T) {
 
 // TestApplicationClientCreatePolicyDefaultsToDisable 创建未提供策略时按列默认 disable 落库。
 func TestApplicationClientCreatePolicyDefaultsToDisable(t *testing.T) {
-	testutil.SetupSQLite(t, &model.ApplicationClientEntity{})
+	testutil.SetupSQLite(t, &model.ApplicationEntity{}, &model.ApplicationClientEntity{})
 
 	ctx := newOAuthDeleteCtx("1", "0")
 	resp, err := NewApplicationClientSvc(nil).Create(requestCtx(ctx), &dtoapplicationclient.ApplicationClientCreateReq{

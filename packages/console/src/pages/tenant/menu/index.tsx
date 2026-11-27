@@ -30,8 +30,8 @@ import {
   UnorderedListOutlined,
 } from '@ant-design/icons'
 import { actionColumn, CODE_COL_WIDTH, COUNT_COL_WIDTH, MENU_ICONS, menuIconOptions, PageContainer, RemoteSelect, StatCard, StatRow, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
-import { createMenu, deleteMenu, getApplicationDetail, getApplicationPageList, getMenuTree, updateMenu } from '@ark-iam/api'
-import type { ApplicationItem, MenuExternalLinkFlag, MenuHiddenFlag, MenuItem, MenuKeepAliveFlag, MenuStatus, MenuType, MenuVisibility } from '@ark-iam/types'
+import { createAppMenu, deleteAppMenu, getAppMenuTree, getOwnedApps, updateAppMenu } from '@ark-iam/api'
+import type { MenuExternalLinkFlag, MenuHiddenFlag, MenuItem, MenuKeepAliveFlag, MenuStatus, MenuType, MenuVisibility } from '@ark-iam/types'
 
 interface MenuFormValues {
   parentID: string
@@ -110,11 +110,24 @@ function filterMenuTree(list: MenuItem[], keyword: string): MenuItem[] {
   return result
 }
 
+/**
+ * 应用选择器选项（租户侧）：来自归属应用接口（getOwnedApps，owner_tenant_id==当前租户），只列本租户可维护的应用。
+ *
+ * 注：「归属当前租户的应用」口径需后端补齐 loadOwnedApps（owner_tenant_id==当前租户）；
+ * 当前 GET /v1/tenant/applications 返回的是「订阅且启用」口径，前端先沿用，待后端切换后
+ * 无需改页面（仅 api 层换实现）。
+ */
+interface MenuAppOption {
+  appID: string
+  code: string
+  name: string
+}
+
 export default function MenuList() {
   const [selectedAppId, setSelectedAppId] = useState<string | undefined>()
-  const [selectedApp, setSelectedApp] = useState<ApplicationItem | null>(null)
-  // 应用搜索结果的本地缓存：切换应用时直接取名称/编码，省掉一次详情请求
-  const appCacheRef = useRef(new Map<string, ApplicationItem>())
+  const [selectedApp, setSelectedApp] = useState<MenuAppOption | null>(null)
+  // 应用清单本地缓存：切换应用时直接取名称/编码，省掉一次列表请求
+  const appCacheRef = useRef(new Map<string, MenuAppOption>())
 
   const [menuTree, setMenuTree] = useState<MenuItem[]>([])
   const [expandedKeys, setExpandedKeys] = useState<string[]>([])
@@ -128,45 +141,42 @@ export default function MenuList() {
   const [form] = Form.useForm<MenuFormValues>()
   const [submitLoading, setSubmitLoading] = useState(false)
 
-  // 应用切换器选项：按关键字走服务端搜索（应用可增长，不能只取前 100 条在前端本地过滤）
+  // 应用切换器选项：租户侧应用清单来自 getOwnedApps（归属当前租户，一次拉全量）。
+  // 关键字过滤在前端本地做（租户应用通常只有几个~几十个）。
   const fetchAppOptions = useCallback(async (keyword: string) => {
-    const resp = await getApplicationPageList({ page: 1, pageSize: 50, name: keyword || undefined })
-    const list = resp?.list || []
+    const resp = await getOwnedApps()
+    const list: MenuAppOption[] = (resp?.list || []).map((a) => ({ appID: a.appID, code: a.code, name: a.name }))
     list.forEach((a) => appCacheRef.current.set(a.appID, a))
-    return list.map((a) => ({ value: a.appID, label: `${a.name}（${a.code}）` }))
+    const kw = keyword.trim().toLowerCase()
+    const filtered = kw
+      ? list.filter((a) => a.name.toLowerCase().includes(kw) || a.code.toLowerCase().includes(kw))
+      : list
+    return filtered.map((a) => ({ value: a.appID, label: `${a.name}（${a.code}）` }))
   }, [])
 
-  // 选中应用：名称/编码优先取搜索缓存；缓存未命中（如上次选择的应用不在已搜索到的结果里）再按 ID 补查详情。
+  // 选中应用：名称/编码优先取缓存；缓存未命中（如上次选择的应用不在当前应用清单里）判定为无效 ID。
   // 只有确实拿到了应用才落到 selectedAppId，避免用一个无效 ID 去拉菜单树。
   // silent：首屏恢复上次选择的应用时该 ID 可能已失效（应用被删、或开发库删库重建换了主键），
-  // 属调用方已兜底的预期分支，不弹全局提示（见 packages/api 的 request.ts）。
-  const selectApp = useCallback(async (appID: string, opts?: { silent?: boolean }) => {
+  // 属调用方已兜底的预期分支，不弹全局提示。
+  const selectApp = useCallback(async (appID: string, _opts?: { silent?: boolean }) => {
     const cached = appCacheRef.current.get(appID)
-    if (cached) {
-      setSelectedApp(cached)
-      setSelectedAppId(appID)
-      return true
-    }
-    try {
-      const detail = await getApplicationDetail(appID, opts?.silent ? { silent: true } : undefined)
-      setSelectedApp(detail)
-      setSelectedAppId(appID)
-      return true
-    } catch {
-      return false
-    }
+    if (!cached) return false
+    setSelectedApp(cached)
+    setSelectedAppId(appID)
+    return true
   }, [])
 
-  // 首屏恢复上次选择的应用；恢复失败（应用已删除等）回退到应用列表第一个，避免整页空白
+  // 首屏恢复上次选择的应用；恢复失败回退到应用列表第一个，避免整页空白
   useEffect(() => {
     void (async () => {
-      const saved = localStorage.getItem(STORAGE_KEY) || ''
-      if (saved && (await selectApp(saved, { silent: true }))) return
       try {
-        const resp = await getApplicationPageList({ page: 1, pageSize: 1 })
-        const first = resp?.list?.[0]
+        const resp = await getOwnedApps()
+        const list: MenuAppOption[] = (resp?.list || []).map((a) => ({ appID: a.appID, code: a.code, name: a.name }))
+        list.forEach((a) => appCacheRef.current.set(a.appID, a))
+        const saved = localStorage.getItem(STORAGE_KEY) || ''
+        const restored = saved ? list.find((a) => a.appID === saved) : undefined
+        const first = restored || list[0]
         if (first) {
-          appCacheRef.current.set(first.appID, first)
           setSelectedApp(first)
           setSelectedAppId(first.appID)
         }
@@ -174,14 +184,14 @@ export default function MenuList() {
         /* 拦截器已提示 */
       }
     })()
-  }, [selectApp])
+  }, [])
 
   // 按选中应用加载菜单树
   const fetchData = useCallback(async () => {
     if (!selectedAppId) return
     setTreeLoading(true)
     try {
-      const resp = await getMenuTree(selectedAppId)
+      const resp = await getAppMenuTree(selectedAppId)
       const list = resp?.list || []
       setMenuTree(list)
       setExpandedKeys(collectKeys(list))
@@ -286,10 +296,10 @@ export default function MenuList() {
       setSubmitLoading(true)
       // 新建/编辑始终以列表页选中的应用为准
       if (mode === 'edit' && editing) {
-        await updateMenu({ menuID: editing.menuID, appID: selectedAppId, ...values })
+        await updateAppMenu({ menuID: editing.menuID, appID: selectedAppId, ...values })
         message.success('修改成功')
       } else {
-        await createMenu({ appID: selectedAppId, ...values })
+        await createAppMenu({ appID: selectedAppId, ...values })
         message.success('创建成功')
       }
       setModalOpen(false)
@@ -302,8 +312,9 @@ export default function MenuList() {
   }
 
   const handleDelete = async (menu: MenuItem) => {
+    if (!selectedAppId) return
     try {
-      await deleteMenu(menu.menuID)
+      await deleteAppMenu(selectedAppId, menu.menuID)
       message.success('删除成功')
       void fetchData()
     } catch {

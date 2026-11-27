@@ -63,7 +63,7 @@ func TestBootstrapSQLite(t *testing.T) {
 	assertCount(model.TableNameApplicationClient, 2)
 	assertCount(model.TableNameUserRole, 2)
 	assertCount(model.TableNameUserApplication, 2)
-	assertCount(model.TableNameRoleMenu, 16)
+	assertCount(model.TableNameRoleMenu, 17)
 	assertCount(model.TableNameTenantApplication, 2)
 	assertCount(model.TableNameDepartment, 1)
 	assertCount(model.TableNameDepartmentUser, 1)
@@ -130,8 +130,8 @@ func TestBootstrapSQLite(t *testing.T) {
 		}
 	}
 
-	// tenant_admin 预授权租户管理后台应用全部 4 个菜单
-	wantMenuCodes := map[string]bool{"department": false, "tenant-user": false, "tenant-role": false, "tenant-api-key": false}
+	// tenant_admin 预授权租户管理后台应用全部 5 个菜单
+	wantMenuCodes := map[string]bool{"department": false, "tenant-user": false, "tenant-role": false, "tenant-api-key": false, "tenant-menu": false}
 	menuIDByCode := map[string]string{}
 	var menus []model.MenuEntity
 	if err := db.Find(&menus).Error; err != nil {
@@ -230,7 +230,6 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 		{code: "application", name: "应用管理", parentCode: "grp-app", sort: 1},
 		{code: "oauth-client", name: "OAuth客户端", parentCode: "grp-app", sort: 2},
 		{code: "grp-platform", name: "平台管理", sort: 4, dir: true},
-		{code: "menu", name: "菜单管理", parentCode: "grp-platform", sort: 1},
 		{code: "setting", name: "配置中心", parentCode: "grp-platform", sort: 2},
 		{code: "connector", name: "身份连接器", parentCode: "grp-platform", sort: 3},
 	}
@@ -336,7 +335,7 @@ func TestSeedPlatformMenuStructure(t *testing.T) {
 			}
 		}
 	}
-	for _, want := range []string{"dashboard", "menu", "connector", "tenant", "application", "tenant-application", "oauth-client", "domain", "department", "tenant-user", "tenant-role"} {
+	for _, want := range []string{"dashboard", "tenant-menu", "connector", "tenant", "application", "tenant-application", "oauth-client", "domain", "department", "tenant-user", "tenant-role"} {
 		if !granted[want] {
 			t.Errorf("admin role missing menu grant %s", want)
 		}

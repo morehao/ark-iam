@@ -35,8 +35,8 @@ func (a *App) authMiddlewareForGroup(conf *pkgconfig.Config, audience string) []
 	opts = append(opts, middleware.WithOIDCAudiences(audience))
 	if conf != nil && conf.OIDC.EnableSSOSessionValidation {
 		ssoStore := sso.NewSSOSessionStore()
-		opts = append(opts, middleware.WithOIDCSSOValidation(func(ctx context.Context, personID string, isMachineToken bool) bool {
-			return validateSSOSession(ctx, ssoStore, personID, isMachineToken)
+		opts = append(opts, middleware.WithOIDCSSOValidation(func(ctx context.Context, personID, sessionID string, isMachineToken bool) bool {
+			return validateSSOSession(ctx, ssoStore, personID, sessionID, isMachineToken)
 		}))
 	}
 	return []gin.HandlerFunc{
@@ -50,14 +50,14 @@ func (a *App) authMiddlewareForGroup(conf *pkgconfig.Config, audience string) []
 //   - 机器凭证：不依赖浏览器会话，直接放行；
 //   - 未配置认证 Redis（dbclient.RedisCli == nil）：无法校验，放行（由 access token 短 TTL 兜底）；
 //   - Redis 已配置但查询出错：fail-closed（返回 false）——否则已撤销的会话会继续用满令牌 TTL。
-func validateSSOSession(ctx context.Context, store sso.SSOSessionStore, personID string, isMachineToken bool) bool {
+func validateSSOSession(ctx context.Context, store sso.SSOSessionStore, personID, sessionID string, isMachineToken bool) bool {
 	if isMachineToken {
 		return true
 	}
 	if dbclient.RedisCli == nil {
 		return true
 	}
-	active, err := store.HasActiveSession(ctx, personID)
+	active, err := sso.ValidateTokenSession(ctx, store, personID, sessionID)
 	if err != nil {
 		glog.Warnf(ctx, "[pkg/appassembly] sso session validate fail, fail-closed, personID:%s, err:%v", personID, err)
 		return false

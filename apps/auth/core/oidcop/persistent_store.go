@@ -745,6 +745,14 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 	// *refreshTokenRequest，不应假设它实现 op.AuthRequest；宽限窗口只依赖 token 本身。
 	if consumedRefreshToken != "" {
 		if result, ok := s.refreshWithGrace(consumedRefreshToken); ok {
+			replacement, err := s.refreshTokenDao().GetByCond(ctx, &dao.RefreshTokenCond{Token: credential.HashSecret(result.newRefreshToken)})
+			if err != nil {
+				return "", "", time.Time{}, err
+			}
+			if replacement == nil || replacement.ID == "" || replacement.RevokedAt != nil ||
+				replacement.ExpiredAt == nil || !replacement.ExpiredAt.After(time.Now()) {
+				return "", "", time.Time{}, op.ErrInvalidRefreshToken
+			}
 			// access token 每次都新签发（jti 必须唯一，绝不复用），
 			// 只有 refresh token 是幂等重放——这正是宽限窗口要解决的重复轮换问题。
 			replayAccessTokenID, idErr := randomTokenID("at")
@@ -876,9 +884,6 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 	// 条件撤销命中 0 行说明旧 token 已被并发轮换/撤销 → 视为复用攻击
 	// （RFC 9706 §4.1），撤销该 person 全部 refresh token（token 家族）。
 	txErr := s.txDB(tenantCtx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(refreshEntity).Error; err != nil {
-			return err
-		}
 		if currentRefreshToken != "" {
 			oldTokenHash := credential.HashSecret(currentRefreshToken)
 			res := tx.Model(&model.RefreshTokenEntity{}).Table(model.TableNameRefreshToken).
@@ -891,7 +896,7 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 				return errRefreshTokenReused
 			}
 		}
-		return nil
+		return tx.Create(refreshEntity).Error
 	})
 	if txErr != nil {
 		if errors.Is(txErr, errRefreshTokenReused) {

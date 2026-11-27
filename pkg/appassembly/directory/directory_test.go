@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -342,4 +343,25 @@ func TestDirectoryAPIKeyChannelRejectsUnknownKey(t *testing.T) {
 	w := get(t, engine, "/v1/rp/directory/members", "", map[string]string{"x-api-key": "ak_unknown"})
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 	assert.NotContains(t, w.Body.String(), fx.memberID)
+}
+
+func TestDirectoryRolesTruncatesSortedTenantResults(t *testing.T) {
+	db := setupSQLite(t, &model.RoleEntity{})
+	ctx := dbclient.CurrentTenantContext(t.Context(), testTenantID)
+	roles := make([]model.RoleEntity, 0, contractdir.MaxRoleListSize+2)
+	for i := contractdir.MaxRoleListSize; i >= 0; i-- {
+		roles = append(roles, model.RoleEntity{
+			TenantID: testTenantID,
+			AppID:    "app",
+			Code:     model.RoleCode(fmt.Sprintf("role_%04d", i)),
+		})
+	}
+	roles = append(roles, model.RoleEntity{TenantID: "other", Code: model.RoleCodeTenantAdmin})
+	require.NoError(t, db.WithContext(dbclient.CrossTenantContext(ctx)).CreateInBatches(roles, 50).Error)
+	result, err := NewDirectorySvc().Roles(ctx)
+	require.NoError(t, err)
+	require.True(t, result.Truncated)
+	require.Len(t, result.List, contractdir.MaxRoleListSize)
+	require.Equal(t, "role_0000", result.List[0].Code)
+	require.Equal(t, fmt.Sprintf("role_%04d", contractdir.MaxRoleListSize-1), result.List[len(result.List)-1].Code)
 }

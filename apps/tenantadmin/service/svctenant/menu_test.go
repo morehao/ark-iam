@@ -16,12 +16,14 @@ import (
 func seedSubscribedApp(t *testing.T, db *gorm.DB, tenantID, appID, code, name string, source model.AppSource, sort int) {
 	t.Helper()
 	if err := db.Create(&model.ApplicationEntity{
-		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: appID}},
-		Code:       code,
-		Name:       name,
-		Status:     model.AppStatusEnable,
-		Source:     source,
-		Sort:       sort,
+		BaseEntity:    gormdao.BaseEntity{StringID: gormdao.StringID{ID: appID}},
+		Code:          code,
+		Name:          name,
+		Status:        model.AppStatusEnable,
+		Source:        source,
+		OwnerType:     model.AppOwnerTypeTenant,
+		OwnerTenantID: tenantID,
+		Sort:          sort,
 	}).Error; err != nil {
 		t.Fatalf("seed app: %v", err)
 	}

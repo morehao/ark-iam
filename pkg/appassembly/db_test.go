@@ -102,3 +102,29 @@ func TestNoRedisLeavesGlobalNil(t *testing.T) {
 		t.Fatal("no Redis config should leave global nil")
 	}
 }
+
+func TestNewEnforcesOneActiveApp(t *testing.T) {
+	cfg := Config{DB: DBConfig{DSN: "sqlite://:memory:"}}
+	first, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first.Close()
+	if _, err := New(cfg); !errors.Is(err, ErrAppAlreadyRunning) {
+		t.Fatalf("second New: %v", err)
+	}
+	if err := first.Close(); err != nil {
+		t.Fatal(err)
+	}
+	next, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer next.Close()
+	if err := first.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := New(cfg); !errors.Is(err, ErrAppAlreadyRunning) {
+		t.Fatalf("stale Close released the active app: %v", err)
+	}
+}

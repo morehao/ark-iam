@@ -24,24 +24,30 @@ func TestResolveDomains(t *testing.T) {
 	for _, d := range DefaultConsoleDomains {
 		set[d] = true
 	}
-	for _, must := range []Domain{DomainCoreAuth, DomainInstall, DomainUser, DomainDepartment, DomainRole, DomainMenu} {
+	for _, must := range []Domain{DomainCoreAuth, DomainInstall, DomainUser, DomainDepartment, DomainRole, DomainMenu, DomainApplication} {
 		if !set[must] {
 			t.Fatalf("DefaultConsoleDomains missing %q", must)
 		}
 	}
 }
 
-// TestDomainDependency 校验域依赖：只选 role 不选 menu 应报错。
+// TestDomainDependency 校验域依赖：只选 role 不选 menu 应报错；menu 依赖 application。
 func TestDomainDependency(t *testing.T) {
 	_, err := New(Config{DB: DBConfig{DSN: "sqlite://:memory:"}, Domains: []Domain{DomainRole}})
 	var depErr *ErrDomainDependency
 	if !errors.As(err, &depErr) {
 		t.Fatalf("New(role only): want ErrDomainDependency, got %v", err)
 	}
-	// role + menu 应通过。
-	if _, err := New(Config{DB: DBConfig{DSN: "sqlite://:memory:"}, Domains: []Domain{DomainRole, DomainMenu}}); err != nil {
-		t.Fatalf("New(role+menu): unexpected %v", err)
+	// role + menu 仍缺 application（role→menu→application 传递）应报错。
+	if _, err := New(Config{DB: DBConfig{DSN: "sqlite://:memory:"}, Domains: []Domain{DomainRole, DomainMenu}}); !errors.As(err, &depErr) {
+		t.Fatalf("New(role+menu): want ErrDomainDependency (menu requires application), got %v", err)
 	}
+	// role + menu + application 应通过（依赖闭包闭合）。
+	app, err := New(Config{DB: DBConfig{DSN: "sqlite://:memory:"}, Domains: []Domain{DomainRole, DomainMenu, DomainApplication}})
+	if err != nil {
+		t.Fatalf("New(role+menu+application): unexpected %v", err)
+	}
+	t.Cleanup(func() { _ = app.Close() })
 }
 
 // TestNonDevSecurityValidation 校验 prod 缺安全配置被拒绝。

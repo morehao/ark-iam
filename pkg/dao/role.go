@@ -1,6 +1,8 @@
 package dao
 
 import (
+	"context"
+
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
@@ -66,4 +68,13 @@ func NewRoleDao(opts ...DaoOption) *RoleDao {
 			resolveDBGetter(opts...),
 		),
 	}
+}
+
+func (d *RoleDao) ListDirectoryRoles(ctx context.Context, limit int) (model.RoleEntityList, error) {
+	var roles model.RoleEntityList
+	err := d.DB(ctx).Model(&model.RoleEntity{}).
+		Select("app_id", "code", "name").
+		Where("deleted_at IS NULL").
+		Order("app_id, code, id").Limit(limit).Find(&roles).Error
+	return roles, err
 }

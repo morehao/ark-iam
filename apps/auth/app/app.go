@@ -49,6 +49,7 @@ func Routers(engine *gin.Engine) (io.Closer, error) {
 	}, guardPrefixes...))
 
 	cfg := appassembly.FromPkgConfig(authconfig.Conf, authDomains(), "", "")
+	cfg.Process = appassembly.ProcessAuth
 	cfg.VerifierBuilder = verifierBuilder
 	cfg.KeysFromURL = keysFromURL
 	cfg.KeysFromSet = keysFromSet

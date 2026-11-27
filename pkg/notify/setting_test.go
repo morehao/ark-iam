@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/morehao/golib/dbaccess/gormdao"
+	"github.com/morehao/golib/gsetting"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -14,6 +15,9 @@ func setupDB(t *testing.T) gormdao.DBGetter {
 	db, err := gorm.Open(sqlite.Open("file:notify_setting_"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := gsetting.Migrate(db); err != nil {
+		t.Fatal(err)
 	}
 	return func(ctx context.Context) *gorm.DB { return db.WithContext(ctx) }
 }

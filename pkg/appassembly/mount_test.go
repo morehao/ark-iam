@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/rsa"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -36,8 +38,10 @@ func dumpRoutes(routes gin.RoutesInfo) []string {
 // TestMountPlatformDomains 校验按域选择挂载：选中的 menu 域路由可达、未选的 tenant 域不可达。
 func TestMountPlatformDomains(t *testing.T) {
 	app, err := New(Config{
-		DB:      DBConfig{DSN: "sqlite://:memory:"},
-		Domains: []Domain{DomainMenu},
+		DB:              DBConfig{DSN: "sqlite://:memory:"},
+		KeySource:       stubKeySource{},
+		VerifierBuilder: buildTestVerifier,
+		Domains:         []Domain{DomainMenu, DomainApplication},
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -56,14 +60,21 @@ func TestMountPlatformDomains(t *testing.T) {
 	if hasRoute(routes, "GET", "/iam/v1/platform/tenants") {
 		t.Fatal("tenant route should NOT be mounted when domain not selected")
 	}
+	resp := httptest.NewRecorder()
+	engine.ServeHTTP(resp, httptest.NewRequest(http.MethodGet, "/iam/v1/platform/menus/tree", nil))
+	if resp.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated console request returned %d", resp.Code)
+	}
 }
 
 // TestMountTenantDomains 校验 tenantadmin 域按域挂载：选中的 user/department 可达，
 // 未选的 machine-user 不可达。
 func TestMountTenantDomains(t *testing.T) {
 	app, err := New(Config{
-		DB:      DBConfig{DSN: "sqlite://:memory:"},
-		Domains: []Domain{DomainUser, DomainDepartment},
+		DB:              DBConfig{DSN: "sqlite://:memory:"},
+		KeySource:       stubKeySource{},
+		VerifierBuilder: buildTestVerifier,
+		Domains:         []Domain{DomainUser, DomainDepartment},
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -108,4 +119,38 @@ type stubKeySource struct{}
 
 func (stubKeySource) PublicKey(ctx context.Context, kid string) (*rsa.PublicKey, error) {
 	return nil, errors.New("stub key source: no key")
+}
+
+func TestMountRejectsMissingConsoleKeySource(t *testing.T) {
+	app := &App{cfg: Config{
+		Process:         ProcessPlatform,
+		Domains:         []Domain{DomainTenant},
+		VerifierBuilder: buildTestVerifier,
+	}}
+	engine := gin.New()
+	if err := app.Mount(engine.Group("")); err == nil {
+		t.Fatal("mount succeeded without a console key source")
+	}
+	if hasRoute(engine.Routes(), "GET", "/v1/platform/tenants") {
+		t.Fatal("mounted a protected route after key source failure")
+	}
+}
+
+func TestTenantProcessDoesNotMountPlatformRoutes(t *testing.T) {
+	app := &App{cfg: Config{
+		Process:         ProcessTenant,
+		Domains:         []Domain{DomainRole, DomainMenu, DomainApplication},
+		KeySource:       stubKeySource{},
+		VerifierBuilder: buildTestVerifier,
+	}}
+	engine := gin.New()
+	if err := app.Mount(engine.Group("")); err != nil {
+		t.Fatal(err)
+	}
+	if hasRoute(engine.Routes(), "GET", "/v1/platform/menus/tree") {
+		t.Fatal("tenant process mounted a platform route")
+	}
+	if !hasRoute(engine.Routes(), "GET", "/v1/tenant/roles") {
+		t.Fatal("tenant process did not mount its role route")
+	}
 }

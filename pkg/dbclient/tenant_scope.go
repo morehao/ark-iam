@@ -126,3 +126,19 @@ func TenantIDFromContext(ctx context.Context) string {
 	}
 	return ""
 }
+
+// CurrentScopeTenantID 返回"当前具体租户"作用域的 TenantID，并报告是否为一个可用的
+// 具体当前租户（Kind==Current 且 TenantID 非空）。
+//
+// 与 TenantIDFromContext 的区别：后者把 AllScope / ExplicitScope / 未声明 都折叠成空串，
+// 用它直接做"归属判等"会把"空作用域"误当成"某归属租户"，导致静默越权（见
+// pkg/core/application.LoadOwnedApp 的调用方）。凡"要用当前租户做安全判等（如 owner 校验）"
+// 必须用本函数，要求 ok==true，否则 fail-closed。
+func CurrentScopeTenantID(ctx context.Context) (string, bool) {
+	scope, found := gcontext.TenantScopeFrom(ctx)
+	if !found || scope.Kind != gcontext.TenantScopeCurrent || scope.TenantID == "" {
+		return "", false
+	}
+	return scope.TenantID, true
+}
+

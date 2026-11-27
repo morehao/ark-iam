@@ -148,6 +148,42 @@ func responseTypeStrings(list model.ResponseTypeList) []string {
 	return values
 }
 
+// resolveWriteTenantScope 解析创建 client 时的写入作用域 ctx 与期望归属租户 id（评审 H5）。
+//
+// application_client 是受租户插件注入的租户表，tenant_id 由插件按 ctx 的作用域落库。创建入口
+// 可能发生在平台上下文（平台代租户建 client，作用域是平台/AllScope），此时 TenantIDFromContext
+// 返回空串，直接落库会让租户侧永远查不到。故：
+//   - 按 app_id 取应用（全局表，跨租户可读，无需作用域）；
+//   - owner_type=tenant：用 dbclient.ExplicitTenantContext(ctx, app.OwnerTenantID) 作为写入 ctx，
+//     使插件按其归属租户落 tenant_id=app.owner_tenant_id；返回期望归属租户 id 供不变式校验；
+//   - owner_type=platform 或应用不存在：保持现行为（写入 ctx=原 ctx，tenant_id 仍取 TenantIDFromContext），
+//     期望归属租户 id 返回空串表示不做归属强校验。
+//
+// **显式例外（登记）**：内置客户端（platform_admin_web / tenant_admin_web 等，source=builtin）与
+// 显式登记的多租户共用外部应用客户端，是「跨租户共用同一 OIDC 客户端」的既定形态——它们的
+// tenant_id 归属属于平台侧既定配置，不由本函数的 owner_type 推导强制覆盖。这些例外不经过
+// Create 控制台路径（内置客户端由种子写入、共用外部客户端由运维登记），因此本函数不在此处做
+// 特判；若未来出现经 Create 创建的例外，须在此显式登记并跳过 owner 强校验，禁止靠 owner_type
+// 判断静默放行。
+//
+// 错误返回仅覆盖“取应用”的系统错误；应用不存在不算错误（保持现行为）。
+func (svc *oAuthClientSvc) resolveWriteTenantScope(ctx context.Context, appID string) (context.Context, string, error) {
+	if appID == "" {
+		return ctx, "", nil
+	}
+	app, err := dao.NewApplicationDao(dao.WithDBGetter(svc.db)).GetByID(ctx, appID)
+	if err != nil {
+		return nil, "", err
+	}
+	if app == nil || app.ID == "" {
+		return ctx, "", nil
+	}
+	if app.OwnerType == model.AppOwnerTypeTenant && app.OwnerTenantID != "" {
+		return dbclient.ExplicitTenantContext(ctx, app.OwnerTenantID), app.OwnerTenantID, nil
+	}
+	return ctx, "", nil
+}
+
 func (svc *oAuthClientSvc) Create(ctx context.Context, req *dtoapplicationclient.ApplicationClientCreateReq) (*dtoapplicationclient.ApplicationClientCreateResp, error) {
 	// 编码规则校验（校验归 service，与 svcapplication.Create 同款）：客户端编码即 OIDC client_id，
 	// 同时是网关侧 audience 白名单值；非法值（连字符/数字/大写/空）必须在此拦截，
@@ -170,8 +206,18 @@ func (svc *oAuthClientSvc) Create(ctx context.Context, req *dtoapplicationclient
 		glog.Errorf(ctx, "[svcapplicationclient.Create] 非法令牌端点认证方式, req:%s", gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationClientAuthMethodInvalidError)
 	}
+	// 归属对齐（评审 H5）：application_client 是租户表，tenant_id 由租户插件按写入 ctx 的作用域落库，
+	// 而不是取 entity 上的 TenantID 字段之外的来源。平台代租户建 client 时当前请求作用域是平台
+	// （AllScope/平台租户），若直接沿用 TenantIDFromContext(ctx) 会落空串/平台租户 → 租户侧永远查不到。
+	// 故按应用归属解析写入作用域：owner_type=tenant 时用 ExplicitTenantContext(app.owner_tenant_id)
+	// 让插件按其归属租户落 tenant_id；owner_type=platform 或应用不存在时保持现行为。
+	writeCtx, ownerTenantID, err := svc.resolveWriteTenantScope(ctx, req.AppID)
+	if err != nil {
+		glog.Errorf(ctx, "[svcapplicationclient.Create] 解析归属租户作用域失败, err:%v, req:%s", err, gutil.ToJsonString(req))
+		return nil, code.GetError(code.ApplicationClientCreateError)
+	}
 	insertEntity := &model.ApplicationClientEntity{
-		TenantID:                dbclient.TenantIDFromContext(ctx),
+		TenantID:                dbclient.TenantIDFromContext(writeCtx),
 		AppID:                   req.AppID,
 		Code:                    req.Code,
 		Name:                    req.Name,
@@ -191,7 +237,17 @@ func (svc *oAuthClientSvc) Create(ctx context.Context, req *dtoapplicationclient
 		CreatedBy:               req.Operator.UserID,
 	}
 
-	if err := dao.NewApplicationClientDao(dao.WithDBGetter(svc.db)).Insert(ctx, insertEntity); err != nil {
+	// 不变式校验：owner_type=tenant 的应用，最终落库的 client.tenant_id 必须 == app.owner_tenant_id。
+	// 这是「归属租户维护的客户端默认落 owner 租户作用域」的硬约束；若写入作用域解析出错导致不一致，
+	// 宁可拒绝也不落一条租户侧查不到的孤儿 client（评审 H5）。内置客户端与多租户共用外部应用为例外，
+	// 见 resolveWriteTenantScope 的登记说明。
+	if ownerTenantID != "" && insertEntity.TenantID != ownerTenantID {
+		glog.Errorf(ctx, "[svcapplicationclient.Create] 不变式违反: client.tenant_id(%q) != app.owner_tenant_id(%q), appID:%s, req:%s",
+			insertEntity.TenantID, ownerTenantID, req.AppID, gutil.ToJsonString(req))
+		return nil, code.GetError(code.ApplicationClientCreateError)
+	}
+
+	if err := dao.NewApplicationClientDao(dao.WithDBGetter(svc.db)).Insert(writeCtx, insertEntity); err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.Create] dao Insert fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationClientCreateError)
 	}

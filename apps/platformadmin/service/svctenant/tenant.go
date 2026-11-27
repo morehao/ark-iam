@@ -216,18 +216,10 @@ func (svc *tenantSvc) ResetAdminPassword(ctx context.Context, req *dtotenant.Ten
 		return nil, code.GetError(code.PasswordHashError)
 	}
 	operatorID := req.Operator.UserID
-	if err := dao.NewPersonDao(dao.WithDBGetter(svc.db)).UpdateMap(ctx, builtinAdmin.PersonID, map[string]any{
-		"password_encrypted": passwordHash,
-		"password_method":    model.PasswordMethodBcrypt,
-		"password_status":    model.PasswordStatusMustChange,
-		"updated_by":         operatorID,
-	}); err != nil {
-		glog.Errorf(ctx, "[svctenant.ResetAdminPassword] person UpdateMap fail, err:%v, personID:%s", err, builtinAdmin.PersonID)
+	if err := person.UpdatePassword(ctx, svc.db, builtinAdmin.PersonID, passwordHash, model.PasswordStatusMustChange, operatorID, ""); err != nil {
+		glog.Errorf(ctx, "[svctenant.ResetAdminPassword] update password and revoke sessions fail, err:%v, personID:%s", err, builtinAdmin.PersonID)
 		return nil, code.GetError(code.TenantAdminResetPasswordError)
 	}
-
-	// 改密即全局登出：旧会话/refresh token 立即失效，新口令首次登录必须改密
-	tenant.RevokePersonSessions(ctx, builtinAdmin.PersonID)
 
 	audit.WriteAudit(ctx, audit.AuditEntry{
 		Action:     audit.ActionTenantAdminPasswordReset,

@@ -79,6 +79,16 @@ type SSOSessionStore interface {
 	HasActiveSession(ctx context.Context, personID string) (bool, error)
 }
 
+// ValidateTokenSession verifies the session referenced by a signed token.
+func ValidateTokenSession(ctx context.Context, store SSOSessionStore, personID, sessionID string) (bool, error) {
+	if sessionID == "" {
+		// Older access tokens may omit sid.
+		return store.HasActiveSession(ctx, personID)
+	}
+	sessionPersonID, err := store.ValidateSession(ctx, sessionID)
+	return sessionPersonID == personID, err
+}
+
 type redisSSOSessionStore struct {
 	client     *redis.Client
 	sessionTTL time.Duration
@@ -164,15 +174,16 @@ func (s *redisSSOSessionStore) CreateSession(ctx context.Context, personID strin
 		return "", fmt.Errorf("failed to marshal session data: %w", err)
 	}
 	ttl := s.sessionTTL
-	if err := s.client.Set(ctx, ssoSessionKey(sessionID), encoded, ttl).Err(); err != nil {
-		return "", fmt.Errorf("failed to store session: %w", err)
-	}
-	if err := s.client.SAdd(ctx, ssoUserSessionsKey(personID), sessionID).Err(); err != nil {
-		// 索引写入失败时清理已写入的 session，避免产生无法随全局登出撤销的孤儿会话
+	_, err = s.client.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.Set(ctx, ssoSessionKey(sessionID), encoded, ttl)
+		pipe.SAdd(ctx, ssoUserSessionsKey(personID), sessionID)
+		pipe.Expire(ctx, ssoUserSessionsKey(personID), ttl)
+		return nil
+	})
+	if err != nil {
 		s.client.Del(ctx, ssoSessionKey(sessionID))
-		return "", fmt.Errorf("failed to index session: %w", err)
+		return "", fmt.Errorf("failed to store and index session: %w", err)
 	}
-	s.client.Expire(ctx, ssoUserSessionsKey(personID), ttl)
 	recordSessionAuditBestEffort(ctx, sessionID, personID)
 	return sessionID, nil
 }
@@ -243,20 +254,19 @@ func (s *redisSSOSessionStore) RevokeSession(ctx context.Context, sessionID stri
 	return s.client.Del(ctx, ssoSessionKey(sessionID)).Err()
 }
 
+var revokePersonSessionsScript = redis.NewScript(`
+local sessions = redis.call('SMEMBERS', KEYS[1])
+for _, sid in ipairs(sessions) do
+    redis.call('DEL', ARGV[1] .. sid)
+end
+return redis.call('DEL', KEYS[1])
+`)
+
 func (s *redisSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, personID string) error {
 	if s.client == nil {
 		return fmt.Errorf("redis client not available")
 	}
-	userSessionsKey := ssoUserSessionsKey(personID)
-	sessionIDs, err := s.client.SMembers(ctx, userSessionsKey).Result()
-	if err != nil {
-		return fmt.Errorf("failed to get user sessions: %w", err)
-	}
-	for _, sessionID := range sessionIDs {
-		s.client.Del(ctx, ssoSessionKey(sessionID))
-	}
-	s.client.Del(ctx, userSessionsKey)
-	return nil
+	return revokePersonSessionsScript.Run(ctx, s.client, []string{ssoUserSessionsKey(personID)}, ssoSessionKeyPrefix).Err()
 }
 
 // HasActiveSession 返回该自然人是否存在至少一个仍然有效的 SSO 会话。

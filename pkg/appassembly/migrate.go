@@ -6,6 +6,7 @@ import (
 
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/golib/gsetting"
 	"gorm.io/gorm"
 )
 
@@ -36,13 +37,17 @@ func (a *App) RunMigrations(ctx context.Context) error {
 	if err := model.AutoMigrateAll(db); err != nil {
 		return fmt.Errorf("pkg/appassembly: automigrate failed: %w", err)
 	}
+	if err := gsetting.Migrate(db); err != nil {
+		return fmt.Errorf("pkg/appassembly: migrate runtime settings: %w", err)
+	}
 	return nil
 }
 
-// iamTableNames 返回 IAM 全部数据表名（源自 model.AllEntities 的 TableName）。
+// iamTableNames 返回 IAM 全部数据表名（含 gsetting 配置表）。
 func iamTableNames(db *gorm.DB) ([]string, error) {
-	names := make([]string, 0, len(model.AllEntities()))
-	for _, entity := range model.AllEntities() {
+	entities := append(model.AllEntities(), gsetting.SchemaModels()...)
+	names := make([]string, 0, len(entities))
+	for _, entity := range entities {
 		stmt := &gorm.Statement{DB: db}
 		if err := stmt.Parse(entity); err != nil {
 			return nil, err

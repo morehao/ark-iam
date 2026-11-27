@@ -3,22 +3,8 @@ package dtopermission
 import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objidentity"
-	"github.com/morehao/ark-iam/pkg/object/objpermission"
 	"github.com/morehao/golib/biz/gobject"
 )
-
-type MenuCreateReq struct {
-	objpermission.MenuBaseInfo
-	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
-	Operator objidentity.Operator
-}
-
-type MenuUpdateReq struct {
-	MenuID string `json:"-" uri:"menuID" binding:"required"` // 菜单ID
-	objpermission.MenuBaseInfo
-	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
-	Operator objidentity.Operator
-}
 
 type MenuDetailReq struct {
 	MenuID string `json:"-" uri:"menuID" binding:"required"` // 菜单ID
@@ -33,12 +19,6 @@ type MenuPageListReq struct {
 	Type       model.MenuType       `json:"type" form:"type"`             // 菜单类型
 	Status     model.MenuStatus     `json:"status" form:"status"`         // 状态
 	Visibility model.MenuVisibility `json:"visibility" form:"visibility"` // 可见性门槛(public/member/admin)
-}
-
-type MenuDeleteReq struct {
-	MenuID string `json:"-" uri:"menuID" binding:"required"` // 菜单ID
-	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
-	Operator objidentity.Operator
 }
 
 type MenuTreeReq struct {

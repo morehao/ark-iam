@@ -17,10 +17,12 @@ import (
 func seedTestApp(t *testing.T, db *gorm.DB, tenantID, appID string) {
 	t.Helper()
 	if err := db.Create(&model.ApplicationEntity{
-		BaseEntity: gormdao.BaseEntity{StringID: gormdao.StringID{ID: appID}},
-		Code:       "app-" + appID,
-		Name:       "租户管理后台",
-		Status:     "enable",
+		BaseEntity:    gormdao.BaseEntity{StringID: gormdao.StringID{ID: appID}},
+		Code:          "app-" + appID,
+		Name:          "租户管理后台",
+		Status:        "enable",
+		OwnerType:     model.AppOwnerTypeTenant,
+		OwnerTenantID: tenantID,
 	}).Error; err != nil {
 		t.Fatalf("seed app: %v", err)
 	}

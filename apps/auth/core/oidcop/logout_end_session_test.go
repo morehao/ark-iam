@@ -94,11 +94,11 @@ func TestTerminateSessionFromRequestEnqueuesPreciseSidJobs(t *testing.T) {
 	}
 
 	// 队列应有一条 sid-a 的任务
-	job, ok, err := sso.DequeueLogout(ctx, 200*time.Millisecond)
+	job, err := sso.ClaimLogout(ctx)
 	if err != nil {
 		t.Fatalf("dequeue: %v", err)
 	}
-	if !ok {
+	if job == nil {
 		t.Fatal("expected a logout job")
 	}
 	if job.SessionID != sidA {
@@ -108,8 +108,11 @@ func TestTerminateSessionFromRequestEnqueuesPreciseSidJobs(t *testing.T) {
 		t.Fatalf("expected job client client-a, got %q", job.ClientID)
 	}
 
+	if err := job.Ack(ctx); err != nil {
+		t.Fatal(err)
+	}
 	// 不应再有多余任务
-	if _, ok, _ = sso.DequeueLogout(ctx, 200*time.Millisecond); ok {
+	if extra, err := sso.ClaimLogout(ctx); err != nil || extra != nil {
 		t.Fatal("expected no additional logout job")
 	}
 }

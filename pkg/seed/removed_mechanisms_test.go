@@ -36,7 +36,7 @@ func TestBootstrap_DeletedBuiltinMenuStaysDeleted(t *testing.T) {
 
 	// 模拟控制台删除「菜单管理」：先解除授权绑定，再软删菜单行（与控制台同一路径）。
 	var target model.MenuEntity
-	if err := db.Where("seed_key = ?", "menu").First(&target).Error; err != nil {
+	if err := db.Where("seed_key = ?", "setting").First(&target).Error; err != nil {
 		t.Fatalf("query menu: %v", err)
 	}
 	if err := db.Where("menu_id = ?", target.ID).Delete(&model.RoleMenuEntity{}).Error; err != nil {
@@ -92,8 +92,8 @@ func TestSeedExportedSurfaceIsPinned(t *testing.T) {
 
 	// 唯一的写通道 + 只读查询 + 只读清单
 	want := []string{
-		// 类型
-		"BuiltinMenu", "Change", "ConsoleRedirects", "ConsolesConfig", "Definition", "Report", "Status",
+		// 类型（RuntimeSettings 仅携带 Bootstrap 的首次安装输入）
+		"BuiltinMenu", "Change", "ConsoleRedirects", "ConsolesConfig", "Definition", "Report", "RuntimeSettings", "Status",
 		// 常量
 		"ErrAdminPasswordHashRequired", "StatusAlreadyInitialized", "StatusCreated",
 		// 函数

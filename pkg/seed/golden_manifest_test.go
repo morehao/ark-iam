@@ -34,7 +34,7 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 		{model.TableNameApplication, 2},
 		{model.TableNameRole, 2},
 		{model.TableNameMenu, 16},
-		{model.TableNameRoleMenu, 16},
+		{model.TableNameRoleMenu, 17},
 		{model.TableNameTenantApplication, 2},
 		{model.TableNamePerson, 1},
 		{model.TableNameUser, 1},
@@ -50,8 +50,8 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 		}
 		total += got
 	}
-	if total != 47 {
-		t.Errorf("12 张表合计 = %d 行, want 47", total)
+	if total != 48 {
+		t.Errorf("12 张表合计 = %d 行, want 48", total)
 	}
 
 	// ---- 租户与根部门 ----
@@ -96,6 +96,16 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 	if apps["platform_admin"].Sort != 0 || apps["tenant_admin"].Sort != 1 {
 		t.Errorf("应用 sort = %d/%d, want 0/1", apps["platform_admin"].Sort, apps["tenant_admin"].Sort)
 	}
+	// 内置应用归属平台租户：owner_type=tenant、owner_tenant_id=平台租户 ID。
+	for _, code := range []string{"platform_admin", "tenant_admin"} {
+		app := apps[code]
+		if app.OwnerType != model.AppOwnerTypeTenant {
+			t.Errorf("内置应用 %s owner_type = %q, want tenant", code, app.OwnerType)
+		}
+		if app.OwnerTenantID == "" {
+			t.Errorf("内置应用 %s owner_tenant_id 为空，want 平台租户 ID", code)
+		}
+	}
 
 	// ---- 角色：平台 admin 角色 code/admin_type/source 固定 ----
 	var platformRole model.RoleEntity
@@ -134,7 +144,7 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 		{"application", "platform_admin", "grp-app", model.MenuTypeMenu, model.MenuVisibilityAdmin},
 		{"oauth-client", "platform_admin", "grp-app", model.MenuTypeMenu, model.MenuVisibilityAdmin},
 		{"grp-platform", "platform_admin", "", model.MenuTypeDirectory, model.MenuVisibilityAdmin},
-		{"menu", "platform_admin", "grp-platform", model.MenuTypeMenu, model.MenuVisibilityAdmin},
+		{"tenant-menu", "tenant_admin", "", model.MenuTypeMenu, model.MenuVisibilityAdmin},
 		{"setting", "platform_admin", "grp-platform", model.MenuTypeMenu, model.MenuVisibilityAdmin},
 		{"connector", "platform_admin", "grp-platform", model.MenuTypeMenu, model.MenuVisibilityAdmin},
 		{"department", "tenant_admin", "", model.MenuTypeMenu, model.MenuVisibilityAdmin},
@@ -207,12 +217,12 @@ func TestBootstrap_GoldenDataManifest(t *testing.T) {
 	// 目录菜单从不授权；平台角色的 10 条含 3 个 tenant_admin 应用菜单（department/tenant-user/tenant-role），
 	// 这是现状（便于平台侧改后无需重新授权），改造中不得"顺手纠正"。
 	wantPlatformRoleMenus := []string{
-		"dashboard", "menu", "setting", "connector", "tenant", "application", "tenant-application",
+		"dashboard", "tenant-menu", "setting", "connector", "tenant", "application", "tenant-application",
 		"oauth-client", "domain", "department", "tenant-user", "tenant-role",
 	}
 	assertRoleMenuSeedKeys(t, db, tenant.ID, platformRole.ID, menusBySeedKey, wantPlatformRoleMenus)
 	assertRoleMenuSeedKeys(t, db, tenant.ID, tenantRole.ID, menusBySeedKey,
-		[]string{"department", "tenant-user", "tenant-role", "tenant-api-key"})
+		[]string{"department", "tenant-user", "tenant-role", "tenant-api-key", "tenant-menu"})
 
 	// ---- 内置 OIDC 客户端 ----
 	wantClients := []struct {

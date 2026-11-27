@@ -107,6 +107,8 @@ var SeedFieldAuthorities = []SeedFieldAuthority{
 	// 名称/描述属控制台展示身份（create_only）：种子的值只是创建时的初值，控制台改名/改描述后不回写。
 	{SeedEntityApplication, "code", SeedFieldImmutable},
 	{SeedEntityApplication, "source", SeedFieldImmutable},
+	{SeedEntityApplication, "owner_type", SeedFieldImmutable},
+	{SeedEntityApplication, "owner_tenant_id", SeedFieldImmutable},
 	{SeedEntityApplication, "name", SeedFieldCreateOnly},
 	{SeedEntityApplication, "description", SeedFieldCreateOnly},
 	{SeedEntityApplication, "status", SeedFieldCreateOnly},

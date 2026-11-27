@@ -8,6 +8,7 @@ import (
 	"github.com/morehao/ark-iam/apps/platformadmin/dto/dtosetting"
 	"github.com/morehao/ark-iam/apps/platformadmin/testutil"
 	"github.com/morehao/ark-iam/pkg/code"
+	"github.com/morehao/ark-iam/pkg/runtimesetting"
 	"github.com/morehao/golib/gsetting"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,10 +17,13 @@ import (
 // setupSvc 建 sqlite 并初始化 gsetting（含 core_setting 表），返回服务实例。
 func setupSvc(t *testing.T) SettingSvc {
 	t.Helper()
-	db := testutil.SetupSQLite(t) // gsetting.New 内部会 AutoMigrate core_setting
-	if _, err := gsetting.New(db); err != nil {
-		t.Fatalf("gsetting.New: %v", err)
+	db := testutil.SetupSQLite(t, &gsetting.SettingEntity{})
+	store, err := runtimesetting.New(db)
+	if err != nil {
+		t.Fatal(err)
 	}
+	runtimesetting.SetProcessStore(store)
+	t.Cleanup(func() { runtimesetting.SetProcessStore(nil) })
 	return NewSettingSvc()
 }
 
@@ -70,13 +74,13 @@ func TestUpdate_MaskedValueKeepsSecret(t *testing.T) {
 	require.NoError(t, svc.Update(ctx, &dtosetting.SettingUpdateReq{SettingID: id, Value: MaskedValue, Encrypted: true}))
 
 	// 直接读回（GetByID 解密），密文应仍为 "orig"。
-	got, err := gsetting.GetAdmin().GetByID(ctx, id)
+	got, err := processAdmin().GetByID(ctx, id)
 	require.NoError(t, err)
 	assert.Equal(t, "orig", got.Value, "掩码值更新不应改变原值")
 
 	// 用新明文更新 -> 应改为 newpwd。
 	require.NoError(t, svc.Update(ctx, &dtosetting.SettingUpdateReq{SettingID: id, Value: "newpwd", Encrypted: true}))
-	got2, err := gsetting.GetAdmin().GetByID(ctx, id)
+	got2, err := processAdmin().GetByID(ctx, id)
 	require.NoError(t, err)
 	assert.Equal(t, "newpwd", got2.Value)
 }

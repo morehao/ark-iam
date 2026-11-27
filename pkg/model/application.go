@@ -64,6 +64,20 @@ const (
 	AppJoinByInvitePolicyDisable AppJoinByInvitePolicy = "disable"
 )
 
+// AppOwnerType 应用归属类型（具名枚举，禁止裸 string）。
+//
+// 语义：
+//   - tenant：归属某个具体租户（含内置应用归属平台租户 t_platform），由该租户维护菜单；
+//   - platform：平台全局应用，未分配具体租户（无租户可写菜单，v2 下无控制台写入口）。
+//
+// 刻意**不复用** user 的 OwnerType（见 pkg/model/enum_test.go 的一类型一列守卫）。
+type AppOwnerType string
+
+const (
+	AppOwnerTypePlatform AppOwnerType = "platform"
+	AppOwnerTypeTenant   AppOwnerType = "tenant"
+)
+
 type ApplicationEntity struct {
 	gormdao.BaseEntity
 	// Code 应用编码：业务标识，**控制台可改**（应用级唯一；改它不影响菜单/订阅/角色——那些都挂 app_id）。
@@ -72,7 +86,13 @@ type ApplicationEntity struct {
 	// SeedKey 种子身份键：内置应用的稳定标识（= 种子定义时的 code），创建时写入后不再变化，
 	// 控制台不可见也不可写。种子查行与租户开通（ProvisionTenantAdmin 定位 tenant_admin 应用）
 	// 都以它为依据；控制台自建应用恒为空串（空串不进部分唯一索引）。
-	SeedKey                 string                      `gorm:"column:seed_key;type:varchar(64);not null;default:'';comment:种子身份键(内置应用稳定标识,控制台不可见);uniqueIndex:iam_uk_application_seed_key_active,where:deleted_at IS NULL AND seed_key <> ''" json:"-"`
+	SeedKey string `gorm:"column:seed_key;type:varchar(64);not null;default:'';comment:种子身份键(内置应用稳定标识,控制台不可见);uniqueIndex:iam_uk_application_seed_key_active,where:deleted_at IS NULL AND seed_key <> ''" json:"-"`
+	// OwnerType 应用归属类型：platform / tenant（见 AppOwnerType）。
+	// immutable：L1 创建时写入后控制台不可改；改写会造成跨租户归属篡夺 / 越权写菜单。
+	OwnerType AppOwnerType `gorm:"column:owner_type;type:varchar(32);not null;default:'platform';comment:归属类型(platform平台/tenant租户)" json:"ownerType"`
+	// OwnerTenantID 归属租户 id：owner_type=tenant 时非空（含内置应用 = 平台租户 t_platform）。
+	// immutable；owner_type=tenant ⇒ owner_tenant_id != ''（service 强校验）。
+	OwnerTenantID           string                      `gorm:"column:owner_tenant_id;type:varchar(36);not null;default:'';comment:归属租户id(owner_type=tenant 时非空)" json:"ownerTenantID"`
 	AllowPersonCreateTenant AppPersonCreateTenantPolicy `gorm:"column:allow_person_create_tenant;type:varchar(16);not null;default:'disable';comment:个人是否可自助创建租户(enable/disable)" json:"allowPersonCreateTenant"`
 	AllowJoinByInvite       AppJoinByInvitePolicy       `gorm:"column:allow_join_by_invite;type:varchar(16);not null;default:'disable';comment:是否允许通过邀请加入租户(enable/disable)" json:"allowJoinByInvite"`
 	// RoleTemplate 应用角色模板：本应用对外提供的跨系统授权契约值清单（code + 展示名）。

@@ -9,15 +9,15 @@ import (
 
 // 角色（role）不再有平台端入口：角色按租户归属，读写与成员管理全部收敛到 tenantadmin，
 // 平台侧不再提供跨租户角色只读视图，避免绕过租户授权边界。
+//
+// 菜单：平台侧只保留只读（PageList/Tree/Detail/MyTree）。菜单写能力已下放归属租户
+// （tenantadmin /v1/tenant/applications/{appID}/menus），平台不再维护任何应用菜单写。
 func menuRouter(rg *gin.RouterGroup, db gormdao.DBGetter) {
 	menuCtr := ctrpermission.NewMenuCtr(db)
-	rg.POST("/menus", menuCtr.Create)
 	rg.GET("/menus", menuCtr.PageList)
 	rg.GET("/menus/tree", menuCtr.Tree)
 	rg.GET("/menus/my", menuCtr.MyTree)
 	rg.GET("/menus/:menuID", menuCtr.Detail)
-	rg.PUT("/menus/:menuID", menuCtr.Update)
-	rg.DELETE("/menus/:menuID", menuCtr.Delete)
 }
 
 func applicationClientRouter(rg *gin.RouterGroup, db gormdao.DBGetter) {

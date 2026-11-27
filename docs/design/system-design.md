@@ -560,7 +560,7 @@ erDiagram
 | 表 | 说明 |
 |---|---|
 | `role` | 角色：租户内 + 按应用（`app_id`）作用域；`source` builtin/custom；`admin_type` admin/normal 是系统管理能力标签（**内置角色整体只读**：禁删、禁编辑——名称/描述/编码一律不可改）。`code` 是**跨系统授权契约值**（`^[a-z][a-z0-9_]*$`）：它是 OIDC ID token `groups` 声明的取值，下游系统按「前缀 + 编码」认自己的策略名（如对象存储 `claim_prefix=iam_` → 策略 `iam_platform_admin`）。**编码只有两个来源，租户侧没有任何写入入口**：① 产品锚点角色（`platform_admin`/`tenant_admin`，`source=builtin && admin_type=admin`，由 L1 首次引导或建租户产生）；② **应用角色模板**（`application.role_template`，开通应用时物化到该租户，`source=builtin && admin_type=normal`）。**租户自建角色（`source=custom`）的 `code` 恒为空串、不进入 `groups` 声明**——下游策略是全局命名实体（策略名 = `claim_prefix` + 编码，全租户共用一条、无映射表可回查），若允许租户写编码，任何租户管理员都能造出一个撞上既有策略的编码从而自提权；把契约值收归应用方定义后，「定义值的人」与「在下游供给策略的人」是同一主体，不再需要保留字护栏。**该声明只下发给「本角色所属应用的客户端」**（作用域键 = `application_client.app_id`，见 §5.4）：下游只认自己那个应用的编码，跨应用的角色不会进入其策略命名空间；反之若按租户全量下发，在无关应用里造一个同码角色即可命中下游策略（跨应用越权）。**无 `type`、无 `is_default`** |
-| `menu` | 菜单：按应用管理（`app_id`），支持树（`parent_id`）；`type` directory/menu/button；`visibility` public/member/admin 为可见性门槛；`seed_key` 为种子身份键（控制台不可见不可写）。**顺序由 `sort` 唯一决定**（升序，同值按 `code`，见 `pkg/dao.MenuOrderBySort`）：所有面向界面的菜单查询（两端侧边栏、角色授权树、菜单管理树/列表）都必须显式 ORDER BY，缺省顺序数据库不保证、控制台改排序会看不到效果。**无 `tenant_id`、无 `permission`** |
+| `menu` | 菜单：按应用管理（`app_id`），支持树（`parent_id`）；`type` directory/menu/button；`visibility` public/member/admin 为可见性门槛；`seed_key` 为种子身份键（控制台不可见不可写）。**顺序由 `sort` 唯一决定**（升序，同值按 `code`，见 `pkg/dao.MenuOrderBySort`）：所有面向界面的菜单查询（两端侧边栏、角色授权树、菜单管理树/列表）都必须显式 ORDER BY，缺省顺序数据库不保证、控制台改排序会看不到效果。**维护权归应用归属租户**（经 `application.owner_type/owner_tenant_id` 推导，写入口 `/v1/tenant/applications/{appID}/menus`，见 §4.5）；**无 `tenant_id`、无 `permission`**（菜单本身全局一份，租户按订阅聚合只读消费） |
 | `user_application` | **准入层**：用户-应用准入（`user_id` 指向 `user.id`，成员与服务账号同构），是「某用户可否使用某应用」的**唯一事实源**；`status`（`UserApplicationStatus`：enable/disable，撤销=置 disable、行保留以备审计）与 `source`（`UserApplicationSource`：manual 手工分配 / role 由角色授予自动补齐 / provision 引导写入）。唯一性靠**部分唯一索引** `uk_user_application_active (tenant_id, user_id, app_id) WHERE deleted_at IS NULL`（软删后可重授，与 `user_role` 同形）。判定式与不变式（角色授予自动补准入、撤销准入级联软删该应用 `user_role`、取消订阅不级联）见 `pkg/core/application` |
 | `user_role` | **授权层**：用户-角色关联（授权**不产生**可用性：有角色而无准入仍不可用；反之写角色会**自动补**准入，撤销角色**不**回撤准入） |
 | `role_menu` | 角色-菜单关联（可访问菜单） |
@@ -571,7 +571,7 @@ erDiagram
 
 | 表 | 说明 |
 |---|---|
-| `application` | 业务应用定义：编码/名称/描述/来源（`source`：builtin/first_party/third_party）/状态/排序/两个**入口策略**具名枚举开关列（`allow_person_create_tenant` 通道 A：`AppPersonCreateTenantPolicy`、`allow_join_by_invite` 通道 B：`AppJoinByInvitePolicy`，取值 enable/disable；NULL ≡ disable，判定见 §5.1）/`seed_key`（内置应用的种子身份键）/`role_template`（**应用角色模板**：`RoleTemplateItemList`（`[{code,name}]`，`serializer:json`），本应用对外的契约角色清单，见 §5.4；平台侧维护，`create_only`）。控制台只能创建 `third_party` |
+| `application` | 业务应用定义：编码/名称/描述/来源（`source`：builtin/first_party/third_party）/状态/排序/两个**入口策略**具名枚举开关列（`allow_person_create_tenant` 通道 A：`AppPersonCreateTenantPolicy`、`allow_join_by_invite` 通道 B：`AppJoinByInvitePolicy`，取值 enable/disable；NULL ≡ disable，判定见 §5.1）/`seed_key`（内置应用的种子身份键）/`role_template`（**应用角色模板**：`RoleTemplateItemList`（`[{code,name}]`，`serializer:json`），本应用对外的契约角色清单，见 §5.4；平台侧维护，`create_only`）/**归属** `owner_type`（`AppOwnerType`：platform/tenant）+ `owner_tenant_id`（归属租户 id，`owner_type=tenant` 时非空；内置应用归属平台租户 `t_platform`）——决定**菜单维护权**：只有归属租户能维护该应用菜单，两列均 immutable（见 §4.5）。控制台只能创建 `third_party`（归属租户由创建入参指定） |
 | `application_client` | **OAuth/OIDC 客户端**：`code` 即 `client_id`（创建时必填，`^[a-z][a-z_]*$`：小写字母开头，仅小写字母与下划线）、`app_id` 归属、redirect_uris / post_logout_redirect_uris、grant_types、token_endpoint_auth_method、`require_pkce`/`require_auth_time`（`ClientPKCEPolicy`/`ClientAuthTimeClaimPolicy`，enable/disable）、令牌 TTL、来源（`source`） |
 | `application_client_secret` | 客户端密钥：只存哈希（`value_hash`）+ 前缀（`value_prefix`），支持过期/吊销 |
 | `api_key` | API Key 机器凭证：只存哈希（`key_hash`）+ 前缀（`key_prefix`，明文前 7 位，仅列表展示），支持过期/吊销（通用 `scope` JSON 列与 `last_used_at` 已下线）；`owner_user_id` 归属**服务账号**（个人密钥能力已下线，历史 member 数据兼容展示），鉴权按归属服务账号注入身份；明文仅创建时展示一次，管理在租户端（需系统管理能力） |
@@ -615,7 +615,9 @@ erDiagram
 | `immutable`（不可变，`SeedFieldImmutable`） | L1（仅创建时） | L1 创建时写入，此后**必须保持不变**：控制台对这类字段一律拒写。这里的原因**不是**"运维改完、下次初始化被收回"（L1 只跑一次、之后永久自锁，不存在下一次），而是这些字段本身就是身份 / 安全不变式——被改写会让鉴权边界失效（如 `source` 内置标记、平台租户 `status`）或让对应控制台自我锁死（如内置应用 / 客户端 `code`） |
 | `create_only`（只播种，`SeedFieldCreateOnly`） | 运维 | L1 只在行不存在时写入初值，此后永不回写；控制台可自由修改 |
 
-**`immutable` 的准入判据**：只有"被控制台改写后会导致鉴权被绕过或控制台自我锁死"的字段才准入，共三类——**安全不变式**：`tenant`/`application`/`application_client` 的 `source`（内置标记）、`role.admin_type`、平台租户 `status`（被挂起整栈失联）、`user.source`；**身份编码**：内置应用 `code`、内置客户端 `code`（= `client_id`）；**客户端类型不变式**：内置客户端的 `token_endpoint_auth_method` 与 `require_pkce`（浏览器客户端不可持密钥：RFC 6749 §10.1 / RFC 10017 §6.3.3.1——改成机密客户端会当场锁死对应控制台，关掉 PKCE 则丢掉公共客户端唯一的补偿控制）。展示 / 结构类字段（应用名与描述、**应用角色模板 `role_template`**、客户端名、角色名/描述/编码、菜单的名/图标/排序/可见性/路径/组件/层级）一律 `create_only` 归运维；矩阵之外的字段视为 `create_only`。**不接受"跨版本自动改名"的需求**：确需改名由运维在控制台改，或按版本级动作发版。判定谓词是 `model.SeedFieldIsImmutable(entity, field)`，实体不可变字段清单用 `model.SeedImmutableFields(entity)`；`immutable` 字段必须在控制台有对应拒写点（见下方"只读字段"）。
+**`immutable` 的准入判据**：只有"被控制台改写后会导致鉴权被绕过或控制台自我锁死"的字段才准入，共三类——**安全不变式**：`tenant`/`application`/`application_client` 的 `source`（内置标记）、`role.admin_type`、平台租户 `status`（被挂起整栈失联）、`user.source`、**`application.owner_type` 与 `application.owner_tenant_id`**（应用归属：被改写会造成跨租户归属篡夺 / 越权维护他人应用菜单，属鉴权被绕过）；**身份编码**：内置应用 `code`、内置客户端 `code`（= `client_id`）；**客户端类型不变式**：内置客户端的 `token_endpoint_auth_method` 与 `require_pkce`（浏览器客户端不可持密钥：RFC 6749 §10.1 / RFC 10017 §6.3.3.1——改成机密客户端会当场锁死对应控制台，关掉 PKCE 则丢掉公共客户端唯一的补偿控制）。展示 / 结构类字段（应用名与描述、**应用角色模板 `role_template`**、客户端名、角色名/描述/编码、菜单的名/图标/排序/可见性/路径/组件/层级）一律 `create_only` 归运维；矩阵之外的字段视为 `create_only`。**不接受"跨版本自动改名"的需求**：确需改名由运维在控制台改，或按版本级动作发版。判定谓词是 `model.SeedFieldIsImmutable(entity, field)`，实体不可变字段清单用 `model.SeedImmutableFields(entity)`；`immutable` 字段必须在控制台有对应拒写点（见下方"只读字段"）。
+
+> **应用归属（`owner_type` / `owner_tenant_id`）与菜单维护权**：应用归属唯一租户（`owner_type=tenant` 且 `owner_tenant_id` 非空；内置 `platform_admin`/`tenant_admin` 归属平台租户 `t_platform`）。**菜单维护权 = 应用归属**：只有归属租户的系统管理员能维护该应用菜单（`/v1/tenant/applications/{appID}/menus`，非归属报 `100606`）；其他租户订阅使用但菜单只读。平台端菜单接口只读。two 个字段 L1 创建时写入（控制台建第三方应用固定 `owner_type=tenant`）、此后 immutable；控制台 `ApplicationUpdateReq` 不含这两字段（结构上不可改），改归属 = 删旧建新。
 
 **L1 认行靠 `seed_key`，不靠业务编码**：`menu` 与 `application` 各有一个控制台**不可见不可写**的内部列 `seed_key`（创建时写入、此后不变），L1 按它定位既有行（只按 `seed_key`，不做 `code` 兜底——保留兜底反而会让运维自建的同 code 行被误认领）。因此菜单的 `code` 与归属应用、自建应用 / 客户端的 `code` 都可以自由修改而不触发"重复建行"。`application_client` 仍按 `code`（= `client_id`）认行。
 
@@ -627,6 +629,8 @@ erDiagram
 - **角色的 `code`**（`role.code`，跨系统授权契约值）：**租户侧在结构上没有写入入口**——`dtotenant.RoleCreateReq`/`RoleUpdateReq` 不含该字段，service 创建自建角色时恒写空串、更新只改名称/描述。取值只能由产品锚点（L1）与应用角色模板（`application.role_template`）产生，见 §5.4。
 
 **菜单的"行"归运维**：控制台可新增根菜单 / 子菜单，也可删除任意菜单（含内置菜单）。删除是**软删除**，软删行仍带 `seed_key`，等于"该菜单已被人为下线"；但 L1 **只在库未初始化时**按 `seed_key` 认行创建，之后永久自锁，因此**不要假设内置菜单行一定存在**，也不要指望从控制台删除后种子会把它建回来。版本级下线只删 `builtinMenuDefs` 中的定义即可——旧实现里的 `retiredMenus` 退役清理与墓碑跳过机制已删除；反之，新增内置菜单也不会自动下发，须由运维按 `make print-builtin-menus` 的清单在控制台补录。
+
+> **菜单维护入口已从平台控制台迁到租户控制台**：菜单写能力下放到**归属租户**（`/v1/tenant/applications/{appID}/menus`，见 `api-reference.md` §6），平台端菜单接口只读。内置应用（`platform_admin`/`tenant_admin`）归属平台租户 `t_platform`，平台管理员维护其菜单时，以「平台租户管理员」身份**登录租户控制台**（`/menu` 页，内置菜单 `tenant-menu`）操作；平台控制台不再提供菜单写页面（仅提供「前往租户控制台维护菜单」跳转）。
 
 ---
 

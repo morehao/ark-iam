@@ -13,5 +13,6 @@ func applicationRouter(rg *gin.RouterGroup, db gormdao.DBGetter) {
 	applicationCtr := ctrtenant.NewApplicationCtr(db)
 
 	rg.GET("/applications", applicationCtr.List)
+	rg.GET("/applications/owned", applicationCtr.OwnedList)
 	rg.GET("/applications/:appID/users", applicationCtr.ListUsers)
 }

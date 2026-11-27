@@ -2,6 +2,7 @@ package svcapplication
 
 import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"reflect"
 	"testing"
 
 	"github.com/morehao/ark-iam/apps/platformadmin/dto/dtoapplication"
@@ -170,5 +171,26 @@ func TestUpdateApplicationRejectsInvalidCode(t *testing.T) {
 	}
 	if got.Code != "my_app" {
 		t.Fatalf("被拒的改名不得落库: %q", got.Code)
+	}
+}
+
+// TestApplicationUpdateReqHasNoOwnerFields 归属（owner_type/owner_tenant_id）属 immutable：
+// 字段权威矩阵登记为 SeedFieldImmutable，ApplicationUpdateReq **结构上不得含** OwnerType/OwnerTenantID
+// （结构不可改强于 service 拒写——换归属=删旧建新）。本条为 DTO 回归断言，防止后续误加字段。
+func TestApplicationUpdateReqHasNoOwnerFields(t *testing.T) {
+	typ := reflect.TypeOf(dtoapplication.ApplicationUpdateReq{})
+	forbidden := []string{"OwnerType", "OwnerTenantID"}
+	for _, name := range forbidden {
+		if _, ok := typ.FieldByName(name); ok {
+			t.Fatalf("ApplicationUpdateReq 不得含归属字段 %q（owner 为 immutable，只允许创建时写入）", name)
+		}
+	}
+
+	// 反向确认：创建请求必须带这两字段（否则创建无法写入归属）。
+	createTyp := reflect.TypeOf(dtoapplication.ApplicationCreateReq{})
+	for _, name := range forbidden {
+		if _, ok := createTyp.FieldByName(name); !ok {
+			t.Fatalf("ApplicationCreateReq 应含归属字段 %q", name)
+		}
 	}
 }
