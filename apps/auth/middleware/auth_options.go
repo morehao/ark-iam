@@ -6,6 +6,7 @@ import (
 	"github.com/morehao/ark-iam/apps/auth/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	pkgmiddleware "github.com/morehao/ark-iam/pkg/middleware"
+	"github.com/morehao/ark-iam/pkg/oidcctx"
 	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/glog"
 )
@@ -38,7 +39,12 @@ func OIDCBusinessAuthOptions() []pkgmiddleware.AuthOption {
 			if dbclient.RedisCli == nil {
 				return true
 			}
-			active, err := sso.ValidateTokenSession(ctx, ssoStore, personID, sessionID)
+			// D 租户（issuer 非配置的中央 issuer）fail-closed：无 sid 不回退 person（DG-SESSION-1）。
+			requireSID := false
+			if iss, ok := oidcctx.IssuerFromContext(ctx); ok && iss != "" && (config.Conf == nil || iss != config.Conf.OIDC.Issuer) {
+				requireSID = true
+			}
+			active, err := sso.ValidateTokenSession(ctx, ssoStore, personID, sessionID, requireSID)
 			if err != nil {
 				glog.Warnf(ctx, "[middleware.OIDCBusinessAuthOptions] validate token session fail, personID:%s, err:%v", personID, err)
 				return false

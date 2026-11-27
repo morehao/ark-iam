@@ -80,8 +80,15 @@ type SSOSessionStore interface {
 }
 
 // ValidateTokenSession verifies the session referenced by a signed token.
-func ValidateTokenSession(ctx context.Context, store SSOSessionStore, personID, sessionID string) (bool, error) {
+//
+// requireSID=true 表示 fail-closed：缺失 sid 直接判定无效，**不得**回退 person 级
+// HasActiveSession——D 租户要求会话粒度隔离（DG-SESSION-1 / AC-7）。requireSID=false 保留
+// 既有兼容（无 sid 的旧 token 回退 person 活性校验）。
+func ValidateTokenSession(ctx context.Context, store SSOSessionStore, personID, sessionID string, requireSID bool) (bool, error) {
 	if sessionID == "" {
+		if requireSID {
+			return false, nil // fail-closed：D 无 sid 不回退 person
+		}
 		// Older access tokens may omit sid.
 		return store.HasActiveSession(ctx, personID)
 	}

@@ -7,6 +7,7 @@ import (
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/middleware"
+	"github.com/morehao/ark-iam/pkg/oidcctx"
 	"github.com/morehao/ark-iam/pkg/oidckit"
 	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
@@ -46,8 +47,12 @@ func (a *App) authMiddlewareForGroup(conf *pkgconfig.Config, audience string) []
 	}))
 	if conf != nil && conf.OIDC.EnableSSOSessionValidation {
 		ssoStore := sso.NewSSOSessionStore()
+		centralIssuer := ""
+		if conf != nil {
+			centralIssuer = conf.OIDC.Issuer
+		}
 		opts = append(opts, middleware.WithOIDCSSOValidation(func(ctx context.Context, personID, sessionID string, isMachineToken bool) bool {
-			return validateSSOSession(ctx, ssoStore, personID, sessionID, isMachineToken)
+			return validateSSOSession(ctx, ssoStore, personID, sessionID, isMachineToken, centralIssuer)
 		}))
 	}
 	return []gin.HandlerFunc{
@@ -61,14 +66,19 @@ func (a *App) authMiddlewareForGroup(conf *pkgconfig.Config, audience string) []
 //   - 机器凭证：不依赖浏览器会话，直接放行；
 //   - 未配置认证 Redis（dbclient.RedisCli == nil）：无法校验，放行（由 access token 短 TTL 兜底）；
 //   - Redis 已配置但查询出错：fail-closed（返回 false）——否则已撤销的会话会继续用满令牌 TTL。
-func validateSSOSession(ctx context.Context, store sso.SSOSessionStore, personID, sessionID string, isMachineToken bool) bool {
+func validateSSOSession(ctx context.Context, store sso.SSOSessionStore, personID, sessionID string, isMachineToken bool, centralIssuer string) bool {
 	if isMachineToken {
 		return true
 	}
 	if dbclient.RedisCli == nil {
 		return true
 	}
-	active, err := sso.ValidateTokenSession(ctx, store, personID, sessionID)
+	// D 租户（issuer 非中央）fail-closed：无 sid 不回退 person 级校验（DG-SESSION-1）。
+	requireSID := false
+	if iss, ok := oidcctx.IssuerFromContext(ctx); ok && iss != "" && iss != centralIssuer {
+		requireSID = true
+	}
+	active, err := sso.ValidateTokenSession(ctx, store, personID, sessionID, requireSID)
 	if err != nil {
 		glog.Warnf(ctx, "[pkg/appassembly] sso session validate fail, fail-closed, personID:%s, err:%v", personID, err)
 		return false
