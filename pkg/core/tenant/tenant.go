@@ -43,6 +43,47 @@ func RevokeMemberSessions(ctx context.Context, tenantID string) error {
 	return nil
 }
 
+// RevokeMemberSessionsByIssuer 撤销某租户成员在指定 issuer 下的会话凭证（refresh + SSO）。
+// 供 D 租户 offboard 使用：只撤该 (tenant, issuer) 范围，不波及其他 issuer（DG-SESSION-2）。
+// issuer 为空时退化为 person 级全撤（极少见，回退）。
+func RevokeMemberSessionsByIssuer(ctx context.Context, tenantID, issuer string) error {
+	if tenantID == "" {
+		return nil
+	}
+	if issuer == "" {
+		return RevokeMemberSessions(ctx, tenantID)
+	}
+	memberCtx := dbclient.ExplicitTenantContext(ctx, tenantID)
+	users, err := dao.NewUserDao().GetListByCond(memberCtx, &dao.UserCond{TenantID: tenantID})
+	if err != nil {
+		return err
+	}
+	ssoStore := sso.NewSSOSessionStore()
+	seen := make(map[string]struct{}, len(users))
+	for i := range users {
+		personID := users[i].PersonID
+		if personID == "" {
+			continue
+		}
+		if _, ok := seen[personID]; ok {
+			continue
+		}
+		seen[personID] = struct{}{}
+		crossCtx := dbclient.CrossTenantContext(ctx)
+		// 先入队 back-channel（依赖 sso 索引），再按 issuer 撤 SSO 会话。
+		if _, bErr := sso.EnqueueLogoutsByPersonID(crossCtx, personID); bErr != nil {
+			glog.Warnf(ctx, "[tenant.RevokeMemberSessionsByIssuer] enqueue back-channel fail, personID:%s, err:%v", personID, bErr)
+		}
+		if rErr := dao.NewRefreshTokenDao().RevokeByCond(crossCtx, &dao.RefreshTokenCond{PersonID: personID, Issuer: issuer}); rErr != nil {
+			glog.Errorf(ctx, "[tenant.RevokeMemberSessionsByIssuer] revoke refresh fail, personID:%s, issuer:%s, err:%v", personID, issuer, rErr)
+		}
+		if sErr := ssoStore.RevokeSessionsByPersonAndIssuer(crossCtx, personID, issuer); sErr != nil {
+			glog.Errorf(ctx, "[tenant.RevokeMemberSessionsByIssuer] revoke sso fail, personID:%s, issuer:%s, err:%v", personID, issuer, sErr)
+		}
+	}
+	return nil
+}
+
 // RevokePersonSessions 撤销某自然人的全部会话凭证（refresh token + SSO 会话），
 // 并向其已登录的各应用（含第三方 RP）投递 back-channel logout 通知。
 //

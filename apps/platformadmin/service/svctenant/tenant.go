@@ -512,6 +512,8 @@ func (svc *tenantSvc) Offboard(ctx context.Context, req *dtotenant.TenantOffboar
 		return code.GetError(code.DomainTenantSuspendedError) // 仅 D 走 offboard
 	}
 
+	// 捕获 offboard 前的 issuer（tx 内会被清空），用于按 (tenant, issuer) 收敛撤销。
+	oldIssuer := tn.Issuer
 	var hosts []string
 	txErr := svc.db(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		dtx := &tenantdomain.Tx{DB: tx, TenantID: req.TenantID, Operator: req.Operator.UserID}
@@ -541,8 +543,8 @@ func (svc *tenantSvc) Offboard(ctx context.Context, req *dtotenant.TenantOffboar
 		return code.GetError(code.TenantUpdateError)
 	}
 	_ = hosts
-	// 提交后异步撤销该租户下全部会话（(tenant) 维度；D 不使用 person 级全撤）。
-	if rerr := tenant.RevokeMemberSessions(ctx, req.TenantID); rerr != nil {
+	// 提交后撤销该租户成员在 (tenant, issuer) 范围内的会话（DG-SESSION-2：不 person 级全撤、不波及其他 issuer）。
+	if rerr := tenant.RevokeMemberSessionsByIssuer(ctx, req.TenantID, oldIssuer); rerr != nil {
 		// 撤销失败不阻断 offboard（签发门禁已停）；记审计留待重试。
 		glog.Errorf(ctx, "[svctenant.Offboard] revoke sessions fail (will retry), err:%v, tenantID:%s", rerr, req.TenantID)
 	}
