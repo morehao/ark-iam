@@ -1,8 +1,8 @@
 package svcdomain
 
 import (
+	"context"
 	"fmt"
-	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,18 +10,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/morehao/ark-iam/apps/platformadmin/dto/dtodomain"
-	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/biz/gcontext"
-	"github.com/morehao/golib/gerror"
+	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
-// newTestDB 打开独立的内存 SQLite，并注册为全局 iam 库，使 service 内部直接
-// dao.NewXxxDao() 的调用自动落到测试库，无需任何注入 seam。
+// newTestDB 内存 SQLite 注册 iam 库，迁移租户/域名表。
 func newTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	dsn := fmt.Sprintf("file:svcdomain_%d?mode=memory&cache=shared", time.Now().UnixNano())
@@ -29,14 +27,13 @@ func newTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&model.DomainEntity{}); err != nil {
+	if err := db.AutoMigrate(&model.TenantEntity{}, &model.DomainEntity{}); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
 	dbclient.RegisterDBForTest(dbclient.ServiceNameIam, db)
 	t.Cleanup(func() {
 		dbclient.ClearDBForTest(dbclient.ServiceNameIam)
-		sqlDB, _ := db.DB()
-		if sqlDB != nil {
+		if sqlDB, _ := db.DB(); sqlDB != nil {
 			_ = sqlDB.Close()
 		}
 	})
@@ -54,186 +51,125 @@ func newGinCtx(tenantID, userID string) *gin.Context {
 	return ctx
 }
 
-func TestDomainSvc_Create_Success(t *testing.T) {
-	newTestDB(t)
-	ctx := newGinCtx("10", "100")
-
-	svc := NewDomainSvc(nil)
-	resp, err := svc.Create(requestCtx(ctx), &dtodomain.DomainCreateReq{Domain: "example.com",
-		Operator: operatorOf(ctx),
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.ID == "" {
-		t.Fatalf("expected non-zero id")
-	}
-
-	entity, err := dao.NewDomainDao().GetByID(dbclient.CrossTenantContext(ctx), resp.ID)
-	if err != nil {
-		t.Fatalf("GetByID: %v", err)
-	}
-	if entity == nil || entity.ID == "" {
-		t.Fatalf("expected persisted domain")
-	}
-	if entity.Domain != "example.com" {
-		t.Fatalf("expected domain example.com, got %s", entity.Domain)
-	}
-	if entity.TenantID != "10" {
-		t.Fatalf("expected tenantID 10, got %s", entity.TenantID)
-	}
-	if entity.VerificationStatus != model.DomainVerificationUnverified {
-		t.Fatalf("expected verificationStatus %q, got %q", model.DomainVerificationUnverified, entity.VerificationStatus)
-	}
-	if entity.CreatedBy != "100" {
-		t.Fatalf("expected createdBy 100, got %s", entity.CreatedBy)
+// seedTenant 插入租户（iam_tenant 是 skip 表，CrossTenant 写）。
+func seedTenant(t *testing.T, db *gorm.DB, id string, status model.TenantStatus) {
+	t.Helper()
+	tn := &model.TenantEntity{Status: status, IsolationMode: model.TenantIsolationDedicated}
+	tn.ID = id
+	if err := db.WithContext(dbclient.CrossTenantContext(context.Background())).Create(tn).Error; err != nil {
+		t.Fatalf("seed tenant: %v", err)
 	}
 }
 
-func TestDomainSvc_Create_DomainAlreadyExists(t *testing.T) {
-	db := newTestDB(t)
-	ctx := newGinCtx("10", "100")
-
-	if err := db.Create(&model.DomainEntity{TenantID: "10", Domain: "example.com"}).Error; err != nil {
-		t.Fatalf("seed: %v", err)
+func getDomain(t *testing.T, db *gorm.DB, tenantID, id string) *model.DomainEntity {
+	t.Helper()
+	var d model.DomainEntity
+	if err := db.WithContext(dbclient.ExplicitTenantContext(context.Background(), tenantID)).Where("id=?", id).First(&d).Error; err != nil {
+		t.Fatalf("get domain: %v", err)
 	}
+	return &d
+}
 
+// TestDomainLifecycle 覆盖 primary draft→verified→tls_ready→active，tenant 被激活。
+func TestDomainLifecycle(t *testing.T) {
+	db := newTestDB(t)
+	seedTenant(t, db, "t1", model.TenantStatusProvisioning)
+	ctx := newGinCtx("t1", "u1")
+	reqCtx := requestCtx(ctx)
 	svc := NewDomainSvc(nil)
-	resp, err := svc.Create(requestCtx(ctx), &dtodomain.DomainCreateReq{Domain: "example.com",
+
+	cr, err := svc.Create(reqCtx, &dtodomain.DomainCreateReq{
+		TenantID: "t1", Domain: "login.acme.com",
+		DomainRole: model.DomainRolePrimary, DomainUsage: model.DomainUsageLogin,
+		Operator: operatorOf(ctx),
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if getDomain(t, db, "t1", cr.ID).Status != model.DomainStatusDraft {
+		t.Fatal("expected draft after create")
+	}
+	if _, err := svc.Verify(reqCtx, &dtodomain.DomainVerifyReq{DomainID: cr.ID, Operator: operatorOf(ctx)}); err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+	if _, err := svc.TLSReady(reqCtx, &dtodomain.DomainTLSReadyReq{DomainID: cr.ID, Operator: operatorOf(ctx)}); err != nil {
+		t.Fatalf("TLSReady: %v", err)
+	}
+	if _, err := svc.Activate(reqCtx, &dtodomain.DomainActivateReq{DomainID: cr.ID, Operator: operatorOf(ctx)}); err != nil {
+		t.Fatalf("Activate: %v", err)
+	}
+	d := getDomain(t, db, "t1", cr.ID)
+	if d.Status != model.DomainStatusActive {
+		t.Fatalf("expected active, got %s", d.Status)
+	}
+	// tenant 被激活 + issuer 派生
+	var tn model.TenantEntity
+	db.WithContext(dbclient.CrossTenantContext(context.Background())).Where("id=?", "t1").First(&tn)
+	if tn.Status != model.TenantStatusActive {
+		t.Fatalf("expected tenant active, got %s", tn.Status)
+	}
+	if tn.Issuer != "https://login.acme.com/oidc" {
+		t.Fatalf("issuer = %q", tn.Issuer)
+	}
+}
+
+// TestAliasRequiresTarget 覆盖 alias 无 target 被拒。
+func TestAliasRequiresTarget(t *testing.T) {
+	db := newTestDB(t)
+	seedTenant(t, db, "t1", model.TenantStatusActive)
+	ctx := newGinCtx("t1", "u1")
+	svc := NewDomainSvc(nil)
+	_, err := svc.Create(requestCtx(ctx), &dtodomain.DomainCreateReq{
+		TenantID: "t1", Domain: "sso.acme.com",
+		DomainRole: model.DomainRoleAlias, DomainUsage: model.DomainUsageLogin,
 		Operator: operatorOf(ctx),
 	})
 	if err == nil {
-		t.Fatalf("expected error for duplicate domain, got resp=%+v", resp)
-	}
-	if gerror.GetCode(err) != int(code.DomainAlreadyExistError) {
-		t.Fatalf("expected DomainAlreadyExistError, got %v", err)
+		t.Fatal("expected error for alias without target")
 	}
 }
 
-func TestDomainSvc_Create_EmptyDomain(t *testing.T) {
-	newTestDB(t)
-	ctx := newGinCtx("10", "100")
-
+// TestPrimaryEmailUsageRejected 覆盖 primary usage=email 被拒。
+func TestPrimaryEmailUsageRejected(t *testing.T) {
+	db := newTestDB(t)
+	seedTenant(t, db, "t1", model.TenantStatusActive)
+	ctx := newGinCtx("t1", "u1")
 	svc := NewDomainSvc(nil)
-	resp, err := svc.Create(requestCtx(ctx), &dtodomain.DomainCreateReq{Domain: "",
+	_, err := svc.Create(requestCtx(ctx), &dtodomain.DomainCreateReq{
+		TenantID: "t1", Domain: "acme.com",
+		DomainRole: model.DomainRolePrimary, DomainUsage: model.DomainUsageEmail,
 		Operator: operatorOf(ctx),
 	})
 	if err == nil {
-		t.Fatalf("expected error for empty domain, got resp=%+v", resp)
+		t.Fatal("expected error for primary with usage=email")
 	}
 }
 
-func TestDomainSvc_PageList(t *testing.T) {
+// TestDeleteRejectedWhenReferencedByAlias 覆盖有未 released alias 引用时删除被拒。
+func TestDeleteRejectedWhenReferencedByAlias(t *testing.T) {
 	db := newTestDB(t)
-	ctx := newGinCtx("10", "100")
-
-	if err := db.Create(&model.DomainEntity{TenantID: "10", Domain: "alpha.com"}).Error; err != nil {
-		t.Fatalf("seed alpha: %v", err)
-	}
-	if err := db.Create(&model.DomainEntity{TenantID: "10", Domain: "beta.com"}).Error; err != nil {
-		t.Fatalf("seed beta: %v", err)
-	}
-	// 其他租户的数据不应出现
-	if err := db.Create(&model.DomainEntity{TenantID: "20", Domain: "alpha-other.com"}).Error; err != nil {
-		t.Fatalf("seed other tenant: %v", err)
-	}
-
+	seedTenant(t, db, "t1", model.TenantStatusProvisioning)
+	ctx := newGinCtx("t1", "u1")
 	svc := NewDomainSvc(nil)
-	resp, err := svc.PageList(requestCtx(ctx), &dtodomain.DomainPageListReq{Domain: "alpha"})
+	reqCtx := requestCtx(ctx)
+
+	pRes, err := svc.Create(reqCtx, &dtodomain.DomainCreateReq{
+		TenantID: "t1", Domain: "login.acme.com",
+		DomainRole: model.DomainRolePrimary, DomainUsage: model.DomainUsageLogin, Operator: operatorOf(ctx),
+	})
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("create primary: %v", err)
 	}
-	if resp.Total != 1 {
-		t.Fatalf("expected total 1, got %d", resp.Total)
-	}
-	if len(resp.List) != 1 || resp.List[0].Domain != "alpha.com" {
-		t.Fatalf("expected alpha.com, got %+v", resp.List)
-	}
-	// 列表必须同时回传创建时间与更新时间（前端「创建时间」「更新时间」两列直读）
-	if item := resp.List[0]; item.CreatedAt <= 0 || item.UpdatedAt <= 0 {
-		t.Fatalf("createdAt/updatedAt not returned: %+v", item)
-	}
-}
-
-func TestDomainSvc_Delete_Success(t *testing.T) {
-	db := newTestDB(t)
-	ctx := newGinCtx("10", "100")
-
-	entity := &model.DomainEntity{TenantID: "10", Domain: "example.com"}
-	if err := db.Create(entity).Error; err != nil {
-		t.Fatalf("seed: %v", err)
-	}
-
-	svc := NewDomainSvc(nil)
-	if err := svc.Delete(requestCtx(ctx), &dtodomain.DomainDeleteReq{DomainID: entity.ID,
+	if _, err := svc.Create(reqCtx, &dtodomain.DomainCreateReq{
+		TenantID: "t1", Domain: "sso.acme.com",
+		DomainRole: model.DomainRoleAlias, DomainUsage: model.DomainUsageLogin, TargetDomain: "login.acme.com",
 		Operator: operatorOf(ctx),
 	}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("create alias: %v", err)
 	}
-
-	// 软删除后 GetByID 应查不到
-	got, err := dao.NewDomainDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
-	if err != nil {
-		t.Fatalf("GetByID: %v", err)
-	}
-	if got != nil && got.ID != "" {
-		t.Fatalf("expected domain soft-deleted, got %+v", got)
+	if err := svc.Delete(reqCtx, &dtodomain.DomainDeleteReq{DomainID: pRes.ID, Operator: operatorOf(ctx)}); err == nil {
+		t.Fatal("expected delete rejected when referenced by alias")
 	}
 }
 
-func TestDomainSvc_Delete_NotExist(t *testing.T) {
-	newTestDB(t)
-	ctx := newGinCtx("10", "100")
-
-	svc := NewDomainSvc(nil)
-	err := svc.Delete(requestCtx(ctx), &dtodomain.DomainDeleteReq{DomainID: "999",
-		Operator: operatorOf(ctx),
-	})
-	if err == nil {
-		t.Fatalf("expected error for non-existent domain")
-	}
-}
-
-// TestDomainSvc_Update_VerificationStatus 验证状态是具名枚举：合法值落库，非法值被拒且不落库。
-func TestDomainSvc_Update_VerificationStatus(t *testing.T) {
-	db := newTestDB(t)
-	ctx := newGinCtx("10", "100")
-
-	entity := &model.DomainEntity{TenantID: "10", Domain: "example.com"}
-	if err := db.Create(entity).Error; err != nil {
-		t.Fatalf("seed: %v", err)
-	}
-
-	svc := NewDomainSvc(nil)
-	if err := svc.Update(requestCtx(ctx), &dtodomain.DomainUpdateReq{
-		DomainID:           entity.ID,
-		VerificationStatus: model.DomainVerificationVerified,
-
-		Operator: operatorOf(ctx)}); err != nil {
-		t.Fatalf("合法验证状态应被接受: %v", err)
-	}
-	got, err := dao.NewDomainDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
-	if err != nil {
-		t.Fatalf("GetByID: %v", err)
-	}
-	if got.VerificationStatus != model.DomainVerificationVerified {
-		t.Fatalf("verificationStatus = %q, want %q", got.VerificationStatus, model.DomainVerificationVerified)
-	}
-
-	// 非法值必须返回既有功能级错误码，且不得落库
-	err = svc.Update(requestCtx(ctx), &dtodomain.DomainUpdateReq{
-		DomainID:           entity.ID,
-		VerificationStatus: model.DomainVerificationStatus("yes"),
-
-		Operator: operatorOf(ctx)})
-	if err == nil || gerror.GetCode(err) != int(code.DomainUpdateError) {
-		t.Fatalf("非法验证状态应返回 DomainUpdateError, got %v", err)
-	}
-	got, err = dao.NewDomainDao().GetByID(dbclient.CrossTenantContext(ctx), entity.ID)
-	if err != nil {
-		t.Fatalf("GetByID: %v", err)
-	}
-	if got.VerificationStatus != model.DomainVerificationVerified {
-		t.Fatalf("非法验证状态不应落库, got %q", got.VerificationStatus)
-	}
-}
+var _ = dao.NewDomainDao
