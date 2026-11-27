@@ -1,97 +1,129 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { VerifiedTag } from '@ark-iam/ui'
+import { DomainStatusTag } from '@ark-iam/ui'
 import type { DomainItem } from '@ark-iam/types'
 
 const mockGetDomainPageList = vi.fn()
-const mockGetDomainDetail = vi.fn()
-const mockUpdateDomain = vi.fn()
+const mockCreateDomain = vi.fn()
+const mockVerifyDomain = vi.fn()
+const mockActivateDomain = vi.fn()
+const mockDisableDomain = vi.fn()
 
 vi.mock('@ark-iam/api', () => ({
-  createDomain: vi.fn(),
+  createDomain: (...args: unknown[]) => mockCreateDomain(...args),
   deleteDomain: vi.fn(),
-  getDomainDetail: (...args: unknown[]) => mockGetDomainDetail(...args),
+  disableDomain: (...args: unknown[]) => mockDisableDomain(...args),
+  enableDomain: vi.fn(),
+  getDomainDetail: vi.fn(),
   getDomainPageList: (...args: unknown[]) => mockGetDomainPageList(...args),
-  updateDomain: (...args: unknown[]) => mockUpdateDomain(...args),
+  activateDomain: (...args: unknown[]) => mockActivateDomain(...args),
+  releaseDomain: vi.fn(),
+  retireDomain: vi.fn(),
+  tlsReadyDomain: vi.fn(),
+  verifyDomain: (...args: unknown[]) => mockVerifyDomain(...args),
 }))
 
 const DomainList = (await import('./index')).default
 
-const domain: DomainItem = {
+const draftDomain: DomainItem = {
   id: 'd1',
+  tenantID: 't1',
   domain: 'example.com',
-  verificationStatus: 'unverified',
+  domainRole: 'primary',
+  domainUsage: 'login',
+  status: 'draft',
   createdAt: 1700000000,
   updatedAt: 1700000000,
 }
 
-/**
- * D2 回归（P3 枚举契约）：domain.verification_status 已从 boolean/0-1 改为字符串枚举
- * unverified/verified，且 domain.verified_at 已从后端删除（前端「验证时间」列同批删除）。
- */
-describe('域名页验证状态枚举', () => {
+const activeAlias: DomainItem = {
+  id: 'd2',
+  tenantID: 't1',
+  domain: 'alias.example.com',
+  domainRole: 'alias',
+  domainUsage: 'login',
+  status: 'active',
+  createdAt: 1700000000,
+  updatedAt: 1700000000,
+}
+
+/** P0 回归：域名状态机 7 态、动作端点驱动、创建入参不含旧验证态字段。 */
+describe('域名页 P0 状态机', () => {
   beforeEach(() => {
-    mockGetDomainPageList.mockReset().mockResolvedValue({ list: [domain], total: 1 })
-    mockGetDomainDetail.mockReset().mockResolvedValue({ ...domain, verificationStatus: 'verified' })
-    mockUpdateDomain.mockReset().mockResolvedValue(undefined)
+    mockGetDomainPageList.mockReset()
+    mockCreateDomain.mockReset()
+    mockVerifyDomain.mockReset()
+    mockActivateDomain.mockReset()
+    mockDisableDomain.mockReset()
   })
 
-  it('编辑态按 verificationStatus 回显并提交 verified 字符串枚举', async () => {
+  it('draft 状态展示「草稿」tag，且只显示「验证」动作按钮', async () => {
+    mockGetDomainPageList.mockResolvedValue({ list: [draftDomain], total: 1 })
     render(<DomainList />)
 
-    fireEvent.click(await screen.findByText('编辑'))
-    // 详情接口回传 verified：提交时不得再提交 isVerified 数字
-    await waitFor(() => expect(mockGetDomainDetail).toHaveBeenCalledWith('d1'))
-
-    const modal = document.querySelector('.ant-modal') as HTMLElement
-    fireEvent.click(modal.querySelector('.ant-modal-footer .ant-btn-primary') as HTMLElement)
-
-    await waitFor(() => expect(mockUpdateDomain).toHaveBeenCalledTimes(1))
-    const payload = mockUpdateDomain.mock.calls[0][0] as Record<string, unknown>
-    expect(payload.id).toBe('d1')
-    expect(payload.verificationStatus).toBe('verified')
-    expect('isVerified' in payload).toBe(false)
+    expect(await screen.findByText('example.com')).toBeInTheDocument()
+    expect(screen.getByText('草稿')).toBeInTheDocument()
+    // draft → 可「验证」；不应出现「激活」「停用」
+    expect(screen.getByRole('button', { name: /验证/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /激活/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /停用/ })).not.toBeInTheDocument()
   })
 
-  it('验证状态下拉选项取值为 unverified/verified，选择未验证后提交字符串枚举', async () => {
+  it('点击「验证」调用 verify 端点', async () => {
+    mockGetDomainPageList.mockResolvedValue({ list: [draftDomain], total: 1 })
+    mockVerifyDomain.mockResolvedValue({ domainId: 'd1', status: 'verified' })
     render(<DomainList />)
 
-    fireEvent.click(await screen.findByText('编辑'))
-    await waitFor(() => expect(mockGetDomainDetail).toHaveBeenCalledWith('d1'))
-
-    // 打开弹窗内的验证状态 Select（页面上还有分页 sizeChanger 的 Select，必须限定在弹窗内），
-    // 选「未验证」（当前回显为 verified，故该选项只存在于下拉里）
-    const modal = document.querySelector('.ant-modal') as HTMLElement
-    fireEvent.mouseDown(modal.querySelector('.ant-select-content') as HTMLElement)
-    fireEvent.click(await screen.findByTitle('未验证'))
-
-    fireEvent.click(modal.querySelector('.ant-modal-footer .ant-btn-primary') as HTMLElement)
-
-    await waitFor(() => expect(mockUpdateDomain).toHaveBeenCalledTimes(1))
-    const payload = mockUpdateDomain.mock.calls[0][0] as Record<string, unknown>
-    expect(payload.verificationStatus).toBe('unverified')
+    fireEvent.click(await screen.findByRole('button', { name: /验证/ }))
+    await waitFor(() => expect(mockVerifyDomain).toHaveBeenCalledWith('d1', { method: 'manual' }))
   })
 
-  it('不再展示「验证时间」列（verifiedAt 已下线）', async () => {
+  it('alias active 展示「启用」tag，且显示「停用」动作（primary 不可直接停用）', async () => {
+    mockGetDomainPageList.mockResolvedValue({ list: [activeAlias], total: 1 })
     render(<DomainList />)
 
-    await screen.findByText('example.com')
-    expect(screen.queryByText('验证时间')).not.toBeInTheDocument()
+    expect(await screen.findByText('alias.example.com')).toBeInTheDocument()
+    expect(screen.getByText('启用')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /停用/ })).toBeInTheDocument()
+  })
+
+  it('新建域名提交 tenantId/domainRole/domainUsage/verificationMethod（后端 DomainCreateReq）', async () => {
+    mockGetDomainPageList.mockResolvedValue({ list: [], total: 0 })
+    mockCreateDomain.mockResolvedValue({ id: 'dn' })
+    render(<DomainList />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /新建域名/ }))
+    fireEvent.change(await screen.findByPlaceholderText('目标租户 ID（UUID）'), { target: { value: 't-1' } })
+    fireEvent.change(screen.getByPlaceholderText('如：example.com'), { target: { value: 'new.example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+
+    await waitFor(() => expect(mockCreateDomain).toHaveBeenCalledTimes(1))
+    const payload = mockCreateDomain.mock.calls[0][0] as Record<string, unknown>
+    expect(payload).toMatchObject({
+      tenantID: 't-1',
+      domain: 'new.example.com',
+      domainRole: 'primary',
+      domainUsage: 'login',
+      verificationMethod: 'manual',
+    })
   })
 })
 
-describe('VerifiedTag 验证状态映射', () => {
-  it("只认枚举：'verified' → 已验证，'unverified' → 未验证", () => {
-    const { rerender } = render(<VerifiedTag value="verified" />)
-    expect(screen.getByText('已验证')).toBeInTheDocument()
-
-    rerender(<VerifiedTag value="unverified" />)
-    expect(screen.getByText('未验证')).toBeInTheDocument()
-  })
-
-  it('不再兼容 1/0 数字取值：1 不再显示「已验证」', () => {
-    render(<VerifiedTag value={1} />)
-    expect(screen.queryByText('已验证')).not.toBeInTheDocument()
-    expect(screen.getByText('未验证')).toBeInTheDocument()
+describe('DomainStatusTag 七态映射', () => {
+  it('7 态各显示对应中文', () => {
+    const cases: [string, string][] = [
+      ['draft', '草稿'],
+      ['verified', '已验证'],
+      ['tls_ready', '证书就绪'],
+      ['active', '启用'],
+      ['disabled', '停用'],
+      ['retired', '已退役'],
+      ['released', '已释放'],
+    ]
+    for (const [value, label] of cases) {
+      const { unmount } = render(<DomainStatusTag value={value} />)
+      expect(screen.getByText(label)).toBeInTheDocument()
+      unmount()
+    }
   })
 })

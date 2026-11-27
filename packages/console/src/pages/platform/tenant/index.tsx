@@ -1,16 +1,23 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Divider, Form, Input, message, Modal, Select, Space, Switch, Table, Tooltip } from 'antd'
-import { DeleteOutlined, EditOutlined, PlusOutlined, QuestionCircleOutlined, ReloadOutlined, RollbackOutlined, SearchOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, LogoutOutlined, PlusOutlined, QuestionCircleOutlined, ReloadOutlined, RollbackOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, CODE_COL_WIDTH, idColumn, InitialPasswordModal, NAME_COL_WIDTH, PageContainer, StatCard, StatRow, STATUS_COL_WIDTH, SuspendedTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, TypeTag } from '@ark-iam/ui'
-import { createTenant, deleteTenant, getTenantPageList, resetTenantAdminPassword, updateTenant } from '@ark-iam/api'
-import type { TenantItem, TenantStatus } from '@ark-iam/types'
+import { actionColumn, CODE_COL_WIDTH, idColumn, InitialPasswordModal, NAME_COL_WIDTH, PageContainer, StatCard, StatRow, STATUS_COL_WIDTH, tableScrollX, TAG_COL_WIDTH, TenantStatusTag, textColumn, timeColumn, TypeTag } from '@ark-iam/ui'
+import { createTenant, deleteTenant, getTenantPageList, offboardTenant, resetTenantAdminPassword, updateTenant } from '@ark-iam/api'
+import type { TenantIsolationMode, TenantItem, TenantStatus } from '@ark-iam/types'
 
-// 租户状态筛选项（后端 model.TenantStatus：active-正常 / suspended-已挂起）。
+// 租户状态筛选项（后端 model.TenantStatus 三值：provisioning-建租中 / active-正常 / suspended-已挂起）。
 // 「全部」由 allowClear 的空值表达，无需单独一项。
 const TENANT_STATUS_OPTIONS = [
+  { value: 'provisioning', label: '建租中' },
   { value: 'active', label: '正常' },
   { value: 'suspended', label: '挂起' },
+]
+
+// 租户隔离模式（后端 model.TenantIsolationMode）：dedicated-专属（自定义域+独立 issuer）/ shared-共享。
+const TENANT_ISOLATION_OPTIONS = [
+  { value: 'shared' as TenantIsolationMode, label: '共享（shared）' },
+  { value: 'dedicated' as TenantIsolationMode, label: '专属（dedicated）' },
 ]
 
 // 租户类型（后端 model.TenantType：customer-客户租户 / platform-平台租户）：
@@ -68,7 +75,7 @@ export default function TenantList() {
   const handleCreate = () => {
     setEditing(null)
     form.resetFields()
-    form.setFieldsValue({ type: 'customer' })
+    form.setFieldsValue({ type: 'customer', isolationMode: 'shared' })
     setModalOpen(true)
   }
 
@@ -79,6 +86,7 @@ export default function TenantList() {
       type: record.type,
       tag: record.tag,
       dbUser: record.dbUser,
+      // D 编辑不提交 status（表单隐藏状态项）；shared 编辑仍可切正常/挂起。
       status: record.status,
     })
     setModalOpen(true)
@@ -89,7 +97,10 @@ export default function TenantList() {
       const values = await form.validateFields()
       setSubmitLoading(true)
       if (editing) {
-        await updateTenant({ tenantID: editing.tenantID, ...values })
+        // D 编辑不提交 status（状态只经 offboard/activate 动作流转）：从 payload 中剔除。
+        const { status, ...rest } = values
+        const payload = editing.isolationMode === 'dedicated' ? rest : { ...rest, status }
+        await updateTenant({ tenantID: editing.tenantID, ...payload })
         message.success('修改成功')
       } else {
         const created = await createTenant({
@@ -97,6 +108,9 @@ export default function TenantList() {
           type: values.type,
           tag: values.tag,
           dbUser: values.dbUser,
+          isolationMode: values.isolationMode,
+          // D 新建带 primaryDomain（同事务创建 draft primary 域名）。
+          primaryDomain: values.isolationMode === 'dedicated' ? values.primaryDomain : undefined,
           admin: {
             name: values.adminName,
             username: values.adminUsername,
@@ -162,6 +176,25 @@ export default function TenantList() {
     }
   }
 
+  /** offboard（D 唯一停用入口）：tenant→suspended、primary disabled、清 issuer、撤 session。 */
+  const handleOffboard = (record: TenantItem) => {
+    Modal.confirm({
+      title: 'offboard 该租户？',
+      content:
+        'offboard 是该专属（D）租户的唯一停用入口：租户将置为「挂起」、primary 域名停用、issuer 清空、成员会话与刷新令牌撤销。该操作不可直接撤销（需重新激活域名与应用），确认继续？',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await offboardTenant(record.tenantID)
+          message.success('已 offboard')
+          void fetchData()
+        } catch {
+          /* 拦截器已提示 */
+        }
+      },
+    })
+  }
+
   const columns: ColumnsType<TenantItem> = [
     idColumn<TenantItem>({ dataIndex: 'tenantID' }),
     textColumn<TenantItem>({ title: '租户名', dataIndex: 'name', width: NAME_COL_WIDTH }),
@@ -186,7 +219,7 @@ export default function TenantList() {
       dataIndex: 'status',
       key: 'status',
       width: STATUS_COL_WIDTH,
-      render: (v: string) => <SuspendedTag value={v} />,
+      render: (v: string) => <TenantStatusTag value={v} />,
     },
     timeColumn<TenantItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<TenantItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
@@ -204,13 +237,22 @@ export default function TenantList() {
           confirm: '将重置该租户内置管理员的密码：新临时密码仅展示一次，其既有会话立即失效。确认重置？',
           onClick: () => void handleResetAdminPassword(r),
         },
+        // D（dedicated）租户：停用唯一入口是 offboard，不提供删除（后端 DELETE 一律 403）。
+        {
+          key: 'offboard',
+          label: 'offboard',
+          icon: <LogoutOutlined />,
+          danger: true,
+          hidden: r.isolationMode !== 'dedicated',
+          onClick: () => handleOffboard(r),
+        },
         {
           key: 'delete',
           label: '删除',
           danger: true,
           icon: <DeleteOutlined />,
-          // 平台自运营租户（种子租户 t_platform）禁删：删除即整栈控制台失联且无恢复路径；
-          // 置灰保留展示，后端 svctenant.Delete 以 TenantBuiltInDeleteForbiddenError 兜底。
+          // D 租户不显示删除（只能 offboard）；平台自运营种子租户禁删（后端兜底 TenantBuiltInDeleteForbiddenError）。
+          hidden: r.isolationMode === 'dedicated',
           disabled: r.code === PLATFORM_TENANT_CODE,
           confirm: '确认删除该租户？',
           onClick: () => void handleDelete(r),
@@ -306,6 +348,38 @@ export default function TenantList() {
           <Form.Item name="type" label="类型" tooltip={TENANT_TYPE_TIP}>
             <Select options={TENANT_TYPE_OPTIONS} />
           </Form.Item>
+          {!editing ? (
+            <>
+              <Form.Item
+                name="isolationMode"
+                label="隔离模式"
+                tooltip="专属（dedicated，D 租户）：自定义域名 + 独立 issuer；共享（shared）：中央 issuer。create-only，创建后不可改。"
+              >
+                <Select options={TENANT_ISOLATION_OPTIONS} />
+              </Form.Item>
+              <Form.Item
+                noStyle
+                shouldUpdate={(prev, cur) => prev.isolationMode !== cur.isolationMode}
+              >
+                {({ getFieldValue }) =>
+                  getFieldValue('isolationMode') === 'dedicated' ? (
+                    <Form.Item
+                      name="primaryDomain"
+                      label="主域名"
+                      rules={[{ required: true, message: '专属租户必须指定主域名' }]}
+                      extra="同事务创建该 primary（draft）；激活后作为独立 issuer 来源"
+                    >
+                      <Input placeholder="如：tenant.example.com" />
+                    </Form.Item>
+                  ) : null
+                }
+              </Form.Item>
+            </>
+          ) : (
+            <Form.Item label="隔离模式" extra="隔离模式 create-only，创建后不可修改">
+              <Input value={editing.isolationMode || 'shared'} disabled />
+            </Form.Item>
+          )}
           <Form.Item name="tag" label="标签">
             <Input placeholder="选填" />
           </Form.Item>
@@ -354,7 +428,9 @@ export default function TenantList() {
               </Form.Item>
             </>
           )}
-          {editing && (
+          {/* D（dedicated）编辑不提交 status：状态只经 activate/offboard 动作流转，此处隐藏状态项。
+              仅共享（shared）租户编辑保留「正常/挂起」开关。 */}
+          {editing && editing.isolationMode !== 'dedicated' && (
             <Form.Item
               name="status"
               label="状态"
@@ -365,7 +441,7 @@ export default function TenantList() {
               }
               valuePropName="checked"
               getValueFromEvent={(checked: boolean) => (checked ? 'active' : 'suspended')}
-              getValueProps={(v?: string) => ({ checked: v !== 'suspended' })}
+              getValueProps={(v?: string) => ({ checked: v === 'active' })}
             >
               <Switch checkedChildren="正常" unCheckedChildren="挂起" disabled={platformTenant} />
             </Form.Item>

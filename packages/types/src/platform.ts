@@ -195,9 +195,16 @@ export interface OAuthSecretCreateResp {
 // ---------- 租户 ----------
 // 租户编码由服务端自动生成（规则 t_<12 位随机 hex>，例 t_3f7a9c1d2e4b），创建/编辑入参均不传 code。
 // 时间字段为秒级时间戳（见 AGENTS.md）。
-// 租户状态（后端 model.TenantStatus）：active-正常 / suspended-已挂起；
-// 非 active 的租户其成员无法登录、令牌不签发，且不能挂起操作者自己所在租户。
-export type TenantStatus = 'active' | 'suspended'
+// 租户状态（后端 model.TenantStatus）：provisioning-建租中 / active-正常 / suspended-已挂起；
+// 仅 active 的租户其成员可登录、令牌可签发。D 租户的 provisioning 在 primary 域名 activate 后转 active，
+// suspended 由 offboard 动作置位；D 编辑（PUT）不提交 status，状态只经 activate/offboard 动作流转。
+export type TenantStatus = 'provisioning' | 'active' | 'suspended'
+/**
+ * 租户隔离模式（后端具名类型 model.TenantIsolationMode）：
+ * dedicated-专属（自定义域 + 独立 issuer，D）/ shared-共享（中央 issuer，S）。
+ * create-only：P0 控制台仅新建时可选，PUT 不可改。
+ */
+export type TenantIsolationMode = 'dedicated' | 'shared'
 /**
  * 租户类型（后端具名类型 model.TenantType）：
  * customer-客户租户 / platform-平台租户（分类标识，不参与隔离判定）。
@@ -212,6 +219,10 @@ export interface TenantItem {
   status: TenantStatus
   tag: string
   type: TenantType
+  /** 隔离模式（后端 model.TenantIsolationMode）：dedicated-专属 / shared-共享。 */
+  isolationMode?: TenantIsolationMode
+  /** D 租户派生缓存 issuer（active 时 = active primary host 派生）；S/平台为空。只读回显。 */
+  issuer?: string
   createdAt?: number
   updatedAt?: number
 }
@@ -231,9 +242,14 @@ export interface TenantAdminCreateReq {
 export interface TenantCreateReq {
   name: string
   dbUser?: string
+  /** 状态：普通（shared）建租户由服务端置 active；D（dedicated）强制 provisioning（传值被忽略/拒绝）。 */
   status?: TenantStatus
   tag?: string
   type?: TenantType
+  /** 隔离模式（后端 model.TenantIsolationMode）：缺省/空=shared，dedicated=新建 D 专属租户。 */
+  isolationMode?: TenantIsolationMode
+  /** 仅 dedicated 新建时使用：同事务创建该 primary（draft 域名）。普通建租户忽略。 */
+  primaryDomain?: string
   admin: TenantAdminCreateReq
 }
 
@@ -260,6 +276,10 @@ export interface TenantUpdateReq {
   tenantID: string
   name?: string
   dbUser?: string
+  /**
+   * 状态仅对普通（shared）租户可经 PUT 修改；D（dedicated）租户编辑**不提交** status
+   * （状态只经 activate/offboard 动作流转，后端对 D 的 PUT 改 status 会拒写）。
+   */
   status?: TenantStatus
   tag?: string
   type?: TenantType
@@ -345,16 +365,96 @@ export interface MenuMyTreeResp {
 }
 
 // ---------- 域名 ----------
-/** 域名验证状态（后端具名类型 model.DomainVerificationStatus）：unverified/verified。 */
-export type DomainVerificationStatus = 'unverified' | 'verified'
+/**
+ * 域名生命周期状态（后端具名类型 model.DomainStatus，7 态单一状态机，替代原布尔「是否已验证」）：
+ * - draft：已占 host、未验证；不建 TLS，不解析/不签发；
+ * - verified：域控证明通过（verifiedAt）；不解析/不签发；
+ * - tls_ready：证书就绪（tlsReadyAt）；不解析/不签发；
+ * - active：唯一可用态；primary 可签发，login/both alias 可 302；
+ * - disabled：停止解析/签发，可回 active（仅 alias）；
+ * - retired：墓碑；host 仍占用；协议请求 400/404；
+ * - released：隔离期满/审批后软删；host 可重新登记（终态）。
+ */
+export type DomainStatus = 'draft' | 'verified' | 'tls_ready' | 'active' | 'disabled' | 'retired' | 'released'
 
+/**
+ * 域名角色（后端具名类型 model.DomainRole）：
+ * - primary：主域（每 active D 租户恰一个 active primary；作为 issuer 来源）；
+ * - alias：别名（302 到 primary，不签 token）；
+ * - branded：仅 P1/P2 预留，P0 不消费。
+ */
+export type DomainRole = 'primary' | 'alias' | 'branded'
+
+/**
+ * 域名用途（后端具名类型 model.DomainUsage）：
+ * - login：登录宿主（可作为 issuer / 302 target）；
+ * - email：邮箱域发现（P0 只登记，不路由/不签发）；
+ * - both：登录 + 邮箱。
+ */
+export type DomainUsage = 'login' | 'email' | 'both'
+
+/** 域控证明方式（后端具名类型 model.DomainVerificationMethod）：manual-人工留证 / dns_txt-DNS TXT 挑战。 */
+export type DomainVerificationMethod = 'manual' | 'dns_txt'
+
+/** 域名列表项（后端 DomainPageListItem）。 */
 export interface DomainItem {
   id: string
+  tenantID: string
   domain: string
-  /** 验证状态（后端 domain.verification_status）；后端 verified_at 已下线，不再回传验证时间。 */
-  verificationStatus: DomainVerificationStatus
+  domainRole: DomainRole
+  domainUsage: DomainUsage
+  status: DomainStatus
   createdAt: number
   updatedAt: number
+}
+
+/** 域名详情（后端 DomainDetailResp）：比列表多验证方式、target、各里程碑时间、退役/释放审计字段。 */
+export interface DomainDetail extends DomainItem {
+  targetDomainID: string
+  verificationMethod: DomainVerificationMethod
+  /** unix 秒，空为 null */
+  verifiedAt: number | null
+  tlsReadyAt: number | null
+  retiredAt: number | null
+  releasedAt: number | null
+  retireReason: string
+  releaseApproval: string
+}
+
+/** 创建域名入参（后端 DomainCreateReq）。P0 只创建 draft，状态流转走动作端点。 */
+export interface DomainCreateReq {
+  tenantID: string
+  domain: string
+  domainRole: DomainRole
+  /** primary 只允许 login/both；alias/email 需 targetDomain。 */
+  domainUsage: DomainUsage
+  /** alias/email 目标 primary 的 host（服务端解析为同租户 target_domain_id）。 */
+  targetDomain?: string
+  /** manual/dns_txt（默认 manual）。 */
+  verificationMethod?: DomainVerificationMethod
+}
+
+/** 域名分页筛选参数（后端 DomainPageListReq）。 */
+export interface DomainPageListParams {
+  page: number
+  pageSize: number
+  tenantID?: string
+  domain?: string
+  status?: DomainStatus
+  domainRole?: DomainRole
+  domainUsage?: DomainUsage
+}
+
+/** 域名动作端点响应（后端 DomainActionResp）：回传动作后的最新状态。 */
+export interface DomainActionResp {
+  domainId: string
+  status: DomainStatus
+}
+
+/** verify 动作入参（后端 DomainVerifyReq 的 body 部分；domainID 走 path）。 */
+export interface DomainVerifyReq {
+  method?: DomainVerificationMethod
+  token?: string
 }
 
 // ---------- Connector（platform 全局对象） ----------

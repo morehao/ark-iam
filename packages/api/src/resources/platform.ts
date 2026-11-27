@@ -9,8 +9,12 @@ import type {
   ConnectorFactoryItem,
   ConnectorItem,
   ConnectorUpdateReq,
+  DomainActionResp,
+  DomainCreateReq,
+  DomainDetail,
   DomainItem,
-  DomainVerificationStatus,
+  DomainPageListParams,
+  DomainVerifyReq,
   MenuMyTreeResp,
   MenuTreeResp,
   OAuthClientCreateReq,
@@ -88,6 +92,12 @@ export const updateTenant = (data: TenantUpdateReq) => {
   return request.put<any, string>(`/platform/tenants/${tenantID}`, body)
 }
 export const deleteTenant = (tenantID: string) => request.delete<any, string>(`/platform/tenants/${tenantID}`)
+/**
+ * offboard 租户（P0 D 唯一停用入口）：tenant→suspended、primary disabled、清 issuer、撤 session/refresh。
+ * D 租户 DELETE 一律 403，只能走此入口。
+ */
+export const offboardTenant = (tenantID: string) =>
+  request.post<any, string>(`/platform/tenants/${tenantID}/offboard`)
 
 // ==================== 租户应用 ====================
 export const getTenantApplicationPageList = (data: { page: number; pageSize: number; tenantID?: string; status?: string }) =>
@@ -109,15 +119,34 @@ export const getMenuTree = (appID: string) => request.get<any, MenuTreeResp>('/p
 export const getMyMenuTree = () => request.get<any, MenuMyTreeResp>('/platform/menus/my')
 
 // ==================== 域名 ====================
-export const getDomainPageList = (data: { page: number; pageSize: number; domain?: string }) =>
+// P0 契约：无通用 PUT 改状态。创建产出 draft，状态流转一律走动作端点（verify/tls-ready/.../release）。
+export const getDomainPageList = (data: DomainPageListParams) =>
   request.get<any, PageListResp<DomainItem>>('/platform/domains', { params: data })
-export const getDomainDetail = (id: string) => request.get<any, DomainItem>(`/platform/domains/${id}`)
-export const createDomain = (domain: string) => request.post<any, { id: string }>('/platform/domains', { domain })
-export const updateDomain = (data: { id: string; domain?: string; verificationStatus?: DomainVerificationStatus }) => {
-  const { id, ...body } = data
-  return request.put<any, string>(`/platform/domains/${id}`, body)
-}
+export const getDomainDetail = (id: string) => request.get<any, DomainDetail>(`/platform/domains/${id}`)
+export const createDomain = (data: DomainCreateReq) =>
+  request.post<any, { id: string }>('/platform/domains', data)
 export const deleteDomain = (id: string) => request.delete<any, string>(`/platform/domains/${id}`)
+
+// ---- 域名状态机动作端点（POST /platform/domains/{id}/{action}） ----
+export const verifyDomain = (id: string, data?: DomainVerifyReq) =>
+  request.post<any, DomainActionResp>(`/platform/domains/${id}/verify`, data ?? {})
+/** 证书就绪：verified → tls_ready（P0 certRef 仅记录）。 */
+export const tlsReadyDomain = (id: string, certRef?: string) =>
+  request.post<any, DomainActionResp>(`/platform/domains/${id}/tls-ready`, { certRef })
+export const activateDomain = (id: string) =>
+  request.post<any, DomainActionResp>(`/platform/domains/${id}/activate`)
+/** 停用：仅 alias active → disabled（primary 只能走 offboard）。 */
+export const disableDomain = (id: string) =>
+  request.post<any, DomainActionResp>(`/platform/domains/${id}/disable`)
+/** 恢复：仅 alias disabled → active。 */
+export const enableDomain = (id: string) =>
+  request.post<any, DomainActionResp>(`/platform/domains/${id}/enable`)
+/** 退役：primary disabled→retired（offboard 后）；alias active/disabled→retired。 */
+export const retireDomain = (id: string, reason?: string) =>
+  request.post<any, DomainActionResp>(`/platform/domains/${id}/retire`, { reason })
+/** 释放（正式）：仅 retired→released；需满隔离期且有审批单。 */
+export const releaseDomain = (id: string, approvalTicket: string) =>
+  request.post<any, DomainActionResp>(`/platform/domains/${id}/release`, { approvalTicket })
 
 // ==================== 系统设置（运行时配置中心） ====================
 export const getSettingGroups = () => request.get<any, { list: SettingGroupMeta[] }>('/platform/settings/groups')

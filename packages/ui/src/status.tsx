@@ -34,11 +34,42 @@ export function SuspendedTag({ value }: { value?: StatusValue | boolean }) {
 }
 
 /**
- * 验证状态（后端具名类型 model.DomainVerificationStatus）：只认 'verified' → 已验证(success)；
- * 'unverified' 及其它取值 → 未验证(warning)。不再兼容 isVerified 的 1/0。
+ * 租户状态（后端 model.TenantStatus 三值）：provisioning-建租中(warning) / active-正常(success) /
+ * suspended-挂起(error)。只认枚举，不再兼容布尔；未知取值原样回显。
  */
-export function VerifiedTag({ value }: { value?: StatusValue }) {
-  return value === 'verified' ? <Tag color="success">已验证</Tag> : <Tag color="warning">未验证</Tag>
+export function TenantStatusTag({ value }: { value?: StatusValue }) {
+  switch (value) {
+    case 'provisioning':
+      return <Tag color="warning">建租中</Tag>
+    case 'active':
+      return <Tag color="success">正常</Tag>
+    case 'suspended':
+      return <Tag color="error">挂起</Tag>
+    default:
+      return <Tag>{value || '-'}</Tag>
+  }
+}
+
+/**
+ * 域名状态标签映射（后端 model.DomainStatus 7 态，语义色）：
+ * draft-草稿(default) / verified-已验证(processing) / tls_ready-证书就绪(processing) /
+ * active-启用(success) / disabled-停用(default) / retired-已退役(warning) / released-已释放(default)。
+ * 未知取值原样回显。
+ */
+const DOMAIN_STATUS_META: Record<string, { label: string; color: string }> = {
+  draft: { label: '草稿', color: 'default' },
+  verified: { label: '已验证', color: 'processing' },
+  tls_ready: { label: '证书就绪', color: 'processing' },
+  active: { label: '启用', color: 'success' },
+  disabled: { label: '停用', color: 'default' },
+  retired: { label: '已退役', color: 'warning' },
+  released: { label: '已释放', color: 'default' },
+}
+
+/** 域名状态标签：7 态语义色（见 DOMAIN_STATUS_META）。 */
+export function DomainStatusTag({ value }: { value?: StatusValue }) {
+  const meta = DOMAIN_STATUS_META[value ?? '']
+  return meta ? <Tag color={meta.color}>{meta.label}</Tag> : <Tag>{value || '-'}</Tag>
 }
 
 /** 类型标识（分类色，非状态语义）：租户类型 platform→geekblue、customer→cyan；其余原样回显 */
