@@ -233,9 +233,13 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/v1/platform/tenants` | 创建租户（**必带 `admin`**：同事务建根部门 + 内置管理员 user + 租户管理员角色授权；响应 `adminInitialPassword` 为一次性临时密码） |
+| POST | `/v1/platform/tenants` | 创建租户（**必带 `admin`**；`{isolationMode:"dedicated", primaryDomain}` 走 D onboarding：同事务建 provisioning 租户 + primary(draft) + console binding(draft)；D 忽略/拒绝请求里的 status）：同事务建根部门 + 内置管理员 user + 租户管理员角色授权；响应 `adminInitialPassword` 为一次性临时密码） |
 | GET | `/v1/platform/tenants` | 租户分页 |
 | GET/PUT/DELETE | `/v1/platform/tenants/{tenantID}` | 租户详情/更新/删除（**平台自运营租户 `t_platform` 禁删**，删除报 `100212`：它是平台控制台自身所在租户，删除即整栈失联且无恢复路径；判定按首次引导写入的固定编码 `t_platform`（`model.SeedPlatformTenantCode`）而非 `type`——控制台可建 `type=platform` 的普通租户） |
+| POST | `/v1/platform/tenants/{tenantID}/offboard` | **P0 D 租户唯一停用入口**：tenant→suspended、active primary→disabled、清 issuer、domain_epoch+1、撤 session/refresh、未上线域名→released、binding disable+软删；接受 provisioning/active。**D 的 `DELETE /tenants` 一律 403**，只能 offboard |
+| GET | `/v1/platform/console-bindings` | 查看 Host binding（host/tenantId/kind/status 过滤） |
+| POST | `/v1/platform/console-bindings/{bindingID}/enable` | 启用 binding（primary active + D console client 有效 + tenant/issuer/client 一致才可启用） |
+| POST | `/v1/platform/console-bindings/{bindingID}/disable` | 停用 binding（可恢复；offboard/release 自动调用） |
 | POST | `/v1/platform/tenants/{tenantID}/builtin-admin/reset-password` | 重置租户内置管理员密码（仅 `source=builtin`，即建租户时由平台创建的管理员；返回一次性临时密码并撤销其会话） |
 | POST | `/v1/platform/tenant-applications` | 开通租户-应用（**必带 `tenantID`** 指定归属租户；同租户同应用重复订阅报 `100747`，租户不存在报 `100205`，应用不存在报 `100735`） |
 | GET | `/v1/platform/tenant-applications` | 租户应用分页（`tenantID` 按归属租户筛选、留空＝全部租户；`status` 筛选状态；返回 `tenantName`/`appName`/`appSource` 便于回显与判定内置订阅，以及 `grantedUserCount`（int64，该租户下已准入本应用且 `user_application.status=enable` 的成员数：订阅一旦停用/删除这些成员即失去访问，故作为「停用/删除订阅」确认文案回显影响人数）） |
@@ -243,7 +247,7 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 > 租户编码 `code` 由服务端自动生成（规则 `t_<12 位随机 hex>`，如 `t_3f7a9c1d2e4b`，平台租户固定 `t_platform`），创建/更新入参无需传 `code`，创建后不可修改；列表支持 `GET /v1/platform/tenants?name=<关键词>&status=<active|suspended>`（`name` 按租户名模糊搜索，`status` 按状态精确筛选、留空不筛选、非法值报 `100209`），并返回 `createdAt`/`updatedAt`（秒级时间戳）。
 >
-> 租户状态 `status`（`active` 正常 / `suspended` 已挂起）：非法值/缺省归一为 `active`；`suspended` 会撤销该租户成员的 refresh token 与 SSO 会话，非 active 租户的成员无法登录、令牌不签发；`PUT /v1/platform/tenants/{tenantID}` 拒绝挂起操作者自己所在的租户（`100208`）；重置内置管理员密码失败报 `100210`。
+> 租户状态 `status` 三值：`provisioning`（D 建租中，不可签发）/ `active`（正常）/ `suspended`（offboard 后）；`suspended` 会撤销该租户成员的 refresh token 与 SSO 会话，非 active 租户的成员无法登录、令牌不签发；`PUT /v1/platform/tenants/{tenantID}` 拒绝挂起操作者自己所在的租户（`100208`）；重置内置管理员密码失败报 `100210`。
 >
 > **建租户的管理员约定**（D2/D3/D6）：`admin` 必填且邮箱/手机至少一个（缺联系方式报 `100521`）；管理员在同事务内创建为 `user.source=builtin`、`owner_type=owner`，并绑定根部门与内置「租户管理员」角色（`source=builtin`、`admin_type=admin`，该角色随租户开通 `tenant-admin` 应用订阅；应用/菜单缺失会整体回滚并报 `100200`）。`adminInitialPassword` 只在**新建自然人**时非空——命中已存在自然人时沿用其原密码、不回显凭据（可改用重置内置管理员密码接口兜底）。该管理员首次登录强制改密：`/oidc/login` 返回 `requiresPasswordChange=true`，改完（`/oidc/login/changePassword`）须重新登录。详见 `system-design.md` §5.8。
 
@@ -274,9 +278,19 @@ curl -X POST http://localhost:8081/oidc/oauth/token \
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/v1/platform/domains` | 创建域名 |
-| GET | `/v1/platform/domains` | 域名分页 |
-| GET/PUT/DELETE | `/v1/platform/domains/{domainID}` | 域名详情/更新/删除 |
+| POST | `/v1/platform/domains` | 创建域名（`{tenantId, domain, domainRole, domainUsage, targetDomain?, verificationMethod?}`；建为 `draft`；D alias/email 必填 `targetDomain`；primary 只允许 login/both） |
+| GET | `/v1/platform/domains` | 域名分页（tenantId/domain/status/domainRole/domainUsage 过滤） |
+| GET | `/v1/platform/domains/{domainID}` | 域名详情 |
+| DELETE | `/v1/platform/domains/{domainID}` | 删除（仅 draft/verified/tls_ready；被未 released alias 引用拒绝；active 必须走 disable/offboard） |
+| POST | `/v1/platform/domains/{domainID}/verify` | 域控证明 draft→verified（`{method, token?}`） |
+| POST | `/v1/platform/domains/{domainID}/tls-ready` | 证书就绪 verified→tls_ready（`{certRef?}`） |
+| POST | `/v1/platform/domains/{domainID}/activate` | 激活 tls_ready→active（primary 校验无其他 active primary 且 usage=login/both；email-only 跳过 tls_ready） |
+| POST | `/v1/platform/domains/{domainID}/disable` | 停用（仅 alias active→disabled；active primary 不允许直接 disable，须走 offboard） |
+| POST | `/v1/platform/domains/{domainID}/enable` | 恢复（仅 alias disabled→active，target 必须 active） |
+| POST | `/v1/platform/domains/{domainID}/retire` | 退役（primary disabled→retired 仅 offboard 后；alias active/disabled→retired；`{reason}`） |
+| POST | `/v1/platform/domains/{domainID}/release` | 释放 retired→released（满 90 天 + `{approvalTicket}`；issuer 已在 offboard 清空，release 只校验） |
+
+> 域名 `domain`/`domain_role`/`domain_usage` 创建后不可改（改名 = 退役 + 新登记）；状态只走动作端点，**无通用 PUT 改状态**。域名状态机 7 态：`draft/verified/tls_ready/active/disabled/retired/released`。错误码 `101207`–`101213`（格式非法/租户挂起/保留/验证失败/issuer-tier 不匹配/状态用途非法/角色非法）。
 
 ### 5.6 身份连接器（平台级全局对象）
 

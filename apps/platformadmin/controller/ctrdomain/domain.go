@@ -113,6 +113,10 @@ func (ctr *domainCtr) Delete(ctx *gin.Context) {
 	gincontext.Success(ctx, nil)
 }
 
+// @Tags 域名管理
+// @Summary 域控证明 draft→verified
+// @Param domainID path string true "域名ID"
+// @Router /v1/platform/domains/{domainID}/verify [post]
 func (ctr *domainCtr) Verify(ctx *gin.Context) {
 	var req dtodomain.DomainVerifyReq
 	req.Operator = identity.OperatorFromGin(ctx)
@@ -132,6 +136,10 @@ func (ctr *domainCtr) Verify(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags 域名管理
+// @Summary 证书就绪 verified→tls_ready
+// @Param domainID path string true "域名ID"
+// @Router /v1/platform/domains/{domainID}/tls-ready [post]
 func (ctr *domainCtr) TLSReady(ctx *gin.Context) {
 	var req dtodomain.DomainTLSReadyReq
 	req.Operator = identity.OperatorFromGin(ctx)
@@ -151,6 +159,10 @@ func (ctr *domainCtr) TLSReady(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags 域名管理
+// @Summary 激活 tls_ready→active
+// @Param domainID path string true "域名ID"
+// @Router /v1/platform/domains/{domainID}/activate [post]
 func (ctr *domainCtr) Activate(ctx *gin.Context) {
 	var req dtodomain.DomainActivateReq
 	req.Operator = identity.OperatorFromGin(ctx)
@@ -166,6 +178,10 @@ func (ctr *domainCtr) Activate(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags 域名管理
+// @Summary 停用 alias active→disabled
+// @Param domainID path string true "域名ID"
+// @Router /v1/platform/domains/{domainID}/disable [post]
 func (ctr *domainCtr) Disable(ctx *gin.Context) {
 	var req dtodomain.DomainDisableReq
 	req.Operator = identity.OperatorFromGin(ctx)
@@ -181,6 +197,10 @@ func (ctr *domainCtr) Disable(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags 域名管理
+// @Summary 恢复 alias disabled→active
+// @Param domainID path string true "域名ID"
+// @Router /v1/platform/domains/{domainID}/enable [post]
 func (ctr *domainCtr) Enable(ctx *gin.Context) {
 	var req dtodomain.DomainEnableReq
 	req.Operator = identity.OperatorFromGin(ctx)
@@ -196,6 +216,10 @@ func (ctr *domainCtr) Enable(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags 域名管理
+// @Summary 退役 →retired
+// @Param domainID path string true "域名ID"
+// @Router /v1/platform/domains/{domainID}/retire [post]
 func (ctr *domainCtr) Retire(ctx *gin.Context) {
 	var req dtodomain.DomainRetireReq
 	req.Operator = identity.OperatorFromGin(ctx)
@@ -215,6 +239,10 @@ func (ctr *domainCtr) Retire(ctx *gin.Context) {
 	gincontext.Success(ctx, res)
 }
 
+// @Tags 域名管理
+// @Summary 释放 retired→released（满90天+审批）
+// @Param domainID path string true "域名ID"
+// @Router /v1/platform/domains/{domainID}/release [post]
 func (ctr *domainCtr) Release(ctx *gin.Context) {
 	var req dtodomain.DomainReleaseReq
 	req.Operator = identity.OperatorFromGin(ctx)
