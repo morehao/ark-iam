@@ -401,12 +401,14 @@ func (svc *tenantSvc) Detail(ctx context.Context, req *dtotenant.TenantDetailReq
 	resp := &dtotenant.TenantDetailResp{
 		TenantID: tenantEntity.ID,
 		TenantBaseInfo: objtenant.TenantBaseInfo{
-			Code:   tenantEntity.Code,
-			DbUser: tenantEntity.DbUser,
-			Name:   tenantEntity.Name,
-			Status: tenantEntity.Status,
-			Tag:    tenantEntity.Tag,
-			Type:   tenantEntity.Type,
+			Code:          tenantEntity.Code,
+			DbUser:        tenantEntity.DbUser,
+			Name:          tenantEntity.Name,
+			Status:        tenantEntity.Status,
+			Tag:           tenantEntity.Tag,
+			Type:          tenantEntity.Type,
+			IsolationMode: tenantEntity.IsolationMode,
+			Issuer:        tenantEntity.Issuer,
 		},
 		OperatorBaseInfo: gobject.OperatorBaseInfo{
 			CreatedAt: tenantEntity.CreatedAt.Unix(),
@@ -421,7 +423,7 @@ func (svc *tenantSvc) Detail(ctx context.Context, req *dtotenant.TenantDetailReq
 // 状态筛选走白名单校验：非法值直接报错，避免静默返回"看起来正常"的错误集合。
 func (svc *tenantSvc) PageList(ctx context.Context, req *dtotenant.TenantPageListReq) (*dtotenant.TenantPageListResp, error) {
 	switch req.Status {
-	case "", model.TenantStatusActive, model.TenantStatusSuspended:
+	case "", model.TenantStatusProvisioning, model.TenantStatusActive, model.TenantStatusSuspended:
 	default:
 		glog.Errorf(ctx, "[svctenant.TenantPageList] invalid status filter, status:%s, req:%s", req.Status, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantPageListStatusInvalidError)
@@ -444,12 +446,14 @@ func (svc *tenantSvc) PageList(ctx context.Context, req *dtotenant.TenantPageLis
 		list = append(list, dtotenant.TenantPageListItem{
 			TenantID: v.ID,
 			TenantBaseInfo: objtenant.TenantBaseInfo{
-				Code:   v.Code,
-				DbUser: v.DbUser,
-				Name:   v.Name,
-				Status: v.Status,
-				Tag:    v.Tag,
-				Type:   v.Type,
+				Code:          v.Code,
+				DbUser:        v.DbUser,
+				Name:          v.Name,
+				Status:        v.Status,
+				Tag:           v.Tag,
+				Type:          v.Type,
+				IsolationMode: v.IsolationMode,
+				Issuer:        v.Issuer,
 			},
 			OperatorBaseInfo: gobject.OperatorBaseInfo{
 				CreatedAt: v.CreatedAt.Unix(),

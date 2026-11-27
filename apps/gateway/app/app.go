@@ -56,6 +56,12 @@ func Routers(engine *gin.Engine) (io.Closer, error) {
 			return nil, fmt.Errorf("[%s] RunMigrations fail: %w", AppName, err)
 		}
 	}
+	// P0 多 issuer：按配置启用「Host→binding 解析」中间件（默认关，走静态 issuer）。
+	// 必须在业务路由 Mount 之前注册，使每个请求先解析一次 Host 并写 pkg/oidcctx，
+	// 供 /config.json、鉴权、/oidc/* 协议栈按请求 issuer 生效（见 pkg/appassembly/hostresolve.go）。
+	if gwconfig.Conf.OIDC.EnableHostBinding {
+		application.MountHostResolver(engine)
+	}
 	if err := application.Mount(engine.Group("")); err != nil {
 		_ = application.Close()
 		return nil, fmt.Errorf("[%s] Mount fail: %w", AppName, err)
