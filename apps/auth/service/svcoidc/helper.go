@@ -14,7 +14,11 @@ import (
 
 // sessionAuditContext 将已解析的租户写入 context，供 CreateSession 落库 session 审计时读取 tenant_id。
 func sessionAuditContext(ctx context.Context, tenantID string) context.Context {
-	return context.WithValue(ctx, sso.ContextKeyTenantID, tenantID)
+	ctx = context.WithValue(ctx, sso.ContextKeyTenantID, tenantID)
+	if iss := requestIssuer(ctx); iss != "" {
+		ctx = context.WithValue(ctx, sso.ContextKeyIssuer, iss)
+	}
+	return ctx
 }
 
 func clientIDFromAuthRequest(authReq op.AuthRequest) string {

@@ -43,8 +43,18 @@ type tenantIDCtxKey struct{}
 // 供跨包（如 oidcop 在 context 中注入租户）与包内记录审计时统一使用。
 var ContextKeyTenantID tenantIDCtxKey
 
+// issuerCtxKey 用于在 ctx 中携带本次会话所属 issuer（创建会话时记录，校验时比对）。
+type issuerCtxKey struct{}
+
+// ContextKeyIssuer 是写入 SSO 会话 issuer 的 context key。
+// 创建会话时由调用方注入（来自入口 Host 派生 issuer），会话数据记录该 issuer；
+// 校验时与请求 issuer 比对，实现跨 issuer 会话拒绝（DG-SESSION-3 / AC-7）。
+var ContextKeyIssuer issuerCtxKey
+
 type ssoSessionData struct {
-	PersonID  string    `json:"personID"`
+	PersonID string `json:"personID"`
+	// Issuer 会话所属 issuer（Host 派生）；空表示未记录（旧会话），校验时不做 issuer 比对。
+	Issuer    string    `json:"issuer,omitempty"`
 	CreatedAt time.Time `json:"createdAt"`
 	// AuthTime 是会话建立（认证发生）的时间。静默续登（prompt=none / sso-login）
 	// 还原到 id_token 的 auth_time 声明，并用于 max_age 超期判定（H5）。
@@ -77,6 +87,8 @@ type SSOSessionStore interface {
 	RevokeSession(ctx context.Context, sessionID string) error
 	RevokeSessionsByPersonID(ctx context.Context, personID string) error
 	HasActiveSession(ctx context.Context, personID string) (bool, error)
+	// SessionIssuer 返回会话所属 issuer；会话不存在或未记录返回空串。
+	SessionIssuer(ctx context.Context, sessionID string) string
 }
 
 // ValidateTokenSession verifies the session referenced by a signed token.
@@ -84,7 +96,7 @@ type SSOSessionStore interface {
 // requireSID=true 表示 fail-closed：缺失 sid 直接判定无效，**不得**回退 person 级
 // HasActiveSession——D 租户要求会话粒度隔离（DG-SESSION-1 / AC-7）。requireSID=false 保留
 // 既有兼容（无 sid 的旧 token 回退 person 活性校验）。
-func ValidateTokenSession(ctx context.Context, store SSOSessionStore, personID, sessionID string, requireSID bool) (bool, error) {
+func ValidateTokenSession(ctx context.Context, store SSOSessionStore, personID, sessionID string, requireSID bool, requestIssuer string) (bool, error) {
 	if sessionID == "" {
 		if requireSID {
 			return false, nil // fail-closed：D 无 sid 不回退 person
@@ -93,7 +105,19 @@ func ValidateTokenSession(ctx context.Context, store SSOSessionStore, personID, 
 		return store.HasActiveSession(ctx, personID)
 	}
 	sessionPersonID, err := store.ValidateSession(ctx, sessionID)
-	return sessionPersonID == personID, err
+	if err != nil {
+		return false, err
+	}
+	if sessionPersonID != personID {
+		return false, nil
+	}
+	// 跨 issuer 会话拒绝（DG-SESSION-3）：会话记录了 issuer 且与请求 issuer 不同 → 拒绝。
+	if requestIssuer != "" {
+		if sessIssuer := store.SessionIssuer(ctx, sessionID); sessIssuer != "" && sessIssuer != requestIssuer {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 type redisSSOSessionStore struct {
@@ -170,8 +194,15 @@ func (s *redisSSOSessionStore) CreateSession(ctx context.Context, personID strin
 		return "", err
 	}
 	now := time.Now()
+	issuer := ""
+	if v := ctx.Value(ContextKeyIssuer); v != nil {
+		if s, ok := v.(string); ok {
+			issuer = s
+		}
+	}
 	data := ssoSessionData{
 		PersonID:  personID,
+		Issuer:    issuer,
 		CreatedAt: now,
 		AuthTime:  now,
 		AMR:       append([]string(nil), amr...),
@@ -243,6 +274,22 @@ func (s *redisSSOSessionStore) SessionAuthTime(ctx context.Context, sessionID st
 		return time.Time{}
 	}
 	return data.AuthTime
+}
+
+// SessionIssuer 返回会话所属 issuer；会话不存在/未记录返回空串。
+func (s *redisSSOSessionStore) SessionIssuer(ctx context.Context, sessionID string) string {
+	if s.client == nil {
+		return ""
+	}
+	encoded, err := s.client.Get(ctx, ssoSessionKey(sessionID)).Bytes()
+	if err != nil {
+		return ""
+	}
+	var data ssoSessionData
+	if err := json.Unmarshal(encoded, &data); err != nil {
+		return ""
+	}
+	return data.Issuer
 }
 
 func (s *redisSSOSessionStore) RevokeSession(ctx context.Context, sessionID string) error {

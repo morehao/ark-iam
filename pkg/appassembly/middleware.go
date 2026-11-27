@@ -74,11 +74,12 @@ func validateSSOSession(ctx context.Context, store sso.SSOSessionStore, personID
 		return true
 	}
 	// D 租户（issuer 非中央）fail-closed：无 sid 不回退 person 级校验（DG-SESSION-1）。
+	reqIss, _ := oidcctx.IssuerFromContext(ctx)
 	requireSID := false
-	if iss, ok := oidcctx.IssuerFromContext(ctx); ok && iss != "" && iss != centralIssuer {
+	if reqIss != "" && reqIss != centralIssuer {
 		requireSID = true
 	}
-	active, err := sso.ValidateTokenSession(ctx, store, personID, sessionID, requireSID)
+	active, err := sso.ValidateTokenSession(ctx, store, personID, sessionID, requireSID, reqIss)
 	if err != nil {
 		glog.Warnf(ctx, "[pkg/appassembly] sso session validate fail, fail-closed, personID:%s, err:%v", personID, err)
 		return false

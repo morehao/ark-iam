@@ -40,11 +40,12 @@ func OIDCBusinessAuthOptions() []pkgmiddleware.AuthOption {
 				return true
 			}
 			// D 租户（issuer 非配置的中央 issuer）fail-closed：无 sid 不回退 person（DG-SESSION-1）。
+			reqIss, _ := oidcctx.IssuerFromContext(ctx)
 			requireSID := false
-			if iss, ok := oidcctx.IssuerFromContext(ctx); ok && iss != "" && (config.Conf == nil || iss != config.Conf.OIDC.Issuer) {
+			if reqIss != "" && (config.Conf == nil || reqIss != config.Conf.OIDC.Issuer) {
 				requireSID = true
 			}
-			active, err := sso.ValidateTokenSession(ctx, ssoStore, personID, sessionID, requireSID)
+			active, err := sso.ValidateTokenSession(ctx, ssoStore, personID, sessionID, requireSID, reqIss)
 			if err != nil {
 				glog.Warnf(ctx, "[middleware.OIDCBusinessAuthOptions] validate token session fail, personID:%s, err:%v", personID, err)
 				return false

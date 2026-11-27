@@ -33,6 +33,7 @@ func (f *fakeSSOStore) SessionAuthTime(context.Context, string) time.Time {
 }
 func (f *fakeSSOStore) RevokeSession(context.Context, string) error            { panic("unused") } //nolint
 func (f *fakeSSOStore) RevokeSessionsByPersonID(context.Context, string) error { panic("unused") } //nolint
+func (f *fakeSSOStore) SessionIssuer(context.Context, string) string           { return "" }
 
 // withRedisClient 临时设置全局 dbclient.RedisCli，测试后还原。
 func withRedisClient(t *testing.T, cli *redis.Client) {
