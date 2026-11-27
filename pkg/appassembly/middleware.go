@@ -33,6 +33,17 @@ func (a *App) authMiddlewareForGroup(conf *pkgconfig.Config, audience string) []
 		opts = append(opts, middleware.WithOIDCIssuer(issuer))
 	}
 	opts = append(opts, middleware.WithOIDCAudiences(audience))
+	// 多 issuer：按请求解析 issuer/audience（Host binding 决定）；未命中回退静态配置（W2/W4）。
+	opts = append(opts, middleware.WithRequestIssuerAudience(func(c *gin.Context) (string, []string, bool) {
+		if rr, ok := resolveFromContext(c); ok && rr != nil && rr.Issuer != "" {
+			aud := audience
+			if rr.Audience != "" {
+				aud = rr.Audience
+			}
+			return rr.Issuer, []string{aud}, true
+		}
+		return "", nil, false
+	}))
 	if conf != nil && conf.OIDC.EnableSSOSessionValidation {
 		ssoStore := sso.NewSSOSessionStore()
 		opts = append(opts, middleware.WithOIDCSSOValidation(func(ctx context.Context, personID, sessionID string, isMachineToken bool) bool {

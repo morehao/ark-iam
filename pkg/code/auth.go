@@ -14,12 +14,14 @@ const (
 	// 登录期由登录链路把拒绝提前，请求期由 pkg/middleware.RequireAppAccess 对控制台整组拦截，
 	// 令牌签发期再兜底——三处同源，故文案与码值统一（码值 110016 已对接前端，不得变更）。
 	AuthAppAccessDeniedError = 110016
-	InviteGetDetailError     = 110030
-	InviteInvalidError       = 110031
-	InviteExpiredError       = 110032
-	InviteCreateError        = 110033
-	InviteRevokeError        = 110034
-	InviteGetPageListError   = 110035
+	// AuthLogoutAllDisabledError D 租户 Host 不支持 /logoutAll（P0 不做 D 跨 issuer 全局登出，返回 410）。
+	AuthLogoutAllDisabledError = 110017
+	InviteGetDetailError       = 110030
+	InviteInvalidError         = 110031
+	InviteExpiredError         = 110032
+	InviteCreateError          = 110033
+	InviteRevokeError          = 110034
+	InviteGetPageListError     = 110035
 )
 
 const (
@@ -56,6 +58,7 @@ var authErrorMsgMap = gerror.CodeMsgMap{
 	AuthJoinNotAllowedError:           "无权加入该租户",
 	AuthTenantRegisterNotAllowedError: "该应用未开放注册",
 	AuthJoinPolicyCheckError:          "加入租户策略校验失败",
+	AuthLogoutAllDisabledError:        "D 租户不支持全局登出",
 	AuthAppAccessDeniedError:          "你未被授权使用该应用，请联系所在租户的管理员分配",
 	InviteGetDetailError:              "获取邀请信息失败",
 	InviteInvalidError:                "邀请码无效",
@@ -92,4 +95,3 @@ var tokenErrorMsgMap = gerror.CodeMsgMap{
 func init() {
 	registerError(tokenErrorMsgMap)
 }
-

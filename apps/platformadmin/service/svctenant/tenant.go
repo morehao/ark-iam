@@ -143,7 +143,7 @@ func (svc *tenantSvc) Create(ctx context.Context, req *dtotenant.TenantCreateReq
 		// D（dedicated）：同事务建 primary（draft）+ console binding（draft）。
 		// 未 active 前不解析/不签发/不启用 binding（DG-ONBOARD-1）；issuer 由后续 activate 派生。
 		if isDedicated {
-			if err := createDedicatedPrimaryAndBinding(tx, tenantID, primaryDomain, req.Operator.UserID); err != nil {
+			if err := createDedicatedPrimaryAndBinding(tx, svc.db, tenantID, primaryDomain, req.Operator.UserID); err != nil {
 				glog.Errorf(ctx, "[svctenant.TenantCreate] create dedicated primary/binding fail, err:%v, tenantID:%s", err, tenantID)
 				return err
 			}
@@ -466,7 +466,7 @@ func (svc *tenantSvc) PageList(ctx context.Context, req *dtotenant.TenantPageLis
 // createDedicatedPrimaryAndBinding 在 onboarding 事务内为 D 租户建 primary(draft) + console binding(draft)。
 // 未 active 前不解析/不签发/不启用（DG-ONBOARD-1）；issuer 留空，由 primary activate 派生。
 // D console client 在 primary activate 同事务创建（见 svcdomain 或后续动作），此处只建 binding 骨架。
-func createDedicatedPrimaryAndBinding(tx *gorm.DB, tenantID, primaryDomain, operator string) error {
+func createDedicatedPrimaryAndBinding(tx *gorm.DB, db gormdao.DBGetter, tenantID, primaryDomain, operator string) error {
 	tenantCtx := dbclient.ExplicitTenantContext(context.Background(), tenantID)
 
 	primary := &model.DomainEntity{
@@ -479,7 +479,7 @@ func createDedicatedPrimaryAndBinding(tx *gorm.DB, tenantID, primaryDomain, oper
 		CreatedBy:          operator,
 		UpdatedBy:          operator,
 	}
-	if err := dao.NewDomainDao().WithTx(tx).Insert(tenantCtx, primary); err != nil {
+	if err := dao.NewDomainDao(dao.WithDBGetter(db)).WithTx(tx).Insert(tenantCtx, primary); err != nil {
 		return err
 	}
 
@@ -490,7 +490,7 @@ func createDedicatedPrimaryAndBinding(tx *gorm.DB, tenantID, primaryDomain, oper
 		Kind:     model.ConsoleBindingKindTenant,
 		Status:   model.ConsoleBindingStatusDraft,
 	}
-	if err := dao.NewConsoleBindingDao().Create(context.Background(), tx, binding); err != nil {
+	if err := dao.NewConsoleBindingDao(dao.WithDBGetter(db)).Create(context.Background(), tx, binding); err != nil {
 		return err
 	}
 	return nil

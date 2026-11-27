@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	appconfig "github.com/morehao/ark-iam/apps/auth/config"
 	"github.com/morehao/ark-iam/apps/auth/dto/dtoauth"
 	"github.com/morehao/ark-iam/apps/auth/service/svcloginguard"
 	"github.com/morehao/ark-iam/pkg/audit"
@@ -335,8 +336,19 @@ func (svc *authSvc) enqueueBackChannelLogouts(ctx context.Context, personID stri
 }
 
 func (svc *authSvc) LogoutAll(ctx context.Context, req *dtoauth.LogoutAllReq) error {
-	// LogoutAll 与 Logout 语义一致（person 级全局登出）。
-	// Operator 必须透传：Logout 从 DTO 取 personID，丢掉它会让登出静默变成 no-op。
+	// P0：D 租户 Host 不支持跨 issuer 全局登出，返回 410（DG-LOGOUT-1 / I-4）。
+	// 判定：请求 issuer 非空且与配置的平台中央 issuer 不同 → 视为 D Host 拒绝。
+	if iss, ok := oidcctx.IssuerFromContext(ctx); ok && iss != "" {
+		central := ""
+		if appconfig.Conf != nil {
+			central = appconfig.Conf.OIDC.Issuer
+		}
+		if central != "" && iss != central {
+			glog.Warnf(ctx, "[svcauth.LogoutAll] D host /logoutAll disabled (410), issuer:%s", iss)
+			return code.GetError(code.AuthLogoutAllDisabledError)
+		}
+	}
+	// 平台 Host：保持 person 级全局登出语义（只撤平台 issuer 内；P0 默认）。
 	return svc.Logout(ctx, &dtoauth.LogoutReq{Operator: req.Operator})
 }
 

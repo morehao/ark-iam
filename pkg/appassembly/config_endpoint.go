@@ -36,6 +36,16 @@ func (a *App) MountConfig(engine *gin.Engine, basePath string) error {
 		if issuer == "" {
 			issuer = requestBaseURL(c) + joinPath(basePath, "/oidc")
 		}
+		// 命中 Host binding 时以 binding 的 issuer/clientId 为准（多 issuer；DG-MW-1 一请求一解析）。
+		clientID := resolveConsoleClientID(c, a.cfg.Raw)
+		if rr, ok := resolveFromContext(c); ok && rr != nil {
+			if rr.Issuer != "" {
+				issuer = rr.Issuer
+			}
+			if rr.ClientID != "" {
+				clientID = rr.ClientID
+			}
+		}
 
 		// enabledDomains：本实例实际挂载的业务域集合（G4）。用于前端控制台按域裁剪菜单/路由入口
 		// （未挂载的域不下发，前端据此隐藏对应入口）。空 Domains 归一为全量（与 Mount 的解析口径一致）。
@@ -55,7 +65,7 @@ func (a *App) MountConfig(engine *gin.Engine, basePath string) error {
 			// 各有独立 client_id 与回调白名单；单进程聚合部署时 /config.json 只有一份端点，
 			// 故按请求来源 Referer/Origin 的 host 命中哪个控制台的 console 地址，返回对应 client_id。
 			// 无匹配（内嵌单控制台 / 外部业务应用读取）回退平台管理台 client_id（历史行为）。
-			"clientId":       resolveConsoleClientID(c, a.cfg.Raw),
+			"clientId": clientID,
 			// enabledDomains：已挂载域白名单（G4）；缺省/全量时前端视为全部域可用。
 			"enabledDomains": enabledDomains,
 		})

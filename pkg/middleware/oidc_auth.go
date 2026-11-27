@@ -51,6 +51,9 @@ type authConfig struct {
 	// disableLegacyUserLookup 关闭"token 未携带 user_id 时反查 user 表"的兼容分支。
 	// 生产不应打开；仅用于验证严格模式。
 	disableLegacyUserLookup bool
+	// requestIssuerAudience 按请求解析 issuer/audiences（多 issuer：由 Host binding 决定）。
+	// 非空时覆盖静态 issuer/audiences，每请求按返回的 issuer/aud 构造/复用 verifier（W4）。
+	requestIssuerAudience func(c *gin.Context) (issuer string, audiences []string, ok bool)
 }
 
 type AuthOption func(*authConfig)
@@ -71,6 +74,14 @@ func WithOIDCIssuer(issuer string) AuthOption {
 
 // WithOIDCAudiences 注入本应用认可的 aud 集合（通常是本应用的 OIDC client_id）。
 // 设置后 access token 的 aud 必须包含其中之一，否则按无效 token 拒绝。
+// WithRequestIssuerAudience 注入按请求解析 issuer/audiences 的钩子（多 issuer）。
+// 返回 ok=true 时以该 issuer/aud 构造 verifier 并强制 iss/aud 校验；ok=false 时回退静态配置。
+func WithRequestIssuerAudience(fn func(c *gin.Context) (issuer string, audiences []string, ok bool)) AuthOption {
+	return func(c *authConfig) {
+		c.requestIssuerAudience = fn
+	}
+}
+
 func WithOIDCAudiences(audiences ...string) AuthOption {
 	return func(c *authConfig) {
 		c.audiences = append(c.audiences, audiences...)
@@ -170,14 +181,29 @@ func OIDCAuth(opts ...AuthOption) gin.HandlerFunc {
 			abortUnauthorized(ctx, "missing auth token")
 			return
 		}
-		if vErr != nil {
+		// 多 issuer：按请求解析 issuer/audiences 并构造 verifier（W4）。
+		reqVerifier := verifier
+		reqErr := vErr
+		if cfg.requestIssuerAudience != nil {
+			if iss, auds, ok := cfg.requestIssuerAudience(ctx); ok {
+				vb := cfg.verifierBuilder
+				if vb != nil && cfg.keySource != nil {
+					reqVerifier = vb(cfg.keySource, iss, auds)
+					reqErr = nil
+				} else if cfg.verifier != nil {
+					reqVerifier = cfg.verifier
+					reqErr = nil
+				}
+			}
+		}
+		if reqErr != nil || reqVerifier == nil {
 			// 密钥来源不可用：fail-closed，绝不因为"配不出来"就放行。
-			glog.Errorf(ctx, "[oidcauth] verifier not ready, err:%v", vErr)
+			glog.Errorf(ctx, "[oidcauth] verifier not ready, err:%v", reqErr)
 			abortUnauthorized(ctx, "auth verifier unavailable")
 			return
 		}
 
-		ident, err := verifier.Verify(ctx, tokenStr)
+		ident, err := reqVerifier.Verify(ctx, tokenStr)
 		if err == nil {
 			if cfg.validateOIDCSSO != nil && !cfg.validateOIDCSSO(ctx.Request.Context(), ident.PersonID, ident.SessionID, ident.IsMachine) {
 				glog.Warnf(ctx, "[oidcauth] sso session revoked, personID:%s", ident.PersonID)

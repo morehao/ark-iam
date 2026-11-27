@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"gorm.io/gorm"
@@ -119,6 +120,21 @@ func (dao *DomainDao) LockByIDWithTx(ctx context.Context, tx *gorm.DB, id string
 	err := dao.WithTx(tx).DB(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("id = ? AND deleted_at IS NULL", id).
 		First(&entity).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &entity, nil
+}
+
+// GetByDomainCrossTenant 按归一化 host 跨全部租户查未删除的域名行（Host 解析入口用）。
+// host 全局由 (domain) partial unique 约束（released 释放），故跨租户唯一可定位。
+func (dao *DomainDao) GetByDomainCrossTenant(ctx context.Context, domain string) (*model.DomainEntity, error) {
+	var entity model.DomainEntity
+	err := dao.DB(dbclient.CrossTenantContext(ctx)).Model(&model.DomainEntity{}).
+		Where("domain = ?", domain).First(&entity).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
