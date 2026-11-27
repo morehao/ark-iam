@@ -25,12 +25,12 @@ import (
 //
 // clientID 为空、客户端不存在或应用不存在时返回 (nil, nil)——「解析不出应用」是可预期
 // 的业务边界，由调用方决定如何处理（各门禁一律 fail-closed）；仅返回数据库/IO 等系统错误。
-func GetByClientID(ctx context.Context, clientID string) (*model.ApplicationEntity, error) {
-	return GetByClientIDWithDB(nil, ctx, clientID)
+func GetByClientID(ctx context.Context, issuer, clientID string) (*model.ApplicationEntity, error) {
+	return GetByClientIDWithDB(nil, ctx, issuer, clientID)
 }
 
 // GetByClientIDWithDB 同 GetByClientID，但允许注入数据访问器（可嵌入 IAM 库用；nil 回退全局）。
-func GetByClientIDWithDB(db gormdao.DBGetter, ctx context.Context, clientID string) (*model.ApplicationEntity, error) {
+func GetByClientIDWithDB(db gormdao.DBGetter, ctx context.Context, issuer, clientID string) (*model.ApplicationEntity, error) {
 	if clientID == "" {
 		return nil, nil
 	}
@@ -40,7 +40,7 @@ func GetByClientIDWithDB(db gormdao.DBGetter, ctx context.Context, clientID stri
 	}
 	// client_id 全局唯一，且本函数在"租户确定之前"的协议层入口被调用（注册/加入租户通道），
 	// 因此必须显式声明「全租户」作用域：跨租户可见性只能来自显式声明，不能来自缺失作用域。
-	clientEntity, err := dao.NewApplicationClientDao(daoOpts...).GetByCond(dbclient.CrossTenantContext(ctx), &dao.ApplicationClientCond{Code: clientID})
+	clientEntity, err := dao.NewApplicationClientDao(daoOpts...).GetByCond(dbclient.CrossTenantContext(ctx), &dao.ApplicationClientCond{Code: clientID, Issuer: issuer})
 	if err != nil {
 		glog.Errorf(ctx, "[application.GetByClientID] dao applicationClient GetByCond fail, err:%v, clientID:%s", err, clientID)
 		return nil, err

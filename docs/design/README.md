@@ -34,7 +34,11 @@
 | [configuration-reference.md](configuration-reference.md) | **配置参考**。各应用 `config.yaml` 全量配置项说明（server / log / trace / db_configs / redis_config / security / oidc / jwt / client / password / es_configs / masterKey） |
 | [run-and-deploy.md](run-and-deploy.md) | **运行与部署**。本地开发环境准备、构建运行、测试、Docker、多环境部署拓扑、常见排障 |
 | [glossary.md](glossary.md) | **术语表**。SSO / OIDC / IAM / 租户 / 自然人 / 应用 / Client / 令牌等术语的统一定义 |
-| [tenant-custom-domain-redesign.md](tenant-custom-domain-redesign.md) | **租户级自定义域名实施方案（待实施）**。按域名识别租户、登录预设与品牌化、`domain` 表重做。**当前实现状态：`domain` 表与控制台 CRUD 已落地，但 auth 侧尚未按域名解析租户，本文方案的主体仍未实施** |
+| [tenant-custom-domain-redesign.md](tenant-custom-domain-redesign.md) | **租户域名与多 issuer 设计（P0 冻结，spike 输入；目标 Mode D）**。P0 只接新建 D：primary issuer + alias；域名单状态机（draft/verified/tls_ready/active/disabled/retired/released）、tenant provisioning/offboard、`(issuer, code)` client、host-only cookie、`iam_console_binding`、按 Host 解析 issuer、`domain_epoch` 签发门禁；S/router/branded/迁移放 P1/P2。**当前实现状态：`iam_domain` 仍无状态机/唯一索引；`iam_application_client.code` 仍是全局唯一；OP 仍是单 issuer；本文为待实施设计，不动代码** |
+| [tenant-domain-examples.md](tenant-domain-examples.md) | **租户域名具体组合示例**。用 Acme/Globex/Initech/Umbrella 的确定主机名，展示 primary+alias、多应用不同主域共享登录、多品牌 branded、S tier、A+B router、alias vs branded 数据行、S→D 迁移、per-app 反例与组合速查；配套主设计文档 |
+| [p0-host-binding-contract.md](p0-host-binding-contract.md) | **P0 Host/Binding 契约**。Host × 路由矩阵、`iam_console_binding` 生命周期与作用域、平台 seed、D 启用、未知 Host、basePath、ProcessAll Host 白名单、空库 install 三态 |
+| [p0-tenant-lifecycle-contract.md](p0-tenant-lifecycle-contract.md) | **P0 Tenant/Domain 生命周期契约**。`provisioning/active/suspended`、D onboarding/取消/offboard、域名状态机、D console client 收尾、host 重登记 |
+| [p0-issuer-context-contract.md](p0-issuer-context-contract.md) | **P0 Issuer/登出契约**。issuer 在 OP/Gin 的传递、`pkg/oidcctx`、refresh/session 列、`/logout`/`/logoutAll`/`end_session`、offboard 撤销 |
 | [context-and-tenant-scope.md](context-and-tenant-scope.md) | **上下文传递与租户作用域（已落地）**。ctx 只保留一种传法（handler 的 `*gin.Context` 直传，非测试代码零 `.Request.Context()`）、租户作用域改为「中间件写默认 + 调用点显式声明 + 缺省 fail-closed」，含两条红线守卫测试、验收结果、实施记录与 fail-closed 暴露的真实缺陷目录。规则速查见 `AGENTS.md`「上下文传递与租户作用域（must）」，安全定位见 `system-design.md` §7.1 |
 
 > **待办项另记**：尚未实施但方向已定的事项统一记在 [`docs/TODO.md`](../TODO.md)（含前端组件发布 npm 包的方案与前置解耦清单），落地后收敛回本目录对应文档。

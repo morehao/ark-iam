@@ -9,12 +9,20 @@ import (
 	"github.com/morehao/golib/dbaccess/gormdao"
 )
 
+// DomainCtr 域名管理控制器。动作端点走 POST /domains/{id}/{action}（AGENTS.md 路由规范 R2）。
 type DomainCtr interface {
 	Create(ctx *gin.Context)
-	Update(ctx *gin.Context)
-	Detail(ctx *gin.Context)
 	PageList(ctx *gin.Context)
+	Detail(ctx *gin.Context)
 	Delete(ctx *gin.Context)
+
+	Verify(ctx *gin.Context)
+	TLSReady(ctx *gin.Context)
+	Activate(ctx *gin.Context)
+	Disable(ctx *gin.Context)
+	Enable(ctx *gin.Context)
+	Retire(ctx *gin.Context)
+	Release(ctx *gin.Context)
 }
 
 type domainCtr struct {
@@ -24,9 +32,7 @@ type domainCtr struct {
 var _ DomainCtr = (*domainCtr)(nil)
 
 func NewDomainCtr(db gormdao.DBGetter) DomainCtr {
-	return &domainCtr{
-		domainSvc: svcdomain.NewDomainSvc(db),
-	}
+	return &domainCtr{domainSvc: svcdomain.NewDomainSvc(db)}
 }
 
 // @Tags 域名管理
@@ -53,8 +59,6 @@ func (ctr *domainCtr) Create(ctx *gin.Context) {
 
 // @Tags 域名管理
 // @Summary 域名列表分页
-// @accept application/json
-// @Produce application/json
 // @Param req query dtodomain.DomainPageListReq true "域名列表分页"
 // @Success 200 {object} gincontext.DtoRender{data=dtodomain.DomainPageListResp}
 // @Router /v1/platform/domains [get]
@@ -73,41 +77,13 @@ func (ctr *domainCtr) PageList(ctx *gin.Context) {
 }
 
 // @Tags 域名管理
-// @Summary 修改域名
-// @accept application/json
-// @Produce application/json
-// @Param domainID path int true "domainID"
-// @Param req body dtodomain.DomainUpdateReq true "修改域名"
-// @Success 200 {object} gincontext.DtoRender{data=string}
-// @Router /v1/platform/domains/{domainID} [put]
-func (ctr *domainCtr) Update(ctx *gin.Context) {
-	var req dtodomain.DomainUpdateReq
-	req.Operator = identity.OperatorFromGin(ctx)
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	if err := ctr.domainSvc.Update(ctx.Request.Context(), &req); err != nil {
-		gincontext.Fail(ctx, err)
-		return
-	}
-	gincontext.Success(ctx, "修改成功")
-}
-
-// @Tags 域名管理
 // @Summary 域名详情
-// @accept application/json
-// @Produce application/json
-// @Param domainID path int true "domainID"
+// @Param domainID path string true "域名ID"
 // @Success 200 {object} gincontext.DtoRender{data=dtodomain.DomainDetailResp}
 // @Router /v1/platform/domains/{domainID} [get]
 func (ctr *domainCtr) Detail(ctx *gin.Context) {
 	var req dtodomain.DomainDetailReq
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+	if err := ctx.ShouldBindUri(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -120,16 +96,13 @@ func (ctr *domainCtr) Detail(ctx *gin.Context) {
 }
 
 // @Tags 域名管理
-// @Summary 删除域名
-// @accept application/json
-// @Produce application/json
-// @Param domainID path int true "domainID"
-// @Success 200 {object} gincontext.DtoRender{data=string}
+// @Summary 删除未上线域名
+// @Param domainID path string true "域名ID"
 // @Router /v1/platform/domains/{domainID} [delete]
 func (ctr *domainCtr) Delete(ctx *gin.Context) {
 	var req dtodomain.DomainDeleteReq
 	req.Operator = identity.OperatorFromGin(ctx)
-	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+	if err := ctx.ShouldBindUri(&req); err != nil {
 		gincontext.Fail(ctx, err)
 		return
 	}
@@ -137,5 +110,154 @@ func (ctr *domainCtr) Delete(ctx *gin.Context) {
 		gincontext.Fail(ctx, err)
 		return
 	}
-	gincontext.Success(ctx, "删除成功")
+	gincontext.Success(ctx, nil)
+}
+
+// @Tags 域名管理
+// @Summary 域控证明 draft→verified
+// @Param domainID path string true "域名ID"
+// @Router /v1/platform/domains/{domainID}/verify [post]
+func (ctr *domainCtr) Verify(ctx *gin.Context) {
+	var req dtodomain.DomainVerifyReq
+	req.Operator = identity.OperatorFromGin(ctx)
+	if err := ctx.ShouldBindUri(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctx.ShouldBindJSON(&req); err != nil && err.Error() != "EOF" {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.domainSvc.Verify(ctx.Request.Context(), &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 域名管理
+// @Summary 证书就绪 verified→tls_ready
+// @Param domainID path string true "域名ID"
+// @Router /v1/platform/domains/{domainID}/tls-ready [post]
+func (ctr *domainCtr) TLSReady(ctx *gin.Context) {
+	var req dtodomain.DomainTLSReadyReq
+	req.Operator = identity.OperatorFromGin(ctx)
+	if err := ctx.ShouldBindUri(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctx.ShouldBindJSON(&req); err != nil && err.Error() != "EOF" {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.domainSvc.TLSReady(ctx.Request.Context(), &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 域名管理
+// @Summary 激活 tls_ready→active
+// @Param domainID path string true "域名ID"
+// @Router /v1/platform/domains/{domainID}/activate [post]
+func (ctr *domainCtr) Activate(ctx *gin.Context) {
+	var req dtodomain.DomainActivateReq
+	req.Operator = identity.OperatorFromGin(ctx)
+	if err := ctx.ShouldBindUri(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.domainSvc.Activate(ctx.Request.Context(), &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 域名管理
+// @Summary 停用 alias active→disabled
+// @Param domainID path string true "域名ID"
+// @Router /v1/platform/domains/{domainID}/disable [post]
+func (ctr *domainCtr) Disable(ctx *gin.Context) {
+	var req dtodomain.DomainDisableReq
+	req.Operator = identity.OperatorFromGin(ctx)
+	if err := ctx.ShouldBindUri(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.domainSvc.Disable(ctx.Request.Context(), &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 域名管理
+// @Summary 恢复 alias disabled→active
+// @Param domainID path string true "域名ID"
+// @Router /v1/platform/domains/{domainID}/enable [post]
+func (ctr *domainCtr) Enable(ctx *gin.Context) {
+	var req dtodomain.DomainEnableReq
+	req.Operator = identity.OperatorFromGin(ctx)
+	if err := ctx.ShouldBindUri(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.domainSvc.Enable(ctx.Request.Context(), &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 域名管理
+// @Summary 退役 →retired
+// @Param domainID path string true "域名ID"
+// @Router /v1/platform/domains/{domainID}/retire [post]
+func (ctr *domainCtr) Retire(ctx *gin.Context) {
+	var req dtodomain.DomainRetireReq
+	req.Operator = identity.OperatorFromGin(ctx)
+	if err := ctx.ShouldBindUri(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctx.ShouldBindJSON(&req); err != nil && err.Error() != "EOF" {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.domainSvc.Retire(ctx.Request.Context(), &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
+}
+
+// @Tags 域名管理
+// @Summary 释放 retired→released（满90天+审批）
+// @Param domainID path string true "域名ID"
+// @Router /v1/platform/domains/{domainID}/release [post]
+func (ctr *domainCtr) Release(ctx *gin.Context) {
+	var req dtodomain.DomainReleaseReq
+	req.Operator = identity.OperatorFromGin(ctx)
+	if err := ctx.ShouldBindUri(&req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctx.ShouldBindJSON(&req); err != nil && err.Error() != "EOF" {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	res, err := ctr.domainSvc.Release(ctx.Request.Context(), &req)
+	if err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, res)
 }

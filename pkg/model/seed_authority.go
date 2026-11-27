@@ -48,6 +48,7 @@ const (
 	SeedEntityDepartment        = "department"
 	SeedEntityApplication       = "application"
 	SeedEntityApplicationClient = "application_client"
+	SeedEntityConsoleBinding    = "console_binding"
 	SeedEntityMenu              = "menu"
 	SeedEntityRole              = "role"
 	SeedEntityPerson            = "person"
@@ -67,6 +68,12 @@ const (
 	SeedBuiltinClientPlatformAdminWeb = "platform_admin_web"
 	SeedBuiltinClientTenantAdminWeb   = "tenant_admin_web"
 )
+
+// SeedDedicatedConsoleClientCode 是 D（dedicated）租户管理台 client 的固定编码。
+// 系统保留名：D onboarding 的 primary activate 同事务用它创建 D console client，
+// 通用 client 创建接口不可占用；必须是合法 ClientCodePattern（小写字母+下划线，无数字）。
+// 见 docs/design/p0-host-binding-contract.md §5 / p0-tenant-lifecycle-contract.md §5。
+const SeedDedicatedConsoleClientCode = "tenant_console"
 
 // back-channel logout 接收端路径（相对 OIDC Issuer 的路径部分）。
 //

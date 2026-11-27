@@ -90,8 +90,12 @@ type ApplicationClientEntity struct {
 	// - 必须满足 model.ClientCodePattern（小写字母开头，仅小写字母与下划线，禁数字与连字符）；
 	//   取值口径见 docs/design/sso-oidc-concepts.md §3.2；
 	// - 与 application_client.id（控制台内部主键，其他表以其为外键）不是一回事。
-	Code string `gorm:"column:code;type:varchar(64);not null;default:'';uniqueIndex;comment:客户端编码(= OIDC client_id)" json:"code"`
-	Name string `gorm:"column:name;type:varchar(256);not null;default:'';comment:客户端名称" json:"name"`
+	Code string `gorm:"column:code;type:varchar(64);not null;default:'';comment:客户端编码(= OIDC client_id)" json:"code"`
+	// Issuer 该 client 所属 issuer：平台 client = 平台 issuer，D client = D issuer；创建后不可变。
+	// 全局 code 唯一已删除，改由 partial unique 索引 iam_idx_application_client_issuer_code_unique
+	// 约束 (issuer, code) WHERE deleted_at IS NULL（见 automigrate.go / redesign §4.4）。
+	Issuer string `gorm:"column:issuer;type:varchar(256);not null;default:'';comment:所属issuer(平台client=平台issuer,D client=D issuer);创建后不可变" json:"issuer"`
+	Name   string `gorm:"column:name;type:varchar(256);not null;default:'';comment:客户端名称" json:"name"`
 
 	RedirectURIs            RedirectURIList           `gorm:"column:redirect_uris;type:json;serializer:json;not null;default:('[]');comment:授权回调地址" json:"redirectURIs"`
 	PostLogoutRedirectURIs  PostLogoutRedirectURIList `gorm:"column:post_logout_redirect_uris;type:json;serializer:json;not null;default:('[]');comment:登出回调地址" json:"postLogoutRedirectURIs"`

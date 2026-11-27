@@ -6,32 +6,76 @@ import (
 	"github.com/morehao/golib/biz/gobject"
 )
 
+// DomainCreateReq 创建域名（平台端）。P0 只创建 draft；状态流转走动作端点。
+// D alias 必填 targetDomain（host，服务端解析为同租户 target_domain_id）。
+// primary 只允许 usage=login/both。
 type DomainCreateReq struct {
-	Domain string `json:"domain" binding:"required"` // 域名
-	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
-	Operator objidentity.Operator
-}
-
-type DomainUpdateReq struct {
-	DomainID string `json:"-" uri:"domainID" binding:"required"` // 域名ID
-	Domain   string `json:"domain"`                              // 域名
-	// VerificationStatus 验证状态: unverified-未验证, verified-已验证；留空表示不修改。
-	VerificationStatus model.DomainVerificationStatus `json:"verificationStatus"`
-	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
-	Operator objidentity.Operator
+	TenantID           string                         `json:"tenantId" binding:"required"` // 目标租户ID
+	Domain             string                         `json:"domain" binding:"required"`   // 归一化 host
+	DomainRole         model.DomainRole               `json:"domainRole" binding:"required"`
+	DomainUsage        model.DomainUsage              `json:"domainUsage" binding:"required"`
+	TargetDomain       string                         `json:"targetDomain"`       // alias/email 目标 primary 的 host（服务端解析）
+	VerificationMethod model.DomainVerificationMethod `json:"verificationMethod"` // manual/dns_txt（默认 manual）
+	Operator           objidentity.Operator
 }
 
 type DomainDetailReq struct {
-	DomainID string `json:"-" uri:"domainID" binding:"required"` // 域名ID
+	DomainID string `json:"-" uri:"domainID" binding:"required"`
 }
 
 type DomainPageListReq struct {
 	gobject.PageQuery
-	Domain string `json:"domain" form:"domain"` // 域名(模糊搜索)
+	TenantID    string             `json:"tenantId" form:"tenantId"`
+	Domain      string             `json:"domain" form:"domain"`
+	Status      model.DomainStatus `json:"status" form:"status"`
+	DomainRole  model.DomainRole   `json:"domainRole" form:"domainRole"`
+	DomainUsage model.DomainUsage  `json:"domainUsage" form:"domainUsage"`
 }
 
+// DomainDeleteReq 删除（仅 draft/verified/tls_ready；被未 released alias 引用时拒绝；active 必须走 disable/offboard）。
 type DomainDeleteReq struct {
-	DomainID string `json:"-" uri:"domainID" binding:"required"` // 域名ID
-	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	DomainID string `json:"-" uri:"domainID" binding:"required"`
 	Operator objidentity.Operator
+}
+
+// 动作端点请求（路径参数 domainID 是唯一 ID 源）。全部含 Operator 供审计。
+
+type DomainVerifyReq struct {
+	DomainID string                         `json:"-" uri:"domainID" binding:"required"`
+	Method   model.DomainVerificationMethod `json:"method"` // manual/dns_txt；空按 manual
+	Token    string                         `json:"token"`  // DNS TXT 挑战值（可选）
+	Operator objidentity.Operator
+}
+
+type DomainTLSReadyReq struct {
+	DomainID string `json:"-" uri:"domainID" binding:"required"`
+	CertRef  string `json:"certRef"` // 证书引用（P0 运维确认，仅记录）
+	Operator objidentity.Operator
+}
+
+type DomainActivateReq struct {
+	DomainID string `json:"-" uri:"domainID" binding:"required"`
+	Operator objidentity.Operator
+}
+
+type DomainDisableReq struct {
+	DomainID string `json:"-" uri:"domainID" binding:"required"`
+	Operator objidentity.Operator
+}
+
+type DomainEnableReq struct {
+	DomainID string `json:"-" uri:"domainID" binding:"required"`
+	Operator objidentity.Operator
+}
+
+type DomainRetireReq struct {
+	DomainID string `json:"-" uri:"domainID" binding:"required"`
+	Reason   string `json:"reason"`
+	Operator objidentity.Operator
+}
+
+type DomainReleaseReq struct {
+	DomainID       string `json:"-" uri:"domainID" binding:"required"`
+	ApprovalTicket string `json:"approvalTicket"` // 正式释放审批单；取消不发
+	Operator       objidentity.Operator
 }

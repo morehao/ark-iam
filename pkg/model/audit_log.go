@@ -16,6 +16,7 @@ const (
 	AuditActionTenantSwitch                  AuditAction = "tenant.switch"                    // 切换租户
 	AuditActionTenantCreate                  AuditAction = "tenant.create"                    // 创建租户
 	AuditActionTenantAdminPasswordReset      AuditAction = "tenant.admin_password_reset"      // 重置租户管理员密码
+	AuditActionTenantOffboard                AuditAction = "tenant.offboard"                  // 租户 offboard 停用
 	AuditActionApplicationCreate             AuditAction = "application.create"               // 创建应用
 	AuditActionApplicationClientCreate       AuditAction = "application_client.create"        // 创建 OAuth 客户端
 	AuditActionApplicationClientCreateSecret AuditAction = "application_client.create_secret" // 创建 OAuth 客户端密钥

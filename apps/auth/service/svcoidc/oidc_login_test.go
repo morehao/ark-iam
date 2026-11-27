@@ -65,6 +65,8 @@ func (f *fakeSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, pers
 func (f *fakeSSOSessionStore) HasActiveSession(ctx context.Context, personID string) (bool, error) {
 	return false, nil
 }
+func (f *fakeSSOSessionStore) SessionIssuer(ctx context.Context, sessionID string) string { return "" }
+func (f *fakeSSOSessionStore) RevokeSessionsByPersonAndIssuer(ctx context.Context, personID, issuer string) error { return nil }
 
 func TestCompleteLoginBySessionHonorsAuthRequestTenantHint(t *testing.T) {
 	testsetup.Initialize(testsetup.AppNameAuth)

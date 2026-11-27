@@ -7,6 +7,7 @@ import (
 	pkgconfig "github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/middleware"
+	"github.com/morehao/ark-iam/pkg/oidcctx"
 	"github.com/morehao/ark-iam/pkg/oidckit"
 	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/biz/gmiddleware/ginmiddleware"
@@ -33,10 +34,25 @@ func (a *App) authMiddlewareForGroup(conf *pkgconfig.Config, audience string) []
 		opts = append(opts, middleware.WithOIDCIssuer(issuer))
 	}
 	opts = append(opts, middleware.WithOIDCAudiences(audience))
+	// 多 issuer：按请求解析 issuer/audience（Host binding 决定）；未命中回退静态配置（W2/W4）。
+	opts = append(opts, middleware.WithRequestIssuerAudience(func(c *gin.Context) (string, []string, bool) {
+		if rr, ok := resolveFromContext(c); ok && rr != nil && rr.Issuer != "" {
+			aud := audience
+			if rr.Audience != "" {
+				aud = rr.Audience
+			}
+			return rr.Issuer, []string{aud}, true
+		}
+		return "", nil, false
+	}))
 	if conf != nil && conf.OIDC.EnableSSOSessionValidation {
 		ssoStore := sso.NewSSOSessionStore()
+		centralIssuer := ""
+		if conf != nil {
+			centralIssuer = conf.OIDC.Issuer
+		}
 		opts = append(opts, middleware.WithOIDCSSOValidation(func(ctx context.Context, personID, sessionID string, isMachineToken bool) bool {
-			return validateSSOSession(ctx, ssoStore, personID, sessionID, isMachineToken)
+			return validateSSOSession(ctx, ssoStore, personID, sessionID, isMachineToken, centralIssuer)
 		}))
 	}
 	return []gin.HandlerFunc{
@@ -50,14 +66,20 @@ func (a *App) authMiddlewareForGroup(conf *pkgconfig.Config, audience string) []
 //   - 机器凭证：不依赖浏览器会话，直接放行；
 //   - 未配置认证 Redis（dbclient.RedisCli == nil）：无法校验，放行（由 access token 短 TTL 兜底）；
 //   - Redis 已配置但查询出错：fail-closed（返回 false）——否则已撤销的会话会继续用满令牌 TTL。
-func validateSSOSession(ctx context.Context, store sso.SSOSessionStore, personID, sessionID string, isMachineToken bool) bool {
+func validateSSOSession(ctx context.Context, store sso.SSOSessionStore, personID, sessionID string, isMachineToken bool, centralIssuer string) bool {
 	if isMachineToken {
 		return true
 	}
 	if dbclient.RedisCli == nil {
 		return true
 	}
-	active, err := sso.ValidateTokenSession(ctx, store, personID, sessionID)
+	// D 租户（issuer 非中央）fail-closed：无 sid 不回退 person 级校验（DG-SESSION-1）。
+	reqIss, _ := oidcctx.IssuerFromContext(ctx)
+	requireSID := false
+	if reqIss != "" && reqIss != centralIssuer {
+		requireSID = true
+	}
+	active, err := sso.ValidateTokenSession(ctx, store, personID, sessionID, requireSID, reqIss)
 	if err != nil {
 		glog.Warnf(ctx, "[pkg/appassembly] sso session validate fail, fail-closed, personID:%s, err:%v", personID, err)
 		return false

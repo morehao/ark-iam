@@ -14,10 +14,12 @@ import (
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objauth"
+	"github.com/morehao/ark-iam/pkg/oidcctx"
 	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 const (
@@ -244,7 +246,8 @@ func (svc *connectorSvc) Callback(ctx context.Context, req *dtoconnector.Connect
 
 	// Connector 登录成功后建立 SSO 会话，与账密/OIDC 登录走同一套 person 级中心会话；
 	// amr 记录外部 IdP 认证方式（connector 名），供静默续登还原到 id_token。
-	sessionID, err := svc.getSSOSessionStore().CreateSession(runtimeContext(ctx), resolvedPerson.Person.ID, []string{"ext"})
+	ssCtx := withIssuerCtx(runtimeContext(ctx))
+	sessionID, err := svc.getSSOSessionStore().CreateSession(ssCtx, resolvedPerson.Person.ID, []string{"ext"})
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.Callback] create sso session fail, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.AuthLoginFailedError)
@@ -272,4 +275,19 @@ func runtimeContext(ctx context.Context) context.Context {
 		return ctx
 	}
 	return context.Background()
+}
+
+// withIssuerCtx 在 ctx 上注入本次请求 issuer（op.IssuerFromContext 优先，其次 pkg/oidcctx），
+// 供 SSO 会话记录 issuer，用于跨 issuer 会话拒绝。
+func withIssuerCtx(ctx context.Context) context.Context {
+	iss := op.IssuerFromContext(ctx)
+	if iss == "" {
+		if v, ok := oidcctx.IssuerFromContext(ctx); ok {
+			iss = v
+		}
+	}
+	if iss != "" {
+		ctx = context.WithValue(ctx, sso.ContextKeyIssuer, iss)
+	}
+	return ctx
 }

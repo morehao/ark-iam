@@ -43,7 +43,12 @@ const (
 
 func authRequestKey(id string) string { return authRequestKeyPrefix + id }
 func authCodeKey(code string) string  { return authCodeKeyPrefix + code }
-func spentCodeKey(code string) string { return spentCodeKeyPrefix + code }
+
+// authCodeKeyIssuer / spentCodeKeyIssuer 把授权码与 spent 标记按 issuer 命名空间隔离（F4 / AC-5）：
+// A issuer 的 code 在 B issuer 无法定位/无法消费 → 天然跨 issuer 拒绝。issuer 空时与旧 key 一致（兼容）。
+func authCodeKeyIssuer(issuer, code string) string  { return authCodeKeyPrefix + issuer + ":" + code }
+func spentCodeKeyIssuer(issuer, code string) string { return spentCodeKeyPrefix + issuer + ":" + code }
+func spentCodeKey(code string) string               { return spentCodeKeyPrefix + code }
 
 // 协议态默认 TTL（可经 NewRedisProtocolStateStore 的选项覆盖，由组装方注入应用配置值）。
 const (
@@ -123,6 +128,7 @@ func (s *RedisProtocolStateStore) CreateAuthRequest(ctx context.Context, authReq
 	req := &AuthRequest{
 		ID:           reqID,
 		ClientID:     authReq.ClientID,
+		Issuer:       op.IssuerFromContext(ctx),
 		RedirectURI:  authReq.RedirectURI,
 		State:        authReq.State,
 		Scopes:       authReq.Scopes,
@@ -243,7 +249,7 @@ func (s *RedisProtocolStateStore) AssociateSession(ctx context.Context, id strin
 }
 
 func (s *RedisProtocolStateStore) SaveAuthCode(ctx context.Context, id, code string) error {
-	if err := s.client.SetArgs(ctx, authCodeKey(code), id, redis.SetArgs{
+	if err := s.client.SetArgs(ctx, authCodeKeyIssuer(op.IssuerFromContext(ctx), code), id, redis.SetArgs{
 		Mode: "NX",
 		TTL:  s.authCodeTTL,
 	}).Err(); err != nil {
@@ -271,7 +277,7 @@ func (s *RedisProtocolStateStore) ConsumeAuthCode(ctx context.Context, code stri
 func (s *RedisProtocolStateStore) consumeAuthCode(ctx context.Context, code string, deleteCode bool) (op.AuthRequest, error) {
 	var requestID string
 	if deleteCode {
-		val, err := s.client.GetDel(ctx, authCodeKey(code)).Result()
+		val, err := s.client.GetDel(ctx, authCodeKeyIssuer(op.IssuerFromContext(ctx), code)).Result()
 		if errors.Is(err, redis.Nil) {
 			return nil, s.checkSpentOrInvalid(ctx, code)
 		}
@@ -280,7 +286,7 @@ func (s *RedisProtocolStateStore) consumeAuthCode(ctx context.Context, code stri
 		}
 		requestID = val
 	} else {
-		val, err := s.client.Get(ctx, authCodeKey(code)).Result()
+		val, err := s.client.Get(ctx, authCodeKeyIssuer(op.IssuerFromContext(ctx), code)).Result()
 		if errors.Is(err, redis.Nil) {
 			return nil, s.checkSpentOrInvalid(ctx, code)
 		}
@@ -309,7 +315,7 @@ func (s *RedisProtocolStateStore) consumeAuthCode(ctx context.Context, code stri
 	}
 
 	if deleteCode {
-		if err := s.client.Set(ctx, spentCodeKey(code), "1", s.spentCodeTTL).Err(); err != nil {
+		if err := s.client.Set(ctx, spentCodeKeyIssuer(op.IssuerFromContext(ctx), code), "1", s.spentCodeTTL).Err(); err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrStoreUnavailable, err)
 		}
 	}
@@ -318,7 +324,7 @@ func (s *RedisProtocolStateStore) consumeAuthCode(ctx context.Context, code stri
 }
 
 func (s *RedisProtocolStateStore) checkSpentOrInvalid(ctx context.Context, code string) error {
-	exists, err := s.client.Exists(ctx, spentCodeKey(code)).Result()
+	exists, err := s.client.Exists(ctx, spentCodeKeyIssuer(op.IssuerFromContext(ctx), code)).Result()
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrStoreUnavailable, err)
 	}

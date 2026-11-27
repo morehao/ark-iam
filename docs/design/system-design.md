@@ -279,7 +279,10 @@ erDiagram
         string code UK "租户编码 t_<12位hex>，服务端生成，创建后不可改"
         string name
         string type "customer 客户 / platform 平台（分类标识，不参与隔离判定）"
-        string status "active 正常 / suspended 已挂起"
+        string status "provisioning 建租中 / active 正常 / suspended 已挂起"
+        string isolation_mode "dedicated 专属(自定义域+独立issuer) / shared 共享"
+        string issuer "D 派生缓存 issuer（事实源为 active primary 域）"
+        bigint domain_epoch "域名/issuer 变更版本号"
         string tag
         string db_user
     }
@@ -462,8 +465,11 @@ erDiagram
     domain {
         string id PK "UUID v7"
         string tenant_id FK
-        string domain
-        string verification_status "unverified 未验证 / verified 已验证（DomainVerificationStatus）"
+        string domain "归一化 host"
+        string domain_role "primary 主域 / alias 别名"
+        string domain_usage "login / email / both"
+        string target_domain_id "alias/email 目标 primary 行 id"
+        string status "draft/verified/tls_ready/active/disabled/retired/released"
     }
     api_key {
         string id PK "UUID v7"

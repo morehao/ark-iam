@@ -3,12 +3,14 @@ package svctenant
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/morehao/ark-iam/apps/platformadmin/dto/dtotenant"
 	"github.com/morehao/ark-iam/pkg/audit"
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/core/person"
 	"github.com/morehao/ark-iam/pkg/core/tenant"
+	"github.com/morehao/ark-iam/pkg/core/tenantdomain"
 	"github.com/morehao/ark-iam/pkg/core/user"
 	"github.com/morehao/ark-iam/pkg/credential"
 	"github.com/morehao/ark-iam/pkg/dao"
@@ -31,6 +33,7 @@ type TenantSvc interface {
 	Update(ctx context.Context, req *dtotenant.TenantUpdateReq) error
 	Detail(ctx context.Context, req *dtotenant.TenantDetailReq) (*dtotenant.TenantDetailResp, error)
 	PageList(ctx context.Context, req *dtotenant.TenantPageListReq) (*dtotenant.TenantPageListResp, error)
+	Offboard(ctx context.Context, req *dtotenant.TenantOffboardReq) error
 }
 
 type tenantSvc struct {
@@ -87,6 +90,17 @@ func (svc *tenantSvc) Create(ctx context.Context, req *dtotenant.TenantCreateReq
 		tenantType = model.TenantTypeCustomer
 	}
 
+	// D（dedicated）新建：强制 provisioning，忽略/拒绝请求里的 status；必须带 primaryDomain。
+	isDedicated := req.IsolationMode == model.TenantIsolationDedicated
+	createStatus := model.NormalizeTenantStatus(req.Status)
+	primaryDomain := strings.ToLower(strings.TrimSpace(req.PrimaryDomain))
+	if isDedicated {
+		if primaryDomain == "" {
+			return nil, code.GetError(code.DomainCreateError)
+		}
+		createStatus = model.TenantStatusProvisioning
+	}
+
 	var (
 		tenantID         string
 		adminUserID      string
@@ -95,13 +109,14 @@ func (svc *tenantSvc) Create(ctx context.Context, req *dtotenant.TenantCreateReq
 	txErr := svc.db(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		result, cErr := tenant.CreateTenantWithBuiltinAdmin(ctx, tx, &tenant.CreateTenantWithBuiltinAdminReq{
 			Tenant: &tenant.CreateWithRootDeptReq{
-				Code:      tenantCode,
-				CreatedBy: userID,
-				DbUser:    req.DbUser,
-				Name:      req.Name,
-				Status:    model.NormalizeTenantStatus(req.Status),
-				Tag:       req.Tag,
-				Type:      tenantType,
+				Code:          tenantCode,
+				CreatedBy:     userID,
+				DbUser:        req.DbUser,
+				Name:          req.Name,
+				Status:        createStatus,
+				IsolationMode: req.IsolationMode,
+				Tag:           req.Tag,
+				Type:          tenantType,
 			},
 			AdminUser: &user.CreateReq{
 				Person: &person.FindOrCreateReq{
@@ -124,6 +139,15 @@ func (svc *tenantSvc) Create(ctx context.Context, req *dtotenant.TenantCreateReq
 		tenantID = result.Tenant.ID
 		adminUserID = result.AdminUser.ID
 		adminPersonIsNew = result.AdminPersonCreated
+
+		// D（dedicated）：同事务建 primary（draft）+ console binding（draft）。
+		// 未 active 前不解析/不签发/不启用 binding（DG-ONBOARD-1）；issuer 由后续 activate 派生。
+		if isDedicated {
+			if err := createDedicatedPrimaryAndBinding(tx, svc.db, tenantID, primaryDomain, req.Operator.UserID); err != nil {
+				glog.Errorf(ctx, "[svctenant.TenantCreate] create dedicated primary/binding fail, err:%v, tenantID:%s", err, tenantID)
+				return err
+			}
+		}
 		return nil
 	})
 	if txErr != nil {
@@ -283,6 +307,11 @@ func (svc *tenantSvc) Delete(ctx context.Context, req *dtotenant.TenantDeleteReq
 		glog.Errorf(ctx, "[svctenant.TenantDelete] refuse to delete platform tenant, tenantID:%s, req:%s", req.TenantID, gutil.ToJsonString(req))
 		return code.GetError(code.TenantBuiltInDeleteForbiddenError)
 	}
+	// D（dedicated）租户 P0 一律 403：停用只能走 offboard，不提供直接删租户（DG-TENANT-GUARD-1）。
+	if tenantEntity.IsolationMode == model.TenantIsolationDedicated {
+		glog.Errorf(ctx, "[svctenant.TenantDelete] refuse to delete dedicated tenant (use offboard), tenantID:%s", req.TenantID)
+		return code.GetError(code.TenantBuiltInDeleteForbiddenError)
+	}
 
 	userID := req.Operator.UserID
 
@@ -302,6 +331,20 @@ func (svc *tenantSvc) Update(ctx context.Context, req *dtotenant.TenantUpdateReq
 	}
 	if tenantEntity == nil || tenantEntity.ID == "" {
 		return code.GetError(code.TenantNotExistError)
+	}
+
+	// D（dedicated）租户：status/isolation_mode 是系统动作（activate/offboard）维护，通用 PUT 拒写。
+	// 仅当请求试图改 status（与原值不同）或改 isolation_mode 时才拒绝；其余字段照常更新。
+	if tenantEntity.IsolationMode == model.TenantIsolationDedicated {
+		if req.IsolationMode != "" && req.IsolationMode != tenantEntity.IsolationMode {
+			glog.Errorf(ctx, "[svctenant.TenantUpdate] refuse to change isolation_mode of dedicated tenant, tenantID:%s", req.TenantID)
+			return code.GetError(code.TenantUpdateError)
+		}
+		reqStatus := model.NormalizeTenantStatus(req.Status)
+		if reqStatus != tenantEntity.Status {
+			glog.Errorf(ctx, "[svctenant.TenantUpdate] refuse to change status of dedicated tenant via PUT (use offboard), tenantID:%s", req.TenantID)
+			return code.GetError(code.DomainStatusInvalidError)
+		}
 	}
 
 	userID := req.Operator.UserID
@@ -358,12 +401,14 @@ func (svc *tenantSvc) Detail(ctx context.Context, req *dtotenant.TenantDetailReq
 	resp := &dtotenant.TenantDetailResp{
 		TenantID: tenantEntity.ID,
 		TenantBaseInfo: objtenant.TenantBaseInfo{
-			Code:   tenantEntity.Code,
-			DbUser: tenantEntity.DbUser,
-			Name:   tenantEntity.Name,
-			Status: tenantEntity.Status,
-			Tag:    tenantEntity.Tag,
-			Type:   tenantEntity.Type,
+			Code:          tenantEntity.Code,
+			DbUser:        tenantEntity.DbUser,
+			Name:          tenantEntity.Name,
+			Status:        tenantEntity.Status,
+			Tag:           tenantEntity.Tag,
+			Type:          tenantEntity.Type,
+			IsolationMode: tenantEntity.IsolationMode,
+			Issuer:        tenantEntity.Issuer,
 		},
 		OperatorBaseInfo: gobject.OperatorBaseInfo{
 			CreatedAt: tenantEntity.CreatedAt.Unix(),
@@ -378,7 +423,7 @@ func (svc *tenantSvc) Detail(ctx context.Context, req *dtotenant.TenantDetailReq
 // 状态筛选走白名单校验：非法值直接报错，避免静默返回"看起来正常"的错误集合。
 func (svc *tenantSvc) PageList(ctx context.Context, req *dtotenant.TenantPageListReq) (*dtotenant.TenantPageListResp, error) {
 	switch req.Status {
-	case "", model.TenantStatusActive, model.TenantStatusSuspended:
+	case "", model.TenantStatusProvisioning, model.TenantStatusActive, model.TenantStatusSuspended:
 	default:
 		glog.Errorf(ctx, "[svctenant.TenantPageList] invalid status filter, status:%s, req:%s", req.Status, gutil.ToJsonString(req))
 		return nil, code.GetError(code.TenantPageListStatusInvalidError)
@@ -401,12 +446,14 @@ func (svc *tenantSvc) PageList(ctx context.Context, req *dtotenant.TenantPageLis
 		list = append(list, dtotenant.TenantPageListItem{
 			TenantID: v.ID,
 			TenantBaseInfo: objtenant.TenantBaseInfo{
-				Code:   v.Code,
-				DbUser: v.DbUser,
-				Name:   v.Name,
-				Status: v.Status,
-				Tag:    v.Tag,
-				Type:   v.Type,
+				Code:          v.Code,
+				DbUser:        v.DbUser,
+				Name:          v.Name,
+				Status:        v.Status,
+				Tag:           v.Tag,
+				Type:          v.Type,
+				IsolationMode: v.IsolationMode,
+				Issuer:        v.Issuer,
 			},
 			OperatorBaseInfo: gobject.OperatorBaseInfo{
 				CreatedAt: v.CreatedAt.Unix(),
@@ -418,4 +465,106 @@ func (svc *tenantSvc) PageList(ctx context.Context, req *dtotenant.TenantPageLis
 		List:  list,
 		Total: total,
 	}, nil
+}
+
+// createDedicatedPrimaryAndBinding 在 onboarding 事务内为 D 租户建 primary(draft) + console binding(draft)。
+// 未 active 前不解析/不签发/不启用（DG-ONBOARD-1）；issuer 留空，由 primary activate 派生。
+// D console client 在 primary activate 同事务创建（见 svcdomain 或后续动作），此处只建 binding 骨架。
+func createDedicatedPrimaryAndBinding(tx *gorm.DB, db gormdao.DBGetter, tenantID, primaryDomain, operator string) error {
+	tenantCtx := dbclient.ExplicitTenantContext(context.Background(), tenantID)
+
+	primary := &model.DomainEntity{
+		TenantID:           tenantID,
+		Domain:             primaryDomain,
+		DomainRole:         model.DomainRolePrimary,
+		DomainUsage:        model.DomainUsageLogin,
+		Status:             model.DomainStatusDraft,
+		VerificationMethod: model.DomainVerificationManual,
+		CreatedBy:          operator,
+		UpdatedBy:          operator,
+	}
+	if err := dao.NewDomainDao(dao.WithDBGetter(db)).WithTx(tx).Insert(tenantCtx, primary); err != nil {
+		return err
+	}
+
+	// console binding：draft；issuer/client/audience/redirect 待 activate/enable 阶段补全。
+	binding := &model.ConsoleBindingEntity{
+		Host:     primaryDomain,
+		TenantID: tenantID,
+		Kind:     model.ConsoleBindingKindTenant,
+		Status:   model.ConsoleBindingStatusDraft,
+	}
+	if err := dao.NewConsoleBindingDao(dao.WithDBGetter(db)).Create(context.Background(), tx, binding); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Offboard 是 P0 D 租户的**唯一**停用入口（DG-OFFBOARD-1）。
+// 同事务：tenant→suspended、active primary→disabled、清 issuer、domain_epoch+1、
+// 未上线域名→released、alias 级联 disabled、binding disable+软删；提交后异步撤 session/refresh（可重试）。
+func (svc *tenantSvc) Offboard(ctx context.Context, req *dtotenant.TenantOffboardReq) error {
+	tn, err := dao.NewTenantDao(dao.WithDBGetter(svc.db)).GetByID(ctx, req.TenantID)
+	if err != nil {
+		glog.Errorf(ctx, "[svctenant.Offboard] GetByID fail, err:%v", err)
+		return code.GetError(code.TenantUpdateError)
+	}
+	if tn == nil || tn.ID == "" {
+		return code.GetError(code.TenantNotExistError)
+	}
+	if tn.IsolationMode != model.TenantIsolationDedicated {
+		return code.GetError(code.DomainTenantSuspendedError) // 仅 D 走 offboard
+	}
+
+	// 捕获 offboard 前的 issuer（tx 内会被清空），用于按 (tenant, issuer) 收敛撤销。
+	oldIssuer := tn.Issuer
+	var hosts []string
+	txErr := svc.db(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		dtx := &tenantdomain.Tx{DB: tx, TenantID: req.TenantID, Operator: req.Operator.UserID}
+		h, e := dtx.Offboard(ctx, time.Now())
+		if e != nil {
+			return e
+		}
+		hosts = h
+		// binding 全部 disable + 软删（offboard 同事务；DG-OFFBOARD-1）。
+		cbDao := dao.NewConsoleBindingDao(dao.WithDBGetter(svc.db))
+		bindings, e := cbDao.ListByTenant(ctx, req.TenantID)
+		if e != nil {
+			return e
+		}
+		for i := range bindings {
+			if _, e := cbDao.SoftDelete(ctx, tx, bindings[i].ID, req.TenantID, req.Operator.UserID); e != nil {
+				return e
+			}
+		}
+		return nil
+	})
+	if txErr != nil {
+		if isSentinel(txErr) {
+			return code.GetError(code.DomainStatusInvalidError)
+		}
+		glog.Errorf(ctx, "[svctenant.Offboard] tx fail, err:%v, tenantID:%s", txErr, req.TenantID)
+		return code.GetError(code.TenantUpdateError)
+	}
+	_ = hosts
+	// 提交后撤销该租户成员在 (tenant, issuer) 范围内的会话（DG-SESSION-2：不 person 级全撤、不波及其他 issuer）。
+	if rerr := tenant.RevokeMemberSessionsByIssuer(ctx, req.TenantID, oldIssuer); rerr != nil {
+		// 撤销失败不阻断 offboard（签发门禁已停）；记审计留待重试。
+		glog.Errorf(ctx, "[svctenant.Offboard] revoke sessions fail (will retry), err:%v, tenantID:%s", rerr, req.TenantID)
+	}
+	audit.WriteAudit(ctx, audit.AuditEntry{
+		Action: audit.ActionTenantOffboard, TenantID: req.TenantID,
+		Result: model.AuditResultSuccess, TargetType: model.AuditTargetTypeTenant, TargetID: req.TenantID,
+		Detail: "offboard",
+	})
+	return nil
+}
+
+func isSentinel(err error) bool {
+	switch err {
+	case tenantdomain.ErrTenantNotExist, tenantdomain.ErrTenantStatusInvalid, tenantdomain.ErrInvalidTransition,
+		tenantdomain.ErrConflict:
+		return true
+	}
+	return false
 }

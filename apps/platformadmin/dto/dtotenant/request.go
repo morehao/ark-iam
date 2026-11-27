@@ -10,6 +10,9 @@ import (
 type TenantCreateReq struct {
 	objtenant.TenantBaseInfo
 	Admin *TenantAdminCreateReq `json:"admin" binding:"required"` // 租户管理员(必填：每个租户都必须有管理员)
+	// PrimaryDomain 仅 dedicated 新建时使用：同事务创建该 primary（draft 域名）。
+	// 普通(shared)建租户忽略。见 p0-tenant-lifecycle-contract.md §2。
+	PrimaryDomain string `json:"primaryDomain"`
 	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
 	Operator objidentity.Operator
 }
@@ -52,5 +55,12 @@ type TenantPageListReq struct {
 type TenantDeleteReq struct {
 	TenantID string `json:"-" uri:"tenantID" binding:"required"` // 租户ID
 	// Operator 由 controller 从鉴权结果填入（json:"-"，客户端不可伪造）。
+	Operator objidentity.Operator
+}
+
+// TenantOffboardReq offboard 租户（P0 唯一停用入口）：tenant→suspended、primary disabled、
+// 清 issuer、撤 session/refresh；接受 provisioning/active。D DELETE 一律 403，只能走此入口。
+type TenantOffboardReq struct {
+	TenantID string `json:"-" uri:"tenantID" binding:"required"`
 	Operator objidentity.Operator
 }

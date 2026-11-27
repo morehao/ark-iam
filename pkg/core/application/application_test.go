@@ -70,7 +70,7 @@ func TestGetByClientID(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			app, err := GetByClientID(ginCtx, c.clientID)
+			app, err := GetByClientID(ginCtx, "", c.clientID)
 			if err != nil {
 				t.Fatalf("GetByClientID(%q) unexpected err: %v", c.clientID, err)
 			}

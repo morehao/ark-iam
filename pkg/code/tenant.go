@@ -44,6 +44,14 @@ const (
 	DomainAlreadyExistError = 101204
 	DomainUpdateError       = 101205
 	DomainDetailError       = 101206
+	// P0 自定义域名/多 issuer 动作端点错误（见 tenant-custom-domain-redesign.md §5.3）。
+	DomainFormatInvalidError    = 101207 // 域名格式非法
+	DomainTenantSuspendedError  = 101208 // 租户不存在/挂起
+	DomainReservedError         = 101209 // 域名保留/不可用
+	DomainVerifyError           = 101210 // 验证失败
+	DomainIssuerTierMismatchError = 101211 // issuer/tier 不匹配
+	DomainStatusInvalidError    = 101212 // 状态/用途非法
+	DomainRoleInvalidError      = 101213 // 角色非法
 )
 
 var tenantErrorMsgMap = gerror.CodeMsgMap{
@@ -79,4 +87,11 @@ var tenantErrorMsgMap = gerror.CodeMsgMap{
 	DomainAlreadyExistError:             "域名已存在",
 	DomainUpdateError:                   "更新域名失败",
 	DomainDetailError:                   "查看域名详情失败",
+	DomainFormatInvalidError:            "域名格式非法",
+	DomainTenantSuspendedError:          "租户不存在或已挂起",
+	DomainReservedError:                 "域名保留或不可用",
+	DomainVerifyError:                   "域名验证失败",
+	DomainIssuerTierMismatchError:       "issuer 或 tier 不匹配",
+	DomainStatusInvalidError:            "域名状态或用途非法",
+	DomainRoleInvalidError:              "域名角色非法",
 }

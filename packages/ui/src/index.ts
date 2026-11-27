@@ -48,7 +48,7 @@ export type {
 } from './RemoteSelect'
 export { AppShell } from './AppShell'
 export { themeConfig, brand, tokens } from './theme'
-export { EnableTag, SuspendedTag, VerifiedTag, TypeTag, SourceTag } from './status'
+export { EnableTag, SuspendedTag, TypeTag, SourceTag, TenantStatusTag, DomainStatusTag } from './status'
 export { fmtTime, fmtRelativeTime, toMillis } from './format'
 export { TimeCell, TIME_COL_WIDTH, TIME_COL_WIDTH_RELATIVE, timeColumn } from './TimeCell'
 export type { TimeCellProps, TimeColumnConfig } from './TimeCell'

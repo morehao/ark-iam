@@ -11,6 +11,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/dao"
 	"github.com/morehao/ark-iam/pkg/dbclient"
 	"github.com/morehao/ark-iam/pkg/model"
+	"github.com/morehao/ark-iam/pkg/oidcctx"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/glog"
 	"github.com/morehao/golib/gutil"
@@ -216,10 +217,15 @@ func (svc *oAuthClientSvc) Create(ctx context.Context, req *dtoapplicationclient
 		glog.Errorf(ctx, "[svcapplicationclient.Create] 解析归属租户作用域失败, err:%v, req:%s", err, gutil.ToJsonString(req))
 		return nil, code.GetError(code.ApplicationClientCreateError)
 	}
+	// issuer 写路径（P0）：普通控制台 client 绑当前请求 issuer（平台/租户控制台由入口中间件写入 oidcctx）；
+	// D console client 的创建走 onboarding 专用路径（targetTenantID → 目标租户 primary issuer，见 W5）。
+	// 禁止从 body 信任 issuer：此处只取服务端请求 ctx 的 issuer。
+	issuer, _ := oidcctx.IssuerFromContext(ctx)
 	insertEntity := &model.ApplicationClientEntity{
 		TenantID:                dbclient.TenantIDFromContext(writeCtx),
 		AppID:                   req.AppID,
 		Code:                    req.Code,
+		Issuer:                  issuer,
 		Name:                    req.Name,
 		RedirectURIs:            model.RedirectURIList(emptyIfNil(req.RedirectURIs)),
 		PostLogoutRedirectURIs:  model.PostLogoutRedirectURIList(emptyIfNil(req.PostLogoutRedirectURIs)),
@@ -515,8 +521,10 @@ func (svc *oAuthClientSvc) PageList(ctx context.Context, req *dtoapplicationclie
 }
 
 func (svc *oAuthClientSvc) GetByClientID(ctx context.Context, clientID string) (*dtoapplicationclient.ApplicationClientDetailResp, error) {
+	issuer, _ := oidcctx.IssuerFromContext(ctx)
 	entity, err := dao.NewApplicationClientDao(dao.WithDBGetter(svc.db)).GetByCond(ctx, &dao.ApplicationClientCond{
-		Code: clientID,
+		Code:   clientID,
+		Issuer: issuer,
 	})
 	if err != nil {
 		glog.Errorf(ctx, "[svcapplicationclient.GetByClientID] dao GetByCond fail, err:%v, clientID:%s", err, clientID)

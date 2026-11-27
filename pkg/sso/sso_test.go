@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/testsetup"
@@ -90,4 +91,83 @@ func TestCreateSessionToleratesAuditWriteFailure(t *testing.T) {
 
 	// 清理共享 Redis 中的测试会话
 	_ = store.RevokeSessionsByPersonID(ctx, "99")
+}
+
+// fakeSSOStore 用于验证 ValidateTokenSession 的 sid 语义，不触达 Redis。
+type fakeSSOStore struct {
+	personHasActive bool
+	validatePerson  string
+	sessionIssuer   string
+}
+
+func (f *fakeSSOStore) CreateSession(ctx context.Context, personID string, amr []string) (string, error) {
+	return "", nil
+}
+func (f *fakeSSOStore) ValidateSession(ctx context.Context, sessionID string) (string, error) {
+	return f.validatePerson, nil
+}
+func (f *fakeSSOStore) SessionAMR(ctx context.Context, sessionID string) []string { return nil }
+func (f *fakeSSOStore) SessionAuthTime(ctx context.Context, sessionID string) time.Time {
+	return time.Time{}
+}
+func (f *fakeSSOStore) RevokeSession(ctx context.Context, sessionID string) error { return nil }
+func (f *fakeSSOStore) RevokeSessionsByPersonID(ctx context.Context, personID string) error {
+	return nil
+}
+func (f *fakeSSOStore) HasActiveSession(ctx context.Context, personID string) (bool, error) {
+	return f.personHasActive, nil
+}
+func (f *fakeSSOStore) SessionIssuer(ctx context.Context, sessionID string) string {
+	return f.sessionIssuer
+}
+
+// TestValidateTokenSessionRequireSID 覆盖 DG-SESSION-1：无 sid 时
+// requireSID=true 必须 fail-closed（不回退 person 活性）；requireSID=false 回退旧兼容。
+func TestValidateTokenSessionRequireSID(t *testing.T) {
+	ctx := context.Background()
+	// person 有活跃会话，但 token 无 sid
+	store := &fakeSSOStore{personHasActive: true}
+
+	// D：requireSID=true，无 sid → false（fail-closed）
+	ok, err := ValidateTokenSession(ctx, store, "p1", "", true, "")
+	require.NoError(t, err)
+	require.False(t, ok, "requireSID 且无 sid 必须 fail-closed，不得回退 person")
+
+	// 平台：requireSID=false，无 sid → 回退 HasActiveSession(true)
+	ok, err = ValidateTokenSession(ctx, store, "p1", "", false, "")
+	require.NoError(t, err)
+	require.True(t, ok, "非 requireSID 无 sid 应回退 person 活性校验")
+
+	// 有 sid：按成员匹配
+	store2 := &fakeSSOStore{validatePerson: "p1"}
+	ok, err = ValidateTokenSession(ctx, store2, "p1", "sid", true, "")
+	require.NoError(t, err)
+	require.True(t, ok)
+	// sid 归属他人 → 拒绝
+	ok, err = ValidateTokenSession(ctx, store2, "p2", "sid", true, "")
+	require.NoError(t, err)
+	require.False(t, ok)
+}
+
+// TestValidateTokenSessionCrossIssuerReject 覆盖 DG-SESSION-3 / AC-7：
+// 会话记录的 issuer 与请求 issuer 不同 → 拒绝（跨 issuer 会话不可用）。
+func TestValidateTokenSessionCrossIssuerReject(t *testing.T) {
+	ctx := context.Background()
+	store := &fakeSSOStore{validatePerson: "p1", sessionIssuer: "https://login.acme.com/oidc"}
+	// 同 issuer → 通过
+	ok, err := ValidateTokenSession(ctx, store, "p1", "sid", true, "https://login.acme.com/oidc")
+	require.NoError(t, err)
+	require.True(t, ok)
+	// 请求来自另一 issuer → 拒绝
+	ok, err = ValidateTokenSession(ctx, store, "p1", "sid", true, "https://login.initech.com/oidc")
+	require.NoError(t, err)
+	require.False(t, ok, "跨 issuer 会话必须拒绝")
+	// 请求 issuer 为空（旧路径）→ 不做 issuer 比对，按成员匹配通过
+	ok, err = ValidateTokenSession(ctx, store, "p1", "sid", true, "")
+	require.NoError(t, err)
+	require.True(t, ok)
+}
+
+func (f *fakeSSOStore) RevokeSessionsByPersonAndIssuer(ctx context.Context, personID, issuer string) error {
+	return nil
 }

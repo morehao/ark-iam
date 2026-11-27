@@ -13,6 +13,7 @@ type TenantCtr interface {
 	Create(ctx *gin.Context)
 	ResetAdminPassword(ctx *gin.Context)
 	Delete(ctx *gin.Context)
+	Offboard(ctx *gin.Context)
 	Update(ctx *gin.Context)
 	Detail(ctx *gin.Context)
 	PageList(ctx *gin.Context)
@@ -163,4 +164,22 @@ func (ctr *tenantCtr) PageList(ctx *gin.Context) {
 		return
 	}
 	gincontext.Success(ctx, res)
+}
+
+// @Tags 租户管理
+// @Summary 租户 offboard（P0 D 唯一停用入口）
+// @Param tenantID path string true "租户ID"
+// @Router /v1/platform/tenants/{tenantID}/offboard [post]
+func (ctr *tenantCtr) Offboard(ctx *gin.Context) {
+	var req dtotenant.TenantOffboardReq
+	req.Operator = identity.OperatorFromGin(ctx)
+	if err := gincontext.BindPathParams(ctx, &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	if err := ctr.tenantSvc.Offboard(ctx.Request.Context(), &req); err != nil {
+		gincontext.Fail(ctx, err)
+		return
+	}
+	gincontext.Success(ctx, "停用成功")
 }

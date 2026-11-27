@@ -18,7 +18,9 @@
 | 多租户 | Multi-tenant | 一个 person 可同时属于多个租户；登录时需选择租户（或由 `tenant` hint 指定） |
 | 挂起 | Suspended | person/user 被停用，禁止登录（`person.status` / `user.status` = `suspended`；旧 `is_suspended` 布尔列已下线） |
 | 启停状态 | Enable Status | 全局统一的「启用/停用」词汇：`enable` 启用 / `disable` 停用。凡表达「这条记录还能不能参与业务」的字段一律用它——`application.status`、`application_client.status`、`tenant_application.status`、`user_application.status`、`department.status`、`connector.status`、`menu.status` 均属此类，禁止再出现 `active`/`inactive`/`enabled` 等同义异写。**布尔开关一律具名枚举化**：同名的 `...Flag` / `...Policy` 列（如 `menu.hidden`、`application_client.require_pkce`、`connector.allow_account_link`）同样是 `enable`/`disable` 的 `varchar(16)` 列 + 具名类型 + 常量，禁止用 Go `bool` 表达字典语义、禁止裸字面量 |
-| 租户状态 | Tenant Status | 租户**生命周期**状态（`tenant.status`）：`active` 正常 / `suspended` 已挂起，属生命周期词汇而**不是**启停状态（`suspended` 有「禁止该租户成员登录与签发令牌」的独立语义，降级为 `disable` 会丢失语义）。仅 active 允许其成员登录、签发与轮换令牌；挂起会撤销该租户成员的 refresh token 与 SSO 会话；禁止挂起操作者自己所在的租户（不可逆自锁） |
+| 租户状态 | Tenant Status | 租户**生命周期**状态（`tenant.status`）三值：`provisioning`（D 建租中，尚未有 active primary，不可签发）/ `active`（正常）/ `suspended`（offboard 后）。属生命周期词汇而非启停状态。仅 active 允许其成员登录、签发与轮换令牌；suspended 会撤销成员 refresh token 与 SSO 会话；禁止挂起操作者自己所在的租户（不可逆自锁）；D 租户停用只能走 offboard（DELETE 403） |
+| 域名状态 | Domain Status | P0 域名**单一状态机**（`domain.status`）：`draft` 已占 host 未验证 / `verified` 域控证明 / `tls_ready` 证书就绪 / `active` 唯一可用态（primary 可签发、alias 可 302）/ `disabled` 停止可恢复 / `retired` 墓碑（仍占 host）/ `released` 释放终态（host 可重登记）。取代旧 `verification_status`（布尔式"已验证即 issuer"已被推翻） |
+| 控制台绑定 | Console Binding | `iam_console_binding`：Host → 租户/issuer/client/audience/redirect 的路由事实源（`(host,kind)` 唯一，kind=platform/tenant/central）。`/config.json`、`/v1/auth`、`/v1/tenant`、back-channel 按 Host 读同一绑定；保留 `tenant_id` 但不进 skip 表（显式作用域） |
 
 ## 二、部门与归属
 

@@ -54,6 +54,9 @@ type AuthRequest struct {
 	ExpiresAt     time.Time           `json:"expires_at"`
 	TenantID      string              `json:"tenant_id"`
 	SessionID     string              `json:"session_id"`
+	// Issuer 授权请求固化所属 issuer（创建时的 Host 派生）；code 兑换时校验请求 issuer 一致，
+	// 防 A issuer 的 code 在 B issuer 兑换（p0-issuer-context §2.1 / AC-5）。
+	Issuer string `json:"issuer,omitempty"`
 	// H5：prompt / max_age 必须持久化，静默续登（CompleteLoginBySession）时校验：
 	// prompt=login 强制重新认证；authTime+max_age 超期后禁止静默完成。
 	Prompt []string `json:"prompt,omitempty"`

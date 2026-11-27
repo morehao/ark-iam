@@ -171,6 +171,12 @@ type OIDC struct {
 	// 用户的 SSO 中心会话活性（HasActiveSession）。开启后"一处登出、处处登出"
 	// 在请求粒度即时生效；要求业务应用与 auth 共享同一认证 Redis。
 	EnableSSOSessionValidation bool `yaml:"enableSSOSessionValidation"`
+	// EnableHostBinding 控制是否启用「按 Host 读 iam_console_binding 解析 issuer/client/audience」
+	// 的多 issuer 运行时（P0 自定义域名）。**默认 false**：关闭时走静态 issuer（现状，单 issuer）；
+	// 开启后 /config.json、鉴权、/oidc/* 协议栈按请求 Host 的 binding 解析 issuer，未知 Host→404。
+	// 开启前置：platform binding/console client 已由 install 引导、D binding 已 enable。
+	// 上线/回滚只需改本开关（部署配置）。
+	EnableHostBinding bool `yaml:"enableHostBinding"`
 	// EnforceAppAccess 控制是否启用「应用准入门禁」（user_application）：
 	// 登录期（CompleteLogin/SelectTenant/静默登录）与令牌签发兜底（personPrivateClaims）
 	// 都会按判定式 application.Usable 校验，失败 fail-closed。

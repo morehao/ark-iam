@@ -46,6 +46,9 @@ func (f *fakeConnectorSSOSessionStore) RevokeSessionsByPersonID(ctx context.Cont
 func (f *fakeConnectorSSOSessionStore) HasActiveSession(ctx context.Context, personID string) (bool, error) {
 	return false, nil
 }
+func (f *fakeConnectorSSOSessionStore) SessionIssuer(ctx context.Context, sessionID string) string {
+	return ""
+}
 
 func TestConnectorCallbackReturnsPersonTokenWhenPersonHasMultipleTenants(t *testing.T) {
 	ginCtx, _ := gin.CreateTestContext(nil)
@@ -228,3 +231,5 @@ func TestConnectorCallbackUsesIdentityResolverPath(t *testing.T) {
 		t.Fatalf("unexpected persisted user: %#v", insertedUser)
 	}
 }
+
+func (f *fakeConnectorSSOSessionStore) RevokeSessionsByPersonAndIssuer(ctx context.Context, personID, issuer string) error { return nil }

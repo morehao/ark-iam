@@ -14,7 +14,11 @@ import (
 
 // sessionAuditContext 将已解析的租户写入 context，供 CreateSession 落库 session 审计时读取 tenant_id。
 func sessionAuditContext(ctx context.Context, tenantID string) context.Context {
-	return context.WithValue(ctx, sso.ContextKeyTenantID, tenantID)
+	ctx = context.WithValue(ctx, sso.ContextKeyTenantID, tenantID)
+	if iss := requestIssuer(ctx); iss != "" {
+		ctx = context.WithValue(ctx, sso.ContextKeyIssuer, iss)
+	}
+	return ctx
 }
 
 func clientIDFromAuthRequest(authReq op.AuthRequest) string {
@@ -38,7 +42,7 @@ func (svc *oidcAuthSvc) canUseClientApp(ctx context.Context, clientID string, op
 	if !svc.appAccessEnforced() {
 		return true, nil
 	}
-	appEntity, err := application.GetByClientIDWithDB(svc.db, ctx, clientID)
+	appEntity, err := application.GetByClientIDWithDB(svc.db, ctx, requestIssuer(ctx), clientID)
 	if err != nil {
 		glog.Errorf(ctx, "[oidcAuthSvc.canUseClientApp] resolve client app fail, clientID:%s, err:%v", clientID, err)
 		return false, err
@@ -80,7 +84,7 @@ func (svc *oidcAuthSvc) filterTenantsByClientApp(ctx context.Context, clientID s
 // client_id → 应用的解析与应用策略读取统一在 pkg/core/application，
 // 与通道 B 的 AllowJoinByInvite 共用同一份实现（禁止各写一套）。
 func (svc *oidcAuthSvc) appAllowsPersonCreateTenant(ctx context.Context, clientID string) bool {
-	appEntity, err := application.GetByClientIDWithDB(svc.db, ctx, clientID)
+	appEntity, err := application.GetByClientIDWithDB(svc.db, ctx, requestIssuer(ctx), clientID)
 	if err != nil {
 		return false
 	}
@@ -94,4 +98,10 @@ func (svc *oidcAuthSvc) resolveAllowPersonCreateTenant(ctx context.Context, clie
 		return false
 	}
 	return svc.appAllowsPersonCreateTenant(ctx, clientID)
+}
+
+// requestIssuer 取本请求 issuer（op 请求 ctx 由 IssuerFromRequest 写入）。
+// P0 多 issuer：client/应用解析按 (issuer, code)，不用全局 code。
+func requestIssuer(ctx context.Context) string {
+	return op.IssuerFromContext(ctx)
 }

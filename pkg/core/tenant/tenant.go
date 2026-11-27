@@ -43,6 +43,47 @@ func RevokeMemberSessions(ctx context.Context, tenantID string) error {
 	return nil
 }
 
+// RevokeMemberSessionsByIssuer 撤销某租户成员在指定 issuer 下的会话凭证（refresh + SSO）。
+// 供 D 租户 offboard 使用：只撤该 (tenant, issuer) 范围，不波及其他 issuer（DG-SESSION-2）。
+// issuer 为空时退化为 person 级全撤（极少见，回退）。
+func RevokeMemberSessionsByIssuer(ctx context.Context, tenantID, issuer string) error {
+	if tenantID == "" {
+		return nil
+	}
+	if issuer == "" {
+		return RevokeMemberSessions(ctx, tenantID)
+	}
+	memberCtx := dbclient.ExplicitTenantContext(ctx, tenantID)
+	users, err := dao.NewUserDao().GetListByCond(memberCtx, &dao.UserCond{TenantID: tenantID})
+	if err != nil {
+		return err
+	}
+	ssoStore := sso.NewSSOSessionStore()
+	seen := make(map[string]struct{}, len(users))
+	for i := range users {
+		personID := users[i].PersonID
+		if personID == "" {
+			continue
+		}
+		if _, ok := seen[personID]; ok {
+			continue
+		}
+		seen[personID] = struct{}{}
+		crossCtx := dbclient.CrossTenantContext(ctx)
+		// 先入队 back-channel（依赖 sso 索引），再按 issuer 撤 SSO 会话。
+		if _, bErr := sso.EnqueueLogoutsByPersonID(crossCtx, personID); bErr != nil {
+			glog.Warnf(ctx, "[tenant.RevokeMemberSessionsByIssuer] enqueue back-channel fail, personID:%s, err:%v", personID, bErr)
+		}
+		if rErr := dao.NewRefreshTokenDao().RevokeByCond(crossCtx, &dao.RefreshTokenCond{PersonID: personID, Issuer: issuer}); rErr != nil {
+			glog.Errorf(ctx, "[tenant.RevokeMemberSessionsByIssuer] revoke refresh fail, personID:%s, issuer:%s, err:%v", personID, issuer, rErr)
+		}
+		if sErr := ssoStore.RevokeSessionsByPersonAndIssuer(crossCtx, personID, issuer); sErr != nil {
+			glog.Errorf(ctx, "[tenant.RevokeMemberSessionsByIssuer] revoke sso fail, personID:%s, issuer:%s, err:%v", personID, issuer, sErr)
+		}
+	}
+	return nil
+}
+
 // RevokePersonSessions 撤销某自然人的全部会话凭证（refresh token + SSO 会话），
 // 并向其已登录的各应用（含第三方 RP）投递 back-channel logout 通知。
 //
@@ -70,13 +111,22 @@ func RevokePersonSessions(ctx context.Context, personID string) {
 
 // CreateWithRootDeptReq 构造 CreateWithRootDept 入参。
 type CreateWithRootDeptReq struct {
-	Code      string // 租户编码（可空，由调用方生成后传入）
-	Name      string // 租户名
-	Type      model.TenantType
-	DbUser    string
-	Status    model.TenantStatus // 租户状态（可空，空值按 active 处理）
-	Tag       string
-	CreatedBy string
+	Code          string // 租户编码（可空，由调用方生成后传入）
+	Name          string // 租户名
+	Type          model.TenantType
+	DbUser        string
+	Status        model.TenantStatus        // 租户状态（可空，空值按 active 处理）
+	IsolationMode model.TenantIsolationMode // 隔离模式（可空，空值按 shared 处理）
+	Tag           string
+	CreatedBy     string
+}
+
+// normalizeIsolationMode 空值按 shared（既有行为），其余原样（dedicated/shared）。
+func normalizeIsolationMode(m model.TenantIsolationMode) model.TenantIsolationMode {
+	if m == "" {
+		return model.TenantIsolationShared
+	}
+	return m
 }
 
 // CreateWithRootDept 在 tx 事务内创建租户 + 同名根部门节点（部门树容器根）。
@@ -84,13 +134,14 @@ type CreateWithRootDeptReq struct {
 // 根部门需要被调用方用作首位成员（内置管理员 / 自助建租户 owner）的行政主部门。
 func CreateWithRootDept(ctx context.Context, tx *gorm.DB, req *CreateWithRootDeptReq) (*model.TenantEntity, *model.DepartmentEntity, error) {
 	tenantEntity := &model.TenantEntity{
-		Code:      req.Code,
-		Name:      req.Name,
-		Type:      req.Type,
-		DbUser:    req.DbUser,
-		Status:    model.NormalizeTenantStatus(req.Status),
-		Tag:       req.Tag,
-		CreatedBy: req.CreatedBy,
+		Code:          req.Code,
+		Name:          req.Name,
+		Type:          req.Type,
+		DbUser:        req.DbUser,
+		Status:        model.NormalizeTenantStatus(req.Status),
+		IsolationMode: normalizeIsolationMode(req.IsolationMode),
+		Tag:           req.Tag,
+		CreatedBy:     req.CreatedBy,
 	}
 	if err := dao.NewTenantDao().WithTx(tx).Insert(ctx, tenantEntity); err != nil {
 		return nil, nil, err

@@ -43,8 +43,18 @@ type tenantIDCtxKey struct{}
 // 供跨包（如 oidcop 在 context 中注入租户）与包内记录审计时统一使用。
 var ContextKeyTenantID tenantIDCtxKey
 
+// issuerCtxKey 用于在 ctx 中携带本次会话所属 issuer（创建会话时记录，校验时比对）。
+type issuerCtxKey struct{}
+
+// ContextKeyIssuer 是写入 SSO 会话 issuer 的 context key。
+// 创建会话时由调用方注入（来自入口 Host 派生 issuer），会话数据记录该 issuer；
+// 校验时与请求 issuer 比对，实现跨 issuer 会话拒绝（DG-SESSION-3 / AC-7）。
+var ContextKeyIssuer issuerCtxKey
+
 type ssoSessionData struct {
-	PersonID  string    `json:"personID"`
+	PersonID string `json:"personID"`
+	// Issuer 会话所属 issuer（Host 派生）；空表示未记录（旧会话），校验时不做 issuer 比对。
+	Issuer    string    `json:"issuer,omitempty"`
 	CreatedAt time.Time `json:"createdAt"`
 	// AuthTime 是会话建立（认证发生）的时间。静默续登（prompt=none / sso-login）
 	// 还原到 id_token 的 auth_time 声明，并用于 max_age 超期判定（H5）。
@@ -77,16 +87,40 @@ type SSOSessionStore interface {
 	RevokeSession(ctx context.Context, sessionID string) error
 	RevokeSessionsByPersonID(ctx context.Context, personID string) error
 	HasActiveSession(ctx context.Context, personID string) (bool, error)
+	// SessionIssuer 返回会话所属 issuer；会话不存在或未记录返回空串。
+	SessionIssuer(ctx context.Context, sessionID string) string
+	// RevokeSessionsByPersonAndIssuer 撤销该自然人名下**属于指定 issuer** 的 SSO 会话；
+	// issuer 为空时退化为撤销全部（保持旧全局语义）。用于按 issuer 收敛登出范围（DG-SESSION-2）。
+	RevokeSessionsByPersonAndIssuer(ctx context.Context, personID, issuer string) error
 }
 
 // ValidateTokenSession verifies the session referenced by a signed token.
-func ValidateTokenSession(ctx context.Context, store SSOSessionStore, personID, sessionID string) (bool, error) {
+//
+// requireSID=true 表示 fail-closed：缺失 sid 直接判定无效，**不得**回退 person 级
+// HasActiveSession——D 租户要求会话粒度隔离（DG-SESSION-1 / AC-7）。requireSID=false 保留
+// 既有兼容（无 sid 的旧 token 回退 person 活性校验）。
+func ValidateTokenSession(ctx context.Context, store SSOSessionStore, personID, sessionID string, requireSID bool, requestIssuer string) (bool, error) {
 	if sessionID == "" {
+		if requireSID {
+			return false, nil // fail-closed：D 无 sid 不回退 person
+		}
 		// Older access tokens may omit sid.
 		return store.HasActiveSession(ctx, personID)
 	}
 	sessionPersonID, err := store.ValidateSession(ctx, sessionID)
-	return sessionPersonID == personID, err
+	if err != nil {
+		return false, err
+	}
+	if sessionPersonID != personID {
+		return false, nil
+	}
+	// 跨 issuer 会话拒绝（DG-SESSION-3）：会话记录了 issuer 且与请求 issuer 不同 → 拒绝。
+	if requestIssuer != "" {
+		if sessIssuer := store.SessionIssuer(ctx, sessionID); sessIssuer != "" && sessIssuer != requestIssuer {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 type redisSSOSessionStore struct {
@@ -163,8 +197,15 @@ func (s *redisSSOSessionStore) CreateSession(ctx context.Context, personID strin
 		return "", err
 	}
 	now := time.Now()
+	issuer := ""
+	if v := ctx.Value(ContextKeyIssuer); v != nil {
+		if s, ok := v.(string); ok {
+			issuer = s
+		}
+	}
 	data := ssoSessionData{
 		PersonID:  personID,
+		Issuer:    issuer,
 		CreatedAt: now,
 		AuthTime:  now,
 		AMR:       append([]string(nil), amr...),
@@ -238,6 +279,22 @@ func (s *redisSSOSessionStore) SessionAuthTime(ctx context.Context, sessionID st
 	return data.AuthTime
 }
 
+// SessionIssuer 返回会话所属 issuer；会话不存在/未记录返回空串。
+func (s *redisSSOSessionStore) SessionIssuer(ctx context.Context, sessionID string) string {
+	if s.client == nil {
+		return ""
+	}
+	encoded, err := s.client.Get(ctx, ssoSessionKey(sessionID)).Bytes()
+	if err != nil {
+		return ""
+	}
+	var data ssoSessionData
+	if err := json.Unmarshal(encoded, &data); err != nil {
+		return ""
+	}
+	return data.Issuer
+}
+
 func (s *redisSSOSessionStore) RevokeSession(ctx context.Context, sessionID string) error {
 	if s.client == nil {
 		return fmt.Errorf("redis client not available")
@@ -267,6 +324,29 @@ func (s *redisSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, per
 		return fmt.Errorf("redis client not available")
 	}
 	return revokePersonSessionsScript.Run(ctx, s.client, []string{ssoUserSessionsKey(personID)}, ssoSessionKeyPrefix).Err()
+}
+
+// RevokeSessionsByPersonAndIssuer 撤销某自然人名下属于指定 issuer 的 SSO 会话。
+// issuer 为空 → 撤销全部（旧全局语义）。逐个校验会话记录的 issuer，仅删匹配的。
+func (s *redisSSOSessionStore) RevokeSessionsByPersonAndIssuer(ctx context.Context, personID, issuer string) error {
+	if s.client == nil {
+		return fmt.Errorf("redis client not available")
+	}
+	if issuer == "" {
+		return s.RevokeSessionsByPersonID(ctx, personID)
+	}
+	userSessionsKey := ssoUserSessionsKey(personID)
+	sessionIDs, err := s.client.SMembers(ctx, userSessionsKey).Result()
+	if err != nil {
+		return fmt.Errorf("failed to get user sessions: %w", err)
+	}
+	for _, sid := range sessionIDs {
+		if s.SessionIssuer(ctx, sid) != issuer {
+			continue // 只撤销本 issuer 的会话，其他 issuer 不受影响
+		}
+		_ = s.RevokeSession(ctx, sid)
+	}
+	return nil
 }
 
 // HasActiveSession 返回该自然人是否存在至少一个仍然有效的 SSO 会话。

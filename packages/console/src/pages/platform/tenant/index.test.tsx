@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { App as AntdApp } from 'antd'
-import { EnableTag, SuspendedTag, fmtTime } from '@ark-iam/ui'
+import { EnableTag, TenantStatusTag, fmtTime } from '@ark-iam/ui'
 import type { TenantItem } from '@ark-iam/types'
 
 const mockGetTenantPageList = vi.fn()
@@ -11,6 +11,7 @@ vi.mock('@ark-iam/api', () => ({
   createTenant: (...args: unknown[]) => mockCreateTenant(...args),
   deleteTenant: vi.fn(),
   getTenantPageList: (...args: unknown[]) => mockGetTenantPageList(...args),
+  offboardTenant: vi.fn(),
   resetTenantAdminPassword: (...args: unknown[]) => mockResetTenantAdminPassword(...args),
   updateTenant: vi.fn(),
 }))
@@ -158,23 +159,21 @@ describe('租户列表', () => {
   })
 })
 
-describe('SuspendedTag 租户状态映射', () => {
-  it("status 枚举：'suspended' → 挂起，'active' → 正常", () => {
-    const { rerender } = render(<SuspendedTag value="suspended" />)
-    expect(screen.getByText('挂起')).toBeInTheDocument()
+describe('TenantStatusTag 租户状态三值映射', () => {
+  it("status 三值：'provisioning' → 建租中，'active' → 正常，'suspended' → 挂起", () => {
+    const { rerender } = render(<TenantStatusTag value="provisioning" />)
+    expect(screen.getByText('建租中')).toBeInTheDocument()
 
-    rerender(<SuspendedTag value="active" />)
+    rerender(<TenantStatusTag value="active" />)
     expect(screen.getByText('正常')).toBeInTheDocument()
+
+    rerender(<TenantStatusTag value="suspended" />)
+    expect(screen.getByText('挂起')).toBeInTheDocument()
   })
 
-  it('不再兼容历史的 isSuspended 布尔/0-1 字段：1/true/0/false 一律显示「正常」', () => {
-    // P3 起 person/user 状态统一为 status 枚举；继续兼容 1/true 会掩盖读错字段的缺陷
-    for (const v of [1, true, 0, false]) {
-      const { unmount } = render(<SuspendedTag value={v} />)
-      expect(screen.queryByText('挂起')).not.toBeInTheDocument()
-      expect(screen.getByText('正常')).toBeInTheDocument()
-      unmount()
-    }
+  it('未知取值原样回显', () => {
+    render(<TenantStatusTag value="unknown" />)
+    expect(screen.getByText('unknown')).toBeInTheDocument()
   })
 })
 

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"gorm.io/gorm"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/morehao/ark-iam/apps/auth/core/oidcop"
 	"github.com/morehao/ark-iam/pkg/config"
 	"github.com/morehao/ark-iam/pkg/dbclient"
+	"github.com/morehao/ark-iam/pkg/oidcctx"
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"golang.org/x/text/language"
 )
@@ -257,6 +259,23 @@ func resolveIssuer() string {
 	return fmt.Sprintf("http://localhost:%s/oidc", port)
 }
 
+// customIssuerFromRequest 返回一个按请求解析 issuer 的 op IssuerFromRequest（P0 多 issuer）：
+// 优先取入口 Host 解析中间件写入 request ctx 的 pkg/oidcctx 值（每个 D Host 各自 issuer）；
+// 未命中（平台中央 / 未启用 binding 解析）回退静态 issuer。这样 op.IssuerFromContext 在
+// /oidc/* 协议栈内（authorize/token/refresh/end_session）得到的是**请求 Host 的 issuer**，
+// 使 (issuer, code) client 查询、授权码 issuer 命名空间、会话 issuer 等真正按 Host 生效。
+// 见 docs/design/p0-issuer-context-contract.md §2 / pkg/appassembly/hostresolve.go。
+func customIssuerFromRequest(staticIssuer string) func(bool) (op.IssuerFromRequest, error) {
+	return func(_ bool) (op.IssuerFromRequest, error) {
+		return func(r *http.Request) string {
+			if v, ok := oidcctx.IssuerFromContext(r.Context()); ok && v != "" {
+				return v
+			}
+			return staticIssuer
+		}, nil
+	}
+}
+
 // SetupOIDCProvider 按应用配置自装配 OP provider：issuer 解析、签名/加密密钥、
 // 协议态 storage 与 op.Provider。
 func SetupOIDCProvider() (*OIDCProvider, error) {
@@ -313,7 +332,7 @@ func SetupOIDCProviderWithDB(db func(ctx context.Context) *gorm.DB) (*OIDCProvid
 		opts = append(opts, op.WithAllowInsecure())
 	}
 
-	provider, err := op.NewProvider(opConfig, storage, op.StaticIssuer(issuer), opts...)
+	provider, err := op.NewProvider(opConfig, storage, customIssuerFromRequest(issuer), opts...)
 	if err != nil {
 		return nil, err
 	}

@@ -10,8 +10,11 @@ const TableNameRefreshToken = "iam_refresh_token"
 
 type RefreshTokenEntity struct {
 	gormdao.BaseEntity
-	PersonID            string `gorm:"column:person_id;type:varchar(36);not null;default:'';comment:自然人ID"`
-	TenantID            string `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id"`
+	PersonID string `gorm:"column:person_id;type:varchar(36);not null;default:'';comment:自然人ID"`
+	TenantID string `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id"`
+	// Issuer 该 refresh token 所属 issuer；查询按 (issuer, token) 定位，轮换保持 issuer。
+	// 索引 iam_idx_refresh_issuer_token 见 automigrate.go。
+	Issuer              string `gorm:"column:issuer;type:varchar(256);not null;default:'';comment:所属issuer"`
 	UserID              string `gorm:"column:user_id;type:varchar(36);not null;default:'';comment:用户ID"`
 	ApplicationClientID string `gorm:"column:application_client_id;type:varchar(36);not null;default:'';comment:OIDC客户端ID"`
 	SessionID           string `gorm:"column:session_id;type:varchar(64);not null;default:'';comment:会话ID"`
