@@ -55,6 +55,7 @@ var inboundBoundaryPathSegments = []string{
 // ginAdapterPkgs 是本身即 gin 边界实现/夹具的包（相对仓库根的路径前缀）。
 var ginAdapterPkgs = []string{
 	"pkg/identity/",
+	"pkg/appassembly/", // 装配/入站适配层：构造 gin 中间件、/config.json、host 解析，是 gin→纯 ctx 的转换点
 	"pkg/sso/",
 	"pkg/oidckit/",
 	"pkg/middleware/",
