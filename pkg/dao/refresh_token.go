@@ -2,6 +2,7 @@ package dao
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/morehao/ark-iam/pkg/dbclient"
@@ -17,6 +18,7 @@ type RefreshTokenCond struct {
 	TenantID string
 	UserID   string
 	Token    string
+	Issuer   string
 }
 
 func (c *RefreshTokenCond) BuildCondition(db *gorm.DB, tableName string) {
@@ -36,6 +38,9 @@ func (c *RefreshTokenCond) BuildCondition(db *gorm.DB, tableName string) {
 	if c.Token != "" {
 		db.Where(clause.Eq{Column: col("token"), Value: c.Token})
 	}
+	if c.Issuer != "" {
+		db.Where(clause.Eq{Column: col("issuer"), Value: c.Issuer})
+	}
 }
 
 type RefreshTokenDao struct {
@@ -51,6 +56,7 @@ func NewRefreshTokenDao(opts ...DaoOption) *RefreshTokenDao {
 	}
 }
 
+// RevokeByPersonID 按 person 撤销（P1/平台语义；D offboard **不得**用它，须按 issuer）。
 func (d *RefreshTokenDao) RevokeByPersonID(ctx context.Context, personID string) error {
 	now := time.Now()
 	return d.DB(ctx).Model(&model.RefreshTokenEntity{}).
@@ -83,4 +89,20 @@ func (d *RefreshTokenDao) RevokeByID(ctx context.Context, id string, personID st
 		return false, res.Error
 	}
 	return res.RowsAffected > 0, nil
+}
+
+// GetByIssuerAndToken 按 (issuer, token) 定位未撤销的 refresh token（P0 多 issuer 定位口径）。
+// 用 CrossTenantContext：token 端点入口可能无租户作用域，issuer+token 唯一即可定位。
+func (d *RefreshTokenDao) GetByIssuerAndToken(ctx context.Context, issuer, token string) (*model.RefreshTokenEntity, error) {
+	var entity model.RefreshTokenEntity
+	err := d.DB(dbclient.CrossTenantContext(ctx)).Model(&model.RefreshTokenEntity{}).
+		Where("issuer = ? AND token = ? AND revoked_at IS NULL", issuer, token).
+		First(&entity).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &entity, nil
 }

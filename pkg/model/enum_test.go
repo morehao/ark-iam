@@ -19,7 +19,7 @@ func hardenedSingleColumnTypes() []reflect.Type {
 		reflect.TypeOf(UserStatus("")),
 		reflect.TypeOf(PasswordStatus("")),
 		reflect.TypeOf(OwnerType("")),
-		reflect.TypeOf(DomainVerificationStatus("")),
+		reflect.TypeOf(DomainStatus("")),
 		reflect.TypeOf(EmailVerificationState("")),
 		reflect.TypeOf(AppPersonCreateTenantPolicy("")),
 		reflect.TypeOf(AppJoinByInvitePolicy("")),
@@ -115,12 +115,12 @@ func TestFieldFlagConstantsUseEnableDisable(t *testing.T) {
 
 func TestSemanticEnumConstantsAreDistinctAndNonEmpty(t *testing.T) {
 	pairs := map[string][2]string{
-		"PersonStatus":             {string(PersonStatusActive), string(PersonStatusSuspended)},
-		"UserStatus":               {string(UserStatusActive), string(UserStatusSuspended)},
-		"PasswordStatus":           {string(PasswordStatusNormal), string(PasswordStatusMustChange)},
-		"OwnerType":                {string(OwnerTypeOwner), string(OwnerTypeNormal)},
-		"DomainVerificationStatus": {string(DomainVerificationUnverified), string(DomainVerificationVerified)},
-		"EmailVerificationState":   {string(EmailVerificationVerified), string(EmailVerificationUnverified)},
+		"PersonStatus":            {string(PersonStatusActive), string(PersonStatusSuspended)},
+		"UserStatus":              {string(UserStatusActive), string(UserStatusSuspended)},
+		"PasswordStatus":          {string(PasswordStatusNormal), string(PasswordStatusMustChange)},
+		"OwnerType":               {string(OwnerTypeOwner), string(OwnerTypeNormal)},
+		"DomainStatusDraftActive": {string(DomainStatusDraft), string(DomainStatusActive)},
+		"EmailVerificationState":  {string(EmailVerificationVerified), string(EmailVerificationUnverified)},
 	}
 	for name, pair := range pairs {
 		if pair[0] == "" || pair[1] == "" || pair[0] == pair[1] {
@@ -153,7 +153,7 @@ func TestHardenedColumnsUseNamedEnums(t *testing.T) {
 		TableNamePerson + ".status":                          reflect.TypeOf(PersonStatus("")),
 		TableNameUser + ".status":                            reflect.TypeOf(UserStatus("")),
 		TableNameUser + ".owner_type":                        reflect.TypeOf(OwnerType("")),
-		TableNameDomain + ".verification_status":             reflect.TypeOf(DomainVerificationStatus("")),
+		TableNameDomain + ".status":                          reflect.TypeOf(DomainStatus("")),
 		TableNameApplication + ".allow_person_create_tenant": reflect.TypeOf(AppPersonCreateTenantPolicy("")),
 		TableNameApplication + ".allow_join_by_invite":       reflect.TypeOf(AppJoinByInvitePolicy("")),
 		TableNameApplicationClient + ".require_pkce":         reflect.TypeOf(ClientPKCEPolicy("")),

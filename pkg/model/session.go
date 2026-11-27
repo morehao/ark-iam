@@ -17,8 +17,11 @@ const TableNameSession = "iam_session"
 // 另两列从未被写入，留着会让读者误以为可以查 `WHERE status='revoked'`。
 type SessionAuditEntity struct {
 	gormdao.BaseEntity
-	PersonID  string    `gorm:"column:person_id;type:varchar(36);not null;default:'';comment:自然人id"`
-	SessionID string    `gorm:"column:session_id;type:varchar(64);not null;default:'';uniqueIndex;comment:会话id"`
+	PersonID  string `gorm:"column:person_id;type:varchar(36);not null;default:'';comment:自然人id"`
+	SessionID string `gorm:"column:session_id;type:varchar(64);not null;default:'';comment:会话id"`
+	// Issuer 会话审计所属 issuer；原 session_id 单列唯一已删除，改由 partial unique 索引
+	// iam_idx_session_issuer_sid_unique 约束 (issuer, session_id) WHERE deleted_at IS NULL。
+	Issuer    string    `gorm:"column:issuer;type:varchar(256);not null;default:'';comment:所属issuer"`
 	TenantID  string    `gorm:"column:tenant_id;type:varchar(36);not null;default:'';comment:租户id"`
 	ClientIP  string    `gorm:"column:client_ip;type:varchar(64);not null;default:'';comment:IP"`
 	UserAgent string    `gorm:"column:user_agent;type:varchar(512);not null;default:'';comment:UA"`

@@ -28,6 +28,7 @@ func AllEntities() []any {
 		&RoleMenuEntity{},
 		&ConnectorEntity{},
 		&DomainEntity{},
+		&ConsoleBindingEntity{},
 		&ApiKeyEntity{},
 		&RefreshTokenEntity{},
 		&SessionAuditEntity{},
@@ -64,6 +65,13 @@ var performanceIndexes = []string{
 	fmt.Sprintf(`CREATE INDEX IF NOT EXISTS iam_idx_audit_tenant_created ON %s (tenant_id, created_at)`, TableNameAuditLog),
 	fmt.Sprintf(`CREATE INDEX IF NOT EXISTS iam_idx_audit_created ON %s (created_at)`, TableNameAuditLog),
 	fmt.Sprintf(`CREATE INDEX IF NOT EXISTS iam_idx_audit_actor_created ON %s (actor_person_id, created_at)`, TableNameAuditLog),
+	// ===== P0 自定义域名/多 issuer（redesign §4.4）=====
+	// alias 级联/校验：按 (tenant_id, target_domain_id) 反查。
+	fmt.Sprintf(`CREATE INDEX IF NOT EXISTS iam_idx_domain_target ON %s (tenant_id, target_domain_id)`, TableNameDomain),
+	// 控制台按 (tenant_id, status) 分页。
+	fmt.Sprintf(`CREATE INDEX IF NOT EXISTS iam_idx_domain_tenant_status ON %s (tenant_id, status)`, TableNameDomain),
+	// refresh 按 (issuer, token) 定位。
+	fmt.Sprintf(`CREATE INDEX IF NOT EXISTS iam_idx_refresh_issuer_token ON %s (issuer, token)`, TableNameRefreshToken),
 }
 
 // EnsurePerformanceIndexes 创建普通性能索引（幂等；PostgreSQL 与 SQLite 均支持该语法）。
@@ -91,6 +99,20 @@ var partialUniqueIndexes = []string{
 	// 部门关系唯一性：同一 (租户, 部门, 用户, 关系类型) 只允许一行未删除记录。
 	// 关系类型互斥（primary 每用户至多 1 行 / leader 每部门至多 1 人）除服务层校验外，此处提供 DB 级兜底。
 	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS iam_uk_dept_user ON %s (tenant_id, department_id, user_id, relation_type) WHERE deleted_at IS NULL`, TableNameDepartmentUser),
+
+	// ===== P0 自定义域名/多 issuer（见 tenant-custom-domain-redesign.md §4.4）=====
+	// 域名 host 唯一：retired 仍占用，released 释放（status<>'released' 约束未删除行）。
+	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS iam_idx_domain_host_unique ON %s (domain) WHERE deleted_at IS NULL AND status <> 'released'`, TableNameDomain),
+	// active D 恰一个 active primary：唯一索引兜底（锁是编排、索引是兜底，见 §4.5）。
+	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS iam_idx_domain_primary_active_unique ON %s (tenant_id) WHERE domain_role='primary' AND status='active' AND deleted_at IS NULL`, TableNameDomain),
+	// 两租户不得共用 issuer（offboard/release 清空后才释放）。
+	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS iam_idx_tenant_issuer_dedicated_unique ON %s (issuer) WHERE isolation_mode='dedicated' AND issuer<>'' AND deleted_at IS NULL`, TableNameTenant),
+	// 同 code 可跨 issuer；同 issuer 内唯一（替代删除的全局 code unique）。
+	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS iam_idx_application_client_issuer_code_unique ON %s (issuer, code) WHERE deleted_at IS NULL`, TableNameApplicationClient),
+	// 同 Host 可多行（平台/租户双控制台）；软删后可重登记。
+	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS iam_idx_console_binding_host_kind_unique ON %s (host, kind) WHERE deleted_at IS NULL`, TableNameConsoleBinding),
+	// 会话审计按 (issuer, session_id) 隔离（替代删除的 session_id 全局唯一）。
+	fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS iam_idx_session_issuer_sid_unique ON %s (issuer, session_id) WHERE deleted_at IS NULL`, TableNameSession),
 }
 
 // EnsurePartialUniqueIndexes 创建/校验软删除表的部分唯一索引（幂等）。
