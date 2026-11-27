@@ -29,13 +29,15 @@ func ssoLogoutRegKey(sessionID string) string {
 
 // LogoutJob 一次待发送的 back-channel logout 通知任务。
 type LogoutJob struct {
-	SessionID            string    `json:"sessionID"`
-	PersonID             string    `json:"personID"`
-	OIDCSessionID        string    `json:"oidcSessionID"`
-	ClientID             string    `json:"clientID"`
-	UserID               string    `json:"userID"`
-	BackChannelLogoutURI string    `json:"backChannelLogoutURI"`
-	CreatedAt            time.Time `json:"createdAt"`
+	SessionID            string `json:"sessionID"`
+	PersonID             string `json:"personID"`
+	OIDCSessionID        string `json:"oidcSessionID"`
+	ClientID             string `json:"clientID"`
+	UserID               string `json:"userID"`
+	BackChannelLogoutURI string `json:"backChannelLogoutURI"`
+	// Issuer 该登出所属 issuer（worker 可按 issuer 分组/审计）；空=未记录。
+	Issuer    string    `json:"issuer,omitempty"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 func (j LogoutJob) encode() string {
@@ -82,6 +84,7 @@ func enqueueLogoutsByPersonID(ctx context.Context, queueKey string, personID str
 			ClientID:             reg.ClientID,
 			UserID:               reg.UserID,
 			BackChannelLogoutURI: reg.BackChannelLogoutURI,
+			Issuer:               reg.Issuer,
 			CreatedAt:            now,
 		}).encode())
 	}
@@ -169,6 +172,8 @@ type LogoutRegistration struct {
 	ClientID             string `json:"clientID"`
 	UserID               string `json:"userID"`
 	BackChannelLogoutURI string `json:"backChannelLogoutURI"`
+	// Issuer 该登记所属 issuer；空=未记录（旧登记）。
+	Issuer string `json:"issuer,omitempty"`
 }
 
 func (r LogoutRegistration) memberValue() string {

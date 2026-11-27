@@ -734,6 +734,7 @@ func (s *PersistentStore) CreateAccessToken(ctx context.Context, request op.Toke
 				UserID:               BuildSubject(pid),
 				SessionID:            sessionID,
 				BackChannelLogoutURI: backChannelLogoutURI,
+				Issuer:               requestIssuer(ctx),
 			})
 		}
 	}
@@ -941,6 +942,7 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 			UserID:               BuildSubject(personID),
 			SessionID:            sessionID,
 			BackChannelLogoutURI: backChannelLogoutURI,
+			Issuer:               requestIssuer(ctx),
 		})
 	}
 
