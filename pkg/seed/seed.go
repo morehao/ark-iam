@@ -689,6 +689,7 @@ func seedOIDCClients(ctx context.Context, db *gorm.DB, rep *Report, tenant *mode
 			TenantID:                tenant.ID,
 			AppID:                   cd.appID,
 			Code:                    cd.code,
+			Issuer:                  def.Issuer, // 内置客户端恒绑平台 issuer
 			Name:                    cd.name,
 			RedirectURIs:            cd.redirectURIs,
 			PostLogoutRedirectURIs:  cd.postLogoutRedirect,

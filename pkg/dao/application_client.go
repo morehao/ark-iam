@@ -12,6 +12,7 @@ type ApplicationClientCond struct {
 	TenantID string
 	AppID    string
 	Code     string
+	Issuer   string
 	Name     string
 	Source   model.ApplicationClientSource
 	Status   model.ApplicationClientStatus
@@ -30,6 +31,9 @@ func (c *ApplicationClientCond) BuildCondition(db *gorm.DB, tableName string) {
 	}
 	if c.Code != "" {
 		db.Where(clause.Eq{Column: col("code"), Value: c.Code})
+	}
+	if c.Issuer != "" {
+		db.Where(clause.Eq{Column: col("issuer"), Value: c.Issuer})
 	}
 	if c.Name != "" {
 		db.Where(clause.Eq{Column: col("name"), Value: c.Name})

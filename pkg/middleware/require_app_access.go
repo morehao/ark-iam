@@ -11,6 +11,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/code"
 	"github.com/morehao/ark-iam/pkg/core/application"
 	"github.com/morehao/ark-iam/pkg/identity"
+	"github.com/morehao/ark-iam/pkg/oidcctx"
 	"github.com/morehao/golib/biz/gcontext/gincontext"
 	"github.com/morehao/golib/glog"
 )
@@ -51,7 +52,8 @@ func RequireAppAccess() gin.HandlerFunc {
 			return
 		}
 
-		appID, err := application.AppIDByClientID(ctx, clientID)
+		issuer, _ := oidcctx.IssuerFromContext(ctx.Request.Context())
+		appID, err := application.AppIDByClientID(ctx.Request.Context(), issuer, clientID)
 		if err != nil {
 			glog.Errorf(ctx, "[RequireAppAccess] resolve app by clientID fail, err:%v, clientID:%s", err, clientID)
 			gincontext.Fail(ctx, err)

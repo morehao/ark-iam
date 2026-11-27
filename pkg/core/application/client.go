@@ -12,8 +12,8 @@ import (
 //
 // 见 AppIDByClientIDWithDAO 的口径说明；本函数是「用全局库」的薄封装，
 // 供请求期调用方（如 pkg/middleware.RequireAppAccess）使用。
-func AppIDByClientID(ctx context.Context, clientID string) (string, error) {
-	return AppIDByClientIDWithDAO(ctx, clientID, dao.NewApplicationClientDao())
+func AppIDByClientID(ctx context.Context, issuer, clientID string) (string, error) {
+	return AppIDByClientIDWithDAO(ctx, issuer, clientID, dao.NewApplicationClientDao())
 }
 
 // AppIDByClientIDWithDAO 解析本次签发客户端所属的应用——即 groups 声明的命名空间。
@@ -27,12 +27,12 @@ func AppIDByClientID(ctx context.Context, clientID string) (string, error) {
 //
 // clientDAO 是数据源注入点：协议层（oidcop）的持久化层按调用方事务/测试库装配 dao 并在此传入，
 // 请求期调用方用 AppIDByClientID 走全局库。**解析逻辑只有本函数一份**，注入的只是数据源。
-func AppIDByClientIDWithDAO(ctx context.Context, clientID string, clientDAO *dao.ApplicationClientDao) (string, error) {
+func AppIDByClientIDWithDAO(ctx context.Context, issuer, clientID string, clientDAO *dao.ApplicationClientDao) (string, error) {
 	if clientID == "" {
 		return "", nil
 	}
 	cctx := dbclient.CrossTenantContext(ctx)
-	client, err := clientDAO.GetByCond(cctx, &dao.ApplicationClientCond{Code: clientID})
+	client, err := clientDAO.GetByCond(cctx, &dao.ApplicationClientCond{Code: clientID, Issuer: issuer})
 	if err != nil {
 		return "", err
 	}

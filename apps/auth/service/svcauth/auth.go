@@ -20,6 +20,7 @@ import (
 	"github.com/morehao/ark-iam/pkg/model"
 	"github.com/morehao/ark-iam/pkg/object/objauth"
 	"github.com/morehao/ark-iam/pkg/object/objidentity"
+	"github.com/morehao/ark-iam/pkg/oidcctx"
 	"github.com/morehao/ark-iam/pkg/sso"
 	"github.com/morehao/golib/dbaccess/gormdao"
 	"github.com/morehao/golib/gconstant"
@@ -220,7 +221,8 @@ func (svc *authSvc) JoinTenant(ctx context.Context, req *dtoauth.JoinTenantReq) 
 	// 机器凭证通道（API Key）不注入 person 身份，本函数在其之前就已按未认证拒绝。
 	// 该检查先于邀请解析：功能关闭时不向外暴露"邀请码是否存在"。
 	clientID := req.ClientID
-	appEntity, err := application.GetByClientID(ctx, clientID)
+	issuer, _ := oidcctx.IssuerFromContext(ctx)
+	appEntity, err := application.GetByClientID(ctx, issuer, clientID)
 	if err != nil {
 		glog.Errorf(ctx, "[svcauth.JoinTenant] resolve application by clientID fail, err:%v, clientID:%s", err, clientID)
 		return nil, code.GetError(code.AuthJoinPolicyCheckError)

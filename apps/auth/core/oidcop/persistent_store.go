@@ -376,11 +376,18 @@ func (s *PersistentStore) GetApiKeyClientByRawKey(ctx context.Context, rawKey st
 	return NewApiKeyOpClient(entity), nil
 }
 
+// requestIssuer 取一次请求的 issuer（op 请求 ctx 由 IssuerFromRequest 写入）。
+// P0 多 issuer：client 唯一口径从「全局 code」改为「(issuer, code)」，所有按 code 的查询都必须带它。
+func requestIssuer(ctx context.Context) string {
+	return op.IssuerFromContext(ctx)
+}
+
 func (s *PersistentStore) GetClientByClientID(ctx context.Context, clientID string) (op.Client, error) {
-	// client_id 全局唯一（租户确定之前即需校验）：显式声明跨全部租户。
+	// (issuer, code) 定位：issuer 取本请求的 Host 派生值，显式跨租户查找。
+	issuer := requestIssuer(ctx)
 	ctx = dbclient.CrossTenantContext(ctx)
 	// H4：仅返回启用状态的 client，管理员停用后 authorize/token/client_credentials 立即失效
-	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID, Status: model.ApplicationClientStatusEnable})
+	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID, Issuer: issuer, Status: model.ApplicationClientStatusEnable})
 	if err != nil || clientEntity == nil || clientEntity.ID == "" {
 		return nil, fmt.Errorf("client not found: %s", clientID)
 	}
@@ -388,12 +395,13 @@ func (s *PersistentStore) GetClientByClientID(ctx context.Context, clientID stri
 }
 
 func (s *PersistentStore) AuthorizeClientIDSecret(ctx context.Context, clientID, clientSecret string) error {
-	// client_id + 密钥摘要校验同样发生在租户确定之前：显式声明跨全部租户。
+	// (issuer, code) + 密钥摘要校验：issuer 取本请求，显式跨租户查找。
+	issuer := requestIssuer(ctx)
 	ctx = dbclient.CrossTenantContext(ctx)
 	clientHash := credential.HashSecret(clientSecret)
 
 	// H4：停用 client 的 secret 一律拒绝
-	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID, Status: model.ApplicationClientStatusEnable})
+	clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID, Issuer: issuer, Status: model.ApplicationClientStatusEnable})
 	if err != nil || clientEntity == nil || clientEntity.ID == "" {
 		return oidc.ErrInvalidClient()
 	}
@@ -551,7 +559,7 @@ func (s *PersistentStore) appendRoleGroupClaims(ctx context.Context, userinfo *o
 // 共用同一份口径）；本方法只负责把本 store 装配的 application_client dao（可能绑定调用方事务）
 // 注入进去，不再自带第二份实现。
 func (s *PersistentStore) resolveClientAppID(ctx context.Context, clientID string) (string, error) {
-	return application.AppIDByClientIDWithDAO(ctx, clientID, s.applicationClientDao())
+	return application.AppIDByClientIDWithDAO(ctx, requestIssuer(ctx), clientID, s.applicationClientDao())
 }
 
 func (s *PersistentStore) SetUserinfoFromScopes(ctx context.Context, userinfo *oidc.UserInfo, userID, clientID string, scopes []string) error {
@@ -689,7 +697,7 @@ func (s *PersistentStore) CreateAccessToken(ctx context.Context, request op.Toke
 	var clientID string
 	if ccReq, ok := request.(*clientCredentialsTokenRequest); ok {
 		clientID = ccReq.ClientID()
-		if entity, e := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID}); e == nil && entity != nil && entity.AccessTokenTTL > 0 {
+		if entity, e := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID, Issuer: requestIssuer(ctx)}); e == nil && entity != nil && entity.AccessTokenTTL > 0 {
 			ttl = time.Duration(entity.AccessTokenTTL) * time.Second
 		} else if e != nil {
 			glog.Warnf(ctx, "[PersistentStore.CreateAccessToken] load client ttl fail, clientID:%s, err:%v", clientID, e)
@@ -697,7 +705,7 @@ func (s *PersistentStore) CreateAccessToken(ctx context.Context, request op.Toke
 	} else if authReq, ok := request.(*AuthRequest); ok {
 		clientID = authReq.GetClientID()
 		if clientID != "" {
-			if entity, e := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID}); e == nil && entity != nil {
+			if entity, e := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID, Issuer: requestIssuer(ctx)}); e == nil && entity != nil {
 				backChannelLogoutURI = entity.BackChannelLogoutURI
 				if entity.AccessTokenTTL > 0 {
 					ttl = time.Duration(entity.AccessTokenTTL) * time.Second
@@ -805,7 +813,7 @@ func (s *PersistentStore) CreateAccessAndRefreshTokens(ctx context.Context, requ
 	var clientRefreshTokenTTL time.Duration
 	backChannelLogoutURI := ""
 	if clientID != "" {
-		clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID})
+		clientEntity, err := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID, Issuer: requestIssuer(ctx)})
 		if err == nil && clientEntity != nil {
 			applicationClientID = clientEntity.ID
 			backChannelLogoutURI = clientEntity.BackChannelLogoutURI
@@ -1106,7 +1114,7 @@ func (s *PersistentStore) RevokeToken(ctx context.Context, tokenOrTokenID string
 		}
 	}
 	if clientID != "" {
-		if entity, cErr := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID}); cErr == nil && entity != nil && entity.ID != "" {
+		if entity, cErr := s.applicationClientDao().GetByCond(ctx, &dao.ApplicationClientCond{Code: clientID, Issuer: requestIssuer(ctx)}); cErr == nil && entity != nil && entity.ID != "" {
 			q = q.Where("application_client_id = ?", entity.ID)
 		}
 	}
