@@ -366,6 +366,8 @@ func (svc *applicationSvc) Detail(ctx context.Context, req *dtoapplication.Appli
 		Source:                  entity.Source,
 		Status:                  entity.Status,
 		Sort:                    entity.Sort,
+		OwnerType:               entity.OwnerType,
+		OwnerTenantID:           entity.OwnerTenantID,
 		AllowPersonCreateTenant: entity.AllowPersonCreateTenant,
 		AllowJoinByInvite:       entity.AllowJoinByInvite,
 		RoleTemplate:            entity.RoleTemplate,
@@ -407,6 +409,8 @@ func (svc *applicationSvc) PageList(ctx context.Context, req *dtoapplication.App
 			Source:                  v.Source,
 			Status:                  v.Status,
 			Sort:                    v.Sort,
+			OwnerType:               v.OwnerType,
+			OwnerTenantID:           v.OwnerTenantID,
 			AllowPersonCreateTenant: v.AllowPersonCreateTenant,
 			AllowJoinByInvite:       v.AllowJoinByInvite,
 			// 列表带上角色模板：编辑弹窗以列表行为初值，缺了它会把"未修改"误判成"清空"

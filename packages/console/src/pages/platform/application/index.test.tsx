@@ -6,11 +6,13 @@ import type { ApplicationItem } from '@ark-iam/types'
 const mockGetApplicationPageList = vi.fn()
 const mockCreateApplication = vi.fn()
 const mockUpdateApplication = vi.fn()
+const mockGetTenantPageList = vi.fn()
 vi.mock('@ark-iam/api', () => ({
   createApplication: (...args: unknown[]) => mockCreateApplication(...args),
   deleteApplication: vi.fn(),
   getApplicationDetail: vi.fn(),
   getApplicationPageList: (...args: unknown[]) => mockGetApplicationPageList(...args),
+  getTenantPageList: (...args: unknown[]) => mockGetTenantPageList(...args),
   updateApplication: (...args: unknown[]) => mockUpdateApplication(...args),
 }))
 
@@ -35,13 +37,19 @@ const applications: ApplicationItem[] = [
   },
 ]
 
-describe('应用列表', () => {
-  beforeEach(() => {
-    mockGetApplicationPageList.mockReset().mockResolvedValue({ list: applications, total: applications.length })
-    mockCreateApplication.mockReset().mockResolvedValue({ appID: 'app-2', code: 'my_app' })
-    mockUpdateApplication.mockReset().mockResolvedValue(undefined)
+// 顶层 beforeEach：所有 describe 共享同一套 mock 重置与默认返回值（含租户列表），
+// 否则兄弟 describe 里的用例会拿到 undefined mock 或上一条用例的残留返回值。
+beforeEach(() => {
+  mockGetApplicationPageList.mockReset().mockResolvedValue({ list: applications, total: applications.length })
+  mockCreateApplication.mockReset().mockResolvedValue({ appID: 'app-2', code: 'my_app' })
+  mockUpdateApplication.mockReset().mockResolvedValue(undefined)
+  mockGetTenantPageList.mockReset().mockResolvedValue({
+    list: [{ tenantID: 't-1', name: '测试租户' }],
+    total: 1,
   })
+})
 
+describe('应用列表', () => {
   it('同时展示创建时间与更新时间两列', async () => {
     render(<ApplicationList />)
 
@@ -67,6 +75,9 @@ describe('应用列表', () => {
 
     fireEvent.change(codeInput, { target: { value: 'my-app' } })
     fireEvent.change(nameInput, { target: { value: '测试应用' } })
+    // 归属租户为创建必填项，先选中，避免必填校验抢在编码校验前拦下提交
+    fireEvent.mouseDown(await screen.findByText('选择归属租户'))
+    fireEvent.click(await screen.findByTitle('测试租户'))
     submit()
 
     expect(await screen.findByText('以小写字母开头，仅含小写字母、数字与下划线')).toBeInTheDocument()
@@ -254,5 +265,76 @@ describe('内置应用不可删除', () => {
 
     expect(await screen.findByText('平台管理后台')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /删除/ })).not.toBeDisabled()
+  })
+})
+
+/**
+ * 归属租户（后端 iam_application.owner_type / owner_tenant_id）为 immutable：
+ * 后端已支持创建时指定，但前端表单此前无此字段，导致 UI 建 third_party 应用因 owner_tenant_id
+ * 为空被 service 拒（ApplicationOwnerInvalidError）。
+ * - 创建态：必选归属租户，提交带上 ownerTenantID（缺省被表单拦下、不发请求）。
+ * - 编辑态：只读展示，不提供可选输入，且不提交 owner 字段。
+ */
+describe('归属租户', () => {
+  it('创建时必选归属租户，未选不提交', async () => {
+    render(<ApplicationList />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /新建应用/ }))
+    const codeInput = await screen.findByPlaceholderText('唯一编码，如 iam_web')
+    const nameInput = screen.getByPlaceholderText('应用名称')
+    const modal = document.querySelector('.ant-modal') as HTMLElement
+    const submit = () => fireEvent.click(modal.querySelector('.ant-modal-footer .ant-btn-primary') as HTMLElement)
+
+    fireEvent.change(codeInput, { target: { value: 'my_app' } })
+    fireEvent.change(nameInput, { target: { value: '测试应用' } })
+    submit()
+
+    // 归属租户必填校验拦住创建
+    expect(await screen.findByText('请选择归属租户')).toBeInTheDocument()
+    expect(mockCreateApplication).not.toHaveBeenCalled()
+  })
+
+  it('创建时选择归属租户后提交带上 ownerTenantID', async () => {
+    render(<ApplicationList />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /新建应用/ }))
+    const codeInput = await screen.findByPlaceholderText('唯一编码，如 iam_web')
+    const nameInput = screen.getByPlaceholderText('应用名称')
+
+    fireEvent.change(codeInput, { target: { value: 'my_app' } })
+    fireEvent.change(nameInput, { target: { value: '测试应用' } })
+
+    // 打开归属租户下拉并选中测试租户
+    const ownerSelect = await screen.findByText('选择归属租户')
+    fireEvent.mouseDown(ownerSelect)
+    const option = await screen.findByTitle('测试租户')
+    fireEvent.click(option)
+
+    const modal = document.querySelector('.ant-modal') as HTMLElement
+    fireEvent.click(modal.querySelector('.ant-modal-footer .ant-btn-primary') as HTMLElement)
+
+    await waitFor(() =>
+      expect(mockCreateApplication).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'my_app', ownerTenantID: 't-1' }),
+      ),
+    )
+  })
+
+  it('编辑态归属租户只读展示且不提供可选输入', async () => {
+    mockGetApplicationPageList.mockResolvedValue({
+      list: [{ ...applications[0], appID: 'app-own', ownerType: 'tenant' as const, ownerTenantID: 't-1' }],
+      total: 1,
+    })
+    render(<ApplicationList />)
+
+    fireEvent.click(await screen.findByText('编辑'))
+    await screen.findByPlaceholderText('唯一编码，如 iam_web')
+
+    // 只读展示归属租户名称（tenantNameByID 解出），并提示不可修改
+    // （列表列也渲染同一租户名，故用 findAllByText 允许多处）
+    expect((await screen.findAllByText('测试租户')).length).toBeGreaterThan(0)
+    expect(screen.getByText('归属不可修改')).toBeInTheDocument()
+    // 编辑态不出现「选择归属租户」占位（无选择器）
+    expect(screen.queryByText('选择归属租户')).not.toBeInTheDocument()
   })
 })
