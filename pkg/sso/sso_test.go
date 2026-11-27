@@ -167,3 +167,7 @@ func TestValidateTokenSessionCrossIssuerReject(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok)
 }
+
+func (f *fakeSSOStore) RevokeSessionsByPersonAndIssuer(ctx context.Context, personID, issuer string) error {
+	return nil
+}

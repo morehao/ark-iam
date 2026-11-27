@@ -96,3 +96,7 @@ func TestValidateSSOSessionUsesTokenSession(t *testing.T) {
 		t.Fatal("the current session should pass")
 	}
 }
+
+func (f *fakeSSOStore) RevokeSessionsByPersonAndIssuer(context.Context, string, string) error {
+	return nil
+}

@@ -231,3 +231,5 @@ func TestConnectorCallbackUsesIdentityResolverPath(t *testing.T) {
 		t.Fatalf("unexpected persisted user: %#v", insertedUser)
 	}
 }
+
+func (f *fakeConnectorSSOSessionStore) RevokeSessionsByPersonAndIssuer(ctx context.Context, personID, issuer string) error { return nil }

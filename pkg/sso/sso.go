@@ -89,6 +89,9 @@ type SSOSessionStore interface {
 	HasActiveSession(ctx context.Context, personID string) (bool, error)
 	// SessionIssuer 返回会话所属 issuer；会话不存在或未记录返回空串。
 	SessionIssuer(ctx context.Context, sessionID string) string
+	// RevokeSessionsByPersonAndIssuer 撤销该自然人名下**属于指定 issuer** 的 SSO 会话；
+	// issuer 为空时退化为撤销全部（保持旧全局语义）。用于按 issuer 收敛登出范围（DG-SESSION-2）。
+	RevokeSessionsByPersonAndIssuer(ctx context.Context, personID, issuer string) error
 }
 
 // ValidateTokenSession verifies the session referenced by a signed token.
@@ -321,6 +324,29 @@ func (s *redisSSOSessionStore) RevokeSessionsByPersonID(ctx context.Context, per
 		return fmt.Errorf("redis client not available")
 	}
 	return revokePersonSessionsScript.Run(ctx, s.client, []string{ssoUserSessionsKey(personID)}, ssoSessionKeyPrefix).Err()
+}
+
+// RevokeSessionsByPersonAndIssuer 撤销某自然人名下属于指定 issuer 的 SSO 会话。
+// issuer 为空 → 撤销全部（旧全局语义）。逐个校验会话记录的 issuer，仅删匹配的。
+func (s *redisSSOSessionStore) RevokeSessionsByPersonAndIssuer(ctx context.Context, personID, issuer string) error {
+	if s.client == nil {
+		return fmt.Errorf("redis client not available")
+	}
+	if issuer == "" {
+		return s.RevokeSessionsByPersonID(ctx, personID)
+	}
+	userSessionsKey := ssoUserSessionsKey(personID)
+	sessionIDs, err := s.client.SMembers(ctx, userSessionsKey).Result()
+	if err != nil {
+		return fmt.Errorf("failed to get user sessions: %w", err)
+	}
+	for _, sid := range sessionIDs {
+		if s.SessionIssuer(ctx, sid) != issuer {
+			continue // 只撤销本 issuer 的会话，其他 issuer 不受影响
+		}
+		_ = s.RevokeSession(ctx, sid)
+	}
+	return nil
 }
 
 // HasActiveSession 返回该自然人是否存在至少一个仍然有效的 SSO 会话。

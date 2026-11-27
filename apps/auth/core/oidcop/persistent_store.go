@@ -1071,23 +1071,29 @@ func selectedTenantFromRequest(request op.TokenRequest) string {
 }
 
 func (s *PersistentStore) TerminateSession(ctx context.Context, userID string, clientID string) error {
-	// 自然人级全局登出：显式声明跨全部租户。
+	// 按请求 issuer 收敛撤销范围：D issuer 只撤该 issuer 的会话/refresh；
+	// issuer 为空（无 Host 解析 / 平台中央）退化为自然人级全局（向后兼容）。
+	issuer := requestIssuer(ctx)
+	// 跨租户定位：显式声明跨全部租户。
 	ctx = dbclient.CrossTenantContext(ctx)
 	personID, err := ParseSubject(userID)
 	if err != nil {
 		glog.Warnf(ctx, "[PersistentStore.TerminateSession] ParseSubject fail, userID:%s, err:%v", userID, err)
 		return nil
 	}
-	glog.Infof(ctx, "[PersistentStore.TerminateSession] terminating session, userID:%s, personID:%s, clientID:%s", userID, personID, clientID)
+	glog.Infof(ctx, "[PersistentStore.TerminateSession] terminating session, userID:%s, personID:%s, clientID:%s, issuer:%s", userID, personID, clientID, issuer)
 
-	if ssoErr := sso.NewSSOSessionStore().RevokeSessionsByPersonID(ctx, personID); ssoErr != nil {
+	if ssoErr := sso.NewSSOSessionStore().RevokeSessionsByPersonAndIssuer(ctx, personID, issuer); ssoErr != nil {
 		glog.Warnf(ctx, "[PersistentStore.TerminateSession] revoke SSO sessions fail, err:%v", ssoErr)
 	}
 
 	now := time.Now()
-	dbErr := s.txDB(ctx).Model(&model.RefreshTokenEntity{}).Table(model.TableNameRefreshToken).
-		Where("person_id = ?", personID).Where("revoked_at IS NULL").
-		Update("revoked_at", &now).Error
+	q := s.txDB(ctx).Model(&model.RefreshTokenEntity{}).Table(model.TableNameRefreshToken).
+		Where("person_id = ?", personID).Where("revoked_at IS NULL")
+	if issuer != "" {
+		q = q.Where("issuer = ?", issuer) // 只撤该 issuer 的 refresh，其他 issuer 不受影响（DG-SESSION-2）
+	}
+	dbErr := q.Update("revoked_at", &now).Error
 	if dbErr != nil {
 		glog.Warnf(ctx, "[PersistentStore.TerminateSession] revoke refresh tokens fail, personID:%s, err:%v", personID, dbErr)
 	}
