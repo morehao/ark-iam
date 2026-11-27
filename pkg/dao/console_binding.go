@@ -118,11 +118,19 @@ func (d *ConsoleBindingDao) UpdateStatus(ctx context.Context, tx *gorm.DB, id, t
 }
 
 // SoftDelete 软删 binding（offboard/release 用；在调用方事务内；写入目标租户作用域）。
-func (d *ConsoleBindingDao) SoftDelete(ctx context.Context, tx *gorm.DB, id, tenantID, deletedBy string) (bool, error) {
+func (d *ConsoleBindingDao) SoftDelete(ctx context.Context, tx *gorm.DB, id, tenantID, _ string) (bool, error) {
 	ctx = dbclient.ExplicitTenantContext(ctx, tenantID)
 	now := time.Now()
 	res := d.WithTx(tx).DB(ctx).Model(&model.ConsoleBindingEntity{}).
 		Where("id = ? AND deleted_at IS NULL", id).
-		Updates(map[string]any{"status": model.ConsoleBindingStatusDisable, "deleted_at": now, "deleted_by": deletedBy})
+		Updates(map[string]any{"status": model.ConsoleBindingStatusDisable, "deleted_at": now})
 	return res.RowsAffected > 0, res.Error
+}
+
+// ListByTenant 列出某租户全部未删除 binding（offboard 批量停用用；跨租户读取）。
+func (d *ConsoleBindingDao) ListByTenant(ctx context.Context, tenantID string) (model.ConsoleBindingEntityList, error) {
+	var list model.ConsoleBindingEntityList
+	err := d.DB(dbclient.CrossTenantContext(ctx)).Model(&model.ConsoleBindingEntity{}).
+		Where("tenant_id = ?", tenantID).Find(&list).Error
+	return list, err
 }

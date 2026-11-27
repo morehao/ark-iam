@@ -341,3 +341,83 @@ func (t *Tx) assertAliasTargetActive(ctx context.Context, d *model.DomainEntity)
 func DeriveIssuer(host, basePath string) string {
 	return "https://" + host + basePath + "/oidc"
 }
+
+// Offboard 是 P0 primary 的**唯一**停用入口（租户 offboard）：在调用方事务内
+//   - tenant → suspended，清空 issuer，domain_epoch + 1；
+//   - active primary → disabled；
+//   - 指向 primary 的 active/disabled alias → disabled（不变量级联）；
+//   - 所有未上线域名（draft/verified/tls_ready）→ released（取消，不填 release_approval）。
+//
+// 返回需要清缓存的 host 列表。session/refresh 撤销由应用层在本事务提交后异步执行（可重试）。
+// 依据 p0-tenant-lifecycle-contract §3「offboard」。
+func (t *Tx) Offboard(ctx context.Context, now time.Time) ([]string, error) {
+	tenant, err := t.lockTenantRow(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if tenant.IsolationMode != model.TenantIsolationDedicated {
+		return nil, ErrTenantStatusInvalid
+	}
+	// 只允许 provisioning / active → suspended。
+	if tenant.Status != model.TenantStatusActive && tenant.Status != model.TenantStatusProvisioning {
+		return nil, ErrTenantStatusInvalid
+	}
+
+	scope := t.scope(ctx)
+	repo := t.domainDao()
+	all, err := repo.WithTx(t.DB).GetListByCond(scope, &dao.DomainCond{TenantID: t.TenantID})
+	if err != nil {
+		return nil, err
+	}
+	var hosts []string
+	// 先处理未上线域名 → released（取消）。
+	for i := range all {
+		d := all[i]
+		switch d.Status {
+		case model.DomainStatusDraft, model.DomainStatusVerified, model.DomainStatusTLSReady:
+			ok, e := repo.CompareAndSetStatusWithTx(scope, t.DB, d.ID, d.Status, model.DomainStatusReleased,
+				map[string]any{"released_at": now, "updated_by": t.Operator})
+			if e != nil {
+				return nil, e
+			}
+			if !ok {
+				return nil, ErrConflict
+			}
+			hosts = append(hosts, d.Domain)
+		case model.DomainStatusActive:
+			if d.DomainRole == model.DomainRolePrimary {
+				ok, e := repo.CompareAndSetStatusWithTx(scope, t.DB, d.ID, model.DomainStatusActive, model.DomainStatusDisabled,
+					map[string]any{"updated_by": t.Operator})
+				if e != nil {
+					return nil, e
+				}
+				if !ok {
+					return nil, ErrConflict
+				}
+				hosts = append(hosts, d.Domain)
+				// 级联其 alias
+				aliased, e := t.cascadeAliasesOfPrimary(ctx, d.ID)
+				if e != nil {
+					return nil, e
+				}
+				hosts = append(hosts, aliased...)
+			} else {
+				// active alias → disabled
+				ok, e := repo.CompareAndSetStatusWithTx(scope, t.DB, d.ID, model.DomainStatusActive, model.DomainStatusDisabled,
+					map[string]any{"updated_by": t.Operator})
+				if e != nil {
+					return nil, e
+				}
+				if !ok {
+					return nil, ErrConflict
+				}
+				hosts = append(hosts, d.Domain)
+			}
+		}
+	}
+	// tenant → suspended，清 issuer，epoch+1。
+	if err := t.updateTenantIssuer(ctx, "", model.TenantStatusSuspended); err != nil {
+		return nil, err
+	}
+	return hosts, nil
+}

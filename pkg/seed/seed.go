@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/morehao/ark-iam/pkg/model"
@@ -191,6 +192,50 @@ func bootstrapAll(ctx context.Context, db *gorm.DB, rep *Report, def Definition)
 		return err
 	}
 
+	// 11. 平台 console binding（Host → 平台租户/issuer/client），与平台租户/内置 client 同批引导。
+	if err := seedPlatformConsoleBinding(ctx, db, rep, tenant, def); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// seedPlatformConsoleBinding 播种平台 Host 的 console binding（kind=platform，直接 enable）。
+// host 取 URL(oidc.issuer).Host；client_id/audience 用平台控制台 client（platform_admin_web）。
+// 缺失只告警不硬启动失败（DG-INSTALL-1）；已存在即跳过（运维可后续在控制台调整）。
+func seedPlatformConsoleBinding(ctx context.Context, db *gorm.DB, rep *Report, tenant *model.TenantEntity, def Definition) error {
+	u, err := url.Parse(def.Issuer)
+	if err != nil || u.Host == "" {
+		return fmt.Errorf("seed platform binding: invalid issuer %q: %w", def.Issuer, err)
+	}
+	host := u.Host
+	// 已存在（同 host + kind=platform，未删除）则跳过。
+	var existing model.ConsoleBindingEntity
+	if e := db.Where("host = ? AND kind = ? AND deleted_at IS NULL", host, model.ConsoleBindingKindPlatform).
+		First(&existing).Error; e == nil && existing.ID != "" {
+		return nil
+	} else if e != nil && !errors.Is(e, gorm.ErrRecordNotFound) {
+		return fmt.Errorf("seed platform binding query fail: %w", e)
+	}
+	redirect := ""
+	if len(def.Consoles.PlatformAdminWeb.RedirectURIs) > 0 {
+		redirect = def.Consoles.PlatformAdminWeb.RedirectURIs[0]
+	}
+	binding := &model.ConsoleBindingEntity{
+		Host:        host,
+		TenantID:    tenant.ID,
+		Issuer:      def.Issuer,
+		ClientID:    model.SeedBuiltinClientPlatformAdminWeb,
+		Audience:    model.SeedBuiltinClientPlatformAdminWeb,
+		RedirectURI: redirect,
+		Kind:        model.ConsoleBindingKindPlatform,
+		Status:      model.ConsoleBindingStatusEnable,
+	}
+	if e := db.WithContext(ctx).Create(binding).Error; e != nil {
+		return fmt.Errorf("seed platform binding create fail: %w", e)
+	}
+	rep.created(model.SeedEntityConsoleBinding, host)
+	glog.Infof(ctx, "[seed] platform console binding created, host:%s", host)
 	return nil
 }
 

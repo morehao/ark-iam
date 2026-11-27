@@ -70,13 +70,22 @@ func RevokePersonSessions(ctx context.Context, personID string) {
 
 // CreateWithRootDeptReq 构造 CreateWithRootDept 入参。
 type CreateWithRootDeptReq struct {
-	Code      string // 租户编码（可空，由调用方生成后传入）
-	Name      string // 租户名
-	Type      model.TenantType
-	DbUser    string
-	Status    model.TenantStatus // 租户状态（可空，空值按 active 处理）
-	Tag       string
-	CreatedBy string
+	Code          string // 租户编码（可空，由调用方生成后传入）
+	Name          string // 租户名
+	Type          model.TenantType
+	DbUser        string
+	Status        model.TenantStatus        // 租户状态（可空，空值按 active 处理）
+	IsolationMode model.TenantIsolationMode // 隔离模式（可空，空值按 shared 处理）
+	Tag           string
+	CreatedBy     string
+}
+
+// normalizeIsolationMode 空值按 shared（既有行为），其余原样（dedicated/shared）。
+func normalizeIsolationMode(m model.TenantIsolationMode) model.TenantIsolationMode {
+	if m == "" {
+		return model.TenantIsolationShared
+	}
+	return m
 }
 
 // CreateWithRootDept 在 tx 事务内创建租户 + 同名根部门节点（部门树容器根）。
@@ -84,13 +93,14 @@ type CreateWithRootDeptReq struct {
 // 根部门需要被调用方用作首位成员（内置管理员 / 自助建租户 owner）的行政主部门。
 func CreateWithRootDept(ctx context.Context, tx *gorm.DB, req *CreateWithRootDeptReq) (*model.TenantEntity, *model.DepartmentEntity, error) {
 	tenantEntity := &model.TenantEntity{
-		Code:      req.Code,
-		Name:      req.Name,
-		Type:      req.Type,
-		DbUser:    req.DbUser,
-		Status:    model.NormalizeTenantStatus(req.Status),
-		Tag:       req.Tag,
-		CreatedBy: req.CreatedBy,
+		Code:          req.Code,
+		Name:          req.Name,
+		Type:          req.Type,
+		DbUser:        req.DbUser,
+		Status:        model.NormalizeTenantStatus(req.Status),
+		IsolationMode: normalizeIsolationMode(req.IsolationMode),
+		Tag:           req.Tag,
+		CreatedBy:     req.CreatedBy,
 	}
 	if err := dao.NewTenantDao().WithTx(tx).Insert(ctx, tenantEntity); err != nil {
 		return nil, nil, err

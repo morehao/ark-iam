@@ -48,6 +48,7 @@ const (
 	SeedEntityDepartment        = "department"
 	SeedEntityApplication       = "application"
 	SeedEntityApplicationClient = "application_client"
+	SeedEntityConsoleBinding    = "console_binding"
 	SeedEntityMenu              = "menu"
 	SeedEntityRole              = "role"
 	SeedEntityPerson            = "person"

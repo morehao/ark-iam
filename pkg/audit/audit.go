@@ -18,6 +18,7 @@ const (
 	ActionTenantSwitch                  = model.AuditActionTenantSwitch
 	ActionTenantCreate                  = model.AuditActionTenantCreate
 	ActionTenantAdminPasswordReset      = model.AuditActionTenantAdminPasswordReset
+	ActionTenantOffboard                = model.AuditActionTenantOffboard
 	ActionApplicationCreate             = model.AuditActionApplicationCreate
 	ActionApplicationClientCreate       = model.AuditActionApplicationClientCreate
 	ActionApplicationClientCreateSecret = model.AuditActionApplicationClientCreateSecret
