@@ -17,6 +17,13 @@ export type SysAdminType = 'admin' | 'normal'
 export type AppSource = 'builtin' | 'first_party' | 'third_party'
 
 /**
+ * 应用归属类型（后端具名类型 model.AppOwnerType）：platform-平台（无归属租户）/
+ * tenant-租户（owner_tenant_id 指向归属租户）。归属为 immutable，仅创建时指定、此后只读。
+ * 控制台创建的应用恒为 third_party，服务端固定归属 owner_type=tenant。
+ */
+export type AppOwnerType = 'platform' | 'tenant'
+
+/**
  * 启停状态（后端具名类型 model.AppStatus / ApplicationClientStatus / TenantApplicationStatus）。
  * 取值与后端常量一一对应，禁止在页面里裸写字面量。
  */
@@ -60,6 +67,10 @@ export interface ApplicationItem {
   source: AppSource
   status: AppStatus
   sort: number
+  /** 归属类型（后端 model.AppOwnerType）：platform-平台 / tenant-租户。immutable，仅供展示。 */
+  ownerType?: AppOwnerType
+  /** 归属租户 id（owner_type=tenant 时非空）。immutable，仅供展示。 */
+  ownerTenantID?: string
   allowPersonCreateTenant?: AppPersonCreateTenantPolicy
   allowJoinByInvite?: AppJoinByInvitePolicy
   /** 应用角色模板：本应用对外的契约值清单，开通应用时物化到各租户（后端 model.ApplicationEntity.RoleTemplate）。 */
@@ -75,6 +86,8 @@ export interface ApplicationCreateReq {
   logoUrl?: string
   homepageUrl?: string
   sort?: number
+  /** 归属租户 id：控制台创建的应用归属固定为 tenant（后端 service 强校验该租户存在），必填。 */
+  ownerTenantID: string
   allowPersonCreateTenant?: AppPersonCreateTenantPolicy
   allowJoinByInvite?: AppJoinByInvitePolicy
   /** 应用角色模板：见 ApplicationItem.roleTemplate，留空表示无。 */

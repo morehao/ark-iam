@@ -17,6 +17,8 @@ type ApplicationDetailResp struct {
 	Source                  model.AppSource                   `json:"source"`                  // 应用来源
 	Status                  model.AppStatus                   `json:"status"`                  // 状态
 	Sort                    int                               `json:"sort"`                    // 排序
+	OwnerType               model.AppOwnerType                `json:"ownerType"`               // 归属类型: platform-平台, tenant-租户（immutable，仅展示）
+	OwnerTenantID           string                            `json:"ownerTenantID"`           // 归属租户 id（owner_type=tenant 时非空；immutable，仅展示）
 	AllowPersonCreateTenant model.AppPersonCreateTenantPolicy `json:"allowPersonCreateTenant"` // 个人是否可自助创建租户(enable/disable)
 	AllowJoinByInvite       model.AppJoinByInvitePolicy       `json:"allowJoinByInvite"`       // 是否允许通过邀请加入租户(enable/disable)
 	RoleTemplate            []model.RoleTemplateItem          `json:"roleTemplate"`            // 应用角色模板（跨系统授权契约值：code + 展示名）
@@ -31,6 +33,8 @@ type PageListItem struct {
 	Source                  model.AppSource                   `json:"source"`                  // 应用来源
 	Status                  model.AppStatus                   `json:"status"`                  // 状态
 	Sort                    int                               `json:"sort"`                    // 排序
+	OwnerType               model.AppOwnerType                `json:"ownerType"`               // 归属类型: platform-平台, tenant-租户（immutable，仅展示）
+	OwnerTenantID           string                            `json:"ownerTenantID"`           // 归属租户 id（owner_type=tenant 时非空；immutable，仅展示）
 	AllowPersonCreateTenant model.AppPersonCreateTenantPolicy `json:"allowPersonCreateTenant"` // 个人是否可自助创建租户(enable/disable)
 	AllowJoinByInvite       model.AppJoinByInvitePolicy       `json:"allowJoinByInvite"`       // 是否允许通过邀请加入租户(enable/disable)
 	RoleTemplate            []model.RoleTemplateItem          `json:"roleTemplate"`            // 应用角色模板（跨系统授权契约值：code + 展示名）

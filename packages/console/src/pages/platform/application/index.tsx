@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Descriptions, Drawer, Form, Input, InputNumber, message, Modal, Select, Space, Switch, Table } from 'antd'
 import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { actionColumn, CODE_COL_WIDTH, fmtTime, IDCell, idColumn, nameColumn, PageContainer, SourceTag, StatCard, StatRow, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
-import { createApplication, deleteApplication, getApplicationDetail, getApplicationPageList, updateApplication } from '@ark-iam/api'
-import type { ApplicationItem, ApplicationRoleTemplateItem } from '@ark-iam/types'
+import { actionColumn, CODE_COL_WIDTH, EllipsisCell, fmtTime, IDCell, idColumn, NAME_COL_WIDTH, nameColumn, PageContainer, SourceTag, StatCard, StatRow, STATUS_COL_WIDTH, EnableTag, tableScrollX, TAG_COL_WIDTH, textColumn, timeColumn, tokens } from '@ark-iam/ui'
+import { createApplication, deleteApplication, getApplicationDetail, getApplicationPageList, getTenantPageList, updateApplication } from '@ark-iam/api'
+import type { ApplicationItem, ApplicationRoleTemplateItem, TenantItem } from '@ark-iam/types'
 
 // 应用编码规则（与后端 model.AppCodePattern 同口径）：以小写字母开头，仅含小写字母、数字与下划线。
 const APP_CODE_PATTERN = /^[a-z][a-z0-9_]*$/
@@ -70,6 +70,24 @@ export default function ApplicationList() {
 
   const [detailOpen, setDetailOpen] = useState(false)
   const [detail, setDetail] = useState<ApplicationItem | null>(null)
+
+  // 租户列表：供「归属租户」选择器与列表/详情的归属租户名称展示（应用只回传 ownerTenantID）。
+  const [tenants, setTenants] = useState<TenantItem[]>([])
+  const tenantNameByID = useCallback(
+    (tenantID?: string): string => {
+      if (!tenantID) return ''
+      return tenants.find((t) => t.tenantID === tenantID)?.name || tenantID
+    },
+    [tenants],
+  )
+
+  useEffect(() => {
+    getTenantPageList({ page: 1, pageSize: 200 })
+      .then((resp) => setTenants(resp?.list || []))
+      .catch(() => {
+        /* 拦截器已提示 */
+      })
+  }, [])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -173,6 +191,13 @@ export default function ApplicationList() {
     }),
     textColumn<ApplicationItem>({ title: '编码', dataIndex: 'code', width: CODE_COL_WIDTH, monospace: true }),
     { title: '来源', dataIndex: 'source', key: 'source', width: TAG_COL_WIDTH, render: (v: string) => <SourceTag value={v} /> },
+    {
+      title: '归属租户',
+      dataIndex: 'ownerTenantID',
+      key: 'ownerTenantID',
+      width: NAME_COL_WIDTH,
+      render: (_: string, r) => <EllipsisCell value={r.ownerType === 'platform' ? '平台' : tenantNameByID(r.ownerTenantID)} />,
+    },
     { title: '状态', dataIndex: 'status', key: 'status', width: STATUS_COL_WIDTH, render: (v: string) => <EnableTag value={v} /> },
     timeColumn<ApplicationItem>({ title: '创建时间', dataIndex: 'createdAt' }),
     timeColumn<ApplicationItem>({ title: '更新时间', dataIndex: 'updatedAt' }),
@@ -281,6 +306,30 @@ export default function ApplicationList() {
           >
             <Input placeholder="应用名称" />
           </Form.Item>
+          {/*
+            归属租户：应用归属（owner_type/owner_tenant_id）为 immutable——仅创建时可选，
+            编辑态只读展示。控制台创建的应用固定归属某租户，故创建时必填且必选。
+          */}
+          {editing ? (
+            <Form.Item label="归属租户" tooltip="应用归属租户不可修改（immutable）；如需变更归属，请删除后重建">
+              <span>{editing.ownerType === 'platform' ? '平台' : tenantNameByID(editing.ownerTenantID)}</span>
+              <span style={{ marginLeft: 8, color: tokens.textSecondary }}>归属不可修改</span>
+            </Form.Item>
+          ) : (
+            <Form.Item
+              name="ownerTenantID"
+              label="归属租户"
+              tooltip="创建后归属不可修改；该租户将获得本应用的菜单维护权"
+              rules={[{ required: true, message: '请选择归属租户' }]}
+            >
+              <Select
+                placeholder="选择归属租户"
+                showSearch
+                optionFilterProp="label"
+                options={tenants.map((t) => ({ value: t.tenantID, label: t.name }))}
+              />
+            </Form.Item>
+          )}
           {editing && (
             <Form.Item label="来源">
               <SourceTag value={editing.source} />
@@ -382,6 +431,9 @@ export default function ApplicationList() {
             <Descriptions.Item label="名称">{detail.name || '-'}</Descriptions.Item>
             <Descriptions.Item label="来源">
               <SourceTag value={detail.source} />
+            </Descriptions.Item>
+            <Descriptions.Item label="归属租户">
+              {detail.ownerType === 'platform' ? '平台' : tenantNameByID(detail.ownerTenantID) || '-'}
             </Descriptions.Item>
             <Descriptions.Item label="状态">
               <EnableTag value={detail.status} />

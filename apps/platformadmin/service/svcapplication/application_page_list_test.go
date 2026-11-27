@@ -32,9 +32,11 @@ func newApplicationCtx() *gin.Context {
 func TestApplicationPageListReturnsTimeFields(t *testing.T) {
 	db := testutil.SetupSQLite(t, &model.ApplicationEntity{})
 	if err := db.Create(&model.ApplicationEntity{
-		Code:   "demo",
-		Name:   "演示应用",
-		Source: model.AppSourceThirdParty,
+		Code:          "demo",
+		Name:          "演示应用",
+		Source:        model.AppSourceThirdParty,
+		OwnerType:     model.AppOwnerTypeTenant,
+		OwnerTenantID: "t_owner",
 	}).Error; err != nil {
 		t.Fatalf("seed application: %v", err)
 	}
@@ -53,6 +55,10 @@ func TestApplicationPageListReturnsTimeFields(t *testing.T) {
 	// source 必须原样回传（前端「来源」列读此字段）
 	if item.Source != model.AppSourceThirdParty {
 		t.Fatalf("source not returned, got %q", item.Source)
+	}
+	// 归属租户必须回传（前端「归属租户」列读 ownerType/ownerTenantID）。
+	if item.OwnerType != model.AppOwnerTypeTenant || item.OwnerTenantID != "t_owner" {
+		t.Fatalf("owner not returned, got ownerType=%q ownerTenantID=%q", item.OwnerType, item.OwnerTenantID)
 	}
 }
 
@@ -128,5 +134,28 @@ func TestCreateApplicationForcesThirdParty(t *testing.T) {
 	}
 	if entity.Source != model.AppSourceThirdParty {
 		t.Fatalf("expected source %q, got %q", model.AppSourceThirdParty, entity.Source)
+	}
+}
+
+// TestApplicationDetailReturnsOwner 详情必须回传归属（前端详情抽屉「归属租户」只读展示）。
+func TestApplicationDetailReturnsOwner(t *testing.T) {
+	db := testutil.SetupSQLite(t, &model.ApplicationEntity{})
+	entity := &model.ApplicationEntity{
+		Code:          "demo",
+		Name:          "演示应用",
+		Source:        model.AppSourceThirdParty,
+		OwnerType:     model.AppOwnerTypeTenant,
+		OwnerTenantID: "t_owner",
+	}
+	if err := db.Create(entity).Error; err != nil {
+		t.Fatalf("seed application: %v", err)
+	}
+
+	resp, err := NewApplicationSvc(nil).Detail(requestCtx(newApplicationCtx()), &dtoapplication.ApplicationDetailReq{AppID: entity.ID})
+	if err != nil {
+		t.Fatalf("Detail failed: %v", err)
+	}
+	if resp.OwnerType != model.AppOwnerTypeTenant || resp.OwnerTenantID != "t_owner" {
+		t.Fatalf("owner not returned in detail, got ownerType=%q ownerTenantID=%q", resp.OwnerType, resp.OwnerTenantID)
 	}
 }
